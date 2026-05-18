@@ -62,14 +62,10 @@ function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFie
     $delta = [];
     foreach ($deltaFields as $field) {
         $currentValue = array_key_exists($field, $state) ? (int) $state[$field] : 0;
-        $previousValue = null;
-        if (array_key_exists($field, $previousState)) {
-            $previous = $previousState[$field];
-            if (is_int($previous) && $previous >= 0) {
-                $previousValue = $previous;
-            } elseif (is_string($previous) && ctype_digit($previous)) {
-                $previousValue = (int) $previous;
-            }
+        $previous = $previousState[$field] ?? null;
+        $previousValue = is_int($previous) && $previous >= 0 ? $previous : null;
+        if (is_string($previous) && ctype_digit($previous)) {
+            $previousValue = (int) $previous;
         }
         $delta[$field] = $previousValue !== null && $currentValue >= $previousValue
             ? $currentValue - $previousValue

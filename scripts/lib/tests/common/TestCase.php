@@ -250,15 +250,17 @@ abstract class TestCase
         return $notRoot || $noSystemd;
     }
 
+    /** Resolve the test temp root, honoring the shared hermetic override. */
+    private function pmssTempRoot(): string
+    {
+        $base = getenv('PMSS_TEST_TEMP_ROOT');
+        return is_string($base) && $base !== '' ? $base : sys_get_temp_dir();
+    }
+
     /** Create a unique temporary directory for hermetic tests. */
     protected function pmssMakeTempDir(string $prefix, int $mode = 0755): string
     {
-        $base = getenv('PMSS_TEST_TEMP_ROOT');
-        if (!is_string($base) || $base === '') {
-            $base = sys_get_temp_dir();
-        }
-
-        $path = rtrim($base, '/').'/'.$prefix.bin2hex(random_bytes(6));
+        $path = rtrim($this->pmssTempRoot(), '/').'/'.$prefix.bin2hex(random_bytes(6));
         @mkdir($path, $mode, true);
         $this->tempPaths[] = $path;
         return $path;
@@ -267,11 +269,7 @@ abstract class TestCase
     /** Create and track a unique temporary file for hermetic tests. */
     protected function pmssMakeTempFile(string $prefix = 'pmss'): string
     {
-        $base = getenv('PMSS_TEST_TEMP_ROOT');
-        if (!is_string($base) || $base === '') {
-            $base = sys_get_temp_dir();
-        }
-
+        $base = $this->pmssTempRoot();
         $path = @tempnam($base, $prefix);
         if ($path === false) {
             $path = rtrim($base, '/').'/'.$prefix.bin2hex(random_bytes(6));
@@ -298,12 +296,7 @@ abstract class TestCase
     /** Reserve and track a unique temporary filesystem path for hermetic tests. */
     protected function pmssMakeTempPath(string $prefix, string $suffix = ''): string
     {
-        $base = getenv('PMSS_TEST_TEMP_ROOT');
-        if (!is_string($base) || $base === '') {
-            $base = sys_get_temp_dir();
-        }
-
-        $path = rtrim($base, '/').'/'.$prefix.bin2hex(random_bytes(6)).$suffix;
+        $path = rtrim($this->pmssTempRoot(), '/').'/'.$prefix.bin2hex(random_bytes(6)).$suffix;
         $this->tempPaths[] = $path;
         return $path;
     }
@@ -391,9 +384,9 @@ abstract class TestCase
 
     protected function pmssBuildWindowValues($month, $week = null, $day = null, $hour = null): array
     {
-        $week = $week === null ? $month : $week;
-        $day = $day === null ? $week : $day;
-        return ['month' => $month, 'week' => $week, 'day' => $day, 'hour' => $hour === null ? $day : $hour];
+        $week = $week ?? $month;
+        $day = $day ?? $week;
+        return ['month' => $month, 'week' => $week, 'day' => $day, 'hour' => $hour ?? $day];
     }
 
     /** Build the serialized resource stats shape used by report-oriented tests. */

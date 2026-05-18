@@ -85,9 +85,8 @@ if ($action === 'get') {
     $value = $payload[$key];
     if (is_array($value)) {
         exit(pmssJsonEmitPayload($value, 'Failed to encode user setting JSON.', JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-    } else {
-        echo $value."\n";
     }
+    echo $value."\n";
     exit(0);
 }
 
