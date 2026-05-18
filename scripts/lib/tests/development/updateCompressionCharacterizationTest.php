@@ -253,9 +253,11 @@ class UpdateCompressionCharacterizationTest extends TestCase
             'storageHealthSnapshot.php should rely on the shared JSONL append helper instead of a local wrapper'
         );
         $this->assertStringContainsString("require_once __DIR__.'/../lib/log.php';", $snapshotSrc);
-        $this->assertStringContainsString('pmssJsonLineAppend($logPath, pmssStorageHealthSnapshotSmart($disk, $last, $timestamp));', $snapshotSrc);
-        $this->assertStringContainsString('pmssJsonLineAppend($logPath, $nvme);', $snapshotSrc);
-        $this->assertStringContainsString('pmssJsonLineAppend($logPath, $raid);', $snapshotSrc);
+        $this->assertStringContainsString('$snapshotEntries[] = pmssStorageHealthSnapshotSmart($disk, $last, $timestamp);', $snapshotSrc);
+        $this->assertStringContainsString('$snapshotEntries[] = $nvme;', $snapshotSrc);
+        $this->assertStringContainsString('$snapshotEntries[] = $raid;', $snapshotSrc);
+        $this->assertStringContainsString('foreach ($snapshotEntries as $entry)', $snapshotSrc);
+        $this->assertStringContainsString('pmssJsonLineAppend($logPath, $entry)', $snapshotSrc);
     }
 
     public function testStorageHealthSnapshotKeepsJsonOptionConsumptionInline(): void

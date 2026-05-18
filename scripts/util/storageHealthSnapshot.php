@@ -55,24 +55,19 @@ function pmssStorageHealthSnapshotMain(array $argv): int
     $timestamp = date('c');
     $last = pmssStorageHealthReadLastEntries($logPath);
 
+    $snapshotEntries = [];
     $disks = pmssStorageHealthDiskInventoryFromLsblk((string) shell_exec('lsblk -dn -o KNAME,TYPE,ROTA,MODEL,SERIAL,SIZE 2>/dev/null'));
     foreach ($disks as $disk) {
-        $smartWritten = pmssJsonLineAppend($logPath, pmssStorageHealthSnapshotSmart($disk, $last, $timestamp));
-        if (!$smartWritten) {
-            fwrite(STDERR, "Failed to write storage health snapshot to {$logPath}\n");
-            return 1;
-        }
+        $snapshotEntries[] = pmssStorageHealthSnapshotSmart($disk, $last, $timestamp);
         if (is_array($nvme = pmssStorageHealthSnapshotNvme($disk, $last, $timestamp))) {
-            $nvmeWritten = pmssJsonLineAppend($logPath, $nvme);
-            if (!$nvmeWritten) {
-                fwrite(STDERR, "Failed to write storage health snapshot to {$logPath}\n");
-                return 1;
-            }
+            $snapshotEntries[] = $nvme;
         }
     }
     foreach (pmssStorageHealthSnapshotRaid($timestamp) as $raid) {
-        $raidWritten = pmssJsonLineAppend($logPath, $raid);
-        if (!$raidWritten) {
+        $snapshotEntries[] = $raid;
+    }
+    foreach ($snapshotEntries as $entry) {
+        if (!pmssJsonLineAppend($logPath, $entry)) {
             fwrite(STDERR, "Failed to write storage health snapshot to {$logPath}\n");
             return 1;
         }
