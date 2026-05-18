@@ -81,6 +81,14 @@ class CliHelperTest extends TestCase
         $this->assertTrue(\pmssCliOption($parsed, 'help', 'h', false) === false);
     }
 
+    public function testDeclaredValueModeKeepsUndeclaredLongOptionsBoolean(): void
+    {
+        $parsed = \pmssParseCliTokens(['script.php', '--dry-run', 'alice', '--target', '-literal'], ['target']);
+        $this->assertTrue(\pmssCliOption($parsed, 'dry-run'));
+        $this->assertEquals(['alice'], $parsed['arguments']);
+        $this->assertEquals('-literal', \pmssCliOption($parsed, 'target'));
+    }
+
     public function testTreatsBareDashAsPositionalAndIgnoresBareDoubleDash(): void
     {
         $parsed = \pmssParseCliTokens(['script.php', '-', '--', 'extra']);

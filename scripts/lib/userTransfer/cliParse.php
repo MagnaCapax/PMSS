@@ -4,7 +4,7 @@
  *
  * @license GPL-3.0-only
  */
-require_once __DIR__.'/../cli/helpText.php';
+require_once __DIR__.'/../cli/optionParser.php';
 
 /**
  * Parse argv and return a normalised configuration array.
@@ -31,10 +31,6 @@ function pmssUserTransferParseCli(array $argv): array
         'Password can be provided via env: PMSS_USER_TRANSFER_PASSWORD',
     ], false);
 
-    // Parse options manually: optionParser treats long flags as value-taking when
-    // followed by a positional token, which makes boolean flags fragile.
-    $tokens = array_slice($argv, 1);
-    $positionals = [];
     $optionSpecs = [
         'main-passes' => ['field' => 'mainPasses', 'default' => 31, 'expectsValue' => true],
         'final-passes' => ['field' => 'finalPasses', 'default' => 3, 'expectsValue' => true],
@@ -51,49 +47,29 @@ function pmssUserTransferParseCli(array $argv): array
         $options[$spec['field']] = $spec['default'];
     }
 
-    for ($i = 0, $tokenCount = count($tokens); $i < $tokenCount; $i++) {
-        $token = $tokens[$i];
-        if ($token === '--') {
-            $positionals = array_merge($positionals, array_slice($tokens, $i + 1));
-            break;
+    $valueOptions = array_keys(array_filter($optionSpecs, static function (array $spec): bool {
+        return $spec['expectsValue'];
+    }));
+    $parsed = pmssParseCliTokens($argv, $valueOptions);
+    $positionals = $parsed['arguments'];
+
+    foreach ($parsed['options'] as $key => $value) {
+        $spec = $key === 'h' ? $optionSpecs['help'] : ($optionSpecs[$key] ?? null);
+        if ($spec === null) {
+            throw new RuntimeException('Unknown option: '.(strlen((string) $key) === 1 ? '-' : '--').$key, 1);
         }
-
-        if (substr($token, 0, 2) === '--') {
-            [$key, $value] = array_pad(explode('=', substr($token, 2), 2), 2, null);
-            $spec = $optionSpecs[$key] ?? null;
-
-            if ($spec === null) {
-                throw new RuntimeException('Unknown option: --'.$key, 1);
-            }
-
-            if (!$spec['expectsValue']) {
-                $options[$spec['field']] = true;
-                continue;
-            }
-
-            if ($value === null) {
-                $value = $tokens[++$i] ?? null;
-            }
-            if ($value === null || $value === '') {
-                throw new RuntimeException('Option --'.$key.' requires a value', 1);
-            }
-            if (!ctype_digit($value)) {
-                throw new RuntimeException('Invalid value for --'.$key.' (expected integer)', 1);
-            }
-
-            $options[$spec['field']] = (int) $value;
+        if (!$spec['expectsValue']) {
+            $options[$spec['field']] = true;
             continue;
         }
-
-        if (substr($token, 0, 1) === '-' && strlen($token) > 1) {
-            if (substr($token, 1) === 'h') {
-                $options['help'] = true;
-                continue;
-            }
-            throw new RuntimeException('Unknown option: '.$token, 1);
+        if (!is_string($value) || $value === '') {
+            throw new RuntimeException('Option --'.$key.' requires a value', 1);
+        }
+        if (!ctype_digit($value)) {
+            throw new RuntimeException('Invalid value for --'.$key.' (expected integer)', 1);
         }
 
-        $positionals[] = $token;
+        $options[$spec['field']] = (int) $value;
     }
 
     if ($options['help']) {

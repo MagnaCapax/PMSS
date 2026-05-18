@@ -21,6 +21,7 @@ function pmssParseCliTokens(array $argv, array $valueOptions = []): array
     $valueOptionLookup = [];
     foreach ($valueOptions as $option) { $valueOptionLookup[ltrim((string) $option, '-')] = true; }
     unset($valueOptionLookup['']);
+    $hasDeclaredValueOptions = !empty($valueOptionLookup);
 
     for ($i = 1, $argc = count($argv); $i < $argc; $i++) {
         $token = $argv[$i];
@@ -51,7 +52,9 @@ function pmssParseCliTokens(array $argv, array $valueOptions = []): array
         }
 
         $next = $argv[$i + 1] ?? null;
-        $shouldConsumeNext = $next !== null && $next !== '' && (isset($valueOptionLookup[$body]) || ($next[0] ?? '') !== '-');
+        $shouldConsumeNext = $next !== null && $next !== '' && (
+            isset($valueOptionLookup[$body]) || (!$hasDeclaredValueOptions && ($next[0] ?? '') !== '-')
+        );
         $options[$body] = $shouldConsumeNext ? $next : true;
         $i += $shouldConsumeNext ? 1 : 0;
     }
