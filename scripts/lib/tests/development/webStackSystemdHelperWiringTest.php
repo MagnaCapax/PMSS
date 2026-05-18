@@ -16,8 +16,10 @@ class WebStackSystemdHelperWiringTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/util/update-step2.php');
 
         $this->assertTrue(strpos($src, "require_once __DIR__.'/../lib/update/runtime/processes.php';") !== false);
-        $this->assertTrue(strpos($src, 'function pmssConfigureWebStack(int $distroVersion): void') !== false);
+        $this->assertTrue(strpos($src, 'function pmssConfigureWebStack(): void') !== false);
         $this->assertTrue(strpos($src, "pmssSystemdUnitActionIfPresent('lighttpd', 'Disabling lighttpd systemd service', 'disable');") !== false);
         $this->assertTrue(strpos($src, "pmssSystemdUnitActionIfPresent('nginx', 'Enabling nginx systemd service', 'enable');") !== false);
+        $this->assertTrue(strpos($src, 'update-rc.d lighttpd') === false);
+        $this->assertTrue(strpos($src, 'Disabling {$legacySvc} in sysvinit') === false);
     }
 }

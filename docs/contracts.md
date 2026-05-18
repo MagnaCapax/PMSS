@@ -243,8 +243,8 @@ Sub-handlers:
 
 ## Web Stack & System Prep
 
-- pmssConfigureWebStack(int $distroVersion): void
-  - Stops nginx; disables/stops lighttpd based on init system; kills lingering `lighttpd` and `php-cgi`.
+- pmssConfigureWebStack(): void
+  - Stops nginx; disables/stops lighttpd through the supported systemd path; kills lingering `lighttpd` and `php-cgi`.
   - Enables nginx and hardens `/home` perms; final nginx config refresh runs later in `scripts/util/update-step2.php` after app installers finish.
 
 - pmssApplyRuntimeTemplates(): void
@@ -284,8 +284,6 @@ Sub-handlers:
 
 - pmssStopDisableMaskSeedboxSystemServices(): void → stops/disables/masks system-wide daemons that must never run on seedbox hosts (e.g. lighttpd, deluged/deluge-web, transmission-daemon, redis-server, memcached, rpcbind/nfs-kernel-server, smbd, exim4, docker.service), then purges exim4 packages and stale exim spool files. Fail-soft; safe when units are missing.
 - pmssEnsureSystemdServicesGuardBootUnit(): void → installs/enables `pmss-systemd-services-guard.service` so the systemd hardening guard runs early at boot (before basic.target).
-
-- pmssDisableLegacyServices(array $services, int $distroVersion): void → stops/disables global daemons (sysvinit vs systemd handling).
 
 - pmssInstallMediaInfo(string $lsbCodename, ?callable $logger=null): void → installs mediainfo with retry; logs version or warns on failure.
 

@@ -60,9 +60,15 @@ class UpdateCompressionCharacterizationTest extends TestCase
             $step2Src,
             'update-step2.php should stop requiring the removed webStack.php module'
         );
-        $this->assertStringContainsString('function pmssConfigureWebStack(int $distroVersion): void', $step2Src);
+        $this->assertStringContainsString('function pmssConfigureWebStack(): void', $step2Src);
         $this->assertStringContainsString("runStep('Stopping nginx prior to configuration refresh'", $step2Src);
         $this->assertStringContainsString("pmssSystemdUnitActionIfPresent('lighttpd', 'Disabling lighttpd systemd service', 'disable');", $step2Src);
+        $this->assertStringContainsString("if (\$reportedVersion > 0 && \$reportedVersion < 10)", $step2Src);
+        $this->pmssAssertStringNotContainsString(
+            'update-rc.d lighttpd',
+            $step2Src,
+            'update-step2.php aborts unsupported Debian versions before web-stack configuration, so legacy sysvinit branches should stay removed'
+        );
     }
 
     public function testKillProcessKeepsGracefulAndForcedWaitPhasesLocally(): void
