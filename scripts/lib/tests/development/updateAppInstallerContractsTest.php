@@ -128,8 +128,8 @@ class UpdateAppInstallerContractsTest extends TestCase
                 strpos($contents, 'pmssDownloadPinnedRemoteTempFile(') !== false || strpos($contents, 'pmssFetchPinnedRemoteFile(') !== false,
                 $installer.' should call a remoteBinary.php pinned download helper'
             );
-            $this->assertTrue(strpos($contents, "pmssBuildCommand('wget'") === false, $installer.' should delegate pinned downloads to remoteBinary.php');
-            $this->assertTrue(strpos($contents, "@hash_file('sha256'") === false, $installer.' should delegate checksum verification to remoteBinary.php');
+            $this->pmssAssertStringNotContainsString("pmssBuildCommand('wget'", $contents, $installer.' should delegate pinned downloads to remoteBinary.php');
+            $this->pmssAssertStringNotContainsString("@hash_file('sha256'", $contents, $installer.' should delegate checksum verification to remoteBinary.php');
         }
     }
 
@@ -158,14 +158,8 @@ class UpdateAppInstallerContractsTest extends TestCase
             'MaxBandwidth 100',
             '/etc/init.d/vnstat restart',
         ], $contents);
-        $this->assertTrue(
-            strpos($contents, $repairCommand) === false,
-            'vnstat.php should not keep Debian 8 repair branches for unsupported releases'
-        );
-        $this->assertTrue(
-            strpos($contents, $removedVersionVariable) === false,
-            'vnstat.php should not parse Debian major versions for removed Debian 8 repair logic'
-        );
+        $this->pmssAssertStringNotContainsString($repairCommand, $contents, 'vnstat.php should not keep Debian 8 repair branches for unsupported releases');
+        $this->pmssAssertStringNotContainsString($removedVersionVariable, $contents, 'vnstat.php should not parse Debian major versions for removed Debian 8 repair logic');
     }
 
     public function testWatchdogInstallerKeepsTemplateAndDeviceFallbackFlow(): void

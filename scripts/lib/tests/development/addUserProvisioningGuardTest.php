@@ -8,23 +8,18 @@ class AddUserProvisioningGuardTest extends TestCase
 {
     public function testAddUserUsesPerUserLock(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/addUser.php');
-        $this->assertTrue(strpos($src, 'pmss-addUser-') !== false, 'addUser.php must use per-user lock file');
-        $this->assertTrue(strpos($src, 'pmssLockFileAcquire(') !== false, 'addUser.php must acquire a lock');
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/addUser.php', ['pmss-addUser-', 'pmssLockFileAcquire('], 'addUser.php missing lock guard: ');
     }
 
     public function testAddUserEmitsSummaryMarker(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/lib/user/add/provisioningRuntime.php');
-        $this->assertTrue(strpos($src, '###ADDUSER:') !== false, 'addUser must emit summary markers');
-        $this->assertTrue(strpos($src, '###ADDUSER_JSON:') !== false, 'addUser must emit JSON summary markers');
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/add/provisioningRuntime.php', ['###ADDUSER:', '###ADDUSER_JSON:'], 'addUser summary marker missing: ');
     }
 
     public function testAddUserRuntimeInitStaysWithProvisioningRuntimeHelpers(): void
     {
         $this->assertTrue(function_exists('\pmssAddUserRuntimeInit'));
-        $src = $this->pmssReadRepoFile('scripts/lib/user/add/provisioningRuntime.php');
-        $this->assertTrue(strpos($src, 'function pmssAddUserRuntimeInit(') !== false);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/add/provisioningRuntime.php', 'function pmssAddUserRuntimeInit(');
     }
 
     public function testAddUserWrapperStaysSmall(): void
@@ -54,8 +49,7 @@ class AddUserProvisioningGuardTest extends TestCase
         $patchPos = strpos($src, "pmssUpdateUserEnvironment(");
         $lighttpdPos = strpos($src, '/scripts/startLighttpd');
 
-        $this->assertTrue(strpos($src, "require_once 'lib/update.php';") !== false);
-        $this->assertTrue(strpos($src, "require_once 'lib/update/users.php';") !== false);
+        $this->assertStringContainsAllStrings(["require_once 'lib/update.php';", "require_once 'lib/update/users.php';"], $src);
         $this->assertTrue($patchPos !== false, 'addUser.php must converge the full user environment after user config');
         $this->assertTrue($lighttpdPos !== false, 'addUser.php must still start lighttpd');
         $this->assertTrue($patchPos < $lighttpdPos, 'addUser.php must converge user environment before services start');
@@ -65,10 +59,12 @@ class AddUserProvisioningGuardTest extends TestCase
     {
         $src = $this->pmssReadRepoFile('scripts/addUser.php');
 
-        $this->assertTrue(strpos($src, "require_once 'lib/user/trafficLimit.php';") !== false);
-        $this->assertTrue(strpos($src, 'pmssTrafficLimitCliTargetModes($user[\'name\'], $homePath)') !== false);
-        $this->assertTrue(strpos($src, 'pmssTrafficLimitPersistTargetModes($targetModes, (int) $user[\'trafficLimit\'], $persistError)') !== false);
-        $this->assertTrue(strpos($src, '@file_put_contents($runtimeDir') === false, 'addUser.php must not reimplement runtime traffic limit writes');
-        $this->assertTrue(strpos($src, '@file_put_contents("/home/{$user[\'name\']}/.trafficLimit"') === false, 'addUser.php must not reimplement home traffic limit writes');
+        $this->assertStringContainsAllStrings([
+            "require_once 'lib/user/trafficLimit.php';",
+            'pmssTrafficLimitCliTargetModes($user[\'name\'], $homePath)',
+            'pmssTrafficLimitPersistTargetModes($targetModes, (int) $user[\'trafficLimit\'], $persistError)',
+        ], $src);
+        $this->pmssAssertStringNotContainsString('@file_put_contents($runtimeDir', $src, 'addUser.php must not reimplement runtime traffic limit writes');
+        $this->pmssAssertStringNotContainsString('@file_put_contents("/home/{$user[\'name\']}/.trafficLimit"', $src, 'addUser.php must not reimplement home traffic limit writes');
     }
 }

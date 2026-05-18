@@ -43,7 +43,7 @@ class UpdateAppsBootstrapTest extends TestCase
             $output = $this->appBootstrapOutput($installer);
 
             $this->assertStringContainsString($label.' updater: missing runtime helper', $output);
-            $this->assertTrue(strpos($output, 'Fatal error') === false, $label.' bootstrap should soft-return when runtime is missing');
+            $this->pmssAssertStringNotContainsString('Fatal error', $output, $label.' bootstrap should soft-return when runtime is missing');
         }
     }
 
@@ -61,10 +61,8 @@ class UpdateAppsBootstrapTest extends TestCase
             $contents = $this->pmssReadUpdateAppFile($installer);
 
             $this->assertStringContainsString("require_once __DIR__.'/pythonVenv.php';", $contents);
-            $this->assertTrue(
-                strpos($contents, "packageState.php") === false && strpos($contents, "packages/helpers.php") === false,
-                $installer.' should not pull package-state helpers when it only needs the shared venv runtime'
-            );
+            $this->pmssAssertStringNotContainsString('packageState.php', $contents, $installer.' should not pull package-state helpers when it only needs the shared venv runtime');
+            $this->pmssAssertStringNotContainsString('packages/helpers.php', $contents, $installer.' should not pull package-state helpers when it only needs the shared venv runtime');
         }
     }
 
@@ -74,7 +72,7 @@ class UpdateAppsBootstrapTest extends TestCase
 
         $this->assertStringContainsString("dirname(__DIR__, 2).'/runtime.php'", $contents);
         $this->assertStringContainsString('%s updater: missing runtime helper', $contents);
-        $this->assertTrue(strpos($contents, "require_once __DIR__.'/bootstrap.php';") === false, 'ARR helper should not require a separate bootstrap helper');
+        $this->pmssAssertStringNotContainsString("require_once __DIR__.'/bootstrap.php';", $contents, 'ARR helper should not require a separate bootstrap helper');
     }
 
     public function testStarrInstallersDelegateRuntimeBootstrapToArrHelper(): void
@@ -83,18 +81,9 @@ class UpdateAppsBootstrapTest extends TestCase
             $contents = $this->pmssReadUpdateAppFile($installer);
 
             $this->assertStringContainsString("require_once __DIR__.'/arr.php';", $contents);
-            $this->assertTrue(
-                strpos($contents, "dirname(__DIR__).'/runtime.php'") === false,
-                $installer.' should delegate runtime bootstrap to arr.php'
-            );
-            $this->assertTrue(
-                strpos($contents, 'missing runtime helper') === false,
-                $installer.' should keep the runtime warning in arr.php'
-            );
-            $this->assertTrue(
-                strpos($contents, "require_once __DIR__.'/bootstrap.php';") === false,
-                $installer.' should not require a separate bootstrap helper'
-            );
+            $this->pmssAssertStringNotContainsString("dirname(__DIR__).'/runtime.php'", $contents, $installer.' should delegate runtime bootstrap to arr.php');
+            $this->pmssAssertStringNotContainsString('missing runtime helper', $contents, $installer.' should keep the runtime warning in arr.php');
+            $this->pmssAssertStringNotContainsString("require_once __DIR__.'/bootstrap.php';", $contents, $installer.' should not require a separate bootstrap helper');
         }
     }
 }
