@@ -66,7 +66,14 @@ function pmssUserTransferParseCli(array $argv): array
             throw new RuntimeException('Invalid value for --'.$key.' (expected integer)', 1);
         }
 
-        $options[$spec['field']] = (int) $value;
+        $field = $spec['field'];
+        $options[$field] = (int) $value;
+        if (isset($spec['range']) && ($options[$field] < $spec['range'][0] || $options[$field] > $spec['range'][1])) {
+            throw new RuntimeException(
+                sprintf('Invalid --%s (expected %d..%d)', $key, $spec['range'][0], $spec['range'][1]),
+                1
+            );
+        }
     }
 
     if ($options['help']) {
@@ -95,19 +102,6 @@ function pmssUserTransferParseCli(array $argv): array
         throw new RuntimeException('Invalid hostname', 1);
     }
 
-    foreach ($optionSpecs as $key => $spec) {
-        if (!isset($spec['range'])) {
-            continue;
-        }
-        $field = $spec['field'];
-        $range = $spec['range'];
-        if ($options[$field] < $range[0] || $options[$field] > $range[1]) {
-            throw new RuntimeException(
-                sprintf('Invalid --%s (expected %d..%d)', $key, $range[0], $range[1]),
-                1
-            );
-        }
-    }
     if ($options['sleepMin'] < 0 || $options['sleepMax'] < 0) {
         throw new RuntimeException('Invalid sleep values (expected non-negative integers)', 1);
     }

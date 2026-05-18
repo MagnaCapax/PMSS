@@ -164,6 +164,7 @@ class UserTransferTest extends TestCase
         $this->assertEquals(2, $cfg['finalPasses']);
         $this->assertTrue($cfg['dryRun']);
         $this->assertTrue($cfg['printPassword']);
+        $this->assertSame('33448dbf45fb18a2927929b8432652ed3eaaef39908fd9e27f8535de57377990', hash('sha256', json_encode($cfg)));
     }
 
     public function testParseCliStopsOptionParsingAfterDoubleDash(): void
