@@ -2,4 +2,4 @@
 
 require_once __DIR__.'/arr.php';
 
-pmssArrUpdateApp('Lidarr');
+pmssArrUpdate(pmssArrAppConfig('Lidarr') ?: []);

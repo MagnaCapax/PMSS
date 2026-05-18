@@ -16,24 +16,6 @@ require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 
 /**
- * Keep legacy htpasswd sync on the shared managed-username rules.
- */
-function pmssCheckUserHtpasswdUsernameIsValid(string $username): bool
-{
-    return pmssValidateUsername($username);
-}
-
-/**
- * Write a structured log entry when the optional user logger is available.
- *
- * @param array<string, mixed> $extra
- */
-function pmssCheckUserHtpasswdLogStatusMessage(string $step, string $username, string $status, string $message, array $extra = array()): void
-{
-    pmssUserLifecycleContextLogStatusMessage('htpasswd', $step, $username, $status, $message, $extra);
-}
-
-/**
  * Check whether the target htpasswd file already appears to contain the user.
  *
  * Returns null when the file exists but cannot be read so callers can skip
@@ -42,7 +24,7 @@ function pmssCheckUserHtpasswdLogStatusMessage(string $step, string $username, s
 function pmssCheckUserHtpasswdHasUserEntry(string $path, string $username)
 {
     $username = trim($username);
-    if (!pmssCheckUserHtpasswdUsernameIsValid($username)) {
+    if (!pmssValidateUsername($username)) {
         return false;
     }
 
@@ -75,8 +57,8 @@ function pmssCheckUserHtpasswdMain(array $argv): int
     $passwords = array_filter(explode("\n", $globalContents), 'strlen');
 
     foreach ($users as $thisUser) {
-        if (!pmssCheckUserHtpasswdUsernameIsValid($thisUser)) {
-            pmssCheckUserHtpasswdLogStatusMessage(
+        if (!pmssValidateUsername($thisUser)) {
+            pmssUserLifecycleContextLogStatusMessage('htpasswd',
                 'validate',
                 trim((string) $thisUser),
                 'ERR',
@@ -88,7 +70,7 @@ function pmssCheckUserHtpasswdMain(array $argv): int
         $userHtpasswd = "/home/{$thisUser}/.lighttpd/.htpasswd";
         $hasExistingEntry = pmssCheckUserHtpasswdHasUserEntry($userHtpasswd, $thisUser);
         if ($hasExistingEntry === null) {
-            pmssCheckUserHtpasswdLogStatusMessage(
+            pmssUserLifecycleContextLogStatusMessage('htpasswd',
                 'read',
                 $thisUser,
                 'ERR',
@@ -109,7 +91,7 @@ function pmssCheckUserHtpasswdMain(array $argv): int
             }
 
             if (!pmssAppendUserFile($userHtpasswd, $thisPassword."\n", $thisUser, 0640)) {
-                pmssCheckUserHtpasswdLogStatusMessage(
+                pmssUserLifecycleContextLogStatusMessage('htpasswd',
                     'write',
                     $thisUser,
                     'ERR',

@@ -51,20 +51,6 @@ function pmssArrAppConfig(string $app): ?array
     ];
 }
 
-/** Run the updater for a supported Starr-family app preset. */
-function pmssArrUpdateApp(string $app): void
-{
-    $config = pmssArrAppConfig($app);
-    if ($config === null) {
-        if (defined('STDERR')) {
-            fwrite(STDERR, 'ARR updater: unknown app preset '.$app.', skipping.'.PHP_EOL);
-        }
-        return;
-    }
-
-    pmssArrUpdate($config);
-}
-
 /**
  * Reject config values that could break shell/file boundaries.
  */

@@ -27,14 +27,6 @@ Usage:
 
 USAGE;
 
-/**
- * Emit a structured log record for settings operations.
- */
-function pmssUserSettingLog(string $user, string $phase, string $status, string $message, array $extra = array()): void
-{
-    pmssUserLifecycleContextLogStatusMessage('settings', $phase, $user, $status, $message, $extra);
-}
-
 $action = $argv[1] ?? '';
 if ($action === '' || $action === '--help' || $action === '-h') {
     echo $usage;
@@ -103,11 +95,25 @@ if ($action === 'unset' || $action === 'set') {
         unset($payload[$key]);
     }
     if (!$store->persist($user, $payload)) {
-        pmssUserSettingLog($user, $action, 'ERR', 'failed_to_save', array('key' => $key));
+        pmssUserLifecycleContextLogStatusMessage(
+            'settings',
+            $action,
+            $user,
+            'ERR',
+            'failed_to_save',
+            array('key' => $key)
+        );
         fwrite(STDERR, "Failed to save settings\n");
         exit(1);
     }
-    pmssUserSettingLog($user, $action, 'OK', $statusMessage, array('key' => $key));
+    pmssUserLifecycleContextLogStatusMessage(
+        'settings',
+        $action,
+        $user,
+        'OK',
+        $statusMessage,
+        array('key' => $key)
+    );
     echo "OK\n";
     exit(0);
 }

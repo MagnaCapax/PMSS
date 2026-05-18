@@ -2,4 +2,4 @@
 
 require_once __DIR__.'/arr.php';
 
-pmssArrUpdateApp('Readarr');
+pmssArrUpdate(pmssArrAppConfig('Readarr') ?: []);
