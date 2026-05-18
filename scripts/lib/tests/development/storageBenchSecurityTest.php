@@ -298,4 +298,55 @@ class StorageBenchSecurityTest extends TestCase
         );
         $this->assertFalse(is_dir($real.'/child'), 'symlinked parent should not receive new benchmark directories');
     }
+
+    public function testDeviceBenchmarksSkipDevicesWithoutPositiveBlockSize(): void
+    {
+        $target = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
+        $jsonLog = $this->pmssMakeJsonLogPath('pmss-bench-device-', 'benchmark-storage.jsonl');
+        $stubDir = $this->pmssMakeTempDir('pmss-bench-stubs-', 0700);
+        $invocations = $this->pmssMakeTempPath('pmss-bench-invocations-', '.log');
+        @file_put_contents($invocations, '');
+
+        $this->pmssWriteExecutableFile($stubDir.'/lsblk', "#!/bin/sh\nprintf '%s\\n' 'null disk 0 NullDevice NULLSER 1B'\n");
+        $this->pmssWriteExecutableFile($stubDir.'/blockdev', "#!/bin/sh\nprintf '%s\\n' 'not-a-size'\nexit 1\n");
+        $this->pmssWriteExecutableFile($stubDir.'/fallocate', "#!/bin/sh\nexit 0\n");
+        $this->pmssWriteExecutableFile($stubDir.'/ioping', "#!/bin/sh\nprintf '%s\\n' 'min/avg/max/mdev = 1.0/2.0/3.0/0.1 ms'\n");
+        $this->pmssWriteExecutableFile($stubDir.'/dd', "#!/bin/sh\nprintf 'DD %s\\n' \"\$*\" >>\"\${PMSS_TEST_INVOCATION_LOG:?}\"\nprintf '%s\\n' '1+0 records in' '1+0 records out' '1048576 bytes copied, 1 s, 1.0 MB/s' >&2\nexit 0\n");
+        $this->pmssWriteExecutableFile($stubDir.'/fio', <<<'SH'
+#!/bin/sh
+out=''
+args="$*"
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --output)
+            shift
+            out="${1:-}"
+            ;;
+        --output=*)
+            out="${1#--output=}"
+            ;;
+    esac
+    shift || break
+done
+printf 'FIO %s\n' "$args" >>"${PMSS_TEST_INVOCATION_LOG:?}"
+cat >"$out" <<'JSON'
+{"jobs":[{"read":{"bw_bytes":1048576,"iops":1,"clat_ns":{"percentile":{"95.000000":1000000}}},"write":{"bw_bytes":0,"iops":0,"clat_ns":{"percentile":{"95.000000":0}}}}]}
+JSON
+SH
+        );
+
+        $result = $this->pmssRunRepoPhpScriptCommand(
+            'scripts/util/storageBenchmark.php',
+            ['--target='.$target, '--json='.$jsonLog, '--size=1M', '--runtime=1', '--devices', '--dd-size=1M', '--device-runtime=1'],
+            $this->pmssPathPrefixedEnvironment($stubDir, ['PMSS_TEST_INVOCATION_LOG' => $invocations])
+        );
+
+        $this->assertSame(0, $result['rc']);
+        $log = (string) @file_get_contents($jsonLog);
+        $this->assertStringContainsString('"device":"/dev/null"', $log);
+        $this->assertStringContainsString('"test":"device-preflight"', $log);
+        $this->assertStringContainsString('"error":"unable to determine block device size"', $log);
+        $this->assertStringNotContainsString('DD if=/dev/null', (string) @file_get_contents($invocations));
+        $this->assertStringNotContainsString('--filename=/dev/null', (string) @file_get_contents($invocations));
+    }
 }
