@@ -127,12 +127,7 @@ function networkLoadMonitoringCommands(?callable $runner = null, ?callable $logg
         return [];
     }
 
-    $lines = [];
-    foreach ($output as $line) {
-        if (is_scalar($line)) {
-            $lines[] = (string) $line;
-        }
-    }
+    $lines = array_map('strval', array_filter($output, 'is_scalar'));
 
     return networkParseMonitoringCommands(implode("\n", $lines));
 }

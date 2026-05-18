@@ -43,8 +43,7 @@ function pmssSetupLetsEncryptMain(array $argv): int
         return 1;
     }
 
-    $distroInfo = pmssDetectDistro();
-    $codename = $distroInfo['codename'] !== '' ? $distroInfo['codename'] : 'bullseye';
+    $codename = pmssDetectDistro()['codename'] ?: 'bullseye';
 
     try {
         pmssSetupLetsEncryptRun($domain, $email, $codename);

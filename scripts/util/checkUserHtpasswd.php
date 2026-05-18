@@ -45,7 +45,6 @@ function pmssCheckUserHtpasswdMain(array $argv): int
     $argUserRaw = trim((string) ($argv[1] ?? ''));
     $selection = pmssManagedUsersSelectFromCommand('/scripts/listUsers.php', $argUserRaw, array('emitEmptyMessage' => true, 'lookupMode' => 'account', 'strictInput' => true));
     if ($selection['exitCode'] !== 0 || $selection['users'] === array()) return $selection['exitCode'];
-    $users = $selection['users'];
     $globalHtpasswd = '/etc/lighttpd/.htpasswd';
     if (trim((string) ($globalContents = @file_get_contents($globalHtpasswd))) === '') {
         if ($argUserRaw === '') {
@@ -56,7 +55,7 @@ function pmssCheckUserHtpasswdMain(array $argv): int
 
     $passwords = array_filter(explode("\n", $globalContents), 'strlen');
 
-    foreach ($users as $thisUser) {
+    foreach ($selection['users'] as $thisUser) {
         if (!pmssValidateUsername($thisUser)) {
             pmssUserLifecycleContextLogStatusMessage('htpasswd',
                 'validate',

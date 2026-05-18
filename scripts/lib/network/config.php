@@ -30,15 +30,13 @@ function networkLocalnetEntryIsValid(string $entry): bool
     if (filter_var($parts[0], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
         return false;
     }
-    if (count($parts) === 1) {
-        return true;
-    }
-
-    return $parts[1] !== ''
+    return count($parts) === 1 || (
+        $parts[1] !== ''
         && ctype_digit($parts[1])
         && (int) $parts[1] >= 0
         && (int) $parts[1] <= 32
-        && (string) (int) $parts[1] === $parts[1];
+        && (string) (int) $parts[1] === $parts[1]
+    );
 }
 
 function networkLoadLocalnets(): array

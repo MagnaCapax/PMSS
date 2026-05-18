@@ -65,11 +65,7 @@ function pmssLogWriteDirectoryPrepare(
     bool $allowExistingLeafFile = false
 ): bool {
     $error = null;
-    if ($directory === '') {
-        $error = 'unsafe';
-        return false;
-    }
-    if ($directory !== '.' && !pmssPathSegmentsAreSafe($directory, true, true, !$allowExistingLeafFile, true)) {
+    if ($directory === '' || ($directory !== '.' && !pmssPathSegmentsAreSafe($directory, true, true, !$allowExistingLeafFile, true))) {
         $error = 'unsafe';
         return false;
     }

@@ -17,10 +17,7 @@ require_once __DIR__.'/runtime.php';
 function pmssNginxUserHostIsValidFqdn(string $hostname): bool
 {
     $trimmed = strtolower(trim($hostname));
-    if ($trimmed === '') {
-        return false;
-    }
-    return strpos($trimmed, '.') !== false && pmssHostnameIsValid($trimmed, false);
+    return $trimmed !== '' && strpos($trimmed, '.') !== false && pmssHostnameIsValid($trimmed, false);
 }
 
 /**
