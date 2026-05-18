@@ -212,12 +212,21 @@ CONF;
         return $tmpSelection;
 }
 
-/**
+    /**
+     * Validate temp-dir prefixes before they reach tempnam() or cleanup guards.
+     */
+    function pmssPrivateTempPrefixIsSafe(string $prefix): bool
+    {
+        return preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $prefix) === 1;
+    }
+
+    /**
      * Create a private temporary directory under the process temp root.
      */
     function pmssCreatePrivateTempDir(string $prefix): ?string
     {
-        if ($prefix === '') {
+        if (!pmssPrivateTempPrefixIsSafe($prefix)) {
+            logMessage('[WARN] Refusing private temporary directory with unsafe prefix');
             return null;
         }
 
@@ -226,8 +235,10 @@ CONF;
             return null;
         }
 
-        if (!@unlink($path) || !@mkdir($path, 0700)) {
-            @unlink($path);
+        if (!@unlink($path)) {
+            return null;
+        }
+        if (!@mkdir($path, 0700)) {
             return null;
         }
 
@@ -243,7 +254,12 @@ CONF;
         $base = realpath(sys_get_temp_dir());
         $real = $path !== '' && !is_link($path) ? realpath($path) : false;
 
-        if ($prefix === '' || $base === false || $base === DIRECTORY_SEPARATOR || $real === false || !is_dir($real)) {
+        if (!pmssPrivateTempPrefixIsSafe($prefix)) {
+            $log('[WARN] Refusing temporary directory cleanup for unsafe prefix');
+            return null;
+        }
+
+        if ($base === false || $base === DIRECTORY_SEPARATOR || $real === false || !is_dir($real)) {
             $log('[WARN] Refusing temporary directory cleanup for unresolved path: '.$path);
             return null;
         }

@@ -75,6 +75,22 @@ class DpkgBaselineApplySafetyTest extends TestCase
         @rmdir((string) $path);
     }
 
+    public function testCreatePrivateTempDirRejectsUnsafePrefixesBeforeTempnam(): void
+    {
+        if (!function_exists('pmssCreatePrivateTempDir')) {
+            throw new SkipTest('pmssCreatePrivateTempDir helper not present in this baseline');
+        }
+
+        foreach (['', '../pmss', '/pmss', '.pmss', "pmss\nstage"] as $prefix) {
+            [$path, $output] = $this->pmssCaptureStdout(function () use ($prefix): ?string {
+                return \pmssCreatePrivateTempDir($prefix);
+            });
+
+            $this->assertSame(null, $path);
+            $this->assertStringContainsString('Refusing private temporary directory with unsafe prefix', $output);
+        }
+    }
+
     public function testPrivateTempDirRealpathAcceptsOwnedPrefixUnderTempRoot(): void
     {
         if (!function_exists('pmssPrivateTempDirRealpath')) {
@@ -117,6 +133,28 @@ class DpkgBaselineApplySafetyTest extends TestCase
 
         $this->assertSame(null, $resolved);
         $this->assertStringContainsString('Refusing temporary directory cleanup outside PMSS temp scope', $output);
+    }
+
+    public function testPrivateTempDirRealpathRejectsUnsafePrefixBeforeScopeMatch(): void
+    {
+        if (!function_exists('pmssPrivateTempDirRealpath')) {
+            throw new SkipTest('pmssPrivateTempDirRealpath helper not present in this baseline');
+        }
+
+        $tmpDir = $this->pmssMakeTempDir('pmss-private-prefix-root-', 0700);
+        $ownedDir = $tmpDir.'/pmss-libssl-owned';
+        @mkdir($ownedDir, 0700);
+        $resolved = 'sentinel';
+        $output = '';
+
+        $this->pmssWithEnv(['TMPDIR' => $tmpDir], function () use ($ownedDir, &$resolved, &$output): void {
+            [$resolved, $output] = $this->pmssCaptureStdout(function () use ($ownedDir): ?string {
+                return \pmssPrivateTempDirRealpath($ownedDir, '../pmss-libssl-');
+            });
+        });
+
+        $this->assertSame(null, $resolved);
+        $this->assertStringContainsString('Refusing temporary directory cleanup for unsafe prefix', $output);
     }
 
     public function testRemovePrivateTempDirRejectsWrongPrefixBeforeRunStep(): void
