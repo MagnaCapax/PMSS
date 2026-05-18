@@ -159,13 +159,15 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
     $highPercent = ($memoryCurrent !== null && $memoryHigh !== null && $memoryHigh > 0)
         ? round(($memoryCurrent / $memoryHigh) * 100, 1)
         : null;
+    $pressureSomeAvg10 = isset($pressure['some']) && preg_match('/avg10=([0-9.]+)/', $pressure['some'], $matches) === 1 ? (float) $matches[1] : null;
+    $pressureFullAvg10 = isset($pressure['full']) && preg_match('/avg10=([0-9.]+)/', $pressure['full'], $matches) === 1 ? (float) $matches[1] : null;
     $status = pmssWebCgroupMemoryStatusClassify([
         'memory_current' => $memoryCurrent,
         'memory_high' => $memoryHigh,
         'usage_percent' => $usagePercent,
         'high_percent' => $highPercent,
-        'pressure_some_avg10' => isset($pressure['some']) && preg_match('/avg10=([0-9.]+)/', $pressure['some'], $matches) === 1 ? (float) $matches[1] : null,
-        'pressure_full_avg10' => isset($pressure['full']) && preg_match('/avg10=([0-9.]+)/', $pressure['full'], $matches) === 1 ? (float) $matches[1] : null,
+        'pressure_some_avg10' => $pressureSomeAvg10,
+        'pressure_full_avg10' => $pressureFullAvg10,
         'throttle_events' => $throttleEvents,
     ]);
 
@@ -179,8 +181,8 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
         'limit_source' => $memoryMax !== null ? 'memory.max' : ($memoryHigh !== null ? 'memory.high' : ''),
         'usage_percent' => $usagePercent,
         'high_percent' => $highPercent,
-        'pressure_some_avg10' => isset($pressure['some']) && preg_match('/avg10=([0-9.]+)/', $pressure['some'], $matches) === 1 ? (float) $matches[1] : null,
-        'pressure_full_avg10' => isset($pressure['full']) && preg_match('/avg10=([0-9.]+)/', $pressure['full'], $matches) === 1 ? (float) $matches[1] : null,
+        'pressure_some_avg10' => $pressureSomeAvg10,
+        'pressure_full_avg10' => $pressureFullAvg10,
         'throttle_events' => $throttleEvents,
         'max_events' => $maxEvents,
         'oom_events' => $oomEvents,

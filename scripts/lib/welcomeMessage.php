@@ -141,10 +141,8 @@ function pmssWelcomeMessageForUser(
     }
 
     $template = pmssWelcomeUserMessageRead($userHome);
-    if ($template === '') {
-        $template = is_string($userConfig['welcomeMessage'] ?? null) && trim($userConfig['welcomeMessage']) !== ''
-            ? $userConfig['welcomeMessage']
-            : '';
+    if ($template === '' && is_string($userConfig['welcomeMessage'] ?? null) && trim($userConfig['welcomeMessage']) !== '') {
+        $template = $userConfig['welcomeMessage'];
     }
     if ($template === '' && $productKey !== '') {
         $messageRootMap = pmssJsonFileReadAssoc($productMessagesPath, true) ?? [];

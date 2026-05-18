@@ -47,18 +47,19 @@ $parsedUsage = pmssTrafficParseOutputUsage($usage, $localnets);
 
 $logger->msg("Collecting data");
 
-foreach($userUids AS $thisUser => $thisUid) {
+foreach ($userUids as $thisUser => $thisUid) {
     $thisUserTraffic = $parsedUsage['traffic'][$thisUid] ?? 0;
     $thisUserTrafficLocal = $parsedUsage['local'][$thisUid] ?? 0;
 
-		// Do not log if usage was MORE than linkspeed for the past 5 minutes.
-	    if (pmssTrafficBudgetExceeded($logdir . 'error.log', $thisUser, 'traffic', $thisUserTraffic, $linkSpeed, "DEBUG USAGE DATA:\n{$usage}", 'traffic anomaly: usage exceeds 90%% link max (%d bytes)')) {
-	            continue;  
-	    }
-	    // Note: variable name typo caused undefined output; use the correct value
-	    if (pmssTrafficBudgetExceeded($logdir . 'error.log', $thisUser, 'LOCAL traffic', $thisUserTrafficLocal, $linkSpeed, "DEBUG USAGE DATA:\n{$usage}", 'traffic anomaly: local usage exceeds 90%% link max (%d bytes)')) {
-	            continue;
-	    }
+    // Drop samples that exceed the five-minute link budget instead of writing bad counters.
+    foreach ([
+        ['traffic', $thisUserTraffic, 'traffic anomaly: usage exceeds 90%% link max (%d bytes)'],
+        ['LOCAL traffic', $thisUserTrafficLocal, 'traffic anomaly: local usage exceeds 90%% link max (%d bytes)'],
+    ] as [$label, $bytes, $message]) {
+        if (pmssTrafficBudgetExceeded($logdir.'error.log', $thisUser, $label, $bytes, $linkSpeed, "DEBUG USAGE DATA:\n{$usage}", $message)) {
+            continue 2;
+        }
+    }
 
     if ($thisUserTraffic > 0) pmssAppendRootTimestampedLogEntry($logdir . $thisUser, ": {$thisUserTraffic}\n");
 
