@@ -65,7 +65,6 @@ foreach($userUids AS $thisUser => $thisUid) {
     if ($thisUserTrafficLocal > 0)
         pmssAppendRootTimestampedLogEntry($logdir . $thisUser . '-localnet', ": {$thisUserTrafficLocal}\n");
 
-    // API push removed; central collector now uses pull workflow.
 }
 
 // Let's take unmatched!

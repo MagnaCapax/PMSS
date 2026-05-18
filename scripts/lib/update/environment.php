@@ -127,11 +127,13 @@ CONF;
                 $baselines[(int) $match[1]] = $path;
             }
         }
-        $latestBaseline = $baselines ? max(array_keys($baselines)) : null;
         $validatedBaselines = array_filter(array_keys($baselines), static function (int $major): bool {
             return $major <= 12;
         });
+        $latestBaseline = $baselines ? max(array_keys($baselines)) : null;
         $latestValidatedBaseline = $validatedBaselines ? max($validatedBaselines) : null;
+        $fallbackBaseline = $latestValidatedBaseline ?? $latestBaseline;
+        $fallbackPath = $fallbackBaseline !== null ? $baselines[$fallbackBaseline] : null;
 
         $candidates = [];
         $requestedPath = null;
@@ -143,18 +145,11 @@ CONF;
                 $candidates[] = $requestedPath;
             }
         }
-        if ($latestValidatedBaseline !== null) {
-            $latestPath = $baselines[$latestValidatedBaseline];
-            if (!in_array($latestPath, $candidates, true)) {
-                $candidates[] = $latestPath;
-            }
-        } elseif ($latestBaseline !== null) {
-            $latestPath = $baselines[$latestBaseline];
-            if (!in_array($latestPath, $candidates, true)) {
-                $candidates[] = $latestPath;
+        foreach (array_filter([$fallbackPath, $baseDir.'/selections.txt']) as $fallbackCandidate) {
+            if (!in_array($fallbackCandidate, $candidates, true)) {
+                $candidates[] = $fallbackCandidate;
             }
         }
-        $candidates[] = $baseDir.'/selections.txt';
 
         $selected = null;
         foreach ($candidates as $candidate) {

@@ -27,7 +27,7 @@ $lastLocalNet = $localnets ? end($localnets) : '';
 // Loopback never leaves the host, so exclude it from egress accounting.
 echo "/sbin/iptables -A OUTPUT -d 127.0.0.0/8 -j ACCEPT\n";
 
-foreach ($userUids as $thisUser => $thisUid) {
+foreach ($userUids as $thisUid) {
     foreach ($localnets as $thisLocalNet) {
         echo "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -m owner --uid-owner {$thisUid} -j ACCEPT\n";
     }

@@ -45,6 +45,22 @@ class DpkgBaselineSelectionTest extends TestCase
         );
     }
 
+    public function testFutureMissingBaselineUsesLatestValidatedFallback(): void
+    {
+        [$path, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger): string {
+            return \pmssSelectDpkgSelectionsBaseline(99, $logger);
+        });
+
+        $this->assertTrue(is_string($path) && $path !== '', 'Expected a dpkg baseline path');
+        $this->assertStringContainsString('selections-debian'.$this->latestValidatedBaselineMajor().'.txt', $path);
+        $this->assertStringNotContainsString('selections-debian99.txt', $path);
+        $this->pmssAssertMessagesContain(
+            $logs,
+            'Debian 99 dpkg baseline missing; using Debian '.$this->latestValidatedBaselineMajor().' baseline',
+            'Expected warning about future distro fallback'
+        );
+    }
+
     public function testWarnsWhenRequestedBaselineIsUnavailable(): void
     {
         [$path, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger): string {

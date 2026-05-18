@@ -42,10 +42,7 @@ function pmssUserTransferParseCli(array $argv): array
         'dry-run' => ['field' => 'dryRun', 'default' => false, 'expectsValue' => false],
         'print-password' => ['field' => 'printPassword', 'default' => false, 'expectsValue' => false],
     ];
-    $options = [];
-    foreach ($optionSpecs as $spec) {
-        $options[$spec['field']] = $spec['default'];
-    }
+    $options = array_column($optionSpecs, 'default', 'field');
 
     $valueOptions = array_keys(array_filter($optionSpecs, static function (array $spec): bool {
         return $spec['expectsValue'];

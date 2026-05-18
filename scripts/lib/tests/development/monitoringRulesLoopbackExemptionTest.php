@@ -11,7 +11,7 @@ class MonitoringRulesLoopbackExemptionTest extends TestCase
         $this->assertTrue($src !== '', 'Expected to read makeMonitoringRules.php');
 
         $loopbackRule = 'echo "/sbin/iptables -A OUTPUT -d 127.0.0.0/8 -j ACCEPT\\n";';
-        $userLoop = 'foreach ($userUids as $thisUser => $thisUid) {';
+        $userLoop = 'foreach ($userUids as $thisUid) {';
 
         $this->assertSame(1, substr_count($src, $loopbackRule), 'Loopback exemption should be declared exactly once');
 

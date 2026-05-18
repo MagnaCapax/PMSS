@@ -12,10 +12,6 @@
  *
  * @license GPL-3.0-only
  */
-// TODO Check if this is still used, since transition happened years ago
-
-// Some kind of htpasswd synchronization from times when lighttpd global instance transition to per-user instances
-
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 
@@ -24,9 +20,7 @@ require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
  */
 function pmssCheckUserHtpasswdUsernameIsValid(string $username): bool
 {
-    return function_exists('pmssValidateUsername')
-        ? pmssValidateUsername($username)
-        : preg_match('/^[a-z][a-z0-9]{0,7}$/', trim($username)) === 1;
+    return pmssValidateUsername($username);
 }
 
 /**
