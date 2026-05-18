@@ -1,25 +1,13 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/DelugeAppTestCase.php';
 
-putenv('PMSS_DELUGE_NO_ENTRYPOINT=1');
-require_once dirname(__DIR__, 2).'/update/apps/deluge.php';
-
-class DelugeFindCallerCompatPatchTest extends TestCase
+class DelugeFindCallerCompatPatchTest extends DelugeAppTestCase
 {
-    /** @var string */
-    private $tempDir;
-
-    /** @var array<int,string> */
-    private $logs = [];
-
-    /** @var callable */
-    private $logger;
-
     protected function setUp(): void
     {
-        $this->pmssAssignTempDirArrayLogger('tempDir', 'pmss-deluge-findcaller-', $this->logs, $this->logger, 0700);
+        $this->pmssSetUpDelugeFixture('pmss-deluge-findcaller-');
     }
 
     public function testPatchAddsStacklevelToLegacySignature(): void

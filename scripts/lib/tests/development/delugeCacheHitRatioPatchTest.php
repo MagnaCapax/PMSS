@@ -1,25 +1,13 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/DelugeAppTestCase.php';
 
-putenv('PMSS_DELUGE_NO_ENTRYPOINT=1');
-require_once dirname(__DIR__, 2).'/update/apps/deluge.php';
-
-class DelugeCacheHitRatioPatchTest extends TestCase
+class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
 {
-    /** @var string */
-    private $tempDir;
-
-    /** @var array<int,string> */
-    private $logs = [];
-
-    /** @var callable */
-    private $logger;
-
     protected function setUp(): void
     {
-        $this->pmssAssignTempDirArrayLogger('tempDir', 'pmss-deluge-cache-hit-ratio-', $this->logs, $this->logger, 0700);
+        $this->pmssSetUpDelugeFixture('pmss-deluge-cache-hit-ratio-');
     }
 
     public function testPatchAddsKeyErrorGuardToLegacyBlock(): void

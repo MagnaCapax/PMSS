@@ -1,25 +1,13 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/DelugeAppTestCase.php';
 
-putenv('PMSS_DELUGE_NO_ENTRYPOINT=1');
-require_once dirname(__DIR__, 2).'/update/apps/deluge.php';
-
-class DelugeCommandSymlinkTest extends TestCase
+class DelugeCommandSymlinkTest extends DelugeAppTestCase
 {
-    /** @var string */
-    private $tempDir;
-
-    /** @var array<int,string> */
-    private $logs = [];
-
-    /** @var callable */
-    private $logger;
-
     protected function setUp(): void
     {
-        $this->pmssAssignTempDirArrayLogger('tempDir', 'pmss-deluge-command-link-', $this->logs, $this->logger, 0700);
+        $this->pmssSetUpDelugeFixture('pmss-deluge-command-link-');
     }
 
     public function testCreatesSymlinkWhenLocalPathMissing(): void

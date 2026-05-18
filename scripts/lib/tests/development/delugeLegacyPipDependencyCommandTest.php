@@ -1,11 +1,9 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
-putenv('PMSS_DELUGE_NO_ENTRYPOINT=1');
-require_once dirname(__DIR__, 2).'/update/apps/deluge.php';
+require_once __DIR__.'/DelugeAppTestCase.php';
 
-class DelugeLegacyPipDependencyCommandTest extends TestCase
+class DelugeLegacyPipDependencyCommandTest extends DelugeAppTestCase
 {
     /**
      * Ensure Debian 10 dependency command keeps pyasn1 pinned.
