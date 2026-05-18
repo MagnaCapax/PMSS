@@ -16,6 +16,46 @@ function networkLoadConfig(): array
     return is_array($config) ? $config : [];
 }
 
+/**
+ * Validate one local network entry before it reaches rendered shell policy.
+ */
+function networkLocalnetEntryIsValid(string $entry): bool
+{
+    $entry = trim($entry);
+    if ($entry === '' || preg_match('/[\s;&|`$<>\\\\\0]/', $entry) === 1) {
+        return false;
+    }
+
+    $parts = explode('/', $entry, 2);
+    if (filter_var($parts[0], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+        return false;
+    }
+    if (count($parts) === 1) {
+        return true;
+    }
+
+    return $parts[1] !== ''
+        && ctype_digit($parts[1])
+        && (int) $parts[1] >= 0
+        && (int) $parts[1] <= 32
+        && (string) (int) $parts[1] === $parts[1];
+}
+
+/**
+ * Return only local network entries that remain safe as policy tokens.
+ */
+function networkLocalnetsFilterValid(array $localnets): array
+{
+    $valid = [];
+    foreach ($localnets as $localnet) {
+        $localnet = trim((string) $localnet);
+        if (networkLocalnetEntryIsValid($localnet)) {
+            $valid[] = $localnet;
+        }
+    }
+    return $valid;
+}
+
 function networkLoadLocalnets(): array
 {
     $path = pmssResolvePathFromEnv('PMSS_LOCALNET_FILE', '/etc/seedbox/config/localnet');
@@ -57,5 +97,9 @@ function networkLoadLocalnets(): array
     }
 
     $cfg = trim($contents);
-    return $cfg === '' ? $loadDefaultLocalnets() : preg_split('/\r?\n/', $cfg, -1, PREG_SPLIT_NO_EMPTY);
+    if ($cfg === '') {
+        return $loadDefaultLocalnets();
+    }
+
+    return networkLocalnetsFilterValid(preg_split('/\r?\n/', $cfg, -1, PREG_SPLIT_NO_EMPTY));
 }

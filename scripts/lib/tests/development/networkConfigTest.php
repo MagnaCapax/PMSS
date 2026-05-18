@@ -52,6 +52,28 @@ class NetworkConfigTest extends TestCase
         });
     }
 
+    public function testLoadLocalnetsSkipsMalformedEntries(): void
+    {
+        $tmp = $this->pmssMakeTempPath('pmss-localnets-');
+        file_put_contents(
+            $tmp,
+            "10.0.0.0/8\n192.168.0.0/16; touch /tmp/bad\n999.1.1.1/33\n127.0.0.1\n"
+        );
+
+        $this->pmssWithEnv(['PMSS_LOCALNET_FILE' => $tmp], function (): void {
+            $this->assertEquals(['10.0.0.0/8', '127.0.0.1'], \networkLoadLocalnets());
+        });
+    }
+
+    public function testLocalnetEntryValidationRejectsUnsafePolicyTokens(): void
+    {
+        $this->assertTrue(\networkLocalnetEntryIsValid('185.148.0.0/22'));
+        $this->assertTrue(\networkLocalnetEntryIsValid('127.0.0.1'));
+        $this->assertFalse(\networkLocalnetEntryIsValid('185.148.0.0/33'));
+        $this->assertFalse(\networkLocalnetEntryIsValid('not-a-network'));
+        $this->assertFalse(\networkLocalnetEntryIsValid('10.0.0.0/8; touch /tmp/bad'));
+    }
+
     public function testLoadLocalnetsRepopulatesBlankPmConfigFileWithDefault(): void
     {
         $tmp = $this->pmssMakeTempPath('pmss-localnets-');
