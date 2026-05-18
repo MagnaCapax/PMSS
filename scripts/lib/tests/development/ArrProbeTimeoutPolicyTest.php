@@ -16,7 +16,8 @@ class ArrProbeTimeoutPolicyTest extends TestCase
             "'--version'",
             '2>/dev/null',
         ], $command);
-        $this->assertStringNotContainsString('timeout 10 ', $command);
+        $legacyTimeout = 'timeout '.'10 ';
+        $this->assertStringNotContainsString($legacyTimeout, $command);
     }
 
     public function testSupportedStarrAppsUseSharedInstallPathPreset(): void
