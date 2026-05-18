@@ -37,6 +37,7 @@ class DpkgBaselineSelectionTest extends TestCase
         $this->assertTrue(is_string($path) && $path !== '', 'Expected a dpkg baseline path');
 
         $this->assertStringContainsString('selections-debian'.$this->latestValidatedBaselineMajor().'.txt', $path);
+        $this->assertStringNotContainsString('selections-debian13.txt', $path);
         $this->pmssAssertMessagesContain(
             $logs,
             'Debian 13 dpkg baseline exists but is not validated for automatic use',
@@ -70,6 +71,7 @@ class DpkgBaselineSelectionTest extends TestCase
 
         $this->assertTrue(is_string($path) && $path !== '', 'Expected a dpkg baseline path');
         $this->assertStringContainsString('selections-debian'.$this->latestValidatedBaselineMajor().'.txt', $path);
+        $this->assertStringNotContainsString('selections-debian13.txt', $path);
         $this->assertEquals([], $logs, 'Did not expect warnings when distro version is unknown');
     }
 

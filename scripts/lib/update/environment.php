@@ -112,28 +112,6 @@ CONF;
 }
 
 /**
-     * Return the newest validated dpkg baseline major for automatic selection.
-     *
-     * Debian 13 stays experimental until its baseline is captured from a
-     * converged host and replay-validated. Keep automatic fallback on the latest
-     * validated baseline so provisional future manifests do not become active
-     * package authority just because the file exists.
-     *
-     * @param array<int, string> $baselines
-     */
-    function pmssLatestValidatedDpkgBaselineMajor(array $baselines): ?int
-    {
-        $validated = [];
-        foreach (array_keys($baselines) as $major) {
-            if ((int) $major <= 12) {
-                $validated[] = (int) $major;
-            }
-        }
-
-        return $validated ? max($validated) : null;
-}
-
-/**
      * Resolve the best dpkg selections baseline file for the detected distro version.
      *
      * This is pure selection logic (no command execution) so tests can validate
@@ -150,7 +128,10 @@ CONF;
             }
         }
         $latestBaseline = $baselines ? max(array_keys($baselines)) : null;
-        $latestValidatedBaseline = pmssLatestValidatedDpkgBaselineMajor($baselines);
+        $validatedBaselines = array_filter(array_keys($baselines), static function (int $major): bool {
+            return $major <= 12;
+        });
+        $latestValidatedBaseline = $validatedBaselines ? max($validatedBaselines) : null;
 
         $candidates = [];
         $requestedPath = null;
