@@ -6,6 +6,10 @@
  * @author PMSS Team
  */
 
+// Bound ARR binary probes so daemonizing applications cannot wedge updates.
+const PMSS_ARR_VERSION_PROBE_TIMEOUT_SECONDS = 50;
+const PMSS_ARR_VERSION_PROBE_KILL_AFTER_SECONDS = 5;
+
 /**
  * Orchestrate the full update flow for a Starr-family application.
  *
@@ -27,18 +31,6 @@ function pmssArrAssetNameHasToken(string $assetName, array $tokens): bool
     }
 
     return false;
-}
-
-/** Return the expected Starr asset tokens for the current host architecture. */
-function pmssArrAssetArchitectureTokens(): array
-{
-    $architecture = trim((string) @shell_exec('dpkg --print-architecture 2>/dev/null'));
-    $tokensByArchitecture = [
-        'arm64' => ['arm64', 'aarch64'],
-        'armhf' => ['armhf', 'armv7', 'arm'],
-    ];
-
-    return $tokensByArchitecture[$architecture] ?? ['x64', 'amd64'];
 }
 
 /** Build the canonical updater config for a supported Starr-family app. */
@@ -82,17 +74,6 @@ function pmssArrIsSafeConfigValue(string $value): bool
 }
 
 /**
- * Only allow one extracted top-level directory from the downloaded archive.
- */
-function pmssArrExtractDirectoryIsSafe(string $extractDir): bool
-{
-    return pmssArrIsSafeConfigValue($extractDir)
-        && $extractDir !== '.'
-        && $extractDir !== '..'
-        && basename($extractDir) === $extractDir;
-}
-
-/**
  * Normalize required config and fail closed on unsafe runtime inputs.
  */
 function pmssArrNormalizeConfig(array $config, callable $log): ?array
@@ -108,7 +89,10 @@ function pmssArrNormalizeConfig(array $config, callable $log): ?array
         $log('Invalid updater configuration: install_path');
         return null;
     }
-    if (!pmssArrExtractDirectoryIsSafe($config['extract_dir'])) {
+    if ($config['extract_dir'] === '.'
+        || $config['extract_dir'] === '..'
+        || basename($config['extract_dir']) !== $config['extract_dir']
+    ) {
         $log('Invalid updater configuration: extract_dir');
         return null;
     }
@@ -126,17 +110,6 @@ function pmssArrNormalizeConfig(array $config, callable $log): ?array
     return $config;
 }
 
-/**
- * Asset names must stay inside the temporary workspace.
- */
-function pmssArrArchiveNameIsSafe(string $assetName): bool
-{
-    return pmssArrIsSafeConfigValue($assetName)
-        && basename($assetName) === $assetName
-        && strpos($assetName, '/') === false
-        && strpos($assetName, '\\') === false;
-}
-
 /** Extract a semantic version from ARR metadata or CLI output. */
 function pmssArrVersionExtract(string $payload): ?string
 {
@@ -145,25 +118,13 @@ function pmssArrVersionExtract(string $payload): ?string
         : null;
 }
 
-/** Return the hard timeout for ARR binary version probes. */
-function pmssArrVersionProbeTimeoutSeconds(): int
-{
-    return 50;
-}
-
-/** Return the SIGKILL grace window for ARR binary version probes. */
-function pmssArrVersionProbeKillAfterSeconds(): int
-{
-    return 5;
-}
-
 /** Build a bounded ARR version probe so daemonizing binaries cannot wedge updates. */
 function pmssArrVersionProbeCommand(string $binary, string $flag): string
 {
     return sprintf(
         'timeout --kill-after=%ds %ds %s %s 2>/dev/null',
-        pmssArrVersionProbeKillAfterSeconds(),
-        pmssArrVersionProbeTimeoutSeconds(),
+        PMSS_ARR_VERSION_PROBE_KILL_AFTER_SECONDS,
+        PMSS_ARR_VERSION_PROBE_TIMEOUT_SECONDS,
         escapeshellarg($binary),
         escapeshellarg($flag)
     );
@@ -180,7 +141,7 @@ function pmssArrVersionProbeRun(string $binary, string $flag): string
     if (($rc === 124 || $rc === 137) && function_exists('pmssTimeoutFireLog')) {
         pmssTimeoutFireLog(
             $command,
-            pmssArrVersionProbeTimeoutSeconds(),
+            PMSS_ARR_VERSION_PROBE_TIMEOUT_SECONDS,
             microtime(true) - $startedAt,
             $rc === 137 ? 'SIGKILL' : 'SIGTERM',
             $rc
@@ -266,7 +227,11 @@ function pmssArrUpdate(array $config): void
 
     $asset = null;
     $genericAsset = null;
-    $targetArchitectureTokens = pmssArrAssetArchitectureTokens();
+    $architecture = trim((string) @shell_exec('dpkg --print-architecture 2>/dev/null'));
+    $targetArchitectureTokens = [
+        'arm64' => ['arm64', 'aarch64'],
+        'armhf' => ['armhf', 'armv7', 'arm'],
+    ][$architecture] ?? ['x64', 'amd64'];
     $knownArchitectureTokens = ['x64', 'amd64', 'arm64', 'aarch64', 'armhf', 'armv7', 'arm'];
     foreach ($releases as $release) {
         if (empty($release['assets']) || !is_array($release['assets'])) {
@@ -274,7 +239,11 @@ function pmssArrUpdate(array $config): void
         }
         foreach ($release['assets'] as $candidateAsset) {
             $name = (string) ($candidateAsset['name'] ?? '');
-            if (!pmssArrArchiveNameIsSafe($name)) {
+            if (!pmssArrIsSafeConfigValue($name)
+                || basename($name) !== $name
+                || strpos($name, '/') !== false
+                || strpos($name, '\\') !== false
+            ) {
                 continue;
             }
             if (!preg_match($config['asset_pattern'], $name, $match)) {
