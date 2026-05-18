@@ -210,19 +210,11 @@ function pmssStatsReadQuotaSnapshot(string $home): array
 }
 
 /**
- * Format bytes for compact CLI output.
- */
-function pmssStatsFormatBytes(float $bytes, int $precision = 1): string
-{
-    return pmssFormatBytes($bytes, $precision);
-}
-
-/**
  * Format a rate stored in bytes per second.
  */
 function pmssStatsFormatRate(float $bytesPerSecond): string
 {
-    return pmssStatsFormatBytes($bytesPerSecond).'/s';
+    return pmssFormatBytes($bytesPerSecond).'/s';
 }
 
 /**
@@ -443,7 +435,7 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
             'used_bytes' => $quota['used_bytes'],
             'limit_bytes' => $diskLimitBytes,
             'used_text' => (string) $quota['used_text'],
-            'limit_text' => $diskLimitBytes !== null ? pmssStatsFormatBytes((float) $diskLimitBytes) : (string) $quota['soft_text'],
+            'limit_text' => $diskLimitBytes !== null ? pmssFormatBytes((float) $diskLimitBytes) : (string) $quota['soft_text'],
             'percent' => $diskPercent,
         ],
         'memory' => [
@@ -507,12 +499,12 @@ function pmssStatsRenderText(array $stats, array $options = []): string
         $lines[] = '';
     }
 
-    $diskValue = (($stats['disk']['used_bytes'] !== null) ? pmssStatsFormatBytes((float) $stats['disk']['used_bytes']) : $stats['disk']['used_text'])
+    $diskValue = (($stats['disk']['used_bytes'] !== null) ? pmssFormatBytes((float) $stats['disk']['used_bytes']) : $stats['disk']['used_text'])
         .' / '
-        .(($stats['disk']['limit_bytes'] !== null) ? pmssStatsFormatBytes((float) $stats['disk']['limit_bytes']) : $stats['disk']['limit_text']);
-    $memoryValue = (($stats['memory']['current_bytes'] !== null) ? pmssStatsFormatBytes((float) $stats['memory']['current_bytes']) : 'n/a')
+        .(($stats['disk']['limit_bytes'] !== null) ? pmssFormatBytes((float) $stats['disk']['limit_bytes']) : $stats['disk']['limit_text']);
+    $memoryValue = (($stats['memory']['current_bytes'] !== null) ? pmssFormatBytes((float) $stats['memory']['current_bytes']) : 'n/a')
         .' / '
-        .(($stats['memory']['limit_bytes'] !== null) ? pmssStatsFormatBytes((float) $stats['memory']['limit_bytes']) : 'n/a');
+        .(($stats['memory']['limit_bytes'] !== null) ? pmssFormatBytes((float) $stats['memory']['limit_bytes']) : 'n/a');
 
     if (!empty($options['mini'])) {
         $ratio = $stats['rtorrent']['ratio'] !== null ? number_format((float) $stats['rtorrent']['ratio'], 2) : 'n/a';
@@ -551,12 +543,12 @@ function pmssStatsRenderText(array $stats, array $options = []): string
     $lines[] = pmssStatsRenderLine(
         'Upload',
         '▲ '.pmssStatsFormatRate((float) ($stats['rtorrent']['upload_rate'] ?? 0.0)),
-        'Total: '.(($stats['rtorrent']['upload_total'] !== null) ? pmssStatsFormatBytes((float) $stats['rtorrent']['upload_total']) : 'n/a')
+        'Total: '.(($stats['rtorrent']['upload_total'] !== null) ? pmssFormatBytes((float) $stats['rtorrent']['upload_total']) : 'n/a')
     );
     $lines[] = pmssStatsRenderLine(
         'Download',
         '▼ '.pmssStatsFormatRate((float) ($stats['rtorrent']['download_rate'] ?? 0.0)),
-        'Total: '.(($stats['rtorrent']['download_total'] !== null) ? pmssStatsFormatBytes((float) $stats['rtorrent']['download_total']) : 'n/a')
+        'Total: '.(($stats['rtorrent']['download_total'] !== null) ? pmssFormatBytes((float) $stats['rtorrent']['download_total']) : 'n/a')
     );
     $lines[] = pmssStatsRenderLine(
         'Ratio',
@@ -564,27 +556,21 @@ function pmssStatsRenderText(array $stats, array $options = []): string
     );
     $lines[] = '';
 
+    $trafficValue = ($stats['traffic']['upload_month_mib'] !== null) ? pmssTrafficFormatAmount((float) $stats['traffic']['upload_month_mib']) : 'n/a';
+    $trafficSuffix = '';
     if ($stats['traffic']['limit_mib'] !== null) {
-        $lines[] = pmssStatsRenderLine(
-            'Traffic',
-            (($stats['traffic']['upload_month_mib'] !== null) ? pmssTrafficFormatAmount((float) $stats['traffic']['upload_month_mib']) : 'n/a')
-                .' / '.pmssTrafficFormatAmount((float) $stats['traffic']['limit_mib']),
-            pmssStatsRenderBar($stats['traffic']['percent'], 16).' '.($stats['traffic']['percent'] !== null ? sprintf('%d%%', round((float) $stats['traffic']['percent'])) : 'n/a')
-        );
-    } else {
-        $lines[] = pmssStatsRenderLine(
-            'Traffic',
-            (($stats['traffic']['upload_month_mib'] !== null) ? pmssTrafficFormatAmount((float) $stats['traffic']['upload_month_mib']) : 'n/a')
-        );
+        $trafficValue .= ' / '.pmssTrafficFormatAmount((float) $stats['traffic']['limit_mib']);
+        $trafficSuffix = pmssStatsRenderBar($stats['traffic']['percent'], 16).' '.($stats['traffic']['percent'] !== null ? sprintf('%d%%', round((float) $stats['traffic']['percent'])) : 'n/a');
     }
+    $lines[] = pmssStatsRenderLine('Traffic', $trafficValue, $trafficSuffix);
     $lines[] = pmssStatsRenderLine('Uptime', $stats['uptime_seconds'] !== null ? pmssStatsFormatUptime((int) $stats['uptime_seconds']) : 'n/a', 'PMSS '.$stats['pmss_version']);
 
     if (!empty($options['full'])) {
         $lines[] = '';
         $lines[] = pmssStatsRenderLine('PIDs', ($stats['cgroup']['pids_current'] !== null) ? (string) $stats['cgroup']['pids_current'] : 'n/a');
         $lines[] = pmssStatsRenderLine('CPU', ($stats['cgroup']['cpu_usage_usec'] !== null) ? number_format(((float) $stats['cgroup']['cpu_usage_usec']) / 1000000, 1, '.', '').'s' : 'n/a');
-        $lines[] = pmssStatsRenderLine('I/O Read', pmssStatsFormatBytes((float) ($stats['cgroup']['io_read_bytes'] ?? 0)));
-        $lines[] = pmssStatsRenderLine('I/O Write', pmssStatsFormatBytes((float) ($stats['cgroup']['io_write_bytes'] ?? 0)));
+        $lines[] = pmssStatsRenderLine('I/O Read', pmssFormatBytes((float) ($stats['cgroup']['io_read_bytes'] ?? 0)));
+        $lines[] = pmssStatsRenderLine('I/O Write', pmssFormatBytes((float) ($stats['cgroup']['io_write_bytes'] ?? 0)));
         $lines[] = pmssStatsRenderLine('I/O PSI', ($stats['cgroup']['io_pressure_avg10'] !== null) ? number_format((float) $stats['cgroup']['io_pressure_avg10'], 1, '.', '') : 'n/a');
     }
 

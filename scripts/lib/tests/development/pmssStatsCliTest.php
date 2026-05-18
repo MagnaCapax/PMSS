@@ -139,6 +139,39 @@ class PmssStatsCliTest extends TestCase
         $this->assertStringContainsAllStrings(['PIDs', 'I/O Read', 'I/O PSI'], $rendered);
     }
 
+    public function testRenderTextSnapshotLocksStatsLayouts(): void
+    {
+        $stats = $this->statsRenderSnapshotPayload();
+
+        foreach ([
+            'default' => [
+                ['full' => false, 'mini' => false, 'no_header' => false],
+                'e35fbb16fd71c2c51701bbdfbfabf81d6bdf4adb201c68a208ecc33eafc58f9a',
+            ],
+            'mini' => [
+                ['mini' => true, 'no_header' => true],
+                'b692e46b01a5b3cc3600dcad006fae9aa7a9fad192f1064ec99e596b836fd849',
+            ],
+            'full' => [
+                ['full' => true, 'mini' => false, 'no_header' => true],
+                '17ca424972afa000d9e9f40f4e83e814c66b0df3d794774cfdf6f9ec2a765081',
+            ],
+            'no-limit' => [
+                ['full' => false, 'mini' => false, 'no_header' => true, 'traffic_limit' => false],
+                'e236f041095d915b5d84b68ceae5776de69093350efffbd04066aee22fc6a543',
+            ],
+        ] as $label => $case) {
+            $payload = $stats;
+            if (isset($case[0]['traffic_limit']) && !$case[0]['traffic_limit']) {
+                unset($case[0]['traffic_limit']);
+                $payload['traffic']['limit_mib'] = null;
+                $payload['traffic']['percent'] = null;
+            }
+
+            $this->assertSame($case[1], hash('sha256', \pmssStatsRenderText($payload, $case[0])), $label);
+        }
+    }
+
     public function testMainEmitsJsonWhenRequested(): void
     {
         $versionFile = $this->pmssWriteTempFile('stats-version', "3.0.0\n");
@@ -175,6 +208,61 @@ class PmssStatsCliTest extends TestCase
             'pmss-stats-stderr-'
         );
         $this->pmssAssertCommandFailsToStderr($command['result'], $command['stderrPath'], "Failed to encode PMSS stats JSON.\n");
+    }
+
+    /**
+     * Build a deterministic payload for exact render-layout characterization.
+     *
+     * @return array<string, mixed>
+     */
+    private function statsRenderSnapshotPayload(): array
+    {
+        return [
+            'context' => ['user' => 'alice'],
+            'product' => 'M10G S',
+            'pmss_version' => '2.8.14',
+            'uptime_seconds' => 93784,
+            'disk' => [
+                'used_bytes' => 1288490188800.0,
+                'limit_bytes' => 4398046511104.0,
+                'used_text' => '1.2T',
+                'limit_text' => '4.0T',
+                'percent' => 29.296875,
+            ],
+            'memory' => [
+                'current_bytes' => 2147483648.0,
+                'limit_bytes' => 8589934592.0,
+                'percent' => 25.0,
+            ],
+            'traffic' => [
+                'upload_month_mib' => 2150.0,
+                'download_month_mib' => 3680.0,
+                'limit_mib' => 6144.0,
+                'bonus_gib' => 1,
+                'percent' => 34.993489583333,
+            ],
+            'resource' => [],
+            'cgroup' => [
+                'pids_current' => 12,
+                'cpu_usage_usec' => 42000000,
+                'io_read_bytes' => 1024,
+                'io_write_bytes' => 2048,
+                'io_pressure_avg10' => 1.5,
+            ],
+            'rtorrent' => [
+                'ok' => true,
+                'upload_rate' => 44302336.0,
+                'download_rate' => 5347738.0,
+                'upload_total' => 8796093022208.0,
+                'download_total' => 4398046511104.0,
+                'ratio' => 2.0,
+                'torrent_total' => 6,
+                'torrent_active' => 4,
+                'torrent_seeding' => 2,
+                'torrent_downloading' => 2,
+                'torrent_stopped' => 2,
+            ],
+        ];
     }
 
     /**
