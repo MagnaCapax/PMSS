@@ -7,16 +7,17 @@ class FuseOverlayfsSupportTest extends TestCase
 {
     public function testDistUpgradeEnsuresFuseOverlayfsWhenAvailable(): void
     {
-        $src = $this->pmssReadUpdateFile('distUpgrade.php');
-        $this->assertTrue(strpos($src, 'pmssEnsureFuseOverlayfsAfterDistUpgrade') !== false, 'Expected post-upgrade fuse-overlayfs helper');
-        $this->assertTrue(strpos($src, 'apt-cache show fuse-overlayfs') !== false, 'Expected availability check for fuse-overlayfs (architecture-aware)');
-        $this->assertTrue(strpos($src, 'apt-get install') !== false && strpos($src, 'fuse-overlayfs') !== false, 'Expected apt-get install fuse-overlayfs step');
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/distUpgrade.php', [
+            'pmssEnsureFuseOverlayfsAfterDistUpgrade',
+            'apt-cache show fuse-overlayfs',
+            'apt-get install',
+            'fuse-overlayfs',
+        ]);
     }
 
     public function testUserMaintenanceEnforcesFuseOverlayfsBeyondDebian11(): void
     {
-        $src = $this->pmssReadUpdateFile('userMaintenance.php');
-        $this->assertTrue(strpos($src, 'fuse-overlayfs') !== false, 'Expected userMaintenance fuse-overlayfs logic');
-        $this->assertTrue(strpos($src, 'if ($distroVersion >= 12)') === false, 'Expected fuse-overlayfs enforcement to apply on Debian 12+ when available');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/userMaintenance.php', 'fuse-overlayfs', 'Expected userMaintenance fuse-overlayfs logic');
+        $this->pmssAssertRepoFileNotContainsString('scripts/lib/update/userMaintenance.php', 'if ($distroVersion >= 12)', 'Expected fuse-overlayfs enforcement to apply on Debian 12+ when available');
     }
 }

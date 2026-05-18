@@ -581,17 +581,11 @@ abstract class TestCase
         });
     }
 
-    /** Read the canonical systemd user-slice drop-in emitted by the fixture. */
-    protected function pmssSystemdSliceDropinRead(string $dropDir, string $name = '15-pmss.conf'): string
-    {
-        return (string) file_get_contents(rtrim($dropDir, '/').'/'.$name);
-    }
-
     /** @param array{dropDir:string,env:array<string,string>} $fixture */
     protected function pmssSystemdSliceDropinRender(array $fixture, string $name = '15-pmss.conf'): string
     {
         $this->pmssSystemdSliceEnsure($fixture);
-        return $this->pmssSystemdSliceDropinRead($fixture['dropDir'], $name);
+        return (string) file_get_contents(rtrim($fixture['dropDir'], '/').'/'.$name);
     }
 
     /** Render the canonical drop-in directly from fixture options. */
@@ -688,17 +682,11 @@ abstract class TestCase
         $property->setValue($this, '');
     }
 
-    /** Build a PATH value with a test stub directory first. */
-    protected function pmssPathWithPrefix(string $prefix): string
-    {
-        $originalPath = getenv('PATH');
-        return $prefix.(($originalPath !== false && $originalPath !== '') ? ':'.$originalPath : '');
-    }
-
     /** Build an environment array with a stub directory prepended to PATH. */
     protected function pmssPathPrefixedEnvironment(string $prefix, array $environment = []): array
     {
-        $environment['PATH'] = $this->pmssPathWithPrefix($prefix);
+        $originalPath = getenv('PATH');
+        $environment['PATH'] = $prefix.(($originalPath !== false && $originalPath !== '') ? ':'.$originalPath : '');
         return $environment;
     }
 
@@ -1038,18 +1026,12 @@ abstract class TestCase
         return $prefix;
     }
 
-    /** Skip the current test when symlinks are unavailable. */
-    protected function pmssRequireSymlinkSupport(): void
+    /** Create a symlink or skip the current test when the platform blocks it. */
+    protected function pmssCreateSymlinkOrSkip(string $target, string $link): void
     {
         if (!function_exists('symlink')) {
             throw new SkipTest('symlink unavailable');
         }
-    }
-
-    /** Create a symlink or skip the current test when the platform blocks it. */
-    protected function pmssCreateSymlinkOrSkip(string $target, string $link): void
-    {
-        $this->pmssRequireSymlinkSupport();
         if (!@symlink($target, $link)) {
             throw new SkipTest('symlink creation failed');
         }
@@ -1070,16 +1052,10 @@ abstract class TestCase
         return $contents;
     }
 
-    /** Read a file from scripts/lib/update through the shared repo helper. */
-    protected function pmssReadUpdateFile(string $relativePath): string
-    {
-        return $this->pmssReadRepoFile('scripts/lib/update/'.ltrim($relativePath, '/'));
-    }
-
     /** Read an update app installer/helper source file. */
     protected function pmssReadUpdateAppFile(string $relativePath): string
     {
-        return $this->pmssReadUpdateFile('apps/'.ltrim($relativePath, '/'));
+        return $this->pmssReadRepoFile('scripts/lib/update/apps/'.ltrim($relativePath, '/'));
     }
 
     /** Read a repository file and assert that it contains a substring. */

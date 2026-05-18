@@ -8,9 +8,10 @@ class ProcessSnapshotCronTest extends TestCase
     public function testSnapshotCronScriptsUseSharedSnapshotLogLifecycle(): void
     {
         foreach (['processSnapshot.php', 'quotaSnapshot.php', 'resourceSnapshot.php'] as $script) {
-            $src = $this->pmssReadRepoFile('scripts/cron/'.$script);
-            $this->assertStringContainsString('pmssRunSnapshotLogTask(__FILE__,', $src, $script.' should use the shared snapshot log lifecycle');
-            $this->assertStringContainsString('pmssSnapshotWriteWarn(', $src, $script.' should share snapshot warning formatting');
+            $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/'.$script, [
+                'pmssRunSnapshotLogTask(__FILE__,',
+                'pmssSnapshotWriteWarn(',
+            ], $script.' should use shared snapshot helpers: ');
         }
     }
 
