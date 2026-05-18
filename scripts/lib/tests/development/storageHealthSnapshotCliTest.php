@@ -45,7 +45,34 @@ class StorageHealthSnapshotCliTest extends TestCase
         $parentPath = $this->pmssMakeTempFile('pmss-storage-health-parent-');
         $result = $this->runSnapshotCommand(['--json', $parentPath.'/child.jsonl']);
         $this->assertSame(1, $result['rc']);
-        $this->assertStringContainsString('Failed to create storage health log directory', $result['output']);
+        $this->assertStringContainsString('Refusing unsafe storage health log path', $result['output']);
+    }
+
+    public function testRejectsSymlinkLogTargetBeforeReading(): void
+    {
+        $target = $this->pmssMakeTempFile('pmss-storage-health-target-');
+        $link = $this->pmssMakeTempDir('pmss-storage-health-link-').'/events.jsonl';
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+
+        $result = $this->runSnapshotCommand(['--json', $link]);
+
+        $this->assertSame(1, $result['rc']);
+        $this->assertStringContainsString('Refusing unsafe storage health log path', $result['output']);
+        $this->assertSame('', (string) file_get_contents($target));
+    }
+
+    public function testRejectsSymlinkedLogParentBeforeCreatingDirectories(): void
+    {
+        $targetDir = $this->pmssMakeTempDir('pmss-storage-health-real-');
+        $linkRoot = $this->pmssMakeTempDir('pmss-storage-health-linkroot-');
+        $linkDir = $linkRoot.'/redirected';
+        $this->pmssCreateSymlinkOrSkip($targetDir, $linkDir);
+
+        $result = $this->runSnapshotCommand(['--json', $linkDir.'/nested/events.jsonl']);
+
+        $this->assertSame(1, $result['rc']);
+        $this->assertStringContainsString('Refusing unsafe storage health log path', $result['output']);
+        $this->assertTrue(!is_dir($targetDir.'/nested'), 'must not create log directories through symlinked parents');
     }
 
     /** @return array{rc:int,output:string,lines:array<int,string>} */

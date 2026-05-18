@@ -10,6 +10,15 @@
 require_once __DIR__.'/../lib/storageHealth.php';
 require_once __DIR__.'/../lib/log.php';
 
+/** Validate the JSONL parent before recursive directory creation. */
+function pmssStorageHealthSnapshotLogDirectoryIsSafe(string $logDir): bool
+{
+    if ($logDir === '') {
+        return false;
+    }
+    return $logDir === '.' || pmssPathSegmentsAreSafe($logDir, true, true, true, true);
+}
+
 function pmssStorageHealthSnapshotMain(array $argv): int
 {
     $logPath = '/var/log/pmss/storage-health.jsonl';
@@ -37,8 +46,17 @@ function pmssStorageHealthSnapshotMain(array $argv): int
         }
     }
 
-    if (($logDir = dirname($logPath)) !== '' && !pmssDirEnsureExists($logDir, 0755)) {
+    $logDir = dirname($logPath);
+    if (!pmssStorageHealthSnapshotLogDirectoryIsSafe($logDir)) {
+        fwrite(STDERR, "Refusing unsafe storage health log path {$logPath}\n");
+        return 1;
+    }
+    if ($logDir !== '.' && !pmssDirEnsureExists($logDir, 0755)) {
         fwrite(STDERR, "Failed to create storage health log directory {$logDir}\n");
+        return 1;
+    }
+    if (!pmssLogWritePathIsSafe($logPath)) {
+        fwrite(STDERR, "Refusing unsafe storage health log path {$logPath}\n");
         return 1;
     }
 
