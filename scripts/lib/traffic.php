@@ -25,6 +25,9 @@ function pmssTrafficParseOutputRule(string $line): ?array
     return ['bytes' => (int) $columns[1], 'destination' => $columns[$ownerIndex - 1], 'uid' => (int) $columns[$ownerIndex + 3]];
 }
 
+/** Emit an optional traffic collection warning. */
+function pmssTrafficCollectWarn(?callable $logger, string $message): void { if ($logger !== null) $logger($message); }
+
 /**
  * Collect OUTPUT counters only after proving the list command succeeded.
  *
@@ -43,9 +46,7 @@ function pmssTrafficCollectOutputUsage(?callable $executor = null, ?callable $lo
     $listRc = 1;
     $executor('/sbin/iptables -nvx -L OUTPUT', $listOutput, $listRc);
     if ($listRc !== 0) {
-        if ($logger !== null) {
-            $logger("Failed to list iptables OUTPUT counters before reset (rc={$listRc}).");
-        }
+        pmssTrafficCollectWarn($logger, "Failed to list iptables OUTPUT counters before reset (rc={$listRc}).");
         return null;
     }
 
@@ -59,9 +60,7 @@ function pmssTrafficCollectOutputUsage(?callable $executor = null, ?callable $lo
 
     $usage = implode("\n", $usageLines);
     if (trim($usage) === '') {
-        if ($logger !== null) {
-            $logger('iptables OUTPUT counter listing returned no usable rows; counters were not reset.');
-        }
+        pmssTrafficCollectWarn($logger, 'iptables OUTPUT counter listing returned no usable rows; counters were not reset.');
         return null;
     }
 
@@ -69,9 +68,7 @@ function pmssTrafficCollectOutputUsage(?callable $executor = null, ?callable $lo
     $resetRc = 1;
     $executor('/sbin/iptables -Z OUTPUT', $resetOutput, $resetRc);
     if ($resetRc !== 0) {
-        if ($logger !== null) {
-            $logger("Failed to zero iptables OUTPUT counters after collection (rc={$resetRc}).");
-        }
+        pmssTrafficCollectWarn($logger, "Failed to zero iptables OUTPUT counters after collection (rc={$resetRc}).");
     }
 
     return $usage;
