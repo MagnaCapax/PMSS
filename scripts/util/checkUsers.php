@@ -9,6 +9,7 @@
 
 require_once __DIR__.'/../lib/users.php';
 require_once __DIR__.'/../lib/cli/optionParser.php';
+require_once __DIR__.'/../lib/log.php';
 
 $parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []));
 if (pmssCliOptionPresent($parsed, 'help', 'h')) {
@@ -27,7 +28,7 @@ $passwdOnly = array_values(array_diff($passwdUsers, $cacheUsers, $homeUsers));
 $consistent = array_values(array_intersect($cacheUsers, $homeUsers, $passwdUsers));
 
 if (pmssCliOptionPresent($parsed, 'json')) {
-    echo json_encode([
+    exit(pmssJsonEmitPayload([
         'consistent'   => $consistent,
         'db_only'      => $dbOnly,
         'home_only'    => $homeOnly,
@@ -35,8 +36,7 @@ if (pmssCliOptionPresent($parsed, 'json')) {
         'db_users'     => $cacheUsers,
         'home_users'   => $homeUsers,
         'passwd_users' => $passwdUsers,
-    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
-    exit(0);
+    ], 'Failed to encode user consistency JSON.', JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 }
 
 echo "== User Dataset Comparison ==\n";

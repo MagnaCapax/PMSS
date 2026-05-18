@@ -62,8 +62,7 @@ if ($action === 'view') {
         fwrite(STDERR, "User not found\n");
         exit(1);
     }
-    echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
-    exit(0);
+    exit(pmssJsonEmitPayload($payload, 'Failed to encode user settings JSON.', JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 }
 
 $key = $argv[3] ?? '';
@@ -85,7 +84,7 @@ if ($action === 'get') {
     }
     $value = $payload[$key];
     if (is_array($value)) {
-        echo json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
+        exit(pmssJsonEmitPayload($value, 'Failed to encode user setting JSON.', JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     } else {
         echo $value."\n";
     }

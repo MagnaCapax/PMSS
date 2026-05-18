@@ -222,7 +222,7 @@ function pmssUserResourcesListMain(array $argv): int
         }
     }
     if ($outputJson) {
-        echo json_encode($allData, JSON_PRETTY_PRINT)."\n";
+        return pmssJsonEmitPayload($allData, 'Failed to encode user resources JSON.', JSON_PRETTY_PRINT);
     }
     return 0;
 }

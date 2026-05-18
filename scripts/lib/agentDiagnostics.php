@@ -182,8 +182,7 @@ function pmssAgentDiagnosticsMain(array $argv): int
     if (pmssCliOption($parsed, 'json', 'j', false) !== false) {
         $flags = JSON_UNESCAPED_SLASHES;
         if (pmssCliOption($parsed, 'pretty', 'p', false) !== false) $flags |= JSON_PRETTY_PRINT;
-        echo json_encode($payload, $flags).PHP_EOL;
-        return 0;
+        return pmssJsonEmitPayload($payload, 'Failed to encode agent diagnostics JSON.', $flags);
     }
 
     echo pmssAgentDiagnosticsRenderText($payload);
