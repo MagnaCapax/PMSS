@@ -14,11 +14,7 @@ class UserUpdatePermissionsTest extends TestCase
         $home = $this->pmssMakeTempDir('pmss-perm-cmd-');
         $jsonLog = $this->pmssMakeTempFile('pmss-user-perm-json-');
 
-        $ctx = [
-            'user'     => 'dummy',
-            'home'     => $home,
-            'user_esc' => escapeshellarg('dummy'),
-        ];
+        $ctx = $this->pmssUserUpdateContext($home);
 
         $previousJsonLogPath = $GLOBALS['PMSS_JSON_LOG_PATH'] ?? null;
         unset($GLOBALS['PMSS_TEST_RUNUSERSTEP_LAST']);
@@ -60,11 +56,7 @@ class UserUpdatePermissionsTest extends TestCase
         file_put_contents($home.'/.rtorrent.rc.custom', "legacy");
         $this->pmssWithEnv(['PMSS_SKEL_DIR' => $home], function () use ($home): void {
             file_put_contents($home.'/.rtorrent.rc.custom', 'legacy');
-            $ctx = [
-                'user'     => 'dummy',
-                'home'     => $home,
-                'user_esc' => escapeshellarg('dummy'),
-            ];
+            $ctx = $this->pmssUserUpdateContext($home);
             \pmssUserRefreshPermissions($ctx);
         });
         $this->assertTrue(true);
@@ -92,11 +84,7 @@ class UserUpdatePermissionsTest extends TestCase
         $home = $this->pmssMakeTempDir('pmss-perm-dir-');
         mkdir($home.'/.rtorrent.rc.custom', 0755, true);
 
-        $ctx = [
-            'user'     => 'dummy',
-            'home'     => $home,
-            'user_esc' => escapeshellarg('dummy'),
-        ];
+        $ctx = $this->pmssUserUpdateContext($home);
 
         $GLOBALS['PMSS_PROFILE'] = [];
 

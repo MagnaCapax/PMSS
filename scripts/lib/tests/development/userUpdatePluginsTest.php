@@ -18,11 +18,7 @@ class UserUpdatePluginsTest extends TestCase
             'PMSS_DRY_RUN' => '1',
             'PMSS_SKEL_DIR' => sys_get_temp_dir().'/does-not-exist',
         ], function () use ($home): void {
-            $ctx = [
-                'user'     => 'dummy',
-                'home'     => $home,
-                'user_esc' => escapeshellarg('dummy'),
-            ];
+            $ctx = $this->pmssUserUpdateContext($home);
             \pmssUserEnsurePlugins($ctx);
 
             $expectedSource = sys_get_temp_dir().'/does-not-exist/www/rutorrent/plugins/unpack';
@@ -52,11 +48,7 @@ class UserUpdatePluginsTest extends TestCase
 
         $GLOBALS['PMSS_PROFILE'] = [];
 
-        \pmssUserEnsurePlugins([
-            'user'     => 'dummy',
-            'home'     => $home,
-            'user_esc' => escapeshellarg('dummy'),
-        ]);
+        \pmssUserEnsurePlugins($this->pmssUserUpdateContext($home));
 
         $this->assertTrue(!file_exists($settingsDir.'/retrackers.dat'));
         $this->assertEquals(

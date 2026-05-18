@@ -12,12 +12,7 @@ class UserUpdateThemesTest extends TestCase
         @mkdir($home.'/www/rutorrent/plugins/theme/themes', 0755, true);
         @mkdir($skel.'/www/rutorrent/plugins/theme/themes', 0755, true);
 
-        $ctx = [
-            'user'               => 'dummy',
-            'home'               => $home,
-            'user_esc'           => escapeshellarg('dummy'),
-            'rutorrent_index_sha'=> '',
-        ];
+        $ctx = $this->pmssUserUpdateContext($home, 'dummy', ['rutorrent_index_sha' => '']);
 
         $jsonLog = $this->pmssMakeTempFile('pmss-user-theme-');
         @file_put_contents($jsonLog, '');

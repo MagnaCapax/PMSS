@@ -336,6 +336,16 @@ abstract class TestCase
         return ['user' => $user, 'home' => $this->pmssUserHomePath($homeRoot, $user)];
     }
 
+    /** Build the updater user-context shape shared by user maintenance handlers. */
+    protected function pmssUserUpdateContext(string $home, string $user = 'dummy', array $extra = []): array
+    {
+        return array_replace([
+            'user' => $user,
+            'home' => $home,
+            'user_esc' => escapeshellarg($user),
+        ], $extra);
+    }
+
     /** Create a fixture directory tree and assert it exists afterwards. */
     protected function pmssEnsureFixtureDirectory(string $path, int $mode = 0755): void { $this->assertTrue(@mkdir($path, $mode, true) || is_dir($path), 'Expected fixture directory to exist: '.$path); }
 

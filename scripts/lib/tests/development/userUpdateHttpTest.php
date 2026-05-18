@@ -21,11 +21,7 @@ class UserUpdateHttpTest extends TestCase
         $config .= "WebUI\\Port=12345\n";
         file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', $config);
 
-        $ctx = [
-            'user'     => 'dummy',
-            'home'     => $home,
-            'user_esc' => escapeshellarg('dummy'),
-        ];
+        $ctx = $this->pmssUserUpdateContext($home);
 
         \pmssUserConfigureHttp($ctx);
 
@@ -45,11 +41,7 @@ class UserUpdateHttpTest extends TestCase
         mkdir($tempHome.'/.lighttpd', 0755, true);
         file_put_contents($tempHome.'/.lighttpd/php.ini', "display_errors = On\n");
 
-        $ctx = [
-            'user'     => 'dummy',
-            'home'     => $tempHome,
-            'user_esc' => escapeshellarg('dummy'),
-        ];
+        $ctx = $this->pmssUserUpdateContext($tempHome);
 
         \pmssUserConfigureHttp($ctx);
 
@@ -65,11 +57,7 @@ class UserUpdateHttpTest extends TestCase
         file_put_contents($target, "display_errors = On\n");
         $this->pmssCreateSymlinkOrSkip($target, $tempHome.'/.lighttpd/php.ini');
 
-        $ctx = [
-            'user'     => 'dummy',
-            'home'     => $tempHome,
-            'user_esc' => escapeshellarg('dummy'),
-        ];
+        $ctx = $this->pmssUserUpdateContext($tempHome);
 
         ob_start();
         try {
@@ -92,11 +80,7 @@ class UserUpdateHttpTest extends TestCase
         $config .= "WebUI\\Address=*\n";
         file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', $config);
 
-        $ctx = [
-            'user'     => 'dummy',
-            'home'     => $home,
-            'user_esc' => escapeshellarg('dummy'),
-        ];
+        $ctx = $this->pmssUserUpdateContext($home);
 
         \pmssUserConfigureHttp($ctx);
 
@@ -130,11 +114,7 @@ class UserUpdateHttpTest extends TestCase
 JSON
         );
 
-        $ctx = [
-            'user'     => 'dummy',
-            'home'     => $home,
-            'user_esc' => escapeshellarg('dummy'),
-        ];
+        $ctx = $this->pmssUserUpdateContext($home);
 
         \pmssUserConfigureHttp($ctx);
 
@@ -151,11 +131,7 @@ JSON
     public function testConfigureHttpUsesDefaultSkelPathForIrssiCopy(): void
     {
         $home = $this->pmssMakeTempDir('pmss-http-skel-default-');
-        $ctx = [
-            'user'     => 'dummy',
-            'home'     => $home,
-            'user_esc' => escapeshellarg('dummy'),
-        ];
+        $ctx = $this->pmssUserUpdateContext($home);
 
         $jsonLog = $this->pmssMakeTempFile('pmss-json-');
         file_put_contents($jsonLog, '');
@@ -186,11 +162,7 @@ JSON
         @mkdir($skel.'/.irssi', 0755, true);
         @file_put_contents($skel.'/.irssi/config', 'test');
 
-        $ctx = [
-            'user'     => 'dummy',
-            'home'     => $home,
-            'user_esc' => escapeshellarg('dummy'),
-        ];
+        $ctx = $this->pmssUserUpdateContext($home);
 
         $jsonLog = $this->pmssMakeTempFile('pmss-json-');
         file_put_contents($jsonLog, '');
