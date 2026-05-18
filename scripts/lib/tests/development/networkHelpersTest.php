@@ -32,6 +32,54 @@ class NetworkHelpersTest extends TestCase
         );
     }
 
+    public function testLoadMonitoringCommandsParsesSuccessfulHelperOutput(): void
+    {
+        $result = \networkLoadMonitoringCommands(
+            static function (array &$output, int &$rc): void {
+                $output = [
+                    '/sbin/iptables -A OUTPUT -m owner --uid-owner 1001 -j ACCEPT',
+                    '/sbin/iptables -A OUTPUT -j ACCEPT; touch /tmp/pmss-bad',
+                ];
+                $rc = 0;
+            }
+        );
+
+        $this->assertEquals(['-A OUTPUT -m owner --uid-owner 1001 -j ACCEPT'], $result);
+    }
+
+    public function testLoadMonitoringCommandsSkipsFailedHelperOutput(): void
+    {
+        $logs = [];
+        $result = \networkLoadMonitoringCommands(
+            static function (array &$output, int &$rc): void {
+                $output = ['/sbin/iptables -A OUTPUT -j ACCEPT'];
+                $rc = 3;
+            },
+            static function (string $message) use (&$logs): void {
+                $logs[] = $message;
+            }
+        );
+
+        $this->assertEquals([], $result);
+        $this->assertSame(['setupNetwork: monitoring rules helper failed (rc=3); skipping per-user monitoring rules'], $logs);
+    }
+
+    public function testLoadMonitoringCommandsSkipsHelperExceptions(): void
+    {
+        $logs = [];
+        $result = \networkLoadMonitoringCommands(
+            static function (array &$output, int &$rc): void {
+                throw new \RuntimeException('helper unavailable');
+            },
+            static function (string $message) use (&$logs): void {
+                $logs[] = $message;
+            }
+        );
+
+        $this->assertEquals([], $result);
+        $this->assertSame(['setupNetwork: failed to run monitoring rules helper: helper unavailable'], $logs);
+    }
+
     public function testIptablesCommandSafetyRejectsNullBytes(): void
     {
         $this->assertFalse(\networkIptablesCommandSafe("-A OUTPUT\0 -j ACCEPT"));

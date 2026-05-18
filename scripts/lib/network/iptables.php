@@ -99,6 +99,44 @@ function networkParseMonitoringCommands(string $raw): array
     return $commands;
 }
 
+/**
+ * Run the monitoring-rule helper and reject output from failed executions.
+ */
+function networkLoadMonitoringCommands(?callable $runner = null, ?callable $logger = null): array
+{
+    $runner = $runner ?? static function (array &$output, int &$rc): void {
+        exec('/scripts/util/makeMonitoringRules.php', $output, $rc);
+    };
+    $logger = $logger ?? 'logMessage';
+    $output = [];
+    $rc = 1;
+
+    try {
+        $runner($output, $rc);
+    } catch (Throwable $exception) {
+        if (is_callable($logger)) {
+            $logger('setupNetwork: failed to run monitoring rules helper: '.$exception->getMessage());
+        }
+        return [];
+    }
+
+    if ($rc !== 0) {
+        if (is_callable($logger)) {
+            $logger("setupNetwork: monitoring rules helper failed (rc={$rc}); skipping per-user monitoring rules");
+        }
+        return [];
+    }
+
+    $lines = [];
+    foreach ($output as $line) {
+        if (is_scalar($line)) {
+            $lines[] = (string) $line;
+        }
+    }
+
+    return networkParseMonitoringCommands(implode("\n", $lines));
+}
+
 function networkApplyIptablesAtomically(array $filterCommands, array $natCommands): bool
 {
     foreach (array_merge($filterCommands, $natCommands) as $command) {
