@@ -4,4 +4,4 @@ declare(strict_types=1);
 
 require_once __DIR__.'/../lib/agentDiagnostics.php';
 
-exit(pmssAgentDiagnosticsMain($argv ?? ($_SERVER['argv'] ?? [])));
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssAgentDiagnosticsMain');

@@ -141,6 +141,4 @@ function pmssCheckUserHtpasswdMain(array $argv): int
     return 0;
 }
 
-if (!defined('PMSS_CHECK_USER_HTPASSWD_LIB_ONLY')) {
-    exit(pmssCheckUserHtpasswdMain($argv));
-}
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssCheckUserHtpasswdMain');

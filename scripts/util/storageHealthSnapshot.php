@@ -72,4 +72,4 @@ function pmssStorageHealthSnapshotMain(array $argv): int
     return 0;
 }
 
-exit(pmssStorageHealthSnapshotMain($argv));
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssStorageHealthSnapshotMain');

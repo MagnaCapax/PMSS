@@ -15,5 +15,4 @@ if (!is_file($pmssStatsLib)) {
 
 require_once $pmssStatsLib;
 
-pmssRequireCli();
-exit(pmssStatsMain($argv ?? ($_SERVER['argv'] ?? [])));
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssStatsMain');

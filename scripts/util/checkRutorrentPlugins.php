@@ -28,6 +28,4 @@ function pmssCheckRutorrentPluginsMain(array $argv): int
     return 0;
 }
 
-if (!defined('PMSS_CHECK_RUTORRENT_PLUGINS_LIB_ONLY')) {
-    exit(pmssCheckRutorrentPluginsMain($argv));
-}
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssCheckRutorrentPluginsMain');

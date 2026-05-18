@@ -58,6 +58,4 @@ function pmssSetupLetsEncryptMain(array $argv): int
     return 0;
 }
 
-if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'] ?? '')) {
-    exit(pmssSetupLetsEncryptMain($argv ?? ($_SERVER['argv'] ?? array())));
-}
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssSetupLetsEncryptMain');

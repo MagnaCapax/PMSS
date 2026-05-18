@@ -3,7 +3,6 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 
-define('PMSS_CHECK_USER_HTPASSWD_LIB_ONLY', true);
 require_once dirname(__DIR__, 4).'/scripts/util/checkUserHtpasswd.php';
 
 class CheckUserHtpasswdTest extends TestCase
