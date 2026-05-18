@@ -5,106 +5,117 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateAppInstallerContractsTest extends TestCase
 {
+    private function assertUpdateAppContainsAllStrings(string $installer, array $needles): void
+    {
+        $this->assertStringContainsAllStrings($needles, $this->pmssReadUpdateAppFile($installer));
+    }
+
     public function testPyloadKeepsSharedVenvAndGuards(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('pyload.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/pythonVenv.php';", $contents);
-        $this->assertStringContainsString('pmssDistroVersionFromEnv()', $contents);
-        $this->assertStringContainsString('Skipping pyLoad setup: unsupported Debian release', $contents);
-        $this->assertStringContainsString('Skipping pyLoad setup: python3 missing from PATH', $contents);
-        $this->assertStringContainsString('pmssPythonVenvInstallCli(', $contents);
-        $this->assertStringContainsString("'pyLoad'", $contents);
+        $this->assertUpdateAppContainsAllStrings('pyload.php', [
+            "require_once __DIR__.'/pythonVenv.php';",
+            'pmssDistroVersionFromEnv()',
+            'Skipping pyLoad setup: unsupported Debian release',
+            'Skipping pyLoad setup: python3 missing from PATH',
+            'pmssPythonVenvInstallCli(',
+            "'pyLoad'",
+        ]);
     }
 
     public function testPyloadKeepsInstallAndLinkSteps(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('pyload.php');
-
-        $this->assertStringContainsString("['Installing pyLoad (pyload-ng)', 'pyload-ng']", $contents);
-        $this->assertStringContainsString('/usr/local/bin/pyload', $contents);
-        $this->assertStringContainsString('pyLoad binary missing after install', $contents);
+        $this->assertUpdateAppContainsAllStrings('pyload.php', [
+            "['Installing pyLoad (pyload-ng)', 'pyload-ng']",
+            '/usr/local/bin/pyload',
+            'pyLoad binary missing after install',
+        ]);
     }
 
     public function testPythonInstallerKeepsSharedVenvAndWarnings(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('python.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/pythonVenv.php';", $contents);
-        $this->assertStringContainsString('Skipping FlexGet install: python3 missing from PATH', $contents);
-        $this->assertStringContainsString('pmssPythonVenvInstallCli(', $contents);
-        $this->assertStringContainsString("'FlexGet'", $contents);
-        $this->assertStringContainsString('FlexGet binary missing after install', $contents);
+        $this->assertUpdateAppContainsAllStrings('python.php', [
+            "require_once __DIR__.'/pythonVenv.php';",
+            'Skipping FlexGet install: python3 missing from PATH',
+            'pmssPythonVenvInstallCli(',
+            "'FlexGet'",
+            'FlexGet binary missing after install',
+        ]);
     }
 
     public function testPythonInstallerKeepsInstallSequence(): void
     {
         $contents = $this->pmssReadUpdateAppFile('python.php');
 
-        foreach (['Installing gdrivefs in FlexGet venv', 'Installing FlexGet dependencies', 'Installing FlexGet', 'Installing youtube-dl for FlexGet'] as $stepLabel) {
-            $this->assertStringContainsString($stepLabel, $contents);
-        }
-        $this->assertStringContainsString('/usr/local/bin/flexget', $contents);
+        $this->assertStringContainsAllStrings([
+            'Installing gdrivefs in FlexGet venv',
+            'Installing FlexGet dependencies',
+            'Installing FlexGet',
+            'Installing youtube-dl for FlexGet',
+            '/usr/local/bin/flexget',
+        ], $contents);
     }
 
     public function testIprangeKeepsPackageAndToolchainGuards(): void
     {
         $contents = $this->pmssReadUpdateAppFile('iprange.php');
 
-        $this->assertStringContainsString("empty(\$GLOBALS['PMSS_PACKAGES_READY'])", $contents);
-        $this->assertStringContainsString('Skipping iprange build: package phase not complete', $contents);
-        $this->assertStringContainsString('Skipping iprange build: missing toolchain packages', $contents);
-        $this->assertStringContainsString('pmssPackageStatus($pkg)', $contents);
-        foreach (['build-essential', 'gcc', 'make', 'gawk'] as $package) {
-            $this->assertStringContainsString("'{$package}'", $contents);
-        }
+        $this->assertStringContainsAllStrings([
+            "empty(\$GLOBALS['PMSS_PACKAGES_READY'])",
+            'Skipping iprange build: package phase not complete',
+            'Skipping iprange build: missing toolchain packages',
+            'pmssPackageStatus($pkg)',
+            "'build-essential'",
+            "'gcc'",
+            "'make'",
+            "'gawk'",
+        ], $contents);
     }
 
     public function testIprangeKeepsCompileStep(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('iprange.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/remoteBinary.php';", $contents);
-        $this->assertStringContainsString("pmssRunPinnedRemoteArchiveStep('iprange '.\$iprangeVersion.' source'", $contents);
-        $this->assertStringContainsString('https://github.com/firehol/iprange/releases/download/v', $contents);
-        $this->assertStringContainsString("'Building iprange from source'", $contents);
-        $this->assertStringContainsString('make -j6', $contents);
-        $this->assertStringContainsString('make install', $contents);
+        $this->assertUpdateAppContainsAllStrings('iprange.php', [
+            "require_once __DIR__.'/remoteBinary.php';",
+            "pmssRunPinnedRemoteArchiveStep('iprange '.\$iprangeVersion.' source'",
+            'https://github.com/firehol/iprange/releases/download/v',
+            "'Building iprange from source'",
+            'make -j6',
+            'make install',
+        ]);
     }
 
     public function testSyncthingInstallerKeepsVersionProbeAndPinnedDownload(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('syncthing.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/remoteBinary.php';", $contents);
-        $this->assertStringContainsString("syncthing version 2>/dev/null", $contents);
-        $this->assertStringContainsString('pmssPinnedRemoteAmd64ArtifactsSupported()', $contents);
-        $this->assertStringContainsString('https://github.com/syncthing/syncthing/releases/download/', $contents);
-        $this->assertStringContainsString('syncthing-linux-amd64-', $contents);
-        $this->assertStringContainsString("pmssRunPinnedRemoteArchiveStep('Syncthing '.\$syncthingVersion", $contents);
-        $this->assertStringContainsString("'Installing Syncthing binary'", $contents);
-        $this->assertStringContainsString('install -m 0755', $contents);
+        $this->assertUpdateAppContainsAllStrings('syncthing.php', [
+            "require_once __DIR__.'/remoteBinary.php';",
+            'syncthing version 2>/dev/null',
+            'pmssPinnedRemoteAmd64ArtifactsSupported()',
+            'https://github.com/syncthing/syncthing/releases/download/',
+            'syncthing-linux-amd64-',
+            "pmssRunPinnedRemoteArchiveStep('Syncthing '.\$syncthingVersion",
+            "'Installing Syncthing binary'",
+            'install -m 0755',
+        ]);
     }
 
     public function testFireholInstallerKeepsPinnedSourceBuild(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('firehol.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/remoteBinary.php';", $contents);
-        $this->assertStringContainsString('https://github.com/firehol/firehol/releases/download/v', $contents);
-        $this->assertStringContainsString("pmssRunPinnedRemoteArchiveStep('FireHOL '.\$fireholVersion.' source'", $contents);
-        $this->assertStringContainsString("'Building FireHOL from source'", $contents);
-        $this->assertStringContainsString('./configure', $contents);
+        $this->assertUpdateAppContainsAllStrings('firehol.php', [
+            "require_once __DIR__.'/remoteBinary.php';",
+            'https://github.com/firehol/firehol/releases/download/v',
+            "pmssRunPinnedRemoteArchiveStep('FireHOL '.\$fireholVersion.' source'",
+            "'Building FireHOL from source'",
+            './configure',
+        ]);
     }
 
     public function testRemoteBinaryOwnsPinnedArchiveExtractionScaffold(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('remoteBinary.php');
-
-        $this->assertStringContainsString('function pmssRunPinnedRemoteArchiveStep(', $contents);
-        $this->assertStringContainsString('pmssFetchPinnedRemoteFile($label, $url, $expectedSha256)', $contents);
-        $this->assertStringContainsString("substr(\$archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf'", $contents);
-        $this->assertStringContainsString("'tar '.\$tarMode", $contents);
+        $this->assertUpdateAppContainsAllStrings('remoteBinary.php', [
+            'function pmssRunPinnedRemoteArchiveStep(',
+            'pmssFetchPinnedRemoteFile($label, $url, $expectedSha256)',
+            "substr(\$archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf'",
+            "'tar '.\$tarMode",
+        ]);
     }
 
     public function testPinnedDownloadInstallersReuseRemoteBinaryHelper(): void
@@ -124,14 +135,14 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testRcloneInstallerKeepsLatestFetchAndRelocationGuards(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('rclone.php');
-
-        $this->assertStringContainsString("getenv('PMSS_RCLONE_FETCH_LATEST') === '1'", $contents);
-        $this->assertStringContainsString('Warning: Unable to determine latest rclone version, falling back to pinned release.', $contents);
-        $this->assertStringContainsString('/usr/bin/rclone version 2>/dev/null', $contents);
-        $this->assertStringContainsString('/usr/bin/rclone -V 2>/dev/null', $contents);
-        $this->assertStringContainsString('mandb;', $contents);
-        $this->assertStringContainsString("passthru('mv /usr/sbin/rclone /usr/bin/rclone')", $contents);
+        $this->assertUpdateAppContainsAllStrings('rclone.php', [
+            "getenv('PMSS_RCLONE_FETCH_LATEST') === '1'",
+            'Warning: Unable to determine latest rclone version, falling back to pinned release.',
+            '/usr/bin/rclone version 2>/dev/null',
+            '/usr/bin/rclone -V 2>/dev/null',
+            'mandb;',
+            "passthru('mv /usr/sbin/rclone /usr/bin/rclone')",
+        ]);
     }
 
     public function testVnstatInstallerKeepsSupportedConfigPathOnly(): void
@@ -140,11 +151,13 @@ class UpdateAppInstallerContractsTest extends TestCase
         $repairCommand = 'chown -R '.'vnstat:vnstat /var/lib/vnstat';
         $removedVersionVariable = '$debian'.'Major';
 
-        $this->assertStringContainsString("require_once '/scripts/lib/networkInfo.php';", $contents);
-        $this->assertStringContainsString("passthru('apt-get install vnstat -y')", $contents);
-        $this->assertStringContainsString("str_replace('RateUnit 1', 'RateUnit 0'", $contents);
-        $this->assertStringContainsString('MaxBandwidth 100', $contents);
-        $this->assertStringContainsString('/etc/init.d/vnstat restart', $contents);
+        $this->assertStringContainsAllStrings([
+            "require_once '/scripts/lib/networkInfo.php';",
+            "passthru('apt-get install vnstat -y')",
+            "str_replace('RateUnit 1', 'RateUnit 0'",
+            'MaxBandwidth 100',
+            '/etc/init.d/vnstat restart',
+        ], $contents);
         $this->assertTrue(
             strpos($contents, $repairCommand) === false,
             'vnstat.php should not keep Debian 8 repair branches for unsupported releases'
@@ -157,14 +170,13 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testWatchdogInstallerKeepsTemplateAndDeviceFallbackFlow(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('watchdog.php');
-
-        $this->assertStringContainsString('template.watchdog.conf', $contents);
-        $this->assertStringContainsString('template.watchdog.network-check.sh', $contents);
-        $this->assertStringContainsString('/etc/watchdog.d', $contents);
-        $this->assertStringContainsString('/dev/watchdog0', $contents);
-        $this->assertStringContainsString('systemctl unmask watchdog || true', $contents);
-        $this->assertStringContainsString('systemctl enable --now watchdog', $contents);
+        $this->assertUpdateAppContainsAllStrings('watchdog.php', [
+            'template.watchdog.conf',
+            'template.watchdog.network-check.sh',
+            '/etc/watchdog.d',
+            '/dev/watchdog0',
+            'systemctl unmask watchdog || true',
+            'systemctl enable --now watchdog',
+        ]);
     }
-
 }

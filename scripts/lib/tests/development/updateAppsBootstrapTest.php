@@ -18,7 +18,7 @@ class UpdateAppsBootstrapTest extends TestCase
     private function appBootstrapOutput(string $installerFile): string
     {
         $sourceDir = dirname(__DIR__, 2).'/update/apps';
-        $sandboxDir = $this->tempDir.'/apps';
+        $sandboxDir = $this->tempDir.'/apps-'.basename($installerFile, '.php');
         $this->assertTrue(@mkdir($sandboxDir, 0700, true), 'Unable to create sandbox app dir');
 
         foreach ([$installerFile, 'bootstrap.php', 'arr.php'] as $file) {
@@ -37,53 +37,21 @@ class UpdateAppsBootstrapTest extends TestCase
         return $output;
     }
 
-    public function testRadarrWarnsAndReturnsWhenRuntimeHelperMissing(): void
+    public function testStarrInstallersWarnAndReturnWhenRuntimeHelperMissing(): void
     {
-        $output = $this->appBootstrapOutput('radarr.php');
+        foreach (['radarr.php' => 'Radarr', 'sonarr.php' => 'Sonarr', 'prowlarr.php' => 'Prowlarr', 'lidarr.php' => 'Lidarr', 'readarr.php' => 'Readarr'] as $installer => $label) {
+            $output = $this->appBootstrapOutput($installer);
 
-        $this->assertStringContainsString('Radarr updater: missing runtime helper', $output);
-        $this->assertTrue(strpos($output, 'Fatal error') === false, 'Radarr bootstrap should soft-return when runtime is missing');
-    }
-
-    public function testSonarrWarnsAndReturnsWhenRuntimeHelperMissing(): void
-    {
-        $output = $this->appBootstrapOutput('sonarr.php');
-
-        $this->assertStringContainsString('Sonarr updater: missing runtime helper', $output);
-        $this->assertTrue(strpos($output, 'Fatal error') === false, 'Sonarr bootstrap should soft-return when runtime is missing');
-    }
-
-    public function testProwlarrWarnsAndReturnsWhenRuntimeHelperMissing(): void
-    {
-        $output = $this->appBootstrapOutput('prowlarr.php');
-
-        $this->assertStringContainsString('Prowlarr updater: missing runtime helper', $output);
-        $this->assertTrue(strpos($output, 'Fatal error') === false, 'Prowlarr bootstrap should soft-return when runtime is missing');
-    }
-
-    public function testLidarrWarnsAndReturnsWhenRuntimeHelperMissing(): void
-    {
-        $output = $this->appBootstrapOutput('lidarr.php');
-
-        $this->assertStringContainsString('Lidarr updater: missing runtime helper', $output);
-        $this->assertTrue(strpos($output, 'Fatal error') === false, 'Lidarr bootstrap should soft-return when runtime is missing');
-    }
-
-    public function testReadarrWarnsAndReturnsWhenRuntimeHelperMissing(): void
-    {
-        $output = $this->appBootstrapOutput('readarr.php');
-
-        $this->assertStringContainsString('Readarr updater: missing runtime helper', $output);
-        $this->assertTrue(strpos($output, 'Fatal error') === false, 'Readarr bootstrap should soft-return when runtime is missing');
+            $this->assertStringContainsString($label.' updater: missing runtime helper', $output);
+            $this->assertTrue(strpos($output, 'Fatal error') === false, $label.' bootstrap should soft-return when runtime is missing');
+        }
     }
 
     public function testUpdateStep2SkipsHelperModulesInAppLoader(): void
     {
         $contents = $this->pmssReadRepoFile('scripts/util/update-step2.php');
 
-        $this->assertStringContainsString("'arr.php'", $contents);
-        $this->assertStringContainsString("'pythonVenv.php'", $contents);
-        $this->assertStringContainsString("'remoteBinary.php'", $contents);
+        $this->assertStringContainsAllStrings(["'arr.php'", "'pythonVenv.php'", "'remoteBinary.php'"], $contents);
         $this->pmssAssertStringNotContainsString("'packages.php'", $contents, 'retired package module should not remain in app loader skip list');
     }
 
