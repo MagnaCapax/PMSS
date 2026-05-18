@@ -71,17 +71,13 @@ class LighttpdWatchdogErrorPageTest extends TestCase
     public function testRenderErrorPageIncludesSpecificStatusAndHomeLink(): void
     {
         $contents = pmssLighttpdWatchdogRenderErrorPage('quota');
-        $this->assertStringContainsString('Your disk quota is full.', $contents);
-        $this->assertStringContainsString('Connect with SFTP and delete files to free space, then retry.', $contents);
-        $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
+        $this->assertStringContainsAllStrings(['Your disk quota is full.', 'Connect with SFTP and delete files to free space, then retry.', '<a href="/">Return to the main page.</a>'], $contents);
     }
 
     public function testRenderErrorPageFallsBackToRestartingMessageForUnknownReason(): void
     {
         $contents = pmssLighttpdWatchdogRenderErrorPage('unknown');
-        $this->assertStringContainsString('Your web service is restarting.', $contents);
-        $this->assertStringContainsString('This usually settles within 1-2 minutes; please retry shortly.', $contents);
-        $this->assertStringContainsString('If the issue persists, please open a support ticket.', $contents);
+        $this->assertStringContainsAllStrings(['Your web service is restarting.', 'This usually settles within 1-2 minutes; please retry shortly.', 'If the issue persists, please open a support ticket.'], $contents);
     }
 
     public function testRenderErrorPageKeepsTicketGuidanceForQuotaReason(): void

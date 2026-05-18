@@ -23,11 +23,7 @@ class StorageBenchmarkShowLastTest extends TestCase
         $log = $this->pmssWriteStorageBenchmarkLog($entries);
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
         $this->assertTrue(is_string($out) && $out !== '', 'no output from storageBenchmark --show-last');
-        $this->assertStringContainsString('== Storage benchmark (last run) ==', $out);
-        $this->assertStringContainsString('File-backed tests', $out);
-        $this->assertStringContainsString('randread-small', $out);
-        $this->assertStringContainsString('Per-device tests', $out);
-        $this->assertStringContainsString('/dev/sda', $out);
+        $this->assertStringContainsAllStrings(['== Storage benchmark (last run) ==', 'File-backed tests', 'randread-small', 'Per-device tests', '/dev/sda'], $out);
     }
 
     public function testShowLastAcceptsEqualsFormForJsonPath(): void
@@ -41,8 +37,7 @@ class StorageBenchmarkShowLastTest extends TestCase
         ];
         $log = $this->pmssWriteStorageBenchmarkLog($entries);
         $out = $this->pmssRunRepoPhpScript('scripts/util/storageBenchmark.php', ['--show-last', '--json='.$log]);
-        $this->assertStringContainsString('== Storage benchmark (last run) ==', (string)$out);
-        $this->assertStringContainsString('randread-small', (string)$out);
+        $this->assertStringContainsAllStrings(['== Storage benchmark (last run) ==', 'randread-small'], (string) $out);
     }
 
     public function testShowLastIgnoresExtraIntegerOptionsWhileUsingSharedValueDispatch(): void
@@ -56,8 +51,7 @@ class StorageBenchmarkShowLastTest extends TestCase
         ];
         $log = $this->pmssWriteStorageBenchmarkLog($entries);
         $out = $this->pmssRunStorageBenchmarkShowLast($log, ['--runtime=15', '--device-runtime', '45', '--idle-util=70']);
-        $this->assertStringContainsString('== Storage benchmark (last run) ==', (string)$out);
-        $this->assertStringContainsString('randread-small', (string)$out);
+        $this->assertStringContainsAllStrings(['== Storage benchmark (last run) ==', 'randread-small'], (string) $out);
     }
 
     public function testShowLastIgnoresMalformedBenchmarkRuntimeOptions(): void
@@ -95,8 +89,7 @@ class StorageBenchmarkShowLastTest extends TestCase
              'metrics'=>['read_bw_MBps'=>1,'write_bw_MBps'=>0,'read_iops'=>1,'write_iops'=>0,'read_p95_ms'=>1,'write_p95_ms'=>0]],
         ]);
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
-        $this->assertStringContainsString('Storage benchmark (last run)', $out);
-        $this->assertStringContainsString('randread-small', $out);
+        $this->assertStringContainsAllStrings(['Storage benchmark (last run)', 'randread-small'], $out);
     }
 
     public function testShowLastSelectsLatestRunByTimestamp(): void

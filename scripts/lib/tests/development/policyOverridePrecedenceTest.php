@@ -19,9 +19,7 @@ class PolicyOverridePrecedenceTest extends TestCase
     {
         $cfgDir = $this->createPolicyDir('policy', "<?php return ['cpuWeight'=>123,'ioWeight'=>321,'tasksMax'=>777];\n");
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--defaults'], ['PMSS_CONFIG_DIR' => $cfgDir]);
-        $this->assertStringContainsString('CPUWeight=123', $out);
-        $this->assertStringContainsString('IOWeight=321', $out);
-        $this->assertStringContainsString('TasksMax=777', $out);
+        $this->assertStringContainsAllStrings(['CPUWeight=123', 'IOWeight=321', 'TasksMax=777'], $out);
     }
 
     public function testExplicitOverridesPolicyDefaults(): void
@@ -43,11 +41,7 @@ class PolicyOverridePrecedenceTest extends TestCase
             ['PMSS_CONFIG_DIR' => $cfgDir, 'PMSS_HOME_DEVICE' => '/dev/testhome']
         );
 
-        $this->assertStringContainsString('IODeviceWeight=/dev/testhome 320', $out);
-        $this->assertStringContainsString('IOReadBandwidthMax=/dev/testhome 25M', $out);
-        $this->assertStringContainsString('IOWriteBandwidthMax=/dev/testhome 10M', $out);
-        $this->assertStringContainsString('IOReadIOPSMax=/dev/testhome 150', $out);
-        $this->assertStringContainsString('IOWriteIOPSMax=/dev/testhome 90', $out);
+        $this->assertStringContainsAllStrings(['IODeviceWeight=/dev/testhome 320', 'IOReadBandwidthMax=/dev/testhome 25M', 'IOWriteBandwidthMax=/dev/testhome 10M', 'IOReadIOPSMax=/dev/testhome 150', 'IOWriteIOPSMax=/dev/testhome 90'], $out);
     }
 
     public function testExplicitIoFlagsOverridePolicyMountIoPairs(): void
