@@ -6,7 +6,6 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
-require_once '/scripts/lib/user/userFilesystem.php';
 require_once '/scripts/lib/resources/log.php';
 $logDir = '/var/log/pmss/resources';
 $stateDir = '/var/run/pmss/resources';
@@ -16,12 +15,12 @@ if (!pmssEnsureSafeDir($logDir, 0755) || !pmssEnsureSafeDir($stateDir, 0700)) {
     exit(1);
 }
 
-$users = userFilesystem::listManagedUsersWithAdditionalUsers(['www-data']);
-if ($users === []) {
+$userUids = pmssResourceLogManagedUserUids();
+if ($userUids === []) {
     exit(0);
 }
-foreach ($users as $user) {
-    if (($uid = pmssResourceLogLookupManagedUid($user)) === null || ($counters = pmssResourceLogReadCounters($uid)) === null) {
+foreach ($userUids as $user => $uid) {
+    if (($counters = pmssResourceLogReadCounters($uid)) === null) {
         continue;
     }
 

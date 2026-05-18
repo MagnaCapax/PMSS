@@ -429,7 +429,7 @@ abstract class TestCase
     protected function pmssListUsersConsumerMap(): array
     {
         return [
-            "userFilesystem::listManagedUsersWithAdditionalUsers(['www-data'])" => [
+            'pmssResourceLogManagedUserUids()' => [
                 'scripts/cron/resourceLog.php',
                 'scripts/cron/resourceSnapshot.php',
                 'scripts/cron/trafficLog.php',

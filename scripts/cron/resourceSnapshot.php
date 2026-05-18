@@ -10,25 +10,20 @@
 require_once __DIR__.'/../lib/resources/log.php';
 require_once __DIR__.'/../lib/resources.php';
 require_once __DIR__.'/../lib/runtime.php';
-require_once __DIR__.'/../lib/user/userFilesystem.php';
 
 const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/resource-daily.log';
 
 function pmssResourceSnapshotRun(): int
 {
     return pmssRunSnapshotLogTask(__FILE__, 'PMSS_RESOURCE_SNAPSHOT_LOG', PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT, static function ($fh, string $ts): int {
-        $users = userFilesystem::listManagedUsersWithAdditionalUsers(['www-data']);
-        if ($users === []) {
+        $userUids = pmssResourceLogManagedUserUids();
+        if ($userUids === []) {
             return 0;
         }
         $stats = new resourceStatistics();
         $homeDir = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
 
-        foreach ($users as $user) {
-            if (($uid = pmssResourceLogLookupManagedUid($user)) === null) {
-                continue;
-            }
-
+        foreach ($userUids as $user => $uid) {
             $dataPath = $homeDir.'/'.$user.'/.resourceData';
             $metrics = $stats->readSnapshotMetricsFromPath($dataPath);
 

@@ -11,10 +11,9 @@
 require_once '/scripts/lib/network/iptables.php';
 require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/resources/log.php';
-require_once '/scripts/lib/user/userFilesystem.php';
 
-$users = userFilesystem::listManagedUsersWithAdditionalUsers(['www-data']);
-if (!$users) exit(0);
+$userUids = pmssResourceLogManagedUserUids();
+if (!$userUids) exit(0);
 
 $mark = 1;
 
@@ -28,10 +27,7 @@ $lastLocalNet = $localnets ? end($localnets) : '';
 // Loopback never leaves the host, so exclude it from egress accounting.
 echo "/sbin/iptables -A OUTPUT -d 127.0.0.0/8 -j ACCEPT\n";
 
-foreach ($users as $thisUser) {
-    $thisUid = pmssResourceLogLookupManagedUid($thisUser);
-    if ($thisUid === null) continue;	// User does not exist anymore
-
+foreach ($userUids as $thisUser => $thisUid) {
     foreach ($localnets as $thisLocalNet) {
         echo "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -m owner --uid-owner {$thisUid} -j ACCEPT\n";
     }

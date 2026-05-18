@@ -10,6 +10,7 @@ require_once __DIR__.'/../userLifecycle.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../resources.php';
+require_once __DIR__.'/../user/userFilesystem.php';
 
 /**
  * Resolve a validated managed username to its UID.
@@ -25,6 +26,22 @@ function pmssResourceLogLookupManagedUid(string $user): ?int
 
     $uid = trim((string) @shell_exec('id -u '.escapeshellarg($user).' 2>/dev/null'));
     return ctype_digit($uid) ? (int) $uid : null;
+}
+
+/** Return managed resource-account users keyed by validated UID. */
+function pmssResourceLogManagedUserUids(array $additionalUsers = ['www-data'], ?callable $listUsers = null, ?callable $uidResolver = null): array
+{
+    $listUsers = $listUsers ?? ['userFilesystem', 'listManagedUsersWithAdditionalUsers'];
+    $uidResolver = $uidResolver ?? 'pmssResourceLogLookupManagedUid';
+    $result = [];
+
+    foreach ($listUsers($additionalUsers) as $user) {
+        $user = (string) $user;
+        if (!is_int($uid = $uidResolver($user))) continue;
+        $result[$user] = $uid;
+    }
+
+    return $result;
 }
 
 function pmssAppendRootTimestampedLogEntry(string $path, string $message, int $mode = 0644): bool

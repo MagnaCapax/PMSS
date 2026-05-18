@@ -13,15 +13,14 @@ require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/network/iptables.php';
 require_once '/scripts/lib/resources/log.php';
 require_once '/scripts/lib/traffic.php';
-require_once '/scripts/lib/user/userFilesystem.php';
 
 $logger = new Logger(__FILE__);
 if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
 }
 $logdir = '/var/log/pmss/traffic/';
-$users = userFilesystem::listManagedUsersWithAdditionalUsers(['www-data']);
-if (count($users) == 0) exit;    // Nothing to collect
+$userUids = pmssResourceLogManagedUserUids();
+if (count($userUids) == 0) exit;    // Nothing to collect
 
 // Load optional localnet definitions for counting LAN traffic separately.
 // Multiple networks may be listed one per line in the central localnet config.
@@ -48,9 +47,7 @@ $parsedUsage = pmssTrafficParseOutputUsage($usage, $localnets);
 
 $logger->msg("Collecting data");
 
-foreach($users AS $thisUser) {
-    $thisUid = pmssResourceLogLookupManagedUid($thisUser);
-    if ($thisUid === null) continue;
+foreach($userUids AS $thisUser => $thisUid) {
     $thisUserTraffic = $parsedUsage['traffic'][$thisUid] ?? 0;
     $thisUserTrafficLocal = $parsedUsage['local'][$thisUid] ?? 0;
 
