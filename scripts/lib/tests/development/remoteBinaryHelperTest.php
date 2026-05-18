@@ -56,8 +56,6 @@ SH
         $this->pmssWithEnv($env, function () use ($callback, $root, $commandLog, $dpkgCapture): void {
             $callback($root, $commandLog, $dpkgCapture);
         });
-
-        $this->pmssRemoveTree($root);
     }
     public function testFetchPinnedRemoteFileReturnsTempPathForMatchingChecksum(): void
     {

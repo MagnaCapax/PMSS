@@ -8,7 +8,7 @@
 /** Ensure a fixture directory exists with the requested mode. */
 function pmssTestingEnsureDirectory(string $path, int $mode = 0700): bool
 {
-    return is_dir($path) || @mkdir($path, $mode, true);
+    return is_dir($path) || @mkdir($path, $mode, true) || is_dir($path);
 }
 
 /** Remove a temporary tree created by tests without shelling out. */

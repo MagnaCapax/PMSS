@@ -5,7 +5,6 @@
  * @license GPL-3.0-only
  */
 
-require_once dirname(__DIR__).'/runtime.php';
 require_once __DIR__.'/filesystem.php';
 
 const PMSS_CUSTOMER_PANEL_RENDER_BASE = '/pmss-render-test';
@@ -25,10 +24,10 @@ function pmssCustomerPanelRenderRepoRoot(): string
 function pmssCustomerPanelRenderTempRoot(): string
 {
     $base = rtrim(sys_get_temp_dir(), '/').PMSS_CUSTOMER_PANEL_RENDER_BASE;
-    pmssDirEnsureExists($base, 0700);
+    pmssTestingEnsureDirectory($base, 0700);
 
     $root = $base.'/run-'.bin2hex(random_bytes(8));
-    pmssDirEnsureExists($root, 0700);
+    pmssTestingEnsureDirectory($root, 0700);
     return $root;
 }
 
@@ -51,7 +50,7 @@ function pmssCustomerPanelRenderPrepare(string $sourceWww, string $home, string 
     }
 
     foreach ([$home, $www, $home.'/.config/deluge', $home.'/.lighttpd'] as $dir) {
-        if (!pmssDirEnsureExists($dir, 0700)) {
+        if (!pmssTestingEnsureDirectory($dir, 0700)) {
             return ['ok' => false, 'error' => 'unable to create mock directory: '.$dir];
         }
     }
