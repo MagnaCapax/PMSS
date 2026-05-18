@@ -25,7 +25,16 @@ $networkConfig = networkLoadConfig();
 $localnets     = networkLoadLocalnets();
 
 // Resolve the uplink interface and current speed capacity.
-$link      = $networkConfig['interface'] ?? detectPrimaryInterface();
+$configuredInterface = isset($networkConfig['interface']) ? (string) $networkConfig['interface'] : '';
+if ($configuredInterface !== '') {
+    $link = networkInterfaceNameNormalized($configuredInterface);
+    if ($link === '') {
+        logMessage('setupNetwork: unsafe configured interface name');
+        die("Error: Unsafe configured network interface\n");
+    }
+} else {
+    $link = detectPrimaryInterface();
+}
 $interface = $link;
 $linkSpeed = getLinkSpeed($link);
 
@@ -36,8 +45,8 @@ if (empty($networkConfig['interface']) && preg_match('/^(tun|tap|wg)/', $interfa
     if ($routes !== '') {
         foreach (explode("\n", $routes) as $line) {
             if (preg_match('/\\bdev\\s+(\\S+)/', $line, $matches)) {
-                $candidate = $matches[1];
-                if (!preg_match('/^(tun|tap|wg)/', $candidate)) {
+                $candidate = networkInterfaceNameNormalized($matches[1]);
+                if ($candidate !== '' && !preg_match('/^(tun|tap|wg)/', $candidate)) {
                     $fallback = $candidate;
                     break;
                 }

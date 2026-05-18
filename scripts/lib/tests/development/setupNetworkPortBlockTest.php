@@ -34,4 +34,17 @@ class SetupNetworkPortBlockTest extends TestCase
             ]
         );
     }
+
+    public function testSetupNetworkNormalizesInterfaceNamesBeforeRenderingRules(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/util/setupNetwork.php',
+            [
+                "networkInterfaceNameNormalized(\$configuredInterface)",
+                "logMessage('setupNetwork: unsafe configured interface name')",
+                "die(\"Error: Unsafe configured network interface\\n\")",
+                "networkInterfaceNameNormalized(\$matches[1])",
+            ]
+        );
+    }
 }
