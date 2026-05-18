@@ -56,7 +56,7 @@ class DelugeFindCallerCompatPatchTest extends DelugeAppTestCase
 
         $this->assertTrue($result, 'Expected dry-run patch to report success');
         $this->assertEquals($original, $content, 'Dry-run must not modify file content');
-        $this->assertTrue($this->pmssLogBufferContains($this->logs, 'Would patch Deluge findCaller signature'), 'Expected dry-run log message');
+        $this->assertTrue($this->pmssMessagesContain($this->logs, 'Would patch Deluge findCaller signature'), 'Expected dry-run log message');
     }
 
     public function testPatchRejectsSymlinkPath(): void

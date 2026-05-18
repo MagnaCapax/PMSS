@@ -48,7 +48,7 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
 
         $this->assertTrue($result, 'Expected dry-run patch to report success');
         $this->assertEquals($original, $content, 'Dry-run must not modify file content');
-        $this->assertTrue($this->pmssLogBufferContains($this->logs, 'Would patch Deluge cache hit ratio'), 'Expected dry-run log message');
+        $this->assertTrue($this->pmssMessagesContain($this->logs, 'Would patch Deluge cache hit ratio'), 'Expected dry-run log message');
     }
 
     public function testPatchReturnsFalseWhenCacheRatioLineMissing(): void
@@ -72,7 +72,7 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
 
         $this->assertTrue($result === false, 'Expected patch to fail without an else block');
         $this->assertEquals($original, $content, 'Failed patch must not modify file content');
-        $this->assertTrue($this->pmssLogBufferContains($this->logs, 'Unable to locate Deluge cache ratio else block'), 'Expected missing else warning');
+        $this->assertTrue($this->pmssMessagesContain($this->logs, 'Unable to locate Deluge cache ratio else block'), 'Expected missing else warning');
     }
 
     public function testPatchRejectsSymlinkPath(): void

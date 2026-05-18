@@ -50,7 +50,7 @@ class DelugeCommandSymlinkTest extends DelugeAppTestCase
         $this->assertTrue(is_file($localPath), 'Expected dry-run to keep legacy file in place');
         $this->assertTrue(!is_link($localPath), 'Expected dry-run to avoid creating symlink');
         $this->assertEquals($legacy, (string) file_get_contents($localPath));
-        $this->assertTrue($this->pmssLogBufferContains($this->logs, 'Would replace legacy Deluge command path'), 'Expected dry-run replace log');
+        $this->assertTrue($this->pmssMessagesContain($this->logs, 'Would replace legacy Deluge command path'), 'Expected dry-run replace log');
     }
 
     public function testReturnsTrueWhenCorrectSymlinkAlreadyExists(): void
@@ -75,7 +75,7 @@ class DelugeCommandSymlinkTest extends DelugeAppTestCase
         $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $localPath, false, $this->logger);
 
         $this->assertTrue($result === false, 'Expected missing system binary to fail refresh');
-        $this->assertTrue($this->pmssLogBufferContains($this->logs, 'missing system binary'), 'Expected missing binary warning log');
+        $this->assertTrue($this->pmssMessagesContain($this->logs, 'missing system binary'), 'Expected missing binary warning log');
     }
 
     public function testRejectsDirectoryAtLocalCommandPath(): void
@@ -88,7 +88,7 @@ class DelugeCommandSymlinkTest extends DelugeAppTestCase
 
         $this->assertTrue($result === false, 'Expected directory local path to be rejected');
         $this->assertTrue(is_dir($localPath), 'Expected directory path to remain untouched');
-        $this->assertTrue($this->pmssLogBufferContains($this->logs, 'Refusing to replace Deluge command directory'), 'Expected directory guard warning');
+        $this->assertTrue($this->pmssMessagesContain($this->logs, 'Refusing to replace Deluge command directory'), 'Expected directory guard warning');
     }
 
     private function makeExecutable(string $relativePath): string
