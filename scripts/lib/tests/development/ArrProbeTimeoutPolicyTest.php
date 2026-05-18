@@ -22,12 +22,24 @@ class ArrProbeTimeoutPolicyTest extends TestCase
 
     public function testSupportedStarrAppsUseSharedInstallPathPreset(): void
     {
-        foreach (['Lidarr', 'Prowlarr', 'Radarr', 'Readarr', 'Sonarr'] as $app) {
+        foreach (\pmssArrSupportedApps() as $app) {
             $config = \pmssArrAppConfig($app);
 
             $this->assertTrue(is_array($config), $app.' config should exist');
             $this->assertSame('/opt/'.$app, (string) $config['install_path']);
         }
+    }
+
+    public function testServarrEntrypointReplacesPerAppWrappers(): void
+    {
+        $appRoot = dirname(__DIR__, 2).'/update/apps';
+
+        $this->assertSame(['Lidarr', 'Prowlarr', 'Radarr', 'Readarr', 'Sonarr'], \pmssArrSupportedApps());
+        $this->assertTrue(is_file($appRoot.'/servarr.php'), 'single Servarr entrypoint should exist');
+        foreach (['lidarr.php', 'prowlarr.php', 'radarr.php', 'readarr.php', 'sonarr.php'] as $wrapper) {
+            $this->assertFalse(is_file($appRoot.'/'.$wrapper), $wrapper.' should not remain as a parallel app wrapper');
+        }
+        $this->assertStringContainsString('pmssArrUpdateSupportedApps();', (string) @file_get_contents($appRoot.'/servarr.php'));
     }
 
     public function testReleaseAssetSelectionPrefersTargetArchitectureOverGenericBuild(): void

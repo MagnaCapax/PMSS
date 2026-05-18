@@ -392,6 +392,9 @@ These scripts are primarily imperative; treat them as idempotent installers guar
 - btsync.php
   - Ensures BTSync 1.4/2.2 binaries in `/usr/bin/`; symlinks `/usr/bin/btsync`→2.2; installs/updates Resilio Sync to pinned version.
 
+- servarr.php
+  - Runs the shared ARR updater for Lidarr, Prowlarr, Radarr, Readarr, and Sonarr using one canonical app list in `arr.php`; Sonarr legacy apt repo cleanup still runs before the Sonarr tarball installer.
+
 - deluge.php
   - Debian 10: installs dependencies via pip and builds Deluge 2.0.5 from source.
   - Newer: `apt-get install -y deluged deluge-web`, disables service.
@@ -412,7 +415,7 @@ These scripts are primarily imperative; treat them as idempotent installers guar
 - wireguard.php
   - See WireGuard section above.
 
-Other app installers (mono.php, radarr.php, sonarr.php, syncthing.php, vnstat.php, iprange.php, pyload.php) follow the same pattern: install/refresh packages or binaries as needed and avoid breaking existing setups. Consult the scripts when extending.
+Other app installers (mono.php, syncthing.php, vnstat.php, iprange.php, pyload.php) follow the same pattern: install/refresh packages or binaries as needed and avoid breaking existing setups. Consult the scripts when extending.
 
 ---
 

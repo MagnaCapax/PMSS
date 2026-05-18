@@ -9,6 +9,7 @@
 // Bound ARR binary probes so daemonizing applications cannot wedge updates.
 const PMSS_ARR_VERSION_PROBE_TIMEOUT_SECONDS = 50;
 const PMSS_ARR_VERSION_PROBE_KILL_AFTER_SECONDS = 5;
+const PMSS_ARR_APP_BRANCHES = ['Lidarr' => 'develop|master', 'Prowlarr' => 'develop|master', 'Radarr' => 'develop|master', 'Readarr' => 'develop|master', 'Sonarr' => 'main|develop'];
 
 /**
  * Orchestrate the full update flow for a Starr-family application.
@@ -36,7 +37,7 @@ function pmssArrAssetNameHasToken(string $assetName, array $tokens): bool
 /** Build the canonical updater config for a supported Starr-family app. */
 function pmssArrAppConfig(string $app): ?array
 {
-    $branches = ['Lidarr' => 'develop|master', 'Prowlarr' => 'develop|master', 'Radarr' => 'develop|master', 'Readarr' => 'develop|master', 'Sonarr' => 'main|develop'];
+    $branches = PMSS_ARR_APP_BRANCHES;
     if (!isset($branches[$app])) {
         return null;
     }
@@ -49,6 +50,12 @@ function pmssArrAppConfig(string $app): ?array
         'extract_dir' => $app,
         'user_agent' => 'PMSS-'.$app,
     ];
+}
+
+/** Return the supported Servarr app labels in deterministic installer order. */
+function pmssArrSupportedApps(): array
+{
+    return array_keys(PMSS_ARR_APP_BRANCHES);
 }
 
 /**
@@ -314,4 +321,15 @@ function pmssArrUpdate(array $config): void
 
     runCommand('rm -rf '.escapeshellarg($workDir));
     if ($installed) { $log("Installed version {$latestVersion}"); }
+}
+
+/** Run every supported Servarr updater from the single app entrypoint. */
+function pmssArrUpdateSupportedApps(): void
+{
+    foreach (pmssArrSupportedApps() as $app) {
+        if ($app === 'Sonarr') { @unlink('/etc/apt/sources.list.d/sonarr.list'); @passthru('apt-key del 0xA236C58F409091A18ACA53CBEBFF6B99D9B78493 2>/dev/null'); }
+
+        $config = pmssArrAppConfig($app);
+        if ($config !== null) { pmssArrUpdate($config); }
+    }
 }

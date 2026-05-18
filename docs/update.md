@@ -151,13 +151,9 @@ table only tracks external/non-Debian sources.
 | `openvpn.php` | Seeds EasyRSA, server/client configs, and writes client bundles to `/etc/skel/www`. | Debian 8 downloads EasyRSA from GitHub (`https://github.com/OpenVPN/easy-rsa/...`); expects templates `template.openvpn.*`. |
 | `pyload.php` | Creates `/opt/pyload` venv and installs `pyload-ng`. | Installs deps via apt then uses pip (PyPI) inside the venv; honours `PMSS_DISTRO_VERSION`. |
 | `python.php` | Provisions FlexGet + gdrivefs virtualenv and CLI symlink. | Executes pip installs (PyPI) for FlexGet stack; assumes Python 3/venv available. |
-| `prowlarr.php` | Fetches newest Prowlarr build and deploys to `/opt/Prowlarr`. | Calls GitHub Releases API (`https://api.github.com/repos/Prowlarr/Prowlarr`); downloads tarball via curl. |
-| `radarr.php` | Fetches newest Radarr build and deploys to `/opt/Radarr`. | Calls GitHub Releases API (`https://api.github.com/repos/Radarr/Radarr`); downloads tarball via curl. |
-| `lidarr.php` | Fetches newest Lidarr build and deploys to `/opt/Lidarr`. | Calls GitHub Releases API (`https://api.github.com/repos/Lidarr/Lidarr`); downloads tarball via curl. |
-| `readarr.php` | Fetches newest Readarr build and deploys to `/opt/Readarr`. | Calls GitHub Releases API (`https://api.github.com/repos/Readarr/Readarr`); downloads tarball via curl. |
+| `servarr.php` | Fetches newest Lidarr, Prowlarr, Radarr, Readarr, and Sonarr builds and deploys them under `/opt/<App>`. | Calls each app's GitHub Releases API; downloads tarballs via curl. Sonarr also clears legacy apt repo artifacts before its tarball install. |
 | `rclone.php` | Pins or updates rclone binary and man page. | Downloads from `https://downloads.rclone.org/`; optional latest check hits `https://rclone.org/downloads/`; honours `PMSS_RCLONE_FETCH_LATEST`. |
 | `rtorrent.php` | Rebuilds rTorrent/libtorrent (plus xmlrpc-c), refreshes templates, restarts daemons. | Fetches pinned tarballs from `https://pulsedmedia.com/remote/pkg/` with SHA256 verification, checks out xmlrpc-c via SourceForge SVN; needs build toolchain. |
-| `sonarr.php` | Installs latest Sonarr under `/opt/Sonarr` and records version metadata. | Uses GitHub Releases API (`https://api.github.com/repos/Sonarr/Sonarr`); removes legacy apt repo artifacts. |
 | `syncthing.php` | Ensures syncthing binary matches the pinned amd64 release. | Fetches the pinned upstream tarball from GitHub over HTTPS, verifies SHA256, and installs `syncthing` into `/usr/bin`. |
 | `vnstat.php` | Installs/configures vnStat for the detected uplink. | Uses Debian APT; depends on `scripts/lib/networkInfo.php` for interface info. |
 | `watchdog.php` | Disables and removes the distro watchdog daemon. | APT operations only; no external downloads. |

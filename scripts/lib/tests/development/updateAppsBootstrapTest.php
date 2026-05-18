@@ -37,14 +37,14 @@ class UpdateAppsBootstrapTest extends TestCase
         return $output;
     }
 
-    public function testStarrInstallersWarnAndReturnWhenRuntimeHelperMissing(): void
+    public function testServarrInstallerWarnsForEveryAppWhenRuntimeHelperMissing(): void
     {
-        foreach (['radarr.php' => 'Radarr', 'sonarr.php' => 'Sonarr', 'prowlarr.php' => 'Prowlarr', 'lidarr.php' => 'Lidarr', 'readarr.php' => 'Readarr'] as $installer => $label) {
-            $output = $this->appBootstrapOutput($installer);
+        $output = $this->appBootstrapOutput('servarr.php');
 
+        foreach (['Lidarr', 'Prowlarr', 'Radarr', 'Readarr', 'Sonarr'] as $label) {
             $this->assertStringContainsString($label.' updater: missing runtime helper', $output);
-            $this->pmssAssertStringNotContainsString('Fatal error', $output, $label.' bootstrap should soft-return when runtime is missing');
         }
+        $this->pmssAssertStringNotContainsString('Fatal error', $output, 'Servarr bootstrap should soft-return when runtime is missing');
     }
 
     public function testUpdateStep2SkipsHelperModulesInAppLoader(): void
@@ -75,15 +75,14 @@ class UpdateAppsBootstrapTest extends TestCase
         $this->pmssAssertStringNotContainsString("require_once __DIR__.'/bootstrap.php';", $contents, 'ARR helper should not require a separate bootstrap helper');
     }
 
-    public function testStarrInstallersDelegateRuntimeBootstrapToArrHelper(): void
+    public function testServarrInstallerDelegatesRuntimeBootstrapToArrHelper(): void
     {
-        foreach (['lidarr.php', 'prowlarr.php', 'radarr.php', 'readarr.php', 'sonarr.php'] as $installer) {
-            $contents = $this->pmssReadUpdateAppFile($installer);
+        $contents = $this->pmssReadUpdateAppFile('servarr.php');
 
-            $this->assertStringContainsString("require_once __DIR__.'/arr.php';", $contents);
-            $this->pmssAssertStringNotContainsString("dirname(__DIR__).'/runtime.php'", $contents, $installer.' should delegate runtime bootstrap to arr.php');
-            $this->pmssAssertStringNotContainsString('missing runtime helper', $contents, $installer.' should keep the runtime warning in arr.php');
-            $this->pmssAssertStringNotContainsString("require_once __DIR__.'/bootstrap.php';", $contents, $installer.' should not require a separate bootstrap helper');
-        }
+        $this->assertStringContainsString("require_once __DIR__.'/arr.php';", $contents);
+        $this->assertStringContainsString('pmssArrUpdateSupportedApps();', $contents);
+        $this->pmssAssertStringNotContainsString("dirname(__DIR__).'/runtime.php'", $contents, 'servarr.php should delegate runtime bootstrap to arr.php');
+        $this->pmssAssertStringNotContainsString('missing runtime helper', $contents, 'servarr.php should keep the runtime warning in arr.php');
+        $this->pmssAssertStringNotContainsString("require_once __DIR__.'/bootstrap.php';", $contents, 'servarr.php should not require a separate bootstrap helper');
     }
 }
