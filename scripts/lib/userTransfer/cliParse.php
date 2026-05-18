@@ -32,11 +32,11 @@ function pmssUserTransferParseCli(array $argv): array
     ], false);
 
     $optionSpecs = [
-        'main-passes' => ['field' => 'mainPasses', 'default' => 31, 'expectsValue' => true],
-        'final-passes' => ['field' => 'finalPasses', 'default' => 3, 'expectsValue' => true],
+        'main-passes' => ['field' => 'mainPasses', 'default' => 31, 'expectsValue' => true, 'range' => [1, 500]],
+        'final-passes' => ['field' => 'finalPasses', 'default' => 3, 'expectsValue' => true, 'range' => [1, 100]],
         'sleep-min' => ['field' => 'sleepMin', 'default' => 60, 'expectsValue' => true],
         'sleep-max' => ['field' => 'sleepMax', 'default' => 360, 'expectsValue' => true],
-        'verify-threshold' => ['field' => 'verifyThreshold', 'default' => 90, 'expectsValue' => true],
+        'verify-threshold' => ['field' => 'verifyThreshold', 'default' => 90, 'expectsValue' => true, 'range' => [1, 100]],
         'help' => ['field' => 'help', 'default' => false, 'expectsValue' => false],
         'no-sleep' => ['field' => 'noSleep', 'default' => false, 'expectsValue' => false],
         'dry-run' => ['field' => 'dryRun', 'default' => false, 'expectsValue' => false],
@@ -98,12 +98,12 @@ function pmssUserTransferParseCli(array $argv): array
         throw new RuntimeException('Invalid hostname', 1);
     }
 
-    foreach ([
-        'main-passes' => [1, 500],
-        'final-passes' => [1, 100],
-        'verify-threshold' => [1, 100],
-    ] as $key => $range) {
-        $field = $optionSpecs[$key]['field'];
+    foreach ($optionSpecs as $key => $spec) {
+        if (!isset($spec['range'])) {
+            continue;
+        }
+        $field = $spec['field'];
+        $range = $spec['range'];
         if ($options[$field] < $range[0] || $options[$field] > $range[1]) {
             throw new RuntimeException(
                 sprintf('Invalid --%s (expected %d..%d)', $key, $range[0], $range[1]),
