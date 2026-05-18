@@ -151,6 +151,7 @@ class UserCgroupUtilTest extends TestCase
         });
 
         $this->assertEquals(2, $rc);
+        /** @var object{resolved: bool} $stub */
         $this->assertFalse($stub->resolved, 'unsafe device selectors must not be resolved through findmnt');
     }
 
