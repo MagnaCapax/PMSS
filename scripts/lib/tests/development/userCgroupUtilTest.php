@@ -19,22 +19,39 @@ class UserCgroupUtilTest extends TestCase
      */
     private function makeManager(): Manager
     {
-        $stub = new class implements SystemInterface {
-            public function getCgroupMode(): string { return 'v2'; }
-            public function getUid(string $user): int { return 1000; }
-            public function execute(string $command): ?string { return ''; }
-            public function readFile(string $path): ?string { return null; }
-            public function getTotalMemoryMiB(): int { return 0; }
-            public function resolveDevice(string $device): string { return ''; }
-            public function requireRoot(): void {}
-        };
-
-        return new Manager($stub);
+        return $this->makeManagerWithSystem($this->makeSystemStub());
     }
 
     private function makeManagerWithSystem(SystemInterface $stub): Manager
     {
         return new Manager($stub);
+    }
+
+    /** Build the shared no-op cgroup system stub used by dry-run manager tests. */
+    private function makeSystemStub(string $resolvedDevice = ''): SystemInterface
+    {
+        return new class($resolvedDevice) implements SystemInterface {
+            /** @var bool */
+            public $resolved = false;
+
+            /** @var string */
+            private $resolvedDevice;
+
+            public function __construct(string $resolvedDevice) { $this->resolvedDevice = $resolvedDevice; }
+            public function getCgroupMode(): string { return 'v2'; }
+            public function getUid(string $user): int { return 1000; }
+            public function execute(string $command): ?string { return ''; }
+            public function readFile(string $path): ?string { return null; }
+            public function getTotalMemoryMiB(): int { return 0; }
+
+            public function resolveDevice(string $device): string
+            {
+                $this->resolved = true;
+                return $this->resolvedDevice;
+            }
+
+            public function requireRoot(): void {}
+        };
     }
 
     public function testComputePropsClampsMemory(): void
@@ -126,18 +143,7 @@ class UserCgroupUtilTest extends TestCase
 
     public function testRejectsUnsafeDeviceSelectorBeforeResolution(): void
     {
-        $stub = new class implements SystemInterface {
-            /** @var bool */
-            public $resolved = false;
-
-            public function getCgroupMode(): string { return 'v2'; }
-            public function getUid(string $user): int { return 1000; }
-            public function execute(string $command): ?string { return ''; }
-            public function readFile(string $path): ?string { return null; }
-            public function getTotalMemoryMiB(): int { return 0; }
-            public function resolveDevice(string $device): string { $this->resolved = true; return '/dev/sdb'; }
-            public function requireRoot(): void {}
-        };
+        $stub = $this->makeSystemStub('/dev/sdb');
 
         $mgr = $this->makeManagerWithSystem($stub);
         list($rc) = $this->pmssCaptureStdout(function () use ($mgr): int {
@@ -150,15 +156,7 @@ class UserCgroupUtilTest extends TestCase
 
     public function testIoLatencySkipsUnsafeResolvedHomeDevice(): void
     {
-        $stub = new class implements SystemInterface {
-            public function getCgroupMode(): string { return 'v2'; }
-            public function getUid(string $user): int { return 1000; }
-            public function execute(string $command): ?string { return ''; }
-            public function readFile(string $path): ?string { return null; }
-            public function getTotalMemoryMiB(): int { return 0; }
-            public function resolveDevice(string $device): string { return '/dev/bad target'; }
-            public function requireRoot(): void {}
-        };
+        $stub = $this->makeSystemStub('/dev/bad target');
 
         $mgr = $this->makeManagerWithSystem($stub);
         list($rc, $out) = $this->pmssCaptureStdout(function () use ($mgr): int {
