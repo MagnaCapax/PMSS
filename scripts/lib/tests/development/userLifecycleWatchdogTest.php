@@ -47,6 +47,28 @@ class UserLifecycleWatchdogTest extends TestCase
         $this->assertFalse($running);
     }
 
+    public function testRestartProcessesIfRefusesInvalidUsernameBeforeTerminator(): void
+    {
+        $terminated = false;
+
+        $running = pmssUserWatchdogRestartProcessesIf(
+            'bad-user',
+            true,
+            ['demo'],
+            static function (): bool {
+                return true;
+            },
+            'demo restart requested',
+            15,
+            static function () use (&$terminated): void {
+                $terminated = true;
+            }
+        );
+
+        $this->assertFalse($terminated);
+        $this->assertTrue($running);
+    }
+
     public function testRestartProcessesIfLeavesRunningStateWhenRestartNotNeeded(): void
     {
         $running = pmssUserWatchdogRestartProcessesIf(
@@ -121,6 +143,26 @@ class UserLifecycleWatchdogTest extends TestCase
         ob_end_clean();
 
         $this->assertTrue(file_exists($marker));
+    }
+
+    public function testEnsureServicesRefusesInvalidUsernameBeforeCommand(): void
+    {
+        $marker = $this->pmssMakeTempFile('watchdog-invalid-');
+        @unlink($marker);
+
+        ob_start();
+        $states = pmssUserWatchdogEnsureServices('bad-user', [
+            [
+                'processName' => 'demo',
+                'serviceLabel' => 'Demo',
+                'command' => 'touch '.escapeshellarg($marker),
+                'userLogMessage' => 'demo start requested',
+            ],
+        ], ['demo' => false]);
+        ob_end_clean();
+
+        $this->assertFalse(file_exists($marker));
+        $this->assertEquals(['demo' => false], $states);
     }
 
     public function testLocalPortReadAcceptsTrimmedNumericPort(): void

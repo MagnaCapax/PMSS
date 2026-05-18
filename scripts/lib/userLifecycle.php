@@ -216,6 +216,10 @@ function pmssUserWebRootUnavailable(string $username, string $homeRoot = '/home'
 /** Shared watchdog helpers keep cron process handling on one path. */
 function pmssUserWatchdogTerminateProcesses(string $username, array $processNames, int $signal = 9): void
 {
+    if (!pmssValidateUsername($username)) {
+        return;
+    }
+
     $signal = $signal === 15 ? 15 : 9;
     foreach ($processNames as $processName) {
         if (!is_string($processName) || $processName === '') { continue; }
@@ -224,7 +228,7 @@ function pmssUserWatchdogTerminateProcesses(string $username, array $processName
 }
 function pmssUserWatchdogProcessRunning(string $username, string $processName): bool
 {
-    if ($processName === '') { return false; }
+    if (!pmssValidateUsername($username) || $processName === '') { return false; }
     $matches = array();
     $exitCode = 1;
     @exec('pgrep -u '.escapeshellarg($username).' '.escapeshellarg($processName).' 2>/dev/null', $matches, $exitCode);
@@ -245,7 +249,7 @@ function pmssUserWatchdogLocalPortRead(string $path): ?int
 /** Return the oldest /proc start marker for exact process-name matches. */
 function pmssUserWatchdogProcessStartTime(string $username, string $processName, string $procRoot = '/proc'): ?int
 {
-    if ($processName === '') {
+    if (!pmssValidateUsername($username) || $processName === '') {
         return null;
     }
 
@@ -275,7 +279,7 @@ function pmssUserWatchdogProcessStartTime(string $username, string $processName,
 }
 function pmssUserWatchdogStartCommand(string $username, string $serviceLabel, string $command, string $userLogMessage): void
 {
-    if ($command === '') { return; }
+    if (!pmssValidateUsername($username) || $command === '') { return; }
     echo "Start {$serviceLabel} for user: {$username}\n";
     passthru($command);
     pmssUserLog($username, $userLogMessage);
@@ -283,6 +287,7 @@ function pmssUserWatchdogStartCommand(string $username, string $serviceLabel, st
 /** @param array<int,string> $processNames */
 function pmssUserWatchdogRestartProcessesIf(string $username, bool $running, array $processNames, callable $restartNeeded, string $userLogMessage, int $signal = 9, ?callable $terminator = null): bool
 {
+    if (!pmssValidateUsername($username)) { return $running; }
     if (!$running || !$restartNeeded()) { return $running; }
     $terminator !== null ? $terminator() : pmssUserWatchdogTerminateProcesses($username, $processNames, $signal);
     pmssUserLog($username, $userLogMessage);
@@ -291,6 +296,7 @@ function pmssUserWatchdogRestartProcessesIf(string $username, bool $running, arr
 /** @param array<int,array<string,mixed>> $serviceSpecs @param array<string,bool> $runningStates @return array<string,bool> */
 function pmssUserWatchdogEnsureServices(string $username, array $serviceSpecs, array $runningStates = array()): array
 {
+    if (!pmssValidateUsername($username)) { return $runningStates; }
     foreach ($serviceSpecs as $serviceSpec) {
         $processName = isset($serviceSpec['processName']) ? (string) $serviceSpec['processName'] : '';
         if ($processName === '') { continue; }
@@ -305,6 +311,7 @@ function pmssUserWatchdogEnsureServices(string $username, array $serviceSpecs, a
 /** @param array<int,string> $processNames */
 function pmssUserWatchdogHandleSuspended(string $username, array $processNames, string $userLogMessage, string $homeRoot = '/home'): bool
 {
+    if (!pmssValidateUsername($username)) return false;
     if (!pmssUserWebRootUnavailable($username, $homeRoot)) return false;
     echo "User: {$username} is suspended\n";
     pmssUserWatchdogTerminateProcesses($username, $processNames, 9);
