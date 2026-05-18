@@ -39,7 +39,7 @@ class UserTransferGuardTest extends TestCase
     {
         require_once __DIR__.'/../../userTransfer.php';
 
-        $this->assertTrue(\function_exists('pmssUserTransferHostnameIsValid'), 'userTransfer should load hostname validation helper');
+        $this->assertTrue(\function_exists('pmssHostnameIsValid'), 'userTransfer should load hostname validation helper');
         $this->assertTrue(\function_exists('pmssUserTransferPostSetup'), 'userTransfer should load post-setup helper');
     }
 }

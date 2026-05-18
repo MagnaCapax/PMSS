@@ -46,10 +46,11 @@ class SetupLetsEncryptTest extends TestCase
     public function testRequiresSharedHostnameValidationForLetsEncryptDomain(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupLetsEncrypt.php', [
-            "require_once __DIR__.'/../lib/userTransfer/cliParse.php';",
-            'pmssUserTransferHostnameIsValid($domain)',
+            "require_once __DIR__.'/../lib/runtime.php';",
+            'pmssHostnameIsValid($domain, false)',
             "strpos(\$domain, '.') === false",
         ]);
+        $this->pmssAssertRepoFileNotContainsString('scripts/util/setupLetsEncrypt.php', 'userTransfer/cliParse.php');
     }
 
     public function testCliDelegatesToSharedSetupLibraryWithoutShellExec(): void

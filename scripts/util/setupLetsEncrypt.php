@@ -14,7 +14,6 @@
 
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/update/distro.php';
-require_once __DIR__.'/../lib/userTransfer/cliParse.php';
 require_once __DIR__.'/../lib/certbotSetup.php';
 
 function pmssSetupLetsEncryptMain(array $argv): int
@@ -38,8 +37,7 @@ function pmssSetupLetsEncryptMain(array $argv): int
     if (
         $domain === ''
         || strpos($domain, '.') === false
-        || filter_var($domain, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false
-        || !pmssUserTransferHostnameIsValid($domain)
+        || !pmssHostnameIsValid($domain, false)
     ) {
         echo "Unable to determine valid hostname for Let's Encrypt";
         return 1;

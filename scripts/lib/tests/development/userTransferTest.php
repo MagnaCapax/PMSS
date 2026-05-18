@@ -28,7 +28,7 @@ class UserTransferTest extends TestCase
 
         foreach ($valid as $hostname) {
             $this->assertTrue(
-                \pmssUserTransferHostnameIsValid($hostname),
+                \pmssHostnameIsValid($hostname),
                 'expected hostname to be valid: '.$hostname
             );
         }
@@ -51,7 +51,7 @@ class UserTransferTest extends TestCase
 
         foreach ($invalid as $hostname) {
             $this->assertTrue(
-                !\pmssUserTransferHostnameIsValid($hostname),
+                !\pmssHostnameIsValid($hostname),
                 'expected hostname to be invalid: '.$hostname
             );
         }

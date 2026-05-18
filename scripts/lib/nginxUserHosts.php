@@ -10,7 +10,6 @@
  */
 
 require_once __DIR__.'/runtime.php';
-require_once __DIR__.'/userTransfer.php';
 
 /**
  * Validate that the hostname is a usable FQDN (no IPs, must contain a dot).
@@ -21,13 +20,7 @@ function pmssNginxUserHostIsValidFqdn(string $hostname): bool
     if ($trimmed === '') {
         return false;
     }
-    if (filter_var($trimmed, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
-        return false;
-    }
-    if (strpos($trimmed, '.') === false) {
-        return false;
-    }
-    return pmssUserTransferHostnameIsValid($trimmed);
+    return strpos($trimmed, '.') !== false && pmssHostnameIsValid($trimmed, false);
 }
 
 /**

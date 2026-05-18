@@ -293,6 +293,24 @@ if (!function_exists('pmssReadRegularFileInt')) {
 if (!function_exists('pmssHostnameRead')) {
     function pmssHostnameRead(string $default = '', string $path = '/etc/hostname'): string { return is_string($hostname = @file_get_contents($path)) ? trim($hostname) : $default; }
 }
+if (!function_exists('pmssHostnameIsValid')) {
+    // Validate a hostname, optionally accepting IPv4 literals for direct node targeting.
+    function pmssHostnameIsValid(string $hostname, bool $allowIpv4 = true): bool
+    {
+        if ($hostname === '' || preg_match('/\s/', $hostname) || strlen($hostname) > 253) return false;
+        if (filter_var($hostname, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) return $allowIpv4;
+        if (
+            !preg_match('/^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$/', $hostname)
+            || strpos($hostname, '..') !== false
+            || $hostname[0] === '.'
+            || substr($hostname, -1) === '.'
+        ) return false;
+        foreach (explode('.', $hostname) as $label) {
+            if ($label === '' || strlen($label) > 63 || $label[0] === '-' || substr($label, -1) === '-') return false;
+        }
+        return true;
+    }
+}
 
 if (!function_exists('pmssLockFileAcquire')) {
     function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mode = 'c', bool $createParentDir = false, bool $closeOnBusy = true, ?bool &$busy = null)
