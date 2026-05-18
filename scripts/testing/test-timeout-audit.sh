@@ -34,4 +34,21 @@ if [[ "$violations" -gt 0 ]]; then
 	exit 1
 fi
 
+start_seconds=$SECONDS
+set +e
+sh -c 'timeout --kill-after=1s 1s bash -c '\''trap "" TERM; sleep 10'\'' >/dev/null 2>&1'
+timeout_rc=$?
+set -e
+elapsed_seconds=$((SECONDS - start_seconds))
+
+if [[ "$timeout_rc" -ne 137 ]]; then
+	printf 'timeout audit: SIGTERM-ignoring probe exited rc=%d, expected 137\n' "$timeout_rc" >&2
+	exit 1
+fi
+
+if [[ "$elapsed_seconds" -gt 5 ]]; then
+	printf 'timeout audit: SIGTERM-ignoring probe took %ds, expected bounded SIGKILL\n' "$elapsed_seconds" >&2
+	exit 1
+fi
+
 echo "timeout audit: OK"
