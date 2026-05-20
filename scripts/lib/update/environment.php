@@ -726,17 +726,23 @@ CONF;
         }
         if ($runitDeb !== '') {
             runStep('Installing runit-helper via dpkg-direct (openssh-server dep)',
-                'dpkg -i '.escapeshellarg($runitDeb));
+                'dpkg --force-confdef --force-confold -i '.escapeshellarg($runitDeb));
         }
 
         // Install openssh-server/client/sftp via dpkg-direct so the apt resolver
-        // cannot re-trigger the original cascade-removal pattern.
+        // cannot re-trigger the original cascade-removal pattern. --force-conf{def,old}
+        // preserves the user's existing /etc/ssh/sshd_config — without these flags,
+        // dpkg's default behavior in non-interactive contexts REPLACES the active
+        // sshd_config with the package default, wiping the PMSS template's
+        // HostkeyAlgorithms +ssh-rsa / PubkeyAcceptedKeyTypes +ssh-rsa lines (libssh2
+        // 1.4.3 compat for hallinta/sbautomage). Observed breakage on 5 hosts
+        // 2026-05-20 (akelarre/oceanic/stafford/roger/voodoo).
         $opensshDebs = array_values(array_filter($debs, static function ($d) {
             return strpos(basename($d), 'openssh') === 0;
         }));
         $installRc = runStep(
-            'Installing openssh-server/client/sftp via dpkg-direct (cascade-heal)',
-            'dpkg -i '.implode(' ', array_map('escapeshellarg', $opensshDebs))
+            'Installing openssh-server/client/sftp via dpkg-direct (cascade-heal, conf-preserve)',
+            'dpkg --force-confdef --force-confold -i '.implode(' ', array_map('escapeshellarg', $opensshDebs))
         );
         if ($installRc !== 0) {
             // dpkg -i may exit non-zero when libssl3 ABI is older than openssh-server
@@ -746,6 +752,28 @@ CONF;
         }
 
         pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-', 'Cleaning openssh-direct download cache');
+
+        // Belt-and-suspenders: re-deploy the PMSS sshd_config template if available on
+        // the host. --force-conf{def,old} above SHOULD already preserve the user's
+        // sshd_config, but dpkg's behavior depends on whether the file matches a known
+        // package-version-hash AND on the `rc` (removed-not-purged) state path. The
+        // explicit template re-deploy guarantees the PMSS-customized config is active
+        // regardless of dpkg's conf-handling decision tree. Mirrors
+        // pmssApplyRuntimeTemplates() inline so the heal function does not depend on a
+        // later step in the update-step2 flow firing for the sshd restart this function
+        // is about to do.
+        $tmpl = '/etc/seedbox/config/template.sshd_config';
+        $live = '/etc/ssh/sshd_config';
+        if (file_exists($tmpl)) {
+            runStep('Backing up sshd_config before re-deploying PMSS template (cascade-heal)',
+                'cp '.escapeshellarg($live).' '.escapeshellarg($live.'.pre-heal-'.date('Ymd-His')));
+            runStep('Re-deploying PMSS sshd_config template (libssh2 1.4.3 compat lines)',
+                'cp '.escapeshellarg($tmpl).' '.escapeshellarg($live));
+            runStep('Setting sshd_config permissions after template re-deploy',
+                'chmod 644 '.escapeshellarg($live));
+        } else {
+            logMessage('[WARN] pmssHealOpensshServerIfMissing: '.$tmpl.' missing on host; cannot re-deploy template — sshd_config may be at package default (no HostkeyAlgorithms +ssh-rsa)');
+        }
 
         $holdRc = runStep(
             'Holding openssh-server/client/sftp to prevent re-removal',
