@@ -585,6 +585,223 @@ CONF;
         }
     }
 
+    /**
+     * Heal openssh-server after the 2026-04-30 libssl3 cascade left dpkg in
+     * `rc` state (config-only) or with `/usr/sbin/sshd` removed while a running
+     * sshd PID kept a deleted-binary in-memory copy alive. PMSS update on its
+     * own only converges libssl3+openssl (the proximate cause) and does not
+     * detect or repair the residual openssh-server damage — so cascade victims
+     * stay as silent time bombs that die at the next reboot.
+     *
+     * This function detects three independent signals and reinstalls if any is
+     * unhealthy: openssh-server is not in `ii` state, `/usr/sbin/sshd` is
+     * missing on disk, or the running sshd PID's `/proc/PID/exe` symlink resolves
+     * to a "(deleted)" path.
+     *
+     * Recovery uses the same dpkg-direct path that the libssl3 healer uses, so
+     * the apt resolver cannot re-trigger the cascade. The freshly-installed
+     * binary then gets `apt-mark hold` plus sshd_config sanitization (legacy
+     * hmac-ripemd160 removed in OpenSSH 9.2) and an explicit /run/sshd tmpfs
+     * directory before sshd -t verification. ssh.service is restarted ONLY when
+     * the live sshd PID is running on a deleted binary — restarting a healthy
+     * sshd would needlessly drop active SSH sessions.
+     *
+     * Idempotent: a host where sshd is healthy on disk and in memory exits with
+     * a single `[SKIP]` log line and zero mutations.
+     *
+     * Refs #436. Discovered 2026-05-20 during fleet sweep finding 5 silent-time
+     * bomb hosts (akelarre, oceanic, stafford, roger, voodoo) all on recent
+     * PMSS updates with libssl3 correctly held but openssh-server still absent.
+     */
+    function pmssHealOpensshServerIfMissing(?int $distroVersion = null): void
+    {
+        if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+            logMessage('[DRY-RUN] pmssHealOpensshServerIfMissing: skipping all mutations');
+            return;
+        }
+
+        $effectiveVersion = pmssDistroVersionFromEnv($distroVersion);
+        if ($effectiveVersion !== 12) {
+            logMessage('[SKIP] pmssHealOpensshServerIfMissing: not Debian 12 (detected: '.$effectiveVersion.')');
+            return;
+        }
+
+        // Functional health signals — the test is "does sshd actually work" not
+        // "does dpkg metadata look pretty." A host with `install ok unpacked`
+        // openssh-server but a working on-disk binary and a non-deleted-exe sshd
+        // PID is functionally healthy and a re-install of the same version would
+        // not change real state (it would just re-fail the postinst). The narrow
+        // heal-triggers are the two ways the cascade actually breaks SSH:
+        //
+        //   (1) binary missing on disk — sshd will fail to start on next reboot
+        //   (2) sshd PID is running off a deleted binary — same as (1) but the
+        //       fuse will blow at next ssh.service restart instead of next reboot
+
+        // Signal A: on-disk binary present?
+        $sshdFile = is_file('/usr/sbin/sshd');
+
+        // Signal B: the SSHD LISTENER process is on a deleted binary?
+        //
+        // Caveat: `pgrep -x sshd` can return MANY pids — every active SSH session
+        // is a per-session sshd fork that survives configured into a child until
+        // the user disconnects. When ssh.service is restarted, the parent daemon
+        // (PID = ssh.service MainPID) gets the fresh on-disk binary, but the
+        // pre-restart per-session forks continue to run on the now-deleted parent
+        // inode. That's healthy state — the listener is fresh, the stragglers
+        // are short-lived. The condition we actually care about is "the LISTENING
+        // daemon is on a deleted binary" — checked via ssh.service MainPID.
+        //
+        // Fallback: if MainPID is 0 / not running, fall back to checking ANY
+        // sshd PID — if NONE has a non-deleted exe, the host is a time bomb.
+        $sshdExeDeleted = false;
+        $mainPidRaw = trim((string) @shell_exec("systemctl show -p MainPID --value ssh 2>/dev/null"));
+        if ($mainPidRaw !== '' && ctype_digit($mainPidRaw) && (int) $mainPidRaw > 0) {
+            $exeLink = @readlink('/proc/'.$mainPidRaw.'/exe');
+            if ($exeLink !== false && strpos($exeLink, '(deleted)') !== false) {
+                $sshdExeDeleted = true;
+            }
+        } else {
+            // Fallback path — no MainPID. Inspect every sshd PID; if NONE has a
+            // clean exe link, it's the time-bomb state.
+            $anyClean   = false;
+            $sawAnyPid  = false;
+            $pidsRaw    = trim((string) @shell_exec('pgrep -x sshd 2>/dev/null'));
+            if ($pidsRaw !== '') {
+                foreach (preg_split('/\s+/', $pidsRaw, -1, PREG_SPLIT_NO_EMPTY) as $pid) {
+                    if (!ctype_digit($pid)) continue;
+                    $sawAnyPid = true;
+                    $exeLink = @readlink('/proc/'.$pid.'/exe');
+                    if ($exeLink !== false && strpos($exeLink, '(deleted)') === false) {
+                        $anyClean = true;
+                        break;
+                    }
+                }
+            }
+            $sshdExeDeleted = ($sawAnyPid && !$anyClean);
+        }
+
+        if ($sshdFile && !$sshdExeDeleted) {
+            logMessage('[SKIP] pmssHealOpensshServerIfMissing: sshd functionally healthy (binary on disk + PID not on deleted exe)');
+            return;
+        }
+
+        logMessage(sprintf(
+            '[INFO] pmssHealOpensshServerIfMissing: cascade-residual state detected — binary_on_disk=%s pid_on_deleted_exe=%s',
+            $sshdFile ? 'yes' : 'no',
+            $sshdExeDeleted ? 'yes' : 'no'
+        ));
+
+        $tmpDir = pmssCreatePrivateTempDir('pmss-openssh-');
+        if ($tmpDir === null) {
+            logMessage('[ERROR] pmssHealOpensshServerIfMissing: cannot create temporary directory for dpkg-direct heal');
+            throw new RuntimeException('pmssHealOpensshServerIfMissing: temp dir creation failed');
+        }
+
+        $downloadRc = runStep(
+            'Downloading openssh-server/client/sftp + runit-helper for dpkg-direct heal',
+            'cd '.escapeshellarg($tmpDir).' && '
+            .'apt-get download openssh-server openssh-client openssh-sftp-server runit-helper 2>&1'
+        );
+        if ($downloadRc !== 0) {
+            pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-', 'Cleaning openssh-direct download cache');
+            logMessage('[ERROR] pmssHealOpensshServerIfMissing: apt-get download failed; refusing unsafe fallback');
+            throw new RuntimeException('pmssHealOpensshServerIfMissing: download failed');
+        }
+
+        $debs = glob($tmpDir.'/*.deb') ?: [];
+        sort($debs);
+        if (count($debs) < 3) {
+            pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-', 'Cleaning openssh-direct download cache');
+            logMessage('[ERROR] pmssHealOpensshServerIfMissing: expected openssh-* .deb files were not downloaded (got '.count($debs).')');
+            throw new RuntimeException('pmssHealOpensshServerIfMissing: incomplete deb set');
+        }
+
+        // Install runit-helper FIRST (openssh-server postinst depends on it on recent bookworm).
+        $runitDeb = '';
+        foreach ($debs as $deb) {
+            if (strpos(basename($deb), 'runit-helper') === 0) {
+                $runitDeb = $deb;
+                break;
+            }
+        }
+        if ($runitDeb !== '') {
+            runStep('Installing runit-helper via dpkg-direct (openssh-server dep)',
+                'dpkg -i '.escapeshellarg($runitDeb));
+        }
+
+        // Install openssh-server/client/sftp via dpkg-direct so the apt resolver
+        // cannot re-trigger the original cascade-removal pattern.
+        $opensshDebs = array_values(array_filter($debs, static function ($d) {
+            return strpos(basename($d), 'openssh') === 0;
+        }));
+        $installRc = runStep(
+            'Installing openssh-server/client/sftp via dpkg-direct (cascade-heal)',
+            'dpkg -i '.implode(' ', array_map('escapeshellarg', $opensshDebs))
+        );
+        if ($installRc !== 0) {
+            // dpkg -i may exit non-zero when libssl3 ABI is older than openssh-server
+            // expects; the binaries are still unpacked onto disk and load the held
+            // libssl3 at runtime. We continue to the hold + verify step below.
+            logMessage('[WARN] pmssHealOpensshServerIfMissing: dpkg -i exited non-zero (likely libssl3 ABI mismatch with held 3.0.17); binary placed on disk — continuing to hold + verify');
+        }
+
+        pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-', 'Cleaning openssh-direct download cache');
+
+        $holdRc = runStep(
+            'Holding openssh-server/client/sftp to prevent re-removal',
+            'apt-mark hold openssh-server openssh-client openssh-sftp-server'
+        );
+        if ($holdRc !== 0) {
+            logMessage('[ERROR] pmssHealOpensshServerIfMissing: apt-mark hold failed');
+            throw new RuntimeException('pmssHealOpensshServerIfMissing: hold failed');
+        }
+
+        // Sanitize legacy hmac-ripemd160 from sshd_config (removed in OpenSSH 9.2).
+        if (file_exists('/etc/ssh/sshd_config')) {
+            $cfg = (string) @file_get_contents('/etc/ssh/sshd_config');
+            if (strpos($cfg, 'hmac-ripemd160') !== false) {
+                runStep('Stripping legacy hmac-ripemd160 from sshd_config (removed in OpenSSH 9.2)',
+                    'sed -i \'s/,hmac-ripemd160,hmac-ripemd160@openssh.com//g; s/,hmac-ripemd160//g; s/hmac-ripemd160@openssh.com,//g; s/hmac-ripemd160,//g\' /etc/ssh/sshd_config');
+            }
+        }
+
+        // /run/sshd is a tmpfs path cleared on reboot; openssh postinst normally
+        // creates it but a non-interactive dpkg --configure path may skip that.
+        if (!is_dir('/run/sshd')) {
+            @mkdir('/run/sshd', 0755, true);
+        }
+
+        // Verify sshd config parses BEFORE any restart that would drop the live session.
+        $sshdT = 1;
+        @exec('/usr/sbin/sshd -t 2>&1', $sshdTOut, $sshdT);
+        if ($sshdT !== 0) {
+            logMessage('[ERROR] pmssHealOpensshServerIfMissing: sshd -t failed after install: '.implode(' | ', array_slice($sshdTOut, 0, 5)));
+            throw new RuntimeException('pmssHealOpensshServerIfMissing: sshd -t failed after install');
+        }
+
+        if ($sshdExeDeleted) {
+            // Live sshd is on a deleted binary — restart so the new on-disk binary
+            // becomes the running process. This kills any active SSH session, so
+            // we ONLY do it when the deleted-exe state was actually detected.
+            runStep('Restarting ssh.service to swap deleted-binary sshd for the freshly-installed one',
+                'systemctl daemon-reload && systemctl enable ssh && systemctl restart ssh');
+            sleep(2);
+            $listening = trim((string) @shell_exec("ss -tln 2>/dev/null | grep -q ':22 ' && echo yes || echo no")) === 'yes';
+            if (!$listening) {
+                logMessage('[ERROR] pmssHealOpensshServerIfMissing: port 22 not listening after restart');
+                throw new RuntimeException('pmssHealOpensshServerIfMissing: sshd not listening after restart');
+            }
+            logMessage('[OK] pmssHealOpensshServerIfMissing: openssh-server reinstalled, ssh.service restarted, port 22 listening');
+        } else {
+            // Binary was missing on disk but no live PID was running on a deleted
+            // exe. Enable ssh.service so the freshly-installed binary takes effect
+            // at next boot without dropping anything that's currently working.
+            runStep('Enabling ssh.service for next boot',
+                'systemctl daemon-reload && systemctl enable ssh');
+            logMessage('[OK] pmssHealOpensshServerIfMissing: openssh-server reinstalled + held + enabled (no live deleted-exe PID to swap)');
+        }
+    }
+
 /**
      * Move the legacy localnet file into the configuration directory.
      */

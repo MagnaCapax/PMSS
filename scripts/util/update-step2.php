@@ -527,6 +527,16 @@ pmssRunProfiledCallable(
     [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null]
 );
 
+// Heal openssh-server residual cascade damage. The libssl3 healer above prevents
+// NEW removals, but cannot detect/repair hosts already left in `rc`, missing-binary,
+// or deleted-exe state from the 2026-04-30 cascade incident. Idempotent — no-ops
+// on healthy hosts. Refs #436.
+pmssRunProfiledCallable(
+    'Healing openssh-server post-cascade if missing/deleted',
+    'pmssHealOpensshServerIfMissing',
+    [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null]
+);
+
 // Package convergence: dpkg selections are the authoritative source of package
 // state.
 logmsg('[OK] Package phase relies on dpkg baseline selections only');
