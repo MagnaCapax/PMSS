@@ -830,6 +830,170 @@ CONF;
         }
     }
 
+    /**
+     * Ensure openssh-server is at a version that's compatible with the held
+     * libssl3 (3.0.17). When libssl3 is held at 3.0.17 (per
+     * pmssHoldLibssl3ForPeclSsh2Compat), openssh-server MUST be at deb12u7 or
+     * older — anything newer (deb12u8, deb12u9, deb12u10, ...) requires libssl3
+     * >= 3.0.18 or 3.0.19 and lives in an unconfigured/broken-dep state that
+     * fails `dpkg --configure -a` every PMSS update.
+     *
+     * Cascade-victim hosts that were emergency-recovered with `dpkg -i
+     * openssh-server_deb12u9_amd64.deb` from the live apt cache end up in this
+     * broken state — the binary runs (sshd is alive) but dpkg metadata says
+     * "unconfigured" and any subsequent apt-resolver decision could re-trigger
+     * the 2026-04-30 cascade-removal pattern (`apt --fix-broken install` would
+     * try to either remove openssh-server or unhold libssl3 to satisfy the
+     * dep).
+     *
+     * Canonical baseline (verified on sea-sparrow 2026-05-21): never-cascaded
+     * Debian 12 hosts have openssh-server at deb12u7 in `ii` state, NOT held;
+     * libssl3+openssl held at 3.0.17 alone is sufficient because apt sees
+     * deb12u9 candidate cannot satisfy held libssl3 and leaves the package at
+     * deb12u7.
+     *
+     * This function brings cascade-victim hosts to the same canonical state.
+     *
+     * Idempotent: no-op on hosts already at deb12u7 or older.
+     *
+     * Refs #436. Origin: SUPER JOUKO 2026-05-21 — manual openssh-* holds on
+     * cascade-recovered hosts were the symptom; the disease is unconfigured
+     * deb12u9. Operator directive: "PMSS CONFIG CHANGES ARE ONLY THROUGH PMSS
+     * UPDATE NEVER MANUAL."
+     */
+    function pmssEnsureOpensshCompatibleWithHeldLibssl3(?int $distroVersion = null): void
+    {
+        $targetOpenssh = '1:9.2p1-2+deb12u7';
+
+        if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+            logMessage('[DRY-RUN] pmssEnsureOpensshCompatibleWithHeldLibssl3: skipping all mutations');
+            return;
+        }
+
+        $effectiveVersion = pmssDistroVersionFromEnv($distroVersion);
+        if ($effectiveVersion !== 12) {
+            logMessage('[SKIP] pmssEnsureOpensshCompatibleWithHeldLibssl3: not Debian 12 (detected: '.$effectiveVersion.')');
+            return;
+        }
+
+        // Precondition: libssl3 must be held at 3.0.17. If not, this function's
+        // assumptions don't hold and we no-op (the libssl3 healer earlier in
+        // update-step2 should have converged this state; if it didn't, this
+        // function shouldn't compensate by guessing).
+        $libsslVer = trim((string) @shell_exec('dpkg-query -W -f=\'${Version}\' libssl3 2>/dev/null'));
+        if (strpos($libsslVer, '3.0.17') !== 0) {
+            logMessage('[SKIP] pmssEnsureOpensshCompatibleWithHeldLibssl3: libssl3 not at 3.0.17 (got: '.$libsslVer.') — precondition not met');
+            return;
+        }
+
+        $opensshVer = trim((string) @shell_exec('dpkg-query -W -f=\'${Version}\' openssh-server 2>/dev/null'));
+        if ($opensshVer === '') {
+            logMessage('[SKIP] pmssEnsureOpensshCompatibleWithHeldLibssl3: openssh-server not installed');
+            return;
+        }
+
+        $compareVersions = static function (string $left, string $operator, string $right): bool {
+            $rc = 1;
+            @exec(
+                'dpkg --compare-versions '
+                .escapeshellarg($left).' '
+                .escapeshellarg($operator).' '
+                .escapeshellarg($right),
+                $unused,
+                $rc
+            );
+            return $rc === 0;
+        };
+
+        if (!$compareVersions($opensshVer, 'gt', $targetOpenssh)) {
+            logMessage('[SKIP] pmssEnsureOpensshCompatibleWithHeldLibssl3: openssh-server already at '.$opensshVer.' (<= target '.$targetOpenssh.')');
+            return;
+        }
+
+        logMessage('[INFO] pmssEnsureOpensshCompatibleWithHeldLibssl3: openssh-server at '.$opensshVer.' is newer than libssl3-3.0.17-compatible target '.$targetOpenssh.' — downgrading via dpkg-direct');
+
+        $tmpDir = pmssCreatePrivateTempDir('pmss-openssh-downgrade-');
+        if ($tmpDir === null) {
+            logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: cannot create temporary directory');
+            throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: temp dir creation failed');
+        }
+
+        // Unhold openssh-* before downgrade so dpkg doesn't refuse (manual holds
+        // from emergency recovery are common; canonical state has them unheld).
+        runStep('Unholding openssh-* for downgrade (if held)',
+            'apt-mark unhold openssh-server openssh-client openssh-sftp-server 2>/dev/null || true');
+
+        // Download the target version trio.
+        $downloadRc = runStep(
+            'Downloading openssh-server/client/sftp at '.$targetOpenssh.' for libssl3-3.0.17-compat downgrade',
+            'cd '.escapeshellarg($tmpDir).' && '
+            .'apt-get download '
+            .'openssh-server='.escapeshellarg($targetOpenssh).' '
+            .'openssh-client='.escapeshellarg($targetOpenssh).' '
+            .'openssh-sftp-server='.escapeshellarg($targetOpenssh).' 2>&1'
+        );
+        if ($downloadRc !== 0) {
+            pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-downgrade-', 'Cleaning openssh-downgrade download cache');
+            logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: apt-get download failed — target version may have aged out of the repo');
+            throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: download failed');
+        }
+
+        $debs = glob($tmpDir.'/*.deb') ?: [];
+        sort($debs);
+        if (count($debs) < 3) {
+            pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-downgrade-', 'Cleaning openssh-downgrade download cache');
+            logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: incomplete deb set (got '.count($debs).')');
+            throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: incomplete debs');
+        }
+
+        // Install via dpkg-direct with conf-preserve (same conf-handling posture
+        // as pmssHealOpensshServerIfMissing — never replace site sshd_config).
+        $installRc = runStep(
+            'Installing openssh-server/client/sftp '.$targetOpenssh.' via dpkg-direct (conf-preserve, libssl3-3.0.17-compat downgrade)',
+            'dpkg --force-confdef --force-confold -i '.implode(' ', array_map('escapeshellarg', $debs))
+        );
+        pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-downgrade-', 'Cleaning openssh-downgrade download cache');
+        if ($installRc !== 0) {
+            logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: dpkg -i failed during downgrade');
+            throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: dpkg -i failed');
+        }
+
+        // After downgrade, sshd_config may have been touched by dpkg's
+        // conf-handling decision tree. Re-deploy the PMSS template explicitly
+        // (mirror pmssHealOpensshServerIfMissing belt-and-suspenders posture).
+        $tmpl = '/etc/seedbox/config/template.sshd_config';
+        $live = '/etc/ssh/sshd_config';
+        if (file_exists($tmpl)) {
+            runStep('Backing up sshd_config before re-deploying PMSS template (post-downgrade)',
+                'cp '.escapeshellarg($live).' '.escapeshellarg($live.'.pre-downgrade-'.date('Ymd-His')));
+            runStep('Re-deploying PMSS sshd_config template (post-downgrade)',
+                'cp '.escapeshellarg($tmpl).' '.escapeshellarg($live));
+            runStep('Setting sshd_config permissions after template re-deploy',
+                'chmod 644 '.escapeshellarg($live));
+        }
+
+        // Verify sshd config parses before restart.
+        $sshdT = 1;
+        @exec('/usr/sbin/sshd -t 2>&1', $sshdTOut, $sshdT);
+        if ($sshdT !== 0) {
+            logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: sshd -t failed after downgrade: '.implode(' | ', array_slice($sshdTOut, 0, 5)));
+            throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: sshd -t failed');
+        }
+
+        // Restart ssh.service so the downgraded sshd takes over.
+        runStep('Restarting ssh.service to load downgraded openssh-server',
+            'systemctl daemon-reload && systemctl restart ssh');
+        sleep(2);
+        $listening = trim((string) @shell_exec("ss -tln 2>/dev/null | grep -q ':22 ' && echo yes || echo no")) === 'yes';
+        if (!$listening) {
+            logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: port 22 not listening after downgrade-restart');
+            throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: sshd not listening after restart');
+        }
+
+        $newVer = trim((string) @shell_exec('dpkg-query -W -f=\'${Version}\' openssh-server 2>/dev/null'));
+        logMessage('[OK] pmssEnsureOpensshCompatibleWithHeldLibssl3: openssh-server downgraded from '.$opensshVer.' to '.$newVer.' (libssl3-3.0.17-compatible canonical state)');
+    }
+
 /**
      * Move the legacy localnet file into the configuration directory.
      */

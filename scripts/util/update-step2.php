@@ -537,6 +537,20 @@ pmssRunProfiledCallable(
     [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null]
 );
 
+// Ensure openssh-server is at a libssl3-3.0.17-compatible version (deb12u7 or
+// older). Cascade-victim hosts that were emergency-recovered with a
+// `dpkg -i openssh-server_deb12u9_amd64.deb` from apt cache end up in an
+// unconfigured/broken-dep state — the binary runs but `dpkg --configure -a`
+// fails every PMSS update, and any apt resolver pass could re-trigger the
+// 2026-04-30 cascade. This step converges them to canonical baseline (matches
+// never-cascaded sea-sparrow: openssh-server at deb12u7, in ii state, unheld).
+// Idempotent — no-ops on hosts already at deb12u7 or older. Refs #436.
+pmssRunProfiledCallable(
+    'Ensuring openssh-server is libssl3-3.0.17-compatible (canonical baseline downgrade)',
+    'pmssEnsureOpensshCompatibleWithHeldLibssl3',
+    [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null]
+);
+
 // Package convergence: dpkg selections are the authoritative source of package
 // state.
 logmsg('[OK] Package phase relies on dpkg baseline selections only');
