@@ -6,11 +6,7 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
-$debianVersion = file_get_contents('/etc/debian_version');
-// Are we running debian 7/8 or Debian 10?
-$debianVersion = $debianVersion[0] == 1 ? 10 : 8;
 
-// Gather iostat information from disks
 $iostatLogFile = '/var/run/pmss/iostat';
 
 $devices = `ls /sys/block/|grep sd|grep -v loop|grep -v md`;
@@ -18,52 +14,90 @@ $devices = explode("\n", trim($devices));
 $deviceList = implode(' ', $devices);
 if (count($devices) == 0) die("No block devices detected\n");
 
-// Get the iostats for past 2 minutes for parsing
-// Depends on debian version, mapping is below
-// Sample code:
-// iostat -xm 1 2 -g grp1 sda sdb sdc sdd | awk '/grp1/ { print $4,$5,$6,$7,$10,$13,$14}'
-// For debian 10 took r_await as that's what we are more interested, both read and write await is now exposed #TODO eventually this
-// 2026-05-15 (verified Debian 12 / sysstat 12.6.1): %util column is at $23, not $16. Fixed last field only.
-// The remaining fields ($2,$3,$4,$5,$10,$15) are still positionally wrong vs sysstat 12 layout
-// (only $2=iopsRead happens to be right); diskAwait/diskServiceTime/throughputRead/Write/iopsWrite all
-// pull shifted columns. Empirical fleet impact: serviceTimeWeek non-zero numbers are bogus shifted data
-// (not actual ms), diskUtil was always 0 because $16=drqm/s. Oversale algo thresholds tuned against
-// these are tuned against garbage.
-// #TODO replace positional awk with header-row parse — read the first non-data line, build a
-// name->index map (r/s, w/s, rMB/s, wMB/s, r_await, %util), then extract by name. Robust across
-// sysstat versions and survives future column additions. Also: svctm was removed in sysstat 12,
-// so diskServiceTime should be retired or aliased to r_await ms. Will require coordinated update
-// of pmssCallbacks::nodeIostat field-name expectations and provisioningApi::updateNodeResources
-// oversale thresholds (currently 25ms is SSD-scale on a field that wasn't actually ms).
-$iostat = $debianVersion == 10
-    ? `iostat -xm 120 2 -g grp1 {$deviceList} | awk '/grp1/ { print $2,$3,$4,$5,$10,$15,$23}'`
-    : `iostat -xm 120 2 -g grp1 {$deviceList} | awk '/grp1/ { print $4,$5,$6,$7,$10,$13,$14}'`;
+// 120s interval, 2 samples. First sample = since-boot (discard); second = 120-sec delta (use).
+$iostatRaw = `iostat -xm 120 2 -g grp1 {$deviceList} 2>&1`;
 
-$iostatRaw = $iostat;
+// Header-row parser: robust across sysstat versions.
+//
+// Pre-2026-05-23 (commit e126beb): positional awk pulled fixed columns
+// ($2,$3,$4,$5,$10,$15,$23). Sysstat 12+ added discard (d/s, dMB/s, ...) and
+// flush (f/s, f_await) columns, shifting every position past r/s. Only $2=r/s
+// and (post-2026-05-15 patch) $23=%util were correct. Field-name extraction
+// below survives future column additions and works across sysstat 9/10/11/12+.
+$lines = explode("\n", $iostatRaw);
+$lastHeaderIdx = -1;
+foreach ($lines as $i => $line) {
+    if (preg_match('/^Device\s/', trim($line))) {
+        $lastHeaderIdx = $i;
+    }
+}
+if ($lastHeaderIdx === -1) die("No iostat Device header found\n");
 
-// Parse them! :)
-$iostat = explode("\n", trim($iostat));
-$iostat = $iostat[1];   // We are only interested in CURRENT load
-$iostat = explode(' ', $iostat);    // empty space is the divider
+$header = preg_split('/\s+/', trim($lines[$lastHeaderIdx]));
+$colMap = array_flip($header);   // 'Device'=>0, 'r/s'=>1, 'rMB/s'=>2, ...
 
+// grp1 data line after the last header (= the 2nd-sample 120-sec average).
+$grp1Line = null;
+for ($i = $lastHeaderIdx + 1; $i < count($lines); $i++) {
+    if (preg_match('/^\s*grp1\s/', $lines[$i])) {
+        $grp1Line = $lines[$i];
+        break;
+    }
+}
+if ($grp1Line === null) die("No grp1 line after iostat header\n");
 
+$values = preg_split('/\s+/', trim($grp1Line));
+// $values[0]='grp1'; $values[1..N] align with $header[1..N] (Device col is name).
+
+$getAny = function (array $colNames) use ($colMap, $values) {
+    foreach ($colNames as $name) {
+        if (isset($colMap[$name])) {
+            return $values[$colMap[$name]] ?? '0';
+        }
+    }
+    return '0';
+};
+
+// Populate with semantically-correct values per sysstat-12 column naming.
+//
+// SEMANTIC CHANGES from the pre-2026-05-23 positional parser:
+//   * `iopsWrite` was rMB/s (shifted); now reads `w/s` (real write IOPS).
+//   * `throughputRead` was rrqm/s (shifted); now reads `rMB/s` (real read MB/s).
+//   * `throughputWrite` was %rrqm (shifted); now reads `wMB/s` (real write MB/s).
+//   * `diskAwait` was wrqm/s (shifted; magnitudes in the hundreds-to-thousands);
+//     now reads `r_await` ms (real read latency) — matches the original
+//     2014-era TODO intent ("took r_await as that's what we are more interested").
+//     Fallback to legacy `await` for sysstat 9-11.
+//   * `diskServiceTime` was dMB/s (always 0 on HDD without TRIM); repurposed to
+//     `w_await` ms (real write latency). The original svctm column was removed
+//     in sysstat 12. Fallback to legacy `svctm` for sysstat 9-11.
+//   * `diskUtil` was already correct on post-2026-05-15 nodes (`%util`); unchanged.
+//   * NEW: `avgQueueSize` reads `aqu-sz` — the RAID-correct saturation signal
+//     per Gregg/Brooker/Percona. PowerAdmin rule of thumb: sustained
+//     `aqu-sz > 2 per HDD` = queue-bound regardless of svctm.
+//
+// CASCADE WARNING: hallinta `serviceTime*` columns will drop ~100x in magnitude
+// once this reaches the fleet (wrqm/s magnitudes were in the hundreds-to-thousands;
+// real r_await is typically <50ms on healthy HDD RAID). Oversale-algo calibration
+// bands need re-tuning against the corrected semantics. The new `avgQueueSize`
+// field is the recommended primary saturation gate going forward.
 $iostat = array(
-    'iopsRead' => $iostat[0],
-    'iopsWrite' => $iostat[1],
-    'throughputRead' => $iostat[2],
-    'throughputWrite' => $iostat[3],
-    'diskAwait' => $iostat[4],
-    'diskServiceTime' => $iostat[5],
-    'diskUtil' => $iostat[6],
-    'diskQuantity' => count($devices),
-    'time' => time()
+    'iopsRead'        => $getAny(['r/s']),
+    'iopsWrite'       => $getAny(['w/s']),
+    'throughputRead'  => $getAny(['rMB/s']),
+    'throughputWrite' => $getAny(['wMB/s']),
+    'diskAwait'       => $getAny(['r_await', 'await']),
+    'diskServiceTime' => $getAny(['w_await', 'svctm']),
+    'diskUtil'        => $getAny(['%util']),
+    'avgQueueSize'    => $getAny(['aqu-sz', 'avgqu-sz']),
+    'diskQuantity'    => count($devices),
+    'time'            => time(),
 );
 
 // Save the data
 file_put_contents($iostatLogFile, serialize($iostat));
-file_put_contents($iostatLogFile . '-history', date('Y-m-d H:i:s') .' || ' . serialize($iostat) . "\n", FILE_APPEND);
-file_put_contents($iostatLogFile . '-history-raw', date('Y-m-d H:i:s') .' || ' . $iostatRaw . "\n---\n", FILE_APPEND);
+file_put_contents($iostatLogFile . '-history', date('Y-m-d H:i:s') . ' || ' . serialize($iostat) . "\n", FILE_APPEND);
+file_put_contents($iostatLogFile . '-history-raw', date('Y-m-d H:i:s') . ' || ' . $iostatRaw . "\n---\n", FILE_APPEND);
 
-
-// This way we can download it just via HTTP and easier view remotely
+// HTTP-readable copy for central admin (hallinta) fetch.
 passthru("cp /var/run/pmss/iostat /var/www/iostat");
