@@ -44,19 +44,32 @@ function pmssSafeWriteSources(string $content, string $label, ?callable $logger 
     // and persist the intended content only to the backup path so callers can
     // inspect what would have been written without touching the real tree.
     if (is_dir($target)) {
+        if (!pmssUserFilePathIsSafe($backup)) {
+            $log("[WARN] Target sources path is a directory for $label and backup path is unsafe, skipping update");
+            return false;
+        }
         $log(@file_put_contents($backup, $content, LOCK_EX) === false
             ? "[WARN] Target sources path is a directory for $label and backup write failed, skipping update"
             : "[WARN] Target sources path is a directory for $label, wrote backup and skipped update");
         return false;
     }
 
-    $current = @file_get_contents($target);
     $dir = dirname($target);
     if (!pmssDirEnsureExists($dir, 0755)) {
         $log("[ERROR] Unable to create parent directory for $label sources.list: $dir");
         return false;
     }
+    if (!pmssUserFilePathIsSafe($target)) {
+        $log("[ERROR] Unsafe target path for $label sources.list: $target");
+        return false;
+    }
+
+    $current = @file_get_contents($target);
     if ($current !== false) {
+        if (!pmssUserFilePathIsSafe($backup)) {
+            $log("[ERROR] Unsafe backup path for $label sources.list: $backup");
+            return false;
+        }
         $log(@file_put_contents($backup, $current, LOCK_EX) === false
             ? "[WARN] Unable to create backup $backup before updating $label"
             : "Backup for sources.list written to $backup");

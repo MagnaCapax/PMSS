@@ -61,6 +61,48 @@ class UpdateHelpersSafeWriteTest extends TestCase
         $this->clearEnv('PMSS_APT_SOURCES_PATH');
     }
 
+    public function testSafeWriteSourcesRejectsSymlinkTarget(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-apt-symlink-target-');
+        $victim = $dir.'/victim';
+        $target = $dir.'/sources.list';
+        file_put_contents($victim, 'victim');
+        $this->assertTrue(symlink($victim, $target));
+
+        putenv('PMSS_APT_SOURCES_PATH='.$target);
+        try {
+            $logs = [];
+            $result = \pmssSafeWriteSources('new', 'SymlinkTarget', $this->pmssMakeArrayLogger($logs));
+
+            $this->assertTrue($result === false);
+            $this->assertEquals('victim', file_get_contents($victim));
+            $this->pmssAssertMessagesContain($logs, 'Unsafe target path for SymlinkTarget sources.list');
+        } finally {
+            $this->clearEnv('PMSS_APT_SOURCES_PATH');
+        }
+    }
+
+    public function testSafeWriteSourcesRejectsSymlinkBackup(): void
+    {
+        $target = $this->pmssWriteTempFile('sources', 'old');
+        $victim = $target.'.victim';
+        file_put_contents($victim, 'victim');
+        $this->assertTrue(symlink($victim, $target.'.pmss-backup'));
+
+        putenv('PMSS_APT_SOURCES_PATH='.$target);
+        try {
+            $logs = [];
+            $result = \pmssSafeWriteSources('new', 'SymlinkBackup', $this->pmssMakeArrayLogger($logs));
+
+            $this->assertTrue($result === false);
+            $this->assertEquals('old', file_get_contents($target));
+            $this->assertEquals('victim', file_get_contents($victim));
+            $this->pmssAssertMessagesContain($logs, 'Unsafe backup path for SymlinkBackup sources.list');
+        } finally {
+            $this->clearEnv('PMSS_APT_SOURCES_PATH');
+        }
+    }
+
     public function testAptWriteValidUntilOverrideCreatesParentDirectories(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-apt-override-');
