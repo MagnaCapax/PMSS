@@ -188,7 +188,7 @@ $userNoticePath = '';
 $userNoticeRequested = false;
 $defaultNoticePath = getenv('PMSS_STORAGE_USER_NOTICE') ?: '/etc/seedbox/config/storagePerformanceNotice.json';
 
-$parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []));
+$parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null));
 if (pmssCliOptionPresent($parsed, 'help', 'h')) {
     echo "\nStorage health report\n";
     echo "Usage: storageHealth.php [--json <path>] [--raw] [--only-problems] [--device <kname|/dev/...>] [--user-notice[=<path>]]\n\n";

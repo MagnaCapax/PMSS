@@ -11,7 +11,7 @@ require_once __DIR__.'/../lib/users.php';
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/log.php';
 
-$parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []));
+$parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null));
 if (pmssCliOptionPresent($parsed, 'help', 'h')) {
     echo "Usage: checkUsers.php [--json]\n";
     exit(0);

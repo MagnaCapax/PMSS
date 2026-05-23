@@ -15,7 +15,7 @@
 require_once 'lib/user/add/cli.php';
 
 try {
-    $cli = pmssAddUserParseCli($argv ?? ($_SERVER['argv'] ?? []));
+    $cli = pmssAddUserParseCli(pmssCliArgv($argv ?? null));
 } catch (InvalidArgumentException $exception) {
     die($exception->getMessage() . "\n");
 }

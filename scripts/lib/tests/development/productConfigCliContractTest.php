@@ -11,7 +11,7 @@ class ProductConfigCliContractTest extends TestCase
 
         $this->assertTrue($source !== '', 'Expected to read scripts/productConfig.php');
         $this->assertStringContainsString("require_once __DIR__.'/lib/cli/optionParser.php';", $source);
-        $this->assertStringContainsString("pmssParseCliTokens(\$argv ?? (\$_SERVER['argv'] ?? []), ['welcome-message'])", $source);
+        $this->assertStringContainsString("pmssParseCliTokens(pmssCliArgv(\$argv ?? null), ['welcome-message'])", $source);
         $this->assertStringContainsString("pmssCliOption(\$parsed, 'welcome-message')", $source);
         $this->assertTrue(
             strpos($source, "strpos((string) \$argv[\$index], '--welcome-message=')") === false,

@@ -18,7 +18,7 @@ pmssRequireCli();
 require_once __DIR__.'/lib/welcomeMessage.php';
 
 $usage = "Usage: productConfig.php PRODUCT --welcome-message=<html>\n";
-$parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []), ['welcome-message']);
+$parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null), ['welcome-message']);
 if (pmssCliOption($parsed, 'help', 'h')) {
     echo $usage;
     exit(0);

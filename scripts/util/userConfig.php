@@ -29,10 +29,7 @@ require_once __DIR__.'/../lib/welcomeMessage.php';
  */
 $usage = pmssUserConfigCliUsage();
 $resourceOptions = pmssUserConfigCliResourceOptionNames('addUserOption');
-$parsed = pmssParseCliTokens(
-    $argv ?? ($_SERVER['argv'] ?? []),
-    array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled'], $resourceOptions)
-);
+$parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null), array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled'], $resourceOptions));
 $helpRequested = pmssCliOption($parsed, 'help', 'h', false) !== false;
 $args = array_merge([''], $parsed['arguments']);
 if ($helpRequested) {

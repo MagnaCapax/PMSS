@@ -10,6 +10,8 @@
  */
 require_once __DIR__.'/helpText.php';
 
+function pmssCliArgv(?array $argv = null): array { return $argv ?? ($_SERVER['argv'] ?? []); }
+
 /**
  * Split argv tokens into associative options and positional arguments.
  * @param array<int,string> $valueOptions Option names that may consume dashed values.

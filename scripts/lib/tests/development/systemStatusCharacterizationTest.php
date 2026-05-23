@@ -580,7 +580,7 @@ final class SystemStatusCharacterizationTest extends TestCase
 
         $this->assertStringContainsString("require_once __DIR__.'/../lib/cli/optionParser.php';", $componentSource);
         $this->assertStringContainsString("require_once __DIR__.'/../lib/systemStatus.php';", $componentSource);
-        $this->assertStringContainsString("pmssParseCliTokens(\$argv ?? (\$_SERVER['argv'] ?? []));", $componentSource);
+        $this->assertStringContainsString("pmssParseCliTokens(pmssCliArgv(\$argv ?? null));", $componentSource);
         $this->pmssAssertStringNotContainsString('getopt(', $componentSource);
         $this->assertStringContainsString("pmssCliOptionPresent(\$parsed, 'json')", $componentSource);
         $this->assertStringContainsString('pmssComponentStatusChecks()', $componentSource);
