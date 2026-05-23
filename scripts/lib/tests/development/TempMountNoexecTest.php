@@ -21,6 +21,16 @@ class TempMountNoexecTest extends TestCase
         $this->pmssRestoreEnv('PMSS_DRY_RUN', $this->prevDryRun);
     }
 
+    private function runNoexecHardening(string $fstab, string $mounts, ?string $flag = '1'): array
+    {
+        $messages = [];
+        $logger = $this->pmssMakeArrayLogger($messages);
+        putenv($flag === null ? 'PMSS_HARDEN_TMP_NOEXEC' : 'PMSS_HARDEN_TMP_NOEXEC='.$flag);
+        putenv('PMSS_DRY_RUN=1');
+        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
+        return $messages;
+    }
+
     public function testSkipsWhenFlagDisabled(): void
     {
         $original = "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0\n";
@@ -31,12 +41,7 @@ class TempMountNoexecTest extends TestCase
             "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n"
         );
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        putenv('PMSS_HARDEN_TMP_NOEXEC');
-        putenv('PMSS_DRY_RUN=1');
-        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
+        $messages = $this->runNoexecHardening($fstab, $mounts, null);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
         $this->assertTrue($this->pmssMessagesContain($messages, 'disabled'), 'expected disabled log');
@@ -52,12 +57,7 @@ class TempMountNoexecTest extends TestCase
             "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n"
         );
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        putenv('PMSS_HARDEN_TMP_NOEXEC=FALSE');
-        putenv('PMSS_DRY_RUN=1');
-        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
+        $messages = $this->runNoexecHardening($fstab, $mounts, 'FALSE');
 
         $this->assertEquals($original, (string) file_get_contents($fstab));
         $this->assertTrue($this->pmssMessagesContain($messages, 'disabled via PMSS_HARDEN_TMP_NOEXEC'), 'expected explicit-false skip log');
@@ -74,12 +74,7 @@ class TempMountNoexecTest extends TestCase
             "tmpfs /dev/shm tmpfs rw,nosuid,nodev 0 0\n"
         );
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        putenv('PMSS_HARDEN_TMP_NOEXEC=1');
-        putenv('PMSS_DRY_RUN=1');
-        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
+        $messages = $this->runNoexecHardening($fstab, $mounts);
 
         $updated = (string)file_get_contents($fstab);
         $this->assertStringContainsString('/tmp', $updated);
@@ -97,12 +92,7 @@ class TempMountNoexecTest extends TestCase
             "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\n"
         );
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        putenv('PMSS_HARDEN_TMP_NOEXEC=1');
-        putenv('PMSS_DRY_RUN=1');
-        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
+        $this->runNoexecHardening($fstab, $mounts);
 
         $options = $this->pmssFstabOptionsForMount($fstab, '/tmp');
         $this->assertTrue(in_array('noexec', $options, true), 'expected noexec option');
@@ -122,12 +112,7 @@ class TempMountNoexecTest extends TestCase
             "tmpfs /tmp tmpfs rw,noexec,nosuid,nodev 0 0\n"
         );
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        putenv('PMSS_HARDEN_TMP_NOEXEC=1');
-        putenv('PMSS_DRY_RUN=1');
-        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
+        $messages = $this->runNoexecHardening($fstab, $mounts);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
         $this->assertTrue($this->pmssMessagesContain($messages, 'already hardened'), 'expected already hardened log');
@@ -142,12 +127,7 @@ class TempMountNoexecTest extends TestCase
             "tmpfs /dev/shm tmpfs rw,nosuid,nodev 0 0\n"
         );
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        putenv('PMSS_HARDEN_TMP_NOEXEC=1');
-        putenv('PMSS_DRY_RUN=1');
-        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
+        $messages = $this->runNoexecHardening($fstab, $mounts);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
         $this->assertTrue($this->pmssMessagesContain($messages, 'not found'), 'expected not found log');
@@ -162,12 +142,7 @@ class TempMountNoexecTest extends TestCase
         );
         chmod($fstab, 0000);
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        putenv('PMSS_HARDEN_TMP_NOEXEC=1');
-        putenv('PMSS_DRY_RUN=1');
-        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
+        $messages = $this->runNoexecHardening($fstab, $mounts);
 
         $this->assertTrue($this->pmssMessagesContain($messages, 'not readable'), 'expected not readable log');
         chmod($fstab, 0600);
@@ -184,12 +159,7 @@ class TempMountNoexecTest extends TestCase
         $this->pmssCreateSymlinkOrSkip($fstabTarget, $fstab);
         file_put_contents($mounts, "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n");
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        putenv('PMSS_HARDEN_TMP_NOEXEC=1');
-        putenv('PMSS_DRY_RUN=1');
-        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
+        $messages = $this->runNoexecHardening($fstab, $mounts);
 
         $this->assertEquals("tmpfs /tmp tmpfs defaults 0 0\n", (string) file_get_contents($fstabTarget));
         $this->assertTrue($this->pmssMessagesContain($messages, 'not a regular file'), 'expected regular-file guard log');
@@ -204,13 +174,8 @@ class TempMountNoexecTest extends TestCase
         );
         chmod($dir, 0500);
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
         $this->pmssResetRuntimeProfile();
-        putenv('PMSS_HARDEN_TMP_NOEXEC=1');
-        putenv('PMSS_DRY_RUN=1');
-        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
+        $messages = $this->runNoexecHardening($fstab, $mounts);
 
         $this->assertEquals([], $this->pmssProfileCommands());
         $this->assertTrue($this->pmssMessagesContain($messages, 'Failed writing updated '.$fstab), 'expected write failure log');
