@@ -34,8 +34,13 @@ $localnets = networkLoadLocalnets();
 	if ($usage === null || trim($usage) === '') die(date('Y-m-d H:i:s') . " **** FATAL: Empty output from iptables???\n");
 
 // Debian 11 iptables -Z output doesn't work anymore .... we might miss a tiny fraction this way, but atleast not exponential growth
-$monitoringRules = shell_exec('/scripts/util/makeMonitoringRules.php');
-$monitoringCommands = networkParseMonitoringCommands(is_string($monitoringRules) ? $monitoringRules : '');
+$monitoringCommands = networkLoadMonitoringCommands(
+    null,
+    static function (string $message) use ($logger): void {
+        $logger->msg(str_replace('setupNetwork:', 'trafficLog:', $message));
+    }
+);
+// networkLoadMonitoringCommands() checks helper status before networkParseMonitoringCommands().
 if ($monitoringCommands !== []) {
     networkRunIptables('-F OUTPUT'); // let's first clear old rules
     foreach ($monitoringCommands as $monitoringCommand) {
