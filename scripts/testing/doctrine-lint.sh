@@ -69,31 +69,17 @@ check_adr_metadata() {
 
 check_adr_metadata
 
-# 3) Guardrail: forbid ADR index docs (no docs/adr/index.md or README.md)
-check_no_adr_index_docs() {
-	local adr_dir="$ROOT_DIR/docs/adr"
-	local bad=0
-	if [[ -f "$adr_dir/index.md" ]]; then
-		echo "doctrine lint: docs/adr/index.md is not allowed (avoid index docs)" >&2
-		bad=1
-	fi
-	if [[ -f "$adr_dir/README.md" ]]; then
-		echo "doctrine lint: docs/adr/README.md is not allowed (avoid index docs)" >&2
-		bad=1
-	fi
-	if [[ $bad -eq 1 ]]; then
-		FAIL=$((FAIL + 1))
-	fi
-}
-
-check_no_adr_index_docs
-
-# 4) Guardrail: forbid any index files under docs/ (directory listings suffice)
+# 3) Guardrail: forbid index docs (directory listings suffice)
 check_no_docs_index_files() {
-	local matches
+	local matches adr_readme
 	matches=$(find "$ROOT_DIR/docs" -type f \( -iname 'index.md' -o -iname 'index.html' \) -print 2>/dev/null || true)
+	adr_readme="$ROOT_DIR/docs/adr/README.md"
+	if [[ -f "$adr_readme" ]]; then
+		[[ -n "$matches" ]] && matches+=$'\n'
+		matches+="$adr_readme"
+	fi
 	if [[ -n "$matches" ]]; then
-		echo "doctrine lint: index files under docs/ are not allowed (use directory listing instead):" >&2
+		echo "doctrine lint: index files under docs/ and docs/adr/README.md are not allowed (use directory listing instead):" >&2
 		echo "$matches" >&2
 		FAIL=$((FAIL + 1))
 	fi

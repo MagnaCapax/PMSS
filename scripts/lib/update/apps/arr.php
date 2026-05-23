@@ -37,8 +37,7 @@ function pmssArrAssetNameHasToken(string $assetName, array $tokens): bool
 /** Build the canonical updater config for a supported Starr-family app. */
 function pmssArrAppConfig(string $app): ?array
 {
-    $branches = PMSS_ARR_APP_BRANCHES;
-    if (!isset($branches[$app])) {
+    if (!isset(PMSS_ARR_APP_BRANCHES[$app])) {
         return null;
     }
 
@@ -46,7 +45,7 @@ function pmssArrAppConfig(string $app): ?array
         'app' => $app,
         'install_path' => '/opt/'.$app,
         'releases_url' => 'https://api.github.com/repos/'.$app.'/'.$app.'/releases',
-        'asset_pattern' => sprintf('/%s\\.(?:%s)\\.([0-9.]+).*linux.*tar\\.gz/i', preg_quote($app, '/'), $branches[$app]),
+        'asset_pattern' => sprintf('/%s\\.(?:%s)\\.([0-9.]+).*linux.*tar\\.gz/i', preg_quote($app, '/'), PMSS_ARR_APP_BRANCHES[$app]),
         'extract_dir' => $app,
         'user_agent' => 'PMSS-'.$app,
     ];

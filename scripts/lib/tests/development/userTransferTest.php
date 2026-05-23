@@ -213,7 +213,7 @@ class UserTransferTest extends TestCase
 
     public function testBuildRsyncMainUsesTrailingSlashAndExcludes(): void
     {
-        $cfg = ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'];
+        $cfg = $this->baseConfig();
         $script = \pmssUserTransferBuildRsyncMain($cfg);
 
         $this->assertStringContainsString('rsync -av', $script);
@@ -227,7 +227,7 @@ class UserTransferTest extends TestCase
 
     public function testBuildRsyncFinalUsesExplicitSources(): void
     {
-        $cfg = ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'];
+        $cfg = $this->baseConfig();
         $script = \pmssUserTransferBuildRsyncFinal($cfg);
 
         $this->assertStringContainsString('rsync -av', $script);
@@ -238,7 +238,7 @@ class UserTransferTest extends TestCase
 
     public function testBuildAuthProbeUsesSinglePasswordPrompt(): void
     {
-        $cfg = ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'];
+        $cfg = $this->baseConfig();
         $script = \pmssUserTransferBuildAuthProbe($cfg);
 
         $this->assertStringContainsString('ssh -o Compression=no', $script);
@@ -250,7 +250,7 @@ class UserTransferTest extends TestCase
 
     public function testBuildRemoteSizeProbeUsesByteAccurateDu(): void
     {
-        $cfg = ['localUser' => 'deefbox', 'remoteUser' => 'remote01', 'hostname' => 'example.com', 'verifyThreshold' => 90];
+        $cfg = $this->baseConfig(['remoteUser' => 'remote01', 'verifyThreshold' => 90]);
         $script = \pmssUserTransferBuildRemoteSizeProbe($cfg);
 
         $this->assertStringContainsString('-o NumberOfPasswordPrompts=1', $script);
@@ -261,7 +261,7 @@ class UserTransferTest extends TestCase
 
     public function testGeneratedScriptsKeepSharedSshFlagsAligned(): void
     {
-        $cfg = ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'];
+        $cfg = $this->baseConfig();
         $sharedFlags = 'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no';
 
         $this->assertStringContainsString($sharedFlags, \pmssUserTransferBuildRsyncMain($cfg));
@@ -311,7 +311,7 @@ class UserTransferTest extends TestCase
 
     public function testGeneratedTransferScriptsMatchSnapshot(): void
     {
-        $cfg = ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'];
+        $cfg = $this->baseConfig();
         $expectedMain = <<<'SNAP'
 #!/bin/bash
 set -e
@@ -335,7 +335,7 @@ SNAP;
 
     public function testSharedRsyncCommandBuilderMatchesSnapshot(): void
     {
-        $cfg = ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'];
+        $cfg = $this->baseConfig();
         $expected = <<<'SNAP'
 #!/bin/bash
 set -e
@@ -541,5 +541,10 @@ SNAP;
             return;
         }
         throw new \AssertionError('Expected RuntimeException, none thrown');
+    }
+
+    private function baseConfig(array $overrides = []): array
+    {
+        return array_replace(['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'], $overrides);
     }
 }

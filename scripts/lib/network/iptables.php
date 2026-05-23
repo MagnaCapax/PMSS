@@ -127,9 +127,7 @@ function networkLoadMonitoringCommands(?callable $runner = null, ?callable $logg
         return [];
     }
 
-    $lines = array_map('strval', array_filter($output, 'is_scalar'));
-
-    return networkParseMonitoringCommands(implode("\n", $lines));
+    return networkParseMonitoringCommands(implode("\n", array_map('strval', array_filter($output, 'is_scalar'))));
 }
 
 function networkApplyIptablesAtomically(array $filterCommands, array $natCommands): bool
