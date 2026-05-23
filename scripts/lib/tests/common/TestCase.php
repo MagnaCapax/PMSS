@@ -452,11 +452,13 @@ abstract class TestCase
                 'scripts/lib/nginxConfig/main.php',
             ],
             'pmssListManagedUsersResult(' => [
-                'scripts/cron/trafficLimits.php',
                 'scripts/cron/checkRtorrent.php',
                 'scripts/cron/userTrackerCleaner.php',
-                'scripts/lib/resources/show.php',
                 'scripts/showTraffic.php',
+            ],
+            'pmssListManagedUsersFromCommand(' => [
+                'scripts/cron/trafficLimits.php',
+                'scripts/lib/resources/show.php',
                 'scripts/userTorrents.php',
             ],
         ];

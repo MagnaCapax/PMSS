@@ -120,6 +120,34 @@ class UpdateHelpersSafeWriteTest extends TestCase
         $this->pmssAssertMessagesContain($logs, 'apt-get clean failed with rc 100 (simulated apt failure)');
     }
 
+    public function testAptRunCleanLogsRunnerException(): void
+    {
+        $runner = static function (): array {
+            throw new \RuntimeException('simulated runner failure');
+        };
+
+        [$result, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($runner): bool {
+            return \pmssAptRunClean($logger, $runner);
+        });
+
+        $this->assertTrue($result === false);
+        $this->pmssAssertMessagesContain($logs, 'apt-get clean runner failed: simulated runner failure');
+    }
+
+    public function testAptRunCleanRejectsMalformedRunnerStatus(): void
+    {
+        $runner = static function (): array {
+            return ['rc' => 'not-a-number', 'output' => 'ignored'];
+        };
+
+        [$result, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($runner): bool {
+            return \pmssAptRunClean($logger, $runner);
+        });
+
+        $this->assertTrue($result === false);
+        $this->pmssAssertMessagesContain($logs, 'apt-get clean runner returned invalid rc; treating as failure');
+    }
+
     private function clearEnv(string $name): void
     {
         putenv($name);

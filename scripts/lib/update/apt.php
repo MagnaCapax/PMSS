@@ -123,9 +123,23 @@ function pmssAptRunClean(?callable $logger = null, ?callable $runner = null): bo
         };
     }
 
-    $result = $runner();
-    $rc = isset($result['rc']) ? (int) $result['rc'] : 1;
-    $output = isset($result['output']) ? trim((string) $result['output']) : '';
+    try {
+        $result = $runner();
+    } catch (Throwable $exception) {
+        $log('[WARN] apt-get clean runner failed: '.$exception->getMessage());
+        return false;
+    }
+
+    $rcRaw = is_array($result) && array_key_exists('rc', $result) ? $result['rc'] : null;
+    if (!is_int($rcRaw) && !(is_string($rcRaw) && preg_match('/^-?[0-9]+$/', $rcRaw) === 1)) {
+        $log('[WARN] apt-get clean runner returned invalid rc; treating as failure');
+        return false;
+    }
+
+    $rc = (int) $rcRaw;
+    $output = (is_array($result) && isset($result['output']) && is_scalar($result['output']))
+        ? trim((string) $result['output'])
+        : '';
     if ($rc !== 0) {
         $suffix = ($output === '') ? '' : ' ('.$output.')';
         $log('[WARN] apt-get clean failed with rc '.$rc.$suffix);
