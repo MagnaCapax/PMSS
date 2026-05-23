@@ -44,10 +44,7 @@ if (!is_dir($disabledRoot)) {
     }
 }
 
-pmssUserLifecycleContextLog('unsuspend', 'start', $username, array(
-    'status'   => 'INFO',
-    'home_dir' => $homeDir,
-));
+pmssUserLifecycleContextLogHomeInfo('unsuspend', 'start', $username, $homeDir);
 
 // Unlock and extend expiry before restoring services.
 pmssUserLifecycleStep('unsuspend', $username, 'unlock_account', 'usermod -U '.escapeshellarg($username), false);
@@ -97,8 +94,5 @@ if (is_dir($disabledRoot) && !@rename($disabledRoot, $activeRoot)) {
 pmssUserLifecycleSyncSuspendedState($username, $disabledRoot);
 pmssUserLifecycleRefreshManagedNginxConfig('unsuspend', $username, false);
 
-pmssUserLifecycleContextLog('unsuspend', 'start_rtorrent', $username, array(
-    'status'   => 'INFO',
-    'home_dir' => $homeDir,
-));
+pmssUserLifecycleContextLogHomeInfo('unsuspend', 'start_rtorrent', $username, $homeDir);
 pmssUserLifecycleStep('unsuspend', $username, 'start_rtorrent', '/scripts/startRtorrent '.escapeshellarg($username), false);

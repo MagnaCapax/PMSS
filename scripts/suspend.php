@@ -29,10 +29,7 @@ if (is_dir($disabledRoot)) {
     die("User already suspended\n");
 }
 
-pmssUserLifecycleContextLog('suspend', 'start', $username, array(
-    'status'   => 'INFO',
-    'home_dir' => $homeDir,
-));
+pmssUserLifecycleContextLogHomeInfo('suspend', 'start', $username, $homeDir);
 
 pmssUserLifecycleStep('suspend', $username, 'lock_account', 'usermod -L '.escapeshellarg($username), false);
 pmssUserLifecycleStep('suspend', $username, 'set_expiry', 'usermod --expiredate 1 '.escapeshellarg($username), false);

@@ -520,6 +520,14 @@ function pmssUserLifecycleContextLogStatusMessage(string $action, string $phase,
 }
 
 /**
+ * Write the common lifecycle info payload for actions scoped to a home dir.
+ */
+function pmssUserLifecycleContextLogHomeInfo(string $action, string $phase, string $username, string $homeDir): void
+{
+    pmssUserLifecycleContextLog($action, $phase, $username, array('status' => 'INFO', 'home_dir' => $homeDir));
+}
+
+/**
  * Convert arbitrary log fields into a single-line text-safe representation.
  */
 function pmssUserLifecycleFormatTextField($value): string
