@@ -37,4 +37,26 @@ class UserCgroupCliTasksAndCpuProfilesTest extends TestCase
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--mem-profile=default']);
         $this->assertStringContainsString('MemoryHigh=500M', $out);
     }
+
+    public function testExplicitValuesOverrideNamedProfiles(): void
+    {
+        $out = $this->pmssRunUserConfigCgroupCli([
+            'root',
+            '--apply',
+            '--dry-run',
+            '--cpu-profile=high',
+            '--cpu-weight=111',
+            '--tasks-profile=high',
+            '--tasks-max=222',
+            '--mem-profile=heavy',
+            '--memory-high=333',
+        ]);
+
+        $this->assertStringContainsString('CPUWeight=111', $out);
+        $this->assertStringContainsString('TasksMax=222', $out);
+        $this->assertStringContainsString('MemoryHigh=333M', $out);
+        $this->assertStringNotContainsString('CPUWeight=300', $out);
+        $this->assertStringNotContainsString('TasksMax=8192', $out);
+        $this->assertStringNotContainsString('MemoryHigh=1024M', $out);
+    }
 }

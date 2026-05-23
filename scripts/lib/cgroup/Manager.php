@@ -512,24 +512,22 @@ class Manager
             'heavy' => '1024',
         ]);
 
-        if (isset($opt['cpu-profile']) && !isset($opt['cpu-weight'])) {
-            $profileName = strtolower($opt['cpu-profile']);
-            $opt['cpu-profile'] = $profileName;
-            $opt['cpu-weight'] = $cpuWeights[$profileName] ?? '100';
+        $this->applyNumericProfileOption($opt, 'cpu-profile', 'cpu-weight', $cpuWeights, '100');
+        $this->applyNumericProfileOption($opt, 'tasks-profile', 'tasks-max', $tasksMax, '4096');
+        $this->applyNumericProfileOption($opt, 'mem-profile', 'memory-high', $memoryHigh, '500');
+    }
+
+    /** Apply a named numeric profile only when the explicit target is absent. */
+    private function applyNumericProfileOption(array &$opt, string $profileKey, string $targetKey, array $profiles, string $fallback): void
+    {
+        if (!isset($opt[$profileKey])) {
+            return;
         }
 
-        if (isset($opt['tasks-profile']) && !isset($opt['tasks-max'])) {
-            $profileName = strtolower($opt['tasks-profile']);
-            $opt['tasks-profile'] = $profileName;
-            $opt['tasks-max'] = $tasksMax[$profileName] ?? '4096';
-        }
-
-        if (isset($opt['mem-profile'])) {
-            $profileName = strtolower($opt['mem-profile']);
-            $opt['mem-profile'] = $profileName;
-            if (!isset($opt['memory-high'])) {
-                $opt['memory-high'] = $memoryHigh[$profileName] ?? '500';
-            }
+        $profileName = strtolower($opt[$profileKey]);
+        $opt[$profileKey] = $profileName;
+        if (!isset($opt[$targetKey])) {
+            $opt[$targetKey] = $profiles[$profileName] ?? $fallback;
         }
     }
 
