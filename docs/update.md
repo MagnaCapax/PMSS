@@ -173,8 +173,9 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
    permissions, hostname/quota overrides exported by `install.sh`).
 5. Apply repository templates, refresh apt indexes, migrate legacy files.
 6. Run application installers under `scripts/lib/update/apps/*.php`.
-7. Configure the web stack, disable legacy daemons, and install supporting
-   packages (e.g., mediainfo, Let’s Encrypt helpers).
+7. Configure the web stack, regenerate per-user nginx configs from staged
+   templates, disable legacy daemons, and install supporting packages
+   (e.g., mediainfo, Let’s Encrypt helpers).
 8. Update every user environment via `pmssUpdateAllUsers()`, which also owns
    linger/rootless-Docker wiring and the optional post-refresh checks
    (user crontabs are user-owned and not rewritten).

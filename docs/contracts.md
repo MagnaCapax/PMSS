@@ -245,7 +245,8 @@ Sub-handlers:
 
 - pmssConfigureWebStack(): void
   - Stops nginx; disables/stops lighttpd through the supported systemd path; kills lingering `lighttpd` and `php-cgi`.
-  - Enables nginx and hardens `/home` perms; final nginx config refresh runs later in `scripts/util/update-step2.php` after app installers finish.
+  - Enables nginx, regenerates all per-user nginx configs from the freshly staged templates without restarting nginx, and hardens `/home` perms.
+  - A final nginx config refresh and restart still runs later in `scripts/util/update-step2.php` after app installers finish.
 
 - pmssApplyRuntimeTemplates(): void
   - Installs `rc.local`, systemd `system.conf`, and `sshd_config` from templates;

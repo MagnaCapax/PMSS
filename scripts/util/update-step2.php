@@ -133,10 +133,17 @@ function pmssConfigureWebStack(): void
     killProcess('php-cgi', 'Terminating lingering php-cgi processes');
     pmssSystemdUnitActionIfPresent('nginx', 'Enabling nginx systemd service', 'enable');
 
+    // Regenerate all per-user nginx configs from the freshly staged template
+    // before the longer app/user phases. The final refresh later in this script
+    // still restarts nginx after app installers finish.
+    $nginxConfigRc = runStep('Regenerating nginx configs from staged templates', '/scripts/util/createNginxConfig.php');
+    if ($nginxConfigRc !== 0) {
+        throw new RuntimeException('nginx_config_regeneration_failed');
+    }
+
     // Per-user lighttpd configuration, htpasswd sync, and instance checks
     // are handled inside the consolidated per-user maintenance loop.
-    // nginx config regeneration runs once after app installers finish, so do
-    // not duplicate it here. nginx stays stopped until that final refresh.
+    // nginx stays stopped until the final post-update refresh.
     runStep('Setting /home directory permissions', 'chmod 751 /home');
     // Quota state files reject chmod; prune them so the find commands stay noise-free.
     $prune = '\( -name "aquota.*" -o -name "lost+found" \)';

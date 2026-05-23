@@ -19,4 +19,21 @@ class UpdateStep2WebRefreshGuardTest extends TestCase
             "'PMSS_UPDATE_STEP2_COMPLETED'",
         ]);
     }
+
+    public function testWebStackRegeneratesAllNginxConfigsFromStagedTemplate(): void
+    {
+        $src = $this->pmssReadRepoFile('scripts/util/update-step2.php');
+
+        $this->assertStringContainsString(
+            "runStep('Regenerating nginx configs from staged templates', '/scripts/util/createNginxConfig.php')",
+            $src
+        );
+        $this->assertStringContainsString("throw new RuntimeException('nginx_config_regeneration_failed');", $src);
+        $this->assertOrderedStrings([
+            "function pmssConfigureWebStack(): void",
+            'Regenerating nginx configs from staged templates',
+            'Updating all user environments',
+            'Post-update nginx configuration refresh',
+        ], $src);
+    }
 }
