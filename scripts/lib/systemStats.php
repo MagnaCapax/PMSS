@@ -57,15 +57,38 @@ function pmssSystemStatsCollect(): array
         }
         return $kb.'K';
     };
-    $readPsiAvg10 = static function (string $path): string {
+    $readPsi = static function (string $path): string {
+        // /proc/pressure/io and /proc/pressure/memory expose:
+        //   some avg10=X.XX avg60=X.XX avg300=X.XX total=N
+        //   full avg10=X.XX avg60=X.XX avg300=X.XX total=N
+        // Emit three timescales (some_avg10/some_avg60/full_avg10) as a
+        // slash-joined string so the log format stays single-field per
+        // metric and matches the downstream node-collect parser contract
+        // (tools/fleet/node-collect splits on '/' into some_avg10,
+        // some_avg60, full_avg10 indices).
         if (!is_readable($path)) {
             return 'na';
         }
         $raw = @file_get_contents($path);
-        if (!is_string($raw) || !preg_match('/avg10=([0-9.]+)/', $raw, $matches)) {
+        if (!is_string($raw)) {
             return 'na';
         }
-        return number_format((float) $matches[1], 1, '.', '');
+        $find = static function (string $row, string $field) use ($raw): ?float {
+            if (!preg_match('/^'.preg_quote($row, '/').'\s.*?'.preg_quote($field, '/').'=([0-9.]+)/m', $raw, $m)) {
+                return null;
+            }
+            return (float) $m[1];
+        };
+        $someAvg10 = $find('some', 'avg10');
+        $someAvg60 = $find('some', 'avg60');
+        $fullAvg10 = $find('full', 'avg10');
+        if ($someAvg10 === null) {
+            return 'na';
+        }
+        $fmt = static function (?float $v): string {
+            return $v === null ? 'na' : number_format($v, 1, '.', '');
+        };
+        return $fmt($someAvg10).'/'.$fmt($someAvg60).'/'.$fmt($fullAvg10);
     };
     $iopingMs = static function (string $path): string {
         if (!is_dir($path)) {
@@ -165,7 +188,7 @@ function pmssSystemStatsCollect(): array
         'iopingRoot'  => $iopingRoot,
         'iopingHome'  => $iopingHome,
         'topMem'      => $topMem,
-        'psiIo'       => $readPsiAvg10('/proc/pressure/io'),
-        'psiMem'      => $readPsiAvg10('/proc/pressure/memory'),
+        'psiIo'       => $readPsi('/proc/pressure/io'),
+        'psiMem'      => $readPsi('/proc/pressure/memory'),
     ];
 }

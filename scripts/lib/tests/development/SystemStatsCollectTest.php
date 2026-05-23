@@ -47,8 +47,16 @@ class SystemStatsCollectTest extends TestCase
             $this->assertMatches('/^(?:[0-9]+\.[0-9][GM]|[0-9]+K)$/', $stats[$key], $key.' should keep compact memory units');
         }
 
+        // psiIo / psiMem now expose three slash-joined timescales matching the
+        // node-collect parser contract: some_avg10/some_avg60/full_avg10.
+        // Each field is either a one-decimal float or 'na'. Whole field can
+        // still degrade to 'na' if /proc/pressure/* is unreadable.
         foreach (['psiIo', 'psiMem'] as $key) {
-            $this->assertMatches('/^(?:na|[0-9]+\.[0-9])$/', $stats[$key], $key.' should stay numeric or na');
+            $this->assertMatches(
+                '#^(?:na|(?:na|[0-9]+\.[0-9])/(?:na|[0-9]+\.[0-9])/(?:na|[0-9]+\.[0-9]))$#',
+                $stats[$key],
+                $key.' should be three slash-joined timescales (avg10/avg60/full10) or na'
+            );
         }
 
         foreach (['iopingRoot', 'iopingHome'] as $key) {
