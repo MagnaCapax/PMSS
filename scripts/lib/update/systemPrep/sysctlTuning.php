@@ -19,6 +19,13 @@ function pmssSystemPrepReadBoolEnv(string $key): ?bool
     return null;
 }
 
+/** Read non-empty config/procfs lines with a consistent fail-soft fallback. */
+function pmssSystemPrepNonEmptyLinesRead(string $path): array
+{
+    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    return is_array($lines) ? $lines : [];
+}
+
 /** Detect whether any swap device is configured. */
 function pmssSysctlHasSwap(): bool
 {
@@ -26,8 +33,7 @@ function pmssSysctlHasSwap(): bool
         return $override;
     }
 
-    $lines = @file('/proc/swaps', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    return is_array($lines) && count($lines) > 1;
+    return count(pmssSystemPrepNonEmptyLinesRead('/proc/swaps')) > 1;
 }
 
 /** Return true when a block device or one of its slaves is non-rotational. */
@@ -64,13 +70,8 @@ function pmssSysctlSwapIsFast(): bool
         return false;
     }
 
-    $swaps = @file('/proc/swaps', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (!is_array($swaps)) {
-        return false;
-    }
-
     $sysClassBlockRoot = pmssResolvePathFromEnv('PMSS_SYSCTL_SYS_CLASS_BLOCK_PATH', '/sys/class/block');
-    foreach ($swaps as $index => $line) {
+    foreach (pmssSystemPrepNonEmptyLinesRead('/proc/swaps') as $index => $line) {
         if ($index === 0) {
             continue;
         }
@@ -100,13 +101,8 @@ function pmssSysctlNicSpeedMbps(): int
     }
 
     $routePath = pmssResolvePathFromEnv('PMSS_SYSCTL_PROC_NET_ROUTE_PATH', '/proc/net/route');
-    $lines = @file($routePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (!is_array($lines)) {
-        return 1000;
-    }
-
     $iface = '';
-    foreach ($lines as $index => $line) {
+    foreach (pmssSystemPrepNonEmptyLinesRead($routePath) as $index => $line) {
         if ($index === 0) {
             continue;
         }
@@ -314,12 +310,7 @@ function pmssSysctlSettingsBuild(array $profile): array
 function pmssSysctlOverridesParse(string $path): array
 {
     $keys = [];
-    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (!is_array($lines)) {
-        return [];
-    }
-
-    foreach ($lines as $line) {
+    foreach (pmssSystemPrepNonEmptyLinesRead($path) as $line) {
         $line = trim((string) preg_replace('/\s+#.*$/', '', $line));
         if ($line === '' || $line[0] === '#') {
             continue;
@@ -356,12 +347,7 @@ function pmssSysctlSettingsFilterOverrides(array $groupedSettings, array $overri
 function pmssSysctlFileParse(string $path): array
 {
     $settings = [];
-    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (!is_array($lines)) {
-        return [];
-    }
-
-    foreach ($lines as $line) {
+    foreach (pmssSystemPrepNonEmptyLinesRead($path) as $line) {
         $trimmed = trim((string) $line);
         if ($trimmed === '' || $trimmed[0] === '#') {
             continue;
