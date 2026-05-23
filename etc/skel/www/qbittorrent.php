@@ -7,14 +7,7 @@ require_once __DIR__.'/../.scriptsInc.php';
 // qBittorrent config) is operator-cron territory and runs out-of-band;
 // customer's startQbittorrent() falls through the function_exists check
 // below when the enforcer is absent, with no functional change.
-/**
-* PMSS: User Frontend: qBittorrent start/disable/restart file
-*
-* Copyright (C) 2010-2024 Magna Capax Finland Oy
-*
-* #TODO Make this dynamic and single file with definitions for all apps, deluge, qbittorrent, jellyfin, *ARR etc. GIT Issue #10
-* # https://github.com/MagnaCapax/PMSS/issues/10
-**/
+/** Lightweight frontend toggle for qBittorrent. */
 
 pmssFrontendToggleAction(
     '../.qbittorrentEnable',

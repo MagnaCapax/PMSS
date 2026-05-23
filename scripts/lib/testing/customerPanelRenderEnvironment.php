@@ -58,6 +58,10 @@ function pmssCustomerPanelRenderPrepare(string $sourceWww, string $home, string 
     if (!pmssTestingCopyTree($sourceWww, $www, 0700)) {
         return ['ok' => false, 'error' => 'unable to copy customer source tree'];
     }
+    $scriptsInc = dirname($sourceWww).'/.scriptsInc.php';
+    if (is_file($scriptsInc) && !@copy($scriptsInc, $home.'/.scriptsInc.php')) {
+        return ['ok' => false, 'error' => 'unable to copy customer helper include'];
+    }
 
     $serializedTraffic = serialize([
         'raw' => ['month' => 15360, 'week' => 4096, 'day' => 512],

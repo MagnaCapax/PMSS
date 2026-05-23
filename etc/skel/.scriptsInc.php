@@ -21,6 +21,21 @@ function pmssFrontendActionRequest() {
 }
 
 /**
+ * Check whether customer PHP may run shell commands on this host.
+ */
+function pmssFrontendShellExecAvailable() {
+ $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+ return function_exists('shell_exec') && !in_array('shell_exec', $disabled, true);
+}
+
+/**
+ * Run a customer-side shell command only when the PHP runtime allows it.
+ */
+function pmssFrontendShellExec($command) {
+ return pmssFrontendShellExecAvailable() ? shell_exec($command) : null;
+}
+
+/**
  * Shared start/disable/restart toggle flow for lightweight app frontends.
  * The callers provide the enable marker path plus app-specific commands.
  */
@@ -33,11 +48,11 @@ function pmssFrontendToggleAction($enableFile, callable $startHandler, $disableC
 
   case 'disable':
     unlink($enableFile);
-    shell_exec($disableCommand);
+    pmssFrontendShellExec($disableCommand);
     break;
 
   case 'restart':
-    shell_exec($restartCommand === null ? $disableCommand : $restartCommand);
+    pmssFrontendShellExec($restartCommand === null ? $disableCommand : $restartCommand);
     $startHandler();
     break;
  }

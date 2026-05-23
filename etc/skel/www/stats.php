@@ -15,17 +15,18 @@
  * #TODO: Hover on status → show systemctl logs
  * #TODO: Click status → attempt restart (if allowed)
  */
+require_once __DIR__.'/../.scriptsInc.php';
 
 // Fail-soft: data collection must never abort page rendering. Show notes and
 // keep going if commands or files are unavailable.
 if (!function_exists('pmssInfoShellExec')) {
     function pmssInfoShellExec($command, $label)
     {
-        if (!function_exists('shell_exec')) {
+        if (!pmssFrontendShellExecAvailable()) {
             return array('output' => null, 'error' => $label . ' unavailable: shell_exec disabled');
         }
 
-        $output = shell_exec($command);
+        $output = pmssFrontendShellExec($command);
         if ($output === null) {
             return array('output' => '', 'error' => null);
         }

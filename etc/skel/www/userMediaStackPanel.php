@@ -7,6 +7,7 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
+require_once __DIR__.'/../.scriptsInc.php';
 
 /**
  * Resolve a media-stack helper path relative to the tenant home.
@@ -38,11 +39,7 @@ function pmssMediaStackPanelCurrentHostnameRead(): string
  */
 function pmssMediaStackPanelShellExecAvailable(): bool
 {
-    if (!function_exists('shell_exec')) {
-        return false;
-    }
-
-    return !in_array('shell_exec', array_map('trim', explode(',', (string) ini_get('disable_functions'))), true);
+    return pmssFrontendShellExecAvailable();
 }
 
 /**

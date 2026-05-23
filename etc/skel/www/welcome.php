@@ -877,11 +877,11 @@ function readUserMemoryBreakdownBytes() {
 }
 
 function readSystemdMemoryCurrentBytes() {
-    if (!function_exists('shell_exec')) {
+    if (!function_exists('pmssFrontendShellExecAvailable') || !pmssFrontendShellExecAvailable()) {
         return null;
     }
 
-    $memoryCurrent = @shell_exec("systemctl show user-$('/usr/bin/id' -u).slice -p MemoryCurrent --value 2>/dev/null");
+    $memoryCurrent = @pmssFrontendShellExec("systemctl show user-$('/usr/bin/id' -u).slice -p MemoryCurrent --value 2>/dev/null");
     if (!is_string($memoryCurrent)) {
         return null;
     }
@@ -896,8 +896,8 @@ function readSystemdMemoryCurrentBytes() {
 
 function readSystemdMemoryBreakdownBytes() {
     $uid = function_exists('posix_getuid') ? (int) posix_getuid() : null;
-    if ($uid === null && function_exists('shell_exec')) {
-        $uidRaw = @shell_exec('/usr/bin/id -u 2>/dev/null');
+    if ($uid === null && function_exists('pmssFrontendShellExecAvailable') && pmssFrontendShellExecAvailable()) {
+        $uidRaw = @pmssFrontendShellExec('/usr/bin/id -u 2>/dev/null');
         if (is_string($uidRaw) && ctype_digit(trim($uidRaw))) {
             $uid = (int) trim($uidRaw);
         }

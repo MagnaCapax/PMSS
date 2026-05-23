@@ -71,7 +71,7 @@ function pmssMediaStackPanelStartHandle($home, $username, $hostname)
     }
 
     @unlink(pmssMediaStackPanelHomePath($home, '.install-media-stack-web.pid'));
-    @shell_exec(pmssMediaStackPanelStartCommandBuild($home, $username));
+    @pmssFrontendShellExec(pmssMediaStackPanelStartCommandBuild($home, $username));
 
     $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
     if ($payload['state'] === 'ready') {
