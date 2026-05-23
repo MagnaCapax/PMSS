@@ -9,6 +9,34 @@
  */
 
 /**
+ * FHS-standard root-owned symlinks that are safe to traverse.
+ *
+ * Debian (and most modern Linux distros) ship /var/run as a symlink to /run
+ * and /var/lock as a symlink to /run/lock. These are root-owned, OS-managed,
+ * and present on every PMSS host. Rejecting them would block every script
+ * that writes to /var/run/pmss/* — see the 2026-05-23 heshtok regression
+ * where resourceLog.php, resourceStats.php, trafficIngressLog.php, and
+ * the traffic-storage helpers all failed silently for 8 days, accumulating
+ * multi-gigabyte error logs, because pmssPathSegmentsAreSafe rejected every
+ * /var/run/* path.
+ *
+ * Both the symlink path AND its target are verified; an attacker-replaced
+ * symlink whose target differs from the FHS standard is still rejected.
+ */
+function pmssPathIsFhsStandardSymlink(string $linkPath): bool
+{
+    static $standard = [
+        '/var/run'  => '/run',
+        '/var/lock' => '/run/lock',
+    ];
+    if (!isset($standard[$linkPath])) {
+        return false;
+    }
+    $target = @readlink($linkPath);
+    return is_string($target) && $target === $standard[$linkPath];
+}
+
+/**
  * Validate path segments while preserving caller-specific absolute/leaf policy.
  */
 function pmssPathSegmentsAreSafe(
@@ -44,7 +72,7 @@ function pmssPathSegmentsAreSafe(
         $current = $current === ''
             ? ($absolute ? '/'.$segment : $segment)
             : $current.'/'.$segment;
-        if (is_link($current)) {
+        if (is_link($current) && !pmssPathIsFhsStandardSymlink($current)) {
             return false;
         }
 
