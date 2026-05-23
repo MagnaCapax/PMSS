@@ -274,15 +274,17 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString('pmssJsonLineAppend($logPath, $entry)', $snapshotSrc);
     }
 
-    public function testStorageHealthSnapshotKeepsJsonOptionConsumptionInline(): void
+    public function testStorageHealthSnapshotUsesSharedCliOptionParser(): void
     {
         $snapshotSrc = $this->pmssReadRepoFile('scripts/util/storageHealthSnapshot.php');
         $helperSymbol = 'pmssStorageHealthSnapshot'.'ParseCli';
 
-        $this->assertSourceOmitsFunction($snapshotSrc, $helperSymbol, 'storageHealthSnapshot.php should keep CLI option consumption inside pmssStorageHealthSnapshotMain()');
-        $this->assertStringContainsString("strpos(\$argv[\$i + 1], '--') !== 0", $snapshotSrc);
-        $this->assertStringContainsString("\$val = \$argv[++\$i];", $snapshotSrc);
-        $this->assertStringContainsString("if (\$key !== '--json') {", $snapshotSrc);
+        $this->assertSourceOmitsFunction($snapshotSrc, $helperSymbol, 'storageHealthSnapshot.php should use the shared CLI parser without adding a local wrapper');
+        $this->assertStringContainsString("require_once __DIR__.'/../lib/cli/optionParser.php';", $snapshotSrc);
+        $this->assertStringContainsString('$parsed = pmssParseCliTokens($argv);', $snapshotSrc);
+        $this->assertStringContainsString("pmssCliOptionPresent(\$parsed, 'quiet')", $snapshotSrc);
+        $this->assertStringContainsString("pmssCliOptionString(\$parsed, 'json', null, \$logPath)", $snapshotSrc);
+        $this->pmssAssertStringNotContainsString("array_pad(explode('=', \$arg, 2), 2, null)", $snapshotSrc);
     }
 
     public function testStorageBenchmarkDropsStandaloneCliConsumeHelper(): void

@@ -9,33 +9,20 @@
 
 require_once __DIR__.'/../lib/storageHealth.php';
 require_once __DIR__.'/../lib/log.php';
+require_once __DIR__.'/../lib/cli/optionParser.php';
 
 function pmssStorageHealthSnapshotMain(array $argv): int
 {
     $logPath = '/var/log/pmss/storage-health.jsonl';
-    $quiet = false;
+    $parsed = pmssParseCliTokens($argv);
 
-    for ($i = 1, $argc = count($argv); $i < $argc; $i++) {
-        $arg = $argv[$i];
-        [$key, $val] = array_pad(explode('=', $arg, 2), 2, null);
-        if ($key === '--quiet') {
-            $quiet = true;
-            continue;
-        }
-        if ($key === '--help' || $key === '-h') {
-            echo "\nStorage health snapshot (SMART/NVMe + mdadm) to JSONL\nUsage: storageHealthSnapshot.php [--json <path>] [--quiet]\n\n  --json <path>   JSON Lines output (default /var/log/pmss/storage-health.jsonl)\n  --quiet         Suppress the success message (cron-friendly)\n\n";
-            return 0;
-        }
-        if ($key !== '--json') {
-            continue;
-        }
-        if ($val === null && $i + 1 < $argc && strpos($argv[$i + 1], '--') !== 0) {
-            $val = $argv[++$i];
-        }
-        if ($val !== null && $val !== '') {
-            $logPath = $val;
-        }
+    if (pmssCliOptionPresent($parsed, 'help', 'h')) {
+        echo "\nStorage health snapshot (SMART/NVMe + mdadm) to JSONL\nUsage: storageHealthSnapshot.php [--json <path>] [--quiet]\n\n  --json <path>   JSON Lines output (default /var/log/pmss/storage-health.jsonl)\n  --quiet         Suppress the success message (cron-friendly)\n\n";
+        return 0;
     }
+
+    $quiet = pmssCliOptionPresent($parsed, 'quiet');
+    $logPath = pmssCliOptionString($parsed, 'json', null, $logPath) ?? $logPath;
 
     $logDir = dirname($logPath);
     $logDirError = null;
