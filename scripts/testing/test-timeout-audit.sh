@@ -21,9 +21,9 @@ while IFS= read -r file; do
 			{
 				line = $0
 				command = "(^|[^[:alnum:]_.-])((/[[:alnum:]_.-]+)+/)?timeout"
-				options = "([[:space:]]+--[A-Za-z0-9_-]+(=[^[:space:]]+)?)*"
+				invocation = command "[[:space:]]+([0-9]|-[A-Za-z-])"
 				duration = "[[:space:]]+[0-9]+[smhd]?([[:space:]]|$)"
-				if (line ~ command options duration &&
+				if (line ~ invocation && line ~ command "[^;&|#]*" duration &&
 					line !~ /--kill-after/) {
 					printf "%s:%d: timeout invocation lacks --kill-after: %s\n", file, NR, line
 				}
