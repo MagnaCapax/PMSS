@@ -316,7 +316,12 @@ class Manager
         if (isset($opts['io-weight'])) {
             $props['IOWeight'] = (int)$opts['io-weight'];
         } elseif ($derivedWeight !== null) {
-            $props['IOWeight'] = $derivedWeight;
+            // Clamp IOWeight at 200. On Debian 12 / systemd 252 / Linux 6.1 with
+            // cgroup v1 BFQ, any IOWeight >= 200 maps to the same kernel
+            // bfq.weight=181 (verified empirically); the formula's 200..1000 range
+            // is dead code at that layer. CPUWeight above uses the full range
+            // because cpu.weight/cpu.shares has no equivalent cap. See PMSS#582.
+            $props['IOWeight'] = min($derivedWeight, 200);
         }
 
         if (isset($opts['tasks-max'])) {
