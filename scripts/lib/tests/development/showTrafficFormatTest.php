@@ -36,9 +36,8 @@ class ShowTrafficFormatTest extends TestCase
 
     public function testShowTrafficUsesSharedManagedUsersParser(): void
     {
-        $this->pmssAssertRepoFileContainsString('scripts/showTraffic.php', "pmssListManagedUsersResult(__DIR__.'/listUsers.php')");
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/showTraffic.php', ["pmssListManagedUsersResult(__DIR__.'/listUsers.php')", "array_map('pmssTrafficFormatAmount', \$data['raw'])"]);
         $this->pmssAssertRepoFileNotContainsString('scripts/showTraffic.php', "exec(escapeshellarg(__DIR__.'/listUsers.php')");
-        $this->pmssAssertRepoFileContainsString('scripts/showTraffic.php', "array_map('pmssTrafficFormatAmount', \$data['raw'])");
     }
 
     public function testFormatRateDisplay(): void

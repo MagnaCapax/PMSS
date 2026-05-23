@@ -132,8 +132,7 @@ class NetworkHelpersTest extends TestCase
 
     public function testTrafficLogParsesMonitoringRulesBeforeApplying(): void
     {
-        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', 'networkParseMonitoringCommands(');
-        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', "networkRunIptables('-F OUTPUT');");
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLog.php', ['networkParseMonitoringCommands(', "networkRunIptables('-F OUTPUT');"]);
         $this->pmssAssertRepoFileNotContainsString('scripts/cron/trafficLog.php', 'passthru($'.'monitoringRules)');
     }
 }

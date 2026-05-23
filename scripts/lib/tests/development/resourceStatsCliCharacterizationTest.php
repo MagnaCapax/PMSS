@@ -12,8 +12,7 @@ final class resourceStatsCliCharacterizationTest extends TestCase
         $this->pmssAssertRepoFileNotContainsString('scripts/cron/resourceStats.php', 'pmssCliUserArgSanitize(');
         $this->pmssAssertRepoFileNotContainsString('scripts/cron/resourceStats.php', "\$processor->spawnWorkers(\$_SERVER['argv'][0], \$users);");
         foreach (['scripts/lib/resources/processor.php', 'scripts/lib/traffic/processor.php'] as $path) {
-            $this->pmssAssertRepoFileContainsString($path, 'pmssStatsProcessorRunCli(');
-            $this->pmssAssertRepoFileContainsString($path, 'pmssPasswdFileHasUser(');
+            $this->pmssAssertRepoFileContainsAllStrings($path, ['pmssStatsProcessorRunCli(', 'pmssPasswdFileHasUser(']);
             $this->pmssAssertRepoFileNotContainsString($path, "preg_match('/^'.preg_quote(");
         }
 

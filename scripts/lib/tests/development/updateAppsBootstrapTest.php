@@ -70,8 +70,7 @@ class UpdateAppsBootstrapTest extends TestCase
     {
         $contents = $this->pmssReadUpdateAppFile('arr.php');
 
-        $this->assertStringContainsString("dirname(__DIR__, 2).'/runtime.php'", $contents);
-        $this->assertStringContainsString('%s updater: missing runtime helper', $contents);
+        $this->assertStringContainsAllStrings(["dirname(__DIR__, 2).'/runtime.php'", '%s updater: missing runtime helper'], $contents);
         $this->pmssAssertStringNotContainsString("require_once __DIR__.'/bootstrap.php';", $contents, 'ARR helper should not require a separate bootstrap helper');
     }
 
@@ -79,8 +78,7 @@ class UpdateAppsBootstrapTest extends TestCase
     {
         $contents = $this->pmssReadUpdateAppFile('servarr.php');
 
-        $this->assertStringContainsString("require_once __DIR__.'/arr.php';", $contents);
-        $this->assertStringContainsString('pmssArrUpdateSupportedApps();', $contents);
+        $this->assertStringContainsAllStrings(["require_once __DIR__.'/arr.php';", 'pmssArrUpdateSupportedApps();'], $contents);
         $this->pmssAssertStringNotContainsString("dirname(__DIR__).'/runtime.php'", $contents, 'servarr.php should delegate runtime bootstrap to arr.php');
         $this->pmssAssertStringNotContainsString('missing runtime helper', $contents, 'servarr.php should keep the runtime warning in arr.php');
         $this->pmssAssertStringNotContainsString("require_once __DIR__.'/bootstrap.php';", $contents, 'servarr.php should not require a separate bootstrap helper');
