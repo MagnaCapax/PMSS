@@ -10,7 +10,7 @@ class ManagedPathCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update/managedPath.php');
 
         $this->assertStringContainsString(
-            'pmssWriteManagedPathFile($path, $contents, $label, $writeLogger, $owner, $group, $mode)',
+            'pmssWriteManagedPathFile($path, $contents, $label, $writeLogger, $owner, $group, $mode',
             $src
         );
         $this->assertSame(1, substr_count($src, 'pmssAtomicWriteFile('));

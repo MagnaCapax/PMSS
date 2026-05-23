@@ -35,7 +35,8 @@ function pmssWriteManagedPathFile(
     callable $logger,
     ?string $owner = null,
     ?string $group = null,
-    int $mode = 0644
+    int $mode = 0644,
+    string $writeFailureMessage = ''
 ): bool
 {
     if (!pmssManagedPathIsSafe($path, $label, $logger)) {
@@ -44,7 +45,7 @@ function pmssWriteManagedPathFile(
     if ($owner === null ? pmssAtomicWriteFile($path, $contents, $mode) : pmssWriteManagedFile($path, $contents, $owner, $group, $mode)) {
         return true;
     }
-    $logger('[WARN] Unable to write '.$label.' at '.$path);
+    $logger($writeFailureMessage !== '' ? $writeFailureMessage : '[WARN] Unable to write '.$label.' at '.$path);
     return false;
 }
 

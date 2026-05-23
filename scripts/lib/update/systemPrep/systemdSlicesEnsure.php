@@ -5,15 +5,13 @@
  * @license GPL-3.0-only
  */
 
+require_once __DIR__.'/../managedPath.php';
 require_once dirname(__DIR__).'/../runtime.php';
 
 /** Atomically install a systemd drop-in and keep failure logging consistent. */
 function pmssSystemdDropinInstall(string $target, string $body, callable $log, string $writeFailurePrefix, string $installFailurePrefix, ?string $successMessage = null): bool
 {
-    $tmpTarget = $target.'.tmp';
-    if (@file_put_contents($tmpTarget, $body) === false) { $log($writeFailurePrefix.$tmpTarget); return false; }
-    @chmod($tmpTarget, 0644);
-    if (!@rename($tmpTarget, $target)) { $log($installFailurePrefix.$target); @unlink($tmpTarget); return false; }
+    if (!pmssWriteManagedPathFile($target, $body, 'systemd drop-in', $log, null, null, 0644, $installFailurePrefix.$target)) return false;
     if ($successMessage !== null) { $log($successMessage); }
     return true;
 }

@@ -5,7 +5,7 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class CronInlineCharacterizationTest extends TestCase
 {
-    public function testBootTuningKeepsFileWritesInline(): void
+    public function testBootTuningUsesSharedManagedPathWrites(): void
     {
         $src = $this->pmssReadRepoFile('scripts/lib/update/systemPrep.php');
         $wrapperNeedle = '$write'.'Target = static function';
@@ -16,8 +16,8 @@ class CronInlineCharacterizationTest extends TestCase
         );
         $this->assertStringContainsString('[$scriptTarget, $scriptRaw, 0755, \'Boot tuning script\']', $src);
         $this->assertStringContainsString('[$serviceTarget, $serviceRaw, 0644, \'Boot tuning service\']', $src);
+        $this->assertStringContainsString('pmssWriteManagedPathFile($path, $content, $label, $log, null, null, $mode', $src);
         $this->assertStringContainsString('$log(\'Installed \'.$label.\' at \'.$path);', $src);
-        $this->assertStringContainsString("@rename(\$tmp, \$path)", $src);
     }
 
     public function testServiceWatchdogsUseSharedHelpersAndKeepCommands(): void

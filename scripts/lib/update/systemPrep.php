@@ -296,16 +296,7 @@ function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = 
             continue;
         }
 
-        $tmp = $path.'.tmp';
-        if (@file_put_contents($tmp, $content) === false) {
-            $log('[WARN] Unable to write '.$label.' at '.$tmp);
-            continue;
-        }
-
-        @chmod($tmp, $mode);
-        if (!@rename($tmp, $path)) {
-            $log('[WARN] Unable to install '.$label.' at '.$path);
-            @unlink($tmp);
+        if (!pmssWriteManagedPathFile($path, $content, $label, $log, null, null, $mode, '[WARN] Unable to install '.$label.' at '.$path)) {
             continue;
         }
 

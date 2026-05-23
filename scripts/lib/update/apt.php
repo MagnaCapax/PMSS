@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/logging.php';
 require_once __DIR__.'/distro.php';
+require_once __DIR__.'/managedPath.php';
 require_once __DIR__.'/../runtime.php';
 
 /**
@@ -89,12 +90,16 @@ function pmssAptWriteValidUntilOverride(?callable $logger = null, ?string $path 
         return false;
     }
 
-    if (@file_put_contents($target, "Acquire::Check-Valid-Until \"false\";\n", LOCK_EX) === false) {
-        $log('[WARN] Unable to write Release timestamp override: '.$target);
-        return false;
-    }
-
-    return true;
+    return pmssWriteManagedPathFile(
+        $target,
+        "Acquire::Check-Valid-Until \"false\";\n",
+        'apt valid-until override',
+        $log,
+        null,
+        null,
+        0644,
+        '[WARN] Unable to write Release timestamp override: '.$target
+    );
 }
 
 /**
