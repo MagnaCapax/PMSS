@@ -22,31 +22,23 @@ function pmssSetupLetsEncryptCommandBuild(string $binary, array $args = array())
 }
 
 /**
- * Normalize one command result, including test double payloads.
- *
- * @return array{rc:int,stdout:string,stderr:string}
- */
-function pmssSetupLetsEncryptCommandResultNormalize($result, string $description): array
-{
-    if (!is_array($result)) {
-        throw new RuntimeException($description.' returned invalid command result');
-    }
-
-    return array(
-        'rc' => isset($result['rc']) ? (int) $result['rc'] : 1,
-        'stdout' => isset($result['stdout']) ? (string) $result['stdout'] : '',
-        'stderr' => isset($result['stderr']) ? (string) $result['stderr'] : '',
-    );
-}
-
-/**
  * Execute one provisioning primitive and fail loudly when it does not succeed.
  */
 function pmssSetupLetsEncryptRunCommand(string $command, string $description, ?callable $runner = null): string
 {
-    $result = $runner !== null
-        ? pmssSetupLetsEncryptCommandResultNormalize($runner($command, $description), $description)
-        : pmssCommandCapture($command);
+    if ($runner !== null) {
+        $result = $runner($command, $description);
+        if (!is_array($result)) {
+            throw new RuntimeException($description.' returned invalid command result');
+        }
+        $result = array(
+            'rc' => isset($result['rc']) ? (int) $result['rc'] : 1,
+            'stdout' => isset($result['stdout']) ? (string) $result['stdout'] : '',
+            'stderr' => isset($result['stderr']) ? (string) $result['stderr'] : '',
+        );
+    } else {
+        $result = pmssCommandCapture($command);
+    }
 
     if ($result['rc'] !== 0) {
         $detail = trim($result['stderr']) !== '' ? trim($result['stderr']) : trim($result['stdout']);

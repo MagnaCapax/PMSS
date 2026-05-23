@@ -158,6 +158,20 @@ class SetupLetsEncryptTest extends TestCase
         }
     }
 
+    public function testSharedSetupRejectsInvalidCommandRunnerPayload(): void
+    {
+        try {
+            \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', $this->pmssLetsEncryptTestOptions([
+                'commandRunner' => static function (string $command, string $description) {
+                    return 'not-a-command-result';
+                },
+            ]));
+            $this->fail('Expected invalid command runner result to throw');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Install certbot packages returned invalid command result', $exception->getMessage());
+        }
+    }
+
     public function testSharedSetupBootstrapsMissingBusterCertbotBinary(): void
     {
         $commands = [];
