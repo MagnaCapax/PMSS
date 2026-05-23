@@ -186,11 +186,11 @@ function pmssWriteTorrentThrottle(string $username, int $value): bool
         return false;
     }
 
-    return pmssReplaceUserFile($path, (string) $value, static function (string $tmp) use ($isRoot): void {
-        @chmod($tmp, 0640);
-        if ($isRoot) {
-            @chown($tmp, 'root');
-            @chgrp($tmp, 'root');
-        }
-    });
+    return pmssReplaceUserFileWithMetadata(
+        $path,
+        (string) $value,
+        0640,
+        $isRoot ? 'root' : null,
+        $isRoot ? 'root' : null
+    );
 }

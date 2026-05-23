@@ -32,7 +32,7 @@ class UpdateQuotasGuardTest extends TestCase
         $this->assertStringContainsString("require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';", $src, 'updateQuotas.php should load the shared managed-file writer');
         $this->assertStringContainsString('$realHome === false || $realHome !== $expectedHome', $src, 'updateQuotas.php must require an exact home-path match before writing ~/.quota');
         $this->assertTrue(strpos($src, 'strpos($realHome, $expectedHome) !== 0') === false, 'updateQuotas.php should not treat prefix-only home-path matches as safe');
-        $this->assertStringContainsString('pmssReplaceUserFile($path, $content', $src, 'updateQuotas.php must stage quota snapshots through the shared replacer');
+        $this->assertStringContainsString('pmssReplaceUserFilePreservingMetadata($path, $content', $src, 'updateQuotas.php must stage quota snapshots through the shared replacer');
         $this->assertStringContainsString('pmssQuotaSnapshotWrite($quotaFile, $fallbackContent)', $src, 'updateQuotas.php must atomically write fallback quota snapshots');
         $this->assertStringContainsString('pmssQuotaSnapshotWrite($quotaFile, $content)', $src, 'updateQuotas.php must atomically write refreshed quota snapshots');
         $this->assertStringContainsString('pmssQuotaSnapshotNormalizeHumanReadableOutput($content)', $src, 'updateQuotas.php should normalize human-readable quota snapshots before writing them');

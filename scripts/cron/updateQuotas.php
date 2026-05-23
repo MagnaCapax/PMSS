@@ -30,29 +30,7 @@ $logger = new Logger(__FILE__);
  */
 function pmssQuotaSnapshotWrite(string $path, string $content, int $mode = 0644): bool
 {
-    $owner = null;
-    $group = null;
-    $canAdjustOwnership = function_exists('posix_geteuid') && @posix_geteuid() === 0;
-    if ($canAdjustOwnership && is_file($path)) {
-        $existingOwner = @fileowner($path);
-        $existingGroup = @filegroup($path);
-        if ($existingOwner !== false) {
-            $owner = $existingOwner;
-        }
-        if ($existingGroup !== false) {
-            $group = $existingGroup;
-        }
-    }
-
-    return pmssReplaceUserFile($path, $content, static function (string $tmp) use ($group, $mode, $owner): void {
-        @chmod($tmp, $mode);
-        if ($owner !== null) {
-            @chown($tmp, $owner);
-        }
-        if ($group !== null) {
-            @chgrp($tmp, $group);
-        }
-    });
+    return pmssReplaceUserFilePreservingMetadata($path, $content, $mode);
 }
 
 $logger->msg('Updating quota information');

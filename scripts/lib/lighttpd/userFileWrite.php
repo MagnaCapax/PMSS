@@ -124,6 +124,29 @@ function pmssReplaceUserFileWithMetadata(string $path, string $content, int $mod
     });
 }
 
+/** Replace a file while keeping existing mode/uid/gid when available. */
+function pmssReplaceUserFilePreservingMetadata(string $path, string $content, int $fallbackMode = 0644): bool
+{
+    $mode = $fallbackMode;
+    $owner = null;
+    $group = null;
+    $canAdjustOwnership = function_exists('posix_geteuid') && @posix_geteuid() === 0;
+
+    if (is_file($path) && is_array($stat = @stat($path))) {
+        $mode = $stat['mode'] & 0777;
+        if ($canAdjustOwnership) {
+            $owner = $stat['uid'];
+            $group = $stat['gid'];
+        }
+    }
+
+    return pmssReplaceUserFile($path, $content, static function (string $tmpPath) use ($group, $mode, $owner): void {
+        @chmod($tmpPath, $mode);
+        if ($owner !== null) @chown($tmpPath, $owner);
+        if ($group !== null) @chgrp($tmpPath, $group);
+    });
+}
+
 function pmssAtomicWriteFile(string $path, string $content, ?int $mode = null): bool
 {
     return $mode === null ? pmssReplaceUserFile($path, $content) : pmssReplaceUserFileWithMetadata($path, $content, $mode);

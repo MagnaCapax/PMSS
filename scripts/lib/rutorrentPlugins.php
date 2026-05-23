@@ -52,31 +52,7 @@ function pmssCheckRutorrentPluginsRunCommand(string $username, string $step, str
  */
 function pmssCheckRutorrentPluginsWriteAccessIni(string $path, string $content): bool
 {
-    $mode = null;
-    $owner = null;
-    $group = null;
-
-    if (is_file($path) && is_array($stat = @stat($path))) {
-        $mode = $stat['mode'] & 0777;
-        $owner = $stat['uid'];
-        $group = $stat['gid'];
-    }
-
-    if ($mode === null) {
-        $mode = 0666 & ~umask();
-    }
-
-    return pmssReplaceUserFile($path, $content, static function (string $tmp) use ($group, $mode, $owner): void {
-        @chmod($tmp, $mode);
-        if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-            if ($owner !== null) {
-                @chown($tmp, $owner);
-            }
-            if ($group !== null) {
-                @chgrp($tmp, $group);
-            }
-        }
-    });
+    return pmssReplaceUserFilePreservingMetadata($path, $content, 0666 & ~umask());
 }
 
 /**
