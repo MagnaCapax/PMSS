@@ -23,14 +23,13 @@ class TempMountNoexecTest extends TestCase
 
     public function testSkipsWhenFlagDisabled(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-noexec-skip-', 0700);
-        $fstab = $dir.'/fstab';
-        $mounts = $dir.'/mounts';
-
         $original = "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0\n";
         $original .= "tmpfs /dev/shm tmpfs defaults,nosuid,nodev 0 0\n";
-        file_put_contents($fstab, $original);
-        file_put_contents($mounts, "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n");
+        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+            'pmss-noexec-skip-',
+            $original,
+            "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n"
+        );
 
         $messages = [];
         $logger = $this->pmssMakeArrayLogger($messages);
@@ -45,14 +44,13 @@ class TempMountNoexecTest extends TestCase
 
     public function testSkipsWhenFlagExplicitlyFalse(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-noexec-false-', 0700);
-        $fstab = $dir.'/fstab';
-        $mounts = $dir.'/mounts';
-
         $original = "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0\n";
         $original .= "tmpfs /dev/shm tmpfs defaults,nosuid,nodev 0 0\n";
-        file_put_contents($fstab, $original);
-        file_put_contents($mounts, "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n");
+        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+            'pmss-noexec-false-',
+            $original,
+            "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n"
+        );
 
         $messages = [];
         $logger = $this->pmssMakeArrayLogger($messages);
@@ -67,15 +65,14 @@ class TempMountNoexecTest extends TestCase
 
     public function testAddsNoexecOptionsToFstab(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-noexec-add-', 0700);
-        $fstab = $dir.'/fstab';
-        $mounts = $dir.'/mounts';
-
         $original = "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0\n";
         $original .= "tmpfs /dev/shm tmpfs defaults,nosuid,nodev 0 0\n";
-        file_put_contents($fstab, $original);
-        file_put_contents($mounts, "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n".
-            "tmpfs /dev/shm tmpfs rw,nosuid,nodev 0 0\n");
+        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+            'pmss-noexec-add-',
+            $original,
+            "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n".
+            "tmpfs /dev/shm tmpfs rw,nosuid,nodev 0 0\n"
+        );
 
         $messages = [];
         $logger = $this->pmssMakeArrayLogger($messages);
@@ -93,13 +90,12 @@ class TempMountNoexecTest extends TestCase
 
     public function testRemovesConflictingOptions(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-noexec-conflict-', 0700);
-        $fstab = $dir.'/fstab';
-        $mounts = $dir.'/mounts';
-
         $original = "tmpfs /tmp tmpfs defaults,exec,suid,dev 0 0\n";
-        file_put_contents($fstab, $original);
-        file_put_contents($mounts, "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\n");
+        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+            'pmss-noexec-conflict-',
+            $original,
+            "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\n"
+        );
 
         $messages = [];
         $logger = $this->pmssMakeArrayLogger($messages);
@@ -119,13 +115,12 @@ class TempMountNoexecTest extends TestCase
 
     public function testAlreadyHardenedSkips(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-noexec-skip-hardened-', 0700);
-        $fstab = $dir.'/fstab';
-        $mounts = $dir.'/mounts';
-
         $original = "tmpfs /tmp tmpfs defaults,noexec,nosuid,nodev 0 0\n";
-        file_put_contents($fstab, $original);
-        file_put_contents($mounts, "tmpfs /tmp tmpfs rw,noexec,nosuid,nodev 0 0\n");
+        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+            'pmss-noexec-skip-hardened-',
+            $original,
+            "tmpfs /tmp tmpfs rw,noexec,nosuid,nodev 0 0\n"
+        );
 
         $messages = [];
         $logger = $this->pmssMakeArrayLogger($messages);
@@ -140,13 +135,12 @@ class TempMountNoexecTest extends TestCase
 
     public function testMountMissingLeavesFstabUntouched(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-noexec-missing-', 0700);
-        $fstab = $dir.'/fstab';
-        $mounts = $dir.'/mounts';
-
         $original = "UUID=abc /home ext4 defaults 0 0\n";
-        file_put_contents($fstab, $original);
-        file_put_contents($mounts, "tmpfs /dev/shm tmpfs rw,nosuid,nodev 0 0\n");
+        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+            'pmss-noexec-missing-',
+            $original,
+            "tmpfs /dev/shm tmpfs rw,nosuid,nodev 0 0\n"
+        );
 
         $messages = [];
         $logger = $this->pmssMakeArrayLogger($messages);
@@ -161,12 +155,11 @@ class TempMountNoexecTest extends TestCase
 
     public function testUnreadableFstabWarns(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-noexec-unreadable-', 0700);
-        $fstab = $dir.'/fstab';
-        $mounts = $dir.'/mounts';
-
-        file_put_contents($fstab, "tmpfs /tmp tmpfs defaults 0 0\n");
-        file_put_contents($mounts, "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n");
+        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+            'pmss-noexec-unreadable-',
+            "tmpfs /tmp tmpfs defaults 0 0\n",
+            "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n"
+        );
         chmod($fstab, 0000);
 
         $messages = [];
@@ -204,12 +197,11 @@ class TempMountNoexecTest extends TestCase
 
     public function testWriteFailureSkipsRemountsWhenFstabUpdateCannotPersist(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-noexec-write-fail-', 0700);
-        $fstab = $dir.'/fstab';
-        $mounts = $dir.'/mounts';
-
-        file_put_contents($fstab, "tmpfs /tmp tmpfs defaults 0 0\nshm /dev/shm tmpfs defaults 0 0\n");
-        file_put_contents($mounts, "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\nshm /dev/shm tmpfs rw,exec,suid,dev 0 0\n");
+        ['dir' => $dir, 'fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+            'pmss-noexec-write-fail-',
+            "tmpfs /tmp tmpfs defaults 0 0\nshm /dev/shm tmpfs defaults 0 0\n",
+            "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\nshm /dev/shm tmpfs rw,exec,suid,dev 0 0\n"
+        );
         chmod($dir, 0500);
 
         $messages = [];
@@ -225,17 +217,15 @@ class TempMountNoexecTest extends TestCase
         $this->assertTrue($this->pmssMessagesContain($messages, 'Skipping live mount hardening because '.$fstab.' could not be updated'), 'expected remount skip log');
 
         chmod($dir, 0700);
-        $this->pmssRemoveTree($dir);
     }
 
     public function testDryRunProfilesRemountCommandsInStableOrder(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-noexec-profile-', 0700);
-        $fstab = $dir.'/fstab';
-        $mounts = $dir.'/mounts';
-
-        file_put_contents($fstab, "tmpfs /tmp tmpfs defaults 0 0\nshm /dev/shm tmpfs defaults 0 0\n");
-        file_put_contents($mounts, "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\nshm /dev/shm tmpfs rw,exec,suid,dev 0 0\n");
+        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+            'pmss-noexec-profile-',
+            "tmpfs /tmp tmpfs defaults 0 0\nshm /dev/shm tmpfs defaults 0 0\n",
+            "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\nshm /dev/shm tmpfs rw,exec,suid,dev 0 0\n"
+        );
 
         $this->pmssResetRuntimeProfile();
         putenv('PMSS_HARDEN_TMP_NOEXEC=1');

@@ -75,6 +75,21 @@ trait FilesystemCleanupTrait
         return $this->pmssWriteFile(rtrim($baseDir, '/').'/'.ltrim($relativePath, '/'), $content, $dirMode);
     }
 
+    /**
+     * Create paired fstab/mounts files for hermetic mount-hardening tests.
+     *
+     * @return array{dir:string,fstab:string,mounts:string}
+     */
+    protected function pmssMountFixtureCreate(string $prefix, string $fstabContent, string $mountsContent = '', int $mode = 0700): array
+    {
+        $dir = $this->pmssMakeTempDir($prefix, $mode);
+        return [
+            'dir' => $dir,
+            'fstab' => $this->pmssWriteFile($dir.'/fstab', $fstabContent, $mode),
+            'mounts' => $this->pmssWriteFile($dir.'/mounts', $mountsContent, $mode),
+        ];
+    }
+
     /** Read fixture content, treating absent files as empty strings for assertions. */
     protected function pmssReadFileOrEmpty(string $path): string
     {
