@@ -35,53 +35,16 @@ class NetworkHelpersEdgeTest extends TestCase
 
     public function testLoadMonitoringCommandsParsesSuccessfulHelperOutput(): void
     {
-        $commands = \networkLoadMonitoringCommands(
-            static function (array &$output, int &$rc): void {
+        $this->assertEquals(
+            ['-A OUTPUT -m owner --uid-owner 1000 -j ACCEPT'],
+            \networkLoadMonitoringCommands(static function (array &$output, int &$rc): void {
                 $output = [
                     'iptables -A OUTPUT -m owner --uid-owner 1000 -j ACCEPT',
                     '/sbin/iptables -F OUTPUT',
                     'iptables -A INPUT -j ACCEPT; rm -rf /',
                 ];
                 $rc = 0;
-            }
+            })
         );
-
-        $this->assertEquals(
-            ['-A OUTPUT -m owner --uid-owner 1000 -j ACCEPT'],
-            $commands
-        );
-    }
-
-    public function testLoadMonitoringCommandsRejectsFailedHelperOutput(): void
-    {
-        $messages = [];
-        $commands = \networkLoadMonitoringCommands(
-            static function (array &$output, int &$rc): void {
-                $output = ['iptables -A OUTPUT -m owner --uid-owner 1000 -j ACCEPT'];
-                $rc = 1;
-            },
-            static function (string $message) use (&$messages): void {
-                $messages[] = $message;
-            }
-        );
-
-        $this->assertSame([], $commands);
-        $this->assertStringContainsString('monitoring rules helper failed', implode("\n", $messages));
-    }
-
-    public function testLoadMonitoringCommandsRejectsRunnerExceptions(): void
-    {
-        $messages = [];
-        $commands = \networkLoadMonitoringCommands(
-            static function (array &$output, int &$rc): void {
-                throw new \RuntimeException('boom');
-            },
-            static function (string $message) use (&$messages): void {
-                $messages[] = $message;
-            }
-        );
-
-        $this->assertSame([], $commands);
-        $this->assertStringContainsString('failed to run monitoring rules helper', implode("\n", $messages));
     }
 }

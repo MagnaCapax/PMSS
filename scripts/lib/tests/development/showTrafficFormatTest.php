@@ -8,22 +8,18 @@ class ShowTrafficFormatTest extends TestCase
     public function testFormatTrafficAmountCharacterizationAcrossUnits(): void
     {
         $twoTiBInMiB = 2 * 1024 * 1024;
-        foreach ([[500, '500MiB'], [2000, '1.95GiB'], [$twoTiBInMiB, '2TiB']] as $case) {
+        foreach ([
+            [500, '500MiB'],
+            [2000, '1.95GiB'],
+            [$twoTiBInMiB, '2TiB'],
+            [0, '0MiB'],
+            [1024, '1024MiB'],
+            [1025, '1GiB'],
+            [1024 * 1024, '1024GiB'],
+            [(1024 * 1024) + 1, '1TiB'],
+        ] as $case) {
             $this->assertEquals($case[1], \pmssTrafficFormatAmount($case[0]));
         }
-        $this->assertEquals([
-            '0MiB',
-            '1024MiB',
-            '1GiB',
-            '1024GiB',
-            '1TiB',
-        ], [
-            \pmssTrafficFormatAmount(0),
-            \pmssTrafficFormatAmount(1024),
-            \pmssTrafficFormatAmount(1025),
-            \pmssTrafficFormatAmount(1024 * 1024),
-            \pmssTrafficFormatAmount((1024 * 1024) + 1),
-        ]);
     }
 
     public function testHelpIncludesJsonOption(): void
