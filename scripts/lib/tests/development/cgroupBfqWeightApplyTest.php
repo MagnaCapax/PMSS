@@ -16,86 +16,40 @@ class CgroupBfqWeightApplyTest extends TestCase
     // Curve points with default coefficient 3.535, customer max 700.
     // round(3.535 * sqrt(MiB)) clamped [1, 700].
 
-    public function testFormula250MiB(): void
+    public function testDefaultCurvePointsAndClamps(): void
     {
-        $this->assertEquals(56, \pmssBfqFormulaWeight(250));
+        foreach ([
+            [250, 56],
+            [500, 79],
+            [1000, 112],
+            [2000, 158],
+            [4000, 224],
+            [8000, 316],
+            [16000, 447],
+            [32768, 640],
+            [64000, 700],
+            [1000000, 700],
+            [0, 1],
+            [-1, 1],
+        ] as [$memoryMiB, $expected]) {
+            $this->assertEquals($expected, \pmssBfqFormulaWeight($memoryMiB), 'Unexpected weight for '.$memoryMiB.' MiB');
+        }
     }
 
-    public function testFormula500MiB(): void
+    public function testCustomParametersAndInvalidCeilings(): void
     {
-        $this->assertEquals(79, \pmssBfqFormulaWeight(500));
-    }
-
-    public function testFormula1000MiB(): void
-    {
-        $this->assertEquals(112, \pmssBfqFormulaWeight(1000));
-    }
-
-    public function testFormula2000MiB(): void
-    {
-        $this->assertEquals(158, \pmssBfqFormulaWeight(2000));
-    }
-
-    public function testFormula4000MiB(): void
-    {
-        $this->assertEquals(224, \pmssBfqFormulaWeight(4000));
-    }
-
-    public function testFormula8000MiB(): void
-    {
-        $this->assertEquals(316, \pmssBfqFormulaWeight(8000));
-    }
-
-    public function testFormula16000MiB(): void
-    {
-        $this->assertEquals(447, \pmssBfqFormulaWeight(16000));
-    }
-
-    public function testFormula32GiBHitsOperatorTarget640(): void
-    {
-        $this->assertEquals(640, \pmssBfqFormulaWeight(32768));
-    }
-
-    public function testClamp64GiBToCustomerCeiling(): void
-    {
-        $this->assertEquals(700, \pmssBfqFormulaWeight(64000));
-    }
-
-    public function testClamp1TiBStillCappedAt700(): void
-    {
-        $this->assertEquals(700, \pmssBfqFormulaWeight(1000000));
-    }
-
-    public function testFloorZeroMiB(): void
-    {
-        $this->assertEquals(1, \pmssBfqFormulaWeight(0));
-    }
-
-    public function testFloorNegativeMiB(): void
-    {
-        $this->assertEquals(1, \pmssBfqFormulaWeight(-1));
-    }
-
-    public function testCustomCoefficient(): void
-    {
-        // 2.5 * sqrt(1000) = 79.057 → 79
-        $this->assertEquals(79, \pmssBfqFormulaWeight(1000, 2.5, 700));
-    }
-
-    public function testCustomCeilingClampsBelowDefault(): void
-    {
-        // 32 GiB would yield 640 with default ceiling; here ceiling=500 wins.
-        $this->assertEquals(500, \pmssBfqFormulaWeight(32768, 3.535, 500));
-    }
-
-    public function testInvalidZeroCeilingClampsToOne(): void
-    {
-        $this->assertEquals(1, \pmssBfqFormulaWeight(1000, 3.535, 0));
-    }
-
-    public function testInvalidNegativeCeilingClampsToOne(): void
-    {
-        $this->assertEquals(1, \pmssBfqFormulaWeight(1000, 3.535, -1));
+        foreach ([
+            [1000, 2.5, 700, 79, 'custom coefficient'],
+            [32768, 3.535, 500, 500, 'custom ceiling'],
+            [1000, 3.535, 0, 1, 'zero ceiling'],
+            [1000, 3.535, -1, 1, 'negative ceiling'],
+        ] as [$memoryMiB, $coefficient, $customerMax, $expected, $label]) {
+            $this->assertEquals(
+                $expected,
+                \pmssBfqFormulaWeight($memoryMiB, $coefficient, $customerMax),
+                'Unexpected weight for '.$label
+            );
+        }
     }
 
     public function testResultIsPositiveInt(): void

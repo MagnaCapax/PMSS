@@ -92,60 +92,39 @@ class UpdateHelpersSafeWriteTest extends TestCase
         $this->assertTrue(!file_exists($target));
     }
 
-    public function testAptRunCleanReturnsTrueOnSuccess(): void
+    public function testAptRunCleanRunnerOutcomes(): void
     {
-        $runner = static function (): array {
-            return ['rc' => 0, 'output' => ''];
-        };
+        foreach ([
+            [
+                static function (): array { return ['rc' => 0, 'output' => '']; },
+                true,
+                '',
+            ],
+            [
+                static function (): array { return ['rc' => 100, 'output' => 'simulated apt failure']; },
+                false,
+                'apt-get clean failed with rc 100 (simulated apt failure)',
+            ],
+            [
+                static function (): array { throw new \RuntimeException('simulated runner failure'); },
+                false,
+                'apt-get clean runner failed: simulated runner failure',
+            ],
+            [
+                static function (): array { return ['rc' => 'not-a-number', 'output' => 'ignored']; },
+                false,
+                'apt-get clean runner returned invalid rc; treating as failure',
+            ],
+        ] as [$runner, $expectedResult, $expectedLog]) {
+            [$result, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($runner): bool {
+                return \pmssAptRunClean($logger, $runner);
+            });
 
-        [$result, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($runner): bool {
-            return \pmssAptRunClean($logger, $runner);
-        });
-
-        $this->assertTrue($result);
-        $this->assertEquals([], $logs);
-    }
-
-    public function testAptRunCleanLogsFailureOutput(): void
-    {
-        $runner = static function (): array {
-            return ['rc' => 100, 'output' => 'simulated apt failure'];
-        };
-
-        [$result, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($runner): bool {
-            return \pmssAptRunClean($logger, $runner);
-        });
-
-        $this->assertTrue($result === false);
-        $this->pmssAssertMessagesContain($logs, 'apt-get clean failed with rc 100 (simulated apt failure)');
-    }
-
-    public function testAptRunCleanLogsRunnerException(): void
-    {
-        $runner = static function (): array {
-            throw new \RuntimeException('simulated runner failure');
-        };
-
-        [$result, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($runner): bool {
-            return \pmssAptRunClean($logger, $runner);
-        });
-
-        $this->assertTrue($result === false);
-        $this->pmssAssertMessagesContain($logs, 'apt-get clean runner failed: simulated runner failure');
-    }
-
-    public function testAptRunCleanRejectsMalformedRunnerStatus(): void
-    {
-        $runner = static function (): array {
-            return ['rc' => 'not-a-number', 'output' => 'ignored'];
-        };
-
-        [$result, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($runner): bool {
-            return \pmssAptRunClean($logger, $runner);
-        });
-
-        $this->assertTrue($result === false);
-        $this->pmssAssertMessagesContain($logs, 'apt-get clean runner returned invalid rc; treating as failure');
+            $this->assertSame($expectedResult, $result);
+            $expectedLog === ''
+                ? $this->assertEquals([], $logs)
+                : $this->pmssAssertMessagesContain($logs, $expectedLog);
+        }
     }
 
     private function clearEnv(string $name): void

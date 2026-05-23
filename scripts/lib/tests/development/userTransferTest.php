@@ -85,22 +85,22 @@ class UserTransferTest extends TestCase
         $this->assertEquals('deefbox', $cfg['remoteUser']);
     }
 
-    public function testParseCliRejectsInvalidUsernames(): void
+    public function testParseCliRejectsInvalidInputs(): void
     {
-        $this->assertThrowsRuntime(static function (): void {
-            \pmssUserTransferParseCli(['userTransfer.php', 'deef_box', 'example.com']);
-        }, 'Invalid username');
-
-        $this->assertThrowsRuntime(static function (): void {
-            \pmssUserTransferParseCli(['userTransfer.php', 'toolongname', 'example.com']);
-        }, 'Invalid username');
-    }
-
-    public function testParseCliRejectsInvalidHostname(): void
-    {
-        $this->assertThrowsRuntime(static function (): void {
-            \pmssUserTransferParseCli(['userTransfer.php', 'deefbox', 'bad host']);
-        }, 'Invalid hostname');
+        foreach ([
+            [['userTransfer.php', 'deef_box', 'example.com'], 'Invalid username'],
+            [['userTransfer.php', 'toolongname', 'example.com'], 'Invalid username'],
+            [['userTransfer.php', 'deefbox', 'bad host'], 'Invalid hostname'],
+            [['userTransfer.php', 'deefbox', 'example.com', '--main-passes'], 'requires a value'],
+            [['userTransfer.php', '--sleep-min=abc', 'deefbox', 'example.com'], 'expected integer'],
+            [['userTransfer.php', '--verify-threshold=101', 'deefbox', 'example.com'], 'verify-threshold'],
+            [['userTransfer.php', '--sleep-min=10', '--sleep-max=5', 'deefbox', 'example.com'], 'sleep-max must be'],
+            [['userTransfer.php', '--main-passes=501', 'deefbox', 'example.com'], 'main-passes'],
+        ] as [$argv, $messageFragment]) {
+            $this->assertThrowsRuntime(static function () use ($argv): void {
+                \pmssUserTransferParseCli($argv);
+            }, $messageFragment);
+        }
     }
 
     public function testParseCliHelpReturnsStableUsageText(): void
@@ -130,20 +130,6 @@ class UserTransferTest extends TestCase
             $this->assertEquals($expected, $e->getMessage());
             $this->assertStringContainsString('--print-password    Print the supplied password at the end (unsafe)', $e->getMessage());
         }
-    }
-
-    public function testParseCliRejectsMissingOptionValue(): void
-    {
-        $this->assertThrowsRuntime(static function (): void {
-            \pmssUserTransferParseCli(['userTransfer.php', 'deefbox', 'example.com', '--main-passes']);
-        }, 'requires a value');
-    }
-
-    public function testParseCliRejectsNonIntegerOptionValue(): void
-    {
-        $this->assertThrowsRuntime(static function (): void {
-            \pmssUserTransferParseCli(['userTransfer.php', '--sleep-min=abc', 'deefbox', 'example.com']);
-        }, 'expected integer');
     }
 
     public function testParseCliAcceptsSplitLongOptionValuesAndFlags(): void
@@ -188,27 +174,6 @@ class UserTransferTest extends TestCase
         $cfg = \pmssUserTransferParseCli(['userTransfer.php', '--verify-threshold=95', 'deefbox', 'example.com']);
 
         $this->assertEquals(95, $cfg['verifyThreshold']);
-    }
-
-    public function testParseCliRejectsInvalidVerifyThreshold(): void
-    {
-        $this->assertThrowsRuntime(static function (): void {
-            \pmssUserTransferParseCli(['userTransfer.php', '--verify-threshold=101', 'deefbox', 'example.com']);
-        }, 'verify-threshold');
-    }
-
-    public function testParseCliRejectsSleepRangeInversion(): void
-    {
-        $this->assertThrowsRuntime(static function (): void {
-            \pmssUserTransferParseCli(['userTransfer.php', '--sleep-min=10', '--sleep-max=5', 'deefbox', 'example.com']);
-        }, 'sleep-max must be');
-    }
-
-    public function testParseCliRejectsExcessivePasses(): void
-    {
-        $this->assertThrowsRuntime(static function (): void {
-            \pmssUserTransferParseCli(['userTransfer.php', '--main-passes=501', 'deefbox', 'example.com']);
-        }, 'main-passes');
     }
 
     public function testBuildRsyncMainUsesTrailingSlashAndExcludes(): void
