@@ -8,14 +8,6 @@
 require_once __DIR__.'/../managedPath.php';
 require_once dirname(__DIR__).'/../runtime.php';
 
-/** Atomically install a systemd drop-in and keep failure logging consistent. */
-function pmssSystemdDropinInstall(string $target, string $body, callable $log, string $writeFailurePrefix, string $installFailurePrefix, ?string $successMessage = null): bool
-{
-    if (!pmssWriteManagedPathFile($target, $body, 'systemd drop-in', $log, null, null, 0644, $installFailurePrefix.$target)) return false;
-    if ($successMessage !== null) { $log($successMessage); }
-    return true;
-}
-
 /**
  * Render and install LimitNOFILE drop-in for user@.service when configured.
  */
@@ -42,7 +34,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
 
     $target = $dropDir.'/20-pmss-limits.conf';
     $body = "# PMSS: per-user manager descriptor limits from cgroup.policy.php\n[Service]\nLimitNOFILE={$soft}:{$hard}\n";
-    pmssSystemdDropinInstall($target, $body, $log, '[WARN] Failed to write temp user@.service drop-in ', '[WARN] Failed to install user@.service drop-in ', sprintf('Installed %s with LimitNOFILE=%d:%d', $target, $soft, $hard));
+    if (pmssWriteManagedPathFile($target, $body, 'systemd drop-in', $log, null, null, 0644, '[WARN] Failed to install user@.service drop-in '.$target)) { $log(sprintf('Installed %s with LimitNOFILE=%d:%d', $target, $soft, $hard)); }
 }
 
     /**
@@ -175,7 +167,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         }
 
         // Atomic write to avoid race conditions where the file is briefly missing
-        if (!pmssSystemdDropinInstall($target, $raw, $log, '[WARN] Failed to write temp user-.slice drop-in ', '[WARN] Failed to atomically replace user-.slice drop-in ')) {
+        if (!pmssWriteManagedPathFile($target, $raw, 'systemd drop-in', $log, null, null, 0644, '[WARN] Failed to atomically replace user-.slice drop-in '.$target)) {
             return;
         }
 
@@ -209,7 +201,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         } else {
             $userAtTarget = $userAtDropDir.'/30-pmss-log-namespace.conf';
             $userAtBody = "# PMSS: isolate per-user manager logs in dedicated namespaces\n[Service]\nLogNamespace=user-%i\n";
-            pmssSystemdDropinInstall($userAtTarget, $userAtBody, $log, '[WARN] Failed to write temp user@.service log namespace drop-in ', '[WARN] Failed to install user@.service log namespace drop-in ', 'Installed '.$userAtTarget.' with LogNamespace=user-%i');
+            if (pmssWriteManagedPathFile($userAtTarget, $userAtBody, 'systemd drop-in', $log, null, null, 0644, '[WARN] Failed to install user@.service log namespace drop-in '.$userAtTarget)) { $log('Installed '.$userAtTarget.' with LogNamespace=user-%i'); }
         }
 
         if ($skipSystemctl) {

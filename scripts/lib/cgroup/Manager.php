@@ -316,12 +316,13 @@ class Manager
         if (isset($opts['io-weight'])) {
             $props['IOWeight'] = (int)$opts['io-weight'];
         } elseif ($derivedWeight !== null) {
-            // Clamp IOWeight at 200. On Debian 12 / systemd 252 / Linux 6.1 with
-            // cgroup v1 BFQ, any IOWeight >= 200 maps to the same kernel
-            // bfq.weight=181 (verified empirically); the formula's 200..1000 range
-            // is dead code at that layer. CPUWeight above uses the full range
-            // because cpu.weight/cpu.shares has no equivalent cap. See PMSS#582.
-            $props['IOWeight'] = min($derivedWeight, 200);
+            // Restored to full derivedWeight range. The systemd-side cgroup-v1 BFQ
+            // chain still caps the effective kernel bfq.weight at 181 for any
+            // IOWeight >= 200, but the kernel-level cap is now bypassed by
+            // /scripts/cron/cgroupBfqWeightApply.php which writes blkio.bfq.weight
+            // directly. The systemd-side value remains visible via systemctl show
+            // and feeds the same data-flow customers/operators expect.
+            $props['IOWeight'] = $derivedWeight;
         }
 
         if (isset($opts['tasks-max'])) {

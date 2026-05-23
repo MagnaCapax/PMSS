@@ -139,6 +139,20 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString("\$execBinary = trim(\$parts[0], \"\\\"'\");", $src);
     }
 
+    public function testSystemdDropinInstallerKeepsSingleFailurePrefix(): void
+    {
+        $src = $this->pmssReadRepoFile('scripts/lib/update/systemPrep/systemdSlicesEnsure.php');
+        $removedHelper = 'pmssSystemdDropin'.'Install';
+        $deadPrefixSymbol = '$write'.'FailurePrefix';
+        $deadTempPrefixMessage = 'Failed to write'.' temp';
+
+        $this->assertSourceOmitsFunction($src, $removedHelper, 'systemd drop-in writes should use the shared managed-file writer directly');
+        $this->assertStringContainsString("pmssWriteManagedPathFile(\$target, \$raw, 'systemd drop-in'", $src);
+        $this->assertStringContainsString("pmssWriteManagedPathFile(\$userAtTarget, \$userAtBody, 'systemd drop-in'", $src);
+        $this->pmssAssertStringNotContainsString($deadPrefixSymbol, $src, 'systemd drop-in writes should not keep a dead temp-write prefix concept');
+        $this->pmssAssertStringNotContainsString($deadTempPrefixMessage, $src, 'systemd drop-in callers should log the single managed-write failure path');
+    }
+
     public function testUpdateLoggingKeepsCorrelationIdBuildLocal(): void
     {
         $src = $this->pmssReadRepoFile('scripts/lib/update/logging.php');
