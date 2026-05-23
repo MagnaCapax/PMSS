@@ -112,6 +112,132 @@ function pmssLocalFrameWelcomeUrlBuild($quotaPath = '../.quota')
     return 'welcome.php?quota='.urlencode(serialize($quotaInfo));
 }
 
+/** Infer the tenant username from the customer home directory. */
+function pmssLocalFrameCurrentUserRead($homePath = '..')
+{
+    $home = realpath($homePath);
+    if (!is_string($home) || $home === '') {
+        return '';
+    }
+
+    $username = basename($home);
+    return preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/', $username) === 1 ? $username : '';
+}
+
+/**
+ * Return static tab metadata for app proxy fragments the customer tree can see.
+ *
+ * @return array<string,array<string,string>>
+ */
+function pmssLocalFrameProxyAppDefinitions($username = '')
+{
+    $publicBase = $username !== '' ? '/public-'.$username.'/' : '';
+    return array(
+        'qbittorrent' => array(
+            'url'      => 'qbittorrent/',
+            'linkText' => 'qBittorrent',
+            'title'    => 'qBittorrent - Torrent web UI',
+        ),
+        'deluge' => array(
+            'url'      => 'deluge/',
+            'linkText' => 'Deluge',
+            'title'    => 'Deluge - Torrent web UI',
+        ),
+        'jellyfin' => array(
+            'url'      => $publicBase === '' ? '' : $publicBase.'jellyfin/web/index.html',
+            'linkText' => 'Jellyfin',
+            'title'    => 'Jellyfin - Media server',
+        ),
+        'radarr' => array(
+            'url'      => $publicBase === '' ? '' : $publicBase.'radarr/',
+            'linkText' => 'Radarr',
+            'title'    => 'Radarr - Movie manager',
+        ),
+        'sonarr' => array(
+            'url'      => $publicBase === '' ? '' : $publicBase.'sonarr/',
+            'linkText' => 'Sonarr',
+            'title'    => 'Sonarr - TV manager',
+        ),
+        'prowlarr' => array(
+            'url'      => $publicBase === '' ? '' : $publicBase.'prowlarr/',
+            'linkText' => 'Prowlarr',
+            'title'    => 'Prowlarr - Indexer manager',
+        ),
+        'lidarr' => array(
+            'url'      => $publicBase === '' ? '' : $publicBase.'lidarr/',
+            'linkText' => 'Lidarr',
+            'title'    => 'Lidarr - Music manager',
+        ),
+        'readarr' => array(
+            'url'      => $publicBase === '' ? '' : $publicBase.'readarr/',
+            'linkText' => 'Readarr',
+            'title'    => 'Readarr - Book manager',
+        ),
+        'sabnzbd' => array(
+            'url'      => $publicBase === '' ? '' : $publicBase.'sabnzbd/',
+            'linkText' => 'SABnzbd',
+            'title'    => 'SABnzbd - Usenet downloader',
+        ),
+        'invidious' => array(
+            'url'      => 'apps/invidious/',
+            'linkText' => 'Invidious',
+            'title'    => 'Invidious - Video frontend',
+        ),
+    );
+}
+
+/** Return true when a lighttpd proxy fragment exposes the named app path. */
+function pmssLocalFrameProxyFragmentMentionsApp($fragment, $app)
+{
+    $appPattern = preg_quote($app, '/');
+    $pathPrefix = '(?:user-[^"\']+\/(?:apps\/)?|public-[^"\']+\/)?';
+    return preg_match('/\^\/'.$pathPrefix.$appPattern.'(?:\(|\/|\$)/i', $fragment) === 1
+        || preg_match('/["\']\/'.$pathPrefix.$appPattern.'(?:\/|["\'])/i', $fragment) === 1;
+}
+
+/**
+ * Discover locally proxied app tabs from customer-readable lighttpd fragments.
+ *
+ * @return array<string,array<string,string>>
+ */
+function pmssLocalFrameProxyAppFramesRead($customDir = '../.lighttpd/custom.d', $homePath = '..')
+{
+    $frames = array();
+    if (!is_dir($customDir)) {
+        return $frames;
+    }
+
+    $files = glob(rtrim($customDir, '/').'/*.conf');
+    if (!is_array($files)) {
+        return $frames;
+    }
+    sort($files);
+
+    $definitions = pmssLocalFrameProxyAppDefinitions(pmssLocalFrameCurrentUserRead($homePath));
+    foreach ($files as $file) {
+        if (!is_readable($file) || is_dir($file)) {
+            continue;
+        }
+
+        $fragment = @file_get_contents($file);
+        if (!is_string($fragment) || $fragment === '') {
+            continue;
+        }
+
+        foreach ($definitions as $app => $frame) {
+            if (isset($frames[$app]) || $frame['url'] === '') {
+                continue;
+            }
+
+            if (pmssLocalFrameProxyFragmentMentionsApp($fragment, $app)) {
+                $frames[$app] = $frame;
+            }
+        }
+    }
+
+    return $frames;
+}
+
 // Remote frames can be disabled explicitly for debugging or fully offline
 // deployments by exporting PMSS_DISABLE_REMOTE_FRAMES=1.
 if (!getenv('PMSS_DISABLE_REMOTE_FRAMES')) {
@@ -262,6 +388,11 @@ if (file_exists('../.customFrames')) {
         );
     }
     $file = null;
+}
+foreach (pmssLocalFrameProxyAppFramesRead() as $app => $frame) {
+    if (!isset($frames[$app]) && !isset($frameData[$app])) {
+        $frameData[$app] = $frame;
+    }
 }
 if (file_exists('../.delugeEnable') && file_exists('deluge.php') && !isset($frames['deluge']) && !isset($frameData['deluge'])) {
     $frameData['deluge'] = array(

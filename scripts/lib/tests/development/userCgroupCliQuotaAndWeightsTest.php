@@ -19,15 +19,16 @@ class UserCgroupCliQuotaAndWeightsTest extends TestCase
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--memory-high=1600']);
         // 8 * sqrt(1600) = 320
         $this->assertStringContainsString('CPUWeight=320', $out);
-        $this->assertStringContainsString('IOWeight=320', $out);
+        // Derived IOWeight is capped at 200; see PMSS#582 rationale in Manager.php.
+        $this->assertStringContainsString('IOWeight=200', $out);
     }
 
     public function testExplicitCpuWeightOverridesDerived(): void
     {
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--memory-high=1600', '--cpu-weight=50']);
         $this->assertStringContainsString('CPUWeight=50', $out);
-        // IOWeight still derives from memory when not explicitly set
-        $this->assertStringContainsString('IOWeight=320', $out);
+        // IOWeight still derives from memory when not explicitly set, then applies the clamp.
+        $this->assertStringContainsString('IOWeight=200', $out);
     }
 
     public function testIoProfileBulkExpandsWeightsAndTasks(): void

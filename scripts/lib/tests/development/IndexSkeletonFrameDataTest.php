@@ -172,6 +172,56 @@ class IndexSkeletonFrameDataTest extends TestCase
         $this->assertStringContainsString('<div id="deluge" class="tabs-container"></div>', $html);
     }
 
+    public function testRemoteDisabledRenderAddsQbittorrentFrameFromProxyFragment(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-index-proxy-root-', 0755);
+        $home = $root.'/alice';
+        @mkdir($home.'/www', 0755, true);
+        @mkdir($home.'/.lighttpd/custom.d', 0755, true);
+        file_put_contents(
+            $home.'/.lighttpd/custom.d/pmss-qbittorrent.conf',
+            '$HTTP["url"] =~ "^/user-alice/qbittorrent/" {'."\n}\n"
+        );
+
+        $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+
+        $this->assertStringContainsString('<a href="#qbittorrent"', $html);
+        $this->assertStringContainsString('title="qBittorrent - Torrent web UI"', $html);
+        $this->assertStringContainsString("loadFrame('qbittorrent', 'qbittorrent/')", $html);
+        $this->assertStringContainsString('<div id="qbittorrent" class="tabs-container"></div>', $html);
+    }
+
+    public function testRemoteDisabledRenderAddsMediaStackFramesFromProxyFragment(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-index-media-root-', 0755);
+        $home = $root.'/alice';
+        @mkdir($home.'/www', 0755, true);
+        @mkdir($home.'/.lighttpd/custom.d', 0755, true);
+        file_put_contents(
+            $home.'/.lighttpd/custom.d/media-stack.conf',
+            implode("\n", array(
+                '$HTTP["url"] =~ "^/sabnzbd($|/)" {',
+                '}',
+                '$HTTP["url"] =~ "^/radarr($|/)" {',
+                '}',
+                '$HTTP["url"] =~ "^/sonarr($|/)" {',
+                '}',
+                '$HTTP["url"] =~ "^/jellyfin($|/)" {',
+                '}',
+                '$HTTP["url"] =~ "^/notebook($|/)" {',
+                '}',
+            ))."\n"
+        );
+
+        $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+
+        $this->assertStringContainsString("loadFrame('sabnzbd', '/public-alice/sabnzbd/')", $html);
+        $this->assertStringContainsString("loadFrame('radarr', '/public-alice/radarr/')", $html);
+        $this->assertStringContainsString("loadFrame('sonarr', '/public-alice/sonarr/')", $html);
+        $this->assertStringContainsString("loadFrame('jellyfin', '/public-alice/jellyfin/web/index.html')", $html);
+        $this->assertStringNotContainsString('<a href="#notebook"', $html);
+    }
+
     public function testCustomFrameParserIgnoresBlankLinesBeforeFieldAccess(): void
     {
         $home = $this->pmssMakeTempDir('pmss-index-custom-home-', 0755);
