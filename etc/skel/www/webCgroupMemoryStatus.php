@@ -10,19 +10,20 @@
  * cgroup files read here (/sys/fs/cgroup/user.slice/user-<UID>.slice/memory.*)
  * are world-readable kernel paths; the customer can read their own slice.
  *
- * Inlines pmssFormatBytes from /scripts/lib/runtime.php so the customer-side
- * has no operator-tree dependency.
+ * Carries the customer-side pmssFormatBytes copy because /scripts/lib/runtime.php
+ * is intentionally outside the customer PHP trust boundary.
  *
  * @license GPL-3.0-only
  */
 
 if (!function_exists('pmssFormatBytes')) {
-    /** Compact human-readable bytes (inlined subset of /scripts/lib/runtime.php). */
-    function pmssFormatBytes(float $bytes, int $precision = 1, int $minimumUnitIndex = 0): string
+    /** Compact human-readable bytes for customer-facing status output. */
+    function pmssFormatBytes($bytes, $precision = 1, $minimumUnitIndex = 0, $trimTrailingZeros = false)
     {
-        $units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+        $units = array('B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB');
+        $bytes = max((float) $bytes, 0.0);
         $index = 0;
-        $minimumUnitIndex = max(0, min($minimumUnitIndex, count($units) - 1));
+        $minimumUnitIndex = max(0, min((int) $minimumUnitIndex, count($units) - 1));
         while ($index < $minimumUnitIndex && $index < count($units) - 1) {
             $bytes /= 1024.0;
             $index++;
@@ -31,7 +32,13 @@ if (!function_exists('pmssFormatBytes')) {
             $bytes /= 1024.0;
             $index++;
         }
-        return number_format($bytes, $precision).' '.$units[$index];
+
+        $formatted = number_format($bytes, (int) $precision, '.', '');
+        if ($trimTrailingZeros) {
+            $formatted = rtrim(rtrim($formatted, '0'), '.');
+        }
+
+        return ($formatted === '' ? '0' : $formatted).' '.$units[$index];
     }
 }
 

@@ -953,9 +953,9 @@ function memoryCreateSection() {
         return '<h6>RAM Info</h6><b>RAM usage data is unavailable right now.</b><hr />';
     }
 
-    $currentText = ($currentBytes === null) ? 'n/a' : filesize2HumanReadable($currentBytes);
-    $processText = ($processBytes === null) ? 'n/a' : filesize2HumanReadable($processBytes);
-    $cacheText = ($cacheBytes === null) ? 'n/a' : filesize2HumanReadable($cacheBytes);
+    $currentText = ($currentBytes === null) ? 'n/a' : pmssFormatBytes($currentBytes, 2, 0, true);
+    $processText = ($processBytes === null) ? 'n/a' : pmssFormatBytes($processBytes, 2, 0, true);
+    $cacheText = ($cacheBytes === null) ? 'n/a' : pmssFormatBytes($cacheBytes, 2, 0, true);
 
     if ($limitBytes === null || $limitBytes <= 0) {
         $breakdownText = '';
@@ -970,7 +970,7 @@ RAM limit: n/a
 EOF;
     }
 
-    $limitText = filesize2HumanReadable($limitBytes);
+    $limitText = pmssFormatBytes($limitBytes, 2, 0, true);
 
     if ($currentBytes === null && $processBytes === null && $cacheBytes === null) {
         return <<<EOF
@@ -1227,9 +1227,9 @@ function quotaCreateSection($quotaInfo, $bonusQuota = 0) {
         $percentFromBurst = round(($usedBytes / $totalSpace) * 100, 1);
     }
 
-    $readableUsed   = filesize2HumanReadable($usedBytes);
-    $readableQuota  = filesize2HumanReadable($totalSpace);
-    $readableBurst  = filesize2HumanReadable($hardLimit);
+    $readableUsed   = pmssFormatBytes($usedBytes, 2, 0, true);
+    $readableQuota  = pmssFormatBytes($totalSpace, 2, 0, true);
+    $readableBurst  = pmssFormatBytes($hardLimit, 2, 0, true);
 
     $bonusQuotaDisplay = ($bonusQuota != 0) ? '<br />Bonus disk space: ' . number_format($bonusQuota) . ' GiB' : '';
 
@@ -1255,12 +1255,4 @@ EOF;
 EOF;
 }
 
-function filesize2HumanReadable($bytes, $precision = 2) {
-    $units = array('B', 'KiB', 'MiB', 'GiB', 'TiB');
-    $bytes = max($bytes, 0);
-    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-    $pow = min($pow, count($units) - 1);
-    $bytes /= pow(1024, $pow);
-    return round($bytes, $precision) . ' ' . $units[$pow];
-}
 ?>
