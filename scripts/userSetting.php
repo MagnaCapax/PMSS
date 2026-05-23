@@ -94,26 +94,19 @@ if ($action === 'unset' || $action === 'set') {
     } elseif (array_key_exists($key, $payload)) {
         unset($payload[$key]);
     }
-    if (!$store->persist($user, $payload)) {
-        pmssUserLifecycleContextLogStatusMessage(
-            'settings',
-            $action,
-            $user,
-            'ERR',
-            'failed_to_save',
-            array('key' => $key)
-        );
-        fwrite(STDERR, "Failed to save settings\n");
-        exit(1);
-    }
+    $saved = $store->persist($user, $payload);
     pmssUserLifecycleContextLogStatusMessage(
         'settings',
         $action,
         $user,
-        'OK',
-        $statusMessage,
+        $saved ? 'OK' : 'ERR',
+        $saved ? $statusMessage : 'failed_to_save',
         array('key' => $key)
     );
+    if (!$saved) {
+        fwrite(STDERR, "Failed to save settings\n");
+        exit(1);
+    }
     echo "OK\n";
     exit(0);
 }

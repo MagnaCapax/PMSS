@@ -34,11 +34,7 @@ function pmssSetupLetsEncryptMain(array $argv): int
     // Gather the fqdn and Debian codename; the latter determines whether we
     // need the virtualenv install path still required on Debian 10 (buster).
     $domain = strtolower(trim(pmssHostnameRead()));
-    if (
-        $domain === ''
-        || strpos($domain, '.') === false
-        || !pmssHostnameIsValid($domain, false)
-    ) {
+    if ($domain === '' || strpos($domain, '.') === false || !pmssHostnameIsValid($domain, false)) {
         echo "Unable to determine valid hostname for Let's Encrypt";
         return 1;
     }

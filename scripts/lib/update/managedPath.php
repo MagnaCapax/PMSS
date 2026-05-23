@@ -117,10 +117,7 @@ function pmssWriteManagedPathFileWithBackup(
         $backup = pmssCreateManagedPathBackup($path, $label, $logger, date('YmdHis'));
     }
     $contents = implode(PHP_EOL, $contentLines).PHP_EOL;
-    $writeLogger = function (string $message) use ($logger, $path, $label): void {
-        $logger($message === '[WARN] Unable to write '.$label.' at '.$path ? '[WARN] Failed writing updated '.$path : $message);
-    };
-    if (!pmssWriteManagedPathFile($path, $contents, $label, $writeLogger, $owner, $group, $mode)) return false;
+    if (!pmssWriteManagedPathFile($path, $contents, $label, $logger, $owner, $group, $mode, '[WARN] Failed writing updated '.$path)) return false;
     if ($logSuccess && $backup !== '') $logger('[WARN] Wrote updated '.$path.' (backup '.$backup.')');
     return true;
 }

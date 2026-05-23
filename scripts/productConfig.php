@@ -45,8 +45,4 @@ if (!pmssWelcomeProductMessageSet($productKey, $welcomeMessage)) {
     exit(1);
 }
 
-if (trim($welcomeMessage) === '') {
-    echo "Cleared welcome message for product '{$productKey}'.\n";
-} else {
-    echo "Updated welcome message for product '{$productKey}'.\n";
-}
+echo (trim($welcomeMessage) === '' ? 'Cleared' : 'Updated')." welcome message for product '{$productKey}'.\n";

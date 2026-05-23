@@ -61,9 +61,7 @@ function pmssStorageHealthSyncUserNotice(string $userNoticePath, ?array $payload
         return;
     }
 
-    if (!pmssAtomicWriteFile($userNoticePath, $json.PHP_EOL, 0644)) {
-        return;
-    }
+    pmssAtomicWriteFile($userNoticePath, $json.PHP_EOL, 0644);
 }
 
 function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestamp, string $jsonPath): void
