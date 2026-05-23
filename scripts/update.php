@@ -653,12 +653,16 @@ function restoreRootCronBestEffort(string $context): void
         logmsg('[WARN] root.cron template missing; cannot restore root cron after '.$context);
         return;
     }
+    // Always re-run setupRootCron.php — it deploys the template idempotently
+    // (`install -m 0644 …`). The previous "skip if target exists" short-circuit
+    // meant new cron entries added to etc/seedbox/config/root.cron were never
+    // deployed to existing hosts via --scripts-only updates; the host kept the
+    // entries present at the time of its last full update only.
     if (file_exists($target)) {
-        logmsg('[INFO] Root cron already present; no restore needed after '.$context);
-        return;
+        logmsg('[INFO] Refreshing root cron from updated template after '.$context);
+    } else {
+        logmsg('[INFO] Restoring root cron after '.$context);
     }
-
-    logmsg('[INFO] Restoring root cron after '.$context);
     runSoft($helper);
 }
 
