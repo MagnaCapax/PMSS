@@ -91,14 +91,7 @@ class TempTmpfsMountTest extends TestCase
 
         $messages = $this->runTmpfsHardening($fstab, $mounts);
 
-        $options = $this->pmssFstabOptionsForMount($fstab, '/tmp');
-        $this->assertTrue(in_array('noexec', $options, true), 'expected noexec option');
-        $this->assertTrue(in_array('nosuid', $options, true), 'expected nosuid option');
-        $this->assertTrue(in_array('nodev', $options, true), 'expected nodev option');
-        $this->assertTrue(in_array('size=2G', $options, true), 'expected size=2G');
-        $this->assertTrue(!in_array('exec', $options, true), 'expected exec removed');
-        $this->assertTrue(!in_array('suid', $options, true), 'expected suid removed');
-        $this->assertTrue(!in_array('dev', $options, true), 'expected dev removed');
+        $this->pmssAssertFstabOptions($fstab, '/tmp', ['noexec', 'nosuid', 'nodev', 'size=2G'], ['exec', 'suid', 'dev']);
         $this->assertTrue($this->pmssMessagesContain($messages, 'Updated /tmp tmpfs options'), 'expected update log');
     }
 

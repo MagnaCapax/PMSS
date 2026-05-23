@@ -241,6 +241,18 @@ abstract class TestCase
         return [];
     }
 
+    /** Assert required and forbidden fstab options for one mount point. */
+    protected function pmssAssertFstabOptions(string $fstab, string $mountPoint, array $required, array $forbidden = []): void
+    {
+        $options = $this->pmssFstabOptionsForMount($fstab, $mountPoint);
+        foreach ($required as $option) {
+            $this->assertTrue(in_array($option, $options, true), 'expected '.$option.' option');
+        }
+        foreach ($forbidden as $option) {
+            $this->assertTrue(!in_array($option, $options, true), 'expected '.$option.' removed');
+        }
+    }
+
     protected function isSandbox(): bool
     {
         if (getenv('PMSS_SANDBOX') === '1') return true;

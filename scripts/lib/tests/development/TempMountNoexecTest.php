@@ -94,13 +94,7 @@ class TempMountNoexecTest extends TestCase
 
         $this->runNoexecHardening($fstab, $mounts);
 
-        $options = $this->pmssFstabOptionsForMount($fstab, '/tmp');
-        $this->assertTrue(in_array('noexec', $options, true), 'expected noexec option');
-        $this->assertTrue(in_array('nosuid', $options, true), 'expected nosuid option');
-        $this->assertTrue(in_array('nodev', $options, true), 'expected nodev option');
-        $this->assertTrue(!in_array('exec', $options, true), 'expected exec removed');
-        $this->assertTrue(!in_array('suid', $options, true), 'expected suid removed');
-        $this->assertTrue(!in_array('dev', $options, true), 'expected dev removed');
+        $this->pmssAssertFstabOptions($fstab, '/tmp', ['noexec', 'nosuid', 'nodev'], ['exec', 'suid', 'dev']);
     }
 
     public function testAlreadyHardenedSkips(): void
