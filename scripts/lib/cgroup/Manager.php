@@ -307,26 +307,19 @@ class Manager
 
         $derivedWeight = $memoryHighMiB !== null ? self::calculateWeightFromMemory($memoryHighMiB) : null;
 
-        if (isset($opts['cpu-weight'])) {
-            $props['CPUWeight'] = (int)$opts['cpu-weight'];
-        } elseif ($derivedWeight !== null) {
-            $props['CPUWeight'] = $derivedWeight;
-        }
-
-        if (isset($opts['io-weight'])) {
-            $props['IOWeight'] = (int)$opts['io-weight'];
-        } elseif ($derivedWeight !== null) {
-            // Restored to full derivedWeight range. The systemd-side cgroup-v1 BFQ
-            // chain still caps the effective kernel bfq.weight at 181 for any
-            // IOWeight >= 200, but the kernel-level cap is now bypassed by
-            // /scripts/cron/cgroupBfqWeightApply.php which writes blkio.bfq.weight
-            // directly. The systemd-side value remains visible via systemctl show
-            // and feeds the same data-flow customers/operators expect.
-            $props['IOWeight'] = $derivedWeight;
-        }
-
-        if (isset($opts['tasks-max'])) {
-            $props['TasksMax'] = (int)$opts['tasks-max'];
+        // CPU and IO weights derive from the same MemoryHigh curve unless explicitly set.
+        foreach ([
+            'cpu-weight' => ['CPUWeight', $derivedWeight],
+            'io-weight' => ['IOWeight', $derivedWeight],
+            'tasks-max' => ['TasksMax', null],
+        ] as $option => $target) {
+            if (isset($opts[$option])) {
+                $props[$target[0]] = (int)$opts[$option];
+                continue;
+            }
+            if ($target[1] !== null) {
+                $props[$target[0]] = $target[1];
+            }
         }
 
         if (isset($opts['cpu-quota-percent'])) {
@@ -405,16 +398,7 @@ class Manager
      */
     public static function calculateWeightFromMemory(int $memoryHighMiB): int
     {
-        if ($memoryHighMiB < 0) {
-            $memoryHighMiB = 0;
-        }
-        $derived = (int) round(8 * sqrt($memoryHighMiB));
-        if ($derived < 10) {
-            $derived = 10;
-        } elseif ($derived > 1000) {
-            $derived = 1000;
-        }
-        return $derived;
+        return max(10, min(1000, (int) round(8 * sqrt(max(0, $memoryHighMiB)))));
     }
 
     private function applyDefaults(array &$opt): array

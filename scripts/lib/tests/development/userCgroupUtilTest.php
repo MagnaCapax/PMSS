@@ -78,10 +78,10 @@ class UserCgroupUtilTest extends TestCase
     public function testComputePropsAcceptsCpuIoTasks(): void
     {
         $mgr = $this->makeManager();
-        $p = $mgr->computeSetProps(['cpu-weight'=>300,'io-weight'=>250,'tasks-max'=>8192], 32768);
-        $this->assertEquals(300, $p['CPUWeight']);
-        $this->assertEquals(250, $p['IOWeight']);
-        $this->assertEquals(8192, $p['TasksMax']);
+        $this->assertSame(
+            ['CPUWeight' => 300, 'IOWeight' => 250, 'TasksMax' => 8192],
+            $mgr->computeSetProps(['cpu-weight'=>300,'io-weight'=>250,'tasks-max'=>8192], 32768)
+        );
     }
 
     public function testComputePropsDefaultsHighWhenOnlyMaxProvided(): void
