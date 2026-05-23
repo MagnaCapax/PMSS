@@ -13,6 +13,15 @@ class MediaStackPanelTest extends TestCase
         return $home;
     }
 
+    public function testEndpointRequiresCustomerTreeHelper(): void
+    {
+        $source = file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/mediaStack.php');
+
+        $this->assertTrue(is_string($source));
+        $this->assertStringContainsString("require_once __DIR__.'/userMediaStackPanel.php';", $source);
+        $this->assertStringNotContainsString('/scripts/lib/user/mediaStackPanel.php', $source);
+    }
+
     public function testStatusIsReadyForFreshHome(): void
     {
         $home = $this->mediaHomeCreate('pmss-media-ready-');
