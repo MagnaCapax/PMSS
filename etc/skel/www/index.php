@@ -336,8 +336,15 @@ html, body {
     background: #3d3d3d;
     color:#fff;
     font-family: Arial;
+    font-size: 14px;
     border-radius: 4px;
     font-weight: 30;
+    padding: 6px 14px;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    min-height: 0;
+    background-image: none;
     display: flex;
     align-items: center;
     justify-content: center; 

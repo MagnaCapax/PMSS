@@ -72,6 +72,23 @@ class SkeletonWebLocalAssetTest extends TestCase
         );
     }
 
+    public function testIndexTabsOverrideLegacySpriteGeometry(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'etc/skel/www/index.php',
+            [
+                'font-size: 14px;',
+                'padding: 6px 14px;',
+                'width: auto;',
+                'height: auto;',
+                'min-width: 0;',
+                'min-height: 0;',
+                'background-image: none;',
+            ],
+            'Missing tab geometry override: '
+        );
+    }
+
     public function testLighttpdTemplateDisablesRemoteFrames(): void
     {
         $this->pmssAssertRepoFileContainsString(
