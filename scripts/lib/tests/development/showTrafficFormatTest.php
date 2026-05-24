@@ -38,15 +38,14 @@ class ShowTrafficFormatTest extends TestCase
 
     public function testFormatRateDisplay(): void
     {
-        $cases = [
+        foreach ([
             [0.0, '0.00MiB/s'],
             [12.345, '12.35MiB/s'],
             [999.99, '999.99MiB/s'],
             [1000.0, '0.98GiB/s'],
             [1024.0, '1.00GiB/s'],
             [2048.0, '2.00GiB/s'],
-        ];
-        foreach ($cases as $case) {
+        ] as $case) {
             $this->assertEquals($case[1], \pmssShowTrafficFormatRateDisplay($case[0]));
         }
     }

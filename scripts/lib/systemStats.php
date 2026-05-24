@@ -79,16 +79,12 @@ function pmssSystemStatsCollect(): array
             }
             return (float) $m[1];
         };
-        $someAvg10 = $find('some', 'avg10');
-        $someAvg60 = $find('some', 'avg60');
-        $fullAvg10 = $find('full', 'avg10');
-        if ($someAvg10 === null) {
+        if (($someAvg10 = $find('some', 'avg10')) === null) {
             return 'na';
         }
-        $fmt = static function (?float $v): string {
+        return implode('/', array_map(static function (?float $v): string {
             return $v === null ? 'na' : number_format($v, 1, '.', '');
-        };
-        return $fmt($someAvg10).'/'.$fmt($someAvg60).'/'.$fmt($fullAvg10);
+        }, [$someAvg10, $find('some', 'avg60'), $find('full', 'avg10')]));
     };
     $iopingMs = static function (string $path): string {
         if (!is_dir($path)) {

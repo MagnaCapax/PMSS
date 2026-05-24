@@ -17,7 +17,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
         $this->assertEquals('new', file_get_contents($target));
         $this->assertEquals('old', file_get_contents($target.'.pmss-backup'));
 
-        $this->clearEnv('PMSS_APT_SOURCES_PATH');
+        putenv('PMSS_APT_SOURCES_PATH');
     }
 
     public function testSafeWriteSourcesReturnsFalseWhenTargetIsDirectory(): void
@@ -30,7 +30,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
         $this->assertTrue($result === false);
         $this->assertTrue(file_exists($dir.'.pmss-backup'));
 
-        $this->clearEnv('PMSS_APT_SOURCES_PATH');
+        putenv('PMSS_APT_SOURCES_PATH');
     }
 
     public function testSafeWriteSourcesCreatesParentDirectoriesWhenMissing(): void
@@ -44,7 +44,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
         $this->assertTrue($result);
         $this->assertTrue(is_dir($dir));
 
-        $this->clearEnv('PMSS_APT_SOURCES_PATH');
+        putenv('PMSS_APT_SOURCES_PATH');
     }
 
     public function testSafeWriteSourcesBackupUpdatedOnSecondWrite(): void
@@ -58,7 +58,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
         $this->assertEquals('third', file_get_contents($target));
         $this->assertEquals('second', file_get_contents($target.'.pmss-backup'));
 
-        $this->clearEnv('PMSS_APT_SOURCES_PATH');
+        putenv('PMSS_APT_SOURCES_PATH');
     }
 
     public function testSafeWriteSourcesRejectsSymlinkTarget(): void
@@ -78,7 +78,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
             $this->assertEquals('victim', file_get_contents($victim));
             $this->pmssAssertMessagesContain($logs, 'Unsafe target path for SymlinkTarget sources.list');
         } finally {
-            $this->clearEnv('PMSS_APT_SOURCES_PATH');
+            putenv('PMSS_APT_SOURCES_PATH');
         }
     }
 
@@ -99,7 +99,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
             $this->assertEquals('victim', file_get_contents($victim));
             $this->pmssAssertMessagesContain($logs, 'Unsafe backup path for SymlinkBackup sources.list');
         } finally {
-            $this->clearEnv('PMSS_APT_SOURCES_PATH');
+            putenv('PMSS_APT_SOURCES_PATH');
         }
     }
 
@@ -167,10 +167,5 @@ class UpdateHelpersSafeWriteTest extends TestCase
                 ? $this->assertEquals([], $logs)
                 : $this->pmssAssertMessagesContain($logs, $expectedLog);
         }
-    }
-
-    private function clearEnv(string $name): void
-    {
-        putenv($name);
     }
 }

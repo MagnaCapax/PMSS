@@ -4,14 +4,6 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/userLifecycle.php';
 
-class UserLifecycleStringableStub
-{
-    public function __toString(): string
-    {
-        return "hello\nworld";
-    }
-}
-
 class userLifecycleLoggingTest extends TestCase
 {
     public function testFormatTextFieldLeavesPlainTextUntouched(): void
@@ -39,7 +31,14 @@ class userLifecycleLoggingTest extends TestCase
 
     public function testFormatTextFieldUsesStringableObjects(): void
     {
-        $this->assertEquals('hello world', \pmssUserLifecycleFormatTextField(new UserLifecycleStringableStub()));
+        $stringable = new class {
+            public function __toString(): string
+            {
+                return "hello\nworld";
+            }
+        };
+
+        $this->assertEquals('hello world', \pmssUserLifecycleFormatTextField($stringable));
     }
 
     public function testUserLifecycleWriterUsesFormattingHelperForTextLogFields(): void

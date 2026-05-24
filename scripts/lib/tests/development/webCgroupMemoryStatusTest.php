@@ -25,54 +25,22 @@ class WebCgroupMemoryStatusTest extends TestCase
 
     public function testClassifyReturnsThrottledWhenAboveHighWithEvents(): void
     {
-        $this->assertSame('THROTTLED', \pmssWebCgroupMemoryStatusClassify([
-            'memory_current' => 2048,
-            'memory_high' => 1024,
-            'usage_percent' => 90.0,
-            'high_percent' => 200.0,
-            'pressure_some_avg10' => 0.0,
-            'pressure_full_avg10' => 0.0,
-            'throttle_events' => 1,
-        ]));
+        $this->assertClassifiesAs('THROTTLED', ['memory_current' => 2048, 'high_percent' => 200.0, 'throttle_events' => 1]);
     }
 
     public function testClassifyReturnsHighNearLimitWithoutThrottle(): void
     {
-        $this->assertSame('HIGH', \pmssWebCgroupMemoryStatusClassify([
-            'memory_current' => 950,
-            'memory_high' => 1000,
-            'usage_percent' => 95.0,
-            'high_percent' => 95.0,
-            'pressure_some_avg10' => 0.0,
-            'pressure_full_avg10' => 0.0,
-            'throttle_events' => 0,
-        ]));
+        $this->assertClassifiesAs('HIGH', ['memory_current' => 950, 'usage_percent' => 95.0, 'high_percent' => 95.0]);
     }
 
     public function testClassifyReturnsMediumAtElevatedUsage(): void
     {
-        $this->assertSame('MEDIUM', \pmssWebCgroupMemoryStatusClassify([
-            'memory_current' => 800,
-            'memory_high' => 1000,
-            'usage_percent' => 80.0,
-            'high_percent' => 80.0,
-            'pressure_some_avg10' => 0.0,
-            'pressure_full_avg10' => 0.0,
-            'throttle_events' => 0,
-        ]));
+        $this->assertClassifiesAs('MEDIUM', ['memory_current' => 800, 'usage_percent' => 80.0, 'high_percent' => 80.0]);
     }
 
     public function testClassifyReturnsLowWhenUsageIsComfortable(): void
     {
-        $this->assertSame('LOW', \pmssWebCgroupMemoryStatusClassify([
-            'memory_current' => 400,
-            'memory_high' => 1000,
-            'usage_percent' => 40.0,
-            'high_percent' => 40.0,
-            'pressure_some_avg10' => 0.0,
-            'pressure_full_avg10' => 0.0,
-            'throttle_events' => 0,
-        ]));
+        $this->assertClassifiesAs('LOW', ['memory_current' => 400, 'usage_percent' => 40.0, 'high_percent' => 40.0]);
     }
 
     public function testReadParsesCgroupCountersAndFormatsUsage(): void
@@ -142,5 +110,18 @@ class WebCgroupMemoryStatusTest extends TestCase
             strpos($source, 'RAM THROTTLE ACTIVE') < strpos($source, 'RAM LIMIT EXCEEDED'),
             'Throttle copy must be selected before the hard-limit/OOM warning copy.'
         );
+    }
+
+    private function assertClassifiesAs(string $expected, array $overrides): void
+    {
+        $this->assertSame($expected, \pmssWebCgroupMemoryStatusClassify(array_replace([
+            'memory_current' => 400,
+            'memory_high' => 1000,
+            'usage_percent' => 40.0,
+            'high_percent' => 40.0,
+            'pressure_some_avg10' => 0.0,
+            'pressure_full_avg10' => 0.0,
+            'throttle_events' => 0,
+        ], $overrides)));
     }
 }
