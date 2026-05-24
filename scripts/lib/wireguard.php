@@ -637,12 +637,12 @@ function wgBootstrapUserGuide(string $user, string $clientGuide): void
         $updatedKeyText = rtrim($publicKeyText, "\r\n").PHP_EOL.$publicKey.PHP_EOL;
     }
 
-    if (!$managedGuide && @file_put_contents($guidePath, $updatedGuide) === false) {
+    if (!$managedGuide && !pmssWriteUserFile($guidePath, $updatedGuide, $user, 0600)) {
         wgLog('Failed to write WireGuard guide for user '.$user);
         return;
     }
 
-    if (@file_put_contents($publicKeyPath, $updatedKeyText) === false) {
+    if (!pmssWriteUserFile($publicKeyPath, $updatedKeyText, $user, 0600)) {
         wgLog('Failed to write WireGuard public key for user '.$user);
         if (!$managedGuide && $originalGuide === null) {
             @unlink($guidePath);
@@ -654,15 +654,7 @@ function wgBootstrapUserGuide(string $user, string $clientGuide): void
 
     if ($managedGuide) {
         wgLog('Recovered WireGuard public key registration for user '.$user.' from existing managed guide');
-    }
-
-    @chown($publicKeyPath, $user);
-    @chgrp($publicKeyPath, $user);
-    @chmod($publicKeyPath, 0600);
-    if ($guideExists || !$managedGuide) {
-        @chown($guidePath, $user);
-        @chgrp($guidePath, $user);
-        @chmod($guidePath, 0600);
+        pmssUserFileApplyMetadata($guidePath, $user, 0600);
     }
 }
 
@@ -716,13 +708,10 @@ function wgSyncUserGuideAddresses(array $assigned, string $fallbackGuide = ''): 
         if ($targetExists && $updated === $guide) {
             continue;
         }
-        if (@file_put_contents($target, $updated) === false) {
+        if (!pmssWriteUserFile($target, $updated, $entry['user'], 0600)) {
             wgLog('Failed to update WireGuard guide for user '.$entry['user']);
             continue;
         }
-        @chown($target, $entry['user']);
-        @chgrp($target, $entry['user']);
-        @chmod($target, 0600);
     }
 }
 
@@ -760,10 +749,9 @@ function wgDistributeToUsers(string $content): void
                 continue;
             }
         }
-        @file_put_contents($target, $content);
-        @chown($target, $user);
-        @chgrp($target, $user);
-        @chmod($target, 0600);
+        if (!pmssWriteUserFile($target, $content, $user, 0600)) {
+            wgLog('Failed to distribute WireGuard guide for user '.$user);
+        }
     }
 }
 
