@@ -968,10 +968,10 @@ function runUpdateStep2(bool $dryRun): void
     passthru(PHP_BINARY.' /scripts/util/update-step2.php', $rc);
     $duration = round(microtime(true) - $start, 3);
 
-    // Interpret non-zero exit codes, including 128+signal (e.g. SIGKILL → 137).
+    // Interpret only valid 128+signal exit codes (e.g. SIGKILL -> 137).
     $status  = $rc === 0 ? 'ok' : 'error';
     $details = ['status' => $status, 'rc' => $rc, 'duration' => $duration];
-    if ($rc !== 0 && $rc >= 128 && $rc <= 255) {
+    if ($rc !== 0 && $rc >= 129 && $rc <= 192) {
         $signal = $rc - 128;
         $name   = [9 => 'SIGKILL', 15 => 'SIGTERM'][$signal] ?? '';
         $details['signal']      = $signal;
@@ -988,6 +988,16 @@ function runUpdateStep2(bool $dryRun): void
         logmsg('Partial step/profile data (if any) are under:');
         logmsg('  - JSON:   '.JSON_LOG);
         logmsg('  - Profile: '.JSON_LOG.'.profile.json');
+    } elseif ($rc !== 0) {
+        $details['exit_class'] = $rc === 255 ? 'general_error' : 'exit_code';
+        if ($rc === 255) {
+            logmsg('[ERROR] update-step2.php exited with status 255 (general error / unhandled exception)');
+        }
+        logEvent('update_step2_exit_code', [
+            'rc'         => $rc,
+            'exit_class' => $details['exit_class'],
+            'duration'   => $duration,
+        ]);
     }
     logEvent('update_step2_end', $details);
     if ($rc !== 0) {

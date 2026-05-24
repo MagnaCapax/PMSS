@@ -689,7 +689,18 @@ pmssRunProfiledCallable('Configuring /tmp disk-backed baseline', 'pmssConfigureT
 pmssRunProfiledCallable('Configuring /tmp tmpfs mount policy', 'pmssConfigureTempTmpfsMount', ['logmsg']);
 pmssRunProfiledCallable('Configuring /tmp noexec hardening', 'pmssConfigureTempMountNoexec', ['logmsg']);
 
-runStep('Refreshing system permissions', '/scripts/util/setupPermissions.php');
+pmssLogJson(['event' => 'phase', 'name' => 'setupPermissions', 'status' => 'start']);
+$setupPermissionsRc = runStep('Refreshing system permissions', '/scripts/util/setupPermissions.php');
+pmssLogJson(['event' => 'phase', 'name' => 'setupPermissions', 'status' => 'end', 'rc' => $setupPermissionsRc]);
+if ($setupPermissionsRc !== 0) {
+    pmssUpdateStep2HandleClassifiedFailure(
+        'Refreshing system permissions',
+        PMSS_UPDATE_STEP_CLASS_SOFT_FAIL,
+        $setupPermissionsRc,
+        'setupPermissions_exit'
+    );
+}
+pmssLogJson(['event' => 'phase', 'name' => 'transition', 'status' => 'leaving setupPermissions', 'rc' => $setupPermissionsRc]);
 runStep('Refreshing FTP configuration', '/scripts/util/ftpConfig.php');
 
 $logrotateTemplate = '/etc/seedbox/config/template.logrotate.pmss';
