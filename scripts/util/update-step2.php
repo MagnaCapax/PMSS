@@ -40,6 +40,7 @@ require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/update/runtime/stepPolicy.php';
 require_once __DIR__.'/../lib/update/runtime/processes.php';
 require_once __DIR__.'/../lib/update/environment.php';
+require_once __DIR__.'/../lib/update/opensslSsh2Compat.php';
 require_once __DIR__.'/../lib/update/distro.php';
 require_once __DIR__.'/../lib/update/kernelHardening.php';
 require_once __DIR__.'/../lib/update/repositories.php';
