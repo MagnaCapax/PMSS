@@ -242,6 +242,11 @@ class Manager
 
         if ($hasPlan) {
             if ($apply && !$dryRun) {
+                if ($uid === 0) {
+                    fwrite(STDERR, "Refusing to apply cgroup changes to root slice; use cgroupRootCheck.php for root guard repair.\n");
+                    return 1;
+                }
+
                 $this->sys->requireRoot();
                 if ($doWipe) {
                     \runStep('Reverting user slice', \pmssBuildCommand('systemctl', ['revert', $slice]).' || true');

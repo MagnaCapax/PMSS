@@ -485,6 +485,17 @@ PHP;
         $this->assertStringContainsString('CPUWeight=400', $res['out']);
     }
 
+    public function testApplyRefusesRootSliceMutation()
+    {
+        $this->ensureManager();
+        $this->sys->users['root'] = 0;
+
+        $res = $this->runMgr(['root', '--apply', '--cpu-weight=400']);
+
+        $this->assertEquals(1, $res['rc']);
+        $this->assertTrue(empty($this->sys->executedCommands), 'root apply must return before system command execution');
+    }
+
     public function testWipeCommand()
     {
         // In dry-run mode wipe should plan work but not execute systemctl.
