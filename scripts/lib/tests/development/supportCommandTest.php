@@ -129,10 +129,7 @@ class SupportCommandTest extends TestCase
     public function testDiagnosticsBuildUsesRunnerOutputs(): void
     {
         $outputs = [];
-        $diagnostics = \pmssSupportDiagnosticsBuild('Need help', function (array $command) use (&$outputs): array {
-            $outputs[] = $command;
-            return ['rc' => 0, 'output' => implode(' ', $command)];
-        });
+        $diagnostics = \pmssSupportDiagnosticsBuild('Need help', $this->pmssCommandEchoRunner($outputs));
 
         $this->assertEquals($this->user, $diagnostics['username']);
         $this->assertStringContainsString('Need help', $diagnostics['body']);
@@ -148,9 +145,7 @@ class SupportCommandTest extends TestCase
 
     public function testSnapshotWriteCreatesPrivateFile(): void
     {
-        $diagnostics = \pmssSupportDiagnosticsBuild('Please investigate', function (array $command): array {
-            return ['rc' => 0, 'output' => implode(' ', $command)];
-        });
+        $diagnostics = \pmssSupportDiagnosticsBuild('Please investigate', $this->pmssCommandEchoRunner());
         $config = \pmssSupportConfigRead();
 
         $path = \pmssSupportSnapshotWrite($diagnostics, $config);
@@ -166,9 +161,7 @@ class SupportCommandTest extends TestCase
         mkdir($snapshotDir, 0755, true);
         chmod($snapshotDir, 0755);
 
-        $diagnostics = \pmssSupportDiagnosticsBuild('Please investigate', function (array $command): array {
-            return ['rc' => 0, 'output' => implode(' ', $command)];
-        });
+        $diagnostics = \pmssSupportDiagnosticsBuild('Please investigate', $this->pmssCommandEchoRunner());
         $config = \pmssSupportConfigRead();
 
         $path = \pmssSupportSnapshotWrite($diagnostics, $config);
@@ -197,9 +190,7 @@ class SupportCommandTest extends TestCase
         mkdir($target, 0700, true);
         symlink($target, $this->homeRoot.'/'.$this->user.'/.support');
 
-        $diagnostics = \pmssSupportDiagnosticsBuild('Please investigate', function (array $command): array {
-            return ['rc' => 0, 'output' => implode(' ', $command)];
-        });
+        $diagnostics = \pmssSupportDiagnosticsBuild('Please investigate', $this->pmssCommandEchoRunner());
         $config = \pmssSupportConfigRead();
 
         $caught = false;
@@ -218,9 +209,7 @@ class SupportCommandTest extends TestCase
 
         $result = \pmssSupportRequestSubmit(
             'rtorrent is stuck',
-            function (array $command): array {
-                return ['rc' => 0, 'output' => implode(' ', $command)];
-            },
+            $this->pmssCommandEchoRunner(),
             function (array $config, array $envelope) use (&$deliveries): void {
                 $deliveries[] = ['config' => $config, 'envelope' => $envelope];
             }

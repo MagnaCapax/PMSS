@@ -112,6 +112,15 @@ trait FilesystemCleanupTrait
         };
     }
 
+    /** Return a hermetic command runner that echoes argv into diagnostic output. */
+    protected function pmssCommandEchoRunner(?array &$commands = null): callable
+    {
+        return static function (array $command) use (&$commands): array {
+            if ($commands !== null) $commands[] = $command;
+            return ['rc' => 0, 'output' => implode(' ', $command)];
+        };
+    }
+
     /** Run a callback with an array-backed logger and return both result and logs. */
     protected function pmssArrayLoggerCapture(callable $callback): array
     {
