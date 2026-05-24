@@ -43,8 +43,8 @@ class webDockerInactiveNoteTest extends TestCase
 
         $note = \pmssWebDockerInactiveNote('inactive', false, $fixture.'/missing-os-release', $fixture.'/missing-debian-version', $fixture.'/cmdline');
 
-        $this->assertStringContainsString('currently disabled', $note);
-        $this->assertStringContainsString('controls below to enable it', $note);
+        $this->assertStringContainsString('currently disabled by policy', $note);
+        $this->assertStringContainsString('Contact support if it should be enabled', $note);
     }
 
     public function testShowsRuntimeGuidanceWhenPolicyIsEnabled(): void
@@ -55,7 +55,7 @@ class webDockerInactiveNoteTest extends TestCase
         $note = \pmssWebDockerInactiveNote('inactive', true, $fixture.'/missing-os-release', $fixture.'/missing-debian-version', $fixture.'/cmdline');
 
         $this->assertStringContainsString('not currently running', $note);
-        $this->assertStringContainsString('start it again', $note);
+        $this->assertStringContainsString('Contact support if it should be restarted', $note);
     }
 
     public function testShowsGenericControlGuidanceWhenPolicyIsUnknown(): void
@@ -65,6 +65,6 @@ class webDockerInactiveNoteTest extends TestCase
 
         $note = \pmssWebDockerInactiveNote('inactive', null, $fixture.'/missing-os-release', $fixture.'/missing-debian-version', $fixture.'/cmdline');
 
-        $this->assertStringContainsString('Docker controls below to enable it', $note);
+        $this->assertStringContainsString('Contact support if it should be enabled for this account', $note);
     }
 }

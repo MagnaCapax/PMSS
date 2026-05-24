@@ -35,72 +35,6 @@ if (!function_exists('pmssInfoShellExec')) {
     }
 }
 
-if (!function_exists('pmssInfoDockerPolicyStoreState')) {
-    /**
-     * Detect whether the current web user can reach the root-owned config helper.
-     */
-    function pmssInfoDockerPolicyStoreState()
-    {
-        $storePath = '/scripts/lib/user/userConfigStore.php';
-        foreach (array('/scripts', '/scripts/lib', '/scripts/lib/user') as $directory) {
-            if (!is_dir($directory)) {
-                return array('available' => false, 'reason' => 'missing');
-            }
-            if (!is_executable($directory)) {
-                return array('available' => false, 'reason' => 'permission');
-            }
-        }
-
-        if (!is_file($storePath)) {
-            return array('available' => false, 'reason' => 'missing');
-        }
-        if (!is_readable($storePath)) {
-            return array('available' => false, 'reason' => 'permission');
-        }
-
-        return array('available' => true, 'reason' => 'ok');
-    }
-}
-
-if (!function_exists('pmssInfoDockerPolicyUnavailableMessage')) {
-    /**
-     * Keep Docker policy failures explicit so user-facing notices stay accurate.
-     */
-    function pmssInfoDockerPolicyUnavailableMessage($reason)
-    {
-        if ($reason === 'permission') {
-            return 'Docker policy changes from the web panel are unavailable on this host. Use the terminal or contact support if this policy must change.';
-        }
-
-        return 'Unable to update Docker policy: user config store is missing.';
-    }
-}
-
-if (!function_exists('pmssInfoResolveDockerEnabled')) {
-    /**
-     * Resolve the current dockerEnabled policy for a user.
-     */
-    function pmssInfoResolveDockerEnabled($username)
-    {
-        if (!is_string($username) || trim($username) === '') {
-            return null;
-        }
-
-        $storePath = '/scripts/lib/user/userConfigStore.php';
-        $storeState = pmssInfoDockerPolicyStoreState();
-        if (!$storeState['available']) {
-            return null;
-        }
-
-        require_once $storePath;
-        if (function_exists('pmssUserDockerEnabled')) {
-            return (bool) pmssUserDockerEnabled($username);
-        }
-
-        return null;
-    }
-}
-
 $pmssWebDockerInactiveNoteLib = __DIR__.'/webDockerInactiveNote.php';
 if (file_exists($pmssWebDockerInactiveNoteLib)) {
     require_once $pmssWebDockerInactiveNoteLib;
@@ -116,56 +50,7 @@ $pmssUserTrafficLimitLib = __DIR__.'/userTrafficLimit.php';
 if (file_exists($pmssUserTrafficLimitLib)) {
     require_once $pmssUserTrafficLimitLib;
 }
-// /scripts/lib/traffic/storage.php require removed 2026-05-17: dead code
-// — no function from traffic/storage.php was called from customer PHP.
 // pmssTrafficLimitStateRead lives in userTrafficLimit.php (see ADR 0016).
-
-
-if (!function_exists('pmssInfoSetDockerEnabled')) {
-    /**
-     * Persist dockerEnabled in the canonical per-user config store.
-     */
-    function pmssInfoSetDockerEnabled($username, $enabled)
-    {
-        $result = array(
-            'ok' => false,
-            'error' => '',
-        );
-
-        if (!is_string($username) || trim($username) === '') {
-            $result['error'] = 'Unable to update Docker policy: username is unavailable.';
-            return $result;
-        }
-
-        $storePath = '/scripts/lib/user/userConfigStore.php';
-        $storeState = pmssInfoDockerPolicyStoreState();
-        if (!$storeState['available']) {
-            $result['error'] = pmssInfoDockerPolicyUnavailableMessage($storeState['reason']);
-            return $result;
-        }
-
-        require_once $storePath;
-        if (!class_exists('UserConfigStore')) {
-            $result['error'] = 'Unable to update Docker policy: config store class is unavailable.';
-            return $result;
-        }
-
-        $store = new UserConfigStore();
-        $payload = $store->get($username);
-        if (!is_array($payload)) {
-            $result['error'] = 'Unable to update Docker policy: user config was not found.';
-            return $result;
-        }
-
-        $payload['dockerEnabled'] = (bool) $enabled;
-        if (!$store->persist($username, $payload)) {
-            $result['error'] = 'Unable to persist Docker policy. Contact support if this account should be allowed to manage Docker state.';
-            return $result;
-        }
-        $result['ok'] = true;
-        return $result;
-    }
-}
 
 if (!function_exists('pmssStatsRenderLineChart')) {
     /**
@@ -218,84 +103,10 @@ if (!function_exists('pmssStatsRenderLineChart')) {
     }
 }
 
-$pmssStatsUsername = '';
-$pmssStatsUserResult = pmssInfoShellExec('whoami', 'Username');
-if ($pmssStatsUserResult['error'] === null && is_string($pmssStatsUserResult['output'])) {
-    $pmssStatsUsername = trim($pmssStatsUserResult['output']);
-}
-
-$pmssDockerToggleNotice = array(
-    'level' => '',
-    'text' => '',
-    'output' => '',
-);
-
-$pmssDockerPolicyStoreState = pmssInfoDockerPolicyStoreState();
-$pmssDockerToggleDisabled = $pmssStatsUsername === '' || !$pmssDockerPolicyStoreState['available'];
-$pmssDockerEnabledPolicy = pmssInfoResolveDockerEnabled($pmssStatsUsername);
-if ($pmssDockerPolicyStoreState['reason'] === 'permission') {
-    $pmssDockerToggleNotice['level'] = 'warn';
-    $pmssDockerToggleNotice['text'] = pmssInfoDockerPolicyUnavailableMessage($pmssDockerPolicyStoreState['reason']);
-}
+$pmssDockerEnabledPolicy = null;
 $pmssMemoryPressure = function_exists('pmssWebCgroupMemoryStatusRead')
     ? pmssWebCgroupMemoryStatusRead()
     : array('available' => false, 'status' => 'UNAVAILABLE');
-
-$requestMethod = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : '';
-if ($requestMethod === 'POST' && isset($_POST['docker_toggle_state'])) {
-    $requestedToggle = strtolower(trim((string) $_POST['docker_toggle_state']));
-    if ($requestedToggle === 'enable' || $requestedToggle === 'disable') {
-        $targetDockerEnabled = $requestedToggle === 'enable';
-        $toggleVerb = $targetDockerEnabled ? 'start' : 'stop';
-
-        $configResult = pmssInfoSetDockerEnabled($pmssStatsUsername, $targetDockerEnabled);
-        $dockerRun = array('output' => '', 'error' => null);
-        $dockerRunOutput = '';
-        $dockerRunRc = null;
-
-        if ($configResult['ok']) {
-            $dockerCommand = sprintf(
-                'php /scripts/userDocker.php %s %s 2>&1; printf "\\n__PMSS_DOCKER_RC=%%s" "$?"',
-                escapeshellarg($pmssStatsUsername),
-                escapeshellarg($toggleVerb)
-            );
-            $dockerRun = pmssInfoShellExec($dockerCommand, 'Docker toggle command');
-            $dockerRunOutput = is_string($dockerRun['output']) ? trim($dockerRun['output']) : '';
-
-            if (preg_match('/__PMSS_DOCKER_RC=(\d+)$/', $dockerRunOutput, $rcMatches) === 1) {
-                $dockerRunRc = (int) $rcMatches[1];
-                $dockerRunOutput = trim((string) preg_replace('/\n__PMSS_DOCKER_RC=\d+$/', '', $dockerRunOutput));
-            }
-        }
-
-        if (!$configResult['ok']) {
-            $pmssDockerToggleNotice['level'] = 'warn';
-            $pmssDockerToggleNotice['text'] = $configResult['error'];
-        } elseif ($dockerRun['error'] !== null) {
-            $pmssDockerToggleNotice['level'] = 'warn';
-            $pmssDockerToggleNotice['text'] = 'Docker policy updated, but the runtime command could not be executed.';
-        } elseif ($dockerRunRc !== 0) {
-            $pmssDockerToggleNotice['level'] = 'warn';
-            $pmssDockerToggleNotice['text'] = 'Docker policy updated, but the runtime command reported a non-zero exit status.';
-        } else {
-            $pmssDockerToggleNotice['level'] = 'ok';
-            $pmssDockerToggleNotice['text'] = $targetDockerEnabled
-                ? 'Docker is enabled and start was requested.'
-                : 'Docker is disabled and stop was requested.';
-        }
-
-        if ($dockerRunOutput !== '') {
-            $pmssDockerToggleNotice['output'] = $dockerRunOutput;
-        }
-    } else {
-        $pmssDockerToggleNotice['level'] = 'warn';
-        $pmssDockerToggleNotice['text'] = 'Ignored unsupported Docker toggle request.';
-    }
-
-    $pmssDockerPolicyStoreState = pmssInfoDockerPolicyStoreState();
-    $pmssDockerToggleDisabled = $pmssStatsUsername === '' || !$pmssDockerPolicyStoreState['available'];
-    $pmssDockerEnabledPolicy = pmssInfoResolveDockerEnabled($pmssStatsUsername);
-}
 ?>
 
 <style>
@@ -395,43 +206,6 @@ pre {
     margin-top: 4px;
     font-style: italic;
 }
-.docker-toggle {
-    margin-top: 14px;
-    padding: 12px;
-    background: #111;
-    border-radius: 8px;
-}
-.docker-toggle-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-.docker-toggle-form {
-    margin-top: 10px;
-    display: flex;
-    gap: 10px;
-}
-.docker-toggle-button {
-    border: 0;
-    border-radius: 6px;
-    padding: 6px 12px;
-    color: #fff;
-    cursor: pointer;
-    font-weight: 600;
-}
-.docker-toggle-button.enable { background: #2e7d32; }
-.docker-toggle-button.disable { background: #c62828; }
-.docker-toggle-button[disabled] {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-.docker-toggle-message {
-    margin-top: 10px;
-    font-size: 0.9em;
-}
-.docker-toggle-message.ok { color: #81c784; }
-.docker-toggle-message.warn { color: #ffb74d; }
 .traffic-ratio {
     font-weight: 600;
 }
@@ -549,8 +323,6 @@ echo htmlspecialchars($ip !== false ? trim($ip) : 'unknown');
     }
 
     // === App Status via ps aux | grep (hidepid safe) ===
-    $username = $pmssStatsUsername;
-
     $psResult = pmssInfoShellExec('ps aux | grep -E "(rtorrent|deluged|rclone)" | grep -v grep', 'App status');
     if ($psResult['error'] !== null) {
         $apps = [
@@ -618,33 +390,11 @@ echo htmlspecialchars($ip !== false ? trim($ip) : 'unknown');
         <?php endforeach; ?>
     </div>
 
-    <?php
-    $dockerPolicyClass = 'error';
-    $dockerPolicyLabel = 'Unknown';
-    if ($pmssDockerEnabledPolicy === true) {
-        $dockerPolicyClass = 'active';
-        $dockerPolicyLabel = 'Enabled';
-    } elseif ($pmssDockerEnabledPolicy === false) {
-        $dockerPolicyClass = 'inactive';
-        $dockerPolicyLabel = 'Disabled';
-    }
-    ?>
-    <div class="docker-toggle">
-        <div class="docker-toggle-row">
-            <span class="label">Docker policy:</span>
-            <span class="status <?php echo $dockerPolicyClass; ?>"><?php echo $dockerPolicyLabel; ?></span>
-        </div>
-        <form method="post" class="docker-toggle-form">
-            <button type="submit" class="docker-toggle-button enable" name="docker_toggle_state" value="enable" <?php echo $pmssDockerToggleDisabled ? 'disabled' : ''; ?>>Enable Docker</button>
-            <button type="submit" class="docker-toggle-button disable" name="docker_toggle_state" value="disable" <?php echo $pmssDockerToggleDisabled ? 'disabled' : ''; ?>>Disable Docker</button>
-        </form>
-        <?php if ($pmssDockerToggleNotice['text'] !== ''): ?>
-            <div class="docker-toggle-message <?php echo htmlspecialchars($pmssDockerToggleNotice['level']); ?>"><?php echo htmlspecialchars($pmssDockerToggleNotice['text']); ?></div>
-        <?php endif; ?>
-        <?php if ($pmssDockerToggleNotice['output'] !== ''): ?>
-            <pre style="margin-top:8px;"><?php echo htmlspecialchars($pmssDockerToggleNotice['output']); ?></pre>
-        <?php endif; ?>
+    <div class="info-line" style="margin-top:14px;">
+        <span class="label">Docker policy:</span>
+        <span class="value"><span class="status unavailable">Platform managed</span></span>
     </div>
+    <div class="memory-pressure-note">Docker policy changes are handled by platform tooling.</div>
 
     <pre style="margin-top:16px; font-size:0.9em;">
 <?php

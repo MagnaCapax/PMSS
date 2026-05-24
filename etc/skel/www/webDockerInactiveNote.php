@@ -13,7 +13,7 @@
  * Build the Docker inactive note shown beside the Docker app status.
  *
  * The note is only shown for the inactive state. When the cgroup boot option is
- * already present, the note points users to the existing Docker controls rather
+ * already present, the note points users to platform-managed support rather
  * than implying a host-level GRUB problem.
  *
  * @param string     $dockerStatus        Current status label from the stats page.
@@ -55,9 +55,9 @@ function pmssWebDockerInactiveNote(
     }
 
     if ($dockerEnabledPolicy === false) {
-        return ' (Docker is available but currently disabled. Use the controls below to enable it.)';
+        return ' (Docker is available but currently disabled by policy. Contact support if it should be enabled.)';
     }
     return $dockerEnabledPolicy === true
-        ? ' (Docker is available but not currently running. Use the controls below to start it again.)'
-        : ' (Docker is available but not currently running. Use the Docker controls below to enable it.)';
+        ? ' (Docker is enabled by policy but not currently running. Contact support if it should be restarted.)'
+        : ' (Docker is available but not currently running. Contact support if it should be enabled for this account.)';
 }
