@@ -18,16 +18,12 @@ class DiskIostatTest extends TestCase
 
     public function testBuildCommandShellEscapesValidatedDevices(): void
     {
-        $command = \pmssDiskIostatBuildCommand(['sda', 'sdb'], '/usr/bin/iostat');
-
-        $this->assertEquals("'/usr/bin/iostat' -xm 120 2 -g grp1 'sda' 'sdb' 2>&1", $command);
+        $this->assertBuildCommand(['sda', 'sdb'], "'/usr/bin/iostat' -xm 120 2 -g grp1 'sda' 'sdb' 2>&1");
     }
 
     public function testBuildCommandKeepsNoDeviceFallbackForNvmeOnlyHosts(): void
     {
-        $command = \pmssDiskIostatBuildCommand([], '/usr/bin/iostat');
-
-        $this->assertEquals("'/usr/bin/iostat' -xm 120 2 -g grp1 2>&1", $command);
+        $this->assertBuildCommand([], "'/usr/bin/iostat' -xm 120 2 -g grp1 2>&1");
     }
 
     public function testBuildCommandRejectsUnsafeDeviceNames(): void
@@ -95,5 +91,10 @@ class DiskIostatTest extends TestCase
         $this->assertStringContainsString("raw\n---\n", (string) file_get_contents($path.'-history-raw'));
 
         $this->assertFalse(\pmssDiskIostatWriteSnapshotFiles($root.'/missing/iostat', $payload, 'raw'));
+    }
+
+    private function assertBuildCommand(array $devices, string $expected): void
+    {
+        $this->assertEquals($expected, \pmssDiskIostatBuildCommand($devices, '/usr/bin/iostat'));
     }
 }

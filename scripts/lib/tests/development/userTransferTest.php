@@ -247,23 +247,17 @@ class UserTransferTest extends TestCase
 
     public function testEvaluateCompletenessWarnsWhenBelowThreshold(): void
     {
-        $warning = \pmssUserTransferEvaluateCompleteness(1000, 850, 90);
-
-        $this->assertTrue(is_array($warning), 'expected warning payload');
-        $this->assertEquals(1000, $warning['remoteBytes']);
-        $this->assertEquals(850, $warning['localBytes']);
-        $this->assertEquals(90, $warning['verifyThreshold']);
-        $this->assertEquals(85.0, $warning['localPercent']);
+        $this->assertEvaluateCompleteness(1000, 850, 90, ['remoteBytes' => 1000, 'localBytes' => 850, 'verifyThreshold' => 90, 'localPercent' => 85.0]);
     }
 
     public function testEvaluateCompletenessAllowsHealthyTransfer(): void
     {
-        $this->assertEquals(null, \pmssUserTransferEvaluateCompleteness(1000, 950, 90));
+        $this->assertEvaluateCompleteness(1000, 950, 90, null);
     }
 
     public function testEvaluateCompletenessSkipsZeroRemoteSize(): void
     {
-        $this->assertEquals(null, \pmssUserTransferEvaluateCompleteness(0, 0, 90));
+        $this->assertEvaluateCompleteness(0, 0, 90, null);
     }
 
     public function testBuildExpectWrapperUsesEnvPassword(): void
@@ -506,6 +500,11 @@ SNAP;
             return;
         }
         throw new \AssertionError('Expected RuntimeException, none thrown');
+    }
+
+    private function assertEvaluateCompleteness(int $remoteBytes, int $localBytes, int $threshold, ?array $expected): void
+    {
+        $this->assertEquals($expected, \pmssUserTransferEvaluateCompleteness($remoteBytes, $localBytes, $threshold));
     }
 
     private function baseConfig(array $overrides = []): array

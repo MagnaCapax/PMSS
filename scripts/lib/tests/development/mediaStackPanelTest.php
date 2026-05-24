@@ -58,11 +58,7 @@ class MediaStackPanelTest extends TestCase
 
     public function testStatusShowsInstalledUrlsWhenJellyfinConfigExists(): void
     {
-        $home = $this->mediaHomeCreate('pmss-media-installed-');
-        @mkdir($home.'/.config/jellyfin/config', 0755, true);
-        @file_put_contents($home.'/.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
-
-        $status = \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
+        $status = $this->mediaStatusFixture('pmss-media-installed-', '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
 
         $this->assertSame('installed', $status['state']);
         $this->assertStringContainsString('/public-alice/jellyfin/web/index.html', $status['urls']['Jellyfin']);
@@ -70,10 +66,7 @@ class MediaStackPanelTest extends TestCase
 
     public function testStatusShowsRunningWhenPidExists(): void
     {
-        $home = $this->mediaHomeCreate('pmss-media-running-');
-        @file_put_contents($home.'/.install-media-stack-web.pid', (string) getmypid());
-
-        $status = \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
+        $status = $this->mediaStatusFixture('pmss-media-running-', '.install-media-stack-web.pid', (string) getmypid());
 
         $this->assertSame('running', $status['state']);
         $this->assertTrue($status['poll']);
@@ -81,10 +74,7 @@ class MediaStackPanelTest extends TestCase
 
     public function testStatusShowsFailedLogWhenPreviousRunStopped(): void
     {
-        $home = $this->mediaHomeCreate('pmss-media-failed-');
-        @file_put_contents($home.'/.install-media-stack.log', "[ERR ] Download failed\nPartial output\n");
-
-        $status = \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
+        $status = $this->mediaStatusFixture('pmss-media-failed-', '.install-media-stack.log', "[ERR ] Download failed\nPartial output\n");
 
         $this->assertSame('failed', $status['state']);
         $this->assertStringContainsString('Download failed', $status['tail']);
@@ -121,5 +111,13 @@ class MediaStackPanelTest extends TestCase
         $this->assertSame('/home/alice/install-media-stack.sh', \pmssMediaStackPanelHomePath($home, 'install-media-stack.sh'));
         $this->assertSame('/home/alice/.install-media-stack.log', \pmssMediaStackPanelHomePath($home, '.install-media-stack.log'));
         $this->assertSame('/home/alice/.install-media-stack-web.pid', \pmssMediaStackPanelHomePath($home, '.install-media-stack-web.pid'));
+    }
+
+    private function mediaStatusFixture(string $prefix, string $relativePath, string $content): array
+    {
+        $home = $this->mediaHomeCreate($prefix);
+        $this->pmssWriteRelativeFile($home, $relativePath, $content);
+
+        return \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
     }
 }

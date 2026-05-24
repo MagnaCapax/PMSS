@@ -30,15 +30,7 @@ function pmssBfqFormulaWeight(int $memoryMiB, float $coefficient = 3.535, int $c
     if ($memoryMiB <= 0) {
         return 1;
     }
-    if ($customerMax < 1) {
-        $customerMax = 1;
-    }
+    $customerMax = max(1, $customerMax);
     $derived = (int) round($coefficient * sqrt($memoryMiB));
-    if ($derived < 1) {
-        return 1;
-    }
-    if ($derived > $customerMax) {
-        return $customerMax;
-    }
-    return $derived;
+    return max(1, min($customerMax, $derived));
 }
