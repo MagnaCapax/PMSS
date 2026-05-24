@@ -12,4 +12,4 @@
 
 require_once __DIR__.'/userConfigLighttpd.php';
 
-exit(pmssUserConfigLighttpdMain($argv));
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserConfigLighttpdMain');

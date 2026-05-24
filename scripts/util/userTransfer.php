@@ -20,4 +20,4 @@ is_dir('/var/log/pmss') || @mkdir('/var/log/pmss', 0755, true);
 
 require_once __DIR__.'/../lib/userTransfer.php';
 
-exit(pmssUserTransferMain($argv));
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserTransferMain');

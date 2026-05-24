@@ -15,4 +15,4 @@ require_once '/scripts/lib/traffic/processor.php';
 (new TrafficStorage())->ensureRuntime();
 $processor = new TrafficStatsProcessor(new trafficStatistics());
 
-exit($processor->runCli($argv, $_SERVER['argv'][0]));
+pmssRunCliEntrypointWithArgv(__FILE__, static function (array $argv) use ($processor): int { return $processor->runCli($argv, (string) ($argv[0] ?? __FILE__)); });

@@ -35,4 +35,4 @@ if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
 
 require_once __DIR__.'/../lib/nginxConfig/main.php';
 
-exit(pmssCreateNginxConfigMain($argv));
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssCreateNginxConfigMain');

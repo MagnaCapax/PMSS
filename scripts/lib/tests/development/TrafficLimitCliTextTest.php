@@ -34,7 +34,7 @@ class TrafficLimitCliTextTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsString(
             'scripts/util/userTrafficLimit.php',
-            "exit(pmssUserTrafficLimitCli(\$argv ?? (\$_SERVER['argv'] ?? [])));"
+            "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserTrafficLimitCli');"
         );
     }
 }

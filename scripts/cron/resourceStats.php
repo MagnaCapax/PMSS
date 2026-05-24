@@ -11,4 +11,4 @@ require_once '/scripts/lib/resources/processor.php';
 
 $processor = new ResourceStatsProcessor(new resourceStatistics());
 
-exit($processor->runCli($argv, $_SERVER['argv'][0]));
+pmssRunCliEntrypointWithArgv(__FILE__, static function (array $argv) use ($processor): int { return $processor->runCli($argv, (string) ($argv[0] ?? __FILE__)); });

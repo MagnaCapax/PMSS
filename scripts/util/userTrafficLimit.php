@@ -16,4 +16,4 @@ require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/user/trafficLimit.php';
 
 // Resolve and validate the target before mutating any persisted state.
-exit(pmssUserTrafficLimitCli($argv ?? ($_SERVER['argv'] ?? [])));
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserTrafficLimitCli');

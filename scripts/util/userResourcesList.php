@@ -14,4 +14,4 @@
 
 require_once __DIR__.'/../lib/user/resourcesList.php';
 
-exit(pmssUserResourcesListMain($argv ?? ($_SERVER['argv'] ?? [])));
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserResourcesListMain');

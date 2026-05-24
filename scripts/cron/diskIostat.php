@@ -9,4 +9,4 @@
 
 require_once __DIR__.'/../lib/diskIostat.php';
 
-exit(pmssDiskIostatMain());
+pmssRunCliEntrypoint(__FILE__, 'pmssDiskIostatMain');

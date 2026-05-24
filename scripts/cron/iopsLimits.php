@@ -10,4 +10,4 @@
 require_once __DIR__.'/../lib/user/log.php';
 require_once __DIR__.'/../lib/user/iopsLimitEnforcer.php';
 
-exit(pmssIopsLimitsRun());
+pmssRunCliEntrypoint(__FILE__, 'pmssIopsLimitsRun');

@@ -2,4 +2,4 @@
 <?php
 require_once __DIR__.'/../lib/user/trafficLimit.php';
 
-exit(pmssUserBonusTrafficCli($argv ?? ($_SERVER['argv'] ?? [])));
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserBonusTrafficCli');

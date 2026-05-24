@@ -16,7 +16,7 @@ final class TrafficLimitCliWrapperCharacterizationTest extends TestCase
             [
                 "require_once __DIR__.'/../lib/runtime.php';",
                 "require_once __DIR__.'/../lib/user/trafficLimit.php';",
-                "exit(pmssUserTrafficLimitCli(\$argv ?? (\$_SERVER['argv'] ?? [])));",
+                "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserTrafficLimitCli');",
             ]
         );
         $this->pmssAssertRepoFileNotContainsStrings(

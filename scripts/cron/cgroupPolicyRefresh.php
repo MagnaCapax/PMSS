@@ -9,5 +9,4 @@
 
 require_once __DIR__.'/../lib/user/cgroupPolicyRefresh.php';
 
-exit(pmssCgroupPolicyRefreshRun());
-
+pmssRunCliEntrypoint(__FILE__, 'pmssCgroupPolicyRefreshRun');
