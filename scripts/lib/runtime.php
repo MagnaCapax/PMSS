@@ -339,7 +339,24 @@ if (!function_exists('pmssLockHandleWritePid')) {
     function pmssLockHandleWritePid($handle): void { @ftruncate($handle, 0); @rewind($handle); @fwrite($handle, (string) getmypid()); @fflush($handle); }
 }
 if (!function_exists('pmssRuntimeLockPath')) {
-    function pmssRuntimeLockPath(string $basename): string { return (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/'.ltrim($basename, '/'); }
+    /** Validate runtime lock filenames before joining them to a writable directory. */
+    function pmssRuntimeLockBasename(string $basename): string
+    {
+        $basename = ltrim($basename, '/');
+        if (
+            $basename === ''
+            || $basename === '.'
+            || $basename === '..'
+            || strpos($basename, '/') !== false
+            || preg_match('/[\r\n\0]/', $basename) === 1
+        ) {
+            throw new RuntimeException('Unsafe runtime lock basename');
+        }
+
+        return $basename;
+    }
+
+    function pmssRuntimeLockPath(string $basename): string { return (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/'.pmssRuntimeLockBasename($basename); }
 }
 if (!function_exists('pmssLockHandleRelease')) {
     function pmssLockHandleRelease($handle, bool $unlock = true): void { $unlock && @flock($handle, LOCK_UN); @fclose($handle); }
@@ -1331,6 +1348,30 @@ if (!function_exists('pmssSnapshotWriteLine')) {
     }
 }
 
+if (!function_exists('pmssSnapshotWarnToken')) {
+    /** Keep warning codes and field keys as single log tokens. */
+    function pmssSnapshotWarnToken(string $value, string $fallback = 'field'): string
+    {
+        $token = (string) preg_replace('/[^A-Za-z0-9_.-]+/', '_', trim($value));
+        $token = trim($token, '_');
+        if ($token === '') {
+            $token = $fallback;
+        }
+
+        return substr($token, 0, 64);
+    }
+}
+
+if (!function_exists('pmssSnapshotWarnValue')) {
+    /** Keep warning field values single-line and bounded without changing normal text. */
+    function pmssSnapshotWarnValue($value): string
+    {
+        $normalized = (string) preg_replace('/[\r\n\0\t]+/', ' ', (string) $value);
+        $normalized = trim((string) preg_replace('/ {2,}/', ' ', $normalized));
+        return strlen($normalized) > 300 ? substr($normalized, 0, 300) : $normalized;
+    }
+}
+
 if (!function_exists('pmssSnapshotWriteWarn')) {
     // Append a normalized warning line to a snapshot log.
     function pmssSnapshotWriteWarn($handle, string $timestamp, string $code, array $fields = [], array $output = []): void
@@ -1342,13 +1383,14 @@ if (!function_exists('pmssSnapshotWriteWarn')) {
             }
         }
 
-        $line = $timestamp.' WARN '.$code;
+        $line = $timestamp.' WARN '.pmssSnapshotWarnToken($code, 'warn');
         foreach ($fields as $key => $value) {
-            if ($value === null || $value === '') {
+            $value = pmssSnapshotWarnValue($value);
+            if ($value === '') {
                 continue;
             }
 
-            $line .= ' '.$key.'='.(string) $value;
+            $line .= ' '.pmssSnapshotWarnToken((string) $key).'='.$value;
         }
 
         pmssSnapshotWriteLine($handle, $line);

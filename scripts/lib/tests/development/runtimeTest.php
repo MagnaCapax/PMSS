@@ -186,6 +186,22 @@ class RuntimeTest extends TestCase
         $this->assertTrue(($data['actual_seconds'] ?? 0) >= 1.0);
     }
 
+    public function testRuntimeLockPathRejectsTraversalBasenames(): void
+    {
+        $this->assertThrowsRuntime(static function (): void {
+            \pmssRuntimeLockPath('../escape.lock');
+        }, 'Unsafe runtime lock basename');
+        $this->assertThrowsRuntime(static function (): void {
+            \pmssRuntimeLockPath("pmss-bad\nlock");
+        }, 'Unsafe runtime lock basename');
+    }
+
+    public function testRuntimeLockPathKeepsValidBasename(): void
+    {
+        $path = \pmssRuntimeLockPath('pmss-runtime-test.lock');
+        $this->assertTrue($path === '/run/lock/pmss-runtime-test.lock' || $path === '/tmp/pmss-runtime-test.lock');
+    }
+
     public function testReadRegularFileIntReturnsParsedDigits(): void
     {
         $tempDir = $this->pmssMakeTempDir('pmss-runtime-int-');
@@ -240,6 +256,27 @@ class RuntimeTest extends TestCase
         $this->assertEquals([7, true, '0600'], [$result['rc'], $result['exists'], $result['mode']]);
         $this->assertStringContainsString(' SNAPSHOT_BEGIN', $result['body']);
         $this->assertStringContainsString(' WARN sample_warn rc=2 msg=alpha beta', $result['body']);
+    }
+
+    public function testSnapshotWarnNormalizesControlCharacters(): void
+    {
+        $handle = fopen('php://temp', 'w+');
+        $this->assertTrue(is_resource($handle), 'expected temp stream');
+
+        try {
+            \pmssSnapshotWriteWarn($handle, '2026-05-24T00:00:00', "bad\ncode", [
+                "bad\nkey" => "alpha\nbeta\tgamma",
+                'empty' => '',
+            ]);
+            rewind($handle);
+            $body = stream_get_contents($handle);
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+        }
+
+        $this->assertSame("2026-05-24T00:00:00 WARN bad_code bad_key=alpha beta gamma\n", $body);
     }
 
     // Note: logMessage() in lib/update.php targets a fixed log location; avoid writing system logs here.
