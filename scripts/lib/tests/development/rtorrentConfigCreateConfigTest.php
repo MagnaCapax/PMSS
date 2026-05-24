@@ -137,6 +137,39 @@ class rtorrentConfigCreateConfigTest extends TestCase
         }
     }
 
+    public function testCreateConfigKeepsLegacyPortDefaultRules(): void
+    {
+        if (is_readable('/etc/seedbox/config/localnet')) {
+            throw new SkipTest('localnet config present on host; skipping rtorrentConfig port default test');
+        }
+
+        $cfg = new class([
+            'ramBlock' => 250,
+            'peers' => ['minimum' => 1, 'maximum' => 2],
+            'uploadSlots' => 1,
+        ], "scgi=##scgiPort\ndht=##dhtPort\nlisten=##listenPort\n") extends \rtorrentConfig {
+            public $reservedTypes = [];
+
+            protected function _configPortPrivate($type, $rangeStart = 2000, $rangeEnd = 65000)
+            {
+                $this->reservedTypes[] = $type;
+                return ['scgi' => 4001, 'dht' => 24002, 'listen' => 44002][$type];
+            }
+        };
+
+        $result = $cfg->createConfig([
+            'ram' => 500,
+            'scgiPort' => 0,
+            'dhtPort' => '',
+            'listenPort' => null,
+            'pex' => 'auto',
+            'dht' => 'yes',
+        ]);
+
+        $this->assertEquals(['dht', 'listen'], $cfg->reservedTypes);
+        $this->assertEquals("scgi=0\ndht=24002\nlisten=44002\n", (string) $result['configFile']);
+    }
+
     public function testCreateConfigKeepsRenderingSilent(): void
     {
         $cfg = new \rtorrentConfig([

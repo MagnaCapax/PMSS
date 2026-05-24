@@ -1,9 +1,11 @@
 <?php
-/** 
- * rTorrent class
- * 
- * rTorrent configuration generator & idempotency.
- * 
+/**
+ * rTorrent configuration generator and idempotency helper.
+ *
+ * The legacy class name is a compatibility contract for provisioning scripts.
+ * Internally the render path is split into normalization, sizing, and IO
+ * helpers so callers keep the same API without carrying one large method.
+ *
  * @author Aleksi Ursin
  * @copyright NuCode 2010-2014 - All Rights reserved.
  * @since 5/10/2010
@@ -11,291 +13,248 @@
  *
  * @license GPL-3.0-only
  */
-class rtorrentConfig {
-    // TODO(complexity-refactor): This class aggregates IO, template rendering,
-    // and parameter normalization in one place. Split into small helpers:
-    //  - pure config assembly (no IO)
-    //  - filesystem IO (read/write, port reservation)
-    //  - defaults/validation
-    // Aim to reduce branching, add unit-style tests, and keep PHP 7.3.
-	/**
-	 * Local template/resource paths used when defaults are not injected.
-	 */
-	private const RESOURCE_CONFIG_PATH = '/etc/seedbox/config/rtorrent.resources.json';
-	private const TEMPLATE_PATH = '/etc/seedbox/config/template.rtorrent.rc';
-	// Optional local override preserved across updates (not shipped in repo).
-	private const TEMPLATE_OVERRIDE_PATH = '/etc/seedbox/config/template.rtorrentrc';
-	protected $_resourceConfig;
-	protected $_template;
-	
-		/**
-		 * Build a configuration helper around the provided templates.
-		 *
-		 * When no resource configuration or template is supplied the class
-		 * loads defaults from `/etc/seedbox/config`. The internal state is
-		 * then validated to keep downstream callers resilient to missing keys.
-		 *
-		 * @param array       $resourceConfig Resource configuration overrides.
-		 * @param string|null $template       Template contents for .rtorrent.rc.
-		 *
-		 * @return void
-		 */
-			function __construct($resourceConfig = array(), $template = null) {
-			if (count($resourceConfig) == 0) {
-				$resourceConfig = $this->loadDefaultResourceConfig();
-			}
-			// Treat whitespace-only templates as empty; otherwise we risk generating
-			// a minimal config (e.g. only ipv4_filter) that breaks rTorrent startup.
-			if (!is_string($template) || trim($template) === '') {
-			    $template = $this->loadDefaultTemplate();
-			}
-			
-			$this->_template = $template;
-			$this->_resourceConfig = $resourceConfig;
+class rtorrentConfig
+{
+    private const RESOURCE_CONFIG_PATH = '/etc/seedbox/config/rtorrent.resources.json';
+    private const TEMPLATE_PATH = '/etc/seedbox/config/template.rtorrent.rc';
+    private const TEMPLATE_OVERRIDE_PATH = '/etc/seedbox/config/template.rtorrentrc';
+    private const DEFAULT_RESOURCE_CONFIG = ['ramBlock' => 250, 'peers' => ['minimum' => 6, 'maximum' => 32], 'uploadSlots' => 7];
+    protected $_resourceConfig;
+    protected $_template;
+    /**
+     * Build a configuration helper around injected templates or defaults.
+     * @param array       $resourceConfig Resource configuration overrides.
+     * @param string|null $template       Template contents for .rtorrent.rc.
+     * @return void
+     */
+    public function __construct($resourceConfig = array(), $template = null)
+    {
+        $this->_resourceConfig = count($resourceConfig) === 0
+            ? $this->loadDefaultResourceConfig()
+            : $resourceConfig;
+        $this->_template = is_string($template) && trim($template) !== ''
+            ? $template
+            : $this->loadDefaultTemplate();
 
-		$this->_checkResourceConfig();
-	}
-    
-   
-	
-		/**
-		 * Create a rendered rTorrent configuration based on the given inputs.
-		 *
-		 * Validates the payload, derives port allocations and memory-based
-		 * tuning from the resources configuration, and returns both the final
-		 * configuration text and the normalised settings that were applied.
-		 *
-		 * @param array $config Input settings such as RAM, DHT/PEX flags and ports.
-		 *
-		 * @return array Array with keys `configFile` and `config`.
-		 *
-		 * @throws Exception When required inputs are missing or invalid.
-		 */
-		public function createConfig($config = array()) {
-		if (!is_array($config) || count($config) == 0) throw new Exception('createConfig requires an array with atleast RAM defined', 100);
-		if (!isset($config['ram'])) throw new Exception('no ram defined for create config');
-		
-		if (!isset($config['scgiPort'])) $config['scgiPort'] = $this->_configPortPrivate('scgi', 4000, 24000);
-		if (!isset($config['dhtPort']) or empty($config['dhtPort'])) $config['dhtPort'] = $this->_configPortPrivate('dht', 24001, 44000);
-		if (!isset($config['listenPort']) or (empty($config['listenPort']))) $config['listenPort'] = $this->_configPortPrivate('listen', 44001, 64000);
-			
-		$resourceConfig = $this->_resourceConfig;
-		$template = $this->_template;
-		
-		// Handle effects of RAM etc. we handle in terms of "ram blocks"
-		$blocks = round(($config['ram'] / $resourceConfig['ramBlock']),2);
-		$minimumPeers = ceil($resourceConfig['peers']['minimum'] * $blocks);
-		$maximumPeers = floor($resourceConfig['peers']['maximum'] * $blocks);
-		$uploadSlots = floor( $resourceConfig['uploadSlots'] * $blocks );
-
-		// Reserve headroom for lighttpd/php-cgi and wrappers inside the user slice.
-		$ramMiB = max(0, (int)$config['ram']);
-		$gapMiB = max(250, min(1000, (int) floor($ramMiB * 0.25)));
-		$piecesMemoryMiB = max(170, $ramMiB - $gapMiB);
-
-		$uploadThrottleLine = '';
-		if (isset($config['uploadThrottle']) && is_numeric($config['uploadThrottle'])) {
-			$uploadThrottle = (int) $config['uploadThrottle'];
-			if ($uploadThrottle > 0) {
-				$uploadThrottleLine = 'throttle.global_up.max_rate.set = '.$uploadThrottle;
-			}
-		}
-
-		$replacements = [
-			'##minimumPeers'      => $minimumPeers,
-			'##maximumPeers'      => $maximumPeers,
-			'##uploadSlotsGlobal' => $uploadSlots * 6,
-			'##uploadSlots'       => $uploadSlots,
-			'##uploadThrottleLine' => $uploadThrottleLine,
-			'##scgiPort'          => $config['scgiPort'],
-			'##dhtPort'           => $config['dhtPort'],
-			'##listenPort'        => $config['listenPort'],
-			'##pex'               => $config['pex'],
-			'##dht'               => $config['dht'],
-			'##memoryMax'         => $piecesMemoryMiB . 'M',
-		];
-		$configFile = str_replace(array_keys($replacements), array_values($replacements), $template);
-	
-		// Config for localnets, add preferred ipv4 filtering if defined
-		if (is_readable('/etc/seedbox/config/localnet')) {
-			$configFile .= "\nipv4_filter.load = /etc/seedbox/config/localnet, preferred";
-			@chmod('/etc/seedbox/config/localnet', 0664);
-		}
-
-        
-		return array('configFile' => $configFile, 'config' => $config);
-	}
-	
-		/**
-		 * Persist a rendered configuration to the user's `.rtorrent.rc` file.
-		 * 
-		 * Writes the supplied configuration string to `/home/<user>/.rtorrent.rc`
-		 * after basic validation and logging. Existing files are created with
-		 * safe permissions when missing and overwritten on success.
-		 * 
-		 * @param string $user   Target username whose home directory is updated.
-		 * @param string $config Fully rendered configuration contents.
-		 *
-		 * @return bool True on successful write, false on failure.
-		 *
-		 * @throws Exception When the configuration or user name is empty.
-		 */
-		public function writeConfig($user, $config) {
-	    if (empty($config)) throw new Exception('rtorrentConfig->writeConfig: Config cannot be empty!');
-	    if (empty($user)) throw new Exception('rtorrentConfig->writeConfig: User cannot be empty!');
-
-	    $file = '/home/' . $user . '/.rtorrent.rc';
-	    if (!file_exists($file)) { touch($file); chmod($file, 0644); }
-	    return is_writable($file) && file_put_contents($file, $config) !== false;
-	}
-	
-		/**
-		 * Apply configuration changes idempotently for the given user.
-		 * 
-		 * Reads the current `.rtorrent.rc` from the user’s home directory and
-		 * compares it with the provided configuration. Only when the contents
-		 * differ is the file rewritten through `writeConfig()`.
-		 * 
-		 * @param string $user   Target username whose configuration is checked.
-		 * @param string $config Proposed configuration contents.
-		 *
-		 * @return bool|null True when a new config is written, false when the
-		 *                   write fails, and null when no change was required.
-		 */
-			public function idempotentConfig($user, $config) {
-			$file = '/home/' . $user . '/.rtorrent.rc';
-			#TODO Check mtime + permissions first. if root and no "other" write permission + mtime exceeds 2-3 months, we can be 99.9% certain it's right
-	                $data = file_get_contents( $file );
-			
-			return $data !== $config ? $this->writeConfig($user, $config) : null;
-		}
-    
-	    /**
-	     * Read a user's configuration file via the high-level helper.
-	     *
-	     * Convenience wrapper that targets `/home/<user>/.rtorrent.rc` and
-	     * delegates parsing to `readConfig()` while handling basic guards.
-	     *
-	     * @param string $user Username whose configuration should be read.
-	     *
-	     * @return array|false Parsed configuration array or false on failure.
-	     */
-	    public function readUserConfig($user) {
-	        $file = "/home/{$user}/.rtorrent.rc";
-	        return (!file_exists($file) || is_dir($file)) ? false : $this->readConfig($file);
-	    }
-    
-	    /**
-	     * Read and parse a `.rtorrent.rc` style configuration file.
-	     *
-	     * Skips empty lines and comments, splits `key = value` style entries,
-	     * and returns a simple associative array of configuration settings.
-	     *
-	     * @param string $file Absolute path to the configuration file.
-	     *
-	     * @return array|false Parsed configuration array or false on failure.
-	     */
-	    public function readConfig($file) {
-        if (!file_exists($file) or
-            is_dir($file)) return false;
-            
-        $configRaw = file_get_contents($file);
-        if (empty($configRaw) or $configRaw == false) return false;
-        
-        $config = array();
-        foreach (explode("\n", $configRaw) AS $thisLine) {
-            $thisLine = trim($thisLine);
-            if (empty($thisLine)) continue;
-            
-            if ($thisLine[0] == '#' or
-                $thisLine[0] == '/') continue;
-            
-            $elements = explode('=', $thisLine);
-            if ( count($elements) != 2 ) continue;
-            
-            $config[ trim($elements[0]) ] = trim( $elements[1] );
-        }
-        
-        return $config;
-    
+        $this->_checkResourceConfig();
     }
-    
-    protected function _configPortPrivate($type, $rangeStart = 2000, $rangeEnd = 65000) {
-        // Use persistent location for reserved ports
+    /**
+     * Create rendered rTorrent config text and return normalized inputs.
+     * @param array $config Input settings such as RAM, flags, and ports.
+     * @return array Rendered config text plus normalized input settings.
+     */
+    public function createConfig($config = array())
+    {
+        if (!is_array($config) || count($config) == 0) {
+            throw new Exception('createConfig requires an array with atleast RAM defined', 100);
+        }
+        if (!isset($config['ram'])) {
+            throw new Exception('no ram defined for create config');
+        }
+
+        $config = $this->configWithPortDefaults($config);
+        return array('configFile' => $this->renderConfigFile($config), 'config' => $config);
+    }
+    /**
+     * Persist rendered configuration text to the user's `.rtorrent.rc` file.
+     * @param string $user   Target username whose home directory is updated.
+     * @param string $config Fully rendered configuration contents.
+     * @return bool True when the file write succeeds.
+     */
+    public function writeConfig($user, $config)
+    {
+        if (empty($config)) {
+            throw new Exception('rtorrentConfig->writeConfig: Config cannot be empty!');
+        }
+        if (empty($user)) {
+            throw new Exception('rtorrentConfig->writeConfig: User cannot be empty!');
+        }
+        $file = '/home/'.$user.'/.rtorrent.rc';
+        if (!file_exists($file)) {
+            touch($file);
+            chmod($file, 0644);
+        }
+        return is_writable($file) && file_put_contents($file, $config) !== false;
+    }
+    /**
+     * Rewrite a user's configuration only when the contents differ.
+     * @param string $user   Target username whose configuration is checked.
+     * @param string $config Proposed configuration contents.
+     * @return bool|null Write result, or null when no change was required.
+     */
+    public function idempotentConfig($user, $config)
+    {
+        $file = '/home/'.$user.'/.rtorrent.rc';
+        $data = file_get_contents($file);
+        return $data !== $config ? $this->writeConfig($user, $config) : null;
+    }
+    /**
+     * Read a user's configuration file through the shared parser.
+     * @param string $user Username whose configuration should be read.
+     * @return array|false Parsed configuration array or false on failure.
+     */
+    public function readUserConfig($user)
+    {
+        $file = "/home/{$user}/.rtorrent.rc";
+        return (!file_exists($file) || is_dir($file)) ? false : $this->readConfig($file);
+    }
+    /**
+     * Parse simple `key = value` lines from an rTorrent config file.
+     * @param string $file Absolute path to the configuration file.
+     * @return array|false Parsed configuration array or false on failure.
+     */
+    public function readConfig($file)
+    {
+        if (!file_exists($file) || is_dir($file)) {
+            return false;
+        }
+        $configRaw = file_get_contents($file);
+        if (empty($configRaw) || $configRaw == false) {
+            return false;
+        }
+        $config = array();
+        foreach (explode("\n", $configRaw) as $thisLine) {
+            $thisLine = trim($thisLine);
+            if (empty($thisLine) || $thisLine[0] == '#' || $thisLine[0] == '/') {
+                continue;
+            }
+            $elements = explode('=', $thisLine);
+            if (count($elements) != 2) {
+                continue;
+            }
+            $config[trim($elements[0])] = trim($elements[1]);
+        }
+        return $config;
+    }
+    protected function _configPortPrivate($type, $rangeStart = 2000, $rangeEnd = 65000)
+    {
         $directoryBase = '/var/lib/pmss/ports';
-        $directoryType = $directoryBase . '/' . $type;
-        
-        if (!is_dir($directoryBase)) {
-            if (!@mkdir($directoryBase, 0755, true) && !is_dir($directoryBase)) {
-                throw new RuntimeException('Unable to create port reservation base directory: '.$directoryBase);
-            }
-        }
-        if (!is_dir($directoryType)) {
-            if (!@mkdir($directoryType, 0755, true) && !is_dir($directoryType)) {
-                throw new RuntimeException('Unable to create port reservation directory: '.$directoryType);
-            }
-        }
+        $directoryType = $directoryBase.'/'.$type;
+
+        $this->ensureDirectory($directoryBase, 'Unable to create port reservation base directory: ');
+        $this->ensureDirectory($directoryType, 'Unable to create port reservation directory: ');
 
         do {
             $port = round(rand($rangeStart, $rangeEnd));
-        } while (file_exists($directoryType . '/' . $port));
+        } while (file_exists($directoryType.'/'.$port));
 
-        if (@touch($directoryType . '/' . $port) === false) {
+        if (@touch($directoryType.'/'.$port) === false) {
             throw new RuntimeException('Unable to reserve port file: '.$directoryType.'/'.$port);
         }
-
         return $port;
     }
-    
-	
-	/**
-	 * Check config
-	 * 
-	 * Checks resource config template. This also defines config options for reference
-	 * 
-	 */
-		protected function _checkResourceConfig() {
-			// Legacy defaults keep downstream code resilient if config misses fields.
-			$this->_resourceConfig += [
-				'ramBlock' => 250,
-				'peers' => ['minimum' => 6, 'maximum' => 32],
-				'uploadSlots' => 7,
-			];
-		}
+    protected function _checkResourceConfig()
+    {
+        $this->_resourceConfig += self::DEFAULT_RESOURCE_CONFIG;
+    }
 
-	/**
-	 * Load the default resource configuration JSON from disk.
-	 */
-	private function loadDefaultResourceConfig(): array
-	{
-		$path = self::RESOURCE_CONFIG_PATH;
-		$contents = @file_get_contents($path);
-		if ($contents === false) {
-			throw new RuntimeException('Unable to read rTorrent resource config: ' . $path);
-		}
-		$data = json_decode($contents, true);
-		if (!is_array($data)) {
-			throw new RuntimeException('Invalid rTorrent resource config JSON in ' . $path);
-		}
-		return $data;
-	}
+    private function configWithPortDefaults(array $config): array
+    {
+        if (!isset($config['scgiPort'])) {
+            $config['scgiPort'] = $this->_configPortPrivate('scgi', 4000, 24000);
+        }
+        if (!isset($config['dhtPort']) || empty($config['dhtPort'])) {
+            $config['dhtPort'] = $this->_configPortPrivate('dht', 24001, 44000);
+        }
+        if (!isset($config['listenPort']) || empty($config['listenPort'])) {
+            $config['listenPort'] = $this->_configPortPrivate('listen', 44001, 64000);
+        }
+        return $config;
+    }
 
-	/**
-	 * Load the default rTorrent template from disk.
-	 */
-	private function loadDefaultTemplate(): string
-	{
-		$paths = [self::TEMPLATE_OVERRIDE_PATH, self::TEMPLATE_PATH];
-		foreach ($paths as $path) {
-			if (!is_file($path)) {
-				continue;
-			}
-			$contents = @file_get_contents($path);
-			if ($contents === false || trim($contents) === '') {
-				continue;
-			}
-			return $contents;
-		}
-		throw new RuntimeException('Unable to read rTorrent template: ' . self::TEMPLATE_PATH);
-	}
+    private function renderConfigFile(array $config): string
+    {
+        $sizing = $this->resourceSizing($config);
+        $replacements = [
+            '##minimumPeers' => $sizing['minimumPeers'],
+            '##maximumPeers' => $sizing['maximumPeers'],
+            '##uploadSlotsGlobal' => $sizing['uploadSlots'] * 6,
+            '##uploadSlots' => $sizing['uploadSlots'],
+            '##uploadThrottleLine' => $this->uploadThrottleLine($config),
+            '##scgiPort' => $config['scgiPort'],
+            '##dhtPort' => $config['dhtPort'],
+            '##listenPort' => $config['listenPort'],
+            '##pex' => $config['pex'],
+            '##dht' => $config['dht'],
+            '##memoryMax' => $sizing['piecesMemoryMiB'].'M',
+        ];
+        $configFile = str_replace(array_keys($replacements), array_values($replacements), $this->_template);
+        return $this->appendLocalnetFilter($configFile);
+    }
+
+    private function resourceSizing(array $config): array
+    {
+        $resourceConfig = $this->_resourceConfig;
+        $blocks = round(($config['ram'] / $resourceConfig['ramBlock']), 2);
+        $uploadSlots = floor($resourceConfig['uploadSlots'] * $blocks);
+
+        return [
+            'minimumPeers' => ceil($resourceConfig['peers']['minimum'] * $blocks),
+            'maximumPeers' => floor($resourceConfig['peers']['maximum'] * $blocks),
+            'uploadSlots' => $uploadSlots,
+            'piecesMemoryMiB' => $this->piecesMemoryMiB((int) $config['ram']),
+        ];
+    }
+
+    private function piecesMemoryMiB(int $ramMiB): int
+    {
+        $ramMiB = max(0, $ramMiB);
+        $gapMiB = max(250, min(1000, (int) floor($ramMiB * 0.25)));
+        return max(170, $ramMiB - $gapMiB);
+    }
+
+    private function uploadThrottleLine(array $config): string
+    {
+        if (!isset($config['uploadThrottle']) || !is_numeric($config['uploadThrottle'])) {
+            return '';
+        }
+        $uploadThrottle = (int) $config['uploadThrottle'];
+        return $uploadThrottle > 0 ? 'throttle.global_up.max_rate.set = '.$uploadThrottle : '';
+    }
+
+    private function appendLocalnetFilter(string $configFile): string
+    {
+        if (!is_readable('/etc/seedbox/config/localnet')) {
+            return $configFile;
+        }
+        @chmod('/etc/seedbox/config/localnet', 0664);
+        return $configFile."\nipv4_filter.load = /etc/seedbox/config/localnet, preferred";
+    }
+
+    private function ensureDirectory(string $directory, string $errorPrefix): void
+    {
+        if (is_dir($directory)) {
+            return;
+        }
+        if (!@mkdir($directory, 0755, true) && !is_dir($directory)) {
+            throw new RuntimeException($errorPrefix.$directory);
+        }
+    }
+    private function loadDefaultResourceConfig(): array
+    {
+        $path = self::RESOURCE_CONFIG_PATH;
+        $contents = @file_get_contents($path);
+        if ($contents === false) {
+            throw new RuntimeException('Unable to read rTorrent resource config: '.$path);
+        }
+        $data = json_decode($contents, true);
+        if (!is_array($data)) {
+            throw new RuntimeException('Invalid rTorrent resource config JSON in '.$path);
+        }
+        return $data;
+    }
+    private function loadDefaultTemplate(): string
+    {
+        foreach ([self::TEMPLATE_OVERRIDE_PATH, self::TEMPLATE_PATH] as $path) {
+            if (!is_file($path)) {
+                continue;
+            }
+
+            $contents = @file_get_contents($path);
+            if ($contents !== false && trim($contents) !== '') {
+                return $contents;
+            }
+        }
+        throw new RuntimeException('Unable to read rTorrent template: '.self::TEMPLATE_PATH);
+    }
 }
