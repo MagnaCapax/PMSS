@@ -433,6 +433,65 @@ if (!function_exists('pmssCommandOutputPipesSetNonBlocking')) {
     }
 }
 
+if (!function_exists('pmssCommandOutputPipesDrain')) {
+    /**
+     * Drain proc_open stdout/stderr pipes until EOF or timeout.
+     *
+     * @return array{stdout:string,stderr:string,timed_out:bool}
+     */
+    function pmssCommandOutputPipesDrain(array $pipes, int $timeoutSec, float $startedAt, int $maxBuffer = 0, bool $mirrorOutput = false, string $streamSelectError = ''): array
+    {
+        $stdout = '';
+        $stderr = '';
+        $timedOut = false;
+
+        while (!feof($pipes[1]) || !feof($pipes[2])) {
+            $read = [];
+            foreach ([1, 2] as $index) {
+                if (!feof($pipes[$index])) $read[] = $pipes[$index];
+            }
+            if (empty($read)) {
+                break;
+            }
+
+            $write = $except = [];
+            $ready = stream_select($read, $write, $except, 0, 200000);
+            if ($ready === false) {
+                if ($streamSelectError !== '') $stderr .= ($stderr !== '' ? "\n" : '').$streamSelectError;
+                break;
+            }
+
+            foreach ($read as $stream) {
+                $chunk = fread($stream, 8192);
+                if ($chunk === false || $chunk === '') {
+                    continue;
+                }
+
+                if ($stream === $pipes[1]) {
+                    $stdout .= $chunk;
+                    if ($maxBuffer > 0 && strlen($stdout) > $maxBuffer) {
+                        $stdout = substr($stdout, -$maxBuffer);
+                    }
+                    if ($mirrorOutput) { echo $chunk; fflush(STDOUT); }
+                } else {
+                    $stderr .= $chunk;
+                    if ($maxBuffer > 0 && strlen($stderr) > $maxBuffer) {
+                        $stderr = substr($stderr, -$maxBuffer);
+                    }
+                    if ($mirrorOutput) { fwrite(STDERR, $chunk); fflush(STDERR); }
+                }
+            }
+
+            if ($timeoutSec > 0 && (microtime(true) - $startedAt) > $timeoutSec) {
+                $timedOut = true;
+                break;
+            }
+        }
+
+        return ['stdout' => $stdout, 'stderr' => $stderr, 'timed_out' => $timedOut];
+    }
+}
+
 if (!function_exists('pmssTimeoutFireLogPath')) {
     /** Resolve the per-host timeout-fire JSONL path, allowing hermetic tests. */
     function pmssTimeoutFireLogPath(): string
@@ -494,6 +553,18 @@ if (!function_exists('pmssCommandTimeoutTerminate')) {
     }
 }
 
+if (!function_exists('pmssCommandTimeoutClose')) {
+    /** Terminate a timed-out command, close its process handle, and log the timeout event. */
+    function pmssCommandTimeoutClose($process, string $cmd, int $timeoutSec, float $startedAt): int
+    {
+        $signal = pmssCommandTimeoutTerminate($process);
+        @proc_close($process);
+        $exitCode = $signal === 'SIGKILL' ? 137 : 124;
+        pmssTimeoutFireLog($cmd, $timeoutSec, microtime(true) - $startedAt, $signal, $exitCode);
+        return $exitCode;
+    }
+}
+
 if (!function_exists('pmssCommandCapture')) {
     /**
      * Execute a shell command and capture stdout/stderr without streaming.
@@ -537,53 +608,17 @@ if (!function_exists('pmssCommandCapture')) {
             return $abortProcess($process, $pipes, 'proc_open pipes unavailable');
         }
 
-        $stdout = '';
-        $stderr = '';
         $startedAt = microtime(true);
-        $timedOut = false;
-
-        while (!feof($pipes[1]) || !feof($pipes[2])) {
-            $read = [];
-            if (!feof($pipes[1])) {
-                $read[] = $pipes[1];
-            }
-            if (!feof($pipes[2])) {
-                $read[] = $pipes[2];
-            }
-            if (empty($read)) {
-                break;
-            }
-            $write = $except = [];
-            $ready = stream_select($read, $write, $except, 0, 200000);
-            if ($ready === false) {
-                $stderr .= ($stderr !== '' ? "\n" : '').'stream_select failed';
-                break;
-            }
-            foreach ($read as $stream) {
-                $chunk = fread($stream, 8192);
-                if ($chunk === false || $chunk === '') {
-                    continue;
-                }
-                if ($stream === $pipes[1]) {
-                    $stdout .= $chunk;
-                } else {
-                    $stderr .= $chunk;
-                }
-            }
-            if ($timeoutSec > 0 && (microtime(true) - $startedAt) > $timeoutSec) {
-                $timedOut = true;
-                break;
-            }
-        }
+        $capture = pmssCommandOutputPipesDrain($pipes, $timeoutSec, $startedAt, 0, false, 'stream_select failed');
+        $stdout = $capture['stdout'];
+        $stderr = $capture['stderr'];
+        $timedOut = $capture['timed_out'];
 
         $closePipe($pipes[1]);
         $closePipe($pipes[2]);
 
         if ($timedOut) {
-            $signal = pmssCommandTimeoutTerminate($process);
-            @proc_close($process);
-            $rc = $signal === 'SIGKILL' ? 137 : 124;
-            pmssTimeoutFireLog($cmd, $timeoutSec, microtime(true) - $startedAt, $signal, $rc);
+            $rc = pmssCommandTimeoutClose($process, $cmd, $timeoutSec, $startedAt);
             return ['rc' => $rc, 'stdout' => $stdout, 'stderr' => $stderr];
         }
 
@@ -988,10 +1023,7 @@ if (!function_exists('runCommand')) {
             }
 
             if ($timedOut) {
-                $signal = pmssCommandTimeoutTerminate($process);
-                @proc_close($process);
-                $exitCode = $signal === 'SIGKILL' ? 137 : 124;
-                pmssTimeoutFireLog($cmd, $timeoutSec, microtime(true) - $startedAt, $signal, $exitCode);
+                $exitCode = pmssCommandTimeoutClose($process, $cmd, $timeoutSec, $startedAt);
             } else {
                 $exitCode = proc_close($process);
             }
@@ -1024,59 +1056,18 @@ if (!function_exists('runCommand')) {
             return $abortPipeCapture($process, $pipes, 'unable to configure proc_open pipes for command capture: '.$cmd);
         }
 
-        $stdout = '';
-        $stderr = '';
         $maxBuffer = 1048576; // keep ~1MiB tail per stream to avoid RSS explosion
         $startedAt = microtime(true);
-        $timedOut = false;
-
-        while (!feof($pipes[1]) || !feof($pipes[2])) {
-            $read = [];
-            if (!feof($pipes[1])) $read[] = $pipes[1];
-            if (!feof($pipes[2])) $read[] = $pipes[2];
-            if (empty($read)) {
-                break;
-            }
-            $write = $except = [];
-            $ready = stream_select($read, $write, $except, 0, 200000);
-            if ($ready === false) {
-                break;
-            }
-            foreach ($read as $stream) {
-                $chunk = fread($stream, 8192);
-                if ($chunk === false || $chunk === '') {
-                    continue;
-                }
-                if ($stream === $pipes[1]) {
-                    $stdout .= $chunk;
-                    if (strlen($stdout) > $maxBuffer) {
-                        $stdout = substr($stdout, -$maxBuffer);
-                    }
-                    echo $chunk;
-                    fflush(STDOUT);
-                } else {
-                    $stderr .= $chunk;
-                    if (strlen($stderr) > $maxBuffer) {
-                        $stderr = substr($stderr, -$maxBuffer);
-                    }
-                    fwrite(STDERR, $chunk);
-                    fflush(STDERR);
-                }
-            }
-            if ($timeoutSec > 0 && (microtime(true) - $startedAt) > $timeoutSec) {
-                $timedOut = true;
-                break;
-            }
-        }
+        $capture = pmssCommandOutputPipesDrain($pipes, $timeoutSec, $startedAt, $maxBuffer, true);
+        $stdout = $capture['stdout'];
+        $stderr = $capture['stderr'];
+        $timedOut = $capture['timed_out'];
 
         fclose($pipes[1]);
         fclose($pipes[2]);
 
         if ($timedOut) {
-            $signal = pmssCommandTimeoutTerminate($process);
-            @proc_close($process);
-            $exitCode = $signal === 'SIGKILL' ? 137 : 124;
-            pmssTimeoutFireLog($cmd, $timeoutSec, microtime(true) - $startedAt, $signal, $exitCode);
+            $exitCode = pmssCommandTimeoutClose($process, $cmd, $timeoutSec, $startedAt);
         } else {
             $exitCode = proc_close($process);
         }
