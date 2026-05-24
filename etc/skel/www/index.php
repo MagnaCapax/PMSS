@@ -238,6 +238,33 @@ function pmssLocalFrameProxyAppFramesRead($customDir = '../.lighttpd/custom.d', 
     return $frames;
 }
 
+/**
+ * Discover app tabs from customer-owned config directories when proxy fragments
+ * have not been regenerated yet.
+ *
+ * @return array<string,array<string,string>>
+ */
+function pmssLocalFrameInstalledAppFramesRead($homePath = '..')
+{
+    $frames = array();
+    $definitions = pmssLocalFrameProxyAppDefinitions(pmssLocalFrameCurrentUserRead($homePath));
+    $signals = array(
+        'qbittorrent' => '.config/qBittorrent',
+        'deluge' => '.config/deluge',
+    );
+
+    foreach ($signals as $app => $relativePath) {
+        if (!isset($definitions[$app]) || $definitions[$app]['url'] === '') {
+            continue;
+        }
+        if (is_dir(rtrim($homePath, '/').'/'.$relativePath)) {
+            $frames[$app] = $definitions[$app];
+        }
+    }
+
+    return $frames;
+}
+
 // Remote frames can be disabled explicitly for debugging or fully offline
 // deployments by exporting PMSS_DISABLE_REMOTE_FRAMES=1.
 if (!getenv('PMSS_DISABLE_REMOTE_FRAMES')) {
@@ -395,6 +422,11 @@ if (file_exists('../.customFrames')) {
         );
     }
     $file = null;
+}
+foreach (pmssLocalFrameInstalledAppFramesRead() as $app => $frame) {
+    if (!isset($frames[$app]) && !isset($frameData[$app])) {
+        $frameData[$app] = $frame;
+    }
 }
 foreach (pmssLocalFrameProxyAppFramesRead() as $app => $frame) {
     if (!isset($frames[$app]) && !isset($frameData[$app])) {

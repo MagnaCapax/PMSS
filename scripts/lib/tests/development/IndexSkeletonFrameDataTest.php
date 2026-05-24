@@ -197,6 +197,22 @@ class IndexSkeletonFrameDataTest extends TestCase
         $this->assertStringContainsString("loadFrame('deluge', 'deluge/')", $html);
     }
 
+    public function testRemoteDisabledRenderAddsTorrentFramesFromLocalConfigDirs(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-index-config-root-', 0755);
+        $home = $root.'/alice';
+        @mkdir($home.'/www', 0755, true);
+        @mkdir($home.'/.config/qBittorrent', 0755, true);
+        @mkdir($home.'/.config/deluge', 0755, true);
+
+        $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+
+        $this->assertStringContainsString('<a href="#qbittorrent"', $html);
+        $this->assertStringContainsString("loadFrame('qbittorrent', 'qbittorrent/')", $html);
+        $this->assertStringContainsString('<a href="#deluge"', $html);
+        $this->assertStringContainsString("loadFrame('deluge', 'deluge/')", $html);
+    }
+
     public function testRemoteDisabledRenderAddsMediaStackFramesFromProxyFragment(): void
     {
         $root = $this->pmssMakeTempDir('pmss-index-media-root-', 0755);
