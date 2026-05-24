@@ -1267,6 +1267,10 @@ if (!function_exists('pmssRunCliEntrypointWithArgv')) {
         });
     }
 }
+if (!function_exists('pmssRunCliProcessorEntrypoint')) {
+    // Run a processor object exposing runCli($argv, $scriptPath) as a CLI entrypoint.
+    function pmssRunCliProcessorEntrypoint(string $scriptPath, object $processor): void { pmssRunCliEntrypointWithArgv($scriptPath, static function (array $argv) use ($processor, $scriptPath): int { return (int) $processor->runCli($argv, (string) ($argv[0] ?? $scriptPath)); }); }
+}
 
 if (!function_exists('pmssSnapshotLogOpen')) {
     /**

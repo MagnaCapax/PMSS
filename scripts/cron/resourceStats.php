@@ -9,6 +9,4 @@
 
 require_once '/scripts/lib/resources/processor.php';
 
-$processor = new ResourceStatsProcessor(new resourceStatistics());
-
-pmssRunCliEntrypointWithArgv(__FILE__, static function (array $argv) use ($processor): int { return $processor->runCli($argv, (string) ($argv[0] ?? __FILE__)); });
+pmssRunCliProcessorEntrypoint(__FILE__, new ResourceStatsProcessor(new resourceStatistics()));

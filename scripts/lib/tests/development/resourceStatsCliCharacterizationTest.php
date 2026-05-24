@@ -8,8 +8,8 @@ final class resourceStatsCliCharacterizationTest extends TestCase
 {
     public function testCliFlowSharesProcessorHelpers(): void
     {
-        $this->pmssAssertRepoFileContainsString('scripts/cron/resourceStats.php', 'pmssRunCliEntrypointWithArgv(__FILE__, static function (array $argv) use ($processor): int');
-        $this->pmssAssertRepoFileContainsString('scripts/cron/resourceStats.php', 'return $processor->runCli($argv, (string) ($argv[0] ?? __FILE__));');
+        $this->pmssAssertRepoFileContainsString('scripts/cron/resourceStats.php', 'pmssRunCliProcessorEntrypoint(__FILE__, new ResourceStatsProcessor(new resourceStatistics()))');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/runtime.php', 'function pmssRunCliProcessorEntrypoint(string $scriptPath, object $processor): void');
         $this->pmssAssertRepoFileNotContainsString('scripts/cron/resourceStats.php', 'pmssCliUserArgSanitize(');
         $this->pmssAssertRepoFileNotContainsString('scripts/cron/resourceStats.php', "\$processor->spawnWorkers(\$_SERVER['argv'][0], \$users);");
         foreach (['scripts/lib/resources/processor.php', 'scripts/lib/traffic/processor.php'] as $path) {
