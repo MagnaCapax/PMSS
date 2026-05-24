@@ -31,8 +31,8 @@ class UserCgroupCliProfilesCombinationsTest extends TestCase
     {
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--cpu-profile=low', '--tasks-profile=high', '--mem-profile=heavy']);
 
-        $this->assertStringContainsString("MemoryHigh=1024M\nMemoryMax=1280M\nCPUWeight=50\nIOWeight=256\nTasksMax=8192", $out);
-        $this->assertSame('94a4e64e1495da496a4dd1d79b245e2316c5b56fcb3258ddcf55e27d290ccb3a', hash('sha256', $out));
+        $this->assertStringContainsString("MemoryHigh=1024M\nMemoryMax=1280M\nCPUWeight=50\nIOWeight=200\nTasksMax=8192", $out);
+        $this->assertSame('eb53ce76e44dd770c4cf49c9d967c6d079c48bf705c60af09ce151e77e2e3c04', hash('sha256', $out));
     }
 
     public function testExplicitIoWeightOverridesProfile(): void

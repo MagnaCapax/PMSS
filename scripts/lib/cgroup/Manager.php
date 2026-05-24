@@ -312,10 +312,10 @@ class Manager
 
         $derivedWeight = $memoryHighMiB !== null ? self::calculateWeightFromMemory($memoryHighMiB) : null;
 
-        // CPU and IO weights derive from the same MemoryHigh curve unless explicitly set.
+        // CPU keeps the full MemoryHigh curve; derived IOWeight stops at the BFQ-effective ceiling.
         foreach ([
             'cpu-weight' => ['CPUWeight', $derivedWeight],
-            'io-weight' => ['IOWeight', $derivedWeight],
+            'io-weight' => ['IOWeight', $derivedWeight !== null ? min($derivedWeight, 200) : null],
             'tasks-max' => ['TasksMax', null],
         ] as $option => $target) {
             if (isset($opts[$option])) {

@@ -77,10 +77,12 @@ class CgroupWeightTest extends \PMSS\Tests\TestCase
             $ramMiB   = (int)($ramBytes / 1024 / 1024);
             
             $expected = Manager::calculateWeightFromMemory($ramMiB);
+            // Derived IOWeight is capped at the BFQ-effective ceiling; CPUWeight keeps the full curve.
+            $expectedIoWeight = min($expected, 200);
             
             // 7. Assert
             $this->assertEquals($expected, (int)$props['CPUWeight'], "CPUWeight mismatch for $user (RAM: {$ramMiB}MiB)");
-            $this->assertEquals($expected, (int)$props['IOWeight'], "IOWeight mismatch for $user (RAM: {$ramMiB}MiB)");
+            $this->assertEquals($expectedIoWeight, (int)$props['IOWeight'], "IOWeight mismatch for $user (RAM: {$ramMiB}MiB)");
             
             $checked++;
         }
