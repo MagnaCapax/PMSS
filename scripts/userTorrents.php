@@ -48,7 +48,6 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
 }
 
 pmssRunCliEntrypointWithArgv(__FILE__, static function (array $argv): int {
-    // Options.
     $parsed = pmssParseCliTokens($argv);
     if (pmssCliOptionPresent($parsed, 'help')) {
         $self = basename(__FILE__);
@@ -61,7 +60,6 @@ pmssRunCliEntrypointWithArgv(__FILE__, static function (array $argv): int {
     $byClient = pmssCliOptionPresent($parsed, 'by-client');
     $homeDir = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
 
-    // Get & parse users list.
     if (($users = pmssListManagedUsersFromCommand(__DIR__.'/listUsers.php')) === null) {
         exit(1);
     }

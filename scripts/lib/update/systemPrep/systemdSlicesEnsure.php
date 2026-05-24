@@ -179,13 +179,11 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         if ($sawLegacyVendorDropin || is_file($shadowPath)) {
             $shadow = "# PMSS: override legacy TasksMax cap (shadow 99-pmss.conf)\n[Slice]\nTasksMax=".$tasksMax."\n";
             $existing = @file_get_contents($shadowPath);
-            if ($existing === false || trim((string) $existing) !== trim($shadow)) {
-                if (@file_put_contents($shadowPath, $shadow) !== false) {
-                    @chmod($shadowPath, 0644);
-                    $log('Installed '.$shadowPath.' TasksMax override (legacy shadow)');
-                } else {
-                    $log('[WARN] Failed to write '.$shadowPath.' TasksMax override (legacy shadow)');
-                }
+            if (
+                ($existing === false || trim((string) $existing) !== trim($shadow))
+                && pmssWriteManagedPathFile($shadowPath, $shadow, 'systemd drop-in', $log, null, null, 0644, '[WARN] Failed to write '.$shadowPath.' TasksMax override (legacy shadow)')
+            ) {
+                $log('Installed '.$shadowPath.' TasksMax override (legacy shadow)');
             }
         }
 
@@ -218,8 +216,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         // Use a suffix that sorts after legacy 99-pmss.conf drop-ins so root
         // remains unlimited even when a stale vendor file exists.
         $rootDrop = $rootDir.'/99-zz-pmss-unlimited.conf';
-        @file_put_contents($rootDrop, "[Slice]\nMemoryHigh=infinity\nMemoryMax=infinity\nTasksMax=infinity\n");
-        @chmod($rootDrop, 0644);
+        pmssWriteManagedPathFile($rootDrop, "[Slice]\nMemoryHigh=infinity\nMemoryMax=infinity\nTasksMax=infinity\n", 'systemd root slice drop-in', $log, null, null, 0644, '[WARN] Failed to install root slice drop-in '.$rootDrop);
         @unlink($rootDir.'/99-pmss-unlimited.conf');
         if ($skipSystemctl) {
             pmssLogStatus('SKIP', 'Reloading systemd manager configuration (root slice, test mode)', 0);

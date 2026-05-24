@@ -255,10 +255,8 @@ function detectDistroCodename(): array
         if ($version !== '') {
             $parts = explode('.', $version);
             $major = $parts[0];
-            if ($major === '10') $codename = 'buster';
-            elseif ($major === '11') $codename = 'bullseye';
-            elseif ($major === '12') $codename = 'bookworm';
-            elseif ($major === '13') $codename = 'trixie';
+            $codenameByMajor = ['10' => 'buster', '11' => 'bullseye', '12' => 'bookworm', '13' => 'trixie'];
+            $codename = $codenameByMajor[$major] ?? $codename;
         }
     }
 
@@ -342,9 +340,6 @@ function updateUsage(string $script): void
     echo "  {$script} --scripts-only            # refresh scripts/skel only; never runs apt/apt-get\n";
 }
 
-/**
- * Parse CLI arguments.
- */
 /**
  * Parse CLI arguments for the bootstrap updater.
  *
@@ -978,12 +973,7 @@ function runUpdateStep2(bool $dryRun): void
     $details = ['status' => $status, 'rc' => $rc, 'duration' => $duration];
     if ($rc !== 0 && $rc >= 128 && $rc <= 255) {
         $signal = $rc - 128;
-        $name   = '';
-        if ($signal === 9) {
-            $name = 'SIGKILL';
-        } elseif ($signal === 15) {
-            $name = 'SIGTERM';
-        }
+        $name   = [9 => 'SIGKILL', 15 => 'SIGTERM'][$signal] ?? '';
         $details['signal']      = $signal;
         $details['signal_name'] = $name;
 

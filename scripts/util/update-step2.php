@@ -270,10 +270,9 @@ function pmssUpdateStep2RegisterWebRefreshShutdownGuard(): void
         }
 
         $error = error_get_last();
-        $reason = 'early_exit';
-        if (is_array($error) && isset($error['message']) && is_string($error['message']) && $error['message'] !== '') {
-            $reason = $error['message'];
-        }
+        $reason = (is_array($error) && is_string($error['message'] ?? null) && $error['message'] !== '')
+            ? $error['message']
+            : 'early_exit';
 
         logmsg('[WARN] update-step2 exited before final nginx refresh; attempting rescue run (reason: '.$reason.')');
         pmssLogJson([
@@ -489,8 +488,6 @@ pmssRunProfiledCallable('Pruning legacy MediaArea repository entries', 'pmssPrun
 // -------------------------------------------------------------------------------------------
 
 runStep('Attempting apt fix-broken install (pre-package phase)', aptCmd('--fix-broken install -y'));
-// Ensure core packaging tools are current before bootstrapping third-party repos
-// This is now handled by the main repo refresh + dpkg baseline to avoid redundant updates.
 pmssRunProfiledCallable('Refreshing package repositories', 'pmssRefreshRepositories', [$distroName, $effectiveRepoVersion, 'logmsg']);
 pmssRunProfiledCallable('Completing pending dpkg configurations', 'pmssCompletePendingDpkg');
 $dpkgBaselineOk = pmssRunProfiledCallable('Applying distro dpkg baseline selections', 'pmssApplyDpkgSelections', [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, true]);
@@ -585,7 +582,6 @@ pmssRunProfiledCallable('Applying boot-time tuning', 'pmssEnsureBootTuning', ['l
 pmssRunProfiledCallable('Configuring root shell defaults', 'pmssConfigureRootShellDefaults', ['logmsg']);
 runStep('Restricting world access to /home', 'chmod o-rw /home');
 
-// --- Basic system preparation ---
 pmssRunProfiledCallable('Ensuring cgroup configuration', 'pmssEnsureCgroupsConfigured', ['logmsg']);
 pmssRunProfiledCallable('Ensuring systemd slices', 'pmssEnsureSystemdSlices', ['logmsg']);
 runStep('Resetting /etc/seedbox permissions', 'chmod -R 755 /etc/seedbox');
@@ -674,8 +670,6 @@ if (is_array($userMaintenanceSummary)) {
         );
     }
 }
-// Per-user maintenance now owns crontab restores, htpasswd sync, and lighttpd instance checks.
-
 // Ensure the standard download speed test file exists
 $testfilePath = '/var/www/testfile';
 if (!file_exists($testfilePath) || filesize($testfilePath) !== 104857600) {

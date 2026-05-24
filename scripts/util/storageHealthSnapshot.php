@@ -27,11 +27,9 @@ function pmssStorageHealthSnapshotMain(array $argv): int
     $logDir = dirname($logPath);
     $logDirError = null;
     if (!pmssLogWriteDirectoryPrepare($logDir, 0755, $logDirError)) {
-        if ($logDirError === 'create') {
-            fwrite(STDERR, "Failed to create storage health log directory {$logDir}\n");
-            return 1;
-        }
-        fwrite(STDERR, "Refusing unsafe storage health log path {$logPath}\n");
+        fwrite(STDERR, $logDirError === 'create'
+            ? "Failed to create storage health log directory {$logDir}\n"
+            : "Refusing unsafe storage health log path {$logPath}\n");
         return 1;
     }
     if (!pmssLogWritePathIsSafe($logPath)) {

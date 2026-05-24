@@ -95,11 +95,9 @@ function pmssCreateSuspendedLanding(string $homeDir, string $username): bool
         echo "Failed to create {$suspendRoot}\n";
         return false;
     }
-    if (!is_dir($publicDir)) {
-        if (!pmssDirEnsureExists($publicDir, 0755)) {
-            echo "Failed to create {$publicDir}\n";
-            return false;
-        }
+    if (!pmssDirEnsureExists($publicDir, 0755)) {
+        echo "Failed to create {$publicDir}\n";
+        return false;
     }
 
     $templatePath = '/etc/seedbox/config/template.suspended.notice.html';

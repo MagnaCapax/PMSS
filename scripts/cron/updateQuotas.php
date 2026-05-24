@@ -14,8 +14,6 @@
  *
  * @license GPL-3.0-only
  */
-// Update & check user quota information
-
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/userLifecycle.php';
 require_once __DIR__.'/../lib/quotaSnapshot.php';
@@ -34,7 +32,6 @@ function pmssQuotaSnapshotWrite(string $path, string $content, int $mode = 0644)
 }
 
 $logger->msg('Updating quota information');
-// Get & parse users list
 $users = pmssListManagedUsers('/scripts/listUsers.php');
 
 // Keep the structured quota event payload and the optional per-user log line in
