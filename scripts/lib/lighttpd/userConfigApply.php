@@ -424,7 +424,7 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
         'rclone' => ["# PMSS-managed: rclone reverse proxy.\n\n", [['^/user-'.$user.'/rclone/', [], true, false, true]]],
         'qbittorrent' => [
             "# PMSS-managed: qBittorrent reverse proxy.\n\n",
-            [['^/user-'.$user.'/qbittorrent/', ['/user-'.$user.'/qbittorrent/' => '/', '/user-'.$user.'/qbittorrent' => ''], false, true]],
+            [['^/user-'.$user.'/qbittorrent($|/)', ['/user-'.$user.'/qbittorrent/' => '/', '/user-'.$user.'/qbittorrent' => ''], false, true]],
         ],
         'invidious' => [
             "# PMSS-managed: Invidious reverse proxy.\n\n",
