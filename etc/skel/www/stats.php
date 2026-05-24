@@ -35,9 +35,58 @@ if (!function_exists('pmssInfoShellExec')) {
     }
 }
 
-$pmssWebDockerInactiveNoteLib = __DIR__.'/webDockerInactiveNote.php';
-if (file_exists($pmssWebDockerInactiveNoteLib)) {
-    require_once $pmssWebDockerInactiveNoteLib;
+if (!function_exists('pmssStatsDockerInactiveNote')) {
+    /**
+     * Build the Docker inactive note shown beside the Docker app status.
+     */
+    function pmssStatsDockerInactiveNote(
+        string $dockerStatus,
+        ?bool $dockerEnabledPolicy,
+        string $osReleasePath = '/etc/os-release',
+        string $debianVersionPath = '/etc/debian_version',
+        string $cmdlinePath = '/proc/cmdline'
+    ): string {
+        if ($dockerStatus !== 'inactive') {
+            return '';
+        }
+
+        $cmdline = (string) @file_get_contents($cmdlinePath);
+        if (strpos($cmdline, 'unified_cgroup_hierarchy=0') !== false) {
+            if ($dockerEnabledPolicy === false) {
+                return ' (Docker is available but currently disabled by policy. Contact support if it should be enabled.)';
+            }
+
+            return $dockerEnabledPolicy === true
+                ? ' (Docker is enabled by policy but not currently running. Contact support if it should be restarted.)'
+                : ' (Docker is available but not currently running. Contact support if it should be enabled for this account.)';
+        }
+
+        $debianLabel = 'Debian';
+        $osRelease = @parse_ini_file($osReleasePath);
+        if (is_array($osRelease)) {
+            $versionId = trim((string) ($osRelease['VERSION_ID'] ?? ''));
+            if ($versionId !== '') {
+                $debianLabel = preg_match('/^([0-9]+)/', $versionId, $matches) === 1
+                    ? 'Debian '.$matches[1]
+                    : 'Debian '.$versionId;
+            }
+        }
+        if ($debianLabel === 'Debian') {
+            $debianVersion = trim((string) @file_get_contents($debianVersionPath));
+            if (preg_match('/^([0-9]+)/', $debianVersion, $matches) === 1) {
+                $debianLabel = 'Debian '.$matches[1];
+            }
+        }
+
+        return sprintf(
+            ' (%s: User bus restricted. Requires `systemd.unified_cgroup_hierarchy=0` in GRUB. Contact support.)',
+            $debianLabel
+        );
+    }
+}
+
+if (defined('PMSS_STATS_HELPERS_ONLY') && PMSS_STATS_HELPERS_ONLY) {
+    return;
 }
 
 $pmssWebCgroupMemoryStatusLib = __DIR__.'/webCgroupMemoryStatus.php';
@@ -360,9 +409,7 @@ echo htmlspecialchars($ip !== false ? trim($ip) : 'unknown');
         }
     }
     $apps['Docker'] = $dockerStatus;
-    $pmssDockerInactiveNote = function_exists('pmssWebDockerInactiveNote')
-        ? pmssWebDockerInactiveNote($dockerStatus, $pmssDockerEnabledPolicy)
-        : '';
+    $pmssDockerInactiveNote = pmssStatsDockerInactiveNote($dockerStatus, $pmssDockerEnabledPolicy);
     ?>
 
     <div class="status-grid">
