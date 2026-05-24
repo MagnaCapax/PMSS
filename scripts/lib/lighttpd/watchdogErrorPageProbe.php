@@ -114,7 +114,7 @@ function pmssLighttpdWatchdogDetectReason(string $username, string $homeDir, str
         return 'quota';
     }
 
-    if (pmssLighttpdWatchdogRootInodesExhausted('/')) {
+    if (pmssLighttpdWatchdogRootInodesExhausted('/') || pmssLighttpdWatchdogRootInodesExhausted('/home')) {
         return 'inode';
     }
 

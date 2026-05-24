@@ -68,6 +68,29 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         $this->assertSame(1, pmssLighttpdWatchdogParseDfInodeUsePercent($output));
     }
 
+    public function testDetectReasonChecksHomeInodesBeforeConfigFallback(): void
+    {
+        $binDir = $this->pmssMakeTempDir('pmss-watchdog-bin-');
+        $this->pmssWriteExecutableFile($binDir.'/quota', "#!/bin/sh\nexit 1\n");
+        $this->pmssWriteExecutableFile($binDir.'/df', <<<'SH'
+#!/bin/sh
+mount="${2:-/}"
+printf '%s\n' 'Filesystem Inodes IUsed IFree IUse% Mounted on'
+case "$mount" in
+    /home) printf '%s\n' '/dev/home 100 96 4 96% /home' ;;
+    /) printf '%s\n' '/dev/root 100 10 90 10% /' ;;
+    *) printf '%s\n' "/dev/other 100 10 90 10% ${mount}" ;;
+esac
+SH
+        );
+        $homeDir = $this->pmssMakeTempDir('pmss-watchdog-home-');
+
+        $this->pmssWithPathPrefix($binDir, function () use ($homeDir): void {
+            $reason = pmssLighttpdWatchdogDetectReason('alice', $homeDir, $homeDir.'/.lighttpd.conf', true);
+            $this->assertSame('inode', $reason);
+        });
+    }
+
     public function testRenderErrorPageIncludesSpecificStatusAndHomeLink(): void
     {
         $contents = pmssLighttpdWatchdogRenderErrorPage('quota');
