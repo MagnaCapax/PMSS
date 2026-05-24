@@ -18,6 +18,11 @@ class Manager
     private const IO_CLI_PROPERTY_MAP = ['io-read-bw' => 'IOReadBandwidthMax', 'io-write-bw' => 'IOWriteBandwidthMax', 'io-read-iops' => 'IOReadIOPSMax', 'io-write-iops' => 'IOWriteIOPSMax'];
     private const IO_POLICY_DEFAULT_MAP = ['ioWeight' => 'io-weight', 'cpuWeight' => 'cpu-weight', 'tasksMax' => 'tasks-max'];
     private const IO_POLICY_LIMIT_MAP = ['readBw' => ['IOReadBandwidthMax', false], 'writeBw' => ['IOWriteBandwidthMax', false], 'readIops' => ['IOReadIOPSMax', true], 'writeIops' => ['IOWriteIOPSMax', true]];
+    private const NUMERIC_PROFILE_MAP = [
+        'cpu' => ['cpu-profile', 'cpu-weight', '100', ['low' => '50', 'high' => '300']],
+        'tasks' => ['tasks-profile', 'tasks-max', '4096', ['low' => '1024', 'high' => '8192']],
+        'mem' => ['mem-profile', 'memory-high', '500', ['low' => '250', 'heavy' => '1024']],
+    ];
 
     /** @var SystemInterface */
     private $sys;
@@ -481,24 +486,10 @@ class Manager
 
     private function expandProfiles(array &$opt): void
     {
-        $cpuWeights = $this->resolveNumericProfiles('cpu', [
-            'low'  => '50',
-            'high' => '300',
-        ]);
-
-        $tasksMax = $this->resolveNumericProfiles('tasks', [
-            'low'  => '1024',
-            'high' => '8192',
-        ]);
-
-        $memoryHigh = $this->resolveNumericProfiles('mem', [
-            'low'   => '250',
-            'heavy' => '1024',
-        ]);
-
-        $this->applyNumericProfileOption($opt, 'cpu-profile', 'cpu-weight', $cpuWeights, '100');
-        $this->applyNumericProfileOption($opt, 'tasks-profile', 'tasks-max', $tasksMax, '4096');
-        $this->applyNumericProfileOption($opt, 'mem-profile', 'memory-high', $memoryHigh, '500');
+        $policy = $this->loadPolicy();
+        foreach (self::NUMERIC_PROFILE_MAP as $family => $profile) {
+            $this->applyNumericProfileOption($opt, $profile[0], $profile[1], $this->resolveNumericProfiles($policy, $family, $profile[3]), $profile[2]);
+        }
     }
 
     /** Apply a named numeric profile only when the explicit target is absent. */
@@ -518,10 +509,9 @@ class Manager
     /**
      * Resolve numeric profile maps from policy, preserving built-in defaults.
      */
-    private function resolveNumericProfiles(string $family, array $defaults): array
+    private function resolveNumericProfiles(array $policy, string $family, array $defaults): array
     {
         $resolved = $defaults;
-        $policy = $this->loadPolicy();
 
         if (!isset($policy['profiles']) || !is_array($policy['profiles'])) {
             return $resolved;
