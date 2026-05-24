@@ -189,6 +189,24 @@ if [[ "$dry_run" != "1" && -s "$COMMITS_FILES" ]]; then
 	fi
 fi
 
+# Whole-codebase candidates for architectural modes (decompose / dry-consolidate).
+# These modes must attack the BIGGEST/oldest files, not just recent-commit churn. The
+# "Target the WHOLE codebase" prompt line alone was a text gate that did nothing — codex
+# only ever saw the recent-commit candidate list, so behemoths (environment.php, runtime.php,
+# update.php, ...) were never offered. This MECHANICALLY feeds the largest runtime PHP files.
+if [[ "$dry_run" != "1" ]] && printf '%s' "$custom_prompt" | grep -qE 'refactor\((decompose|dry)\):'; then
+	WHOLE_N="${PMSS_REFACTOR_WHOLE_N:-15}"
+	{ git -C "$ROOT" ls-files '*.php' 2>/dev/null |
+		grep -E '^(scripts|etc/skel/www)/' |
+		grep -vE '/(tests|testing|rutorrent)/' |
+		while IFS= read -r f; do
+			[[ -f "$ROOT/$f" ]] && printf '%s %s\n' "$(wc -l <"$ROOT/$f" 2>/dev/null || echo 0)" "$f"
+		done |
+		sort -rn | head -n "$WHOLE_N" | awk '{print $2}'; } >>"$CANDIDATES" || true
+	sort -u "$CANDIDATES" -o "$CANDIDATES" 2>/dev/null || true
+	echo "[agentic-refactor] whole-codebase mode: added up to $WHOLE_N largest runtime PHP files to candidates" >&1
+fi
+
 # Ensure advisory complexity snapshots exist (best-effort).
 if [[ "$dry_run" != "1" && -x "$ROOT/development/loc.sh" ]]; then
 	echo "[agentic-refactor] generating LOC snapshot via development/loc.sh" >&1

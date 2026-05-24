@@ -183,7 +183,11 @@ if [[ "$exec_bin" == "codex" && "${PMSS_CODEX_NO_SANDBOX:-0}" != "1" ]]; then
 	if [[ "$exec_cmd" == "codex" ]]; then
 		exec_cmd="codex --sandbox workspace-write --add-dir .git --ask-for-approval untrusted"
 	elif [[ "$is_codex_exec" == "1" && "$exec_cmd" == "codex exec" ]]; then
-		exec_cmd="codex exec --sandbox workspace-write --add-dir .git"
+		# danger-full-access lets codex write .git/index.lock and commit DIRECTLY.
+		# workspace-write + --add-dir .git did NOT reliably permit the commit, which spawned
+		# the parent-shell "git add -A" fallback antipattern (since removed) that destroyed
+		# mode attribution. Operator-accepted sandbox choice (c8f7b21f, 2026-05-14).
+		exec_cmd="codex exec --sandbox danger-full-access"
 	else
 		[[ "$exec_cmd" == *"--sandbox"* ]] || exec_cmd+=" --sandbox danger-full-access"
 		if [[ "$is_codex_exec" == "0" ]]; then
@@ -220,6 +224,15 @@ if [[ "$autocommit" == "1" ]]; then
 	qa) commit_prefix="fix:" ;;
 	*) commit_prefix="fix:" ;;
 	esac
+
+	# Mode-aware prefix: refactor runs embed the selected mode's prefix in the prompt
+	# (e.g. 'COMMIT PREFIX OVERRIDE: Use "refactor(decompose):" as commit prefix.'). Honor it
+	# so commit attribution reflects the ACTUAL mode (decompose/dry/safety), not the filename
+	# default. Absent (build/issues/qa prompts) -> keep the filename-derived default above.
+	if [[ -n "$custom_prompt" ]]; then
+		mode_prefix="$(printf '%s' "$custom_prompt" | grep -oE 'COMMIT PREFIX OVERRIDE: Use "[^"]+"' | head -1 | sed -E 's/.*Use "([^"]+)".*/\1/')"
+		[[ -n "$mode_prefix" ]] && commit_prefix="$mode_prefix"
+	fi
 
 	cat <<EOF >>"$prompt_out"
 
@@ -278,10 +291,9 @@ COMMIT MESSAGE RULE (PUBLIC REPO — BINDING):
   Use generic descriptions: "user account", "target server", "the affected host".
   The push wrapper scans commit messages and BLOCKS push if violations found.
 
-PUSH after each commit (best-effort — sandbox may still block network):
+PUSH after each commit:
   git push origin HEAD
-  Sandbox defaults can also block writes under .git in workspace-write mode; codex-run adds --add-dir .git to allow autocommit.
-  If push fails (sandbox/network): continue. Wrapper pushes after session.
+  The danger-full-access sandbox permits .git writes and network, so commit and push work directly.
   If rejected (remote ahead): git pull --rebase origin main → re-verify → push.
   NEVER force push.
 
@@ -290,12 +302,13 @@ STOP CONDITIONS:
   - Architectural issue found → STOP
   - Unsure → STOP
   - Context feels exhausted (many files read, long session) → STOP
-  - Cumulative LOC delta > 0 → STOP (refactor mode)
+  - Cumulative LOC delta > 0 → STOP (refactor modes EXCEPT refactor(safety):, which is allowed to add LOC for safety rails)
   - Failure count not strictly decreasing → STOP (CI mode)
 
-REFACTOR ITERATION (when prefix = refactor(compression)):
-After each commit: print cumulative runtime LOC delta + concepts delta.
-If cumulative LOC delta > 0: STOP. If 2 cycles found nothing: STOP.
+REFACTOR ITERATION (ALL refactor modes — compression, decompose, dry, safety):
+After EACH commit: ALWAYS print cumulative runtime LOC delta + concepts delta. Every mode, no exceptions —
+this visibility is mandatory so the run's net effect is observable regardless of prefix.
+If cumulative LOC delta > 0 AND PREFIX is not refactor(safety): STOP. If 2 cycles found nothing: STOP.
 If context exhausted: STOP. Otherwise: pick 5-10 new targets → implement → verify → commit.
 Maximum 15 cycles per session. One commit per cycle.
 
@@ -348,13 +361,6 @@ invoke_start_ms="$(codex_now_ms)"
 codex_emit_event_jsonl "$event_log" "assistant_invoke_start" "info" "invoke" "$run_id" "" "" \
 	"exec=${exec_cmd%% *}"
 
-# Capture HEAD before invocation so we can detect "codex modified files but failed
-# to commit" sandbox-blocker pattern and fall back to a parent-shell commit.
-head_before_invoke=""
-if command -v git >/dev/null 2>&1 && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-	head_before_invoke="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
-fi
-
 set +e
 codex_invoke "$exec_cmd" "$prompt_out"
 invoke_rc=$?
@@ -388,61 +394,15 @@ if ! codex_scan_commit_messages_for_pii "$ROOT"; then
 		"PII-like data detected in unpushed commit messages"
 fi
 
-# Sandbox commit fallback: codex's workspace-write sandbox can block .git/index.lock
-# creation despite --add-dir .git, leaving codex-implemented changes uncommitted.
-# Frozen paths and PII have been scanned/reverted/warned above; the parent shell
-# runs outside the sandbox and can commit. Risk profile is identical to what
-# codex would have committed directly.
-if [[ "$autocommit" == "1" ]] && command -v git >/dev/null 2>&1 \
-	&& git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-	head_after_invoke="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
-	dirty_status="$(git -C "$ROOT" status --porcelain 2>/dev/null || true)"
-	if [[ -n "$head_before_invoke" && "$head_after_invoke" == "$head_before_invoke" \
-		&& -n "$dirty_status" ]]; then
-		echo "[codex-run] codex implemented changes but did not commit (sandbox blocker); parent-shell fallback engaged" >&1
-		codex_emit_event_jsonl "$event_log" "fallback_commit_start" "warn" "fallback_commit" "$run_id" "" "" \
-			"codex produced uncommitted changes; parent-shell fallback engaged"
-
-		issue_ref=""
-		if [[ -f "$prompt_out" ]]; then
-			issue_ref="$(grep -oE 'Refs #[0-9]+' "$prompt_out" 2>/dev/null | sort -u | head -1 || true)"
-		fi
-		[[ -z "${commit_prefix:-}" ]] && commit_prefix="fix:"
-
-		git -C "$ROOT" add -A 2>&1 | tail -3
-
-		commit_subject="${commit_prefix} codex sandbox commit fallback"
-		[[ -n "$issue_ref" ]] && commit_subject="${commit_subject} (${issue_ref})"
-		commit_body="Codex implemented changes but the workspace-write sandbox blocked .git/index.lock; parent shell committed.
-
-Mode: ${autocommit_mode:-general}
-Run ID: ${run_id}
-
-Co-Authored-By: Sampsa Pellervoinen <noreply@pulsedmedia.com>"
-
-		fallback_rc=0
-		git -C "$ROOT" \
-			-c user.name="Sampsa Pellervoinen" \
-			-c user.email="noreply@pulsedmedia.com" \
-			commit -m "${commit_subject}" -m "${commit_body}" 2>&1 | tail -5 || fallback_rc=$?
-
-		if [[ "$fallback_rc" -eq 0 ]]; then
-			echo "[codex-run] fallback commit OK: $(git -C "$ROOT" log -1 --oneline 2>/dev/null)" >&1
-			codex_emit_event_jsonl "$event_log" "fallback_commit_ok" "info" "fallback_commit" "$run_id" "0" "" \
-				"parent-shell commit recovered codex changes"
-			set +e
-			git -C "$ROOT" push origin HEAD 2>&1 | tail -3
-			push_rc=$?
-			set -e
-			codex_emit_event_jsonl "$event_log" "fallback_push_done" "info" "fallback_commit" "$run_id" "$push_rc" "" \
-				"parent-shell push completed (rc=$push_rc; non-zero is best-effort)"
-		else
-			echo "[codex-run] fallback commit FAILED rc=$fallback_rc — leaving working tree dirty" >&2
-			codex_emit_event_jsonl "$event_log" "fallback_commit_fail" "error" "fallback_commit" "$run_id" "$fallback_rc" "" \
-				"parent-shell commit failed; working tree left dirty"
-		fi
-	fi
-fi
+# NOTE: The parent-shell "git add -A" commit fallback that used to live here was REMOVED
+# (2026-05-24). It was an agent-introduced band-aid (2026-05-11, 5d00bc3a) for codex being
+# unable to write .git/index.lock under --sandbox workspace-write. It masked that root cause
+# and destroyed mode attribution — every commit became "refactor(compression): codex sandbox
+# commit fallback" regardless of the actual run mode, with no real change description.
+# Root-cause fix: codex now runs --sandbox danger-full-access and commits DIRECTLY with the
+# correct mode prefix + a real description. If codex makes changes but fails to commit, the
+# working tree is left for the runner's start-guard to triage — untracked files are sacred
+# (never auto-committed, never auto-discarded).
 
 total_duration_ms=$(($(codex_now_ms) - run_start_ms))
 codex_emit_event_jsonl "$event_log" "runner_end" "info" "post_checks" "$run_id" "0" "$total_duration_ms" \
