@@ -137,14 +137,12 @@ function pmssReadTorrentThrottle(string $username): ?int
         if ((int) $stats['uid'] !== 0) {
             return null;
         }
-        if (function_exists('posix_getgrgid')) {
-            $group = @posix_getgrgid((int) $stats['gid']);
-            if (is_array($group) && isset($group['name'])
-                && $group['name'] !== 'root'
-                && $group['name'] !== $username
-            ) {
-                return null;
-            }
+        if (function_exists('posix_getgrgid')
+            && is_array($group = @posix_getgrgid((int) $stats['gid']))
+            && isset($group['name'])
+            && !in_array($group['name'], ['root', $username], true)
+        ) {
+            return null;
         }
     }
 

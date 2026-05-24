@@ -57,22 +57,17 @@ pmssUserLifecycleStep(
     false
 );
 
-if (pmssUserHtpasswdSyncFromShadow($username)) {
-    pmssUserLifecycleContextLogStatusMessage(
-        'unsuspend',
-        'sync_htpasswd_shadow',
-        $username,
-        'OK',
-        'Resynced per-user htpasswd from unlocked shadow hash'
-    );
-} else {
-    pmssUserLifecycleContextLogStatusMessage(
-        'unsuspend',
-        'sync_htpasswd_shadow',
-        $username,
-        'WARN',
-        'Unable to resync per-user htpasswd from unlocked shadow hash'
-    );
+$htpasswdSynced = pmssUserHtpasswdSyncFromShadow($username);
+pmssUserLifecycleContextLogStatusMessage(
+    'unsuspend',
+    'sync_htpasswd_shadow',
+    $username,
+    $htpasswdSynced ? 'OK' : 'WARN',
+    $htpasswdSynced
+        ? 'Resynced per-user htpasswd from unlocked shadow hash'
+        : 'Unable to resync per-user htpasswd from unlocked shadow hash'
+);
+if (!$htpasswdSynced) {
     echo "Warning: unable to resync per-user htpasswd from unlocked shadow hash\n";
 }
 

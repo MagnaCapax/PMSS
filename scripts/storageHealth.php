@@ -179,11 +179,6 @@ function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestam
 }
 
 $jsonPath = '/var/log/pmss/storage-health.jsonl';
-$raw = false;
-$onlyProblems = false;
-$deviceFilter = null;
-$userNoticePath = '';
-$userNoticeRequested = false;
 $defaultNoticePath = getenv('PMSS_STORAGE_USER_NOTICE') ?: '/etc/seedbox/config/storagePerformanceNotice.json';
 
 $parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null));
@@ -202,12 +197,11 @@ if (pmssCliOptionPresent($parsed, 'help', 'h')) {
 $jsonPath = pmssCliOptionString($parsed, 'json', null, $jsonPath) ?? $jsonPath;
 $raw = pmssCliOptionPresent($parsed, 'raw');
 $onlyProblems = pmssCliOptionPresent($parsed, 'only-problems');
-$deviceFilter = pmssCliOptionString($parsed, 'device', null, $deviceFilter);
-
-if (pmssCliOptionPresent($parsed, 'user-notice')) {
-    $userNoticeRequested = true;
-    $userNoticePath = pmssCliOptionString($parsed, 'user-notice', null, $defaultNoticePath) ?? $defaultNoticePath;
-}
+$deviceFilter = pmssCliOptionString($parsed, 'device', null, null);
+$userNoticeRequested = pmssCliOptionPresent($parsed, 'user-notice');
+$userNoticePath = $userNoticeRequested
+    ? (pmssCliOptionString($parsed, 'user-notice', null, $defaultNoticePath) ?? $defaultNoticePath)
+    : '';
 
 if (!is_file($jsonPath)) {
     fwrite(STDERR, "No snapshot file found at {$jsonPath}\n");

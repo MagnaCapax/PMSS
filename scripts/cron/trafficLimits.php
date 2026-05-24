@@ -17,10 +17,6 @@ require_once '/scripts/lib/traffic/storage.php';
 require_once '/scripts/lib/userLifecycle.php';
 require_once '/scripts/lib/user/userConfigStore.php';
 require_once __DIR__.'/../lib/user/trafficLimit.php';
-$userLogDependency = __DIR__.'/../lib/user/log.php';
-if (is_file($userLogDependency)) {
-    require_once $userLogDependency;
-}
 if (!pmssDirEnsureExists('/var/run/pmss/trafficLimits', 0755)) {
     fwrite(STDERR, "Unable to prepare traffic limit runtime directory\n");
     exit(1);
@@ -136,48 +132,38 @@ foreach($users AS $thisUser) {
             continue;
         }
         setRateLimit($thisUser, $effectiveCapMbit);    // Apply rate limiting
-        if (function_exists('pmssUserLog')) {
-            if (is_array($matchedOverageStage)) {
-                pmssUserLog(
-                    $thisUser,
-                    sprintf(
-                        'traffic throttle staged (limit=%.2f GiB usage=%.2f GiB overage=%.1f%% overageGiB=%.2f cap=%d Mbit stageCap=%d Mbit stageOverage=%.1f%% stageMinOverageGiB=%.2f effective=%d Mbit)',
-                        $trafficLimit,
-                        $trafficUsageGiB,
-                        $overagePercent,
-                        $overageGiB,
-                        $trafficCapMbit,
-                        $matchedOverageStage['capMbit'],
-                        $matchedOverageStage['overagePercent'],
-                        $matchedOverageStage['minOverageGiB'],
-                        $effectiveCapMbit
-                    )
-                );
-            } elseif ($progressiveThrottleEnabled) {
-                pmssUserLog(
-                    $thisUser,
-                    sprintf(
-                        'traffic throttle enabled (limit=%.2f GiB usage=%.2f GiB overage=%.1f%% adjusted=%.1f%% cap=%d Mbit effective=%d Mbit floor=%d Mbit)',
-                        $trafficLimit,
-                        $trafficUsageGiB,
-                        $overagePercent,
-                        $adjustedOverage,
-                        $trafficCapMbit,
-                        $effectiveCapMbit,
-                        $floorMbit
-                    )
-                );
-            } else {
-                pmssUserLog(
-                    $thisUser,
-                    sprintf(
-                        'traffic throttle enabled (limit=%.2f GiB usage=%.2f GiB)',
-                        $trafficLimit,
-                        $trafficUsageGiB
-                    )
-                );
-            }
+        if (is_array($matchedOverageStage)) {
+            $trafficLimitLogMessage = sprintf(
+                'traffic throttle staged (limit=%.2f GiB usage=%.2f GiB overage=%.1f%% overageGiB=%.2f cap=%d Mbit stageCap=%d Mbit stageOverage=%.1f%% stageMinOverageGiB=%.2f effective=%d Mbit)',
+                $trafficLimit,
+                $trafficUsageGiB,
+                $overagePercent,
+                $overageGiB,
+                $trafficCapMbit,
+                $matchedOverageStage['capMbit'],
+                $matchedOverageStage['overagePercent'],
+                $matchedOverageStage['minOverageGiB'],
+                $effectiveCapMbit
+            );
+        } elseif ($progressiveThrottleEnabled) {
+            $trafficLimitLogMessage = sprintf(
+                'traffic throttle enabled (limit=%.2f GiB usage=%.2f GiB overage=%.1f%% adjusted=%.1f%% cap=%d Mbit effective=%d Mbit floor=%d Mbit)',
+                $trafficLimit,
+                $trafficUsageGiB,
+                $overagePercent,
+                $adjustedOverage,
+                $trafficCapMbit,
+                $effectiveCapMbit,
+                $floorMbit
+            );
+        } else {
+            $trafficLimitLogMessage = sprintf(
+                'traffic throttle enabled (limit=%.2f GiB usage=%.2f GiB)',
+                $trafficLimit,
+                $trafficUsageGiB
+            );
         }
+        pmssUserLog($thisUser, $trafficLimitLogMessage);
 
     } else if (file_exists($userTrafficLimitEnabledFile)) {     // Now let's see if it's time to remove it?
 
@@ -185,9 +171,7 @@ foreach($users AS $thisUser) {
             if (!pmssTrafficLimitMarkerRemove($thisUser, $userTrafficLimitEnabledFile)) {
                 continue;
             }
-            if (function_exists('pmssUserLog')) {
-                pmssUserLog($thisUser, 'traffic throttle removed after cooldown');
-            }
+            pmssUserLog($thisUser, 'traffic throttle removed after cooldown');
             setRateLimit($thisUser, $trafficCapMbit, false);
 			// Do it second time as removal does not always work for some reason
 			sleep(1);
@@ -203,7 +187,7 @@ foreach($users AS $thisUser) {
 function pmssTrafficLimitLog(string $user, string $message): void
 {
     echo date('Y-m-d H:i:s') . ": {$message}\n";
-    if (function_exists('pmssUserLog') && pmssValidateUsername($user)) {
+    if (pmssValidateUsername($user)) {
         pmssUserLog($user, $message);
     }
 }
