@@ -6,18 +6,23 @@ require_once dirname(__DIR__, 2).'/update/apps/arr.php';
 
 class ArrProbeTimeoutPolicyTest extends TestCase
 {
-    public function testVersionProbeCommandKeepsProwlarrProbeBounded(): void
+    public function testVersionProbeCommandKeepsSafeCommandStringWithoutCustomTimeoutWrapper(): void
     {
         $command = \pmssArrVersionProbeCommand('/opt/Prowlarr/Prowlarr', '--version');
 
         $this->assertStringContainsAllStrings([
-            'timeout --kill-after=5s 50s ',
-            "'/opt/Prowlarr/Prowlarr'",
+            '/opt/Prowlarr/Prowlarr',
             "'--version'",
-            '2>/dev/null',
         ], $command);
-        $legacyTimeout = 'timeout '.'10 ';
-        $this->assertStringNotContainsString($legacyTimeout, $command);
+        $this->assertStringNotContainsString('timeout ', $command);
+    }
+
+    public function testArrVersionProbeRunUsesSharedAppProbe(): void
+    {
+        $probe = $this->pmssMakeTempFile('pmss-arr-probe-');
+        $this->pmssWriteExecutableFile($probe, "#!/usr/bin/env bash\nprintf 'Prowlarr 1.2.3\\n'\n");
+
+        $this->assertSame('Prowlarr 1.2.3', \pmssArrVersionProbeRun($probe, '--version'));
     }
 
     public function testSupportedStarrAppsUseSharedInstallPathPreset(): void

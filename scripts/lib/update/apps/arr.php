@@ -8,7 +8,6 @@
 
 // Bound ARR binary probes so daemonizing applications cannot wedge updates.
 const PMSS_ARR_VERSION_PROBE_TIMEOUT_SECONDS = 50;
-const PMSS_ARR_VERSION_PROBE_KILL_AFTER_SECONDS = 5;
 const PMSS_ARR_APP_BRANCHES = ['Lidarr' => 'develop|master', 'Prowlarr' => 'develop|master', 'Radarr' => 'develop|master', 'Readarr' => 'develop|master', 'Sonarr' => 'main|develop'];
 
 /**
@@ -128,37 +127,19 @@ function pmssArrVersionExtract(string $payload): ?string
         : null;
 }
 
-/** Build a bounded ARR version probe so daemonizing binaries cannot wedge updates. */
+/** Build the shell-safe command used by the shared bounded app probe. */
 function pmssArrVersionProbeCommand(string $binary, string $flag): string
 {
-    return sprintf(
-        'timeout --kill-after=%ds %ds %s %s 2>/dev/null',
-        PMSS_ARR_VERSION_PROBE_KILL_AFTER_SECONDS,
-        PMSS_ARR_VERSION_PROBE_TIMEOUT_SECONDS,
-        escapeshellarg($binary),
-        escapeshellarg($flag)
-    );
+    return function_exists('pmssBuildCommand')
+        ? pmssBuildCommand($binary, [$flag])
+        : escapeshellarg($binary).' '.escapeshellarg($flag);
 }
 
-/** Run an ARR version probe and log timeout fires when the guard trips. */
+/** Run an ARR version probe through the shared app probe timeout path. */
 function pmssArrVersionProbeRun(string $binary, string $flag): string
 {
-    $command = pmssArrVersionProbeCommand($binary, $flag);
-    $startedAt = microtime(true);
-    $output = [];
-    $rc = 0;
-    @exec($command, $output, $rc);
-    if (($rc === 124 || $rc === 137) && function_exists('pmssTimeoutFireLog')) {
-        pmssTimeoutFireLog(
-            $command,
-            PMSS_ARR_VERSION_PROBE_TIMEOUT_SECONDS,
-            microtime(true) - $startedAt,
-            $rc === 137 ? 'SIGKILL' : 'SIGTERM',
-            $rc
-        );
-    }
-
-    return implode("\n", $output);
+    require_once __DIR__.'/remoteBinary.php';
+    return trim(pmssAppVersionProbeOutput(pmssArrVersionProbeCommand($binary, $flag), PMSS_ARR_VERSION_PROBE_TIMEOUT_SECONDS));
 }
 
 /** Prefer cheap version files, then bounded binary probes, to detect installed ARR versions. */

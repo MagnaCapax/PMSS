@@ -170,7 +170,7 @@ class ArrUpdateTest extends TestCase
         }
     }
 
-    public function testUpdateUsesTimeoutWrappedBinaryProbeBeforeSkippingMatchingInstall(): void
+    public function testUpdateUsesSharedBinaryProbeBeforeSkippingMatchingInstall(): void
     {
         $baseDir = $this->pmssMakeTempDir('pmss-arr-update-timeout-probe-');
         $app = 'PmssArrProbe'.bin2hex(random_bytes(3));
@@ -179,30 +179,28 @@ class ArrUpdateTest extends TestCase
         $archivePath = $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'replacement']);
         $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
         $shimDir = $this->writeCurlShim($baseDir);
-        $timeoutLog = $baseDir.'/timeout.log';
+        $probeLog = $baseDir.'/probe.log';
 
         @mkdir($installPath, 0755, true);
         @file_put_contents($installPath.'/marker.txt', 'existing');
-        $this->writeVersionBinary($installPath.'/'.$app, '1.2.3');
-        $this->writeTimeoutShim($shimDir);
+        $this->writeVersionBinary($installPath.'/'.$app, '1.2.3', $probeLog);
 
         try {
             $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
             }, [
-                'PMSS_ARR_TEST_TIMEOUT_LOG' => $timeoutLog,
+                'PMSS_ARR_TEST_PROBE_LOG' => $probeLog,
             ]);
 
             $this->assertEquals('existing', (string) @file_get_contents($installPath.'/marker.txt'));
-            $timeoutOutput = (string) @file_get_contents($timeoutLog);
-            $this->assertStringContainsString('--kill-after=5s 50s '.($installPath.'/'.$app).' --version', $timeoutOutput);
-            $this->assertStringNotContainsString(' -v', $timeoutOutput, 'expected --version probe to satisfy the version check without a fallback probe');
+            $probeLines = file($probeLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+            $this->assertSame(['--version'], $probeLines, 'expected --version probe to satisfy the version check without a fallback probe');
         } finally {
             $this->cleanup($baseDir);
         }
     }
 
-    public function testUpdateReinstallsWhenTimeoutWrappedVersionProbesReturnNoVersion(): void
+    public function testUpdateReinstallsWhenSharedVersionProbesReturnNoVersion(): void
     {
         $baseDir = $this->pmssMakeTempDir('pmss-arr-update-timeout-fallback-');
         $app = 'PmssArrTimeout'.bin2hex(random_bytes(3));
@@ -211,25 +209,22 @@ class ArrUpdateTest extends TestCase
         $archivePath = $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'replacement']);
         $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
         $shimDir = $this->writeCurlShim($baseDir);
-        $timeoutLog = $baseDir.'/timeout.log';
+        $probeLog = $baseDir.'/probe.log';
 
         @mkdir($installPath, 0755, true);
         @file_put_contents($installPath.'/marker.txt', 'existing');
-        $this->writeVersionBinary($installPath.'/'.$app, '9.9.9');
-        $this->writeTimeoutShim($shimDir);
+        $this->writeVersionBinary($installPath.'/'.$app, '', $probeLog);
 
         try {
             $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
             }, [
-                'PMSS_ARR_TEST_TIMEOUT_LOG' => $timeoutLog,
-                'PMSS_ARR_TEST_TIMEOUT_MODE' => 'always-timeout',
+                'PMSS_ARR_TEST_PROBE_LOG' => $probeLog,
             ]);
 
             $this->assertEquals('replacement', (string) @file_get_contents($installPath.'/marker.txt'));
-            $timeoutOutput = (string) @file_get_contents($timeoutLog);
-            $this->assertStringContainsString('--kill-after=5s 50s '.($installPath.'/'.$app).' --version', $timeoutOutput);
-            $this->assertStringContainsString('--kill-after=5s 50s '.($installPath.'/'.$app).' -v', $timeoutOutput);
+            $probeLines = file($probeLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+            $this->assertSame(['--version', '-v'], $probeLines);
         } finally {
             $this->cleanup($baseDir);
         }
@@ -353,35 +348,12 @@ SH
         return $shimDir;
     }
 
-    private function writeVersionBinary(string $path, string $version): void
+    private function writeVersionBinary(string $path, string $version, string $probeLog = ''): void
     {
-        $this->pmssWriteExecutableFile($path, "#!/usr/bin/env bash\nif [ \"\${1:-}\" = \"--version\" ] || [ \"\${1:-}\" = \"-v\" ]; then\n  printf '%s\\n' ".escapeshellarg($version)."\n  exit 0\nfi\nexit 1\n");
-    }
-
-    private function writeTimeoutShim(string $shimDir): void
-    {
-        $timeout = $shimDir.'/timeout';
-        $this->pmssWriteExecutableFile($timeout, <<<'SH'
-#!/usr/bin/env bash
-set -euo pipefail
-printf '%s\n' "$*" >> "${PMSS_ARR_TEST_TIMEOUT_LOG:?}"
-if [ "${PMSS_ARR_TEST_TIMEOUT_MODE:-pass-through}" = "always-timeout" ]; then
-  exit 124
-fi
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --kill-after=*) shift ;;
-    --) shift; break ;;
-    -*) shift ;;
-    *) shift; break ;;
-  esac
-done
-if [ "$#" -lt 1 ]; then
-  exit 125
-fi
-exec "$@"
-SH
-        );
+        $logLine = $probeLog !== ''
+            ? 'printf \'%s\n\' "$*" >> '.escapeshellarg($probeLog)."\n"
+            : '';
+        $this->pmssWriteExecutableFile($path, "#!/usr/bin/env bash\n".$logLine."if [ \"\${1:-}\" = \"--version\" ] || [ \"\${1:-}\" = \"-v\" ]; then\n  printf '%s\\n' ".escapeshellarg($version)."\n  exit 0\nfi\nexit 1\n");
     }
 
     private function cleanupGlob(string $pattern): void
