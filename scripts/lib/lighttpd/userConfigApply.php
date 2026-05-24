@@ -442,6 +442,14 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
     return $fragment;
 }
 
+/** Write one PMSS-managed proxy fragment with the standard owner/mode/error path. */
+function pmssLighttpdWriteManagedProxyFragment(string $proxyName, string $user, int $port, string $path): bool
+{
+    if (pmssWriteUserFile($path, pmssLighttpdManagedProxyFragment($proxyName, $user, $port), $user, 0640)) { return true; }
+    fwrite(STDERR, "[user:{$user}] Failed to write {$proxyName} lighttpd fragment\n");
+    return false;
+}
+
 function pmssUserConfigLighttpdConfigureUser(
     string $thisUser,
     string $portsDirectory,
@@ -493,10 +501,7 @@ function pmssUserConfigLighttpdConfigureUser(
         'rclone' => $rclonePort,
         'qbittorrent' => $qbittorrentPort,
     ] as $proxyName => $proxyPort) {
-        $proxyConfPath = "{$customDir}/pmss-{$proxyName}.conf";
-        if (!pmssWriteUserFile($proxyConfPath, pmssLighttpdManagedProxyFragment($proxyName, $thisUser, $proxyPort), $thisUser, 0640)) {
-            fwrite(STDERR, "[user:{$thisUser}] Failed to write {$proxyName} lighttpd fragment\n");
-        }
+        pmssLighttpdWriteManagedProxyFragment($proxyName, $thisUser, $proxyPort, "{$customDir}/pmss-{$proxyName}.conf");
     }
 
     // Optional Invidious proxy wiring: publish both public and private URLs
@@ -504,9 +509,7 @@ function pmssUserConfigLighttpdConfigureUser(
     $invidiousPort = pmssReadRegularFileInt($homeDir.'/.invidiousPort');
     $invidiousConfPath = $customDir.'/pmss-invidious.conf';
     if ($invidiousPort >= 1024 && $invidiousPort <= 65535) {
-        if (!pmssWriteUserFile($invidiousConfPath, pmssLighttpdManagedProxyFragment('invidious', $thisUser, $invidiousPort), $thisUser, 0640)) {
-            fwrite(STDERR, "[user:{$thisUser}] Failed to write invidious lighttpd fragment\n");
-        }
+        pmssLighttpdWriteManagedProxyFragment('invidious', $thisUser, $invidiousPort, $invidiousConfPath);
     } elseif (is_file($invidiousConfPath) || is_link($invidiousConfPath)) {
         @unlink($invidiousConfPath);
     }
@@ -565,10 +568,7 @@ function pmssUserConfigLighttpdConfigureUser(
         }
     }
     if ($delugeWebPort !== null) {
-        $delugeConfPath = $customDir.'/pmss-deluge.conf';
-        if (!pmssWriteUserFile($delugeConfPath, pmssLighttpdManagedProxyFragment('deluge', $thisUser, $delugeWebPort), $thisUser, 0640)) {
-            fwrite(STDERR, "[user:{$thisUser}] Failed to write deluge lighttpd fragment\n");
-        }
+        pmssLighttpdWriteManagedProxyFragment('deluge', $thisUser, $delugeWebPort, $customDir.'/pmss-deluge.conf');
     }
 
     $props = pmssReadUserSlicePropertiesByUsername(

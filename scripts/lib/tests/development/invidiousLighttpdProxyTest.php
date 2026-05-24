@@ -17,7 +17,7 @@ class InvidiousLighttpdProxyTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/lighttpd/userConfigApply.php', [
             ".invidiousPort",
-            "pmssLighttpdManagedProxyFragment('invidious'",
+            "pmssLighttpdWriteManagedProxyFragment('invidious'",
             "pmss-invidious.conf",
             "@unlink(\$invidiousConfPath);",
         ]);
