@@ -23,24 +23,16 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->assertSame($dir, \pmssWebCgroupMemoryStatusDetectDir(['cgroup_dir' => $dir]));
     }
 
-    public function testClassifyReturnsThrottledWhenAboveHighWithEvents(): void
+    public function testClassifyReturnsExpectedSeverityBands(): void
     {
-        $this->assertClassifiesAs('THROTTLED', ['memory_current' => 2048, 'high_percent' => 200.0, 'throttle_events' => 1]);
-    }
-
-    public function testClassifyReturnsHighNearLimitWithoutThrottle(): void
-    {
-        $this->assertClassifiesAs('HIGH', ['memory_current' => 950, 'usage_percent' => 95.0, 'high_percent' => 95.0]);
-    }
-
-    public function testClassifyReturnsMediumAtElevatedUsage(): void
-    {
-        $this->assertClassifiesAs('MEDIUM', ['memory_current' => 800, 'usage_percent' => 80.0, 'high_percent' => 80.0]);
-    }
-
-    public function testClassifyReturnsLowWhenUsageIsComfortable(): void
-    {
-        $this->assertClassifiesAs('LOW', ['memory_current' => 400, 'usage_percent' => 40.0, 'high_percent' => 40.0]);
+        foreach ([
+            'THROTTLED' => ['memory_current' => 2048, 'high_percent' => 200.0, 'throttle_events' => 1],
+            'HIGH' => ['memory_current' => 950, 'usage_percent' => 95.0, 'high_percent' => 95.0],
+            'MEDIUM' => ['memory_current' => 800, 'usage_percent' => 80.0, 'high_percent' => 80.0],
+            'LOW' => ['memory_current' => 400, 'usage_percent' => 40.0, 'high_percent' => 40.0],
+        ] as $expected => $overrides) {
+            $this->assertClassifiesAs($expected, $overrides);
+        }
     }
 
     public function testReadParsesCgroupCountersAndFormatsUsage(): void

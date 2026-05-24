@@ -165,32 +165,19 @@ class UserCgroupUtilTest extends TestCase
         $this->assertEquals(2, $rc);
     }
 
-    public function testIoLatencySkipsUnsafeResolvedHomeDevice(): void
+    public function testIoLatencyRejectsUnsafeResolvedHomeDeviceTargets(): void
     {
-        $stub = $this->makeSystemStub('/dev/bad target');
+        foreach (['/dev/bad target', '/dev/../bad'] as $device) {
+            $stub = $this->makeSystemStub($device);
+            $mgr = $this->makeManagerWithSystem($stub);
+            list($rc, $out) = $this->pmssCaptureStdout(function () use ($mgr): int {
+                return $mgr->run(['userConfigCgroup.php', 'testuser', '--dry-run', '--io-latency-ms=50']);
+            });
 
-        $mgr = $this->makeManagerWithSystem($stub);
-        list($rc, $out) = $this->pmssCaptureStdout(function () use ($mgr): int {
-            return $mgr->run(['userConfigCgroup.php', 'testuser', '--dry-run', '--io-latency-ms=50']);
-        });
-
-        $this->assertEquals(0, $rc);
-        $this->assertStringContainsString('IODeviceLatencyTargetSec skipped', $out);
-        $this->assertStringNotContainsString('IODeviceLatencyTargetSec=/dev/bad target', $out);
-    }
-
-    public function testIoLatencySkipsDotSegmentResolvedHomeDevice(): void
-    {
-        $stub = $this->makeSystemStub('/dev/../bad');
-
-        $mgr = $this->makeManagerWithSystem($stub);
-        list($rc, $out) = $this->pmssCaptureStdout(function () use ($mgr): int {
-            return $mgr->run(['userConfigCgroup.php', 'testuser', '--dry-run', '--io-latency-ms=50']);
-        });
-
-        $this->assertEquals(0, $rc);
-        $this->assertStringContainsString('IODeviceLatencyTargetSec skipped', $out);
-        $this->assertStringNotContainsString('IODeviceLatencyTargetSec=/dev/../bad', $out);
+            $this->assertEquals(0, $rc);
+            $this->assertStringContainsString('IODeviceLatencyTargetSec skipped', $out);
+            $this->assertStringNotContainsString('IODeviceLatencyTargetSec='.$device, $out);
+        }
     }
 
     public function testPolicyDefaultsSkipUnsafeDeviceTargets(): void

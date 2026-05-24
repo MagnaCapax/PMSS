@@ -69,17 +69,14 @@ class UpdateHelpersSafeWriteTest extends TestCase
         file_put_contents($victim, 'victim');
         $this->assertTrue(symlink($victim, $target));
 
-        putenv('PMSS_APT_SOURCES_PATH='.$target);
-        try {
+        $this->pmssWithAptSourcesPath($target, function () use ($target, $victim): void {
             $logs = [];
             $result = \pmssSafeWriteSources('new', 'SymlinkTarget', $this->pmssMakeArrayLogger($logs));
 
             $this->assertTrue($result === false);
             $this->assertEquals('victim', file_get_contents($victim));
             $this->pmssAssertMessagesContain($logs, 'Unsafe target path for SymlinkTarget sources.list');
-        } finally {
-            putenv('PMSS_APT_SOURCES_PATH');
-        }
+        });
     }
 
     public function testSafeWriteSourcesRejectsSymlinkBackup(): void
@@ -89,8 +86,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
         file_put_contents($victim, 'victim');
         $this->assertTrue(symlink($victim, $target.'.pmss-backup'));
 
-        putenv('PMSS_APT_SOURCES_PATH='.$target);
-        try {
+        $this->pmssWithAptSourcesPath($target, function () use ($target, $victim): void {
             $logs = [];
             $result = \pmssSafeWriteSources('new', 'SymlinkBackup', $this->pmssMakeArrayLogger($logs));
 
@@ -98,9 +94,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
             $this->assertEquals('old', file_get_contents($target));
             $this->assertEquals('victim', file_get_contents($victim));
             $this->pmssAssertMessagesContain($logs, 'Unsafe backup path for SymlinkBackup sources.list');
-        } finally {
-            putenv('PMSS_APT_SOURCES_PATH');
-        }
+        });
     }
 
     public function testAptWriteValidUntilOverrideCreatesParentDirectories(): void

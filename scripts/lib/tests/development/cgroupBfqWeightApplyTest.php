@@ -32,7 +32,9 @@ class CgroupBfqWeightApplyTest extends TestCase
             [0, 1],
             [-1, 1],
         ] as [$memoryMiB, $expected]) {
-            $this->assertEquals($expected, \pmssBfqFormulaWeight($memoryMiB), 'Unexpected weight for '.$memoryMiB.' MiB');
+            $actual = \pmssBfqFormulaWeight($memoryMiB);
+            $this->assertEquals($expected, $actual, 'Unexpected weight for '.$memoryMiB.' MiB');
+            $this->assertTrue(is_int($actual) && $actual > 0);
         }
     }
 
@@ -50,11 +52,5 @@ class CgroupBfqWeightApplyTest extends TestCase
                 'Unexpected weight for '.$label
             );
         }
-    }
-
-    public function testResultIsPositiveInt(): void
-    {
-        $val = \pmssBfqFormulaWeight(2000);
-        $this->assertTrue(is_int($val) && $val > 0);
     }
 }
