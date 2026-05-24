@@ -55,6 +55,8 @@ final class welcomeQuotaMissingWarningTest extends TestCase
             array(
                 'single' => '85016bc86aa6155a5775e00ffba371c7663ba1270101e66c012b34dbdadfed9e',
                 'stacked' => 'e0d82eedbaa584ada4e7a80b626b3adef78dbb415f090899de45ecb662f18293',
+                'stacked_clamped' => '9ef71d1f87189eb5cd0d6eac66428ddefa4d8cdda5af7fdc5d5ff4da42146ff0',
+                'single_infinite' => '8121f04f49056c45452dfd7517263f5b257e118b4a1d184b56db6c4759a94337',
                 'colors' => array('-10' => '90ee99', '0' => '99e699', '50' => 'c4bf99', '100' => 'ee9999', '101' => 'FF4040'),
             ),
             array(
@@ -69,6 +71,16 @@ final class welcomeQuotaMissingWarningTest extends TestCase
                         array('width' => 44.5, 'color' => 'transparent'),
                     )
                 )),
+                'stacked_clamped' => hash('sha256', $this->createStackedGauge(
+                    'Wide',
+                    'Wide',
+                    125,
+                    array(
+                        array('width' => 80, 'color' => '#111111'),
+                        array('width' => 80, 'color' => '#222222'),
+                    )
+                )),
+                'single_infinite' => hash('sha256', $this->createGauge('Infinite', 'Infinite', INF, INF)),
                 'colors' => array('-10' => $this->gaugeColor(-10), '0' => $this->gaugeColor(0), '50' => $this->gaugeColor(50), '100' => $this->gaugeColor(100), '101' => $this->gaugeColor(101)),
             )
         );

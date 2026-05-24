@@ -1113,32 +1113,18 @@ function createStackedGauge($titleText, $footerText, $percent, $segments) {
     $filledPercent = 0;
     foreach ($segments as $segment) {
         $width = isset($segment['width']) && is_numeric($segment['width']) ? (float) $segment['width'] : 0;
-        $width = max(0, min(100 - $filledPercent, $width));
-        if ($width <= 0) {
-            continue;
+        if (empty($segment['raw'])) {
+            $width = max(0, min(100 - $filledPercent, $width));
+            if ($width <= 0) {
+                continue;
+            }
+            $filledPercent += $width;
         }
-        $filledPercent += $width;
         $color = isset($segment['color']) ? (string) $segment['color'] : 'transparent';
-        $barHtml .= '<div style="float: left; width: '.$width.'%; background-color: '.$color.'; visibility: visible;">&nbsp;</div>';
+        $id = isset($segment['id']) ? ' id="'.(string) $segment['id'].'"' : '';
+        $barHtml .= '<div'.$id.' style="float: left; width: '.$width.'%; background-color: '.$color.'; visibility: visible;">&nbsp;</div>';
     }
 
-    return createGaugeFrameHtml($titleText, $footerText, $percent, $barHtml);
-}
-
-function createGauge($titleText, $footerText, $percent, $percentMax = 0) {
-    if (!is_finite($percent)) $percent = 0;
-    if (!is_finite($percentMax)) $percentMax = 0;
-    if ($percentMax == 0) $percentMax = $percent;
-
-    return createGaugeFrameHtml(
-        $titleText,
-        $footerText,
-        $percent,
-        '<div id="meter-disk-value" style="float: left; width: '.$percentMax.'%; background-color: #'.gaugeColor($percent).'; visibility: visible;">&nbsp;</div>'
-    );
-}
-
-function createGaugeFrameHtml($titleText, $footerText, $percent, $barHtml) {
     return <<<EOF
     <table style="margin: 0; padding: 0;">
         <tr>
@@ -1152,6 +1138,19 @@ function createGaugeFrameHtml($titleText, $footerText, $percent, $barHtml) {
     </table>
     <span style="font-size: 1.05em; float: right; text-align: right; line-height: 13px;">{$footerText}</span>
 EOF;
+}
+
+function createGauge($titleText, $footerText, $percent, $percentMax = 0) {
+    if (!is_finite($percent)) $percent = 0;
+    if (!is_finite($percentMax)) $percentMax = 0;
+    if ($percentMax == 0) $percentMax = $percent;
+
+    return createStackedGauge(
+        $titleText,
+        $footerText,
+        $percent,
+        array(array('id' => 'meter-disk-value', 'width' => $percentMax, 'color' => '#'.gaugeColor($percent), 'raw' => true))
+    );
 }
 
 function gaugeColor($percent) {
