@@ -89,6 +89,21 @@ class SkeletonWebLocalAssetTest extends TestCase
             ],
             'Missing tab geometry override: '
         );
+
+        $this->pmssAssertRepoFileNotContainsStrings(
+            'etc/skel/www/jquery.tabs.css',
+            [
+                'background: url(tab.png) no-repeat;',
+                'background-position:',
+                'width: 64px;',
+                'min-width: 64px;',
+                'height: 18px;',
+                'min-height: 18px;',
+                'padding-top: 6px;',
+                'padding-right: 0;',
+            ],
+            'Legacy sprite tab geometry should not constrain flex tabs: '
+        );
     }
 
     public function testLighttpdTemplateDisablesRemoteFrames(): void
