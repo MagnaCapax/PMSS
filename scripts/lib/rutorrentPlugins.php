@@ -10,29 +10,6 @@ require_once __DIR__.'/userLifecycle.php';
 require_once __DIR__.'/lighttpd/userFileWrite.php';
 
 /**
- * Build the fixed ruTorrent plugin paths for a managed user.
- *
- * @param array<string, string> $overrides
- * @return array<string, string>
- */
-function pmssCheckRutorrentPluginsUserPaths(string $username, array $overrides = array()): array
-{
-    $homeRoot = rtrim((string) ($overrides['homeRoot'] ?? '/home'), '/');
-    $skelRoot = rtrim((string) ($overrides['skelRoot'] ?? '/etc/skel'), '/');
-
-    $pluginsDir = $homeRoot.'/'.$username.'/www/rutorrent/plugins';
-    $confDir = $homeRoot.'/'.$username.'/www/rutorrent/conf';
-
-    return array(
-        'plugins' => $pluginsDir,
-        'diskspace' => $pluginsDir.'/diskspace',
-        'hddquotaSource' => $skelRoot.'/www/rutorrent/plugins/hddquota',
-        'hddquotaTarget' => $pluginsDir.'/hddquota',
-        'accessIni' => $confDir.'/access.ini',
-    );
-}
-
-/**
  * Run a maintenance command through the shared user lifecycle logger.
  */
 function pmssCheckRutorrentPluginsRunCommand(string $username, string $step, string $command, $runner = null): int
@@ -42,17 +19,6 @@ function pmssCheckRutorrentPluginsRunCommand(string $username, string $step, str
     }
 
     return pmssUserLifecycleStep('rutorrent_plugins', $username, $step, $command, false);
-}
-
-/**
- * Replace the managed ruTorrent access file without following symlinks.
- *
- * Existing mode and ownership are preserved so the safety rail does not change
- * the long-standing on-disk policy for already-managed files.
- */
-function pmssCheckRutorrentPluginsWriteAccessIni(string $path, string $content): bool
-{
-    return pmssReplaceUserFilePreservingMetadata($path, $content, 0666 & ~umask());
 }
 
 /**
@@ -67,7 +33,16 @@ function pmssCheckRutorrentPluginsSyncUser(string $username, string $accessIni, 
         return false;
     }
 
-    $paths = pmssCheckRutorrentPluginsUserPaths($username, $overrides);
+    $homeRoot = rtrim((string) ($overrides['homeRoot'] ?? '/home'), '/');
+    $skelRoot = rtrim((string) ($overrides['skelRoot'] ?? '/etc/skel'), '/');
+    $pluginsDir = $homeRoot.'/'.$username.'/www/rutorrent/plugins';
+    $paths = array(
+        'plugins' => $pluginsDir,
+        'diskspace' => $pluginsDir.'/diskspace',
+        'hddquotaSource' => $skelRoot.'/www/rutorrent/plugins/hddquota',
+        'hddquotaTarget' => $pluginsDir.'/hddquota',
+        'accessIni' => $homeRoot.'/'.$username.'/www/rutorrent/conf/access.ini',
+    );
     if (!is_dir($paths['plugins'])) {
         return false;
     }
@@ -109,5 +84,5 @@ function pmssCheckRutorrentPluginsSyncUser(string $username, string $accessIni, 
         return false;
     }
 
-    return pmssCheckRutorrentPluginsWriteAccessIni($paths['accessIni'], $accessIni) && $ok;
+    return pmssReplaceUserFilePreservingMetadata($paths['accessIni'], $accessIni, 0666 & ~umask()) && $ok;
 }

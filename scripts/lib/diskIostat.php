@@ -68,13 +68,6 @@ function pmssDiskIostatBuildCommand(array $devices, string $iostatBinary = ''): 
     return escapeshellarg($iostatBinary).' -xm 120 2 -g grp1'.$deviceArgs.' 2>&1';
 }
 
-/** Run the iostat command and normalize disabled shell_exec results. */
-function pmssDiskIostatRunCommand(string $command): string
-{
-    $output = @shell_exec($command);
-    return is_string($output) ? $output : '';
-}
-
 /**
  * Parse the second-sample iostat group row by column name.
  *
@@ -157,17 +150,6 @@ function pmssDiskIostatWriteSnapshotFiles(string $iostatLogFile, array $iostat, 
     return true;
 }
 
-/** Copy the latest snapshot to the HTTP-readable location without shelling out. */
-function pmssDiskIostatCopySnapshotForHttp(string $source, string $target): bool
-{
-    if (@copy($source, $target)) {
-        return true;
-    }
-
-    fwrite(STDERR, 'Unable to copy iostat snapshot to '.$target."\n");
-    return false;
-}
-
 /** Main cron entry point; legacy fatal messages remain stdout-visible. */
 function pmssDiskIostatMain(?callable $runner = null): int
 {
@@ -176,7 +158,12 @@ function pmssDiskIostatMain(?callable $runner = null): int
 
     try {
         $command = pmssDiskIostatBuildCommand($devices);
-        $iostatRaw = $runner === null ? pmssDiskIostatRunCommand($command) : (string) $runner($command);
+        if ($runner === null) {
+            $rawOutput = @shell_exec($command);
+            $iostatRaw = is_string($rawOutput) ? $rawOutput : '';
+        } else {
+            $iostatRaw = (string) $runner($command);
+        }
         $iostat = pmssDiskIostatParseLatestSample($iostatRaw, max(1, count($devices)));
     } catch (RuntimeException $exception) {
         echo $exception->getMessage()."\n";
@@ -184,7 +171,9 @@ function pmssDiskIostatMain(?callable $runner = null): int
     }
 
     if (pmssDiskIostatWriteSnapshotFiles($iostatLogFile, $iostat, $iostatRaw)) {
-        pmssDiskIostatCopySnapshotForHttp($iostatLogFile, '/var/www/iostat');
+        if (!@copy($iostatLogFile, '/var/www/iostat')) {
+            fwrite(STDERR, "Unable to copy iostat snapshot to /var/www/iostat\n");
+        }
     }
     return 0;
 }
