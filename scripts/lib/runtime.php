@@ -565,6 +565,68 @@ if (!function_exists('pmssCommandTimeoutClose')) {
     }
 }
 
+if (!function_exists('pmssCommandPipedCapture')) {
+    /**
+     * Run a prepared shell command through proc_open pipes.
+     *
+     * @return array{rc:int,stdout:string,stderr:string,timed_out:bool,launch_failed:bool,pipe_failed:bool}
+     */
+    function pmssCommandPipedCapture(string $bash, string $timeoutCommand, int $timeoutSec, int $maxBuffer = 0, bool $mirrorOutput = false, string $launchError = 'proc_open failed', int $launchRc = 1, bool $retryLaunch = false, string $streamSelectError = 'stream_select failed'): array
+    {
+        $closePipes = static function (array $pipes, array $indexes = [0, 1, 2]): void {
+            foreach ($indexes as $index) {
+                if (isset($pipes[$index]) && is_resource($pipes[$index])) fclose($pipes[$index]);
+            }
+        };
+        $abortProcess = static function ($process, array $pipes) use ($closePipes): void {
+            $closePipes($pipes);
+            if (!is_resource($process)) {
+                return;
+            }
+            if (function_exists('proc_terminate')) @proc_terminate($process);
+            @proc_close($process);
+        };
+        $closeProcess = static function ($process): int {
+            $rc = proc_close($process);
+            if ($rc === -1 && function_exists('proc_get_status')) {
+                $status = @proc_get_status($process);
+                if (is_array($status) && isset($status['exitcode']) && is_int($status['exitcode']) && $status['exitcode'] >= 0) {
+                    $rc = $status['exitcode'];
+                }
+            }
+            return (int) $rc;
+        };
+
+        $process = @proc_open($bash, pmssProcessPipeDescriptorSpec(), $pipes);
+        if (!is_resource($process) && $retryLaunch) {
+            usleep(500000);
+            $process = @proc_open($bash, pmssProcessPipeDescriptorSpec(), $pipes);
+        }
+        if (!is_resource($process)) {
+            return ['rc' => $launchRc, 'stdout' => '', 'stderr' => $launchError, 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];
+        }
+        if (!pmssCommandPipesReady($pipes)) {
+            $abortProcess($process, $pipes);
+            return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'proc_open pipes unavailable', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => true];
+        }
+
+        fclose($pipes[0]);
+        if (!pmssCommandOutputPipesSetNonBlocking($pipes)) {
+            $abortProcess($process, $pipes);
+            return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'proc_open pipes unavailable', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => true];
+        }
+
+        $startedAt = microtime(true);
+        $capture = pmssCommandOutputPipesDrain($pipes, $timeoutSec, $startedAt, $maxBuffer, $mirrorOutput, $streamSelectError);
+        $closePipes($pipes, [1, 2]);
+        $rc = $capture['timed_out']
+            ? pmssCommandTimeoutClose($process, $timeoutCommand, $timeoutSec, $startedAt)
+            : $closeProcess($process);
+
+        return ['rc' => $rc, 'stdout' => $capture['stdout'], 'stderr' => $capture['stderr'], 'timed_out' => $capture['timed_out'], 'launch_failed' => false, 'pipe_failed' => false];
+    }
+}
+
 if (!function_exists('pmssCommandCapture')) {
     /**
      * Execute a shell command and capture stdout/stderr without streaming.
@@ -573,63 +635,9 @@ if (!function_exists('pmssCommandCapture')) {
      */
     function pmssCommandCapture(string $cmd, int $timeoutSec = 0, bool $loginShell = false, string $launchError = 'proc_open failed', int $launchRc = 1): array
     {
-        $closePipe = static function (&$pipe): void {
-            if (is_resource($pipe)) {
-                fclose($pipe);
-            }
-        };
-        $closeProcess = static function ($process): void {
-            if (function_exists('proc_terminate')) {
-                @proc_terminate($process);
-            }
-            @proc_close($process);
-        };
-        $abortProcess = static function ($process, array $pipes, string $stderr) use ($closePipe, $closeProcess, $launchRc): array {
-            foreach ([0, 1, 2] as $index) {
-                if (array_key_exists($index, $pipes)) {
-                    $closePipe($pipes[$index]);
-                }
-            }
-            $closeProcess($process);
-            return ['rc' => $launchRc, 'stdout' => '', 'stderr' => $stderr];
-        };
-
-        $descriptor = pmssProcessPipeDescriptorSpec();
         $bash = '/bin/bash '.($loginShell ? '-lc ' : '-c ').escapeshellarg($cmd);
-        $process = @proc_open($bash, $descriptor, $pipes);
-        if (!is_resource($process)) {
-            return ['rc' => $launchRc, 'stdout' => '', 'stderr' => $launchError];
-        }
-        if (!pmssCommandPipesReady($pipes)) {
-            return $abortProcess($process, $pipes, 'proc_open pipes unavailable');
-        }
-        fclose($pipes[0]);
-        if (!pmssCommandOutputPipesSetNonBlocking($pipes)) {
-            return $abortProcess($process, $pipes, 'proc_open pipes unavailable');
-        }
-
-        $startedAt = microtime(true);
-        $capture = pmssCommandOutputPipesDrain($pipes, $timeoutSec, $startedAt, 0, false, 'stream_select failed');
-        $stdout = $capture['stdout'];
-        $stderr = $capture['stderr'];
-        $timedOut = $capture['timed_out'];
-
-        $closePipe($pipes[1]);
-        $closePipe($pipes[2]);
-
-        if ($timedOut) {
-            $rc = pmssCommandTimeoutClose($process, $cmd, $timeoutSec, $startedAt);
-            return ['rc' => $rc, 'stdout' => $stdout, 'stderr' => $stderr];
-        }
-
-        $rc = proc_close($process);
-        if ($rc === -1 && function_exists('proc_get_status')) {
-            $status = @proc_get_status($process);
-            if (is_array($status) && isset($status['exitcode']) && is_int($status['exitcode']) && $status['exitcode'] >= 0) {
-                $rc = $status['exitcode'];
-            }
-        }
-        return ['rc' => (int) $rc, 'stdout' => $stdout, 'stderr' => $stderr];
+        $result = pmssCommandPipedCapture($bash, $cmd, $timeoutSec, 0, false, $launchError, $launchRc);
+        return ['rc' => $result['rc'], 'stdout' => $result['stdout'], 'stderr' => $result['stderr']];
     }
 }
 
@@ -904,23 +912,20 @@ if (!function_exists('runCommand')) {
     function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null, bool $inheritTty = false): int
     {
         $log = $logger ?? 'logMessage';
-        $abortPipeCapture = static function ($process, array $pipes, string $message) use ($log): int {
-            foreach ([0, 1, 2] as $index) {
-                if (isset($pipes[$index]) && is_resource($pipes[$index])) {
-                    fclose($pipes[$index]);
-                }
-            }
-            if (is_resource($process)) {
-                if (function_exists('proc_terminate')) {
-                    @proc_terminate($process);
-                }
-                @proc_close($process);
-            }
-
+        $failPipeCapture = static function (string $message) use ($log): int {
             $log('[WARN] '.$message);
             fwrite(STDERR, '[PIPE] '.$message.PHP_EOL);
             $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => $message];
 
+            return 1;
+        };
+        $failLaunch = static function () use ($cmd, $log): int {
+            $message = '[WARN] Failed to launch command: '.$cmd.'; possible process limit exhaustion (check pids.max / ulimit -u)';
+            $log($message);
+            $banner = pmssStreamIsTty(STDERR) ? "\033[1;31m[FORK]\033[0m " : '[FORK] ';
+            fwrite(STDERR, $banner.$message.PHP_EOL);
+            pmssDumpForkDiagnostics('proc_open failed: '.$cmd, $log);
+            $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => ''];
             return 1;
         };
         $isInteractive = pmssStreamIsTty(STDOUT);
@@ -948,20 +953,7 @@ if (!function_exists('runCommand')) {
             $log(sprintf('[CMD] memory usage before=%0.2f MiB', memory_get_usage(true) / 1048576));
         }
 
-        $useInheritedIO = false;
-        if ($inheritTty) {
-            $useInheritedIO = pmssStandardStreamsAreTty();
-        }
-
-        if ($useInheritedIO) {
-            $descriptor = [
-                0 => STDIN,
-                1 => STDOUT,
-                2 => STDERR,
-            ];
-        } else {
-            $descriptor = pmssProcessPipeDescriptorSpec();
-        }
+        $useInheritedIO = $inheritTty && pmssStandardStreamsAreTty();
         // Use a single command string for PHP 7.3 compatibility.
         // For apt/dpkg, prefer exec when safe so timeouts terminate the real child process.
         // Context: output capture existed at least by 8e3bd4b (pre-Dec) with unbounded buffers.
@@ -989,24 +981,18 @@ if (!function_exists('runCommand')) {
             $cmdForShell = 'PATH='.escapeshellarg($pathOverride).' '.$cmdForShell;
         }
         $bash = '/bin/bash -lc '.escapeshellarg($cmdForShell);
-        $process = proc_open($bash, $descriptor, $pipes);
-        if (!is_resource($process)) {
-            // Simple one-shot retry for transient fork failures under load.
-            usleep(500000);
-            $process = proc_open($bash, $descriptor, $pipes);
-        }
-        if (!is_resource($process)) {
-            $message = '[WARN] Failed to launch command: '.$cmd.'; possible process limit exhaustion (check pids.max / ulimit -u)';
-            $log($message);
-            $isTty = pmssStreamIsTty(STDERR);
-            $banner = $isTty ? "\033[1;31m[FORK]\033[0m " : '[FORK] ';
-            fwrite(STDERR, $banner.$message.PHP_EOL);
-            pmssDumpForkDiagnostics('proc_open failed: '.$cmd, $log);
-            $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => ''];
-            return 1;
-        }
-
         if ($useInheritedIO) {
+            $descriptor = [0 => STDIN, 1 => STDOUT, 2 => STDERR];
+            $process = proc_open($bash, $descriptor, $pipes);
+            if (!is_resource($process)) {
+                // Simple one-shot retry for transient fork failures under load.
+                usleep(500000);
+                $process = proc_open($bash, $descriptor, $pipes);
+            }
+            if (!is_resource($process)) {
+                return $failLaunch();
+            }
+
             $startedAt = microtime(true);
             $timedOut = false;
 
@@ -1047,30 +1033,18 @@ if (!function_exists('runCommand')) {
             return $exitCode;
         }
 
-        if (!pmssCommandPipesReady($pipes)) {
-            return $abortPipeCapture($process, $pipes, 'proc_open pipes unavailable for command capture: '.$cmd);
+        $result = pmssCommandPipedCapture($bash, $cmd, $timeoutSec, 1048576, true, '', 1, true);
+        if ($result['launch_failed']) {
+            return $failLaunch();
+        }
+        if ($result['pipe_failed']) {
+            return $failPipeCapture('proc_open pipes unavailable for command capture: '.$cmd);
         }
 
-        fclose($pipes[0]);
-        if (!pmssCommandOutputPipesSetNonBlocking($pipes)) {
-            return $abortPipeCapture($process, $pipes, 'unable to configure proc_open pipes for command capture: '.$cmd);
-        }
-
-        $maxBuffer = 1048576; // keep ~1MiB tail per stream to avoid RSS explosion
-        $startedAt = microtime(true);
-        $capture = pmssCommandOutputPipesDrain($pipes, $timeoutSec, $startedAt, $maxBuffer, true);
-        $stdout = $capture['stdout'];
-        $stderr = $capture['stderr'];
-        $timedOut = $capture['timed_out'];
-
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-
-        if ($timedOut) {
-            $exitCode = pmssCommandTimeoutClose($process, $cmd, $timeoutSec, $startedAt);
-        } else {
-            $exitCode = proc_close($process);
-        }
+        $exitCode = $result['rc'];
+        $stdout = $result['stdout'];
+        $stderr = $result['stderr'];
+        $timedOut = $result['timed_out'];
 
         $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = [
             'stdout' => $stdout,

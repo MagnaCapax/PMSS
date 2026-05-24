@@ -123,6 +123,31 @@ class RuntimeTest extends TestCase
         $this->assertTrue(is_string($err));
     }
 
+    public function testRunCommandFailureLogKeepsStderrExcerpt(): void
+    {
+        $logs = [];
+        $rc = \runCommand(
+            'php -r '.escapeshellarg('fwrite(STDERR, "RUNTIME_ERR_MARKER\n"); exit(3);'),
+            false,
+            function (string $m) use (&$logs): void { $logs[] = $m; }
+        );
+
+        $this->assertEquals(3, $rc);
+        $this->assertTrue($this->pmssMessagesContain($logs, 'Command failed (rc=3)'));
+        $this->assertTrue($this->pmssMessagesContain($logs, 'RUNTIME_ERR_MARKER'));
+    }
+
+    public function testCommandCaptureKeepsStdoutStderrAndRc(): void
+    {
+        $result = \pmssCommandCapture(
+            'php -r '.escapeshellarg('fwrite(STDOUT, "CAPTURE_OUT\n"); fwrite(STDERR, "CAPTURE_ERR\n"); exit(7);')
+        );
+
+        $this->assertEquals(7, $result['rc']);
+        $this->assertEquals("CAPTURE_OUT\n", $result['stdout']);
+        $this->assertEquals("CAPTURE_ERR\n", $result['stderr']);
+    }
+
     public function testRunCommandInheritTtyModeDoesNotBreakCallers(): void
     {
         $rc = \runCommand('true', false, function (string $m): void {}, true);
