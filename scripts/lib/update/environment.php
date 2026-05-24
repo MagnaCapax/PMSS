@@ -449,6 +449,11 @@ CONF;
     function pmssHoldLibssl3ForPeclSsh2Compat(?int $distroVersion = null): void
     {
         $targetVersion = '3.0.17-1~deb12u2';
+        // openssh-server/client/sftp-server depend on libssl3 >= 3.0.19. Downgrading
+        // libssl3 ALONE makes apt REMOVE the openssh trio. Converging the trio to its
+        // matching 3.0.17-era version (deb12u7) in the SAME apt transaction makes apt
+        // downgrade them together instead. Refs #436, #585.
+        $opensshTarget = '1:9.2p1-2+deb12u7';
 
         if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
             logMessage('[DRY-RUN] pmssHoldLibssl3ForPeclSsh2Compat: skipping all mutations');
@@ -503,57 +508,26 @@ CONF;
                 throw new RuntimeException('Unable to upgrade libssl3/openssl to '.$targetVersion);
             }
         } elseif ($needsDowngrade) {
-            // Guard downgrade safety: if apt predicts openssh removals, switch to dpkg-direct path.
-            $simulateCmd = 'apt-get install --simulate --allow-downgrades '
-                .'libssl3='.$targetVersion.' openssl='.$targetVersion.' 2>&1';
-            $simulateOut = (string) @shell_exec($simulateCmd);
-            $opensshCascade = preg_match('/Remv:\s+.*openssh|Remv\s+openssh/i', $simulateOut) === 1;
-
-            if ($opensshCascade) {
-                logMessage('[WARN] pmssHoldLibssl3ForPeclSsh2Compat: apt simulate shows openssh removals; using dpkg-direct downgrade path');
-                runStep('Unholding libssl3/openssl for dpkg-direct downgrade', 'apt-mark unhold libssl3 openssl 2>/dev/null || true');
-
-                $tmpDir = pmssCreatePrivateTempDir('pmss-libssl-');
-                if ($tmpDir === null) {
-                    logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: cannot create temporary directory for dpkg-direct downgrade');
-                    throw new RuntimeException('Unable to create temporary directory for dpkg-direct downgrade');
-                }
-
-                $downloadRc = runStep(
-                    'Downloading libssl3/openssl '.$targetVersion.' deb packages',
-                    'cd '.escapeshellarg($tmpDir)
-                    .' && apt-get download libssl3='.$targetVersion.' openssl='.$targetVersion.' 2>&1'
-                );
-                if ($downloadRc !== 0) {
-                    pmssRemovePrivateTempDir($tmpDir, 'pmss-libssl-', 'Cleaning dpkg-direct download cache');
-                    logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: apt-get download failed; refusing unsafe fallback');
-                    throw new RuntimeException('dpkg-direct downgrade blocked: download failed for libssl3/openssl '.$targetVersion);
-                }
-
-                $debs = glob($tmpDir.'/*.deb') ?: [];
-                sort($debs);
-                if (count($debs) < 2) {
-                    pmssRemovePrivateTempDir($tmpDir, 'pmss-libssl-', 'Cleaning dpkg-direct download cache');
-                    logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: missing downloaded .deb files; refusing unsafe fallback');
-                    throw new RuntimeException('dpkg-direct downgrade blocked: expected .deb files were not downloaded');
-                }
-
-                $installRc = runStep(
-                    'Installing libssl3/openssl via dpkg-direct (openssh-safe path)',
-                    'dpkg -i '.implode(' ', array_map('escapeshellarg', $debs))
-                );
-                pmssRemovePrivateTempDir($tmpDir, 'pmss-libssl-', 'Cleaning dpkg-direct download cache');
-                if ($installRc !== 0) {
-                    logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: dpkg-direct install failed; refusing unsafe fallback');
-                    throw new RuntimeException('dpkg-direct downgrade blocked: dpkg -i failed');
-                }
-            } else {
-                $downgradeCmd = aptCmd('install -y --allow-downgrades libssl3='.$targetVersion.' openssl='.$targetVersion);
-                $downgradeRc  = runStep('Downgrading libssl3/openssl to '.$targetVersion.' (simulate-verified safe)', $downgradeCmd);
-                if ($downgradeRc !== 0) {
-                    logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: guarded apt downgrade to '.$targetVersion.' failed');
-                    throw new RuntimeException('Unable to downgrade libssl3/openssl to '.$targetVersion);
-                }
+            // Converge the FULL libssl3-3.0.17-compatible set in ONE apt transaction so
+            // apt's resolver downgrades the openssh trio alongside libssl3 instead of
+            // removing it. Verified 2026-05-24 on fact-core via --simulate: this set
+            // produces "5 downgraded, 1 to remove (libssl-dev only), 0 not upgraded" —
+            // openssh-server is downgraded to deb12u7, NOT removed. This replaces the
+            // former simulate-detect + dpkg-direct-download fallback (apt finds deb12u7
+            // in bookworm-updates natively). --allow-change-held-packages converges hosts
+            // whose libssl3/openssl are already apt-mark held without an unhold/re-hold
+            // dance. Refs #436, #585.
+            $compatSet = 'libssl3='.$targetVersion.' openssl='.$targetVersion
+                .' openssh-server='.$opensshTarget
+                .' openssh-client='.$opensshTarget
+                .' openssh-sftp-server='.$opensshTarget;
+            $downgradeRc = runStep(
+                'Converging libssl3/openssl/openssh to the 3.0.17-compatible set',
+                aptCmd('install -y --allow-downgrades --allow-change-held-packages '.$compatSet)
+            );
+            if ($downgradeRc !== 0) {
+                logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: full-set convergence to '.$targetVersion.' failed');
+                throw new RuntimeException('Unable to converge libssl3/openssl/openssh to the '.$targetVersion.'-compatible set');
             }
 
             $downgraded = true;
