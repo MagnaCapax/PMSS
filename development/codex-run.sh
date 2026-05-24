@@ -306,11 +306,16 @@ STOP CONDITIONS:
   - Failure count not strictly decreasing → STOP (CI mode)
 
 REFACTOR ITERATION (ALL refactor modes — compression, decompose, dry, safety):
-After EACH commit: ALWAYS print cumulative runtime LOC delta + concepts delta. Every mode, no exceptions —
+After the commit: ALWAYS print cumulative runtime LOC delta + concepts delta. Every mode, no exceptions —
 this visibility is mandatory so the run's net effect is observable regardless of prefix.
-If cumulative LOC delta > 0 AND PREFIX is not refactor(safety): STOP. If 2 cycles found nothing: STOP.
-If context exhausted: STOP. Otherwise: pick 5-10 new targets → implement → verify → commit.
-Maximum 15 cycles per session. One commit per cycle.
+DEPTH OVER BREADTH — ONE cohesive commit per run: pick ONE cohesive target (prefer the LARGEST
+unfinished file from the candidate list) and refactor it FULLY in a single deep, cohesive pass.
+Produce ONE comprehensive, behavior-preserving commit. Go deep on that one target rather than spreading
+shallow edits across many files. A 2nd commit is allowed ONLY if the work splits into two genuinely
+independent cohesive units — never fragment one refactor into many tiny commits, never force-merge
+unrelated changes into one. After the cohesive commit(s): STOP.
+Also STOP if: cumulative LOC delta > 0 AND PREFIX is not refactor(safety); or context exhausted.
+Maximum 2 commits per session.
 
 CI RE-VERIFY (when prefix = ci):
 After all commits: re-run full test suite. If failure count did not strictly decrease: STOP.
