@@ -33,34 +33,22 @@ class TempMountNoexecTest extends TestCase
 
     public function testSkipsWhenFlagDisabled(): void
     {
-        $original = "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0\n";
-        $original .= "tmpfs /dev/shm tmpfs defaults,nosuid,nodev 0 0\n";
-        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
-            'pmss-noexec-skip-',
-            $original,
-            "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n"
-        );
+        foreach ([
+            [null, 'disabled', 'pmss-noexec-skip-'],
+            ['FALSE', 'disabled via PMSS_HARDEN_TMP_NOEXEC', 'pmss-noexec-false-'],
+        ] as [$flag, $needle, $prefix]) {
+            $original = "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0\n";
+            $original .= "tmpfs /dev/shm tmpfs defaults,nosuid,nodev 0 0\n";
+            ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+                $prefix,
+                $original,
+                "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n"
+            );
 
-        $messages = $this->runNoexecHardening($fstab, $mounts, null);
-
-        $this->assertEquals($original, (string)file_get_contents($fstab));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'disabled'), 'expected disabled log');
-    }
-
-    public function testSkipsWhenFlagExplicitlyFalse(): void
-    {
-        $original = "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0\n";
-        $original .= "tmpfs /dev/shm tmpfs defaults,nosuid,nodev 0 0\n";
-        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
-            'pmss-noexec-false-',
-            $original,
-            "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n"
-        );
-
-        $messages = $this->runNoexecHardening($fstab, $mounts, 'FALSE');
-
-        $this->assertEquals($original, (string) file_get_contents($fstab));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'disabled via PMSS_HARDEN_TMP_NOEXEC'), 'expected explicit-false skip log');
+            $messages = $this->runNoexecHardening($fstab, $mounts, $flag);
+            $this->assertEquals($original, (string) file_get_contents($fstab));
+            $this->assertTrue($this->pmssMessagesContain($messages, $needle), 'expected disabled log');
+        }
     }
 
     public function testAddsNoexecOptionsToFstab(): void

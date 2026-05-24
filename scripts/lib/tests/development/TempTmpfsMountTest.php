@@ -37,24 +37,17 @@ class TempTmpfsMountTest extends TestCase
 
     public function testSkipsWhenFlagDisabled(): void
     {
-        $original = "UUID=abc / ext4 defaults 0 0\n";
-        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate('pmss-tmpfs-skip-', $original);
+        foreach ([
+            [null, 'disabled', 'pmss-tmpfs-skip-'],
+            ['FALSE', 'disabled via PMSS_HARDEN_TMP_TMPFS', 'pmss-tmpfs-false-'],
+        ] as [$flag, $needle, $prefix]) {
+            $original = "UUID=abc / ext4 defaults 0 0\n";
+            ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate($prefix, $original);
 
-        $messages = $this->runTmpfsHardening($fstab, $mounts, null);
-
-        $this->assertEquals($original, (string)file_get_contents($fstab));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'disabled'), 'expected disabled log');
-    }
-
-    public function testSkipsWhenFlagExplicitlyFalse(): void
-    {
-        $original = "UUID=abc / ext4 defaults 0 0\n";
-        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate('pmss-tmpfs-false-', $original);
-
-        $messages = $this->runTmpfsHardening($fstab, $mounts, 'FALSE');
-
-        $this->assertEquals($original, (string) file_get_contents($fstab));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'disabled via PMSS_HARDEN_TMP_TMPFS'), 'expected explicit-false skip log');
+            $messages = $this->runTmpfsHardening($fstab, $mounts, $flag);
+            $this->assertEquals($original, (string) file_get_contents($fstab));
+            $this->assertTrue($this->pmssMessagesContain($messages, $needle), 'expected disabled log');
+        }
     }
 
     public function testAddsTmpfsEntryWhenMissing(): void

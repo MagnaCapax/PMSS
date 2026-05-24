@@ -17,27 +17,16 @@
 // Customer-side helpers MUST live in the customer tree (etc/skel/www/) because
 // per-user lighttpd runs as the customer UID and cannot traverse /scripts/
 // (intentionally 750 root:root — the operator-only security boundary).
-// Helpers in /scripts/lib/ are unreachable from customer PHP; file_exists()
-// returns false and the require_once is silently skipped, producing
-// fleet-wide invisible feature loss.
-$pmssWelcomeAnnouncementsLib = __DIR__.'/welcomeAnnouncements.php';
-if (file_exists($pmssWelcomeAnnouncementsLib)) {
-    require_once $pmssWelcomeAnnouncementsLib;
-}
-$pmssWebCgroupMemoryStatusLib = __DIR__.'/webCgroupMemoryStatus.php';
-if (file_exists($pmssWebCgroupMemoryStatusLib)) {
-    require_once $pmssWebCgroupMemoryStatusLib;
-}
-$pmssUserMediaStackPanelLib = __DIR__.'/userMediaStackPanel.php';
-if (file_exists($pmssUserMediaStackPanelLib)) {
-    require_once $pmssUserMediaStackPanelLib;
-}
-// Customer-side traffic-limit reader: see userTrafficLimit.php for rationale.
-// The operator-side write/CLI lives at /scripts/lib/user/trafficLimit.php
-// and is unreachable from customer PHP (750 root:root tree).
-$pmssUserTrafficLimitLib = __DIR__.'/userTrafficLimit.php';
-if (file_exists($pmssUserTrafficLimitLib)) {
-    require_once $pmssUserTrafficLimitLib;
+foreach ([
+    'welcomeAnnouncements.php',
+    'webCgroupMemoryStatus.php',
+    'userMediaStackPanel.php',
+    'userTrafficLimit.php',
+] as $pmssWelcomeHelper) {
+    $pmssWelcomeHelperPath = __DIR__.'/'.$pmssWelcomeHelper;
+    if (file_exists($pmssWelcomeHelperPath)) {
+        require_once $pmssWelcomeHelperPath;
+    }
 }
 // /scripts/lib/traffic/storage.php require removed 2026-05-17: dead code
 // — no function from traffic/storage.php was called from customer PHP.

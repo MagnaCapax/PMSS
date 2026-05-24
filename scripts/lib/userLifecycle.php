@@ -675,14 +675,18 @@ function pmssUserLifecycleFindSuspendedBackup(string $homeDir): ?string
     }
     $ranked = array();
     $hasSuspendedContent = static function (string $candidate): bool {
-        if (!is_dir($candidate) || is_dir($candidate.'/rutorrent') || is_file($candidate.'/index.php')) {
-            return is_dir($candidate) && (is_dir($candidate.'/rutorrent') || is_file($candidate.'/index.php'));
-        }
-        $entries = @scandir($candidate);
-        if ($entries === false || empty(array_diff($entries, array('.', '..')))) {
+        if (!is_dir($candidate)) {
             return false;
         }
-        foreach (array_diff($entries, array('.', '..')) as $entry) {
+        if (is_dir($candidate.'/rutorrent') || is_file($candidate.'/index.php')) {
+            return true;
+        }
+        $entries = @scandir($candidate);
+        $entries = is_array($entries) ? array_diff($entries, array('.', '..')) : array();
+        if (empty($entries)) {
+            return false;
+        }
+        foreach ($entries as $entry) {
             if ($entry !== 'index.html' && $entry !== 'public') {
                 return true;
             }
