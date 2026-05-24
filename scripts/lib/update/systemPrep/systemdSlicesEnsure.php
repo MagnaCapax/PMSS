@@ -8,6 +8,41 @@
 require_once __DIR__.'/../managedPath.php';
 require_once dirname(__DIR__).'/../runtime.php';
 
+/** Keep systemd IO property device targets to plain block-device paths. */
+function pmssSystemdIoDeviceTargetIsSafe(string $device): bool
+{
+    if (strpos($device, '/dev/') !== 0
+        || strpos($device, "\0") !== false
+        || preg_match('/\s/', $device) === 1
+        || substr($device, -1) === '/') {
+        return false;
+    }
+
+    foreach (explode('/', substr($device, 5)) as $segment) {
+        if ($segment === '' || $segment === '.' || $segment === '..') {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/** Validate the value side of systemd IO limits before rendering drop-ins. */
+function pmssSystemdIoLimitValueIsSafe($value): bool
+{
+    return is_scalar($value)
+        && trim((string) $value) !== ''
+        && strpos((string) $value, "\0") === false
+        && preg_match('/\s/', (string) $value) !== 1;
+}
+
+/** Render untrusted policy/findmnt fragments safely in single-line logs. */
+function pmssSystemdLogValue($value): string
+{
+    $safe = str_replace(["\r", "\n", "\0"], ['\\r', '\\n', '\\0'], (string) $value);
+    return strlen($safe) > 160 ? substr($safe, 0, 157).'...' : $safe;
+}
+
 /**
  * Render and install LimitNOFILE drop-in for user@.service when configured.
  */
@@ -127,8 +162,10 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         ];
         if ($mode === 'v2' && isset($policy['ioLatencyMs']) && is_numeric($policy['ioLatencyMs']) && (int) $policy['ioLatencyMs'] > 0) {
             $homeDevice = trim((string) @shell_exec('findmnt -no SOURCE /home 2>/dev/null'));
-            if ($homeDevice !== '') {
+            if ($homeDevice !== '' && pmssSystemdIoDeviceTargetIsSafe($homeDevice)) {
                 $repl['%%USER_CGROUP_IO_DEVICE_LATENCY%%'] = 'IODeviceLatencyTargetSec='.$homeDevice.' '.(int) $policy['ioLatencyMs'].'ms';
+            } elseif ($homeDevice !== '') {
+                $log('[WARN] Unsafe /home backing device for IODeviceLatencyTargetSec: '.pmssSystemdLogValue($homeDevice));
             } else {
                 $log('[WARN] Unable to resolve /home backing device for IODeviceLatencyTargetSec');
             }
@@ -145,6 +182,10 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
                     || ($src = trim((string) @shell_exec('findmnt -no SOURCE '.escapeshellarg($mount).' 2>/dev/null'))) === '') {
                     continue;
                 }
+                if (!pmssSystemdIoDeviceTargetIsSafe($src)) {
+                    $log('[WARN] Unsafe backing device for cgroup policy mount '.pmssSystemdLogValue($mount).': '.pmssSystemdLogValue($src));
+                    continue;
+                }
                 if (isset($def['ioWeight']) && is_numeric($def['ioWeight'])) {
                     if ($mode === 'v2') {
                         $append[] = 'IODeviceWeight='.$src.' '.(int)$def['ioWeight'];
@@ -154,7 +195,11 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
                 }
                 foreach (['readBw' => 'IOReadBandwidthMax', 'writeBw' => 'IOWriteBandwidthMax', 'readIops' => 'IOReadIOPSMax', 'writeIops' => 'IOWriteIOPSMax'] as $policyKey => $directive) {
                     if (isset($def[$policyKey])) {
-                        $append[] = $directive.'='.$src.' '.$def[$policyKey];
+                        if (!pmssSystemdIoLimitValueIsSafe($def[$policyKey])) {
+                            $log('[WARN] Unsafe '.$policyKey.' value for cgroup policy mount '.pmssSystemdLogValue($mount).', skipping');
+                            continue;
+                        }
+                        $append[] = $directive.'='.$src.' '.trim((string) $def[$policyKey]);
                     }
                 }
             }

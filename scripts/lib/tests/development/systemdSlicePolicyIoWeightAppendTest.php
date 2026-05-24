@@ -78,4 +78,68 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
         ]);
         $this->assertStringContainsString('IODeviceLatencyTargetSec=/dev/md0 50ms', $out);
     }
+
+    public function testIODeviceLatencySkipsUnsafeHomeBackingDevice(): void
+    {
+        $findmntPath = $this->pmssMakeExecutableStub(
+            'findmnt',
+            "#!/bin/sh\nif [ \"$3\" = \"/home\" ]; then\n  printf '%s\\n%s\\n' '/dev/md0' 'TasksMax=infinity'\nfi\n",
+            'pmss-findmnt-latency-unsafe-'
+        );
+        $out = $this->pmssSystemdSliceRender([
+            'v2Template' => $this->pmssSystemdSliceTasksTemplate(['%%USER_CGROUP_IO_DEVICE_LATENCY%%']),
+            'policy' => $this->pmssSystemdSlicePolicySource([
+                'ioLatencyMs' => 50,
+            ]),
+            'env' => $this->pmssPathPrefixedEnvironment($findmntPath),
+            'totalMemMiB' => 2048,
+        ]);
+        $this->assertStringNotContainsString('IODeviceLatencyTargetSec=', $out);
+        $this->assertStringNotContainsString('TasksMax=infinity', $out);
+    }
+
+    public function testMountIoSkipsUnsafeBackingDevice(): void
+    {
+        $findmntPath = $this->pmssMakeExecutableStub(
+            'findmnt',
+            "#!/bin/sh\nprintf '%s\\n' '/dev/bad target'\n",
+            'pmss-findmnt-mount-unsafe-'
+        );
+        $out = $this->pmssSystemdSliceRender([
+            'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
+            'policy' => $this->pmssSystemdSlicePolicySource([
+                'tasksMax' => 512,
+                'mounts' => ['/'=> ['readBw' => '100M']],
+            ]),
+            'env' => $this->pmssPathPrefixedEnvironment($findmntPath),
+            'totalMemMiB' => 2048,
+        ]);
+        $this->assertStringNotContainsString('IOReadBandwidthMax=', $out);
+    }
+
+    public function testMountIoSkipsUnsafePolicyValue(): void
+    {
+        $findmntPath = $this->pmssMakeExecutableStub(
+            'findmnt',
+            "#!/bin/sh\nprintf '%s\\n' '/dev/md0'\n",
+            'pmss-findmnt-policy-unsafe-'
+        );
+        $out = $this->pmssSystemdSliceRender([
+            'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
+            'policy' => $this->pmssSystemdSlicePolicySource([
+                'tasksMax' => 512,
+                'mounts' => [
+                    '/' => [
+                        'readBw' => "100M\nTasksMax=infinity",
+                        'writeBw' => '120M',
+                    ],
+                ],
+            ]),
+            'env' => $this->pmssPathPrefixedEnvironment($findmntPath),
+            'totalMemMiB' => 2048,
+        ]);
+        $this->assertStringNotContainsString('IOReadBandwidthMax=', $out);
+        $this->assertStringNotContainsString('TasksMax=infinity', $out);
+        $this->assertStringContainsString('IOWriteBandwidthMax=/dev/md0 120M', $out);
+    }
 }
