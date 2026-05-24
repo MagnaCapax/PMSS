@@ -33,16 +33,10 @@ function pmssStorageHealthDiskInventoryFromLsblk(string $lsblkOut): array
  */
 function pmssStorageHealthReadLastEntries(string $path): array
 {
-    if (($fh = @fopen($path, 'r')) === false) {
-        return [];
-    }
     $last = [];
-    while (($line = fgets($fh)) !== false) {
-        if (is_array($entry = json_decode($line, true))) {
-            $last[(string) ($entry['kind'] ?? '').'::'.(string) ($entry['device'] ?? ($entry['array'] ?? 'global'))] = $entry;
-        }
-    }
-    fclose($fh);
+    pmssJsonLineFileEach($path, static function (array $entry) use (&$last): void {
+        $last[(string) ($entry['kind'] ?? '').'::'.(string) ($entry['device'] ?? ($entry['array'] ?? 'global'))] = $entry;
+    });
     return $last;
 }
 

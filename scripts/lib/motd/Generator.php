@@ -283,10 +283,8 @@ class Motd
     {
         $path = getenv('PMSS_HEALTH_LOG_PATH') ?: '/var/log/pmss/storage-health.jsonl';
         if (!is_file($path)) return '';
-        $fh = @fopen($path,'r'); if (!$fh) return '';
         $raidWarn = null; $nvmeCrit=[]; $lastSmart=[]; $raidPerf=null;
-        while (($line=fgets($fh))!==false) {
-            $j = json_decode($line,true); if (!is_array($j)) continue;
+        pmssJsonLineFileEach($path, static function (array $j) use (&$raidWarn, &$nvmeCrit, &$lastSmart, &$raidPerf): void {
             $k = $j['kind'] ?? '';
             if ($k==='smart') { $lastSmart[$j['device'] ?? '']=$j; }
             elseif ($k==='raid') {
@@ -296,8 +294,7 @@ class Motd
                 }
             }
             elseif ($k==='nvme') { if ((int)($j['metrics']['critical_warnings'] ?? 0) > 0) $nvmeCrit[] = $j['device'] ?? 'nvme'; }
-        }
-        fclose($fh);
+        });
         $lines=[];
         if ($raidWarn) {
             $arr=$raidWarn['array'] ?? 'md'; $flags=implode(',',(array)($raidWarn['flags']??[]));

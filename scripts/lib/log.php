@@ -85,6 +85,22 @@ function pmssJsonLineAppend(string $path, array $payload): bool
         && @file_put_contents($path, $encoded.PHP_EOL, FILE_APPEND | LOCK_EX) !== false;
 }
 
+/** Stream decodable JSON Lines entries to a caller-owned handler. */
+function pmssJsonLineFileEach(string $path, callable $handler): bool
+{
+    $handle = @fopen($path, 'r');
+    if ($handle === false) {
+        return false;
+    }
+    while (($line = fgets($handle)) !== false) {
+        if (is_array($decoded = json_decode($line, true))) {
+            $handler($decoded);
+        }
+    }
+    fclose($handle);
+    return true;
+}
+
 /** Emit one JSON payload to stdout while keeping encode failures on stderr. */
 function pmssJsonEmitPayload(array $payload, string $errorMessage, int $flags = 0): int
 {
