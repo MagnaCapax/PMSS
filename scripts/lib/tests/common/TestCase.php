@@ -245,22 +245,17 @@ abstract class TestCase
         }
     }
 
-    /** Return parsed mount options for one fstab mount point. */
-    protected function pmssFstabOptionsForMount(string $fstab, string $mountPoint): array
-    {
-        $lines = file($fstab, FILE_IGNORE_NEW_LINES) ?: [];
-        foreach ($lines as $line) {
-            $columns = preg_split('/\s+/', trim($line));
-            if (!is_array($columns) || count($columns) < 4 || $columns[1] !== $mountPoint) continue;
-            return array_values(array_filter(explode(',', $columns[3]), 'strlen'));
-        }
-        return [];
-    }
-
     /** Assert required and forbidden fstab options for one mount point. */
     protected function pmssAssertFstabOptions(string $fstab, string $mountPoint, array $required, array $forbidden = []): void
     {
-        $options = $this->pmssFstabOptionsForMount($fstab, $mountPoint);
+        $options = [];
+        foreach (file($fstab, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+            $columns = preg_split('/\s+/', trim($line));
+            if (is_array($columns) && count($columns) >= 4 && $columns[1] === $mountPoint) {
+                $options = array_values(array_filter(explode(',', $columns[3]), 'strlen'));
+                break;
+            }
+        }
         foreach ($required as $option) {
             $this->assertTrue(in_array($option, $options, true), 'expected '.$option.' option');
         }

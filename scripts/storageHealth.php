@@ -27,46 +27,12 @@ function pmssStorageHealthColor(string $severity, string $text): string
     return "\033[".$code."m".$text."\033[0m";
 }
 
-function pmssStorageHealthFormatInt($value, string $suffix = ''): string
-{
-    return is_int($value) ? (string) $value.$suffix : '-';
-}
-
-/**
- * Persist or clear the user-facing notice without exposing partial JSON.
- *
- * @param array<string, string>|null $payload
- */
-function pmssStorageHealthSyncUserNotice(string $userNoticePath, ?array $payload): void
-{
-    if (!pmssUserFilePathIsSafe($userNoticePath)) {
-        return;
-    }
-
-    if ($payload === null) {
-        if (is_file($userNoticePath)) {
-            @unlink($userNoticePath);
-        }
-        return;
-    }
-
-    $userNoticeDir = dirname($userNoticePath);
-    // Keep the notice on the same guarded write path as other managed files.
-    if ($userNoticeDir !== '' && !pmssEnsureSafeDir($userNoticeDir, 0755)) {
-        return;
-    }
-
-    $json = json_encode($payload, JSON_UNESCAPED_SLASHES);
-    if (!is_string($json) || $json === '') {
-        return;
-    }
-
-    pmssAtomicWriteFile($userNoticePath, $json.PHP_EOL, 0644);
-}
-
 function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestamp, string $jsonPath): void
 {
     $markLabelMap = ['ok' => 'OK', 'warn' => '!!', 'fail' => 'XX'];
+    $formatInt = static function ($value, string $suffix = ''): string {
+        return is_int($value) ? (string) $value.$suffix : '-';
+    };
 
     $header = "Storage health (latest snapshot {$timestamp})";
     echo $header.PHP_EOL;
@@ -88,7 +54,7 @@ function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestam
         echo "Disks\n";
         echo "-----\n";
 
-        $rows = array_map(static function (array $entry): array {
+        $rows = array_map(static function (array $entry) use ($formatInt): array {
             $metrics = is_array($entry['metrics'] ?? null) ? $entry['metrics'] : [];
             $kind = (string) ($entry['kind'] ?? 'smart');
 
@@ -99,10 +65,10 @@ function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestam
                 'model' => (string) ($entry['model'] ?? ''),
                 'flags' => is_array($entry['flags'] ?? null) ? implode(',', $entry['flags']) : '',
                 'health' => $kind === 'nvme' ? 'NVME' : (string) ($metrics['health'] ?? 'UNKNOWN'),
-                'temp' => pmssStorageHealthFormatInt($kind === 'nvme' ? ($metrics['temperature'] ?? null) : ($metrics['temp_c'] ?? null), 'C'),
-                'realloc' => $kind === 'nvme' ? '-' : pmssStorageHealthFormatInt($metrics['reallocated'] ?? null),
-                'pend' => pmssStorageHealthFormatInt($kind === 'nvme' ? ($metrics['media_errors'] ?? null) : ($metrics['pending'] ?? null)),
-                'link' => pmssStorageHealthFormatInt($kind === 'nvme' ? ($metrics['percentage_used'] ?? null) : ($metrics['link_errors'] ?? ($metrics['udma_crc'] ?? null))),
+                'temp' => $formatInt($kind === 'nvme' ? ($metrics['temperature'] ?? null) : ($metrics['temp_c'] ?? null), 'C'),
+                'realloc' => $kind === 'nvme' ? '-' : $formatInt($metrics['reallocated'] ?? null),
+                'pend' => $formatInt($kind === 'nvme' ? ($metrics['media_errors'] ?? null) : ($metrics['pending'] ?? null)),
+                'link' => $formatInt($kind === 'nvme' ? ($metrics['percentage_used'] ?? null) : ($metrics['link_errors'] ?? ($metrics['udma_crc'] ?? null))),
             ];
         }, $disks);
 
@@ -261,7 +227,17 @@ if ($userNoticeRequested && $userNoticePath !== '') {
             'array' => $perfStatus['array'],
         ];
     }
-    pmssStorageHealthSyncUserNotice($userNoticePath, $noticePayload);
+    if (pmssUserFilePathIsSafe($userNoticePath)) {
+        if ($noticePayload === null && is_file($userNoticePath)) {
+            @unlink($userNoticePath);
+        } elseif ($noticePayload !== null) {
+            $userNoticeDir = dirname($userNoticePath);
+            $json = json_encode($noticePayload, JSON_UNESCAPED_SLASHES);
+            if (($userNoticeDir === '' || pmssEnsureSafeDir($userNoticeDir, 0755)) && is_string($json) && $json !== '') {
+                pmssAtomicWriteFile($userNoticePath, $json.PHP_EOL, 0644);
+            }
+        }
+    }
 }
 
 if ($raw) {

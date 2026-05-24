@@ -38,7 +38,7 @@ class rtorrentConfig
             ? $template
             : $this->loadDefaultTemplate();
 
-        $this->_checkResourceConfig();
+        $this->_resourceConfig += self::DEFAULT_RESOURCE_CONFIG;
     }
     /**
      * Create rendered rTorrent config text and return normalized inputs.
@@ -153,11 +153,6 @@ class rtorrentConfig
         }
         return $port;
     }
-    protected function _checkResourceConfig()
-    {
-        $this->_resourceConfig += self::DEFAULT_RESOURCE_CONFIG;
-    }
-
     private function configWithPortDefaults(array $config): array
     {
         if (!isset($config['scgiPort'])) {
@@ -175,12 +170,17 @@ class rtorrentConfig
     private function renderConfigFile(array $config): string
     {
         $sizing = $this->resourceSizing($config);
+        $uploadThrottleLine = '';
+        if (isset($config['uploadThrottle']) && is_numeric($config['uploadThrottle'])) {
+            $uploadThrottle = (int) $config['uploadThrottle'];
+            $uploadThrottleLine = $uploadThrottle > 0 ? 'throttle.global_up.max_rate.set = '.$uploadThrottle : '';
+        }
         $replacements = [
             '##minimumPeers' => $sizing['minimumPeers'],
             '##maximumPeers' => $sizing['maximumPeers'],
             '##uploadSlotsGlobal' => $sizing['uploadSlots'] * 6,
             '##uploadSlots' => $sizing['uploadSlots'],
-            '##uploadThrottleLine' => $this->uploadThrottleLine($config),
+            '##uploadThrottleLine' => $uploadThrottleLine,
             '##scgiPort' => $config['scgiPort'],
             '##dhtPort' => $config['dhtPort'],
             '##listenPort' => $config['listenPort'],
@@ -211,15 +211,6 @@ class rtorrentConfig
         $ramMiB = max(0, $ramMiB);
         $gapMiB = max(250, min(1000, (int) floor($ramMiB * 0.25)));
         return max(170, $ramMiB - $gapMiB);
-    }
-
-    private function uploadThrottleLine(array $config): string
-    {
-        if (!isset($config['uploadThrottle']) || !is_numeric($config['uploadThrottle'])) {
-            return '';
-        }
-        $uploadThrottle = (int) $config['uploadThrottle'];
-        return $uploadThrottle > 0 ? 'throttle.global_up.max_rate.set = '.$uploadThrottle : '';
     }
 
     private function appendLocalnetFilter(string $configFile): string
