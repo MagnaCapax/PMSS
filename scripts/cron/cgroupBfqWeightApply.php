@@ -31,6 +31,7 @@
 declare(strict_types=1);
 
 require_once __DIR__.'/../lib/cgroup/bfqFormula.php';
+require_once __DIR__.'/../lib/log.php';
 
 // Constants — tunable top-of-file per AGENTS.md doctrine.
 $USERS_DIR  = '/etc/seedbox/config/users';
@@ -77,7 +78,7 @@ $errors = 0;
 
 foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
     $user = basename($cfgPath, '.json');
-    $json = @json_decode((string) @file_get_contents($cfgPath), true);
+    $json = pmssJsonFileReadAssoc($cfgPath);
     if (!is_array($json)) {
         $errors++;
         syslog(LOG_WARNING, "bad json $user");

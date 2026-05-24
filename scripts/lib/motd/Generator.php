@@ -192,12 +192,9 @@ class Motd
         $pmssVersion = getPmssVersion();
         
         // Append short commit hash if available
-        $metaPath = '/etc/seedbox/config/version.meta';
-        if (is_file($metaPath)) {
-            $meta = json_decode(file_get_contents($metaPath), true);
-            if (isset($meta['commit']) && strlen($meta['commit']) >= 7) {
-                $pmssVersion .= ' ('.substr($meta['commit'], 0, 7).')';
-            }
+        $meta = pmssJsonFileReadAssoc('/etc/seedbox/config/version.meta');
+        if (is_array($meta) && isset($meta['commit']) && strlen($meta['commit']) >= 7) {
+            $pmssVersion .= ' ('.substr($meta['commit'], 0, 7).')';
         }
 
         $updateDate = pmssReadRegularFileTrimmed('/var/run/pmss/updated') ?? 'not set';

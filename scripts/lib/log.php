@@ -39,6 +39,19 @@ function pmssJsonEncodeSafe(array $payload, int $flags = 0): ?string
     return is_string($encoded) ? $encoded : null;
 }
 
+/** Read a JSON object file as an associative array, rejecting unsafe paths when requested. */
+function pmssJsonFileReadAssoc(string $path, bool $safePathRequired = false): ?array
+{
+    if ($path === '' || ($safePathRequired && !pmssPathTargetIsSafe($path, false, true)) || !is_file($path) || is_link($path)) {
+        return null;
+    }
+    $raw = @file_get_contents($path);
+    if (!is_string($raw) || trim($raw) === '') {
+        return null;
+    }
+    return is_array($decoded = json_decode($raw, true)) ? $decoded : null;
+}
+
 /** Validate a log write target before appending data. */
 function pmssLogWritePathIsSafe(string $path): bool
 {
