@@ -69,7 +69,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
         file_put_contents($victim, 'victim');
         $this->assertTrue(symlink($victim, $target));
 
-        $this->pmssWithAptSourcesPath($target, function () use ($target, $victim): void {
+        $this->pmssWithAptSourcesPath($target, function () use ($victim): void {
             $logs = [];
             $result = \pmssSafeWriteSources('new', 'SymlinkTarget', $this->pmssMakeArrayLogger($logs));
 
