@@ -23,15 +23,9 @@ foreach ([
     'userMediaStackPanel.php',
     'userTrafficLimit.php',
 ] as $pmssWelcomeHelper) {
-    $pmssWelcomeHelperPath = __DIR__.'/'.$pmssWelcomeHelper;
-    if (file_exists($pmssWelcomeHelperPath)) {
-        require_once $pmssWelcomeHelperPath;
-    }
+    pmssWelcomeRequireLocalHelper($pmssWelcomeHelper);
 }
-// /scripts/lib/traffic/storage.php require removed 2026-05-17: dead code
-// — no function from traffic/storage.php was called from customer PHP.
-// pmssTrafficLimitStateRead (the only function welcome.php / stats.php use)
-// lives in customer-readable userTrafficLimit.php (see ADR 0016).
+// traffic/storage.php stays out of customer PHP; userTrafficLimit.php owns the state reader (ADR 0016).
 
 
 $pageState = pmssWelcomePageStateBuild();
@@ -430,16 +424,9 @@ if (file_exists('openvpn-config.tgz')) {
 
                         if (@file_exists('../.trafficLimit')) {
                             $trafficLimit = (int) $trafficLimitState['limitGiB'];
-                            $trafficData = null;
-                            if (is_file('../.trafficData') && !is_link('../.trafficData') && function_exists('pmssReadSerializedArrayFile')) {
-                                $trafficData = pmssReadSerializedArrayFile('../.trafficData');
-                            }
-                            if (is_array($trafficData)) {
-                                $trafficIngress = null;
-                                if (is_file('../.trafficDataIngress') && !is_link('../.trafficDataIngress') && function_exists('pmssReadSerializedArrayFile')) {
-                                    $trafficIngress = pmssReadSerializedArrayFile('../.trafficDataIngress');
-                                }
-                                trafficCreateSection($trafficData, $trafficLimit, $trafficIngress, $bonusTraffic, $trafficBandwidthState, $billingId);
+                            $trafficData = pmssWelcomeSerializedArrayRead('../.trafficData');
+                            if ($trafficData !== null) {
+                                trafficCreateSection($trafficData, $trafficLimit, pmssWelcomeSerializedArrayRead('../.trafficDataIngress'), $bonusTraffic, $trafficBandwidthState, $billingId);
                             } else {
                                 if ($trafficLimit > 0) {
                                     $effectiveLimit = (int) $trafficLimitState['effectiveLimitGiB'];
@@ -498,6 +485,19 @@ echo $announcementItemsHtml;
 </html>
 
 <?php
+/**
+ * Require a customer-tree helper when it exists.
+ */
+function pmssWelcomeRequireLocalHelper($file) {
+    $path = __DIR__.'/'.$file;
+    if (file_exists($path)) {
+        require_once $path;
+        return true;
+    }
+
+    return false;
+}
+
 /**
  * Gather the state used by the welcome page before rendering begins.
  *
@@ -678,12 +678,10 @@ function pmssWelcomeVendorRead() {
 }
 
 function pmssWelcomeContextualMessageBuild($quotaInfo) {
-    $pmssWelcomeMessageLib = __DIR__.'/welcomeMessage.php';
-    if (!file_exists($pmssWelcomeMessageLib)) {
+    if (!pmssWelcomeRequireLocalHelper('welcomeMessage.php')) {
         return '';
     }
 
-    require_once $pmssWelcomeMessageLib;
     if (!function_exists('pmssWelcomeMessageForUser')) {
         return '';
     }
@@ -694,7 +692,7 @@ function pmssWelcomeContextualMessageBuild($quotaInfo) {
     }
 
     $username = basename($userHome);
-    if (!is_string($username) || $username === '' || $username === '.' || $username === '..') {
+    if ($username === '' || $username === '.' || $username === '..') {
         $username = (string) @get_current_user();
     }
 
@@ -703,12 +701,10 @@ function pmssWelcomeContextualMessageBuild($quotaInfo) {
 
 function pmssWelcomeHomeRaidNoticeHtmlRead() {
     // Customer-side storage-health notice (see storageHealthNotice.php).
-    $pmssStorageHealthNoticeLib = __DIR__.'/storageHealthNotice.php';
-    if (!file_exists($pmssStorageHealthNoticeLib)) {
+    if (!pmssWelcomeRequireLocalHelper('storageHealthNotice.php')) {
         return '';
     }
 
-    require_once $pmssStorageHealthNoticeLib;
     if (!function_exists('pmssStorageHealthHomeRaidActivity')) {
         return '';
     }
@@ -725,10 +721,7 @@ function pmssWelcomeDelugeStateBuild($username, $delugeAuthPath) {
     // Customer-side password display: see userPasswords.php (ADR 0016).
     // Rotation is allowed only when the customer-tree helper defines it
     // locally; customer PHP must not call helpers defined only in /scripts/lib.
-    $pmssUserPasswordsLib = __DIR__.'/userPasswords.php';
-    if (file_exists($pmssUserPasswordsLib)) {
-        require_once $pmssUserPasswordsLib;
-    }
+    pmssWelcomeRequireLocalHelper('userPasswords.php');
 
     $canRead = function_exists('pmssDelugeAuthReadLocalclientPassword');
     $canRotate = function_exists('pmssDelugeServicePasswordRotate');
@@ -803,6 +796,15 @@ function pmssWelcomeUserConfigNumber($key, $allowSymlink = false) {
         : null;
 }
 
+function pmssWelcomeSerializedArrayRead($path) {
+    if (!is_file($path) || is_link($path) || !function_exists('pmssReadSerializedArrayFile')) {
+        return null;
+    }
+
+    $data = pmssReadSerializedArrayFile($path);
+    return is_array($data) ? $data : null;
+}
+
 function readUserRamLimitBytes() {
     $ramMiB = pmssWelcomeUserConfigNumber('ramMiB');
     if ($ramMiB === null || $ramMiB <= 0) {
@@ -834,10 +836,7 @@ function readUserMemoryCurrentBytes() {
 }
 
 function readUserResourceData() {
-    if (!function_exists('pmssReadSerializedArrayFile')) {
-        return null;
-    }
-    return pmssReadSerializedArrayFile('../.resourceData');
+    return pmssWelcomeSerializedArrayRead('../.resourceData');
 }
 
 function readUserMemoryBreakdownBytes() {
