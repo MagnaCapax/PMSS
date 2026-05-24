@@ -8,6 +8,8 @@
 # Pulsed Media Seedbox Management Software "PMSS"
 # Rclone installer + update
 
+require_once __DIR__.'/remoteBinary.php';
+
 // Version pinning keeps deployments reproducible; opt-in fetch updates on demand.
 $rcloneVersion = '1.69.1';
 $fetchedLatest = false;
@@ -32,7 +34,7 @@ if ($fetchedLatest) {
 $currentRclone = null;
 if (file_exists('/usr/bin/rclone')) {
     foreach (['/usr/bin/rclone version 2>/dev/null', '/usr/bin/rclone -V 2>/dev/null'] as $command) {
-        if (preg_match('/rclone v?(\d+\.\d+\.\d+)/i', (string) @shell_exec($command), $match)) {
+        if (preg_match('/rclone v?(\d+\.\d+\.\d+)/i', pmssAppVersionProbeOutput($command), $match)) {
             $currentRclone = $match[1];
             break;
         }

@@ -17,7 +17,7 @@ if (!pmssPinnedRemoteAmd64ArtifactsSupported()) {
 }
 
 if (file_exists('/usr/bin/syncthing')
-    && strpos((string) @shell_exec('syncthing version 2>/dev/null'), $syncthingVersion) !== false) {
+    && strpos(pmssAppVersionProbeOutput('/usr/bin/syncthing version 2>/dev/null'), $syncthingVersion) !== false) {
     return;
 }
 

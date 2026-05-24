@@ -202,7 +202,7 @@ if (getenv('PMSS_RTORRENT_NO_ENTRYPOINT') === '1') {
 
 $log = 'logmsg';
 
-$rtorrentVersion = shell_exec('rtorrent -h');
+$rtorrentVersion = pmssAppVersionProbeOutput('rtorrent -h');
 // Resolve the target branch from distro detection instead of string-prefix
 // checks on /etc/debian_version so codename/major overrides stay consistent.
 $distroInfo = pmssDetectDistro();

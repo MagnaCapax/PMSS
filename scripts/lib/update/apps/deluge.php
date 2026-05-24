@@ -298,7 +298,7 @@ echo "#### Deluge install // update\n";
 
 // Detect currently installed Deluge version if possible.
 $currentVersion = '';
-$out = @shell_exec('deluge-console --version 2>/dev/null');
+$out = pmssAppVersionProbeOutput('deluge-console --version 2>/dev/null');
 if (is_string($out) && preg_match('/deluge\s+([0-9.]+)/i', $out, $m)) {
     $currentVersion = $m[1];
 }

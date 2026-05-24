@@ -5,6 +5,8 @@ require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../logging.php';
 require_once dirname(__DIR__, 2).'/pathSafety.php';
 
+const PMSS_APP_VERSION_PROBE_TIMEOUT_SECONDS = 150;
+
 function pmssPinnedRemoteChecksum(string $path): string
 {
     $checksum = @hash_file('sha256', $path);
@@ -14,6 +16,13 @@ function pmssPinnedRemoteChecksum(string $path): string
 function pmssPinnedRemoteAmd64ArtifactsSupported(?string $architecture = null): bool
 {
     return in_array($architecture ?? php_uname('m'), ['x86_64', 'amd64'], true);
+}
+
+/** Run a bounded app version probe without letting daemon-capable binaries wedge updates. */
+function pmssAppVersionProbeOutput(string $command, int $timeoutSeconds = PMSS_APP_VERSION_PROBE_TIMEOUT_SECONDS): string
+{
+    $result = pmssCommandCapture($command, max(1, $timeoutSeconds));
+    return is_string($result['stdout'] ?? null) ? $result['stdout'] : '';
 }
 
 // Download a pinned artifact to a temp file; caller owns cleanup.

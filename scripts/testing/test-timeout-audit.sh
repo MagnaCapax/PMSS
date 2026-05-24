@@ -32,6 +32,23 @@ while IFS= read -r file; do
 	)
 done < <(git ls-files scripts tools docs install.sh 2>/dev/null)
 
+while IFS= read -r file; do
+	[[ -f "$file" ]] || continue
+	while IFS= read -r hit; do
+		[[ -n "$hit" ]] || continue
+		printf '%s\n' "$hit" >&2
+		violations=$((violations + 1))
+	done < <(
+		awk -v file="$file" '
+			/^[[:space:]]*(#|\/\/|\*)/ { next }
+			/shell_exec[[:space:]]*\(/ && /(--version|-version|[[:space:]]version[[:space:]]|rtorrent[[:space:]]+-h)/ &&
+				$0 !~ /pmssAppVersionProbeOutput|pmssCommandCapture/ {
+				printf "%s:%d: app version probe bypasses bounded capture: %s\n", file, NR, $0
+			}
+		' "$file"
+	)
+done < <(git ls-files 'scripts/lib/update/apps/*.php' 2>/dev/null)
+
 if [[ "$violations" -gt 0 ]]; then
 	printf 'timeout audit: %d offender(s)\n' "$violations" >&2
 	exit 1

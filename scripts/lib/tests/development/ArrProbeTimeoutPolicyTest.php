@@ -30,6 +30,43 @@ class ArrProbeTimeoutPolicyTest extends TestCase
         }
     }
 
+    public function testSharedAppVersionProbeCapturesOutput(): void
+    {
+        $output = \pmssAppVersionProbeOutput('printf %s '.escapeshellarg('v1.2.3'), 5);
+
+        $this->assertSame('v1.2.3', $output);
+    }
+
+    public function testSharedAppVersionProbeLogsTimeouts(): void
+    {
+        $timeoutLog = $this->pmssMakeTempFile('pmss-app-version-timeout-');
+        $output = 'not-run';
+        $previousCorrelationId = $GLOBALS['PMSS_CORRELATION_ID_CACHE'] ?? null;
+
+        try {
+            $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = null;
+            $this->pmssWithEnv([
+                'PMSS_TIMEOUT_FIRE_LOG' => $timeoutLog,
+                'PMSS_CORRELATION_ID' => 'app-version-probe-test',
+            ], function () use (&$output): void {
+                $output = \pmssAppVersionProbeOutput('php -r '.escapeshellarg('sleep(2);'), 1);
+            });
+        } finally {
+            $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $previousCorrelationId;
+        }
+
+        $this->assertSame('', $output);
+        $lines = file($timeoutLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $this->assertTrue(is_array($lines) && count($lines) >= 1, 'expected app probe timeout-fire JSONL entry');
+        $data = json_decode((string) end($lines), true);
+        $this->assertTrue(is_array($data), 'expected app probe timeout-fire JSON payload');
+        $this->assertSame('timeout_fired', $data['event'] ?? '');
+        $this->assertSame(1, $data['intended_seconds'] ?? 0);
+        $this->assertSame(124, $data['exit_status'] ?? 0);
+        $this->assertSame('SIGTERM', $data['signal'] ?? '');
+        $this->assertSame('app-version-probe-test', $data['correlation_id'] ?? '');
+    }
+
     public function testServarrEntrypointReplacesPerAppWrappers(): void
     {
         $appRoot = dirname(__DIR__, 2).'/update/apps';

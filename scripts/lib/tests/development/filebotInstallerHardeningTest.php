@@ -41,7 +41,8 @@ class FilebotInstallerHardeningTest extends TestCase
         $contents = $this->pmssReadUpdateAppFile('filebot.php');
 
         $this->assertStringContainsString('/usr/bin/filebot', $contents);
-        $this->assertStringContainsString('filebot -version 2>/dev/null', $contents);
+        $this->assertStringContainsString('pmssAppVersionProbeOutput', $contents);
+        $this->assertStringContainsString(' -version 2>/dev/null', $contents);
         $this->assertStringContainsString('@unlink($filebotPath)', $contents);
     }
 
