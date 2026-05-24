@@ -794,13 +794,6 @@ function pmssWelcomeRemoteFetch($url) {
         : false;
 }
 
-function bonusQuotaDisplay($bonusQuota) {
-    if ($bonusQuota != 0) {
-        return '<b>BONUS QUOTA:</b> ' . number_format($bonusQuota) . ' GiB<br />';
-    }
-    return '';
-}
-
 function readUserRamLimitBytes() {
     $configPath = '../.config/pmss-user.json';
     if (!is_file($configPath) || is_link($configPath)) {
@@ -1001,9 +994,6 @@ EOF;
         $processPercent = round(($processBytes / $limitBytes) * 100, 1);
         $cachePercent = round(($cacheBytes / $limitBytes) * 100, 1);
         $remainingPercent = max(0, 100 - max(0, min(100, $processPercent)) - max(0, min(100, $cachePercent)));
-        if ($remainingPercent < 0) {
-            $remainingPercent = 0;
-        }
         $titleText = 'Process: '.$processText.' | Cache: '.$cacheText.' | Limit: '.$limitText;
         $gauge = createStackedGauge(
             $titleText,
@@ -1056,82 +1046,67 @@ EOF;
 EOF;
 }
 
-	function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null, $bonusTraffic = 0, $trafficBandwidthState = array(), $billingId = 0) {
-	    if (count($trafficData) == 0) return;
-	    $bandwidthNote = pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingId);
-
-	    $trafficUsed = round($trafficData['raw']['month']);
-	    $ratioGoodMin = 2.0;
-	    $ratioWarnMin = 1.0;
-	    $inboundLine = '';
-	    $ratioLine = '';
-	    $outboundMonth = null;
-	    $inboundMonth = null;
-	    if (isset($trafficData['raw']['month']) && is_numeric($trafficData['raw']['month'])) {
-	        $outboundMonth = (float) $trafficData['raw']['month'];
-	    }
-	    if (is_array($trafficIngress) && isset($trafficIngress['raw']['month']) && is_numeric($trafficIngress['raw']['month'])) {
-	        $inboundMonth = (float) $trafficIngress['raw']['month'];
-	        $inboundUsed = round($inboundMonth / 1024) . " GiB";
-	        $inboundLine = '<br />Inbound (30 days): '.$inboundUsed;
-	    }
-	    if ($inboundMonth !== null && $outboundMonth !== null) {
-	        if ($outboundMonth > 0) {
-	            $ratio = $inboundMonth / $outboundMonth;
-	            $ratioText = number_format($ratio, 2) . ':1';
-	            if ($ratio >= $ratioGoodMin) {
-	                $ratioColor = '#81c784';
-	            } elseif ($ratio >= $ratioWarnMin) {
-	                $ratioColor = '#ffb74d';
-	            } else {
-	                $ratioColor = '#ef5350';
-	            }
-	        } else {
-	            $ratioText = 'N/A';
-	            $ratioColor = '#b0bec5';
-	        }
-	        $ratioLine = '<br />Inbound:Outbound ratio (30 days): <span style="color: '.$ratioColor.'">'.$ratioText.'</span>';
-	    }
-	    if ($trafficLimit <= 0) {
-	        $trafficUsed = round($trafficUsed / 1024) . " GiB";
-
-	        echo <<<EOF
-	    <h6>Traffic Info</h6>
-	    Traffic used (30 days): {$trafficUsed}<br />
-	    Traffic limit: Unlimited{$inboundLine}{$ratioLine}<br />
-	    <div style="margin-top: 3px; line-height: 1.35;">{$bandwidthNote}</div>
-	    This is rolling past 30 days, <a href="https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
-	    <hr />
-	EOF;
-	        return;
-	    }
-	    $bonusTraffic = (int) $bonusTraffic;
-	    if ($bonusTraffic < 0) {
-	        $bonusTraffic = 0;
-	    }
-	    $limitTotal = $trafficLimit + $bonusTraffic;
-	    $percent = ($limitTotal > 0) ? round((($trafficUsed / 1024) / $limitTotal) * 100) : 0;
-	    if (!is_finite($percent)) $percent = 0;
-	    $trafficUsed = round($trafficUsed / 1024) . " GiB";
-
-	    if ($percent > 100) {
-	        $warning = '<br /><b style="color: red;">OVER TRAFFIC LIMIT WARNING - REDUCED BANDWIDTH</b><br />You are beyond your traffic limit. Consider upgrading your plan or adding extra traffic.<br />Datacenter external outbound (TO internet) bandwidth limited to 100 Mbps. Datacenter internal and inbound bandwidth is unrestricted.';
-    } else {
-        $warning = '';
+function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null, $bonusTraffic = 0, $trafficBandwidthState = array(), $billingId = 0) {
+    if (count($trafficData) == 0) {
+        return;
     }
 
-	    $titleText = "{$trafficUsed} / {$limitTotal} GiB";
-		    $bonusLine = ($bonusTraffic > 0) ? '<br />Bonus traffic: ' . number_format($bonusTraffic) . ' GiB' : '';
-		    $gauge = createGauge($titleText, $titleText . $bonusLine, $percent);
+    $bandwidthNote = pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingId);
+    $trafficUsedRaw = round($trafficData['raw']['month']);
+    $trafficUsed = round($trafficUsedRaw / 1024) . ' GiB';
+    $outboundMonth = isset($trafficData['raw']['month']) && is_numeric($trafficData['raw']['month'])
+        ? (float) $trafficData['raw']['month']
+        : null;
+    $inboundMonth = is_array($trafficIngress) && isset($trafficIngress['raw']['month']) && is_numeric($trafficIngress['raw']['month'])
+        ? (float) $trafficIngress['raw']['month']
+        : null;
+    $inboundLine = $inboundMonth !== null ? '<br />Inbound (30 days): '.round($inboundMonth / 1024).' GiB' : '';
+    $ratioLine = '';
 
-		    echo <<<EOF
-	    <h6>Traffic Info</h6>
-	    {$gauge}
-	    {$warning}
-	    <div style="margin-top: 3px; line-height: 1.35;">{$bandwidthNote}</div>
-	    {$inboundLine}{$ratioLine}
-	    This is rolling past 30 days, <a href="https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
-	    <hr />
+    if ($inboundMonth !== null && $outboundMonth !== null) {
+        if ($outboundMonth > 0) {
+            $ratio = $inboundMonth / $outboundMonth;
+            $ratioText = number_format($ratio, 2).':1';
+            $ratioColor = $ratio >= 2.0 ? '#81c784' : ($ratio >= 1.0 ? '#ffb74d' : '#ef5350');
+        } else {
+            $ratioText = 'N/A';
+            $ratioColor = '#b0bec5';
+        }
+        $ratioLine = '<br />Inbound:Outbound ratio (30 days): <span style="color: '.$ratioColor.'">'.$ratioText.'</span>';
+    }
+
+    if ($trafficLimit <= 0) {
+        echo <<<EOF
+<h6>Traffic Info</h6>
+Traffic used (30 days): {$trafficUsed}<br />
+Traffic limit: Unlimited{$inboundLine}{$ratioLine}<br />
+<div style="margin-top: 3px; line-height: 1.35;">{$bandwidthNote}</div>
+This is rolling past 30 days, <a href="https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
+<hr />
+EOF;
+        return;
+    }
+
+    $bonusTraffic = max(0, (int) $bonusTraffic);
+    $limitTotal = $trafficLimit + $bonusTraffic;
+    $percent = ($limitTotal > 0) ? round((($trafficUsedRaw / 1024) / $limitTotal) * 100) : 0;
+    if (!is_finite($percent)) $percent = 0;
+
+    $warning = $percent > 100
+        ? '<br /><b style="color: red;">OVER TRAFFIC LIMIT WARNING - REDUCED BANDWIDTH</b><br />You are beyond your traffic limit. Consider upgrading your plan or adding extra traffic.<br />Datacenter external outbound (TO internet) bandwidth limited to 100 Mbps. Datacenter internal and inbound bandwidth is unrestricted.'
+        : '';
+    $titleText = "{$trafficUsed} / {$limitTotal} GiB";
+    $bonusLine = ($bonusTraffic > 0) ? '<br />Bonus traffic: ' . number_format($bonusTraffic) . ' GiB' : '';
+    $gauge = createGauge($titleText, $titleText . $bonusLine, $percent);
+
+    echo <<<EOF
+<h6>Traffic Info</h6>
+{$gauge}
+{$warning}
+<div style="margin-top: 3px; line-height: 1.35;">{$bandwidthNote}</div>
+{$inboundLine}{$ratioLine}
+This is rolling past 30 days, <a href="https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
+<hr />
 EOF;
 }
 
@@ -1220,7 +1195,7 @@ function quotaCreateSection($quotaInfo, $bonusQuota = 0) {
     $readableQuota  = pmssFormatBytes($totalSpace, 2, 0, true);
     $readableBurst  = pmssFormatBytes($hardLimit, 2, 0, true);
 
-    $bonusQuotaDisplay = ($bonusQuota != 0) ? '<br />Bonus disk space: ' . number_format($bonusQuota) . ' GiB' : '';
+    $bonusQuotaLine = ($bonusQuota != 0) ? '<br />Bonus disk space: ' . number_format($bonusQuota) . ' GiB' : '';
 
     if ($percent > 100) {
         $warning = <<<EOF
@@ -1234,7 +1209,7 @@ EOF;
     $titleText = "{$readableUsed}/{$readableQuota}";
     if ($percent > 100) $titleText .= " Burst limit: {$readableBurst}";
 
-    $gauge = createGauge($titleText, $titleText . $bonusQuotaDisplay, $percent, $percentFromBurst);
+    $gauge = createGauge($titleText, $titleText . $bonusQuotaLine, $percent, $percentFromBurst);
 
     return <<<EOF
 <h6>Quota Info</h6>
