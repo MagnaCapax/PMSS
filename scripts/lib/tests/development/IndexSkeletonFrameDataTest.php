@@ -172,7 +172,7 @@ class IndexSkeletonFrameDataTest extends TestCase
         $this->assertStringContainsString('<div id="deluge" class="tabs-container"></div>', $html);
     }
 
-    public function testRemoteDisabledRenderAddsQbittorrentFrameFromProxyFragment(): void
+    public function testRemoteDisabledRenderAddsTorrentFramesFromProxyFragments(): void
     {
         $root = $this->pmssMakeTempDir('pmss-index-proxy-root-', 0755);
         $home = $root.'/alice';
@@ -182,6 +182,10 @@ class IndexSkeletonFrameDataTest extends TestCase
             $home.'/.lighttpd/custom.d/pmss-qbittorrent.conf',
             '$HTTP["url"] =~ "^/user-alice/qbittorrent/" {'."\n}\n"
         );
+        file_put_contents(
+            $home.'/.lighttpd/custom.d/pmss-deluge.conf',
+            '$HTTP["url"] =~ "^/user-alice/deluge/" {'."\n}\n"
+        );
 
         $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
@@ -189,6 +193,8 @@ class IndexSkeletonFrameDataTest extends TestCase
         $this->assertStringContainsString('title="qBittorrent - Torrent web UI"', $html);
         $this->assertStringContainsString("loadFrame('qbittorrent', 'qbittorrent/')", $html);
         $this->assertStringContainsString('<div id="qbittorrent" class="tabs-container"></div>', $html);
+        $this->assertStringContainsString('<a href="#deluge"', $html);
+        $this->assertStringContainsString("loadFrame('deluge', 'deluge/')", $html);
     }
 
     public function testRemoteDisabledRenderAddsMediaStackFramesFromProxyFragment(): void
@@ -204,7 +210,13 @@ class IndexSkeletonFrameDataTest extends TestCase
                 '}',
                 '$HTTP["url"] =~ "^/radarr($|/)" {',
                 '}',
+                '$HTTP["url"] =~ "^/prowlarr($|/)" {',
+                '}',
                 '$HTTP["url"] =~ "^/sonarr($|/)" {',
+                '}',
+                '$HTTP["url"] =~ "^/lidarr($|/)" {',
+                '}',
+                '$HTTP["url"] =~ "^/readarr($|/)" {',
                 '}',
                 '$HTTP["url"] =~ "^/jellyfin($|/)" {',
                 '}',
@@ -217,7 +229,10 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $this->assertStringContainsString("loadFrame('sabnzbd', '/public-alice/sabnzbd/')", $html);
         $this->assertStringContainsString("loadFrame('radarr', '/public-alice/radarr/')", $html);
+        $this->assertStringContainsString("loadFrame('prowlarr', '/public-alice/prowlarr/')", $html);
         $this->assertStringContainsString("loadFrame('sonarr', '/public-alice/sonarr/')", $html);
+        $this->assertStringContainsString("loadFrame('lidarr', '/public-alice/lidarr/')", $html);
+        $this->assertStringContainsString("loadFrame('readarr', '/public-alice/readarr/')", $html);
         $this->assertStringContainsString("loadFrame('jellyfin', '/public-alice/jellyfin/web/index.html')", $html);
         $this->assertStringNotContainsString('<a href="#notebook"', $html);
     }
