@@ -613,19 +613,11 @@ function pmssWelcomeTrafficDefaultCapMbitRead() {
         $defaultCapMbit = 100;
     }
 
-    $userConfigPath = '../.config/pmss-user.json';
-    if (file_exists($userConfigPath)) {
-        $userConfigRaw = @file_get_contents($userConfigPath);
-        if (is_string($userConfigRaw) && trim($userConfigRaw) !== '') {
-            $userConfig = json_decode($userConfigRaw, true);
-            if (is_array($userConfig)
-                && isset($userConfig['trafficCapMbit'])
-                && is_numeric($userConfig['trafficCapMbit'])) {
-                $userCapMbit = (int) $userConfig['trafficCapMbit'];
-                if ($userCapMbit > 0) {
-                    $defaultCapMbit = $userCapMbit;
-                }
-            }
+    $userCapMbit = pmssWelcomeUserConfigNumber('trafficCapMbit', true);
+    if ($userCapMbit !== null) {
+        $userCapMbit = (int) $userCapMbit;
+        if ($userCapMbit > 0) {
+            $defaultCapMbit = $userCapMbit;
         }
     }
 
@@ -794,9 +786,9 @@ function pmssWelcomeRemoteFetch($url) {
         : false;
 }
 
-function readUserRamLimitBytes() {
+function pmssWelcomeUserConfigNumber($key, $allowSymlink = false) {
     $configPath = '../.config/pmss-user.json';
-    if (!is_file($configPath) || is_link($configPath)) {
+    if ($allowSymlink ? !file_exists($configPath) : (!is_file($configPath) || is_link($configPath))) {
         return null;
     }
 
@@ -806,29 +798,39 @@ function readUserRamLimitBytes() {
     }
 
     $userConfig = json_decode($raw, true);
-    if (!is_array($userConfig) || !isset($userConfig['ramMiB']) || !is_numeric($userConfig['ramMiB'])) {
-        return null;
-    }
+    return is_array($userConfig) && isset($userConfig[$key]) && is_numeric($userConfig[$key])
+        ? (float) $userConfig[$key]
+        : null;
+}
 
-    $ramMiB = (float) $userConfig['ramMiB'];
-    if ($ramMiB <= 0) {
+function readUserRamLimitBytes() {
+    $ramMiB = pmssWelcomeUserConfigNumber('ramMiB');
+    if ($ramMiB === null || $ramMiB <= 0) {
         return null;
     }
 
     return $ramMiB * 1024 * 1024;
 }
 
-function readUserMemoryCurrentBytes() {
+// Read the resource-data memory subtree if the serialized state is valid.
+function readUserResourceMemoryData() {
     $resourceData = readUserResourceData();
     if (!is_array($resourceData)
         || !isset($resourceData['memory'])
-        || !is_array($resourceData['memory'])
-        || !isset($resourceData['memory']['current'])
-        || !is_numeric($resourceData['memory']['current'])) {
+        || !is_array($resourceData['memory'])) {
         return null;
     }
 
-    return (float) $resourceData['memory']['current'];
+    return $resourceData['memory'];
+}
+
+function readUserMemoryCurrentBytes() {
+    $memory = readUserResourceMemoryData();
+    if (!is_array($memory) || !isset($memory['current']) || !is_numeric($memory['current'])) {
+        return null;
+    }
+
+    return (float) $memory['current'];
 }
 
 function readUserResourceData() {
@@ -839,20 +841,16 @@ function readUserResourceData() {
 }
 
 function readUserMemoryBreakdownBytes() {
-    $resourceData = readUserResourceData();
-    if (!is_array($resourceData)
-        || !isset($resourceData['memory'])
-        || !is_array($resourceData['memory'])) {
+    $memory = readUserResourceMemoryData();
+    if (!is_array($memory)) {
         return array();
     }
 
-    $memory = $resourceData['memory'];
     $breakdown = array();
-    if (isset($memory['anon']) && is_numeric($memory['anon'])) {
-        $breakdown['anon'] = (float) $memory['anon'];
-    }
-    if (isset($memory['file']) && is_numeric($memory['file'])) {
-        $breakdown['file'] = (float) $memory['file'];
+    foreach (array('anon', 'file') as $key) {
+        if (isset($memory[$key]) && is_numeric($memory[$key])) {
+            $breakdown[$key] = (float) $memory[$key];
+        }
     }
 
     return $breakdown;
