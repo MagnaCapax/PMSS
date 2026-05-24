@@ -28,30 +28,34 @@ class TorrentPortFrontendTest extends TestCase
         ]);
     }
 
-    public function testApplySkeletonFilesPatchesDelugeFrontendToUsePhpHelper(): void
+    public function testApplySkeletonFilesKeepsCleanDelugeFrontendInCustomerTree(): void
     {
-        $this->pmssWriteRelativeFile($this->skelDir, 'www/deluge.php', "<?php\nfunction startDeluge() {\n    shell_exec('nohup python3 /home/\$(whoami)/.delugePort.py; deluged -l /home/\$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/\$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');\n}\n");
+        $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/deluge.php');
+        $this->pmssWriteRelativeFile($this->skelDir, 'www/deluge.php', $source);
 
         \pmssUserApplySkeletonFiles($this->context());
 
         $content = (string) file_get_contents($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/deluge.php'));
-        $this->assertTrue(strpos($content, "if (is_readable('/scripts/lib/user/torrentPort.php')) {") !== false);
-        $this->assertTrue(strpos($content, "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';") === false);
-        $this->assertTrue(strpos($content, 'pmssDelugePortEnsureCurrentUser') !== false);
-        $this->assertTrue(strpos($content, '.delugePort.py') === false);
+        $this->assertEquals($source, $content);
+        $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $content);
+        $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $content);
+        $this->assertStringContainsString('pmssDelugePortEnsureCurrentUser', $content);
+        $this->assertStringNotContainsString('.delugePort.py', $content);
     }
 
-    public function testApplySkeletonFilesPatchesQbittorrentFrontendToUsePhpHelper(): void
+    public function testApplySkeletonFilesKeepsCleanQbittorrentFrontendInCustomerTree(): void
     {
-        $this->pmssWriteRelativeFile($this->skelDir, 'www/qbittorrent.php', "<?php\nfunction startQbittorrent() {\n    passthru('python3 /home/\$(whoami)/.qbittorrentPort.py; zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');\n}\n");
+        $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/qbittorrent.php');
+        $this->pmssWriteRelativeFile($this->skelDir, 'www/qbittorrent.php', $source);
 
         \pmssUserApplySkeletonFiles($this->context());
 
         $content = (string) file_get_contents($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/qbittorrent.php'));
-        $this->assertTrue(strpos($content, "if (is_readable('/scripts/lib/user/torrentPort.php')) {") !== false);
-        $this->assertTrue(strpos($content, "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';") === false);
-        $this->assertTrue(strpos($content, 'pmssQbittorrentPortEnsureCurrentUser') !== false);
-        $this->assertTrue(strpos($content, '.qbittorrentPort.py') === false);
+        $this->assertEquals($source, $content);
+        $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $content);
+        $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $content);
+        $this->assertStringContainsString('pmssQbittorrentPortEnsureCurrentUser', $content);
+        $this->assertStringNotContainsString('.qbittorrentPort.py', $content);
     }
 
     public function testApplySkeletonFilesStopsPropagatingLegacyPythonHelpers(): void
@@ -60,8 +64,8 @@ class TorrentPortFrontendTest extends TestCase
 
         $this->assertTrue(strpos($src, "        '.delugePort.py',") === false);
         $this->assertTrue(strpos($src, "        '.qbittorrentPort.py',") === false);
-        $this->assertTrue(strpos($src, 'pmssDelugePortEnsureCurrentUser') !== false);
-        $this->assertTrue(strpos($src, 'pmssQbittorrentPortEnsureCurrentUser') !== false);
+        $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $src);
+        $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $src);
     }
 
     public function testShippedDelugeFrontendUsesPhpPortHelper(): void

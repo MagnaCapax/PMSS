@@ -357,19 +357,18 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString('function getPmssVersion(', $src);
     }
 
-    public function testSkeletonMaintenanceKeepsTorrentFrontendPatchLocal(): void
+    public function testSkeletonMaintenanceDoesNotInjectTorrentFrontendOperatorRequires(): void
     {
         $src = $this->pmssReadRepoFile('scripts/lib/update/users.php');
         $filesystemSrc = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
         $symbol = 'pmssUserPatch'.'TorrentFrontends';
 
-        $this->assertSourceOmitsFunction($filesystemSrc, $symbol, 'filesystem.php should keep torrent frontend patch logic local to pmssUserApplySkeletonFiles()');
+        $this->assertSourceOmitsFunction($filesystemSrc, $symbol, 'filesystem.php should not restore removed torrent frontend patch wrappers');
         $this->assertStringContainsString("require_once __DIR__.'/users/filesystem.php';", $src);
-        $this->assertStringContainsString("\$guardedRequireLine = preg_replace('/^<\\?php\\s*/', '', \$requireLine, 1, \$count);", $filesystemSrc);
-        $this->assertStringContainsString("str_replace(\"require_once '/scripts/lib/user/torrentPort.php';\\n\", \$guardedRequireLine, \$updated, \$replaced)", $filesystemSrc);
-        $this->assertStringContainsString("preg_replace('/^<\\?php\\s*/', \$requireLine, \$updated, 1, \$count)", $filesystemSrc);
-        $this->assertStringContainsString('pmssDelugePortEnsureCurrentUser', $filesystemSrc);
-        $this->assertStringContainsString('pmssQbittorrentPortEnsureCurrentUser', $filesystemSrc);
+        $this->pmssAssertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $filesystemSrc);
+        $this->pmssAssertStringNotContainsString("is_readable('/scripts/lib/user/torrentPort.php')", $filesystemSrc);
+        $this->pmssAssertStringNotContainsString('pmssDelugePortEnsureCurrentUser', $filesystemSrc);
+        $this->pmssAssertStringNotContainsString('pmssQbittorrentPortEnsureCurrentUser', $filesystemSrc);
     }
 
     public function testUserUpdateModuleOwnsRutorrentHelpers(): void

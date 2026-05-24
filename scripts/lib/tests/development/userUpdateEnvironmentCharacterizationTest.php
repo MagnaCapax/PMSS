@@ -70,8 +70,8 @@ file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', "[BitTorrent]\n
 file_put_contents($home.'/www/filemanager.php', "before\n        ob_flush();\nafter\n");
 file_put_contents($home.'/www/rutorrent/php/settings.php', '((integer)($tm["minutes"]/$interval))*$interval+$interval,');
 file_put_contents($home.'/www/rutorrent/plugins/rss/action.php', "before\nob_flush();\nafter\n");
-file_put_contents($skelRoot.'/www/deluge.php', "<?php\nfunction startDeluge() {\n    shell_exec('nohup python3 /home/\$(whoami)/.delugePort.py; deluged -l /home/\$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/\$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');\n}\n");
-file_put_contents($skelRoot.'/www/qbittorrent.php', "<?php\nfunction startQbittorrent() {\n    passthru('python3 /home/\$(whoami)/.qbittorrentPort.py; zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');\n}\n");
+copy($repoRoot.'/etc/skel/www/deluge.php', $skelRoot.'/www/deluge.php');
+copy($repoRoot.'/etc/skel/www/qbittorrent.php', $skelRoot.'/www/qbittorrent.php');
 file_put_contents($skelRoot.'/www/rutorrent/plugins/hddquota/action.php', "return \$field;\n");
 file_put_contents($skelRoot.'/.irssi/config', "test\n");
 file_put_contents($skelRoot.'/www/rutorrent/plugins/hddquota/sample.txt', "quota\n");
@@ -116,10 +116,12 @@ PHP
         $this->assertTrue($result['irssi_exists']);
         $this->assertTrue($result['recycle_exists']);
         $this->assertStringContainsString('@ob_flush();', $result['filemanager']);
-        $this->assertStringContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $result['deluge']);
+        $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $result['deluge']);
+        $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $result['deluge']);
         $this->assertStringContainsString('pmssDelugePortEnsureCurrentUser', $result['deluge']);
         $this->assertTrue(strpos($result['deluge'], '.delugePort.py') === false);
-        $this->assertStringContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $result['qbittorrent_frontend']);
+        $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $result['qbittorrent_frontend']);
+        $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $result['qbittorrent_frontend']);
         $this->assertStringContainsString('pmssQbittorrentPortEnsureCurrentUser', $result['qbittorrent_frontend']);
         $this->assertTrue(strpos($result['qbittorrent_frontend'], '.qbittorrentPort.py') === false);
         $this->assertStringContainsString('((integer)($tm["minutes"]/((', str_replace('(int)$interval', '((int)$interval)', $result['settings']));
