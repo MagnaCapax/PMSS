@@ -33,9 +33,7 @@ function pmssTotalMemMiB(): int
         return (int) $override;
     }
 
-    return preg_match('/^MemTotal:\s+([0-9]+)/m', (string) @file_get_contents('/proc/meminfo'), $matches) === 1
-        ? (int) round(((int) $matches[1]) / 1024)
-        : 0;
+    return pmssProcMeminfoTotalMiBRead();
 }
 
 /**

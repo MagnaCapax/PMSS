@@ -192,6 +192,16 @@ if (!function_exists('pmssReadRegularFileTrimmed')) {
         return (($contents = pmssReadRegularFileContents($path)) === null) ? null : trim($contents);
     }
 }
+if (!function_exists('pmssProcMeminfoFieldsRead')) {
+    // Parse Linux meminfo into integer KiB fields for shared resource callers.
+    function pmssProcMeminfoFieldsRead(string $path = '/proc/meminfo'): array
+    {
+        $fields = [];
+        foreach (explode("\n", pmssReadRegularFileContents($path) ?? '') as $line) if (preg_match('/^(\w+):\s+(\d+)/', $line, $matches) === 1) $fields[$matches[1]] = (int) $matches[2];
+        return $fields;
+    }
+}
+if (!function_exists('pmssProcMeminfoTotalMiBRead')) { function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fields = pmssProcMeminfoFieldsRead($path); return isset($fields['MemTotal']) ? (int) round($fields['MemTotal'] / 1024) : 0; } }
 if (!function_exists('pmssReadSerializedArrayFile')) {
     // Read a serialized array payload without allowing object wakeups.
     function pmssReadSerializedArrayFile(string $path): ?array

@@ -146,14 +146,7 @@ function pmssSystemStatsCollect(): array
         $load = array_slice($parts, 0, 3);
     }
 
-    $meminfo = [];
-    if (is_array($memLines = @file('/proc/meminfo'))) {
-        foreach ($memLines as $line) {
-            if (preg_match('/^(\w+):\s+(\d+)/', $line, $m)) {
-                $meminfo[$m[1]] = (int)$m[2];
-            }
-        }
-    }
+    $meminfo = pmssProcMeminfoFieldsRead();
 
     $hasIoping = pmssCommandPath('ioping') !== '';
     $iopingRoot = $hasIoping ? $iopingMs('/') : 'na';
