@@ -380,7 +380,7 @@ class Manager
             return null;
         }
 
-        if (strpos($matches[1], '/dev/') !== 0 || strpos($matches[1], "\0") !== false || strpos($matches[2], "\0") !== false) {
+        if (!$this->deviceTargetIsSafe($matches[1]) || strpos($matches[2], "\0") !== false) {
             return null;
         }
 
@@ -742,9 +742,20 @@ class Manager
     /** Keep systemd IO property device targets to plain /dev paths. */
     private function deviceTargetIsSafe(string $device): bool
     {
-        return strpos($device, '/dev/') === 0
-            && strpos($device, "\0") === false
-            && preg_match('/\s/', $device) !== 1;
+        if (strpos($device, '/dev/') !== 0
+            || strpos($device, "\0") !== false
+            || preg_match('/\s/', $device) === 1
+            || substr($device, -1) === '/') {
+            return false;
+        }
+
+        foreach (explode('/', substr($device, 5)) as $segment) {
+            if ($segment === '' || $segment === '.' || $segment === '..') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** Prefix plain nested keys with the resolved major:minor device token. */
