@@ -192,4 +192,59 @@ class rtorrentConfigCreateConfigTest extends TestCase
         $this->assertEquals('', $output);
         $this->assertEquals("mem=250M\n", (string) $result['configFile']);
     }
+
+    public function testWriteConfigUsesValidatedHomeRoot(): void
+    {
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-rtorrent-home-');
+        $this->pmssEnsureFixtureDirectory($this->pmssUserHomePath($homeRoot, 'dummy'));
+        $cfg = $this->rtorrentConfigFixture();
+        $content = "directory.default.set = /home/dummy/data\n";
+
+        $this->assertTrue($cfg->writeConfig('dummy', $content));
+        $path = $this->pmssUserHomePath($homeRoot, 'dummy', '.rtorrent.rc');
+        $this->assertEquals($content, (string) file_get_contents($path));
+        $this->assertEquals(['directory.default.set' => '/home/dummy/data'], $cfg->readUserConfig('dummy'));
+        $this->assertSame(null, $cfg->idempotentConfig('dummy', $content));
+        $this->assertTrue($cfg->idempotentConfig('dummy', "directory.default.set = /home/dummy/other\n"));
+    }
+
+    public function testWriteConfigRejectsUnsafeUsernames(): void
+    {
+        $this->pmssMakeTrackedHomeRoot('pmss-rtorrent-home-');
+        $cfg = $this->rtorrentConfigFixture();
+
+        foreach (['BadName', '../root', 'user/name', 'dummy;rm'] as $username) {
+            try {
+                $cfg->writeConfig($username, "x = y\n");
+            } catch (\InvalidArgumentException $exception) {
+                $this->assertStringContainsString('valid PMSS username', $exception->getMessage());
+                continue;
+            }
+            $this->fail('Expected invalid username to be rejected: '.$username);
+        }
+    }
+
+    public function testWriteConfigRefusesMissingOrSymlinkedHome(): void
+    {
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-rtorrent-home-');
+        $cfg = $this->rtorrentConfigFixture();
+
+        $this->assertFalse($cfg->writeConfig('dummy', "x = y\n"));
+
+        $target = $this->pmssMakeTempDir('pmss-rtorrent-target-');
+        if (!@symlink($target, $this->pmssUserHomePath($homeRoot, 'dummy'))) {
+            throw new SkipTest('symlink fixtures unavailable');
+        }
+        $this->assertFalse($cfg->writeConfig('dummy', "x = y\n"));
+        $this->assertFalse(file_exists($target.'/.rtorrent.rc'));
+    }
+
+    private function rtorrentConfigFixture(): \rtorrentConfig
+    {
+        return new \rtorrentConfig([
+            'ramBlock' => 250,
+            'peers' => ['minimum' => 1, 'maximum' => 2],
+            'uploadSlots' => 1,
+        ], "mem=##memoryMax\n");
+    }
 }

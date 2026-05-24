@@ -13,6 +13,8 @@
  *
  * @license GPL-3.0-only
  */
+require_once __DIR__.'/pathSafety.php';
+
 class rtorrentConfig
 {
     private const RESOURCE_CONFIG_PATH = '/etc/seedbox/config/rtorrent.resources.json';
@@ -69,12 +71,17 @@ class rtorrentConfig
         if (empty($user)) {
             throw new Exception('rtorrentConfig->writeConfig: User cannot be empty!');
         }
-        $file = '/home/'.$user.'/.rtorrent.rc';
-        if (!file_exists($file)) {
-            touch($file);
-            chmod($file, 0644);
+        $file = $this->userConfigFilePath($user);
+        if (!$this->userConfigFileTargetIsSafe($file)) {
+            return false;
         }
-        return is_writable($file) && file_put_contents($file, $config) !== false;
+        if (!file_exists($file)) {
+            if (@touch($file) === false || !$this->userConfigFileTargetIsSafe($file)) {
+                return false;
+            }
+            @chmod($file, 0644);
+        }
+        return is_writable($file) && @file_put_contents($file, $config) !== false;
     }
     /**
      * Rewrite a user's configuration only when the contents differ.
@@ -84,8 +91,8 @@ class rtorrentConfig
      */
     public function idempotentConfig($user, $config)
     {
-        $file = '/home/'.$user.'/.rtorrent.rc';
-        $data = file_get_contents($file);
+        $file = $this->userConfigFilePath($user);
+        $data = (is_file($file) && !is_link($file)) ? @file_get_contents($file) : false;
         return $data !== $config ? $this->writeConfig($user, $config) : null;
     }
     /**
@@ -95,8 +102,11 @@ class rtorrentConfig
      */
     public function readUserConfig($user)
     {
-        $file = "/home/{$user}/.rtorrent.rc";
-        return (!file_exists($file) || is_dir($file)) ? false : $this->readConfig($file);
+        if (!$this->userConfigUsernameIsSafe($user)) {
+            return false;
+        }
+        $file = $this->userConfigFilePath($user);
+        return (!is_file($file) || is_link($file)) ? false : $this->readConfig($file);
     }
     /**
      * Parse simple `key = value` lines from an rTorrent config file.
@@ -105,11 +115,11 @@ class rtorrentConfig
      */
     public function readConfig($file)
     {
-        if (!file_exists($file) || is_dir($file)) {
+        if (!is_file($file) || is_link($file)) {
             return false;
         }
-        $configRaw = file_get_contents($file);
-        if (empty($configRaw) || $configRaw == false) {
+        $configRaw = @file_get_contents($file);
+        if (!is_string($configRaw) || $configRaw === '') {
             return false;
         }
         $config = array();
@@ -256,5 +266,46 @@ class rtorrentConfig
             }
         }
         throw new RuntimeException('Unable to read rTorrent template: '.self::TEMPLATE_PATH);
+    }
+
+    private function userConfigFilePath($user): string
+    {
+        if (!$this->userConfigUsernameIsSafe($user)) {
+            throw new InvalidArgumentException('rtorrentConfig requires a valid PMSS username');
+        }
+
+        $homeRoot = getenv('PMSS_HOME_DIR');
+        $homeRoot = is_string($homeRoot) && trim($homeRoot) !== '' ? rtrim($homeRoot, '/') : '/home';
+        if ($homeRoot === '') {
+            $homeRoot = '/';
+        }
+        $prefix = $homeRoot === '/' ? '' : $homeRoot;
+        return $prefix.'/'.$user.'/.rtorrent.rc';
+    }
+
+    private function userConfigFileTargetIsSafe(string $file): bool
+    {
+        $homeDir = dirname($file);
+        return is_dir($homeDir)
+            && !is_link($homeDir)
+            && pmssPathTargetIsSafe($homeDir, true)
+            && pmssPathTargetIsSafe($file, false, true);
+    }
+
+    private function userConfigUsernameIsSafe($user): bool
+    {
+        if (!is_string($user)) {
+            return false;
+        }
+        if (function_exists('pmssValidateUsername')) {
+            return pmssValidateUsername($user);
+        }
+
+        // Keep this leaf writer independent of the full user lifecycle
+        // bootstrap; the fallback mirrors pmssUsernameIsValid().
+        $normalized = strtolower(trim($user));
+        return $user !== ''
+            && $normalized === $user
+            && preg_match('/^[a-z][a-z0-9]{0,7}$/D', $normalized) === 1;
     }
 }
