@@ -139,7 +139,7 @@ class SetupLetsEncryptTest extends TestCase
     {
         $cronPath = $this->pmssMakeTempDir('pmss-certbot-cron-fail-').'/certbot';
 
-        try {
+        $this->assertThrowsRuntime(function () use ($cronPath): void {
             \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', $this->pmssLetsEncryptTestOptions([
                 'cronPath' => $cronPath,
                 'fileExists' => static function (string $path): bool {
@@ -152,24 +152,18 @@ class SetupLetsEncryptTest extends TestCase
                     return ['rc' => 0, 'stdout' => '', 'stderr' => ''];
                 },
             ]));
-            $this->fail('Expected nginx restart failure to throw');
-        } catch (\RuntimeException $exception) {
-            $this->assertStringContainsString('Restart nginx failed (rc=1): restart failed', $exception->getMessage());
-        }
+        }, 'Restart nginx failed (rc=1): restart failed');
     }
 
     public function testSharedSetupRejectsInvalidCommandRunnerPayload(): void
     {
-        try {
+        $this->assertThrowsRuntime(function (): void {
             \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', $this->pmssLetsEncryptTestOptions([
                 'commandRunner' => static function (string $command, string $description) {
                     return 'not-a-command-result';
                 },
             ]));
-            $this->fail('Expected invalid command runner result to throw');
-        } catch (\RuntimeException $exception) {
-            $this->assertSame('Install certbot packages returned invalid command result', $exception->getMessage());
-        }
+        }, 'Install certbot packages returned invalid command result');
     }
 
     public function testSharedSetupBootstrapsMissingBusterCertbotBinary(): void

@@ -213,6 +213,22 @@ abstract class TestCase
         throw new \AssertionError($message !== '' ? $message : 'Test failed');
     }
 
+    /** Assert that a callback throws RuntimeException with the expected message fragment. */
+    protected function assertThrowsRuntime(callable $callback, string $messageFragment, ?int $code = null): void
+    {
+        try {
+            $callback();
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString($messageFragment, $e->getMessage());
+            if ($code !== null) {
+                $this->assertEquals($code, $e->getCode());
+            }
+            return;
+        }
+
+        $this->fail('Expected RuntimeException, none thrown');
+    }
+
     /**
      * Capture stdout emitted by a callback and return its result alongside the buffer.
      *

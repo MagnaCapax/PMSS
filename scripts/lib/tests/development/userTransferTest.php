@@ -74,7 +74,7 @@ class UserTransferTest extends TestCase
         $this->assertEquals('deefbox', $cfg['localUser']);
         $this->assertEquals('remote01', $cfg['remoteUser']);
         $this->assertEquals('example.com', $cfg['hostname']);
-        $this->assertTrue(!$cfg['suffixAppended'], 'expected no suffix appended');
+        $this->assertFalse($cfg['suffixAppended'], 'expected no suffix appended');
         $this->assertEquals([31, 3, 60, 360, 90, false, false], [$cfg['mainPasses'], $cfg['finalPasses'], $cfg['sleepMin'], $cfg['sleepMax'], $cfg['verifyThreshold'], $cfg['dryRun'], $cfg['printPassword']]);
     }
 
@@ -187,7 +187,7 @@ class UserTransferTest extends TestCase
         $this->assertStringContainsString("--exclude='.rtorrent.rc'", $script);
         $this->assertStringContainsString("--exclude='.trafficDataIngress'", $script);
         $this->assertStringContainsString("--exclude='.trafficDataIngressLocal'", $script);
-        $this->assertTrue(strpos($script, '--exclude={') === false, 'expected no brace-expanded excludes');
+        $this->assertStringNotContainsString('--exclude={', $script, 'expected no brace-expanded excludes');
     }
 
     public function testBuildRsyncFinalUsesExplicitSources(): void
@@ -198,7 +198,7 @@ class UserTransferTest extends TestCase
         $this->assertStringContainsString('rsync -av', $script);
         $this->assertStringContainsString(':/home/deefbox/session', $script);
         $this->assertStringContainsString(':/home/deefbox/www/public', $script);
-        $this->assertTrue(strpos($script, '{session') === false, 'expected no brace-expanded sources');
+        $this->assertStringNotContainsString('{session', $script, 'expected no brace-expanded sources');
     }
 
     public function testBuildAuthProbeUsesSinglePasswordPrompt(): void
@@ -242,22 +242,18 @@ class UserTransferTest extends TestCase
 
     public function testParseDuBytesRejectsUnreadableOutput(): void
     {
-        $this->assertEquals(null, \pmssUserTransferParseDuBytes("du: cannot access '/home/deefbox': Permission denied\n"));
+        $this->assertSame(null, \pmssUserTransferParseDuBytes("du: cannot access '/home/deefbox': Permission denied\n"));
     }
 
-    public function testEvaluateCompletenessWarnsWhenBelowThreshold(): void
+    public function testEvaluateCompletenessHandlesThresholdCases(): void
     {
-        $this->assertEvaluateCompleteness(1000, 850, 90, ['remoteBytes' => 1000, 'localBytes' => 850, 'verifyThreshold' => 90, 'localPercent' => 85.0]);
-    }
-
-    public function testEvaluateCompletenessAllowsHealthyTransfer(): void
-    {
-        $this->assertEvaluateCompleteness(1000, 950, 90, null);
-    }
-
-    public function testEvaluateCompletenessSkipsZeroRemoteSize(): void
-    {
-        $this->assertEvaluateCompleteness(0, 0, 90, null);
+        foreach ([
+            [1000, 850, 90, ['remoteBytes' => 1000, 'localBytes' => 850, 'verifyThreshold' => 90, 'localPercent' => 85.0], 'below threshold'],
+            [1000, 950, 90, null, 'healthy transfer'],
+            [0, 0, 90, null, 'zero remote size'],
+        ] as [$remoteBytes, $localBytes, $threshold, $expected, $label]) {
+            $this->assertEquals($expected, \pmssUserTransferEvaluateCompleteness($remoteBytes, $localBytes, $threshold), 'unexpected result for '.$label);
+        }
     }
 
     public function testBuildExpectWrapperUsesEnvPassword(): void
@@ -265,7 +261,7 @@ class UserTransferTest extends TestCase
         $script = \pmssUserTransferBuildExpectWrapper();
 
         $this->assertStringContainsString('env(PMSS_USER_TRANSFER_PASSWORD)', $script);
-        $this->assertTrue(strpos($script, 'send "{$') === false, 'expected password not embedded in script');
+        $this->assertStringNotContainsString('send "{$', $script, 'expected password not embedded in script');
     }
 
     public function testGeneratedTransferScriptsMatchSnapshot(): void
@@ -428,7 +424,7 @@ SNAP;
         $helper = (string) file_get_contents(dirname(__DIR__, 2).'/userTransfer/localUserSafety.php');
 
         $needle = "pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home')";
-        $this->assertTrue(strpos($helper, $needle) !== false, 'userTransfer safety checks must honour PMSS_HOME_DIR');
+        $this->assertStringContainsString($needle, $helper, 'userTransfer safety checks must honour PMSS_HOME_DIR');
     }
 
     public function testWriteFilePersistsPayloadAndMode(): void
@@ -489,22 +485,6 @@ SNAP;
         \pmssUserTransferSleep(0, 0, 'Unit test');
 
         $this->assertTrue((microtime(true) - $started) < 0.2, 'expected non-positive max sleep to return immediately');
-    }
-
-    private function assertThrowsRuntime(callable $fn, string $messageFragment): void
-    {
-        try {
-            $fn();
-        } catch (\RuntimeException $e) {
-            $this->assertStringContainsString($messageFragment, $e->getMessage());
-            return;
-        }
-        throw new \AssertionError('Expected RuntimeException, none thrown');
-    }
-
-    private function assertEvaluateCompleteness(int $remoteBytes, int $localBytes, int $threshold, ?array $expected): void
-    {
-        $this->assertEquals($expected, \pmssUserTransferEvaluateCompleteness($remoteBytes, $localBytes, $threshold));
     }
 
     private function baseConfig(array $overrides = []): array

@@ -53,8 +53,10 @@ class SkeletonWebLocalAssetTest extends TestCase
             'Missing local tabs asset reference: '
         );
 
-        $this->pmssAssertRepoFileNotContainsString('etc/skel/www/index.php', 'static.pulsedmedia.com/jquery.tabs.pack.js', 'index.php should not depend on the remote tabs script host.');
-        $this->pmssAssertRepoFileNotContainsString('etc/skel/www/index.php', 'static.pulsedmedia.com/jquery.tabs.css', 'index.php should not depend on the remote tabs stylesheet host.');
+        $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/index.php', [
+            'static.pulsedmedia.com/jquery.tabs.pack.js',
+            'static.pulsedmedia.com/jquery.tabs.css',
+        ], 'index.php should not depend on remote tabs assets: ');
     }
 
     public function testLocalTabsHelperAddsNavigationClass(): void

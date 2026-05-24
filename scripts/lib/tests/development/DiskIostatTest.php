@@ -18,22 +18,19 @@ class DiskIostatTest extends TestCase
 
     public function testBuildCommandShellEscapesValidatedDevices(): void
     {
-        $this->assertBuildCommand(['sda', 'sdb'], "'/usr/bin/iostat' -xm 120 2 -g grp1 'sda' 'sdb' 2>&1");
+        $this->assertEquals("'/usr/bin/iostat' -xm 120 2 -g grp1 'sda' 'sdb' 2>&1", \pmssDiskIostatBuildCommand(['sda', 'sdb'], '/usr/bin/iostat'));
     }
 
     public function testBuildCommandKeepsNoDeviceFallbackForNvmeOnlyHosts(): void
     {
-        $this->assertBuildCommand([], "'/usr/bin/iostat' -xm 120 2 -g grp1 2>&1");
+        $this->assertEquals("'/usr/bin/iostat' -xm 120 2 -g grp1 2>&1", \pmssDiskIostatBuildCommand([], '/usr/bin/iostat'));
     }
 
     public function testBuildCommandRejectsUnsafeDeviceNames(): void
     {
-        try {
+        $this->assertThrowsRuntime(static function (): void {
             \pmssDiskIostatBuildCommand(['sda;rm'], '/usr/bin/iostat');
-            $this->fail('Expected unsafe device name to throw');
-        } catch (\RuntimeException $exception) {
-            $this->assertStringContainsString('Unsafe block device name for iostat', $exception->getMessage());
-        }
+        }, 'Unsafe block device name for iostat');
     }
 
     public function testParseLatestSampleUsesHeaderNames(): void
@@ -45,16 +42,21 @@ class DiskIostatTest extends TestCase
 
         $parsed = \pmssDiskIostatParseLatestSample($raw, 2, 123456);
 
-        $this->assertSame('1.10', $parsed['iopsRead']);
-        $this->assertSame('3.30', $parsed['iopsWrite']);
-        $this->assertSame('2.20', $parsed['throughputRead']);
-        $this->assertSame('4.40', $parsed['throughputWrite']);
-        $this->assertSame('12.50', $parsed['diskAwait']);
-        $this->assertSame('34.25', $parsed['diskServiceTime']);
-        $this->assertSame('88.80', $parsed['diskUtil']);
-        $this->assertSame('1.25', $parsed['avgQueueSize']);
-        $this->assertSame(2, $parsed['diskQuantity']);
-        $this->assertSame(123456, $parsed['time']);
+        $this->assertSame([
+            'iopsRead' => '1.10',
+            'iopsWrite' => '3.30',
+            'throughputRead' => '2.20',
+            'throughputWrite' => '4.40',
+            'diskAwait' => '12.50',
+            'diskServiceTime' => '34.25',
+            'diskUtil' => '88.80',
+            'avgQueueSize' => '1.25',
+            'diskQuantity' => 2,
+            'time' => 123456,
+        ], array_intersect_key($parsed, array_flip([
+            'iopsRead', 'iopsWrite', 'throughputRead', 'throughputWrite', 'diskAwait',
+            'diskServiceTime', 'diskUtil', 'avgQueueSize', 'diskQuantity', 'time',
+        ])));
     }
 
     public function testParseLatestSampleKeepsLegacyAwaitFallbacks(): void
@@ -64,19 +66,18 @@ class DiskIostatTest extends TestCase
 
         $parsed = \pmssDiskIostatParseLatestSample($raw, 1, 123456);
 
-        $this->assertSame('9.90', $parsed['diskAwait']);
-        $this->assertSame('10.10', $parsed['diskServiceTime']);
-        $this->assertSame('0.50', $parsed['avgQueueSize']);
+        $this->assertSame([
+            'diskAwait' => '9.90',
+            'diskServiceTime' => '10.10',
+            'avgQueueSize' => '0.50',
+        ], array_intersect_key($parsed, array_flip(['diskAwait', 'diskServiceTime', 'avgQueueSize'])));
     }
 
     public function testParseLatestSampleReportsMissingHeader(): void
     {
-        try {
+        $this->assertThrowsRuntime(static function (): void {
             \pmssDiskIostatParseLatestSample("not iostat\n", 1, 123456);
-            $this->fail('Expected missing header to throw');
-        } catch (\RuntimeException $exception) {
-            $this->assertStringContainsString('No iostat Device header found', $exception->getMessage());
-        }
+        }, 'No iostat Device header found');
     }
 
     public function testWriteSnapshotFilesChecksEachOutput(): void
@@ -93,8 +94,4 @@ class DiskIostatTest extends TestCase
         $this->assertFalse(\pmssDiskIostatWriteSnapshotFiles($root.'/missing/iostat', $payload, 'raw'));
     }
 
-    private function assertBuildCommand(array $devices, string $expected): void
-    {
-        $this->assertEquals($expected, \pmssDiskIostatBuildCommand($devices, '/usr/bin/iostat'));
-    }
 }
