@@ -639,8 +639,7 @@ abstract class TestCase
     protected function pmssMakeExecutableStub(string $binaryName, string $script, string $dirPrefix): string
     {
         $binDir = $this->pmssMakeTempDir($dirPrefix);
-        file_put_contents($binDir.'/'.$binaryName, $script);
-        @chmod($binDir.'/'.$binaryName, 0755);
+        $this->pmssWriteExecutableFile($binDir.'/'.$binaryName, $script);
         return $binDir;
     }
 
@@ -738,16 +737,7 @@ abstract class TestCase
     private function pmssCleanupTempPaths(): void
     {
         foreach (array_reverse($this->tempPaths) as $path) {
-            if (!file_exists($path) && !is_link($path)) {
-                continue;
-            }
-
-            if (is_file($path) || is_link($path)) {
-                @unlink($path);
-                continue;
-            }
-
-            $this->pmssRemoveTree($path);
+            $this->cleanup($path);
         }
 
         foreach ($this->tempDirProperties as $propertyName) {
@@ -803,9 +793,7 @@ abstract class TestCase
         bool $unsetEmptyString = false
     ): void {
         $previous = $this->pmssCaptureEnv(array_values(array_unique(array_merge(array_keys($values), $trackedKeys))));
-        foreach ($values as $key => $value) {
-            $this->pmssRestoreEnv($key, $value, $unsetEmptyString);
-        }
+        $this->pmssRestoreEnvMap($values, $unsetEmptyString);
 
         try {
             $callback();
@@ -842,9 +830,7 @@ abstract class TestCase
             'unsetEmptyString' => $unsetEmptyString,
         ];
 
-        foreach ($values as $key => $value) {
-            $this->pmssRestoreEnv($key, $value);
-        }
+        $this->pmssRestoreEnvMap($values);
     }
 
     /** Track environment keys for automatic restoration without changing their current values. */
@@ -860,10 +846,7 @@ abstract class TestCase
     private function pmssCleanupTrackedEnvOverrides(): void
     {
         foreach (array_reverse($this->trackedEnvOverrides) as $trackedOverride) {
-            $this->pmssRestoreEnvMap(
-                $trackedOverride['values'],
-                $trackedOverride['unsetEmptyString']
-            );
+            $this->pmssRestoreEnvMap($trackedOverride['values'], $trackedOverride['unsetEmptyString']);
         }
 
         $this->trackedEnvOverrides = [];
