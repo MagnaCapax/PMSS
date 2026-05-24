@@ -7,15 +7,14 @@
  */
 
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
+require_once __DIR__.'/integerSetting.php';
 
 /**
  * Resolve the canonical Deluge core.conf path for a user.
  */
 function pmssDelugeConfigPath(string $username): string
 {
-    $homeRoot = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
-
-    return $homeRoot.'/'.$username.'/.config/deluge/core.conf';
+    return pmssUserHomeFilePath($username, '.config/deluge/core.conf');
 }
 
 /**

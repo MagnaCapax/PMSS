@@ -20,7 +20,7 @@ class QbittorrentThrottleHelperTest extends TestCase
             $this->source
         );
         $this->assertStringContainsString(
-            "pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home')",
+            "pmssUserHomeFilePath(\$username, '.config/qBittorrent/qBittorrent.conf')",
             $this->source
         );
     }

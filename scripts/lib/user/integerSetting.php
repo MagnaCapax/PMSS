@@ -78,8 +78,11 @@ function pmssIntegerSettingFileWrite(string $path, int $value): bool
 /** Resolve an integer-setting runtime bucket path for one user. */
 function pmssIntegerSettingRuntimeUserPath(string $bucket, string $username, ?string $runtimeDir = null): string { return rtrim(pmssDirPathResolve($runtimeDir, 'PMSS_RUNTIME_DIR', '/etc/seedbox/runtime'), '/').'/'.$bucket.'/'.$username; }
 
+/** Resolve a managed file path under one user home. */
+function pmssUserHomeFilePath(string $username, string $filename, ?string $homeDir = null): string { return rtrim(pmssDirPathResolve($homeDir, 'PMSS_HOME_DIR', '/home'), '/').'/'.$username.'/'.ltrim($filename, '/'); }
+
 /** Resolve an integer-setting file path under one user home. */
-function pmssIntegerSettingUserHomePath(string $username, string $filename, ?string $homeDir = null): string { return rtrim(pmssDirPathResolve($homeDir, 'PMSS_HOME_DIR', '/home'), '/').'/'.$username.'/'.ltrim($filename, '/'); }
+function pmssIntegerSettingUserHomePath(string $username, string $filename, ?string $homeDir = null): string { return pmssUserHomeFilePath($username, $filename, $homeDir); }
 
 function pmssIntegerSettingPathModeConverge(string $path, int $mode): bool
 {

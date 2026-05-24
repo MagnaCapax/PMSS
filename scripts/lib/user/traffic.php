@@ -118,8 +118,7 @@ function pmssReadTorrentThrottle(string $username): ?int
         return null;
     }
 
-    $homeDir = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
-    $path = rtrim($homeDir, '/').'/'.$username.'/.torrentThrottle';
+    $path = pmssUserHomeFilePath($username, '.torrentThrottle');
     if (!is_file($path) || is_link($path)) {
         return null;
     }
@@ -164,8 +163,7 @@ function pmssWriteTorrentThrottle(string $username, int $value): bool
         return false;
     }
 
-    $homeDir = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
-    $path = rtrim($homeDir, '/').'/'.$username.'/.torrentThrottle';
+    $path = pmssUserHomeFilePath($username, '.torrentThrottle');
     $homeDir = dirname($path);
     if (!is_dir($homeDir) || is_link($homeDir)) {
         return false;
