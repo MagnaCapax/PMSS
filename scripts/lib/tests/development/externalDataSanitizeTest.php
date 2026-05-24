@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/runtime.php';
 
 class ExternalDataSanitizeTest extends TestCase
 {
@@ -104,11 +105,7 @@ class ExternalDataSanitizeTest extends TestCase
     private function runSanitize(string $input, array $args, array $envOverrides = []): array
     {
         $cmd = array_merge([$this->script], $args);
-        $descriptors = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ];
+        $descriptors = \pmssProcessPipeDescriptorSpec();
         $env = array_merge($this->env, $envOverrides);
         $proc = proc_open($cmd, $descriptors, $pipes, null, $env);
         if (!is_resource($proc)) {

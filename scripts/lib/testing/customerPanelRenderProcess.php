@@ -5,6 +5,8 @@
  * @license GPL-3.0-only
  */
 
+require_once dirname(__DIR__).'/runtime.php';
+
 /** Return per-page byte thresholds and query strings. */
 function pmssCustomerPanelRenderExpectations(): array
 {
@@ -85,11 +87,7 @@ function pmssCustomerPanelRenderPage(string $www, string $bootstrap, string $hom
 /** Run a command with proc_open while capturing stdout/stderr and timeout state. */
 function pmssCustomerPanelRenderRunProcess(string $command, string $cwd, array $env, int $timeoutSec): array
 {
-    $descriptor = [
-        0 => ['pipe', 'r'],
-        1 => ['pipe', 'w'],
-        2 => ['pipe', 'w'],
-    ];
+    $descriptor = pmssProcessPipeDescriptorSpec();
     $process = @proc_open($command, $descriptor, $pipes, $cwd, $env);
     if (!is_resource($process)) {
         return ['rc' => 1, 'stdout' => '', 'stderr' => 'proc_open failed', 'timedOut' => false];

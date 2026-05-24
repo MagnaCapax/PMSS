@@ -396,6 +396,14 @@ if (!function_exists('pmssCommandPipesReady')) {
     }
 }
 
+if (!function_exists('pmssProcessPipeDescriptorSpec')) {
+    /** Build a three-stream proc_open pipe descriptor spec. */
+    function pmssProcessPipeDescriptorSpec(string $stdinMode = 'r', string $stdoutMode = 'w', string $stderrMode = 'w'): array
+    {
+        return [0 => ['pipe', $stdinMode], 1 => ['pipe', $stdoutMode], 2 => ['pipe', $stderrMode]];
+    }
+}
+
 if (!function_exists('pmssCommandOutputPipesSetNonBlocking')) {
     /** Put proc_open stdout/stderr pipes into non-blocking mode when available. */
     function pmssCommandOutputPipesSetNonBlocking(array $pipes): bool
@@ -498,11 +506,7 @@ if (!function_exists('pmssCommandCapture')) {
             return ['rc' => $launchRc, 'stdout' => '', 'stderr' => $stderr];
         };
 
-        $descriptor = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ];
+        $descriptor = pmssProcessPipeDescriptorSpec();
         $bash = '/bin/bash '.($loginShell ? '-lc ' : '-c ').escapeshellarg($cmd);
         $process = @proc_open($bash, $descriptor, $pipes);
         if (!is_resource($process)) {
@@ -904,11 +908,7 @@ if (!function_exists('runCommand')) {
                 2 => STDERR,
             ];
         } else {
-            $descriptor = [
-                0 => ['pipe', 'r'],
-                1 => ['pipe', 'w'],
-                2 => ['pipe', 'w'],
-            ];
+            $descriptor = pmssProcessPipeDescriptorSpec();
         }
         // Use a single command string for PHP 7.3 compatibility.
         // For apt/dpkg, prefer exec when safe so timeouts terminate the real child process.

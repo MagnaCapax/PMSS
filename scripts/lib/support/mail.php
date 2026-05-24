@@ -116,7 +116,7 @@ function pmssSupportMailSend(array $config, array $envelope, ?callable $transpor
 function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): void
 {
     $envelope = pmssSupportMailEnvelopeNormalize($envelope);
-    $spec = [0 => ['pipe', 'w'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    $spec = pmssProcessPipeDescriptorSpec('w');
     $process = @proc_open(escapeshellarg($sendmailPath).' -t -i', $spec, $pipes);
     if (!is_resource($process)) {
         throw new RuntimeException('Unable to start sendmail transport.');
