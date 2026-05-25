@@ -42,8 +42,8 @@ class installMediaStackScriptTest extends TestCase
 
     public function testProwlarrRuntimeNetcorePresent(): void
     {
-        $this->assertStringContainsString('runtime=netcore&arch=%s', $this->script);
-        $this->assertStringContainsString('servarr_update_api_download_url "$PROWLARR_UPDATE_BASE" "$PROWLARR_BRANCH"', $this->script);
+        $this->assertStringContainsString('runtime=netcore&arch=${SERVARR_ARCH}', $this->script);
+        $this->assertStringContainsString('SERVARR_DOWNLOAD_URL="${PROWLARR_UPDATE_BASE}/${PROWLARR_BRANCH}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"', $this->script);
     }
 
     public function testInstallServarrAppCreatesLoopbackPublicConfig(): void
@@ -415,11 +415,16 @@ LIGHTTPD;
 
     public function testServarrDownloadResolversPreserveUrlContracts(): void
     {
+        $this->assertStringContainsString('for servarr_spec in \\', $this->script);
+        $this->assertStringContainsString('"radarr|Radarr|$HOME/.config/radarr|$RADARR_PORT|7878|echo"', $this->script);
+        $this->assertStringContainsString('"prowlarr|Prowlarr|$HOME/.config/prowlarr|$PROWLARR_PORT|9696|log_step"', $this->script);
+        $this->assertStringContainsString('"sonarr|Sonarr|$HOME/.config/sonarr|$SONARR_PORT|8989|log_step"', $this->script);
+        $this->pmssAssertStringNotContainsString('servarr_resolve'.'_radarr_download_url', $this->script);
+        $this->pmssAssertStringNotContainsString('servarr_resolve'.'_prowlarr_download_url', $this->script);
+        $this->pmssAssertStringNotContainsString('servarr_resolve'.'_sonarr_download_url', $this->script);
+
         $functions = $this->pmssExtractShellFunctions(array(
-            'servarr_update_api_download_url',
-            'servarr_resolve_radarr_download_url',
-            'servarr_resolve_prowlarr_download_url',
-            'servarr_resolve_sonarr_download_url',
+            'servarr_resolve_download_url',
         ));
         $script = implode("\n", array(
             '#!/usr/bin/env bash',
@@ -441,25 +446,25 @@ LIGHTTPD;
             'getconf() { echo "glibc 2.36"; }',
             'dpkg() { return 0; }',
             $functions,
-            'servarr_resolve_radarr_download_url',
+            'servarr_resolve_download_url "radarr"',
             'echo "radarr_override=$SERVARR_DOWNLOAD_URL"',
             'OVR_RADARR_URL=',
             'OVR_RADARR_VERSION=v5.10.4.9218',
-            'servarr_resolve_radarr_download_url',
+            'servarr_resolve_download_url "radarr"',
             'echo "radarr_pin=$SERVARR_DOWNLOAD_URL"',
             'OVR_RADARR_VERSION=',
-            'servarr_resolve_radarr_download_url',
+            'servarr_resolve_download_url "radarr"',
             'echo "radarr_api=$SERVARR_DOWNLOAD_URL"',
-            'servarr_resolve_prowlarr_download_url',
+            'servarr_resolve_download_url "prowlarr"',
             'echo "prowlarr_override=$SERVARR_DOWNLOAD_URL"',
             'OVR_PROWLARR_URL=',
-            'servarr_resolve_prowlarr_download_url',
+            'servarr_resolve_download_url "prowlarr"',
             'echo "prowlarr_api=$SERVARR_DOWNLOAD_URL"',
             'OVR_SONARR_URL=https://mirror.example/sonarr.tar.gz',
-            'servarr_resolve_sonarr_download_url',
+            'servarr_resolve_download_url "sonarr"',
             'echo "sonarr_override=$SERVARR_DOWNLOAD_URL"',
             'OVR_SONARR_URL=',
-            'servarr_resolve_sonarr_download_url',
+            'servarr_resolve_download_url "sonarr"',
             'echo "sonarr_api=$SERVARR_DOWNLOAD_URL"',
             '',
         ));
@@ -478,8 +483,7 @@ LIGHTTPD;
     public function testServarrRadarrResolverPreservesOldGlibcPin(): void
     {
         $functions = $this->pmssExtractShellFunctions(array(
-            'servarr_update_api_download_url',
-            'servarr_resolve_radarr_download_url',
+            'servarr_resolve_download_url',
         ));
         $script = implode("\n", array(
             '#!/usr/bin/env bash',
@@ -494,7 +498,7 @@ LIGHTTPD;
             'getconf() { echo "glibc 2.31"; }',
             'dpkg() { return 1; }',
             $functions,
-            'servarr_resolve_radarr_download_url',
+            'servarr_resolve_download_url "radarr"',
             'echo "url=$SERVARR_DOWNLOAD_URL"',
             '',
         ));

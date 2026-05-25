@@ -422,45 +422,47 @@ EOF
 	echo ""
 }
 
-servarr_update_api_download_url() {
-	local base="$1" branch="$2"
-	printf '%s/%s/updatefile?os=linux&runtime=netcore&arch=%s' "$base" "$branch" "$SERVARR_ARCH"
-}
-
-servarr_resolve_radarr_download_url() {
+servarr_resolve_download_url() {
+	local app="$1"
 	local glibc_ver=""
 
-	if [[ -n "$OVR_RADARR_URL" ]]; then
-		SERVARR_DOWNLOAD_URL="$OVR_RADARR_URL"
-	elif [[ -n "$OVR_RADARR_VERSION" && "$SERVARR_ARCH" == "x64" ]]; then
-		SERVARR_DOWNLOAD_URL="https://github.com/Radarr/Radarr/releases/download/${OVR_RADARR_VERSION}/Radarr.master.${OVR_RADARR_VERSION#v}.linux-core-x64.tar.gz"
-	else
-		glibc_ver=$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}')
-		if dpkg --compare-versions "${glibc_ver:-0}" ge 2.33; then
-			SERVARR_DOWNLOAD_URL=$(servarr_update_api_download_url "$RADARR_UPDATE_BASE" "$RADARR_BRANCH")
-		elif [[ "$SERVARR_ARCH" == "x64" ]]; then
-			SERVARR_DOWNLOAD_URL="https://github.com/Radarr/Radarr/releases/download/v5.10.4.9218/Radarr.master.5.10.4.9218.linux-core-x64.tar.gz"
-			log_warn "Detected GLIBC ${glibc_ver:-unknown} < 2.33 → pinning Radarr to v5.10.4.9218 (linux-core-x64)."
+	case "$app" in
+	radarr)
+		if [[ -n "$OVR_RADARR_URL" ]]; then
+			SERVARR_DOWNLOAD_URL="$OVR_RADARR_URL"
+		elif [[ -n "$OVR_RADARR_VERSION" && "$SERVARR_ARCH" == "x64" ]]; then
+			SERVARR_DOWNLOAD_URL="https://github.com/Radarr/Radarr/releases/download/${OVR_RADARR_VERSION}/Radarr.master.${OVR_RADARR_VERSION#v}.linux-core-x64.tar.gz"
 		else
-			SERVARR_DOWNLOAD_URL=$(servarr_update_api_download_url "$RADARR_UPDATE_BASE" "$RADARR_BRANCH")
+			glibc_ver=$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}')
+			if dpkg --compare-versions "${glibc_ver:-0}" ge 2.33; then
+				SERVARR_DOWNLOAD_URL="${RADARR_UPDATE_BASE}/${RADARR_BRANCH}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
+			elif [[ "$SERVARR_ARCH" == "x64" ]]; then
+				SERVARR_DOWNLOAD_URL="https://github.com/Radarr/Radarr/releases/download/v5.10.4.9218/Radarr.master.5.10.4.9218.linux-core-x64.tar.gz"
+				log_warn "Detected GLIBC ${glibc_ver:-unknown} < 2.33 → pinning Radarr to v5.10.4.9218 (linux-core-x64)."
+			else
+				SERVARR_DOWNLOAD_URL="${RADARR_UPDATE_BASE}/${RADARR_BRANCH}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
+			fi
 		fi
-	fi
-}
-
-servarr_resolve_prowlarr_download_url() {
-	if [[ -n "$OVR_PROWLARR_URL" ]]; then
-		SERVARR_DOWNLOAD_URL="$OVR_PROWLARR_URL"
-	else
-		SERVARR_DOWNLOAD_URL=$(servarr_update_api_download_url "$PROWLARR_UPDATE_BASE" "$PROWLARR_BRANCH")
-	fi
-}
-
-servarr_resolve_sonarr_download_url() {
-	if [[ -n "$OVR_SONARR_URL" ]]; then
-		SERVARR_DOWNLOAD_URL="$OVR_SONARR_URL"
-	else
-		SERVARR_DOWNLOAD_URL="${SONARR_DL_BASE}/${SONARR_BRANCH}/latest?version=${SONARR_MAJOR}&os=linux&arch=${SERVARR_ARCH}"
-	fi
+		;;
+	prowlarr)
+		if [[ -n "$OVR_PROWLARR_URL" ]]; then
+			SERVARR_DOWNLOAD_URL="$OVR_PROWLARR_URL"
+		else
+			SERVARR_DOWNLOAD_URL="${PROWLARR_UPDATE_BASE}/${PROWLARR_BRANCH}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
+		fi
+		;;
+	sonarr)
+		if [[ -n "$OVR_SONARR_URL" ]]; then
+			SERVARR_DOWNLOAD_URL="$OVR_SONARR_URL"
+		else
+			SERVARR_DOWNLOAD_URL="${SONARR_DL_BASE}/${SONARR_BRANCH}/latest?version=${SONARR_MAJOR}&os=linux&arch=${SERVARR_ARCH}"
+		fi
+		;;
+	*)
+		log_err "Unknown Servarr app: $app"
+		return 1
+		;;
+	esac
 }
 
 servarr_install_from_url() {
@@ -1170,23 +1172,15 @@ fi
 echo "${app^^} configured"
 echo ""
 
-# Install Radarr (branch master; Debian 11 fallback)
-app="radarr"
-echo "Installing ${app^^}..."
-servarr_resolve_radarr_download_url
-servarr_install_from_url "$app" "Radarr" "$HOME/.config/${app}" "$RADARR_PORT" "7878" "$SERVARR_DOWNLOAD_URL"
-
-# Install Prowlarr (branch master)
-app="prowlarr"
-log_step "Installing ${app^^}..."
-servarr_resolve_prowlarr_download_url
-servarr_install_from_url "$app" "Prowlarr" "$HOME/.config/${app}" "$PROWLARR_PORT" "9696" "$SERVARR_DOWNLOAD_URL"
-
-# Install Sonarr (services.sonarr.tv download API; branch main)
-app="sonarr"
-log_step "Installing ${app^^}..."
-servarr_resolve_sonarr_download_url
-servarr_install_from_url "$app" "Sonarr" "$HOME/.config/${app}" "$SONARR_PORT" "8989" "$SERVARR_DOWNLOAD_URL"
+for servarr_spec in \
+	"radarr|Radarr|$HOME/.config/radarr|$RADARR_PORT|7878|echo" \
+	"prowlarr|Prowlarr|$HOME/.config/prowlarr|$PROWLARR_PORT|9696|log_step" \
+	"sonarr|Sonarr|$HOME/.config/sonarr|$SONARR_PORT|8989|log_step"; do
+	IFS='|' read -r app install_name datadir port default_port step_logger <<<"$servarr_spec"
+	"$step_logger" "Installing ${app^^}..."
+	servarr_resolve_download_url "$app"
+	servarr_install_from_url "$app" "$install_name" "$datadir" "$port" "$default_port" "$SERVARR_DOWNLOAD_URL"
+done
 
 # Install ASP.NET Core (.NET 8)
 app="aspnetcore"
