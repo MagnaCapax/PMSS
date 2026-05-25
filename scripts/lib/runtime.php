@@ -565,6 +565,40 @@ if (!function_exists('pmssCommandTimeoutClose')) {
     }
 }
 
+if (!function_exists('pmssProcessStatusExitCode')) {
+    /** Extract a usable child exit code from proc_get_status() output. */
+    function pmssProcessStatusExitCode($status): ?int
+    {
+        if (!is_array($status)) {
+            return null;
+        }
+
+        $exitCode = $status['exitcode'] ?? null;
+        return is_int($exitCode) && $exitCode >= 0 ? $exitCode : null;
+    }
+}
+
+if (!function_exists('pmssProcessCloseExitCode')) {
+    /**
+     * Close a process handle without losing an exit code observed during polling.
+     *
+     * PHP may return -1 from proc_close() after proc_get_status() has already
+     * observed the child exit. In that case the cached status is a safer result
+     * than reporting an unknown process-close failure to callers.
+     */
+    function pmssProcessCloseExitCode($process, $lastStatus = null): int
+    {
+        $fallbackExitCode = pmssProcessStatusExitCode($lastStatus);
+        $rc = is_resource($process) ? @proc_close($process) : -1;
+
+        if ($rc === -1 && $fallbackExitCode !== null) {
+            return $fallbackExitCode;
+        }
+
+        return (int) $rc;
+    }
+}
+
 if (!function_exists('pmssCommandPipedCapture')) {
     /**
      * Run a prepared shell command through proc_open pipes.
@@ -586,16 +620,7 @@ if (!function_exists('pmssCommandPipedCapture')) {
             if (function_exists('proc_terminate')) @proc_terminate($process);
             @proc_close($process);
         };
-        $closeProcess = static function ($process): int {
-            $rc = proc_close($process);
-            if ($rc === -1 && function_exists('proc_get_status')) {
-                $status = @proc_get_status($process);
-                if (is_array($status) && isset($status['exitcode']) && is_int($status['exitcode']) && $status['exitcode'] >= 0) {
-                    $rc = $status['exitcode'];
-                }
-            }
-            return (int) $rc;
-        };
+        $closeProcess = static function ($process): int { return pmssProcessCloseExitCode($process); };
 
         $process = @proc_open($bash, pmssProcessPipeDescriptorSpec(), $pipes);
         if (!is_resource($process) && $retryLaunch) {
@@ -995,9 +1020,11 @@ if (!function_exists('runCommand')) {
 
             $startedAt = microtime(true);
             $timedOut = false;
+            $lastStatus = null;
 
             while (true) {
                 $status = proc_get_status($process);
+                $lastStatus = is_array($status) ? $status : $lastStatus;
                 if (!is_array($status) || empty($status['running'])) {
                     break;
                 }
@@ -1011,7 +1038,7 @@ if (!function_exists('runCommand')) {
             if ($timedOut) {
                 $exitCode = pmssCommandTimeoutClose($process, $cmd, $timeoutSec, $startedAt);
             } else {
-                $exitCode = proc_close($process);
+                $exitCode = pmssProcessCloseExitCode($process, $lastStatus);
             }
 
             $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => ''];

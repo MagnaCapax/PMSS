@@ -148,6 +148,42 @@ class RuntimeTest extends TestCase
         $this->assertEquals("CAPTURE_ERR\n", $result['stderr']);
     }
 
+    public function testProcessStatusExitCodeAcceptsOnlyObservedExitCodes(): void
+    {
+        $this->assertSame(7, \pmssProcessStatusExitCode(['exitcode' => 7]));
+        $this->assertSame(null, \pmssProcessStatusExitCode(['exitcode' => -1]));
+        $this->assertSame(null, \pmssProcessStatusExitCode(['exitcode' => '7']));
+        $this->assertSame(null, \pmssProcessStatusExitCode([]));
+    }
+
+    public function testProcessCloseExitCodeUsesObservedStatusAfterPolling(): void
+    {
+        $process = proc_open(
+            '/bin/bash -lc '.escapeshellarg('exit 7'),
+            \pmssProcessPipeDescriptorSpec(),
+            $pipes
+        );
+        $this->assertTrue(is_resource($process), 'expected proc_open handle');
+
+        foreach ($pipes as $pipe) {
+            if (is_resource($pipe)) {
+                fclose($pipe);
+            }
+        }
+
+        $status = null;
+        $deadline = microtime(true) + 5.0;
+        do {
+            $status = proc_get_status($process);
+            if (!is_array($status) || empty($status['running'])) {
+                break;
+            }
+            usleep(10000);
+        } while (microtime(true) < $deadline);
+
+        $this->assertEquals(7, \pmssProcessCloseExitCode($process, $status));
+    }
+
     public function testRunCommandInheritTtyModeDoesNotBreakCallers(): void
     {
         $rc = \runCommand('true', false, function (string $m): void {}, true);
