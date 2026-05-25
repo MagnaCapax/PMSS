@@ -678,6 +678,137 @@ function pmssRemoveTreeBestEffort(string $path, string $label): void
 }
 
 /**
+ * Remove one file-like path and refuse directories so cron disables stay bounded.
+ */
+function pmssRemoveFile(string $path, string $label, ?string &$error = null): bool
+{
+    $error = null;
+    if (!file_exists($path) && !is_link($path)) {
+        return true;
+    }
+    if (is_dir($path) && !is_link($path)) {
+        $error = "Refusing to unlink directory for {$label}: {$path}";
+        return false;
+    }
+    if (!@unlink($path)) {
+        $error = "Failed to remove {$label}: {$path}".pmssLastFilesystemError();
+        return false;
+    }
+
+    return true;
+}
+
+function pmssRemoveFileFatal(string $path, string $label): void
+{
+    $error = null;
+    if (!pmssRemoveFile($path, $label, $error)) {
+        fatal($error ?? "Failed to remove {$label}: {$path}", EXIT_COPY);
+    }
+}
+
+/**
+ * Allow content-clears only for the live skeleton tree or hermetic test fixtures.
+ */
+function pmssIsSafeDirectoryContentsClearPath(string $path): bool
+{
+    $path = rtrim($path, '/');
+    if ($path === '' || $path === '/' || strpos($path, "\0") !== false) {
+        return false;
+    }
+    if (preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
+        return false;
+    }
+    if ($path === '/etc/skel') {
+        return true;
+    }
+
+    $tempRoot = rtrim(sys_get_temp_dir(), '/').'/';
+    $tempNamePrefix = 'pmss-update-clear-';
+    $baseName = basename($path);
+    return strpos($path, $tempRoot) === 0
+        && strpos($baseName, $tempNamePrefix) === 0
+        && strlen($baseName) > strlen($tempNamePrefix);
+}
+
+/**
+ * Remove one filesystem entry without following symlinks outside the cleared tree.
+ */
+function pmssRemoveFilesystemEntry(string $path, ?string &$error): bool
+{
+    if (!file_exists($path) && !is_link($path)) {
+        return true;
+    }
+    if (is_link($path) || !is_dir($path)) {
+        if (@unlink($path)) {
+            return true;
+        }
+        $error = "Failed to remove filesystem entry {$path}".pmssLastFilesystemError();
+        return false;
+    }
+
+    $entries = @scandir($path);
+    if (!is_array($entries)) {
+        $error = "Unable to read directory while removing {$path}".pmssLastFilesystemError();
+        return false;
+    }
+    foreach ($entries as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+        if (!pmssRemoveFilesystemEntry($path.'/'.$entry, $error)) {
+            return false;
+        }
+    }
+    if (!@rmdir($path)) {
+        $error = "Failed to remove directory {$path}".pmssLastFilesystemError();
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Clear child entries while leaving the guarded root directory itself in place.
+ */
+function pmssClearDirectoryContents(string $path, string $label, ?string &$error = null): bool
+{
+    $error = null;
+    $path = rtrim($path, '/');
+    if (!pmssIsSafeDirectoryContentsClearPath($path)) {
+        $error = "Refusing unsafe {$label} clear path: {$path}";
+        return false;
+    }
+    if (is_link($path) || !is_dir($path)) {
+        $error = "Refusing to clear missing or non-directory {$label}: {$path}";
+        return false;
+    }
+
+    $entries = @scandir($path);
+    if (!is_array($entries)) {
+        $error = "Unable to read {$label} before clearing: {$path}".pmssLastFilesystemError();
+        return false;
+    }
+    foreach ($entries as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+        if (!pmssRemoveFilesystemEntry($path.'/'.$entry, $error)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function pmssClearDirectoryContentsFatal(string $path, string $label): void
+{
+    $error = null;
+    if (!pmssClearDirectoryContents($path, $label, $error)) {
+        fatal($error ?? "Unable to clear {$label}: {$path}", EXIT_COPY);
+    }
+}
+
+/**
  * Swap a staged directory into place and restore the old tree if the final rename fails.
  */
 function pmssAtomicSwapDirectory(string $target, string $staging, string $backup, string $label): void
@@ -837,7 +968,7 @@ function stageSnapshot(string $tmp, bool $dryRun): void
         logmsg("[DRY RUN] Would atomically swap /etc/seedbox and overlay other /etc files from {$etcSource}");
     } else {
         if (is_dir($etcSource.'/skel') && is_dir('/etc/skel')) {
-            runFatal('rm -rf /etc/skel/* /etc/skel/.[!.]* /etc/skel/..?*', EXIT_COPY);
+            pmssClearDirectoryContentsFatal('/etc/skel', 'skeleton tree');
         }
 
         // Atomic swap for /etc/seedbox
@@ -1198,8 +1329,8 @@ function bootstrapMain(array $argv): void
 
     // Disable root cronjobs for update; update-step2 will reapply the template.
     $rootCron = '/etc/cron.d/pmss';
-    if (file_exists($rootCron)) {
-        @unlink($rootCron);
+    if (file_exists($rootCron) || is_link($rootCron)) {
+        pmssRemoveFileFatal($rootCron, 'root cron file');
         logmsg('[INFO] Disabled /etc/cron.d/pmss during update; template will be reapplied in update-step2');
     }
 
@@ -1208,8 +1339,8 @@ function bootstrapMain(array $argv): void
     // recurrence of the 2025-12-08 /home wipe class when cron runs during partial-update windows.
     // See incident report: docs/incidents/2025-12-08-home-wipe-updateQuotas-listUsers.md
     $obsoleteQuotaCron = '/etc/cron.d/updateQuotas';
-    if (file_exists($obsoleteQuotaCron)) {
-        @unlink($obsoleteQuotaCron);
+    if (file_exists($obsoleteQuotaCron) || is_link($obsoleteQuotaCron)) {
+        pmssRemoveFileFatal($obsoleteQuotaCron, 'legacy quota cron file');
         logmsg('[INFO] Removed legacy updateQuotas cron entry to prevent quota-refresh regression');
     }
 
