@@ -41,7 +41,7 @@ class UpdateBootstrapInterpreterSwapTest extends TestCase
     {
         $data = $this->pmssReadRepoFile('scripts/update.php');
         // Code-level invocations (not comments) must not reference PHP_BINARY.
-        // The fix converted every passthru/runSoft site to literal 'php'.
+        // The fix converted every passthru/bootstrap-command site to literal 'php'.
         $this->assertTrue(
             strpos($data, 'passthru(PHP_BINARY') === false,
             "no passthru() may use the stale PHP_BINARY constant (GH#589)"

@@ -589,8 +589,8 @@ function fetchSnapshot(array $spec, string $tmp): void
             escapeshellarg($url),
             escapeshellarg($tar)
         );
-        runFatal($cmd, EXIT_FETCH);
-        runFatal('tar -xzf '.escapeshellarg($tar).' -C '.escapeshellarg($tmp).' --strip-components=1', EXIT_FETCH);
+        pmssRunBootstrapCommand($cmd, EXIT_FETCH);
+        pmssRunBootstrapCommand('tar -xzf '.escapeshellarg($tar).' -C '.escapeshellarg($tmp).' --strip-components=1', EXIT_FETCH);
         return;
     }
 
@@ -600,31 +600,27 @@ function fetchSnapshot(array $spec, string $tmp): void
         escapeshellarg($spec['repo']),
         escapeshellarg($tmp)
     );
-    runFatal($clone, EXIT_FETCH);
+    pmssRunBootstrapCommand($clone, EXIT_FETCH);
 
     if ($spec['pin'] !== '') {
         $rev = escapeshellarg($spec['branch'].'@{'.$spec['pin'].'}');
-        runFatal('cd '.escapeshellarg($tmp).' && git fetch --quiet && git checkout '.$rev, EXIT_FETCH);
+        pmssRunBootstrapCommand('cd '.escapeshellarg($tmp).' && git fetch --quiet && git checkout '.$rev, EXIT_FETCH);
     }
 }
 
-function runFatal(string $command, int $code): void
+function pmssRunBootstrapCommand(string $command, ?int $fatalCode = null): int
 {
     logmsg('[RUN] '.$command);
     passthru($command, $rc);
-    if ($rc !== 0) {
-        fatal("Command failed (rc={$rc}): {$command}", $code);
+    if ($rc !== 0 && $fatalCode !== null) {
+        fatal("Command failed (rc={$rc}): {$command}", $fatalCode);
     }
-}
-
-function runSoft(string $command): void
-{
-    logmsg('[RUN] '.$command);
-    passthru($command, $rc);
     if ($rc !== 0) {
         logmsg("[WARN] Command failed (rc={$rc}): {$command}");
         logEvent('command_warn', ['command' => $command, 'rc' => $rc]);
     }
+
+    return $rc;
 }
 
 function pmssLastFilesystemError(): string
@@ -674,7 +670,7 @@ function pmssRemoveTreeBestEffort(string $path, string $label): void
         return;
     }
 
-    runSoft('rm -rf '.escapeshellarg($path));
+    pmssRunBootstrapCommand('rm -rf '.escapeshellarg($path));
 }
 
 /**
@@ -870,7 +866,7 @@ function restoreRootCronBestEffort(string $context): void
     } else {
         logmsg('[INFO] Restoring root cron after '.$context);
     }
-    runSoft($helper);
+    pmssRunBootstrapCommand($helper);
 }
 
 /**
@@ -892,7 +888,7 @@ function restorePermissionsBestEffort(string $context): void
     logmsg('[INFO] Refreshing skeleton/config permissions after '.$context);
     // Use 'php' from $PATH (not PHP_BINARY) — PHP_BINARY is frozen at script start
     // and points to a removed binary after --dist-upgrade swaps php7.4 → php8.2 (GH#589).
-    runSoft(escapeshellarg('php').' '.escapeshellarg($helper));
+    pmssRunBootstrapCommand(escapeshellarg('php').' '.escapeshellarg($helper));
 }
 
 function ensureSnapshot(string $tmp): void
@@ -953,7 +949,7 @@ function stageSnapshot(string $tmp, bool $dryRun): void
         $scriptsStaging = '/scripts.pmss-staging-'.$runId;
         $scriptsBackup  = '/scripts.pmss-backup-'.$runId;
         pmssRemoveTreeBestEffort($scriptsStaging, 'scripts staging');
-        runFatal(sprintf('cp -a %s/. %s', escapeshellarg($scriptsSource), escapeshellarg($scriptsStaging)), EXIT_COPY);
+        pmssRunBootstrapCommand(sprintf('cp -a %s/. %s', escapeshellarg($scriptsSource), escapeshellarg($scriptsStaging)), EXIT_COPY);
 
         pmssAtomicSwapDirectory('/scripts', $scriptsStaging, $scriptsBackup, 'scripts');
         pmssRemoveTreeBestEffort($scriptsBackup, 'scripts backup');
@@ -979,12 +975,12 @@ function stageSnapshot(string $tmp, bool $dryRun): void
         if ($haveSeedboxSnapshot || is_dir('/etc/seedbox')) {
             pmssRemoveTreeBestEffort($seedboxStaging, 'seedbox staging');
             if (is_dir('/etc/seedbox')) {
-                runFatal(sprintf('cp -a %s %s', escapeshellarg('/etc/seedbox'), escapeshellarg($seedboxStaging)), EXIT_COPY);
+                pmssRunBootstrapCommand(sprintf('cp -a %s %s', escapeshellarg('/etc/seedbox'), escapeshellarg($seedboxStaging)), EXIT_COPY);
             } else {
                 @mkdir($seedboxStaging, 0755, true);
             }
             if ($haveSeedboxSnapshot) {
-                runFatal(sprintf('cp -a %s/. %s', escapeshellarg($seedboxSource), escapeshellarg($seedboxStaging)), EXIT_COPY);
+                pmssRunBootstrapCommand(sprintf('cp -a %s/. %s', escapeshellarg($seedboxSource), escapeshellarg($seedboxStaging)), EXIT_COPY);
             }
             pmssAtomicSwapDirectory('/etc/seedbox', $seedboxStaging, $seedboxBackup, 'seedbox config');
             pmssRemoveTreeBestEffort($seedboxBackup, 'seedbox backup');
@@ -998,7 +994,7 @@ function stageSnapshot(string $tmp, bool $dryRun): void
                     continue;
                 }
                 $path = $etcSource.'/'.$entry;
-                runFatal('cp -rpu '.escapeshellarg($path).' /etc', EXIT_COPY);
+                pmssRunBootstrapCommand('cp -rpu '.escapeshellarg($path).' /etc', EXIT_COPY);
             }
         }
     }
@@ -1011,16 +1007,16 @@ function stageSnapshot(string $tmp, bool $dryRun): void
     } elseif ($dryRun) {
         logmsg("[DRY RUN] Would copy var from {$varSource}");
     } else {
-        runFatal('cp -a '.escapeshellarg($varSource).' /', EXIT_COPY);
+        pmssRunBootstrapCommand('cp -a '.escapeshellarg($varSource).' /', EXIT_COPY);
     }
 
     if ($dryRun) {
         return;
     }
 
-    runFatal('chmod -R o-rwx /scripts /root /etc/skel /etc/seedbox', EXIT_COPY);
-    runFatal('find /scripts -type f -name "*.php" -exec chmod 0750 {} +', EXIT_COPY);
-    runFatal('chmod 0750 /scripts/update.php', EXIT_COPY);
+    pmssRunBootstrapCommand('chmod -R o-rwx /scripts /root /etc/skel /etc/seedbox', EXIT_COPY);
+    pmssRunBootstrapCommand('find /scripts -type f -name "*.php" -exec chmod 0750 {} +', EXIT_COPY);
+    pmssRunBootstrapCommand('chmod 0750 /scripts/update.php', EXIT_COPY);
     flattenScriptsLayout();
 }
 
@@ -1032,8 +1028,8 @@ function flattenScriptsLayout(): void
     }
     logmsg('Detected nested /scripts/scripts layout, flattening');
     logEvent('scripts_flatten', ['status' => 'start']);
-    runSoft(sprintf('cp -a %s/. %s', escapeshellarg($nested), escapeshellarg('/scripts')));
-    runSoft('rm -rf '.escapeshellarg($nested));
+    pmssRunBootstrapCommand(sprintf('cp -a %s/. %s', escapeshellarg($nested), escapeshellarg('/scripts')));
+    pmssRunBootstrapCommand('rm -rf '.escapeshellarg($nested));
     if (!file_exists('/scripts/util/update-step2.php')) {
         logmsg('[WARN] update-step2.php missing after flattening');
         logEvent('scripts_flatten', ['status' => 'update_step2_missing']);
@@ -1278,7 +1274,7 @@ function maybeRunDistUpgrade($distUpgrade, bool $deferRootCronRestore = false): 
     // gives operators immediate visibility without requiring a reboot.
     $motd = '/scripts/util/motdGenerate.php';
     if (file_exists($motd)) {
-        runSoft($motd);
+        pmssRunBootstrapCommand($motd);
     }
 }
 
@@ -1404,7 +1400,7 @@ function bootstrapMain(array $argv): void
         }
         if (!$options['dry_run'] && file_exists('/scripts/util/ftpConfig.php')) {
             logmsg('[INFO] Refreshing FTP configuration for --scripts-only run');
-            runSoft(escapeshellarg('php').' /scripts/util/ftpConfig.php');  // GH#589: avoid stale PHP_BINARY
+            pmssRunBootstrapCommand(escapeshellarg('php').' /scripts/util/ftpConfig.php');  // GH#589: avoid stale PHP_BINARY
         }
         if (!$options['dry_run']) {
             restoreRootCronBestEffort('scripts-only');

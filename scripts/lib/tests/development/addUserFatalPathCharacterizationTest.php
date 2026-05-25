@@ -7,7 +7,7 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
 {
     public function testFatalExitEmitsFatalSummaryAndJsonMarkers(): void
     {
-        $result = $this->runFatalExitHarness(array(
+        $result = $this->fatalExitHarness(array(
             'detail' => 'User already exists; refusing to overwrite',
             'message' => 'user_exists',
         ));
@@ -23,7 +23,7 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
 
     public function testFatalExitAddsExtraSummaryFieldsToJsonPayload(): void
     {
-        $result = $this->runFatalExitHarness(array(
+        $result = $this->fatalExitHarness(array(
             'detail' => 'Invalid username "alice/evil": slash not allowed',
             'message' => 'invalid_username',
             'extra' => array(
@@ -39,7 +39,7 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
 
     public function testFatalExitWritesOptionalStderrLineForAutomation(): void
     {
-        $result = $this->runFatalExitHarness(array(
+        $result = $this->fatalExitHarness(array(
             'detail' => 'Invalid username "alice/evil": slash not allowed',
             'message' => 'invalid_username',
             'stderr' => 'ERROR: Invalid username "alice/evil": slash not allowed',
@@ -71,7 +71,7 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
      *
      * @return array<string,mixed>
      */
-    private function runFatalExitHarness(array $overrides = array()): array
+    private function fatalExitHarness(array $overrides = array()): array
     {
         $options = array_merge(
             array(
