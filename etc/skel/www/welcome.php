@@ -916,35 +916,12 @@ function readSystemdMemoryCurrentBytes() {
     return (float) $memoryCurrent;
 }
 
-function pmssWelcomeMemoryStatCandidatePaths($uid) {
-    return array(
-        '/sys/fs/cgroup/user.slice/user-'.$uid.'.slice/memory.stat',
-        '/sys/fs/cgroup/unified/user.slice/user-'.$uid.'.slice/memory.stat',
-        '/sys/fs/cgroup/memory/user.slice/user-'.$uid.'.slice/memory.stat',
-    );
-}
-
-function pmssWelcomeMemoryStatBreakdownParse($raw) {
-    $breakdown = array();
-    if (!is_string($raw) || trim($raw) === '') {
-        return $breakdown;
-    }
-
-    foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
-        if (count($parts = preg_split('/\s+/', trim($line), 2)) !== 2 || !ctype_digit($parts[1])) {
-            continue;
-        }
-        if ($parts[0] === 'anon' || $parts[0] === 'total_rss') {
-            $breakdown['anon'] = (float) $parts[1];
-        } elseif ($parts[0] === 'file' || $parts[0] === 'total_cache') {
-            $breakdown['file'] = (float) $parts[1];
-        }
-    }
-
-    return $breakdown;
-}
-
 function readSystemdMemoryBreakdownBytes() {
+    if (!function_exists('pmssWebCgroupMemoryStatusMemoryStatCandidatePaths')
+        || !function_exists('pmssWebCgroupMemoryStatusMemoryStatBreakdownParse')) {
+        return array();
+    }
+
     $uid = function_exists('posix_getuid') ? (int) posix_getuid() : null;
     if ($uid === null && function_exists('pmssFrontendShellExecAvailable') && pmssFrontendShellExecAvailable()) {
         $uidRaw = @pmssFrontendShellExec('/usr/bin/id -u 2>/dev/null');
@@ -956,13 +933,13 @@ function readSystemdMemoryBreakdownBytes() {
         return array();
     }
 
-    foreach (pmssWelcomeMemoryStatCandidatePaths($uid) as $path) {
+    foreach (pmssWebCgroupMemoryStatusMemoryStatCandidatePaths($uid) as $path) {
         $raw = @file_get_contents($path);
         if (!is_string($raw) || trim($raw) === '') {
             continue;
         }
 
-        $breakdown = pmssWelcomeMemoryStatBreakdownParse($raw);
+        $breakdown = pmssWebCgroupMemoryStatusMemoryStatBreakdownParse($raw);
         if (isset($breakdown['anon'], $breakdown['file'])) {
             return $breakdown;
         }

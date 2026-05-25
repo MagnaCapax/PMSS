@@ -107,6 +107,39 @@ function pmssWebCgroupMemoryStatusReadMap($path)
     return $map;
 }
 
+/** Return candidate memory.stat paths for the current account slice. */
+function pmssWebCgroupMemoryStatusMemoryStatCandidatePaths($uid)
+{
+    $uid = (int) $uid;
+    return $uid >= 0 ? [
+        '/sys/fs/cgroup/user.slice/user-'.$uid.'.slice/memory.stat',
+        '/sys/fs/cgroup/unified/user.slice/user-'.$uid.'.slice/memory.stat',
+        '/sys/fs/cgroup/memory/user.slice/user-'.$uid.'.slice/memory.stat',
+    ] : [];
+}
+
+/** Parse cgroup v1/v2 memory.stat anon+file counters into byte values. */
+function pmssWebCgroupMemoryStatusMemoryStatBreakdownParse($raw)
+{
+    $breakdown = [];
+    if (!is_string($raw) || trim($raw) === '') {
+        return $breakdown;
+    }
+
+    foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
+        if (count($parts = preg_split('/\s+/', trim($line), 2)) !== 2 || !ctype_digit($parts[1])) {
+            continue;
+        }
+        if ($parts[0] === 'anon' || $parts[0] === 'total_rss') {
+            $breakdown['anon'] = (float) $parts[1];
+        } elseif ($parts[0] === 'file' || $parts[0] === 'total_cache') {
+            $breakdown['file'] = (float) $parts[1];
+        }
+    }
+
+    return $breakdown;
+}
+
 /** Classify current cgroup memory pressure into a user-facing level. */
 function pmssWebCgroupMemoryStatusClassify(array $stats)
 {

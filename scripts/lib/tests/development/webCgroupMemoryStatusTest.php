@@ -104,29 +104,29 @@ class WebCgroupMemoryStatusTest extends TestCase
         );
     }
 
-    public function testWelcomeMemoryStatParserAcceptsCgroupV1Totals(): void
+    public function testMemoryStatParserAcceptsCgroupV1Totals(): void
     {
-        $breakdown = $this->pmssWelcomeMemoryInlineJson(
-            'echo json_encode(pmssWelcomeMemoryStatBreakdownParse("total_rss 134217728\nhierarchical_memory_limit 999\ntotal_cache 67108864\n"));'
+        $breakdown = \pmssWebCgroupMemoryStatusMemoryStatBreakdownParse(
+            "total_rss 134217728\nhierarchical_memory_limit 999\ntotal_cache 67108864\n"
         );
 
         $this->assertSame(134217728.0, (float) $breakdown['anon']);
         $this->assertSame(67108864.0, (float) $breakdown['file']);
     }
 
-    public function testWelcomeMemoryStatParserKeepsCgroupV2Fields(): void
+    public function testMemoryStatParserKeepsCgroupV2Fields(): void
     {
-        $breakdown = $this->pmssWelcomeMemoryInlineJson(
-            'echo json_encode(pmssWelcomeMemoryStatBreakdownParse("anon 268435456\nslab 123\nfile 33554432\n"));'
+        $breakdown = \pmssWebCgroupMemoryStatusMemoryStatBreakdownParse(
+            "anon 268435456\nslab 123\nfile 33554432\n"
         );
 
         $this->assertSame(268435456.0, (float) $breakdown['anon']);
         $this->assertSame(33554432.0, (float) $breakdown['file']);
     }
 
-    public function testWelcomeMemoryStatCandidatePathsPreferV2BeforeV1(): void
+    public function testMemoryStatCandidatePathsPreferV2BeforeV1(): void
     {
-        $paths = $this->pmssWelcomeMemoryInlineJson('echo json_encode(pmssWelcomeMemoryStatCandidatePaths(1234));');
+        $paths = \pmssWebCgroupMemoryStatusMemoryStatCandidatePaths(1234);
 
         $this->assertSame('/sys/fs/cgroup/user.slice/user-1234.slice/memory.stat', $paths[0]);
         $this->assertSame('/sys/fs/cgroup/unified/user.slice/user-1234.slice/memory.stat', $paths[1]);
@@ -144,27 +144,5 @@ class WebCgroupMemoryStatusTest extends TestCase
             'pressure_full_avg10' => 0.0,
             'throttle_events' => 0,
         ], $overrides)));
-    }
-
-    private function pmssWelcomeMemoryInlineJson(string $body): array
-    {
-        $home = $this->pmssMakeTempDir('pmss-welcome-home-', 0700);
-        $www = $home.'/www';
-        $this->assertTrue(\pmssTestingCopyTree($this->pmssRepoPath('etc/skel/www'), $www, 0700), 'Expected welcome fixture copy to succeed');
-        @mkdir($home.'/.config', 0700, true);
-        @copy($this->pmssRepoPath('etc/skel/.scriptsInc.php'), $home.'/.scriptsInc.php');
-
-        $script = 'chdir('.var_export($www, true).');'
-            .'$_SERVER["REQUEST_METHOD"] = "GET";'
-            .'$_GET = array();'
-            .'ob_start();'
-            .'require '.var_export($www.'/welcome.php', true).';'
-            .'ob_end_clean();'
-            .$body;
-        $command = escapeshellarg(PHP_BINARY).' -d allow_url_fopen=0 -r '.escapeshellarg($script);
-        $result = $this->pmssExecShellCommand($command, [], '2>&1');
-
-        $this->assertSame(0, $result['rc'], 'Welcome helper inline PHP failed: '.$result['output']);
-        return $this->pmssDecodeJsonArray($result['output']);
     }
 }
