@@ -55,6 +55,50 @@ require_once __DIR__.'/../user/userConfigStore.php';
     }
 
     /**
+     * Resume-capability state dir (GH#302 point 5). Overridable for tests.
+     */
+    function pmssUserRefreshStateDir(): string
+    {
+        $override = (string) getenv('PMSS_USER_REFRESH_STATE_DIR');
+        return $override !== '' ? $override : '/var/lib/pmss/user-refresh';
+    }
+
+    /**
+     * Signature a user is "refreshed against". Keyed on the installed PMSS
+     * version (advances every update → forces full refresh on a real upgrade)
+     * plus the ruTorrent skel SHA (catches skel-only template bumps). Within one
+     * update a same-version re-run reuses the signature so completed users skip.
+     */
+    function pmssUserRefreshSignature(string $rutorrentIndexSha): string
+    {
+        $version = trim((string) @file_get_contents('/etc/seedbox/config/version'));
+        return sha1($version.'|'.$rutorrentIndexSha);
+    }
+
+    /** Marker path for a (validated) username. */
+    function pmssUserRefreshMarkerPath(string $user): string
+    {
+        return pmssUserRefreshStateDir().'/'.$user;
+    }
+
+    /** True when the user was already fully refreshed against this signature. */
+    function pmssUserRefreshAlreadyDone(string $user, string $signature): bool
+    {
+        $path = pmssUserRefreshMarkerPath($user);
+        return is_file($path) && trim((string) @file_get_contents($path)) === $signature;
+    }
+
+    /** Record that the user is fully refreshed against this signature. */
+    function pmssUserRefreshMarkDone(string $user, string $signature): void
+    {
+        $dir = pmssUserRefreshStateDir();
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+        @file_put_contents(pmssUserRefreshMarkerPath($user), $signature."\n");
+    }
+
+    /**
      * Refresh ruTorrent and skeleton data for every provisioned user.
      *
      * Keep this a simple foreach(users) orchestrator; avoid accumulating
@@ -68,6 +112,14 @@ require_once __DIR__.'/../user/userConfigStore.php';
         $totalUsers = count($users);
         $processedUsers = 0;
         $skippedUsers = 0;
+        // Resume capability (GH#302 point 5): on I/O-saturated hosts a single
+        // run can time out mid-queue. We mark each user fully-refreshed against
+        // the CURRENT PMSS version; a same-version re-run then skips already-done
+        // users and converges on the timed-out tail instead of re-walking every
+        // home from scratch. A version change invalidates all markers → full
+        // refresh (new skel/permission logic must reach every user). Keyed on
+        // the version string + the ruTorrent skel SHA for skel-only bumps.
+        $refreshSignature = pmssUserRefreshSignature($rutorrentIndexSha);
         // Capture per-user skip reasons so a partial-completion failure can name
         // WHY users were skipped (e.g. userPermissions timeout) instead of only
         // reporting an opaque N_of_M count. Operators otherwise chase correlated
@@ -110,6 +162,15 @@ require_once __DIR__.'/../user/userConfigStore.php';
                 $skippedUsers++;
                 $skipReasons[] = $userTrim.': invalid username';
                 logMessage(sprintf("[WARN] Account '%s' skipped during environment refresh: invalid username", $userTrim));
+                continue;
+            }
+
+            // Resume: this user was already fully refreshed against the current
+            // PMSS version (e.g. a prior run that timed out further down the
+            // queue). Count as processed and skip the expensive home traversal.
+            if (pmssUserRefreshAlreadyDone($userTrim, $refreshSignature)) {
+                $processedUsers++;
+                logMessage(sprintf('User %s already refreshed this version; skipping (resume)', $userTrim));
                 continue;
             }
 
@@ -168,6 +229,9 @@ require_once __DIR__.'/../user/userConfigStore.php';
                 $userDuration = microtime(true) - $userStart;
                 pmssUserLog($userTrim, sprintf('update-step2: user maintenance finished (%.2fs)', $userDuration));
                 $recordUserProfile($userTrim, 'OK', 0, $userDuration);
+                // Mark fully-refreshed against this version so a same-version
+                // re-run (after a timeout further down the queue) skips this user.
+                pmssUserRefreshMarkDone($userTrim, $refreshSignature);
                 $processedUsers++;
             } catch (\Throwable $throwable) {
                 $skippedUsers++;
