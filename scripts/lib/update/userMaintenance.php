@@ -505,8 +505,7 @@ require_once __DIR__.'/../user/userConfigStore.php';
         $data = is_array($data) ? $data : [];
 
         $writeConfig = static function (array $payload) use ($configFile, $uid, $gid, $user): bool {
-            $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-            if ($json === false) {
+            if (($json = pmssJsonEncodePretty($payload)) === null) {
                 pmssUserLog($user, '[WARN] Failed to encode daemon.json');
                 return false;
             }

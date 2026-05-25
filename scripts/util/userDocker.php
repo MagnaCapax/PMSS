@@ -197,8 +197,7 @@ function userDockerEnsureCgroupfsDaemonConfig(string $user, string $home, int $u
 
     $execOpts[] = 'native.cgroupdriver=cgroupfs';
     $data['exec-opts'] = array_values(array_unique($execOpts));
-    $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    if ($json === false) {
+    if (($json = pmssJsonEncodePretty($data)) === null) {
         pmssUserLog($user, '[WARN] userDocker: failed to encode daemon.json for cgroup v2 rootless Docker');
         return;
     }

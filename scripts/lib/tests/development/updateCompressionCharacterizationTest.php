@@ -430,7 +430,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $symbol = 'pmssWrite'.'DockerDaemonConfig';
 
         $this->assertSourceOmitsFunction($src, $symbol, 'userMaintenance.php should keep daemon.json write handling inside pmssEnsureDockerDependencies()');
-        $this->assertStringContainsString('JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES', $src);
+        $this->assertStringContainsString('pmssJsonEncodePretty($payload)', $src);
         $this->assertStringContainsString("'native.cgroupdriver=cgroupfs'", $src);
     }
 

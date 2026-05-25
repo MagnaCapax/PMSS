@@ -83,5 +83,5 @@ function pmssProfileSummary(): void
         return;
     }
     pmssDirEnsureExists(dirname($profileOutput), 0755);
-    @file_put_contents($profileOutput, json_encode($profile, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    @file_put_contents($profileOutput, pmssJsonEncodePretty($profile) ?? '');
 }

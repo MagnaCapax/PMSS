@@ -80,7 +80,7 @@ function pmssUpdateRecordIncompleteUserMaintenance(int $processed, int $total, a
         'total'     => $total,
         'skipped'   => array_values($skipReasons),
     ];
-    @file_put_contents($path, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
+    @file_put_contents($path, (pmssJsonEncodePretty($payload) ?? '')."\n");
 }
 
 /**

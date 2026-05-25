@@ -458,8 +458,7 @@ function pmssSysctlSummaryWrite(?callable $logger, array $profile, array $groupe
         'changes_made' => array_values($changes),
     ];
 
-    $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    if (!is_string($json)) {
+    if (($json = pmssJsonEncodePretty($payload)) === null) {
         $log('[WARN] Unable to encode hardware summary JSON for '.$target);
         return;
     }
