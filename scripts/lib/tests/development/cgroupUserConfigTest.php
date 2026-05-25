@@ -498,6 +498,51 @@ PHP;
         $this->assertStringContainsString('CPUWeight=400', $res['out']);
     }
 
+    public function testApplyReturnsFailureWhenCgroupStepFails()
+    {
+        $steps = [];
+        $this->mgr = new Manager($this->sys, function (string $description, string $command) use (&$steps): int {
+            $steps[] = [$description, $command];
+            return 7;
+        });
+
+        $res = $this->runMgr(['testuser', '--apply', '--cpu-weight=400']);
+
+        $this->assertEquals(1, $res['rc']);
+        $this->assertEquals('Applying cgroup properties', $steps[0][0]);
+        $this->assertStringContainsString('systemctl', $steps[0][1]);
+    }
+
+    public function testApplyAttemptsEveryIoCostWriteBeforeReturningFailure()
+    {
+        $steps = [];
+        $this->sys->findmnt['/home'] = '/dev/md0';
+        $this->sys->commands['lsblk -dn -o MAJ:MIN'] = "9:0\n";
+        $this->sys->files['/sys/fs/cgroup/user.slice/user-1000.slice/io.cost.qos'] = '';
+        $this->sys->files['/sys/fs/cgroup/user.slice/user-1000.slice/io.cost.model'] = '';
+        $this->mgr = new Manager($this->sys, function (string $description, string $command) use (&$steps): int {
+            $steps[] = [$description, $command];
+            return count($steps) === 1 ? 5 : 0;
+        });
+
+        $res = $this->runMgr([
+            'testuser',
+            '--apply',
+            '--io-cost-qos=enable=1 ctrl=user',
+            '--io-cost-model=ctrl=user model=linear',
+        ]);
+
+        $this->assertEquals(1, $res['rc']);
+        $this->assertEquals(
+            4,
+            count($steps),
+            'all planned io.cost writes should be attempted for operator visibility'
+        );
+        foreach ($steps as $step) {
+            $this->assertEquals('Applying io.cost setting', $step[0]);
+        }
+    }
+
     public function testApplyRefusesRootSliceMutation()
     {
         $this->ensureManager();

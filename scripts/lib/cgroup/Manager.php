@@ -27,9 +27,15 @@ class Manager
     /** @var SystemInterface */
     private $sys;
 
-    public function __construct(SystemInterface $sys)
+    /** @var callable */
+    private $stepRunner;
+
+    public function __construct(SystemInterface $sys, ?callable $stepRunner = null)
     {
         $this->sys = $sys;
+        $this->stepRunner = $stepRunner ?? static function (string $description, string $command): int {
+            return \runStep($description, $command);
+        };
     }
 
     public function run(array $argv): int
@@ -228,9 +234,13 @@ class Manager
                 }
 
                 $this->sys->requireRoot();
+                $applyFailed = false;
                 if ($doWipe) {
-                    \runStep('Reverting user slice', \pmssBuildCommand('systemctl', ['revert', $slice]).' || true');
-                    \runStep(
+                    $applyFailed = $this->runApplyStep(
+                        'Reverting user slice',
+                        \pmssBuildCommand('systemctl', ['revert', $slice]).' || true'
+                    ) !== 0 || $applyFailed;
+                    $applyFailed = $this->runApplyStep(
                         'Unlimiting core properties',
                         \pmssBuildCommand('systemctl', [
                             'set-property',
@@ -241,19 +251,26 @@ class Manager
                             'CPUWeight=100',
                             'IOWeight=100',
                         ])
-                    );
+                    ) !== 0 || $applyFailed;
                 } else {
                     $pairs = [];
                     foreach ($props as $k=>$v) { $pairs[] = $k.'='.$v; }
                     $allPairs = array_merge($pairs, $ioPairs);
                     if (!empty($allPairs)) {
                         $cmd = \pmssBuildCommand('systemctl', array_merge(['set-property', $slice], $allPairs));
-                        \runStep('Applying cgroup properties', $cmd);
+                        $applyFailed = $this->runApplyStep('Applying cgroup properties', $cmd) !== 0
+                            || $applyFailed;
                     }
                     foreach ($ioCostWrites as $write) {
                         $cmd = $this->buildIoCostWriteCommand($write['path'], $write['value']);
-                        \runStep('Applying io.cost setting', $cmd);
+                        $applyFailed = $this->runApplyStep('Applying io.cost setting', $cmd) !== 0
+                            || $applyFailed;
                     }
+                }
+
+                if ($applyFailed) {
+                    fwrite(STDERR, "One or more cgroup apply operations failed; inspect the logged command output above.\n");
+                    return 1;
                 }
             } else {
                 echo "(dry-run or no --apply; not changing system)\n";
@@ -325,6 +342,12 @@ class Manager
         }
 
         return $props;
+    }
+
+    /** Run one cgroup apply command and return the command status for callers. */
+    private function runApplyStep(string $description, string $command): int
+    {
+        return (int) call_user_func($this->stepRunner, $description, $command);
     }
 
     /**

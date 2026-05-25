@@ -480,6 +480,12 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Docker floor: when `ramMiB < 245`, persists `dockerEnabled=false` for the user. Storage Box product payloads also default `dockerEnabled=false` unless explicitly overridden.
   - rTorrent restart guard: when `~/session/rtorrent.lock` exists, parses only a positive lock-file PID greater than 1 and sends `kill -9` only when `/proc/<pid>` still belongs to the target UID and has an `rtorrent*` command name.
 
+- scripts/util/userConfigCgroup.php USERNAME [options]
+  - Behavior: Plans and optionally applies systemd/cgroup slice properties for one existing user.
+  - Apply errors: when `--apply` runs a planned `systemctl` or `io.cost`
+    write and any step returns non-zero, the script attempts the remaining
+    planned writes for visibility, then exits non-zero.
+
 - scripts/productConfig.php <product> --welcome-message=<HTML>
   - Behavior: Sets/clears product-level welcome banner templates in `/etc/seedbox/config/welcomeMessages.json`.
 
