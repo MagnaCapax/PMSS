@@ -15,27 +15,27 @@ BACKUP_DIR_FILE="/root/.backup_dir"
 KEY_FILE="/root/backup_etc_key"
 
 if [ ! -f "$BACKUP_DIR_FILE" ]; then
-    RAND_DIR=$(tr -dc A-Za-z0-9 </dev/urandom | head -c8 || true)
-    BACKUP_DIR="/home/root-backup-${RAND_DIR}"
-    mkdir -p "$BACKUP_DIR"
-    chmod 700 "$BACKUP_DIR"
-    chown root:root "$BACKUP_DIR"
-    echo "$BACKUP_DIR" > "$BACKUP_DIR_FILE"
-    chmod 600 "$BACKUP_DIR_FILE"
+	RAND_DIR=$(tr -dc A-Za-z0-9 </dev/urandom | head -c8 || true)
+	BACKUP_DIR="/home/root-backup-${RAND_DIR}"
+	mkdir -p "$BACKUP_DIR"
+	chmod 700 "$BACKUP_DIR"
+	chown root:root "$BACKUP_DIR"
+	echo "$BACKUP_DIR" >"$BACKUP_DIR_FILE"
+	chmod 600 "$BACKUP_DIR_FILE"
 else
-    BACKUP_DIR=$(cat "$BACKUP_DIR_FILE")
-    [ -d "$BACKUP_DIR" ] || {
-        mkdir -p "$BACKUP_DIR"
-        chmod 700 "$BACKUP_DIR"
-        chown root:root "$BACKUP_DIR"
-    }
+	BACKUP_DIR=$(cat "$BACKUP_DIR_FILE")
+	[ -d "$BACKUP_DIR" ] || {
+		mkdir -p "$BACKUP_DIR"
+		chmod 700 "$BACKUP_DIR"
+		chown root:root "$BACKUP_DIR"
+	}
 fi
 
 # Generate passphrase if it doesn't exist
 if [ ! -f "$KEY_FILE" ]; then
-    umask 177
-    head -c 32 /dev/urandom | base64 | tr -d '\n' > "$KEY_FILE"
-    chmod 600 "$KEY_FILE"
+	umask 177
+	head -c 32 /dev/urandom | base64 | tr -d '\n' >"$KEY_FILE"
+	chmod 600 "$KEY_FILE"
 fi
 
 DATE="$(date +%Y%m%d)"
@@ -47,10 +47,10 @@ ionice -c3 -p $$ >/dev/null 2>&1 || true
 renice +19 $$ >/dev/null 2>&1 || true
 
 umask 177
-tar -czf - /etc 2>/dev/null | \
-    gpg --batch --yes --pinentry-mode loopback \
-        --symmetric --cipher-algo AES256 --passphrase-file "$KEY_FILE" \
-        -o "$BACKUP_FILE"
+tar -czf - /etc 2>/dev/null |
+	gpg --batch --yes --pinentry-mode loopback \
+		--symmetric --cipher-algo AES256 --passphrase-file "$KEY_FILE" \
+		-o "$BACKUP_FILE"
 
 chown root:root "$BACKUP_FILE"
 chmod 600 "$BACKUP_FILE"

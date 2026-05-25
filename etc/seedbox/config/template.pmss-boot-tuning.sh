@@ -13,8 +13,8 @@ json_bool() {
 
 json_int_or_null() {
 	case "$1" in
-		'' | *[!0-9]*) printf 'null' ;;
-		*) printf '%s' "$1" ;;
+	'' | *[!0-9]*) printf 'null' ;;
+	*) printf '%s' "$1" ;;
 	esac
 }
 
@@ -32,8 +32,8 @@ write_hardware_summary() {
 	if [ -r /proc/meminfo ]; then
 		ram_kb=$(awk '/^MemTotal:/ { print $2; exit }' /proc/meminfo 2>/dev/null || echo '')
 		case "$ram_kb" in
-			'' | *[!0-9]*) ;;
-			*) ram_gb=$(((ram_kb + 1048575) / 1048576)) ;;
+		'' | *[!0-9]*) ;;
+		*) ram_gb=$(((ram_kb + 1048575) / 1048576)) ;;
 		esac
 	fi
 
@@ -43,7 +43,7 @@ write_hardware_summary() {
 	if [ -n "$default_iface" ] && [ -r "/sys/class/net/$default_iface/speed" ]; then
 		nic_speed_mbps=$(cat "/sys/class/net/$default_iface/speed" 2>/dev/null || echo '')
 		case "$nic_speed_mbps" in
-			'' | *[!0-9]*) nic_speed_mbps='' ;;
+		'' | *[!0-9]*) nic_speed_mbps='' ;;
 		esac
 	fi
 

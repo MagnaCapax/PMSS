@@ -12,24 +12,24 @@ echo "[open-tag-lint] scanning ${#PHP_FILES[@]} PHP files" >&2
 
 fail=0
 for rel in "${PHP_FILES[@]}"; do
-  file="$ROOT_DIR/$rel"
+	file="$ROOT_DIR/$rel"
 
-  if grep -q -E '<\?php|<\?=' "$file"; then
-    continue
-  fi
+	if grep -q -E '<\?php|<\?=' "$file"; then
+		continue
+	fi
 
-  # Allow empty placeholders; otherwise require a PHP open tag.
-  if [[ ! -s "$file" ]]; then
-    continue
-  fi
+	# Allow empty placeholders; otherwise require a PHP open tag.
+	if [[ ! -s "$file" ]]; then
+		continue
+	fi
 
-  echo "[open-tag-lint] $rel: missing '<?php' or '<?=' tag" >&2
-  fail=1
+	echo "[open-tag-lint] $rel: missing '<?php' or '<?=' tag" >&2
+	fail=1
 done
 
-if (( fail )); then
-  echo "[open-tag-lint] ERROR: PHP files must contain a PHP open tag" >&2
-  exit 1
+if ((fail)); then
+	echo "[open-tag-lint] ERROR: PHP files must contain a PHP open tag" >&2
+	exit 1
 fi
 
 echo "[open-tag-lint] OK" >&2

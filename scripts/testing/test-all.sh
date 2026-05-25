@@ -6,12 +6,12 @@ scripts/testing/test-php.sh
 scripts/testing/test-bash.sh
 
 runIfEnabled() {
-  local envVar="$1" label="$2"
-  shift 2
-  if [[ "${!envVar:-0}" == "1" ]]; then
-    echo "$label"
-    "$@"
-  fi
+	local envVar="$1" label="$2"
+	shift 2
+	if [[ "${!envVar:-0}" == "1" ]]; then
+		echo "$label"
+		"$@"
+	fi
 }
 
 echo "doctrine lint"

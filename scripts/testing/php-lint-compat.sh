@@ -10,6 +10,6 @@ source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 echo "[php-lint-compat] using $(php -r 'echo PHP_VERSION;')" >&2
 # Lint all PHP files except dev/prod tests (which may target newer PHP).
 pmss_testing_find_runtime_php_files "$ROOT_DIR" |
-  xargs -0 -n1 php -l >/dev/null
+	xargs -0 -n1 php -l >/dev/null
 
 echo "OK: PHP syntax check (compat)" >&2

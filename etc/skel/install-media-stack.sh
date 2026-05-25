@@ -36,29 +36,29 @@
 
 # Self-update unless explicitly skipped, but only when running interactively (TTY)
 if [[ "${1:-}" != "--skip-update" ]] && [[ -t 0 ]]; then
-  REMOTE_RAW_URL="https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/main/etc/skel/install-media-stack.sh"
-  tmp=$(mktemp) || true
-  if [[ -n "$tmp" ]]; then
-    if command -v curl >/dev/null 2>&1; then
-      curl -fsSL "$REMOTE_RAW_URL" -o "$tmp" || true
-    elif command -v wget >/dev/null 2>&1; then
-      wget -q "$REMOTE_RAW_URL" -O "$tmp" || true
-    fi
-    if [[ -s "$tmp" ]]; then
-      # Verify downloaded script looks like a PMSS installer (not HTML error page, binary, etc.)
-      if ! head -1 "$tmp" | grep -q '^#!/usr/bin/env bash$'; then
-        echo "[WARN] Downloaded script has unexpected shebang — refusing to exec, using local copy" >&2
-        rm -f "$tmp" 2>/dev/null || true
-      elif ! grep -q '^# PMSS: .* Installer' "$tmp"; then
-        echo "[WARN] Downloaded script missing PMSS marker — refusing to exec, using local copy" >&2
-        rm -f "$tmp" 2>/dev/null || true
-      else
-        chmod +x "$tmp" 2>/dev/null || true
-        exec "$tmp" --skip-update "$@"
-      fi
-    fi
-    rm -f "$tmp" 2>/dev/null || true
-  fi
+	REMOTE_RAW_URL="https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/main/etc/skel/install-media-stack.sh"
+	tmp=$(mktemp) || true
+	if [[ -n "$tmp" ]]; then
+		if command -v curl >/dev/null 2>&1; then
+			curl -fsSL "$REMOTE_RAW_URL" -o "$tmp" || true
+		elif command -v wget >/dev/null 2>&1; then
+			wget -q "$REMOTE_RAW_URL" -O "$tmp" || true
+		fi
+		if [[ -s "$tmp" ]]; then
+			# Verify downloaded script looks like a PMSS installer (not HTML error page, binary, etc.)
+			if ! head -1 "$tmp" | grep -q '^#!/usr/bin/env bash$'; then
+				echo "[WARN] Downloaded script has unexpected shebang — refusing to exec, using local copy" >&2
+				rm -f "$tmp" 2>/dev/null || true
+			elif ! grep -q '^# PMSS: .* Installer' "$tmp"; then
+				echo "[WARN] Downloaded script missing PMSS marker — refusing to exec, using local copy" >&2
+				rm -f "$tmp" 2>/dev/null || true
+			else
+				chmod +x "$tmp" 2>/dev/null || true
+				exec "$tmp" --skip-update "$@"
+			fi
+		fi
+		rm -f "$tmp" 2>/dev/null || true
+	fi
 fi
 
 set -euo pipefail # Exit on error, undefined vars, pipe failures
@@ -72,16 +72,22 @@ DRY_RUN=0
 VERIFY_ONLY=0
 
 # Overrides (initialized empty)
-OVR_SONARR_URL=""; OVR_SONARR_BRANCH=""; OVR_SONARR_VERSION=""
-OVR_RADARR_URL=""; OVR_RADARR_BRANCH=""; OVR_RADARR_VERSION=""
-OVR_PROWLARR_URL=""; OVR_PROWLARR_BRANCH=""
-OVR_SAB_URL=""; OVR_SAB_VERSION=""
+OVR_SONARR_URL=""
+OVR_SONARR_BRANCH=""
+OVR_SONARR_VERSION=""
+OVR_RADARR_URL=""
+OVR_RADARR_BRANCH=""
+OVR_RADARR_VERSION=""
+OVR_PROWLARR_URL=""
+OVR_PROWLARR_BRANCH=""
+OVR_SAB_URL=""
+OVR_SAB_VERSION=""
 OVR_JELLYFIN_URL=""
 OVR_JELLYFIN_FFMPEG=""
 JELLYFIN_INSTALL_ENABLED=1
 
 print_usage() {
-  cat <<USAGE
+	cat <<USAGE
 Usage: install-media-stack.sh [--skip-update] [--dry-run] [overrides]
 
 Overrides:
@@ -110,26 +116,32 @@ USAGE
 }
 
 for arg in "$@"; do
-  case "$arg" in
-    --help|-h) print_usage; exit 0 ;;
-    --dry-run) DRY_RUN=1 ;;
-    --verify-only) VERIFY_ONLY=1; DRY_RUN=1 ;;
-    --sonarr-url=*) OVR_SONARR_URL=${arg#*=} ;;
-    --sonarr-branch=*) OVR_SONARR_BRANCH=${arg#*=} ;;
-    --sonarr-version=*) OVR_SONARR_VERSION=${arg#*=} ;;
-    --radarr-url=*) OVR_RADARR_URL=${arg#*=} ;;
-    --radarr-branch=*) OVR_RADARR_BRANCH=${arg#*=} ;;
-    --radarr-version=*) OVR_RADARR_VERSION=${arg#*=} ;;
-    --radarr-pin=*) OVR_RADARR_VERSION=${arg#*=} ;;
-    --prowlarr-url=*) OVR_PROWLARR_URL=${arg#*=} ;;
-    --prowlarr-branch=*) OVR_PROWLARR_BRANCH=${arg#*=} ;;
-    --sab-url=*) OVR_SAB_URL=${arg#*=} ;;
-    --sab-version=*) OVR_SAB_VERSION=${arg#*=} ;;
-    --jellyfin-url=*) OVR_JELLYFIN_URL=${arg#*=} ;;
-    --jellyfin-ffmpeg=*) OVR_JELLYFIN_FFMPEG=${arg#*=} ;;
-    --skip-update) : ;; # handled above
-    *) ;;
-  esac
+	case "$arg" in
+	--help | -h)
+		print_usage
+		exit 0
+		;;
+	--dry-run) DRY_RUN=1 ;;
+	--verify-only)
+		VERIFY_ONLY=1
+		DRY_RUN=1
+		;;
+	--sonarr-url=*) OVR_SONARR_URL=${arg#*=} ;;
+	--sonarr-branch=*) OVR_SONARR_BRANCH=${arg#*=} ;;
+	--sonarr-version=*) OVR_SONARR_VERSION=${arg#*=} ;;
+	--radarr-url=*) OVR_RADARR_URL=${arg#*=} ;;
+	--radarr-branch=*) OVR_RADARR_BRANCH=${arg#*=} ;;
+	--radarr-version=*) OVR_RADARR_VERSION=${arg#*=} ;;
+	--radarr-pin=*) OVR_RADARR_VERSION=${arg#*=} ;;
+	--prowlarr-url=*) OVR_PROWLARR_URL=${arg#*=} ;;
+	--prowlarr-branch=*) OVR_PROWLARR_BRANCH=${arg#*=} ;;
+	--sab-url=*) OVR_SAB_URL=${arg#*=} ;;
+	--sab-version=*) OVR_SAB_VERSION=${arg#*=} ;;
+	--jellyfin-url=*) OVR_JELLYFIN_URL=${arg#*=} ;;
+	--jellyfin-ffmpeg=*) OVR_JELLYFIN_FFMPEG=${arg#*=} ;;
+	--skip-update) : ;; # handled above
+	*) ;;
+	esac
 done
 
 # Reserved for future SABnzbd version pinning; keep the arg plumbed.
@@ -144,16 +156,26 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 
 # Colors if tty
 if [[ -t 1 ]]; then
-  C_RESET="\033[0m"; C_INFO="\033[1;34m"; C_OK="\033[1;32m"; C_WARN="\033[1;33m"; C_ERR="\033[1;31m"; C_STEP="\033[1;36m"
+	C_RESET="\033[0m"
+	C_INFO="\033[1;34m"
+	C_OK="\033[1;32m"
+	C_WARN="\033[1;33m"
+	C_ERR="\033[1;31m"
+	C_STEP="\033[1;36m"
 else
-  C_RESET=""; C_INFO=""; C_OK=""; C_WARN=""; C_ERR=""; C_STEP=""
+	C_RESET=""
+	C_INFO=""
+	C_OK=""
+	C_WARN=""
+	C_ERR=""
+	C_STEP=""
 fi
 
-log_step(){ echo -e "${C_STEP}==> $*${C_RESET}"; }
-log_info(){ echo -e "${C_INFO}[INFO]${C_RESET} $*"; }
-log_ok(){ echo -e "${C_OK}[ OK ]${C_RESET} $*"; }
-log_warn(){ echo -e "${C_WARN}[WARN]${C_RESET} $*"; }
-log_err(){ echo -e "${C_ERR}[ERR ]${C_RESET} $*"; }
+log_step() { echo -e "${C_STEP}==> $*${C_RESET}"; }
+log_info() { echo -e "${C_INFO}[INFO]${C_RESET} $*"; }
+log_ok() { echo -e "${C_OK}[ OK ]${C_RESET} $*"; }
+log_warn() { echo -e "${C_WARN}[WARN]${C_RESET} $*"; }
+log_err() { echo -e "${C_ERR}[ERR ]${C_RESET} $*"; }
 
 # Checksums file for download integrity verification
 CHECKSUMS_FILE="$HOME/.install-checksums.sha256"
@@ -161,225 +183,227 @@ CHECKSUMS_RAW_URL="https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/
 
 # Fetch latest checksums file from repo (best-effort, non-blocking)
 fetch_checksums_file() {
-    local tmp_ck
-    tmp_ck=$(mktemp) || return 1
-    if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "$CHECKSUMS_RAW_URL" -o "$tmp_ck" 2>/dev/null || true
-    elif command -v wget >/dev/null 2>&1; then
-        wget -q "$CHECKSUMS_RAW_URL" -O "$tmp_ck" 2>/dev/null || true
-    fi
-    if [[ -s "$tmp_ck" ]] && head -1 "$tmp_ck" | grep -q '^# PMSS'; then
-        mv "$tmp_ck" "$CHECKSUMS_FILE" 2>/dev/null || true
-        chmod 600 "$CHECKSUMS_FILE" 2>/dev/null || true
-    else
-        rm -f "$tmp_ck" 2>/dev/null || true
-    fi
+	local tmp_ck
+	tmp_ck=$(mktemp) || return 1
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$CHECKSUMS_RAW_URL" -o "$tmp_ck" 2>/dev/null || true
+	elif command -v wget >/dev/null 2>&1; then
+		wget -q "$CHECKSUMS_RAW_URL" -O "$tmp_ck" 2>/dev/null || true
+	fi
+	if [[ -s "$tmp_ck" ]] && head -1 "$tmp_ck" | grep -q '^# PMSS'; then
+		mv "$tmp_ck" "$CHECKSUMS_FILE" 2>/dev/null || true
+		chmod 600 "$CHECKSUMS_FILE" 2>/dev/null || true
+	else
+		rm -f "$tmp_ck" 2>/dev/null || true
+	fi
 }
 
 # Verify SHA256 checksum of a downloaded file against the checksums file.
 # - artifact_id not found in checksums file: warn, return 0 (allow new versions)
 # - artifact_id found but hash mismatches: error, return 1 (corruption/compromise)
 verify_checksum() {
-    local file="$1" artifact_id="$2"
-    if [[ ! -f "$file" ]]; then
-        return 0  # File not present (e.g., dry-run mode) — skip
-    fi
-    if [[ ! -f "$CHECKSUMS_FILE" ]]; then
-        log_warn "No checksums file — skipping verification for $(basename "$file")"
-        return 0
-    fi
-    local expected_hash
-    expected_hash=$(grep -F "  ${artifact_id}" "$CHECKSUMS_FILE" 2>/dev/null | grep -v '^#' | awk '{print $1}' | head -1)
-    if [[ -z "$expected_hash" ]]; then
-        log_warn "No checksum on file for '${artifact_id}' — skipping verification"
-        return 0
-    fi
-    local actual_hash
-    actual_hash=$(sha256sum "$file" | cut -d' ' -f1)
-    if [[ "$actual_hash" != "$expected_hash" ]]; then
-        log_err "CHECKSUM MISMATCH for ${artifact_id}"
-        log_err "  Expected: $expected_hash"
-        log_err "  Got:      $actual_hash"
-        log_err "  This could indicate a corrupted download or supply chain compromise."
-        log_err "  Re-run the installer to retry. If this persists, report to support."
-        return 1
-    fi
-    log_ok "Checksum verified: ${artifact_id}"
-    return 0
+	local file="$1" artifact_id="$2"
+	if [[ ! -f "$file" ]]; then
+		return 0 # File not present (e.g., dry-run mode) — skip
+	fi
+	if [[ ! -f "$CHECKSUMS_FILE" ]]; then
+		log_warn "No checksums file — skipping verification for $(basename "$file")"
+		return 0
+	fi
+	local expected_hash
+	expected_hash=$(grep -F "  ${artifact_id}" "$CHECKSUMS_FILE" 2>/dev/null | grep -v '^#' | awk '{print $1}' | head -1)
+	if [[ -z "$expected_hash" ]]; then
+		log_warn "No checksum on file for '${artifact_id}' — skipping verification"
+		return 0
+	fi
+	local actual_hash
+	actual_hash=$(sha256sum "$file" | cut -d' ' -f1)
+	if [[ "$actual_hash" != "$expected_hash" ]]; then
+		log_err "CHECKSUM MISMATCH for ${artifact_id}"
+		log_err "  Expected: $expected_hash"
+		log_err "  Got:      $actual_hash"
+		log_err "  This could indicate a corrupted download or supply chain compromise."
+		log_err "  Re-run the installer to retry. If this persists, report to support."
+		return 1
+	fi
+	log_ok "Checksum verified: ${artifact_id}"
+	return 0
 }
 
 # Escape XML special characters in user-supplied values before writing to config.
 # Note: in bash ${//pattern/replacement}, & in replacement = matched text; use \& for literal &.
 xml_escape() {
-    local s="$1"
-    s="${s//&/\&amp;}"
-    s="${s//</\&lt;}"
-    s="${s//>/\&gt;}"
-    s="${s//\"/\&quot;}"
-    s="${s//\'/\&apos;}"
-    printf '%s' "$s"
+	local s="$1"
+	s="${s//&/\&amp;}"
+	s="${s//</\&lt;}"
+	s="${s//>/\&gt;}"
+	s="${s//\"/\&quot;}"
+	s="${s//\'/\&apos;}"
+	printf '%s' "$s"
 }
 
-check_url(){
-  local url="$1"
-  if command -v curl >/dev/null 2>&1; then
-    # Prefer HEAD to avoid downloading large artifacts, but some APIs reject HEAD
-    # (observed with Radarr endpoints). Fall back to a tiny GET.
-    curl -fsIL --max-time 10 "$url" >/dev/null 2>&1 && return 0
-    curl -fsSL --max-time 10 -r 0-0 -o /dev/null "$url" >/dev/null 2>&1
-  elif command -v wget >/dev/null 2>&1; then
-    wget -q --spider --timeout=10 "$url" >/dev/null 2>&1 && return 0
-    wget -q -O /dev/null --timeout=10 --tries=1 --max-redirect=5 "$url" >/dev/null 2>&1
-  else
-    return 1
-  fi
+check_url() {
+	local url="$1"
+	if command -v curl >/dev/null 2>&1; then
+		# Prefer HEAD to avoid downloading large artifacts, but some APIs reject HEAD
+		# (observed with Radarr endpoints). Fall back to a tiny GET.
+		curl -fsIL --max-time 10 "$url" >/dev/null 2>&1 && return 0
+		curl -fsSL --max-time 10 -r 0-0 -o /dev/null "$url" >/dev/null 2>&1
+	elif command -v wget >/dev/null 2>&1; then
+		wget -q --spider --timeout=10 "$url" >/dev/null 2>&1 && return 0
+		wget -q -O /dev/null --timeout=10 --tries=1 --max-redirect=5 "$url" >/dev/null 2>&1
+	else
+		return 1
+	fi
 }
 
-fetch(){
-  # fetch <url> <outfile or ->
-  local url="$1"; local out="$2"
-  log_info "Fetching: $url"
-  if [[ $DRY_RUN -eq 1 ]]; then
-    if check_url "$url"; then 
-      log_ok "URL reachable (dry-run)"
-      return 0
-    else 
-      log_warn "URL not reachable (dry-run)"
-      return 1
-    fi
-  fi
-  if command -v wget >/dev/null 2>&1; then
-    if [[ "$out" == "-" ]]; then wget -qO - "$url"; else wget -q "$url" -O "$out"; fi
-  else
-    if [[ "$out" == "-" ]]; then curl -fsSL "$url"; else curl -fsSL "$url" -o "$out"; fi
-  fi
+fetch() {
+	# fetch <url> <outfile or ->
+	local url="$1"
+	local out="$2"
+	log_info "Fetching: $url"
+	if [[ $DRY_RUN -eq 1 ]]; then
+		if check_url "$url"; then
+			log_ok "URL reachable (dry-run)"
+			return 0
+		else
+			log_warn "URL not reachable (dry-run)"
+			return 1
+		fi
+	fi
+	if command -v wget >/dev/null 2>&1; then
+		if [[ "$out" == "-" ]]; then wget -qO - "$url"; else wget -q "$url" -O "$out"; fi
+	else
+		if [[ "$out" == "-" ]]; then curl -fsSL "$url"; else curl -fsSL "$url" -o "$out"; fi
+	fi
 }
 
 # Extraction helper
-extract_tgz(){
-  # extract_tgz <archive> [target_dir] [strip_components]
-  local a="$1" t="${2:-.}" s="${3:-}"
-  if [[ $DRY_RUN -eq 1 ]]; then
-    log_info "[dry-run] would extract $a to $t${s:+ (strip $s)}"; return
-  fi
-  if [[ -n "$s" ]]; then
-    tar -xzf "$a" -C "$t" --strip-components="$s" >/dev/null 2>&1
-  else
-    tar -xzf "$a" -C "$t" >/dev/null 2>&1
-  fi
-  rm -f "$a" >/dev/null 2>&1
-  echo "Installation files downloaded and extracted"
+extract_tgz() {
+	# extract_tgz <archive> [target_dir] [strip_components]
+	local a="$1" t="${2:-.}" s="${3:-}"
+	if [[ $DRY_RUN -eq 1 ]]; then
+		log_info "[dry-run] would extract $a to $t${s:+ (strip $s)}"
+		return
+	fi
+	if [[ -n "$s" ]]; then
+		tar -xzf "$a" -C "$t" --strip-components="$s" >/dev/null 2>&1
+	else
+		tar -xzf "$a" -C "$t" >/dev/null 2>&1
+	fi
+	rm -f "$a" >/dev/null 2>&1
+	echo "Installation files downloaded and extracted"
 }
 
 jellyfin_ffmpeg_binary_version() {
-  local binary="$1"
-  [[ -x "$binary" ]] || return 1
-  "$binary" -version 2>/dev/null | awk 'NR == 1 {print $3; exit}'
+	local binary="$1"
+	[[ -x "$binary" ]] || return 1
+	"$binary" -version 2>/dev/null | awk 'NR == 1 {print $3; exit}'
 }
 
 jellyfin_ffmpeg_version_usable() {
-  local version="$1"
-  [[ "$version" =~ ^[0-9] ]] || return 1
-  dpkg --compare-versions "$version" ge "$JELLYFIN_MIN_FFMPEG_VERSION"
+	local version="$1"
+	[[ "$version" =~ ^[0-9] ]] || return 1
+	dpkg --compare-versions "$version" ge "$JELLYFIN_MIN_FFMPEG_VERSION"
 }
 
 jellyfin_ffmpeg_configure_fallback() {
-  local home_ffmpeg="$HOME/.bin/ffmpeg"
-  local system_ffmpeg=""
-  local version=""
+	local home_ffmpeg="$HOME/.bin/ffmpeg"
+	local system_ffmpeg=""
+	local version=""
 
-  if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
-    log_info "Using explicit Jellyfin FFmpeg path: $OVR_JELLYFIN_FFMPEG"
-    return 0
-  fi
+	if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
+		log_info "Using explicit Jellyfin FFmpeg path: $OVR_JELLYFIN_FFMPEG"
+		return 0
+	fi
 
-  if [[ -x "$home_ffmpeg" ]]; then
-    version=$(jellyfin_ffmpeg_binary_version "$home_ffmpeg" || true)
-    if jellyfin_ffmpeg_version_usable "$version"; then
-      OVR_JELLYFIN_FFMPEG="$home_ffmpeg"
-      log_info "Using existing user FFmpeg ${version} at $home_ffmpeg"
-      return 0
-    fi
-    log_warn "Existing $home_ffmpeg is below Jellyfin FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION} requirement (${version:-unknown})"
-  fi
+	if [[ -x "$home_ffmpeg" ]]; then
+		version=$(jellyfin_ffmpeg_binary_version "$home_ffmpeg" || true)
+		if jellyfin_ffmpeg_version_usable "$version"; then
+			OVR_JELLYFIN_FFMPEG="$home_ffmpeg"
+			log_info "Using existing user FFmpeg ${version} at $home_ffmpeg"
+			return 0
+		fi
+		log_warn "Existing $home_ffmpeg is below Jellyfin FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION} requirement (${version:-unknown})"
+	fi
 
-  if command -v ffmpeg >/dev/null 2>&1; then
-    system_ffmpeg=$(command -v ffmpeg)
-    version=$(jellyfin_ffmpeg_binary_version "$system_ffmpeg" || true)
-    if jellyfin_ffmpeg_version_usable "$version"; then
-      log_info "System FFmpeg ${version} satisfies Jellyfin startup requirement"
-      return 0
-    fi
-    log_warn "System FFmpeg is below Jellyfin FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION} requirement (${version:-unknown})"
-  else
-    log_warn "System ffmpeg not found; Jellyfin requires FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
-  fi
+	if command -v ffmpeg >/dev/null 2>&1; then
+		system_ffmpeg=$(command -v ffmpeg)
+		version=$(jellyfin_ffmpeg_binary_version "$system_ffmpeg" || true)
+		if jellyfin_ffmpeg_version_usable "$version"; then
+			log_info "System FFmpeg ${version} satisfies Jellyfin startup requirement"
+			return 0
+		fi
+		log_warn "System FFmpeg is below Jellyfin FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION} requirement (${version:-unknown})"
+	else
+		log_warn "System ffmpeg not found; Jellyfin requires FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
+	fi
 
-  JELLYFIN_INSTALL_ENABLED=0
-  log_err "Skipping Jellyfin: FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is required for Jellyfin startup."
-  log_err "Install a user-local static FFmpeg at $home_ffmpeg, then rerun:"
-  log_err "  bash install-media-stack.sh --jellyfin-ffmpeg=$home_ffmpeg"
-  log_warn "Continuing with Radarr, Sonarr, Prowlarr, SABnzbd, and Cloudplow."
+	JELLYFIN_INSTALL_ENABLED=0
+	log_err "Skipping Jellyfin: FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is required for Jellyfin startup."
+	log_err "Install a user-local static FFmpeg at $home_ffmpeg, then rerun:"
+	log_err "  bash install-media-stack.sh --jellyfin-ffmpeg=$home_ffmpeg"
+	log_warn "Continuing with Radarr, Sonarr, Prowlarr, SABnzbd, and Cloudplow."
 }
 
 managed_install_path_reset() {
-  local path="$1"
-  if [[ $DRY_RUN -eq 1 ]]; then
-    log_info "[dry-run] would refresh managed install path $path"
-    return 0
-  fi
-  if [[ -L "$path" || -e "$path" ]]; then
-    rm -rf "$path"
-  fi
+	local path="$1"
+	if [[ $DRY_RUN -eq 1 ]]; then
+		log_info "[dry-run] would refresh managed install path $path"
+		return 0
+	fi
+	if [[ -L "$path" || -e "$path" ]]; then
+		rm -rf "$path"
+	fi
 }
 
 servarr_config_xml_converge() {
-  local app="$1" datadir="$2" port="$3" default_port="$4"
+	local app="$1" datadir="$2" port="$3" default_port="$4"
 
-  if [[ $DRY_RUN -eq 0 ]]; then
-    touch "$datadir"/update_required
-  fi
-  echo "${app^^} Installed"
-  echo "Configuring ${app^^}"
-  if [[ $DRY_RUN -eq 0 ]]; then
-    if [ ! -f "$datadir/config.xml" ]; then
-      cat <<EOF >"$datadir/config.xml"
+	if [[ $DRY_RUN -eq 0 ]]; then
+		touch "$datadir"/update_required
+	fi
+	echo "${app^^} Installed"
+	echo "Configuring ${app^^}"
+	if [[ $DRY_RUN -eq 0 ]]; then
+		if [ ! -f "$datadir/config.xml" ]; then
+			cat <<EOF >"$datadir/config.xml"
 <Config>
   <UrlBase></UrlBase>
   <Port>${default_port}</Port>
   <BindAddress>127.0.0.1</BindAddress>
 </Config>
 EOF
-    fi
-    sed -i -E "s|<Port>[^<]*</Port>|<Port>${port}</Port>|g" "$datadir/config.xml"
-    sed -i -E "s|<UrlBase>[^<]*</UrlBase>|<UrlBase>/public-${USERNAME}/${app}</UrlBase>|g" "$datadir/config.xml"
-    sed -i -E "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddress>|g" "$datadir/config.xml"
-  else
-    log_info "[dry-run] would configure ${app^^} (port=${port}, url_base=/public-${USERNAME}/${app})"
-  fi
-  echo "${app^^} configured"
-  echo ""
+		fi
+		sed -i -E "s|<Port>[^<]*</Port>|<Port>${port}</Port>|g" "$datadir/config.xml"
+		sed -i -E "s|<UrlBase>[^<]*</UrlBase>|<UrlBase>/public-${USERNAME}/${app}</UrlBase>|g" "$datadir/config.xml"
+		sed -i -E "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddress>|g" "$datadir/config.xml"
+	else
+		log_info "[dry-run] would configure ${app^^} (port=${port}, url_base=/public-${USERNAME}/${app})"
+	fi
+	echo "${app^^} configured"
+	echo ""
 }
 
 lighttpd_custom_has_legacy_media_stack_rules() {
-  local custom_file="$1"
-  [[ -f "$custom_file" ]] || return 1
-  grep -Fq '# Keep ARR base paths canonical so missing-slash requests' "$custom_file" &&
-    grep -Fq '"^/sabnzbd(\$|/)"' "$custom_file" &&
-    grep -Fq '"^/radarr(\$|/)"' "$custom_file" &&
-    grep -Fq '"^/prowlarr(\$|/)"' "$custom_file" &&
-    grep -Fq '"^/sonarr(\$|/)"' "$custom_file" &&
-    grep -Fq '"^/jellyfin(\$|/)"' "$custom_file"
+	local custom_file="$1"
+	[[ -f "$custom_file" ]] || return 1
+	grep -Fq '# Keep ARR base paths canonical so missing-slash requests' "$custom_file" &&
+		grep -Fq '"^/sabnzbd(\$|/)"' "$custom_file" &&
+		grep -Fq '"^/radarr(\$|/)"' "$custom_file" &&
+		grep -Fq '"^/prowlarr(\$|/)"' "$custom_file" &&
+		grep -Fq '"^/sonarr(\$|/)"' "$custom_file" &&
+		grep -Fq '"^/jellyfin(\$|/)"' "$custom_file"
 }
 
 lighttpd_custom_strip_managed_media_stack_routes() {
-  local custom_fragment="$1"
-  local temp_fragment=""
-  [[ -f "$custom_fragment" ]] || return 0
+	local custom_fragment="$1"
+	local temp_fragment=""
+	[[ -f "$custom_fragment" ]] || return 0
 
-  temp_fragment="${custom_fragment}.pmss.$$"
+	temp_fragment="${custom_fragment}.pmss.$$"
 
-  if ! awk '
+	if ! awk '
     function line_is_managed_route_start(line) {
       if (line !~ /^[[:space:]]*\$HTTP\["url"\] =~ /) {
         return 0
@@ -433,83 +457,83 @@ lighttpd_custom_strip_managed_media_stack_routes() {
       print
     }
   ' "$custom_fragment" >"$temp_fragment"; then
-    rm -f "$temp_fragment"
-    log_warn "Failed to sanitize overlapping PMSS lighttpd routes in ~/.lighttpd/custom.d/custom-migrated.conf"
-    return 1
-  fi
+		rm -f "$temp_fragment"
+		log_warn "Failed to sanitize overlapping PMSS lighttpd routes in ~/.lighttpd/custom.d/custom-migrated.conf"
+		return 1
+	fi
 
-  if cmp -s "$custom_fragment" "$temp_fragment"; then
-    rm -f "$temp_fragment"
-    return 0
-  fi
+	if cmp -s "$custom_fragment" "$temp_fragment"; then
+		rm -f "$temp_fragment"
+		return 0
+	fi
 
-  if mv "$temp_fragment" "$custom_fragment"; then
-    chmod 640 "$custom_fragment" 2>/dev/null || true
-    log_info "Removed PMSS-managed media stack proxy routes from ~/.lighttpd/custom.d/custom-migrated.conf"
-    return 0
-  fi
+	if mv "$temp_fragment" "$custom_fragment"; then
+		chmod 640 "$custom_fragment" 2>/dev/null || true
+		log_info "Removed PMSS-managed media stack proxy routes from ~/.lighttpd/custom.d/custom-migrated.conf"
+		return 0
+	fi
 
-  rm -f "$temp_fragment"
-  log_warn "Failed to update sanitized PMSS lighttpd routes in ~/.lighttpd/custom.d/custom-migrated.conf"
-  return 1
+	rm -f "$temp_fragment"
+	log_warn "Failed to update sanitized PMSS lighttpd routes in ~/.lighttpd/custom.d/custom-migrated.conf"
+	return 1
 }
 
 prepare_lighttpd_media_stack_paths() {
-  local lighttpd_dir="$HOME/.lighttpd"
-  local custom_file="$lighttpd_dir/custom"
-  local custom_dir="$lighttpd_dir/custom.d"
-  local managed_fragment="$custom_dir/media-stack.conf"
-  local migrated_fragment="$custom_dir/custom-migrated.conf"
-  local backup_stamp=""
+	local lighttpd_dir="$HOME/.lighttpd"
+	local custom_file="$lighttpd_dir/custom"
+	local custom_dir="$lighttpd_dir/custom.d"
+	local managed_fragment="$custom_dir/media-stack.conf"
+	local migrated_fragment="$custom_dir/custom-migrated.conf"
+	local backup_stamp=""
 
-  mkdir -p "$lighttpd_dir" "$custom_dir"
+	mkdir -p "$lighttpd_dir" "$custom_dir"
 
-  if [[ -s "$custom_file" && ! -f "$managed_fragment" ]]; then
-    backup_stamp=$(date +%Y%m%d)
-    if ! cp "$custom_file" "$lighttpd_dir/backup.custom.${backup_stamp}" 2>/dev/null; then
-      log_warn "Failed to backup existing lighttpd custom config"
-    fi
+	if [[ -s "$custom_file" && ! -f "$managed_fragment" ]]; then
+		backup_stamp=$(date +%Y%m%d)
+		if ! cp "$custom_file" "$lighttpd_dir/backup.custom.${backup_stamp}" 2>/dev/null; then
+			log_warn "Failed to backup existing lighttpd custom config"
+		fi
 
-    if lighttpd_custom_has_legacy_media_stack_rules "$custom_file"; then
-      : > "$custom_file"
-      log_info "Migrated legacy PMSS lighttpd rules to ~/.lighttpd/custom.d/media-stack.conf"
-    elif [[ ! -e "$migrated_fragment" ]]; then
-      mv "$custom_file" "$migrated_fragment"
-      : > "$custom_file"
-      lighttpd_custom_strip_managed_media_stack_routes "$migrated_fragment" || true
-      chmod 640 "$migrated_fragment" 2>/dev/null || true
-      log_info "Preserved ~/.lighttpd/custom at ~/.lighttpd/custom.d/custom-migrated.conf"
-    else
-      log_warn "Leaving ~/.lighttpd/custom unchanged; ~/.lighttpd/custom.d/custom-migrated.conf already exists"
-    fi
-  elif [[ ! -e "$custom_file" ]]; then
-    : > "$custom_file"
-  fi
+		if lighttpd_custom_has_legacy_media_stack_rules "$custom_file"; then
+			: >"$custom_file"
+			log_info "Migrated legacy PMSS lighttpd rules to ~/.lighttpd/custom.d/media-stack.conf"
+		elif [[ ! -e "$migrated_fragment" ]]; then
+			mv "$custom_file" "$migrated_fragment"
+			: >"$custom_file"
+			lighttpd_custom_strip_managed_media_stack_routes "$migrated_fragment" || true
+			chmod 640 "$migrated_fragment" 2>/dev/null || true
+			log_info "Preserved ~/.lighttpd/custom at ~/.lighttpd/custom.d/custom-migrated.conf"
+		else
+			log_warn "Leaving ~/.lighttpd/custom unchanged; ~/.lighttpd/custom.d/custom-migrated.conf already exists"
+		fi
+	elif [[ ! -e "$custom_file" ]]; then
+		: >"$custom_file"
+	fi
 }
 
 # Helper to append to .bashrc.custom only if marker not present
 append_to_bashrc_custom_if_missing() {
-  local content="$1"
-  local marker="$2"
-  local target="$HOME/.bashrc.custom"
-  
-  if [[ $DRY_RUN -eq 1 ]]; then
-    log_info "[dry-run] would check and append to ~/.bashrc.custom (marker: $marker)"
-    return 0
-  fi
-  
-  if [[ ! -f "$target" ]]; then
-    : > "$target" || {
-      log_err "Failed to create $target"
-      return 1
-    }
-  fi
+	local content="$1"
+	local marker="$2"
+	local target="$HOME/.bashrc.custom"
 
-  if ! grep -q "$marker" "$target" 2>/dev/null; then
-    echo "$content" >> "$target"
-  else
-    log_warn "Entry with marker '$marker' already exists in .bashrc.custom, skipping"
-  fi
+	if [[ $DRY_RUN -eq 1 ]]; then
+		log_info "[dry-run] would check and append to ~/.bashrc.custom (marker: $marker)"
+		return 0
+	fi
+
+	if [[ ! -f "$target" ]]; then
+		: >"$target" || {
+			log_err "Failed to create $target"
+			return 1
+		}
+	fi
+
+	if ! grep -q "$marker" "$target" 2>/dev/null; then
+		echo "$content" >>"$target"
+	else
+		log_warn "Entry with marker '$marker' already exists in .bashrc.custom, skipping"
+	fi
 }
 
 # Central configuration (keep multi-use constants here)
@@ -542,28 +566,28 @@ REQUIRED_CMDS=("ss" "tmux" "git" "python3" "tar" "dpkg" "getconf")
 MISSING_CMDS=()
 
 for cmd in "${REQUIRED_CMDS[@]}"; do
-  if ! command -v "$cmd" >/dev/null 2>&1; then
-    MISSING_CMDS+=("$cmd")
-  fi
+	if ! command -v "$cmd" >/dev/null 2>&1; then
+		MISSING_CMDS+=("$cmd")
+	fi
 done
 
 if [[ ${#MISSING_CMDS[@]} -gt 0 ]]; then
-  log_err "Missing required commands: ${MISSING_CMDS[*]}"
-  log_err "Please install missing dependencies and retry."
-  exit 1
+	log_err "Missing required commands: ${MISSING_CMDS[*]}"
+	log_err "Please install missing dependencies and retry."
+	exit 1
 fi
 
 # Check for curl or wget (at least one needed)
 if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
-  log_err "Neither 'curl' nor 'wget' found. At least one is required."
-  exit 1
+	log_err "Neither 'curl' nor 'wget' found. At least one is required."
+	exit 1
 fi
 
 log_ok "All required dependencies found"
 
 # Fetch latest checksums for download verification
 if [[ $DRY_RUN -eq 0 ]]; then
-  fetch_checksums_file
+	fetch_checksums_file
 fi
 
 # CPU feature detection for compatibility warnings
@@ -571,10 +595,10 @@ CPU_HAS_AVX=0
 if grep -q ' avx ' /proc/cpuinfo 2>/dev/null; then CPU_HAS_AVX=1; fi
 
 if [[ $CPU_HAS_AVX -eq 0 ]]; then
-  log_warn "CPU lacks AVX instructions — some native libraries may not work"
-  log_warn "Jellyfin image processing (SkiaSharp) may crash on very old CPUs"
-  log_warn "If any app crashes with 'Illegal instruction', your CPU is too old for that component"
-  echo ""
+	log_warn "CPU lacks AVX instructions — some native libraries may not work"
+	log_warn "Jellyfin image processing (SkiaSharp) may crash on very old CPUs"
+	log_warn "If any app crashes with 'Illegal instruction', your CPU is too old for that component"
+	echo ""
 fi
 
 # Detect Architecture
@@ -605,51 +629,52 @@ jellyfin_ffmpeg_configure_fallback
 
 # Preserve unrelated ~/.bin contents on reruns; only managed media-stack paths are refreshed.
 if [ -d "$HOME/.bin" ] && [ "$(ls -A "$HOME/.bin" 2>/dev/null)" ]; then
-  log_info "Keeping existing ~/.bin contents outside PMSS-managed app paths."
-  log_info "Managed media-stack binaries will be refreshed in place."
+	log_info "Keeping existing ~/.bin contents outside PMSS-managed app paths."
+	log_info "Managed media-stack binaries will be refreshed in place."
 fi
 
 # Safety check for existing Jellyfin config/data (can cause DB migration hang on rerun).
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && [ -d "$HOME/.config/jellyfin" ] && [ "$(ls -A "$HOME/.config/jellyfin" 2>/dev/null)" ]; then
-    if [[ $DRY_RUN -eq 1 ]]; then
-      log_warn "$HOME/.config/jellyfin exists and would be removed (dry-run); Jellyfin users, metadata, and watch state would be lost."
-    else
-      printf "WARNING: %s exists and will be removed. Jellyfin users, metadata, and watch state will be lost. Continue? (y/N): " "$HOME/.config/jellyfin"
-      read -r confirm
-      [[ $confirm == [yY] ]] || exit 1
-      rm -rf "$HOME/.config/jellyfin"
-    fi
+	if [[ $DRY_RUN -eq 1 ]]; then
+		log_warn "$HOME/.config/jellyfin exists and would be removed (dry-run); Jellyfin users, metadata, and watch state would be lost."
+	else
+		printf "WARNING: %s exists and will be removed. Jellyfin users, metadata, and watch state will be lost. Continue? (y/N): " "$HOME/.config/jellyfin"
+		read -r confirm
+		[[ $confirm == [yY] ]] || exit 1
+		rm -rf "$HOME/.config/jellyfin"
+	fi
 elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && [ -d "$HOME/.config/jellyfin" ]; then
-  [[ $DRY_RUN -eq 1 ]] || rm -rf "$HOME/.config/jellyfin"
+	[[ $DRY_RUN -eq 1 ]] || rm -rf "$HOME/.config/jellyfin"
 elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 0 ]] && [ -d "$HOME/.config/jellyfin" ]; then
-  log_warn "Leaving existing Jellyfin config untouched because this run will skip Jellyfin."
+	log_warn "Leaving existing Jellyfin config untouched because this run will skip Jellyfin."
 fi
 
 if [[ $DRY_RUN -eq 0 ]]; then
-  mkdir -p "$HOME"/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow}
-  chmod 700 "$HOME"/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow}
-  if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-    mkdir -p "$HOME/.config/jellyfin"
-    chmod 700 "$HOME/.config/jellyfin"
-  fi
-  mkdir -p "$HOME/.bin"
+	mkdir -p "$HOME"/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow}
+	chmod 700 "$HOME"/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow}
+	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+		mkdir -p "$HOME/.config/jellyfin"
+		chmod 700 "$HOME/.config/jellyfin"
+	fi
+	mkdir -p "$HOME/.bin"
 else
-  if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-    log_info "[dry-run] would create ~/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}"
-  else
-    log_info "[dry-run] would create ~/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow}"
-  fi
-  log_info "[dry-run] would create ~/.bin"
+	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+		log_info "[dry-run] would create ~/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}"
+	else
+		log_info "[dry-run] would create ~/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow}"
+	fi
+	log_info "[dry-run] would create ~/.bin"
 fi
 
 log_step "Resolving latest versions..."
 
 # SABnzbd (GitHub API)
 if [[ -n "$OVR_SAB_URL" ]]; then
-  SABNZBD_URL="$OVR_SAB_URL"; SABNZBD_VERSION="override"
+	SABNZBD_URL="$OVR_SAB_URL"
+	SABNZBD_VERSION="override"
 else
-  SABNZBD_VERSION=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'tag_name' | cut -d '"' -f 4 || true)
-  SABNZBD_URL=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'browser_download_url' | grep -- '-src' | cut -d '"' -f 4 || true)
+	SABNZBD_VERSION=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'tag_name' | cut -d '"' -f 4 || true)
+	SABNZBD_URL=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'browser_download_url' | grep -- '-src' | cut -d '"' -f 4 || true)
 fi
 
 # Jellyfin (Repo Scraping)
@@ -657,15 +682,18 @@ fi
 JF_REPO_BASE="https://repo.jellyfin.org/files/server/linux/latest-stable/${JF_ARCH}/"
 # Find filename like jellyfin_10.X.Y-amd64.tar.gz
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 0 ]]; then
-  JELLYFIN_URL=""; JF_FILENAME="skipped"
+	JELLYFIN_URL=""
+	JF_FILENAME="skipped"
 elif [[ -n "$OVR_JELLYFIN_URL" ]]; then
-  JELLYFIN_URL="$OVR_JELLYFIN_URL"; JF_FILENAME="override"
+	JELLYFIN_URL="$OVR_JELLYFIN_URL"
+	JF_FILENAME="override"
 else
-  JF_FILENAME=$(curl -s "$JF_REPO_BASE" | grep -oE "jellyfin_[0-9]+\\.[0-9]+\\.[0-9]+-${JF_ARCH}\\.tar\\.gz" | head -n 1)
-  if [[ -z "$JF_FILENAME" ]]; then
-    log_err "Could not resolve latest Jellyfin tarball from $JF_REPO_BASE"; exit 1
-  fi
-  JELLYFIN_URL="${JF_REPO_BASE}${JF_FILENAME}"
+	JF_FILENAME=$(curl -s "$JF_REPO_BASE" | grep -oE "jellyfin_[0-9]+\\.[0-9]+\\.[0-9]+-${JF_ARCH}\\.tar\\.gz" | head -n 1)
+	if [[ -z "$JF_FILENAME" ]]; then
+		log_err "Could not resolve latest Jellyfin tarball from $JF_REPO_BASE"
+		exit 1
+	fi
+	JELLYFIN_URL="${JF_REPO_BASE}${JF_FILENAME}"
 fi
 
 # ASP.NET Core Runtime (Microsoft aka.ms Links)
@@ -678,26 +706,26 @@ log_info "ASP.NET: .NET 8 LTS (${DOTNET_ARCH})"
 
 # If verify-only, check URLs and exit
 if [[ $VERIFY_ONLY -eq 1 ]]; then
-  log_step "Verifying URLs..."
-  urls_to_check=("${SABNZBD_URL:-}" "${JELLYFIN_URL:-}" "${ASPDOTNET_URL:-}")
-  all_ok=true
-  for url in "${urls_to_check[@]}"; do
-    if [[ -n "$url" ]]; then
-      if check_url "$url"; then
-        log_ok "URL reachable: $url"
-      else
-        log_err "URL not reachable: $url"
-        all_ok=false
-      fi
-    fi
-  done
-  if [[ "$all_ok" == true ]]; then
-    log_ok "All URLs verified successfully"
-    exit 0
-  else
-    log_err "Some URLs failed verification"
-    exit 1
-  fi
+	log_step "Verifying URLs..."
+	urls_to_check=("${SABNZBD_URL:-}" "${JELLYFIN_URL:-}" "${ASPDOTNET_URL:-}")
+	all_ok=true
+	for url in "${urls_to_check[@]}"; do
+		if [[ -n "$url" ]]; then
+			if check_url "$url"; then
+				log_ok "URL reachable: $url"
+			else
+				log_err "URL not reachable: $url"
+				all_ok=false
+			fi
+		fi
+	done
+	if [[ "$all_ok" == true ]]; then
+		log_ok "All URLs verified successfully"
+		exit 0
+	else
+		log_err "Some URLs failed verification"
+		exit 1
+	fi
 fi
 
 # Enhanced port randomizer with bind test (for shared env security)
@@ -707,13 +735,13 @@ random_open_port() {
 	local candidate
 	local attempts=0
 	local max_attempts=100
-	
+
 	# Check required commands
 	if ! command -v comm >/dev/null 2>&1 || ! command -v shuf >/dev/null 2>&1 || ! command -v seq >/dev/null 2>&1; then
 		log_err "Required commands (comm, shuf, seq) not found for port randomization"
 		exit 1
 	fi
-	
+
 	while [ $attempts -lt $max_attempts ]; do
 		candidate=$(comm -23 <(seq "${LOW_BOUND}" "${UPPER_BOUND}" | sort -u) <(ss -Htan | awk '{print $4}' | rev | cut -d':' -f1 | rev | sort -u) | shuf | head -n 1)
 		if [[ -z "$candidate" ]]; then
@@ -828,20 +856,20 @@ installdir="$HOME/.bin/cloudplow"
 datadir="$HOME/.config/cloudplow"
 mkdir -p "$datadir"
 if [[ $DRY_RUN -eq 0 ]]; then
-  managed_install_path_reset "$installdir"
-  python3 -m venv "$installdir"
-  cd "$installdir"
-  git clone https://github.com/l3uddz/cloudplow.git >/dev/null 2>&1
-  cd "${installdir}/cloudplow" && git checkout "$CLOUDPLOW_COMMIT" >/dev/null 2>&1
-  cd "$installdir"
-  # shellcheck disable=SC1091
-  source "${installdir}/bin/activate"
-  python3 -m pip install -U pip >/dev/null 2>&1
-  python3 -m pip install -r "${installdir}/cloudplow/requirements.txt" >/dev/null 2>&1
-  deactivate
-  echo "${app^^} Installed"
+	managed_install_path_reset "$installdir"
+	python3 -m venv "$installdir"
+	cd "$installdir"
+	git clone https://github.com/l3uddz/cloudplow.git >/dev/null 2>&1
+	cd "${installdir}/cloudplow" && git checkout "$CLOUDPLOW_COMMIT" >/dev/null 2>&1
+	cd "$installdir"
+	# shellcheck disable=SC1091
+	source "${installdir}/bin/activate"
+	python3 -m pip install -U pip >/dev/null 2>&1
+	python3 -m pip install -r "${installdir}/cloudplow/requirements.txt" >/dev/null 2>&1
+	deactivate
+	echo "${app^^} Installed"
 else
-  log_info "[dry-run] would install Cloudplow via git clone and venv"
+	log_info "[dry-run] would install Cloudplow via git clone and venv"
 fi
 echo ""
 
@@ -853,30 +881,37 @@ datadir="$HOME/.config/sabnzbd"
 mkdir -p "$datadir"
 pkill -9 -f -u "$USERNAME" "${app}" >/dev/null 2>&1 || true
 if [[ $DRY_RUN -eq 0 ]]; then
-  managed_install_path_reset "$installdir"
-  python3 -m venv "$installdir"
-  cd "$installdir"
-  echo "Downloading...${app^^} (${SABNZBD_VERSION})"
-  if [[ -z "${SABNZBD_URL:-}" ]]; then log_err "SABnzbd URL not resolved"; exit 1; fi
-  if ! fetch "${SABNZBD_URL}" "${app}.tar.gz"; then log_err "Failed to download SABnzbd"; exit 1; fi
-  if ! verify_checksum "${app}.tar.gz" "$(basename "${SABNZBD_URL%%\?*}")"; then
-    log_err "SABnzbd download failed integrity check — aborting"; exit 1
-  fi
-  mkdir -p "${app}"
-  extract_tgz "${app}.tar.gz" "${app}" 1
-  # shellcheck disable=SC1091
-  source "${installdir}/bin/activate"
-  python3 -m pip install -U pip >/dev/null 2>&1
-  python3 -m pip install -r "${installdir}/${app}/requirements.txt" >/dev/null 2>&1
-  deactivate
-  echo "${app^^} Installed"
+	managed_install_path_reset "$installdir"
+	python3 -m venv "$installdir"
+	cd "$installdir"
+	echo "Downloading...${app^^} (${SABNZBD_VERSION})"
+	if [[ -z "${SABNZBD_URL:-}" ]]; then
+		log_err "SABnzbd URL not resolved"
+		exit 1
+	fi
+	if ! fetch "${SABNZBD_URL}" "${app}.tar.gz"; then
+		log_err "Failed to download SABnzbd"
+		exit 1
+	fi
+	if ! verify_checksum "${app}.tar.gz" "$(basename "${SABNZBD_URL%%\?*}")"; then
+		log_err "SABnzbd download failed integrity check — aborting"
+		exit 1
+	fi
+	mkdir -p "${app}"
+	extract_tgz "${app}.tar.gz" "${app}" 1
+	# shellcheck disable=SC1091
+	source "${installdir}/bin/activate"
+	python3 -m pip install -U pip >/dev/null 2>&1
+	python3 -m pip install -r "${installdir}/${app}/requirements.txt" >/dev/null 2>&1
+	deactivate
+	echo "${app^^} Installed"
 else
-  log_info "[dry-run] would create SABnzbd venv and install requirements"
+	log_info "[dry-run] would create SABnzbd venv and install requirements"
 fi
 echo "Configuring ${app^^}"
 if [[ $DRY_RUN -eq 0 ]]; then
-  if [ ! -f "$datadir/${app}.ini" ]; then
-    cat <<EOF >"$datadir/${app}.ini"
+	if [ ! -f "$datadir/${app}.ini" ]; then
+		cat <<EOF >"$datadir/${app}.ini"
 [misc]
 port = 8080
 host = 127.0.0.1
@@ -884,22 +919,22 @@ url_base = /sabnzbd
 host_whitelist = ${HOSTNAME}
 inet_exposure = 4
 EOF
-  fi
-  sed -i -E "s#(url_base = ).*#\1/public-${USERNAME}/${app}#" "$datadir/${app}.ini"
-  sed -i -E "s#^(port = ).*#\1${SABNZBD_PORT}#" "$datadir/${app}.ini"
-  sed -i -E "s#^(host = ).*#\1127.0.0.1#" "$datadir/${app}.ini"
-  # Ensure host line exists (older installs may lack it; SABnzbd defaults to 0.0.0.0)
-  if ! grep -q '^host = ' "$datadir/${app}.ini"; then
-    sed -i '/^\[misc\]/a host = 127.0.0.1' "$datadir/${app}.ini"
-  fi
-  sed -i -E "s#^(host_whitelist = ).*#\1${HOSTNAME}#" "$datadir/${app}.ini"
-  # The public lighttpd proxy forwards real client IPs; allow the setup wizard so users can set SABnzbd auth.
-  sed -i -E "s#^inet_exposure = .*#inet_exposure = 4#" "$datadir/${app}.ini"
-  if ! grep -q '^inet_exposure = ' "$datadir/${app}.ini"; then
-    sed -i '/^\[misc\]/a inet_exposure = 4' "$datadir/${app}.ini"
-  fi
+	fi
+	sed -i -E "s#(url_base = ).*#\1/public-${USERNAME}/${app}#" "$datadir/${app}.ini"
+	sed -i -E "s#^(port = ).*#\1${SABNZBD_PORT}#" "$datadir/${app}.ini"
+	sed -i -E "s#^(host = ).*#\1127.0.0.1#" "$datadir/${app}.ini"
+	# Ensure host line exists (older installs may lack it; SABnzbd defaults to 0.0.0.0)
+	if ! grep -q '^host = ' "$datadir/${app}.ini"; then
+		sed -i '/^\[misc\]/a host = 127.0.0.1' "$datadir/${app}.ini"
+	fi
+	sed -i -E "s#^(host_whitelist = ).*#\1${HOSTNAME}#" "$datadir/${app}.ini"
+	# The public lighttpd proxy forwards real client IPs; allow the setup wizard so users can set SABnzbd auth.
+	sed -i -E "s#^inet_exposure = .*#inet_exposure = 4#" "$datadir/${app}.ini"
+	if ! grep -q '^inet_exposure = ' "$datadir/${app}.ini"; then
+		sed -i '/^\[misc\]/a inet_exposure = 4' "$datadir/${app}.ini"
+	fi
 else
-  log_info "[dry-run] would configure ${app^^} (port=${SABNZBD_PORT}, url_base=/public-${USERNAME}/${app})"
+	log_info "[dry-run] would configure ${app^^} (port=${SABNZBD_PORT}, url_base=/public-${USERNAME}/${app})"
 fi
 echo "${app^^} configured"
 echo ""
@@ -912,33 +947,37 @@ datadir="$HOME/.config/${app}"
 branch="$RADARR_BRANCH"
 mkdir -p "$datadir"
 if [[ $DRY_RUN -eq 0 ]]; then
-  managed_install_path_reset "$installdir/Radarr"
+	managed_install_path_reset "$installdir/Radarr"
 fi
 pkill -9 -f -u "$USERNAME" "${app^}" >/dev/null 2>&1 || true
 GLIBC_VER=$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}')
 if [[ -n "$OVR_RADARR_URL" ]]; then
-  DLURL="$OVR_RADARR_URL"
+	DLURL="$OVR_RADARR_URL"
 elif [[ -n "$OVR_RADARR_VERSION" && "$SERVARR_ARCH" == "x64" ]]; then
-  DLURL="https://github.com/Radarr/Radarr/releases/download/${OVR_RADARR_VERSION}/Radarr.master.${OVR_RADARR_VERSION#v}.linux-core-x64.tar.gz"
+	DLURL="https://github.com/Radarr/Radarr/releases/download/${OVR_RADARR_VERSION}/Radarr.master.${OVR_RADARR_VERSION#v}.linux-core-x64.tar.gz"
 else
-  if dpkg --compare-versions "${GLIBC_VER:-0}" ge 2.33; then
-    DLURL="${RADARR_UPDATE_BASE}/${branch}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
-  else
-    if [[ "$SERVARR_ARCH" == "x64" ]]; then
-      DLURL="https://github.com/Radarr/Radarr/releases/download/v5.10.4.9218/Radarr.master.5.10.4.9218.linux-core-x64.tar.gz"
-      log_warn "Detected GLIBC ${GLIBC_VER:-unknown} < 2.33 → pinning Radarr to v5.10.4.9218 (linux-core-x64)."
-    else
-      DLURL="${RADARR_UPDATE_BASE}/${branch}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
-    fi
-  fi
+	if dpkg --compare-versions "${GLIBC_VER:-0}" ge 2.33; then
+		DLURL="${RADARR_UPDATE_BASE}/${branch}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
+	else
+		if [[ "$SERVARR_ARCH" == "x64" ]]; then
+			DLURL="https://github.com/Radarr/Radarr/releases/download/v5.10.4.9218/Radarr.master.5.10.4.9218.linux-core-x64.tar.gz"
+			log_warn "Detected GLIBC ${GLIBC_VER:-unknown} < 2.33 → pinning Radarr to v5.10.4.9218 (linux-core-x64)."
+		else
+			DLURL="${RADARR_UPDATE_BASE}/${branch}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
+		fi
+	fi
 fi
 log_info "Radarr URL: $DLURL"
 
 echo "Downloading...${app^^}"
 cd "$installdir"
-if ! fetch "$DLURL" "Radarr.tar.gz"; then log_err "Failed to download Radarr"; exit 1; fi
+if ! fetch "$DLURL" "Radarr.tar.gz"; then
+	log_err "Failed to download Radarr"
+	exit 1
+fi
 if ! verify_checksum "Radarr.tar.gz" "$(basename "${DLURL%%\?*}")"; then
-  log_err "Radarr download failed integrity check — aborting"; exit 1
+	log_err "Radarr download failed integrity check — aborting"
+	exit 1
 fi
 extract_tgz "Radarr.tar.gz"
 servarr_config_xml_converge "$app" "$datadir" "$RADARR_PORT" "7878"
@@ -951,21 +990,25 @@ datadir="$HOME/.config/${app}"
 branch="$PROWLARR_BRANCH" # Stable
 mkdir -p "$datadir"
 if [[ $DRY_RUN -eq 0 ]]; then
-  managed_install_path_reset "$installdir/Prowlarr"
+	managed_install_path_reset "$installdir/Prowlarr"
 fi
 pkill -9 -f -u "$USERNAME" "${app^}" >/dev/null 2>&1 || true
 if [[ -n "$OVR_PROWLARR_URL" ]]; then
-  DLURL="$OVR_PROWLARR_URL"
+	DLURL="$OVR_PROWLARR_URL"
 else
-  DLURL="${PROWLARR_UPDATE_BASE}/${branch}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
+	DLURL="${PROWLARR_UPDATE_BASE}/${branch}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
 fi
 log_info "Prowlarr URL: $DLURL"
 
 echo "Downloading...${app^^}"
 cd "$installdir"
-if ! fetch "$DLURL" "Prowlarr.tar.gz"; then log_err "Failed to download Prowlarr"; exit 1; fi
+if ! fetch "$DLURL" "Prowlarr.tar.gz"; then
+	log_err "Failed to download Prowlarr"
+	exit 1
+fi
 if ! verify_checksum "Prowlarr.tar.gz" "$(basename "${DLURL%%\?*}")"; then
-  log_err "Prowlarr download failed integrity check — aborting"; exit 1
+	log_err "Prowlarr download failed integrity check — aborting"
+	exit 1
 fi
 extract_tgz "Prowlarr.tar.gz"
 servarr_config_xml_converge "$app" "$datadir" "$PROWLARR_PORT" "9696"
@@ -978,21 +1021,25 @@ datadir="$HOME/.config/${app}"
 branch="$SONARR_BRANCH"
 mkdir -p "$datadir"
 if [[ $DRY_RUN -eq 0 ]]; then
-  managed_install_path_reset "$installdir/Sonarr"
+	managed_install_path_reset "$installdir/Sonarr"
 fi
 pkill -9 -f -u "$USERNAME" "${app^}" >/dev/null 2>&1 || true
 if [[ -n "$OVR_SONARR_URL" ]]; then
-  DLURL="$OVR_SONARR_URL"
+	DLURL="$OVR_SONARR_URL"
 else
-  DLURL="${SONARR_DL_BASE}/${branch}/latest?version=${SONARR_MAJOR}&os=linux&arch=${SERVARR_ARCH}"
+	DLURL="${SONARR_DL_BASE}/${branch}/latest?version=${SONARR_MAJOR}&os=linux&arch=${SERVARR_ARCH}"
 fi
 log_info "Sonarr URL: $DLURL"
 
 echo "Downloading...${app^^}"
 cd "$installdir"
-if ! fetch "$DLURL" "Sonarr.tar.gz"; then log_err "Failed to download Sonarr"; exit 1; fi
+if ! fetch "$DLURL" "Sonarr.tar.gz"; then
+	log_err "Failed to download Sonarr"
+	exit 1
+fi
 if ! verify_checksum "Sonarr.tar.gz" "$(basename "${DLURL%%\?*}")"; then
-  log_err "Sonarr download failed integrity check — aborting"; exit 1
+	log_err "Sonarr download failed integrity check — aborting"
+	exit 1
 fi
 extract_tgz "Sonarr.tar.gz"
 servarr_config_xml_converge "$app" "$datadir" "$SONARR_PORT" "8989"
@@ -1003,25 +1050,29 @@ log_step "Installing ${app^^}..."
 echo "Downloading...${app^^}"
 installdir="$HOME/.bin/dotnet"
 if [[ $DRY_RUN -eq 0 ]]; then
-  managed_install_path_reset "$installdir"
+	managed_install_path_reset "$installdir"
 fi
 mkdir -p "$installdir"
 cd "$installdir"
-if ! fetch "$ASPDOTNET_URL" "aspnetcore.tar.gz"; then log_err "Failed to download ASP.NET runtime"; exit 1; fi
+if ! fetch "$ASPDOTNET_URL" "aspnetcore.tar.gz"; then
+	log_err "Failed to download ASP.NET runtime"
+	exit 1
+fi
 if ! verify_checksum "aspnetcore.tar.gz" "$(basename "${ASPDOTNET_URL%%\?*}")"; then
-  log_err "ASP.NET runtime download failed integrity check — aborting"; exit 1
+	log_err "ASP.NET runtime download failed integrity check — aborting"
+	exit 1
 fi
 if [[ $DRY_RUN -eq 0 ]]; then
-  if [ ! -f "aspnetcore.tar.gz" ]; then
-    log_err "Failed to find downloaded ASP.NET archive"
-    exit 1
-  fi
-  tar -xvzf "aspnetcore.tar.gz" >/dev/null 2>&1
-  rm -f "aspnetcore.tar.gz" >/dev/null 2>&1
-  echo "Installation files downloaded and extracted"
-  echo "${app^^} Installed"
+	if [ ! -f "aspnetcore.tar.gz" ]; then
+		log_err "Failed to find downloaded ASP.NET archive"
+		exit 1
+	fi
+	tar -xvzf "aspnetcore.tar.gz" >/dev/null 2>&1
+	rm -f "aspnetcore.tar.gz" >/dev/null 2>&1
+	echo "Installation files downloaded and extracted"
+	echo "${app^^} Installed"
 else
-  log_info "[dry-run] would extract aspnetcore.tar.gz"
+	log_info "[dry-run] would extract aspnetcore.tar.gz"
 fi
 # shellcheck disable=SC2016
 append_to_bashrc_custom_if_missing '# Added by PMSS media stack installer (.NET 8)
@@ -1039,32 +1090,36 @@ chmod 0640 "$HOME/.bashrc.custom" 2>/dev/null || true
 echo ""
 
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-# Install Jellyfin (URL, extract, no chmod)
-app="jellyfin"
-log_step "Installing ${app^^}..."
-installdir="$HOME/.bin"
-datadir="$JELLYFIN_DATA_DIR"
-configdir="$JELLYFIN_CONFIG_DIR"
-logdir="$JELLYFIN_LOG_DIR"
-mkdir -p "$datadir" "$logdir" "$configdir"
-if [[ $DRY_RUN -eq 0 ]]; then
-  managed_install_path_reset "$installdir/${app}"
-fi
-cd "$installdir"
-echo "Downloading...${app^^}"
-if ! fetch "${JELLYFIN_URL}" "${app}.tar.gz"; then log_err "Failed to download Jellyfin"; exit 1; fi
-if ! verify_checksum "${app}.tar.gz" "${JF_FILENAME:-override}"; then
-  log_err "Jellyfin download failed integrity check — aborting"; exit 1
-fi
-mkdir -p "${app}"
-extract_tgz "${app}.tar.gz" "${app}" 1
-[[ $DRY_RUN -eq 1 ]] || echo "${app^^} Installed"
+	# Install Jellyfin (URL, extract, no chmod)
+	app="jellyfin"
+	log_step "Installing ${app^^}..."
+	installdir="$HOME/.bin"
+	datadir="$JELLYFIN_DATA_DIR"
+	configdir="$JELLYFIN_CONFIG_DIR"
+	logdir="$JELLYFIN_LOG_DIR"
+	mkdir -p "$datadir" "$logdir" "$configdir"
+	if [[ $DRY_RUN -eq 0 ]]; then
+		managed_install_path_reset "$installdir/${app}"
+	fi
+	cd "$installdir"
+	echo "Downloading...${app^^}"
+	if ! fetch "${JELLYFIN_URL}" "${app}.tar.gz"; then
+		log_err "Failed to download Jellyfin"
+		exit 1
+	fi
+	if ! verify_checksum "${app}.tar.gz" "${JF_FILENAME:-override}"; then
+		log_err "Jellyfin download failed integrity check — aborting"
+		exit 1
+	fi
+	mkdir -p "${app}"
+	extract_tgz "${app}.tar.gz" "${app}" 1
+	[[ $DRY_RUN -eq 1 ]] || echo "${app^^} Installed"
 
-# Configure Jellyfin BEFORE first start (security: prevents 0.0.0.0 binding)
-echo "Configuring ${app^^}"
-if [[ $DRY_RUN -eq 0 ]]; then
-  if [ ! -f "$configdir/network.xml" ]; then
-    cat <<EOF >"$configdir/network.xml"
+	# Configure Jellyfin BEFORE first start (security: prevents 0.0.0.0 binding)
+	echo "Configuring ${app^^}"
+	if [[ $DRY_RUN -eq 0 ]]; then
+		if [ ! -f "$configdir/network.xml" ]; then
+			cat <<EOF >"$configdir/network.xml"
 <?xml version="1.0" encoding="utf-8"?>
 <NetworkConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <EnableUPnP>false</EnableUPnP>
@@ -1103,84 +1158,84 @@ if [[ $DRY_RUN -eq 0 ]]; then
   <KnownProxies />
 </NetworkConfiguration>
 EOF
-  fi
-  sed -i -E "s|(<PublicHttpPort>)[^<]*(</PublicHttpPort>)|\1$JELLYFIN_PORT\2|g" "$configdir/network.xml"
-  sed -i -E "s|(<InternalHttpPort>)[^<]*(</InternalHttpPort>)|\1$JELLYFIN_PORT\2|g" "$configdir/network.xml"
-  sed -i -E "s|(<EnableRemoteAccess>)[^<]*(</EnableRemoteAccess>)|\1false\2|g" "$configdir/network.xml"
-  sed -i -E "s|<BaseUrl />|<BaseUrl></BaseUrl>|g" "$configdir/network.xml"
-  sed -i -E "s|(<BaseUrl>)[^<]*(</BaseUrl>)|\1/public-${USERNAME}/${app}\2|g" "$configdir/network.xml"
-  ensure_jellyfin_local_bind "$configdir/network.xml"
-  syscfg="$configdir/system.xml"
-  if [ ! -f "$syscfg" ]; then
-    cat > "$syscfg" <<SYSXML
+		fi
+		sed -i -E "s|(<PublicHttpPort>)[^<]*(</PublicHttpPort>)|\1$JELLYFIN_PORT\2|g" "$configdir/network.xml"
+		sed -i -E "s|(<InternalHttpPort>)[^<]*(</InternalHttpPort>)|\1$JELLYFIN_PORT\2|g" "$configdir/network.xml"
+		sed -i -E "s|(<EnableRemoteAccess>)[^<]*(</EnableRemoteAccess>)|\1false\2|g" "$configdir/network.xml"
+		sed -i -E "s|<BaseUrl />|<BaseUrl></BaseUrl>|g" "$configdir/network.xml"
+		sed -i -E "s|(<BaseUrl>)[^<]*(</BaseUrl>)|\1/public-${USERNAME}/${app}\2|g" "$configdir/network.xml"
+		ensure_jellyfin_local_bind "$configdir/network.xml"
+		syscfg="$configdir/system.xml"
+		if [ ! -f "$syscfg" ]; then
+			cat >"$syscfg" <<SYSXML
 <?xml version="1.0" encoding="utf-8"?>
 <ServerConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <BaseUrl>/public-${USERNAME}/${app}</BaseUrl>
 SYSXML
-    # Add FFmpegPath if provided, otherwise close the tag
-    if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
-      echo "  <FFmpegPath>$(xml_escape "${OVR_JELLYFIN_FFMPEG}")</FFmpegPath>" >> "$syscfg"
-    fi
-    echo "</ServerConfiguration>" >> "$syscfg"
-  else
-    # Update existing system.xml - merge settings
-    if grep -q "<BaseUrl>" "$syscfg"; then
-      sed -i -E "s|<BaseUrl>[^<]*</BaseUrl>|<BaseUrl>/public-${USERNAME}/${app}</BaseUrl>|g" "$syscfg"
-    else
-      sed -i -E "s|</ServerConfiguration>|  <BaseUrl>/public-${USERNAME}/${app}</BaseUrl>\n</ServerConfiguration>|" "$syscfg"
-    fi
-    # Handle FFmpegPath - merge with existing config (escape XML special chars)
-    if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
-      escaped_ffmpeg=$(xml_escape "${OVR_JELLYFIN_FFMPEG}")
-      if grep -q "<FFmpegPath>" "$syscfg"; then
-        sed -i -E "s|<FFmpegPath>[^<]*</FFmpegPath>|<FFmpegPath>${escaped_ffmpeg}</FFmpegPath>|g" "$syscfg"
-      else
-        sed -i -E "s|</ServerConfiguration>|  <FFmpegPath>${escaped_ffmpeg}</FFmpegPath>\n</ServerConfiguration>|" "$syscfg"
-      fi
-    fi
-  fi
-else
-  log_info "[dry-run] would configure ${app^^} (port=${JELLYFIN_PORT}, url_base=/public-${USERNAME}/${app})"
-  if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
-    log_info "[dry-run] would set Jellyfin FFmpegPath to '$OVR_JELLYFIN_FFMPEG' in $configdir/system.xml"
-  fi
-fi
-echo "${app^^} configured"
+			# Add FFmpegPath if provided, otherwise close the tag
+			if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
+				echo "  <FFmpegPath>$(xml_escape "${OVR_JELLYFIN_FFMPEG}")</FFmpegPath>" >>"$syscfg"
+			fi
+			echo "</ServerConfiguration>" >>"$syscfg"
+		else
+			# Update existing system.xml - merge settings
+			if grep -q "<BaseUrl>" "$syscfg"; then
+				sed -i -E "s|<BaseUrl>[^<]*</BaseUrl>|<BaseUrl>/public-${USERNAME}/${app}</BaseUrl>|g" "$syscfg"
+			else
+				sed -i -E "s|</ServerConfiguration>|  <BaseUrl>/public-${USERNAME}/${app}</BaseUrl>\n</ServerConfiguration>|" "$syscfg"
+			fi
+			# Handle FFmpegPath - merge with existing config (escape XML special chars)
+			if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
+				escaped_ffmpeg=$(xml_escape "${OVR_JELLYFIN_FFMPEG}")
+				if grep -q "<FFmpegPath>" "$syscfg"; then
+					sed -i -E "s|<FFmpegPath>[^<]*</FFmpegPath>|<FFmpegPath>${escaped_ffmpeg}</FFmpegPath>|g" "$syscfg"
+				else
+					sed -i -E "s|</ServerConfiguration>|  <FFmpegPath>${escaped_ffmpeg}</FFmpegPath>\n</ServerConfiguration>|" "$syscfg"
+				fi
+			fi
+		fi
+	else
+		log_info "[dry-run] would configure ${app^^} (port=${JELLYFIN_PORT}, url_base=/public-${USERNAME}/${app})"
+		if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
+			log_info "[dry-run] would set Jellyfin FFmpegPath to '$OVR_JELLYFIN_FFMPEG' in $configdir/system.xml"
+		fi
+	fi
+	echo "${app^^} configured"
 
-# Jellyfin smoke test: verify DLL loads without Illegal Instruction crash
-if [[ $DRY_RUN -eq 0 ]] && [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
-  log_info "Running Jellyfin smoke test..."
-  # Start Jellyfin briefly to verify native libraries load on this CPU
-  tmux new-session -d -s "jellyfin-smoke" \
-    "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin-smoke.log\"" 2>/dev/null || true
-  sleep 4
-  if tmux has-session -t "jellyfin-smoke" 2>/dev/null; then
-    log_ok "Jellyfin smoke test passed (DLL loads, native libs OK)"
-    tmux kill-session -t "jellyfin-smoke" 2>/dev/null || true
-  else
-    log_warn "Jellyfin exited during smoke test — may have crashed"
-    if [[ -f "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" ]]; then
-      if grep -qi "FfmpegException\|Failed.*ffmpeg" "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null; then
-        log_err "Jellyfin failed FFmpeg validation — pass --jellyfin-ffmpeg=$HOME/.bin/ffmpeg after installing FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
-      fi
-      if grep -qi "illegal instruction\|SIGILL\|signal 4" "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null; then
-        log_err "Jellyfin crashed with Illegal Instruction — CPU lacks required instruction sets"
-        log_err "SkiaSharp or other native libraries need SSE4.2/AVX which this CPU does not have"
-        log_warn "Jellyfin will be installed but may crash during image processing"
-      fi
-    fi
-  fi
-  rm -f "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null || true
-fi
+	# Jellyfin smoke test: verify DLL loads without Illegal Instruction crash
+	if [[ $DRY_RUN -eq 0 ]] && [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
+		log_info "Running Jellyfin smoke test..."
+		# Start Jellyfin briefly to verify native libraries load on this CPU
+		tmux new-session -d -s "jellyfin-smoke" \
+			"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin-smoke.log\"" 2>/dev/null || true
+		sleep 4
+		if tmux has-session -t "jellyfin-smoke" 2>/dev/null; then
+			log_ok "Jellyfin smoke test passed (DLL loads, native libs OK)"
+			tmux kill-session -t "jellyfin-smoke" 2>/dev/null || true
+		else
+			log_warn "Jellyfin exited during smoke test — may have crashed"
+			if [[ -f "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" ]]; then
+				if grep -qi "FfmpegException\|Failed.*ffmpeg" "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null; then
+					log_err "Jellyfin failed FFmpeg validation — pass --jellyfin-ffmpeg=$HOME/.bin/ffmpeg after installing FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
+				fi
+				if grep -qi "illegal instruction\|SIGILL\|signal 4" "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null; then
+					log_err "Jellyfin crashed with Illegal Instruction — CPU lacks required instruction sets"
+					log_err "SkiaSharp or other native libraries need SSE4.2/AVX which this CPU does not have"
+					log_warn "Jellyfin will be installed but may crash during image processing"
+				fi
+			fi
+		fi
+		rm -f "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null || true
+	fi
 else
-  log_warn "Skipping Jellyfin install; rerun with --jellyfin-ffmpeg=$HOME/.bin/ffmpeg after installing FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
+	log_warn "Skipping Jellyfin install; rerun with --jellyfin-ffmpeg=$HOME/.bin/ffmpeg after installing FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
 fi
 echo ""
 
 # Aliases (Sonarr fix, PATH added above)
 # shellcheck disable=SC2016
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-  append_to_bashrc_custom_if_missing '# PMSS Jellyfin alias (updated Nov 2025)
+	append_to_bashrc_custom_if_missing '# PMSS Jellyfin alias (updated Nov 2025)
 alias jellyfin='\''tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; export JELLYFIN_CONFIG_DIR=\"$HOME/.config/jellyfin/config\"; export JELLYFIN_DATA_DIR=\"$HOME/.config/jellyfin/data\"; export JELLYFIN_LOG_DIR=\"$HOME/.config/jellyfin/log\"; ionice -c 3 nice -n 19 \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""'\''
 ' 'alias jellyfin='
 fi
@@ -1196,8 +1251,8 @@ alias sabnzbd='\''tmux new-session -d -s "sabnzbd" "source $HOME/.bin/sabnzbd/bi
 
 # Lighttpd config (use $HOSTNAME)
 if [[ $DRY_RUN -eq 0 ]]; then
-  prepare_lighttpd_media_stack_paths
-  cat <<EOF >"$HOME/.lighttpd/custom.d/media-stack.conf"
+	prepare_lighttpd_media_stack_paths
+	cat <<EOF >"$HOME/.lighttpd/custom.d/media-stack.conf"
 # PMSS-managed media stack proxy fragment.
 # Keep ARR base paths canonical so missing-slash requests
 # redirect to proxy-managed app roots.
@@ -1269,8 +1324,8 @@ url.redirect += (
   ) )
 }
 EOF
-  if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-    cat <<EOF >>"$HOME/.lighttpd/custom.d/media-stack.conf"
+	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+		cat <<EOF >>"$HOME/.lighttpd/custom.d/media-stack.conf"
 \$HTTP["url"] =~ "^/jellyfin(\$|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
@@ -1286,12 +1341,11 @@ EOF
   ) )
 }
 EOF
-  fi
-  chmod 640 "$HOME/.lighttpd/custom.d/media-stack.conf" 2>/dev/null || true
+	fi
+	chmod 640 "$HOME/.lighttpd/custom.d/media-stack.conf" 2>/dev/null || true
 else
-  log_info "[dry-run] would create lighttpd config at ~/.lighttpd/custom.d/media-stack.conf"
+	log_info "[dry-run] would create lighttpd config at ~/.lighttpd/custom.d/media-stack.conf"
 fi
-
 
 # shellcheck source=/dev/null
 set +u
@@ -1303,99 +1357,99 @@ echo ""
 log_step "Starting applications"
 # Corrected: Point to dotnet binary, not the directory
 if [[ $DRY_RUN -eq 0 ]]; then
-  # Verify required files exist before starting
-  if [[ ! -f "$DOTNET_ROOT_PATH/dotnet" ]]; then
-    log_err "dotnet binary not found at $DOTNET_ROOT_PATH/dotnet"
-    exit 1
-  fi
-  
-  # Ensure log directories exist.
-  mkdir -p "$HOME/.config/sonarr" "$HOME/.config/radarr" "$HOME/.config/prowlarr" "$HOME/.config/sabnzbd"
-  if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-    mkdir -p "$JELLYFIN_DATA_DIR/log"
-  fi
-  
-  if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-    # Start Jellyfin only after the FFmpeg pre-flight passed.
-    if [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
-      tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" || log_warn "Failed to create jellyfin tmux session"
-    else
-      log_err "Jellyfin DLL not found at $HOME/.bin/jellyfin/jellyfin.dll"
-    fi
-  else
-    log_warn "Skipping Jellyfin start; FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is not configured"
-  fi
-  
-  # Start Sonarr
-  if [[ -f "$HOME/.bin/Sonarr/Sonarr.dll" ]]; then
-    tmux new-session -d -s "sonarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/Sonarr\" && \"$DOTNET_ROOT_PATH/dotnet\" Sonarr.dll --data=\"$HOME/.config/sonarr\" 2>&1 | tee -a \"$HOME/.config/sonarr/sonarr.log\"" || log_warn "Failed to create sonarr tmux session"
-  else
-    log_err "Sonarr DLL not found at $HOME/.bin/Sonarr/Sonarr.dll"
-  fi
-  
-  # Start Radarr
-  if [[ -f "$HOME/.bin/Radarr/Radarr.dll" ]]; then
-    tmux new-session -d -s "radarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/Radarr\" && \"$DOTNET_ROOT_PATH/dotnet\" Radarr.dll --nobrowser --data=\"$HOME/.config/radarr\" 2>&1 | tee -a \"$HOME/.config/radarr/radarr.log\"" || log_warn "Failed to create radarr tmux session"
-  else
-    log_err "Radarr DLL not found at $HOME/.bin/Radarr/Radarr.dll"
-  fi
-  
-  # Start Prowlarr
-  if [[ -f "$HOME/.bin/Prowlarr/Prowlarr.dll" ]]; then
-    tmux new-session -d -s "prowlarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/Prowlarr\" && \"$DOTNET_ROOT_PATH/dotnet\" Prowlarr.dll --nobrowser --data=\"$HOME/.config/prowlarr\" 2>&1 | tee -a \"$HOME/.config/prowlarr/prowlarr.log\"" || log_warn "Failed to create prowlarr tmux session"
-  else
-    log_err "Prowlarr DLL not found at $HOME/.bin/Prowlarr/Prowlarr.dll"
-  fi
-  
-  # Start SABnzbd
-  if [[ -f "$HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py" ]]; then
-    tmux new-session -d -s "sabnzbd" "source $HOME/.bin/sabnzbd/bin/activate && cd \"$HOME/.bin/sabnzbd/sabnzbd\" && nice -n 19 python3 SABnzbd.py -b 0 -f $HOME/.config/sabnzbd/sabnzbd.ini 2>&1 | tee -a \"$HOME/.config/sabnzbd/sabnzbd.log\"" || log_warn "Failed to create sabnzbd tmux session"
-  else
-    log_err "SABnzbd not found at $HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py"
-  fi
-  
-  # Start Cloudplow
-  if [[ -f "$HOME/.bin/cloudplow/cloudplow/cloudplow.py" ]]; then
-    tmux new-session -d -s "cloudplow" "source $HOME/.bin/cloudplow/bin/activate && python3 $HOME/.bin/cloudplow/cloudplow/cloudplow.py run --config=$HOME/.config/cloudplow/config.json --loglevel=DEBUG --cachefile=$HOME/.config/cloudplow/cache.db --logfile=$HOME/.config/cloudplow/cloudplow.log" || log_warn "Failed to create cloudplow tmux session"
-  else
-    log_err "Cloudplow not found at $HOME/.bin/cloudplow/cloudplow/cloudplow.py"
-  fi
-  
-  # Wait a moment and verify sessions are still running
-  sleep 3
-  log_step "Verifying started applications..."
-  apps_to_verify=(sonarr radarr prowlarr sabnzbd cloudplow)
-  if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-    apps_to_verify=(jellyfin "${apps_to_verify[@]}")
-  fi
-  for app in "${apps_to_verify[@]}"; do
-    if tmux has-session -t "$app" 2>/dev/null; then
-      log_ok "$app session is running"
-    else
-      log_warn "$app session exited immediately"
-      # Check for Illegal Instruction (CPU incompatibility)
-      app_log=""
-      case "$app" in
-        jellyfin) app_log="$JELLYFIN_LOG_DIR/jellyfin.log" ;;
-        sonarr)   app_log="$HOME/.config/sonarr/sonarr.log" ;;
-        radarr)   app_log="$HOME/.config/radarr/radarr.log" ;;
-        prowlarr) app_log="$HOME/.config/prowlarr/prowlarr.log" ;;
-        sabnzbd)  app_log="$HOME/.config/sabnzbd/sabnzbd.log" ;;
-      esac
-      if [[ -n "$app_log" ]] && [[ -f "$app_log" ]]; then
-        if grep -qi "illegal instruction\|SIGILL\|signal 4" "$app_log" 2>/dev/null; then
-          log_err "$app crashed: Illegal Instruction — CPU lacks required instruction sets (SSE4.2/AVX)"
-        fi
-      fi
-      log_info "To diagnose: tmux new-session -s ${app}-debug 'cd ~/.bin/${app}* && ...'"
-    fi
-  done
+	# Verify required files exist before starting
+	if [[ ! -f "$DOTNET_ROOT_PATH/dotnet" ]]; then
+		log_err "dotnet binary not found at $DOTNET_ROOT_PATH/dotnet"
+		exit 1
+	fi
+
+	# Ensure log directories exist.
+	mkdir -p "$HOME/.config/sonarr" "$HOME/.config/radarr" "$HOME/.config/prowlarr" "$HOME/.config/sabnzbd"
+	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+		mkdir -p "$JELLYFIN_DATA_DIR/log"
+	fi
+
+	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+		# Start Jellyfin only after the FFmpeg pre-flight passed.
+		if [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
+			tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" || log_warn "Failed to create jellyfin tmux session"
+		else
+			log_err "Jellyfin DLL not found at $HOME/.bin/jellyfin/jellyfin.dll"
+		fi
+	else
+		log_warn "Skipping Jellyfin start; FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is not configured"
+	fi
+
+	# Start Sonarr
+	if [[ -f "$HOME/.bin/Sonarr/Sonarr.dll" ]]; then
+		tmux new-session -d -s "sonarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/Sonarr\" && \"$DOTNET_ROOT_PATH/dotnet\" Sonarr.dll --data=\"$HOME/.config/sonarr\" 2>&1 | tee -a \"$HOME/.config/sonarr/sonarr.log\"" || log_warn "Failed to create sonarr tmux session"
+	else
+		log_err "Sonarr DLL not found at $HOME/.bin/Sonarr/Sonarr.dll"
+	fi
+
+	# Start Radarr
+	if [[ -f "$HOME/.bin/Radarr/Radarr.dll" ]]; then
+		tmux new-session -d -s "radarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/Radarr\" && \"$DOTNET_ROOT_PATH/dotnet\" Radarr.dll --nobrowser --data=\"$HOME/.config/radarr\" 2>&1 | tee -a \"$HOME/.config/radarr/radarr.log\"" || log_warn "Failed to create radarr tmux session"
+	else
+		log_err "Radarr DLL not found at $HOME/.bin/Radarr/Radarr.dll"
+	fi
+
+	# Start Prowlarr
+	if [[ -f "$HOME/.bin/Prowlarr/Prowlarr.dll" ]]; then
+		tmux new-session -d -s "prowlarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/Prowlarr\" && \"$DOTNET_ROOT_PATH/dotnet\" Prowlarr.dll --nobrowser --data=\"$HOME/.config/prowlarr\" 2>&1 | tee -a \"$HOME/.config/prowlarr/prowlarr.log\"" || log_warn "Failed to create prowlarr tmux session"
+	else
+		log_err "Prowlarr DLL not found at $HOME/.bin/Prowlarr/Prowlarr.dll"
+	fi
+
+	# Start SABnzbd
+	if [[ -f "$HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py" ]]; then
+		tmux new-session -d -s "sabnzbd" "source $HOME/.bin/sabnzbd/bin/activate && cd \"$HOME/.bin/sabnzbd/sabnzbd\" && nice -n 19 python3 SABnzbd.py -b 0 -f $HOME/.config/sabnzbd/sabnzbd.ini 2>&1 | tee -a \"$HOME/.config/sabnzbd/sabnzbd.log\"" || log_warn "Failed to create sabnzbd tmux session"
+	else
+		log_err "SABnzbd not found at $HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py"
+	fi
+
+	# Start Cloudplow
+	if [[ -f "$HOME/.bin/cloudplow/cloudplow/cloudplow.py" ]]; then
+		tmux new-session -d -s "cloudplow" "source $HOME/.bin/cloudplow/bin/activate && python3 $HOME/.bin/cloudplow/cloudplow/cloudplow.py run --config=$HOME/.config/cloudplow/config.json --loglevel=DEBUG --cachefile=$HOME/.config/cloudplow/cache.db --logfile=$HOME/.config/cloudplow/cloudplow.log" || log_warn "Failed to create cloudplow tmux session"
+	else
+		log_err "Cloudplow not found at $HOME/.bin/cloudplow/cloudplow/cloudplow.py"
+	fi
+
+	# Wait a moment and verify sessions are still running
+	sleep 3
+	log_step "Verifying started applications..."
+	apps_to_verify=(sonarr radarr prowlarr sabnzbd cloudplow)
+	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+		apps_to_verify=(jellyfin "${apps_to_verify[@]}")
+	fi
+	for app in "${apps_to_verify[@]}"; do
+		if tmux has-session -t "$app" 2>/dev/null; then
+			log_ok "$app session is running"
+		else
+			log_warn "$app session exited immediately"
+			# Check for Illegal Instruction (CPU incompatibility)
+			app_log=""
+			case "$app" in
+			jellyfin) app_log="$JELLYFIN_LOG_DIR/jellyfin.log" ;;
+			sonarr) app_log="$HOME/.config/sonarr/sonarr.log" ;;
+			radarr) app_log="$HOME/.config/radarr/radarr.log" ;;
+			prowlarr) app_log="$HOME/.config/prowlarr/prowlarr.log" ;;
+			sabnzbd) app_log="$HOME/.config/sabnzbd/sabnzbd.log" ;;
+			esac
+			if [[ -n "$app_log" ]] && [[ -f "$app_log" ]]; then
+				if grep -qi "illegal instruction\|SIGILL\|signal 4" "$app_log" 2>/dev/null; then
+					log_err "$app crashed: Illegal Instruction — CPU lacks required instruction sets (SSE4.2/AVX)"
+				fi
+			fi
+			log_info "To diagnose: tmux new-session -s ${app}-debug 'cd ~/.bin/${app}* && ...'"
+		fi
+	done
 else
-  if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-    log_info "[dry-run] would start tmux sessions: jellyfin, sonarr, radarr, prowlarr, sabnzbd, cloudplow"
-  else
-    log_info "[dry-run] would start tmux sessions: sonarr, radarr, prowlarr, sabnzbd, cloudplow"
-  fi
+	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+		log_info "[dry-run] would start tmux sessions: jellyfin, sonarr, radarr, prowlarr, sabnzbd, cloudplow"
+	else
+		log_info "[dry-run] would start tmux sessions: sonarr, radarr, prowlarr, sabnzbd, cloudplow"
+	fi
 fi
 
 echo ""
@@ -1412,22 +1466,22 @@ echo "PROWLARR-URL = https://${HOSTNAME}/public-${USERNAME}/prowlarr/"
 echo "SABNZBD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/"
 echo "SABNZBD-WIZARD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/wizard/"
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-  echo "JELLYFIN-URL = https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
-  echo "JELLYFIN-LOCAL-URL = http://127.0.0.1:${JELLYFIN_PORT}"
+	echo "JELLYFIN-URL = https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
+	echo "JELLYFIN-LOCAL-URL = http://127.0.0.1:${JELLYFIN_PORT}"
 else
-  echo "JELLYFIN-SKIPPED = install FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ under ~/.bin and rerun with --jellyfin-ffmpeg=$HOME/.bin/ffmpeg"
+	echo "JELLYFIN-SKIPPED = install FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ under ~/.bin and rerun with --jellyfin-ffmpeg=$HOME/.bin/ffmpeg"
 fi
 echo "PUBLIC-IP (do not expose ports): ${PUBLIC_IP}"
 
 echo ""
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-  echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}, Jellyfin=${JELLYFIN_PORT}"
-  echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr | Jellyfin=$HOME/.config/jellyfin | Cloudplow=$HOME/.config/cloudplow"
-  echo "Tmux sessions running: jellyfin, sonarr, radarr, prowlarr, sabnzbd, cloudplow"
+	echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}, Jellyfin=${JELLYFIN_PORT}"
+	echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr | Jellyfin=$HOME/.config/jellyfin | Cloudplow=$HOME/.config/cloudplow"
+	echo "Tmux sessions running: jellyfin, sonarr, radarr, prowlarr, sabnzbd, cloudplow"
 else
-  echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}"
-  echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr | Cloudplow=$HOME/.config/cloudplow"
-  echo "Tmux sessions running: sonarr, radarr, prowlarr, sabnzbd, cloudplow"
+	echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}"
+	echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr | Cloudplow=$HOME/.config/cloudplow"
+	echo "Tmux sessions running: sonarr, radarr, prowlarr, sabnzbd, cloudplow"
 fi
 
 echo ""
@@ -1436,28 +1490,28 @@ echo "To kill all applications use 'tmux kill-server'"
 echo ""
 log_step "Restarting lighttpd"
 if [[ $DRY_RUN -eq 0 ]]; then
-  pkill -9 -u "$USERNAME" lighttpd >/dev/null 2>&1 || true
-  pkill -9 -u "$USERNAME" php-cgi >/dev/null 2>&1 || true
-  if command -v lighttpd >/dev/null 2>&1 && [[ -f "$HOME/.lighttpd.conf" ]]; then
-    if ! lighttpd -f "$HOME/.lighttpd.conf" >/dev/null 2>&1; then
-      log_warn "Direct lighttpd restart failed; watchdog may retry."
-    fi
-  else
-    echo "It may take 1-2 minutes to restart lighttpd"
-  fi
+	pkill -9 -u "$USERNAME" lighttpd >/dev/null 2>&1 || true
+	pkill -9 -u "$USERNAME" php-cgi >/dev/null 2>&1 || true
+	if command -v lighttpd >/dev/null 2>&1 && [[ -f "$HOME/.lighttpd.conf" ]]; then
+		if ! lighttpd -f "$HOME/.lighttpd.conf" >/dev/null 2>&1; then
+			log_warn "Direct lighttpd restart failed; watchdog may retry."
+		fi
+	else
+		echo "It may take 1-2 minutes to restart lighttpd"
+	fi
 else
-  log_info "[dry-run] would restart lighttpd/php-cgi"
+	log_info "[dry-run] would restart lighttpd/php-cgi"
 fi
 
 echo ""
 echo "================== SECURITY WARNING =================="
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-  echo "Jellyfin first-run requires creating an admin account."
-  echo "Set a STRONG admin password immediately after opening:"
-  echo "  https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
+	echo "Jellyfin first-run requires creating an admin account."
+	echo "Set a STRONG admin password immediately after opening:"
+	echo "  https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
 else
-  echo "Jellyfin was skipped because FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is not configured."
-  echo "Install user-local FFmpeg and rerun with --jellyfin-ffmpeg=$HOME/.bin/ffmpeg."
+	echo "Jellyfin was skipped because FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is not configured."
+	echo "Install user-local FFmpeg and rerun with --jellyfin-ffmpeg=$HOME/.bin/ffmpeg."
 fi
 echo "Services are bound to 127.0.0.1 via per-user lighttpd,"
 echo "but do NOT expose them publicly without authentication."

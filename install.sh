@@ -49,10 +49,26 @@ log_file() {
 	printf '%s\n' "$*" >>"$LOG_FILE"
 }
 
-log_step() { local msg="==> $*"; echo -e "${COLOR_BLUE}${msg}${COLOR_RESET}"; log_file "$msg"; }
-log_info() { local msg="--> $*"; echo -e "${COLOR_GREEN}${msg}${COLOR_RESET}"; log_file "$msg"; }
-log_warn() { local msg="WARN $*"; echo -e "${COLOR_YELLOW}${msg}${COLOR_RESET}"; log_file "$msg"; }
-log_error() { local msg="ERR  $*"; echo -e "${COLOR_RED}${msg}${COLOR_RESET}"; log_file "$msg"; }
+log_step() {
+	local msg="==> $*"
+	echo -e "${COLOR_BLUE}${msg}${COLOR_RESET}"
+	log_file "$msg"
+}
+log_info() {
+	local msg="--> $*"
+	echo -e "${COLOR_GREEN}${msg}${COLOR_RESET}"
+	log_file "$msg"
+}
+log_warn() {
+	local msg="WARN $*"
+	echo -e "${COLOR_YELLOW}${msg}${COLOR_RESET}"
+	log_file "$msg"
+}
+log_error() {
+	local msg="ERR  $*"
+	echo -e "${COLOR_RED}${msg}${COLOR_RESET}"
+	log_file "$msg"
+}
 
 log_info "Installer log file: ${LOG_FILE}"
 tty_in="no"
@@ -566,17 +582,17 @@ fi
 # Setup fstab for quota and /home array
 log_step "Rechecking kernel quota support"
 append_unique_block \
-    /etc/fstab \
-    "#usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1" \
-    $'\n# PMSS: quota/performance mount options sample for /home (edit the /home mount line)\n#usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1\n#defaults,nofail,lazytime,noatime,commit=30,usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1\n# Optional (risky on hosts without a protected write cache): nobarrier\n'
+	/etc/fstab \
+	"#usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1" \
+	$'\n# PMSS: quota/performance mount options sample for /home (edit the /home mount line)\n#usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1\n#defaults,nofail,lazytime,noatime,commit=30,usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1\n# Optional (risky on hosts without a protected write cache): nobarrier\n'
 
 quota_options="usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1"
 perf_options_base="nofail,noatime,lazytime"
 
 # Return 0 if /etc/fstab contains a non-comment line for the mount point
 fstab_has_mount() {
-    local mp="$1"
-    grep -Eq "^[[:space:]]*[^#]+[[:space:]]+${mp//\//\/}[[:space:]]+" /etc/fstab
+	local mp="$1"
+	grep -Eq "^[[:space:]]*[^#]+[[:space:]]+${mp//\//\/}[[:space:]]+" /etc/fstab
 }
 
 fstab_mount_fstype() {
@@ -603,24 +619,24 @@ fstab_perf_options_for_mount() {
 
 # Return 0 if fstab line for mount contains known quota options
 fstab_mount_has_quota() {
-    local mp="$1"
-    grep -Eq "^[[:space:]]*[^#]+[[:space:]]+${mp//\//\/}[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]*(usrjquota=|grpjquota=|usrquota|grpquota)" /etc/fstab
+	local mp="$1"
+	grep -Eq "^[[:space:]]*[^#]+[[:space:]]+${mp//\//\/}[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]*(usrjquota=|grpjquota=|usrquota|grpquota)" /etc/fstab
 }
 
 # Ensure the mount options for a mount point contain the given CSV list of options.
 # Creates a timestamped backup of /etc/fstab when making changes.
 ensure_fstab_options() {
-    local mount_point="$1"
-    local required_csv="$2"
+	local mount_point="$1"
+	local required_csv="$2"
 
-    if [[ -z "$mount_point" || -z "$required_csv" ]]; then
-        return 1
-    fi
+	if [[ -z "$mount_point" || -z "$required_csv" ]]; then
+		return 1
+	fi
 
-    local tmpfile backup
-    tmpfile=$(mktemp)
+	local tmpfile backup
+	tmpfile=$(mktemp)
 
-    awk -v mp="$mount_point" -v reqcsv="$required_csv" '
+	awk -v mp="$mount_point" -v reqcsv="$required_csv" '
         BEGIN {
             reqn = split(reqcsv, req, ",");
         }
@@ -664,70 +680,70 @@ ensure_fstab_options() {
         { print }
     ' /etc/fstab >"$tmpfile"
 
-    # Only replace if content changed
-    if ! cmp -s /etc/fstab "$tmpfile"; then
-        backup="/etc/fstab.pmss-backup-$(date +%Y%m%d%H%M%S)"
-        cp /etc/fstab "$backup" 2>/dev/null || true
-        mv "$tmpfile" /etc/fstab
-        log_info "Updated /etc/fstab for $mount_point (backup: ${backup##*/})"
-        return 0
-    fi
+	# Only replace if content changed
+	if ! cmp -s /etc/fstab "$tmpfile"; then
+		backup="/etc/fstab.pmss-backup-$(date +%Y%m%d%H%M%S)"
+		cp /etc/fstab "$backup" 2>/dev/null || true
+		mv "$tmpfile" /etc/fstab
+		log_info "Updated /etc/fstab for $mount_point (backup: ${backup##*/})"
+		return 0
+	fi
 
-    rm -f "$tmpfile"
-    return 0
+	rm -f "$tmpfile"
+	return 0
 }
 
 ensure_grub_cmdline_option() {
-    local option="$1"
-    local file="/etc/default/grub"
+	local option="$1"
+	local file="/etc/default/grub"
 
-    if [ -z "$option" ]; then
-        return 1
-    fi
+	if [ -z "$option" ]; then
+		return 1
+	fi
 
-    if [ ! -f "$file" ]; then
-        log_warn "/etc/default/grub not found; unable to persist required boot option: ${option}"
-        return 0
-    fi
+	if [ ! -f "$file" ]; then
+		log_warn "/etc/default/grub not found; unable to persist required boot option: ${option}"
+		return 0
+	fi
 
-    append_unique_block \
-        "$file" \
-        "# PMSS: required boot parameters" \
-        $'\n# PMSS: required boot parameters\n# - /proc hidepid=2 is enabled for tenant privacy.\n# - Rootless Docker is expected to work under this default.\n#\n# Ensure this exists in GRUB_CMDLINE_LINUX_DEFAULT (or GRUB_CMDLINE_LINUX):\n# systemd.unified_cgroup_hierarchy=0\n#\n# After editing, run: update-grub && reboot\n'
+	append_unique_block \
+		"$file" \
+		"# PMSS: required boot parameters" \
+		$'\n# PMSS: required boot parameters\n# - /proc hidepid=2 is enabled for tenant privacy.\n# - Rootless Docker is expected to work under this default.\n#\n# Ensure this exists in GRUB_CMDLINE_LINUX_DEFAULT (or GRUB_CMDLINE_LINUX):\n# systemd.unified_cgroup_hierarchy=0\n#\n# After editing, run: update-grub && reboot\n'
 
-    if grep -E '^GRUB_CMDLINE_LINUX(_DEFAULT)?="' "$file" | grep -Fq "$option"; then
-        return 0
-    fi
+	if grep -E '^GRUB_CMDLINE_LINUX(_DEFAULT)?="' "$file" | grep -Fq "$option"; then
+		return 0
+	fi
 
-    local tmpfile backup
-    tmpfile=$(mktemp)
-    if grep -Eq '^GRUB_CMDLINE_LINUX_DEFAULT="' "$file"; then
-        sed -E "s/^(GRUB_CMDLINE_LINUX_DEFAULT=\"[^\"]*)\"/\\1 ${option}\"/" "$file" >"$tmpfile"
-    elif grep -Eq '^GRUB_CMDLINE_LINUX="' "$file"; then
-        sed -E "s/^(GRUB_CMDLINE_LINUX=\"[^\"]*)\"/\\1 ${option}\"/" "$file" >"$tmpfile"
-    else
-        cat "$file" >"$tmpfile"
-        printf '\nGRUB_CMDLINE_LINUX_DEFAULT="%s"\n' "$option" >>"$tmpfile"
-    fi
+	local tmpfile backup
+	tmpfile=$(mktemp)
+	if grep -Eq '^GRUB_CMDLINE_LINUX_DEFAULT="' "$file"; then
+		sed -E "s/^(GRUB_CMDLINE_LINUX_DEFAULT=\"[^\"]*)\"/\\1 ${option}\"/" "$file" >"$tmpfile"
+	elif grep -Eq '^GRUB_CMDLINE_LINUX="' "$file"; then
+		sed -E "s/^(GRUB_CMDLINE_LINUX=\"[^\"]*)\"/\\1 ${option}\"/" "$file" >"$tmpfile"
+	else
+		cat "$file" >"$tmpfile"
+		printf '\nGRUB_CMDLINE_LINUX_DEFAULT="%s"\n' "$option" >>"$tmpfile"
+	fi
 
-    if cmp -s "$file" "$tmpfile"; then
-        rm -f "$tmpfile"
-        return 0
-    fi
+	if cmp -s "$file" "$tmpfile"; then
+		rm -f "$tmpfile"
+		return 0
+	fi
 
-    backup="/etc/default/grub.pmss-backup-$(date +%Y%m%d%H%M%S)"
-    cp "$file" "$backup" 2>/dev/null || true
-    mv "$tmpfile" "$file"
-    chmod 0644 "$file" 2>/dev/null || true
-    log_info "Updated /etc/default/grub (backup: ${backup##*/})"
-    return 0
+	backup="/etc/default/grub.pmss-backup-$(date +%Y%m%d%H%M%S)"
+	cp "$file" "$backup" 2>/dev/null || true
+	mv "$tmpfile" "$file"
+	chmod 0644 "$file" 2>/dev/null || true
+	log_info "Updated /etc/default/grub (backup: ${backup##*/})"
+	return 0
 }
 
 ensure_proc_hidepid() {
-    local tmpfile backup
-    tmpfile=$(mktemp)
+	local tmpfile backup
+	tmpfile=$(mktemp)
 
-    awk '
+	awk '
         BEGIN { touched=0 }
         /^[ \t]*#/ { print; next }
         NF < 2 { print; next }
@@ -768,25 +784,25 @@ ensure_proc_hidepid() {
         { print }
     ' /etc/fstab >"$tmpfile"
 
-    if cmp -s /etc/fstab "$tmpfile"; then
-        rm -f "$tmpfile"
-        return 0
-    fi
+	if cmp -s /etc/fstab "$tmpfile"; then
+		rm -f "$tmpfile"
+		return 0
+	fi
 
-    backup="/etc/fstab.pmss-backup-$(date +%Y%m%d%H%M%S)"
-    cp /etc/fstab "$backup" 2>/dev/null || true
-    mv "$tmpfile" /etc/fstab
-    log_info "Updated /etc/fstab /proc options (backup: ${backup##*/})"
-    return 0
+	backup="/etc/fstab.pmss-backup-$(date +%Y%m%d%H%M%S)"
+	cp /etc/fstab "$backup" 2>/dev/null || true
+	mv "$tmpfile" /etc/fstab
+	log_info "Updated /etc/fstab /proc options (backup: ${backup##*/})"
+	return 0
 }
 
 if fstab_has_mount "/proc"; then
-    ensure_proc_hidepid || true
+	ensure_proc_hidepid || true
 else
-    backup="/etc/fstab.pmss-backup-$(date +%Y%m%d%H%M%S)"
-    cp /etc/fstab "$backup" 2>/dev/null || true
-    printf '\nproc\t/proc\tproc\tdefaults,hidepid=2\t0\t0\n' >>/etc/fstab
-    log_info "Added /proc mount with hidepid=2 to /etc/fstab (backup: ${backup##*/})"
+	backup="/etc/fstab.pmss-backup-$(date +%Y%m%d%H%M%S)"
+	cp /etc/fstab "$backup" 2>/dev/null || true
+	printf '\nproc\t/proc\tproc\tdefaults,hidepid=2\t0\t0\n' >>/etc/fstab
+	log_info "Added /proc mount with hidepid=2 to /etc/fstab (backup: ${backup##*/})"
 fi
 
 # Best-effort remount to apply hidepid immediately.
@@ -794,40 +810,40 @@ mount -o remount,hidepid=2 /proc 2>/dev/null || true
 
 ensure_grub_cmdline_option "systemd.unified_cgroup_hierarchy=0" || true
 if [ -f /etc/default/grub ] && [ "$FORCE_NONINTERACTIVE" != true ]; then
-    log_step "Review /etc/default/grub (press Ctrl+X to exit nano)"
-    run_editor /etc/default/grub
+	log_step "Review /etc/default/grub (press Ctrl+X to exit nano)"
+	run_editor /etc/default/grub
 fi
 
 if [ -f /etc/default/grub ] && command -v update-grub >/dev/null 2>&1; then
-    log_step "Updating GRUB configuration"
-    run_cmd update-grub
+	log_step "Updating GRUB configuration"
+	run_cmd update-grub
 else
-    log_warn "update-grub not available; run update-grub (or grub-mkconfig) manually after editing /etc/default/grub"
+	log_warn "update-grub not available; run update-grub (or grub-mkconfig) manually after editing /etc/default/grub"
 fi
 
 if [ -r /proc/cmdline ] && ! grep -q 'systemd.unified_cgroup_hierarchy=0' /proc/cmdline 2>/dev/null; then
-    log_warn "Boot parameter systemd.unified_cgroup_hierarchy=0 will apply after reboot (required for rootless Docker with hidepid=2)"
+	log_warn "Boot parameter systemd.unified_cgroup_hierarchy=0 will apply after reboot (required for rootless Docker with hidepid=2)"
 fi
 
 if [[ -n "$quota_mountpoint" ]]; then
-    required_options="$(fstab_perf_options_for_mount "$quota_mountpoint"),$quota_options"
-    ensure_fstab_options "$quota_mountpoint" "$required_options" || true
+	required_options="$(fstab_perf_options_for_mount "$quota_mountpoint"),$quota_options"
+	ensure_fstab_options "$quota_mountpoint" "$required_options" || true
 elif [[ "$skip_quota_edit" == true ]]; then
-    log_info "Skipping quota configuration as requested"
+	log_info "Skipping quota configuration as requested"
 else
-    # Default to /home logic: if /home defined, ensure options automatically; if already has quota, skip editor
-    if fstab_has_mount "/home"; then
-        if fstab_mount_has_quota "/home"; then
-            log_info "Quota already configured in /etc/fstab for /home; skipping editor"
-        else
-            required_options="$(fstab_perf_options_for_mount "/home"),$quota_options"
-            ensure_fstab_options "/home" "$required_options" || true
-        fi
-    else
-        log_step "Review /etc/fstab quota options (Ctrl+X to exit editor)"
-        log_warn "PMSS expects /home to be a dedicated filesystem (with quotas). Configure it now."
-        run_editor /etc/fstab
-    fi
+	# Default to /home logic: if /home defined, ensure options automatically; if already has quota, skip editor
+	if fstab_has_mount "/home"; then
+		if fstab_mount_has_quota "/home"; then
+			log_info "Quota already configured in /etc/fstab for /home; skipping editor"
+		else
+			required_options="$(fstab_perf_options_for_mount "/home"),$quota_options"
+			ensure_fstab_options "/home" "$required_options" || true
+		fi
+	else
+		log_step "Review /etc/fstab quota options (Ctrl+X to exit editor)"
+		log_warn "PMSS expects /home to be a dedicated filesystem (with quotas). Configure it now."
+		run_editor /etc/fstab
+	fi
 fi
 
 # Best-effort remount to pick up option changes (may be no-op on fresh installs)
