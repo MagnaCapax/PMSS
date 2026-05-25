@@ -309,6 +309,16 @@ extract_tgz() {
 	echo "Installation files downloaded and extracted"
 }
 
+python_venv_install_requirements() {
+	local venv_dir="$1" requirements="$2"
+
+	# shellcheck disable=SC1091
+	source "${venv_dir}/bin/activate"
+	python3 -m pip install -U pip >/dev/null 2>&1
+	python3 -m pip install -r "$requirements" >/dev/null 2>&1
+	deactivate
+}
+
 jellyfin_ffmpeg_binary_version() {
 	local binary="$1"
 	[[ -x "$binary" ]] || return 1
@@ -695,6 +705,8 @@ JELLYFIN_CONFIG_DIR="$HOME/.config/jellyfin/config"
 JELLYFIN_DATA_DIR="$HOME/.config/jellyfin/data"
 JELLYFIN_LOG_DIR="$HOME/.config/jellyfin/log"
 JELLYFIN_MIN_FFMPEG_VERSION="4.4"
+MEDIA_STACK_BASE_SESSIONS=(sonarr radarr prowlarr sabnzbd cloudplow)
+MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow)
 # Determine public IP from default route (no external HTTP request needed)
 PUBLIC_IP=$(ip -4 route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "unavailable")
 
@@ -730,15 +742,10 @@ fi
 log_ok "All required dependencies found"
 
 # Fetch latest checksums for download verification
-if [[ $DRY_RUN -eq 0 ]]; then
-	fetch_checksums_file
-fi
+[[ $DRY_RUN -eq 0 ]] && fetch_checksums_file
 
 # CPU feature detection for compatibility warnings
-CPU_HAS_AVX=0
-if grep -q ' avx ' /proc/cpuinfo 2>/dev/null; then CPU_HAS_AVX=1; fi
-
-if [[ $CPU_HAS_AVX -eq 0 ]]; then
+if ! grep -q ' avx ' /proc/cpuinfo 2>/dev/null; then
 	log_warn "CPU lacks AVX instructions — some native libraries may not work"
 	log_warn "Jellyfin image processing (SkiaSharp) may crash on very old CPUs"
 	log_warn "If any app crashes with 'Illegal instruction', your CPU is too old for that component"
@@ -854,14 +861,13 @@ if [[ $VERIFY_ONLY -eq 1 ]]; then
 	urls_to_check=("${SABNZBD_URL:-}" "${JELLYFIN_URL:-}" "${ASPDOTNET_URL:-}")
 	all_ok=true
 	for url in "${urls_to_check[@]}"; do
-		if [[ -n "$url" ]]; then
-			if check_url "$url"; then
-				log_ok "URL reachable: $url"
-			else
-				log_err "URL not reachable: $url"
-				all_ok=false
-			fi
+		[[ -n "$url" ]] || continue
+		if check_url "$url"; then
+			log_ok "URL reachable: $url"
+			continue
 		fi
+		log_err "URL not reachable: $url"
+		all_ok=false
 	done
 	if [[ "$all_ok" == true ]]; then
 		log_ok "All URLs verified successfully"
@@ -972,9 +978,18 @@ with open(path, "w", encoding="utf-8") as handle:
 PY
 }
 
+media_stack_sessions() {
+	[[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && printf '%s\n' jellyfin
+	printf '%s\n' "$@"
+}
+
 media_stack_sessions_label() {
-	[[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && printf 'jellyfin, '
-	printf 'sonarr, radarr, prowlarr, sabnzbd, cloudplow'
+	local app label=""
+
+	while IFS= read -r app; do
+		label+="${label:+, }$app"
+	done < <(media_stack_sessions "${MEDIA_STACK_BASE_SESSIONS[@]}")
+	printf '%s' "$label"
 }
 
 media_stack_app_log_path() {
@@ -1033,15 +1048,10 @@ media_stack_start_apps() {
 
 media_stack_verify_sessions() {
 	local app app_log
-	local apps_to_verify=(sonarr radarr prowlarr sabnzbd cloudplow)
-
-	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-		apps_to_verify=(jellyfin "${apps_to_verify[@]}")
-	fi
 
 	sleep 3
 	log_step "Verifying started applications..."
-	for app in "${apps_to_verify[@]}"; do
+	while IFS= read -r app; do
 		if tmux has-session -t "$app" 2>/dev/null; then
 			log_ok "$app session is running"
 			continue
@@ -1054,7 +1064,7 @@ media_stack_verify_sessions() {
 			log_err "$app crashed: Illegal Instruction — CPU lacks required instruction sets (SSE4.2/AVX)"
 		fi
 		log_info "To diagnose: tmux new-session -s ${app}-debug 'cd ~/.bin/${app}* && ...'"
-	done
+	done < <(media_stack_sessions "${MEDIA_STACK_BASE_SESSIONS[@]}")
 }
 
 SABNZBD_PORT=$(pick_existing_or_random_port "$(existing_port_from_ini "$HOME/.config/sabnzbd/sabnzbd.ini" "port")")
@@ -1080,13 +1090,9 @@ fi
 # Kill existing tmux sessions per app first
 log_step "Stopping existing sessions..."
 if [[ $DRY_RUN -eq 0 ]]; then
-	apps_to_stop=(sabnzbd radarr prowlarr sonarr cloudplow)
-	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-		apps_to_stop=(jellyfin "${apps_to_stop[@]}")
-	fi
-	for app in "${apps_to_stop[@]}"; do
+	while IFS= read -r app; do
 		tmux kill-session -t "${app}" 2>/dev/null || true
-	done
+	done < <(media_stack_sessions "${MEDIA_STACK_STOP_SESSIONS[@]}")
 fi
 
 # Install Cloudplow (unchanged, repo active)
@@ -1102,11 +1108,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
 	git clone https://github.com/l3uddz/cloudplow.git >/dev/null 2>&1
 	cd "${installdir}/cloudplow" && git checkout "$CLOUDPLOW_COMMIT" >/dev/null 2>&1
 	cd "$installdir"
-	# shellcheck disable=SC1091
-	source "${installdir}/bin/activate"
-	python3 -m pip install -U pip >/dev/null 2>&1
-	python3 -m pip install -r "${installdir}/cloudplow/requirements.txt" >/dev/null 2>&1
-	deactivate
+	python_venv_install_requirements "$installdir" "${installdir}/cloudplow/requirements.txt"
 	echo "${app^^} Installed"
 else
 	log_info "[dry-run] would install Cloudplow via git clone and venv"
@@ -1132,11 +1134,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
 	fetch_verified_archive "$SABNZBD_URL" "${app}.tar.gz" "SABnzbd"
 	mkdir -p "${app}"
 	extract_tgz "${app}.tar.gz" "${app}" 1
-	# shellcheck disable=SC1091
-	source "${installdir}/bin/activate"
-	python3 -m pip install -U pip >/dev/null 2>&1
-	python3 -m pip install -r "${installdir}/${app}/requirements.txt" >/dev/null 2>&1
-	deactivate
+	python_venv_install_requirements "$installdir" "${installdir}/${app}/requirements.txt"
 	echo "${app^^} Installed"
 else
 	log_info "[dry-run] would create SABnzbd venv and install requirements"

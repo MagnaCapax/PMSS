@@ -64,10 +64,12 @@ class installMediaStackScriptTest extends TestCase
 
     public function testVenvPipBootstrapUsesPython3(): void
     {
+        $this->assertStringContainsString('python_venv_install_requirements() {', $this->script);
         $this->assertTrue(
-            substr_count($this->script, 'python3 -m pip install -U pip >/dev/null 2>&1') === 2,
-            'Cloudplow and SABnzbd venv bootstrap should use python3 explicitly'
+            substr_count($this->script, 'python_venv_install_requirements "$installdir"') === 2,
+            'Cloudplow and SABnzbd should share the venv requirements helper'
         );
+        $this->assertStringContainsString('python3 -m pip install -U pip >/dev/null 2>&1', $this->script);
         $this->assertTrue(
             strpos($this->script, 'python -m pip install -U pip >/dev/null 2>&1') === false,
             'Media stack venv bootstrap must not rely on bare python'
@@ -365,9 +367,9 @@ LIGHTTPD;
 
     public function testTmuxKillIsScopedToNamedSessions(): void
     {
-        $this->assertStringContainsString('apps_to_stop=(sabnzbd radarr prowlarr sonarr cloudplow)', $this->script);
-        $this->assertStringContainsString('apps_to_stop=(jellyfin "${apps_to_stop[@]}")', $this->script);
-        $this->assertStringContainsString('for app in "${apps_to_stop[@]}"; do', $this->script);
+        $this->assertStringContainsString('MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow)', $this->script);
+        $this->assertStringContainsString('media_stack_sessions "${MEDIA_STACK_STOP_SESSIONS[@]}"', $this->script);
+        $this->assertStringContainsString('while IFS= read -r app; do', $this->script);
         $this->assertStringContainsString('tmux kill-session -t "${app}"', $this->script);
     }
 
