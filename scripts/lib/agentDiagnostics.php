@@ -16,7 +16,8 @@ function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = 
 {
     $scriptPath = pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT', dirname(__DIR__, 2)).'/'.ltrim($relativePath, '/');
     if (!is_file($scriptPath) || !is_readable($scriptPath)) return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script missing or unreadable: '.$relativePath];
-    $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($scriptPath);
+    // Use 'php' from $PATH instead of PHP_BINARY — consistent with update.php (GH#589).
+    $command = escapeshellarg('php').' '.escapeshellarg($scriptPath);
     foreach ($arguments as $argument) {
         $command .= ' '.escapeshellarg((string) $argument);
     }

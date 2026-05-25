@@ -678,7 +678,9 @@ function restorePermissionsBestEffort(string $context): void
     }
 
     logmsg('[INFO] Refreshing skeleton/config permissions after '.$context);
-    runSoft(escapeshellarg(PHP_BINARY).' '.escapeshellarg($helper));
+    // Use 'php' from $PATH (not PHP_BINARY) — PHP_BINARY is frozen at script start
+    // and points to a removed binary after --dist-upgrade swaps php7.4 → php8.2 (GH#589).
+    runSoft(escapeshellarg('php').' '.escapeshellarg($helper));
 }
 
 function ensureSnapshot(string $tmp): void
@@ -912,7 +914,8 @@ function maybeSelfUpdate(array $argv, bool $dryRun, bool $skipSelfUpdate, string
     }
     $args[] = SELF_UPDATE_SKIP_FLAG;
 
-    $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg(__FILE__);
+    // Use 'php' from $PATH instead of PHP_BINARY — see GH#589 for rationale (post-dist-upgrade stale interpreter).
+    $command = escapeshellarg('php').' '.escapeshellarg(__FILE__);
     foreach ($args as $arg) {
         $command .= ' '.escapeshellarg($arg);
     }
@@ -965,7 +968,9 @@ function runUpdateStep2(bool $dryRun): void
     logmsg($handoffLog);
     logEvent('update_step2_start');
     $start = microtime(true);
-    passthru(PHP_BINARY.' /scripts/util/update-step2.php', $rc);
+    // Use 'php' from $PATH instead of PHP_BINARY — GH#589: dist-upgrade swaps php7.4 → php8.2 mid-script,
+    // PHP_BINARY still points at /usr/bin/php7.4 (no longer exists) → exit 127.
+    passthru('php /scripts/util/update-step2.php', $rc);
     $duration = round(microtime(true) - $start, 3);
 
     // Interpret only valid 128+signal exit codes (e.g. SIGKILL -> 137).
@@ -1200,7 +1205,7 @@ function bootstrapMain(array $argv): void
         }
         if (!$options['dry_run'] && file_exists('/scripts/util/ftpConfig.php')) {
             logmsg('[INFO] Refreshing FTP configuration for --scripts-only run');
-            runSoft(escapeshellarg(PHP_BINARY).' /scripts/util/ftpConfig.php');
+            runSoft(escapeshellarg('php').' /scripts/util/ftpConfig.php');  // GH#589: avoid stale PHP_BINARY
         }
         if (!$options['dry_run']) {
             restoreRootCronBestEffort('scripts-only');
