@@ -152,6 +152,43 @@ if (!function_exists('pmssStatsRenderLineChart')) {
     }
 }
 
+if (!function_exists('pmssStatsSerializedStateRead')) {
+    /**
+     * Read one customer-visible serialized state file.
+     *
+     * @return array{data:?array,time:int|false|null,error:?string}
+     */
+    function pmssStatsSerializedStateRead(string $path, string $invalidMessage): array
+    {
+        $state = array('data' => null, 'time' => null, 'error' => null);
+        if (!is_file($path) || is_link($path)) {
+            return $state;
+        }
+
+        $state['time'] = @filemtime($path);
+        $state['data'] = function_exists('pmssReadSerializedArrayFile')
+            ? pmssReadSerializedArrayFile($path)
+            : null;
+        if ($state['data'] === null) {
+            $state['error'] = $invalidMessage;
+        }
+
+        return $state;
+    }
+}
+
+if (!function_exists('pmssStatsNestedArrayRead')) {
+    /**
+     * Return a nested array section or an empty fallback.
+     */
+    function pmssStatsNestedArrayRead(array $source, string $section, string $key): array
+    {
+        return isset($source[$section][$key]) && is_array($source[$section][$key])
+            ? $source[$section][$key]
+            : array();
+    }
+}
+
 $pmssDockerEnabledPolicy = null;
 $pmssMemoryPressure = function_exists('pmssWebCgroupMemoryStatusRead')
     ? pmssWebCgroupMemoryStatusRead()
@@ -540,31 +577,14 @@ if ($meminfo && preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m)) {
 
 <?php
 // === Traffic Usage ===
-$trafficData = null;
-$trafficTime = null;
-$trafficDataError = null;
-$trafficIngressData = null;
-$trafficIngressTime = null;
-$trafficIngressError = null;
-if (is_file('../.trafficData') && !is_link('../.trafficData')) {
-    $trafficTime = @filemtime('../.trafficData');
-    $trafficData = function_exists('pmssReadSerializedArrayFile')
-        ? pmssReadSerializedArrayFile('../.trafficData')
-        : null;
-    if ($trafficData === null) {
-        $trafficDataError = 'Invalid traffic data format.';
-    }
-}
-
-if (is_file('../.trafficDataIngress') && !is_link('../.trafficDataIngress')) {
-    $trafficIngressTime = @filemtime('../.trafficDataIngress');
-    $trafficIngressData = function_exists('pmssReadSerializedArrayFile')
-        ? pmssReadSerializedArrayFile('../.trafficDataIngress')
-        : null;
-    if ($trafficIngressData === null) {
-        $trafficIngressError = 'Invalid inbound traffic data format.';
-    }
-}
+$trafficState = pmssStatsSerializedStateRead('../.trafficData', 'Invalid traffic data format.');
+$trafficData = $trafficState['data'];
+$trafficTime = $trafficState['time'];
+$trafficDataError = $trafficState['error'];
+$trafficIngressState = pmssStatsSerializedStateRead('../.trafficDataIngress', 'Invalid inbound traffic data format.');
+$trafficIngressData = $trafficIngressState['data'];
+$trafficIngressTime = $trafficIngressState['time'];
+$trafficIngressError = $trafficIngressState['error'];
 $trafficLimitState = function_exists('pmssTrafficLimitStateRead') ? pmssTrafficLimitStateRead('../.trafficLimit', '../.bonusTraffic') : array('limitGiB' => 0, 'bonusGiB' => 0, 'effectiveLimitGiB' => 0);
 $trafficOutboundMonth = null;
 $trafficInboundMonth = null;
@@ -617,9 +637,7 @@ Inbound:Outbound ratio (month): <span class="traffic-ratio <?php echo $trafficRa
 
         <?php if ($trafficData !== null && !empty($trafficData['daily']) && count($trafficData['daily']) >= 2): ?>
             <?php
-            $trafficValues = array_values($trafficData['daily']);
-            foreach ($trafficValues as &$v) $v = round((float)$v, 2);
-            unset($v);
+            $trafficValues = array_map(function ($value) { return round((float)$value, 2); }, array_values($trafficData['daily']));
             pmssStatsRenderLineChart('trafficChart', array_keys($trafficData['daily']), array(array(
                 'label' => 'Daily Traffic (MiB)',
                 'data' => $trafficValues,
@@ -690,41 +708,21 @@ if (!function_exists('pmssFormatIoOperationsShort')) {
 }
 
 // === Resource Usage ===
-$resourceData = null;
-$resourceTime = null;
-$resourceDataError = null;
-if (is_file('../.resourceData') && !is_link('../.resourceData')) {
-    $resourceTime = @filemtime('../.resourceData');
-    $resourceData = function_exists('pmssReadSerializedArrayFile')
-        ? pmssReadSerializedArrayFile('../.resourceData')
-        : null;
-    if ($resourceData === null) {
-        $resourceDataError = 'Invalid resource data format.';
-    }
-}
+$resourceState = pmssStatsSerializedStateRead('../.resourceData', 'Invalid resource data format.');
+$resourceData = $resourceState['data'];
+$resourceTime = $resourceState['time'];
+$resourceDataError = $resourceState['error'];
 
 if ($resourceData === null) {
     $message = $resourceDataError !== null ? $resourceDataError : 'Resource data not available.';
     echo '<div class="stats-block"><h6>Resource usage</h6><pre>'.$message.'</pre></div>';
 } else {
-    $ioReadDisplay = isset($resourceData['io_read']['display']) && is_array($resourceData['io_read']['display'])
-        ? $resourceData['io_read']['display']
-        : [];
-    $ioWriteDisplay = isset($resourceData['io_write']['display']) && is_array($resourceData['io_write']['display'])
-        ? $resourceData['io_write']['display']
-        : [];
-    $cpuDisplay = isset($resourceData['cpu']['display']) && is_array($resourceData['cpu']['display'])
-        ? $resourceData['cpu']['display']
-        : [];
-    $cpuRaw = isset($resourceData['cpu']['raw']) && is_array($resourceData['cpu']['raw'])
-        ? $resourceData['cpu']['raw']
-        : [];
-    $ioReadOpsRaw = isset($resourceData['io_read_ops']['raw']) && is_array($resourceData['io_read_ops']['raw'])
-        ? $resourceData['io_read_ops']['raw']
-        : [];
-    $ioWriteOpsRaw = isset($resourceData['io_write_ops']['raw']) && is_array($resourceData['io_write_ops']['raw'])
-        ? $resourceData['io_write_ops']['raw']
-        : [];
+    $ioReadDisplay = pmssStatsNestedArrayRead($resourceData, 'io_read', 'display');
+    $ioWriteDisplay = pmssStatsNestedArrayRead($resourceData, 'io_write', 'display');
+    $cpuDisplay = pmssStatsNestedArrayRead($resourceData, 'cpu', 'display');
+    $cpuRaw = pmssStatsNestedArrayRead($resourceData, 'cpu', 'raw');
+    $ioReadOpsRaw = pmssStatsNestedArrayRead($resourceData, 'io_read_ops', 'raw');
+    $ioWriteOpsRaw = pmssStatsNestedArrayRead($resourceData, 'io_write_ops', 'raw');
     $ioOperationsMonth = (float)($ioReadOpsRaw['month'] ?? 0.0) + (float)($ioWriteOpsRaw['month'] ?? 0.0);
     if (isset($cpuRaw['month'])) {
         $cpuDisplay['month'] = pmssFormatCpuHours($cpuRaw['month']);
@@ -738,12 +736,8 @@ if ($resourceData === null) {
     if (!isset($cpuDisplay['hour']) && isset($cpuRaw['hour'])) {
         $cpuDisplay['hour'] = pmssFormatDurationSeconds($cpuRaw['hour'] / 1000000000);
     }
-    $memoryDisplay = isset($resourceData['memory']['display']) && is_array($resourceData['memory']['display'])
-        ? $resourceData['memory']['display']
-        : [];
-    $ramHoursDisplay = isset($resourceData['ram_hours']['display']) && is_array($resourceData['ram_hours']['display'])
-        ? $resourceData['ram_hours']['display']
-        : [];
+    $memoryDisplay = pmssStatsNestedArrayRead($resourceData, 'memory', 'display');
+    $ramHoursDisplay = pmssStatsNestedArrayRead($resourceData, 'ram_hours', 'display');
     $memoryCurrent = isset($resourceData['memory']['current'])
         ? pmssFormatBytesShort($resourceData['memory']['current'])
         : 'n/a';
@@ -802,33 +796,13 @@ Past 30 days total I/O operations: <?php echo pmssFormatIoOperationsShort($ioOpe
                     'borderColor' => 'rgb(244, 67, 54)',
                 ),
             ));
+            pmssStatsRenderLineChart('iopsChart', $ioDailyLabels, array(array(
+                'label' => 'Daily I/O Operations',
+                'data' => $ioDailyOperations,
+                'backgroundColor' => 'rgba(255, 193, 7, 0.2)',
+                'borderColor' => 'rgb(255, 193, 7)',
+            )));
             ?>
-            <div class="traffic-chart">
-                <canvas id="iopsChart" width="600" height="250"></canvas>
-            </div>
-            <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                if (typeof Chart === 'undefined') return;
-                const element = document.getElementById('iopsChart');
-                if (!element) return;
-                new Chart(element.getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: <?php echo json_encode($ioDailyLabels); ?>,
-                        datasets: [{
-                            label: 'Daily I/O Operations',
-                            data: <?php echo json_encode($ioDailyOperations); ?>,
-                            fill: true,
-                            backgroundColor: 'rgba(255, 193, 7, 0.2)',
-                            borderColor: 'rgb(255, 193, 7)',
-                            tension: 0.4,
-                            pointRadius: 3
-                        }]
-                    },
-                    options: pmssStatsChartOptions()
-                });
-            });
-            </script>
         <?php else: ?>
             <div class="docker-note">Chart requires 2+ days of data.</div>
         <?php endif; ?>

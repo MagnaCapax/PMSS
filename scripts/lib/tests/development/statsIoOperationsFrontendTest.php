@@ -21,7 +21,7 @@ class StatsIoOperationsFrontendTest extends TestCase
 
         $this->assertStringContainsAllStrings([
             '$ioDailyOperations[] = round($readOps + $writeOps, 2);',
-            "label: 'Daily I/O Operations'",
+            "'label' => 'Daily I/O Operations'",
         ], $source);
         $this->assertStringNotContainsString('$iopsDailyAverage', $source);
     }
