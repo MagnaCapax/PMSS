@@ -219,36 +219,25 @@ function userDockerEnsureCgroupfsDaemonConfig(string $user, string $home, int $u
 
 /**
  * Collect running rootless Docker-related PIDs for a user.
- *
- * #TODO(user-docker-process-check): consolidate per-user start process checks
- * with other launchers (startRtorrent/startLighttpd) into a shared helper.
  */
 function userDockerCollectPids(string $user, bool $debug = false, ?bool &$checkOk = null): array
 {
     $pids = [];
     $checks = [
-        ['label' => 'dockerd-rootless.sh', 'cmd' => 'pgrep -u %s -f dockerd-rootless\\.sh 2>&1'],
-        ['label' => 'dockerd-rootless', 'cmd' => 'pgrep -u %s -f dockerd-rootless 2>&1'],
-        ['label' => 'dockerd', 'cmd' => 'pgrep -u %s -x dockerd 2>&1'],
+        ['label' => 'dockerd-rootless.sh', 'pattern' => 'dockerd-rootless\\.sh', 'options' => ['full' => true, 'captureStderr' => true]],
+        ['label' => 'dockerd-rootless', 'pattern' => 'dockerd-rootless', 'options' => ['full' => true, 'captureStderr' => true]],
+        ['label' => 'dockerd', 'pattern' => 'dockerd', 'options' => ['exact' => true, 'captureStderr' => true]],
     ];
     $checkOkLocal = true;
 
     foreach ($checks as $check) {
-        $out = [];
-        $rc = 0;
-        $cmd = sprintf($check['cmd'], escapeshellarg($user));
-        exec($cmd, $out, $rc);
+        $out = []; $rc = 0;
+        foreach (pmssUserWatchdogProcessPids($user, (string) $check['pattern'], (array) $check['options'], $rc, $out) as $pid) {
+            $pids[$pid] = true;
+        }
         if ($rc === 127) {
             $checkOkLocal = false;
             break;
-        }
-        if ($rc === 0) {
-            foreach ($out as $line) {
-                $pid = trim((string) $line);
-                if ($pid !== '' && ctype_digit($pid)) {
-                    $pids[(int) $pid] = true;
-                }
-            }
         }
         if ($debug) {
             $joined = implode(' | ', $out);

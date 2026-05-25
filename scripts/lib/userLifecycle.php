@@ -228,13 +228,34 @@ function pmssUserWatchdogTerminateProcesses(string $username, array $processName
         @passthru('killall -'.$signal.' -u '.escapeshellarg($username).' '.escapeshellarg($processName).' 2>/dev/null');
     }
 }
+/** @return int[] Normalized positive PIDs from a per-user pgrep probe. */
+function pmssUserWatchdogProcessPids(string $username, string $processPattern, array $options = array(), ?int &$exitCode = null, ?array &$output = null): array
+{
+    if (!pmssValidateUsername($username) || $processPattern === '') { $exitCode = 1; $output = array(); return array(); }
+
+    $command = 'pgrep -u '.escapeshellarg($username)
+        .(!empty($options['full']) ? ' -f' : '')
+        .(!empty($options['exact']) ? ' -x' : '')
+        .' '.escapeshellarg($processPattern)
+        .(!empty($options['captureStderr']) ? ' 2>&1' : ' 2>/dev/null');
+
+    $matches = array(); $rc = 1;
+    @exec($command, $matches, $rc);
+    $exitCode = $rc;
+    $output = $matches;
+
+    $pids = array();
+    foreach ($matches as $rawPid) {
+        $pid = trim((string) $rawPid);
+        if ($pid !== '' && ctype_digit($pid)) { $pids[(int) $pid] = (int) $pid; }
+    }
+    return array_values($pids);
+}
 function pmssUserWatchdogProcessRunning(string $username, string $processName): bool
 {
-    if (!pmssValidateUsername($username) || $processName === '') { return false; }
-    $matches = array();
     $exitCode = 1;
-    @exec('pgrep -u '.escapeshellarg($username).' '.escapeshellarg($processName).' 2>/dev/null', $matches, $exitCode);
-    return $exitCode === 0 && $matches !== array();
+    $pids = pmssUserWatchdogProcessPids($username, $processName, array(), $exitCode);
+    return $exitCode === 0 && $pids !== array();
 }
 function pmssUserWatchdogSuCommand(string $username, string $innerCommand): string { return 'su '.escapeshellarg($username).' -c '.escapeshellarg($innerCommand); }
 /** Read a watchdog-owned local TCP port, failing closed on malformed files. */
@@ -251,25 +272,13 @@ function pmssUserWatchdogLocalPortRead(string $path): ?int
 /** Return the oldest /proc start marker for exact process-name matches. */
 function pmssUserWatchdogProcessStartTime(string $username, string $processName, string $procRoot = '/proc'): ?int
 {
-    if (!pmssValidateUsername($username) || $processName === '') {
-        return null;
-    }
-
-    $matches = array();
     $exitCode = 1;
-    @exec('pgrep -u '.escapeshellarg($username).' -x '.escapeshellarg($processName).' 2>/dev/null', $matches, $exitCode);
-    if ($exitCode !== 0 || $matches === array()) {
-        return null;
-    }
+    $pids = pmssUserWatchdogProcessPids($username, $processName, array('exact' => true), $exitCode);
+    if ($exitCode !== 0 || $pids === array()) { return null; }
 
     $oldest = null;
     $procRoot = rtrim($procRoot, '/');
-    foreach ($matches as $rawPid) {
-        $pid = trim((string) $rawPid);
-        if ($pid === '' || preg_match('/^[0-9]+$/', $pid) !== 1) {
-            continue;
-        }
-
+    foreach ($pids as $pid) {
         $mtime = @filemtime($procRoot.'/'.$pid);
         if (!is_int($mtime)) {
             continue;
