@@ -20,6 +20,15 @@ class OpenvpnHelpersTest extends TestCase
         $this->assertOpenvpnArtifactPathsRemainInlined('scripts/util/configureOpenvpn.php');
     }
 
+    public function testConfigureOpenvpnSkipRequiresSkelBundle(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/configureOpenvpn.php', [
+            "\$bundleTgz    = '/etc/skel/www/openvpn-config.tgz';",
+            '&& is_file($bundleTgz);',
+            "escapeshellarg(\$bundleTgz)",
+        ]);
+    }
+
     public function testSystemTestUsesMatchingClientArtifactPaths(): void
     {
         $this->assertOpenvpnArtifactPathsRemainInlined('scripts/lib/systemStatus.php', [

@@ -31,13 +31,15 @@ $tplServer    = '/etc/seedbox/config/template.openvpn.server.config';
 $tplClient    = '/etc/seedbox/config/template.openvpn.client.config';
 $clientOvpn   = '/home/openvpn-'.$slug.'.ovpn';
 $clientCrt    = '/home/openvpn-'.$slug.'.crt';
+$bundleTgz    = '/etc/skel/www/openvpn-config.tgz';
 
 // Fast-path using the same binary/config/artifact checks expected by systemTest.
 $alreadyConfigured = pmssCommandPath('openvpn') !== ''
     && is_file($serverConf)
     && (is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt'))
     && is_file($clientOvpn)
-    && is_file($clientCrt);
+    && is_file($clientCrt)
+    && is_file($bundleTgz);
 if ($alreadyConfigured) {
     pmssLogStatus('SKIP', 'OpenVPN already configured; skipping provisioning', 0);
     return;
@@ -130,8 +132,7 @@ if (!file_exists($clientCrt) && file_exists($easyRsaDir.'/pki/ca.crt')) {
 // lockdown for /etc/skel/www unless explicitly instructed — and this path is
 // explicitly approved here for OpenVPN client bundle publication.
 if (file_exists($clientOvpn) && file_exists($clientCrt) && is_dir('/etc/skel/www')) {
-    $tgz = '/etc/skel/www/openvpn-config.tgz';
-    $cmd = 'bash -lc '.escapeshellarg('cd /home; tar -czf '.escapeshellarg($tgz).' '
+    $cmd = 'bash -lc '.escapeshellarg('cd /home; tar -czf '.escapeshellarg($bundleTgz).' '
         .escapeshellarg(basename($clientOvpn)).' '.escapeshellarg(basename($clientCrt)));
     runStep('Bundling OpenVPN client package for web download', $cmd);
 }
