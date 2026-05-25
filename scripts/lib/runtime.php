@@ -620,8 +620,6 @@ if (!function_exists('pmssCommandPipedCapture')) {
             if (function_exists('proc_terminate')) @proc_terminate($process);
             @proc_close($process);
         };
-        $closeProcess = static function ($process): int { return pmssProcessCloseExitCode($process); };
-
         $process = @proc_open($bash, pmssProcessPipeDescriptorSpec(), $pipes);
         if (!is_resource($process) && $retryLaunch) {
             usleep(500000);
@@ -646,7 +644,7 @@ if (!function_exists('pmssCommandPipedCapture')) {
         $closePipes($pipes, [1, 2]);
         $rc = $capture['timed_out']
             ? pmssCommandTimeoutClose($process, $timeoutCommand, $timeoutSec, $startedAt)
-            : $closeProcess($process);
+            : pmssProcessCloseExitCode($process);
 
         return ['rc' => $rc, 'stdout' => $capture['stdout'], 'stderr' => $capture['stderr'], 'timed_out' => $capture['timed_out'], 'launch_failed' => false, 'pipe_failed' => false];
     }
@@ -977,6 +975,13 @@ if (!function_exists('runCommand')) {
         if ($logMemoryUsage) {
             $log(sprintf('[CMD] memory usage before=%0.2f MiB', memory_get_usage(true) / 1048576));
         }
+        $logTimeout = static function () use ($cmd, $isInteractive, $log, $timeoutSec): void {
+            $banner = $isInteractive ? "\033[1;31m[TIMEOUT]\033[0m " : '[TIMEOUT] ';
+            $msg = $banner.'Command timed out after '.$timeoutSec.'s: '.$cmd;
+            fwrite(STDERR, $msg.PHP_EOL);
+            echo $msg.PHP_EOL;
+            $log($msg);
+        };
 
         $useInheritedIO = $inheritTty && pmssStandardStreamsAreTty();
         // Use a single command string for PHP 7.3 compatibility.
@@ -1045,11 +1050,7 @@ if (!function_exists('runCommand')) {
 
             if ($exitCode !== 0) {
                 if ($timedOut) {
-                    $banner = $isInteractive ? "\033[1;31m[TIMEOUT]\033[0m " : '[TIMEOUT] ';
-                    $msg = $banner.'Command timed out after '.$timeoutSec.'s: '.$cmd;
-                    fwrite(STDERR, $msg.PHP_EOL);
-                    echo $msg.PHP_EOL;
-                    $log($msg);
+                    $logTimeout();
                 } else {
                     $log('[WARN] Command failed (rc='.$exitCode.'): '.$cmd);
                 }
@@ -1084,11 +1085,7 @@ if (!function_exists('runCommand')) {
                 $excerpt = ' :: '.preg_replace('/\s+/', ' ', substr($excerpt, 0, 300));
             }
             if ($timedOut) {
-                $banner = $isInteractive ? "\033[1;31m[TIMEOUT]\033[0m " : '[TIMEOUT] ';
-                $msg = $banner.'Command timed out after '.$timeoutSec.'s: '.$cmd;
-                fwrite(STDERR, $msg.PHP_EOL);
-                echo $msg.PHP_EOL;
-                $log($msg);
+                $logTimeout();
             } else {
                 $log('[WARN] Command failed (rc='.$exitCode.'): '.$cmd.$excerpt);
             }
