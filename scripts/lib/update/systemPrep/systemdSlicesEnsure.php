@@ -6,25 +6,13 @@
  */
 
 require_once __DIR__.'/../managedPath.php';
+require_once dirname(__DIR__, 2).'/pathSafety.php';
 require_once dirname(__DIR__).'/../runtime.php';
 
 /** Keep systemd IO property device targets to plain block-device paths. */
 function pmssSystemdIoDeviceTargetIsSafe(string $device): bool
 {
-    if (strpos($device, '/dev/') !== 0
-        || strpos($device, "\0") !== false
-        || preg_match('/\s/', $device) === 1
-        || substr($device, -1) === '/') {
-        return false;
-    }
-
-    foreach (explode('/', substr($device, 5)) as $segment) {
-        if ($segment === '' || $segment === '.' || $segment === '..') {
-            return false;
-        }
-    }
-
-    return true;
+    return pmssPathAbsoluteStringIsSafe($device, ['allowTrailingSlash' => false, 'allowWhitespace' => false, 'requiredPrefix' => '/dev/']);
 }
 
 /** Validate the value side of systemd IO limits before rendering drop-ins. */

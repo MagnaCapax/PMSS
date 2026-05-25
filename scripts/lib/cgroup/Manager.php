@@ -11,6 +11,7 @@ namespace PMSS\Cgroup;
 require_once __DIR__ . '/SystemInterface.php';
 require_once __DIR__ . '/../cli/helpText.php';
 require_once __DIR__ . '/../cli/optionParser.php';
+require_once __DIR__ . '/../pathSafety.php';
 require_once __DIR__ . '/../systemdSliceProperties.php';
 require_once __DIR__ . '/../update/runtime/commands.php'; // for runStep
 
@@ -722,20 +723,7 @@ class Manager
     /** Keep systemd IO property device targets to plain /dev paths. */
     private function deviceTargetIsSafe(string $device): bool
     {
-        if (strpos($device, '/dev/') !== 0
-            || strpos($device, "\0") !== false
-            || preg_match('/\s/', $device) === 1
-            || substr($device, -1) === '/') {
-            return false;
-        }
-
-        foreach (explode('/', substr($device, 5)) as $segment) {
-            if ($segment === '' || $segment === '.' || $segment === '..') {
-                return false;
-            }
-        }
-
-        return true;
+        return \pmssPathAbsoluteStringIsSafe($device, ['allowTrailingSlash' => false, 'allowWhitespace' => false, 'requiredPrefix' => '/dev/']);
     }
 
     /** Prefix plain nested keys with the resolved major:minor device token. */

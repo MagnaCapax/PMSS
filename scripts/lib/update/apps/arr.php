@@ -69,17 +69,8 @@ function pmssArrIsSafeConfigValue(string $value): bool
  */
 function pmssArrInstallPathIsSafe(string $path): bool
 {
-    if ($path === '' || $path[0] !== '/' || $path === '/') {
-        return false;
-    }
-
-    foreach (explode('/', trim($path, '/')) as $segment) {
-        if ($segment === '' || $segment === '.' || $segment === '..') {
-            return false;
-        }
-    }
-
-    return true;
+    require_once dirname(__DIR__, 2).'/pathSafety.php';
+    return pmssPathAbsoluteStringIsSafe($path);
 }
 
 /**

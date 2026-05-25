@@ -37,6 +37,36 @@ function pmssPathIsFhsStandardSymlink(string $linkPath): bool
 }
 
 /**
+ * Validate lexical absolute path strings without touching the filesystem.
+ */
+function pmssPathAbsoluteStringIsSafe(string $path, array $options = []): bool
+{
+    $allowRoot = isset($options['allowRoot']) ? (bool) $options['allowRoot'] : false;
+    $allowTrailingSlash = array_key_exists('allowTrailingSlash', $options) ? (bool) $options['allowTrailingSlash'] : true;
+    $allowWhitespace = array_key_exists('allowWhitespace', $options) ? (bool) $options['allowWhitespace'] : true;
+    $requiredPrefix = isset($options['requiredPrefix']) ? (string) $options['requiredPrefix'] : '';
+
+    if ($path === ''
+        || $path[0] !== '/'
+        || strpos($path, "\0") !== false
+        || (!$allowWhitespace && preg_match('/\s/', $path) === 1)
+        || (!$allowTrailingSlash && substr($path, -1) === '/')
+        || ($requiredPrefix !== '' && strpos($path, $requiredPrefix) !== 0)
+    ) {
+        return false;
+    }
+    if ($path === '/') return $allowRoot;
+
+    foreach (explode('/', trim($path, '/')) as $segment) {
+        if ($segment === '' || $segment === '.' || $segment === '..') {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
  * Validate path segments while preserving caller-specific absolute/leaf policy.
  */
 function pmssPathSegmentsAreSafe(
