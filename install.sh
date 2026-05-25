@@ -89,6 +89,17 @@ run_cmd() {
 	return $?
 }
 
+run_required() {
+	local rc
+
+	run_cmd "$@"
+	rc=$?
+	if [ "$rc" -ne 0 ]; then
+		log_error "Required command failed (rc=${rc}): $*"
+		exit "$rc"
+	fi
+}
+
 pmssDetectExistingInstall() {
 	if [ -f /etc/seedbox/config/version ] || [ -f /etc/seedbox/config/version.meta ]; then
 		return 0
@@ -359,6 +370,49 @@ append_unique_block() {
 	fi
 
 	printf '%s\n' "$content" >>"$file"
+}
+
+cleanup_snapshot_workspace() {
+	local path
+
+	for path in /tmp/PMSS /tmp/PMSS.tar.gz; do
+		case "$path" in
+		/tmp/PMSS | /tmp/PMSS.tar.gz) ;;
+		*)
+			log_error "Refusing unsafe snapshot cleanup path: ${path}"
+			exit 1
+			;;
+		esac
+
+		if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+			continue
+		fi
+		if [ -d "$path" ] && command -v mountpoint >/dev/null 2>&1 && mountpoint -q "$path"; then
+			log_error "Refusing to remove mounted snapshot workspace: ${path}"
+			exit 1
+		fi
+
+		rm -rf -- "$path" || {
+			log_error "Failed to remove snapshot workspace path: ${path}"
+			exit 1
+		}
+	done
+}
+
+validate_snapshot_tree() {
+	local snapshot_dir="$1"
+
+	if [ ! -d "$snapshot_dir/scripts" ] || [ ! -d "$snapshot_dir/etc" ]; then
+		log_error "Fetched snapshot is missing required scripts/ or etc/ tree"
+		return 1
+	fi
+
+	if [ ! -f "$snapshot_dir/scripts/update.php" ]; then
+		log_error "Fetched snapshot is missing scripts/update.php"
+		return 1
+	fi
+
+	return 0
 }
 
 # Install packages only if missing to avoid accidental removals
@@ -861,8 +915,8 @@ ensure_packages build-essential autoconf automake pkg-config libtool subversion
 # Script installs from release by default and uses a specific git branch as the source if given string of "git/branch" format
 log_step "Setting up base software"
 mkdir ~/compile
-cd /tmp || exit
-rm -rf PMSS*
+cd /tmp || exit 1
+cleanup_snapshot_workspace
 echo
 parse_version_string "$SOURCE_SPEC"
 if [ -z "$type" ]; then
@@ -872,26 +926,35 @@ if [ -z "$type" ]; then
 fi
 
 if [ "$type" = "git" ]; then
-	git clone "$repository" PMSS
+	run_required git clone "$repository" PMSS
 	(
-		cd PMSS || exit
-		git checkout "$branch"
-		chmod u+x ./scripts/*.php
-	)
-	rsync -a --ignore-missing-args PMSS/{var,scripts,etc} /
-	rm -rf PMSS
+		cd PMSS || exit 1
+		run_required git checkout "$branch"
+		if compgen -G './scripts/*.php' >/dev/null; then
+			run_required chmod u+x ./scripts/*.php
+		fi
+	) || exit 1
+	validate_snapshot_tree PMSS || exit 1
+	run_required rsync -a --ignore-missing-args PMSS/{var,scripts,etc} /
+	cleanup_snapshot_workspace
 	SOURCE="$type/$repository:$branch"
 	VERSION="$SOURCE"
 else
 	if [ -n "$url" ]; then
 		VERSION="$url"
 	else
-		VERSION=$(wget https://api.github.com/repos/MagnaCapax/PMSS/releases/latest -O - | awk -F \" -v RS="," '/tag_name/ {print $(NF-1)}')
+		VERSION=$(wget -qO- https://api.github.com/repos/MagnaCapax/PMSS/releases/latest | awk -F \" -v RS="," '/tag_name/ {print $(NF-1)}')
+		if [ -z "$VERSION" ]; then
+			log_error "Unable to resolve latest PMSS release tag"
+			exit 1
+		fi
 	fi
-	wget "https://api.github.com/repos/MagnaCapax/PMSS/tarball/${VERSION}" -O PMSS.tar.gz
-	mkdir PMSS && tar -xzf PMSS.tar.gz -C PMSS --strip-components 1
-	rsync -a --ignore-missing-args PMSS/{var,scripts,etc} /
-	rm -rf PMSS
+	run_required wget "https://api.github.com/repos/MagnaCapax/PMSS/tarball/${VERSION}" -O PMSS.tar.gz
+	run_required mkdir PMSS
+	run_required tar -xzf PMSS.tar.gz -C PMSS --strip-components 1
+	validate_snapshot_tree PMSS || exit 1
+	run_required rsync -a --ignore-missing-args PMSS/{var,scripts,etc} /
+	cleanup_snapshot_workspace
 	SOURCE="release"
 	VERSION="$SOURCE:${VERSION:-unknown}"
 fi
