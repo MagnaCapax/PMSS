@@ -1,6 +1,6 @@
 <?php
 /**
- * Customer-side traffic-limit reader.
+ * Customer-side traffic helpers.
  *
  * Reads ~/.trafficLimit and ~/.bonusTraffic (both customer-owned files) and
  * returns a state array consumed by welcome.php and stats.php. Lives in
@@ -11,7 +11,7 @@
  * /scripts/cron/trafficLimits.php (the cron enforcer). Both writes the
  * customer-readable files that THIS reader consumes.
  *
- * Inlined functions (subset of /scripts/lib/user/trafficLimit.php +
+ * Inlined limit functions (subset of /scripts/lib/user/trafficLimit.php +
  * /scripts/lib/user/integerSetting.php + /scripts/lib/runtime.php):
  *   pmssTrafficLimitStateRead, pmssTrafficLimitReadGiBFile,
  *   pmssTrafficLimitParseGiB.
@@ -94,5 +94,31 @@ if (!function_exists('pmssTrafficLimitStateRead')) {
             'bonusGiB'          => $bonusGiB,
             'effectiveLimitGiB' => ($limitGiB > 0) ? ($limitGiB + $bonusGiB) : 0,
         ];
+    }
+}
+
+if (!function_exists('pmssTrafficRatioStateBuild')) {
+    /** Classify monthly inbound:outbound ratio for welcome.php and stats.php.
+     * @return array{available:bool,display:string,class:string,color:string} */
+    function pmssTrafficRatioStateBuild($outboundMonth, $inboundMonth): array
+    {
+        if (!is_numeric($outboundMonth) || !is_numeric($inboundMonth)) {
+            return ['available' => false, 'display' => '', 'class' => '', 'color' => ''];
+        }
+        $outboundMonth = (float) $outboundMonth;
+        if ($outboundMonth <= 0) {
+            return ['available' => true, 'display' => 'N/A', 'class' => 'na', 'color' => '#b0bec5'];
+        }
+        $ratio = (float) $inboundMonth / $outboundMonth;
+        $state = $ratio >= 2.0
+            ? array('good', '#81c784')
+            : ($ratio >= 1.0 ? array('warn', '#ffb74d') : array('bad', '#ef5350'));
+
+        return array(
+            'available' => true,
+            'display'   => number_format($ratio, 2).':1',
+            'class'     => $state[0],
+            'color'     => $state[1],
+        );
     }
 }

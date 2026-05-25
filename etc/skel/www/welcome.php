@@ -1115,19 +1115,10 @@ function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = nul
         ? (float) $trafficIngress['raw']['month']
         : null;
     $inboundLine = $inboundMonth !== null ? '<br />Inbound (30 days): '.round($inboundMonth / 1024).' GiB' : '';
-    $ratioLine = '';
-
-    if ($inboundMonth !== null && $outboundMonth !== null) {
-        if ($outboundMonth > 0) {
-            $ratio = $inboundMonth / $outboundMonth;
-            $ratioText = number_format($ratio, 2).':1';
-            $ratioColor = $ratio >= 2.0 ? '#81c784' : ($ratio >= 1.0 ? '#ffb74d' : '#ef5350');
-        } else {
-            $ratioText = 'N/A';
-            $ratioColor = '#b0bec5';
-        }
-        $ratioLine = '<br />Inbound:Outbound ratio (30 days): <span style="color: '.$ratioColor.'">'.$ratioText.'</span>';
-    }
+    $ratioState = function_exists('pmssTrafficRatioStateBuild') ? pmssTrafficRatioStateBuild($outboundMonth, $inboundMonth) : array('available' => false);
+    $ratioLine = !empty($ratioState['available'])
+        ? '<br />Inbound:Outbound ratio (30 days): <span style="color: '.$ratioState['color'].'">'.$ratioState['display'].'</span>'
+        : '';
 
     if ($trafficLimit <= 0) {
         echo <<<EOF

@@ -125,8 +125,32 @@ function pmssSetupLetsEncryptRun(string $domain, string $email, string $codename
     $liveCertPath = $liveDir.'/'.$domain;
 
     // Debian 10 still needs the upstream virtualenv layout for a new enough certbot.
+    // Existence alone is not a health signal — a dist-upgrade can leave the venv on disk
+    // while the underlying Python it was built against is gone, so /opt/certbot/bin/certbot
+    // imports against a sys.path that no longer matches and silently fails every renewal
+    // for the next 90 days until the cert expires (Refs #484).
     if ($codename === 'buster') {
-        if (!$fileExists($certbotVirtualenvBinary)) {
+        $venvFunctional = false;
+        if ($fileExists($certbotVirtualenvBinary)) {
+            $versionCheck = $commandRunner !== null
+                ? $commandRunner(
+                    pmssSetupLetsEncryptCommandBuild($certbotVirtualenvBinary, array('--version')),
+                    'Verify certbot virtualenv functional'
+                )
+                : pmssCommandCapture(
+                    pmssSetupLetsEncryptCommandBuild($certbotVirtualenvBinary, array('--version'))
+                );
+            $venvFunctional = isset($versionCheck['rc']) && (int) $versionCheck['rc'] === 0;
+        }
+
+        if (!$venvFunctional) {
+            if ($fileExists($certbotVirtualenvBinary)) {
+                pmssSetupLetsEncryptRunCommand(
+                    pmssSetupLetsEncryptCommandBuild('rm', array('-rf', '/opt/certbot')),
+                    'Remove broken certbot virtualenv',
+                    $commandRunner
+                );
+            }
             foreach (array(
                 array('python3', array('-m', 'venv', '/opt/certbot/'), 'Create certbot virtualenv'),
                 array('/opt/certbot/bin/pip', array('install', '--upgrade', 'pip'), 'Upgrade certbot pip'),

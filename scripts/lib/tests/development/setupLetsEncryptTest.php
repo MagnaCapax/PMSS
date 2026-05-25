@@ -190,4 +190,78 @@ class SetupLetsEncryptTest extends TestCase
             $commands
         );
     }
+
+    public function testSharedSetupRebuildsBrokenBusterVenvWhenVersionCheckFails(): void
+    {
+        // Post-dist-upgrade: /opt/certbot exists but the Python it was built against is gone.
+        // The version check must catch this and force a rebuild, otherwise renewals fail
+        // silently for 90 days until the cert expires (Refs #484).
+        $commands = [];
+
+        \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'buster', $this->pmssLetsEncryptTestOptions([
+            'fileExists' => static function (string $path): bool {
+                return $path === '/opt/certbot/bin/certbot' || $path === '/usr/bin/certbot';
+            },
+            'commandRunner' => static function (string $command, string $description) use (&$commands): array {
+                $commands[] = $description;
+                if ($description === 'Verify certbot virtualenv functional') {
+                    return ['rc' => 1, 'stdout' => '', 'stderr' => 'ModuleNotFoundError'];
+                }
+                return ['rc' => 0, 'stdout' => '', 'stderr' => ''];
+            },
+        ]));
+
+        $this->assertEquals(
+            [
+                'Verify certbot virtualenv functional',
+                'Remove broken certbot virtualenv',
+                'Create certbot virtualenv',
+                'Upgrade certbot pip',
+                'Install certbot virtualenv packages',
+                'Request Let\'s Encrypt certificate',
+                'Rebuild nginx configuration',
+                'Restart nginx',
+            ],
+            $commands
+        );
+    }
+
+    public function testSharedSetupSkipsRebuildWhenBusterVenvHealthCheckPasses(): void
+    {
+        // Healthy venv with cert already present: version check returns rc=0 and no
+        // rebuild commands are emitted; cert request also skipped because liveCertPath exists.
+        $commands = [];
+
+        \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'buster', $this->pmssLetsEncryptTestOptions([
+            'fileExists' => static function (string $path): bool {
+                return $path === '/opt/certbot/bin/certbot'
+                    || $path === '/usr/bin/certbot'
+                    || strpos($path, '/etc/letsencrypt/live/') === 0;
+            },
+            'commandRunner' => static function (string $command, string $description) use (&$commands): array {
+                $commands[] = $description;
+                return ['rc' => 0, 'stdout' => 'certbot 2.1.0', 'stderr' => ''];
+            },
+        ]));
+
+        $this->assertEquals(
+            [
+                'Verify certbot virtualenv functional',
+                'Rebuild nginx configuration',
+                'Restart nginx',
+            ],
+            $commands
+        );
+    }
+
+    public function testSharedSetupBusterPathDeclaresFunctionalHealthCheck(): void
+    {
+        // Static guard against regression: any future refactor of the buster branch
+        // must preserve the certbot-functionality check, not just the existence check.
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/certbotSetup.php', [
+            "'Verify certbot virtualenv functional'",
+            "'Remove broken certbot virtualenv'",
+            '$venvFunctional',
+        ]);
+    }
 }

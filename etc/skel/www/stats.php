@@ -566,10 +566,6 @@ if (is_file('../.trafficDataIngress') && !is_link('../.trafficDataIngress')) {
     }
 }
 $trafficLimitState = function_exists('pmssTrafficLimitStateRead') ? pmssTrafficLimitStateRead('../.trafficLimit', '../.bonusTraffic') : array('limitGiB' => 0, 'bonusGiB' => 0, 'effectiveLimitGiB' => 0);
-$trafficRatioDisplay = null;
-$trafficRatioClass = '';
-$trafficRatioGoodMin = 2.0;
-$trafficRatioWarnMin = 1.0;
 $trafficOutboundMonth = null;
 $trafficInboundMonth = null;
 
@@ -579,22 +575,7 @@ if ($trafficData !== null && isset($trafficData['raw']['month']) && is_numeric($
 if ($trafficIngressData !== null && isset($trafficIngressData['raw']['month']) && is_numeric($trafficIngressData['raw']['month'])) {
     $trafficInboundMonth = (float) $trafficIngressData['raw']['month'];
 }
-if ($trafficOutboundMonth !== null && $trafficInboundMonth !== null) {
-    if ($trafficOutboundMonth > 0) {
-        $trafficRatio = $trafficInboundMonth / $trafficOutboundMonth;
-        $trafficRatioDisplay = number_format($trafficRatio, 2) . ':1';
-        if ($trafficRatio >= $trafficRatioGoodMin) {
-            $trafficRatioClass = 'traffic-ratio good';
-        } elseif ($trafficRatio >= $trafficRatioWarnMin) {
-            $trafficRatioClass = 'traffic-ratio warn';
-        } else {
-            $trafficRatioClass = 'traffic-ratio bad';
-        }
-    } else {
-        $trafficRatioDisplay = 'N/A';
-        $trafficRatioClass = 'traffic-ratio na';
-    }
-}
+$trafficRatioState = function_exists('pmssTrafficRatioStateBuild') ? pmssTrafficRatioStateBuild($trafficOutboundMonth, $trafficInboundMonth) : array('available' => false);
 
 if ($trafficData === null && $trafficIngressData === null) {
     echo '<div class="stats-block"><h6>Traffic usage</h6><pre>Traffic data not available.</pre></div>';
@@ -629,8 +610,8 @@ Past 30 days inbound traffic: <?php echo $trafficIngressData['display']['month']
 <?php elseif ($trafficIngressError !== null): ?>
 <?php echo $trafficIngressError . "\n"; ?>
 <?php endif; ?>
-<?php if ($trafficRatioDisplay !== null): ?>
-Inbound:Outbound ratio (month): <span class="<?php echo $trafficRatioClass; ?>"><?php echo $trafficRatioDisplay; ?></span>
+<?php if (!empty($trafficRatioState['available'])): ?>
+Inbound:Outbound ratio (month): <span class="traffic-ratio <?php echo $trafficRatioState['class']; ?>"><?php echo $trafficRatioState['display']; ?></span>
 <?php endif; ?>
         </pre>
 
