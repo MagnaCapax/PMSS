@@ -42,6 +42,20 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         require_once $fixture;
     }
 
+    private function loadWelcomeServiceControlFunctions(): void
+    {
+        if (function_exists('pmssWelcomeActionButtonHtmlBuild')) {
+            return;
+        }
+
+        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+        $start = strpos($source, 'function pmssWelcomeHtmlAttr'); $end = strpos($source, 'function pmssWelcomeHeadingHtmlBuild');
+        $this->assertTrue($start !== false && $end !== false && $end > $start, 'welcome.php service-control helpers should remain present');
+
+        $fixture = $this->pmssMakeTempPath('pmss-welcome-service-controls-', '.php');
+        file_put_contents($fixture, "<?php\n".substr($source, $start, $end - $start)); require_once $fixture;
+    }
+
     public function testQuotaMissingWarningGuardUsesOnlyQuotaLimitFields(): void
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
@@ -65,6 +79,18 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
         $this->assertStringContainsString('pmssDelugeServicePasswordRotate((string) $username)', $source);
         $this->pmssAssertStringNotContainsString('pmssDelugeAuthWriteLocalclientPassword($delugeAuthPath, $newDelugePassword)', $source);
+    }
+
+    public function testWelcomeServiceActionButtonSnapshots(): void
+    {
+        $this->loadWelcomeServiceControlFunctions();
+        /** @var callable(mixed,mixed,mixed,mixed,mixed,mixed): string $button */
+        $button = 'pmssWelcomeActionButtonHtmlBuild';
+
+        $this->assertSame(
+            array('start' => 'a20fd8acbdd11bfdc8870e2e7f12e958949003b7683bcbe96c8a6790d2910f6b', 'restart' => '258044f7ee96acc6e493dd7aaf01116d4491c1798ee95c2b2b00a12b8e46c65c', 'quote' => 'e684ca17b182836eeee3702faad7b7fab6a0fa18a9cfc9e123e6dcd87ab6668c'),
+            array('start' => hash('sha256', $button('rcloneStart', 'Start Rclone', 'rclone.php?action=start', 'Rclone starting, access at /user-USERNAME/rclone. Refresh GUI to see tab.', true, 'Starting Rclone...')), 'restart' => hash('sha256', $button('qbittorrentRestart', 'Restart qBittorrent', 'qbittorrent.php?action=restart', 'qBittorrent restart requested.', false, 'Restarting qBittorrent...')), 'quote' => hash('sha256', $button('demo', "Don't", 'demo.php?action=run', "It's ready", true, "Line\nnext")))
+        );
     }
 
     public function testWelcomeLocalHelperRejectsTraversalPaths(): void
@@ -183,4 +209,5 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $color = 'gaugeColor';
         return $color($percent);
     }
+
 }

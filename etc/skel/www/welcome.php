@@ -314,74 +314,27 @@ $homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
                         </ul>
 
 <?php
-if ((file_exists('/usr/bin/deluged') || file_exists('/usr/local/bin/deluged')) && file_exists('deluge.php')) {
-?>
-                        <h6>Deluge</h6>
-                        <p>Deluge Web UI password: <b><?php echo htmlspecialchars($delugePassword === '' ? 'Unavailable' : $delugePassword, ENT_QUOTES, 'UTF-8'); ?></b> (also used for the daemon connection; separate from your account password)</p>
-<?php
-    if ($delugePasswordCanRotate) {
-?>
-                        <form method="post" action="">
-                            <input type="hidden" name="delugePasswordRotate" value="1" />
-                            <input type="submit" value="Rotate Deluge Password" />
-                        </form>
-<?php
-    } else {
-?>
-                        <p><b>Deluge password rotation is unavailable on this host.</b></p>
-<?php
-    }
-
+if (pmssWelcomeServiceAvailable('deluge.php', array('/usr/bin/deluged', '/usr/local/bin/deluged'))) {
+    echo '<h6>Deluge</h6>';
+    echo '<p>Deluge Web UI password: <b>'.pmssWelcomeHtmlAttr($delugePassword === '' ? 'Unavailable' : $delugePassword).'</b> (also used for the daemon connection; separate from your account password)</p>';
+    if ($delugePasswordCanRotate) echo '<form method="post" action=""><input type="hidden" name="delugePasswordRotate" value="1" /><input type="submit" value="Rotate Deluge Password" /></form>';
+    else echo '<p><b>Deluge password rotation is unavailable on this host.</b></p>';
     if ($delugePasswordNotice !== '') {
-?>
-                        <p><b><?php echo htmlspecialchars($delugePasswordNotice, ENT_QUOTES, 'UTF-8'); ?></b></p>
-<?php
+        echo '<p><b>'.pmssWelcomeHtmlAttr($delugePasswordNotice).'</b></p>';
     }
-
-    if (!file_exists('../.delugeEnable')) {
-?>
-                        <input type="button" name="delugeStart" value="Start Deluge" onClick="pmssRunAction(this, 'deluge.php?action=start', 'Deluge starting. Accessible at /deluge-USERNAME/. Refresh GUI to see tab.', true, 'Deluge start request sent...');" />
-<?php
-    } else {
-?>
-                        <input type="button" name="delugeDisable" value="Disable Deluge" onClick="pmssRunAction(this, 'deluge.php?action=disable', 'Deluge disabled.', true, 'Disabling Deluge...');" />
-                        <input type="button" name="delugeRestart" value="Restart Deluge" onClick="pmssRunAction(this, 'deluge.php?action=restart', 'Deluge restart requested.', false, 'Restarting Deluge...');" />
-<?php
-    }
+    echo !file_exists('../.delugeEnable') ? pmssWelcomeActionButtonHtmlBuild('delugeStart', 'Start Deluge', 'deluge.php?action=start', 'Deluge starting. Accessible at /deluge-USERNAME/. Refresh GUI to see tab.', true, 'Deluge start request sent...') : pmssWelcomeActionButtonHtmlBuild('delugeDisable', 'Disable Deluge', 'deluge.php?action=disable', 'Deluge disabled.', true, 'Disabling Deluge...').pmssWelcomeActionButtonHtmlBuild('delugeRestart', 'Restart Deluge', 'deluge.php?action=restart', 'Deluge restart requested.', false, 'Restarting Deluge...');
 }
 
-if (file_exists('/usr/bin/rclone') && file_exists('rclone.php')) {
-?>
-                        <h6>Rclone Web UI</h6>
-                        <p>Rclone password is the same as your web access password</p>
-<?php
-    if (!file_exists('../.rcloneEnable')) {
-?>
-                        <input type="button" name="rcloneStart" value="Start Rclone" onClick="pmssRunAction(this, 'rclone.php?action=start', 'Rclone starting, access at /user-USERNAME/rclone. Refresh GUI to see tab.', true, 'Starting Rclone...');" />
-<?php
-    } else {
-?>
-                        <input type="button" name="rcloneDisable" value="Disable Rclone" onClick="pmssRunAction(this, 'rclone.php?action=disable', 'Rclone disabled.', true, 'Disabling Rclone...');" />
-                        <input type="button" name="rcloneRestart" value="Restart Rclone" onClick="pmssRunAction(this, 'rclone.php?action=restart', 'Rclone restart requested.', false, 'Restarting Rclone...');" />
-<?php
-    }
+if (pmssWelcomeServiceAvailable('rclone.php', array('/usr/bin/rclone'))) {
+    echo '<h6>Rclone Web UI</h6>';
+    echo '<p>Rclone password is the same as your web access password</p>';
+    echo !file_exists('../.rcloneEnable') ? pmssWelcomeActionButtonHtmlBuild('rcloneStart', 'Start Rclone', 'rclone.php?action=start', 'Rclone starting, access at /user-USERNAME/rclone. Refresh GUI to see tab.', true, 'Starting Rclone...') : pmssWelcomeActionButtonHtmlBuild('rcloneDisable', 'Disable Rclone', 'rclone.php?action=disable', 'Rclone disabled.', true, 'Disabling Rclone...').pmssWelcomeActionButtonHtmlBuild('rcloneRestart', 'Restart Rclone', 'rclone.php?action=restart', 'Rclone restart requested.', false, 'Restarting Rclone...');
 }
 
-if ((file_exists('/usr/bin/qbittorrent-nox') || file_exists('/usr/local/bin/qbittorrent-nox')) && file_exists('qbittorrent.php')) {
-?>
-                        <h6>qBittorrent</h6>
-                        <p>qBittorrent username is your own username and password matches your account password. Change it once logged in if you want a separate WebUI password. If you get 503, try restarting Lighttpd — port may have changed.</p>
-<?php
-    if (!file_exists('../.qbittorrentEnable')) {
-?>
-                        <input type="button" name="qbittorrentStart" value="Start qBittorrent" onClick="pmssRunAction(this, 'qbittorrent.php?action=start', 'qBittorrent starting, access at /user-USERNAME/qbittorrent/ — Refresh GUI to see tab.', true, 'Starting qBittorrent...');" />
-<?php
-    } else {
-?>
-                        <input type="button" name="qbittorrentDisable" value="Disable qBittorrent" onClick="pmssRunAction(this, 'qbittorrent.php?action=disable', 'qBittorrent disabled.', true, 'Disabling qBittorrent...');" />
-                        <input type="button" name="qbittorrentRestart" value="Restart qBittorrent" onClick="pmssRunAction(this, 'qbittorrent.php?action=restart', 'qBittorrent restart requested.', false, 'Restarting qBittorrent...');" />
-<?php
-    }
+if (pmssWelcomeServiceAvailable('qbittorrent.php', array('/usr/bin/qbittorrent-nox', '/usr/local/bin/qbittorrent-nox'))) {
+    echo '<h6>qBittorrent</h6>';
+    echo '<p>qBittorrent username is your own username and password matches your account password. Change it once logged in if you want a separate WebUI password. If you get 503, try restarting Lighttpd — port may have changed.</p>';
+    echo !file_exists('../.qbittorrentEnable') ? pmssWelcomeActionButtonHtmlBuild('qbittorrentStart', 'Start qBittorrent', 'qbittorrent.php?action=start', 'qBittorrent starting, access at /user-USERNAME/qbittorrent/ — Refresh GUI to see tab.', true, 'Starting qBittorrent...') : pmssWelcomeActionButtonHtmlBuild('qbittorrentDisable', 'Disable qBittorrent', 'qbittorrent.php?action=disable', 'qBittorrent disabled.', true, 'Disabling qBittorrent...').pmssWelcomeActionButtonHtmlBuild('qbittorrentRestart', 'Restart qBittorrent', 'qbittorrent.php?action=restart', 'qBittorrent restart requested.', false, 'Restarting qBittorrent...');
 }
 ?>
 
@@ -805,6 +758,24 @@ function pmssWelcomeDelugeStateBuild($username, $delugeAuthPath) {
         'passwordNotice' => $passwordNotice,
         'password' => $password,
     );
+}
+
+function pmssWelcomeHtmlAttr($value) { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); }
+
+function pmssWelcomeJsSingleQuoted($value) { return str_replace(array('\\', "'", "\r", "\n"), array('\\\\', "\\'", '\\r', '\\n'), (string) $value); }
+
+function pmssWelcomeServiceAvailable($scriptPath, array $binaryPaths) {
+    if (!file_exists($scriptPath)) return false;
+    foreach ($binaryPaths as $binaryPath) if (file_exists((string) $binaryPath)) return true;
+    return false;
+}
+
+function pmssWelcomeActionButtonHtmlBuild($name, $value, $url, $successMessage, $shouldReload, $pendingMessage) {
+    return '<input type="button" name="'.pmssWelcomeHtmlAttr($name).'" value="'.pmssWelcomeHtmlAttr($value).'" onClick="pmssRunAction(this, \''
+        .pmssWelcomeJsSingleQuoted($url).'\', \''
+        .pmssWelcomeJsSingleQuoted($successMessage).'\', '
+        .($shouldReload ? 'true' : 'false').', \''
+        .pmssWelcomeJsSingleQuoted($pendingMessage).'\');" />';
 }
 
 function pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage) {
