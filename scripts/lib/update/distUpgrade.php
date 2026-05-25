@@ -100,6 +100,9 @@ function pmssDistUpgradeAptEnv(bool $warnWhenInteractiveUnavailable = true): arr
         .' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a', $hasTty];
 }
 
+/** Build apt commands with dist-upgrade's shared force-conf policy. */
+function pmssDistUpgradeAptCommand(string $env, string $action, string $arguments = ''): string { $suffix = trim($arguments); $aptAction = $action === 'install' ? 'apt-get install' : 'apt-get '.$action; return trim($env.' '.$aptAction.' -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'.($suffix !== '' ? ' '.$suffix : '')); }
+
 /**
  * Ensure fuse-overlayfs is present after dist-upgrade so rootless Docker keeps working.
  *
@@ -137,7 +140,7 @@ function pmssEnsureFuseOverlayfsAfterDistUpgrade(string $toMajor): void
     list($env, $hasTty) = pmssDistUpgradeAptEnv(false);
 
     logMessage('dist-upgrade: ensuring fuse-overlayfs is installed for rootless Docker');
-    $rc = runCommand("$env apt-get install -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold fuse-overlayfs", true, null, $hasTty);
+    $rc = runCommand(pmssDistUpgradeAptCommand($env, 'install', 'fuse-overlayfs'), true, null, $hasTty);
     if ($rc !== 0) {
         logMessage('[WARN] dist-upgrade: failed to install fuse-overlayfs; rootless Docker may fail or fall back to a slower storage driver');
     }
@@ -378,7 +381,7 @@ function pmssRepairNginxAfterDistUpgrade(): void
         logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall');
         return;
     }
-    if (runCommand("$env apt-get install -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold nginx nginx-full nginx-common", true, null, $hasTty) !== 0) {
+    if (runCommand(pmssDistUpgradeAptCommand($env, 'install', 'nginx nginx-full nginx-common'), true, null, $hasTty) !== 0) {
         logMessage('[WARN] dist-upgrade: nginx reinstall failed; leaving existing config in place');
         return;
     }
@@ -582,33 +585,28 @@ function pmssDpkgLockActive(array $paths): bool
 function pmssExecuteUpgrade(): bool
 {
     list($env, $hasTty) = pmssDistUpgradeAptEnv();
-    $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
     if (!pmssWaitForDpkgLocks()) {
         logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt phase');
         return false;
     }
 
-    // Update package lists
     runCommand("$env apt-get update", true, null, $hasTty);
 
-    // Upgrade packages (step 1)
     pmssRunUpgradeWithRecovery(
-        "$env apt-get upgrade -y $opts",
+        pmssDistUpgradeAptCommand($env, 'upgrade'),
         $env,
         'dist-upgrade: upgrade failed, attempting recovery (dpkg --configure -a, apt-get -f install)',
         $hasTty
     );
 
-    // Dist-upgrade (step 2)
     pmssRunUpgradeWithRecovery(
-        "$env apt-get full-upgrade -y $opts",
+        pmssDistUpgradeAptCommand($env, 'full-upgrade'),
         $env,
         'dist-upgrade: full-upgrade failed, attempting recovery',
         $hasTty
     );
 
-    // Autoremove residuals
     if (!pmssWaitForDpkgLocks()) {
         logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt autoremove');
         return false;
@@ -709,7 +707,7 @@ function pmssEnsureLibcryptBeforeUpgrade(string $fromMajor, string $toMajor): vo
         logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 install');
         return;
     }
-    if (runCommand("$env apt-get install -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold libcrypt1", true, null, $hasTty) !== 0) {
+    if (runCommand(pmssDistUpgradeAptCommand($env, 'install', 'libcrypt1'), true, null, $hasTty) !== 0) {
         logMessage('[WARN] dist-upgrade: libcrypt1 preinstall failed; continuing');
     }
 }
