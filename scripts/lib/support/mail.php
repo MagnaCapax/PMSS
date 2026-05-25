@@ -53,8 +53,8 @@ function pmssSupportMailEnvelopeNormalize(array $envelope): array
 function pmssSupportMailEnvelopeBuild(array $diagnostics, array $config, string $snapshotPath): array
 {
     $subject = sprintf(
-        '[PMSS Support] billing=%d user=%s host=%s',
-        (int) ($diagnostics['billingId'] ?? 0),
+        '[PMSS Support] billing_service=%d user=%s host=%s',
+        (int) ($diagnostics['billingServiceId'] ?? 0),
         (string) ($diagnostics['username'] ?? 'unknown-user'),
         (string) ($diagnostics['hostname'] ?? 'unknown-host')
     );
@@ -65,7 +65,8 @@ function pmssSupportMailEnvelopeBuild(array $diagnostics, array $config, string 
         'To: '.$config['targetEmail'],
         'Subject: '.$subject,
         'X-PMSS-Username: '.(string) ($diagnostics['username'] ?? ''),
-        'X-PMSS-Billing-Id: '.(string) ((int) ($diagnostics['billingId'] ?? 0)),
+        'X-PMSS-Billing-Service-Id: '.(string) ((int) ($diagnostics['billingServiceId'] ?? 0)),
+        'X-PMSS-Billing-Client-Id: '.(string) ((int) ($diagnostics['billingClientId'] ?? 0)),
         'X-PMSS-Hostname: '.(string) ($diagnostics['hostname'] ?? ''),
         'Content-Type: text/plain; charset=UTF-8',
     ];

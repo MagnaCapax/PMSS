@@ -137,8 +137,9 @@ $payload['quota'] = $user['quota'];
 $payload['quotaBurst'] = (int) round(((float) $user['quota']) * 1.25);
 $payload['trafficLimit'] = 0;
 $payload = pmssUserConfigCliApplyPersistedResources($payload, $user, $presence);
-$payload['billingId'] = $payload['billingId'] ?? 0;
-if ($payload['billingId'] === 0) {
+$payload['billingServiceId'] = $payload['billingServiceId'] ?? 0;
+$payload['billingClientId'] = $payload['billingClientId'] ?? 0;
+if ($payload['billingServiceId'] === 0 || $payload['billingClientId'] === 0) {
     $payload = $store->applyFallbacks($user['name'], $payload);
 }
 if ($dockerEnabled !== null) {

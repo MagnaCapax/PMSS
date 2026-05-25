@@ -46,7 +46,8 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
         'quota' => $user['quota'],
         'quotaBurst' => round(((float) $user['quota']) * 1.25),
         'rtorrentPort' => 0,    #TODO Choose port here and use that for the userConfig :)
-        'billingId' => 0,
+        'billingServiceId' => 0,
+        'billingClientId' => 0,
         'trafficLimit' => 0,
         'suspended' => false
     );

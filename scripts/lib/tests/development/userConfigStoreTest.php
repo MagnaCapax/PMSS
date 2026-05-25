@@ -126,11 +126,31 @@ class UserConfigStoreTest extends TestCase
         $this->assertTrue(isset($reloaded['rtorrentRam']));
     }
 
-    public function testBillingIdDefaultsTo0AndSuspendedDefaultsFalse(): void
+    public function testBillingIdentifiersDefaultTo0AndSuspendedDefaultsFalse(): void
     {
         $reloaded = $this->persistAndReload('carol', $this->basePayload(['rtorrentPort' => 5001]));
-        $this->assertEquals(0, $reloaded['billingId']);
+        $this->assertEquals(0, $reloaded['billingServiceId']);
+        $this->assertEquals(0, $reloaded['billingClientId']);
         $this->assertEquals(false, $reloaded['suspended']);
+    }
+
+    public function testLegacyBillingIdNormalisesToBillingServiceId(): void
+    {
+        $reloaded = $this->persistAndReload('billold', $this->basePayload([
+            'billingId' => '54321',
+        ]));
+
+        $this->assertEquals(54321, $reloaded['billingServiceId']);
+        $this->assertTrue(!array_key_exists('billingId', $reloaded));
+    }
+
+    public function testBillingClientIdNormalisesToInt(): void
+    {
+        $reloaded = $this->persistAndReload('billclient', $this->basePayload([
+            'billingClientId' => '987',
+        ]));
+
+        $this->assertEquals(987, $reloaded['billingClientId']);
     }
 
     public function testDockerEnabledDefaultsTrue(): void

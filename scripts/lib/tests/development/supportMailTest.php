@@ -9,13 +9,15 @@ class SupportMailTest extends TestCase
     public function testMailEnvelopeBuildFallsBackWhenHostnameSanitizesEmpty(): void
     {
         $envelope = \pmssSupportMailEnvelopeBuild(
-            ['hostname' => '!!!', 'username' => 'demo', 'billingId' => 7, 'body' => 'payload'],
+            ['hostname' => '!!!', 'username' => 'demo', 'billingServiceId' => 7, 'billingClientId' => 3, 'body' => 'payload'],
             ['targetEmail' => 'support@example.com'],
             '/tmp/support-snapshot.txt'
         );
 
         $this->assertSame('support-command@pmss.local', $envelope['from']);
         $this->assertStringContainsString('From: support-command@pmss.local', $envelope['data']);
+        $this->assertStringContainsString('X-PMSS-Billing-Service-Id: 7', $envelope['data']);
+        $this->assertStringContainsString('X-PMSS-Billing-Client-Id: 3', $envelope['data']);
     }
 
     public function testMailSendRejectsEnvelopeWithMissingRecipient(): void

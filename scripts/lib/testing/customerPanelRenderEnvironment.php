@@ -79,6 +79,8 @@ function pmssCustomerPanelRenderPrepare(string $sourceWww, string $home, string 
         $home.'/.trafficLimit' => "100\n",
         $home.'/.bonusTraffic' => "25\n",
         $home.'/.bonusQuota' => "50\n",
+        $home.'/.billingServiceId' => "12345\n",
+        $home.'/.billingClientId' => "67890\n",
         $home.'/.billingId' => "12345\n",
         $home.'/.throttle' => "100\n",
         $home.'/.trafficData' => $serializedTraffic,

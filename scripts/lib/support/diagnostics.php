@@ -12,6 +12,7 @@
 
 require_once __DIR__.'/config.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
+require_once __DIR__.'/../user/billingIds.php';
 
 /**
  * Write an entire payload to a writable stream or fail loudly.
@@ -114,13 +115,19 @@ function pmssSupportMessageNormalize(string $message): string
 }
 
 /**
- * Read the billing/service identifier from the user home.
+ * Read the billing service identifier from the user home.
  */
-function pmssSupportBillingIdRead(string $home): int
+function pmssSupportBillingServiceIdRead(string $home): int
 {
-    $path = rtrim($home, '/').'/.billingId';
-    $value = (int) (pmssReadRegularFileDigits($path) ?? '0');
-    return $value > 0 ? $value : 0;
+    return pmssUserBillingServiceIdRead($home);
+}
+
+/**
+ * Read the billing client/account identifier from the user home.
+ */
+function pmssSupportBillingClientIdRead(string $home): int
+{
+    return pmssUserBillingClientIdRead($home);
 }
 
 /**
@@ -146,7 +153,8 @@ function pmssSupportDiagnosticsBuild(string $message, ?callable $runner = null):
     $username = (string) $identity['username'];
     $home = (string) $identity['home'];
     $hostname = (string) (gethostname() ?: 'unknown-host');
-    $billingId = pmssSupportBillingIdRead($home);
+    $billingServiceId = pmssSupportBillingServiceIdRead($home);
+    $billingClientId = pmssSupportBillingClientIdRead($home);
     $versionPath = pmssResolvePathFromEnv('PMSS_VERSION_FILE', pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/version');
     $pmssVersion = is_file($versionPath) ? trim((string) @file_get_contents($versionPath)) : 'unknown';
     $commands = [
@@ -170,7 +178,8 @@ function pmssSupportDiagnosticsBuild(string $message, ?callable $runner = null):
         '# PMSS Support Request',
         'submitted_at='.gmdate('c'),
         'username='.$username,
-        'billing_id='.$billingId,
+        'billing_service_id='.$billingServiceId,
+        'billing_client_id='.$billingClientId,
         'hostname='.$hostname,
         'pmss_version='.$pmssVersion,
         '',
@@ -186,7 +195,8 @@ function pmssSupportDiagnosticsBuild(string $message, ?callable $runner = null):
         'username' => $username,
         'home' => $home,
         'hostname' => $hostname,
-        'billingId' => $billingId,
+        'billingServiceId' => $billingServiceId,
+        'billingClientId' => $billingClientId,
         'pmssVersion' => $pmssVersion,
         'body' => $body,
     ];

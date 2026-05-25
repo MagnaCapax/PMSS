@@ -110,7 +110,6 @@ function pmssUserTransferBuildRsyncMain(array $cfg): string
         'rTorrentLog',
         '.bonusQuota',
         '.bonusTraffic',
-        '.billingId',
         '.trafficLimit',
     ];
 

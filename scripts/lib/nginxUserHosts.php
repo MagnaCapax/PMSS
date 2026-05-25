@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__.'/runtime.php';
+require_once __DIR__.'/user/billingIds.php';
 
 /**
  * Validate that the hostname is a usable FQDN (no IPs, must contain a dot).
@@ -21,18 +22,17 @@ function pmssNginxUserHostIsValidFqdn(string $hostname): bool
 }
 
 /**
- * Read and validate the billingId stored in user homes.
+ * Read and validate the billing service ID stored in user homes.
  */
-function pmssNginxUserBillingIdFromFile(string $path): ?string
+function pmssNginxUserBillingServiceIdFromHome(string $home): ?string
 {
-    $raw = pmssReadRegularFileDigits($path);
-    return ($raw !== null && (int) $raw > 0) ? $raw : null;
+    return pmssUserBillingServiceIdDigitsRead($home);
 }
 
 /**
  * Build the SHA256 host prefix for a user.
  */
-function pmssNginxUserHashHostname(string $username, string $billingId, string $hostname): string
+function pmssNginxUserHashHostname(string $username, string $billingServiceId, string $hostname): string
 {
-    return hash('sha256', $username.'.'.$billingId.'.'.$hostname).'.'.$hostname;
+    return hash('sha256', $username.'.'.$billingServiceId.'.'.$hostname).'.'.$hostname;
 }

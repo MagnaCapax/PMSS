@@ -55,20 +55,34 @@ class SupportCommandTest extends TestCase
         $this->assertTrue($caught, 'empty messages must be rejected');
     }
 
-    public function testBillingIdReadAcceptsPositiveInteger(): void
+    public function testBillingServiceIdReadAcceptsPositiveInteger(): void
     {
-        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingId', "42\n");
+        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingServiceId', "42\n");
 
-        $this->assertEquals(42, \pmssSupportBillingIdRead($this->homeRoot.'/'.$this->user));
+        $this->assertEquals(42, \pmssSupportBillingServiceIdRead($this->homeRoot.'/'.$this->user));
     }
 
-    public function testBillingIdReadRejectsSymlink(): void
+    public function testBillingServiceIdReadFallsBackToLegacyName(): void
+    {
+        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingId', "43\n");
+
+        $this->assertEquals(43, \pmssSupportBillingServiceIdRead($this->homeRoot.'/'.$this->user));
+    }
+
+    public function testBillingClientIdReadAcceptsPositiveInteger(): void
+    {
+        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingClientId', "99\n");
+
+        $this->assertEquals(99, \pmssSupportBillingClientIdRead($this->homeRoot.'/'.$this->user));
+    }
+
+    public function testBillingServiceIdReadRejectsSymlink(): void
     {
         $target = $this->homeRoot.'/'.$this->user.'/billing-id-target';
         file_put_contents($target, "41\n");
-        symlink($target, $this->homeRoot.'/'.$this->user.'/.billingId');
+        symlink($target, $this->homeRoot.'/'.$this->user.'/.billingServiceId');
 
-        $this->assertEquals(0, \pmssSupportBillingIdRead($this->homeRoot.'/'.$this->user));
+        $this->assertEquals(0, \pmssSupportBillingServiceIdRead($this->homeRoot.'/'.$this->user));
     }
 
     public function testConfigReadHonorsExplicitConfigPathOverride(): void
@@ -217,7 +231,7 @@ class SupportCommandTest extends TestCase
 
         $this->assertTrue(is_file($result['snapshotPath']));
         $this->assertEquals('support@example.com', $deliveries[0]['config']['targetEmail']);
-        $this->assertStringContainsString('Subject: [PMSS Support] billing=0', $deliveries[0]['envelope']['data']);
+        $this->assertStringContainsString('Subject: [PMSS Support] billing_service=0', $deliveries[0]['envelope']['data']);
         $this->assertStringContainsString('Snapshot: '.$result['snapshotPath'], $deliveries[0]['envelope']['data']);
     }
 

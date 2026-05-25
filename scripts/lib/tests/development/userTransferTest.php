@@ -270,7 +270,7 @@ class UserTransferTest extends TestCase
         $expectedMain = <<<'SNAP'
 #!/bin/bash
 set -e
-rsync -av -e 'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l '\''deefbox'\''' --exclude='.rtorrent.rc' --exclude='.config/qBittorrent/qBittorrent.conf' --exclude='.config/deluge/core.conf' --exclude='.config/deluge/web.conf' --exclude='.cache' --exclude='www' --exclude='session' --exclude='www/rutorrent/share' --exclude='.lighttpd' --exclude='.logs' --exclude='.local' --exclude='.lighttpd.conf' --exclude='.quota' --exclude='.rtorrentExecuteRun' --exclude='.trafficData' --exclude='.trafficDataLocal' --exclude='.trafficDataIngress' --exclude='.trafficDataIngressLocal' --exclude='rTorrentLog' --exclude='.bonusQuota' --exclude='.bonusTraffic' --exclude='.billingId' --exclude='.trafficLimit' 'deefbox@example.com:/home/deefbox/' '/home/deefbox/'
+rsync -av -e 'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l '\''deefbox'\''' --exclude='.rtorrent.rc' --exclude='.config/qBittorrent/qBittorrent.conf' --exclude='.config/deluge/core.conf' --exclude='.config/deluge/web.conf' --exclude='.cache' --exclude='www' --exclude='session' --exclude='www/rutorrent/share' --exclude='.lighttpd' --exclude='.logs' --exclude='.local' --exclude='.lighttpd.conf' --exclude='.quota' --exclude='.rtorrentExecuteRun' --exclude='.trafficData' --exclude='.trafficDataLocal' --exclude='.trafficDataIngress' --exclude='.trafficDataIngressLocal' --exclude='rTorrentLog' --exclude='.bonusQuota' --exclude='.bonusTraffic' --exclude='.trafficLimit' 'deefbox@example.com:/home/deefbox/' '/home/deefbox/'
 SNAP;
         $expectedFinal = <<<'SNAP'
 #!/bin/bash

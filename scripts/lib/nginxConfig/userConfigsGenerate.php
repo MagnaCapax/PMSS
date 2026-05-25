@@ -76,9 +76,9 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     };
 
     if ($subdomainEnabled) {
-        $billingId = pmssNginxUserBillingIdFromFile($homeDir.'/.billingId');
-        $hashHost = $billingId !== null
-            ? pmssNginxUserHashHostname($thisUser, $billingId, $subdomainBase)
+        $billingServiceId = pmssNginxUserBillingServiceIdFromHome($homeDir);
+        $hashHost = $billingServiceId !== null
+            ? pmssNginxUserHashHostname($thisUser, $billingServiceId, $subdomainBase)
             : null;
     }
 

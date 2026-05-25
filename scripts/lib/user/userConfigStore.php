@@ -15,7 +15,9 @@
  * - rtorrentPort (int) Assigned SCGI port for rTorrent.
  * - quota (int)        Disk quota in GiB.
  * - quotaBurst (int)   Burst quota in GiB (typically 125%).
- * - billingId (int)    0 when missing; fallback reads /home/<user>/.billingId if root-owned.
+ * - billingServiceId (int) 0 when missing; fallback reads /home/<user>/.billingServiceId
+ *   then legacy /home/<user>/.billingId if root-owned.
+ * - billingClientId (int) 0 when missing; fallback reads /home/<user>/.billingClientId if root-owned.
  * - trafficLimit (int) Always written as 0 (traffic caps live in runtime files).
  * - trafficCapMbit (int) Post-limit ceiling in Mbit (0/absent uses server default).
  * - suspended (bool)   Best-effort mirror of suspension state (marker remains www-disabled).
@@ -35,6 +37,7 @@
 require_once __DIR__.'/../runtime.php';
 
 require_once __DIR__.'/UserValidator.php';
+require_once __DIR__.'/billingIds.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
 
@@ -160,8 +163,11 @@ class UserConfigStore
             if (empty($payload['ramMiB'])) {
                 $payload['ramMiB'] = $this->resolveRamMiB($username);
             }
-            if (empty($payload['billingId'])) {
-                $payload['billingId'] = $this->readBillingId($username);
+            if (empty($payload['billingServiceId'])) {
+                $payload['billingServiceId'] = $this->readBillingServiceId($username);
+            }
+            if (empty($payload['billingClientId'])) {
+                $payload['billingClientId'] = $this->readBillingClientId($username);
             }
         }
         return $this->normalise($payload);
@@ -231,18 +237,30 @@ class UserConfigStore
         }
 
         $intKeys = [
-            'ramMiB', 'rtorrentPort', 'quota', 'quotaBurst', 'billingId', 'trafficLimit',
+            'ramMiB', 'rtorrentPort', 'quota', 'quotaBurst', 'billingServiceId', 'billingClientId', 'trafficLimit',
             'trafficCapMbit',
             'CPUWeight', 'IOWeight', 'IOReadIOPS', 'IOWriteIOPS', 'ioLatencyMs',
         ];
+
+        if ((!isset($payload['billingServiceId']) || !is_numeric($payload['billingServiceId']) || (int) $payload['billingServiceId'] <= 0)
+            && isset($payload['billingId'])
+            && is_numeric($payload['billingId'])
+        ) {
+            $payload['billingServiceId'] = (int) $payload['billingId'];
+        }
+        unset($payload['billingId']);
+
         foreach ($intKeys as $key) {
             if (array_key_exists($key, $payload) && $payload[$key] !== null && $payload[$key] !== '' && is_numeric($payload[$key])) {
                 $payload[$key] = (int)$payload[$key];
             }
         }
 
-        if (!isset($payload['billingId']) || !is_numeric($payload['billingId'])) {
-            $payload['billingId'] = 0;
+        if (!isset($payload['billingServiceId']) || !is_numeric($payload['billingServiceId'])) {
+            $payload['billingServiceId'] = 0;
+        }
+        if (!isset($payload['billingClientId']) || !is_numeric($payload['billingClientId'])) {
+            $payload['billingClientId'] = 0;
         }
 
         $payload['suspended'] = array_key_exists('suspended', $payload) && (bool)$payload['suspended'];
@@ -321,18 +339,20 @@ class UserConfigStore
         return max(0, (int) floor($bytes / 1048576));
     }
 
-    private function readBillingId(string $username): int
+    private function readBillingServiceId(string $username): int
     {
         if (getenv('PMSS_TEST_MODE') === '1') {
             return 0;
         }
-        $path = "/home/{$username}/.billingId";
-        if (!is_file($path) || is_link($path) || @fileowner($path) !== 0) {
+        return pmssUserBillingServiceIdRead("/home/{$username}", true);
+    }
+
+    private function readBillingClientId(string $username): int
+    {
+        if (getenv('PMSS_TEST_MODE') === '1') {
             return 0;
         }
-
-        $raw = pmssReadRegularFileDigits($path);
-        return ($raw !== null && (int) $raw > 0) ? (int) $raw : 0;
+        return pmssUserBillingClientIdRead("/home/{$username}", true);
     }
 }
 

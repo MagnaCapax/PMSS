@@ -39,7 +39,7 @@ $delugePasswordCanRotate = $pageState['delugePasswordCanRotate'];
 $delugePasswordNotice = $pageState['delugePasswordNotice'];
 $delugePassword = $pageState['delugePassword'];
 $mediaStackStatus = $pageState['mediaStackStatus'];
-$billingId = $pageState['billingId'];
+$billingServiceId = $pageState['billingServiceId'];
 $trafficBandwidthState = $pageState['trafficBandwidthState'];
 $welcomeHeadingHtml = pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage);
 $announcementItemsHtml = pmssWelcomeAnnouncementItemsHtmlBuild();
@@ -426,7 +426,7 @@ if (file_exists('openvpn-config.tgz')) {
                             $trafficLimit = (int) $trafficLimitState['limitGiB'];
                             $trafficData = pmssWelcomeSerializedArrayRead('../.trafficData');
                             if ($trafficData !== null) {
-                                trafficCreateSection($trafficData, $trafficLimit, pmssWelcomeSerializedArrayRead('../.trafficDataIngress'), $bonusTraffic, $trafficBandwidthState, $billingId);
+                                trafficCreateSection($trafficData, $trafficLimit, pmssWelcomeSerializedArrayRead('../.trafficDataIngress'), $bonusTraffic, $trafficBandwidthState, $billingServiceId);
                             } else {
                                 if ($trafficLimit > 0) {
                                     $effectiveLimit = (int) $trafficLimitState['effectiveLimitGiB'];
@@ -438,17 +438,17 @@ if (file_exists('openvpn-config.tgz')) {
                                     $trafficLimitText = 'Unlimited';
                                 }
                                 echo "Traffic limit: {$trafficLimitText}<br />";
-                                echo pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingId).'<br />';
+                                echo pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId).'<br />';
                             }
                         }
 
                         echo memoryCreateSection();
 
-                        if ($billingId > 0) {
+                        if ($billingServiceId > 0) {
                             echo <<<EOF
                             <h6>Need more resources?</h6>
                     <p>Need more disk space, traffic, or RAM?</p>
-                            <p>You can upgrade fast and easy — activation usually within few minutes! Just check out your <a href="https://pulsedmedia.com/clients/upgrade.php?type=configoptions&id={$billingId}" target="_blank">Upgrade Options!</a></p>
+                            <p>You can upgrade fast and easy — activation usually within few minutes! Just check out your <a href="https://pulsedmedia.com/clients/upgrade.php?type=configoptions&id={$billingServiceId}" target="_blank">Upgrade Options!</a></p>
 EOF;
                         }
                         ?>
@@ -536,7 +536,7 @@ function pmssWelcomePageStateBuild() {
     $trafficLimitState = function_exists('pmssTrafficLimitStateRead')
         ? pmssTrafficLimitStateRead('../.trafficLimit', '../.bonusTraffic')
         : array('limitGiB' => 0, 'bonusGiB' => 0, 'effectiveLimitGiB' => 0);
-    $billingId = pmssWelcomeBillingIdRead('../.billingId');
+    $billingServiceId = pmssWelcomeBillingServiceIdRead('../.billingServiceId', '../.billingId');
     $trafficBandwidthState = pmssWelcomeTrafficBandwidthStateBuild('../.throttle');
 
     return array(
@@ -549,26 +549,44 @@ function pmssWelcomePageStateBuild() {
         'delugePasswordNotice' => $delugeState['passwordNotice'],
         'delugePassword' => $delugeState['password'],
         'mediaStackStatus' => $mediaStackStatus,
-        'billingId' => $billingId,
+        'billingServiceId' => $billingServiceId,
         'trafficBandwidthState' => $trafficBandwidthState,
     );
 }
 
 /**
- * Read billing profile ID for upgrade links.
+ * Read billing service ID for upgrade links, with legacy file fallback.
  */
-function pmssWelcomeBillingIdRead($path) {
-    if (!file_exists($path)) {
-        return 0;
+function pmssWelcomeBillingServiceIdRead($primaryPath, $legacyPath) {
+    foreach (array($primaryPath, $legacyPath) as $path) {
+        $billingServiceId = pmssWelcomeBillingFileRead($path);
+        if ($billingServiceId > 0) {
+            return $billingServiceId;
+        }
     }
 
+    return 0;
+}
+
+/**
+ * Read one positive billing identifier file without following symlinks.
+ */
+function pmssWelcomeBillingFileRead($path) {
+    if (!file_exists($path) || is_link($path)) {
+        return 0;
+    }
     $raw = @file_get_contents($path);
     if (!is_string($raw)) {
         return 0;
     }
 
-    $billingId = (int) trim($raw);
-    return $billingId > 0 ? $billingId : 0;
+    $trimmed = trim($raw);
+    if ($trimmed === '' || !ctype_digit($trimmed)) {
+        return 0;
+    }
+
+    $billingServiceId = (int) $trimmed;
+    return $billingServiceId > 0 ? $billingServiceId : 0;
 }
 
 /**
@@ -633,7 +651,7 @@ function pmssWelcomeTrafficDefaultCapMbitRead() {
 /**
  * Build tiny traffic-cap disclosure text shown near usage gauge.
  */
-function pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingId) {
+function pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId) {
     $effectiveCapMbit = isset($trafficBandwidthState['effectiveCapMbit']) && is_numeric($trafficBandwidthState['effectiveCapMbit'])
         ? (int) $trafficBandwidthState['effectiveCapMbit']
         : 0;
@@ -643,8 +661,8 @@ function pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingId
     }
 
     $upgradeUrl = 'https://pulsedmedia.com/clients/upgrade.php?type=configoptions';
-    if ((int) $billingId > 0) {
-        $upgradeUrl .= '&id='.(int) $billingId;
+    if ((int) $billingServiceId > 0) {
+        $upgradeUrl .= '&id='.(int) $billingServiceId;
     }
 
     $effectiveText = number_format(max(0, $effectiveCapMbit));
@@ -1077,12 +1095,12 @@ EOF;
 EOF;
 }
 
-function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null, $bonusTraffic = 0, $trafficBandwidthState = array(), $billingId = 0) {
+function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null, $bonusTraffic = 0, $trafficBandwidthState = array(), $billingServiceId = 0) {
     if (count($trafficData) == 0) {
         return;
     }
 
-    $bandwidthNote = pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingId);
+    $bandwidthNote = pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId);
     $trafficUsedRaw = round($trafficData['raw']['month']);
     $trafficUsed = round($trafficUsedRaw / 1024) . ' GiB';
     $outboundMonth = isset($trafficData['raw']['month']) && is_numeric($trafficData['raw']['month'])

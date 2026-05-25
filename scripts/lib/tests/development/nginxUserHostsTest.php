@@ -45,7 +45,7 @@ class NginxUserHostsTest extends TestCase
         }
     }
 
-    public function testBillingIdFromFileAcceptsValidDigits(): void
+    public function testBillingServiceIdFromHomeAcceptsValidDigits(): void
     {
         $valid = [
             "123\n" => '123',
@@ -56,12 +56,21 @@ class NginxUserHostsTest extends TestCase
         ];
 
         foreach ($valid as $raw => $expected) {
-            $path = $this->pmssWriteTempFile('nginx-hosts', $raw);
-            $this->assertEquals($expected, \pmssNginxUserBillingIdFromFile($path));
+            $home = $this->pmssMakeTempDir('nginx-hosts-home-');
+            file_put_contents($home.'/.billingServiceId', $raw);
+            $this->assertEquals($expected, \pmssNginxUserBillingServiceIdFromHome($home));
         }
     }
 
-    public function testBillingIdFromFileRejectsInvalidValues(): void
+    public function testBillingServiceIdFromHomeFallsBackToLegacyName(): void
+    {
+        $home = $this->pmssMakeTempDir('nginx-hosts-legacy-');
+        file_put_contents($home.'/.billingId', "0008\n");
+
+        $this->assertEquals('0008', \pmssNginxUserBillingServiceIdFromHome($home));
+    }
+
+    public function testBillingServiceIdFromHomeRejectsInvalidValues(): void
     {
         $invalid = [
             "",
@@ -72,8 +81,9 @@ class NginxUserHostsTest extends TestCase
         ];
 
         foreach ($invalid as $raw) {
-            $path = $this->pmssWriteTempFile('nginx-hosts', $raw);
-            $this->assertEquals(null, \pmssNginxUserBillingIdFromFile($path));
+            $home = $this->pmssMakeTempDir('nginx-hosts-invalid-');
+            file_put_contents($home.'/.billingServiceId', $raw);
+            $this->assertEquals(null, \pmssNginxUserBillingServiceIdFromHome($home));
         }
     }
 
@@ -87,10 +97,10 @@ class NginxUserHostsTest extends TestCase
             ['test', '10001', 'srv.example.org'],
         ];
 
-        foreach ($cases as [$user, $billingId, $host]) {
-            $seed = $user.'.'.$billingId.'.'.$host;
+        foreach ($cases as [$user, $billingServiceId, $host]) {
+            $seed = $user.'.'.$billingServiceId.'.'.$host;
             $expected = hash('sha256', $seed).'.'.$host;
-            $this->assertEquals($expected, \pmssNginxUserHashHostname($user, $billingId, $host));
+            $this->assertEquals($expected, \pmssNginxUserHashHostname($user, $billingServiceId, $host));
         }
     }
 }
