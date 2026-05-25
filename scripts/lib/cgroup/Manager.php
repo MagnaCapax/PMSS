@@ -137,11 +137,7 @@ class Manager
         // IO Device resolution
         $devResolved = '';
         if ($device !== '') {
-            if (strpos($device, '/dev/') === 0) {
-                $devResolved = $device;
-            } else {
-                $devResolved = $this->sys->resolveDevice($device);
-            }
+            $devResolved = strpos($device, '/dev/') === 0 ? $device : $this->sys->resolveDevice($device);
 
             if ($devResolved !== '' && !$this->deviceTargetIsSafe($devResolved)) {
                 fwrite(STDERR, "Invalid resolved --device target: expected /dev/... without whitespace or NUL bytes\n");
@@ -348,11 +344,10 @@ class Manager
             return 'Invalid --io-latency-ms value: expected positive integer';
         }
 
-        if (!$this->isValidIoCostSetting($ioCostQos)) {
-            return 'Invalid --io-cost-qos value: newline and NUL bytes are not allowed';
-        }
-        if (!$this->isValidIoCostSetting($ioCostModel)) {
-            return 'Invalid --io-cost-model value: newline and NUL bytes are not allowed';
+        foreach (['io-cost-qos' => $ioCostQos, 'io-cost-model' => $ioCostModel] as $flagName => $value) {
+            if (!$this->isValidIoCostSetting($value)) {
+                return 'Invalid --'.$flagName.' value: newline and NUL bytes are not allowed';
+            }
         }
 
         if (!isset($opt['cpu-quota-percent'])) {
@@ -463,16 +458,12 @@ class Manager
     {
         $cfgDir = \pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
         $policyFile = $cfgDir.'/cgroup.policy.php';
-        $policy = [];
-
-        if (is_file($policyFile)) {
-            $loaded = @include $policyFile;
-            if (is_array($loaded)) {
-                $policy = $loaded;
-            }
+        if (!is_file($policyFile)) {
+            return [];
         }
 
-        return $policy;
+        $loaded = @include $policyFile;
+        return is_array($loaded) ? $loaded : [];
     }
 
     private function expandProfiles(array &$opt): void
@@ -504,11 +495,7 @@ class Manager
     {
         $resolved = $defaults;
 
-        if (!isset($policy['profiles']) || !is_array($policy['profiles'])) {
-            return $resolved;
-        }
-
-        if (!isset($policy['profiles'][$family]) || !is_array($policy['profiles'][$family])) {
+        if (!isset($policy['profiles']) || !is_array($policy['profiles']) || !isset($policy['profiles'][$family]) || !is_array($policy['profiles'][$family])) {
             return $resolved;
         }
 
@@ -656,12 +643,8 @@ class Manager
             return ['writes' => $writes, 'messages' => $messages];
         }
 
-        foreach ([
-            ['io.cost.qos', $ioCostQos],
-            ['io.cost.model', $ioCostModel],
-        ] as $entry) {
-            $fileName = $entry[0];
-            $setting = trim((string) $entry[1]);
+        foreach (['io.cost.qos' => $ioCostQos, 'io.cost.model' => $ioCostModel] as $fileName => $rawSetting) {
+            $setting = trim((string) $rawSetting);
             if ($setting === '') {
                 continue;
             }
@@ -835,19 +818,21 @@ class Manager
             if ($this->sys->readFile($base.'/io.cost.model') === null) {
                 $pairs['io.cost.model'] = '/sys/fs/cgroup/io.cost.model';
             }
-            foreach ($pairs as $label => $path) {
-                $val = $this->sys->readFile($path);
-                if ($val === null) { echo "$label: (unavailable)\n"; } else { echo "$label: ".trim($val)."\n"; }
-            }
+            $this->showStatusPairs($pairs);
         } else {
             $base = "/sys/fs/cgroup";
             $pids = $base."/pids/user.slice/user-".$uid.".slice/pids.current";
             $meml = $base."/memory/user.slice/user-".$uid.".slice/memory.limit_in_bytes";
             $memu = $base."/memory/user.slice/user-".$uid.".slice/memory.usage_in_bytes";
-            foreach ([ 'pids.current' => $pids, 'memory.limit_in_bytes' => $meml, 'memory.usage_in_bytes' => $memu ] as $label => $path) {
-                $val = $this->sys->readFile($path);
-                if ($val === null) { echo "$label: (unavailable)\n"; } else { echo "$label: ".trim($val)."\n"; }
-            }
+            $this->showStatusPairs([ 'pids.current' => $pids, 'memory.limit_in_bytes' => $meml, 'memory.usage_in_bytes' => $memu ]);
+        }
+    }
+
+    private function showStatusPairs(array $pairs): void
+    {
+        foreach ($pairs as $label => $path) {
+            $val = $this->sys->readFile($path);
+            echo $label.': '.($val === null ? '(unavailable)' : trim($val))."\n";
         }
     }
 
