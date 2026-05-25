@@ -45,6 +45,7 @@ shellAllowlistedLine() {
 	case "$file" in
 	"$ROOT_DIR/install.sh")
 		# Bootstrap temp cleanup and fstab atomic writes.
+		# shellcheck disable=SC2016  # Reason: literal dollar-sign match; expansion intentionally avoided.
 		if grep -Eq 'mv[[:space:]]+"\$tmpfile"[[:space:]]+(/etc/fstab|"\$file")' <<<"$text"; then
 			return 0
 		fi
