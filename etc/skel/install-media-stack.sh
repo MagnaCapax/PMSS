@@ -932,6 +932,88 @@ with open(path, "w", encoding="utf-8") as handle:
 PY
 }
 
+media_stack_sessions_label() {
+	[[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && printf 'jellyfin, '
+	printf 'sonarr, radarr, prowlarr, sabnzbd, cloudplow'
+}
+
+media_stack_app_log_path() {
+	case "$1" in
+	jellyfin) printf '%s' "$JELLYFIN_LOG_DIR/jellyfin.log" ;;
+	sonarr | radarr | prowlarr | sabnzbd) printf '%s' "$HOME/.config/${1}/${1}.log" ;;
+	esac
+}
+
+media_stack_start_tmux_app() {
+	local app="$1" required_file="$2" session_command="$3" missing_message="$4"
+	[[ -f "$required_file" ]] || { log_err "$missing_message"; return 0; }
+	tmux new-session -d -s "$app" "$session_command" || log_warn "Failed to create ${app} tmux session"
+}
+
+media_stack_start_servarr_app() {
+	local app="$1" install_name="$2" dll="$3" extra_args="$4"
+	local run_args="$dll"
+	[[ -n "$extra_args" ]] && run_args+=" $extra_args"
+	run_args+=" --data=\"$HOME/.config/${app}\""
+	media_stack_start_tmux_app "$app" "$HOME/.bin/${install_name}/${dll}" \
+		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/${install_name}\" && \"$DOTNET_ROOT_PATH/dotnet\" ${run_args} 2>&1 | tee -a \"$HOME/.config/${app}/${app}.log\"" \
+		"${install_name} DLL not found at $HOME/.bin/${install_name}/${dll}"
+}
+
+media_stack_start_apps() {
+	# Point service commands to the dotnet binary, not the runtime directory.
+	if [[ ! -f "$DOTNET_ROOT_PATH/dotnet" ]]; then
+		log_err "dotnet binary not found at $DOTNET_ROOT_PATH/dotnet"
+		exit 1
+	fi
+
+	mkdir -p "$HOME/.config/sonarr" "$HOME/.config/radarr" "$HOME/.config/prowlarr" "$HOME/.config/sabnzbd"
+	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+		mkdir -p "$JELLYFIN_DATA_DIR/log"
+		media_stack_start_tmux_app "jellyfin" "$HOME/.bin/jellyfin/jellyfin.dll" \
+			"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" \
+			"Jellyfin DLL not found at $HOME/.bin/jellyfin/jellyfin.dll"
+	else
+		log_warn "Skipping Jellyfin start; FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is not configured"
+	fi
+
+	media_stack_start_servarr_app "sonarr" "Sonarr" "Sonarr.dll" ""
+	media_stack_start_servarr_app "radarr" "Radarr" "Radarr.dll" "--nobrowser"
+	media_stack_start_servarr_app "prowlarr" "Prowlarr" "Prowlarr.dll" "--nobrowser"
+	media_stack_start_tmux_app "sabnzbd" "$HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py" \
+		"source $HOME/.bin/sabnzbd/bin/activate && cd \"$HOME/.bin/sabnzbd/sabnzbd\" && nice -n 19 python3 SABnzbd.py -b 0 -f $HOME/.config/sabnzbd/sabnzbd.ini 2>&1 | tee -a \"$HOME/.config/sabnzbd/sabnzbd.log\"" \
+		"SABnzbd not found at $HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py"
+	media_stack_start_tmux_app "cloudplow" "$HOME/.bin/cloudplow/cloudplow/cloudplow.py" \
+		"source $HOME/.bin/cloudplow/bin/activate && python3 $HOME/.bin/cloudplow/cloudplow/cloudplow.py run --config=$HOME/.config/cloudplow/config.json --loglevel=DEBUG --cachefile=$HOME/.config/cloudplow/cache.db --logfile=$HOME/.config/cloudplow/cloudplow.log" \
+		"Cloudplow not found at $HOME/.bin/cloudplow/cloudplow/cloudplow.py"
+}
+
+media_stack_verify_sessions() {
+	local app app_log
+	local apps_to_verify=(sonarr radarr prowlarr sabnzbd cloudplow)
+
+	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+		apps_to_verify=(jellyfin "${apps_to_verify[@]}")
+	fi
+
+	sleep 3
+	log_step "Verifying started applications..."
+	for app in "${apps_to_verify[@]}"; do
+		if tmux has-session -t "$app" 2>/dev/null; then
+			log_ok "$app session is running"
+			continue
+		fi
+
+		log_warn "$app session exited immediately"
+		app_log=$(media_stack_app_log_path "$app")
+		if [[ -n "$app_log" && -f "$app_log" ]] &&
+			grep -qi "illegal instruction\|SIGILL\|signal 4" "$app_log" 2>/dev/null; then
+			log_err "$app crashed: Illegal Instruction — CPU lacks required instruction sets (SSE4.2/AVX)"
+		fi
+		log_info "To diagnose: tmux new-session -s ${app}-debug 'cd ~/.bin/${app}* && ...'"
+	done
+}
+
 SABNZBD_PORT=$(pick_existing_or_random_port "$(existing_port_from_ini "$HOME/.config/sabnzbd/sabnzbd.ini" "port")")
 RADARR_PORT=$(pick_existing_or_random_port "$(existing_port_from_xml_tag "$HOME/.config/radarr/config.xml" "Port")")
 PROWLARR_PORT=$(pick_existing_or_random_port "$(existing_port_from_xml_tag "$HOME/.config/prowlarr/config.xml" "Port")")
@@ -1383,101 +1465,11 @@ set -u
 
 echo ""
 log_step "Starting applications"
-# Corrected: Point to dotnet binary, not the directory
 if [[ $DRY_RUN -eq 0 ]]; then
-	# Verify required files exist before starting
-	if [[ ! -f "$DOTNET_ROOT_PATH/dotnet" ]]; then
-		log_err "dotnet binary not found at $DOTNET_ROOT_PATH/dotnet"
-		exit 1
-	fi
-
-	# Ensure log directories exist.
-	mkdir -p "$HOME/.config/sonarr" "$HOME/.config/radarr" "$HOME/.config/prowlarr" "$HOME/.config/sabnzbd"
-	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-		mkdir -p "$JELLYFIN_DATA_DIR/log"
-	fi
-
-	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-		# Start Jellyfin only after the FFmpeg pre-flight passed.
-		if [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
-			tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" || log_warn "Failed to create jellyfin tmux session"
-		else
-			log_err "Jellyfin DLL not found at $HOME/.bin/jellyfin/jellyfin.dll"
-		fi
-	else
-		log_warn "Skipping Jellyfin start; FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is not configured"
-	fi
-
-	# Start Sonarr
-	if [[ -f "$HOME/.bin/Sonarr/Sonarr.dll" ]]; then
-		tmux new-session -d -s "sonarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/Sonarr\" && \"$DOTNET_ROOT_PATH/dotnet\" Sonarr.dll --data=\"$HOME/.config/sonarr\" 2>&1 | tee -a \"$HOME/.config/sonarr/sonarr.log\"" || log_warn "Failed to create sonarr tmux session"
-	else
-		log_err "Sonarr DLL not found at $HOME/.bin/Sonarr/Sonarr.dll"
-	fi
-
-	# Start Radarr
-	if [[ -f "$HOME/.bin/Radarr/Radarr.dll" ]]; then
-		tmux new-session -d -s "radarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/Radarr\" && \"$DOTNET_ROOT_PATH/dotnet\" Radarr.dll --nobrowser --data=\"$HOME/.config/radarr\" 2>&1 | tee -a \"$HOME/.config/radarr/radarr.log\"" || log_warn "Failed to create radarr tmux session"
-	else
-		log_err "Radarr DLL not found at $HOME/.bin/Radarr/Radarr.dll"
-	fi
-
-	# Start Prowlarr
-	if [[ -f "$HOME/.bin/Prowlarr/Prowlarr.dll" ]]; then
-		tmux new-session -d -s "prowlarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/Prowlarr\" && \"$DOTNET_ROOT_PATH/dotnet\" Prowlarr.dll --nobrowser --data=\"$HOME/.config/prowlarr\" 2>&1 | tee -a \"$HOME/.config/prowlarr/prowlarr.log\"" || log_warn "Failed to create prowlarr tmux session"
-	else
-		log_err "Prowlarr DLL not found at $HOME/.bin/Prowlarr/Prowlarr.dll"
-	fi
-
-	# Start SABnzbd
-	if [[ -f "$HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py" ]]; then
-		tmux new-session -d -s "sabnzbd" "source $HOME/.bin/sabnzbd/bin/activate && cd \"$HOME/.bin/sabnzbd/sabnzbd\" && nice -n 19 python3 SABnzbd.py -b 0 -f $HOME/.config/sabnzbd/sabnzbd.ini 2>&1 | tee -a \"$HOME/.config/sabnzbd/sabnzbd.log\"" || log_warn "Failed to create sabnzbd tmux session"
-	else
-		log_err "SABnzbd not found at $HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py"
-	fi
-
-	# Start Cloudplow
-	if [[ -f "$HOME/.bin/cloudplow/cloudplow/cloudplow.py" ]]; then
-		tmux new-session -d -s "cloudplow" "source $HOME/.bin/cloudplow/bin/activate && python3 $HOME/.bin/cloudplow/cloudplow/cloudplow.py run --config=$HOME/.config/cloudplow/config.json --loglevel=DEBUG --cachefile=$HOME/.config/cloudplow/cache.db --logfile=$HOME/.config/cloudplow/cloudplow.log" || log_warn "Failed to create cloudplow tmux session"
-	else
-		log_err "Cloudplow not found at $HOME/.bin/cloudplow/cloudplow/cloudplow.py"
-	fi
-
-	# Wait a moment and verify sessions are still running
-	sleep 3
-	log_step "Verifying started applications..."
-	apps_to_verify=(sonarr radarr prowlarr sabnzbd cloudplow)
-	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-		apps_to_verify=(jellyfin "${apps_to_verify[@]}")
-	fi
-	for app in "${apps_to_verify[@]}"; do
-		if tmux has-session -t "$app" 2>/dev/null; then
-			log_ok "$app session is running"
-		else
-			log_warn "$app session exited immediately"
-			# Check for Illegal Instruction (CPU incompatibility)
-			app_log=""
-			case "$app" in
-			jellyfin) app_log="$JELLYFIN_LOG_DIR/jellyfin.log" ;;
-			sonarr) app_log="$HOME/.config/sonarr/sonarr.log" ;;
-			radarr) app_log="$HOME/.config/radarr/radarr.log" ;;
-			prowlarr) app_log="$HOME/.config/prowlarr/prowlarr.log" ;;
-			sabnzbd) app_log="$HOME/.config/sabnzbd/sabnzbd.log" ;;
-			esac
-			if [[ -n "$app_log" ]] && [[ -f "$app_log" ]]; then
-				if grep -qi "illegal instruction\|SIGILL\|signal 4" "$app_log" 2>/dev/null; then
-					log_err "$app crashed: Illegal Instruction — CPU lacks required instruction sets (SSE4.2/AVX)"
-				fi
-			fi
-			log_info "To diagnose: tmux new-session -s ${app}-debug 'cd ~/.bin/${app}* && ...'"
-		fi
-	done
+	media_stack_start_apps
+	media_stack_verify_sessions
 else
-	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-		log_info "[dry-run] would start tmux sessions: jellyfin, sonarr, radarr, prowlarr, sabnzbd, cloudplow"
-	else
-		log_info "[dry-run] would start tmux sessions: sonarr, radarr, prowlarr, sabnzbd, cloudplow"
-	fi
+	log_info "[dry-run] would start tmux sessions: $(media_stack_sessions_label)"
 fi
 
 echo ""
@@ -1502,15 +1494,15 @@ fi
 echo "PUBLIC-IP (do not expose ports): ${PUBLIC_IP}"
 
 echo ""
+summary_jellyfin_port=""
+summary_jellyfin_config=""
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-	echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}, Jellyfin=${JELLYFIN_PORT}"
-	echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr | Jellyfin=$HOME/.config/jellyfin | Cloudplow=$HOME/.config/cloudplow"
-	echo "Tmux sessions running: jellyfin, sonarr, radarr, prowlarr, sabnzbd, cloudplow"
-else
-	echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}"
-	echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr | Cloudplow=$HOME/.config/cloudplow"
-	echo "Tmux sessions running: sonarr, radarr, prowlarr, sabnzbd, cloudplow"
+	summary_jellyfin_port=", Jellyfin=${JELLYFIN_PORT}"
+	summary_jellyfin_config=" | Jellyfin=$HOME/.config/jellyfin"
 fi
+echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}${summary_jellyfin_port}"
+echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr${summary_jellyfin_config} | Cloudplow=$HOME/.config/cloudplow"
+echo "Tmux sessions running: $(media_stack_sessions_label)"
 
 echo ""
 echo "To kill all applications use 'tmux kill-server'"
