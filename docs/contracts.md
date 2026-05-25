@@ -191,6 +191,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## System Preparation
 
+- pmssHomeInodeDensityCheck(?callable $logger=null, string $path='/home', int $warnThresholdBytes=262144): void
+  - Inputs: mounted filesystem path, optional logger, warning threshold in bytes per inode.
+  - Output: logs `[OK]`, `[WARN]`, or `[SKIP]` only; no return value.
+  - Side-effects: runs `stat -f -c "%S %b %c" <path>` through `runStep()` and emits `home_inode_density` JSON when JSON logging is enabled.
+  - Errors: fail-soft; missing path, stat failure, malformed output, or zero values log warning/skip and never abort update-step2.
+
 - pmssEnsureLegacySysctlBaseline(?callable $logger=null, ?string $targetOverride=null, bool $reload=true, ?string $modulesLoadOverride=null): void
   - Writes `/etc/sysctl.d/99-pmss.conf` (override path) with the PMSS-owned hardware-aware baseline.
   - Ensures `/etc/modules-load.d/pmss-bbr.conf` contains `tcp_bbr` (override path).

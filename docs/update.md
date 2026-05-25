@@ -65,6 +65,7 @@ inline:
 ```
 scripts/lib/update/distro.php          # OS detection and legacy self-heal
 scripts/lib/update/environment.php     # dpkg/apt environment guards
+scripts/lib/update/filesystem.php      # warning-only filesystem preflights
 scripts/lib/update/repositories.php    # sources.list templates and apt refresh
 scripts/lib/update/systemPrep.php      # cgroups, slices, base locale and perms
 scripts/lib/update/services/*          # runtime templates, legacy daemons,
@@ -163,23 +164,25 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
 
 ### Execution Outline
 
-1. Detect distro name/version/codename and ensure `update.php` is up to date.
-2. Enforce non-interactive apt settings and finish any pending dpkg configs.
-3. Immediately refresh APT repositories and apply the codename-selected dpkg baseline
+1. Acquire the phase-2 lock and run warning-only preflights, including `/home`
+   inode density detection for media-stack workloads.
+2. Detect distro name/version/codename and ensure `update.php` is up to date.
+3. Enforce non-interactive apt settings and finish any pending dpkg configs.
+4. Immediately refresh APT repositories and apply the codename-selected dpkg baseline
    _before_ any other orchestration (this ordering is mandatory for all regressions).
-4. Prepare the host (cgroups, systemd slices, base permissions, MOTD, locales) and
+5. Prepare the host (cgroups, systemd slices, base permissions, MOTD, locales) and
    reapply installer defaults (hardware-aware late-order sysctl tuning, Debian 13+
    `/tmp` disk-backed baseline, root shell config, `/home`
    permissions, hostname/quota overrides exported by `install.sh`).
-5. Apply repository templates, refresh apt indexes, migrate legacy files.
-6. Run application installers under `scripts/lib/update/apps/*.php`.
-7. Configure the web stack, regenerate per-user nginx configs from staged
+6. Apply repository templates, refresh apt indexes, migrate legacy files.
+7. Run application installers under `scripts/lib/update/apps/*.php`.
+8. Configure the web stack, regenerate per-user nginx configs from staged
    templates, disable legacy daemons, and install supporting packages
    (e.g., mediainfo, Let’s Encrypt helpers).
-8. Update every user environment via `pmssUpdateAllUsers()`, which also owns
+9. Update every user environment via `pmssUpdateAllUsers()`, which also owns
    linger/rootless-Docker wiring and the optional post-refresh checks
    (user crontabs are user-owned and not rewritten).
-9. Reapply network templates, apply security hardening, summarise profiling, and
+10. Reapply network templates, apply security hardening, summarise profiling, and
    log completion markers. Per-user traffic monitoring rules rely on the
    iptables owner match; when unavailable `setupNetwork.php` skips those rules
    and logs to `/var/log/pmss/iptables.log`.
@@ -212,6 +215,10 @@ Dry-run a release update to inspect logging only:
 
 - Always run `php -l scripts/update.php` and
   `php scripts/lib/tests/development/Runner.php` after touching update logic.
+- Treat inode exhaustion on `/home` as a valid migration trigger for
+  `/scripts/util/userTransfer.php`, alongside hardware failure and capacity
+  rebalancing. The phase-2 inode-density warning is diagnostic only; reformat or
+  evacuation decisions remain operator-planned maintenance.
 - Aim for comprehensive testing: add new unit/integration coverage when you modify services, and run smoke tests (`/scripts/update.php --dry-run`) before shipping.
 - Check `/var/log/pmss-update.jsonl` for a structured summary of the last run;
   a missing `update_step2_end` event typically means phase 2 was skipped.

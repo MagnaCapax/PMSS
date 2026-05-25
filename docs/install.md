@@ -15,6 +15,20 @@ Interactivity contract:
 - When running the installer via an `ssh host "..."` remote command, force a pseudo-TTY with `ssh -t` (otherwise no prompts are possible).
 - For unattended runs, use `--non-interactive` (or `--skip-hostname` / `--skip-quota`) to suppress prompts.
 
+## Filesystem provisioning
+
+`/home` must be formatted with default-or-denser inode allocation for shared
+seedbox workloads. Media stacks create many small files under application
+metadata, queues, caches, and rootless container storage, so low-inode profiles
+such as ext4 `-T largefile4` are contraindicated even when the host is intended
+for large media files.
+
+For ext4, choose the inode ratio at filesystem creation time; routine online
+PMSS updates cannot add a usable inode budget after the filesystem is full.
+`update-step2.php` warns when `/home` exceeds 256 KiB per inode so operators can
+plan user migration or host evacuation/reformat before customer writes hit
+`ENOSPC`.
+
 ## Development capture (interactive TTY)
 
 To capture the full interactive session (including prompts) while keeping output visible on screen, use `script` with a TTY:

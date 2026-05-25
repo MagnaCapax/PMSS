@@ -40,6 +40,7 @@ require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/update/runtime/stepPolicy.php';
 require_once __DIR__.'/../lib/update/runtime/processes.php';
 require_once __DIR__.'/../lib/update/environment.php';
+require_once __DIR__.'/../lib/update/filesystem.php';
 require_once __DIR__.'/../lib/update/opensslSsh2Compat.php';
 require_once __DIR__.'/../lib/update/distro.php';
 require_once __DIR__.'/../lib/update/kernelHardening.php';
@@ -384,6 +385,7 @@ pmssRunProfiledCallable('Running update-step2 preflight checks', static function
 
     pmssLogJson(['event' => 'preflight_ok']);
 });
+pmssRunProfiledCallable('Checking /home inode density', 'pmssHomeInodeDensityCheck', ['logmsg']);
 
 // Ensure the root cron template is restored even if the updater exits early.
 // Phase 1 disables `/etc/cron.d/pmss` to avoid cron activity while the tree is
