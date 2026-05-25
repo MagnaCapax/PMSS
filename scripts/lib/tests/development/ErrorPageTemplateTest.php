@@ -31,11 +31,7 @@ class ErrorPageTemplateTest extends TestCase
 
     public function testAuthenticationErrorPageDefinesImageVariantsAndHomeLink(): void
     {
-        $contents = $this->pmssReadRepoFile('var/www/error-401.html');
-        $this->assertEquals(3, substr_count($contents, '.png'));
-        $this->assertStringContainsString('/401_images/401-1.png', $contents);
-        $this->assertStringContainsString('/401_images/401-2.png', $contents);
-        $this->assertStringContainsString('/401_images/401-3.png', $contents);
+        $contents = $this->assertErrorPageImagePool('var/www/error-401.html', '/401_images/401-', 3);
         $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
     }
 
@@ -50,27 +46,18 @@ class ErrorPageTemplateTest extends TestCase
 
     public function testForbiddenErrorPageDefinesTwentyTwoImageVariants(): void
     {
-        $contents = $this->pmssReadRepoFile('var/www/error-403.html');
-        $this->assertEquals(22, substr_count($contents, '.png'));
-        $this->assertStringContainsString('/404_images/404-1.png', $contents);
-        $this->assertStringContainsString('/404_images/404-22.png', $contents);
+        $this->assertErrorPageImagePool('var/www/error-403.html', '/404_images/404-', 22);
     }
 
     public function testNotFoundErrorPageDefinesTwentyTwoImageVariantsAndHomeLink(): void
     {
-        $contents = $this->pmssReadRepoFile('var/www/error-404.html');
-        $this->assertEquals(22, substr_count($contents, '.png'));
-        $this->assertStringContainsString('/404_images/404-1.png', $contents);
-        $this->assertStringContainsString('/404_images/404-22.png', $contents);
+        $contents = $this->assertErrorPageImagePool('var/www/error-404.html', '/404_images/404-', 22);
         $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
     }
 
     public function testBadGatewayErrorPageDefinesThirteenImageVariantsAndHomeLink(): void
     {
-        $contents = $this->pmssReadRepoFile('var/www/error-502.html');
-        $this->assertEquals(13, substr_count($contents, '.png'));
-        $this->assertStringContainsString('/502_images/502-1.png', $contents);
-        $this->assertStringContainsString('/502_images/502-13.png', $contents);
+        $contents = $this->assertErrorPageImagePool('var/www/error-502.html', '/502_images/502-', 13);
         $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
     }
 
@@ -116,4 +103,12 @@ class ErrorPageTemplateTest extends TestCase
         $this->assertStringContainsString('try_files $uri /error-502.html;', $contents);
     }
 
+    private function assertErrorPageImagePool(string $path, string $prefix, int $count): string
+    {
+        $contents = $this->pmssReadRepoFile($path);
+        $this->assertStringContainsString('data-error-image-prefix="'.$prefix.'"', $contents);
+        $this->assertStringContainsString('data-error-image-count="'.$count.'"', $contents);
+        $this->assertStringContainsString('<script src="/error-page.js"></script>', $contents);
+        return $contents;
+    }
 }

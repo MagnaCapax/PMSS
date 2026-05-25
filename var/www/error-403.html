@@ -3,7 +3,7 @@
   <br />
   <div class="content-container">
     <div id="image-container">
-      <img alt="403 - Forbidden" id="error-image" />
+      <img alt="403 - Forbidden" data-error-image-prefix="/404_images/404-" data-error-image-count="22" id="error-image" />
     </div>
 
     <div class="error-description">
@@ -17,18 +17,4 @@
   </div>
 </div>
 
-<script>
-  const variants = ['/404_images/404-1.png', '/404_images/404-2.png', '/404_images/404-3.png', '/404_images/404-4.png', '/404_images/404-5.png', '/404_images/404-6.png', '/404_images/404-7.png', '/404_images/404-8.png', '/404_images/404-9.png', '/404_images/404-10.png', '/404_images/404-11.png', '/404_images/404-12.png', '/404_images/404-13.png', '/404_images/404-14.png', '/404_images/404-15.png', '/404_images/404-16.png', '/404_images/404-17.png', '/404_images/404-18.png', '/404_images/404-19.png', '/404_images/404-20.png', '/404_images/404-21.png', '/404_images/404-22.png'];
-  const imageElement = document.getElementById('error-image');
-  imageElement.src = variants[Math.floor(Math.random() * variants.length)];
-  imageElement.classList.add('error-image');
-  imageElement.addEventListener('error', function () {
-    imageElement.style.display = 'none';
-  });
-
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.type = 'text/css';
-  link.href = '/css/error-styles.css';
-  document.head.appendChild(link);
-</script>
+<script src="/error-page.js"></script>

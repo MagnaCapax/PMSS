@@ -49,6 +49,7 @@
 !/var/www/
 !/var/www/*.php
 !/var/www/*.html
+!/var/www/*.js
 !/var/www/502_images
 !/var/www/502_images/*
 !/var/www/404_images

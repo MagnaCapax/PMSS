@@ -3,7 +3,7 @@
   <br />
   <div class="content-container">
     <div id="image-container">
-      <img alt="401 - Authentication Required" id="error-image" />
+      <img alt="401 - Authentication Required" data-error-image-prefix="/401_images/401-" data-error-image-count="3" id="error-image" />
     </div>
     <div class="error-description">
       <p>
@@ -28,18 +28,4 @@
   </div>
 </div>
 
-<script>
-  const variants = ['/401_images/401-1.png', '/401_images/401-2.png', '/401_images/401-3.png'];
-  const imageElement = document.getElementById('error-image');
-  imageElement.src = variants[Math.floor(Math.random() * variants.length)];
-  imageElement.classList.add('error-image');
-  imageElement.addEventListener('error', function () {
-    imageElement.style.display = 'none';
-  });
-
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.type = 'text/css';
-  link.href = '/css/error-styles.css';
-  document.head.appendChild(link);
-</script>
+<script src="/error-page.js"></script>
