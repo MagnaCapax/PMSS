@@ -513,6 +513,47 @@ PHP;
         $this->assertStringContainsString('systemctl', $steps[0][1]);
     }
 
+    public function testApplyStepSnapshotLocksMixedPropertiesBeforeIoCostWrites(): void
+    {
+        $steps = [];
+        $this->sys->findmnt['/home'] = '/dev/md0';
+        $this->sys->commands['lsblk -dn -o MAJ:MIN'] = "9:0\n";
+        $this->mgr = new Manager($this->sys, function (string $description, string $command) use (&$steps): int {
+            $steps[] = [$description, $command];
+            return 0;
+        });
+
+        $res = $this->runMgr([
+            'testuser',
+            '--apply',
+            '--memory-high=600',
+            '--io-cost-qos=enable=1 ctrl=user',
+        ]);
+
+        $ioCostWriter = "if [ -w '/sys/fs/cgroup/io.cost.qos' ]; then printf '%s\\n' "
+            ."'9:0 enable=1 ctrl=user' > '/sys/fs/cgroup/io.cost.qos'; else echo "
+            ."'[SKIP] io.cost path not writable: /sys/fs/cgroup/io.cost.qos'; fi";
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertSame(
+            [
+                [
+                    'Applying cgroup properties',
+                    \pmssBuildCommand('systemctl', [
+                        'set-property',
+                        'user-1000.slice',
+                        'MemoryHigh=600M',
+                        'MemoryMax=750M',
+                        'CPUWeight=196',
+                        'IOWeight=196',
+                    ]),
+                ],
+                ['Applying io.cost setting', \pmssBuildCommand('sh', ['-c', $ioCostWriter])],
+            ],
+            $steps
+        );
+    }
+
     public function testApplyAttemptsEveryIoCostWriteBeforeReturningFailure()
     {
         $steps = [];

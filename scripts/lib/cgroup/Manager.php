@@ -234,38 +234,25 @@ class Manager
                 }
 
                 $this->sys->requireRoot();
-                $applyFailed = false;
+                $steps = [];
                 if ($doWipe) {
-                    $applyFailed = $this->runApplyStep(
-                        'Reverting user slice',
-                        \pmssBuildCommand('systemctl', ['revert', $slice]).' || true'
-                    ) !== 0 || $applyFailed;
-                    $applyFailed = $this->runApplyStep(
-                        'Unlimiting core properties',
-                        \pmssBuildCommand('systemctl', [
-                            'set-property',
-                            $slice,
-                            'MemoryHigh=infinity',
-                            'MemoryMax=infinity',
-                            'TasksMax=infinity',
-                            'CPUWeight=100',
-                            'IOWeight=100',
-                        ])
-                    ) !== 0 || $applyFailed;
+                    $steps[] = ['Reverting user slice', \pmssBuildCommand('systemctl', ['revert', $slice]).' || true'];
+                    $steps[] = ['Unlimiting core properties', \pmssBuildCommand('systemctl', ['set-property', $slice, 'MemoryHigh=infinity', 'MemoryMax=infinity', 'TasksMax=infinity', 'CPUWeight=100', 'IOWeight=100'])];
                 } else {
                     $pairs = [];
                     foreach ($props as $k=>$v) { $pairs[] = $k.'='.$v; }
                     $allPairs = array_merge($pairs, $ioPairs);
                     if (!empty($allPairs)) {
-                        $cmd = \pmssBuildCommand('systemctl', array_merge(['set-property', $slice], $allPairs));
-                        $applyFailed = $this->runApplyStep('Applying cgroup properties', $cmd) !== 0
-                            || $applyFailed;
+                        $steps[] = ['Applying cgroup properties', \pmssBuildCommand('systemctl', array_merge(['set-property', $slice], $allPairs))];
                     }
                     foreach ($ioCostWrites as $write) {
-                        $cmd = $this->buildIoCostWriteCommand($write['path'], $write['value']);
-                        $applyFailed = $this->runApplyStep('Applying io.cost setting', $cmd) !== 0
-                            || $applyFailed;
+                        $steps[] = ['Applying io.cost setting', $this->buildIoCostWriteCommand($write['path'], $write['value'])];
                     }
+                }
+
+                $applyFailed = false;
+                foreach ($steps as $step) {
+                    $applyFailed = $this->runApplyStep($step[0], $step[1]) !== 0 || $applyFailed;
                 }
 
                 if ($applyFailed) {
