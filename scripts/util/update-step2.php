@@ -665,11 +665,22 @@ if (is_array($userMaintenanceSummary)) {
     $totalUsers = isset($userMaintenanceSummary['total']) ? (int) $userMaintenanceSummary['total'] : 0;
     $processedUsers = isset($userMaintenanceSummary['processed']) ? (int) $userMaintenanceSummary['processed'] : 0;
     if ($processedUsers < $totalUsers) {
+        // Name WHY users were skipped so operators act on the real cause
+        // (e.g. userPermissions timeout) rather than chasing correlated host
+        // state. The mismatch stays must_succeed: silently-skipped users get
+        // no post-upgrade service restart and break for customers (GH#302).
+        $reason = sprintf('processed_users_mismatch:%d_of_%d', $processedUsers, $totalUsers);
+        $skipReasons = isset($userMaintenanceSummary['skip_reasons']) && is_array($userMaintenanceSummary['skip_reasons'])
+            ? $userMaintenanceSummary['skip_reasons']
+            : [];
+        if ($skipReasons !== []) {
+            $reason .= ' skipped=['.implode('; ', array_slice($skipReasons, 0, 10)).']';
+        }
         pmssUpdateStep2HandleClassifiedFailure(
             'Updating all user environments',
             PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED,
             1,
-            sprintf('processed_users_mismatch:%d_of_%d', $processedUsers, $totalUsers)
+            $reason
         );
     }
 }

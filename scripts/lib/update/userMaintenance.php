@@ -68,6 +68,12 @@ require_once __DIR__.'/../user/userConfigStore.php';
         $totalUsers = count($users);
         $processedUsers = 0;
         $skippedUsers = 0;
+        // Capture per-user skip reasons so a partial-completion failure can name
+        // WHY users were skipped (e.g. userPermissions timeout) instead of only
+        // reporting an opaque N_of_M count. Operators otherwise chase correlated
+        // but unrelated host state (see GH#591). Compact list only; detailed
+        // traces already go to per-user logs.
+        $skipReasons = [];
         logMessage(sprintf('Per-user maintenance: %d user(s) to process', $totalUsers));
         $isTty = pmssStreamIsTty(STDOUT);
         $phases = ['Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)'];
@@ -96,11 +102,13 @@ require_once __DIR__.'/../user/userConfigStore.php';
         foreach ($users as $user) {
             if (($userTrim = trim($user)) === '') {
                 $skippedUsers++;
+                $skipReasons[] = '(empty): empty username entry';
                 logMessage("[WARN] Account '(empty)' skipped during environment refresh: empty username entry");
                 continue;
             }
             if (!pmssValidateUsername($userTrim)) {
                 $skippedUsers++;
+                $skipReasons[] = $userTrim.': invalid username';
                 logMessage(sprintf("[WARN] Account '%s' skipped during environment refresh: invalid username", $userTrim));
                 continue;
             }
@@ -165,6 +173,7 @@ require_once __DIR__.'/../user/userConfigStore.php';
                 $skippedUsers++;
                 $userDuration = microtime(true) - $userStart;
                 $reason = get_class($throwable).($throwable->getMessage() === '' ? '' : ': '.$throwable->getMessage());
+                $skipReasons[] = $userTrim.': '.$reason;
 
                 logMessage(sprintf("[WARN] Account '%s' skipped during environment refresh: %s", $userTrim, $reason));
                 pmssUserLog($userTrim, '[WARN] update-step2 user maintenance aborted: '.$reason);
@@ -181,12 +190,14 @@ require_once __DIR__.'/../user/userConfigStore.php';
             'total'     => $totalUsers,
             'processed' => $processedUsers,
             'skipped'   => $skippedUsers,
+            'skip_reasons' => $skipReasons,
         ]);
 
         return [
             'total' => $totalUsers,
             'processed' => $processedUsers,
             'skipped' => $skippedUsers,
+            'skip_reasons' => $skipReasons,
         ];
     }
 
