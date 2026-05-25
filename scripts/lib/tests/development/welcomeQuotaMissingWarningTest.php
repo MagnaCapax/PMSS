@@ -5,6 +5,26 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class welcomeQuotaMissingWarningTest extends TestCase
 {
+    private function makeWelcomeSafetyFixture(): string
+    {
+        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+        $start = strpos($source, 'function pmssWelcomeRequireLocalHelper');
+        $end = strpos($source, 'function pmssWelcomeVendorRead');
+        $this->assertTrue($start !== false, 'welcome.php safety helpers should remain present');
+        $this->assertTrue($end !== false && $end > $start, 'welcome.php vendor reader should follow safety helpers');
+
+        $dir = $this->pmssMakeTempDir('pmss-welcome-safety-');
+        $fixture = $dir.'/welcomeSafety.php';
+        file_put_contents($fixture, "<?php\n".substr($source, $start, $end - $start));
+        return $fixture;
+    }
+
+    private function runWelcomeSafetyScript(string $script): string
+    {
+        $fixture = $this->makeWelcomeSafetyFixture();
+        return $this->pmssRunInlinePhp('require '.var_export($fixture, true).'; '.$script);
+    }
+
     private function loadWelcomeGaugeFunctions(): void
     {
         if (function_exists('createGauge')) {
@@ -45,6 +65,63 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
         $this->assertStringContainsString('pmssDelugeServicePasswordRotate((string) $username)', $source);
         $this->pmssAssertStringNotContainsString('pmssDelugeAuthWriteLocalclientPassword($delugeAuthPath, $newDelugePassword)', $source);
+    }
+
+    public function testWelcomeLocalHelperRejectsTraversalPaths(): void
+    {
+        $fixture = $this->makeWelcomeSafetyFixture();
+        file_put_contents(dirname($fixture).'/safeHelper.php', "<?php\nfunction pmssWelcomeSafeHelperLoaded() { return true; }\n");
+
+        $output = $this->pmssRunInlinePhp(
+            'require '.var_export($fixture, true).';'
+            .'echo json_encode(array('
+            .'"safe" => pmssWelcomeRequireLocalHelper("safeHelper.php"),'
+            .'"loaded" => function_exists("pmssWelcomeSafeHelperLoaded"),'
+            .'"traversal" => pmssWelcomeRequireLocalHelper("../safeHelper.php"),'
+            .'"absolute" => pmssWelcomeRequireLocalHelper("/tmp/safeHelper.php")'
+            .'));'
+        );
+
+        $this->assertSame(
+            array('safe' => true, 'loaded' => true, 'traversal' => false, 'absolute' => false),
+            json_decode($output, true)
+        );
+    }
+
+    public function testWelcomeQuotaReaderAcceptsSerializedArrayContract(): void
+    {
+        $payload = array('hardLimit' => 200, 'totalSpace' => 100, 'usedBytes' => 25);
+        $output = $this->runWelcomeSafetyScript(
+            '$_GET["quota"] = urlencode(serialize('.var_export($payload, true).'));'
+            .'echo json_encode(pmssWelcomeQuotaInfoRead());'
+        );
+
+        $this->assertSame($payload, json_decode($output, true));
+    }
+
+    public function testWelcomeQuotaReaderRejectsObjectPayloads(): void
+    {
+        $output = $this->runWelcomeSafetyScript(
+            '$_GET["quota"] = urlencode(serialize(array("hardLimit" => new stdClass())));'
+            .'echo json_encode(pmssWelcomeQuotaInfoRead());'
+        );
+
+        $this->assertSame(array(), json_decode($output, true));
+    }
+
+    public function testWelcomeQuotaReaderRejectsNonScalarAndOversizeInput(): void
+    {
+        $arrayOutput = $this->runWelcomeSafetyScript(
+            '$_GET["quota"] = array("not-scalar");'
+            .'echo json_encode(pmssWelcomeQuotaInfoRead());'
+        );
+        $largeOutput = $this->runWelcomeSafetyScript(
+            '$_GET["quota"] = str_repeat("x", 8193);'
+            .'echo json_encode(pmssWelcomeQuotaInfoRead());'
+        );
+
+        $this->assertSame(array(), json_decode($arrayOutput, true));
+        $this->assertSame(array(), json_decode($largeOutput, true));
     }
 
     public function testWelcomeGaugeHtmlAndColorSnapshot(): void

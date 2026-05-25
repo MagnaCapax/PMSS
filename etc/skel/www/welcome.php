@@ -489,8 +489,14 @@ echo $announcementItemsHtml;
  * Require a customer-tree helper when it exists.
  */
 function pmssWelcomeRequireLocalHelper($file) {
+    if (!is_string($file)
+        || !preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]*\.php\z/', $file)
+        || basename($file) !== $file) {
+        return false;
+    }
+
     $path = __DIR__.'/'.$file;
-    if (file_exists($path)) {
+    if (is_file($path) && !is_link($path)) {
         require_once $path;
         return true;
     }
@@ -648,15 +654,52 @@ function pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingId
 }
 
 function pmssWelcomeQuotaInfoRead() {
-    if (!isset($_GET['quota'])) {
+    if (!isset($_GET['quota']) || !is_string($_GET['quota'])) {
         return array();
     }
 
     $quotaInfo = urldecode($_GET['quota']);
     $quotaInfo = str_replace('\\', '', $quotaInfo); // Serialized data might be malformed with \ chars!
-    $quotaInfo = @unserialize($quotaInfo);
+    $quotaInfo = pmssWelcomeSerializedArrayDecode($quotaInfo);
 
     return is_array($quotaInfo) ? $quotaInfo : array();
+}
+
+/**
+ * Decode serialized customer-facing arrays without instantiating PHP objects.
+ */
+function pmssWelcomeSerializedArrayDecode($raw, $maxBytes = 8192) {
+    if (!is_string($raw) || $raw === '' || strlen($raw) > $maxBytes) {
+        return null;
+    }
+
+    $data = @unserialize($raw, array('allowed_classes' => false));
+    if (!is_array($data) || pmssWelcomeSerializedArrayHasObject($data)) {
+        return null;
+    }
+
+    return $data;
+}
+
+/**
+ * Reject object payloads that should never appear in quota snapshots.
+ */
+function pmssWelcomeSerializedArrayHasObject($value) {
+    if (is_object($value)) {
+        return true;
+    }
+
+    if (!is_array($value)) {
+        return false;
+    }
+
+    foreach ($value as $child) {
+        if (pmssWelcomeSerializedArrayHasObject($child)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function pmssWelcomeVendorRead() {
