@@ -916,6 +916,34 @@ function readSystemdMemoryCurrentBytes() {
     return (float) $memoryCurrent;
 }
 
+function pmssWelcomeMemoryStatCandidatePaths($uid) {
+    return array(
+        '/sys/fs/cgroup/user.slice/user-'.$uid.'.slice/memory.stat',
+        '/sys/fs/cgroup/unified/user.slice/user-'.$uid.'.slice/memory.stat',
+        '/sys/fs/cgroup/memory/user.slice/user-'.$uid.'.slice/memory.stat',
+    );
+}
+
+function pmssWelcomeMemoryStatBreakdownParse($raw) {
+    $breakdown = array();
+    if (!is_string($raw) || trim($raw) === '') {
+        return $breakdown;
+    }
+
+    foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
+        if (count($parts = preg_split('/\s+/', trim($line), 2)) !== 2 || !ctype_digit($parts[1])) {
+            continue;
+        }
+        if ($parts[0] === 'anon' || $parts[0] === 'total_rss') {
+            $breakdown['anon'] = (float) $parts[1];
+        } elseif ($parts[0] === 'file' || $parts[0] === 'total_cache') {
+            $breakdown['file'] = (float) $parts[1];
+        }
+    }
+
+    return $breakdown;
+}
+
 function readSystemdMemoryBreakdownBytes() {
     $uid = function_exists('posix_getuid') ? (int) posix_getuid() : null;
     if ($uid === null && function_exists('pmssFrontendShellExecAvailable') && pmssFrontendShellExecAvailable()) {
@@ -928,27 +956,13 @@ function readSystemdMemoryBreakdownBytes() {
         return array();
     }
 
-    foreach (array(
-        '/sys/fs/cgroup/user.slice/user-'.$uid.'.slice/memory.stat',
-        '/sys/fs/cgroup/unified/user.slice/user-'.$uid.'.slice/memory.stat',
-    ) as $path) {
+    foreach (pmssWelcomeMemoryStatCandidatePaths($uid) as $path) {
         $raw = @file_get_contents($path);
         if (!is_string($raw) || trim($raw) === '') {
             continue;
         }
 
-        $breakdown = array();
-        foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
-            if (count($parts = preg_split('/\s+/', trim($line), 2)) !== 2 || !ctype_digit($parts[1])) {
-                continue;
-            }
-            if ($parts[0] === 'anon') {
-                $breakdown['anon'] = (float) $parts[1];
-            } elseif ($parts[0] === 'file') {
-                $breakdown['file'] = (float) $parts[1];
-            }
-        }
-
+        $breakdown = pmssWelcomeMemoryStatBreakdownParse($raw);
         if (isset($breakdown['anon'], $breakdown['file'])) {
             return $breakdown;
         }
