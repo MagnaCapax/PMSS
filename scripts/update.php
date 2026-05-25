@@ -627,6 +627,87 @@ function runSoft(string $command): void
     }
 }
 
+function pmssLastFilesystemError(): string
+{
+    $error = error_get_last();
+    if (!is_array($error) || !isset($error['message'])) {
+        return '';
+    }
+
+    $message = trim((string) $error['message']);
+    return $message !== '' ? ': '.$message : '';
+}
+
+function pmssIsSafeUpdateRemovePath(string $path): bool
+{
+    $path = rtrim($path, '/');
+    if ($path === '' || $path === '/') {
+        return false;
+    }
+    if (strpos($path, "\0") !== false || preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
+        return false;
+    }
+
+    $tempPrefix = rtrim(sys_get_temp_dir(), '/').'/pmss-update-';
+    $prefixes = [
+        $tempPrefix,
+        '/scripts.pmss-staging-',
+        '/scripts.pmss-backup-',
+        '/etc/seedbox.pmss-staging-',
+        '/etc/seedbox.pmss-backup-',
+    ];
+
+    foreach ($prefixes as $prefix) {
+        if (strpos($path, $prefix) === 0 && strlen($path) > strlen($prefix)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function pmssRemoveTreeBestEffort(string $path, string $label): void
+{
+    if (!pmssIsSafeUpdateRemovePath($path)) {
+        logmsg('[WARN] Refusing unsafe '.$label.' removal path: '.$path);
+        logEvent('unsafe_remove_refused', ['label' => $label, 'path' => $path]);
+        return;
+    }
+
+    runSoft('rm -rf '.escapeshellarg($path));
+}
+
+/**
+ * Swap a staged directory into place and restore the old tree if the final rename fails.
+ */
+function pmssAtomicSwapDirectory(string $target, string $staging, string $backup, string $label): void
+{
+    if (!is_dir($staging)) {
+        fatal("Staging directory missing for {$label}: {$staging}", EXIT_COPY);
+    }
+    if ((file_exists($target) || is_link($target)) && !is_dir($target)) {
+        fatal("{$target} exists but is not a directory", EXIT_COPY);
+    }
+
+    $hadTarget = is_dir($target);
+    if ($hadTarget && !@rename($target, $backup)) {
+        fatal("Failed to rename {$target} to backup for atomic swap".pmssLastFilesystemError(), EXIT_COPY);
+    }
+
+    if (@rename($staging, $target)) {
+        return;
+    }
+
+    $swapError = pmssLastFilesystemError();
+    if ($hadTarget && is_dir($backup) && !file_exists($target) && @rename($backup, $target)) {
+        logmsg("[WARN] Restored previous {$label} tree after failed atomic swap");
+        logEvent('atomic_swap_rollback', ['label' => $label, 'target' => $target, 'backup' => $backup]);
+        fatal("Failed to rename staged {$target} into place{$swapError}; restored previous tree", EXIT_COPY);
+    }
+
+    fatal("Failed to rename staged {$target} into place{$swapError}; rollback unavailable", EXIT_COPY);
+}
+
 /**
  * Best-effort restore of PMSS root cron after updates that temporarily disable it.
  *
@@ -740,19 +821,11 @@ function stageSnapshot(string $tmp, bool $dryRun): void
     } else {
         $scriptsStaging = '/scripts.pmss-staging-'.$runId;
         $scriptsBackup  = '/scripts.pmss-backup-'.$runId;
-        runSoft('rm -rf '.escapeshellarg($scriptsStaging));
+        pmssRemoveTreeBestEffort($scriptsStaging, 'scripts staging');
         runFatal(sprintf('cp -a %s/. %s', escapeshellarg($scriptsSource), escapeshellarg($scriptsStaging)), EXIT_COPY);
 
-        if (file_exists('/scripts') && !is_dir('/scripts')) {
-            fatal('/scripts exists but is not a directory', EXIT_COPY);
-        }
-        if (is_dir('/scripts') && !@rename('/scripts', $scriptsBackup)) {
-            fatal('Failed to rename /scripts to backup for atomic swap', EXIT_COPY);
-        }
-        if (!@rename($scriptsStaging, '/scripts')) {
-            fatal('Failed to rename staged /scripts into place', EXIT_COPY);
-        }
-        runSoft('rm -rf '.escapeshellarg($scriptsBackup));
+        pmssAtomicSwapDirectory('/scripts', $scriptsStaging, $scriptsBackup, 'scripts');
+        pmssRemoveTreeBestEffort($scriptsBackup, 'scripts backup');
     }
 
     // Stage /etc tree with atomic swap for /etc/seedbox and overlay for the rest.
@@ -773,7 +846,7 @@ function stageSnapshot(string $tmp, bool $dryRun): void
         $seedboxBackup  = '/etc/seedbox.pmss-backup-'.$runId;
         $haveSeedboxSnapshot = directoryHasContent($seedboxSource);
         if ($haveSeedboxSnapshot || is_dir('/etc/seedbox')) {
-            runSoft('rm -rf '.escapeshellarg($seedboxStaging));
+            pmssRemoveTreeBestEffort($seedboxStaging, 'seedbox staging');
             if (is_dir('/etc/seedbox')) {
                 runFatal(sprintf('cp -a %s %s', escapeshellarg('/etc/seedbox'), escapeshellarg($seedboxStaging)), EXIT_COPY);
             } else {
@@ -782,13 +855,8 @@ function stageSnapshot(string $tmp, bool $dryRun): void
             if ($haveSeedboxSnapshot) {
                 runFatal(sprintf('cp -a %s/. %s', escapeshellarg($seedboxSource), escapeshellarg($seedboxStaging)), EXIT_COPY);
             }
-            if (is_dir('/etc/seedbox') && !@rename('/etc/seedbox', $seedboxBackup)) {
-                fatal('Failed to rename /etc/seedbox to backup for atomic swap', EXIT_COPY);
-            }
-            if (!@rename($seedboxStaging, '/etc/seedbox')) {
-                fatal('Failed to rename staged /etc/seedbox into place', EXIT_COPY);
-            }
-            runSoft('rm -rf '.escapeshellarg($seedboxBackup));
+            pmssAtomicSwapDirectory('/etc/seedbox', $seedboxStaging, $seedboxBackup, 'seedbox config');
+            pmssRemoveTreeBestEffort($seedboxBackup, 'seedbox backup');
         }
 
         // Overlay remaining /etc content (excluding seedbox) to preserve local edits.
@@ -888,7 +956,7 @@ function recordVersion(string $spec, array $details, bool $dryRun): void
 function cleanup(string $path): void
 {
     if ($path !== '' && is_dir($path)) {
-        runSoft('rm -rf '.escapeshellarg($path));
+        pmssRemoveTreeBestEffort($path, 'temporary workspace');
     }
 }
 
