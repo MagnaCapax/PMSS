@@ -7,6 +7,37 @@ require_once __DIR__.'/../common/updateBootstrapShim.php';
 
 class RuntimeTest extends TestCase
 {
+    public function testRuntimeRequireOnceOwnsDefinitionContract(): void
+    {
+        $runtime = var_export(dirname(__DIR__, 3).'/lib/runtime.php', true);
+        $script = "require_once {$runtime}; require_once {$runtime}; echo json_encode([".
+            "'runCommand'=>function_exists('runCommand'),".
+            "'capture'=>function_exists('pmssCommandCapture'),".
+            "'snapshot'=>function_exists('pmssRunSnapshotLogTask')".
+            "]);";
+
+        $this->assertSame([
+            'runCommand' => true,
+            'capture'    => true,
+            'snapshot'   => true,
+        ], $this->pmssRunInlinePhpJson($script));
+    }
+
+    public function testRuntimeKeepsCliGuardStubCompatibility(): void
+    {
+        $runtime = var_export(dirname(__DIR__, 3).'/lib/runtime.php', true);
+        $script = "function pmssRequireCli(string \$message = '', ?int \$failureCode = 1): bool { return false; } ".
+            "require_once {$runtime}; echo json_encode([".
+            "'cli'=>pmssRequireCli(),".
+            "'entrypoint'=>function_exists('pmssPrepareCliEntrypoint')".
+            "]);";
+
+        $this->assertSame([
+            'cli'        => false,
+            'entrypoint' => true,
+        ], $this->pmssRunInlinePhpJson($script));
+    }
+
     public function testPmssPrepareCliEntrypointAppendsArgumentsToGlobalArgv(): void
     {
         $this->withRuntimeArgv(['wrapper.php'], function (): void {

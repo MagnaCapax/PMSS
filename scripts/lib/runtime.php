@@ -20,7 +20,6 @@ const PMSS_COMMAND_TIMEOUT_APT_DEFAULT = 1200;
 const PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT = 5;
 const PMSS_TIMEOUT_FIRE_LOG_DEFAULT = '/var/log/pmss-timeout-fires.jsonl';
 
-if (!function_exists('pmssResolvePathFromEnv')) {
     // Resolve a filesystem path from an environment variable with a default.
     function pmssResolvePathFromEnv(string $envKey, string $default): string
     {
@@ -29,22 +28,15 @@ if (!function_exists('pmssResolvePathFromEnv')) {
         $value = rtrim($value, '/');
         return $value !== '' ? $value : rtrim($default, '/');
     }
-}
-if (!function_exists('pmssDirPathNormalize')) {
     // Normalize directory paths while preserving `/` and intentional empty overrides.
     function pmssDirPathNormalize(string $path): string { $trimmed = rtrim($path, '/'); return $trimmed !== '' ? $trimmed : ($path !== '' ? '/' : ''); }
-}
-if (!function_exists('pmssDirPathResolve')) {
     // Resolve a directory path from an explicit override or env-backed default.
     function pmssDirPathResolve(?string $override, string $envKey, string $default): string { return pmssDirPathNormalize((string) ($override !== null ? $override : pmssResolvePathFromEnv($envKey, $default))); }
-}
 // Build the standard month/week/day/hour/15min thresholds used by PMSS stats processors.
 function pmssStatsCompareTimesBuild(?int $now = null): array { $now = $now ?? time(); return ['month' => $now - (30 * 24 * 60 * 60), 'week' => $now - (7 * 24 * 60 * 60), 'day' => $now - (24 * 60 * 60), 'hour' => $now - (60 * 60), '15min' => $now - (15 * 60)]; }
-if (!function_exists('pmssCliUserArgSanitize')) {
     // Strip unexpected characters from a CLI-supplied user key.
     function pmssCliUserArgSanitize(string $value): string { return (string) preg_replace('/[^a-zA-Z0-9-_]/', '', $value); }
-}
-if (!function_exists('pmssPasswdFileHasUser')) { function pmssPasswdFileHasUser(string $passwdFile, string $user): bool { return is_string($passwd = @file_get_contents($passwdFile)) && preg_match('/^'.preg_quote($user, '/').':/m', $passwd) === 1; } }
+function pmssPasswdFileHasUser(string $passwdFile, string $user): bool { return is_string($passwd = @file_get_contents($passwdFile)) && preg_match('/^'.preg_quote($user, '/').':/m', $passwd) === 1; }
 // Discover natural-sorted file basenames from a bounded glob pattern.
 function pmssFileBasenamesDiscover(string $pattern): array { $items = array_map('basename', array_filter(glob($pattern) ?: [], 'is_file')); sort($items, SORT_NATURAL | SORT_FLAG_CASE); return $items; }
 // Spawn per-user workers and redirect output to a shared PMSS log.
@@ -52,14 +44,11 @@ function pmssUserWorkersSpawnDetached(string $scriptPath, array $users, string $
 function pmssStatsProcessorRunCli(array $argv, string $scriptPath, callable $validateUser, callable $processUser, callable $discoverUsers, callable $spawnWorkers, ?callable $beforeSpawn = null): int { if (isset($argv[1])) { $user = pmssCliUserArgSanitize($argv[1]); if (!$validateUser($user)) { echo "Invalid user specified: {$user}\n"; return 0; } $processUser($user, pmssStatsCompareTimesBuild()); return 0; } if ($beforeSpawn !== null && !$beforeSpawn()) return 0; if (empty($users = $discoverUsers())) { echo "No users in this system!\n"; return 0; } $spawnWorkers($scriptPath, $users); return 0; }
 /** @return array{data_lines:string,records:array<int,string>}|null */
 function pmssStatsProcessorDataLinesLoad(string $user, callable $validateUser, callable $loadData, string $logPrefix, bool $trimData = false): ?array { if (!$validateUser($user)) { logMessage($logPrefix."Invalid user {$user}"); return null; } $dataLines = (string) $loadData($user, (int) ((35 * 24 * 60) / 5)); $trimData && $dataLines = trim($dataLines); if ($dataLines === '') { logMessage($logPrefix."No data for user {$user}"); return null; } if (count($records = array_filter(explode("\n", $dataLines))) < 2) { logMessage($logPrefix."Too little data for {$user}"); return null; } return ['data_lines' => $dataLines, 'records' => $records]; }
-if (!function_exists('pmssCommandBinaryNameIsSafe')) {
     // Accept only bare binary names before crossing the shell boundary.
     function pmssCommandBinaryNameIsSafe(string $binary): bool
     {
         return preg_match('/^[A-Za-z0-9._+-]+$/', $binary) === 1;
     }
-}
-if (!function_exists('pmssCommandPath')) {
     // Resolve an executable path for a safe bare binary name.
     function pmssCommandPath(string $binary): string
     {
@@ -76,24 +65,15 @@ if (!function_exists('pmssCommandPath')) {
         $path = trim($resolved);
         return $path !== '' && strpos($path, '/') === 0 && is_executable($path) ? $path : '';
     }
-}
 
-if (!function_exists('pmssEnvValueNormalized')) {
     // Normalize environment values so flag parsing stays consistent.
     function pmssEnvValueNormalized($value): string { return strtolower(trim((string) $value)); }
-}
-if (!function_exists('pmssValueMatchesNormalized')) {
     // Compare a normalized scalar value against a caller-owned token set.
     function pmssValueMatchesNormalized($value, array $tokens): bool { return in_array(pmssEnvValueNormalized($value), $tokens, true); }
-}
-if (!function_exists('pmssEnvValueIsFalsey')) {
     // Treat empty and explicit disable values as falsey toggles.
     function pmssEnvValueIsFalsey($value): bool { return pmssValueMatchesNormalized($value, ['', '0', 'false', 'no']); }
-}
-if (!function_exists('pmssEnvValueIsTruthy')) {
     // Treat explicit enable values as truthy toggles.
     function pmssEnvValueIsTruthy($value): bool { return pmssValueMatchesNormalized($value, ['1', 'true', 'yes', 'on']); }
-}
 if (!function_exists('pmssFormatBytes')) {
     // Format byte counts with binary IEC units for compact human output.
     function pmssFormatBytes(float $bytes, int $precision = 1, int $minimumUnitIndex = 0): string
@@ -113,7 +93,6 @@ if (!function_exists('pmssFormatBytes')) {
         return number_format($bytes, $index === 0 ? 0 : $precision, '.', '').' '.$units[$index];
     }
 }
-if (!function_exists('pmssConfigLineTrimmed')) {
     // Trim a config line and drop blank/commented entries.
     function pmssConfigLineTrimmed(string $line, array $commentPrefixes = ['#']): string
     {
@@ -123,8 +102,6 @@ if (!function_exists('pmssConfigLineTrimmed')) {
         }
         return $trimmed;
     }
-}
-if (!function_exists('pmssConfigLineColumns')) {
     // Split an active config line into whitespace-separated columns.
     function pmssConfigLineColumns(string $line, int $minColumns = 0, array $commentPrefixes = ['#']): array
     {
@@ -133,8 +110,6 @@ if (!function_exists('pmssConfigLineColumns')) {
         $columns = preg_split('/\s+/', $trimmed);
         return is_array($columns) && count($columns) >= $minColumns ? $columns : [];
     }
-}
-if (!function_exists('pmssConfigOptionsUpdatePlan')) {
     // Build updated comma-separated config options after required additions/removals.
     function pmssConfigOptionsUpdatePlan(string $optionList, array $requiredOptions = [], array $removeOptions = [], bool $dropDefaultsOnly = false): array
     {
@@ -155,15 +130,12 @@ if (!function_exists('pmssConfigOptionsUpdatePlan')) {
         $added = array_values(array_diff($requiredOptions, $options));
         return ['options' => array_merge($options, $added), 'added' => $added, 'removed' => $removed];
     }
-}
 
-if (!function_exists('pmssLogDir')) {
     // Resolve the PMSS log directory, allowing hermetic test overrides.
     function pmssLogDir(): string
     {
         return pmssResolvePathFromEnv('PMSS_LOG_DIR', PMSS_LOG_DIR_DEFAULT);
     }
-}
 
 // Share structured `logMessage()` with update helpers via the standalone
 // logging bootstrap. `require_once` keeps the import idempotent. Only runtime-
@@ -175,24 +147,17 @@ if (!$pmssLogmsgUsesLogMessageInitialized) {
     $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] = false;
 }
 
-if (!function_exists('pmssDirEnsureExists')) {
     function pmssDirEnsureExists(string $path, int $mode = 0755): bool { return is_dir($path) || @mkdir($path, $mode, true) || is_dir($path); }
-}
-if (!function_exists('pmssReadRegularFileContents')) {
     // Read a regular non-symlink file and return its raw contents.
     function pmssReadRegularFileContents(string $path): ?string
     {
         return (!is_file($path) || is_link($path) || !is_string($contents = @file_get_contents($path))) ? null : $contents;
     }
-}
-if (!function_exists('pmssReadRegularFileTrimmed')) {
     // Read a regular non-symlink file and return its trimmed contents.
     function pmssReadRegularFileTrimmed(string $path): ?string
     {
         return (($contents = pmssReadRegularFileContents($path)) === null) ? null : trim($contents);
     }
-}
-if (!function_exists('pmssProcMeminfoFieldsRead')) {
     // Parse Linux meminfo into integer KiB fields for shared resource callers.
     function pmssProcMeminfoFieldsRead(string $path = '/proc/meminfo'): array
     {
@@ -200,9 +165,7 @@ if (!function_exists('pmssProcMeminfoFieldsRead')) {
         foreach (explode("\n", pmssReadRegularFileContents($path) ?? '') as $line) if (preg_match('/^(\w+):\s+(\d+)/', $line, $matches) === 1) $fields[$matches[1]] = (int) $matches[2];
         return $fields;
     }
-}
-if (!function_exists('pmssProcMeminfoTotalMiBRead')) { function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fields = pmssProcMeminfoFieldsRead($path); return isset($fields['MemTotal']) ? (int) round($fields['MemTotal'] / 1024) : 0; } }
-if (!function_exists('pmssReadSerializedArrayFile')) {
+function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fields = pmssProcMeminfoFieldsRead($path); return isset($fields['MemTotal']) ? (int) round($fields['MemTotal'] / 1024) : 0; }
     // Read a serialized array payload without allowing object wakeups.
     function pmssReadSerializedArrayFile(string $path): ?array
     {
@@ -214,8 +177,6 @@ if (!function_exists('pmssReadSerializedArrayFile')) {
         $data = @unserialize($raw, ['allowed_classes' => false]);
         return is_array($data) ? $data : null;
     }
-}
-if (!function_exists('pmssReadOptionalSerializedArrayFile')) {
     // Read an optional serialized array file; malformed payloads fail closed.
     function pmssReadOptionalSerializedArrayFile(string $path, string $label = 'serialized array file'): array
     {
@@ -230,8 +191,6 @@ if (!function_exists('pmssReadOptionalSerializedArrayFile')) {
 
         return $payload;
     }
-}
-if (!function_exists('pmssReadRequiredRegularFile')) {
     // Read one required regular file without following symlinks.
     function pmssReadRequiredRegularFile(string $path, string $label = 'required file'): string
     {
@@ -246,15 +205,11 @@ if (!function_exists('pmssReadRequiredRegularFile')) {
 
         return $contents;
     }
-}
-if (!function_exists('pmssReadRegularFileDigits')) {
     // Read a regular non-symlink file that must contain digits only.
     function pmssReadRegularFileDigits(string $path): ?string
     {
         return (($raw = pmssReadRegularFileTrimmed($path)) !== null && $raw !== '' && ctype_digit($raw)) ? $raw : null;
     }
-}
-if (!function_exists('pmssColonRecordFieldsLookup')) {
     // Resolve a single colon-delimited account row without repeating file scans.
     function pmssColonRecordFieldsLookup(string $path, string $recordName, int $minFields = 2, bool $skipEmptyLines = true): ?array
     {
@@ -291,19 +246,13 @@ if (!function_exists('pmssColonRecordFieldsLookup')) {
 
         return null;
     }
-}
-if (!function_exists('pmssReadRegularFileInt')) {
     // Read a regular non-symlink file that must contain digits to become an int.
     function pmssReadRegularFileInt(string $path, int $default = 0): int
     {
         $raw = pmssReadRegularFileDigits($path);
         return $raw === null ? $default : (int) $raw;
     }
-}
-if (!function_exists('pmssHostnameRead')) {
     function pmssHostnameRead(string $default = '', string $path = '/etc/hostname'): string { return is_string($hostname = @file_get_contents($path)) ? trim($hostname) : $default; }
-}
-if (!function_exists('pmssHostnameIsValid')) {
     // Validate a hostname, optionally accepting IPv4 literals for direct node targeting.
     function pmssHostnameIsValid(string $hostname, bool $allowIpv4 = true): bool
     {
@@ -320,9 +269,7 @@ if (!function_exists('pmssHostnameIsValid')) {
         }
         return true;
     }
-}
 
-if (!function_exists('pmssLockFileAcquire')) {
     function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mode = 'c', bool $createParentDir = false, bool $closeOnBusy = true, ?bool &$busy = null)
     {
         $busy = false;
@@ -334,11 +281,7 @@ if (!function_exists('pmssLockFileAcquire')) {
         }
         return $handle;
     }
-}
-if (!function_exists('pmssLockHandleWritePid')) {
     function pmssLockHandleWritePid($handle): void { @ftruncate($handle, 0); @rewind($handle); @fwrite($handle, (string) getmypid()); @fflush($handle); }
-}
-if (!function_exists('pmssRuntimeLockPath')) {
     /** Validate runtime lock filenames before joining them to a writable directory. */
     function pmssRuntimeLockBasename(string $basename): string
     {
@@ -357,27 +300,19 @@ if (!function_exists('pmssRuntimeLockPath')) {
     }
 
     function pmssRuntimeLockPath(string $basename): string { return (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/'.pmssRuntimeLockBasename($basename); }
-}
-if (!function_exists('pmssLockHandleRelease')) {
     function pmssLockHandleRelease($handle, bool $unlock = true): void { $unlock && @flock($handle, LOCK_UN); @fclose($handle); }
-}
-if (!function_exists('pmssRuntimeDir')) {
     // Resolve the PMSS runtime directory, allowing hermetic test overrides.
     function pmssRuntimeDir(): string
     {
         return pmssResolvePathFromEnv('PMSS_RUNTIME_DIR', PMSS_RUNTIME_DIR_DEFAULT);
     }
-}
 
-if (!function_exists('pmssStateDir')) {
     // Resolve the PMSS state directory, allowing hermetic test overrides.
     function pmssStateDir(): string
     {
         return pmssResolvePathFromEnv('PMSS_STATE_DIR', PMSS_STATE_DIR_DEFAULT);
     }
-}
 
-if (!function_exists('pmssStreamIsTty')) {
     /** Detect whether a stream resource is attached to a terminal. */
     function pmssStreamIsTty($stream, bool $defaultWhenUnavailable = false): bool
     {
@@ -392,17 +327,13 @@ if (!function_exists('pmssStreamIsTty')) {
         }
         return $defaultWhenUnavailable;
     }
-}
 
-if (!function_exists('pmssStandardStreamsAreTty')) {
     /** Detect whether all standard streams are attached to terminals. */
     function pmssStandardStreamsAreTty(): bool
     {
         return pmssStreamIsTty(STDIN) && pmssStreamIsTty(STDOUT) && pmssStreamIsTty(STDERR);
     }
-}
 
-if (!function_exists('pmssCommandPipesReady')) {
     /** Validate that proc_open exposed all requested pipes as stream resources. */
     function pmssCommandPipesReady(array $pipes): bool
     {
@@ -411,17 +342,13 @@ if (!function_exists('pmssCommandPipesReady')) {
             && is_resource($pipes[1])
             && is_resource($pipes[2]);
     }
-}
 
-if (!function_exists('pmssProcessPipeDescriptorSpec')) {
     /** Build a three-stream proc_open pipe descriptor spec. */
     function pmssProcessPipeDescriptorSpec(string $stdinMode = 'r', string $stdoutMode = 'w', string $stderrMode = 'w'): array
     {
         return [0 => ['pipe', $stdinMode], 1 => ['pipe', $stdoutMode], 2 => ['pipe', $stderrMode]];
     }
-}
 
-if (!function_exists('pmssCommandOutputPipesSetNonBlocking')) {
     /** Put proc_open stdout/stderr pipes into non-blocking mode when available. */
     function pmssCommandOutputPipesSetNonBlocking(array $pipes): bool
     {
@@ -431,9 +358,7 @@ if (!function_exists('pmssCommandOutputPipesSetNonBlocking')) {
             && @stream_set_blocking($pipes[1], false)
             && @stream_set_blocking($pipes[2], false);
     }
-}
 
-if (!function_exists('pmssCommandOutputPipesDrain')) {
     /**
      * Drain proc_open stdout/stderr pipes until EOF or timeout.
      *
@@ -490,27 +415,21 @@ if (!function_exists('pmssCommandOutputPipesDrain')) {
 
         return ['stdout' => $stdout, 'stderr' => $stderr, 'timed_out' => $timedOut];
     }
-}
 
-if (!function_exists('pmssTimeoutFireLogPath')) {
     /** Resolve the per-host timeout-fire JSONL path, allowing hermetic tests. */
     function pmssTimeoutFireLogPath(): string
     {
         $path = getenv('PMSS_TIMEOUT_FIRE_LOG');
         return is_string($path) && trim($path) !== '' ? trim($path) : PMSS_TIMEOUT_FIRE_LOG_DEFAULT;
     }
-}
 
-if (!function_exists('pmssTimeoutCommandForLog')) {
     /** Keep timeout command payloads single-line and bounded for JSONL logs. */
     function pmssTimeoutCommandForLog(string $command): string
     {
         $command = trim((string) preg_replace('/[\r\n\0\t ]+/', ' ', $command));
         return strlen($command) > 500 ? substr($command, 0, 500).'...' : $command;
     }
-}
 
-if (!function_exists('pmssTimeoutFireLog')) {
     /** Emit one structured timeout-fire event to the dedicated host log and JSON stream. */
     function pmssTimeoutFireLog(string $command, int $intendedSeconds, float $actualSeconds, string $signal, int $exitStatus): void
     {
@@ -528,9 +447,7 @@ if (!function_exists('pmssTimeoutFireLog')) {
         pmssJsonLineAppend(pmssTimeoutFireLogPath(), $payload);
         pmssLogJson($payload);
     }
-}
 
-if (!function_exists('pmssCommandTimeoutTerminate')) {
     /** Send SIGTERM, then SIGKILL after a short grace period when the child lingers. */
     function pmssCommandTimeoutTerminate($process, int $killAfterSeconds = PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT): string
     {
@@ -551,9 +468,7 @@ if (!function_exists('pmssCommandTimeoutTerminate')) {
         @proc_terminate($process, 9);
         return 'SIGKILL';
     }
-}
 
-if (!function_exists('pmssCommandTimeoutClose')) {
     /** Terminate a timed-out command, close its process handle, and log the timeout event. */
     function pmssCommandTimeoutClose($process, string $cmd, int $timeoutSec, float $startedAt): int
     {
@@ -563,9 +478,7 @@ if (!function_exists('pmssCommandTimeoutClose')) {
         pmssTimeoutFireLog($cmd, $timeoutSec, microtime(true) - $startedAt, $signal, $exitCode);
         return $exitCode;
     }
-}
 
-if (!function_exists('pmssProcessStatusExitCode')) {
     /** Extract a usable child exit code from proc_get_status() output. */
     function pmssProcessStatusExitCode($status): ?int
     {
@@ -576,9 +489,7 @@ if (!function_exists('pmssProcessStatusExitCode')) {
         $exitCode = $status['exitcode'] ?? null;
         return is_int($exitCode) && $exitCode >= 0 ? $exitCode : null;
     }
-}
 
-if (!function_exists('pmssProcessCloseExitCode')) {
     /**
      * Close a process handle without losing an exit code observed during polling.
      *
@@ -597,9 +508,7 @@ if (!function_exists('pmssProcessCloseExitCode')) {
 
         return (int) $rc;
     }
-}
 
-if (!function_exists('pmssCommandPipedCapture')) {
     /**
      * Run a prepared shell command through proc_open pipes.
      *
@@ -648,9 +557,7 @@ if (!function_exists('pmssCommandPipedCapture')) {
 
         return ['rc' => $rc, 'stdout' => $capture['stdout'], 'stderr' => $capture['stderr'], 'timed_out' => $capture['timed_out'], 'launch_failed' => false, 'pipe_failed' => false];
     }
-}
 
-if (!function_exists('pmssCommandCapture')) {
     /**
      * Execute a shell command and capture stdout/stderr without streaming.
      *
@@ -662,9 +569,7 @@ if (!function_exists('pmssCommandCapture')) {
         $result = pmssCommandPipedCapture($bash, $cmd, $timeoutSec, 0, false, $launchError, $launchRc);
         return ['rc' => $result['rc'], 'stdout' => $result['stdout'], 'stderr' => $result['stderr']];
     }
-}
 
-if (!function_exists('pmssOutputIndicatesForkFailure')) {
     /**
      * Detect common fork-related failure strings in captured command output.
      *
@@ -676,9 +581,7 @@ if (!function_exists('pmssOutputIndicatesForkFailure')) {
         $haystack = $stdout."\n".$stderr;
         return preg_match('/\b(Cannot fork|fork failed|Unable to fork|Resource temporarily unavailable)\b/i', $haystack) === 1;
     }
-}
 
-if (!function_exists('pmssDumpForkDiagnostics')) {
     /**
      * Emit a best-effort diagnostics snapshot for fork/proc exhaustion scenarios.
      *
@@ -922,9 +825,7 @@ if (!function_exists('pmssDumpForkDiagnostics')) {
             }
         }
     }
-}
 
-if (!function_exists('runCommand')) {
     /**
      * Execute a shell command while keeping failures non-fatal.
      *
@@ -1095,9 +996,7 @@ if (!function_exists('runCommand')) {
         }
         return $exitCode;
     }
-}
 
-if (!function_exists('requireRoot')) {
     /**
      * Abort with a clear error when the current user is not root.
      */
@@ -1108,7 +1007,6 @@ if (!function_exists('requireRoot')) {
             exit(1);
         }
     }
-}
 
 if (!function_exists('pmssRequireCli')) {
     /**
@@ -1129,7 +1027,6 @@ if (!function_exists('pmssRequireCli')) {
     }
 }
 
-if (!function_exists('pmssPrepareCliEntrypoint')) {
     /**
      * Apply the standard CLI/bootstrap guard used by thin script wrappers.
      */
@@ -1157,24 +1054,18 @@ if (!function_exists('pmssPrepareCliEntrypoint')) {
             $_SERVER['argv'][] = $arg;
         }
     }
-}
 
-if (!function_exists('pmssRequireCliEntrypointScript')) {
     function pmssRequireCliEntrypointScript(string $baseDir, string $relativePath, bool $rootRequired = false, array $argvAppend = []): void
     {
         pmssPrepareCliEntrypoint($rootRequired, $argvAppend);
         require_once rtrim($baseDir, '/').'/'.ltrim($relativePath, '/');
     }
-}
 
-if (!function_exists('pmssRunCliEntrypoint')) {
     function pmssRunCliEntrypoint(string $scriptPath, callable $main): void
     {
         if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === $scriptPath) exit((int) $main());
     }
-}
 
-if (!function_exists('pmssRunCliEntrypointWithArgv')) {
     /** Run a direct CLI entrypoint and pass through the current argv vector. */
     function pmssRunCliEntrypointWithArgv(string $scriptPath, callable $main): void
     {
@@ -1183,13 +1074,9 @@ if (!function_exists('pmssRunCliEntrypointWithArgv')) {
             return (int) $main(is_array($argv) ? $argv : []);
         });
     }
-}
-if (!function_exists('pmssRunCliProcessorEntrypoint')) {
     // Run a processor object exposing runCli($argv, $scriptPath) as a CLI entrypoint.
     function pmssRunCliProcessorEntrypoint(string $scriptPath, object $processor): void { pmssRunCliEntrypointWithArgv($scriptPath, static function (array $argv) use ($processor, $scriptPath): int { return (int) $processor->runCli($argv, (string) ($argv[0] ?? $scriptPath)); }); }
-}
 
-if (!function_exists('pmssSnapshotLogOpen')) {
     /**
      * Open a root-only append log for snapshot-style cron jobs.
      *
@@ -1216,9 +1103,7 @@ if (!function_exists('pmssSnapshotLogOpen')) {
         }
         return $handle;
     }
-}
 
-if (!function_exists('pmssRunSnapshotLogTask')) {
     /** Resolve env log path, stamp time once, and run a snapshot callback. */
     function pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defaultLogPath, callable $callback): int
     {
@@ -1238,17 +1123,13 @@ if (!function_exists('pmssRunSnapshotLogTask')) {
             if ($oldUmask !== null) umask($oldUmask);
         }
     }
-}
 
-if (!function_exists('pmssSnapshotWriteLine')) {
     // Append one newline-terminated line to a snapshot log.
     function pmssSnapshotWriteLine($handle, string $line): void
     {
         @fwrite($handle, $line.PHP_EOL);
     }
-}
 
-if (!function_exists('pmssSnapshotWarnToken')) {
     /** Keep warning codes and field keys as single log tokens. */
     function pmssSnapshotWarnToken(string $value, string $fallback = 'field'): string
     {
@@ -1260,9 +1141,7 @@ if (!function_exists('pmssSnapshotWarnToken')) {
 
         return substr($token, 0, 64);
     }
-}
 
-if (!function_exists('pmssSnapshotWarnValue')) {
     /** Keep warning field values single-line and bounded without changing normal text. */
     function pmssSnapshotWarnValue($value): string
     {
@@ -1270,9 +1149,7 @@ if (!function_exists('pmssSnapshotWarnValue')) {
         $normalized = trim((string) preg_replace('/ {2,}/', ' ', $normalized));
         return strlen($normalized) > 300 ? substr($normalized, 0, 300) : $normalized;
     }
-}
 
-if (!function_exists('pmssSnapshotWriteWarn')) {
     // Append a normalized warning line to a snapshot log.
     function pmssSnapshotWriteWarn($handle, string $timestamp, string $code, array $fields = [], array $output = []): void
     {
@@ -1295,9 +1172,7 @@ if (!function_exists('pmssSnapshotWriteWarn')) {
 
         pmssSnapshotWriteLine($handle, $line);
     }
-}
 
-if (!function_exists('pmssError')) {
     /**
      * Write an error message to STDERR and the log.
      */
@@ -1306,8 +1181,7 @@ if (!function_exists('pmssError')) {
         // Use ANSI red for visibility if interactive, otherwise plain text
         $isTty = pmssStreamIsTty(STDERR);
         $prefix = $isTty ? "\033[31m[ERROR]\033[0m " : "[ERROR] ";
-        
+
         fwrite(STDERR, $prefix . $message . PHP_EOL);
         logMessage('[ERROR] ' . $message); // Persist to logfile
     }
-}

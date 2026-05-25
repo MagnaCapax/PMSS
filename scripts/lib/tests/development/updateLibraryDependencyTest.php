@@ -35,6 +35,10 @@ class UpdateLibraryDependencyTest extends TestCase
 
     public function testRuntimeBootstrapsKeepOnlyIntentionalFallbackGuards(): void
     {
+        $runtimeSource = $this->pmssReadRepoFile('scripts/lib/runtime.php');
+        preg_match_all("/if \\(!function_exists\\('([^']+)'\\)\\) \\{/", $runtimeSource, $runtimeGuards);
+        $this->assertSame(['pmssFormatBytes', 'pmssRequireCli'], $runtimeGuards[1], 'runtime.php should keep only compatibility guards that support customer/helper stubs');
+
         $this->assertRepoFileDependencyCases([
             ['scripts/lib/log.php', ["if (!function_exists('logmsg')) {", 'function pmssJsonEncodeSafe(array $payload, int $flags = 0): ?string', 'function pmssJsonLineAppend(string $path, array $payload): bool', 'function pmssLogWriteMessage(string $primary, string $fallback, string $message, bool $writeToStderr = false): void'], ["if (!function_exists('pmssJsonEncodeSafe')) {", "if (!function_exists('pmssJsonLineAppend')) {", "if (!function_exists('pmssJsonEmitPayload')) {", "if (!function_exists('pmssLogAppendTimestampedLine')) {", "if (!function_exists('pmssLogWriteMessage')) {"], 'log.php should keep only the intentional update.php compatibility guard'],
             ['scripts/lib/update/runtime/commands.php', ["if (!function_exists('runUserStep')) {"], ["if (!function_exists('runStep')) {", "if (!function_exists('aptCmd')) {", "if (!function_exists('pmssBuildCommand')) {", "if (!function_exists('pmssLogStatus')) {"], 'runtime/commands.php should rely on require_once for '],
