@@ -21,7 +21,10 @@ class UpdateStep2FinalPermissionsTest extends TestCase
         $this->assertOrderedStrings([
             "pmssLogJson(['event' => 'phase', 'name' => 'setupPermissions', 'status' => 'start']);",
             "\$setupPermissionsRc = runStep('Refreshing system permissions', '/scripts/util/setupPermissions.php');",
-            "PMSS_UPDATE_STEP_CLASS_SOFT_FAIL",
+            // Anchor on the setupPermissions-specific reason, not bare SOFT_FAIL:
+            // GH#592 added an earlier SOFT_FAIL (user-maintenance mismatch) so
+            // the first global SOFT_FAIL occurrence is no longer this block's.
+            "'setupPermissions_exit'",
             "'status' => 'leaving setupPermissions'",
             "runStep('Refreshing FTP configuration', '/scripts/util/ftpConfig.php');",
         ], $src);

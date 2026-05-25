@@ -667,8 +667,7 @@ if (is_array($userMaintenanceSummary)) {
     if ($processedUsers < $totalUsers) {
         // Name WHY users were skipped so operators act on the real cause
         // (e.g. userPermissions timeout) rather than chasing correlated host
-        // state. The mismatch stays must_succeed: silently-skipped users get
-        // no post-upgrade service restart and break for customers (GH#302).
+        // state.
         $reason = sprintf('processed_users_mismatch:%d_of_%d', $processedUsers, $totalUsers);
         $skipReasons = isset($userMaintenanceSummary['skip_reasons']) && is_array($userMaintenanceSummary['skip_reasons'])
             ? $userMaintenanceSummary['skip_reasons']
@@ -676,12 +675,29 @@ if (is_array($userMaintenanceSummary)) {
         if ($skipReasons !== []) {
             $reason .= ' skipped=['.implode('; ', array_slice($skipReasons, 0, 10)).']';
         }
+        // SOFT_FAIL (GH#592), not MUST_SUCCEED. Rationale: a per-user
+        // maintenance miss (most commonly userPermissions timeout on an
+        // I/O-saturated host) must NOT block the whole system update — on such
+        // hosts the hard-fail left the host stuck on an old PMSS version
+        // indefinitely, which is strictly worse for customers than completing
+        // the system update. The GH#302 concern (skipped users get no
+        // post-upgrade service restart) is independently covered by the
+        // per-minute watchdog crons (checkLighttpdInstances 1m,
+        // checkRtorrent 2m) which regenerate config + restart services
+        // regardless of update-step2 outcome. The hard-fail never repaired the
+        // timed-out user's permissions anyway (the timeout already happened);
+        // it only blocked the fleet. Durable visibility below replaces the
+        // hard-fail's only real benefit: surfacing the incomplete tail.
+        pmssUpdateRecordIncompleteUserMaintenance($processedUsers, $totalUsers, $skipReasons);
         pmssUpdateStep2HandleClassifiedFailure(
             'Updating all user environments',
-            PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED,
+            PMSS_UPDATE_STEP_CLASS_SOFT_FAIL,
             1,
             $reason
         );
+    } else {
+        // Clear any stale incomplete-tail marker once a run completes all users.
+        pmssUpdateClearIncompleteUserMaintenance();
     }
 }
 // Ensure the standard download speed test file exists

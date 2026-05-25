@@ -48,3 +48,48 @@ function pmssUpdateStep2HandleClassifiedFailure(string $description, string $cla
         exit(1);
     }
 }
+
+/**
+ * Durable marker path for an incomplete per-user-maintenance tail (GH#592).
+ *
+ * Overridable via PMSS_INCOMPLETE_USER_MAINTENANCE_PATH for tests.
+ */
+function pmssUpdateIncompleteUserMaintenancePath(): string
+{
+    $override = (string) getenv('PMSS_INCOMPLETE_USER_MAINTENANCE_PATH');
+    return $override !== '' ? $override : '/var/lib/pmss/update-incomplete-users.json';
+}
+
+/**
+ * Record that per-user maintenance finished with a skipped tail (GH#592).
+ *
+ * Replaces the only real benefit the former MUST_SUCCEED hard-fail provided —
+ * surfacing the incomplete tail — without blocking the whole system update.
+ * The marker is durable (survives reboot) so operators / agentDiagnostics /
+ * MOTD can see that some users still need a permission+skel refresh.
+ *
+ * @param array<int, string> $skipReasons
+ */
+function pmssUpdateRecordIncompleteUserMaintenance(int $processed, int $total, array $skipReasons): void
+{
+    $path = pmssUpdateIncompleteUserMaintenancePath();
+    @mkdir(dirname($path), 0755, true);
+    $payload = [
+        'ts'        => gmdate('c'),
+        'processed' => $processed,
+        'total'     => $total,
+        'skipped'   => array_values($skipReasons),
+    ];
+    @file_put_contents($path, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
+}
+
+/**
+ * Clear the incomplete-tail marker once a run processes all users (GH#592).
+ */
+function pmssUpdateClearIncompleteUserMaintenance(): void
+{
+    $path = pmssUpdateIncompleteUserMaintenancePath();
+    if (is_file($path)) {
+        @unlink($path);
+    }
+}
