@@ -707,8 +707,23 @@ runStep('Refreshing FTP configuration', '/scripts/util/ftpConfig.php');
 
 $logrotateTemplate = '/etc/seedbox/config/template.logrotate.pmss';
 if (file_exists($logrotateTemplate)) {
-    runStep('Installing logrotate policy for PMSS update logs', sprintf('cp %s /etc/logrotate.d/pmss-update', escapeshellarg($logrotateTemplate)));
-    runStep('Setting permissions on PMSS logrotate policy', 'chmod 644 /etc/logrotate.d/pmss-update');
+    $logrotateTarget = '/etc/logrotate.d/pmss-update';
+    $logrotateInstallRc = runStep(
+        'Installing logrotate policy for PMSS update logs',
+        sprintf('install -m 0644 -T %s %s', escapeshellarg($logrotateTemplate), escapeshellarg($logrotateTarget))
+    );
+    $logrotateVerifyRc = runStep(
+        'Verifying PMSS logrotate policy matches template',
+        sprintf('cmp -s %s %s', escapeshellarg($logrotateTemplate), escapeshellarg($logrotateTarget))
+    );
+    if ($logrotateInstallRc !== 0 || $logrotateVerifyRc !== 0) {
+        pmssUpdateStep2HandleClassifiedFailure(
+            'Installing logrotate policy for PMSS update logs',
+            PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED,
+            $logrotateInstallRc !== 0 ? $logrotateInstallRc : $logrotateVerifyRc,
+            'logrotate_policy_install_or_verify_failed'
+        );
+    }
 }
 
 pmssRunProfiledCallable('Ensuring network template baseline', 'pmssEnsureNetworkTemplate', ['logmsg']);
