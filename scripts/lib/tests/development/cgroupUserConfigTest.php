@@ -153,6 +153,19 @@ class CgroupUserConfigTest extends TestCase
         $this->assertStringContainsString('MemoryMax=312M', $res['out']);
     }
 
+    public function testScalarOptionParserKeepsInlineOnlyContract(): void
+    {
+        $split = $this->runMgr(['testuser', '--memory-high', '600']);
+
+        $this->assertEquals(0, $split['rc']);
+        $this->assertStringNotContainsString('[Planned properties]', $split['out']);
+        $this->assertStringContainsString('[Config]', $split['out']);
+
+        $bareAfterInline = $this->runMgr(['testuser', '--memory-high=600', '--memory-high']);
+        $this->assertEquals(0, $bareAfterInline['rc']);
+        $this->assertStringContainsString('MemoryHigh=600M', $bareAfterInline['out']);
+    }
+
     public function testMemory95PercentCap()
     {
         // 1GB System RAM. Cap ~972M.

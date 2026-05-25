@@ -10,6 +10,7 @@ namespace PMSS\Cgroup;
 
 require_once __DIR__ . '/SystemInterface.php';
 require_once __DIR__ . '/../cli/helpText.php';
+require_once __DIR__ . '/../cli/optionParser.php';
 require_once __DIR__ . '/../systemdSliceProperties.php';
 require_once __DIR__ . '/../update/runtime/commands.php'; // for runStep
 
@@ -47,6 +48,13 @@ class Manager
 
         $user  = $args[0];
         $flags = array_slice($args, 1);
+        $inlineValueFlags = array_filter($flags, static function (string $flag): bool {
+            return strpos($flag, '--') === 0 && strpos($flag, '=') !== false;
+        });
+        $parsedFlags = \pmssParseCliTokens(
+            array_merge([$argv[0] ?? 'userConfigCgroup.php'], $inlineValueFlags),
+            ['__pmss-cgroup-inline-values-only']
+        );
         $uid   = $this->sys->getUid($user);
 
         if ($uid < 0) {
@@ -67,10 +75,10 @@ class Manager
         $respectExisting = isset($flagSet['--respect-existing']);
         $defaultsRequested = isset($flagSet['--defaults']);
         $doWipe = isset($flagSet['--wipe']);
-        $device = '';
-        $ioProfile = '';
-        $ioCostQos = '';
-        $ioCostModel = '';
+        $device = (string) \pmssCliOptionString($parsedFlags, 'device', null, '', true);
+        $ioProfile = strtolower((string) \pmssCliOptionString($parsedFlags, 'io-profile', null, '', true));
+        $ioCostQos = (string) \pmssCliOptionString($parsedFlags, 'io-cost-qos', null, '', true);
+        $ioCostModel = (string) \pmssCliOptionString($parsedFlags, 'io-cost-model', null, '', true);
         $hasIoFlag = false;
         $ioPairs = [];
         $policyIoPairs = [];
@@ -79,41 +87,18 @@ class Manager
         $ioSpecs = [];
         $optLowercase = ['cpu-profile' => true, 'mem-profile' => true, 'tasks-profile' => true];
 
-        // Scan value flags once, then replay IO specs in canonical property order.
-        foreach ($flags as $flag) {
-            if (strpos($flag, '--') !== 0 || ($separator = strpos($flag, '=')) === false) {
-                continue;
-            }
+        foreach (array_keys($optTargets) as $name) {
+            $value = \pmssCliOptionString($parsedFlags, $name, null, null, true);
+            if ($value !== null) $opt[$name] = isset($optLowercase[$name]) ? strtolower($value) : $value;
+        }
 
+        // IO flags may repeat; collect them from raw tokens before canonical replay.
+        foreach ($inlineValueFlags as $flag) {
+            $separator = strpos($flag, '=');
             $name = substr($flag, 2, $separator - 2);
-            $value = substr($flag, $separator + 1);
-
-            if (isset(self::IO_CLI_PROPERTY_MAP[$name])) {
-                $ioSpecs[$name][] = $value;
-                $hasIoFlag = true;
-                continue;
-            }
-
-            if ($name === 'device') {
-                $device = $value;
-                continue;
-            }
-            if ($name === 'io-profile') {
-                $ioProfile = strtolower($value);
-                continue;
-            }
-            if ($name === 'io-cost-qos') {
-                $ioCostQos = $value;
-                continue;
-            }
-            if ($name === 'io-cost-model') {
-                $ioCostModel = $value;
-                continue;
-            }
-
-            if (isset($optTargets[$name])) {
-                $opt[$name] = isset($optLowercase[$name]) ? strtolower($value) : $value;
-            }
+            if (!isset(self::IO_CLI_PROPERTY_MAP[$name])) continue;
+            $ioSpecs[$name][] = substr($flag, $separator + 1);
+            $hasIoFlag = true;
         }
 
         foreach (self::IO_CLI_PROPERTY_MAP as $flagName => $propertyName) {
