@@ -69,7 +69,10 @@ function pmssSetupLetsEncryptPathResolve(string $path, string $label): string
  */
 function pmssSetupLetsEncryptRenewalCronContents(): string
 {
-    return "0 0,12 * * * root python -c 'import random; import time; time.sleep(random.random() * 3600)' && /usr/bin/certbot renew\n";
+    // `python` is Python 2 on legacy Debian and absent on bookworm+; the `&&` chain meant
+    // the jitter pre-command silently failed and `certbot renew` never ran. Use `python3`
+    // which is present on every PMSS-supported Debian release (Refs #484 review).
+    return "0 0,12 * * * root python3 -c 'import random; import time; time.sleep(random.random() * 3600)' && /usr/bin/certbot renew\n";
 }
 
 /**

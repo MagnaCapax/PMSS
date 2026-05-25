@@ -264,4 +264,19 @@ class SetupLetsEncryptTest extends TestCase
             '$venvFunctional',
         ]);
     }
+
+    public function testRenewalCronUsesPython3NotPython2(): void
+    {
+        // Static guard against regression: the renewal-cron jitter command MUST use
+        // `python3` (present on every PMSS-supported Debian release). `python`
+        // is Python 2, absent on bookworm+; the `&&` chain made certbot renew
+        // silently never run. See Refs #484 adversarial review supplement.
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/certbotSetup.php', [
+            "python3 -c 'import random; import time; time.sleep",
+        ]);
+        $this->pmssAssertRepoFileNotContainsString(
+            'scripts/lib/certbotSetup.php',
+            "python -c 'import random; import time; time.sleep"
+        );
+    }
 }
