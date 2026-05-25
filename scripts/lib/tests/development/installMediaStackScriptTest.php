@@ -62,7 +62,8 @@ class installMediaStackScriptTest extends TestCase
 
     public function testProwlarrRuntimeNetcorePresent(): void
     {
-        $this->assertStringContainsString('runtime=netcore&arch=${SERVARR_ARCH}', $this->script);
+        $this->assertStringContainsString('runtime=netcore&arch=%s', $this->script);
+        $this->assertStringContainsString('servarr_update_api_download_url "$PROWLARR_UPDATE_BASE" "$PROWLARR_BRANCH"', $this->script);
     }
 
     public function testInstallServarrAppCreatesConfigXml(): void
@@ -277,5 +278,169 @@ class installMediaStackScriptTest extends TestCase
         $this->assertTrue(strpos($this->script, 's/\\(<PublicHttpPort>\\)') === false, 'Must not use / delimiters that break on </tag>');
         $this->assertStringContainsString('s|(<PublicHttpPort>)[^<]*(</PublicHttpPort>)|', $this->script);
         $this->assertStringContainsString('s|(<InternalHttpPort>)[^<]*(</InternalHttpPort>)|', $this->script);
+    }
+
+    public function testServarrDownloadResolversPreserveUrlContracts(): void
+    {
+        $functions = $this->pmssExtractShellFunctions(array(
+            'servarr_update_api_download_url',
+            'servarr_resolve_radarr_download_url',
+            'servarr_resolve_prowlarr_download_url',
+            'servarr_resolve_sonarr_download_url',
+        ));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'SERVARR_ARCH=x64',
+            'RADARR_BRANCH=master',
+            'PROWLARR_BRANCH=master',
+            'SONARR_BRANCH=main',
+            'SONARR_MAJOR=4',
+            'RADARR_UPDATE_BASE=https://radarr.servarr.com/v1/update',
+            'PROWLARR_UPDATE_BASE=https://prowlarr.servarr.com/v1/update',
+            'SONARR_DL_BASE=https://services.sonarr.tv/v1/download',
+            'OVR_RADARR_URL=https://mirror.example/radarr.tar.gz',
+            'OVR_RADARR_VERSION=',
+            'OVR_PROWLARR_URL=https://mirror.example/prowlarr.tar.gz',
+            'OVR_SONARR_URL=',
+            'SERVARR_DOWNLOAD_URL=',
+            'log_warn() { echo "WARN:$*" >&2; }',
+            'getconf() { echo "glibc 2.36"; }',
+            'dpkg() { return 0; }',
+            $functions,
+            'servarr_resolve_radarr_download_url',
+            'echo "radarr_override=$SERVARR_DOWNLOAD_URL"',
+            'OVR_RADARR_URL=',
+            'OVR_RADARR_VERSION=v5.10.4.9218',
+            'servarr_resolve_radarr_download_url',
+            'echo "radarr_pin=$SERVARR_DOWNLOAD_URL"',
+            'OVR_RADARR_VERSION=',
+            'servarr_resolve_radarr_download_url',
+            'echo "radarr_api=$SERVARR_DOWNLOAD_URL"',
+            'servarr_resolve_prowlarr_download_url',
+            'echo "prowlarr_override=$SERVARR_DOWNLOAD_URL"',
+            'OVR_PROWLARR_URL=',
+            'servarr_resolve_prowlarr_download_url',
+            'echo "prowlarr_api=$SERVARR_DOWNLOAD_URL"',
+            'OVR_SONARR_URL=https://mirror.example/sonarr.tar.gz',
+            'servarr_resolve_sonarr_download_url',
+            'echo "sonarr_override=$SERVARR_DOWNLOAD_URL"',
+            'OVR_SONARR_URL=',
+            'servarr_resolve_sonarr_download_url',
+            'echo "sonarr_api=$SERVARR_DOWNLOAD_URL"',
+            '',
+        ));
+
+        $output = $this->pmssRunShellHarness($script);
+
+        $this->assertStringContainsString('radarr_override=https://mirror.example/radarr.tar.gz', $output);
+        $this->assertStringContainsString('radarr_pin=https://github.com/Radarr/Radarr/releases/download/v5.10.4.9218/Radarr.master.5.10.4.9218.linux-core-x64.tar.gz', $output);
+        $this->assertStringContainsString('radarr_api=https://radarr.servarr.com/v1/update/master/updatefile?os=linux&runtime=netcore&arch=x64', $output);
+        $this->assertStringContainsString('prowlarr_override=https://mirror.example/prowlarr.tar.gz', $output);
+        $this->assertStringContainsString('prowlarr_api=https://prowlarr.servarr.com/v1/update/master/updatefile?os=linux&runtime=netcore&arch=x64', $output);
+        $this->assertStringContainsString('sonarr_override=https://mirror.example/sonarr.tar.gz', $output);
+        $this->assertStringContainsString('sonarr_api=https://services.sonarr.tv/v1/download/main/latest?version=4&os=linux&arch=x64', $output);
+    }
+
+    public function testServarrRadarrResolverPreservesOldGlibcPin(): void
+    {
+        $functions = $this->pmssExtractShellFunctions(array(
+            'servarr_update_api_download_url',
+            'servarr_resolve_radarr_download_url',
+        ));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'SERVARR_ARCH=x64',
+            'RADARR_BRANCH=master',
+            'RADARR_UPDATE_BASE=https://radarr.servarr.com/v1/update',
+            'OVR_RADARR_URL=',
+            'OVR_RADARR_VERSION=',
+            'SERVARR_DOWNLOAD_URL=',
+            'log_warn() { echo "WARN:$*"; }',
+            'getconf() { echo "glibc 2.31"; }',
+            'dpkg() { return 1; }',
+            $functions,
+            'servarr_resolve_radarr_download_url',
+            'echo "url=$SERVARR_DOWNLOAD_URL"',
+            '',
+        ));
+
+        $output = $this->pmssRunShellHarness($script);
+
+        $this->assertStringContainsString('WARN:Detected GLIBC 2.31 < 2.33', $output);
+        $this->assertStringContainsString('url=https://github.com/Radarr/Radarr/releases/download/v5.10.4.9218/Radarr.master.5.10.4.9218.linux-core-x64.tar.gz', $output);
+    }
+
+    public function testServarrInstallHelperRunsSharedDownloadAndConfigSequence(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-servarr-home-');
+        $trace = $home.'/trace.log';
+        mkdir($home.'/.bin', 0755, true);
+
+        $functions = $this->pmssExtractShellFunctions(array('servarr_install_from_url'));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'HOME='.escapeshellarg($home),
+            'TRACE='.escapeshellarg($trace),
+            'USERNAME=alice',
+            'DRY_RUN=0',
+            'log_info() { echo "info:$*" >> "$TRACE"; }',
+            'log_err() { echo "err:$*" >> "$TRACE"; }',
+            'managed_install_path_reset() { echo "reset:$1" >> "$TRACE"; }',
+            'pkill() { echo "pkill:$*" >> "$TRACE"; }',
+            'fetch() { echo "fetch:$1|$2" >> "$TRACE"; return 0; }',
+            'verify_checksum() { echo "verify:$1|$2" >> "$TRACE"; return 0; }',
+            'extract_tgz() { echo "extract:$*" >> "$TRACE"; }',
+            'servarr_config_xml_converge() { echo "config:$1|$2|$3|$4" >> "$TRACE"; }',
+            $functions,
+            'servarr_install_from_url "radarr" "Radarr" "$HOME/.config/radarr" "17878" "7878" "https://example.invalid/updatefile?os=linux"',
+            '',
+        ));
+
+        $this->pmssRunShellHarness($script);
+        $traceOutput = (string) file_get_contents($trace);
+
+        $this->assertOrderedStrings(array(
+            'reset:'.$home.'/.bin/Radarr',
+            'pkill:-9 -f -u alice Radarr',
+            'info:Radarr URL: https://example.invalid/updatefile?os=linux',
+            'fetch:https://example.invalid/updatefile?os=linux|Radarr.tar.gz',
+            'verify:Radarr.tar.gz|updatefile',
+            'extract:Radarr.tar.gz',
+            'config:radarr|'.$home.'/.config/radarr|17878|7878',
+        ), $traceOutput);
+    }
+
+    /**
+     * @param array<int, string> $names
+     */
+    private function pmssExtractShellFunctions(array $names): string
+    {
+        $functions = array();
+        foreach ($names as $name) {
+            $pattern = '/^'.preg_quote($name, '/').'\(\) \{\n(?:.*\n)*?^\}/m';
+            $matched = preg_match($pattern, $this->script, $matches);
+
+            $this->assertSame(1, $matched, 'Failed to extract shell function '.$name);
+            $functions[] = $matches[0];
+        }
+
+        return implode("\n\n", $functions);
+    }
+
+    private function pmssRunShellHarness(string $script): string
+    {
+        $harness = $this->pmssMakeTempDir('pmss-media-stack-harness-').'/run.sh';
+        file_put_contents($harness, $script);
+        chmod($harness, 0755);
+
+        $output = array();
+        exec(escapeshellarg($harness).' 2>&1', $output, $rc);
+        $combined = implode("\n", $output);
+
+        $this->assertSame(0, $rc, $combined);
+        return $combined;
     }
 }
