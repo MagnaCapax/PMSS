@@ -112,16 +112,13 @@ function pmssStatsResolveContext(array $overrides = []): array
     if ($cgroupDir === '') {
         $lines = @file('/proc/self/cgroup', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         if (is_array($lines)) {
-            $paths = [];
             foreach ($lines as $line) {
                 $parts = explode(':', (string) $line, 3);
                 if (count($parts) !== 3 || trim($parts[2]) === '') {
                     continue;
                 }
-                $paths[] = '/'.ltrim(trim($parts[2]), '/');
-            }
 
-            foreach ($paths as $path) {
+                $path = '/'.ltrim(trim($parts[2]), '/');
                 foreach (['/sys/fs/cgroup'.$path, '/sys/fs/cgroup/unified'.$path] as $candidate) {
                     if (is_dir($candidate)) {
                         $cgroupDir = $candidate;
@@ -159,12 +156,7 @@ function pmssStatsParseSizeToBytes(string $value): ?float
     $number = (float) $matches[1];
     $unit = strtoupper($matches[2]);
     $powerMap = ['' => 0, 'K' => 1, 'M' => 2, 'G' => 3, 'T' => 4, 'P' => 5, 'E' => 6];
-    $power = $powerMap[$unit] ?? null;
-    if ($power === null) {
-        return null;
-    }
-
-    return $number * pow(1024, $power);
+    return $number * pow(1024, $powerMap[$unit]);
 }
 
 /**
@@ -209,12 +201,10 @@ function pmssStatsReadQuotaSnapshot(string $home): array
     return $result;
 }
 
-/**
- * Format a rate stored in bytes per second.
- */
-function pmssStatsFormatRate(float $bytesPerSecond): string
+// Shared scalar render helpers keep repeated stats layout branches in one place.
+function pmssStatsPercent(?float $used, ?float $limit): ?float
 {
-    return pmssFormatBytes($bytesPerSecond).'/s';
+    return ($used !== null && $limit !== null && $limit > 0.0) ? ($used / $limit) * 100.0 : null;
 }
 
 /**
@@ -229,10 +219,8 @@ function pmssStatsFormatUptime(int $seconds): string
     if ($days > 0) {
         return sprintf('%dd %dh %dm', $days, $hours, $minutes);
     }
-    if ($hours > 0) {
-        return sprintf('%dh %dm', $hours, $minutes);
-    }
-    return sprintf('%dm', $minutes);
+
+    return $hours > 0 ? sprintf('%dh %dm', $hours, $minutes) : sprintf('%dm', $minutes);
 }
 
 /**
@@ -391,10 +379,7 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
     if ($diskLimitBytes === null && isset($config['quota']) && is_numeric($config['quota'])) {
         $diskLimitBytes = ((float) $config['quota']) * 1024 * 1024 * 1024;
     }
-    $diskPercent = null;
-    if ($quota['used_bytes'] !== null && is_numeric($diskLimitBytes) && (float) $diskLimitBytes > 0) {
-        $diskPercent = ((float) $quota['used_bytes'] / (float) $diskLimitBytes) * 100.0;
-    }
+    $diskPercent = pmssStatsPercent($quota['used_bytes'], $diskLimitBytes);
 
     $memoryCurrentBytes = null;
     if (isset($resource['memory']['current']) && is_numeric($resource['memory']['current'])) {
@@ -409,10 +394,7 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
     } elseif (is_int($cgroup['memory_limit'] ?? null)) {
         $memoryLimitBytes = (float) $cgroup['memory_limit'];
     }
-    $memoryPercent = null;
-    if ($memoryCurrentBytes !== null && $memoryLimitBytes !== null && $memoryLimitBytes > 0.0) {
-        $memoryPercent = ($memoryCurrentBytes / $memoryLimitBytes) * 100.0;
-    }
+    $memoryPercent = pmssStatsPercent($memoryCurrentBytes, $memoryLimitBytes);
 
     $trafficLimitMiB = $trafficLimitState['effectiveLimitGiB'] > 0
         ? $trafficLimitState['effectiveLimitGiB'] * 1024.0
@@ -420,10 +402,7 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
     $trafficUsedMiB = isset($traffic['raw']['month']) && is_numeric($traffic['raw']['month'])
         ? (float) $traffic['raw']['month']
         : null;
-    $trafficPercent = null;
-    if ($trafficUsedMiB !== null && $trafficLimitMiB !== null && $trafficLimitMiB > 0.0) {
-        $trafficPercent = ($trafficUsedMiB / $trafficLimitMiB) * 100.0;
-    }
+    $trafficPercent = pmssStatsPercent($trafficUsedMiB, $trafficLimitMiB);
 
     return [
         'context' => $context,
@@ -472,6 +451,16 @@ function pmssStatsRenderBar(?float $percent, int $width): string
     return '['.str_repeat('█', $filled).str_repeat('░', max(0, $width - $filled)).']';
 }
 
+function pmssStatsFormatBytesOrFallback($bytes, string $fallback = 'n/a'): string
+{
+    return $bytes !== null ? pmssFormatBytes((float) $bytes) : $fallback;
+}
+
+function pmssStatsRenderPercentSuffix(?float $percent, int $width): string
+{
+    return pmssStatsRenderBar($percent, $width).' '.($percent !== null ? sprintf('%d%%', round($percent)) : 'n/a');
+}
+
 /**
  * Render one labeled line with alignment suitable for narrow terminals.
  */
@@ -499,18 +488,18 @@ function pmssStatsRenderText(array $stats, array $options = []): string
         $lines[] = '';
     }
 
-    $diskValue = (($stats['disk']['used_bytes'] !== null) ? pmssFormatBytes((float) $stats['disk']['used_bytes']) : $stats['disk']['used_text'])
+    $diskValue = pmssStatsFormatBytesOrFallback($stats['disk']['used_bytes'], $stats['disk']['used_text'])
         .' / '
-        .(($stats['disk']['limit_bytes'] !== null) ? pmssFormatBytes((float) $stats['disk']['limit_bytes']) : $stats['disk']['limit_text']);
-    $memoryValue = (($stats['memory']['current_bytes'] !== null) ? pmssFormatBytes((float) $stats['memory']['current_bytes']) : 'n/a')
+        .pmssStatsFormatBytesOrFallback($stats['disk']['limit_bytes'], $stats['disk']['limit_text']);
+    $memoryValue = pmssStatsFormatBytesOrFallback($stats['memory']['current_bytes'])
         .' / '
-        .(($stats['memory']['limit_bytes'] !== null) ? pmssFormatBytes((float) $stats['memory']['limit_bytes']) : 'n/a');
+        .pmssStatsFormatBytesOrFallback($stats['memory']['limit_bytes']);
 
     if (!empty($options['mini'])) {
         $ratio = $stats['rtorrent']['ratio'] !== null ? number_format((float) $stats['rtorrent']['ratio'], 2) : 'n/a';
         $lines[] = $title;
         $lines[] = 'Disk '.$diskValue.' · Mem '.$memoryValue;
-        $lines[] = 'Up '.pmssStatsFormatRate((float) ($stats['rtorrent']['upload_rate'] ?? 0.0)).' · Down '.pmssStatsFormatRate((float) ($stats['rtorrent']['download_rate'] ?? 0.0)).' · Ratio '.$ratio;
+        $lines[] = 'Up '.pmssFormatBytes((float) ($stats['rtorrent']['upload_rate'] ?? 0.0)).'/s · Down '.pmssFormatBytes((float) ($stats['rtorrent']['download_rate'] ?? 0.0)).'/s · Ratio '.$ratio;
         $lines[] = 'Traffic '.(($stats['traffic']['upload_month_mib'] !== null) ? pmssTrafficFormatAmount((float) $stats['traffic']['upload_month_mib']) : 'n/a').' · Uptime '.($stats['uptime_seconds'] !== null ? pmssStatsFormatUptime((int) $stats['uptime_seconds']) : 'n/a');
         return implode(PHP_EOL, $lines).PHP_EOL;
     }
@@ -518,12 +507,12 @@ function pmssStatsRenderText(array $stats, array $options = []): string
     $lines[] = pmssStatsRenderLine(
         'Disk',
         $diskValue,
-        pmssStatsRenderBar($stats['disk']['percent'], 20).' '.($stats['disk']['percent'] !== null ? sprintf('%d%%', round((float) $stats['disk']['percent'])) : 'n/a')
+        pmssStatsRenderPercentSuffix($stats['disk']['percent'], 20)
     );
     $lines[] = pmssStatsRenderLine(
         'Memory',
         $memoryValue,
-        pmssStatsRenderBar($stats['memory']['percent'], 20).' '.($stats['memory']['percent'] !== null ? sprintf('%d%%', round((float) $stats['memory']['percent'])) : 'n/a')
+        pmssStatsRenderPercentSuffix($stats['memory']['percent'], 20)
     );
     $lines[] = '';
 
@@ -542,13 +531,13 @@ function pmssStatsRenderText(array $stats, array $options = []): string
     $lines[] = pmssStatsRenderLine('Torrents', $torrentSummary);
     $lines[] = pmssStatsRenderLine(
         'Upload',
-        '▲ '.pmssStatsFormatRate((float) ($stats['rtorrent']['upload_rate'] ?? 0.0)),
-        'Total: '.(($stats['rtorrent']['upload_total'] !== null) ? pmssFormatBytes((float) $stats['rtorrent']['upload_total']) : 'n/a')
+        '▲ '.pmssFormatBytes((float) ($stats['rtorrent']['upload_rate'] ?? 0.0)).'/s',
+        'Total: '.pmssStatsFormatBytesOrFallback($stats['rtorrent']['upload_total'])
     );
     $lines[] = pmssStatsRenderLine(
         'Download',
-        '▼ '.pmssStatsFormatRate((float) ($stats['rtorrent']['download_rate'] ?? 0.0)),
-        'Total: '.(($stats['rtorrent']['download_total'] !== null) ? pmssFormatBytes((float) $stats['rtorrent']['download_total']) : 'n/a')
+        '▼ '.pmssFormatBytes((float) ($stats['rtorrent']['download_rate'] ?? 0.0)).'/s',
+        'Total: '.pmssStatsFormatBytesOrFallback($stats['rtorrent']['download_total'])
     );
     $lines[] = pmssStatsRenderLine(
         'Ratio',
@@ -560,7 +549,7 @@ function pmssStatsRenderText(array $stats, array $options = []): string
     $trafficSuffix = '';
     if ($stats['traffic']['limit_mib'] !== null) {
         $trafficValue .= ' / '.pmssTrafficFormatAmount((float) $stats['traffic']['limit_mib']);
-        $trafficSuffix = pmssStatsRenderBar($stats['traffic']['percent'], 16).' '.($stats['traffic']['percent'] !== null ? sprintf('%d%%', round((float) $stats['traffic']['percent'])) : 'n/a');
+        $trafficSuffix = pmssStatsRenderPercentSuffix($stats['traffic']['percent'], 16);
     }
     $lines[] = pmssStatsRenderLine('Traffic', $trafficValue, $trafficSuffix);
     $lines[] = pmssStatsRenderLine('Uptime', $stats['uptime_seconds'] !== null ? pmssStatsFormatUptime((int) $stats['uptime_seconds']) : 'n/a', 'PMSS '.$stats['pmss_version']);

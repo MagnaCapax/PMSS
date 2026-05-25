@@ -139,6 +139,15 @@ class PmssStatsCliTest extends TestCase
         $this->assertStringContainsAllStrings(['PIDs', 'I/O Read', 'I/O PSI'], $rendered);
     }
 
+    public function testRenderPercentHelpersLockMissingAndBoundedValues(): void
+    {
+        $this->assertSame(null, \pmssStatsPercent(null, 100.0));
+        $this->assertSame(null, \pmssStatsPercent(10.0, 0.0));
+        $this->assertEquals(25.0, \pmssStatsPercent(2.0, 8.0));
+        $this->assertSame('[····] n/a', \pmssStatsRenderPercentSuffix(null, 4));
+        $this->assertSame('[████] 150%', \pmssStatsRenderPercentSuffix(150.0, 4));
+    }
+
     public function testRenderTextSnapshotLocksStatsLayouts(): void
     {
         $stats = $this->statsRenderSnapshotPayload();
