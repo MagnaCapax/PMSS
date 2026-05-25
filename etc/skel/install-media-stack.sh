@@ -615,6 +615,57 @@ prepare_lighttpd_media_stack_paths() {
 	fi
 }
 
+lighttpd_media_stack_proxy_block_write() {
+	local app="$1" port="$2"
+
+	cat <<-EOF
+		\$HTTP["url"] =~ "^/${app}(\\\$|/)" {
+			  proxy.server = ( "" => ( (
+			    "host" => "127.0.0.1",
+			    "port" => ${port}
+			  ) ) ),
+			  proxy.forwarded = (
+			    "for" => 1,
+			    "host" => 1,
+			    "by" => 1
+			  ),
+			  proxy.header = ( "map-urlpath" => (
+			    "/${app}" => "/public-${USERNAME}/${app}"
+			  ) )
+			}
+	EOF
+}
+
+lighttpd_media_stack_config_write() {
+	local target="$1"
+
+	{
+		cat <<EOF
+# PMSS-managed media stack proxy fragment.
+# Keep ARR base paths canonical so missing-slash requests
+# redirect to proxy-managed app roots.
+# App-specific Location and Set-Cookie Path rewriting belongs here via
+# map-urlpath so nginx stays a minimal per-user front door.
+url.redirect += (
+  "^/radarr$" => "/public-${USERNAME}/radarr/",
+  "^/sonarr$" => "/public-${USERNAME}/sonarr/",
+  "^/prowlarr$" => "/public-${USERNAME}/prowlarr/"
+)
+
+EOF
+		lighttpd_media_stack_proxy_block_write "sabnzbd" "$SABNZBD_PORT"
+		echo ""
+		lighttpd_media_stack_proxy_block_write "radarr" "$RADARR_PORT"
+		echo ""
+		lighttpd_media_stack_proxy_block_write "prowlarr" "$PROWLARR_PORT"
+		echo ""
+		lighttpd_media_stack_proxy_block_write "sonarr" "$SONARR_PORT"
+		if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+			lighttpd_media_stack_proxy_block_write "jellyfin" "$JELLYFIN_PORT"
+		fi
+	} >"$target"
+}
+
 # Helper to append to .bashrc.custom only if marker not present
 append_to_bashrc_custom_if_missing() {
 	local content="$1"
@@ -946,7 +997,10 @@ media_stack_app_log_path() {
 
 media_stack_start_tmux_app() {
 	local app="$1" required_file="$2" session_command="$3" missing_message="$4"
-	[[ -f "$required_file" ]] || { log_err "$missing_message"; return 0; }
+	[[ -f "$required_file" ]] || {
+		log_err "$missing_message"
+		return 0
+	}
 	tmux new-session -d -s "$app" "$session_command" || log_warn "Failed to create ${app} tmux session"
 }
 
@@ -1362,96 +1416,7 @@ alias sabnzbd='\''tmux new-session -d -s "sabnzbd" "source $HOME/.bin/sabnzbd/bi
 # Lighttpd config (use $HOSTNAME)
 if [[ $DRY_RUN -eq 0 ]]; then
 	prepare_lighttpd_media_stack_paths
-	cat <<EOF >"$HOME/.lighttpd/custom.d/media-stack.conf"
-# PMSS-managed media stack proxy fragment.
-# Keep ARR base paths canonical so missing-slash requests
-# redirect to proxy-managed app roots.
-# App-specific Location and Set-Cookie Path rewriting belongs here via
-# map-urlpath so nginx stays a minimal per-user front door.
-url.redirect += (
-  "^/radarr$" => "/public-${USERNAME}/radarr/",
-  "^/sonarr$" => "/public-${USERNAME}/sonarr/",
-  "^/prowlarr$" => "/public-${USERNAME}/prowlarr/"
-)
-
-\$HTTP["url"] =~ "^/sabnzbd(\$|/)" {
-  proxy.server = ( "" => ( (
-    "host" => "127.0.0.1",
-    "port" => ${SABNZBD_PORT}
-  ) ) ),
-  proxy.forwarded = (
-    "for" => 1,
-    "host" => 1,
-    "by" => 1
-  ),
-  proxy.header = ( "map-urlpath" => (
-    "/sabnzbd" => "/public-${USERNAME}/sabnzbd"
-  ) )
-}
-
-\$HTTP["url"] =~ "^/radarr(\$|/)" {
-  proxy.server = ( "" => ( (
-    "host" => "127.0.0.1",
-    "port" => ${RADARR_PORT}
-  ) ) ),
-  proxy.forwarded = (
-    "for" => 1,
-    "host" => 1,
-    "by" => 1
-  ),
-  proxy.header = ( "map-urlpath" => (
-    "/radarr" => "/public-${USERNAME}/radarr"
-  ) )
-}
-
-\$HTTP["url"] =~ "^/prowlarr(\$|/)" {
-  proxy.server = ( "" => ( (
-    "host" => "127.0.0.1",
-    "port" => ${PROWLARR_PORT}
-  ) ) ),
-  proxy.forwarded = (
-    "for" => 1,
-    "host" => 1,
-    "by" => 1
-  ),
-  proxy.header = ( "map-urlpath" => (
-    "/prowlarr" => "/public-${USERNAME}/prowlarr"
-  ) )
-}
-
-\$HTTP["url"] =~ "^/sonarr(\$|/)" {
-  proxy.server = ( "" => ( (
-    "host" => "127.0.0.1",
-    "port" => ${SONARR_PORT}
-  ) ) ),
-  proxy.forwarded = (
-    "for" => 1,
-    "host" => 1,
-    "by" => 1
-  ),
-  proxy.header = ( "map-urlpath" => (
-    "/sonarr" => "/public-${USERNAME}/sonarr"
-  ) )
-}
-EOF
-	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-		cat <<EOF >>"$HOME/.lighttpd/custom.d/media-stack.conf"
-\$HTTP["url"] =~ "^/jellyfin(\$|/)" {
-  proxy.server = ( "" => ( (
-    "host" => "127.0.0.1",
-    "port" => ${JELLYFIN_PORT}
-  ) ) ),
-  proxy.forwarded = (
-    "for" => 1,
-    "host" => 1,
-    "by" => 1
-  ),
-  proxy.header = ( "map-urlpath" => (
-    "/jellyfin" => "/public-${USERNAME}/jellyfin"
-  ) )
-}
-EOF
-	fi
+	lighttpd_media_stack_config_write "$HOME/.lighttpd/custom.d/media-stack.conf"
 	chmod 640 "$HOME/.lighttpd/custom.d/media-stack.conf" 2>/dev/null || true
 else
 	log_info "[dry-run] would create lighttpd config at ~/.lighttpd/custom.d/media-stack.conf"

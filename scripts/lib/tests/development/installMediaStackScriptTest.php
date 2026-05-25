@@ -260,22 +260,56 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('Jellyfin users, metadata, and watch state will be lost.', $this->script);
     }
 
-    public function testLighttpdArrPathsRedirectToTrailingSlash(): void
+    public function testLighttpdMediaStackFragmentRendererPreservesProxyContracts(): void
     {
-        $this->assertStringContainsString('"^/radarr$" => "/public-${USERNAME}/radarr/"', $this->script);
-        $this->assertStringContainsString('"^/sonarr$" => "/public-${USERNAME}/sonarr/"', $this->script);
-        $this->assertStringContainsString('"^/prowlarr$" => "/public-${USERNAME}/prowlarr/"', $this->script);
-    }
+        $home = $this->pmssMakeTempDir('pmss-media-stack-lighttpd-render-home-');
+        mkdir($home.'/.lighttpd/custom.d', 0755, true);
 
-    public function testLighttpdMediaStackFragmentOwnsAppResponsePathMapping(): void
-    {
-        $this->assertStringContainsString('Location and Set-Cookie Path rewriting belongs here via', $this->script);
-        $this->assertStringContainsString('map-urlpath so nginx stays a minimal per-user front door.', $this->script);
-        $this->assertStringContainsString('"/sabnzbd" => "/public-${USERNAME}/sabnzbd"', $this->script);
-        $this->assertStringContainsString('"/radarr" => "/public-${USERNAME}/radarr"', $this->script);
-        $this->assertStringContainsString('"/prowlarr" => "/public-${USERNAME}/prowlarr"', $this->script);
-        $this->assertStringContainsString('"/sonarr" => "/public-${USERNAME}/sonarr"', $this->script);
-        $this->assertStringContainsString('"/jellyfin" => "/public-${USERNAME}/jellyfin"', $this->script);
+        $functions = $this->pmssExtractShellFunctions(array(
+            'lighttpd_media_stack_proxy_block_write',
+            'lighttpd_media_stack_config_write',
+        ));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'HOME='.escapeshellarg($home),
+            'USERNAME=alice',
+            'SABNZBD_PORT=18080 RADARR_PORT=17878 PROWLARR_PORT=19696 SONARR_PORT=18989 JELLYFIN_PORT=18096',
+            'JELLYFIN_INSTALL_ENABLED=1',
+            $functions,
+            'lighttpd_media_stack_config_write "$HOME/.lighttpd/custom.d/media-stack.conf"',
+            'JELLYFIN_INSTALL_ENABLED=0',
+            'lighttpd_media_stack_config_write "$HOME/.lighttpd/custom.d/media-stack-no-jellyfin.conf"',
+            '',
+        ));
+
+        $this->pmssRunShellHarness($script);
+        $withJellyfin = (string) file_get_contents($home.'/.lighttpd/custom.d/media-stack.conf');
+        $withoutJellyfin = (string) file_get_contents($home.'/.lighttpd/custom.d/media-stack-no-jellyfin.conf');
+
+        $this->assertOrderedStrings(array(
+            'Location and Set-Cookie Path rewriting belongs here via',
+            'map-urlpath so nginx stays a minimal per-user front door.',
+            '"^/radarr$" => "/public-alice/radarr/"',
+            '"^/sonarr$" => "/public-alice/sonarr/"',
+            '"^/prowlarr$" => "/public-alice/prowlarr/"',
+            '$HTTP["url"] =~ "^/sabnzbd(\$|/)" {',
+            '"port" => 18080',
+            '"/sabnzbd" => "/public-alice/sabnzbd"',
+            '$HTTP["url"] =~ "^/radarr(\$|/)" {',
+            '"port" => 17878',
+            '"/radarr" => "/public-alice/radarr"',
+            '$HTTP["url"] =~ "^/prowlarr(\$|/)" {',
+            '"port" => 19696',
+            '"/prowlarr" => "/public-alice/prowlarr"',
+            '$HTTP["url"] =~ "^/sonarr(\$|/)" {',
+            '"port" => 18989',
+            '"/sonarr" => "/public-alice/sonarr"',
+            '$HTTP["url"] =~ "^/jellyfin(\$|/)" {',
+            '"port" => 18096',
+            '"/jellyfin" => "/public-alice/jellyfin"',
+        ), $withJellyfin);
+        $this->assertStringNotContainsString('jellyfin', $withoutJellyfin);
     }
 
     public function testDryRunLoggingPresent(): void
