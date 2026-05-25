@@ -491,13 +491,13 @@ servarr_install_from_url() {
 
 lighttpd_custom_has_legacy_media_stack_rules() {
 	local custom_file="$1"
+	local app
+
 	[[ -f "$custom_file" ]] || return 1
-	grep -Fq '# Keep ARR base paths canonical so missing-slash requests' "$custom_file" &&
-		grep -Fq '"^/sabnzbd(\$|/)"' "$custom_file" &&
-		grep -Fq '"^/radarr(\$|/)"' "$custom_file" &&
-		grep -Fq '"^/prowlarr(\$|/)"' "$custom_file" &&
-		grep -Fq '"^/sonarr(\$|/)"' "$custom_file" &&
-		grep -Fq '"^/jellyfin(\$|/)"' "$custom_file"
+	grep -Fq '# Keep ARR base paths canonical so missing-slash requests' "$custom_file" || return 1
+	for app in sabnzbd radarr prowlarr sonarr jellyfin; do
+		grep -Fq '"^/'"$app"'(\$|/)"' "$custom_file" || return 1
+	done
 }
 
 lighttpd_custom_strip_managed_media_stack_routes() {
@@ -509,27 +509,7 @@ lighttpd_custom_strip_managed_media_stack_routes() {
 
 	if ! awk '
     function line_is_managed_route_start(line) {
-      if (line !~ /^[[:space:]]*\$HTTP\["url"\] =~ /) {
-        return 0
-      }
-
-      if (index(line, "\"^/sabnzbd(\\$|/)\"") > 0) {
-        return 1
-      }
-      if (index(line, "\"^/radarr(\\$|/)\"") > 0) {
-        return 1
-      }
-      if (index(line, "\"^/prowlarr(\\$|/)\"") > 0) {
-        return 1
-      }
-      if (index(line, "\"^/sonarr(\\$|/)\"") > 0) {
-        return 1
-      }
-      if (index(line, "\"^/jellyfin(\\$|/)\"") > 0) {
-        return 1
-      }
-
-      return 0
+      return line ~ /^[[:space:]]*\$HTTP\["url"\] =~ "\^\/(sabnzbd|radarr|prowlarr|sonarr|jellyfin)[(]\\[$][|]\/[)]"/
     }
 
     function brace_delta(line, open_count, close_count) {

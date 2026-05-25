@@ -20,39 +20,19 @@ class installMediaStackScriptTest extends TestCase
         $this->assertTrue($this->script !== false, 'Failed to read install-media-stack.sh');
     }
 
-    public function testBranchDefaultSonarrMain(): void
+    public function testServarrBranchDefaultsAndOverridesPresent(): void
     {
-        $this->assertTrue(strpos($this->script, 'SONARR_BRANCH="main"') !== false, 'Sonarr default branch should be main');
-    }
-
-    public function testBranchDefaultRadarrMaster(): void
-    {
-        $this->assertTrue(strpos($this->script, 'RADARR_BRANCH="master"') !== false, 'Radarr default branch should be master');
-    }
-
-    public function testBranchDefaultProwlarrMaster(): void
-    {
-        $this->assertTrue(strpos($this->script, 'PROWLARR_BRANCH="master"') !== false, 'Prowlarr default branch should be master');
-    }
-
-    public function testBranchOverrideSonarr(): void
-    {
-        $this->assertTrue(strpos($this->script, 'if [[ -n "$OVR_SONARR_BRANCH" ]]') !== false, 'Sonarr branch override missing');
-    }
-
-    public function testBranchOverrideRadarr(): void
-    {
-        $this->assertTrue(strpos($this->script, 'if [[ -n "$OVR_RADARR_BRANCH" ]]') !== false, 'Radarr branch override missing');
-    }
-
-    public function testBranchOverrideProwlarr(): void
-    {
-        $this->assertTrue(strpos($this->script, 'if [[ -n "$OVR_PROWLARR_BRANCH" ]]') !== false, 'Prowlarr branch override missing');
-    }
-
-    public function testSonarrVersionOverride(): void
-    {
-        $this->assertTrue(strpos($this->script, 'if [[ -n "$OVR_SONARR_VERSION" ]]') !== false, 'Sonarr version override missing');
+        foreach (array(
+            'SONARR_BRANCH="main"' => 'Sonarr default branch should be main',
+            'RADARR_BRANCH="master"' => 'Radarr default branch should be master',
+            'PROWLARR_BRANCH="master"' => 'Prowlarr default branch should be master',
+            'if [[ -n "$OVR_SONARR_BRANCH" ]]' => 'Sonarr branch override missing',
+            'if [[ -n "$OVR_RADARR_BRANCH" ]]' => 'Radarr branch override missing',
+            'if [[ -n "$OVR_PROWLARR_BRANCH" ]]' => 'Prowlarr branch override missing',
+            'if [[ -n "$OVR_SONARR_VERSION" ]]' => 'Sonarr version override missing',
+        ) as $needle => $message) {
+            $this->assertStringContainsString($needle, $this->script, $message);
+        }
     }
 
     public function testRadarrGlibcPinPresent(): void
@@ -66,22 +46,14 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('servarr_update_api_download_url "$PROWLARR_UPDATE_BASE" "$PROWLARR_BRANCH"', $this->script);
     }
 
-    public function testInstallServarrAppCreatesConfigXml(): void
+    public function testInstallServarrAppCreatesLoopbackPublicConfig(): void
     {
         $this->assertStringContainsString('<Config>', $this->script);
         $this->assertTrue(
             strpos($this->script, '<BindAddress>*</BindAddress>') === false,
             'Servarr defaults must not bind wildcard address'
         );
-    }
-
-    public function testInstallServarrAppSetsUrlBasePublic(): void
-    {
         $this->assertStringContainsString('/public-${USERNAME}/${app}</UrlBase>', $this->script);
-    }
-
-    public function testInstallServarrAppSetsBindAddressLoopback(): void
-    {
         $this->assertStringContainsString('<BindAddress>127.0.0.1</BindAddress>', $this->script);
     }
 
@@ -193,6 +165,53 @@ class installMediaStackScriptTest extends TestCase
     {
         $this->assertStringContainsString('lighttpd_custom_strip_managed_media_stack_routes', $this->script);
         $this->assertStringContainsString('Removed PMSS-managed media stack proxy routes', $this->script);
+    }
+
+    public function testLighttpdManagedRouteStripPreservesUserRulesSnapshot(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-lighttpd-strip-home-');
+        $fragment = $home.'/custom-migrated.conf';
+        $functions = $this->pmssExtractShellFunctions(array('lighttpd_custom_strip_managed_media_stack_routes'));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'FRAGMENT='.escapeshellarg($fragment),
+            'log_info() { echo "INFO:$*"; }',
+            'log_warn() { echo "WARN:$*"; }',
+            'cat > "$FRAGMENT" <<\'LIGHTTPD\'',
+            '# User-owned route before',
+            '$HTTP["url"] =~ "^/custom(\$|/)" {',
+            '  proxy.server = ( "" => ( ( "host" => "127.0.0.1", "port" => 12000 ) ) )',
+            '}',
+            '$HTTP["url"] =~ "^/sabnzbd(\$|/)" {',
+            '  proxy.server = ( "" => ( ( "host" => "127.0.0.1", "port" => 18080 ) ) )',
+            '}',
+            '$HTTP["url"] =~ "^/radarr(\$|/)" {',
+            '  proxy.server = ( "" => ( ( "host" => "127.0.0.1", "port" => 17878 ) ) )',
+            '}',
+            '# User-owned route after',
+            '$HTTP["url"] =~ "^/custom-after(\$|/)" {',
+            '  proxy.server = ( "" => ( ( "host" => "127.0.0.1", "port" => 12001 ) ) )',
+            '}',
+            'LIGHTTPD',
+            $functions,
+            'lighttpd_custom_strip_managed_media_stack_routes "$FRAGMENT"',
+            '',
+        ));
+
+        $this->pmssRunShellHarness($script);
+
+        $expected = <<<'LIGHTTPD'
+# User-owned route before
+$HTTP["url"] =~ "^/custom(\$|/)" {
+  proxy.server = ( "" => ( ( "host" => "127.0.0.1", "port" => 12000 ) ) )
+}
+# User-owned route after
+$HTTP["url"] =~ "^/custom-after(\$|/)" {
+  proxy.server = ( "" => ( ( "host" => "127.0.0.1", "port" => 12001 ) ) )
+}
+LIGHTTPD;
+        $this->assertSame($expected."\n", (string) file_get_contents($fragment));
     }
 
     public function testManagedBinPathsRefreshInPlace(): void
