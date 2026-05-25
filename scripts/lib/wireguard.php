@@ -606,6 +606,9 @@ function wgBootstrapUserGuide(string $user, string $clientGuide): void
     $managedGuide  = $guide !== false && $guide !== '' && !wgGuideHasPrivateKeyPlaceholder($guide);
 
     if (!empty(wgReadUserPublicKeys($user))) {
+        if (!$managedGuide && $clientGuide !== '' && !pmssWriteUserFile($guidePath, $clientGuide, $user, 0600)) {
+            wgLog('Failed to distribute WireGuard guide for user '.$user);
+        }
         return;
     }
     if ($managedGuide && !wgGuideLooksManagedBootstrapProfile($guide)) {
@@ -733,29 +736,6 @@ function wireguardWriteConfig(string $privKey, int $port): bool
 }
 
 /**
- * Seed per-user client configurations without clobbering ready profiles.
- */
-function wgDistributeToUsers(string $content): void
-{
-    if ($content === '') {
-        return;
-    }
-
-    foreach (wgListHomeUsers() as $user) {
-        $target = wgUserGuidePath($user);
-        if (is_file($target)) {
-            $existing = @file_get_contents($target);
-            if ($existing !== false && $existing !== '' && !wgGuideHasPrivateKeyPlaceholder($existing)) {
-                continue;
-            }
-        }
-        if (!pmssWriteUserFile($target, $content, $user, 0600)) {
-            wgLog('Failed to distribute WireGuard guide for user '.$user);
-        }
-    }
-}
-
-/**
  * Provision WireGuard configuration and service.
  */
 function pmssWireguardConfigure(?callable $logger = null): void
@@ -805,7 +785,6 @@ function pmssWireguardConfigure(?callable $logger = null): void
 
     $clientGuide = wgBuildClientGuide($pubKey, $endpoint, $listenPort);
     wgBootstrapUserGuides($clientGuide);
-    wgDistributeToUsers($clientGuide);
 
     $assignedPeers = wgAssignClientIps(wgCollectUserPublicKeys());
     wgSyncUserGuideAddresses($assignedPeers, $clientGuide);

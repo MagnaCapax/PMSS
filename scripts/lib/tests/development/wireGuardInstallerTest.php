@@ -242,39 +242,41 @@ class WireGuardInstallerTest extends TestCase
         });
     }
 
-    public function testDistributeToUsersWritesFiles(): void
+    public function testBootstrapUserGuideSeedsTemplateWhenPublicKeyAlreadyRegistered(): void
     {
         $homeBase = $this->createTempDir();
         @mkdir($homeBase.'/alice', 0755, true);
-        @mkdir($homeBase.'/bob', 0755, true);
+        $publicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+        file_put_contents($homeBase.'/alice/.wireguard-public-key', $publicKey."\n");
 
-	        $this->pmssWithEnv([
-	            'PMSS_WG_HOME_BASE' => $homeBase,
-	            'PMSS_WG_USER_LIST' => 'alice,bob',
-	        ], function (): void {
-	            \wgDistributeToUsers('sample');
-	        });
-
-        foreach (['alice', 'bob'] as $user) {
-            $file = $homeBase.'/'.$user.'/wireguard.txt';
-            $this->assertTrue(file_exists($file), $user.' missing wireguard.txt');
-            $this->assertEquals('sample', trim((string) file_get_contents($file)));
-            $mode = substr(sprintf('%o', fileperms($file)), -3);
-            $this->assertEquals('600', $mode);
-        }
-    }
-
-    public function testDistributeToUsersKeepsExistingReadyImportGuide(): void
-    {
-        $homeBase = $this->createTempDir();
-        @mkdir($homeBase.'/alice', 0755, true);
-        file_put_contents($homeBase.'/alice/wireguard.txt', "[Interface]\nPrivateKey = keep-me\n");
+        $guide = \wgBuildClientGuide('server-pub', 'vpn.example.com', 51820);
 
         $this->pmssWithEnv([
             'PMSS_WG_HOME_BASE' => $homeBase,
-            'PMSS_WG_USER_LIST' => 'alice',
-        ], function (): void {
-            \wgDistributeToUsers('replacement');
+        ], function () use ($guide): void {
+            \wgBootstrapUserGuide('alice', $guide);
+        });
+
+        $file = $homeBase.'/alice/wireguard.txt';
+        $this->assertTrue(file_exists($file), 'registered-key user missing wireguard.txt');
+        $this->assertEquals($guide, (string) file_get_contents($file));
+        $this->assertEquals($publicKey."\n", (string) file_get_contents($homeBase.'/alice/.wireguard-public-key'));
+        $this->assertEquals('600', substr(sprintf('%o', fileperms($file)), -3));
+    }
+
+    public function testBootstrapUserGuideKeepsExistingReadyImportGuideForRegisteredKey(): void
+    {
+        $homeBase = $this->createTempDir();
+        @mkdir($homeBase.'/alice', 0755, true);
+        file_put_contents($homeBase.'/alice/.wireguard-public-key', "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n");
+        file_put_contents($homeBase.'/alice/wireguard.txt', "[Interface]\nPrivateKey = keep-me\n");
+
+        $guide = \wgBuildClientGuide('server-pub', 'vpn.example.com', 51820);
+
+        $this->pmssWithEnv([
+            'PMSS_WG_HOME_BASE' => $homeBase,
+        ], function () use ($guide): void {
+            \wgBootstrapUserGuide('alice', $guide);
         });
 
         $this->assertEquals("[Interface]\nPrivateKey = keep-me\n", (string) file_get_contents($homeBase.'/alice/wireguard.txt'));

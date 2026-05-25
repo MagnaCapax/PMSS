@@ -48,7 +48,6 @@ if ($endpoint === '') {
 
 $guideTemplate = wgBuildClientGuide($pubKey, $endpoint, $listenPort);
 wgBootstrapUserGuides($guideTemplate);
-wgDistributeToUsers($guideTemplate);
 $assignedPeers = wgAssignClientIps(wgCollectUserPublicKeys());
 wgSyncUserGuideAddresses($assignedPeers, $guideTemplate);
 
