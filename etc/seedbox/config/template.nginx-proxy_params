@@ -15,8 +15,7 @@ client_body_timeout 300s;
 send_timeout 300s;
 proxy_buffering off;
 
-# Keep request buffering defaults for maximum nginx version compatibility.
-# (Debian 8-era nginx lacks proxy_request_buffering.)
-#proxy_request_buffering off;
+# Generic proxy locations keep nginx request buffering defaults. WebDAV uses
+# /etc/nginx/webdav_proxy_params so multi-GB uploads stream to lighttpd.
 
 #proxy_pass_header       Authorization;

@@ -71,6 +71,8 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
     @copy('/etc/seedbox/config/template.nginx-conf', '/etc/nginx/nginx.conf');
     pmssBackupCriticalConfig('nginx', '/etc/nginx/proxy_params');
     @copy('/etc/seedbox/config/template.nginx-proxy_params', '/etc/nginx/proxy_params');
+    pmssBackupCriticalConfig('nginx', '/etc/nginx/webdav_proxy_params');
+    @copy('/etc/seedbox/config/template.nginx-webdav_proxy_params', '/etc/nginx/webdav_proxy_params');
 
     // Configure site default
     $serverHostname = pmssHostnameRead();

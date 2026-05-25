@@ -45,7 +45,7 @@ location /webdav-##username/ {
                 return 301 https://$host$request_uri;
         }
         proxy_pass http://127.0.0.1:##serverPort/webdav-##username/;
-        include /etc/nginx/proxy_params;
+        include /etc/nginx/webdav_proxy_params;
         proxy_http_version 1.1;
 
         # WebDAV: allow large uploads.

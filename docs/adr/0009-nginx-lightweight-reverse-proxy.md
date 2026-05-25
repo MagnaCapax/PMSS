@@ -25,6 +25,11 @@ timeouts, and buffering directives. This duplicated proxy logic across multiple
 templates, increased drift risk, and blurred responsibility boundaries between
 nginx and lighttpd.
 
+In May 2026, production WebDAV uploads in the multi-GB range exposed a separate
+request-body problem: generic nginx proxy defaults kept request buffering enabled
+and used 300s body/proxy timeouts, so large uploads over mobile links could time
+out in nginx before lighttpd saw the request.
+
 We need to keep nginx minimal, preserve existing WebDAV URLs, and avoid
 per-location proxy divergence that can regress config safety.
 
@@ -39,14 +44,23 @@ per-location proxy divergence that can regress config safety.
   and include it in WebDAV blocks; keep lighttpd as the sole WebDAV handler.
   - Pros: Minimal nginx blocks, consistent defaults, clear responsibility split.
   - Cons: Proxy defaults apply broadly; requires review for side effects.
+- Option D - Keep generic proxy defaults in `template.nginx-proxy_params`, add a
+  scoped `template.nginx-webdav_proxy_params` include for WebDAV request-body
+  behavior, and keep lighttpd as the sole WebDAV handler.
+  - Pros: WebDAV upload behavior is tuned without changing panel/app proxy
+    defaults; WebDAV blocks remain minimal and avoid duplicate nginx directives.
+  - Cons: Two proxy parameter files must keep their shared header set aligned.
 
 ## Decision
-Adopt Option C.
+Adopt Option C with the Option D refinement for WebDAV request bodies.
 
 Nginx remains a lightweight reverse proxy that forwards WebDAV (and other app)
 traffic to per-user lighttpd. All proxy headers and timeouts are centralized in
-`etc/seedbox/config/template.nginx-proxy_params`, and WebDAV blocks include that
-file instead of duplicating directives.
+proxy parameter include files instead of being duplicated inline in location
+blocks. Generic proxy locations include
+`etc/seedbox/config/template.nginx-proxy_params`; WebDAV locations include
+`etc/seedbox/config/template.nginx-webdav_proxy_params` so multi-GB uploads
+stream to lighttpd with longer upload-specific timeouts.
 
 Guardrail for future changes:
 - Do not add new "nginx -> per-app port" proxies. App reverse proxying belongs
@@ -57,9 +71,9 @@ Guardrail for future changes:
 ## Consequences
 - Positive: Reduced duplication, fewer config drift regressions, clearer
   boundary between nginx and per-user lighttpd.
-- Negative: Proxy defaults (timeouts, buffering, body size) now apply to all
-  proxied locations; monitor for unintended effects and adjust centrally if
-  needed.
+- Negative: There are now generic and WebDAV proxy parameter files; tests must
+  keep shared forwarded headers aligned and prevent inline duplicate timeout
+  directives in WebDAV blocks.
 - Follow-ups: Keep WebDAV-related tests aligned with the centralized proxy
   parameters and re-evaluate defaults if production behavior indicates issues.
 
@@ -67,5 +81,6 @@ Guardrail for future changes:
 - GH issue #7 (Deluge path alignment discussion)
 - GH issue #137 (WebDAV proxy timeout duplication regression)
 - `etc/seedbox/config/template.nginx-proxy_params`
+- `etc/seedbox/config/template.nginx-webdav_proxy_params`
 - `etc/seedbox/config/template.nginx-user`
 - `scripts/util/createNginxConfig.php`

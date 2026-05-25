@@ -621,10 +621,16 @@ LIGHTTPD;
     {
         $proxyParamsPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-proxy_params';
         $proxyParams = file_get_contents($proxyParamsPath);
+        $webdavProxyParamsPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-webdav_proxy_params';
+        $webdavProxyParams = file_get_contents($webdavProxyParamsPath);
 
         $this->assertStringContainsString('proxy_read_timeout 300s;', $proxyParams);
         $this->assertStringContainsString('proxy_send_timeout 300s;', $proxyParams);
         $this->assertStringContainsString('proxy_buffering off;', $proxyParams);
+        $this->assertStringContainsString('proxy_read_timeout 600s;', $webdavProxyParams);
+        $this->assertStringContainsString('proxy_send_timeout 600s;', $webdavProxyParams);
+        $this->assertStringContainsString('client_body_timeout 600s;', $webdavProxyParams);
+        $this->assertStringContainsString('proxy_request_buffering off;', $webdavProxyParams);
 
         $nginxConfPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-conf';
         $nginxConf = file_get_contents($nginxConfPath);
@@ -922,11 +928,11 @@ LIGHTTPD;
     }
 
     /**
-     * TEST 45: Nginx WebDAV blocks do not duplicate proxy_params directives
+     * TEST 45: Nginx WebDAV blocks do not duplicate proxy timeout directives
      *
-     * HARDENS: WebDAV location blocks must not include proxy_params AND set
-     * proxy_read_timeout explicitly, as this causes nginx to fail with
-     * "directive is duplicate" error.
+     * HARDENS: WebDAV location blocks must not include proxy parameter files
+     * AND set timeout directives explicitly, as this causes nginx to fail with
+     * "directive is duplicate" errors.
      *
      * REGRESSION: Fixed in 2026-01 after WebDAV deployment broke nginx startup.
      */
@@ -949,14 +955,15 @@ LIGHTTPD;
             }
 
             $proxyBlocksChecked++;
-            $hasIncludeProxyParams = strpos($locationBlock, 'include /etc/nginx/proxy_params') !== false;
-            $hasExplicitTimeout = strpos($locationBlock, 'proxy_read_timeout') !== false;
+            $hasIncludeProxyParams = strpos($locationBlock, 'include /etc/nginx/') !== false
+                && strpos($locationBlock, 'proxy_params') !== false;
+            $hasExplicitTimeout = preg_match('/\\b(proxy_read_timeout|proxy_send_timeout|client_body_timeout)\\b/', $locationBlock) === 1;
 
-            // Either include proxy_params OR set timeout explicitly, not both
+            // Either include proxy params OR set timeouts explicitly, not both.
             $hasDuplicate = $hasIncludeProxyParams && $hasExplicitTimeout;
             $this->assertTrue(
                 !$hasDuplicate,
-                "WebDAV proxy block $i includes proxy_params AND sets proxy_read_timeout - duplicate directive"
+                "WebDAV proxy block $i includes proxy params AND sets timeout directives - duplicate directive"
             );
         }
 
@@ -964,12 +971,12 @@ LIGHTTPD;
     }
 
     /**
-     * TEST 46: Nginx WebDAV blocks include proxy_params
+     * TEST 46: Nginx WebDAV blocks include WebDAV proxy params
      *
-     * HARDENS: Keep WebDAV proxy blocks minimal and consistent by always
-     * including proxy_params.
+     * HARDENS: Keep WebDAV proxy blocks minimal and consistent by always using
+     * the scoped WebDAV proxy parameter include.
      */
-    public function testNginxWebdavBlocksIncludeProxyParams(): void
+    public function testNginxWebdavBlocksIncludeWebdavProxyParams(): void
     {
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
         $script = implode("\n", \pmssNginxUserSubdomainTemplates());
@@ -986,9 +993,9 @@ LIGHTTPD;
 
             $proxyBlocksChecked++;
             $this->assertStringContainsString(
-                'include /etc/nginx/proxy_params',
+                'include /etc/nginx/webdav_proxy_params',
                 $locationBlock,
-                "WebDAV proxy block $i must include proxy_params"
+                "WebDAV proxy block $i must include webdav_proxy_params"
             );
         }
 
@@ -1013,11 +1020,52 @@ LIGHTTPD;
     }
 
     /**
-     * TEST 48: template.nginx-user WebDAV block does not duplicate proxy_read_timeout
+     * TEST 48: webdav_proxy_params streams uploads and keeps auth headers
      *
-     * HARDENS: The external nginx user template must not include proxy_params AND
-     * set proxy_read_timeout explicitly, as this causes nginx to fail with
-     * "directive is duplicate" error.
+     * HARDENS: WebDAV must forward authentication to lighttpd while disabling
+     * request buffering so multi-GB uploads do not sit entirely in nginx.
+     */
+    public function testWebdavProxyParamsStreamUploadsAndKeepAuthHeaders(): void
+    {
+        $proxyParamsPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-proxy_params';
+        $proxyParams = file_get_contents($proxyParamsPath);
+        $webdavProxyParamsPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-webdav_proxy_params';
+        $webdavProxyParams = file_get_contents($webdavProxyParamsPath);
+        $proxyHeaders = array();
+        $webdavProxyHeaders = array();
+        preg_match_all('/^proxy_set_header\\s+[^;]+;$/m', $proxyParams, $proxyHeaders);
+        preg_match_all('/^proxy_set_header\\s+[^;]+;$/m', $webdavProxyParams, $webdavProxyHeaders);
+        $proxyHeaderLines = isset($proxyHeaders[0]) ? $proxyHeaders[0] : array();
+        $webdavProxyHeaderLines = isset($webdavProxyHeaders[0]) ? $webdavProxyHeaders[0] : array();
+        sort($proxyHeaderLines);
+        sort($webdavProxyHeaderLines);
+
+        $this->assertEquals($proxyHeaderLines, $webdavProxyHeaderLines);
+        $this->assertStringContainsString('proxy_request_buffering off;', $webdavProxyParams);
+        $this->assertStringContainsString('client_body_timeout 600s;', $webdavProxyParams);
+    }
+
+    /**
+     * TEST 49: createNginxConfig copies webdav_proxy_params into nginx
+     *
+     * HARDENS: Generated configs include /etc/nginx/webdav_proxy_params, so the
+     * setup helper must stage the file before nginx config testing/reload.
+     */
+    public function testCreateNginxConfigCopiesWebdavProxyParams(): void
+    {
+        $setupPath = dirname(__DIR__, 3).'/lib/nginxConfig/setup.php';
+        $setup = file_get_contents($setupPath);
+
+        $this->assertStringContainsString("'/etc/nginx/webdav_proxy_params'", $setup);
+        $this->assertStringContainsString("'/etc/seedbox/config/template.nginx-webdav_proxy_params'", $setup);
+    }
+
+    /**
+     * TEST 50: template.nginx-user WebDAV block does not duplicate proxy timeouts
+     *
+     * HARDENS: The external nginx user template must not include proxy params
+     * AND set timeout directives explicitly, as this causes nginx to fail with
+     * "directive is duplicate" errors.
      *
      * REGRESSION: Fixed in 2026-01 after issue #137 (WebDAV template not updated
      * when createNginxConfig.php inline templates were fixed in commit 005b1fe).
@@ -1032,23 +1080,24 @@ LIGHTTPD;
         $webdavBlock = $this->extractNginxLocationBlock($template, '/webdav-');
         $this->assertNotEmpty($webdavBlock, 'WebDAV location block must exist in template');
 
-        $hasIncludeProxyParams = strpos($webdavBlock, 'include /etc/nginx/proxy_params') !== false;
-        $hasExplicitTimeout = strpos($webdavBlock, 'proxy_read_timeout') !== false;
+        $hasIncludeProxyParams = strpos($webdavBlock, 'include /etc/nginx/') !== false
+            && strpos($webdavBlock, 'proxy_params') !== false;
+        $hasExplicitTimeout = preg_match('/\\b(proxy_read_timeout|proxy_send_timeout|client_body_timeout)\\b/', $webdavBlock) === 1;
 
-        // Either include proxy_params OR set timeout explicitly, not both
+        // Either include proxy params OR set timeouts explicitly, not both.
         $this->assertTrue(
             !($hasIncludeProxyParams && $hasExplicitTimeout),
-            'template.nginx-user WebDAV block includes proxy_params AND sets proxy_read_timeout - duplicate directive causes nginx failure'
+            'template.nginx-user WebDAV block includes proxy params AND sets timeout directives - duplicate directive causes nginx failure'
         );
     }
 
     /**
-     * TEST 49: template.nginx-user WebDAV block includes proxy_params
+     * TEST 51: template.nginx-user WebDAV block includes webdav_proxy_params
      *
-     * HARDENS: Keep WebDAV proxy blocks minimal and consistent by always
-     * including proxy_params.
+     * HARDENS: Keep WebDAV proxy blocks minimal and consistent by always using
+     * the scoped WebDAV proxy parameter include.
      */
-    public function testNginxUserTemplateWebdavIncludesProxyParams(): void
+    public function testNginxUserTemplateWebdavIncludesWebdavProxyParams(): void
     {
         $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-user';
         $template = file_get_contents($templatePath);
@@ -1058,9 +1107,9 @@ LIGHTTPD;
         $this->assertNotEmpty($webdavBlock, 'WebDAV location block must exist in template');
 
         $this->assertStringContainsString(
-            'include /etc/nginx/proxy_params',
+            'include /etc/nginx/webdav_proxy_params',
             $webdavBlock,
-            'template.nginx-user WebDAV block must include proxy_params'
+            'template.nginx-user WebDAV block must include webdav_proxy_params'
         );
     }
 
@@ -1107,7 +1156,7 @@ LIGHTTPD;
     }
 
     /**
-     * TEST 50: template.nginx-conf has server_names_hash_bucket_size set
+     * TEST 52: template.nginx-conf has server_names_hash_bucket_size set
      *
      * HARDENS: Servers with many users/subdomains need adequate hash bucket size.
      * Default of 64 is insufficient; 128 is required for production.

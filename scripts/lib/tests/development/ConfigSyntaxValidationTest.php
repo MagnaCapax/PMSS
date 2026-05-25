@@ -115,6 +115,8 @@ class ConfigSyntaxValidationTest extends TestCase
         $templates = \pmssNginxUserSubdomainTemplates();
 
         $serverBlocks = '';
+        $webdavProxyParamsPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-webdav_proxy_params';
+        $webdavProxyParams = (string)file_get_contents($webdavProxyParamsPath);
         foreach ($templates as $block) {
             // Only include blocks that have server { } definitions
             if (strpos($block, 'server {') !== false) {
@@ -124,6 +126,8 @@ class ConfigSyntaxValidationTest extends TestCase
                     array('testuser', '30000', 'test.example.com', ''),
                     $block
                 );
+                // Inline WebDAV proxy params so nginx -t validates the real scoped directives.
+                $rendered = str_replace('include /etc/nginx/webdav_proxy_params;', rtrim($webdavProxyParams), $rendered);
                 // Remove proxy_params includes; we inline minimal proxy params below.
                 $rendered = str_replace('include /etc/nginx/proxy_params;', '', $rendered);
                 $serverBlocks .= $rendered."\n";
@@ -283,7 +287,7 @@ NGINX;
     }
 
     /**
-     * TEST: No WebDAV location includes proxy_params AND sets timeout.
+     * TEST: No WebDAV location includes proxy params AND sets timeouts inline.
      *
      * This is the specific bug pattern from 2026-01. Kept here as explicit
      * binary-independent check alongside the WebdavSecurityTest version.
@@ -302,13 +306,13 @@ NGINX;
                 continue;
             }
 
-            $hasInclude = strpos($block, 'include') !== false
+            $hasInclude = strpos($block, 'include /etc/nginx/') !== false
                        && strpos($block, 'proxy_params') !== false;
-            $hasTimeout = strpos($block, 'proxy_read_timeout') !== false;
+            $hasTimeout = preg_match('/\\b(proxy_read_timeout|proxy_send_timeout|client_body_timeout)\\b/', $block) === 1;
 
             $this->assertTrue(
                 !($hasInclude && $hasTimeout),
-                "WebDAV block $i has both include proxy_params AND proxy_read_timeout"
+                "WebDAV block $i has both include proxy params AND inline timeout directives"
             );
         }
     }

@@ -492,16 +492,16 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertStringContainsString('"session_timeout": 3600', $tpl);
     }
 
-    public function testCreateNginxConfigUsesCentralProxyParamsInWebdavBlocks(): void
+    public function testCreateNginxConfigUsesScopedWebdavProxyParamsInWebdavBlocks(): void
     {
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
         $templates = \pmssNginxUserSubdomainTemplates();
 
-        // If proxy headers/timeouts drift in per-location blocks, nginx can break (duplicate directives).
+        // Keep upload-specific timeout and streaming directives in one WebDAV include.
         $this->assertStringContainsString('location /webdav-##user##/', $templates['public']);
-        $this->assertStringContainsString('include /etc/nginx/proxy_params;', $templates['public']);
+        $this->assertStringContainsString('include /etc/nginx/webdav_proxy_params;', $templates['public']);
         $this->assertStringContainsString('location /webdav-##user##/', $templates['private']);
-        $this->assertStringContainsString('include /etc/nginx/proxy_params;', $templates['private']);
+        $this->assertStringContainsString('include /etc/nginx/webdav_proxy_params;', $templates['private']);
     }
 
     public function testWebdavLocationsAllowLargeUploads(): void

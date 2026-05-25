@@ -1,0 +1,19 @@
+# WebDAV proxy parameters for large request bodies.
+#
+# Keep these headers aligned with template.nginx-proxy_params. WebDAV uses a
+# separate include so upload-specific timeouts and request streaming do not
+# alter application and panel proxy defaults.
+
+proxy_set_header Host $host;
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header Authorization $http_authorization;
+proxy_read_timeout 600s;
+proxy_send_timeout 600s;
+client_body_timeout 600s;
+send_timeout 600s;
+proxy_buffering off;
+proxy_request_buffering off;
+
+#proxy_pass_header       Authorization;

@@ -36,7 +36,7 @@ NGINX;
         error_page 502 /error-502-##user##.html;
 NGINX;
     $webdavProxyDefaults = <<<'NGINX'
-        include /etc/nginx/proxy_params;
+        include /etc/nginx/webdav_proxy_params;
         proxy_http_version 1.1;
 
         # WebDAV: allow large uploads.

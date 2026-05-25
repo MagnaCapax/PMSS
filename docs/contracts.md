@@ -446,6 +446,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - 502 pages: private user proxies route upstream failures to `/error-502-<user>.html`, which falls back to the shared `/error-502.html`; the lighttpd watchdog refreshes those per-user files under `/var/www` while the stack is unhealthy.
   - WebDAV: the external URL format is `https://<server-fqdn>/webdav-<user>/`; the path is never bare `/webdav`.
   - WebDAV: `/webdav-<user>/` is protected by per-user htpasswd at `/home/<user>/.lighttpd/.htpasswd`.
+  - WebDAV: nginx WebDAV locations include `/etc/nginx/webdav_proxy_params`, which preserves forwarded auth/origin headers, disables request buffering, and uses 600s body/proxy timeouts for large uploads.
   - WebDAV: make `~/www` writable by creating `/home/<user>/.lighttpd/webdav.www-writable` (default is read-only except `~/www/public`).
   - Side-effects: Writes under `/etc/nginx/` and reloads/restarts nginx via callers.
 
