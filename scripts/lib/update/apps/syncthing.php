@@ -21,7 +21,9 @@ if (file_exists('/usr/bin/syncthing')
     return;
 }
 
-@unlink('/usr/bin/syncthing');
+if (file_exists('/usr/bin/syncthing') || is_link('/usr/bin/syncthing')) {
+    @unlink('/usr/bin/syncthing');
+}
 echo "*** Syncthing not present, downloading and adding!\n";
 
 pmssRunPinnedRemoteArchiveStep('Syncthing '.$syncthingVersion, $syncthingUrl, $syncthingSha256, $syncthingArchive, 'syncthing-linux-amd64-'.$syncthingVersion, 'Installing Syncthing binary', [
