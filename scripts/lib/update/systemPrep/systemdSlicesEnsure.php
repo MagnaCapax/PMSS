@@ -6,23 +6,8 @@
  */
 
 require_once __DIR__.'/../managedPath.php';
-require_once dirname(__DIR__, 2).'/pathSafety.php';
+require_once dirname(__DIR__, 2).'/cgroup/policy.php';
 require_once dirname(__DIR__).'/../runtime.php';
-
-/** Keep systemd IO property device targets to plain block-device paths. */
-function pmssSystemdIoDeviceTargetIsSafe(string $device): bool
-{
-    return pmssPathAbsoluteStringIsSafe($device, ['allowTrailingSlash' => false, 'allowWhitespace' => false, 'requiredPrefix' => '/dev/']);
-}
-
-/** Validate the value side of systemd IO limits before rendering drop-ins. */
-function pmssSystemdIoLimitValueIsSafe($value): bool
-{
-    return is_scalar($value)
-        && trim((string) $value) !== ''
-        && strpos((string) $value, "\0") === false
-        && preg_match('/\s/', (string) $value) !== 1;
-}
 
 /** Render untrusted policy/findmnt fragments safely in single-line logs. */
 function pmssSystemdLogValue($value): string
@@ -107,8 +92,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         $totalMiB     = pmssTotalMemMiB();
         $minHighMiB   = 250; // minimum MemoryHigh
         // Allow policy override via PHP array file: cgroup.policy.php returning ['memoryHighMiB'=>..,'memoryMaxMiB'=>..,'cpuWeight'=>..,'ioWeight'=>..,'tasksMax'=>..]
-        $policyFile = $cfgDir.'/cgroup.policy.php';
-        $policy = (is_array($loaded = file_exists($policyFile) ? @include $policyFile : null)) ? $loaded : [];
+        $policy = pmssCgroupPolicyLoad($cfgDir);
 
         $defaultHigh  = max($minHighMiB, (int)floor($totalMiB * 0.10)); // default ~10% of RAM
         $maxCapMiB    = (int)floor($totalMiB * 0.95); // MemoryMax never above 95% of total
@@ -150,7 +134,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         ];
         if ($mode === 'v2' && isset($policy['ioLatencyMs']) && is_numeric($policy['ioLatencyMs']) && (int) $policy['ioLatencyMs'] > 0) {
             $homeDevice = trim((string) @shell_exec('findmnt -no SOURCE /home 2>/dev/null'));
-            if ($homeDevice !== '' && pmssSystemdIoDeviceTargetIsSafe($homeDevice)) {
+            if ($homeDevice !== '' && pmssCgroupPolicyDeviceTargetIsSafe($homeDevice)) {
                 $repl['%%USER_CGROUP_IO_DEVICE_LATENCY%%'] = 'IODeviceLatencyTargetSec='.$homeDevice.' '.(int) $policy['ioLatencyMs'].'ms';
             } elseif ($homeDevice !== '') {
                 $log('[WARN] Unsafe /home backing device for IODeviceLatencyTargetSec: '.pmssSystemdLogValue($homeDevice));
@@ -170,25 +154,17 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
                     || ($src = trim((string) @shell_exec('findmnt -no SOURCE '.escapeshellarg($mount).' 2>/dev/null'))) === '') {
                     continue;
                 }
-                if (!pmssSystemdIoDeviceTargetIsSafe($src)) {
+                if (!pmssCgroupPolicyDeviceTargetIsSafe($src)) {
                     $log('[WARN] Unsafe backing device for cgroup policy mount '.pmssSystemdLogValue($mount).': '.pmssSystemdLogValue($src));
                     continue;
                 }
                 if (isset($def['ioWeight']) && is_numeric($def['ioWeight'])) {
-                    if ($mode === 'v2') {
-                        $append[] = 'IODeviceWeight='.$src.' '.(int)$def['ioWeight'];
-                    } else {
-                        $skippedDeviceWeights = true;
-                    }
+                    $skippedDeviceWeights = $skippedDeviceWeights || $mode !== 'v2';
                 }
-                foreach (['readBw' => 'IOReadBandwidthMax', 'writeBw' => 'IOWriteBandwidthMax', 'readIops' => 'IOReadIOPSMax', 'writeIops' => 'IOWriteIOPSMax'] as $policyKey => $directive) {
-                    if (isset($def[$policyKey])) {
-                        if (!pmssSystemdIoLimitValueIsSafe($def[$policyKey])) {
-                            $log('[WARN] Unsafe '.$policyKey.' value for cgroup policy mount '.pmssSystemdLogValue($mount).', skipping');
-                            continue;
-                        }
-                        $append[] = $directive.'='.$src.' '.trim((string) $def[$policyKey]);
-                    }
+                $unsafeKeys = [];
+                $append = array_merge($append, pmssCgroupPolicyIoPairs($def, $src, $mode === 'v2', true, $unsafeKeys));
+                foreach ($unsafeKeys as $policyKey) {
+                    $log('[WARN] Unsafe '.$policyKey.' value for cgroup policy mount '.pmssSystemdLogValue($mount).', skipping');
                 }
             }
             if (!empty($append)) {

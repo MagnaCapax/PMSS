@@ -49,16 +49,21 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
 
     public function testBandwidthLimitsAppendedWhenConfigured(): void
     {
+        $findmntPath = $this->pmssMakeExecutableStub('findmnt', "#!/bin/sh\nprintf '%s\\n' '/dev/md0'\n", 'pmss-findmnt-bandwidth-');
         $out = $this->pmssSystemdSliceRender([
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
             'policy' => $this->pmssSystemdSlicePolicySource([
                 'tasksMax' => 512,
                 'mounts' => ['/'=> ['readBw' => '100M', 'writeBw' => '120M']],
             ]),
+            'env' => $this->pmssPathPrefixedEnvironment($findmntPath),
             'totalMemMiB' => 2048,
         ]);
-        $this->assertTrue(strpos($out, 'IOReadBandwidthMax=') !== false, 'IOReadBandwidthMax not appended');
-        $this->assertTrue(strpos($out, 'IOWriteBandwidthMax=') !== false, 'IOWriteBandwidthMax not appended');
+        $this->assertStringContainsString(
+            "\nIOReadBandwidthMax=/dev/md0 100M\n"
+            ."IOWriteBandwidthMax=/dev/md0 120M\n",
+            $out
+        );
     }
 
     public function testIODeviceLatencyUsesHomeBackingDeviceOnV2(): void

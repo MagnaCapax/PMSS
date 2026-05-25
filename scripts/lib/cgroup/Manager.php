@@ -9,17 +9,15 @@
 namespace PMSS\Cgroup;
 
 require_once __DIR__ . '/SystemInterface.php';
+require_once __DIR__ . '/policy.php';
 require_once __DIR__ . '/../cli/helpText.php';
 require_once __DIR__ . '/../cli/optionParser.php';
-require_once __DIR__ . '/../pathSafety.php';
 require_once __DIR__ . '/../systemdSliceProperties.php';
 require_once __DIR__ . '/../update/runtime/commands.php'; // for runStep
 
 class Manager
 {
     private const IO_CLI_PROPERTY_MAP = ['io-read-bw' => 'IOReadBandwidthMax', 'io-write-bw' => 'IOWriteBandwidthMax', 'io-read-iops' => 'IOReadIOPSMax', 'io-write-iops' => 'IOWriteIOPSMax'];
-    private const IO_POLICY_DEFAULT_MAP = ['ioWeight' => 'io-weight', 'cpuWeight' => 'cpu-weight', 'tasksMax' => 'tasks-max'];
-    private const IO_POLICY_LIMIT_MAP = ['readBw' => ['IOReadBandwidthMax', false], 'writeBw' => ['IOWriteBandwidthMax', false], 'readIops' => ['IOReadIOPSMax', true], 'writeIops' => ['IOWriteIOPSMax', true]];
     private const NUMERIC_PROFILE_MAP = [
         'cpu' => ['cpu-profile', 'cpu-weight', '100', ['low' => '50', 'high' => '300']],
         'tasks' => ['tasks-profile', 'tasks-max', '4096', ['low' => '1024', 'high' => '8192']],
@@ -139,7 +137,7 @@ class Manager
         if ($device !== '') {
             $devResolved = strpos($device, '/dev/') === 0 ? $device : $this->sys->resolveDevice($device);
 
-            if ($devResolved !== '' && !$this->deviceTargetIsSafe($devResolved)) {
+            if ($devResolved !== '' && !\pmssCgroupPolicyDeviceTargetIsSafe($devResolved)) {
                 fwrite(STDERR, "Invalid resolved --device target: expected /dev/... without whitespace or NUL bytes\n");
                 return 2;
             }
@@ -147,7 +145,7 @@ class Manager
 
         if (isset($opt['io-latency-ms']) && $devResolved === '') {
             $devResolved = $this->sys->resolveDevice('/home');
-            if ($devResolved !== '' && !$this->deviceTargetIsSafe($devResolved)) {
+            if ($devResolved !== '' && !\pmssCgroupPolicyDeviceTargetIsSafe($devResolved)) {
                 echo "[WARN] IODeviceLatencyTargetSec skipped: unsafe /home backing device target\n";
                 $devResolved = '';
             }
@@ -371,7 +369,7 @@ class Manager
             return null;
         }
 
-        if (!$this->deviceTargetIsSafe($matches[1]) || strpos($matches[2], "\0") !== false) {
+        if (!\pmssCgroupPolicyDeviceTargetIsSafe($matches[1]) || strpos($matches[2], "\0") !== false) {
             return null;
         }
 
@@ -394,7 +392,7 @@ class Manager
 
     private function applyDefaults(array &$opt): array
     {
-        $policy = $this->loadPolicy();
+        $policy = \pmssCgroupPolicyLoad();
 
         foreach (['cpu-weight' => 'cpuWeight', 'io-weight' => 'ioWeight', 'tasks-max' => 'tasksMax', 'cpu-quota-percent' => 'cpuQuotaPercent', 'io-latency-ms' => 'ioLatencyMs', 'memory-high' => 'memoryHighMiB', 'memory-max' => 'memoryMaxMiB'] as $optionKey => $policyKey) {
             if (!isset($opt[$optionKey]) && isset($policy[$policyKey]) && is_numeric($policy[$policyKey])) {
@@ -415,60 +413,22 @@ class Manager
             $devicePath = strpos($mountPath, '/dev/') === 0
                 ? trim($mountPath)
                 : ($this->validateDeviceSelector($mountPath) === null ? trim($this->sys->resolveDevice($mountPath)) : '');
-            if ($devicePath === '' || !$this->deviceTargetIsSafe($devicePath)) {
+            if ($devicePath === '' || !\pmssCgroupPolicyDeviceTargetIsSafe($devicePath)) {
                 continue;
             }
 
-            foreach (['ioWeight' => ['IODeviceWeight', true]] + self::IO_POLICY_LIMIT_MAP as $policyKey => $mapping) {
-                $propertyName = $mapping[0];
-                $numeric = $mapping[1];
-                $value = $this->policyPositiveValue($mountPolicy, $policyKey, $numeric);
-                if ($value === null) {
-                    continue;
-                }
-
-                $pairsByKey[$propertyName.'|'.$devicePath] = $propertyName.'='.$devicePath.' '.$value;
+            foreach (\pmssCgroupPolicyIoPairs($mountPolicy, $devicePath) as $pair) {
+                $propertyName = substr($pair, 0, strpos($pair, '='));
+                $pairsByKey[$propertyName.'|'.$devicePath] = $pair;
             }
         }
 
         return array_values($pairsByKey);
     }
 
-    /**
-     * Read one positive policy value, preserving the existing skip-on-invalid contract.
-     */
-    private function policyPositiveValue(array $source, string $key, bool $numeric): ?string
-    {
-        if (!isset($source[$key])) {
-            return null;
-        }
-
-        if ($numeric) {
-            return is_numeric($source[$key]) && (int)$source[$key] > 0 ? (string)(int)$source[$key] : null;
-        }
-
-        $value = trim((string)$source[$key]);
-        return $value === '' ? null : $value;
-    }
-
-    /**
-     * Load cgroup policy from PMSS config directory.
-     */
-    private function loadPolicy(): array
-    {
-        $cfgDir = \pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
-        $policyFile = $cfgDir.'/cgroup.policy.php';
-        if (!is_file($policyFile)) {
-            return [];
-        }
-
-        $loaded = @include $policyFile;
-        return is_array($loaded) ? $loaded : [];
-    }
-
     private function expandProfiles(array &$opt): void
     {
-        $policy = $this->loadPolicy();
+        $policy = \pmssCgroupPolicyLoad();
         foreach (self::NUMERIC_PROFILE_MAP as $family => $profile) {
             $this->applyNumericProfileOption($opt, $profile[0], $profile[1], $this->resolveNumericProfiles($policy, $family, $profile[3]), $profile[2]);
         }
@@ -532,7 +492,7 @@ class Manager
             ],
         ];
 
-        $policy = $this->loadPolicy();
+        $policy = \pmssCgroupPolicyLoad();
         if (isset($policy['profiles']['io']) && is_array($policy['profiles']['io'])) {
             foreach ($policy['profiles']['io'] as $profileName => $profileConfig) {
                 if (!is_string($profileName) || $profileName === '' || !is_array($profileConfig)) {
@@ -545,8 +505,8 @@ class Manager
                     : ['defaults' => [], 'limits' => []];
                 $hasValidOverride = false;
 
-                foreach (self::IO_POLICY_DEFAULT_MAP as $policyKey => $targetKey) {
-                    $value = $this->policyPositiveValue($profileConfig, $policyKey, true);
+                foreach (\pmssCgroupPolicyIoDefaultMap() as $policyKey => $targetKey) {
+                    $value = \pmssCgroupPolicyPositiveValue($profileConfig, $policyKey, true);
                     if ($value === null) {
                         continue;
                     }
@@ -554,9 +514,8 @@ class Manager
                     $hasValidOverride = true;
                 }
 
-                foreach (self::IO_POLICY_LIMIT_MAP as $limitKey => $mapping) {
-                    $numeric = $mapping[1];
-                    $limitValue = $this->policyPositiveValue($profileConfig, $limitKey, $numeric);
+                foreach (\pmssCgroupPolicyIoPairSpecs(false) as $limitKey => $mapping) {
+                    $limitValue = \pmssCgroupPolicyPositiveValue($profileConfig, $limitKey, (bool) $mapping[1]);
                     if ($limitValue === null) {
                         continue;
                     }
@@ -588,12 +547,8 @@ class Manager
             return;
         }
 
-        foreach (self::IO_POLICY_LIMIT_MAP as $limitKey => $mapping) {
-            $propertyName = $mapping[0];
-            if (!array_key_exists($limitKey, $entry['limits'])) {
-                continue;
-            }
-            $pairs[] = $propertyName.'='.$dev.' '.(string)$entry['limits'][$limitKey];
+        foreach (\pmssCgroupPolicyIoPairs($entry['limits'], $dev, false) as $pair) {
+            $pairs[] = $pair;
         }
     }
 
@@ -626,7 +581,7 @@ class Manager
             $messages[] = '[WARN] io.cost skipped: unable to resolve /home backing device';
             return ['writes' => $writes, 'messages' => $messages];
         }
-        if (!$this->deviceTargetIsSafe($resolvedDevice)) {
+        if (!\pmssCgroupPolicyDeviceTargetIsSafe($resolvedDevice)) {
             $messages[] = '[WARN] io.cost skipped: unsafe backing device target';
             return ['writes' => $writes, 'messages' => $messages];
         }
@@ -701,12 +656,6 @@ class Manager
         }
 
         return null;
-    }
-
-    /** Keep systemd IO property device targets to plain /dev paths. */
-    private function deviceTargetIsSafe(string $device): bool
-    {
-        return \pmssPathAbsoluteStringIsSafe($device, ['allowTrailingSlash' => false, 'allowWhitespace' => false, 'requiredPrefix' => '/dev/']);
     }
 
     /** Prefix plain nested keys with the resolved major:minor device token. */
