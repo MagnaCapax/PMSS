@@ -515,7 +515,7 @@ LIGHTTPD;
         $trace = $home.'/trace.log';
         mkdir($home.'/.bin', 0755, true);
 
-        $functions = $this->pmssExtractShellFunctions(array('servarr_install_from_url'));
+        $functions = $this->pmssExtractShellFunctions(array('fetch_verified_archive', 'servarr_install_from_url'));
         $script = implode("\n", array(
             '#!/usr/bin/env bash',
             'set -euo pipefail',

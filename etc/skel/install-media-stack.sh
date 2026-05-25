@@ -278,6 +278,20 @@ fetch() {
 	fi
 }
 
+fetch_verified_archive() {
+	local url="$1" archive="$2" label="$3" checksum_id="${4:-}"
+	[[ -n "$checksum_id" ]] || checksum_id=$(basename "${url%%\?*}")
+
+	if ! fetch "$url" "$archive"; then
+		log_err "Failed to download ${label}"
+		exit 1
+	fi
+	if ! verify_checksum "$archive" "$checksum_id"; then
+		log_err "${label} download failed integrity check — aborting"
+		exit 1
+	fi
+}
+
 # Extraction helper
 extract_tgz() {
 	# extract_tgz <archive> [target_dir] [strip_components]
@@ -479,14 +493,7 @@ servarr_install_from_url() {
 
 	echo "Downloading...${app^^}"
 	cd "$install_dir"
-	if ! fetch "$download_url" "$archive"; then
-		log_err "Failed to download ${install_name}"
-		exit 1
-	fi
-	if ! verify_checksum "$archive" "$(basename "${download_url%%\?*}")"; then
-		log_err "${install_name} download failed integrity check — aborting"
-		exit 1
-	fi
+	fetch_verified_archive "$download_url" "$archive" "$install_name"
 	extract_tgz "$archive"
 	servarr_config_xml_converge "$app" "$data_dir" "$port" "$default_port"
 }
@@ -1122,14 +1129,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
 		log_err "SABnzbd URL not resolved"
 		exit 1
 	fi
-	if ! fetch "${SABNZBD_URL}" "${app}.tar.gz"; then
-		log_err "Failed to download SABnzbd"
-		exit 1
-	fi
-	if ! verify_checksum "${app}.tar.gz" "$(basename "${SABNZBD_URL%%\?*}")"; then
-		log_err "SABnzbd download failed integrity check — aborting"
-		exit 1
-	fi
+	fetch_verified_archive "$SABNZBD_URL" "${app}.tar.gz" "SABnzbd"
 	mkdir -p "${app}"
 	extract_tgz "${app}.tar.gz" "${app}" 1
 	# shellcheck disable=SC1091
@@ -1192,14 +1192,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
 fi
 mkdir -p "$installdir"
 cd "$installdir"
-if ! fetch "$ASPDOTNET_URL" "aspnetcore.tar.gz"; then
-	log_err "Failed to download ASP.NET runtime"
-	exit 1
-fi
-if ! verify_checksum "aspnetcore.tar.gz" "$(basename "${ASPDOTNET_URL%%\?*}")"; then
-	log_err "ASP.NET runtime download failed integrity check — aborting"
-	exit 1
-fi
+fetch_verified_archive "$ASPDOTNET_URL" "aspnetcore.tar.gz" "ASP.NET runtime"
 if [[ $DRY_RUN -eq 0 ]]; then
 	if [ ! -f "aspnetcore.tar.gz" ]; then
 		log_err "Failed to find downloaded ASP.NET archive"
@@ -1241,14 +1234,7 @@ if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 	fi
 	cd "$installdir"
 	echo "Downloading...${app^^}"
-	if ! fetch "${JELLYFIN_URL}" "${app}.tar.gz"; then
-		log_err "Failed to download Jellyfin"
-		exit 1
-	fi
-	if ! verify_checksum "${app}.tar.gz" "${JF_FILENAME:-override}"; then
-		log_err "Jellyfin download failed integrity check — aborting"
-		exit 1
-	fi
+	fetch_verified_archive "$JELLYFIN_URL" "${app}.tar.gz" "Jellyfin" "${JF_FILENAME:-override}"
 	mkdir -p "${app}"
 	extract_tgz "${app}.tar.gz" "${app}" 1
 	[[ $DRY_RUN -eq 1 ]] || echo "${app^^} Installed"
