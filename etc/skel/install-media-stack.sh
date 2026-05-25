@@ -346,8 +346,26 @@ jellyfin_ffmpeg_configure_fallback() {
 	log_warn "Continuing with Radarr, Sonarr, Prowlarr, SABnzbd, and Cloudplow."
 }
 
+managed_install_path_reset_target_is_safe() {
+	local path="$1"
+
+	[[ -n "${HOME:-}" && "$HOME" == /* && "$HOME" != "/" ]] || return 1
+	[[ "$path" == "$HOME/.bin/"* ]] || return 1
+	[[ "$path" != "$HOME/.bin" && "$path" != "$HOME/.bin/" ]] || return 1
+
+	case "$path" in
+	*"/../"* | *"/.." | *"../"*) return 1 ;;
+	esac
+
+	return 0
+}
+
 managed_install_path_reset() {
 	local path="$1"
+	if ! managed_install_path_reset_target_is_safe "$path"; then
+		log_err "Refusing to refresh unsafe managed install path: $path"
+		return 1
+	fi
 	if [[ $DRY_RUN -eq 1 ]]; then
 		log_info "[dry-run] would refresh managed install path $path"
 		return 0
@@ -355,6 +373,25 @@ managed_install_path_reset() {
 	if [[ -L "$path" || -e "$path" ]]; then
 		rm -rf "$path"
 	fi
+}
+
+jellyfin_config_dir_reset_target_is_safe() {
+	local path="$1"
+
+	[[ -n "${HOME:-}" && "$HOME" == /* && "$HOME" != "/" ]] || return 1
+	[[ "$path" == "$HOME/.config/jellyfin" ]] || return 1
+	return 0
+}
+
+jellyfin_config_dir_reset() {
+	local path="$HOME/.config/jellyfin"
+
+	if ! jellyfin_config_dir_reset_target_is_safe "$path"; then
+		log_err "Refusing to remove unsafe Jellyfin config path: $path"
+		return 1
+	fi
+
+	rm -rf "$path"
 }
 
 servarr_config_xml_converge() {
@@ -708,10 +745,10 @@ if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && [ -d "$HOME/.config/jellyfin" ] &&
 		printf "WARNING: %s exists and will be removed. Jellyfin users, metadata, and watch state will be lost. Continue? (y/N): " "$HOME/.config/jellyfin"
 		read -r confirm
 		[[ $confirm == [yY] ]] || exit 1
-		rm -rf "$HOME/.config/jellyfin"
+		jellyfin_config_dir_reset
 	fi
 elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && [ -d "$HOME/.config/jellyfin" ]; then
-	[[ $DRY_RUN -eq 1 ]] || rm -rf "$HOME/.config/jellyfin"
+	[[ $DRY_RUN -eq 1 ]] || jellyfin_config_dir_reset
 elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 0 ]] && [ -d "$HOME/.config/jellyfin" ]; then
 	log_warn "Leaving existing Jellyfin config untouched because this run will skip Jellyfin."
 fi
@@ -849,13 +886,24 @@ existing_port_from_xml_tag() {
 	printf '%s' "$value"
 }
 
+media_stack_port_is_valid() {
+	local port="$1"
+
+	[[ "$port" =~ ^[0-9]{1,5}$ ]] || return 1
+	((10#$port >= 1 && 10#$port <= 65535)) || return 1
+	return 0
+}
+
 pick_existing_or_random_port() {
 	local existing="$1"
 	if [[ -n "$existing" ]]; then
-		printf '%s' "$existing"
-	else
-		random_open_port
+		if media_stack_port_is_valid "$existing"; then
+			printf '%s' "$existing"
+			return
+		fi
+		log_warn "Ignoring invalid existing port '${existing}' and selecting a fresh local port"
 	fi
+	random_open_port
 }
 
 ensure_jellyfin_local_bind() {

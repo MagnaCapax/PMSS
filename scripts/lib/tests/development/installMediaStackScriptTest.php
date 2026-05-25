@@ -199,9 +199,59 @@ class installMediaStackScriptTest extends TestCase
     {
         $this->assertStringContainsString('Keeping existing ~/.bin contents outside PMSS-managed app paths.', $this->script);
         $this->assertStringContainsString('managed_install_path_reset', $this->script);
+        $this->assertStringContainsString('managed_install_path_reset_target_is_safe', $this->script);
         $this->assertTrue(
             strpos($this->script, 'rm -rf "$HOME/.bin"') === false,
             'Installer must not delete the entire ~/.bin directory on reruns'
+        );
+    }
+
+    public function testManagedInstallPathResetRefusesUnsafeTargets(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-reset-home-');
+        mkdir($home.'/.bin/Radarr', 0755, true);
+        mkdir($home.'/.bin/keep', 0755, true);
+        file_put_contents($home.'/.bin/Radarr/file', 'managed');
+        file_put_contents($home.'/.bin/keep/file', 'preserve');
+
+        $functions = $this->pmssExtractShellFunctions(array(
+            'managed_install_path_reset_target_is_safe',
+            'managed_install_path_reset',
+        ));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'HOME='.escapeshellarg($home),
+            'DRY_RUN=0',
+            'log_info() { echo "INFO:$*"; }',
+            'log_err() { echo "ERR:$*"; }',
+            $functions,
+            'if managed_install_path_reset "$HOME/.bin/Radarr"; then echo "safe_removed"; else echo "safe_failed"; fi',
+            'if [[ -e "$HOME/.bin/Radarr" ]]; then echo "safe_still_exists"; fi',
+            'if managed_install_path_reset "$HOME/.bin"; then echo "unsafe_allowed"; else echo "unsafe_refused"; fi',
+            'if managed_install_path_reset "$HOME/.bin/../outside"; then echo "traversal_allowed"; else echo "traversal_refused"; fi',
+            'if [[ -f "$HOME/.bin/keep/file" ]]; then echo "keep_preserved"; fi',
+            '',
+        ));
+
+        $output = $this->pmssRunShellHarness($script);
+
+        $this->assertStringContainsString('safe_removed', $output);
+        $this->assertStringContainsString('unsafe_refused', $output);
+        $this->assertStringContainsString('traversal_refused', $output);
+        $this->assertStringContainsString('keep_preserved', $output);
+        $this->assertTrue(strpos($output, 'safe_still_exists') === false, $output);
+        $this->assertTrue(strpos($output, 'unsafe_allowed') === false, $output);
+        $this->assertTrue(strpos($output, 'traversal_allowed') === false, $output);
+    }
+
+    public function testJellyfinConfigResetUsesExactPathGuard(): void
+    {
+        $this->assertStringContainsString('jellyfin_config_dir_reset_target_is_safe', $this->script);
+        $this->assertStringContainsString('[[ "$path" == "$HOME/.config/jellyfin" ]]', $this->script);
+        $this->assertTrue(
+            strpos($this->script, 'rm -rf "$HOME/.config/jellyfin"') === false,
+            'Jellyfin config reset must route through the exact-path guard'
         );
     }
 
@@ -271,6 +321,36 @@ class installMediaStackScriptTest extends TestCase
     public function testSourceBashrcIsFailSoft(): void
     {
         $this->assertStringContainsString('source "$HOME/.bashrc" || true', $this->script);
+    }
+
+    public function testExistingPortSelectionRejectsInvalidValues(): void
+    {
+        $functions = $this->pmssExtractShellFunctions(array(
+            'media_stack_port_is_valid',
+            'pick_existing_or_random_port',
+        ));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'log_warn() { echo "WARN:$*" >&2; }',
+            'random_open_port() { echo 23456; }',
+            $functions,
+            'echo "valid=$(pick_existing_or_random_port 8080)"',
+            'echo "zero=$(pick_existing_or_random_port 0)"',
+            'echo "text=$(pick_existing_or_random_port abc)"',
+            'echo "high=$(pick_existing_or_random_port 70000)"',
+            '',
+        ));
+
+        $output = $this->pmssRunShellHarness($script);
+
+        $this->assertStringContainsString('valid=8080', $output);
+        $this->assertStringContainsString('zero=23456', $output);
+        $this->assertStringContainsString('text=23456', $output);
+        $this->assertStringContainsString('high=23456', $output);
+        $this->assertStringContainsString("WARN:Ignoring invalid existing port '0'", $output);
+        $this->assertStringContainsString("WARN:Ignoring invalid existing port 'abc'", $output);
+        $this->assertStringContainsString("WARN:Ignoring invalid existing port '70000'", $output);
     }
 
     public function testJellyfinSedDoesNotUseSlashDelimitersWithClosingTags(): void
