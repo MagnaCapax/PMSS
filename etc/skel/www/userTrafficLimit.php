@@ -110,9 +110,7 @@ if (!function_exists('pmssTrafficRatioStateBuild')) {
             return ['available' => true, 'display' => 'N/A', 'class' => 'na', 'color' => '#b0bec5'];
         }
         $ratio = (float) $inboundMonth / $outboundMonth;
-        $state = $ratio >= 2.0
-            ? array('good', '#81c784')
-            : ($ratio >= 1.0 ? array('warn', '#ffb74d') : array('bad', '#ef5350'));
+        $state = $ratio >= 2.0 ? array('good', '#81c784') : ($ratio >= 1.0 ? array('warn', '#ffb74d') : array('bad', '#ef5350'));
 
         return array(
             'available' => true,

@@ -413,9 +413,7 @@ if (!function_exists('pmssTrafficLimitDefaultOverageStages')) {
      */
     function pmssTrafficLimitDefaultOverageStages(): array
     {
-        return [
-            ['overagePercent' => 0.0, 'minOverageGiB' => 0.0, 'capMbit' => 100],
-        ];
+        return [['overagePercent' => 0.0, 'minOverageGiB' => 0.0, 'capMbit' => 100]];
     }
 }
 

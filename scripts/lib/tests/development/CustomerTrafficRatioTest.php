@@ -39,11 +39,11 @@ final class CustomerTrafficRatioTest extends TestCase
         $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/welcome.php', [
             '$ratio >= 2.0',
             '$ratio >= 1.0',
-            '$ratioColor',
+            '$ratio'.'Color',
         ]);
         $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/stats.php', [
-            '$trafficRatioGoodMin',
-            '$trafficRatioWarnMin',
+            '$trafficRatio'.'GoodMin',
+            '$trafficRatio'.'WarnMin',
             '$trafficRatio >=',
         ]);
     }
