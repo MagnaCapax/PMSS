@@ -359,6 +359,9 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
             && @stream_set_blocking($pipes[2], false);
     }
 
+    function pmssCommandPipesClose(array $pipes, array $indexes = [0, 1, 2]): void { foreach ($indexes as $index) if (isset($pipes[$index]) && is_resource($pipes[$index])) fclose($pipes[$index]); }
+    function pmssCommandProcessAbort($process, array $pipes): void { pmssCommandPipesClose($pipes); if (!is_resource($process)) return; if (function_exists('proc_terminate')) @proc_terminate($process); @proc_close($process); }
+
     /**
      * Drain proc_open stdout/stderr pipes until EOF or timeout.
      *
@@ -516,19 +519,6 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
      */
     function pmssCommandPipedCapture(string $bash, string $timeoutCommand, int $timeoutSec, int $maxBuffer = 0, bool $mirrorOutput = false, string $launchError = 'proc_open failed', int $launchRc = 1, bool $retryLaunch = false, string $streamSelectError = 'stream_select failed'): array
     {
-        $closePipes = static function (array $pipes, array $indexes = [0, 1, 2]): void {
-            foreach ($indexes as $index) {
-                if (isset($pipes[$index]) && is_resource($pipes[$index])) fclose($pipes[$index]);
-            }
-        };
-        $abortProcess = static function ($process, array $pipes) use ($closePipes): void {
-            $closePipes($pipes);
-            if (!is_resource($process)) {
-                return;
-            }
-            if (function_exists('proc_terminate')) @proc_terminate($process);
-            @proc_close($process);
-        };
         $process = @proc_open($bash, pmssProcessPipeDescriptorSpec(), $pipes);
         if (!is_resource($process) && $retryLaunch) {
             usleep(500000);
@@ -538,19 +528,19 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
             return ['rc' => $launchRc, 'stdout' => '', 'stderr' => $launchError, 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];
         }
         if (!pmssCommandPipesReady($pipes)) {
-            $abortProcess($process, $pipes);
+            pmssCommandProcessAbort($process, $pipes);
             return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'proc_open pipes unavailable', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => true];
         }
 
         fclose($pipes[0]);
         if (!pmssCommandOutputPipesSetNonBlocking($pipes)) {
-            $abortProcess($process, $pipes);
+            pmssCommandProcessAbort($process, $pipes);
             return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'proc_open pipes unavailable', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => true];
         }
 
         $startedAt = microtime(true);
         $capture = pmssCommandOutputPipesDrain($pipes, $timeoutSec, $startedAt, $maxBuffer, $mirrorOutput, $streamSelectError);
-        $closePipes($pipes, [1, 2]);
+        pmssCommandPipesClose($pipes, [1, 2]);
         $rc = $capture['timed_out']
             ? pmssCommandTimeoutClose($process, $timeoutCommand, $timeoutSec, $startedAt)
             : pmssProcessCloseExitCode($process);
@@ -580,6 +570,39 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
     {
         $haystack = $stdout."\n".$stderr;
         return preg_match('/\b(Cannot fork|fork failed|Unable to fork|Resource temporarily unavailable)\b/i', $haystack) === 1;
+    }
+
+    function pmssCommandIsAptDpkg(string $cmd): bool { return preg_match('/\b(apt-get|apt|dpkg)\b/i', $cmd) === 1; }
+
+    /** Resolve the effective timeout for one command invocation. */
+    function pmssCommandTimeoutSeconds(string $cmd): int
+    {
+        $timeoutEnv = getenv('PMSS_COMMAND_TIMEOUT');
+        $timeoutSec = ($timeoutEnv !== false && $timeoutEnv !== '' && ctype_digit($timeoutEnv))
+            ? (int) $timeoutEnv
+            : PMSS_COMMAND_TIMEOUT_DEFAULT;
+
+        return pmssCommandIsAptDpkg($cmd) && $timeoutSec > 0
+            ? max($timeoutSec, PMSS_COMMAND_TIMEOUT_APT_DEFAULT)
+            : $timeoutSec;
+    }
+
+    /** Build the shell invocation used by runCommand while preserving apt exec handling. */
+    function pmssCommandBashInvocation(string $cmd): string
+    {
+        $cmdForShell = $cmd;
+        if (pmssCommandIsAptDpkg($cmd) && preg_match('/[|;]|&&|\|\|/', $cmd) !== 1) {
+            $cmdForShell = preg_match('/^(\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)+)(.+)$/', $cmd, $match) === 1
+                ? rtrim($match[1]).' exec '.ltrim($match[2])
+                : 'exec '.$cmd;
+        }
+
+        $pathOverride = getenv('PATH');
+        if ($pathOverride !== false && $pathOverride !== '' && preg_match('/(^|\s)PATH=/', $cmdForShell) !== 1) {
+            $cmdForShell = 'PATH='.escapeshellarg($pathOverride).' '.$cmdForShell;
+        }
+
+        return '/bin/bash -lc '.escapeshellarg($cmdForShell);
     }
 
     /**
@@ -853,18 +876,7 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
             return 1;
         };
         $isInteractive = pmssStreamIsTty(STDOUT);
-        $timeoutEnv = getenv('PMSS_COMMAND_TIMEOUT');
-        $timeoutSec = PMSS_COMMAND_TIMEOUT_DEFAULT;
-        if ($timeoutEnv !== false && $timeoutEnv !== '' && ctype_digit($timeoutEnv)) {
-            // 0 = no timeout (infinite); positive = timeout in seconds.
-            $timeoutSec = (int) $timeoutEnv;
-        }
-        // APT/dpkg operations legitimately take a long time (especially dist-upgrades).
-        // Always apply a sane floor even when PMSS_COMMAND_TIMEOUT is set lower.
-        $isAptDpkgCommand = preg_match('/\b(apt-get|apt|dpkg)\b/i', $cmd) === 1;
-        if ($isAptDpkgCommand && $timeoutSec > 0) {
-            $timeoutSec = max($timeoutSec, PMSS_COMMAND_TIMEOUT_APT_DEFAULT);
-        }
+        $timeoutSec = pmssCommandTimeoutSeconds($cmd);
         $announceStart = $isInteractive || $verbose;
         if ($announceStart) {
             $prefix = $isInteractive ? "\033[36m[EXEC]\033[0m " : '[CMD] ';
@@ -885,33 +897,7 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
         };
 
         $useInheritedIO = $inheritTty && pmssStandardStreamsAreTty();
-        // Use a single command string for PHP 7.3 compatibility.
-        // For apt/dpkg, prefer exec when safe so timeouts terminate the real child process.
-        // Context: output capture existed at least by 8e3bd4b (pre-Dec) with unbounded buffers.
-        // a2ca2bbf6bf added timeouts + tail-capped buffers for hung/noisy commands, and
-        // cc05325aaf1 added exec for apt/dpkg; exec+env broke DEBIAN_FRONTEND-prefixed
-        // commands (rc=127), so we insert exec after env assignments here.
-        // If regressions continue (e.g., interactive dist-upgrade), re-evaluate rolling back
-        // these runtime changes instead of piling on more workarounds.
-        // References: docs/adr/0006-update-step2-user-loop-and-observability.md,
-        // docs/contracts.md (runCommand contract/timeout/buffering notes).
-        $cmdForShell = $cmd;
-        if ($isAptDpkgCommand
-            && strpos($cmd, ';') === false
-            && strpos($cmd, '&&') === false
-            && strpos($cmd, '||') === false
-            && strpos($cmd, '|') === false) {
-            if (preg_match('/^(\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)+)(.+)$/', $cmd, $match)) {
-                $cmdForShell = rtrim($match[1]).' exec '.ltrim($match[2]);
-            } else {
-                $cmdForShell = 'exec '.$cmd;
-            }
-        }
-        $pathOverride = getenv('PATH');
-        if ($pathOverride !== false && $pathOverride !== '' && preg_match('/(^|\s)PATH=/', $cmdForShell) !== 1) {
-            $cmdForShell = 'PATH='.escapeshellarg($pathOverride).' '.$cmdForShell;
-        }
-        $bash = '/bin/bash -lc '.escapeshellarg($cmdForShell);
+        $bash = pmssCommandBashInvocation($cmd);
         if ($useInheritedIO) {
             $descriptor = [0 => STDIN, 1 => STDOUT, 2 => STDERR];
             $process = proc_open($bash, $descriptor, $pipes);

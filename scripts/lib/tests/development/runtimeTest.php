@@ -246,6 +246,16 @@ class RuntimeTest extends TestCase
         $this->assertTrue(strpos($out, 'apt-get') !== false);
     }
 
+    public function testCommandBashInvocationPreservesAptEnvExecContract(): void
+    {
+        $this->pmssWithEnv(['PATH' => '/tmp/pmss-test-bin'], function (): void {
+            $bash = \pmssCommandBashInvocation('DEBIAN_FRONTEND=noninteractive apt-get update');
+
+            $this->assertStringContainsString('/tmp/pmss-test-bin', $bash);
+            $this->assertStringContainsString('DEBIAN_FRONTEND=noninteractive exec apt-get update', $bash);
+        });
+    }
+
     public function testRunCommandTimeoutWritesStructuredTimeoutFireLog(): void
     {
         $timeoutLog = $this->pmssMakeTempFile('pmss-timeout-fire-');
