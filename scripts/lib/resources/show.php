@@ -24,8 +24,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             continue;
         }
 
-        $data = pmssReadSerializedArrayFile("{$statsDir}/{$thisUser}");
-        if ($data === null || ($row = pmssResourceStoredPayloadReportRow($data)) === null) {
+        if (($data = pmssReadSerializedArrayFile("{$statsDir}/{$thisUser}")) === null || ($row = pmssResourceStoredPayloadReportRow($data)) === null) {
             $missingStats[] = $thisUser;
             continue;
         }
@@ -82,31 +81,29 @@ function pmssShowResourcesMain(array $argv): int
         return pmssJsonEmitPayload(['users' => $rows, 'totals' => $totals, 'missing' => $missingStats], 'Failed to encode resource report JSON.');
     }
 
-    $formatBytes = static function (float $bytes): string { return pmssFormatBytes($bytes, 2, 1); };
     $formatIoOperations = static function (float $operations): string {
         foreach ([1000000000.0 => 'B ops', 1000000.0 => 'M ops', 1000.0 => 'K ops'] as $divisor => $unit) {
             if ($operations >= $divisor) {
                 $value = $operations / $divisor;
-                $decimals = $value >= 100 ? 0 : ($value >= 10 ? 1 : 2);
-                return number_format($value, $decimals).' '.$unit;
+                return number_format($value, $value >= 100 ? 0 : ($value >= 10 ? 1 : 2)).' '.$unit;
             }
         }
 
         return number_format($operations, 0).' ops';
     };
     $rowFormat = "%-14s %-12s %-12s %-11s %-14s %-9s %-6s %-10s %-8s\n";
-    $printUsageRow = static function (string $label, array $data) use ($formatBytes, $formatIoOperations, $rowFormat): void {
+    $printUsageRow = static function (string $label, array $data) use ($formatIoOperations, $rowFormat): void {
         $hourOps = (float) (($data['io_read_ops']['hour'] ?? 0) + ($data['io_write_ops']['hour'] ?? 0));
         $monthOps = (float) (($data['io_read_ops']['month'] ?? 0) + ($data['io_write_ops']['month'] ?? 0));
         $ramHours = (float) $data['ram_hours']['month'];
         printf(
             $rowFormat,
             $label,
-            $formatBytes((float) $data['io_read']['month']),
-            $formatBytes((float) $data['io_write']['month']),
+            pmssFormatBytes((float) $data['io_read']['month'], 2, 1),
+            pmssFormatBytes((float) $data['io_write']['month'], 2, 1),
             number_format((float) $data['cpu']['month'] / 1000000000 / 3600, 1).' hrs',
             number_format($ramHours, $ramHours >= 100 ? 0 : ($ramHours >= 10 ? 1 : 2)).' GB-hrs',
-            $formatBytes((float) $data['memory']['current']),
+            pmssFormatBytes((float) $data['memory']['current'], 2, 1),
             (string) round($data['tasks']['current']),
             $formatIoOperations($monthOps),
             number_format($hourOps / 3600, 2)
