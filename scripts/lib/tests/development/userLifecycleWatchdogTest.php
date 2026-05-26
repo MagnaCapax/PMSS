@@ -165,6 +165,50 @@ class UserLifecycleWatchdogTest extends TestCase
         $this->assertEquals(['demo' => false], $states);
     }
 
+    public function testRunServiceStartsOnlyEnabledStoppedUsers(): void
+    {
+        $homeRoot = $this->pmssMakeTempDir('watchdog-run-service-');
+        foreach (['alice', 'bob', 'cara'] as $user) {
+            @mkdir($homeRoot.'/'.$user.'/www', 0755, true);
+        }
+        touch($homeRoot.'/alice/.demoEnable');
+        touch($homeRoot.'/cara/.demoEnable');
+
+        $listUsers = $this->pmssMakeTempDir('watchdog-list-users-').'/listUsers.php';
+        $this->pmssWriteExecutablePhpFile($listUsers, "echo \"alice\\nbob\\ncara\\n\";");
+
+        $marker = $this->pmssMakeTempFile('watchdog-run-service-started-');
+        @unlink($marker);
+
+        list(, $output) = $this->pmssCaptureStdout(function () use ($homeRoot, $listUsers, $marker): void {
+            pmssUserWatchdogRunService(
+                '',
+                'demoEnable',
+                ['demo'],
+                'demo stopped due to suspension',
+                [[
+                    'processName' => 'demo',
+                    'serviceLabel' => 'Demo',
+                    'command' => static function (string $username) use ($marker): string {
+                        return 'echo '.escapeshellarg($username).' >> '.escapeshellarg($marker);
+                    },
+                    'userLogMessage' => 'demo start requested',
+                ]],
+                static function (string $username): array {
+                    return ['demo' => $username === 'cara'];
+                },
+                null,
+                $homeRoot,
+                $listUsers
+            );
+        });
+
+        $this->assertEquals("alice\n", (string) file_get_contents($marker));
+        $this->assertStringContainsString('Start Demo for user: alice', $output);
+        $this->assertStringNotContainsString('Start Demo for user: bob', $output);
+        $this->assertStringNotContainsString('Start Demo for user: cara', $output);
+    }
+
     public function testLocalPortReadAcceptsTrimmedNumericPort(): void
     {
         $path = $this->pmssMakeTempFile('watchdog-port-');

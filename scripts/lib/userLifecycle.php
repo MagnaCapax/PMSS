@@ -288,13 +288,6 @@ function pmssUserWatchdogProcessStartTime(string $username, string $processName,
 
     return $oldest;
 }
-function pmssUserWatchdogStartCommand(string $username, string $serviceLabel, string $command, string $userLogMessage): void
-{
-    if (!pmssValidateUsername($username) || $command === '') { return; }
-    echo "Start {$serviceLabel} for user: {$username}\n";
-    passthru($command);
-    pmssUserLog($username, $userLogMessage);
-}
 /** @param array<int,string> $processNames */
 function pmssUserWatchdogRestartProcessesIf(string $username, bool $running, array $processNames, callable $restartNeeded, string $userLogMessage, int $signal = 9, ?callable $terminator = null): bool
 {
@@ -314,7 +307,11 @@ function pmssUserWatchdogEnsureServices(string $username, array $serviceSpecs, a
         $command = $serviceSpec['command'] ?? '';
         is_callable($command) && $command = (string) $command($username);
         $running = isset($runningStates[$processName]) ? (bool) $runningStates[$processName] : pmssUserWatchdogProcessRunning($username, $processName);
-        !$running && pmssUserWatchdogStartCommand($username, (string) ($serviceSpec['serviceLabel'] ?? $processName), (string) $command, (string) ($serviceSpec['userLogMessage'] ?? ($processName.' start requested')));
+        if (!$running && (string) $command !== '') {
+            echo 'Start '.(string) ($serviceSpec['serviceLabel'] ?? $processName).' for user: '.$username."\n";
+            passthru((string) $command);
+            pmssUserLog($username, (string) ($serviceSpec['userLogMessage'] ?? ($processName.' start requested')));
+        }
         $runningStates[$processName] = $running;
     }
     return $runningStates;
@@ -329,23 +326,17 @@ function pmssUserWatchdogHandleSuspended(string $username, array $processNames, 
     pmssUserLog($username, $userLogMessage);
     return true;
 }
-/** Run a watchdog callback for enabled, unsuspended managed users. */
-function pmssUserWatchdogRunEnabledUsers(string $enableMarker, array $processNames, string $userLogMessage, callable $callback, string $homeRoot = '/home', string $command = '/scripts/listUsers.php'): void
-{
-    if ($enableMarker === '') { return; }
-    $homeRoot = rtrim($homeRoot, '/');
-    foreach (pmssListManagedUsers($command) as $username) {
-        if (pmssUserWatchdogHandleSuspended($username, $processNames, $userLogMessage, $homeRoot) || !is_file($homeRoot.'/'.$username.'/.'.$enableMarker)) { continue; }
-        $callback($username);
-    }
-}
-
 /** @param array<int,string> $processNames @param array<int,array<string,mixed>> $serviceSpecs */
 function pmssUserWatchdogRunService(string $heading, string $enableMarker, array $processNames, string $userLogMessage, array $serviceSpecs, ?callable $runningStateBuilder = null, ?string $optionalRequirePath = null, string $homeRoot = '/home', string $command = '/scripts/listUsers.php'): void
 {
     $heading !== '' && print date('Y-m-d H:i:s') . ': Checking '.$heading." instances\n";
     $optionalRequirePath !== null && is_file($optionalRequirePath) && require_once $optionalRequirePath;
-    pmssUserWatchdogRunEnabledUsers($enableMarker, $processNames, $userLogMessage, function (string $username) use ($serviceSpecs, $runningStateBuilder): void { pmssUserWatchdogEnsureServices($username, $serviceSpecs, $runningStateBuilder !== null ? (array) $runningStateBuilder($username) : array()); }, $homeRoot, $command);
+    if ($enableMarker === '') { return; }
+    $homeRoot = rtrim($homeRoot, '/');
+    foreach (pmssListManagedUsers($command) as $username) {
+        if (pmssUserWatchdogHandleSuspended($username, $processNames, $userLogMessage, $homeRoot) || !is_file($homeRoot.'/'.$username.'/.'.$enableMarker)) { continue; }
+        pmssUserWatchdogEnsureServices($username, $serviceSpecs, $runningStateBuilder !== null ? (array) $runningStateBuilder($username) : array());
+    }
 }
 
 function pmssManagedUsersSelectFromList(array $managedUsers, string $rawUsername = '', array $options = array()): array
