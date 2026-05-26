@@ -884,10 +884,13 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
         }
         $debugRun = getenv('PMSS_RUNCOMMAND_DEBUG');
         $logMemoryUsage = $verbose || ($debugRun !== false && $debugRun !== '');
+        $logMemory = static function (string $label) use ($log, $logMemoryUsage): void {
+            if ($logMemoryUsage) {
+                $log(sprintf('[CMD] memory usage %-6s=%0.2f MiB', $label, memory_get_usage(true) / 1048576));
+            }
+        };
         $log('[CMD start] '.$cmd);
-        if ($logMemoryUsage) {
-            $log(sprintf('[CMD] memory usage before=%0.2f MiB', memory_get_usage(true) / 1048576));
-        }
+        $logMemory('before');
         $logTimeout = static function () use ($cmd, $isInteractive, $log, $timeoutSec): void {
             $banner = $isInteractive ? "\033[1;31m[TIMEOUT]\033[0m " : '[TIMEOUT] ';
             $msg = $banner.'Command timed out after '.$timeoutSec.'s: '.$cmd;
@@ -933,33 +936,22 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
                 $exitCode = pmssProcessCloseExitCode($process, $lastStatus);
             }
 
-            $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => ''];
-
-            if ($exitCode !== 0) {
-                if ($timedOut) {
-                    $logTimeout();
-                } else {
-                    $log('[WARN] Command failed (rc='.$exitCode.'): '.$cmd);
-                }
+            $stdout = '';
+            $stderr = '';
+        } else {
+            $result = pmssCommandPipedCapture($bash, $cmd, $timeoutSec, 1048576, true, '', 1, true);
+            if ($result['launch_failed']) {
+                return $failLaunch();
             }
-            if ($logMemoryUsage) {
-                $log(sprintf('[CMD] memory usage after =%0.2f MiB', memory_get_usage(true) / 1048576));
+            if ($result['pipe_failed']) {
+                return $failPipeCapture('proc_open pipes unavailable for command capture: '.$cmd);
             }
-            return $exitCode;
-        }
 
-        $result = pmssCommandPipedCapture($bash, $cmd, $timeoutSec, 1048576, true, '', 1, true);
-        if ($result['launch_failed']) {
-            return $failLaunch();
+            $exitCode = $result['rc'];
+            $stdout = $result['stdout'];
+            $stderr = $result['stderr'];
+            $timedOut = $result['timed_out'];
         }
-        if ($result['pipe_failed']) {
-            return $failPipeCapture('proc_open pipes unavailable for command capture: '.$cmd);
-        }
-
-        $exitCode = $result['rc'];
-        $stdout = $result['stdout'];
-        $stderr = $result['stderr'];
-        $timedOut = $result['timed_out'];
 
         $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = [
             'stdout' => $stdout,
@@ -977,9 +969,7 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
                 $log('[WARN] Command failed (rc='.$exitCode.'): '.$cmd.$excerpt);
             }
         }
-        if ($logMemoryUsage) {
-            $log(sprintf('[CMD] memory usage after =%0.2f MiB', memory_get_usage(true) / 1048576));
-        }
+        $logMemory('after');
         return $exitCode;
     }
 
