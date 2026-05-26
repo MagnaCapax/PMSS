@@ -12,6 +12,9 @@
 
 require_once __DIR__.'/runtime.php';
 
+const PMSS_DISK_IOSTAT_HISTORY_LOG = '/var/log/pmss/iostat-history.log';
+const PMSS_DISK_IOSTAT_HISTORY_RAW_LOG = '/var/log/pmss/iostat-history-raw.log';
+
 /** Keep block device names argv-safe before passing them to iostat. */
 function pmssDiskIostatDeviceNameIsSafe(string $device): bool
 {
@@ -130,14 +133,20 @@ function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?i
  *
  * @param array<string, int|string> $iostat
  */
-function pmssDiskIostatWriteSnapshotFiles(string $iostatLogFile, array $iostat, string $iostatRaw): bool
+function pmssDiskIostatWriteSnapshotFiles(
+    string $iostatLogFile,
+    array $iostat,
+    string $iostatRaw,
+    string $historyLogFile = PMSS_DISK_IOSTAT_HISTORY_LOG,
+    string $historyRawLogFile = PMSS_DISK_IOSTAT_HISTORY_RAW_LOG
+): bool
 {
     $serialized = serialize($iostat);
     $historyPrefix = date('Y-m-d H:i:s').' || ';
     $writes = [
         [$iostatLogFile, $serialized, 0],
-        [$iostatLogFile.'-history', $historyPrefix.$serialized."\n", FILE_APPEND],
-        [$iostatLogFile.'-history-raw', $historyPrefix.$iostatRaw."\n---\n", FILE_APPEND],
+        [$historyLogFile, $historyPrefix.$serialized."\n", FILE_APPEND],
+        [$historyRawLogFile, $historyPrefix.$iostatRaw."\n---\n", FILE_APPEND],
     ];
 
     foreach ($writes as $write) {

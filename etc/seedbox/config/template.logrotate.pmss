@@ -46,6 +46,17 @@
     sharedscripts
 }
 
+/var/log/pmss/iostat-history.log
+/var/log/pmss/iostat-history-raw.log {
+    monthly
+    rotate 12
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 root root
+}
+
 /var/log/pmss/check*.log {
     monthly
     rotate 7

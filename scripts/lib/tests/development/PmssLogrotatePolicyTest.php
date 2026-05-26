@@ -32,6 +32,17 @@ class PmssLogrotatePolicyTest extends TestCase
         );
     }
 
+    public function testDiskIostatHistoryLogsPersistWithAnnualRetention(): void
+    {
+        $policy = $this->pmssReadRepoFile('etc/seedbox/config/template.logrotate.pmss');
+
+        $this->assertMatches(
+            '#/var/log/pmss/iostat-history\.log\s+/var/log/pmss/iostat-history-raw\.log\s*\{[^}]*monthly[^}]*rotate 12[^}]*create 0644 root root#s',
+            $policy,
+            'iostat history logs must persist outside tmpfs with annual rotation'
+        );
+    }
+
     public function testUpdateStep2RefreshesAndVerifiesLogrotatePolicy(): void
     {
         $src = $this->pmssReadRepoFile('scripts/util/update-step2.php');

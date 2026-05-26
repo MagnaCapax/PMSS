@@ -61,7 +61,9 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
 - `checkQbittorrentInstances.php` – Restart qBittorrent if processes exit.
 - `checkRcloneInstances.php` – Maintain rclone mount processes.
 - `cpuStat.php` – Periodically record CPU usage statistics.
-- `diskIostat.php` – Collect disk I/O metrics for later analysis.
+- `diskIostat.php` – Collect disk I/O metrics for later analysis. The live
+  snapshot stays under `/var/run/pmss/iostat`; append-only history is persisted
+  under `/var/log/pmss/iostat-history*.log` for reboot-safe postmortems.
 - `storageHealthSnapshot.php` – Append SMART/NVMe/mdadm health snapshots to
   `/var/log/pmss/storage-health.jsonl` without waking standby disks. The root
   cron template runs it twice daily (06:00 and 18:00), and the PMSS logrotate

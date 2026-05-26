@@ -84,14 +84,15 @@ class DiskIostatTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-iostat-write-');
         $path = $root.'/iostat';
+        $historyPath = $root.'/iostat-history.log';
+        $historyRawPath = $root.'/iostat-history-raw.log';
         $payload = ['iopsRead' => '1.00', 'diskQuantity' => 1, 'time' => 123456];
 
-        $this->assertTrue(\pmssDiskIostatWriteSnapshotFiles($path, $payload, 'raw'));
+        $this->assertTrue(\pmssDiskIostatWriteSnapshotFiles($path, $payload, 'raw', $historyPath, $historyRawPath));
         $this->assertSame(serialize($payload), (string) file_get_contents($path));
-        $this->assertStringContainsString(serialize($payload), (string) file_get_contents($path.'-history'));
-        $this->assertStringContainsString("raw\n---\n", (string) file_get_contents($path.'-history-raw'));
+        $this->assertStringContainsString(serialize($payload), (string) file_get_contents($historyPath));
+        $this->assertStringContainsString("raw\n---\n", (string) file_get_contents($historyRawPath));
 
         $this->assertFalse(\pmssDiskIostatWriteSnapshotFiles($root.'/missing/iostat', $payload, 'raw'));
     }
-
 }
