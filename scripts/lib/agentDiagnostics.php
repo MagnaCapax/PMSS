@@ -135,14 +135,14 @@ function pmssAgentDiagnosticsSpecCollect(array $spec)
 /** Return CLI usage text for the diagnostics wrapper. */
 function pmssAgentDiagnosticsUsage(): string
 {
-    return "Usage:\n"
-        ."  agentDiagnostics.php [--json] [--pretty] [--user USERNAME]\n"
-        ."  agentDiagnostics.php [--help]\n\n"
-        ."Options:\n"
-        ."  --json          Emit JSON output.\n"
-        ."  --pretty        Pretty-print JSON output.\n"
-        ."  --user USER     Include per-user diagnostics.\n"
-        ."  -h, --help      Show this help text.\n";
+    return pmssCliHelpUsageOptions([
+        'agentDiagnostics.php [--json] [--pretty] [--user USERNAME]', 'agentDiagnostics.php [--help]',
+    ], [
+        ['--json', 'Emit JSON output.'],
+        ['--pretty', 'Pretty-print JSON output.'],
+        ['--user USER', 'Include per-user diagnostics.'],
+        ['-h, --help', 'Show this help text.'],
+    ], 16, [], false);
 }
 
 /** Assemble the full diagnostics payload. */
@@ -180,7 +180,7 @@ function pmssAgentDiagnosticsRenderText(array $payload): string
 function pmssAgentDiagnosticsMain(array $argv): int
 {
     $parsed = pmssParseCliTokens($argv, ['user']);
-    if (pmssCliOption($parsed, 'help', 'h', false) !== false) { echo pmssAgentDiagnosticsUsage(); return 0; }
+    if (pmssCliOptionPresent($parsed, 'help', 'h')) { echo pmssAgentDiagnosticsUsage(); return 0; }
 
     if (getenv('PMSS_TEST_MODE') !== '1') requireRoot();
 
@@ -196,9 +196,9 @@ function pmssAgentDiagnosticsMain(array $argv): int
     }
 
     $payload = pmssAgentDiagnosticsCollect($user);
-    if (pmssCliOption($parsed, 'json', 'j', false) !== false) {
+    if (pmssCliOptionPresent($parsed, 'json', 'j')) {
         $flags = JSON_UNESCAPED_SLASHES;
-        if (pmssCliOption($parsed, 'pretty', 'p', false) !== false) $flags |= JSON_PRETTY_PRINT;
+        if (pmssCliOptionPresent($parsed, 'pretty', 'p')) $flags |= JSON_PRETTY_PRINT;
         return pmssJsonEmitPayload($payload, 'Failed to encode agent diagnostics JSON.', $flags);
     }
 

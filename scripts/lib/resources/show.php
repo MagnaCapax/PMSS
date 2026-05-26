@@ -5,7 +5,7 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
-require_once dirname(__DIR__).'/cli/helpText.php';
+require_once dirname(__DIR__).'/cli/optionParser.php';
 require_once dirname(__DIR__).'/resources.php';
 require_once dirname(__DIR__).'/userLifecycle.php';
 
@@ -44,8 +44,8 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
 function pmssShowResourcesMain(array $argv): int
 {
-    $options = getopt('', ['json', 'show-missing', 'user:', 'help']);
-    if (isset($options['help'])) {
+    $parsed = pmssParseCliTokens($argv, ['user']);
+    if (pmssCliOptionPresent($parsed, 'help')) {
         $self = basename($_SERVER['SCRIPT_NAME'] ?? 'showResources.php');
         echo pmssCliHelpUsageOptions($self.' [--json] [--show-missing] [--user=<username>]', [
             ['--json', 'Emit JSON instead of human text output.'],
@@ -55,7 +55,7 @@ function pmssShowResourcesMain(array $argv): int
         ]);
         return 0;
     }
-    $userFilter = trim((string) ($options['user'] ?? ''));
+    $userFilter = trim((string) pmssCliOptionString($parsed, 'user', null, ''));
     $statsDir = pmssRuntimeDir().'/resourceStats';
 
     if ($userFilter !== '') {
@@ -78,7 +78,7 @@ function pmssShowResourcesMain(array $argv): int
 
     ['rows' => $rows, 'missing' => $missingStats, 'totals' => $totals] = pmssResourceBuildReport($statsDir, $users);
 
-    if (isset($options['json'])) {
+    if (pmssCliOptionPresent($parsed, 'json')) {
         return pmssJsonEmitPayload(['users' => $rows, 'totals' => $totals, 'missing' => $missingStats], 'Failed to encode resource report JSON.');
     }
 
@@ -122,7 +122,7 @@ function pmssShowResourcesMain(array $argv): int
 
     if (!empty($missingStats)) {
         echo "* Missing resource stats for ".count($missingStats)." users (run resourceStats to rebuild).\n";
-        if (isset($options['show-missing'])) { echo "* Missing: ".implode(' ', $missingStats)."\n"; }
+        if (pmssCliOptionPresent($parsed, 'show-missing')) { echo "* Missing: ".implode(' ', $missingStats)."\n"; }
     }
 
     return 0;
