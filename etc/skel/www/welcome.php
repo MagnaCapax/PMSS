@@ -525,21 +525,30 @@ function pmssWelcomeBillingServiceIdRead($primaryPath, $legacyPath) {
  * Read one positive billing identifier file without following symlinks.
  */
 function pmssWelcomeBillingFileRead($path) {
+    $billingServiceId = pmssWelcomePositiveIntegerFileRead($path);
+    return $billingServiceId === null ? 0 : $billingServiceId;
+}
+
+/**
+ * Read one positive integer file without following symlinks.
+ */
+function pmssWelcomePositiveIntegerFileRead($path) {
     if (!is_file($path) || is_link($path)) {
-        return 0;
+        return null;
     }
+
     $raw = @file_get_contents($path);
     if (!is_string($raw)) {
-        return 0;
+        return null;
     }
 
     $trimmed = trim($raw);
     if ($trimmed === '' || !ctype_digit($trimmed)) {
-        return 0;
+        return null;
     }
 
-    $billingServiceId = (int) $trimmed;
-    return $billingServiceId > 0 ? $billingServiceId : 0;
+    $value = (int) $trimmed;
+    return $value > 0 ? $value : null;
 }
 
 /**
@@ -551,17 +560,9 @@ function pmssWelcomeTrafficBandwidthStateBuild($throttlePath) {
     $defaultCapMbit = pmssWelcomeTrafficDefaultCapMbitRead();
     $effectiveCapMbit = $defaultCapMbit;
 
-    if (is_file($throttlePath) && !is_link($throttlePath)) {
-        $rawThrottle = @file_get_contents($throttlePath);
-        if (is_string($rawThrottle)) {
-            $rawThrottle = trim($rawThrottle);
-            if ($rawThrottle !== '' && ctype_digit($rawThrottle)) {
-                $parsedCap = (int) $rawThrottle;
-                if ($parsedCap > 0) {
-                    $effectiveCapMbit = $parsedCap;
-                }
-            }
-        }
+    $parsedCap = pmssWelcomePositiveIntegerFileRead($throttlePath);
+    if ($parsedCap !== null) {
+        $effectiveCapMbit = $parsedCap;
     }
 
     return array(
@@ -896,11 +897,7 @@ function readUserMemoryBreakdownBytes() {
     return $breakdown;
 }
 
-function readSystemdMemoryCurrentBytes() {
-    if (!function_exists('pmssFrontendShellExecAvailable') || !pmssFrontendShellExecAvailable()) {
-        return null;
-    }
-
+function pmssWelcomeCurrentUidRead() {
     $uid = function_exists('posix_getuid') ? (int) posix_getuid() : null;
     if ($uid === null && function_exists('pmssFrontendShellExecAvailable') && pmssFrontendShellExecAvailable()) {
         $uidRaw = @pmssFrontendShellExec('/usr/bin/id -u 2>/dev/null');
@@ -908,7 +905,17 @@ function readSystemdMemoryCurrentBytes() {
             $uid = (int) trim($uidRaw);
         }
     }
-    if (!is_int($uid) || $uid < 0) {
+
+    return is_int($uid) && $uid >= 0 ? $uid : null;
+}
+
+function readSystemdMemoryCurrentBytes() {
+    if (!function_exists('pmssFrontendShellExecAvailable') || !pmssFrontendShellExecAvailable()) {
+        return null;
+    }
+
+    $uid = pmssWelcomeCurrentUidRead();
+    if ($uid === null) {
         return null;
     }
 
@@ -931,14 +938,8 @@ function readSystemdMemoryBreakdownBytes() {
         return array();
     }
 
-    $uid = function_exists('posix_getuid') ? (int) posix_getuid() : null;
-    if ($uid === null && function_exists('pmssFrontendShellExecAvailable') && pmssFrontendShellExecAvailable()) {
-        $uidRaw = @pmssFrontendShellExec('/usr/bin/id -u 2>/dev/null');
-        if (is_string($uidRaw) && ctype_digit(trim($uidRaw))) {
-            $uid = (int) trim($uidRaw);
-        }
-    }
-    if (!is_int($uid) || $uid < 0) {
+    $uid = pmssWelcomeCurrentUidRead();
+    if ($uid === null) {
         return array();
     }
 
@@ -1086,19 +1087,26 @@ EOF;
 EOF;
 }
 
+function pmssWelcomeTrafficMonthValueRead($trafficState) {
+    if (!is_array($trafficState)
+        || !isset($trafficState['raw'])
+        || !is_array($trafficState['raw'])
+        || !isset($trafficState['raw']['month'])
+        || !is_numeric($trafficState['raw']['month'])) {
+        return null;
+    }
+
+    $month = (float) $trafficState['raw']['month'];
+    return is_finite($month) && $month >= 0 ? $month : null;
+}
+
 function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null, $bonusTraffic = 0, $trafficBandwidthState = array(), $billingServiceId = 0) {
     if (!is_array($trafficData) || count($trafficData) == 0) {
         return;
     }
 
     $bandwidthNote = pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId);
-    $trafficUsedRaw = null;
-    if (isset($trafficData['raw']) && is_array($trafficData['raw']) && isset($trafficData['raw']['month']) && is_numeric($trafficData['raw']['month'])) {
-        $trafficUsedRaw = (float) $trafficData['raw']['month'];
-        if (!is_finite($trafficUsedRaw) || $trafficUsedRaw < 0) {
-            $trafficUsedRaw = null;
-        }
-    }
+    $trafficUsedRaw = pmssWelcomeTrafficMonthValueRead($trafficData);
     if ($trafficUsedRaw === null) {
         echo <<<EOF
 <h6>Traffic Info</h6>
@@ -1112,17 +1120,7 @@ EOF;
     $outboundMonth = $trafficUsedRaw;
     $trafficUsedRaw = round($trafficUsedRaw);
     $trafficUsed = round($trafficUsedRaw / 1024) . ' GiB';
-    $inboundMonth = null;
-    if (is_array($trafficIngress)
-        && isset($trafficIngress['raw'])
-        && is_array($trafficIngress['raw'])
-        && isset($trafficIngress['raw']['month'])
-        && is_numeric($trafficIngress['raw']['month'])) {
-        $inboundMonth = (float) $trafficIngress['raw']['month'];
-        if (!is_finite($inboundMonth) || $inboundMonth < 0) {
-            $inboundMonth = null;
-        }
-    }
+    $inboundMonth = pmssWelcomeTrafficMonthValueRead($trafficIngress);
     $inboundLine = $inboundMonth !== null ? '<br />Inbound (30 days): '.round($inboundMonth / 1024).' GiB' : '';
     $ratioState = function_exists('pmssTrafficRatioStateBuild') ? pmssTrafficRatioStateBuild($outboundMonth, $inboundMonth) : array('available' => false);
     $ratioLine = !empty($ratioState['available'])
