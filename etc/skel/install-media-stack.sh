@@ -837,12 +837,10 @@ elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 0 ]] && [ -d "$HOME/.config/jellyfin" ];
 fi
 
 if [[ $DRY_RUN -eq 0 ]]; then
-	mkdir -p "$HOME"/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow}
-	chmod 700 "$HOME"/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow}
-	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-		mkdir -p "$HOME/.config/jellyfin"
-		chmod 700 "$HOME/.config/jellyfin"
-	fi
+	config_dirs=("$HOME"/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow})
+	[[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && config_dirs+=("$HOME/.config/jellyfin")
+	mkdir -p "${config_dirs[@]}"
+	chmod 700 "${config_dirs[@]}"
 	mkdir -p "$HOME/.bin"
 else
 	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
@@ -904,9 +902,8 @@ log_info "ASP.NET: .NET 8 LTS (${DOTNET_ARCH})"
 # If verify-only, check URLs and exit
 if [[ $VERIFY_ONLY -eq 1 ]]; then
 	log_step "Verifying URLs..."
-	urls_to_check=("${SABNZBD_URL:-}" "${JELLYFIN_URL:-}" "${ASPDOTNET_URL:-}")
 	all_ok=true
-	for url in "${urls_to_check[@]}"; do
+	for url in "${SABNZBD_URL:-}" "${JELLYFIN_URL:-}" "${ASPDOTNET_URL:-}"; do
 		[[ -n "$url" ]] || continue
 		if check_url "$url"; then
 			log_ok "URL reachable: $url"
@@ -1391,10 +1388,9 @@ echo ""
 echo "To start application manually use appname as command"
 echo "e.g for SONARR use 'sonarr'"
 echo ""
-echo "RADARR-URL = https://${HOSTNAME}/public-${USERNAME}/radarr/"
-echo "SONARR-URL = https://${HOSTNAME}/public-${USERNAME}/sonarr/"
-echo "PROWLARR-URL = https://${HOSTNAME}/public-${USERNAME}/prowlarr/"
-echo "SABNZBD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/"
+for app in radarr sonarr prowlarr sabnzbd; do
+	echo "${app^^}-URL = https://${HOSTNAME}/public-${USERNAME}/${app}/"
+done
 echo "SABNZBD-WIZARD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/wizard/"
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 	echo "JELLYFIN-URL = https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
