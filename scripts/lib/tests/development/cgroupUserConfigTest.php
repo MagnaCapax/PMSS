@@ -416,8 +416,19 @@ class CgroupUserConfigTest extends TestCase
     {
         $this->sys->findmnt['/dev/sdb'] = '/dev/sdb';
         $res = $this->runMgr(['testuser', '--device=/dev/sdb', '--io-profile=hdd']);
-        $this->assertStringContainsString('IOReadBandwidthMax=/dev/sdb 5M', $res['out']);
-        $this->assertStringContainsString('IOWeight=200', $res['out']);
+        $this->assertSame(
+            "user=testuser uid=1000 slice=user-1000.slice mode=v2\n"
+            ."\n"
+            ."[Planned properties]\n"
+            ."IOWeight=200\n"
+            ."[Planned IO properties]\n"
+            ."IOReadBandwidthMax=/dev/sdb 5M\n"
+            ."IOWriteBandwidthMax=/dev/sdb 10M\n"
+            ."IOReadIOPSMax=/dev/sdb 100\n"
+            ."IOWriteIOPSMax=/dev/sdb 100\n"
+            ."(dry-run or no --apply; not changing system)\n",
+            $res['out']
+        );
     }
 
     public function testIoProfileBulk()

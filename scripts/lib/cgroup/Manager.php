@@ -18,6 +18,11 @@ require_once __DIR__ . '/../update/runtime/commands.php'; // for runStep
 class Manager
 {
     private const IO_CLI_PROPERTY_MAP = ['io-read-bw' => 'IOReadBandwidthMax', 'io-write-bw' => 'IOWriteBandwidthMax', 'io-read-iops' => 'IOReadIOPSMax', 'io-write-iops' => 'IOWriteIOPSMax'];
+    private const IO_PROFILE_MAP = [
+        'hdd' => ['defaults' => ['io-weight' => '200'], 'limits' => ['readBw' => '5M', 'writeBw' => '10M', 'readIops' => 100, 'writeIops' => 100]],
+        'nvme' => ['defaults' => ['io-weight' => '200'], 'limits' => []],
+        'bulk' => ['defaults' => ['io-weight' => '500', 'cpu-weight' => '300', 'tasks-max' => '8192'], 'limits' => []],
+    ];
     private const NUMERIC_PROFILE_MAP = [
         'cpu' => ['cpu-profile', 'cpu-weight', '100', ['low' => '50', 'high' => '300']],
         'tasks' => ['tasks-profile', 'tasks-max', '4096', ['low' => '1024', 'high' => '8192']],
@@ -290,18 +295,13 @@ class Manager
                 $props['MemoryHigh'] = $memoryHighMiB.'M';
             }
             $memoryMax = (int)$opts['memory-max'];
-            
-            // Apply clamp: Max cannot exceed High + 2048 MiB
-            $headroomCap = $memoryHighMiB + 2048;
-            $memoryMax = max($memoryHighMiB, min($memoryMax, $maxCap, $headroomCap));
-            
-            $props['MemoryMax'] = $memoryMax.'M';
         } elseif ($memoryHighMiB !== null) {
-            // Derived Max: 1.25x High, but capped at High + 2048 MiB (2GB) headroom
-            $derived = (int)floor($memoryHighMiB * 1.25);
-            $headroomCap = $memoryHighMiB + 2048;
-            $memoryMax = min($derived, $headroomCap, $maxCap);
-            $props['MemoryMax'] = $memoryMax.'M';
+            $memoryMax = (int) floor($memoryHighMiB * 1.25);
+        }
+
+        if ($memoryHighMiB !== null) {
+            // MemoryMax cannot exceed High + 2048 MiB whether explicit or derived.
+            $props['MemoryMax'] = max($memoryHighMiB, min($memoryMax, $memoryHighMiB + 2048, $maxCap)).'M';
         }
 
         $derivedWeight = $memoryHighMiB !== null ? self::calculateWeightFromMemory($memoryHighMiB) : null;
@@ -524,21 +524,7 @@ class Manager
 
     private function applyIoProfile(string $profile, string $dev, array &$opt, array &$pairs): void
     {
-        $profiles = [
-            'hdd' => [
-                'defaults' => ['io-weight' => '200'],
-                'limits'   => ['readBw' => '5M', 'writeBw' => '10M', 'readIops' => 100, 'writeIops' => 100],
-            ],
-            'nvme' => [
-                'defaults' => ['io-weight' => '200'],
-                'limits'   => [],
-            ],
-            'bulk' => [
-                'defaults' => ['io-weight' => '500', 'cpu-weight' => '300', 'tasks-max' => '8192'],
-                'limits'   => [],
-            ],
-        ];
-
+        $profiles = self::IO_PROFILE_MAP;
         $policy = \pmssCgroupPolicyLoad();
         if (isset($policy['profiles']['io']) && is_array($policy['profiles']['io'])) {
             foreach ($policy['profiles']['io'] as $profileName => $profileConfig) {
