@@ -992,20 +992,120 @@ function restorePermissionsBestEffort(string $context): void
 function ensureSnapshot(string $tmp): void
 {
     $required = [
-        $tmp.'/scripts',
-        $tmp.'/scripts/update.php',
-        $tmp.'/scripts/util/update-step2.php',
+        [$tmp.'/scripts', 'scripts tree', 'directory'],
+        [$tmp.'/scripts/update.php', 'update bootstrap', 'file'],
+        [$tmp.'/scripts/util/update-step2.php', 'phase 2 bootstrap', 'file'],
     ];
-    foreach ($required as $path) {
-        if (!file_exists($path)) {
+    foreach ($required as $requirement) {
+        [$path, $label, $type] = $requirement;
+        if (!file_exists($path) && !is_link($path)) {
             fatal("Snapshot missing required file: {$path}", EXIT_COPY);
+        }
+        $error = null;
+        if (!pmssIsSafeSnapshotPath($tmp, $path, $type, $error)) {
+            fatal("Snapshot {$label} failed safety checks: ".($error ?? $path), EXIT_COPY);
         }
     }
 }
 
+/** Return true when a resolved path is equal to or beneath a directory. */
+function pmssPathIsWithinDirectory(string $path, string $directory): bool
+{
+    $directory = rtrim($directory, '/');
+    return $path === $directory || strpos($path, $directory.'/') === 0;
+}
+
+/** Detect symlink components between a guarded directory and target path. */
+function pmssPathHasSymlinkSegment(string $directory, string $path): bool
+{
+    $directory = rtrim($directory, '/');
+    $path = rtrim($path, '/');
+    if (!pmssPathIsWithinDirectory($path, $directory)) {
+        return true;
+    }
+
+    $relative = ltrim(substr($path, strlen($directory)), '/');
+    if ($relative === '') {
+        return is_link($directory);
+    }
+
+    $current = $directory;
+    foreach (explode('/', $relative) as $segment) {
+        if ($segment === '') {
+            continue;
+        }
+        $current .= '/'.$segment;
+        if (is_link($current)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Validate fetched snapshot paths before copying them into live system trees.
+ */
+function pmssIsSafeSnapshotPath(string $snapshotRoot, string $path, string $expectedType, ?string &$error = null): bool
+{
+    $error = null;
+    $snapshotRoot = rtrim($snapshotRoot, '/');
+    $path = rtrim($path, '/');
+    if ($snapshotRoot === '' || $path === '' || strpos($snapshotRoot, "\0") !== false || strpos($path, "\0") !== false) {
+        $error = 'empty or invalid snapshot path';
+        return false;
+    }
+    if (preg_match('#(^|/)\.\.(/|$)#', $snapshotRoot) === 1 || preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
+        $error = "snapshot path contains parent traversal: {$path}";
+        return false;
+    }
+
+    $rootReal = realpath($snapshotRoot);
+    if ($rootReal === false || !is_dir($rootReal) || is_link($snapshotRoot)) {
+        $error = "snapshot root is not a real directory: {$snapshotRoot}";
+        return false;
+    }
+    if (!file_exists($path) && !is_link($path)) {
+        $error = "snapshot path is missing: {$path}";
+        return false;
+    }
+    if (is_link($path)) {
+        $error = "snapshot path must not be a symlink: {$path}";
+        return false;
+    }
+    if (pmssPathHasSymlinkSegment($snapshotRoot, $path)) {
+        $error = "snapshot path contains a symlink segment: {$path}";
+        return false;
+    }
+
+    $pathReal = realpath($path);
+    if ($pathReal === false || !pmssPathIsWithinDirectory($pathReal, $rootReal)) {
+        $error = "snapshot path escapes root: {$path}";
+        return false;
+    }
+
+    if ($expectedType === 'directory') {
+        $matchesType = is_dir($path);
+    } elseif ($expectedType === 'file') {
+        $matchesType = is_file($path);
+    } elseif ($expectedType === 'entry') {
+        $matchesType = is_dir($path) || is_file($path);
+    } else {
+        $error = "unknown snapshot path type: {$expectedType}";
+        return false;
+    }
+
+    if (!$matchesType) {
+        $error = "snapshot path is not a {$expectedType}: {$path}";
+        return false;
+    }
+
+    return true;
+}
+
 function directoryHasContent(string $path): bool
 {
-    if (!is_dir($path)) {
+    if (is_link($path) || !is_dir($path)) {
         return false;
     }
     $handle = @opendir($path);
@@ -1023,8 +1123,17 @@ function directoryHasContent(string $path): bool
 }
 
 // Gate missing/dry-run staging before tree-specific work.
-function pmssStageSnapshotTreeIfPresent(string $source, string $tree, bool $dryRun, string $dryRunMessage, callable $stageTree): void
+function pmssStageSnapshotTreeIfPresent(string $snapshotRoot, string $source, string $tree, bool $dryRun, string $dryRunMessage, callable $stageTree): void
 {
+    if (!file_exists($source) && !is_link($source)) {
+        logmsg("[WARN] Snapshot {$tree} tree missing or empty, skipping copy");
+        logEvent('tree_skipped', ['tree' => $tree]);
+        return;
+    }
+    $error = null;
+    if (!pmssIsSafeSnapshotPath($snapshotRoot, $source, 'directory', $error)) {
+        fatal("Unsafe snapshot {$tree} tree: ".($error ?? $source), EXIT_COPY);
+    }
     if (!directoryHasContent($source)) {
         logmsg("[WARN] Snapshot {$tree} tree missing or empty, skipping copy");
         logEvent('tree_skipped', ['tree' => $tree]);
@@ -1054,7 +1163,7 @@ function stageSnapshot(string $tmp, bool $dryRun): void
 
     // Stage /scripts with an atomic rename swap.
     $scriptsSource = $tmp.'/scripts';
-    pmssStageSnapshotTreeIfPresent($scriptsSource, 'scripts', $dryRun, "[DRY RUN] Would atomically swap /scripts from {$scriptsSource}", function (string $scriptsSource) use ($runId): void {
+    pmssStageSnapshotTreeIfPresent($tmp, $scriptsSource, 'scripts', $dryRun, "[DRY RUN] Would atomically swap /scripts from {$scriptsSource}", function (string $scriptsSource) use ($runId): void {
         $scriptsStaging = '/scripts.pmss-staging-'.$runId;
         $scriptsBackup  = '/scripts.pmss-backup-'.$runId;
         pmssRemoveTreeBestEffort($scriptsStaging, 'scripts staging');
@@ -1066,8 +1175,15 @@ function stageSnapshot(string $tmp, bool $dryRun): void
 
     // Stage /etc tree with atomic swap for /etc/seedbox and overlay for the rest.
     $etcSource = $tmp.'/etc';
-    pmssStageSnapshotTreeIfPresent($etcSource, 'etc', $dryRun, "[DRY RUN] Would atomically swap /etc/seedbox and overlay other /etc files from {$etcSource}", function (string $etcSource) use ($runId): void {
-        if (is_dir($etcSource.'/skel') && is_dir('/etc/skel')) {
+    pmssStageSnapshotTreeIfPresent($tmp, $etcSource, 'etc', $dryRun, "[DRY RUN] Would atomically swap /etc/seedbox and overlay other /etc files from {$etcSource}", function (string $etcSource) use ($runId, $tmp): void {
+        $skelSource = $etcSource.'/skel';
+        if (file_exists($skelSource) || is_link($skelSource)) {
+            $error = null;
+            if (!pmssIsSafeSnapshotPath($tmp, $skelSource, 'directory', $error)) {
+                fatal("Unsafe snapshot skel tree: ".($error ?? $skelSource), EXIT_COPY);
+            }
+        }
+        if (is_dir($skelSource) && is_dir('/etc/skel')) {
             pmssClearDirectoryContentsFatal('/etc/skel', 'skeleton tree');
         }
 
@@ -1075,7 +1191,14 @@ function stageSnapshot(string $tmp, bool $dryRun): void
         $seedboxSource  = $etcSource.'/seedbox';
         $seedboxStaging = '/etc/seedbox.pmss-staging-'.$runId;
         $seedboxBackup  = '/etc/seedbox.pmss-backup-'.$runId;
-        $haveSeedboxSnapshot = directoryHasContent($seedboxSource);
+        $haveSeedboxSnapshot = false;
+        if (file_exists($seedboxSource) || is_link($seedboxSource)) {
+            $error = null;
+            if (!pmssIsSafeSnapshotPath($tmp, $seedboxSource, 'directory', $error)) {
+                fatal("Unsafe snapshot seedbox tree: ".($error ?? $seedboxSource), EXIT_COPY);
+            }
+            $haveSeedboxSnapshot = directoryHasContent($seedboxSource);
+        }
         if ($haveSeedboxSnapshot || is_dir('/etc/seedbox')) {
             pmssRemoveTreeBestEffort($seedboxStaging, 'seedbox staging');
             if (is_dir('/etc/seedbox')) {
@@ -1098,6 +1221,10 @@ function stageSnapshot(string $tmp, bool $dryRun): void
                     continue;
                 }
                 $path = $etcSource.'/'.$entry;
+                $error = null;
+                if (!pmssIsSafeSnapshotPath($tmp, $path, 'entry', $error)) {
+                    fatal("Unsafe snapshot etc entry: ".($error ?? $path), EXIT_COPY);
+                }
                 pmssRunBootstrapCommand('cp -rpu '.escapeshellarg($path).' /etc', EXIT_COPY);
             }
         }
@@ -1105,7 +1232,7 @@ function stageSnapshot(string $tmp, bool $dryRun): void
 
     // Stage /var as before.
     $varSource = $tmp.'/var';
-    pmssStageSnapshotTreeIfPresent($varSource, 'var', $dryRun, "[DRY RUN] Would copy var from {$varSource}", function (string $varSource): void {
+    pmssStageSnapshotTreeIfPresent($tmp, $varSource, 'var', $dryRun, "[DRY RUN] Would copy var from {$varSource}", function (string $varSource): void {
         pmssRunBootstrapCommand('cp -a '.escapeshellarg($varSource).' /', EXIT_COPY);
     });
 

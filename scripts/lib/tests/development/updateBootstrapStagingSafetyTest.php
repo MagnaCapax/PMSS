@@ -55,6 +55,41 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
         $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath($tempRoot.'/target', $tempRoot.'/staging', $tempRoot.'/../backup'));
     }
 
+    public function testSnapshotPathGuardAcceptsOnlyRealPathsInsideSnapshot(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-update-snapshot-');
+        $this->pmssWriteFile($root.'/scripts/update.php', '<?php echo "ok";');
+        $this->pmssWriteFile($root.'/scripts/util/update-step2.php', '<?php echo "ok";');
+
+        $error = null;
+        $this->assertTrue(pmssIsSafeSnapshotPath($root, $root.'/scripts', 'directory', $error), (string) $error);
+        $this->assertTrue(pmssIsSafeSnapshotPath($root, $root.'/scripts/update.php', 'file', $error), (string) $error);
+        $this->assertTrue(pmssIsSafeSnapshotPath($root, $root.'/scripts/util', 'entry', $error), (string) $error);
+
+        $this->assertFalse(pmssIsSafeSnapshotPath($root, $root.'/scripts', 'file', $error));
+        $this->assertStringContainsString('not a file', (string) $error);
+        $this->assertFalse(pmssIsSafeSnapshotPath($root, $root.'/missing.php', 'file', $error));
+        $this->assertStringContainsString('missing', (string) $error);
+    }
+
+    public function testSnapshotPathGuardRejectsSymlinkedSourceRoots(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-update-snapshot-');
+        $outsideRoot = $this->pmssMakeTempDir('pmss-update-snapshot-outside-');
+        $this->pmssWriteFile($outsideRoot.'/keep.txt', 'keep');
+        $this->pmssCreateSymlinkOrSkip($outsideRoot, $root.'/var');
+        $this->pmssEnsureFixtureDirectory($root.'/scripts');
+        $this->pmssWriteFile($outsideRoot.'/update-step2.php', '<?php echo "ok";');
+        $this->pmssCreateSymlinkOrSkip($outsideRoot, $root.'/scripts/util');
+
+        $error = null;
+        $this->assertFalse(pmssIsSafeSnapshotPath($root, $root.'/var', 'directory', $error));
+        $this->assertStringContainsString('symlink', (string) $error);
+        $this->assertFalse(pmssIsSafeSnapshotPath($root, $root.'/scripts/util/update-step2.php', 'file', $error));
+        $this->assertStringContainsString('symlink segment', (string) $error);
+        $this->assertFalse(directoryHasContent($root.'/var'), 'snapshot content checks must not follow symlinked roots');
+    }
+
     public function testNestedScriptsLayoutRemoveGuardAcceptsOnlyKnownPaths(): void
     {
         $tempRoot = $this->pmssMakeTempDir('pmss-update-nested-scripts-');
