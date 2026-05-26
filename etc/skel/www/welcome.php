@@ -512,21 +512,13 @@ function pmssWelcomePageStateBuild() {
  */
 function pmssWelcomeBillingServiceIdRead($primaryPath, $legacyPath) {
     foreach (array($primaryPath, $legacyPath) as $path) {
-        $billingServiceId = pmssWelcomeBillingFileRead($path);
-        if ($billingServiceId > 0) {
+        $billingServiceId = pmssWelcomePositiveIntegerFileRead($path);
+        if ($billingServiceId !== null) {
             return $billingServiceId;
         }
     }
 
     return 0;
-}
-
-/**
- * Read one positive billing identifier file without following symlinks.
- */
-function pmssWelcomeBillingFileRead($path) {
-    $billingServiceId = pmssWelcomePositiveIntegerFileRead($path);
-    return $billingServiceId === null ? 0 : $billingServiceId;
 }
 
 /**
@@ -623,6 +615,18 @@ function pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingSe
 
     return '<span style="font-size: 0.82em; color: #7a1a1a;">Current effective: '.$effectiveText.' Mbps (reduced)</span>'
         . '<br /><span style="font-size: 0.82em;"><a href="'.htmlspecialchars($upgradeUrl, ENT_QUOTES, 'UTF-8').'" target="_blank">Need more bandwidth? Upgrade your plan.</a></span>';
+}
+
+/**
+ * Calculate a finite percentage for quota, traffic, and RAM gauges.
+ */
+function pmssWelcomePercent($used, $limit, $precision = 1) {
+    if (!is_numeric($used) || !is_numeric($limit) || (float) $limit <= 0) {
+        return 0;
+    }
+
+    $percent = round(((float) $used / (float) $limit) * 100, (int) $precision);
+    return is_finite($percent) ? $percent : 0;
 }
 
 function pmssWelcomeQuotaInfoRead() {
@@ -858,7 +862,7 @@ function readUserRamLimitBytes() {
 
 // Read the resource-data memory subtree if the serialized state is valid.
 function readUserResourceMemoryData() {
-    $resourceData = readUserResourceData();
+    $resourceData = pmssWelcomeSerializedArrayRead('../.resourceData');
     if (!is_array($resourceData)
         || !isset($resourceData['memory'])
         || !is_array($resourceData['memory'])) {
@@ -875,10 +879,6 @@ function readUserMemoryCurrentBytes() {
     }
 
     return (float) $memory['current'];
-}
-
-function readUserResourceData() {
-    return pmssWelcomeSerializedArrayRead('../.resourceData');
 }
 
 function readUserMemoryBreakdownBytes() {
@@ -1005,10 +1005,7 @@ EOF;
     }
 
     $warningBytes = $processBytes !== null ? $processBytes : $currentBytes;
-    $warningPercent = round(($warningBytes / $limitBytes) * 100, 1);
-    if (!is_finite($warningPercent)) {
-        $warningPercent = 0;
-    }
+    $warningPercent = pmssWelcomePercent($warningBytes, $limitBytes, 1);
 
     $pressureStatus = null;
     if (function_exists('pmssWebCgroupMemoryStatusRead')) {
@@ -1028,12 +1025,9 @@ EOF;
 
     if ($processBytes !== null && $cacheBytes !== null) {
         $usedBytes = max($processBytes + $cacheBytes, $currentBytes !== null ? $currentBytes : 0);
-        $usedPercent = round(($usedBytes / $limitBytes) * 100, 1);
-        if (!is_finite($usedPercent)) {
-            $usedPercent = 0;
-        }
-        $processPercent = round(($processBytes / $limitBytes) * 100, 1);
-        $cachePercent = round(($cacheBytes / $limitBytes) * 100, 1);
+        $usedPercent = pmssWelcomePercent($usedBytes, $limitBytes, 1);
+        $processPercent = pmssWelcomePercent($processBytes, $limitBytes, 1);
+        $cachePercent = pmssWelcomePercent($cacheBytes, $limitBytes, 1);
         $remainingPercent = max(0, 100 - max(0, min(100, $processPercent)) - max(0, min(100, $cachePercent)));
         $titleText = 'Process: '.$processText.' | Cache: '.$cacheText.' | Limit: '.$limitText;
         $gauge = createStackedGauge(
@@ -1047,10 +1041,7 @@ EOF;
             )
         );
     } else {
-        $percent = round((($currentBytes !== null ? $currentBytes : 0) / $limitBytes) * 100, 1);
-        if (!is_finite($percent)) {
-            $percent = 0;
-        }
+        $percent = pmssWelcomePercent($currentBytes !== null ? $currentBytes : 0, $limitBytes, 1);
         $titleText = "{$currentText} / {$limitText}";
         $gauge = createGauge($titleText, $titleText, $percent);
     }
@@ -1141,8 +1132,7 @@ EOF;
 
     $bonusTraffic = max(0, (int) $bonusTraffic);
     $limitTotal = $trafficLimit + $bonusTraffic;
-    $percent = ($limitTotal > 0) ? round((($trafficUsedRaw / 1024) / $limitTotal) * 100) : 0;
-    if (!is_finite($percent)) $percent = 0;
+    $percent = pmssWelcomePercent($trafficUsedRaw / 1024, $limitTotal, 0);
 
     $warning = $percent > 100
         ? '<br /><b style="color: red;">OVER TRAFFIC LIMIT WARNING - REDUCED BANDWIDTH</b><br />You are beyond your traffic limit. Consider upgrading your plan or adding extra traffic.<br />Datacenter external outbound (TO internet) bandwidth limited to 100 Mbps. Datacenter internal and inbound bandwidth is unrestricted.'
@@ -1250,10 +1240,10 @@ function quotaCreateSection($quotaInfo, $bonusQuota = 0) {
         return $quotaMissingWarning;
     }
 
-    $percent = ($totalSpace > 0) ? round(($usedBytes / $totalSpace) * 100, 1) : 0;
-    $percentFromBurst = ($hardLimit > 0) ? round(($usedBytes / $hardLimit) * 100) : 0;
+    $percent = pmssWelcomePercent($usedBytes, $totalSpace, 1);
+    $percentFromBurst = pmssWelcomePercent($usedBytes, $hardLimit, 0);
     if ($percent < 100 && $totalSpace > 0) {
-        $percentFromBurst = round(($usedBytes / $totalSpace) * 100, 1);
+        $percentFromBurst = pmssWelcomePercent($usedBytes, $totalSpace, 1);
     }
 
     $readableUsed   = pmssFormatBytes($usedBytes, 2, 0, true);

@@ -40,7 +40,6 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
         $this->pmssAssertRepoFileNotContainsString('etc/skel/www/stats.php', '@unserialize(@file_get_contents(');
         $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/welcome.php', [
             '@unserialize(trim(@file_get_contents(',
-            'function readUserResourceData() {'.PHP_EOL.'    $resourcePath = \'../.resourceData\';',
         ]);
     }
 
