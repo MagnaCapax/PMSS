@@ -5,11 +5,7 @@ set -o errtrace
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
 source "$HERE/lib/codex-common.sh"
-codex_init_root "$HERE" 1
-
-# Optional debug: PMSS_ISSUES_CODEX_DEBUG=1 enables bash -x tracing.
-codex_enable_debug PMSS_ISSUES_CODEX_DEBUG "agentic-issues"
-codex_set_error_trap "agentic-issues"
+codex_agentic_bootstrap "$HERE" "PMSS_ISSUES_CODEX_DEBUG" "agentic-issues" 1
 
 echo "[agentic-issues] start: fetching open issues and invoking assistant" >&1
 
@@ -165,65 +161,65 @@ has_label() {
 }
 
 if [[ -z "$target_issue" ]]; then
-# Fetch a larger candidate pool, then filter/prioritize down to max_issues.
-# Using --limit max_issues directly causes starvation when top N are strategic
-# meta-issues (e.g. process/architecture epics) that are repeatedly skipped.
-candidate_pool=$((max_issues * 8))
-if [[ "$candidate_pool" -lt 25 ]]; then
-	candidate_pool=25
-fi
-if [[ "$candidate_pool" -gt 100 ]]; then
-	candidate_pool=100
-fi
-echo "[agentic-issues] fetching candidate pool (limit ${candidate_pool}, target ${max_issues})..." >&1
-
-while IFS=$'\t' read -r num title labels_csv; do
-	[[ -n "$num" ]] || continue
-	raw_candidate_count=$((raw_candidate_count + 1))
-
-	if [[ -n "$exclude_numbers_csv" && "$exclude_numbers_csv" == *",${num},"* ]]; then
-		echo "[agentic-issues] SKIP #$num (excluded via PMSS_ISSUES_EXCLUDE_NUMBERS)" >&1
-		continue
+	# Fetch a larger candidate pool, then filter/prioritize down to max_issues.
+	# Using --limit max_issues directly causes starvation when top N are strategic
+	# meta-issues (e.g. process/architecture epics) that are repeatedly skipped.
+	candidate_pool=$((max_issues * 8))
+	if [[ "$candidate_pool" -lt 25 ]]; then
+		candidate_pool=25
 	fi
-
-	# Skip known process/meta issues that consume cycles but don't produce
-	# tractable code changes in this runner.
-	if [[ "$title" =~ ^(Playwright:|QA\ pass:|Issues\ pass:|Refactor\ prompt:|Rewrite\ issue\ selector|Ticket\ runner\ redesign:) ]]; then
-		echo "[agentic-issues] SKIP #$num (meta/process issue): $title" >&1
-		continue
+	if [[ "$candidate_pool" -gt 100 ]]; then
+		candidate_pool=100
 	fi
+	echo "[agentic-issues] fetching candidate pool (limit ${candidate_pool}, target ${max_issues})..." >&1
 
-	title_lc=$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]')
-	if [[ "$title_lc" == *"roadmap"* || "$title_lc" == *"research"* || "$title_lc" == *"investigation"* ]]; then
-		echo "[agentic-issues] SKIP #$num (research/roadmap ticket): $title" >&1
-		continue
-	fi
+	while IFS=$'\t' read -r num title labels_csv; do
+		[[ -n "$num" ]] || continue
+		raw_candidate_count=$((raw_candidate_count + 1))
 
-	if has_label "$labels_csv" "bug"; then
-		issue_numbers_bug+=("$num")
-	elif has_label "$labels_csv" "security"; then
-		issue_numbers_security+=("$num")
-	elif has_label "$labels_csv" "stability"; then
-		issue_numbers_stability+=("$num")
+		if [[ -n "$exclude_numbers_csv" && "$exclude_numbers_csv" == *",${num},"* ]]; then
+			echo "[agentic-issues] SKIP #$num (excluded via PMSS_ISSUES_EXCLUDE_NUMBERS)" >&1
+			continue
+		fi
+
+		# Skip known process/meta issues that consume cycles but don't produce
+		# tractable code changes in this runner.
+		if [[ "$title" =~ ^(Playwright:|QA\ pass:|Issues\ pass:|Refactor\ prompt:|Rewrite\ issue\ selector|Ticket\ runner\ redesign:) ]]; then
+			echo "[agentic-issues] SKIP #$num (meta/process issue): $title" >&1
+			continue
+		fi
+
+		title_lc=$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]')
+		if [[ "$title_lc" == *"roadmap"* || "$title_lc" == *"research"* || "$title_lc" == *"investigation"* ]]; then
+			echo "[agentic-issues] SKIP #$num (research/roadmap ticket): $title" >&1
+			continue
+		fi
+
+		if has_label "$labels_csv" "bug"; then
+			issue_numbers_bug+=("$num")
+		elif has_label "$labels_csv" "security"; then
+			issue_numbers_security+=("$num")
+		elif has_label "$labels_csv" "stability"; then
+			issue_numbers_stability+=("$num")
+		else
+			issue_numbers_other+=("$num")
+		fi
+	done < <(gh issue list --state open --limit "$candidate_pool" \
+		--json number,title,labels \
+		--jq '.[] | select((.labels | map(.name) | any(. == "complete-verify" or . == "wontfix" or . == "needs-investigation" or . == "blocked" or . == "should-not-implement")) | not) | [(.number|tostring), .title, ([.labels[].name] | join(","))] | @tsv' 2>/dev/null || true)
+
+	if [[ ${#issue_numbers_bug[@]} -gt 0 ]]; then
+		# Throughput rule: if there are open bug tickets, focus on those first.
+		# This avoids starving concrete break/fix work behind broad enhancement backlog.
+		issue_numbers=("${issue_numbers_bug[@]}")
 	else
-		issue_numbers_other+=("$num")
+		issue_numbers=("${issue_numbers_security[@]}" "${issue_numbers_stability[@]}" "${issue_numbers_other[@]}")
 	fi
-done < <(gh issue list --state open --limit "$candidate_pool" \
-	--json number,title,labels \
-	--jq '.[] | select((.labels | map(.name) | any(. == "complete-verify" or . == "wontfix" or . == "needs-investigation" or . == "blocked" or . == "should-not-implement")) | not) | [(.number|tostring), .title, ([.labels[].name] | join(","))] | @tsv' 2>/dev/null || true)
 
-if [[ ${#issue_numbers_bug[@]} -gt 0 ]]; then
-	# Throughput rule: if there are open bug tickets, focus on those first.
-	# This avoids starving concrete break/fix work behind broad enhancement backlog.
-	issue_numbers=("${issue_numbers_bug[@]}")
-else
-	issue_numbers=("${issue_numbers_security[@]}" "${issue_numbers_stability[@]}" "${issue_numbers_other[@]}")
-fi
-
-# Randomize selection to avoid getting locked on the same issue every run
-if [[ ${#issue_numbers[@]} -gt 1 ]] && command -v shuf >/dev/null 2>&1; then
-	mapfile -t issue_numbers < <(printf '%s\n' "${issue_numbers[@]}" | shuf)
-fi
+	# Randomize selection to avoid getting locked on the same issue every run
+	if [[ ${#issue_numbers[@]} -gt 1 ]] && command -v shuf >/dev/null 2>&1; then
+		mapfile -t issue_numbers < <(printf '%s\n' "${issue_numbers[@]}" | shuf)
+	fi
 fi
 
 if [[ ${#issue_numbers[@]} -eq 0 ]]; then
@@ -236,74 +232,74 @@ if [[ ${#issue_numbers[@]} -eq 0 ]]; then
 fi
 
 if [[ -z "$target_issue" ]]; then
-echo "[agentic-issues] candidates: raw=${raw_candidate_count} filtered=${#issue_numbers[@]} (pre-gate)" >&1
+	echo "[agentic-issues] candidates: raw=${raw_candidate_count} filtered=${#issue_numbers[@]} (pre-gate)" >&1
 
-# --- Author Gate (security: public repo, only org issues auto-approved) ---
-# MagnaCapax issues: auto-approved.
-# All others: require "approved" label AND a comment from MagnaCapax.
-# Anti-bait-and-switch: reject if issue was edited after the approval comment.
-APPROVED_AUTHORS="MagnaCapax"
+	# --- Author Gate (security: public repo, only org issues auto-approved) ---
+	# MagnaCapax issues: auto-approved.
+	# All others: require "approved" label AND a comment from MagnaCapax.
+	# Anti-bait-and-switch: reject if issue was edited after the approval comment.
+	APPROVED_AUTHORS="MagnaCapax"
 
-check_issue_approved() {
-	local num="$1"
-	local author
-	author=$(gh api "repos/MagnaCapax/PMSS/issues/$num" --jq '.user.login' 2>/dev/null) || return 1
+	check_issue_approved() {
+		local num="$1"
+		local author
+		author=$(gh api "repos/MagnaCapax/PMSS/issues/$num" --jq '.user.login' 2>/dev/null) || return 1
 
-	# Auto-approve known authors
-	local a
-	for a in $APPROVED_AUTHORS; do
-		[[ "$author" == "$a" ]] && return 0
+		# Auto-approve known authors
+		local a
+		for a in $APPROVED_AUTHORS; do
+			[[ "$author" == "$a" ]] && return 0
+		done
+
+		# External: require "approved" label
+		local has_label
+		has_label=$(gh api "repos/MagnaCapax/PMSS/issues/$num" --jq '[.labels[].name] | any(. == "approved")' 2>/dev/null)
+		if [[ "$has_label" != "true" ]]; then
+			echo "[agentic-issues] GATE: #$num rejected — no 'approved' label (author: $author)" >&1
+			return 1
+		fi
+
+		# External: require comment from approved author
+		local approved_comments
+		approved_comments=$(gh api "repos/MagnaCapax/PMSS/issues/$num/comments" \
+			--jq '[.[] | select(.user.login == "MagnaCapax")] | length' 2>/dev/null || echo 0)
+		if [[ "$approved_comments" -eq 0 ]]; then
+			echo "[agentic-issues] GATE: #$num rejected — no MagnaCapax comment (author: $author)" >&1
+			return 1
+		fi
+
+		# Anti-bait-and-switch: issue must not be edited after latest approval comment
+		local issue_updated
+		issue_updated=$(gh api "repos/MagnaCapax/PMSS/issues/$num" --jq '.updated_at' 2>/dev/null)
+		local approval_ts
+		approval_ts=$(gh api "repos/MagnaCapax/PMSS/issues/$num/comments" \
+			--jq '[.[] | select(.user.login == "MagnaCapax")] | sort_by(.created_at) | last | .created_at' 2>/dev/null)
+		if [[ -n "$approval_ts" && "$issue_updated" > "$approval_ts" ]]; then
+			echo "[agentic-issues] GATE: #$num rejected — edited after approval (bait-and-switch protection)" >&1
+			return 1
+		fi
+
+		return 0
+	}
+
+	# Apply author gate
+	approved_issues=()
+	for num in "${issue_numbers[@]}"; do
+		if check_issue_approved "$num"; then
+			approved_issues+=("$num")
+			echo "[agentic-issues] GATE: #$num approved" >&1
+			if [[ ${#approved_issues[@]} -ge "$max_issues" ]]; then
+				break
+			fi
+		fi
 	done
 
-	# External: require "approved" label
-	local has_label
-	has_label=$(gh api "repos/MagnaCapax/PMSS/issues/$num" --jq '[.labels[].name] | any(. == "approved")' 2>/dev/null)
-	if [[ "$has_label" != "true" ]]; then
-		echo "[agentic-issues] GATE: #$num rejected — no 'approved' label (author: $author)" >&1
-		return 1
+	if [[ ${#approved_issues[@]} -eq 0 ]]; then
+		echo "[agentic-issues] No approved issues after gate. Skipping." >&1
+		exit 0
 	fi
 
-	# External: require comment from approved author
-	local approved_comments
-	approved_comments=$(gh api "repos/MagnaCapax/PMSS/issues/$num/comments" \
-		--jq '[.[] | select(.user.login == "MagnaCapax")] | length' 2>/dev/null || echo 0)
-	if [[ "$approved_comments" -eq 0 ]]; then
-		echo "[agentic-issues] GATE: #$num rejected — no MagnaCapax comment (author: $author)" >&1
-		return 1
-	fi
-
-	# Anti-bait-and-switch: issue must not be edited after latest approval comment
-	local issue_updated
-	issue_updated=$(gh api "repos/MagnaCapax/PMSS/issues/$num" --jq '.updated_at' 2>/dev/null)
-	local approval_ts
-	approval_ts=$(gh api "repos/MagnaCapax/PMSS/issues/$num/comments" \
-		--jq '[.[] | select(.user.login == "MagnaCapax")] | sort_by(.created_at) | last | .created_at' 2>/dev/null)
-	if [[ -n "$approval_ts" && "$issue_updated" > "$approval_ts" ]]; then
-		echo "[agentic-issues] GATE: #$num rejected — edited after approval (bait-and-switch protection)" >&1
-		return 1
-	fi
-
-	return 0
-}
-
-# Apply author gate
-approved_issues=()
-for num in "${issue_numbers[@]}"; do
-	if check_issue_approved "$num"; then
-		approved_issues+=("$num")
-		echo "[agentic-issues] GATE: #$num approved" >&1
-		if [[ ${#approved_issues[@]} -ge "$max_issues" ]]; then
-			break
-		fi
-	fi
-done
-
-if [[ ${#approved_issues[@]} -eq 0 ]]; then
-	echo "[agentic-issues] No approved issues after gate. Skipping." >&1
-	exit 0
-fi
-
-issue_numbers=("${approved_issues[@]}")
+	issue_numbers=("${approved_issues[@]}")
 fi
 echo "[agentic-issues] selected ${#issue_numbers[@]} issue(s): ${issue_numbers[*]}" >&1
 

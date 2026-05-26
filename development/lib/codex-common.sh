@@ -24,6 +24,14 @@ codex_set_error_trap() {
 	trap 'echo "['"$prefix"'] ERROR rc=$? at line $LINENO while: $BASH_COMMAND" >&1' ERR
 }
 
+# Apply the common agentic launcher root, debug, and ERR-trap setup.
+codex_agentic_bootstrap() {
+	local here="$1" debug_env="$2" prefix="$3" cd_root="${4:-0}"
+	codex_init_root "$here" "$cd_root"
+	codex_enable_debug "$debug_env" "$prefix"
+	codex_set_error_trap "$prefix"
+}
+
 # Millisecond timestamp helper with a portable fallback.
 codex_now_ms() {
 	local now

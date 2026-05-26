@@ -5,11 +5,7 @@ set -o errtrace
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
 source "$HERE/lib/codex-common.sh"
-codex_init_root "$HERE"
-
-# Optional debug: PMSS_REFACTOR_CODEX_DEBUG=1 enables bash -x tracing.
-codex_enable_debug PMSS_REFACTOR_CODEX_DEBUG "agentic-refactor"
-codex_set_error_trap "agentic-refactor"
+codex_agentic_bootstrap "$HERE" "PMSS_REFACTOR_CODEX_DEBUG" "agentic-refactor"
 
 echo "[agentic-refactor] start: assembling refactor context and invoking assistant" >&1
 

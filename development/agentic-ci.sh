@@ -6,12 +6,7 @@ set -o errtrace
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
 source "$HERE/lib/codex-common.sh"
-codex_init_root "$HERE" 1
-
-# Optional debug: PMSS_CI_CODEX_DEBUG=1 enables bash -x tracing
-codex_enable_debug PMSS_CI_CODEX_DEBUG "codex-ci"
-
-codex_set_error_trap "codex-ci"
+codex_agentic_bootstrap "$HERE" "PMSS_CI_CODEX_DEBUG" "codex-ci" 1
 
 echo "[codex-ci] start: assembling CI context and invoking Codex" >&1
 

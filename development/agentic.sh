@@ -5,10 +5,7 @@ set -o errtrace
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
 source "$HERE/lib/codex-common.sh"
-codex_init_root "$HERE"
-
-codex_enable_debug PMSS_AGENTIC_DEBUG "agentic"
-codex_set_error_trap "agentic"
+codex_agentic_bootstrap "$HERE" "PMSS_AGENTIC_DEBUG" "agentic"
 
 ASSIST_DIR="$HERE/assistants"
 default_agent="${PMSS_AGENTIC_DEFAULT_AGENT:-codex}"
@@ -73,14 +70,14 @@ while [[ $# -gt 0 ]]; do
 		continue
 	fi
 	case "$1" in
-		--verbose)
-			verbose=1
-			passthrough+=("$1")
-			shift || true
-			;;
-		--)
-			shift || true
-			if [[ $# -gt 0 ]]; then
+	--verbose)
+		verbose=1
+		passthrough+=("$1")
+		shift || true
+		;;
+	--)
+		shift || true
+		if [[ $# -gt 0 ]]; then
 			exec_extra_args+=("$@")
 		fi
 		break

@@ -7,11 +7,7 @@ set -o errtrace
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
 source "$HERE/lib/codex-common.sh"
-codex_init_root "$HERE" 1
-
-# Optional debug: PMSS_QA_CODEX_DEBUG=1 enables bash -x tracing.
-codex_enable_debug PMSS_QA_CODEX_DEBUG "agentic-qa"
-codex_set_error_trap "agentic-qa"
+codex_agentic_bootstrap "$HERE" "PMSS_QA_CODEX_DEBUG" "agentic-qa" 1
 
 echo "[agentic-qa] DEPRECATED: Full E2E QA runs externally. Running code-level fallback." >&2
 echo "[agentic-qa] start: fetching complete-verify issues and invoking assistant" >&1
