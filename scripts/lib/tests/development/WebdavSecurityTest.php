@@ -181,8 +181,7 @@ class WebdavSecurityTest extends TestCase
      */
     public function testDotfileDenyPatternExistsInTemplate(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd';
-        $template = file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
 
         $this->assertStringContainsString('url.access-deny = ( "/." )', $template);
     }
@@ -490,8 +489,7 @@ LIGHTTPD;
      */
     public function testAuthRequirementIsUserSpecific(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd';
-        $template = file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
 
         $this->assertStringContainsString('"/webdav-##username/"', $template);
         $this->assertStringContainsString('"require" => "user=##username"', $template);
@@ -509,8 +507,7 @@ LIGHTTPD;
      */
     public function testLockFilePathIsSecure(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd';
-        $template = file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
 
         $this->assertStringContainsString(
             'webdav.sqlite-db-name = "/home/##username/.lighttpd/webdav.lock.db"',
@@ -526,8 +523,7 @@ LIGHTTPD;
      */
     public function testAliasMappingPointsToCorrectHome(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd';
-        $template = file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
 
         $this->assertStringContainsString(
             '"/webdav-##username/" => "/home/##username/"',
@@ -542,8 +538,7 @@ LIGHTTPD;
      */
     public function testDirectoryListingDisabledForWebdav(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd';
-        $template = file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
 
         preg_match('/# PMSS_WEBDAV_BEGIN.*?# PMSS_WEBDAV_END/s', $template, $matches);
         $webdavBlock = isset($matches[0]) ? $matches[0] : '';
@@ -558,8 +553,7 @@ LIGHTTPD;
      */
     public function testTemplateHasCorrectRegexAnchors(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd';
-        $template = file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
 
         $this->assertStringContainsString('"^/webdav-##username($|/)"', $template);
     }
@@ -588,8 +582,7 @@ LIGHTTPD;
      */
     public function testNginxRedirectUses301(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-user';
-        $template = file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
 
         $this->assertStringContainsString('return 301 https://$host$request_uri;', $template);
         $this->assertStringNotContainsString('return 302', $template);
@@ -602,8 +595,7 @@ LIGHTTPD;
      */
     public function testNginxForwardsAuthorizationHeader(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-proxy_params';
-        $template = file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-proxy_params');
 
         $this->assertStringContainsString(
             'proxy_set_header Authorization $http_authorization;',
@@ -619,10 +611,8 @@ LIGHTTPD;
      */
     public function testNginxProxyDefaultsSupportLargeUploads(): void
     {
-        $proxyParamsPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-proxy_params';
-        $proxyParams = file_get_contents($proxyParamsPath);
-        $webdavProxyParamsPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-webdav_proxy_params';
-        $webdavProxyParams = file_get_contents($webdavProxyParamsPath);
+        $proxyParams = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-proxy_params');
+        $webdavProxyParams = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-webdav_proxy_params');
 
         $this->assertStringContainsString('proxy_read_timeout 300s;', $proxyParams);
         $this->assertStringContainsString('proxy_send_timeout 300s;', $proxyParams);
@@ -632,8 +622,7 @@ LIGHTTPD;
         $this->assertStringContainsString('client_body_timeout 600s;', $webdavProxyParams);
         $this->assertStringContainsString('proxy_request_buffering off;', $webdavProxyParams);
 
-        $nginxConfPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-conf';
-        $nginxConf = file_get_contents($nginxConfPath);
+        $nginxConf = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-conf');
         $this->assertStringContainsString('client_max_body_size 8192M;', $nginxConf);
     }
 
@@ -875,8 +864,7 @@ LIGHTTPD;
      */
     public function testLighttpdAuthRequireEntriesAreCommaSeparated(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd';
-        $template = file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
 
         // Extract auth.require block
         if (!preg_match('/auth\.require\s*=\s*\((.*?)\n\)/s', $template, $matches)) {
@@ -904,8 +892,7 @@ LIGHTTPD;
      */
     public function testLighttpdTemplateProducesValidSyntax(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd';
-        $template = file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
 
         // Render with test values
         $rendered = str_replace(
@@ -1009,8 +996,7 @@ LIGHTTPD;
      */
     public function testProxyParamsContainsReadTimeout(): void
     {
-        $proxyParamsPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-proxy_params';
-        $proxyParams = file_get_contents($proxyParamsPath);
+        $proxyParams = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-proxy_params');
 
         $this->assertStringContainsString(
             'proxy_read_timeout',
@@ -1027,10 +1013,8 @@ LIGHTTPD;
      */
     public function testWebdavProxyParamsStreamUploadsAndKeepAuthHeaders(): void
     {
-        $proxyParamsPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-proxy_params';
-        $proxyParams = file_get_contents($proxyParamsPath);
-        $webdavProxyParamsPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-webdav_proxy_params';
-        $webdavProxyParams = file_get_contents($webdavProxyParamsPath);
+        $proxyParams = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-proxy_params');
+        $webdavProxyParams = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-webdav_proxy_params');
         $proxyHeaders = array();
         $webdavProxyHeaders = array();
         preg_match_all('/^proxy_set_header\\s+[^;]+;$/m', $proxyParams, $proxyHeaders);
@@ -1053,8 +1037,7 @@ LIGHTTPD;
      */
     public function testCreateNginxConfigCopiesWebdavProxyParams(): void
     {
-        $setupPath = dirname(__DIR__, 3).'/lib/nginxConfig/setup.php';
-        $setup = file_get_contents($setupPath);
+        $setup = $this->pmssReadRepoFile('scripts/lib/nginxConfig/setup.php');
 
         $this->assertStringContainsString("'/etc/nginx/webdav_proxy_params'", $setup);
         $this->assertStringContainsString("'/etc/seedbox/config/template.nginx-webdav_proxy_params'", $setup);
@@ -1072,8 +1055,7 @@ LIGHTTPD;
      */
     public function testNginxUserTemplateWebdavNoDuplicateTimeout(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-user';
-        $template = file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
 
         // Extract WebDAV location block - find from "location /webdav-" to the matching
         // closing brace, handling nested braces (e.g., if blocks inside).
@@ -1099,8 +1081,7 @@ LIGHTTPD;
      */
     public function testNginxUserTemplateWebdavIncludesWebdavProxyParams(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-user';
-        $template = file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
 
         // Extract WebDAV location block with nested brace handling.
         $webdavBlock = $this->extractNginxLocationBlock($template, '/webdav-');
@@ -1166,8 +1147,7 @@ LIGHTTPD;
      */
     public function testNginxConfHasServerNamesHashBucketSize(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-conf';
-        $template = file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-conf');
 
         // Must be uncommented and set to at least 128
         $this->assertTrue(
