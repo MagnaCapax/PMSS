@@ -8,9 +8,8 @@
  */
 # Set user folder permissions
 
-if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) { require_once $pmssUserLogPath; }
-if (is_file($pmssUserLifecyclePath = __DIR__.'/../lib/userLifecycle.php')) { require_once $pmssUserLifecyclePath; }
-if (is_file($pmssShellPath = __DIR__.'/../lib/shell.php')) { require_once $pmssShellPath; }
+require_once __DIR__.'/../lib/userLifecycle.php';
+require_once __DIR__.'/../lib/shell.php';
 require_once __DIR__.'/../lib/user/userFilesystem.php';
 require_once __DIR__.'/../lib/traffic/storage.php';
 
@@ -76,18 +75,16 @@ if ($homeOwner !== false && $homeGroup !== false &&
         )
     );
     chownPath($homeDir, $userIds['uid'].':'.$userIds['gid']);
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog(
-            $thisUser,
-            sprintf(
-                'userPermissions: fixed home ownership (uid=%s gid=%s, was uid=%s gid=%s)',
-                $userIds['uid'],
-                $userIds['gid'],
-                $homeOwner,
-                $homeGroup
-            )
-        );
-    }
+    pmssUserLog(
+        $thisUser,
+        sprintf(
+            'userPermissions: fixed home ownership (uid=%s gid=%s, was uid=%s gid=%s)',
+            $userIds['uid'],
+            $userIds['gid'],
+            $homeOwner,
+            $homeGroup
+        )
+    );
 }
 pmssRun(sprintf(
     'find %s -path %s -prune -o -type d -exec chmod 750 {} +',
@@ -107,9 +104,7 @@ foreach ([
     pmssRun(sprintf('mkdir -p %s', escapeshellarg($binDir)));
     chownPath($binDir, "{$thisUser}:{$thisUser}");
     chmodPath($binDir, 0750, true);
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog($thisUser, $binSpec[1]);
-    }
+    pmssUserLog($thisUser, $binSpec[1]);
 }
 
 $chmodItems = [

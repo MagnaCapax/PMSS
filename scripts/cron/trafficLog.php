@@ -13,11 +13,9 @@ require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/network/iptables.php';
 require_once '/scripts/lib/resources/log.php';
 require_once '/scripts/lib/traffic.php';
+require_once '/scripts/lib/user/log.php';
 
 $logger = new Logger(__FILE__);
-if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
-    require_once $pmssUserLogPath;
-}
 $logdir = '/var/log/pmss/traffic/';
 $userUids = pmssResourceLogManagedUserUids();
 if (count($userUids) == 0) exit;    // Nothing to collect

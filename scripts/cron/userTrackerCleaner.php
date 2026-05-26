@@ -23,9 +23,6 @@ include '/scripts/lib/devristo/File.php';
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
-if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
-    require_once $pmssUserLogPath;
-}
 use Devristo\Torrent\Torrent;
 
 function pmssTrackerCleanerTimestamp(): string
@@ -503,16 +500,14 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
    $userVerboseLog .= pmssTrackerCleanerTimestamp()
        ." run_end user={$thisUser} processed={$userProcessedTorrents} private={$userPrivateTorrents} changed={$userChangedTorrents}{$runSuffix}\n";
    pmssTrackerCleanerWriteUserVerboseLog($thisUser, $userVerboseLog);
-   if (function_exists('pmssUserLog')) {
-       $summary = sprintf(
-           'tracker cleaner: processed=%d private=%d changed=%d%s',
-           $userProcessedTorrents,
-           $userPrivateTorrents,
-           $userChangedTorrents,
-           $stopReason !== '' ? ' stop_reason='.$stopReason : ''
-       );
-       pmssUserLog($thisUser, $summary);
-   }
+   $summary = sprintf(
+       'tracker cleaner: processed=%d private=%d changed=%d%s',
+       $userProcessedTorrents,
+       $userPrivateTorrents,
+       $userChangedTorrents,
+       $stopReason !== '' ? ' stop_reason='.$stopReason : ''
+   );
+   pmssUserLog($thisUser, $summary);
 
    if ($stopReason !== '') {
        break;
