@@ -617,6 +617,10 @@ function pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingSe
         . '<br /><span style="font-size: 0.82em;"><a href="'.htmlspecialchars($upgradeUrl, ENT_QUOTES, 'UTF-8').'" target="_blank">Need more bandwidth? Upgrade your plan.</a></span>';
 }
 
+function pmssWelcomeMetricSectionHtmlBuild($title, $bodyHtml) {
+    return '<h6>'.pmssWelcomeHtmlAttr($title).'</h6>'.(string) $bodyHtml.'<hr />';
+}
+
 /**
  * Calculate a finite percentage for quota, traffic, and RAM gauges.
  */
@@ -973,7 +977,7 @@ function memoryCreateSection() {
     $cacheBytes = isset($memoryBreakdown['file']) ? (float) $memoryBreakdown['file'] : null;
 
     if ($currentBytes === null && $limitBytes === null && $processBytes === null && $cacheBytes === null) {
-        return '<h6>RAM Info</h6><b>RAM usage data is unavailable right now.</b><hr />';
+        return pmssWelcomeMetricSectionHtmlBuild('RAM Info', '<b>RAM usage data is unavailable right now.</b>');
     }
 
     $currentText = ($currentBytes === null) ? 'n/a' : pmssFormatBytes($currentBytes, 2, 0, true);
@@ -985,23 +989,13 @@ function memoryCreateSection() {
         if ($processBytes !== null || $cacheBytes !== null) {
             $breakdownText = '<br />Process memory: '.$processText.'<br />Page cache: '.$cacheText;
         }
-        return <<<EOF
-<h6>RAM Info</h6>
-Current RAM usage: {$currentText}{$breakdownText}<br />
-RAM limit: n/a
-<hr />
-EOF;
+        return pmssWelcomeMetricSectionHtmlBuild('RAM Info', "\nCurrent RAM usage: {$currentText}{$breakdownText}<br />\nRAM limit: n/a\n");
     }
 
     $limitText = pmssFormatBytes($limitBytes, 2, 0, true);
 
     if ($currentBytes === null && $processBytes === null && $cacheBytes === null) {
-        return <<<EOF
-<h6>RAM Info</h6>
-Current RAM usage: n/a<br />
-RAM limit: {$limitText}
-<hr />
-EOF;
+        return pmssWelcomeMetricSectionHtmlBuild('RAM Info', "\nCurrent RAM usage: n/a<br />\nRAM limit: {$limitText}\n");
     }
 
     $warningBytes = $processBytes !== null ? $processBytes : $currentBytes;
@@ -1069,13 +1063,7 @@ EOF;
         $pressureIndicator = implode('', $pressureParts).'<br />';
     }
 
-    return <<<EOF
-<h6>RAM Info</h6>
-{$gauge}
-{$pressureIndicator}
-{$warning}
-<hr />
-EOF;
+    return pmssWelcomeMetricSectionHtmlBuild('RAM Info', "\n{$gauge}\n{$pressureIndicator}\n{$warning}\n");
 }
 
 function pmssWelcomeTrafficMonthValueRead($trafficState) {
@@ -1099,12 +1087,7 @@ function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = nul
     $bandwidthNote = pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId);
     $trafficUsedRaw = pmssWelcomeTrafficMonthValueRead($trafficData);
     if ($trafficUsedRaw === null) {
-        echo <<<EOF
-<h6>Traffic Info</h6>
-Traffic usage data is unavailable right now.<br />
-<div style="margin-top: 3px; line-height: 1.35;">{$bandwidthNote}</div>
-<hr />
-EOF;
+        echo pmssWelcomeMetricSectionHtmlBuild('Traffic Info', "\nTraffic usage data is unavailable right now.<br />\n<div style=\"margin-top: 3px; line-height: 1.35;\">{$bandwidthNote}</div>\n");
         return;
     }
 
@@ -1119,14 +1102,7 @@ EOF;
         : '';
 
     if ($trafficLimit <= 0) {
-        echo <<<EOF
-<h6>Traffic Info</h6>
-Traffic used (30 days): {$trafficUsed}<br />
-Traffic limit: Unlimited{$inboundLine}{$ratioLine}<br />
-<div style="margin-top: 3px; line-height: 1.35;">{$bandwidthNote}</div>
-This is rolling past 30 days, <a href="https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
-<hr />
-EOF;
+        echo pmssWelcomeMetricSectionHtmlBuild('Traffic Info', "\nTraffic used (30 days): {$trafficUsed}<br />\nTraffic limit: Unlimited{$inboundLine}{$ratioLine}<br />\n<div style=\"margin-top: 3px; line-height: 1.35;\">{$bandwidthNote}</div>\nThis is rolling past 30 days, <a href=\"https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/\" target=\"_blank\">read more</a>.\n");
         return;
     }
 
@@ -1141,15 +1117,7 @@ EOF;
     $bonusLine = ($bonusTraffic > 0) ? '<br />Bonus traffic: ' . number_format($bonusTraffic) . ' GiB' : '';
     $gauge = createGauge($titleText, $titleText . $bonusLine, $percent);
 
-    echo <<<EOF
-<h6>Traffic Info</h6>
-{$gauge}
-{$warning}
-<div style="margin-top: 3px; line-height: 1.35;">{$bandwidthNote}</div>
-{$inboundLine}{$ratioLine}
-This is rolling past 30 days, <a href="https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
-<hr />
-EOF;
+    echo pmssWelcomeMetricSectionHtmlBuild('Traffic Info', "\n{$gauge}\n{$warning}\n<div style=\"margin-top: 3px; line-height: 1.35;\">{$bandwidthNote}</div>\n{$inboundLine}{$ratioLine}\nThis is rolling past 30 days, <a href=\"https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/\" target=\"_blank\">read more</a>.\n");
 }
 
 function createStackedGauge($titleText, $footerText, $percent, $segments) {
