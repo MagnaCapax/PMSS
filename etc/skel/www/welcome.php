@@ -449,7 +449,7 @@ function pmssWelcomeRequireLocalHelper($file) {
     }
 
     $path = __DIR__.'/'.$file;
-    if (is_file($path) && !is_link($path)) {
+    if (is_file($path) && !is_link($path) && is_readable($path)) {
         require_once $path;
         return true;
     }
@@ -525,7 +525,7 @@ function pmssWelcomeBillingServiceIdRead($primaryPath, $legacyPath) {
  * Read one positive billing identifier file without following symlinks.
  */
 function pmssWelcomeBillingFileRead($path) {
-    if (!file_exists($path) || is_link($path)) {
+    if (!is_file($path) || is_link($path)) {
         return 0;
     }
     $raw = @file_get_contents($path);
@@ -551,7 +551,7 @@ function pmssWelcomeTrafficBandwidthStateBuild($throttlePath) {
     $defaultCapMbit = pmssWelcomeTrafficDefaultCapMbitRead();
     $effectiveCapMbit = $defaultCapMbit;
 
-    if (file_exists($throttlePath)) {
+    if (is_file($throttlePath) && !is_link($throttlePath)) {
         $rawThrottle = @file_get_contents($throttlePath);
         if (is_string($rawThrottle)) {
             $rawThrottle = trim($rawThrottle);
@@ -655,7 +655,7 @@ function pmssWelcomeSerializedArrayDecode($raw, $maxBytes = 8192) {
 /**
  * Reject object payloads that should never appear in quota snapshots.
  */
-function pmssWelcomeSerializedArrayHasObject($value) {
+function pmssWelcomeSerializedArrayHasObject($value, $depth = 0) {
     if (is_object($value)) {
         return true;
     }
@@ -664,8 +664,13 @@ function pmssWelcomeSerializedArrayHasObject($value) {
         return false;
     }
 
+    // Treat pathologically deep or broad arrays as unsafe customer input.
+    if ($depth > 32 || count($value) > 256) {
+        return true;
+    }
+
     foreach ($value as $child) {
-        if (pmssWelcomeSerializedArrayHasObject($child)) {
+        if (pmssWelcomeSerializedArrayHasObject($child, $depth + 1)) {
             return true;
         }
     }
@@ -678,12 +683,16 @@ function pmssWelcomeVendorRead() {
         'name' => 'Pulsed Media'
     );
 
-    if (!file_exists('/etc/seedbox/config/vendor')) {
+    if (!is_file('/etc/seedbox/config/vendor') || is_link('/etc/seedbox/config/vendor')) {
         return $vendorDefault;
     }
 
     $vendor = @file_get_contents('/etc/seedbox/config/vendor');
-    $vendor = @unserialize($vendor);
+    if (!is_string($vendor)) {
+        return $vendorDefault;
+    }
+
+    $vendor = pmssWelcomeSerializedArrayDecode($vendor, 4096);
     if (!is_array($vendor) || count($vendor) == 0 || !isset($vendor['name']) || empty($vendor['name'])) {
         return $vendorDefault;
     }
@@ -892,7 +901,18 @@ function readSystemdMemoryCurrentBytes() {
         return null;
     }
 
-    $memoryCurrent = @pmssFrontendShellExec("systemctl show user-$('/usr/bin/id' -u).slice -p MemoryCurrent --value 2>/dev/null");
+    $uid = function_exists('posix_getuid') ? (int) posix_getuid() : null;
+    if ($uid === null && function_exists('pmssFrontendShellExecAvailable') && pmssFrontendShellExecAvailable()) {
+        $uidRaw = @pmssFrontendShellExec('/usr/bin/id -u 2>/dev/null');
+        if (is_string($uidRaw) && ctype_digit(trim($uidRaw))) {
+            $uid = (int) trim($uidRaw);
+        }
+    }
+    if (!is_int($uid) || $uid < 0) {
+        return null;
+    }
+
+    $memoryCurrent = @pmssFrontendShellExec('systemctl show user-'.$uid.'.slice -p MemoryCurrent --value 2>/dev/null');
     if (!is_string($memoryCurrent)) {
         return null;
     }
@@ -1067,19 +1087,42 @@ EOF;
 }
 
 function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null, $bonusTraffic = 0, $trafficBandwidthState = array(), $billingServiceId = 0) {
-    if (count($trafficData) == 0) {
+    if (!is_array($trafficData) || count($trafficData) == 0) {
         return;
     }
 
     $bandwidthNote = pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId);
-    $trafficUsedRaw = round($trafficData['raw']['month']);
+    $trafficUsedRaw = null;
+    if (isset($trafficData['raw']) && is_array($trafficData['raw']) && isset($trafficData['raw']['month']) && is_numeric($trafficData['raw']['month'])) {
+        $trafficUsedRaw = (float) $trafficData['raw']['month'];
+        if (!is_finite($trafficUsedRaw) || $trafficUsedRaw < 0) {
+            $trafficUsedRaw = null;
+        }
+    }
+    if ($trafficUsedRaw === null) {
+        echo <<<EOF
+<h6>Traffic Info</h6>
+Traffic usage data is unavailable right now.<br />
+<div style="margin-top: 3px; line-height: 1.35;">{$bandwidthNote}</div>
+<hr />
+EOF;
+        return;
+    }
+
+    $outboundMonth = $trafficUsedRaw;
+    $trafficUsedRaw = round($trafficUsedRaw);
     $trafficUsed = round($trafficUsedRaw / 1024) . ' GiB';
-    $outboundMonth = isset($trafficData['raw']['month']) && is_numeric($trafficData['raw']['month'])
-        ? (float) $trafficData['raw']['month']
-        : null;
-    $inboundMonth = is_array($trafficIngress) && isset($trafficIngress['raw']['month']) && is_numeric($trafficIngress['raw']['month'])
-        ? (float) $trafficIngress['raw']['month']
-        : null;
+    $inboundMonth = null;
+    if (is_array($trafficIngress)
+        && isset($trafficIngress['raw'])
+        && is_array($trafficIngress['raw'])
+        && isset($trafficIngress['raw']['month'])
+        && is_numeric($trafficIngress['raw']['month'])) {
+        $inboundMonth = (float) $trafficIngress['raw']['month'];
+        if (!is_finite($inboundMonth) || $inboundMonth < 0) {
+            $inboundMonth = null;
+        }
+    }
     $inboundLine = $inboundMonth !== null ? '<br />Inbound (30 days): '.round($inboundMonth / 1024).' GiB' : '';
     $ratioState = function_exists('pmssTrafficRatioStateBuild') ? pmssTrafficRatioStateBuild($outboundMonth, $inboundMonth) : array('available' => false);
     $ratioLine = !empty($ratioState['available'])
@@ -1185,14 +1228,28 @@ function gaugeColor($percent) {
 }
 
 function quotaCreateSection($quotaInfo, $bonusQuota = 0) {
-    if (count($quotaInfo) == 0) return '';
+    if (!is_array($quotaInfo) || count($quotaInfo) == 0) return '';
 
-    $hardLimit  = $quotaInfo['hardLimit'];
-    $totalSpace = $quotaInfo['totalSpace'];
-    $usedBytes  = $quotaInfo['usedBytes'];
+    $quotaMissingWarning = '<b>Warning:</b> Quota info is missing. If this persists for more than an hour, contact support.';
+    $quotaFields = array();
+    foreach (array('hardLimit', 'totalSpace', 'usedBytes') as $field) {
+        if (!isset($quotaInfo[$field]) || !is_numeric($quotaInfo[$field])) {
+            return $quotaMissingWarning;
+        }
+
+        $value = (float) $quotaInfo[$field];
+        if (!is_finite($value) || $value < 0) {
+            return $quotaMissingWarning;
+        }
+        $quotaFields[$field] = $value;
+    }
+
+    $hardLimit  = $quotaFields['hardLimit'];
+    $totalSpace = $quotaFields['totalSpace'];
+    $usedBytes  = $quotaFields['usedBytes'];
 
     if ($hardLimit == 0 || $totalSpace == 0) {
-        return '<b>Warning:</b> Quota info is missing. If this persists for more than an hour, contact support.';
+        return $quotaMissingWarning;
     }
 
     $percent = ($totalSpace > 0) ? round(($usedBytes / $totalSpace) * 100, 1) : 0;

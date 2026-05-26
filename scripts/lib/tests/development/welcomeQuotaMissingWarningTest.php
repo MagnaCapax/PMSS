@@ -25,6 +25,25 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         return $this->pmssRunInlinePhp('require '.var_export($fixture, true).'; '.$script);
     }
 
+    private function makeWelcomeUsageFixture(): string
+    {
+        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+        $start = strpos($source, 'function pmssWelcomeTrafficEffectiveHtmlBuild');
+        $this->assertTrue($start !== false, 'welcome.php usage helpers should remain present');
+
+        $tail = substr($source, $start);
+        $tail = preg_replace('/\?>\s*$/', '', $tail);
+        $fixture = $this->pmssMakeTempPath('pmss-welcome-usage-', '.php');
+        file_put_contents($fixture, "<?php\nif (!function_exists('pmssFormatBytes')) { function pmssFormatBytes(\$bytes, \$precision = 1, \$minimumUnitIndex = 0, \$trimTrailingZeros = false) { return (string) round((float) \$bytes); } }\n".$tail);
+        return $fixture;
+    }
+
+    private function runWelcomeUsageScript(string $script, string $stderrRedirect = '2>/dev/null'): string
+    {
+        $fixture = $this->makeWelcomeUsageFixture();
+        return $this->pmssRunInlinePhp('require '.var_export($fixture, true).'; '.$script, [], $stderrRedirect);
+    }
+
     private function loadWelcomeGaugeFunctions(): void
     {
         if (function_exists('createGauge')) {
@@ -79,6 +98,22 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
         $this->assertStringContainsString('pmssDelugeServicePasswordRotate((string) $username)', $source);
         $this->pmssAssertStringNotContainsString('pmssDelugeAuthWriteLocalclientPassword($delugeAuthPath, $newDelugePassword)', $source);
+    }
+
+    public function testWelcomeVendorReaderUsesSafeSerializedArrayDecoder(): void
+    {
+        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+
+        $this->assertStringContainsString('pmssWelcomeSerializedArrayDecode($vendor, 4096)', $source);
+        $this->pmssAssertStringNotContainsString('$vendor = @unserialize($vendor)', $source);
+    }
+
+    public function testWelcomeMemoryProbeBuildsUidCommandWithoutShellSubstitution(): void
+    {
+        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+
+        $this->assertStringContainsString("'systemctl show user-'.\$uid.'.slice -p MemoryCurrent --value 2>/dev/null'", $source);
+        $this->pmssAssertStringNotContainsString("systemctl show user-$('/usr/bin/id' -u).slice", $source);
     }
 
     public function testWelcomeServiceActionButtonSnapshots(): void
@@ -148,6 +183,40 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
         $this->assertSame(array(), json_decode($arrayOutput, true));
         $this->assertSame(array(), json_decode($largeOutput, true));
+    }
+
+    public function testWelcomeQuotaReaderRejectsPathologicallyDeepInput(): void
+    {
+        $output = $this->runWelcomeSafetyScript(
+            '$payload = array(); $cursor =& $payload;'
+            .'for ($i = 0; $i < 34; $i++) { $cursor["child"] = array(); $cursor =& $cursor["child"]; }'
+            .'$_GET["quota"] = urlencode(serialize($payload));'
+            .'echo json_encode(pmssWelcomeQuotaInfoRead());'
+        );
+
+        $this->assertSame(array(), json_decode($output, true));
+    }
+
+    public function testWelcomeQuotaSectionHandlesMalformedPayloadWithoutNotice(): void
+    {
+        $output = $this->runWelcomeUsageScript(
+            'echo quotaCreateSection(array("hardLimit" => 100, "totalSpace" => 50));',
+            '2>&1'
+        );
+
+        $this->assertStringContainsString('Quota info is missing', $output);
+        $this->pmssAssertStringNotContainsString('Undefined', $output);
+    }
+
+    public function testWelcomeTrafficSectionHandlesMalformedPayloadWithoutNotice(): void
+    {
+        $output = $this->runWelcomeUsageScript(
+            'ob_start(); trafficCreateSection(array("raw" => array()), 100); echo ob_get_clean();',
+            '2>&1'
+        );
+
+        $this->assertStringContainsString('Traffic usage data is unavailable right now.', $output);
+        $this->pmssAssertStringNotContainsString('Undefined', $output);
     }
 
     public function testWelcomeGaugeHtmlAndColorSnapshot(): void
