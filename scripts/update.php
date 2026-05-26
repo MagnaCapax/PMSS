@@ -255,8 +255,7 @@ function detectDistroCodename(): array
     if ($codename === '' && is_readable('/etc/debian_version')) {
         $version = trim((string) @file_get_contents('/etc/debian_version'));
         if ($version !== '') {
-            $parts = explode('.', $version);
-            $major = $parts[0];
+            $major = explode('.', $version)[0];
             $codenameByMajor = ['10' => 'buster', '11' => 'bullseye', '12' => 'bookworm', '13' => 'trixie'];
             $codename = $codenameByMajor[$major] ?? $codename;
         }
@@ -639,10 +638,7 @@ function pmssLastFilesystemError(): string
 function pmssIsSafeUpdateRemovePath(string $path): bool
 {
     $path = rtrim($path, '/');
-    if ($path === '' || $path === '/') {
-        return false;
-    }
-    if (strpos($path, "\0") !== false || preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
+    if ($path === '' || $path === '/' || strpos($path, "\0") !== false || preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
         return false;
     }
 
@@ -681,10 +677,7 @@ function pmssIsSafeAtomicSwapDirectoryPath(string $target, string $staging, stri
     $backup = rtrim($backup, '/');
 
     foreach ([$target, $staging, $backup] as $path) {
-        if ($path === '' || $path === '/' || strpos($path, "\0") !== false) {
-            return false;
-        }
-        if (preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
+        if ($path === '' || $path === '/' || strpos($path, "\0") !== false || preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
             return false;
         }
     }
@@ -766,10 +759,7 @@ function pmssRemoveFileFatal(string $path, string $label): void
 function pmssIsSafeDirectoryContentsClearPath(string $path): bool
 {
     $path = rtrim($path, '/');
-    if ($path === '' || $path === '/' || strpos($path, "\0") !== false) {
-        return false;
-    }
-    if (preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
+    if ($path === '' || $path === '/' || strpos($path, "\0") !== false || preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
         return false;
     }
     if ($path === '/etc/skel') {
@@ -824,10 +814,7 @@ function pmssRemoveFilesystemEntry(string $path, ?string &$error): bool
 function pmssIsSafeNestedScriptsLayoutRemovePath(string $path): bool
 {
     $path = rtrim($path, '/');
-    if ($path === '' || $path === '/' || strpos($path, "\0") !== false) {
-        return false;
-    }
-    if (preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
+    if ($path === '' || $path === '/' || strpos($path, "\0") !== false || preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
         return false;
     }
     if ($path === '/scripts/scripts') {
@@ -1619,12 +1606,10 @@ function bootstrapMain(array $argv): void
         // initial hardening in stageSnapshot().
         if (!$options['dry_run']) {
             restorePermissionsBestEffort('--scripts-only run');
-        }
-        if (!$options['dry_run'] && file_exists('/scripts/util/ftpConfig.php')) {
-            logmsg('[INFO] Refreshing FTP configuration for --scripts-only run');
-            pmssRunBootstrapCommand(escapeshellarg('php').' /scripts/util/ftpConfig.php');  // GH#589: avoid stale PHP_BINARY
-        }
-        if (!$options['dry_run']) {
+            if (file_exists('/scripts/util/ftpConfig.php')) {
+                logmsg('[INFO] Refreshing FTP configuration for --scripts-only run');
+                pmssRunBootstrapCommand(escapeshellarg('php').' /scripts/util/ftpConfig.php');  // GH#589: avoid stale PHP_BINARY
+            }
             restoreRootCronBestEffort('scripts-only');
         }
         logmsg('Skipping update-step2.php (--scripts-only)');
