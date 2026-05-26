@@ -346,10 +346,7 @@ python_venv_install_requirements() {
 	deactivate
 }
 
-jellyfin_ffmpeg_binary_version() {
-	local binary="$1"
-	[[ -x "$binary" ]] && "$binary" -version 2>/dev/null | awk 'NR == 1 {print $3; exit}'
-}
+jellyfin_ffmpeg_binary_version() { [[ -x "$1" ]] && "$1" -version 2>/dev/null | awk 'NR == 1 {print $3; exit}'; }
 
 jellyfin_ffmpeg_version_usable() {
 	local version="$1"
@@ -401,8 +398,8 @@ managed_install_path_reset_target_is_safe() {
 
 	media_stack_home_path_is_safe || return 1
 	[[ "$path" == "$HOME/.bin/"* && "$path" != "$HOME/.bin" && "$path" != "$HOME/.bin/" ]] || return 1
-	[[ "$path" != *"/../"* && "$path" != *"/.." && "$path" != *"../"* ]] && return 0
-	return 1
+	[[ "$path" == *"/../"* || "$path" == *"/.." || "$path" == *"../"* ]] && return 1
+	return 0
 }
 
 managed_install_path_reset() {
@@ -791,21 +788,9 @@ fi
 # Detect Architecture
 ARCH=$(dpkg --print-architecture)
 case "$ARCH" in
-"amd64")
-	JF_ARCH="amd64"
-	DOTNET_ARCH="x64"
-	SERVARR_ARCH="x64"
-	;;
-"arm64")
-	JF_ARCH="arm64"
-	DOTNET_ARCH="arm64"
-	SERVARR_ARCH="arm64"
-	;;
-"armhf")
-	JF_ARCH="armhf"
-	DOTNET_ARCH="arm"
-	SERVARR_ARCH="arm"
-	;;
+"amd64") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH <<<"amd64|x64|x64" ;;
+"arm64") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH <<<"arm64|arm64|arm64" ;;
+"armhf") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH <<<"armhf|arm|arm" ;;
 *)
 	log_err "Architecture '$ARCH' not supported."
 	exit 1
@@ -1086,9 +1071,7 @@ RADARR_PORT=$(pick_existing_or_random_port "$(existing_port_from_xml_tag "$HOME/
 PROWLARR_PORT=$(pick_existing_or_random_port "$(existing_port_from_xml_tag "$HOME/.config/prowlarr/config.xml" "Port")")
 SONARR_PORT=$(pick_existing_or_random_port "$(existing_port_from_xml_tag "$HOME/.config/sonarr/config.xml" "Port")")
 JELLYFIN_PORT="$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_DIR/network.xml" "InternalHttpPort")"
-if [[ -z "$JELLYFIN_PORT" ]]; then
-	JELLYFIN_PORT="$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_DIR/network.xml" "PublicHttpPort")"
-fi
+JELLYFIN_PORT="${JELLYFIN_PORT:-$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_DIR/network.xml" "PublicHttpPort")}"
 JELLYFIN_PORT="$(pick_existing_or_random_port "$JELLYFIN_PORT")"
 USERNAME=$(whoami)
 HOSTNAME=$(hostname)
@@ -1403,10 +1386,7 @@ echo "PUBLIC-IP (do not expose ports): ${PUBLIC_IP}"
 echo ""
 summary_jellyfin_port=""
 summary_jellyfin_config=""
-if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-	summary_jellyfin_port=", Jellyfin=${JELLYFIN_PORT}"
-	summary_jellyfin_config=" | Jellyfin=$HOME/.config/jellyfin"
-fi
+[[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && summary_jellyfin_port=", Jellyfin=${JELLYFIN_PORT}" && summary_jellyfin_config=" | Jellyfin=$HOME/.config/jellyfin"
 echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}${summary_jellyfin_port}"
 echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr${summary_jellyfin_config} | Cloudplow=$HOME/.config/cloudplow"
 echo "Tmux sessions running: $(media_stack_sessions_label)"
