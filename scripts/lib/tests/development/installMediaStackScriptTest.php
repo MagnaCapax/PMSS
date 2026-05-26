@@ -140,6 +140,17 @@ class installMediaStackScriptTest extends TestCase
         );
     }
 
+    public function testJellyfinSystemXmlTagSetterLocksSnapshot(): void
+    {
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash', 'set -euo pipefail', 'file=$(mktemp)',
+            $this->pmssExtractShellFunctions(array('xml_escape', 'sed_replacement_escape', 'jellyfin_system_xml_tag_set')),
+            'printf "%s\n" "<ServerConfiguration>" "  <BaseUrl>old</BaseUrl>" "</ServerConfiguration>" > "$file"',
+            'jellyfin_system_xml_tag_set "$file" BaseUrl /public-alice/jellyfin; jellyfin_system_xml_tag_set "$file" FFmpegPath "/opt/a&b/ffmpeg"; cat "$file"', '',
+        ));
+        $this->assertSame("<ServerConfiguration>\n  <BaseUrl>/public-alice/jellyfin</BaseUrl>\n  <FFmpegPath>/opt/a&amp;b/ffmpeg</FFmpegPath>\n</ServerConfiguration>", $this->pmssRunShellHarness($script));
+    }
+
     public function testJellyfinFfmpegPreflightRunsBeforeDataLossPrompt(): void
     {
         $preflight = strpos($this->script, "esac\n\njellyfin_ffmpeg_configure_fallback");
@@ -559,7 +570,7 @@ LIGHTTPD;
     {
         $functions = array();
         foreach ($names as $name) {
-            $pattern = '/^'.preg_quote($name, '/').'\(\) \{\n(?:.*\n)*?^\}/m';
+            $pattern = '/^'.preg_quote($name, '/').'\(\) \{(?:\n(?:.*\n)*?^\}|[^\n]*\})/m';
             $matched = preg_match($pattern, $this->script, $matches);
 
             $this->assertSame(1, $matched, 'Failed to extract shell function '.$name);

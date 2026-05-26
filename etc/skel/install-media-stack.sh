@@ -242,6 +242,8 @@ xml_escape() {
 	printf '%s' "$s"
 }
 
+sed_replacement_escape() { local s="$1"; s="${s//\\/\\\\}"; s="${s//&/\\&}"; s="${s//|/\\|}"; printf '%s' "$s"; }
+
 check_url() {
 	local url="$1"
 	if command -v curl >/dev/null 2>&1; then
@@ -978,18 +980,21 @@ with open(path, "w", encoding="utf-8") as handle:
 PY
 }
 
+jellyfin_system_xml_tag_set() {
+	local file="$1" tag="$2" value=""
+	value=$(sed_replacement_escape "$(xml_escape "$3")")
+	grep -q "<${tag}>" "$file" &&
+		sed -i -E "s|<${tag}>[^<]*</${tag}>|<${tag}>${value}</${tag}>|g" "$file" && return
+	sed -i -E "s|</ServerConfiguration>|  <${tag}>${value}</${tag}>\n</ServerConfiguration>|" "$file"
+}
+
 media_stack_sessions() {
 	[[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && printf '%s\n' jellyfin
 	printf '%s\n' "$@"
 }
 
 media_stack_sessions_label() {
-	local app label=""
-
-	while IFS= read -r app; do
-		label+="${label:+, }$app"
-	done < <(media_stack_sessions "${MEDIA_STACK_BASE_SESSIONS[@]}")
-	printf '%s' "$label"
+	media_stack_sessions "${MEDIA_STACK_BASE_SESSIONS[@]}" | awk 'NR > 1 { printf ", " } { printf "%s", $0 }'
 }
 
 media_stack_app_log_path() {
@@ -1292,29 +1297,12 @@ EOF
 			cat >"$syscfg" <<SYSXML
 <?xml version="1.0" encoding="utf-8"?>
 <ServerConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <BaseUrl>/public-${USERNAME}/${app}</BaseUrl>
 SYSXML
-			# Add FFmpegPath if provided, otherwise close the tag
-			if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
-				echo "  <FFmpegPath>$(xml_escape "${OVR_JELLYFIN_FFMPEG}")</FFmpegPath>" >>"$syscfg"
-			fi
 			echo "</ServerConfiguration>" >>"$syscfg"
-		else
-			# Update existing system.xml - merge settings
-			if grep -q "<BaseUrl>" "$syscfg"; then
-				sed -i -E "s|<BaseUrl>[^<]*</BaseUrl>|<BaseUrl>/public-${USERNAME}/${app}</BaseUrl>|g" "$syscfg"
-			else
-				sed -i -E "s|</ServerConfiguration>|  <BaseUrl>/public-${USERNAME}/${app}</BaseUrl>\n</ServerConfiguration>|" "$syscfg"
-			fi
-			# Handle FFmpegPath - merge with existing config (escape XML special chars)
-			if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
-				escaped_ffmpeg=$(xml_escape "${OVR_JELLYFIN_FFMPEG}")
-				if grep -q "<FFmpegPath>" "$syscfg"; then
-					sed -i -E "s|<FFmpegPath>[^<]*</FFmpegPath>|<FFmpegPath>${escaped_ffmpeg}</FFmpegPath>|g" "$syscfg"
-				else
-					sed -i -E "s|</ServerConfiguration>|  <FFmpegPath>${escaped_ffmpeg}</FFmpegPath>\n</ServerConfiguration>|" "$syscfg"
-				fi
-			fi
+		fi
+		jellyfin_system_xml_tag_set "$syscfg" "BaseUrl" "/public-${USERNAME}/${app}"
+		if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
+			jellyfin_system_xml_tag_set "$syscfg" "FFmpegPath" "$OVR_JELLYFIN_FFMPEG"
 		fi
 	else
 		log_info "[dry-run] would configure ${app^^} (port=${JELLYFIN_PORT}, url_base=/public-${USERNAME}/${app})"
