@@ -60,6 +60,26 @@ function wgSupports(): bool
 }
 
 /**
+ * Resolve key material from a test override or first shell-output line.
+ */
+function wgKeyMaterialResolve(string $envKey, string $command, string $failureMessage): string
+{
+    $override = getenv($envKey);
+    if ($override !== false) {
+        $value = trim($override);
+    } else {
+        exec($command, $output, $rc);
+        $value = $rc === 0 ? trim($output[0] ?? '') : '';
+    }
+
+    if ($value === '') {
+        wgLog($failureMessage);
+    }
+
+    return $value;
+}
+
+/**
  * Confirm that the supplied address is a routable public IPv4 endpoint.
  */
 function wgValidatePublicIp(string $candidate): ?string
@@ -194,27 +214,13 @@ function wgEnsureKeys(string $dir): array
         return [trim((string)file_get_contents($privFile)), trim((string)file_get_contents($pubFile))];
     }
 
-    $override = getenv('PMSS_WG_PRIVATE_KEY');
-    if ($override !== false) {
-        $priv = trim($override);
-    } else {
-        exec('wg genkey', $privOut, $rc);
-        $priv = $rc === 0 ? trim($privOut[0] ?? '') : '';
-    }
+    $priv = wgKeyMaterialResolve('PMSS_WG_PRIVATE_KEY', 'wg genkey', 'Failed to generate server private key');
     if ($priv === '') {
-        wgLog('Failed to generate server private key');
         return ['', ''];
     }
 
-    $override = getenv('PMSS_WG_PUBLIC_KEY');
-    if ($override !== false) {
-        $pub = trim($override);
-    } else {
-        exec('echo '.escapeshellarg($priv).' | wg pubkey', $pubOut, $rc);
-        $pub = $rc === 0 ? trim($pubOut[0] ?? '') : '';
-    }
+    $pub = wgKeyMaterialResolve('PMSS_WG_PUBLIC_KEY', 'echo '.escapeshellarg($priv).' | wg pubkey', 'Failed to derive server public key');
     if ($pub === '') {
-        wgLog('Failed to derive server public key');
         return ['', ''];
     }
 
@@ -240,6 +246,15 @@ function wgRenderTemplate(string $path, array $placeholders): ?string
         return null;
     }
     return str_replace(array_keys($placeholders), array_values($placeholders), $template);
+}
+
+/**
+ * Replace one guide line while preserving the original text on regex errors.
+ */
+function wgGuideReplaceFirst(string $content, string $pattern, string $replacement): string
+{
+    $updated = preg_replace($pattern, $replacement, $content, 1);
+    return $updated === null ? $content : $updated;
 }
 
 /**
@@ -273,14 +288,11 @@ function wgGuideHasPrivateKeyPlaceholder(string $content): bool
  */
 function wgApplyPrivateKeyToGuide(string $content, string $privateKey): string
 {
-    $updated = preg_replace(
-        '/^PrivateKey = <client private key>$/m',
-        'PrivateKey = '.$privateKey,
+    return wgGuideReplaceFirst(
         $content,
-        1
+        '/^PrivateKey = <client private key>$/m',
+        'PrivateKey = '.$privateKey
     );
-
-    return $updated === null ? $content : $updated;
 }
 
 /**
@@ -502,11 +514,8 @@ function wgAssignClientIps(array $entries): array
             continue;
         }
         $used[$ip] = true;
-        $assigned[] = [
-            'user' => $entry['user'],
-            'key'  => $entry['key'],
-            'ip'   => $ip,
-        ];
+        $entry['ip'] = $ip;
+        $assigned[] = $entry;
     }
 
     return $assigned;
@@ -561,10 +570,7 @@ function wireguardBuildConfig(string $privKey, int $port): string
                     "ListenPort = {$port}\n";
     }
 
-    $base   = rtrim($rendered, "\r\n");
-    $peers  = wgBuildPeersConfig();
-
-    return $base."\n\n".$peers;
+    return rtrim($rendered, "\r\n")."\n\n".wgBuildPeersConfig();
 }
 
 /**
@@ -572,25 +578,17 @@ function wireguardBuildConfig(string $privKey, int $port): string
  */
 function wgApplyAssignedIpToGuide(string $content, string $ip): string
 {
-    $updated = preg_replace(
+    $content = wgGuideReplaceFirst(
+        $content,
         '/^Address = 10\.90\.90\.(?:X|[0-9]{1,3})\/32$/m',
-        'Address = '.$ip.'/32',
-        $content,
-        1
+        'Address = '.$ip.'/32'
     );
-    if ($updated === null) {
-        return $content;
-    }
 
-    $content = $updated;
-    $updated = preg_replace(
+    return wgGuideReplaceFirst(
+        $content,
         '/AllowedIPs = 10\.90\.90\.(?:X|[0-9]{1,3})\/32/',
-        'AllowedIPs = '.$ip.'/32',
-        $content,
-        1
+        'AllowedIPs = '.$ip.'/32'
     );
-
-    return $updated === null ? $content : $updated;
 }
 
 /**

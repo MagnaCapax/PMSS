@@ -286,6 +286,7 @@ class WireGuardInstallerTest extends TestCase
     {
         $guide = \wgBuildClientGuide('server-pub', 'vpn.example.com', 51820);
 
+        $this->assertSame('c1501d1931af0c6ec16f58213b837615451961175ada7caefb6679d21ec6ce80', hash('sha256', $guide));
         $this->assertStringContainsString("PrivateKey = <client private key>\n", $guide);
         $this->assertStringContainsString("PublicKey = server-pub\n", $guide);
         $this->assertStringContainsString("Endpoint = vpn.example.com:51820\n", $guide);
