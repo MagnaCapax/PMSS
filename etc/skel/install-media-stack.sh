@@ -147,6 +147,16 @@ done
 # Reserved for future SABnzbd version pinning; keep the arg plumbed.
 : "${OVR_SAB_VERSION}"
 
+media_stack_home_path_is_safe() {
+	[[ -n "${HOME:-}" && "$HOME" == /* && "$HOME" != "/" ]] || return 1
+	return 0
+}
+
+if ! media_stack_home_path_is_safe; then
+	printf '[ERR ] Refusing to run media stack installer with unsafe HOME: %s\n' "${HOME:-unset}" >&2
+	exit 1
+fi
+
 # Logging
 LOG_FILE="$HOME/.install-media-stack.log"
 mkdir -p "$(dirname "$LOG_FILE")" >/dev/null 2>&1 || true
@@ -254,6 +264,18 @@ check_url() {
 	elif command -v wget >/dev/null 2>&1; then
 		wget -q --spider --timeout=10 "$url" >/dev/null 2>&1 && return 0
 		wget -q -O /dev/null --timeout=10 --tries=1 --max-redirect=5 "$url" >/dev/null 2>&1
+	else
+		return 1
+	fi
+}
+
+fetch_text() {
+	local url="$1"
+
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL --max-time 20 "$url" 2>/dev/null
+	elif command -v wget >/dev/null 2>&1; then
+		wget -q -O - --timeout=20 --tries=1 "$url" 2>/dev/null
 	else
 		return 1
 	fi
@@ -639,6 +661,7 @@ lighttpd_media_stack_proxy_block_write() {
 
 lighttpd_media_stack_config_write() {
 	local target="$1"
+	local temp_target="${target}.pmss.$$"
 
 	{
 		cat <<EOF
@@ -664,7 +687,15 @@ EOF
 		if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 			lighttpd_media_stack_proxy_block_write "jellyfin" "$JELLYFIN_PORT"
 		fi
-	} >"$target"
+	} >"$temp_target" || {
+		rm -f "$temp_target"
+		return 1
+	}
+
+	if ! mv "$temp_target" "$target"; then
+		rm -f "$temp_target"
+		return 1
+	fi
 }
 
 # Helper to append to .bashrc.custom only if marker not present
@@ -826,8 +857,15 @@ if [[ -n "$OVR_SAB_URL" ]]; then
 	SABNZBD_URL="$OVR_SAB_URL"
 	SABNZBD_VERSION="override"
 else
-	SABNZBD_VERSION=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'tag_name' | cut -d '"' -f 4 || true)
-	SABNZBD_URL=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'browser_download_url' | grep -- '-src' | cut -d '"' -f 4 || true)
+	if ! SABNZBD_RELEASE_JSON=$(fetch_text "https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest"); then
+		SABNZBD_RELEASE_JSON=""
+	fi
+	SABNZBD_VERSION=$(printf '%s\n' "$SABNZBD_RELEASE_JSON" | grep -E 'tag_name' | cut -d '"' -f 4 || true)
+	SABNZBD_URL=$(printf '%s\n' "$SABNZBD_RELEASE_JSON" | grep -E 'browser_download_url' | grep -- '-src' | cut -d '"' -f 4 || true)
+	if [[ -z "$SABNZBD_URL" ]]; then
+		log_err "Could not resolve SABnzbd release metadata from GitHub"
+		exit 1
+	fi
 fi
 
 # Jellyfin (Repo Scraping)
@@ -841,7 +879,10 @@ elif [[ -n "$OVR_JELLYFIN_URL" ]]; then
 	JELLYFIN_URL="$OVR_JELLYFIN_URL"
 	JF_FILENAME="override"
 else
-	JF_FILENAME=$(curl -s "$JF_REPO_BASE" | grep -oE "jellyfin_[0-9]+\\.[0-9]+\\.[0-9]+-${JF_ARCH}\\.tar\\.gz" | head -n 1)
+	if ! JF_REPO_INDEX=$(fetch_text "$JF_REPO_BASE"); then
+		JF_REPO_INDEX=""
+	fi
+	JF_FILENAME=$(printf '%s\n' "$JF_REPO_INDEX" | grep -oE "jellyfin_[0-9]+\\.[0-9]+\\.[0-9]+-${JF_ARCH}\\.tar\\.gz" | head -n 1)
 	if [[ -z "$JF_FILENAME" ]]; then
 		log_err "Could not resolve latest Jellyfin tarball from $JF_REPO_BASE"
 		exit 1

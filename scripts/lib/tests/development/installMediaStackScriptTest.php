@@ -344,6 +344,49 @@ LIGHTTPD;
         $this->assertStringNotContainsString('jellyfin', $withoutJellyfin);
     }
 
+    public function testLighttpdMediaStackFragmentWriteIsAtomic(): void
+    {
+        $this->assertStringContainsString('local temp_target="${target}.pmss.$$"', $this->script);
+        $this->assertStringContainsString('} >"$temp_target" || {', $this->script);
+        $this->assertStringContainsString('if ! mv "$temp_target" "$target"; then', $this->script);
+    }
+
+    public function testHomePathGuardRunsBeforeLogFileCreation(): void
+    {
+        $this->assertStringContainsString('media_stack_home_path_is_safe() {', $this->script);
+        $guard = strpos($this->script, 'if ! media_stack_home_path_is_safe; then');
+        $logFile = strpos($this->script, 'LOG_FILE="$HOME/.install-media-stack.log"');
+
+        $this->assertTrue($guard !== false, 'HOME path guard missing');
+        $this->assertTrue($logFile !== false, 'Log file setup missing');
+        $this->assertTrue($guard < $logFile, 'HOME must be validated before touching the log file');
+    }
+
+    public function testHomePathGuardRejectsUnsafeValues(): void
+    {
+        $functions = $this->pmssExtractShellFunctions(array('media_stack_home_path_is_safe'));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            $functions,
+            'HOME=/home/alice; if media_stack_home_path_is_safe; then echo safe_home; fi',
+            'HOME=/; if media_stack_home_path_is_safe; then echo root_allowed; else echo root_refused; fi',
+            'unset HOME; if media_stack_home_path_is_safe; then echo unset_allowed; else echo unset_refused; fi',
+            'HOME=relative; if media_stack_home_path_is_safe; then echo relative_allowed; else echo relative_refused; fi',
+            '',
+        ));
+
+        $output = $this->pmssRunShellHarness($script);
+
+        $this->assertStringContainsString('safe_home', $output);
+        $this->assertStringContainsString('root_refused', $output);
+        $this->assertStringContainsString('unset_refused', $output);
+        $this->assertStringContainsString('relative_refused', $output);
+        $this->assertTrue(strpos($output, 'root_allowed') === false, $output);
+        $this->assertTrue(strpos($output, 'unset_allowed') === false, $output);
+        $this->assertTrue(strpos($output, 'relative_allowed') === false, $output);
+    }
+
     public function testDryRunLoggingPresent(): void
     {
         $this->assertStringContainsString('[dry-run]', $this->script);
@@ -364,6 +407,16 @@ LIGHTTPD;
     {
         $this->assertStringContainsString('curl -fsIL --max-time 10 "$url"', $this->script);
         $this->assertStringContainsString('wget -q --spider --timeout=10 "$url"', $this->script);
+    }
+
+    public function testMetadataFetchUsesCurlOrWgetHelper(): void
+    {
+        $this->assertStringContainsString('fetch_text() {', $this->script);
+        $this->assertStringContainsString('curl -fsSL --max-time 20 "$url"', $this->script);
+        $this->assertStringContainsString('wget -q -O - --timeout=20 --tries=1 "$url"', $this->script);
+        $this->assertStringContainsString('SABNZBD_RELEASE_JSON=$(fetch_text "https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest")', $this->script);
+        $this->assertStringContainsString('JF_REPO_INDEX=$(fetch_text "$JF_REPO_BASE")', $this->script);
+        $this->assertStringContainsString('Could not resolve SABnzbd release metadata from GitHub', $this->script);
     }
 
     public function testLogFilePathSetOnce(): void
