@@ -420,9 +420,7 @@ function pmssResolveDistUpgradeStep(string $currentMajor, string $maxMajor): arr
         ];
     }
 
-    static $upgradePathMap = ['10' => ['10', '11'], '11' => ['11', '12'], '12' => ['12', '13'], '13' => [null, null]];
-    [$from, $next] = $upgradePathMap[$currentMajor] ?? [null, null];
-    if ($from === null || $next === null) {
+    if (!pmssDistUpgradeIsAllowedMajor($currentMajor) || $currentMajorInt >= 13) {
         return [
             'action'  => 'noop',
             'from'    => null,
@@ -431,6 +429,8 @@ function pmssResolveDistUpgradeStep(string $currentMajor, string $maxMajor): arr
         ];
     }
 
+    $from = (string) $currentMajorInt;
+    $next = (string) ($currentMajorInt + 1);
     if ((int) $next > $maxMajorInt) {
         return [
             'action'  => 'error',
@@ -460,12 +460,8 @@ function pmssResolveTargetVersion(string $input): string
         return '';
     }
 
-    if (pmssDistUpgradeIsAllowedMajor($key)) {
-        return $key;
-    }
-
-    $mapped = (string) pmssVersionFromCodename($key);
-    return pmssDistUpgradeIsAllowedMajor($mapped) ? $mapped : '';
+    $target = pmssDistUpgradeIsAllowedMajor($key) ? $key : (string) pmssVersionFromCodename($key);
+    return pmssDistUpgradeIsAllowedMajor($target) ? $target : '';
 }
 
 /**
@@ -493,15 +489,14 @@ function pmssRewriteSources(string $fromMajor, string $toMajor): void
     }
 
     static $paths = ['/etc/apt/sources.list', '/etc/apt/sources.list.d/*.list'];
-    $sedPairs = [
-        [sprintf("s/\\<%s\\>/%s/g", $from, $to), $paths[0]],
-        [sprintf("s#%s/updates#%s-security#g", $to, $to), $paths[0]],
-        [sprintf("s/\\<%s\\>/%s/g", $from, $to), $paths[1]],
-        [sprintf("s#%s/updates#%s-security#g", $to, $to), $paths[1]],
+    $sedExpressions = [
+        sprintf("s/\\<%s\\>/%s/g", $from, $to),
+        sprintf("s#%s/updates#%s-security#g", $to, $to),
     ];
-
-    foreach ($sedPairs as [$expr, $path]) {
-        runCommand("sed -i '{$expr}' {$path}");
+    foreach ($paths as $path) {
+        foreach ($sedExpressions as $expr) {
+            runCommand("sed -i '{$expr}' {$path}");
+        }
     }
 
     // Ensure security repository uses the live security host after upgrade.

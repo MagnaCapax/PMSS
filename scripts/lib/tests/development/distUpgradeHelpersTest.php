@@ -31,42 +31,28 @@ class DistUpgradeHelpersTest extends TestCase
 
     public function testResolveDistUpgradeStepHonorsMaximum(): void
     {
-        $plan = \pmssResolveDistUpgradeStep('10', '12');
-        $this->assertEquals('upgrade', $plan['action']);
-        $this->assertEquals('10', $plan['from']);
-        $this->assertEquals('11', $plan['to']);
-        $this->assertStringContainsString('Requested maximum is 12', $plan['message']);
+        $cases = [
+            ['10', '12', 'upgrade', '10', '11', 'Requested maximum is 12'],
+            ['11', '13', 'upgrade', '11', '12', ''],
+            ['12', '13', 'upgrade', '12', '13', ''],
+            ['11', '11', 'noop', '11', null, 'No dist-upgrade required'],
+            ['13', '13', 'noop', '13', null, 'No dist-upgrade required'],
+            ['9', '13', 'noop', null, null, 'No upgrade recipe for Debian 9'],
+            ['13', '14', 'noop', null, null, 'No upgrade recipe for Debian 13'],
+            ['12', '11', 'error', '12', null, 'Safety halt'],
+            ['13', '12', 'error', '13', null, 'Safety halt'],
+            ['14', '13', 'error', '14', null, 'Safety halt'],
+        ];
 
-        $plan = \pmssResolveDistUpgradeStep('11', '13');
-        $this->assertEquals('upgrade', $plan['action']);
-        $this->assertEquals('11', $plan['from']);
-        $this->assertEquals('12', $plan['to']);
-
-        $plan = \pmssResolveDistUpgradeStep('11', '11');
-        $this->assertEquals('noop', $plan['action']);
-        $this->assertEquals(null, $plan['to']);
-        $this->assertStringContainsString('No dist-upgrade required', $plan['message']);
-
-        $plan = \pmssResolveDistUpgradeStep('12', '11');
-        $this->assertEquals('error', $plan['action']);
-        $this->assertEquals(null, $plan['to']);
-        $this->assertStringContainsString('Safety halt', $plan['message']);
-
-        $plan = \pmssResolveDistUpgradeStep('13', '13');
-        $this->assertEquals('noop', $plan['action']);
-        $this->assertEquals(null, $plan['to']);
-        $this->assertStringContainsString('No dist-upgrade required', $plan['message']);
-
-        $plan = \pmssResolveDistUpgradeStep('13', '12');
-        $this->assertEquals('error', $plan['action']);
-        $this->assertEquals(null, $plan['to']);
-        $this->assertStringContainsString('Safety halt', $plan['message']);
-
-        $plan = \pmssResolveDistUpgradeStep('14', '13');
-        $this->assertEquals('error', $plan['action']);
-        $this->assertEquals('14', $plan['from']);
-        $this->assertEquals(null, $plan['to']);
-        $this->assertStringContainsString('Safety halt', $plan['message']);
+        foreach ($cases as [$current, $max, $action, $from, $to, $message]) {
+            $plan = \pmssResolveDistUpgradeStep($current, $max);
+            $this->assertEquals($action, $plan['action'], "action for {$current}/{$max}");
+            $this->assertEquals($from, $plan['from'], "from for {$current}/{$max}");
+            $this->assertEquals($to, $plan['to'], "to for {$current}/{$max}");
+            if ($message !== '') {
+                $this->assertStringContainsString($message, $plan['message'], "message for {$current}/{$max}");
+            }
+        }
     }
 
     public function testBootReadinessParsers(): void
