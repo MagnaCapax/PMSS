@@ -40,6 +40,36 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
         $this->assertFalse(pmssIsSafeDirectoryContentsClearPath($tmpPrefix.'abc123/../escape'));
     }
 
+    public function testAtomicSwapGuardAcceptsOnlyKnownSwapPairs(): void
+    {
+        $tempRoot = $this->pmssMakeTempDir('pmss-update-swap-');
+
+        $this->assertTrue(pmssIsSafeAtomicSwapDirectoryPath('/scripts', '/scripts.pmss-staging-abc123', '/scripts.pmss-backup-abc123'));
+        $this->assertTrue(pmssIsSafeAtomicSwapDirectoryPath('/etc/seedbox', '/etc/seedbox.pmss-staging-abc123', '/etc/seedbox.pmss-backup-abc123'));
+        $this->assertTrue(pmssIsSafeAtomicSwapDirectoryPath($tempRoot.'/target', $tempRoot.'/staging', $tempRoot.'/backup'));
+
+        $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath('', '/scripts.pmss-staging-abc123', '/scripts.pmss-backup-abc123'));
+        $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath('/home', '/scripts.pmss-staging-abc123', '/scripts.pmss-backup-abc123'));
+        $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath('/scripts', '/tmp/staging', '/scripts.pmss-backup-abc123'));
+        $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath('/scripts', '/scripts.pmss-staging-abc123', '/tmp/backup'));
+        $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath($tempRoot.'/target', $tempRoot.'/staging', $tempRoot.'/../backup'));
+    }
+
+    public function testNestedScriptsLayoutRemoveGuardAcceptsOnlyKnownPaths(): void
+    {
+        $tempRoot = $this->pmssMakeTempDir('pmss-update-nested-scripts-');
+
+        $this->assertTrue(pmssIsSafeNestedScriptsLayoutRemovePath('/scripts/scripts'));
+        $this->assertTrue(pmssIsSafeNestedScriptsLayoutRemovePath($tempRoot.'/scripts/scripts'));
+
+        $this->assertFalse(pmssIsSafeNestedScriptsLayoutRemovePath(''));
+        $this->assertFalse(pmssIsSafeNestedScriptsLayoutRemovePath('/'));
+        $this->assertFalse(pmssIsSafeNestedScriptsLayoutRemovePath('/scripts'));
+        $this->assertFalse(pmssIsSafeNestedScriptsLayoutRemovePath('/etc/seedbox'));
+        $this->assertFalse(pmssIsSafeNestedScriptsLayoutRemovePath($tempRoot.'/scripts'));
+        $this->assertFalse(pmssIsSafeNestedScriptsLayoutRemovePath($tempRoot.'/scripts/../scripts'));
+    }
+
     public function testClearDirectoryContentsRemovesEntriesWithoutFollowingSymlinks(): void
     {
         $root = $this->pmssMakeTempDir('pmss-update-clear-');
@@ -82,6 +112,21 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
 
         $this->assertFalse(pmssRemoveFile($root, 'test directory', $error));
         $this->assertStringContainsString('Refusing to unlink directory', (string) $error);
+    }
+
+    public function testNestedScriptsLayoutRemovalDoesNotFollowSymlinks(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-update-nested-scripts-');
+        $nested = $root.'/scripts/scripts';
+        $outsideRoot = $this->pmssMakeTempDir('pmss-update-nested-scripts-outside-');
+        $outsideFile = $this->pmssWriteFile($outsideRoot.'/keep.txt', 'keep');
+
+        $this->pmssWriteFile($nested.'/nested.txt', 'nested');
+        $this->pmssCreateSymlinkOrSkip($outsideFile, $nested.'/outside-link');
+
+        $this->assertTrue(pmssRemoveNestedScriptsLayout($nested));
+        $this->assertFalse(file_exists($nested), 'nested scripts layout should be removed');
+        $this->assertTrue(is_file($outsideFile), 'nested layout removal must not follow symlink targets');
     }
 
     public function testAtomicSwapDirectoryKeepsPreviousTreeInBackup(): void

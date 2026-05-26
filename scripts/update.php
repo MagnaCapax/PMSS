@@ -664,6 +664,62 @@ function pmssIsSafeUpdateRemovePath(string $path): bool
     return false;
 }
 
+function pmssBootstrapTempRoot(): string
+{
+    $testRoot = getenv('PMSS_TEST_TEMP_ROOT');
+    if (is_string($testRoot) && $testRoot !== '') {
+        return rtrim($testRoot, '/');
+    }
+
+    return rtrim(sys_get_temp_dir(), '/');
+}
+
+function pmssIsSafeAtomicSwapDirectoryPath(string $target, string $staging, string $backup): bool
+{
+    $target = rtrim($target, '/');
+    $staging = rtrim($staging, '/');
+    $backup = rtrim($backup, '/');
+
+    foreach ([$target, $staging, $backup] as $path) {
+        if ($path === '' || $path === '/' || strpos($path, "\0") !== false) {
+            return false;
+        }
+        if (preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
+            return false;
+        }
+    }
+
+    $allowedPairs = [
+        ['/scripts', '/scripts.pmss-staging-', '/scripts.pmss-backup-'],
+        ['/etc/seedbox', '/etc/seedbox.pmss-staging-', '/etc/seedbox.pmss-backup-'],
+    ];
+    foreach ($allowedPairs as $pair) {
+        [$allowedTarget, $stagingPrefix, $backupPrefix] = $pair;
+        if ($target !== $allowedTarget) {
+            continue;
+        }
+
+        return strpos($staging, $stagingPrefix) === 0
+            && strlen($staging) > strlen($stagingPrefix)
+            && strpos($backup, $backupPrefix) === 0
+            && strlen($backup) > strlen($backupPrefix);
+    }
+
+    // Hermetic tests may exercise the swap helper under generated temp roots.
+    $tempPrefix = pmssBootstrapTempRoot().'/pmss-update-swap-';
+    if (strpos($target, $tempPrefix) !== 0) {
+        return false;
+    }
+
+    $fixtureRoot = dirname($target);
+    return strlen($fixtureRoot) > strlen($tempPrefix)
+        && dirname($staging) === $fixtureRoot
+        && dirname($backup) === $fixtureRoot
+        && basename($target) === 'target'
+        && basename($staging) === 'staging'
+        && basename($backup) === 'backup';
+}
+
 function pmssRemoveTreeBestEffort(string $path, string $label): void
 {
     if (!pmssIsSafeUpdateRemovePath($path)) {
@@ -765,6 +821,43 @@ function pmssRemoveFilesystemEntry(string $path, ?string &$error): bool
     return true;
 }
 
+function pmssIsSafeNestedScriptsLayoutRemovePath(string $path): bool
+{
+    $path = rtrim($path, '/');
+    if ($path === '' || $path === '/' || strpos($path, "\0") !== false) {
+        return false;
+    }
+    if (preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
+        return false;
+    }
+    if ($path === '/scripts/scripts') {
+        return true;
+    }
+
+    // Test fixtures must keep the same /scripts/scripts shape under temp roots.
+    $tempPrefix = pmssBootstrapTempRoot().'/pmss-update-nested-scripts-';
+    $pattern = '#^'.preg_quote($tempPrefix, '#').'[^/]+/scripts/scripts$#';
+    return preg_match($pattern, $path) === 1;
+}
+
+function pmssRemoveNestedScriptsLayout(string $path): bool
+{
+    if (!pmssIsSafeNestedScriptsLayoutRemovePath($path)) {
+        logmsg('[WARN] Refusing unsafe nested scripts removal path: '.$path);
+        logEvent('unsafe_remove_refused', ['label' => 'nested scripts layout', 'path' => $path]);
+        return false;
+    }
+
+    $error = null;
+    if (pmssRemoveFilesystemEntry($path, $error)) {
+        return true;
+    }
+
+    logmsg('[WARN] Failed to remove nested scripts layout: '.($error ?? $path));
+    logEvent('nested_scripts_remove_failed', ['path' => $path, 'error' => $error ?? 'unknown']);
+    return false;
+}
+
 /**
  * Clear child entries while leaving the guarded root directory itself in place.
  */
@@ -811,6 +904,9 @@ function pmssClearDirectoryContentsFatal(string $path, string $label): void
  */
 function pmssAtomicSwapDirectory(string $target, string $staging, string $backup, string $label): void
 {
+    if (!pmssIsSafeAtomicSwapDirectoryPath($target, $staging, $backup)) {
+        fatal("Refusing unsafe atomic swap paths for {$label}", EXIT_COPY);
+    }
     if (!is_dir($staging)) {
         fatal("Staging directory missing for {$label}: {$staging}", EXIT_COPY);
     }
@@ -1032,7 +1128,7 @@ function flattenScriptsLayout(): void
     logmsg('Detected nested /scripts/scripts layout, flattening');
     logEvent('scripts_flatten', ['status' => 'start']);
     pmssRunBootstrapCommand(sprintf('cp -a %s/. %s', escapeshellarg($nested), escapeshellarg('/scripts')));
-    pmssRunBootstrapCommand('rm -rf '.escapeshellarg($nested));
+    pmssRemoveNestedScriptsLayout($nested);
     if (!file_exists('/scripts/util/update-step2.php')) {
         logmsg('[WARN] update-step2.php missing after flattening');
         logEvent('scripts_flatten', ['status' => 'update_step2_missing']);
