@@ -41,6 +41,8 @@ class LighttpdSocketCleanupTest extends TestCase
         $this->assertTrue($chdirPos !== false);
         $this->assertTrue($commandPos !== false && $commandPos > $chdirPos);
         $this->assertTrue($suPos !== false && $suPos > $commandPos);
+        $this->assertTrue(strpos($script, 'fwrite(STDERR, "Unable to enter user home\n");') !== false);
+        $this->assertTrue(strpos($script, 'exit(1);') !== false);
         $this->assertTrue(strpos($script, 'cd {$homeDir}; su {$user}') === false);
         $this->assertTrue(strpos($script, "ps aux | grep '.escapeshellarg(\$user)") !== false);
     }

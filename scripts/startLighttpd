@@ -55,7 +55,10 @@ foreach (glob(rtrim($lighttpdDir, '/').'/php.socket*') ?: [] as $socketPath) {
 }
 
 // lighttpd inherits cwd before opening logs; keep it out of root-only paths.
-if (!@chdir($homeDir)) die("Unable to enter user home\n");
+if (!@chdir($homeDir)) {
+    fwrite(STDERR, "Unable to enter user home\n");
+    exit(1);
+}
 $startCommand = '/usr/sbin/lighttpd -f '.escapeshellarg($configPath);
 passthru('su '.escapeshellarg($user).' -c '.escapeshellarg($startCommand));
 
