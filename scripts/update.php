@@ -63,6 +63,14 @@ const EXIT_FETCH = 12;
 const EXIT_COPY  = 13;
 const EXIT_DIST  = 14;
 
+// Best-effort directory creation for bootstrap log/state writes.
+function pmssEnsureDirectory(string $dir, int $mode = 0755): void
+{
+    if (!is_dir($dir)) {
+        @mkdir($dir, $mode, true);
+    }
+}
+
 /**
  * Minimal logger – writes both to stdout and a file so rescue scenarios still log.
  */
@@ -73,9 +81,7 @@ function logmsg(string $message): void
         $script = $_SERVER['SCRIPT_NAME'] ?? __FILE__;
         $base   = basename($script, '.php');
         $dir    = '/var/log/pmss';
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
-        }
+        pmssEnsureDirectory($dir);
         $logFiles = [
             'primary'  => rtrim($dir, '/').'/'.$base.'.log',
             'fallback' => '/tmp/'.$base.'.log',
@@ -133,9 +139,7 @@ function logEvent(string $event, array $payload = []): void
     }
 
     $dir = dirname(JSON_LOG);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
+    pmssEnsureDirectory($dir);
     $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES);
     if ($encoded !== false) {
         @file_put_contents(JSON_LOG, $encoded.PHP_EOL, FILE_APPEND | LOCK_EX);
@@ -160,9 +164,7 @@ function pmssAcquireUpdateLock(): void
     }
 
     $dir = dirname(PMSS_UPDATE_LOCK_FILE);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
+    pmssEnsureDirectory($dir);
     $fh = @fopen(PMSS_UPDATE_LOCK_FILE, 'c');
     if ($fh === false) {
         fatal('Unable to open update lock file: '.PMSS_UPDATE_LOCK_FILE, EXIT_COPY);
@@ -924,6 +926,22 @@ function directoryHasContent(string $path): bool
     return false;
 }
 
+// Gate missing/dry-run staging before tree-specific work.
+function pmssStageSnapshotTreeIfPresent(string $source, string $tree, bool $dryRun, string $dryRunMessage, callable $stageTree): void
+{
+    if (!directoryHasContent($source)) {
+        logmsg("[WARN] Snapshot {$tree} tree missing or empty, skipping copy");
+        logEvent('tree_skipped', ['tree' => $tree]);
+        return;
+    }
+    if ($dryRun) {
+        logmsg($dryRunMessage);
+        return;
+    }
+
+    $stageTree($source);
+}
+
 /**
  * Stage snapshot trees into place.
  *
@@ -940,12 +958,7 @@ function stageSnapshot(string $tmp, bool $dryRun): void
 
     // Stage /scripts with an atomic rename swap.
     $scriptsSource = $tmp.'/scripts';
-    if (!directoryHasContent($scriptsSource)) {
-        logmsg("[WARN] Snapshot scripts tree missing or empty, skipping copy");
-        logEvent('tree_skipped', ['tree' => 'scripts']);
-    } elseif ($dryRun) {
-        logmsg("[DRY RUN] Would atomically swap /scripts from {$scriptsSource}");
-    } else {
+    pmssStageSnapshotTreeIfPresent($scriptsSource, 'scripts', $dryRun, "[DRY RUN] Would atomically swap /scripts from {$scriptsSource}", function (string $scriptsSource) use ($runId): void {
         $scriptsStaging = '/scripts.pmss-staging-'.$runId;
         $scriptsBackup  = '/scripts.pmss-backup-'.$runId;
         pmssRemoveTreeBestEffort($scriptsStaging, 'scripts staging');
@@ -953,16 +966,11 @@ function stageSnapshot(string $tmp, bool $dryRun): void
 
         pmssAtomicSwapDirectory('/scripts', $scriptsStaging, $scriptsBackup, 'scripts');
         pmssRemoveTreeBestEffort($scriptsBackup, 'scripts backup');
-    }
+    });
 
     // Stage /etc tree with atomic swap for /etc/seedbox and overlay for the rest.
     $etcSource = $tmp.'/etc';
-    if (!directoryHasContent($etcSource)) {
-        logmsg("[WARN] Snapshot etc tree missing or empty, skipping copy");
-        logEvent('tree_skipped', ['tree' => 'etc']);
-    } elseif ($dryRun) {
-        logmsg("[DRY RUN] Would atomically swap /etc/seedbox and overlay other /etc files from {$etcSource}");
-    } else {
+    pmssStageSnapshotTreeIfPresent($etcSource, 'etc', $dryRun, "[DRY RUN] Would atomically swap /etc/seedbox and overlay other /etc files from {$etcSource}", function (string $etcSource) use ($runId): void {
         if (is_dir($etcSource.'/skel') && is_dir('/etc/skel')) {
             pmssClearDirectoryContentsFatal('/etc/skel', 'skeleton tree');
         }
@@ -977,7 +985,7 @@ function stageSnapshot(string $tmp, bool $dryRun): void
             if (is_dir('/etc/seedbox')) {
                 pmssRunBootstrapCommand(sprintf('cp -a %s %s', escapeshellarg('/etc/seedbox'), escapeshellarg($seedboxStaging)), EXIT_COPY);
             } else {
-                @mkdir($seedboxStaging, 0755, true);
+                pmssEnsureDirectory($seedboxStaging);
             }
             if ($haveSeedboxSnapshot) {
                 pmssRunBootstrapCommand(sprintf('cp -a %s/. %s', escapeshellarg($seedboxSource), escapeshellarg($seedboxStaging)), EXIT_COPY);
@@ -997,18 +1005,13 @@ function stageSnapshot(string $tmp, bool $dryRun): void
                 pmssRunBootstrapCommand('cp -rpu '.escapeshellarg($path).' /etc', EXIT_COPY);
             }
         }
-    }
+    });
 
     // Stage /var as before.
     $varSource = $tmp.'/var';
-    if (!directoryHasContent($varSource)) {
-        logmsg("[WARN] Snapshot var tree missing or empty, skipping copy");
-        logEvent('tree_skipped', ['tree' => 'var']);
-    } elseif ($dryRun) {
-        logmsg("[DRY RUN] Would copy var from {$varSource}");
-    } else {
+    pmssStageSnapshotTreeIfPresent($varSource, 'var', $dryRun, "[DRY RUN] Would copy var from {$varSource}", function (string $varSource): void {
         pmssRunBootstrapCommand('cp -a '.escapeshellarg($varSource).' /', EXIT_COPY);
-    }
+    });
 
     if ($dryRun) {
         return;
@@ -1057,9 +1060,7 @@ function recordVersion(string $spec, array $details, bool $dryRun): void
         return;
     }
 
-    if (!is_dir(VERSION_DIR)) {
-        @mkdir(VERSION_DIR, 0755, true);
-    }
+    pmssEnsureDirectory(VERSION_DIR);
 
     $timestamp = time();
     $line      = $spec.'@'.date('Y-m-d H:i', $timestamp);
@@ -1071,9 +1072,7 @@ function recordVersion(string $spec, array $details, bool $dryRun): void
 
     // Backwards-compatibility: some tooling expects /etc/seedbox/runtime/version.
     // #TODO(Q4/2027): remove this compatibility write once all consumers use VERSION_FILE.
-    if (!is_dir(dirname(VERSION_RUNTIME_FILE))) {
-        @mkdir(dirname(VERSION_RUNTIME_FILE), 0755, true);
-    }
+    pmssEnsureDirectory(dirname(VERSION_RUNTIME_FILE));
     @file_put_contents(VERSION_RUNTIME_FILE, $line.PHP_EOL);
 
     // #TODO Ensure consistent permissions (0640) on version metadata and any
