@@ -37,8 +37,18 @@ class changePwPasswdFailureGuardTest extends TestCase
             '$parseOptions = true;',
             "if (\$parseOptions && \$token === '--jsonl') {",
             'if (!$jsonlOutput) {',
-            'pmssChangePwEmitJsonl($username, $password, $passwdReturnCode, $htpasswdReturnCode, $qbittorrentReturnCode);',
+            'pmssChangePwEmitJsonl($username, $password, $passwdReturnCode, $htpasswdReturnCode, $qbittorrentUpdated);',
         ]);
+    }
+
+    public function testJsonlModeReportsQbittorrentUpdateAsBoolean(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/changePw.php');
+
+        $this->assertStringContainsString('?bool $qbittorrentUpdated', $source);
+        $this->assertStringContainsString("'qbittorrent_updated' => \$qbittorrentUpdated,", $source);
+        $this->assertStringNotContainsString('$qbittorrent'.'ReturnCode = 0;', $source);
+        $this->assertStringNotContainsString("'qbittorrent".'_rc'."' =>", $source);
     }
 
     public function testPasswdFailureExitsBeforeHttpCredentialSync(): void

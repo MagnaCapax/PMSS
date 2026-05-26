@@ -539,7 +539,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/changePw.php [--jsonl] USERNAME [PASSWORD]
   - Behavior: Sets Unix password (generated if omitted) and per-user htpasswd; prints the password.
-    With `--jsonl`, suppresses human status lines and emits one JSON object with the new credential and sync return codes.
+    With `--jsonl`, suppresses human status lines and emits one JSON object with the new credential, sync return codes, and `qbittorrent_updated` (`true` when the existing qBittorrent config was updated, `false` when no qBittorrent config was present, `null` before that sync step is reached).
 
 - scripts/recreateUser.php USERNAME RAM_MiB QUOTA_GiB
   - Behavior: Kills user processes; if `/home/<user>` exists, moves to `/home/backup-<user>`;

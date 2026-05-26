@@ -136,7 +136,6 @@ if ($chownReturnCode !== 0) {
 // Deluge is intentionally excluded: its auth file stores passwords in plaintext,
 // making account password sync a security risk (see GH#211).
 $qbittorrentUpdated = pmssUpdateQbittorrentPassword($username, $password);
-$qbittorrentReturnCode = 0;
 
 // Kill updated torrent daemons gracefully; watchdog cron will restart them.
 if ($qbittorrentUpdated) {
@@ -148,7 +147,7 @@ if ($qbittorrentUpdated && !$jsonlOutput) {
 }
 
 if ($jsonlOutput) {
-    pmssChangePwEmitJsonl($username, $password, $passwdReturnCode, $htpasswdReturnCode, $qbittorrentReturnCode);
+    pmssChangePwEmitJsonl($username, $password, $passwdReturnCode, $htpasswdReturnCode, $qbittorrentUpdated);
 }
 
 function generatePassword(): string
@@ -202,15 +201,15 @@ function legacyPasswordSeed(): string
 /**
  * Emit one machine-readable credential sync result.
  */
-function pmssChangePwEmitJsonl(string $username, string $password, ?int $passwdReturnCode, ?int $htpasswdReturnCode, ?int $qbittorrentReturnCode): void
+function pmssChangePwEmitJsonl(string $username, string $password, ?int $passwdReturnCode, ?int $htpasswdReturnCode, ?bool $qbittorrentUpdated): void
 {
     $payload = [
-        'username'       => $username,
-        'new_credential' => $password,
-        'passwd_rc'      => $passwdReturnCode,
-        'htpasswd_rc'    => $htpasswdReturnCode,
-        'qbittorrent_rc' => $qbittorrentReturnCode,
-        'ts'             => gmdate('Y-m-d\TH:i:s\Z'),
+        'username'            => $username,
+        'new_credential'      => $password,
+        'passwd_rc'           => $passwdReturnCode,
+        'htpasswd_rc'         => $htpasswdReturnCode,
+        'qbittorrent_updated' => $qbittorrentUpdated,
+        'ts'                  => gmdate('Y-m-d\TH:i:s\Z'),
     ];
 
     echo json_encode($payload, JSON_UNESCAPED_SLASHES)."\n";
