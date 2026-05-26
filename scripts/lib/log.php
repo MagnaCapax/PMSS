@@ -39,8 +39,8 @@ function pmssJsonEncodeSafe(array $payload, int $flags = 0): ?string
     return is_string($encoded) ? $encoded : null;
 }
 
-/** Encode a payload with PMSS's standard pretty file-output flags. */
-function pmssJsonEncodePretty(array $payload): ?string { $encoded = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES); return is_string($encoded) ? $encoded : null; }
+/** Encode data with PMSS's standard pretty file-output flags. */
+function pmssJsonEncodePretty($payload, int $extraFlags = 0): ?string { $encoded = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | $extraFlags); return is_string($encoded) ? $encoded : null; }
 
 /** Read a JSON object file as an associative array, rejecting unsafe paths when requested. */
 function pmssJsonFileReadAssoc(string $path, bool $safePathRequired = false): ?array

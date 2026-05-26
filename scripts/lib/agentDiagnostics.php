@@ -171,7 +171,7 @@ function pmssAgentDiagnosticsRenderText(array $payload): string
             $output .= rtrim($section)."\n";
             continue;
         }
-        $output .= json_encode($section, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
+        $output .= (pmssJsonEncodePretty($section) ?? '')."\n";
     }
     return $output;
 }

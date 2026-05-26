@@ -107,10 +107,10 @@ function pmssDelugeConfigDecode(string $raw): ?array
  */
 function pmssDelugeConfigEncode(array $meta, array $config): ?string
 {
-    $metaJson = json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $metaJson = pmssJsonEncodePretty($meta, JSON_UNESCAPED_UNICODE);
+    $configJson = pmssJsonEncodePretty($config, JSON_UNESCAPED_UNICODE);
 
-    return ($metaJson === false || $configJson === false) ? null : $metaJson.$configJson;
+    return ($metaJson === null || $configJson === null) ? null : $metaJson.$configJson;
 }
 
 /**

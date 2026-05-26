@@ -39,7 +39,7 @@ function pmssWelcomeProductMessageSet(
         ? array_replace($rootMap, ['products' => $productMap])
         : $productMap;
 
-    if (!is_string($encoded = json_encode($rootMap, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES))) {
+    if (($encoded = pmssJsonEncodePretty($rootMap)) === null) {
         return false;
     }
 

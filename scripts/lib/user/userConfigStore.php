@@ -317,8 +317,8 @@ class UserConfigStore
         if (!pmssDirEnsureExists($dir, 0750)) {
             return false;
         }
-        $encoded = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        if ($encoded === false) {
+        $encoded = pmssJsonEncodePretty($payload);
+        if ($encoded === null) {
             return false;
         }
 
