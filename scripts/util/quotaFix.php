@@ -98,6 +98,13 @@ usleep(500000);
 // 6. Re-enable quotas
 pmssQuotaFixRunCommand('[quotaFix] Re-enabling quotas', 'quotaon -av', true, $exitCode);
 
+// 6.5. Verify enforcement actually took effect after the quotaon call. Without
+// this line the runtime.log records the ATTEMPT but not the OUTCOME — a silent
+// failure leaves quotas off and the next investigator cannot tell from the log
+// whether enforcement is on or off. quotaon -ap reads the kernel's actual
+// state, not just our intent.
+pmssQuotaFixRunCommand('[quotaFix] Verifying quota enforcement state:', 'quotaon -ap', false, $exitCode);
+
 // 7. Report final status for visual comparison
 pmssQuotaFixRunCommand('[quotaFix] Final quota state:', 'repquota -as', false, $exitCode);
 
