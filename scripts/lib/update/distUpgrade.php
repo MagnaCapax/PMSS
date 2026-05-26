@@ -291,16 +291,7 @@ function pmssVerifyDistUpgradeBootReadiness(
     $mdadmConfigPath = $mdadmConfigPath ?? '/etc/mdadm/mdadm.conf';
     $initramfsMdadmPath = $initramfsMdadmPath ?? '/etc/initramfs-tools/conf.d/mdadm';
 
-    if (is_readable($mdstatPath)) {
-        $mdstat = (string) @file_get_contents($mdstatPath);
-        if (pmssMdstatHasDegradedArrays($mdstat)) {
-            logMessage('[WARN] dist-upgrade: degraded RAID array detected in '.$mdstatPath.'; inspect before reboot');
-        } else {
-            logMessage('[SKIP] dist-upgrade: RAID arrays appear healthy');
-        }
-    } else {
-        logMessage('[WARN] dist-upgrade: unable to read '.$mdstatPath.'; RAID health check skipped');
-    }
+    pmssDistUpgradeVerifyReadablePattern($mdstatPath, '[WARN] dist-upgrade: unable to read '.$mdstatPath.'; RAID health check skipped', '/\[[U_]*_[U_]*\]/', true, '[WARN] dist-upgrade: degraded RAID array detected in '.$mdstatPath.'; inspect before reboot', '[SKIP] dist-upgrade: RAID arrays appear healthy');
 
     if (!is_file($grubConfigPath)) {
         logMessage('[WARN] dist-upgrade: missing '.$grubConfigPath.'; run update-grub before reboot');
@@ -313,27 +304,29 @@ function pmssVerifyDistUpgradeBootReadiness(
         }
     }
 
-    if (is_readable($mdadmConfigPath)) {
-        $mdadmConfig = (string) @file_get_contents($mdadmConfigPath);
-        if (preg_match('/^\s*ARRAY\s+\S+/m', $mdadmConfig) !== 1) {
-            logMessage('[WARN] dist-upgrade: '.$mdadmConfigPath.' lacks ARRAY definitions; regenerate before reboot');
-        } else {
-            logMessage('[SKIP] dist-upgrade: mdadm ARRAY definitions found');
-        }
-    } else {
-        logMessage('[WARN] dist-upgrade: unable to read '.$mdadmConfigPath.'; mdadm config check skipped');
+    pmssDistUpgradeVerifyReadablePattern($mdadmConfigPath, '[WARN] dist-upgrade: unable to read '.$mdadmConfigPath.'; mdadm config check skipped', '/^\s*ARRAY\s+\S+/m', false, '[WARN] dist-upgrade: '.$mdadmConfigPath.' lacks ARRAY definitions; regenerate before reboot', '[SKIP] dist-upgrade: mdadm ARRAY definitions found');
+    pmssDistUpgradeVerifyReadablePattern($initramfsMdadmPath, '[WARN] dist-upgrade: unable to read '.$initramfsMdadmPath.'; BOOT_DEGRADED verification skipped', '/^\s*BOOT_DEGRADED\s*=\s*true\s*$/mi', false, '[WARN] dist-upgrade: '.$initramfsMdadmPath.' missing BOOT_DEGRADED=true; degraded RAID boot may fail', '[SKIP] dist-upgrade: BOOT_DEGRADED=true is configured');
+}
+
+/**
+ * Apply a readable-file boot check and emit the existing warning/skip message.
+ */
+function pmssDistUpgradeVerifyReadablePattern(
+    string $path,
+    string $unreadableMessage,
+    string $pattern,
+    bool $warnWhenMatched,
+    string $warnMessage,
+    string $skipMessage
+): void
+{
+    if (!is_readable($path)) {
+        logMessage($unreadableMessage);
+        return;
     }
 
-    if (is_readable($initramfsMdadmPath)) {
-        $initramfsMdadm = (string) @file_get_contents($initramfsMdadmPath);
-        if (preg_match('/^\s*BOOT_DEGRADED\s*=\s*true\s*$/mi', $initramfsMdadm) !== 1) {
-            logMessage('[WARN] dist-upgrade: '.$initramfsMdadmPath.' missing BOOT_DEGRADED=true; degraded RAID boot may fail');
-        } else {
-            logMessage('[SKIP] dist-upgrade: BOOT_DEGRADED=true is configured');
-        }
-    } else {
-        logMessage('[WARN] dist-upgrade: unable to read '.$initramfsMdadmPath.'; BOOT_DEGRADED verification skipped');
-    }
+    $matched = preg_match($pattern, (string) @file_get_contents($path)) === 1;
+    logMessage($matched === $warnWhenMatched ? $warnMessage : $skipMessage);
 }
 
 /**
