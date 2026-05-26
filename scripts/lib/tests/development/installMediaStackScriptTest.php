@@ -84,8 +84,8 @@ class installMediaStackScriptTest extends TestCase
     public function testSabnzbdAllowsProxiedWizardAccess(): void
     {
         $this->assertStringContainsString('inet_exposure = 4', $this->script);
-        $this->assertStringContainsString('s#^inet_exposure = .*#inet_exposure = 4#', $this->script);
-        $this->assertStringContainsString('/^\[misc\]/a inet_exposure = 4', $this->script);
+        $this->assertStringContainsString('sabnzbd_misc_value_set() {', $this->script);
+        $this->assertStringContainsString('sabnzbd_misc_value_set "$datadir/${app}.ini" inet_exposure "4"', $this->script);
     }
 
     public function testDotnetRootExportedInBashrc(): void

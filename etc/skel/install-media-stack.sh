@@ -252,7 +252,11 @@ xml_escape() {
 	printf '%s' "$s"
 }
 
-sed_replacement_escape() { local s="$1"; s="${s//\\/\\\\}"; s="${s//&/\\&}"; s="${s//|/\\|}"; printf '%s' "$s"; }
+sed_replacement_escape() {
+	local s="${1//\\/\\\\}"
+	s="${s//&/\\&}"
+	printf '%s' "${s//|/\\|}"
+}
 
 check_url() {
 	local url="$1"
@@ -316,7 +320,6 @@ fetch_verified_archive() {
 	fi
 }
 
-# Extraction helper
 extract_tgz() {
 	# extract_tgz <archive> [target_dir] [strip_components]
 	local a="$1" t="${2:-.}" s="${3:-}"
@@ -511,9 +514,7 @@ servarr_install_from_url() {
 	local archive="${install_name}.tar.gz"
 
 	mkdir -p "$data_dir"
-	if [[ $DRY_RUN -eq 0 ]]; then
-		managed_install_path_reset "$install_dir/$install_name"
-	fi
+	managed_install_path_reset "$install_dir/$install_name"
 	pkill -9 -f -u "$USERNAME" "$install_name" >/dev/null 2>&1 || true
 	log_info "${install_name} URL: $download_url"
 
@@ -522,6 +523,16 @@ servarr_install_from_url() {
 	fetch_verified_archive "$download_url" "$archive" "$install_name"
 	extract_tgz "$archive"
 	servarr_config_xml_converge "$app" "$data_dir" "$port" "$default_port"
+}
+
+sabnzbd_misc_value_set() {
+	local file="$1" key="$2" value
+	value=$(sed_replacement_escape "$3")
+	if grep -q "^${key} = " "$file"; then
+		sed -i -E "s#^(${key} = ).*#\1${value}#" "$file"
+		return
+	fi
+	sed -i "/^\[misc\]/a ${key} = ${value}" "$file"
 }
 
 lighttpd_custom_has_legacy_media_stack_rules() {
@@ -1183,19 +1194,12 @@ host_whitelist = ${HOSTNAME}
 inet_exposure = 4
 EOF
 	fi
-	sed -i -E "s#(url_base = ).*#\1/public-${USERNAME}/${app}#" "$datadir/${app}.ini"
-	sed -i -E "s#^(port = ).*#\1${SABNZBD_PORT}#" "$datadir/${app}.ini"
-	sed -i -E "s#^(host = ).*#\1127.0.0.1#" "$datadir/${app}.ini"
-	# Ensure host line exists (older installs may lack it; SABnzbd defaults to 0.0.0.0)
-	if ! grep -q '^host = ' "$datadir/${app}.ini"; then
-		sed -i '/^\[misc\]/a host = 127.0.0.1' "$datadir/${app}.ini"
-	fi
-	sed -i -E "s#^(host_whitelist = ).*#\1${HOSTNAME}#" "$datadir/${app}.ini"
+	sabnzbd_misc_value_set "$datadir/${app}.ini" url_base "/public-${USERNAME}/${app}"
+	sabnzbd_misc_value_set "$datadir/${app}.ini" port "$SABNZBD_PORT"
+	sabnzbd_misc_value_set "$datadir/${app}.ini" host "127.0.0.1"
+	sabnzbd_misc_value_set "$datadir/${app}.ini" host_whitelist "$HOSTNAME"
 	# The public lighttpd proxy forwards real client IPs; allow the setup wizard so users can set SABnzbd auth.
-	sed -i -E "s#^inet_exposure = .*#inet_exposure = 4#" "$datadir/${app}.ini"
-	if ! grep -q '^inet_exposure = ' "$datadir/${app}.ini"; then
-		sed -i '/^\[misc\]/a inet_exposure = 4' "$datadir/${app}.ini"
-	fi
+	sabnzbd_misc_value_set "$datadir/${app}.ini" inet_exposure "4"
 else
 	log_info "[dry-run] would configure ${app^^} (port=${SABNZBD_PORT}, url_base=/public-${USERNAME}/${app})"
 fi
@@ -1217,9 +1221,7 @@ app="aspnetcore"
 log_step "Installing ${app^^}..."
 echo "Downloading...${app^^}"
 installdir="$HOME/.bin/dotnet"
-if [[ $DRY_RUN -eq 0 ]]; then
-	managed_install_path_reset "$installdir"
-fi
+managed_install_path_reset "$installdir"
 mkdir -p "$installdir"
 cd "$installdir"
 fetch_verified_archive "$ASPDOTNET_URL" "aspnetcore.tar.gz" "ASP.NET runtime"
@@ -1259,9 +1261,7 @@ if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 	configdir="$JELLYFIN_CONFIG_DIR"
 	logdir="$JELLYFIN_LOG_DIR"
 	mkdir -p "$datadir" "$logdir" "$configdir"
-	if [[ $DRY_RUN -eq 0 ]]; then
-		managed_install_path_reset "$installdir/${app}"
-	fi
+	managed_install_path_reset "$installdir/${app}"
 	cd "$installdir"
 	echo "Downloading...${app^^}"
 	fetch_verified_archive "$JELLYFIN_URL" "${app}.tar.gz" "Jellyfin" "${JF_FILENAME:-override}"
