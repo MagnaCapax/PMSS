@@ -32,26 +32,21 @@ class DistUpgradeHelpersTest extends TestCase
     public function testResolveDistUpgradeStepHonorsMaximum(): void
     {
         $cases = [
-            ['10', '12', 'upgrade', '10', '11', 'Requested maximum is 12'],
-            ['11', '13', 'upgrade', '11', '12', ''],
-            ['12', '13', 'upgrade', '12', '13', ''],
-            ['11', '11', 'noop', '11', null, 'No dist-upgrade required'],
-            ['13', '13', 'noop', '13', null, 'No dist-upgrade required'],
-            ['9', '13', 'noop', null, null, 'No upgrade recipe for Debian 9'],
-            ['13', '14', 'noop', null, null, 'No upgrade recipe for Debian 13'],
-            ['12', '11', 'error', '12', null, 'Safety halt'],
-            ['13', '12', 'error', '13', null, 'Safety halt'],
-            ['14', '13', 'error', '14', null, 'Safety halt'],
+            ['10', '12', ['action' => 'upgrade', 'from' => '10', 'to' => '11', 'message' => 'Requested maximum is 12; performing safe incremental upgrade to 11.']],
+            ['11', '13', ['action' => 'upgrade', 'from' => '11', 'to' => '12', 'message' => 'Requested maximum is 13; performing safe incremental upgrade to 12.']],
+            ['12', '13', ['action' => 'upgrade', 'from' => '12', 'to' => '13', 'message' => '']],
+            ['11', '11', ['action' => 'noop', 'from' => '11', 'to' => null, 'message' => 'No dist-upgrade required: current version is 11 and requested maximum is 11.']],
+            ['13', '13', ['action' => 'noop', 'from' => '13', 'to' => null, 'message' => 'No dist-upgrade required: current version is 13 and requested maximum is 13.']],
+            ['9', '13', ['action' => 'noop', 'from' => null, 'to' => null, 'message' => 'No upgrade recipe for Debian 9']],
+            ['13', '14', ['action' => 'noop', 'from' => null, 'to' => null, 'message' => 'No upgrade recipe for Debian 13']],
+            ['12', '11', ['action' => 'error', 'from' => '12', 'to' => null, 'message' => 'Safety halt: Current version is 12 but the requested maximum is 11.']],
+            ['13', '12', ['action' => 'error', 'from' => '13', 'to' => null, 'message' => 'Safety halt: Current version is 13 but the requested maximum is 12.']],
+            ['14', '13', ['action' => 'error', 'from' => '14', 'to' => null, 'message' => 'Safety halt: Current version is 14 but the requested maximum is 13.']],
         ];
 
-        foreach ($cases as [$current, $max, $action, $from, $to, $message]) {
+        foreach ($cases as [$current, $max, $expected]) {
             $plan = \pmssResolveDistUpgradeStep($current, $max);
-            $this->assertEquals($action, $plan['action'], "action for {$current}/{$max}");
-            $this->assertEquals($from, $plan['from'], "from for {$current}/{$max}");
-            $this->assertEquals($to, $plan['to'], "to for {$current}/{$max}");
-            if ($message !== '') {
-                $this->assertStringContainsString($message, $plan['message'], "message for {$current}/{$max}");
-            }
+            $this->assertSame($expected, $plan, "plan for {$current}/{$max}");
         }
     }
 

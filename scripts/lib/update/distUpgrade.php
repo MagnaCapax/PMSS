@@ -254,8 +254,7 @@ function pmssEnsureInitrdAfterDistUpgrade(): void
     }
 
     logMessage('dist-upgrade: initrd missing for kernel '.$latest.'; generating with update-initramfs');
-    if (!pmssWaitForDpkgLocks()) {
-        logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping initrd generation');
+    if (!pmssDistUpgradeWaitForLocksOrLog('[WARN] dist-upgrade: dpkg lock did not clear; skipping initrd generation')) {
         return;
     }
     if (runCommand('update-initramfs -c -k '.escapeshellarg($latest), true) !== 0) {
@@ -362,16 +361,14 @@ function pmssRepairNginxAfterDistUpgrade(): void
     }
 
     logMessage('dist-upgrade: nginx ABI mismatch detected; purging and reinstalling nginx packages');
-    if (!pmssWaitForDpkgLocks()) {
-        logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall');
+    if (!pmssDistUpgradeWaitForLocksOrLog('[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall')) {
         return;
     }
 
     list($env, $hasTty) = pmssDistUpgradeAptEnv();
 
     runCommand("$env apt-get purge -y 'nginx*'", true, null, $hasTty);
-    if (!pmssWaitForDpkgLocks()) {
-        logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall');
+    if (!pmssDistUpgradeWaitForLocksOrLog('[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall')) {
         return;
     }
     if (runCommand(pmssDistUpgradeAptCommand($env, 'install', 'nginx nginx-full nginx-common'), true, null, $hasTty) !== 0) {
@@ -386,6 +383,16 @@ function pmssRepairNginxAfterDistUpgrade(): void
 }
 
 /**
+ * Build the normalized dist-upgrade plan shape used by callers and tests.
+ *
+ * @return array{action:string, from:?string, to:?string, message:string}
+ */
+function pmssDistUpgradePlan(string $action, ?string $from, ?string $to, string $message = ''): array
+{
+    return ['action' => $action, 'from' => $from, 'to' => $to, 'message' => $message];
+}
+
+/**
  * Determine the safe, single-step dist-upgrade action for the current Debian major,
  * capped at the requested maximum.
  *
@@ -397,50 +404,28 @@ function pmssResolveDistUpgradeStep(string $currentMajor, string $maxMajor): arr
     $maxMajorInt     = (int) $maxMajor;
 
     if ($currentMajorInt > $maxMajorInt) {
-        return [
-            'action'  => 'error',
-            'from'    => $currentMajor,
-            'to'      => null,
-            'message' => sprintf('Safety halt: Current version is %s but the requested maximum is %s.', $currentMajor, $maxMajor),
-        ];
+        return pmssDistUpgradePlan('error', $currentMajor, null, sprintf('Safety halt: Current version is %s but the requested maximum is %s.', $currentMajor, $maxMajor));
     }
     if ($currentMajorInt === $maxMajorInt) {
-        return [
-            'action'  => 'noop',
-            'from'    => $currentMajor,
-            'to'      => null,
-            'message' => sprintf('No dist-upgrade required: current version is %s and requested maximum is %s.', $currentMajor, $maxMajor),
-        ];
+        return pmssDistUpgradePlan('noop', $currentMajor, null, sprintf('No dist-upgrade required: current version is %s and requested maximum is %s.', $currentMajor, $maxMajor));
     }
 
     if (!pmssDistUpgradeIsAllowedMajor($currentMajor) || $currentMajorInt >= 13) {
-        return [
-            'action'  => 'noop',
-            'from'    => null,
-            'to'      => null,
-            'message' => 'No upgrade recipe for Debian '.$currentMajor,
-        ];
+        return pmssDistUpgradePlan('noop', null, null, 'No upgrade recipe for Debian '.$currentMajor);
     }
 
     $from = (string) $currentMajorInt;
     $next = (string) ($currentMajorInt + 1);
     if ((int) $next > $maxMajorInt) {
-        return [
-            'action'  => 'error',
-            'from'    => $from,
-            'to'      => null,
-            'message' => sprintf('Safety halt: Current version is %s. The next logical upgrade is to %s, but your maximum is %s.', $currentMajor, $next, $maxMajor),
-        ];
+        return pmssDistUpgradePlan('error', $from, null, sprintf('Safety halt: Current version is %s. The next logical upgrade is to %s, but your maximum is %s.', $currentMajor, $next, $maxMajor));
     }
 
-    return [
-        'action'  => 'upgrade',
-        'from'    => $from,
-        'to'      => $next,
-        'message' => $maxMajor !== $next
-            ? sprintf('Requested maximum is %s; performing safe incremental upgrade to %s.', $maxMajor, $next)
-            : '',
-    ];
+    return pmssDistUpgradePlan(
+        'upgrade',
+        $from,
+        $next,
+        $maxMajor !== $next ? sprintf('Requested maximum is %s; performing safe incremental upgrade to %s.', $maxMajor, $next) : ''
+    );
 }
 
 /**
@@ -549,6 +534,19 @@ function pmssWaitForDpkgLocks(int $timeoutSeconds = 1800, int $sleepSeconds = 5)
 }
 
 /**
+ * Wait for dpkg locks and emit the caller's stable failure message on timeout.
+ */
+function pmssDistUpgradeWaitForLocksOrLog(string $message): bool
+{
+    if (pmssWaitForDpkgLocks()) {
+        return true;
+    }
+
+    logMessage($message);
+    return false;
+}
+
+/**
  * Check if any dpkg/apt lock files are currently held.
  */
 function pmssDpkgLockActive(array $paths): bool
@@ -574,8 +572,7 @@ function pmssExecuteUpgrade(): bool
 {
     list($env, $hasTty) = pmssDistUpgradeAptEnv();
 
-    if (!pmssWaitForDpkgLocks()) {
-        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt phase');
+    if (!pmssDistUpgradeWaitForLocksOrLog('[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt phase')) {
         return false;
     }
 
@@ -595,14 +592,12 @@ function pmssExecuteUpgrade(): bool
         $hasTty
     );
 
-    if (!pmssWaitForDpkgLocks()) {
-        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt autoremove');
+    if (!pmssDistUpgradeWaitForLocksOrLog('[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt autoremove')) {
         return false;
     }
     runCommand("$env apt-get autoremove -y", true, null, $hasTty);
 
-    if (!pmssWaitForDpkgLocks()) {
-        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg --configure -a');
+    if (!pmssDistUpgradeWaitForLocksOrLog('[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg --configure -a')) {
         return false;
     }
     runCommand('dpkg --configure -a', true, null, $hasTty);
@@ -618,8 +613,7 @@ function pmssExecuteUpgrade(): bool
  */
 function pmssRunUpgradeWithRecovery(string $command, string $env, string $recoveryMessage, bool $inheritTty = false): void
 {
-    if (!pmssWaitForDpkgLocks()) {
-        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt action');
+    if (!pmssDistUpgradeWaitForLocksOrLog('[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt action')) {
         return;
     }
     if (runCommand($command, true, null, $inheritTty) === 0) {
@@ -627,26 +621,17 @@ function pmssRunUpgradeWithRecovery(string $command, string $env, string $recove
     }
 
     logMessage($recoveryMessage);
-    if (!pmssWaitForDpkgLocks()) {
-        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg recovery');
-        return;
+    foreach ([
+        ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg recovery', 'dpkg --configure -a'],
+        ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt recovery', "$env apt-get -f install -y"],
+        ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt update', "$env apt-get update"],
+        ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt retry', $command],
+    ] as $recoveryStep) {
+        if (!pmssDistUpgradeWaitForLocksOrLog($recoveryStep[0])) {
+            return;
+        }
+        runCommand($recoveryStep[1], true, null, $inheritTty);
     }
-    runCommand('dpkg --configure -a', true, null, $inheritTty);
-    if (!pmssWaitForDpkgLocks()) {
-        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt recovery');
-        return;
-    }
-    runCommand("$env apt-get -f install -y", true, null, $inheritTty);
-    if (!pmssWaitForDpkgLocks()) {
-        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt update');
-        return;
-    }
-    runCommand("$env apt-get update", true, null, $inheritTty);
-    if (!pmssWaitForDpkgLocks()) {
-        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt retry');
-        return;
-    }
-    runCommand($command, true, null, $inheritTty);
 }
 
 /**
@@ -683,16 +668,14 @@ function pmssEnsureLibcryptBeforeUpgrade(string $fromMajor, string $toMajor): vo
     }
 
     logMessage('dist-upgrade: ensuring libcrypt1 is installed before Debian 11 → 12 upgrade');
-    if (!pmssWaitForDpkgLocks()) {
-        logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 preinstall');
+    if (!pmssDistUpgradeWaitForLocksOrLog('[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 preinstall')) {
         return;
     }
 
     list($env, $hasTty) = pmssDistUpgradeAptEnv();
 
     runCommand("$env apt-get update", true, null, $hasTty);
-    if (!pmssWaitForDpkgLocks()) {
-        logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 install');
+    if (!pmssDistUpgradeWaitForLocksOrLog('[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 install')) {
         return;
     }
     if (runCommand(pmssDistUpgradeAptCommand($env, 'install', 'libcrypt1'), true, null, $hasTty) !== 0) {
