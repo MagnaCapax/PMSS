@@ -111,7 +111,15 @@ class installMediaStackScriptTest extends TestCase
 
     public function testJellyfinLocalNetworkAddressSet(): void
     {
-        $this->assertStringContainsString('<string>127.0.0.1</string>', $this->script);
+        $this->assertStringContainsString('<EnableRemoteAccess>false</EnableRemoteAccess>', $this->script);
+        $this->assertOrderedStrings(array(
+            '<LocalNetworkSubnets />',
+            '<LocalNetworkAddresses>',
+            '<string>127.0.0.1</string>',
+            '</LocalNetworkAddresses>',
+        ), $this->script);
+        $removedHelper = 'ensure_jellyfin_local'.'_bind';
+        $this->assertStringNotContainsString($removedHelper, $this->script);
     }
 
     public function testJellyfinAspNetCoreUrlsUsed(): void

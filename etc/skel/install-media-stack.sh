@@ -992,32 +992,6 @@ pick_existing_or_random_port() {
 	random_open_port
 }
 
-ensure_jellyfin_local_bind() {
-	local file="$1"
-	if [[ ! -f "$file" ]]; then
-		return
-	fi
-	python3 - "$file" <<'PY'
-import re
-import sys
-
-path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as handle:
-    data = handle.read()
-
-block = "  <LocalNetworkAddresses>\\n    <string>127.0.0.1</string>\\n  </LocalNetworkAddresses>"
-
-data = re.sub(r"<LocalNetworkAddresses\\s*/>", block, data)
-data = re.sub(r"<LocalNetworkAddresses>.*?</LocalNetworkAddresses>", block, data, flags=re.S)
-
-if "<LocalNetworkAddresses>" not in data:
-    data = data.replace("<LocalNetworkSubnets />", "<LocalNetworkSubnets />\\n" + block)
-
-with open(path, "w", encoding="utf-8") as handle:
-    handle.write(data)
-PY
-}
-
 jellyfin_system_xml_tag_set() {
 	local file="$1" tag="$2" value=""
 	value=$(sed_replacement_escape "$(xml_escape "$3")")
@@ -1318,7 +1292,6 @@ EOF
 		sed -i -E "s|(<EnableRemoteAccess>)[^<]*(</EnableRemoteAccess>)|\1false\2|g" "$configdir/network.xml"
 		sed -i -E "s|<BaseUrl />|<BaseUrl></BaseUrl>|g" "$configdir/network.xml"
 		sed -i -E "s|(<BaseUrl>)[^<]*(</BaseUrl>)|\1/public-${USERNAME}/${app}\2|g" "$configdir/network.xml"
-		ensure_jellyfin_local_bind "$configdir/network.xml"
 		syscfg="$configdir/system.xml"
 		if [ ! -f "$syscfg" ]; then
 			cat >"$syscfg" <<SYSXML
