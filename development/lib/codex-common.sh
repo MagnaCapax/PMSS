@@ -3,7 +3,11 @@
 # Keep lightweight and dependency-free so scripts can source this safely.
 
 # Initialize ROOT from a launcher path and optionally chdir.
-codex_init_root() { ROOT="$(cd "$1/.." && pwd)"; [[ "${2:-0}" == "1" ]] && cd "$ROOT"; return 0; }
+codex_init_root() {
+	ROOT="$(cd "$1/.." && pwd)"
+	[[ "${2:-0}" == "1" ]] && cd "$ROOT"
+	return 0
+}
 
 # Enable bash -x tracing when the given env var is set to 1.
 codex_enable_debug() {
@@ -716,6 +720,29 @@ codex_scan_commit_messages_for_pii() {
 	return 0
 }
 
+# Expand prompt placeholders for both real invocation and dry-run previews.
+codex_expand_prompt_placeholders() {
+	local exec_cmd="$1" prompt_file="$2" prompt_replacement="$3" output_name="$4" mode_name="$5"
+	local -n output_ref="$output_name"
+	local -n mode_ref="$mode_name"
+	local prompt_file_q
+	printf -v prompt_file_q '%q' "$prompt_file"
+	output_ref="$exec_cmd"
+	mode_ref="prompt-string"
+	if [[ "$output_ref" == *"##PROMPT_FILE##"* ]]; then
+		output_ref="${output_ref//##PROMPT_FILE##/$prompt_file_q}"
+		mode_ref="prompt-inline"
+	fi
+	if [[ "$output_ref" == *"##PROMPT##"* ]]; then
+		output_ref="${output_ref//##PROMPT##/$prompt_replacement}"
+		mode_ref="prompt-inline"
+	fi
+	if [[ "$output_ref" == *"##PROMPT_STDIN##"* ]]; then
+		output_ref="${output_ref//##PROMPT_STDIN##/}"
+		mode_ref="prompt-stdin"
+	fi
+}
+
 # Invoke the assistant executable with the prompt file contents.
 codex_invoke() {
 	local exec_cmd="$1" prompt_file="$2"
@@ -727,29 +754,18 @@ codex_invoke() {
 		exit 127
 	fi
 
-	local prompt prompt_q prompt_file_q exec_cmd_final inline_prompt
+	local prompt prompt_q exec_cmd_final prompt_mode
 	prompt="$(cat "$prompt_file")"
 	printf -v prompt_q '%q' "$prompt"
-	printf -v prompt_file_q '%q' "$prompt_file"
-	exec_cmd_final="$exec_cmd"
-	inline_prompt=0
+	codex_expand_prompt_placeholders "$exec_cmd" "$prompt_file" "$prompt_q" exec_cmd_final prompt_mode
 
-	if [[ "$exec_cmd_final" == *"##PROMPT_FILE##"* ]]; then
-		exec_cmd_final="${exec_cmd_final//##PROMPT_FILE##/$prompt_file_q}"
-		inline_prompt=1
-	fi
-	if [[ "$exec_cmd_final" == *"##PROMPT##"* ]]; then
-		exec_cmd_final="${exec_cmd_final//##PROMPT##/$prompt_q}"
-		inline_prompt=1
-	fi
-	if [[ "$exec_cmd_final" == *"##PROMPT_STDIN##"* ]]; then
-		exec_cmd_final="${exec_cmd_final//##PROMPT_STDIN##/}"
+	if [[ "$prompt_mode" == "prompt-stdin" ]]; then
 		echo "[codex] invoking: $exec_cmd_final [prompt-stdin]" >&1
 		eval "$exec_cmd_final < $prompt_file"
 		return
 	fi
 
-	if [[ "$inline_prompt" == "1" ]]; then
+	if [[ "$prompt_mode" == "prompt-inline" ]]; then
 		echo "[codex] invoking: $exec_cmd_final [prompt-inline]" >&1
 		eval "$exec_cmd_final"
 		return

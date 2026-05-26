@@ -28,26 +28,9 @@ codex_color_line() {
 # Render a dry-run preview without inlining full prompt text.
 codex_exec_preview() {
 	local exec_cmd="$1" prompt_file="$2"
-	local exec_cmd_final inline_prompt prompt_file_q mode
-	exec_cmd_final="$exec_cmd"
-	inline_prompt=0
-	mode="prompt-string"
+	local exec_cmd_final mode
 
-	printf -v prompt_file_q '%q' "$prompt_file"
-	if [[ "$exec_cmd_final" == *"##PROMPT_FILE##"* ]]; then
-		exec_cmd_final="${exec_cmd_final//##PROMPT_FILE##/$prompt_file_q}"
-		inline_prompt=1
-	fi
-	if [[ "$exec_cmd_final" == *"##PROMPT##"* ]]; then
-		exec_cmd_final="${exec_cmd_final//##PROMPT##/<PROMPT>}"
-		inline_prompt=1
-	fi
-	if [[ "$exec_cmd_final" == *"##PROMPT_STDIN##"* ]]; then
-		exec_cmd_final="${exec_cmd_final//##PROMPT_STDIN##/}"
-		mode="prompt-stdin"
-	elif [[ "$inline_prompt" == "1" ]]; then
-		mode="prompt-inline"
-	fi
+	codex_expand_prompt_placeholders "$exec_cmd" "$prompt_file" "<PROMPT>" exec_cmd_final mode
 	# Trim trailing whitespace left by placeholder removal.
 	exec_cmd_final="${exec_cmd_final%"${exec_cmd_final##*[![:space:]]}"}"
 
