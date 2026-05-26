@@ -153,6 +153,24 @@ class CgroupUserConfigTest extends TestCase
         $this->assertStringContainsString('MemoryMax=312M', $res['out']);
     }
 
+    public function testMemoryMaxOnlyDerivesMemoryHighSnapshot(): void
+    {
+        $res = $this->runMgr(['testuser', '--memory-max=3000']);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertSame(
+            "user=testuser uid=1000 slice=user-1000.slice mode=v2\n"
+            ."\n"
+            ."[Planned properties]\n"
+            ."MemoryHigh=1638M\n"
+            ."MemoryMax=3000M\n"
+            ."CPUWeight=324\n"
+            ."IOWeight=200\n"
+            ."(dry-run or no --apply; not changing system)\n",
+            $res['out']
+        );
+    }
+
     public function testScalarOptionParserKeepsInlineOnlyContract(): void
     {
         $split = $this->runMgr(['testuser', '--memory-high', '600']);
@@ -460,6 +478,34 @@ PHP;
         $this->assertStringContainsString('IODeviceWeight=/dev/md0 333', $res['out']);
         $this->assertStringContainsString('IOReadBandwidthMax=/dev/md0 6M', $res['out']);
         $this->assertStringContainsString('IOReadIOPSMax=/dev/md0 123', $res['out']);
+    }
+
+    public function testDefaultsSkipPolicyMountIoPairsWhenExplicitIoInputIsPresent(): void
+    {
+        $policy = <<<'PHP'
+<?php return [
+    'mounts' => [
+        '/home' => [
+            'ioWeight' => 333,
+            'readBw' => '6M',
+            'readIops' => 123,
+        ],
+    ],
+];
+PHP;
+        file_put_contents(sys_get_temp_dir().'/cgroup.policy.php', $policy);
+        $this->sys->findmnt['/home'] = '/dev/md0';
+
+        $res = $this->runMgr(['testuser', '--defaults', '--io-read-bw=/dev/sda:5M']);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertSame(
+            "user=testuser uid=1000 slice=user-1000.slice mode=v2\n"
+            ."[Planned IO properties]\n"
+            ."IOReadBandwidthMax=/dev/sda 5M\n"
+            ."(dry-run or no --apply; not changing system)\n",
+            $res['out']
+        );
     }
 
     public function testIoProfilePolicyOverridesPreserveBuiltInFallbacks()

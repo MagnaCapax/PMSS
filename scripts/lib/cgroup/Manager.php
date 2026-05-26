@@ -89,7 +89,6 @@ class Manager
         $ioProfile = strtolower((string) \pmssCliOptionString($parsedFlags, 'io-profile', null, '', true));
         $ioCostQos = (string) \pmssCliOptionString($parsedFlags, 'io-cost-qos', null, '', true);
         $ioCostModel = (string) \pmssCliOptionString($parsedFlags, 'io-cost-model', null, '', true);
-        $hasIoFlag = false;
         $ioPairs = [];
         $policyIoPairs = [];
         $ioCostWrites = [];
@@ -108,7 +107,6 @@ class Manager
             $name = substr($flag, 2, $separator - 2);
             if (!isset(self::IO_CLI_PROPERTY_MAP[$name])) continue;
             $ioSpecs[$name][] = substr($flag, $separator + 1);
-            $hasIoFlag = true;
         }
 
         foreach (self::IO_CLI_PROPERTY_MAP as $flagName => $propertyName) {
@@ -127,7 +125,7 @@ class Manager
             return 2;
         }
 
-        if (($invalidWipeMessage = $this->validateWipeIsolation($doWipe, $opt, $defaultsRequested, $respectExisting, $device, $ioProfile, $ioCostQos, $ioCostModel, $hasIoFlag)) !== null) {
+        if (($invalidWipeMessage = $this->validateWipeIsolation($doWipe, $opt, $defaultsRequested, $respectExisting, $device, $ioProfile, $ioCostQos, $ioCostModel, $ioPairs)) !== null) {
             fwrite(STDERR, $invalidWipeMessage."\n");
             return 2;
         }
@@ -175,7 +173,6 @@ class Manager
         if (isset($opt['io-latency-ms']) && (int)$opt['io-latency-ms'] > 0) {
             if ($mode === 'v2' && $devResolved !== '') {
                 $ioPairs[] = 'IODeviceLatencyTargetSec='.$devResolved.' '.(int)$opt['io-latency-ms'].'ms';
-                $hasIoFlag = true;
             } elseif ($mode !== 'v2') {
                 echo "[SKIP] IODeviceLatencyTargetSec requires cgroup v2\n";
             }
@@ -194,13 +191,13 @@ class Manager
         }
 
         // Policy mount defaults apply only when no explicit IO input is given.
-        if (!empty($policyIoPairs) && !$hasIoFlag && $ioProfile === '' && $device === '') {
+        if (!empty($policyIoPairs) && empty($ioPairs) && $ioProfile === '' && $device === '') {
             $ioPairs = array_merge($ioPairs, $policyIoPairs);
         }
 
         // Default view if no actions
         if (!$wantStatus && !$wantConfig) {
-            $hasPlanInput = !empty($opt) || !empty($ioPairs) || !empty($ioCostWrites) || $device !== '' || $ioProfile !== '' || $hasIoFlag || $doWipe;
+            $hasPlanInput = !empty($opt) || !empty($ioPairs) || !empty($ioCostWrites) || $device !== '' || $ioProfile !== '' || $doWipe;
             if (!$hasPlanInput) {
                 $this->showConfig($slice);
                 $this->showStatus($slice, $uid);
@@ -234,7 +231,7 @@ class Manager
             }
         }
 
-        $hasPlan = !empty($props) || !empty($ioPairs) || !empty($ioCostWrites) || $doWipe || $hasIoFlag;
+        $hasPlan = !empty($props) || !empty($ioPairs) || !empty($ioCostWrites) || $doWipe;
 
         if ($hasPlan) {
             if ($apply && !$dryRun) {
@@ -284,22 +281,14 @@ class Manager
         $memoryHighMiB = null;
         $maxCap = $sysMemMiB > 0 ? (int)floor($sysMemMiB * 0.95) : PHP_INT_MAX;
 
-        if (isset($opts['memory-high'])) {
-            $memoryHighMiB = max($minHigh, (int)$opts['memory-high']);
+        if (isset($opts['memory-high']) || isset($opts['memory-max'])) {
+            $memoryHighMiB = isset($opts['memory-high'])
+                ? max($minHigh, (int)$opts['memory-high'])
+                : max($minHigh, (int)($sysMemMiB*0.10));
             $props['MemoryHigh'] = $memoryHighMiB.'M';
-        }
-
-        if (isset($opts['memory-max'])) {
-            if ($memoryHighMiB === null) {
-                $memoryHighMiB = max($minHigh, (int)($sysMemMiB*0.10));
-                $props['MemoryHigh'] = $memoryHighMiB.'M';
-            }
-            $memoryMax = (int)$opts['memory-max'];
-        } elseif ($memoryHighMiB !== null) {
-            $memoryMax = (int) floor($memoryHighMiB * 1.25);
-        }
-
-        if ($memoryHighMiB !== null) {
+            $memoryMax = isset($opts['memory-max'])
+                ? (int)$opts['memory-max']
+                : (int) floor($memoryHighMiB * 1.25);
             // MemoryMax cannot exceed High + 2048 MiB whether explicit or derived.
             $props['MemoryMax'] = max($memoryHighMiB, min($memoryMax, $memoryHighMiB + 2048, $maxCap)).'M';
         }
@@ -387,7 +376,7 @@ class Manager
         string $ioProfile,
         string $ioCostQos,
         string $ioCostModel,
-        bool $hasIoFlag
+        array $ioPairs
     ): ?string {
         if (!$doWipe) {
             return null;
@@ -400,7 +389,7 @@ class Manager
             || $ioProfile !== ''
             || $ioCostQos !== ''
             || $ioCostModel !== ''
-            || $hasIoFlag;
+            || !empty($ioPairs);
 
         return $hasConflictingInput
             ? 'Invalid --wipe combination: remove resource, IO, defaults, and respect-existing options before wiping'
