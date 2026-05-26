@@ -485,6 +485,8 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Apply errors: when `--apply` runs a planned `systemctl` or `io.cost`
     write and any step returns non-zero, the script attempts the remaining
     planned writes for visibility, then exits non-zero.
+  - Safety: `--wipe` must be isolated from resource/IO/default modifiers, and
+    explicit io.cost major:minor tokens must match the resolved target device.
 
 - scripts/productConfig.php <product> --welcome-message=<HTML>
   - Behavior: Sets/clears product-level welcome banner templates in `/etc/seedbox/config/welcomeMessages.json`.

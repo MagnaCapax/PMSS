@@ -122,6 +122,11 @@ class Manager
             return 2;
         }
 
+        if (($invalidWipeMessage = $this->validateWipeIsolation($doWipe, $opt, $defaultsRequested, $respectExisting, $device, $ioProfile, $ioCostQos, $ioCostModel, $hasIoFlag)) !== null) {
+            fwrite(STDERR, $invalidWipeMessage."\n");
+            return 2;
+        }
+
         // Defaults policy
         if ($defaultsRequested) {
             $policyIoPairs = $this->applyDefaults($opt);
@@ -368,6 +373,38 @@ class Manager
         }
 
         return 'Invalid --cpu-quota-percent value: expected integer or infinity';
+    }
+
+    /**
+     * Keep the destructive wipe path isolated from resource-changing options.
+     */
+    private function validateWipeIsolation(
+        bool $doWipe,
+        array $opt,
+        bool $defaultsRequested,
+        bool $respectExisting,
+        string $device,
+        string $ioProfile,
+        string $ioCostQos,
+        string $ioCostModel,
+        bool $hasIoFlag
+    ): ?string {
+        if (!$doWipe) {
+            return null;
+        }
+
+        $hasConflictingInput = !empty($opt)
+            || $defaultsRequested
+            || $respectExisting
+            || $device !== ''
+            || $ioProfile !== ''
+            || $ioCostQos !== ''
+            || $ioCostModel !== ''
+            || $hasIoFlag;
+
+        return $hasConflictingInput
+            ? 'Invalid --wipe combination: remove resource, IO, defaults, and respect-existing options before wiping'
+            : null;
     }
 
     /**
@@ -674,8 +711,8 @@ class Manager
         if ($setting === '') {
             return null;
         }
-        if (preg_match('/^[0-9]+:[0-9]+\s+/', $setting) === 1) {
-            return $setting;
+        if (preg_match('/^([0-9]+:[0-9]+)\s+/', $setting, $matches) === 1) {
+            return $matches[1] === $majorMinor ? $setting : null;
         }
         return $majorMinor.' '.$setting;
     }

@@ -59,6 +59,7 @@ Current state for the cgroup policy extension TODOs:
 - **Per-user io.cost exposure**: Implemented with scheduler guard.
   - Per-user knobs `ioCostQos` / `ioCostModel` map to `--io-cost-qos=...` / `--io-cost-model=...` on `userConfigCgroup.php`.
   - PMSS resolves `/home` to major:minor automatically and prefixes io.cost nested keys when the device token is omitted.
+  - If an io.cost value includes an explicit major:minor token, it must match the resolved target device; mismatches are skipped.
   - io.cost writes are skipped when BFQ is active on any block scheduler queue (kernel-level incompatibility).
   - PMSS writes io.cost to root cgroup files (`/sys/fs/cgroup/io.cost.qos`, `/sys/fs/cgroup/io.cost.model`) and mirrors to the user slice path when the kernel exposes those files there.
 
@@ -133,7 +134,7 @@ Inspect and apply limits per user:
 ### Behavior
 
 - All flags are additive. If you pass only one flag (e.g., `--cpu-weight=300`), only that property is changed. Unspecified settings remain as they are.
-- `--wipe` reverts the user slice (`systemctl revert user-UID.slice`) and sets MemoryHigh/Max to infinity and resets weights to defaults.
+- `--wipe` reverts the user slice (`systemctl revert user-UID.slice`) and sets MemoryHigh/Max to infinity and resets weights to defaults. It is rejected when mixed with resource, IO, defaults, or respect-existing modifier flags.
 - `--dry-run` prints planned K=V and IO properties without changing the system.
 
 ## Root Slice Safety

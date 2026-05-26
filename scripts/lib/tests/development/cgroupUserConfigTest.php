@@ -340,6 +340,30 @@ class CgroupUserConfigTest extends TestCase
         $this->assertStringContainsString('/sys/fs/cgroup/io.cost.qos <= 9:0 enable=1 ctrl=user', $res['out']);
     }
 
+    public function testIoCostAcceptsMatchingExplicitMajorMinor()
+    {
+        $this->sys->findmnt['/home'] = '/dev/md0';
+        $this->sys->commands['lsblk -dn -o MAJ:MIN'] = "9:0\n";
+
+        $res = $this->runMgr(['testuser', '--io-cost-qos=9:0 enable=1 ctrl=user']);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertStringContainsString('[Planned io.cost writes]', $res['out']);
+        $this->assertStringContainsString('/sys/fs/cgroup/io.cost.qos <= 9:0 enable=1 ctrl=user', $res['out']);
+    }
+
+    public function testIoCostRejectsMismatchedExplicitMajorMinor()
+    {
+        $this->sys->findmnt['/home'] = '/dev/md0';
+        $this->sys->commands['lsblk -dn -o MAJ:MIN'] = "9:0\n";
+
+        $res = $this->runMgr(['testuser', '--io-cost-qos=8:0 enable=1 ctrl=user']);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertStringContainsString('io.cost skipped: invalid io.cost.qos setting', $res['out']);
+        $this->assertStringNotContainsString('[Planned io.cost writes]', $res['out']);
+    }
+
     public function testIoCostSkippedWhenBfqSchedulerActive()
     {
         $this->sys->findmnt['/home'] = '/dev/md0';
@@ -601,6 +625,25 @@ PHP;
         $res = $this->runMgr(['testuser', '--apply', '--dry-run', '--wipe']);
         $this->assertEquals(0, $res['rc']);
         $this->assertStringContainsString('(dry-run or no --apply; not changing system)', $res['out']);
+    }
+
+    public function testWipeRejectsMixedResourceOptions()
+    {
+        $res = $this->runMgr(['testuser', '--apply', '--dry-run', '--wipe', '--memory-high=600']);
+
+        $this->assertEquals(2, $res['rc']);
+        $this->assertStringNotContainsString('(dry-run or no --apply; not changing system)', $res['out']);
+    }
+
+    public function testWipeRejectsMixedIoCostOptions()
+    {
+        $this->sys->findmnt['/home'] = '/dev/md0';
+        $this->sys->commands['lsblk -dn -o MAJ:MIN'] = "9:0\n";
+
+        $res = $this->runMgr(['testuser', '--apply', '--dry-run', '--wipe', '--io-cost-qos=enable=1 ctrl=user']);
+
+        $this->assertEquals(2, $res['rc']);
+        $this->assertStringNotContainsString('[Planned io.cost writes]', $res['out']);
     }
 
     // -- Edge Cases & Adversarial --
