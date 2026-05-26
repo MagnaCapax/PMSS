@@ -8,9 +8,6 @@ require_once dirname(__DIR__, 2).'/update/runtime/processes.php';
 
 class UpdateRuntimeProcessesTest extends TestCase
 {
-    /** @var string */
-    private $tempDir;
-
     /** @var string|false */
     private $previousPath;
 

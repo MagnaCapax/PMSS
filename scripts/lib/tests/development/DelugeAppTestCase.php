@@ -11,9 +11,6 @@ require_once dirname(__DIR__, 2).'/update/apps/deluge.php';
  */
 abstract class DelugeAppTestCase extends TestCase
 {
-    /** @var string */
-    protected $tempDir;
-
     /** @var array<int,string> */
     protected $logs = [];
 

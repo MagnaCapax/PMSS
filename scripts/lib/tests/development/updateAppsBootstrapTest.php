@@ -5,11 +5,6 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateAppsBootstrapTest extends TestCase
 {
-    /**
-     * @var string
-     */
-    private $tempDir;
-
     public function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-update-app-bootstrap', 0700);

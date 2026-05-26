@@ -6,9 +6,6 @@ require_once dirname(__DIR__, 2).'/nginxConfig/configTest.php';
 
 class NginxConfigTestTest extends TestCase
 {
-    /** @var string */
-    private $tempDir;
-
     protected function setUp(): void
     {
         $this->tempDir = $this->pmssMakeTempDir('pmss-nginx-config-test-', 0700);

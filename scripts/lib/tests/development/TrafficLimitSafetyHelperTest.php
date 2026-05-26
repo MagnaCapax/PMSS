@@ -7,8 +7,6 @@ require_once dirname(__DIR__, 4).'/scripts/lib/user/trafficLimit.php';
 
 class TrafficLimitSafetyHelperTest extends TestCase
 {
-    private $tempDir = '';
-
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-traffic-limit-safety-');

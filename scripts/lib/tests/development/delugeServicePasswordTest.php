@@ -5,8 +5,6 @@ require_once dirname(__DIR__, 2).'/user/passwords.php';
 
 class DelugeServicePasswordTest extends TestCase
 {
-    private $tempDir;
-
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-passwords');

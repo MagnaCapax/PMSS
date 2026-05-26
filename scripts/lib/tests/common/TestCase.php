@@ -34,6 +34,11 @@ abstract class TestCase
     private $tempPaths = [];
 
     /**
+     * @var string Shared fixture directory for tests with one primary temp root.
+     */
+    protected $tempDir = '';
+
+    /**
      * @var array<string, string>
      */
     private $tempDirProperties = [];

@@ -5,9 +5,6 @@ require_once dirname(__DIR__, 2).'/welcomeMessage.php';
 
 class WelcomeMessageTest extends TestCase
 {
-    /** @var string */
-    private $tempDir = '';
-
     protected function setUp(): void
     {
         parent::setUp();

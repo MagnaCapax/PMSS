@@ -5,9 +5,6 @@ require_once dirname(__DIR__, 2).'/user/userRepository.php';
 
 class UserRepositoryTest extends TestCase
 {
-    /** @var string */
-    private $tempDir = '';
-
     private function configDirPath(): string
     {
         return $this->tempDir.'/seedbox/config';

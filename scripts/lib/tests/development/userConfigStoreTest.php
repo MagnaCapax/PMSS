@@ -22,9 +22,6 @@ class UserConfigStoreRuntimeStub extends \UserConfigStore
 
 class UserConfigStoreTest extends TestCase
 {
-    /** @var string */
-    private $tempDir = '';
-
     protected function setUp(): void
     {
         parent::setUp();

@@ -23,8 +23,6 @@ if (!function_exists('pmssDelugeReadWebConf')) {
 
 class DelugeReverseProxyHardeningTest extends TestCase
 {
-    private $tempDir;
-
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-proxy-test', 0700);

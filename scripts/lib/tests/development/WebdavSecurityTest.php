@@ -50,8 +50,6 @@ if (!function_exists('pmssWebdavWwwPolicyBlock')) {
 
 class WebdavSecurityTest extends TestCase
 {
-    private $tempDir;
-
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-webdav-test', 0700);

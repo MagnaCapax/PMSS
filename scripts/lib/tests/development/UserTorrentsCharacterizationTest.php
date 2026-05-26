@@ -6,9 +6,6 @@ require_once dirname(__DIR__, 3).'/userTorrents.php';
 
 class UserTorrentsCharacterizationTest extends TestCase
 {
-    /** @var string */
-    private $tempDir = '';
-
     protected function setUp(): void
     {
         $this->tempDir = $this->pmssMakeTempDir('pmss-user-torrents-characterization-');

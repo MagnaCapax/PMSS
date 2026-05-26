@@ -9,8 +9,6 @@ require_once __DIR__.'/../common/TestCase.php';
  */
 class NginxConfigWriteGuardTest extends TestCase
 {
-    private $tempDir = '';
-
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-nginx-config-write-');

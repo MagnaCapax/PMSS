@@ -7,8 +7,6 @@ require_once dirname(__DIR__, 4).'/scripts/util/checkUserHtpasswd.php';
 
 class CheckUserHtpasswdTest extends TestCase
 {
-    private $tempDir = '';
-
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-check-user-htpasswd-');

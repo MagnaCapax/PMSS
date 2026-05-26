@@ -7,9 +7,6 @@ require_once dirname(__DIR__, 2).'/lighttpd/htpasswd.php';
 
 class userPasswordShadowSyncTest extends TestCase
 {
-    /** @var string */
-    private $tempDir = '';
-
     protected function setUp(): void
     {
         parent::setUp();

@@ -10,7 +10,6 @@ require_once dirname(__DIR__, 2).'/user/directories.php';
 
 class UserDirectoriesEnsureTest extends TestCase
 {
-    private $tempDir;
     private $user;
 
     protected function setUp(): void

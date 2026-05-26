@@ -9,7 +9,6 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class LinuxserverInstallScriptTest extends TestCase
 {
-    private $tempDir;
     private $homeDir;
     private $fakeBinDir;
     private $dockerLog;

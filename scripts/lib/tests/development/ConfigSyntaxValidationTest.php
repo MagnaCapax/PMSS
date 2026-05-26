@@ -26,7 +26,6 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class ConfigSyntaxValidationTest extends TestCase
 {
-    private $tempDir;
     private $lighttpdBinary;
     private $nginxBinary;
 

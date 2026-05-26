@@ -6,11 +6,6 @@ require_once dirname(__DIR__, 2).'/lighttpd/userConfigApply.php';
 
 class LighttpdWatchdogSocketPathsTest extends TestCase
 {
-    /**
-     * @var string
-     */
-    private $tempDir;
-
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-lighttpd-watchdog-');
