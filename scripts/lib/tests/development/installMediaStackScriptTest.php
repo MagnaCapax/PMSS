@@ -23,13 +23,10 @@ class installMediaStackScriptTest extends TestCase
     public function testServarrBranchDefaultsAndOverridesPresent(): void
     {
         foreach (array(
-            'SONARR_BRANCH="main"' => 'Sonarr default branch should be main',
-            'RADARR_BRANCH="master"' => 'Radarr default branch should be master',
-            'PROWLARR_BRANCH="master"' => 'Prowlarr default branch should be master',
-            'if [[ -n "$OVR_SONARR_BRANCH" ]]' => 'Sonarr branch override missing',
-            'if [[ -n "$OVR_RADARR_BRANCH" ]]' => 'Radarr branch override missing',
-            'if [[ -n "$OVR_PROWLARR_BRANCH" ]]' => 'Prowlarr branch override missing',
-            'if [[ -n "$OVR_SONARR_VERSION" ]]' => 'Sonarr version override missing',
+            'SONARR_BRANCH="${OVR_SONARR_BRANCH:-main}"' => 'Sonarr default branch should be main',
+            'RADARR_BRANCH="${OVR_RADARR_BRANCH:-master}"' => 'Radarr default branch should be master',
+            'PROWLARR_BRANCH="${OVR_PROWLARR_BRANCH:-master}"' => 'Prowlarr default branch should be master',
+            'SONARR_MAJOR="${OVR_SONARR_VERSION:-4}"' => 'Sonarr version default should be 4',
         ) as $needle => $message) {
             $this->assertStringContainsString($needle, $this->script, $message);
         }
@@ -74,6 +71,16 @@ class installMediaStackScriptTest extends TestCase
             strpos($this->script, 'python -m pip install -U pip >/dev/null 2>&1') === false,
             'Media stack venv bootstrap must not rely on bare python'
         );
+    }
+
+    public function testAspDotnetRuntimeUsesSharedArchiveExtractor(): void
+    {
+        $oldTarCommand = 'tar -xvzf '.'"aspnetcore.tar.gz"';
+        $oldRemoveCommand = 'rm -f '.'"aspnetcore.tar.gz"';
+
+        $this->assertStringContainsString('extract_tgz "aspnetcore.tar.gz" "$installdir"', $this->script);
+        $this->assertStringNotContainsString($oldTarCommand, $this->script);
+        $this->assertStringNotContainsString($oldRemoveCommand, $this->script);
     }
 
     public function testSabnzbdUsesConfigDir(): void

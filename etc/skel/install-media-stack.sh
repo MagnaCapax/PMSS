@@ -724,11 +724,11 @@ append_to_bashrc_custom_if_missing() {
 }
 
 # Central configuration (keep multi-use constants here)
-SONARR_BRANCH="main"
-RADARR_BRANCH="master"
-PROWLARR_BRANCH="master"
+SONARR_BRANCH="${OVR_SONARR_BRANCH:-main}"
+RADARR_BRANCH="${OVR_RADARR_BRANCH:-master}"
+PROWLARR_BRANCH="${OVR_PROWLARR_BRANCH:-master}"
 SONARR_DL_BASE="https://services.sonarr.tv/v1/download"
-SONARR_MAJOR="4"
+SONARR_MAJOR="${OVR_SONARR_VERSION:-4}"
 RADARR_UPDATE_BASE="https://radarr.servarr.com/v1/update"
 PROWLARR_UPDATE_BASE="https://prowlarr.servarr.com/v1/update"
 # Cloudplow: pinned to last known-good commit (project unmaintained since 2023)
@@ -742,12 +742,6 @@ MEDIA_STACK_BASE_SESSIONS=(sonarr radarr prowlarr sabnzbd cloudplow)
 MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow)
 # Determine public IP from default route (no external HTTP request needed)
 PUBLIC_IP=$(ip -4 route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "unavailable")
-
-# Apply arg overrides for branch/version
-if [[ -n "$OVR_SONARR_BRANCH" ]]; then SONARR_BRANCH="$OVR_SONARR_BRANCH"; fi
-if [[ -n "$OVR_RADARR_BRANCH" ]]; then RADARR_BRANCH="$OVR_RADARR_BRANCH"; fi
-if [[ -n "$OVR_PROWLARR_BRANCH" ]]; then PROWLARR_BRANCH="$OVR_PROWLARR_BRANCH"; fi
-if [[ -n "$OVR_SONARR_VERSION" ]]; then SONARR_MAJOR="$OVR_SONARR_VERSION"; fi
 
 # Check required dependencies early
 log_step "Checking dependencies..."
@@ -1179,17 +1173,13 @@ managed_install_path_reset "$installdir"
 mkdir -p "$installdir"
 cd "$installdir"
 fetch_verified_archive "$ASPDOTNET_URL" "aspnetcore.tar.gz" "ASP.NET runtime"
+if [[ $DRY_RUN -eq 0 && ! -f "aspnetcore.tar.gz" ]]; then
+	log_err "Failed to find downloaded ASP.NET archive"
+	exit 1
+fi
+extract_tgz "aspnetcore.tar.gz" "$installdir"
 if [[ $DRY_RUN -eq 0 ]]; then
-	if [ ! -f "aspnetcore.tar.gz" ]; then
-		log_err "Failed to find downloaded ASP.NET archive"
-		exit 1
-	fi
-	tar -xvzf "aspnetcore.tar.gz" >/dev/null 2>&1
-	rm -f "aspnetcore.tar.gz" >/dev/null 2>&1
-	echo "Installation files downloaded and extracted"
 	echo "${app^^} Installed"
-else
-	log_info "[dry-run] would extract aspnetcore.tar.gz"
 fi
 # shellcheck disable=SC2016
 append_to_bashrc_custom_if_missing '# Added by PMSS media stack installer (.NET 8)
