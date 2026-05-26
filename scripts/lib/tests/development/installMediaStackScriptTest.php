@@ -247,6 +247,7 @@ LIGHTTPD;
         file_put_contents($home.'/.bin/keep/file', 'preserve');
 
         $functions = $this->pmssExtractShellFunctions(array(
+            'media_stack_home_path_is_safe',
             'managed_install_path_reset_target_is_safe',
             'managed_install_path_reset',
         ));

@@ -148,8 +148,8 @@ done
 : "${OVR_SAB_VERSION}"
 
 media_stack_home_path_is_safe() {
-	[[ -n "${HOME:-}" && "$HOME" == /* && "$HOME" != "/" ]] || return 1
-	return 0
+	[[ -n "${HOME:-}" && "$HOME" == /* && "$HOME" != "/" ]] && return 0
+	return 1
 }
 
 if ! media_stack_home_path_is_safe; then
@@ -345,8 +345,7 @@ python_venv_install_requirements() {
 
 jellyfin_ffmpeg_binary_version() {
 	local binary="$1"
-	[[ -x "$binary" ]] || return 1
-	"$binary" -version 2>/dev/null | awk 'NR == 1 {print $3; exit}'
+	[[ -x "$binary" ]] && "$binary" -version 2>/dev/null | awk 'NR == 1 {print $3; exit}'
 }
 
 jellyfin_ffmpeg_version_usable() {
@@ -397,15 +396,10 @@ jellyfin_ffmpeg_configure_fallback() {
 managed_install_path_reset_target_is_safe() {
 	local path="$1"
 
-	[[ -n "${HOME:-}" && "$HOME" == /* && "$HOME" != "/" ]] || return 1
-	[[ "$path" == "$HOME/.bin/"* ]] || return 1
-	[[ "$path" != "$HOME/.bin" && "$path" != "$HOME/.bin/" ]] || return 1
-
-	case "$path" in
-	*"/../"* | *"/.." | *"../"*) return 1 ;;
-	esac
-
-	return 0
+	media_stack_home_path_is_safe || return 1
+	[[ "$path" == "$HOME/.bin/"* && "$path" != "$HOME/.bin" && "$path" != "$HOME/.bin/" ]] || return 1
+	[[ "$path" != *"/../"* && "$path" != *"/.." && "$path" != *"../"* ]] && return 0
+	return 1
 }
 
 managed_install_path_reset() {
@@ -426,9 +420,7 @@ managed_install_path_reset() {
 jellyfin_config_dir_reset_target_is_safe() {
 	local path="$1"
 
-	[[ -n "${HOME:-}" && "$HOME" == /* && "$HOME" != "/" ]] || return 1
-	[[ "$path" == "$HOME/.config/jellyfin" ]] || return 1
-	return 0
+	media_stack_home_path_is_safe && [[ "$path" == "$HOME/.config/jellyfin" ]]
 }
 
 jellyfin_config_dir_reset() {
@@ -954,33 +946,27 @@ random_open_port() {
 
 # Preserve existing ports on reruns so proxy configs stay stable.
 existing_port_from_ini() {
-	local file="$1" key="$2" value=""
-	if [[ -f "$file" ]]; then
-		value=$(awk -F'=' -v k="$key" '
+	local file="$1" key="$2"
+	[[ -f "$file" ]] || return 0
+	awk -F'=' -v k="$key" '
 			$1 ~ "^[[:space:]]*" k "[[:space:]]*$" {
 				gsub(/[[:space:]]/, "", $2);
 				print $2;
 				exit
 			}
-		' "$file")
-	fi
-	printf '%s' "$value"
+		' "$file"
 }
 
 existing_port_from_xml_tag() {
-	local file="$1" tag="$2" value=""
-	if [[ -f "$file" ]]; then
-		value=$(sed -n -E "s|.*<${tag}>([0-9]+)</${tag}>.*|\\1|p" "$file" | head -n 1)
-	fi
-	printf '%s' "$value"
+	local file="$1" tag="$2"
+	[[ -f "$file" ]] || return 0
+	sed -n -E "s|.*<${tag}>([0-9]+)</${tag}>.*|\\1|p" "$file" | head -n 1
 }
 
 media_stack_port_is_valid() {
 	local port="$1"
 
-	[[ "$port" =~ ^[0-9]{1,5}$ ]] || return 1
-	((10#$port >= 1 && 10#$port <= 65535)) || return 1
-	return 0
+	[[ "$port" =~ ^[0-9]{1,5}$ ]] && ((10#$port >= 1 && 10#$port <= 65535))
 }
 
 pick_existing_or_random_port() {
