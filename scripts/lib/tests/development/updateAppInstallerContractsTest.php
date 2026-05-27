@@ -155,9 +155,13 @@ class UpdateAppInstallerContractsTest extends TestCase
 
         $this->assertStringContainsAllStrings([
             "require_once '/scripts/lib/networkInfo.php';",
+            "networkInterfaceNameNormalized((string) \$link)",
             "passthru('apt-get install vnstat -y')",
+            "passthru('vnstat -u -i '.escapeshellarg(\$link))",
             "str_replace('RateUnit 1', 'RateUnit 0'",
             'MaxBandwidth 100',
+            'Warning: unable to read /etc/vnstat.conf',
+            'Warning: unable to write /etc/vnstat.conf',
             '/etc/init.d/vnstat restart',
         ], $contents);
         $this->pmssAssertStringNotContainsString($repairCommand, $contents, 'vnstat.php should not keep Debian 8 repair branches for unsupported releases');
