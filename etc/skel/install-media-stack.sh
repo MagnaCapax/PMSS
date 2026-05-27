@@ -323,15 +323,13 @@ fetch_verified_archive() {
 extract_tgz() {
 	# extract_tgz <archive> [target_dir] [strip_components]
 	local a="$1" t="${2:-.}" s="${3:-}"
+	local tar_args=(-xzf "$a" -C "$t")
 	if [[ $DRY_RUN -eq 1 ]]; then
 		log_info "[dry-run] would extract $a to $t${s:+ (strip $s)}"
 		return
 	fi
-	if [[ -n "$s" ]]; then
-		tar -xzf "$a" -C "$t" --strip-components="$s" >/dev/null 2>&1
-	else
-		tar -xzf "$a" -C "$t" >/dev/null 2>&1
-	fi
+	[[ -n "$s" ]] && tar_args+=(--strip-components="$s")
+	tar "${tar_args[@]}" >/dev/null 2>&1
 	rm -f "$a" >/dev/null 2>&1
 	echo "Installation files downloaded and extracted"
 }
@@ -678,12 +676,11 @@ url.redirect += (
 
 EOF
 		lighttpd_media_stack_proxy_block_write "sabnzbd" "$SABNZBD_PORT"
-		echo ""
-		lighttpd_media_stack_proxy_block_write "radarr" "$RADARR_PORT"
-		echo ""
-		lighttpd_media_stack_proxy_block_write "prowlarr" "$PROWLARR_PORT"
-		echo ""
-		lighttpd_media_stack_proxy_block_write "sonarr" "$SONARR_PORT"
+		for proxy in "radarr|$RADARR_PORT" "prowlarr|$PROWLARR_PORT" "sonarr|$SONARR_PORT"; do
+			IFS='|' read -r app port <<<"$proxy"
+			echo ""
+			lighttpd_media_stack_proxy_block_write "$app" "$port"
+		done
 		if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 			lighttpd_media_stack_proxy_block_write "jellyfin" "$JELLYFIN_PORT"
 		fi
@@ -745,10 +742,9 @@ PUBLIC_IP=$(ip -4 route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "
 
 # Check required dependencies early
 log_step "Checking dependencies..."
-REQUIRED_CMDS=("ss" "tmux" "git" "python3" "tar" "dpkg" "getconf")
 MISSING_CMDS=()
 
-for cmd in "${REQUIRED_CMDS[@]}"; do
+for cmd in ss tmux git python3 tar dpkg getconf; do
 	if ! command -v "$cmd" >/dev/null 2>&1; then
 		MISSING_CMDS+=("$cmd")
 	fi
@@ -822,11 +818,9 @@ if [[ $DRY_RUN -eq 0 ]]; then
 	chmod 700 "${config_dirs[@]}"
 	mkdir -p "$HOME/.bin"
 else
-	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-		log_info "[dry-run] would create ~/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}"
-	else
-		log_info "[dry-run] would create ~/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow}"
-	fi
+	config_dir_label="radarr,sonarr,prowlarr,sabnzbd,cloudplow"
+	[[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && config_dir_label="radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow"
+	log_info "[dry-run] would create ~/.config/{${config_dir_label}}"
 	log_info "[dry-run] would create ~/.bin"
 fi
 
@@ -951,9 +945,7 @@ existing_port_from_xml_tag() {
 }
 
 media_stack_port_is_valid() {
-	local port="$1"
-
-	[[ "$port" =~ ^[0-9]{1,5}$ ]] && ((10#$port >= 1 && 10#$port <= 65535))
+	[[ "$1" =~ ^[0-9]{1,5}$ ]] && ((10#$1 >= 1 && 10#$1 <= 65535))
 }
 
 pick_existing_or_random_port() {
@@ -1003,9 +995,7 @@ media_stack_start_tmux_app() {
 
 media_stack_start_servarr_app() {
 	local app="$1" install_name="$2" dll="$3" extra_args="$4"
-	local run_args="$dll"
-	[[ -n "$extra_args" ]] && run_args+=" $extra_args"
-	run_args+=" --data=\"$HOME/.config/${app}\""
+	local run_args="${dll}${extra_args:+ $extra_args} --data=\"$HOME/.config/${app}\""
 	media_stack_start_tmux_app "$app" "$HOME/.bin/${install_name}/${dll}" \
 		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/${install_name}\" && \"$DOTNET_ROOT_PATH/dotnet\" ${run_args} 2>&1 | tee -a \"$HOME/.config/${app}/${app}.log\"" \
 		"${install_name} DLL not found at $HOME/.bin/${install_name}/${dll}"
