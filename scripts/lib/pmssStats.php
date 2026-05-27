@@ -55,6 +55,12 @@ function pmssStatsContextPathResolve($candidate, string $default, bool $director
     return $directoryPath ? pmssDirPathNormalize($path) : $path;
 }
 
+function pmssStatsContextValue(array $overrides, string $key, string $envKey, string $default): string
+{
+    if (array_key_exists($key, $overrides)) return (string) $overrides[$key];
+    return is_string($value = getenv($envKey)) && $value !== '' ? $value : $default;
+}
+
 /**
  * Resolve the effective user, home, and local PMSS paths for stats reads.
  *
@@ -91,21 +97,21 @@ function pmssStatsResolveContext(array $overrides = []): array
     $home = pmssStatsContextPathResolve($homeCandidate, $defaultHome, true);
 
     $configDir = pmssStatsContextPathResolve(
-        $overrides['config_dir'] ?? getenv('PMSS_STATS_CONFIG_DIR') ?: '/etc/seedbox/config',
+        pmssStatsContextValue($overrides, 'config_dir', 'PMSS_STATS_CONFIG_DIR', '/etc/seedbox/config'),
         '/etc/seedbox/config',
         true
     );
     $socketPath = pmssStatsContextPathResolve(
-        $overrides['socket_path'] ?? getenv('PMSS_STATS_SOCKET_PATH') ?: ($home.'/.rtorrent.socket'),
+        pmssStatsContextValue($overrides, 'socket_path', 'PMSS_STATS_SOCKET_PATH', $home.'/.rtorrent.socket'),
         $home.'/.rtorrent.socket'
     );
     $versionFile = pmssStatsContextPathResolve(
-        $overrides['version_file'] ?? getenv('PMSS_STATS_VERSION_FILE') ?: '/etc/seedbox/config/version',
+        pmssStatsContextValue($overrides, 'version_file', 'PMSS_STATS_VERSION_FILE', '/etc/seedbox/config/version'),
         '/etc/seedbox/config/version'
     );
 
     $cgroupDir = pmssStatsContextPathResolve(
-        $overrides['cgroup_dir'] ?? getenv('PMSS_STATS_CGROUP_DIR') ?: '',
+        pmssStatsContextValue($overrides, 'cgroup_dir', 'PMSS_STATS_CGROUP_DIR', ''),
         '',
         true
     );
@@ -306,18 +312,14 @@ function pmssStatsReadRtorrentStats(callable $caller, string $socketPath): array
         'torrent_stopped' => null,
     ];
 
-    $requiredValues = [];
     foreach (['upload_rate' => 'get_up_rate', 'download_rate' => 'get_down_rate', 'upload_total' => 'get_up_total', 'download_total' => 'get_down_total'] as $key => $method) {
-        $requiredValues[$key] = $caller($socketPath, $method, [], 2);
-    }
-    if (in_array(false, $requiredValues, true)) {
-        return $stats;
-    }
-
-    $stats['ok'] = true;
-    foreach ($requiredValues as $key => $value) {
+        $value = $caller($socketPath, $method, [], 2);
+        if ($value === false) {
+            return $stats;
+        }
         $stats[$key] = (float) $value;
     }
+    $stats['ok'] = true;
     $stats['ratio'] = ($stats['download_total'] > 0.0) ? ($stats['upload_total'] / $stats['download_total']) : null;
 
     $countView = static function (string $view) use ($caller, $socketPath): ?int {
@@ -529,16 +531,13 @@ function pmssStatsRenderText(array $stats, array $options = []): string
         $torrentSummary = 'rTorrent unavailable';
     }
     $lines[] = pmssStatsRenderLine('Torrents', $torrentSummary);
-    $lines[] = pmssStatsRenderLine(
-        'Upload',
-        '▲ '.pmssFormatBytes((float) ($stats['rtorrent']['upload_rate'] ?? 0.0)).'/s',
-        'Total: '.pmssStatsFormatBytesOrFallback($stats['rtorrent']['upload_total'])
-    );
-    $lines[] = pmssStatsRenderLine(
-        'Download',
-        '▼ '.pmssFormatBytes((float) ($stats['rtorrent']['download_rate'] ?? 0.0)).'/s',
-        'Total: '.pmssStatsFormatBytesOrFallback($stats['rtorrent']['download_total'])
-    );
+    foreach ([['Upload', '▲', 'upload'], ['Download', '▼', 'download']] as $transferLine) {
+        $lines[] = pmssStatsRenderLine(
+            $transferLine[0],
+            $transferLine[1].' '.pmssFormatBytes((float) ($stats['rtorrent'][$transferLine[2].'_rate'] ?? 0.0)).'/s',
+            'Total: '.pmssStatsFormatBytesOrFallback($stats['rtorrent'][$transferLine[2].'_total'])
+        );
+    }
     $lines[] = pmssStatsRenderLine(
         'Ratio',
         $stats['rtorrent']['ratio'] !== null ? number_format((float) $stats['rtorrent']['ratio'], 2) : 'n/a'
