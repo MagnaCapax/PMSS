@@ -64,6 +64,15 @@ class UsernameValidationTest extends TestCase
         $this->assertEquals(null, \pmssUsernameCreateValidationError('abc123'));
     }
 
+    public function testCreateValidationBooleanMatchesClassifierForCanonicalNames(): void
+    {
+        foreach (array('abc' => true, 'user123' => true, 'a' => false, 'ab' => false, '1user' => false, 'seedbox' => false, 'toolong89x' => false) as $name => $expected) {
+            $classifierAllowsCreate = \pmssUsernameCreateValidationError($name) === null;
+            $this->assertEquals($expected, \pmssUsernameIsValidForCreate($name), 'Unexpected boolean result for '.$name);
+            $this->assertEquals($expected, $classifierAllowsCreate, 'Unexpected classifier result for '.$name);
+        }
+    }
+
     public function testUsernameNormalizeIfValidReturnsCanonicalUsernames(): void
     {
         $cases = [

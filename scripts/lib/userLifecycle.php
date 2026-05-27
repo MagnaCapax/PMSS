@@ -122,8 +122,7 @@ function pmssUsernameIsReserved(string $username): bool
 function pmssUsernameIsValidForCreate(string $username): bool
 {
     return pmssUsernameIsValid($username)
-        && strlen($username) >= 3
-        && !pmssUsernameIsReserved($username);
+        && pmssUsernameCreateValidationError($username) === null;
 }
 
 /**
@@ -505,18 +504,8 @@ function pmssUserLifecycleContextLog(string $action, string $phase, string $user
  */
 function pmssUserLifecycleContextLogStatusMessage(string $action, string $phase, string $username, string $status, string $message, array $extra = array()): void
 {
-    pmssUserLifecycleContextLog(
-        $action,
-        $phase,
-        $username,
-        array_merge(
-            array(
-                'status' => $status,
-                'message' => $message,
-            ),
-            $extra
-        )
-    );
+    $payload = array_merge(array('status' => $status, 'message' => $message), $extra);
+    pmssUserLifecycleContextLog($action, $phase, $username, $payload);
 }
 
 /**
