@@ -289,16 +289,39 @@ STOP CONDITIONS:
   - Failure count not strictly decreasing → STOP (CI mode)
 
 REFACTOR ITERATION (ALL refactor modes — compression, decompose, dry, safety):
-After the commit: ALWAYS print cumulative runtime LOC delta + concepts delta. Every mode, no exceptions —
+After each commit: ALWAYS print cumulative runtime LOC delta + concepts delta. Every mode, no exceptions —
 this visibility is mandatory so the run's net effect is observable regardless of prefix.
-DEPTH OVER BREADTH — ONE cohesive commit per run: pick ONE cohesive target (prefer the LARGEST
-unfinished file from the candidate list) and refactor it FULLY in a single deep, cohesive pass.
-Produce ONE comprehensive, behavior-preserving commit. Go deep on that one target rather than spreading
-shallow edits across many files. A 2nd commit is allowed ONLY if the work splits into two genuinely
-independent cohesive units — never fragment one refactor into many tiny commits, never force-merge
-unrelated changes into one. After the cohesive commit(s): STOP.
-Also STOP if: cumulative LOC delta > 0 AND PREFIX is not refactor(safety); or context exhausted.
-Maximum 2 commits per session.
+
+DEPTH PER TARGET: pick the LARGEST unfinished file from the candidate list and refactor it FULLY
+in a single deep, cohesive pass. Produce ONE comprehensive, behavior-preserving commit per target.
+Go deep on each target rather than spreading shallow edits within it.
+
+BREADTH ACROSS TARGETS (iterate between commits): after each commit + verification, if ALL of:
+  - cumulative LOC delta is net-negative or neutral (or PREFIX is refactor(safety)), AND
+  - candidate-files.txt still has unfinished targets in scope, AND
+  - the session commit budget for this mode is not yet hit (see per-mode budgets below), AND
+  - the work is fundamentally cohesive within architectural-mode scope (decompose/dry),
+THEN: pick the next target and continue. Do NOT stop after one commit. The point of the
+architectural / dry runs is to make multiple coherent decompositions in a single session —
+one-commit runs leave 95% of the budget unused.
+
+Per-session commit budgets (after each commit, check before continuing):
+  - refactor(compression): 1-3 commits  (compression tends to localize; small batches)
+  - refactor(decompose):   5-10 commits (architectural; multiple independent decompositions)
+  - refactor(dry):         5-10 commits (DRY consolidation across files)
+  - refactor(safety):      1-2 commits  (cautious additions, never roll up)
+
+STOP CONDITIONS (any of these halts the iteration immediately):
+  - Cumulative LOC delta > 0 AND PREFIX is not refactor(safety)
+  - Two consecutive verification failures (regardless of which target)
+  - Context genuinely exhausted (>50 files read or working memory unable to track diff state)
+  - Architectural issue found requiring operator decision
+  - Per-mode commit budget reached
+  - Candidate-files.txt has no remaining in-scope targets
+  - You are unsure about the next target's safety
+
+Never fragment ONE refactor into many tiny commits, never force-merge unrelated changes into one.
+"Cohesive per commit" is per target, NOT per session.
 
 CI RE-VERIFY (when prefix = ci):
 After all commits: re-run full test suite. If failure count did not strictly decrease: STOP.
