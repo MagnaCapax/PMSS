@@ -64,7 +64,7 @@ function pmssShowResourcesMain(array $argv): int
         }
         $users = [$userFilter];
     } else {
-        if (($users = pmssListManagedUsersFromCommand(dirname(__DIR__, 2).'/listUsers.php')) === null) {
+        if (($users = pmssListManagedUsersFromResult(pmssListManagedUsersResult(dirname(__DIR__, 2).'/listUsers.php'))) === null) {
             return 1;
         }
         $users = array_values(array_filter($users, 'pmssResourceUserIsValid'));

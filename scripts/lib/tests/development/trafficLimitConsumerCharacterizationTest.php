@@ -53,7 +53,7 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
     public function testTrafficLimitCronChecksListUsersExitCode(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLimits.php', [
-            'if (($users = pmssListManagedUsersFromCommand(\'/scripts/listUsers.php\')) === null) {',
+            'if (($users = pmssListManagedUsersFromResult(pmssListManagedUsersResult(\'/scripts/listUsers.php\'))) === null) {',
             'exit(1);',
         ]);
     }

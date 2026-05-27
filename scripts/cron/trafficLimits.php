@@ -24,7 +24,7 @@ if (!pmssDirEnsureExists('/var/run/pmss/trafficLimits', 0755)) {
 
 $trafficLimitPeriod = 3 * 24 * 60 * 60;     // 3 days limiting period
 
-if (($users = pmssListManagedUsersFromCommand('/scripts/listUsers.php')) === null) {
+if (($users = pmssListManagedUsersFromResult(pmssListManagedUsersResult('/scripts/listUsers.php'))) === null) {
     exit(1);
 }
 if (count($users) == 0) die("No users in this system!\n");

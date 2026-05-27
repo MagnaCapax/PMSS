@@ -193,8 +193,6 @@ function pmssListManagedUsersFromResult(array $listUsersResult): ?array
     fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
     return null;
 }
-/** Return managed users from listUsers.php, preserving the shared failure message. */
-function pmssListManagedUsersFromCommand(string $command = '/scripts/listUsers.php'): ?array { return pmssListManagedUsersFromResult(pmssListManagedUsersResult($command)); }
 /**
  * Return trimmed, normalized, validated managed usernames from listUsers.php.
  *

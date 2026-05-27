@@ -60,7 +60,7 @@ pmssRunCliEntrypointWithArgv(__FILE__, static function (array $argv): int {
     $byClient = pmssCliOptionPresent($parsed, 'by-client');
     $homeDir = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
 
-    if (($users = pmssListManagedUsersFromCommand(__DIR__.'/listUsers.php')) === null) {
+    if (($users = pmssListManagedUsersFromResult(pmssListManagedUsersResult(__DIR__.'/listUsers.php'))) === null) {
         exit(1);
     }
 
