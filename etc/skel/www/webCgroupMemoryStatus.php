@@ -237,3 +237,165 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
             .($usagePercent !== null ? ' ('.number_format($usagePercent, 1, '.', '').'%)' : ''),
     ];
 }
+
+/**
+ * Gather the welcome-page RAM counters from customer-readable sources.
+ *
+ * @return array<string,mixed>
+ */
+function pmssWelcomeMemoryStateBuild($pressureStatusOverride = null)
+{
+    $memory = pmssWelcomeSerializedArrayRead('../.resourceData');
+    $memory = is_array($memory) && isset($memory['memory']) && is_array($memory['memory'])
+        ? $memory['memory']
+        : array();
+    $currentBytes = isset($memory['current']) && is_numeric($memory['current'])
+        ? (float) $memory['current']
+        : null;
+    $breakdown = array();
+    foreach (array('anon', 'file') as $key) {
+        if (isset($memory[$key]) && is_numeric($memory[$key])) {
+            $breakdown[$key] = (float) $memory[$key];
+        }
+    }
+
+    $uid = function_exists('posix_getuid') ? (int) posix_getuid() : null;
+    if ($uid === null
+        && function_exists('pmssFrontendShellExecAvailable')
+        && function_exists('pmssFrontendShellExec')
+        && pmssFrontendShellExecAvailable()) {
+        $uidRaw = @pmssFrontendShellExec('/usr/bin/id -u 2>/dev/null');
+        if (is_string($uidRaw) && ctype_digit(trim($uidRaw))) {
+            $uid = (int) trim($uidRaw);
+        }
+    }
+    $uid = is_int($uid) && $uid >= 0 ? $uid : null;
+
+    if ($currentBytes === null
+        && $uid !== null
+        && function_exists('pmssFrontendShellExecAvailable')
+        && function_exists('pmssFrontendShellExec')
+        && pmssFrontendShellExecAvailable()) {
+        $memoryCurrent = @pmssFrontendShellExec('systemctl show user-'.$uid.'.slice -p MemoryCurrent --value 2>/dev/null');
+        if (is_string($memoryCurrent) && is_numeric(trim($memoryCurrent))) {
+            $currentBytes = (float) trim($memoryCurrent);
+        }
+    }
+
+    if (!isset($breakdown['anon'], $breakdown['file']) && $uid !== null) {
+        foreach (pmssWebCgroupMemoryStatusMemoryStatCandidatePaths($uid) as $path) {
+            $raw = @file_get_contents($path);
+            if (!is_string($raw) || trim($raw) === '') {
+                continue;
+            }
+
+            $parsed = pmssWebCgroupMemoryStatusMemoryStatBreakdownParse($raw);
+            if (isset($parsed['anon'], $parsed['file'])) {
+                $breakdown = $parsed;
+                break;
+            }
+        }
+    }
+
+    $ramMiB = pmssWelcomeUserConfigNumber('ramMiB');
+    $pressureStatus = null;
+    if (is_array($pressureStatusOverride)) {
+        $pressureStatus = !empty($pressureStatusOverride['available']) ? $pressureStatusOverride : null;
+    } elseif (function_exists('pmssWebCgroupMemoryStatusRead')) {
+        $readPressureStatus = pmssWebCgroupMemoryStatusRead();
+        if (!empty($readPressureStatus['available'])) {
+            $pressureStatus = $readPressureStatus;
+        }
+    }
+
+    return array(
+        'currentBytes' => $currentBytes,
+        'limitBytes' => $ramMiB !== null && $ramMiB > 0 ? $ramMiB * 1024 * 1024 : null,
+        'processBytes' => isset($breakdown['anon']) ? (float) $breakdown['anon'] : null,
+        'cacheBytes' => isset($breakdown['file']) ? (float) $breakdown['file'] : null,
+        'pressureStatus' => $pressureStatus,
+    );
+}
+
+/** Render the welcome-page RAM usage section. */
+function pmssWelcomeMemorySectionHtmlBuild($pressureStatusOverride = null)
+{
+    $state = pmssWelcomeMemoryStateBuild($pressureStatusOverride);
+    $currentBytes = $state['currentBytes'];
+    $limitBytes = $state['limitBytes'];
+    $processBytes = $state['processBytes'];
+    $cacheBytes = $state['cacheBytes'];
+    $pressureStatus = $state['pressureStatus'];
+
+    if ($currentBytes === null && $limitBytes === null && $processBytes === null && $cacheBytes === null) {
+        return pmssWelcomeMetricSectionHtmlBuild('RAM Info', '<b>RAM usage data is unavailable right now.</b>');
+    }
+
+    $currentText = $currentBytes === null ? 'n/a' : pmssFormatBytes($currentBytes, 2, 0, true);
+    $processText = $processBytes === null ? 'n/a' : pmssFormatBytes($processBytes, 2, 0, true);
+    $cacheText = $cacheBytes === null ? 'n/a' : pmssFormatBytes($cacheBytes, 2, 0, true);
+    if ($limitBytes === null || $limitBytes <= 0) {
+        $breakdownText = ($processBytes !== null || $cacheBytes !== null)
+            ? '<br />Process memory: '.$processText.'<br />Page cache: '.$cacheText
+            : '';
+        return pmssWelcomeMetricSectionHtmlBuild('RAM Info', "\nCurrent RAM usage: {$currentText}{$breakdownText}<br />\nRAM limit: n/a\n");
+    }
+
+    $limitText = pmssFormatBytes($limitBytes, 2, 0, true);
+    if ($currentBytes === null && $processBytes === null && $cacheBytes === null) {
+        return pmssWelcomeMetricSectionHtmlBuild('RAM Info', "\nCurrent RAM usage: n/a<br />\nRAM limit: {$limitText}\n");
+    }
+
+    $warningBytes = $processBytes !== null ? $processBytes : $currentBytes;
+    $warningPercent = pmssWelcomePercent($warningBytes, $limitBytes, 1);
+    if ($processBytes !== null && $cacheBytes !== null) {
+        $usedBytes = max($processBytes + $cacheBytes, $currentBytes !== null ? $currentBytes : 0);
+        $processPercent = pmssWelcomePercent($processBytes, $limitBytes, 1);
+        $cachePercent = pmssWelcomePercent($cacheBytes, $limitBytes, 1);
+        $titleText = 'Process: '.$processText.' | Cache: '.$cacheText.' | Limit: '.$limitText;
+        $gauge = createStackedGauge(
+            $titleText,
+            $titleText,
+            pmssWelcomePercent($usedBytes, $limitBytes, 1),
+            array(
+                array('width' => $processPercent, 'color' => '#'.gaugeColor($warningPercent)),
+                array('width' => $cachePercent, 'color' => '#b0bec5'),
+                array('width' => max(0, 100 - max(0, min(100, $processPercent)) - max(0, min(100, $cachePercent))), 'color' => 'transparent'),
+            )
+        );
+    } else {
+        $titleText = "{$currentText} / {$limitText}";
+        $gauge = createGauge($titleText, $titleText, pmssWelcomePercent($currentBytes !== null ? $currentBytes : 0, $limitBytes, 1));
+    }
+
+    $hasOomEvents = is_array($pressureStatus)
+        && ((int) ($pressureStatus['max_events'] ?? 0) > 0
+            || (int) ($pressureStatus['oom_events'] ?? 0) > 0
+            || (int) ($pressureStatus['oom_kill_events'] ?? 0) > 0);
+    $isThrottleActive = is_array($pressureStatus)
+        && (string) ($pressureStatus['status'] ?? '') === 'THROTTLED'
+        && !$hasOomEvents;
+    if ($isThrottleActive) {
+        $warning = '<br /><b style="color: #d2691e;">RAM THROTTLE ACTIVE</b><br />Your service is running at reduced speed due to memory pressure. Reducing active tasks or upgrading your plan will restore full speed.<br />';
+    } elseif ($warningPercent > 100) {
+        $warning = '<br /><b style="color: red;">RAM LIMIT EXCEEDED</b><br />Processes may be killed (OOM) until memory usage drops.<br />';
+    } elseif ($warningPercent >= 80) {
+        $warning = '<br /><b style="color: #d2691e;">RAM WARNING</b><br />You are close to your RAM limit. Consider reducing running services or upgrading your plan.<br />';
+    } else {
+        $warning = '';
+    }
+
+    $pressureIndicator = '';
+    if (is_array($pressureStatus)) {
+        $pressureParts = array(
+            '<br /><b>Memory pressure:</b> <span style="color: '.$pressureStatus['status_color'].';">&#9679; '.htmlspecialchars($pressureStatus['status'], ENT_QUOTES, 'UTF-8').'</span>',
+            '<br />Throttle events: '.number_format((int) $pressureStatus['throttle_events']),
+        );
+        if ($pressureStatus['message'] !== '') {
+            $pressureParts[] = '<br /><b style="color: '.$pressureStatus['status_color'].';">'.htmlspecialchars($pressureStatus['message'], ENT_QUOTES, 'UTF-8').'</b>';
+        }
+        $pressureIndicator = implode('', $pressureParts).'<br />';
+    }
+
+    return pmssWelcomeMetricSectionHtmlBuild('RAM Info', "\n{$gauge}\n{$pressureIndicator}\n{$warning}\n");
+}

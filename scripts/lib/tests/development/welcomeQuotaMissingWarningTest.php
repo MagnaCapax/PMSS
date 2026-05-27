@@ -34,7 +34,14 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $tail = substr($source, $start);
         $tail = preg_replace('/\?>\s*$/', '', $tail);
         $fixture = $this->pmssMakeTempPath('pmss-welcome-usage-', '.php');
-        file_put_contents($fixture, "<?php\nif (!function_exists('pmssFormatBytes')) { function pmssFormatBytes(\$bytes, \$precision = 1, \$minimumUnitIndex = 0, \$trimTrailingZeros = false) { return (string) round((float) \$bytes); } }\n".$tail);
+        $memoryHelper = $this->pmssRepoPath('etc/skel/www/webCgroupMemoryStatus.php');
+        file_put_contents(
+            $fixture,
+            "<?php\n"
+            ."if (!function_exists('pmssReadSerializedArrayFile')) { function pmssReadSerializedArrayFile(\$path) { \$raw = @file_get_contents(\$path); if (!is_string(\$raw)) return null; \$data = @unserialize(\$raw, array('allowed_classes' => false)); return is_array(\$data) ? \$data : null; } }\n"
+            .'require_once '.var_export($memoryHelper, true).";\n"
+            .$tail
+        );
         return $fixture;
     }
 
@@ -110,10 +117,11 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
     public function testWelcomeMemoryProbeBuildsUidCommandWithoutShellSubstitution(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+        $source = $this->pmssReadRepoFile('etc/skel/www/webCgroupMemoryStatus.php');
 
         $this->assertStringContainsString("'systemctl show user-'.\$uid.'.slice -p MemoryCurrent --value 2>/dev/null'", $source);
         $this->pmssAssertStringNotContainsString("systemctl show user-$('/usr/bin/id' -u).slice", $source);
+        $this->pmssAssertRepoFileNotContainsString('etc/skel/www/welcome.php', 'function '.'memory'.'CreateSection(');
     }
 
     public function testWelcomeServiceActionButtonSnapshots(): void
@@ -246,6 +254,37 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
         $this->assertStringContainsString('Traffic usage data is unavailable right now.', $output);
         $this->pmssAssertStringNotContainsString('Undefined', $output);
+    }
+
+    public function testWelcomeMemorySectionSnapshots(): void
+    {
+        $fixture = $this->makeWelcomeUsageFixture();
+        $home = $this->pmssMakeTempDir('pmss-welcome-memory-').'/home/www';
+        $output = $this->pmssRunInlinePhp(
+            'require '.var_export($fixture, true).';'
+            .'$home = '.var_export($home, true).';'
+            .'@mkdir($home, 0755, true); chdir($home);'
+            .'@mkdir("../.config", 0755, true);'
+            .'file_put_contents("../.config/pmss-user.json", json_encode(array("ramMiB" => 1024)));'
+            .'file_put_contents("../.resourceData", serialize(array("memory" => array("current" => 536870912, "anon" => 268435456, "file" => 134217728))));'
+            .'$basePressure = array("available" => true, "status" => "LOW", "status_color" => "#81c784", "throttle_events" => 0, "max_events" => 0, "oom_events" => 0, "oom_kill_events" => 0, "message" => "");'
+            .'$cases = array();'
+            .'$cases["low"] = hash("sha256", pmssWelcomeMemorySectionHtmlBuild($basePressure));'
+            .'$cases["throttled"] = hash("sha256", pmssWelcomeMemorySectionHtmlBuild(array_replace($basePressure, array("status" => "THROTTLED", "status_color" => "#d2691e", "throttle_events" => 3, "message" => "Your service is running at reduced speed due to memory pressure. Reducing active tasks or upgrading your plan will restore full speed."))));'
+            .'$cases["oom"] = hash("sha256", pmssWelcomeMemorySectionHtmlBuild(array_replace($basePressure, array("status" => "THROTTLED", "status_color" => "#d2691e", "throttle_events" => 3, "oom_events" => 1, "message" => "Your service is running at reduced speed due to memory pressure. Reducing active tasks or upgrading your plan will restore full speed."))));'
+            .'echo json_encode($cases);',
+            [],
+            '2>&1'
+        );
+
+        $this->assertSame(
+            array(
+                'low' => '1c8003bfe60f82fabf1a7f2c7b89bf8d5891016abfe3470df1eef1d47c2d0dff',
+                'throttled' => '8be9eb9abd053de1551f21aa0d5c8d6c7915019dad40d7b2c17f27c836cd031e',
+                'oom' => '84fb923ea3b0cf5eaa347d3a15955987c30be39eedec0086debb1ef1b1623876',
+            ),
+            json_decode($output, true)
+        );
     }
 
     public function testWelcomeGaugeHtmlAndColorSnapshot(): void
