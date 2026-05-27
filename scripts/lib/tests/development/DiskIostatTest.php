@@ -6,14 +6,14 @@ require_once dirname(__DIR__, 2).'/diskIostat.php';
 
 class DiskIostatTest extends TestCase
 {
-    public function testDiscoverDevicesMatchesLegacySdFilterAndRejectsUnsafeNames(): void
+    public function testDiscoverDevicesMatchesSharedDataDeviceFilter(): void
     {
         $sysBlock = $this->pmssMakeTempDir('pmss-sys-block-');
-        foreach (['sda', 'sdb', 'nvme0n1', 'loop0', 'md0', 'sd;bad'] as $entry) {
+        foreach (['sda', 'sdb', 'vda', 'xvda', 'nvme0n1', 'mmcblk0', 'sda1', 'nvme0n1p1', 'mmcblk0p1', 'loop0', 'md0', 'sd;bad'] as $entry) {
             $this->pmssEnsureDir($sysBlock.'/'.$entry, 0755);
         }
 
-        $this->assertEquals(['sda', 'sdb'], \pmssDiskIostatDiscoverDevices($sysBlock));
+        $this->assertEquals(['mmcblk0', 'nvme0n1', 'sda', 'sdb', 'vda', 'xvda'], \pmssDiskIostatDiscoverDevices($sysBlock));
     }
 
     public function testBuildCommandShellEscapesValidatedDevices(): void
@@ -21,7 +21,7 @@ class DiskIostatTest extends TestCase
         $this->assertEquals("'/usr/bin/iostat' -xm 120 2 -g grp1 'sda' 'sdb' 2>&1", \pmssDiskIostatBuildCommand(['sda', 'sdb'], '/usr/bin/iostat'));
     }
 
-    public function testBuildCommandKeepsNoDeviceFallbackForNvmeOnlyHosts(): void
+    public function testBuildCommandKeepsNoDeviceFallbackForEmptyDiscovery(): void
     {
         $this->assertEquals("'/usr/bin/iostat' -xm 120 2 -g grp1 2>&1", \pmssDiskIostatBuildCommand([], '/usr/bin/iostat'));
     }

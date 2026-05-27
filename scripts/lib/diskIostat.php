@@ -22,7 +22,7 @@ function pmssDiskIostatDeviceNameIsSafe(string $device): bool
 }
 
 /**
- * Discover the legacy sd* device set from /sys/block without crossing a shell.
+ * Discover data block devices from /sys/block without crossing a shell.
  *
  * @return array<int, string>
  */
@@ -36,9 +36,7 @@ function pmssDiskIostatDiscoverDevices(string $sysBlockDir = '/sys/block'): arra
     $devices = [];
     foreach ($entries as $entry) {
         if (!pmssDiskIostatDeviceNameIsSafe($entry)
-            || strpos($entry, 'sd') === false
-            || strpos($entry, 'loop') !== false
-            || strpos($entry, 'md') !== false
+            || !pmssBlockDeviceNameIsDataDevice($entry)
             || !is_dir($sysBlockDir.'/'.$entry)) {
             continue;
         }

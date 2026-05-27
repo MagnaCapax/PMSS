@@ -41,7 +41,7 @@ function pmssSystemStatsCollect(): array
                 continue;
             }
             $name = $parts[2] ?? '';
-            if (!preg_match('/^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme\d+n\d+|mmcblk\d+)$/', $name)) {
+            if (!pmssBlockDeviceNameIsDataDevice($name)) {
                 continue;
             }
             $stats[$name] = (int) ($parts[12] ?? 0);

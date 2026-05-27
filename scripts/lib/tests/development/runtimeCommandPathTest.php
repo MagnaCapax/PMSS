@@ -27,6 +27,17 @@ class RuntimeCommandPathTest extends TestCase
         $this->assertTrue(pmssCommandBinaryNameIsSafe("php\nls") === false);
     }
 
+    public function testBlockDeviceNameIsDataDeviceMatchesBaseStorageDevicesOnly(): void
+    {
+        foreach (['sda', 'vda', 'xvda', 'nvme0n1', 'mmcblk0'] as $device) {
+            $this->assertTrue(pmssBlockDeviceNameIsDataDevice($device), $device.' should match');
+        }
+
+        foreach (['sda1', 'nvme0n1p1', 'mmcblk0p1', 'loop0', 'md0', 'sd;bad', ''] as $device) {
+            $this->assertTrue(!pmssBlockDeviceNameIsDataDevice($device), $device.' should not match');
+        }
+    }
+
     public function testCommandPathReturnsStubPathForSafeBinary(): void
     {
         $binDir = $this->pmssMakeExecutableStub('pmss-demo-binary', "#!/bin/sh\nexit 0\n", 'pmss-command-path-');

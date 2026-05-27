@@ -19,6 +19,7 @@ const PMSS_COMMAND_TIMEOUT_DEFAULT = 1200;
 const PMSS_COMMAND_TIMEOUT_APT_DEFAULT = 1200;
 const PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT = 5;
 const PMSS_TIMEOUT_FIRE_LOG_DEFAULT = '/var/log/pmss-timeout-fires.jsonl';
+const PMSS_BLOCK_DATA_DEVICE_NAME_PATTERN = '/^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme\d+n\d+|mmcblk\d+)$/';
 
     // Resolve a filesystem path from an environment variable with a default.
     function pmssResolvePathFromEnv(string $envKey, string $default): string
@@ -38,6 +39,11 @@ function pmssStatsCompareTimesBuild(?int $now = null): array { $now = $now ?? ti
     function pmssCommandBinaryNameIsSafe(string $binary): bool
     {
         return preg_match('/^[A-Za-z0-9._+-]+$/', $binary) === 1;
+    }
+    // Match base data block devices while excluding partitions and virtual helpers.
+    function pmssBlockDeviceNameIsDataDevice(string $device): bool
+    {
+        return preg_match(PMSS_BLOCK_DATA_DEVICE_NAME_PATTERN, $device) === 1;
     }
     // Resolve an executable path for a safe bare binary name.
     function pmssCommandPath(string $binary): string
