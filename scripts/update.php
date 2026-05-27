@@ -691,6 +691,10 @@ function pmssIsSafeAtomicSwapDirectoryPath(string $target, string $staging, stri
     $staging = rtrim($staging, '/');
     $backup = rtrim($backup, '/');
 
+    if (is_link($target)) {
+        return false;
+    }
+
     foreach ([$target, $staging, $backup] as $path) {
         if (pmssBootstrapPathLooksUnsafe($path)) {
             return false;
@@ -1094,6 +1098,46 @@ function pmssIsSafeSnapshotPath(string $snapshotRoot, string $path, string $expe
     return true;
 }
 
+/**
+ * Validate symlinks inside a snapshot tree before cp preserves them live.
+ */
+function pmssValidateSnapshotTreeLinks(string $snapshotRoot, string $treePath, ?string &$error = null): bool
+{
+    $error = null;
+    $treePath = rtrim($treePath, '/');
+    if (!pmssIsSafeSnapshotPath($snapshotRoot, $treePath, 'directory', $error)) {
+        return false;
+    }
+
+    try {
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($treePath, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($iterator as $entryPath => $entry) {
+            $path = is_string($entryPath) ? $entryPath : $entry->getPathname();
+            if (!$entry->isLink()) {
+                continue;
+            }
+
+            $target = @readlink($path);
+            if (!is_string($target) || $target === '') {
+                $error = "snapshot symlink target is unreadable: {$path}";
+                return false;
+            }
+            if ($target[0] === '/' || strpos($target, "\0") !== false) {
+                $error = "snapshot symlink has unsafe target {$target}: {$path}";
+                return false;
+            }
+        }
+    } catch (UnexpectedValueException $exception) {
+        $error = "unable to scan snapshot tree {$treePath}: ".$exception->getMessage();
+        return false;
+    }
+
+    return true;
+}
+
 function directoryHasContent(string $path): bool
 {
     if (is_link($path) || !is_dir($path)) {
@@ -1124,6 +1168,9 @@ function pmssStageSnapshotTreeIfPresent(string $snapshotRoot, string $source, st
     $error = null;
     if (!pmssIsSafeSnapshotPath($snapshotRoot, $source, 'directory', $error)) {
         fatal("Unsafe snapshot {$tree} tree: ".($error ?? $source), EXIT_COPY);
+    }
+    if (!pmssValidateSnapshotTreeLinks($snapshotRoot, $source, $error)) {
+        fatal("Unsafe snapshot {$tree} tree links: ".($error ?? $source), EXIT_COPY);
     }
     if (!directoryHasContent($source)) {
         logmsg("[WARN] Snapshot {$tree} tree missing or empty, skipping copy");
@@ -1208,19 +1255,20 @@ function stageSnapshot(string $tmp, bool $dryRun): void
         }
 
         // Overlay remaining /etc content (excluding seedbox) to preserve local edits.
-        $entries = scandir($etcSource);
-        if (is_array($entries)) {
-            foreach ($entries as $entry) {
-                if ($entry === '.' || $entry === '..' || $entry === 'seedbox') {
-                    continue;
-                }
-                $path = $etcSource.'/'.$entry;
-                $error = null;
-                if (!pmssIsSafeSnapshotPath($tmp, $path, 'entry', $error)) {
-                    fatal("Unsafe snapshot etc entry: ".($error ?? $path), EXIT_COPY);
-                }
-                pmssRunBootstrapCommand('cp -rpu '.escapeshellarg($path).' /etc', EXIT_COPY);
+        $entries = @scandir($etcSource);
+        if (!is_array($entries)) {
+            fatal("Unable to read snapshot etc tree: {$etcSource}".pmssLastFilesystemError(), EXIT_COPY);
+        }
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..' || $entry === 'seedbox') {
+                continue;
             }
+            $path = $etcSource.'/'.$entry;
+            $error = null;
+            if (!pmssIsSafeSnapshotPath($tmp, $path, 'entry', $error)) {
+                fatal("Unsafe snapshot etc entry: ".($error ?? $path), EXIT_COPY);
+            }
+            pmssRunBootstrapCommand('cp -rpu '.escapeshellarg($path).' /etc', EXIT_COPY);
         }
     });
 

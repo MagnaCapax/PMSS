@@ -55,6 +55,16 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
         $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath($tempRoot.'/target', $tempRoot.'/staging', $tempRoot.'/../backup'));
     }
 
+    public function testAtomicSwapGuardRejectsSymlinkedTarget(): void
+    {
+        $tempRoot = $this->pmssMakeTempDir('pmss-update-swap-');
+        $this->pmssEnsureFixtureDirectory($tempRoot.'/real-target');
+        $this->pmssEnsureFixtureDirectory($tempRoot.'/staging');
+        $this->pmssCreateSymlinkOrSkip($tempRoot.'/real-target', $tempRoot.'/target');
+
+        $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath($tempRoot.'/target', $tempRoot.'/staging', $tempRoot.'/backup'));
+    }
+
     public function testSnapshotPathGuardAcceptsOnlyRealPathsInsideSnapshot(): void
     {
         $root = $this->pmssMakeTempDir('pmss-update-snapshot-');
@@ -88,6 +98,28 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
         $this->assertFalse(pmssIsSafeSnapshotPath($root, $root.'/scripts/util/update-step2.php', 'file', $error));
         $this->assertStringContainsString('symlink segment', (string) $error);
         $this->assertFalse(directoryHasContent($root.'/var'), 'snapshot content checks must not follow symlinked roots');
+    }
+
+    public function testSnapshotTreeLinkGuardAllowsRelativeSkeletonLinks(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-update-snapshot-');
+        $this->pmssWriteFile($root.'/etc/skel/www/index.php', '<?php echo "ok";');
+        $this->pmssCreateSymlinkOrSkip('../data', $root.'/etc/skel/www/data');
+        $this->pmssCreateSymlinkOrSkip('../watch', $root.'/etc/skel/www/watch');
+
+        $error = null;
+        $this->assertTrue(pmssValidateSnapshotTreeLinks($root, $root.'/etc', $error), (string) $error);
+    }
+
+    public function testSnapshotTreeLinkGuardRejectsAbsoluteTargets(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-update-snapshot-');
+        $this->pmssWriteFile($root.'/etc/skel/www/index.php', '<?php echo "ok";');
+        $this->pmssCreateSymlinkOrSkip('/etc/passwd', $root.'/etc/skel/www/passwd');
+
+        $error = null;
+        $this->assertFalse(pmssValidateSnapshotTreeLinks($root, $root.'/etc', $error));
+        $this->assertStringContainsString('unsafe target', (string) $error);
     }
 
     public function testNestedScriptsLayoutRemoveGuardAcceptsOnlyKnownPaths(): void
