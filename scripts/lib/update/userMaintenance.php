@@ -501,8 +501,7 @@ require_once __DIR__.'/../user/userConfigStore.php';
 
         $hasConfigFile = is_file($configFile);
         $current = $hasConfigFile ? @file_get_contents($configFile) : false;
-        $data = $current ? json_decode($current, true) : [];
-        $data = is_array($data) ? $data : [];
+        $data = $current ? (pmssJsonDecodeAssoc($current) ?? []) : [];
 
         $writeConfig = static function (array $payload) use ($configFile, $uid, $gid, $user): bool {
             if (($json = pmssJsonEncodePretty($payload)) === null) {

@@ -179,8 +179,7 @@ function userDockerEnsureCgroupfsDaemonConfig(string $user, string $home, int $u
     $current = $hasConfigFile ? @file_get_contents($configFile) : false;
     $data = [];
     if ($current !== false && trim($current) !== '') {
-        $decoded = json_decode($current, true);
-        if (!is_array($decoded)) {
+        if (($decoded = pmssJsonDecodeAssoc($current)) === null) {
             pmssUserLog($user, '[WARN] userDocker: existing daemon.json is invalid JSON; leaving it unchanged');
             return;
         }

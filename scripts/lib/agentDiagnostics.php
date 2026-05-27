@@ -120,8 +120,8 @@ function pmssAgentDiagnosticsSpecCollect(array $spec)
         if ((int) ($result['rc'] ?? 1) !== 0) {
             return ['error' => pmssAgentDiagnosticsSpecLabel($spec).' failed', 'rc' => (int) $result['rc'], 'stderr' => trim((string) ($result['stderr'] ?? ''))];
         }
-        $decoded = json_decode((string) ($result['stdout'] ?? ''), true);
-        return is_array($decoded)
+        $decoded = pmssJsonDecodeAssoc((string) ($result['stdout'] ?? ''));
+        return $decoded !== null
             ? $decoded
             : ['error' => pmssAgentDiagnosticsSpecLabel($spec).' returned invalid JSON', 'rc' => (int) $result['rc'], 'stdout' => $stdout];
     }

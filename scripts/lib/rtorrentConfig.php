@@ -13,7 +13,7 @@
  *
  * @license GPL-3.0-only
  */
-require_once __DIR__.'/pathSafety.php';
+require_once __DIR__.'/log.php';
 
 class rtorrentConfig
 {
@@ -238,8 +238,7 @@ class rtorrentConfig
         if ($contents === false) {
             throw new RuntimeException('Unable to read rTorrent resource config: '.$path);
         }
-        $data = json_decode($contents, true);
-        if (!is_array($data)) {
+        if (($data = pmssJsonDecodeAssoc($contents)) === null) {
             throw new RuntimeException('Invalid rTorrent resource config JSON in '.$path);
         }
         return $data;

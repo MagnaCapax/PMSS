@@ -39,6 +39,9 @@ function pmssJsonEncodeSafe(array $payload, int $flags = 0): ?string
     return is_string($encoded) ? $encoded : null;
 }
 
+/** Decode JSON through associative arrays, rejecting invalid or scalar payloads. */
+function pmssJsonDecodeAssoc(string $payload): ?array { $decoded = json_decode($payload, true); return is_array($decoded) ? $decoded : null; }
+
 /** Encode data with PMSS's standard pretty file-output flags. */
 function pmssJsonEncodePretty($payload, int $extraFlags = 0): ?string { $encoded = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | $extraFlags); return is_string($encoded) ? $encoded : null; }
 
@@ -52,7 +55,7 @@ function pmssJsonFileReadAssoc(string $path, bool $safePathRequired = false): ?a
     if (!is_string($raw) || trim($raw) === '') {
         return null;
     }
-    return is_array($decoded = json_decode($raw, true)) ? $decoded : null;
+    return pmssJsonDecodeAssoc($raw);
 }
 
 /** Validate a log write target before appending data. */
@@ -109,7 +112,7 @@ function pmssJsonLineFileEach(string $path, callable $handler): bool
         return false;
     }
     while (($line = fgets($handle)) !== false) {
-        if (is_array($decoded = json_decode($line, true))) {
+        if (($decoded = pmssJsonDecodeAssoc($line)) !== null) {
             $handler($decoded);
         }
     }

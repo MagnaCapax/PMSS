@@ -56,9 +56,7 @@ function pmssAppendRootTimestampedLogEntry(string $path, string $message, int $m
 function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFields): array
 {
     $handle = pmssPathTargetIsSafe($statePath, false) ? pmssLockFileAcquire($statePath, false, 'c+') : false;
-    $previousState = $handle !== false && is_array($decoded = json_decode((string) @stream_get_contents($handle), true))
-        ? $decoded
-        : [];
+    $previousState = $handle !== false ? (pmssJsonDecodeAssoc((string) @stream_get_contents($handle)) ?? []) : [];
     $delta = [];
     foreach ($deltaFields as $field) {
         $currentValue = array_key_exists($field, $state) ? (int) $state[$field] : 0;

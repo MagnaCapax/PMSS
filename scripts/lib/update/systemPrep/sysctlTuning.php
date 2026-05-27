@@ -423,13 +423,7 @@ function pmssSysctlSummaryWrite(?callable $logger, array $profile, array $groupe
 
     $target = $cfgDir.'/hardware.json';
     $existing = @file_get_contents($target);
-    $payload = [];
-    if ($existing !== false) {
-        $decoded = json_decode($existing, true);
-        if (is_array($decoded)) {
-            $payload = $decoded;
-        }
-    }
+    $payload = is_string($existing) ? (pmssJsonDecodeAssoc($existing) ?? []) : [];
 
     $applied = [];
     foreach ($groupedSettings as $settings) {

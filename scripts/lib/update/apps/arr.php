@@ -237,8 +237,8 @@ function pmssArrUpdate(array $config): void
     ]));
     if ($payload === false) { $log('Unable to fetch release metadata (network issue?)'); return; }
 
-    $releases = json_decode($payload, true);
-    if (!is_array($releases)) { $log('Invalid release metadata payload'); return; }
+    $releases = pmssJsonDecodeAssoc($payload);
+    if ($releases === null) { $log('Invalid release metadata payload'); return; }
 
     $architecture = trim((string) @shell_exec('dpkg --print-architecture 2>/dev/null'));
     $asset = pmssArrReleaseAssetSelect($releases, $config['asset_pattern'], $architecture);

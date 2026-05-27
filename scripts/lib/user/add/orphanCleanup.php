@@ -50,8 +50,8 @@ function pmssAddUserLatestProvisionSummary(string $userName): ?array
             if ($markerPos === false) {
                 continue;
             }
-            $payload = json_decode(substr($line, $markerPos + 16), true);
-            if (!is_array($payload) || ($payload['event'] ?? '') !== 'adduser_summary' || ($payload['user'] ?? '') !== $userName) {
+            $payload = pmssJsonDecodeAssoc(substr($line, $markerPos + 16));
+            if ($payload === null || ($payload['event'] ?? '') !== 'adduser_summary' || ($payload['user'] ?? '') !== $userName) {
                 continue;
             }
             $payload['timestamp'] = strtotime(substr($line, 0, 19)) ?: 0;

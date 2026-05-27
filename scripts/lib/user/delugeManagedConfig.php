@@ -93,9 +93,9 @@ function pmssDelugeConfigDecode(string $raw): ?array
         return null;
     }
 
-    $meta = json_decode(substr($raw, $start, $firstObjectEnd - $start), true);
-    $config = json_decode(ltrim(substr($raw, $firstObjectEnd)), true);
-    if (!is_array($meta) || !is_array($config)) {
+    $meta = pmssJsonDecodeAssoc(substr($raw, $start, $firstObjectEnd - $start));
+    $config = pmssJsonDecodeAssoc(ltrim(substr($raw, $firstObjectEnd)));
+    if ($meta === null || $config === null) {
         return null;
     }
 
