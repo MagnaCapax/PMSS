@@ -118,11 +118,11 @@ PHP
         $this->assertStringContainsString('@ob_flush();', $result['filemanager']);
         $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $result['deluge']);
         $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $result['deluge']);
-        $this->assertStringContainsString('pmssDelugePortEnsureCurrentUser', $result['deluge']);
+        $this->assertStringNotContainsString('pmssDelugePortEnsureCurrentUser', $result['deluge']);
         $this->assertTrue(strpos($result['deluge'], '.delugePort.py') === false);
         $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $result['qbittorrent_frontend']);
         $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $result['qbittorrent_frontend']);
-        $this->assertStringContainsString('pmssQbittorrentPortEnsureCurrentUser', $result['qbittorrent_frontend']);
+        $this->assertStringNotContainsString('pmssQbittorrentPortEnsureCurrentUser', $result['qbittorrent_frontend']);
         $this->assertTrue(strpos($result['qbittorrent_frontend'], '.qbittorrentPort.py') === false);
         $this->assertStringContainsString('((integer)($tm["minutes"]/((', str_replace('(int)$interval', '((int)$interval)', $result['settings']));
         $this->assertStringContainsString('@ob_flush();', $result['rss']);

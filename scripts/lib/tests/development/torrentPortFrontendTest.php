@@ -39,7 +39,7 @@ class TorrentPortFrontendTest extends TestCase
         $this->assertEquals($source, $content);
         $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $content);
         $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $content);
-        $this->assertStringContainsString('pmssDelugePortEnsureCurrentUser', $content);
+        $this->assertStringNotContainsString('pmssDelugePortEnsureCurrentUser', $content);
         $this->assertStringNotContainsString('.delugePort.py', $content);
     }
 
@@ -54,7 +54,7 @@ class TorrentPortFrontendTest extends TestCase
         $this->assertEquals($source, $content);
         $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $content);
         $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $content);
-        $this->assertStringContainsString('pmssQbittorrentPortEnsureCurrentUser', $content);
+        $this->assertStringNotContainsString('pmssQbittorrentPortEnsureCurrentUser', $content);
         $this->assertStringNotContainsString('.qbittorrentPort.py', $content);
     }
 
@@ -68,23 +68,19 @@ class TorrentPortFrontendTest extends TestCase
         $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $src);
     }
 
-    public function testShippedDelugeFrontendUsesPhpPortHelper(): void
+    public function testShippedDelugeFrontendOmitsOperatorPortHelper(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/deluge.php');
 
         $this->assertTrue(strpos($src, "require_once __DIR__.'/../.scriptsInc.php';") !== false);
         $this->assertTrue(strpos($src, 'pmssFrontendToggleAction(') !== false);
-        // ADR 0016: customer PHP no longer require_once'es /scripts/ — the
-        // is_readable() guard was silently failing for customer UID anyway.
-        // Port enforcement is operator-cron territory; the function_exists()
-        // check inside startDeluge() handles graceful degradation when the
-        // helper is absent from customer space.
+        // ADR 0016 keeps operator-only port helpers out of customer PHP.
         $this->assertTrue(strpos($src, "require_once '/scripts/lib/user/torrentPort.php';") === false);
-        $this->assertTrue(strpos($src, 'pmssDelugePortEnsureCurrentUser') !== false);
+        $this->assertTrue(strpos($src, 'pmssDelugePortEnsureCurrentUser') === false);
         $this->assertTrue(strpos($src, '.delugePort.py') === false);
     }
 
-    public function testShippedQbittorrentFrontendUsesPhpPortHelper(): void
+    public function testShippedQbittorrentFrontendOmitsOperatorPortHelper(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/qbittorrent.php');
 
@@ -92,7 +88,7 @@ class TorrentPortFrontendTest extends TestCase
         $this->assertTrue(strpos($src, 'pmssFrontendToggleAction(') !== false);
         // ADR 0016: customer PHP no longer require_once'es /scripts/.
         $this->assertTrue(strpos($src, "require_once '/scripts/lib/user/torrentPort.php';") === false);
-        $this->assertTrue(strpos($src, 'pmssQbittorrentPortEnsureCurrentUser') !== false);
+        $this->assertTrue(strpos($src, 'pmssQbittorrentPortEnsureCurrentUser') === false);
         $this->assertTrue(strpos($src, '.qbittorrentPort.py') === false);
     }
 
