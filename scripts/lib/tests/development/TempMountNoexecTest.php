@@ -120,6 +120,23 @@ class TempMountNoexecTest extends TestCase
         chmod($fstab, 0600);
     }
 
+    public function testUnreadableFstabStillProfilesLiveRemounts(): void
+    {
+        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+            'pmss-noexec-unreadable-remount-',
+            "tmpfs /tmp tmpfs defaults 0 0\n",
+            "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\n"
+        );
+        chmod($fstab, 0000);
+
+        $this->pmssResetRuntimeProfile();
+        $messages = $this->runNoexecHardening($fstab, $mounts);
+
+        $this->assertEquals(["mount '-o' 'remount,noexec,nosuid,nodev' '/tmp'"], $this->pmssProfileCommands());
+        $this->assertTrue($this->pmssMessagesContain($messages, 'not readable'), 'expected not readable log');
+        chmod($fstab, 0600);
+    }
+
     public function testSymlinkedFstabWarnsAndSkips(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-noexec-symlinked-', 0700);
