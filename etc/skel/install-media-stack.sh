@@ -675,13 +675,13 @@ url.redirect += (
 )
 
 EOF
-		lighttpd_media_stack_proxy_block_write "sabnzbd" "$SABNZBD_PORT"
-		for proxy in "radarr|$RADARR_PORT" "prowlarr|$PROWLARR_PORT" "sonarr|$SONARR_PORT"; do
+		for proxy in "sabnzbd|$SABNZBD_PORT" "radarr|$RADARR_PORT" "prowlarr|$PROWLARR_PORT" "sonarr|$SONARR_PORT"; do
 			IFS='|' read -r app port <<<"$proxy"
-			echo ""
+			[[ "$app" == "sabnzbd" ]] || echo ""
 			lighttpd_media_stack_proxy_block_write "$app" "$port"
 		done
 		if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+			echo ""
 			lighttpd_media_stack_proxy_block_write "jellyfin" "$JELLYFIN_PORT"
 		fi
 	} >"$temp_target" || {
@@ -984,6 +984,11 @@ media_stack_app_log_path() {
 	esac
 }
 
+media_stack_log_has() {
+	[[ -f "$1" ]] || return 1
+	grep -qi "$2" "$1" 2>/dev/null
+}
+
 media_stack_start_tmux_app() {
 	local app="$1" required_file="$2" session_command="$3" missing_message="$4"
 	[[ -f "$required_file" ]] || {
@@ -1042,8 +1047,7 @@ media_stack_verify_sessions() {
 
 		log_warn "$app session exited immediately"
 		app_log=$(media_stack_app_log_path "$app")
-		if [[ -n "$app_log" && -f "$app_log" ]] &&
-			grep -qi "illegal instruction\|SIGILL\|signal 4" "$app_log" 2>/dev/null; then
+		if [[ -n "$app_log" ]] && media_stack_log_has "$app_log" "illegal instruction\|SIGILL\|signal 4"; then
 			log_err "$app crashed: Illegal Instruction — CPU lacks required instruction sets (SSE4.2/AVX)"
 		fi
 		log_info "To diagnose: tmux new-session -s ${app}-debug 'cd ~/.bin/${app}* && ...'"
@@ -1272,30 +1276,27 @@ SYSXML
 	fi
 	echo "${app^^} configured"
 
-	# Jellyfin smoke test: verify DLL loads without Illegal Instruction crash
 	if [[ $DRY_RUN -eq 0 ]] && [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
+		jellyfin_smoke_log="$JELLYFIN_LOG_DIR/jellyfin-smoke.log"
 		log_info "Running Jellyfin smoke test..."
-		# Start Jellyfin briefly to verify native libraries load on this CPU
 		tmux new-session -d -s "jellyfin-smoke" \
-			"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin-smoke.log\"" 2>/dev/null || true
+			"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$jellyfin_smoke_log\"" 2>/dev/null || true
 		sleep 4
 		if tmux has-session -t "jellyfin-smoke" 2>/dev/null; then
 			log_ok "Jellyfin smoke test passed (DLL loads, native libs OK)"
 			tmux kill-session -t "jellyfin-smoke" 2>/dev/null || true
 		else
 			log_warn "Jellyfin exited during smoke test — may have crashed"
-			if [[ -f "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" ]]; then
-				if grep -qi "FfmpegException\|Failed.*ffmpeg" "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null; then
-					log_err "Jellyfin failed FFmpeg validation — pass --jellyfin-ffmpeg=$HOME/.bin/ffmpeg after installing FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
-				fi
-				if grep -qi "illegal instruction\|SIGILL\|signal 4" "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null; then
-					log_err "Jellyfin crashed with Illegal Instruction — CPU lacks required instruction sets"
-					log_err "SkiaSharp or other native libraries need SSE4.2/AVX which this CPU does not have"
-					log_warn "Jellyfin will be installed but may crash during image processing"
-				fi
+			if media_stack_log_has "$jellyfin_smoke_log" "FfmpegException\|Failed.*ffmpeg"; then
+				log_err "Jellyfin failed FFmpeg validation — pass --jellyfin-ffmpeg=$HOME/.bin/ffmpeg after installing FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
+			fi
+			if media_stack_log_has "$jellyfin_smoke_log" "illegal instruction\|SIGILL\|signal 4"; then
+				log_err "Jellyfin crashed with Illegal Instruction — CPU lacks required instruction sets"
+				log_err "SkiaSharp or other native libraries need SSE4.2/AVX which this CPU does not have"
+				log_warn "Jellyfin will be installed but may crash during image processing"
 			fi
 		fi
-		rm -f "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null || true
+		rm -f "$jellyfin_smoke_log" 2>/dev/null || true
 	fi
 else
 	log_warn "Skipping Jellyfin install; rerun with --jellyfin-ffmpeg=$HOME/.bin/ffmpeg after installing FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
@@ -1327,8 +1328,6 @@ if [[ $DRY_RUN -eq 0 ]]; then
 else
 	log_info "[dry-run] would create lighttpd config at ~/.lighttpd/custom.d/media-stack.conf"
 fi
-
-# shellcheck source=/dev/null
 set +u
 # shellcheck disable=SC1091
 source "$HOME/.bashrc" || true
