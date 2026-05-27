@@ -138,7 +138,7 @@ class UpdateAppInstallerContractsTest extends TestCase
     public function testRcloneInstallerKeepsLatestFetchAndRelocationGuards(): void
     {
         $this->assertUpdateAppContainsAllStrings('rclone.php', [
-            "getenv('PMSS_RCLONE_FETCH_LATEST') === '1'",
+            "pmssEnvFlagEnabled('PMSS_RCLONE_FETCH_LATEST')",
             'Warning: Unable to determine latest rclone version, falling back to pinned release.',
             '/usr/bin/rclone version 2>/dev/null',
             '/usr/bin/rclone -V 2>/dev/null',

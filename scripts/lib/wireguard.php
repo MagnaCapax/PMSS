@@ -789,7 +789,7 @@ function pmssWireguardConfigure(?callable $logger = null): void
         return;
     }
 
-    if (getenv('PMSS_WG_SKIP_SERVICE') === '1') {
+    if (pmssEnvFlagEnabled('PMSS_WG_SKIP_SERVICE')) {
         wgLog('Service enable skipped via PMSS_WG_SKIP_SERVICE');
         return;
     }

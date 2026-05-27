@@ -13,7 +13,7 @@
 require_once __DIR__.'/remoteBinary.php';
 
 $logger = 'logmsg';
-$force = getenv('PMSS_FORCE_AI_TOOLS_REFRESH') === '1';
+$force = pmssEnvFlagEnabled('PMSS_FORCE_AI_TOOLS_REFRESH');
 $dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
 $architecture = php_uname('m');
 $supportsPinnedArtifacts = pmssPinnedRemoteAmd64ArtifactsSupported($architecture);

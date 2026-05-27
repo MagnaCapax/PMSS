@@ -44,7 +44,7 @@ function pmssUserTransferWriteFile(string $path, string $contents, int $mode): v
 function pmssUserTransferSleep(int $min, int $max, string $reason): void
 {
     // Dry runs should never stall for long-running sleeps.
-    if (getenv('PMSS_DRY_RUN') === '1' || $max <= 0) {
+    if (pmssEnvFlagEnabled('PMSS_DRY_RUN') || $max <= 0) {
         return;
     }
 

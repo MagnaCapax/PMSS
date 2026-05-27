@@ -10,8 +10,6 @@ require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/profile.php';
 require_once __DIR__.'/../../runtime.php';
 
-function pmssEnvFlagEnabled(string $envKey): bool { return getenv($envKey) === '1'; }
-
 /**
  * Execute a shell command, keeping failures soft.
  *

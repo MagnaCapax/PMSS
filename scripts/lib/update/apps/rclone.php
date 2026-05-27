@@ -13,7 +13,7 @@ require_once __DIR__.'/remoteBinary.php';
 // Version pinning keeps deployments reproducible; opt-in fetch updates on demand.
 $rcloneVersion = '1.69.1';
 $fetchedLatest = false;
-if (getenv('PMSS_RCLONE_FETCH_LATEST') === '1') {
+if (pmssEnvFlagEnabled('PMSS_RCLONE_FETCH_LATEST')) {
     foreach (['https://downloads.rclone.org/version.txt', 'https://rclone.org/downloads/'] as $url) {
         $payload = @file_get_contents($url);
         if ($payload !== false && preg_match('/v?(\d+\.\d+\.\d+)/', $payload, $match)) {

@@ -89,7 +89,7 @@ function pmssSystemStatsCollect(): array
     $iopingMs = static function (string $path): string { $value = is_dir($path) ? pmssIopingAverageMs($path) : null; return $value === null ? 'na' : number_format($value, 1, '.', '').'ms'; };
 
     // Keep this low in test mode so hermetic tests don't waste time sleeping.
-    $sampleUsec = getenv('PMSS_TEST_MODE') === '1' ? 50000 : 1000000;
+    $sampleUsec = pmssEnvFlagEnabled('PMSS_TEST_MODE') ? 50000 : 1000000;
     $sampleSeconds = $sampleUsec / 1000000;
 
     $cpu1 = $readCpuStat();

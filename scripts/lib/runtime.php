@@ -74,6 +74,7 @@ function pmssStatsCompareTimesBuild(?int $now = null): array { $now = $now ?? ti
     function pmssEnvValueIsFalsey($value): bool { return pmssValueMatchesNormalized($value, ['', '0', 'false', 'no']); }
     // Treat explicit enable values as truthy toggles.
     function pmssEnvValueIsTruthy($value): bool { return pmssValueMatchesNormalized($value, ['1', 'true', 'yes', 'on']); }
+    function pmssEnvFlagEnabled(string $envKey): bool { return getenv($envKey) === '1'; }
 if (!function_exists('pmssFormatBytes')) {
     // Format byte counts with binary IEC units for compact human output.
     function pmssFormatBytes(float $bytes, int $precision = 1, int $minimumUnitIndex = 0): string

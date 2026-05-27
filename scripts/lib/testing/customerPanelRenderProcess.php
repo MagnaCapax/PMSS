@@ -29,7 +29,7 @@ function pmssCustomerPanelRenderExpectations(): array
 /** Return required feature markers across all rendered output. */
 function pmssCustomerPanelRenderRequiredMarkers(): array
 {
-    return getenv('PMSS_CUSTOMER_PANEL_RENDER_DISABLE_MARKERS') === '1'
+    return pmssEnvFlagEnabled('PMSS_CUSTOMER_PANEL_RENDER_DISABLE_MARKERS')
         ? []
         : ['<h6>Announcements</h6>', 'Traffic limit:', 'RAM Info', 'ruTorrent'];
 }

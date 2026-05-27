@@ -283,7 +283,7 @@ function pmssEnsureDelugeCommandSymlink(string $command, string $systemPath, str
     return true;
 }
 
-if (getenv('PMSS_DELUGE_NO_ENTRYPOINT') === '1') {
+if (pmssEnvFlagEnabled('PMSS_DELUGE_NO_ENTRYPOINT')) {
     return;
 }
 

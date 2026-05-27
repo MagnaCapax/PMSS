@@ -352,7 +352,7 @@ function rtorrentProcessResetSessionDirectory(string $home, string $user, callab
     $home = rtrim($home, '/');
     $sessionDir = $home.'/session';
     $expected = '/home/'.$user.'/session';
-    $testMode = defined('PMSS_TEST_MODE') || getenv('PMSS_TEST_MODE') === '1';
+    $testMode = defined('PMSS_TEST_MODE') || pmssEnvFlagEnabled('PMSS_TEST_MODE');
 
     if ((!$testMode && ($sessionDir !== $expected || strpos($sessionDir, '/home/') !== 0))
         || ($testMode && substr($sessionDir, -strlen('/'.$user.'/session')) !== '/'.$user.'/session')

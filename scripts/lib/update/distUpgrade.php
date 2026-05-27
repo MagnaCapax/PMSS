@@ -90,7 +90,7 @@ function pmssRunDistUpgrade(?string $maxTarget = null): int
 /** Build the apt environment and interactive flag for dist-upgrade commands. */
 function pmssDistUpgradeAptEnv(bool $warnWhenInteractiveUnavailable = true): array
 {
-    $interactiveRequested = getenv('PMSS_DIST_UPGRADE_INTERACTIVE') === '1';
+    $interactiveRequested = pmssEnvFlagEnabled('PMSS_DIST_UPGRADE_INTERACTIVE');
     $hasTty = $interactiveRequested && pmssStandardStreamsAreTty();
     if ($warnWhenInteractiveUnavailable && $interactiveRequested && !$hasTty) {
         logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');

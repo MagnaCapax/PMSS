@@ -330,7 +330,7 @@ class UserConfigStore
 
     private function resolveRamMiBFromSystemdSlice(string $username): int
     {
-        if (getenv('PMSS_TEST_MODE') === '1') {
+        if (pmssEnvFlagEnabled('PMSS_TEST_MODE')) {
             return 0;
         }
         $limits = pmssReadUserSlicePropertiesByUsername($username, ['MemoryHigh', 'MemoryMax']);
@@ -344,7 +344,7 @@ class UserConfigStore
 
     private function readBillingServiceId(string $username): int
     {
-        if (getenv('PMSS_TEST_MODE') === '1') {
+        if (pmssEnvFlagEnabled('PMSS_TEST_MODE')) {
             return 0;
         }
         return pmssUserBillingServiceIdRead("/home/{$username}", true);
@@ -352,7 +352,7 @@ class UserConfigStore
 
     private function readBillingClientId(string $username): int
     {
-        if (getenv('PMSS_TEST_MODE') === '1') {
+        if (pmssEnvFlagEnabled('PMSS_TEST_MODE')) {
             return 0;
         }
         return pmssUserBillingClientIdRead("/home/{$username}", true);

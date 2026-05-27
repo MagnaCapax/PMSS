@@ -124,7 +124,7 @@ function pmssConfigBackupsPrepareContext(string $service, string $sourcePath, ar
         : $GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER']);
     $service = pmssConfigBackupsNormalizeService($service);
     $sourcePath = trim($sourcePath);
-    if ($service === '' || $sourcePath === '' || getenv('PMSS_DRY_RUN') === '1') {
+    if ($service === '' || $sourcePath === '' || pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
         if ($service === '') {
             $log($invalidServiceMessage);
         }

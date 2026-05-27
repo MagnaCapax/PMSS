@@ -196,7 +196,7 @@ function pmssRtorrentNormalizeLegacyTemplate(string $template): string
     return $normalized;
 }
 
-if (getenv('PMSS_RTORRENT_NO_ENTRYPOINT') === '1') {
+if (pmssEnvFlagEnabled('PMSS_RTORRENT_NO_ENTRYPOINT')) {
     return;
 }
 
