@@ -64,13 +64,36 @@ function userApplyDiskQuota(array $user): void
     );
     runStep('Applying disk quota', $cmd);
 
-    // Immediately refresh the user-visible quota status file
-    $refreshCmd = sprintf(
-        'quota -u %2$s -s > %1$s; chmod o+r %1$s',
-        escapeshellarg("/home/{$user['name']}/.quota"),
-        escapeshellarg($user['name'])
+    $quotaPath = pmssUserQuotaStatusPath($user['name']);
+    if ($quotaPath === null) {
+        pmssLogStatus('skip', 'Refreshing quota status file: unsafe or missing user home');
+        return;
+    }
+
+    // Keep redirection as the only shell feature so quota output lands in ~/.quota.
+    runStep(
+        'Refreshing quota status file',
+        pmssBuildCommand('quota', ['-u', $user['name'], '-s']).' > '.escapeshellarg($quotaPath)
     );
-    runStep('Refreshing quota status file', $refreshCmd);
+    runStep('Publishing quota status file', pmssBuildCommand('chmod', ['o+r', $quotaPath]));
+}
+
+/**
+ * Resolve the per-user quota snapshot path without crossing unsafe home paths.
+ */
+function pmssUserQuotaStatusPath(string $username): ?string
+{
+    if (!pmssUsernameIsValid($username)) {
+        return null;
+    }
+
+    $path = pmssUserHomeFilePath($username, '.quota');
+    $home = dirname($path);
+    if (!is_dir($home) || is_link($home) || !pmssPathTargetIsSafe($home, true)) {
+        return null;
+    }
+
+    return pmssUserFilePathIsSafe($path) ? $path : null;
 }
 
 /**

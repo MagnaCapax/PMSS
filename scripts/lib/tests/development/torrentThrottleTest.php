@@ -118,4 +118,47 @@ class TorrentThrottleTest extends TestCase
         $this->assertTrue(!pmssWriteTorrentThrottle('alice/evil', 10), 'Expected invalid username write to fail');
         $this->assertTrue(!is_file($this->homeRoot.'/alice/evil/.torrentThrottle'), 'Traversal-like path should remain untouched');
     }
+
+    public function testDiskQuotaRefreshUsesSeparateGuardedCommands(): void
+    {
+        $this->pmssTrackEnvOverrides(['PMSS_DRY_RUN' => '1'], true);
+        $this->pmssResetRuntimeProfile();
+
+        userApplyDiskQuota(['name' => $this->user, 'quota' => 10]);
+
+        $quotaPath = $this->homeRoot.'/'.$this->user.'/.quota';
+        $commands = $this->pmssProfileCommands();
+        $this->assertStringContainsString(
+            pmssBuildCommand('quota', ['-u', $this->user, '-s']).' > '.escapeshellarg($quotaPath),
+            implode("\n", $commands)
+        );
+        $this->assertStringContainsString(
+            pmssBuildCommand('chmod', ['o+r', $quotaPath]),
+            implode("\n", $commands)
+        );
+        foreach ($commands as $command) {
+            $this->assertStringNotContainsString(';', $command, 'Quota refresh commands must not be shell-chained');
+        }
+    }
+
+    public function testDiskQuotaRefreshSkipsSymlinkedHome(): void
+    {
+        $this->pmssTrackEnvOverrides(['PMSS_DRY_RUN' => '1'], true);
+        $this->pmssResetRuntimeProfile();
+        @rmdir($this->homeRoot.'/'.$this->user);
+        $target = $this->pmssMakeTempDir('pmss-quota-home-target-', 0755);
+        $this->pmssCreateSymlinkOrSkip($target, $this->homeRoot.'/'.$this->user);
+
+        userApplyDiskQuota(['name' => $this->user, 'quota' => 10]);
+
+        $commands = $this->pmssProfileCommands();
+        $joined = implode("\n", $commands);
+        $this->assertStringContainsString('setquota', $joined);
+        $this->assertStringNotContainsString("quota '-u'", $joined);
+        $this->assertStringNotContainsString('chmod', $joined);
+        $this->assertStringContainsString(
+            'Refreshing quota status file: unsafe or missing user home',
+            (string) ($GLOBALS['PMSS_PROFILE'][1]['description'] ?? '')
+        );
+    }
 }
