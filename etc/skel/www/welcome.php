@@ -824,9 +824,30 @@ function pmssWelcomeAnnouncementItemsHtmlBuild() {
 }
 
 function pmssWelcomeRemoteFetch($url) {
-    return function_exists('pmssWelcomeHttpContextCreate')
-        ? @file_get_contents($url, false, pmssWelcomeHttpContextCreate())
-        : false;
+    if (!is_string($url) || $url === '' || strlen($url) > 2048 || preg_match('/[\x00-\x1F\x7F]/', $url)) {
+        return false;
+    }
+
+    $parts = parse_url($url);
+    if (!is_array($parts) || isset($parts['user']) || isset($parts['pass'])) {
+        return false;
+    }
+
+    $allowedPaths = array(
+        '/clients/announcementsrss.php',
+        '/remote/welcomeHeadingText.php',
+    );
+
+    // Customer-panel remote fetches are pinned to expected PMSS HTTPS endpoints.
+    if (strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+        || strtolower((string) ($parts['host'] ?? '')) !== 'pulsedmedia.com'
+        || !in_array((string) ($parts['path'] ?? ''), $allowedPaths, true)
+        || !function_exists('pmssWelcomeHttpContextCreate')) {
+        return false;
+    }
+
+    $body = @file_get_contents($url, false, pmssWelcomeHttpContextCreate(), 0, 1048576);
+    return is_string($body) ? $body : false;
 }
 
 function pmssWelcomeUserConfigNumber($key, $allowSymlink = false) {

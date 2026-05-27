@@ -128,6 +128,35 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         );
     }
 
+    public function testWelcomeRemoteFetchRejectsUnexpectedEndpoints(): void
+    {
+        $output = $this->runWelcomeUsageScript(
+            'echo json_encode(array('
+            .'"http" => pmssWelcomeRemoteFetch("http://pulsedmedia.com/clients/announcementsrss.php") === false,'
+            .'"otherHost" => pmssWelcomeRemoteFetch("https://example.invalid/clients/announcementsrss.php") === false,'
+            .'"otherPath" => pmssWelcomeRemoteFetch("https://pulsedmedia.com/remote/other.php") === false,'
+            .'"credentials" => pmssWelcomeRemoteFetch("https://user:p@pulsedmedia.com/clients/announcementsrss.php") === false,'
+            .'"control" => pmssWelcomeRemoteFetch("https://pulsedmedia.com/clients/announcementsrss.php'."\n".'") === false'
+            .'));'
+        );
+
+        $this->assertSame(
+            array(
+                'http' => true,
+                'otherHost' => true,
+                'otherPath' => true,
+                'credentials' => true,
+                'control' => true,
+            ),
+            json_decode($output, true)
+        );
+
+        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+        $this->assertStringContainsString("'https://pulsedmedia.com/remote/welcomeHeadingText.php'", $source);
+        $this->assertStringContainsString("'https://pulsedmedia.com/clients/announcementsrss.php'", $source);
+        $this->assertStringContainsString('@file_get_contents($url, false, pmssWelcomeHttpContextCreate(), 0, 1048576)', $source);
+    }
+
     public function testWelcomeLocalHelperRejectsTraversalPaths(): void
     {
         $fixture = $this->makeWelcomeSafetyFixture();
