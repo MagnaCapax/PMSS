@@ -289,7 +289,7 @@ abstract class TestCase
     protected function pmssMakeTempDir(string $prefix, int $mode = 0755): string
     {
         $path = rtrim($this->pmssTempRoot(), '/').'/'.$prefix.bin2hex(random_bytes(6));
-        @mkdir($path, $mode, true);
+        $this->assertTrue(@mkdir($path, $mode, true) || is_dir($path), 'Expected temporary directory to exist: '.$path);
         $this->tempPaths[] = $path;
         return $path;
     }
@@ -301,9 +301,10 @@ abstract class TestCase
         $path = @tempnam($base, $prefix);
         if ($path === false) {
             $path = rtrim($base, '/').'/'.$prefix.bin2hex(random_bytes(6));
-            touch($path);
+            $this->assertTrue(@touch($path), 'Expected temporary file to exist: '.$path);
         }
 
+        $this->assertTrue(is_file($path), 'Expected temporary file to exist: '.$path);
         $this->tempPaths[] = $path;
         return $path;
     }
@@ -381,7 +382,8 @@ abstract class TestCase
     protected function pmssWritePhpArrayFixture(array $value, string $prefix = 'pmss-fixture-'): string
     {
         $path = $this->pmssMakeTempPath($prefix, '.php');
-        file_put_contents($path, "<?php return ".var_export($value, true).";\n");
+        $written = @file_put_contents($path, "<?php return ".var_export($value, true).";\n");
+        $this->assertTrue($written !== false, 'Expected PHP array fixture to be written: '.$path);
         return $path;
     }
 
@@ -497,15 +499,18 @@ abstract class TestCase
     {
         foreach ($lines as $line) {
             $payload = is_array($line) ? json_encode($line) : (string) $line;
-            file_put_contents($path, $payload."\n", FILE_APPEND);
+            $this->assertTrue($payload !== false, 'Expected fixture line to encode as JSON');
+            $written = @file_put_contents($path, $payload."\n", FILE_APPEND);
+            $this->assertTrue($written !== false, 'Expected fixture line to be appended: '.$path);
         }
     }
 
     /** Create a tracked readable file under a fresh temporary directory. */
     protected function pmssMakeReadableTempPath(string $dirPrefix, string $filePrefix = 'pmss'): string
     {
-        $path = tempnam($this->pmssMakeTempDir($dirPrefix), $filePrefix);
+        $path = @tempnam($this->pmssMakeTempDir($dirPrefix), $filePrefix);
         $this->assertTrue($path !== false, 'Expected a temporary readable path');
+        $this->assertTrue(is_file((string) $path), 'Expected temporary readable path to exist');
         return (string) $path;
     }
 

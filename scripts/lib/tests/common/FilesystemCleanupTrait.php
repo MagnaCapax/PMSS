@@ -36,14 +36,19 @@ trait FilesystemCleanupTrait
     /** Ensure a directory exists for hermetic filesystem fixtures. */
     protected function pmssEnsureDir(string $path, int $mode = 0755): void
     {
-        if (!is_dir($path)) @mkdir($path, $mode, true);
+        if (is_dir($path)) {
+            return;
+        }
+
+        $this->assertTrue(@mkdir($path, $mode, true) || is_dir($path), 'Expected fixture directory to exist: '.$path);
     }
 
     /** Write fixture content while creating parent directories when needed. */
     protected function pmssWriteFile(string $path, string $content, int $dirMode = 0755): string
     {
         $this->pmssEnsureDir(dirname($path), $dirMode);
-        @file_put_contents($path, $content);
+        $written = @file_put_contents($path, $content);
+        $this->assertTrue($written !== false, 'Expected fixture file to be written: '.$path);
 
         return $path;
     }
@@ -56,7 +61,7 @@ trait FilesystemCleanupTrait
         int $fileMode = 0755
     ): void {
         $this->pmssWriteFile($path, $content, $dirMode);
-        @chmod($path, $fileMode);
+        $this->assertTrue(@chmod($path, $fileMode), 'Expected fixture executable mode to be applied: '.$path);
     }
 
     /** Write an executable PHP fixture with the standard test shebang/header. */
