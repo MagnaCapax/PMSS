@@ -23,7 +23,7 @@ class LighttpdProxyFragmentsTest extends TestCase
             '/user-##username/rclone/' => 'rclone proxy must be in custom fragment',
             '/user-##username/qbittorrent/' => 'qBittorrent proxy must be in custom fragment',
         ] as $needle => $message) {
-            $this->assertFalse(strpos($template, $needle) !== false, $message);
+            $this->assertStringNotContainsString($needle, $template, $message);
         }
     }
 
@@ -46,12 +46,12 @@ class LighttpdProxyFragmentsTest extends TestCase
         $fragments = $this->managedProxyFragments();
         foreach ($fragments as $name => $fragment) {
             $this->assertStringContainsString('$HTTP["url"] =~ ', $fragment, $name.' fragment must use lighttpd $HTTP matcher');
-            $this->assertFalse(strpos($fragment, '\\$HTTP["url"]') !== false, $name.' fragment must not escape lighttpd $HTTP matcher');
+            $this->assertStringNotContainsString('\\$HTTP["url"]', $fragment, $name.' fragment must not escape lighttpd $HTTP matcher');
         }
 
         $rcloneFragment = $fragments['rclone'];
         $this->assertStringContainsString('$REQUEST_HEADER["Content-Length"]', $rcloneFragment);
-        $this->assertFalse(strpos($rcloneFragment, '\\$REQUEST_HEADER["Content-Length"]') !== false, 'rclone fragment must not escape lighttpd $REQUEST_HEADER matcher');
+        $this->assertStringNotContainsString('\\$REQUEST_HEADER["Content-Length"]', $rcloneFragment, 'rclone fragment must not escape lighttpd $REQUEST_HEADER matcher');
     }
 
     public function testQbittorrentFragmentMatchesBasePathWithoutTrailingSlash(): void

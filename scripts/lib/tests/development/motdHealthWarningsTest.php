@@ -27,10 +27,10 @@ class MotdHealthWarningsTest extends TestCase
 
         \Motd::motdGenerate();
         $content = (string) @file_get_contents($out);
-        $this->assertTrue(strpos($content, 'Storage WARN:') !== false, 'Storage WARN not shown');
-        $this->assertTrue(strpos($content, 'RAID md0') !== false, 'RAID warn not shown');
-        $this->assertTrue(strpos($content, 'NVMe critical warning') !== false, 'NVMe critical not shown');
-        $this->assertTrue(strpos($content, 'UDMA CRC increased') !== false, 'UDMA CRC not shown');
+        $this->assertStringContainsString('Storage WARN:', $content, 'Storage WARN not shown');
+        $this->assertStringContainsString('RAID md0', $content, 'RAID warn not shown');
+        $this->assertStringContainsString('NVMe critical warning', $content, 'NVMe critical not shown');
+        $this->assertStringContainsString('UDMA CRC increased', $content, 'UDMA CRC not shown');
     }
 
     public function testMotdHandlesMalformedHealthLogGracefully(): void
@@ -59,6 +59,6 @@ class MotdHealthWarningsTest extends TestCase
         putenv('PMSS_HEALTH_LOG_PATH='.$dir.'/missing.jsonl');
         \Motd::motdGenerate();
         $content = (string) @file_get_contents($out);
-        $this->assertTrue(strpos($content, 'Storage WARN:') === false, 'Storage WARN unexpectedly present');
+        $this->assertStringNotContainsString('Storage WARN:', $content, 'Storage WARN unexpectedly present');
     }
 }

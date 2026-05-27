@@ -14,7 +14,7 @@ class UserCgroupCliProfilesCombinationsTest extends TestCase
             'PMSS_HOME_DEVICE' => '/dev/pmssNVME',
         ]);
         $this->assertStringContainsString('IOWeight=200', $out);
-        $this->assertTrue(strpos($out, 'IOReadBandwidthMax=') === false);
+        $this->assertStringNotContainsString('IOReadBandwidthMax=', $out);
     }
 
     public function testBulkProfileRaisesWeights(): void
@@ -46,7 +46,7 @@ class UserCgroupCliProfilesCombinationsTest extends TestCase
     public function testInvalidDevicePathSkipsIoLines(): void
     {
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--device=/nope', '--io-profile=hdd']);
-        $this->assertTrue(strpos($out, 'IOReadBandwidthMax=') === false);
+        $this->assertStringNotContainsString('IOReadBandwidthMax=', $out);
     }
 
     public function testExplicitIoReadBwFlagProducesIoLine(): void

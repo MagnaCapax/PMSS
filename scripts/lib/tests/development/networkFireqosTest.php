@@ -68,9 +68,9 @@ class NetworkFireqosTest extends TestCase
                 [],
                 ['10.0.0.0/8']
             );
-            $this->assertTrue(strpos($config, 'eth1') !== false);
-            $this->assertTrue(strpos($config, '500') !== false);
-            $this->assertTrue(strpos($config, 'match dst 10.0.0.0/8') !== false);
+            $this->assertStringContainsString('eth1', $config);
+            $this->assertStringContainsString('500', $config);
+            $this->assertStringContainsString('match dst 10.0.0.0/8', $config);
         });
     }
 
@@ -89,8 +89,8 @@ class NetworkFireqosTest extends TestCase
             });
         });
 
-        $this->assertTrue(strpos($config, 'interface eth2') !== false);
-        $this->assertTrue(strpos($config, 'rate 1234') !== false);
+        $this->assertStringContainsString('interface eth2', $config);
+        $this->assertStringContainsString('rate 1234', $config);
     }
 
     public function testBuildFireqosConfigUsesUserThrottleCapWhenEnabled(): void
@@ -110,7 +110,7 @@ class NetworkFireqosTest extends TestCase
                 ['root'],
                 []
             );
-            $this->assertTrue(strpos($config, 'class root ceil 25Mbit') !== false);
+            $this->assertStringContainsString('class root ceil 25Mbit', $config);
         });
     }
 
@@ -140,8 +140,8 @@ class NetworkFireqosTest extends TestCase
             $this->assertTrue($localPos !== false);
             $this->assertTrue($localPos > $interfacePos);
             $this->assertEquals(1, substr_count($config, 'class local commit 10%'));
-            $this->assertTrue(strpos($config, 'class root ceil 25Mbit') !== false);
-            $this->assertTrue(strpos($config, 'match dst 10.0.0.0/8') !== false);
+            $this->assertStringContainsString('class root ceil 25Mbit', $config);
+            $this->assertStringContainsString('match dst 10.0.0.0/8', $config);
         });
     }
 
@@ -161,7 +161,7 @@ class NetworkFireqosTest extends TestCase
                 ['root'],
                 []
             );
-            $this->assertTrue(strpos($config, 'class root ceil 90Mbit') !== false);
+            $this->assertStringContainsString('class root ceil 90Mbit', $config);
         });
     }
 
@@ -184,7 +184,7 @@ class NetworkFireqosTest extends TestCase
                 ['root'],
                 []
             );
-            $this->assertTrue(strpos($config, 'ceil') === false);
+            $this->assertStringNotContainsString('ceil', $config);
         });
     }
 
@@ -204,7 +204,7 @@ class NetworkFireqosTest extends TestCase
         }
 
         $this->assertTrue($created === false);
-        $this->assertTrue(strpos($config, 'class root ') !== false);
-        $this->assertTrue(strpos($config, $username) === false);
+        $this->assertStringContainsString('class root ', $config);
+        $this->assertStringNotContainsString($username, $config);
     }
 }

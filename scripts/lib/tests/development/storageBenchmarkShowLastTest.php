@@ -71,10 +71,7 @@ class StorageBenchmarkShowLastTest extends TestCase
         $out = $this->pmssRunRepoPhpScript('scripts/util/storageBenchmark.php', ['--show-last', '--json', '-h']);
 
         $this->assertStringContainsString('No log at -h', (string) $out);
-        $this->assertTrue(
-            strpos((string) $out, 'Storage benchmark (non-destructive)') === false,
-            'Expected --json to consume -h as its value instead of triggering help'
-        );
+        $this->assertStringNotContainsString('Storage benchmark (non-destructive)', (string) $out, 'Expected --json to consume -h as its value instead of triggering help');
     }
 
     public function testShowLastHandlesMalformedLines(): void

@@ -10,10 +10,7 @@ class UserPermissionsLargeHomeGuardTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/util/userPermissions.php');
 
         $this->assertStringContainsString('["/home/{$thisUser}/data", 0750],', $src);
-        $this->assertTrue(
-            strpos($src, '["/home/{$thisUser}/data", 0750, true],') === false,
-            'Expected data tree chmod to avoid recursive mode'
-        );
+        $this->assertStringNotContainsString('["/home/{$thisUser}/data", 0750, true],', $src, 'Expected data tree chmod to avoid recursive mode');
     }
 
     public function testLargeDataTreeOwnershipWalkIsPruned(): void

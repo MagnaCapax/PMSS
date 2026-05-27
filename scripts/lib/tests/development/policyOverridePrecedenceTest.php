@@ -57,7 +57,7 @@ class PolicyOverridePrecedenceTest extends TestCase
         );
 
         $this->assertStringContainsString('IOReadBandwidthMax=/dev/manual 9M', $out);
-        $this->assertTrue(strpos($out, 'IOReadBandwidthMax=/dev/testhome 25M') === false);
+        $this->assertStringNotContainsString('IOReadBandwidthMax=/dev/testhome 25M', $out);
     }
 
     public function testIoProfileOverridesPolicyMountIoPairs(): void
@@ -73,6 +73,6 @@ class PolicyOverridePrecedenceTest extends TestCase
         );
 
         $this->assertStringContainsString('IOReadBandwidthMax=/dev/manual 5M', $out);
-        $this->assertTrue(strpos($out, 'IOReadBandwidthMax=/dev/testhome 25M') === false);
+        $this->assertStringNotContainsString('IOReadBandwidthMax=/dev/testhome 25M', $out);
     }
 }

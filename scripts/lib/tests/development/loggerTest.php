@@ -15,7 +15,7 @@ class LoggerTest extends TestCase
         $base = basename(__FILE__, '.php');
         $path = rtrim($dir, '/').'/'.$base.'.log';
         $this->assertTrue(file_exists($path));
-        $this->assertTrue(strpos(file_get_contents($path), 'hello custom') !== false);
+        $this->assertStringContainsString('hello custom', (string) file_get_contents($path));
     }
 
     public function testLoggerFallsBackToTmp(): void
@@ -25,7 +25,7 @@ class LoggerTest extends TestCase
         $logger->msg('fallback line');
         $path = '/tmp/'.basename('/no/perm/logger-fallback-test.php', '.php').'.log';
         $this->assertTrue(file_exists($path));
-        $this->assertTrue(strpos(file_get_contents($path), 'fallback line') !== false);
+        $this->assertStringContainsString('fallback line', (string) file_get_contents($path));
     }
 
     public function testLogMsgWrapperFallbackToTmp(): void
@@ -38,7 +38,7 @@ class LoggerTest extends TestCase
         \logmsg('wrapper line');
 
         $this->assertTrue(file_exists($fallbackPath));
-        $this->assertTrue(strpos((string) file_get_contents($fallbackPath), 'wrapper line') !== false);
+        $this->assertStringContainsString('wrapper line', (string) file_get_contents($fallbackPath));
         @unlink($fallbackPath);
     }
 
@@ -50,6 +50,6 @@ class LoggerTest extends TestCase
 
         $path = $dir.'/pmss-update.log';
         $this->assertTrue(file_exists($path));
-        $this->assertTrue(strpos((string) file_get_contents($path), 'custom base') !== false);
+        $this->assertStringContainsString('custom base', (string) file_get_contents($path));
     }
 }

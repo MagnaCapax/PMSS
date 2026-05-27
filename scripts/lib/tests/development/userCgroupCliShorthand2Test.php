@@ -25,8 +25,8 @@ class UserCgroupCliShorthand2Test extends TestCase
         $this->assertStringContainsString('Planned properties', $out);
         $this->assertStringContainsString('CPUWeight=300', $out);
         // Memory should not be planned unless explicitly provided
-        $this->assertTrue(strpos($out, 'MemoryHigh=') === false);
-        $this->assertTrue(strpos($out, 'MemoryMax=') === false);
+        $this->assertStringNotContainsString('MemoryHigh=', $out);
+        $this->assertStringNotContainsString('MemoryMax=', $out);
     }
 
     public function testMemProfileHeavySetsHigh(): void
