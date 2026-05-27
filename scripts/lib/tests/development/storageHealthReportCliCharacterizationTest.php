@@ -184,6 +184,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
 
         $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath, '--user-notice='.(string) $noticePath]);
 
+        clearstatcache(true, (string) $noticePath);
         $this->assertFalse(is_file($noticePath), 'Expected stale user notice to be removed');
     }
 
