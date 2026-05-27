@@ -923,36 +923,12 @@ LIGHTTPD;
      */
     public function testNginxWebdavBlocksNoDuplicateDirectives(): void
     {
-        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
-        $script = implode("\n", \pmssNginxUserSubdomainTemplates());
-
-        // Extract WebDAV location blocks from the HEREDOC templates.
-        // Match from "location /webdav-" to the closing "}" with proper nesting.
-        preg_match_all('/location\s+\/webdav-[^{]+\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/s', $script, $matches);
-
-        $this->assertGreaterThan(0, count($matches[1]), 'WebDAV location blocks must exist');
-
-        $proxyBlocksChecked = 0;
-        foreach ($matches[1] as $i => $locationBlock) {
-            // Skip redirect-only blocks (no proxy_pass means it's just a redirect)
-            if (strpos($locationBlock, 'proxy_pass') === false) {
-                continue;
-            }
-
-            $proxyBlocksChecked++;
-            $hasIncludeProxyParams = strpos($locationBlock, 'include /etc/nginx/') !== false
-                && strpos($locationBlock, 'proxy_params') !== false;
-            $hasExplicitTimeout = preg_match('/\\b(proxy_read_timeout|proxy_send_timeout|client_body_timeout)\\b/', $locationBlock) === 1;
-
-            // Either include proxy params OR set timeouts explicitly, not both.
-            $hasDuplicate = $hasIncludeProxyParams && $hasExplicitTimeout;
+        foreach ($this->pmssNginxGeneratedWebdavProxyBlocks() as $i => $locationBlock) {
             $this->assertTrue(
-                !$hasDuplicate,
+                !$this->pmssNginxWebdavProxyBlockHasDuplicateTimeout($locationBlock),
                 "WebDAV proxy block $i includes proxy params AND sets timeout directives - duplicate directive"
             );
         }
-
-        $this->assertGreaterThan(0, $proxyBlocksChecked, 'Must have at least one WebDAV proxy block');
     }
 
     /**
@@ -963,28 +939,13 @@ LIGHTTPD;
      */
     public function testNginxWebdavBlocksIncludeWebdavProxyParams(): void
     {
-        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
-        $script = implode("\n", \pmssNginxUserSubdomainTemplates());
-
-        // Match WebDAV location blocks with their full content
-        preg_match_all('/location\s+\/webdav-[^{]+\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/s', $script, $matches);
-
-        $proxyBlocksChecked = 0;
-        foreach ($matches[1] as $i => $locationBlock) {
-            // Skip redirect-only blocks (no proxy_pass means it's just a redirect)
-            if (strpos($locationBlock, 'proxy_pass') === false) {
-                continue;
-            }
-
-            $proxyBlocksChecked++;
+        foreach ($this->pmssNginxGeneratedWebdavProxyBlocks() as $i => $locationBlock) {
             $this->assertStringContainsString(
                 'include /etc/nginx/webdav_proxy_params',
                 $locationBlock,
                 "WebDAV proxy block $i must include webdav_proxy_params"
             );
         }
-
-        $this->assertGreaterThan(0, $proxyBlocksChecked, 'Must have at least one WebDAV proxy block');
     }
 
     /**
@@ -1060,13 +1021,9 @@ LIGHTTPD;
         $webdavBlock = $this->extractNginxLocationBlock($template, '/webdav-');
         $this->assertNotEmpty($webdavBlock, 'WebDAV location block must exist in template');
 
-        $hasIncludeProxyParams = strpos($webdavBlock, 'include /etc/nginx/') !== false
-            && strpos($webdavBlock, 'proxy_params') !== false;
-        $hasExplicitTimeout = preg_match('/\\b(proxy_read_timeout|proxy_send_timeout|client_body_timeout)\\b/', $webdavBlock) === 1;
-
         // Either include proxy params OR set timeouts explicitly, not both.
         $this->assertTrue(
-            !($hasIncludeProxyParams && $hasExplicitTimeout),
+            !$this->pmssNginxWebdavProxyBlockHasDuplicateTimeout($webdavBlock),
             'template.nginx-user WebDAV block includes proxy params AND sets timeout directives - duplicate directive causes nginx failure'
         );
     }
@@ -1090,6 +1047,30 @@ LIGHTTPD;
             $webdavBlock,
             'template.nginx-user WebDAV block must include webdav_proxy_params'
         );
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function pmssNginxGeneratedWebdavProxyBlocks(): array
+    {
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $script = implode("\n", \pmssNginxUserSubdomainTemplates());
+        preg_match_all('/location\s+\/webdav-[^{]+\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/s', $script, $matches);
+
+        $blocks = array_values(array_filter($matches[1], static function (string $locationBlock): bool {
+            return strpos($locationBlock, 'proxy_pass') !== false;
+        }));
+        $this->assertGreaterThan(0, count($blocks), 'Must have at least one WebDAV proxy block');
+
+        return $blocks;
+    }
+
+    private function pmssNginxWebdavProxyBlockHasDuplicateTimeout(string $locationBlock): bool
+    {
+        return strpos($locationBlock, 'include /etc/nginx/') !== false
+            && strpos($locationBlock, 'proxy_params') !== false
+            && preg_match('/\\b(proxy_read_timeout|proxy_send_timeout|client_body_timeout)\\b/', $locationBlock) === 1;
     }
 
     /**
