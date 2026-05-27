@@ -10,34 +10,26 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
     {
         $tmpPrefix = rtrim(sys_get_temp_dir(), '/').'/pmss-update-';
 
-        $this->assertTrue(pmssIsSafeUpdateRemovePath($tmpPrefix.'abc123'));
-        $this->assertTrue(pmssIsSafeUpdateRemovePath('/scripts.pmss-staging-abc123'));
-        $this->assertTrue(pmssIsSafeUpdateRemovePath('/scripts.pmss-backup-abc123'));
-        $this->assertTrue(pmssIsSafeUpdateRemovePath('/etc/seedbox.pmss-staging-abc123'));
-        $this->assertTrue(pmssIsSafeUpdateRemovePath('/etc/seedbox.pmss-backup-abc123'));
+        foreach ([$tmpPrefix.'abc123', '/scripts.pmss-staging-abc123', '/scripts.pmss-backup-abc123', '/etc/seedbox.pmss-staging-abc123', '/etc/seedbox.pmss-backup-abc123'] as $path) {
+            $this->assertTrue(pmssIsSafeUpdateRemovePath($path), 'expected safe generated removal path: '.$path);
+        }
 
-        $this->assertFalse(pmssIsSafeUpdateRemovePath(''));
-        $this->assertFalse(pmssIsSafeUpdateRemovePath('/'));
-        $this->assertFalse(pmssIsSafeUpdateRemovePath('/home'));
-        $this->assertFalse(pmssIsSafeUpdateRemovePath('/scripts'));
-        $this->assertFalse(pmssIsSafeUpdateRemovePath('/etc/seedbox'));
-        $this->assertFalse(pmssIsSafeUpdateRemovePath($tmpPrefix));
-        $this->assertFalse(pmssIsSafeUpdateRemovePath($tmpPrefix.'abc123/../escape'));
+        foreach (['', '/', '/home', '/scripts', '/etc/seedbox', $tmpPrefix, $tmpPrefix.'abc123/../escape', '/scripts.pmss-staging-', '/etc/seedbox.pmss-backup-'] as $path) {
+            $this->assertFalse(pmssIsSafeUpdateRemovePath($path), 'expected unsafe removal path: '.$path);
+        }
     }
 
     public function testDirectoryClearGuardAcceptsOnlySkeletonAndGeneratedTempPaths(): void
     {
         $tmpPrefix = rtrim(sys_get_temp_dir(), '/').'/pmss-update-clear-';
 
-        $this->assertTrue(pmssIsSafeDirectoryContentsClearPath('/etc/skel'));
-        $this->assertTrue(pmssIsSafeDirectoryContentsClearPath($tmpPrefix.'abc123'));
+        foreach (['/etc/skel', $tmpPrefix.'abc123'] as $path) {
+            $this->assertTrue(pmssIsSafeDirectoryContentsClearPath($path), 'expected safe clear path: '.$path);
+        }
 
-        $this->assertFalse(pmssIsSafeDirectoryContentsClearPath(''));
-        $this->assertFalse(pmssIsSafeDirectoryContentsClearPath('/'));
-        $this->assertFalse(pmssIsSafeDirectoryContentsClearPath('/etc'));
-        $this->assertFalse(pmssIsSafeDirectoryContentsClearPath('/home'));
-        $this->assertFalse(pmssIsSafeDirectoryContentsClearPath($tmpPrefix));
-        $this->assertFalse(pmssIsSafeDirectoryContentsClearPath($tmpPrefix.'abc123/../escape'));
+        foreach (['', '/', '/etc', '/home', $tmpPrefix, $tmpPrefix.'abc123/../escape'] as $path) {
+            $this->assertFalse(pmssIsSafeDirectoryContentsClearPath($path), 'expected unsafe clear path: '.$path);
+        }
     }
 
     public function testAtomicSwapGuardAcceptsOnlyKnownSwapPairs(): void
@@ -126,15 +118,13 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
     {
         $tempRoot = $this->pmssMakeTempDir('pmss-update-nested-scripts-');
 
-        $this->assertTrue(pmssIsSafeNestedScriptsLayoutRemovePath('/scripts/scripts'));
-        $this->assertTrue(pmssIsSafeNestedScriptsLayoutRemovePath($tempRoot.'/scripts/scripts'));
+        foreach (['/scripts/scripts', $tempRoot.'/scripts/scripts'] as $path) {
+            $this->assertTrue(pmssIsSafeNestedScriptsLayoutRemovePath($path), 'expected safe nested scripts path: '.$path);
+        }
 
-        $this->assertFalse(pmssIsSafeNestedScriptsLayoutRemovePath(''));
-        $this->assertFalse(pmssIsSafeNestedScriptsLayoutRemovePath('/'));
-        $this->assertFalse(pmssIsSafeNestedScriptsLayoutRemovePath('/scripts'));
-        $this->assertFalse(pmssIsSafeNestedScriptsLayoutRemovePath('/etc/seedbox'));
-        $this->assertFalse(pmssIsSafeNestedScriptsLayoutRemovePath($tempRoot.'/scripts'));
-        $this->assertFalse(pmssIsSafeNestedScriptsLayoutRemovePath($tempRoot.'/scripts/../scripts'));
+        foreach (['', '/', '/scripts', '/etc/seedbox', $tempRoot.'/scripts', $tempRoot.'/scripts/../scripts'] as $path) {
+            $this->assertFalse(pmssIsSafeNestedScriptsLayoutRemovePath($path), 'expected unsafe nested scripts path: '.$path);
+        }
     }
 
     public function testClearDirectoryContentsRemovesEntriesWithoutFollowingSymlinks(): void

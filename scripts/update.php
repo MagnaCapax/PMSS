@@ -645,34 +645,28 @@ function pmssBootstrapPathLooksUnsafe(string $path): bool
     return $path === '' || $path === '/' || strpos($path, "\0") !== false || preg_match('#(^|/)\.\.(/|$)#', $path) === 1;
 }
 
-function pmssPathHasGeneratedPrefix(string $path, string $prefix): bool
+function pmssBootstrapPathHasGeneratedPrefix(string $path, array $prefixes): bool
 {
-    return strpos($path, $prefix) === 0 && strlen($path) > strlen($prefix);
-}
-
-function pmssIsSafeUpdateRemovePath(string $path): bool
-{
-    $path = rtrim($path, '/');
-    if (pmssBootstrapPathLooksUnsafe($path)) {
-        return false;
-    }
-
-    $tempPrefix = rtrim(sys_get_temp_dir(), '/').'/pmss-update-';
-    $prefixes = [
-        $tempPrefix,
-        '/scripts.pmss-staging-',
-        '/scripts.pmss-backup-',
-        '/etc/seedbox.pmss-staging-',
-        '/etc/seedbox.pmss-backup-',
-    ];
-
     foreach ($prefixes as $prefix) {
-        if (pmssPathHasGeneratedPrefix($path, $prefix)) {
+        if (strpos($path, $prefix) === 0 && strlen($path) > strlen($prefix)) {
             return true;
         }
     }
 
     return false;
+}
+
+function pmssIsSafeUpdateRemovePath(string $path): bool
+{
+    $path = rtrim($path, '/');
+    return !pmssBootstrapPathLooksUnsafe($path)
+        && pmssBootstrapPathHasGeneratedPrefix($path, [
+            rtrim(sys_get_temp_dir(), '/').'/pmss-update-',
+            '/scripts.pmss-staging-',
+            '/scripts.pmss-backup-',
+            '/etc/seedbox.pmss-staging-',
+            '/etc/seedbox.pmss-backup-',
+        ]);
 }
 
 function pmssBootstrapTempRoot(): string
@@ -702,27 +696,20 @@ function pmssIsSafeAtomicSwapDirectoryPath(string $target, string $staging, stri
     }
 
     $allowedPairs = [
-        ['/scripts', '/scripts.pmss-staging-', '/scripts.pmss-backup-'],
-        ['/etc/seedbox', '/etc/seedbox.pmss-staging-', '/etc/seedbox.pmss-backup-'],
+        '/scripts' => ['/scripts.pmss-staging-', '/scripts.pmss-backup-'],
+        '/etc/seedbox' => ['/etc/seedbox.pmss-staging-', '/etc/seedbox.pmss-backup-'],
     ];
-    foreach ($allowedPairs as $pair) {
-        [$allowedTarget, $stagingPrefix, $backupPrefix] = $pair;
-        if ($target !== $allowedTarget) {
-            continue;
-        }
-
-        return pmssPathHasGeneratedPrefix($staging, $stagingPrefix)
-            && pmssPathHasGeneratedPrefix($backup, $backupPrefix);
+    if (isset($allowedPairs[$target])) {
+        [$stagingPrefix, $backupPrefix] = $allowedPairs[$target];
+        return pmssBootstrapPathHasGeneratedPrefix($staging, [$stagingPrefix])
+            && pmssBootstrapPathHasGeneratedPrefix($backup, [$backupPrefix]);
     }
 
     // Hermetic tests may exercise the swap helper under generated temp roots.
     $tempPrefix = pmssBootstrapTempRoot().'/pmss-update-swap-';
-    if (strpos($target, $tempPrefix) !== 0) {
-        return false;
-    }
-
     $fixtureRoot = dirname($target);
-    return strlen($fixtureRoot) > strlen($tempPrefix)
+    return strpos($target, $tempPrefix) === 0
+        && strlen($fixtureRoot) > strlen($tempPrefix)
         && dirname($staging) === $fixtureRoot
         && dirname($backup) === $fixtureRoot
         && basename($target) === 'target'
@@ -784,10 +771,8 @@ function pmssIsSafeDirectoryContentsClearPath(string $path): bool
     }
 
     $tempRoot = rtrim(sys_get_temp_dir(), '/').'/';
-    $tempNamePrefix = 'pmss-update-clear-';
-    $baseName = basename($path);
     return strpos($path, $tempRoot) === 0
-        && pmssPathHasGeneratedPrefix($baseName, $tempNamePrefix);
+        && pmssBootstrapPathHasGeneratedPrefix(basename($path), ['pmss-update-clear-']);
 }
 
 /**
@@ -839,8 +824,7 @@ function pmssIsSafeNestedScriptsLayoutRemovePath(string $path): bool
 
     // Test fixtures must keep the same /scripts/scripts shape under temp roots.
     $tempPrefix = pmssBootstrapTempRoot().'/pmss-update-nested-scripts-';
-    $pattern = '#^'.preg_quote($tempPrefix, '#').'[^/]+/scripts/scripts$#';
-    return preg_match($pattern, $path) === 1;
+    return preg_match('#^'.preg_quote($tempPrefix, '#').'[^/]+/scripts/scripts$#', $path) === 1;
 }
 
 function pmssRemoveNestedScriptsLayout(string $path): bool
