@@ -25,6 +25,7 @@ class ArrUpdateTest extends TestCase
 
             $this->assertTrue(is_dir($installPath), 'expected install path to be created');
             $this->assertEquals('new', (string) @file_get_contents($installPath.'/marker.txt'));
+            $this->assertEquals("1.2.3\n", (string) @file_get_contents($installPath.'/version.txt'));
             $this->assertEquals([], glob($workPattern) ?: [], 'expected workspace cleanup after install');
         } finally {
             $this->cleanup($baseDir);

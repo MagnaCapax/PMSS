@@ -291,7 +291,12 @@ function pmssArrUpdate(array $config): void
     }
 
     runCommand('rm -rf '.escapeshellarg($workDir));
-    if ($installed) { $log("Installed version {$latestVersion}"); }
+    if ($installed) {
+        if (@file_put_contents($installPath.'/version.txt', $latestVersion.PHP_EOL) === false) {
+            $log('Failed to persist installed version marker');
+        }
+        $log("Installed version {$latestVersion}");
+    }
 }
 
 /** Run every supported Servarr updater from the single app entrypoint. */
