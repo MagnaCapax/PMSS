@@ -60,7 +60,7 @@ function wgSupports(): bool
 }
 
 /**
- * Resolve key material from a test override or first shell-output line.
+ * Resolve WireGuard key material from a test override or captured command output.
  */
 function wgKeyMaterialResolve(string $envKey, string $command, string $failureMessage): string
 {
@@ -68,8 +68,8 @@ function wgKeyMaterialResolve(string $envKey, string $command, string $failureMe
     if ($override !== false) {
         $value = trim($override);
     } else {
-        exec($command, $output, $rc);
-        $value = $rc === 0 ? trim($output[0] ?? '') : '';
+        $result = pmssCommandCapture($command);
+        $value = $result['rc'] === 0 ? trim($result['stdout']) : '';
     }
 
     if ($value === '') {
@@ -349,15 +349,12 @@ function wgBuildClientGuide(string $publicKey, string $endpoint, int $listenPort
  */
 function wgGenerateClientKeypair(): array
 {
-    $privateOverride = getenv('PMSS_WG_CLIENT_PRIVATE_KEY');
-    if ($privateOverride !== false) {
-        $privateKey = trim($privateOverride);
-    } else {
-        $privateResult = pmssCommandCapture('wg genkey');
-        $privateKey = $privateResult['rc'] === 0 ? trim($privateResult['stdout']) : '';
-    }
+    $privateKey = wgKeyMaterialResolve(
+        'PMSS_WG_CLIENT_PRIVATE_KEY',
+        'wg genkey',
+        'Failed to generate WireGuard client private key'
+    );
     if ($privateKey === '') {
-        wgLog('Failed to generate WireGuard client private key');
         return ['', ''];
     }
 
@@ -374,14 +371,15 @@ function wgGenerateClientKeypair(): array
  */
 function wgDerivePublicKey(string $privateKey): string
 {
-    $publicOverride = getenv('PMSS_WG_CLIENT_PUBLIC_KEY');
-    if ($publicOverride !== false) {
-        $publicKey = trim($publicOverride);
-    } else {
-        $publicResult = pmssCommandCapture('printf %s '.escapeshellarg($privateKey).' | wg pubkey');
-        $publicKey = $publicResult['rc'] === 0 ? trim($publicResult['stdout']) : '';
-    }
-    if (!wgValidatePublicKey($publicKey)) {
+    $publicKey = wgKeyMaterialResolve(
+        'PMSS_WG_CLIENT_PUBLIC_KEY',
+        'printf %s '.escapeshellarg($privateKey).' | wg pubkey',
+        'Failed to derive WireGuard client public key'
+    );
+    if ($publicKey === '' || !wgValidatePublicKey($publicKey)) {
+        if ($publicKey === '') {
+            return '';
+        }
         wgLog('Failed to derive WireGuard client public key');
         return '';
     }
