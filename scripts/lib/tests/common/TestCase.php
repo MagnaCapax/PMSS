@@ -940,6 +940,38 @@ abstract class TestCase
         ];
     }
 
+    /** Extract one shell function body from a source fixture for focused harness tests. */
+    protected function pmssExtractShellFunction(string $source, string $name): string
+    {
+        $pattern = '/^'.preg_quote($name, '/').'\(\) \{(?:\n(?:.*\n)*?^\}|[^\n]*\})/m';
+        $matched = preg_match($pattern, $source, $matches);
+
+        $this->assertSame(1, $matched, 'Failed to extract shell function '.$name);
+        return $matches[0];
+    }
+
+    /** Extract multiple shell functions from the same source fixture in caller order. */
+    protected function pmssExtractShellFunctions(string $source, array $names): string
+    {
+        $functions = [];
+        foreach ($names as $name) {
+            $functions[] = $this->pmssExtractShellFunction($source, (string) $name);
+        }
+
+        return implode("\n\n", $functions);
+    }
+
+    /** Write and execute a temporary shell harness, returning combined output. */
+    protected function pmssRunShellHarness(string $script, string $dirPrefix = 'pmss-shell-harness-'): string
+    {
+        $harness = $this->pmssMakeTempDir($dirPrefix).'/run.sh';
+        $this->pmssWriteExecutableFile($harness, $script);
+
+        $result = $this->pmssExecShellCommand(escapeshellarg($harness));
+        $this->assertSame(0, $result['rc'], $result['output']);
+        return $result['output'];
+    }
+
     protected function pmssRunInlinePhp(string $script, array $environment = [], string $stderrRedirect = '2>/dev/null'): string
     {
         return $this->pmssRunShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script), $environment, $stderrRedirect);

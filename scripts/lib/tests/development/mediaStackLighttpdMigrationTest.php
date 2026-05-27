@@ -122,12 +122,11 @@ class MediaStackLighttpdMigrationTest extends TestCase
         }
 
         $functions = implode("\n\n", [
-            $this->pmssExtractShellFunction('lighttpd_custom_has_legacy_media_stack_rules'),
-            $this->pmssExtractShellFunction('lighttpd_custom_strip_managed_media_stack_routes'),
-            $this->pmssExtractShellFunction('prepare_lighttpd_media_stack_paths'),
+            $this->pmssExtractShellFunction($this->script, 'lighttpd_custom_has_legacy_media_stack_rules'),
+            $this->pmssExtractShellFunction($this->script, 'lighttpd_custom_strip_managed_media_stack_routes'),
+            $this->pmssExtractShellFunction($this->script, 'prepare_lighttpd_media_stack_paths'),
         ]);
 
-        $harness = $this->pmssMakeTempDir('pmss-media-stack-lighttpd-harness-').'/run.sh';
         $script = implode("\n", [
             '#!/usr/bin/env bash',
             'set -euo pipefail',
@@ -140,21 +139,8 @@ class MediaStackLighttpdMigrationTest extends TestCase
             '',
         ]);
 
-        file_put_contents($harness, $script);
-        chmod($harness, 0755);
-
-        exec(escapeshellcmd($harness).' 2>&1', $output, $rc);
-        $this->assertSame(0, $rc, implode("\n", $output));
+        $this->pmssRunShellHarness($script, 'pmss-media-stack-lighttpd-harness-');
 
         return $home;
-    }
-
-    private function pmssExtractShellFunction(string $name): string
-    {
-        $pattern = '/^'.preg_quote($name, '/').'\(\) \{\n(?:.*\n)*?^\}/m';
-        $matched = preg_match($pattern, $this->script, $matches);
-
-        $this->assertSame(1, $matched, 'Failed to extract shell function '.$name);
-        return $matches[0];
     }
 }

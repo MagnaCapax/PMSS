@@ -159,7 +159,7 @@ class installMediaStackScriptTest extends TestCase
     {
         $script = implode("\n", array(
             '#!/usr/bin/env bash', 'set -euo pipefail', 'file=$(mktemp)',
-            $this->pmssExtractShellFunctions(array('xml_escape', 'sed_replacement_escape', 'jellyfin_system_xml_tag_set')),
+            $this->pmssExtractShellFunctions($this->script, array('xml_escape', 'sed_replacement_escape', 'jellyfin_system_xml_tag_set')),
             'printf "%s\n" "<ServerConfiguration>" "  <BaseUrl>old</BaseUrl>" "</ServerConfiguration>" > "$file"',
             'jellyfin_system_xml_tag_set "$file" BaseUrl /public-alice/jellyfin; jellyfin_system_xml_tag_set "$file" FFmpegPath "/opt/a&b/ffmpeg"; cat "$file"', '',
         ));
@@ -199,7 +199,7 @@ class installMediaStackScriptTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-media-stack-lighttpd-strip-home-');
         $fragment = $home.'/custom-migrated.conf';
-        $functions = $this->pmssExtractShellFunctions(array('lighttpd_custom_strip_managed_media_stack_routes'));
+        $functions = $this->pmssExtractShellFunctions($this->script, array('lighttpd_custom_strip_managed_media_stack_routes'));
         $script = implode("\n", array(
             '#!/usr/bin/env bash',
             'set -euo pipefail',
@@ -261,7 +261,7 @@ LIGHTTPD;
         file_put_contents($home.'/.bin/Radarr/file', 'managed');
         file_put_contents($home.'/.bin/keep/file', 'preserve');
 
-        $functions = $this->pmssExtractShellFunctions(array(
+        $functions = $this->pmssExtractShellFunctions($this->script, array(
             'media_stack_home_path_is_safe',
             'managed_install_path_reset_target_is_safe',
             'managed_install_path_reset',
@@ -313,7 +313,7 @@ LIGHTTPD;
         $home = $this->pmssMakeTempDir('pmss-media-stack-lighttpd-render-home-');
         mkdir($home.'/.lighttpd/custom.d', 0755, true);
 
-        $functions = $this->pmssExtractShellFunctions(array(
+        $functions = $this->pmssExtractShellFunctions($this->script, array(
             'lighttpd_media_stack_proxy_block_write',
             'lighttpd_media_stack_config_write',
         ));
@@ -380,7 +380,7 @@ LIGHTTPD;
 
     public function testHomePathGuardRejectsUnsafeValues(): void
     {
-        $functions = $this->pmssExtractShellFunctions(array('media_stack_home_path_is_safe'));
+        $functions = $this->pmssExtractShellFunctions($this->script, array('media_stack_home_path_is_safe'));
         $script = implode("\n", array(
             '#!/usr/bin/env bash',
             'set -euo pipefail',
@@ -460,7 +460,7 @@ LIGHTTPD;
 
     public function testExistingPortSelectionRejectsInvalidValues(): void
     {
-        $functions = $this->pmssExtractShellFunctions(array(
+        $functions = $this->pmssExtractShellFunctions($this->script, array(
             'media_stack_port_is_valid',
             'pick_existing_or_random_port',
         ));
@@ -505,7 +505,7 @@ LIGHTTPD;
         $this->pmssAssertStringNotContainsString('servarr_resolve'.'_prowlarr_download_url', $this->script);
         $this->pmssAssertStringNotContainsString('servarr_resolve'.'_sonarr_download_url', $this->script);
 
-        $functions = $this->pmssExtractShellFunctions(array(
+        $functions = $this->pmssExtractShellFunctions($this->script, array(
             'servarr_resolve_download_url',
         ));
         $script = implode("\n", array(
@@ -564,7 +564,7 @@ LIGHTTPD;
 
     public function testServarrRadarrResolverPreservesOldGlibcPin(): void
     {
-        $functions = $this->pmssExtractShellFunctions(array(
+        $functions = $this->pmssExtractShellFunctions($this->script, array(
             'servarr_resolve_download_url',
         ));
         $script = implode("\n", array(
@@ -597,7 +597,7 @@ LIGHTTPD;
         $trace = $home.'/trace.log';
         mkdir($home.'/.bin', 0755, true);
 
-        $functions = $this->pmssExtractShellFunctions(array('fetch_verified_archive', 'servarr_install_from_url'));
+        $functions = $this->pmssExtractShellFunctions($this->script, array('fetch_verified_archive', 'servarr_install_from_url'));
         $script = implode("\n", array(
             '#!/usr/bin/env bash',
             'set -euo pipefail',
@@ -632,34 +632,4 @@ LIGHTTPD;
         ), $traceOutput);
     }
 
-    /**
-     * @param array<int, string> $names
-     */
-    private function pmssExtractShellFunctions(array $names): string
-    {
-        $functions = array();
-        foreach ($names as $name) {
-            $pattern = '/^'.preg_quote($name, '/').'\(\) \{(?:\n(?:.*\n)*?^\}|[^\n]*\})/m';
-            $matched = preg_match($pattern, $this->script, $matches);
-
-            $this->assertSame(1, $matched, 'Failed to extract shell function '.$name);
-            $functions[] = $matches[0];
-        }
-
-        return implode("\n\n", $functions);
-    }
-
-    private function pmssRunShellHarness(string $script): string
-    {
-        $harness = $this->pmssMakeTempDir('pmss-media-stack-harness-').'/run.sh';
-        file_put_contents($harness, $script);
-        chmod($harness, 0755);
-
-        $output = array();
-        exec(escapeshellarg($harness).' 2>&1', $output, $rc);
-        $combined = implode("\n", $output);
-
-        $this->assertSame(0, $rc, $combined);
-        return $combined;
-    }
 }
