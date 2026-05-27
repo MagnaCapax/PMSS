@@ -25,7 +25,25 @@ abstract class PmssUserStatsProcessor
 
     public function discoverUsers(): array { $items = array_map('basename', array_filter(glob($this->statsDataDir.'/*') ?: [], 'is_file')); sort($items, SORT_NATURAL | SORT_FLAG_CASE); return $items; }
 
-    public function spawnWorkers(string $scriptPath, array $users): void { $script = escapeshellarg($scriptPath); foreach ($users as $user) passthru("nohup {$script} ".escapeshellarg($user)." >> ".escapeshellarg($this->workerLogPath)." 2>&1 &"); }
+    public function spawnWorkers(string $scriptPath, array $users): void
+    {
+        $script = escapeshellarg($scriptPath);
+        foreach ($users as $user) {
+            $command = "nohup {$script} ".escapeshellarg($user)." >> ".escapeshellarg($this->workerLogPath)." 2>&1 &";
+            $rc = $this->runSpawnCommand($command);
+            if ($rc !== 0) {
+                logMessage(date('c').": Failed to start stats worker, rc={$rc}");
+            }
+        }
+    }
+
+    /** Execute one detached worker command and return the shell startup status. */
+    protected function runSpawnCommand(string $command): int
+    {
+        $rc = 0;
+        passthru($command, $rc);
+        return (int) $rc;
+    }
 
     public function runCli(array $argv, string $scriptPath): int
     {

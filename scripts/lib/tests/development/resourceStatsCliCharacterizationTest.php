@@ -28,6 +28,29 @@ final class ResourceStatsCliHarness extends \PmssUserStatsProcessor
     public function processUser(string $user, array $compareTimes): void { $this->processed = [$user, array_keys($compareTimes)]; }
 }
 
+final class ResourceStatsSpawnHarness extends \PmssUserStatsProcessor
+{
+    /** @var array<int,string> */
+    public $commands = [];
+    /** @var array<int,int> */
+    private $returnCodes;
+
+    public function __construct(array $returnCodes = [])
+    {
+        parent::__construct(['resource_dir' => sys_get_temp_dir(), 'home_dir' => sys_get_temp_dir(), 'passwd_file' => '/dev/null'], 'resource_dir', 'PMSS_RESOURCE_DIR', sys_get_temp_dir(), '/tmp/pmss stats.log');
+        $this->returnCodes = $returnCodes;
+    }
+
+    protected function runSpawnCommand(string $command): int
+    {
+        $this->commands[] = $command;
+        return array_shift($this->returnCodes) ?? 0;
+    }
+
+    public function validateUser(string $user): bool { return true; }
+    public function processUser(string $user, array $compareTimes): void {}
+}
+
 final class resourceStatsCliCharacterizationTest extends TestCase
 {
     public function testCliFlowSharesProcessorHelpers(): void
@@ -76,5 +99,28 @@ final class resourceStatsCliCharacterizationTest extends TestCase
 
         $this->assertSame(0, $rc);
         $this->assertSame("Invalid user specified: bad\n", $output);
+    }
+
+    public function testStatsProcessorSpawnBuildsEscapedDetachedCommands(): void
+    {
+        $processor = new ResourceStatsSpawnHarness();
+        $processor->spawnWorkers('/tmp/worker script.php', ['alice', 'bob-localnet']);
+
+        $this->assertEquals([
+            'nohup '.escapeshellarg('/tmp/worker script.php').' '.escapeshellarg('alice').' >> '.escapeshellarg('/tmp/pmss stats.log').' 2>&1 &',
+            'nohup '.escapeshellarg('/tmp/worker script.php').' '.escapeshellarg('bob-localnet').' >> '.escapeshellarg('/tmp/pmss stats.log').' 2>&1 &',
+        ], $processor->commands);
+    }
+
+    public function testStatsProcessorSpawnLogsShellStartupFailure(): void
+    {
+        $processor = new ResourceStatsSpawnHarness([7]);
+
+        list(, $output) = $this->pmssCaptureStdout(function () use ($processor): void {
+            $processor->spawnWorkers('/tmp/worker.php', ['alice']);
+        });
+
+        $this->assertStringContainsString('Failed to start stats worker, rc=7', $output);
+        $this->assertEquals(1, count($processor->commands));
     }
 }
