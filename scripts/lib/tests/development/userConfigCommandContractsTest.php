@@ -14,18 +14,14 @@ class userConfigCommandContractsTest extends TestCase
     {
         $source = $this->loadUserConfigSubsystemSource();
 
-        $this->assertStringContainsString('$scgiPort = (int) ($configuration[\'config\'][\'scgiPort\'] ?? 0);', $source);
-        $this->assertStringContainsString("updateRutorrentConfig(\$user['name'], \$scgiPort);", $source);
+        $this->assertStringContainsAllStrings(['$scgiPort = (int) ($configuration[\'config\'][\'scgiPort\'] ?? 0);', "updateRutorrentConfig(\$user['name'], \$scgiPort);"], $source);
     }
 
     public function testRtorrentRestartContractRemainsStable(): void
     {
         $source = $this->loadUserConfigSubsystemSource();
 
-        $this->assertStringContainsString("'/home/%s/session/rtorrent.lock'", $source);
-        $this->assertStringContainsString('pmssUserConfigRtorrentLockPid($lockFile)', $source);
-        $this->assertStringContainsString("pmssUserConfigRtorrentProcessOwnedBy(\$pid, \$user['id'])", $source);
-        $this->assertStringContainsString("runStep('Restarting rTorrent', sprintf('kill -9 %d', \$pid));", $source);
+        $this->assertStringContainsAllStrings(["'/home/%s/session/rtorrent.lock'", 'pmssUserConfigRtorrentLockPid($lockFile)', "pmssUserConfigRtorrentProcessOwnedBy(\$pid, \$user['id'])", "runStep('Restarting rTorrent', sprintf('kill -9 %d', \$pid));"], $source);
         $this->assertStringNotContainsString('(int) $pid'.'Chunk', $source);
     }
 
@@ -33,17 +29,14 @@ class userConfigCommandContractsTest extends TestCase
     {
         $source = $this->loadUserConfigSubsystemSource();
 
-        $this->assertStringContainsString("file_exists('/bin/bash')", $source);
-        $this->assertStringContainsString("runStep('Ensuring bash shell', sprintf('chsh -s /bin/bash %s', escapeshellarg(\$user['name'])));", $source);
+        $this->assertStringContainsAllStrings(["file_exists('/bin/bash')", "runStep('Ensuring bash shell', sprintf('chsh -s /bin/bash %s', escapeshellarg(\$user['name'])));"], $source);
     }
 
     public function testCgroupConfigurationContractRemainsStable(): void
     {
         $source = $this->loadUserConfigSubsystemSource();
 
-        $this->assertStringContainsString("'/scripts/util/userConfigCgroup.php'", $source);
-        $this->assertStringContainsString("runStep(\n    'Configuring cgroups',", $source);
-        $this->assertStringContainsString("'--memory-high=' . \$user['memory']", $source);
+        $this->assertStringContainsAllStrings(["'/scripts/util/userConfigCgroup.php'", "runStep(\n    'Configuring cgroups',", "'--memory-high=' . \$user['memory']"], $source);
     }
 
     public function testUserConfigUsesSharedWelcomeCliParser(): void
@@ -51,18 +44,9 @@ class userConfigCommandContractsTest extends TestCase
         $source = $this->loadUserConfigSubsystemSource();
 
         $this->assertStringContainsAllStrings(["require_once __DIR__.'/../lib/cli/optionParser.php';", "require_once __DIR__.'/../lib/user/userConfigCli.php';", "pmssUserConfigCliResourceOptionNames('addUserOption')", "array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled'], \$resourceOptions)", "pmssCliOption(\$parsed, 'upload-throttle-kib')", "pmssCliOption(\$parsed, 'welcome-message')", "pmssCliOption(\$parsed, 'docker-enabled')", "pmssUserConfigCliExplicitResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", "\$presence = array_fill_keys(array_keys(\$explicitResourceOverrides), true);"], $source);
-        $this->assertTrue(
-            strpos($source, "strpos(\$arg, '--upload-throttle-kib=')") === false,
-            'userConfig.php should not keep a manual --upload-throttle-kib scan'
-        );
-        $this->assertTrue(
-            strpos($source, "strpos(\$arg, '--welcome-message=')") === false,
-            'userConfig.php should not keep a manual --welcome-message scan'
-        );
-        $this->assertTrue(
-            strpos($source, "strpos(\$arg, '--docker-enabled=')") === false,
-            'userConfig.php should not keep a manual --docker-enabled scan'
-        );
+        $this->assertStringNotContainsString("strpos(\$arg, '--upload-throttle-kib=')", $source, 'userConfig.php should not keep a manual --upload-throttle-kib scan');
+        $this->assertStringNotContainsString("strpos(\$arg, '--welcome-message=')", $source, 'userConfig.php should not keep a manual --welcome-message scan');
+        $this->assertStringNotContainsString("strpos(\$arg, '--docker-enabled=')", $source, 'userConfig.php should not keep a manual --docker-enabled scan');
     }
 
     public function testUsageTextSeparatesNamedOptionsFromPositionals(): void
@@ -88,11 +72,7 @@ class userConfigCommandContractsTest extends TestCase
     {
         $source = $this->loadUserConfigSubsystemSource();
 
-        $this->assertStringContainsString("'Rootless Docker disabled by config for '.\$user['name']", $source);
-        $this->assertStringContainsString("runStep('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg(\$user['name'])));", $source);
-        $this->assertStringContainsString("runStep('Installing systemd-container tools', 'apt-get install -y systemd-container');", $source);
-        $this->assertStringContainsString("'Configuring rootless Docker'", $source);
-        $this->assertStringContainsString("'machinectl shell %1\$s@ /usr/bin/dockerd-rootless-setuptool.sh install'", $source);
+        $this->assertStringContainsAllStrings(["'Rootless Docker disabled by config for '.\$user['name']", "runStep('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg(\$user['name'])));", "runStep('Installing systemd-container tools', 'apt-get install -y systemd-container');", "'Configuring rootless Docker'", "'machinectl shell %1\$s@ /usr/bin/dockerd-rootless-setuptool.sh install'"], $source);
     }
 
     public function testUserConfigUsesSharedResourceSpecForPositionals(): void
@@ -100,39 +80,20 @@ class userConfigCommandContractsTest extends TestCase
         $source = $this->loadUserConfigSubsystemSource();
 
         $this->assertStringContainsAllStrings(["pmssUserConfigCliResolvedResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", "pmssUserConfigCliPersistedStoredResources(\$existing)", "pmssUserConfigCliApplyPersistedResources(\$payload, \$user, \$presence)", "pmssUserConfigCliBuildCgroupResourceArgs(\$user)"], $source);
-        $this->assertTrue(
-            strpos($source, 'pmssUserConfigCli'.'PersistedResourcePresence') === false,
-            'userConfig.php should derive persisted presence from explicit resource overrides'
-        );
-        $this->assertTrue(
-            strpos($source, "'--cpu-weight=' . \$user['CPUWeight']") === false,
-            'userConfig.php should not keep a duplicated cpu-weight flag path'
-        );
-        $this->assertTrue(
-            strpos($source, "'--io-weight=' . \$user['IOWeight']") === false,
-            'userConfig.php should not keep a duplicated io-weight flag path'
-        );
-        $this->assertTrue(
-            strpos($source, "['CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit']") === false,
-            'userConfig.php should not keep a duplicated persisted-resource key list'
-        );
+        $this->assertStringNotContainsString('pmssUserConfigCli'.'PersistedResourcePresence', $source, 'userConfig.php should derive persisted presence from explicit resource overrides');
+        $this->assertStringNotContainsString("'--cpu-weight=' . \$user['CPUWeight']", $source, 'userConfig.php should not keep a duplicated cpu-weight flag path');
+        $this->assertStringNotContainsString("'--io-weight=' . \$user['IOWeight']", $source, 'userConfig.php should not keep a duplicated io-weight flag path');
+        $this->assertStringNotContainsString("['CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit']", $source, 'userConfig.php should not keep a duplicated persisted-resource key list');
     }
 
     public function testUserConfigUsesSharedWelcomeAndPersistFlows(): void
     {
         $source = $this->loadUserConfigSubsystemSource();
 
-        $this->assertStringContainsString("pmssWelcomeUserMessageSet(\$user['name'], \$expectedHome, \$welcomeMessage)", $source);
-        $this->assertStringContainsString("unset(\$payload['welcomeMessage']);", $source);
-        $this->assertTrue(
-            strpos($source, 'pmssUserConfigClear'.'WelcomeMessage') === false,
-            'userConfig.php should clear legacy welcome banners inline'
-        );
+        $this->assertStringContainsAllStrings(["pmssWelcomeUserMessageSet(\$user['name'], \$expectedHome, \$welcomeMessage)", "unset(\$payload['welcomeMessage']);"], $source);
+        $this->assertStringNotContainsString('pmssUserConfigClear'.'WelcomeMessage', $source, 'userConfig.php should clear legacy welcome banners inline');
         $this->assertStringContainsString("\$store->persist(\$user['name'], \$payload)", $source);
-        $this->assertTrue(
-            strpos($source, 'writeUserCache(') === false,
-            'userConfig.php should not bypass the shared persist flow'
-        );
+        $this->assertStringNotContainsString('writeUserCache(', $source, 'userConfig.php should not bypass the shared persist flow');
     }
 
     public function testGeneratedPortAndQbittorrentWritesAreChecked(): void

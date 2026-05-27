@@ -15,9 +15,7 @@ class CustomerContextFatalScanTest extends TestCase
         $result = $this->pmssCustomerContextRunScan($root);
 
         $this->assertSame(1, $result['rc']);
-        $this->assertStringContainsString('OPERATOR_TREE_FUNCTION_LEAK', $result['output']);
-        $this->assertStringContainsString('etc/skel/www/welcome.php:2 - pmssJsonFileReadAssoc()', $result['output']);
-        $this->assertStringContainsString('scripts/lib/lighttpd/userFileWrite.php', $result['output']);
+        $this->assertStringContainsAllStrings(['OPERATOR_TREE_FUNCTION_LEAK', 'etc/skel/www/welcome.php:2 - pmssJsonFileReadAssoc()', 'scripts/lib/lighttpd/userFileWrite.php'], $result['output']);
     }
 
     public function testAllowsCustomerTreeFunctionDefinitions(): void

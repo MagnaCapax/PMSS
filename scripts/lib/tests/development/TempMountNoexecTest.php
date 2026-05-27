@@ -55,9 +55,7 @@ class TempMountNoexecTest extends TestCase
         $messages = $this->runNoexecHardening($fstab, $mounts);
 
         $updated = (string)file_get_contents($fstab);
-        $this->assertStringContainsString('/tmp', $updated);
-        $this->assertStringContainsString('/dev/shm', $updated);
-        $this->assertStringContainsString('noexec', $updated);
+        $this->assertStringContainsAllStrings(['/tmp', '/dev/shm', 'noexec'], $updated);
         $this->assertTrue($this->pmssMessagesContain($messages, 'Updated /tmp mount options'), 'expected /tmp update log');
     }
 

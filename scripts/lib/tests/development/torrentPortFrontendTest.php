@@ -62,8 +62,8 @@ class TorrentPortFrontendTest extends TestCase
     {
         $src = (string) file_get_contents(dirname(__DIR__, 2).'/update/users/filesystem.php');
 
-        $this->assertTrue(strpos($src, "        '.delugePort.py',") === false);
-        $this->assertTrue(strpos($src, "        '.qbittorrentPort.py',") === false);
+        $this->assertStringNotContainsString("        '.delugePort.py',", $src);
+        $this->assertStringNotContainsString("        '.qbittorrentPort.py',", $src);
         $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $src);
         $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $src);
     }
@@ -72,24 +72,22 @@ class TorrentPortFrontendTest extends TestCase
     {
         $src = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/deluge.php');
 
-        $this->assertTrue(strpos($src, "require_once __DIR__.'/../.scriptsInc.php';") !== false);
-        $this->assertTrue(strpos($src, 'pmssFrontendToggleAction(') !== false);
+        $this->assertStringContainsAllStrings(["require_once __DIR__.'/../.scriptsInc.php';", 'pmssFrontendToggleAction('], $src);
         // ADR 0016 keeps operator-only port helpers out of customer PHP.
-        $this->assertTrue(strpos($src, "require_once '/scripts/lib/user/torrentPort.php';") === false);
-        $this->assertTrue(strpos($src, 'pmssDelugePortEnsureCurrentUser') === false);
-        $this->assertTrue(strpos($src, '.delugePort.py') === false);
+        $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $src);
+        $this->assertStringNotContainsString('pmssDelugePortEnsureCurrentUser', $src);
+        $this->assertStringNotContainsString('.delugePort.py', $src);
     }
 
     public function testShippedQbittorrentFrontendOmitsOperatorPortHelper(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/qbittorrent.php');
 
-        $this->assertTrue(strpos($src, "require_once __DIR__.'/../.scriptsInc.php';") !== false);
-        $this->assertTrue(strpos($src, 'pmssFrontendToggleAction(') !== false);
+        $this->assertStringContainsAllStrings(["require_once __DIR__.'/../.scriptsInc.php';", 'pmssFrontendToggleAction('], $src);
         // ADR 0016: customer PHP no longer require_once'es /scripts/.
-        $this->assertTrue(strpos($src, "require_once '/scripts/lib/user/torrentPort.php';") === false);
-        $this->assertTrue(strpos($src, 'pmssQbittorrentPortEnsureCurrentUser') === false);
-        $this->assertTrue(strpos($src, '.qbittorrentPort.py') === false);
+        $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $src);
+        $this->assertStringNotContainsString('pmssQbittorrentPortEnsureCurrentUser', $src);
+        $this->assertStringNotContainsString('.qbittorrentPort.py', $src);
     }
 
     public function testApplySkeletonFilesRemovesLegacyPhpXplorerFile(): void
@@ -181,7 +179,7 @@ class TorrentPortFrontendTest extends TestCase
         $this->assertTrue(\pmssQbittorrentPortEnsure($this->user, $home));
         $updated = (string) file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf');
 
-        $this->assertTrue(strpos($updated, "WebUI\\Port=45678\n") !== false);
+        $this->assertStringContainsString("WebUI\\Port=45678\n", $updated);
     }
 
     public function testQbittorrentPortEnsureRejectsMissingWebUiPort(): void

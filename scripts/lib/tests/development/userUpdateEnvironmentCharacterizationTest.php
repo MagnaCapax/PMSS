@@ -119,21 +119,15 @@ PHP
         $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $result['deluge']);
         $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $result['deluge']);
         $this->assertStringNotContainsString('pmssDelugePortEnsureCurrentUser', $result['deluge']);
-        $this->assertTrue(strpos($result['deluge'], '.delugePort.py') === false);
+        $this->assertStringNotContainsString('.delugePort.py', $result['deluge']);
         $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $result['qbittorrent_frontend']);
         $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $result['qbittorrent_frontend']);
         $this->assertStringNotContainsString('pmssQbittorrentPortEnsureCurrentUser', $result['qbittorrent_frontend']);
-        $this->assertTrue(strpos($result['qbittorrent_frontend'], '.qbittorrentPort.py') === false);
+        $this->assertStringNotContainsString('.qbittorrentPort.py', $result['qbittorrent_frontend']);
         $this->assertStringContainsString('((integer)($tm["minutes"]/((', str_replace('(int)$interval', '((int)$interval)', $result['settings']));
         $this->assertStringContainsString('@ob_flush();', $result['rss']);
         $this->assertStringContainsString('return (int) $field;', $result['hddquota']);
-        $this->assertStringContainsString('WebUI\\CSRFProtection=false', $result['qbittorrent']);
-        $this->assertStringContainsString('WebUI\\ClickjackingProtection=false', $result['qbittorrent']);
-        $this->assertStringContainsString('WebUI\\HostHeaderValidation=false', $result['qbittorrent']);
-        $this->assertStringContainsString('Session\\DiskCacheSize=128', $result['qbittorrent']);
-        $this->assertStringContainsString('Session\\MaxConnections=300', $result['qbittorrent']);
-        $this->assertStringContainsString('Downloads\\DiskWriteCacheSize=128', $result['qbittorrent']);
-        $this->assertStringContainsString('Bittorrent\\MaxConnecs=300', $result['qbittorrent']);
+        $this->assertStringContainsAllStrings(['WebUI\\CSRFProtection=false', 'WebUI\\ClickjackingProtection=false', 'WebUI\\HostHeaderValidation=false', 'Session\\DiskCacheSize=128', 'Session\\MaxConnections=300', 'Downloads\\DiskWriteCacheSize=128', 'Bittorrent\\MaxConnecs=300'], $result['qbittorrent']);
 
         $this->assertPhaseOrder(
             $result['descriptions'],
