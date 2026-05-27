@@ -51,6 +51,47 @@ Run types (pick one):
    - No “parallel implementations” left in-tree at end (no permanent old+new).
 
 ----------------------------------------------------------------------
+TEST REFACTOR — EXPLICITLY ALLOWED (under contract preservation)
+----------------------------------------------------------------------
+
+Tests CAN and SHOULD be updated to match new architecture when production
+code is refactored. What stays locked: the CONTRACT — what behavior the
+test verifies (inputs → outputs, observable side effects, invariants).
+What is free to change: structure of the test file/method/class, where
+assertions live, how the test scaffold is organized, helper extraction
+inside the test tree, naming when the production symbol it tracks renames.
+
+ALLOWED in test refactor:
+- Move assertions between test methods or between test files as long as
+  the same contract is verified somewhere in the test suite.
+- Restructure test fixtures, data providers, setup/teardown.
+- Rename test methods to match renamed production symbols.
+- Consolidate duplicated test scaffolding into shared helpers in
+  scripts/lib/tests/development/ or tests/.
+- Delete test methods that verify a contract that no longer exists
+  because the production code was simplified (e.g., deleted helper
+  collapsed into caller — its standalone test goes too).
+- Net change in assertion COUNT is not by itself a failure: assertions
+  consolidate when the verified behavior consolidates.
+
+FORBIDDEN in test refactor:
+- Weakening or removing verification of a contract that still holds
+  in production code. Example: production still validates min length 3
+  → test must still verify rejection at length 2.
+- Replacing strict equality with looser checks unless the production
+  contract genuinely allows the loosening.
+- Deleting a test because it currently fails — that is a regression
+  signal, not a refactor target.
+
+The RELAXATION gate (codex-common.sh) flags net `$this->assert*` removal
+as informational. It does NOT mean a refactor must stop — re-evaluate
+each flagged file against the contract-preservation rule above. If the
+contract is still locked elsewhere in the test suite, the assertion-line
+delta is benign and the refactor proceeds. If the contract is no longer
+verified anywhere, the refactor is incomplete — restore coverage before
+committing.
+
+----------------------------------------------------------------------
 Compression & Indirection Rails (NEW — HARD)
 ----------------------------------------------------------------------
 
