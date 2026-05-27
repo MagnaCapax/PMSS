@@ -10,25 +10,6 @@ codex_agentic_bootstrap "$HERE" "PMSS_CI_CODEX_DEBUG" "codex-ci" 1
 
 echo "[codex-ci] start: assembling CI context and invoking Codex" >&1
 
-# codex-ci.sh — Fetch latest CI logs and feed them to a coding assistant (Codex CLI or similar).
-#
-# Requirements (one of):
-#   - GitHub CLI (`gh`) installed and authenticated: gh auth login
-#   - `curl` available; for private repos set `GITHUB_TOKEN` (classic PAT with `repo` + `actions:read`)
-# Optional:
-#   - A local assistant CLI to receive the prompt. Provide via --exec (e.g., --exec 'codex --sandbox workspace-write --ask-for-approval untrusted')
-#
-# Usage:
-#   development/codex-ci.sh                          # assemble prompt + logs into codex-ci/prompt.txt
-#   development/codex-ci.sh --job smoke               # include only 'smoke' job logs in the prompt
-#   development/codex-ci.sh --prompt "text..."        # use custom high-level prompt text
-#   development/codex-ci.sh --exec 'codex --sandbox workspace-write --ask-for-approval untrusted'  # send prompt to Codex CLI directly
-#
-# The default prompt:
-#   "Last CI Integration Logs are here. If issues or code fails, please fix them.
-#    First read AGENTS.md, docs, and ADRs to understand the rails, and double
-#    check TODOs before any code changes. Maintain PHP 7.3 compatibility."
-
 usage() {
 	cat <<EOF
 Usage:
@@ -86,12 +67,11 @@ custom_prompt=""
 exec_cmd=""
 dry_run=0
 autocommit=0
+declare -a remaining_args=()
 
+codex_parse_launcher_common_args agent exec_cmd dry_run autocommit remaining_args 0 "" job prompt -- "$@"
+set -- "${remaining_args[@]}"
 while [[ $# -gt 0 ]]; do
-	if codex_parse_launcher_option agent exec_cmd dry_run autocommit "$1" "${2:-}"; then
-		shift "$CODEX_PARSE_SHIFT" || true
-		continue
-	fi
 	case "$1" in
 	--job)
 		codex_parse_option_value job_name "$1" "${2:-}" "--job"

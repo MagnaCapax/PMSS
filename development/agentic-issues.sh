@@ -9,18 +9,6 @@ codex_agentic_bootstrap "$HERE" "PMSS_ISSUES_CODEX_DEBUG" "agentic-issues" 1
 
 echo "[agentic-issues] start: fetching open issues and invoking assistant" >&1
 
-# agentic-issues.sh — Fetch open GitHub issues and launch an assistant to implement them.
-#
-# Usage:
-#   development/agentic-issues.sh
-#   development/agentic-issues.sh --max-issues 5
-#   development/agentic-issues.sh --exec 'codex exec'
-#   development/agentic-issues.sh --autocommit
-#   development/agentic-issues.sh --dry-run
-#   development/agentic-issues.sh --select-only
-#   development/agentic-issues.sh --target-issue 123
-#   development/agentic-issues.sh --target-issue 123 --force
-
 usage() {
 	cat <<EOF
 Usage:
@@ -62,12 +50,11 @@ autocommit=0
 select_only=0
 target_issue=""
 force_target=0
+declare -a remaining_args=()
 
+codex_parse_launcher_common_args agent exec_cmd dry_run autocommit remaining_args 0 "" max-issues target-issue -- "$@"
+set -- "${remaining_args[@]}"
 while [[ $# -gt 0 ]]; do
-	if codex_parse_launcher_option agent exec_cmd dry_run autocommit "$1" "${2:-}"; then
-		shift "$CODEX_PARSE_SHIFT" || true
-		continue
-	fi
 	case "$1" in
 	--max-issues)
 		codex_parse_option_value max_issues "$1" "${2:-5}" "--max-issues"

@@ -9,18 +9,6 @@ codex_agentic_bootstrap "$HERE" "PMSS_REFACTOR_CODEX_DEBUG" "agentic-refactor"
 
 echo "[agentic-refactor] start: assembling refactor context and invoking assistant" >&1
 
-# agentic-refactor.sh — Collect refactor candidate context (best-effort), then launch
-# a coding assistant with the strict refactor prompt.
-#
-# Usage:
-#   development/agentic-refactor.sh
-#   development/agentic-refactor.sh --commits 25
-#   development/agentic-refactor.sh --target scripts/lib/update
-#   development/agentic-refactor.sh --prompt "Refactor X (behaviour-preserving)"
-#   development/agentic-refactor.sh --exec 'codex --sandbox workspace-write --ask-for-approval untrusted'
-#   development/agentic-refactor.sh --agent codex
-#   development/agentic-refactor.sh --dry-run
-
 usage() {
 	cat <<EOF
 Usage:
@@ -83,12 +71,11 @@ custom_prompt=""
 dry_run=0
 autocommit=0
 cooling_files=""
+declare -a remaining_args=()
 
+codex_parse_launcher_common_args agent exec_cmd dry_run autocommit remaining_args 0 exec_extra_args commits target prompt cooling-files -- "$@"
+set -- "${remaining_args[@]}"
 while [[ $# -gt 0 ]]; do
-	if codex_parse_launcher_option agent exec_cmd dry_run autocommit "$1" "${2:-}" 0 exec_extra_args; then
-		shift "$CODEX_PARSE_SHIFT" || true
-		continue
-	fi
 	case "$1" in
 	--commits)
 		codex_parse_option_value commits "$1" "${2:-}" "--commits"

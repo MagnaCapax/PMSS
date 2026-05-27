@@ -12,15 +12,6 @@ codex_agentic_bootstrap "$HERE" "PMSS_QA_CODEX_DEBUG" "agentic-qa" 1
 echo "[agentic-qa] DEPRECATED: Full E2E QA runs externally. Running code-level fallback." >&2
 echo "[agentic-qa] start: fetching complete-verify issues and invoking assistant" >&1
 
-# agentic-qa.sh — Fetch issues labeled complete-verify and launch an assistant
-# to run the QA verification gauntlet on each.
-#
-# Usage:
-#   development/agentic-qa.sh
-#   development/agentic-qa.sh --exec 'codex exec'
-#   development/agentic-qa.sh --autocommit
-#   development/agentic-qa.sh --dry-run
-
 usage() {
 	cat <<EOF
 Usage:
@@ -59,12 +50,11 @@ agent=""
 exec_cmd=""
 dry_run=0
 autocommit=0
+declare -a remaining_args=()
 
+codex_parse_launcher_common_args agent exec_cmd dry_run autocommit remaining_args 0 "" -- "$@"
+set -- "${remaining_args[@]}"
 while [[ $# -gt 0 ]]; do
-	if codex_parse_launcher_option agent exec_cmd dry_run autocommit "$1" "${2:-}"; then
-		shift "$CODEX_PARSE_SHIFT" || true
-		continue
-	fi
 	case "$1" in
 	-h | --help)
 		usage

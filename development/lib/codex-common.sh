@@ -210,6 +210,58 @@ codex_parse_launcher_option() {
 	return 1
 }
 
+# Match wrapper-specific value options so their value token is not consumed as
+# a later common launcher option during the shared pre-pass.
+codex_launcher_value_option_matches() {
+	local arg="$1" option
+	shift || true
+	[[ "$arg" == --*=* ]] && return 1
+	for option in "$@"; do
+		option="${option#--}"
+		[[ "$arg" == "--$option" ]] && return 0
+	done
+	return 1
+}
+
+# Strip common agentic launcher options and leave wrapper-specific args intact.
+codex_parse_launcher_common_args() {
+	local agent_name="$1" exec_name="$2" dry_run_name="${3-}" autocommit_name="${4-}"
+	local remaining_name="$5" exec_inline_allowed="${6:-0}" exec_extra_name="${7-}"
+	shift 7 || true
+	local -a value_options=()
+	while [[ $# -gt 0 && "$1" != "--" ]]; do
+		value_options+=("$1")
+		shift || true
+	done
+	if [[ "${1-}" == "--" ]]; then
+		shift || true
+	fi
+
+	local -n remaining_ref="$remaining_name"
+	remaining_ref=()
+	while [[ $# -gt 0 ]]; do
+		if [[ "$1" == "--" ]]; then
+			remaining_ref+=("$@")
+			break
+		fi
+		if codex_launcher_value_option_matches "$1" "${value_options[@]}"; then
+			remaining_ref+=("$1")
+			shift || true
+			if [[ $# -gt 0 ]]; then
+				remaining_ref+=("$1")
+				shift || true
+			fi
+			continue
+		fi
+		if codex_parse_launcher_option "$agent_name" "$exec_name" "$dry_run_name" "$autocommit_name" "$1" "${2:-}" "$exec_inline_allowed" "$exec_extra_name"; then
+			shift "$CODEX_PARSE_SHIFT" || true
+			continue
+		fi
+		remaining_ref+=("$1")
+		shift || true
+	done
+}
+
 # Parse a CLI option and expose its value via shared parse globals.
 codex_parse_option() {
 	local arg="$1" next_value="${2-}" option_name="$3" inline_allowed="${4:-0}"
@@ -280,6 +332,7 @@ codex_append_runner_args() {
 	[[ -n "$exec_cmd" ]] && target_ref+=(--exec "$exec_cmd")
 	[[ "$dry_run" == "1" ]] && target_ref+=(--dry-run)
 	[[ "$autocommit" == "1" ]] && target_ref+=(--autocommit)
+	return 0
 }
 
 # Resolve the requested agent, falling back to the shared default.
