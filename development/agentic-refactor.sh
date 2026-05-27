@@ -191,7 +191,7 @@ fi
 # only ever saw the recent-commit candidate list, so behemoths (environment.php, runtime.php,
 # update.php, ...) were never offered. This MECHANICALLY feeds the largest runtime PHP files.
 if [[ "$dry_run" != "1" ]] && printf '%s' "$custom_prompt" | grep -qE 'refactor\((decompose|dry)\):'; then
-	WHOLE_N="${PMSS_REFACTOR_WHOLE_N:-15}"
+	WHOLE_N="${PMSS_REFACTOR_WHOLE_N:-30}"
 	{ git -C "$ROOT" ls-files '*.php' 2>/dev/null |
 		grep -E '^(scripts|etc/skel/www)/' |
 		grep -vE '/(tests|testing|rutorrent)/' |
