@@ -50,3 +50,21 @@ Reject the refactor if any of these are true:
 - Default invocation exit-code meaning changed.
 - Machine payload channel (stdout) now includes diagnostics/noise.
 - No compatibility test proves legacy default behavior still works.
+
+## Helper Extraction Rules
+
+When a helper pattern reaches three similar implementations, extract the shared
+shape before shipping the third clone. The third implementation is the refactor
+trigger, not proof that a duplicated pattern should persist.
+
+### Third-Instance Refactor Trigger
+
+When code review identifies that a proposed function has the same API shape as
+an existing two-function pair, file the refactor issue first, or complete the
+refactor if it is already tracked, and represent the third case as data or
+configuration. The existing "extract at three call sites" threshold describes
+when extraction is warranted; this rule defines when the work must happen. For
+example, a proposed
+`pmssEnsureXyzBlacklist()` sibling to `pmssEnsureAlgifAeadBlacklist()` and
+`pmssEnsureDirtyFragBlacklist()` should become a registry entry behind one
+shared blacklist helper instead of a third near-duplicate function.
