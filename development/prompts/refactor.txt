@@ -330,7 +330,9 @@ WORKFLOW (DO THIS)
 
 6) Implement (Test-Driven where applicable):
    - If the logic is complex or risky, create a test case FIRST (scripts/lib/tests/development) to pin down current behavior.
-   - Implement minimal edits.
+   - Implement edits as deep as the architectural arc requires — "minimal" applies to scope creep
+     OUTSIDE the arc, not to the depth WITHIN the arc. For decompose/dry runs, bundle 5-15
+     related decompositions in ONE commit (per codex-run.sh REFACTOR ITERATION).
    - Keep behaviour identical.
    - Prefer deletion + inlining + flattening before extraction.
    - If a change would violate gates (without justification), drop it.
