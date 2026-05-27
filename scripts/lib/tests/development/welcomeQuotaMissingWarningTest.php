@@ -256,6 +256,18 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $this->pmssAssertStringNotContainsString('Undefined', $output);
     }
 
+    public function testWelcomeTrafficSectionShowsRawUsedAndLimitLine(): void
+    {
+        $output = $this->runWelcomeUsageScript(
+            'ob_start(); trafficCreateSection(array("raw" => array("month" => 433152)), 1000); echo ob_get_clean();',
+            '2>&1'
+        );
+
+        $this->assertStringContainsString('Used: 423 GiB / Limit: 1,000 GiB (30-day window)', $output);
+        $this->assertStringContainsString('Current effective: full plan port speed', $output);
+        $this->pmssAssertStringNotContainsString('Undefined', $output);
+    }
+
     public function testWelcomeMemorySectionSnapshots(): void
     {
         $fixture = $this->makeWelcomeUsageFixture();

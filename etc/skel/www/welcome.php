@@ -925,9 +925,10 @@ function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = nul
         : '';
     $titleText = "{$trafficUsed} / {$limitTotal} GiB";
     $bonusLine = ($bonusTraffic > 0) ? '<br />Bonus traffic: ' . number_format($bonusTraffic) . ' GiB' : '';
+    $usageLine = 'Used: '.$trafficUsed.' / Limit: '.number_format($limitTotal).' GiB (30-day window)';
     $gauge = createGauge($titleText, $titleText . $bonusLine, $percent);
 
-    echo pmssWelcomeMetricSectionHtmlBuild('Traffic Info', "\n{$gauge}\n{$warning}\n<div style=\"margin-top: 3px; line-height: 1.35;\">{$bandwidthNote}</div>\n{$inboundLine}{$ratioLine}\nThis is rolling past 30 days, <a href=\"https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/\" target=\"_blank\">read more</a>.\n");
+    echo pmssWelcomeMetricSectionHtmlBuild('Traffic Info', "\n{$usageLine}<br />\n{$gauge}\n{$warning}\n<div style=\"margin-top: 3px; line-height: 1.35;\">{$bandwidthNote}</div>\n{$inboundLine}{$ratioLine}\nThis is rolling past 30 days, <a href=\"https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/\" target=\"_blank\">read more</a>.\n");
 }
 
 function createStackedGauge($titleText, $footerText, $percent, $segments) {
