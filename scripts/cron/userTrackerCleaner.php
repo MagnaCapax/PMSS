@@ -1,21 +1,6 @@
 #!/usr/bin/env php
 <?php
-/**
- * Tracker cleanup script — remove known bad/dead trackers from rTorrent sessions.
- *
- * Scans a limited set of torrents per user on each run to avoid excessive I/O
- * and strips problematic trackers from announce lists. Intended to run at a
- * low cadence (e.g., hourly) due to its IOPS footprint.
- *
- * @author    Aleksi Ursin <aleksi@magnacapax.fi>
- * @copyright 2010-2025 Magna Capax Finland Oy
- *
- * @license GPL-3.0-only
- */
-// We should not run this too often, can generate TONS of I/O operations; for example maths:
-// 30 users, with each 250+ torrents ALL PRIVATE (best case) is still going to be roughly 30*260 == 7800 IO requests
-// 7800 IO in 60 seconds == 130IOPS. We should target more like 0.1, so 7800 / 0.1 = 78 000 seconds per pass or 1300minutes...
-// Hence a compromise has to be made, and run this once every two hours or so.
+/** Remove known bad public trackers from a bounded rTorrent session sample. */
 
 include '/scripts/lib/devristo/Torrent.php';
 include '/scripts/lib/devristo/Bee.php';
@@ -23,47 +8,19 @@ include '/scripts/lib/devristo/File.php';
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
+require_once __DIR__.'/../lib/trackerCleaner.php';
 use Devristo\Torrent\Torrent;
-
-function pmssTrackerCleanerTimestamp(): string
-{
-    return '['.date('Y-m-d H:i:s').']';
-}
-
-function pmssTrackerCleanerLog(string $message): void
-{
-    echo pmssTrackerCleanerTimestamp().' '.$message."\n";
-}
-
-function pmssTrackerCleanerShouldScrubTracker(string $trackerUrl, array $filterList, array $filterDomainList): bool
-{
-    foreach ($filterList as $filter) {
-        if ($filter !== '' && strpos($trackerUrl, $filter) !== false) {
-            return true;
-        }
-    }
-    foreach ($filterDomainList as $domain) {
-        if ($domain !== '' && stripos($trackerUrl, $domain) !== false) {
-            return true;
-        }
-    }
-    return false;
-}
 
 function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload): void
 {
-    if ($payload === '') {
-        return;
-    }
+    if ($payload === '') return;
 
     $userHome = "/home/{$username}";
     $userLogsDir = $userHome.'/.logs';
     $userLogFile = $userLogsDir.'/trackerCleaner.log';
 
     $tmpLogPath = @tempnam(sys_get_temp_dir(), 'pmss-trackerCleaner-');
-    if ($tmpLogPath === false) {
-        return;
-    }
+    if ($tmpLogPath === false) return;
     if (@file_put_contents($tmpLogPath, $payload) === false) {
         @unlink($tmpLogPath);
         return;
@@ -78,8 +35,7 @@ function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload
     @chgrp($tmpLogPath, $username);
     @chmod($tmpLogPath, 0640);
 
-    $ensureDirCmd = 'su -s /bin/bash -c '.escapeshellarg('mkdir -p ~/.logs').' '.escapeshellarg($username);
-    pmssUserLifecycleStep('trackerCleaner', $username, 'ensure_user_logs_dir', $ensureDirCmd, false);
+    pmssUserLifecycleStep('trackerCleaner', $username, 'ensure_user_logs_dir', 'su -s /bin/bash -c '.escapeshellarg('mkdir -p ~/.logs').' '.escapeshellarg($username), false);
 
     if (!is_dir($userLogsDir) || !pmssPathWithinRootIsSafe($userLogsDir, $userHome, true)) {
         pmssTrackerCleanerLog("WARN: User log directory is unsafe or missing for {$username} ({$userLogsDir}); skipping per-user verbose log.");
@@ -92,10 +48,7 @@ function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload
         return;
     }
 
-    $appendCmd = 'su -s /bin/bash -c '
-        .escapeshellarg('cat '.escapeshellarg($tmpLogPath).' >> ~/.logs/trackerCleaner.log')
-        .' '.escapeshellarg($username);
-    pmssUserLifecycleStep('trackerCleaner', $username, 'append_user_verbose_log', $appendCmd, false);
+    pmssUserLifecycleStep('trackerCleaner', $username, 'append_user_verbose_log', 'su -s /bin/bash -c '.escapeshellarg('cat '.escapeshellarg($tmpLogPath).' >> ~/.logs/trackerCleaner.log').' '.escapeshellarg($username), false);
 
     if (file_exists($userLogFile) && !is_link($userLogFile) && pmssPathWithinRootIsSafe($userLogFile, $userHome)) {
         @chown($userLogFile, $username);
@@ -124,38 +77,8 @@ if ($lockHandle === false) {
     pmssLockHandleWritePid($lockHandle);
 }
 
-$filterList = array(
-//    'udp://',
-    'udp://public.popcorn-tracker.org:6969/announce', // Watch reliability; flapping trackers can cause stalls.
-    'http://sub4all.org',
-    'udp://tracker.openbittorrent.com:80/announce',
-    'udp://tracker.publicbt.com',
-    'udp://tracker.ccc.de',
-    'http://tracker.tntvillage.scambioetico.org',
-    'http://exodus.desync.com',
-    'http://tracker.ftfansub.net',
-    'http://nyaa.tracker.wf',
-    'udp://tracker.istole.it',
-    'udp://mgtracker.org'
-);
-
-// Re-enabled (functional again) 2025-12-21:
-// - udp://tracker.opentrackr.org
-// - udp://open.demonii.com
-$filterDomainList = array(
-    // Any tracker URL containing this domain (exact URL varies).
-    'legittorrents.info',
-    'tracker.openbittorrent.com',
-    'tracker.leechers-paradise.org',
-    'tracker.coppersurfer.tk',
-    '9.rarbg.',
-    '10.rarbg.',
-    'tracker.eddie4.nl',
-    'tracker.supertracker.net',
-    'concen.org',
-    'tracker.tfile.me',
-    'tracker.cyberia.is',
-);
+$filterList = pmssTrackerCleanerFilterList();
+$filterDomainList = pmssTrackerCleanerFilterDomainList();
 
 // Get & parse users list
 $listUsersResult = pmssListManagedUsersResult('/scripts/listUsers.php');
@@ -173,8 +96,7 @@ shuffle($users);
 // Limit to 1 user per pass - thus we limit IOPS used as well!
 if (count($users) > 1) $users = array_slice($users, 0, 1);
 
-$runStarted = time();
-$runDeadline = $runStarted + (30 * 60);
+$runDeadline = time() + (30 * 60);
 $maxTorrentsPerUser = 500;
 $maxModifiedTorrents = 500;
 $modifiedCount = 0;
@@ -211,7 +133,6 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
 	        continue;
 	    } // Disabled the cleaner
 	    $expectedSessionDir = "/home/{$thisUser}/session";
-	    $expectedSessionPrefix = $expectedSessionDir.'/';
 	    if (!pmssPathWithinRootIsSafe($expectedSessionDir, $expectedSessionDir, true)) {
 	        pmssTrackerCleanerLog("SKIP: refusing to operate; session path unsafe for user {$thisUser} ({$expectedSessionDir}).");
 	        $userVerboseLog .= pmssTrackerCleanerTimestamp()." user_skip reason=session_path_unsafe session={$expectedSessionDir}\n";
@@ -286,8 +207,8 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
 	          $userPrivateTorrents++;
 	          $userVerboseLog .= pmssTrackerCleanerTimestamp()
 	              ." torrent_skip reason=private_flag_present file=".basename($thisTorrent)
-	              ." infohash=".$torrent->getInfoHash(false)
-	              ." name=".str_replace("\n", ' ', (string) $torrent->getName())
+	          ." infohash=".$torrent->getInfoHash(false)
+	          ." name=".pmssTrackerCleanerLogValue($torrent->getName())
 	              ."\n";
 	          continue;	// Do not touch private torrents
 	      }
@@ -295,80 +216,26 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
       $userVerboseLog .= pmssTrackerCleanerTimestamp()
           ." torrent_check public=1 file=".basename($thisTorrent)
           ." infohash=".$torrent->getInfoHash(false)
-          ." name=".str_replace("\n", ' ', (string) $torrent->getName())
+	          ." name=".pmssTrackerCleanerLogValue($torrent->getName())
           ."\n";
 
-      $torrentAnnounceList = $torrent->getAnnounceList();
-      $torrentAnnounceListNew = array();
-      $changed = false;
-      $removedTrackers = array();
-      $remainingTrackers = array();
-      foreach ($torrentAnnounceList as $tier) {
-          if (!is_array($tier)) {
-              continue;
-          }
-          $tierNew = array();
-          foreach ($tier as $trackerUrl) {
-              if (!is_string($trackerUrl)) {
-                  continue;
-              }
-              if (pmssTrackerCleanerShouldScrubTracker($trackerUrl, $filterList, $filterDomainList)) {
-                  $removedTrackers[$trackerUrl] = true;
-                  $changed = true;
-                  continue;
-              }
-              $tierNew[] = $trackerUrl;
-              $remainingTrackers[$trackerUrl] = true;
-          }
-          if (count($tierNew) > 0) {
-              $torrentAnnounceListNew[] = $tierNew;
-          }
+	      $scrub = pmssTrackerCleanerScrubTorrent($torrent, $filterList, $filterDomainList);
+	      foreach ($scrub['events'] as $event) {
+	          $userVerboseLog .= pmssTrackerCleanerTimestamp().' '.$event."\n";
 	      }
-	      if ($changed) {
-	          $torrent->setAnnounceList($torrentAnnounceListNew);
-      }
 
-      $announce = $torrent->getAnnounce();
-      if (is_string($announce) && $announce !== '' && pmssTrackerCleanerShouldScrubTracker($announce, $filterList, $filterDomainList)) {
-          $removedTrackers[$announce] = true;
-	          $replacement = null;
-	          foreach ($torrentAnnounceListNew as $tierNew) {
-	              if (isset($tierNew[0]) && is_string($tierNew[0]) && $tierNew[0] !== '') {
-	                  $replacement = $tierNew[0];
-	                  break;
-	              }
-	          }
-	          if ($replacement !== null) {
-	              $torrent->setAnnounce($replacement);
-	              $changed = true;
-	              $userVerboseLog .= pmssTrackerCleanerTimestamp()
-	                  ." announce_replaced from=".$announce
-	                  ." to=".$replacement
-	                  ."\n";
-          } else {
-              $userVerboseLog .= pmssTrackerCleanerTimestamp()
-                  ." announce_scrubbed_no_replacement announce=".$announce
-                  ."\n";
-          }
-      } elseif (is_string($announce) && $announce !== '') {
-          $remainingTrackers[$announce] = true;
-      }
-
-      if ($changed && count($remainingTrackers) === 0) {
-          // Avoid leaving a torrent trackerless; even flaky trackers can still be better than none.
-          $warning = 'Would leave completely trackerless, no tracker cleaning done';
-          pmssTrackerCleanerLog("WARN: {$warning} (user={$thisUser} file=".basename($thisTorrent).")");
-          $userVerboseLog .= pmssTrackerCleanerTimestamp()
+	      if ($scrub['would_trackerless']) {
+	          // Avoid leaving a torrent trackerless; even flaky trackers can still be better than none.
+	          $warning = 'Would leave completely trackerless, no tracker cleaning done';
+	          pmssTrackerCleanerLog("WARN: {$warning} (user={$thisUser} file=".basename($thisTorrent).")");
+	          $userVerboseLog .= pmssTrackerCleanerTimestamp()
               ." torrent_skip reason=trackerless warning=".$warning
               ."\n";
-          continue;
-      }
+	          continue;
+	      }
 
-      if ($changed) {
-          $removedList = implode(', ', array_keys($removedTrackers));
-          if ($removedList === '') {
-              $removedList = '(unknown)';
-          }
+	      if ($scrub['changed']) {
+	          $removedList = pmssTrackerCleanerRemovedTrackersText($scrub['removed_trackers']);
           // Backup as the user so ownership/perms stay consistent.
           $sourcePerms = @fileperms($thisTorrent);
           $sourceMode = $sourcePerms === false ? 0640 : ($sourcePerms & 0777);
@@ -380,13 +247,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
                   'mkdir -p '.escapeshellarg($thisUserTorrentBackupDirectory)
                   .' && chmod 750 '.escapeshellarg($thisUserTorrentBackupDirectory)
               ).' '.escapeshellarg($thisUser);
-              $prepareRc = pmssUserLifecycleStep(
-                  'trackerCleaner',
-                  $thisUser,
-                  'prepare_backup_dir',
-                  $prepareCmd,
-                  false
-              );
+              $prepareRc = pmssUserLifecycleStep('trackerCleaner', $thisUser, 'prepare_backup_dir', $prepareCmd, false);
               if ($prepareRc !== 0) {
                   pmssTrackerCleanerLog("ERR: Failed to prepare backup dir for user {$thisUser} (dir={$thisUserTorrentBackupDirectory}, rc={$prepareRc}).");
                   $userVerboseLog .= pmssTrackerCleanerTimestamp()
@@ -409,22 +270,11 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
               'cp -p '.escapeshellarg($thisTorrent).' '.escapeshellarg($backupTarget)
               .' && chmod '.$sourceModeText.' '.escapeshellarg($backupTarget)
           ).' '.escapeshellarg($thisUser);
-          $backupRc = pmssUserLifecycleStep(
-              'trackerCleaner',
-              $thisUser,
-              'backup_torrent',
-              $backupCmd,
-              false
-          );
+          $backupRc = pmssUserLifecycleStep('trackerCleaner', $thisUser, 'backup_torrent', $backupCmd, false);
           $backupSize = @filesize($backupTarget);
           $backupSizeText = $backupSize === false ? 'unknown' : (string) $backupSize;
-          $backupOk = $backupRc === 0
-              && $sourceSize !== false
-              && $backupSize !== false
-              && $backupSize === $sourceSize
-              && is_file($backupTarget)
-              && !is_link($backupTarget)
-              && pmssPathWithinRootIsSafe($backupTarget, $expectedBackupsDir);
+          $backupOk = $backupRc === 0 && $sourceSize !== false && $backupSize !== false && $backupSize === $sourceSize
+              && is_file($backupTarget) && !is_link($backupTarget) && pmssPathWithinRootIsSafe($backupTarget, $expectedBackupsDir);
           $userVerboseLog .= pmssTrackerCleanerTimestamp()
               ." torrent_backup rc={$backupRc} src={$thisTorrent} dst={$backupTarget}\n";
           if (!$backupOk) {
@@ -441,11 +291,8 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
               break;
           }
           $comment = (string) $torrent->getComment();
-          $marker = 'Trackers cleaned by PMSS tracker cleaner';
-          if (strpos($comment, $marker) === false) {
-              $suffix = '; '.$marker.' (https://github.com/MagnaCapax/PMSS/blob/main/docs/tracker-cleaner.md)';
-              $torrent->setComment($comment.$suffix);
-          }
+          $markedComment = pmssTrackerCleanerCommentWithMarker($comment);
+          if ($markedComment !== $comment) $torrent->setComment($markedComment);
           $written = @file_put_contents($thisTorrent, $torrent->serialize());
           $writtenBytes = $written === false ? -1 : (int) $written;
           $userVerboseLog .= pmssTrackerCleanerTimestamp()
@@ -475,12 +322,9 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
 
     }
 
-    // Let's also log it all!
-    $log = '';
     if (count($thisUserTorrentChanges) != 0) {
-      $log = '';
-      foreach($thisUserTorrentChanges AS $thisTorrentInfoHash => $thisTorrentName)
-          $log .= pmssTrackerCleanerTimestamp()." Changed {$thisTorrentName} ({$thisTorrentInfoHash})\n";
+	      $log = '';
+	      foreach($thisUserTorrentChanges AS $thisTorrentInfoHash => $thisTorrentName) $log .= pmssTrackerCleanerTimestamp()." Changed {$thisTorrentName} ({$thisTorrentInfoHash})\n";
 
       $userLogPath = "/home/{$thisUser}/.trackerCleaner.log";
       if (file_exists($userLogPath) && is_link($userLogPath)) {
@@ -500,13 +344,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
    $userVerboseLog .= pmssTrackerCleanerTimestamp()
        ." run_end user={$thisUser} processed={$userProcessedTorrents} private={$userPrivateTorrents} changed={$userChangedTorrents}{$runSuffix}\n";
    pmssTrackerCleanerWriteUserVerboseLog($thisUser, $userVerboseLog);
-   $summary = sprintf(
-       'tracker cleaner: processed=%d private=%d changed=%d%s',
-       $userProcessedTorrents,
-       $userPrivateTorrents,
-       $userChangedTorrents,
-       $stopReason !== '' ? ' stop_reason='.$stopReason : ''
-   );
+   $summary = sprintf('tracker cleaner: processed=%d private=%d changed=%d%s', $userProcessedTorrents, $userPrivateTorrents, $userChangedTorrents, $stopReason !== '' ? ' stop_reason='.$stopReason : '');
    pmssUserLog($thisUser, $summary);
 
    if ($stopReason !== '') {
