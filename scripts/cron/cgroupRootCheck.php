@@ -25,7 +25,7 @@ foreach (pmssReadSystemdProperties('user-0.slice', ['MemoryHigh', 'MemoryMax', '
 
 if ($fixes) {
     // In test mode, allow running without root to exercise logging paths
-    if (!defined('PMSS_TEST_MODE') && !pmssEnvFlagEnabled('PMSS_TEST_MODE')) {
+    if (!pmssTestModeEnabled()) {
         requireRoot();
     }
     runStep('Unlimiting root user slice', 'systemctl set-property user-0.slice '.implode(' ', $fixes));

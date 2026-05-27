@@ -23,7 +23,7 @@ function pmssSystemdUnitNameIsSafe(string $unit): bool
 
 function pmssSystemdActionSkipReason(?string $unit = null, bool $skipInDryRun = false, bool $skipInStrictTestMode = false): string
 {
-    if (($skipInDryRun && pmssEnvFlagEnabled('PMSS_DRY_RUN')) || ($skipInStrictTestMode && defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true)) return 'test/dry-run';
+    if (($skipInDryRun && pmssEnvFlagEnabled('PMSS_DRY_RUN')) || ($skipInStrictTestMode && pmssTestModeEnabled())) return 'test/dry-run';
     if (!pmssEnvFlagEnabled('PMSS_DRY_RUN') && !is_dir('/run/systemd/system')) return 'systemd unavailable';
     if ($unit !== null && !pmssSystemdUnitNameIsSafe($unit)) return 'invalid unit name';
     if ($unit !== null && !pmssEnvFlagEnabled('PMSS_DRY_RUN') && !pmssSystemdUnitExists($unit)) return 'unit '.$unit.' missing';

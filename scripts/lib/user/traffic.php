@@ -132,7 +132,7 @@ function pmssReadTorrentThrottle(string $username): ?int
         return null;
     }
 
-    if (getenv('PMSS_TEST_MODE') !== '1') {
+    if (!pmssTestModeEnabled()) {
         if ((int) $stats['uid'] !== 0) {
             return null;
         }
@@ -178,7 +178,7 @@ function pmssWriteTorrentThrottle(string $username, int $value): bool
     }
 
     $isRoot = function_exists('posix_geteuid') ? (posix_geteuid() === 0) : false;
-    if (!$isRoot && getenv('PMSS_TEST_MODE') !== '1') {
+    if (!$isRoot && !pmssTestModeEnabled()) {
         return false;
     }
 

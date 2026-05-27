@@ -182,7 +182,7 @@ function pmssAgentDiagnosticsMain(array $argv): int
     $parsed = pmssParseCliTokens($argv, ['user']);
     if (pmssCliOptionPresent($parsed, 'help', 'h')) { echo pmssAgentDiagnosticsUsage(); return 0; }
 
-    if (getenv('PMSS_TEST_MODE') !== '1') requireRoot();
+    if (!pmssTestModeEnabled()) requireRoot();
 
     $user = trim((string) pmssCliOption($parsed, 'user', 'u', ''));
     if ($user !== '') {

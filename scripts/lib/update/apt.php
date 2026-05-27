@@ -191,7 +191,7 @@ function pmssUpdateAptSources(string $distroName, int $distroVersion, string $cu
         }
         if ($target['eol']) {
             // EOL suites lack valid Release timestamps; relax the check.
-            if (defined('PMSS_TEST_MODE')) {
+            if (pmssTestModeEnabled()) {
                 $log('PMSS_TEST_MODE: skipping apt conf/clean ('.$label.')');
             } else {
                 pmssAptWriteValidUntilOverride($log);

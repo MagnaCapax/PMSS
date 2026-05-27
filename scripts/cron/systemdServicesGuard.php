@@ -13,7 +13,7 @@
 
 require_once __DIR__.'/../lib/update/services/systemd.php';
 
-if (!defined('PMSS_TEST_MODE') && !pmssEnvFlagEnabled('PMSS_TEST_MODE')) {
+if (!pmssTestModeEnabled()) {
     requireRoot();
 }
 

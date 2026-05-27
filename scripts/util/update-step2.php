@@ -368,7 +368,7 @@ pmssRunProfiledCallable('Running update-step2 preflight checks', static function
     }
 
     // Basic network reachability (warn only; skip in dry-run/test mode)
-    if (!pmssEnvFlagEnabled('PMSS_DRY_RUN') && !pmssEnvFlagEnabled('PMSS_TEST_MODE')) {
+    if (!pmssEnvFlagEnabled('PMSS_DRY_RUN') && !pmssTestModeEnabled()) {
         $sock = @fsockopen('deb.debian.org', 80, $errno, $errstr, 3.0);
         if ($sock === false) {
             pmssLogJson(['event' => 'preflight_error', 'check' => 'network', 'status' => 'warn', 'reason' => 'unreachable', 'host' => 'deb.debian.org', 'errno' => $errno, 'error' => $errstr]);

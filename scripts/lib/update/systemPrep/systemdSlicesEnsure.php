@@ -52,7 +52,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
     {
         $log = $logger ?: 'logMessage';
         // Avoid touching the host systemd manager in test mode so dev tests stay hermetic.
-        $skipSystemctl = (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true);
+        $skipSystemctl = pmssTestModeEnabled();
 
         // Drop-in management must target /etc paths only; avoid vendor dirs.
         // Some legacy hosts still carry a vendor drop-in at:

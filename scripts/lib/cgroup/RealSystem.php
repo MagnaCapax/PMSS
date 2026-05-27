@@ -28,8 +28,7 @@ class RealSystem implements SystemInterface
     public function execute(string $command): ?string
     {
         // In test mode we avoid shelling out to real systemctl/findmnt.
-        if ((defined('PMSS_TEST_MODE') && PMSS_TEST_MODE)
-            || \pmssValueMatchesNormalized(getenv('PMSS_TEST_MODE'), ['1', 'true', 'yes'])) {
+        if (\pmssTestModeEnabled()) {
             return '';
         }
 
