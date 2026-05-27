@@ -409,27 +409,16 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
         return ['stdout' => $stdout, 'stderr' => $stderr, 'timed_out' => $timedOut];
     }
 
-    /** Resolve the per-host timeout-fire JSONL path, allowing hermetic tests. */
-    function pmssTimeoutFireLogPath(): string
-    {
-        $path = getenv('PMSS_TIMEOUT_FIRE_LOG');
-        return is_string($path) && trim($path) !== '' ? trim($path) : PMSS_TIMEOUT_FIRE_LOG_DEFAULT;
-    }
-
-    /** Keep timeout command payloads single-line and bounded for JSONL logs. */
-    function pmssTimeoutCommandForLog(string $command): string
-    {
-        $command = trim((string) preg_replace('/[\r\n\0\t ]+/', ' ', $command));
-        return strlen($command) > 500 ? substr($command, 0, 500).'...' : $command;
-    }
-
     /** Emit one structured timeout-fire event to the dedicated host log and JSON stream. */
     function pmssTimeoutFireLog(string $command, int $intendedSeconds, float $actualSeconds, string $signal, int $exitStatus): void
     {
+        $logPath = getenv('PMSS_TIMEOUT_FIRE_LOG');
+        $logPath = is_string($logPath) && trim($logPath) !== '' ? trim($logPath) : PMSS_TIMEOUT_FIRE_LOG_DEFAULT;
+        $command = trim((string) preg_replace('/[\r\n\0\t ]+/', ' ', $command));
         $payload = [
             'timestamp'        => date('c'),
             'event'            => 'timeout_fired',
-            'command'          => pmssTimeoutCommandForLog($command),
+            'command'          => strlen($command) > 500 ? substr($command, 0, 500).'...' : $command,
             'intended_seconds' => $intendedSeconds,
             'actual_seconds'   => (float) sprintf('%.3f', max(0.0, $actualSeconds)),
             'signal'           => $signal,
@@ -437,7 +426,7 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
             'correlation_id'   => pmssCorrelationId(),
         ];
 
-        pmssJsonLineAppend(pmssTimeoutFireLogPath(), $payload);
+        pmssJsonLineAppend($logPath, $payload);
         pmssLogJson($payload);
     }
 
@@ -472,17 +461,6 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
         return $exitCode;
     }
 
-    /** Extract a usable child exit code from proc_get_status() output. */
-    function pmssProcessStatusExitCode($status): ?int
-    {
-        if (!is_array($status)) {
-            return null;
-        }
-
-        $exitCode = $status['exitcode'] ?? null;
-        return is_int($exitCode) && $exitCode >= 0 ? $exitCode : null;
-    }
-
     /**
      * Close a process handle without losing an exit code observed during polling.
      *
@@ -492,7 +470,8 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
      */
     function pmssProcessCloseExitCode($process, $lastStatus = null): int
     {
-        $fallbackExitCode = pmssProcessStatusExitCode($lastStatus);
+        $observedExitCode = is_array($lastStatus) ? ($lastStatus['exitcode'] ?? null) : null;
+        $fallbackExitCode = is_int($observedExitCode) && $observedExitCode >= 0 ? $observedExitCode : null;
         $rc = is_resource($process) ? @proc_close($process) : -1;
 
         if ($rc === -1 && $fallbackExitCode !== null) {

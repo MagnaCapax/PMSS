@@ -179,14 +179,6 @@ class RuntimeTest extends TestCase
         $this->assertEquals("CAPTURE_ERR\n", $result['stderr']);
     }
 
-    public function testProcessStatusExitCodeAcceptsOnlyObservedExitCodes(): void
-    {
-        $this->assertSame(7, \pmssProcessStatusExitCode(['exitcode' => 7]));
-        $this->assertSame(null, \pmssProcessStatusExitCode(['exitcode' => -1]));
-        $this->assertSame(null, \pmssProcessStatusExitCode(['exitcode' => '7']));
-        $this->assertSame(null, \pmssProcessStatusExitCode([]));
-    }
-
     public function testProcessCloseExitCodeUsesObservedStatusAfterPolling(): void
     {
         $process = proc_open(
@@ -281,6 +273,7 @@ class RuntimeTest extends TestCase
         $data = json_decode((string) end($lines), true);
         $this->assertTrue(is_array($data), 'expected timeout-fire JSON payload');
         $this->assertEquals('timeout_fired', $data['event'] ?? '');
+        $this->assertStringContainsString('php -r', $data['command'] ?? '');
         $this->assertEquals(1, $data['intended_seconds'] ?? 0);
         $this->assertEquals(124, $data['exit_status'] ?? 0);
         $this->assertEquals('SIGTERM', $data['signal'] ?? '');
