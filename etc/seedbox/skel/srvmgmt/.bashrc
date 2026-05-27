@@ -1,3 +1,6 @@
+# Keep newly-created files private before any early shell return.
+umask 077
+
 # ~/.bashrc: executed by bash(1) for non-login shells.
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples

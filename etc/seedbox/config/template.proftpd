@@ -41,7 +41,7 @@ PassivePorts                    60000 65535
 User                            proftpd
 Group                           nogroup
 
-Umask                           022  022
+Umask                           077  077
 AllowOverwrite                  on
 TransferLog                     /var/log/proftpd/xferlog
 SystemLog                       /var/log/proftpd/proftpd.log

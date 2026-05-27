@@ -72,7 +72,7 @@ X11UseLocalhost yes
 AcceptEnv LANG LC_*
 
 # Subsystem for SFTP
-Subsystem       sftp    internal-sftp
+Subsystem       sftp    internal-sftp -u 0077
 
 # Authentication methods
 # PasswordAuthentication yes
