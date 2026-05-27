@@ -9,6 +9,17 @@ require_once dirname(__DIR__, 2).'/update/environment.php';
  */
 class DpkgBaselineApplySafetyTest extends TestCase
 {
+    public function testDpkgSelectionSanitizerKeepsBaselinePolicySnapshot(): void
+    {
+        $available = static function (string $package): bool { return in_array($package, ['alpha', 'held'], true); };
+        [$plan, $output] = $this->pmssCaptureStdout(function () use ($available): array {
+            return \pmssDpkgSelectionsSanitise(['alpha', 'held HOLD', 'wireguard-dkms install', 'repo-mediaarea install', 'nzbdrone install', 'linux-image-6.1.0-1-amd64 install', 'php8.2-cli install', 'python3.11-venv install', 'missing-tool install', 'cgroup-bin install', 'bad$name install', 'purged purge'], 12, $available);
+        });
+
+        $this->assertSame([["alpha\tinstall", "held\thold", "wireguard-dkms\tdeinstall", "repo-mediaarea\tdeinstall", "purged\tpurge"], true, true, ['missing-tool'], ['wireguard-dkms', 'repo-mediaarea', 'nzbdrone', 'php8.2-cli', 'python3.11-venv'], ['linux-image-6.1.0-1-amd64']], [$plan['sanitised'], $plan['warnings'], $plan['short_form_seen'], $plan['dropped_unavailable'], $plan['dropped_obsolete'], $plan['dropped_kernel']]);
+        $this->assertStringContainsString('Invalid dpkg selection entry at line 11: bad$name install', $output);
+    }
+
     public function testWriteSanitisedDpkgSelectionsTempFileWritesPayloadWhenHelperExists(): void
     {
         if (!function_exists('pmssWriteSanitisedDpkgSelectionsTempFile')) {

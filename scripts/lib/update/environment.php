@@ -13,7 +13,7 @@
 
 require_once __DIR__.'/logging.php';
 require_once __DIR__.'/runtime/commands.php';
-require_once __DIR__.'/packageState.php';
+require_once __DIR__.'/dpkgSelections.php';
 require_once __DIR__.'/managedPath.php';
 
 /**
@@ -109,102 +109,6 @@ CONF;
         if ($rc !== 0) {
             runStep('Retrying proftpd configure', 'dpkg --configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic || true');
         }
-}
-
-/**
-     * Resolve the best dpkg selections baseline file for the detected distro version.
-     *
-     * This is pure selection logic (no command execution) so tests can validate
-     * baseline availability without mutating a host.
-     */
-    function pmssSelectDpkgSelectionsBaseline(?int $distroVersion = null, ?callable $logger = null): ?string
-    {
-        $log = $logger ?: 'logMessage';
-        $baseDir = __DIR__.'/dpkg';
-        $baselines = [];
-        foreach (glob($baseDir.'/selections-debian*.txt') ?: [] as $path) {
-            if (preg_match('/selections-debian([0-9]+)\\.txt$/', $path, $match)) {
-                $baselines[(int) $match[1]] = $path;
-            }
-        }
-        $validatedBaselines = array_filter(array_keys($baselines), static function (int $major): bool {
-            return $major <= 12;
-        });
-        $latestBaseline = $baselines ? max(array_keys($baselines)) : null;
-        $latestValidatedBaseline = $validatedBaselines ? max($validatedBaselines) : null;
-        $fallbackBaseline = $latestValidatedBaseline ?? $latestBaseline;
-        $fallbackPath = $fallbackBaseline !== null ? $baselines[$fallbackBaseline] : null;
-
-        $candidates = [];
-        $requestedPath = null;
-        $requestedBaselineValidated = true;
-        if ($distroVersion !== null) {
-            $requestedPath = $baselines[$distroVersion] ?? sprintf('%s/selections-debian%d.txt', $baseDir, $distroVersion);
-            $requestedBaselineValidated = $distroVersion <= 12;
-            if ($requestedBaselineValidated) {
-                $candidates[] = $requestedPath;
-            }
-        }
-        foreach (array_filter([$fallbackPath, $baseDir.'/selections.txt']) as $fallbackCandidate) {
-            if (!in_array($fallbackCandidate, $candidates, true)) {
-                $candidates[] = $fallbackCandidate;
-            }
-        }
-
-        $selected = null;
-        foreach ($candidates as $candidate) {
-            if (is_readable($candidate)) {
-                $selected = $candidate;
-                break;
-            }
-        }
-
-        if ($selected === null) {
-            return null;
-        }
-
-        if ($distroVersion !== null && $requestedPath !== null && $selected !== $requestedPath) {
-            if (!$requestedBaselineValidated && is_readable($requestedPath)) {
-                if ($latestValidatedBaseline !== null && isset($baselines[$latestValidatedBaseline]) && $selected === $baselines[$latestValidatedBaseline]) {
-                    $log(sprintf('[WARN] Debian %d dpkg baseline exists but is not validated for automatic use; using Debian %d baseline (%s).', $distroVersion, $latestValidatedBaseline, basename($selected)));
-                } else {
-                    $log(sprintf('[WARN] Debian %d dpkg baseline exists but is not validated for automatic use; using %s.', $distroVersion, basename($selected)));
-                }
-            } elseif ($latestValidatedBaseline !== null && $latestValidatedBaseline < $distroVersion && isset($baselines[$latestValidatedBaseline]) && $selected === $baselines[$latestValidatedBaseline]) {
-                $log(sprintf('[WARN] Debian %d dpkg baseline missing; using Debian %d baseline (%s).', $distroVersion, $latestValidatedBaseline, basename($selected)));
-            } else {
-                $log(sprintf('[WARN] Debian %d dpkg baseline unavailable; using %s.', $distroVersion, basename($selected)));
-            }
-        }
-
-        return $selected;
-}
-
-/**
-     * Persist the sanitized dpkg baseline to a temporary file.
-     *
-     * Callers must treat a null return as a hard stop. Falling back to the raw
-     * baseline would bypass the validation pass that produced the sanitized
-     * payload.
-     *
-     * @param array<int, string> $sanitised
-     */
-    function pmssWriteSanitisedDpkgSelectionsTempFile(array $sanitised): ?string
-    {
-        $tmpSelection = @tempnam(sys_get_temp_dir(), 'pmss-selections-');
-        if ($tmpSelection === false) {
-            logMessage('[ERROR] Unable to create temporary file for sanitized dpkg selections baseline');
-            return null;
-        }
-
-        $payload = implode(PHP_EOL, $sanitised).PHP_EOL;
-        if (@file_put_contents($tmpSelection, $payload, LOCK_EX) === false) {
-            @unlink($tmpSelection);
-            logMessage('[ERROR] Unable to write temporary file for sanitized dpkg selections baseline');
-            return null;
-        }
-
-        return $tmpSelection;
 }
 
     /**
@@ -305,76 +209,12 @@ CONF;
         $success       = true;
         $warnings      = false;
         if ($lines !== false) {
-            $sanitised = [];
-            $shortFormSeen = false;
-            $t0 = microtime(true);
-            $droppedUnavailable = [];
-            $droppedObsolete    = [];
-            $droppedKernel      = [];
-            $runtimeVersion     = pmssDistroVersionFromEnv($distroVersion);
-            foreach ($lines as $idx => $line) {
-                $trimmed = trim($line);
-                if ($trimmed === '') {
-                    continue;
-                }
-                $parts = preg_split('/\s+/', $trimmed);
-                if (count($parts) === 1) {
-                    // Debian 12 baseline currently uses short-form lines containing only
-                    // the package name. Treat these as "install" selections instead of
-                    // emitting per-line warnings. Aggregated validation below still
-                    // enforces allowed package/state patterns.
-                    $package = $parts[0];
-                    $state   = 'install';
-                    $shortFormSeen = true;
-                } elseif (count($parts) >= 2) {
-                    $package = $parts[0];
-                    $state   = $parts[1];
-                } else {
-                    pmssLogStatus('WARN', sprintf('Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed), 0);
-                    $warnings = true;
-                    continue;
-                }
-                // Skip problematic or deprecated packages from baseline
-                $lower = strtolower($package);
-
-                // On Debian 12+ WireGuard is part of the stock kernel; the
-                // out-of-tree DKMS module is no longer required and can cause
-                // BUILD_EXCLUSIVE failures during kernel upgrades. Force its
-                // selection state to "deinstall" so dselect-upgrade removes it.
-                if ($runtimeVersion >= 12 && $lower === 'wireguard-dkms') {
-                    $sanitised[] = $package."\tdeinstall";
-                    $warnings = true;
-                    $droppedObsolete[] = $package;
-                    continue;
-                }
-
-                // Legacy MediaArea bootstrap package: repo-mediaarea is no longer
-                // required now that apt sources are templated directly. Newer
-                // builds also use control.tar.zst which older dpkg cannot unpack.
-                // Always mark it for deinstallation so hosts converge away from it.
-                if ($lower === 'repo-mediaarea') {
-                    $sanitised[] = $package."\tdeinstall";
-                    $warnings = true;
-                    $droppedObsolete[] = $package;
-                    continue;
-                }
-
-                // Drop legacy names we no longer install via apt (tarball/venv used instead)
-                if (in_array($lower, ['nzbdrone', 'pyload-cli'], true)) { $warnings = true; $droppedObsolete[] = $package; continue; }
-                // Drop version-pinned kernel images silently; rely on meta 'linux-image-amd64'
-                if (preg_match('/^linux-image-[0-9]/i', $package)) { $warnings = true; $droppedKernel[] = $package; continue; }
-                // Drop versioned PHP and Python3 packages from baseline; rely on meta/unversioned names
-                if (preg_match('/^php[0-9]+\.[0-9]+\-/i', $package)) { $warnings = true; $droppedObsolete[] = $package; continue; }
-                if (preg_match('/^python3\.[0-9]+\-/i', $package)) { $warnings = true; $droppedObsolete[] = $package; continue; }
-                if (!preg_match('/^[a-z0-9.+:-]+$/i', $package) || !preg_match('/^(install|hold|purge|deinstall)$/i', $state)) {
-                    pmssLogStatus('WARN', sprintf('Invalid dpkg selection entry at line %d: %s', $idx + 1, $trimmed), 0);
-                    $warnings = true;
-                    continue;
-                }
-                // If requesting install of a package not available in the current apt cache, drop it
-                if (strtolower($state) === 'install' && !pmssPackageAvailable($package)) { $warnings = true; if (strtolower($package) !== 'cgroup-bin') { $droppedUnavailable[] = $package; } continue; }
-                $sanitised[] = $package."\t".strtolower($state);
-            }
+            $runtimeVersion = function_exists('pmssDistroVersionFromEnv')
+                ? pmssDistroVersionFromEnv($distroVersion)
+                : (int) ($distroVersion ?? 0);
+            $selectionPlan = pmssDpkgSelectionsSanitise($lines, $runtimeVersion);
+            $sanitised = $selectionPlan['sanitised'];
+            $warnings = (bool) $selectionPlan['warnings'];
 
             if (!empty($sanitised)) {
                 $tmpSelection = pmssWriteSanitisedDpkgSelectionsTempFile($sanitised);
@@ -385,20 +225,7 @@ CONF;
                 $selectionPath = $tmpSelection;
             }
 
-            // Aggregate summary logs instead of per-package noise
-            if (!empty($droppedUnavailable)) {
-                $sample = array_slice($droppedUnavailable, 0, 10);
-                pmssLogStatus('SKIP', sprintf('Baseline: dropped %d unavailable packages (first %d: %s)', count($droppedUnavailable), count($sample), implode(', ', $sample)), 0, microtime(true)-$t0);
-            }
-            if (!empty($droppedKernel)) {
-                pmssLogStatus('SKIP', sprintf('Baseline: dropped %d versioned kernel packages', count($droppedKernel)), 0, 0.0);
-            }
-            if (!empty($droppedObsolete)) {
-                pmssLogStatus('SKIP', sprintf('Baseline: dropped %d obsolete entries (legacy names)', count($droppedObsolete)), 0, 0.0);
-            }
-            if ($shortFormSeen) {
-                pmssLogStatus('INFO', 'Baseline: detected short-form dpkg selection entries; treating as \"install\" state', 0, 0.0);
-            }
+            pmssDpkgSelectionsLogSummary($selectionPlan);
         }
 
         $cmd = sprintf('dpkg --set-selections < %s', escapeshellarg($selectionPath));

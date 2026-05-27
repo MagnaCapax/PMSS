@@ -28,7 +28,7 @@ class UpdateLibraryDependencyTest extends TestCase
             ['scripts/lib/user/qbittorrent.php', ["require_once __DIR__.'/traffic.php';"], ["require_once __DIR__.'/../update/runtime/commands.php';"], 'qbittorrent.php should not bootstrap update runtime helpers it does not use'],
             ['scripts/util/configureOpenvpn.php', ["pmssLogStatus('SKIP', 'OpenVPN already configured; skipping provisioning', 0);"], ["function_exists('pmssLogStatus')"], 'configureOpenvpn.php should rely on runtime/commands.php for pmssLogStatus()'],
             ['scripts/util/userConfig.php', ["pmssLogStatus('SKIP', 'Rootless Docker disabled by config for '.\$user['name']);", "pmssUserDockerEnabled(\$user['name'], \$store)"], ["function_exists('pmssLogStatus')", "function_exists('pmssUserDockerEnabled')"], 'userConfig.php should rely on runtime/commands.php and userConfigStore.php for Docker policy helpers'],
-            ['scripts/lib/update/environment.php', ["require_once __DIR__.'/packageState.php';"], ["apps/packages/helpers.php"], 'environment.php should use read-only package state helpers'],
+            ['scripts/lib/update/environment.php', ["require_once __DIR__.'/dpkgSelections.php';"], ["apps/packages/helpers.php"], 'environment.php should use dpkg selection sanitizers instead of package queues'],
             ['scripts/lib/update/apps/iprange.php', ["require_once __DIR__.'/../packageState.php';"], ["packages/helpers.php"], 'iprange.php should use read-only package state helpers'],
         ]);
     }
