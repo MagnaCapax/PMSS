@@ -181,12 +181,7 @@ class UserTransferTest extends TestCase
         $cfg = $this->baseConfig();
         $script = \pmssUserTransferBuildRsyncMain($cfg);
 
-        $this->assertStringContainsString('rsync -av', $script);
-        $this->assertStringContainsString(':/home/deefbox/', $script);
-        $this->assertStringContainsString('/home/deefbox/', $script);
-        $this->assertStringContainsString("--exclude='.rtorrent.rc'", $script);
-        $this->assertStringContainsString("--exclude='.trafficDataIngress'", $script);
-        $this->assertStringContainsString("--exclude='.trafficDataIngressLocal'", $script);
+        $this->assertStringContainsAllStrings(['rsync -av', ':/home/deefbox/', '/home/deefbox/', "--exclude='.rtorrent.rc'", "--exclude='.trafficDataIngress'", "--exclude='.trafficDataIngressLocal'"], $script);
         $this->assertStringNotContainsString('--exclude={', $script, 'expected no brace-expanded excludes');
     }
 
@@ -206,11 +201,7 @@ class UserTransferTest extends TestCase
         $cfg = $this->baseConfig();
         $script = \pmssUserTransferBuildAuthProbe($cfg);
 
-        $this->assertStringContainsString('ssh -o Compression=no', $script);
-        $this->assertStringContainsString('-o NumberOfPasswordPrompts=1', $script);
-        $this->assertStringContainsString("-l 'deefbox'", $script);
-        $this->assertStringContainsString("'example.com'", $script);
-        $this->assertStringContainsString("'/bin/true'", $script);
+        $this->assertStringContainsAllStrings(['ssh -o Compression=no', '-o NumberOfPasswordPrompts=1', "-l 'deefbox'", "'example.com'", "'/bin/true'"], $script);
     }
 
     public function testBuildRemoteSizeProbeUsesByteAccurateDu(): void
@@ -218,10 +209,7 @@ class UserTransferTest extends TestCase
         $cfg = $this->baseConfig(['remoteUser' => 'remote01', 'verifyThreshold' => 90]);
         $script = \pmssUserTransferBuildRemoteSizeProbe($cfg);
 
-        $this->assertStringContainsString('-o NumberOfPasswordPrompts=1', $script);
-        $this->assertStringContainsString("'example.com'", $script);
-        $this->assertStringContainsString("/home/remote01/", $script);
-        $this->assertStringContainsString("'du '\\''-sb'\\''", $script);
+        $this->assertStringContainsAllStrings(['-o NumberOfPasswordPrompts=1', "'example.com'", "/home/remote01/", "'du '\\''-sb'\\''"], $script);
     }
 
     public function testGeneratedScriptsKeepSharedSshFlagsAligned(): void

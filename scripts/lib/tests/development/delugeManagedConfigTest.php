@@ -27,11 +27,7 @@ JSON
         $this->assertTrue(\pmssDelugeApplyManagedConfig('alice'));
 
         $updated = (string) file_get_contents($configPath);
-        $this->assertStringContainsString('"download_location": "/srv/downloads"', $updated);
-        $this->assertStringContainsString('"max_active_downloading": 5', $updated);
-        $this->assertStringContainsString('"max_active_limit": 500', $updated);
-        $this->assertStringContainsString('"max_connections_global": 300', $updated);
-        $this->assertStringContainsString('"max_upload_slots_global": 15', $updated);
+        $this->assertStringContainsAllStrings(['"download_location": "/srv/downloads"', '"max_active_downloading": 5', '"max_active_limit": 500', '"max_connections_global": 300', '"max_upload_slots_global": 15'], $updated);
         $this->assertSame(0640, fileperms($configPath) & 0777);
     }
 
@@ -57,12 +53,7 @@ JSON
         $this->assertTrue(\pmssDelugeApplyManagedConfig('alice'));
 
         $updated = (string) file_get_contents($configPath);
-        $this->assertStringContainsString('"download_location": "/home/alice/data"', $updated);
-        $this->assertStringContainsString('"enabled_plugins": [', $updated);
-        $this->assertStringContainsString('"Label"', $updated);
-        $this->assertStringContainsString('"max_upload_speed": 250', $updated);
-        $this->assertStringContainsString('"max_active_limit": 500', $updated);
-        $this->assertStringContainsString('"max_upload_slots_global": 15', $updated);
+        $this->assertStringContainsAllStrings(['"download_location": "/home/alice/data"', '"enabled_plugins": [', '"Label"', '"max_upload_speed": 250', '"max_active_limit": 500', '"max_upload_slots_global": 15'], $updated);
     }
 
     public function testApplyManagedConfigReturnsFalseWhenAlreadyConverged(): void

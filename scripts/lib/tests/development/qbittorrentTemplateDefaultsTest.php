@@ -9,24 +9,14 @@ class QbittorrentTemplateDefaultsTest extends TestCase
     {
         $template = $this->loadTemplate();
 
-        $this->assertStringContainsString("Session\\MaxConnections=300\n", $template);
-        $this->assertStringContainsString("Session\\MaxConnectionsPerTorrent=75\n", $template);
-        $this->assertStringContainsString("Session\\MaxUploads=20\n", $template);
-        $this->assertStringContainsString("Session\\MaxUploadsPerTorrent=4\n", $template);
-        $this->assertStringContainsString("Bittorrent\\MaxConnecs=300\n", $template);
-        $this->assertStringContainsString("Bittorrent\\MaxConnecsPerTorrent=75\n", $template);
+        $this->assertStringContainsAllStrings(["Session\\MaxConnections=300\n", "Session\\MaxConnectionsPerTorrent=75\n", "Session\\MaxUploads=20\n", "Session\\MaxUploadsPerTorrent=4\n", "Bittorrent\\MaxConnecs=300\n", "Bittorrent\\MaxConnecsPerTorrent=75\n"], $template);
     }
 
     public function testTemplatePinsSharedDiskCacheDefaults(): void
     {
         $template = $this->loadTemplate();
 
-        $this->assertStringContainsString("Session\\DiskCacheSize=128\n", $template);
-        $this->assertStringContainsString("Session\\DiskCacheTTL=120\n", $template);
-        $this->assertStringContainsString("Downloads\\DiskWriteCacheSize=128\n", $template);
-        $this->assertStringContainsString("Downloads\\DiskWriteCacheTTL=120\n", $template);
-        $this->assertStringContainsString("Session\\Preallocation=false\n", $template);
-        $this->assertStringContainsString("Downloads\\PreAllocation=false\n", $template);
+        $this->assertStringContainsAllStrings(["Session\\DiskCacheSize=128\n", "Session\\DiskCacheTTL=120\n", "Downloads\\DiskWriteCacheSize=128\n", "Downloads\\DiskWriteCacheTTL=120\n", "Session\\Preallocation=false\n", "Downloads\\PreAllocation=false\n"], $template);
     }
 
     public function testTemplateUsesPosixDiskIoAndLimitedAsyncThreads(): void
@@ -41,18 +31,14 @@ class QbittorrentTemplateDefaultsTest extends TestCase
     {
         $template = $this->loadTemplate();
 
-        $this->assertStringContainsString("Session\\uTPMixedMode=TCP\n", $template);
-        $this->assertStringContainsString("Session\\ChokingAlgorithm=FixedSlots\n", $template);
-        $this->assertStringContainsString("Session\\SeedChokingAlgorithm=FastestUpload\n", $template);
+        $this->assertStringContainsAllStrings(["Session\\uTPMixedMode=TCP\n", "Session\\ChokingAlgorithm=FixedSlots\n", "Session\\SeedChokingAlgorithm=FastestUpload\n"], $template);
     }
 
     public function testTemplatePinsSendBufferDefaults(): void
     {
         $template = $this->loadTemplate();
 
-        $this->assertStringContainsString("Session\\SendBufferWatermark=1024\n", $template);
-        $this->assertStringContainsString("Session\\SendBufferLowWatermark=256\n", $template);
-        $this->assertStringContainsString("Session\\SendBufferWatermarkFactor=150\n", $template);
+        $this->assertStringContainsAllStrings(["Session\\SendBufferWatermark=1024\n", "Session\\SendBufferLowWatermark=256\n", "Session\\SendBufferWatermarkFactor=150\n"], $template);
     }
 
     private function loadTemplate(): string

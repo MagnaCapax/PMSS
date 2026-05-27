@@ -40,10 +40,7 @@ class FilebotInstallerHardeningTest extends TestCase
     {
         $contents = $this->pmssReadUpdateAppFile('filebot.php');
 
-        $this->assertStringContainsString('/usr/bin/filebot', $contents);
-        $this->assertStringContainsString('pmssAppVersionProbeOutput', $contents);
-        $this->assertStringContainsString(' -version 2>/dev/null', $contents);
-        $this->assertStringContainsString('@unlink($filebotPath)', $contents);
+        $this->assertStringContainsAllStrings(['/usr/bin/filebot', 'pmssAppVersionProbeOutput', ' -version 2>/dev/null', '@unlink($filebotPath)'], $contents);
     }
 
     public function testFilebotInstallerNoLongerBuildsDpkgCommandInline(): void
@@ -58,21 +55,14 @@ class FilebotInstallerHardeningTest extends TestCase
     {
         $contents = $this->pmssReadUpdateAppFile('remoteBinary.php');
 
-        $this->assertStringContainsString('function pmssInstallPinnedRemoteDebPackage', $contents);
-        $this->assertStringContainsString('function pmssDownloadPinnedRemoteTempFile', $contents);
-        $this->assertStringContainsString("pmssBuildCommand('dpkg'", $contents);
-        $this->assertStringContainsString('checksum mismatch; refusing install', $contents);
+        $this->assertStringContainsAllStrings(['function pmssInstallPinnedRemoteDebPackage', 'function pmssDownloadPinnedRemoteTempFile', "pmssBuildCommand('dpkg'", 'checksum mismatch; refusing install'], $contents);
     }
 
     public function testRemoteBinaryKeepsTempCleanupInlineWithFinally(): void
     {
         $contents = $this->pmssReadUpdateAppFile('remoteBinary.php');
 
-        $this->assertStringContainsString('pmssDownloadPinnedRemoteTempFile(', $contents);
-        $this->assertStringContainsString("'pmss-remote-bin-'", $contents);
-        $this->assertStringContainsString("'pmss-remote-deb-'", $contents);
-        $this->assertStringContainsString('try {', $contents);
-        $this->assertStringContainsString('} finally {', $contents);
+        $this->assertStringContainsAllStrings(['pmssDownloadPinnedRemoteTempFile(', "'pmss-remote-bin-'", "'pmss-remote-deb-'", 'try {', '} finally {'], $contents);
         $this->assertTrue(strpos($contents, 'function pmssRemoteBinary') === false, 'remoteBinary.php should keep temp-file cleanup inline rather than adding a helper wrapper');
     }
 }

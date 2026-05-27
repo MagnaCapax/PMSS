@@ -10,14 +10,7 @@ class SharpEdgesLintFatalTest extends TestCase
         $path = 'scripts/testing/sharp-edges-lint.sh';
         $src  = (string) file_get_contents($path);
         $this->assertStringContainsString('fatalScan()', $src, 'scripts/testing/sharp-edges-lint.sh must define fatalScan()');
-        $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+/([[:space:];]|$)", $src);
-        $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+/home([[:space:];]|$)", $src);
-        $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+/home/([[:space:];]|$|\\*)", $src);
-        $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+\\\"/home", $src);
-        $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+/home/\\$[A-Za-z_][A-Za-z0-9_]*", $src);
-        $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+\\$[A-Za-z_][A-Za-z0-9_]*([[:space:];]|$)", $src);
-        $this->assertStringContainsString('rm[[:space:]]+-rf[[:space:]]+[$]HOME', $src);
-        $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+~", $src);
+        $this->assertStringContainsAllStrings(["rm[[:space:]]+-rf[[:space:]]+/([[:space:];]|$)", "rm[[:space:]]+-rf[[:space:]]+/home([[:space:];]|$)", "rm[[:space:]]+-rf[[:space:]]+/home/([[:space:];]|$|\\*)", "rm[[:space:]]+-rf[[:space:]]+\\\"/home", "rm[[:space:]]+-rf[[:space:]]+/home/\\$[A-Za-z_][A-Za-z0-9_]*", "rm[[:space:]]+-rf[[:space:]]+\\$[A-Za-z_][A-Za-z0-9_]*([[:space:];]|$)", 'rm[[:space:]]+-rf[[:space:]]+[$]HOME', "rm[[:space:]]+-rf[[:space:]]+~"], $src);
     }
 
     public function testFatalPatternsCatchCommonAbusiveForms(): void

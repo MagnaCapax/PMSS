@@ -11,16 +11,7 @@ class addUserCliTest extends TestCase
     {
         $usage = \pmssAddUserCliUsage();
 
-        $this->assertStringContainsString('addUser.php USERNAME --password=PASSWORD', $usage);
-        $this->assertStringContainsString('--cpu-weight=WEIGHT', $usage);
-        $this->assertStringContainsString('--io-read-bw=/dev/DEVICE:RATE', $usage);
-        $this->assertStringContainsString('--cpu-quota-percent=PERCENT|infinity', $usage);
-        $this->assertStringContainsString('--iops-limit=OPS', $usage);
-        $this->assertStringContainsString('--io-latency-ms=MS', $usage);
-        $this->assertStringContainsString('--io-cost-qos=SETTING', $usage);
-        $this->assertStringContainsString('--io-cost-model=SETTING', $usage);
-        $this->assertStringContainsString('--docker-enabled=true|false', $usage);
-        $this->assertStringContainsString('--help', $usage);
+        $this->assertStringContainsAllStrings(['addUser.php USERNAME --password=PASSWORD', '--cpu-weight=WEIGHT', '--io-read-bw=/dev/DEVICE:RATE', '--cpu-quota-percent=PERCENT|infinity', '--iops-limit=OPS', '--io-latency-ms=MS', '--io-cost-qos=SETTING', '--io-cost-model=SETTING', '--docker-enabled=true|false', '--help'], $usage);
     }
 
     public function testHelpFlagReturnsUsageWithoutUserPayload(): void
@@ -150,10 +141,7 @@ class addUserCliTest extends TestCase
             'dockerEnabled' => 'false',
         ]);
 
-        $this->assertStringContainsString("'/scripts/util/userConfig.php' 'alice' '512' '100' '' '200' '' '' '' '' '' '150'", $command);
-        $this->assertStringContainsString("'--upload-throttle-kib=16'", $command);
-        $this->assertStringContainsString("'--iops-limit=1234'", $command);
-        $this->assertStringContainsString("'--docker-enabled=false'", $command);
+        $this->assertStringContainsAllStrings(["'/scripts/util/userConfig.php' 'alice' '512' '100' '' '200' '' '' '' '' '' '150'", "'--upload-throttle-kib=16'", "'--iops-limit=1234'", "'--docker-enabled=false'"], $command);
     }
 
     private function parseAddUserCli(array $args): array

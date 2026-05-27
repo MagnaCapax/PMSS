@@ -50,15 +50,7 @@ class userConfigCommandContractsTest extends TestCase
     {
         $source = $this->loadUserConfigSubsystemSource();
 
-        $this->assertStringContainsString("require_once __DIR__.'/../lib/cli/optionParser.php';", $source);
-        $this->assertStringContainsString("require_once __DIR__.'/../lib/user/userConfigCli.php';", $source);
-        $this->assertStringContainsString("pmssUserConfigCliResourceOptionNames('addUserOption')", $source);
-        $this->assertStringContainsString("array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled'], \$resourceOptions)", $source);
-        $this->assertStringContainsString("pmssCliOption(\$parsed, 'upload-throttle-kib')", $source);
-        $this->assertStringContainsString("pmssCliOption(\$parsed, 'welcome-message')", $source);
-        $this->assertStringContainsString("pmssCliOption(\$parsed, 'docker-enabled')", $source);
-        $this->assertStringContainsString("pmssUserConfigCliExplicitResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", $source);
-        $this->assertStringContainsString("\$presence = array_fill_keys(array_keys(\$explicitResourceOverrides), true);", $source);
+        $this->assertStringContainsAllStrings(["require_once __DIR__.'/../lib/cli/optionParser.php';", "require_once __DIR__.'/../lib/user/userConfigCli.php';", "pmssUserConfigCliResourceOptionNames('addUserOption')", "array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled'], \$resourceOptions)", "pmssCliOption(\$parsed, 'upload-throttle-kib')", "pmssCliOption(\$parsed, 'welcome-message')", "pmssCliOption(\$parsed, 'docker-enabled')", "pmssUserConfigCliExplicitResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", "\$presence = array_fill_keys(array_keys(\$explicitResourceOverrides), true);"], $source);
         $this->assertTrue(
             strpos($source, "strpos(\$arg, '--upload-throttle-kib=')") === false,
             'userConfig.php should not keep a manual --upload-throttle-kib scan'
@@ -107,10 +99,7 @@ class userConfigCommandContractsTest extends TestCase
     {
         $source = $this->loadUserConfigSubsystemSource();
 
-        $this->assertStringContainsString("pmssUserConfigCliResolvedResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", $source);
-        $this->assertStringContainsString("pmssUserConfigCliPersistedStoredResources(\$existing)", $source);
-        $this->assertStringContainsString("pmssUserConfigCliApplyPersistedResources(\$payload, \$user, \$presence)", $source);
-        $this->assertStringContainsString("pmssUserConfigCliBuildCgroupResourceArgs(\$user)", $source);
+        $this->assertStringContainsAllStrings(["pmssUserConfigCliResolvedResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", "pmssUserConfigCliPersistedStoredResources(\$existing)", "pmssUserConfigCliApplyPersistedResources(\$payload, \$user, \$presence)", "pmssUserConfigCliBuildCgroupResourceArgs(\$user)"], $source);
         $this->assertTrue(
             strpos($source, 'pmssUserConfigCli'.'PersistedResourcePresence') === false,
             'userConfig.php should derive persisted presence from explicit resource overrides'
@@ -150,10 +139,6 @@ class userConfigCommandContractsTest extends TestCase
     {
         $source = $this->loadUserConfigSubsystemSource();
 
-        $this->assertStringContainsString('@file_put_contents($rclonePortFile, (string) rand(1500, 65500)) === false', $source);
-        $this->assertStringContainsString('Warning: failed to write rclone port', $source);
-        $this->assertStringContainsString('Warning: failed to create qBittorrent config directory', $source);
-        $this->assertStringContainsString('@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false', $source);
-        $this->assertStringContainsString('Warning: failed to write qBittorrent port', $source);
+        $this->assertStringContainsAllStrings(['@file_put_contents($rclonePortFile, (string) rand(1500, 65500)) === false', 'Warning: failed to write rclone port', 'Warning: failed to create qBittorrent config directory', '@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false', 'Warning: failed to write qBittorrent port'], $source);
     }
 }

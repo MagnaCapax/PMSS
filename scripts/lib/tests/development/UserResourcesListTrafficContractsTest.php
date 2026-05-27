@@ -17,10 +17,7 @@ class UserResourcesListTrafficContractsTest extends TestCase
     {
         $src = $this->pmssReadRepoFile('scripts/lib/user/resourcesList.php');
 
-        $this->assertStringContainsString("require_once __DIR__.'/traffic.php';", $src);
-        $this->assertStringContainsString("require_once __DIR__.'/trafficLimit.php';", $src);
-        $this->assertStringContainsString('pmssTrafficLimitReadGiBFile($trafficLimitPath)', $src);
-        $this->assertStringContainsString('pmssReadUserTrafficMonth($trafficDataPath)', $src);
+        $this->assertStringContainsAllStrings(["require_once __DIR__.'/traffic.php';", "require_once __DIR__.'/trafficLimit.php';", 'pmssTrafficLimitReadGiBFile($trafficLimitPath)', 'pmssReadUserTrafficMonth($trafficDataPath)'], $src);
         $this->pmssAssertStringNotContainsString('unserialize(', $src);
         $this->assertStringContainsString('max($diskQuotaGiB * 500, 15000)', $src);
     }
@@ -33,9 +30,7 @@ class UserResourcesListTrafficContractsTest extends TestCase
         $showTrafficReader = 'pmssShowTrafficRead'.'StatsPayload';
         $trafficLimitsReader = 'pmssRead'.'TrafficData';
 
-        $this->assertStringContainsString('pmssTrafficStatsPath($thisUser, $statsDir)', $showTraffic);
-        $this->assertStringContainsString('pmssReadSerializedArrayFile($statsPath)', $showTraffic);
-        $this->assertStringContainsString('pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser)', $showTraffic);
+        $this->assertStringContainsAllStrings(['pmssTrafficStatsPath($thisUser, $statsDir)', 'pmssReadSerializedArrayFile($statsPath)', 'pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser)'], $showTraffic);
         $this->pmssAssertStringNotContainsString('function '.$showTrafficReader, $showTraffic);
         $this->pmssAssertStringNotContainsString('unserialize(', $showTraffic);
 
