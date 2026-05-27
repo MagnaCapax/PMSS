@@ -86,26 +86,7 @@ function pmssSystemStatsCollect(): array
             return $v === null ? 'na' : number_format($v, 1, '.', '');
         }, [$someAvg10, $find('some', 'avg60'), $find('full', 'avg10')]));
     };
-    $iopingMs = static function (string $path): string {
-        if (!is_dir($path)) {
-            return 'na';
-        }
-        // 10 samples, 0.1s interval, direct I/O — matches storageBenchmark.php preflight pattern.
-        // Single-shot (-c 1) variance is 10x; 10-sample average is the stable signal.
-        // Parse avg from "min/avg/max/mdev = a / b / c / d" stats line (last line of output).
-        $out = trim((string) @shell_exec('ioping -c 10 -i 0.1 -D '.escapeshellarg($path).' 2>/dev/null | tail -n1'));
-        if ($out === '' || !preg_match('#min/avg/max/mdev\s*=\s*[^/]+/\s*([0-9.]+)\s*(us|ms|s)\s*/#i', $out, $matches)) {
-            return 'na';
-        }
-        $value = (float) $matches[1];
-        $unit = strtolower($matches[2]);
-        if ($unit === 'us') {
-            $value /= 1000;
-        } elseif ($unit === 's') {
-            $value *= 1000;
-        }
-        return number_format($value, 1, '.', '').'ms';
-    };
+    $iopingMs = static function (string $path): string { $value = is_dir($path) ? pmssIopingAverageMs($path) : null; return $value === null ? 'na' : number_format($value, 1, '.', '').'ms'; };
 
     // Keep this low in test mode so hermetic tests don't waste time sleeping.
     $sampleUsec = getenv('PMSS_TEST_MODE') === '1' ? 50000 : 1000000;

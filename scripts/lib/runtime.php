@@ -55,6 +55,16 @@ function pmssStatsCompareTimesBuild(?int $now = null): array { $now = $now ?? ti
         $path = trim($resolved);
         return $path !== '' && strpos($path, '/') === 0 && is_executable($path) ? $path : '';
     }
+    // Return a 10-sample direct-I/O ioping average normalized to milliseconds.
+    function pmssIopingAverageMs(?string $target): ?float
+    {
+        $bin = pmssCommandPath('ioping');
+        if ($bin === '') return null;
+        $out = trim((string) shell_exec(escapeshellcmd($bin).' -c 10 -i 0.1 -D '.escapeshellarg((string) $target).' 2>&1 | tail -n1'));
+        if (!preg_match('/min\/avg\/max\/mdev\s*=\s*[^\/]+\/\s*([0-9.]+)\s*(us|ms|s)\s*\//i', $out, $m)) return null;
+        $value = (float) $m[1];
+        return strtolower($m[2]) === 'us' ? $value / 1000.0 : (strtolower($m[2]) === 's' ? $value * 1000.0 : $value);
+    }
 
     // Normalize environment values so flag parsing stays consistent.
     function pmssEnvValueNormalized($value): string { return strtolower(trim((string) $value)); }

@@ -61,6 +61,31 @@ class RuntimeCommandPathTest extends TestCase
         $this->assertEquals('', pmssCommandPath('cd'));
     }
 
+    public function testIopingAverageMsParsesReportedUnits(): void
+    {
+        foreach ([['1500 us', 1.5], ['2.75 ms', 2.75], ['0.25 s', 250.0]] as $case) {
+            $binDir = $this->pmssMakeExecutableStub('ioping', "#!/bin/sh\nprintf '%s\\n' 'min/avg/max/mdev = 1.0 / ".$case[0]." / 3.0 / 0.1'\n", 'pmss-ioping-avg-');
+            $this->pmssWithPathPrefix($binDir, function () use ($case): void {
+                $this->assertEquals($case[1], pmssIopingAverageMs('/tmp'));
+            });
+        }
+    }
+
+    public function testIopingAverageMsReturnsNullForMalformedOutput(): void
+    {
+        $binDir = $this->pmssMakeExecutableStub('ioping', "#!/bin/sh\nprintf '%s\\n' 'not ioping statistics'\n", 'pmss-ioping-avg-');
+        $this->pmssWithPathPrefix($binDir, function (): void {
+            $this->assertSame(null, pmssIopingAverageMs('/tmp'));
+        });
+    }
+
+    public function testIopingAverageMsReturnsNullWhenIopingIsMissing(): void
+    {
+        $this->pmssWithEnv(['PATH' => '/nonexistent'], function (): void {
+            $this->assertSame(null, pmssIopingAverageMs('/tmp'));
+        });
+    }
+
     private function prependCommandPath(string $binDir): void
     {
         $path = getenv('PATH');
