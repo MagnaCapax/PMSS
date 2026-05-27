@@ -23,37 +23,36 @@ abstract class PmssUserStatsProcessor
         $this->workerLogPath = $workerLogPath;
     }
 
-    public function discoverUsers(): array { return pmssFileBasenamesDiscover($this->statsDataDir.'/*'); }
+    public function discoverUsers(): array { $items = array_map('basename', array_filter(glob($this->statsDataDir.'/*') ?: [], 'is_file')); sort($items, SORT_NATURAL | SORT_FLAG_CASE); return $items; }
 
-    public function spawnWorkers(string $scriptPath, array $users): void { pmssUserWorkersSpawnDetached($scriptPath, $users, $this->workerLogPath); }
+    public function spawnWorkers(string $scriptPath, array $users): void { $script = escapeshellarg($scriptPath); foreach ($users as $user) passthru("nohup {$script} ".escapeshellarg($user)." >> ".escapeshellarg($this->workerLogPath)." 2>&1 &"); }
 
     public function runCli(array $argv, string $scriptPath): int
     {
         $this->beforeRunCli();
-        return pmssStatsProcessorRunCli(
-            $argv,
-            $scriptPath,
-            [$this, 'validateUser'],
-            [$this, 'processUser'],
-            [$this, 'discoverUsers'],
-            [$this, 'spawnWorkers'],
-            [$this, 'beforeSpawn']
-        );
+        if (isset($argv[1])) { $user = self::sanitizeUserArg($argv[1]); if (!$this->validateUser($user)) { echo "Invalid user specified: {$user}\n"; return 0; } $this->processUser($user, pmssStatsCompareTimesBuild()); return 0; }
+        if (!$this->beforeSpawn()) return 0;
+        if (empty($users = $this->discoverUsers())) { echo "No users in this system!\n"; return 0; }
+        $this->spawnWorkers($scriptPath, $users); return 0;
     }
 
     protected function beforeRunCli(): void {}
 
     public function beforeSpawn(): bool { return true; }
 
+    private static function sanitizeUserArg(string $value): string { return (string) preg_replace('/[^a-zA-Z0-9-_]/', '', $value); }
+
     protected function statsUserHasDataHomeAndPasswd(string $dataUser, string $homeUser): bool
     {
         return is_readable($this->statsDataDir.'/'.$dataUser)
             && is_dir($this->homeDir.'/'.$homeUser)
-            && pmssPasswdFileHasUser($this->passwdFile, $homeUser);
+            && self::passwdFileHasUser($this->passwdFile, $homeUser);
     }
 
+    private static function passwdFileHasUser(string $passwdFile, string $user): bool { return is_string($passwd = @file_get_contents($passwdFile)) && preg_match('/^'.preg_quote($user, '/').':/m', $passwd) === 1; }
+
     /** @return array{data_lines:string,records:array<int,string>}|null */
-    protected function loadStatsDataLines(string $user, callable $loadData, string $logPrefix, bool $trimData = false): ?array { return pmssStatsProcessorDataLinesLoad($user, [$this, 'validateUser'], $loadData, $logPrefix, $trimData); }
+    protected function loadStatsDataLines(string $user, callable $loadData, string $logPrefix, bool $trimData = false): ?array { if (!$this->validateUser($user)) { logMessage($logPrefix."Invalid user {$user}"); return null; } $dataLines = (string) $loadData($user, (int) ((35 * 24 * 60) / 5)); $trimData && $dataLines = trim($dataLines); if ($dataLines === '') { logMessage($logPrefix."No data for user {$user}"); return null; } if (count($records = array_filter(explode("\n", $dataLines))) < 2) { logMessage($logPrefix."Too little data for {$user}"); return null; } return ['data_lines' => $dataLines, 'records' => $records]; }
 
     abstract public function validateUser(string $user): bool;
 

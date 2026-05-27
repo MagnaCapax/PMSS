@@ -34,16 +34,6 @@ const PMSS_TIMEOUT_FIRE_LOG_DEFAULT = '/var/log/pmss-timeout-fires.jsonl';
     function pmssDirPathResolve(?string $override, string $envKey, string $default): string { return pmssDirPathNormalize((string) ($override !== null ? $override : pmssResolvePathFromEnv($envKey, $default))); }
 // Build the standard month/week/day/hour/15min thresholds used by PMSS stats processors.
 function pmssStatsCompareTimesBuild(?int $now = null): array { $now = $now ?? time(); return ['month' => $now - (30 * 24 * 60 * 60), 'week' => $now - (7 * 24 * 60 * 60), 'day' => $now - (24 * 60 * 60), 'hour' => $now - (60 * 60), '15min' => $now - (15 * 60)]; }
-    // Strip unexpected characters from a CLI-supplied user key.
-    function pmssCliUserArgSanitize(string $value): string { return (string) preg_replace('/[^a-zA-Z0-9-_]/', '', $value); }
-function pmssPasswdFileHasUser(string $passwdFile, string $user): bool { return is_string($passwd = @file_get_contents($passwdFile)) && preg_match('/^'.preg_quote($user, '/').':/m', $passwd) === 1; }
-// Discover natural-sorted file basenames from a bounded glob pattern.
-function pmssFileBasenamesDiscover(string $pattern): array { $items = array_map('basename', array_filter(glob($pattern) ?: [], 'is_file')); sort($items, SORT_NATURAL | SORT_FLAG_CASE); return $items; }
-// Spawn per-user workers and redirect output to a shared PMSS log.
-function pmssUserWorkersSpawnDetached(string $scriptPath, array $users, string $logPath): void { $script = escapeshellarg($scriptPath); foreach ($users as $user) passthru("nohup {$script} ".escapeshellarg($user)." >> ".escapeshellarg($logPath)." 2>&1 &"); }
-function pmssStatsProcessorRunCli(array $argv, string $scriptPath, callable $validateUser, callable $processUser, callable $discoverUsers, callable $spawnWorkers, ?callable $beforeSpawn = null): int { if (isset($argv[1])) { $user = pmssCliUserArgSanitize($argv[1]); if (!$validateUser($user)) { echo "Invalid user specified: {$user}\n"; return 0; } $processUser($user, pmssStatsCompareTimesBuild()); return 0; } if ($beforeSpawn !== null && !$beforeSpawn()) return 0; if (empty($users = $discoverUsers())) { echo "No users in this system!\n"; return 0; } $spawnWorkers($scriptPath, $users); return 0; }
-/** @return array{data_lines:string,records:array<int,string>}|null */
-function pmssStatsProcessorDataLinesLoad(string $user, callable $validateUser, callable $loadData, string $logPrefix, bool $trimData = false): ?array { if (!$validateUser($user)) { logMessage($logPrefix."Invalid user {$user}"); return null; } $dataLines = (string) $loadData($user, (int) ((35 * 24 * 60) / 5)); $trimData && $dataLines = trim($dataLines); if ($dataLines === '') { logMessage($logPrefix."No data for user {$user}"); return null; } if (count($records = array_filter(explode("\n", $dataLines))) < 2) { logMessage($logPrefix."Too little data for {$user}"); return null; } return ['data_lines' => $dataLines, 'records' => $records]; }
     // Accept only bare binary names before crossing the shell boundary.
     function pmssCommandBinaryNameIsSafe(string $binary): bool
     {

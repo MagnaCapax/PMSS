@@ -18,7 +18,7 @@ function pmssAddUserEnsurePreflightState(users $userDb, array $user, string $hom
             return true;
         }
 
-        return pmssPasswdFileHasUser('/etc/passwd', $userName);
+        return pmssPasswdEntryLookup($userName) !== null;
     };
 
     $userExists = $accountExists($user['name']);
