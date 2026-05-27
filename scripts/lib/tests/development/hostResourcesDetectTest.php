@@ -6,31 +6,9 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class hostResourcesDetectTest extends TestCase
 {
-    /** @var string|false */
-    private $originalTotalMem;
-
-    /** @var string|false */
-    private $originalTotalCpuThreads;
-
     public function setUp(): void
     {
-        $this->originalTotalMem = getenv('PMSS_TOTAL_MEM_MIB');
-        $this->originalTotalCpuThreads = getenv('PMSS_TOTAL_CPU_THREADS');
-    }
-
-    public function tearDown(): void
-    {
-        if ($this->originalTotalMem === false) {
-            putenv('PMSS_TOTAL_MEM_MIB');
-        } else {
-            putenv('PMSS_TOTAL_MEM_MIB='.$this->originalTotalMem);
-        }
-
-        if ($this->originalTotalCpuThreads === false) {
-            putenv('PMSS_TOTAL_CPU_THREADS');
-        } else {
-            putenv('PMSS_TOTAL_CPU_THREADS='.$this->originalTotalCpuThreads);
-        }
+        $this->pmssTrackEnvKeys(['PMSS_TOTAL_MEM_MIB', 'PMSS_TOTAL_CPU_THREADS']);
     }
 
     public function testTotalMemUsesNumericOverride(): void

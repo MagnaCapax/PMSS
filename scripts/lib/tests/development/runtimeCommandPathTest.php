@@ -6,22 +6,9 @@ require_once dirname(__DIR__, 3).'/lib/runtime.php';
 
 class RuntimeCommandPathTest extends TestCase
 {
-    /** @var string|false */
-    private $previousPath;
-
     protected function setUp(): void
     {
-        $this->previousPath = getenv('PATH');
-    }
-
-    protected function tearDown(): void
-    {
-        if ($this->previousPath === false) {
-            putenv('PATH');
-            return;
-        }
-
-        putenv('PATH='.$this->previousPath);
+        $this->pmssTrackEnvKeys(['PATH']);
     }
 
     public function testCommandBinaryNameIsSafeAcceptsSimpleBinaryNames(): void
@@ -43,7 +30,7 @@ class RuntimeCommandPathTest extends TestCase
     public function testCommandPathReturnsStubPathForSafeBinary(): void
     {
         $binDir = $this->pmssMakeExecutableStub('pmss-demo-binary', "#!/bin/sh\nexit 0\n", 'pmss-command-path-');
-        putenv('PATH='.$binDir.($this->previousPath !== false ? ':'.$this->previousPath : ''));
+        $this->prependCommandPath($binDir);
 
         $this->assertEquals($binDir.'/pmss-demo-binary', pmssCommandPath('pmss-demo-binary'));
     }
@@ -51,7 +38,7 @@ class RuntimeCommandPathTest extends TestCase
     public function testCommandPathRejectsUnsafeBinaryNamesBeforeShellLookup(): void
     {
         $binDir = $this->pmssMakeExecutableStub('pmss-safe-binary', "#!/bin/sh\nexit 0\n", 'pmss-command-path-');
-        putenv('PATH='.$binDir.($this->previousPath !== false ? ':'.$this->previousPath : ''));
+        $this->prependCommandPath($binDir);
 
         $this->assertEquals('', pmssCommandPath('../pmss-safe-binary'));
         $this->assertEquals('', pmssCommandPath('pmss-safe-binary;id'));
@@ -72,5 +59,11 @@ class RuntimeCommandPathTest extends TestCase
     public function testCommandPathRejectsShellBuiltinsWithoutExecutablePaths(): void
     {
         $this->assertEquals('', pmssCommandPath('cd'));
+    }
+
+    private function prependCommandPath(string $binDir): void
+    {
+        $path = getenv('PATH');
+        putenv('PATH='.$binDir.($path !== false ? ':'.$path : ''));
     }
 }

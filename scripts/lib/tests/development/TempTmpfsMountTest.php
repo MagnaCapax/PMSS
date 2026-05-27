@@ -6,22 +6,9 @@ require_once dirname(__DIR__, 2).'/update/services/mountHardening.php';
 
 class TempTmpfsMountTest extends TestCase
 {
-    private $prevFlag;
-    private $prevSize;
-    private $prevDryRun;
-
     public function setUp(): void
     {
-        $this->prevFlag = getenv('PMSS_HARDEN_TMP_TMPFS');
-        $this->prevSize = getenv('PMSS_TMPFS_TMP_SIZE');
-        $this->prevDryRun = getenv('PMSS_DRY_RUN');
-    }
-
-    public function tearDown(): void
-    {
-        $this->pmssRestoreEnv('PMSS_HARDEN_TMP_TMPFS', $this->prevFlag);
-        $this->pmssRestoreEnv('PMSS_TMPFS_TMP_SIZE', $this->prevSize);
-        $this->pmssRestoreEnv('PMSS_DRY_RUN', $this->prevDryRun);
+        $this->pmssTrackEnvKeys(['PMSS_HARDEN_TMP_TMPFS', 'PMSS_TMPFS_TMP_SIZE', 'PMSS_DRY_RUN']);
     }
 
     private function runTmpfsHardening(string $fstab, string $mounts, ?string $flag = '1', ?string $size = null): array

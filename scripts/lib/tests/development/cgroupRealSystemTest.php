@@ -20,21 +20,9 @@ class cgroupRealSystemProbe extends \PMSS\Cgroup\RealSystem
 
 class cgroupRealSystemTest extends TestCase
 {
-    /** @var string|false */
-    private $originalHomeDevice;
-
     public function setUp(): void
     {
-        $this->originalHomeDevice = getenv('PMSS_HOME_DEVICE');
-    }
-
-    public function tearDown(): void
-    {
-        if ($this->originalHomeDevice === false) {
-            putenv('PMSS_HOME_DEVICE');
-            return;
-        }
-        putenv('PMSS_HOME_DEVICE='.$this->originalHomeDevice);
+        $this->pmssTrackEnvKeys(['PMSS_HOME_DEVICE']);
     }
 
     public function testExecuteReturnsEmptyStringInTestMode(): void

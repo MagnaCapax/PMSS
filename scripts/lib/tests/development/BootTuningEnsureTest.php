@@ -6,22 +6,9 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class BootTuningEnsureTest extends TestCase
 {
-    /** @var string|false */
-    private $prevConfigDir = false;
-
     protected function setUp(): void
     {
-        $this->prevConfigDir = getenv('PMSS_CONFIG_DIR');
-        putenv('PMSS_CONFIG_DIR='.$this->pmssRepoPath('etc/seedbox/config'));
-    }
-
-    protected function tearDown(): void
-    {
-        if ($this->prevConfigDir === false || $this->prevConfigDir === '') {
-            putenv('PMSS_CONFIG_DIR');
-            return;
-        }
-        putenv('PMSS_CONFIG_DIR='.$this->prevConfigDir);
+        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $this->pmssRepoPath('etc/seedbox/config')], true);
     }
 
     public function testWritesBootTuningScript(): void

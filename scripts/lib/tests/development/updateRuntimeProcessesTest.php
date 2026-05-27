@@ -8,12 +8,6 @@ require_once dirname(__DIR__, 2).'/update/runtime/processes.php';
 
 class UpdateRuntimeProcessesTest extends TestCase
 {
-    /** @var string|false */
-    private $previousPath;
-
-    /** @var string|false */
-    private $previousHome;
-
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-update-runtime-processes');
@@ -45,32 +39,20 @@ esac
 BASH
 );
 
-        $this->previousPath = getenv('PATH');
-        $this->previousHome = getenv('HOME');
-        putenv('PATH='.$this->tempDir.'/bin'.($this->previousPath !== false ? ':'.$this->previousPath : ''));
-        putenv('HOME='.$this->tempDir);
-        putenv('PMSS_TEST_PGREP_STATE='.$this->tempDir.'/state');
-        putenv('PMSS_TEST_COMMAND_LOG='.$this->tempDir.'/commands.log');
-        putenv('PMSS_TEST_KILL_MODE='.$this->tempDir.'/kill-mode');
+        $path = getenv('PATH');
+        $this->pmssTrackEnvOverrides([
+            'PATH' => $this->tempDir.'/bin'.($path !== false ? ':'.$path : ''),
+            'HOME' => $this->tempDir,
+            'PMSS_TEST_PGREP_STATE' => $this->tempDir.'/state',
+            'PMSS_TEST_COMMAND_LOG' => $this->tempDir.'/commands.log',
+            'PMSS_TEST_KILL_MODE' => $this->tempDir.'/kill-mode',
+        ]);
         $this->pmssResetRuntimeProfile();
     }
 
     protected function tearDown(): void
     {
         $this->pmssResetRuntimeProfile();
-        putenv('PMSS_TEST_PGREP_STATE');
-        putenv('PMSS_TEST_COMMAND_LOG');
-        putenv('PMSS_TEST_KILL_MODE');
-        if ($this->previousPath === false) {
-            putenv('PATH');
-        } else {
-            putenv('PATH='.$this->previousPath);
-        }
-        if ($this->previousHome === false) {
-            putenv('HOME');
-        } else {
-            putenv('HOME='.$this->previousHome);
-        }
     }
 
     public function testKillProcessSkipsWhenProcessMissing(): void

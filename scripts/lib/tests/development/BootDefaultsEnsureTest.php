@@ -7,9 +7,11 @@ require_once dirname(__DIR__, 2).'/update/services/quota.php';
 
 class BootDefaultsEnsureTest extends TestCase
 {
-    private $prevDryRun;
-    protected function setUp(): void { $this->prevDryRun = getenv('PMSS_DRY_RUN'); putenv('PMSS_DRY_RUN=1'); }
-    protected function tearDown(): void { $this->prevDryRun === false || $this->prevDryRun === '' ? putenv('PMSS_DRY_RUN') : putenv('PMSS_DRY_RUN='.$this->prevDryRun); }
+    protected function setUp(): void
+    {
+        $this->pmssTrackEnvOverrides(['PMSS_DRY_RUN' => '1'], true);
+    }
+
     public function testBootDefaultsMatrix(): void
     {
         $option = 'systemd.unified_cgroup_hierarchy=0';

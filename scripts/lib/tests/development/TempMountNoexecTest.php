@@ -6,19 +6,9 @@ require_once dirname(__DIR__, 2).'/update/services/mountHardening.php';
 
 class TempMountNoexecTest extends TestCase
 {
-    private $prevHardening;
-    private $prevDryRun;
-
     public function setUp(): void
     {
-        $this->prevHardening = getenv('PMSS_HARDEN_TMP_NOEXEC');
-        $this->prevDryRun = getenv('PMSS_DRY_RUN');
-    }
-
-    public function tearDown(): void
-    {
-        $this->pmssRestoreEnv('PMSS_HARDEN_TMP_NOEXEC', $this->prevHardening);
-        $this->pmssRestoreEnv('PMSS_DRY_RUN', $this->prevDryRun);
+        $this->pmssTrackEnvKeys(['PMSS_HARDEN_TMP_NOEXEC', 'PMSS_DRY_RUN']);
     }
 
     private function runNoexecHardening(string $fstab, string $mounts, ?string $flag = '1'): array

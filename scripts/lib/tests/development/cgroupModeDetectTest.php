@@ -6,21 +6,9 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class cgroupModeDetectTest extends TestCase
 {
-    /** @var string|false */
-    private $originalOverride;
-
     public function setUp(): void
     {
-        $this->originalOverride = getenv('PMSS_CGROUP_MODE');
-    }
-
-    public function tearDown(): void
-    {
-        if ($this->originalOverride === false) {
-            putenv('PMSS_CGROUP_MODE');
-            return;
-        }
-        putenv('PMSS_CGROUP_MODE='.$this->originalOverride);
+        $this->pmssTrackEnvKeys(['PMSS_CGROUP_MODE']);
     }
 
     public function testOverrideSelectsV1(): void
