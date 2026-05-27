@@ -70,6 +70,10 @@ function pmssGuardedNegative(): bool
     }
     return true;
 }
+function pmssGuardedTernary()
+{
+    return function_exists('pmssOptionalFifth') ? pmssOptionalFifth() : null;
+}
 function pmssGuardedEarlyReturn()
 {
     if (!function_exists('pmssOptionalFourth')) {

@@ -139,7 +139,12 @@ function pmssCustomerContextSameExpressionGuarded(array $tokens, int $call, arra
     for ($i = pmssCustomerContextBoundary($tokens, $call) + 1; $i < $call; $i++) {
         $guard = pmssCustomerContextFunctionExistsAt($tokens, $i, $guards);
         if ($guard === null) continue;
-        $operator = pmssCustomerContextGuardOperator($tokens, $guard['end'], $call);
+        $operator = '';
+        for ($j = $guard['end'] + 1; $j < $call; $j++) {
+            if (pmssCustomerContextIs($tokens[$j], T_BOOLEAN_AND) || pmssCustomerContextText($tokens[$j]) === '&&') { $operator = 'and'; break; }
+            if (pmssCustomerContextIs($tokens[$j], T_BOOLEAN_OR) || pmssCustomerContextText($tokens[$j]) === '||') { $operator = 'or'; break; }
+            if (pmssCustomerContextText($tokens[$j]) === '?') { $operator = 'ternary'; break; }
+        }
         if ((!$guard['negated'] && ($operator === 'and' || $operator === 'ternary')) || ($guard['negated'] && $operator === 'or')) return true;
     }
     return false;
@@ -152,7 +157,13 @@ function pmssCustomerContextEnclosingIfGuarded(array $tokens, int $call, array $
     while (($brace = pmssCustomerContextNearestOpenBrace($tokens, $cursor)) !== null) {
         $closeParen = pmssCustomerContextWalk($tokens, $brace, -1);
         $openParen = ($closeParen !== null && pmssCustomerContextText($tokens[$closeParen]) === ')') ? pmssCustomerContextMatchOpen($tokens, $closeParen, '(', ')') : null;
-        if ($openParen !== null && pmssCustomerContextConditionGuarded($tokens, $openParen, $closeParen, $guards, false)) return true;
+        $before = $openParen === null ? null : pmssCustomerContextWalk($tokens, $openParen, -1);
+        if ($before !== null && pmssCustomerContextIs($tokens[$before], T_IF)) {
+            for ($i = $openParen + 1; $i < $closeParen; $i++) {
+                $guard = pmssCustomerContextFunctionExistsAt($tokens, $i, $guards);
+                if ($guard !== null && !$guard['negated']) return true;
+            }
+        }
         $cursor = $brace;
     }
     return false;
@@ -164,10 +175,21 @@ function pmssCustomerContextPreviousIfReturns(array $tokens, int $call, array $g
     $boundary = pmssCustomerContextBoundary($tokens, $call);
     if ($boundary < 0 || pmssCustomerContextText($tokens[$boundary]) !== '}') return false;
     $openBrace = pmssCustomerContextMatchOpen($tokens, $boundary, '{', '}');
-    if ($openBrace === null || !pmssCustomerContextBlockReturns($tokens, $openBrace, $boundary)) return false;
+    if ($openBrace === null) return false;
+    $blockReturns = false;
+    for ($i = $openBrace + 1; $i < $boundary; $i++) {
+        if (pmssCustomerContextIs($tokens[$i], T_RETURN) || pmssCustomerContextIs($tokens[$i], T_EXIT)) { $blockReturns = true; break; }
+    }
+    if (!$blockReturns) return false;
     $closeParen = pmssCustomerContextWalk($tokens, $openBrace, -1);
     $openParen = ($closeParen !== null && pmssCustomerContextText($tokens[$closeParen]) === ')') ? pmssCustomerContextMatchOpen($tokens, $closeParen, '(', ')') : null;
-    return $openParen !== null && pmssCustomerContextConditionGuarded($tokens, $openParen, $closeParen, $guards, true);
+    $before = $openParen === null ? null : pmssCustomerContextWalk($tokens, $openParen, -1);
+    if ($before === null || !pmssCustomerContextIs($tokens[$before], T_IF)) return false;
+    for ($i = $openParen + 1; $i < $closeParen; $i++) {
+        $guard = pmssCustomerContextFunctionExistsAt($tokens, $i, $guards);
+        if ($guard !== null && $guard['negated']) return true;
+    }
+    return false;
 }
 
 /** @return array{end:int,negated:bool}|null */
@@ -182,29 +204,6 @@ function pmssCustomerContextFunctionExistsAt(array $tokens, int $i, array $guard
     return ['end' => pmssCustomerContextWalk($tokens, $literal, 1) ?? $literal, 'negated' => $previous !== null && pmssCustomerContextText($tokens[$previous]) === '!'];
 }
 
-/** Return true when an if condition contains the requested guard polarity. */
-function pmssCustomerContextConditionGuarded(array $tokens, int $open, int $close, array $guards, bool $negated): bool
-{
-    $before = pmssCustomerContextWalk($tokens, $open, -1);
-    if ($before === null || !pmssCustomerContextIs($tokens[$before], T_IF)) return false;
-    for ($i = $open + 1; $i < $close; $i++) {
-        $guard = pmssCustomerContextFunctionExistsAt($tokens, $i, $guards);
-        if ($guard !== null && $guard['negated'] === $negated) return true;
-    }
-    return false;
-}
-
-/** Return short-circuit operator between a guard and a guarded call. */
-function pmssCustomerContextGuardOperator(array $tokens, int $start, int $end): string
-{
-    for ($i = $start + 1; $i < $end; $i++) {
-        if (pmssCustomerContextIs($tokens[$i], T_BOOLEAN_AND) || pmssCustomerContextText($tokens[$i]) === '&&') return 'and';
-        if (pmssCustomerContextIs($tokens[$i], T_BOOLEAN_OR) || pmssCustomerContextText($tokens[$i]) === '||') return 'or';
-        if (pmssCustomerContextText($tokens[$i]) === '?') return 'ternary';
-    }
-    return '';
-}
-
 function pmssCustomerContextCallExcluded(array $tokens, int $i): bool
 {
     $prev = pmssCustomerContextWalk($tokens, $i, -1);
@@ -216,14 +215,6 @@ function pmssCustomerContextCallExcluded(array $tokens, int $i): bool
         || pmssCustomerContextIs($tokens[$prev], T_DOUBLE_COLON)
         || pmssCustomerContextIs($tokens[$prev], T_NEW)
         || pmssCustomerContextText($tokens[$prev]) === '\\';
-}
-
-function pmssCustomerContextBlockReturns(array $tokens, int $open, int $close): bool
-{
-    for ($i = $open + 1; $i < $close; $i++) {
-        if (pmssCustomerContextIs($tokens[$i], T_RETURN) || pmssCustomerContextIs($tokens[$i], T_EXIT)) return true;
-    }
-    return false;
 }
 
 function pmssCustomerContextNearestOpenBrace(array $tokens, int $i): ?int
