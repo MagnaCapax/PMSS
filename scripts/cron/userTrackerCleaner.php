@@ -94,7 +94,7 @@ if (count($users) === 0) {
 shuffle($users);
 
 // Limit to 1 user per pass - thus we limit IOPS used as well!
-if (count($users) > 1) $users = array_slice($users, 0, 1);
+$users = array_slice($users, 0, 1);
 
 $runDeadline = time() + (30 * 60);
 $maxTorrentsPerUser = 500;

@@ -22,16 +22,14 @@ if (!is_dir('/run/systemd/system')) {
 }
 
 foreach (pmssSeedboxSystemServiceSpecs() + ['apache2' => 'Apache httpd (legacy)'] as $unit => $label) {
-    if ($unit === '' || !pmssSystemdUnitExists($unit)) {
+    if (!pmssSystemdUnitExists($unit)) {
         continue;
     }
 
     $active = trim((string) @shell_exec('systemctl is-active '.escapeshellarg($unit).' 2>/dev/null'));
     $enabled = trim((string) @shell_exec('systemctl is-enabled '.escapeshellarg($unit).' 2>/dev/null'));
 
-    if (($active !== 'active' && $active !== 'activating')
-        && $enabled === 'masked'
-    ) {
+    if (($active !== 'active' && $active !== 'activating') && $enabled === 'masked') {
         continue;
     }
 

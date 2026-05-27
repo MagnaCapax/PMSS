@@ -21,9 +21,6 @@ if (!file_exists('/etc/wireguard/wg0.conf')) {
 
 function pmssWireguardLogUsers(array $users, string $message): void
 {
-    if (empty($users)) {
-        return;
-    }
     foreach ($users as $user) {
         pmssUserLog($user, $message);
     }
@@ -87,9 +84,7 @@ if (is_dir('/run/systemd/system')) {
             echo $logPrefix . "failed to bring up wg0 (rc={$rc})\n";
             pmssWireguardLogUsers($peerUsers, sprintf('wireguard: wg0 bring-up failed (rc=%d)', $rc));
         }
-    } else {
-        if ($debug) {
-            echo $logPrefix . "wg show reports interface active\n";
-        }
+    } elseif ($debug) {
+        echo $logPrefix . "wg show reports interface active\n";
     }
 }
