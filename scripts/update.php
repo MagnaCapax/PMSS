@@ -290,8 +290,7 @@ function normalizeAptSources(): void
     $content .= "deb http://security.debian.org/debian-security {$codename}-security {$components}\n";
     $content .= "deb http://deb.debian.org/debian {$codename}-updates {$components}\n";
 
-    if (@file_put_contents($sourcesPath, $content) !== false) {
-        @chmod($sourcesPath, 0644);
+    if (pmssWriteBootstrapFile($sourcesPath, $content, 'apt sources list', 0644, LOCK_EX)) {
         logmsg("[INFO] Rewrote sources.list for suite {$codename}");
     }
 
@@ -306,8 +305,9 @@ function normalizeAptSources(): void
         if (preg_match('/^[ \t]*[^#\r\n].*\\bbuster\\b/im', $data) === 1) {
             $mutated = preg_replace('/^([^#].*)/m', '# PMSS(suite-mismatch): disabled: $1', $data);
             if ($mutated !== null && $mutated !== $data) {
-                @file_put_contents($list, $mutated);
-                logmsg('[INFO] Disabled stale buster entry in '.basename($list));
+                if (pmssWriteBootstrapFile($list, $mutated, 'stale apt source list', null, LOCK_EX)) {
+                    logmsg('[INFO] Disabled stale buster entry in '.basename($list));
+                }
             }
         }
     }
@@ -618,6 +618,26 @@ function pmssLastFilesystemError(): string
 
     $message = trim((string) $error['message']);
     return $message !== '' ? ': '.$message : '';
+}
+
+/**
+ * Write bootstrap-managed files with visible failure reporting.
+ */
+function pmssWriteBootstrapFile(string $path, string $content, string $label, ?int $mode = null, int $flags = 0): bool
+{
+    if (@file_put_contents($path, $content, $flags) === false) {
+        logmsg('[WARN] Failed to write '.$label.': '.$path.pmssLastFilesystemError());
+        logEvent('bootstrap_file_write_failed', ['label' => $label, 'path' => $path]);
+        return false;
+    }
+
+    if ($mode !== null && !@chmod($path, $mode)) {
+        logmsg('[WARN] Failed to chmod '.$label.' to '.sprintf('%04o', $mode).': '.$path.pmssLastFilesystemError());
+        logEvent('bootstrap_file_chmod_failed', ['label' => $label, 'path' => $path, 'mode' => sprintf('%04o', $mode)]);
+        return false;
+    }
+
+    return true;
 }
 
 function pmssBootstrapPathLooksUnsafe(string $path): bool
@@ -1264,13 +1284,21 @@ function recordVersion(string $spec, array $details, bool $dryRun): void
     $details['recorded_spec'] = $spec;
     $details['timestamp']     = date('c', $timestamp);
 
-    @file_put_contents(VERSION_FILE, $line.PHP_EOL);
-    @file_put_contents(VERSION_META, json_encode($details, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL);
+    $encodedMeta = json_encode($details, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($encodedMeta === false) {
+        $jsonError = function_exists('json_last_error_msg') ? json_last_error_msg() : 'unknown JSON error';
+        logmsg('[WARN] Failed to encode version metadata: '.$jsonError);
+        logEvent('version_metadata_encode_failed', ['error' => $jsonError]);
+        $encodedMeta = '{}';
+    }
+
+    pmssWriteBootstrapFile(VERSION_FILE, $line.PHP_EOL, 'version marker', null, LOCK_EX);
+    pmssWriteBootstrapFile(VERSION_META, $encodedMeta.PHP_EOL, 'version metadata', null, LOCK_EX);
 
     // Backwards-compatibility: some tooling expects /etc/seedbox/runtime/version.
     // #TODO(Q4/2027): remove this compatibility write once all consumers use VERSION_FILE.
     pmssEnsureDirectory(dirname(VERSION_RUNTIME_FILE));
-    @file_put_contents(VERSION_RUNTIME_FILE, $line.PHP_EOL);
+    pmssWriteBootstrapFile(VERSION_RUNTIME_FILE, $line.PHP_EOL, 'runtime version marker', null, LOCK_EX);
 
     // #TODO Ensure consistent permissions (0640) on version metadata and any
     //       future config artifacts written here.

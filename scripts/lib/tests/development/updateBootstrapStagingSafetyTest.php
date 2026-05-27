@@ -149,6 +149,19 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
         $this->assertStringContainsString('Refusing to unlink directory', (string) $error);
     }
 
+    public function testBootstrapFileWriteHelperWritesContentAndMode(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-update-write-');
+        $path = $root.'/marker.txt';
+
+        $this->assertTrue(pmssWriteBootstrapFile($path, 'marker', 'test marker', 0600, LOCK_EX));
+        $this->assertSame('marker', (string) file_get_contents($path));
+
+        $perms = fileperms($path);
+        $this->assertTrue(is_int($perms), 'Expected marker permissions to be readable');
+        $this->assertSame(0600, $perms & 0777);
+    }
+
     public function testNestedScriptsLayoutRemovalDoesNotFollowSymlinks(): void
     {
         $root = $this->pmssMakeTempDir('pmss-update-nested-scripts-');
