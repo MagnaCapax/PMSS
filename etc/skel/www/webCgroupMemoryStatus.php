@@ -147,11 +147,13 @@ function pmssWebCgroupMemoryStatusClassify(array $stats)
     $highPercent = $stats['high_percent'];
     $pressureSome = $stats['pressure_some_avg10'];
     $pressureFull = $stats['pressure_full_avg10'];
+    $throttleEvents = $stats['throttle_events'];
 
     if ($stats['memory_current'] !== null
         && $stats['memory_high'] !== null
-        && $stats['memory_current'] >= $stats['memory_high']
-        && $stats['throttle_events'] > 0) {
+        && $throttleEvents > 0
+        && ($stats['memory_current'] >= $stats['memory_high']
+            || ($throttleEvents > 1000 && $highPercent !== null && $highPercent >= 95.0))) {
         return 'THROTTLED';
     }
 

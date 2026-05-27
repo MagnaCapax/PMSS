@@ -35,6 +35,26 @@ class WebCgroupMemoryStatusTest extends TestCase
         }
     }
 
+    public function testClassifyDetectsSustainedSoftThrottleBelowMemoryHigh(): void
+    {
+        $this->assertClassifiesAs('THROTTLED', [
+            'memory_current' => 9970,
+            'memory_high' => 10000,
+            'high_percent' => 99.7,
+            'throttle_events' => 1001,
+        ]);
+    }
+
+    public function testClassifyDoesNotPromoteStaleThrottleEventsBelowSoftLimit(): void
+    {
+        $this->assertClassifiesAs('MEDIUM', [
+            'memory_current' => 9490,
+            'memory_high' => 10000,
+            'high_percent' => 94.9,
+            'throttle_events' => 1001,
+        ]);
+    }
+
     public function testReadParsesCgroupCountersAndFormatsUsage(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-web-cgroup-');
@@ -56,6 +76,23 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->assertSame(0, $status['oom_kill_events']);
         $this->assertSame('MEDIUM', $status['status']);
         $this->assertStringContainsString('4.0 GiB / 5.0 GiB', $status['usage_text']);
+    }
+
+    public function testReadClassifiesSustainedSoftThrottleBeforeHardLimit(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-');
+        file_put_contents($dir.'/memory.current', "16774565888\n");
+        file_put_contents($dir.'/memory.high', "16777216000\n");
+        file_put_contents($dir.'/memory.max', "33554432000\n");
+        file_put_contents($dir.'/memory.events', "low 0\nhigh 137149598\nmax 0\noom 0\noom_kill 0\n");
+        file_put_contents($dir.'/memory.pressure', "some avg10=0.50 avg60=0.01 avg300=0.00 total=123\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n");
+
+        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir]);
+
+        $this->assertSame('THROTTLED', $status['status']);
+        $this->assertSame(50.0, $status['usage_percent']);
+        $this->assertSame(100.0, $status['high_percent']);
+        $this->assertStringContainsString('reduced speed', $status['message']);
     }
 
     public function testReadFallsBackToMemoryHighWhenMaxIsUnlimited(): void
