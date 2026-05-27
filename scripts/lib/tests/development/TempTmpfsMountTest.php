@@ -39,14 +39,15 @@ class TempTmpfsMountTest extends TestCase
 
     public function testAddsTmpfsEntryWhenMissing(): void
     {
-        $original = "UUID=abc / ext4 defaults 0 0\n";
-        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate('pmss-tmpfs-add-', $original);
+        foreach ([[null, '2G'], ['512M', '512M']] as [$override, $expectedSize]) {
+            $original = "UUID=abc / ext4 defaults 0 0\n";
+            ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate('pmss-tmpfs-add-', $original);
 
-        $messages = $this->runTmpfsHardening($fstab, $mounts);
+            $messages = $this->runTmpfsHardening($fstab, $mounts, '1', $override);
 
-        $updated = (string)file_get_contents($fstab);
-        $this->assertStringContainsString('tmpfs /tmp tmpfs defaults,noexec,nosuid,nodev,size=2G 0 0', $updated);
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Added /tmp tmpfs entry'), 'expected add log');
+            $this->assertStringContainsString('tmpfs /tmp tmpfs defaults,noexec,nosuid,nodev,size='.$expectedSize.' 0 0', (string)file_get_contents($fstab));
+            $this->pmssAssertMessagesContain($messages, $override === null ? 'Added /tmp tmpfs entry' : 'size='.$expectedSize);
+        }
     }
 
     public function testSkipsWhenNonTmpfsEntryExists(): void
@@ -73,18 +74,6 @@ class TempTmpfsMountTest extends TestCase
 
         $this->pmssAssertFstabOptions($fstab, '/tmp', ['noexec', 'nosuid', 'nodev', 'size=2G'], ['exec', 'suid', 'dev']);
         $this->assertTrue($this->pmssMessagesContain($messages, 'Updated /tmp tmpfs options'), 'expected update log');
-    }
-
-    public function testSizeOverride(): void
-    {
-        $original = "UUID=abc / ext4 defaults 0 0\n";
-        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate('pmss-tmpfs-size-', $original);
-
-        $messages = $this->runTmpfsHardening($fstab, $mounts, '1', '512M');
-
-        $updated = (string)file_get_contents($fstab);
-        $this->assertStringContainsString('size=512M', $updated);
-        $this->assertTrue($this->pmssMessagesContain($messages, 'size=512M'), 'expected size override log');
     }
 
     public function testUnreadableMountsWarns(): void

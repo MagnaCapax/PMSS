@@ -121,10 +121,10 @@ class MediaStackLighttpdMigrationTest extends TestCase
             file_put_contents($customDir.'/custom-migrated.conf', $migratedContents);
         }
 
-        $functions = implode("\n\n", [
-            $this->pmssExtractShellFunction($this->script, 'lighttpd_custom_has_legacy_media_stack_rules'),
-            $this->pmssExtractShellFunction($this->script, 'lighttpd_custom_strip_managed_media_stack_routes'),
-            $this->pmssExtractShellFunction($this->script, 'prepare_lighttpd_media_stack_paths'),
+        $functions = $this->pmssExtractShellFunctions($this->script, [
+            'lighttpd_custom_has_legacy_media_stack_rules',
+            'lighttpd_custom_strip_managed_media_stack_routes',
+            'prepare_lighttpd_media_stack_paths',
         ]);
 
         $script = implode("\n", [

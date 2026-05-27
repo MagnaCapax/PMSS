@@ -11,33 +11,20 @@ class hostResourcesDetectTest extends TestCase
         $this->pmssTrackEnvKeys(['PMSS_TOTAL_MEM_MIB', 'PMSS_TOTAL_CPU_THREADS']);
     }
 
-    public function testTotalMemUsesNumericOverride(): void
+    public function testResourceOverrideMatrix(): void
     {
-        putenv('PMSS_TOTAL_MEM_MIB=16384');
-        $this->assertEquals(16384, \pmssTotalMemMiB());
-    }
-
-    public function testTotalMemInvalidOverrideFallsBack(): void
-    {
-        putenv('PMSS_TOTAL_MEM_MIB=invalid');
-        $this->assertTrue(\pmssTotalMemMiB() >= 0);
-    }
-
-    public function testTotalCpuThreadsUsesNumericOverride(): void
-    {
-        putenv('PMSS_TOTAL_CPU_THREADS=24');
-        $this->assertEquals(24, \pmssTotalCpuThreads());
-    }
-
-    public function testTotalCpuThreadsSupportsZeroOverride(): void
-    {
-        putenv('PMSS_TOTAL_CPU_THREADS=0');
-        $this->assertEquals(0, \pmssTotalCpuThreads());
-    }
-
-    public function testTotalCpuThreadsInvalidOverrideFallsBack(): void
-    {
-        putenv('PMSS_TOTAL_CPU_THREADS=invalid');
-        $this->assertTrue(\pmssTotalCpuThreads() >= 0);
+        foreach ([
+            ['PMSS_TOTAL_MEM_MIB', '16384', '\pmssTotalMemMiB', 16384],
+            ['PMSS_TOTAL_MEM_MIB', 'invalid', '\pmssTotalMemMiB', null],
+            ['PMSS_TOTAL_CPU_THREADS', '24', '\pmssTotalCpuThreads', 24],
+            ['PMSS_TOTAL_CPU_THREADS', '0', '\pmssTotalCpuThreads', 0],
+            ['PMSS_TOTAL_CPU_THREADS', 'invalid', '\pmssTotalCpuThreads', null],
+        ] as $case) {
+            putenv($case[0].'='.$case[1]);
+            $actual = call_user_func($case[2]);
+            $case[3] === null
+                ? $this->assertTrue($actual >= 0, 'Expected fallback for '.$case[0])
+                : $this->assertEquals($case[3], $actual, 'Expected override for '.$case[0]);
+        }
     }
 }

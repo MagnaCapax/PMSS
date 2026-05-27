@@ -33,8 +33,7 @@ class BootTuningEnsureTest extends TestCase
 
         $this->assertTrue(file_exists($service), 'expected systemd service to be written');
         $content = (string)file_get_contents($service);
-        $this->assertStringContainsString('ExecStart='.$script, $content);
-        $this->assertStringContainsString('WantedBy=multi-user.target', $content);
+        $this->assertStringContainsAllStrings(['ExecStart='.$script, 'WantedBy=multi-user.target'], $content);
     }
 
     public function testScriptPermissionsAreExecutable(): void
@@ -71,14 +70,8 @@ class BootTuningEnsureTest extends TestCase
         $messages = [];
         $this->runBootTuning($dir, $messages);
 
-        $this->assertTrue(
-            $this->pmssMessagesContain($messages, 'Boot tuning script already present and up to date'),
-            'expected boot tuning script skip log'
-        );
-        $this->assertTrue(
-            $this->pmssMessagesContain($messages, 'Boot tuning service already present and up to date'),
-            'expected boot tuning service skip log'
-        );
+        $this->pmssAssertMessagesContain($messages, 'Boot tuning script already present and up to date');
+        $this->pmssAssertMessagesContain($messages, 'Boot tuning service already present and up to date');
     }
 
     /**
