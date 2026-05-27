@@ -10,11 +10,12 @@
  * the full kernel 1..1000 range. The cron self-heals systemd overwrites
  * (daemon-reload, set-property) within the 60-second interval.
  *
- * Per-user IOWeight in /etc/seedbox/config/users/<user>.json drives the
- * target, clamped to [1, 700] for customer-reachable plans. The
- * "bfq_addon": true JSON flag enables the [701, 1000] bonus band for
- * paid addons. Fallback formula round(3.535 * sqrt(ramMiB)) clamped
- * [1, 700] applies when JSON IOWeight is absent.
+ * Per-user "IOWeight" in /etc/seedbox/config/users/<user>.json is honored
+ * as an explicit override (clamped to [1, 1000]). When absent, the
+ * fallback formula round(3.535 * sqrt(ramMiB) * (1 + bonusPct/100))
+ * applies. "bonusPct" in the same JSON (integer percent from the Free
+ * Bonus Disk Policy, 0-300) multiplies the RAM-derived base so tenure
+ * and spend carry customers into the [701, 1000] band by design.
  *
  * Idempotent: writes only when current kernel value differs from
  * desired. Hard fail on missing prerequisites (root, cgroup-v1, BFQ
@@ -35,8 +36,7 @@ require_once __DIR__.'/../lib/log.php';
 
 // Constants — tunable top-of-file per AGENTS.md doctrine.
 $USERS_DIR  = '/etc/seedbox/config/users';
-$CUST_MAX   = 700;       // customer-reachable ceiling
-$KERN_MAX   = 1000;      // kernel BFQ absolute max (bonus-addon ceiling)
+$KERN_MAX   = 1000;      // kernel BFQ absolute max (the only artificial cap)
 $FORMULA_K  = 3.535;     // round(K * sqrt(ramMiB)) — produces 640 at 32768 MiB
 $DRY_RUN    = in_array('--dry-run', $argv ?? [], true);
 
@@ -94,18 +94,24 @@ foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
     }
     $uid = (int) $pwd['uid'];
 
+    // Tenure/spend bonus percent (0-300). Applied uniformly to whichever base
+    // is selected below — explicit JSON IOWeight or RAM-derived fallback. The
+    // fallback path is rare in production (most users have an explicit tier-
+    // assigned IOWeight at provisioning); applying bonus only in the fallback
+    // would make the feature dead for the typical case.
+    $bonusPct = isset($json['bonusPct']) && is_numeric($json['bonusPct']) ? (float) $json['bonusPct'] : 0.0;
+
     // Prefer explicit JSON IOWeight; fall back to ramMiB-derived formula.
     if (isset($json['IOWeight']) && is_numeric($json['IOWeight'])) {
-        $wRaw = (int) $json['IOWeight'];
+        $wBase = (int) $json['IOWeight'];
     } else {
         $ramMiB = isset($json['ramMiB']) && is_numeric($json['ramMiB']) ? (int) $json['ramMiB'] : 0;
-        $wRaw = pmssBfqFormulaWeight($ramMiB, (float) $FORMULA_K, (int) $CUST_MAX);
+        $wBase = pmssBfqFormulaWeight($ramMiB, (float) $FORMULA_K, (int) $KERN_MAX);
     }
 
-    // bfq_addon flag unlocks the [CUST_MAX+1, KERN_MAX] bonus band.
-    $bonus = !empty($json['bfq_addon']);
-    $cap = $bonus ? $KERN_MAX : $CUST_MAX;
-    $w = max(1, min($cap, $wRaw));
+    // Bonus multiplier applied to the selected base, then kernel-clamped.
+    $wRaw = (int) round($wBase * (1 + max(0.0, $bonusPct) / 100));
+    $w = max(1, min($KERN_MAX, $wRaw));
 
     $cgPath = '/sys/fs/cgroup/blkio/user.slice/user-'.$uid.'.slice/blkio.bfq.weight';
     if (!file_exists($cgPath)) {
@@ -118,8 +124,10 @@ foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
         continue;
     }
 
+    $bonusTag = ($bonusPct > 0) ? sprintf(' (+%.0f%%)', $bonusPct) : '';
+
     if ($DRY_RUN) {
-        echo sprintf("[DRY-RUN] %-20s uid=%d %d -> %d%s\n", $user, $uid, $cur, $w, $bonus ? ' (bonus)' : '');
+        echo sprintf("[DRY-RUN] %-20s uid=%d %d -> %d%s\n", $user, $uid, $cur, $w, $bonusTag);
         $written++;
         continue;
     }
@@ -130,7 +138,7 @@ foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
         continue;
     }
     $written++;
-    syslog(LOG_INFO, "bfq $user uid=$uid: $cur -> $w".($bonus ? ' (bonus)' : ''));
+    syslog(LOG_INFO, "bfq $user uid=$uid: $cur -> $w".$bonusTag);
 }
 
 $tag = $DRY_RUN ? 'DRY-RUN' : 'apply';

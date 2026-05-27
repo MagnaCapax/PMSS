@@ -27,6 +27,8 @@
  *   (default true unless the operator stores an explicit override).
  * - CPUWeight/IOWeight/IOReadBW/... and ioCostQos/ioCostModel pass-through for
  *   cgroup resource controls.
+ * - bonusPct (int) Free Bonus Disk policy percent (0-300); multiplies the
+ *   RAM-derived BFQ weight in cgroupBfqWeightApply.php.
  *
  * #TODO(Q4/2027): Remove legacy /etc/seedbox/runtime/users.json fallback.
  *
@@ -240,6 +242,7 @@ class UserConfigStore
             'ramMiB', 'rtorrentPort', 'quota', 'quotaBurst', 'billingServiceId', 'billingClientId', 'trafficLimit',
             'trafficCapMbit',
             'CPUWeight', 'IOWeight', 'IOReadIOPS', 'IOWriteIOPS', 'ioLatencyMs',
+            'bonusPct',
         ];
 
         if ((!isset($payload['billingServiceId']) || !is_numeric($payload['billingServiceId']) || (int) $payload['billingServiceId'] <= 0)
