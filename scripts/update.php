@@ -234,9 +234,9 @@ function pmssReleaseUpdateLock(): void
 }
 
 /**
- * Detect Debian codename and major version from the local system.
+ * Make sure /etc/apt/sources.list matches the detected suite before any apt command runs.
  */
-function detectDistroCodename(): array
+function normalizeAptSources(): void
 {
     $codename = '';
     $major    = '';
@@ -261,15 +261,6 @@ function detectDistroCodename(): array
         }
     }
 
-    return [$codename, $major];
-}
-
-/**
- * Make sure /etc/apt/sources.list matches the detected suite before any apt command runs.
- */
-function normalizeAptSources(): void
-{
-    [$codename, $major] = detectDistroCodename();
     logmsg(sprintf('[INFO] Detected distro codename=%s major=%s', $codename !== '' ? $codename : 'unknown', $major !== '' ? $major : 'unknown'));
 
     if ($codename === '' || $codename === 'buster') {
@@ -629,10 +620,20 @@ function pmssLastFilesystemError(): string
     return $message !== '' ? ': '.$message : '';
 }
 
+function pmssBootstrapPathLooksUnsafe(string $path): bool
+{
+    return $path === '' || $path === '/' || strpos($path, "\0") !== false || preg_match('#(^|/)\.\.(/|$)#', $path) === 1;
+}
+
+function pmssPathHasGeneratedPrefix(string $path, string $prefix): bool
+{
+    return strpos($path, $prefix) === 0 && strlen($path) > strlen($prefix);
+}
+
 function pmssIsSafeUpdateRemovePath(string $path): bool
 {
     $path = rtrim($path, '/');
-    if ($path === '' || $path === '/' || strpos($path, "\0") !== false || preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
+    if (pmssBootstrapPathLooksUnsafe($path)) {
         return false;
     }
 
@@ -646,7 +647,7 @@ function pmssIsSafeUpdateRemovePath(string $path): bool
     ];
 
     foreach ($prefixes as $prefix) {
-        if (strpos($path, $prefix) === 0 && strlen($path) > strlen($prefix)) {
+        if (pmssPathHasGeneratedPrefix($path, $prefix)) {
             return true;
         }
     }
@@ -671,7 +672,7 @@ function pmssIsSafeAtomicSwapDirectoryPath(string $target, string $staging, stri
     $backup = rtrim($backup, '/');
 
     foreach ([$target, $staging, $backup] as $path) {
-        if ($path === '' || $path === '/' || strpos($path, "\0") !== false || preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
+        if (pmssBootstrapPathLooksUnsafe($path)) {
             return false;
         }
     }
@@ -686,10 +687,8 @@ function pmssIsSafeAtomicSwapDirectoryPath(string $target, string $staging, stri
             continue;
         }
 
-        return strpos($staging, $stagingPrefix) === 0
-            && strlen($staging) > strlen($stagingPrefix)
-            && strpos($backup, $backupPrefix) === 0
-            && strlen($backup) > strlen($backupPrefix);
+        return pmssPathHasGeneratedPrefix($staging, $stagingPrefix)
+            && pmssPathHasGeneratedPrefix($backup, $backupPrefix);
     }
 
     // Hermetic tests may exercise the swap helper under generated temp roots.
@@ -753,7 +752,7 @@ function pmssRemoveFileFatal(string $path, string $label): void
 function pmssIsSafeDirectoryContentsClearPath(string $path): bool
 {
     $path = rtrim($path, '/');
-    if ($path === '' || $path === '/' || strpos($path, "\0") !== false || preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
+    if (pmssBootstrapPathLooksUnsafe($path)) {
         return false;
     }
     if ($path === '/etc/skel') {
@@ -764,8 +763,7 @@ function pmssIsSafeDirectoryContentsClearPath(string $path): bool
     $tempNamePrefix = 'pmss-update-clear-';
     $baseName = basename($path);
     return strpos($path, $tempRoot) === 0
-        && strpos($baseName, $tempNamePrefix) === 0
-        && strlen($baseName) > strlen($tempNamePrefix);
+        && pmssPathHasGeneratedPrefix($baseName, $tempNamePrefix);
 }
 
 /**
@@ -808,7 +806,7 @@ function pmssRemoveFilesystemEntry(string $path, ?string &$error): bool
 function pmssIsSafeNestedScriptsLayoutRemovePath(string $path): bool
 {
     $path = rtrim($path, '/');
-    if ($path === '' || $path === '/' || strpos($path, "\0") !== false || preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
+    if (pmssBootstrapPathLooksUnsafe($path)) {
         return false;
     }
     if ($path === '/scripts/scripts') {
@@ -870,14 +868,6 @@ function pmssClearDirectoryContents(string $path, string $label, ?string &$error
     }
 
     return true;
-}
-
-function pmssClearDirectoryContentsFatal(string $path, string $label): void
-{
-    $error = null;
-    if (!pmssClearDirectoryContents($path, $label, $error)) {
-        fatal($error ?? "Unable to clear {$label}: {$path}", EXIT_COPY);
-    }
 }
 
 /**
@@ -1165,7 +1155,10 @@ function stageSnapshot(string $tmp, bool $dryRun): void
             }
         }
         if (is_dir($skelSource) && is_dir('/etc/skel')) {
-            pmssClearDirectoryContentsFatal('/etc/skel', 'skeleton tree');
+            $error = null;
+            if (!pmssClearDirectoryContents('/etc/skel', 'skeleton tree', $error)) {
+                fatal($error ?? 'Unable to clear skeleton tree: /etc/skel', EXIT_COPY);
+            }
         }
 
         // Atomic swap for /etc/seedbox
