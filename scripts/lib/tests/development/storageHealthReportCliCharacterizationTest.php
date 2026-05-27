@@ -8,10 +8,9 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
     public function testOnlyProblemsAndDeviceFilterKeepLatestMatchingEntry(): void
     {
         $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
-        $this->assertTrue($jsonPath !== false, 'Expected a JSONL fixture path');
 
-        file_put_contents((string) $jsonPath, implode("\n", [
-            json_encode([
+        $this->pmssAppendFixtureLines($jsonPath, [
+            [
                 'timestamp' => '2025-01-01T00:00:00+00:00',
                 'kind' => 'smart',
                 'device' => '/dev/sda',
@@ -21,8 +20,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
                 'severity' => 'ok',
                 'flags' => [],
                 'metrics' => ['health' => 'PASSED', 'temp_c' => 34],
-            ], JSON_UNESCAPED_SLASHES),
-            json_encode([
+            ],
+            [
                 'timestamp' => '2025-01-01T00:00:01+00:00',
                 'kind' => 'smart',
                 'device' => '/dev/sdb',
@@ -32,8 +31,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
                 'severity' => 'fail',
                 'flags' => ['pending_sectors'],
                 'metrics' => ['health' => 'FAILED', 'temp_c' => 52, 'pending' => 3],
-            ], JSON_UNESCAPED_SLASHES),
-            json_encode([
+            ],
+            [
                 'timestamp' => '2025-01-01T00:00:02+00:00',
                 'kind' => 'raid',
                 'array' => 'md0',
@@ -42,8 +41,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
                 'detail' => 'sda1[0] sdb1[1]',
                 'severity' => 'ok',
                 'flags' => [],
-            ], JSON_UNESCAPED_SLASHES),
-        ])."\n");
+            ],
+        ]);
 
         $output = $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath, '--device', 'sdb', '--only-problems']);
 
@@ -59,10 +58,9 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
     public function testMixedSmartAndNvmeDisksShareSeverityOrdering(): void
     {
         $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
-        $this->assertTrue($jsonPath !== false, 'Expected a JSONL fixture path');
 
-        file_put_contents((string) $jsonPath, implode("\n", [
-            json_encode([
+        $this->pmssAppendFixtureLines($jsonPath, [
+            [
                 'timestamp' => '2025-01-01T00:00:01+00:00',
                 'kind' => 'nvme',
                 'device' => '/dev/nvme0n1',
@@ -72,8 +70,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
                 'severity' => 'warn',
                 'flags' => ['wearout_high'],
                 'metrics' => ['temperature' => 61, 'media_errors' => 0, 'percentage_used' => 85],
-            ], JSON_UNESCAPED_SLASHES),
-            json_encode([
+            ],
+            [
                 'timestamp' => '2025-01-01T00:00:02+00:00',
                 'kind' => 'smart',
                 'device' => '/dev/sdb',
@@ -83,8 +81,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
                 'severity' => 'ok',
                 'flags' => [],
                 'metrics' => ['health' => 'PASSED', 'temp_c' => 34],
-            ], JSON_UNESCAPED_SLASHES),
-            json_encode([
+            ],
+            [
                 'timestamp' => '2025-01-01T00:00:03+00:00',
                 'kind' => 'smart',
                 'device' => '/dev/sda',
@@ -94,8 +92,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
                 'severity' => 'fail',
                 'flags' => ['pending_sectors'],
                 'metrics' => ['health' => 'FAILED', 'temp_c' => 48, 'pending' => 7],
-            ], JSON_UNESCAPED_SLASHES),
-        ])."\n");
+            ],
+        ]);
 
         $output = $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath]);
 
@@ -119,7 +117,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
         $noticePath = $this->pmssMakeTempPath('pmss-storage-health-notice-', '.json');
 
-        file_put_contents((string) $jsonPath, json_encode([
+        $this->pmssAppendFixtureLines($jsonPath, [[
             'timestamp' => '2025-01-01T00:00:03+00:00',
             'kind' => 'raid',
             'array' => 'md0',
@@ -129,7 +127,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             'severity' => 'warn',
             'flags' => ['rebuild_in_progress'],
             'operation' => 'recovery',
-        ], JSON_UNESCAPED_SLASHES)."\n");
+        ]]);
 
         $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath, '--user-notice='.(string) $noticePath]);
 
@@ -145,7 +143,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
         $noticePath = $this->pmssMakeTempPath('pmss-storage-health-separate-', '.json');
 
-        file_put_contents((string) $jsonPath, json_encode([
+        $this->pmssAppendFixtureLines($jsonPath, [[
             'timestamp' => '2025-01-01T00:00:03+00:00',
             'kind' => 'raid',
             'array' => 'md1',
@@ -155,7 +153,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             'severity' => 'warn',
             'flags' => ['rebuild_in_progress'],
             'operation' => 'check',
-        ], JSON_UNESCAPED_SLASHES)."\n");
+        ]]);
 
         $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath, '--user-notice', (string) $noticePath]);
 
@@ -170,7 +168,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
         $noticePath = $this->pmssMakeTempFile('pmss-storage-health-notice-');
 
-        file_put_contents((string) $jsonPath, json_encode([
+        $this->pmssAppendFixtureLines($jsonPath, [[
             'timestamp' => '2025-01-01T00:00:03+00:00',
             'kind' => 'raid',
             'array' => 'md0',
@@ -179,8 +177,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             'detail' => 'sda1[0] sdb1[1]',
             'severity' => 'ok',
             'flags' => [],
-        ], JSON_UNESCAPED_SLASHES)."\n");
-        file_put_contents((string) $noticePath, "stale\n");
+        ]]);
+        $this->pmssWriteFile($noticePath, "stale\n");
 
         $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath, '--user-notice='.(string) $noticePath]);
 
@@ -194,7 +192,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         $realNoticePath = $this->pmssMakeTempFile('pmss-storage-health-real-notice-');
         $linkNoticePath = $this->pmssMakeTempPath('pmss-storage-health-link-notice-', '.json');
 
-        file_put_contents((string) $jsonPath, json_encode([
+        $this->pmssAppendFixtureLines($jsonPath, [[
             'timestamp' => '2025-01-01T00:00:03+00:00',
             'kind' => 'raid',
             'array' => 'md0',
@@ -204,8 +202,8 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             'severity' => 'warn',
             'flags' => ['rebuild_in_progress'],
             'operation' => 'recovery',
-        ], JSON_UNESCAPED_SLASHES)."\n");
-        file_put_contents((string) $realNoticePath, "safe\n");
+        ]]);
+        $this->pmssWriteFile($realNoticePath, "safe\n");
         symlink((string) $realNoticePath, (string) $linkNoticePath);
 
         $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath, '--user-notice='.(string) $linkNoticePath]);

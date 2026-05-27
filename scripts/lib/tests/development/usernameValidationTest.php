@@ -89,8 +89,7 @@ class UsernameValidationTest extends TestCase
 
     public function testPasswdEntryLookupRequiresExactUserMatch(): void
     {
-        $passwd = $this->pmssMakeTempDir('pmss-passwd-').'/passwd';
-        file_put_contents($passwd, implode("\n", [
+        $passwd = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-passwd-').'/passwd', implode("\n", [
             'alice2:x:1000:1000::/home/alice2:/bin/bash',
             'alice:x:1001:1001::/home/alice:/bin/bash',
             '',
@@ -109,8 +108,8 @@ class UsernameValidationTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-passwd-link-');
         $passwd = $root.'/passwd';
         $link = $root.'/passwd.link';
-        file_put_contents($passwd, "alice:x:1001:1001::/home/alice:/bin/bash\n");
-        symlink($passwd, $link);
+        $this->pmssWriteFile($passwd, "alice:x:1001:1001::/home/alice:/bin/bash\n");
+        $this->pmssCreateSymlinkOrSkip($passwd, $link);
 
         $this->assertEquals(null, \pmssPasswdEntryLookup('../alice', $passwd));
         $this->assertEquals(null, \pmssPasswdEntryLookup('alice', $link));
@@ -118,8 +117,7 @@ class UsernameValidationTest extends TestCase
 
     public function testColonRecordFieldsLookupRequiresExactMatchAndMinimumFields(): void
     {
-        $passwd = $this->pmssMakeTempDir('pmss-passwd-fields-').'/passwd';
-        file_put_contents($passwd, implode("\n", [
+        $passwd = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-passwd-fields-').'/passwd', implode("\n", [
             'alice2:x:1000:1000::/home/alice2:/bin/bash',
             'alice:x:1001:1001::/home/alice:/bin/bash',
             'broken:x',

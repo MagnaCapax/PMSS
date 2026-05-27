@@ -144,9 +144,9 @@ class TempMountNoexecTest extends TestCase
         $fstab = $dir.'/fstab';
         $mounts = $dir.'/mounts';
 
-        file_put_contents($fstabTarget, "tmpfs /tmp tmpfs defaults 0 0\n");
+        $this->pmssWriteFile($fstabTarget, "tmpfs /tmp tmpfs defaults 0 0\n");
         $this->pmssCreateSymlinkOrSkip($fstabTarget, $fstab);
-        file_put_contents($mounts, "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n");
+        $this->pmssWriteFile($mounts, "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n");
 
         $messages = $this->runNoexecHardening($fstab, $mounts);
 

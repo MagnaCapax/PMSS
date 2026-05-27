@@ -15,8 +15,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
         $dir = $this->pmssMakeTempDir('pmss-welcome-safety-');
         $fixture = $dir.'/welcomeSafety.php';
-        file_put_contents($fixture, "<?php\n".substr($source, $start, $end - $start));
-        return $fixture;
+        return $this->pmssWriteFile($fixture, "<?php\n".substr($source, $start, $end - $start));
     }
 
     private function runWelcomeSafetyScript(string $script): string
@@ -55,14 +54,13 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $tail = preg_replace('/\?>\s*$/', '', $tail);
         $fixture = $this->pmssMakeTempPath('pmss-welcome-usage-', '.php');
         $memoryHelper = $this->pmssRepoPath('etc/skel/www/webCgroupMemoryStatus.php');
-        file_put_contents(
+        return $this->pmssWriteFile(
             $fixture,
             "<?php\n"
             ."if (!function_exists('pmssReadSerializedArrayFile')) { function pmssReadSerializedArrayFile(\$path) { \$raw = @file_get_contents(\$path); if (!is_string(\$raw)) return null; \$data = @unserialize(\$raw, array('allowed_classes' => false)); return is_array(\$data) ? \$data : null; } }\n"
             .'require_once '.var_export($memoryHelper, true).";\n"
             .$tail
         );
-        return $fixture;
     }
 
     private function runWelcomeUsageScript(string $script, string $stderrRedirect = '2>/dev/null'): string
@@ -84,8 +82,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $tail = substr($source, $start);
         $tail = preg_replace('/\?>\s*$/', '', $tail);
         $fixture = $this->pmssMakeTempPath('pmss-welcome-gauge-', '.php');
-        file_put_contents($fixture, "<?php\n".$tail);
-        require_once $fixture;
+        require_once $this->pmssWriteFile($fixture, "<?php\n".$tail);
     }
 
     private function loadWelcomeServiceControlFunctions(): void
@@ -99,7 +96,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $this->assertTrue($start !== false && $end !== false && $end > $start, 'welcome.php service-control helpers should remain present');
 
         $fixture = $this->pmssMakeTempPath('pmss-welcome-service-controls-', '.php');
-        file_put_contents($fixture, "<?php\n".substr($source, $start, $end - $start)); require_once $fixture;
+        require_once $this->pmssWriteFile($fixture, "<?php\n".substr($source, $start, $end - $start));
     }
 
     public function testQuotaMissingWarningGuardUsesOnlyQuotaLimitFields(): void
@@ -188,7 +185,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     public function testWelcomeLocalHelperRejectsTraversalPaths(): void
     {
         $fixture = $this->makeWelcomeSafetyFixture();
-        file_put_contents(dirname($fixture).'/safeHelper.php', "<?php\nfunction pmssWelcomeSafeHelperLoaded() { return true; }\n");
+        $this->pmssWriteFile(dirname($fixture).'/safeHelper.php', "<?php\nfunction pmssWelcomeSafeHelperLoaded() { return true; }\n");
 
         $output = $this->pmssRunInlinePhp(
             'require '.var_export($fixture, true).';'

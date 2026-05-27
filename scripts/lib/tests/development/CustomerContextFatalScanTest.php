@@ -105,9 +105,7 @@ PHP
     {
         $root = $this->pmssMakeTempDir('pmss-customer-context-scan-', 0700);
         foreach ($files as $relativePath => $contents) {
-            $path = $root.'/'.$relativePath;
-            @mkdir(dirname($path), 0755, true);
-            file_put_contents($path, $contents);
+            $this->pmssWriteFile($root.'/'.$relativePath, $contents);
         }
         return $root;
     }

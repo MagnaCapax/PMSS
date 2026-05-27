@@ -52,7 +52,7 @@ class RuntimeTest extends TestCase
         $originalCapture = $GLOBALS['PMSS_RUNTIME_TEST_ENTRYPOINT'] ?? null;
         $tempDir = $this->pmssMakeTempDir('pmss-runtime-entrypoint-');
         $scriptPath = $tempDir.'/capture.php';
-        file_put_contents(
+        $this->pmssWriteFile(
             $scriptPath,
             "<?php\n".
             "\$GLOBALS['PMSS_RUNTIME_TEST_ENTRYPOINT'] = [\n".
@@ -70,7 +70,6 @@ class RuntimeTest extends TestCase
                 $this->assertEquals($capture['argv'], $capture['serverArgv']);
             });
         } finally {
-            $this->pmssRemoveTree($tempDir);
             if ($originalCapture === null) {
                 unset($GLOBALS['PMSS_RUNTIME_TEST_ENTRYPOINT']);
             } else {
@@ -299,43 +298,25 @@ class RuntimeTest extends TestCase
 
     public function testReadRegularFileIntReturnsParsedDigits(): void
     {
-        $tempDir = $this->pmssMakeTempDir('pmss-runtime-int-');
-        $path = $tempDir.'/port';
-        file_put_contents($path, "123\n");
+        $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-runtime-int-').'/port', "123\n");
 
-        try {
-            $this->assertEquals(123, \pmssReadRegularFileInt($path, 99));
-        } finally {
-            $this->pmssRemoveTree($tempDir);
-        }
+        $this->assertEquals(123, \pmssReadRegularFileInt($path, 99));
     }
 
     public function testReadRegularFileIntFallsBackForNonDigitContent(): void
     {
-        $tempDir = $this->pmssMakeTempDir('pmss-runtime-int-');
-        $path = $tempDir.'/port';
-        file_put_contents($path, "123oops\n");
+        $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-runtime-int-').'/port', "123oops\n");
 
-        try {
-            $this->assertEquals(99, \pmssReadRegularFileInt($path, 99));
-        } finally {
-            $this->pmssRemoveTree($tempDir);
-        }
+        $this->assertEquals(99, \pmssReadRegularFileInt($path, 99));
     }
 
     public function testReadRegularFileIntFallsBackForSymlinkedFile(): void
     {
         $tempDir = $this->pmssMakeTempDir('pmss-runtime-int-');
-        $target = $tempDir.'/target';
         $path = $tempDir.'/port';
-        file_put_contents($target, "123\n");
-        symlink($target, $path);
+        $this->pmssCreateSymlinkOrSkip($this->pmssWriteFile($tempDir.'/target', "123\n"), $path);
 
-        try {
-            $this->assertEquals(99, \pmssReadRegularFileInt($path, 99));
-        } finally {
-            $this->pmssRemoveTree($tempDir);
-        }
+        $this->assertEquals(99, \pmssReadRegularFileInt($path, 99));
     }
 
     public function testSnapshotLogTaskKeepsLifecycleContract(): void

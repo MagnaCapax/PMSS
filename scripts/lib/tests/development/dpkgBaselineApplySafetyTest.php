@@ -22,9 +22,7 @@ class DpkgBaselineApplySafetyTest extends TestCase
 
     public function testWriteSanitisedDpkgSelectionsTempFileWritesPayloadWhenHelperExists(): void
     {
-        if (!function_exists('pmssWriteSanitisedDpkgSelectionsTempFile')) {
-            throw new SkipTest('pmssWriteSanitisedDpkgSelectionsTempFile helper not present in this baseline');
-        }
+        $this->pmssSkipUnlessFunctionExists('pmssWriteSanitisedDpkgSelectionsTempFile');
 
         $tmpDir = $this->pmssMakeTempDir('pmss-dpkg-stage-', 0700);
         $path = null;
@@ -43,15 +41,11 @@ class DpkgBaselineApplySafetyTest extends TestCase
         $this->assertTrue(file_exists((string) $path), 'Expected staged temp file to exist');
         $this->assertEquals('', $output, 'Successful staging should not emit warnings');
         $this->assertEquals("alpha\tinstall\nbeta\thold\n", (string) file_get_contents($path));
-
-        @unlink($path);
     }
 
     public function testWriteSanitisedDpkgSelectionsTempFileAppendsTrailingNewlineWhenHelperExists(): void
     {
-        if (!function_exists('pmssWriteSanitisedDpkgSelectionsTempFile')) {
-            throw new SkipTest('pmssWriteSanitisedDpkgSelectionsTempFile helper not present in this baseline');
-        }
+        $this->pmssSkipUnlessFunctionExists('pmssWriteSanitisedDpkgSelectionsTempFile');
 
         $tmpDir = $this->pmssMakeTempDir('pmss-dpkg-newline-', 0700);
         $path = null;
@@ -64,15 +58,11 @@ class DpkgBaselineApplySafetyTest extends TestCase
 
         $payload = (string) file_get_contents((string) $path);
         $this->assertSame("\n", substr($payload, -1), 'Expected staged baseline payload to end with one newline');
-
-        @unlink((string) $path);
     }
 
     public function testCreatePrivateTempDirUsesProcessTempRoot(): void
     {
-        if (!function_exists('pmssCreatePrivateTempDir')) {
-            throw new SkipTest('pmssCreatePrivateTempDir helper not present in this baseline');
-        }
+        $this->pmssSkipUnlessFunctionExists('pmssCreatePrivateTempDir');
 
         $path = \pmssCreatePrivateTempDir('pmss-libssl-');
         $tmpDir = realpath(sys_get_temp_dir());
@@ -88,9 +78,7 @@ class DpkgBaselineApplySafetyTest extends TestCase
 
     public function testCreatePrivateTempDirRejectsUnsafePrefixesBeforeTempnam(): void
     {
-        if (!function_exists('pmssCreatePrivateTempDir')) {
-            throw new SkipTest('pmssCreatePrivateTempDir helper not present in this baseline');
-        }
+        $this->pmssSkipUnlessFunctionExists('pmssCreatePrivateTempDir');
 
         foreach (['', '../pmss', '/pmss', '.pmss', "pmss\nstage"] as $prefix) {
             [$path, $output] = $this->pmssCaptureStdout(function () use ($prefix): ?string {
@@ -104,9 +92,7 @@ class DpkgBaselineApplySafetyTest extends TestCase
 
     public function testPrivateTempDirRealpathAcceptsOwnedPrefixUnderTempRoot(): void
     {
-        if (!function_exists('pmssPrivateTempDirRealpath')) {
-            throw new SkipTest('pmssPrivateTempDirRealpath helper not present in this baseline');
-        }
+        $this->pmssSkipUnlessFunctionExists('pmssPrivateTempDirRealpath');
 
         $tmpDir = $this->pmssMakeTempDir('pmss-private-realpath-root-', 0700);
         $ownedDir = $tmpDir.'/pmss-libssl-owned';
@@ -126,9 +112,7 @@ class DpkgBaselineApplySafetyTest extends TestCase
 
     public function testPrivateTempDirRealpathRejectsWrongPrefixUnderTempRoot(): void
     {
-        if (!function_exists('pmssPrivateTempDirRealpath')) {
-            throw new SkipTest('pmssPrivateTempDirRealpath helper not present in this baseline');
-        }
+        $this->pmssSkipUnlessFunctionExists('pmssPrivateTempDirRealpath');
 
         $tmpDir = $this->pmssMakeTempDir('pmss-private-reject-root-', 0700);
         $wrongDir = $tmpDir.'/other-cache';
@@ -148,9 +132,7 @@ class DpkgBaselineApplySafetyTest extends TestCase
 
     public function testPrivateTempDirRealpathRejectsUnsafePrefixBeforeScopeMatch(): void
     {
-        if (!function_exists('pmssPrivateTempDirRealpath')) {
-            throw new SkipTest('pmssPrivateTempDirRealpath helper not present in this baseline');
-        }
+        $this->pmssSkipUnlessFunctionExists('pmssPrivateTempDirRealpath');
 
         $tmpDir = $this->pmssMakeTempDir('pmss-private-prefix-root-', 0700);
         $ownedDir = $tmpDir.'/pmss-libssl-owned';
@@ -170,9 +152,7 @@ class DpkgBaselineApplySafetyTest extends TestCase
 
     public function testRemovePrivateTempDirRejectsWrongPrefixBeforeRunStep(): void
     {
-        if (!function_exists('pmssRemovePrivateTempDir')) {
-            throw new SkipTest('pmssRemovePrivateTempDir helper not present in this baseline');
-        }
+        $this->pmssSkipUnlessFunctionExists('pmssRemovePrivateTempDir');
 
         $tmpDir = $this->pmssMakeTempDir('pmss-private-cleanup-root-', 0700);
         $wrongDir = $tmpDir.'/other-cache';
@@ -194,9 +174,7 @@ class DpkgBaselineApplySafetyTest extends TestCase
 
     public function testWriteSanitisedDpkgSelectionsTempFileFailurePathOnlyWhenHelperExists(): void
     {
-        if (!function_exists('pmssWriteSanitisedDpkgSelectionsTempFile')) {
-            throw new SkipTest('pmssWriteSanitisedDpkgSelectionsTempFile helper not present in this baseline');
-        }
+        $this->pmssSkipUnlessFunctionExists('pmssWriteSanitisedDpkgSelectionsTempFile');
 
         $blockedPath = $this->pmssMakeReadableTempPath('pmss-dpkg-blocked-', 'tmpdir');
         $path = 'sentinel';

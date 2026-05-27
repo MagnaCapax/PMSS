@@ -234,6 +234,14 @@ abstract class TestCase
         $this->fail('Expected RuntimeException, none thrown');
     }
 
+    /** Skip the current test when an optional helper is unavailable. */
+    protected function pmssSkipUnlessFunctionExists(string $function): void
+    {
+        if (!function_exists($function)) {
+            throw new SkipTest($function.' helper not present in this baseline');
+        }
+    }
+
     /**
      * Capture stdout emitted by a callback and return its result alongside the buffer.
      *
@@ -382,9 +390,7 @@ abstract class TestCase
     protected function pmssWritePhpArrayFixture(array $value, string $prefix = 'pmss-fixture-'): string
     {
         $path = $this->pmssMakeTempPath($prefix, '.php');
-        $written = @file_put_contents($path, "<?php return ".var_export($value, true).";\n");
-        $this->assertTrue($written !== false, 'Expected PHP array fixture to be written: '.$path);
-        return $path;
+        return $this->pmssWriteFile($path, "<?php return ".var_export($value, true).";\n");
     }
 
     /** Read an array-shaped JSON fixture and optionally fall back on decode failures. */
