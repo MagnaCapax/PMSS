@@ -194,7 +194,8 @@ if [[ "$dry_run" != "1" ]] && printf '%s' "$custom_prompt" | grep -qE 'refactor\
 	WHOLE_N="${PMSS_REFACTOR_WHOLE_N:-30}"
 	{ git -C "$ROOT" ls-files '*.php' 2>/dev/null |
 		grep -E '^(scripts|etc/skel/www)/' |
-		grep -vE '/(tests|testing|rutorrent)/' |
+		grep -vE '/(tests|testing|rutorrent|devristo)/' |
+		grep -vE '^etc/skel/www/filemanager\.php$' |
 		while IFS= read -r f; do
 			[[ -f "$ROOT/$f" ]] && printf '%s %s\n' "$(wc -l <"$ROOT/$f" 2>/dev/null || echo 0)" "$f"
 		done |
