@@ -494,7 +494,7 @@ function pmssWelcomePageStateBuild() {
 
     return array(
         'quotaInfo' => $quotaInfo,
-        'bonusQuota' => (int) @file_get_contents('../.bonusQuota'),
+        'bonusQuota' => (int) (pmssWelcomePositiveIntegerFileRead('../.bonusQuota') ?? 0),
         'trafficLimitState' => $trafficLimitState,
         'vendor' => pmssWelcomeVendorRead(),
         'contextualWelcomeMessage' => pmssWelcomeContextualMessageBuild($quotaInfo),

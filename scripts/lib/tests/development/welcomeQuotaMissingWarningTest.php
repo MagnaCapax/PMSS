@@ -25,6 +25,26 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         return $this->pmssRunInlinePhp('require '.var_export($fixture, true).'; '.$script);
     }
 
+    private function runWelcomePageStateBonusQuota(string $home): int
+    {
+        $fixture = $this->makeWelcomeSafetyFixture();
+        $output = $this->pmssRunInlinePhp(
+            'require '.var_export($fixture, true).';'
+            .'if (!function_exists("pmssWelcomeVendorRead")) { function pmssWelcomeVendorRead() { return array("name" => "Pulsed Media"); } }'
+            .'if (!function_exists("pmssWelcomeContextualMessageBuild")) { function pmssWelcomeContextualMessageBuild($quotaInfo) { return ""; } }'
+            .'if (!function_exists("pmssWelcomeDelugeStateBuild")) { function pmssWelcomeDelugeStateBuild($username, $path) { return array("canRotate" => false, "passwordNotice" => "", "password" => ""); } }'
+            .'if (!function_exists("pmssWelcomeUserConfigNumber")) { function pmssWelcomeUserConfigNumber($key, $allowSymlink = false) { return null; } }'
+            .'chdir('.var_export($home, true).');'
+            .'$state = pmssWelcomePageStateBuild();'
+            .'echo json_encode($state["bonusQuota"]);',
+            [],
+            '2>&1'
+        );
+        $decoded = json_decode($output, true);
+        $this->assertTrue(is_int($decoded), 'Expected bonusQuota JSON integer, got: '.$output);
+        return $decoded;
+    }
+
     private function makeWelcomeUsageFixture(): string
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
@@ -232,6 +252,34 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         );
 
         $this->assertSame(array(), json_decode($output, true));
+    }
+
+    public function testWelcomePageStateAcceptsPositiveBonusQuota(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-welcome-bonus-').'/alice/www';
+        $this->pmssEnsureFixtureDirectory($home);
+        $this->pmssWriteFile(dirname($home).'/.bonusQuota', "25\n");
+
+        $this->assertSame(25, $this->runWelcomePageStateBonusQuota($home));
+    }
+
+    public function testWelcomePageStateRejectsNegativeBonusQuota(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-welcome-bonus-').'/alice/www';
+        $this->pmssEnsureFixtureDirectory($home);
+        $this->pmssWriteFile(dirname($home).'/.bonusQuota', "-10\n");
+
+        $this->assertSame(0, $this->runWelcomePageStateBonusQuota($home));
+    }
+
+    public function testWelcomePageStateRejectsSymlinkedBonusQuota(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-welcome-bonus-').'/alice/www';
+        $this->pmssEnsureFixtureDirectory($home);
+        $target = $this->pmssWriteFile(dirname($home).'/.bonusQuotaTarget', "77\n");
+        $this->pmssCreateSymlinkOrSkip($target, dirname($home).'/.bonusQuota');
+
+        $this->assertSame(0, $this->runWelcomePageStateBonusQuota($home));
     }
 
     public function testWelcomeQuotaSectionHandlesMalformedPayloadWithoutNotice(): void
