@@ -45,6 +45,7 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
@@ -54,11 +55,8 @@ require_once __DIR__.'/../lib/user/log.php';
 require_once __DIR__.'/../lib/user/directories.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
 
-$args = $argv ?? ($_SERVER['argv'] ?? []);
-$debug = in_array('--debug', $args, true);
-$args = array_values(array_filter($args, static function ($arg) {
-    return $arg !== '--debug';
-}));
+$debug = pmssCliArgvHasToken($argv ?? null, '--debug');
+$args = pmssCliArgvWithoutTokens($argv ?? null, ['--debug']);
 
 if (count($args) < 3) {
     fwrite(STDERR, "Usage: /scripts/util/userDocker.php USER {start|stop|restart|status} [--debug]\n");

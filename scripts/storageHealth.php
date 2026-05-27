@@ -150,13 +150,14 @@ $defaultNoticePath = getenv('PMSS_STORAGE_USER_NOTICE') ?: '/etc/seedbox/config/
 $parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null));
 if (pmssCliOptionPresent($parsed, 'help', 'h')) {
     echo "\nStorage health report\n";
-    echo "Usage: storageHealth.php [--json <path>] [--raw] [--only-problems] [--device <kname|/dev/...>] [--user-notice[=<path>]]\n\n";
-    echo "  --json <path>   JSON Lines input (default /var/log/pmss/storage-health.jsonl)\n";
-    echo "  --raw           Print the latest JSON entries (per device) and exit\n";
-    echo "  --only-problems Show only warn/fail entries\n";
-    echo "  --device <id>   Filter to one device (kname like sda, or path like /dev/sda)\n";
-    echo "  --user-notice[=<path>]  Write/clear a user-facing performance notice when perf is limited\n";
-    echo "  --help          Show this help\n\n";
+    echo pmssCliHelpUsageOptions('storageHealth.php [--json <path>] [--raw] [--only-problems] [--device <kname|/dev/...>] [--user-notice[=<path>]]', [
+        ['--json <path>', 'JSON Lines input (default /var/log/pmss/storage-health.jsonl).'],
+        ['--raw', 'Print the latest JSON entries (per device) and exit.'],
+        ['--only-problems', 'Show only warn/fail entries.'],
+        ['--device <id>', 'Filter to one device (kname like sda, or path like /dev/sda).'],
+        ['--user-notice[=<path>]', 'Write/clear a user-facing performance notice when perf is limited.'],
+        ['--help', 'Show this help.'],
+    ], 28);
     exit(0);
 }
 

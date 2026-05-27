@@ -30,6 +30,7 @@
  * @license   Proprietary
  */
 
+require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/user/log.php';
 require_once __DIR__.'/../lib/rtorrent/scgi.php';
@@ -40,8 +41,7 @@ require_once __DIR__.'/../lib/user/traffic.php';
 
 require_once __DIR__.'/../lib/userLifecycle.php';
 
-$args = $argv ?? ($_SERVER['argv'] ?? []);
-$debug = in_array('--debug', $args, true);
+$debug = pmssCliArgvHasToken($argv ?? null, '--debug');
 
 // Grace periods for transient conditions (seconds).
 define('PMSS_RTORRENT_MISSING_GRACE', 180);

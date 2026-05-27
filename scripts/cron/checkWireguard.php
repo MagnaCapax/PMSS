@@ -6,10 +6,10 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
+require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
-$args = $argv ?? ($_SERVER['argv'] ?? []);
-$debug = in_array('--debug', $args, true);
+$debug = pmssCliArgvHasToken($argv ?? null, '--debug');
 
 $logPrefix = date('c') . ' ';
 if (!file_exists('/etc/wireguard/wg0.conf')) {

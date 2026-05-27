@@ -12,6 +12,12 @@ require_once __DIR__.'/helpText.php';
 
 function pmssCliArgv(?array $argv = null): array { return $argv ?? ($_SERVER['argv'] ?? []); }
 
+/** Test for an exact argv token without duplicating fallback boilerplate. */
+function pmssCliArgvHasToken(?array $argv, string $token): bool { return in_array($token, pmssCliArgv($argv), true); }
+
+/** Remove exact option tokens from argv while preserving positional order. */
+function pmssCliArgvWithoutTokens(?array $argv, array $tokens): array { $blocked = array_flip($tokens); return array_values(array_filter(pmssCliArgv($argv), static function ($arg) use ($blocked): bool { return !isset($blocked[(string) $arg]); })); }
+
 /**
  * Split argv tokens into associative options and positional arguments.
  * @param array<int,string> $valueOptions Option names that may consume dashed values.

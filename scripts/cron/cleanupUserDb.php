@@ -7,9 +7,10 @@
  * @author PMSS Team
  */
 
-$debug = in_array('--debug', $argv ?? ($_SERVER['argv'] ?? []), true);
-
+require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/users.php';
+
+$debug = pmssCliArgvHasToken($argv ?? null, '--debug');
 
 $db = new users();
 $removed = $db->prune();

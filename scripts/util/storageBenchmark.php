@@ -27,34 +27,22 @@ $valueOptionNames = [
 // Keep long flag literals inline for CLI characterization coverage: '--require-idle'.
 $parsed = pmssParseCliTokens($argv, $valueOptionNames);
 if (pmssCliOption($parsed, 'help', 'h')) {
-    echo <<<'USAGE'
-
-Storage benchmark (non-destructive)
-Usage: storageBenchmark.php [options]
-
-Core options:
-  --target <dir>            Directory for file-backed tests (default /home)
-  --size <bytes|MiB|GiB>    Target file size (default 500G, capped to 80% free)
-  --runtime <seconds>       Per-test runtime for volume fio tests (default 60)
-  --label <name>            Tag results (e.g., hostname/site/array)
-  --json <path>             JSON Lines log (default /var/log/pmss/benchmark-storage.jsonl)
-  (also accepts --key=value form for all options above)
-
-Device options (read-only):
-  --devices                 Enable per-device tests (dd seqread + fio randread)
-  --dd-size <MiB|GiB>       Size for dd seqread per device (default 1G)
-  --device-runtime <sec>    Per-device fio runtime (default 30)
-
-Idle checks:
-  --require-idle            Abort if busy (ioping/iostat exceed thresholds)
-  --idle-latency-ms <ms>    ioping avg latency threshold (default 100)
-  --idle-util <percent>     iostat util threshold (default 85)
-
-Other:
-  --show-last               Print the last run's human summary and exit
-  --help                    Show this help
-
-USAGE;
+    echo "\nStorage benchmark (non-destructive)\n";
+    echo pmssCliHelpUsageOptions('storageBenchmark.php [options]', [
+        ['--target <dir>', 'Directory for file-backed tests (default /home).'],
+        ['--size <bytes|MiB|GiB>', 'Target file size (default 500G, capped to 80% free).'],
+        ['--runtime <seconds>', 'Per-test runtime for volume fio tests (default 60).'],
+        ['--label <name>', 'Tag results (e.g., hostname/site/array).'],
+        ['--json <path>', 'JSON Lines log (default /var/log/pmss/benchmark-storage.jsonl).'],
+        ['--devices', 'Enable per-device tests (dd seqread + fio randread).'],
+        ['--dd-size <MiB|GiB>', 'Size for dd seqread per device (default 1G).'],
+        ['--device-runtime <sec>', 'Per-device fio runtime (default 30).'],
+        ['--require-idle', 'Abort if busy (ioping/iostat exceed thresholds).'],
+        ['--idle-latency-ms <ms>', 'ioping avg latency threshold (default 100).'],
+        ['--idle-util <percent>', 'iostat util threshold (default 85).'],
+        ['--show-last', 'Print the last run human summary and exit.'],
+        ['--help', 'Show this help.'],
+    ], 28, ['Also accepts --key=value form for all value options.']);
     exit(0);
 }
 $testDevices = pmssCliOptionPresent($parsed, 'devices', null, true);
