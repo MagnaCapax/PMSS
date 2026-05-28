@@ -181,6 +181,24 @@ class PmssStatsCliTest extends TestCase
         }
     }
 
+    public function testHelpTextSnapshotLocksCliContract(): void
+    {
+        list($result, $help) = $this->pmssCaptureStdout(function () {
+            return \pmssStatsParseOptions(['scripts/pmss-stats.php', '--help']);
+        });
+
+        $expected = "Usage: pmss-stats.php [--full] [--json] [--mini] [--no-header]\n\n";
+        $expected .= "Options:\n";
+        $expected .= "  --full       Show extra cgroup counters and I/O details.\n";
+        $expected .= "  --json       Emit machine-readable JSON.\n";
+        $expected .= "  --mini       Show a compact four-line summary.\n";
+        $expected .= "  --no-header  Skip the title box.\n";
+        $expected .= "  --help       Show this help.\n\n";
+
+        $this->assertSame(false, $result);
+        $this->assertSame($expected, $help);
+    }
+
     public function testMainEmitsJsonWhenRequested(): void
     {
         $versionFile = $this->pmssWriteTempFile('stats-version', "3.0.0\n");

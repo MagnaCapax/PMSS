@@ -7,7 +7,7 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 {
     public function testCanonicalConsumersUseSharedTrafficLimitStateReader(): void
     {
-        foreach (['scripts/cron/trafficLimits.php', 'scripts/lib/pmssStats.php', 'etc/skel/www/stats.php', 'etc/skel/www/welcome.php'] as $path) {
+        foreach (['scripts/cron/trafficLimits.php', 'scripts/lib/stats/collect.php', 'etc/skel/www/stats.php', 'etc/skel/www/welcome.php'] as $path) {
             $this->pmssAssertRepoFileContainsString($path, 'pmssTrafficLimitStateRead(');
         }
     }
@@ -30,7 +30,7 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
     public function testSerializedStateConsumersUseSharedArrayReader(): void
     {
-        foreach (['scripts/lib/pmssStats.php', 'etc/skel/www/stats.php', 'etc/skel/www/welcome.php'] as $path) {
+        foreach (['scripts/lib/stats/collect.php', 'etc/skel/www/stats.php', 'etc/skel/www/welcome.php'] as $path) {
             $this->pmssAssertRepoFileContainsString($path, 'pmssReadSerializedArrayFile(');
         }
     }
