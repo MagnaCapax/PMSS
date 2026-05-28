@@ -14,9 +14,9 @@ $linkSpeed = isset($linkSpeed) && is_numeric($linkSpeed) ? (int) $linkSpeed : 0;
 #TODO This should be in the install script
 #TODO Use an actual config template
 if (!file_exists('/usr/bin/vnstat')) {
-    passthru('apt-get install vnstat -y');
+    runStep('Installing vnstat', pmssBuildCommand('apt-get', ['install', '-y', 'vnstat']));
     if ($link !== '') {
-        passthru('vnstat -u -i '.escapeshellarg($link));
+        runStep('Updating vnstat interface database', pmssBuildCommand('vnstat', ['-u', '-i', $link]));
     }
 }
 if (file_exists('/etc/vnstat.conf')) {	// Fix some default configs! Especially on Deb6+7 this was an issue
@@ -36,5 +36,5 @@ if (file_exists('/etc/vnstat.conf')) {	// Fix some default configs! Especially o
         return;
     }
 
-    passthru('/etc/init.d/vnstat restart');
+    runStep('Restarting vnstat', pmssBuildCommand('/etc/init.d/vnstat', ['restart']));
 }
