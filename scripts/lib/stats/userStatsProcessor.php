@@ -48,7 +48,7 @@ abstract class PmssUserStatsProcessor
     public function runCli(array $argv, string $scriptPath): int
     {
         $this->beforeRunCli();
-        if (isset($argv[1])) { $user = self::sanitizeUserArg($argv[1]); if (!$this->validateUser($user)) { echo "Invalid user specified: {$user}\n"; return 0; } $this->processUser($user, pmssStatsCompareTimesBuild()); return 0; }
+        if (isset($argv[1])) { $user = (string) preg_replace('/[^a-zA-Z0-9-_]/', '', $argv[1]); if (!$this->validateUser($user)) { echo "Invalid user specified: {$user}\n"; return 0; } $this->processUser($user, pmssStatsCompareTimesBuild()); return 0; }
         if (!$this->beforeSpawn()) return 0;
         if (empty($users = $this->discoverUsers())) { echo "No users in this system!\n"; return 0; }
         $this->spawnWorkers($scriptPath, $users); return 0;
@@ -58,16 +58,12 @@ abstract class PmssUserStatsProcessor
 
     public function beforeSpawn(): bool { return true; }
 
-    private static function sanitizeUserArg(string $value): string { return (string) preg_replace('/[^a-zA-Z0-9-_]/', '', $value); }
-
     protected function statsUserHasDataHomeAndPasswd(string $dataUser, string $homeUser): bool
     {
         return is_readable($this->statsDataDir.'/'.$dataUser)
             && is_dir($this->homeDir.'/'.$homeUser)
-            && self::passwdFileHasUser($this->passwdFile, $homeUser);
+            && pmssColonRecordFieldsLookup($this->passwdFile, $homeUser, 2, false) !== null;
     }
-
-    private static function passwdFileHasUser(string $passwdFile, string $user): bool { return is_string($passwd = @file_get_contents($passwdFile)) && preg_match('/^'.preg_quote($user, '/').':/m', $passwd) === 1; }
 
     /** @return array{data_lines:string,records:array<int,string>}|null */
     protected function loadStatsDataLines(string $user, callable $loadData, string $logPrefix, bool $trimData = false): ?array { if (!$this->validateUser($user)) { logMessage($logPrefix."Invalid user {$user}"); return null; } $dataLines = (string) $loadData($user, (int) ((35 * 24 * 60) / 5)); $trimData && $dataLines = trim($dataLines); if ($dataLines === '') { logMessage($logPrefix."No data for user {$user}"); return null; } if (count($records = array_filter(explode("\n", $dataLines))) < 2) { logMessage($logPrefix."Too little data for {$user}"); return null; } return ['data_lines' => $dataLines, 'records' => $records]; }
