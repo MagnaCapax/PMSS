@@ -19,7 +19,7 @@ class DelugeFindCallerCompatPatchTest extends DelugeAppTestCase
         $content = (string) file_get_contents($path);
 
         $this->assertTrue($result, 'Expected legacy signature to be patched');
-        $this->assertStringContainsString('def findCaller(self, stack_info=False, stacklevel=1):', $content);
+        $this->assertEquals("class Logging:\n    def findCaller(self, stack_info=False, stacklevel=1):  # NOQA: N802\n        return ('x', 1, 'y', None)\n", $content);
     }
 
     public function testPatchReturnsTrueForAlreadyPatchedSignature(): void

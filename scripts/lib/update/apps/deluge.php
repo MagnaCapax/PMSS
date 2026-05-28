@@ -32,88 +32,110 @@ function pmssDelugeLegacyPipDependencyPackages(): array
 }
 
 /**
- * Patch Deluge cache hit ratio handling for libtorrent 2.0+ stats removal.
+ * Read a candidate patch target while refusing symlinked or unreadable paths.
  */
-function pmssPatchDelugeCacheHitRatio(string $path, bool $dryRun, callable $log): bool
+function pmssDelugeReadPatchLines(string $path, callable $log, string $readWarning): ?array
 {
     if (!is_file($path) || is_link($path) || !is_readable($path)) {
-        return false;
+        return null;
     }
 
     $lines = @file($path, FILE_IGNORE_NEW_LINES);
     if (!is_array($lines)) {
-        $log('[WARN] Unable to read Deluge core.py for patching: '.$path);
+        $log($readWarning.$path);
+        return null;
+    }
+
+    return $lines;
+}
+
+/**
+ * Search a bounded line window without open-coding patch-specific loops.
+ */
+function pmssDelugeLineSearch(array $lines, string $needle, int $start = 0, ?int $end = null, int $step = 1, bool $regex = false): ?int
+{
+    if ($lines === [] || $step === 0) {
+        return null;
+    }
+
+    $lastIndex = count($lines) - 1;
+    $start = max(0, min($start, $lastIndex));
+    $end = $end === null ? ($step > 0 ? $lastIndex : 0) : max(0, min($end, $lastIndex));
+
+    for ($i = $start; $step > 0 ? $i <= $end : $i >= $end; $i += $step) {
+        if ($regex ? preg_match($needle, $lines[$i]) === 1 : strpos($lines[$i], $needle) !== false) {
+            return $i;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Persist patched lines with the same newline and dry-run contract.
+ */
+function pmssDelugeWritePatchedLines(string $path, array $lines, bool $dryRun, callable $log, string $dryRunMessage, string $writeWarning): bool
+{
+    $newContent = implode("\n", $lines);
+    if ($newContent !== '' && substr($newContent, -1) !== "\n") {
+        $newContent .= "\n";
+    }
+
+    if ($dryRun) {
+        $log($dryRunMessage.$path);
+        return true;
+    }
+
+    if (@file_put_contents($path, $newContent) === false) {
+        $log($writeWarning.$path);
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Patch Deluge cache hit ratio handling for libtorrent 2.0+ stats removal.
+ */
+function pmssPatchDelugeCacheHitRatio(string $path, bool $dryRun, callable $log): bool
+{
+    $lines = pmssDelugeReadPatchLines($path, $log, '[WARN] Unable to read Deluge core.py for patching: ');
+    if ($lines === null) {
         return false;
     }
 
     $lineCount = count($lines);
-    $hitLine = null;
-    for ($i = 0; $i < $lineCount; $i++) {
-        if (strpos($lines[$i], 'disk.num_blocks_cache_hits') !== false) {
-            $hitLine = $i;
-            break;
-        }
-    }
+    $hitLine = pmssDelugeLineSearch($lines, 'disk.num_blocks_cache_hits');
     if ($hitLine === null) {
         return false;
     }
 
     $windowStart = max(0, $hitLine - 6);
     $windowEnd = min($lineCount - 1, $hitLine + 6);
-    for ($i = $windowStart; $i <= $windowEnd; $i++) {
-        if (strpos($lines[$i], 'except KeyError') !== false) {
-            return true;
-        }
+    if (pmssDelugeLineSearch($lines, 'except KeyError', $windowStart, $windowEnd) !== null) {
+        return true;
     }
 
-    $ifLine = null;
-    for ($i = $hitLine; $i >= 0; $i--) {
-        if (preg_match('/^\\s*if blocks_read:\\s*$/', $lines[$i])) {
-            $ifLine = $i;
-            break;
-        }
-    }
+    $ifLine = pmssDelugeLineSearch($lines, '/^\\s*if blocks_read:\\s*$/', $hitLine, 0, -1, true);
     if ($ifLine === null) {
         $log('[WARN] Unable to locate Deluge cache ratio block in '.$path);
         return false;
     }
 
-    $elseLine = null;
-    $scanLimit = min($lineCount, $ifLine + 20);
-    for ($i = $hitLine; $i < $scanLimit; $i++) {
-        if (preg_match('/^\\s*else:\\s*$/', $lines[$i])) {
-            $elseLine = $i;
-            break;
-        }
-    }
+    $elseLine = pmssDelugeLineSearch($lines, '/^\\s*else:\\s*$/', $hitLine, min($lineCount - 1, $ifLine + 19), 1, true);
     if ($elseLine === null) {
         $log('[WARN] Unable to locate Deluge cache ratio else block in '.$path);
         return false;
     }
 
-    $assignLine = null;
-    $calcLine = null;
-    for ($i = $ifLine + 1; $i < $elseLine; $i++) {
-        if ($assignLine === null && strpos($lines[$i], "self.session_status['read_hit_ratio']") !== false) {
-            $assignLine = $i;
-        }
-        if ($calcLine === null && strpos($lines[$i], 'disk.num_blocks_cache_hits') !== false) {
-            $calcLine = $i;
-        }
-    }
+    $assignLine = pmssDelugeLineSearch($lines, "self.session_status['read_hit_ratio']", $ifLine + 1, $elseLine - 1);
+    $calcLine = pmssDelugeLineSearch($lines, 'disk.num_blocks_cache_hits', $ifLine + 1, $elseLine - 1);
     if ($assignLine === null || $calcLine === null) {
         $log('[WARN] Unable to locate Deluge cache ratio assignment in '.$path);
         return false;
     }
 
-    $elseAssignLine = null;
-    $elseScanLimit = min($lineCount, $elseLine + 6);
-    for ($i = $elseLine + 1; $i < $elseScanLimit; $i++) {
-        if (strpos($lines[$i], "self.session_status['read_hit_ratio']") !== false) {
-            $elseAssignLine = $i;
-            break;
-        }
-    }
+    $elseAssignLine = pmssDelugeLineSearch($lines, "self.session_status['read_hit_ratio']", $elseLine + 1, min($lineCount - 1, $elseLine + 5));
     if ($elseAssignLine === null) {
         $log('[WARN] Unable to locate Deluge cache ratio else assignment in '.$path);
         return false;
@@ -150,22 +172,14 @@ function pmssPatchDelugeCacheHitRatio(string $path, bool $dryRun, callable $log)
     ];
 
     array_splice($lines, $ifLine, $elseAssignLine - $ifLine + 1, $newBlock);
-    $newContent = implode("\n", $lines);
-    if ($newContent !== '' && substr($newContent, -1) !== "\n") {
-        $newContent .= "\n";
-    }
-
-    if ($dryRun) {
-        $log('[DRYRUN] Would patch Deluge cache hit ratio in '.$path);
-        return true;
-    }
-
-    if (@file_put_contents($path, $newContent) === false) {
-        $log('[WARN] Failed to write Deluge cache ratio patch to '.$path);
-        return false;
-    }
-
-    return true;
+    return pmssDelugeWritePatchedLines(
+        $path,
+        $lines,
+        $dryRun,
+        $log,
+        '[DRYRUN] Would patch Deluge cache hit ratio in ',
+        '[WARN] Failed to write Deluge cache ratio patch to '
+    );
 }
 
 /**
@@ -173,47 +187,31 @@ function pmssPatchDelugeCacheHitRatio(string $path, bool $dryRun, callable $log)
  */
 function pmssPatchDelugeFindCallerSignature(string $path, bool $dryRun, callable $log): bool
 {
-    if (!is_file($path) || is_link($path) || !is_readable($path)) {
+    $lines = pmssDelugeReadPatchLines($path, $log, '[WARN] Unable to read Deluge log.py for patching: ');
+    if ($lines === null) {
         return false;
     }
 
-    $lines = @file($path, FILE_IGNORE_NEW_LINES);
-    if (!is_array($lines)) {
-        $log('[WARN] Unable to read Deluge log.py for patching: '.$path);
-        return false;
-    }
-
-    $lineCount = count($lines);
-    for ($i = 0; $i < $lineCount; $i++) {
-        if (strpos($lines[$i], 'def findCaller(') === false) {
-            continue;
-        }
-
+    $searchStart = 0;
+    while (($i = pmssDelugeLineSearch($lines, 'def findCaller(', $searchStart)) !== null) {
         if (strpos($lines[$i], 'stacklevel=') !== false) {
             return true;
         }
 
         if (!preg_match('/^(\s*def\s+findCaller\(\s*self\s*,\s*stack_info\s*=\s*False)\)(.*)$/', $lines[$i], $matches)) {
+            $searchStart = $i + 1;
             continue;
         }
 
         $lines[$i] = $matches[1].', stacklevel=1)'.$matches[2];
-        $newContent = implode("\n", $lines);
-        if ($newContent !== '' && substr($newContent, -1) !== "\n") {
-            $newContent .= "\n";
-        }
-
-        if ($dryRun) {
-            $log('[DRYRUN] Would patch Deluge findCaller signature in '.$path);
-            return true;
-        }
-
-        if (@file_put_contents($path, $newContent) === false) {
-            $log('[WARN] Failed to write Deluge findCaller patch to '.$path);
-            return false;
-        }
-
-        return true;
+        return pmssDelugeWritePatchedLines(
+            $path,
+            $lines,
+            $dryRun,
+            $log,
+            '[DRYRUN] Would patch Deluge findCaller signature in ',
+            '[WARN] Failed to write Deluge findCaller patch to '
+        );
     }
 
     return false;
