@@ -200,31 +200,42 @@ LIGHTTPD;
         }
     }
 
-    public function testUserConfigApplyOwnsPhpIniMemoryLimitUpdate(): void
+    public function testPhpIniContentRendererKeepsExistingDirectivesStable(): void
+    {
+        $updated = \pmssLighttpdApplyPhpIniContent(
+            "engine = On\nmemory_limit = 64M\n; upload_tmp_dir = /tmp\n",
+            'alice',
+            512
+        );
+
+        $this->assertSame(
+            "engine = On\nmemory_limit = 512M\nupload_tmp_dir = /home/alice/.lighttpd/upload\n",
+            $updated
+        );
+    }
+
+    public function testPhpIniContentRendererAppendsMissingDirectives(): void
+    {
+        $updated = \pmssLighttpdApplyPhpIniContent("engine = On\n", 'bob', 256);
+
+        $this->assertSame(
+            "engine = On\nmemory_limit = 256M\nupload_tmp_dir = /home/bob/.lighttpd/upload\n",
+            $updated
+        );
+    }
+
+    public function testUserConfigApplyFacadeLoadsFocusedHelpers(): void
     {
         $src = $this->pmssReadRepoFile('scripts/lib/lighttpd/userConfigApply.php');
 
         $this->assertStringContainsAllStrings([
-            "preg_match('/^memory_limit\\s*=.*$/m', \$phpIniContent)",
-            'if (!pmssAtomicWriteFile($phpIniPath, $phpIniContent))',
-            'Failed to update php.ini; skipping user',
+            "require_once __DIR__.'/configRender.php';",
+            "require_once __DIR__.'/delugeWebConf.php';",
+            "require_once __DIR__.'/proxyFragments.php';",
+            "require_once __DIR__.'/resourcePlan.php';",
+            "require_once __DIR__.'/userDirectoriesPrepare.php';",
+            'function pmssUserConfigLighttpdConfigureUser(',
         ], $src);
-    }
-
-    public function testUserConfigApplyOwnsPhpIniUploadTmpDirUpdate(): void
-    {
-        $src = $this->pmssReadRepoFile('scripts/lib/lighttpd/userConfigApply.php');
-
-        $this->assertStringContainsAllStrings([
-            "preg_match('/^\\s*;?\\s*upload_tmp_dir\\s*=.*$/m', \$phpIniContent)",
-            "'upload_tmp_dir = /home/'.\$thisUser.'/.lighttpd/upload'",
-        ], $src);
-    }
-
-    public function testUserConfigApplyOwnsMovedHelperFunctions(): void
-    {
-        $src = $this->pmssReadRepoFile('scripts/lib/lighttpd/userConfigApply.php');
-
         foreach ([
             'pmssClampLighttpdBandwidthLimits',
             'pmssStripLighttpdWebdavConfig',
@@ -239,7 +250,7 @@ LIGHTTPD;
             'pmssDelugeWriteWebConf',
             'pmssLighttpdManagedProxyFragment',
         ] as $functionName) {
-            $this->assertStringContainsString('function '.$functionName.'(', $src);
+            $this->assertTrue(function_exists($functionName), $functionName.' should be loaded through the facade');
         }
 
         $this->assertSame(
