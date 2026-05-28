@@ -27,6 +27,140 @@ function pmssTrackerCleanerShouldScrubTracker(string $trackerUrl, array $blockRu
 
 function pmssTrackerCleanerLogValue($value): string { return str_replace(["\r", "\n"], ' ', (string) $value); }
 
+function pmssTrackerCleanerSuCommand(string $username, string $command): string { return 'su -s /bin/bash -c '.escapeshellarg($command).' '.escapeshellarg($username); }
+
+function pmssTrackerCleanerChangeLog(array $changes, ?string $timestamp = null): string
+{
+    $timestamp = $timestamp ?? pmssTrackerCleanerTimestamp();
+    $log = '';
+    foreach ($changes as $infoHash => $name) $log .= $timestamp.' Changed '.$name.' ('.$infoHash.")\n";
+    return $log;
+}
+
+function pmssTrackerCleanerUserSummary(int $processed, int $private, int $changed, string $stopReason = ''): string
+{
+    return sprintf('tracker cleaner: processed=%d private=%d changed=%d%s', $processed, $private, $changed, $stopReason !== '' ? ' stop_reason='.$stopReason : '');
+}
+
+function pmssTrackerCleanerRunOutcomeLogLine(string $stopReason, bool $anyWork, bool $anyChanges): string
+{
+    if ($stopReason === 'runtime_limit') return 'WARN: runtime limit reached; stopping early.';
+    if ($stopReason === 'backup_failed') return 'ERR: backup verification failed; stopping early.';
+    if ($stopReason === 'modify_limit') return 'WARN: modification limit reached; stopping early.';
+    if (!$anyWork) return 'SKIP: no eligible torrents processed this run.';
+    return $anyChanges ? 'OK: run complete; tracker changes applied.' : 'OK: run complete; no tracker changes needed.';
+}
+
+function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload): void
+{
+    if ($payload === '') {
+        return;
+    }
+    $userHome = "/home/{$username}";
+    $userLogsDir = $userHome.'/.logs';
+    $userLogFile = $userLogsDir.'/trackerCleaner.log';
+    $tmpLogPath = @tempnam(sys_get_temp_dir(), 'pmss-trackerCleaner-');
+    if ($tmpLogPath === false || @file_put_contents($tmpLogPath, $payload) === false) {
+        if (is_string($tmpLogPath)) @unlink($tmpLogPath);
+        return;
+    }
+    if (!@chown($tmpLogPath, $username)) {
+        pmssTrackerCleanerLog("WARN: Unable to chown temp log {$tmpLogPath} for user {$username}; skipping per-user verbose log.");
+        @unlink($tmpLogPath);
+        return;
+    }
+    @chgrp($tmpLogPath, $username); @chmod($tmpLogPath, 0640);
+
+    pmssUserLifecycleStep('trackerCleaner', $username, 'ensure_user_logs_dir', pmssTrackerCleanerSuCommand($username, 'mkdir -p ~/.logs'), false);
+    if (!is_dir($userLogsDir) || !pmssPathWithinRootIsSafe($userLogsDir, $userHome, true)) {
+        pmssTrackerCleanerLog("WARN: User log directory is unsafe or missing for {$username} ({$userLogsDir}); skipping per-user verbose log.");
+        @unlink($tmpLogPath);
+        return;
+    }
+    if (file_exists($userLogFile) && is_link($userLogFile)) {
+        pmssTrackerCleanerLog("WARN: User log file is symlink for {$username} ({$userLogFile}); skipping per-user verbose log.");
+        @unlink($tmpLogPath);
+        return;
+    }
+
+    pmssUserLifecycleStep('trackerCleaner', $username, 'append_user_verbose_log', pmssTrackerCleanerSuCommand($username, 'cat '.escapeshellarg($tmpLogPath).' >> ~/.logs/trackerCleaner.log'), false);
+    if (file_exists($userLogFile) && !is_link($userLogFile) && pmssPathWithinRootIsSafe($userLogFile, $userHome)) {
+        @chown($userLogFile, $username);
+        @chgrp($userLogFile, $username);
+    }
+    @unlink($tmpLogPath);
+}
+
+/** @return array{skip:bool,reason:string,message:string,session_dir:string,backups_dir:string} */
+function pmssTrackerCleanerUserSessionPlan(string $username): array
+{
+    $sessionDir = "/home/{$username}/session";
+    $backupsDir = $sessionDir.'/backups';
+
+    if (pmssUserWebRootUnavailable($username)) return ['skip' => true, 'reason' => 'suspended', 'message' => "User {$username} is suspended; skipping.", 'session_dir' => $sessionDir, 'backups_dir' => $backupsDir];
+    if (file_exists("/home/{$username}/.trackerCleanerDisable")) return ['skip' => true, 'reason' => 'disabled', 'message' => '', 'session_dir' => $sessionDir, 'backups_dir' => $backupsDir];
+    if (!pmssPathWithinRootIsSafe($sessionDir, $sessionDir, true)) return ['skip' => true, 'reason' => 'session_path_unsafe', 'message' => "SKIP: refusing to operate; session path unsafe for user {$username} ({$sessionDir}).", 'session_dir' => $sessionDir, 'backups_dir' => $backupsDir];
+    if (file_exists($backupsDir) && (!is_dir($backupsDir) || is_link($backupsDir))) return ['skip' => true, 'reason' => 'backups_path_unsafe', 'message' => "SKIP: refusing to operate; backups path unsafe for user {$username} ({$backupsDir}).", 'session_dir' => $sessionDir, 'backups_dir' => $backupsDir];
+
+    return ['skip' => false, 'reason' => '', 'message' => '', 'session_dir' => $sessionDir, 'backups_dir' => $backupsDir];
+}
+
+function pmssTrackerCleanerTorrentCandidates(string $sessionDir, int $maxTorrents): array { $torrents = glob($sessionDir.'/*.torrent'); if (!is_array($torrents) || $torrents === []) return []; shuffle($torrents); return count($torrents) > $maxTorrents ? array_slice($torrents, 0, $maxTorrents) : $torrents; }
+
+/** @return array{ok:bool,stop_reason:string,verbose_log:string} */
+function pmssTrackerCleanerBackupTorrent(string $username, string $torrentPath, string $backupDir, string $backupsRoot, string $removedList): array
+{
+    $sourcePerms = @fileperms($torrentPath);
+    $sourceModeText = sprintf('%o', $sourcePerms === false ? 0640 : ($sourcePerms & 0777));
+    $sourceSize = @filesize($torrentPath);
+    $sourceSizeText = $sourceSize === false ? 'unknown' : (string) $sourceSize;
+
+    if (!is_dir($backupDir)) {
+        $prepareRc = pmssUserLifecycleStep('trackerCleaner', $username, 'prepare_backup_dir', pmssTrackerCleanerSuCommand($username, 'mkdir -p '.escapeshellarg($backupDir).' && chmod 750 '.escapeshellarg($backupDir)), false);
+        if ($prepareRc !== 0) {
+            pmssTrackerCleanerLog("ERR: Failed to prepare backup dir for user {$username} (dir={$backupDir}, rc={$prepareRc}).");
+            return ['ok' => false, 'stop_reason' => 'backup_failed', 'verbose_log' => pmssTrackerCleanerTimestamp()." torrent_skip reason=backup_dir_prepare_failed rc={$prepareRc} backup_dir={$backupDir}\n".pmssTrackerCleanerTimestamp()." run_stop reason=backup_failed\n"];
+        }
+    }
+    if (!pmssPathWithinRootIsSafe($backupDir, $backupsRoot, true)) {
+        pmssTrackerCleanerLog("ERR: Backup path unsafe for user {$username} ({$backupDir}).");
+        return ['ok' => false, 'stop_reason' => 'backup_failed', 'verbose_log' => pmssTrackerCleanerTimestamp()." torrent_skip reason=backup_path_unsafe backup_dir={$backupDir}\n".pmssTrackerCleanerTimestamp()." run_stop reason=backup_failed\n"];
+    }
+
+    $backupTarget = $backupDir.'/'.basename($torrentPath);
+    $backupRc = pmssUserLifecycleStep('trackerCleaner', $username, 'backup_torrent', pmssTrackerCleanerSuCommand($username, 'cp -p '.escapeshellarg($torrentPath).' '.escapeshellarg($backupTarget).' && chmod '.$sourceModeText.' '.escapeshellarg($backupTarget)), false);
+    $backupSize = @filesize($backupTarget);
+    $backupSizeText = $backupSize === false ? 'unknown' : (string) $backupSize;
+    $backupOk = $backupRc === 0 && $sourceSize !== false && $backupSize !== false && $backupSize === $sourceSize
+        && is_file($backupTarget) && !is_link($backupTarget) && pmssPathWithinRootIsSafe($backupTarget, $backupsRoot);
+    $verbose = pmssTrackerCleanerTimestamp()." torrent_backup rc={$backupRc} src={$torrentPath} dst={$backupTarget}\n";
+    if (!$backupOk) {
+        pmssTrackerCleanerLog("ERR: Backup verification failed for user {$username} (file=".basename($torrentPath).", rc={$backupRc}, src_bytes={$sourceSizeText}, dst_bytes={$backupSizeText}).");
+        $verbose .= pmssTrackerCleanerTimestamp()." torrent_skip reason=backup_failed rc={$backupRc} src={$torrentPath} dst={$backupTarget} src_bytes={$sourceSizeText} dst_bytes={$backupSizeText} removed_trackers={$removedList}\n".pmssTrackerCleanerTimestamp()." run_stop reason=backup_failed\n";
+        return ['ok' => false, 'stop_reason' => 'backup_failed', 'verbose_log' => $verbose];
+    }
+
+    return ['ok' => true, 'stop_reason' => '', 'verbose_log' => $verbose];
+}
+
+function pmssTrackerCleanerAppendUserChangeLog(string $username, array $changes): string
+{
+    if ($changes === []) return '';
+    $log = pmssTrackerCleanerChangeLog($changes);
+    $userLogPath = "/home/{$username}/.trackerCleaner.log";
+    if (file_exists($userLogPath) && is_link($userLogPath)) {
+        pmssTrackerCleanerLog("SKIP: refusing to write log; path is symlink for user {$username} ({$userLogPath}).");
+        return $log;
+    }
+
+    file_put_contents($userLogPath, $log, FILE_APPEND);
+    if (file_exists($userLogPath) && !is_link($userLogPath) && pmssPathWithinRootIsSafe($userLogPath, "/home/{$username}")) {
+        @chown($userLogPath, $username);
+        @chgrp($userLogPath, $username);
+    }
+    return $log;
+}
+
 /**
  * Remove blocked trackers from the announce-list tiers while preserving order.
  *

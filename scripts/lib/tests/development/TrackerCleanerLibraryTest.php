@@ -57,4 +57,15 @@ class TrackerCleanerLibraryTest extends TestCase
         $marked = pmssTrackerCleanerCommentWithMarker('existing');
         $this->assertSame($marked, pmssTrackerCleanerCommentWithMarker($marked));
     }
+
+    public function testRunnerLogHelpersKeepCronOutputStable(): void
+    {
+        $changes = ['abc123' => 'Public Torrent', 'def456' => 'Second Torrent'];
+        $this->assertSame("[2025-01-01 00:00:00] Changed Public Torrent (abc123)\n[2025-01-01 00:00:00] Changed Second Torrent (def456)\n", pmssTrackerCleanerChangeLog($changes, '[2025-01-01 00:00:00]'));
+        $this->assertSame('tracker cleaner: processed=4 private=1 changed=2', pmssTrackerCleanerUserSummary(4, 1, 2));
+        $this->assertSame('tracker cleaner: processed=4 private=1 changed=2 stop_reason=runtime_limit', pmssTrackerCleanerUserSummary(4, 1, 2, 'runtime_limit'));
+        foreach ([['runtime_limit', true, true, 'WARN: runtime limit reached; stopping early.'], ['backup_failed', true, false, 'ERR: backup verification failed; stopping early.'], ['modify_limit', true, true, 'WARN: modification limit reached; stopping early.'], ['', false, false, 'SKIP: no eligible torrents processed this run.'], ['', true, false, 'OK: run complete; no tracker changes needed.'], ['', true, true, 'OK: run complete; tracker changes applied.']] as $case) {
+            $this->assertSame($case[3], pmssTrackerCleanerRunOutcomeLogLine($case[0], $case[1], $case[2]));
+        }
+    }
 }
