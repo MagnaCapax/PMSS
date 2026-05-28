@@ -238,6 +238,16 @@ class StorageBenchSecurityTest extends TestCase
         $this->assertStringNotContainsString('unserialize(', $source);
     }
 
+    public function testFileBackedProbesUseCheckedCommandCapture(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/util/storageBenchmark.php');
+
+        $this->assertStringContainsString('storageBenchmarkRequireCommandField', $source);
+        $this->assertStringContainsString('pmssCommandCapture($command, 30)', $source);
+        $this->assertStringContainsString("storageBenchmarkRequirePositiveIntCommandField('df -PB1 ", $source);
+        $this->assertStringNotContainsString("\$free=(int)trim((string) shell_exec('df -PB1 ", $source);
+    }
+
     public function testUnsafeTargetTraversalFailsBeforeBenchmarkWork(): void
     {
         $base = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
@@ -357,5 +367,42 @@ SH
         $this->assertStringContainsString('"error":"unable to determine block device size"', $log);
         $this->assertStringNotContainsString('DD if=/dev/null', (string) @file_get_contents($invocations));
         $this->assertStringNotContainsString('--filename=/dev/null', (string) @file_get_contents($invocations));
+    }
+
+    public function testInvalidFreeSpaceProbeFailsBeforeFileBackedBenchmarkWork(): void
+    {
+        $target = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
+        $jsonLog = $this->pmssMakeJsonLogPath('pmss-bench-df-', 'benchmark-storage.jsonl');
+        $stubDir = $this->pmssMakeTempDir('pmss-bench-stubs-', 0700);
+        $invocations = $this->pmssMakeTempPath('pmss-bench-invocations-', '.log');
+        @file_put_contents($invocations, '');
+
+        $this->pmssWriteExecutableFile($stubDir.'/stat', "#!/bin/sh\nprintf '%s\\n' 'ext2/ext3'\n");
+        $this->pmssWriteExecutableFile($stubDir.'/df', <<<'SH'
+#!/bin/sh
+if [ "${1:-}" = "-PB1" ]; then
+    printf '%s\n' 'Filesystem 1B-blocks Used Available Use% Mounted on'
+    printf '%s\n' 'pmssfs 100 1 notbytes 1% /tmp'
+    exit 0
+fi
+printf '%s\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on'
+printf '%s\n' 'pmssfs 100 1 99 1% /tmp'
+SH
+        );
+        $this->pmssWriteExecutableFile($stubDir.'/fallocate', "#!/bin/sh\nprintf 'FALLOCATE %s\\n' \"\$*\" >>\"\${PMSS_TEST_INVOCATION_LOG:?}\"\nexit 0\n");
+        $this->pmssWriteExecutableFile($stubDir.'/ioping', "#!/bin/sh\nprintf '%s\\n' 'min/avg/max/mdev = 1.0/2.0/3.0/0.1 ms'\n");
+        $this->pmssWriteExecutableFile($stubDir.'/fio', "#!/bin/sh\nprintf 'FIO %s\\n' \"\$*\" >>\"\${PMSS_TEST_INVOCATION_LOG:?}\"\nexit 0\n");
+
+        $run = $this->pmssRunRepoPhpScriptCommandWithTempStderr(
+            'scripts/util/storageBenchmark.php',
+            ['--target='.$target, '--json='.$jsonLog, '--size=1M', '--runtime=1'],
+            $this->pmssPathPrefixedEnvironment($stubDir, ['PMSS_TEST_INVOCATION_LOG' => $invocations])
+        );
+
+        $this->assertSame(1, $run['result']['rc']);
+        $this->assertSame('', $run['result']['output']);
+        $this->assertSame("Error: failed to read free space.\n", (string) @file_get_contents($run['stderrPath']));
+        $this->assertStringNotContainsString('FALLOCATE ', (string) @file_get_contents($invocations));
+        $this->assertStringNotContainsString('FIO ', (string) @file_get_contents($invocations));
     }
 }
