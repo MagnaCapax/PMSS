@@ -47,7 +47,9 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/cron/trafficLimits.php');
 
-        $this->assertStringContainsString('@chmod($throttleFile, 0644);', $source);
+        $this->assertStringContainsString('pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)', $source);
+        $this->assertStringContainsString('traffic throttle file write failed', $source);
+        $this->assertStringContainsString('pmssTrafficLimitThrottleFileRemove($throttleFile, $error)', $source);
     }
 
     public function testTrafficLimitCronChecksListUsersExitCode(): void

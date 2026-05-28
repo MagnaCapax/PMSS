@@ -161,7 +161,15 @@ function setRateLimit($user, $trafficCapMbit, $enable=true) {
     $throttleFile = pmssTrafficLimitThrottleFilePath((string) $user);
     if ($throttleFile === null) return;
 
-    if ($enable == false) { @unlink($throttleFile); return; }
+    $error = null;
+    if ($enable == false) {
+        if (!pmssTrafficLimitThrottleFileRemove($throttleFile, $error)) {
+            pmssTrafficLimitLog((string) $user, 'traffic throttle file removal failed ('.($error ?: $throttleFile).')');
+        }
+        return;
+    }
 
-    if (@file_put_contents($throttleFile, (int) $trafficCapMbit) !== false) @chmod($throttleFile, 0644);
+    if (!pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)) {
+        pmssTrafficLimitLog((string) $user, 'traffic throttle file write failed ('.($error ?: $throttleFile).')');
+    }
 }

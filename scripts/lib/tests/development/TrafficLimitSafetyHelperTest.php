@@ -115,6 +115,67 @@ class TrafficLimitSafetyHelperTest extends TestCase
         $this->assertTrue(\pmssTrafficLimitConvergeFileMode($linkPath, 0600) === false);
     }
 
+    public function testThrottleFileWritePersistsCapWithReadableMode(): void
+    {
+        $path = $this->tempDir.'/home/alice/.throttle';
+        mkdir(dirname($path), 0755, true);
+
+        $error = 'stale';
+        $this->assertTrue(\pmssTrafficLimitThrottleFileWrite($path, 25, $error));
+        $this->assertSame(null, $error);
+        $this->assertSame('25', trim((string) file_get_contents($path)));
+        $this->assertEquals(0644, fileperms($path) & 0777);
+    }
+
+    public function testThrottleFileWriteRejectsNegativeCap(): void
+    {
+        $path = $this->tempDir.'/home/alice/.throttle';
+        mkdir(dirname($path), 0755, true);
+
+        $error = null;
+        $this->assertFalse(\pmssTrafficLimitThrottleFileWrite($path, -1, $error));
+        $this->assertSame('invalid throttle cap', $error);
+        $this->assertFalse(file_exists($path));
+    }
+
+    public function testThrottleFileWriteRejectsSymlinkTarget(): void
+    {
+        $realPath = $this->tempDir.'/real';
+        $linkPath = $this->tempDir.'/home/alice/.throttle';
+        mkdir(dirname($linkPath), 0755, true);
+        file_put_contents($realPath, 'old');
+        symlink($realPath, $linkPath);
+
+        $error = null;
+        $this->assertFalse(\pmssTrafficLimitThrottleFileWrite($linkPath, 25, $error));
+        $this->assertSame('unsafe throttle path', $error);
+        $this->assertSame('old', file_get_contents($realPath));
+    }
+
+    public function testThrottleFileRemoveTreatsMissingFileAsSuccess(): void
+    {
+        $path = $this->tempDir.'/home/alice/.throttle';
+        mkdir(dirname($path), 0755, true);
+
+        $error = 'stale';
+        $this->assertTrue(\pmssTrafficLimitThrottleFileRemove($path, $error));
+        $this->assertSame(null, $error);
+    }
+
+    public function testThrottleFileRemoveRejectsSymlinkTarget(): void
+    {
+        $realPath = $this->tempDir.'/real';
+        $linkPath = $this->tempDir.'/home/alice/.throttle';
+        mkdir(dirname($linkPath), 0755, true);
+        file_put_contents($realPath, 'old');
+        symlink($realPath, $linkPath);
+
+        $error = null;
+        $this->assertFalse(\pmssTrafficLimitThrottleFileRemove($linkPath, $error));
+        $this->assertSame('unsafe throttle path', $error);
+        $this->assertTrue(file_exists($realPath));
+    }
+
     public function testPersistTargetModesWritesAllTargetsWithRequestedModes(): void
     {
         $runtimeDir = $this->tempDir.'/runtime/trafficLimits';

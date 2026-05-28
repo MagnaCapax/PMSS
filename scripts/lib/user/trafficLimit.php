@@ -95,6 +95,54 @@ if (!function_exists('pmssTrafficLimitConvergeFileMode')) {
     }
 }
 
+if (!function_exists('pmssTrafficLimitThrottleFileWrite')) {
+    /**
+     * Persist the active traffic throttle cap using the shared safe file writer.
+     */
+    function pmssTrafficLimitThrottleFileWrite(string $path, int $capMbit, ?string &$error = null): bool
+    {
+        $error = null;
+        if ($capMbit < 0) {
+            $error = 'invalid throttle cap';
+            return false;
+        }
+        if (!function_exists('pmssUserFilePathIsSafe') || !pmssUserFilePathIsSafe($path)) {
+            $error = 'unsafe throttle path';
+            return false;
+        }
+        if (!pmssIntegerSettingFileWrite($path, $capMbit)) {
+            $error = 'failed to write throttle file: '.$path;
+            return false;
+        }
+        if (!pmssIntegerSettingPathModeConverge($path, 0644)) {
+            $error = 'failed to secure throttle file: '.$path;
+            return false;
+        }
+
+        return true;
+    }
+}
+
+if (!function_exists('pmssTrafficLimitThrottleFileRemove')) {
+    /**
+     * Remove the active traffic throttle cap only after validating the target.
+     */
+    function pmssTrafficLimitThrottleFileRemove(string $path, ?string &$error = null): bool
+    {
+        $error = null;
+        if (!function_exists('pmssUserFilePathIsSafe') || !pmssUserFilePathIsSafe($path)) {
+            $error = 'unsafe throttle path';
+            return false;
+        }
+        if (!pmssIntegerSettingFileRemove($path)) {
+            $error = 'failed to remove throttle file: '.$path;
+            return false;
+        }
+
+        return true;
+    }
+}
+
 if (!function_exists('pmssTrafficLimitPersistTargetModes')) {
     /** @param array<string,int> $targetModes */
     function pmssTrafficLimitPersistTargetModes(array $targetModes, int $value, ?string &$error = null): bool
