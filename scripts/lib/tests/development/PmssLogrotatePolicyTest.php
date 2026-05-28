@@ -23,22 +23,18 @@ class PmssLogrotatePolicyTest extends TestCase
 
     public function testWatchdogLogsStayCoveredByCheckWildcard(): void
     {
-        $policy = $this->pmssReadRepoFile('etc/seedbox/config/template.logrotate.pmss');
-
-        $this->assertMatches(
+        $this->pmssAssertRepoFileMatches(
+            'etc/seedbox/config/template.logrotate.pmss',
             '#/var/log/pmss/check\*\.log\s*\{[^}]*maxsize 64M[^}]*copytruncate#s',
-            $policy,
             'checkInstances and checkLighttpdInstances must stay size-bounded'
         );
     }
 
     public function testDiskIostatHistoryLogsPersistWithAnnualRetention(): void
     {
-        $policy = $this->pmssReadRepoFile('etc/seedbox/config/template.logrotate.pmss');
-
-        $this->assertMatches(
+        $this->pmssAssertRepoFileMatches(
+            'etc/seedbox/config/template.logrotate.pmss',
             '#/var/log/pmss/iostat-history\.log\s+/var/log/pmss/iostat-history-raw\.log\s*\{[^}]*monthly[^}]*rotate 12[^}]*create 0644 root root#s',
-            $policy,
             'iostat history logs must persist outside tmpfs with annual rotation'
         );
     }

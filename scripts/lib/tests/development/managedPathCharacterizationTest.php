@@ -7,13 +7,11 @@ class ManagedPathCharacterizationTest extends TestCase
 {
     public function testBackupHelperDelegatesToSharedWriter(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/lib/update/managedPath.php');
-
-        $this->assertStringContainsString(
+        $this->pmssAssertRepoFileContainsString(
+            'scripts/lib/update/managedPath.php',
             'pmssWriteManagedPathFile($path, $contents, $label, $logger, $owner, $group, $mode',
-            $src
         );
-        $this->assertSame(1, substr_count($src, 'pmssAtomicWriteFile('));
-        $this->assertSame(1, substr_count($src, 'pmssWriteManagedFile('));
+        $this->pmssAssertRepoFileSubstringCount('scripts/lib/update/managedPath.php', 'pmssAtomicWriteFile(', 1);
+        $this->pmssAssertRepoFileSubstringCount('scripts/lib/update/managedPath.php', 'pmssWriteManagedFile(', 1);
     }
 }

@@ -7,34 +7,36 @@ class UpdateBootstrapLockReleaseTest extends TestCase
 {
     public function testBootstrapAndPhase2ShareTheStateDirectoryLockPath(): void
     {
-        $bootstrapSource = (string) file_get_contents(__DIR__.'/../../../update.php');
-        $step2Source = (string) file_get_contents(__DIR__.'/../../../util/update-step2.php');
         $expected = "define('PMSS_UPDATE_LOCK_FILE', '/var/lib/pmss/update.lock');";
 
-        $this->assertStringContainsString($expected, $bootstrapSource, 'update.php should move the global lock outside /var/run');
-        $this->assertStringContainsString($expected, $step2Source, 'update-step2.php should share the migrated lock path');
-        $this->assertStringNotContainsString('/var/run/pmss/update.lock', $bootstrapSource, 'update.php should not keep the legacy /var/run lock path');
-        $this->assertStringNotContainsString('/var/run/pmss/update.lock', $step2Source, 'update-step2.php should not keep the legacy /var/run lock path');
+        $this->pmssAssertRepoFileContainsString('scripts/update.php', $expected, 'update.php should move the global lock outside /var/run');
+        $this->pmssAssertRepoFileContainsString('scripts/util/update-step2.php', $expected, 'update-step2.php should share the migrated lock path');
+        $this->pmssAssertRepoFileNotContainsString('scripts/update.php', '/var/run/pmss/update.lock', 'update.php should not keep the legacy /var/run lock path');
+        $this->pmssAssertRepoFileNotContainsString('scripts/util/update-step2.php', '/var/run/pmss/update.lock', 'update-step2.php should not keep the legacy /var/run lock path');
     }
 
     public function testBootstrapLockAcquisitionIsBoundedAndNonBlocking(): void
     {
-        $bootstrapSource = (string) file_get_contents(__DIR__.'/../../../update.php');
-
-        $this->assertStringContainsString('PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS', $bootstrapSource, 'update.php should bound lock wait time');
-        $this->assertStringContainsString('LOCK_EX | LOCK_NB', $bootstrapSource, 'update.php should not block indefinitely on flock');
-        $this->assertStringContainsString("logEvent('update_lock_busy_skip'", $bootstrapSource, 'update.php should report skipped busy locks');
-        $this->assertStringNotContainsString('flock($fh, LOCK_EX))', $bootstrapSource, 'update.php should not use a blocking exclusive flock');
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/update.php',
+            ['PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS', 'LOCK_EX | LOCK_NB', "logEvent('update_lock_busy_skip'"],
+            'update.php lock handling should contain: '
+        );
+        $this->pmssAssertRepoFileNotContainsString('scripts/update.php', 'flock($fh, LOCK_EX))', 'update.php should not use a blocking exclusive flock');
     }
 
     public function testPhase2StandaloneLockAcquisitionIsBoundedAndNonBlocking(): void
     {
-        $step2Source = (string) file_get_contents(__DIR__.'/../../../util/update-step2.php');
-
-        $this->assertStringContainsString('PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS', $step2Source, 'update-step2.php should bound standalone lock wait time');
-        $this->assertStringContainsString("pmssLockFileAcquire(PMSS_UPDATE_LOCK_FILE, true, 'c', true", $step2Source, 'update-step2.php should request a non-blocking lock');
-        $this->assertStringContainsString("'event' => 'update_lock_busy_skip'", $step2Source, 'update-step2.php should report skipped busy locks');
-        $this->assertStringNotContainsString("pmssLockFileAcquire(PMSS_UPDATE_LOCK_FILE, false, 'c', true)", $step2Source, 'update-step2.php should not use a blocking lock acquire');
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/util/update-step2.php',
+            [
+                'PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS',
+                "pmssLockFileAcquire(PMSS_UPDATE_LOCK_FILE, true, 'c', true",
+                "'event' => 'update_lock_busy_skip'",
+            ],
+            'update-step2.php lock handling should contain: '
+        );
+        $this->pmssAssertRepoFileNotContainsString('scripts/util/update-step2.php', "pmssLockFileAcquire(PMSS_UPDATE_LOCK_FILE, false, 'c', true)", 'update-step2.php should not use a blocking lock acquire');
     }
 
     public function testReleaseUpdateLockDoesNotDependOnRuntimeHelper(): void

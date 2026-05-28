@@ -7,8 +7,10 @@ class TerminateUserConfirmTest extends TestCase
 {
     public function testTerminateUserConfirmationLoopHandlesEof(): void
     {
-        $src = (string) file_get_contents(__DIR__.'/../../../terminateUser.php');
-        $this->assertTrue(strpos($src, 'confirmation input unavailable (EOF)') !== false, 'terminateUser.php should abort when STDIN is EOF');
-        $this->assertTrue(strpos($src, 'Unable to read confirmation input (EOF)') !== false, 'terminateUser.php should log non-interactive confirmation failure');
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/terminateUser.php',
+            ['confirmation input unavailable (EOF)', 'Unable to read confirmation input (EOF)'],
+            'terminateUser.php should handle EOF confirmation: '
+        );
     }
 }

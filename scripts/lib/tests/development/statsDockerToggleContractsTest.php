@@ -7,11 +7,7 @@ class statsDockerToggleContractsTest extends TestCase
 {
     public function testStatsPageDoesNotPostCustomerActionsIntoOperatorDockerCli(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/stats.php');
-
-        $this->assertStringNotContainsString('docker_toggle_state', $source);
-        $this->assertStringNotContainsString('/scripts/userDocker.php', $source);
-        $this->assertStringNotContainsString('UserConfigStore', $source);
-        $this->assertStringContainsString('Docker policy changes are handled by platform tooling.', $source);
+        $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/stats.php', ['docker_toggle_state', '/scripts/userDocker.php', 'UserConfigStore']);
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/stats.php', 'Docker policy changes are handled by platform tooling.');
     }
 }

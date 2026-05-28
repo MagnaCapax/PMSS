@@ -7,15 +7,16 @@ class UpdateScriptsOnlyFtpConfigTest extends TestCase
 {
     public function testScriptsOnlyRefreshesFtpConfigWhenAvailable(): void
     {
-        $src = (string) file_get_contents(__DIR__.'/../../../update.php');
-        $posScriptsOnly = strpos($src, "if (\$options['scripts_only'])");
-        $posFtpConfig = strpos($src, '/scripts/util/ftpConfig.php');
-        $posLog = strpos($src, 'Refreshing FTP configuration for --scripts-only run');
-
-        $this->assertTrue($posScriptsOnly !== false, 'update.php should contain the scripts-only branch');
-        $this->assertTrue($posFtpConfig !== false, 'update.php should reference ftpConfig.php');
-        $this->assertTrue($posLog !== false, 'update.php should log ftpConfig refresh in scripts-only mode');
-        $this->assertTrue($posScriptsOnly < $posFtpConfig, 'ftpConfig refresh should be inside the scripts-only branch');
-        $this->assertStringContainsString('Skipping update-step2.php (--scripts-only)', $src, 'update.php should still skip update-step2 during scripts-only runs');
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/update.php',
+            ['Refreshing FTP configuration for --scripts-only run', 'Skipping update-step2.php (--scripts-only)'],
+            'update.php scripts-only branch should contain: '
+        );
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/update.php',
+            ["if (\$options['scripts_only'])", '/scripts/util/ftpConfig.php'],
+            'update.php should contain scripts-only FTP refresh: ',
+            'ftpConfig refresh should be inside the scripts-only branch: '
+        );
     }
 }

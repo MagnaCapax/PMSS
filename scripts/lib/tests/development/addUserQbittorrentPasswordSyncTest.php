@@ -7,9 +7,7 @@ class addUserQbittorrentPasswordSyncTest extends TestCase
 {
     public function testProvisioningRequiresPasswordHelperLibrary(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/user/add/userConfigApply.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/../qbittorrent.php';", $source);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/add/userConfigApply.php', "require_once __DIR__.'/../qbittorrent.php';");
     }
 
     public function testProvisioningSyncsQbittorrentPasswordAfterUserConfig(): void
@@ -46,10 +44,9 @@ class addUserQbittorrentPasswordSyncTest extends TestCase
 
     public function testWelcomePageNoLongerAdvertisesLegacyAdminadminPassword(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
         $legacyPassword = 'admin'.'admin';
 
-        $this->assertTrue(strpos($source, $legacyPassword) === false, 'welcome page must not advertise the legacy qBittorrent password');
-        $this->assertStringContainsString('password matches your account password', $source);
+        $this->pmssAssertRepoFileNotContainsString('etc/skel/www/welcome.php', $legacyPassword, 'welcome page must not advertise the legacy qBittorrent password');
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/welcome.php', 'password matches your account password');
     }
 }

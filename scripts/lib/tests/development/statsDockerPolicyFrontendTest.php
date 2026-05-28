@@ -9,20 +9,16 @@ class StatsDockerPolicyFrontendTest extends TestCase
 {
     public function testStatsPageKeepsDockerPolicyReadOnlyInsideCustomerTree(): void
     {
-        $src = $this->pmssReadRepoFile('etc/skel/www/stats.php');
-
-        $this->assertStringNotContainsString('function pmssInfoDockerPolicy'.'StoreState()', $src);
-        $this->assertStringNotContainsString('pmssInfoSetDocker'.'Enabled', $src);
-        $this->assertStringNotContainsString('/scripts/lib/user/userConfigStore.php', $src);
-        $this->assertStringContainsString('Platform managed', $src);
+        $this->pmssAssertRepoFileNotContainsStrings(
+            'etc/skel/www/stats.php',
+            ['function pmssInfoDockerPolicy'.'StoreState()', 'pmssInfoSetDocker'.'Enabled', '/scripts/lib/user/userConfigStore.php']
+        );
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/stats.php', 'Platform managed');
     }
 
     public function testStatsPageShowsPlatformManagedNotice(): void
     {
-        $src = $this->pmssReadRepoFile('etc/skel/www/stats.php');
-
-        $this->assertStringContainsString('Docker policy:', $src);
-        $this->assertStringContainsString('Docker policy changes are handled by platform tooling.', $src);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/stats.php', ['Docker policy:', 'Docker policy changes are handled by platform tooling.']);
     }
 
     public function testStatsRenderShowsReadOnlyDockerPolicy(): void

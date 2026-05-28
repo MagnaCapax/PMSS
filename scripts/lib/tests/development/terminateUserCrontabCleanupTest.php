@@ -7,10 +7,9 @@ class TerminateUserCrontabCleanupTest extends TestCase
 {
     public function testTerminateUserClearsCrontabBeforeUserdel(): void
     {
-        $src = (string) file_get_contents(__DIR__.'/../../../terminateUser.php');
-        $this->assertOrderedStrings(
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/terminateUser.php',
             ["'crontab_remove'", "'userdel_initial'"],
-            $src,
             'terminateUser.php should define step ',
             'terminateUser.php should clear crontab before deleting the user account: '
         );

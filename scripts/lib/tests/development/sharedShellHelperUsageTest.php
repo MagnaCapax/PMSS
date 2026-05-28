@@ -7,10 +7,10 @@ class SharedShellHelperUsageTest extends TestCase
 {
     public function testShellLibraryDefinesSharedRunner(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/shell.php');
-
-        $this->assertStringContainsString('function pmssRun(string $cmd, bool $logFailure = true): int', $source);
-        $this->assertStringContainsString('function pmssRunOrExit(string $cmd, bool $logFailure = true): void', $source);
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/lib/shell.php',
+            ['function pmssRun(string $cmd, bool $logFailure = true): int', 'function pmssRunOrExit(string $cmd, bool $logFailure = true): void']
+        );
     }
 
     public function testShellRunnerRejectsEmptyCommandBeforePassthru(): void
@@ -27,37 +27,21 @@ class SharedShellHelperUsageTest extends TestCase
 
     public function testUserPermissionsRequiresSharedShellLibrary(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/userPermissions.php');
-
-        $this->assertStringContainsString("__DIR__.'/../lib/shell.php'", $source);
-        $this->assertStringContainsString('pmssRun(', $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userPermissions.php', ["__DIR__.'/../lib/shell.php'", 'pmssRun(']);
     }
 
     public function testUserPermissionsNoLongerDefinesLegacyRunHelper(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/userPermissions.php');
-
-        $this->assertTrue(
-            strpos($source, 'function run(string $cmd): int') === false,
-            'Expected userPermissions.php to stop defining a local run() helper'
-        );
+        $this->pmssAssertRepoFileNotContainsString('scripts/util/userPermissions.php', 'function run(string $cmd): int', 'Expected userPermissions.php to stop defining a local run() helper');
     }
 
     public function testRecreateUserRequiresSharedShellLibrary(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/recreateUser.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/lib/shell.php';", $source);
-        $this->assertStringContainsString('pmssRunOrExit(', $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/recreateUser.php', ["require_once __DIR__.'/lib/shell.php';", 'pmssRunOrExit(']);
     }
 
     public function testRecreateUserNoLongerDefinesLegacyRunHelper(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/recreateUser.php');
-
-        $this->assertTrue(
-            strpos($source, 'function run(string $cmd): void') === false,
-            'Expected recreateUser.php to stop defining a local run() helper'
-        );
+        $this->pmssAssertRepoFileNotContainsString('scripts/recreateUser.php', 'function run(string $cmd): void', 'Expected recreateUser.php to stop defining a local run() helper');
     }
 }

@@ -99,7 +99,7 @@ class CounterStateCharacterizationTest extends TestCase
         $this->assertEquals(123, $result['delta']);
         $this->assertEquals(null, $result['previous_ingress']);
         $this->assertEquals(['ingress' => 123, 'egress' => 456], array_intersect_key($this->pmssReadJsonArrayFile($path, []), ['ingress' => true, 'egress' => true]));
-        $this->assertStringContainsString('pmssCounterStateUpdate(', $this->pmssReadRepoFile('scripts/lib/traffic/ingress.php'));
-        $this->assertStringContainsString('pmssCounterStateUpdate(', $this->pmssReadRepoFile('scripts/lib/resources/log.php'));
+        $this->pmssAssertRepoFileContainsString('scripts/lib/traffic/ingress.php', 'pmssCounterStateUpdate(');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/resources/log.php', 'pmssCounterStateUpdate(');
     }
 }

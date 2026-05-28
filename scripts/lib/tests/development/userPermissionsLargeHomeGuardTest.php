@@ -7,15 +7,12 @@ class UserPermissionsLargeHomeGuardTest extends TestCase
 {
     public function testLargeDataTreeChmodIsNotRecursive(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/util/userPermissions.php');
-
-        $this->assertStringContainsString('["/home/{$thisUser}/data", 0750],', $src);
-        $this->assertStringNotContainsString('["/home/{$thisUser}/data", 0750, true],', $src, 'Expected data tree chmod to avoid recursive mode');
+        $this->pmssAssertRepoFileContainsString('scripts/util/userPermissions.php', '["/home/{$thisUser}/data", 0750],');
+        $this->pmssAssertRepoFileNotContainsString('scripts/util/userPermissions.php', '["/home/{$thisUser}/data", 0750, true],', 'Expected data tree chmod to avoid recursive mode');
     }
 
     public function testLargeDataTreeOwnershipWalkIsPruned(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/util/userPermissions.php');
         $dataPrune = <<<'PHP'
 escapeshellarg("/home/{$thisUser}/data").' -prune -o';
 PHP;
@@ -23,14 +20,14 @@ PHP;
 escapeshellarg("/home/{$thisUser}/.local").' -prune -o';
 PHP;
 
-        $this->assertStringContainsString($dataPrune, $src);
-        $this->assertStringContainsString($localPrune, $src);
-        $this->assertStringContainsString('["/home/{$thisUser}/data", "{$thisUser}:{$thisUser}"],', $src);
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/util/userPermissions.php',
+            [$dataPrune, $localPrune, '["/home/{$thisUser}/data", "{$thisUser}:{$thisUser}"],']
+        );
     }
 
     public function testHomeTreeChownUsesOwnershipMismatchFilter(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/util/userPermissions.php');
         $uidFilter = <<<'PHP'
 -not -uid '.(string) $userIds['uid']
 PHP;
@@ -41,8 +38,6 @@ PHP;
 escapeshellarg($userIds['uid'].':'.$userIds['gid'])
 PHP;
 
-        $this->assertStringContainsString($uidFilter, $src);
-        $this->assertStringContainsString($gidFilter, $src);
-        $this->assertStringContainsString($ownerSpec, $src);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userPermissions.php', [$uidFilter, $gidFilter, $ownerSpec]);
     }
 }
