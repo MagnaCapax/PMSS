@@ -22,6 +22,6 @@ Active work items are tracked in GitHub issues to avoid duplication between this
 
 - Single-run locking for updates is implemented (lock + JSON events) in `ab31f8b`.
 - Atomic staging swaps for `/scripts` and `/etc/seedbox` are implemented in `ab31f8b`.
-- Phase 2 preflight checks are implemented in `scripts/util/update-step2.php` (expanded as of `ab31f8b`).
+- Phase 2 preflight checks are implemented in `scripts/lib/update/filesystem.php` (expanded as of `ab31f8b`).
 - Per-user action logs via `pmssUserLog()` are implemented and used in cron/util flows (see `2923d6c`).
 - #117 strict error handling policy is codified via ADR 0014 and classified update-step2 wrappers.

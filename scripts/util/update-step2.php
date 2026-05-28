@@ -315,76 +315,7 @@ pmssRunProfiledCallable('Acquiring update-step2 lock', static function (): void 
         pmssLogJson(['event' => 'update_lock_released', 'path' => PMSS_UPDATE_LOCK_FILE]);
     });
 });
-pmssRunProfiledCallable('Running update-step2 preflight checks', static function (): void {
-    $required = 3.0 * 1024 * 1024 * 1024;
-    $fatalError = false;
-
-    foreach (['/', '/home'] as $path) {
-        if (!is_dir($path)) {
-            continue;
-        }
-        $free = @disk_free_space($path);
-        if ($free === false) {
-            logmsg("[WARN] Unable to determine free space for {$path}");
-            pmssLogJson(['event' => 'preflight_error', 'check' => 'disk_space', 'path' => $path, 'status' => 'warn', 'reason' => 'stat_failed']);
-            continue;
-        }
-        if ($free < $required) {
-            $availableGb = round($free / 1073741824, 2);
-            $requiredGb  = round($required / 1073741824, 2);
-            $fatalError  = true;
-            $payload = [
-                'event'           => 'preflight_error',
-                'check'           => 'disk_space',
-                'path'            => $path,
-                'status'          => 'error',
-                'available_bytes' => $free,
-                'required_bytes'  => $required,
-            ];
-            pmssLogJson($payload);
-            logmsg("Insufficient free space on {$path}: {$availableGb} GiB available, {$requiredGb} GiB required");
-        }
-    }
-
-    // dpkg lock availability (warn only)
-    foreach (['/var/lib/dpkg/lock-frontend', '/var/lib/dpkg/lock'] as $lockFile) {
-        $lockBusy = false;
-        $fh = pmssLockFileAcquire($lockFile, true, 'c', false, true, $lockBusy);
-        if ($fh === false) {
-            $reason = $lockBusy ? 'busy' : 'open_failed';
-            pmssLogJson(['event' => 'preflight_error', 'check' => 'dpkg_lock', 'status' => 'warn', 'path' => $lockFile, 'reason' => $reason]);
-            logmsg($lockBusy ? "[WARN] dpkg lock appears busy: {$lockFile}" : "[WARN] Unable to open dpkg lock file: {$lockFile}");
-            continue;
-        }
-        pmssLockHandleRelease($fh, false);
-    }
-
-    // apt cache presence/writability (warn only)
-    foreach (['/var/cache/apt/archives', '/var/lib/apt/lists'] as $path) {
-        if (!is_dir($path) || !is_writable($path)) {
-            pmssLogJson(['event' => 'preflight_error', 'check' => 'apt_cache', 'status' => 'warn', 'path' => $path, 'reason' => 'unwritable']);
-            logmsg("[WARN] APT cache path missing or not writable: {$path}");
-        }
-    }
-
-    // Basic network reachability (warn only; skip in dry-run/test mode)
-    if (!pmssEnvFlagEnabled('PMSS_DRY_RUN') && !pmssTestModeEnabled()) {
-        $sock = @fsockopen('deb.debian.org', 80, $errno, $errstr, 3.0);
-        if ($sock === false) {
-            pmssLogJson(['event' => 'preflight_error', 'check' => 'network', 'status' => 'warn', 'reason' => 'unreachable', 'host' => 'deb.debian.org', 'errno' => $errno, 'error' => $errstr]);
-            logmsg('[WARN] Unable to reach deb.debian.org: '.$errstr.' ('.$errno.')');
-        } else {
-            fclose($sock);
-        }
-    }
-
-    if ($fatalError) {
-        logmsg('Preflight checks failed (fatal) - aborting update-step2');
-        exit(1);
-    }
-
-    pmssLogJson(['event' => 'preflight_ok']);
-});
+pmssRunProfiledCallable('Running update-step2 preflight checks', static function (): void { if (!pmssUpdateStep2PreflightChecks('logmsg')) { exit(1); } });
 pmssRunProfiledCallable('Checking /home inode density', 'pmssHomeInodeDensityCheck', ['logmsg']);
 
 // Ensure the root cron template is restored even if the updater exits early.

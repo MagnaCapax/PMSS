@@ -14,6 +14,50 @@ if (!defined('PMSS_HOME_INODE_DENSITY_WARN_BYTES')) {
     define('PMSS_HOME_INODE_DENSITY_WARN_BYTES', 256 * 1024);
 }
 
+/** Run phase-2 preflight checks before package and configuration work begins. */
+function pmssUpdateStep2PreflightChecks(?callable $logger = null, ?array $diskPaths = null, ?array $lockFiles = null, ?array $aptCachePaths = null, string $networkHost = 'deb.debian.org', float $requiredBytes = 3221225472.0): bool
+{
+    $log = $logger ?: 'logMessage';
+    $fatalError = false;
+    foreach ($diskPaths ?? ['/', '/home'] as $path) {
+        if (!is_dir($path)) continue;
+        $free = @disk_free_space($path);
+        if ($free === false) {
+            $log("[WARN] Unable to determine free space for {$path}");
+            pmssLogJson(['event' => 'preflight_error', 'check' => 'disk_space', 'path' => $path, 'status' => 'warn', 'reason' => 'stat_failed']);
+            continue;
+        }
+        if ($free >= $requiredBytes) continue;
+        $fatalError = true;
+        pmssLogJson(['event' => 'preflight_error', 'check' => 'disk_space', 'path' => $path, 'status' => 'error', 'available_bytes' => $free, 'required_bytes' => $requiredBytes]);
+        $log('Insufficient free space on '.$path.': '.round($free / 1073741824, 2).' GiB available, '.round($requiredBytes / 1073741824, 2).' GiB required');
+    }
+    foreach ($lockFiles ?? ['/var/lib/dpkg/lock-frontend', '/var/lib/dpkg/lock'] as $lockFile) {
+        $lockBusy = false;
+        $fh = pmssLockFileAcquire($lockFile, true, 'c', false, true, $lockBusy);
+        if ($fh !== false) { pmssLockHandleRelease($fh, false); continue; }
+        pmssLogJson(['event' => 'preflight_error', 'check' => 'dpkg_lock', 'status' => 'warn', 'path' => $lockFile, 'reason' => $lockBusy ? 'busy' : 'open_failed']);
+        $log($lockBusy ? "[WARN] dpkg lock appears busy: {$lockFile}" : "[WARN] Unable to open dpkg lock file: {$lockFile}");
+    }
+    foreach ($aptCachePaths ?? ['/var/cache/apt/archives', '/var/lib/apt/lists'] as $path) {
+        if (is_dir($path) && is_writable($path)) continue;
+        pmssLogJson(['event' => 'preflight_error', 'check' => 'apt_cache', 'status' => 'warn', 'path' => $path, 'reason' => 'unwritable']);
+        $log("[WARN] APT cache path missing or not writable: {$path}");
+    }
+    if ($networkHost !== '' && !pmssEnvFlagEnabled('PMSS_DRY_RUN') && !pmssTestModeEnabled()) {
+        $sock = @fsockopen($networkHost, 80, $errno, $errstr, 3.0);
+        if ($sock === false) {
+            pmssLogJson(['event' => 'preflight_error', 'check' => 'network', 'status' => 'warn', 'reason' => 'unreachable', 'host' => $networkHost, 'errno' => $errno, 'error' => $errstr]);
+            $log('[WARN] Unable to reach '.$networkHost.': '.$errstr.' ('.$errno.')');
+        } else {
+            fclose($sock);
+        }
+    }
+    if ($fatalError) { $log('Preflight checks failed (fatal) - aborting update-step2'); return false; }
+    pmssLogJson(['event' => 'preflight_ok']);
+    return true;
+}
+
 /**
  * Parse the `stat -f -c "%S %b %c"` output needed for inode density checks.
  *

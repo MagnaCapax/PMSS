@@ -69,4 +69,23 @@ class HomeInodeDensityTest extends TestCase
 
         $this->assertTrue($this->pmssMessagesContain($messages, 'path missing'));
     }
+
+    public function testUpdateStep2PreflightKeepsFatalAndWarningOnlyContracts(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-preflight-disk-home-');
+        $messages = [];
+        $this->assertFalse(
+            \pmssUpdateStep2PreflightChecks($this->pmssMakeArrayLogger($messages), [$home], [], [], '', 1.0E20),
+            'Fatal disk-space failures should abort the caller'
+        );
+        $this->assertStringContainsAllStrings(['Insufficient free space on', 'Preflight checks failed (fatal)'], implode("\n", $messages));
+
+        $messages = [];
+        $missingBase = sys_get_temp_dir().'/pmss-preflight-missing-'.uniqid('', true);
+        $this->assertTrue(
+            \pmssUpdateStep2PreflightChecks($this->pmssMakeArrayLogger($messages), [], [$missingBase.'/dpkg.lock'], [$missingBase.'/apt-cache'], ''),
+            'Warning-only preflight failures should not abort update-step2'
+        );
+        $this->assertStringContainsAllStrings(['Unable to open dpkg lock file', 'APT cache path missing or not writable'], implode("\n", $messages));
+    }
 }
