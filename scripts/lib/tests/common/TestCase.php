@@ -1135,6 +1135,12 @@ abstract class TestCase
         $this->assertStringContainsAllStrings($needles, $this->pmssReadRepoFile($relativePath), $messagePrefix);
     }
 
+    /** Read a repository file and assert ordered substrings. */
+    protected function pmssAssertRepoFileContainsOrderedStrings(string $relativePath, array $needles, string $missingPrefix = '', string $orderPrefix = ''): void
+    {
+        $this->assertOrderedStrings($needles, $this->pmssReadRepoFile($relativePath), $missingPrefix, $orderPrefix);
+    }
+
     /** Read a repository file and assert that it matches a regex. */
     protected function pmssAssertRepoFileMatches(string $relativePath, string $pattern, string $message = ''): void
     {
@@ -1149,10 +1155,22 @@ abstract class TestCase
         }
     }
 
+    /** Read a repository file and assert that it does not declare a named function. */
+    protected function pmssAssertRepoFileNotContainsFunction(string $relativePath, string $symbol, string $message): void
+    {
+        $this->pmssAssertRepoFileNotContainsString($relativePath, 'function '.$symbol.'(', $message);
+    }
+
     /** Read a repository file and assert a fixed substring count. */
     protected function pmssAssertRepoFileSubstringCount(string $relativePath, string $needle, int $expectedCount, string $message = ''): void
     {
         $this->assertEquals($expectedCount, substr_count($this->pmssReadRepoFile($relativePath), $needle), $message);
+    }
+
+    /** Read a repository file and assert a minimum substring count. */
+    protected function pmssAssertRepoFileSubstringCountAtLeast(string $relativePath, string $needle, int $minimumCount, string $message = ''): void
+    {
+        $this->assertTrue(substr_count($this->pmssReadRepoFile($relativePath), $needle) >= $minimumCount, $message);
     }
 
     /** Find the recorded command for a JSON step log entry matching a description substring. */

@@ -7,27 +7,21 @@ class changePwPasswdFailureGuardTest extends TestCase
 {
     public function testPasswdCommandUsesExitCodeAwareExecCall(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/changePw.php');
-
-        $this->assertStringNotContainsString('shell_exec($cmd);', $source, 'changePw must not ignore passwd exit codes');
-        $this->assertStringContainsString('exec($cmd.\' 2>&1\', $passwdOutput, $passwdReturnCode);', $source, 'changePw must capture passwd stderr and return code');
+        $this->pmssAssertRepoFileNotContainsString('scripts/changePw.php', 'shell_exec($cmd);', 'changePw must not ignore passwd exit codes');
+        $this->pmssAssertRepoFileContainsString('scripts/changePw.php', 'exec($cmd.\' 2>&1\', $passwdOutput, $passwdReturnCode);', 'changePw must capture passwd stderr and return code');
     }
 
     public function testPasswdCommandTreatsPasswordPayloadAsPrintfData(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/changePw.php');
-
-        $this->assertStringContainsString("printf '%%s' %s | passwd %s", $source);
         $legacyPattern = "'printf ".'%s | passwd %s'."'";
-        $this->assertStringNotContainsString($legacyPattern, $source);
+        $this->pmssAssertRepoFileContainsString('scripts/changePw.php', "printf '%%s' %s | passwd %s");
+        $this->pmssAssertRepoFileNotContainsString('scripts/changePw.php', $legacyPattern);
     }
 
     public function testGeneratedPasswordUsesSharedSafeAlphabet(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/changePw.php');
-
-        $this->assertStringContainsString('$alphabet = \'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_\';', $source);
-        $this->assertStringNotContainsString('!@#$%', $source);
+        $this->pmssAssertRepoFileContainsString('scripts/changePw.php', '$alphabet = \'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_\';');
+        $this->pmssAssertRepoFileNotContainsString('scripts/changePw.php', '!@#$%');
     }
 
     public function testJsonlModeKeepsDefaultHumanOutputGuarded(): void
@@ -43,26 +37,20 @@ class changePwPasswdFailureGuardTest extends TestCase
 
     public function testJsonlModeReportsQbittorrentUpdateAsBoolean(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/changePw.php');
-
-        $this->assertStringContainsString('?bool $qbittorrentUpdated', $source);
-        $this->assertStringContainsString("'qbittorrent_updated' => \$qbittorrentUpdated,", $source);
-        $this->assertStringNotContainsString('$qbittorrent'.'ReturnCode = 0;', $source);
-        $this->assertStringNotContainsString("'qbittorrent".'_rc'."' =>", $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/changePw.php', ['?bool $qbittorrentUpdated', "'qbittorrent_updated' => \$qbittorrentUpdated,"]);
+        $this->pmssAssertRepoFileNotContainsStrings('scripts/changePw.php', ['$qbittorrent'.'ReturnCode = 0;', "'qbittorrent".'_rc'."' =>"]);
     }
 
     public function testPasswdFailureExitsBeforeHttpCredentialSync(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/changePw.php');
-
-        $this->assertOrderedStrings(
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/changePw.php',
             [
                 'exec($cmd.\' 2>&1\', $passwdOutput, $passwdReturnCode);',
                 'if ($passwdReturnCode !== 0) {',
                 'exit(1);',
                 '$htpasswdCommand = is_file($htpasswdFile) ? \'htpasswd -b -m\' : \'htpasswd -c -b -m\';',
             ],
-            $source,
             'changePw missing guard substring: ',
             'changePw guard order changed near: '
         );
@@ -79,9 +67,8 @@ class changePwPasswdFailureGuardTest extends TestCase
 
     public function testHtpasswdFailureExitsBeforeOwnershipUpdate(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/changePw.php');
-
-        $this->assertOrderedStrings(
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/changePw.php',
             [
                 '$htpasswdOutput = [];',
                 '$htpasswdReturnCode = 0;',
@@ -89,7 +76,6 @@ class changePwPasswdFailureGuardTest extends TestCase
                 'htpasswd update failed for {$username}; aborting credential sync',
                 '$chownOutput = [];',
             ],
-            $source,
             'changePw htpasswd guard missing substring: ',
             'changePw htpasswd guard order changed near: '
         );

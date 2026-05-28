@@ -5,48 +5,35 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class userConfigCommandContractsTest extends TestCase
 {
-    private function loadUserConfigSubsystemSource(): string
-    {
-        return $this->pmssReadRepoFile('scripts/util/userConfig.php');
-    }
-
     public function testRutorrentConfigUpdateContractRemainsStable(): void
     {
-        $source = $this->loadUserConfigSubsystemSource();
-
-        $this->assertStringContainsAllStrings(['$scgiPort = (int) ($configuration[\'config\'][\'scgiPort\'] ?? 0);', "updateRutorrentConfig(\$user['name'], \$scgiPort);"], $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', ['$scgiPort = (int) ($configuration[\'config\'][\'scgiPort\'] ?? 0);', "updateRutorrentConfig(\$user['name'], \$scgiPort);"]);
     }
 
     public function testRtorrentRestartContractRemainsStable(): void
     {
-        $source = $this->loadUserConfigSubsystemSource();
-
-        $this->assertStringContainsAllStrings(["'/home/%s/session/rtorrent.lock'", 'pmssUserConfigRtorrentLockPid($lockFile)', "pmssUserConfigRtorrentProcessOwnedBy(\$pid, \$user['id'])", "runStep('Restarting rTorrent', sprintf('kill -9 %d', \$pid));"], $source);
-        $this->assertStringNotContainsString('(int) $pid'.'Chunk', $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', ["'/home/%s/session/rtorrent.lock'", 'pmssUserConfigRtorrentLockPid($lockFile)', "pmssUserConfigRtorrentProcessOwnedBy(\$pid, \$user['id'])", "runStep('Restarting rTorrent', sprintf('kill -9 %d', \$pid));"]);
+        $this->pmssAssertRepoFileNotContainsString('scripts/util/userConfig.php', '(int) $pid'.'Chunk');
     }
 
     public function testShellNormalizationContractRemainsStable(): void
     {
-        $source = $this->loadUserConfigSubsystemSource();
-
-        $this->assertStringContainsAllStrings(["file_exists('/bin/bash')", "runStep('Ensuring bash shell', sprintf('chsh -s /bin/bash %s', escapeshellarg(\$user['name'])));"], $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', ["file_exists('/bin/bash')", "runStep('Ensuring bash shell', sprintf('chsh -s /bin/bash %s', escapeshellarg(\$user['name'])));"]);
     }
 
     public function testCgroupConfigurationContractRemainsStable(): void
     {
-        $source = $this->loadUserConfigSubsystemSource();
-
-        $this->assertStringContainsAllStrings(["'/scripts/util/userConfigCgroup.php'", "runStep(\n    'Configuring cgroups',", "'--memory-high=' . \$user['memory']"], $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', ["'/scripts/util/userConfigCgroup.php'", "runStep(\n    'Configuring cgroups',", "'--memory-high=' . \$user['memory']"]);
     }
 
     public function testUserConfigUsesSharedWelcomeCliParser(): void
     {
-        $source = $this->loadUserConfigSubsystemSource();
-
-        $this->assertStringContainsAllStrings(["require_once __DIR__.'/../lib/cli/optionParser.php';", "require_once __DIR__.'/../lib/user/userConfigCli.php';", "pmssUserConfigCliResourceOptionNames('addUserOption')", "array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled'], \$resourceOptions)", "pmssCliOption(\$parsed, 'upload-throttle-kib')", "pmssCliOption(\$parsed, 'welcome-message')", "pmssCliOption(\$parsed, 'docker-enabled')", "pmssUserConfigCliExplicitResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", "\$presence = array_fill_keys(array_keys(\$explicitResourceOverrides), true);"], $source);
-        $this->assertStringNotContainsString("strpos(\$arg, '--upload-throttle-kib=')", $source, 'userConfig.php should not keep a manual --upload-throttle-kib scan');
-        $this->assertStringNotContainsString("strpos(\$arg, '--welcome-message=')", $source, 'userConfig.php should not keep a manual --welcome-message scan');
-        $this->assertStringNotContainsString("strpos(\$arg, '--docker-enabled=')", $source, 'userConfig.php should not keep a manual --docker-enabled scan');
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', ["require_once __DIR__.'/../lib/cli/optionParser.php';", "require_once __DIR__.'/../lib/user/userConfigCli.php';", "pmssUserConfigCliResourceOptionNames('addUserOption')", "array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled'], \$resourceOptions)", "pmssCliOption(\$parsed, 'upload-throttle-kib')", "pmssCliOption(\$parsed, 'welcome-message')", "pmssCliOption(\$parsed, 'docker-enabled')", "pmssUserConfigCliExplicitResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", "\$presence = array_fill_keys(array_keys(\$explicitResourceOverrides), true);"]);
+        $this->pmssAssertRepoFileNotContainsStrings('scripts/util/userConfig.php', [
+            "strpos(\$arg, '--upload-throttle-kib=')",
+            "strpos(\$arg, '--welcome-message=')",
+            "strpos(\$arg, '--docker-enabled=')",
+        ], 'userConfig.php should not keep a manual scan: ');
     }
 
     public function testUsageTextSeparatesNamedOptionsFromPositionals(): void
@@ -70,36 +57,31 @@ class userConfigCommandContractsTest extends TestCase
 
     public function testRootlessDockerProvisioningContractRemainsStable(): void
     {
-        $source = $this->loadUserConfigSubsystemSource();
-
-        $this->assertStringContainsAllStrings(["'Rootless Docker disabled by config for '.\$user['name']", "runStep('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg(\$user['name'])));", "runStep('Installing systemd-container tools', 'apt-get install -y systemd-container');", "'Configuring rootless Docker'", "'machinectl shell %1\$s@ /usr/bin/dockerd-rootless-setuptool.sh install'"], $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', ["'Rootless Docker disabled by config for '.\$user['name']", "runStep('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg(\$user['name'])));", "runStep('Installing systemd-container tools', 'apt-get install -y systemd-container');", "'Configuring rootless Docker'", "'machinectl shell %1\$s@ /usr/bin/dockerd-rootless-setuptool.sh install'"]);
     }
 
     public function testUserConfigUsesSharedResourceSpecForPositionals(): void
     {
-        $source = $this->loadUserConfigSubsystemSource();
-
-        $this->assertStringContainsAllStrings(["pmssUserConfigCliResolvedResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", "pmssUserConfigCliPersistedStoredResources(\$existing)", "pmssUserConfigCliApplyPersistedResources(\$payload, \$user, \$presence)", "pmssUserConfigCliBuildCgroupResourceArgs(\$user)"], $source);
-        $this->assertStringNotContainsString('pmssUserConfigCli'.'PersistedResourcePresence', $source, 'userConfig.php should derive persisted presence from explicit resource overrides');
-        $this->assertStringNotContainsString("'--cpu-weight=' . \$user['CPUWeight']", $source, 'userConfig.php should not keep a duplicated cpu-weight flag path');
-        $this->assertStringNotContainsString("'--io-weight=' . \$user['IOWeight']", $source, 'userConfig.php should not keep a duplicated io-weight flag path');
-        $this->assertStringNotContainsString("['CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit']", $source, 'userConfig.php should not keep a duplicated persisted-resource key list');
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', ["pmssUserConfigCliResolvedResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", "pmssUserConfigCliPersistedStoredResources(\$existing)", "pmssUserConfigCliApplyPersistedResources(\$payload, \$user, \$presence)", "pmssUserConfigCliBuildCgroupResourceArgs(\$user)"]);
+        $this->pmssAssertRepoFileNotContainsStrings('scripts/util/userConfig.php', [
+            'pmssUserConfigCli'.'PersistedResourcePresence',
+            "'--cpu-weight=' . \$user['CPUWeight']",
+            "'--io-weight=' . \$user['IOWeight']",
+            "['CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit']",
+        ], 'userConfig.php should not keep duplicated resource logic: ');
     }
 
     public function testUserConfigUsesSharedWelcomeAndPersistFlows(): void
     {
-        $source = $this->loadUserConfigSubsystemSource();
-
-        $this->assertStringContainsAllStrings(["pmssWelcomeUserMessageSet(\$user['name'], \$expectedHome, \$welcomeMessage)", "unset(\$payload['welcomeMessage']);"], $source);
-        $this->assertStringNotContainsString('pmssUserConfigClear'.'WelcomeMessage', $source, 'userConfig.php should clear legacy welcome banners inline');
-        $this->assertStringContainsString("\$store->persist(\$user['name'], \$payload)", $source);
-        $this->assertStringNotContainsString('writeUserCache(', $source, 'userConfig.php should not bypass the shared persist flow');
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', ["pmssWelcomeUserMessageSet(\$user['name'], \$expectedHome, \$welcomeMessage)", "unset(\$payload['welcomeMessage']);", "\$store->persist(\$user['name'], \$payload)"]);
+        $this->pmssAssertRepoFileNotContainsStrings('scripts/util/userConfig.php', [
+            'pmssUserConfigClear'.'WelcomeMessage',
+            'writeUserCache(',
+        ], 'userConfig.php should keep shared welcome/persist flow: ');
     }
 
     public function testGeneratedPortAndQbittorrentWritesAreChecked(): void
     {
-        $source = $this->loadUserConfigSubsystemSource();
-
-        $this->assertStringContainsAllStrings(['@file_put_contents($rclonePortFile, (string) rand(1500, 65500)) === false', 'Warning: failed to write rclone port', 'Warning: failed to create qBittorrent config directory', '@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false', 'Warning: failed to write qBittorrent port'], $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', ['@file_put_contents($rclonePortFile, (string) rand(1500, 65500)) === false', 'Warning: failed to write rclone port', 'Warning: failed to create qBittorrent config directory', '@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false', 'Warning: failed to write qBittorrent port']);
     }
 }

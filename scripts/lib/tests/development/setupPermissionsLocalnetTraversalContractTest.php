@@ -15,21 +15,20 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 
     public function testSeedboxParentTraversalRunsBeforeConfigTreeNormalization(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/util/setupPermissions.php');
-
-        $parentPos = strpos($src, "'directory' => ['Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox']");
-        $configPos = strpos($src, '@chmod($configDir, 0775);');
-
-        $this->assertTrue($parentPos !== false, 'setupPermissions.php should preserve /etc/seedbox traversal before config normalization');
-        $this->assertTrue($configPos !== false, 'setupPermissions.php should keep the config directory traversable');
-        $this->assertTrue($parentPos < $configPos, 'Parent traversal fix must run before /etc/seedbox/config normalization');
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/util/setupPermissions.php',
+            [
+                "'directory' => ['Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox']",
+                '@chmod($configDir, 0775);',
+            ],
+            'setupPermissions.php missing traversal substring: ',
+            'Parent traversal fix must run before /etc/seedbox/config normalization: '
+        );
     }
 
     public function testConfigDirectoryRootKeepsTraversePermission(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/util/setupPermissions.php');
-
-        $this->assertStringContainsString('@chmod($configDir, 0775);', $src);
+        $this->pmssAssertRepoFileContainsString('scripts/util/setupPermissions.php', '@chmod($configDir, 0775);');
     }
 
     public function testSystemTestChecksBothSeedboxTraversalDirectories(): void

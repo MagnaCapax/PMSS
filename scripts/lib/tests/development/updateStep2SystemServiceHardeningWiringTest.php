@@ -7,17 +7,18 @@ class UpdateStep2SystemServiceHardeningWiringTest extends TestCase
 {
     public function testUpdateStep2WiresSystemdHardeningHelpers(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/util/update-step2.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/../lib/update/services/systemd.php';", $src);
-
-        $this->assertTrue(
-            substr_count($src, 'pmssStopDisableMaskSeedboxSystemServices') >= 2,
+        $this->pmssAssertRepoFileContainsString('scripts/util/update-step2.php', "require_once __DIR__.'/../lib/update/services/systemd.php';");
+        $this->pmssAssertRepoFileSubstringCountAtLeast(
+            'scripts/util/update-step2.php',
+            'pmssStopDisableMaskSeedboxSystemServices',
+            2,
             'Expected system service hardening to run at least twice (pre/post installers)'
         );
-        $this->assertStringContainsString('pmssEnsureSystemdServicesGuardBootUnit', $src, 'Expected boot-time systemd guard unit installation to be wired');
-        $this->assertTrue(
-            substr_count($src, 'pmssStopDisableMaskSystemdUnit') >= 1,
+        $this->pmssAssertRepoFileContainsString('scripts/util/update-step2.php', 'pmssEnsureSystemdServicesGuardBootUnit', 'Expected boot-time systemd guard unit installation to be wired');
+        $this->pmssAssertRepoFileSubstringCountAtLeast(
+            'scripts/util/update-step2.php',
+            'pmssStopDisableMaskSystemdUnit',
+            1,
             'Expected Apache hardening helper to be invoked'
         );
     }

@@ -31,40 +31,33 @@ class AddUserProvisioningGuardTest extends TestCase
 
     public function testAddUserStillStartsServicesAndRefreshesNetwork(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/addUser.php');
-        $rtorrentPos = strpos($src, '/scripts/startRtorrent');
-        $lighttpdPos = strpos($src, '/scripts/startLighttpd');
-        $networkPos = strpos($src, '/scripts/util/setupNetwork.php');
-
-        $this->assertTrue($rtorrentPos !== false, 'addUser.php must start rTorrent');
-        $this->assertTrue($lighttpdPos !== false, 'addUser.php must start lighttpd');
-        $this->assertTrue($networkPos !== false, 'addUser.php must refresh network rules');
-        $this->assertTrue($rtorrentPos < $lighttpdPos, 'addUser.php must start rTorrent before lighttpd');
-        $this->assertTrue($lighttpdPos < $networkPos, 'addUser.php must refresh network after starting services');
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/addUser.php',
+            ['/scripts/startRtorrent', '/scripts/startLighttpd', '/scripts/util/setupNetwork.php'],
+            'addUser.php missing service/network substring: ',
+            'addUser.php service/network order changed near: '
+        );
     }
 
     public function testAddUserRefreshesPatchedTorrentFrontendsBeforeServices(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/addUser.php');
-        $patchPos = strpos($src, "pmssUpdateUserEnvironment(");
-        $lighttpdPos = strpos($src, '/scripts/startLighttpd');
-
-        $this->assertStringContainsAllStrings(["require_once 'lib/update.php';", "require_once 'lib/update/users.php';"], $src);
-        $this->assertTrue($patchPos !== false, 'addUser.php must converge the full user environment after user config');
-        $this->assertTrue($lighttpdPos !== false, 'addUser.php must still start lighttpd');
-        $this->assertTrue($patchPos < $lighttpdPos, 'addUser.php must converge user environment before services start');
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/addUser.php', ["require_once 'lib/update.php';", "require_once 'lib/update/users.php';"]);
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/addUser.php',
+            ['pmssUpdateUserEnvironment(', '/scripts/startLighttpd'],
+            'addUser.php missing frontend refresh substring: ',
+            'addUser.php must converge user environment before services start: '
+        );
     }
 
     public function testAddUserDelegatesTrafficLimitPersistenceToSharedHelpers(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/addUser.php');
-
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/addUser.php', [
             "require_once 'lib/user/trafficLimit.php';",
             'pmssTrafficLimitCliTargetModes($user[\'name\'], $homePath)',
             'pmssTrafficLimitPersistTargetModes($targetModes, (int) $user[\'trafficLimit\'], $persistError)',
-        ], $src);
-        $this->pmssAssertStringNotContainsString('@file_put_contents($runtimeDir', $src, 'addUser.php must not reimplement runtime traffic limit writes');
-        $this->pmssAssertStringNotContainsString('@file_put_contents("/home/{$user[\'name\']}/.trafficLimit"', $src, 'addUser.php must not reimplement home traffic limit writes');
+        ]);
+        $this->pmssAssertRepoFileNotContainsString('scripts/addUser.php', '@file_put_contents($runtimeDir', 'addUser.php must not reimplement runtime traffic limit writes');
+        $this->pmssAssertRepoFileNotContainsString('scripts/addUser.php', '@file_put_contents("/home/{$user[\'name\']}/.trafficLimit"', 'addUser.php must not reimplement home traffic limit writes');
     }
 }
