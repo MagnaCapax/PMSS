@@ -1176,14 +1176,11 @@ abstract class TestCase
     /** Find the recorded command for a JSON step log entry matching a description substring. */
     protected function pmssFindJsonStepCommand(string $jsonLog, string $needle): ?string
     {
-        $lines = @file($jsonLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if (!is_array($lines)) {
-            return null;
+        if (!function_exists('pmssJsonLineFileRead')) {
+            require_once __DIR__.'/../../log.php';
         }
-
-        foreach ($lines as $line) {
-            $decoded = json_decode($line, true);
-            if (!is_array($decoded) || ($decoded['event'] ?? '') !== 'step') {
+        foreach (pmssJsonLineFileRead($jsonLog) as $decoded) {
+            if (($decoded['event'] ?? '') !== 'step') {
                 continue;
             }
 

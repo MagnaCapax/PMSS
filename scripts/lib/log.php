@@ -120,6 +120,11 @@ function pmssJsonLineFileEach(string $path, callable $handler): bool
     return true;
 }
 
+/** Read decodable JSON Lines entries from a file. */
+function pmssJsonLineFileRead(string $path): array { $entries = []; pmssJsonLineFileEach($path, static function (array $entry) use (&$entries): void { $entries[] = $entry; }); return $entries; }
+/** Return the last decodable JSON Lines entry from a file. */
+function pmssJsonLineFileLast(string $path): ?array { $last = null; pmssJsonLineFileEach($path, static function (array $entry) use (&$last): void { $last = $entry; }); return $last; }
+
 /** Emit one JSON payload to stdout while keeping encode failures on stderr. */
 function pmssJsonEmitPayload(array $payload, string $errorMessage, int $flags = 0): int
 {

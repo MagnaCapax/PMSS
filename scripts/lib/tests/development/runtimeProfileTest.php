@@ -11,6 +11,7 @@ if (!function_exists('logmsg')) {
     }
 }
 
+require_once dirname(__DIR__, 2).'/log.php';
 require_once dirname(__DIR__, 2).'/update/runtime/profile.php';
 
 class RuntimeProfileTest extends TestCase
@@ -135,12 +136,9 @@ class RuntimeProfileTest extends TestCase
 
         // The JSON log should contain a profile_summary event with status_counts.
         $this->assertTrue(file_exists($tmpJson));
-        $summaryEvents = [];
-        pmssJsonLineFileEach($tmpJson, static function (array $decoded) use (&$summaryEvents): void {
-            if (($decoded['event'] ?? '') === 'profile_summary') {
-                $summaryEvents[] = $decoded;
-            }
-        });
+        $summaryEvents = array_values(array_filter(pmssJsonLineFileRead($tmpJson), static function (array $decoded): bool {
+            return ($decoded['event'] ?? '') === 'profile_summary';
+        }));
         $this->assertTrue(count($summaryEvents) >= 1, 'Expected at least one profile_summary JSON event');
         $last = end($summaryEvents);
         $this->assertTrue(isset($last['status_counts']) && is_array($last['status_counts']));
@@ -182,13 +180,9 @@ class RuntimeProfileTest extends TestCase
 
         pmssProfileSummary();
 
-        $summaryEvents = [];
-        pmssJsonLineFileEach($tmpJson, static function (array $decoded) use (&$summaryEvents): void {
-            if (($decoded['event'] ?? '') !== 'profile_summary') {
-                return;
-            }
-            $summaryEvents[] = $decoded;
-        });
+        $summaryEvents = array_values(array_filter(pmssJsonLineFileRead($tmpJson), static function (array $decoded): bool {
+            return ($decoded['event'] ?? '') === 'profile_summary';
+        }));
 
         $this->assertTrue(count($summaryEvents) >= 1, 'Expected at least one profile_summary JSON event');
         $last = end($summaryEvents);

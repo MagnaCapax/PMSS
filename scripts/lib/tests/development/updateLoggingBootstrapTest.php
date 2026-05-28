@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/log.php';
 
 class UpdateLoggingBootstrapTest extends TestCase
 {
@@ -96,10 +97,7 @@ class UpdateLoggingBootstrapTest extends TestCase
 
         $this->runLibraryScript($script);
 
-        $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-
-        $this->assertTrue(is_array($lines) && !empty($lines), 'Expected JSON log output at '.$path);
-        $decoded = json_decode((string) end($lines), true);
+        $decoded = pmssJsonLineFileLast($path);
         $this->assertTrue(is_array($decoded), 'Expected the JSON log line to decode into an array');
 
         return $decoded;

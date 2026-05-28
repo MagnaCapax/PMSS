@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/log.php';
 require_once dirname(__DIR__, 2).'/update/apps/arr.php';
 
 class ArrProbeTimeoutPolicyTest extends TestCase
@@ -61,9 +62,7 @@ class ArrProbeTimeoutPolicyTest extends TestCase
         }
 
         $this->assertSame('', $output);
-        $lines = file($timeoutLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        $this->assertTrue(is_array($lines) && count($lines) >= 1, 'expected app probe timeout-fire JSONL entry');
-        $data = json_decode((string) end($lines), true);
+        $data = pmssJsonLineFileLast($timeoutLog);
         $this->assertTrue(is_array($data), 'expected app probe timeout-fire JSON payload');
         $this->assertSame('timeout_fired', $data['event'] ?? '');
         $this->assertSame(1, $data['intended_seconds'] ?? 0);

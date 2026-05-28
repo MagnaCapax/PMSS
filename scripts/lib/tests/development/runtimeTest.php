@@ -4,6 +4,7 @@ namespace PMSS\Tests;
 // Tests for runtime helpers (loaded via scripts/lib/update.php)
 require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../common/updateBootstrapShim.php';
+require_once dirname(__DIR__, 2).'/log.php';
 
 class RuntimeTest extends TestCase
 {
@@ -280,9 +281,7 @@ class RuntimeTest extends TestCase
         }
 
         $this->assertEquals(124, $rc);
-        $lines = file($timeoutLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        $this->assertTrue(is_array($lines) && count($lines) >= 1, 'expected timeout-fire JSONL entry');
-        $data = json_decode((string) end($lines), true);
+        $data = pmssJsonLineFileLast($timeoutLog);
         $this->assertTrue(is_array($data), 'expected timeout-fire JSON payload');
         $this->assertEquals('timeout_fired', $data['event'] ?? '');
         $this->assertStringContainsString('php -r', $data['command'] ?? '');
