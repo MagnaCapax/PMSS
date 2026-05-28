@@ -5,24 +5,21 @@ function pmssTrackerCleanerTimestamp(): string { return '['.date('Y-m-d H:i:s').
 
 function pmssTrackerCleanerLog(string $message): void { echo pmssTrackerCleanerTimestamp().' '.$message."\n"; }
 
-/** @return array<int, string> */
-function pmssTrackerCleanerFilterList(): array
+/** @return array{contains:array<int,string>,domains:array<int,string>} */
+function pmssTrackerCleanerBlockRules(): array
 {
-    return ['udp://public.popcorn-tracker.org:6969/announce', 'http://sub4all.org', 'udp://tracker.openbittorrent.com:80/announce', 'udp://tracker.publicbt.com', 'udp://tracker.ccc.de', 'http://tracker.tntvillage.scambioetico.org', 'http://exodus.desync.com', 'http://tracker.ftfansub.net', 'http://nyaa.tracker.wf', 'udp://tracker.istole.it', 'udp://mgtracker.org'];
+    return [
+        'contains' => ['udp://public.popcorn-tracker.org:6969/announce', 'http://sub4all.org', 'udp://tracker.openbittorrent.com:80/announce', 'udp://tracker.publicbt.com', 'udp://tracker.ccc.de', 'http://tracker.tntvillage.scambioetico.org', 'http://exodus.desync.com', 'http://tracker.ftfansub.net', 'http://nyaa.tracker.wf', 'udp://tracker.istole.it', 'udp://mgtracker.org'],
+        'domains' => ['legittorrents.info', 'tracker.openbittorrent.com', 'tracker.leechers-paradise.org', 'tracker.coppersurfer.tk', '9.rarbg.', '10.rarbg.', 'tracker.eddie4.nl', 'tracker.supertracker.net', 'concen.org', 'tracker.tfile.me', 'tracker.cyberia.is'],
+    ];
 }
 
-/** @return array<int, string> */
-function pmssTrackerCleanerFilterDomainList(): array
+function pmssTrackerCleanerShouldScrubTracker(string $trackerUrl, array $blockRules): bool
 {
-    return ['legittorrents.info', 'tracker.openbittorrent.com', 'tracker.leechers-paradise.org', 'tracker.coppersurfer.tk', '9.rarbg.', '10.rarbg.', 'tracker.eddie4.nl', 'tracker.supertracker.net', 'concen.org', 'tracker.tfile.me', 'tracker.cyberia.is'];
-}
-
-function pmssTrackerCleanerShouldScrubTracker(string $trackerUrl, array $filterList, array $filterDomainList): bool
-{
-    foreach ($filterList as $filter) {
+    foreach ($blockRules['contains'] ?? [] as $filter) {
         if ($filter !== '' && strpos($trackerUrl, $filter) !== false) return true;
     }
-    foreach ($filterDomainList as $domain) {
+    foreach ($blockRules['domains'] ?? [] as $domain) {
         if ($domain !== '' && stripos($trackerUrl, $domain) !== false) return true;
     }
     return false;
@@ -35,7 +32,7 @@ function pmssTrackerCleanerLogValue($value): string { return str_replace(["\r", 
  *
  * @return array{changed:bool,announce_list:array<int,array<int,string>>,removed_trackers:array<int,string>,remaining_trackers:array<int,string>}
  */
-function pmssTrackerCleanerPruneAnnounceList(array $announceList, array $filterList, array $filterDomainList): array
+function pmssTrackerCleanerPruneAnnounceList(array $announceList, array $blockRules): array
 {
     $newList = [];
     $removed = [];
@@ -47,7 +44,7 @@ function pmssTrackerCleanerPruneAnnounceList(array $announceList, array $filterL
         $tierNew = [];
         foreach ($tier as $trackerUrl) {
             if (!is_string($trackerUrl)) continue;
-            if (pmssTrackerCleanerShouldScrubTracker($trackerUrl, $filterList, $filterDomainList)) {
+            if (pmssTrackerCleanerShouldScrubTracker($trackerUrl, $blockRules)) {
                 $removed[$trackerUrl] = true;
                 $changed = true;
                 continue;
@@ -68,16 +65,16 @@ function pmssTrackerCleanerFirstAnnounceReplacement(array $announceList): ?strin
  *
  * @return array{changed:bool,would_trackerless:bool,removed_trackers:array<int,string>,remaining_trackers:array<int,string>,events:array<int,string>}
  */
-function pmssTrackerCleanerScrubTorrent($torrent, array $filterList, array $filterDomainList): array
+function pmssTrackerCleanerScrubTorrent($torrent, array $blockRules): array
 {
-    $list = pmssTrackerCleanerPruneAnnounceList($torrent->getAnnounceList(), $filterList, $filterDomainList);
+    $list = pmssTrackerCleanerPruneAnnounceList($torrent->getAnnounceList(), $blockRules);
     if ($list['changed']) $torrent->setAnnounceList($list['announce_list']);
     $changed = $list['changed'];
     $removed = array_fill_keys($list['removed_trackers'], true);
     $remaining = array_fill_keys($list['remaining_trackers'], true);
     $events = [];
     $announce = $torrent->getAnnounce();
-    if (is_string($announce) && $announce !== '' && pmssTrackerCleanerShouldScrubTracker($announce, $filterList, $filterDomainList)) {
+    if (is_string($announce) && $announce !== '' && pmssTrackerCleanerShouldScrubTracker($announce, $blockRules)) {
         $removed[$announce] = true;
         $replacement = pmssTrackerCleanerFirstAnnounceReplacement($list['announce_list']);
         if ($replacement !== null) {
@@ -93,8 +90,6 @@ function pmssTrackerCleanerScrubTorrent($torrent, array $filterList, array $filt
     }
     return ['changed' => $changed, 'would_trackerless' => $changed && count($remaining) === 0, 'removed_trackers' => array_keys($removed), 'remaining_trackers' => array_keys($remaining), 'events' => $events];
 }
-
-function pmssTrackerCleanerRemovedTrackersText(array $removedTrackers): string { return $removedTrackers === [] ? '(unknown)' : implode(', ', $removedTrackers); }
 
 function pmssTrackerCleanerCommentWithMarker(string $comment): string
 {

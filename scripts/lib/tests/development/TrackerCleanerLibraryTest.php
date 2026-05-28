@@ -25,19 +25,22 @@ class TrackerCleanerLibraryTest extends TestCase
 {
     public function testAnnounceListPruningPreservesGoodTiers(): void
     {
+        $rules = pmssTrackerCleanerBlockRules();
         $result = pmssTrackerCleanerPruneAnnounceList([
             ['https://good.test/announce', 'udp://tracker.openbittorrent.com:80/announce'],
             ['https://also-good.test/announce'],
-        ], pmssTrackerCleanerFilterList(), pmssTrackerCleanerFilterDomainList());
+        ], $rules);
         $this->assertTrue($result['changed']);
         $this->assertSame([['https://good.test/announce'], ['https://also-good.test/announce']], $result['announce_list']);
         $this->assertSame(['udp://tracker.openbittorrent.com:80/announce'], $result['removed_trackers']);
+        $this->assertTrue(pmssTrackerCleanerShouldScrubTracker('https://tracker.coppersurfer.tk/announce', $rules));
+        $this->assertFalse(pmssTrackerCleanerShouldScrubTracker('https://good.test/announce', $rules));
     }
 
     public function testScrubTorrentReplacesBlockedPrimaryAnnounce(): void
     {
         $torrent = new TrackerCleanerFakeTorrent([['udp://tracker.publicbt.com', 'https://good.test/announce']], 'udp://tracker.publicbt.com');
-        $result = pmssTrackerCleanerScrubTorrent($torrent, pmssTrackerCleanerFilterList(), pmssTrackerCleanerFilterDomainList());
+        $result = pmssTrackerCleanerScrubTorrent($torrent, pmssTrackerCleanerBlockRules());
         $this->assertTrue($result['changed']);
         $this->assertFalse($result['would_trackerless']);
         $this->assertSame('https://good.test/announce', $torrent->getAnnounce());
@@ -47,7 +50,7 @@ class TrackerCleanerLibraryTest extends TestCase
     public function testScrubTorrentReportsTrackerlessResultWithoutReplacement(): void
     {
         $torrent = new TrackerCleanerFakeTorrent([['udp://tracker.publicbt.com']], 'udp://tracker.publicbt.com');
-        $result = pmssTrackerCleanerScrubTorrent($torrent, pmssTrackerCleanerFilterList(), pmssTrackerCleanerFilterDomainList());
+        $result = pmssTrackerCleanerScrubTorrent($torrent, pmssTrackerCleanerBlockRules());
         $this->assertTrue($result['changed']);
         $this->assertTrue($result['would_trackerless']);
         $this->assertSame('udp://tracker.publicbt.com', $torrent->getAnnounce());

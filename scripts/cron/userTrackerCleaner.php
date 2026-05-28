@@ -77,8 +77,7 @@ if ($lockHandle === false) {
     pmssLockHandleWritePid($lockHandle);
 }
 
-$filterList = pmssTrackerCleanerFilterList();
-$filterDomainList = pmssTrackerCleanerFilterDomainList();
+$blockRules = pmssTrackerCleanerBlockRules();
 
 // Get & parse users list
 $listUsersResult = pmssListManagedUsersResult('/scripts/listUsers.php');
@@ -219,7 +218,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
 	          ." name=".pmssTrackerCleanerLogValue($torrent->getName())
           ."\n";
 
-	      $scrub = pmssTrackerCleanerScrubTorrent($torrent, $filterList, $filterDomainList);
+	      $scrub = pmssTrackerCleanerScrubTorrent($torrent, $blockRules);
 	      foreach ($scrub['events'] as $event) {
 	          $userVerboseLog .= pmssTrackerCleanerTimestamp().' '.$event."\n";
 	      }
@@ -235,7 +234,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
 	      }
 
 	      if ($scrub['changed']) {
-	          $removedList = pmssTrackerCleanerRemovedTrackersText($scrub['removed_trackers']);
+	          $removedList = $scrub['removed_trackers'] === [] ? '(unknown)' : implode(', ', $scrub['removed_trackers']);
           // Backup as the user so ownership/perms stay consistent.
           $sourcePerms = @fileperms($thisTorrent);
           $sourceMode = $sourcePerms === false ? 0640 : ($sourcePerms & 0777);
