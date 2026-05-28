@@ -94,6 +94,28 @@ final class SystemStatusCharacterizationTest extends TestCase
         ];
     }
 
+    private function buildComponentStatusDependencies(): array
+    {
+        $dependencies = $this->buildSystemStatusDependencies();
+        return [
+            'runCommand' => $dependencies['runCommand'],
+            'pathExists' => $dependencies['pathExists'],
+            'readFile' => $dependencies['readFile'],
+            'isExecutable' => $dependencies['isExecutable'],
+        ];
+    }
+
+    private function runStatusEmitScript(string $script): array
+    {
+        return $this->pmssExecShellCommandWithTempStderr(
+            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
+                'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'.$script
+            ),
+            [],
+            'pmss-status-stderr-'
+        );
+    }
+
     public function testComponentChecksStayStableWithHermeticInputs(): void
     {
         $checks = pmssComponentStatusChecks([
@@ -358,19 +380,14 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testStatusEmitJsonSubstitutesInvalidUtf8(): void
     {
-        $script = 'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'
-            .'exit(pmssStatusEmit('
+        $command = $this->runStatusEmitScript(
+            'exit(pmssStatusEmit('
             .'[pmssStatus("bin.php", "OK", "ready")],'
             .'"PMSS Status",'
             .'true,'
             .'["results" => [pmssStatus("bin.php", "OK", "bad\xB1detail")]],'
             .'null'
-            .'));';
-
-        $command = $this->pmssExecShellCommandWithTempStderr(
-            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
-            [],
-            'pmss-status-stderr-'
+            .'));'
         );
 
         $this->assertEquals(0, $command['result']['rc']);
@@ -381,20 +398,15 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testStatusEmitReturnsErrorWhenJsonEncodingFails(): void
     {
-        $script = 'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'
-            .'exit(pmssStatusEmit('
+        $command = $this->runStatusEmitScript(
+            'exit(pmssStatusEmit('
             .'[pmssStatus("bin.php", "OK", "ready")],'
             .'"PMSS Status",'
             .'true,'
             .'["results" => [["name" => "bin.php", "status" => "OK", "detail" => INF]]],'
             .'null,'
             .'JSON_PRETTY_PRINT'
-            .'));';
-
-        $command = $this->pmssExecShellCommandWithTempStderr(
-            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
-            [],
-            'pmss-status-stderr-'
+            .'));'
         );
         $this->pmssAssertCommandFailsToStderr($command['result'], $command['stderrPath'], "Failed to encode status JSON.\n");
     }
@@ -406,14 +418,9 @@ final class SystemStatusCharacterizationTest extends TestCase
             ['status' => 'WARN', 'detail' => ['nested' => 'ignored']],
             ['name' => ['nested' => 'ignored'], 'status' => 'ERR', 'detail' => 'broken'],
         ];
-        $script = 'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'
-            .'$checks = '.var_export($checks, true).';'
-            .'exit(pmssStatusEmit($checks, "PMSS Status", false, [], null, 0, false, 8, false));';
-
-        $command = $this->pmssExecShellCommandWithTempStderr(
-            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
-            [],
-            'pmss-status-stderr-'
+        $command = $this->runStatusEmitScript(
+            '$checks = '.var_export($checks, true).';'
+            .'exit(pmssStatusEmit($checks, "PMSS Status", false, [], null, 0, false, 8, false));'
         );
         $this->assertEquals(0, $command['result']['rc']);
         $this->assertStringContainsString('PMSS Status (', $command['result']['output']);
@@ -423,8 +430,8 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testStatusEmitTextDefaultsMissingSummaryKeysToZero(): void
     {
-        $script = 'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'
-            .'exit(pmssStatusEmit('
+        $command = $this->runStatusEmitScript(
+            'exit(pmssStatusEmit('
             .'[pmssStatus("bin.php", "OK", "ready")],'
             .'"PMSS Status",'
             .'false,'
@@ -434,12 +441,7 @@ final class SystemStatusCharacterizationTest extends TestCase
             .'false,'
             .'8,'
             .'false'
-            .'));';
-
-        $command = $this->pmssExecShellCommandWithTempStderr(
-            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
-            [],
-            'pmss-status-stderr-'
+            .'));'
         );
         $this->assertEquals(0, $command['result']['rc']);
         $this->assertStringContainsString('Summary: 1 OK, 0 WARN, 0 ERR', $command['result']['output']);
@@ -524,12 +526,7 @@ final class SystemStatusCharacterizationTest extends TestCase
     public function testSystemStatusIncludesComponentProjectionVerbatim(): void
     {
         $dependencies = $this->buildSystemStatusDependencies();
-        $componentDependencies = [
-            'runCommand' => $dependencies['runCommand'],
-            'pathExists' => $dependencies['pathExists'],
-            'readFile' => $dependencies['readFile'],
-            'isExecutable' => $dependencies['isExecutable'],
-        ];
+        $componentDependencies = $this->buildComponentStatusDependencies();
 
         $systemChecks = pmssSystemStatusChecks($dependencies);
         $componentChecks = pmssComponentStatusChecks($componentDependencies);
@@ -549,13 +546,7 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testComponentStatusCheckOrderStaysStableWithHermeticInputs(): void
     {
-        $dependencies = $this->buildSystemStatusDependencies();
-        $checks = pmssComponentStatusChecks([
-            'runCommand' => $dependencies['runCommand'],
-            'pathExists' => $dependencies['pathExists'],
-            'readFile' => $dependencies['readFile'],
-            'isExecutable' => $dependencies['isExecutable'],
-        ]);
+        $checks = pmssComponentStatusChecks($this->buildComponentStatusDependencies());
 
         $this->assertSame(
             [

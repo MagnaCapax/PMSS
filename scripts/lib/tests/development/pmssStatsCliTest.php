@@ -67,14 +67,10 @@ class PmssStatsCliTest extends TestCase
 
     public function testCollectBuildsCanonicalStatsPayload(): void
     {
-        $stats = \pmssStatsCollect([
-            'user' => 'alice',
-            'home' => $this->home,
-            'config_dir' => $this->configDir,
-            'cgroup_dir' => $this->cgroupDir,
+        $stats = $this->collectStats([
             'version_file' => $this->pmssWriteTempFile('stats-version', "2.8.14\n"),
             'socket_path' => $this->home.'/.rtorrent.socket',
-        ], $this->rtorrentCallerStub());
+        ]);
 
         $this->assertEquals('alice', $stats['context']['user']);
         $this->assertEquals('M10G S', $stats['product']);
@@ -91,13 +87,9 @@ class PmssStatsCliTest extends TestCase
 
     public function testRenderTextShowsCompactLayout(): void
     {
-        $stats = \pmssStatsCollect([
-            'user' => 'alice',
-            'home' => $this->home,
-            'config_dir' => $this->configDir,
-            'cgroup_dir' => $this->cgroupDir,
+        $stats = $this->collectStats([
             'version_file' => $this->pmssWriteTempFile('stats-version', "2.8.14\n"),
-        ], $this->rtorrentCallerStub());
+        ]);
 
         $rendered = \pmssStatsRenderText($stats, ['full' => false, 'mini' => false, 'no_header' => false]);
         $this->assertStringContainsAllStrings([
@@ -112,12 +104,7 @@ class PmssStatsCliTest extends TestCase
 
     public function testRenderTextSupportsMiniMode(): void
     {
-        $stats = \pmssStatsCollect([
-            'user' => 'alice',
-            'home' => $this->home,
-            'config_dir' => $this->configDir,
-            'cgroup_dir' => $this->cgroupDir,
-        ], $this->rtorrentCallerStub());
+        $stats = $this->collectStats();
 
         $rendered = \pmssStatsRenderText($stats, ['mini' => true, 'no_header' => true]);
         $lines = preg_split('/\r?\n/', trim($rendered)) ?: [];
@@ -128,12 +115,7 @@ class PmssStatsCliTest extends TestCase
 
     public function testRenderTextSupportsFullMode(): void
     {
-        $stats = \pmssStatsCollect([
-            'user' => 'alice',
-            'home' => $this->home,
-            'config_dir' => $this->configDir,
-            'cgroup_dir' => $this->cgroupDir,
-        ], $this->rtorrentCallerStub());
+        $stats = $this->collectStats();
 
         $rendered = \pmssStatsRenderText($stats, ['full' => true, 'mini' => false, 'no_header' => true]);
         $this->assertStringContainsAllStrings(['PIDs', 'I/O Read', 'I/O PSI'], $rendered);
@@ -290,6 +272,22 @@ class PmssStatsCliTest extends TestCase
                 'torrent_stopped' => 2,
             ],
         ];
+    }
+
+    /**
+     * Collect stats with the shared fixture paths used by this test case.
+     *
+     * @param array<string, string> $overrides
+     * @return array<string, mixed>
+     */
+    private function collectStats(array $overrides = []): array
+    {
+        return \pmssStatsCollect(array_replace([
+            'user' => 'alice',
+            'home' => $this->home,
+            'config_dir' => $this->configDir,
+            'cgroup_dir' => $this->cgroupDir,
+        ], $overrides), $this->rtorrentCallerStub());
     }
 
     /**
