@@ -503,11 +503,6 @@ pmssRunProfiledCallable('Purging failed unbound daemon if present', 'pmssPurgeFa
 // Ensure the boot-time guard is installed/enabled so masked services cannot
 // start during the next reboot even if systemd enablement drifts.
 pmssRunProfiledCallable('Ensuring systemd service guard boot unit', 'pmssEnsureSystemdServicesGuardBootUnit');
-// Legacy hosts occasionally re-enable Apache during package recovery; perform
-// the stop/disable/mask sequence twice so hosts drifting between bullseye and
-// bookworm converge reliably. Success = units masked and no apache2 processes
-// left running. Failure is tolerated but logged via runStep.
-pmssRunProfiledCallable('Hardening legacy Apache systemd unit (pre-purge)', 'pmssStopDisableMaskSystemdUnit', ['apache2', 'Apache httpd (legacy)', true]);
 // Remove legacy Apache packages; keep apache2-utils. It provides htpasswd (used by
 // lighttpd basic auth) and ab; removing it breaks auth setup and other scripts.
 runStep('Removing residual Apache packages', aptCmd('purge -y apache2 apache2-bin apache2-data libapache2-mod-php7.4 || true'));

@@ -91,6 +91,8 @@ function pmssSeedboxSystemServiceSpecs(): array
         'cups.socket' => 'CUPS socket',
         'cups.path' => 'CUPS path',
         'cups-browsed' => 'CUPS browsed',
+        // Apache must stay purged/masked; apache2-utils remains installed for htpasswd.
+        'apache2' => 'Apache httpd (legacy)',
         // Docker must run rootless per-user; the system daemon must stay off.
         'docker.service' => 'Docker (system)',
         'docker.socket' => 'Docker socket (system)',

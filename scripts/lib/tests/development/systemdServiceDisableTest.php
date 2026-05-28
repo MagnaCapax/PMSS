@@ -36,6 +36,7 @@ class SystemdServiceDisableTest extends TestCase
         $this->assertTrue(strpos($joined, "systemctl mask 'smbd'") !== false);
         $this->assertTrue(strpos($joined, "systemctl mask 'avahi-daemon'") !== false);
         $this->assertTrue(strpos($joined, "systemctl mask 'cups'") !== false);
+        $this->assertTrue(strpos($joined, "systemctl mask 'apache2'") !== false);
         $this->assertTrue(strpos($joined, "systemctl mask 'docker.service'") !== false);
         $this->assertTrue(strpos($joined, "systemctl mask 'docker.socket'") !== false);
         $this->assertTrue(strpos($joined, 'apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold purge -y exim4 exim4-base exim4-config exim4-daemon-light') !== false);

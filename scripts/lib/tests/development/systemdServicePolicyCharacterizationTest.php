@@ -30,6 +30,7 @@ class SystemdServicePolicyCharacterizationTest extends TestCase
             'cups.socket' => 'CUPS socket',
             'cups.path' => 'CUPS path',
             'cups-browsed' => 'CUPS browsed',
+            'apache2' => 'Apache httpd (legacy)',
             'docker.service' => 'Docker (system)',
             'docker.socket' => 'Docker socket (system)',
             'containerd' => 'containerd (system)',

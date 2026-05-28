@@ -3,7 +3,7 @@
 /**
  * Enforce that unwanted system-wide services stay stopped/disabled/masked.
  *
- * Policy list: pmssSeedboxSystemServiceSpecs() + apache2 legacy hardening.
+ * Policy list: pmssSeedboxSystemServiceSpecs().
  * See scripts/lib/update/services/systemd.php for the current list.
  * This is a drift guard against package manager actions and manual starts.
  *
@@ -21,7 +21,7 @@ if (!is_dir('/run/systemd/system')) {
     exit(0);
 }
 
-foreach (pmssSeedboxSystemServiceSpecs() + ['apache2' => 'Apache httpd (legacy)'] as $unit => $label) {
+foreach (pmssSeedboxSystemServiceSpecs() as $unit => $label) {
     if (!pmssSystemdUnitExists($unit)) {
         continue;
     }
