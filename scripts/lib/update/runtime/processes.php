@@ -21,6 +21,27 @@ function pmssSystemdUnitNameIsSafe(string $unit): bool
     return preg_match('/^[A-Za-z0-9:_.@\\-]+$/', $unit) === 1;
 }
 
+/**
+ * Limit systemctl unit actions to single-token service operations.
+ */
+function pmssSystemdUnitActionNameIsSafe(string $action): bool
+{
+    $actions = [
+        'disable' => true,
+        'enable' => true,
+        'mask' => true,
+        'reload' => true,
+        'restart' => true,
+        'start' => true,
+        'stop' => true,
+        'try-reload-or-restart' => true,
+        'try-restart' => true,
+        'unmask' => true,
+    ];
+
+    return isset($actions[trim($action)]);
+}
+
 function pmssSystemdActionSkipReason(?string $unit = null, bool $skipInDryRun = false, bool $skipInStrictTestMode = false): string
 {
     if (($skipInDryRun && pmssEnvFlagEnabled('PMSS_DRY_RUN')) || ($skipInStrictTestMode && pmssTestModeEnabled())) return 'test/dry-run';
@@ -64,6 +85,8 @@ function pmssSystemdUnitExists(string $unit): bool
  */
 function pmssSystemdUnitActionIfPresent(string $unit, string $description, string $action): void
 {
+    $action = trim($action);
+    if (!pmssSystemdUnitActionNameIsSafe($action)) { logmsg("[SKIP] {$description} (invalid systemd action)"); return; }
     if (($skipReason = pmssSystemdActionSkipReason($unit)) !== '') { logmsg("[SKIP] {$description} ({$skipReason})"); return; }
     runStep($description, 'systemctl '.$action.' '.escapeshellarg(
         $action === 'enable' && !preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $unit)

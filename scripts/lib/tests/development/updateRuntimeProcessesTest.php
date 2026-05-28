@@ -71,6 +71,27 @@ BASH
         $this->assertEquals([], $this->pmssProfileCommands());
     }
 
+    public function testSystemdUnitActionNameAllowsKnownUnitActions(): void
+    {
+        foreach (['enable', 'disable', 'start', 'stop', 'restart', 'reload', 'mask', 'unmask', 'try-restart'] as $action) {
+            $this->assertTrue(\pmssSystemdUnitActionNameIsSafe($action), $action.' should be accepted');
+        }
+    }
+
+    public function testSystemdUnitActionNameRejectsShellAndNonUnitActions(): void
+    {
+        foreach (['', 'enable --now', "restart\nstop", 'restart; rm -rf /', 'reboot', '-H'] as $action) {
+            $this->assertFalse(\pmssSystemdUnitActionNameIsSafe($action), var_export($action, true).' should be rejected');
+        }
+    }
+
+    public function testSystemdUnitActionSkipsUnsafeActionBeforeCommandBuild(): void
+    {
+        \pmssSystemdUnitActionIfPresent('demo.service', 'Restarting demo service', 'restart; rm -rf /');
+
+        $this->assertEquals([], $this->pmssProfileCommands());
+    }
+
     public function testKillProcessStopsAfterSigtermWhenProcessExits(): void
     {
         @file_put_contents($this->tempDir.'/state', "running\n");
