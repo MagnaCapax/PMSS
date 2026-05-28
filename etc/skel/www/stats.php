@@ -656,15 +656,12 @@ if (!function_exists('pmssFormatBytesShort')) {
     function pmssFormatBytesShort($bytes)
     {
         $bytes = (float)$bytes;
-        if (($bytes / 1024 / 1024 / 1024 / 1024) > 1) {
-            return round($bytes / 1024 / 1024 / 1024 / 1024, 2).'TiB';
+        foreach (array(1099511627776 => 'TiB', 1073741824 => 'GiB', 1048576 => 'MiB') as $divisor => $unit) {
+            if (($bytes / $divisor) > 1) {
+                return round($bytes / $divisor, 2).$unit;
+            }
         }
-        if (($bytes / 1024 / 1024 / 1024) > 1) {
-            return round($bytes / 1024 / 1024 / 1024, 2).'GiB';
-        }
-        if (($bytes / 1024 / 1024) > 1) {
-            return round($bytes / 1024 / 1024, 2).'MiB';
-        }
+
         return round($bytes / 1024, 2).'KiB';
     }
 }

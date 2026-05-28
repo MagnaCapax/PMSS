@@ -6,14 +6,6 @@
  * @author PMSS Team
  */
 
-function pmssStatsParseSizeToBytes(string $value): ?float
-{
-    $value = trim($value);
-    if ($value === '' || preg_match('/^(\d+(?:\.\d+)?)\s*([KMGTPE]?)(?:i?B)?$/i', $value, $matches) !== 1) return null;
-    $powerMap = ['' => 0, 'K' => 1, 'M' => 2, 'G' => 3, 'T' => 4, 'P' => 5, 'E' => 6];
-    return (float) $matches[1] * pow(1024, $powerMap[strtoupper($matches[2])]);
-}
-
 /**
  * Read the quota snapshot written into the user home directory.
  *
@@ -32,9 +24,9 @@ function pmssStatsReadQuotaSnapshot(string $home): array
         $result['used_text'] = $matches[1];
         $result['soft_text'] = $matches[2];
         $result['hard_text'] = $matches[3];
-        $result['used_bytes'] = pmssStatsParseSizeToBytes($matches[1]);
-        $result['soft_bytes'] = pmssStatsParseSizeToBytes($matches[2]);
-        $result['hard_bytes'] = pmssStatsParseSizeToBytes($matches[3]);
+        $result['used_bytes'] = pmssParseSizeToBytes($matches[1]);
+        $result['soft_bytes'] = pmssParseSizeToBytes($matches[2]);
+        $result['hard_bytes'] = pmssParseSizeToBytes($matches[3]);
         break;
     }
     return $result;

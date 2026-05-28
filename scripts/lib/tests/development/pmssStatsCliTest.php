@@ -75,7 +75,7 @@ class PmssStatsCliTest extends TestCase
         $this->assertEquals('alice', $stats['context']['user']);
         $this->assertEquals('M10G S', $stats['product']);
         $this->assertEquals('2.8.14', $stats['pmss_version']);
-        $this->assertTrue($stats['disk']['percent'] > 0.0);
+        $this->assertEquals(30.0, round((float) $stats['disk']['percent'], 2));
         $this->assertEquals(6144.0, $stats['traffic']['limit_mib']);
         $this->assertEquals(12, $stats['cgroup']['pids_current']);
         $this->assertEquals(6, $stats['rtorrent']['torrent_total']);

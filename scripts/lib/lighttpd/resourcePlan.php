@@ -5,21 +5,7 @@
  * @license GPL-3.0-only
  */
 
-function pmssParseSizeToMiB($value): ?int
-{
-    $raw = trim((string) $value);
-    if ($raw === '' || $raw === 'infinity' || $raw === '0') {
-        return null;
-    }
-    if (preg_match('/^([0-9.]+)\s*([KMG])?B?$/i', $raw, $m) !== 1) {
-        return is_numeric($raw) ? (int) round(((float) $raw) / 1048576) : null;
-    }
-
-    $unit = strtolower($m[2] ?? '');
-    $factors = ['' => 1 / 1048576, 'k' => 1 / 1024, 'm' => 1, 'g' => 1024];
-
-    return isset($factors[$unit]) ? (int) round(((float) $m[1]) * $factors[$unit]) : null;
-}
+require_once __DIR__.'/../runtime.php';
 
 function pmssClampMemoryLimit(int $memoryMiB): int
 {

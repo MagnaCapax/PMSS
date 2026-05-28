@@ -101,6 +101,25 @@ if (!function_exists('pmssFormatBytes')) {
         return number_format($bytes, $index === 0 ? 0 : $precision, '.', '').' '.$units[$index];
     }
 }
+    // Parse compact byte strings shared by stats, resource plans, and CLI guards.
+    function pmssParseSizeToBytes(string $value, bool $wholeNumberOnly = false, bool $allowBareBinarySuffix = false): ?float
+    {
+        $value = trim($value);
+        $numberPattern = $wholeNumberOnly ? '[0-9]+' : '[0-9]+(?:\.[0-9]+)?';
+        $suffixPattern = $allowBareBinarySuffix ? '(?:i?B?)?' : '(?:i?B)?';
+        if ($value === '' || preg_match('/^('.$numberPattern.')\s*([KMGTPE]?)'.$suffixPattern.'$/i', $value, $matches) !== 1) return null;
+        $powers = ['' => 0, 'K' => 1, 'M' => 2, 'G' => 3, 'T' => 4, 'P' => 5, 'E' => 6];
+        return (float) $matches[1] * pow(1024, $powers[strtoupper($matches[2])]);
+    }
+    // Preserve the legacy MiB parser contract used by lighttpd resource planning.
+    function pmssParseSizeToMiB($value): ?int
+    {
+        $raw = trim((string) $value);
+        if ($raw === '' || $raw === 'infinity' || $raw === '0') return null;
+        if (preg_match('/^[0-9.]+\s*[KMG]?B?$/i', $raw) !== 1) return is_numeric($raw) ? (int) round(((float) $raw) / 1048576) : null;
+        $bytes = pmssParseSizeToBytes($raw);
+        return $bytes !== null ? (int) round($bytes / 1048576) : null;
+    }
     // Trim a config line and drop blank/commented entries.
     function pmssConfigLineTrimmed(string $line, array $commentPrefixes = ['#']): string
     {

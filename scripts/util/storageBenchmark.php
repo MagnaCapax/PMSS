@@ -53,7 +53,7 @@ $fileSize = (string) pmssCliOptionString($parsed, 'size', null, '500G', true);
 $jsonLog = (string) pmssCliOptionString($parsed, 'json', null, '/var/log/pmss/benchmark-storage.jsonl', true);
 $label = (string) pmssCliOptionString($parsed, 'label', null, '', true);
 $ddSize = (string) pmssCliOptionString($parsed, 'dd-size', null, '1G', true);
-function storageBenchmarkRequirePositiveSizeBytes(string $optionName, string $value): int { $s=trim($value); $bytes=0; if(preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i',$s,$m)){ $n=(int)$m[1]; $u=strtolower($m[2]??''); $bytes=$u==='k'||$u==='kb'||$u==='kib'?$n*1024:($u==='m'||$u==='mb'||$u==='mib'?$n*1024*1024:($u==='g'||$u==='gb'||$u==='gib'?$n*1024*1024*1024:$n)); } if($bytes<=0){ fwrite(STDERR,"Error: {$optionName} must be a positive size (examples: 1G, 512M, 1048576).\n"); exit(1); } return $bytes; }
+function storageBenchmarkRequirePositiveSizeBytes(string $optionName, string $value): int { $bytes = preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i', trim($value)) === 1 ? pmssParseSizeToBytes($value, true, true) : null; if ($bytes === null || $bytes <= 0.0) { fwrite(STDERR, "Error: {$optionName} must be a positive size (examples: 1G, 512M, 1048576).\n"); exit(1); } return (int) $bytes; }
 // Reject malformed numeric knobs before they reach fio/dd runtime settings.
 function storageBenchmarkRequireIntOption(array $parsed, string $optionName, int $default, int $minimum, string $minimumLabel): int
 {
