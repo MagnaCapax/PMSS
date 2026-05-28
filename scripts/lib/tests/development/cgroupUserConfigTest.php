@@ -705,6 +705,20 @@ PHP;
         $this->assertStringNotContainsString('[Planned io.cost writes]', $res['out']);
     }
 
+    public function testWipeRejectsDefaultPolicyInputs(): void
+    {
+        foreach ([
+            ['--defaults'],
+            ['--respect-existing'],
+            ['--defaults', '--respect-existing'],
+        ] as $case) {
+            $res = $this->runMgr(array_merge(['testuser', '--apply', '--dry-run', '--wipe'], $case));
+
+            $this->assertEquals(2, $res['rc']);
+            $this->assertStringNotContainsString('(dry-run or no --apply; not changing system)', $res['out']);
+        }
+    }
+
     // -- Edge Cases & Adversarial --
 
     public function testUserShellInjection()

@@ -111,12 +111,14 @@ class Manager
 
         foreach (self::IO_CLI_PROPERTY_MAP as $flagName => $propertyName) {
             foreach ($ioSpecs[$flagName] ?? [] as $spec) {
-                $parsedIoPair = $this->parseIoPropertyPair($propertyName, $spec);
-                if ($parsedIoPair === null) {
+                $specText = trim($spec);
+                if (preg_match('/^([^:\s]+):([^\s]+)$/', $specText, $matches) !== 1
+                    || !\pmssCgroupPolicyDeviceTargetIsSafe($matches[1])
+                    || strpos($matches[2], "\0") !== false) {
                     fwrite(STDERR, 'Invalid --'.$flagName.' specification: '.$spec."\n");
                     return 2;
                 }
-                $ioPairs[] = $parsedIoPair;
+                $ioPairs[] = $propertyName.'='.$matches[1].' '.$matches[2];
             }
         }
 
@@ -125,9 +127,19 @@ class Manager
             return 2;
         }
 
-        if (($invalidWipeMessage = $this->validateWipeIsolation($doWipe, $opt, $defaultsRequested, $respectExisting, $device, $ioProfile, $ioCostQos, $ioCostModel, $ioPairs)) !== null) {
-            fwrite(STDERR, $invalidWipeMessage."\n");
-            return 2;
+        if ($doWipe) {
+            $hasConflictingInput = !empty($opt)
+                || $defaultsRequested
+                || $respectExisting
+                || $device !== ''
+                || $ioProfile !== ''
+                || $ioCostQos !== ''
+                || $ioCostModel !== ''
+                || !empty($ioPairs);
+            if ($hasConflictingInput) {
+                fwrite(STDERR, "Invalid --wipe combination: remove resource, IO, defaults, and respect-existing options before wiping\n");
+                return 2;
+            }
         }
 
         // Defaults policy
@@ -253,7 +265,11 @@ class Manager
                         $steps[] = ['Applying cgroup properties', \pmssBuildCommand('systemctl', array_merge(['set-property', $slice], $allPairs))];
                     }
                     foreach ($ioCostWrites as $write) {
-                        $steps[] = ['Applying io.cost setting', $this->buildIoCostWriteCommand($write['path'], $write['value'])];
+                        $script = 'if [ -w '.escapeshellarg($write['path']).' ]; then printf \'%s\\n\' '
+                            .escapeshellarg($write['value'])
+                            .' > '.escapeshellarg($write['path'])
+                            .'; else echo '.escapeshellarg('[SKIP] io.cost path not writable: '.$write['path']).'; fi';
+                        $steps[] = ['Applying io.cost setting', \pmssBuildCommand('sh', ['-c', $script])];
                     }
                 }
 
@@ -359,54 +375,6 @@ class Manager
     }
 
     /**
-     * Keep the destructive wipe path isolated from resource-changing options.
-     */
-    private function validateWipeIsolation(
-        bool $doWipe,
-        array $opt,
-        bool $defaultsRequested,
-        bool $respectExisting,
-        string $device,
-        string $ioProfile,
-        string $ioCostQos,
-        string $ioCostModel,
-        array $ioPairs
-    ): ?string {
-        if (!$doWipe) {
-            return null;
-        }
-
-        $hasConflictingInput = !empty($opt)
-            || $defaultsRequested
-            || $respectExisting
-            || $device !== ''
-            || $ioProfile !== ''
-            || $ioCostQos !== ''
-            || $ioCostModel !== ''
-            || !empty($ioPairs);
-
-        return $hasConflictingInput
-            ? 'Invalid --wipe combination: remove resource, IO, defaults, and respect-existing options before wiping'
-            : null;
-    }
-
-    /**
-     * Convert explicit IO throttle input into a validated systemd property pair.
-     */
-    private function parseIoPropertyPair(string $propertyName, string $spec): ?string
-    {
-        if (preg_match('/^([^:\s]+):([^\s]+)$/', trim($spec), $matches) !== 1) {
-            return null;
-        }
-
-        if (!\pmssCgroupPolicyDeviceTargetIsSafe($matches[1]) || strpos($matches[2], "\0") !== false) {
-            return null;
-        }
-
-        return $propertyName.'='.$matches[1].' '.$matches[2];
-    }
-
-    /**
      * Derive a CPU/IO weight from a configured memory high watermark.
      *
      * Formula mirrors the original userConfigCgroup.php helper:
@@ -460,21 +428,18 @@ class Manager
     {
         $policy = \pmssCgroupPolicyLoad();
         foreach (self::NUMERIC_PROFILE_MAP as $family => $profile) {
-            $this->applyNumericProfileOption($opt, $profile[0], $profile[1], $this->resolveNumericProfiles($policy, $family, $profile[3]), $profile[2]);
-        }
-    }
+            $profileKey = $profile[0];
+            if (!isset($opt[$profileKey])) {
+                continue;
+            }
 
-    /** Apply a named numeric profile only when the explicit target is absent. */
-    private function applyNumericProfileOption(array &$opt, string $profileKey, string $targetKey, array $profiles, string $fallback): void
-    {
-        if (!isset($opt[$profileKey])) {
-            return;
-        }
-
-        $profileName = strtolower($opt[$profileKey]);
-        $opt[$profileKey] = $profileName;
-        if (!isset($opt[$targetKey])) {
-            $opt[$targetKey] = $profiles[$profileName] ?? $fallback;
+            $profileName = strtolower($opt[$profileKey]);
+            $opt[$profileKey] = $profileName;
+            $targetKey = $profile[1];
+            if (!isset($opt[$targetKey])) {
+                $profiles = $this->resolveNumericProfiles($policy, $family, $profile[3]);
+                $opt[$targetKey] = $profiles[$profileName] ?? $profile[2];
+            }
         }
     }
 
@@ -667,16 +632,6 @@ class Manager
         }
 
         return null;
-    }
-
-    /** Build a shell-safe writer command for cgroup io.cost files. */
-    private function buildIoCostWriteCommand(string $path, string $value): string
-    {
-        $script = 'if [ -w '.escapeshellarg($path).' ]; then printf \'%s\\n\' '
-            .escapeshellarg($value)
-            .' > '.escapeshellarg($path)
-            .'; else echo '.escapeshellarg('[SKIP] io.cost path not writable: '.$path).'; fi';
-        return \pmssBuildCommand('sh', ['-c', $script]);
     }
 
     private function showConfig(string $slice): void
