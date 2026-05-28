@@ -207,6 +207,25 @@ class SysctlBaselineTest extends TestCase
         $this->cleanup($dir);
     }
 
+    public function testSettingsBuildKeepsProfileBranchSnapshot(): void
+    {
+        $cases = [
+            'no_swap' => [['ram_gb' => 64, 'has_swap' => false, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], ['60', '50', '327680', '20', '16777216']],
+            'vm' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => true, 'nic_speed_gbps' => 1], ['10', '50', '131072', '20', '16777216']],
+            'fast_swap_10g' => [['ram_gb' => 256, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => false, 'nic_speed_gbps' => 10], ['100', '2', '2621440', '40', '67108864']],
+            'slow_swap' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], ['10', '50', '327680', '20', '16777216']],
+        ];
+
+        foreach ($cases as $label => [$profile, $expected]) {
+            $settings = \pmssSysctlSettingsBuild($profile);
+            $this->assertSame($expected[0], $settings['vm']['vm.swappiness'], $label.' swappiness changed');
+            $this->assertSame($expected[1], $settings['vm']['vm.vfs_cache_pressure'], $label.' cache pressure changed');
+            $this->assertSame($expected[2], $settings['vm']['vm.min_free_kbytes'], $label.' min_free_kbytes changed');
+            $this->assertSame($expected[3], $settings['vm']['vm.dirty_ratio'], $label.' dirty ratio changed');
+            $this->assertSame($expected[4], $settings['net']['net.core.rmem_max'], $label.' network buffer changed');
+        }
+    }
+
     public function testRespectsOperatorOwnedOverrideKeys(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-overrides-', 0700);

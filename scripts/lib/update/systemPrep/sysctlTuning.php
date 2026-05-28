@@ -185,66 +185,41 @@ function pmssSysctlSettingsBuild(array $profile): array
     $ramGb = max(1, (int) ($profile['ram_gb'] ?? 1));
     $tenGigabit = (int) ($profile['nic_speed_gbps'] ?? 1) >= 10;
 
+    $memorySettings = [
+        'vm.swappiness' => '10',
+        'vm.vfs_cache_pressure' => '50',
+        'vm.min_free_kbytes' => (string) min(2097152, max(131072, $ramGb * 5120)),
+        'vm.dirty_ratio' => '20',
+        'vm.dirty_background_ratio' => '5',
+    ];
     if (!$hasSwap) {
-        $memorySettings = [
-            'vm.swappiness' => '60',
-            'vm.vfs_cache_pressure' => '50',
-            'vm.min_free_kbytes' => (string) min(2097152, max(131072, $ramGb * 5120)),
-            'vm.dirty_ratio' => '20',
-            'vm.dirty_background_ratio' => '5',
-        ];
+        $memorySettings['vm.swappiness'] = '60';
     } elseif ($isVm) {
-        $memorySettings = [
-            'vm.swappiness' => '10',
-            'vm.vfs_cache_pressure' => '50',
-            'vm.min_free_kbytes' => '131072',
-            'vm.dirty_ratio' => '20',
-            'vm.dirty_background_ratio' => '5',
-        ];
+        $memorySettings['vm.min_free_kbytes'] = '131072';
     } elseif ($fastSwap) {
-        $memorySettings = [
-            'vm.swappiness' => '100',
-            'vm.vfs_cache_pressure' => '2',
-            'vm.min_free_kbytes' => (string) min(4194304, max(131072, $ramGb * 10240)),
-            'vm.dirty_ratio' => '40',
-            'vm.dirty_background_ratio' => '10',
-        ];
-    } elseif ($hasSwap) {
-        $memorySettings = [
-            'vm.swappiness' => '10',
-            'vm.vfs_cache_pressure' => '50',
-            'vm.min_free_kbytes' => (string) min(2097152, max(131072, $ramGb * 5120)),
-            'vm.dirty_ratio' => '20',
-            'vm.dirty_background_ratio' => '5',
-        ];
+        $memorySettings['vm.swappiness'] = '100';
+        $memorySettings['vm.vfs_cache_pressure'] = '2';
+        $memorySettings['vm.min_free_kbytes'] = (string) min(4194304, max(131072, $ramGb * 10240));
+        $memorySettings['vm.dirty_ratio'] = '40';
+        $memorySettings['vm.dirty_background_ratio'] = '10';
     }
 
     $memorySettings['vm.dirty_expire_centisecs'] = '1500';
     $memorySettings['vm.dirty_writeback_centisecs'] = '500';
 
-    $networkAdaptiveSettings = $tenGigabit
-        ? [
-            'net.core.rmem_max' => '67108864',
-            'net.core.wmem_max' => '67108864',
-            'net.core.rmem_default' => '67108864',
-            'net.core.wmem_default' => '67108864',
-            'net.core.optmem_max' => '67108864',
-            'net.core.netdev_max_backlog' => '524288',
-            'net.core.somaxconn' => '4096',
-            'net.ipv4.tcp_rmem' => '4096 524000 134217728',
-            'net.ipv4.tcp_wmem' => '4096 524000 134217728',
-        ]
-        : [
-            'net.core.rmem_max' => '16777216',
-            'net.core.wmem_max' => '16777216',
-            'net.core.rmem_default' => '16777216',
-            'net.core.wmem_default' => '16777216',
-            'net.core.optmem_max' => '16777216',
-            'net.core.netdev_max_backlog' => '262144',
-            'net.core.somaxconn' => '2000',
-            'net.ipv4.tcp_rmem' => '4096 524000 67110000',
-            'net.ipv4.tcp_wmem' => '4096 524000 67110000',
-        ];
+    $networkBufferBytes = $tenGigabit ? '67108864' : '16777216';
+    $networkTcpBytes = $tenGigabit ? '134217728' : '67110000';
+    $networkAdaptiveSettings = [
+        'net.core.rmem_max' => $networkBufferBytes,
+        'net.core.wmem_max' => $networkBufferBytes,
+        'net.core.rmem_default' => $networkBufferBytes,
+        'net.core.wmem_default' => $networkBufferBytes,
+        'net.core.optmem_max' => $networkBufferBytes,
+        'net.core.netdev_max_backlog' => $tenGigabit ? '524288' : '262144',
+        'net.core.somaxconn' => $tenGigabit ? '4096' : '2000',
+        'net.ipv4.tcp_rmem' => '4096 524000 '.$networkTcpBytes,
+        'net.ipv4.tcp_wmem' => '4096 524000 '.$networkTcpBytes,
+    ];
 
     $settings = [
         'vm' => $memorySettings,
