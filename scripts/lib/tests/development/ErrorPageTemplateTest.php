@@ -64,10 +64,7 @@ class ErrorPageTemplateTest extends TestCase
     public function testBadGatewayErrorPageRestoresActionableRecoveryGuidance(): void
     {
         $contents = $this->pmssReadRepoFile('var/www/error-502.html');
-        $this->assertStringContainsString('Your disk quota is full', $contents);
-        $this->assertStringContainsString('connect with SFTP and delete files', $contents);
-        $this->assertStringContainsString('account is suspended', $contents);
-        $this->assertStringContainsString('server-wide storage pressure', $contents);
+        $this->assertStringContainsAllStrings(['Your disk quota is full', 'connect with SFTP and delete files', 'account is suspended', 'server-wide storage pressure'], $contents);
     }
 
     public function testSuspendedErrorPageDoesNotReferenceABrokenImage(): void
@@ -81,17 +78,14 @@ class ErrorPageTemplateTest extends TestCase
     public function testSuspendedErrorPageKeepsSupportCallToActionReadable(): void
     {
         $contents = $this->pmssReadRepoFile('var/www/error-suspended.html');
-        $this->assertStringContainsString('class="cta"', $contents);
-        $this->assertStringContainsString('.cta:visited', $contents);
-        $this->assertStringContainsString('color:#fff;', $contents);
+        $this->assertStringContainsAllStrings(['class="cta"', '.cta:visited', 'color:#fff;'], $contents);
     }
 
     public function testUserNginxTemplateUsesPerUser502FallbackPage(): void
     {
         $contents = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
         $this->assertEquals(3, substr_count($contents, 'error_page 502 /error-502-##username.html;'));
-        $this->assertStringContainsString('location = /error-502-##username.html {', $contents);
-        $this->assertStringContainsString('try_files $uri /error-502.html;', $contents);
+        $this->assertStringContainsAllStrings(['location = /error-502-##username.html {', 'try_files $uri /error-502.html;'], $contents);
     }
 
     public function testPrivateSubdomainTemplateUsesPerUser502FallbackPage(): void
@@ -99,16 +93,13 @@ class ErrorPageTemplateTest extends TestCase
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
         $contents = \pmssNginxUserSubdomainTemplates()['private'];
         $this->assertEquals(4, substr_count($contents, 'error_page 502 /error-502-##user##.html;'));
-        $this->assertStringContainsString('location = /error-502-##user##.html {', $contents);
-        $this->assertStringContainsString('try_files $uri /error-502.html;', $contents);
+        $this->assertStringContainsAllStrings(['location = /error-502-##user##.html {', 'try_files $uri /error-502.html;'], $contents);
     }
 
     private function assertErrorPageImagePool(string $path, string $prefix, int $count): string
     {
         $contents = $this->pmssReadRepoFile($path);
-        $this->assertStringContainsString('data-error-image-prefix="'.$prefix.'"', $contents);
-        $this->assertStringContainsString('data-error-image-count="'.$count.'"', $contents);
-        $this->assertStringContainsString('<script src="/error-page.js"></script>', $contents);
+        $this->assertStringContainsAllStrings(['data-error-image-prefix="'.$prefix.'"', 'data-error-image-count="'.$count.'"', '<script src="/error-page.js"></script>'], $contents);
         return $contents;
     }
 }

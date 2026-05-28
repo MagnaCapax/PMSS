@@ -8,10 +8,7 @@ class UserResourcesListModesTest extends TestCase
     public function testBriefAndFullModesAreWired(): void
     {
         $src = $this->pmssReadRepoFile('scripts/lib/user/resourcesList.php');
-        $this->assertStringContainsString("pmssCliOption(", $src);
-        $this->assertStringContainsString("'brief'", $src);
-        $this->assertStringContainsString("'full'", $src);
-        $this->assertStringContainsString('choose either --brief or --full', $src);
+        $this->assertStringContainsAllStrings(["pmssCliOption(", "'brief'", "'full'", 'choose either --brief or --full'], $src);
     }
 
     public function testBriefColumnContractIsPresent(): void
@@ -29,9 +26,6 @@ class UserResourcesListModesTest extends TestCase
     public function testExtendedJsonFieldsArePresent(): void
     {
         $src = $this->pmssReadRepoFile('scripts/lib/user/resourcesList.php');
-        $this->assertStringContainsString("'disk_quota_gib'", $src);
-        $this->assertStringContainsString("'network_used_gib'", $src);
-        $this->assertStringContainsString("'process_max'", $src);
-        $this->assertStringContainsString("'suspended'", $src);
+        $this->assertStringContainsAllStrings(["'disk_quota_gib'", "'network_used_gib'", "'process_max'", "'suspended'"], $src);
     }
 }

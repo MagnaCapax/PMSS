@@ -28,10 +28,7 @@ class DelugeCoreTemplateTest extends TestCase
             ['version' => 11, 'codename' => 'bullseye']
         );
 
-        $this->assertStringContainsString('"cache_expiry": 90', $config);
-        $this->assertStringContainsString('"cache_size": 256', $config);
-        $this->assertStringContainsString('"daemon_port": 6000', $config);
-        $this->assertStringContainsString('"max_upload_speed": 123.0', $config);
+        $this->assertStringContainsAllStrings(['"cache_expiry": 90', '"cache_size": 256', '"daemon_port": 6000', '"max_upload_speed": 123.0'], $config);
     }
 
     public function testBookwormTemplateOmitsLegacyCacheSettings(): void
@@ -45,10 +42,7 @@ class DelugeCoreTemplateTest extends TestCase
 
         $this->pmssAssertStringNotContainsString('"cache_expiry"', $config);
         $this->pmssAssertStringNotContainsString('"cache_size"', $config);
-        $this->assertStringContainsString('"max_active_seeding": 300', $config);
-        $this->assertStringContainsString('"dht": false', $config);
-        $this->assertStringContainsString('"lsd": false', $config);
-        $this->assertStringContainsString('"upnp": false', $config);
+        $this->assertStringContainsAllStrings(['"max_active_seeding": 300', '"dht": false', '"lsd": false', '"upnp": false'], $config);
     }
 
     public function testTrixieUsesNoCacheTemplate(): void

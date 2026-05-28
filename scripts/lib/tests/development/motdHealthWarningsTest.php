@@ -27,10 +27,7 @@ class MotdHealthWarningsTest extends TestCase
 
         \Motd::motdGenerate();
         $content = (string) @file_get_contents($out);
-        $this->assertStringContainsString('Storage WARN:', $content, 'Storage WARN not shown');
-        $this->assertStringContainsString('RAID md0', $content, 'RAID warn not shown');
-        $this->assertStringContainsString('NVMe critical warning', $content, 'NVMe critical not shown');
-        $this->assertStringContainsString('UDMA CRC increased', $content, 'UDMA CRC not shown');
+        $this->assertStringContainsAllStrings(['Storage WARN:', 'RAID md0', 'NVMe critical warning', 'UDMA CRC increased'], $content);
     }
 
     public function testMotdHandlesMalformedHealthLogGracefully(): void

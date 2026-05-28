@@ -93,10 +93,7 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
             ),
             $source
         );
-        $this->assertStringContainsString('/scripts/util/portManager.php release', $source);
-        $this->assertStringContainsString('userdel -r', $source);
-        $this->assertStringContainsString("'/etc/seedbox/runtime/trafficLimits/'.\$userName", $source);
-        $this->assertStringContainsString('pmssAddUserCleanupFailedProvisionTargetValid($userName, $homePath)', $source);
+        $this->assertStringContainsAllStrings(['/scripts/util/portManager.php release', 'userdel -r', "'/etc/seedbox/runtime/trafficLimits/'.\$userName", 'pmssAddUserCleanupFailedProvisionTargetValid($userName, $homePath)'], $source);
     }
 
     public function testFailureRollbackRunsOnlyForEarlyFailAfterUserCreation(): void
@@ -124,15 +121,13 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
     public function testAddUserWrapperUsesPreflightHelper(): void
     {
         $src = $this->pmssReadRepoFile('scripts/addUser.php');
-        $this->assertStringContainsString("require_once 'lib/user/add/preflight.php';", $src);
-        $this->assertStringContainsString('pmssAddUserEnsurePreflightState($userDb, $user, $homePath);', $src);
+        $this->assertStringContainsAllStrings(["require_once 'lib/user/add/preflight.php';", 'pmssAddUserEnsurePreflightState($userDb, $user, $homePath);'], $src);
     }
 
     public function testAddUserWrapperInitializesFailureRollback(): void
     {
         $src = $this->pmssReadRepoFile('scripts/addUser.php');
-        $this->assertStringContainsString("require_once 'lib/user/add/failureRollback.php';", $src);
-        $this->assertStringContainsString("pmssAddUserFailureRollbackInit(\$userDb, \$user['name'], \$homePath);", $src);
+        $this->assertStringContainsAllStrings(["require_once 'lib/user/add/failureRollback.php';", "pmssAddUserFailureRollbackInit(\$userDb, \$user['name'], \$homePath);"], $src);
     }
 
     public function testProvisioningPhasesMarkRollbackBoundaries(): void

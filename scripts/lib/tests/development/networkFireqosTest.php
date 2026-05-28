@@ -68,9 +68,7 @@ class NetworkFireqosTest extends TestCase
                 [],
                 ['10.0.0.0/8']
             );
-            $this->assertStringContainsString('eth1', $config);
-            $this->assertStringContainsString('500', $config);
-            $this->assertStringContainsString('match dst 10.0.0.0/8', $config);
+            $this->assertStringContainsAllStrings(['eth1', '500', 'match dst 10.0.0.0/8'], $config);
         });
     }
 
@@ -89,8 +87,7 @@ class NetworkFireqosTest extends TestCase
             });
         });
 
-        $this->assertStringContainsString('interface eth2', $config);
-        $this->assertStringContainsString('rate 1234', $config);
+        $this->assertStringContainsAllStrings(['interface eth2', 'rate 1234'], $config);
     }
 
     public function testBuildFireqosConfigUsesUserThrottleCapWhenEnabled(): void
@@ -140,8 +137,7 @@ class NetworkFireqosTest extends TestCase
             $this->assertTrue($localPos !== false);
             $this->assertTrue($localPos > $interfacePos);
             $this->assertEquals(1, substr_count($config, 'class local commit 10%'));
-            $this->assertStringContainsString('class root ceil 25Mbit', $config);
-            $this->assertStringContainsString('match dst 10.0.0.0/8', $config);
+            $this->assertStringContainsAllStrings(['class root ceil 25Mbit', 'match dst 10.0.0.0/8'], $config);
         });
     }
 

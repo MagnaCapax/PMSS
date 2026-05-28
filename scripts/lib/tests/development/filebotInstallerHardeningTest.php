@@ -9,8 +9,7 @@ class FilebotInstallerHardeningTest extends TestCase
     {
         $contents = $this->pmssReadUpdateAppFile('filebot.php');
 
-        $this->assertStringContainsString("require_once __DIR__.'/remoteBinary.php';", $contents);
-        $this->assertStringContainsString('pmssInstallPinnedRemoteDebPackage', $contents);
+        $this->assertStringContainsAllStrings(["require_once __DIR__.'/remoteBinary.php';", 'pmssInstallPinnedRemoteDebPackage'], $contents);
     }
 
     public function testFilebotInstallerLetsRemoteBinaryBootstrapRuntimeHelpers(): void

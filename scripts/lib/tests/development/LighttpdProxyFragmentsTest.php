@@ -58,17 +58,14 @@ class LighttpdProxyFragmentsTest extends TestCase
     {
         $fragment = \pmssLighttpdManagedProxyFragment('qbittorrent', 'demo', 4002);
 
-        $this->assertStringContainsString('$HTTP["url"] =~ "^/user-demo/qbittorrent($|/)" {', $fragment);
-        $this->assertStringContainsString('"/user-demo/qbittorrent" => ""', $fragment);
+        $this->assertStringContainsAllStrings(['$HTTP["url"] =~ "^/user-demo/qbittorrent($|/)" {', '"/user-demo/qbittorrent" => ""'], $fragment);
     }
 
     public function testRcloneFragmentAddsZeroContentLengthOnlyForBodylessPosts(): void
     {
         $fragment = \pmssLighttpdManagedProxyFragment('rclone', 'demo', 4001);
 
-        $this->assertStringContainsString('$HTTP["request-method"] == "POST" {', $fragment);
-        $this->assertStringContainsString('$REQUEST_HEADER["Content-Length"] == "" {', $fragment);
-        $this->assertStringContainsString('setenv.set-request-header = ( "Content-Length" => "0" )', $fragment);
+        $this->assertStringContainsAllStrings(['$HTTP["request-method"] == "POST" {', '$REQUEST_HEADER["Content-Length"] == "" {', 'setenv.set-request-header = ( "Content-Length" => "0" )'], $fragment);
     }
 
     public function testOnlyRcloneFragmentTouchesContentLengthHeader(): void
