@@ -229,6 +229,15 @@ class StorageBenchSecurityTest extends TestCase
         }
     }
 
+    public function testIostatPreflightUsesSafeSerializedArrayReader(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/util/storageBenchmark.php');
+
+        $this->assertStringContainsString('storageBenchmarkIostatUtilPctRead', $source);
+        $this->assertStringContainsString('pmssReadSerializedArrayFile($path)', $source);
+        $this->assertStringNotContainsString('unserialize(', $source);
+    }
+
     public function testUnsafeTargetTraversalFailsBeforeBenchmarkWork(): void
     {
         $base = $this->pmssMakeTempDir('pmss-bench-target-', 0700);

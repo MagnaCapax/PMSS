@@ -100,6 +100,23 @@ function storageBenchmarkRequireTargetDir(string $targetDir): string
     return $path;
 }
 function storageBenchmarkAppendJsonLine(string $jsonLog, array $entry): void { if(!pmssJsonLineAppend($jsonLog,$entry)){ fwrite(STDERR,"Error: failed to append JSON log entry: {$jsonLog}\n"); exit(1); } }
+function storageBenchmarkIostatUtilPctRead(string $path): ?float
+{
+    $payload = pmssReadSerializedArrayFile($path);
+    if ($payload === null || !array_key_exists('diskUtil', $payload)) {
+        return null;
+    }
+
+    $util = $payload['diskUtil'];
+    if (is_int($util) || is_float($util)) {
+        return (float) $util;
+    }
+    if (is_string($util) && is_numeric(trim($util))) {
+        return (float) trim($util);
+    }
+
+    return null;
+}
 function storageBenchmarkShowLast(string $jsonLog): int { if (!is_file($jsonLog)) { fwrite(STDERR,"No log at {$jsonLog}\n"); return 1; } $runs=[]; $lastId=''; $lastTs=''; foreach (pmssJsonLineFileRead($jsonLog) as $entry) { if (!isset($entry['run_id']) || !is_string($entry['run_id']) || $entry['run_id']==='') continue; $runId=$entry['run_id']; $runs[$runId][]=$entry; $runTs=(isset($entry['run_ts']) && is_string($entry['run_ts'])) ? $entry['run_ts'] : ''; if ($runTs>$lastTs){$lastTs=$runTs;$lastId=$runId;} } if ($lastId===''){ echo "No runs found.\n"; return 0; } $run=$runs[$lastId]; $first=$run[0]; $labelStr=(isset($first['label']) && $first['label']!=='') ? ('  Label: '.$first['label']) : ''; echo "\n== Storage benchmark (last run) ==\nRun ID: {$lastId}  Time: ".($first['run_ts'] ?? '').$labelStr."\n\n"; foreach ($run as $entry) { if (($entry['test'] ?? '')==='preflight-idle'){ echo "Preflight: ioping=".($entry['ioping_avg_ms']??'n/a')." ms util=".($entry['iostat_util_pct']??'n/a')."%\n\n"; break; } } echo "File-backed tests\n"; echo "test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95\twrite_p95\n"; foreach ($run as $entry){ if (isset($entry['test']) && empty($entry['device']) && (($entry['params']['rw']??'')!=='')) { $metrics=$entry['metrics']??[]; printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n",$entry['test'],$metrics['read_bw_MBps']??0,$metrics['write_bw_MBps']??0,$metrics['read_iops']??0,$metrics['write_iops']??0,$metrics['read_p95_ms']??0,$metrics['write_p95_ms']??0); } } echo "\nPer-device tests\n"; $devices=[]; foreach($run as $entry){ if(isset($entry['device'])) $devices[$entry['device']][]=$entry; } foreach ($devices as $device=>$entries){ echo $device."\n"; foreach ($entries as $entry){ $test=$entry['test']; $metrics=$entry['metrics']??[]; if($test==='device-seqread-dd') printf("  %-18s seq_MB/s=%.2f t=%.2fs\n",$test,$metrics['seqread_MBps']??0,$metrics['elapsed_s']??0); elseif(strpos($test,'dev-randread')===0) printf("  %-18s read_MB/s=%.2f IOPS=%.1f p95=%.2fms\n",$test,$metrics['read_bw_MBps']??0,$metrics['read_iops']??0,$metrics['read_p95_ms']??0); elseif($test==='device-ioping') printf("  %-18s avg_ms=%.2f\n",$test,$metrics['ioping_avg_ms']??0);} } return 0; }
 
 if ($showLast) exit(storageBenchmarkShowLast($jsonLog));
@@ -120,7 +137,8 @@ $fs=trim((string) shell_exec('stat -f -c %T '.escapeshellarg($targetDir))); $mnt
 // Preflight
 $pre = ['timestamp'=>$runTs,'label'=>$label?:null,'target_dir'=>$targetDir,'test'=>'preflight-idle','run_id'=>$runId,'run_ts'=>$runTs,'ok'=>true];
 $pre['ioping_avg_ms']=pmssIopingAverageMs($targetDir); if(($pre['ioping_avg_ms']??0)>$idleLatencyMs){ $pre['ok']=false; $pre['warn']='ioping above threshold'; }
-if (is_file('/var/run/pmss/iostat')){ $arr=@unserialize((string)@file_get_contents('/var/run/pmss/iostat')); if(is_array($arr) && isset($arr['diskUtil'])){ $pre['iostat_util_pct']=(float)$arr['diskUtil']; if($pre['iostat_util_pct']>$idleUtilPct){ $pre['ok']=false; $pre['warn_util']='iostat util high'; } } }
+$iostatUtilPct = storageBenchmarkIostatUtilPctRead('/var/run/pmss/iostat');
+if ($iostatUtilPct !== null){ $pre['iostat_util_pct']=$iostatUtilPct; if($pre['iostat_util_pct']>$idleUtilPct){ $pre['ok']=false; $pre['warn_util']='iostat util high'; } }
 storageBenchmarkAppendJsonLine($jsonLog,$pre); if($requireIdle && !$pre['ok']){ fwrite(STDERR,"Busy system (--require-idle): aborting.\n"); exit(2);}
 
 // File-backed tests
