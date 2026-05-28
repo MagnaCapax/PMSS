@@ -313,6 +313,15 @@ commit when they share the arc. The point of the architectural / dry runs is to 
 architectural simplification in ONE comprehensive landing — a 2-file commit leaves 95% of the
 per-commit budget unused.
 
+UNDER-DELIVERY CHECK (decompose/dry, qualitative — NOT a number to game): a session that lands only
+a peephole edit (1-2 files, a few hundred lines) has UNDER-DELIVERED, UNLESS that edit fully
+restructured one of the top-3 largest behemoths (e.g. update.php, runtime.php). Before committing a
+small decompose/dry diff, return to candidate-files.txt and ask: "is there a related decomposition I
+can fold into THIS arc?" Keep folding related targets until the arc is genuinely complete — then
+commit. Do NOT pad the diff with low-value churn (comment rewraps, whitespace, cosmetic renames) to
+look bigger; that is gaming, caught by the danger/relaxation gates and the comment-integrity rails.
+Substantial means substantial REAL simplification, not substantial line count.
+
 After committing the arc: STOP. Do not start a second arc in the same session. A second commit is
 permitted ONLY in CI-mode or to fix a verification regression introduced by the first commit.
 

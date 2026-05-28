@@ -42,7 +42,12 @@ Run types (pick one):
 
 3) Architectural Simplification Run (operator-approved):
    - Goal: reduce concepts/branching across a subsystem by restructuring internals (still behavior-preserving).
-   - Budget increase: up to 20 files and 2000 changed lines.
+   - TARGET (not a ceiling): land a substantial cohesive architectural simplification — aim for a
+     meaningful fraction of the budget (30 files / 3000 lines), not 5% of it. A session that lands
+     only a peephole edit (1-2 files, a few hundred lines) has UNDER-DELIVERED, UNLESS that edit
+     fully restructured one of the largest behemoths (e.g. update.php, runtime.php). The architectural
+     modes exist to restructure WHOLE subsystems in one cohesive arc — under-shooting wastes the
+     fixed per-session startup cost (context load + candidate analysis).
    - Must end net-negative in:
      - concepts (files + exported symbols + require hops), AND
      - runtime LOC OR complexity (measured by your snapshot tooling).
@@ -315,10 +320,16 @@ WORKFLOW (DO THIS)
    - Relevant docs under docs/ (architecture, update, refactoring, etc.).
    - Relevant ADRs under docs/adr/ and incidents under docs/incidents/ for the subsystem.
 
-3) Pick targets (balanced run):
-   - Pick 5–15 targets max.
+3) Pick targets:
+   - Balanced run: 5–15 targets, highest-value duplication / nesting hot spots.
+   - Decompose/dry run: pick a cohesive ARC (one subsystem, or one duplicated pattern across many
+     files) and bundle ALL its related decompositions into a single commit. Do not stop at the first
+     file — keep pulling related targets from candidate-files.txt into the same arc until the arc is
+     complete or the budget target is reached. A single-file stop is under-delivery unless that file
+     is a top-3 behemoth fully restructured.
    - Prefer the highest-value, highest-duplication / highest-nesting hot spots.
-   - Avoid roaming.
+   - Avoid roaming OUTSIDE the chosen arc (roaming = unrelated scattered edits; bundling related
+     decompositions within one arc is the goal, not roaming).
 
 4) Non-goals gate:
    - Explicitly state you are NOT doing feature work, rewrites, interface changes, or style cleanups.
@@ -363,12 +374,15 @@ No commits unless the operator explicitly instructs you to.
 Autocommit: When Autocommit Mode is appended below, "no commits" is VOID.
 No new branches unless explicitly instructed.
 
-Change budget:
-- Balanced/Safety runs: ≤ 20 files touched, ≤ 2000 total changed lines (additions + deletions)
-- Architectural Simplification runs: ≤ 30 files touched, ≤ 3000 total changed lines (additions + deletions)
-Stop if budget is reached.
+Change budget (these are TARGETS to approach, AND hard ceilings — not signals to stop early):
+- Balanced/Safety runs: aim substantial; hard ceiling 20 files / 2000 changed lines.
+- Architectural / dry runs: aim for a substantial fraction; hard ceiling 30 files / 3000 changed lines.
+The budget is the room you HAVE, not a line to stay far under. Landing at 5% of the budget on an
+architectural run is under-delivery, not caution. Only stop early for a real STOP CONDITION
+(verification failure, safety doubt, no remaining in-scope targets, ceiling reached).
 
 Autocommit budget (when Autocommit Mode is active):
 - Balanced: 25 targets, 40 files, 5000 lines (gates GATE 1-4 still apply at full strength)
-- Architectural: 50 files, 6000 lines (gates still apply)
-- Work in batches: 5-10 related changes → verify → commit → continue.
+- Architectural / dry: 30 files, 5000 lines per cohesive-arc commit (gates still apply at full strength)
+- ONE cohesive-arc commit per session (per codex-run.sh REFACTOR ITERATION) — bundle all related
+  decompositions of the arc into that single commit; do not fragment into many tiny commits.
