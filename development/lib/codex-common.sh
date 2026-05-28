@@ -55,6 +55,12 @@ codex_json_escape() {
 	printf '%s' "$value"
 }
 
+# Run a static PHP JSON filter against stdin, with decoded payload in $j.
+# shellcheck disable=SC2016
+codex_json_filter_stdin() {
+	local php_code="$1"
+	php -r '$j=json_decode(stream_get_contents(STDIN), true); if (!is_array($j)) { $j=[]; } '"$php_code" 2>/dev/null || true
+}
 # Derive a compact distro label for event logs.
 codex_detect_distro_label() {
 	local label

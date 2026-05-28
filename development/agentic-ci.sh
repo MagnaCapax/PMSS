@@ -310,7 +310,7 @@ else
 
 	echo "[codex-ci] discovering latest run via API for $repo_full..." >&1
 	runs_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs?per_page=1" 2>/dev/null || true)"
-	run_id="$(printf '%s' "$runs_json" | php -r '$j=json_decode(stream_get_contents(STDIN), true); echo $j["workflow_runs"][0]["id"] ?? "";' 2>/dev/null || true)"
+	run_id="$(printf '%s' "$runs_json" | codex_json_filter_stdin 'echo $j["workflow_runs"][0]["id"] ?? "";')"
 fi
 
 if [[ -z "$run_id" ]]; then
@@ -329,7 +329,7 @@ if [[ "$fetch_mode" == "gh" ]]; then
 	status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
 else
 	status="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id" 2>/dev/null |
-		php -r '$j=json_decode(stream_get_contents(STDIN), true); echo $j["status"] ?? "";' 2>/dev/null || true)"
+		codex_json_filter_stdin 'echo $j["status"] ?? "";' || true)"
 	[[ -n "$status" ]] || status="queued"
 fi
 while [[ "$status" != "completed" && $(date +%s) -lt $deadline ]]; do
@@ -339,7 +339,7 @@ while [[ "$status" != "completed" && $(date +%s) -lt $deadline ]]; do
 		status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
 	else
 		status="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id" 2>/dev/null |
-			php -r '$j=json_decode(stream_get_contents(STDIN), true); echo $j["status"] ?? "";' 2>/dev/null || true)"
+			codex_json_filter_stdin 'echo $j["status"] ?? "";' || true)"
 		[[ -n "$status" ]] || status="queued"
 	fi
 done
@@ -354,8 +354,7 @@ for attempt in {1..10}; do
 		gh run download "$run_id" --dir "$ARTDIR" >/dev/null 2>&1 || true
 	else
 		arts_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id/artifacts?per_page=100" 2>/dev/null || true)"
-		printf '%s' "$arts_json" | php -r '
-			$j=json_decode(stream_get_contents(STDIN), true);
+		printf '%s' "$arts_json" | codex_json_filter_stdin '
 			foreach (($j["artifacts"] ?? []) as $a) {
 				$id=$a["id"] ?? "";
 				$name=$a["name"] ?? "";
@@ -388,8 +387,7 @@ if [[ "$fetch_mode" == "gh" ]]; then
 	gh run view "$run_id" >"$SUMMARY" || true
 else
 	run_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id" 2>/dev/null || true)"
-	printf '%s' "$run_json" | php -r '
-		$j=json_decode(stream_get_contents(STDIN), true);
+	printf '%s' "$run_json" | codex_json_filter_stdin '
 		$fields=[
 			"workflow" => $j["name"] ?? "",
 			"status" => $j["status"] ?? "",
@@ -411,6 +409,16 @@ fi
 
 # Optionally capture a specific job log
 # Fetch logs for a requested job, or both 'build' and 'smoke' by default
+ci_job_id_from_jobs_json() {
+	local jobs_json="$1" name="$2"
+	printf '%s' "$jobs_json" | PMSS_CI_JOB_NAME="$name" codex_json_filter_stdin '
+		$name=getenv("PMSS_CI_JOB_NAME") ?: "";
+		foreach (($j["jobs"] ?? []) as $job) {
+			if (($job["name"] ?? "") === $name) { echo $job["id"] ?? ""; break; }
+		}
+	'
+}
+
 fetch_job_log() {
 	local name="$1" out="$2"
 	if [[ "$fetch_mode" == "gh" ]]; then
@@ -425,14 +433,7 @@ fetch_job_log() {
 			if [[ -z "$jobs_json" ]]; then
 				jobs_json="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo_full/actions/runs/$run_id/jobs" 2>/dev/null || true)"
 			fi
-			# shellcheck disable=SC2034
-			PMSS_CI_JOB_NAME="$name" job_id="$(printf '%s' "$jobs_json" | php -r '
-					$j=json_decode(stream_get_contents(STDIN), true);
-					$name=getenv("PMSS_CI_JOB_NAME") ?: "";
-					foreach (($j["jobs"] ?? []) as $job) {
-						if (($job["name"] ?? "") === $name) { echo $job["id"] ?? ""; break; }
-					}
-				' 2>/dev/null || true)"
+			job_id="$(ci_job_id_from_jobs_json "$jobs_json" "$name" || true)"
 			id="$job_id"
 		fi
 
@@ -487,14 +488,7 @@ fetch_job_log() {
 
 	local jobs_json job_id zip_path
 	jobs_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id/jobs?per_page=100" 2>/dev/null || true)"
-	# shellcheck disable=SC2034
-	PMSS_CI_JOB_NAME="$name" job_id="$(printf '%s' "$jobs_json" | php -r '
-		$j=json_decode(stream_get_contents(STDIN), true);
-		$name=getenv("PMSS_CI_JOB_NAME") ?: "";
-		foreach (($j["jobs"] ?? []) as $job) {
-			if (($job["name"] ?? "") === $name) { echo $job["id"] ?? ""; break; }
-		}
-	' 2>/dev/null || true)"
+	job_id="$(ci_job_id_from_jobs_json "$jobs_json" "$name" || true)"
 	[[ -n "$job_id" ]] || return 0
 	zip_path="$OUTDIR/job-${job_id}.zip"
 	if ci_api_download_zip "$api_base/repos/$repo_full/actions/jobs/$job_id/logs" "$zip_path" >/dev/null 2>&1; then
