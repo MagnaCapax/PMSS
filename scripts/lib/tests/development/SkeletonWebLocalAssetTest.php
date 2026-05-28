@@ -120,9 +120,15 @@ class SkeletonWebLocalAssetTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings(
             'scripts/lib/update/users/filesystem.php',
             [
+                "'www/deluge.php',",
+                "'www/filemanager.php',",
+                "'www/index.php',",
                 "'www/jquery.tabs.css',",
+                "'www/mediaStack.php',",
                 "'www/pmssTabs.js',",
+                "'www/qbittorrent.php',",
                 "'www/screen.css',",
+                "'www/welcome.php',",
             ],
             'Missing skeleton sync asset entry: '
         );
