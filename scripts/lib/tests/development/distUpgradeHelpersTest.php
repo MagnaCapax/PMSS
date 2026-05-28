@@ -50,6 +50,27 @@ class DistUpgradeHelpersTest extends TestCase
         }
     }
 
+    public function testDistUpgradeAptCommandPreservesKnownActions(): void
+    {
+        $env = 'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none';
+        $opts = ' -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
+
+        $this->assertSame(
+            $env.' apt-get install'.$opts.' fuse-overlayfs nginx-full',
+            \pmssDistUpgradeAptCommand($env, 'install', 'fuse-overlayfs nginx-full')
+        );
+        $this->assertSame($env.' apt-get upgrade'.$opts, \pmssDistUpgradeAptCommand($env, 'upgrade'));
+        $this->assertSame($env.' apt-get full-upgrade'.$opts, \pmssDistUpgradeAptCommand($env, 'full-upgrade'));
+    }
+
+    public function testDistUpgradeAptCommandRejectsShellShapedInput(): void
+    {
+        $this->assertDistUpgradeAptCommandFails('install; reboot', 'libcrypt1', 'Unsafe dist-upgrade apt action');
+        $this->assertDistUpgradeAptCommandFails('install', 'libcrypt1; reboot', 'Unsafe dist-upgrade apt arguments');
+        $this->assertDistUpgradeAptCommandFails('install', "libcrypt1\nnginx", 'Unsafe dist-upgrade apt arguments');
+        $this->assertDistUpgradeAptCommandFails('install', '/tmp/package.deb', 'Unsafe dist-upgrade apt arguments');
+    }
+
     public function testBootReadinessParsers(): void
     {
         $cases = [
@@ -116,5 +137,17 @@ class DistUpgradeHelpersTest extends TestCase
         });
 
         return $output;
+    }
+
+    private function assertDistUpgradeAptCommandFails(string $action, string $arguments, string $message): void
+    {
+        try {
+            \pmssDistUpgradeAptCommand('DEBIAN_FRONTEND=noninteractive', $action, $arguments);
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertStringContainsString($message, $exception->getMessage());
+            return;
+        }
+
+        $this->fail('Expected dist-upgrade apt command guard failure: '.$message);
     }
 }

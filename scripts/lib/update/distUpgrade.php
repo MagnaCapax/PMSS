@@ -101,7 +101,25 @@ function pmssDistUpgradeAptEnv(bool $warnWhenInteractiveUnavailable = true): arr
 }
 
 /** Build apt commands with dist-upgrade's shared force-conf policy. */
-function pmssDistUpgradeAptCommand(string $env, string $action, string $arguments = ''): string { $suffix = trim($arguments); $aptAction = $action === 'install' ? 'apt-get install' : 'apt-get '.$action; return trim($env.' '.$aptAction.' -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'.($suffix !== '' ? ' '.$suffix : '')); }
+function pmssDistUpgradeAptCommand(string $env, string $action, string $arguments = ''): string
+{
+    if (!in_array($action, ['install', 'upgrade', 'full-upgrade'], true)) {
+        throw new InvalidArgumentException('Unsafe dist-upgrade apt action: '.$action);
+    }
+
+    $suffix = trim($arguments);
+    if (preg_match('/[\r\n\0]/', $arguments) === 1) {
+        throw new InvalidArgumentException('Unsafe dist-upgrade apt arguments');
+    }
+    foreach ($suffix === '' ? [] : (preg_split('/\s+/', $suffix) ?: []) as $token) {
+        if (preg_match('/^[A-Za-z0-9][A-Za-z0-9.+:~_-]*$/', $token) !== 1) {
+            throw new InvalidArgumentException('Unsafe dist-upgrade apt arguments');
+        }
+    }
+
+    $aptAction = $action === 'install' ? 'apt-get install' : 'apt-get '.$action;
+    return trim($env.' '.$aptAction.' -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'.($suffix !== '' ? ' '.$suffix : ''));
+}
 
 /**
  * Ensure fuse-overlayfs is present after dist-upgrade so rootless Docker keeps working.
