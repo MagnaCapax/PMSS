@@ -86,6 +86,18 @@ class BootDefaultsEnsureTest extends TestCase
         $this->assertStringNotContainsString('BAD-KEY', $updatedGrub);
     }
 
+    public function testBootDefaultsPlanHelpersStayStable(): void
+    {
+        $this->assertSame(
+            ['systemd.unified_cgroup_hierarchy=0', 'console=tty0'],
+            \pmssBootDefaultsRequiredGrubOptions(' systemd.unified_cgroup_hierarchy=0 ', ['console=tty0', 'console=tty0', ' '])
+        );
+        $this->assertSame(
+            ['GRUB_TERMINAL' => 'console serial'],
+            \pmssBootDefaultsRequiredGrubSettings(['GRUB_TERMINAL' => ' console serial ', 'BAD-KEY' => 'ignored'])
+        );
+    }
+
     public function testFstabMutationCharacterizationMatrix(): void
     {
         $cases = [
