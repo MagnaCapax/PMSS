@@ -277,8 +277,25 @@ COMMIT MESSAGE RULE (PUBLIC REPO — BINDING):
 PUSH after each commit:
   git push origin HEAD
   The danger-full-access sandbox permits .git writes and network, so commit and push work directly.
-  If rejected (remote ahead): git pull --rebase origin main → re-verify → push.
-  NEVER force push.
+
+  REJECTION HANDLING (operator directive 2026-05-28 — autonomous-refactor scope):
+  If push is rejected (remote ahead): STOP the session. Do NOT rebase. Do NOT pull --rebase. Do NOT
+  force push. Do NOT "reconcile" by squashing or merging parallel work. Print
+    "PUSH-REJECTED: another instance won the race; this session's work is preserved as a local
+     commit at HEAD. Do not retry from this session — operator will handle."
+  and exit.
+
+  Rationale: in the parallel autonomous-refactor pipeline, `git pull --rebase` silently dropped
+  584e6499 (6 files / 856 LOC bundled-arc commit, lost to a smaller 3-file sibling) on 2026-05-28.
+  The general doctrine "use rebase, never force push" applies to interactive human workflows where a
+  human reviews the rebase result. In autonomous parallel runs, rebase has no reviewer and the
+  smaller commit's conflict-resolution wins by default — eating the larger arc.
+
+  The losing commit's work is preserved (orphaned commit in object DB + reflog) but not on main.
+  Operator-side recovery: `git format-patch -1 <orphan-sha>` then `git am --3way` after instances
+  settle. Do not attempt this recovery from inside an autonomous Codex session.
+
+  NEVER force push (unchanged baseline rule).
 
 STOP CONDITIONS:
   - Two consecutive verification failures → STOP
