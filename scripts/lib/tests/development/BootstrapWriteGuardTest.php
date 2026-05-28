@@ -18,7 +18,7 @@ class BootstrapWriteGuardTest extends TestCase
     public function testManagedPathWriterStoresContentWithRootMetadata(): void
     {
         $path = $this->tempDir.'/etc/hostname';
-        $this->pmssEnsureFixtureDirectory(dirname($path));
+        $this->pmssEnsureDir(dirname($path));
 
         $this->assertTrue(\pmssWriteManagedPathFile($path, "pmss-host\n", 'hostname', 'logMessage', 'root', 'root'));
         $this->assertEquals("pmss-host\n", $this->pmssReadFileOrEmpty($path));

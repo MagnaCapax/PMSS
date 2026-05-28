@@ -50,8 +50,8 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
     public function testAtomicSwapGuardRejectsSymlinkedTarget(): void
     {
         $tempRoot = $this->pmssMakeTempDir('pmss-update-swap-');
-        $this->pmssEnsureFixtureDirectory($tempRoot.'/real-target');
-        $this->pmssEnsureFixtureDirectory($tempRoot.'/staging');
+        $this->pmssEnsureDir($tempRoot.'/real-target');
+        $this->pmssEnsureDir($tempRoot.'/staging');
         $this->pmssCreateSymlinkOrSkip($tempRoot.'/real-target', $tempRoot.'/target');
 
         $this->assertFalse(pmssIsSafeAtomicSwapDirectoryPath($tempRoot.'/target', $tempRoot.'/staging', $tempRoot.'/backup'));
@@ -80,7 +80,7 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
         $outsideRoot = $this->pmssMakeTempDir('pmss-update-snapshot-outside-');
         $this->pmssWriteFile($outsideRoot.'/keep.txt', 'keep');
         $this->pmssCreateSymlinkOrSkip($outsideRoot, $root.'/var');
-        $this->pmssEnsureFixtureDirectory($root.'/scripts');
+        $this->pmssEnsureDir($root.'/scripts');
         $this->pmssWriteFile($outsideRoot.'/update-step2.php', '<?php echo "ok";');
         $this->pmssCreateSymlinkOrSkip($outsideRoot, $root.'/scripts/util');
 
@@ -206,8 +206,8 @@ class UpdateBootstrapStagingSafetyTest extends TestCase
         $staging = $root.'/staging';
         $backup = $root.'/backup';
 
-        $this->pmssEnsureFixtureDirectory($target);
-        $this->pmssEnsureFixtureDirectory($staging);
+        $this->pmssEnsureDir($target);
+        $this->pmssEnsureDir($staging);
         $this->pmssWriteFile($target.'/old.txt', 'old');
         $this->pmssWriteFile($staging.'/new.txt', 'new');
 

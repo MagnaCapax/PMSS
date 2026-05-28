@@ -24,7 +24,7 @@ class UserDirectoriesEnsureTest extends TestCase
     public function testCreatesNestedPathWithParentModeAndLeafMode(): void
     {
         $home = $this->tempDir.'/home';
-        $this->pmssEnsureFixtureDirectory($home);
+        $this->pmssEnsureDir($home);
 
         $ok = \pmssEnsureUserHomeDir($this->user, $home, 'www/recycle', 0771, null, 0755);
         $this->assertTrue($ok);
@@ -40,7 +40,7 @@ class UserDirectoriesEnsureTest extends TestCase
     public function testRejectsTraversalRelativePath(): void
     {
         $home = $this->tempDir.'/home';
-        $this->pmssEnsureFixtureDirectory($home);
+        $this->pmssEnsureDir($home);
         $ok = \pmssEnsureUserHomeDir($this->user, $home, '../evil', 0755);
         $this->assertTrue($ok === false);
         $this->assertTrue(!is_dir($this->tempDir.'/evil'));
@@ -49,7 +49,7 @@ class UserDirectoriesEnsureTest extends TestCase
     public function testRejectsAbsoluteRelativePath(): void
     {
         $home = $this->tempDir.'/home';
-        $this->pmssEnsureFixtureDirectory($home);
+        $this->pmssEnsureDir($home);
         $ok = \pmssEnsureUserHomeDir($this->user, $home, '/etc', 0755);
         $this->assertTrue($ok === false);
     }
@@ -64,8 +64,8 @@ class UserDirectoriesEnsureTest extends TestCase
     {
         $home = $this->tempDir.'/home';
         $other = $this->tempDir.'/other';
-        $this->pmssEnsureFixtureDirectory($home);
-        $this->pmssEnsureFixtureDirectory($other);
+        $this->pmssEnsureDir($home);
+        $this->pmssEnsureDir($other);
 
         $ok = \pmssEnsureUserHomeDir($this->user, $home.'/../other', '.tmp', 0755);
         $this->assertTrue($ok === false);
@@ -75,7 +75,7 @@ class UserDirectoriesEnsureTest extends TestCase
     public function testRejectsSymlinkedTarget(): void
     {
         $home = $this->tempDir.'/home';
-        $this->pmssEnsureFixtureDirectory($home);
+        $this->pmssEnsureDir($home);
         $target = $home.'/.tmp';
         @symlink($this->tempDir, $target);
 
@@ -87,10 +87,10 @@ class UserDirectoriesEnsureTest extends TestCase
     public function testRejectsSymlinkedParentDirectory(): void
     {
         $home = $this->tempDir.'/home';
-        $this->pmssEnsureFixtureDirectory($home);
+        $this->pmssEnsureDir($home);
 
         $elsewhere = $this->tempDir.'/elsewhere';
-        $this->pmssEnsureFixtureDirectory($elsewhere, 0700);
+        $this->pmssEnsureDir($elsewhere, 0700);
 
         $symlinked = $home.'/.lighttpd';
         @symlink($elsewhere, $symlinked);
@@ -104,9 +104,9 @@ class UserDirectoriesEnsureTest extends TestCase
     public function testConvergesLeafModeWhenDirectoryExists(): void
     {
         $home = $this->tempDir.'/home';
-        $this->pmssEnsureFixtureDirectory($home);
+        $this->pmssEnsureDir($home);
         $dir = $home.'/.tmp';
-        $this->pmssEnsureFixtureDirectory($dir, 0700);
+        $this->pmssEnsureDir($dir, 0700);
         @chmod($dir, 0700);
 
         $ok = \pmssEnsureUserHomeDir($this->user, $home, '.tmp', 0755);

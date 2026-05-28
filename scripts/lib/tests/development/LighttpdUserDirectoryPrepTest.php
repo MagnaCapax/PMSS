@@ -17,8 +17,8 @@ class LighttpdUserDirectoryPrepTest extends TestCase
     {
         $user = 'testuser';
         $home = $this->base.'/home';
-        $this->pmssEnsureFixtureDirectory($home);
-        $this->pmssEnsureFixtureDirectory($home.'/www');
+        $this->pmssEnsureDir($home);
+        $this->pmssEnsureDir($home.'/www');
 
         $ok = \pmssPrepareLighttpdUserDirectories($user, $home, true);
         $this->assertTrue($ok);
@@ -40,7 +40,7 @@ class LighttpdUserDirectoryPrepTest extends TestCase
     public function testRejectsInvalidUsername(): void
     {
         $home = $this->base.'/home';
-        $this->pmssEnsureFixtureDirectory($home);
+        $this->pmssEnsureDir($home);
         $ok = \pmssPrepareLighttpdUserDirectories('bad/user', $home, false);
         $this->assertTrue($ok === false);
     }
@@ -49,11 +49,11 @@ class LighttpdUserDirectoryPrepTest extends TestCase
     {
         $user = 'testuser';
         $home = $this->base.'/home';
-        $this->pmssEnsureFixtureDirectory($home);
-        $this->pmssEnsureFixtureDirectory($home.'/www');
+        $this->pmssEnsureDir($home);
+        $this->pmssEnsureDir($home.'/www');
 
         $elsewhere = $this->base.'/elsewhere';
-        $this->pmssEnsureFixtureDirectory($elsewhere, 0700);
+        $this->pmssEnsureDir($elsewhere, 0700);
         @symlink($elsewhere, $home.'/.lighttpd');
 
         $ok = \pmssPrepareLighttpdUserDirectories($user, $home, true);

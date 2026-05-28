@@ -254,7 +254,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     public function testWelcomePageStateAcceptsPositiveBonusQuota(): void
     {
         $home = $this->pmssMakeTempDir('pmss-welcome-bonus-').'/alice/www';
-        $this->pmssEnsureFixtureDirectory($home);
+        $this->pmssEnsureDir($home);
         $this->pmssWriteFile(dirname($home).'/.bonusQuota', "25\n");
 
         $this->assertSame(25, $this->runWelcomePageStateBonusQuota($home));
@@ -263,7 +263,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     public function testWelcomePageStateRejectsNegativeBonusQuota(): void
     {
         $home = $this->pmssMakeTempDir('pmss-welcome-bonus-').'/alice/www';
-        $this->pmssEnsureFixtureDirectory($home);
+        $this->pmssEnsureDir($home);
         $this->pmssWriteFile(dirname($home).'/.bonusQuota', "-10\n");
 
         $this->assertSame(0, $this->runWelcomePageStateBonusQuota($home));
@@ -272,7 +272,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     public function testWelcomePageStateRejectsSymlinkedBonusQuota(): void
     {
         $home = $this->pmssMakeTempDir('pmss-welcome-bonus-').'/alice/www';
-        $this->pmssEnsureFixtureDirectory($home);
+        $this->pmssEnsureDir($home);
         $target = $this->pmssWriteFile(dirname($home).'/.bonusQuotaTarget', "77\n");
         $this->pmssCreateSymlinkOrSkip($target, dirname($home).'/.bonusQuota');
 

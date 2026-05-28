@@ -196,7 +196,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
     public function testWriteConfigUsesValidatedHomeRoot(): void
     {
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-rtorrent-home-');
-        $this->pmssEnsureFixtureDirectory($this->pmssUserHomePath($homeRoot, 'dummy'));
+        $this->pmssEnsureDir($this->pmssUserHomePath($homeRoot, 'dummy'));
         $cfg = $this->rtorrentConfigFixture();
         $content = "directory.default.set = /home/dummy/data\n";
 

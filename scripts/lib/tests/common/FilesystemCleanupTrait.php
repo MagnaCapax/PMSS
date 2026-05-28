@@ -27,7 +27,7 @@ trait FilesystemCleanupTrait
         $homeRoot = $this->pmssMakeTrackedHomeRoot($prefix);
         $home = $this->pmssUserHomePath($homeRoot, $user);
         if ($relativeDir !== '') {
-            $this->pmssEnsureFixtureDirectory($home.'/'.ltrim($relativeDir, '/'), 0755);
+            $this->pmssEnsureDir($home.'/'.ltrim($relativeDir, '/'), 0755);
         }
 
         return $home;

@@ -350,11 +350,11 @@ abstract class TestCase
         $home = $this->pmssMakeTempDir($prefix);
         if ($homeRelativePath !== '') {
             $home .= '/'.trim($homeRelativePath, '/');
-            $this->pmssEnsureFixtureDirectory($home, 0755);
+            $this->pmssEnsureDir($home, 0755);
         }
 
         if ($relativeDir !== '') {
-            $this->pmssEnsureFixtureDirectory($home.'/'.ltrim($relativeDir, '/'), 0755);
+            $this->pmssEnsureDir($home.'/'.ltrim($relativeDir, '/'), 0755);
         }
 
         return $home;
@@ -382,9 +382,6 @@ abstract class TestCase
             'user_esc' => escapeshellarg($user),
         ], $extra);
     }
-
-    /** Create a fixture directory tree and assert it exists afterwards. */
-    protected function pmssEnsureFixtureDirectory(string $path, int $mode = 0755): void { $this->assertTrue(@mkdir($path, $mode, true) || is_dir($path), 'Expected fixture directory to exist: '.$path); }
 
     /** Write a PHP array fixture that can be loaded with include/require. */
     protected function pmssWritePhpArrayFixture(array $value, string $prefix = 'pmss-fixture-'): string

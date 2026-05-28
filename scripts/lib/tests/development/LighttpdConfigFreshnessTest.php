@@ -11,13 +11,13 @@ class LighttpdConfigFreshnessTest extends TestCase
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('home', 'pmss-lighttpd-freshness-', 0700);
-        $this->pmssEnsureFixtureDirectory($this->home.'/.lighttpd/custom.d');
+        $this->pmssEnsureDir($this->home.'/.lighttpd/custom.d');
     }
 
     private function writeConfigFile(string $relativePath, string $content, int $mtime): string
     {
         $path = $this->home.'/'.$relativePath;
-        $this->pmssEnsureFixtureDirectory(dirname($path));
+        $this->pmssEnsureDir(dirname($path));
         file_put_contents($path, $content);
         touch($path, $mtime);
 
