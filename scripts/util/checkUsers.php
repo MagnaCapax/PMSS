@@ -12,10 +12,7 @@ require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/log.php';
 
 $parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null));
-if (pmssCliOptionPresent($parsed, 'help', 'h')) {
-    echo "Usage: checkUsers.php [--json]\n";
-    exit(0);
-}
+if (pmssCliHelpTextEmitIfRequested($parsed, "Usage: checkUsers.php [--json]\n")) exit(0);
 
 $db = new users();
 $cacheUsers = array_keys($db->getUsers());

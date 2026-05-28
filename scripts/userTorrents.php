@@ -49,7 +49,7 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
 
 pmssRunCliEntrypointWithArgv(__FILE__, static function (array $argv): int {
     $parsed = pmssParseCliTokens($argv);
-    if (pmssCliOptionPresent($parsed, 'help')) {
+    if (pmssCliHelpRequested($parsed, null)) {
         $self = basename(__FILE__);
         echo pmssCliHelpUsageOptions($self.' [--by-client]', [
             ['--by-client', 'Show per-client breakdown (rtorrent/deluge/qbittorrent).'],

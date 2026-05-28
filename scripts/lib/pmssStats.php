@@ -574,7 +574,7 @@ function pmssStatsParseOptions(array $argv)
 {
     $parsed = pmssParseCliTokens($argv);
 
-    if (pmssCliOptionPresent($parsed, 'help', 'h')) {
+    if (pmssCliHelpRequested($parsed)) {
         $self = basename($argv[0] ?? 'pmss-stats.php');
         echo pmssCliHelpUsageOptions($self.' [--full] [--json] [--mini] [--no-header]', [
             ['--full', 'Show extra cgroup counters and I/O details.'],

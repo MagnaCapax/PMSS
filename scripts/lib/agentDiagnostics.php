@@ -180,7 +180,7 @@ function pmssAgentDiagnosticsRenderText(array $payload): string
 function pmssAgentDiagnosticsMain(array $argv): int
 {
     $parsed = pmssParseCliTokens($argv, ['user']);
-    if (pmssCliOptionPresent($parsed, 'help', 'h')) { echo pmssAgentDiagnosticsUsage(); return 0; }
+    if (pmssCliHelpTextEmitIfRequested($parsed, pmssAgentDiagnosticsUsage())) return 0;
 
     if (!pmssTestModeEnabled()) requireRoot();
 

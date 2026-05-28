@@ -86,6 +86,22 @@ function pmssCliOptionPresent(array $parsed, string $long, ?string $short = null
     return $bareFlagOnly ? $value === true : $value !== false;
 }
 
+/** Return whether the standard help option was requested. */
+function pmssCliHelpRequested(array $parsed, ?string $short = 'h'): bool
+{
+    return pmssCliOptionPresent($parsed, 'help', $short);
+}
+
+/** Emit prepared help text when requested and report whether it was printed. */
+function pmssCliHelpTextEmitIfRequested(array $parsed, string $helpText, ?string $short = 'h'): bool
+{
+    if (!pmssCliHelpRequested($parsed, $short)) {
+        return false;
+    }
+    echo $helpText;
+    return true;
+}
+
 /**
  * Return a non-empty string option value, or the caller's default.
  */

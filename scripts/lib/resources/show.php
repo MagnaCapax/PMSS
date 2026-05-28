@@ -44,7 +44,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 function pmssShowResourcesMain(array $argv): int
 {
     $parsed = pmssParseCliTokens($argv, ['user']);
-    if (pmssCliOptionPresent($parsed, 'help')) {
+    if (pmssCliHelpRequested($parsed, null)) {
         $self = basename($_SERVER['SCRIPT_NAME'] ?? 'showResources.php');
         echo pmssCliHelpUsageOptions($self.' [--json] [--show-missing] [--user=<username>]', [
             ['--json', 'Emit JSON instead of human text output.'],

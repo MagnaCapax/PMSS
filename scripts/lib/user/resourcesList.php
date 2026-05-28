@@ -166,10 +166,7 @@ function pmssUserResourcesListRowBuild(array $resourceData, string $displayMode)
 function pmssUserResourcesListMain(array $argv): int
 {
     $parsed = pmssParseCliTokens($argv);
-    if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
-        echo pmssUserResourcesListUsageText()."\n";
-        return 0;
-    }
+    if (pmssCliHelpTextEmitIfRequested($parsed, pmssUserResourcesListUsageText()."\n")) return 0;
     if (posix_getuid() !== 0) {
         fwrite(STDERR, "Error: This script must be run as root to query systemd slices.\n");
         return 1;

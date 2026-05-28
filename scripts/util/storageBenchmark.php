@@ -26,7 +26,7 @@ $valueOptionNames = [
 ];
 // Keep long flag literals inline for CLI characterization coverage: '--require-idle'.
 $parsed = pmssParseCliTokens($argv, $valueOptionNames);
-if (pmssCliOption($parsed, 'help', 'h')) {
+if (pmssCliHelpRequested($parsed)) {
     echo "\nStorage benchmark (non-destructive)\n";
     echo pmssCliHelpUsageOptions('storageBenchmark.php [options]', [
         ['--target <dir>', 'Directory for file-backed tests (default /home).'],

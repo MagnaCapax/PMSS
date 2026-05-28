@@ -231,7 +231,7 @@ if (!function_exists('pmssUserGiBSettingCli')) {
         if (!pmssUserTrafficCliBootstrap()) return 1;
         $usage = isset($spec['usage']) && is_string($spec['usage']) ? $spec['usage'] : '';
         $parsed = pmssParseCliTokens($argv);
-        if (pmssCliOption($parsed, 'help', 'h')) { echo $usage."\n"; return 0; }
+        if (pmssCliHelpTextEmitIfRequested($parsed, $usage."\n")) return 0;
 
         $userName = (string) pmssCliOption($parsed, 'user', 'u', $parsed['arguments'][0] ?? '');
         $show = (pmssCliOption($parsed, 'show') === true);

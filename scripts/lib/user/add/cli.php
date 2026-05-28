@@ -78,9 +78,7 @@ function pmssAddUserParseCli(array $argv): array
 {
     $longOptions = array_merge(['user', 'password', 'ram-mib', 'disk-quota-gib', 'upload-throttle-kib', 'docker-enabled'], array_column(pmssUserConfigCliResourceSpecs(), 'addUserOption'));
     $parsed = pmssParseCliTokens($argv, $longOptions);
-    if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
-        return ['help' => true, 'usage' => pmssAddUserCliUsage()];
-    }
+    if (pmssCliHelpRequested($parsed)) return ['help' => true, 'usage' => pmssAddUserCliUsage()];
 
     $args = array_merge([''], $parsed['arguments']);
     $user = [

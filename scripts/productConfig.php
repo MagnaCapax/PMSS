@@ -19,10 +19,7 @@ require_once __DIR__.'/lib/welcomeMessage.php';
 
 $usage = "Usage: productConfig.php PRODUCT --welcome-message=<html>\n";
 $parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null), ['welcome-message']);
-if (pmssCliOption($parsed, 'help', 'h')) {
-    echo $usage;
-    exit(0);
-}
+if (pmssCliHelpTextEmitIfRequested($parsed, $usage)) exit(0);
 
 requireRoot();
 
