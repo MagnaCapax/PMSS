@@ -33,6 +33,27 @@ class TrafficLimitTieredCapCharacterizationTest extends TestCase
         $this->assertEquals(\pmssTrafficLimitDefaultOverageStages(), $legacyPolicy['overageThrottleStages']);
     }
 
+    public function testNetworkThrottlePolicyPreservesCustomSnapshot(): void
+    {
+        $policy = \pmssTrafficLimitThrottlePolicyFromNetworkConfig([
+            'throttle' => [
+                'max' => 80,
+                'progressiveThrottleEnabled' => 'no',
+                'progressiveThrottleFloorPercent' => 5,
+                'progressiveThrottleGracePercent' => 7.5,
+                'overageStages' => [['overagePercent' => 75.0, 'minOverageGiB' => 2048.0, 'capMbit' => 20]],
+            ],
+        ]);
+
+        $this->assertEquals([
+            'defaultTrafficCapMbit' => 80,
+            'progressiveThrottleEnabled' => false,
+            'progressiveThrottleFloorPercent' => 5.0,
+            'progressiveThrottleGracePercent' => 7.5,
+            'overageThrottleStages' => [['overagePercent' => 75.0, 'minOverageGiB' => 2048.0, 'capMbit' => 20]],
+        ], $policy);
+    }
+
     public function testHigherMinimumOverageWinsWhenThresholdMatches(): void
     {
         $result = \pmssTrafficLimitSelectTieredCapMbit(75.0, 6000.0, 100, [
