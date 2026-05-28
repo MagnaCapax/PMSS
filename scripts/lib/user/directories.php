@@ -171,8 +171,19 @@ if (!function_exists('pmssEnsureUserHomeDir')) {
         $log = $logger ?: function (string $_msg): void { };
 
         $home = rtrim($home, '/');
-        if ($home === '' || $home[0] !== '/' || !is_dir($home) || is_link($home)) {
-            $log('[WARN] Refusing to ensure user dir; invalid home path: '.$home);
+        $safeHome = str_replace(["\0", "\r", "\n"], '?', $home);
+        if ($home === '' || $home[0] !== '/' || strpos($home, "\0") !== false) {
+            $log('[WARN] Refusing to ensure user dir; invalid home path: '.$safeHome);
+            return false;
+        }
+        foreach (explode('/', trim($home, '/')) as $segment) {
+            if ($segment === '.' || $segment === '..') {
+                $log('[WARN] Refusing to ensure user dir; unsafe home path segment: '.$safeHome);
+                return false;
+            }
+        }
+        if (!is_dir($home) || is_link($home)) {
+            $log('[WARN] Refusing to ensure user dir; invalid home path: '.$safeHome);
             return false;
         }
         $relative = trim($relative);

@@ -54,6 +54,24 @@ class UserDirectoriesEnsureTest extends TestCase
         $this->assertTrue($ok === false);
     }
 
+    public function testRejectsNullByteHomePathBeforeFilesystemProbe(): void
+    {
+        $ok = \pmssEnsureUserHomeDir($this->user, $this->tempDir."/home\0evil", '.tmp', 0755);
+        $this->assertTrue($ok === false);
+    }
+
+    public function testRejectsTraversalInsideHomePath(): void
+    {
+        $home = $this->tempDir.'/home';
+        $other = $this->tempDir.'/other';
+        $this->pmssEnsureFixtureDirectory($home);
+        $this->pmssEnsureFixtureDirectory($other);
+
+        $ok = \pmssEnsureUserHomeDir($this->user, $home.'/../other', '.tmp', 0755);
+        $this->assertTrue($ok === false);
+        $this->assertTrue(!is_dir($other.'/.tmp'), 'must not create directories through a traversed home path');
+    }
+
     public function testRejectsSymlinkedTarget(): void
     {
         $home = $this->tempDir.'/home';
