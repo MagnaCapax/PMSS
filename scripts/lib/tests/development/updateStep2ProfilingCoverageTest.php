@@ -12,6 +12,8 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
         $this->assertTrue(strpos($src, '#TODO profiling (GH #120)') === false, 'Profiling TODO marker should be removed once coverage is wired');
         $this->assertStringContainsString('function pmssRunProfiledStep(', $src, 'Expected callable profiling helper');
         $this->assertStringContainsString('function pmssRunProfiledCallable(', $src, 'Expected callable invocation helper');
+        $removedWrapper = 'function pmssUpdateStep2Run'.'ClassifiedCallable(';
+        $this->assertStringNotContainsString($removedWrapper, $src, 'Classified callable handling should be folded into pmssRunProfiledCallable');
 
         foreach ([
             'Preparing noninteractive apt defaults',

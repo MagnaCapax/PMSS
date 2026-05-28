@@ -15,10 +15,10 @@ class UpdateStep2IncompleteUserMaintenanceTest extends TestCase
 {
     public function testMismatchIsSoftFailNotMustSucceed(): void
     {
-        $data = $this->pmssReadRepoFile('scripts/util/update-step2.php');
+        $data = $this->pmssReadRepoFile('scripts/lib/update/runtime/stepPolicy.php');
         // The processed_users_mismatch call must classify SOFT_FAIL.
         $this->assertTrue(
-            strpos($data, "PMSS_UPDATE_STEP_CLASS_SOFT_FAIL,\n            1,\n            \$reason") !== false
+            strpos($data, "PMSS_UPDATE_STEP_CLASS_SOFT_FAIL,\n        1,\n        pmssUpdateStep2UserMaintenanceMismatchReason") !== false
             || preg_match('/pmssUpdateStep2HandleClassifiedFailure\(\s*\'Updating all user environments\',\s*PMSS_UPDATE_STEP_CLASS_SOFT_FAIL/s', $data) === 1,
             'processed_users_mismatch must be SOFT_FAIL (GH#592), not MUST_SUCCEED'
         );
@@ -26,6 +26,10 @@ class UpdateStep2IncompleteUserMaintenanceTest extends TestCase
         $this->assertTrue(
             preg_match('/\'Updating all user environments\',\s*PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED/s', $data) !== 1,
             'the user-mismatch step must not be re-promoted to MUST_SUCCEED without revisiting GH#592/#302'
+        );
+        $this->assertSame(
+            'processed_users_mismatch:3_of_15 skipped=[u1; u2]',
+            pmssUpdateStep2UserMaintenanceMismatchReason(3, 15, ['u1', 'u2'])
         );
     }
 
@@ -51,8 +55,8 @@ class UpdateStep2IncompleteUserMaintenanceTest extends TestCase
 
     public function testFullCompletionClearsStaleMarker(): void
     {
-        // The else-branch in update-step2 clears the marker on a clean run.
-        $data = $this->pmssReadRepoFile('scripts/util/update-step2.php');
+        // The policy helper clears the marker on a clean run.
+        $data = $this->pmssReadRepoFile('scripts/lib/update/runtime/stepPolicy.php');
         $this->assertTrue(
             strpos($data, 'pmssUpdateClearIncompleteUserMaintenance()') !== false,
             'a clean run (all users processed) must clear a stale incomplete-tail marker'

@@ -195,19 +195,14 @@ function pmssRunProfiledStep(string $description, callable $step)
  * @param array<int, mixed> $arguments
  * @return mixed
  */
-function pmssRunProfiledCallable(string $description, callable $callable, array $arguments = [])
-{
-    return pmssRunProfiledStep($description, static function () use ($callable, $arguments) { return $callable(...$arguments); });
-}
-
-/**
- * Execute a profiled callable using the configured step classification policy.
- */
-function pmssUpdateStep2RunClassifiedCallable(string $description, callable $callable, array $arguments, string $classification): void
+function pmssRunProfiledCallable(string $description, callable $callable, array $arguments = [], string $classification = '')
 {
     try {
-        pmssRunProfiledCallable($description, $callable, $arguments);
+        return pmssRunProfiledStep($description, static function () use ($callable, $arguments) { return $callable(...$arguments); });
     } catch (\Throwable $throwable) {
+        if ($classification === '') {
+            throw $throwable;
+        }
         $reason = get_class($throwable).($throwable->getMessage() !== '' ? ': '.$throwable->getMessage() : '');
         pmssUpdateStep2HandleClassifiedFailure($description, $classification, 1, $reason);
     }
@@ -496,7 +491,7 @@ putenv('PMSS_PACKAGE_PHASE=complete');
 pmssLogJson(['event' => 'package_phase', 'status' => 'ok']);
 
 pmssRunProfiledCallable('Migrating legacy localnet config path', 'pmssMigrateLegacyLocalnet');
-pmssUpdateStep2RunClassifiedCallable('Applying runtime service templates', 'pmssApplyRuntimeTemplates', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);
+pmssRunProfiledCallable('Applying runtime service templates', 'pmssApplyRuntimeTemplates', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);
 pmssRunProfiledCallable('Applying journald runtime limits', 'pmssApplyJournaldLimits', ['logmsg']);
 pmssRunProfiledCallable('Applying remote logging configuration', 'pmssApplyRemoteLogging', ['logmsg']);
 pmssRunProfiledCallable('Applying hostname configuration', 'pmssApplyHostnameConfig', ['logmsg']);
@@ -517,7 +512,7 @@ runStep('Resetting /scripts permissions', 'chmod -R 750 /scripts');
 pmssRunProfiledCallable('Ensuring locale baseline', 'pmssEnsureLocaleBaseline');
 
 // Web stack hardening and per-user HTTP refresh.
-pmssUpdateStep2RunClassifiedCallable('Configuring web stack', 'pmssConfigureWebStack', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);
+pmssRunProfiledCallable('Configuring web stack', 'pmssConfigureWebStack', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);
 
 // Configure OpenVPN via dedicated utility for better logging/observability.
 runStep('Configuring OpenVPN', 'php /scripts/util/configureOpenvpn.php');
@@ -586,45 +581,7 @@ pmssRunProfiledStep('Adjusting lighttpd security settings', static function (): 
 // template changes.
 $rutorrentIndexSha = sha1((string) @file_get_contents('/etc/skel/www/rutorrent/index.html'));
 $userMaintenanceSummary = pmssRunProfiledCallable('Updating all user environments', 'pmssUpdateAllUsers', [$rutorrentIndexSha]);
-if (is_array($userMaintenanceSummary)) {
-    $totalUsers = isset($userMaintenanceSummary['total']) ? (int) $userMaintenanceSummary['total'] : 0;
-    $processedUsers = isset($userMaintenanceSummary['processed']) ? (int) $userMaintenanceSummary['processed'] : 0;
-    if ($processedUsers < $totalUsers) {
-        // Name WHY users were skipped so operators act on the real cause
-        // (e.g. userPermissions timeout) rather than chasing correlated host
-        // state.
-        $reason = sprintf('processed_users_mismatch:%d_of_%d', $processedUsers, $totalUsers);
-        $skipReasons = isset($userMaintenanceSummary['skip_reasons']) && is_array($userMaintenanceSummary['skip_reasons'])
-            ? $userMaintenanceSummary['skip_reasons']
-            : [];
-        if ($skipReasons !== []) {
-            $reason .= ' skipped=['.implode('; ', array_slice($skipReasons, 0, 10)).']';
-        }
-        // SOFT_FAIL (GH#592), not MUST_SUCCEED. Rationale: a per-user
-        // maintenance miss (most commonly userPermissions timeout on an
-        // I/O-saturated host) must NOT block the whole system update — on such
-        // hosts the hard-fail left the host stuck on an old PMSS version
-        // indefinitely, which is strictly worse for customers than completing
-        // the system update. The GH#302 concern (skipped users get no
-        // post-upgrade service restart) is independently covered by the
-        // per-minute watchdog crons (checkLighttpdInstances 1m,
-        // checkRtorrent 2m) which regenerate config + restart services
-        // regardless of update-step2 outcome. The hard-fail never repaired the
-        // timed-out user's permissions anyway (the timeout already happened);
-        // it only blocked the fleet. Durable visibility below replaces the
-        // hard-fail's only real benefit: surfacing the incomplete tail.
-        pmssUpdateRecordIncompleteUserMaintenance($processedUsers, $totalUsers, $skipReasons);
-        pmssUpdateStep2HandleClassifiedFailure(
-            'Updating all user environments',
-            PMSS_UPDATE_STEP_CLASS_SOFT_FAIL,
-            1,
-            $reason
-        );
-    } else {
-        // Clear any stale incomplete-tail marker once a run completes all users.
-        pmssUpdateClearIncompleteUserMaintenance();
-    }
-}
+pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);
 // Ensure the standard download speed test file exists
 $testfilePath = '/var/www/testfile';
 if (!file_exists($testfilePath) || filesize($testfilePath) !== 104857600) {

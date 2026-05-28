@@ -66,12 +66,11 @@ PHP,
         ]);
     }
 
-    public function testUpdateStep2FailsWhenUserProcessingIsPartial(): void
+    public function testUpdateStep2DelegatesPartialUserProcessingPolicy(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
-            'processed_users_mismatch',
-            'PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED',
-            '$processedUsers < $totalUsers',
+            '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',
+            'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
         ]);
     }
 

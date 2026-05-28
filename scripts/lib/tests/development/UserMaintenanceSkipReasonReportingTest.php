@@ -45,10 +45,12 @@ class UserMaintenanceSkipReasonReportingTest extends TestCase
     public function testUpdateStep2SurfacesSkipReasonsWithSoftFailAndMarker(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
+            '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',
+            'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/runtime/stepPolicy.php', [
             'processed_users_mismatch',
             'PMSS_UPDATE_STEP_CLASS_SOFT_FAIL',
-            '$processedUsers < $totalUsers',
-            "\$userMaintenanceSummary['skip_reasons']",
             "' skipped=['.implode('; ', array_slice(\$skipReasons, 0, 10)).']'",
             'pmssUpdateRecordIncompleteUserMaintenance(',
         ]);
@@ -64,10 +66,9 @@ class UserMaintenanceSkipReasonReportingTest extends TestCase
      */
     public function testMismatchClassificationIsSoftFailNotMustSucceed(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/util/update-step2.php');
-
+        $src = $this->pmssReadRepoFile('scripts/lib/update/runtime/stepPolicy.php');
         $start = strpos($src, 'processed_users_mismatch');
-        $this->assertTrue($start !== false, 'processed_users_mismatch block missing from update-step2');
+        $this->assertTrue($start !== false, 'processed_users_mismatch policy missing from stepPolicy.php');
 
         // Inspect the classified-failure call that follows the mismatch reason
         // assembly; it must be soft_fail (GH#592), never must_succeed. Window is

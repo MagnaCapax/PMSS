@@ -93,3 +93,34 @@ function pmssUpdateClearIncompleteUserMaintenance(): void
         @unlink($path);
     }
 }
+
+/** Build the classified failure reason for a partial per-user run. */
+function pmssUpdateStep2UserMaintenanceMismatchReason(int $processed, int $total, array $skipReasons): string
+{
+    $reason = sprintf('processed_users_mismatch:%d_of_%d', $processed, $total);
+    return $skipReasons === [] ? $reason : $reason.' skipped=['.implode('; ', array_slice($skipReasons, 0, 10)).']';
+}
+
+/**
+ * Apply GH#592 partial user-maintenance policy to the update-step2 summary.
+ */
+function pmssUpdateStep2HandleUserMaintenanceSummary($summary): void
+{
+    if (!is_array($summary)) return;
+
+    $total = isset($summary['total']) ? (int) $summary['total'] : 0;
+    $processed = isset($summary['processed']) ? (int) $summary['processed'] : 0;
+    if ($processed >= $total) {
+        pmssUpdateClearIncompleteUserMaintenance();
+        return;
+    }
+
+    $skipReasons = isset($summary['skip_reasons']) && is_array($summary['skip_reasons']) ? $summary['skip_reasons'] : [];
+    pmssUpdateRecordIncompleteUserMaintenance($processed, $total, $skipReasons);
+    pmssUpdateStep2HandleClassifiedFailure(
+        'Updating all user environments',
+        PMSS_UPDATE_STEP_CLASS_SOFT_FAIL,
+        1,
+        pmssUpdateStep2UserMaintenanceMismatchReason($processed, $total, $skipReasons)
+    );
+}
