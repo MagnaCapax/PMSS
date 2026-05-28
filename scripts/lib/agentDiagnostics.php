@@ -14,7 +14,17 @@ const PMSS_AGENT_DIAGNOSTICS_COMMAND_TIMEOUT_DEFAULT = 60;
 /** Execute a repository PHP script relative to the diagnostics script root. */
 function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = [], int $timeoutSec = PMSS_AGENT_DIAGNOSTICS_COMMAND_TIMEOUT_DEFAULT): array
 {
-    $scriptPath = pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT', dirname(__DIR__, 2)).'/'.ltrim($relativePath, '/');
+    $relativePath = trim($relativePath);
+    if ($relativePath === '' || $relativePath[0] === '/' || !pmssPathSegmentsAreSafe($relativePath, true, false)) {
+        return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script path unsafe: '.$relativePath];
+    }
+
+    $scriptRoot = pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT', dirname(__DIR__, 2));
+    if (!pmssPathSegmentsAreSafe($scriptRoot, false, false, true, true)) {
+        return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script root unsafe: '.$scriptRoot];
+    }
+
+    $scriptPath = $scriptRoot.'/'.$relativePath;
     if (!is_file($scriptPath) || !is_readable($scriptPath)) return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script missing or unreadable: '.$relativePath];
     // Use 'php' from $PATH instead of PHP_BINARY — consistent with update.php (GH#589).
     $command = escapeshellarg('php').' '.escapeshellarg($scriptPath);

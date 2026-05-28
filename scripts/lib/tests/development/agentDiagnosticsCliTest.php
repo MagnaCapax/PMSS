@@ -108,6 +108,30 @@ final class agentDiagnosticsCliTest extends TestCase
         $this->assertStringContainsString('Diagnostics script missing or unreadable: scripts/util/checkUsers.php', $payload['sections']['users']['consistency']['stderr']);
     }
 
+    public function testPhpScriptRejectsUnsafeRelativePathBeforeExecution(): void
+    {
+        $result = \pmssAgentDiagnosticsPhpScript('../scripts/listUsers.php');
+
+        $this->assertSame(1, $result['rc']);
+        $this->assertSame('', $result['stdout']);
+        $this->assertSame('Diagnostics script path unsafe: ../scripts/listUsers.php', $result['stderr']);
+    }
+
+    public function testPhpScriptRejectsUnsafeScriptRootBeforeExecution(): void
+    {
+        $root = $this->pmssMakeNamedTempDir('pmss-agent-root-');
+        $unsafeRoot = $root.'/safe/../safe';
+        @mkdir($root.'/safe', 0700, true);
+
+        $this->pmssWithEnv(['PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $unsafeRoot], function () use ($unsafeRoot): void {
+            $result = \pmssAgentDiagnosticsPhpScript('scripts/listUsers.php');
+
+            $this->assertSame(1, $result['rc']);
+            $this->assertSame('', $result['stdout']);
+            $this->assertSame('Diagnostics script root unsafe: '.$unsafeRoot, $result['stderr']);
+        });
+    }
+
     public function testSpecCollectRecursesMixedNestedSectionsInStableOrder(): void
     {
         $scriptRoot = $this->makeScriptRoot();

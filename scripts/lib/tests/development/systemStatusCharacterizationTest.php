@@ -215,6 +215,21 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertSame('', pmssStatusBinaryPathResolve('wget', $runCommand, $isExecutable));
     }
 
+    public function testBinaryPathResolveRejectsUnsafeBinaryNamesBeforeShelling(): void
+    {
+        $commands = [];
+        $runCommand = static function (string $command) use (&$commands): string {
+            $commands[] = $command;
+            return '/usr/bin/unexpected';
+        };
+
+        foreach (['', 'nginx;id', '../nginx', "php\n-v"] as $binary) {
+            $this->assertSame('', pmssStatusBinaryPathResolve($binary, $runCommand));
+        }
+
+        $this->assertSame([], $commands);
+    }
+
     public function testSharedBinaryProbeRendererKeepsSystemAndComponentViewsStable(): void
     {
         $runCommand = static function (string $command): string {

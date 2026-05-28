@@ -19,6 +19,11 @@ function pmssStatus(string $name, string $status, string $detail = ''): array
  */
 function pmssStatusBinaryPathResolve(string $binary, callable $runCommand, ?callable $isExecutable = null): string
 {
+    $binary = trim($binary);
+    if ($binary === '' || !pmssCommandBinaryNameIsSafe($binary)) {
+        return '';
+    }
+
     $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
     if ($path === '' || strpos($path, '/') !== 0) {
         return '';
