@@ -97,14 +97,12 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
 
         $output = $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath]);
 
-        $failPos = strpos($output, 'Failing Disk');
-        $warnPos = strpos($output, 'Fast Flash');
-        $okPos = strpos($output, 'Healthy Disk');
-
-        $this->assertTrue($failPos !== false, 'Expected SMART fail disk in output');
-        $this->assertTrue($warnPos !== false, 'Expected NVMe warn disk in output');
-        $this->assertTrue($okPos !== false, 'Expected SMART ok disk in output');
-        $this->assertTrue($failPos < $warnPos && $warnPos < $okPos, 'Expected fail/warn/ok ordering across mixed disk kinds');
+        $this->assertOrderedStrings(
+            ['Failing Disk', 'Fast Flash', 'Healthy Disk'],
+            $output,
+            'Expected disk in output: ',
+            'Expected fail/warn/ok ordering across mixed disk kinds: '
+        );
         $this->assertStringContainsString('NVME', $output);
         $this->assertTrue(
             (bool) preg_match('/Fast Flash.*NVME.*61C.*0.*85/', $output),

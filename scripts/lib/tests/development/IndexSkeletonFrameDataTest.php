@@ -176,10 +176,9 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
-        $this->assertStringContainsString('<a href="#deluge"', $html);
-        $this->assertStringContainsString('title="Deluge - Torrent web UI"', $html);
-        $this->assertStringContainsString("loadFrame('deluge', 'deluge/')", $html);
-        $this->assertStringContainsString('<div id="deluge" class="tabs-container"></div>', $html);
+        foreach (['<a href="#deluge"', 'title="Deluge - Torrent web UI"', "loadFrame('deluge', 'deluge/')", '<div id="deluge" class="tabs-container"></div>'] as $needle) {
+            $this->assertStringContainsString($needle, $html);
+        }
     }
 
     public function testRemoteDisabledRenderAddsTorrentFramesFromProxyFragments(): void
@@ -199,12 +198,13 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
-        $this->assertStringContainsString('<a href="#qbittorrent"', $html);
-        $this->assertStringContainsString('title="qBittorrent - Torrent web UI"', $html);
-        $this->assertStringContainsString("loadFrame('qbittorrent', 'qbittorrent/')", $html);
-        $this->assertStringContainsString('<div id="qbittorrent" class="tabs-container"></div>', $html);
-        $this->assertStringContainsString('<a href="#deluge"', $html);
-        $this->assertStringContainsString("loadFrame('deluge', 'deluge/')", $html);
+        foreach (['qbittorrent', 'deluge'] as $frame) {
+            $this->assertStringContainsString('<a href="#'.$frame.'"', $html);
+            $this->assertStringContainsString("loadFrame('".$frame."', '".$frame."/')", $html);
+        }
+        foreach (['title="qBittorrent - Torrent web UI"', '<div id="qbittorrent" class="tabs-container"></div>'] as $needle) {
+            $this->assertStringContainsString($needle, $html);
+        }
     }
 
     public function testRemoteDisabledRenderAddsTorrentFramesFromLocalConfigDirs(): void
@@ -217,10 +217,9 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
-        $this->assertStringContainsString('<a href="#qbittorrent"', $html);
-        $this->assertStringContainsString("loadFrame('qbittorrent', 'qbittorrent/')", $html);
-        $this->assertStringContainsString('<a href="#deluge"', $html);
-        $this->assertStringContainsString("loadFrame('deluge', 'deluge/')", $html);
+        foreach (['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')", '<a href="#deluge"', "loadFrame('deluge', 'deluge/')"] as $needle) {
+            $this->assertStringContainsString($needle, $html);
+        }
     }
 
     public function testRemoteDisabledRenderAddsMediaStackFramesFromProxyFragment(): void
@@ -253,12 +252,9 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
-        $this->assertStringContainsString("loadFrame('sabnzbd', '/public-alice/sabnzbd/')", $html);
-        $this->assertStringContainsString("loadFrame('radarr', '/public-alice/radarr/')", $html);
-        $this->assertStringContainsString("loadFrame('prowlarr', '/public-alice/prowlarr/')", $html);
-        $this->assertStringContainsString("loadFrame('sonarr', '/public-alice/sonarr/')", $html);
-        $this->assertStringContainsString("loadFrame('lidarr', '/public-alice/lidarr/')", $html);
-        $this->assertStringContainsString("loadFrame('readarr', '/public-alice/readarr/')", $html);
+        foreach (['sabnzbd', 'radarr', 'prowlarr', 'sonarr', 'lidarr', 'readarr'] as $app) {
+            $this->assertStringContainsString("loadFrame('".$app."', '/public-alice/".$app."/')", $html);
+        }
         $this->assertStringContainsString("loadFrame('jellyfin', '/public-alice/jellyfin/web/index.html')", $html);
         $this->assertStringNotContainsString('<a href="#notebook"', $html);
     }

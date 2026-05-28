@@ -175,10 +175,9 @@ final class agentDiagnosticsCliTest extends TestCase
     {
         $default = (int) constant('PMSS_AGENT_DIAGNOSTICS_COMMAND_TIMEOUT_DEFAULT');
 
-        $this->assertSame($default, \pmssAgentDiagnosticsSpecTimeout([]));
-        $this->assertSame($default, \pmssAgentDiagnosticsSpecTimeout(['timeout' => 'bad']));
-        $this->assertSame($default, \pmssAgentDiagnosticsSpecTimeout(['timeout' => 0]));
-        $this->assertSame($default, \pmssAgentDiagnosticsSpecTimeout(['timeout' => $default + 1]));
+        foreach ([[], ['timeout' => 'bad'], ['timeout' => 0], ['timeout' => $default + 1]] as $spec) {
+            $this->assertSame($default, \pmssAgentDiagnosticsSpecTimeout($spec));
+        }
         $this->assertSame(1, \pmssAgentDiagnosticsSpecTimeout(['timeout' => '1']));
     }
 
@@ -196,20 +195,18 @@ final class agentDiagnosticsCliTest extends TestCase
 
     public function testSpecLabelDerivesStablePhpErrorLabels(): void
     {
-        $this->assertSame(
-            'checkUsers.php --json',
-            \pmssAgentDiagnosticsSpecLabel([
+        foreach ([
+            'checkUsers.php --json' => [
                 'path' => 'scripts/util/checkUsers.php',
                 'args' => ['--json'],
-            ])
-        );
-        $this->assertSame(
-            'userSetting.php view alice',
-            \pmssAgentDiagnosticsSpecLabel([
+            ],
+            'userSetting.php view alice' => [
                 'path' => 'scripts/userSetting.php',
                 'args' => ['view', 'alice'],
-            ])
-        );
+            ],
+        ] as $expected => $spec) {
+            $this->assertSame($expected, \pmssAgentDiagnosticsSpecLabel($spec));
+        }
     }
 
     private function makeScriptRoot(bool $brokenCheckUsers = false): string
