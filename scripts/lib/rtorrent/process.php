@@ -12,6 +12,7 @@
 
 require_once __DIR__.'/../pathSafety.php';
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/legacyDirectives.php';
 
 // Signal constants for systems without pcntl.
 if (!defined('SIGTERM')) {
@@ -409,20 +410,7 @@ function rtorrentCustomConfigFindLegacyDirectives(string $content): array
     }
 
     $matches = [];
-    foreach ([
-        'tracker_numwant',
-        'use_udp_trackers',
-        'port_range',
-        'check_hash',
-        'schedule',
-        'schedule_remove',
-        'load_start',
-        'load_start_verbose',
-        'execute',
-        'umask',
-        'hash_interval',
-        'hash_max_tries',
-    ] as $label) {
+    foreach (pmssRtorrentLegacyDirectiveNames() as $label) {
         $pattern = '/^\s*'.preg_quote($label, '/').'\s*=/m';
         if (preg_match($pattern, $content) === 1) {
             $matches[] = $label;

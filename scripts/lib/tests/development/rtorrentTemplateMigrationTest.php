@@ -125,4 +125,21 @@ class RtorrentTemplateMigrationTest extends TestCase
             \pmssRtorrentNormalizeLegacyTemplate($input)
         );
     }
+
+    /**
+     * The updater should rewrite or remove every directive in the shared catalog.
+     */
+    public function testNormalizerFollowsSharedLegacyDirectiveCatalog(): void
+    {
+        $input = '';
+        $expected = '';
+        foreach (\pmssRtorrentLegacyDirectiveCatalog() as $legacy => $rule) {
+            $input .= $legacy." = VALUE\n";
+            if ($rule['replacement'] !== null) {
+                $expected .= $rule['replacement']." = VALUE\n";
+            }
+        }
+
+        $this->assertEquals($expected, \pmssRtorrentNormalizeLegacyTemplate($input));
+    }
 }

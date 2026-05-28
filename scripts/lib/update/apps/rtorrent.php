@@ -24,6 +24,7 @@
 
 require_once __DIR__.'/remoteBinary.php';
 require_once __DIR__.'/../distro.php';
+require_once dirname(__DIR__, 2).'/rtorrent/legacyDirectives.php';
 
 /**
  * Resolve rtorrent/libtorrent targets by detected Debian major version.
@@ -75,55 +76,22 @@ function pmssRtorrentNormalizeLegacyTemplate(string $template): string
         array_pop($lines);
     }
 
-    $legacyMappings = [
-        [
-            'pattern' => '/^\s*tracker_numwant\s*=\s*(.+?)\s*$/',
-            'replacementPrefix' => 'trackers.numwant.set = ',
-        ],
-        [
-            'pattern' => '/^\s*use_udp_trackers\s*=\s*(.+?)\s*$/',
-            'replacementPrefix' => 'trackers.use_udp.set = ',
-        ],
-        [
-            'pattern' => '/^\s*port_range\s*=\s*(.+?)\s*$/',
-            'replacementPrefix' => 'network.port_range.set = ',
-        ],
-        [
-            'pattern' => '/^\s*check_hash\s*=\s*(.+?)\s*$/',
-            'replacementPrefix' => 'pieces.hash.on_completion.set = ',
-        ],
-        [
-            'pattern' => '/^\s*schedule\s*=\s*(.+?)\s*$/',
-            'replacementPrefix' => 'schedule2 = ',
-        ],
-        [
-            'pattern' => '/^\s*schedule_remove\s*=\s*(.+?)\s*$/',
-            'replacementPrefix' => 'schedule_remove2 = ',
-        ],
-        [
-            'pattern' => '/^\s*load_start\s*=\s*(.+?)\s*$/',
-            'replacementPrefix' => 'load.start = ',
-        ],
-        [
-            'pattern' => '/^\s*load_start_verbose\s*=\s*(.+?)\s*$/',
-            'replacementPrefix' => 'load.start_verbose = ',
-        ],
-        [
-            'pattern' => '/^\s*execute\s*=\s*(.+?)\s*$/',
-            'replacementPrefix' => 'execute2 = ',
-        ],
-    ];
-    $legacyRemovalPatterns = [
-        '/^\s*umask\s*=\s*.+?\s*$/',
-        '/^\s*hash_interval\s*=\s*.+?\s*$/',
-        '/^\s*hash_max_tries\s*=\s*.+?\s*$/',
-    ];
-
-    $inlineLegacyMappings = [
-        '/(?<![A-Za-z0-9_.])load_start_verbose(?==)/' => 'load.start_verbose',
-        '/(?<![A-Za-z0-9_.])load_start(?==)/' => 'load.start',
-        '/(?<![A-Za-z0-9_.])execute(?==)/' => 'execute2',
-    ];
+    $legacyMappings = [];
+    $legacyRemovalPatterns = [];
+    $inlineLegacyMappings = [];
+    foreach (pmssRtorrentLegacyDirectiveCatalog() as $legacy => $rule) {
+        if ($rule['replacement'] === null) {
+            $legacyRemovalPatterns[] = '/^\s*'.preg_quote($legacy, '/').'\s*=\s*.+?\s*$/';
+            continue;
+        }
+        $legacyMappings[] = [
+            'pattern' => '/^\s*'.preg_quote($legacy, '/').'\s*=\s*(.+?)\s*$/',
+            'replacementPrefix' => $rule['replacement'].' = ',
+        ];
+        if (isset($rule['inline'])) {
+            $inlineLegacyMappings['/(?<![A-Za-z0-9_.])'.preg_quote($legacy, '/').'(?==)/'] = $rule['inline'];
+        }
+    }
 
     $normalizeInlineAliases = static function (string $line) use ($inlineLegacyMappings): string {
         return (string) preg_replace(
