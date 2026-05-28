@@ -281,6 +281,8 @@ class CgroupUserConfigTest extends TestCase
             'testuser',
             '--apply',
             '--dry-run',
+            '--memory-high',
+            '999',
             '--memory-high=600',
             '--memory-max=900',
             '--cpu-weight=111',
@@ -288,6 +290,7 @@ class CgroupUserConfigTest extends TestCase
             '--device=/dev/sdb',
             '--io-profile=bulk',
             '--io-read-bw=/dev/sda:5M',
+            '--io-read-bw=/dev/sdb:6M',
             '--io-write-iops=/dev/sda:9',
         ]);
 
@@ -303,6 +306,7 @@ class CgroupUserConfigTest extends TestCase
             ."TasksMax=8192\n"
             ."[Planned IO properties]\n"
             ."IOReadBandwidthMax=/dev/sda 5M\n"
+            ."IOReadBandwidthMax=/dev/sdb 6M\n"
             ."IOWriteIOPSMax=/dev/sda 9\n"
             ."(dry-run or no --apply; not changing system)\n",
             $res['out']

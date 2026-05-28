@@ -11,7 +11,6 @@ namespace PMSS\Cgroup;
 require_once __DIR__ . '/SystemInterface.php';
 require_once __DIR__ . '/policy.php';
 require_once __DIR__ . '/../cli/helpText.php';
-require_once __DIR__ . '/../cli/optionParser.php';
 require_once __DIR__ . '/../systemdSliceProperties.php';
 require_once __DIR__ . '/../update/runtime/commands.php'; // for runStep
 
@@ -58,13 +57,21 @@ class Manager
 
         $user  = $args[0];
         $flags = array_slice($args, 1);
-        $inlineValueFlags = array_filter($flags, static function (string $flag): bool {
-            return strpos($flag, '--') === 0 && strpos($flag, '=') !== false;
-        });
-        $parsedFlags = \pmssParseCliTokens(
-            array_merge([$argv[0] ?? 'userConfigCgroup.php'], $inlineValueFlags),
-            ['__pmss-cgroup-inline-values-only']
-        );
+        $inlineOptions = [];
+        $ioSpecs = [];
+        foreach ($flags as $flag) {
+            if (strpos($flag, '--') !== 0 || ($separator = strpos($flag, '=')) === false) {
+                continue;
+            }
+
+            $name = substr($flag, 2, $separator - 2);
+            $value = substr($flag, $separator + 1);
+            if (isset(self::IO_CLI_PROPERTY_MAP[$name])) {
+                $ioSpecs[$name][] = $value;
+            } else {
+                $inlineOptions[$name] = $value;
+            }
+        }
         $uid   = $this->sys->getUid($user);
 
         if ($uid < 0) {
@@ -76,37 +83,26 @@ class Manager
         $mode  = $this->sys->getCgroupMode();
         echo "user=$user uid=$uid slice=$slice mode=$mode\n";
 
-        $flagSet = array_flip($flags);
         $opt = [];
-        $wantStatus = isset($flagSet['--status']);
-        $wantConfig = isset($flagSet['--config']);
-        $apply      = isset($flagSet['--apply']);
-        $dryRun     = isset($flagSet['--dry-run']);
-        $respectExisting = isset($flagSet['--respect-existing']);
-        $defaultsRequested = isset($flagSet['--defaults']);
-        $doWipe = isset($flagSet['--wipe']);
-        $device = (string) \pmssCliOptionString($parsedFlags, 'device', null, '', true);
-        $ioProfile = strtolower((string) \pmssCliOptionString($parsedFlags, 'io-profile', null, '', true));
-        $ioCostQos = (string) \pmssCliOptionString($parsedFlags, 'io-cost-qos', null, '', true);
-        $ioCostModel = (string) \pmssCliOptionString($parsedFlags, 'io-cost-model', null, '', true);
+        $wantStatus = in_array('--status', $flags, true);
+        $wantConfig = in_array('--config', $flags, true);
+        $apply      = in_array('--apply', $flags, true);
+        $dryRun     = in_array('--dry-run', $flags, true);
+        $respectExisting = in_array('--respect-existing', $flags, true);
+        $defaultsRequested = in_array('--defaults', $flags, true);
+        $doWipe = in_array('--wipe', $flags, true);
+        $device = (string) ($inlineOptions['device'] ?? '');
+        $ioProfile = strtolower((string) ($inlineOptions['io-profile'] ?? ''));
+        $ioCostQos = (string) ($inlineOptions['io-cost-qos'] ?? '');
+        $ioCostModel = (string) ($inlineOptions['io-cost-model'] ?? '');
         $ioPairs = [];
         $policyIoPairs = [];
         $ioCostWrites = [];
-        $optTargets = ['cpu-weight' => true, 'io-weight' => true, 'tasks-max' => true, 'memory-high' => true, 'memory-max' => true, 'cpu-quota-percent' => true, 'io-latency-ms' => true, 'cpu-profile' => true, 'mem-profile' => true, 'tasks-profile' => true];
-        $ioSpecs = [];
-        $optLowercase = ['cpu-profile' => true, 'mem-profile' => true, 'tasks-profile' => true];
 
-        foreach (array_keys($optTargets) as $name) {
-            $value = \pmssCliOptionString($parsedFlags, $name, null, null, true);
-            if ($value !== null) $opt[$name] = isset($optLowercase[$name]) ? strtolower($value) : $value;
-        }
-
-        // IO flags may repeat; collect them from raw tokens before canonical replay.
-        foreach ($inlineValueFlags as $flag) {
-            $separator = strpos($flag, '=');
-            $name = substr($flag, 2, $separator - 2);
-            if (!isset(self::IO_CLI_PROPERTY_MAP[$name])) continue;
-            $ioSpecs[$name][] = substr($flag, $separator + 1);
+        foreach (['cpu-weight', 'io-weight', 'tasks-max', 'memory-high', 'memory-max', 'cpu-quota-percent', 'io-latency-ms', 'cpu-profile', 'mem-profile', 'tasks-profile'] as $name) {
+            if (!array_key_exists($name, $inlineOptions)) continue;
+            $value = (string) $inlineOptions[$name];
+            $opt[$name] = strpos($name, '-profile') !== false ? strtolower($value) : $value;
         }
 
         foreach (self::IO_CLI_PROPERTY_MAP as $flagName => $propertyName) {
