@@ -11,20 +11,20 @@ class RuntimeCommandPathTest extends TestCase
         $this->pmssTrackEnvKeys(['PATH']);
     }
 
-    public function testCommandBinaryNameIsSafeAcceptsSimpleBinaryNames(): void
+    public function testCommandBinaryNameSafetyMatrix(): void
     {
-        $this->assertTrue(pmssCommandBinaryNameIsSafe('php'));
-        $this->assertTrue(pmssCommandBinaryNameIsSafe('python3.11'));
-        $this->assertTrue(pmssCommandBinaryNameIsSafe('seedbox-helper_test+1'));
-    }
-
-    public function testCommandBinaryNameIsSafeRejectsUnsafeNames(): void
-    {
-        $this->assertTrue(pmssCommandBinaryNameIsSafe('') === false);
-        $this->assertTrue(pmssCommandBinaryNameIsSafe('two words') === false);
-        $this->assertTrue(pmssCommandBinaryNameIsSafe('../php') === false);
-        $this->assertTrue(pmssCommandBinaryNameIsSafe('php;id') === false);
-        $this->assertTrue(pmssCommandBinaryNameIsSafe("php\nls") === false);
+        foreach ([
+            'php' => true,
+            'python3.11' => true,
+            'seedbox-helper_test+1' => true,
+            '' => false,
+            'two words' => false,
+            '../php' => false,
+            'php;id' => false,
+            "php\nls" => false,
+        ] as $binary => $expected) {
+            $this->assertSame($expected, pmssCommandBinaryNameIsSafe($binary), 'Unexpected binary safety result for '.$binary);
+        }
     }
 
     public function testBlockDeviceNameIsDataDeviceMatchesBaseStorageDevicesOnly(): void
@@ -55,21 +55,13 @@ class RuntimeCommandPathTest extends TestCase
         $this->assertEquals('', pmssCommandPath('pmss-safe-binary;id'));
     }
 
-    public function testCommandPathReturnsEmptyStringWhenBinaryMissing(): void
+    public function testCommandPathReturnsEmptyStringForUnavailableInputs(): void
     {
         putenv('PATH=/nonexistent');
 
-        $this->assertEquals('', pmssCommandPath('pmss-missing-binary'));
-    }
-
-    public function testCommandPathReturnsEmptyStringForBlankInput(): void
-    {
-        $this->assertEquals('', pmssCommandPath('   '));
-    }
-
-    public function testCommandPathRejectsShellBuiltinsWithoutExecutablePaths(): void
-    {
-        $this->assertEquals('', pmssCommandPath('cd'));
+        foreach (['pmss-missing-binary', '   ', 'cd'] as $binary) {
+            $this->assertEquals('', pmssCommandPath($binary));
+        }
     }
 
     public function testIopingAverageMsParsesReportedUnits(): void

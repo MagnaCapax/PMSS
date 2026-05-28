@@ -22,9 +22,7 @@ class UserCgroupCliProfilesCombinationsTest extends TestCase
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--device=/home', '--io-profile=bulk'], [
             'PMSS_HOME_DEVICE' => '/dev/pmssBULK',
         ]);
-        $this->assertStringContainsString('IOWeight=500', $out);
-        $this->assertStringContainsString('CPUWeight=300', $out);
-        $this->assertStringContainsString('TasksMax=8192', $out);
+        $this->assertStringContainsAllStrings(['IOWeight=500', 'CPUWeight=300', 'TasksMax=8192'], $out);
     }
 
     public function testCombinedNumericProfilesMatchSnapshot(): void

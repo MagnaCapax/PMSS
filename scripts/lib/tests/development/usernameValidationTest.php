@@ -8,21 +8,18 @@ class UsernameValidationTest extends TestCase
 {
     public function testValidUsernamesPass(): void
     {
-        $valid = ['a', 'abc', 'user123', 'abcdefg8'];
-        foreach ($valid as $name) {
+        foreach (['a', 'abc', 'user123', 'abcdefg8'] as $name) {
             $this->assertTrue(\pmssValidateUsername($name), 'Expected valid username: '.$name);
         }
     }
 
     public function testCreateUsernamesRequireMinLengthThree(): void
     {
-        $valid = ['abc', 'user123', 'abcdefg8'];
-        foreach ($valid as $name) {
+        foreach (['abc', 'user123', 'abcdefg8'] as $name) {
             $this->assertTrue(\pmssUsernameIsValidForCreate($name), 'Expected create-valid username: '.$name);
         }
 
-        $invalid = ['a', 'ab', '1user', 'user-name', 'User123', 'toolong89x'];
-        foreach ($invalid as $name) {
+        foreach (['a', 'ab', '1user', 'user-name', 'User123', 'toolong89x'] as $name) {
             $this->assertTrue(!\pmssUsernameIsValidForCreate($name), 'Expected create-invalid username: '.$name);
         }
     }
@@ -48,17 +45,15 @@ class UsernameValidationTest extends TestCase
 
     public function testCreateValidationErrorClassifiesInvalidInputs(): void
     {
-        $cases = [
-            ['seedbox@anyemail.com', 'email_not_allowed'],
-            ['1user', 'invalid_format'],
-            ['ab', 'too_short'],
-            ['seedbox', 'reserved'],
-        ];
-
-        foreach ($cases as $case) {
-            $error = \pmssUsernameCreateValidationError($case[0]);
-            $this->assertTrue(is_array($error), 'Expected error payload for username: '.$case[0]);
-            $this->assertEquals($case[1], $error['code'], 'Unexpected error code for username: '.$case[0]);
+        foreach ([
+            'seedbox@anyemail.com' => 'email_not_allowed',
+            '1user' => 'invalid_format',
+            'ab' => 'too_short',
+            'seedbox' => 'reserved',
+        ] as $name => $code) {
+            $error = \pmssUsernameCreateValidationError($name);
+            $this->assertTrue(is_array($error), 'Expected error payload for username: '.$name);
+            $this->assertEquals($code, $error['code'], 'Unexpected error code for username: '.$name);
         }
 
         $this->assertEquals(null, \pmssUsernameCreateValidationError('abc123'));
@@ -75,15 +70,8 @@ class UsernameValidationTest extends TestCase
 
     public function testUsernameNormalizeIfValidReturnsCanonicalUsernames(): void
     {
-        $cases = [
-            [' User1 ', 'user1'],
-            ['abc123', 'abc123'],
-            ['user-name', null],
-            ['', null],
-        ];
-
-        foreach ($cases as $case) {
-            $this->assertEquals($case[1], \pmssUsernameNormalizeIfValid($case[0]));
+        foreach ([' User1 ' => 'user1', 'abc123' => 'abc123', 'user-name' => null, '' => null] as $name => $expected) {
+            $this->assertEquals($expected, \pmssUsernameNormalizeIfValid($name));
         }
     }
 

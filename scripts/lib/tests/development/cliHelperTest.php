@@ -43,22 +43,12 @@ class CliHelperTest extends TestCase
         $this->assertEquals(['script.php', 'alice'], \pmssCliArgvWithoutTokens(['script.php', '--debug', 'alice'], ['--debug']));
     }
 
-    public function testSupportsSpaceSeparatedLongValues(): void
+    public function testSupportsLongAndShortOptionValues(): void
     {
-        $parsed = \pmssParseCliTokens(['script.php', '--limit', '64']);
-        $this->assertEquals('64', \pmssCliOption($parsed, 'limit', 'l'));
-    }
-
-    public function testSupportsSpaceSeparatedShortValues(): void
-    {
-        $parsed = \pmssParseCliTokens(['script.php', '-l', '64']);
-        $this->assertEquals('64', \pmssCliOption($parsed, 'limit', 'l'));
-    }
-
-    public function testSupportsShortOptionWithAttachedValue(): void
-    {
-        $parsed = \pmssParseCliTokens(['script.php', '-l64']);
-        $this->assertEquals('64', \pmssCliOption($parsed, 'limit', 'l'));
+        foreach ([['script.php', '--limit', '64'], ['script.php', '-l', '64'], ['script.php', '-l64']] as $argv) {
+            $parsed = \pmssParseCliTokens($argv);
+            $this->assertEquals('64', \pmssCliOption($parsed, 'limit', 'l'));
+        }
     }
 
     public function testDoesNotConsumeFollowingOptionAsValue(): void
@@ -69,18 +59,16 @@ class CliHelperTest extends TestCase
         $this->assertTrue(\pmssCliOption($parsed, 'v'));
     }
 
-    public function testDeclaredLongValueOptionConsumesDashedToken(): void
+    public function testDeclaredValueOptionConsumesDashedToken(): void
     {
-        $parsed = \pmssParseCliTokens(['script.php', '--json', '-h'], ['json']);
-        $this->assertEquals('-h', \pmssCliOption($parsed, 'json'));
-        $this->assertTrue(\pmssCliOption($parsed, 'help', 'h', false) === false);
-    }
-
-    public function testDeclaredShortValueOptionConsumesDashedToken(): void
-    {
-        $parsed = \pmssParseCliTokens(['script.php', '-j', '--help'], ['j']);
-        $this->assertEquals('--help', \pmssCliOption($parsed, 'json', 'j'));
-        $this->assertTrue(\pmssCliOption($parsed, 'help', 'h', false) === false);
+        foreach ([
+            [['script.php', '--json', '-h'], ['json'], null, '-h'],
+            [['script.php', '-j', '--help'], ['j'], 'j', '--help'],
+        ] as $case) {
+            $parsed = \pmssParseCliTokens($case[0], $case[1]);
+            $this->assertEquals($case[3], \pmssCliOption($parsed, 'json', $case[2]));
+            $this->assertTrue(\pmssCliOption($parsed, 'help', 'h', false) === false);
+        }
     }
 
     public function testDeclaredValueModeKeepsUndeclaredLongOptionsBoolean(): void
