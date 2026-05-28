@@ -361,6 +361,41 @@ codex_make_temp_workspace() {
 	mktemp -d "${TMPDIR:-/tmp}/${prefix}-XXXXXXXX"
 }
 
+# Filter candidates to entries this process can claim atomically.
+codex_scope_claim_filter_candidates() {
+	local claims_dir="$1" candidates="$2" claimed_name="$3" claimed_count_name="$4" orig_count_name="$5" stale_minutes="${6:-480}"
+	local filtered f key
+	local -n claimed_ref="$claimed_name"
+
+	printf -v "$orig_count_name" '%s' 0
+	printf -v "$claimed_count_name" '%s' 0
+	[[ -n "$claims_dir" && "$claims_dir" != "/" ]] || return 0
+	mkdir -p "$claims_dir" 2>/dev/null || true
+	[[ -d "$claims_dir" ]] || return 0
+	find "$claims_dir" -mindepth 1 -maxdepth 1 -mmin +"$stale_minutes" -type d -exec rm -rf -- {} + 2>/dev/null || true
+	[[ -s "$candidates" ]] || return 0
+
+	filtered="${candidates}.filtered"
+	printf -v "$orig_count_name" '%s' "$(wc -l <"$candidates" | tr -d ' ')"
+	: >"$filtered"
+	while IFS= read -r f; do
+		[[ -n "$f" ]] || continue
+		key="${f//\//_}"
+		mkdir "$claims_dir/$key" 2>/dev/null || continue
+		printf '%s\n' "$f" >>"$filtered"
+		claimed_ref+=("$key")
+	done <"$candidates"
+	mv "$filtered" "$candidates"
+	printf -v "$claimed_count_name" '%s' "$(wc -l <"$candidates" | tr -d ' ')"
+}
+
+codex_scope_claim_release() {
+	local claims_dir="$1" f
+	shift || true
+	[[ -n "$claims_dir" && "$claims_dir" != "/" ]] || return 0
+	for f in "$@"; do rmdir "$claims_dir/$f" 2>/dev/null || true; done
+}
+
 # Assemble and invoke a standard codex-run prompt command.
 codex_run_prompt() {
 	local here="$1" prompt_file="$2" outdir="$3" repo_root="$4" agent="$5" exec_cmd="$6" dry_run="$7" autocommit="$8"
