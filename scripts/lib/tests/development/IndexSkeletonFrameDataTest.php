@@ -68,6 +68,16 @@ class IndexSkeletonFrameDataTest extends TestCase
         );
     }
 
+    public function testIndexUsesBundledLocalFrameDefinitionsOnly(): void
+    {
+        $source = $this->pmssReadRepoFile('etc/skel/www/index.php');
+
+        $this->pmssAssertStringNotContainsString('gui'.'Frames.php', $source);
+        $this->pmssAssertStringNotContainsString('$frames'.'Code', $source);
+        $this->pmssAssertStringNotContainsString('eval'.'($frames'.'Code)', $source);
+        $this->assertStringContainsString('$useLocalFrames = true;', $source);
+    }
+
     public function testLocalFallbackWelcomeUrlCarriesSerializedQuotaSnapshot(): void
     {
         $this->loadIndexFrameHelpers();
@@ -321,7 +331,7 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $source = $this->pmssReadRepoFile('etc/skel/www/index.php');
         $start = strpos($source, '/** Detect frames that must open outside the iframe tab container. */');
-        $end = strpos($source, '// Remote frames can be disabled explicitly');
+        $end = strpos($source, 'if ($useLocalFrames) {');
         $this->assertTrue($start !== false && $end !== false && $end > $start, 'index.php helper extraction markers changed');
 
         $fixture = $this->pmssMakeTempPath('pmss-index-frame-helpers-', '.php');
