@@ -132,6 +132,19 @@ $homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
             margin-top: 8px;
             font-weight: bold;
         }
+        .pmss-traffic-disclosure {
+            margin-top: 8px;
+            padding: 8px 10px;
+            border: 1px solid #d8a55a;
+            background: #fff6e5;
+            color: #5f3b00;
+            line-height: 1.45;
+        }
+        .pmss-traffic-disclosure-active {
+            border-color: #cc8f8f;
+            background: #fff1f1;
+            color: #7a1a1a;
+        }
     </style>
     <script type="text/javascript">
         var pmssActionNoticeTimer = null;
@@ -545,7 +558,7 @@ function pmssWelcomePositiveIntegerFileRead($path) {
 /**
  * Resolve baseline and currently effective per-account bandwidth caps.
  *
- * @return array{defaultCapMbit:int,effectiveCapMbit:int,isReduced:bool}
+ * @return array{defaultCapMbit:int,effectiveCapMbit:int,isReduced:bool,throttleFileExists:bool,throttleFileMtime:?int}
  */
 function pmssWelcomeTrafficBandwidthStateBuild($throttlePath) {
     $defaultCapMbit = pmssWelcomeTrafficDefaultCapMbitRead();
@@ -556,11 +569,26 @@ function pmssWelcomeTrafficBandwidthStateBuild($throttlePath) {
         $effectiveCapMbit = $parsedCap;
     }
 
+    $throttleFileMtime = $parsedCap !== null ? pmssWelcomeRegularFileMtimeRead($throttlePath) : null;
     return array(
         'defaultCapMbit' => $defaultCapMbit,
         'effectiveCapMbit' => $effectiveCapMbit,
         'isReduced' => $effectiveCapMbit < $defaultCapMbit,
+        'throttleFileExists' => $parsedCap !== null,
+        'throttleFileMtime' => $throttleFileMtime,
     );
+}
+
+/**
+ * Read a regular file mtime without following symlinks.
+ */
+function pmssWelcomeRegularFileMtimeRead($path) {
+    if (!is_string($path) || $path === '' || !is_file($path) || is_link($path)) {
+        return null;
+    }
+
+    $mtime = @filemtime($path);
+    return is_int($mtime) && $mtime > 0 ? $mtime : null;
 }
 
 /**
@@ -614,6 +642,75 @@ function pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingSe
 
     return '<span style="font-size: 0.82em; color: #7a1a1a;">Current effective: '.$effectiveText.' Mbps (reduced)</span>'
         . '<br /><span style="font-size: 0.82em;"><a href="'.htmlspecialchars($upgradeUrl, ENT_QUOTES, 'UTF-8').'" target="_blank">Need more bandwidth? Upgrade your plan.</a></span>';
+}
+
+/**
+ * Build customer-visible traffic throttle status for capped accounts.
+ */
+function pmssWelcomeTrafficDisclosureHtmlBuild($trafficPercent, $trafficBandwidthState, $billingServiceId) {
+    $usageText = number_format((float) $trafficPercent, 1);
+    $lines = array(
+        pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId),
+        'Usage: <b>'.$usageText.'%</b> of monthly traffic cap.',
+    );
+
+    $isReduced = !empty($trafficBandwidthState['isReduced']);
+    $effectiveCapMbit = isset($trafficBandwidthState['effectiveCapMbit']) && is_numeric($trafficBandwidthState['effectiveCapMbit'])
+        ? max(0, (int) $trafficBandwidthState['effectiveCapMbit'])
+        : 0;
+    $throttleFileMtime = isset($trafficBandwidthState['throttleFileMtime']) && is_numeric($trafficBandwidthState['throttleFileMtime'])
+        ? (int) $trafficBandwidthState['throttleFileMtime']
+        : null;
+    $capText = number_format($effectiveCapMbit).' Mbps';
+
+    if ($isReduced && (float) $trafficPercent > 100.0) {
+        $overagePercent = max(0.0, (float) $trafficPercent - 100.0);
+        $lines[] = '<b>Throttled to '.$capText.'</b> - usage is '.number_format($overagePercent, 1).'% over cap. Throttle lift requires 3 consecutive days under cap.';
+    } elseif ($isReduced) {
+        $cooldown = pmssWelcomeTrafficCooldownTextBuild($throttleFileMtime);
+        $lines[] = '<b>Throttle cooldown active</b> - current ceiling is '.$capText.'; '.$cooldown;
+    } elseif ((float) $trafficPercent >= 70.0) {
+        $lines[] = '<b>Approaching monthly traffic cap</b> - review the graduated throttling policy before crossing the cap.';
+    }
+
+    $lines[] = 'Policy: <a href="https://wiki.pulsedmedia.com/index.php/Bandwidth#Graduated_throttling" target="_blank">Graduated throttling</a>.';
+    $class = $isReduced ? 'pmss-traffic-disclosure pmss-traffic-disclosure-active' : 'pmss-traffic-disclosure';
+
+    return '<div class="'.$class.'">'.implode('<br />', $lines).'</div>';
+}
+
+/**
+ * Explain the under-cap cooldown without depending on customer-readable timers.
+ */
+function pmssWelcomeTrafficCooldownTextBuild($throttleFileMtime) {
+    $period = 3 * 24 * 60 * 60;
+    if (!is_int($throttleFileMtime) || $throttleFileMtime <= 0) {
+        return 'it lifts after 3 consecutive days under cap.';
+    }
+
+    $remaining = $period - max(0, time() - $throttleFileMtime);
+    if ($remaining <= 0) {
+        return 'cooldown is ready to lift on the next traffic-limit cron pass.';
+    }
+
+    return 'remaining under-cap cooldown: about '.pmssWelcomeDurationCompact($remaining).'.';
+}
+
+/**
+ * Format a short customer-facing duration for throttle cooldowns.
+ */
+function pmssWelcomeDurationCompact($seconds) {
+    $seconds = max(0, (int) $seconds);
+    if ($seconds >= 86400) {
+        $days = (int) ceil($seconds / 86400);
+        return $days.' day'.($days === 1 ? '' : 's');
+    }
+    if ($seconds >= 3600) {
+        $hours = (int) ceil($seconds / 3600);
+        return $hours.' hour'.($hours === 1 ? '' : 's');
+    }
+    $minutes = (int) max(1, ceil($seconds / 60));
+    return $minutes.' minute'.($minutes === 1 ? '' : 's');
 }
 
 function pmssWelcomeMetricSectionHtmlBuild($title, $bodyHtml) {
@@ -893,9 +990,9 @@ function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = nul
         return;
     }
 
-    $bandwidthNote = pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId);
     $trafficUsedRaw = pmssWelcomeTrafficMonthValueRead($trafficData);
     if ($trafficUsedRaw === null) {
+        $bandwidthNote = pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId);
         echo pmssWelcomeMetricSectionHtmlBuild('Traffic Info', "\nTraffic usage data is unavailable right now.<br />\n<div style=\"margin-top: 3px; line-height: 1.35;\">{$bandwidthNote}</div>\n");
         return;
     }
@@ -911,13 +1008,16 @@ function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = nul
         : '';
 
     if ($trafficLimit <= 0) {
+        $bandwidthNote = pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId);
         echo pmssWelcomeMetricSectionHtmlBuild('Traffic Info', "\nTraffic used (30 days): {$trafficUsed}<br />\nTraffic limit: Unlimited{$inboundLine}{$ratioLine}<br />\n<div style=\"margin-top: 3px; line-height: 1.35;\">{$bandwidthNote}</div>\nThis is rolling past 30 days, <a href=\"https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/\" target=\"_blank\">read more</a>.\n");
         return;
     }
 
     $bonusTraffic = max(0, (int) $bonusTraffic);
     $limitTotal = $trafficLimit + $bonusTraffic;
-    $percent = pmssWelcomePercent($trafficUsedRaw / 1024, $limitTotal, 0);
+    $trafficUsedGiB = $trafficUsedRaw / 1024;
+    $percent = pmssWelcomePercent($trafficUsedGiB, $limitTotal, 0);
+    $trafficDisclosure = pmssWelcomeTrafficDisclosureHtmlBuild(pmssWelcomePercent($trafficUsedGiB, $limitTotal, 1), $trafficBandwidthState, $billingServiceId);
 
     $warning = $percent > 100
         ? '<br /><b style="color: red;">OVER TRAFFIC LIMIT WARNING - REDUCED BANDWIDTH</b><br />You are beyond your traffic limit. Consider upgrading your plan or adding extra traffic.<br />Datacenter external outbound (TO internet) bandwidth limited to 100 Mbps. Datacenter internal and inbound bandwidth is unrestricted.'
@@ -927,7 +1027,7 @@ function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = nul
     $usageLine = 'Used: '.$trafficUsed.' / Limit: '.number_format($limitTotal).' GiB (30-day window)';
     $gauge = createGauge($titleText, $titleText . $bonusLine, $percent);
 
-    echo pmssWelcomeMetricSectionHtmlBuild('Traffic Info', "\n{$usageLine}<br />\n{$gauge}\n{$warning}\n<div style=\"margin-top: 3px; line-height: 1.35;\">{$bandwidthNote}</div>\n{$inboundLine}{$ratioLine}\nThis is rolling past 30 days, <a href=\"https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/\" target=\"_blank\">read more</a>.\n");
+    echo pmssWelcomeMetricSectionHtmlBuild('Traffic Info', "\n{$usageLine}<br />\n{$gauge}\n{$warning}\n{$trafficDisclosure}\n{$inboundLine}{$ratioLine}\nThis is rolling past 30 days, <a href=\"https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/\" target=\"_blank\">read more</a>.\n");
 }
 
 function createStackedGauge($titleText, $footerText, $percent, $segments) {

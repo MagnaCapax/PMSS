@@ -313,6 +313,47 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $this->pmssAssertStringNotContainsString('Undefined', $output);
     }
 
+    public function testWelcomeTrafficSectionShowsApproachDisclosure(): void
+    {
+        $output = $this->runWelcomeUsageScript(
+            'ob_start(); trafficCreateSection(array("raw" => array("month" => 716800)), 1000); echo ob_get_clean();',
+            '2>&1'
+        );
+
+        $this->assertStringContainsString('Usage: <b>70.0%</b> of monthly traffic cap.', $output);
+        $this->assertStringContainsString('Approaching monthly traffic cap', $output);
+        $this->assertStringContainsString('Bandwidth#Graduated_throttling', $output);
+        $this->pmssAssertStringNotContainsString('Undefined', $output);
+    }
+
+    public function testWelcomeTrafficSectionShowsActiveThrottleDisclosure(): void
+    {
+        $state = array('defaultCapMbit' => 100, 'effectiveCapMbit' => 25, 'isReduced' => true);
+        $output = $this->runWelcomeUsageScript(
+            'ob_start(); trafficCreateSection(array("raw" => array("month" => 1536000)), 1000, null, 0, '.var_export($state, true).'); echo ob_get_clean();',
+            '2>&1'
+        );
+
+        $this->assertStringContainsString('Throttled to 25 Mbps', $output);
+        $this->assertStringContainsString('50.0% over cap', $output);
+        $this->assertStringContainsString('Throttle lift requires 3 consecutive days under cap.', $output);
+        $this->pmssAssertStringNotContainsString('Undefined', $output);
+    }
+
+    public function testWelcomeTrafficSectionShowsCooldownDisclosure(): void
+    {
+        $state = array('defaultCapMbit' => 100, 'effectiveCapMbit' => 25, 'isReduced' => true, 'throttleFileMtime' => time() - 86400);
+        $output = $this->runWelcomeUsageScript(
+            'ob_start(); trafficCreateSection(array("raw" => array("month" => 921600)), 1000, null, 0, '.var_export($state, true).'); echo ob_get_clean();',
+            '2>&1'
+        );
+
+        $this->assertStringContainsString('Throttle cooldown active', $output);
+        $this->assertStringContainsString('current ceiling is 25 Mbps', $output);
+        $this->assertStringContainsString('remaining under-cap cooldown: about 2 days', $output);
+        $this->pmssAssertStringNotContainsString('Undefined', $output);
+    }
+
     public function testWelcomeMemorySectionSnapshots(): void
     {
         $fixture = $this->makeWelcomeUsageFixture();
