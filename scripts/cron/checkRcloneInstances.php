@@ -6,7 +6,7 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
-require_once __DIR__.'/../lib/userLifecycle.php';
+require_once __DIR__.'/../lib/user/watchdog.php';
 pmssUserWatchdogRunService('Rclone', 'rcloneEnable', ['rclone'], 'rclone stopped due to suspension', [[
     'processName' => 'rclone',
     'command' => static function (string $thisUser): string {

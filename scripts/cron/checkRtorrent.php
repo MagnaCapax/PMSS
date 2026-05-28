@@ -39,7 +39,7 @@ require_once __DIR__.'/../lib/rtorrentConfig.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
 require_once __DIR__.'/../lib/user/traffic.php';
 
-require_once __DIR__.'/../lib/userLifecycle.php';
+require_once __DIR__.'/../lib/user/watchdog.php';
 
 $debug = pmssCliArgvHasToken($argv ?? null, '--debug');
 

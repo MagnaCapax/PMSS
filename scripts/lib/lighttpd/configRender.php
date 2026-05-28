@@ -5,7 +5,7 @@
  * @license GPL-3.0-only
  */
 
-require_once __DIR__.'/../userLifecycle.php';
+require_once __DIR__.'/../user/identity.php';
 require_once __DIR__.'/userFileWrite.php';
 
 function pmssClampLighttpdBandwidthLimits(string $config): string

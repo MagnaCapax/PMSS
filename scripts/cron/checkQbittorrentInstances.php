@@ -6,7 +6,7 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
-require_once __DIR__.'/../lib/userLifecycle.php';
+require_once __DIR__.'/../lib/user/watchdog.php';
 pmssUserWatchdogRunService('qBittorrent', 'qbittorrentEnable', ['qbittorrent-nox'], 'qbittorrent-nox stopped due to suspension', [
     ['processName' => 'qbittorrent-nox', 'serviceLabel' => 'qBittorrent', 'command' => static function (string $thisUser): string {
         return pmssUserWatchdogSuCommand($thisUser, 'cd ~; nohup qbittorrent-nox -d >> /dev/null 2>&1 &');

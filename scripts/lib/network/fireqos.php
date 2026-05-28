@@ -5,7 +5,7 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
-require_once __DIR__.'/../userLifecycle.php';
+require_once __DIR__.'/../user/identity.php';
 require_once __DIR__.'/../runtime.php';
 
 function networkBuildFireqosConfig(array $networkConfig, array $users, array $localnets): string

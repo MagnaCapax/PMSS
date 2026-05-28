@@ -11,8 +11,8 @@
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/runtime.php';
 require_once '/scripts/lib/user/log.php';
-require_once '/scripts/lib/userLifecycle.php';
 require_once '/scripts/lib/user/userConfigStore.php';
+require_once '/scripts/lib/user/watchdog.php';
 
 $logger = new Logger(__FILE__);
 // Mirror messages to the legacy logfile when stdout is interactive.
