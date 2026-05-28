@@ -56,6 +56,29 @@ EOF
 ASSIST_DIR="$HERE/assistants"
 default_agent="${PMSS_AGENTIC_DEFAULT_AGENT:-codex}"
 OUTDIR="$(codex_make_temp_workspace pmss-refactor-codex)"
+
+# Parallel-instance scope lock (operator directive 2026-05-28).
+# Prevents the rebase-race that lost PMSS commit 584e6499 (6 files / 856 LOC)
+# to f02777f1 (3 files / 347 LOC) by ensuring two instances never pick the
+# same candidate file. Each instance atomically claims candidate files via
+# mkdir (O_CREAT|O_EXCL semantics) in PMSS_REFACTOR_CLAIMS_DIR. Failed claims
+# = file already owned by another instance = skip. Stale claims (>8h, codex
+# session timeout) are cleaned at start. On exit, this instance's claims are
+# released so the next launch sees a clean slate.
+CLAIMS_DIR="${PMSS_REFACTOR_CLAIMS_DIR:-/tmp/pmss-refactor-claims}"
+mkdir -p "$CLAIMS_DIR" 2>/dev/null || true
+# Cleanup stale claims older than 8h (codex-run timeout). Self-heals after
+# crashed sessions without manual intervention.
+find "$CLAIMS_DIR" -mindepth 1 -maxdepth 1 -mmin +480 -type d -exec rm -rf {} + 2>/dev/null || true
+# Track what THIS instance claims for cleanup on exit. Bash EXIT trap.
+declare -a PMSS_REFACTOR_CLAIMED=()
+pmss_refactor_release_claims() {
+	local f
+	for f in "${PMSS_REFACTOR_CLAIMED[@]}"; do
+		rmdir "$CLAIMS_DIR/$f" 2>/dev/null || true
+	done
+}
+trap pmss_refactor_release_claims EXIT
 COMMITS_SUMMARY="$OUTDIR/commits-summary.txt"
 COMMITS_FILES="$OUTDIR/commits-files.txt"
 CANDIDATES="$OUTDIR/candidate-files.txt"
@@ -189,6 +212,27 @@ if [[ "$dry_run" != "1" ]] && printf '%s' "$custom_prompt" | grep -qE 'refactor\
 		sort -rn | head -n "$WHOLE_N" | awk '{print $2}'; } >>"$CANDIDATES" || true
 	sort -u "$CANDIDATES" -o "$CANDIDATES" 2>/dev/null || true
 	echo "[agentic-refactor] whole-codebase mode: added up to $WHOLE_N largest runtime PHP files to candidates" >&1
+fi
+
+# Parallel-instance scope claim: filter candidate list to files this instance
+# can claim atomically. Files already claimed by parallel instances are
+# skipped, ensuring each candidate file belongs to AT MOST ONE active session.
+if [[ "$dry_run" != "1" && -s "$CANDIDATES" ]]; then
+	PMSS_REFACTOR_FILTERED="$OUTDIR/candidate-files.filtered.txt"
+	PMSS_REFACTOR_ORIG_COUNT=$(wc -l <"$CANDIDATES" | tr -d ' ')
+	: >"$PMSS_REFACTOR_FILTERED"
+	while IFS= read -r pmss_refactor_f; do
+		[[ -n "$pmss_refactor_f" ]] || continue
+		# Path-safe claim key (no slashes).
+		pmss_refactor_key=${pmss_refactor_f//\//_}
+		if mkdir "$CLAIMS_DIR/$pmss_refactor_key" 2>/dev/null; then
+			printf '%s\n' "$pmss_refactor_f" >>"$PMSS_REFACTOR_FILTERED"
+			PMSS_REFACTOR_CLAIMED+=("$pmss_refactor_key")
+		fi
+	done <"$CANDIDATES"
+	mv "$PMSS_REFACTOR_FILTERED" "$CANDIDATES"
+	PMSS_REFACTOR_CLAIMED_COUNT=$(wc -l <"$CANDIDATES" | tr -d ' ')
+	echo "[agentic-refactor] scope-claim: claimed $PMSS_REFACTOR_CLAIMED_COUNT of $PMSS_REFACTOR_ORIG_COUNT candidates (others held by parallel instances)" >&1
 fi
 
 # Ensure advisory complexity snapshots exist (best-effort).
