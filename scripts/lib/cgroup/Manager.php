@@ -259,7 +259,7 @@ class Manager
 
                 $applyFailed = false;
                 foreach ($steps as $step) {
-                    $applyFailed = $this->runApplyStep($step[0], $step[1]) !== 0 || $applyFailed;
+                    $applyFailed = (int) call_user_func($this->stepRunner, $step[0], $step[1]) !== 0 || $applyFailed;
                 }
 
                 if ($applyFailed) {
@@ -325,12 +325,6 @@ class Manager
         return $props;
     }
 
-    /** Run one cgroup apply command and return the command status for callers. */
-    private function runApplyStep(string $description, string $command): int
-    {
-        return (int) call_user_func($this->stepRunner, $description, $command);
-    }
-
     /**
      * Reject malformed CLI values before they reach systemctl.
      */
@@ -347,7 +341,7 @@ class Manager
         }
 
         foreach (['io-cost-qos' => $ioCostQos, 'io-cost-model' => $ioCostModel] as $flagName => $value) {
-            if (!$this->isValidIoCostSetting($value)) {
+            if ($value !== '' && (strpos($value, "\0") !== false || strpos($value, "\n") !== false || strpos($value, "\r") !== false)) {
                 return 'Invalid --'.$flagName.' value: newline and NUL bytes are not allowed';
             }
         }
@@ -574,13 +568,6 @@ class Manager
         }
     }
 
-    /** Validate free-form io.cost setting strings before shell execution. */
-    private function isValidIoCostSetting(string $value): bool
-    {
-        return $value === ''
-            || (strpos($value, "\0") === false && strpos($value, "\n") === false && strpos($value, "\r") === false);
-    }
-
     /**
      * Build io.cost write operations for qos/model with scheduler safeguards.
      *
@@ -625,11 +612,13 @@ class Manager
             if ($setting === '') {
                 continue;
             }
-            $normalized = $this->normalizeIoCostWriteValue($setting, $majorMinor);
-            if ($normalized === null) {
+            $majorMinorMatch = [];
+            $hasMajorMinor = preg_match('/^([0-9]+:[0-9]+)\s+/', $setting, $majorMinorMatch) === 1;
+            if ($hasMajorMinor && $majorMinorMatch[1] !== $majorMinor) {
                 $messages[] = '[WARN] io.cost skipped: invalid '.$fileName.' setting';
                 continue;
             }
+            $normalized = $hasMajorMinor ? $setting : $majorMinor.' '.$setting;
 
             $writes[] = ['path' => '/sys/fs/cgroup/'.$fileName, 'value' => $normalized];
             $slicePath = '/sys/fs/cgroup/user.slice/'.$slice.'/'.$fileName;
@@ -678,18 +667,6 @@ class Manager
         }
 
         return null;
-    }
-
-    /** Prefix plain nested keys with the resolved major:minor device token. */
-    private function normalizeIoCostWriteValue(string $setting, string $majorMinor): ?string
-    {
-        if ($setting === '') {
-            return null;
-        }
-        if (preg_match('/^([0-9]+:[0-9]+)\s+/', $setting, $matches) === 1) {
-            return $matches[1] === $majorMinor ? $setting : null;
-        }
-        return $majorMinor.' '.$setting;
     }
 
     /** Build a shell-safe writer command for cgroup io.cost files. */

@@ -406,8 +406,10 @@ class CgroupUserConfigTest extends TestCase
 
     public function testIoCostRejectsControlCharacters()
     {
-        $res = $this->runMgr(['testuser', "--io-cost-qos=enable=1\nctrl=user"]);
-        $this->assertEquals(2, $res['rc']);
+        foreach (['--io-cost-qos', '--io-cost-model'] as $flag) {
+            $res = $this->runMgr(['testuser', $flag."=enable=1\nctrl=user"]);
+            $this->assertEquals(2, $res['rc']);
+        }
     }
 
     // -- Profile Tests --
