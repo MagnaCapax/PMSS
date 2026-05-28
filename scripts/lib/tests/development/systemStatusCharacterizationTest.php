@@ -341,17 +341,27 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertEquals(['ok' => 2, 'warn' => 1, 'err' => 1], $summary);
     }
 
-    public function testStatusJsonEncodeSubstitutesInvalidUtf8(): void
+    public function testStatusEmitJsonSubstitutesInvalidUtf8(): void
     {
-        $json = pmssStatusJsonEncode([
-            'results' => [
-                pmssStatus('bin.php', 'OK', "bad\xB1detail"),
-            ],
-        ]);
+        $script = 'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'
+            .'exit(pmssStatusEmit('
+            .'[pmssStatus("bin.php", "OK", "ready")],'
+            .'"PMSS Status",'
+            .'true,'
+            .'["results" => [pmssStatus("bin.php", "OK", "bad\xB1detail")]],'
+            .'null'
+            .'));';
 
-        $this->assertStringContainsString('"results"', $json);
-        $this->assertStringContainsString('\\ufffd', $json);
-        $this->assertEquals(JSON_ERROR_NONE, json_last_error());
+        $command = $this->pmssExecShellCommandWithTempStderr(
+            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
+            [],
+            'pmss-status-stderr-'
+        );
+
+        $this->assertEquals(0, $command['result']['rc']);
+        $this->assertStringContainsString('"results"', $command['result']['output']);
+        $this->assertStringContainsString('\\ufffd', $command['result']['output']);
+        $this->assertEquals('', (string) file_get_contents($command['stderrPath']));
     }
 
     public function testStatusEmitReturnsErrorWhenJsonEncodingFails(): void
@@ -585,7 +595,6 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertStringContainsString("pmssCliOptionPresent(\$parsed, 'json')", $componentSource);
         $this->assertStringContainsString('pmssComponentStatusChecks()', $componentSource);
         $this->assertStringContainsString('pmssSystemStatusChecks()', $systemSource);
-        $this->assertStringContainsString('function pmssStatusJsonEncode(', $librarySource);
         $this->assertStringContainsString('function pmssStatusEmit(', $librarySource);
         $this->assertStringContainsString('function pmssSystemStatusChecks(', $librarySource);
         $this->assertStringContainsString('function pmssComponentStatusChecks(array $dependencies = [])', $librarySource);

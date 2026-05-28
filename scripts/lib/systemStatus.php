@@ -15,26 +15,6 @@ function pmssStatus(string $name, string $status, string $detail = ''): array
 }
 
 /**
- * Normalize status entry values before emitting human-readable text.
- */
-function pmssStatusTextValue($value): string
-{
-    return is_scalar($value) || $value === null ? (string) $value : '';
-}
-
-/**
- * Encode a status payload as JSON without letting invalid UTF-8 break output.
- */
-function pmssStatusJsonEncode(array $payload, int $flags = 0): string
-{
-    if (is_string($json = pmssJsonEncodeSafe($payload, $flags))) {
-        return $json;
-    }
-
-    return '{"error":"status_json_encode_failed","code":'.(int) json_last_error().'}';
-}
-
-/**
  * Resolve a binary probe path only when `command -v` yields an executable path.
  */
 function pmssStatusBinaryPathResolve(string $binary, callable $runCommand, ?callable $isExecutable = null): string
@@ -75,11 +55,14 @@ function pmssStatusEmit(
     echo str_repeat('-', 60)."\n";
 
     $isTty = $useColour && pmssStreamIsTty(STDOUT, true);
+    $textValue = static function ($value): string {
+        return is_scalar($value) || $value === null ? (string) $value : '';
+    };
     foreach ($checks as $result) {
-        $status = strtoupper(pmssStatusTextValue($result['status'] ?? ''));
+        $status = strtoupper($textValue($result['status'] ?? ''));
         $label = str_pad('['.$status.']', $labelWidth);
-        $name = pmssStatusTextValue($result['name'] ?? '');
-        $detail = pmssStatusTextValue($result['detail'] ?? '');
+        $name = $textValue($result['name'] ?? '');
+        $detail = $textValue($result['detail'] ?? '');
         $colour = $isTty ? (['OK' => "\033[32m", 'WARN' => "\033[33m", 'ERR' => "\033[31m"][$status] ?? '') : '';
         $reset = $colour === '' ? '' : "\033[0m";
         echo $colour.$label.$reset.$name.($detail !== '' ? ' - '.$detail : '').PHP_EOL;
