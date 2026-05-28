@@ -211,4 +211,17 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         $this->assertTrue(is_link($linkNoticePath), 'Expected symlinked notice path to remain a symlink');
         $this->assertEquals("safe\n", file_get_contents($realNoticePath), 'Expected symlink target to stay untouched');
     }
+
+    public function testRawOutputMatchesLatestEntriesSnapshot(): void
+    {
+        $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
+        $smart = ['timestamp'=>'2025-01-01T00:00:01+00:00','kind'=>'smart','device'=>'/dev/sda','kname'=>'sda','severity'=>'ok','flags'=>[],'metrics'=>['health'=>'PASSED']];
+        $raid = ['timestamp'=>'2025-01-01T00:00:02+00:00','kind'=>'raid','array'=>'md0','level'=>'raid1','state'=>'active','detail'=>'sda1[0] sdb1[1]','severity'=>'ok','flags'=>[]];
+        $this->pmssAppendFixtureLines($jsonPath, [$smart, $raid]);
+
+        $expected = json_encode($smart, JSON_UNESCAPED_SLASHES).PHP_EOL.json_encode($raid, JSON_UNESCAPED_SLASHES).PHP_EOL;
+        $actual = $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath, '--raw']);
+
+        $this->assertSame($expected, $actual);
+    }
 }
