@@ -55,47 +55,6 @@ function pmssWelcomeReadJson(string $path): array
 }
 
 /**
- * Set or clear a product-level welcome message template.
- */
-function pmssWelcomeProductMessageSet(
-    string $productKey,
-    string $template,
-    string $productMessagesPath = '/etc/seedbox/config/welcomeMessages.json'
-): bool {
-    $normalizedProductKey = trim($productKey);
-    if ($normalizedProductKey === '') {
-        return false;
-    }
-
-    $rootMap = pmssWelcomeReadJson($productMessagesPath);
-    $productMap = is_array($rootMap['products'] ?? null) ? $rootMap['products'] : $rootMap;
-
-    if (trim($template) === '') {
-        unset($productMap[$normalizedProductKey]);
-    } else {
-        $productMap[$normalizedProductKey] = $template;
-    }
-    ksort($productMap, SORT_STRING);
-
-    $rootMap = is_array($rootMap['products'] ?? null)
-        ? array_replace($rootMap, ['products' => $productMap])
-        : $productMap;
-
-    if (!is_string($encoded = json_encode($rootMap, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES))) {
-        return false;
-    }
-
-    return function_exists('pmssReplaceUserFile')
-        && pmssReplaceUserFile(
-            $productMessagesPath,
-            $encoded.PHP_EOL,
-            static function (string $temporaryPath): void {
-                @chmod($temporaryPath, 0640);
-            }
-        );
-}
-
-/**
  * Resolve the per-user welcome-message override path.
  */
 function pmssWelcomeUserMessagePath(string $userHome): string
@@ -109,54 +68,12 @@ function pmssWelcomeUserMessagePath(string $userHome): string
 function pmssWelcomeUserMessageRead(string $userHome): string
 {
     $path = pmssWelcomeUserMessagePath($userHome);
-    if (!function_exists('pmssUserFilePathIsSafe') || !pmssUserFilePathIsSafe($path) || !is_file($path) || is_link($path)) {
+    if (!pmssWelcomeMessageCustomerPathIsSafe($path) || !is_file($path) || is_link($path)) {
         return '';
     }
 
     $content = @file_get_contents($path);
     return (is_string($content) && trim($content) !== '') ? $content : '';
-}
-
-/**
- * Persist or clear a per-user welcome-message override beside other local config.
- */
-function pmssWelcomeUserMessageSet(string $username, string $userHome, string $template): bool
-{
-    $username = trim($username);
-    $userHome = rtrim($userHome, '/');
-    if ($username === '' || $userHome === '') {
-        return false;
-    }
-
-    $path = pmssWelcomeUserMessagePath($userHome);
-    if (!function_exists('pmssPathTargetIsSafe') || !pmssPathTargetIsSafe($path, false)) {
-        return false;
-    }
-
-    if (trim($template) === '') {
-        return !is_link($path) && (!is_file($path) || @unlink($path));
-    }
-
-    $configDir = $userHome.'/.config';
-    if (!function_exists('pmssEnsureSafeDir') || !pmssEnsureSafeDir($configDir, 0755)) {
-        return false;
-    }
-    if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-        @chown($configDir, $username);
-        @chgrp($configDir, $username);
-    }
-
-    return function_exists('pmssReplaceUserFile')
-        && pmssReplaceUserFile(
-            $path,
-            $template,
-            static function (string $temporaryPath) use ($username): void {
-                @chmod($temporaryPath, 0640);
-                if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-                    @chgrp($temporaryPath, $username);
-                }
-            }
-        );
 }
 
 /**
@@ -177,7 +94,7 @@ function pmssWelcomeMessageForUser(
         }
     }
     if ($productKey === '' && is_file($productFile = $userHome.'/.product') && !is_link($productFile)) {
-        if (function_exists('pmssUserFilePathIsSafe') && pmssUserFilePathIsSafe($productFile)) {
+        if (pmssWelcomeMessageCustomerPathIsSafe($productFile)) {
             $productKey = trim((string) @file_get_contents($productFile));
         }
     }

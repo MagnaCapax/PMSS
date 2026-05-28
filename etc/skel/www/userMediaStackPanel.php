@@ -18,39 +18,6 @@ function pmssMediaStackPanelHomePath(string $home, string $suffix): string
 }
 
 /**
- * Infer the current tenant username from the home directory path.
- */
-function pmssMediaStackPanelCurrentUserRead(string $home): string
-{
-    return basename(rtrim($home, '/'));
-}
-
-/**
- * Return the current hostname for URL rendering.
- */
-function pmssMediaStackPanelCurrentHostnameRead(): string
-{
-    $hostname = function_exists('gethostname') ? (string) gethostname() : '';
-    return $hostname !== '' ? $hostname : (string) php_uname('n');
-}
-
-/**
- * Check whether the launcher can execute shell commands from PHP.
- */
-function pmssMediaStackPanelShellExecAvailable(): bool
-{
-    return pmssFrontendShellExecAvailable();
-}
-
-/**
- * Detect whether the media stack has already been installed for this tenant.
- */
-function pmssMediaStackPanelInstalled(string $home): bool
-{
-    return is_file(rtrim($home, '/').'/.config/jellyfin/config/network.xml');
-}
-
-/**
  * Return true when a directory exists and contains non-dot entries.
  */
 function pmssMediaStackPanelDirectoryPopulated(string $path): bool
@@ -69,7 +36,7 @@ function pmssMediaStackPanelStartGateRead(string $home): array
     $home = rtrim($home, '/');
     foreach (array(
         array(!is_file(pmssMediaStackPanelHomePath($home, 'install-media-stack.sh')), 'Media stack installer is missing from this account.'),
-        array(!pmssMediaStackPanelShellExecAvailable(), 'PHP shell execution is unavailable on this host.'),
+        array(!pmssFrontendShellExecAvailable(), 'PHP shell execution is unavailable on this host.'),
         array(pmssMediaStackPanelDirectoryPopulated($home.'/.bin'), 'Web install is limited to the first run because existing ~/.bin content triggers interactive prompts.'),
         array(pmssMediaStackPanelDirectoryPopulated($home.'/.config/jellyfin'), 'Web install is limited to the first run because existing Jellyfin data must be reviewed over SSH.'),
     ) as $gate) {
@@ -168,7 +135,7 @@ function pmssMediaStackPanelStartCommandBuild(string $home, string $username): s
  */
 function pmssMediaStackPanelStatusRead(string $home, string $username, string $hostname): array
 {
-    $installed = pmssMediaStackPanelInstalled($home);
+    $installed = is_file(rtrim($home, '/').'/.config/jellyfin/config/network.xml');
     $pid = pmssMediaStackPanelPidRead($home);
     $running = pmssMediaStackPanelPidRunning($pid);
     $logTail = pmssMediaStackPanelLogTailRead($home);

@@ -476,13 +476,12 @@ function pmssWelcomePageStateBuild() {
         'poll' => false,
     );
 
-    if (function_exists('pmssMediaStackPanelStatusRead')
-        && function_exists('pmssMediaStackPanelCurrentUserRead')
-        && function_exists('pmssMediaStackPanelCurrentHostnameRead')) {
+    if (function_exists('pmssMediaStackPanelStatusRead')) {
+        $hostname = function_exists('gethostname') ? (string) gethostname() : '';
         $mediaStackStatus = pmssMediaStackPanelStatusRead(
             $home,
-            pmssMediaStackPanelCurrentUserRead($home),
-            pmssMediaStackPanelCurrentHostnameRead()
+            basename(rtrim($home, '/')),
+            $hostname !== '' ? $hostname : (string) php_uname('n')
         );
     }
 

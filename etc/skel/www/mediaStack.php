@@ -14,8 +14,9 @@
 require_once __DIR__.'/userMediaStackPanel.php';
 
 $home = dirname(__DIR__);
-$username = pmssMediaStackPanelCurrentUserRead($home);
-$hostname = pmssMediaStackPanelCurrentHostnameRead();
+$username = basename(rtrim($home, '/'));
+$hostname = function_exists('gethostname') ? (string) gethostname() : '';
+$hostname = $hostname !== '' ? $hostname : (string) php_uname('n');
 $action = isset($_GET['action']) ? (string) $_GET['action'] : 'status';
 
 if ($action === 'start') {

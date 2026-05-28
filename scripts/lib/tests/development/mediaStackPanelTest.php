@@ -16,10 +16,17 @@ class MediaStackPanelTest extends TestCase
     public function testEndpointRequiresCustomerTreeHelper(): void
     {
         $source = file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/mediaStack.php');
+        $helper = file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/userMediaStackPanel.php');
 
         $this->assertTrue(is_string($source));
+        $this->assertTrue(is_string($helper));
         $this->assertStringContainsString("require_once __DIR__.'/userMediaStackPanel.php';", $source);
+        $this->assertStringContainsString('$username = basename(rtrim($home, \'/\'));', $source);
         $this->assertStringNotContainsString('/scripts/lib/user/mediaStackPanel.php', $source);
+        $this->assertStringNotContainsString('function pmssMediaStackPanelCurrent'.'UserRead', $helper);
+        $this->assertStringNotContainsString('function pmssMediaStackPanelCurrent'.'HostnameRead', $helper);
+        $this->assertStringNotContainsString('function pmssMediaStackPanelShellExec'.'Available', $helper);
+        $this->assertStringNotContainsString('function pmssMediaStackPanel'.'Installed', $helper);
     }
 
     public function testStatusIsReadyForFreshHome(): void

@@ -252,21 +252,53 @@ class WelcomeMessageTest extends TestCase
     {
             $homeRoot = $this->tempDir.'/customer-home';
             $home = $homeRoot.'/alice';
+            $overrideHome = $homeRoot.'/bob';
             $script = ''
                 .'$lib = '.var_export($this->pmssRepoPath('etc/skel/www/welcomeMessage.php'), true).';'
                 .'$home = '.var_export($home, true).';'
+                .'$overrideHome = '.var_export($overrideHome, true).';'
                 .'$root = '.var_export($homeRoot, true).';'
                 .'@mkdir($home."/.config", 0755, true);'
+                .'@mkdir($overrideHome."/.config", 0755, true);'
                 .'file_put_contents($home."/.config/pmss-user.json", json_encode(["product" => "m1000"]));'
+                .'file_put_contents($overrideHome."/.config/pmss-user.json", json_encode(["product" => "m1000"]));'
+                .'file_put_contents($overrideHome."/.config/welcome-message.html", "custom {{username}} / {{quota}}");'
                 .'file_put_contents($root."/plain.json", json_encode(["m1000" => "plain {{username}}"]));'
                 .'file_put_contents($root."/nested.json", json_encode(["products" => ["m1000" => "nested {{username}}"]]));'
                 .'require $lib;'
-                .'echo json_encode(["plain" => pmssWelcomeMessageForUser([], $home, "alice", $root."/plain.json"), "nested" => pmssWelcomeMessageForUser([], $home, "alice", $root."/nested.json")]);';
+                .'echo json_encode(['
+                .'"plain" => pmssWelcomeMessageForUser([], $home, "alice", $root."/plain.json"),'
+                .'"nested" => pmssWelcomeMessageForUser([], $home, "alice", $root."/nested.json"),'
+                .'"override" => pmssWelcomeMessageForUser(["totalSpace" => 1073741824], $overrideHome, "bob", $root."/missing.json"),'
+                .'"productSet" => function_exists("pmssWelcomeProductMessageSet"),'
+                .'"userSet" => function_exists("pmssWelcomeUserMessageSet")'
+                .']);';
 
             $this->assertEquals(
-                ['plain' => 'plain alice', 'nested' => 'nested alice'],
+                [
+                    'plain' => 'plain alice',
+                    'nested' => 'nested alice',
+                    'override' => 'custom bob / 1 GiB',
+                    'productSet' => false,
+                    'userSet' => false,
+                ],
                 $this->pmssRunInlinePhpJson($script, ['PMSS_HOME_DIR' => $homeRoot])
             );
+    }
+
+    public function testCustomerWelcomeMessageHelperStaysReadOnly(): void
+    {
+        $source = $this->pmssReadRepoFile('etc/skel/www/welcomeMessage.php');
+
+        $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/welcomeMessage.php', [
+            'function pmssWelcomeProductMessageSet(',
+            'function pmssWelcomeUserMessageSet(',
+            'pmssReplaceUserFile',
+            'pmssPathTargetIsSafe',
+            'pmssEnsureSafeDir',
+            'pmssUserFilePathIsSafe',
+        ]);
+        $this->assertStringContainsString('pmssWelcomeMessageCustomerPathIsSafe($path)', $source);
     }
 
     public function testProductConfigUsesUnifiedWelcomeLibrary(): void
