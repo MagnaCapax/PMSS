@@ -151,4 +151,36 @@ class userLifecycleLoggingTest extends TestCase
             $calls
         );
     }
+
+    public function testFindSuspendedBackupSelectsNewestContentfulCandidate(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-user-lifecycle-backup-');
+        $old = $home.'/www-suspended-old';
+        $new = $home.'/www-suspended-new';
+        $empty = $home.'/www-suspended-empty';
+
+        $this->pmssWriteFile($old.'/rutorrent/.keep', '');
+        $this->pmssWriteFile($new.'/public/content.txt', '');
+        $this->pmssEnsureDir($empty);
+        touch($old, 1000);
+        touch($new, 2000);
+        touch($empty, 3000);
+
+        $this->assertSame($new, \pmssUserLifecycleFindSuspendedBackup($home));
+
+        $tieHome = $this->pmssMakeTempDir('pmss-user-lifecycle-backup-tie-');
+        $first = $tieHome.'/www-suspended-a';
+        $last = $tieHome.'/www-suspended-z';
+        $this->pmssWriteFile($first.'/index.php', '');
+        $this->pmssWriteFile($last.'/index.php', '');
+        touch($first, 4000);
+        touch($last, 4000);
+
+        $this->assertSame($last, \pmssUserLifecycleFindSuspendedBackup($tieHome));
+
+        $emptyHome = $this->pmssMakeTempDir('pmss-user-lifecycle-backup-empty-');
+        $this->pmssEnsureDir($emptyHome.'/www-suspended-empty');
+
+        $this->assertSame(null, \pmssUserLifecycleFindSuspendedBackup($emptyHome));
+    }
 }

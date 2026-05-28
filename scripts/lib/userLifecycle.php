@@ -573,31 +573,28 @@ function pmssUserWriteLogs(array $payload): void
 function pmssUserLifecycleStep(string $action, string $username, string $step, string $command, bool $dryRun): int
 {
     $started = microtime(true);
-    if ($dryRun) {
-        pmssUserLifecycleContextLog($action, $step, $username, array(
-            'step'     => $step,
-            'command'  => $command,
-            'rc'       => 0,
-            'duration' => 0.0,
-            'dry_run'  => true,
-            'status'   => 'SKIP',
-        ));
-        echo "[DRY-RUN][{$action}] {$step}: {$command}\n";
-        return 0;
-    }
-
     $rc = 0;
-    @passthru($command, $rc);
-    $duration = microtime(true) - $started;
+    $duration = 0.0;
+    $status = $dryRun ? 'SKIP' : 'OK';
+    $dryRunMessage = $dryRun ? "[DRY-RUN][{$action}] {$step}: {$command}\n" : '';
+    if (!$dryRun) {
+        @passthru($command, $rc);
+        $duration = microtime(true) - $started;
+        $status = $rc === 0 ? 'OK' : 'ERR';
+    }
 
     pmssUserLifecycleContextLog($action, $step, $username, array(
         'step'     => $step,
         'command'  => $command,
         'rc'       => $rc,
         'duration' => round($duration, 4),
-        'dry_run'  => false,
-        'status'   => $rc === 0 ? 'OK' : 'ERR',
+        'dry_run'  => $dryRun,
+        'status'   => $status,
     ));
+
+    if ($dryRunMessage !== '') {
+        echo $dryRunMessage;
+    }
 
     return $rc;
 }
@@ -660,7 +657,8 @@ function pmssUserLifecycleFindSuspendedBackup(string $homeDir): ?string
     if (!is_array($candidates) || empty($candidates)) {
         return null;
     }
-    $ranked = array();
+    $bestPath = null;
+    $bestMtime = 0;
     $hasSuspendedContent = static function (string $candidate): bool {
         if (!is_dir($candidate)) {
             return false;
@@ -686,19 +684,14 @@ function pmssUserLifecycleFindSuspendedBackup(string $homeDir): ?string
             continue;
         }
         $mtime = @filemtime($candidate);
-        $ranked[] = array('path' => $candidate, 'mtime' => $mtime === false ? 0 : $mtime);
-    }
-    if (empty($ranked)) {
-        return null;
-    }
-    usort($ranked, static function (array $a, array $b): int {
-        if ($a['mtime'] === $b['mtime']) {
-            return strcmp($b['path'], $a['path']);
+        $mtime = $mtime === false ? 0 : $mtime;
+        if ($bestPath === null || $mtime > $bestMtime || ($mtime === $bestMtime && strcmp($candidate, $bestPath) > 0)) {
+            $bestPath = $candidate;
+            $bestMtime = $mtime;
         }
-        return $b['mtime'] <=> $a['mtime'];
-    });
+    }
 
-    return $ranked[0]['path'];
+    return $bestPath;
 }
 
 /** @param array<string,string> $restartOptions */
