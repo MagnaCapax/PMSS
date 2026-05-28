@@ -178,6 +178,19 @@ class RuntimeTest extends TestCase
         $this->assertEquals("CAPTURE_ERR\n", $result['stderr']);
     }
 
+    public function testPipedCaptureKeepsStdoutStderrRcShape(): void
+    {
+        $bash = '/bin/bash -lc '.escapeshellarg('printf PIPE_OUT; printf PIPE_ERR >&2; exit 6');
+        $result = \pmssCommandPipedCapture($bash, 'pipe-shape-test', 0);
+
+        $this->assertEquals(6, $result['rc']);
+        $this->assertEquals('PIPE_OUT', $result['stdout']);
+        $this->assertEquals('PIPE_ERR', $result['stderr']);
+        $this->assertFalse($result['timed_out']);
+        $this->assertFalse($result['launch_failed']);
+        $this->assertFalse($result['pipe_failed']);
+    }
+
     public function testProcessCloseExitCodeUsesObservedStatusAfterPolling(): void
     {
         $process = proc_open(
