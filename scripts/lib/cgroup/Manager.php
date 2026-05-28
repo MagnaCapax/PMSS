@@ -251,7 +251,7 @@ class Manager
                 $this->sys->requireRoot();
                 $steps = [];
                 if ($doWipe) {
-                    $steps[] = ['Reverting user slice', \pmssBuildCommand('systemctl', ['revert', $slice]).' || true'];
+                    $steps[] = ['Reverting user slice', \pmssBuildCommand('systemctl', ['revert', $slice])];
                     $steps[] = ['Unlimiting core properties', \pmssBuildCommand('systemctl', ['set-property', $slice, 'MemoryHigh=infinity', 'MemoryMax=infinity', 'TasksMax=infinity', 'CPUWeight=100', 'IOWeight=100'])];
                 } else {
                     $pairs = [];
@@ -264,7 +264,7 @@ class Manager
                         $script = 'if [ -w '.escapeshellarg($write['path']).' ]; then printf \'%s\\n\' '
                             .escapeshellarg($write['value'])
                             .' > '.escapeshellarg($write['path'])
-                            .'; else echo '.escapeshellarg('[SKIP] io.cost path not writable: '.$write['path']).'; fi';
+                            .'; else echo '.escapeshellarg('[ERR] io.cost path not writable: '.$write['path']).'; exit 1; fi';
                         $steps[] = ['Applying io.cost setting', \pmssBuildCommand('sh', ['-c', $script])];
                     }
                 }

@@ -275,6 +275,42 @@ class CgroupUserConfigTest extends TestCase
         $this->assertStringContainsString("'IOReadBandwidthMax=/dev/sda 5M'", $res['out']);
     }
 
+    public function testApplyWipePropagatesRevertFailure(): void
+    {
+        $steps = [];
+        $this->mgr = new Manager($this->sys, static function (string $description, string $command) use (&$steps): int {
+            $steps[] = [$description, $command];
+            return $description === 'Reverting user slice' ? 1 : 0;
+        });
+
+        $res = $this->runMgr(['testuser', '--apply', '--wipe']);
+
+        $this->assertEquals(1, $res['rc']);
+        $this->assertEquals(2, count($steps));
+        $this->assertStringContainsString('systemctl', $steps[0][1]);
+        $this->assertStringNotContainsString('|| true', $steps[0][1]);
+        $this->assertSame('Unlimiting core properties', $steps[1][0]);
+    }
+
+    public function testApplyIoCostFailurePropagatesFromRunner(): void
+    {
+        $steps = [];
+        $this->sys->findmnt['/home'] = '/dev/md0';
+        $this->sys->commands['lsblk -dn -o MAJ:MIN'] = "9:0\n";
+        $this->mgr = new Manager($this->sys, static function (string $description, string $command) use (&$steps): int {
+            $steps[] = [$description, $command];
+            return $description === 'Applying io.cost setting' ? 1 : 0;
+        });
+
+        $res = $this->runMgr(['testuser', '--apply', '--io-cost-qos=enable=1 ctrl=user']);
+
+        $this->assertEquals(1, $res['rc']);
+        $this->assertEquals(1, count($steps));
+        $this->assertSame('Applying io.cost setting', $steps[0][0]);
+        $this->assertStringContainsString('[ERR] io.cost path not writable:', $steps[0][1]);
+        $this->assertStringContainsString('exit 1', $steps[0][1]);
+    }
+
     public function testMixedFlagPlanSnapshotLocksParsingPrecedence(): void
     {
         $res = $this->runMgr([
@@ -619,7 +655,7 @@ PHP;
 
         $ioCostWriter = "if [ -w '/sys/fs/cgroup/io.cost.qos' ]; then printf '%s\\n' "
             ."'9:0 enable=1 ctrl=user' > '/sys/fs/cgroup/io.cost.qos'; else echo "
-            ."'[SKIP] io.cost path not writable: /sys/fs/cgroup/io.cost.qos'; fi";
+            ."'[ERR] io.cost path not writable: /sys/fs/cgroup/io.cost.qos'; exit 1; fi";
 
         $this->assertEquals(0, $res['rc']);
         $this->assertSame(
