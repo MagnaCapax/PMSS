@@ -27,6 +27,7 @@ class UserDockerCgroupDriverTest extends TestCase
                 'userDockerEnsureCgroupfsDaemonConfig($user, $home, $uid, (int) $info[\'gid\']);',
                 'userDocker: wrote ~/.config/docker/daemon.json for cgroup v2 rootless Docker',
                 'userDocker: updated ~/.config/docker/daemon.json for cgroup v2 rootless Docker',
+                'unsafe_config_file',
             ]
         );
     }
@@ -96,6 +97,35 @@ class UserDockerCgroupDriverTest extends TestCase
         $this->assertFalse($result['ok']);
         $this->assertEquals('invalid_json', $result['reason']);
         $this->assertEquals('{broken', file_get_contents($home.'/.config/docker/daemon.json'));
+    }
+
+    public function testSharedRootlessDockerConfigRejectsSymlinkedConfigFile(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+        @mkdir($home.'/.config/docker', 0755, true);
+        file_put_contents($home.'/outside.json', '{"keep":true}');
+        symlink($home.'/outside.json', $home.'/.config/docker/daemon.json');
+
+        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+            'create_when_missing' => true,
+        ]);
+
+        $this->assertFalse($result['ok']);
+        $this->assertEquals('unsafe_config_file', $result['reason']);
+        $this->assertEquals('{"keep":true}', file_get_contents($home.'/outside.json'));
+    }
+
+    public function testSharedRootlessDockerConfigRejectsDirectoryConfigFile(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+        @mkdir($home.'/.config/docker/daemon.json', 0755, true);
+
+        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+            'create_when_missing' => true,
+        ]);
+
+        $this->assertFalse($result['ok']);
+        $this->assertEquals('unsafe_config_file', $result['reason']);
     }
 
     private function writeDaemonConfig(string $home, array $payload): void

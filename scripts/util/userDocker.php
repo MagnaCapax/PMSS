@@ -164,9 +164,15 @@ function userDockerEnsureCgroupfsDaemonConfig(string $user, string $home, int $u
     if (!$result['ok']) {
         $messages = [
             'ensure_dir_failed' => '[WARN] userDocker: failed to ensure ~/.config/docker for cgroup v2 rootless Docker',
+            'unsafe_config_file' => '[WARN] userDocker: refusing unsafe ~/.config/docker/daemon.json target',
             'invalid_json' => '[WARN] userDocker: existing daemon.json is invalid JSON; leaving it unchanged',
             'encode_failed' => '[WARN] userDocker: failed to encode daemon.json for cgroup v2 rootless Docker',
+            'temp_failed' => '[WARN] userDocker: failed to create temporary daemon.json for cgroup v2 rootless Docker',
             'write_failed' => '[WARN] userDocker: failed to write ~/.config/docker/daemon.json for cgroup v2 rootless Docker',
+            'chown_failed' => '[WARN] userDocker: failed to set daemon.json owner for cgroup v2 rootless Docker',
+            'chgrp_failed' => '[WARN] userDocker: failed to set daemon.json group for cgroup v2 rootless Docker',
+            'chmod_failed' => '[WARN] userDocker: failed to set daemon.json mode for cgroup v2 rootless Docker',
+            'rename_failed' => '[WARN] userDocker: failed to install daemon.json for cgroup v2 rootless Docker',
         ];
         pmssUserLog($user, $messages[$result['reason']] ?? '[WARN] userDocker: failed to converge daemon.json');
         return;

@@ -5,6 +5,51 @@ require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/directories.php';
 require_once __DIR__.'/log.php';
 
+/** Return true when daemon.json can be read or replaced safely. */
+function pmssUserRootlessDockerConfigTargetIsSafe(string $configFile): bool
+{
+    return !is_link($configFile)
+        && (!file_exists($configFile) || is_file($configFile));
+}
+
+/** Atomically write daemon.json without following unsafe existing targets. */
+function pmssUserRootlessDockerConfigWrite(string $configFile, string $json, int $uid, int $gid, ?string &$reason = null): bool
+{
+    $reason = null;
+    if (!pmssUserRootlessDockerConfigTargetIsSafe($configFile)) {
+        $reason = 'unsafe_config_file';
+        return false;
+    }
+
+    $directory = dirname($configFile);
+    $tempFile = @tempnam($directory, '.daemon.json.');
+    if (!is_string($tempFile)) {
+        $reason = 'temp_failed';
+        return false;
+    }
+
+    $ok = false;
+    $isRoot = function_exists('posix_geteuid') && (int) @posix_geteuid() === 0;
+    if (@file_put_contents($tempFile, $json) === false) {
+        $reason = 'write_failed';
+    } elseif ($isRoot && !@chown($tempFile, $uid)) {
+        $reason = 'chown_failed';
+    } elseif ($isRoot && !@chgrp($tempFile, $gid)) {
+        $reason = 'chgrp_failed';
+    } elseif (!@chmod($tempFile, 0600)) {
+        $reason = 'chmod_failed';
+    } elseif (!@rename($tempFile, $configFile)) {
+        $reason = 'rename_failed';
+    } else {
+        $ok = true;
+    }
+
+    if (!$ok && is_file($tempFile)) {
+        @unlink($tempFile);
+    }
+    return $ok;
+}
+
 /**
  * Converge ~/.config/docker/daemon.json according to the requested policy.
  *
@@ -25,6 +70,10 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
     };
     if (!pmssEnsureUserHomeDir($user, $home, '.config/docker', 0700, $logger, 0700)) {
         $result['reason'] = 'ensure_dir_failed';
+        return $result;
+    }
+    if (!pmssUserRootlessDockerConfigTargetIsSafe($configFile)) {
+        $result['reason'] = 'unsafe_config_file';
         return $result;
     }
 
@@ -78,14 +127,12 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
         $result['reason'] = 'encode_failed';
         return $result;
     }
-    if (@file_put_contents($configFile, $json) === false) {
-        $result['reason'] = 'write_failed';
+    $writeReason = null;
+    if (!pmssUserRootlessDockerConfigWrite($configFile, $json, $uid, $gid, $writeReason)) {
+        $result['reason'] = $writeReason ?? 'write_failed';
         return $result;
     }
 
-    @chown($configFile, $uid);
-    @chgrp($configFile, $gid);
-    @chmod($configFile, 0600);
     $result['ok'] = true;
     $result['changed'] = true;
     $result['created'] = !$hasConfigFile;
