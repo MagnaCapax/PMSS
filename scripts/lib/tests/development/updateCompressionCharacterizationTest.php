@@ -424,14 +424,15 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString("'stderr_excerpt' => \$stderrExcerpt", $src);
     }
 
-    public function testDockerDependenciesKeepDaemonJsonWritesLocal(): void
+    public function testDockerDependenciesUseSharedDaemonJsonConvergence(): void
     {
         $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
         $symbol = 'pmssWrite'.'DockerDaemonConfig';
 
-        $this->assertSourceOmitsFunction($src, $symbol, 'userMaintenance.php should keep daemon.json write handling inside pmssEnsureDockerDependencies()');
-        $this->assertStringContainsString('pmssJsonEncodePretty($payload)', $src);
-        $this->assertStringContainsString("'native.cgroupdriver=cgroupfs'", $src);
+        $this->assertSourceOmitsFunction($src, $symbol, 'daemon.json convergence should not grow a second local writer');
+        $this->assertStringContainsString("require_once __DIR__.'/../user/rootlessDockerConfig.php';", $src);
+        $this->assertStringContainsString('pmssUserRootlessDockerConfigConverge($user, $home, (int)$uid, (int)$gid', $src);
+        $this->pmssAssertStringNotContainsString('pmssJsonEncodePretty($payload)', $src, 'userMaintenance.php should use the shared rootless Docker config writer');
     }
 
     public function testRepositoryPrerequisitesKeepSonarrDetectionInline(): void

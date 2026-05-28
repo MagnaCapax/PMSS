@@ -12,6 +12,7 @@ require_once __DIR__.'/users.php';
 require_once __DIR__.'/../users.php';
 require_once __DIR__.'/../userLifecycle.php';
 require_once __DIR__.'/../user/directories.php';
+require_once __DIR__.'/../user/rootlessDockerConfig.php';
 require_once __DIR__.'/../user/userConfigStore.php';
 
     /**
@@ -491,94 +492,31 @@ require_once __DIR__.'/../user/userConfigStore.php';
         }
         $fuseOverlayfsStatus = $fuseOverlayfsAvailable ? 'available' : ($fuseOverlayfsPath === null ? 'missing' : 'unusable');
 
-        $configDir  = $home.'/.config/docker';
-        $configFile = $configDir.'/daemon.json';
-
-        if (!pmssEnsureUserHomeDir($user, $home, '.config/docker', 0700, static function (string $message) use ($user): void { pmssUserLog($user, $message); }, 0700)) {
-            pmssUserLog($user, '[WARN] Failed to ensure ~/.config/docker');
+        $hasConfigFile = is_file($home.'/.config/docker/daemon.json');
+        $result = pmssUserRootlessDockerConfigConverge($user, $home, (int)$uid, (int)$gid, [
+            'storage_driver' => $fuseOverlayfsAvailable ? 'fuse-overlayfs' : null,
+            'remove_pmss_storage_driver' => !$fuseOverlayfsAvailable,
+            'create_when_missing' => $fuseOverlayfsAvailable,
+            'invalid_json_as_empty' => true,
+            'preserve_custom_storage_driver' => true,
+        ]);
+        if (!$result['ok']) {
+            $messages = [
+                'ensure_dir_failed' => '[WARN] Failed to ensure ~/.config/docker',
+                'encode_failed' => '[WARN] Failed to encode daemon.json',
+                'write_failed' => '[WARN] Failed to write daemon.json',
+            ];
+            pmssUserLog($user, $messages[$result['reason']] ?? '[WARN] Failed to converge daemon.json');
+            return;
+        }
+        if (!$fuseOverlayfsAvailable && !$hasConfigFile) {
+            pmssUserLog($user, sprintf('[WARN] fuse-overlayfs %s; skipping storage-driver enforcement', $fuseOverlayfsStatus));
             return;
         }
 
-        $hasConfigFile = is_file($configFile);
-        $current = $hasConfigFile ? @file_get_contents($configFile) : false;
-        $data = $current ? (pmssJsonDecodeAssoc($current) ?? []) : [];
-
-        $writeConfig = static function (array $payload) use ($configFile, $uid, $gid, $user): bool {
-            if (($json = pmssJsonEncodePretty($payload)) === null) {
-                pmssUserLog($user, '[WARN] Failed to encode daemon.json');
-                return false;
-            }
-            if (file_put_contents($configFile, $json) !== false) {
-                chown($configFile, $uid);
-                chgrp($configFile, $gid);
-                chmod($configFile, 0600);
-                return true;
-            }
-            pmssUserLog($user, '[WARN] Failed to write daemon.json');
-            return false;
-        };
-
-        $changed = false;
-        $ensureExecOpts = static function (array &$payload) use (&$changed): void {
-            $execOpts = [];
-            if (isset($payload['exec-opts']) && is_array($payload['exec-opts'])) {
-                $execOpts = $payload['exec-opts'];
-            }
-            if (!in_array('native.cgroupdriver=cgroupfs', $execOpts, true)) {
-                $execOpts[] = 'native.cgroupdriver=cgroupfs';
-                $payload['exec-opts'] = array_values(array_unique($execOpts));
-                $changed = true;
-            }
-        };
-        $writeIfChanged = static function (array $payload) use (&$changed, $writeConfig): bool {
-            return $changed ? $writeConfig($payload) : false;
-        };
-
-        // If storage-driver is already set, respect it unless it is our default.
-        if (isset($data['storage-driver'])) {
-            if ($data['storage-driver'] !== 'fuse-overlayfs') {
-                if ($hasConfigFile) {
-                    $ensureExecOpts($data);
-                    $writeIfChanged($data);
-                }
-                return;
-            }
-
-            if ($fuseOverlayfsAvailable) {
-                $ensureExecOpts($data);
-                $writeIfChanged($data);
-                return;
-            }
-
-            if ($hasConfigFile) {
-                unset($data['storage-driver']);
-                $changed = true;
-                $ensureExecOpts($data);
-                if ($writeIfChanged($data)) {
-                    pmssUserLog($user, '[WARN] Removed daemon.json storage-driver because fuse-overlayfs is unavailable');
-                }
-            } else {
-                pmssUserLog($user, sprintf('[WARN] fuse-overlayfs %s; skipping daemon.json storage-driver cleanup', $fuseOverlayfsStatus));
-            }
-            return;
-        }
-
-        if (!$fuseOverlayfsAvailable) {
-            if ($hasConfigFile) {
-                $ensureExecOpts($data);
-                $writeIfChanged($data);
-            } else {
-                pmssUserLog($user, sprintf('[WARN] fuse-overlayfs %s; skipping storage-driver enforcement', $fuseOverlayfsStatus));
-            }
-            return;
-        }
-
-        // Otherwise, enforce fuse-overlayfs
-        $data['storage-driver'] = 'fuse-overlayfs';
-        $changed = true;
-        $ensureExecOpts($data);
-
-        if ($writeIfChanged($data)) {
+        if ($result['removed_storage_driver']) {
+            pmssUserLog($user, '[WARN] Removed daemon.json storage-driver because fuse-overlayfs is unavailable');
+        } elseif ($result['configured_storage_driver']) {
             pmssUserLog($user, '[INFO] Configured Docker storage-driver: fuse-overlayfs');
         }
     }

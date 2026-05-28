@@ -52,7 +52,7 @@ require_once __DIR__.'/../lib/userLifecycle.php';
 pmssRequireCli();
 
 require_once __DIR__.'/../lib/user/log.php';
-require_once __DIR__.'/../lib/user/directories.php';
+require_once __DIR__.'/../lib/user/rootlessDockerConfig.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
 
 $debug = pmssCliArgvHasToken($argv ?? null, '--debug');
@@ -158,60 +158,24 @@ function userDockerEnsureCgroupfsDaemonConfig(string $user, string $home, int $u
         return;
     }
 
-    if (!pmssEnsureUserHomeDir(
-        $user,
-        $home,
-        '.config/docker',
-        0700,
-        static function (string $message) use ($user): void {
-            pmssUserLog($user, $message);
-        },
-        0700
-    )) {
-        pmssUserLog($user, '[WARN] userDocker: failed to ensure ~/.config/docker for cgroup v2 rootless Docker');
+    $result = pmssUserRootlessDockerConfigConverge($user, $home, $uid, $gid, [
+        'create_when_missing' => true,
+    ]);
+    if (!$result['ok']) {
+        $messages = [
+            'ensure_dir_failed' => '[WARN] userDocker: failed to ensure ~/.config/docker for cgroup v2 rootless Docker',
+            'invalid_json' => '[WARN] userDocker: existing daemon.json is invalid JSON; leaving it unchanged',
+            'encode_failed' => '[WARN] userDocker: failed to encode daemon.json for cgroup v2 rootless Docker',
+            'write_failed' => '[WARN] userDocker: failed to write ~/.config/docker/daemon.json for cgroup v2 rootless Docker',
+        ];
+        pmssUserLog($user, $messages[$result['reason']] ?? '[WARN] userDocker: failed to converge daemon.json');
         return;
     }
-
-    $configFile = $home.'/.config/docker/daemon.json';
-    $hasConfigFile = is_file($configFile);
-    $current = $hasConfigFile ? @file_get_contents($configFile) : false;
-    $data = [];
-    if ($current !== false && trim($current) !== '') {
-        if (($decoded = pmssJsonDecodeAssoc($current)) === null) {
-            pmssUserLog($user, '[WARN] userDocker: existing daemon.json is invalid JSON; leaving it unchanged');
-            return;
-        }
-        $data = $decoded;
+    if ($result['changed']) {
+        pmssUserLog($user, $result['created']
+            ? 'userDocker: wrote ~/.config/docker/daemon.json for cgroup v2 rootless Docker'
+            : 'userDocker: updated ~/.config/docker/daemon.json for cgroup v2 rootless Docker');
     }
-
-    $execOpts = [];
-    if (isset($data['exec-opts']) && is_array($data['exec-opts'])) {
-        $execOpts = $data['exec-opts'];
-    }
-    if (in_array('native.cgroupdriver=cgroupfs', $execOpts, true)) {
-        return;
-    }
-
-    $execOpts[] = 'native.cgroupdriver=cgroupfs';
-    $data['exec-opts'] = array_values(array_unique($execOpts));
-    if (($json = pmssJsonEncodePretty($data)) === null) {
-        pmssUserLog($user, '[WARN] userDocker: failed to encode daemon.json for cgroup v2 rootless Docker');
-        return;
-    }
-    if (@file_put_contents($configFile, $json) === false) {
-        pmssUserLog($user, '[WARN] userDocker: failed to write ~/.config/docker/daemon.json for cgroup v2 rootless Docker');
-        return;
-    }
-
-    @chown($configFile, $uid);
-    @chgrp($configFile, $gid);
-    @chmod($configFile, 0600);
-    pmssUserLog(
-        $user,
-        $hasConfigFile
-            ? 'userDocker: updated ~/.config/docker/daemon.json for cgroup v2 rootless Docker'
-            : 'userDocker: wrote ~/.config/docker/daemon.json for cgroup v2 rootless Docker'
-    );
 }
 
 /**

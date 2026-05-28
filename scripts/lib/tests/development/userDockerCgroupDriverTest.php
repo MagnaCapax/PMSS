@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/user/rootlessDockerConfig.php';
 
 class UserDockerCgroupDriverTest extends TestCase
 {
@@ -18,16 +19,94 @@ class UserDockerCgroupDriverTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings(
             'scripts/util/userDocker.php',
             [
-                "require_once __DIR__.'/../lib/user/directories.php';",
+                "require_once __DIR__.'/../lib/user/rootlessDockerConfig.php';",
                 'function userDockerCgroupMode(): string',
                 "getenv('PMSS_CGROUP_MODE')",
                 "'/sys/fs/cgroup/cgroup.controllers'",
-                "'.config/docker'",
-                "'native.cgroupdriver=cgroupfs'",
+                'pmssUserRootlessDockerConfigConverge($user, $home, $uid, $gid',
                 'userDockerEnsureCgroupfsDaemonConfig($user, $home, $uid, (int) $info[\'gid\']);',
                 'userDocker: wrote ~/.config/docker/daemon.json for cgroup v2 rootless Docker',
                 'userDocker: updated ~/.config/docker/daemon.json for cgroup v2 rootless Docker',
             ]
         );
+    }
+
+    public function testSharedRootlessDockerConfigCreatesCgroupfsOnlyConfig(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+
+        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+            'create_when_missing' => true,
+        ]);
+
+        $this->assertTrue($result['ok']);
+        $this->assertTrue($result['changed']);
+        $this->assertTrue($result['created']);
+        $payload = $this->readDaemonConfig($home);
+        $this->assertEquals(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
+        $this->assertTrue(!array_key_exists('storage-driver', $payload));
+    }
+
+    public function testSharedRootlessDockerConfigPreservesCustomStorageDriver(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+        $this->writeDaemonConfig($home, ['storage-driver' => 'overlay2']);
+
+        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+            'storage_driver' => 'fuse-overlayfs',
+            'create_when_missing' => true,
+            'preserve_custom_storage_driver' => true,
+        ]);
+
+        $this->assertTrue($result['ok']);
+        $this->assertTrue($result['changed']);
+        $this->assertFalse($result['configured_storage_driver']);
+        $payload = $this->readDaemonConfig($home);
+        $this->assertEquals('overlay2', $payload['storage-driver']);
+        $this->assertEquals(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
+    }
+
+    public function testSharedRootlessDockerConfigRemovesUnavailablePmssDriver(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+        $this->writeDaemonConfig($home, ['storage-driver' => 'fuse-overlayfs']);
+
+        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+            'remove_pmss_storage_driver' => true,
+            'invalid_json_as_empty' => true,
+        ]);
+
+        $this->assertTrue($result['ok']);
+        $this->assertTrue($result['removed_storage_driver']);
+        $payload = $this->readDaemonConfig($home);
+        $this->assertTrue(!array_key_exists('storage-driver', $payload));
+        $this->assertEquals(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
+    }
+
+    public function testSharedRootlessDockerConfigCanAbortOnInvalidJson(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+        @mkdir($home.'/.config/docker', 0755, true);
+        file_put_contents($home.'/.config/docker/daemon.json', '{broken');
+
+        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+            'create_when_missing' => true,
+        ]);
+
+        $this->assertFalse($result['ok']);
+        $this->assertEquals('invalid_json', $result['reason']);
+        $this->assertEquals('{broken', file_get_contents($home.'/.config/docker/daemon.json'));
+    }
+
+    private function writeDaemonConfig(string $home, array $payload): void
+    {
+        @mkdir($home.'/.config/docker', 0755, true);
+        file_put_contents($home.'/.config/docker/daemon.json', json_encode($payload));
+    }
+
+    private function readDaemonConfig(string $home): array
+    {
+        $payload = json_decode((string) file_get_contents($home.'/.config/docker/daemon.json'), true);
+        return is_array($payload) ? $payload : [];
     }
 }
