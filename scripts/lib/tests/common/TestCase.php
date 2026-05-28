@@ -1158,7 +1158,27 @@ abstract class TestCase
     /** Read a repository file and assert that it does not declare a named function. */
     protected function pmssAssertRepoFileNotContainsFunction(string $relativePath, string $symbol, string $message): void
     {
-        $this->pmssAssertRepoFileNotContainsString($relativePath, 'function '.$symbol.'(', $message);
+        $this->pmssAssertSourceOmitsFunction($this->pmssReadRepoFile($relativePath), $symbol, $message);
+    }
+
+    /** Assert that source text does not declare a named function. */
+    protected function pmssAssertSourceOmitsFunction(string $source, string $symbol, string $message): void
+    {
+        $this->pmssAssertStringNotContainsString('function '.$symbol.'(', $source, $message);
+    }
+
+    /** Read a repository file and assert required and forbidden substrings. */
+    protected function pmssAssertRepoFileContainsAndOmitsStrings(string $relativePath, array $required = [], array $forbidden = []): string
+    {
+        $source = $this->pmssReadRepoFile($relativePath);
+        $this->assertStringContainsAllStrings($required, $source);
+        foreach ($forbidden as $key => $value) {
+            $needle = is_int($key) ? (string) $value : (string) $key;
+            $message = is_int($key) ? '' : (string) $value;
+            $this->pmssAssertStringNotContainsString($needle, $source, $message);
+        }
+
+        return $source;
     }
 
     /** Read a repository file and assert a fixed substring count. */
