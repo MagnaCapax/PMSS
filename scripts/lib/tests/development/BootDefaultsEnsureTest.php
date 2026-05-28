@@ -69,6 +69,23 @@ class BootDefaultsEnsureTest extends TestCase
         $this->assertStringContainsString('GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"', $updatedGrub);
     }
 
+    public function testBootDefaultsNormalizesExtraGrubInputs(): void
+    {
+        $logger = static function (string $message): void { };
+        $dir = $this->pmssMakeTempDir('pmss-boot-defaults-normalize-', 0700);
+        $fstab = $dir.'/fstab';
+        $grub = $dir.'/grub';
+        file_put_contents($fstab, "proc /proc proc defaults,hidepid=2 0 0\n");
+        file_put_contents($grub, "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet\"\nGRUB_TERMINAL=\"old\"\n");
+
+        \pmssEnsureBootDefaults($logger, $fstab, $grub, ' systemd.unified_cgroup_hierarchy=0 ', ['console=tty0', 'console=tty0', '  '], ['GRUB_TERMINAL' => ' console ', 'BAD-KEY' => 'ignored']);
+        $updatedGrub = (string) file_get_contents($grub);
+
+        $this->assertStringContainsString('GRUB_CMDLINE_LINUX_DEFAULT="quiet systemd.unified_cgroup_hierarchy=0 console=tty0"', $updatedGrub);
+        $this->assertStringContainsString('GRUB_TERMINAL="console"', $updatedGrub);
+        $this->assertStringNotContainsString('BAD-KEY', $updatedGrub);
+    }
+
     public function testFstabMutationCharacterizationMatrix(): void
     {
         $cases = [

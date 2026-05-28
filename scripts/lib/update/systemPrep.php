@@ -311,6 +311,123 @@ function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = 
     runStep('Starting PMSS boot tuning service', 'systemctl start pmss-boot-tuning.service || true');
 }
 
+// Boot-default helpers keep fstab mutation, grub cmdline mutation, and grub key convergence separate.
+function pmssBootDefaultsRequiredGrubOptions(string $grubOption, ?array $extraGrubOptions): array
+{
+    $options = [];
+    foreach (array_merge([$grubOption], is_array($extraGrubOptions) ? $extraGrubOptions : []) as $option) {
+        $option = trim((string) $option);
+        if ($option !== '') $options[] = $option;
+    }
+    return array_values(array_unique($options));
+}
+
+function pmssBootDefaultsRequiredGrubSettings(?array $extraGrubSettings): array
+{
+    $settings = [];
+    foreach (is_array($extraGrubSettings) ? $extraGrubSettings : [] as $key => $value) {
+        $key = trim((string) $key);
+        if ($key !== '' && preg_match('/^[A-Z0-9_]+$/', $key) === 1) $settings[$key] = trim((string) $value);
+    }
+    return $settings;
+}
+
+function pmssBootDefaultsEnsureProcHidepid(string $fstabPath, callable $log): void
+{
+    $fstabChanged = false;
+    $lines = pmssFstabLinesRead($fstabPath, $log, '/proc hidepid enforcement');
+    if ($lines === null) return;
+
+    $plan = pmssFstabMountOptionsEnsure($lines, '/proc', [], [], false, 'proc', ['hidepid=' => 'hidepid=2']);
+    if ($plan === null) {
+        $lines[] = "proc\t/proc\tproc\tdefaults,hidepid=2\t0\t0";
+        $fstabChanged = true;
+        $log('Added /proc mount with hidepid=2 to '.$fstabPath);
+    } elseif ($plan['changed']) {
+        $fstabChanged = true;
+        $log('Updated /proc mount options in '.$fstabPath);
+    }
+
+    if ($fstabChanged) {
+        pmssWriteManagedPathFileWithBackup($fstabPath, $lines, 'fstab', $log);
+        runStep('Remounting /proc with hidepid=2', pmssBuildCommand('mount', ['-o', 'remount,hidepid=2', '/proc']));
+    }
+}
+
+function pmssBootDefaultsGrubValueUnquote(string $rawValue): string
+{
+    if (strlen($rawValue) < 2) return $rawValue;
+    $quote = $rawValue[0];
+    return (($quote === '"' || $quote === "'") && $rawValue[strlen($rawValue) - 1] === $quote) ? substr($rawValue, 1, -1) : $rawValue;
+}
+
+function pmssBootDefaultsEnsureGrubOptions(array &$lines, array $requiredGrubOptions, string $grubPath, callable $log): bool
+{
+    $changed = $found = false;
+    foreach ($lines as $idx => $line) {
+        if (!preg_match('/^(GRUB_CMDLINE_LINUX_DEFAULT|GRUB_CMDLINE_LINUX)=("|\')([^"\']*)("|\')/', $line, $match)) {
+            continue;
+        }
+        $found = true;
+        $currentOptions = array_values(array_filter(preg_split('/\s+/', trim($match[3])) ?: [], 'strlen'));
+        foreach ($requiredGrubOptions as $option) {
+            if (!in_array($option, $currentOptions, true)) $currentOptions[] = $option;
+        }
+        $updatedValue = implode(' ', $currentOptions);
+        if ($updatedValue !== $match[3]) {
+            $lines[$idx] = $match[1].'='.$match[2].$updatedValue.$match[2];
+            $changed = true;
+            $log('Updated '.$match[1].' options in '.$grubPath);
+        }
+        break;
+    }
+    if (!$found && $requiredGrubOptions !== []) {
+        $lines[] = 'GRUB_CMDLINE_LINUX_DEFAULT="'.implode(' ', $requiredGrubOptions).'"';
+        $changed = true;
+        $log('Added GRUB_CMDLINE_LINUX_DEFAULT to '.$grubPath);
+    }
+    return $changed;
+}
+
+function pmssBootDefaultsEnsureGrubSettings(array &$lines, array $requiredGrubSettings, string $grubPath, callable $log): bool
+{
+    $changed = false;
+    foreach ($requiredGrubSettings as $settingKey => $settingValue) {
+        $settingFound = false;
+        $settingPrefix = $settingKey.'=';
+        foreach ($lines as $lineIdx => $line) {
+            if (strpos($line, $settingPrefix) !== 0) continue;
+            $settingFound = true;
+            if (pmssBootDefaultsGrubValueUnquote(trim(substr($line, strlen($settingPrefix)))) !== $settingValue) {
+                $lines[$lineIdx] = $settingKey.'="'.$settingValue.'"';
+                $changed = true;
+                $log('Updated '.$settingKey.' in '.$grubPath);
+            }
+            break;
+        }
+        if (!$settingFound) {
+            $lines[] = $settingKey.'="'.$settingValue.'"';
+            $changed = true;
+            $log('Added '.$settingKey.' to '.$grubPath);
+        }
+    }
+    return $changed;
+}
+
+function pmssBootDefaultsApplyGrubChanges(bool $grubChanged, string $grubPath, string $grubOption, callable $log): void
+{
+    if (!$grubChanged) return;
+    if (pmssCommandPath('update-grub') !== '') {
+        runStep('Updating GRUB configuration', 'update-grub');
+    } else {
+        $log('[WARN] update-grub not available; run update-grub after editing '.$grubPath);
+    }
+    $cmdline = @file_get_contents('/proc/cmdline');
+    if ($grubOption !== '' && $cmdline !== false && strpos($cmdline, $grubOption) === false) {
+        $log('[WARN] '.$grubOption.' will apply after reboot');
+    }
+}
+
 /**
  * Ensure /proc hidepid=2 and legacy grub cmdline defaults stay applied.
  *
@@ -331,143 +448,25 @@ function pmssEnsureBootDefaults(
     $grubPath = $grubPath ?? '/etc/default/grub';
     $grubOption = $grubOption ?? 'systemd.unified_cgroup_hierarchy=0';
 
-    $requiredGrubOptions = [];
     $grubOption = trim((string) $grubOption);
-    if ($grubOption !== '') {
-        $requiredGrubOptions[] = $grubOption;
-    }
-    if (is_array($extraGrubOptions)) {
-        foreach ($extraGrubOptions as $option) {
-            $option = trim((string) $option);
-            if ($option !== '') {
-                $requiredGrubOptions[] = $option;
-            }
-        }
-    }
-    $requiredGrubOptions = array_values(array_unique($requiredGrubOptions));
+    $requiredGrubOptions = pmssBootDefaultsRequiredGrubOptions($grubOption, $extraGrubOptions);
+    $requiredGrubSettings = pmssBootDefaultsRequiredGrubSettings($extraGrubSettings);
 
-    $requiredGrubSettings = [];
-    if (is_array($extraGrubSettings)) {
-        foreach ($extraGrubSettings as $key => $value) {
-            $key = trim((string) $key);
-            if ($key === '' || preg_match('/^[A-Z0-9_]+$/', $key) !== 1) {
-                continue;
-            }
-            $requiredGrubSettings[$key] = trim((string) $value);
-        }
-    }
+    pmssBootDefaultsEnsureProcHidepid($fstabPath, $log);
 
-    // /proc hidepid baseline.
-    $fstabChanged = false;
-    $lines = pmssFstabLinesRead($fstabPath, $log, '/proc hidepid enforcement');
-    if ($lines !== null) {
-        $plan = pmssFstabMountOptionsEnsure($lines, '/proc', [], [], false, 'proc', ['hidepid=' => 'hidepid=2']);
-        if ($plan === null) {
-            $lines[] = "proc\t/proc\tproc\tdefaults,hidepid=2\t0\t0";
-            $fstabChanged = true;
-            $log('Added /proc mount with hidepid=2 to '.$fstabPath);
-        } elseif ($plan['changed']) {
-            $fstabChanged = true;
-            $log('Updated /proc mount options in '.$fstabPath);
-        }
-        // Write fstab only when content changed, with a backup.
-        if ($fstabChanged) {
-            pmssWriteManagedPathFileWithBackup($fstabPath, $lines, 'fstab', $log);
-
-            // Remount /proc after fstab changes so the runtime view matches.
-            $command = pmssBuildCommand('mount', ['-o', 'remount,hidepid=2', '/proc']);
-            runStep('Remounting /proc with hidepid=2', $command);
-        }
-    }
-
-    // Grub cmdline baseline.
     $grubChanged = false;
     if (is_readable($grubPath) && ($lines = file($grubPath, FILE_IGNORE_NEW_LINES)) !== false) {
-        // Update the first GRUB_CMDLINE entry or add a new one.
-        $found = false;
-        foreach ($lines as $idx => $line) {
-            if (!preg_match('/^(GRUB_CMDLINE_LINUX_DEFAULT|GRUB_CMDLINE_LINUX)=("|\')([^"\']*)("|\')/', $line, $match)) {
-                continue;
-            }
-            $found = true;
-            $key = $match[1];
-            $quote = $match[2];
-            $value = $match[3];
-
-            $currentOptions = preg_split('/\s+/', trim($value)) ?: [];
-            $currentOptions = array_values(array_filter($currentOptions, 'strlen'));
-            foreach ($requiredGrubOptions as $option) {
-                if (!in_array($option, $currentOptions, true)) {
-                    $currentOptions[] = $option;
-                }
-            }
-            $updatedValue = implode(' ', $currentOptions);
-
-            if ($updatedValue !== $value) {
-                $lines[$idx] = $key.'='.$quote.$updatedValue.$quote;
-                $grubChanged = true;
-                $log('Updated '.$key.' options in '.$grubPath);
-            }
-            break;
-        }
-        if (!$found && !empty($requiredGrubOptions)) {
-            $lines[] = 'GRUB_CMDLINE_LINUX_DEFAULT="'.implode(' ', $requiredGrubOptions).'"';
+        $grubChanged = pmssBootDefaultsEnsureGrubOptions($lines, $requiredGrubOptions, $grubPath, $log);
+        if (pmssBootDefaultsEnsureGrubSettings($lines, $requiredGrubSettings, $grubPath, $log)) {
             $grubChanged = true;
-            $log('Added GRUB_CMDLINE_LINUX_DEFAULT to '.$grubPath);
         }
-
-        // Ensure additional grub key/value settings (e.g. serial console)
-        // are present with explicit values.
-        foreach ($requiredGrubSettings as $settingKey => $settingValue) {
-            $settingFound = false;
-            $settingPrefix = $settingKey.'=';
-            foreach ($lines as $lineIdx => $line) {
-                if (strpos($line, $settingPrefix) !== 0) {
-                    continue;
-                }
-                $settingFound = true;
-                $rawValue = trim(substr($line, strlen($settingPrefix)));
-                if (strlen($rawValue) >= 2) {
-                    $first = $rawValue[0];
-                    $last = $rawValue[strlen($rawValue) - 1];
-                    if (($first === '"' && $last === '"') || ($first === "'" && $last === "'")) {
-                        $rawValue = substr($rawValue, 1, -1);
-                    }
-                }
-                if ($rawValue !== $settingValue) {
-                    $lines[$lineIdx] = $settingKey.'="'.$settingValue.'"';
-                    $grubChanged = true;
-                    $log('Updated '.$settingKey.' in '.$grubPath);
-                }
-                break;
-            }
-            if (!$settingFound) {
-                $lines[] = $settingKey.'="'.$settingValue.'"';
-                $grubChanged = true;
-                $log('Added '.$settingKey.' to '.$grubPath);
-            }
-        }
-
-        // Persist grub updates only when modified, keeping a backup.
         if ($grubChanged) {
             pmssWriteManagedPathFileWithBackup($grubPath, $lines, 'grub', $log);
         }
     } else {
         $log('[WARN] '.$grubPath.' not readable; skipping grub cmdline update');
     }
-    // Apply grub changes when possible and warn about reboot.
-    if ($grubChanged) {
-        $hasUpdateGrub = pmssCommandPath('update-grub') !== '';
-        if ($hasUpdateGrub) {
-            runStep('Updating GRUB configuration', 'update-grub');
-        } else {
-            $log('[WARN] update-grub not available; run update-grub after editing '.$grubPath);
-        }
-        $cmdline = @file_get_contents('/proc/cmdline');
-        if ($grubOption !== '' && $cmdline !== false && strpos($cmdline, $grubOption) === false) {
-            $log('[WARN] '.$grubOption.' will apply after reboot');
-        }
-    }
+    pmssBootDefaultsApplyGrubChanges($grubChanged, $grubPath, $grubOption, $log);
 }
 
 /**
