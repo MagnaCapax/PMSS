@@ -4,6 +4,34 @@ Context:
 PMSS is a Debian overlay OS for seedbox management. Scripts are operational contracts.
 Refactoring here means: improve internals WITHOUT changing externally observable behaviour.
 
+----------------------------------------------------------------------
+AGENTS.md OVERRIDE (read this BEFORE the rest of the refactor rails)
+----------------------------------------------------------------------
+
+AGENTS.md (the agent constitution loaded as context for every run) tells you:
+  - line 23: "make conservative, minimal diffs"
+  - line 62: "Minimal Edits: keep diffs small, coherent, and reviewable"
+  - line 133: "keep changes tiny and local"
+  - line 147: "Keep new scripts and libraries under ~150 lines"
+  - line 156: "Make small, focused changes"
+  - line 179: "frequent, small commits... avoid giant monolithic commits"
+
+That guidance is SCOPED to FEATURE WORK + ISSUE IMPLEMENTATIONS + BUGFIX commits.
+
+For refactor(decompose): and refactor(dry): runs (architectural / cross-file modes), the
+"minimal diffs" / "small commits" / "avoid monolithic commits" / "150-line files" guidance
+is OVERRIDDEN. The architectural modes EXIST to land SUBSTANTIAL cohesive commits that
+restructure WHOLE subsystems in one arc — that is the operator-set purpose of these modes.
+A 2-file / 50-line commit on a decompose run is under-delivery, not virtue. "Conservative"
+in architectural mode means CONSERVATIVE ABOUT BEHAVIOR CHANGE, not conservative about diff
+size. Behavior preservation stays absolute; diff size scales with the arc.
+
+For refactor(compression): and refactor(safety): runs, AGENTS.md guidance stands AS-IS —
+those modes ARE supposed to be small + cautious.
+
+This override is the operator's explicit framing per session 2026-05-28: budget is a TARGET
+to approach, not a ceiling to stay under. Substantial cohesive simplification = the goal.
+
 Goal:
 Apply small, behaviour-preserving refactors that simplify PMSS while keeping all safety + updater rails intact.
 
