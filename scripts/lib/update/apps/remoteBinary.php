@@ -106,10 +106,8 @@ function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expe
         }
     }
     if ($workDir === ''
-        || strpos($workDir, '/') !== 0
-        || strpos($workDir, "\0") !== false
         || $trimmedWorkDir === ''
-        || strpos($trimmedWorkDir.'/', '/../') !== false
+        || !pmssPathTargetIsSafe($trimmedWorkDir, true, false, false)
     ) {
         logmsg("[WARN] Refusing unsafe archive extraction path for {$label}");
         return;

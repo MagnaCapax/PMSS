@@ -161,6 +161,32 @@ SH
         }
     }
 
+    public function testRunPinnedRemoteArchiveStepRejectsSymlinkedWorkspaceBeforeDownload(): void
+    {
+        $body = 'payload';
+        $expectedSha256 = hash('sha256', $body);
+
+        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog) use ($expectedSha256): void {
+            $target = $root.'/real-workspace';
+            $link = $root.'/linked-workspace';
+            @mkdir($target, 0755, true);
+            $this->pmssCreateSymlinkOrSkip($target, $link);
+
+            \pmssRunPinnedRemoteArchiveStep(
+                'demo archive',
+                'https://example.invalid/archive',
+                $expectedSha256,
+                'archive.tar.gz',
+                'source',
+                'Extracting demo archive',
+                [],
+                $link
+            );
+
+            $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
+        });
+    }
+
     public function testInstallPinnedRemoteBinarySkipsDownloadWhenChecksumAlreadyMatches(): void
     {
         $body = 'payload';
