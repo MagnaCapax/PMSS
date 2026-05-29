@@ -7,24 +7,21 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
 {
     public function testUpdateStep2UsesProfiledWrappersForModuleCalls(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/util/update-step2.php');
-
-        $this->assertTrue(strpos($src, '#TODO profiling (GH #120)') === false, 'Profiling TODO marker should be removed once coverage is wired');
-        $this->assertStringContainsString('function pmssRunProfiledStep(', $src, 'Expected callable profiling helper');
-        $this->assertStringContainsString('function pmssRunProfiledCallable(', $src, 'Expected callable invocation helper');
         $removedWrapper = 'function pmssUpdateStep2Run'.'ClassifiedCallable(';
-        $this->assertStringNotContainsString($removedWrapper, $src, 'Classified callable handling should be folded into pmssRunProfiledCallable');
 
-        foreach ([
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/update-step2.php', [
+            'function pmssRunProfiledStep(',
+            'function pmssRunProfiledCallable(',
             'Preparing noninteractive apt defaults',
             'Refreshing package repositories',
             'Applying distro dpkg baseline selections',
             'Configuring web stack',
             'Updating all user environments',
             'Ensuring network template baseline',
-        ] as $label) {
-            $this->assertStringContainsString($label, $src, 'Missing profiled step label: '.$label);
-        }
+        ], [
+            '#TODO profiling (GH #120)' => 'Profiling TODO marker should be removed once coverage is wired',
+            $removedWrapper => 'Classified callable handling should be folded into pmssRunProfiledCallable',
+        ]);
     }
 
     public function testUpdateStep2EmitsProfileSummaryAfterFinalWork(): void

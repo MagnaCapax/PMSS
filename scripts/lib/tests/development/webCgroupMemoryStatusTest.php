@@ -132,9 +132,11 @@ class WebCgroupMemoryStatusTest extends TestCase
 
     public function testWelcomePageSplitsThrottleAndOomWarningCopy(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/webCgroupMemoryStatus.php');
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'etc/skel/www/webCgroupMemoryStatus.php',
+            ['RAM THROTTLE ACTIVE', 'RAM LIMIT EXCEEDED', '$isThrottleActive', '$hasOomEvents']
+        );
 
-        $this->assertStringContainsAllStrings(['RAM THROTTLE ACTIVE', 'RAM LIMIT EXCEEDED', '$isThrottleActive', '$hasOomEvents'], $source);
         $this->assertTrue(
             strpos($source, 'RAM THROTTLE ACTIVE') < strpos($source, 'RAM LIMIT EXCEEDED'),
             'Throttle copy must be selected before the hard-limit/OOM warning copy.'

@@ -7,7 +7,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 {
     private function assertUpdateAppContainsAllStrings(string $installer, array $needles): void
     {
-        $this->assertStringContainsAllStrings($needles, $this->pmssReadUpdateAppFile($installer));
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/'.$installer, $needles);
     }
 
     public function testPyloadKeepsSharedVenvAndGuards(): void
@@ -44,22 +44,18 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testPythonInstallerKeepsInstallSequence(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('python.php');
-
-        $this->assertStringContainsAllStrings([
+        $this->assertUpdateAppContainsAllStrings('python.php', [
             'Installing gdrivefs in FlexGet venv',
             'Installing FlexGet dependencies',
             'Installing FlexGet',
             'Installing youtube-dl for FlexGet',
             '/usr/local/bin/flexget',
-        ], $contents);
+        ]);
     }
 
     public function testIprangeKeepsPackageAndToolchainGuards(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('iprange.php');
-
-        $this->assertStringContainsAllStrings([
+        $this->assertUpdateAppContainsAllStrings('iprange.php', [
             "empty(\$GLOBALS['PMSS_PACKAGES_READY'])",
             'Skipping iprange build: package phase not complete',
             'Skipping iprange build: missing toolchain packages',
@@ -68,7 +64,7 @@ class UpdateAppInstallerContractsTest extends TestCase
             "'gcc'",
             "'make'",
             "'gawk'",
-        ], $contents);
+        ]);
     }
 
     public function testIprangeKeepsCompileStep(): void
@@ -149,11 +145,10 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testVnstatInstallerKeepsSupportedConfigPathOnly(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('vnstat.php');
         $repairCommand = 'chown -R '.'vnstat:vnstat /var/lib/vnstat';
         $removedVersionVariable = '$debian'.'Major';
 
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/vnstat.php', [
             "require_once '/scripts/lib/networkInfo.php';",
             "networkInterfaceNameNormalized((string) \$link)",
             "runStep('Installing vnstat'",
@@ -166,10 +161,11 @@ class UpdateAppInstallerContractsTest extends TestCase
             'Warning: unable to write /etc/vnstat.conf',
             "runStep('Restarting vnstat'",
             "pmssBuildCommand('/etc/init.d/vnstat', ['restart'])",
-        ], $contents);
-        $this->pmssAssertStringNotContainsString('passthru(', $contents, 'vnstat.php should route shelling through runStep()');
-        $this->pmssAssertStringNotContainsString($repairCommand, $contents, 'vnstat.php should not keep Debian 8 repair branches for unsupported releases');
-        $this->pmssAssertStringNotContainsString($removedVersionVariable, $contents, 'vnstat.php should not parse Debian major versions for removed Debian 8 repair logic');
+        ], [
+            'passthru(' => 'vnstat.php should route shelling through runStep()',
+            $repairCommand => 'vnstat.php should not keep Debian 8 repair branches for unsupported releases',
+            $removedVersionVariable => 'vnstat.php should not parse Debian major versions for removed Debian 8 repair logic',
+        ]);
     }
 
     public function testWatchdogInstallerKeepsTemplateAndDeviceFallbackFlow(): void

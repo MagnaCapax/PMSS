@@ -83,13 +83,9 @@ class ResourceLogHelpersTest extends TestCase
         $path = $root.'/resource.log';
         $this->assertTrue(\pmssAppendRootTimestampedLogEntry($path, ": 123\n"));
         $this->assertTrue((bool) preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}: 123\n$/', (string) file_get_contents($path)));
-        $this->pmssAssertRepoFileContainsString('scripts/cron/resourceLog.php', "pmssAppendRootTimestampedLogEntry(\$logDir.'/'.\$user");
-        $this->pmssAssertRepoFileNotContainsString('scripts/cron/resourceLog.php', "pmssAppendUserFile(\$logDir.'/'.\$user");
-        $this->pmssAssertRepoFileNotContainsString('scripts/cron/resourceLog.php', "@file_put_contents(\$logDir.'/'.\$user");
-        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', 'pmssAppendRootTimestampedLogEntry(');
-        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficIngressLog.php', 'pmssAppendRootTimestampedLogEntry(');
-        $this->pmssAssertRepoFileNotContainsString('scripts/cron/trafficLog.php', "file_put_contents(\$logdir . \$thisUser");
-        $this->pmssAssertRepoFileNotContainsString('scripts/cron/trafficIngressLog.php', "@file_put_contents(\$logDir.'/'.\$user");
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/resourceLog.php', ["pmssAppendRootTimestampedLogEntry(\$logDir.'/'.\$user"], ["pmssAppendUserFile(\$logDir.'/'.\$user", "@file_put_contents(\$logDir.'/'.\$user"]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/trafficLog.php', ['pmssAppendRootTimestampedLogEntry('], ["file_put_contents(\$logdir . \$thisUser"]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/trafficIngressLog.php', ['pmssAppendRootTimestampedLogEntry('], ["@file_put_contents(\$logDir.'/'.\$user"]);
     }
 
     public function testFiveMinuteLinkBudgetThresholdChecks(): void
@@ -146,16 +142,13 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testTrafficLogUsesSharedUsageParserInsteadOfTempFileGreps(): void
     {
-        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', '$parsedUsage = pmssTrafficParseOutputUsage($usage, $localnets);');
-        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', 'pmssTrafficCollectOutputUsage(');
-        $this->pmssAssertRepoFileNotContainsString('scripts/cron/trafficLog.php', '/sbin/iptables -nvx -L OUTPUT |');
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/trafficLog.php', [
+            '$parsedUsage = pmssTrafficParseOutputUsage($usage, $localnets);',
+            'pmssTrafficCollectOutputUsage(',
+            'pmssTrafficBudgetExceeded(',
+        ], ['/sbin/iptables -nvx -L OUTPUT |', '$thisUsageFile', 'grep "0.0.0.0/0', 'grep "Chain OUTPUT ("', 'unlink($thisUsageFile)']);
         $this->pmssAssertRepoFileContainsString('scripts/lib/traffic.php', 'function pmssTrafficBudgetExceeded(');
-        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', 'pmssTrafficBudgetExceeded(');
         $this->pmssAssertRepoFileContainsString('scripts/cron/trafficIngressLog.php', 'pmssTrafficBudgetExceeded(');
-        $this->pmssAssertRepoFileNotContainsStrings(
-            'scripts/cron/trafficLog.php',
-            ['$thisUsageFile', 'grep "0.0.0.0/0', 'grep "Chain OUTPUT ("', 'unlink($thisUsageFile)']
-        );
     }
 
     public function testTrafficOutputUsageCollectorListsBeforeReset(): void
