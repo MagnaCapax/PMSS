@@ -45,7 +45,7 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
     public function testTrafficLimitCronWritesReadableThrottleFile(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/cron/trafficLimits.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/user/trafficLimit.php');
 
         $this->assertStringContainsString('pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)', $source);
         $this->assertStringContainsString('traffic throttle file write failed', $source);
@@ -63,21 +63,24 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
     public function testTrafficLimitCronChecksRuntimeMarkerWrites(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLimits.php', [
-            'function pmssTrafficLimitMarkerTouch(string $user, string $path): bool',
-            'function pmssTrafficLimitMarkerRemove(string $user, string $path): bool',
             'if (!pmssTrafficLimitMarkerTouch($thisUser, $userTrafficLimitEnabledFile)) {',
             'if (!pmssTrafficLimitMarkerRemove($thisUser, $userTrafficLimitEnabledFile)) {',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/trafficLimit.php', [
+            'function pmssTrafficLimitMarkerTouch(string $user, string $path): bool',
+            'function pmssTrafficLimitMarkerRemove(string $user, string $path): bool',
         ]);
     }
 
     public function testTrafficLimitCronValidatesThrottleFileBoundary(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLimits.php', [
-            'function pmssTrafficLimitThrottleFilePath(string $user): ?string',
-            'pmssValidateUsername($user)',
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/trafficLimit.php', [
+            "function pmssTrafficLimitThrottleFilePath(string \$user, string \$homeRoot = '/home'): ?string",
+            'pmssTrafficLimitCliUsernameNormalize($user)',
             '@realpath($home) !== $home',
             'pmssUserFilePathIsSafe($path)',
         ]);
+        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLimits.php', 'pmssTrafficLimitThrottleApply($thisUser, $throttlePlan[\'effectiveCapMbit\']);');
     }
 
     public function testThrottlePolicyNoLongerUsesSlidingStateFiles(): void

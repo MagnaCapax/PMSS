@@ -143,6 +143,93 @@ if (!function_exists('pmssTrafficLimitThrottleFileRemove')) {
     }
 }
 
+if (!function_exists('pmssTrafficLimitCliUsernameNormalize')) {
+    function pmssTrafficLimitCliUsernameNormalize(string $rawUserName): ?string
+    {
+        if (function_exists('pmssUsernameNormalizeIfValid')) {
+            return pmssUsernameNormalizeIfValid($rawUserName);
+        }
+        $normalized = function_exists('pmssNormalizeUsername')
+            ? pmssNormalizeUsername($rawUserName)
+            : strtolower(trim($rawUserName));
+        return preg_match('/^[a-z][a-z0-9]{0,7}$/D', $normalized) === 1 ? $normalized : null;
+    }
+}
+
+if (!function_exists('pmssTrafficLimitLog')) {
+    function pmssTrafficLimitLog(string $user, string $message): void
+    {
+        echo date('Y-m-d H:i:s') . ": {$message}\n";
+        if (function_exists('pmssUserLog') && ($normalizedUser = pmssTrafficLimitCliUsernameNormalize($user)) !== null) {
+            pmssUserLog($normalizedUser, $message);
+        }
+    }
+}
+
+if (!function_exists('pmssTrafficLimitMarkerTouch')) {
+    function pmssTrafficLimitMarkerTouch(string $user, string $path): bool
+    {
+        if (!@touch($path)) {
+            pmssTrafficLimitLog($user, "traffic throttle marker touch failed ({$path})");
+            return false;
+        }
+        if (!@chmod($path, 0600)) {
+            pmssTrafficLimitLog($user, "traffic throttle marker chmod failed ({$path})");
+        }
+        return true;
+    }
+}
+
+if (!function_exists('pmssTrafficLimitMarkerRemove')) {
+    function pmssTrafficLimitMarkerRemove(string $user, string $path): bool
+    {
+        if (!file_exists($path) || @unlink($path) || !file_exists($path)) {
+            return true;
+        }
+        pmssTrafficLimitLog($user, "traffic throttle marker removal failed ({$path})");
+        return false;
+    }
+}
+
+if (!function_exists('pmssTrafficLimitThrottleFilePath')) {
+    function pmssTrafficLimitThrottleFilePath(string $user, string $homeRoot = '/home'): ?string
+    {
+        $user = pmssTrafficLimitCliUsernameNormalize($user) ?? '';
+        if ($user === '') {
+            return null;
+        }
+        $home = rtrim($homeRoot, '/').'/'.$user;
+        if (!is_dir($home) || is_link($home) || @realpath($home) !== $home) {
+            return null;
+        }
+        $path = $home.'/.throttle';
+        return (!function_exists('pmssUserFilePathIsSafe') || pmssUserFilePathIsSafe($path)) ? $path : null;
+    }
+}
+
+if (!function_exists('pmssTrafficLimitThrottleApply')) {
+    function pmssTrafficLimitThrottleApply(string $user, int $trafficCapMbit, bool $enable = true, string $homeRoot = '/home'): bool
+    {
+        $throttleFile = pmssTrafficLimitThrottleFilePath($user, $homeRoot);
+        if ($throttleFile === null) {
+            return false;
+        }
+        $error = null;
+        if (!$enable) {
+            if (!pmssTrafficLimitThrottleFileRemove($throttleFile, $error)) {
+                pmssTrafficLimitLog($user, 'traffic throttle file removal failed ('.($error ?: $throttleFile).')');
+                return false;
+            }
+            return true;
+        }
+        if (!pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)) {
+            pmssTrafficLimitLog($user, 'traffic throttle file write failed ('.($error ?: $throttleFile).')');
+            return false;
+        }
+        return true;
+    }
+}
+
 if (!function_exists('pmssTrafficLimitPersistTargetModes')) {
     /** @param array<string,int> $targetModes */
     function pmssTrafficLimitPersistTargetModes(array $targetModes, int $value, ?string &$error = null): bool
@@ -152,21 +239,6 @@ if (!function_exists('pmssTrafficLimitPersistTargetModes')) {
 }
 
 if (!function_exists('pmssTrafficLimitResolveCliUserHome')) {
-    function pmssTrafficLimitCliUsernameNormalize(string $rawUserName): ?string
-    {
-        if (function_exists('pmssUsernameNormalizeIfValid')) {
-            return pmssUsernameNormalizeIfValid($rawUserName);
-        }
-
-        $normalized = function_exists('pmssNormalizeUsername')
-            ? pmssNormalizeUsername($rawUserName)
-            : strtolower(trim($rawUserName));
-
-        return preg_match('/^[a-z][a-z0-9]{0,7}$/D', $normalized) === 1
-            ? $normalized
-            : null;
-    }
-
     /** @return array<string,mixed>|null */
     function pmssTrafficLimitCliUserAccountLookup(string $userName): ?array
     {

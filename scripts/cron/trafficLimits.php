@@ -80,7 +80,7 @@ foreach($users AS $thisUser) {
         if (!pmssTrafficLimitMarkerTouch($thisUser, $userTrafficLimitEnabledFile)) {
             continue;
         }
-        setRateLimit($thisUser, $throttlePlan['effectiveCapMbit']);    // Apply rate limiting
+        pmssTrafficLimitThrottleApply($thisUser, $throttlePlan['effectiveCapMbit']);
         pmssUserLog($thisUser, $throttlePlan['logMessage']);
 
     } else if (file_exists($userTrafficLimitEnabledFile)) {     // Now let's see if it's time to remove it?
@@ -90,86 +90,11 @@ foreach($users AS $thisUser) {
                 continue;
             }
             pmssUserLog($thisUser, 'traffic throttle removed after cooldown');
-            setRateLimit($thisUser, $trafficCapMbit, false);
+            pmssTrafficLimitThrottleApply($thisUser, $trafficCapMbit, false);
 			// Do it second time as removal does not always work for some reason
 			sleep(1);
-			setRateLimit($thisUser, $trafficCapMbit, false);
+			pmssTrafficLimitThrottleApply($thisUser, $trafficCapMbit, false);
         }
 
-    }
-}
-
-/**
- * Emit traffic-limit safety warnings to cron output and the per-user log.
- */
-function pmssTrafficLimitLog(string $user, string $message): void
-{
-    echo date('Y-m-d H:i:s') . ": {$message}\n";
-    if (pmssValidateUsername($user)) {
-        pmssUserLog($user, $message);
-    }
-}
-
-/**
- * Refresh the active-throttle marker and report marker write failures.
- */
-function pmssTrafficLimitMarkerTouch(string $user, string $path): bool
-{
-    if (!@touch($path)) {
-        pmssTrafficLimitLog($user, "traffic throttle marker touch failed ({$path})");
-        return false;
-    }
-
-    if (!@chmod($path, 0600)) {
-        pmssTrafficLimitLog($user, "traffic throttle marker chmod failed ({$path})");
-    }
-
-    return true;
-}
-
-/**
- * Remove the active-throttle marker only when filesystem state confirms it.
- */
-function pmssTrafficLimitMarkerRemove(string $user, string $path): bool
-{
-    if (!file_exists($path) || @unlink($path) || !file_exists($path)) {
-        return true;
-    }
-
-    pmssTrafficLimitLog($user, "traffic throttle marker removal failed ({$path})");
-    return false;
-}
-
-/**
- * Resolve the throttle marker path after rechecking the user/home boundary.
- */
-function pmssTrafficLimitThrottleFilePath(string $user): ?string
-{
-    $user = pmssNormalizeUsername($user);
-    if (!pmssValidateUsername($user)) {
-        return null;
-    }
-
-    $home = "/home/{$user}";
-    if (!is_dir($home) || is_link($home) || @realpath($home) !== $home) return null;
-
-    $path = $home.'/.throttle';
-    return pmssUserFilePathIsSafe($path) ? $path : null;
-}
-
-function setRateLimit($user, $trafficCapMbit, $enable=true) {
-    $throttleFile = pmssTrafficLimitThrottleFilePath((string) $user);
-    if ($throttleFile === null) return;
-
-    $error = null;
-    if ($enable == false) {
-        if (!pmssTrafficLimitThrottleFileRemove($throttleFile, $error)) {
-            pmssTrafficLimitLog((string) $user, 'traffic throttle file removal failed ('.($error ?: $throttleFile).')');
-        }
-        return;
-    }
-
-    if (!pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)) {
-        pmssTrafficLimitLog((string) $user, 'traffic throttle file write failed ('.($error ?: $throttleFile).')');
     }
 }
