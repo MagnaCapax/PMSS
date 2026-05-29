@@ -102,6 +102,10 @@ foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
         $wRaw = pmssBfqFormulaWeight($ramMiB, (float) $FORMULA_K, (int) $CUST_MAX);
     }
 
+    // Free Bonus Disk Policy: ~/.bonus holds tenure/spend bonus percent.
+    $bonusPct = max(0, (int) @file_get_contents('/home/'.$user.'/.bonus'));
+    $wRaw     = (int) round($wRaw * (1 + $bonusPct / 100));
+
     // bfq_addon flag unlocks the [CUST_MAX+1, KERN_MAX] bonus band.
     $bonus = !empty($json['bfq_addon']);
     $cap = $bonus ? $KERN_MAX : $CUST_MAX;
