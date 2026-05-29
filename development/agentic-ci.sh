@@ -72,15 +72,11 @@ declare -a remaining_args=()
 codex_parse_launcher_common_args agent exec_cmd dry_run autocommit remaining_args 0 "" job prompt -- "$@"
 set -- "${remaining_args[@]}"
 while [[ $# -gt 0 ]]; do
+	if codex_parse_value_option_map "$1" "${2:-}" job_name --job custom_prompt --prompt; then
+		shift "$CODEX_PARSE_SHIFT" || true
+		continue
+	fi
 	case "$1" in
-	--job)
-		codex_parse_option_value job_name "$1" "${2:-}" "--job"
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
-	--prompt)
-		codex_parse_option_value custom_prompt "$1" "${2:-}" "--prompt"
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
 	-h | --help)
 		usage
 		exit 0

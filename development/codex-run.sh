@@ -103,31 +103,15 @@ autocommit=0
 declare -a extra_context=()
 
 while [[ $# -gt 0 ]]; do
+	if codex_parse_value_option_map "$1" "${2:-}" prompt_file --prompt-file custom_prompt --prompt exec_cmd --exec outdir --outdir event_log --event-log; then
+		shift "$CODEX_PARSE_SHIFT" || true
+		continue
+	fi
+	if codex_parse_append_option_map "$1" "${2:-}" extra_context --context; then
+		shift "$CODEX_PARSE_SHIFT" || true
+		continue
+	fi
 	case "$1" in
-	--prompt-file)
-		codex_parse_option_value prompt_file "$1" "${2:-}" "--prompt-file"
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
-	--prompt)
-		codex_parse_option_value custom_prompt "$1" "${2:-}" "--prompt"
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
-	--exec)
-		codex_parse_option_value exec_cmd "$1" "${2:-}" "--exec"
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
-	--outdir)
-		codex_parse_option_value outdir "$1" "${2:-}" "--outdir"
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
-	--event-log)
-		codex_parse_option_value event_log "$1" "${2:-}" "--event-log"
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
-	--context)
-		codex_parse_option_append extra_context "$1" "${2:-}" "--context"
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
 	--dry-run | --autocommit)
 		if [[ "$1" == "--dry-run" ]]; then
 			dry_run=1

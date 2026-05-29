@@ -80,23 +80,11 @@ declare -a remaining_args=()
 codex_parse_launcher_common_args agent exec_cmd dry_run autocommit remaining_args 0 exec_extra_args commits target prompt cooling-files -- "$@"
 set -- "${remaining_args[@]}"
 while [[ $# -gt 0 ]]; do
+	if codex_parse_value_option_map "$1" "${2:-}" commits --commits target --target custom_prompt --prompt cooling_files --cooling-files; then
+		shift "$CODEX_PARSE_SHIFT" || true
+		continue
+	fi
 	case "$1" in
-	--commits)
-		codex_parse_option_value commits "$1" "${2:-}" "--commits"
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
-	--target)
-		codex_parse_option_value target "$1" "${2:-}" "--target"
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
-	--prompt)
-		codex_parse_option_value custom_prompt "$1" "${2:-}" "--prompt"
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
-	--cooling-files)
-		cooling_files=${2:-}
-		shift 2 || true
-		;;
 	--)
 		shift || true
 		if [[ $# -gt 0 ]]; then

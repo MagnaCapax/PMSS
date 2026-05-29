@@ -297,12 +297,42 @@ codex_parse_option_value() {
 	target_ref="$CODEX_PARSE_VALUE"
 }
 
+# Parse one of several value options without duplicating case arms in wrappers.
+codex_parse_value_option_map() {
+	local arg="$1" next_value="${2-}" target_name option_name
+	shift 2 || true
+	while [[ $# -ge 2 ]]; do
+		target_name="$1"
+		option_name="$2"
+		shift 2 || true
+		if codex_parse_option_value "$target_name" "$arg" "$next_value" "$option_name"; then
+			return 0
+		fi
+	done
+	return 1
+}
+
 # Parse a repeatable option and append its value to the target array.
 codex_parse_option_append() {
 	local target_name="$1"
 	local -n target_ref="$target_name"
 	codex_parse_option "$2" "${3-}" "$4" "${5:-0}" || return 1
 	target_ref+=("$CODEX_PARSE_VALUE")
+}
+
+# Parse one of several repeatable value options into mapped target arrays.
+codex_parse_append_option_map() {
+	local arg="$1" next_value="${2-}" target_name option_name
+	shift 2 || true
+	while [[ $# -ge 2 ]]; do
+		target_name="$1"
+		option_name="$2"
+		shift 2 || true
+		if codex_parse_option_append "$target_name" "$arg" "$next_value" "$option_name"; then
+			return 0
+		fi
+	done
+	return 1
 }
 
 # Parse assistant CLI passthrough flags collected before exec normalization.

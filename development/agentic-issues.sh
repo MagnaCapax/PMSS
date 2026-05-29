@@ -55,6 +55,10 @@ declare -a remaining_args=()
 codex_parse_launcher_common_args agent exec_cmd dry_run autocommit remaining_args 0 "" max-issues target-issue -- "$@"
 set -- "${remaining_args[@]}"
 while [[ $# -gt 0 ]]; do
+	if codex_parse_value_option_map "$1" "${2:-}" target_issue --target-issue; then
+		shift "$CODEX_PARSE_SHIFT" || true
+		continue
+	fi
 	case "$1" in
 	--max-issues)
 		codex_parse_option_value max_issues "$1" "${2:-5}" "--max-issues"
@@ -63,10 +67,6 @@ while [[ $# -gt 0 ]]; do
 	--select-only)
 		select_only=1
 		shift || true
-		;;
-	--target-issue)
-		codex_parse_option_value target_issue "$1" "${2:-}" "--target-issue"
-		shift "$CODEX_PARSE_SHIFT" || true
 		;;
 	--force)
 		force_target=1
