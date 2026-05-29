@@ -24,8 +24,7 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
     public function testPmssStatsNoLongerCarriesLocalIntegerReader(): void
     {
-        $this->pmssAssertRepoFileNotContainsString('scripts/lib/pmssStats.php', 'function '.'pmssStats'.'ReadIntegerFile(');
-        $this->pmssAssertRepoFileContainsString('scripts/lib/pmssStats.php', "require_once __DIR__.'/user/trafficLimit.php';");
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/pmssStats.php', ["require_once __DIR__.'/user/trafficLimit.php';"], ['function '.'pmssStats'.'ReadIntegerFile(']);
     }
 
     public function testSerializedStateConsumersUseSharedArrayReader(): void
@@ -45,11 +44,11 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
     public function testTrafficLimitCronWritesReadableThrottleFile(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/user/trafficLimit.php');
-
-        $this->assertStringContainsString('pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)', $source);
-        $this->assertStringContainsString('traffic throttle file write failed', $source);
-        $this->assertStringContainsString('pmssTrafficLimitThrottleFileRemove($throttleFile, $error)', $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/trafficLimit.php', [
+            'pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)',
+            'traffic throttle file write failed',
+            'pmssTrafficLimitThrottleFileRemove($throttleFile, $error)',
+        ]);
     }
 
     public function testTrafficLimitCronChecksListUsersExitCode(): void
@@ -88,8 +87,12 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
         $slidingKey = 'sliding'.'ThrottleStart';
         $legacyFileKey = 'throttle'.'_mbit';
 
-        $this->pmssAssertRepoFileNotContainsStrings('scripts/cron/trafficLimits.php', [$slidingKey, $legacyFileKey]);
-        $this->pmssAssertRepoFileNotContainsString('scripts/lib/network/fireqos.php', $legacyFileKey);
-        $this->pmssAssertRepoFileNotContainsString('scripts/lib/update/networking.php', $slidingKey);
+        foreach ([
+            'scripts/cron/trafficLimits.php' => [$slidingKey, $legacyFileKey],
+            'scripts/lib/network/fireqos.php' => [$legacyFileKey],
+            'scripts/lib/update/networking.php' => [$slidingKey],
+        ] as $path => $needles) {
+            $this->pmssAssertRepoFileNotContainsStrings($path, $needles);
+        }
     }
 }

@@ -9,16 +9,11 @@ class StatsDockerPolicyFrontendTest extends TestCase
 {
     public function testStatsPageKeepsDockerPolicyReadOnlyInsideCustomerTree(): void
     {
-        $this->pmssAssertRepoFileNotContainsStrings(
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'etc/skel/www/stats.php',
+            ['Docker policy:', 'Docker policy changes are handled by platform tooling.', 'Platform managed'],
             ['function pmssInfoDockerPolicy'.'StoreState()', 'pmssInfoSetDocker'.'Enabled', '/scripts/lib/user/userConfigStore.php']
         );
-        $this->pmssAssertRepoFileContainsString('etc/skel/www/stats.php', 'Platform managed');
-    }
-
-    public function testStatsPageShowsPlatformManagedNotice(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/stats.php', ['Docker policy:', 'Docker policy changes are handled by platform tooling.']);
     }
 
     public function testStatsRenderShowsReadOnlyDockerPolicy(): void

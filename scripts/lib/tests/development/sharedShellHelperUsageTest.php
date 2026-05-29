@@ -25,23 +25,21 @@ class SharedShellHelperUsageTest extends TestCase
         $this->assertEquals("Command failed (rc=1): empty command\n1", trim($output));
     }
 
-    public function testUserPermissionsRequiresSharedShellLibrary(): void
+    public function testUserPermissionsUsesSharedShellLibrary(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userPermissions.php', ["__DIR__.'/../lib/shell.php'", 'pmssRun(']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'scripts/util/userPermissions.php',
+            ["__DIR__.'/../lib/shell.php'", 'pmssRun('],
+            ['function run(string $cmd): int' => 'Expected userPermissions.php to stop defining a local run() helper']
+        );
     }
 
-    public function testUserPermissionsNoLongerDefinesLegacyRunHelper(): void
+    public function testRecreateUserUsesSharedShellLibrary(): void
     {
-        $this->pmssAssertRepoFileNotContainsString('scripts/util/userPermissions.php', 'function run(string $cmd): int', 'Expected userPermissions.php to stop defining a local run() helper');
-    }
-
-    public function testRecreateUserRequiresSharedShellLibrary(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/recreateUser.php', ["require_once __DIR__.'/lib/shell.php';", 'pmssRunOrExit(']);
-    }
-
-    public function testRecreateUserNoLongerDefinesLegacyRunHelper(): void
-    {
-        $this->pmssAssertRepoFileNotContainsString('scripts/recreateUser.php', 'function run(string $cmd): void', 'Expected recreateUser.php to stop defining a local run() helper');
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'scripts/recreateUser.php',
+            ["require_once __DIR__.'/lib/shell.php';", 'pmssRunOrExit('],
+            ['function run(string $cmd): void' => 'Expected recreateUser.php to stop defining a local run() helper']
+        );
     }
 }

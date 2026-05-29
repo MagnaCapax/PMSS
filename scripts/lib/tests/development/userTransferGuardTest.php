@@ -20,12 +20,11 @@ class UserTransferGuardTest extends TestCase
 
     public function testUserTransferLibraryAvoidsEmbeddingPasswordInScripts(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'scripts/lib/userTransfer.php',
             ['PMSS_USER_TRANSFER_PASSWORD', 'Remote user password:'],
-            'userTransfer library should keep password flow: '
+            ['send "{$args' => 'userTransfer must not embed password literals']
         );
-        $this->pmssAssertRepoFileNotContainsString('scripts/lib/userTransfer.php', 'send "{$args', 'userTransfer must not embed password literals');
     }
 
     public function testUserTransferRequiresRoot(): void
