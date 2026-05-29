@@ -1,40 +1,27 @@
 <?php
 /** Snapshot log primitives loaded by the shared runtime facade. */
 
-/**
- * Open a root-only append log for snapshot-style cron jobs.
- *
- * @return resource|false
- */
-function pmssSnapshotLogOpen(string $scriptName, string $logPath, ?int &$oldUmask)
-{
-    if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
-        fwrite(STDERR, basename($scriptName)." must be run as root.\n");
-        return false;
-    }
-    $oldUmask = umask(0077);
-    if (!pmssDirEnsureExists(dirname($logPath), 0755)) {
-        return false;
-    }
-    $handle = @fopen($logPath, 'ab');
-    if ($handle === false) {
-        return false;
-    }
-    @chmod($logPath, 0600);
-    if (function_exists('flock')) {
-        @flock($handle, LOCK_EX);
-    }
-    return $handle;
-}
-
 /** Resolve env log path, stamp time once, and run a snapshot callback. */
 function pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defaultLogPath, callable $callback): int
 {
     $timestamp = date('Y-m-d\\TH:i:s'); $oldUmask = null; $handle = false;
     try {
-        $handle = pmssSnapshotLogOpen($scriptName, pmssResolvePathFromEnv($envKey, $defaultLogPath), $oldUmask);
+        if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
+            fwrite(STDERR, basename($scriptName)." must be run as root.\n");
+            return 1;
+        }
+        $oldUmask = umask(0077);
+        $logPath = pmssResolvePathFromEnv($envKey, $defaultLogPath);
+        if (!pmssDirEnsureExists(dirname($logPath), 0755)) {
+            return 1;
+        }
+        $handle = @fopen($logPath, 'ab');
         if ($handle === false) {
             return 1;
+        }
+        @chmod($logPath, 0600);
+        if (function_exists('flock')) {
+            @flock($handle, LOCK_EX);
         }
         return (int) $callback($handle, $timestamp);
     } finally {
@@ -61,9 +48,6 @@ function pmssSnapshotWarnToken(string $value, string $fallback = 'field'): strin
     return substr($token, 0, 64);
 }
 
-/** Keep warning field values single-line and bounded without changing normal text. */
-function pmssSnapshotWarnValue($value): string { $normalized = (string) preg_replace('/[\r\n\0\t]+/', ' ', (string) $value); $normalized = trim((string) preg_replace('/ {2,}/', ' ', $normalized)); return strlen($normalized) > 300 ? substr($normalized, 0, 300) : $normalized; }
-
 // Append a normalized warning line to a snapshot log.
 function pmssSnapshotWriteWarn($handle, string $timestamp, string $code, array $fields = [], array $output = []): void
 {
@@ -76,7 +60,7 @@ function pmssSnapshotWriteWarn($handle, string $timestamp, string $code, array $
 
     $line = $timestamp.' WARN '.pmssSnapshotWarnToken($code, 'warn');
     foreach ($fields as $key => $value) {
-        $value = pmssSnapshotWarnValue($value);
+        $value = substr(trim((string) preg_replace('/ {2,}/', ' ', (string) preg_replace('/[\r\n\0\t]+/', ' ', (string) $value))), 0, 300);
         if ($value === '') {
             continue;
         }

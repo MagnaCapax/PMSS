@@ -45,17 +45,6 @@ function pmssUserConfigCliResourceOptionNames(string $optionKey): array
     return array_values(array_filter(array_map('strval', array_column(pmssUserConfigCliResourceSpecs(), $optionKey)), 'strlen'));
 }
 
-/** Check whether a parsed long option carries an explicit scalar value. */
-function pmssUserConfigCliHasExplicitOptionValue(array $parsed, string $option): bool
-{
-    if (!array_key_exists($option, $parsed['options'])) {
-        return false;
-    }
-
-    $value = $parsed['options'][$option];
-    return $value !== null && $value !== true && $value !== '';
-}
-
 /** @return array<string,mixed> Parse resource values with named options overriding positional slots. */
 function pmssUserConfigCliResolvedResources(array $parsed, array $args, string $optionKey, string $indexKey): array
 {
@@ -74,8 +63,9 @@ function pmssUserConfigCliExplicitResources(array $parsed, array $args, string $
     $values = [];
     foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
         $value = null;
-        if (pmssUserConfigCliHasExplicitOptionValue($parsed, $spec[$optionKey])) {
-            $value = $parsed['options'][$spec[$optionKey]];
+        $optionValue = $parsed['options'][$spec[$optionKey]] ?? null;
+        if ($optionValue !== null && $optionValue !== true && $optionValue !== '') {
+            $value = $optionValue;
         } elseif (isset($spec[$indexKey]) && array_key_exists($spec[$indexKey], $args) && $args[$spec[$indexKey]] !== '') {
             $value = $args[$spec[$indexKey]];
         }
@@ -171,19 +161,6 @@ function pmssUserConfigCliBuildCgroupResourceArgs(array $user): array
         }
     }
     return $args;
-}
-
-/** @return array<string,array<string,string>> Human-facing descriptions for shared resource knobs. */
-function pmssUserConfigCliResourceHelpSpecs(): array
-{
-    $helpSpecs = [];
-    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        $helpSpecs[$key] = [
-            'parameter' => $spec['parameter'],
-            'description' => $spec['description'],
-        ];
-    }
-    return $helpSpecs;
 }
 
 /** Render the canonical userConfig.php help output. */

@@ -22,17 +22,6 @@ function pmssManagedUsersNormalizeList(array $rawUsers): array
     return array_keys($users);
 }
 
-/** Resolve the listUsers command, allowing hermetic tests to supply a fixture. */
-function pmssManagedUsersListCommand(string $command): string
-{
-    $override = getenv('PMSS_TEST_LIST_USERS_COMMAND');
-    if (function_exists('pmssTestModeEnabled') && pmssTestModeEnabled() && is_string($override) && trim($override) !== '') {
-        return trim($override);
-    }
-
-    return $command;
-}
-
 /** Return validated managed usernames discovered from local home/account state. */
 function pmssManagedHomeUsersList(bool $sort = false): array
 {
@@ -47,7 +36,11 @@ function pmssListManagedUsersResult(string $command = '/scripts/listUsers.php'):
 {
     $lines = array();
     $exitCode = 0;
-    exec(escapeshellarg(pmssManagedUsersListCommand($command)), $lines, $exitCode);
+    $override = getenv('PMSS_TEST_LIST_USERS_COMMAND');
+    if (function_exists('pmssTestModeEnabled') && pmssTestModeEnabled() && is_string($override) && trim($override) !== '') {
+        $command = trim($override);
+    }
+    exec(escapeshellarg($command), $lines, $exitCode);
     return array('exitCode' => $exitCode, 'users' => pmssManagedUsersNormalizeList($lines));
 }
 
