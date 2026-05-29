@@ -55,7 +55,9 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   `~/.rtorrent.rc` from the canonical templates, and restart as needed. Its
   `startRtorrent` hand-off only reports success after rTorrent appears and
   survives a post-launch stability window, so brief crashes do not clear the
-  failed-start counter.
+  failed-start counter. A live-but-unresponsive rTorrent is restarted only when
+  the SCGI accept queue is saturated for consecutive watchdog runs and the
+  process is not in uninterruptible I/O sleep.
 - `checkLighttpdInstances.php` – Confirm each user’s lighttpd/php-cgi pair and probe the php-cgi sockets that should exist immediately after startup before restarting the stack.
 - `lighttpdAccessLogTrim.php` – Truncate `~/.lighttpd/access.log` in place once
   it exceeds 100 MiB so long-lived reverse-proxied web UIs do not silently

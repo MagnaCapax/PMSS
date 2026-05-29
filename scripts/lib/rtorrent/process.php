@@ -206,6 +206,94 @@ function rtorrentProcessSnapshot(string $user): array
 }
 
 /**
+ * Parse one `ps -o pid=,stat=,wchan=` row for restart-safety checks.
+ *
+ * @param string $line One trimmed or untrimmed ps output row.
+ *
+ * @return array{pid:int,stat:string,wchan:string}|null Parsed process state.
+ */
+function rtorrentProcessStateFromPsLine(string $line): ?array
+{
+    $line = trim($line);
+    if ($line === '' || !preg_match('/^(\d+)\s+(\S+)(?:\s+(\S+))?$/', $line, $m)) {
+        return null;
+    }
+
+    $pid = (int) $m[1];
+    if ($pid <= 0) {
+        return null;
+    }
+
+    return [
+        'pid' => $pid,
+        'stat' => (string) $m[2],
+        'wchan' => (string) ($m[3] ?? ''),
+    ];
+}
+
+/**
+ * Parse process-state rows into a PID-keyed map.
+ *
+ * @param string[] $lines Output rows from `ps -o pid=,stat=,wchan=`.
+ *
+ * @return array<int, array{pid:int,stat:string,wchan:string}> Process states keyed by PID.
+ */
+function rtorrentProcessStatesFromPsLines(array $lines): array
+{
+    $states = [];
+    foreach ($lines as $line) {
+        $state = rtorrentProcessStateFromPsLine((string) $line);
+        if ($state !== null) {
+            $states[$state['pid']] = $state;
+        }
+    }
+
+    return $states;
+}
+
+/**
+ * Capture process STAT/WCHAN details for known PIDs.
+ *
+ * @param int[] $pids Process IDs to inspect.
+ *
+ * @return array<int, array{pid:int,stat:string,wchan:string}> Process states keyed by PID.
+ */
+function rtorrentProcessStatesForPids(array $pids): array
+{
+    $normalized = rtorrentProcessNormalizePids($pids);
+    if (empty($normalized)) {
+        return [];
+    }
+
+    $out = [];
+    $rc = 1;
+    @exec('ps -o pid=,stat=,wchan= -p '.escapeshellarg(implode(',', $normalized)), $out, $rc);
+    if ($rc !== 0) {
+        return [];
+    }
+
+    return rtorrentProcessStatesFromPsLines($out);
+}
+
+/**
+ * Detect uninterruptible I/O sleep, where killing and restarting is unsafe.
+ *
+ * @param array<int, array{pid:int,stat:string,wchan:string}> $states Process states.
+ *
+ * @return bool True when any process STAT contains D.
+ */
+function rtorrentProcessStatesHaveUninterruptibleIo(array $states): bool
+{
+    foreach ($states as $state) {
+        if (strpos((string) ($state['stat'] ?? ''), 'D') !== false) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * Send a signal to multiple PIDs.
  *
  * Best-effort delivery - errors are silently ignored. Uses posix_kill when

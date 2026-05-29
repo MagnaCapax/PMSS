@@ -34,7 +34,7 @@ class checkRtorrentStaleSocketContractTest extends TestCase
         );
     }
 
-    public function testStaleScgiPathRefreshesGraceWhileRtorrentIsAlive(): void
+    public function testStaleScgiPathRefreshesGraceForNonWedgedAliveRtorrent(): void
     {
         $path = 'scripts/cron/checkRtorrent.php';
         $this->pmssAssertRepoFileContainsString(
@@ -43,8 +43,23 @@ class checkRtorrentStaleSocketContractTest extends TestCase
         );
         $this->pmssAssertRepoFileMatches(
             $path,
-            '/\$state = rtorrentProcessCheckStaleState\(\$unresponsiveState, \$effectiveGrace\);.*?if \(\$state\[\'action\'\] === \'wait\'\) \{.*?continue;\s*\}.*?\$rtorrentPids = rtorrentProcessPgrepExact\(\$user, \'rtorrent\'\);.*?if \(!empty\(\$rtorrentPids\)\) \{.*?rtorrentProcessWriteStateFile\(\$unresponsiveState, \(string\) time\(\)\);.*?continue;\s*\}.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$unresponsiveState, \$debug\);.*?rtorrentProcessRestart\(\$user, \[\], \$executorAllPids, \$logCallback, \$debug\);/s',
-            'Stale SCGI recovery should extend grace for live rtorrent processes and reserve restart for missing ones'
+            '/\$state = rtorrentProcessCheckStaleState\(\$unresponsiveState, \$effectiveGrace\);.*?\$rtorrentPids = rtorrentProcessPgrepExact\(\$user, \'rtorrent\'\);.*?if \(!empty\(\$rtorrentPids\)\) \{.*?\$queueSnapshot = rtorrentScgiSocketQueueSnapshot\(\$socketPath\);.*?if \(\$queueSnapshot === null \|\| !rtorrentScgiSocketQueueSaturated\(\$queueSnapshot\)\) \{.*?rtorrentProcessWriteStateFile\(\$unresponsiveState, \(string\) time\(\)\);.*?rtorrentProcessClearStaleState\(\$acceptQueueWedgeState\);.*?continue;\s*\}/s',
+            'Stale SCGI recovery should still extend grace for live rtorrent processes without a saturated accept queue'
         );
+    }
+
+    public function testStaleScgiPathCanRestartConfirmedAcceptQueueWedge(): void
+    {
+        $path = 'scripts/cron/checkRtorrent.php';
+        $this->pmssAssertRepoFileContainsAllStrings($path, [
+            'PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES',
+            '$acceptQueueWedgeState',
+            'rtorrentProcessStatesForPids($rtorrentPids)',
+            'rtorrentProcessStatesHaveUninterruptibleIo($processStates)',
+            'rtorrentScgiSocketQueueSnapshot($socketPath)',
+            'rtorrentScgiSocketQueueSaturated($queueSnapshot)',
+            'rtorrentProcessCheckFailureCountState(',
+            'rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);',
+        ]);
     }
 }

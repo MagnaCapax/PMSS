@@ -121,6 +121,42 @@ class RtorrentScgiTest extends TestCase
         $this->assertEquals('/home/bob123/.rtorrent.socket', $path);
     }
 
+    public function testSocketQueueSnapshotParsesMatchingListenSocket(): void
+    {
+        $snapshot = rtorrentScgiSocketQueueSnapshotFromLines([
+            'Netid State  Recv-Q Send-Q Local Address:Port Peer Address:Port',
+            'u_str LISTEN 101    100    /home/alice/.rtorrent.socket 12345 * 0',
+        ], '/home/alice/.rtorrent.socket');
+
+        $this->assertSame(['recvQ' => 101, 'sendQ' => 100], $snapshot);
+    }
+
+    public function testSocketQueueSnapshotIgnoresOtherSockets(): void
+    {
+        $snapshot = rtorrentScgiSocketQueueSnapshotFromLines([
+            'u_str LISTEN 101 100 /home/bob/.rtorrent.socket 12345 * 0',
+        ], '/home/alice/.rtorrent.socket');
+
+        $this->assertSame(null, $snapshot);
+    }
+
+    public function testSocketQueueSnapshotRejectsMalformedColumns(): void
+    {
+        $snapshot = rtorrentScgiSocketQueueSnapshotFromLines([
+            'u_str LISTEN nope 100 /home/alice/.rtorrent.socket 12345 * 0',
+            'u_str ESTAB 101 100 /home/alice/.rtorrent.socket 12345 * 0',
+        ], '/home/alice/.rtorrent.socket');
+
+        $this->assertSame(null, $snapshot);
+    }
+
+    public function testSocketQueueSaturatedRequiresRecvQAtBacklog(): void
+    {
+        $this->assertTrue(rtorrentScgiSocketQueueSaturated(['recvQ' => 100, 'sendQ' => 100]));
+        $this->assertFalse(rtorrentScgiSocketQueueSaturated(['recvQ' => 99, 'sendQ' => 100]));
+        $this->assertFalse(rtorrentScgiSocketQueueSaturated(['recvQ' => 1, 'sendQ' => 0]));
+    }
+
     public function testPingReturnsFalseForMissingSocket(): void
     {
         $result = rtorrentScgiPing($this->fakeSocketPath(), 1);

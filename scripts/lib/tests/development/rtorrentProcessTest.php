@@ -338,6 +338,46 @@ class RtorrentProcessTest extends TestCase
         $this->assertTrue(is_array($result));
     }
 
+    public function testProcessStateParserCapturesPidStatAndWchan(): void
+    {
+        $state = rtorrentProcessStateFromPsLine('1234 Sl+ futex_wait_queue');
+
+        $this->assertSame(['pid' => 1234, 'stat' => 'Sl+', 'wchan' => 'futex_wait_queue'], $state);
+    }
+
+    public function testProcessStateParserAllowsMissingWchan(): void
+    {
+        $state = rtorrentProcessStateFromPsLine('1234 Sl+');
+
+        $this->assertSame(['pid' => 1234, 'stat' => 'Sl+', 'wchan' => ''], $state);
+    }
+
+    public function testProcessStateParserRejectsMalformedRows(): void
+    {
+        $this->assertSame(null, rtorrentProcessStateFromPsLine(''));
+        $this->assertSame(null, rtorrentProcessStateFromPsLine('pid Sl+ futex_wait_queue'));
+    }
+
+    public function testProcessStatesFromPsLinesArePidKeyed(): void
+    {
+        $states = rtorrentProcessStatesFromPsLines([
+            '1234 Sl+ futex_wait_queue',
+            '2345 Dl+ wait_transaction_locked',
+        ]);
+
+        $this->assertSame('Sl+', $states[1234]['stat']);
+        $this->assertSame('wait_transaction_locked', $states[2345]['wchan']);
+    }
+
+    public function testProcessStatesHaveUninterruptibleIoDetectsDState(): void
+    {
+        $safe = rtorrentProcessStatesFromPsLines(['1234 Sl+ futex_wait_queue']);
+        $unsafe = rtorrentProcessStatesFromPsLines(['2345 Dl+ wait_transaction_locked']);
+
+        $this->assertFalse(rtorrentProcessStatesHaveUninterruptibleIo($safe));
+        $this->assertTrue(rtorrentProcessStatesHaveUninterruptibleIo($unsafe));
+    }
+
     /**
      * Test signal constants are defined.
      */

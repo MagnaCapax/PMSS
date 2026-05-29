@@ -46,6 +46,7 @@ $debug = pmssCliArgvHasToken($argv ?? null, '--debug');
 // Grace periods for transient conditions (seconds).
 define('PMSS_RTORRENT_MISSING_GRACE', 180);
 define('PMSS_RTORRENT_UNRESPONSIVE_GRACE', 120);
+define('PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES', 3);
 define('PMSS_RTORRENT_START_FAILURE_SESSION_RESET', 3);
 define('PMSS_RTORRENT_START_FAILURE_ESCALATE', 6);
 
@@ -243,6 +244,7 @@ foreach ($users as $user) {
     // State file paths.
     $missingState = $stateDir.'/checkRtorrent-missing-'.$user.'.ts';
     $unresponsiveState = $stateDir.'/checkRtorrent-unresponsive-'.$user.'.ts';
+    $acceptQueueWedgeState = $stateDir.'/checkRtorrent-accept-queue-'.$user.'.count';
     $startMarkerState = $stateDir.'/checkRtorrent-started-'.$user.'.ts';
     $startFailureState = $stateDir.'/checkRtorrent-start-failure-'.$user.'.count';
     $sessionResetState = $stateDir.'/checkRtorrent-session-reset-'.$user.'.ts';
@@ -251,6 +253,9 @@ foreach ($users as $user) {
     // Clear state if condition resolved.
     if (!empty($rtorrentPids) || !$executorPresent) {
         rtorrentProcessClearStaleState($missingState);
+    }
+    if (empty($rtorrentPids)) {
+        rtorrentProcessClearStaleState($acceptQueueWedgeState);
     }
     if (!empty($rtorrentPids) || $executorPresent) {
         foreach ([$startMarkerState, $startFailureState, $sessionResetState, $escalationState] as $statePath) {
@@ -382,6 +387,7 @@ foreach ($users as $user) {
 
         if ($responsive) {
             rtorrentProcessClearStaleState($unresponsiveState);
+            rtorrentProcessClearStaleState($acceptQueueWedgeState);
             $throttle = pmssReadTorrentThrottle($user);
             if ($throttle !== null) {
                 $throttleValue = $throttle > 0 ? $throttle : 0;
@@ -451,15 +457,77 @@ foreach ($users as $user) {
             continue;
         }
 
-        // Stale - confirm the process is still gone before restarting.
+        // Stale - restart only after confirming this is not a transient alive process.
         $rtorrentPids = rtorrentProcessPgrepExact($user, 'rtorrent');
         if (!empty($rtorrentPids)) {
-            rtorrentProcessWriteStateFile($unresponsiveState, (string) time());
+            $processStates = rtorrentProcessStatesForPids($rtorrentPids);
+            if (empty($processStates)) {
+                rtorrentProcessWriteStateFile($unresponsiveState, (string) time());
+                rtorrentProcessClearStaleState($acceptQueueWedgeState);
+                pmssCheckRtorrentLogBoth(
+                    $user,
+                    'SCGI unresponsive but rtorrent process state is unavailable (pids='
+                        .implode(',', $rtorrentPids).'); extending grace',
+                    $debug
+                );
+                continue;
+            }
+
+            if (rtorrentProcessStatesHaveUninterruptibleIo($processStates)) {
+                rtorrentProcessWriteStateFile($unresponsiveState, (string) time());
+                rtorrentProcessClearStaleState($acceptQueueWedgeState);
+                pmssCheckRtorrentLogBoth(
+                    $user,
+                    'SCGI unresponsive but rtorrent is in uninterruptible I/O state (pids='
+                        .implode(',', $rtorrentPids).'); extending grace',
+                    $debug
+                );
+                continue;
+            }
+
+            $queueSnapshot = rtorrentScgiSocketQueueSnapshot($socketPath);
+            if ($queueSnapshot === null || !rtorrentScgiSocketQueueSaturated($queueSnapshot)) {
+                rtorrentProcessWriteStateFile($unresponsiveState, (string) time());
+                rtorrentProcessClearStaleState($acceptQueueWedgeState);
+                $queueText = $queueSnapshot === null
+                    ? 'queue=unavailable'
+                    : 'recvQ='.(int) $queueSnapshot['recvQ'].' sendQ='.(int) $queueSnapshot['sendQ'];
+                pmssCheckRtorrentLogBoth(
+                    $user,
+                    'SCGI unresponsive but rtorrent still alive (pids='.implode(',', $rtorrentPids)
+                        ."; {$queueText}); extending grace",
+                    $debug
+                );
+                continue;
+            }
+
+            $wedgeState = rtorrentProcessCheckFailureCountState(
+                $acceptQueueWedgeState,
+                PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES
+            );
+            if ($wedgeState['action'] !== 'stale') {
+                rtorrentProcessWriteStateFile($unresponsiveState, (string) time());
+                pmssCheckRtorrentLogBoth(
+                    $user,
+                    'SCGI accept queue saturated for rtorrent (pids='.implode(',', $rtorrentPids)
+                        .'; recvQ='.(int) $queueSnapshot['recvQ'].' sendQ='.(int) $queueSnapshot['sendQ']
+                        .'; count='.(int) $wedgeState['count'].'/'
+                        .PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES.'); observing',
+                    $debug
+                );
+                continue;
+            }
+
             pmssCheckRtorrentLogBoth(
                 $user,
-                'SCGI unresponsive but rtorrent still alive (pids='.implode(',', $rtorrentPids).'); extending grace',
+                'SCGI accept queue saturated for consecutive checks (pids='.implode(',', $rtorrentPids)
+                    .'; recvQ='.(int) $queueSnapshot['recvQ'].' sendQ='.(int) $queueSnapshot['sendQ']
+                    .'); restarting rtorrent',
                 $debug
             );
+            rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);
+            rtorrentProcessClearStaleState($unresponsiveState);
+            rtorrentProcessClearStaleState($acceptQueueWedgeState);
             continue;
         }
 

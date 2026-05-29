@@ -306,6 +306,90 @@ function rtorrentScgiPing(string $socketPath, int $timeout = 5): bool
 }
 
 /**
+ * Parse `ss -xln` output and return the queue depth for one Unix socket.
+ *
+ * The watchdog treats `ss` output as a trust boundary: match the exact socket
+ * path and accept only numeric Recv-Q/Send-Q columns from LISTEN rows.
+ *
+ * @param string[] $lines      Lines from `ss -xln`.
+ * @param string   $socketPath Absolute Unix socket path to match.
+ *
+ * @return array{recvQ:int,sendQ:int}|null Queue snapshot when found.
+ */
+function rtorrentScgiSocketQueueSnapshotFromLines(array $lines, string $socketPath): ?array
+{
+    if ($socketPath === '') {
+        return null;
+    }
+
+    foreach ($lines as $line) {
+        $line = trim((string) $line);
+        if ($line === '' || strpos($line, $socketPath) === false) {
+            continue;
+        }
+
+        $columns = preg_split('/\s+/', $line);
+        if (!is_array($columns) || count($columns) < 5) {
+            continue;
+        }
+        if (($columns[1] ?? '') !== 'LISTEN') {
+            continue;
+        }
+        if (!in_array($socketPath, $columns, true)) {
+            continue;
+        }
+        if (!preg_match('/^\d+$/', $columns[2] ?? '') || !preg_match('/^\d+$/', $columns[3] ?? '')) {
+            continue;
+        }
+
+        return [
+            'recvQ' => (int) $columns[2],
+            'sendQ' => (int) $columns[3],
+        ];
+    }
+
+    return null;
+}
+
+/**
+ * Read the rTorrent SCGI socket accept queue from `ss -xln`.
+ *
+ * @param string $socketPath Absolute Unix socket path to inspect.
+ *
+ * @return array{recvQ:int,sendQ:int}|null Queue snapshot when available.
+ */
+function rtorrentScgiSocketQueueSnapshot(string $socketPath): ?array
+{
+    if ($socketPath === '') {
+        return null;
+    }
+
+    $out = [];
+    $rc = 1;
+    @exec('ss -xln 2>/dev/null', $out, $rc);
+    if ($rc !== 0) {
+        return null;
+    }
+
+    return rtorrentScgiSocketQueueSnapshotFromLines($out, $socketPath);
+}
+
+/**
+ * Decide whether the SCGI listen queue is saturated enough to signal a wedge.
+ *
+ * @param array{recvQ:int,sendQ:int} $snapshot Queue snapshot.
+ *
+ * @return bool True when Recv-Q has reached the listen backlog.
+ */
+function rtorrentScgiSocketQueueSaturated(array $snapshot): bool
+{
+    $recvQ = (int) ($snapshot['recvQ'] ?? 0);
+    $sendQ = (int) ($snapshot['sendQ'] ?? 0);
+
+    return $sendQ > 0 && $recvQ >= $sendQ;
+}
+
+/**
  * Get the standard socket path for a user's rTorrent instance.
  *
  * @param string $username The system username.
