@@ -11,10 +11,11 @@
  * (daemon-reload, set-property) within the 60-second interval.
  *
  * Per-user "IOWeight" in /etc/seedbox/config/users/<user>.json is honored
- * as an explicit override; absent, the RAM-derived formula round(3.535 *
- * sqrt(ramMiB)) applies. Either base is then multiplied by (1 + bonusPct/100)
- * where "bonusPct" is the Free Bonus Disk Policy percent (0-300, integer) in
- * the same JSON. Final weight is clamped to the kernel maximum (1000).
+ * as an explicit override (clamped to [1, 1000]). When absent, the
+ * fallback formula round(3.535 * sqrt(ramMiB) * (1 + bonusPct/100))
+ * applies. "bonusPct" in the same JSON (integer percent from the Free
+ * Bonus Disk Policy, 0-300) multiplies the RAM-derived base so tenure
+ * and spend carry customers into the [701, 1000] band by design.
  *
  * Idempotent: writes only when current kernel value differs from
  * desired. Hard fail on missing prerequisites (root, cgroup-v1, BFQ
