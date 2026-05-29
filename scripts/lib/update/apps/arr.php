@@ -70,7 +70,17 @@ function pmssArrIsSafeConfigValue(string $value): bool
 function pmssArrInstallPathIsSafe(string $path): bool
 {
     require_once dirname(__DIR__, 2).'/pathSafety.php';
-    return pmssPathAbsoluteStringIsSafe($path);
+    if (!pmssPathAbsoluteStringIsSafe($path)) {
+        return false;
+    }
+
+    // The updater replaces this directory with rm+mv; never allow top-level
+    // targets such as /opt, /home, or /tmp to pass config validation.
+    if (count(explode('/', trim($path, '/'))) < 2) {
+        return false;
+    }
+
+    return pmssPathTargetIsSafe($path, true, false);
 }
 
 /**
@@ -171,6 +181,19 @@ function pmssArrInstalledVersionRead(string $installPath, string $app): ?string
     return null;
 }
 
+/** Remove a PMSS-created temporary workspace only after runtime scope checks. */
+function pmssArrCleanupWorkspace(string $workDir, string $prefix): void
+{
+    if (!function_exists('pmssPrivateTempDirRealpath')) {
+        return;
+    }
+
+    $real = pmssPrivateTempDirRealpath($workDir, $prefix);
+    if ($real !== null) {
+        runCommand('rm -rf '.escapeshellarg($real));
+    }
+}
+
 /** Select the release asset matching the host architecture, or a generic build.
  * @return array{0:string,1:string,2:string}|null
  */
@@ -259,7 +282,8 @@ function pmssArrUpdate(array $config): void
         $log('Unknown installed version; reinstalling to avoid stale binaries');
     }
 
-    $workDir = pmssCreatePrivateTempDir(strtolower($app).'-');
+    $workPrefix = strtolower($app).'-';
+    $workDir = pmssCreatePrivateTempDir($workPrefix);
     if ($workDir === null) { $log('Failed to create temporary workspace'); return; }
 
     $archivePath = $workDir.'/'.$assetName;
@@ -285,7 +309,7 @@ function pmssArrUpdate(array $config): void
         $installed = true;
     }
 
-    runCommand('rm -rf '.escapeshellarg($workDir));
+    pmssArrCleanupWorkspace($workDir, $workPrefix);
     if ($installed) {
         if (@file_put_contents($installPath.'/version.txt', $latestVersion.PHP_EOL) === false) {
             $log('Failed to persist installed version marker');

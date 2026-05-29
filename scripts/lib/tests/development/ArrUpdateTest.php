@@ -145,6 +145,63 @@ class ArrUpdateTest extends TestCase
         }
     }
 
+    public function testUpdateRejectsTopLevelInstallPathBeforeFetchingMetadata(): void
+    {
+        $output = '';
+
+        $this->pmssWithEnv([], function () use (&$output): void {
+            ob_start();
+            $this->runArrUpdate('PmssArrUnsafeTopLevel', '/opt', '/tmp/pmss-arr-missing-releases.json', 'PackageDir');
+            $output = (string) ob_get_clean();
+        });
+
+        $this->assertStringContainsString('Invalid updater configuration: install_path', $output);
+        $this->assertStringNotContainsString('Unable to fetch release metadata', $output);
+    }
+
+    public function testUpdateRejectsSymlinkedInstallPathBeforeFetchingMetadata(): void
+    {
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-symlink-install-');
+        $link = sys_get_temp_dir().'/pmss-arr-update-link-'.bin2hex(random_bytes(3));
+        $output = '';
+
+        try {
+            $this->pmssCreateSymlinkOrSkip($baseDir, $link);
+            $this->pmssWithEnv([], function () use ($link, &$output): void {
+                ob_start();
+                $this->runArrUpdate('PmssArrUnsafeSymlink', $link.'/install', $link.'/missing-releases.json', 'PackageDir');
+                $output = (string) ob_get_clean();
+            });
+
+            $this->assertStringContainsString('Invalid updater configuration: install_path', $output);
+            $this->assertStringNotContainsString('Unable to fetch release metadata', $output);
+        } finally {
+            @unlink($link);
+            $this->cleanup($baseDir);
+        }
+    }
+
+    public function testUpdateRejectsFileInstallPathBeforeFetchingMetadata(): void
+    {
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-file-install-');
+        $installPath = $baseDir.'/install';
+        $output = '';
+
+        try {
+            @file_put_contents($installPath, 'not a directory');
+            $this->pmssWithEnv([], function () use ($installPath, $baseDir, &$output): void {
+                ob_start();
+                $this->runArrUpdate('PmssArrUnsafeFile', $installPath, $baseDir.'/missing-releases.json', 'PackageDir');
+                $output = (string) ob_get_clean();
+            });
+
+            $this->assertStringContainsString('Invalid updater configuration: install_path', $output);
+            $this->assertStringNotContainsString('Unable to fetch release metadata', $output);
+        } finally {
+            $this->cleanup($baseDir);
+        }
+    }
+
     public function testUpdateDoesNotReportInstalledWhenInstallParentIsMissing(): void
     {
         $baseDir = $this->pmssMakeTempDir('pmss-arr-update-move-fail-');
