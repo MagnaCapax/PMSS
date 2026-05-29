@@ -186,6 +186,40 @@ class UserLifecycleWatchdogTest extends TestCase
         $this->assertStringNotContainsString('Start Demo for user: cara', $output);
     }
 
+    public function testRunServiceStopsWhenListUsersCommandFails(): void
+    {
+        $homeRoot = $this->pmssMakeTempDir('watchdog-run-service-fail-');
+        @mkdir($homeRoot.'/alice/www', 0755, true);
+        touch($homeRoot.'/alice/.demoEnable');
+
+        $listUsers = $this->pmssMakeTempDir('watchdog-list-users-fail-').'/listUsers.php';
+        $this->pmssWriteExecutablePhpFile($listUsers, "echo \"alice\\n\"; exit(1);");
+
+        $marker = $this->pmssMakeTempFile('watchdog-run-service-blocked-');
+        @unlink($marker);
+
+        list(, $output) = $this->pmssCaptureStdout(function () use ($homeRoot, $listUsers, $marker): void {
+            pmssUserWatchdogRunService(
+                '',
+                'demoEnable',
+                ['demo'],
+                'demo stopped due to suspension',
+                [
+                    pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'demo start requested', 'Demo'),
+                ],
+                static function (): array {
+                    return ['demo' => false];
+                },
+                null,
+                $homeRoot,
+                $listUsers
+            );
+        });
+
+        $this->assertFalse(file_exists($marker));
+        $this->assertEquals('', $output);
+    }
+
     public function testLocalPortReadAcceptsTrimmedNumericPort(): void
     {
         $path = $this->pmssMakeTempFile('watchdog-port-');
