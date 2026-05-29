@@ -3,6 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../../cgroup/bfqFormula.php';
+require_once __DIR__.'/../../cgroup/bfqWeightTarget.php';
 
 /**
  * Hermetic tests for pmssBfqFormulaWeight() — the per-user bfq.weight curve
@@ -76,5 +77,78 @@ class CgroupBfqWeightApplyTest extends TestCase
                 'Unexpected weight: '.$label
             );
         }
+    }
+
+    public function testCgroupTargetPathsCoverV1AndV2Fallback(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-cgroup-root-');
+
+        $this->assertEquals(
+            $root.'/blkio/user.slice/user-1001.slice/blkio.bfq.weight',
+            \pmssCgroupBfqWeightTargetPath('v1', 1001, $root)
+        );
+        $this->assertEquals(
+            $root.'/user.slice/user-1001.slice/io.weight',
+            \pmssCgroupBfqWeightTargetPath('v2', 1001, $root)
+        );
+        $this->assertEquals('', \pmssCgroupBfqWeightTargetPath('unknown', 1001, $root));
+    }
+
+    public function testCgroupV2PrefersBfqSpecificWeightWhenPresent(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-cgroup-root-');
+        $slice = $root.'/user.slice/user-1001.slice';
+        $this->assertTrue(@mkdir($slice, 0700, true), 'Expected v2 slice fixture');
+        $this->pmssWriteFile($slice.'/io.bfq.weight', "default 100\n");
+
+        $this->assertEquals(
+            $slice.'/io.bfq.weight',
+            \pmssCgroupBfqWeightTargetPath('v2', 1001, $root)
+        );
+    }
+
+    public function testCgroupControllerReadinessUsesModeSpecificSignals(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-cgroup-root-');
+        $this->assertFalse(\pmssCgroupBfqWeightControllerReady('v1', $root));
+        $this->assertTrue(@mkdir($root.'/blkio', 0700, true), 'Expected v1 blkio fixture');
+        $this->assertTrue(\pmssCgroupBfqWeightControllerReady('v1', $root));
+
+        $this->assertFalse(\pmssCgroupBfqWeightControllerReady('v2', $root));
+        $this->pmssWriteFile($root.'/cgroup.controllers', "cpu memory io pids\n");
+        $this->assertTrue(\pmssCgroupBfqWeightControllerReady('v2', $root));
+        $this->pmssWriteFile($root.'/cgroup.controllers', "cpu memory pids\n");
+        $this->assertFalse(\pmssCgroupBfqWeightControllerReady('v2', $root));
+    }
+
+    public function testCgroupWeightReadbackParsesBareAndDefaultFormats(): void
+    {
+        foreach ([
+            ["640\n", 640],
+            ["  704\n", 704],
+            ["default 800\n8:0 100\n", 800],
+            ["\n", 0],
+            ["default nope\n", 0],
+        ] as [$contents, $expected]) {
+            $this->assertEquals($expected, \pmssCgroupBfqWeightCurrentValue($contents));
+        }
+    }
+
+    public function testCgroupWritePayloadMatchesKernelFileFormat(): void
+    {
+        $this->assertEquals('640', \pmssCgroupBfqWeightWritePayload('v1', 640));
+        $this->assertEquals('default 640', \pmssCgroupBfqWeightWritePayload('v2', 640));
+    }
+
+    public function testBfqSchedulerDetectionUsesFixtureSchedulers(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-block-root-');
+        $scheduler = $root.'/sda/queue';
+        $this->assertTrue(@mkdir($scheduler, 0700, true), 'Expected scheduler fixture');
+        $this->pmssWriteFile($scheduler.'/scheduler', "mq-deadline kyber [none]\n");
+        $this->assertFalse(\pmssCgroupBfqWeightBfqSchedulerActive($root));
+
+        $this->pmssWriteFile($scheduler.'/scheduler', "mq-deadline [bfq] none\n");
+        $this->assertTrue(\pmssCgroupBfqWeightBfqSchedulerActive($root));
     }
 }

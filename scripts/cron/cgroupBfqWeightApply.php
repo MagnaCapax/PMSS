@@ -1,14 +1,16 @@
 #!/usr/bin/env php
 <?php
 /**
- * Apply per-user blkio.bfq.weight directly to the cgroup-v1 kernel file,
- * bypassing the systemd v252+ cgroup_weight_io_to_blkio + BFQ_WEIGHT chain.
+ * Apply per-user cgroup I/O weights directly to kernel files, bypassing the
+ * systemd v252+ cgroup_weight_io_to_blkio + BFQ_WEIGHT chain on cgroup-v1 BFQ.
  *
  * The chain caps any IOWeight >= 200 at kernel bfq.weight = 181 on
  * cgroup-v1 hosts, collapsing tier differentiation. Direct write to
  * /sys/fs/cgroup/blkio/user.slice/user-N.slice/blkio.bfq.weight restores
- * the full kernel 1..1000 range. The cron self-heals systemd overwrites
- * (daemon-reload, set-property) within the 60-second interval.
+ * the full kernel 1..1000 range. On cgroup-v2 hosts, the same cron writes
+ * user.slice/user-N.slice/io.bfq.weight when BFQ exposes it, falling back to
+ * io.weight for generic v2 I/O weighting. The cron self-heals systemd
+ * overwrites (daemon-reload, set-property) within the 5-minute cycle.
  *
  * Per-user "IOWeight" in /etc/seedbox/config/users/<user>.json is honored
  * as an explicit override (clamped to [1, 1000]). When absent, the
@@ -17,9 +19,9 @@
  * Bonus Disk Policy, 0-300) multiplies the RAM-derived base so tenure
  * and spend carry customers into the [701, 1000] band by design.
  *
- * Idempotent: writes only when current kernel value differs from
- * desired. Hard fail on missing prerequisites (root, cgroup-v1, BFQ
- * scheduler) — no silent no-op.
+ * Idempotent: writes only when current kernel value differs from desired. Hard
+ * fail on missing hierarchy prerequisites; v1 also requires an active BFQ
+ * scheduler because the direct blkio.bfq.weight write is BFQ-specific.
  *
  * References upstream systemd issues #20522, #21187, #27622 (maintainer
  * acknowledgement that the cgroup-v1 BFQ chain is broken with no fix
@@ -32,35 +34,32 @@
 declare(strict_types=1);
 
 require_once __DIR__.'/../lib/cgroup/bfqFormula.php';
+require_once __DIR__.'/../lib/cgroup/bfqWeightTarget.php';
 require_once __DIR__.'/../lib/log.php';
+require_once __DIR__.'/../lib/update/systemPrep/hostEnvironment.php';
 
 // Constants — tunable top-of-file per AGENTS.md doctrine.
 $USERS_DIR  = '/etc/seedbox/config/users';
+$CGROUP_DIR = '/sys/fs/cgroup';
+$BLOCK_DIR  = '/sys/block';
 $KERN_MAX   = 1000;      // kernel BFQ absolute max (the only artificial cap)
 $FORMULA_K  = 3.535;     // round(K * sqrt(ramMiB)) — produces 640 at 32768 MiB
 $DRY_RUN    = in_array('--dry-run', $argv ?? [], true);
 
 // Pre-flight — fail loud rather than silent no-op on misconfig.
 if (posix_geteuid() !== 0) {
-    fwrite(STDERR, "FATAL: must run as root (writes to /sys/fs/cgroup/blkio/)\n");
+    fwrite(STDERR, "FATAL: must run as root (writes to /sys/fs/cgroup/)\n");
     exit(2);
 }
 
-// cgroup-v2 unified hosts have no /sys/fs/cgroup/blkio — exit cleanly.
-if (!is_dir('/sys/fs/cgroup/blkio')) {
-    fwrite(STDERR, "INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); script does not apply here\n");
-    exit(0);
+$cgroupMode = pmssCgroupMode();
+if (!pmssCgroupBfqWeightControllerReady($cgroupMode, $CGROUP_DIR)) {
+    fwrite(STDERR, "FATAL: cgroup I/O controller unavailable for mode $cgroupMode\n");
+    exit(2);
 }
 
-// BFQ scheduler must be the active elevator on at least one block device.
-$bfqActive = false;
-foreach (glob('/sys/block/sd*/queue/scheduler') ?: [] as $schedFile) {
-    if (preg_match('/\[bfq\]/', (string) @file_get_contents($schedFile))) {
-        $bfqActive = true;
-        break;
-    }
-}
-if (!$bfqActive) {
+// v1 direct writes target BFQ-specific files, so require a BFQ-backed device.
+if ($cgroupMode === 'v1' && !pmssCgroupBfqWeightBfqSchedulerActive($BLOCK_DIR)) {
     fwrite(STDERR, "FATAL: BFQ scheduler not active on any sd* device; no work to do\n");
     exit(2);
 }
@@ -113,13 +112,13 @@ foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
     $wRaw = (int) round($wBase * (1 + max(0.0, $bonusPct) / 100));
     $w = max(1, min($KERN_MAX, $wRaw));
 
-    $cgPath = '/sys/fs/cgroup/blkio/user.slice/user-'.$uid.'.slice/blkio.bfq.weight';
+    $cgPath = pmssCgroupBfqWeightTargetPath($cgroupMode, $uid, $CGROUP_DIR);
     if (!file_exists($cgPath)) {
         $skippedNoSlice++;
         continue;
     }
 
-    $cur = (int) trim((string) @file_get_contents($cgPath));
+    $cur = pmssCgroupBfqWeightCurrentValue((string) @file_get_contents($cgPath));
     if ($cur === $w) {
         continue;
     }
@@ -132,7 +131,7 @@ foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
         continue;
     }
 
-    if (@file_put_contents($cgPath, (string) $w) === false) {
+    if (@file_put_contents($cgPath, pmssCgroupBfqWeightWritePayload($cgroupMode, $w)) === false) {
         syslog(LOG_WARNING, "write failed $user uid=$uid desired=$w");
         $errors++;
         continue;
