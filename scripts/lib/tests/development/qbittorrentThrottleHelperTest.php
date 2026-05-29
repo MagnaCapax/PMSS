@@ -10,7 +10,7 @@ class QbittorrentThrottleHelperTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->source = (string) file_get_contents(dirname(__DIR__, 2).'/user/qbittorrent.php');
+        $this->source = $this->pmssReadRepoFile('scripts/lib/user/qbittorrent.php');
     }
 
     public function testHelperKeepsCanonicalConfigPath(): void

@@ -7,50 +7,39 @@ class AiToolsInstallTest extends TestCase
 {
     public function testInstallsAllRequestedCliTools(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('aiToolsInstall.php');
-        $this->assertStringContainsString('@google/gemini-cli', $contents);
-        $this->assertStringContainsString('@anthropic-ai/claude-code', $contents);
-        $this->assertStringContainsString('/usr/local/bin/codex', $contents);
+        $this->pmssAssertUpdateAppFileContainsAndOmitsStrings('aiToolsInstall.php', ['@google/gemini-cli', '@anthropic-ai/claude-code', '/usr/local/bin/codex']);
     }
 
     public function testPinsNodeAndCodexArtifacts(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('aiToolsInstall.php');
-        $this->assertStringContainsString('node-v22.22.1-linux-x64.tar.xz', $contents);
-        $this->assertStringContainsString('codex-x86_64-unknown-linux-musl.tar.gz', $contents);
+        $contents = $this->pmssAssertUpdateAppFileContainsAndOmitsStrings('aiToolsInstall.php', ['node-v22.22.1-linux-x64.tar.xz', 'codex-x86_64-unknown-linux-musl.tar.gz']);
         $this->assertMatches('/[0-9a-f]{64}/', $contents);
     }
 
     public function testSupportsForceRefreshFlag(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('aiToolsInstall.php');
-        $this->assertStringContainsString('PMSS_FORCE_AI_TOOLS_REFRESH', $contents);
+        $this->pmssAssertUpdateAppFileContainsAndOmitsStrings('aiToolsInstall.php', ['PMSS_FORCE_AI_TOOLS_REFRESH']);
     }
 
     public function testKeepsInlineNodeVersionGate(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('aiToolsInstall.php');
-        $this->assertStringContainsString('preg_match(\'/^v?([0-9]+)/\', $systemVersion, $match)', $contents);
-        $this->assertStringContainsString('>= 22', $contents);
-        $this->assertTrue(strpos($contents, 'function pmssAiTools'.'NodeMajor(') === false, 'Node major parsing should stay inline in the only call site');
+        $this->pmssAssertUpdateAppFileContainsAndOmitsStrings('aiToolsInstall.php', [
+            'preg_match(\'/^v?([0-9]+)/\', $systemVersion, $match)',
+            '>= 22',
+        ], ['function pmssAiTools'.'NodeMajor(' => 'Node major parsing should stay inline in the only call site']);
     }
 
     public function testKeepsNpmCliInstallFlowInline(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('aiToolsInstall.php');
-        $this->assertStringContainsString("dirname(\$nodeBinary).'/npm'", $contents);
-        $this->assertStringContainsString('npm not available', $contents);
-        $this->assertStringContainsString("putenv('PATH='.dirname(\$nodeBinary)", $contents);
-        $this->assertTrue(
-            strpos($contents, 'function pmssAiTools'.'InstallNpmCli(') === false,
-            'NPM CLI installation should stay inline in the only installer'
-        );
+        $this->pmssAssertUpdateAppFileContainsAndOmitsStrings('aiToolsInstall.php', [
+            "dirname(\$nodeBinary).'/npm'",
+            'npm not available',
+            "putenv('PATH='.dirname(\$nodeBinary)",
+        ], ['function pmssAiTools'.'InstallNpmCli(' => 'NPM CLI installation should stay inline in the only installer']);
     }
 
     public function testPreservesCodexOldKernelFallback(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('aiToolsInstall.php');
-        $this->assertStringContainsString('/etc/codex/config.toml', $contents);
-        $this->assertStringContainsString('danger-full-access', $contents);
+        $this->pmssAssertUpdateAppFileContainsAndOmitsStrings('aiToolsInstall.php', ['/etc/codex/config.toml', 'danger-full-access']);
     }
 }

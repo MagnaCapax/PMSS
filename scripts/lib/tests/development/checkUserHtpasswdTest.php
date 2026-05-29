@@ -78,7 +78,7 @@ class CheckUserHtpasswdTest extends TestCase
 
     public function testSourceKeepsOptionalLoggingGuardAndReadErrorMessage(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/util/checkUserHtpasswd.php');
+        $src = $this->pmssReadRepoFile('scripts/util/checkUserHtpasswd.php');
 
         $this->assertStringContainsString("pmssUserLifecycleContextLogStatusMessage('htpasswd'", $src);
         $this->assertStringContainsString('Unable to read per-user htpasswd; skipping synchronization', $src);

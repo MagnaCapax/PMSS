@@ -249,7 +249,7 @@ BASH;
 
     public function testSkeletonCopiesInstallerScript(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 2).'/update/users/filesystem.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
 
         $this->assertStringContainsString("'bin/docker-install-lsio'", $source);
         $this->assertStringContainsString("'bin/linuxserverInstall.sh'", $source);

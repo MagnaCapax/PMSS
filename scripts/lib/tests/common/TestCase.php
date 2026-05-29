@@ -1122,6 +1122,12 @@ abstract class TestCase
         return $this->pmssReadRepoFile('scripts/lib/update/apps/'.ltrim($relativePath, '/'));
     }
 
+    /** Assert update app source requirements while sharing the repo-file reader. */
+    protected function pmssAssertUpdateAppFileContainsAndOmitsStrings(string $relativePath, array $required = [], array $forbidden = []): string
+    {
+        return $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/'.ltrim($relativePath, '/'), $required, $forbidden);
+    }
+
     /** Read a repository file and assert that it contains a substring. */
     protected function pmssAssertRepoFileContainsString(string $relativePath, string $needle, string $message = ''): void
     {

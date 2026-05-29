@@ -412,7 +412,7 @@ SNAP;
 
     public function testUserTransferHomePathsStillResolveFromPmssHomeDirEnv(): void
     {
-        $helper = (string) file_get_contents(dirname(__DIR__, 2).'/userTransfer/localUserSafety.php');
+        $helper = $this->pmssReadRepoFile('scripts/lib/userTransfer/localUserSafety.php');
 
         $needle = "pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home')";
         $this->assertStringContainsString($needle, $helper, 'userTransfer safety checks must honour PMSS_HOME_DIR');

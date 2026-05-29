@@ -49,6 +49,6 @@ class LighttpdSocketCleanupTest extends TestCase
 
     private function readStartScript(): string
     {
-        return (string) file_get_contents(dirname(__DIR__, 3).'/startLighttpd');
+        return $this->pmssReadRepoFile('scripts/startLighttpd');
     }
 }

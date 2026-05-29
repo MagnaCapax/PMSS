@@ -130,7 +130,7 @@ SH
 
     public function testStaticFallback502PageQualifiesTicketGuidance(): void
     {
-        $contents = (string) file_get_contents(dirname(__DIR__, 4).'/var/www/error-502.html');
+        $contents = $this->pmssReadRepoFile('var/www/error-502.html');
         $this->assertStringContainsString('If this continues for more than a few minutes, open a support ticket.', $contents);
     }
 

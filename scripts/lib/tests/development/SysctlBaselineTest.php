@@ -286,7 +286,7 @@ class SysctlBaselineTest extends TestCase
 
     private function systemPrepSource(): string
     {
-        return (string) file_get_contents(dirname(__DIR__, 2).'/update/systemPrep.php');
+        return $this->pmssReadRepoFile('scripts/lib/update/systemPrep.php');
     }
 
 }

@@ -444,7 +444,7 @@ class WireGuardInstallerTest extends TestCase
 
     public function testConfigureKeepsReadmeFlowInline(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 2).'/wireguard.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/wireguard.php');
 
         $this->assertStringContainsString('template.wireguard.readme', $source);
         $this->assertStringContainsString("file_put_contents(\$configDir.'/README', \$guide);", $source);
@@ -453,7 +453,7 @@ class WireGuardInstallerTest extends TestCase
 
     public function testConfigureKeepsServiceEnableFlowInline(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 2).'/wireguard.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/wireguard.php');
 
         $this->assertStringContainsString('PMSS_WG_SKIP_SERVICE', $source);
         $this->assertStringContainsString('systemctl enable --now wg-quick@wg0', $source);
@@ -463,7 +463,7 @@ class WireGuardInstallerTest extends TestCase
 
     public function testWireguardUsesDirectLogAndRuntimeRequires(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 2).'/wireguard.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/wireguard.php');
 
         $this->assertStringContainsString("require_once __DIR__.'/log.php';", $source);
         $this->assertStringContainsString("require_once __DIR__.'/update/runtime/commands.php';", $source);

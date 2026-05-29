@@ -140,7 +140,7 @@ class KernelHardeningAlgifAeadTest extends TestCase
 
     public function testUpdateStep2UsesKernelHardeningDispatcher(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/util/update-step2.php');
+        $source = $this->pmssReadRepoFile('scripts/util/update-step2.php');
 
         $this->assertStringContainsString("'pmssApplyKernelHardening'", $source, 'update-step2 must call the registry dispatcher');
         $this->assertStringNotContainsString("'pmssEnsureAlgifAeadBlacklist'", $source, 'copyfail must be registered through PMSS_KERNEL_HARDENING');

@@ -53,29 +53,24 @@ class UpdateAppsBootstrapTest extends TestCase
     public function testPythonVenvInstallersAvoidPackageQueueHelpers(): void
     {
         foreach (['python.php', 'pyload.php'] as $installer) {
-            $contents = $this->pmssReadUpdateAppFile($installer);
-
-            $this->assertStringContainsString("require_once __DIR__.'/pythonVenv.php';", $contents);
-            $this->pmssAssertStringNotContainsString('packageState.php', $contents, $installer.' should not pull package-state helpers when it only needs the shared venv runtime');
-            $this->pmssAssertStringNotContainsString('packages/helpers.php', $contents, $installer.' should not pull package-state helpers when it only needs the shared venv runtime');
+            $this->pmssAssertUpdateAppFileContainsAndOmitsStrings($installer, ["require_once __DIR__.'/pythonVenv.php';"], [
+                'packageState.php' => $installer.' should not pull package-state helpers when it only needs the shared venv runtime',
+                'packages/helpers.php' => $installer.' should not pull package-state helpers when it only needs the shared venv runtime',
+            ]);
         }
     }
 
     public function testArrHelperKeepsSharedRuntimeBootstrapPath(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('arr.php');
-
-        $this->assertStringContainsAllStrings(["dirname(__DIR__, 2).'/runtime.php'", '%s updater: missing runtime helper'], $contents);
-        $this->pmssAssertStringNotContainsString("require_once __DIR__.'/bootstrap.php';", $contents, 'ARR helper should not require a separate bootstrap helper');
+        $this->pmssAssertUpdateAppFileContainsAndOmitsStrings('arr.php', ["dirname(__DIR__, 2).'/runtime.php'", '%s updater: missing runtime helper'], ["require_once __DIR__.'/bootstrap.php';" => 'ARR helper should not require a separate bootstrap helper']);
     }
 
     public function testServarrInstallerDelegatesRuntimeBootstrapToArrHelper(): void
     {
-        $contents = $this->pmssReadUpdateAppFile('servarr.php');
-
-        $this->assertStringContainsAllStrings(["require_once __DIR__.'/arr.php';", 'pmssArrUpdateSupportedApps();'], $contents);
-        $this->pmssAssertStringNotContainsString("dirname(__DIR__).'/runtime.php'", $contents, 'servarr.php should delegate runtime bootstrap to arr.php');
-        $this->pmssAssertStringNotContainsString('missing runtime helper', $contents, 'servarr.php should keep the runtime warning in arr.php');
-        $this->pmssAssertStringNotContainsString("require_once __DIR__.'/bootstrap.php';", $contents, 'servarr.php should not require a separate bootstrap helper');
+        $this->pmssAssertUpdateAppFileContainsAndOmitsStrings('servarr.php', ["require_once __DIR__.'/arr.php';", 'pmssArrUpdateSupportedApps();'], [
+            "dirname(__DIR__).'/runtime.php'" => 'servarr.php should delegate runtime bootstrap to arr.php',
+            'missing runtime helper' => 'servarr.php should keep the runtime warning in arr.php',
+            "require_once __DIR__.'/bootstrap.php';" => 'servarr.php should not require a separate bootstrap helper',
+        ]);
     }
 }
