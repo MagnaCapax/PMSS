@@ -29,7 +29,6 @@ function pmssUserConfigCliResourceSpecs(): array
         'ioLatencyMs' => ['addUserOption' => 'io-latency-ms', 'addUserLegacyIndex' => 15, 'userConfigIndex' => 13, 'usage' => '--io-latency-ms=MS', 'parse' => 'int', 'default' => 0, 'persist' => true, 'cgroupFlag' => '--io-latency-ms='],
         'ioCostQos' => ['addUserOption' => 'io-cost-qos', 'addUserLegacyIndex' => 16, 'userConfigIndex' => 14, 'usage' => '--io-cost-qos=SETTING', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-cost-qos='],
         'ioCostModel' => ['addUserOption' => 'io-cost-model', 'addUserLegacyIndex' => 17, 'userConfigIndex' => 15, 'usage' => '--io-cost-model=SETTING', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-cost-model='],
-        'bonusPct' => ['addUserOption' => 'bonus-pct', 'usage' => '--bonus-pct=PERCENT', 'parse' => 'int', 'default' => 0, 'persist' => true],
     ];
 }
 
@@ -229,10 +228,6 @@ function pmssUserConfigCliResourceHelpSpecs(): array
         'ioCostModel' => [
             'parameter' => 'IO_COST_MODEL',
             'description' => 'io.cost.model nested keys; defaults to the /home backing device major:minor.',
-        ],
-        'bonusPct' => [
-            'parameter' => 'BONUS_PCT',
-            'description' => 'Free Bonus Disk policy percent (0-300); multiplies the RAM-derived BFQ weight.',
         ],
     ];
 }

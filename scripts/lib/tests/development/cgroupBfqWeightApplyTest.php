@@ -13,8 +13,8 @@ require_once __DIR__.'/../../cgroup/bfqFormula.php';
  */
 class CgroupBfqWeightApplyTest extends TestCase
 {
-    // Curve points with default coefficient 3.535, kernel max 1000, bonus 0.
-    // round(3.535 * sqrt(MiB)) clamped [1, 1000].
+    // Curve points with default coefficient 3.535, customer max 700.
+    // round(3.535 * sqrt(MiB)) clamped [1, 700].
 
     public function testDefaultCurvePointsAndClamps(): void
     {
@@ -27,9 +27,8 @@ class CgroupBfqWeightApplyTest extends TestCase
             [8000, 316],
             [16000, 447],
             [32768, 640],
-            [64000, 894],
-            [80000, 1000],
-            [1000000, 1000],
+            [64000, 700],
+            [1000000, 700],
             [0, 1],
             [-1, 1],
         ] as [$memoryMiB, $expected]) {
@@ -42,38 +41,15 @@ class CgroupBfqWeightApplyTest extends TestCase
     public function testCustomParametersAndInvalidCeilings(): void
     {
         foreach ([
-            [1000, 2.5, 1000, 79, 'custom coefficient'],
+            [1000, 2.5, 700, 79, 'custom coefficient'],
             [32768, 3.535, 500, 500, 'custom ceiling'],
             [1000, 3.535, 0, 1, 'zero ceiling'],
             [1000, 3.535, -1, 1, 'negative ceiling'],
-        ] as [$memoryMiB, $coefficient, $kernMax, $expected, $label]) {
+        ] as [$memoryMiB, $coefficient, $customerMax, $expected, $label]) {
             $this->assertEquals(
                 $expected,
-                \pmssBfqFormulaWeight($memoryMiB, $coefficient, $kernMax),
+                \pmssBfqFormulaWeight($memoryMiB, $coefficient, $customerMax),
                 'Unexpected weight for '.$label
-            );
-        }
-    }
-
-    public function testBonusPercentMultipliesBase(): void
-    {
-        // Base at 32768 MiB = 640. Bonus multiplies the RAM-derived base.
-        foreach ([
-            [32768, 0.0, 640, 'zero bonus matches base'],
-            [32768, 10.0, 704, '10% bonus crosses old 700 hold'],
-            [32768, 25.0, 800, '25% bonus -> 800'],
-            [32768, 50.0, 960, '50% bonus -> 960'],
-            [32768, 100.0, 1000, '100% bonus clamps to kernMax 1000'],
-            [32768, 300.0, 1000, '300% bonus clamps to kernMax 1000'],
-            [8000, 100.0, 632, '100% bonus on 8 GiB plan'],
-            [1000, 200.0, 335, '200% bonus on 1 GiB plan'],
-            [32768, -50.0, 640, 'negative bonus treated as zero'],
-            [0, 300.0, 1, 'zero RAM with bonus still returns 1'],
-        ] as [$memoryMiB, $bonusPct, $expected, $label]) {
-            $this->assertEquals(
-                $expected,
-                \pmssBfqFormulaWeight($memoryMiB, 3.535, 1000, $bonusPct),
-                'Unexpected weight: '.$label
             );
         }
     }
