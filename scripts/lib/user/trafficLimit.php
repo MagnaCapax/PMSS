@@ -166,9 +166,21 @@ if (!function_exists('pmssTrafficLimitLog')) {
     }
 }
 
+if (!function_exists('pmssTrafficLimitMarkerPathIsSafe')) {
+    /** Confirm traffic throttle markers cannot follow unsafe path segments. */
+    function pmssTrafficLimitMarkerPathIsSafe(string $path): bool
+    {
+        return function_exists('pmssUserFilePathIsSafe') && pmssUserFilePathIsSafe($path);
+    }
+}
+
 if (!function_exists('pmssTrafficLimitMarkerTouch')) {
     function pmssTrafficLimitMarkerTouch(string $user, string $path): bool
     {
+        if (!pmssTrafficLimitMarkerPathIsSafe($path)) {
+            pmssTrafficLimitLog($user, "traffic throttle marker path unsafe ({$path})");
+            return false;
+        }
         if (!@touch($path)) {
             pmssTrafficLimitLog($user, "traffic throttle marker touch failed ({$path})");
             return false;
@@ -183,6 +195,13 @@ if (!function_exists('pmssTrafficLimitMarkerTouch')) {
 if (!function_exists('pmssTrafficLimitMarkerRemove')) {
     function pmssTrafficLimitMarkerRemove(string $user, string $path): bool
     {
+        if (!file_exists($path) && !is_link($path)) {
+            return true;
+        }
+        if (!pmssTrafficLimitMarkerPathIsSafe($path)) {
+            pmssTrafficLimitLog($user, "traffic throttle marker path unsafe ({$path})");
+            return false;
+        }
         if (!file_exists($path) || @unlink($path) || !file_exists($path)) {
             return true;
         }

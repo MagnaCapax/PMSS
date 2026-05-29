@@ -176,6 +176,55 @@ class TrafficLimitSafetyHelperTest extends TestCase
         $this->assertTrue(file_exists($realPath));
     }
 
+    public function testMarkerTouchCreatesSafeMarkerWithStrictMode(): void
+    {
+        $path = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
+        mkdir(dirname($path), 0700, true);
+
+        $this->assertTrue(\pmssTrafficLimitMarkerTouch('alice', $path));
+        $this->assertTrue(is_file($path));
+        $this->assertEquals(0600, fileperms($path) & 0777);
+    }
+
+    public function testMarkerTouchRejectsSymlinkTarget(): void
+    {
+        $realPath = $this->tempDir.'/real-marker';
+        $linkPath = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
+        mkdir(dirname($linkPath), 0700, true);
+        file_put_contents($realPath, 'old');
+        symlink($realPath, $linkPath);
+
+        ob_start();
+        $result = \pmssTrafficLimitMarkerTouch('alice', $linkPath);
+        ob_end_clean();
+
+        $this->assertFalse($result);
+        $this->assertTrue(is_link($linkPath));
+        $this->assertSame('old', file_get_contents($realPath));
+    }
+
+    public function testMarkerRemoveTreatsMissingFileAsSuccess(): void
+    {
+        $this->assertTrue(\pmssTrafficLimitMarkerRemove('alice', $this->tempDir.'/runtime/trafficLimits/alice.enabled'));
+    }
+
+    public function testMarkerRemoveRejectsSymlinkTarget(): void
+    {
+        $realPath = $this->tempDir.'/real-marker';
+        $linkPath = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
+        mkdir(dirname($linkPath), 0700, true);
+        file_put_contents($realPath, 'old');
+        symlink($realPath, $linkPath);
+
+        ob_start();
+        $result = \pmssTrafficLimitMarkerRemove('alice', $linkPath);
+        ob_end_clean();
+
+        $this->assertFalse($result);
+        $this->assertTrue(is_link($linkPath));
+        $this->assertTrue(file_exists($realPath));
+    }
+
     public function testPersistTargetModesWritesAllTargetsWithRequestedModes(): void
     {
         $runtimeDir = $this->tempDir.'/runtime/trafficLimits';
