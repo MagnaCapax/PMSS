@@ -15,6 +15,7 @@ require_once __DIR__.'/rutorrent/config.php';
 // so update helpers always keep the context-aware logging contract.
 require_once __DIR__.'/update/logging.php';
 require_once __DIR__.'/runtime.php';
+require_once __DIR__.'/version.php';
 require_once __DIR__.'/update/apt.php';
 require_once __DIR__.'/update/osRelease.php';
 
@@ -201,21 +202,4 @@ function copyToUserSpace($sourceFile, $targetFile, $user) {
     // Avoid shelling out for simple chmod/chown: fork failures are common during updates.
     $applyPermissions($targetFile);
     return true;
-}
-
-/**
- * Retrieve current PMSS version from the configured version file.
- *
- * @param string $versionFile Path to the version file.
- *
- * @return string The version string or "unknown" if not found.
- */
-function getPmssVersion($versionFile = '/etc/seedbox/config/version') {
-    foreach ([$versionFile, '/etc/seedbox/runtime/version'] as $path) {
-        if ($path !== '' && is_file($path) && ($data = trim((string) @file_get_contents($path))) !== '') {
-            return $data;
-        }
-    }
-
-    return 'unknown';
 }

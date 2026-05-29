@@ -11,6 +11,7 @@
 require_once __DIR__.'/../update/distro.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/../version.php';
 
 class Motd
 {

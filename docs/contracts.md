@@ -334,7 +334,13 @@ read-only probes used by baseline sanitization and source-build guards.
 
 ---
 
-## OS-Release & Skeleton Utilities – `scripts/lib/update.php`
+## Version Helper - `scripts/lib/version.php`
+
+- getPmssVersion(string $versionFile='/etc/seedbox/config/version'): string -> trimmed file contents or `'unknown'`.
+
+---
+
+## OS-Release & Skeleton Utilities - `scripts/lib/update.php`
 
 - pmssSkeletonBase(): string → `PMSS_SKEL_DIR` or `/etc/skel`.
 - updateUserFile(string $file, string $user): void → copies a skeleton file into `PMSS_HOME_DIR` (default `/home`) under `/<user>/<file>` when missing or checksum differs; ensures parent directories exist, writes via temp-file + rename, sets mode 755 and `chown user:user`.
@@ -343,7 +349,6 @@ read-only probes used by baseline sanitization and source-build guards.
 - getOsReleaseData(): array → cached `parse_ini_file` of `PMSS_OS_RELEASE_PATH` or `/etc/os-release`.
 - getDistroName(): string, getDistroVersion(): string, getDistroCodename(): string → wrappers around `getOsReleaseData()`.
 - pmssResetOsReleaseCache(): void → clears cached os-release data for current path.
-- getPmssVersion(string $versionFile='/etc/seedbox/config/version'): string → trimmed file contents or `'unknown'`.
 
 ---
 

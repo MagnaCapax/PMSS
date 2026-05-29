@@ -6,6 +6,14 @@ require_once dirname(__DIR__, 3).'/motd/Generator.php';
 
 class MotdTest extends TestCase
 {
+    public function testGeneratorLoadsVersionHelperForStandaloneUse(): void
+    {
+        $script = 'require '.var_export(dirname(__DIR__, 3).'/motd/Generator.php', true).'; '
+            .'echo function_exists("getPmssVersion") ? "loaded" : "missing";';
+
+        $this->assertEquals('loaded', trim($this->pmssRunInlinePhp($script, ['PMSS_TEST_MODE' => '1'])));
+    }
+
     public function testGenerateMotdWritesToOutputWithTemplate(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-motd-', 0700);

@@ -312,11 +312,12 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $motdFacade = 'function generate'.'Motd(';
 
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update.php', [
-            'function getPmssVersion(',
+            "require_once __DIR__.'/version.php';",
         ], [
             $aptFacade => 'update.php should keep the canonical pmssUpdateAptSources() symbol only',
             $motdFacade => 'update.php should not keep a dead MOTD wrapper once callers use Motd::motdGenerate() directly',
         ]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/version.php', 'function getPmssVersion(');
     }
 
     public function testSkeletonMaintenanceDoesNotInjectTorrentFrontendOperatorRequires(): void
