@@ -9,6 +9,7 @@
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/systemPrep.php';
 require_once __DIR__.'/users.php';
+require_once __DIR__.'/../pathSafety.php';
 require_once __DIR__.'/../users.php';
 require_once __DIR__.'/../userLifecycle.php';
 require_once __DIR__.'/../user/directories.php';
@@ -35,27 +36,42 @@ require_once __DIR__.'/users/docker.php';
         return sha1($version.'|'.$rutorrentIndexSha);
     }
 
-    /** Marker path for a (validated) username. */
+    /** Marker path for a username when the boundary inputs are safe. */
     function pmssUserRefreshMarkerPath(string $user): string
     {
-        return pmssUserRefreshStateDir().'/'.$user;
+        $dir = pmssUserRefreshStateDir();
+        if (!pmssValidateUsername($user) || !pmssPathTargetIsSafe($dir, true, false, false)) {
+            return '';
+        }
+
+        return $dir.'/'.$user;
     }
 
     /** True when the user was already fully refreshed against this signature. */
     function pmssUserRefreshAlreadyDone(string $user, string $signature): bool
     {
         $path = pmssUserRefreshMarkerPath($user);
-        return is_file($path) && trim((string) @file_get_contents($path)) === $signature;
+        return $path !== '' && is_file($path) && trim((string) @file_get_contents($path)) === $signature;
     }
 
     /** Record that the user is fully refreshed against this signature. */
     function pmssUserRefreshMarkDone(string $user, string $signature): void
     {
-        $dir = pmssUserRefreshStateDir();
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
+        $path = pmssUserRefreshMarkerPath($user);
+        if ($path === '') {
+            $safeUser = (string) preg_replace('/[\r\n\0]+/', '?', $user);
+            logMessage('[WARN] Refusing to write unsafe user refresh marker for '.($safeUser === '' ? '(empty)' : $safeUser));
+            return;
         }
-        @file_put_contents(pmssUserRefreshMarkerPath($user), $signature."\n");
+
+        $dir = dirname($path);
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+            logMessage('[WARN] Unable to create user refresh state directory: '.$dir);
+            return;
+        }
+        if (@file_put_contents($path, $signature."\n") === false) {
+            logMessage('[WARN] Unable to write user refresh marker: '.$path);
+        }
     }
 
     /**

@@ -31,6 +31,41 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
         }
     }
 
+    public function testMarkerRejectsInvalidUsernameBeforeFilesystemWrite(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-urefresh-safe-', 0700);
+        $escapePath = dirname($dir).'/pmss-urefresh-escape-'.bin2hex(random_bytes(4));
+
+        $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $dir], function () use ($escapePath): void {
+            $invalidUser = '../'.basename($escapePath);
+            ob_start();
+            pmssUserRefreshMarkDone($invalidUser, 'sig');
+            $output = (string) ob_get_clean();
+
+            $this->assertSame('', pmssUserRefreshMarkerPath($invalidUser));
+            $this->assertFalse(pmssUserRefreshAlreadyDone($invalidUser, 'sig'));
+            $this->assertFalse(file_exists($escapePath), 'invalid usernames must not escape the marker directory');
+            $this->assertStringContainsString('Refusing to write unsafe user refresh marker', $output);
+        });
+    }
+
+    public function testMarkerRejectsUnsafeStateDirectoryBeforeWrite(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-urefresh-state-', 0700);
+        $unsafeDir = $root.'/state/../escape';
+
+        $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $unsafeDir], function () use ($root): void {
+            ob_start();
+            pmssUserRefreshMarkDone('alice', 'sig');
+            $output = (string) ob_get_clean();
+
+            $this->assertSame('', pmssUserRefreshMarkerPath('alice'));
+            $this->assertFalse(pmssUserRefreshAlreadyDone('alice', 'sig'));
+            $this->assertFalse(is_dir($root.'/escape'), 'unsafe state dirs must not be materialized');
+            $this->assertStringContainsString('Refusing to write unsafe user refresh marker', $output);
+        });
+    }
+
     public function testLoopChecksResumeAndMarksDone(): void
     {
         $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
