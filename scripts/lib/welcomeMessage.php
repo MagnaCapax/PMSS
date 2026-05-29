@@ -8,7 +8,9 @@
  * @license GPL-3.0-only
  */
 
-if (!function_exists('pmssReplaceUserFile') && is_file(__DIR__.'/lighttpd/userFileWrite.php')) {
+if ((!function_exists('pmssReplaceUserFile') || !function_exists('pmssUserFileApplyMetadata'))
+    && is_file(__DIR__.'/lighttpd/userFileWrite.php')
+) {
     require_once __DIR__.'/lighttpd/userFileWrite.php';
 }
 
@@ -96,23 +98,18 @@ function pmssWelcomeUserMessageSet(string $username, string $userHome, string $t
     }
 
     $configDir = $userHome.'/.config';
-    if (!function_exists('pmssEnsureSafeDir') || !pmssEnsureSafeDir($configDir, 0755)) {
+    if (!function_exists('pmssEnsureSafeDir') || !function_exists('pmssUserFileApplyOwnership') || !pmssEnsureSafeDir($configDir, 0755)) {
         return false;
     }
-    if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-        @chown($configDir, $username);
-        @chgrp($configDir, $username);
-    }
+    pmssUserFileApplyOwnership($configDir, $username);
 
     return function_exists('pmssReplaceUserFile')
+        && function_exists('pmssUserFileApplyMetadata')
         && pmssReplaceUserFile(
             $path,
             $template,
             static function (string $temporaryPath) use ($username): void {
-                @chmod($temporaryPath, 0640);
-                if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-                    @chgrp($temporaryPath, $username);
-                }
+                pmssUserFileApplyMetadata($temporaryPath, 'root', 0640, $username);
             }
         );
 }

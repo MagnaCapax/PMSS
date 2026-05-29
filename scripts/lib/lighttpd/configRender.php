@@ -113,11 +113,7 @@ function pmssLighttpdSyncPhpIni(string $phpIniPath, string $user, int $memoryLim
         return false;
     }
 
-    @chmod($phpIniPath, 0751);
-    if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-        @chown($phpIniPath, $user);
-        @chgrp($phpIniPath, $user);
-    }
+    pmssUserFileApplyMetadata($phpIniPath, $user, 0751);
 
     return true;
 }

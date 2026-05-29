@@ -60,13 +60,20 @@ function pmssEnsureSafeDir(string $path, int $mode): bool
     return is_dir($path) && !is_link($path);
 }
 
-function pmssUserFileApplyMetadata(string $path, string $owner, int $mode, ?string $group = null): void
+/** Apply owner/group metadata only when the caller is root. */
+function pmssUserFileApplyOwnership(string $path, string $owner, ?string $group = null): void
 {
-    @chmod($path, $mode);
     if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
         @chown($path, $owner);
         @chgrp($path, ($group === null || $group === '') ? $owner : $group);
     }
+}
+
+/** Apply file mode plus root-only ownership metadata to a managed user path. */
+function pmssUserFileApplyMetadata(string $path, string $owner, int $mode, ?string $group = null): void
+{
+    @chmod($path, $mode);
+    pmssUserFileApplyOwnership($path, $owner, $group);
 }
 
 /**

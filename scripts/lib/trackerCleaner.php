@@ -2,6 +2,7 @@
 /** Shared tracker-cleaner policy and in-memory torrent mutation helpers. */
 
 require_once __DIR__.'/runtime.php';
+require_once __DIR__.'/lighttpd/userFileWrite.php';
 
 function pmssTrackerCleanerTimestamp(): string { return '['.date('Y-m-d H:i:s').']'; }
 
@@ -87,8 +88,7 @@ function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload
 
     pmssUserLifecycleStep('trackerCleaner', $username, 'append_user_verbose_log', pmssTrackerCleanerSuCommand($username, 'cat '.escapeshellarg($tmpLogPath).' >> ~/.logs/trackerCleaner.log'), false);
     if (file_exists($userLogFile) && !is_link($userLogFile) && pmssPathWithinRootIsSafe($userLogFile, $userHome)) {
-        @chown($userLogFile, $username);
-        @chgrp($userLogFile, $username);
+        pmssUserFileApplyOwnership($userLogFile, $username);
     }
     @unlink($tmpLogPath);
 }
@@ -157,8 +157,7 @@ function pmssTrackerCleanerAppendUserChangeLog(string $username, array $changes)
 
     file_put_contents($userLogPath, $log, FILE_APPEND);
     if (file_exists($userLogPath) && !is_link($userLogPath) && pmssPathWithinRootIsSafe($userLogPath, "/home/{$username}")) {
-        @chown($userLogPath, $username);
-        @chgrp($userLogPath, $username);
+        pmssUserFileApplyOwnership($userLogPath, $username);
     }
     return $log;
 }

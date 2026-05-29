@@ -187,8 +187,7 @@ class UserConfigStore
             return;
         }
         if (!is_dir($configDir) && pmssDirEnsureExists($configDir, 0755)) {
-            @chown($configDir, $username);
-            @chgrp($configDir, $username);
+            pmssUserFileApplyOwnership($configDir, $username);
         }
 
         $payload = $this->normalise($payload);

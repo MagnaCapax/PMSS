@@ -114,12 +114,7 @@ function pmssEnsureWebdavLockDatabase(string $user, string $homeDir): void
         return;
     }
 
-    @chmod($lockFile, 0600);
+    pmssUserFileApplyMetadata($lockFile, $user, 0600);
     clearstatcache(true, $lockFile);
-    if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-        @chown($lighttpdDir, $user);
-        @chgrp($lighttpdDir, $user);
-        @chown($lockFile, $user);
-        @chgrp($lockFile, $user);
-    }
+    pmssUserFileApplyOwnership($lighttpdDir, $user);
 }
