@@ -7,37 +7,7 @@
  *
  * @license GPL-3.0-only
  */
-
-// Customer-side path-safety + JSON helpers inlined from
-// /scripts/lib/lighttpd/userFileWrite.php (operator-only). Customer PHP
-// cannot traverse /scripts/, per ADR 0016.
-if (!function_exists('pmssWelcomeMessageCustomerPathIsSafe')) {
-    function pmssWelcomeMessageCustomerPathIsSafe(string $path): bool
-    {
-        if ($path === '' || strpos($path, "\0") !== false || is_link($path)) {
-            return false;
-        }
-        $homeRoot = getenv('PMSS_HOME_DIR');
-        $homeRoot = (is_string($homeRoot) && trim($homeRoot) !== '') ? rtrim($homeRoot, '/') : '/home';
-        $real = realpath($path);
-        if ($real === false) {
-            $real = realpath(dirname($path));
-            if ($real === false) {
-                return false;
-            }
-            $real .= '/'.basename($path);
-        }
-        return strpos($real, $homeRoot.'/') === 0;
-    }
-}
-
-/**
- * Build the standard remote-request context used by PMSS GUI pages.
- */
-function pmssWelcomeHttpContextCreate()
-{
-    return stream_context_create(array('http' => array('timeout' => 5, 'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)')));
-}
+require_once __DIR__.'/../.scriptsInc.php';
 
 /**
  * Read a JSON file into an associative array.

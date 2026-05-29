@@ -13,6 +13,7 @@
  * @package PMSS
  * @version 1.0
  */
+require_once __DIR__.'/../.scriptsInc.php';
 
 // Customer-side helpers MUST live in the customer tree (etc/skel/www/) because
 // per-user lighttpd runs as the customer UID and cannot traverse /scripts/
@@ -452,25 +453,6 @@ echo $announcementItemsHtml;
 
 <?php
 /**
- * Require a customer-tree helper when it exists.
- */
-function pmssWelcomeRequireLocalHelper($file) {
-    if (!is_string($file)
-        || !preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]*\.php\z/', $file)
-        || basename($file) !== $file) {
-        return false;
-    }
-
-    $path = __DIR__.'/'.$file;
-    if (is_file($path) && !is_link($path) && is_readable($path)) {
-        require_once $path;
-        return true;
-    }
-
-    return false;
-}
-
-/**
  * Gather the state used by the welcome page before rendering begins.
  *
  * @return array<string,mixed>
@@ -739,48 +721,6 @@ function pmssWelcomeQuotaInfoRead() {
     $quotaInfo = pmssWelcomeSerializedArrayDecode($quotaInfo);
 
     return is_array($quotaInfo) ? $quotaInfo : array();
-}
-
-/**
- * Decode serialized customer-facing arrays without instantiating PHP objects.
- */
-function pmssWelcomeSerializedArrayDecode($raw, $maxBytes = 8192) {
-    if (!is_string($raw) || $raw === '' || strlen($raw) > $maxBytes) {
-        return null;
-    }
-
-    $data = @unserialize($raw, array('allowed_classes' => false));
-    if (!is_array($data) || pmssWelcomeSerializedArrayHasObject($data)) {
-        return null;
-    }
-
-    return $data;
-}
-
-/**
- * Reject object payloads that should never appear in quota snapshots.
- */
-function pmssWelcomeSerializedArrayHasObject($value, $depth = 0) {
-    if (is_object($value)) {
-        return true;
-    }
-
-    if (!is_array($value)) {
-        return false;
-    }
-
-    // Treat pathologically deep or broad arrays as unsafe customer input.
-    if ($depth > 32 || count($value) > 256) {
-        return true;
-    }
-
-    foreach ($value as $child) {
-        if (pmssWelcomeSerializedArrayHasObject($child, $depth + 1)) {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 function pmssWelcomeVendorRead() {

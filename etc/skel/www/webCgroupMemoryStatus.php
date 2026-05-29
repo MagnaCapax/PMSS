@@ -10,37 +10,12 @@
  * cgroup files read here (/sys/fs/cgroup/user.slice/user-<UID>.slice/memory.*)
  * are world-readable kernel paths; the customer can read their own slice.
  *
- * Carries the customer-side pmssFormatBytes copy because /scripts/lib/runtime.php
- * is intentionally outside the customer PHP trust boundary.
+ * Uses the customer-side pmssFormatBytes copy from ../.scriptsInc.php because
+ * /scripts/lib/runtime.php is intentionally outside the customer PHP boundary.
  *
  * @license GPL-3.0-only
  */
-
-if (!function_exists('pmssFormatBytes')) {
-    /** Compact human-readable bytes for customer-facing status output. */
-    function pmssFormatBytes($bytes, $precision = 1, $minimumUnitIndex = 0, $trimTrailingZeros = false)
-    {
-        $units = array('B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB');
-        $bytes = max((float) $bytes, 0.0);
-        $index = 0;
-        $minimumUnitIndex = max(0, min((int) $minimumUnitIndex, count($units) - 1));
-        while ($index < $minimumUnitIndex && $index < count($units) - 1) {
-            $bytes /= 1024.0;
-            $index++;
-        }
-        while ($bytes >= 1024 && $index < count($units) - 1) {
-            $bytes /= 1024.0;
-            $index++;
-        }
-
-        $formatted = number_format($bytes, (int) $precision, '.', '');
-        if ($trimTrailingZeros) {
-            $formatted = rtrim(rtrim($formatted, '0'), '.');
-        }
-
-        return ($formatted === '' ? '0' : $formatted).' '.$units[$index];
-    }
-}
+require_once __DIR__.'/../.scriptsInc.php';
 
 /** Format bytes into a compact human-readable string. */
 function pmssWebCgroupMemoryStatusFormatBytes($bytes, $precision = 1)

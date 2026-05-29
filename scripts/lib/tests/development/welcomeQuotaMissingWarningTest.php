@@ -8,14 +8,17 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     private function makeWelcomeSafetyFixture(): string
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-        $start = strpos($source, 'function pmssWelcomeRequireLocalHelper');
+        $start = strpos($source, 'function pmssWelcomePageStateBuild');
         $end = strpos($source, 'function pmssWelcomeVendorRead');
-        $this->assertTrue($start !== false, 'welcome.php safety helpers should remain present');
+        $this->assertTrue($start !== false, 'welcome.php page-state helpers should remain present');
         $this->assertTrue($end !== false && $end > $start, 'welcome.php vendor reader should follow safety helpers');
 
         $dir = $this->pmssMakeTempDir('pmss-welcome-safety-');
-        $fixture = $dir.'/welcomeSafety.php';
-        return $this->pmssWriteFile($fixture, "<?php\n".substr($source, $start, $end - $start));
+        $www = $dir.'/www';
+        $this->pmssEnsureDir($www);
+        $this->pmssWriteFile($dir.'/.scriptsInc.php', $this->pmssReadRepoFile('etc/skel/.scriptsInc.php'));
+        $fixture = $www.'/welcomeSafety.php';
+        return $this->pmssWriteFile($fixture, "<?php\nrequire_once __DIR__.'/../.scriptsInc.php';\n".substr($source, $start, $end - $start));
     }
 
     private function runWelcomeSafetyScript(string $script): string
