@@ -66,7 +66,8 @@ function pmssUserWatchdogProcessPids(string $username, string $processPattern, a
 
 function pmssUserWatchdogProcessRunning(string $username, string $processName): bool
 {
-    $pids = pmssUserWatchdogProcessPids($username, $processName, array(), $exitCode = 1);
+    $exitCode = 1;
+    $pids = pmssUserWatchdogProcessPids($username, $processName, array(), $exitCode);
     return $exitCode === 0 && $pids !== array();
 }
 
@@ -87,7 +88,8 @@ function pmssUserWatchdogLocalPortRead(string $path): ?int
 /** Return the oldest /proc start marker for exact process-name matches. */
 function pmssUserWatchdogProcessStartTime(string $username, string $processName, string $procRoot = '/proc'): ?int
 {
-    $pids = pmssUserWatchdogProcessPids($username, $processName, array('exact' => true), $exitCode = 1);
+    $exitCode = 1;
+    $pids = pmssUserWatchdogProcessPids($username, $processName, array('exact' => true), $exitCode);
     if ($exitCode !== 0 || $pids === array()) {
         return null;
     }
