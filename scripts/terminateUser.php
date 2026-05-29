@@ -27,6 +27,50 @@ require_once __DIR__.'/lib/traffic/storage.php';
 // stale state. Abort early with a clear message.
 pmssRequireHomeMounted('terminateUser.php');
 
+/**
+ * Remove a lifecycle-owned file while preserving dry-run semantics.
+ */
+function pmssTerminateUserUnlinkPath(string $username, string $phase, string $path, bool $dryRun): bool
+{
+    if (!file_exists($path) && !is_link($path)) {
+        return true;
+    }
+    if ($dryRun) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'SKIP', 'Dry run; file not removed', array('path' => $path));
+        return true;
+    }
+    if (@unlink($path)) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'OK', 'Removed file', array('path' => $path));
+        return true;
+    }
+    pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', 'Failed to remove file', array('path' => $path));
+    return false;
+}
+
+/**
+ * Remove an empty lifecycle-owned directory without hiding dry-run mutations.
+ */
+function pmssTerminateUserRemoveEmptyDir(string $username, string $phase, string $path, bool $dryRun): bool
+{
+    if (!is_dir($path)) {
+        return true;
+    }
+    $entries = @scandir($path);
+    if (!is_array($entries) || array_diff($entries, array('.', '..')) !== array()) {
+        return true;
+    }
+    if ($dryRun) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'SKIP', 'Dry run; directory not removed', array('path' => $path));
+        return true;
+    }
+    if (@rmdir($path)) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'OK', 'Removed empty directory', array('path' => $path));
+        return true;
+    }
+    pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', 'Failed to remove empty directory', array('path' => $path));
+    return false;
+}
+
 $continue = '-';
 $dryRun   = false;
 $usage    = "Usage: terminateUser.php [--dry-run] [--confirm] USERNAME\n";
@@ -156,19 +200,17 @@ if (file_exists($portFile)) {
         }
     }
     $portsBase = '/var/lib/pmss/ports';
+    $portCleanupOk = true;
     foreach ($ports as $type => $port) {
         $filePath = "$portsBase/{$type}/{$port}";
-        if (file_exists($filePath)) {
-            unlink($filePath);
-            $dir = dirname($filePath);
-            if (is_dir($dir) && count(glob($dir . '/*')) === 0) rmdir($dir);
+        if (file_exists($filePath) || is_link($filePath)) {
+            $portCleanupOk = pmssTerminateUserUnlinkPath($username, 'release_rtorrent_'.$type.'_port', $filePath, $dryRun) && $portCleanupOk;
+            $portCleanupOk = pmssTerminateUserRemoveEmptyDir($username, 'remove_empty_rtorrent_'.$type.'_port_dir', dirname($filePath), $dryRun) && $portCleanupOk;
         }
     }
-    if (is_dir($portsBase) && count(glob($portsBase . '/*')) === 0) {
-        rmdir($portsBase);
-    }
+    $portCleanupOk = pmssTerminateUserRemoveEmptyDir($username, 'remove_empty_rtorrent_ports_root', $portsBase, $dryRun) && $portCleanupOk;
     pmssUserLifecycleContextLog('terminate', 'cleanup_ports', $username, array(
-        'status'  => 'OK',
+        'status'  => $dryRun ? 'SKIP' : ($portCleanupOk ? 'OK' : 'ERR'),
         'ports'   => $ports,
         'dry_run' => $dryRun,
     ));
@@ -232,12 +274,17 @@ foreach (array(
 ) as $stepSpec) {
     pmssUserLifecycleStep('terminate', $username, $stepSpec[0], $stepSpec[1], $dryRun);
 }
-@unlink("/etc/nginx/users/{$username}");
+pmssTerminateUserUnlinkPath($username, 'remove_nginx_user_file', "/etc/nginx/users/{$username}", $dryRun);
 
 $db = new users();
 if (pmssUserAccountLookup($username) !== null) {
     // #TODO explore force-removal path when passwd entry lingers to keep DB in sync automatically.
     fwrite(STDERR, "Warning: {$username} still present in /etc/passwd; skipping DB removal.\n");
+} elseif ($dryRun) {
+    pmssUserLifecycleContextLog('terminate', 'remove_user_db', $username, array(
+        'status'  => 'SKIP',
+        'dry_run' => true,
+    ));
 } else {
     $db->removeUser($username);
     pmssUserLifecycleContextLog('terminate', 'remove_user_db', $username, array(

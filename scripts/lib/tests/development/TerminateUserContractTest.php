@@ -64,4 +64,34 @@ final class TerminateUserContractTest extends TestCase
             'terminateUser.php should keep immutable home handling: '
         );
     }
+
+    public function testTerminateUserDryRunGuardsDirectCleanupMutations(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/terminateUser.php',
+            [
+                'function pmssTerminateUserUnlinkPath',
+                'function pmssTerminateUserRemoveEmptyDir',
+                "pmssTerminateUserUnlinkPath(\$username, 'remove_nginx_user_file'",
+                '} elseif ($dryRun) {',
+                "'status'  => 'SKIP'",
+            ],
+            'terminateUser.php should route direct cleanup through dry-run-aware helpers: '
+        );
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/terminateUser.php',
+            ['} elseif ($dryRun) {', '$db->removeUser($username);'],
+            'terminateUser.php should guard DB removal: ',
+            'terminateUser.php should check dry-run before DB removal: '
+        );
+        $this->pmssAssertRepoFileNotContainsStrings(
+            'scripts/terminateUser.php',
+            [
+                '@unlink("/etc/nginx/users/{$username}")',
+                'unlink($filePath)',
+                'rmdir($portsBase)',
+            ],
+            'terminateUser.php should not keep unguarded cleanup mutation: '
+        );
+    }
 }
