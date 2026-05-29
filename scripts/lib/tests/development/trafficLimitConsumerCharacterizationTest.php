@@ -5,10 +5,15 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class trafficLimitConsumerCharacterizationTest extends TestCase
 {
-    public function testCanonicalConsumersUseSharedTrafficLimitStateReader(): void
+    public function testTrafficConsumersUseSharedReaders(): void
     {
-        foreach (['scripts/cron/trafficLimits.php', 'scripts/lib/stats/collect.php', 'etc/skel/www/stats.php', 'etc/skel/www/welcome.php'] as $path) {
-            $this->pmssAssertRepoFileContainsString($path, 'pmssTrafficLimitStateRead(');
+        foreach ([
+            'scripts/cron/trafficLimits.php' => ['pmssTrafficLimitStateRead('],
+            'scripts/lib/stats/collect.php' => ['pmssTrafficLimitStateRead(', 'pmssReadSerializedArrayFile('],
+            'etc/skel/www/stats.php' => ['pmssTrafficLimitStateRead(', 'pmssReadSerializedArrayFile('],
+            'etc/skel/www/welcome.php' => ['pmssTrafficLimitStateRead(', 'pmssReadSerializedArrayFile('],
+        ] as $path => $needles) {
+            $this->pmssAssertRepoFileContainsAllStrings($path, $needles);
         }
     }
 
@@ -25,13 +30,6 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
     public function testPmssStatsNoLongerCarriesLocalIntegerReader(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/pmssStats.php', ["require_once __DIR__.'/user/trafficLimit.php';"], ['function '.'pmssStats'.'ReadIntegerFile(']);
-    }
-
-    public function testSerializedStateConsumersUseSharedArrayReader(): void
-    {
-        foreach (['scripts/lib/stats/collect.php', 'etc/skel/www/stats.php', 'etc/skel/www/welcome.php'] as $path) {
-            $this->pmssAssertRepoFileContainsString($path, 'pmssReadSerializedArrayFile(');
-        }
     }
 
     public function testLegacyWebConsumersNoLongerInlineUnserializeFileReads(): void

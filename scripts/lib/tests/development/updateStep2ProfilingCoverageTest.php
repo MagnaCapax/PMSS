@@ -26,16 +26,10 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
 
     public function testUpdateStep2EmitsProfileSummaryAfterFinalWork(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/util/update-step2.php');
-
-        $summaryIndex = strpos($src, 'pmssProfileSummary();');
-        $rootCronIndex = strpos($src, "runStep('Refreshing root cron configuration'");
-        $motdIndex = strpos($src, "pmssRunProfiledCallable('Refreshing MOTD'");
-
-        $this->assertTrue($summaryIndex !== false, 'Expected pmssProfileSummary() call in update-step2.php');
-        $this->assertTrue($rootCronIndex !== false, 'Expected root cron refresh step in update-step2.php');
-        $this->assertTrue($motdIndex !== false, 'Expected profiled MOTD refresh step in update-step2.php');
-        $this->assertTrue($summaryIndex > $rootCronIndex, 'Profile summary should run after root cron refresh');
-        $this->assertTrue($summaryIndex > $motdIndex, 'Profile summary should run after MOTD refresh');
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/util/update-step2.php', [
+            "runStep('Refreshing root cron configuration'",
+            "pmssRunProfiledCallable('Refreshing MOTD'",
+            'pmssProfileSummary();',
+        ], 'Missing final profiling step: ', 'Profile summary should run after: ');
     }
 }
