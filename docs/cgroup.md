@@ -149,12 +149,11 @@ Inspect and apply limits per user:
   - Policy `mounts` entries are applied as per-device IO limits/weights when their backing devices can be resolved.
 - Cron refresh reapplies explicit io.latency/io.cost user knobs:
   - `/scripts/cron/cgroupPolicyRefresh.php` runs at boot and every 2 hours from `root.cron`.
-- Cgroup hosts get a direct per-user kernel weight refresh:
+- Cgroup-v1 BFQ hosts get a direct kernel weight refresh:
   - `/scripts/cron/cgroupBfqWeightApply.php` runs at boot and every 5 minutes from `root.cron`.
-  - It keeps the PMSS user JSON and systemd slice settings as the operator-facing source of truth, then writes
-    `/sys/fs/cgroup/blkio/.../blkio.bfq.weight` on cgroup-v1 BFQ hosts and
-    `/sys/fs/cgroup/user.slice/.../io.bfq.weight` or `io.weight` on cgroup-v2 hosts.
-    This keeps bonus-aware user I/O weighting consistent across both hierarchies.
+  - It keeps the systemd slice settings as the operator-facing source of truth, then writes
+    `/sys/fs/cgroup/blkio/.../blkio.bfq.weight` directly so Debian 12/systemd 252
+    BFQ translation caps do not collapse weights above `IOWeight=200`.
 - User termination clears slice overrides:
   - `systemctl revert user-UID.slice` before deleting OS user data.
 
@@ -184,8 +183,7 @@ Inspect and apply limits per user:
 - IOWeight effectiveness depends on device scheduler. It works well with BFQ (HDDs), but is less effective with NVMe (none/mq‑deadline). Prefer strict throttles when needed.
 - On cgroup-v1 BFQ hosts, systemd may translate any `IOWeight >= 200`
   to the same kernel `blkio.bfq.weight`. PMSS therefore uses
-  `cgroupBfqWeightApply.php` to restore per-user kernel weights directly. On
-  cgroup-v2 hosts, the same helper writes the matching per-user v2 I/O weight
-  file so `bonusPct` affects I/O priority instead of only disk and traffic quota.
+  `cgroupBfqWeightApply.php` to restore per-user kernel weights directly; the
+  helper exits cleanly on cgroup-v2 hosts where `/sys/fs/cgroup/blkio` is absent.
 - io.cost is skipped automatically when BFQ is active on any queue; PMSS logs a skip message rather than applying dead settings.
 - cgroup v1 systems (Debian 10) use BlockIOAccounting and analogous memory/task settings. PMSS retains a v1 template and selection by kernel detection.
