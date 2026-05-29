@@ -57,12 +57,17 @@ SH
             $callback($root, $commandLog, $dpkgCapture);
         });
     }
+
+    private function withFakeDownloadBody(string $body, callable $callback, array $extraEnv = array()): void
+    {
+        $this->withFakeCommands(array_merge(['PMSS_TEST_WGET_BODY' => $body], $extraEnv), function ($root, $commandLog, $dpkgCapture) use ($body, $callback): void {
+            $callback($root, $commandLog, $dpkgCapture, $body, hash('sha256', $body));
+        });
+    }
+
     public function testFetchPinnedRemoteFileReturnsTempPathForMatchingChecksum(): void
     {
-        $body = 'payload';
-        $expectedSha256 = hash('sha256', $body);
-
-        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog) use ($body, $expectedSha256): void {
+        $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
             $path = \pmssFetchPinnedRemoteFile('demo archive', 'https://example.invalid/archive', $expectedSha256);
 
             $this->assertTrue(is_string($path) && $path !== '', 'Expected matching download to return a temp path');
@@ -74,10 +79,7 @@ SH
 
     public function testFetchPinnedRemoteFileRejectsNonHttpsUrls(): void
     {
-        $body = 'payload';
-        $expectedSha256 = hash('sha256', $body);
-
-        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog) use ($expectedSha256): void {
+        $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
             $path = \pmssFetchPinnedRemoteFile('demo archive', 'http://example.invalid/archive', $expectedSha256);
 
             $this->assertTrue($path === null, 'Expected HTTP download to be rejected');
@@ -87,8 +89,6 @@ SH
 
     public function testFetchPinnedRemoteFileRejectsMalformedUrlsBeforeDownload(): void
     {
-        $body = 'payload';
-        $expectedSha256 = hash('sha256', $body);
         $cases = [
             'https://example.invalid/archive'."\n".'next',
             'https://',
@@ -96,7 +96,7 @@ SH
         ];
 
         foreach ($cases as $url) {
-            $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog) use ($expectedSha256, $url): void {
+            $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256) use ($url): void {
                 $path = \pmssFetchPinnedRemoteFile('demo archive', $url, $expectedSha256);
 
                 $this->assertTrue($path === null, 'Expected malformed URL to be rejected');
@@ -107,7 +107,7 @@ SH
 
     public function testFetchPinnedRemoteFileRejectsMalformedChecksumBeforeDownload(): void
     {
-        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => 'payload'], function ($root, $commandLog): void {
+        $this->withFakeDownloadBody('payload', function ($root, $commandLog): void {
             $path = \pmssFetchPinnedRemoteFile('demo archive', 'https://example.invalid/archive', 'not-a-sha256');
 
             $this->assertTrue($path === null, 'Expected malformed checksum to be rejected');
@@ -119,7 +119,7 @@ SH
     {
         $before = glob(sys_get_temp_dir().'/pmss-remote-bin-*') ?: [];
 
-        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => 'payload'], function () use ($before): void {
+        $this->withFakeDownloadBody('payload', function () use ($before): void {
             $path = \pmssFetchPinnedRemoteFile('demo archive', 'https://example.invalid/archive', str_repeat('a', 64));
             $after = glob(sys_get_temp_dir().'/pmss-remote-bin-*') ?: [];
 
@@ -130,8 +130,6 @@ SH
 
     public function testRunPinnedRemoteArchiveStepRejectsUnsafeExtractionInputsBeforeDownload(): void
     {
-        $body = 'payload';
-        $expectedSha256 = hash('sha256', $body);
         $cases = [
             ['../archive.tar.gz', 'source', 'compile'],
             ['archive.tar.gz', 'source/child', 'compile'],
@@ -142,7 +140,7 @@ SH
         ];
 
         foreach ($cases as $case) {
-            $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog) use ($expectedSha256, $case): void {
+            $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256) use ($case): void {
                 $workDir = $case[2] === '' ? '' : $root.'/'.$case[2];
 
                 \pmssRunPinnedRemoteArchiveStep(
@@ -163,10 +161,7 @@ SH
 
     public function testRunPinnedRemoteArchiveStepRejectsSymlinkedWorkspaceBeforeDownload(): void
     {
-        $body = 'payload';
-        $expectedSha256 = hash('sha256', $body);
-
-        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog) use ($expectedSha256): void {
+        $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
             $target = $root.'/real-workspace';
             $link = $root.'/linked-workspace';
             @mkdir($target, 0755, true);
@@ -189,10 +184,7 @@ SH
 
     public function testInstallPinnedRemoteBinarySkipsDownloadWhenChecksumAlreadyMatches(): void
     {
-        $body = 'payload';
-        $expectedSha256 = hash('sha256', $body);
-
-        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => 'new-payload'], function ($root, $commandLog) use ($body, $expectedSha256): void {
+        $this->withFakeDownloadBody('new-payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
             $destination = $root.'/binary';
             @file_put_contents($destination, $body);
 
@@ -205,10 +197,7 @@ SH
 
     public function testInstallPinnedRemoteBinaryWritesSafeMissingDestination(): void
     {
-        $body = 'payload';
-        $expectedSha256 = hash('sha256', $body);
-
-        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog) use ($body, $expectedSha256): void {
+        $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
             $destination = $root.'/safe-binary';
 
             \pmssInstallPinnedRemoteBinary('demo binary', 'https://example.invalid/binary', $expectedSha256, $destination, true);
@@ -220,10 +209,7 @@ SH
 
     public function testInstallPinnedRemoteBinaryRejectsUnsafeDestinationsBeforeDownload(): void
     {
-        $body = 'payload';
-        $expectedSha256 = hash('sha256', $body);
-
-        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog) use ($expectedSha256): void {
+        $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
             $realDestination = $root.'/real-binary';
             $linkDestination = $root.'/link-binary';
             file_put_contents($realDestination, 'original');
@@ -240,11 +226,9 @@ SH
 
     public function testInstallPinnedRemoteDebPackageInvokesDpkgForMatchingPackage(): void
     {
-        $body = 'package-payload';
-        $expectedSha256 = hash('sha256', $body);
         $before = glob(sys_get_temp_dir().'/pmss-remote-deb-*') ?: [];
 
-        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog, $dpkgCapture) use ($body, $expectedSha256, $before): void {
+        $this->withFakeDownloadBody('package-payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256) use ($before): void {
             $result = \pmssInstallPinnedRemoteDebPackage('demo package', 'https://example.invalid/demo.deb', $expectedSha256);
             $after = glob(sys_get_temp_dir().'/pmss-remote-deb-*') ?: [];
 
@@ -258,14 +242,9 @@ SH
 
     public function testInstallPinnedRemoteDebPackageReturnsDryRunSuccessWithoutCommands(): void
     {
-        $body = 'package-payload';
-        $expectedSha256 = hash('sha256', $body);
         $before = glob(sys_get_temp_dir().'/pmss-remote-deb-*') ?: [];
 
-        $this->withFakeCommands([
-            'PMSS_DRY_RUN' => '1',
-            'PMSS_TEST_WGET_BODY' => $body,
-        ], function ($root, $commandLog, $dpkgCapture) use ($expectedSha256, $before): void {
+        $this->withFakeDownloadBody('package-payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256) use ($before): void {
             $result = \pmssInstallPinnedRemoteDebPackage('demo package', 'https://example.invalid/demo.deb', $expectedSha256);
             $after = glob(sys_get_temp_dir().'/pmss-remote-deb-*') ?: [];
 
@@ -273,6 +252,6 @@ SH
             $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
             $this->assertTrue(!is_file($dpkgCapture), 'Dry-run should not invoke dpkg');
             $this->assertEquals([], array_values(array_diff($after, $before)), 'Dry-run package install should clean temp files');
-        });
+        }, ['PMSS_DRY_RUN' => '1']);
     }
 }
