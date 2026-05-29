@@ -103,14 +103,21 @@ class UpdateCompressionCharacterizationTest extends TestCase
         ], [$symbol => 'update-step2.php should own the mediaarea bootstrap cleanup directly']);
     }
 
-    public function testRootlessDockerUnitParsingStaysInsideUserMaintenance(): void
+    public function testRootlessDockerUnitParsingBelongsToDockerMaintenanceModule(): void
     {
         $symbol = 'pmssReadSystemd'.'UnitExecStartBinary';
 
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/userMaintenance.php', [
-            "if (strpos(\$trim, 'ExecStart=') !== 0)",
-            "\$execBinary = trim(\$parts[0], \"\\\"'\");",
-        ], ['function '.$symbol.'(' => 'userMaintenance.php should keep the docker ExecStart parse local to the stale-unit check']);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/userMaintenance.php', "require_once __DIR__.'/users/docker.php';");
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/docker.php', [
+            'function pmssUserDockerUnitExecBinary(',
+            "if (\$trim === '' || strpos(\$trim, 'ExecStart=') !== 0)",
+            "return \$parts && \$parts[0] !== '' ? trim(\$parts[0], \"\\\"'\") : null;",
+        ], ['function '.$symbol.'(' => 'docker.php should own rootless Docker unit parsing directly']);
+        $this->pmssAssertRepoFileNotContainsString(
+            'scripts/lib/update/userMaintenance.php',
+            "ExecStart=",
+            'userMaintenance.php should not parse rootless Docker units'
+        );
     }
 
     public function testSystemdDropinInstallerKeepsSingleFailurePrefix(): void
@@ -393,12 +400,13 @@ class UpdateCompressionCharacterizationTest extends TestCase
     {
         $symbol = 'pmssWrite'.'DockerDaemonConfig';
 
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/userMaintenance.php', [
-            "require_once __DIR__.'/../user/rootlessDockerConfig.php';",
-            'pmssUserRootlessDockerConfigConverge($user, $home, (int)$uid, (int)$gid',
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/userMaintenance.php', "require_once __DIR__.'/users/docker.php';");
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/docker.php', [
+            "require_once dirname(__DIR__, 2).'/user/rootlessDockerConfig.php';",
+            "pmssUserRootlessDockerConfigConverge(\$user, \$home, (int) \$uinfo['uid'], (int) \$uinfo['gid']",
         ], [
             'function '.$symbol.'(' => 'daemon.json convergence should not grow a second local writer',
-            'pmssJsonEncodePretty($payload)' => 'userMaintenance.php should use the shared rootless Docker config writer',
+            'pmssJsonEncodePretty($payload)' => 'docker.php should use the shared rootless Docker config writer',
         ]);
     }
 
@@ -456,7 +464,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUserDomainModulesDoNotCrossRequireEachOther(): void
     {
-        foreach (['context', 'http', 'filesystem', 'permissions', 'rutorrent'] as $module) {
+        foreach (['context', 'http', 'filesystem', 'permissions', 'rutorrent', 'docker'] as $module) {
             $src = $this->pmssReadRepoFile('scripts/lib/update/users/'.$module.'.php');
             $this->pmssAssertStringNotContainsString(
                 "require_once __DIR__.'/",
@@ -489,6 +497,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $postCheckLoopPos = strpos($src, 'foreach ($postChecks as $label => $helperPath)');
 
         $this->assertStringContainsString('Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)', $src);
+        $this->assertStringContainsString("require_once __DIR__.'/users/docker.php';", $src);
         $this->assertTrue($updatePos !== false, 'userMaintenance.php should update the user environment directly');
         $this->assertTrue($lingerPos !== false, 'userMaintenance.php should keep linger wiring in the main per-user loop');
         $this->assertTrue($lighttpdPostCheckPos !== false, 'userMaintenance.php should keep the per-user lighttpd watchdog post-check');

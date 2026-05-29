@@ -37,7 +37,10 @@ PHP,
 
     public function testUserMaintenanceShellBoundaryHelpersShareUsernameGuard(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
+        $maintenanceSrc = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
+        $dockerSrc = $this->pmssReadRepoFile('scripts/lib/update/users/docker.php');
+
+        $this->assertStringContainsString("require_once __DIR__.'/users/docker.php';", $maintenanceSrc);
 
         foreach ([
             'pmssRunAndLog',
@@ -47,7 +50,7 @@ PHP,
         ] as $functionName) {
             $this->assertStringContainsString(
                 "pmssUserMaintenanceUsernameAllowed(\$user, '{$functionName}')",
-                $src,
+                $dockerSrc,
                 'Expected username guard in '.$functionName
             );
         }
