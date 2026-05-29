@@ -420,6 +420,9 @@ abstract class TestCase
         return $log;
     }
 
+    /** Create a one-run storage benchmark JSONL fixture with a preflight entry. */
+    protected function pmssWriteStorageBenchmarkRunLog(string $runId, string $runTs, array $entries = [], array $preflightExtra = [], string $dirPrefix = 'pmss-bench-'): string { array_unshift($entries, $this->pmssStorageBenchmarkPreflightEntry($runId, $runTs, $preflightExtra)); return $this->pmssWriteStorageBenchmarkLog($entries, $dirPrefix); }
+
     /** Build storage-benchmark JSONL entries with the common run identity. */
     protected function pmssStorageBenchmarkEntry(string $runId, string $runTs, string $test, array $extra = []): array { return array_replace(['run_id' => $runId, 'run_ts' => $runTs, 'test' => $test], $extra); }
     protected function pmssStorageBenchmarkPreflightEntry(string $runId, string $runTs, array $extra = []): array { return $this->pmssStorageBenchmarkEntry($runId, $runTs, 'preflight-idle', array_replace(['ok' => true], $extra)); }
