@@ -609,6 +609,70 @@ function pmssRunBootstrapCommand(string $command, ?int $fatalCode = null): int
     return $rc;
 }
 
+/**
+ * Check whether a candidate PHP binary is a usable CLI interpreter.
+ */
+function pmssPhpCliCandidateIsUsable(string $candidate): bool
+{
+    $candidate = trim($candidate);
+    if ($candidate === '') {
+        return false;
+    }
+    if (strpos($candidate, '/') !== false && (!is_file($candidate) || !is_executable($candidate))) {
+        return false;
+    }
+
+    $command = escapeshellarg($candidate).' -r '.escapeshellarg('exit(PHP_SAPI === "cli" ? 0 : 1);');
+    $output = [];
+    $rc = 1;
+    @exec($command, $output, $rc);
+    return $rc === 0;
+}
+
+/**
+ * Resolve the currently usable PHP CLI after a dist-upgrade may replace it.
+ */
+function pmssResolvePhpCliBinary(): string
+{
+    $pathResolved = trim((string) @shell_exec('command -v php 2>/dev/null'));
+    $candidates = $pathResolved !== '' ? [$pathResolved] : [];
+    foreach ([
+        '/usr/bin/php',
+        '/usr/local/bin/php',
+        '/usr/bin/php8.4',
+        '/usr/bin/php8.3',
+        '/usr/bin/php8.2',
+        '/usr/bin/php8.1',
+        '/usr/bin/php7.4',
+        '/usr/bin/php7.3',
+    ] as $candidate) {
+        $candidates[] = $candidate;
+    }
+
+    foreach (array_unique($candidates) as $candidate) {
+        if (pmssPhpCliCandidateIsUsable($candidate)) {
+            return $candidate;
+        }
+    }
+
+    return 'php';
+}
+
+/**
+ * Build a shell-safe PHP CLI invocation for refreshed bootstrap children.
+ *
+ * @param array<int, string> $args
+ */
+function pmssBootstrapPhpCommand(string $script, array $args = []): string
+{
+    $command = escapeshellarg(pmssResolvePhpCliBinary()).' '.escapeshellarg($script);
+    foreach ($args as $arg) {
+        $command .= ' '.escapeshellarg($arg);
+    }
+
+    return $command;
+}
+
 function pmssLastFilesystemError(): string
 {
     $error = error_get_last();
@@ -943,7 +1007,7 @@ function restoreRootCronBestEffort(string $context): void
     } else {
         logmsg('[INFO] Restoring root cron after '.$context);
     }
-    pmssRunBootstrapCommand($helper);
+    pmssRunBootstrapCommand(pmssBootstrapPhpCommand($helper));
 }
 
 /**
@@ -963,9 +1027,7 @@ function restorePermissionsBestEffort(string $context): void
     }
 
     logmsg('[INFO] Refreshing skeleton/config permissions after '.$context);
-    // Use 'php' from $PATH (not PHP_BINARY) — PHP_BINARY is frozen at script start
-    // and points to a removed binary after --dist-upgrade swaps php7.4 → php8.2 (GH#589).
-    pmssRunBootstrapCommand(escapeshellarg('php').' '.escapeshellarg($helper));
+    pmssRunBootstrapCommand(pmssBootstrapPhpCommand($helper));
 }
 
 function ensureSnapshot(string $tmp): void
@@ -1365,11 +1427,7 @@ function maybeSelfUpdate(array $argv, bool $dryRun, bool $skipSelfUpdate, string
     }
     $args[] = SELF_UPDATE_SKIP_FLAG;
 
-    // Use 'php' from $PATH instead of PHP_BINARY — see GH#589 for rationale (post-dist-upgrade stale interpreter).
-    $command = escapeshellarg('php').' '.escapeshellarg(__FILE__);
-    foreach ($args as $arg) {
-        $command .= ' '.escapeshellarg($arg);
-    }
+    $command = pmssBootstrapPhpCommand(__FILE__, $args);
 
     passthru($command, $rc);
     if ($rc !== 0) {
@@ -1419,9 +1477,7 @@ function runUpdateStep2(bool $dryRun): void
     logmsg($handoffLog);
     logEvent('update_step2_start');
     $start = microtime(true);
-    // Use 'php' from $PATH instead of PHP_BINARY — GH#589: dist-upgrade swaps php7.4 → php8.2 mid-script,
-    // PHP_BINARY still points at /usr/bin/php7.4 (no longer exists) → exit 127.
-    passthru('php /scripts/util/update-step2.php', $rc);
+    passthru(pmssBootstrapPhpCommand('/scripts/util/update-step2.php'), $rc);
     $duration = round(microtime(true) - $start, 3);
 
     // Interpret only valid 128+signal exit codes (e.g. SIGKILL -> 137).
@@ -1530,7 +1586,7 @@ function maybeRunDistUpgrade($distUpgrade, bool $deferRootCronRestore = false): 
     // gives operators immediate visibility without requiring a reboot.
     $motd = '/scripts/util/motdGenerate.php';
     if (file_exists($motd)) {
-        pmssRunBootstrapCommand($motd);
+        pmssRunBootstrapCommand(pmssBootstrapPhpCommand($motd));
     }
 }
 
@@ -1655,7 +1711,7 @@ function bootstrapMain(array $argv): void
             restorePermissionsBestEffort('--scripts-only run');
             if (file_exists('/scripts/util/ftpConfig.php')) {
                 logmsg('[INFO] Refreshing FTP configuration for --scripts-only run');
-                pmssRunBootstrapCommand(escapeshellarg('php').' /scripts/util/ftpConfig.php');  // GH#589: avoid stale PHP_BINARY
+                pmssRunBootstrapCommand(pmssBootstrapPhpCommand('/scripts/util/ftpConfig.php'));
             }
             restoreRootCronBestEffort('scripts-only');
         }

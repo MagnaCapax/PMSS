@@ -10,9 +10,9 @@ require_once __DIR__.'/../common/TestCase.php';
  *
  * PHP_BINARY is frozen at SAPI startup to the launching interpreter's path
  * (e.g. /usr/bin/php7.4). After apt removes php7.4 mid-run, any
- * passthru/exec using that stale path fails with exit 127. The fix (commit
- * f4e6e71b) replaces PHP_BINARY with the literal 'php', resolved via $PATH /
- * Debian alternatives at exec time.
+ * passthru/exec using that stale path fails with exit 127. The bootstrap must
+ * resolve a usable PHP CLI at exec time, with versioned fallbacks for hosts
+ * where the generic `php` alternative is temporarily missing.
  *
  * These are source-level assertions (cheap, deterministic) — they pin the fix
  * so it cannot silently regress to PHP_BINARY in a future refactor.
@@ -23,8 +23,8 @@ class UpdateBootstrapInterpreterSwapTest extends TestCase
     {
         $data = $this->pmssReadRepoFile('scripts/update.php');
         $this->assertTrue(
-            strpos($data, "passthru('php /scripts/util/update-step2.php'") !== false,
-            "step2 handoff must use literal 'php' (PATH-resolved), not PHP_BINARY (GH#589)"
+            strpos($data, "passthru(pmssBootstrapPhpCommand('/scripts/util/update-step2.php')") !== false,
+            "step2 handoff must use the runtime PHP CLI resolver, not PHP_BINARY (GH#589)"
         );
     }
 
@@ -32,23 +32,37 @@ class UpdateBootstrapInterpreterSwapTest extends TestCase
     {
         $data = $this->pmssReadRepoFile('scripts/update.php');
         $this->assertTrue(
-            strpos($data, "escapeshellarg('php').' '.escapeshellarg(__FILE__)") !== false,
-            "self-refresh re-exec must use literal 'php', not PHP_BINARY (GH#589)"
+            strpos($data, '$command = pmssBootstrapPhpCommand(__FILE__, $args);') !== false,
+            "self-refresh re-exec must use the runtime PHP CLI resolver, not PHP_BINARY (GH#589)"
         );
+    }
+
+    public function testPhpCliResolverPrefersCurrentlyResolvedPhpCommand(): void
+    {
+        $binDir = $this->pmssMakeExecutableStub(
+            'php',
+            "#!/bin/sh\nif [ \"\$1\" = '-r' ]; then exit 0; fi\nexit 0\n",
+            'pmss-php-cli-'
+        );
+
+        $script = 'require '.var_export(dirname(__DIR__).'/common/updateBootstrapShim.php', true).'; '
+            .'echo pmssResolvePhpCliBinary();';
+
+        $this->assertEquals($binDir.'/php', trim($this->pmssRunInlinePhp($script, ['PATH' => $binDir])));
     }
 
     public function testNoPhpBinaryInExecPaths(): void
     {
         $data = $this->pmssReadRepoFile('scripts/update.php');
         // Code-level invocations (not comments) must not reference PHP_BINARY.
-        // The fix converted every passthru/bootstrap-command site to literal 'php'.
+        // Bootstrap children go through the resolver so a stale CLI path is not reused.
         $this->assertTrue(
             strpos($data, 'passthru(PHP_BINARY') === false,
             "no passthru() may use the stale PHP_BINARY constant (GH#589)"
         );
         $this->assertTrue(
             strpos($data, 'escapeshellarg(PHP_BINARY)') === false,
-            "no escapeshellarg(PHP_BINARY) invocation may remain — use 'php' (GH#589)"
+            "no escapeshellarg(PHP_BINARY) invocation may remain; use the PHP CLI resolver (GH#589)"
         );
     }
 
