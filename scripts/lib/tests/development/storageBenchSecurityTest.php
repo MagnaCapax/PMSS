@@ -318,7 +318,7 @@ class StorageBenchSecurityTest extends TestCase
         $this->assertFalse(is_dir($real.'/child'), 'symlinked parent should not receive new benchmark directories');
     }
 
-    public function testDeviceBenchmarksSkipDevicesWithoutPositiveBlockSize(): void
+    public function testDeviceBenchmarksSkipNonBlockDevicesBeforeRawReads(): void
     {
         $target = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
         $jsonLog = $this->pmssMakeJsonLogPath('pmss-bench-device-', 'benchmark-storage.jsonl');
@@ -364,7 +364,7 @@ SH
         $log = (string) @file_get_contents($jsonLog);
         $this->assertStringContainsString('"device":"/dev/null"', $log);
         $this->assertStringContainsString('"test":"device-preflight"', $log);
-        $this->assertStringContainsString('"error":"unable to determine block device size"', $log);
+        $this->assertStringContainsString('"error":"not a readable block device"', $log);
         $this->assertStringNotContainsString('DD if=/dev/null', (string) @file_get_contents($invocations));
         $this->assertStringNotContainsString('--filename=/dev/null', (string) @file_get_contents($invocations));
     }

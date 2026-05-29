@@ -53,4 +53,35 @@ class CgroupBfqWeightApplyTest extends TestCase
             );
         }
     }
+
+    public function testCronValidatesConfigUsernameBeforeUserPaths(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/cron/cgroupBfqWeightApply.php');
+
+        $this->assertStringContainsString("require_once __DIR__.'/../lib/user/identity.php';", $source);
+        $this->assertStringContainsString('if (!pmssValidateUsername($user)) {', $source);
+        $this->assertStringContainsString('pmssBfqUserBonusPercentRead($user)', $source);
+        $this->assertOrderedStrings(
+            [
+                "\$user = basename(\$cfgPath, '.json');",
+                'syslog(LOG_WARNING, "invalid username config "',
+                '$json = pmssJsonFileReadAssoc($cfgPath);',
+                'pmssBfqUserBonusPercentRead($user)',
+            ],
+            $source,
+            'missing BFQ username boundary guard: ',
+            'BFQ username guard must run before user paths: '
+        );
+    }
+
+    public function testCronReadsBonusMarkerAsTinyRegularFile(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/cron/cgroupBfqWeightApply.php');
+
+        $this->assertStringContainsString('function pmssBfqUserBonusPercentRead(string $user): int', $source);
+        $this->assertStringContainsString('$stat = @lstat($path);', $source);
+        $this->assertStringContainsString("((\$stat['mode'] ?? 0) & 0170000) !== 0100000", $source);
+        $this->assertStringContainsString("(int) (\$stat['size'] ?? 0) > 64", $source);
+        $this->assertStringContainsString('@file_get_contents($path, false, null, 0, 64)', $source);
+    }
 }

@@ -32,6 +32,7 @@ declare(strict_types=1);
 
 require_once __DIR__.'/../lib/cgroup/bfqFormula.php';
 require_once __DIR__.'/../lib/log.php';
+require_once __DIR__.'/../lib/user/identity.php';
 
 // Constants — tunable top-of-file per AGENTS.md doctrine.
 $USERS_DIR  = '/etc/seedbox/config/users';
@@ -64,6 +65,27 @@ if (!$bfqActive) {
     exit(2);
 }
 
+function pmssBfqUserBonusPercentRead(string $user): int
+{
+    if (!pmssValidateUsername($user)) {
+        return 0;
+    }
+
+    $path = '/home/'.$user.'/.bonus';
+    $stat = @lstat($path);
+    if (!is_array($stat)) {
+        return 0;
+    }
+
+    // The bonus marker is a tiny scalar. Refuse links, devices, and bulky files.
+    if ((($stat['mode'] ?? 0) & 0170000) !== 0100000 || (int) ($stat['size'] ?? 0) > 64) {
+        return 0;
+    }
+
+    $raw = @file_get_contents($path, false, null, 0, 64);
+    return is_string($raw) ? max(0, (int) trim($raw)) : 0;
+}
+
 openlog('pmss-bfq', LOG_PID, LOG_DAEMON);
 
 $total = 0;
@@ -77,6 +99,12 @@ $errors = 0;
 
 foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
     $user = basename($cfgPath, '.json');
+    if (!pmssValidateUsername($user)) {
+        $errors++;
+        syslog(LOG_WARNING, "invalid username config ".str_replace(["\r", "\n", "\0"], '?', $user));
+        continue;
+    }
+
     $json = pmssJsonFileReadAssoc($cfgPath);
     if (!is_array($json)) {
         $errors++;
@@ -102,7 +130,7 @@ foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
     }
 
     // Free Bonus Disk Policy: ~/.bonus holds tenure/spend bonus percent.
-    $bonusPct = max(0, (int) @file_get_contents('/home/'.$user.'/.bonus'));
+    $bonusPct = pmssBfqUserBonusPercentRead($user);
     $wRaw     = (int) round($wRaw * (1 + $bonusPct / 100));
 
     $w = max(1, min($KERN_MAX, $wRaw));
