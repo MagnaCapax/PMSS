@@ -10,72 +10,68 @@ class UpdateAppInstallerContractsTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/'.$installer, $needles);
     }
 
-    public function testPyloadKeepsSharedVenvAndGuards(): void
+    private function assertUpdateAppContainsCases(array $cases): void
     {
-        $this->assertUpdateAppContainsAllStrings('pyload.php', [
-            "require_once __DIR__.'/pythonVenv.php';",
-            'pmssDistroVersionFromEnv()',
-            'Skipping pyLoad setup: unsupported Debian release',
-            'Skipping pyLoad setup: python3 missing from PATH',
-            'pmssPythonVenvInstallCli(',
-            "'pyLoad'",
+        foreach ($cases as $installer => $needles) {
+            $this->assertUpdateAppContainsAllStrings($installer, $needles);
+        }
+    }
+
+    public function testPythonVenvInstallersKeepSharedContracts(): void
+    {
+        $this->assertUpdateAppContainsCases([
+            'pyload.php' => [
+                "require_once __DIR__.'/pythonVenv.php';",
+                'pmssDistroVersionFromEnv()',
+                'Skipping pyLoad setup: unsupported Debian release',
+                'Skipping pyLoad setup: python3 missing from PATH',
+                'pmssPythonVenvInstallCli(',
+                "'pyLoad'",
+                "['Installing pyLoad (pyload-ng)', 'pyload-ng']",
+                '/usr/local/bin/pyload',
+                'pyLoad binary missing after install',
+            ],
+            'python.php' => [
+                "require_once __DIR__.'/pythonVenv.php';",
+                'Skipping FlexGet install: python3 missing from PATH',
+                'pmssPythonVenvInstallCli(',
+                "'FlexGet'",
+                'FlexGet binary missing after install',
+                'Installing gdrivefs in FlexGet venv',
+                'Installing FlexGet dependencies',
+                'Installing FlexGet',
+                'Installing youtube-dl for FlexGet',
+                '/usr/local/bin/flexget',
+            ],
         ]);
     }
 
-    public function testPyloadKeepsInstallAndLinkSteps(): void
+    public function testSourceBuildInstallersKeepPinnedContracts(): void
     {
-        $this->assertUpdateAppContainsAllStrings('pyload.php', [
-            "['Installing pyLoad (pyload-ng)', 'pyload-ng']",
-            '/usr/local/bin/pyload',
-            'pyLoad binary missing after install',
-        ]);
-    }
-
-    public function testPythonInstallerKeepsSharedVenvAndWarnings(): void
-    {
-        $this->assertUpdateAppContainsAllStrings('python.php', [
-            "require_once __DIR__.'/pythonVenv.php';",
-            'Skipping FlexGet install: python3 missing from PATH',
-            'pmssPythonVenvInstallCli(',
-            "'FlexGet'",
-            'FlexGet binary missing after install',
-        ]);
-    }
-
-    public function testPythonInstallerKeepsInstallSequence(): void
-    {
-        $this->assertUpdateAppContainsAllStrings('python.php', [
-            'Installing gdrivefs in FlexGet venv',
-            'Installing FlexGet dependencies',
-            'Installing FlexGet',
-            'Installing youtube-dl for FlexGet',
-            '/usr/local/bin/flexget',
-        ]);
-    }
-
-    public function testIprangeKeepsPackageAndToolchainGuards(): void
-    {
-        $this->assertUpdateAppContainsAllStrings('iprange.php', [
-            "empty(\$GLOBALS['PMSS_PACKAGES_READY'])",
-            'Skipping iprange build: package phase not complete',
-            'Skipping iprange build: missing toolchain packages',
-            'pmssPackageStatus($pkg)',
-            "'build-essential'",
-            "'gcc'",
-            "'make'",
-            "'gawk'",
-        ]);
-    }
-
-    public function testIprangeKeepsCompileStep(): void
-    {
-        $this->assertUpdateAppContainsAllStrings('iprange.php', [
-            "require_once __DIR__.'/remoteBinary.php';",
-            "pmssRunPinnedRemoteArchiveStep('iprange '.\$iprangeVersion.' source'",
-            'https://github.com/firehol/iprange/releases/download/v',
-            "'Building iprange from source'",
-            'make -j6',
-            'make install',
+        $this->assertUpdateAppContainsCases([
+            'iprange.php' => [
+                "empty(\$GLOBALS['PMSS_PACKAGES_READY'])",
+                'Skipping iprange build: package phase not complete',
+                'Skipping iprange build: missing toolchain packages',
+                'pmssPackageStatus($pkg)',
+                "'build-essential'",
+                "'gcc'",
+                "'make'",
+                "'gawk'",
+                "require_once __DIR__.'/remoteBinary.php';",
+                "pmssRunPinnedRemoteArchiveStep('iprange '.\$iprangeVersion.' source'",
+                'https://github.com/firehol/iprange/releases/download/v',
+                "'Building iprange from source'",
+                'make -j6',
+                'make install',
+            ],
+            'firehol.php' => [
+                "require_once __DIR__.'/remoteBinary.php';",
+                'https://github.com/firehol/firehol/releases/download/v',
+                "pmssRunPinnedRemoteArchiveStep('FireHOL '.\$fireholVersion.' source'",
+                "'Building FireHOL from source'",
+                './configure',
+            ],
         ]);
     }
 
@@ -92,17 +88,6 @@ class UpdateAppInstallerContractsTest extends TestCase
             "pmssRunPinnedRemoteArchiveStep('Syncthing '.\$syncthingVersion",
             "'Installing Syncthing binary'",
             'install -m 0755',
-        ]);
-    }
-
-    public function testFireholInstallerKeepsPinnedSourceBuild(): void
-    {
-        $this->assertUpdateAppContainsAllStrings('firehol.php', [
-            "require_once __DIR__.'/remoteBinary.php';",
-            'https://github.com/firehol/firehol/releases/download/v',
-            "pmssRunPinnedRemoteArchiveStep('FireHOL '.\$fireholVersion.' source'",
-            "'Building FireHOL from source'",
-            './configure',
         ]);
     }
 

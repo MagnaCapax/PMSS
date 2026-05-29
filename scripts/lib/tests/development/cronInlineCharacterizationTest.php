@@ -25,30 +25,18 @@ class CronInlineCharacterizationTest extends TestCase
         foreach ([
             [
                 'scripts/cron/checkQbittorrentInstances.php',
-                ['pmssUserWatchdogRunService(', 'pmssUserWatchdogRestartProcessesIf(', 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox start requested'"],
+                ['pmssUserWatchdogRunService(', 'pmssUserWatchdogRestartProcessesIf(', 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox stopped due to suspension'", "'qbittorrent-nox start requested'"],
             ],
             [
                 'scripts/cron/checkRcloneInstances.php',
-                ['pmssUserWatchdogRunService(', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone start requested'"],
+                ['pmssUserWatchdogRunService(', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone stopped due to suspension'", "'rclone start requested'"],
             ],
             [
                 'scripts/cron/checkDelugeInstances.php',
-                ['pmssUserWatchdogRunService(', 'pmssUserWatchdogRestartProcessesIf(', "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'"],
+                ['pmssUserWatchdogRunService(', 'pmssUserWatchdogRestartProcessesIf(', "'deluge stopped due to suspension'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'"],
             ],
         ] as $case) {
             $this->pmssAssertRepoFileContainsAllStrings($case[0], $case[1]);
-        }
-    }
-
-    public function testWatchdogsKeepSuspensionAndStartUserLogMessages(): void
-    {
-        foreach ([
-            ['scripts/cron/checkLighttpdInstances.php', 'pmssUserWatchdogHandleSuspended(', "'lighttpd stopped due to suspension'", "'lighttpd start requested'"],
-            ['scripts/cron/checkQbittorrentInstances.php', 'pmssUserWatchdogRunService(', "'qbittorrent-nox stopped due to suspension'", "'qbittorrent-nox start requested'"],
-            ['scripts/cron/checkRcloneInstances.php', 'pmssUserWatchdogRunService(', "'rclone stopped due to suspension'", "'rclone start requested'"],
-            ['scripts/cron/checkDelugeInstances.php', 'pmssUserWatchdogRunService(', "'deluge stopped due to suspension'", "'deluged start requested'"],
-        ] as $case) {
-            $this->pmssAssertRepoFileContainsAllStrings($case[0], array_slice($case, 1));
         }
     }
 
@@ -77,6 +65,8 @@ class CronInlineCharacterizationTest extends TestCase
             'pmssLighttpdWatchdogWriteErrorPage(',
             'pmssLighttpdWatchdogDetectReason(',
             'pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);',
+            'pmssUserWatchdogHandleSuspended(',
+            "'lighttpd stopped due to suspension'",
             'pmssUserWatchdogProcessRunning($thisUser, \'php-cgi\')',
             'pmssUserWatchdogRestartProcessesIf(',
             'pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 15);',
