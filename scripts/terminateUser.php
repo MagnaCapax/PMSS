@@ -63,7 +63,7 @@ $username = pmssRequireCliUsername(
 // Cross-check against the managed user list to avoid acting on unexpected
 // system accounts. This mirrors scripts/listUsers.php behaviour without
 // spawning a separate process.
-$knownUsers = users::listHomeUsers();
+$knownUsers = pmssManagedHomeUsersList();
 if (!in_array($username, $knownUsers, true)) {
     pmssUserLifecycleContextLogStatusMessage('terminate', 'validate', $username, 'ERR', 'Username not present in managed user list');
     die("\t**** USER NOT FOUND IN MANAGED LIST ****\n\n");

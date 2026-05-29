@@ -177,20 +177,9 @@ function pmssRepairDockerRootlessAfterDistUpgrade(string $toMajor): void
         putenv('PMSS_DISTRO_VERSION='.(string) ((int) $toMajor));
     }
 
-    $users = users::listHomeUsers();
-    sort($users, SORT_NATURAL | SORT_FLAG_CASE);
     $targets = [];
 
-    foreach ($users as $user) {
-        $userTrim = trim($user);
-        if ($userTrim === '') {
-            continue;
-        }
-        if (!pmssValidateUsername($userTrim)) {
-            logMessage(sprintf('[WARN] dist-upgrade: skipping invalid username: %s', $userTrim));
-            continue;
-        }
-
+    foreach (pmssManagedHomeUsersList(true) as $userTrim) {
         $home = '/home/'.$userTrim;
         if (!is_dir($home)) {
             continue;

@@ -16,7 +16,7 @@
  */
 
 require_once __DIR__.'/../lib/runtime.php';
-require_once __DIR__.'/../lib/users.php';
+require_once __DIR__.'/../lib/user/selection.php';
 
 /**
  * Ensure a required user directory exists with expected ownership.
@@ -70,8 +70,7 @@ $logger = new Logger(__FILE__);
 $log = [$logger, 'msg'];
 $skeletonIndex = '/etc/skel/www/index.php';
 
-// Get & parse users list using the robust library method
-foreach(users::listHomeUsers() as $thisUser) {    // Loop users checking their instances
+foreach (pmssManagedHomeUsersList() as $thisUser) {
     // User suspended check (skip empty usernames too).
     if (empty($thisUser) || file_exists("/home/{$thisUser}/www-disabled")) continue;
 

@@ -22,15 +22,11 @@
  */
 declare(strict_types=1);
 
-require_once dirname(__DIR__, 2).'/lib/users.php';
-require_once dirname(__DIR__, 2).'/lib/userLifecycle.php';
+require_once dirname(__DIR__, 2).'/lib/user/selection.php';
 require_once dirname(__DIR__, 2).'/lib/user/traffic.php';
 
 $userTrafficData = [];
-foreach (users::listHomeUsers() as $userName) {
-    if (!pmssValidateUsername($userName)) {
-        continue;
-    }
+foreach (pmssManagedHomeUsersList() as $userName) {
     $userTrafficData[$userName] = pmssReadUserTrafficStates($userName);
 }
 

@@ -22,6 +22,15 @@ function pmssManagedUsersNormalizeList(array $rawUsers): array
     return array_keys($users);
 }
 
+/** Return validated managed usernames discovered from local home/account state. */
+function pmssManagedHomeUsersList(bool $sort = false): array
+{
+    require_once dirname(__DIR__).'/users.php';
+    $users = pmssManagedUsersNormalizeList(users::listHomeUsers());
+    if ($sort) sort($users, SORT_NATURAL | SORT_FLAG_CASE);
+    return $users;
+}
+
 /** @return array{exitCode:int,users:array<int,string>} */
 function pmssListManagedUsersResult(string $command = '/scripts/listUsers.php'): array
 {

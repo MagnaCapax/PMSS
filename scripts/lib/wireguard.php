@@ -6,7 +6,7 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/users.php';
+require_once __DIR__.'/user/selection.php';
 require_once __DIR__.'/networkInfo.php';
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/log.php';
@@ -45,9 +45,9 @@ function wgConfigDir(): string
 function wgListHomeUsers(): array
 {
     if (($override = getenv('PMSS_WG_USER_LIST')) !== false && $override !== '') {
-        return array_values(array_filter(array_map('trim', explode(',', $override)), 'strlen'));
+        return pmssManagedUsersNormalizeList(explode(',', $override));
     }
-    return users::listHomeUsers();
+    return pmssManagedHomeUsersList();
 }
 
 function wgSupports(): bool

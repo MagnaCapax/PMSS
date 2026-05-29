@@ -9,7 +9,7 @@
 
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/logger.php';
-require_once __DIR__.'/../lib/users.php';
+require_once __DIR__.'/../lib/user/selection.php';
 require_once __DIR__.'/../lib/lighttpd/accessLog.php';
 
 $debug = pmssCliArgvHasToken($argv ?? null, '--debug');
@@ -17,7 +17,7 @@ $logger = new Logger(__FILE__);
 $trimmed = 0;
 $thresholdBytes = PMSS_LIGHTTPD_ACCESS_LOG_THRESHOLD_BYTES;
 
-foreach (users::listHomeUsers() as $thisUser) {
+foreach (pmssManagedHomeUsersList() as $thisUser) {
     $logPath = "/home/{$thisUser}/.lighttpd/access.log";
     $result = pmssLighttpdAccessLogTrimFile($logPath, $thresholdBytes);
     if (($result['status'] ?? '') === 'trimmed') {

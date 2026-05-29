@@ -11,8 +11,7 @@ class UserTrafficRemoteCompatibilityTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings(
             $path,
             [
-                'users::listHomeUsers()',
-                'pmssValidateUsername($userName)',
+                'pmssManagedHomeUsersList()',
                 'serialize($userTrafficData)',
             ],
             'Remote userTraffic callback must keep contract-safe user discovery and serialized payload output'
