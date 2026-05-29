@@ -255,6 +255,7 @@ class UserTransferTest extends TestCase
     public function testGeneratedTransferScriptsMatchSnapshot(): void
     {
         $cfg = $this->baseConfig();
+        $expectedScratchPaths = ['expect' => '/root/pmss-userTransfer-<generated>/transfer.expect', 'authProbe' => '/root/pmss-userTransfer-<generated>/auth-probe.sh', 'mainScript' => '/root/pmss-userTransfer-<generated>/rsync-main.sh', 'finalScript' => '/root/pmss-userTransfer-<generated>/rsync-final.sh', 'remoteSizeScript' => '/root/pmss-userTransfer-<generated>/remote-size.sh'];
         $expectedMain = <<<'SNAP'
 #!/bin/bash
 set -e
@@ -274,6 +275,8 @@ SNAP;
         $this->assertEquals($expectedMain."\n", \pmssUserTransferBuildRsyncMain($cfg));
         $this->assertEquals($expectedFinal."\n", \pmssUserTransferBuildRsyncFinal($cfg));
         $this->assertEquals($expectedAuth."\n", \pmssUserTransferBuildAuthProbe($cfg));
+        $this->assertSame($expectedScratchPaths, \pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>/'));
+        $this->assertSame(array_keys($expectedScratchPaths), array_keys(\pmssUserTransferScratchPayloads($cfg)));
     }
 
     public function testSharedRsyncCommandBuilderMatchesSnapshot(): void

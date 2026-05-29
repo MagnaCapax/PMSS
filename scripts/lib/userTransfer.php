@@ -38,6 +38,9 @@ function pmssUserTransferWriteFile(string $path, string $contents, int $mode): v
     throw new RuntimeException('Failed writing: '.$path, 1);
 }
 
+/** Return scratch paths shared by dry-run and live transfer flows. */
+function pmssUserTransferScratchPaths(string $scratchRoot): array { $scratchRoot = rtrim($scratchRoot, '/'); return ['expect' => $scratchRoot.'/transfer.expect', 'authProbe' => $scratchRoot.'/auth-probe.sh', 'mainScript' => $scratchRoot.'/rsync-main.sh', 'finalScript' => $scratchRoot.'/rsync-final.sh', 'remoteSizeScript' => $scratchRoot.'/remote-size.sh']; }
+
 /**
  * Sleep between passes (optionally randomised) while logging the reason.
  */
@@ -201,6 +204,9 @@ exit [lindex $result 3]
 EXP;
 }
 
+/** Build scratch script payloads keyed to pmssUserTransferScratchPaths(). */
+function pmssUserTransferScratchPayloads(array $cfg): array { return ['expect' => pmssUserTransferBuildExpectWrapper()."\n", 'authProbe' => pmssUserTransferBuildAuthProbe($cfg), 'mainScript' => pmssUserTransferBuildRsyncMain($cfg), 'finalScript' => pmssUserTransferBuildRsyncFinal($cfg), 'remoteSizeScript' => pmssUserTransferBuildRemoteSizeProbe($cfg)]; }
+
 /**
  * Entry point used by scripts/util/userTransfer.php.
  */
@@ -236,12 +242,9 @@ function pmssUserTransferMain(array $argv): int
             $cfg['verifyThreshold']
         ));
 
-        $scratchFiles = ['expect' => 'transfer.expect', 'authProbe' => 'auth-probe.sh', 'mainScript' => 'rsync-main.sh', 'finalScript' => 'rsync-final.sh', 'remoteSizeScript' => 'remote-size.sh'];
-
         // Dry runs should be fully non-interactive and avoid writing temp scripts.
         if ($cfg['dryRun']) {
-            $scratchPaths = [];
-            foreach ($scratchFiles as $key => $name) $scratchPaths[$key] = '/root/pmss-userTransfer-<generated>/'.$name;
+            $scratchPaths = pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>');
             runStep('Validating remote SSH authentication', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['authProbe']]));
             pmssUserTransferRunPasses('Pulling home data', $scratchPaths['expect'], $scratchPaths['mainScript'], 1, 0, 0);
             pmssUserTransferRunPasses('Pulling volatile data', $scratchPaths['expect'], $scratchPaths['finalScript'], 1, 0, 0);
@@ -285,7 +288,6 @@ function pmssUserTransferMain(array $argv): int
             }
             $password = $pass1;
         }
-        $cleanup = static function (): void {};
         putenv('PMSS_USER_TRANSFER_PASSWORD='.$password);
 
         try {
@@ -299,8 +301,7 @@ function pmssUserTransferMain(array $argv): int
         }
         @chmod($scratch, 0700);
 
-        $scratchPaths = [];
-        foreach ($scratchFiles as $key => $name) $scratchPaths[$key] = $scratch.'/'.$name;
+        $scratchPaths = pmssUserTransferScratchPaths($scratch);
         $cleanup = function () use ($scratchPaths, $scratch): void {
             foreach ($scratchPaths as $path) {
                 if (file_exists($path)) {
@@ -313,13 +314,7 @@ function pmssUserTransferMain(array $argv): int
         };
         register_shutdown_function($cleanup);
 
-        foreach ([
-            'expect' => pmssUserTransferBuildExpectWrapper()."\n",
-            'authProbe' => pmssUserTransferBuildAuthProbe($cfg),
-            'mainScript' => pmssUserTransferBuildRsyncMain($cfg),
-            'finalScript' => pmssUserTransferBuildRsyncFinal($cfg),
-            'remoteSizeScript' => pmssUserTransferBuildRemoteSizeProbe($cfg),
-        ] as $key => $contents) {
+        foreach (pmssUserTransferScratchPayloads($cfg) as $key => $contents) {
             pmssUserTransferWriteFile($scratchPaths[$key], $contents, 0700);
         }
 
