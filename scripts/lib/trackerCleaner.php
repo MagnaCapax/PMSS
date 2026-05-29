@@ -1,6 +1,8 @@
 <?php
 /** Shared tracker-cleaner policy and in-memory torrent mutation helpers. */
 
+require_once __DIR__.'/runtime.php';
+
 function pmssTrackerCleanerTimestamp(): string { return '['.date('Y-m-d H:i:s').']'; }
 
 function pmssTrackerCleanerLog(string $message): void { echo pmssTrackerCleanerTimestamp().' '.$message."\n"; }
@@ -59,8 +61,8 @@ function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload
     $userHome = "/home/{$username}";
     $userLogsDir = $userHome.'/.logs';
     $userLogFile = $userLogsDir.'/trackerCleaner.log';
-    $tmpLogPath = @tempnam(sys_get_temp_dir(), 'pmss-trackerCleaner-');
-    if ($tmpLogPath === false || @file_put_contents($tmpLogPath, $payload) === false) {
+    $tmpLogPath = pmssCreatePrivateTempFile('pmss-trackerCleaner-');
+    if ($tmpLogPath === null || @file_put_contents($tmpLogPath, $payload) === false) {
         if (is_string($tmpLogPath)) @unlink($tmpLogPath);
         return;
     }

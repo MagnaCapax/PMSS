@@ -50,8 +50,8 @@ function pmssDownloadPinnedRemoteTempFile(
         return null;
     }
 
-    $tmp = tempnam(sys_get_temp_dir(), $tempPrefix);
-    if ($tmp === false) {
+    $tmp = pmssCreatePrivateTempFile($tempPrefix);
+    if ($tmp === null) {
         logmsg("[WARN] Unable to create temp file for {$label} download");
         return null;
     }

@@ -64,8 +64,8 @@ function pmssSelectDpkgSelectionsBaseline(?int $distroVersion = null, ?callable 
  */
 function pmssWriteSanitisedDpkgSelectionsTempFile(array $sanitised): ?string
 {
-    $tmpSelection = @tempnam(sys_get_temp_dir(), 'pmss-selections-');
-    if ($tmpSelection === false) {
+    $tmpSelection = pmssCreatePrivateTempFile('pmss-selections-');
+    if ($tmpSelection === null) {
         logMessage('[ERROR] Unable to create temporary file for sanitized dpkg selections baseline');
         return null;
     }

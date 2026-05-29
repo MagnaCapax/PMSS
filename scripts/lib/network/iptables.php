@@ -160,8 +160,8 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
     }
 
     $data = implode("\n", $sections)."\n";
-    $tmp = tempnam(sys_get_temp_dir(), 'pmss-iptables-');
-    if (!is_string($tmp) || $tmp === '') {
+    $tmp = pmssCreatePrivateTempFile('pmss-iptables-');
+    if ($tmp === null) {
         networkIptablesLog('ERROR', 'unable to allocate iptables-restore temp file');
         return false;
     }

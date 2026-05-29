@@ -76,6 +76,21 @@ class DpkgBaselineApplySafetyTest extends TestCase
         @rmdir((string) $path);
     }
 
+    public function testCreatePrivateTempFileUsesProcessTempRoot(): void
+    {
+        $this->pmssSkipUnlessFunctionExists('pmssCreatePrivateTempFile');
+
+        $path = \pmssCreatePrivateTempFile('pmss-file-');
+        $tmpDir = realpath(sys_get_temp_dir());
+        $realPath = is_string($path) ? realpath($path) : false;
+
+        $this->assertTrue(is_string($tmpDir) && $tmpDir !== '', 'Expected process temp root to resolve');
+        $this->assertTrue(is_string($realPath) && is_file($realPath), 'Expected private temp file to exist');
+        $this->assertSame($tmpDir.'/', substr((string) $realPath, 0, strlen($tmpDir) + 1));
+
+        @unlink((string) $path);
+    }
+
     public function testCreatePrivateTempDirRejectsUnsafePrefixesBeforeTempnam(): void
     {
         $this->pmssSkipUnlessFunctionExists('pmssCreatePrivateTempDir');

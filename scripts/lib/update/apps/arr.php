@@ -259,13 +259,8 @@ function pmssArrUpdate(array $config): void
         $log('Unknown installed version; reinstalling to avoid stale binaries');
     }
 
-    try {
-        $suffix = bin2hex(random_bytes(4));
-    } catch (Exception $e) {
-        $suffix = uniqid();
-    }
-    $workDir = sys_get_temp_dir().'/'.strtolower($app).'-'.$suffix;
-    if (!@mkdir($workDir, 0755, true) && !is_dir($workDir)) { $log('Failed to create temporary workspace'); return; }
+    $workDir = pmssCreatePrivateTempDir(strtolower($app).'-');
+    if ($workDir === null) { $log('Failed to create temporary workspace'); return; }
 
     $archivePath = $workDir.'/'.$assetName;
     $extractPath = $workDir.'/'.$config['extract_dir'];

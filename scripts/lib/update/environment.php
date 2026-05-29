@@ -111,67 +111,6 @@ CONF;
         }
 }
 
-    /**
-     * Validate temp-dir prefixes before they reach tempnam() or cleanup guards.
-     */
-    function pmssPrivateTempPrefixIsSafe(string $prefix): bool
-    {
-        return preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $prefix) === 1;
-    }
-
-    /**
-     * Create a private temporary directory under the process temp root.
-     */
-    function pmssCreatePrivateTempDir(string $prefix): ?string
-    {
-        if (!pmssPrivateTempPrefixIsSafe($prefix)) {
-            logMessage('[WARN] Refusing private temporary directory with unsafe prefix');
-            return null;
-        }
-
-        $path = @tempnam(sys_get_temp_dir(), $prefix);
-        if ($path === false) {
-            return null;
-        }
-
-        if (!@unlink($path)) {
-            return null;
-        }
-        if (!@mkdir($path, 0700)) {
-            return null;
-        }
-
-        return $path;
-}
-
-/**
-     * Resolve a PMSS-owned temporary directory before destructive cleanup.
-     */
-    function pmssPrivateTempDirRealpath(string $path, string $prefix, ?callable $logger = null): ?string
-    {
-        $log = $logger ?: 'logMessage';
-        $base = realpath(sys_get_temp_dir());
-        $real = $path !== '' && !is_link($path) ? realpath($path) : false;
-
-        if (!pmssPrivateTempPrefixIsSafe($prefix)) {
-            $log('[WARN] Refusing temporary directory cleanup for unsafe prefix');
-            return null;
-        }
-
-        if ($base === false || $base === DIRECTORY_SEPARATOR || $real === false || !is_dir($real)) {
-            $log('[WARN] Refusing temporary directory cleanup for unresolved path: '.$path);
-            return null;
-        }
-
-        $basePrefix = rtrim($base, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
-        if (strpos($real, $basePrefix) !== 0 || strpos(basename($real), $prefix) !== 0) {
-            $log('[WARN] Refusing temporary directory cleanup outside PMSS temp scope: '.$real);
-            return null;
-        }
-
-        return $real;
-}
-
 /**
      * Remove a PMSS-owned temporary directory after verifying its scope.
      */
