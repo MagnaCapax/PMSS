@@ -41,6 +41,32 @@ class ResourceLogHelpersTest extends TestCase
         }
     }
 
+    private function assertReadCounters(array $outputLines, ?array $expected): void
+    {
+        $this->withFakeSystemctl($outputLines, function () use ($expected): void {
+            $counters = \pmssResourceLogReadCounters(1000);
+            if ($expected === null) {
+                $this->assertSame(null, $counters);
+                return;
+            }
+
+            $this->assertTrue(is_array($counters));
+            foreach ($expected as $field => $value) {
+                $this->assertEquals($value, $counters[$field]);
+            }
+        });
+    }
+
+    private function makeStatePath($previousPayload = null): string
+    {
+        $statePath = $this->makeRoot().'/state.json';
+        if ($previousPayload !== null) {
+            file_put_contents($statePath, is_array($previousPayload) ? (string) json_encode($previousPayload) : (string) $previousPayload);
+        }
+
+        return $statePath;
+    }
+
     public function testEnsureDirRejectsRelative(): void
     {
         $this->assertTrue(!\pmssEnsureSafeDir('relative/path', 0700));
@@ -262,7 +288,7 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testReadCountersParsesSystemctlOutput(): void
     {
-        $this->withFakeSystemctl([
+        $this->assertReadCounters([
             'IOReadBytes=11',
             'IOWriteBytes=22',
             'IOReadOperations=33',
@@ -270,58 +296,39 @@ class ResourceLogHelpersTest extends TestCase
             'CPUUsageNSec=55',
             'MemoryCurrent=66',
             'TasksCurrent=77',
-        ], function (): void {
-            $counters = \pmssResourceLogReadCounters(1000);
-            $this->assertTrue(is_array($counters));
-            $this->assertEquals(11, $counters['io_read']);
-            $this->assertEquals(22, $counters['io_write']);
-            $this->assertEquals(33, $counters['io_read_ops']);
-            $this->assertEquals(44, $counters['io_write_ops']);
-            $this->assertEquals(55, $counters['cpu_nsec']);
-            $this->assertEquals(66, $counters['memory']);
-            $this->assertEquals(77, $counters['tasks']);
-        });
+        ], ['io_read' => 11, 'io_write' => 22, 'io_read_ops' => 33, 'io_write_ops' => 44, 'cpu_nsec' => 55, 'memory' => 66, 'tasks' => 77]);
     }
 
     public function testReadCountersReturnsNullWhenRequiredFieldMissing(): void
     {
-        $this->withFakeSystemctl([
+        $this->assertReadCounters([
             'IOReadBytes=11',
             'IOWriteBytes=22',
             'CPUUsageNSec=55',
             'MemoryCurrent=66',
-        ], function (): void {
-            $this->assertTrue(\pmssResourceLogReadCounters(1000) === null);
-        });
+        ], null);
     }
 
     public function testReadCountersDefaultsMissingOpsToZero(): void
     {
-        $this->withFakeSystemctl([
+        $this->assertReadCounters([
             'IOReadBytes=11',
             'IOWriteBytes=22',
             'CPUUsageNSec=55',
             'MemoryCurrent=66',
             'TasksCurrent=77',
-        ], function (): void {
-            $counters = \pmssResourceLogReadCounters(1000);
-            $this->assertTrue(is_array($counters));
-            $this->assertEquals(0, $counters['io_read_ops']);
-            $this->assertEquals(0, $counters['io_write_ops']);
-        });
+        ], ['io_read_ops' => 0, 'io_write_ops' => 0]);
     }
 
     public function testReadCountersReturnsNullWhenRequiredValueIsNotNumeric(): void
     {
-        $this->withFakeSystemctl([
+        $this->assertReadCounters([
             'IOReadBytes=11',
             'IOWriteBytes=22',
             'CPUUsageNSec=55',
             'MemoryCurrent=oops',
             'TasksCurrent=77',
-        ], function (): void {
-            $this->assertTrue(\pmssResourceLogReadCounters(1000) === null);
-        });
+        ], null);
     }
 
     public function testReadMemoryBreakdownParsesMemoryStat(): void
@@ -348,8 +355,7 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testUpdateStateCreatesStateWhenMissing(): void
     {
-        $root = $this->makeRoot();
-        $statePath = $root.'/state.json';
+        $statePath = $this->makeStatePath();
         $counters = $this->makeCounters(10, 20, 30, 4096, 7);
 
         $result = \pmssResourceLogUpdateState($statePath, $counters);
@@ -363,8 +369,7 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testUpdateStatePersistsMemoryBreakdownWhenAvailable(): void
     {
-        $root = $this->makeRoot();
-        $statePath = $root.'/state.json';
+        $statePath = $this->makeStatePath();
         $counters = $this->makeCounters(10, 20, 30, 4096, 7) + ['memory_anon' => 1024, 'memory_file' => 2048];
 
         $result = \pmssResourceLogUpdateState($statePath, $counters);
@@ -375,9 +380,7 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testUpdateStateComputesDeltaFromPrevious(): void
     {
-        $root = $this->makeRoot();
-        $statePath = $root.'/state.json';
-        file_put_contents($statePath, json_encode([
+        $statePath = $this->makeStatePath([
             'io_read' => 5,
             'io_write' => 2,
             'io_read_ops' => 10,
@@ -386,7 +389,7 @@ class ResourceLogHelpersTest extends TestCase
             'memory' => 1,
             'tasks' => 1,
             'ts' => 123,
-        ]));
+        ]);
 
         $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(8, 12, 150, 2048, 3, 16, 29));
 
@@ -403,16 +406,14 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testUpdateStateHandlesCounterReset(): void
     {
-        $root = $this->makeRoot();
-        $statePath = $root.'/state.json';
-        file_put_contents($statePath, json_encode([
+        $statePath = $this->makeStatePath([
             'io_read' => 100,
             'io_write' => 200,
             'cpu_nsec' => 300,
             'memory' => 1,
             'tasks' => 1,
             'ts' => 1,
-        ]));
+        ]);
 
         $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(10, 20, 30, 1024, 2));
 
@@ -421,9 +422,7 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testUpdateStateHandlesInvalidJson(): void
     {
-        $root = $this->makeRoot();
-        $statePath = $root.'/state.json';
-        file_put_contents($statePath, '{invalid json}');
+        $statePath = $this->makeStatePath('{invalid json}');
 
         $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(4, 5, 6, 2048, 1));
 
@@ -432,16 +431,14 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testUpdateStateIgnoresMalformedPreviousCounterFields(): void
     {
-        $root = $this->makeRoot();
-        $statePath = $root.'/state.json';
-        file_put_contents($statePath, json_encode([
+        $statePath = $this->makeStatePath([
             'io_read' => ['bad'],
             'io_write' => true,
             'cpu_nsec' => '12ns',
             'memory' => 1,
             'tasks' => 1,
             'ts' => 1,
-        ]));
+        ]);
         $result = null;
 
         $this->pmssAssertNoPhpWarnings(function () use (&$result, $statePath): void {
@@ -453,8 +450,7 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testUpdateStateDefaultsMissingCountersWithoutWarnings(): void
     {
-        $root = $this->makeRoot();
-        $statePath = $root.'/state.json';
+        $statePath = $this->makeStatePath();
         $result = null;
 
         $this->pmssAssertNoPhpWarnings(function () use (&$result, $statePath): void {
@@ -468,8 +464,7 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testCounterStateUpdateDefaultsMissingDeltaFieldsWithoutWarnings(): void
     {
-        $root = $this->makeRoot();
-        $statePath = $root.'/state.json';
+        $statePath = $this->makeStatePath();
         $result = null;
 
         $this->pmssAssertNoPhpWarnings(function () use (&$result, $statePath): void {
