@@ -27,7 +27,7 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
         $ts = date('c');
         $log = $this->pmssWriteStorageBenchmarkLog([
             $this->pmssStorageBenchmarkPreflightEntry($rid, $ts, ['timestamp' => $ts]),
-            $this->pmssStorageBenchmarkEntry($rid, $ts, 'randread-large', ['timestamp'=>$ts,'params'=>['rw'=>'randread'],'metrics'=>['read_bw_MBps'=>1.0e9,'write_bw_MBps'=>0,'read_iops'=>1.0e7,'write_iops'=>0,'read_p95_ms'=>123456.78,'write_p95_ms'=>0]]),
+            $this->pmssStorageBenchmarkFileEntry($rid, $ts, 'randread-large', ['read_bw_MBps'=>1.0e9,'read_iops'=>1.0e7,'read_p95_ms'=>123456.78], ['timestamp'=>$ts]),
         ], 'pmss-bench-edge-');
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
         $this->assertStringContainsString('randread-large', $out);
@@ -38,7 +38,7 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
         $rid = 'neg-'.bin2hex(random_bytes(2)); $ts = date('c');
         $log = $this->pmssWriteStorageBenchmarkLog([
             $this->pmssStorageBenchmarkPreflightEntry($rid, $ts, ['timestamp' => $ts]),
-            $this->pmssStorageBenchmarkEntry($rid, $ts, 'randread-small', ['timestamp'=>$ts,'params'=>['rw'=>'randread'],'metrics'=>['read_bw_MBps'=>-1,'write_bw_MBps'=>-2,'read_iops'=>-3,'write_iops'=>-4,'read_p95_ms'=>-5,'write_p95_ms'=>-6]]),
+            $this->pmssStorageBenchmarkFileEntry($rid, $ts, 'randread-small', ['read_bw_MBps'=>-1,'write_bw_MBps'=>-2,'read_iops'=>-3,'write_iops'=>-4,'read_p95_ms'=>-5,'write_p95_ms'=>-6], ['timestamp'=>$ts]),
         ], 'pmss-bench-edge-');
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
         $this->assertStringContainsString('randread-small', $out);
@@ -72,7 +72,7 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
         $rid='nl-'.bin2hex(random_bytes(2)); $ts=date('c');
         file_put_contents($log, '{"run_id":"'.$rid.'","run_ts":"'.$ts.'","test":"preflight-idle","ok":true'."\n", FILE_APPEND);
         file_put_contents($log, "}\n", FILE_APPEND);
-        $this->pmssAppendFixtureLines($log, [$this->pmssStorageBenchmarkEntry($rid, $ts, 'randread-small', ['params'=>['rw'=>'randread'],'metrics'=>['read_bw_MBps'=>1,'write_bw_MBps'=>0,'read_iops'=>1,'write_iops'=>0,'read_p95_ms'=>1,'write_p95_ms'=>0]])]);
+        $this->pmssAppendFixtureLines($log, [$this->pmssStorageBenchmarkFileEntry($rid, $ts)]);
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
         $this->assertStringContainsString('randread-small', $out);
     }
@@ -108,7 +108,7 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
             $rid = 'rid-'.$i;
             $this->pmssAppendFixtureLines($log, [
                 $this->pmssStorageBenchmarkPreflightEntry($rid, $ts, ['timestamp' => $ts]),
-                $this->pmssStorageBenchmarkEntry($rid, $ts, 'randread-small', ['timestamp'=>$ts,'params'=>['rw'=>'randread'], 'metrics'=>['read_bw_MBps'=>$i+1,'write_bw_MBps'=>0,'read_iops'=>1,'write_iops'=>0,'read_p95_ms'=>1,'write_p95_ms'=>0]]),
+                $this->pmssStorageBenchmarkFileEntry($rid, $ts, 'randread-small', ['read_bw_MBps'=>$i+1], ['timestamp'=>$ts]),
             ]);
         }
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
@@ -122,7 +122,7 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
         $this->pmssAppendFixtureLines($log, [
             $this->pmssStorageBenchmarkPreflightEntry($rid, $t1, ['timestamp'=>$t1]),
             $this->pmssStorageBenchmarkPreflightEntry($rid, $t2, ['timestamp'=>$t2]),
-            $this->pmssStorageBenchmarkEntry($rid, $t2, 'randread-small', ['timestamp'=>$t2,'params'=>['rw'=>'randread'],'metrics'=>['read_bw_MBps'=>2,'write_bw_MBps'=>0,'read_iops'=>2,'write_iops'=>0,'read_p95_ms'=>2,'write_p95_ms'=>0]]),
+            $this->pmssStorageBenchmarkFileEntry($rid, $t2, 'randread-small', ['read_bw_MBps'=>2,'read_iops'=>2,'read_p95_ms'=>2], ['timestamp'=>$t2]),
         ]);
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
         $this->assertStringContainsString("\t2.00\t0.00\t2.0\t0.0\t2.00\t0.00", $out);
@@ -132,7 +132,7 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
     {
         $log=$this->pmssMakeJsonLogPath('pmss-bench-edge-', 'benchmark-storage.jsonl'); $rid='ws'; $ts=date('c');
         $this->pmssAppendFixtureLines($log, ["  ", $this->pmssStorageBenchmarkPreflightEntry($rid, $ts), "  ",
-            $this->pmssStorageBenchmarkEntry($rid, $ts, 'randread-large', ['params'=>['rw'=>'randread'], 'metrics'=>['read_bw_MBps'=>3,'write_bw_MBps'=>0,'read_iops'=>3,'write_iops'=>0,'read_p95_ms'=>3,'write_p95_ms'=>0]])]);
+            $this->pmssStorageBenchmarkFileEntry($rid, $ts, 'randread-large', ['read_bw_MBps'=>3,'read_iops'=>3,'read_p95_ms'=>3])]);
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
         $this->assertStringContainsString('randread-large', $out);
     }
@@ -141,7 +141,7 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
     {
         $log=$this->pmssMakeJsonLogPath('pmss-bench-edge-', 'benchmark-storage.jsonl'); $rid='unk'; $ts=date('c');
         $this->pmssAppendFixtureLines($log, [ $this->pmssStorageBenchmarkPreflightEntry($rid, $ts),
-            $this->pmssStorageBenchmarkEntry($rid, $ts, 'mystery-test', ['params'=>['rw'=>'randread'],'metrics'=>['read_bw_MBps'=>1,'write_bw_MBps'=>1,'read_iops'=>1,'write_iops'=>1,'read_p95_ms'=>1,'write_p95_ms'=>1]]) ]);
+            $this->pmssStorageBenchmarkFileEntry($rid, $ts, 'mystery-test', ['write_bw_MBps'=>1,'write_iops'=>1,'write_p95_ms'=>1]) ]);
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
         $this->assertStringContainsString('mystery-test', $out);
     }
@@ -195,7 +195,7 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
     {
         $log=$this->pmssMakeJsonLogPath('pmss-bench-edge-', 'benchmark-storage.jsonl'); $rid='nonn'; $ts=date('c');
         $this->pmssAppendFixtureLines($log,[ $this->pmssStorageBenchmarkPreflightEntry($rid, $ts),
-            $this->pmssStorageBenchmarkEntry($rid, $ts, 'randread-small', ['params'=>['rw'=>'randread'],'metrics'=>['read_bw_MBps'=>'x','write_bw_MBps'=>'y','read_iops'=>'z','write_iops'=>'w','read_p95_ms'=>'q','write_p95_ms'=>'r']]) ]);
+            $this->pmssStorageBenchmarkFileEntry($rid, $ts, 'randread-small', ['read_bw_MBps'=>'x','write_bw_MBps'=>'y','read_iops'=>'z','write_iops'=>'w','read_p95_ms'=>'q','write_p95_ms'=>'r']) ]);
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
         $this->assertStringContainsString('randread-small', $out);
     }
@@ -215,7 +215,7 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
         $log=$this->pmssMakeJsonLogPath('pmss-bench-edge-', 'benchmark-storage.jsonl'); $rid='combo'; $ts=date('c');
         $this->pmssAppendFixtureLines($log,[ $this->pmssStorageBenchmarkPreflightEntry($rid, $ts),
             $this->pmssStorageBenchmarkEntry($rid, $ts, 'device-ioping', ['device'=>'/dev/sde','metrics'=>['ioping_avg_ms'=>1.11]]),
-            $this->pmssStorageBenchmarkEntry($rid, $ts, 'seqread-large', ['params'=>['rw'=>'read'],'metrics'=>['read_bw_MBps'=>400,'write_bw_MBps'=>0,'read_iops'=>100,'write_iops'=>0,'read_p95_ms'=>5,'write_p95_ms'=>0]]) ]);
+            $this->pmssStorageBenchmarkFileEntry($rid, $ts, 'seqread-large', ['read_bw_MBps'=>400,'read_iops'=>100,'read_p95_ms'=>5], ['params'=>['rw'=>'read']]) ]);
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
         $this->assertStringContainsString('seqread-large', $out);
         $this->assertStringContainsString('/dev/sde', $out);
@@ -233,7 +233,7 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
     public function testMixedOrderEntriesDoNotBreakGrouping(): void
     {
         $log=$this->pmssMakeJsonLogPath('pmss-bench-edge-', 'benchmark-storage.jsonl'); $rid='mix'; $ts=date('c');
-        $this->pmssAppendFixtureLines($log,[ $this->pmssStorageBenchmarkEntry($rid, $ts, 'randread-small', ['params'=>['rw'=>'randread'],'metrics'=>['read_bw_MBps'=>10,'write_bw_MBps'=>0,'read_iops'=>1,'write_iops'=>0,'read_p95_ms'=>1,'write_p95_ms'=>0]]), $this->pmssStorageBenchmarkPreflightEntry($rid, $ts) ]);
+        $this->pmssAppendFixtureLines($log,[ $this->pmssStorageBenchmarkFileEntry($rid, $ts, 'randread-small', ['read_bw_MBps'=>10]), $this->pmssStorageBenchmarkPreflightEntry($rid, $ts) ]);
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
         $this->assertStringContainsString('File-backed tests', $out);
         $this->assertStringContainsString('randread-small', $out);

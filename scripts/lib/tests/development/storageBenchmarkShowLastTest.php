@@ -10,16 +10,15 @@ class StorageBenchmarkShowLastTest extends TestCase
         $runId  = '20250101010101-aaa';
         $runTs  = '2025-01-01T01:01:01Z';
         $older  = '2024-12-31T23:59:59Z';
-        $entries = [
+        $log = $this->pmssWriteStorageBenchmarkLog([
             // Older run we should ignore
             $this->pmssStorageBenchmarkPreflightEntry('old', $older, ['timestamp'=>$older]),
             // Current run
             $this->pmssStorageBenchmarkPreflightEntry($runId, $runTs, ['timestamp'=>$runTs,'ioping_avg_ms'=>1.23,'iostat_util_pct'=>3.0]),
-            $this->pmssStorageBenchmarkEntry($runId, $runTs, 'randread-small', ['timestamp'=>$runTs,'params'=>['rw'=>'randread'],'metrics'=>['read_bw_MBps'=>123.45,'write_bw_MBps'=>0,'read_iops'=>999.9,'write_iops'=>0,'read_p95_ms'=>2.34,'write_p95_ms'=>0]]),
+            $this->pmssStorageBenchmarkFileEntry($runId, $runTs, 'randread-small', ['read_bw_MBps'=>123.45,'read_iops'=>999.9,'read_p95_ms'=>2.34], ['timestamp'=>$runTs]),
             // Device sample
             $this->pmssStorageBenchmarkEntry($runId, $runTs, 'device-seqread-dd', ['timestamp'=>$runTs,'device'=>'/dev/sda','metrics'=>['seqread_MBps'=>250.5,'elapsed_s'=>4.0]]),
-        ];
-        $log = $this->pmssWriteStorageBenchmarkLog($entries);
+        ]);
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
         $this->assertTrue(is_string($out) && $out !== '', 'no output from storageBenchmark --show-last');
         $this->assertStringContainsAllStrings(['== Storage benchmark (last run) ==', 'File-backed tests', 'randread-small', 'Per-device tests', '/dev/sda'], $out);
@@ -29,11 +28,10 @@ class StorageBenchmarkShowLastTest extends TestCase
     {
         $runId  = '20250202020202-ccc';
         $runTs  = '2025-02-02T02:02:02Z';
-        $entries = [
+        $log = $this->pmssWriteStorageBenchmarkLog([
             $this->pmssStorageBenchmarkPreflightEntry($runId, $runTs, ['timestamp'=>$runTs,'ioping_avg_ms'=>1.0,'iostat_util_pct'=>1.0]),
-            $this->pmssStorageBenchmarkEntry($runId, $runTs, 'randread-small', ['timestamp'=>$runTs,'params'=>['rw'=>'randread'],'metrics'=>['read_bw_MBps'=>10,'write_bw_MBps'=>0,'read_iops'=>10,'write_iops'=>0,'read_p95_ms'=>1,'write_p95_ms'=>0]]),
-        ];
-        $log = $this->pmssWriteStorageBenchmarkLog($entries);
+            $this->pmssStorageBenchmarkFileEntry($runId, $runTs, 'randread-small', ['read_bw_MBps'=>10,'read_iops'=>10], ['timestamp'=>$runTs]),
+        ]);
         $out = $this->pmssRunRepoPhpScript('scripts/util/storageBenchmark.php', ['--show-last', '--json='.$log]);
         $this->assertStringContainsAllStrings(['== Storage benchmark (last run) ==', 'randread-small'], (string) $out);
     }
@@ -42,11 +40,10 @@ class StorageBenchmarkShowLastTest extends TestCase
     {
         $runId  = '20250202020203-int';
         $runTs  = '2025-02-02T02:02:03Z';
-        $entries = [
+        $log = $this->pmssWriteStorageBenchmarkLog([
             $this->pmssStorageBenchmarkPreflightEntry($runId, $runTs, ['timestamp'=>$runTs,'ioping_avg_ms'=>1.0,'iostat_util_pct'=>1.0]),
-            $this->pmssStorageBenchmarkEntry($runId, $runTs, 'randread-small', ['timestamp'=>$runTs,'params'=>['rw'=>'randread'],'metrics'=>['read_bw_MBps'=>10,'write_bw_MBps'=>0,'read_iops'=>10,'write_iops'=>0,'read_p95_ms'=>1,'write_p95_ms'=>0]]),
-        ];
-        $log = $this->pmssWriteStorageBenchmarkLog($entries);
+            $this->pmssStorageBenchmarkFileEntry($runId, $runTs, 'randread-small', ['read_bw_MBps'=>10,'read_iops'=>10], ['timestamp'=>$runTs]),
+        ]);
         $out = $this->pmssRunStorageBenchmarkShowLast($log, ['--runtime=15', '--device-runtime', '45', '--idle-util=70']);
         $this->assertStringContainsAllStrings(['== Storage benchmark (last run) ==', 'randread-small'], (string) $out);
     }
@@ -79,7 +76,7 @@ class StorageBenchmarkShowLastTest extends TestCase
             '{this is not json}', // junk
             $this->pmssStorageBenchmarkPreflightEntry($runId, $runTs, ['timestamp'=>$runTs]),
             'BROKEN LINE',
-            $this->pmssStorageBenchmarkEntry($runId, $runTs, 'randread-small', ['timestamp'=>$runTs,'params'=>['rw'=>'randread'],'metrics'=>['read_bw_MBps'=>1,'write_bw_MBps'=>0,'read_iops'=>1,'write_iops'=>0,'read_p95_ms'=>1,'write_p95_ms'=>0]]),
+            $this->pmssStorageBenchmarkFileEntry($runId, $runTs, 'randread-small', [], ['timestamp'=>$runTs]),
         ]);
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
         $this->assertStringContainsAllStrings(['Storage benchmark (last run)', 'randread-small'], $out);
@@ -91,9 +88,9 @@ class StorageBenchmarkShowLastTest extends TestCase
         $newer = '2025-01-03T01:00:00Z';
         $log = $this->pmssWriteStorageBenchmarkLog([
             $this->pmssStorageBenchmarkPreflightEntry('old', $older, ['timestamp'=>$older]),
-            $this->pmssStorageBenchmarkEntry('old', $older, 'randread-small', ['timestamp'=>$older,'params'=>['rw'=>'randread'],'metrics'=>['read_bw_MBps'=>1,'write_bw_MBps'=>0,'read_iops'=>1,'write_iops'=>0,'read_p95_ms'=>1,'write_p95_ms'=>0]]),
+            $this->pmssStorageBenchmarkFileEntry('old', $older, 'randread-small', [], ['timestamp'=>$older]),
             $this->pmssStorageBenchmarkPreflightEntry('new', $newer, ['timestamp'=>$newer]),
-            $this->pmssStorageBenchmarkEntry('new', $newer, 'randread-small', ['timestamp'=>$newer,'params'=>['rw'=>'randread'],'metrics'=>['read_bw_MBps'=>2,'write_bw_MBps'=>0,'read_iops'=>2,'write_iops'=>0,'read_p95_ms'=>2,'write_p95_ms'=>0]]),
+            $this->pmssStorageBenchmarkFileEntry('new', $newer, 'randread-small', ['read_bw_MBps'=>2,'read_iops'=>2,'read_p95_ms'=>2], ['timestamp'=>$newer]),
         ]);
         $out = $this->pmssRunStorageBenchmarkShowLast($log);
         // Only the newer result value should appear
@@ -106,7 +103,7 @@ class StorageBenchmarkShowLastTest extends TestCase
         $runTs = '2025-01-05T05:05:05Z';
         $log = $this->pmssWriteStorageBenchmarkLog([
             $this->pmssStorageBenchmarkPreflightEntry($runId, $runTs, ['timestamp' => $runTs, 'label' => 'array-a', 'ioping_avg_ms' => 1.5, 'iostat_util_pct' => 2]),
-            $this->pmssStorageBenchmarkEntry($runId, $runTs, 'randread-small', ['timestamp' => $runTs, 'label' => 'array-a', 'params' => ['rw' => 'randread'], 'metrics' => ['read_bw_MBps' => 123.45, 'write_bw_MBps' => 0, 'read_iops' => 456.7, 'write_iops' => 0, 'read_p95_ms' => 3.21, 'write_p95_ms' => 0]]),
+            $this->pmssStorageBenchmarkFileEntry($runId, $runTs, 'randread-small', ['read_bw_MBps' => 123.45, 'read_iops' => 456.7, 'read_p95_ms' => 3.21], ['timestamp' => $runTs, 'label' => 'array-a']),
             $this->pmssStorageBenchmarkEntry($runId, $runTs, 'device-seqread-dd', ['timestamp' => $runTs, 'label' => 'array-a', 'device' => '/dev/sda', 'metrics' => ['seqread_MBps' => 250.5, 'elapsed_s' => 4.0]]),
             $this->pmssStorageBenchmarkEntry($runId, $runTs, 'device-ioping', ['timestamp' => $runTs, 'label' => 'array-a', 'device' => '/dev/sda', 'metrics' => ['ioping_avg_ms' => 1.23]]),
             $this->pmssStorageBenchmarkEntry($runId, $runTs, 'dev-randread-4k', ['timestamp' => $runTs, 'label' => 'array-a', 'device' => '/dev/sda', 'metrics' => ['read_bw_MBps' => 12.34, 'read_iops' => 567.8, 'read_p95_ms' => 0.91]]),

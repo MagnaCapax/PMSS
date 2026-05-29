@@ -424,6 +424,9 @@ abstract class TestCase
     protected function pmssStorageBenchmarkEntry(string $runId, string $runTs, string $test, array $extra = []): array { return array_replace(['run_id' => $runId, 'run_ts' => $runTs, 'test' => $test], $extra); }
     protected function pmssStorageBenchmarkPreflightEntry(string $runId, string $runTs, array $extra = []): array { return $this->pmssStorageBenchmarkEntry($runId, $runTs, 'preflight-idle', array_replace(['ok' => true], $extra)); }
 
+    /** Build the repeated file-backed fio entry shape used by storage benchmark tests. */
+    protected function pmssStorageBenchmarkFileEntry(string $runId, string $runTs, string $test = 'randread-small', array $metrics = [], array $extra = []): array { return $this->pmssStorageBenchmarkEntry($runId, $runTs, $test, array_replace(['params' => ['rw' => 'randread'], 'metrics' => array_replace(['read_bw_MBps' => 1, 'write_bw_MBps' => 0, 'read_iops' => 1, 'write_iops' => 0, 'read_p95_ms' => 1, 'write_p95_ms' => 0], $metrics)], $extra)); }
+
     /** Persist serialized fixture data while ensuring the parent path exists. */
     protected function pmssWriteSerializedFixture(string $path, $value): void
     {

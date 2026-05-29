@@ -85,7 +85,7 @@ class StorageBenchSecurityTest extends TestCase
     public function testMetricsLookLikeCommands(): void
     {
         $rid='cmd'; $ts=date('c');
-        $log = $this->pmssWriteStorageBenchmarkLog([$this->pmssStorageBenchmarkPreflightEntry($rid, $ts), $this->pmssStorageBenchmarkEntry($rid, $ts, 'randread-small', ['params'=>['rw'=>'randread'], 'metrics'=>['read_bw_MBps'=>'`rm -rf /`','write_bw_MBps'=>0,'read_iops'=>0,'write_iops'=>0,'read_p95_ms'=>0,'write_p95_ms'=>0]])], 'pmss-bench-sec-');
+        $log = $this->pmssWriteStorageBenchmarkLog([$this->pmssStorageBenchmarkPreflightEntry($rid, $ts), $this->pmssStorageBenchmarkFileEntry($rid, $ts, 'randread-small', ['read_bw_MBps'=>'`rm -rf /`','read_iops'=>0,'read_p95_ms'=>0])], 'pmss-bench-sec-');
         $out=$this->runShow($log);
         $this->assertStringContainsString('randread-small', $out);
     }
