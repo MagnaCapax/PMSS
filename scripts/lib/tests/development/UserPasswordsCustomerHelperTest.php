@@ -104,10 +104,7 @@ final class UserPasswordsCustomerHelperTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
 
-        $this->assertStringContainsString("'delugePasswordCanRotate' => \$delugeState['canRotate']", $source);
-        $this->assertStringContainsString('if ($delugePasswordCanRotate)', $source);
-        $this->assertStringContainsString("\$canRotate = function_exists('pmssDelugeServicePasswordRotate')", $source);
-        $this->assertStringContainsString('pmssDelugeServicePasswordRotate((string) $username)', $source);
+        $this->assertStringContainsAllStrings(["'delugePasswordCanRotate' => \$delugeState['canRotate']", 'if ($delugePasswordCanRotate)', "\$canRotate = function_exists('pmssDelugeServicePasswordRotate')", 'pmssDelugeServicePasswordRotate((string) $username)'], $source);
         $this->assertStringNotContainsString('if ($delugePasswordHelpersAvailable) {', $source);
     }
 }

@@ -57,10 +57,7 @@ class userLifecycleLoggingTest extends TestCase
 
     public function testContextLogHelperDelegatesToBaseContextAndWriter(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/userLifecycle.php');
-
-        $this->assertStringContainsString('function pmssUserLifecycleContextLog(', $source);
-        $this->assertStringContainsString('pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));', $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/userLifecycle.php', ['function pmssUserLifecycleContextLog(', 'pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));']);
     }
 
     public function testContextLogStatusMessageHelperBuildsSharedPayload(): void

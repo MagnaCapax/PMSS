@@ -7,19 +7,11 @@ class CliWrapperDependencyGuardTest extends TestCase
 {
     public function testPmssStatsWrapperGuardsMissingLibraryBeforeRequire(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/pmss-stats.php');
-
-        $this->assertStringContainsString("if (!is_file(\$pmssStatsLib))", $source);
-        $this->assertStringContainsString('pmss stats library missing; aborting.', $source);
-        $this->assertStringContainsString('require_once $pmssStatsLib;', $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/pmss-stats.php', ["if (!is_file(\$pmssStatsLib))", 'pmss stats library missing; aborting.', 'require_once $pmssStatsLib;']);
     }
 
     public function testSetupSkelPermissionsWrapperGuardsRenamedEntrypoint(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/setupSkelPermissions.php');
-
-        $this->assertStringContainsString("if (!is_file(\$setupPermissions))", $source);
-        $this->assertStringContainsString('setupPermissions.php missing; aborting wrapper.', $source);
-        $this->assertStringContainsString('require $setupPermissions;', $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupSkelPermissions.php', ["if (!is_file(\$setupPermissions))", 'setupPermissions.php missing; aborting wrapper.', 'require $setupPermissions;']);
     }
 }

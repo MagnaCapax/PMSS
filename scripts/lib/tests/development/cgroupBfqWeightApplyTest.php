@@ -58,9 +58,7 @@ class CgroupBfqWeightApplyTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/cron/cgroupBfqWeightApply.php');
 
-        $this->assertStringContainsString("require_once __DIR__.'/../lib/user/identity.php';", $source);
-        $this->assertStringContainsString('if (!pmssValidateUsername($user)) {', $source);
-        $this->assertStringContainsString('pmssBfqUserBonusPercentRead($user)', $source);
+        $this->assertStringContainsAllStrings(["require_once __DIR__.'/../lib/user/identity.php';", 'if (!pmssValidateUsername($user)) {', 'pmssBfqUserBonusPercentRead($user)'], $source);
         $this->assertOrderedStrings(
             [
                 "\$user = basename(\$cfgPath, '.json');",
@@ -78,10 +76,6 @@ class CgroupBfqWeightApplyTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/cron/cgroupBfqWeightApply.php');
 
-        $this->assertStringContainsString('function pmssBfqUserBonusPercentRead(string $user): int', $source);
-        $this->assertStringContainsString('$stat = @lstat($path);', $source);
-        $this->assertStringContainsString("((\$stat['mode'] ?? 0) & 0170000) !== 0100000", $source);
-        $this->assertStringContainsString("(int) (\$stat['size'] ?? 0) > 64", $source);
-        $this->assertStringContainsString('@file_get_contents($path, false, null, 0, 64)', $source);
+        $this->assertStringContainsAllStrings(['function pmssBfqUserBonusPercentRead(string $user): int', '$stat = @lstat($path);', "((\$stat['mode'] ?? 0) & 0170000) !== 0100000", "(int) (\$stat['size'] ?? 0) > 64", '@file_get_contents($path, false, null, 0, 64)'], $source);
     }
 }
