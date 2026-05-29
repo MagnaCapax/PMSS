@@ -16,19 +16,19 @@ require_once __DIR__.'/../cli/helpText.php';
 function pmssUserConfigCliResourceSpecs(): array
 {
     return [
-        'trafficLimit' => ['addUserOption' => 'traffic-limit-gb', 'addUserLegacyIndex' => 5, 'userConfigIndex' => 4, 'usage' => '--traffic-limit-gb=GIB', 'parse' => 'int', 'default' => null, 'persist' => false],
-        'iopsLimit' => ['addUserOption' => 'iops-limit', 'usage' => '--iops-limit=OPS', 'parse' => 'int', 'default' => null, 'persist' => false],
-        'trafficCapMbit' => ['addUserOption' => 'traffic-cap-mbit', 'addUserLegacyIndex' => 6, 'userConfigIndex' => 12, 'usage' => '--traffic-cap-mbit=MBIT', 'parse' => 'int', 'default' => 0, 'persist' => true],
-        'CPUWeight' => ['addUserOption' => 'cpu-weight', 'addUserLegacyIndex' => 8, 'userConfigIndex' => 5, 'usage' => '--cpu-weight=WEIGHT', 'parse' => 'int', 'default' => 0, 'persist' => true, 'cgroupFlag' => '--cpu-weight='],
-        'IOWeight' => ['addUserOption' => 'io-weight', 'addUserLegacyIndex' => 9, 'userConfigIndex' => 6, 'usage' => '--io-weight=WEIGHT', 'parse' => 'int', 'default' => 0, 'persist' => true, 'cgroupFlag' => '--io-weight='],
-        'IOReadBW' => ['addUserOption' => 'io-read-bw', 'addUserLegacyIndex' => 10, 'userConfigIndex' => 7, 'usage' => '--io-read-bw=/dev/DEVICE:RATE', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-read-bw='],
-        'IOWriteBW' => ['addUserOption' => 'io-write-bw', 'addUserLegacyIndex' => 11, 'userConfigIndex' => 8, 'usage' => '--io-write-bw=/dev/DEVICE:RATE', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-write-bw='],
-        'IOReadIOPS' => ['addUserOption' => 'io-read-iops', 'addUserLegacyIndex' => 12, 'userConfigIndex' => 9, 'usage' => '--io-read-iops=/dev/DEVICE:IOPS', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-read-iops='],
-        'IOWriteIOPS' => ['addUserOption' => 'io-write-iops', 'addUserLegacyIndex' => 13, 'userConfigIndex' => 10, 'usage' => '--io-write-iops=/dev/DEVICE:IOPS', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-write-iops='],
-        'cpuQuotaPercent' => ['addUserOption' => 'cpu-quota-percent', 'addUserLegacyIndex' => 14, 'userConfigIndex' => 11, 'usage' => '--cpu-quota-percent=PERCENT|infinity', 'parse' => 'string', 'default' => 0, 'persist' => true],
-        'ioLatencyMs' => ['addUserOption' => 'io-latency-ms', 'addUserLegacyIndex' => 15, 'userConfigIndex' => 13, 'usage' => '--io-latency-ms=MS', 'parse' => 'int', 'default' => 0, 'persist' => true, 'cgroupFlag' => '--io-latency-ms='],
-        'ioCostQos' => ['addUserOption' => 'io-cost-qos', 'addUserLegacyIndex' => 16, 'userConfigIndex' => 14, 'usage' => '--io-cost-qos=SETTING', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-cost-qos='],
-        'ioCostModel' => ['addUserOption' => 'io-cost-model', 'addUserLegacyIndex' => 17, 'userConfigIndex' => 15, 'usage' => '--io-cost-model=SETTING', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-cost-model='],
+        'trafficLimit' => ['addUserOption' => 'traffic-limit-gb', 'addUserLegacyIndex' => 5, 'userConfigIndex' => 4, 'usage' => '--traffic-limit-gb=GIB', 'parameter' => 'TRAFFIC_LIMIT_GB', 'description' => 'Monthly traffic quota in GiB.', 'parse' => 'int', 'default' => null, 'persist' => false],
+        'iopsLimit' => ['addUserOption' => 'iops-limit', 'usage' => '--iops-limit=OPS', 'parameter' => 'IOPS_LIMIT', 'description' => 'Monthly combined read+write I/O operations budget.', 'parse' => 'int', 'default' => null, 'persist' => false],
+        'trafficCapMbit' => ['addUserOption' => 'traffic-cap-mbit', 'addUserLegacyIndex' => 6, 'userConfigIndex' => 12, 'usage' => '--traffic-cap-mbit=MBIT', 'parameter' => 'TRAFFIC_CAP_MBIT', 'description' => 'Traffic shaper ceiling in Mbit/s; 0 disables shaping.', 'parse' => 'int', 'default' => 0, 'persist' => true],
+        'CPUWeight' => ['addUserOption' => 'cpu-weight', 'addUserLegacyIndex' => 8, 'userConfigIndex' => 5, 'usage' => '--cpu-weight=WEIGHT', 'parameter' => 'CPUWEIGHT', 'description' => 'systemd CPUWeight; systemd expects 1-10000.', 'parse' => 'int', 'default' => 0, 'persist' => true, 'cgroupFlag' => '--cpu-weight='],
+        'IOWeight' => ['addUserOption' => 'io-weight', 'addUserLegacyIndex' => 9, 'userConfigIndex' => 6, 'usage' => '--io-weight=WEIGHT', 'parameter' => 'IOWEIGHT', 'description' => 'systemd IOWeight; systemd expects 1-10000.', 'parse' => 'int', 'default' => 0, 'persist' => true, 'cgroupFlag' => '--io-weight='],
+        'IOReadBW' => ['addUserOption' => 'io-read-bw', 'addUserLegacyIndex' => 10, 'userConfigIndex' => 7, 'usage' => '--io-read-bw=/dev/DEVICE:RATE', 'parameter' => 'IO_READ_BW', 'description' => 'Read bandwidth cap in /dev/DEVICE:RATE form.', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-read-bw='],
+        'IOWriteBW' => ['addUserOption' => 'io-write-bw', 'addUserLegacyIndex' => 11, 'userConfigIndex' => 8, 'usage' => '--io-write-bw=/dev/DEVICE:RATE', 'parameter' => 'IO_WRITE_BW', 'description' => 'Write bandwidth cap in /dev/DEVICE:RATE form.', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-write-bw='],
+        'IOReadIOPS' => ['addUserOption' => 'io-read-iops', 'addUserLegacyIndex' => 12, 'userConfigIndex' => 9, 'usage' => '--io-read-iops=/dev/DEVICE:IOPS', 'parameter' => 'IO_READ_IOPS', 'description' => 'Read IOPS cap in /dev/DEVICE:IOPS form.', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-read-iops='],
+        'IOWriteIOPS' => ['addUserOption' => 'io-write-iops', 'addUserLegacyIndex' => 13, 'userConfigIndex' => 10, 'usage' => '--io-write-iops=/dev/DEVICE:IOPS', 'parameter' => 'IO_WRITE_IOPS', 'description' => 'Write IOPS cap in /dev/DEVICE:IOPS form.', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-write-iops='],
+        'cpuQuotaPercent' => ['addUserOption' => 'cpu-quota-percent', 'addUserLegacyIndex' => 14, 'userConfigIndex' => 11, 'usage' => '--cpu-quota-percent=PERCENT|infinity', 'parameter' => 'CPU_QUOTA_PERCENT', 'description' => 'CPU quota percent; use infinity to remove the limit.', 'parse' => 'string', 'default' => 0, 'persist' => true],
+        'ioLatencyMs' => ['addUserOption' => 'io-latency-ms', 'addUserLegacyIndex' => 15, 'userConfigIndex' => 13, 'usage' => '--io-latency-ms=MS', 'parameter' => 'IO_LATENCY_MS', 'description' => 'IODeviceLatencyTargetSec target in milliseconds; defaults to the /home backing device.', 'parse' => 'int', 'default' => 0, 'persist' => true, 'cgroupFlag' => '--io-latency-ms='],
+        'ioCostQos' => ['addUserOption' => 'io-cost-qos', 'addUserLegacyIndex' => 16, 'userConfigIndex' => 14, 'usage' => '--io-cost-qos=SETTING', 'parameter' => 'IO_COST_QOS', 'description' => 'io.cost.qos nested keys; defaults to the /home backing device major:minor.', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-cost-qos='],
+        'ioCostModel' => ['addUserOption' => 'io-cost-model', 'addUserLegacyIndex' => 17, 'userConfigIndex' => 15, 'usage' => '--io-cost-model=SETTING', 'parameter' => 'IO_COST_MODEL', 'description' => 'io.cost.model nested keys; defaults to the /home backing device major:minor.', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-cost-model='],
     ];
 }
 
@@ -176,67 +176,20 @@ function pmssUserConfigCliBuildCgroupResourceArgs(array $user): array
 /** @return array<string,array<string,string>> Human-facing descriptions for shared resource knobs. */
 function pmssUserConfigCliResourceHelpSpecs(): array
 {
-    return [
-        'trafficLimit' => [
-            'parameter' => 'TRAFFIC_LIMIT_GB',
-            'description' => 'Monthly traffic quota in GiB.',
-        ],
-        'iopsLimit' => [
-            'parameter' => 'IOPS_LIMIT',
-            'description' => 'Monthly combined read+write I/O operations budget.',
-        ],
-        'trafficCapMbit' => [
-            'parameter' => 'TRAFFIC_CAP_MBIT',
-            'description' => 'Traffic shaper ceiling in Mbit/s; 0 disables shaping.',
-        ],
-        'CPUWeight' => [
-            'parameter' => 'CPUWEIGHT',
-            'description' => 'systemd CPUWeight; systemd expects 1-10000.',
-        ],
-        'IOWeight' => [
-            'parameter' => 'IOWEIGHT',
-            'description' => 'systemd IOWeight; systemd expects 1-10000.',
-        ],
-        'IOReadBW' => [
-            'parameter' => 'IO_READ_BW',
-            'description' => 'Read bandwidth cap in /dev/DEVICE:RATE form.',
-        ],
-        'IOWriteBW' => [
-            'parameter' => 'IO_WRITE_BW',
-            'description' => 'Write bandwidth cap in /dev/DEVICE:RATE form.',
-        ],
-        'IOReadIOPS' => [
-            'parameter' => 'IO_READ_IOPS',
-            'description' => 'Read IOPS cap in /dev/DEVICE:IOPS form.',
-        ],
-        'IOWriteIOPS' => [
-            'parameter' => 'IO_WRITE_IOPS',
-            'description' => 'Write IOPS cap in /dev/DEVICE:IOPS form.',
-        ],
-        'cpuQuotaPercent' => [
-            'parameter' => 'CPU_QUOTA_PERCENT',
-            'description' => 'CPU quota percent; use infinity to remove the limit.',
-        ],
-        'ioLatencyMs' => [
-            'parameter' => 'IO_LATENCY_MS',
-            'description' => 'IODeviceLatencyTargetSec target in milliseconds; defaults to the /home backing device.',
-        ],
-        'ioCostQos' => [
-            'parameter' => 'IO_COST_QOS',
-            'description' => 'io.cost.qos nested keys; defaults to the /home backing device major:minor.',
-        ],
-        'ioCostModel' => [
-            'parameter' => 'IO_COST_MODEL',
-            'description' => 'io.cost.model nested keys; defaults to the /home backing device major:minor.',
-        ],
-    ];
+    $helpSpecs = [];
+    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
+        $helpSpecs[$key] = [
+            'parameter' => $spec['parameter'],
+            'description' => $spec['description'],
+        ];
+    }
+    return $helpSpecs;
 }
 
 /** Render the canonical userConfig.php help output. */
 function pmssUserConfigCliUsage(): string
 {
     $useColor = pmssCliHelpSupportsColor();
-    $resourceHelp = pmssUserConfigCliResourceHelpSpecs();
     $resourceSpecs = pmssUserConfigCliResourceSpecs();
     $derivedDefault = pmssCliHelpDim(' (default: auto-derived from RAM when omitted)', $useColor);
     $unchangedDefault = pmssCliHelpDim(' (default: leave current slice policy unchanged)', $useColor);
@@ -258,13 +211,13 @@ function pmssUserConfigCliUsage(): string
     ];
 
     foreach (['trafficLimit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'] as $key) {
-        $lines[] = pmssCliHelpLine($resourceHelp[$key]['parameter'], $resourceHelp[$key]['description'].($resourceDescriptionSuffixes[$key] ?? ''));
+        $lines[] = pmssCliHelpLine($resourceSpecs[$key]['parameter'], $resourceSpecs[$key]['description'].($resourceDescriptionSuffixes[$key] ?? ''));
     }
 
     $lines[] = '';
     $lines[] = pmssCliHelpHeading('Named Options', $useColor);
     foreach (['trafficLimit', 'iopsLimit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'] as $key) {
-        $lines[] = pmssCliHelpLine($resourceSpecs[$key]['usage'], $resourceHelp[$key]['description'].($resourceDescriptionSuffixes[$key] ?? ''));
+        $lines[] = pmssCliHelpLine($resourceSpecs[$key]['usage'], $resourceSpecs[$key]['description'].($resourceDescriptionSuffixes[$key] ?? ''));
     }
     $lines[] = pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.');
     $lines[] = pmssCliHelpLine('--welcome-message=HTML', 'Set or clear ~/.config/welcome-message.html.');

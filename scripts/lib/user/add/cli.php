@@ -20,7 +20,6 @@ function pmssAddUserCliUsage(): string
 {
     $useColor = pmssCliHelpSupportsColor();
     $resourceSpecs = pmssUserConfigCliResourceSpecs();
-    $resourceHelp = pmssUserConfigCliResourceHelpSpecs();
     $derivedDefault = pmssCliHelpDim(' (default: auto-derived from RAM when omitted)', $useColor);
     $lines = [
         pmssCliHelpHeading('Usage', $useColor),
@@ -33,8 +32,8 @@ function pmssAddUserCliUsage(): string
         pmssCliHelpLine('PASSWORD', 'Initial password; use rand to generate one automatically.'),
         pmssCliHelpLine('RAM_MiB', 'Account RAM target in MiB; forwarded as MemoryHigh with a 250 MiB floor.'),
         pmssCliHelpLine('DISK_QUOTA_GiB', 'Disk quota in GiB.'),
-        pmssCliHelpLine($resourceHelp['trafficLimit']['parameter'], $resourceHelp['trafficLimit']['description']),
-        pmssCliHelpLine($resourceHelp['trafficCapMbit']['parameter'], $resourceHelp['trafficCapMbit']['description']),
+        pmssCliHelpLine($resourceSpecs['trafficLimit']['parameter'], $resourceSpecs['trafficLimit']['description']),
+        pmssCliHelpLine($resourceSpecs['trafficCapMbit']['parameter'], $resourceSpecs['trafficCapMbit']['description']),
         pmssCliHelpLine('UPLOAD_THROTTLE_KIB', 'Torrent upload throttle in KiB/s; 0 removes it.'),
         '',
         pmssCliHelpHeading('Named Options', $useColor),
@@ -42,14 +41,14 @@ function pmssAddUserCliUsage(): string
         pmssCliHelpLine('--password=PASSWORD', 'Same as the second positional password.'),
         pmssCliHelpLine('--ram-mib=RAM_MiB', 'Same as the RAM positional argument.'),
         pmssCliHelpLine('--disk-quota-gib=DISK_QUOTA_GiB', 'Same as the disk quota positional argument.'),
-        pmssCliHelpLine($resourceSpecs['trafficLimit']['usage'], $resourceHelp['trafficLimit']['description']),
-        pmssCliHelpLine($resourceSpecs['iopsLimit']['usage'], $resourceHelp['iopsLimit']['description']),
-        pmssCliHelpLine($resourceSpecs['trafficCapMbit']['usage'], $resourceHelp['trafficCapMbit']['description']),
+        pmssCliHelpLine($resourceSpecs['trafficLimit']['usage'], $resourceSpecs['trafficLimit']['description']),
+        pmssCliHelpLine($resourceSpecs['iopsLimit']['usage'], $resourceSpecs['iopsLimit']['description']),
+        pmssCliHelpLine($resourceSpecs['trafficCapMbit']['usage'], $resourceSpecs['trafficCapMbit']['description']),
         pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
     ];
     foreach (['CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'] as $key) {
         $suffix = in_array($key, ['CPUWeight', 'IOWeight'], true) ? $derivedDefault : '';
-        $lines[] = pmssCliHelpLine($resourceSpecs[$key]['usage'], $resourceHelp[$key]['description'].$suffix);
+        $lines[] = pmssCliHelpLine($resourceSpecs[$key]['usage'], $resourceSpecs[$key]['description'].$suffix);
     }
     $lines = array_merge($lines, [
         pmssCliHelpLine('--docker-enabled=true|false', 'Persist the initial rootless Docker policy.'),
