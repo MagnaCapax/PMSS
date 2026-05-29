@@ -39,6 +39,23 @@ class ManagedUsersSelectionTest extends TestCase
         $this->assertEquals(['user1', 'user2'], $result['users']);
     }
 
+    public function testListManagedUsersResultFailsClosedOnDiagnosticOutput(): void
+    {
+        $this->writeListUsersScript("echo \"PHP Fatal error: Uncaught Error: missing dependency\\nStack trace:\\n#0 /scripts/listUsers.php(1): demo()\\nuser1\\n\";");
+
+        $result = \pmssListManagedUsersResult($this->listUsersScript);
+
+        $this->assertEquals(1, $result['exitCode']);
+        $this->assertEquals([], $result['users']);
+    }
+
+    public function testListManagedUsersReturnsEmptyListOnDiagnosticOutput(): void
+    {
+        $this->writeListUsersScript("echo \"Warning: require_once(/scripts/lib/users.php): Failed opening required\\nuser1\\n\";");
+
+        $this->assertEquals([], \pmssListManagedUsers($this->listUsersScript));
+    }
+
     public function testManagedUsersSelectFromListRejectsInvalidRawUsernamesBeforeNormalizing(): void
     {
         $selection = \pmssManagedUsersSelectFromList([' user1 ', 'INVALID', 'user1', 'user2']);

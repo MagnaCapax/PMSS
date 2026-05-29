@@ -22,6 +22,28 @@ function pmssManagedUsersNormalizeList(array $rawUsers): array
     return array_keys($users);
 }
 
+/** Return true when listUsers output contains runtime diagnostics, not only data. */
+function pmssManagedUsersOutputHasDiagnostics(array $rawUsers): bool
+{
+    foreach ($rawUsers as $rawUser) {
+        $line = trim((string) $rawUser);
+        if ($line === '') {
+            continue;
+        }
+        if (preg_match('/^(?:PHP )?(?:Fatal error|Parse error|Warning|Notice|Deprecated|Recoverable fatal error):/i', $line) === 1) {
+            return true;
+        }
+        if (preg_match('/^(?:Stack trace:|#[0-9]+\s|thrown in )/i', $line) === 1) {
+            return true;
+        }
+        if (stripos($line, 'Uncaught ') !== false || stripos($line, 'Failed opening required') !== false) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /** Return validated managed usernames discovered from local home/account state. */
 function pmssManagedHomeUsersList(bool $sort = false): array
 {
@@ -41,6 +63,9 @@ function pmssListManagedUsersResult(string $command = '/scripts/listUsers.php'):
         $command = trim($override);
     }
     exec(escapeshellarg($command), $lines, $exitCode);
+    if ($exitCode === 0 && pmssManagedUsersOutputHasDiagnostics($lines)) {
+        return array('exitCode' => 1, 'users' => array());
+    }
     return array('exitCode' => $exitCode, 'users' => pmssManagedUsersNormalizeList($lines));
 }
 
