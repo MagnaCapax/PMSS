@@ -102,8 +102,8 @@ function pmssCheckRtorrentStart(string $user, string $startMarkerState, bool $de
     $rc = 0;
     @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
     pmssCheckRtorrentLog("startRtorrent {$user} completed (rc={$rc})", true, $debug);
-    @file_put_contents('/tmp/.pmss-rtorrent-restart-'.$user, (string) time(), LOCK_EX);
-    @file_put_contents($startMarkerState, (string) time(), LOCK_EX);
+    rtorrentProcessWriteStateFile('/tmp/.pmss-rtorrent-restart-'.$user, (string) time());
+    rtorrentProcessWriteStateFile($startMarkerState, (string) time());
 }
 
 // Delay starts shortly after reboot so many users do not hit storage at once.
@@ -294,7 +294,7 @@ foreach ($users as $user) {
                 && !is_file($sessionResetState)
             ) {
                 if (rtorrentProcessResetSessionDirectory($home, $user, $logCallback)) {
-                    @file_put_contents($sessionResetState, (string) time(), LOCK_EX);
+                    rtorrentProcessWriteStateFile($sessionResetState, (string) time());
                     pmssCheckRtorrentLogBoth(
                         $user,
                         'persistent start failure recovery: reset session directory',
@@ -304,10 +304,9 @@ foreach ($users as $user) {
             }
 
             if ($persistentFailureCount >= PMSS_RTORRENT_START_FAILURE_ESCALATE) {
-                @file_put_contents(
+                rtorrentProcessWriteStateFile(
                     $escalationState,
-                    json_encode(['timestamp' => time(), 'user' => $user, 'count' => $persistentFailureCount]),
-                    LOCK_EX
+                    (string) json_encode(['timestamp' => time(), 'user' => $user, 'count' => $persistentFailureCount])
                 );
                 pmssCheckRtorrentLogBoth(
                     $user,
@@ -455,7 +454,7 @@ foreach ($users as $user) {
         // Stale - confirm the process is still gone before restarting.
         $rtorrentPids = rtorrentProcessPgrepExact($user, 'rtorrent');
         if (!empty($rtorrentPids)) {
-            @file_put_contents($unresponsiveState, (string) time(), LOCK_EX);
+            rtorrentProcessWriteStateFile($unresponsiveState, (string) time());
             pmssCheckRtorrentLogBoth(
                 $user,
                 'SCGI unresponsive but rtorrent still alive (pids='.implode(',', $rtorrentPids).'); extending grace',
