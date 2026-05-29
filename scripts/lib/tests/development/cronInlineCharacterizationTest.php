@@ -81,7 +81,7 @@ class CronInlineCharacterizationTest extends TestCase
             'pmssUserWatchdogRestartProcessesIf(',
             'pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 15);',
             'pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 9);',
-            'pmssUserWatchdogEnsureServices($thisUser, [[\'processName\' => \'lighttpd\'',
+            "pmssUserWatchdogServiceSpec('lighttpd'",
             'lighttpd disabled by config; terminating web stack',
             'Killing (if any) lighttpd for user: {$thisUser}',
             "'lighttpd restart requested'",
@@ -93,6 +93,7 @@ class CronInlineCharacterizationTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/watchdog.php', [
             'function pmssUserWatchdogRestartProcessesIf(',
+            'function pmssUserWatchdogServiceSpec(',
             'function pmssUserWatchdogEnsureServices(',
             'function pmssUserWatchdogRunService(',
         ]);

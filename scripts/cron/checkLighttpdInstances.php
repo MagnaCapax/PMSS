@@ -96,5 +96,5 @@ foreach($users AS $thisUser) {
             usleep(50000);
         }
     );
-    pmssUserWatchdogEnsureServices($thisUser, [['processName' => 'lighttpd', 'command' => '/scripts/startLighttpd ' . $thisUser, 'userLogMessage' => 'lighttpd start requested']], ['lighttpd' => $lighttpdRunning]);
+    pmssUserWatchdogEnsureServices($thisUser, [pmssUserWatchdogServiceSpec('lighttpd', '/scripts/startLighttpd ' . $thisUser, 'lighttpd start requested')], ['lighttpd' => $lighttpdRunning]);
 }

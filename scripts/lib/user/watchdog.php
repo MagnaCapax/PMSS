@@ -119,6 +119,8 @@ function pmssUserWatchdogRestartProcessesIf(string $username, bool $running, arr
     return false;
 }
 
+function pmssUserWatchdogServiceSpec(string $processName, $command, string $userLogMessage, string $serviceLabel = ''): array { return $serviceLabel === '' ? ['processName' => $processName, 'command' => $command, 'userLogMessage' => $userLogMessage] : ['processName' => $processName, 'serviceLabel' => $serviceLabel, 'command' => $command, 'userLogMessage' => $userLogMessage]; }
+
 /** @param array<int,array<string,mixed>> $serviceSpecs @param array<string,bool> $runningStates @return array<string,bool> */
 function pmssUserWatchdogEnsureServices(string $username, array $serviceSpecs, array $runningStates = array()): array
 {

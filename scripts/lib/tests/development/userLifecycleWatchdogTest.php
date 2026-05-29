@@ -91,12 +91,7 @@ class UserLifecycleWatchdogTest extends TestCase
 
         ob_start();
         $states = pmssUserWatchdogEnsureServices('alice', [
-            [
-                'processName' => 'demo',
-                'serviceLabel' => 'Demo',
-                'command' => 'touch '.escapeshellarg($marker),
-                'userLogMessage' => 'demo start requested',
-            ],
+            pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'demo start requested', 'Demo'),
         ], ['demo' => false]);
         ob_end_clean();
 
@@ -111,12 +106,7 @@ class UserLifecycleWatchdogTest extends TestCase
 
         ob_start();
         $states = pmssUserWatchdogEnsureServices('alice', [
-            [
-                'processName' => 'demo',
-                'serviceLabel' => 'Demo',
-                'command' => 'touch '.escapeshellarg($marker),
-                'userLogMessage' => 'demo start requested',
-            ],
+            pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'demo start requested', 'Demo'),
         ], ['demo' => true]);
         ob_end_clean();
 
@@ -131,14 +121,9 @@ class UserLifecycleWatchdogTest extends TestCase
 
         ob_start();
         pmssUserWatchdogEnsureServices('alice', [
-            [
-                'processName' => 'demo',
-                'serviceLabel' => 'Demo',
-                'command' => static function () use ($marker): string {
-                    return 'touch '.escapeshellarg($marker);
-                },
-                'userLogMessage' => 'demo start requested',
-            ],
+            pmssUserWatchdogServiceSpec('demo', static function () use ($marker): string {
+                return 'touch '.escapeshellarg($marker);
+            }, 'demo start requested', 'Demo'),
         ], ['demo' => false]);
         ob_end_clean();
 
@@ -152,12 +137,7 @@ class UserLifecycleWatchdogTest extends TestCase
 
         ob_start();
         $states = pmssUserWatchdogEnsureServices('bad-user', [
-            [
-                'processName' => 'demo',
-                'serviceLabel' => 'Demo',
-                'command' => 'touch '.escapeshellarg($marker),
-                'userLogMessage' => 'demo start requested',
-            ],
+            pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'demo start requested', 'Demo'),
         ], ['demo' => false]);
         ob_end_clean();
 
@@ -186,14 +166,11 @@ class UserLifecycleWatchdogTest extends TestCase
                 'demoEnable',
                 ['demo'],
                 'demo stopped due to suspension',
-                [[
-                    'processName' => 'demo',
-                    'serviceLabel' => 'Demo',
-                    'command' => static function (string $username) use ($marker): string {
+                [
+                    pmssUserWatchdogServiceSpec('demo', static function (string $username) use ($marker): string {
                         return 'echo '.escapeshellarg($username).' >> '.escapeshellarg($marker);
-                    },
-                    'userLogMessage' => 'demo start requested',
-                ]],
+                    }, 'demo start requested', 'Demo'),
+                ],
                 static function (string $username): array {
                     return ['demo' => $username === 'cara'];
                 },
