@@ -16,15 +16,51 @@
  */
 
 require_once __DIR__.'/../lib/runtime.php';
+require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 require_once __DIR__.'/../lib/user/selection.php';
+
+/**
+ * Confirm a GUI repair target stays inside the expected home directory.
+ */
+function pmssCheckGuiUserPathIsSafe(string $path, string $homeDir, bool $directoryTarget): bool
+{
+    $homeDir = rtrim($homeDir, '/');
+    if ($homeDir === '' || !pmssPathTargetIsSafe($homeDir, true)) {
+        return false;
+    }
+
+    return pmssPathTargetIsSafe($path, $directoryTarget, true)
+        && pmssPathWithinRootIsSafe(dirname($path), $homeDir, true);
+}
+
+/**
+ * Apply ownership metadata for a repaired user path.
+ */
+function pmssCheckGuiApplyOwnership(string $path, string $user, callable $log): bool
+{
+    if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
+        if (!@chown($path, $user) || !@chgrp($path, $user)) {
+            $log("Skipping {$user}: unable to apply ownership to {$path}");
+            return false;
+        }
+    }
+
+    return true;
+}
 
 /**
  * Ensure a required user directory exists with expected ownership.
  *
  * Returns false only when a conflicting non-directory path blocks recovery.
  */
-function pmssCheckGuiEnsureUserDirectory(string $directory, string $user, string $label, callable $log): bool
+function pmssCheckGuiEnsureUserDirectory(string $directory, string $user, string $label, callable $log, string $homeDir = ''): bool
 {
+    $homeDir = $homeDir === '' ? dirname($directory) : rtrim($homeDir, '/');
+    if (!pmssCheckGuiUserPathIsSafe($directory, $homeDir, true)) {
+        $log("Skipping {$user}: unsafe {$label} directory target {$directory}");
+        return false;
+    }
+
     if (is_dir($directory)) {
         return true;
     }
@@ -35,9 +71,17 @@ function pmssCheckGuiEnsureUserDirectory(string $directory, string $user, string
     }
 
     $log("Restoring {$label} directory for user {$user}");
-    runCommand('mkdir -p '.escapeshellarg($directory), false, $log);
-    runCommand('chown '.escapeshellarg($user.':'.$user).' '.escapeshellarg($directory), false, $log);
-    runCommand('chmod 0755 '.escapeshellarg($directory), false, $log);
+    if (!@mkdir($directory, 0755, true) && !is_dir($directory)) {
+        $log("Skipping {$user}: unable to create {$label} directory at {$directory}");
+        return false;
+    }
+    if (!@chmod($directory, 0755)) {
+        $log("Skipping {$user}: unable to apply mode to {$label} directory at {$directory}");
+        return false;
+    }
+    if (!pmssCheckGuiApplyOwnership($directory, $user, $log)) {
+        return false;
+    }
 
     return is_dir($directory);
 }
@@ -45,53 +89,82 @@ function pmssCheckGuiEnsureUserDirectory(string $directory, string $user, string
 /**
  * Restore the user's GUI entrypoint when it is missing or empty.
  */
-function pmssCheckGuiRestoreUserIndex(string $targetFile, string $sourceFile, string $user, callable $log): void
+function pmssCheckGuiRestoreUserIndex(string $targetFile, string $sourceFile, string $user, callable $log, string $homeDir = ''): bool
 {
+    $homeDir = $homeDir === '' ? dirname(dirname($targetFile)) : rtrim($homeDir, '/');
+    if (!pmssCheckGuiUserPathIsSafe($targetFile, $homeDir, false)) {
+        $log("Skipping {$user}: unsafe index.php target {$targetFile}");
+        return false;
+    }
+
     if (is_file($targetFile) && filesize($targetFile) > 0) {
-        return;
+        return true;
     }
 
     if (file_exists($targetFile) && !is_file($targetFile)) {
         $log("Skipping {$user}: expected index.php file but found non-file at {$targetFile}");
-        return;
+        return false;
     }
 
-    if (!is_file($sourceFile) || filesize($sourceFile) === 0) {
+    $sourceSize = @filesize($sourceFile);
+    if (
+        !pmssPathTargetIsSafe($sourceFile, false, true)
+        || !is_file($sourceFile)
+        || is_link($sourceFile)
+        || !is_int($sourceSize)
+        || $sourceSize <= 0
+    ) {
         $log("Cannot restore index.php for {$user}: missing skeleton source {$sourceFile}");
-        return;
+        return false;
     }
 
     $log("Restoring index.php for user {$user}");
-    runCommand('cp '.escapeshellarg($sourceFile).' '.escapeshellarg($targetFile), false, $log);
-    runCommand('chown '.escapeshellarg($user.':'.$user).' '.escapeshellarg($targetFile), false, $log);
+    if (!@copy($sourceFile, $targetFile)) {
+        $log("Skipping {$user}: unable to copy index.php to {$targetFile}");
+        return false;
+    }
+
+    return pmssCheckGuiApplyOwnership($targetFile, $user, $log);
 }
 
-$logger = new Logger(__FILE__);
-$log = [$logger, 'msg'];
-$skeletonIndex = '/etc/skel/www/index.php';
+/**
+ * Run the GUI watchdog for every managed home user.
+ */
+function pmssCheckGuiMain(array $argv): int
+{
+    $logger = new Logger(__FILE__);
+    $log = [$logger, 'msg'];
+    $skeletonIndex = '/etc/skel/www/index.php';
 
-foreach (pmssManagedHomeUsersList() as $thisUser) {
-    // User suspended check (skip empty usernames too).
-    if (empty($thisUser) || file_exists("/home/{$thisUser}/www-disabled")) continue;
+    foreach (pmssManagedHomeUsersList() as $thisUser) {
+        // User suspended check (skip empty usernames too).
+        if (empty($thisUser) || file_exists("/home/{$thisUser}/www-disabled")) continue;
 
-    $homeDir = "/home/{$thisUser}";
-    $wwwDir = $homeDir.'/www';
-    $dataDir = $homeDir.'/data';
+        $homeDir = "/home/{$thisUser}";
+        $wwwDir = $homeDir.'/www';
+        $dataDir = $homeDir.'/data';
 
-    if (!is_dir($homeDir)) {
-        $logger->msg("Skipping {$thisUser}: home directory missing at {$homeDir}");
-        continue;
+        if (!is_dir($homeDir) || is_link($homeDir)) {
+            $logger->msg("Skipping {$thisUser}: home directory missing or unsafe at {$homeDir}");
+            continue;
+        }
+
+        // Recreate core userspace paths if users accidentally remove them.
+        if (!pmssCheckGuiEnsureUserDirectory($wwwDir, $thisUser, 'www', $log, $homeDir)) {
+            continue;
+        }
+        pmssCheckGuiEnsureUserDirectory($dataDir, $thisUser, 'data', $log, $homeDir);
+
+        // Keep a functioning GUI entrypoint for each non-suspended account.
+        pmssCheckGuiRestoreUserIndex($wwwDir.'/index.php', $skeletonIndex, $thisUser, $log, $homeDir);
+
+        #TODO Check responsiveness etc. other common stuff as well.
     }
 
-	// Recreate core userspace paths if users accidentally remove them.
-    if (!pmssCheckGuiEnsureUserDirectory($wwwDir, $thisUser, 'www', $log)) {
-        continue;
-    }
-    pmssCheckGuiEnsureUserDirectory($dataDir, $thisUser, 'data', $log);
+    return 0;
+}
 
-    // Keep a functioning GUI entrypoint for each non-suspended account.
-    pmssCheckGuiRestoreUserIndex($wwwDir.'/index.php', $skeletonIndex, $thisUser, $log);
-
-	#TODO Check responsiveness etc. other common stuff as well.
-
+$pmssCheckGuiScript = $_SERVER['SCRIPT_FILENAME'] ?? '';
+if ($pmssCheckGuiScript !== '' && realpath($pmssCheckGuiScript) === realpath(__FILE__)) {
+    exit(pmssCheckGuiMain($argv ?? []));
 }
