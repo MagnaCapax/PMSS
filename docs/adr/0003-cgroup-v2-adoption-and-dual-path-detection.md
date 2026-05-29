@@ -73,20 +73,3 @@ Production systems span Debian 10/11/12 with a mix of kernel capabilities. Debia
 
 ## Scope
 This ADR governs per‑user resource control (cgroups) via systemd slices and related tooling, including detection, policy, templates, utilities, lifecycle hooks, and CI lints. It does not cover application‑level QoS or network shaping beyond notes and TODOs.
-
-## 2026‑05‑29 Update: Production GRUB pin (v1 only in production)
-
-Production deployment intentionally pins cgroup v1 on every host regardless of Debian version, via `systemd.unified_cgroup_hierarchy=0` in `/etc/default/grub` (see `docs/install.md`). The pin exists for:
-
-- Rootless Docker compatibility on the supported configurations (the `docker-ce-rootless-extras` chain expects v1 controller hierarchy).
-- `hidepid=2` interaction with the namespace overlay that v2 reshuffles.
-
-Consequence: the dual-path detection and v2 templates documented above remain in the codebase as defensive infrastructure (so the software is portable to v2 if the GRUB pin is ever removed), but the deployed fleet has NO v2 hosts and NO traffic on v2 code paths. The detection is correct; the deployed-population for the v2 branches is empty.
-
-Rule for downstream changes:
-
-- Bugfixes to defensive v2 code paths are permitted (defense-in-depth retained).
-- NEW feature work that targets cgroup-v2 hosts (sibling writers, v2-mode appliers, v2 `io.weight` handlers, v2-specific bonus logic, etc.) is forbidden without explicit operator override that removes the GRUB pin. The target host population is empty; such work ships irrelevant code that the standard verification suite cannot catch as misdirected.
-- Issue-generating and implementing agents MUST verify the host population is non-empty before building features targeting any subset of the fleet keyed on cgroup version.
-
-This update SUPERSEDES the "v2 adoption" framing of the rest of this ADR for deployment-state purposes. The "v2 adoption" framing remains accurate for code-portability purposes only.
