@@ -17,14 +17,13 @@ class UserMaintenanceDockerModuleTest extends TestCase
 
     public function testUserMaintenanceOnlyOrchestratesDockerModule(): void
     {
-        $maintenance = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
-        $docker = $this->pmssReadRepoFile('scripts/lib/update/users/docker.php');
+        $dockerFunctions = array_map(static function (string $function): string {
+            return 'function '.$function.'(';
+        }, ['pmssEnsureLingerAndDocker', 'pmssEnsureRootlessDockerInstalled', 'pmssEnsureDockerDependencies']);
 
-        $this->assertStringContainsString("require_once __DIR__.'/users/docker.php';", $maintenance);
-        foreach (['pmssEnsureLingerAndDocker', 'pmssEnsureRootlessDockerInstalled', 'pmssEnsureDockerDependencies'] as $function) {
-            $this->assertStringContainsString('function '.$function.'(', $docker);
-            $this->pmssAssertStringNotContainsString('function '.$function.'(', $maintenance);
-        }
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/userMaintenance.php', "require_once __DIR__.'/users/docker.php';");
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/docker.php', $dockerFunctions);
+        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/update/userMaintenance.php', $dockerFunctions);
     }
 
     private function dockerUnitExecBinaryCases(): array

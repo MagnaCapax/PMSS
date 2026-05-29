@@ -18,7 +18,10 @@ class FuseOverlayfsSupportTest extends TestCase
     public function testUserMaintenanceEnforcesFuseOverlayfsBeyondDebian11(): void
     {
         $this->pmssAssertRepoFileContainsString('scripts/lib/update/userMaintenance.php', "require_once __DIR__.'/users/docker.php';");
-        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/docker.php', 'fuse-overlayfs', 'Expected Docker maintenance fuse-overlayfs logic');
-        $this->pmssAssertRepoFileNotContainsString('scripts/lib/update/users/docker.php', 'if ($distroVersion >= 12)', 'Expected fuse-overlayfs enforcement to apply on Debian 12+ when available');
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/docker.php', [
+            'fuse-overlayfs',
+        ], [
+            'if ($distroVersion >= 12)' => 'Expected fuse-overlayfs enforcement to apply on Debian 12+ when available',
+        ]);
     }
 }

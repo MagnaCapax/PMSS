@@ -7,22 +7,16 @@ class UserTrafficRemoteCompatibilityTest extends TestCase
 {
     public function testRemoteUserTrafficUsesContractSafeUserEnumerationPath(): void
     {
-        $path = 'scripts/util/remote/userTraffic.php';
-        $this->pmssAssertRepoFileContainsAllStrings(
-            $path,
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'scripts/util/remote/userTraffic.php',
             [
                 'pmssManagedHomeUsersList()',
                 'serialize($userTrafficData)',
             ],
-            'Remote userTraffic callback must keep contract-safe user discovery and serialized payload output'
-        );
-        $this->pmssAssertRepoFileNotContainsStrings(
-            $path,
             [
-                "pmssListManagedUsers('/scripts/listUsers.php')",
-                "PMSS_SKIP_HOME_MOUNT_CHECK=1",
-            ],
-            'Remote userTraffic callback must not rely on listUsers mount-gate bypass path'
+                "pmssListManagedUsers('/scripts/listUsers.php')" => 'Remote userTraffic callback must not rely on listUsers mount-gate bypass path',
+                'PMSS_SKIP_HOME_MOUNT_CHECK=1' => 'Remote userTraffic callback must not rely on listUsers mount-gate bypass path',
+            ]
         );
     }
 

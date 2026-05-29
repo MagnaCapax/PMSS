@@ -42,8 +42,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUpdateStep2OwnsWebStackConfiguration(): void
     {
-        $modulePath = dirname(__DIR__, 4).'/scripts/lib/update/webStack.php';
-        $this->assertTrue(!is_file($modulePath), 'Expected one-call update/webStack.php helper file to be removed');
+        $this->assertTrue(!is_file($this->pmssRepoPath('scripts/lib/update/webStack.php')), 'Expected one-call update/webStack.php helper file to be removed');
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/update-step2.php', [
             'function pmssConfigureWebStack(): void',
             "runStep('Stopping nginx prior to configuration refresh'",
@@ -220,23 +219,17 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testStorageToolsShareLsblkDiskInventoryParser(): void
     {
-        $snapshotSrc = $this->pmssReadRepoFile('scripts/util/storageHealthSnapshot.php');
-        $benchmarkSrc = $this->pmssReadRepoFile('scripts/util/storageBenchmark.php');
-        $commonSrc = $this->pmssReadRepoFile('scripts/lib/storageHealth/common.php');
-        $libraryPath = dirname(__DIR__, 4).'/scripts/lib/storageHealth/disks.php';
-        $facadeSrc = $this->pmssReadRepoFile('scripts/lib/storageHealth.php');
         $symbol = 'pmssStorageHealthDisk'.'InventoryFromLsblk';
 
-        $this->assertTrue(!is_file($libraryPath), 'Expected one-call storageHealth/disks.php helper file to be removed');
-        $this->assertStringContainsString('function '.$symbol.'(', $commonSrc);
-        $this->assertStringContainsString($symbol.'((string) shell_exec', $snapshotSrc);
-        $this->assertStringContainsString($symbol.'((string) shell_exec', $benchmarkSrc);
-        $this->pmssAssertStringNotContainsString("preg_split('/\\r?\\n/', trim((string) \$lsblkOut))", $snapshotSrc, 'snapshot should not keep a local lsblk parser');
-        $this->pmssAssertStringNotContainsString(
-            "'disks'",
-            $facadeSrc,
-            'storageHealth.php should stop requiring the removed disks.php module'
-        );
+        $this->assertTrue(!is_file($this->pmssRepoPath('scripts/lib/storageHealth/disks.php')), 'Expected one-call storageHealth/disks.php helper file to be removed');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/storageHealth/common.php', 'function '.$symbol.'(');
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/storageHealthSnapshot.php', [
+            $symbol.'((string) shell_exec',
+        ], [
+            "preg_split('/\\r?\\n/', trim((string) \$lsblkOut))" => 'snapshot should not keep a local lsblk parser',
+        ]);
+        $this->pmssAssertRepoFileContainsString('scripts/util/storageBenchmark.php', $symbol.'((string) shell_exec');
+        $this->pmssAssertRepoFileNotContainsString('scripts/lib/storageHealth.php', "'disks'", 'storageHealth.php should stop requiring the removed disks.php module');
     }
 
     public function testStorageHealthSnapshotKeepsJsonAppendsInline(): void
@@ -280,10 +273,9 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testStorageHealthFacadeDropsStandaloneExecModule(): void
     {
-        $libraryPath = dirname(__DIR__, 4).'/scripts/lib/storageHealth/exec.php';
         $symbol = 'pmssStorageHealthExec'.'Capture';
 
-        $this->assertTrue(!is_file($libraryPath), 'Expected one-call storageHealth/exec.php helper file to be removed');
+        $this->assertTrue(!is_file($this->pmssRepoPath('scripts/lib/storageHealth/exec.php')), 'Expected one-call storageHealth/exec.php helper file to be removed');
         $this->pmssAssertRepoFileNotContainsString('scripts/lib/storageHealth.php', "'exec'", 'storageHealth.php should stop requiring the removed exec.php module');
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/storageHealth/common.php', [
             'function '.$symbol.'(',
@@ -293,9 +285,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testResourceSnapshotCronOwnsSnapshotLoop(): void
     {
-        $libraryPath = dirname(__DIR__, 4).'/scripts/lib/resources/snapshot.php';
         $symbol = 'pmssResource'.'SnapshotRun';
-        $this->assertTrue(!is_file($libraryPath), 'Expected one-call resources snapshot library file to be removed');
+        $this->assertTrue(!is_file($this->pmssRepoPath('scripts/lib/resources/snapshot.php')), 'Expected one-call resources snapshot library file to be removed');
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/resourceSnapshot.php', [
             "require_once __DIR__.'/../lib/resources/log.php';",
             'const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT',
@@ -465,10 +456,9 @@ class UpdateCompressionCharacterizationTest extends TestCase
     public function testUserDomainModulesDoNotCrossRequireEachOther(): void
     {
         foreach (['context', 'http', 'filesystem', 'permissions', 'rutorrent', 'docker'] as $module) {
-            $src = $this->pmssReadRepoFile('scripts/lib/update/users/'.$module.'.php');
-            $this->pmssAssertStringNotContainsString(
+            $this->pmssAssertRepoFileNotContainsString(
+                'scripts/lib/update/users/'.$module.'.php',
                 "require_once __DIR__.'/",
-                $src,
                 $module.'.php should not require sibling domain modules'
             );
         }
@@ -490,51 +480,30 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUserMaintenanceKeepsDirectPhaseSummaryAndSummaryLogging(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
-        $updatePos = strpos($src, 'pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);');
-        $lingerPos = strpos($src, 'pmssEnsureLingerAndDocker($userTrim);');
-        $lighttpdPostCheckPos = strpos($src, "\$postChecks['Checking lighttpd instance'] = '/scripts/cron/checkLighttpdInstances.php';");
-        $postCheckLoopPos = strpos($src, 'foreach ($postChecks as $label => $helperPath)');
-
-        $this->assertStringContainsString('Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)', $src);
-        $this->assertStringContainsString("require_once __DIR__.'/users/docker.php';", $src);
-        $this->assertTrue($updatePos !== false, 'userMaintenance.php should update the user environment directly');
-        $this->assertTrue($lingerPos !== false, 'userMaintenance.php should keep linger wiring in the main per-user loop');
-        $this->assertTrue($lighttpdPostCheckPos !== false, 'userMaintenance.php should keep the per-user lighttpd watchdog post-check');
-        $this->assertTrue($postCheckLoopPos !== false, 'userMaintenance.php should run post-check helpers after environment convergence');
-        $this->assertTrue($lingerPos > $updatePos, 'linger wiring should run after environment convergence');
-        $this->assertTrue($postCheckLoopPos > $updatePos, 'lighttpd post-checks must run after custom.d fragments are written');
-        $this->assertTrue($postCheckLoopPos > $lingerPos, 'lighttpd post-checks should run after linger wiring in the per-user loop');
-        $this->assertStringContainsString("pmssUserLog(\$userTrim, '[WARN] update-step2 user maintenance aborted: '.\$reason);", $src);
-        $this->assertStringContainsString('pmssLogJson([', $src);
-        $this->pmssAssertStringNotContainsString(
-            "function_exists('pmssUpdateUserEnvironment')",
-            $src,
-            'userMaintenance.php should not guard helpers that are required at file load time'
-        );
-        $this->pmssAssertStringNotContainsString(
-            "function_exists('pmssLogJson')",
-            $src,
-            'userMaintenance.php should log its JSON summary directly through the required logging runtime'
-        );
-        $this->pmssAssertStringNotContainsString(
-            "function_exists('pmssUserDockerEnabled')",
-            $src,
-            'userMaintenance.php should call the required Docker config helper directly'
-        );
-        foreach ([
+        $deadGuards = [
             "if (!function_exists('pmssRunAndLog'))",
             "if (!function_exists('pmssUpdateAllUsers'))",
             "if (!function_exists('pmssEnsureLingerAndDocker'))",
             "if (!function_exists('pmssEnsureRootlessDockerInstalled'))",
             "if (!function_exists('pmssEnsureDockerDependencies'))",
-        ] as $deadGuard) {
-            $this->pmssAssertStringNotContainsString(
-                $deadGuard,
-                $src,
-                'userMaintenance.php should not keep dead self-guard wrappers once runtime callers use require_once'
-            );
-        }
+        ];
+
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/update/userMaintenance.php', [
+            'pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);',
+            'pmssEnsureLingerAndDocker($userTrim);',
+            'foreach ($postChecks as $label => $helperPath)',
+        ], 'Missing user-maintenance phase: ', 'User-maintenance phase order changed at: ');
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/userMaintenance.php', [
+            'Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)',
+            "require_once __DIR__.'/users/docker.php';",
+            "\$postChecks['Checking lighttpd instance'] = '/scripts/cron/checkLighttpdInstances.php';",
+            "pmssUserLog(\$userTrim, '[WARN] update-step2 user maintenance aborted: '.\$reason);",
+            'pmssLogJson([',
+        ], array_merge([
+            "function_exists('pmssUpdateUserEnvironment')" => 'userMaintenance.php should not guard helpers that are required at file load time',
+            "function_exists('pmssLogJson')" => 'userMaintenance.php should log its JSON summary directly through the required logging runtime',
+            "function_exists('pmssUserDockerEnabled')" => 'userMaintenance.php should call the required Docker config helper directly',
+        ], array_fill_keys($deadGuards, 'userMaintenance.php should not keep dead self-guard wrappers once runtime callers use require_once')));
     }
 
     public function testDistUpgradeUsesRequiredRepairHelpersDirectly(): void

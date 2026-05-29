@@ -119,15 +119,17 @@ class UpdateAppInstallerContractsTest extends TestCase
     public function testPinnedDownloadInstallersReuseRemoteBinaryHelper(): void
     {
         foreach (['aiToolsInstall.php', 'deluge.php', 'rtorrent.php'] as $installer) {
-            $contents = $this->pmssReadUpdateAppFile($installer);
+            $contents = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/'.$installer, [
+                "require_once __DIR__.'/remoteBinary.php';",
+            ], [
+                "pmssBuildCommand('wget'" => $installer.' should delegate pinned downloads to remoteBinary.php',
+                "@hash_file('sha256'" => $installer.' should delegate checksum verification to remoteBinary.php',
+            ]);
 
-            $this->assertStringContainsString("require_once __DIR__.'/remoteBinary.php';", $contents);
             $this->assertTrue(
                 strpos($contents, 'pmssDownloadPinnedRemoteTempFile(') !== false || strpos($contents, 'pmssFetchPinnedRemoteFile(') !== false,
                 $installer.' should call a remoteBinary.php pinned download helper'
             );
-            $this->pmssAssertStringNotContainsString("pmssBuildCommand('wget'", $contents, $installer.' should delegate pinned downloads to remoteBinary.php');
-            $this->pmssAssertStringNotContainsString("@hash_file('sha256'", $contents, $installer.' should delegate checksum verification to remoteBinary.php');
         }
     }
 
