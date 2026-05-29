@@ -5,11 +5,9 @@ require_once __DIR__.'/../.scriptsInc.php';
 
 pmssFrontendToggleAction(
     '../.qbittorrentEnable',
-    'startQbittorrent',
+    static function () {
+        passthru('zsh -c "qbittorrent-nox -d" >> /dev/null 2>&1 &');
+    },
     'killall -u $(whoami) -9 qbittorrent-nox;',
     'killall -u $(whoami) qbittorrent-nox; sleep 3; killall -u $(whoami) -9 qbittorrent-nox'
 );
-
-function startQbittorrent() {
-    passthru('zsh -c "qbittorrent-nox -d" >> /dev/null 2>&1 &');
-}

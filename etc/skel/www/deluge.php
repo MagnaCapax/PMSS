@@ -5,10 +5,8 @@ require_once __DIR__.'/../.scriptsInc.php';
 
 pmssFrontendToggleAction(
     '../.delugeEnable',
-    'startDeluge',
+    static function () {
+        pmssFrontendShellExec('nohup deluged -l /home/$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');
+    },
     'killall -u $(whoami) -9 deluged; killall -u $(whoami) -9 deluge-web'
 );
-
-function startDeluge() {
-    pmssFrontendShellExec('nohup deluged -l /home/$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');
-}

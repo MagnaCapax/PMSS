@@ -28,34 +28,27 @@ class TorrentPortFrontendTest extends TestCase
         ]);
     }
 
-    public function testApplySkeletonFilesKeepsCleanDelugeFrontendInCustomerTree(): void
+    public function testApplySkeletonFilesKeepsCleanFrontendTogglesInCustomerTree(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/deluge.php');
-        $this->pmssWriteRelativeFile($this->skelDir, 'www/deluge.php', $source);
+        $frontends = [
+            'deluge.php' => ['pmssDelugePortEnsureCurrentUser', '.delugePort.py'],
+            'qbittorrent.php' => ['pmssQbittorrentPortEnsureCurrentUser', '.qbittorrentPort.py'],
+        ];
 
-        \pmssUserApplySkeletonFiles($this->context());
+        foreach ($frontends as $file => $forbidden) {
+            $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/'.$file);
+            $this->pmssWriteRelativeFile($this->skelDir, 'www/'.$file, $source);
+            \pmssUserApplySkeletonFiles($this->context());
 
-        $content = (string) file_get_contents($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/deluge.php'));
-        $this->assertEquals($source, $content);
-        $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $content);
-        $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $content);
-        $this->assertStringNotContainsString('pmssDelugePortEnsureCurrentUser', $content);
-        $this->assertStringNotContainsString('.delugePort.py', $content);
-    }
-
-    public function testApplySkeletonFilesKeepsCleanQbittorrentFrontendInCustomerTree(): void
-    {
-        $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/qbittorrent.php');
-        $this->pmssWriteRelativeFile($this->skelDir, 'www/qbittorrent.php', $source);
-
-        \pmssUserApplySkeletonFiles($this->context());
-
-        $content = (string) file_get_contents($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/qbittorrent.php'));
-        $this->assertEquals($source, $content);
-        $this->assertStringNotContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $content);
-        $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $content);
-        $this->assertStringNotContainsString('pmssQbittorrentPortEnsureCurrentUser', $content);
-        $this->assertStringNotContainsString('.qbittorrentPort.py', $content);
+            $content = (string) file_get_contents($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/'.$file));
+            $this->assertEquals($source, $content);
+            foreach (array_merge([
+                "if (is_readable('/scripts/lib/user/torrentPort.php')) {",
+                "require_once '/scripts/lib/user/torrentPort.php';",
+            ], $forbidden) as $needle) {
+                $this->assertStringNotContainsString($needle, $content);
+            }
+        }
     }
 
     public function testApplySkeletonFilesStopsPropagatingLegacyPythonHelpers(): void
@@ -68,26 +61,21 @@ class TorrentPortFrontendTest extends TestCase
         $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $src);
     }
 
-    public function testShippedDelugeFrontendOmitsOperatorPortHelper(): void
+    public function testShippedTorrentFrontendsOmitOperatorPortHelpers(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/deluge.php');
+        $frontends = [
+            'deluge.php' => ['pmssDelugePortEnsureCurrentUser', '.delugePort.py'],
+            'qbittorrent.php' => ['pmssQbittorrentPortEnsureCurrentUser', '.qbittorrentPort.py'],
+        ];
 
-        $this->assertStringContainsAllStrings(["require_once __DIR__.'/../.scriptsInc.php';", 'pmssFrontendToggleAction('], $src);
-        // ADR 0016 keeps operator-only port helpers out of customer PHP.
-        $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $src);
-        $this->assertStringNotContainsString('pmssDelugePortEnsureCurrentUser', $src);
-        $this->assertStringNotContainsString('.delugePort.py', $src);
-    }
-
-    public function testShippedQbittorrentFrontendOmitsOperatorPortHelper(): void
-    {
-        $src = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/qbittorrent.php');
-
-        $this->assertStringContainsAllStrings(["require_once __DIR__.'/../.scriptsInc.php';", 'pmssFrontendToggleAction('], $src);
-        // ADR 0016: customer PHP no longer require_once'es /scripts/.
-        $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $src);
-        $this->assertStringNotContainsString('pmssQbittorrentPortEnsureCurrentUser', $src);
-        $this->assertStringNotContainsString('.qbittorrentPort.py', $src);
+        foreach ($frontends as $file => $forbidden) {
+            $src = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/'.$file);
+            $this->assertStringContainsAllStrings(["require_once __DIR__.'/../.scriptsInc.php';", 'pmssFrontendToggleAction(', 'static function ()'], $src);
+            // ADR 0016: customer PHP no longer require_once'es /scripts/.
+            foreach (array_merge(["require_once '/scripts/lib/user/torrentPort.php';"], $forbidden) as $needle) {
+                $this->assertStringNotContainsString($needle, $src);
+            }
+        }
     }
 
     public function testApplySkeletonFilesRemovesLegacyPhpXplorerFile(): void
