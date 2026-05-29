@@ -19,16 +19,18 @@ if ($argUserRaw === '') {
 $selection = pmssManagedUsersSelectFromCommand('/scripts/listUsers.php', $argUserRaw, array('lookupMode' => 'account', 'strictInput' => true));
 if ($selection['exitCode'] !== 0) exit($selection['exitCode']);
 $users = $selection['users'];
+$homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
+$watchdogWebRoot = pmssResolvePathFromEnv('PMSS_LIGHTTPD_WATCHDOG_WEB_ROOT', '/var/www');
 foreach($users AS $thisUser) {
-    $homeDir = "/home/{$thisUser}";
-    if (pmssUserWatchdogHandleSuspended($thisUser, ['lighttpd', 'php-cgi'], 'lighttpd stopped due to suspension')) {
-        pmssLighttpdWatchdogDeleteErrorPage($thisUser);
+    $homeDir = rtrim($homeRoot, '/')."/{$thisUser}";
+    if (pmssUserWatchdogHandleSuspended($thisUser, ['lighttpd', 'php-cgi'], 'lighttpd stopped due to suspension', $homeRoot)) {
+        pmssLighttpdWatchdogDeleteErrorPage($thisUser, $watchdogWebRoot);
         continue;
     }
     if (!pmssUserLighttpdEnabled($thisUser)) {
         echo "User {$thisUser}: lighttpd disabled by config; terminating web stack.\n";
         pmssUserWatchdogTerminateProcesses($thisUser, ['lighttpd', 'php-cgi'], 15);
-        pmssLighttpdWatchdogDeleteErrorPage($thisUser);
+        pmssLighttpdWatchdogDeleteErrorPage($thisUser, $watchdogWebRoot);
         continue;
     }
 
@@ -72,10 +74,11 @@ foreach($users AS $thisUser) {
     if ($socketError || !$lighttpdRunningBeforeRestart) {
         pmssLighttpdWatchdogWriteErrorPage(
             $thisUser,
-            pmssLighttpdWatchdogDetectReason($thisUser, $homeDir, $homeDir.'/.lighttpd.conf', $socketError)
+            pmssLighttpdWatchdogDetectReason($thisUser, $homeDir, $homeDir.'/.lighttpd.conf', $socketError),
+            $watchdogWebRoot
         );
     } else {
-        pmssLighttpdWatchdogDeleteErrorPage($thisUser);
+        pmssLighttpdWatchdogDeleteErrorPage($thisUser, $watchdogWebRoot);
     }
 
     $restartRequired = $socketError || $configChangedAfterStart;

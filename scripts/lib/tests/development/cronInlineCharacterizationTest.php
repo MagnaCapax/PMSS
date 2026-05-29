@@ -73,7 +73,7 @@ class CronInlineCharacterizationTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkLighttpdInstances.php', [
             "require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';",
             "pmssUserLighttpdEnabled(\$thisUser)",
-            "pmssLighttpdWatchdogDeleteErrorPage(\$thisUser)",
+            "pmssLighttpdWatchdogDeleteErrorPage(\$thisUser, \$watchdogWebRoot)",
             'pmssLighttpdWatchdogWriteErrorPage(',
             'pmssLighttpdWatchdogDetectReason(',
             'pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);',

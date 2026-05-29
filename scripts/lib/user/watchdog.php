@@ -165,7 +165,7 @@ function pmssUserWatchdogRunService(string $heading, string $enableMarker, array
     $heading !== '' && print date('Y-m-d H:i:s') . ': Checking '.$heading." instances\n";
     $optionalRequirePath !== null && is_file($optionalRequirePath) && require_once $optionalRequirePath;
     if ($enableMarker === '') { return; }
-    $homeRoot = rtrim($homeRoot, '/');
+    $homeRoot = rtrim($homeRoot === '/home' ? pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home') : $homeRoot, '/');
     foreach (pmssListManagedUsers($command) as $username) {
         if (pmssUserWatchdogHandleSuspended($username, $processNames, $userLogMessage, $homeRoot) || !is_file($homeRoot.'/'.$username.'/.'.$enableMarker)) {
             continue;
