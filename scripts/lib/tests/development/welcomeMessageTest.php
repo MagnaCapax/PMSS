@@ -54,44 +54,53 @@ class WelcomeMessageTest extends TestCase
             $this->assertEquals('<p>Hello alice / 200 GiB</p>', $message);
     }
 
-    public function testProductTemplateRendersWhenNoUserOverrideExists(): void
+    public function testProductLookupCasesRenderExpectedMessages(): void
     {
+        foreach ([
+            'direct product template' => [
+                ['product' => 'm1000', 'ramMiB' => 1024],
+                ['m1000' => '<b>{{product}}/{{ramMiB}}</b>'],
+                '<b>m1000/1024</b>',
+            ],
+            'productName alias in nested map' => [
+                ['productName' => 'M900'],
+                ['products' => ['m900' => '<b>{{product}}/{{username}}</b>']],
+                '<b>M900/alice</b>',
+            ],
+            'case-insensitive product key' => [
+                ['product' => 'M500'],
+                ['m500' => 'ok {{product}}'],
+                'ok M500',
+            ],
+            'product field wins over alias' => [
+                ['product' => 'm500', 'productName' => 'm900'],
+                ['m500' => 'primary {{product}}', 'm900' => 'alias {{product}}'],
+                'primary m500',
+            ],
+            'dot product fallback' => [
+                [],
+                ['free-tier' => 'hi'],
+                'hi',
+                'free-tier',
+            ],
+            'missing configuration' => [
+                [],
+                null,
+                '',
+            ],
+        ] as $label => $case) {
             $home = $this->makeUserHome();
-            $this->writeUserConfig($home, ['product' => 'm1000', 'ramMiB' => 1024]);
-            $this->writeWelcomeMessages(['m1000' => '<b>{{product}}/{{ramMiB}}</b>']);
+            $this->writeUserConfig($home, $case[0]);
+            if (isset($case[3])) {
+                @file_put_contents($home.'/.product', $case[3]."\n");
+            }
+            if (is_array($case[1])) {
+                $this->writeWelcomeMessages($case[1]);
+            }
 
-            $message = $this->renderWelcome([], $home);
-            $this->assertEquals('<b>m1000/1024</b>', $message);
-    }
-
-    public function testProductNameAliasReadsNestedProductsMap(): void
-    {
-            $home = $this->makeUserHome();
-            $this->writeUserConfig($home, ['productName' => 'M900']);
-            $this->writeWelcomeMessages(['products' => ['m900' => '<b>{{product}}/{{username}}</b>']]);
-
-            $message = $this->renderWelcome([], $home);
-            $this->assertEquals('<b>M900/alice</b>', $message);
-    }
-
-    public function testProductLookupIsCaseInsensitive(): void
-    {
-            $home = $this->makeUserHome();
-            $this->writeUserConfig($home, ['product' => 'M500']);
-            $this->writeWelcomeMessages(['m500' => 'ok {{product}}']);
-
-            $message = $this->renderWelcome([], $home);
-            $this->assertEquals('ok M500', $message);
-    }
-
-    public function testProductFieldWinsOverProductNameWhenBothExist(): void
-    {
-            $home = $this->makeUserHome();
-            $this->writeUserConfig($home, ['product' => 'm500', 'productName' => 'm900']);
-            $this->writeWelcomeMessages(['m500' => 'primary {{product}}', 'm900' => 'alias {{product}}']);
-
-            $message = $this->renderWelcome([], $home);
-            $this->assertEquals('primary m500', $message);
+            $messagePath = is_array($case[1]) ? '' : $this->tempDir.'/missing.json';
+            $this->assertEquals($case[2], $this->renderWelcome([], $home, $messagePath), $label);
+        }
     }
 
     public function testProductMessageSetPreservesNestedProductsMapShape(): void
@@ -107,17 +116,6 @@ class WelcomeMessageTest extends TestCase
             $this->assertEquals('test', $stored['meta']['updatedBy'] ?? '');
             $this->assertEquals('<p>old</p>', $stored['products']['free-tier'] ?? '');
             $this->assertEquals('<p>new</p>', $stored['products']['m1000'] ?? '');
-    }
-
-    public function testProductFallsBackToDotProductFile(): void
-    {
-            $home = $this->makeUserHome();
-            @file_put_contents($home.'/.product', "free-tier\n");
-            $this->writeUserConfig($home, []);
-            $this->writeWelcomeMessages(['free-tier' => 'hi']);
-
-            $message = $this->renderWelcome([], $home);
-            $this->assertEquals('hi', $message);
     }
 
     public function testSubstitutionsAreEscaped(): void
@@ -176,15 +174,6 @@ class WelcomeMessageTest extends TestCase
             $this->pmssCreateSymlinkOrSkip($messagesTarget, $messagesLink);
 
             $this->assertEquals('', \pmssWelcomeMessageForUser([], $home, 'alice', $messagesLink));
-    }
-
-    public function testMissingConfigurationReturnsEmptyMessage(): void
-    {
-            $home = $this->makeUserHome();
-            $this->writeUserConfig($home, []);
-
-            $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/missing.json');
-            $this->assertEquals('', $message);
     }
 
     public function testProductMessageSetWritesNestedProductsMap(): void
