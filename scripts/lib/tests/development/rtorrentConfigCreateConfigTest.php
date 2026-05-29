@@ -17,12 +17,17 @@ class rtorrentConfigCreateConfigTest extends TestCase
         return $piecesMemoryMiB;
     }
 
+    private function skipIfLocalnetPresent(string $label): void
+    {
+        if (is_readable('/etc/seedbox/config/localnet')) {
+            throw new SkipTest('localnet config present on host; skipping rtorrentConfig '.$label.' test');
+        }
+    }
+
     public function testCreateConfigRendersTemplateReplacements(): void
     {
         // createConfig() touches this real path when present; keep dev tests hermetic.
-        if (is_readable('/etc/seedbox/config/localnet')) {
-            throw new SkipTest('localnet config present on host; skipping rtorrentConfig render test');
-        }
+        $this->skipIfLocalnetPresent('render');
 
         $resourceConfig = [
             'ramBlock' => 250,
@@ -94,9 +99,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
 
     public function testCreateConfigAppliesMemoryHeadroomGuardrails(): void
     {
-        if (is_readable('/etc/seedbox/config/localnet')) {
-            throw new SkipTest('localnet config present on host; skipping rtorrentConfig memory guardrail test');
-        }
+        $this->skipIfLocalnetPresent('memory guardrail');
 
         $resourceConfig = [
             'ramBlock' => 250,
@@ -139,9 +142,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
 
     public function testCreateConfigKeepsLegacyPortDefaultRules(): void
     {
-        if (is_readable('/etc/seedbox/config/localnet')) {
-            throw new SkipTest('localnet config present on host; skipping rtorrentConfig port default test');
-        }
+        $this->skipIfLocalnetPresent('port default');
 
         $cfg = new class([
             'ramBlock' => 250,

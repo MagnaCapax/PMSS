@@ -28,15 +28,21 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
         };
     }
 
+    private function quarantineCustomConfig(string $user = '', ?callable $logFn = null): ?string
+    {
+        return \rtorrentCustomConfigQuarantine(
+            $this->tempHome,
+            $user !== '' ? $user : $this->resolveTestUser(),
+            $logFn ?? $this->noOpLogFn()
+        );
+    }
+
     public function testQuarantineMovesRegularFile(): void
     {
         $src = $this->tempHome.'/.rtorrent.rc.custom';
         @file_put_contents($src, "broken_line\n");
 
-        $user = $this->resolveTestUser();
-        $logFn = $this->noOpLogFn();
-
-        $dst = \rtorrentCustomConfigQuarantine($this->tempHome, $user, $logFn);
+        $dst = $this->quarantineCustomConfig();
         $this->assertTrue(is_string($dst) && $dst !== '');
         $this->assertTrue(!file_exists($src), 'Source file should be moved away');
         $this->assertTrue(is_file($dst), 'Destination file should exist');
@@ -44,9 +50,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
 
     public function testQuarantineSkipsMissingFile(): void
     {
-        $user = $this->resolveTestUser();
-        $logFn = $this->noOpLogFn();
-        $dst = \rtorrentCustomConfigQuarantine($this->tempHome, $user, $logFn);
+        $dst = $this->quarantineCustomConfig();
         $this->assertTrue($dst === null);
     }
 
@@ -59,9 +63,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
             throw new SkipTest('symlink() not available; skipping');
         }
 
-        $user = $this->resolveTestUser();
-        $logFn = $this->noOpLogFn();
-        $dst = \rtorrentCustomConfigQuarantine($this->tempHome, $user, $logFn);
+        $dst = $this->quarantineCustomConfig();
         $this->assertTrue($dst === null);
         $this->assertTrue(is_link($src), 'Symlink should remain untouched');
     }
@@ -71,8 +73,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
         $src = $this->tempHome.'/.rtorrent.rc.custom';
         @file_put_contents($src, "x\n");
 
-        $logFn = $this->noOpLogFn();
-        $dst = \rtorrentCustomConfigQuarantine($this->tempHome, 'root', $logFn);
+        $dst = $this->quarantineCustomConfig('root');
         $this->assertTrue($dst === null, 'Should refuse when file is not owned by root for user=root');
         $this->assertTrue(is_file($src), 'Source file should remain in place');
     }
@@ -114,12 +115,11 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
         @file_put_contents($src, "schedule = watch,1,1,\"load_start=~/watch/*.torrent\"\nexecute = sh,-c,echo ok\n");
 
         $messages = [];
-        $user = $this->resolveTestUser();
         $logFn = function (string $message, bool $force = true) use (&$messages): void {
             $messages[] = $message;
         };
 
-        $dst = \rtorrentCustomConfigQuarantine($this->tempHome, $user, $logFn);
+        $dst = $this->quarantineCustomConfig('', $logFn);
         $this->assertTrue(is_string($dst) && $dst !== '');
         $this->assertTrue(
             in_array('Custom rTorrent config still uses legacy PMSS-migrated directives: schedule, execute', $messages, true),
