@@ -126,6 +126,9 @@ function pmssAddUserFatalExit(
 ): void
 {
     logProvisionMessage('FATAL: '.$detail);
+    if ($stderrMessage !== null) {
+        logProvisionMessage($stderrMessage);
+    }
     finalizeProvision($status, $message, 1, $extraSummary);
     if ($stderrMessage !== null) {
         fwrite(STDERR, $stderrMessage.PHP_EOL);

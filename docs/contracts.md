@@ -533,6 +533,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
     queues permission fix; optional traffic limit persists to runtime traffic files (user config store always writes `trafficLimit=0`).
   - Resource passthrough: Supports optional `--traffic-limit-gb`, `--traffic-cap-mbit`, `--upload-throttle-kib`, `--cpu-weight`, `--io-weight`, `--io-read-bw`, `--io-write-bw`, `--io-read-iops`, `--io-write-iops`, and `--cpu-quota-percent` flags while preserving the legacy positional form.
   - Help: `-h` / `--help` prints structured usage and exits successfully.
+  - Parse failures: missing or invalid CLI arguments print usage/error text to stderr and exit non-zero.
   - Guardrails: Per-user lock file prevents concurrent addUser runs for the same username.
   - Guardrails: Rejects reserved system/service usernames to avoid future account collisions.
   - Recovery gate: When `/etc/passwd` already contains the username, addUser may self-heal only if the latest `###ADDUSER_JSON` summary for that user is a recent internal `FAIL` and both per-user `rtorrent` and `lighttpd` are inactive; the stale account is cleaned before retry. All other existing-user cases still abort.

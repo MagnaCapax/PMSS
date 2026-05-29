@@ -22,6 +22,15 @@ class addUserCliTest extends TestCase
         $this->assertStringContainsAllStrings(['Usage', 'Positional Parameters', 'Named Options', 'Examples'], $cli['usage']);
     }
 
+    public function testWrapperParseErrorsExitNonZeroForAutomation(): void
+    {
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/addUser.php', array(), array(), '2>&1');
+
+        $this->assertSame(1, $result['rc']);
+        $this->assertStringContainsString('Usage', $result['output']);
+        $this->assertStringContainsString('addUser.php USERNAME PASSWORD', $result['output']);
+    }
+
     public function testLegacyPositionalArgumentsRemainSupported(): void
     {
         $cli = $this->parseAddUserCli(['alice', 'rand', '512', '100', '500', '80', '16']);

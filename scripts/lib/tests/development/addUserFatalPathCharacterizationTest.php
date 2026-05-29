@@ -45,6 +45,7 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
             'stderr' => 'ERROR: Invalid username "alice/evil": slash not allowed',
         ));
 
+        $this->assertStringContainsString('ERROR: Invalid username "alice/evil": slash not allowed', $result['output']);
         $this->assertStringContainsString('ERROR: Invalid username "alice/evil": slash not allowed', $result['stderr']);
         $this->assertStringContainsString('###ADDUSER_JSON:', $result['output']);
     }

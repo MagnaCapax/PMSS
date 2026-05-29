@@ -48,6 +48,7 @@ Usage
 - The first positional `USERNAME` can be mixed with named options for the remaining values.
 - `RAM_MiB` is applied through `userConfig.php` and then `userConfigCgroup.php`; PMSS clamps the effective `MemoryHigh` floor to 250 MiB and derives `MemoryMax` at roughly 1.25x with at most 2048 MiB of headroom.
 - If `RAM_MiB` is below `245`, PMSS persists `dockerEnabled=false` for safety.
+- Invalid CLI input exits non-zero. Username validation failures also emit an `ERROR:` line and `###ADDUSER_JSON` with `success=false` for automation.
 
 ## Examples
 
