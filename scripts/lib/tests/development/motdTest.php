@@ -24,11 +24,13 @@ class MotdTest extends TestCase
 
         file_put_contents($template, "Host: %HOSTNAME%\nVersion: %PMSS_VERSION%\n");
 
-        putenv('PMSS_MOTD_TEMPLATE_PATH='.$template);
-        putenv('PMSS_MOTD_OUTPUT_PATH='.$output);
-        putenv('PMSS_RUNTIME_DIR='.$runtime);
-
-        \Motd::motdGenerate();
+        $this->pmssWithEnv([
+            'PMSS_MOTD_TEMPLATE_PATH' => $template,
+            'PMSS_MOTD_OUTPUT_PATH' => $output,
+            'PMSS_RUNTIME_DIR' => $runtime,
+        ], function (): void {
+            \Motd::motdGenerate();
+        });
 
         $this->assertTrue(file_exists($output), 'MOTD output file missing');
         $content = (string)file_get_contents($output);
@@ -46,12 +48,14 @@ class MotdTest extends TestCase
 
         file_put_contents($template, "Host: %HOSTNAME%\nKernel: %KERNEL_VERSION%\nNet: %NETWORK_SPEED%\n");
 
-        putenv('PMSS_MOTD_TEMPLATE_PATH='.$template);
-        putenv('PMSS_MOTD_OUTPUT_PATH='.$output);
-        putenv('PMSS_RUNTIME_DIR='.$runtime);
-        putenv('PMSS_MOTD_COLOR=0');
-
-        \Motd::motdGenerate();
+        $this->pmssWithEnv([
+            'PMSS_MOTD_TEMPLATE_PATH' => $template,
+            'PMSS_MOTD_OUTPUT_PATH' => $output,
+            'PMSS_RUNTIME_DIR' => $runtime,
+            'PMSS_MOTD_COLOR' => '0',
+        ], function (): void {
+            \Motd::motdGenerate();
+        });
 
         $this->assertTrue(file_exists($output), 'MOTD output file missing');
         $content = (string) file_get_contents($output);

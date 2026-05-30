@@ -5,51 +5,20 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class SysctlBaselineTest extends TestCase
 {
-    /** @var array<string, string|false> */
-    private $env = [];
-
-    protected function setUp(): void
-    {
-        $this->env = [];
-        foreach ([
-            'PMSS_TOTAL_MEM_MIB',
-            'PMSS_SYSCTL_HAS_SWAP',
-            'PMSS_SYSCTL_SWAP_IS_FAST',
-            'PMSS_SYSCTL_NIC_SPEED_MBPS',
-            'PMSS_SYSCTL_IS_VM',
-            'PMSS_SYSCTL_HAS_CONNTRACK',
-            'PMSS_SYSCTL_OVERRIDES_PATH',
-            'PMSS_CONFIG_DIR',
-            'PMSS_SYSCTL_PROC_SYS_PATH',
-        ] as $key) {
-            $this->env[$key] = getenv($key);
-        }
-    }
-
-    protected function tearDown(): void
-    {
-        foreach ($this->env as $key => $value) {
-            if ($value === false || $value === '') {
-                putenv($key);
-                continue;
-            }
-
-            putenv($key.'='.$value);
-        }
-    }
-
     public function testWritesBaselineWithKptrRestrict(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-', 0700);
         $target = $dir.'/sysctl.conf';
         $configDir = $dir.'/config';
-        putenv('PMSS_CONFIG_DIR='.$configDir);
-        putenv('PMSS_TOTAL_MEM_MIB=262144');
-        putenv('PMSS_SYSCTL_HAS_SWAP=1');
-        putenv('PMSS_SYSCTL_SWAP_IS_FAST=1');
-        putenv('PMSS_SYSCTL_NIC_SPEED_MBPS=10000');
-        putenv('PMSS_SYSCTL_IS_VM=0');
-        putenv('PMSS_SYSCTL_HAS_CONNTRACK=1');
+        $this->pmssTrackEnvOverrides([
+            'PMSS_CONFIG_DIR' => $configDir,
+            'PMSS_TOTAL_MEM_MIB' => '262144',
+            'PMSS_SYSCTL_HAS_SWAP' => '1',
+            'PMSS_SYSCTL_SWAP_IS_FAST' => '1',
+            'PMSS_SYSCTL_NIC_SPEED_MBPS' => '10000',
+            'PMSS_SYSCTL_IS_VM' => '0',
+            'PMSS_SYSCTL_HAS_CONNTRACK' => '1',
+        ]);
         $messages = [];
         $this->runBaseline($target, $messages, false);
 
@@ -70,7 +39,7 @@ class SysctlBaselineTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-sysctl-bbr-', 0700);
         $target = $dir.'/sysctl.conf';
         $modulesLoad = $dir.'/modules-load.conf';
-        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
+        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir.'/config']);
         $messages = [];
         $this->runBaseline($target, $messages, false, $modulesLoad);
 
@@ -85,7 +54,7 @@ class SysctlBaselineTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-skip-', 0700);
         $target = $dir.'/sysctl.conf';
-        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
+        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir.'/config']);
 
         $messages = [];
         $this->runBaseline($target, $messages, false);
@@ -106,7 +75,7 @@ class SysctlBaselineTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-sysctl-dir-', 0700);
         $targetDir = $dir.'/nested';
         $target = $targetDir.'/sysctl.conf';
-        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
+        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir.'/config']);
 
         $messages = [];
         $this->runBaseline($target, $messages, false);
@@ -121,7 +90,7 @@ class SysctlBaselineTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-reload-', 0700);
         $target = $dir.'/sysctl.conf';
-        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
+        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir.'/config']);
         $messages = [];
         $this->runBaseline($target, $messages, false);
 
@@ -134,7 +103,7 @@ class SysctlBaselineTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-update-', 0700);
         $target = $dir.'/sysctl.conf';
-        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
+        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir.'/config']);
         file_put_contents($target, "kernel.kptr_restrict = 0\n");
 
         $messages = [];
@@ -152,7 +121,7 @@ class SysctlBaselineTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-sysctl-fail-', 0700);
         $blocked = $dir.'/blocked';
         $target = $blocked.'/sysctl.conf';
-        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
+        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir.'/config']);
         $messages = [];
 
         file_put_contents($blocked, "not a directory\n");
@@ -171,10 +140,12 @@ class SysctlBaselineTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-vm-', 0700);
         $target = $dir.'/sysctl.conf';
-        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
-        putenv('PMSS_SYSCTL_IS_VM=1');
-        putenv('PMSS_SYSCTL_HAS_SWAP=1');
-        putenv('PMSS_SYSCTL_SWAP_IS_FAST=1');
+        $this->pmssTrackEnvOverrides([
+            'PMSS_CONFIG_DIR' => $dir.'/config',
+            'PMSS_SYSCTL_IS_VM' => '1',
+            'PMSS_SYSCTL_HAS_SWAP' => '1',
+            'PMSS_SYSCTL_SWAP_IS_FAST' => '1',
+        ]);
 
         $messages = [];
         $this->runBaseline($target, $messages, false);
@@ -192,9 +163,11 @@ class SysctlBaselineTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-noswap-', 0700);
         $target = $dir.'/sysctl.conf';
-        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
-        putenv('PMSS_SYSCTL_HAS_SWAP=0');
-        putenv('PMSS_SYSCTL_SWAP_IS_FAST=0');
+        $this->pmssTrackEnvOverrides([
+            'PMSS_CONFIG_DIR' => $dir.'/config',
+            'PMSS_SYSCTL_HAS_SWAP' => '0',
+            'PMSS_SYSCTL_SWAP_IS_FAST' => '0',
+        ]);
 
         $messages = [];
         $this->runBaseline($target, $messages, false);
@@ -232,8 +205,10 @@ class SysctlBaselineTest extends TestCase
         $target = $dir.'/sysctl.conf';
         $configDir = $dir.'/config';
         $overridePath = $dir.'/90-pmss-overrides.conf';
-        putenv('PMSS_CONFIG_DIR='.$configDir);
-        putenv('PMSS_SYSCTL_OVERRIDES_PATH='.$overridePath);
+        $this->pmssTrackEnvOverrides([
+            'PMSS_CONFIG_DIR' => $configDir,
+            'PMSS_SYSCTL_OVERRIDES_PATH' => $overridePath,
+        ]);
         file_put_contents($overridePath, "vm.swappiness = 70\nnet.core.somaxconn = 9000\n");
 
         $messages = [];
@@ -258,11 +233,13 @@ class SysctlBaselineTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-sysctl-summary-', 0700);
         $target = $dir.'/sysctl.conf';
         $configDir = $dir.'/config';
-        putenv('PMSS_CONFIG_DIR='.$configDir);
-        putenv('PMSS_TOTAL_MEM_MIB=65536');
-        putenv('PMSS_SYSCTL_HAS_SWAP=1');
-        putenv('PMSS_SYSCTL_SWAP_IS_FAST=0');
-        putenv('PMSS_SYSCTL_NIC_SPEED_MBPS=1000');
+        $this->pmssTrackEnvOverrides([
+            'PMSS_CONFIG_DIR' => $configDir,
+            'PMSS_TOTAL_MEM_MIB' => '65536',
+            'PMSS_SYSCTL_HAS_SWAP' => '1',
+            'PMSS_SYSCTL_SWAP_IS_FAST' => '0',
+            'PMSS_SYSCTL_NIC_SPEED_MBPS' => '1000',
+        ]);
 
         $messages = [];
         $this->runBaseline($target, $messages, false);

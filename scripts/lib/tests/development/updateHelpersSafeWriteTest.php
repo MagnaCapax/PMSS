@@ -10,27 +10,23 @@ class UpdateHelpersSafeWriteTest extends TestCase
     public function testSafeWriteSourcesOverwritesExisting(): void
     {
         $target = $this->pmssWriteTempFile('sources', 'old');
-        putenv('PMSS_APT_SOURCES_PATH='.$target);
-
-        $result = \pmssSafeWriteSources('new', 'UnitTest', null);
-        $this->assertTrue($result);
-        $this->assertEquals('new', file_get_contents($target));
-        $this->assertEquals('old', file_get_contents($target.'.pmss-backup'));
-
-        putenv('PMSS_APT_SOURCES_PATH');
+        $this->pmssWithAptSourcesPath($target, function () use ($target): void {
+            $result = \pmssSafeWriteSources('new', 'UnitTest', null);
+            $this->assertTrue($result);
+            $this->assertEquals('new', file_get_contents($target));
+            $this->assertEquals('old', file_get_contents($target.'.pmss-backup'));
+        });
     }
 
     public function testSafeWriteSourcesReturnsFalseWhenTargetIsDirectory(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-dir-');
         $this->assertTrue(is_dir($dir));
-        putenv('PMSS_APT_SOURCES_PATH='.$dir);
-
-        $result = \pmssSafeWriteSources('data', 'DirTest', null);
-        $this->assertTrue($result === false);
-        $this->assertTrue(file_exists($dir.'.pmss-backup'));
-
-        putenv('PMSS_APT_SOURCES_PATH');
+        $this->pmssWithAptSourcesPath($dir, function () use ($dir): void {
+            $result = \pmssSafeWriteSources('data', 'DirTest', null);
+            $this->assertTrue($result === false);
+            $this->assertTrue(file_exists($dir.'.pmss-backup'));
+        });
     }
 
     public function testSafeWriteSourcesCreatesParentDirectoriesWhenMissing(): void
@@ -38,27 +34,23 @@ class UpdateHelpersSafeWriteTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-missing-');
         $target = $dir.'/sources.list';
         $this->cleanup($dir);
-        putenv('PMSS_APT_SOURCES_PATH='.$target);
-
-        $result = \pmssSafeWriteSources('deb test main', 'DirCreate', null);
-        $this->assertTrue($result);
-        $this->assertTrue(is_dir($dir));
-
-        putenv('PMSS_APT_SOURCES_PATH');
+        $this->pmssWithAptSourcesPath($target, function () use ($dir): void {
+            $result = \pmssSafeWriteSources('deb test main', 'DirCreate', null);
+            $this->assertTrue($result);
+            $this->assertTrue(is_dir($dir));
+        });
     }
 
     public function testSafeWriteSourcesBackupUpdatedOnSecondWrite(): void
     {
         $target = $this->pmssWriteTempFile('sources', 'first');
-        putenv('PMSS_APT_SOURCES_PATH='.$target);
+        $this->pmssWithAptSourcesPath($target, function () use ($target): void {
+            \pmssSafeWriteSources('second', 'UnitTest', null);
+            \pmssSafeWriteSources('third', 'UnitTest', null);
 
-        \pmssSafeWriteSources('second', 'UnitTest', null);
-        \pmssSafeWriteSources('third', 'UnitTest', null);
-
-        $this->assertEquals('third', file_get_contents($target));
-        $this->assertEquals('second', file_get_contents($target.'.pmss-backup'));
-
-        putenv('PMSS_APT_SOURCES_PATH');
+            $this->assertEquals('third', file_get_contents($target));
+            $this->assertEquals('second', file_get_contents($target.'.pmss-backup'));
+        });
     }
 
     public function testSafeWriteSourcesRejectsSymlinkTarget(): void

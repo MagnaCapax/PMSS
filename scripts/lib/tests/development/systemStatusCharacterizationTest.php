@@ -23,16 +23,16 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->sourcesPath = $tempDir.'/sources.list';
         file_put_contents($this->osReleasePath, "ID=debian\nVERSION_ID=12\nVERSION_CODENAME=bookworm\n");
         file_put_contents($this->sourcesPath, "deb http://example.invalid/debian bookworm main\n");
-        putenv('PMSS_OS_RELEASE_PATH='.$this->osReleasePath);
-        putenv('PMSS_APT_SOURCES_PATH='.$this->sourcesPath);
+        $this->pmssTrackEnvOverrides([
+            'PMSS_OS_RELEASE_PATH' => $this->osReleasePath,
+            'PMSS_APT_SOURCES_PATH' => $this->sourcesPath,
+        ]);
         pmssResetOsReleaseCache();
     }
 
     public function tearDown(): void
     {
         pmssResetOsReleaseCache();
-        putenv('PMSS_OS_RELEASE_PATH');
-        putenv('PMSS_APT_SOURCES_PATH');
         $this->pmssRemoveTree(dirname($this->osReleasePath));
     }
 

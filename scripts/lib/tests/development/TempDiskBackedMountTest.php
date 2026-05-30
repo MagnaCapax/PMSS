@@ -54,22 +54,14 @@ class TempDiskBackedMountTest extends TestCase
 
     public function testDetectsDebian13FromOsReleaseWhenVersionMissing(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-tmp-detect-', 0700);
         $logPath = $this->pmssMakeTempPath('pmss-tmp-detect-', '.log');
-        $osRelease = $root.'/os-release';
         $binDir = $this->pmssMakeInvocationLogStub('systemctl', $logPath, 'pmss-tmp-detect-bin-');
-        @file_put_contents($osRelease, "ID=debian\nVERSION_ID=12\nVERSION_CODENAME=trixie\n");
 
-        $previous = getenv('PMSS_OS_RELEASE_PATH');
-        putenv('PMSS_OS_RELEASE_PATH='.$osRelease);
-
-        try {
+        $this->pmssWithOsRelease(['ID' => 'debian', 'VERSION_ID' => '12', 'VERSION_CODENAME' => 'trixie'], function () use ($binDir): void {
             $this->pmssWithPathPrefix($binDir, function (): void {
                 \pmssConfigureTempDiskBackedMount();
             });
-        } finally {
-            $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', $previous);
-        }
+        });
 
         $this->assertEquals("mask tmp.mount\n", (string) file_get_contents($logPath));
     }

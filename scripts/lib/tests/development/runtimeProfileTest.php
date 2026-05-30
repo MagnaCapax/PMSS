@@ -21,8 +21,10 @@ class RuntimeProfileTest extends TestCase
         $GLOBALS['PMSS_TEST_LOGS'] = [];
         unset($GLOBALS['PMSS_PROFILE']);
         $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
-        putenv('PMSS_JSON_LOG');
-        putenv('PMSS_PROFILE_OUTPUT');
+        $this->pmssTrackEnvOverrides([
+            'PMSS_JSON_LOG' => null,
+            'PMSS_PROFILE_OUTPUT' => null,
+        ]);
     }
 
     public function testRecordProfileInitializesStoreWhenMissing(): void
@@ -64,8 +66,10 @@ class RuntimeProfileTest extends TestCase
     {
         $this->resetState();
         $tmpProfile = sys_get_temp_dir().'/pmss-profile-'.bin2hex(random_bytes(4));
-        putenv('PMSS_PROFILE_OUTPUT='.$tmpProfile);
-        putenv('PMSS_JSON_LOG');
+        $this->pmssTrackEnvOverrides([
+            'PMSS_PROFILE_OUTPUT' => $tmpProfile,
+            'PMSS_JSON_LOG' => null,
+        ]);
         pmssRecordProfile([
             'description' => 'First',
             'command' => 'true',
@@ -86,8 +90,10 @@ class RuntimeProfileTest extends TestCase
     {
         $this->resetState();
         $tmpProfile = sys_get_temp_dir().'/pmss-profile-empty-'.bin2hex(random_bytes(4));
-        putenv('PMSS_PROFILE_OUTPUT='.$tmpProfile);
-        putenv('PMSS_JSON_LOG');
+        $this->pmssTrackEnvOverrides([
+            'PMSS_PROFILE_OUTPUT' => $tmpProfile,
+            'PMSS_JSON_LOG' => null,
+        ]);
         pmssProfileSummary();
         $this->assertTrue(!file_exists($tmpProfile), 'No file should be written when profile is empty');
         @unlink($tmpProfile);
@@ -99,7 +105,7 @@ class RuntimeProfileTest extends TestCase
 
         // Route JSON events to a temp file so we can inspect the payload.
         $tmpJson = sys_get_temp_dir().'/pmss-profile-json-'.bin2hex(random_bytes(4));
-        putenv('PMSS_JSON_LOG='.$tmpJson);
+        $this->pmssTrackEnvOverrides(['PMSS_JSON_LOG' => $tmpJson]);
 
         pmssRecordProfile([
             'description' => 'ok-step',
@@ -147,7 +153,6 @@ class RuntimeProfileTest extends TestCase
         $this->assertEquals(1, $last['status_counts']['SKIP'] ?? null);
 
         @unlink($tmpJson);
-        putenv('PMSS_JSON_LOG');
     }
 
     public function testProfileSummaryNormalizesKnownStatusesAndBucketsUnknownOnes(): void
@@ -155,7 +160,7 @@ class RuntimeProfileTest extends TestCase
         $this->resetState();
 
         $tmpJson = sys_get_temp_dir().'/pmss-profile-json-'.bin2hex(random_bytes(4));
-        putenv('PMSS_JSON_LOG='.$tmpJson);
+        $this->pmssTrackEnvOverrides(['PMSS_JSON_LOG' => $tmpJson]);
 
         pmssRecordProfile([
             'description' => 'ok-step',
@@ -190,6 +195,5 @@ class RuntimeProfileTest extends TestCase
         $this->assertEquals(1, $last['status_counts']['OTHER'] ?? null);
 
         @unlink($tmpJson);
-        putenv('PMSS_JSON_LOG');
     }
 }

@@ -21,11 +21,13 @@ class MotdHealthWarningsTest extends TestCase
             ['timestamp'=>date('c'),'kind'=>'smart','device'=>'/dev/sda','flags'=>['udma_crc_increase']],
         ]);
 
-        putenv('PMSS_MOTD_TEMPLATE_PATH='.$tpl);
-        putenv('PMSS_MOTD_OUTPUT_PATH='.$out);
-        putenv('PMSS_HEALTH_LOG_PATH='.$log);
-
-        \Motd::motdGenerate();
+        $this->pmssWithEnv([
+            'PMSS_MOTD_TEMPLATE_PATH' => $tpl,
+            'PMSS_MOTD_OUTPUT_PATH' => $out,
+            'PMSS_HEALTH_LOG_PATH' => $log,
+        ], function (): void {
+            \Motd::motdGenerate();
+        });
         $content = (string) @file_get_contents($out);
         $this->assertStringContainsAllStrings(['Storage WARN:', 'RAID md0', 'NVMe critical warning', 'UDMA CRC increased'], $content);
     }
@@ -38,10 +40,13 @@ class MotdHealthWarningsTest extends TestCase
         $out = $dir.'/motd.txt';
         $log = $dir.'/health.jsonl';
         file_put_contents($log, "{this is not json}\n{\"kind\":\"nvme\",\"metrics\":{}}\nBROKEN\n");
-        putenv('PMSS_MOTD_TEMPLATE_PATH='.$tpl);
-        putenv('PMSS_MOTD_OUTPUT_PATH='.$out);
-        putenv('PMSS_HEALTH_LOG_PATH='.$log);
-        \Motd::motdGenerate();
+        $this->pmssWithEnv([
+            'PMSS_MOTD_TEMPLATE_PATH' => $tpl,
+            'PMSS_MOTD_OUTPUT_PATH' => $out,
+            'PMSS_HEALTH_LOG_PATH' => $log,
+        ], function (): void {
+            \Motd::motdGenerate();
+        });
         $this->assertTrue(file_exists($out), 'MOTD not generated');
     }
 
@@ -51,10 +56,13 @@ class MotdHealthWarningsTest extends TestCase
         $this->pmssWriteRelativeFile($dir, 'template.motd', "Hello %HOSTNAME%\n", 0700);
         $tpl = $dir.'/template.motd';
         $out = $dir.'/motd.txt';
-        putenv('PMSS_MOTD_TEMPLATE_PATH='.$tpl);
-        putenv('PMSS_MOTD_OUTPUT_PATH='.$out);
-        putenv('PMSS_HEALTH_LOG_PATH='.$dir.'/missing.jsonl');
-        \Motd::motdGenerate();
+        $this->pmssWithEnv([
+            'PMSS_MOTD_TEMPLATE_PATH' => $tpl,
+            'PMSS_MOTD_OUTPUT_PATH' => $out,
+            'PMSS_HEALTH_LOG_PATH' => $dir.'/missing.jsonl',
+        ], function (): void {
+            \Motd::motdGenerate();
+        });
         $content = (string) @file_get_contents($out);
         $this->assertStringNotContainsString('Storage WARN:', $content, 'Storage WARN unexpectedly present');
     }

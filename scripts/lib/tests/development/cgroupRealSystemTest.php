@@ -20,21 +20,16 @@ class cgroupRealSystemProbe extends \PMSS\Cgroup\RealSystem
 
 class cgroupRealSystemTest extends TestCase
 {
-    public function setUp(): void
-    {
-        $this->pmssTrackEnvKeys(['PMSS_HOME_DEVICE']);
-    }
-
     public function testExecuteReturnsEmptyStringInTestMode(): void
     {
-        putenv('PMSS_HOME_DEVICE');
+        $this->pmssTrackEnvOverrides(['PMSS_HOME_DEVICE' => null]);
         $sys = new \PMSS\Cgroup\RealSystem();
         $this->assertEquals('', $sys->execute('echo test'));
     }
 
     public function testResolveDeviceUsesHomeOverride(): void
     {
-        putenv('PMSS_HOME_DEVICE=/dev/md-test');
+        $this->pmssTrackEnvOverrides(['PMSS_HOME_DEVICE' => '/dev/md-test']);
         $probe = new cgroupRealSystemProbe();
 
         $resolved = $probe->resolveDevice('/home');
@@ -45,7 +40,7 @@ class cgroupRealSystemTest extends TestCase
 
     public function testResolveDeviceQueriesHomeWithoutOverride(): void
     {
-        putenv('PMSS_HOME_DEVICE');
+        $this->pmssTrackEnvOverrides(['PMSS_HOME_DEVICE' => null]);
         $probe = new cgroupRealSystemProbe();
         $probe->returnValue = '/dev/md0';
 
