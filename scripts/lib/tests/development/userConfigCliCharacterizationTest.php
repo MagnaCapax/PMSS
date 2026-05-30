@@ -161,26 +161,46 @@ class userConfigCliCharacterizationTest extends TestCase
         ], $values);
     }
 
-    public function testCgroupResourceArgsUseSharedFlagMapOnce(): void
+    public function testCgroupApplyArgsUseOneCanonicalShape(): void
     {
-        $args = \pmssUserConfigCliBuildCgroupResourceArgs([
-            'trafficLimit' => 500,
+        $args = \pmssUserConfigCliBuildCgroupApplyArgs('alice', 1024, [
             'CPUWeight' => 200,
             'IOWeight' => 300,
-            'IOWriteBW' => '/dev/sda:7M',
-            'ioLatencyMs' => 50,
-            'ioCostQos' => 'enable=1 ctrl=user',
-            'ioCostModel' => 'ctrl=user model=linear',
-            'cpuQuotaPercent' => '150',
+            'IOReadIOPS' => '/dev/md0:250',
+            'IOWriteIOPS' => '/dev/md0:275',
+            'cpuQuotaPercent' => '125',
         ]);
 
         $this->assertSame([
+            '/scripts/util/userConfigCgroup.php',
+            'alice',
+            '--apply',
+            '--memory-high=1024',
             '--cpu-weight=200',
             '--io-weight=300',
-            '--io-write-bw=/dev/sda:7M',
-            '--io-latency-ms=50',
-            '--io-cost-qos=enable=1 ctrl=user',
-            '--io-cost-model=ctrl=user model=linear',
+            '--io-read-iops=/dev/md0:250',
+            '--io-write-iops=/dev/md0:275',
+            '--cpu-quota-percent=125',
+        ], $args);
+    }
+
+    public function testStoredCgroupApplyArgsRequireMemoryBaseline(): void
+    {
+        $this->assertSame(null, \pmssUserConfigCliBuildStoredCgroupApplyArgs('alice', ['IOWeight' => 300]));
+
+        $args = \pmssUserConfigCliBuildStoredCgroupApplyArgs('alice', [
+            'ramMiB' => 512,
+            'IOWeight' => 300,
+            'cpuQuotaPercent' => 'infinity',
+        ]);
+
+        $this->assertSame([
+            '/scripts/util/userConfigCgroup.php',
+            'alice',
+            '--apply',
+            '--memory-high=512',
+            '--io-weight=300',
+            '--cpu-quota-percent=infinity',
         ], $args);
     }
 }

@@ -23,7 +23,8 @@ class userConfigCommandContractsTest extends TestCase
 
     public function testCgroupConfigurationContractRemainsStable(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', ["'/scripts/util/userConfigCgroup.php'", "runStep(\n    'Configuring cgroups',", "'--memory-high=' . \$user['memory']"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', ['pmssUserConfigCliBuildCgroupApplyArgs($user[\'name\'], (int) $user[\'memory\'], $user)', "runStep(\n    'Configuring cgroups',"]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/userConfigCli.php', "'/scripts/util/userConfigCgroup.php'");
     }
 
     public function testUserConfigUsesSharedWelcomeCliParser(): void
@@ -62,7 +63,7 @@ class userConfigCommandContractsTest extends TestCase
 
     public function testUserConfigUsesSharedResourceSpecForPositionals(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', ["pmssUserConfigCliResolvedResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", "pmssUserConfigCliPersistedStoredResources(\$existing)", "pmssUserConfigCliApplyPersistedResources(\$payload, \$user, \$presence)", "pmssUserConfigCliBuildCgroupResourceArgs(\$user)"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', ["pmssUserConfigCliResolvedResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", "pmssUserConfigCliPersistedStoredResources(\$existing)", "pmssUserConfigCliApplyPersistedResources(\$payload, \$user, \$presence)", 'pmssUserConfigCliBuildCgroupApplyArgs($user[\'name\'], (int) $user[\'memory\'], $user)']);
         $this->pmssAssertRepoFileNotContainsStrings('scripts/util/userConfig.php', [
             'pmssUserConfigCli'.'PersistedResourcePresence',
             "'--cpu-weight=' . \$user['CPUWeight']",

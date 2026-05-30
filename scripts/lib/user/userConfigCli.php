@@ -162,16 +162,34 @@ function pmssUserConfigCliBuildUserConfigPositionals(array $user): array
     return array_slice($optionalArgs, 0, max(0, $lastOptionalIndex - 3));
 }
 
-/** @return array<int,string> Translate shared resource keys into cgroup flags. */
-function pmssUserConfigCliBuildCgroupResourceArgs(array $user): array
+/** @return array<int,string> Build canonical userConfigCgroup.php apply arguments. */
+function pmssUserConfigCliBuildCgroupApplyArgs(string $username, int $memoryMiB, array $user): array
 {
-    $args = [];
+    $args = ['/scripts/util/userConfigCgroup.php', $username, '--apply', '--memory-high='.(string) $memoryMiB];
     foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
         if (!empty($spec['cgroupFlag']) && !empty($user[$key])) {
             $args[] = $spec['cgroupFlag'].$user[$key];
         }
     }
+    if (isset($user['cpuQuotaPercent']) && $user['cpuQuotaPercent'] !== '') {
+        $args[] = '--cpu-quota-percent='.(string) $user['cpuQuotaPercent'];
+    }
     return $args;
+}
+
+/** @return array<int,string>|null Build cgroup apply args from a stored payload. */
+function pmssUserConfigCliBuildStoredCgroupApplyArgs(string $username, array $payload): ?array
+{
+    $memory = isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) ? (int) $payload['ramMiB'] : 0;
+    if ($memory <= 0) {
+        return null;
+    }
+
+    return pmssUserConfigCliBuildCgroupApplyArgs(
+        $username,
+        $memory,
+        array_merge(['name' => $username, 'memory' => $memory], pmssUserConfigCliPersistedStoredResources($payload))
+    );
 }
 
 /** Render the canonical userConfig.php help output. */

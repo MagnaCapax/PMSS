@@ -266,22 +266,13 @@ if (file_exists('/bin/bash')) {
 
 // Delegate cgroup configuration to the dedicated utility.
 // This ensures v1/v2 compatibility and automatic weight calculation.
-$args = [
-    '/scripts/util/userConfigCgroup.php',
-    $user['name'],
-    '--apply',
-    '--memory-high=' . $user['memory'],
-];
-
-// Optional I/O throttles
-$args = array_merge($args, pmssUserConfigCliBuildCgroupResourceArgs($user));
+$args = pmssUserConfigCliBuildCgroupApplyArgs($user['name'], (int) $user['memory'], $user);
 if (isset($user['cpuQuotaPercent']) && $user['cpuQuotaPercent'] !== '') {
     $quotaVal = $user['cpuQuotaPercent'];
     $quotaLabel = (is_string($quotaVal) && strtolower((string) $quotaVal) === 'infinity')
         ? 'infinity'
         : $quotaVal.'%';
     echo 'Applying CPU quota: '.$quotaLabel."\n";
-    $args[] = '--cpu-quota-percent=' . $quotaVal;
 }
 
 runStep(

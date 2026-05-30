@@ -24,25 +24,9 @@ function pmssCgroupRefreshHasExplicitIoPolicy(array $payload): bool
 /** Build the canonical per-user cgroup refresh command from stored config. */
 function pmssCgroupRefreshBuildCommand(string $username, array $payload): ?string
 {
-    $memory = isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) ? (int) $payload['ramMiB'] : 0;
-    if ($memory <= 0) {
+    $args = pmssUserConfigCliBuildStoredCgroupApplyArgs($username, $payload);
+    if ($args === null) {
         return null;
-    }
-
-    $user = array_merge(
-        ['name' => $username, 'memory' => $memory],
-        pmssUserConfigCliPersistedStoredResources($payload)
-    );
-
-    $args = [
-        '/scripts/util/userConfigCgroup.php',
-        $username,
-        '--apply',
-        '--memory-high='.(string) $memory,
-    ];
-    $args = array_merge($args, pmssUserConfigCliBuildCgroupResourceArgs($user));
-    if (isset($user['cpuQuotaPercent']) && $user['cpuQuotaPercent'] !== '') {
-        $args[] = '--cpu-quota-percent='.(string) $user['cpuQuotaPercent'];
     }
 
     return pmssBuildCommand('php', $args);
