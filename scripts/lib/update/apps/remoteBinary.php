@@ -25,6 +25,18 @@ function pmssAppVersionProbeOutput(string $command, int $timeoutSeconds = PMSS_A
     return is_string($result['stdout'] ?? null) ? $result['stdout'] : '';
 }
 
+/** Reject archive basenames that could become shell options or path escapes. */
+function pmssPinnedRemoteArchiveComponentIsSafe(string $component): bool
+{
+    return $component !== ''
+        && $component !== '.'
+        && $component !== '..'
+        && substr($component, 0, 1) !== '-'
+        && strpos($component, '/') === false
+        && strpos($component, '\\') === false
+        && strpos($component, "\0") === false;
+}
+
 // Download a pinned artifact to a temp file; caller owns cleanup.
 function pmssDownloadPinnedRemoteTempFile(
     string $label,
@@ -100,7 +112,7 @@ function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expe
 {
     $trimmedWorkDir = rtrim($workDir, '/');
     foreach ([$archiveName, $sourceDir] as $component) {
-        if ($component === '' || $component === '.' || $component === '..' || strpos($component, '/') !== false || strpos($component, '\\') !== false || strpos($component, "\0") !== false) {
+        if (!pmssPinnedRemoteArchiveComponentIsSafe($component)) {
             logmsg("[WARN] Refusing unsafe archive extraction path for {$label}");
             return;
         }

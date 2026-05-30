@@ -130,9 +130,11 @@ SH
     {
         $cases = [
             ['../archive.tar.gz', 'source', 'compile'],
+            ['-archive.tar.gz', 'source', 'compile'],
             ['archive.tar.gz', 'source/child', 'compile'],
             ['', 'source', 'compile'],
             ['archive.tar.gz', '..', 'compile'],
+            ['archive.tar.gz', '-source', 'compile'],
             ['archive.tar.gz', 'source', ''],
             ['archive.tar.gz', 'source', 'compile/../outside'],
         ];
