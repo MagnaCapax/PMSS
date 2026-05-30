@@ -148,21 +148,6 @@ function rtorrentScgiSend(string $socketPath, string $request, int $timeout = 5)
 }
 
 /**
- * Send an xmlrpc int call and return whether rTorrent accepted it.
- *
- * @param string $socketPath Absolute path to the rTorrent Unix socket.
- * @param string $method     xmlrpc method name.
- * @param int    $value      Integer parameter.
- * @param int    $timeout    Timeout in seconds.
- *
- * @return bool True when a valid response is received.
- */
-function rtorrentScgiCallInt(string $socketPath, string $method, int $value, int $timeout = 5): bool
-{
-    return rtorrentScgiCall($socketPath, $method, [$value], $timeout) !== false;
-}
-
-/**
  * Decode one xmlrpc value node into a PHP scalar or nested list.
  *
  * @param \SimpleXMLElement $valueNode Xmlrpc value node.
@@ -269,23 +254,6 @@ function rtorrentScgiCall(string $socketPath, string $method, array $params = []
     }
 
     return rtorrentScgiDecodeResponse($response);
-}
-
-/**
- * Check if an rTorrent instance is responsive via its SCGI socket.
- *
- * Sends a lightweight xmlrpc call (system.api_version) and verifies we get
- * a valid response containing a <value> element. This confirms the instance
- * is not only running but also processing xmlrpc requests.
- *
- * @param string $socketPath Absolute path to the rTorrent Unix socket.
- * @param int    $timeout    Timeout in seconds (default 5).
- *
- * @return bool True if responsive, false if unresponsive or unreachable.
- */
-function rtorrentScgiPing(string $socketPath, int $timeout = 5): bool
-{
-    return rtorrentScgiCall($socketPath, 'system.api_version', [], $timeout) !== false;
 }
 
 /**

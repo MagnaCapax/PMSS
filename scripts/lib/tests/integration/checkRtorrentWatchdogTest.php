@@ -182,7 +182,7 @@ check('addUser exits 0', $addRc === 0);
 $socket = rtorrentScgiSocketPath($testUser);
 $rtReady = false;
 for ($i = 0; $i < 15; $i++) {
-    if (rtorrentScgiPing($socket, 3)) {
+    if (rtorrentScgiCall($socket, 'system.api_version', [], 3) !== false) {
         $rtReady = true;
         break;
     }
@@ -238,7 +238,7 @@ if (!$skipTorrents) {
 
 // Baseline SCGI latency.
 $t = microtime(true);
-$pingOk = rtorrentScgiPing($socket, 5);
+$pingOk = rtorrentScgiCall($socket, 'system.api_version', [], 5) !== false;
 $pingMs = round((microtime(true) - $t) * 1000, 1);
 check("SCGI baseline ping ({$pingMs}ms)", $pingOk);
 
@@ -261,7 +261,7 @@ $stallStart = time();
 emit('INFO', 'Socket renamed at '.date('c'));
 
 // Verify stall.
-$stalled = !rtorrentScgiPing($socket, 2);
+$stalled = rtorrentScgiCall($socket, 'system.api_version', [], 2) === false;
 check('SCGI is now unresponsive', $stalled);
 
 // Verify process still alive.
@@ -360,7 +360,7 @@ check('New socket created', $socketReady);
 // SCGI should respond.
 $recovered = false;
 for ($i = 0; $i < 10; $i++) {
-    if (rtorrentScgiPing($socket, 5)) {
+    if (rtorrentScgiCall($socket, 'system.api_version', [], 5) !== false) {
         $recovered = true;
         break;
     }

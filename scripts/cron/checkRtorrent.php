@@ -120,6 +120,19 @@ function pmssCheckRtorrentStaggerAfterRecentReboot(string $user, string $message
     return true;
 }
 
+// Keep alive-but-unresponsive rTorrent handling in one conservative path.
+function pmssCheckRtorrentExtendUnresponsiveGrace(
+    string $user,
+    string $message,
+    string $unresponsiveState,
+    string $acceptQueueWedgeState,
+    bool $debug
+): void {
+    rtorrentProcessWriteStateFile($unresponsiveState, (string) time());
+    rtorrentProcessClearStaleState($acceptQueueWedgeState);
+    pmssCheckRtorrentLogBoth($user, $message, $debug);
+}
+
 /**
  * Rebuild a missing per-user rTorrent config from the canonical templates.
  *
@@ -383,7 +396,7 @@ foreach ($users as $user) {
     // --- SCGI Health Check: Process running, verify responsiveness ---
     if (!empty($rtorrentPids) && count($rtorrentPids) === 1) {
         $socketPath = rtorrentScgiSocketPath($user);
-        $responsive = rtorrentScgiPing($socketPath, 5);
+        $responsive = rtorrentScgiCall($socketPath, 'system.api_version', [], 5) !== false;
 
         if ($responsive) {
             rtorrentProcessClearStaleState($unresponsiveState);
@@ -391,7 +404,7 @@ foreach ($users as $user) {
             $throttle = pmssReadTorrentThrottle($user);
             if ($throttle !== null) {
                 $throttleValue = $throttle > 0 ? $throttle : 0;
-                if (!rtorrentScgiCallInt($socketPath, 'throttle.global_up.max_rate.set', $throttleValue, 5)) {
+                if (rtorrentScgiCall($socketPath, 'throttle.global_up.max_rate.set', [$throttleValue], 5) === false) {
                     pmssCheckRtorrentLogBoth($user, 'failed to apply upload throttle', $debug);
                 } else {
                     pmssCheckRtorrentLog(
@@ -462,24 +475,24 @@ foreach ($users as $user) {
         if (!empty($rtorrentPids)) {
             $processStates = rtorrentProcessStatesForPids($rtorrentPids);
             if (empty($processStates)) {
-                rtorrentProcessWriteStateFile($unresponsiveState, (string) time());
-                rtorrentProcessClearStaleState($acceptQueueWedgeState);
-                pmssCheckRtorrentLogBoth(
+                pmssCheckRtorrentExtendUnresponsiveGrace(
                     $user,
                     'SCGI unresponsive but rtorrent process state is unavailable (pids='
                         .implode(',', $rtorrentPids).'); extending grace',
+                    $unresponsiveState,
+                    $acceptQueueWedgeState,
                     $debug
                 );
                 continue;
             }
 
             if (rtorrentProcessStatesHaveUninterruptibleIo($processStates)) {
-                rtorrentProcessWriteStateFile($unresponsiveState, (string) time());
-                rtorrentProcessClearStaleState($acceptQueueWedgeState);
-                pmssCheckRtorrentLogBoth(
+                pmssCheckRtorrentExtendUnresponsiveGrace(
                     $user,
                     'SCGI unresponsive but rtorrent is in uninterruptible I/O state (pids='
                         .implode(',', $rtorrentPids).'); extending grace',
+                    $unresponsiveState,
+                    $acceptQueueWedgeState,
                     $debug
                 );
                 continue;
@@ -492,10 +505,12 @@ foreach ($users as $user) {
                 $queueText = $queueSnapshot === null
                     ? 'queue=unavailable'
                     : 'recvQ='.(int) $queueSnapshot['recvQ'].' sendQ='.(int) $queueSnapshot['sendQ'];
-                pmssCheckRtorrentLogBoth(
+                pmssCheckRtorrentExtendUnresponsiveGrace(
                     $user,
                     'SCGI unresponsive but rtorrent still alive (pids='.implode(',', $rtorrentPids)
                         ."; {$queueText}); extending grace",
+                    $unresponsiveState,
+                    $acceptQueueWedgeState,
                     $debug
                 );
                 continue;

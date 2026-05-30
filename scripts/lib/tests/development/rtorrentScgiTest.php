@@ -157,17 +157,17 @@ class RtorrentScgiTest extends TestCase
         $this->assertFalse(rtorrentScgiSocketQueueSaturated(['recvQ' => 1, 'sendQ' => 0]));
     }
 
-    public function testPingReturnsFalseForMissingSocket(): void
+    public function testCallReturnsFalseForMissingSocket(): void
     {
-        $result = rtorrentScgiPing($this->fakeSocketPath(), 1);
+        $result = rtorrentScgiCall($this->fakeSocketPath(), 'system.api_version', [], 1);
 
-        $this->assertTrue($result === false, 'Ping should return false for missing socket');
+        $this->assertTrue($result === false, 'Call should return false for missing socket');
     }
 
-    public function testPingWithEmptyPathReturnsFalse(): void
+    public function testCallWithEmptyPathReturnsFalse(): void
     {
-        $result = rtorrentScgiPing('', 1);
-        $this->assertTrue($result === false, 'Ping should return false for empty path');
+        $result = rtorrentScgiCall('', 'system.api_version', [], 1);
+        $this->assertTrue($result === false, 'Call should return false for empty path');
     }
 
     public function testScgiSendReturnsFalseForMissingSocket(): void
