@@ -13,7 +13,8 @@ const PMSS_CUSTOMER_CONTEXT_ANTIPATTERN = 'OPERATOR_TREE_FUNCTION_LEAK';
 /** Execute the customer context fatal scanner CLI. */
 function pmssCustomerContextFatalScanMain(array $argv): int
 {
-    $root = pmssCustomerContextRoot();
+    $override = getenv('PMSS_CUSTOMER_CONTEXT_SCAN_ROOT');
+    $root = is_string($override) && trim($override) !== '' ? rtrim($override, '/') : dirname(__DIR__, 2);
     $violations = pmssCustomerContextFatalScan($root);
     if ($violations === []) {
         fwrite(STDERR, "[customer-context-fatal-scan] OK - customer-side bare function calls resolve safely\n");
@@ -33,247 +34,243 @@ function pmssCustomerContextFatalScanMain(array $argv): int
 /** Return unresolved bare function calls in customer-facing PHP. */
 function pmssCustomerContextFatalScan(string $root): array
 {
-    $root = rtrim($root, '/');
-    $skel = $root.'/etc/skel';
-    $www = $skel.'/www';
-    if (!is_dir($www)) return [];
+    return (new PmssCustomerContextFatalScanner($root))->scan();
+}
 
-    $wwwFiles = pmssCustomerContextFiles($www, false);
-    $customerDefs = pmssCustomerContextDefinitions(array_merge(pmssCustomerContextFiles($skel, false), $wwwFiles));
-    $operatorDefs = pmssCustomerContextDefinitions(pmssCustomerContextFiles($root.'/scripts/lib', true));
-    $builtins = array_fill_keys(array_map('strtolower', get_defined_functions()['internal'] ?? []), true);
-    $violations = [];
+/** Encapsulates token walking so only the scanner entrypoints remain global. */
+final class PmssCustomerContextFatalScanner
+{
+    private $root, $skel, $www, $builtins;
 
-    foreach ($wwwFiles as $file) {
-        $tokens = pmssCustomerContextTokens($file);
-        foreach (pmssCustomerContextCalls($tokens) as $call) {
-            $key = strtolower($call['function']);
-            if (isset($builtins[$key]) || isset($customerDefs[$key]) || pmssCustomerContextGuarded($tokens, $call['index'], $key)) {
-                continue;
-            }
-            $violations[] = [
-                'file' => pmssCustomerContextRelative($root, $file),
-                'line' => $call['line'],
-                'function' => $call['function'],
-                'operator_tree_source' => isset($operatorDefs[$key]) ? pmssCustomerContextRelative($root, $operatorDefs[$key]) : '',
-            ];
-        }
+    public function __construct(string $root)
+    {
+        $this->root = rtrim($root, '/');
+        $this->skel = $this->root.'/etc/skel';
+        $this->www = $this->skel.'/www';
+        $this->builtins = array_fill_keys(array_map('strtolower', get_defined_functions()['internal'] ?? []), true);
     }
-    return $violations;
-}
 
-/** Resolve the repository root, allowing tests to provide a hermetic fixture. */
-function pmssCustomerContextRoot(): string
-{
-    $override = getenv('PMSS_CUSTOMER_CONTEXT_SCAN_ROOT');
-    return is_string($override) && trim($override) !== '' ? rtrim($override, '/') : dirname(__DIR__, 2);
-}
+    /** @return array<int,array{file:string,line:int,function:string,operator_tree_source:string}> */
+    public function scan(): array
+    {
+        if (!is_dir($this->www)) return [];
 
-/** @return array<int, string> */
-function pmssCustomerContextFiles(string $dir, bool $recursive): array
-{
-    if (!is_dir($dir)) return [];
-    $files = [];
-    $iterator = $recursive
-        ? new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS))
-        : new DirectoryIterator($dir);
-    foreach ($iterator as $file) {
-        $path = $file->getPathname();
-        if (!$file->isFile() || $file->getExtension() !== 'php') continue;
-        if ($recursive && (strpos($path, '/tests/') !== false || strpos($path, '/devristo/') !== false)) continue;
-        $files[] = $path;
-    }
-    sort($files);
-    return $files;
-}
+        $wwwFiles = $this->files($this->www, false);
+        $customerDefs = $this->definitions(array_merge($this->files($this->skel, false), $wwwFiles));
+        $operatorDefs = $this->definitions($this->files($this->root.'/scripts/lib', true));
+        $violations = [];
 
-/** @return array<int, mixed> */
-function pmssCustomerContextTokens(string $file): array
-{
-    $content = file_get_contents($file);
-    return token_get_all(is_string($content) ? $content : '');
-}
-
-/** @return array<string, string> */
-function pmssCustomerContextDefinitions(array $files): array
-{
-    $defs = [];
-    foreach (array_values(array_unique($files)) as $file) {
-        $tokens = pmssCustomerContextTokens($file);
-        for ($i = 0, $n = count($tokens); $i < $n; $i++) {
-            if (!pmssCustomerContextIs($tokens[$i], T_FUNCTION)) continue;
-            $name = pmssCustomerContextWalk($tokens, $i, 1);
-            if ($name !== null && pmssCustomerContextText($tokens[$name]) === '&') $name = pmssCustomerContextWalk($tokens, $name, 1);
-            if ($name !== null && pmssCustomerContextIs($tokens[$name], T_STRING)) $defs[strtolower($tokens[$name][1])] = $file;
-        }
-    }
-    return $defs;
-}
-
-/** @return array<int, array{index:int,function:string,line:int}> */
-function pmssCustomerContextCalls(array $tokens): array
-{
-    $calls = [];
-    foreach ($tokens as $i => $token) {
-        if (!pmssCustomerContextIs($token, T_STRING)) continue;
-        $next = pmssCustomerContextWalk($tokens, $i, 1);
-        if ($next === null || pmssCustomerContextText($tokens[$next]) !== '(') continue;
-        if (pmssCustomerContextCallExcluded($tokens, $i)) continue;
-        $calls[] = ['index' => $i, 'function' => $token[1], 'line' => $token[2]];
-    }
-    return $calls;
-}
-
-/** Return true when function_exists() proves a missing call cannot fatal. */
-function pmssCustomerContextGuarded(array $tokens, int $call, string $name): bool
-{
-    $guards = strpos($name, 'zip_') === 0 && $name !== 'zip_open' ? [$name, 'zip_open'] : [$name];
-    return pmssCustomerContextSameExpressionGuarded($tokens, $call, $guards)
-        || pmssCustomerContextEnclosingIfGuarded($tokens, $call, $guards)
-        || pmssCustomerContextPreviousIfReturns($tokens, $call, $guards);
-}
-
-/** Detect short-circuit guards like function_exists('x') && x(). */
-function pmssCustomerContextSameExpressionGuarded(array $tokens, int $call, array $guards): bool
-{
-    for ($i = pmssCustomerContextBoundary($tokens, $call) + 1; $i < $call; $i++) {
-        $guard = pmssCustomerContextFunctionExistsAt($tokens, $i, $guards);
-        if ($guard === null) continue;
-        $operator = '';
-        for ($j = $guard['end'] + 1; $j < $call; $j++) {
-            if (pmssCustomerContextIs($tokens[$j], T_BOOLEAN_AND) || pmssCustomerContextText($tokens[$j]) === '&&') { $operator = 'and'; break; }
-            if (pmssCustomerContextIs($tokens[$j], T_BOOLEAN_OR) || pmssCustomerContextText($tokens[$j]) === '||') { $operator = 'or'; break; }
-            if (pmssCustomerContextText($tokens[$j]) === '?') { $operator = 'ternary'; break; }
-        }
-        if ((!$guard['negated'] && ($operator === 'and' || $operator === 'ternary')) || ($guard['negated'] && $operator === 'or')) return true;
-    }
-    return false;
-}
-
-/** Detect ancestor blocks guarded by if (function_exists('x')). */
-function pmssCustomerContextEnclosingIfGuarded(array $tokens, int $call, array $guards): bool
-{
-    $cursor = $call;
-    while (($brace = pmssCustomerContextNearestOpenBrace($tokens, $cursor)) !== null) {
-        $closeParen = pmssCustomerContextWalk($tokens, $brace, -1);
-        $openParen = ($closeParen !== null && pmssCustomerContextText($tokens[$closeParen]) === ')') ? pmssCustomerContextMatchOpen($tokens, $closeParen, '(', ')') : null;
-        $before = $openParen === null ? null : pmssCustomerContextWalk($tokens, $openParen, -1);
-        if ($before !== null && pmssCustomerContextIs($tokens[$before], T_IF)) {
-            for ($i = $openParen + 1; $i < $closeParen; $i++) {
-                $guard = pmssCustomerContextFunctionExistsAt($tokens, $i, $guards);
-                if ($guard !== null && !$guard['negated']) return true;
+        foreach ($wwwFiles as $file) {
+            $tokens = $this->tokens($file);
+            foreach ($this->calls($tokens) as $call) {
+                $key = strtolower($call['function']);
+                if (isset($this->builtins[$key]) || isset($customerDefs[$key]) || $this->guarded($tokens, $call['index'], $key)) continue;
+                $violations[] = [
+                    'file' => $this->relative($file),
+                    'line' => $call['line'],
+                    'function' => $call['function'],
+                    'operator_tree_source' => isset($operatorDefs[$key]) ? $this->relative($operatorDefs[$key]) : '',
+                ];
             }
         }
-        $cursor = $brace;
+        return $violations;
     }
-    return false;
-}
 
-/** Detect immediately preceding if (!function_exists('x')) { return; }. */
-function pmssCustomerContextPreviousIfReturns(array $tokens, int $call, array $guards): bool
-{
-    $boundary = pmssCustomerContextBoundary($tokens, $call);
-    if ($boundary < 0 || pmssCustomerContextText($tokens[$boundary]) !== '}') return false;
-    $openBrace = pmssCustomerContextMatchOpen($tokens, $boundary, '{', '}');
-    if ($openBrace === null) return false;
-    $blockReturns = false;
-    for ($i = $openBrace + 1; $i < $boundary; $i++) {
-        if (pmssCustomerContextIs($tokens[$i], T_RETURN) || pmssCustomerContextIs($tokens[$i], T_EXIT)) { $blockReturns = true; break; }
+    private function files(string $dir, bool $recursive): array
+    {
+        if (!is_dir($dir)) return [];
+
+        $files = [];
+        $iterator = $recursive
+            ? new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS))
+            : new DirectoryIterator($dir);
+        foreach ($iterator as $file) {
+            $path = $file->getPathname();
+            if (!$file->isFile() || $file->getExtension() !== 'php') continue;
+            if ($recursive && (strpos($path, '/tests/') !== false || strpos($path, '/devristo/') !== false)) continue;
+            $files[] = $path;
+        }
+        sort($files);
+        return $files;
     }
-    if (!$blockReturns) return false;
-    $closeParen = pmssCustomerContextWalk($tokens, $openBrace, -1);
-    $openParen = ($closeParen !== null && pmssCustomerContextText($tokens[$closeParen]) === ')') ? pmssCustomerContextMatchOpen($tokens, $closeParen, '(', ')') : null;
-    $before = $openParen === null ? null : pmssCustomerContextWalk($tokens, $openParen, -1);
-    if ($before === null || !pmssCustomerContextIs($tokens[$before], T_IF)) return false;
-    for ($i = $openParen + 1; $i < $closeParen; $i++) {
-        $guard = pmssCustomerContextFunctionExistsAt($tokens, $i, $guards);
-        if ($guard !== null && $guard['negated']) return true;
+
+    private function definitions(array $files): array
+    {
+        $defs = [];
+        foreach (array_values(array_unique($files)) as $file) {
+            $tokens = $this->tokens($file);
+            for ($i = 0, $n = count($tokens); $i < $n; $i++) {
+                if (!$this->is($tokens[$i], T_FUNCTION)) continue;
+                $name = $this->walk($tokens, $i, 1);
+                if ($name !== null && $this->text($tokens[$name]) === '&') $name = $this->walk($tokens, $name, 1);
+                if ($name !== null && $this->is($tokens[$name], T_STRING)) $defs[strtolower($tokens[$name][1])] = $file;
+            }
+        }
+        return $defs;
     }
-    return false;
-}
 
-/** @return array{end:int,negated:bool}|null */
-function pmssCustomerContextFunctionExistsAt(array $tokens, int $i, array $guards): ?array
-{
-    if (!pmssCustomerContextIs($tokens[$i], T_STRING) || strtolower($tokens[$i][1]) !== 'function_exists') return null;
-    $open = pmssCustomerContextWalk($tokens, $i, 1);
-    $literal = $open === null ? null : pmssCustomerContextWalk($tokens, $open, 1);
-    if ($open === null || $literal === null || pmssCustomerContextText($tokens[$open]) !== '(' || !pmssCustomerContextIs($tokens[$literal], T_CONSTANT_ENCAPSED_STRING)) return null;
-    if (!in_array(strtolower(stripcslashes(substr((string) $tokens[$literal][1], 1, -1))), $guards, true)) return null;
-    $previous = pmssCustomerContextWalk($tokens, $i, -1);
-    return ['end' => pmssCustomerContextWalk($tokens, $literal, 1) ?? $literal, 'negated' => $previous !== null && pmssCustomerContextText($tokens[$previous]) === '!'];
-}
-
-function pmssCustomerContextCallExcluded(array $tokens, int $i): bool
-{
-    $prev = pmssCustomerContextWalk($tokens, $i, -1);
-    if ($prev === null) return false;
-    if (pmssCustomerContextIs($tokens[$prev], T_FUNCTION)) return true;
-    $beforeRef = pmssCustomerContextText($tokens[$prev]) === '&' ? pmssCustomerContextWalk($tokens, $prev, -1) : null;
-    if ($beforeRef !== null && pmssCustomerContextIs($tokens[$beforeRef], T_FUNCTION)) return true;
-    return pmssCustomerContextIs($tokens[$prev], T_OBJECT_OPERATOR)
-        || pmssCustomerContextIs($tokens[$prev], T_DOUBLE_COLON)
-        || pmssCustomerContextIs($tokens[$prev], T_NEW)
-        || pmssCustomerContextText($tokens[$prev]) === '\\';
-}
-
-function pmssCustomerContextNearestOpenBrace(array $tokens, int $i): ?int
-{
-    $depth = 0;
-    for ($j = $i - 1; $j >= 0; $j--) {
-        $text = pmssCustomerContextText($tokens[$j]);
-        if ($text === '}') $depth++;
-        if ($text === '{' && $depth-- === 0) return $j;
+    private function tokens(string $file): array
+    {
+        $content = file_get_contents($file);
+        return token_get_all(is_string($content) ? $content : '');
     }
-    return null;
-}
 
-function pmssCustomerContextMatchOpen(array $tokens, int $close, string $openText, string $closeText): ?int
-{
-    $depth = 0;
-    for ($i = $close; $i >= 0; $i--) {
-        $text = pmssCustomerContextText($tokens[$i]);
-        if ($text === $closeText) $depth++;
-        if ($text === $openText && --$depth === 0) return $i;
+    private function calls(array $tokens): array
+    {
+        $calls = [];
+        foreach ($tokens as $i => $token) {
+            if (!$this->is($token, T_STRING)) continue;
+            $next = $this->walk($tokens, $i, 1);
+            if ($next === null || $this->text($tokens[$next]) !== '(' || $this->callExcluded($tokens, $i)) continue;
+            $calls[] = ['index' => $i, 'function' => $token[1], 'line' => $token[2]];
+        }
+        return $calls;
     }
-    return null;
-}
 
-function pmssCustomerContextBoundary(array $tokens, int $i): int
-{
-    for ($j = $i - 1; $j >= 0; $j--) {
-        if (in_array(pmssCustomerContextText($tokens[$j]), [';', '{', '}'], true)) return $j;
+    private function guarded(array $tokens, int $call, string $name): bool
+    {
+        $guards = strpos($name, 'zip_') === 0 && $name !== 'zip_open' ? [$name, 'zip_open'] : [$name];
+        return $this->sameExpressionGuarded($tokens, $call, $guards)
+            || $this->enclosingIfGuarded($tokens, $call, $guards)
+            || $this->previousIfReturns($tokens, $call, $guards);
     }
-    return -1;
-}
 
-function pmssCustomerContextWalk(array $tokens, int $i, int $step): ?int
-{
-    $step = $step < 0 ? -1 : 1;
-    for ($j = $i + $step, $n = count($tokens); $j >= 0 && $j < $n; $j += $step) {
-        if (!pmssCustomerContextTrivia($tokens[$j])) return $j;
+    private function sameExpressionGuarded(array $tokens, int $call, array $guards): bool
+    {
+        for ($i = $this->boundary($tokens, $call) + 1; $i < $call; $i++) {
+            $guard = $this->functionExistsAt($tokens, $i, $guards);
+            if ($guard === null) continue;
+            $operator = '';
+            for ($j = $guard['end'] + 1; $j < $call; $j++) {
+                if ($this->is($tokens[$j], T_BOOLEAN_AND) || $this->text($tokens[$j]) === '&&') { $operator = 'and'; break; }
+                if ($this->is($tokens[$j], T_BOOLEAN_OR) || $this->text($tokens[$j]) === '||') { $operator = 'or'; break; }
+                if ($this->text($tokens[$j]) === '?') { $operator = 'ternary'; break; }
+            }
+            if ((!$guard['negated'] && ($operator === 'and' || $operator === 'ternary')) || ($guard['negated'] && $operator === 'or')) return true;
+        }
+        return false;
     }
-    return null;
-}
 
-function pmssCustomerContextTrivia($token): bool
-{
-    return is_array($token) && in_array($token[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true);
-}
+    private function enclosingIfGuarded(array $tokens, int $call, array $guards): bool
+    {
+        $cursor = $call;
+        while (($brace = $this->nearestOpenBrace($tokens, $cursor)) !== null) {
+            $closeParen = $this->walk($tokens, $brace, -1);
+            $openParen = ($closeParen !== null && $this->text($tokens[$closeParen]) === ')') ? $this->matchOpen($tokens, $closeParen, '(', ')') : null;
+            $before = $openParen === null ? null : $this->walk($tokens, $openParen, -1);
+            if ($before !== null && $this->is($tokens[$before], T_IF)) {
+                for ($i = $openParen + 1; $i < $closeParen; $i++) {
+                    $guard = $this->functionExistsAt($tokens, $i, $guards);
+                    if ($guard !== null && !$guard['negated']) return true;
+                }
+            }
+            $cursor = $brace;
+        }
+        return false;
+    }
 
-function pmssCustomerContextIs($token, int $id): bool
-{
-    return is_array($token) && $token[0] === $id;
-}
+    private function previousIfReturns(array $tokens, int $call, array $guards): bool
+    {
+        $boundary = $this->boundary($tokens, $call);
+        if ($boundary < 0 || $this->text($tokens[$boundary]) !== '}') return false;
 
-function pmssCustomerContextText($token): string
-{
-    return is_array($token) ? (string) $token[1] : (string) $token;
-}
+        $openBrace = $this->matchOpen($tokens, $boundary, '{', '}');
+        if ($openBrace === null) return false;
 
-function pmssCustomerContextRelative(string $root, string $path): string
-{
-    $root = rtrim(str_replace('\\', '/', $root), '/');
-    $path = str_replace('\\', '/', $path);
-    return strpos($path, $root.'/') === 0 ? substr($path, strlen($root) + 1) : $path;
+        $blockReturns = false;
+        for ($i = $openBrace + 1; $i < $boundary; $i++) {
+            if ($this->is($tokens[$i], T_RETURN) || $this->is($tokens[$i], T_EXIT)) { $blockReturns = true; break; }
+        }
+        if (!$blockReturns) return false;
+
+        $closeParen = $this->walk($tokens, $openBrace, -1);
+        $openParen = ($closeParen !== null && $this->text($tokens[$closeParen]) === ')') ? $this->matchOpen($tokens, $closeParen, '(', ')') : null;
+        $before = $openParen === null ? null : $this->walk($tokens, $openParen, -1);
+        if ($before === null || !$this->is($tokens[$before], T_IF)) return false;
+
+        for ($i = $openParen + 1; $i < $closeParen; $i++) {
+            $guard = $this->functionExistsAt($tokens, $i, $guards);
+            if ($guard !== null && $guard['negated']) return true;
+        }
+        return false;
+    }
+
+    /** @return array{end:int,negated:bool}|null */
+    private function functionExistsAt(array $tokens, int $i, array $guards): ?array
+    {
+        if (!$this->is($tokens[$i], T_STRING) || strtolower($tokens[$i][1]) !== 'function_exists') return null;
+
+        $open = $this->walk($tokens, $i, 1);
+        $literal = $open === null ? null : $this->walk($tokens, $open, 1);
+        if ($open === null || $literal === null || $this->text($tokens[$open]) !== '(' || !$this->is($tokens[$literal], T_CONSTANT_ENCAPSED_STRING)) return null;
+        if (!in_array(strtolower(stripcslashes(substr((string) $tokens[$literal][1], 1, -1))), $guards, true)) return null;
+
+        $previous = $this->walk($tokens, $i, -1);
+        return ['end' => $this->walk($tokens, $literal, 1) ?? $literal, 'negated' => $previous !== null && $this->text($tokens[$previous]) === '!'];
+    }
+
+    private function callExcluded(array $tokens, int $i): bool
+    {
+        $prev = $this->walk($tokens, $i, -1);
+        if ($prev === null) return false;
+        if ($this->is($tokens[$prev], T_FUNCTION)) return true;
+
+        $beforeRef = $this->text($tokens[$prev]) === '&' ? $this->walk($tokens, $prev, -1) : null;
+        if ($beforeRef !== null && $this->is($tokens[$beforeRef], T_FUNCTION)) return true;
+
+        return $this->is($tokens[$prev], T_OBJECT_OPERATOR)
+            || $this->is($tokens[$prev], T_DOUBLE_COLON)
+            || $this->is($tokens[$prev], T_NEW)
+            || $this->text($tokens[$prev]) === '\\';
+    }
+
+    private function nearestOpenBrace(array $tokens, int $i): ?int
+    {
+        $depth = 0;
+        for ($j = $i - 1; $j >= 0; $j--) {
+            $text = $this->text($tokens[$j]);
+            if ($text === '}') $depth++;
+            if ($text === '{' && $depth-- === 0) return $j;
+        }
+        return null;
+    }
+
+    private function matchOpen(array $tokens, int $close, string $openText, string $closeText): ?int
+    {
+        $depth = 0;
+        for ($i = $close; $i >= 0; $i--) {
+            $text = $this->text($tokens[$i]);
+            if ($text === $closeText) $depth++;
+            if ($text === $openText && --$depth === 0) return $i;
+        }
+        return null;
+    }
+
+    private function boundary(array $tokens, int $i): int
+    {
+        for ($j = $i - 1; $j >= 0; $j--) {
+            if (in_array($this->text($tokens[$j]), [';', '{', '}'], true)) return $j;
+        }
+        return -1;
+    }
+
+    private function walk(array $tokens, int $i, int $step): ?int
+    {
+        $step = $step < 0 ? -1 : 1;
+        for ($j = $i + $step, $n = count($tokens); $j >= 0 && $j < $n; $j += $step) {
+            if (!$this->trivia($tokens[$j])) return $j;
+        }
+        return null;
+    }
+
+    private function trivia($token): bool { return is_array($token) && in_array($token[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true); }
+    private function is($token, int $id): bool { return is_array($token) && $token[0] === $id; }
+    private function text($token): string { return is_array($token) ? (string) $token[1] : (string) $token; }
+
+    private function relative(string $path): string
+    {
+        $root = rtrim(str_replace('\\', '/', $this->root), '/');
+        $path = str_replace('\\', '/', $path);
+        return strpos($path, $root.'/') === 0 ? substr($path, strlen($root) + 1) : $path;
+    }
 }

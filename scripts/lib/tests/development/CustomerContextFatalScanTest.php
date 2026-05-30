@@ -15,7 +15,7 @@ class CustomerContextFatalScanTest extends TestCase
         $result = $this->pmssCustomerContextRunScan($root);
 
         $this->assertSame(1, $result['rc']);
-        $this->assertStringContainsAllStrings(['OPERATOR_TREE_FUNCTION_LEAK', 'etc/skel/www/welcome.php:2 - pmssJsonFileReadAssoc()', 'scripts/lib/lighttpd/userFileWrite.php'], $result['output']);
+        $this->assertSame("[customer-context-fatal-scan] FAIL - OPERATOR_TREE_FUNCTION_LEAK: 1 unresolved customer PHP function call(s):\n  etc/skel/www/welcome.php:2 - pmssJsonFileReadAssoc() (operator tree definition: scripts/lib/lighttpd/userFileWrite.php)\n\nPer ADR 0016 and ADR 0017, customer PHP must not depend on operator-tree functions.\nMove the customer-side subset into etc/skel/www/ or split operator-write/customer-read behavior.", $result['output']);
     }
 
     public function testAllowsCustomerTreeFunctionDefinitions(): void
