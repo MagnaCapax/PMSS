@@ -78,6 +78,74 @@ function pmssEnsureCronServiceActive(string $context = 'update'): void
     runStep('Enabling and starting cron service ('.$context.')', 'systemctl enable --now cron.service || true');
 }
 
+/** Return the PMSS-owned restart policy payload for cron.service. */
+function pmssCronRestartDropinContent(): string
+{
+    return "[Service]\nRestart=always\nRestartSec=10\n";
+}
+
+/**
+ * Ensure the cron.service restart policy drop-in is written to a safe target.
+ */
+function pmssEnsureCronRestartDropin(
+    string $dropinDir = '/etc/systemd/system/cron.service.d',
+    string $dropinFile = '',
+    string $systemdRuntimeDir = '/run/systemd/system',
+    ?bool &$changed = null
+): bool {
+    $changed = false;
+    if (!is_dir($systemdRuntimeDir)) {
+        return true;
+    }
+
+    $dropinDir = rtrim($dropinDir, '/');
+    $dropinFile = $dropinFile !== '' ? $dropinFile : $dropinDir.'/pmss-restart.conf';
+    if ($dropinDir === '' || $dropinDir[0] !== '/' || $dropinFile[0] !== '/' || dirname($dropinFile) !== $dropinDir) {
+        logMessage('[ERR] Refusing unsafe cron systemd drop-in path: '.$dropinFile);
+        return false;
+    }
+    if (!is_dir($dropinDir)) {
+        $rc = runStep('Ensuring cron systemd drop-in directory', 'install -d -m 0755 '.escapeshellarg($dropinDir));
+        if ($rc !== 0 || !is_dir($dropinDir)) {
+            logMessage('[ERR] Failed to create cron systemd drop-in directory: '.$dropinDir);
+            return false;
+        }
+    }
+    if (is_link($dropinDir)) {
+        logMessage('[ERR] Refusing symlinked cron systemd drop-in directory: '.$dropinDir);
+        return false;
+    }
+
+    if (is_link($dropinFile) || (file_exists($dropinFile) && !is_file($dropinFile))) {
+        logMessage('[ERR] Refusing unsafe cron systemd drop-in target: '.$dropinFile);
+        return false;
+    }
+
+    $content = pmssCronRestartDropinContent();
+    if (is_file($dropinFile)) {
+        $existing = @file_get_contents($dropinFile);
+        if (!is_string($existing)) {
+            logMessage('[ERR] Failed to read cron systemd drop-in target: '.$dropinFile);
+            return false;
+        }
+        if ($existing === $content) {
+            return true;
+        }
+    }
+
+    if (@file_put_contents($dropinFile, $content, LOCK_EX) === false) {
+        logMessage('[ERR] Failed to write cron systemd drop-in target: '.$dropinFile);
+        return false;
+    }
+    if (!@chmod($dropinFile, 0644)) {
+        logMessage('[ERR] Failed to set cron systemd drop-in mode: '.$dropinFile);
+        return false;
+    }
+
+    $changed = true;
+    return true;
+}
+
 /**
  * Specs for system-wide services that must stay disabled on seedbox hosts.
  *

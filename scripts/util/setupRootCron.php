@@ -81,21 +81,7 @@ if (is_file($systemCrontab)) {
 }
 
 $dropinChanged = false;
-if (is_dir('/run/systemd/system')) {
-    $dropinContent = "[Service]\nRestart=always\nRestartSec=10\n";
-    if (!is_dir($cronDropinDir)) {
-        $failed = runStep(
-            'Ensuring cron systemd drop-in directory',
-            'install -d -m 0755 '.escapeshellarg($cronDropinDir)
-        ) !== 0 || $failed;
-    }
-    $existing = is_file($cronDropinFile) ? file_get_contents($cronDropinFile) : '';
-    if ($existing !== $dropinContent) {
-        file_put_contents($cronDropinFile, $dropinContent);
-        chmod($cronDropinFile, 0644);
-        $dropinChanged = true;
-    }
-}
+$failed = !pmssEnsureCronRestartDropin($cronDropinDir, $cronDropinFile, '/run/systemd/system', $dropinChanged) || $failed;
 
 if ($dropinChanged) {
     $failed = runStep('Reloading systemd unit files (cron restart policy)', 'systemctl daemon-reload || true') !== 0 || $failed;

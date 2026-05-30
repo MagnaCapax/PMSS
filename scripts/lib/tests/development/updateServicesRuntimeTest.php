@@ -86,4 +86,73 @@ class UpdateServicesRuntimeTest extends TestCase
             '/usr/bin/systemctl restart sshd',
         ], $commands);
     }
+
+    public function testCronRestartDropinCreatesDirectoryAndFileSafely(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-cron-dropin-');
+        $dropinDir = $root.'/cron.service.d';
+        $dropinFile = $dropinDir.'/pmss-restart.conf';
+        $changed = false;
+
+        $this->assertTrue(\pmssEnsureCronRestartDropin($dropinDir, $dropinFile, $root, $changed));
+        $this->assertTrue($changed);
+        $this->assertSame(\pmssCronRestartDropinContent(), $this->pmssReadFileOrEmpty($dropinFile));
+        $this->assertSame(0644, fileperms($dropinFile) & 0777);
+    }
+
+    public function testCronRestartDropinSkipsUnchangedContent(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-cron-dropin-same-');
+        $dropinDir = $root.'/cron.service.d';
+        $dropinFile = $dropinDir.'/pmss-restart.conf';
+        $this->pmssWriteFile($dropinFile, \pmssCronRestartDropinContent());
+        $mtime = filemtime($dropinFile);
+        $changed = true;
+
+        $this->assertTrue(\pmssEnsureCronRestartDropin($dropinDir, $dropinFile, $root, $changed));
+        $this->assertFalse($changed);
+        $this->assertSame($mtime, filemtime($dropinFile));
+    }
+
+    public function testCronRestartDropinRefusesSymlinkTarget(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-cron-dropin-link-');
+        $dropinDir = $root.'/cron.service.d';
+        $dropinFile = $dropinDir.'/pmss-restart.conf';
+        $outside = $root.'/outside.conf';
+        $this->pmssWriteFile($outside, 'original');
+        $this->pmssEnsureDir($dropinDir);
+        symlink($outside, $dropinFile);
+        $changed = true;
+
+        $this->assertFalse(\pmssEnsureCronRestartDropin($dropinDir, $dropinFile, $root, $changed));
+        $this->assertFalse($changed);
+        $this->assertSame('original', $this->pmssReadFileOrEmpty($outside));
+    }
+
+    public function testCronRestartDropinRefusesSymlinkedDirectory(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-cron-dropin-dirlink-');
+        $realDir = $root.'/real';
+        $linkDir = $root.'/cron.service.d';
+        $this->pmssEnsureDir($realDir);
+        symlink($realDir, $linkDir);
+        $changed = true;
+
+        $this->assertFalse(\pmssEnsureCronRestartDropin($linkDir, $linkDir.'/pmss-restart.conf', $root, $changed));
+        $this->assertFalse($changed);
+        $this->assertFalse(file_exists($realDir.'/pmss-restart.conf'));
+    }
+
+    public function testCronRestartDropinRequiresTargetInsideDirectory(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-cron-dropin-outside-');
+        $dropinDir = $root.'/cron.service.d';
+        $outside = $root.'/outside.conf';
+        $changed = true;
+
+        $this->assertFalse(\pmssEnsureCronRestartDropin($dropinDir, $outside, $root, $changed));
+        $this->assertFalse($changed);
+        $this->assertFalse(file_exists($outside));
+    }
 }
