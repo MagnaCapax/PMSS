@@ -231,7 +231,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - pmssEnsureLingerAndDocker(string $user): void
   - Enables linger + rootless Docker wiring for the user.
   - Skips and attempts `userDocker.php stop` when user config `dockerEnabled` is false (default true, but defaults false for Storage Box product payloads) or the effective RAM floor for Docker is below 245 MiB.
-  - Rootless Docker `daemon.json` convergence refuses symlinked or non-regular config targets before writing, then installs changes through a temporary file with mode 0600.
+  - Rootless Docker `daemon.json` convergence refuses symlinked or non-regular config targets before writing, then installs changes through a temporary file with mode 0600. On Debian 10/11 with `fuse-overlayfs` available, it also disables Docker's containerd image store so the classic rootless graphdriver honours `storage-driver`.
 
 Sub-handlers:
 - pmssBuildUserContext(string $user, string $rutorrentIndexSha=''): ?array → validates `/home/<user>` with `.rtorrent.rc`, `data`, and no `www-disabled`; returns context.

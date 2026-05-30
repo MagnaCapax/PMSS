@@ -56,7 +56,8 @@ existing users, but new examples and support guidance should prefer
 On PMSS, rootless Docker prefers overlay-style drivers so containers stay fast and space-efficient:
 
 - Cgroup v2 hosts: PMSS seeds `~/.config/docker/daemon.json` with `"exec-opts": ["native.cgroupdriver=cgroupfs"]` so first-start rootless Docker avoids the transient systemd scope permission failure seen on unified cgroup hosts.
-- Debian 10+: when no driver is configured yet and `fuse-overlayfs` is available, PMSS writes `~/.config/docker/daemon.json` with `"storage-driver": "fuse-overlayfs"`. This is the default and recommended mode for rootless Docker on PMSS.
+- Debian 10/11: when `fuse-overlayfs` is available, PMSS writes `~/.config/docker/daemon.json` with `"storage-driver": "fuse-overlayfs"` and disables Docker's containerd image store via `"features": {"containerd-snapshotter": false}` so Docker honours the classic graphdriver on kernels without native rootless overlay support.
+- Debian 12+: when no driver is configured yet and `fuse-overlayfs` is available, PMSS writes `~/.config/docker/daemon.json` with `"storage-driver": "fuse-overlayfs"`. This is the default and recommended mode for rootless Docker on PMSS.
 - Custom drivers: if `daemon.json` already contains `storage-driver` (for example `overlay2` or `vfs`), PMSS leaves it untouched and logs that it is reusing the existing configuration. `vfs` is supported but slow and space-heavy, and should generally be considered a last resort.
 
 During dist-upgrades, PMSS also attempts to install `fuse-overlayfs` (best-effort) so existing rootless Docker configurations keep working after the reboot.

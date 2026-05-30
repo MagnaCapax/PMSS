@@ -207,7 +207,8 @@ function pmssEnsureDockerDependencies(string $user): void
     $subgid = @file_get_contents('/etc/subgid');
     if ($subuid === false || strpos($subuid, $user.':') === false) pmssUserLog($user, '[WARN] User missing from /etc/subuid; rootless Docker may fail.');
     if ($subgid === false || strpos($subgid, $user.':') === false) pmssUserLog($user, '[WARN] User missing from /etc/subgid; rootless Docker may fail.');
-    if (pmssDistroVersionFromEnv() <= 0) {
+    $distroVersion = pmssDistroVersionFromEnv();
+    if ($distroVersion <= 0) {
         pmssUserLog($user, '[WARN] PMSS_DISTRO_VERSION missing; skipping Docker storage-driver enforcement');
         return;
     }
@@ -226,6 +227,7 @@ function pmssEnsureDockerDependencies(string $user): void
         'create_when_missing' => $fuse['available'],
         'invalid_json_as_empty' => true,
         'preserve_custom_storage_driver' => true,
+        'disable_containerd_snapshotter' => $fuse['available'] && $distroVersion <= 11,
     ]);
     if (!$result['ok']) {
         $messages = ['ensure_dir_failed' => '[WARN] Failed to ensure ~/.config/docker', 'encode_failed' => '[WARN] Failed to encode daemon.json', 'write_failed' => '[WARN] Failed to write daemon.json'];
@@ -234,9 +236,14 @@ function pmssEnsureDockerDependencies(string $user): void
     }
     if (!$fuse['available'] && !$hasConfigFile) {
         pmssUserLog($user, sprintf('[WARN] fuse-overlayfs %s; skipping storage-driver enforcement', $fuse['path'] === null ? 'missing' : 'unusable'));
-    } elseif ($result['removed_storage_driver']) {
+    }
+    if ($result['removed_storage_driver']) {
         pmssUserLog($user, '[WARN] Removed daemon.json storage-driver because fuse-overlayfs is unavailable');
-    } elseif ($result['configured_storage_driver']) {
+    }
+    if ($result['configured_storage_driver']) {
         pmssUserLog($user, '[INFO] Configured Docker storage-driver: fuse-overlayfs');
+    }
+    if ($result['disabled_containerd_snapshotter']) {
+        pmssUserLog($user, '[INFO] Disabled Docker containerd image store for rootless fuse-overlayfs');
     }
 }

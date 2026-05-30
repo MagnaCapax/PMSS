@@ -16,8 +16,10 @@ class FuseOverlayfsSupportTest extends TestCase
         $this->pmssAssertRepoFileContainsString('scripts/lib/update/userMaintenance.php', "require_once __DIR__.'/users/docker.php';");
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/docker.php', [
             'fuse-overlayfs',
+            'disable_containerd_snapshotter',
         ], [
             'if ($distroVersion >= 12)' => 'Expected fuse-overlayfs enforcement to apply on Debian 12+ when available',
         ]);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/rootlessDockerConfig.php', 'containerd-snapshotter');
     }
 }

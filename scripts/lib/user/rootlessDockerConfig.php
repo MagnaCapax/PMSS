@@ -53,7 +53,7 @@ function pmssUserRootlessDockerConfigWrite(string $configFile, string $json, int
 /**
  * Converge ~/.config/docker/daemon.json according to the requested policy.
  *
- * @return array{ok:bool,changed:bool,created:bool,removed_storage_driver:bool,configured_storage_driver:bool,reason:string,path:string}
+ * @return array{ok:bool,changed:bool,created:bool,removed_storage_driver:bool,configured_storage_driver:bool,disabled_containerd_snapshotter:bool,reason:string,path:string}
  */
 function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $uid, int $gid, array $policy): array
 {
@@ -62,6 +62,7 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
         'ok' => false, 'changed' => false, 'created' => false,
         'removed_storage_driver' => false,
         'configured_storage_driver' => false,
+        'disabled_containerd_snapshotter' => false,
         'reason' => '', 'path' => $configFile,
     ];
 
@@ -105,6 +106,18 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
                 $changed = true;
                 $result['configured_storage_driver'] = true;
             }
+        }
+    }
+
+    if (!empty($policy['disable_containerd_snapshotter'])) {
+        // Docker reads storage backend features only at daemon startup. This
+        // preserves existing feature keys while forcing the classic graphdriver.
+        $features = isset($data['features']) && is_array($data['features']) ? $data['features'] : [];
+        if (!array_key_exists('containerd-snapshotter', $features) || $features['containerd-snapshotter'] !== false) {
+            $features['containerd-snapshotter'] = false;
+            $data['features'] = $features;
+            $changed = true;
+            $result['disabled_containerd_snapshotter'] = true;
         }
     }
 

@@ -67,6 +67,40 @@ class UserDockerCgroupDriverTest extends TestCase
         $this->assertEquals(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
     }
 
+    public function testSharedRootlessDockerConfigDisablesContainerdSnapshotterWhenRequested(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+
+        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+            'storage_driver' => 'fuse-overlayfs',
+            'create_when_missing' => true,
+            'disable_containerd_snapshotter' => true,
+        ]);
+
+        $this->assertTrue($result['ok']);
+        $this->assertTrue($result['changed']);
+        $this->assertTrue($result['disabled_containerd_snapshotter']);
+        $payload = $this->readDaemonConfig($home);
+        $this->assertEquals('fuse-overlayfs', $payload['storage-driver']);
+        $this->assertFalse($payload['features']['containerd-snapshotter']);
+        $this->assertEquals(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
+    }
+
+    public function testSharedRootlessDockerConfigPreservesExistingFeatureKeys(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+        $this->writeDaemonConfig($home, ['features' => ['buildkit' => true]]);
+
+        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+            'disable_containerd_snapshotter' => true,
+        ]);
+
+        $this->assertTrue($result['ok']);
+        $payload = $this->readDaemonConfig($home);
+        $this->assertFalse($payload['features']['containerd-snapshotter']);
+        $this->assertTrue($payload['features']['buildkit']);
+    }
+
     public function testSharedRootlessDockerConfigRemovesUnavailablePmssDriver(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
