@@ -110,9 +110,19 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
         $result['stderr'] = (string) @file_get_contents($stderrPath);
         $result['provision_log'] = (string) @file_get_contents($provisionLogPath);
         $result['user_log_lines'] = @file($userLogPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: array();
-        $result['summary_json'] = $this->extractFatalExitSummaryJson($result['output']);
+        foreach (explode("\n", trim($result['output'])) as $line) {
+            if (strpos($line, '###ADDUSER_JSON:') !== 0) {
+                continue;
+            }
 
-        return $result;
+            $result['summary_json'] = $this->pmssDecodeJsonArray(
+                substr($line, strlen('###ADDUSER_JSON:')),
+                'Expected fatal exit JSON line to decode'
+            );
+            return $result;
+        }
+
+        throw new \AssertionError('Expected fatal exit JSON summary in output: '.$result['output']);
     }
 
     /**
@@ -145,22 +155,4 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
         ))."\n";
     }
 
-    /**
-     * @return array<string,mixed>
-     */
-    private function extractFatalExitSummaryJson(string $output): array
-    {
-        foreach (explode("\n", trim($output)) as $line) {
-            if (strpos($line, '###ADDUSER_JSON:') !== 0) {
-                continue;
-            }
-
-            return $this->pmssDecodeJsonArray(
-                substr($line, strlen('###ADDUSER_JSON:')),
-                'Expected fatal exit JSON line to decode'
-            );
-        }
-
-        throw new \AssertionError('Expected fatal exit JSON summary in output: '.$output);
-    }
 }

@@ -72,36 +72,6 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         return $this->pmssRunInlinePhp('require '.var_export($fixture, true).'; '.$script, [], $stderrRedirect);
     }
 
-    private function loadWelcomeGaugeFunctions(): void
-    {
-        if (function_exists('createGauge')) {
-            return;
-        }
-
-        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-        $start = strpos($source, 'function createStackedGauge');
-        $this->assertTrue($start !== false, 'welcome.php gauge helpers should remain present');
-
-        $tail = substr($source, $start);
-        $tail = preg_replace('/\?>\s*$/', '', $tail);
-        $fixture = $this->pmssMakeTempPath('pmss-welcome-gauge-', '.php');
-        require_once $this->pmssWriteFile($fixture, "<?php\n".$tail);
-    }
-
-    private function loadWelcomeServiceControlFunctions(): void
-    {
-        if (function_exists('pmssWelcomeActionButtonHtmlBuild')) {
-            return;
-        }
-
-        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-        $start = strpos($source, 'function pmssWelcomeHtmlAttr'); $end = strpos($source, 'function pmssWelcomeHeadingHtmlBuild');
-        $this->assertTrue($start !== false && $end !== false && $end > $start, 'welcome.php service-control helpers should remain present');
-
-        $fixture = $this->pmssMakeTempPath('pmss-welcome-service-controls-', '.php');
-        require_once $this->pmssWriteFile($fixture, "<?php\n".substr($source, $start, $end - $start));
-    }
-
     public function testQuotaMissingWarningGuardUsesOnlyQuotaLimitFields(): void
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
@@ -146,7 +116,15 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
     public function testWelcomeServiceActionButtonSnapshots(): void
     {
-        $this->loadWelcomeServiceControlFunctions();
+        if (!function_exists('pmssWelcomeActionButtonHtmlBuild')) {
+            $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+            $start = strpos($source, 'function pmssWelcomeHtmlAttr'); $end = strpos($source, 'function pmssWelcomeHeadingHtmlBuild');
+            $this->assertTrue($start !== false && $end !== false && $end > $start, 'welcome.php service-control helpers should remain present');
+
+            $fixture = $this->pmssMakeTempPath('pmss-welcome-service-controls-', '.php');
+            require_once $this->pmssWriteFile($fixture, "<?php\n".substr($source, $start, $end - $start));
+        }
+
         /** @var callable(mixed,mixed,mixed,mixed,mixed,mixed): string $button */
         $button = 'pmssWelcomeActionButtonHtmlBuild';
 
@@ -387,7 +365,16 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
     public function testWelcomeGaugeHtmlAndColorSnapshot(): void
     {
-        $this->loadWelcomeGaugeFunctions();
+        if (!function_exists('createGauge')) {
+            $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+            $start = strpos($source, 'function createStackedGauge');
+            $this->assertTrue($start !== false, 'welcome.php gauge helpers should remain present');
+
+            $tail = substr($source, $start);
+            $tail = preg_replace('/\?>\s*$/', '', $tail);
+            $fixture = $this->pmssMakeTempPath('pmss-welcome-gauge-', '.php');
+            require_once $this->pmssWriteFile($fixture, "<?php\n".$tail);
+        }
 
         $this->assertSame(
             array(

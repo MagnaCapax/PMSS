@@ -6,7 +6,7 @@ require_once dirname(__DIR__, 2).'/update/apps/remoteBinary.php';
 
 class RemoteBinaryHelperTest extends TestCase
 {
-    private function withFakeCommands(array $env, callable $callback): void
+    private function withFakeDownloadBody(string $body, callable $callback, array $extraEnv = array()): void
     {
         $root = $this->pmssMakeTempDir('pmss-remote-binary-', 0700);
         $binDir = $root.'/bin';
@@ -47,18 +47,11 @@ cat "$pkg" > "${PMSS_TEST_DPKG_CAPTURE}"
 SH
         ]);
 
-        $env = $this->pmssPathPrefixedEnvironment($binDir, $env);
+        $env = $this->pmssPathPrefixedEnvironment($binDir, array_merge(['PMSS_TEST_WGET_BODY' => $body], $extraEnv));
         $env['PMSS_TEST_COMMAND_LOG'] = $commandLog;
         $env['PMSS_TEST_DPKG_CAPTURE'] = $dpkgCapture;
 
-        $this->pmssWithEnv($env, function () use ($callback, $root, $commandLog, $dpkgCapture): void {
-            $callback($root, $commandLog, $dpkgCapture);
-        });
-    }
-
-    private function withFakeDownloadBody(string $body, callable $callback, array $extraEnv = array()): void
-    {
-        $this->withFakeCommands(array_merge(['PMSS_TEST_WGET_BODY' => $body], $extraEnv), function ($root, $commandLog, $dpkgCapture) use ($body, $callback): void {
+        $this->pmssWithEnv($env, function () use ($callback, $root, $commandLog, $dpkgCapture, $body): void {
             $callback($root, $commandLog, $dpkgCapture, $body, hash('sha256', $body));
         });
     }

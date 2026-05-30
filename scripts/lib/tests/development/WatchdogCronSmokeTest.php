@@ -24,26 +24,6 @@ class WatchdogCronSmokeTest extends TestCase
 
     public function testCoreWatchdogCronsExitCleanlyForFixtureUser(): void
     {
-        $this->stageWatchdogFixture();
-
-        foreach (array(
-            'scripts/cron/checkLighttpdInstances.php',
-            'scripts/cron/checkDelugeInstances.php',
-            'scripts/cron/checkQbittorrentInstances.php',
-        ) as $entrypoint) {
-            $result = $this->pmssRunRepoPhpScriptCommand($entrypoint, array(), $this->watchdogEnvironment());
-
-            $this->assertSame(0, $result['rc'], $entrypoint.' failed: '.$result['output']);
-            $this->assertStringNotContainsString('Fatal error', $result['output'], $entrypoint.' emitted a PHP fatal');
-            $this->assertStringNotContainsString('Uncaught', $result['output'], $entrypoint.' emitted an uncaught throwable');
-        }
-
-        $commandLog = (string) @file_get_contents($this->commandLog);
-        $this->assertSame('', $commandLog, 'watchdog smoke test should not start or kill services: '.$commandLog);
-    }
-
-    private function stageWatchdogFixture(): void
-    {
         $this->homeRoot = $this->pmssMakeTempDir('watchdog-cron-home-');
         $this->binDir = $this->pmssMakeTempDir('watchdog-cron-bin-');
         $this->commandLog = $this->pmssMakeTempPath('watchdog-cron-command-', '.log');
@@ -67,17 +47,26 @@ class WatchdogCronSmokeTest extends TestCase
             throw new SkipTest('unix socket fixture unavailable: '.$errstr.' ('.$errno.')');
         }
         $this->socketServers[] = $server;
-    }
 
-    /** @return array<string,string> */
-    private function watchdogEnvironment(): array
-    {
-        return array(
-            'PATH' => $this->binDir.':'.getenv('PATH'),
-            'PMSS_HOME_DIR' => $this->homeRoot,
-            'PMSS_LIGHTTPD_WATCHDOG_WEB_ROOT' => $this->pmssMakeTempDir('watchdog-cron-web-'),
-            'PMSS_TEST_LIST_USERS_COMMAND' => $this->listUsersScript,
-            'PMSS_TEST_MODE' => '1',
-        );
+        foreach (array(
+            'scripts/cron/checkLighttpdInstances.php',
+            'scripts/cron/checkDelugeInstances.php',
+            'scripts/cron/checkQbittorrentInstances.php',
+        ) as $entrypoint) {
+            $result = $this->pmssRunRepoPhpScriptCommand($entrypoint, array(), array(
+                'PATH' => $this->binDir.':'.getenv('PATH'),
+                'PMSS_HOME_DIR' => $this->homeRoot,
+                'PMSS_LIGHTTPD_WATCHDOG_WEB_ROOT' => $this->pmssMakeTempDir('watchdog-cron-web-'),
+                'PMSS_TEST_LIST_USERS_COMMAND' => $this->listUsersScript,
+                'PMSS_TEST_MODE' => '1',
+            ));
+
+            $this->assertSame(0, $result['rc'], $entrypoint.' failed: '.$result['output']);
+            $this->assertStringNotContainsString('Fatal error', $result['output'], $entrypoint.' emitted a PHP fatal');
+            $this->assertStringNotContainsString('Uncaught', $result['output'], $entrypoint.' emitted an uncaught throwable');
+        }
+
+        $commandLog = (string) @file_get_contents($this->commandLog);
+        $this->assertSame('', $commandLog, 'watchdog smoke test should not start or kill services: '.$commandLog);
     }
 }

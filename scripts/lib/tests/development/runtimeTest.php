@@ -365,22 +365,17 @@ class RuntimeTest extends TestCase
         try {
             $callback();
         } finally {
-            $this->restoreRuntimeArgv($originalGlobalArgv, $originalServerArgv);
-        }
-    }
+            if ($originalGlobalArgv === null) {
+                unset($GLOBALS['argv']);
+            } else {
+                $GLOBALS['argv'] = $originalGlobalArgv;
+            }
 
-    private function restoreRuntimeArgv($originalGlobalArgv, $originalServerArgv): void
-    {
-        if ($originalGlobalArgv === null) {
-            unset($GLOBALS['argv']);
-        } else {
-            $GLOBALS['argv'] = $originalGlobalArgv;
-        }
-
-        if ($originalServerArgv === null) {
-            unset($_SERVER['argv']);
-        } else {
-            $_SERVER['argv'] = $originalServerArgv;
+            if ($originalServerArgv === null) {
+                unset($_SERVER['argv']);
+            } else {
+                $_SERVER['argv'] = $originalServerArgv;
+            }
         }
     }
 }

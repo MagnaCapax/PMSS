@@ -256,7 +256,7 @@ class IndexSkeletonFrameDataTest extends TestCase
         $home = $this->pmssMakeUserWebHome('pmss-index-custom-home-');
         $this->pmssWriteFile($home.'/.customFrames', "custom|Custom tooltip|Custom|custom/\n\n");
 
-        $output = $this->renderIndexFromHomeWithDisplayedErrors($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+        $output = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'), true);
 
         $this->assertStringContainsString('<a href="#custom"', $output);
         $this->assertStringNotContainsString('Undefined array key', $output);
@@ -360,17 +360,10 @@ class IndexSkeletonFrameDataTest extends TestCase
         return $quotaInfo;
     }
 
-    private function renderIndexFromHome(string $home, array $environment = []): string
+    private function renderIndexFromHome(string $home, array $environment = [], bool $displayErrors = false): string
     {
-        $script = 'chdir('.var_export($home.'/www', true).'); '
-            .'ob_start(); include '.var_export($this->pmssRepoPath('etc/skel/www/index.php'), true).'; echo ob_get_clean();';
-
-        return $this->pmssRunInlinePhp($script, $environment, '2>&1');
-    }
-
-    private function renderIndexFromHomeWithDisplayedErrors(string $home, array $environment = []): string
-    {
-        $script = 'error_reporting(E_ALL); ini_set("display_errors", "1"); chdir('.var_export($home.'/www', true).'); '
+        $script = ($displayErrors ? 'error_reporting(E_ALL); ini_set("display_errors", "1"); ' : '')
+            .'chdir('.var_export($home.'/www', true).'); '
             .'ob_start(); include '.var_export($this->pmssRepoPath('etc/skel/www/index.php'), true).'; echo ob_get_clean();';
 
         return $this->pmssRunInlinePhp($script, $environment, '2>&1');
