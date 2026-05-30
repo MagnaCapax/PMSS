@@ -15,8 +15,8 @@ function pmssStatsReadQuotaSnapshot(string $home): array
 {
     $path = rtrim($home, '/').'/.quota';
     $result = ['path' => $path, 'raw' => '', 'used_text' => 'n/a', 'soft_text' => 'n/a', 'hard_text' => 'n/a', 'used_bytes' => null, 'soft_bytes' => null, 'hard_bytes' => null];
-    $raw = @file_get_contents($path);
-    if (!is_string($raw) || trim($raw) === '') return $result;
+    $raw = pmssReadRegularFileContents($path);
+    if ($raw === null || trim($raw) === '') return $result;
     $result['raw'] = $raw;
 
     foreach (preg_split('/\r?\n/', trim($raw)) ?: [] as $line) {
@@ -56,23 +56,23 @@ function pmssStatsReadCgroupStats(string $cgroupDir): array
     $stats = ['memory_current' => null, 'memory_limit' => null, 'pids_current' => null, 'cpu_usage_usec' => null, 'io_read_bytes' => 0, 'io_write_bytes' => 0, 'io_pressure_avg10' => null];
     if ($cgroupDir === '' || !is_dir($cgroupDir)) return $stats;
 
-    $memoryCurrent = trim((string) @file_get_contents($cgroupDir.'/memory.current'));
-    $memoryMax = trim((string) @file_get_contents($cgroupDir.'/memory.max'));
-    $pidsCurrent = trim((string) @file_get_contents($cgroupDir.'/pids.current'));
+    $memoryCurrent = pmssReadRegularFileTrimmed($cgroupDir.'/memory.current') ?? '';
+    $memoryMax = pmssReadRegularFileTrimmed($cgroupDir.'/memory.max') ?? '';
+    $pidsCurrent = pmssReadRegularFileTrimmed($cgroupDir.'/pids.current') ?? '';
     $stats['memory_current'] = ctype_digit($memoryCurrent) ? (int) $memoryCurrent : null;
     $stats['memory_limit'] = ($memoryMax === 'max') ? 'max' : (ctype_digit($memoryMax) ? (int) $memoryMax : null);
     $stats['pids_current'] = ctype_digit($pidsCurrent) ? (int) $pidsCurrent : null;
 
-    foreach (@file($cgroupDir.'/cpu.stat', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+    foreach (preg_split('/\r?\n/', trim(pmssReadRegularFileContents($cgroupDir.'/cpu.stat') ?? '')) ?: [] as $line) {
         if (preg_match('/^usage_usec\s+(\d+)$/', (string) $line, $matches) === 1) $stats['cpu_usage_usec'] = (int) $matches[1];
     }
-    foreach (@file($cgroupDir.'/io.stat', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+    foreach (preg_split('/\r?\n/', trim(pmssReadRegularFileContents($cgroupDir.'/io.stat') ?? '')) ?: [] as $line) {
         if (preg_match('/\brbytes=(\d+)/', (string) $line, $readMatches) === 1) $stats['io_read_bytes'] += (int) $readMatches[1];
         if (preg_match('/\bwbytes=(\d+)/', (string) $line, $writeMatches) === 1) $stats['io_write_bytes'] += (int) $writeMatches[1];
     }
 
-    $ioPressure = @file_get_contents($cgroupDir.'/../io.pressure');
-    if (!is_string($ioPressure) || trim($ioPressure) === '') $ioPressure = @file_get_contents(dirname($cgroupDir).'/io.pressure');
+    $ioPressure = pmssReadRegularFileContents($cgroupDir.'/../io.pressure');
+    if ($ioPressure === null || trim($ioPressure) === '') $ioPressure = pmssReadRegularFileContents(dirname($cgroupDir).'/io.pressure');
     if (is_string($ioPressure) && preg_match('/avg10=([0-9.]+)/', $ioPressure, $matches) === 1) $stats['io_pressure_avg10'] = (float) $matches[1];
     return $stats;
 }
@@ -131,7 +131,7 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
     $trafficLimitState = pmssTrafficLimitStateRead($home.'/.trafficLimit', $home.'/.bonusTraffic');
     $cgroup = pmssStatsReadCgroupStats($context['cgroup_dir']);
     $uptimeSeconds = null;
-    $uptimeRaw = @file_get_contents('/proc/uptime');
+    $uptimeRaw = pmssReadRegularFileContents('/proc/uptime');
     if (is_string($uptimeRaw) && preg_match('/^(\d+(?:\.\d+)?)/', trim($uptimeRaw), $matches) === 1) $uptimeSeconds = (int) floor((float) $matches[1]);
 
     $rtorrent = pmssStatsReadRtorrentStats($rtorrentCaller ?: 'rtorrentScgiCall', $context['socket_path']);

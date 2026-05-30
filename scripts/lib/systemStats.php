@@ -18,7 +18,7 @@ function pmssSystemStatsCollect(): array
     // These routines only serve the snapshot collector, so keep them local and
     // avoid exporting extra global helpers from the cron logging path.
     $readCpuStat = static function (): array {
-        $lines = @file('/proc/stat');
+        $lines = preg_split('/\r?\n/', pmssReadRegularFileContents('/proc/stat') ?? '');
         if (!is_array($lines) || !isset($lines[0])) {
             return [];
         }
@@ -31,11 +31,7 @@ function pmssSystemStatsCollect(): array
     };
     $readDiskIoTime = static function (): array {
         $stats = [];
-        $lines = @file('/proc/diskstats');
-        if (!is_array($lines)) {
-            return $stats;
-        }
-        foreach ($lines as $line) {
+        foreach (preg_split('/\r?\n/', pmssReadRegularFileContents('/proc/diskstats') ?? '') ?: [] as $line) {
             $parts = preg_split('/\s+/', trim($line));
             if (!is_array($parts) || count($parts) < 13) {
                 continue;
@@ -69,8 +65,8 @@ function pmssSystemStatsCollect(): array
         if (!is_readable($path)) {
             return 'na';
         }
-        $raw = @file_get_contents($path);
-        if (!is_string($raw)) {
+        $raw = pmssReadRegularFileContents($path);
+        if ($raw === null) {
             return 'na';
         }
         $find = static function (string $row, string $field) use ($raw): ?float {
@@ -120,7 +116,7 @@ function pmssSystemStatsCollect(): array
 
     $load = ['na', 'na', 'na'];
     if (
-        is_string($loadRaw = @file_get_contents('/proc/loadavg'))
+        is_string($loadRaw = pmssReadRegularFileContents('/proc/loadavg'))
         && is_array($parts = preg_split('/\s+/', trim($loadRaw)))
         && count($parts) >= 3
     ) {

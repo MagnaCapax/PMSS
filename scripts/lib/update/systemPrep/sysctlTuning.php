@@ -22,8 +22,10 @@ function pmssSystemPrepReadBoolEnv(string $key): ?bool
 /** Read non-empty config/procfs lines with a consistent fail-soft fallback. */
 function pmssSystemPrepNonEmptyLinesRead(string $path): array
 {
-    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    return is_array($lines) ? $lines : [];
+    $lines = preg_split('/\r?\n/', pmssReadRegularFileContents($path) ?? '');
+    return array_values(array_filter(is_array($lines) ? $lines : [], static function (string $line): bool {
+        return $line !== '';
+    }));
 }
 
 /** Detect whether any swap device is configured. */
@@ -47,7 +49,7 @@ function pmssSysctlBlockDeviceIsFast(string $deviceName, string $sysClassBlockRo
     $seen[$deviceName] = true;
     $queuePath = rtrim($sysClassBlockRoot, '/').'/'.$deviceName.'/queue/rotational';
     if (is_file($queuePath)) {
-        return trim((string) @file_get_contents($queuePath)) === '0';
+        return (pmssReadRegularFileTrimmed($queuePath) ?? '') === '0';
     }
 
     foreach (glob(rtrim($sysClassBlockRoot, '/').'/'.$deviceName.'/slaves/*') ?: [] as $slavePath) {
@@ -119,7 +121,7 @@ function pmssSysctlNicSpeedMbps(): int
     }
 
     $speedPath = pmssResolvePathFromEnv('PMSS_SYSCTL_SYS_CLASS_NET_PATH', '/sys/class/net').'/'.$iface.'/speed';
-    $speed = is_file($speedPath) ? trim((string) @file_get_contents($speedPath)) : '';
+    $speed = pmssReadRegularFileTrimmed($speedPath) ?? '';
     return ctype_digit($speed) ? (int) $speed : 1000;
 }
 
@@ -135,7 +137,7 @@ function pmssSysctlIsVm(): bool
     }
 
     foreach (['/sys/class/dmi/id/product_name', '/sys/class/dmi/id/sys_vendor'] as $path) {
-        $value = strtolower(trim((string) @file_get_contents($path)));
+        $value = strtolower(pmssReadRegularFileTrimmed($path) ?? '');
         if ($value !== '' && preg_match('/kvm|vmware|virtualbox|qemu|bochs|openstack|hvm domu|xen/', $value)) {
             return true;
         }

@@ -32,7 +32,7 @@ function pmssTotalCpuThreads(): int
         return (int) $override;
     }
 
-    $count = substr_count((string) @file_get_contents('/proc/cpuinfo'), 'processor');
+    $count = substr_count(pmssReadRegularFileContents('/proc/cpuinfo') ?? '', 'processor');
     return $count > 0 ? $count : max(0, (int) trim((string) @shell_exec('nproc')));
 }
 
@@ -46,11 +46,11 @@ function pmssCgroupMode(): string
     }
 
     if (is_file('/sys/fs/cgroup/cgroup.controllers')
-        || strpos((string) @file_get_contents('/proc/self/mountinfo'), ' - cgroup2 ') !== false) {
+        || strpos(pmssReadRegularFileContents('/proc/self/mountinfo') ?? '', ' - cgroup2 ') !== false) {
         return 'v2';
     }
 
-    if (strpos((string) @file_get_contents('/proc/cmdline'), 'systemd.unified_cgroup_hierarchy=0') !== false) {
+    if (strpos(pmssReadRegularFileContents('/proc/cmdline') ?? '', 'systemd.unified_cgroup_hierarchy=0') !== false) {
         return 'v1';
     }
 
@@ -101,12 +101,9 @@ function pmssEnsureCgroupsConfigured(?callable $logger = null): void
 
     try {
         $procMount = $hidepid = '';
-        $mi = @file('/proc/self/mountinfo', FILE_IGNORE_NEW_LINES);
-        if (is_array($mi)) {
-            foreach ($mi as $l) {
-                if (preg_match('#\s(/proc)\s#', $l)) {
-                    $procMount = $l;
-                }
+        foreach (preg_split('/\r?\n/', pmssReadRegularFileContents('/proc/self/mountinfo') ?? '') ?: [] as $l) {
+            if (preg_match('#\s(/proc)\s#', $l)) {
+                $procMount = $l;
             }
         }
         if ($procMount !== '') {
