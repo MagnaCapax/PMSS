@@ -79,56 +79,11 @@ function pmssTrafficReadRootOwnedStatsPayload(string $path, string $username): ?
     return $data;
 }
 
-/** Best-effort immutable toggle for traffic data files. */
-function pmssTrafficSetImmutable(string $path, bool $enable): void
-{
-    if (!is_file($path) || is_link($path)) {
-        return;
-    }
+/** Compatibility wrapper for traffic permission repair callers. */
+function pmssTrafficSetImmutable(string $path, bool $enable): void { pmssManagedFileImmutableSet($path, $enable); }
 
-    static $chattr = null;
-    if ($chattr === null) {
-        $chattr = '';
-        foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
-            if (is_executable($candidate)) {
-                $chattr = $candidate;
-                break;
-            }
-        }
-    }
-
-    $chattr === '' || @exec($chattr.' '.($enable ? '+i' : '-i').' '.escapeshellarg($path).' 2>/dev/null');
-}
-
-/**
- * Persist one traffic state file through the shared atomic writer.
- */
-function pmssTrafficWriteFile(string $path, string $serialized, string $group, int $mode, bool $immutable): bool
-{
-    $immutable && pmssTrafficSetImmutable($path, false);
-
-    try {
-        return pmssWriteManagedFile($path, $serialized, 'root', $group, $mode);
-    } finally {
-        $immutable && pmssTrafficSetImmutable($path, true);
-    }
-}
-
-/** Ensure each managed directory exists, reporting unsafe paths through the callback. */
-function pmssManagedDirsEnsure(array $directories, callable $failureLogger): void { foreach ($directories as $dir => $mode) { pmssEnsureSafeDir((string) $dir, (int) $mode) || $failureLogger((string) $dir); } }
-
-/** Write one serialized payload to each managed target while preserving partial success. */
-function pmssManagedSerializedTargetsWrite(string $serialized, array $targets, callable $failureLogger): bool
-{
-    $allWritesSucceeded = true;
-    foreach ($targets as list($path, $group, $mode, $immutable)) {
-        if (!pmssTrafficWriteFile((string) $path, $serialized, (string) $group, (int) $mode, (bool) $immutable)) {
-            $allWritesSucceeded = false;
-            $failureLogger((string) $path);
-        }
-    }
-    return $allWritesSucceeded;
-}
+/** Compatibility wrapper for older traffic-state callers. */
+function pmssTrafficWriteFile(string $path, string $serialized, string $group, int $mode, bool $immutable): bool { return pmssManagedSerializedTargetsWrite($serialized, [[$path, $group, $mode, $immutable]], static function (string $_path): void {}); }
 
 /** Persist zeroed traffic state for new accounts via the canonical storage helper. */
 function pmssTrafficSeedInitialState(string $username, ?string $homeDir = null, ?string $runtimeDir = null, ?callable $logger = null): bool

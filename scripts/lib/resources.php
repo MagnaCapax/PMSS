@@ -7,8 +7,8 @@
  */
 
 require_once __DIR__.'/runtime.php';
+require_once __DIR__.'/lighttpd/userFileWrite.php';
 require_once __DIR__.'/resources/accumulator.php';
-require_once __DIR__.'/traffic/storage.php';
 
 /** @return array<string, string> */
 function pmssResourceMemoryBreakdownFieldMap(string $prefix = 'memory_'): array { return ['anon' => $prefix.'anon', 'file' => $prefix.'file']; }

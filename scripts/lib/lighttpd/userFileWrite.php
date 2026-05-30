@@ -60,6 +60,9 @@ function pmssEnsureSafeDir(string $path, int $mode): bool
     return is_dir($path) && !is_link($path);
 }
 
+/** Ensure each managed directory exists, reporting unsafe paths through the callback. */
+function pmssManagedDirsEnsure(array $directories, callable $failureLogger): void { foreach ($directories as $dir => $mode) { pmssEnsureSafeDir((string) $dir, (int) $mode) || $failureLogger((string) $dir); } }
+
 /** Apply owner/group metadata only when the caller is root. */
 function pmssUserFileApplyOwnership(string $path, string $owner, ?string $group = null): void
 {
@@ -168,6 +171,46 @@ function pmssWriteManagedFile(string $path, string $content, string $owner, ?str
 function pmssWriteUserFile(string $path, string $content, string $owner, int $mode): bool
 {
     return pmssWriteManagedFile($path, $content, $owner, $owner, $mode);
+}
+
+/** Best-effort immutable toggle for managed root-owned files. */
+function pmssManagedFileImmutableSet(string $path, bool $enable): void
+{
+    if (!is_file($path) || is_link($path)) {
+        return;
+    }
+
+    static $chattr = null;
+    if ($chattr === null) {
+        $chattr = '';
+        foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
+            if (is_executable($candidate)) {
+                $chattr = $candidate;
+                break;
+            }
+        }
+    }
+
+    $chattr === '' || @exec($chattr.' '.($enable ? '+i' : '-i').' '.escapeshellarg($path).' 2>/dev/null');
+}
+
+/** Write one serialized payload to each managed target while preserving partial success. */
+function pmssManagedSerializedTargetsWrite(string $serialized, array $targets, callable $failureLogger): bool
+{
+    $allWritesSucceeded = true;
+    foreach ($targets as list($path, $group, $mode, $immutable)) {
+        (bool) $immutable && pmssManagedFileImmutableSet((string) $path, false);
+        try {
+            $ok = pmssWriteManagedFile((string) $path, $serialized, 'root', (string) $group, (int) $mode);
+        } finally {
+            (bool) $immutable && pmssManagedFileImmutableSet((string) $path, true);
+        }
+        if (!$ok) {
+            $allWritesSucceeded = false;
+            $failureLogger((string) $path);
+        }
+    }
+    return $allWritesSucceeded;
 }
 
 /**
