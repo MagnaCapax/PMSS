@@ -64,7 +64,7 @@ class UpdateBootstrapDistUpgradeTest extends TestCase
         ]);
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/services/systemd.php', [
             'function pmssEnsureCronServiceActive',
-            'systemctl is-enabled cron.service',
+            "pmssSystemdUnitState('is-enabled', 'cron.service')",
             'systemctl unmask cron.service || true',
             'systemctl enable --now cron.service || true',
         ]);

@@ -69,8 +69,7 @@ function pmssEnsureCronServiceActive(string $context = 'update'): void
         return;
     }
 
-    $state = trim((string) @shell_exec('systemctl is-enabled cron.service 2>/dev/null'));
-    if ($state === 'masked') {
+    if (pmssSystemdUnitState('is-enabled', 'cron.service') === 'masked') {
         logmsg('[WARN] cron.service is masked during '.$context.'; unmasking immediately');
         runStep('Unmasking cron service ('.$context.')', 'systemctl unmask cron.service || true');
     }
@@ -233,7 +232,7 @@ function pmssPurgeFailedUnbound(): void
         return;
     }
 
-    if (trim((string) @shell_exec('systemctl is-active unbound 2>/dev/null')) !== 'failed') {
+    if (pmssSystemdUnitState('is-active', 'unbound') !== 'failed') {
         return;
     }
 

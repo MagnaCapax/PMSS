@@ -96,8 +96,7 @@ CONF;
         // #TODO replace special-casing with a generic unit-unmask helper when more services require it.
         $hasSystemd = pmssSystemdRuntimeAvailable();
         if ($hasSystemd) {
-            $state = trim((string) @shell_exec('systemctl is-enabled proftpd.service 2>/dev/null'));
-            if ($state === 'masked') {
+            if (pmssSystemdUnitState('is-enabled', 'proftpd.service') === 'masked') {
                 runCommand('systemctl unmask proftpd.service');
             }
         }

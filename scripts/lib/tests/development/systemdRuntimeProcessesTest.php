@@ -27,6 +27,12 @@ class SystemdRuntimeProcessesTest extends TestCase
         $this->assertFalse(\pmssSystemdUnitNameIsSafe('demo;service'));
     }
 
+    public function testSystemdUnitStateRejectsUnsafeRequestsBeforeShelling(): void
+    {
+        $this->assertSame(null, \pmssSystemdUnitState('status', 'cron.service'));
+        $this->assertSame(null, \pmssSystemdUnitState('is-active', '-cron.service'));
+    }
+
     public function testStopDisableMaskSystemdUnitSkipsInvalidUnitNameDuringDryRun(): void
     {
         $this->pmssResetRuntimeProfile();

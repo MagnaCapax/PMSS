@@ -410,7 +410,11 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
     }
 
     function pmssSystemdRuntimeAvailable(string $runtimeDir = '/run/systemd/system'): bool { return is_dir($runtimeDir); }
-    function pmssSystemdUnitQuietStatus(string $action, string $unit): ?bool { if ($action !== 'is-active' && $action !== 'is-enabled') return null; if (!pmssSystemdRuntimeAvailable()) return null; exec('systemctl '.$action.' --quiet '.escapeshellarg($unit), $_, $rc); return $rc === 0; }
+    function pmssSystemdUnitNameIsSafe(string $unit): bool { $unit = trim($unit); return $unit !== '' && strpos($unit, '-') !== 0 && preg_match('/^[A-Za-z0-9:_.@\\-]+$/', $unit) === 1; }
+    function pmssSystemdUnitActionNameIsSafe(string $action): bool { return isset(['disable' => true, 'enable' => true, 'mask' => true, 'reload' => true, 'restart' => true, 'start' => true, 'stop' => true, 'try-reload-or-restart' => true, 'try-restart' => true, 'unmask' => true][trim($action)]); }
+    function pmssSystemdUnitStateActionNameIsSafe(string $action): bool { return $action === 'is-active' || $action === 'is-enabled'; }
+    function pmssSystemdUnitState(string $action, string $unit): ?string { if (!pmssSystemdUnitStateActionNameIsSafe($action) || !pmssSystemdRuntimeAvailable() || !pmssSystemdUnitNameIsSafe($unit)) return null; return trim((string) @shell_exec('systemctl '.$action.' '.escapeshellarg($unit).' 2>/dev/null')); }
+    function pmssSystemdUnitQuietStatus(string $action, string $unit): ?bool { if (!pmssSystemdUnitStateActionNameIsSafe($action) || !pmssSystemdRuntimeAvailable() || !pmssSystemdUnitNameIsSafe($unit)) return null; exec('systemctl '.$action.' --quiet '.escapeshellarg($unit), $_, $rc); return $rc === 0; }
     function pmssSystemdUnitIsActive(string $unit): ?bool { return pmssSystemdUnitQuietStatus('is-active', $unit); }
     function pmssSystemdUnitIsEnabled(string $unit): ?bool { return pmssSystemdUnitQuietStatus('is-enabled', $unit); }
 require_once __DIR__.'/runtime/commands.php';

@@ -8,40 +8,6 @@
 
 require_once __DIR__.'/commands.php';
 
-/**
- * Reject unit names that could be misparsed at the systemctl boundary.
- */
-function pmssSystemdUnitNameIsSafe(string $unit): bool
-{
-    $unit = trim($unit);
-    if ($unit === '' || strpos($unit, '-') === 0) {
-        return false;
-    }
-
-    return preg_match('/^[A-Za-z0-9:_.@\\-]+$/', $unit) === 1;
-}
-
-/**
- * Limit systemctl unit actions to single-token service operations.
- */
-function pmssSystemdUnitActionNameIsSafe(string $action): bool
-{
-    $actions = [
-        'disable' => true,
-        'enable' => true,
-        'mask' => true,
-        'reload' => true,
-        'restart' => true,
-        'start' => true,
-        'stop' => true,
-        'try-reload-or-restart' => true,
-        'try-restart' => true,
-        'unmask' => true,
-    ];
-
-    return isset($actions[trim($action)]);
-}
-
 function pmssSystemdActionSkipReason(?string $unit = null, bool $skipInDryRun = false, bool $skipInStrictTestMode = false): string
 {
     if (($skipInDryRun && pmssEnvFlagEnabled('PMSS_DRY_RUN')) || ($skipInStrictTestMode && pmssTestModeEnabled())) return 'test/dry-run';

@@ -26,8 +26,8 @@ foreach (pmssSeedboxSystemServiceSpecs() as $unit => $label) {
         continue;
     }
 
-    $active = trim((string) @shell_exec('systemctl is-active '.escapeshellarg($unit).' 2>/dev/null'));
-    $enabled = trim((string) @shell_exec('systemctl is-enabled '.escapeshellarg($unit).' 2>/dev/null'));
+    $active = pmssSystemdUnitState('is-active', $unit);
+    $enabled = pmssSystemdUnitState('is-enabled', $unit);
 
     if (($active !== 'active' && $active !== 'activating') && $enabled === 'masked') {
         continue;
