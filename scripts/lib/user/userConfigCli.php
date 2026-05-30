@@ -33,16 +33,27 @@ function pmssUserConfigCliResourceSpecs(): array
 }
 
 /** Prefer an explicit long option over a legacy positional slot. */
-function pmssUserConfigCliLegacyValue(array $parsed, string $option, array $args, int $legacyIndex, $default = null)
-{
-    $value = pmssCliOption($parsed, $option, null, null);
-    return ($value !== null && $value !== true) ? $value : (array_key_exists($legacyIndex, $args) ? $args[$legacyIndex] : $default);
-}
+function pmssUserConfigCliLegacyValue(array $parsed, string $option, array $args, int $legacyIndex, $default = null) { $value = pmssCliOption($parsed, $option, null, null); return ($value !== null && $value !== true) ? $value : (array_key_exists($legacyIndex, $args) ? $args[$legacyIndex] : $default); }
 
 /** @return array<int,string> List shared long-option names for resource flags. */
-function pmssUserConfigCliResourceOptionNames(string $optionKey): array
+function pmssUserConfigCliResourceOptionNames(string $optionKey): array { return array_values(array_filter(array_map('strval', array_column(pmssUserConfigCliResourceSpecs(), $optionKey)), 'strlen')); }
+
+/** @return array<int,string> Stable resource-key groups for CLI help rendering. */
+function pmssUserConfigCliResourceGroupKeys(string $group): array
 {
-    return array_values(array_filter(array_map('strval', array_column(pmssUserConfigCliResourceSpecs(), $optionKey)), 'strlen'));
+    return [
+        'addUserPositionals' => ['trafficLimit', 'trafficCapMbit'],
+        'addUserPrimaryOptions' => ['trafficLimit', 'iopsLimit', 'trafficCapMbit'],
+        'addUserAdvancedOptions' => ['CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'],
+        'userConfigPositionals' => ['trafficLimit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'],
+        'userConfigNamedOptions' => ['trafficLimit', 'iopsLimit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'],
+    ][$group] ?? [];
+}
+
+/** @return array<int,string> Render resource help lines from the shared spec table. */
+function pmssUserConfigCliResourceHelpLines(string $group, string $labelKey, array $descriptionSuffixes = []): array
+{
+    $lines = []; $specs = pmssUserConfigCliResourceSpecs(); foreach (pmssUserConfigCliResourceGroupKeys($group) as $key) { isset($specs[$key][$labelKey]) && $lines[] = pmssCliHelpLine($specs[$key][$labelKey], $specs[$key]['description'].($descriptionSuffixes[$key] ?? '')); } return $lines;
 }
 
 /** @return array<string,mixed> Parse resource values with named options overriding positional slots. */
@@ -167,7 +178,6 @@ function pmssUserConfigCliBuildCgroupResourceArgs(array $user): array
 function pmssUserConfigCliUsage(): string
 {
     $useColor = pmssCliHelpSupportsColor();
-    $resourceSpecs = pmssUserConfigCliResourceSpecs();
     $derivedDefault = pmssCliHelpDim(' (default: auto-derived from RAM when omitted)', $useColor);
     $unchangedDefault = pmssCliHelpDim(' (default: leave current slice policy unchanged)', $useColor);
     $resourceDescriptionSuffixes = [
@@ -187,31 +197,26 @@ function pmssUserConfigCliUsage(): string
         pmssCliHelpLine('DISK_QUOTA_GiB', 'Disk quota in GiB.'),
     ];
 
-    foreach (['trafficLimit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'] as $key) {
-        $lines[] = pmssCliHelpLine($resourceSpecs[$key]['parameter'], $resourceSpecs[$key]['description'].($resourceDescriptionSuffixes[$key] ?? ''));
-    }
+    $lines = array_merge($lines, pmssUserConfigCliResourceHelpLines('userConfigPositionals', 'parameter', $resourceDescriptionSuffixes));
 
     $lines[] = '';
     $lines[] = pmssCliHelpHeading('Named Options', $useColor);
-    foreach (['trafficLimit', 'iopsLimit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'] as $key) {
-        $lines[] = pmssCliHelpLine($resourceSpecs[$key]['usage'], $resourceSpecs[$key]['description'].($resourceDescriptionSuffixes[$key] ?? ''));
-    }
-    $lines[] = pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.');
-    $lines[] = pmssCliHelpLine('--welcome-message=HTML', 'Set or clear ~/.config/welcome-message.html.');
-    $lines[] = pmssCliHelpLine('--docker-enabled=true|false', 'Persist the rootless Docker policy for this user.');
-    $lines[] = pmssCliHelpLine('-h, --help', 'Show this help and exit.');
-    $lines[] = '';
-    $lines[] = pmssCliHelpHeading('Examples', $useColor);
-    $lines[] = '  /scripts/util/userConfig.php alice 1024 200';
-    $lines[] = '  /scripts/util/userConfig.php alice --io-weight=300';
-    $lines[] = '  /scripts/util/userConfig.php alice 2048 500 750 300 300 /dev/sda:20M /dev/sda:20M /dev/sda:500 /dev/sda:500 125 150 50 "enable=1 ctrl=user rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.00" "ctrl=user model=linear rbps=834913556 rseqiops=93622 rrandiops=102913 wbps=618985353 wseqiops=72325 wrandiops=71025" --upload-throttle-kib=2048 --docker-enabled=true';
-    $lines[] = '  /scripts/util/userConfig.php alice --welcome-message=<p>Planned maintenance tonight.</p>';
-    $lines[] = '';
-    $lines[] = pmssCliHelpHeading('Notes', $useColor);
-    $lines[] = '  - Named resource options override legacy positional values, and USERNAME with named options reuses the stored RAM/quota baseline.';
-    $lines[] = '  - RAM_MiB is applied through userConfigCgroup.php as MemoryHigh; PMSS clamps the effective floor to 250 MiB and derives MemoryMax at roughly 1.25x with at most 2048 MiB of headroom.';
-    $lines[] = '  - If RAM_MiB is below 245 MiB, PMSS persists dockerEnabled=false for safety.';
-    $lines[] = '  - For targeted slice-only edits, use /scripts/util/userConfigCgroup.php directly.';
-
-    return implode("\n", $lines);
+    return implode("\n", array_merge($lines, pmssUserConfigCliResourceHelpLines('userConfigNamedOptions', 'usage', $resourceDescriptionSuffixes), [
+        pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
+        pmssCliHelpLine('--welcome-message=HTML', 'Set or clear ~/.config/welcome-message.html.'),
+        pmssCliHelpLine('--docker-enabled=true|false', 'Persist the rootless Docker policy for this user.'),
+        pmssCliHelpLine('-h, --help', 'Show this help and exit.'),
+        '',
+        pmssCliHelpHeading('Examples', $useColor),
+        '  /scripts/util/userConfig.php alice 1024 200',
+        '  /scripts/util/userConfig.php alice --io-weight=300',
+        '  /scripts/util/userConfig.php alice 2048 500 750 300 300 /dev/sda:20M /dev/sda:20M /dev/sda:500 /dev/sda:500 125 150 50 "enable=1 ctrl=user rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.00" "ctrl=user model=linear rbps=834913556 rseqiops=93622 rrandiops=102913 wbps=618985353 wseqiops=72325 wrandiops=71025" --upload-throttle-kib=2048 --docker-enabled=true',
+        '  /scripts/util/userConfig.php alice --welcome-message=<p>Planned maintenance tonight.</p>',
+        '',
+        pmssCliHelpHeading('Notes', $useColor),
+        '  - Named resource options override legacy positional values, and USERNAME with named options reuses the stored RAM/quota baseline.',
+        '  - RAM_MiB is applied through userConfigCgroup.php as MemoryHigh; PMSS clamps the effective floor to 250 MiB and derives MemoryMax at roughly 1.25x with at most 2048 MiB of headroom.',
+        '  - If RAM_MiB is below 245 MiB, PMSS persists dockerEnabled=false for safety.',
+        '  - For targeted slice-only edits, use /scripts/util/userConfigCgroup.php directly.',
+    ]));
 }

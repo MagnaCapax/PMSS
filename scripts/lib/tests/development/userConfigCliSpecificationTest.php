@@ -78,4 +78,16 @@ class userConfigCliSpecificationTest extends TestCase
         $this->assertFalse(isset($specs['trafficLimit']['cgroupFlag']));
         $this->assertFalse(isset($specs['cpuQuotaPercent']['cgroupFlag']));
     }
+
+    public function testResourceHelpGroupsKeepOutputOrderStable(): void
+    {
+        foreach ([
+            'addUserPositionals' => ['trafficLimit', 'trafficCapMbit'],
+            'addUserPrimaryOptions' => ['trafficLimit', 'iopsLimit', 'trafficCapMbit'],
+            'userConfigPositionals' => ['trafficLimit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'],
+            'userConfigNamedOptions' => ['trafficLimit', 'iopsLimit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'],
+        ] as $group => $expected) {
+            $this->assertSame($expected, \pmssUserConfigCliResourceGroupKeys($group));
+        }
+    }
 }
