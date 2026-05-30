@@ -54,6 +54,15 @@ $jsonLog = (string) pmssCliOptionString($parsed, 'json', null, '/var/log/pmss/be
 $label = (string) pmssCliOptionString($parsed, 'label', null, '', true);
 $ddSize = (string) pmssCliOptionString($parsed, 'dd-size', null, '1G', true);
 function storageBenchmarkRequirePositiveSizeBytes(string $optionName, string $value): int { $bytes = preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i', trim($value)) === 1 ? pmssParseSizeToBytes($value, true, true) : null; if ($bytes === null || $bytes <= 0.0) { fwrite(STDERR, "Error: {$optionName} must be a positive size (examples: 1G, 512M, 1048576).\n"); exit(1); } return (int) $bytes; }
+function storageBenchmarkRequireMinimumSizeBytes(string $optionName, int $bytes, int $minimumBytes, string $minimumLabel): int
+{
+    if ($bytes < $minimumBytes) {
+        fwrite(STDERR, "Error: {$optionName} must be at least {$minimumLabel}.\n");
+        exit(1);
+    }
+
+    return $bytes;
+}
 // Reject malformed numeric knobs before they reach fio/dd runtime settings.
 function storageBenchmarkRequireIntOption(array $parsed, string $optionName, int $default, int $minimum, string $minimumLabel): int
 {
@@ -146,6 +155,14 @@ function storageBenchmarkDeviceIsReadableBlock(string $path): bool
         && is_readable($path)
         && @filetype($path) === 'block';
 }
+function storageBenchmarkRegisterFileCleanup(string $path): void
+{
+    register_shutdown_function(static function () use ($path): void {
+        if ($path !== '' && is_file($path)) {
+            @unlink($path);
+        }
+    });
+}
 function storageBenchmarkShowLast(string $jsonLog): int { if (!is_file($jsonLog)) { fwrite(STDERR,"No log at {$jsonLog}\n"); return 1; } $runs=[]; $lastId=''; $lastTs=''; foreach (pmssJsonLineFileRead($jsonLog) as $entry) { if (!isset($entry['run_id']) || !is_string($entry['run_id']) || $entry['run_id']==='') continue; $runId=$entry['run_id']; $runs[$runId][]=$entry; $runTs=(isset($entry['run_ts']) && is_string($entry['run_ts'])) ? $entry['run_ts'] : ''; if ($runTs>$lastTs){$lastTs=$runTs;$lastId=$runId;} } if ($lastId===''){ echo "No runs found.\n"; return 0; } $run=$runs[$lastId]; $first=$run[0]; $labelStr=(isset($first['label']) && $first['label']!=='') ? ('  Label: '.$first['label']) : ''; echo "\n== Storage benchmark (last run) ==\nRun ID: {$lastId}  Time: ".($first['run_ts'] ?? '').$labelStr."\n\n"; foreach ($run as $entry) { if (($entry['test'] ?? '')==='preflight-idle'){ echo "Preflight: ioping=".($entry['ioping_avg_ms']??'n/a')." ms util=".($entry['iostat_util_pct']??'n/a')."%\n\n"; break; } } echo "File-backed tests\n"; echo "test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95\twrite_p95\n"; foreach ($run as $entry){ if (isset($entry['test']) && empty($entry['device']) && (($entry['params']['rw']??'')!=='')) { $metrics=$entry['metrics']??[]; printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n",$entry['test'],$metrics['read_bw_MBps']??0,$metrics['write_bw_MBps']??0,$metrics['read_iops']??0,$metrics['write_iops']??0,$metrics['read_p95_ms']??0,$metrics['write_p95_ms']??0); } } echo "\nPer-device tests\n"; $devices=[]; foreach($run as $entry){ if(isset($entry['device'])) $devices[$entry['device']][]=$entry; } foreach ($devices as $device=>$entries){ echo $device."\n"; foreach ($entries as $entry){ $test=$entry['test']; $metrics=$entry['metrics']??[]; if($test==='device-seqread-dd') printf("  %-18s seq_MB/s=%.2f t=%.2fs\n",$test,$metrics['seqread_MBps']??0,$metrics['elapsed_s']??0); elseif(strpos($test,'dev-randread')===0) printf("  %-18s read_MB/s=%.2f IOPS=%.1f p95=%.2fms\n",$test,$metrics['read_bw_MBps']??0,$metrics['read_iops']??0,$metrics['read_p95_ms']??0); elseif($test==='device-ioping') printf("  %-18s avg_ms=%.2f\n",$test,$metrics['ioping_avg_ms']??0);} } return 0; }
 
 if ($showLast) exit(storageBenchmarkShowLast($jsonLog));
@@ -154,7 +171,7 @@ $runtime = storageBenchmarkRequireIntOption($parsed, 'runtime', 60, 1, 'positive
 $devRuntime = $testDevices ? storageBenchmarkRequireIntOption($parsed, 'device-runtime', 30, 1, 'positive') : 30;
 $idleLatencyMs = storageBenchmarkRequireIntOption($parsed, 'idle-latency-ms', 100, 0, 'non-negative');
 $idleUtilPct = storageBenchmarkRequireIntOption($parsed, 'idle-util', 85, 0, 'non-negative');
-$requested = storageBenchmarkRequirePositiveSizeBytes('--size', $fileSize); $ddSizeBytes = $testDevices ? storageBenchmarkRequirePositiveSizeBytes('--dd-size', $ddSize) : 0;
+$requested = storageBenchmarkRequirePositiveSizeBytes('--size', $fileSize); $ddSizeBytes = $testDevices ? storageBenchmarkRequireMinimumSizeBytes('--dd-size', storageBenchmarkRequirePositiveSizeBytes('--dd-size', $ddSize), 1024 * 1024, '1 MiB') : 0;
 storageBenchmarkRequireJsonLogPath($jsonLog);
 $targetDir = storageBenchmarkRequireTargetDir($targetDir);
 
@@ -172,7 +189,7 @@ storageBenchmarkAppendJsonLine($jsonLog,$pre); if($requireIdle && !$pre['ok']){ 
 
 // File-backed tests
 $free=storageBenchmarkRequirePositiveIntCommandField('df -PB1 '.escapeshellarg($targetDir).' | awk ' . escapeshellarg('NR==2 {print $4}'), 'free space'); $use=(int) min($requested, floor($free*0.8)); if($use<=0){ fwrite(STDERR,"Insufficient free space.\n"); exit(1);}
-$testFile=rtrim($targetDir,'/').'/pmss-fio-'.bin2hex(random_bytes(4)).'.dat'; if(pmssCommandPath('fallocate')!=='') runCommand('fallocate -l '.$use.' '.escapeshellarg($testFile));
+$testFile=rtrim($targetDir,'/').'/pmss-fio-'.bin2hex(random_bytes(4)).'.dat'; storageBenchmarkRegisterFileCleanup($testFile); if(pmssCommandPath('fallocate')!=='') runCommand('fallocate -l '.$use.' '.escapeshellarg($testFile));
 $tests=[ ['name'=>'randmix-large-95r5w','rw'=>'randrw','rwmixread'=>95,'bssplit'=>'4k/2:64k/3:128k/5:256k/10:512k/20:768k/25:1024k/35','iodepth'=>32,'numjobs'=>4,'direct'=>1], ['name'=>'randread-large','rw'=>'randread','bs'=>'1M','iodepth'=>32,'numjobs'=>4,'direct'=>1], ['name'=>'randread-small','rw'=>'randread','bs'=>'4k','iodepth'=>64,'numjobs'=>4,'direct'=>1], ['name'=>'randwrite-small-short','rw'=>'randwrite','bs'=>'4k','iodepth'=>32,'numjobs'=>2,'direct'=>1,'runtime'=>max(15,(int)floor($runtime/3))], ['name'=>'seqread-large','rw'=>'read','bs'=>'1M','iodepth'=>32,'numjobs'=>2,'direct'=>1] ];
  function fioRun(string $file,int $size,int $runtime,array $job): array { $json=pmssCreatePrivateTempFile('fio-'); if($json===null) return ['ok'=>false,'error'=>'unable to allocate fio JSON temp file']; $opts=['--name='.escapeshellarg($job['name']),'--filename='.escapeshellarg($file),'--size='.$size,'--time_based=1','--runtime='.(int)($job['runtime']??$runtime),'--rw='.escapeshellarg($job['rw']),'--ioengine=libaio','--iodepth='.(int)$job['iodepth'],'--numjobs='.(int)$job['numjobs'],'--direct='.(int)$job['direct'],'--group_reporting=1']; if(isset($job['bs'])) $opts[]='--bs='.escapeshellarg($job['bs']); if(isset($job['bssplit'])) $opts[]='--bssplit='.escapeshellarg($job['bssplit']); if(isset($job['rwmixread'])) $opts[]='--rwmixread='.(int)$job['rwmixread']; $cmd='fio --output-format=json --output '.escapeshellarg($json).' '.implode(' ',$opts); $rc=runCommand($cmd,true); $payload=@file_get_contents($json); @unlink($json); if($rc!==0 || $payload===false || trim($payload)==='') return ['ok'=>false,'error'=>'fio failed']; $j=json_decode($payload,true); if(!is_array($j)||empty($j['jobs'][0])) return ['ok'=>false,'error'=>'invalid fio JSON']; $rbw=0;$wbw=0;$ri=0;$wi=0;$rp=[];$wp=[]; foreach($j['jobs'] as $jobj){ $rbw+=(int)($jobj['read']['bw_bytes']??0); $wbw+=(int)($jobj['write']['bw_bytes']??0); $ri+=(float)($jobj['read']['iops']??0); $wi+=(float)($jobj['write']['iops']??0); $p95r=$jobj['read']['clat_ns']['percentile']['95.000000']??null; $p95w=$jobj['write']['clat_ns']['percentile']['95.000000']??null; if($p95r!==null) $rp[]=(float)$p95r; if($p95w!==null) $wp[]=(float)$p95w; } $avg=function($a){return count($a)?array_sum($a)/count($a):0;}; return ['ok'=>true,'result'=>['read_bw_MBps'=>round($rbw/(1024*1024),2),'write_bw_MBps'=>round($wbw/(1024*1024),2),'read_iops'=>round($ri,1),'write_iops'=>round($wi,1),'read_p95_ms'=>round($avg($rp)/1000000,2),'write_p95_ms'=>round($avg($wp)/1000000,2),'raw'=>$j]]; }
 $summary=[]; foreach($tests as $job){ $res=fioRun($testFile,$use,$runtime,$job); $entry=['timestamp'=>$runTs,'label'=>$label?:null,'run_id'=>$runId,'run_ts'=>$runTs,'target_dir'=>$targetDir,'device'=>$mntDev,'filesystem'=>$fs,'test'=>$job['name'],'params'=>['rw'=>$job['rw'],'rwmixread'=>$job['rwmixread']??null,'bs'=>$job['bs']??null,'bssplit'=>$job['bssplit']??null,'iodepth'=>$job['iodepth'],'numjobs'=>$job['numjobs'],'direct'=>$job['direct'],'runtime'=>(int)($job['runtime']??$runtime),'size_bytes'=>$use],'ok'=>$res['ok']]; if($res['ok']){$entry['metrics']=$res['result']; $summary[]=[ $job['name'],$res['result']['read_bw_MBps'],$res['result']['write_bw_MBps'],$res['result']['read_iops'],$res['result']['write_iops'],$res['result']['read_p95_ms'],$res['result']['write_p95_ms'] ];} else {$entry['error']=$res['error']??'unknown';} storageBenchmarkAppendJsonLine($jsonLog,$entry);} @unlink($testFile);

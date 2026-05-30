@@ -229,6 +229,14 @@ class StorageBenchSecurityTest extends TestCase
         }
     }
 
+    public function testDeviceDdSizeBelowOneMegabyteFailsBeforeBenchmarkWork(): void
+    {
+        $this->assertBenchmarkInputGuard(
+            ['--devices', '--dd-size=512K'],
+            "Error: --dd-size must be at least 1 MiB.\n"
+        );
+    }
+
     public function testIostatPreflightUsesSafeSerializedArrayReader(): void
     {
         $source = $this->pmssReadRepoFile('scripts/util/storageBenchmark.php');
@@ -243,6 +251,65 @@ class StorageBenchSecurityTest extends TestCase
 
         $this->assertStringContainsAllStrings(['storageBenchmarkRequireCommandField', 'pmssCommandCapture($command, 30)', "storageBenchmarkRequirePositiveIntCommandField('df -PB1 "], $source);
         $this->assertStringNotContainsString("\$free=(int)trim((string) shell_exec('df -PB1 ", $source);
+    }
+
+    public function testFileBackedTempFileIsCleanedAfterLateAppendFailure(): void
+    {
+        $target = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
+        $jsonLog = $this->pmssMakeJsonLogPath('pmss-bench-cleanup-', 'benchmark-storage.jsonl');
+        $stubDir = $this->pmssMakeTempDir('pmss-bench-stubs-', 0700);
+
+        $this->pmssWriteExecutableFile($stubDir.'/stat', "#!/bin/sh\nprintf '%s\\n' 'ext2/ext3'\n");
+        $this->pmssWriteExecutableFile($stubDir.'/df', <<<'SH'
+#!/bin/sh
+if [ "${1:-}" = "-PB1" ]; then
+    printf '%s\n' 'Filesystem 1B-blocks Used Available Use% Mounted on'
+    printf '%s\n' 'pmssfs 10485760 0 10485760 1% /tmp'
+    exit 0
+fi
+printf '%s\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on'
+printf '%s\n' 'pmssfs 10240 0 10240 1% /tmp'
+SH
+        );
+        $this->pmssWriteExecutableFile($stubDir.'/fallocate', <<<'SH'
+#!/bin/sh
+last=''
+for arg in "$@"; do
+    last="$arg"
+done
+: >"$last"
+SH
+        );
+        $this->pmssWriteExecutableFile($stubDir.'/ioping', "#!/bin/sh\nprintf '%s\\n' 'min/avg/max/mdev = 1.0/2.0/3.0/0.1 ms'\n");
+        $this->pmssWriteExecutableFile($stubDir.'/fio', <<<'SH'
+#!/bin/sh
+out=''
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --output)
+            shift
+            out="${1:-}"
+            ;;
+    esac
+    shift || break
+done
+cat >"$out" <<'JSON'
+{"jobs":[{"read":{"bw_bytes":1048576,"iops":1,"clat_ns":{"percentile":{"95.000000":1000000}}},"write":{"bw_bytes":0,"iops":0,"clat_ns":{"percentile":{"95.000000":0}}}}]}
+JSON
+rm -f "${PMSS_TEST_JSON_LOG:?}"
+mkdir "${PMSS_TEST_JSON_LOG:?}"
+SH
+        );
+
+        $run = $this->pmssRunRepoPhpScriptCommandWithTempStderr(
+            'scripts/util/storageBenchmark.php',
+            ['--target='.$target, '--json='.$jsonLog, '--size=1M', '--runtime=1'],
+            $this->pmssPathPrefixedEnvironment($stubDir, ['PMSS_TEST_JSON_LOG' => $jsonLog])
+        );
+
+        $this->assertSame(1, $run['result']['rc']);
+        $this->assertSame("Error: failed to append JSON log entry: {$jsonLog}\n", (string) @file_get_contents($run['stderrPath']));
+        $this->assertSame([], glob($target.'/pmss-fio-*.dat'));
     }
 
     public function testUnsafeTargetTraversalFailsBeforeBenchmarkWork(): void
