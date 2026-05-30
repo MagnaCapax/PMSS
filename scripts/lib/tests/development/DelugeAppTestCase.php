@@ -19,6 +19,8 @@ abstract class DelugeAppTestCase extends TestCase
 
     protected function pmssSetUpDelugeFixture(string $prefix): void
     {
-        $this->pmssAssignTempDirArrayLogger('tempDir', $prefix, $this->logs, $this->logger, 0700);
+        $this->pmssAssignTempDirProperty('tempDir', $prefix, 0700);
+        $this->logs = [];
+        $this->logger = $this->pmssMakeArrayLogger($this->logs);
     }
 }

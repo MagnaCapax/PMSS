@@ -17,7 +17,8 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->pmssCleanupTempDirProperty('tmpDir');
+        $this->cleanup($this->tmpDir);
+        $this->tmpDir = '';
     }
 
     public function testParsesRaidActivitySummaryDetails(): void

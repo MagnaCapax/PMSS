@@ -53,7 +53,8 @@ function pmssCustomerPanelRenderPage(string $www, string $bootstrap, string $hom
         .' -d allow_url_fopen=0'
         .' -d '.escapeshellarg('auto_prepend_file='.$bootstrap)
         .' '.escapeshellarg($pagePath);
-    $process = pmssCustomerPanelRenderRunProcess($command, $www, $env, 20);
+    $result = pmssCommandPipedCapture($command, $command, 20, 0, false, 'proc_open failed', 1, false, 'stream_select failed', $www, $env);
+    $process = ['rc' => $result['rc'], 'stdout' => $result['stdout'], 'stderr' => $result['stderr'], 'timedOut' => $result['timed_out']];
     $stdoutBytes = strlen($process['stdout']);
     $errors = [];
 
@@ -82,11 +83,4 @@ function pmssCustomerPanelRenderPage(string $www, string $bootstrap, string $hom
         'errors' => $errors,
         'stdout' => $process['stdout'],
     ];
-}
-
-/** Run a command through the shared capture path while preserving harness keys. */
-function pmssCustomerPanelRenderRunProcess(string $command, string $cwd, array $env, int $timeoutSec): array
-{
-    $result = pmssCommandPipedCapture($command, $command, $timeoutSec, 0, false, 'proc_open failed', 1, false, 'stream_select failed', $cwd, $env);
-    return ['rc' => $result['rc'], 'stdout' => $result['stdout'], 'stderr' => $result['stderr'], 'timedOut' => $result['timed_out']];
 }

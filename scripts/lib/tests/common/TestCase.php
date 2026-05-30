@@ -705,34 +705,6 @@ abstract class TestCase
         $this->tempDirProperties[$propertyName] = $propertyName;
     }
 
-    /** Seed a temp-dir property plus an array-backed logger pair for fixture-heavy tests. */
-    protected function pmssAssignTempDirArrayLogger(
-        string $propertyName,
-        string $prefix,
-        array &$messages,
-        &$logger,
-        int $mode = 0755,
-        ?string $baseDir = null
-    ): void {
-        $this->pmssAssignTempDirProperty($propertyName, $prefix, $mode, $baseDir);
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-    }
-
-    /** Remove a temporary directory stored on a test property, including private child properties. */
-    protected function pmssCleanupTempDirProperty(string $propertyName): void
-    {
-        $property = new \ReflectionProperty($this, $propertyName);
-        $property->setAccessible(true);
-        $path = (string) $property->getValue($this);
-        if ($path === '') {
-            return;
-        }
-
-        $this->cleanup($path);
-        $property->setValue($this, '');
-    }
-
     /** Build an environment array with a stub directory prepended to PATH. */
     protected function pmssPathPrefixedEnvironment(string $prefix, array $environment = []): array
     {
@@ -1119,12 +1091,6 @@ abstract class TestCase
         return $contents;
     }
 
-    /** Read an update app installer/helper source file. */
-    protected function pmssReadUpdateAppFile(string $relativePath): string
-    {
-        return $this->pmssReadRepoFile('scripts/lib/update/apps/'.ltrim($relativePath, '/'));
-    }
-
     /** Assert update app source requirements while sharing the repo-file reader. */
     protected function pmssAssertUpdateAppFileContainsAndOmitsStrings(string $relativePath, array $required = [], array $forbidden = []): string
     {
@@ -1172,13 +1138,7 @@ abstract class TestCase
     /** Read a repository file and assert that it does not declare a named function. */
     protected function pmssAssertRepoFileNotContainsFunction(string $relativePath, string $symbol, string $message): void
     {
-        $this->pmssAssertSourceOmitsFunction($this->pmssReadRepoFile($relativePath), $symbol, $message);
-    }
-
-    /** Assert that source text does not declare a named function. */
-    protected function pmssAssertSourceOmitsFunction(string $source, string $symbol, string $message): void
-    {
-        $this->pmssAssertStringNotContainsString('function '.$symbol.'(', $source, $message);
+        $this->pmssAssertStringNotContainsString('function '.$symbol.'(', $this->pmssReadRepoFile($relativePath), $message);
     }
 
     /** Read a repository file and assert required and forbidden substrings. */
