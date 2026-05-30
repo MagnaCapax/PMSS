@@ -21,7 +21,7 @@
     sharedscripts
 }
 
-/var/log/pmss/users.log /var/log/pmss/users.jsonl /var/log/pmss/trafficStats.log {
+/var/log/pmss/users.log /var/log/pmss/users.jsonl /var/log/pmss/trafficStats.log /var/log/pmss/user-home-reclaim.log {
     daily
     rotate 7
     size 100M

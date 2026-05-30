@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/user/homeReclaim.php';
 
 final class TerminateUserContractTest extends TestCase
 {
@@ -35,13 +36,13 @@ final class TerminateUserContractTest extends TestCase
         );
     }
 
-    public function testTerminateUserClearsImmutableTrafficBeforeHomeRemoval(): void
+    public function testTerminateUserClearsImmutableTrafficBeforeHomeReclaim(): void
     {
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'scripts/terminateUser.php',
-            ["'clear_immutable_traffic'", "'remove_home_initial'"],
+            ["'clear_immutable_traffic'", '$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim'],
             'terminateUser.php should define step ',
-            'terminateUser.php should clear immutable traffic files before removing the home directory: '
+            'terminateUser.php should clear immutable traffic files before moving the home aside: '
         );
         $this->pmssAssertRepoFileContainsAllStrings(
             'scripts/terminateUser.php',
@@ -50,23 +51,48 @@ final class TerminateUserContractTest extends TestCase
         );
     }
 
-    public function testTerminateUserClearsImmutableHomeLeftoversAfterInitialRemoval(): void
+    public function testTerminateUserQueuesHomeReclaimAfterTrafficImmutableCleanup(): void
     {
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'scripts/terminateUser.php',
-            ["'remove_home_initial'", "'clear_immutable_home'", "'remove_home_leftovers'"],
+            ["'clear_immutable_traffic'", '$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim', "'queue_home_reclaim'"],
             'terminateUser.php should define step ',
-            'terminateUser.php should remove normal home files before clearing immutable leftovers: '
+            'terminateUser.php should queue home reclaim after traffic immutability cleanup: '
         );
         $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/lib/user/homeReclaim.php',
+            [
+                'PMSS_USER_HOME_RECLAIM_LOG',
+                'ionice -c3 nice -n 19',
+                '/scripts/util/userHomeReclaim.php',
+            ],
+            'home reclaim should run asynchronously at low priority: '
+        );
+    }
+
+    public function testHomeReclaimPathContract(): void
+    {
+        $path = \pmssUserHomeReclaimPathBuild('user1234', 1767225600, 42);
+        $this->assertSame('/home/.terminating-user1234-20260101000000-42', $path);
+        $this->assertSame('user1234', \pmssUserHomeReclaimPathUsername($path));
+        $this->assertTrue(\pmssUserHomeReclaimPathIsSafe($path), 'unused generated reclaim path should be safe');
+        $this->assertFalse(\pmssUserHomeReclaimPathIsSafe('/home/user1234'), 'active home path must not be reclaimable');
+        $this->assertFalse(\pmssUserHomeReclaimPathIsSafe('/tmp/.terminating-user1234-20260101000000-42'), 'reclaim path must stay under /home');
+    }
+
+    public function testTerminateUserFinalCleanupDoesNotDeleteActiveHomeName(): void
+    {
+        $this->pmssAssertRepoFileContainsString(
+            'scripts/terminateUser.php',
+            "'remove_nginx_user'",
+            'terminateUser.php should still clean nginx user config: '
+        );
+        $this->pmssAssertRepoFileNotContainsStrings(
             'scripts/terminateUser.php',
             [
-                '$homeArg = escapeshellarg($homePath);',
-                "'if [ -d '.\$homeArg.' ] && command -v chattr",
-                'chattr -R -i',
-                "'if [ -d '.\$homeArg.' ]; then rm -rf -- '.\$homeArg.'; fi'",
+                'escapeshellarg("/home/{$username}")',
             ],
-            'terminateUser.php should keep conditional immutable leftover handling: '
+            'terminateUser.php final cleanup must not target a potentially re-created active home: '
         );
     }
 

@@ -21,6 +21,7 @@ require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/users.php';
 require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/traffic/storage.php';
+require_once __DIR__.'/lib/user/homeReclaim.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Terminating
 // a user when /home is unavailable could lead to incomplete cleanup or acting on
@@ -69,6 +70,29 @@ function pmssTerminateUserRemoveEmptyDir(string $username, string $phase, string
     }
     pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', 'Failed to remove empty directory', array('path' => $path));
     return false;
+}
+
+/**
+ * Move the home out of the active username namespace before slow disk reclaim.
+ */
+function pmssTerminateUserMoveHomeForReclaim(string $username, string $homePath, bool $dryRun): string
+{
+    $targetPath = pmssUserHomeReclaimPathNext($username);
+    if ($targetPath === '') {
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'home_reclaim_rename', $username, 'ERR', 'Unable to allocate reclaim path');
+        return '';
+    }
+    if ($dryRun) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'home_reclaim_rename', $username, 'SKIP', 'Dry run; home not renamed', array('source' => $homePath, 'target' => $targetPath));
+        return $targetPath;
+    }
+    if (!pmssUserHomeReclaimPathIsSafe($targetPath) || is_link($homePath) || !@rename($homePath, $targetPath)) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'home_reclaim_rename', $username, 'ERR', 'Failed to rename home for background reclaim', array('source' => $homePath, 'target' => $targetPath));
+        return '';
+    }
+
+    pmssUserLifecycleContextLogStatusMessage('terminate', 'home_reclaim_rename', $username, 'OK', 'Renamed home for background reclaim', array('source' => $homePath, 'target' => $targetPath));
+    return $targetPath;
 }
 
 $continue = '-';
@@ -241,20 +265,19 @@ $trafficFiles = array_values(pmssTrafficDataPaths($username));
 $trafficArgs = array_map('escapeshellarg', $trafficFiles);
 $clearImmutableCmd = 'if command -v chattr >/dev/null 2>&1; then chattr -i '.implode(' ', $trafficArgs).' 2>/dev/null || true; fi';
 $homePath = "/home/{$username}";
-$homeArg = escapeshellarg($homePath);
-$clearHomeImmutableCmd = 'if [ -d '.$homeArg.' ] && command -v chattr >/dev/null 2>&1; then chattr -R -i '.$homeArg.' 2>/dev/null || true; fi';
-$removeHomeLeftoversCmd = 'if [ -d '.$homeArg.' ]; then rm -rf -- '.$homeArg.'; fi';
 foreach (array(
     array('crontab_remove', 'crontab -r -u '.escapeshellarg($username).' || true'),
     array('crontab_spool_remove', 'rm -f -- '.escapeshellarg($crontabSpoolPaths[0]).' '.escapeshellarg($crontabSpoolPaths[1]).' || true'),
     array('userdel_initial', $userdelCommand),
     array('clear_immutable_traffic', $clearImmutableCmd),
-    array('remove_home_initial', 'cd /home && rm -rf -- '.escapeshellarg($username)),
-    // Remove ordinary files first so recursive chattr only visits leftovers.
-    array('clear_immutable_home', $clearHomeImmutableCmd),
-    array('remove_home_leftovers', $removeHomeLeftoversCmd),
 ) as $stepSpec) {
     pmssUserLifecycleStep('terminate', $username, $stepSpec[0], $stepSpec[1], $dryRun);
+}
+$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim($username, $homePath, $dryRun);
+if ($homeReclaimPath !== '') {
+    pmssUserLifecycleStep('terminate', $username, 'queue_home_reclaim', pmssUserHomeReclaimLaunchCommand($homeReclaimPath), $dryRun);
+} else {
+    pmssUserLifecycleStep('terminate', $username, 'remove_home_fallback', 'cd /home && rm -rf -- '.escapeshellarg($username), $dryRun);
 }
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");
 pmssUserLifecycleRefreshNginxConfig(
@@ -272,7 +295,7 @@ foreach (array(
     array('userdel_groupdel_retry', $userdelCommand),
     array('groupdel_retry', $groupdelCommand),
     array('remove_screen_socket', 'rm -rf -- '.escapeshellarg("/var/run/screen/S-{$username}")),
-    array('remove_home_and_nginx_user', 'rm -rf -- '.escapeshellarg("/home/{$username}").' -- '.escapeshellarg("/etc/nginx/users/{$username}")),
+    array('remove_nginx_user', 'rm -rf -- '.escapeshellarg("/etc/nginx/users/{$username}")),
     array('release_lighttpd_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' lighttpd'),
 ) as $stepSpec) {
     pmssUserLifecycleStep('terminate', $username, $stepSpec[0], $stepSpec[1], $dryRun);
