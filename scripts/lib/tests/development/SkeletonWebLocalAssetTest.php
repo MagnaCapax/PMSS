@@ -79,6 +79,7 @@ class SkeletonWebLocalAssetTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings(
             'etc/skel/www/index.php',
             [
+                'top: 34px;',
                 'font-size: 14px;',
                 'padding: 6px 14px;',
                 'width: auto;',
@@ -86,6 +87,7 @@ class SkeletonWebLocalAssetTest extends TestCase
                 'min-width: 0;',
                 'min-height: 0;',
                 'background-image: none;',
+                'var offsetHeight = -34;',
             ],
             'Missing tab geometry override: '
         );

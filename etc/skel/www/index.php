@@ -319,7 +319,7 @@ html, body {
 
 #content {
  width: 100%;
- top: 24px;
+ top: 34px;
  height: 350px; 
  position: absolute;
  overflow: auto;
@@ -475,7 +475,7 @@ foreach($frames AS $thisId => $thisFrame) {
 <script type="text/javascript">
 var offsetWidth = 3;
 var offsetDocumentHeight = -5;
-var offsetHeight = -24;
+var offsetHeight = -34;
 var windowHeight = $(window).height();
 
 function setHeights() {
