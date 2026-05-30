@@ -94,22 +94,29 @@ contents, so plan for services that may have open handles.
 
 ### Package Phase Ordering
 
-The package phase is a hard invariant: update-step2 must complete every dpkg task
-before any other orchestrator steps run. The sequence is:
+Package recovery and package installation are hard invariants: after lock
+acquisition and fatal preflight checks, update-step2 must repair interrupted
+dpkg configuration before any warning-only probes or other orchestrator steps
+run. The sequence is:
 
-1. `pmssConfigureAptNonInteractive()` – force unattended apt behaviour; runtime
+1. `pmssCompletePendingDpkg()` – finish any interrupted `dpkg --configure` runs
+   before `/home` inode-density checks or other PHP/apt-adjacent work. The
+   direct `dpkg --configure -a` call uses `--force-confdef --force-confold`
+   because dpkg conffile prompts do not honor `DEBIAN_FRONTEND`.
+2. Warning-only probes and distro detection run against the recovered package
+   state.
+3. `pmssConfigureAptNonInteractive()` – force unattended apt behaviour; runtime
    command wrappers also export `DEBIAN_FRONTEND=noninteractive`,
    `APT_LISTCHANGES_FRONTEND=none`, `UCF_FORCE_CONFDEF=1`,
    `UCF_FORCE_CONFOLD=1`, and `NEEDRESTART_MODE=a` for apt/dpkg recovery
    commands.
-2. `pmssCompletePendingDpkg()` – finish any interrupted `dpkg --configure` runs.
-3. `pmssApplyDpkgSelections()` – apply the codename-specific baseline snapshot.
-4. `pmssApplyDpkgSelections()` recovery + post-phase fix-broken/autoremove checks.
+4. `pmssApplyDpkgSelections()` – apply the codename-specific baseline snapshot.
+5. `pmssApplyDpkgSelections()` recovery + post-phase fix-broken/autoremove checks.
 
-Do not insert other modules between these calls and never move them later in the
-flow. The dpkg baseline is now the sole source of package state in this phase;
-when in doubt, update the baseline snapshot instead of injecting ad-hoc installs
-elsewhere in the run.
+Do not move the dpkg recovery below probes, and do not move apt configuration or
+baseline application later in the flow. The dpkg baseline is now the sole source
+of package state in this phase; when in doubt, update the baseline snapshot
+instead of injecting ad-hoc installs elsewhere in the run.
 
 ### Step Error Classification
 
@@ -172,10 +179,11 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
 
 ### Execution Outline
 
-1. Acquire the phase-2 lock and run warning-only preflights, including `/home`
-   inode density detection for media-stack workloads.
+1. Acquire the phase-2 lock, run fatal preflight checks, finish pending dpkg
+   configs, then run warning-only probes including `/home` inode density
+   detection for media-stack workloads.
 2. Detect distro name/version/codename and ensure `update.php` is up to date.
-3. Enforce non-interactive apt settings and finish any pending dpkg configs.
+3. Enforce non-interactive apt settings for subsequent apt work.
 4. Immediately refresh APT repositories and apply the codename-selected dpkg baseline
    _before_ any other orchestration (this ordering is mandatory for all regressions).
 5. Prepare the host (cgroups, systemd slices, base permissions, MOTD, locales) and

@@ -40,8 +40,9 @@ Keep the canonical installer/update details under `docs/install.md` and
 - Release-specific dpkg snapshots: `scripts/lib/update/dpkg/selections-debian10/11/12.txt`. Apply via `pmssApplyDpkgSelections()` once per run (update-step2 picks the codename-resolved version or logs if unavailable).
 - #TODO #Debian13: Debian 13 (trixie) is experimental; add `scripts/lib/update/dpkg/selections-debian13.txt` (captured from a real host) before promoting beyond experimental.
 - `pmssApplyDpkgSelections()` is the sole package-state authority during update-step2 package phase; the retired per-app package queue has been removed.
-- Always run repository refresh + package installation at the start of phase 2;
-  no other orchestration steps may run before APT completes.
+- Always recover pending dpkg configuration first, then run repository refresh +
+  package installation at the start of phase 2; no other orchestration steps may
+  run before package recovery completes.
 - Tests that touch package logic should remain hermetic—seed inputs via temp files and environment overrides (e.g., `PMSS_OS_RELEASE_PATH`, `PMSS_APT_SOURCES_PATH`).
 
 ## Testing Layout

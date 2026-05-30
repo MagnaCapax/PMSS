@@ -7,9 +7,10 @@
  * (/scripts/update.php) refreshes itself. Tasks include repository setup,
  * service configuration, user environment maintenance and security tweaks.
  *
- * Package phase invariant: repository templating, dpkg baseline replay, and
- * queued package installs must succeed before any other module executes. Do
- * not insert additional orchestration ahead of the package phase.
+ * Package recovery invariant: after lock and fatal preflight checks, finish any
+ * interrupted dpkg configuration before warning-only probes or modules execute.
+ * Repository templating, dpkg baseline replay, and package installs follow that
+ * early recovery pass.
  *
  * This file is refreshed from GitHub by /scripts/update.php prior to each run.
  * Keep local changes minimal or contribute them upstream.
@@ -311,7 +312,21 @@ pmssRunProfiledCallable('Acquiring update-step2 lock', static function (): void 
     });
 });
 pmssRunProfiledCallable('Running update-step2 preflight checks', static function (): void { if (!pmssUpdateStep2PreflightChecks('logmsg')) { exit(1); } });
-pmssRunProfiledCallable('Checking /home inode density', 'pmssHomeInodeDensityCheck', ['logmsg']);
+
+putenv('DEBIAN_FRONTEND=noninteractive');
+putenv('APT_LISTCHANGES_FRONTEND=none');
+putenv('UCF_FORCE_CONFOLD=1');
+putenv('UCF_FORCE_CONFNEW=0');
+putenv('UCF_FORCE_CONFDEF=1');
+putenv('NEEDRESTART_MODE=a');
+
+$GLOBALS['PMSS_PACKAGES_READY'] = false;
+// PMSS_PACKAGE_PHASE advertises coarse progress (`initializing`/`complete`); unknown values mean "in progress".
+// Flip it after logging the matching step so external monitors keep ordering intact.
+putenv('PMSS_PACKAGE_PHASE=initializing');
+
+pmssRunProfiledCallable('Completing pending dpkg configurations', 'pmssCompletePendingDpkg');
+pmssRunProfiledCallable('Checking /home inode density', 'pmssHomeInodeDensityCheck', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 
 // Ensure the root cron template is restored even if the updater exits early.
 // update.php disables `/etc/cron.d/pmss` only at the immediate phase-2 handoff;
@@ -362,18 +377,6 @@ putenv('PMSS_DISTRO_NAME='.$distroName);
 putenv('PMSS_DISTRO_VERSION='.(string) $reportedVersion);
 putenv('PMSS_DISTRO_CODENAME='.$lsbCodename);
 
-putenv('DEBIAN_FRONTEND=noninteractive');
-putenv('APT_LISTCHANGES_FRONTEND=none');
-putenv('UCF_FORCE_CONFOLD=1');
-putenv('UCF_FORCE_CONFNEW=0');
-putenv('UCF_FORCE_CONFDEF=1');
-putenv('NEEDRESTART_MODE=a');
-
-$GLOBALS['PMSS_PACKAGES_READY'] = false;
-// PMSS_PACKAGE_PHASE advertises coarse progress (`initializing`/`complete`); unknown values mean "in progress".
-// Flip it after logging the matching step so external monitors keep ordering intact.
-putenv('PMSS_PACKAGE_PHASE=initializing');
-
 $effectiveRepoVersion = $repoVersion > 0 ? $repoVersion : $reportedVersion;
 
 logmsg('Update-step2 log: /var/log/pmss-update.log (fallback /tmp/pmss-update.log)');
@@ -406,9 +409,9 @@ pmssRunProfiledStep('Cleaning mediaarea bootstrap package state', static functio
 pmssRunProfiledCallable('Pruning legacy MediaArea repository entries', 'pmssPruneLegacyMediaArea');
 
 // --- PACKAGE PHASE: DO NOT REORDER ---------------------------------------------------------
-// Everything below depends on distro packages being in a good state. Toolchains, service
-// binaries, and build scripts all assume apt has already delivered their dependencies. If
-// this sequence changes, expect cascading failures across the update flow.
+// The first dpkg configure pass intentionally ran immediately after preflight so a host
+// stuck with half-configured packages can recover before PHP or apt-adjacent probes run.
+// Everything below assumes that early pass cleared the package state enough for apt work.
 //   1. Attempt to recover partially configured packages (`apt --fix-broken`)
 //   2. Refresh repositories (apt update) so we pull the latest metadata
 //   3. Autoremove strays that block upgrades
@@ -418,7 +421,6 @@ pmssRunProfiledCallable('Pruning legacy MediaArea repository entries', 'pmssPrun
 
 runStep('Attempting apt fix-broken install (pre-package phase)', aptCmd('--fix-broken install -y'));
 pmssRunProfiledCallable('Refreshing package repositories', 'pmssRefreshRepositories', [$distroName, $effectiveRepoVersion, 'logmsg']);
-pmssRunProfiledCallable('Completing pending dpkg configurations', 'pmssCompletePendingDpkg');
 $dpkgBaselineOk = pmssRunProfiledCallable('Applying distro dpkg baseline selections', 'pmssApplyDpkgSelections', [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, true]);
 
 // System-wide services must not run on seedbox hosts. Stop/disable early so

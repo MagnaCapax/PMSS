@@ -102,12 +102,12 @@ CONF;
             }
         }
 
-        $rc = runStep('Completing pending dpkg configuration', dpkgCmd('--configure -a'));
+        $rc = runStep('Completing pending dpkg configuration', dpkgCmd('--force-confdef --force-confold --configure -a'));
         if ($rc !== 0 && $hasSystemd) {
             runStep('Unmasking proftpd for dpkg retry', 'systemctl unmask proftpd.service || true');
         }
         if ($rc !== 0) {
-            runStep('Retrying proftpd configure', dpkgCmd('--configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic').' || true');
+            runStep('Retrying proftpd configure', dpkgCmd('--force-confdef --force-confold --configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic').' || true');
         }
 }
 
