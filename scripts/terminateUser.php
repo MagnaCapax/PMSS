@@ -240,16 +240,19 @@ $groupdelCommand = 'groupdel '.escapeshellarg($username);
 $trafficFiles = array_values(pmssTrafficDataPaths($username));
 $trafficArgs = array_map('escapeshellarg', $trafficFiles);
 $clearImmutableCmd = 'if command -v chattr >/dev/null 2>&1; then chattr -i '.implode(' ', $trafficArgs).' 2>/dev/null || true; fi';
-$clearHomeImmutableCmd = 'if command -v chattr >/dev/null 2>&1; then chattr -R -i '.escapeshellarg("/home/{$username}").' 2>/dev/null || true; fi';
+$homePath = "/home/{$username}";
+$homeArg = escapeshellarg($homePath);
+$clearHomeImmutableCmd = 'if [ -d '.$homeArg.' ] && command -v chattr >/dev/null 2>&1; then chattr -R -i '.$homeArg.' 2>/dev/null || true; fi';
+$removeHomeLeftoversCmd = 'if [ -d '.$homeArg.' ]; then rm -rf -- '.$homeArg.'; fi';
 foreach (array(
     array('crontab_remove', 'crontab -r -u '.escapeshellarg($username).' || true'),
     array('crontab_spool_remove', 'rm -f -- '.escapeshellarg($crontabSpoolPaths[0]).' '.escapeshellarg($crontabSpoolPaths[1]).' || true'),
     array('userdel_initial', $userdelCommand),
     array('clear_immutable_traffic', $clearImmutableCmd),
-    // Clear recursive immutable flags as well because resource and state files
-    // may be protected under the user's home even after the account is gone.
-    array('clear_immutable_home', $clearHomeImmutableCmd),
     array('remove_home_initial', 'cd /home && rm -rf -- '.escapeshellarg($username)),
+    // Remove ordinary files first so recursive chattr only visits leftovers.
+    array('clear_immutable_home', $clearHomeImmutableCmd),
+    array('remove_home_leftovers', $removeHomeLeftoversCmd),
 ) as $stepSpec) {
     pmssUserLifecycleStep('terminate', $username, $stepSpec[0], $stepSpec[1], $dryRun);
 }

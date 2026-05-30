@@ -50,18 +50,23 @@ final class TerminateUserContractTest extends TestCase
         );
     }
 
-    public function testTerminateUserClearsImmutableHomeBeforeRemovingIt(): void
+    public function testTerminateUserClearsImmutableHomeLeftoversAfterInitialRemoval(): void
     {
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'scripts/terminateUser.php',
-            ["'clear_immutable_home'", "'remove_home_initial'"],
+            ["'remove_home_initial'", "'clear_immutable_home'", "'remove_home_leftovers'"],
             'terminateUser.php should define step ',
-            'terminateUser.php should clear immutable home files before removing the home directory: '
+            'terminateUser.php should remove normal home files before clearing immutable leftovers: '
         );
         $this->pmssAssertRepoFileContainsAllStrings(
             'scripts/terminateUser.php',
-            ['chattr -R -i', 'escapeshellarg("/home/{$username}")'],
-            'terminateUser.php should keep immutable home handling: '
+            [
+                '$homeArg = escapeshellarg($homePath);',
+                "'if [ -d '.\$homeArg.' ] && command -v chattr",
+                'chattr -R -i',
+                "'if [ -d '.\$homeArg.' ]; then rm -rf -- '.\$homeArg.'; fi'",
+            ],
+            'terminateUser.php should keep conditional immutable leftover handling: '
         );
     }
 
