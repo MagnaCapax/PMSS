@@ -88,6 +88,18 @@ function pmssLighttpdWriteManagedProxyFragment(string $proxyName, string $user, 
     return false;
 }
 
+/** Persist a generated proxy port through the shared symlink-safe writer. */
+function pmssLighttpdProxyPortPersist(string $proxyPortFile, int $proxyPort): bool
+{
+    if (!pmssNetworkPortInRange($proxyPort, 1024, 65500)) {
+        return false;
+    }
+
+    // These dotfiles live in user-writable homes; use the guarded writer so
+    // a customer-owned symlink cannot redirect the root-run refresh.
+    return pmssReplaceUserFilePreservingMetadata($proxyPortFile, (string) $proxyPort, 0640);
+}
+
 function pmssLighttpdProxyPortsEnsure(array $proxyPortFiles): array
 {
     $proxyPorts = [];
@@ -95,7 +107,9 @@ function pmssLighttpdProxyPortsEnsure(array $proxyPortFiles): array
         $proxyPort = pmssReadRegularFileInt($proxyPortFile);
         if (!pmssNetworkPortInRange($proxyPort, 1024, 65500)) {
             $proxyPort = (int) round(rand(1500, 65500));
-            file_put_contents($proxyPortFile, (string) $proxyPort);
+            if (!pmssLighttpdProxyPortPersist($proxyPortFile, $proxyPort)) {
+                $proxyPort = 0;
+            }
         }
         $proxyPorts[$proxyName] = $proxyPort;
     }

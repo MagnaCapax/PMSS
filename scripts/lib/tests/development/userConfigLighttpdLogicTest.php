@@ -182,6 +182,31 @@ LIGHTTPD;
         $this->assertEquals(0640, fileperms($path) & 0777);
     }
 
+    public function testProxyPortEnsureRejectsSymlinkTarget(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-lighttpd-proxy-port-');
+        $realPath = $root.'/real-port';
+        $linkPath = $root.'/rclone-port';
+        file_put_contents($realPath, '1234');
+        symlink($realPath, $linkPath);
+
+        $ports = \pmssLighttpdProxyPortsEnsure(['rclone' => $linkPath]);
+
+        $this->assertEquals(0, $ports['rclone']);
+        $this->assertEquals('1234', file_get_contents($realPath));
+    }
+
+    public function testProxyPortEnsurePersistsMissingPortInsideRange(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-lighttpd-proxy-port-');
+        $path = $root.'/rclone-port';
+
+        $ports = \pmssLighttpdProxyPortsEnsure(['rclone' => $path]);
+
+        $this->assertTrue(\pmssNetworkPortInRange($ports['rclone'], 1024, 65500));
+        $this->assertEquals((string) $ports['rclone'], file_get_contents($path));
+    }
+
     public function testUserConfigEntryPointKeepsLighttpdApplyHelperWiring(): void
     {
         $src = $this->pmssReadRepoFile('scripts/util/userConfigLighttpd.php');

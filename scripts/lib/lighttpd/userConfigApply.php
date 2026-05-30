@@ -59,6 +59,10 @@ function pmssUserConfigLighttpdConfigureUser(
         'rclone' => $rclonePort,
         'qbittorrent' => $qbittorrentPort,
     ] as $proxyName => $proxyPort) {
+        if (!pmssNetworkPortInRange($proxyPort, 1024, 65500)) {
+            fwrite(STDERR, "[user:{$thisUser}] Skipping {$proxyName} proxy fragment; proxy port file is unsafe\n");
+            continue;
+        }
         pmssLighttpdWriteManagedProxyFragment($proxyName, $thisUser, $proxyPort, "{$customDir}/pmss-{$proxyName}.conf");
     }
 
