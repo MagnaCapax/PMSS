@@ -382,10 +382,8 @@ SNAP;
 
     public function testIsPathWithinHomeAcceptsRealChildPaths(): void
     {
-        $base = sys_get_temp_dir().'/pmss-userTransfer-path-within-'.uniqid('', true);
-        $home = $base.'/home/testuser';
-        @mkdir($home.'/www', 0755, true);
-        file_put_contents($home.'/www/index.html', 'x');
+        $home = $this->pmssMakeUserWebHome('pmss-userTransfer-path-within-', 'testuser');
+        $this->pmssWriteFile($home.'/www/index.html', 'x');
 
         $this->assertTrue(\pmssUserTransferIsPathWithinHome($home.'/www', $home), 'expected www dir within home');
         $this->assertTrue(\pmssUserTransferIsPathWithinHome($home.'/www/index.html', $home), 'expected file within home');

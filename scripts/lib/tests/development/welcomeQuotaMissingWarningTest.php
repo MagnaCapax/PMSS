@@ -256,8 +256,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
     public function testWelcomePageStateAcceptsPositiveBonusQuota(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-welcome-bonus-').'/alice/www';
-        $this->pmssEnsureDir($home);
+        $home = $this->pmssMakeUserWebHome('pmss-welcome-bonus-').'/www';
         $this->pmssWriteFile(dirname($home).'/.bonusQuota', "25\n");
 
         $this->assertSame(25, $this->runWelcomePageStateBonusQuota($home));
@@ -265,8 +264,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
     public function testWelcomePageStateRejectsNegativeBonusQuota(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-welcome-bonus-').'/alice/www';
-        $this->pmssEnsureDir($home);
+        $home = $this->pmssMakeUserWebHome('pmss-welcome-bonus-').'/www';
         $this->pmssWriteFile(dirname($home).'/.bonusQuota', "-10\n");
 
         $this->assertSame(0, $this->runWelcomePageStateBonusQuota($home));
@@ -274,8 +272,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
     public function testWelcomePageStateRejectsSymlinkedBonusQuota(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-welcome-bonus-').'/alice/www';
-        $this->pmssEnsureDir($home);
+        $home = $this->pmssMakeUserWebHome('pmss-welcome-bonus-').'/www';
         $target = $this->pmssWriteFile(dirname($home).'/.bonusQuotaTarget', "77\n");
         $this->pmssCreateSymlinkOrSkip($target, dirname($home).'/.bonusQuota');
 
@@ -360,11 +357,11 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     public function testWelcomeMemorySectionSnapshots(): void
     {
         $fixture = $this->makeWelcomeUsageFixture();
-        $home = $this->pmssMakeTempDir('pmss-welcome-memory-').'/home/www';
+        $home = $this->pmssMakeUserWebHome('pmss-welcome-memory-', 'home').'/www';
         $output = $this->pmssRunInlinePhp(
             'require '.var_export($fixture, true).';'
             .'$home = '.var_export($home, true).';'
-            .'@mkdir($home, 0755, true); chdir($home);'
+            .'chdir($home);'
             .'@mkdir("../.config", 0755, true);'
             .'file_put_contents("../.config/pmss-user.json", json_encode(array("ramMiB" => 1024)));'
             .'file_put_contents("../.resourceData", serialize(array("memory" => array("current" => 536870912, "anon" => 268435456, "file" => 134217728))));'

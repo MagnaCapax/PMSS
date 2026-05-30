@@ -149,7 +149,7 @@ class UserLifecycleWatchdogTest extends TestCase
     {
         $homeRoot = $this->pmssMakeTempDir('watchdog-run-service-');
         foreach (['alice', 'bob', 'cara'] as $user) {
-            @mkdir($homeRoot.'/'.$user.'/www', 0755, true);
+            $this->pmssEnsureUserWebHome($homeRoot, $user);
         }
         touch($homeRoot.'/alice/.demoEnable');
         touch($homeRoot.'/cara/.demoEnable');
@@ -189,7 +189,7 @@ class UserLifecycleWatchdogTest extends TestCase
     public function testRunServiceStopsWhenListUsersCommandFails(): void
     {
         $homeRoot = $this->pmssMakeTempDir('watchdog-run-service-fail-');
-        @mkdir($homeRoot.'/alice/www', 0755, true);
+        $this->pmssEnsureUserWebHome($homeRoot, 'alice');
         touch($homeRoot.'/alice/.demoEnable');
 
         $listUsers = $this->pmssMakeTempDir('watchdog-list-users-fail-').'/listUsers.php';

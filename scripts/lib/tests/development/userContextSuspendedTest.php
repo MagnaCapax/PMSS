@@ -13,13 +13,11 @@ class UserContextSuspendedTest extends TestCase
 {
     public function testBuildUserContextSkipsSuspendedUsers(): void
     {
-        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-user-context-suspended-marker-');
         $user = 'testuser';
 
-        $home = $homeRoot.'/'.$user;
-        @mkdir($home.'/data', 0755, true);
-        @mkdir($home.'/www-disabled', 0755, true);
-        file_put_contents($home.'/.rtorrent.rc', "dummy");
+        $home = $this->pmssMakeTrackedUserHomeTree('pmss-user-context-suspended-marker-', $user, 'data');
+        $this->pmssEnsureDir($home.'/www-disabled');
+        $this->pmssWriteFile($home.'/.rtorrent.rc', "dummy");
 
         $this->assertEquals(null, \pmssBuildUserContext($user));
     }
@@ -33,37 +31,31 @@ class UserContextSuspendedTest extends TestCase
 
     public function testBuildUserContextReturnsNullWhenRtorrentConfigMissing(): void
     {
-        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-user-context-missing-rtorrent-');
         $user = 'testuser';
 
-        $home = $homeRoot.'/'.$user;
-        @mkdir($home.'/data', 0755, true);
+        $this->pmssMakeTrackedUserHomeTree('pmss-user-context-missing-rtorrent-', $user, 'data');
 
         $this->assertEquals(null, \pmssBuildUserContext($user));
     }
 
     public function testBuildUserContextReturnsNullWhenDataDirMissing(): void
     {
-        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-user-context-missing-data-');
         $user = 'testuser';
 
-        $home = $homeRoot.'/'.$user;
-        @mkdir($home, 0755, true);
-        file_put_contents($home.'/.rtorrent.rc', "dummy");
+        $home = $this->pmssMakeTrackedUserHomeTree('pmss-user-context-missing-data-', $user);
+        $this->pmssWriteFile($home.'/.rtorrent.rc', "dummy");
 
         $this->assertEquals(null, \pmssBuildUserContext($user));
     }
 
     public function testBuildUserContextReturnsWhenMarkerMissing(): void
     {
-        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-user-context-active-');
         $user = 'testuser';
         $sha = 'sha123';
 
-        $home = $homeRoot.'/'.$user;
-        @mkdir($home.'/data', 0755, true);
-        @mkdir($home.'/www', 0755, true);
-        file_put_contents($home.'/.rtorrent.rc', "dummy");
+        $home = $this->pmssMakeTrackedUserHomeTree('pmss-user-context-active-', $user, 'data');
+        $this->pmssEnsureDir($home.'/www');
+        $this->pmssWriteFile($home.'/.rtorrent.rc', "dummy");
 
         $ctx = \pmssBuildUserContext($user, $sha);
         $this->assertTrue(is_array($ctx));

@@ -147,9 +147,8 @@ class IndexSkeletonFrameDataTest extends TestCase
 
     public function testRemoteDisabledRenderCarriesQuotaInWelcomeIframe(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-index-home-', 0755);
-        @mkdir($home.'/www', 0755, true);
-        file_put_contents(
+        $home = $this->pmssMakeUserWebHome('pmss-index-home-');
+        $this->pmssWriteFile(
             $home.'/.quota',
             "Disk quotas for user panel (uid 1000):\n"
             ."     Filesystem   space   quota   limit   grace   files   quota   limit   grace\n"
@@ -169,8 +168,7 @@ class IndexSkeletonFrameDataTest extends TestCase
 
     public function testRemoteDisabledRenderAddsDelugeFrameWhenEnabled(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-index-deluge-home-', 0755);
-        @mkdir($home.'/www', 0755, true);
+        $home = $this->pmssMakeUserWebHome('pmss-index-deluge-home-');
         touch($home.'/.delugeEnable');
         touch($home.'/www/deluge.php');
 
@@ -183,15 +181,13 @@ class IndexSkeletonFrameDataTest extends TestCase
 
     public function testRemoteDisabledRenderAddsTorrentFramesFromProxyFragments(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-index-proxy-root-', 0755);
-        $home = $root.'/alice';
-        @mkdir($home.'/www', 0755, true);
-        @mkdir($home.'/.lighttpd/custom.d', 0755, true);
-        file_put_contents(
+        $home = $this->pmssMakeUserWebHome('pmss-index-proxy-root-');
+        $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
+        $this->pmssWriteFile(
             $home.'/.lighttpd/custom.d/pmss-qbittorrent.conf',
             '$HTTP["url"] =~ "^/user-alice/qbittorrent/" {'."\n}\n"
         );
-        file_put_contents(
+        $this->pmssWriteFile(
             $home.'/.lighttpd/custom.d/pmss-deluge.conf',
             '$HTTP["url"] =~ "^/user-alice/deluge/" {'."\n}\n"
         );
@@ -209,11 +205,9 @@ class IndexSkeletonFrameDataTest extends TestCase
 
     public function testRemoteDisabledRenderAddsTorrentFramesFromLocalConfigDirs(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-index-config-root-', 0755);
-        $home = $root.'/alice';
-        @mkdir($home.'/www', 0755, true);
-        @mkdir($home.'/.config/qBittorrent', 0755, true);
-        @mkdir($home.'/.config/deluge', 0755, true);
+        $home = $this->pmssMakeUserWebHome('pmss-index-config-root-');
+        $this->pmssEnsureDir($home.'/.config/qBittorrent');
+        $this->pmssEnsureDir($home.'/.config/deluge');
 
         $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
@@ -224,11 +218,9 @@ class IndexSkeletonFrameDataTest extends TestCase
 
     public function testRemoteDisabledRenderAddsMediaStackFramesFromProxyFragment(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-index-media-root-', 0755);
-        $home = $root.'/alice';
-        @mkdir($home.'/www', 0755, true);
-        @mkdir($home.'/.lighttpd/custom.d', 0755, true);
-        file_put_contents(
+        $home = $this->pmssMakeUserWebHome('pmss-index-media-root-');
+        $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
+        $this->pmssWriteFile(
             $home.'/.lighttpd/custom.d/media-stack.conf',
             implode("\n", array(
                 '$HTTP["url"] =~ "^/sabnzbd($|/)" {',
@@ -261,9 +253,8 @@ class IndexSkeletonFrameDataTest extends TestCase
 
     public function testCustomFrameParserIgnoresBlankLinesBeforeFieldAccess(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-index-custom-home-', 0755);
-        @mkdir($home.'/www', 0755, true);
-        file_put_contents($home.'/.customFrames', "custom|Custom tooltip|Custom|custom/\n\n");
+        $home = $this->pmssMakeUserWebHome('pmss-index-custom-home-');
+        $this->pmssWriteFile($home.'/.customFrames', "custom|Custom tooltip|Custom|custom/\n\n");
 
         $output = $this->renderIndexFromHomeWithDisplayedErrors($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 

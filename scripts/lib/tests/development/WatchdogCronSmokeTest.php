@@ -49,10 +49,9 @@ class WatchdogCronSmokeTest extends TestCase
         $this->commandLog = $this->pmssMakeTempPath('watchdog-cron-command-', '.log');
         $this->listUsersScript = $this->pmssMakeTempDir('watchdog-cron-list-users-').'/listUsers.php';
 
-        $home = $this->homeRoot.'/alice';
+        $home = $this->pmssEnsureUserWebHome($this->homeRoot, 'alice');
         $this->pmssWriteFile($home.'/.lighttpd.conf', '"max-procs" => 0'."\n");
         $this->pmssEnsureDir($home.'/.lighttpd');
-        $this->pmssEnsureDir($home.'/www');
         $this->pmssWriteFile($home.'/.delugeEnable', '');
         $this->pmssWriteFile($home.'/.qbittorrentEnable', '');
         $this->pmssWriteExecutablePhpFile($this->listUsersScript, "echo \"alice\\n\";");

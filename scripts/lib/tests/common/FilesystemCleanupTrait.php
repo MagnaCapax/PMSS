@@ -33,6 +33,20 @@ trait FilesystemCleanupTrait
         return $home;
     }
 
+    /** Ensure a fixture user home has the standard customer web root. */
+    protected function pmssEnsureUserWebHome(string $homeRoot, string $user): string
+    {
+        $home = $this->pmssUserHomePath($homeRoot, $user);
+        $this->pmssEnsureDir($home.'/www');
+        return $home;
+    }
+
+    /** Create a temporary fixture user home with a customer web root. */
+    protected function pmssMakeUserWebHome(string $prefix, string $user = 'alice'): string
+    {
+        return $this->pmssEnsureUserWebHome($this->pmssMakeTempDir($prefix), $user);
+    }
+
     /** Ensure a directory exists for hermetic filesystem fixtures. */
     protected function pmssEnsureDir(string $path, int $mode = 0755): void
     {

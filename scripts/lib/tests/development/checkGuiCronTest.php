@@ -87,9 +87,8 @@ class CheckGuiCronTest extends TestCase
 
     public function testRestoreUserIndexCopiesSafeSkeletonSource(): void
     {
-        $homeDir = $this->tempDir.'/dummy';
+        $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
         $sourceFile = $this->tempDir.'/skel/index.php';
-        $this->pmssEnsureDir($homeDir.'/www');
         $this->pmssWriteFile($sourceFile, "<?php echo 'ok';\n");
         $messages = [];
 
@@ -105,10 +104,9 @@ class CheckGuiCronTest extends TestCase
 
     public function testRestoreUserIndexRejectsSymlinkTarget(): void
     {
-        $homeDir = $this->tempDir.'/dummy';
+        $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
         $sourceFile = $this->tempDir.'/skel/index.php';
         $outsideFile = $this->tempDir.'/outside.php';
-        $this->pmssEnsureDir($homeDir.'/www');
         $this->pmssWriteFile($sourceFile, "<?php echo 'ok';\n");
         $this->pmssWriteFile($outsideFile, "outside\n");
         symlink($outsideFile, $homeDir.'/www/index.php');
@@ -127,10 +125,9 @@ class CheckGuiCronTest extends TestCase
 
     public function testRestoreUserIndexRejectsSymlinkSource(): void
     {
-        $homeDir = $this->tempDir.'/dummy';
+        $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
         $realSource = $this->tempDir.'/skel-real/index.php';
         $sourceFile = $this->tempDir.'/skel/index.php';
-        $this->pmssEnsureDir($homeDir.'/www');
         $this->pmssWriteFile($realSource, "<?php echo 'ok';\n");
         $this->pmssEnsureDir(dirname($sourceFile));
         symlink($realSource, $sourceFile);

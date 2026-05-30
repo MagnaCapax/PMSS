@@ -20,10 +20,9 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
         }
 
         $this->homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-panel-index-');
-        $this->home = $this->homeRoot.'/'.$this->user;
+        $this->home = $this->pmssEnsureUserWebHome($this->homeRoot, $this->user);
         $this->skelIndex = $skelBase.'/www/index.php';
 
-        @mkdir($this->home.'/www', 0755, true);
         $this->pmssWriteFile($this->skelIndex, $this->fixedPanelIndexSource());
     }
 

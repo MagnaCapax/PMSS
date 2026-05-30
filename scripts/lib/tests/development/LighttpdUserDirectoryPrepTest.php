@@ -16,9 +16,7 @@ class LighttpdUserDirectoryPrepTest extends TestCase
     public function testCreatesDirectoriesAndCustomFile(): void
     {
         $user = 'testuser';
-        $home = $this->base.'/home';
-        $this->pmssEnsureDir($home);
-        $this->pmssEnsureDir($home.'/www');
+        $home = $this->pmssEnsureUserWebHome($this->base, 'home');
 
         $ok = \pmssPrepareLighttpdUserDirectories($user, $home, true);
         $this->assertTrue($ok);
@@ -48,9 +46,7 @@ class LighttpdUserDirectoryPrepTest extends TestCase
     public function testRejectsSymlinkedLighttpdDir(): void
     {
         $user = 'testuser';
-        $home = $this->base.'/home';
-        $this->pmssEnsureDir($home);
-        $this->pmssEnsureDir($home.'/www');
+        $home = $this->pmssEnsureUserWebHome($this->base, 'home');
 
         $elsewhere = $this->base.'/elsewhere';
         $this->pmssEnsureDir($elsewhere, 0700);
