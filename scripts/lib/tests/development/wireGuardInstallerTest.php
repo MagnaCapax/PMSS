@@ -364,6 +364,27 @@ class WireGuardInstallerTest extends TestCase
         $this->assertEquals($publicKey."\n", (string) file_get_contents($homeBase.'/alice/.wireguard-public-key'));
     }
 
+    public function testBootstrapUserGuideRestoresOriginalGuideWhenPublicKeyWriteFails(): void
+    {
+        $homeBase = $this->createTempDir();
+        @mkdir($homeBase.'/alice', 0755, true);
+
+        $guide = \wgBuildClientGuide('server-pub', 'vpn.example.com', 51820);
+        file_put_contents($homeBase.'/alice/wireguard.txt', $guide);
+        @mkdir($homeBase.'/alice/.wireguard-public-key', 0755, true);
+
+        $this->pmssWithEnv([
+            'PMSS_WG_HOME_BASE'           => $homeBase,
+            'PMSS_WG_CLIENT_PRIVATE_KEY'  => 'client-private',
+            'PMSS_WG_CLIENT_PUBLIC_KEY'   => 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+        ], function () use ($guide): void {
+            \wgBootstrapUserGuide('alice', $guide);
+        });
+
+        $this->assertEquals($guide, (string) file_get_contents($homeBase.'/alice/wireguard.txt'));
+        $this->assertTrue(is_dir($homeBase.'/alice/.wireguard-public-key'), 'failed public key target should remain untouched');
+    }
+
     public function testApplyAssignedIpToGuideReplacesPlaceholderAddress(): void
     {
         $guide = "[Interface]\nAddress = 10.90.90.X/32\n"
@@ -447,7 +468,7 @@ class WireGuardInstallerTest extends TestCase
         $source = $this->pmssReadRepoFile('scripts/lib/wireguard.php');
 
         $this->assertStringContainsString('template.wireguard.readme', $source);
-        $this->assertStringContainsString("file_put_contents(\$configDir.'/README', \$guide);", $source);
+        $this->assertStringContainsString("wgWriteManagedFile(\$configDir.'/README', \$guide, 0644, 'WireGuard README')", $source);
         $this->assertTrue(strpos($source, 'function wgWrite'.'Readme') === false, 'README helper should stay inlined in pmssWireguardConfigure');
     }
 

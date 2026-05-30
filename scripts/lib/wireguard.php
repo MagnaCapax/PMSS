@@ -644,9 +644,11 @@ function wgBootstrapUserGuide(string $user, string $clientGuide): void
     if (!pmssWriteUserFile($publicKeyPath, $updatedKeyText, $user, 0600)) {
         wgLog('Failed to write WireGuard public key for user '.$user);
         if (!$managedGuide && $originalGuide === null) {
-            @unlink($guidePath);
-        } elseif (!$managedGuide) {
-            @file_put_contents($guidePath, $originalGuide);
+            if (pmssUserFilePathIsSafe($guidePath) && is_file($guidePath) && !@unlink($guidePath)) {
+                wgLog('Failed to remove incomplete WireGuard guide for user '.$user);
+            }
+        } elseif (!$managedGuide && !pmssWriteUserFile($guidePath, $originalGuide, $user, 0600)) {
+            wgLog('Failed to restore WireGuard guide for user '.$user.' after public key write failure');
         }
         return;
     }
@@ -775,8 +777,8 @@ function pmssWireguardConfigure(?callable $logger = null): void
     );
     if ($guide === null) {
         $guide = '';
-    } else {
-        file_put_contents($configDir.'/README', $guide);
+    } elseif (!wgWriteManagedFile($configDir.'/README', $guide, 0644, 'WireGuard README')) {
+        // wgWriteManagedFile() logs the failed path; keep service configuration fail-soft.
     }
 
     $clientGuide = wgBuildClientGuide($pubKey, $endpoint, $listenPort);
