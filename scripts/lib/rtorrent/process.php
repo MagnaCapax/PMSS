@@ -12,6 +12,7 @@
 
 require_once __DIR__.'/../pathSafety.php';
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/../user/watchdog.php';
 require_once __DIR__.'/legacyDirectives.php';
 
 // Signal constants for systems without pcntl.
@@ -20,31 +21,6 @@ if (!defined('SIGTERM')) {
 }
 if (!defined('SIGKILL')) {
     define('SIGKILL', 9);
-}
-
-/**
- * List PIDs for a user's process by command name.
- *
- * Uses pgrep with start-anchored pattern. Note: rtorrent may report as
- * "rtorrent main" on some systems, so we use ^pattern to match process
- * names starting with the given string (avoids matching .rtorrentExecute).
- *
- * @param string $user System username.
- * @param string $comm Process command name (start-anchored pgrep pattern).
- *
- * @return int[] Array of matching PIDs.
- */
-function rtorrentProcessPgrepExact(string $user, string $comm, ?int &$rc = null, ?array &$output = null): array
-{
-    $pgrepOutput = [];
-    $pgrepRc = 1;
-    @exec('pgrep -u '.escapeshellarg($user).' '.escapeshellarg('^'.$comm), $pgrepOutput, $pgrepRc);
-    $output = $pgrepOutput;
-    $rc = $pgrepRc;
-    if ($pgrepRc !== 0) {
-        return [];
-    }
-    return rtorrentProcessNormalizePids($pgrepOutput);
 }
 
 /**
@@ -642,7 +618,7 @@ function rtorrentProcessRestart(
     sleep(3);
 
     // Re-check for survivors.
-    $rtorrentPids = rtorrentProcessPgrepExact($user, 'rtorrent');
+    $rtorrentPids = pmssUserWatchdogProcessPids($user, '^rtorrent');
     $executorPids = rtorrentProcessExecutorPids($user)['all'];
 
     // Force kill.

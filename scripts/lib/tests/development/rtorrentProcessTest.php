@@ -277,15 +277,6 @@ class RtorrentProcessTest extends TestCase
     }
 
     /**
-     * Test pgrep exact returns empty for nonexistent user.
-     */
-    public function testPgrepExactNonexistentUser(): void
-    {
-        $pids = rtorrentProcessPgrepExact('nonexistent_user_12345', 'rtorrent');
-        $this->assertEquals([], $pids);
-    }
-
-    /**
      * Test executor PIDs returns empty for nonexistent user.
      */
     public function testExecutorPidsNonexistentUser(): void
@@ -299,7 +290,7 @@ class RtorrentProcessTest extends TestCase
         $rc = null;
         $output = null;
 
-        $this->assertEquals([], rtorrentProcessPgrepExact('nonexistent_user_12345', 'rtorrent', $rc, $output));
+        $this->assertEquals([], pmssUserWatchdogProcessPids('nonexistent_user_12345', '^rtorrent', [], $rc, $output));
         $this->assertTrue(is_int($rc), 'Expected integer exit code reference');
         $this->assertTrue(is_array($output), 'Expected raw output reference array');
 

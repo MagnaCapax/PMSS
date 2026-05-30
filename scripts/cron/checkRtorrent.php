@@ -251,7 +251,7 @@ foreach ($users as $user) {
     $executorPhpPids = $executor['php'];
     $executorScreenPids = $executor['screen'];
     $executorAllPids = $executor['all'];
-    $rtorrentPids = rtorrentProcessPgrepExact($user, 'rtorrent');
+    $rtorrentPids = pmssUserWatchdogProcessPids($user, '^rtorrent');
     $executorPresent = !empty($executorPhpPids);
 
     // State file paths.
@@ -419,7 +419,7 @@ foreach ($users as $user) {
         }
 
         // Re-check process liveness before treating the socket as a stuck SCGI endpoint.
-        $rtorrentPids = rtorrentProcessPgrepExact($user, 'rtorrent');
+        $rtorrentPids = pmssUserWatchdogProcessPids($user, '^rtorrent');
         if (empty($rtorrentPids)) {
             pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $unresponsiveState, $debug);
 
@@ -471,7 +471,7 @@ foreach ($users as $user) {
         }
 
         // Stale - restart only after confirming this is not a transient alive process.
-        $rtorrentPids = rtorrentProcessPgrepExact($user, 'rtorrent');
+        $rtorrentPids = pmssUserWatchdogProcessPids($user, '^rtorrent');
         if (!empty($rtorrentPids)) {
             $processStates = rtorrentProcessStatesForPids($rtorrentPids);
             if (empty($processStates)) {
@@ -500,8 +500,6 @@ foreach ($users as $user) {
 
             $queueSnapshot = rtorrentScgiSocketQueueSnapshot($socketPath);
             if ($queueSnapshot === null || !rtorrentScgiSocketQueueSaturated($queueSnapshot)) {
-                rtorrentProcessWriteStateFile($unresponsiveState, (string) time());
-                rtorrentProcessClearStaleState($acceptQueueWedgeState);
                 $queueText = $queueSnapshot === null
                     ? 'queue=unavailable'
                     : 'recvQ='.(int) $queueSnapshot['recvQ'].' sendQ='.(int) $queueSnapshot['sendQ'];

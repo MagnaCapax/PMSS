@@ -8,9 +8,10 @@ class UpdateCompressionCharacterizationTest extends TestCase
     public function testStartRtorrentReusesSharedProcessLookups(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/startRtorrent', [
-            "rtorrentProcessPgrepExact(\$user, 'rtorrent', \$rtorrentRc, \$rtorrentOut)",
+            "pmssUserWatchdogProcessPids(\$user, '^rtorrent', [], \$rtorrentRc, \$rtorrentOut)",
             "rtorrentProcessExecutorPids(\$user, \$executorRc, \$executorOut)['all']",
         ]);
+        $this->pmssAssertRepoFileNotContainsString('scripts/lib/rtorrent/process.php', 'function rtorrentProcess'.'PgrepExact(');
     }
 
     public function testUpdateStep2KeepsInlineLighttpdHardeningStep(): void

@@ -77,7 +77,7 @@ function pmssStartRtorrentWaitForRtorrent(string $user, int $startupTimeoutSecon
 {
     return rtorrentProcessWaitForStablePids(
         function () use ($user): array {
-            return rtorrentProcessPgrepExact($user, 'rtorrent');
+            return pmssUserWatchdogProcessPids($user, '^rtorrent');
         },
         (float) max(1, $startupTimeoutSeconds),
         (float) max(1, $stabilityWindowSeconds)
@@ -136,7 +136,7 @@ if (is_file($executor) && is_file($skelExecutor) && !is_link($executor)) {
 
 $rtorrentRc = 0;
 $rtorrentOut = [];
-$rtorrentPids = rtorrentProcessPgrepExact($user, 'rtorrent', $rtorrentRc, $rtorrentOut);
+$rtorrentPids = pmssUserWatchdogProcessPids($user, '^rtorrent', [], $rtorrentRc, $rtorrentOut);
 if (!empty($rtorrentPids)) {
     logmsg("rTorrent already running for {$user}; skipping start");
     exit(0);
