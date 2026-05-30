@@ -10,7 +10,6 @@
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
-const PMSS_PORT_MANAGER_USAGE = 'Usage: portManager.php [view|assign|release] USER [SERVICE]';
 const PMSS_PORT_MANAGER_MIN_PORT = 2000;
 const PMSS_PORT_MANAGER_MAX_PORT = 38000;
 
@@ -78,14 +77,15 @@ function pmssPortManagerFail(string $message, string $user = '', string $action 
 /** Keep one dispatch path for every CLI action. */
 function pmssPortManagerMain(array $argv): int
 {
+    $usage = 'Usage: portManager.php [view|assign|release] USER [SERVICE]';
     if (count($argv) < 3) {
-        echo PMSS_PORT_MANAGER_USAGE;
+        echo $usage;
         return 0;
     }
 
     $action = strtolower(trim((string) $argv[1]));
     if (!in_array($action, array('view', 'assign', 'release'), true)) {
-        echo PMSS_PORT_MANAGER_USAGE;
+        echo $usage;
         return 0;
     }
 

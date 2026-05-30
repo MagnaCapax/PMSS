@@ -320,18 +320,6 @@ function ensureRoot(): void
     }
 }
 
-function updateUsage(string $script): void
-{
-    echo "Usage: {$script} [<spec>] [--repo=<url>] [--branch=<name>] [--dry-run] [--dist-upgrade=<max>] [--scripts-only]\n";
-    echo "Examples:\n";
-    echo "  {$script}                      # update from git/main (default repo)\n";
-    echo "  {$script} git/dev:2025-01-03   # dev branch pinned to a date\n";
-    echo "  {$script} release:2025-07-12   # explicit tagged release\n";
-    echo "  {$script} --repo=https://git/url.git --branch=beta\n";
-    echo "  {$script} --dist-upgrade=11         # dist-upgrade one major step, capped at Debian 11\n";
-    echo "  {$script} --scripts-only            # refresh scripts/skel only; never runs apt/apt-get\n";
-}
-
 /**
  * Parse CLI arguments for the bootstrap updater.
  *
@@ -360,7 +348,15 @@ function parseArguments(array $argv): array
 
     foreach (array_slice($argv, 1) as $arg) {
         if ($arg === '--help' || $arg === '-h') {
-            updateUsage($argv[0]);
+            $script = $argv[0];
+            echo "Usage: {$script} [<spec>] [--repo=<url>] [--branch=<name>] [--dry-run] [--dist-upgrade=<max>] [--scripts-only]\n"
+                ."Examples:\n"
+                ."  {$script}                      # update from git/main (default repo)\n"
+                ."  {$script} git/dev:2025-01-03   # dev branch pinned to a date\n"
+                ."  {$script} release:2025-07-12   # explicit tagged release\n"
+                ."  {$script} --repo=https://git/url.git --branch=beta\n"
+                ."  {$script} --dist-upgrade=11         # dist-upgrade one major step, capped at Debian 11\n"
+                ."  {$script} --scripts-only            # refresh scripts/skel only; never runs apt/apt-get\n";
             exit(0);
         }
         if ($arg === '--dry-run') {

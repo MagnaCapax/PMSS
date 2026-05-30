@@ -13,18 +13,13 @@
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/user/homeReclaim.php';
 
-/** Show CLI usage for the reclaim worker. */
-function pmssUserHomeReclaimUsage(): string
-{
-    return "Usage: userHomeReclaim.php --confirm /home/.terminating-USER-YYYYMMDDHHMMSS-PID\n";
-}
-
 /** Execute the asynchronous home reclaim worker. */
 function pmssUserHomeReclaimMain(array $argv): int
 {
     pmssRequireCli();
     requireRoot();
 
+    $usage = "Usage: userHomeReclaim.php --confirm /home/.terminating-USER-YYYYMMDDHHMMSS-PID\n";
     $confirm = false;
     $targetPath = '';
     foreach (array_slice($argv, 1) as $arg) {
@@ -36,12 +31,12 @@ function pmssUserHomeReclaimMain(array $argv): int
             $targetPath = $arg;
             continue;
         }
-        fwrite(STDERR, pmssUserHomeReclaimUsage());
+        fwrite(STDERR, $usage);
         return 2;
     }
 
     if (!$confirm || $targetPath === '') {
-        fwrite(STDERR, pmssUserHomeReclaimUsage());
+        fwrite(STDERR, $usage);
         return 2;
     }
 
