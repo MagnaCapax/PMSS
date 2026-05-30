@@ -96,8 +96,7 @@ function pmssDistUpgradeAptEnv(bool $warnWhenInteractiveUnavailable = true): arr
         logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');
     }
 
-    return ['DEBIAN_FRONTEND='.($hasTty ? 'readline' : 'noninteractive')
-        .' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a', $hasTty];
+    return [pmssAptDpkgEnvPrefix(['DEBIAN_FRONTEND' => $hasTty ? 'readline' : 'noninteractive']), $hasTty];
 }
 
 /** Build apt commands with dist-upgrade's shared force-conf policy. */
@@ -607,7 +606,7 @@ function pmssExecuteUpgrade(): bool
     if (!pmssDistUpgradeWaitForLocksOrLog('[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg --configure -a')) {
         return false;
     }
-    runCommand('dpkg --configure -a', true, null, $hasTty);
+    runCommand("$env dpkg --configure -a", true, null, $hasTty);
 
     return true;
 }
@@ -629,7 +628,7 @@ function pmssRunUpgradeWithRecovery(string $command, string $env, string $recove
 
     logMessage($recoveryMessage);
     foreach ([
-        ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg recovery', 'dpkg --configure -a'],
+        ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg recovery', "$env dpkg --configure -a"],
         ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt recovery', "$env apt-get -f install -y"],
         ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt update', "$env apt-get update"],
         ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt retry', $command],
@@ -657,7 +656,7 @@ function pmssRemoveLegacyWireguardDkms(string $fromMajor, string $toMajor): void
     }
 
     logMessage('dist-upgrade: removing legacy wireguard-dkms before Debian 11 → 12 upgrade');
-    $env = 'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none';
+    $env = pmssAptDpkgEnvPrefix();
 
     // Best-effort purge; ignore failure if package is already absent.
     runCommand("$env apt-get purge -y wireguard-dkms", true);

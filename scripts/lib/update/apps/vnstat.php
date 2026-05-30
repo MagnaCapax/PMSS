@@ -14,7 +14,7 @@ $linkSpeed = isset($linkSpeed) && is_numeric($linkSpeed) ? (int) $linkSpeed : 0;
 #TODO This should be in the install script
 #TODO Use an actual config template
 if (!file_exists('/usr/bin/vnstat')) {
-    runStep('Installing vnstat', pmssBuildCommand('apt-get', ['install', '-y', 'vnstat']));
+    runStep('Installing vnstat', aptCmd('install -y vnstat'));
     if ($link !== '') {
         runStep('Updating vnstat interface database', pmssBuildCommand('vnstat', ['-u', '-i', $link]));
     }

@@ -260,7 +260,7 @@ require_once __DIR__.'/environment.php';
         $downloadRc = runStep(
             'Downloading openssh-server/client/sftp + runit-helper for dpkg-direct heal',
             'cd '.escapeshellarg($tmpDir).' && '
-            .'apt-get download openssh-server openssh-client openssh-sftp-server runit-helper 2>&1'
+            .pmssAptDpkgEnvPrefix().' apt-get download openssh-server openssh-client openssh-sftp-server runit-helper 2>&1'
         );
         if ($downloadRc !== 0) {
             pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-', 'Cleaning openssh-direct download cache');
@@ -286,7 +286,7 @@ require_once __DIR__.'/environment.php';
         }
         if ($runitDeb !== '') {
             runStep('Installing runit-helper via dpkg-direct (openssh-server dep)',
-                'dpkg --force-confdef --force-confold -i '.escapeshellarg($runitDeb));
+                dpkgCmd('--force-confdef --force-confold -i '.escapeshellarg($runitDeb)));
         }
 
         // Install openssh-server/client/sftp via dpkg-direct so the apt resolver
@@ -302,7 +302,7 @@ require_once __DIR__.'/environment.php';
         }));
         $installRc = runStep(
             'Installing openssh-server/client/sftp via dpkg-direct (cascade-heal, conf-preserve)',
-            'dpkg --force-confdef --force-confold -i '.implode(' ', array_map('escapeshellarg', $opensshDebs))
+            dpkgCmd('--force-confdef --force-confold -i '.implode(' ', array_map('escapeshellarg', $opensshDebs)))
         );
         if ($installRc !== 0) {
             // dpkg -i may exit non-zero when libssl3 ABI is older than openssh-server
@@ -337,7 +337,7 @@ require_once __DIR__.'/environment.php';
 
         $holdRc = runStep(
             'Holding openssh-server/client/sftp to prevent re-removal',
-            'apt-mark hold openssh-server openssh-client openssh-sftp-server'
+            pmssAptDpkgEnvPrefix().' apt-mark hold openssh-server openssh-client openssh-sftp-server'
         );
         if ($holdRc !== 0) {
             logMessage('[ERROR] pmssHealOpensshServerIfMissing: apt-mark hold failed');
@@ -481,13 +481,13 @@ require_once __DIR__.'/environment.php';
         // Unhold openssh-* before downgrade so dpkg doesn't refuse (manual holds
         // from emergency recovery are common; canonical state has them unheld).
         runStep('Unholding openssh-* for downgrade (if held)',
-            'apt-mark unhold openssh-server openssh-client openssh-sftp-server 2>/dev/null || true');
+            pmssAptDpkgEnvPrefix().' apt-mark unhold openssh-server openssh-client openssh-sftp-server 2>/dev/null || true');
 
         // Download the target version trio.
         $downloadRc = runStep(
             'Downloading openssh-server/client/sftp at '.$targetOpenssh.' for libssl3-3.0.17-compat downgrade',
             'cd '.escapeshellarg($tmpDir).' && '
-            .'apt-get download '
+            .pmssAptDpkgEnvPrefix().' apt-get download '
             .'openssh-server='.escapeshellarg($targetOpenssh).' '
             .'openssh-client='.escapeshellarg($targetOpenssh).' '
             .'openssh-sftp-server='.escapeshellarg($targetOpenssh).' 2>&1'
@@ -510,7 +510,7 @@ require_once __DIR__.'/environment.php';
         // as pmssHealOpensshServerIfMissing — never replace site sshd_config).
         $installRc = runStep(
             'Installing openssh-server/client/sftp '.$targetOpenssh.' via dpkg-direct (conf-preserve, libssl3-3.0.17-compat downgrade)',
-            'dpkg --force-confdef --force-confold -i '.implode(' ', array_map('escapeshellarg', $debs))
+            dpkgCmd('--force-confdef --force-confold -i '.implode(' ', array_map('escapeshellarg', $debs)))
         );
         pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-downgrade-', 'Cleaning openssh-downgrade download cache');
         if ($installRc !== 0) {

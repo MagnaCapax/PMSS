@@ -226,8 +226,25 @@ class RuntimeTest extends TestCase
             $bash = \pmssCommandBashInvocation('DEBIAN_FRONTEND=noninteractive apt-get update');
 
             $this->assertStringContainsString('/tmp/pmss-test-bin', $bash);
+            $this->assertStringContainsString('export PATH=', $bash);
+            $this->assertStringContainsString('APT_LISTCHANGES_FRONTEND=none', $bash);
+            $this->assertStringContainsString('UCF_FORCE_CONFOLD=1', $bash);
+            $this->assertStringContainsString('NEEDRESTART_MODE=a', $bash);
             $this->assertStringContainsString('DEBIAN_FRONTEND=noninteractive exec apt-get update', $bash);
         });
+    }
+
+    public function testCommandBashInvocationExportsEnvForBareDpkgRecovery(): void
+    {
+        $bash = \pmssCommandBashInvocation('dpkg --configure -a');
+
+        $this->assertStringContainsString('export ', $bash);
+        $this->assertStringContainsString('DEBIAN_FRONTEND=noninteractive', $bash);
+        $this->assertStringContainsString('APT_LISTCHANGES_FRONTEND=none', $bash);
+        $this->assertStringContainsString('UCF_FORCE_CONFDEF=1', $bash);
+        $this->assertStringContainsString('UCF_FORCE_CONFOLD=1', $bash);
+        $this->assertStringContainsString('NEEDRESTART_MODE=a', $bash);
+        $this->assertStringContainsString('exec dpkg --configure -a', $bash);
     }
 
     public function testRunCommandTimeoutWritesStructuredTimeoutFireLog(): void

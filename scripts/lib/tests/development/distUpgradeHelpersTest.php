@@ -63,6 +63,18 @@ class DistUpgradeHelpersTest extends TestCase
         $this->assertSame($env.' apt-get full-upgrade'.$opts, \pmssDistUpgradeAptCommand($env, 'full-upgrade'));
     }
 
+    public function testDistUpgradeAptEnvCarriesUnattendedRecoveryVariables(): void
+    {
+        [$env, $hasTty] = \pmssDistUpgradeAptEnv(false);
+
+        $this->assertEquals(false, $hasTty);
+        $this->assertStringContainsString('DEBIAN_FRONTEND=noninteractive', $env);
+        $this->assertStringContainsString('APT_LISTCHANGES_FRONTEND=none', $env);
+        $this->assertStringContainsString('UCF_FORCE_CONFDEF=1', $env);
+        $this->assertStringContainsString('UCF_FORCE_CONFOLD=1', $env);
+        $this->assertStringContainsString('NEEDRESTART_MODE=a', $env);
+    }
+
     public function testDistUpgradeAptCommandRejectsShellShapedInput(): void
     {
         $this->assertDistUpgradeAptCommandFails('install; reboot', 'libcrypt1', 'Unsafe dist-upgrade apt action');

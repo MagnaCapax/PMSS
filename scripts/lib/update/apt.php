@@ -127,7 +127,7 @@ function pmssAptRunClean(?callable $logger = null, ?callable $runner = null): bo
         $runner = static function (): array {
             $output = [];
             $rc = 1;
-            @exec('apt-get clean 2>&1', $output, $rc);
+            @exec(pmssAptDpkgEnvPrefix().' apt-get clean 2>&1', $output, $rc);
 
             return [
                 'rc' => (int) $rc,

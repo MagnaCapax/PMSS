@@ -195,7 +195,7 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
     runStep('Cleaning legacy libtorrent libraries', 'rm -rf /usr/local/lib/libtorrent*; ldconfig;'); // Clean up old libtorrent installed files
     
     // Ensure build/runtime dependencies exist. #TODO migrate to shared package helper. (GH #132)
-    runCommand('apt-get install -y libudns0 libudns-dev libcppunit-dev');
+    runCommand(aptCmd('install -y libudns0 libudns-dev libcppunit-dev'));
 
     echo "**** Remove old rtorrent packages\n";
     //passthru('rm -rf /tmp/rtorrent*; rm -rf /tmp/libtorrent*; rm -rf /tmp/xmlrpc*');

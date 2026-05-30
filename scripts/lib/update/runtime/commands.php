@@ -101,9 +101,17 @@ if (!function_exists('runUserStep')) {
  */
 function aptCmd(string $args): string
 {
-    return 'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none '
+    return pmssAptDpkgEnvPrefix().' '
         .'apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold '
         .$args;
+}
+
+/**
+ * Compose a reusable dpkg command prefix with unattended environment vars.
+ */
+function dpkgCmd(string $args): string
+{
+    return pmssAptDpkgEnvPrefix().' dpkg '.$args;
 }
 
 /**

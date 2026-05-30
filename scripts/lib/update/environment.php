@@ -48,7 +48,7 @@ require_once __DIR__.'/managedPath.php';
         }
 
         runStep('Purging legacy MediaArea package', aptCmd('purge -y repo-mediaarea || true'));
-        runStep('Holding legacy MediaArea package to block reinstalls', 'apt-mark hold repo-mediaarea || true');
+        runStep('Holding legacy MediaArea package to block reinstalls', pmssAptDpkgEnvPrefix().' apt-mark hold repo-mediaarea || true');
         runStep(
             'Removing cached MediaArea packages',
             'rm -f /var/cache/apt/archives/repo-mediaarea_*.deb '
@@ -102,12 +102,12 @@ CONF;
             }
         }
 
-        $rc = runStep('Completing pending dpkg configuration', 'dpkg --configure -a');
+        $rc = runStep('Completing pending dpkg configuration', dpkgCmd('--configure -a'));
         if ($rc !== 0 && $hasSystemd) {
             runStep('Unmasking proftpd for dpkg retry', 'systemctl unmask proftpd.service || true');
         }
         if ($rc !== 0) {
-            runStep('Retrying proftpd configure', 'dpkg --configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic || true');
+            runStep('Retrying proftpd configure', dpkgCmd('--configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic').' || true');
         }
 }
 
@@ -140,7 +140,10 @@ CONF;
             pmssPruneLegacyMediaArea();
             runStep('Refreshing apt cache before dpkg selection', aptCmd('update'));
         }
-        runStep('Refreshing dpkg availability database', 'apt-cache dumpavail | dpkg --merge-avail');
+        runStep(
+            'Refreshing dpkg availability database',
+            pmssAptDpkgEnvPrefix().' apt-cache dumpavail | '.dpkgCmd('--merge-avail')
+        );
 
         $selectionPath = $selections;
         $tmpSelection  = null;
@@ -167,7 +170,7 @@ CONF;
             pmssDpkgSelectionsLogSummary($selectionPlan);
         }
 
-        $cmd = sprintf('dpkg --set-selections < %s', escapeshellarg($selectionPath));
+        $cmd = sprintf('%s < %s', dpkgCmd('--set-selections'), escapeshellarg($selectionPath));
         $success = $success && (runStep('Applying dpkg selection baseline', $cmd) === 0);
 
         $installCmd = aptCmd('dselect-upgrade -y');

@@ -264,7 +264,9 @@ class DpkgBaselineApplySafetyTest extends TestCase
         $matches = [];
         $this->assertTrue($result, 'Expected dry-run dpkg baseline application to succeed when staging works');
         $this->assertTrue(
-            is_string($applyCommand) && preg_match("/^dpkg --set-selections < '([^']+)'$/", $applyCommand, $matches) === 1,
+            is_string($applyCommand)
+            && strpos($applyCommand, 'dpkg --set-selections < ') !== false
+            && preg_match("/< '([^']+)'$/", $applyCommand, $matches) === 1,
             'Expected staged dpkg baseline command to reference a temporary file'
         );
         $this->assertEquals(\aptCmd('dselect-upgrade -y'), $installCommand);

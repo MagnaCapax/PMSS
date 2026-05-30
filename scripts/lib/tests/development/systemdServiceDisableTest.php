@@ -46,12 +46,12 @@ class SystemdServiceDisableTest extends TestCase
         $this->assertTrue(strpos($joined, "find '/var/spool/exim4/db' -xdev -type f -delete") !== false);
 
         $purgeIndex = array_search(
-            'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold purge -y exim4 exim4-base exim4-config exim4-daemon-light',
+            \aptCmd('purge -y exim4 exim4-base exim4-config exim4-daemon-light'),
             $commands,
             true
         );
         $autoremoveIndex = array_search(
-            'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold autoremove -y',
+            \aptCmd('autoremove -y'),
             $commands,
             true
         );

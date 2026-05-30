@@ -186,7 +186,7 @@ function pmssInstallPinnedRemoteDebPackage(string $label, string $url, string $e
 
     try {
         return pmssEnvFlagEnabled('PMSS_DRY_RUN')
-            || runStep("Installing {$label}", pmssBuildCommand('dpkg', ['-i', $tmp])) === 0;
+            || runStep("Installing {$label}", dpkgCmd('-i '.escapeshellarg($tmp))) === 0;
     } finally {
         @unlink($tmp);
     }

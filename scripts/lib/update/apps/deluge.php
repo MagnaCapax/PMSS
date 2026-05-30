@@ -334,7 +334,7 @@ if ($isDebian10) {
               && (trim((string) @shell_exec('dpkg -s deluge-web 2>/dev/null | grep -iE "^Status:.*installed$"')) !== '');
     runStep(
         $installed ? 'Upgrading Deluge packages' : 'Installing Deluge packages',
-        pmssBuildCommand('apt-get', ['install', '-y', 'deluged', 'deluge-web'])
+        aptCmd('install -y deluged deluge-web')
     );
     runStep('Disabling deluged service', 'systemctl disable deluged || true');
 }
