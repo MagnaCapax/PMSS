@@ -314,8 +314,8 @@ pmssRunProfiledCallable('Running update-step2 preflight checks', static function
 pmssRunProfiledCallable('Checking /home inode density', 'pmssHomeInodeDensityCheck', ['logmsg']);
 
 // Ensure the root cron template is restored even if the updater exits early.
-// Phase 1 disables `/etc/cron.d/pmss` to avoid cron activity while the tree is
-// partially refreshed; if phase 2 crashes, we still want cron back on the next boot.
+// update.php disables `/etc/cron.d/pmss` only at the immediate phase-2 handoff;
+// if phase 2 crashes, cron must come back before the process exits.
 $pmssRootCronRestored = false;
 register_shutdown_function(function () use (&$pmssRootCronRestored): void {
     if ($pmssRootCronRestored) {
@@ -397,10 +397,10 @@ pmssRunProfiledStep('Cleaning mediaarea bootstrap package state', static functio
 
     runStep(
         'Removing legacy MediaArea bootstrap package (repo-mediaarea)',
-        'dpkg --remove --force-remove-reinstreq repo-mediaarea || true'
+        dpkgCmd('--remove --force-remove-reinstreq repo-mediaarea').' || true'
     );
 
-    $setSelection = "printf '%s\\t%s\\n' 'repo-mediaarea' 'deinstall' | dpkg --set-selections";
+    $setSelection = "printf '%s\\t%s\\n' 'repo-mediaarea' 'deinstall' | ".dpkgCmd('--set-selections');
     runStep('Marking repo-mediaarea for deinstallation', $setSelection);
 });
 pmssRunProfiledCallable('Pruning legacy MediaArea repository entries', 'pmssPruneLegacyMediaArea');
@@ -642,8 +642,9 @@ runStep('Hardening access to session and network binaries', 'chmod o-r /var/log/
 // Cleanup legacy runtime metadata that should never have shipped with snapshots.
 if (is_dir('/etc/seedbox/config/app-versions')) { runStep('Removing legacy app version records', 'rm -rf '.escapeshellarg('/etc/seedbox/config/app-versions')); }
 
-// Restore root cron at the very end. Phase 1 disables it to avoid cron activity
-// during a partial-update window; we want it back for normal operations.
+// Restore root cron at the very end. update.php only disables it for the
+// phase-2 handoff window; we want it back for normal operations.
+pmssRunProfiledCallable('Ensuring cron service is active before root cron restore', 'pmssEnsureCronServiceActive', ['update-step2 root cron restore']);
 runStep('Refreshing root cron configuration', '/scripts/util/setupRootCron.php');
 $pmssRootCronRestored = true;
 

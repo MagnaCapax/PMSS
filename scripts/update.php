@@ -979,11 +979,55 @@ function pmssAtomicSwapDirectory(string $target, string $staging, string $backup
 /**
  * Best-effort restore of PMSS root cron after updates that temporarily disable it.
  *
- * During phase 1 we remove `/etc/cron.d/pmss` to avoid cron activity while the
- * tree is partially refreshed. Flows that end before phase 2 must restore the
- * cron template here; otherwise defer to update-step2.
+ * Phase 1 keeps `/etc/cron.d/pmss` live until the immediate phase-2 handoff.
+ * If phase 2 exits early or the bootstrap receives a termination signal after
+ * that handoff, restore the cron template before update.php exits.
  */
-function restoreRootCronBestEffort(string $context): void
+function pmssRestoreRootCronBackup(string $context): bool
+{
+    $target = '/etc/cron.d/pmss';
+    $backup = $GLOBALS['PMSS_ROOT_CRON_BACKUP_CONTENT'] ?? null;
+    if (file_exists($target) || is_link($target)) {
+        return true;
+    }
+    if (!is_string($backup) || $backup === '') {
+        return false;
+    }
+    if (@file_put_contents($target, $backup, LOCK_EX) === false) {
+        logmsg('[WARN] Failed to restore root cron backup after '.$context);
+        return false;
+    }
+
+    @chmod($target, 0644);
+    logmsg('[WARN] Restored root cron from phase-1 backup after '.$context);
+    return true;
+}
+
+/**
+ * Ensure cron itself is not left masked or stopped.
+ */
+function pmssEnsureCronServiceActiveBootstrap(string $context): void
+{
+    if (!is_dir('/run/systemd/system')) {
+        logmsg('[SKIP] Ensuring cron service is active (systemd unavailable)');
+        return;
+    }
+    $systemctl = trim((string) @shell_exec('command -v systemctl 2>/dev/null'));
+    if ($systemctl === '') {
+        logmsg('[SKIP] Ensuring cron service is active (systemctl missing)');
+        return;
+    }
+
+    $state = trim((string) @shell_exec('systemctl is-enabled cron.service 2>/dev/null'));
+    if ($state === 'masked') {
+        logmsg('[WARN] cron.service is masked during '.$context.'; unmasking immediately');
+        pmssRunBootstrapCommand('systemctl unmask cron.service || true');
+    }
+
+    pmssRunBootstrapCommand('systemctl enable --now cron.service || true');
+}
+
+function restoreRootCronBestEffort(string $context): bool
 {
     $helper   = '/scripts/util/setupRootCron.php';
     $template = '/etc/seedbox/config/root.cron';
@@ -991,11 +1035,13 @@ function restoreRootCronBestEffort(string $context): void
 
     if (!file_exists($helper)) {
         logmsg('[WARN] setupRootCron.php missing; cannot restore root cron after '.$context);
-        return;
+        pmssEnsureCronServiceActiveBootstrap($context.' root cron restore');
+        return pmssRestoreRootCronBackup($context);
     }
     if (!file_exists($template)) {
         logmsg('[WARN] root.cron template missing; cannot restore root cron after '.$context);
-        return;
+        pmssEnsureCronServiceActiveBootstrap($context.' root cron restore');
+        return pmssRestoreRootCronBackup($context);
     }
     // Always re-run setupRootCron.php — it deploys the template idempotently
     // (`install -m 0644 …`). The previous "skip if target exists" short-circuit
@@ -1008,6 +1054,66 @@ function restoreRootCronBestEffort(string $context): void
         logmsg('[INFO] Restoring root cron after '.$context);
     }
     pmssRunBootstrapCommand(pmssBootstrapPhpCommand($helper));
+    pmssEnsureCronServiceActiveBootstrap($context.' root cron restore');
+    if (!file_exists($target) && !is_link($target)) {
+        return pmssRestoreRootCronBackup($context);
+    }
+
+    return true;
+}
+
+function pmssRootCronShutdownRestore(string $context = 'shutdown'): void
+{
+    if (empty($GLOBALS['PMSS_ROOT_CRON_DISABLED_BY_UPDATE'])) {
+        return;
+    }
+
+    restoreRootCronBestEffort($context);
+    $GLOBALS['PMSS_ROOT_CRON_DISABLED_BY_UPDATE'] = false;
+}
+
+function pmssRootCronSignalHandler(int $signal): void
+{
+    logmsg('[WARN] update.php received signal '.$signal.'; restoring root cron before exit');
+    pmssRootCronShutdownRestore('signal '.$signal);
+    exit(128 + $signal);
+}
+
+function pmssRegisterRootCronRestoreGuard(): void
+{
+    if (!empty($GLOBALS['PMSS_ROOT_CRON_RESTORE_GUARD_REGISTERED'])) {
+        return;
+    }
+
+    register_shutdown_function('pmssRootCronShutdownRestore', 'shutdown');
+    if (function_exists('pcntl_signal') && function_exists('pcntl_async_signals')) {
+        pcntl_async_signals(true);
+        foreach (['SIGTERM', 'SIGINT', 'SIGHUP'] as $signalName) {
+            if (defined($signalName)) {
+                pcntl_signal(constant($signalName), 'pmssRootCronSignalHandler');
+            }
+        }
+    }
+
+    $GLOBALS['PMSS_ROOT_CRON_RESTORE_GUARD_REGISTERED'] = true;
+}
+
+function pmssDisableRootCronForUpdateStep2(): void
+{
+    pmssRegisterRootCronRestoreGuard();
+    $target = '/etc/cron.d/pmss';
+    $GLOBALS['PMSS_ROOT_CRON_DISABLED_BY_UPDATE'] = true;
+    $GLOBALS['PMSS_ROOT_CRON_BACKUP_CONTENT'] = is_file($target) && !is_link($target)
+        ? @file_get_contents($target)
+        : null;
+
+    if (file_exists($target) || is_link($target)) {
+        pmssRemoveFileFatal($target, 'root cron file');
+        logmsg('[INFO] Disabled /etc/cron.d/pmss for immediate update-step2 handoff; shutdown guard will restore it');
+        return;
+    }
+
+    logmsg('[WARN] /etc/cron.d/pmss was already missing before update-step2 handoff; shutdown guard will restore from template');
 }
 
 /**
@@ -1476,9 +1582,12 @@ function runUpdateStep2(bool $dryRun): void
     }
     logmsg($handoffLog);
     logEvent('update_step2_start');
+    pmssDisableRootCronForUpdateStep2();
     $start = microtime(true);
     passthru(pmssBootstrapPhpCommand('/scripts/util/update-step2.php'), $rc);
     $duration = round(microtime(true) - $start, 3);
+    restoreRootCronBestEffort('update-step2 handoff');
+    $GLOBALS['PMSS_ROOT_CRON_DISABLED_BY_UPDATE'] = false;
 
     // Interpret only valid 128+signal exit codes (e.g. SIGKILL -> 137).
     $status  = $rc === 0 ? 'ok' : 'error';
@@ -1574,10 +1683,10 @@ function maybeRunDistUpgrade($distUpgrade, bool $deferRootCronRestore = false): 
         fatal('dist-upgrade helper exited with status '.$rc, EXIT_DIST);
     }
 
-    // When phase 2 will run, defer root cron restoration to update-step2 so
-    // cron does not run mid-update. Otherwise restore immediately.
+    // When phase 2 will run, keep the root cron template refresh for the
+    // handoff/end guard. Otherwise restore immediately.
     if ($deferRootCronRestore) {
-        logmsg('[INFO] Deferring root cron restore until update-step2');
+        logmsg('[INFO] Deferring root cron template refresh until update-step2');
     } else {
         restoreRootCronBestEffort('dist-upgrade');
     }
@@ -1610,6 +1719,9 @@ function bootstrapMain(array $argv): void
     if ($options['scripts_only'] && $options['dist_upgrade']) {
         fatal('Cannot combine --scripts-only with --dist-upgrade; scripts-only must never modify packages.', EXIT_PARSE);
     }
+    if (!$options['dry_run']) {
+        pmssEnsureCronServiceActiveBootstrap('update.php start');
+    }
 
     // Only normalize apt sources for full update or dist-upgrade flows. Scripts
     // refreshes intentionally leave apt configuration untouched.
@@ -1634,13 +1746,6 @@ function bootstrapMain(array $argv): void
         'branch'       => $spec['branch'],
         'pin'          => $spec['pin'],
     ]);
-
-    // Disable root cronjobs for update; update-step2 will reapply the template.
-    $rootCron = '/etc/cron.d/pmss';
-    if (file_exists($rootCron) || is_link($rootCron)) {
-        pmssRemoveFileFatal($rootCron, 'root cron file');
-        logmsg('[INFO] Disabled /etc/cron.d/pmss during update; template will be reapplied in update-step2');
-    }
 
     // Remove /etc/cron.d/updateQuotas if present: PMSS cron entries must be in /etc/cron.d/pmss
     // (deployed from /etc/seedbox/config/root.cron). This is a safety guard to prevent any

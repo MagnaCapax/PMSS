@@ -17,6 +17,10 @@ Responsibilities:
   `version.meta`.
 - Re-run itself once if the fetched snapshot updated `update.php`.
 - Invoke phase 2 unless explicitly skipped.
+- Keep `/etc/cron.d/pmss` active through phase-1 staging; disable it only for
+  the immediate phase-2 handoff and restore it from a shutdown/signal guard.
+- Self-heal `cron.service` when systemd reports it as masked, because PMSS
+  watchdogs, quotas, and traffic jobs depend on root cron.
 - If phase 2 exits non-zero after staging, make a best-effort
   `setupPermissions.php` pass before surfacing the failure so
   `/etc/seedbox` remains traversable.
@@ -93,7 +97,11 @@ contents, so plan for services that may have open handles.
 The package phase is a hard invariant: update-step2 must complete every dpkg task
 before any other orchestrator steps run. The sequence is:
 
-1. `pmssConfigureAptNonInteractive()` – force unattended apt behaviour.
+1. `pmssConfigureAptNonInteractive()` – force unattended apt behaviour; runtime
+   command wrappers also export `DEBIAN_FRONTEND=noninteractive`,
+   `APT_LISTCHANGES_FRONTEND=none`, `UCF_FORCE_CONFDEF=1`,
+   `UCF_FORCE_CONFOLD=1`, and `NEEDRESTART_MODE=a` for apt/dpkg recovery
+   commands.
 2. `pmssCompletePendingDpkg()` – finish any interrupted `dpkg --configure` runs.
 3. `pmssApplyDpkgSelections()` – apply the codename-specific baseline snapshot.
 4. `pmssApplyDpkgSelections()` recovery + post-phase fix-broken/autoremove checks.

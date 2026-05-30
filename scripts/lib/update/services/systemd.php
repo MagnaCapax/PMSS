@@ -60,6 +60,25 @@ function pmssEnsureSystemdServicesGuardBootUnit(): void
 }
 
 /**
+ * Keep cron available because PMSS watchdogs and quota jobs depend on it.
+ */
+function pmssEnsureCronServiceActive(string $context = 'update'): void
+{
+    if (($skipReason = pmssSystemdActionSkipReason('cron.service')) !== '') {
+        logmsg('[SKIP] Ensuring cron service is active ('.$skipReason.')');
+        return;
+    }
+
+    $state = trim((string) @shell_exec('systemctl is-enabled cron.service 2>/dev/null'));
+    if ($state === 'masked') {
+        logmsg('[WARN] cron.service is masked during '.$context.'; unmasking immediately');
+        runStep('Unmasking cron service ('.$context.')', 'systemctl unmask cron.service || true');
+    }
+
+    runStep('Enabling and starting cron service ('.$context.')', 'systemctl enable --now cron.service || true');
+}
+
+/**
  * Specs for system-wide services that must stay disabled on seedbox hosts.
  *
  * Keep this list conservative and system-wide only. Per-user instances are

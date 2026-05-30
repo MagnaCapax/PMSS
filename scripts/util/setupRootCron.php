@@ -9,6 +9,7 @@
  */
 
 require_once __DIR__.'/../lib/update/runtime/commands.php';
+require_once __DIR__.'/../lib/update/services/systemd.php';
 
 requireRoot();
 
@@ -23,6 +24,8 @@ if (!is_readable($source)) {
     logmsg('Root cron template missing; aborting without changes');
     exit(1);
 }
+
+pmssEnsureCronServiceActive('root cron setup');
 
 $failed = runStep(
     'Deploying root cron template',
