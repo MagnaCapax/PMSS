@@ -15,33 +15,6 @@ require_once __DIR__.'/traffic.php';
 require_once __DIR__.'/trafficLimit.php';
 require_once __DIR__.'/userConfigStore.php';
 
-/** Render the canonical help text for userResourcesList.php. */
-function pmssUserResourcesListUsageText(): string
-{
-    $useColor = pmssCliHelpSupportsColor();
-    $lines = [
-        pmssCliHelpHeading('Usage', $useColor),
-        '  /scripts/util/userResourcesList.php [--brief|--full] [--json|--jsonl]',
-        '',
-        pmssCliHelpHeading('Options', $useColor),
-        pmssCliHelpLine('--brief', 'Show the compact RAM/CPU/IO table.'.pmssCliHelpDim(' (default)', $useColor)),
-        pmssCliHelpLine('--full', 'Include disk quota, traffic, TasksMax, and suspension columns.'),
-        pmssCliHelpLine('--json', 'Emit one JSON array instead of text output.'),
-        pmssCliHelpLine('--jsonl', 'Emit one JSON object per line for pipelines.'),
-        pmssCliHelpLine('-h, --help', 'Show this help and exit.'),
-        '',
-        pmssCliHelpHeading('Examples', $useColor),
-        '  /scripts/util/userResourcesList.php --full',
-        '  /scripts/util/userResourcesList.php --json',
-        '',
-        pmssCliHelpHeading('Notes', $useColor),
-        '  - Run as root when querying real slice data; --help works without root.',
-        '  - --brief and --full are mutually exclusive.',
-    ];
-
-    return implode("\n", $lines);
-}
-
 /** Format a byte value in a compact binary unit. */
 function pmssUserResourcesListBinaryFormat(?int $bytes): string
 {
@@ -165,7 +138,27 @@ function pmssUserResourcesListRowBuild(array $resourceData, string $displayMode)
 /** Main CLI entrypoint for resource listing. */
 function pmssUserResourcesListMain(array $argv): int
 {
-    if (($parsed = pmssParseCliTokensOrHelp($argv, pmssUserResourcesListUsageText()."\n")) === null) return 0;
+    $useColor = pmssCliHelpSupportsColor();
+    $usage = implode("\n", [
+        pmssCliHelpHeading('Usage', $useColor),
+        '  /scripts/util/userResourcesList.php [--brief|--full] [--json|--jsonl]',
+        '',
+        pmssCliHelpHeading('Options', $useColor),
+        pmssCliHelpLine('--brief', 'Show the compact RAM/CPU/IO table.'.pmssCliHelpDim(' (default)', $useColor)),
+        pmssCliHelpLine('--full', 'Include disk quota, traffic, TasksMax, and suspension columns.'),
+        pmssCliHelpLine('--json', 'Emit one JSON array instead of text output.'),
+        pmssCliHelpLine('--jsonl', 'Emit one JSON object per line for pipelines.'),
+        pmssCliHelpLine('-h, --help', 'Show this help and exit.'),
+        '',
+        pmssCliHelpHeading('Examples', $useColor),
+        '  /scripts/util/userResourcesList.php --full',
+        '  /scripts/util/userResourcesList.php --json',
+        '',
+        pmssCliHelpHeading('Notes', $useColor),
+        '  - Run as root when querying real slice data; --help works without root.',
+        '  - --brief and --full are mutually exclusive.',
+    ])."\n";
+    if (($parsed = pmssParseCliTokensOrHelp($argv, $usage)) === null) return 0;
     if (posix_getuid() !== 0) {
         fwrite(STDERR, "Error: This script must be run as root to query systemd slices.\n");
         return 1;

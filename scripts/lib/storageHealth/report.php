@@ -11,19 +11,6 @@ require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../storageHealth.php';
 require_once __DIR__.'/reportTable.php';
 
-/** Build help text close to the CLI parser so option contracts stay visible. */
-function pmssStorageHealthReportHelpText(): string
-{
-    return "\nStorage health report\n".pmssCliHelpUsageOptions('storageHealth.php [--json <path>] [--raw] [--only-problems] [--device <kname|/dev/...>] [--user-notice[=<path>]]', [
-        ['--json <path>', 'JSON Lines input (default /var/log/pmss/storage-health.jsonl).'],
-        ['--raw', 'Print the latest JSON entries (per device) and exit.'],
-        ['--only-problems', 'Show only warn/fail entries.'],
-        ['--device <id>', 'Filter to one device (kname like sda, or path like /dev/sda).'],
-        ['--user-notice[=<path>]', 'Write/clear a user-facing performance notice when perf is limited.'],
-        ['--help', 'Show this help.'],
-    ], 28);
-}
-
 /** @return array{0:array<int,array<string,mixed>>,1:array<int,array<string,mixed>>,2:string} */
 function pmssStorageHealthReportEntries(string $jsonPath): array
 {
@@ -96,8 +83,16 @@ function pmssStorageHealthReportMain(array $argv): int
 {
     $jsonPath = '/var/log/pmss/storage-health.jsonl';
     $defaultNoticePath = getenv('PMSS_STORAGE_USER_NOTICE') ?: '/etc/seedbox/config/storagePerformanceNotice.json';
+    $usage = "\nStorage health report\n".pmssCliHelpUsageOptions('storageHealth.php [--json <path>] [--raw] [--only-problems] [--device <kname|/dev/...>] [--user-notice[=<path>]]', [
+        ['--json <path>', 'JSON Lines input (default /var/log/pmss/storage-health.jsonl).'],
+        ['--raw', 'Print the latest JSON entries (per device) and exit.'],
+        ['--only-problems', 'Show only warn/fail entries.'],
+        ['--device <id>', 'Filter to one device (kname like sda, or path like /dev/sda).'],
+        ['--user-notice[=<path>]', 'Write/clear a user-facing performance notice when perf is limited.'],
+        ['--help', 'Show this help.'],
+    ], 28);
 
-    if (($parsed = pmssParseCliTokensOrHelp($argv, pmssStorageHealthReportHelpText())) === null) return 0;
+    if (($parsed = pmssParseCliTokensOrHelp($argv, $usage)) === null) return 0;
 
     $jsonPath = pmssCliOptionString($parsed, 'json', null, $jsonPath) ?? $jsonPath;
     if (!is_file($jsonPath)) {

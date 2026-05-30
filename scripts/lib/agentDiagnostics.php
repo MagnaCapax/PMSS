@@ -142,19 +142,6 @@ function pmssAgentDiagnosticsSpecCollect(array $spec)
     return isset($spec['wrap']) ? [(string) $spec['wrap'] => $value] : $value;
 }
 
-/** Return CLI usage text for the diagnostics wrapper. */
-function pmssAgentDiagnosticsUsage(): string
-{
-    return pmssCliHelpUsageOptions([
-        'agentDiagnostics.php [--json] [--pretty] [--user USERNAME]', 'agentDiagnostics.php [--help]',
-    ], [
-        ['--json', 'Emit JSON output.'],
-        ['--pretty', 'Pretty-print JSON output.'],
-        ['--user USER', 'Include per-user diagnostics.'],
-        ['-h, --help', 'Show this help text.'],
-    ], 16, [], false);
-}
-
 /** Assemble the full diagnostics payload. */
 function pmssAgentDiagnosticsCollect(string $user = ''): array
 {
@@ -189,7 +176,15 @@ function pmssAgentDiagnosticsRenderText(array $payload): string
 /** CLI entrypoint for the agent diagnostics utility. */
 function pmssAgentDiagnosticsMain(array $argv): int
 {
-    if (($parsed = pmssParseCliTokensOrHelp($argv, pmssAgentDiagnosticsUsage(), ['user'])) === null) return 0;
+    $usage = pmssCliHelpUsageOptions([
+        'agentDiagnostics.php [--json] [--pretty] [--user USERNAME]', 'agentDiagnostics.php [--help]',
+    ], [
+        ['--json', 'Emit JSON output.'],
+        ['--pretty', 'Pretty-print JSON output.'],
+        ['--user USER', 'Include per-user diagnostics.'],
+        ['-h, --help', 'Show this help text.'],
+    ], 16, [], false);
+    if (($parsed = pmssParseCliTokensOrHelp($argv, $usage, ['user'])) === null) return 0;
 
     if (!pmssTestModeEnabled()) requireRoot();
 
