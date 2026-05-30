@@ -71,15 +71,15 @@ class statsDockerInactiveNoteTest extends TestCase
     {
         $script = 'define("PMSS_STATS_HELPERS_ONLY", true);'
             .'require '.var_export($this->pmssRepoPath('etc/skel/www/stats.php'), true).';'
-            .'echo json_encode(pmssStatsDockerInactiveNote('
+            .'echo json_encode(array("note" => pmssStatsDockerInactiveNote('
             .var_export($status, true).','
             .var_export($policy, true).','
             .var_export($osRelease, true).','
             .var_export($debianVersion, true).','
             .var_export($cmdline, true)
-            .'), JSON_UNESCAPED_SLASHES);';
+            .')), JSON_UNESCAPED_SLASHES);';
 
-        $decoded = json_decode($this->pmssRunInlinePhp($script), true);
-        return is_string($decoded) ? $decoded : '';
+        $decoded = $this->pmssDecodeJsonArray($this->pmssRunInlinePhp($script));
+        return is_string($decoded['note'] ?? null) ? $decoded['note'] : '';
     }
 }

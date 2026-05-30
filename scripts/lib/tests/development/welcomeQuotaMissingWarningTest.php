@@ -38,13 +38,13 @@ final class welcomeQuotaMissingWarningTest extends TestCase
             .'if (!function_exists("pmssWelcomeUserConfigNumber")) { function pmssWelcomeUserConfigNumber($key, $allowSymlink = false) { return null; } }'
             .'chdir('.var_export($home, true).');'
             .'$state = pmssWelcomePageStateBuild();'
-            .'echo json_encode($state["bonusQuota"]);',
+            .'echo json_encode(array("bonusQuota" => $state["bonusQuota"]));',
             [],
             '2>&1'
         );
-        $decoded = json_decode($output, true);
-        $this->assertTrue(is_int($decoded), 'Expected bonusQuota JSON integer, got: '.$output);
-        return $decoded;
+        $decoded = $this->pmssDecodeJsonArray($output);
+        $this->assertTrue(is_int($decoded['bonusQuota'] ?? null), 'Expected bonusQuota JSON integer, got: '.$output);
+        return $decoded['bonusQuota'];
     }
 
     private function makeWelcomeUsageFixture(): string
@@ -176,7 +176,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
                 'credentials' => true,
                 'control' => true,
             ),
-            json_decode($output, true)
+            $this->pmssDecodeJsonArray($output)
         );
 
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
@@ -202,7 +202,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
         $this->assertSame(
             array('safe' => true, 'loaded' => true, 'traversal' => false, 'absolute' => false),
-            json_decode($output, true)
+            $this->pmssDecodeJsonArray($output)
         );
     }
 
@@ -214,7 +214,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
             .'echo json_encode(pmssWelcomeQuotaInfoRead());'
         );
 
-        $this->assertSame($payload, json_decode($output, true));
+        $this->assertSame($payload, $this->pmssDecodeJsonArray($output));
     }
 
     public function testWelcomeQuotaReaderRejectsObjectPayloads(): void
@@ -224,7 +224,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
             .'echo json_encode(pmssWelcomeQuotaInfoRead());'
         );
 
-        $this->assertSame(array(), json_decode($output, true));
+        $this->assertSame(array(), $this->pmssDecodeJsonArray($output));
     }
 
     public function testWelcomeQuotaReaderRejectsNonScalarAndOversizeInput(): void
@@ -238,8 +238,8 @@ final class welcomeQuotaMissingWarningTest extends TestCase
             .'echo json_encode(pmssWelcomeQuotaInfoRead());'
         );
 
-        $this->assertSame(array(), json_decode($arrayOutput, true));
-        $this->assertSame(array(), json_decode($largeOutput, true));
+        $this->assertSame(array(), $this->pmssDecodeJsonArray($arrayOutput));
+        $this->assertSame(array(), $this->pmssDecodeJsonArray($largeOutput));
     }
 
     public function testWelcomeQuotaReaderRejectsPathologicallyDeepInput(): void
@@ -251,7 +251,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
             .'echo json_encode(pmssWelcomeQuotaInfoRead());'
         );
 
-        $this->assertSame(array(), json_decode($output, true));
+        $this->assertSame(array(), $this->pmssDecodeJsonArray($output));
     }
 
     public function testWelcomePageStateAcceptsPositiveBonusQuota(): void
@@ -384,7 +384,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
                 'throttled' => '8be9eb9abd053de1551f21aa0d5c8d6c7915019dad40d7b2c17f27c836cd031e',
                 'oom' => '84fb923ea3b0cf5eaa347d3a15955987c30be39eedec0086debb1ef1b1623876',
             ),
-            json_decode($output, true)
+            $this->pmssDecodeJsonArray($output)
         );
     }
 

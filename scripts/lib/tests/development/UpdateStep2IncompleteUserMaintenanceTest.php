@@ -40,7 +40,7 @@ class UpdateStep2IncompleteUserMaintenanceTest extends TestCase
         try {
             pmssUpdateRecordIncompleteUserMaintenance(21, 22, ['u: RuntimeException: userPermissions timeout after 900s']);
             $this->assertTrue(is_file($tmp), 'incomplete-tail marker must be written on mismatch');
-            $decoded = json_decode((string) file_get_contents($tmp), true);
+            $decoded = $this->pmssReadJsonArrayFile($tmp);
             $this->assertTrue(is_array($decoded) && ($decoded['processed'] ?? null) === 21 && ($decoded['total'] ?? null) === 22,
                 'marker must record processed/total counts');
             $this->assertTrue(isset($decoded['skipped'][0]) && strpos($decoded['skipped'][0], 'timeout') !== false,

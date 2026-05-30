@@ -56,8 +56,7 @@ class A00_JsonLogPathTest extends TestCase
         $expectedCorrelationId = \pmssCorrelationId();
         $this->assertEquals($path, \pmssJsonLogPath());
         \pmssLogJson(['event' => 'edge', 'val' => 1]);
-        $raw = trim(file_get_contents($path));
-        $data = json_decode($raw, true);
+        $data = $this->pmssDecodeJsonArray(trim(file_get_contents($path)));
         $this->assertEquals('edge', $data['event'] ?? '');
         $this->assertMatches('/^\d{4}-\d{2}-\d{2}T/', $data['ts'] ?? '');
         $this->assertEquals($expectedCorrelationId, $data['pmss_correlation_id'] ?? '');
@@ -72,8 +71,7 @@ class A00_JsonLogPathTest extends TestCase
         putenv('PMSS_CORRELATION_ID=test-correlation-id');
         $this->resetCorrelationIdCache();
         \pmssLogJson(['event' => 'edge', 'val' => 2]);
-        $raw = trim(file_get_contents($path));
-        $data = json_decode($raw, true);
+        $data = $this->pmssDecodeJsonArray(trim(file_get_contents($path)));
         $this->assertEquals('test-correlation-id', $data['pmss_correlation_id'] ?? '');
     }
 

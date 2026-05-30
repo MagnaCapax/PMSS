@@ -155,9 +155,10 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
                 continue;
             }
 
-            $decoded = json_decode(substr($line, strlen('###ADDUSER_JSON:')), true);
-            $this->assertTrue(is_array($decoded), 'Expected fatal exit JSON line to decode');
-            return $decoded;
+            return $this->pmssDecodeJsonArray(
+                substr($line, strlen('###ADDUSER_JSON:')),
+                'Expected fatal exit JSON line to decode'
+            );
         }
 
         throw new \AssertionError('Expected fatal exit JSON summary in output: '.$output);
