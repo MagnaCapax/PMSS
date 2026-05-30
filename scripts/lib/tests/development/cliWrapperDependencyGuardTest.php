@@ -5,13 +5,11 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class CliWrapperDependencyGuardTest extends TestCase
 {
-    public function testPmssStatsWrapperGuardsMissingLibraryBeforeRequire(): void
+    public function testCliWrappersGuardMissingTargetsBeforeRequire(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/pmss-stats.php', ["if (!is_file(\$pmssStatsLib))", 'pmss stats library missing; aborting.', 'require_once $pmssStatsLib;']);
-    }
-
-    public function testSetupSkelPermissionsWrapperGuardsRenamedEntrypoint(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupSkelPermissions.php', ["if (!is_file(\$setupPermissions))", 'setupPermissions.php missing; aborting wrapper.', 'require $setupPermissions;']);
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/pmss-stats.php' => ['required' => ["if (!is_file(\$pmssStatsLib))", 'pmss stats library missing; aborting.', 'require_once $pmssStatsLib;']],
+            'scripts/util/setupSkelPermissions.php' => ['required' => ["if (!is_file(\$setupPermissions))", 'setupPermissions.php missing; aborting wrapper.', 'require $setupPermissions;']],
+        ]);
     }
 }

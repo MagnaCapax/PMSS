@@ -5,25 +5,11 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateAppInstallerContractsTest extends TestCase
 {
-    private function assertUpdateAppSourceContractCases(array $cases): void
-    {
-        foreach ($cases as $installer => $case) {
-            $source = $this->pmssAssertUpdateAppFileContainsAndOmitsStrings(
-                $installer,
-                $case['requires'],
-                $case['omits'] ?? []
-            );
-            foreach ($case['matches'] ?? [] as $pattern) {
-                $this->assertMatches($pattern, $source);
-            }
-        }
-    }
-
     public function testInstallersKeepSourceContracts(): void
     {
-        $this->assertUpdateAppSourceContractCases([
+        $this->pmssAssertRepoFileContractCases([
             'aiToolsInstall.php' => [
-                'requires' => [
+                'required' => [
                     '@google/gemini-cli',
                     '@anthropic-ai/claude-code',
                     '/usr/local/bin/codex',
@@ -38,14 +24,14 @@ class UpdateAppInstallerContractsTest extends TestCase
                     '/etc/codex/config.toml',
                     'danger-full-access',
                 ],
-                'omits' => [
+                'forbidden' => [
                     'function pmssAiTools'.'NodeMajor(' => 'Node major parsing should stay inline in the only call site',
                     'function pmssAiTools'.'InstallNpmCli(' => 'NPM CLI installation should stay inline in the only installer',
                 ],
                 'matches' => ['/[0-9a-f]{64}/'],
             ],
             'btsync.php' => [
-                'requires' => [
+                'required' => [
                     "require_once __DIR__.'/remoteBinary.php';",
                     'pmssInstallPinnedRemoteBinary',
                     'https://pulsedmedia.com/remote/pkg/',
@@ -53,7 +39,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                     "runStep('Linking btsync shim'",
                     "pmssInstallPinnedRemoteBinary('Resilio Sync'",
                 ],
-                'omits' => [
+                'forbidden' => [
                     'http://pulsedmedia.com/remote/pkg/' => 'Found insecure http:// remote/pkg URL',
                     '--help 2>/dev/null' => 'Found rslsync --help probing',
                     'Resilio Sync 2.' => 'Found pinned version string probing',
@@ -64,7 +50,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                 'matches' => ['/\\x27[0-9a-f]{64}\\x27/'],
             ],
             'filebot.php' => [
-                'requires' => [
+                'required' => [
                     "require_once __DIR__.'/remoteBinary.php';",
                     'pmssInstallPinnedRemoteDebPackage',
                     'https://pulsedmedia.com/remote/pkg/FileBot_4.9.4_amd64.deb',
@@ -73,7 +59,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                     ' -version 2>/dev/null',
                     '@unlink($filebotPath)',
                 ],
-                'omits' => [
+                'forbidden' => [
                     "require_once __DIR__.'/../runtime/commands.php';" => 'FileBot installer should rely on remoteBinary.php for runtime helper bootstrap',
                     "require_once __DIR__.'/../logging.php';" => 'FileBot installer should not duplicate remoteBinary.php logging bootstrap',
                     'http://pulsedmedia.com/remote/pkg/' => 'Found insecure FileBot URL',
@@ -83,7 +69,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                 'matches' => ['/\\x27[0-9a-f]{64}\\x27/'],
             ],
             'pyload.php' => [
-                'requires' => [
+                'required' => [
                     "require_once __DIR__.'/pythonVenv.php';",
                     'pmssDistroVersionFromEnv()',
                     'Skipping pyLoad setup: unsupported Debian release',
@@ -96,7 +82,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                 ],
             ],
             'python.php' => [
-                'requires' => [
+                'required' => [
                     "require_once __DIR__.'/pythonVenv.php';",
                     'Skipping FlexGet install: python3 missing from PATH',
                     'pmssPythonVenvInstallCli(',
@@ -110,7 +96,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                 ],
             ],
             'iprange.php' => [
-                'requires' => [
+                'required' => [
                     "empty(\$GLOBALS['PMSS_PACKAGES_READY'])",
                     'Skipping iprange build: package phase not complete',
                     'Skipping iprange build: missing toolchain packages',
@@ -128,7 +114,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                 ],
             ],
             'firehol.php' => [
-                'requires' => [
+                'required' => [
                     "require_once __DIR__.'/remoteBinary.php';",
                     'https://github.com/firehol/firehol/releases/download/v',
                     "pmssRunPinnedRemoteArchiveStep('FireHOL '.\$fireholVersion.' source'",
@@ -137,7 +123,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                 ],
             ],
             'rclone.php' => [
-                'requires' => [
+                'required' => [
                     "pmssEnvFlagEnabled('PMSS_RCLONE_FETCH_LATEST')",
                     'Warning: Unable to determine latest rclone version, falling back to pinned release.',
                     '/usr/bin/rclone version 2>/dev/null',
@@ -147,7 +133,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                 ],
             ],
             'remoteBinary.php' => [
-                'requires' => [
+                'required' => [
                     'function pmssRunPinnedRemoteArchiveStep(',
                     'pmssFetchPinnedRemoteFile($label, $url, $expectedSha256)',
                     "substr(\$archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf'",
@@ -162,10 +148,10 @@ class UpdateAppInstallerContractsTest extends TestCase
                     'try {',
                     '} finally {',
                 ],
-                'omits' => ['function pmssRemoteBinary' => 'remoteBinary.php should keep temp-file cleanup inline rather than adding a helper wrapper'],
+                'forbidden' => ['function pmssRemoteBinary' => 'remoteBinary.php should keep temp-file cleanup inline rather than adding a helper wrapper'],
             ],
             'syncthing.php' => [
-                'requires' => [
+                'required' => [
                     "require_once __DIR__.'/remoteBinary.php';",
                     'syncthing version 2>/dev/null',
                     'pmssPinnedRemoteAmd64ArtifactsSupported()',
@@ -179,7 +165,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                 ],
             ],
             'vnstat.php' => [
-                'requires' => [
+                'required' => [
                     "require_once '/scripts/lib/networkInfo.php';",
                     "networkInterfaceNameNormalized((string) \$link)",
                     "runStep('Installing vnstat'",
@@ -193,14 +179,14 @@ class UpdateAppInstallerContractsTest extends TestCase
                     "runStep('Restarting vnstat'",
                     "pmssBuildCommand('/etc/init.d/vnstat', ['restart'])",
                 ],
-                'omits' => [
+                'forbidden' => [
                     'passthru(' => 'vnstat.php should route shelling through runStep()',
                     'chown -R vnstat:vnstat /var/lib/vnstat' => 'vnstat.php should not keep Debian 8 repair branches for unsupported releases',
                     '$debianMajor' => 'vnstat.php should not parse Debian major versions for removed Debian 8 repair logic',
                 ],
             ],
             'watchdog.php' => [
-                'requires' => [
+                'required' => [
                     'template.watchdog.conf',
                     'template.watchdog.network-check.sh',
                     '/etc/watchdog.d',
@@ -209,7 +195,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                     'systemctl enable --now watchdog',
                 ],
             ],
-        ]);
+        ], 'scripts/lib/update/apps/');
     }
 
     public function testPinnedDownloadInstallersReuseRemoteBinaryHelper(): void

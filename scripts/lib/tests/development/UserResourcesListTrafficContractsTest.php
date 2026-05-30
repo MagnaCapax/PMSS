@@ -5,17 +5,11 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UserResourcesListTrafficContractsTest extends TestCase
 {
-    public function testTrafficStatePathsRemainStable(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/resourcesList.php', [
-            '"/home/{$user}/.trafficLimit"',
-            '"/home/{$user}/.trafficData"',
-        ]);
-    }
-
     public function testTrafficStateReadingDelegatesToSharedHelpers(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/resourcesList.php', [
+            '"/home/{$user}/.trafficLimit"',
+            '"/home/{$user}/.trafficData"',
             "require_once __DIR__.'/traffic.php';",
             "require_once __DIR__.'/trafficLimit.php';",
             'pmssTrafficLimitReadGiBFile($trafficLimitPath)',

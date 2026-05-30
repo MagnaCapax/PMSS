@@ -1195,6 +1195,21 @@ abstract class TestCase
         return $source;
     }
 
+    /** Assert repeated source-contract tables without per-test boilerplate. */
+    protected function pmssAssertRepoFileContractCases(array $cases, string $pathPrefix = ''): void
+    {
+        foreach ($cases as $relativePath => $case) {
+            $source = $this->pmssAssertRepoFileContainsAndOmitsStrings(
+                $pathPrefix.ltrim((string) $relativePath, '/'),
+                $case['required'] ?? [],
+                $case['forbidden'] ?? []
+            );
+            foreach ($case['matches'] ?? [] as $pattern) {
+                $this->assertMatches((string) $pattern, $source);
+            }
+        }
+    }
+
     /** Read a repository file and assert a fixed substring count. */
     protected function pmssAssertRepoFileSubstringCount(string $relativePath, string $needle, int $expectedCount, string $message = ''): void
     {
