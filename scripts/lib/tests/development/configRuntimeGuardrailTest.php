@@ -8,8 +8,7 @@ class ConfigRuntimeGuardrailTest extends TestCase
 {
     public function testAppVersionsDirectoryNotTracked(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
-        $path     = $repoRoot.'/etc/seedbox/config/app-versions';
+        $path     = $this->pmssRepoPath('etc/seedbox/config/app-versions');
         $entries  = [];
         if (is_dir($path)) {
             $entries = array_values(array_diff(scandir($path) ?: [], ['.', '..']));

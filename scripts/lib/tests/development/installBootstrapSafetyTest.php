@@ -10,7 +10,7 @@ class installBootstrapSafetyTest extends TestCase
 
     protected function setUp(): void
     {
-        $path = dirname(__DIR__, 4).'/install.sh';
+        $path = $this->pmssRepoPath('install.sh');
         $script = file_get_contents($path);
         $this->assertTrue($script !== false, 'Failed to read install.sh');
         $this->script = $script;

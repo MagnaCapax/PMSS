@@ -12,7 +12,7 @@ class DelugeCoreTemplateTest extends TestCase
     protected function setUp(): void
     {
         $this->pmssTrackEnvOverrides([
-            'PMSS_SEEDBOX_CONFIG_DIR' => dirname(__DIR__, 4).'/etc/seedbox/config',
+            'PMSS_SEEDBOX_CONFIG_DIR' => $this->pmssRepoPath('etc/seedbox/config'),
             'PMSS_HOME_DIR' => null,
             'PMSS_DRY_RUN' => null,
             'PMSS_DELUGE_AUTH_TEMPLATE_PATH' => null,

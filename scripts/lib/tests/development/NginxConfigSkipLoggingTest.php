@@ -10,7 +10,7 @@ class NginxConfigSkipLoggingTest extends TestCase
 {
     public function testSkipHelperMirrorsWarningsToSharedAndUserLogs(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
+        $repoRoot = $this->pmssRepoRoot();
         $script = <<<'PHP'
 $repoRoot = __REPO_ROOT__;
 $GLOBALS['PMSS_NGINX_SKIP_APPEND_LOGS'] = [];
@@ -20,11 +20,7 @@ function pmssCreateNginxConfigAppendLog(string $message): void
 {
     $GLOBALS['PMSS_NGINX_SKIP_APPEND_LOGS'][] = $message;
 }
-
-function pmssUserLog(string $user, string $message): void
-{
-    $GLOBALS['PMSS_NGINX_SKIP_USER_LOGS'][] = [$user, $message];
-}
+__USER_LOG_SHIM__
 
 require $repoRoot.'/scripts/lib/nginxConfig/userConfigsGenerate.php';
 
@@ -36,7 +32,11 @@ echo json_encode([
 ]);
 PHP;
 
-        $script = str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script);
+        $script = str_replace(
+            ['__REPO_ROOT__', '__USER_LOG_SHIM__'],
+            [var_export($repoRoot, true), $this->pmssInlinePhpUserLogShim('PMSS_NGINX_SKIP_USER_LOGS')],
+            $script
+        );
         $decoded = $this->pmssRunInlinePhpJson($script);
 
         $this->assertEquals(

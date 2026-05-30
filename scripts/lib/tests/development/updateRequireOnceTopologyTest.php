@@ -7,7 +7,7 @@ class UpdateRequireOnceTopologyTest extends TestCase
 {
     public function testUpdaterHelperModulesLoadTogetherViaRequireOnce(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
+        $repoRoot = $this->pmssRepoRoot();
         $script = <<<'PHP'
 $repoRoot = __REPO_ROOT__;
 putenv('PMSS_TEST_MODE=1');

@@ -22,10 +22,8 @@ class PackageStateTest extends TestCase
 
     public function testRetiredPackageQueueFilesStayRemoved(): void
     {
-        $root = dirname(__DIR__, 4);
-
-        $this->assertTrue(!is_file($root.'/scripts/lib/update/apps/packages.php'), 'legacy package app must remain removed');
-        $this->assertTrue(!is_file($root.'/scripts/lib/update/apps/packages/helpers.php'), 'legacy package helpers must remain removed');
+        $this->assertTrue(!is_file($this->pmssRepoPath('scripts/lib/update/apps/packages.php')), 'legacy package app must remain removed');
+        $this->assertTrue(!is_file($this->pmssRepoPath('scripts/lib/update/apps/packages/helpers.php')), 'legacy package helpers must remain removed');
     }
 
     public function testUpdateStep2DoesNotCarryPackageQueueSkipPath(): void

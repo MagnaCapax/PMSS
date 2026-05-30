@@ -45,7 +45,7 @@ final class StorageHealthFacadeCharacterizationTest extends TestCase
 
     public function testFacadeOwnsNvmeAndRaidSnapshotEntrypoints(): void
     {
-        $facadePath = dirname(__DIR__, 4).'/scripts/lib/storageHealth.php';
+        $facadePath = $this->pmssRepoPath('scripts/lib/storageHealth.php');
         $facadeSource = @file_get_contents($facadePath);
 
         $this->assertTrue(is_string($facadeSource) && $facadeSource !== '', 'Expected to read '.$facadePath);

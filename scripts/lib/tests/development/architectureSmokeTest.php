@@ -17,7 +17,7 @@ class ArchitectureSmokeTest extends TestCase
      */
     public function testNoNearDuplicateFunctionPairs(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
+        $repoRoot = $this->pmssRepoRoot();
         $functions = $this->collectFunctionBodies($repoRoot.'/scripts/lib/update', $repoRoot);
         $pairs = $this->findNearDuplicatePairs($functions);
 

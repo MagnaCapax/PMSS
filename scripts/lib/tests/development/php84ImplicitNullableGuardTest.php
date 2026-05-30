@@ -10,7 +10,7 @@ class Php84ImplicitNullableGuardTest extends TestCase
 {
     public function testScriptsDoNotUseImplicitNullableParameterTypes(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
+        $repoRoot = $this->pmssRepoRoot();
         $paths = [
             $repoRoot.'/scripts',
             $repoRoot.'/etc/skel/www',

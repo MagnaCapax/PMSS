@@ -7,7 +7,7 @@ class UserMaintenancePartialCompletionGuardTest extends TestCase
 {
     public function testRunAndLogRejectsInvalidUsernameBeforeShellExecution(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
+        $repoRoot = $this->pmssRepoRoot();
         $marker = $this->pmssMakeTempPath('pmss-user-maintenance-marker-');
         $script = sprintf(
             <<<'PHP'

@@ -7,7 +7,7 @@ final class UserPasswordsCustomerHelperTest extends TestCase
 {
     private function helperPath(): string
     {
-        return dirname(__DIR__, 4).'/etc/skel/www/userPasswords.php';
+        return $this->pmssRepoPath('etc/skel/www/userPasswords.php');
     }
 
     private function runHelperJson(string $script, array $environment = []): array

@@ -110,7 +110,7 @@ class UserUpdatePermissionsTest extends TestCase
      */
     private function runRefreshPermissionsWithStepRc(int $rc): array
     {
-        $repoRoot = dirname(__DIR__, 4);
+        $repoRoot = $this->pmssRepoRoot();
         $script = <<<'PHP'
 $repoRoot = __REPO_ROOT__;
 $home = sys_get_temp_dir().'/pmss-perm-rc-'.bin2hex(random_bytes(4));

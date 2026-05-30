@@ -14,7 +14,7 @@ class UserUpdateEnvironmentCharacterizationTest extends TestCase
 {
     public function testUpdateUserEnvironmentReturnsEarlyWhenContextIsInvalid(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
+        $repoRoot = $this->pmssRepoRoot();
         $script = $this->buildUserEnvironmentScript(
             'invalid',
             <<<'PHP'
@@ -42,7 +42,7 @@ PHP
 
     public function testUpdateUserEnvironmentRunsStablePhasesWithoutLingerHook(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
+        $repoRoot = $this->pmssRepoRoot();
         $script = $this->buildUserEnvironmentScript(
             'valid',
             <<<'PHP'

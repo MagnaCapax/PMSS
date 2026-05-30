@@ -91,7 +91,7 @@ final class BonusTrafficTest extends TestCase
      */
     private function runBonusTrafficCli(array $argv, string $existingContents = ''): array
     {
-        $repoRoot = dirname(__DIR__, 4);
+        $repoRoot = $this->pmssRepoRoot();
         $homeDir = $this->pmssMakeTempDir('pmss-bonus-home-').'/alice';
         @mkdir($homeDir, 0755, true);
 
@@ -106,29 +106,7 @@ $argv = __ARGV__;
 $repoRoot = __REPO_ROOT__;
 $GLOBALS['PMSS_BONUS_TEST_HOME'] = $homeDir;
 $GLOBALS['PMSS_BONUS_TEST_LOGS'] = [];
-
-function pmssRequireCli(string $message, $exitCode = null): bool
-{
-    return true;
-}
-
-function pmssTrafficLimitResolveCliUserHome($rawUserName, string $usage, ?int &$exitCode = null): ?array
-{
-    $exitCode = null;
-    $userName = strtolower(trim((string) $rawUserName));
-    if ($userName === '') {
-        fwrite(STDERR, "Error: missing username.\n".$usage."\n");
-        $exitCode = 2;
-        return null;
-    }
-
-    return ['user' => $userName, 'home' => $GLOBALS['PMSS_BONUS_TEST_HOME']];
-}
-
-function pmssUserLog(string $userName, string $message): void
-{
-    $GLOBALS['PMSS_BONUS_TEST_LOGS'][] = [$userName, $message];
-}
+__TRAFFIC_CLI_SHIMS__
 
 require $repoRoot.'/scripts/lib/user/bonusTraffic.php';
 
@@ -146,8 +124,13 @@ echo json_encode([
 PHP;
 
         $script = str_replace(
-            ['__HOME_DIR__', '__ARGV__', '__REPO_ROOT__'],
-            [var_export($homeDir, true), var_export($argv, true), var_export($repoRoot, true)],
+            ['__HOME_DIR__', '__ARGV__', '__REPO_ROOT__', '__TRAFFIC_CLI_SHIMS__'],
+            [
+                var_export($homeDir, true),
+                var_export($argv, true),
+                var_export($repoRoot, true),
+                $this->pmssInlinePhpTrafficCliShims('PMSS_BONUS_TEST_HOME', 'PMSS_BONUS_TEST_LOGS'),
+            ],
             $script
         );
 

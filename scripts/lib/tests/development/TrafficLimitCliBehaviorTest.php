@@ -23,7 +23,7 @@ PHP;
 
         $script = str_replace(
             '__REPO_FILE__',
-            var_export(dirname(__DIR__, 4).'/scripts/lib/user/trafficLimit.php', true),
+            var_export($this->pmssRepoPath('scripts/lib/user/trafficLimit.php'), true),
             $script
         );
         $result = $this->pmssRunInlinePhpJson($script);
@@ -105,7 +105,7 @@ PHP;
      */
     private function runTrafficLimitCli(array $argv, array $existingFiles = [], ?string $usage = ''): array
     {
-        $repoRoot = dirname(__DIR__, 4);
+        $repoRoot = $this->pmssRepoRoot();
         $runtimeDir = $this->pmssMakeTempDir('pmss-traffic-runtime-').'/trafficLimits';
         $homeDir = $this->pmssMakeTempDir('pmss-traffic-home-').'/alice';
         @mkdir($runtimeDir, 0755, true);
@@ -140,37 +140,7 @@ $usage = __USAGE__;
 $argv = __ARGV__;
 $repoRoot = __REPO_ROOT__;
 $GLOBALS['PMSS_TRAFFIC_LIMIT_TEST_LOGS'] = [];
-
-function pmssRequireCli(string $message, $exitCode = null): bool
-{
-    return true;
-}
-
-function pmssTrafficLimitResolveCliUserHome($rawUserName, string $usage, ?int &$exitCode = null): ?array
-{
-    $exitCode = null;
-    $userName = strtolower(trim((string) $rawUserName));
-    if ($userName === '') {
-        fwrite(STDERR, "Error: missing username.\n".$usage."\n");
-        $exitCode = 2;
-        return null;
-    }
-
-    return ['user' => $userName, 'home' => $GLOBALS['PMSS_TRAFFIC_LIMIT_TEST_HOME']];
-}
-
-function pmssTrafficLimitCliTargetModes(string $userName, string $homeDir): array
-{
-    return [
-        $GLOBALS['PMSS_TRAFFIC_LIMIT_TEST_RUNTIME'].'/'.$userName => 0600,
-        $homeDir.'/.trafficLimit' => 0664,
-    ];
-}
-
-function pmssUserLog(string $userName, string $message): void
-{
-    $GLOBALS['PMSS_TRAFFIC_LIMIT_TEST_LOGS'][] = [$userName, $message];
-}
+__TRAFFIC_CLI_SHIMS__
 
 $GLOBALS['PMSS_TRAFFIC_LIMIT_TEST_RUNTIME'] = $runtimeDir;
 $GLOBALS['PMSS_TRAFFIC_LIMIT_TEST_HOME'] = $homeDir;
@@ -195,13 +165,18 @@ echo json_encode([
 PHP;
 
         $script = str_replace(
-            ['__RUNTIME_DIR__', '__HOME_DIR__', '__USAGE__', '__ARGV__', '__REPO_ROOT__'],
+            ['__RUNTIME_DIR__', '__HOME_DIR__', '__USAGE__', '__ARGV__', '__REPO_ROOT__', '__TRAFFIC_CLI_SHIMS__'],
             [
                 var_export($runtimeDir, true),
                 var_export($homeDir, true),
                 var_export($usage, true),
                 var_export($argv, true),
                 var_export($repoRoot, true),
+                $this->pmssInlinePhpTrafficCliShims(
+                    'PMSS_TRAFFIC_LIMIT_TEST_HOME',
+                    'PMSS_TRAFFIC_LIMIT_TEST_LOGS',
+                    'PMSS_TRAFFIC_LIMIT_TEST_RUNTIME'
+                ),
             ],
             $script
         );

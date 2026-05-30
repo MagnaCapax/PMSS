@@ -92,7 +92,7 @@ class ConfigSyntaxValidationTest extends TestCase
      */
     private function renderLighttpdTemplate(): string
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd';
+        $templatePath = $this->pmssRepoPath('etc/seedbox/config/template.lighttpd');
         $template = file_get_contents($templatePath);
 
         // Substitute placeholders with valid test values
@@ -114,7 +114,7 @@ class ConfigSyntaxValidationTest extends TestCase
         $templates = \pmssNginxUserSubdomainTemplates();
 
         $serverBlocks = '';
-        $webdavProxyParamsPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-webdav_proxy_params';
+        $webdavProxyParamsPath = $this->pmssRepoPath('etc/seedbox/config/template.nginx-webdav_proxy_params');
         $webdavProxyParams = (string)file_get_contents($webdavProxyParamsPath);
         foreach ($templates as $block) {
             // Only include blocks that have server { } definitions

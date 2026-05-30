@@ -975,6 +975,38 @@ abstract class TestCase
         );
     }
 
+    /** Return inline PHP shims shared by traffic-limit style CLI subprocess tests. */
+    protected function pmssInlinePhpTrafficCliShims(string $homeGlobalName, string $logGlobalName, ?string $runtimeGlobalName = null): string
+    {
+        foreach ([$homeGlobalName, $logGlobalName, $runtimeGlobalName] as $globalName) {
+            if ($globalName !== null) $this->assertMatches('/^[A-Z0-9_]+$/', $globalName, 'Invalid inline PHP global key: '.$globalName);
+        }
+
+        $lines = [
+            'function pmssRequireCli(string $message, $exitCode = null): bool { return true; }',
+            'function pmssTrafficLimitResolveCliUserHome($rawUserName, string $usage, ?int &$exitCode = null): ?array {',
+            '    $exitCode = null; $userName = strtolower(trim((string) $rawUserName));',
+            '    if ($userName === \'\') { fwrite(STDERR, "Error: missing username.\n".$usage."\n"); $exitCode = 2; return null; }',
+            "    return ['user' => \$userName, 'home' => \$GLOBALS[".var_export($homeGlobalName, true).']];',
+            '}',
+        ];
+        if ($runtimeGlobalName !== null) {
+            $lines[] = sprintf(
+                'function pmssTrafficLimitCliTargetModes(string $userName, string $homeDir): array { return [$GLOBALS[%s].\'/\'.$userName => 0600, $homeDir.\'/.trafficLimit\' => 0664]; }',
+                var_export($runtimeGlobalName, true)
+            );
+        }
+        $lines[] = $this->pmssInlinePhpUserLogShim($logGlobalName);
+        return implode("\n", $lines)."\n";
+    }
+
+    /** Return an inline PHP user-log shim that appends log calls to a global array. */
+    protected function pmssInlinePhpUserLogShim(string $logGlobalName): string
+    {
+        $this->assertMatches('/^[A-Z0-9_]+$/', $logGlobalName, 'Invalid inline PHP global key: '.$logGlobalName);
+        return 'function pmssUserLog(string $userName, string $message): void { $GLOBALS['.var_export($logGlobalName, true).'][] = [$userName, $message]; }';
+    }
+
     /** Decode JSON output that is expected to produce an array payload. */
     protected function pmssDecodeJsonArray(string $output, string $message = ''): array
     {
@@ -1076,10 +1108,16 @@ abstract class TestCase
         }
     }
 
+    /** Resolve the repository root from the development test tree. */
+    protected function pmssRepoRoot(): string
+    {
+        return dirname(__DIR__, 4);
+    }
+
     /** Resolve a repository-relative path from the development test tree. */
     protected function pmssRepoPath(string $relativePath): string
     {
-        return dirname(__DIR__, 4).'/'.ltrim($relativePath, '/');
+        return $this->pmssRepoRoot().'/'.ltrim($relativePath, '/');
     }
 
     /** Read a repository file and fail the test when it is unavailable. */

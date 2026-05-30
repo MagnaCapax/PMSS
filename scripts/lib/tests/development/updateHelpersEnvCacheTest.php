@@ -10,7 +10,7 @@ class UpdateHelpersEnvCacheTest extends TestCase
     public function testOsReleaseHelpersLoadStandaloneWithRuntimeDependency(): void
     {
         $file = $this->pmssWriteTempFile('standalone', "ID=debian\nVERSION_ID=12\n", 'pmss-env');
-        $repoRoot = dirname(__DIR__, 4);
+        $repoRoot = $this->pmssRepoRoot();
         $script = <<<'PHP'
 putenv('PMSS_OS_RELEASE_PATH='.__OS_RELEASE__);
 require_once __REPO_ROOT__.'/scripts/lib/update/osRelease.php';

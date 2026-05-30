@@ -64,7 +64,7 @@ class UserRutorrentCompatPatchTest extends TestCase
 
     public function testSkeletonHddquotaActionReturnsInt(): void
     {
-        $path = dirname(__DIR__, 4).'/etc/skel/www/rutorrent/plugins/hddquota/action.php';
+        $path = $this->pmssRepoPath('etc/skel/www/rutorrent/plugins/hddquota/action.php');
         $content = (string) file_get_contents($path);
 
         $this->assertStringContainsString('return (int) $field;', $content);

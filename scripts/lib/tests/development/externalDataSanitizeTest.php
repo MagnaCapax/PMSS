@@ -18,9 +18,7 @@ class ExternalDataSanitizeTest extends TestCase
 
     public function setUp(): void
     {
-        // Repo root: scripts/lib/tests/development -> ../../../../
-        $root = dirname(__DIR__, 4);
-        $this->script = $root.'/development/external-data/externalDataSanitize.sh';
+        $this->script = $this->pmssRepoPath('development/external-data/externalDataSanitize.sh');
         if (!is_file($this->script)) {
             throw new SkipTest('externalDataSanitize.sh not found');
         }

@@ -7,9 +7,8 @@ class NetworkInfoCharacterizationTest extends TestCase
 {
     public function testGlobalsStayAlignedWithHelperResults(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
         $result = $this->pmssRunInlinePhpJson(
-            'require_once '.var_export($repoRoot.'/scripts/lib/networkInfo.php', true).';'
+            'require_once '.var_export($this->pmssRepoPath('scripts/lib/networkInfo.php'), true).';'
             .'echo json_encode(['
             .'"link" => $link,'
             .'"linkSpeed" => $linkSpeed,'

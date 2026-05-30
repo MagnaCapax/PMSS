@@ -25,8 +25,7 @@ class StatsDockerPolicyFrontendTest extends TestCase
 
     public function testStatsRenderShowsReadOnlyDockerPolicy(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
-        $sourceWww = $repoRoot.'/etc/skel/www';
+        $sourceWww = $this->pmssRepoPath('etc/skel/www');
         $runRoot = \pmssCustomerPanelRenderTempRoot();
         $homeRoot = $runRoot.'/home';
         $home = $homeRoot.'/renderuser';
