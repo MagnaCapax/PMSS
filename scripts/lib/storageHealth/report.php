@@ -96,11 +96,8 @@ function pmssStorageHealthReportMain(array $argv): int
 {
     $jsonPath = '/var/log/pmss/storage-health.jsonl';
     $defaultNoticePath = getenv('PMSS_STORAGE_USER_NOTICE') ?: '/etc/seedbox/config/storagePerformanceNotice.json';
-    $parsed = pmssParseCliTokens($argv);
 
-    if (pmssCliHelpTextEmitIfRequested($parsed, pmssStorageHealthReportHelpText())) {
-        return 0;
-    }
+    if (($parsed = pmssParseCliTokensOrHelp($argv, pmssStorageHealthReportHelpText())) === null) return 0;
 
     $jsonPath = pmssCliOptionString($parsed, 'json', null, $jsonPath) ?? $jsonPath;
     if (!is_file($jsonPath)) {

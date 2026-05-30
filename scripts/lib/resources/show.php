@@ -43,17 +43,14 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
 function pmssShowResourcesMain(array $argv): int
 {
-    $parsed = pmssParseCliTokens($argv, ['user']);
-    if (pmssCliHelpRequested($parsed, null)) {
-        $self = basename($_SERVER['SCRIPT_NAME'] ?? 'showResources.php');
-        echo pmssCliHelpUsageOptions($self.' [--json] [--show-missing] [--user=<username>]', [
-            ['--json', 'Emit JSON instead of human text output.'],
-            ['--show-missing', 'Print missing stats usernames (text mode only).'],
-            ['--user', 'Show only the named user.'],
-            ['--help', 'Show this help.'],
-        ]);
-        return 0;
-    }
+    $self = basename($_SERVER['SCRIPT_NAME'] ?? 'showResources.php');
+    $usage = pmssCliHelpUsageOptions($self.' [--json] [--show-missing] [--user=<username>]', [
+        ['--json', 'Emit JSON instead of human text output.'],
+        ['--show-missing', 'Print missing stats usernames (text mode only).'],
+        ['--user', 'Show only the named user.'],
+        ['--help', 'Show this help.'],
+    ]);
+    if (($parsed = pmssParseCliTokensOrHelp($argv, $usage, ['user'], null)) === null) return 0;
     $userFilter = trim((string) pmssCliOptionString($parsed, 'user', null, ''));
     $statsDir = pmssRuntimeDir().'/resourceStats';
 

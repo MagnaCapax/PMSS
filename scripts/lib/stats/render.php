@@ -104,18 +104,15 @@ function pmssStatsRenderText(array $stats, array $options = []): string
  */
 function pmssStatsParseOptions(array $argv)
 {
-    $parsed = pmssParseCliTokens($argv);
-    if (pmssCliHelpRequested($parsed)) {
-        $self = basename($argv[0] ?? 'pmss-stats.php');
-        echo pmssCliHelpUsageOptions($self.' [--full] [--json] [--mini] [--no-header]', [
-            ['--full', 'Show extra cgroup counters and I/O details.'],
-            ['--json', 'Emit machine-readable JSON.'],
-            ['--mini', 'Show a compact four-line summary.'],
-            ['--no-header', 'Skip the title box.'],
-            ['--help', 'Show this help.'],
-        ], 13);
-        return false;
-    }
+    $self = basename($argv[0] ?? 'pmss-stats.php');
+    $usage = pmssCliHelpUsageOptions($self.' [--full] [--json] [--mini] [--no-header]', [
+        ['--full', 'Show extra cgroup counters and I/O details.'],
+        ['--json', 'Emit machine-readable JSON.'],
+        ['--mini', 'Show a compact four-line summary.'],
+        ['--no-header', 'Skip the title box.'],
+        ['--help', 'Show this help.'],
+    ], 13);
+    if (($parsed = pmssParseCliTokensOrHelp($argv, $usage)) === null) return false;
 
     return [
         'full' => pmssCliOptionPresent($parsed, 'full'),

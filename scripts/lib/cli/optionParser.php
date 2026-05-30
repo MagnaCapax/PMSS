@@ -102,6 +102,13 @@ function pmssCliHelpTextEmitIfRequested(array $parsed, string $helpText, ?string
     return true;
 }
 
+/** Parse CLI tokens, emit help when requested, and return null on help. */
+function pmssParseCliTokensOrHelp(array $argv, string $helpText, array $valueOptions = [], ?string $short = 'h'): ?array
+{
+    $parsed = pmssParseCliTokens($argv, $valueOptions);
+    return pmssCliHelpTextEmitIfRequested($parsed, $helpText, $short) ? null : $parsed;
+}
+
 /**
  * Return a non-empty string option value, or the caller's default.
  */

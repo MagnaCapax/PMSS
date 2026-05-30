@@ -41,8 +41,7 @@ function pmssCreateNginxConfigMain(array $argv): int
         ['--help, -h', 'Show this help'],
     ], 21);
 
-    $parsed = pmssParseCliTokens($argv);
-    if (pmssCliHelpTextEmitIfRequested($parsed, $usage)) return 0;
+    if (($parsed = pmssParseCliTokensOrHelp($argv, $usage)) === null) return 0;
 
     $requestedUser = (string) pmssCliOption($parsed, 'user', 'u', '');
     $positionals = $parsed['arguments'] ?? [];

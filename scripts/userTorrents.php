@@ -48,15 +48,12 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
 }
 
 pmssRunCliEntrypointWithArgv(__FILE__, static function (array $argv): int {
-    $parsed = pmssParseCliTokens($argv);
-    if (pmssCliHelpRequested($parsed, null)) {
-        $self = basename(__FILE__);
-        echo pmssCliHelpUsageOptions($self.' [--by-client]', [
-            ['--by-client', 'Show per-client breakdown (rtorrent/deluge/qbittorrent).'],
-            ['--help', 'Show this help.'],
-        ], 13);
-        return 0;
-    }
+    $self = basename(__FILE__);
+    $usage = pmssCliHelpUsageOptions($self.' [--by-client]', [
+        ['--by-client', 'Show per-client breakdown (rtorrent/deluge/qbittorrent).'],
+        ['--help', 'Show this help.'],
+    ], 13);
+    if (($parsed = pmssParseCliTokensOrHelp($argv, $usage, [], null)) === null) return 0;
     $byClient = pmssCliOptionPresent($parsed, 'by-client');
     $homeDir = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
 

@@ -85,4 +85,14 @@ class CliHelperTest extends TestCase
         $this->assertEquals(['-', 'extra'], $parsed['arguments']);
         $this->assertEquals([], $parsed['options']);
     }
+
+    public function testParseCliTokensOrHelpEmitsHelpAndReturnsNull(): void
+    {
+        list($parsed, $output) = $this->pmssCaptureStdout(static function () {
+            return \pmssParseCliTokensOrHelp(['script.php', '--help'], "Usage: script.php\n");
+        });
+        $this->assertSame(null, $parsed);
+        $this->assertEquals("Usage: script.php\n", $output);
+        $this->assertSame(['options' => ['json' => true], 'arguments' => []], \pmssParseCliTokensOrHelp(['script.php', '--json'], ''));
+    }
 }

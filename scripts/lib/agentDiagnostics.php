@@ -189,8 +189,7 @@ function pmssAgentDiagnosticsRenderText(array $payload): string
 /** CLI entrypoint for the agent diagnostics utility. */
 function pmssAgentDiagnosticsMain(array $argv): int
 {
-    $parsed = pmssParseCliTokens($argv, ['user']);
-    if (pmssCliHelpTextEmitIfRequested($parsed, pmssAgentDiagnosticsUsage())) return 0;
+    if (($parsed = pmssParseCliTokensOrHelp($argv, pmssAgentDiagnosticsUsage(), ['user'])) === null) return 0;
 
     if (!pmssTestModeEnabled()) requireRoot();
 
