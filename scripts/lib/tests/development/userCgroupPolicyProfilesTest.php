@@ -131,6 +131,8 @@ class UserCgroupPolicyProfilesTest extends TestCase
                         'ioWeight' => 150,
                         'readBw' => '3M',
                         'writeBw' => '4M',
+                        'readIops' => 30,
+                        'writeIops' => 40,
                     ],
                 ],
             ],
@@ -141,9 +143,7 @@ class UserCgroupPolicyProfilesTest extends TestCase
             ['PMSS_CONFIG_DIR' => $configDirectory]
         );
 
-        $this->assertStringContainsString('IOWeight=150', $output);
-        $this->assertStringContainsString('IOReadBandwidthMax=/dev/sda 3M', $output);
-        $this->assertStringContainsString('IOWriteBandwidthMax=/dev/sda 4M', $output);
+        $this->assertStringContainsAllStrings(['IOWeight=150', 'IOReadBandwidthMax=/dev/sda 3M', 'IOWriteBandwidthMax=/dev/sda 4M', 'IOReadIOPSMax=/dev/sda 30', 'IOWriteIOPSMax=/dev/sda 40'], $output);
     }
 
     public function testIoProfilePolicyCanOverrideBulkCpuAndTasksDefaults(): void

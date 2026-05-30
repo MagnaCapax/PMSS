@@ -433,80 +433,14 @@ class Manager
             $opt[$profileKey] = $profileName;
             $targetKey = $profile[1];
             if (!isset($opt[$targetKey])) {
-                $profiles = $this->resolveNumericProfiles($policy, $family, $profile[3]);
-                $opt[$targetKey] = $profiles[$profileName] ?? $profile[2];
+                $opt[$targetKey] = \pmssCgroupPolicyNumericProfileValue($policy, $family, $profileName, $profile[3], $profile[2]);
             }
         }
-    }
-
-    /**
-     * Resolve numeric profile maps from policy, preserving built-in defaults.
-     */
-    private function resolveNumericProfiles(array $policy, string $family, array $defaults): array
-    {
-        $resolved = $defaults;
-
-        if (!isset($policy['profiles']) || !is_array($policy['profiles']) || !isset($policy['profiles'][$family]) || !is_array($policy['profiles'][$family])) {
-            return $resolved;
-        }
-
-        foreach ($policy['profiles'][$family] as $profileName => $profileValue) {
-            if (!is_string($profileName) || $profileName === '' || !is_numeric($profileValue)) {
-                continue;
-            }
-
-            $numericValue = (int)$profileValue;
-            if ($numericValue <= 0) {
-                continue;
-            }
-
-            $resolved[strtolower($profileName)] = (string)$numericValue;
-        }
-
-        return $resolved;
     }
 
     private function applyIoProfile(string $profile, string $dev, array &$opt, array &$pairs): void
     {
-        $profiles = self::IO_PROFILE_MAP;
-        $policy = \pmssCgroupPolicyLoad();
-        if (isset($policy['profiles']['io']) && is_array($policy['profiles']['io'])) {
-            foreach ($policy['profiles']['io'] as $profileName => $profileConfig) {
-                if (!is_string($profileName) || $profileName === '' || !is_array($profileConfig)) {
-                    continue;
-                }
-
-                $resolvedName = strtolower($profileName);
-                $resolvedProfile = isset($profiles[$resolvedName]) && is_array($profiles[$resolvedName])
-                    ? $profiles[$resolvedName]
-                    : ['defaults' => [], 'limits' => []];
-                $hasValidOverride = false;
-
-                foreach (\pmssCgroupPolicyIoDefaultMap() as $policyKey => $targetKey) {
-                    $value = \pmssCgroupPolicyPositiveValue($profileConfig, $policyKey, true);
-                    if ($value === null) {
-                        continue;
-                    }
-                    $resolvedProfile['defaults'][$targetKey] = $value;
-                    $hasValidOverride = true;
-                }
-
-                foreach (\pmssCgroupPolicyIoPairSpecs(false) as $limitKey => $mapping) {
-                    $limitValue = \pmssCgroupPolicyPositiveValue($profileConfig, $limitKey, (bool) $mapping[1]);
-                    if ($limitValue === null) {
-                        continue;
-                    }
-
-                    $resolvedProfile['limits'][$limitKey] = $limitValue;
-                    $hasValidOverride = true;
-                }
-
-                if ($hasValidOverride) {
-                    $profiles[$resolvedName] = $resolvedProfile;
-                }
-            }
-        }
-
+        $profiles = \pmssCgroupPolicyIoProfiles(\pmssCgroupPolicyLoad(), self::IO_PROFILE_MAP);
         $entry = isset($profiles[$profile]) ? $profiles[$profile] : null;
         if (!is_array($entry)) {
             return;
