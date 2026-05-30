@@ -169,6 +169,31 @@ class TorrentPortFrontendTest extends TestCase
         $this->assertTrue(\pmssQbittorrentPortEnsure($this->user, $home) === false);
     }
 
+    public function testDelugePortEnsureRejectsInvalidUsernameBeforeConfigWrite(): void
+    {
+        $user = 'bad-user';
+        $home = $this->pmssUserHomePath($this->homeRoot, $user);
+        @mkdir($home.'/.config/deluge', 0755, true);
+        file_put_contents($home.'/.delugePort', "34567\n");
+        file_put_contents($home.'/.config/deluge/web.conf', "{\"file\":1,\"format\":1}{\"port\":12345,\"sessions\":[]}");
+
+        $this->assertTrue(\pmssDelugePortEnsure($user, $home) === false);
+        $parsed = \pmssDelugeReadWebConf($home.'/.config/deluge/web.conf');
+
+        $this->assertEquals(12345, $parsed['config']['port']);
+    }
+
+    public function testQbittorrentPortEnsureRejectsUserHomeMismatchBeforeConfigWrite(): void
+    {
+        $home = $this->pmssUserHomePath($this->homeRoot, $this->user);
+        @mkdir($home.'/.config/qBittorrent', 0755, true);
+        file_put_contents($home.'/.qbittorrentPort', "45678\n");
+        file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nWebUI\\Port=12345\n");
+
+        $this->assertTrue(\pmssQbittorrentPortEnsure('otherusr', $home) === false);
+        $this->assertSame("[Preferences]\nWebUI\\Port=12345\n", (string) file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf'));
+    }
+
     public function testCurrentUserContextRejectsSymlinkedHomePath(): void
     {
         $realHome = $this->pmssUserHomePath($this->homeRoot, $this->user);

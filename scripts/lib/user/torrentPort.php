@@ -9,6 +9,20 @@
 require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../lighttpd/userConfigApply.php';
 require_once __DIR__.'/qbittorrent.php';
+require_once __DIR__.'/identity.php';
+
+/**
+ * Validate the user/home pair before crossing process or filesystem boundaries.
+ */
+function pmssTorrentPortUserHomeContextIsSafe(string $user, string $home): bool
+{
+    $home = rtrim($home, '/');
+    return pmssValidateUsername($user)
+        && $home !== ''
+        && basename($home) === $user
+        && is_dir($home)
+        && pmssPathTargetIsSafe($home, true);
+}
 
 /**
  * Resolve the current user and home directory for frontend calls.
@@ -33,7 +47,7 @@ function pmssTorrentPortCurrentUserContext(): ?array
         $user = $info['name'];
     }
 
-    return $user === '' ? null : ['user' => $user, 'home' => $home];
+    return pmssTorrentPortUserHomeContextIsSafe($user, $home) ? ['user' => $user, 'home' => $home] : null;
 }
 
 /**
@@ -57,7 +71,7 @@ function pmssDelugePortEnsureCurrentUser(): bool
  */
 function pmssDelugePortEnsure(string $user, string $home): bool
 {
-    if (!pmssPathTargetIsSafe($home, true)) {
+    if (!pmssTorrentPortUserHomeContextIsSafe($user, $home)) {
         return false;
     }
     $expectedPort = pmssTorrentPortExpectedRead($home.'/.delugePort');
@@ -89,7 +103,7 @@ function pmssQbittorrentPortEnsureCurrentUser(): bool
  */
 function pmssQbittorrentPortEnsure(string $user, string $home): bool
 {
-    if (!pmssPathTargetIsSafe($home, true)) {
+    if (!pmssTorrentPortUserHomeContextIsSafe($user, $home)) {
         return false;
     }
     $expectedPort = pmssTorrentPortExpectedRead($home.'/.qbittorrentPort');
