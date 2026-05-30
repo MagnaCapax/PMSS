@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__.'/update/runtime/commands.php';
+require_once __DIR__.'/lighttpd/userFileWrite.php';
 
 /**
  * Parse a netconsole spec and extract the interface, target IP, and target MAC.
@@ -68,11 +69,10 @@ function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
         if (is_file($path) && (string) @file_get_contents($path) === $body) {
             continue;
         }
-        if (@file_put_contents($path, $body) === false) {
+        if (!pmssAtomicWriteFile($path, $body, 0644)) {
             $log('[WARN] Failed to write netconsole file '.$path);
             continue;
         }
-        @chmod($path, 0644);
         $log('Updated '.$path);
         $changed = true;
     }

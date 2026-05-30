@@ -432,15 +432,14 @@ function pmssSysctlSummaryWrite(?callable $logger, array $profile, array $groupe
         return;
     }
 
-    $tmpTarget = $target.'.tmp';
-    if (@file_put_contents($tmpTarget, $json.PHP_EOL) === false) {
-        $log('[WARN] Unable to write hardware summary JSON at '.$tmpTarget);
-        return;
-    }
-
-    @chmod($tmpTarget, 0644);
-    if (!@rename($tmpTarget, $target)) {
-        $log('[WARN] Unable to install hardware summary JSON at '.$target);
-        @unlink($tmpTarget);
-    }
+    pmssWriteManagedPathFile(
+        $target,
+        $json.PHP_EOL,
+        'hardware summary JSON',
+        $log,
+        null,
+        null,
+        0644,
+        '[WARN] Unable to write hardware summary JSON at '.$target
+    );
 }

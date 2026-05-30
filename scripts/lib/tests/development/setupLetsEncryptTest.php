@@ -66,7 +66,7 @@ class SetupLetsEncryptTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/certbotSetup.php', [
             'pmssCommandCapture($command)',
-            '@file_put_contents($cronPath, pmssSetupLetsEncryptRenewalCronContents()) === false',
+            'pmssAtomicWriteFile($cronPath, pmssSetupLetsEncryptRenewalCronContents(), 0644)',
         ]);
         $this->pmssAssertRepoFileNotContainsString('scripts/lib/certbotSetup.php', 'shell_exec(');
     }

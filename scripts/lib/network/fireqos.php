@@ -7,6 +7,7 @@
  */
 require_once __DIR__.'/../user/identity.php';
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 function networkBuildFireqosConfig(array $networkConfig, array $users, array $localnets): string
 {
@@ -79,7 +80,7 @@ function networkApplyFireqos(string $config): void
     if (!pmssDirEnsureExists(dirname($configPath), 0755) || !pmssDirEnsureExists(dirname($logPath), 0755)) {
         return;
     }
-    if (@file_put_contents($configPath, $config) === false) {
+    if (!pmssAtomicWriteFile($configPath, $config, 0644)) {
         return;
     }
 

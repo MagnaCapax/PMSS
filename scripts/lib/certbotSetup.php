@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/runtime.php';
+require_once __DIR__.'/lighttpd/userFileWrite.php';
 
 /**
  * Build a shell-safe argv command string for certbot setup primitives.
@@ -89,12 +90,8 @@ function pmssSetupLetsEncryptEnsureRenewalCron(string $cronPath, callable $fileE
         throw new RuntimeException('Unable to create certbot cron directory: '.$directory);
     }
 
-    if (@file_put_contents($cronPath, pmssSetupLetsEncryptRenewalCronContents()) === false) {
+    if (!pmssAtomicWriteFile($cronPath, pmssSetupLetsEncryptRenewalCronContents(), 0644)) {
         throw new RuntimeException('Unable to write certbot cron file: '.$cronPath);
-    }
-
-    if (!@chmod($cronPath, 0644)) {
-        throw new RuntimeException('Unable to set certbot cron permissions: '.$cronPath);
     }
 }
 
