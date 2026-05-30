@@ -11,20 +11,19 @@ class UpdateRuntimeProcessesTest extends TestCase
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-update-runtime-processes');
-        @mkdir($this->tempDir.'/bin', 0755, true);
         @file_put_contents($this->tempDir.'/state', "stopped\n");
         @file_put_contents($this->tempDir.'/commands.log', '');
         @file_put_contents($this->tempDir.'/kill-mode', "term\n");
         @file_put_contents($this->tempDir.'/.bash_profile', 'export PATH="'.$this->tempDir.'/bin:$PATH"'."\n");
 
-        $this->writeExecutable('pgrep', <<<'BASH'
+        $this->pmssWriteExecutableFiles($this->tempDir.'/bin', [
+            'pgrep' => <<<'BASH'
 #!/bin/bash
 state_file=${PMSS_TEST_PGREP_STATE:?}
 state=$(cat "$state_file" 2>/dev/null || echo stopped)
 [ "$state" = "running" ]
-BASH
-);
-        $this->writeExecutable('pkill', <<<'BASH'
+BASH,
+            'pkill' => <<<'BASH'
 #!/bin/bash
 printf '%s
 ' "$*" >> "${PMSS_TEST_COMMAND_LOG:?}"
@@ -37,7 +36,7 @@ case "${1:-}" in
 ' > "$state_file" ;;
 esac
 BASH
-);
+        ]);
 
         $path = getenv('PATH');
         $this->pmssTrackEnvOverrides([
@@ -129,10 +128,4 @@ BASH
         ], $this->pmssProfileCommands());
     }
 
-    private function writeExecutable(string $name, string $content): void
-    {
-        $path = $this->tempDir.'/bin/'.$name;
-        @file_put_contents($path, $content);
-        @chmod($path, 0755);
-    }
 }

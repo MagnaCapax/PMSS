@@ -71,8 +71,9 @@ class LighttpdWatchdogErrorPageTest extends TestCase
     public function testDetectReasonChecksHomeInodesBeforeConfigFallback(): void
     {
         $binDir = $this->pmssMakeTempDir('pmss-watchdog-bin-');
-        $this->pmssWriteExecutableFile($binDir.'/quota', "#!/bin/sh\nexit 1\n");
-        $this->pmssWriteExecutableFile($binDir.'/df', <<<'SH'
+        $this->pmssWriteExecutableFiles($binDir, [
+            'quota' => "#!/bin/sh\nexit 1\n",
+            'df' => <<<'SH'
 #!/bin/sh
 mount="${2:-/}"
 printf '%s\n' 'Filesystem Inodes IUsed IFree IUse% Mounted on'
@@ -82,7 +83,7 @@ case "$mount" in
     *) printf '%s\n' "/dev/other 100 10 90 10% ${mount}" ;;
 esac
 SH
-        );
+        ]);
         $homeDir = $this->pmssMakeTempDir('pmss-watchdog-home-');
 
         $this->pmssWithPathPrefix($binDir, function () use ($homeDir): void {

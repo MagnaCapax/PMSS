@@ -94,8 +94,7 @@ class DelugeCommandSymlinkTest extends DelugeAppTestCase
     private function makeExecutable(string $relativePath): string
     {
         $path = $this->tempDir.'/'.$relativePath;
-        $this->pmssWriteFile($path, "#!/bin/sh\nexit 0\n");
-        @chmod($path, 0755);
+        $this->pmssWriteExecutableFile($path, "#!/bin/sh\nexit 0\n");
         return $path;
     }
 

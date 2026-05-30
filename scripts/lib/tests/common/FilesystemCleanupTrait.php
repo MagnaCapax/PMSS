@@ -74,6 +74,22 @@ trait FilesystemCleanupTrait
         $this->pmssWriteExecutableFile($path, "#!/usr/bin/env php\n<?php\n".$body."\n", $dirMode, $fileMode);
     }
 
+    /** Write a set of executable fixture files beneath one base directory. */
+    protected function pmssWriteExecutableFiles(
+        string $baseDir,
+        array $scripts,
+        int $dirMode = 0755,
+        int $fileMode = 0755
+    ): string {
+        $baseDir = rtrim($baseDir, '/');
+        $this->pmssEnsureDir($baseDir, $dirMode);
+        foreach ($scripts as $relativePath => $content) {
+            $this->pmssWriteExecutableFile($baseDir.'/'.ltrim((string) $relativePath, '/'), (string) $content, $dirMode, $fileMode);
+        }
+
+        return $baseDir;
+    }
+
     /** Write fixture content beneath a base directory and return the resolved path. */
     protected function pmssWriteRelativeFile(string $baseDir, string $relativePath, string $content, int $dirMode = 0755): string
     {

@@ -12,9 +12,9 @@ class RemoteBinaryHelperTest extends TestCase
         $binDir = $root.'/bin';
         $commandLog = $root.'/commands.log';
         $dpkgCapture = $root.'/dpkg.capture';
-        @mkdir($binDir, 0755, true);
 
-        $this->pmssWriteExecutableFile($binDir.'/wget', <<<'SH'
+        $this->pmssWriteExecutableFiles($binDir, [
+            'wget' => <<<'SH'
 #!/bin/sh
 out=''
 while [ "$#" -gt 0 ]; do
@@ -30,24 +30,22 @@ if [ "$out" = "" ]; then
 fi
 printf '%s' "${PMSS_TEST_WGET_BODY}" > "$out"
 printf 'wget %s\n' "$out" >> "${PMSS_TEST_COMMAND_LOG}"
-SH
-        );
-        $this->pmssWriteExecutableFile($binDir.'/install', <<<'SH'
+SH,
+            'install' => <<<'SH'
 #!/bin/sh
 src="$3"
 dest="$4"
 cat "$src" > "$dest"
 chmod 0755 "$dest" 2>/dev/null || true
 printf 'install %s %s\n' "$src" "$dest" >> "${PMSS_TEST_COMMAND_LOG}"
-SH
-        );
-        $this->pmssWriteExecutableFile($binDir.'/dpkg', <<<'SH'
+SH,
+            'dpkg' => <<<'SH'
 #!/bin/sh
 pkg="$2"
 printf 'dpkg %s\n' "$pkg" >> "${PMSS_TEST_COMMAND_LOG}"
 cat "$pkg" > "${PMSS_TEST_DPKG_CAPTURE}"
 SH
-        );
+        ]);
 
         $env = $this->pmssPathPrefixedEnvironment($binDir, $env);
         $env['PMSS_TEST_COMMAND_LOG'] = $commandLog;

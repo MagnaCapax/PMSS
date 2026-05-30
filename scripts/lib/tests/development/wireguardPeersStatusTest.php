@@ -48,7 +48,6 @@ class WireGuardPeersStatusTest extends TestCase
     private function runScript(string $configDir, string $dumpOutput): string
     {
         $binDir = $this->pmssMakeNamedTempDir('pmss-wireguard-status-', 0700).'/bin';
-        @mkdir($binDir, 0755, true);
 
         $wgScript = "#!/bin/sh\n";
         if ($dumpOutput !== '') {
@@ -57,9 +56,7 @@ class WireGuardPeersStatusTest extends TestCase
             }
         }
         $wgScript .= "exit 0\n";
-        $wgPath = $binDir.'/wg';
-        @file_put_contents($wgPath, $wgScript);
-        @chmod($wgPath, 0755);
+        $this->pmssWriteExecutableFiles($binDir, ['wg' => $wgScript]);
 
         return $this->pmssRunPhpScript(
             dirname(__DIR__, 3).'/wireguardPeersStatus.php',

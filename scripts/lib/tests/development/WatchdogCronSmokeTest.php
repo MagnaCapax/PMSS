@@ -56,9 +56,11 @@ class WatchdogCronSmokeTest extends TestCase
         $this->pmssWriteFile($home.'/.delugeEnable', '');
         $this->pmssWriteFile($home.'/.qbittorrentEnable', '');
         $this->pmssWriteExecutablePhpFile($this->listUsersScript, "echo \"alice\\n\";");
-        $this->pmssWriteExecutableFile($this->binDir.'/pgrep', "#!/bin/sh\nprintf '99999999\\n'\n");
-        $this->pmssWriteExecutableFile($this->binDir.'/su', "#!/bin/sh\nprintf 'su %s\\n' \"$*\" >> ".escapeshellarg($this->commandLog)."\n");
-        $this->pmssWriteExecutableFile($this->binDir.'/killall', "#!/bin/sh\nprintf 'killall %s\\n' \"$*\" >> ".escapeshellarg($this->commandLog)."\n");
+        $this->pmssWriteExecutableFiles($this->binDir, [
+            'pgrep' => "#!/bin/sh\nprintf '99999999\\n'\n",
+            'su' => "#!/bin/sh\nprintf 'su %s\\n' \"$*\" >> ".escapeshellarg($this->commandLog)."\n",
+            'killall' => "#!/bin/sh\nprintf 'killall %s\\n' \"$*\" >> ".escapeshellarg($this->commandLog)."\n",
+        ]);
 
         $socketPath = $home.'/.lighttpd/php.socket-0';
         $server = @stream_socket_server('unix://'.$socketPath, $errno, $errstr);

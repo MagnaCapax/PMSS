@@ -35,8 +35,7 @@ class UpdateServicesRuntimeTest extends TestCase
     public function testSshdValidationCommandUsesAbsolutePathWhenExecutable(): void
     {
         $sshd = $this->pmssMakeTempDir('pmss-sshd-bin-').'/sshd';
-        $this->pmssWriteFile($sshd, "#!/bin/sh\nexit 0\n");
-        @chmod($sshd, 0755);
+        $this->pmssWriteExecutableFile($sshd, "#!/bin/sh\nexit 0\n");
 
         $this->assertSame(\pmssBuildCommand($sshd, ['-t']), \pmssSshdValidationCommand($sshd));
     }

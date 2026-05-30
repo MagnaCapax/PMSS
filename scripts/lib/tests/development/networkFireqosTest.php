@@ -9,16 +9,10 @@ class NetworkFireqosTest extends TestCase
     {
         $configDir = $this->pmssMakeTempDir('pmss-fireqos-config-', 0700);
         $logDir = $this->pmssMakeTempDir('pmss-fireqos-log-', 0700);
-        $binDir = $this->pmssMakeTempDir('pmss-fireqos-bin-', 0700);
         $markerPath = $this->pmssMakeTempPath('pmss-fireqos-marker-');
         $configPath = $configDir.'/fireqos.conf';
         $logPath = $logDir.'/fireqos.log';
-
-        $this->pmssWriteFile(
-            $binDir.'/fireqos',
-            "#!/bin/sh\nprintf '%s\\n' \"$*\" > ".escapeshellarg($markerPath)."\nprintf 'started\\n'\n"
-        );
-        @chmod($binDir.'/fireqos', 0755);
+        $binDir = $this->pmssMakeExecutableStub('fireqos', "#!/bin/sh\nprintf '%s\\n' \"$*\" > ".escapeshellarg($markerPath)."\nprintf 'started\\n'\n", 'pmss-fireqos-bin-');
 
         $this->pmssWithPathPrefixedEnv($binDir, [
             'PMSS_FIREQOS_CONFIG_PATH' => $configPath,
@@ -36,14 +30,8 @@ class NetworkFireqosTest extends TestCase
     {
         $blockedParent = $this->pmssMakeTempFile('pmss-fireqos-blocked-');
         $logDir = $this->pmssMakeTempDir('pmss-fireqos-log-', 0700);
-        $binDir = $this->pmssMakeTempDir('pmss-fireqos-bin-', 0700);
         $markerPath = $this->pmssMakeTempPath('pmss-fireqos-marker-');
-
-        $this->pmssWriteFile(
-            $binDir.'/fireqos',
-            "#!/bin/sh\nprintf '%s\\n' \"$*\" > ".escapeshellarg($markerPath)."\n"
-        );
-        @chmod($binDir.'/fireqos', 0755);
+        $binDir = $this->pmssMakeExecutableStub('fireqos', "#!/bin/sh\nprintf '%s\\n' \"$*\" > ".escapeshellarg($markerPath)."\n", 'pmss-fireqos-bin-');
 
         $this->pmssWithPathPrefixedEnv($binDir, [
             'PMSS_FIREQOS_CONFIG_PATH' => $blockedParent.'/fireqos.conf',

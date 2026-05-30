@@ -259,8 +259,9 @@ class StorageBenchSecurityTest extends TestCase
         $jsonLog = $this->pmssMakeJsonLogPath('pmss-bench-cleanup-', 'benchmark-storage.jsonl');
         $stubDir = $this->pmssMakeTempDir('pmss-bench-stubs-', 0700);
 
-        $this->pmssWriteExecutableFile($stubDir.'/stat', "#!/bin/sh\nprintf '%s\\n' 'ext2/ext3'\n");
-        $this->pmssWriteExecutableFile($stubDir.'/df', <<<'SH'
+        $this->pmssWriteExecutableFiles($stubDir, [
+            'stat' => "#!/bin/sh\nprintf '%s\\n' 'ext2/ext3'\n",
+            'df' => <<<'SH'
 #!/bin/sh
 if [ "${1:-}" = "-PB1" ]; then
     printf '%s\n' 'Filesystem 1B-blocks Used Available Use% Mounted on'
@@ -269,19 +270,17 @@ if [ "${1:-}" = "-PB1" ]; then
 fi
 printf '%s\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on'
 printf '%s\n' 'pmssfs 10240 0 10240 1% /tmp'
-SH
-        );
-        $this->pmssWriteExecutableFile($stubDir.'/fallocate', <<<'SH'
+SH,
+            'fallocate' => <<<'SH'
 #!/bin/sh
 last=''
 for arg in "$@"; do
     last="$arg"
 done
 : >"$last"
-SH
-        );
-        $this->pmssWriteExecutableFile($stubDir.'/ioping', "#!/bin/sh\nprintf '%s\\n' 'min/avg/max/mdev = 1.0/2.0/3.0/0.1 ms'\n");
-        $this->pmssWriteExecutableFile($stubDir.'/fio', <<<'SH'
+SH,
+            'ioping' => "#!/bin/sh\nprintf '%s\\n' 'min/avg/max/mdev = 1.0/2.0/3.0/0.1 ms'\n",
+            'fio' => <<<'SH'
 #!/bin/sh
 out=''
 while [ "$#" -gt 0 ]; do
@@ -299,7 +298,7 @@ JSON
 rm -f "${PMSS_TEST_JSON_LOG:?}"
 mkdir "${PMSS_TEST_JSON_LOG:?}"
 SH
-        );
+        ]);
 
         $run = $this->pmssRunRepoPhpScriptCommandWithTempStderr(
             'scripts/util/storageBenchmark.php',
@@ -390,12 +389,13 @@ SH
         $invocations = $this->pmssMakeTempPath('pmss-bench-invocations-', '.log');
         @file_put_contents($invocations, '');
 
-        $this->pmssWriteExecutableFile($stubDir.'/lsblk', "#!/bin/sh\nprintf '%s\\n' 'null disk 0 NullDevice NULLSER 1B'\n");
-        $this->pmssWriteExecutableFile($stubDir.'/blockdev', "#!/bin/sh\nprintf '%s\\n' 'not-a-size'\nexit 1\n");
-        $this->pmssWriteExecutableFile($stubDir.'/fallocate', "#!/bin/sh\nexit 0\n");
-        $this->pmssWriteExecutableFile($stubDir.'/ioping', "#!/bin/sh\nprintf '%s\\n' 'min/avg/max/mdev = 1.0/2.0/3.0/0.1 ms'\n");
-        $this->pmssWriteExecutableFile($stubDir.'/dd', "#!/bin/sh\nprintf 'DD %s\\n' \"\$*\" >>\"\${PMSS_TEST_INVOCATION_LOG:?}\"\nprintf '%s\\n' '1+0 records in' '1+0 records out' '1048576 bytes copied, 1 s, 1.0 MB/s' >&2\nexit 0\n");
-        $this->pmssWriteExecutableFile($stubDir.'/fio', <<<'SH'
+        $this->pmssWriteExecutableFiles($stubDir, [
+            'lsblk' => "#!/bin/sh\nprintf '%s\\n' 'null disk 0 NullDevice NULLSER 1B'\n",
+            'blockdev' => "#!/bin/sh\nprintf '%s\\n' 'not-a-size'\nexit 1\n",
+            'fallocate' => "#!/bin/sh\nexit 0\n",
+            'ioping' => "#!/bin/sh\nprintf '%s\\n' 'min/avg/max/mdev = 1.0/2.0/3.0/0.1 ms'\n",
+            'dd' => "#!/bin/sh\nprintf 'DD %s\\n' \"\$*\" >>\"\${PMSS_TEST_INVOCATION_LOG:?}\"\nprintf '%s\\n' '1+0 records in' '1+0 records out' '1048576 bytes copied, 1 s, 1.0 MB/s' >&2\nexit 0\n",
+            'fio' => <<<'SH'
 #!/bin/sh
 out=''
 args="$*"
@@ -416,7 +416,7 @@ cat >"$out" <<'JSON'
 {"jobs":[{"read":{"bw_bytes":1048576,"iops":1,"clat_ns":{"percentile":{"95.000000":1000000}}},"write":{"bw_bytes":0,"iops":0,"clat_ns":{"percentile":{"95.000000":0}}}}]}
 JSON
 SH
-        );
+        ]);
 
         $result = $this->pmssRunRepoPhpScriptCommand(
             'scripts/util/storageBenchmark.php',
@@ -441,8 +441,9 @@ SH
         $invocations = $this->pmssMakeTempPath('pmss-bench-invocations-', '.log');
         @file_put_contents($invocations, '');
 
-        $this->pmssWriteExecutableFile($stubDir.'/stat', "#!/bin/sh\nprintf '%s\\n' 'ext2/ext3'\n");
-        $this->pmssWriteExecutableFile($stubDir.'/df', <<<'SH'
+        $this->pmssWriteExecutableFiles($stubDir, [
+            'stat' => "#!/bin/sh\nprintf '%s\\n' 'ext2/ext3'\n",
+            'df' => <<<'SH'
 #!/bin/sh
 if [ "${1:-}" = "-PB1" ]; then
     printf '%s\n' 'Filesystem 1B-blocks Used Available Use% Mounted on'
@@ -451,11 +452,11 @@ if [ "${1:-}" = "-PB1" ]; then
 fi
 printf '%s\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on'
 printf '%s\n' 'pmssfs 100 1 99 1% /tmp'
-SH
-        );
-        $this->pmssWriteExecutableFile($stubDir.'/fallocate', "#!/bin/sh\nprintf 'FALLOCATE %s\\n' \"\$*\" >>\"\${PMSS_TEST_INVOCATION_LOG:?}\"\nexit 0\n");
-        $this->pmssWriteExecutableFile($stubDir.'/ioping', "#!/bin/sh\nprintf '%s\\n' 'min/avg/max/mdev = 1.0/2.0/3.0/0.1 ms'\n");
-        $this->pmssWriteExecutableFile($stubDir.'/fio', "#!/bin/sh\nprintf 'FIO %s\\n' \"\$*\" >>\"\${PMSS_TEST_INVOCATION_LOG:?}\"\nexit 0\n");
+SH,
+            'fallocate' => "#!/bin/sh\nprintf 'FALLOCATE %s\\n' \"\$*\" >>\"\${PMSS_TEST_INVOCATION_LOG:?}\"\nexit 0\n",
+            'ioping' => "#!/bin/sh\nprintf '%s\\n' 'min/avg/max/mdev = 1.0/2.0/3.0/0.1 ms'\n",
+            'fio' => "#!/bin/sh\nprintf 'FIO %s\\n' \"\$*\" >>\"\${PMSS_TEST_INVOCATION_LOG:?}\"\nexit 0\n",
+        ]);
 
         $run = $this->pmssRunRepoPhpScriptCommandWithTempStderr(
             'scripts/util/storageBenchmark.php',

@@ -372,9 +372,8 @@ class ArrUpdateTest extends TestCase
     private function writeCurlShim(string $baseDir, string $architecture = ''): string
     {
         $shimDir = $baseDir.'/bin';
-        @mkdir($shimDir, 0755, true);
-        $curl = $shimDir.'/curl';
-        $this->pmssWriteExecutableFile($curl, <<<'SH'
+        $scripts = [
+            'curl' => <<<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 target=''
@@ -396,14 +395,13 @@ while [ "$#" -gt 0 ]; do
 done
 cp "${source_url#file://}" "$target"
 SH
-        );
+        ];
 
         if ($architecture !== '') {
-            $dpkg = $shimDir.'/dpkg';
-            $this->pmssWriteExecutableFile($dpkg, "#!/usr/bin/env bash\nif [ \"\${1:-}\" = \"--print-architecture\" ]; then\n  printf '%s\\n' ".escapeshellarg($architecture)."\n  exit 0\nfi\nexit 1\n");
+            $scripts['dpkg'] = "#!/usr/bin/env bash\nif [ \"\${1:-}\" = \"--print-architecture\" ]; then\n  printf '%s\\n' ".escapeshellarg($architecture)."\n  exit 0\nfi\nexit 1\n";
         }
 
-        return $shimDir;
+        return $this->pmssWriteExecutableFiles($shimDir, $scripts);
     }
 
     private function writeVersionBinary(string $path, string $version, string $probeLog = ''): void

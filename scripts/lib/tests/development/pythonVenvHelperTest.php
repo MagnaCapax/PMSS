@@ -24,9 +24,7 @@ class PythonVenvHelperTest extends TestCase
 
     private function makeVenvPython(string $venvDir): void
     {
-        @mkdir($venvDir.'/bin', 0755, true);
-        file_put_contents($venvDir.'/bin/python', "#!/bin/sh\nexit 0\n");
-        @chmod($venvDir.'/bin/python', 0755);
+        $this->pmssWriteExecutableFiles($venvDir.'/bin', ['python' => "#!/bin/sh\nexit 0\n"]);
     }
 
     public function testCustomMissingPythonWarningOverridesDefaultLabelMessage(): void
@@ -102,8 +100,7 @@ class PythonVenvHelperTest extends TestCase
         $pythonPath = $this->makePythonPath();
         $cliBin = $venvDir.'/bin/pyload';
         $linkPath = $this->pmssMakeTempDir('pmss-python-link-dir-').'/pyload';
-        file_put_contents($cliBin, "#!/bin/sh\nexit 0\n");
-        @chmod($cliBin, 0755);
+        $this->pmssWriteExecutableFile($cliBin, "#!/bin/sh\nexit 0\n");
 
         $this->pmssWithEnv(['PATH' => $pythonPath], function () use (&$messages, $venvDir, $cliBin, $linkPath): void {
             \pmssPythonVenvInstallCli(

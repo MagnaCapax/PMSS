@@ -226,12 +226,13 @@ final class agentDiagnosticsCliTest extends TestCase
     private function makeCommandStubs(): string
     {
         $binDir = $this->pmssMakeNamedTempDir('pmss-agent-bin-');
-        $this->pmssWriteExecutableFile($binDir.'/df', "#!/bin/sh\nprintf 'Filesystem Size Used Avail Use%% Mounted on\\n/dev/md0 100G 10G 90G 10%% /home\\n'\n");
-        $this->pmssWriteExecutableFile($binDir.'/systemctl', "#!/bin/sh\nprintf 'active\\n'\n");
-        $this->pmssWriteExecutableFile($binDir.'/pgrep', "#!/bin/sh\nif [ \"$1\" = '-cx' ]; then\n  if [ \"$2\" = 'rtorrent' ]; then printf '4\\n'; else printf '2\\n'; fi\n  exit 0\nfi\nprintf 'pid1 rtorrent\\n'\n");
-        $this->pmssWriteExecutableFile($binDir.'/id', "#!/bin/sh\nprintf 'uid=1001(alice) gid=1001(alice) groups=1001(alice)\\n'\n");
-        $this->pmssWriteExecutableFile($binDir.'/quota', "#!/bin/sh\nprintf 'Disk quotas for user alice\\n'\n");
-        $this->pmssWriteExecutableFile($binDir.'/du', "#!/bin/sh\nprintf '12G /home/alice\\n'\n");
-        return $binDir;
+        return $this->pmssWriteExecutableFiles($binDir, [
+            'df' => "#!/bin/sh\nprintf 'Filesystem Size Used Avail Use%% Mounted on\\n/dev/md0 100G 10G 90G 10%% /home\\n'\n",
+            'systemctl' => "#!/bin/sh\nprintf 'active\\n'\n",
+            'pgrep' => "#!/bin/sh\nif [ \"$1\" = '-cx' ]; then\n  if [ \"$2\" = 'rtorrent' ]; then printf '4\\n'; else printf '2\\n'; fi\n  exit 0\nfi\nprintf 'pid1 rtorrent\\n'\n",
+            'id' => "#!/bin/sh\nprintf 'uid=1001(alice) gid=1001(alice) groups=1001(alice)\\n'\n",
+            'quota' => "#!/bin/sh\nprintf 'Disk quotas for user alice\\n'\n",
+            'du' => "#!/bin/sh\nprintf '12G /home/alice\\n'\n",
+        ]);
     }
 }
