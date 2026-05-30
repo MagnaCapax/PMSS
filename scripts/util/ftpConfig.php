@@ -98,7 +98,7 @@ if (
     exit(0);
 }
 
-if (is_dir('/run/systemd/system')) {
+if (pmssSystemdRuntimeAvailable()) {
     runStep('Restarting ProFTPD (systemd)', 'systemctl restart proftpd');
 } elseif (file_exists('/etc/init.d/proftpd')) {
     runStep('Restarting ProFTPD (sysvinit)', '/etc/init.d/proftpd restart');

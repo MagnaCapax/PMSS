@@ -793,7 +793,7 @@ function pmssWireguardConfigure(?callable $logger = null): void
         wgLog('Service enable skipped via PMSS_WG_SKIP_SERVICE');
         return;
     }
-    if (!is_dir('/run/systemd/system')) {
+    if (!pmssSystemdRuntimeAvailable()) {
         wgLog('systemd unavailable; skipping wg-quick@wg0 enable');
         return;
     }

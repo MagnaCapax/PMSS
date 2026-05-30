@@ -409,6 +409,10 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
         return pmssStreamIsTty(STDIN) && pmssStreamIsTty(STDOUT) && pmssStreamIsTty(STDERR);
     }
 
+    function pmssSystemdRuntimeAvailable(string $runtimeDir = '/run/systemd/system'): bool { return is_dir($runtimeDir); }
+    function pmssSystemdUnitQuietStatus(string $action, string $unit): ?bool { if ($action !== 'is-active' && $action !== 'is-enabled') return null; if (!pmssSystemdRuntimeAvailable()) return null; exec('systemctl '.$action.' --quiet '.escapeshellarg($unit), $_, $rc); return $rc === 0; }
+    function pmssSystemdUnitIsActive(string $unit): ?bool { return pmssSystemdUnitQuietStatus('is-active', $unit); }
+    function pmssSystemdUnitIsEnabled(string $unit): ?bool { return pmssSystemdUnitQuietStatus('is-enabled', $unit); }
 require_once __DIR__.'/runtime/commands.php';
 
     /**

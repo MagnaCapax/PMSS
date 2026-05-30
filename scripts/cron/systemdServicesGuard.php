@@ -17,7 +17,7 @@ if (!pmssTestModeEnabled()) {
     requireRoot();
 }
 
-if (!is_dir('/run/systemd/system')) {
+if (!pmssSystemdRuntimeAvailable()) {
     exit(0);
 }
 

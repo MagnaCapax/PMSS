@@ -55,14 +55,13 @@ if ($moduleStatus !== 0) {
     }
 }
 
-if (is_dir('/run/systemd/system')) {
-    exec('systemctl is-active --quiet wg-quick@wg0', $out, $status);
-    if ($status === 0) {
-        if ($debug) {
-            echo $logPrefix . "wg-quick@wg0 active\n";
-        }
-        exit(0);
+$wgQuickActive = pmssSystemdUnitIsActive('wg-quick@wg0');
+if ($wgQuickActive === true) {
+    if ($debug) {
+        echo $logPrefix . "wg-quick@wg0 active\n";
     }
+    exit(0);
+} elseif ($wgQuickActive === false) {
     echo $logPrefix . "wg-quick@wg0 inactive, attempting restart\n";
     exec('systemctl restart wg-quick@wg0', $out, $restartStatus);
     if ($restartStatus === 0) {

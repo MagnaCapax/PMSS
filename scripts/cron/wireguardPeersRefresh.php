@@ -65,10 +65,8 @@ if (!wgWriteManagedFile($configPath, $newConfig, 0640, 'WireGuard refresh config
 
 wgLog('wireguardPeersRefresh: updated wg0.conf with current peer set');
 
-// Apply config only when systemd is available.
-if (is_dir('/run/systemd/system')) {
-    exec('systemctl is-active --quiet wg-quick@wg0', $_, $rc);
-    $cmd = $rc === 0 ? 'systemctl restart wg-quick@wg0' : 'systemctl start wg-quick@wg0';
+if (($wgQuickActive = pmssSystemdUnitIsActive('wg-quick@wg0')) !== null) {
+    $cmd = $wgQuickActive ? 'systemctl restart wg-quick@wg0' : 'systemctl start wg-quick@wg0';
     exec($cmd, $_, $rc2);
     if ($rc2 !== 0) {
         wgLog('wireguardPeersRefresh: '.$cmd.' failed (rc='.$rc2.')');

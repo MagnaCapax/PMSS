@@ -68,7 +68,7 @@ function pmssEnsureLingerAndDocker(string $user): void
         pmssRunAndLog($user, 'userDocker stop (disabled)', sprintf('php /scripts/util/userDocker.php %s stop', escapeshellarg($user)));
         return;
     }
-    if (!is_dir('/run/systemd/system')) {
+    if (!pmssSystemdRuntimeAvailable()) {
         pmssUserLog($user, '[SKIP] systemd not available on this host');
         return;
     }

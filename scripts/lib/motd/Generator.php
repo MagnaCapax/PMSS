@@ -265,11 +265,10 @@ class Motd
             if ($configPath !== null && !file_exists($configPath)) {
                 return self::c('not configured', '33');
             }
-            if (!is_dir('/run/systemd/system')) return self::c('unknown', '33');
-            exec('systemctl is-active --quiet '.escapeshellarg($service), $o, $rc);
-            if ($rc === 0) return self::c('active', '32');
-            exec('systemctl is-enabled --quiet '.escapeshellarg($service), $o, $en);
-            return $en !== 0 ? self::c('disabled', '33') : self::c('inactive', '31');
+            $active = \pmssSystemdUnitIsActive($service);
+            if ($active === null) return self::c('unknown', '33');
+            if ($active) return self::c('active', '32');
+            return \pmssSystemdUnitIsEnabled($service) === false ? self::c('disabled', '33') : self::c('inactive', '31');
         };
         return [
             $svc('wg-quick@wg0', '/etc/wireguard/wg0.conf'),

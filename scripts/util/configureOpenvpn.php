@@ -102,7 +102,7 @@ if (file_exists($tplServer) && (!file_exists($serverConf) || md5_file($serverCon
 }
 
 // 7) Restart OpenVPN service
-if (is_dir('/run/systemd/system')) {
+if (pmssSystemdRuntimeAvailable()) {
     runStep('Restarting OpenVPN service', 'bash -lc "systemctl restart openvpn@openvpn || systemctl restart openvpn || true"');
 } elseif (file_exists('/etc/init.d/openvpn')) {
     runStep('Restarting OpenVPN service (sysvinit)', '/etc/init.d/openvpn restart');

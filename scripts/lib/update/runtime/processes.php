@@ -45,7 +45,7 @@ function pmssSystemdUnitActionNameIsSafe(string $action): bool
 function pmssSystemdActionSkipReason(?string $unit = null, bool $skipInDryRun = false, bool $skipInStrictTestMode = false): string
 {
     if (($skipInDryRun && pmssEnvFlagEnabled('PMSS_DRY_RUN')) || ($skipInStrictTestMode && pmssTestModeEnabled())) return 'test/dry-run';
-    if (!pmssEnvFlagEnabled('PMSS_DRY_RUN') && !is_dir('/run/systemd/system')) return 'systemd unavailable';
+    if (!pmssEnvFlagEnabled('PMSS_DRY_RUN') && !pmssSystemdRuntimeAvailable()) return 'systemd unavailable';
     if ($unit !== null && !pmssSystemdUnitNameIsSafe($unit)) return 'invalid unit name';
     if ($unit !== null && !pmssEnvFlagEnabled('PMSS_DRY_RUN') && !pmssSystemdUnitExists($unit)) return 'unit '.$unit.' missing';
     return '';
@@ -56,7 +56,7 @@ function pmssSystemdActionSkipReason(?string $unit = null, bool $skipInDryRun = 
  */
 function pmssSystemdUnitExists(string $unit): bool
 {
-    if (!is_dir('/run/systemd/system')) {
+    if (!pmssSystemdRuntimeAvailable()) {
         return false;
     }
     $unit = trim($unit);
@@ -121,7 +121,7 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
     if ($systemdUnit !== null) {
         if (!pmssSystemdUnitNameIsSafe($systemdUnit)) {
             logmsg("[WARN] {$description} (invalid systemd unit {$systemdUnit})");
-        } elseif (!is_dir('/run/systemd/system')) {
+        } elseif (!pmssSystemdRuntimeAvailable()) {
             logmsg("[WARN] {$description} (systemd unavailable for unit {$systemdUnit})");
         } elseif (pmssSystemdUnitExists($systemdUnit)) {
             runStep($description.' (stop unit)', 'systemctl stop '.escapeshellarg($systemdUnit).' 2>/dev/null');

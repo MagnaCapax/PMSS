@@ -94,7 +94,7 @@ CONF;
     function pmssCompletePendingDpkg(): void
     {
         // #TODO replace special-casing with a generic unit-unmask helper when more services require it.
-        $hasSystemd = is_dir('/run/systemd/system');
+        $hasSystemd = pmssSystemdRuntimeAvailable();
         if ($hasSystemd) {
             $state = trim((string) @shell_exec('systemctl is-enabled proftpd.service 2>/dev/null'));
             if ($state === 'masked') {
