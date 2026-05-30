@@ -85,58 +85,6 @@ class RuntimeTest extends TestCase
         $this->assertEquals(1200, constant('PMSS_COMMAND_TIMEOUT_DEFAULT'));
     }
 
-    public function testPmssCommandPipesReadyRejectsMissingDescriptors(): void
-    {
-        $this->assertFalse(\pmssCommandPipesReady([]));
-    }
-
-    public function testPmssCommandPipesReadyRejectsClosedDescriptor(): void
-    {
-        $pipes = [
-            fopen('php://temp', 'w+'),
-            fopen('php://temp', 'w+'),
-            fopen('php://temp', 'w+'),
-        ];
-        fclose($pipes[1]);
-
-        try {
-            $this->assertFalse(\pmssCommandPipesReady($pipes));
-        } finally {
-            foreach ($pipes as $pipe) {
-                if (is_resource($pipe)) {
-                    fclose($pipe);
-                }
-            }
-        }
-    }
-
-    public function testPmssCommandOutputPipesSetNonBlockingRejectsMissingDescriptors(): void
-    {
-        $this->assertFalse(\pmssCommandOutputPipesSetNonBlocking([]));
-    }
-
-    public function testPmssCommandOutputPipesSetNonBlockingMarksStreamsNonBlocking(): void
-    {
-        $pipes = [
-            fopen('php://temp', 'w+'),
-            fopen('php://temp', 'w+'),
-            fopen('php://temp', 'w+'),
-        ];
-
-        try {
-            $this->assertTrue(\pmssCommandPipesReady($pipes));
-            $this->assertTrue(\pmssCommandOutputPipesSetNonBlocking($pipes));
-            $this->assertFalse((bool) (stream_get_meta_data($pipes[1])['blocked'] ?? false));
-            $this->assertFalse((bool) (stream_get_meta_data($pipes[2])['blocked'] ?? false));
-        } finally {
-            foreach ($pipes as $pipe) {
-                if (is_resource($pipe)) {
-                    fclose($pipe);
-                }
-            }
-        }
-    }
-
     public function testRunCommandEchoSuccessCapturesStdout(): void
     {
         $captured = [];
@@ -190,6 +138,27 @@ class RuntimeTest extends TestCase
         $this->assertFalse($result['timed_out']);
         $this->assertFalse($result['launch_failed']);
         $this->assertFalse($result['pipe_failed']);
+    }
+
+    public function testPipedCaptureKeepsTailBoundedOutputSnapshot(): void
+    {
+        $code = 'fwrite(STDOUT, "1234567890"); fwrite(STDERR, "abcdefghij");';
+        $bash = '/bin/bash -lc '.escapeshellarg(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code));
+        $result = \pmssCommandPipedCapture($bash, 'pipe-tail-test', 0, 4);
+
+        $this->assertSame(['rc' => 0, 'stdout' => '7890', 'stderr' => 'ghij', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => false], $result);
+    }
+
+    public function testPipedCaptureHonorsCwdAndEnvironment(): void
+    {
+        $cwd = $this->pmssMakeTempDir('pmss-piped-cwd-');
+        $code = 'echo basename(getcwd()).":".getenv("PMSS_PIPE_ENV");';
+        $bash = '/bin/bash -lc '.escapeshellarg(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code));
+        $result = \pmssCommandPipedCapture($bash, 'pipe-env-test', 0, 0, false, 'proc_open failed', 1, false, 'stream_select failed', $cwd, ['PMSS_PIPE_ENV' => 'ok']);
+
+        $this->assertSame(0, $result['rc']);
+        $this->assertSame(basename($cwd).':ok', $result['stdout']);
+        $this->assertSame('', $result['stderr']);
     }
 
     public function testProcessCloseExitCodeUsesObservedStatusAfterPolling(): void

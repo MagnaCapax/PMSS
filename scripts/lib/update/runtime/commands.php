@@ -44,7 +44,7 @@ function runStep(string $description, string $command): int
     // Fork failures may occur inside nested scripts (e.g. find/chown) while the
     // wrapper command itself still exits rc=0. Detect known strings and emit a
     // non-shell diagnostics snapshot so we have the cgroup/rlimit context.
-    if (!$dryRun && function_exists('pmssOutputIndicatesForkFailure') && pmssOutputIndicatesForkFailure($stdout, $stderr)) {
+    if (!$dryRun && pmssOutputIndicatesForkFailure($stdout, $stderr)) {
         pmssDumpForkDiagnostics('runStep: '.$description.' :: '.$command, 'logMessage');
     }
 

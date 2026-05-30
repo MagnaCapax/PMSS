@@ -84,49 +84,9 @@ function pmssCustomerPanelRenderPage(string $www, string $bootstrap, string $hom
     ];
 }
 
-/** Run a command with proc_open while capturing stdout/stderr and timeout state. */
+/** Run a command through the shared capture path while preserving harness keys. */
 function pmssCustomerPanelRenderRunProcess(string $command, string $cwd, array $env, int $timeoutSec): array
 {
-    $descriptor = pmssProcessPipeDescriptorSpec();
-    $process = @proc_open($command, $descriptor, $pipes, $cwd, $env);
-    if (!is_resource($process)) {
-        return ['rc' => 1, 'stdout' => '', 'stderr' => 'proc_open failed', 'timedOut' => false];
-    }
-
-    fclose($pipes[0]);
-    stream_set_blocking($pipes[1], false);
-    stream_set_blocking($pipes[2], false);
-
-    $stdout = '';
-    $stderr = '';
-    $deadline = microtime(true) + $timeoutSec;
-    $timedOut = false;
-    $exitCode = null;
-    while (true) {
-        $stdout .= (string) stream_get_contents($pipes[1]);
-        $stderr .= (string) stream_get_contents($pipes[2]);
-        $status = proc_get_status($process);
-        if (!$status['running']) {
-            $exitCode = isset($status['exitcode']) ? (int) $status['exitcode'] : null;
-            break;
-        }
-        if (microtime(true) >= $deadline) {
-            $timedOut = true;
-            proc_terminate($process);
-            break;
-        }
-        usleep(10000);
-    }
-
-    $stdout .= (string) stream_get_contents($pipes[1]);
-    $stderr .= (string) stream_get_contents($pipes[2]);
-    fclose($pipes[1]);
-    fclose($pipes[2]);
-    $closedRc = proc_close($process);
-    $rc = $exitCode !== null && $exitCode >= 0 ? $exitCode : $closedRc;
-    if ($timedOut && $rc === 0) {
-        $rc = 124;
-    }
-
-    return ['rc' => $rc, 'stdout' => $stdout, 'stderr' => $stderr, 'timedOut' => $timedOut];
+    $result = pmssCommandPipedCapture($command, $command, $timeoutSec, 0, false, 'proc_open failed', 1, false, 'stream_select failed', $cwd, $env);
+    return ['rc' => $result['rc'], 'stdout' => $result['stdout'], 'stderr' => $result['stderr'], 'timedOut' => $result['timed_out']];
 }

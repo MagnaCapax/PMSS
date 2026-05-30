@@ -10,47 +10,9 @@
  * @author PMSS Team
  */
 
-function pmssCommandPipesReady(array $pipes): bool
-{
-    return isset($pipes[0], $pipes[1], $pipes[2])
-        && is_resource($pipes[0])
-        && is_resource($pipes[1])
-        && is_resource($pipes[2]);
-}
-
 function pmssProcessPipeDescriptorSpec(string $stdinMode = 'r', string $stdoutMode = 'w', string $stderrMode = 'w'): array
 {
     return [0 => ['pipe', $stdinMode], 1 => ['pipe', $stdoutMode], 2 => ['pipe', $stderrMode]];
-}
-
-function pmssCommandOutputPipesSetNonBlocking(array $pipes): bool
-{
-    return isset($pipes[1], $pipes[2])
-        && is_resource($pipes[1])
-        && is_resource($pipes[2])
-        && @stream_set_blocking($pipes[1], false)
-        && @stream_set_blocking($pipes[2], false);
-}
-
-function pmssCommandPipesClose(array $pipes, array $indexes = [0, 1, 2]): void
-{
-    foreach ($indexes as $index) {
-        if (isset($pipes[$index]) && is_resource($pipes[$index])) {
-            fclose($pipes[$index]);
-        }
-    }
-}
-
-function pmssCommandProcessAbort($process, array $pipes): void
-{
-    pmssCommandPipesClose($pipes);
-    if (!is_resource($process)) {
-        return;
-    }
-    if (function_exists('proc_terminate')) {
-        @proc_terminate($process);
-    }
-    @proc_close($process);
 }
 
 /**
@@ -179,30 +141,52 @@ function pmssProcessCloseExitCode($process, $lastStatus = null): int
 /**
  * @return array{rc:int,stdout:string,stderr:string,timed_out:bool,launch_failed:bool,pipe_failed:bool}
  */
-function pmssCommandPipedCapture(string $bash, string $timeoutCommand, int $timeoutSec, int $maxBuffer = 0, bool $mirrorOutput = false, string $launchError = 'proc_open failed', int $launchRc = 1, bool $retryLaunch = false, string $streamSelectError = 'stream_select failed'): array
+function pmssCommandPipedCapture(string $bash, string $timeoutCommand, int $timeoutSec, int $maxBuffer = 0, bool $mirrorOutput = false, string $launchError = 'proc_open failed', int $launchRc = 1, bool $retryLaunch = false, string $streamSelectError = 'stream_select failed', ?string $cwd = null, ?array $env = null): array
 {
-    $process = @proc_open($bash, pmssProcessPipeDescriptorSpec(), $pipes);
+    $pipes = [];
+    $process = @proc_open($bash, pmssProcessPipeDescriptorSpec(), $pipes, $cwd, $env);
     if (!is_resource($process) && $retryLaunch) {
         usleep(500000);
-        $process = @proc_open($bash, pmssProcessPipeDescriptorSpec(), $pipes);
+        $process = @proc_open($bash, pmssProcessPipeDescriptorSpec(), $pipes, $cwd, $env);
     }
     if (!is_resource($process)) {
         return ['rc' => $launchRc, 'stdout' => '', 'stderr' => $launchError, 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];
     }
-    if (!pmssCommandPipesReady($pipes)) {
-        pmssCommandProcessAbort($process, $pipes);
-        return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'proc_open pipes unavailable', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => true];
-    }
+    $abortProcess = static function () use (&$process, &$pipes): void {
+        foreach ($pipes as $pipe) {
+            if (is_resource($pipe)) {
+                fclose($pipe);
+            }
+        }
+        if (is_resource($process)) {
+            if (function_exists('proc_terminate')) {
+                @proc_terminate($process);
+            }
+            @proc_close($process);
+        }
+    };
 
+    foreach ([0, 1, 2] as $index) {
+        if (!isset($pipes[$index]) || !is_resource($pipes[$index])) {
+            $abortProcess();
+            return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'proc_open pipes unavailable', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => true];
+        }
+    }
     fclose($pipes[0]);
-    if (!pmssCommandOutputPipesSetNonBlocking($pipes)) {
-        pmssCommandProcessAbort($process, $pipes);
-        return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'proc_open pipes unavailable', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => true];
+    foreach ([1, 2] as $index) {
+        if (!@stream_set_blocking($pipes[$index], false)) {
+            $abortProcess();
+            return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'proc_open pipes unavailable', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => true];
+        }
     }
 
     $startedAt = microtime(true);
     $capture = pmssCommandOutputPipesDrain($pipes, $timeoutSec, $startedAt, $maxBuffer, $mirrorOutput, $streamSelectError);
-    pmssCommandPipesClose($pipes, [1, 2]);
+    foreach ([1, 2] as $index) {
+        if (isset($pipes[$index]) && is_resource($pipes[$index])) {
+            fclose($pipes[$index]);
+        }
+    }
     $rc = $capture['timed_out']
         ? pmssCommandTimeoutClose($process, $timeoutCommand, $timeoutSec, $startedAt)
         : pmssProcessCloseExitCode($process);
