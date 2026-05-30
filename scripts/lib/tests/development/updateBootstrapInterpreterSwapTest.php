@@ -19,21 +19,22 @@ require_once __DIR__.'/../common/TestCase.php';
  */
 class UpdateBootstrapInterpreterSwapTest extends TestCase
 {
-    public function testStep2HandoffUsesPathResolvedPhp(): void
+    public function testBootstrapExecPathsResolvePhpAtRuntime(): void
     {
         $data = $this->pmssReadRepoFile('scripts/update.php');
-        $this->assertTrue(
-            strpos($data, "passthru(pmssBootstrapPhpCommand('/scripts/util/update-step2.php')") !== false,
-            "step2 handoff must use the runtime PHP CLI resolver, not PHP_BINARY (GH#589)"
+        $this->assertStringContainsAllStrings([
+            "passthru(pmssBootstrapPhpCommand('/scripts/util/update-step2.php')",
+            '$command = pmssBootstrapPhpCommand(__FILE__, $args);',
+        ], $data);
+        $this->pmssAssertStringNotContainsString(
+            'passthru(PHP_BINARY',
+            $data,
+            'no passthru() may use the stale PHP_BINARY constant (GH#589)'
         );
-    }
-
-    public function testSelfRefreshUsesPathResolvedPhp(): void
-    {
-        $data = $this->pmssReadRepoFile('scripts/update.php');
-        $this->assertTrue(
-            strpos($data, '$command = pmssBootstrapPhpCommand(__FILE__, $args);') !== false,
-            "self-refresh re-exec must use the runtime PHP CLI resolver, not PHP_BINARY (GH#589)"
+        $this->pmssAssertStringNotContainsString(
+            'escapeshellarg(PHP_BINARY)',
+            $data,
+            'no escapeshellarg(PHP_BINARY) invocation may remain; use the PHP CLI resolver (GH#589)'
         );
     }
 
@@ -49,21 +50,6 @@ class UpdateBootstrapInterpreterSwapTest extends TestCase
             .'echo pmssResolvePhpCliBinary();';
 
         $this->assertEquals($binDir.'/php', trim($this->pmssRunInlinePhp($script, ['PATH' => $binDir])));
-    }
-
-    public function testNoPhpBinaryInExecPaths(): void
-    {
-        $data = $this->pmssReadRepoFile('scripts/update.php');
-        // Code-level invocations (not comments) must not reference PHP_BINARY.
-        // Bootstrap children go through the resolver so a stale CLI path is not reused.
-        $this->assertTrue(
-            strpos($data, 'passthru(PHP_BINARY') === false,
-            "no passthru() may use the stale PHP_BINARY constant (GH#589)"
-        );
-        $this->assertTrue(
-            strpos($data, 'escapeshellarg(PHP_BINARY)') === false,
-            "no escapeshellarg(PHP_BINARY) invocation may remain; use the PHP CLI resolver (GH#589)"
-        );
     }
 
     public function testDiagnosticsHelperUsesPathResolvedPhp(): void
