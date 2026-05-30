@@ -9,11 +9,20 @@ require_once __DIR__.'/update/runtime/commands.php';
 require_once __DIR__.'/lighttpd/userFileWrite.php';
 
 /**
+ * Validate Linux interface names accepted from the operator netconsole file.
+ */
+function pmssNetconsoleInterfaceIsValid(string $interface): bool
+{
+    return preg_match('/^[A-Za-z0-9_.:-]{1,15}$/', $interface) === 1;
+}
+
+/**
  * Parse a netconsole spec and extract the interface, target IP, and target MAC.
  */
 function pmssNetconsoleTargetFromSpec(string $spec): ?array
 {
-    if (!preg_match('~^[^,]*/([^,/@]+),[^@,]*@([^/\s,]+)/(([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})$~', trim($spec), $matches)
+    if (!preg_match('~^[^,]*/([^,\s/@]+),[^@,]*@([^/\s,]+)/(([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})$~', trim($spec), $matches)
+        || !pmssNetconsoleInterfaceIsValid($matches[1])
         || filter_var($matches[2], FILTER_VALIDATE_IP) === false) {
         return null;
     }
@@ -23,6 +32,28 @@ function pmssNetconsoleTargetFromSpec(string $spec): ?array
         'targetIp' => $matches[2],
         'targetMac' => strtolower($matches[3]),
     ];
+}
+
+/**
+ * Prime ARP/NDP state, then verify the configured neighbor MAC.
+ */
+function pmssNetconsoleTargetIsReachable(array $target, callable $runner): bool
+{
+    $pingArgs = ['-c', '1', '-W', '1', '-I', $target['interface'], $target['targetIp']];
+    if (strpos($target['targetIp'], ':') !== false) {
+        array_unshift($pingArgs, '-6');
+    }
+
+    $runner(
+        'Priming netconsole target neighbor cache',
+        pmssBuildCommand('ping', $pingArgs).' >/dev/null 2>&1'
+    );
+
+    return (int) $runner(
+        'Verifying netconsole target reachability',
+        pmssBuildCommand('ip', ['neigh', 'show', 'to', $target['targetIp'], 'dev', $target['interface']])
+            .' | grep -Fqi '.escapeshellarg($target['targetMac'])
+    ) === 0;
 }
 
 /**
@@ -46,15 +77,7 @@ function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
         return;
     }
 
-    if ((int) $runner(
-        'Verifying netconsole target reachability',
-        'bash -lc '.escapeshellarg(
-            (strpos($target['targetIp'], ':') === false ? 'ping' : 'ping -6')
-            .' -c 1 -W 1 -I '.escapeshellarg($target['interface']).' '.escapeshellarg($target['targetIp']).' >/dev/null 2>&1 || true; '
-            .'ip neigh show to '.escapeshellarg($target['targetIp']).' dev '.escapeshellarg($target['interface'])
-            .' | grep -Fqi '.escapeshellarg($target['targetMac'])
-        )
-    ) !== 0) {
+    if (!pmssNetconsoleTargetIsReachable($target, $runner)) {
         $log('[WARN] Netconsole target '.$target['targetIp'].'/'.$target['targetMac'].' is not reachable via '.$target['interface']);
         return;
     }

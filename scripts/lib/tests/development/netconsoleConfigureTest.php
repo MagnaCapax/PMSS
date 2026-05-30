@@ -20,6 +20,12 @@ class NetconsoleConfigureTest extends TestCase
         $this->assertTrue($target === null, 'expected missing device segment to be rejected');
     }
 
+    public function testRejectsSpecWithUnsafeInterfaceName(): void
+    {
+        $target = \pmssNetconsoleTargetFromSpec('6665@192.0.2.10/eth0 bad,6666@192.0.2.20/aa:bb:cc:dd:ee:ff');
+        $this->assertTrue($target === null, 'expected whitespace-bearing interface to be rejected');
+    }
+
     public function testSkipsWhenConfigMissing(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-netconsole-missing-');
@@ -50,6 +56,13 @@ class NetconsoleConfigureTest extends TestCase
         $descriptions = array_map(static function (array $call): string {
             return $call[0];
         }, $calls);
+        foreach ($calls as $call) {
+            if (strpos($call[0], 'netconsole target') === false) {
+                continue;
+            }
+            $this->assertStringNotContainsString(';', $call[1], 'target probe must avoid command chaining');
+            $this->assertStringNotContainsString('||', $call[1], 'target probe must avoid conditional chaining');
+        }
         $this->assertTrue(in_array('Loading netconsole kernel module', $descriptions, true), 'expected netconsole module load step');
     }
 
@@ -88,8 +101,9 @@ class NetconsoleConfigureTest extends TestCase
             });
         });
 
-        $this->assertEquals(1, count($calls));
-        $this->assertEquals('Verifying netconsole target reachability', $calls[0][0]);
+        $this->assertEquals(2, count($calls));
+        $this->assertEquals('Priming netconsole target neighbor cache', $calls[0][0]);
+        $this->assertEquals('Verifying netconsole target reachability', $calls[1][0]);
     }
 
     private function netconsoleEnv(string $dir): array
