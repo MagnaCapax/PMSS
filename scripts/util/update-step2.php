@@ -151,12 +151,12 @@ function pmssConfigureWebStack(): void
     // Quota state files reject chmod; prune them so the find commands stay noise-free.
     $prune = '\( -name "aquota.*" -o -name "lost+found" \)';
     foreach ([
-        ['Hardening /home tenant directories', 'd', '700'],
-        ['Hardening /home tenant files', 'f', '600'],
+        ['Hardening /home tenant directories', 'd', '0700', '700'],
+        ['Hardening /home tenant files', 'f', '0600', '600'],
     ] as $hardeningStep) {
         runStep(
             $hardeningStep[0],
-            sprintf('find /home -mindepth 1 -maxdepth 1 %s -prune -o -type %s -exec chmod %s {} +', $prune, $hardeningStep[1], $hardeningStep[2])
+            sprintf('find /home -mindepth 1 -maxdepth 1 %s -prune -o -type %s -not -perm %s -exec chmod %s {} +', $prune, $hardeningStep[1], $hardeningStep[2], $hardeningStep[3])
         );
     }
 }
@@ -509,8 +509,8 @@ runStep('Restricting world access to /home', 'chmod o-rw /home');
 
 pmssRunProfiledCallable('Ensuring cgroup configuration', 'pmssEnsureCgroupsConfigured', ['logmsg']);
 pmssRunProfiledCallable('Ensuring systemd slices', 'pmssEnsureSystemdSlices', ['logmsg']);
-runStep('Resetting /etc/seedbox permissions', 'chmod -R 755 /etc/seedbox');
-runStep('Resetting /scripts permissions', 'chmod -R 750 /scripts');
+runStep('Resetting /etc/seedbox permissions', 'find /etc/seedbox -not -type l -not -perm 0755 -exec chmod 0755 {} +');
+runStep('Resetting /scripts permissions', 'find /scripts -not -type l -not -perm 0750 -exec chmod 0750 {} +');
 pmssRunProfiledCallable('Ensuring locale baseline', 'pmssEnsureLocaleBaseline');
 
 // Web stack hardening and per-user HTTP refresh.

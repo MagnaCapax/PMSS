@@ -28,6 +28,12 @@ function chmodPath(string $path, int $perm, bool $recursive = false): void
         return;
     }
 
+    if ($recursive) {
+        $mode = sprintf('%04o', $perm);
+        pmssRun(sprintf('find %s -not -type l -not -perm %s -exec chmod %s {} +', $target, $mode, $mode));
+        return;
+    }
+
     pmssRun(sprintf('chmod %s%o %s', $recursive ? '-R ' : '', $perm, $target));
 }
 
@@ -53,8 +59,31 @@ function chownPath(string $path, string $owner, bool $recursive = false): void
         return;
     }
 
+    if ($recursive) {
+        $predicate = pmssFindOwnerMismatchPredicate($owner);
+        if ($predicate !== '') {
+            pmssRun(sprintf('find %s -not -type l %s -exec chown %s {} +', $target, $predicate, escapeshellarg($owner)));
+            return;
+        }
+    }
+
     // Quote owner spec as a single argument; chown accepts quoted 'user.group'
     pmssRun(sprintf('chown %s%s %s', $recursive ? '-R ' : '', escapeshellarg($owner), $target));
+}
+
+function pmssFindOwnerMismatchPredicate(string $owner): string
+{
+    $delimiter = strpos($owner, ':') !== false ? ':' : (strpos($owner, '.') !== false ? '.' : '');
+    if ($delimiter === '') {
+        return '';
+    }
+
+    $parts = explode($delimiter, $owner, 2);
+    if (count($parts) !== 2 || $parts[0] === '' || $parts[1] === '') {
+        return '';
+    }
+
+    return sprintf('\( -not -user %s -o -not -group %s \)', escapeshellarg($parts[0]), escapeshellarg($parts[1]));
 }
 
 // Safer traversal without relying on xargs delimiters; applies to each directory in place.
@@ -87,7 +116,7 @@ if ($homeOwner !== false && $homeGroup !== false &&
     );
 }
 pmssRun(sprintf(
-    'find %s -path %s -prune -o -type d -exec chmod 750 {} +',
+    'find %s -path %s -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',
     escapeshellarg('/home/'.$thisUser),
     escapeshellarg("/home/{$thisUser}/.local")
 ));

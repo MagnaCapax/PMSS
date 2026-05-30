@@ -74,14 +74,14 @@ function pmssOwnAndRestrictDirectory(string $path, string $message, string $comm
 // Table-driven to keep skeleton/config hardening steps aligned and avoid drift.
 $permissionTargets = [
     '/etc/skel' => [
-        'content'   => ['Hardening /etc/skel content permissions', 'cd /etc/skel && find . -mindepth 1 -exec chmod -R o-w -- {} +'],
+        'content'   => ['Hardening /etc/skel content permissions', 'find /etc/skel -mindepth 1 -not -type l -perm /002 -exec chmod o-w -- {} +'],
         'directory' => ['Restricting /etc/skel directory permissions', 'chmod 770 /etc/skel'],
-        'files'     => ['Removing other permissions from /etc/skel files', "find /etc/skel -type f -exec chmod o-rwx -- {} +"],
+        'files'     => ['Removing other permissions from /etc/skel files', "find /etc/skel -type f -perm /007 -exec chmod o-rwx -- {} +"],
     ],
     '/etc/seedbox' => [
-        'content'   => ['Hardening /etc/seedbox content permissions', 'cd /etc/seedbox && find . -mindepth 1 -exec chmod -R o-w -- {} +'],
+        'content'   => ['Hardening /etc/seedbox content permissions', 'find /etc/seedbox -mindepth 1 -not -type l -perm /002 -exec chmod o-w -- {} +'],
         'directory' => ['Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox'],
-        'files'     => ['Removing other permissions from /etc/seedbox files', "find /etc/seedbox -type f -exec chmod o-rwx -- {} +"],
+        'files'     => ['Removing other permissions from /etc/seedbox files', "find /etc/seedbox -type f -perm /007 -exec chmod o-rwx -- {} +"],
     ],
 ];
 
@@ -161,17 +161,17 @@ if (is_dir($configDir)) {
 // Keep scope narrow and commands idempotent for stability.
 $letsencryptSteps = [
     '/etc/letsencrypt/live' => [
-        ['Hardening TLS private keys (Let\'s Encrypt)', "find /etc/letsencrypt/live -type f -name 'privkey.pem' -exec chmod 600 {} +"],
+        ['Hardening TLS private keys (Let\'s Encrypt)', "find /etc/letsencrypt/live -type f -name 'privkey.pem' -not -perm 0600 -exec chmod 600 {} +"],
     ],
     '/etc/letsencrypt/accounts' => [
-        ['Hardening TLS account keys (Let\'s Encrypt)', "find /etc/letsencrypt/accounts -type f \\( -name 'private_key.json' -o -name 'private_key*.pem' \\) -exec chmod 600 {} +"],
-        ['Hardening TLS account metadata (Let\'s Encrypt)', "find /etc/letsencrypt/accounts -type f \\( -name 'registration.json' -o -name 'meta.json' \\) -exec chmod 600 {} +"],
+        ['Hardening TLS account keys (Let\'s Encrypt)', "find /etc/letsencrypt/accounts -type f \\( -name 'private_key.json' -o -name 'private_key*.pem' \\) -not -perm 0600 -exec chmod 600 {} +"],
+        ['Hardening TLS account metadata (Let\'s Encrypt)', "find /etc/letsencrypt/accounts -type f \\( -name 'registration.json' -o -name 'meta.json' \\) -not -perm 0600 -exec chmod 600 {} +"],
     ],
     '/etc/letsencrypt/archive' => [
-        ['Hardening TLS archive keys (Let\'s Encrypt)', "find /etc/letsencrypt/archive -type f -name 'privkey*.pem' -exec chmod 600 {} +"],
+        ['Hardening TLS archive keys (Let\'s Encrypt)', "find /etc/letsencrypt/archive -type f -name 'privkey*.pem' -not -perm 0600 -exec chmod 600 {} +"],
     ],
     '/etc/letsencrypt/renewal' => [
-        ['Restricting TLS renewal configs (Let\'s Encrypt)', "find /etc/letsencrypt/renewal -type f -name '*.conf' -exec chmod 600 {} +"],
+        ['Restricting TLS renewal configs (Let\'s Encrypt)', "find /etc/letsencrypt/renewal -type f -name '*.conf' -not -perm 0600 -exec chmod 600 {} +"],
     ],
 ];
 
@@ -182,12 +182,12 @@ foreach ($letsencryptSteps as $path => $steps) {
 pmssOwnAndRestrictDirectory('/var/lib/letsencrypt', 'Restricting /var/lib/letsencrypt', 'chmod 700 /var/lib/letsencrypt', $exitCodes);
 pmssOwnAndRestrictDirectory('/var/log/letsencrypt', 'Restricting /var/log/letsencrypt', 'chmod 700 /var/log/letsencrypt', $exitCodes);
 if (is_dir('/etc/seedbox/config/ssl')) {
-    $exitCodes[] = runStep('Hardening seedbox SSL private keys', "find /etc/seedbox/config/ssl -type f -name 'privkey.pem' -exec chmod 600 {} +");
+    $exitCodes[] = runStep('Hardening seedbox SSL private keys', "find /etc/seedbox/config/ssl -type f -name 'privkey.pem' -not -perm 0600 -exec chmod 600 {} +");
 }
 if (is_dir('/etc/openvpn/easy-rsa/pki/private')) {
     pmssEnsureRootOwnership('/etc/openvpn/easy-rsa/pki/private', $exitCodes);
     $exitCodes[] = runStep('Restricting OpenVPN private key directory', 'chmod 700 /etc/openvpn/easy-rsa/pki/private');
-    $exitCodes[] = runStep('Hardening OpenVPN private keys', "find /etc/openvpn/easy-rsa/pki/private -type f -name '*.key' -exec chmod 600 {} +");
+    $exitCodes[] = runStep('Hardening OpenVPN private keys', "find /etc/openvpn/easy-rsa/pki/private -type f -name '*.key' -not -perm 0600 -exec chmod 600 {} +");
 }
 foreach (['/etc/openvpn/easy-rsa/pki/issued', '/etc/openvpn/easy-rsa/pki/reqs', '/etc/openvpn/easy-rsa/pki/crl', '/etc/openvpn/easy-rsa/pki/certs_by_serial'] as $dir) {
     if (is_dir($dir)) {
@@ -204,9 +204,9 @@ if (is_file('/etc/openvpn/ta.key')) {
     $exitCodes[] = runStep('Restricting OpenVPN ta.key', 'chmod 600 /etc/openvpn/ta.key');
 }
 if (is_dir('/etc/openvpn')) {
-    $exitCodes[] = runStep('Restricting OpenVPN configs', "find /etc/openvpn -maxdepth 1 -type f -name '*.conf' -exec chmod 640 {} +");
+    $exitCodes[] = runStep('Restricting OpenVPN configs', "find /etc/openvpn -maxdepth 1 -type f -name '*.conf' -not -perm 0640 -exec chmod 640 {} +");
     pmssEnsureRootOwnership('/etc/openvpn', $exitCodes);
-    $exitCodes[] = runStep('Ensuring OpenVPN configs owned by root', "find /etc/openvpn -maxdepth 1 -type f -name '*.conf' -exec chown root:root {} +");
+    $exitCodes[] = runStep('Ensuring OpenVPN configs owned by root', "find /etc/openvpn -maxdepth 1 -type f -name '*.conf' \\( -not -user root -o -not -group root \\) -exec chown root:root {} +");
 }
 
 // WireGuard hardening: restrict directory and sensitive files
@@ -224,7 +224,7 @@ if (is_dir('/etc/wireguard')) {
     if (is_file('/etc/wireguard/server_public.key')) {
         pmssEnsureRootOwnership('/etc/wireguard/server_public.key', $exitCodes);
     }
-    $exitCodes[] = runStep('Restricting WireGuard key material', "find /etc/wireguard -type f -name '*.key' -exec chmod 600 {} +");
+    $exitCodes[] = runStep('Restricting WireGuard key material', "find /etc/wireguard -type f -name '*.key' -not -perm 0600 -exec chmod 600 {} +");
 }
 
 $failed = array_filter($exitCodes, static function ($rc) { return $rc !== 0; });

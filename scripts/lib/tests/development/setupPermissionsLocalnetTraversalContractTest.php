@@ -31,6 +31,20 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
         $this->pmssAssertRepoFileContainsString('scripts/util/setupPermissions.php', '@chmod($configDir, 0775);');
     }
 
+    public function testPermissionTargetsFilterBeforeChmod(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupPermissions.php', [
+            'find /etc/skel -mindepth 1 -not -type l -perm /002 -exec chmod o-w -- {} +',
+            'find /etc/seedbox -mindepth 1 -not -type l -perm /002 -exec chmod o-w -- {} +',
+            'find /etc/skel -type f -perm /007 -exec chmod o-rwx -- {} +',
+            'find /etc/seedbox -type f -perm /007 -exec chmod o-rwx -- {} +',
+            "find /etc/openvpn -maxdepth 1 -type f -name '*.conf'",
+            '-not -user root -o -not -group root',
+            '-exec chown root:root {} +',
+        ]);
+        $this->pmssAssertRepoFileNotContainsString('scripts/util/setupPermissions.php', 'chmod -R o-w');
+    }
+
     public function testSystemTestChecksBothSeedboxTraversalDirectories(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/systemStatus.php', [
