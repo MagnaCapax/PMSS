@@ -27,19 +27,7 @@ function pmssPortManagerLog(string $user, string $action, string $service, ?int 
  */
 function pmssPortManagerReadAssignedPort(string $portFile): ?int
 {
-    if (!is_file($portFile) || is_link($portFile)) {
-        return null;
-    }
-
-    $raw = @file_get_contents($portFile);
-    if ($raw === false) return null;
-    $portText = trim((string) $raw);
-    if ($portText === '' || !ctype_digit($portText)) {
-        return null;
-    }
-
-    $port = (int) $portText;
-    return $port >= 1 && $port <= 65535 ? $port : null;
+    return pmssReadRegularFileNetworkPort($portFile);
 }
 
 /**

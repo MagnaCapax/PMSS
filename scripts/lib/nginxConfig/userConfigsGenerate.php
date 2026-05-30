@@ -123,12 +123,12 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     }
 
     $serverPort = pmssReadRegularFileInt($portFile);
-    $needsLighttpdRefresh = ($serverPort < 1024 || $serverPort > 65535) || !is_file($homeDir.'/.lighttpd.conf');
+    $needsLighttpdRefresh = !pmssNetworkPortInRange($serverPort, 1024) || !is_file($homeDir.'/.lighttpd.conf');
     if ($needsLighttpdRefresh) {
         passthru('/scripts/util/userConfigLighttpd.php '.escapeshellarg($thisUser));
         $serverPort = pmssReadRegularFileInt($portFile);
     }
-    if ($serverPort < 1024 || $serverPort > 65535) {
+    if (!pmssNetworkPortInRange($serverPort, 1024)) {
         pmssCreateNginxConfigLogSkippedUser($thisUser, 'lighttpd port missing or invalid after refresh attempt ('.$portFile.')');
         return;
     }
@@ -168,7 +168,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
                     $raw = trim($raw);
                     if ($raw !== '' && ctype_digit($raw)) {
                         $delugePort = (int) $raw;
-                        if ($delugePort >= 1024 && $delugePort <= 65534) {
+                        if (pmssNetworkPortInRange($delugePort, 1024, 65534)) {
                             $delugeWebPort = $delugePort + 1;
                         } elseif (function_exists('pmssUserLog')) {
                             pmssUserLog($thisUser, '[WARN] Ignoring invalid .delugePort value while rendering nginx template');

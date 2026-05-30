@@ -41,13 +41,7 @@ function pmssTorrentPortCurrentUserContext(): ?array
  */
 function pmssTorrentPortExpectedRead(string $path): ?int
 {
-    $raw = pmssReadRegularFileDigits($path);
-    if ($raw === null) {
-        return null;
-    }
-
-    $port = (int) $raw;
-    return ($port >= 1024 && $port <= 65535) ? $port : null;
+    return pmssReadRegularFileNetworkPort($path, 1024);
 }
 
 /**

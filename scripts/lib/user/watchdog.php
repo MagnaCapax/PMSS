@@ -76,13 +76,7 @@ function pmssUserWatchdogSuCommand(string $username, string $innerCommand): stri
 /** Read a watchdog-owned local TCP port, failing closed on malformed files. */
 function pmssUserWatchdogLocalPortRead(string $path): ?int
 {
-    $raw = pmssReadRegularFileTrimmed($path);
-    if ($raw === null || preg_match('/^[0-9]+$/', $raw) !== 1) {
-        return null;
-    }
-
-    $port = (int) $raw;
-    return ($port >= 1 && $port <= 65535) ? $port : null;
+    return pmssReadRegularFileNetworkPort($path);
 }
 
 /** Return the oldest /proc start marker for exact process-name matches. */

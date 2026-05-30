@@ -259,6 +259,32 @@ function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fie
     {
         return (($raw = pmssReadRegularFileTrimmed($path)) !== null && $raw !== '' && ctype_digit($raw)) ? $raw : null;
     }
+    // Validate a network service port while preserving caller-specific ranges.
+    function pmssNetworkPortInRange(int $port, int $min = 1, int $max = 65535): bool
+    {
+        return $min >= 1 && $max <= 65535 && $min <= $max && $port >= $min && $port <= $max;
+    }
+    // Parse digit-only port payloads from CLI/config files without accepting junk suffixes.
+    function pmssNetworkPortParseDigits($value, int $min = 1, int $max = 65535): ?int
+    {
+        if (!is_int($value) && !is_string($value)) {
+            return null;
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '' || !ctype_digit($raw)) {
+            return null;
+        }
+
+        $port = (int) $raw;
+        return pmssNetworkPortInRange($port, $min, $max) ? $port : null;
+    }
+    // Read a regular non-symlink file as a bounded network service port.
+    function pmssReadRegularFileNetworkPort(string $path, int $min = 1, int $max = 65535): ?int
+    {
+        $raw = pmssReadRegularFileDigits($path);
+        return $raw === null ? null : pmssNetworkPortParseDigits($raw, $min, $max);
+    }
     // Resolve a single colon-delimited account row without repeating file scans.
     function pmssColonRecordFieldsLookup(string $path, string $recordName, int $minFields = 2, bool $skipEmptyLines = true): ?array
     {

@@ -53,7 +53,7 @@ function pmssLighttpdDelugeWebPortFromConfig(string $user, string $path): ?int
     }
 
     $port = $parsed['config']['port'] ?? null;
-    $webPort = is_int($port) && $port >= 1024 && $port <= 65535 ? $port : null;
+    $webPort = is_int($port) && pmssNetworkPortInRange($port, 1024) ? $port : null;
     $expectedBase = "/user-{$user}/deluge/";
     $base = $parsed['config']['base'] ?? null;
     if (is_string($base) && in_array($base, ["/user-{$user}/deluge", "/deluge-{$user}/", "/deluge-{$user}"], true)) {
@@ -72,13 +72,13 @@ function pmssLighttpdDelugeWebPortFromConfig(string $user, string $path): ?int
 
 function pmssLighttpdDelugeWebPortFallback(string $homeDir): ?int
 {
-    $delugePort = pmssReadRegularFileInt($homeDir.'/.delugePort');
-    if ($delugePort < 1024 || $delugePort > 65535) {
+    $delugePort = pmssReadRegularFileNetworkPort($homeDir.'/.delugePort', 1024);
+    if ($delugePort === null) {
         return null;
     }
 
     foreach ([$delugePort + 1, $delugePort] as $candidate) {
-        if ($candidate < 1024 || $candidate > 65535) {
+        if (!pmssNetworkPortInRange($candidate, 1024)) {
             continue;
         }
         $sock = @fsockopen('127.0.0.1', $candidate, $errno, $errstr, 0.2);
@@ -90,7 +90,7 @@ function pmssLighttpdDelugeWebPortFallback(string $homeDir): ?int
 
     $candidate = $delugePort + 1;
 
-    return ($candidate >= 1024 && $candidate <= 65535) ? $candidate : $delugePort;
+    return pmssNetworkPortInRange($candidate, 1024) ? $candidate : $delugePort;
 }
 
 function pmssLighttpdDelugeWebPortResolve(string $user, string $homeDir): ?int

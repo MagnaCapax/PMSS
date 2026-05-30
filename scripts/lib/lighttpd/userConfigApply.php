@@ -66,7 +66,7 @@ function pmssUserConfigLighttpdConfigureUser(
     // only when the user or installer pins a local port explicitly.
     $invidiousPort = pmssReadRegularFileInt($homeDir.'/.invidiousPort');
     $invidiousConfPath = $customDir.'/pmss-invidious.conf';
-    if ($invidiousPort >= 1024 && $invidiousPort <= 65535) {
+    if (pmssNetworkPortInRange($invidiousPort, 1024)) {
         pmssLighttpdWriteManagedProxyFragment('invidious', $thisUser, $invidiousPort, $invidiousConfPath);
     } elseif (is_file($invidiousConfPath) || is_link($invidiousConfPath)) {
         @unlink($invidiousConfPath);

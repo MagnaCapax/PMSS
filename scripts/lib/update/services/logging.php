@@ -78,7 +78,7 @@ function pmssRemoteLoggingReadConfig(string $loggingConf): array
         ? trim((string) $parsed['remote_host'])
         : $config['host'];
     $port = trim((string) ($parsed['remote_port'] ?? ''));
-    if (ctype_digit($port) && ($parsedPort = (int) $port) > 0 && $parsedPort <= 65535) {
+    if (($parsedPort = pmssNetworkPortParseDigits($port)) !== null) {
         $config['port'] = $parsedPort;
     }
     $protocol = strtolower(trim((string) ($parsed['remote_protocol'] ?? '')));

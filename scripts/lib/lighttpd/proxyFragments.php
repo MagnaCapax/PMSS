@@ -93,7 +93,7 @@ function pmssLighttpdProxyPortsEnsure(array $proxyPortFiles): array
     $proxyPorts = [];
     foreach ($proxyPortFiles as $proxyName => $proxyPortFile) {
         $proxyPort = pmssReadRegularFileInt($proxyPortFile);
-        if ($proxyPort < 1024 || $proxyPort > 65500) {
+        if (!pmssNetworkPortInRange($proxyPort, 1024, 65500)) {
             $proxyPort = (int) round(rand(1500, 65500));
             file_put_contents($proxyPortFile, (string) $proxyPort);
         }

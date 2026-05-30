@@ -159,12 +159,8 @@ function pmssDockerInstallLsioHostPort(?string $value, string $defaultPort): ?st
         return $defaultPort;
     }
 
-    if (!ctype_digit($value)) {
-        return null;
-    }
-
-    $port = (int) $value;
-    return ($port >= 1 && $port <= 65535) ? (string) $port : null;
+    $port = pmssNetworkPortParseDigits($value);
+    return $port === null ? null : (string) $port;
 }
 
 /**
