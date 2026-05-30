@@ -8,6 +8,7 @@
 // #TODO Refactor this installer to use virtualenv instead of system-wide pip. (GH #125)
 // #TODO Pin Python package versions explicitly; avoid unbounded upgrades. (GH #125)
 // #TODO Replace passthru/backticks with runStep wrappers for consistent logging. (GH #125)
+require_once __DIR__.'/../packageState.php';
 require_once __DIR__.'/remoteBinary.php';
 
 /**
@@ -328,10 +329,7 @@ if ($isDebian10) {
         echo "\t*** Deluge already at target version ({$currentVersion}); skipping pip build\n";
     }
 } else {
-    // For supported releases, always let apt reconcile Deluge package state.
-    // This keeps first installs and package upgrades on the same idempotent path.
-    $installed = (trim((string) @shell_exec('dpkg -s deluged 2>/dev/null | grep -iE "^Status:.*installed$"')) !== '')
-              && (trim((string) @shell_exec('dpkg -s deluge-web 2>/dev/null | grep -iE "^Status:.*installed$"')) !== '');
+    $installed = pmssPackageStatus('deluged') === 'install ok installed' && pmssPackageStatus('deluge-web') === 'install ok installed';
     runStep(
         $installed ? 'Upgrading Deluge packages' : 'Installing Deluge packages',
         aptCmd('install -y deluged deluge-web')

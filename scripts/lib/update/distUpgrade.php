@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/../update.php';
 require_once __DIR__.'/distro.php';
+require_once __DIR__.'/packageState.php';
 require_once __DIR__.'/userMaintenance.php';
 
 /**
@@ -140,8 +141,7 @@ function pmssEnsureFuseOverlayfsAfterDistUpgrade(string $toMajor): void
         return;
     }
 
-    $status = trim((string) @shell_exec('dpkg-query -W -f=\'${Status}\' fuse-overlayfs 2>/dev/null'));
-    if ($status === 'install ok installed') {
+    if (pmssPackageStatus('fuse-overlayfs') === 'install ok installed') {
         logMessage('[SKIP] dist-upgrade: fuse-overlayfs already installed');
         return;
     }
