@@ -45,6 +45,19 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
         $this->pmssAssertRepoFileNotContainsString('scripts/util/setupPermissions.php', 'chmod -R o-w');
     }
 
+    public function testPermissionHardeningSkipsSymlinkTargetsBeforeActing(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupPermissions.php', [
+            'function pmssPermissionTargetDirectoryExists(string $path): bool',
+            'function pmssPermissionTargetFileExists(string $path): bool',
+            'return !pmssSkipSymlink($path) && is_dir($path);',
+            'return !pmssSkipSymlink($path) && is_file($path);',
+            'if ($node->isLink()) {',
+            "if (pmssPermissionTargetDirectoryExists('/etc/wireguard')) {",
+            "if (pmssPermissionTargetFileExists('/etc/openvpn/ta.key')) {",
+        ]);
+    }
+
     public function testSystemTestChecksBothSeedboxTraversalDirectories(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/systemStatus.php', [
