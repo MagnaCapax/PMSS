@@ -8,8 +8,7 @@ class UpdateLibraryDependencyTest extends TestCase
     private function assertRepoFileDependencyCases(array $cases): void
     {
         foreach ($cases as $case) {
-            $this->pmssAssertRepoFileContainsAllStrings($case[0], $case[1]);
-            $this->pmssAssertRepoFileNotContainsStrings($case[0], $case[2], $case[3]);
+            $this->pmssAssertRepoFileContainsAndOmitsStrings($case[0], $case[1], array_fill_keys($case[2], $case[3]));
         }
     }
 

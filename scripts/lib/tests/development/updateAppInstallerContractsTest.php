@@ -5,15 +5,10 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateAppInstallerContractsTest extends TestCase
 {
-    private function assertUpdateAppContainsAllStrings(string $installer, array $needles): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/'.$installer, $needles);
-    }
-
     private function assertUpdateAppContainsCases(array $cases): void
     {
         foreach ($cases as $installer => $needles) {
-            $this->assertUpdateAppContainsAllStrings($installer, $needles);
+            $this->pmssAssertUpdateAppFileContainsAndOmitsStrings($installer, $needles);
         }
     }
 
@@ -77,7 +72,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testSyncthingInstallerKeepsVersionProbeAndPinnedDownload(): void
     {
-        $this->assertUpdateAppContainsAllStrings('syncthing.php', [
+        $this->pmssAssertUpdateAppFileContainsAndOmitsStrings('syncthing.php', [
             "require_once __DIR__.'/remoteBinary.php';",
             'syncthing version 2>/dev/null',
             'pmssPinnedRemoteAmd64ArtifactsSupported()',
@@ -93,7 +88,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testRemoteBinaryOwnsPinnedArchiveExtractionScaffold(): void
     {
-        $this->assertUpdateAppContainsAllStrings('remoteBinary.php', [
+        $this->pmssAssertUpdateAppFileContainsAndOmitsStrings('remoteBinary.php', [
             'function pmssRunPinnedRemoteArchiveStep(',
             'pmssFetchPinnedRemoteFile($label, $url, $expectedSha256)',
             "substr(\$archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf'",
@@ -120,7 +115,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testRcloneInstallerKeepsLatestFetchAndRelocationGuards(): void
     {
-        $this->assertUpdateAppContainsAllStrings('rclone.php', [
+        $this->pmssAssertUpdateAppFileContainsAndOmitsStrings('rclone.php', [
             "pmssEnvFlagEnabled('PMSS_RCLONE_FETCH_LATEST')",
             'Warning: Unable to determine latest rclone version, falling back to pinned release.',
             '/usr/bin/rclone version 2>/dev/null',
@@ -157,7 +152,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testWatchdogInstallerKeepsTemplateAndDeviceFallbackFlow(): void
     {
-        $this->assertUpdateAppContainsAllStrings('watchdog.php', [
+        $this->pmssAssertUpdateAppFileContainsAndOmitsStrings('watchdog.php', [
             'template.watchdog.conf',
             'template.watchdog.network-check.sh',
             '/etc/watchdog.d',

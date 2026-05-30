@@ -163,23 +163,6 @@ function rtorrentScgiCallInt(string $socketPath, string $method, int $value, int
 }
 
 /**
- * Extract the xmlrpc body from an SCGI response.
- *
- * @param string $response Raw SCGI response including headers.
- *
- * @return string|false Xml body when present, otherwise false.
- */
-function rtorrentScgiExtractXmlBody(string $response)
-{
-    $offset = strpos($response, '<?xml');
-    if ($offset === false) {
-        return false;
-    }
-
-    return substr($response, $offset);
-}
-
-/**
  * Decode one xmlrpc value node into a PHP scalar or nested list.
  *
  * @param \SimpleXMLElement $valueNode Xmlrpc value node.
@@ -244,12 +227,12 @@ function rtorrentScgiDecodeXmlrpcValue(\SimpleXMLElement $valueNode)
  */
 function rtorrentScgiDecodeResponse(string $response)
 {
-    $xmlBody = rtorrentScgiExtractXmlBody($response);
-    if ($xmlBody === false || !function_exists('simplexml_load_string')) {
+    $offset = strpos($response, '<?xml');
+    if ($offset === false || !function_exists('simplexml_load_string')) {
         return false;
     }
 
-    $xml = @simplexml_load_string($xmlBody);
+    $xml = @simplexml_load_string(substr($response, $offset));
     if (!($xml instanceof \SimpleXMLElement)) {
         return false;
     }

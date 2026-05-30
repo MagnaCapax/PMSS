@@ -16,15 +16,6 @@ require_once __DIR__.'/../user/directories.php';
 require_once __DIR__.'/users/docker.php';
 
     /**
-     * Resume-capability state dir (GH#302 point 5). Overridable for tests.
-     */
-    function pmssUserRefreshStateDir(): string
-    {
-        $override = (string) getenv('PMSS_USER_REFRESH_STATE_DIR');
-        return $override !== '' ? $override : '/var/lib/pmss/user-refresh';
-    }
-
-    /**
      * Signature a user is "refreshed against". Keyed on the installed PMSS
      * version (advances every update → forces full refresh on a real upgrade)
      * plus the ruTorrent skel SHA (catches skel-only template bumps). Within one
@@ -39,7 +30,8 @@ require_once __DIR__.'/users/docker.php';
     /** Marker path for a username when the boundary inputs are safe. */
     function pmssUserRefreshMarkerPath(string $user): string
     {
-        $dir = pmssUserRefreshStateDir();
+        $override = (string) getenv('PMSS_USER_REFRESH_STATE_DIR');
+        $dir = $override !== '' ? $override : '/var/lib/pmss/user-refresh';
         if (!pmssValidateUsername($user) || !pmssPathTargetIsSafe($dir, true, false, false)) {
             return '';
         }

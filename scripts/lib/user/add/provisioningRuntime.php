@@ -20,22 +20,15 @@ function pmssAddUserRuntimeBootstrap(): void
 }
 
 /**
- * Resolve one env-backed path without forcing the full runtime bootstrap.
- */
-function pmssAddUserResolvePathFromEnv(string $envKey, string $default): string
-{
-    $value = getenv($envKey);
-    $value = ($value === false || $value === '') ? $default : $value;
-    $value = rtrim($value, '/');
-    return $value !== '' ? $value : rtrim($default, '/');
-}
-
-/**
  * Resolve the addUser provisioning log path with a hermetic test override.
  */
 function pmssAddUserProvisioningLogPath(): string
 {
-    return pmssAddUserResolvePathFromEnv('PMSS_ADDUSER_LOG_PATH', '/var/log/pmss/addUser.log');
+    $default = '/var/log/pmss/addUser.log';
+    $value = getenv('PMSS_ADDUSER_LOG_PATH');
+    $value = ($value === false || $value === '') ? $default : $value;
+    $value = rtrim($value, '/');
+    return $value !== '' ? $value : $default;
 }
 
 /**
