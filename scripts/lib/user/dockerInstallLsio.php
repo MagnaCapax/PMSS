@@ -16,11 +16,10 @@ require_once __DIR__.'/../runtime.php';
  */
 function pmssDockerInstallLsioUsage(string $scriptName): string
 {
-    $supportedApps = ['jellyfin', 'qbittorrent', 'radarr', 'sonarr', 'prowlarr', 'mariadb', 'phpmyadmin'];
     return sprintf(
         "Usage: %s APP [HOST_PORT] [--dry-run]\n\nSupported apps: %s\n",
         $scriptName,
-        implode(' ', $supportedApps)
+        implode(' ', array_keys(pmssDockerInstallLsioAppCatalog()))
     );
 }
 
@@ -164,97 +163,83 @@ function pmssDockerInstallLsioHostPort(?string $value, string $defaultPort): ?st
 }
 
 /**
+ * Catalog the supported LSIO apps in the public usage order.
+ *
+ * @return array<string,array<string,mixed>>
+ */
+function pmssDockerInstallLsioAppCatalog(): array
+{
+    return [
+        'jellyfin' => ['port' => '8096', 'mkdir' => ['media'], 'volumes' => ['config:/config', 'media:/data']],
+        'qbittorrent' => ['port' => '8080', 'mkdir' => ['downloads'], 'extraArgs' => ['-e', 'WEBUI_PORT=8080'], 'volumes' => ['config:/config', 'downloads:/downloads']],
+        'radarr' => ['port' => '7878', 'mkdir' => ['movies', 'downloads'], 'volumes' => ['config:/config', 'movies:/movies', 'downloads:/downloads']],
+        'sonarr' => ['port' => '8989', 'mkdir' => ['tv', 'downloads'], 'volumes' => ['config:/config', 'tv:/tv', 'downloads:/downloads']],
+        'prowlarr' => ['port' => '9696', 'volumes' => ['config:/config']],
+        'mariadb' => ['port' => '3306', 'bindHost' => '127.0.0.1', 'credentials' => true, 'volumes' => ['config:/config']],
+        'phpmyadmin' => ['port' => '8082', 'containerPort' => '80', 'bindHost' => '127.0.0.1', 'extraArgs' => ['-e', 'PMA_HOST=mariadb', '-e', 'PMA_PORT=3306'], 'volumes' => ['config:/config']],
+    ];
+}
+
+/**
  * Build the app-specific install specification.
  *
  * @return array<string,mixed>|null
  */
 function pmssDockerInstallLsioAppSpec(string $app, string $homeDir, bool $dryRun)
 {
-    $configDir = $homeDir.'/docker/'.$app.'/config';
-    $downloadsDir = $homeDir.'/downloads';
-    $moviesDir = $homeDir.'/movies';
-    $tvDir = $homeDir.'/tv';
-    $mediaDir = $homeDir.'/media';
-    $credentialFile = '';
-    $dbName = '';
-    $dbUser = '';
+    $catalog = pmssDockerInstallLsioAppCatalog();
+    if (!isset($catalog[$app])) {
+        return null;
+    }
+
+    $appSpec = $catalog[$app];
+    $paths = [
+        'config' => $homeDir.'/docker/'.$app.'/config',
+        'downloads' => $homeDir.'/downloads',
+        'movies' => $homeDir.'/movies',
+        'tv' => $homeDir.'/tv',
+        'media' => $homeDir.'/media',
+    ];
 
     $spec = [
         'image' => 'lscr.io/linuxserver/'.$app.':latest',
-        'configDir' => $configDir,
-        'mkdirPaths' => [$configDir],
-        'bindHost' => '',
-        'containerPort' => '',
-        'defaultPort' => '',
-        'extraArgs' => [],
+        'mkdirPaths' => [$paths['config']],
+        'bindHost' => (string) ($appSpec['bindHost'] ?? ''),
+        'containerPort' => (string) ($appSpec['containerPort'] ?? $appSpec['port']),
+        'defaultPort' => (string) $appSpec['port'],
+        'extraArgs' => isset($appSpec['extraArgs']) ? $appSpec['extraArgs'] : [],
         'volumeArgs' => [],
         'credentialFile' => '',
     ];
 
-    switch ($app) {
-        case 'jellyfin':
-            $spec['defaultPort'] = '8096';
-            $spec['containerPort'] = '8096';
-            $spec['mkdirPaths'][] = $mediaDir;
-            $spec['volumeArgs'] = ['-v', $configDir.':/config', '-v', $mediaDir.':/data'];
-            return $spec;
-
-        case 'qbittorrent':
-            $spec['defaultPort'] = '8080';
-            $spec['containerPort'] = '8080';
-            $spec['mkdirPaths'][] = $downloadsDir;
-            $spec['extraArgs'] = ['-e', 'WEBUI_PORT=8080'];
-            $spec['volumeArgs'] = ['-v', $configDir.':/config', '-v', $downloadsDir.':/downloads'];
-            return $spec;
-
-        case 'radarr':
-            $spec['defaultPort'] = '7878';
-            $spec['containerPort'] = '7878';
-            $spec['mkdirPaths'][] = $moviesDir;
-            $spec['mkdirPaths'][] = $downloadsDir;
-            $spec['volumeArgs'] = ['-v', $configDir.':/config', '-v', $moviesDir.':/movies', '-v', $downloadsDir.':/downloads'];
-            return $spec;
-
-        case 'sonarr':
-            $spec['defaultPort'] = '8989';
-            $spec['containerPort'] = '8989';
-            $spec['mkdirPaths'][] = $tvDir;
-            $spec['mkdirPaths'][] = $downloadsDir;
-            $spec['volumeArgs'] = ['-v', $configDir.':/config', '-v', $tvDir.':/tv', '-v', $downloadsDir.':/downloads'];
-            return $spec;
-
-        case 'prowlarr':
-            $spec['defaultPort'] = '9696';
-            $spec['containerPort'] = '9696';
-            $spec['volumeArgs'] = ['-v', $configDir.':/config'];
-            return $spec;
-
-        case 'mariadb':
-            $credentialFile = $homeDir.'/docker/'.$app.'/pmss-credentials.env';
-            $dbUser = pmssDockerInstallLsioDatabaseIdentifier(basename(rtrim($homeDir, '/')), 'db_');
-            $dbName = pmssDockerInstallLsioDatabaseIdentifier($dbUser.'_app', '');
-            $spec['defaultPort'] = '3306';
-            $spec['containerPort'] = '3306';
-            $spec['bindHost'] = '127.0.0.1';
-            $spec['credentialFile'] = $credentialFile;
-            $spec['dbName'] = $dbName;
-            $spec['dbUser'] = $dbUser;
-            $spec['extraArgs'] = $dryRun
-                ? ['-e', 'MYSQL_ROOT_PASSWORD=<generated-at-install>', '-e', 'MYSQL_DATABASE='.$dbName, '-e', 'MYSQL_USER='.$dbUser, '-e', 'MYSQL_PASSWORD=<generated-at-install>']
-                : ['--env-file', $credentialFile];
-            $spec['volumeArgs'] = ['-v', $configDir.':/config'];
-            return $spec;
-
-        case 'phpmyadmin':
-            $spec['defaultPort'] = '8082';
-            $spec['containerPort'] = '80';
-            $spec['bindHost'] = '127.0.0.1';
-            $spec['extraArgs'] = ['-e', 'PMA_HOST=mariadb', '-e', 'PMA_PORT=3306'];
-            $spec['volumeArgs'] = ['-v', $configDir.':/config'];
-            return $spec;
+    foreach ($appSpec['mkdir'] ?? [] as $pathKey) {
+        if (isset($paths[$pathKey])) {
+            $spec['mkdirPaths'][] = $paths[$pathKey];
+        }
     }
 
-    return null;
+    foreach ($appSpec['volumes'] ?? [] as $volume) {
+        [$pathKey, $containerPath] = array_pad(explode(':', (string) $volume, 2), 2, '');
+        if (!isset($paths[$pathKey]) || $containerPath === '') {
+            continue;
+        }
+        $spec['volumeArgs'][] = '-v';
+        $spec['volumeArgs'][] = $paths[$pathKey].':'.$containerPath;
+    }
+
+    if (!empty($appSpec['credentials'])) {
+        $credentialFile = $homeDir.'/docker/'.$app.'/pmss-credentials.env';
+        $dbUser = pmssDockerInstallLsioDatabaseIdentifier(basename(rtrim($homeDir, '/')), 'db_');
+        $dbName = pmssDockerInstallLsioDatabaseIdentifier($dbUser.'_app', '');
+        $spec['credentialFile'] = $credentialFile;
+        $spec['dbName'] = $dbName;
+        $spec['dbUser'] = $dbUser;
+        $spec['extraArgs'] = $dryRun
+            ? ['-e', 'MYSQL_ROOT_PASSWORD=<generated-at-install>', '-e', 'MYSQL_DATABASE='.$dbName, '-e', 'MYSQL_USER='.$dbUser, '-e', 'MYSQL_PASSWORD=<generated-at-install>']
+            : ['--env-file', $credentialFile];
+    }
+
+    return $spec;
 }
 
 /**

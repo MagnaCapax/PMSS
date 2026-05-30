@@ -6,6 +6,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/user/dockerInstallLsio.php';
 
 class LinuxserverInstallScriptTest extends TestCase
 {
@@ -109,6 +110,18 @@ BASH;
         $this->assertTrue(!is_dir($this->homeDir.'/media'), 'dry-run must not create data dirs');
         $this->assertStringContainsString('--network pmss-media', $result['output']);
         $this->assertStringContainsString($this->homeDir.'/media:/data', $result['output']);
+    }
+
+    public function testSupportedAppCatalogFeedsUsageText(): void
+    {
+        $this->assertSame(
+            ['jellyfin', 'qbittorrent', 'radarr', 'sonarr', 'prowlarr', 'mariadb', 'phpmyadmin'],
+            array_keys(\pmssDockerInstallLsioAppCatalog())
+        );
+        $this->assertStringContainsString(
+            'Supported apps: jellyfin qbittorrent radarr sonarr prowlarr mariadb phpmyadmin',
+            \pmssDockerInstallLsioUsage('docker-install-lsio')
+        );
     }
 
     public function testDryRunQbittorrentUsesDownloadsAndWebUiPort(): void
