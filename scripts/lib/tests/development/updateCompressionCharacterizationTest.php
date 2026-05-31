@@ -229,7 +229,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
         ], [
             "preg_split('/\\r?\\n/', trim((string) \$lsblkOut))" => 'snapshot should not keep a local lsblk parser',
         ]);
-        $this->pmssAssertRepoFileContainsString('scripts/util/storageBenchmark.php', $symbol.'((string) shell_exec');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/storageBenchmark.php', $symbol.'((string) shell_exec');
+        $this->pmssAssertRepoFileContainsString('scripts/util/storageBenchmark.php', "require_once __DIR__.'/../lib/storageBenchmark.php';");
         $this->pmssAssertRepoFileNotContainsString('scripts/lib/storageHealth.php', "'disks'", 'storageHealth.php should stop requiring the removed disks.php module');
     }
 

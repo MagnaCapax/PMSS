@@ -239,7 +239,7 @@ class StorageBenchSecurityTest extends TestCase
 
     public function testIostatPreflightUsesSafeSerializedArrayReader(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/storageBenchmark.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/storageBenchmark.php');
 
         $this->assertStringContainsAllStrings(['storageBenchmarkIostatUtilPctRead', 'pmssReadSerializedArrayFile($path)'], $source);
         $this->assertStringNotContainsString('unserialize(', $source);
@@ -247,7 +247,7 @@ class StorageBenchSecurityTest extends TestCase
 
     public function testFileBackedProbesUseCheckedCommandCapture(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/storageBenchmark.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/storageBenchmark.php');
 
         $this->assertStringContainsAllStrings(['storageBenchmarkRequireCommandField', 'pmssCommandCapture($command, 30)', "storageBenchmarkRequirePositiveIntCommandField('df -PB1 "], $source);
         $this->assertStringNotContainsString("\$free=(int)trim((string) shell_exec('df -PB1 ", $source);

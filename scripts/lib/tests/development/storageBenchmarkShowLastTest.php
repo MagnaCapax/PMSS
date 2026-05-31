@@ -119,6 +119,23 @@ class StorageBenchmarkShowLastTest extends TestCase
         $this->assertSame($expected, $this->pmssRunRepoPhpScript('scripts/util/storageBenchmark.php', ['--show-last', '--json', $log]));
     }
 
+    public function testShowLastLibraryRendererMatchesCliWrapper(): void
+    {
+        require_once $this->pmssRepoPath('scripts/lib/storageBenchmark.php');
+        $runId = '2025-01-06T06:06:06Z-lib';
+        $runTs = '2025-01-06T06:06:06Z';
+        $log = $this->pmssWriteStorageBenchmarkRunLog($runId, $runTs, [
+            $this->pmssStorageBenchmarkFileEntry($runId, $runTs, 'seqread-large', ['read_bw_MBps' => 42.5, 'read_iops' => 7.0, 'read_p95_ms' => 1.5], ['timestamp' => $runTs]),
+        ], ['timestamp' => $runTs, 'ioping_avg_ms' => 2.5]);
+
+        [$rc, $libraryOut] = $this->pmssCaptureStdout(static function () use ($log): int {
+            return \storageBenchmarkShowLast($log);
+        });
+
+        $this->assertSame(0, $rc);
+        $this->assertSame($this->pmssRunRepoPhpScript('scripts/util/storageBenchmark.php', ['--show-last', '--json', $log]), $libraryOut);
+    }
+
     public function testShowLastPrintsPreflightOnlyIfNoTests(): void
     {
         $runTs  = '2025-01-04T03:03:03Z';
