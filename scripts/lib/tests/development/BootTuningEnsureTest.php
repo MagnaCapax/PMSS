@@ -17,11 +17,10 @@ class BootTuningEnsureTest extends TestCase
         $messages = [];
         [$script, $service] = $this->runBootTuning($dir, $messages);
 
-        $this->assertTrue(file_exists($script), 'expected boot tuning script to be written');
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertFileContainsAllStrings($script, [
             '/sys/kernel/mm/lru_gen/enabled', '/sys/module/zswap/parameters/enabled', '/md/stripe_cache_size',
             'target_file="$target_dir/hardware.json"', '"swap_is_fast":', '"nic_speed_mbps":',
-        ], (string)file_get_contents($script));
+        ], 'expected boot tuning script to be written');
         $this->assertTrue(file_exists($service), 'expected boot tuning service to be written');
     }
 
@@ -31,9 +30,10 @@ class BootTuningEnsureTest extends TestCase
         $messages = [];
         [$script, $service] = $this->runBootTuning($dir, $messages);
 
-        $this->assertTrue(file_exists($service), 'expected systemd service to be written');
-        $content = (string)file_get_contents($service);
-        $this->assertStringContainsAllStrings(['ExecStart='.$script, 'WantedBy=multi-user.target'], $content);
+        $this->pmssAssertFileContainsAllStrings($service, [
+            'ExecStart='.$script,
+            'WantedBy=multi-user.target',
+        ], 'expected systemd service to be written');
     }
 
     public function testScriptPermissionsAreExecutable(): void

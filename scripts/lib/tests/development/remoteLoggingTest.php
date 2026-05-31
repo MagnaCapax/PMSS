@@ -91,10 +91,10 @@ class RemoteLoggingTest extends TestCase
             'PMSS_RSYSLOG_CONF_DIR' => $targetDir,
         ], $messages);
 
-        $this->assertTrue(file_exists($target), 'expected rendered remote logging config');
-        $rendered = (string) file_get_contents($target);
-        $this->assertStringContainsString('*.* @logserver.example.com:1514', $rendered);
-        $this->assertStringContainsString('# protocol=udp', $rendered);
+        $this->pmssAssertFileContainsAllStrings($target, [
+            '*.* @logserver.example.com:1514',
+            '# protocol=udp',
+        ], 'expected rendered remote logging config');
         $this->assertTrue($this->pmssMessagesContain($messages, 'Applied remote logging: logserver.example.com:1514 (udp)'), 'expected apply log');
     }
 

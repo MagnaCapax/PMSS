@@ -36,10 +36,10 @@ class RemoteLoggingCharacterizationTest extends TestCase
             \pmssApplyRemoteLogging($this->pmssMakeArrayLogger($messages));
         });
 
-        $this->assertTrue(file_exists($target), 'Expected rendered remote logging config');
-        $rendered = (string) file_get_contents($target);
-        $this->assertStringContainsString('*.* @@logs.example.net:514', $rendered);
-        $this->assertStringContainsString('# protocol=tcp', $rendered);
+        $this->pmssAssertFileContainsAllStrings($target, [
+            '*.* @@logs.example.net:514',
+            '# protocol=tcp',
+        ], 'Expected rendered remote logging config');
         $this->assertTrue(
             $this->pmssMessagesContain($messages, 'Applied remote logging: logs.example.net:514 (tcp)'),
             'Expected apply log to reflect defaulted port and protocol'
@@ -74,10 +74,10 @@ class RemoteLoggingCharacterizationTest extends TestCase
             \pmssApplyRemoteLogging();
         });
 
-        $this->assertTrue(file_exists($target), 'Expected rendered remote logging config');
-        $rendered = (string) file_get_contents($target);
-        $this->assertStringContainsString('*.* @mirror.example.net:10514', $rendered);
-        $this->assertStringContainsString('# copy=mirror.example.net:10514', $rendered);
-        $this->assertStringContainsString('# protocol=udp/udp', $rendered);
+        $this->pmssAssertFileContainsAllStrings($target, [
+            '*.* @mirror.example.net:10514',
+            '# copy=mirror.example.net:10514',
+            '# protocol=udp/udp',
+        ], 'Expected rendered remote logging config');
     }
 }

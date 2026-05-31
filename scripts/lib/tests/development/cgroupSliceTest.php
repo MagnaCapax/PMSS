@@ -28,14 +28,14 @@ class cgroupSliceTest extends TestCase
         $this->pmssSystemdSliceEnsure($fixture);
 
         $target = $fixture['dropDir'].'/15-pmss.conf';
-        $this->assertTrue(file_exists($target), 'slice drop-in not created');
-        $content = (string) file_get_contents($target);
+        $content = $this->pmssAssertFileContainsAllStrings($target, [
+            'CPUWeight=',
+            'IOWeight=',
+            'TasksMax=',
+            'MemoryHigh=',
+            'MemoryMax=',
+        ], 'slice drop-in not created');
         $this->assertTrue(strpos($content, '%%') === false, 'placeholders remained in output');
-        $this->assertTrue(strpos($content, 'CPUWeight=') !== false);
-        $this->assertTrue(strpos($content, 'IOWeight=') !== false);
-        $this->assertTrue(strpos($content, 'TasksMax=') !== false);
-        $this->assertTrue(strpos($content, 'MemoryHigh=') !== false);
-        $this->assertTrue(strpos($content, 'MemoryMax=') !== false);
     }
 
     public function testMemoryConstraintsApplied(): void

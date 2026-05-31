@@ -21,10 +21,10 @@ class SystemdSliceRootOverrideWrittenTest extends TestCase
         $this->pmssSystemdSliceEnsure($fixture);
 
         $rootDrop = $base.'/user-0.slice.d/99-zz-pmss-unlimited.conf';
-        $this->assertTrue(file_exists($rootDrop), 'Root override missing');
-        $data = (string) file_get_contents($rootDrop);
-        $this->assertStringContainsString('TasksMax=infinity', $data);
-        $this->assertStringContainsString('MemoryHigh=infinity', $data);
-        $this->assertStringContainsString('MemoryMax=infinity', $data);
+        $this->pmssAssertFileContainsAllStrings($rootDrop, [
+            'TasksMax=infinity',
+            'MemoryHigh=infinity',
+            'MemoryMax=infinity',
+        ], 'Root override missing');
     }
 }

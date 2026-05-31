@@ -202,6 +202,15 @@ abstract class TestCase
         }
     }
 
+    /** Assert that a generated fixture file exists and contains every expected fragment. */
+    protected function pmssAssertFileContainsAllStrings(string $path, array $needles, string $missingMessage = '', string $messagePrefix = ''): string
+    {
+        $this->assertTrue(file_exists($path), $missingMessage !== '' ? $missingMessage : 'Expected file to exist: '.$path);
+        $content = (string) file_get_contents($path);
+        $this->assertStringContainsAllStrings($needles, $content, $messagePrefix);
+        return $content;
+    }
+
     protected function assertOrderedStrings(array $needles, string $haystack, string $missingPrefix = '', string $orderPrefix = ''): void
     {
         $offset = -1;

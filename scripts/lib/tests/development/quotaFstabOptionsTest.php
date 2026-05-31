@@ -35,11 +35,12 @@ class QuotaFstabOptionsTest extends TestCase
 
         \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
 
-        $updated = (string)file_get_contents($fstab);
-        $this->assertStringContainsString('usrjquota=aquota.user', $updated);
-        $this->assertStringContainsString('grpjquota=aquota.group', $updated);
-        $this->assertStringContainsString('jqfmt=vfsv1', $updated);
-        $this->assertStringContainsString('defaults,noatime', $updated);
+        $updated = $this->pmssAssertFileContainsAllStrings($fstab, [
+            'usrjquota=aquota.user',
+            'grpjquota=aquota.group',
+            'jqfmt=vfsv1',
+            'defaults,noatime',
+        ]);
         $this->assertEquals(1, preg_match_all('/\s\/home\s/', $updated), 'expected existing /home line updated in place');
 
         $backups = glob($fstab.'.pmss-backup-*') ?: [];
@@ -60,10 +61,11 @@ class QuotaFstabOptionsTest extends TestCase
 
         \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
 
-        $updated = (string)file_get_contents($fstab);
-        $this->assertStringContainsString('usrjquota=aquota.user', $updated);
-        $this->assertStringContainsString('grpjquota=aquota.group', $updated);
-        $this->assertStringContainsString('jqfmt=vfsv1', $updated);
+        $updated = $this->pmssAssertFileContainsAllStrings($fstab, [
+            'usrjquota=aquota.user',
+            'grpjquota=aquota.group',
+            'jqfmt=vfsv1',
+        ]);
         $this->assertTrue(strpos($updated, 'defaults,') === false, 'expected defaults token removed');
     }
 

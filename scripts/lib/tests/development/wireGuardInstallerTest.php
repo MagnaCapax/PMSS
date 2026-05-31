@@ -156,15 +156,11 @@ class WireGuardInstallerTest extends TestCase
         ], function () use ($dir, $aliceKey, $bobKey): void {
             \wireguardWriteConfig('dummy', 12345);
             $config = $dir.'/wg0.conf';
-            $this->assertTrue(file_exists($config));
-            $contents = (string) file_get_contents($config);
-
-            // Base interface section remains.
-            $this->assertStringContainsString('PrivateKey = dummy', $contents);
-
-            // Peer sections exist for both keys with per-key AllowedIPs in 10.90.90.0/24.
-            $this->assertStringContainsString('PublicKey = '.$aliceKey, $contents);
-            $this->assertStringContainsString('PublicKey = '.$bobKey, $contents);
+            $contents = $this->pmssAssertFileContainsAllStrings($config, [
+                'PrivateKey = dummy',
+                'PublicKey = '.$aliceKey,
+                'PublicKey = '.$bobKey,
+            ]);
             $this->assertMatches('/AllowedIPs = 10\\.90\\.90\\.[0-9]+\\/32/', $contents);
         });
     }
@@ -312,10 +308,9 @@ class WireGuardInstallerTest extends TestCase
         $guidePath = $homeBase.'/alice/wireguard.txt';
         $keyPath   = $homeBase.'/alice/.wireguard-public-key';
 
-        $this->assertTrue(file_exists($guidePath), 'wireguard.txt should be created for bootstrap users');
+        $guideContents = $this->pmssAssertFileContainsAllStrings($guidePath, ["PrivateKey = client-private\n"], 'wireguard.txt should be created for bootstrap users');
         $this->assertTrue(file_exists($keyPath), '.wireguard-public-key should be created for bootstrap users');
-        $this->assertStringContainsString("PrivateKey = client-private\n", (string) file_get_contents($guidePath));
-        $this->assertTrue(strpos((string) file_get_contents($guidePath), '<client private key>') === false, 'bootstrap guide should not keep the placeholder');
+        $this->assertTrue(strpos($guideContents, '<client private key>') === false, 'bootstrap guide should not keep the placeholder');
         $this->assertEquals($publicKey."\n", (string) file_get_contents($keyPath));
         $this->assertEquals('600', substr(sprintf('%o', fileperms($guidePath)), -3));
         $this->assertEquals('600', substr(sprintf('%o', fileperms($keyPath)), -3));
@@ -457,10 +452,10 @@ class WireGuardInstallerTest extends TestCase
         });
 
         $file = $homeBase.'/alice/wireguard.txt';
-        $this->assertTrue(file_exists($file), 'wireguard.txt should be created from the fallback guide');
-        $updated = (string) file_get_contents($file);
-        $this->assertStringContainsString("Address = 10.90.90.55/32\n", $updated);
-        $this->assertStringContainsString("AllowedIPs = 10.90.90.55/32\n", $updated);
+        $this->pmssAssertFileContainsAllStrings($file, [
+            "Address = 10.90.90.55/32\n",
+            "AllowedIPs = 10.90.90.55/32\n",
+        ], 'wireguard.txt should be created from the fallback guide');
     }
 
     public function testConfigureKeepsReadmeFlowInline(): void

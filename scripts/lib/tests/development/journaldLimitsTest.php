@@ -87,11 +87,10 @@ class JournaldLimitsTest extends TestCase
         });
 
         $target = $targetDir.'/pmss-limits.conf';
-        $this->assertTrue(file_exists($target), 'Journald limits file missing');
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertFileContainsAllStrings($target, [
             'SystemMaxUse=2G', 'SystemKeepFree=1G', 'RuntimeMaxUse=256M',
             'RateLimitIntervalSec=10s', 'RateLimitBurst=2000',
-        ], (string)file_get_contents($target));
+        ], 'Journald limits file missing');
     }
 
     public function testDryRunSkipsJournaldRestartAfterWritingTemplate(): void
