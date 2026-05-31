@@ -192,7 +192,7 @@ function pmssUserResourcesListMain(array $argv): int
         }
         $resourceData = pmssUserResourcesListEntryBuild($user, $info, pmssReadSystemdProperties('user-'.$info['uid'].'.slice', $sliceKeys), $store->get($user));
         if ($outputJsonl) {
-            echo json_encode($resourceData)."\n";
+            if (pmssJsonEmitPayload($resourceData, 'Failed to encode user resources JSON line.') !== 0) return 1;
         } elseif ($outputJson) {
             $allData[] = $resourceData;
         } else {

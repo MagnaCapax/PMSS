@@ -212,5 +212,5 @@ function pmssChangePwEmitJsonl(string $username, string $password, ?int $passwdR
         'ts'                  => gmdate('Y-m-d\TH:i:s\Z'),
     ];
 
-    echo json_encode($payload, JSON_UNESCAPED_SLASHES)."\n";
+    pmssJsonEmitPayload($payload, 'Failed to encode changePw JSONL payload.', JSON_UNESCAPED_SLASHES);
 }

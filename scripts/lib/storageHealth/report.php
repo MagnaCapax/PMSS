@@ -72,7 +72,7 @@ function pmssStorageHealthReportSyncUserNotice(string $noticePath, ?array $perfS
         @unlink($noticePath);
         return;
     }
-    $json = $noticePayload === null ? '' : json_encode($noticePayload, JSON_UNESCAPED_SLASHES);
+    $json = $noticePayload === null ? '' : pmssJsonEncodeSafe($noticePayload, JSON_UNESCAPED_SLASHES);
     $noticeDir = dirname($noticePath);
     if (is_string($json) && $json !== '' && ($noticeDir === '' || pmssEnsureSafeDir($noticeDir, 0755))) {
         pmssAtomicWriteFile($noticePath, $json.PHP_EOL, 0644);
@@ -112,7 +112,7 @@ function pmssStorageHealthReportMain(array $argv): int
     }
     if (pmssCliOptionPresent($parsed, 'raw')) {
         foreach (array_merge($disks, $raid) as $entry) {
-            echo json_encode($entry, JSON_UNESCAPED_SLASHES).PHP_EOL;
+            if (pmssJsonEmitPayload($entry, 'Failed to encode storage health JSON line.', JSON_UNESCAPED_SLASHES) !== 0) return 1;
         }
         return 0;
     }

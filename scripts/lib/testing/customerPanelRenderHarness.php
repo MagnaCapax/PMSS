@@ -10,6 +10,7 @@
 
 require_once __DIR__.'/customerPanelRenderEnvironment.php';
 require_once __DIR__.'/customerPanelRenderProcess.php';
+require_once dirname(__DIR__).'/log.php';
 
 /** Execute the customer panel render harness and emit JSON for CI. */
 function pmssCustomerPanelRenderMain(): int
@@ -35,7 +36,7 @@ function pmssCustomerPanelRenderMain(): int
     if (!$setupOk['ok']) {
         $result['errors'][] = $setupOk['error'];
         fwrite(STDERR, "[customer-panel-render-harness] FAIL - ".$setupOk['error']."\n");
-        echo json_encode($result, JSON_PRETTY_PRINT)."\n";
+        pmssJsonEmitPayload($result, 'Failed to encode customer panel render result.', JSON_PRETTY_PRINT);
         return 1;
     }
 
@@ -65,6 +66,5 @@ function pmssCustomerPanelRenderMain(): int
             fwrite(STDERR, "  - ".$error."\n");
         }
     }
-    echo json_encode($result, JSON_PRETTY_PRINT)."\n";
-    return $result['ok'] ? 0 : 1;
+    return pmssJsonEmitPayload($result, 'Failed to encode customer panel render result.', JSON_PRETTY_PRINT) === 0 && $result['ok'] ? 0 : 1;
 }
