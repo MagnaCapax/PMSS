@@ -74,4 +74,60 @@ class SystemStatsCollectTest extends TestCase
 
         $this->assertTrue($elapsed < 0.9, 'Expected PMSS_TEST_MODE sampling window to stay short, got '.$elapsed.'s');
     }
+
+    public function testTopMemoryRowsRenderValidatedCompactValues(): void
+    {
+        $this->assertEquals(
+            'mysqld:2.0G,php-fpm:1.5M,cron:512K',
+            \pmssSystemStatsTopMemoryFromPsRows([
+                'mysqld 2097152',
+                'php-fpm 1536',
+                'cron 512',
+            ])
+        );
+    }
+
+    public function testTopMemoryRowsSkipMalformedBoundaryInput(): void
+    {
+        $this->assertEquals(
+            'nginx:2.0M',
+            \pmssSystemStatsTopMemoryFromPsRows([
+                '',
+                'php-fpm not-a-number',
+                'bad:name 1024',
+                'bad,name 1024',
+                "bad\tname 1024",
+                'nginx 2048',
+            ])
+        );
+    }
+
+    public function testTopMemoryRowsReturnNaWhenNoValidRowsRemain(): void
+    {
+        $this->assertEquals('na', \pmssSystemStatsTopMemoryFromPsRows([
+            'only-command',
+            'bad:name 1024',
+            'php-fpm -1',
+        ]));
+    }
+
+    public function testTopMemoryProcessesReturnNaWhenCommandFails(): void
+    {
+        $summary = \pmssSystemStatsTopMemoryProcesses(static function (array &$output, int &$rc): void {
+            $output = ['php-fpm 2048'];
+            $rc = 1;
+        });
+
+        $this->assertEquals('na', $summary);
+    }
+
+    public function testTopMemoryProcessesUseRunnerOutputWhenCommandPasses(): void
+    {
+        $summary = \pmssSystemStatsTopMemoryProcesses(static function (array &$output, int &$rc): void {
+            $output = ['php-fpm 2048'];
+            $rc = 0;
+        });
+
+        $this->assertEquals('php-fpm:2.0M', $summary);
+    }
 }

@@ -8,6 +8,64 @@
 
 require_once __DIR__.'/runtime.php';
 
+/** Convert KiB counters to the compact legacy units used by stats logs. */
+function pmssSystemStatsKbToHuman(int $kb): string
+{
+    if ($kb >= 1048576) {
+        return number_format($kb / 1048576, 1, '.', '').'G';
+    }
+    if ($kb >= 1024) {
+        return number_format($kb / 1024, 1, '.', '').'M';
+    }
+    return $kb.'K';
+}
+
+/**
+ * Render validated `ps` top-memory rows for the stats snapshot.
+ *
+ * @param array<int, string> $rows
+ */
+function pmssSystemStatsTopMemoryFromPsRows(array $rows): string
+{
+    $items = [];
+    foreach ($rows as $line) {
+        $parts = preg_split('/\s+/', trim((string) $line));
+        if (!is_array($parts) || count($parts) < 2) {
+            continue;
+        }
+
+        $command = (string) $parts[0];
+        $rssKiB = (string) $parts[1];
+        if ($command === '' || preg_match('/[\s,:[:cntrl:]]/', $command) === 1 || !ctype_digit($rssKiB)) {
+            continue;
+        }
+
+        $items[] = $command.':'.pmssSystemStatsKbToHuman((int) $rssKiB);
+    }
+
+    return empty($items) ? 'na' : implode(',', $items);
+}
+
+/**
+ * Collect the bounded top-memory process summary while checking command rc.
+ */
+function pmssSystemStatsTopMemoryProcesses(?callable $runner = null): string
+{
+    $runner = $runner ?? static function (array &$output, int &$rc): void {
+        exec('/bin/bash -o pipefail -c '.escapeshellarg('ps -eo comm=,rss= --sort=-rss | head -n 3'), $output, $rc);
+    };
+
+    $output = [];
+    $rc = 1;
+    try {
+        $runner($output, $rc);
+    } catch (Throwable $exception) {
+        return 'na';
+    }
+
+    return $rc === 0 ? pmssSystemStatsTopMemoryFromPsRows($output) : 'na';
+}
+
 /**
  * Collect a single snapshot of system metrics for logging.
  *
@@ -43,15 +101,6 @@ function pmssSystemStatsCollect(): array
             $stats[$name] = (int) ($parts[12] ?? 0);
         }
         return $stats;
-    };
-    $kbToHuman = static function (int $kb): string {
-        if ($kb >= 1048576) {
-            return number_format($kb / 1048576, 1, '.', '').'G';
-        }
-        if ($kb >= 1024) {
-            return number_format($kb / 1024, 1, '.', '').'M';
-        }
-        return $kb.'K';
     };
     $readPsi = static function (string $path): string {
         // /proc/pressure/io and /proc/pressure/memory expose:
@@ -148,28 +197,17 @@ function pmssSystemStatsCollect(): array
     $hasIoping = pmssCommandPath('ioping') !== '';
     $iopingRoot = $hasIoping ? $iopingMs('/') : 'na';
     $iopingHome = $hasIoping ? $iopingMs('/home') : 'na';
-    $topMem = 'na';
-    if (($out = trim((string)@shell_exec('ps -eo comm=,rss= --sort=-rss | head -n 3'))) !== '') {
-        $items = [];
-        foreach (preg_split('/\n+/', $out) as $line) {
-            $parts = preg_split('/\s+/', trim($line));
-            if (count($parts) < 2) {
-                continue;
-            }
-            $items[] = $parts[0].':'.$kbToHuman((int) $parts[1]);
-        }
-        $topMem = empty($items) ? 'na' : implode(',', $items);
-    }
+    $topMem = pmssSystemStatsTopMemoryProcesses();
 
     return [
         'load'       => implode(',', $load),
         'cpuIowait'   => $cpuIowait,
-        'memTotal'    => $kbToHuman($meminfo['MemTotal'] ?? 0),
-        'memFree'     => $kbToHuman($meminfo['MemFree'] ?? 0),
-        'memCache'    => $kbToHuman($meminfo['Cached'] ?? 0),
-        'memBuffers'  => $kbToHuman($meminfo['Buffers'] ?? 0),
-        'swapTotal'   => $kbToHuman($meminfo['SwapTotal'] ?? 0),
-        'swapFree'    => $kbToHuman($meminfo['SwapFree'] ?? 0),
+        'memTotal'    => pmssSystemStatsKbToHuman($meminfo['MemTotal'] ?? 0),
+        'memFree'     => pmssSystemStatsKbToHuman($meminfo['MemFree'] ?? 0),
+        'memCache'    => pmssSystemStatsKbToHuman($meminfo['Cached'] ?? 0),
+        'memBuffers'  => pmssSystemStatsKbToHuman($meminfo['Buffers'] ?? 0),
+        'swapTotal'   => pmssSystemStatsKbToHuman($meminfo['SwapTotal'] ?? 0),
+        'swapFree'    => pmssSystemStatsKbToHuman($meminfo['SwapFree'] ?? 0),
         'diskBusy'    => $diskBusy,
         'iopingRoot'  => $iopingRoot,
         'iopingHome'  => $iopingHome,
