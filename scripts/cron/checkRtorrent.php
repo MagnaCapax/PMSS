@@ -97,16 +97,6 @@ function pmssCheckRtorrentCleanupStaleSocket(string $user, string $socketPath, s
     }
 }
 
-// Start rTorrent and refresh the restart markers used by recovery paths.
-function pmssCheckRtorrentStart(string $user, string $startMarkerState, bool $debug): void
-{
-    $rc = 0;
-    @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
-    pmssCheckRtorrentLog("startRtorrent {$user} completed (rc={$rc})", true, $debug);
-    rtorrentProcessWriteStateFile('/tmp/.pmss-rtorrent-restart-'.$user, (string) time());
-    rtorrentProcessWriteStateFile($startMarkerState, (string) time());
-}
-
 // Delay starts shortly after reboot so many users do not hit storage at once.
 function pmssCheckRtorrentStaggerAfterRecentReboot(string $user, string $messagePrefix, bool $debug): bool
 {
@@ -339,7 +329,7 @@ foreach ($users as $user) {
             pmssCheckRtorrentLogBoth($user, 'rTorrent missing; starting', $debug);
         }
 
-        pmssCheckRtorrentStart($user, $startMarkerState, $debug);
+        rtorrentProcessStart($user, $logCallback, $startMarkerState);
         continue;
     }
 
@@ -424,7 +414,7 @@ foreach ($users as $user) {
             pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $unresponsiveState, $debug);
 
             pmssCheckRtorrentLogBoth($user, 'rTorrent missing after SCGI probe; starting', $debug);
-            pmssCheckRtorrentStart($user, $startMarkerState, $debug);
+            rtorrentProcessStart($user, $logCallback, $startMarkerState);
             continue;
         }
 

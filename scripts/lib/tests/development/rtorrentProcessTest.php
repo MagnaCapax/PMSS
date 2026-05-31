@@ -380,6 +380,25 @@ class RtorrentProcessTest extends TestCase
         $this->assertEquals(9, SIGKILL);
     }
 
+    public function testProcessStartOwnsLaunchCommandAndRestartMarkers(): void
+    {
+        $processSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/process.php');
+        $watchdogSource = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
+
+        $this->assertSame(1, substr_count($processSource, "@passthru('/scripts/startRtorrent "));
+        $this->assertStringContainsAllStrings([
+            'function rtorrentProcessStart(',
+            "'/tmp/.pmss-rtorrent-restart-'.\$user",
+            'rtorrentProcessWriteStateFile($startMarkerState, $now)',
+            '$rc = rtorrentProcessStart($user, $logFn);',
+        ], $processSource);
+        $this->assertStringContainsAllStrings([
+            'rtorrentProcessStart($user, $logCallback, $startMarkerState)',
+            'rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);',
+        ], $watchdogSource);
+        $this->pmssAssertStringNotContainsString("@passthru('/scripts/startRtorrent ", $watchdogSource);
+    }
+
     public function testResetSessionDirectoryQuarantinesAndRecreatesDirectory(): void
     {
         $home = $this->tempDir.'/alice';

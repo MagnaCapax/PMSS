@@ -586,6 +586,28 @@ function rtorrentProcessStaggerDelay(string $user, int $maxDelay = 300): int
 }
 
 /**
+ * Start rTorrent for a user and refresh restart tracking markers.
+ *
+ * @param string      $user             System username.
+ * @param callable    $logFn            Logging callback: function(string $message, bool $force).
+ * @param string|null $startMarkerState Optional watchdog marker for a direct start attempt.
+ *
+ * @return int Exit code from startRtorrent.
+ */
+function rtorrentProcessStart(string $user, callable $logFn, ?string $startMarkerState = null): int
+{
+    $rc = 0;
+    @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
+    $logFn("startRtorrent {$user} completed (rc={$rc})", true);
+
+    $now = (string) time();
+    rtorrentProcessWriteStateFile('/tmp/.pmss-rtorrent-restart-'.$user, $now);
+    if ($startMarkerState !== null && $startMarkerState !== '') rtorrentProcessWriteStateFile($startMarkerState, $now);
+
+    return $rc;
+}
+
+/**
  * Restart rTorrent for a user with full diagnostic logging.
  *
  * Performs graceful shutdown (SIGTERM), waits, then force kills (SIGKILL),
@@ -625,13 +647,7 @@ function rtorrentProcessRestart(
     rtorrentProcessKillPids(array_merge($rtorrentPids, $executorPids), SIGKILL);
     sleep(1);
 
-    // Start fresh.
-    $rc = 0;
-    @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
-    $logFn("startRtorrent {$user} completed (rc={$rc})", true);
-
-    // Record restart for backoff tracking.
-    rtorrentProcessWriteStateFile('/tmp/.pmss-rtorrent-restart-'.$user, (string) time());
+    $rc = rtorrentProcessStart($user, $logFn);
 
     // Capture after snapshot.
     $after = rtorrentProcessSnapshot($user);

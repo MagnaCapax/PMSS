@@ -17,6 +17,6 @@ class checkRtorrentUsernameValidationContractTest extends TestCase
     {
         $path = 'scripts/cron/checkRtorrent.php';
         $this->pmssAssertRepoFileNotContainsStrings($path, ["@exec('/scripts/listUsers.php'", '/^[a-z][a-z0-9]{0,7}$/']);
-        $this->pmssAssertRepoFileContainsString($path, 'function pmssCheckRtorrentStart(');
+        $this->pmssAssertRepoFileContainsString($path, 'rtorrentProcessStart($user, $logCallback, $startMarkerState)');
     }
 }

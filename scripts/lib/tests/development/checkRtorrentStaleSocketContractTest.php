@@ -11,7 +11,7 @@ class checkRtorrentStaleSocketContractTest extends TestCase
         $this->pmssAssertRepoFileContainsString($path, 'function pmssCheckRtorrentCleanupStaleSocket(');
         $this->pmssAssertRepoFileMatches(
             $path,
-            '/if \(!\$executorPresent && empty\(\$rtorrentPids\)\) \{.*?\$socketPath = rtorrentScgiSocketPath\(\$user\);.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$unresponsiveState, \$debug\);.*?pmssCheckRtorrentStart\(\$user, \$startMarkerState, \$debug\);/s',
+            '/if \(!\$executorPresent && empty\(\$rtorrentPids\)\) \{.*?\$socketPath = rtorrentScgiSocketPath\(\$user\);.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$unresponsiveState, \$debug\);.*?rtorrentProcessStart\(\$user, \$logCallback, \$startMarkerState\);/s',
             'Missing-process recovery should use the shared stale-socket cleanup before starting rTorrent'
         );
     }
@@ -29,7 +29,7 @@ class checkRtorrentStaleSocketContractTest extends TestCase
     {
         $this->pmssAssertRepoFileMatches(
             'scripts/cron/checkRtorrent.php',
-            '/\$responsive = rtorrentScgiCall\(\$socketPath, \'system\.api_version\', \[\], 5\) !== false;.*?\$rtorrentPids = pmssUserWatchdogProcessPids\(\$user, \'\^rtorrent\'\);.*?if \(empty\(\$rtorrentPids\)\) \{.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$unresponsiveState, \$debug\);.*?rTorrent missing after SCGI probe; starting.*?pmssCheckRtorrentStart\(\$user, \$startMarkerState, \$debug\);/s',
+            '/\$responsive = rtorrentScgiCall\(\$socketPath, \'system\.api_version\', \[\], 5\) !== false;.*?\$rtorrentPids = pmssUserWatchdogProcessPids\(\$user, \'\^rtorrent\'\);.*?if \(empty\(\$rtorrentPids\)\) \{.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$unresponsiveState, \$debug\);.*?rTorrent missing after SCGI probe; starting.*?rtorrentProcessStart\(\$user, \$logCallback, \$startMarkerState\);/s',
             'SCGI recovery should reuse the shared cleanup and restart helpers after re-checking process liveness'
         );
     }
