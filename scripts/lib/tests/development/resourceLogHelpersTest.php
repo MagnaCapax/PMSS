@@ -8,14 +8,6 @@ require_once dirname(__DIR__, 2).'/userLifecycle.php';
 
 class ResourceLogHelpersTest extends TestCase
 {
-    private function withFakeSystemctl(array $outputLines, callable $callback): void
-    {
-        $this->pmssWithPathPrefix(
-            $this->pmssMakeLineOutputStub('systemctl', $outputLines, 'pmss-resource-systemctl-'),
-            $callback
-        );
-    }
-
     private function makeRoot(): string
     {
         return $this->pmssMakeTempDir('pmss-resource-', 0700);
@@ -43,18 +35,21 @@ class ResourceLogHelpersTest extends TestCase
 
     private function assertReadCounters(array $outputLines, ?array $expected): void
     {
-        $this->withFakeSystemctl($outputLines, function () use ($expected): void {
-            $counters = \pmssResourceLogReadCounters(1000);
-            if ($expected === null) {
-                $this->assertSame(null, $counters);
-                return;
-            }
+        $this->pmssWithPathPrefix(
+            $this->pmssMakeLineOutputStub('systemctl', $outputLines, 'pmss-resource-systemctl-'),
+            function () use ($expected): void {
+                $counters = \pmssResourceLogReadCounters(1000);
+                if ($expected === null) {
+                    $this->assertSame(null, $counters);
+                    return;
+                }
 
-            $this->assertTrue(is_array($counters));
-            foreach ($expected as $field => $value) {
-                $this->assertEquals($value, $counters[$field]);
+                $this->assertTrue(is_array($counters));
+                foreach ($expected as $field => $value) {
+                    $this->assertEquals($value, $counters[$field]);
+                }
             }
-        });
+        );
     }
 
     private function makeStatePath($previousPayload = null): string

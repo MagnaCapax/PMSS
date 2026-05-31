@@ -79,14 +79,9 @@ class UserMaintenanceSkipReasonReportingTest extends TestCase
             $window,
             'mismatch handler must be SOFT_FAIL (GH#592 implements #302 prominent-warning option)'
         );
-        $this->assertStringNotContainsStringInWindow($window, 'PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED');
-    }
-
-    private function assertStringNotContainsStringInWindow(string $haystack, string $needle): void
-    {
         $this->assertTrue(
-            strpos($haystack, $needle) === false,
-            'mismatch handler must not use '.$needle.' (GH#592: re-blocks I/O-saturated hosts)'
+            strpos($window, 'PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED') === false,
+            'mismatch handler must not use PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED (GH#592: re-blocks I/O-saturated hosts)'
         );
     }
 }

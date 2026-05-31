@@ -11,11 +11,6 @@ class JournaldLimitsTest extends TestCase
         return $value * 1024 * 1024 * 1024;
     }
 
-    private function mib(int $value): int
-    {
-        return $value * 1024 * 1024;
-    }
-
     public function testSmallRootUsesTwentyPercent(): void
     {
         $rootBytes = $this->gib(20);
@@ -62,7 +57,7 @@ class JournaldLimitsTest extends TestCase
     {
         $rootBytes = $this->gib(8);
         $policy = \pmssJournaldLimitsForRootBytes($rootBytes);
-        $this->assertEquals($this->mib(256), $policy['runtime_max_use_bytes']);
+        $this->assertEquals(256 * 1024 * 1024, $policy['runtime_max_use_bytes']);
     }
 
     public function testTemplateRenderAndWrite(): void

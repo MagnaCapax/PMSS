@@ -6,11 +6,6 @@ require_once dirname(__DIR__, 2).'/user/userConfigCli.php';
 
 class userConfigCliCharacterizationTest extends TestCase
 {
-    private function userConfigCommandArgs(array $positionals = []): array
-    {
-        return array_merge(['userConfig.php', 'alice', '512', '100'], $positionals);
-    }
-
     /** @return array{0:array{options:array,arguments:array},1:array<int,string>} */
     private function parsedInvocation(array $arguments, array $options = []): array
     {
@@ -29,7 +24,7 @@ class userConfigCliCharacterizationTest extends TestCase
 
         $parsed = \pmssUserConfigCliResolvedResources(
             ['options' => []],
-            $this->userConfigCommandArgs($positionals),
+            array_merge(['userConfig.php', 'alice', '512', '100'], $positionals),
             'addUserOption',
             'userConfigIndex'
         );

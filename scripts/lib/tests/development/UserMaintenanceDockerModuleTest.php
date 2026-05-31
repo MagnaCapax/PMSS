@@ -8,7 +8,13 @@ class UserMaintenanceDockerModuleTest extends TestCase
 {
     public function testDockerUnitExecBinaryParsingStaysStable(): void
     {
-        foreach ($this->dockerUnitExecBinaryCases() as $case) {
+        foreach ([
+            ["[Service]\nExecStart=/usr/bin/dockerd-rootless.sh --experimental\n", '/usr/bin/dockerd-rootless.sh', 'plain ExecStart binary'],
+            [";ignored\n# ExecStart=/bad\nExecStart=-/usr/local/bin/dockerd-rootless.sh --flag\n", '/usr/local/bin/dockerd-rootless.sh', 'systemd dash prefix'],
+            ["[Service]\nEnvironment=FOO=bar\n", null, 'missing ExecStart'],
+            ["[Service]\nExecStart=\n", null, 'empty ExecStart'],
+            ["[Service]\nExecStart=-\n", null, 'dash-only ExecStart'],
+        ] as $case) {
             $unit = $this->pmssMakeTempPath('pmss-docker-unit-');
             file_put_contents($unit, $case[0]);
             $this->assertSame($case[1], \pmssUserDockerUnitExecBinary($unit), $case[2]);
@@ -24,16 +30,5 @@ class UserMaintenanceDockerModuleTest extends TestCase
         $this->pmssAssertRepoFileContainsString('scripts/lib/update/userMaintenance.php', "require_once __DIR__.'/users/docker.php';");
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/docker.php', $dockerFunctions);
         $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/update/userMaintenance.php', $dockerFunctions);
-    }
-
-    private function dockerUnitExecBinaryCases(): array
-    {
-        return [
-            ["[Service]\nExecStart=/usr/bin/dockerd-rootless.sh --experimental\n", '/usr/bin/dockerd-rootless.sh', 'plain ExecStart binary'],
-            [";ignored\n# ExecStart=/bad\nExecStart=-/usr/local/bin/dockerd-rootless.sh --flag\n", '/usr/local/bin/dockerd-rootless.sh', 'systemd dash prefix'],
-            ["[Service]\nEnvironment=FOO=bar\n", null, 'missing ExecStart'],
-            ["[Service]\nExecStart=\n", null, 'empty ExecStart'],
-            ["[Service]\nExecStart=-\n", null, 'dash-only ExecStart'],
-        ];
     }
 }

@@ -10,7 +10,11 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
      */
     public function testPmssRtorrentConfigsAvoidRemovedSchedulerAndExecuteAliases(): void
     {
-        foreach ($this->rtorrentConfigFiles() as $relativePath) {
+        foreach ([
+            'etc/seedbox/config/template.rtorrent.rc',
+            'etc/skel/.rtorrent.rc',
+            'etc/skel/.rtorrent.rc.custom',
+        ] as $relativePath) {
             $content = $this->pmssReadRepoFile($relativePath);
             $forbiddenPatterns = [
                 '/^\s*schedule\s*=/m' => 'schedule',
@@ -108,15 +112,4 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
         }
     }
 
-    /**
-     * Limit the audit to PMSS-owned config files, excluding the frozen vendor tree.
-     */
-    private function rtorrentConfigFiles(): array
-    {
-        return [
-            'etc/seedbox/config/template.rtorrent.rc',
-            'etc/skel/.rtorrent.rc',
-            'etc/skel/.rtorrent.rc.custom',
-        ];
-    }
 }

@@ -63,7 +63,7 @@ class KernelHardeningDirtyFragTest extends TestCase
         file_put_contents($dir.'/runtime/dirtyfrag-modules-loaded', "esp4\t1\n");
 
         $this->pmssWithEnv($this->dirtyFragEnv($dir, "Module                  Size  Used by\n"), function (): void {
-            \pmssEnsureDirtyFragBlacklist($this->noopLogger(), $this->noopKernelRunner());
+            \pmssEnsureDirtyFragBlacklist(function (): void {}, $this->noopKernelRunner());
         });
 
         $this->assertTrue(!is_file($dir.'/runtime/dirtyfrag-modules-loaded'), 'expected stale runtime flag to be removed');
@@ -122,6 +122,4 @@ class KernelHardeningDirtyFragTest extends TestCase
     private function captureKernelCalls(array &$calls): callable { return function (string $description, string $command) use (&$calls): int { $calls[] = [$description, $command]; return 0; }; }
 
     private function noopKernelRunner(): callable { return function (): int { return 0; }; }
-
-    private function noopLogger(): callable { return function (): void {}; }
 }

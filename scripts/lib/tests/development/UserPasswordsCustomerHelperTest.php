@@ -15,16 +15,6 @@ final class UserPasswordsCustomerHelperTest extends TestCase
         return $this->pmssRunInlinePhpJson('require '.var_export($this->helperPath(), true).';'.$script, $environment);
     }
 
-    private function writeDelugeWebConf(string $path, string $salt, string $password): void
-    {
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents(
-            $path,
-            json_encode(array('file' => 2), JSON_UNESCAPED_SLASHES)
-            .json_encode(array('pwd_salt' => $salt, 'pwd_sha1' => sha1($salt.$password), 'sessions' => (object) array()), JSON_UNESCAPED_SLASHES)
-        );
-    }
-
     public function testReadLocalclientPasswordReturnsEmptyWhenMissing(): void
     {
         $path = $this->pmssMakeTempPath('pmss-missing-auth-');
@@ -80,9 +70,14 @@ final class UserPasswordsCustomerHelperTest extends TestCase
         $homeRoot = $this->pmssTrackHomeRoot($this->pmssMakeTempDir('pmss-deluge-home-'));
         $authPath = $homeRoot.'/alice/.config/deluge/auth';
         $webConfPath = $homeRoot.'/alice/.config/deluge/web.conf';
+        $salt = '2222222222222222222222222222222222222222';
         @mkdir(dirname($authPath), 0755, true);
         file_put_contents($authPath, "localclient:old-secret:10\n");
-        $this->writeDelugeWebConf($webConfPath, '2222222222222222222222222222222222222222', 'old-secret');
+        file_put_contents(
+            $webConfPath,
+            json_encode(array('file' => 2), JSON_UNESCAPED_SLASHES)
+            .json_encode(array('pwd_salt' => $salt, 'pwd_sha1' => sha1($salt.'old-secret'), 'sessions' => (object) array()), JSON_UNESCAPED_SLASHES)
+        );
 
         $result = $this->pmssRunInlinePhpJson(
             'require '.var_export($this->helperPath(), true).';'

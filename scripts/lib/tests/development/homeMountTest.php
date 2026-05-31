@@ -51,7 +51,10 @@ MOUNTS
     public function testRequireHomeMountedSkipsWhenEnvEnabled(): void
     {
         foreach (['1', 'true', 'TRUE'] as $skip) {
-            $this->stageMissingMounts($skip);
+            $this->pmssTrackEnvOverrides([
+                'PMSS_SKIP_HOME_MOUNT_CHECK' => $skip,
+                'PMSS_PROC_MOUNTS_PATH' => '/nonexistent/path/to/mounts',
+            ]);
 
             pmssRequireHomeMounted('test');
         }
@@ -90,11 +93,4 @@ MOUNTS
         return $path;
     }
 
-    private function stageMissingMounts(string $skip): void
-    {
-        $this->pmssTrackEnvOverrides([
-            'PMSS_SKIP_HOME_MOUNT_CHECK' => $skip,
-            'PMSS_PROC_MOUNTS_PATH' => '/nonexistent/path/to/mounts',
-        ]);
-    }
 }

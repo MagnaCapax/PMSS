@@ -73,11 +73,6 @@ class WebdavSecurityTest extends TestCase
         $this->assertTrue(!empty($value), $msg !== '' ? $msg : 'Expected value to not be empty');
     }
 
-    private function assertIsString($value, string $msg = ''): void
-    {
-        $this->assertTrue(is_string($value), $msg !== '' ? $msg : 'Expected value to be string');
-    }
-
     // =========================================================================
     // SECTION 1: USERNAME VALIDATION
     // =========================================================================
@@ -822,7 +817,7 @@ LIGHTTPD;
 
         foreach ($unicodeUsers as $user) {
             $policy = @pmssWebdavWwwPolicyBlock($user);
-            $this->assertIsString($policy);
+            $this->assertTrue(is_string($policy), 'Expected invalid username policy to be string');
             $this->assertStringNotContainsString($user, $policy);
             $this->assertStringContainsString('invalid username', $policy);
         }
