@@ -19,7 +19,8 @@ function pmssStorageHealthDiskInventoryFromLsblk(string $lsblkOut): array
     foreach (preg_split('/\r?\n/', trim($lsblkOut)) as $line) {
         if ($line === '' || !is_array($parts = preg_split('/\s+/', trim($line))) || ($partCount = count($parts)) < 3) continue;
         $kname = (string) $parts[0];
-        if ($kname === '' || $kname === '.' || $kname === '..' || strpos($kname, '/') !== false || strpos($kname, '\\') !== false || strpos($kname, "\0") !== false) continue;
+        // KNAME comes from lsblk; reject shell/path syntax before composing /dev/<name>.
+        if ($kname === '' || $kname === '.' || $kname === '..' || preg_match('/^[A-Za-z0-9._!+-]+$/D', $kname) !== 1) continue;
         if ($parts[1] !== 'disk' || strpos($kname, 'loop') === 0 || strpos($kname, 'ram') === 0) continue;
         $disks[] = ['path' => '/dev/'.$kname, 'kname' => $kname, 'rota' => (int) $parts[2], 'model' => implode(' ', array_slice($parts, 3, max(0, $partCount - 5))), 'serial' => (string) ($parts[$partCount - 2] ?? ''), 'size' => (string) ($parts[$partCount - 1] ?? '')];
     }

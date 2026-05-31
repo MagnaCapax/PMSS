@@ -31,6 +31,10 @@ final class StorageHealthFacadeCharacterizationTest extends TestCase
             ."sdb/evil disk 0 Bad Slash BAD 1T\n"
             ."sdc\\evil disk 0 Bad Backslash BAD 1T\n"
             .". disk 0 Bad Dot BAD 1T\n"
+            .'$(id) disk 0 Bad Shell BAD 1T'."\n"
+            ."semi;colon disk 0 Bad Semicolon BAD 1T\n"
+            ."pipe|name disk 0 Bad Pipe BAD 1T\n"
+            .'back`tick disk 0 Bad Backtick BAD 1T'."\n"
             ."dm-0 disk 0 MapperVol DMSER 1T\n"
             ."cciss!c0d0 disk 1 SmartArray HPSER 1T\n";
 
