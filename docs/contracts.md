@@ -405,7 +405,7 @@ These scripts are primarily imperative; treat them as idempotent installers guar
   - Ensures BTSync 1.4/2.2 binaries in `/usr/bin/`; symlinks `/usr/bin/btsync`→2.2; installs/updates Resilio Sync to pinned version.
 
 - servarr.php
-  - Runs the shared ARR updater for Lidarr, Prowlarr, Radarr, Readarr, and Sonarr using one canonical app list in `arr.php`; Sonarr legacy apt repo cleanup still runs before the Sonarr tarball installer.
+  - Provides the shared ARR updater for Lidarr, Prowlarr, Radarr, Readarr, and Sonarr using one canonical app list in `arr.php`; update-step2 excludes this entrypoint from the default app autoloader so system updates do not block on account-scoped media-stack maintenance.
 
 - deluge.php
   - Debian 10: installs dependencies via pip and builds Deluge 2.0.5 from source.

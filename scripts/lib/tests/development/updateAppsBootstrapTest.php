@@ -44,7 +44,12 @@ class UpdateAppsBootstrapTest extends TestCase
 
     public function testUpdateStep2SkipsHelperModulesInAppLoader(): void
     {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/update-step2.php', ["'arr.php'", "'pythonVenv.php'", "'remoteBinary.php'"], [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/update-step2.php', [
+            "'arr.php'",
+            "'pythonVenv.php'",
+            "'remoteBinary.php'",
+            "'servarr.php'",
+        ], [
             "'packages.php'" => 'retired package module should not remain in app loader skip list',
         ]);
 

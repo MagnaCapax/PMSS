@@ -36,7 +36,7 @@ Keep the canonical installer/update details under `docs/install.md` and
 - **scripts/lib/update/apps/** – Application installers (rtorrent, deluge, docker, etc.) called during phase 2. These modules perform one-time bootstrap tasks only; ongoing configuration and scheduling belong under `scripts/util` and `scripts/cron`.
 
 ## Package Strategy
-- Per-release bootstrap baselines live under `scripts/lib/update/dpkg/`; the installer only ensures core tools. Apps (Radarr, SabNZBd, etc.) are built via update-step2 modules.
+- Per-release bootstrap baselines live under `scripts/lib/update/dpkg/`; the installer only ensures core tools. System-level apps are built via update-step2 modules, while per-account media-stack apps stay in the skeleton/user maintenance tooling.
 - Release-specific dpkg snapshots: `scripts/lib/update/dpkg/selections-debian10/11/12.txt`. Apply via `pmssApplyDpkgSelections()` once per run (update-step2 picks the codename-resolved version or logs if unavailable).
 - #TODO #Debian13: Debian 13 (trixie) is experimental; add `scripts/lib/update/dpkg/selections-debian13.txt` (captured from a real host) before promoting beyond experimental.
 - `pmssApplyDpkgSelections()` is the sole package-state authority during update-step2 package phase; the retired per-app package queue has been removed.
