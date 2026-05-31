@@ -81,6 +81,11 @@ class CgroupUserConfigTest extends TestCase
         return ['rc' => $rc, 'out' => $out];
     }
 
+    private function writePolicy(array $policy): void
+    {
+        file_put_contents(sys_get_temp_dir().'/cgroup.policy.php', '<?php return '.var_export($policy, true).";\n");
+    }
+
     public function testUsage()
     {
         $res = $this->runMgr([]);
@@ -108,18 +113,7 @@ class CgroupUserConfigTest extends TestCase
 
     public function testMemoryDefaultCalculation()
     {
-        // 16GB RAM. Default High = 10% = 1638M. Max = 1.25x = 2047M.
-        // No apply, just check planned output.
-        $res = $this->runMgr(['testuser', '--defaults']); 
-        // Note: --defaults reads policy. If no policy, no defaults applied?
-        // Wait, computeSetProps calculates defaults if flags are present OR if logic requires it.
-        // Actually, computeSetProps only runs if $opt is not empty or if we pass something.
-        // The script says: "Compute final properties ... $props = !empty($opt) ? ... : []"
-        // So without flags or policy, no calculation happens.
-        // Let's force calculation by passing --memory-high without value? No, parser requires value.
-        // Let's create a policy file.
-        $policy = '<?php return ["memoryHighMiB"=>1000];';
-        file_put_contents(sys_get_temp_dir().'/cgroup.policy.php', $policy);
+        $this->writePolicy(['memoryHighMiB' => 1000]);
         
         $res = $this->runMgr(['testuser', '--defaults']);
         $this->assertStringContainsString('MemoryHigh=1000M', $res['out']);
@@ -392,8 +386,7 @@ class CgroupUserConfigTest extends TestCase
 
     public function testDefaultsApplyPolicyLatencyToHomeDevice()
     {
-        $policy = '<?php return ["ioLatencyMs"=>45];';
-        file_put_contents(sys_get_temp_dir().'/cgroup.policy.php', $policy);
+        $this->writePolicy(['ioLatencyMs' => 45]);
         $this->sys->findmnt['/home'] = '/dev/md0';
 
         $res = $this->runMgr(['testuser', '--defaults']);
@@ -526,18 +519,11 @@ class CgroupUserConfigTest extends TestCase
 
     public function testDefaultsApplyPolicyMountIoPairsWithoutExplicitIoInput()
     {
-        $policy = <<<'PHP'
-<?php return [
-    'mounts' => [
-        '/home' => [
-            'ioWeight' => 333,
-            'readBw' => '6M',
-            'readIops' => 123,
-        ],
-    ],
-];
-PHP;
-        file_put_contents(sys_get_temp_dir().'/cgroup.policy.php', $policy);
+        $this->writePolicy([
+            'mounts' => [
+                '/home' => ['ioWeight' => 333, 'readBw' => '6M', 'readIops' => 123],
+            ],
+        ]);
         $this->sys->findmnt['/home'] = '/dev/md0';
 
         $res = $this->runMgr(['testuser', '--defaults']);
@@ -549,18 +535,11 @@ PHP;
 
     public function testDefaultsSkipPolicyMountIoPairsWhenExplicitIoInputIsPresent(): void
     {
-        $policy = <<<'PHP'
-<?php return [
-    'mounts' => [
-        '/home' => [
-            'ioWeight' => 333,
-            'readBw' => '6M',
-            'readIops' => 123,
-        ],
-    ],
-];
-PHP;
-        file_put_contents(sys_get_temp_dir().'/cgroup.policy.php', $policy);
+        $this->writePolicy([
+            'mounts' => [
+                '/home' => ['ioWeight' => 333, 'readBw' => '6M', 'readIops' => 123],
+            ],
+        ]);
         $this->sys->findmnt['/home'] = '/dev/md0';
 
         $res = $this->runMgr(['testuser', '--defaults', '--io-read-bw=/dev/sda:5M']);
@@ -577,19 +556,13 @@ PHP;
 
     public function testIoProfilePolicyOverridesPreserveBuiltInFallbacks()
     {
-        $policy = <<<'PHP'
-<?php return [
-    'profiles' => [
-        'io' => [
-            'hdd' => [
-                'ioWeight' => 777,
-                'writeBw' => '12M',
+        $this->writePolicy([
+            'profiles' => [
+                'io' => [
+                    'hdd' => ['ioWeight' => 777, 'writeBw' => '12M'],
+                ],
             ],
-        ],
-    ],
-];
-PHP;
-        file_put_contents(sys_get_temp_dir().'/cgroup.policy.php', $policy);
+        ]);
         $this->sys->findmnt['/dev/sdb'] = '/dev/sdb';
 
         $res = $this->runMgr(['testuser', '--device=/dev/sdb', '--io-profile=hdd']);
@@ -603,8 +576,7 @@ PHP;
 
     public function testDefaultsApplication()
     {
-        $policy = '<?php return ["cpuWeight"=>500, "tasksMax"=>2048];';
-        file_put_contents(sys_get_temp_dir().'/cgroup.policy.php', $policy);
+        $this->writePolicy(['cpuWeight' => 500, 'tasksMax' => 2048]);
         $res = $this->runMgr(['testuser', '--defaults']);
         $this->assertStringContainsString('CPUWeight=500', $res['out']);
         $this->assertStringContainsString('TasksMax=2048', $res['out']);
@@ -612,8 +584,7 @@ PHP;
 
     public function testCliOverridesDefaults()
     {
-        $policy = '<?php return ["cpuWeight"=>500];';
-        file_put_contents(sys_get_temp_dir().'/cgroup.policy.php', $policy);
+        $this->writePolicy(['cpuWeight' => 500]);
         $res = $this->runMgr(['testuser', '--defaults', '--cpu-weight=100']);
         $this->assertStringContainsString('CPUWeight=100', $res['out']);
         $this->assertStringNotContainsString('CPUWeight=500', $res['out']);
@@ -621,14 +592,8 @@ PHP;
 
     public function testRespectExisting()
     {
-        $policy = '<?php return ["cpuWeight"=>500];';
-        file_put_contents(sys_get_temp_dir().'/cgroup.policy.php', $policy);
-        // Mock existing property
-        $this->sys->commands['systemctl show'] = "CPUWeight=123\n"; // simplified mock response
-        // Note: The mock execute logic needs to match the specific command string used in readCurrentProps
-        // Command: systemctl show 'user-1000.slice' -p CPUWeight -p ...
-        // The mock looks for substring match.
-        $this->sys->commands['systemctl show'] = "CPUWeight=123\n"; 
+        $this->writePolicy(['cpuWeight' => 500]);
+        $this->sys->commands['systemctl show'] = "CPUWeight=123\n";
         
         $res = $this->runMgr(['testuser', '--defaults', '--respect-existing']);
         // Should NOT apply 500 because 123 exists
