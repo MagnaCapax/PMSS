@@ -196,11 +196,7 @@ function pmssRepairDockerRootlessAfterDistUpgrade(string $toMajor): void
         $targets[] = $userTrim;
     }
 
-    if (empty($targets)) {
-        logMessage('[SKIP] dist-upgrade: no rootless Docker configs found; skipping rootless repair');
-    } else {
-        logMessage(sprintf('dist-upgrade: repairing rootless Docker for %d user(s)', count($targets)));
-    }
+    logMessage(empty($targets) ? '[SKIP] dist-upgrade: no rootless Docker configs found; skipping rootless repair' : sprintf('dist-upgrade: repairing rootless Docker for %d user(s)', count($targets)));
 
     foreach ($targets as $user) {
         pmssUserLog($user, 'dist-upgrade: rootless Docker repair start');
@@ -208,13 +204,10 @@ function pmssRepairDockerRootlessAfterDistUpgrade(string $toMajor): void
         pmssEnsureDockerDependencies($user);
     }
 
-    if (is_file('/usr/bin/slirp4netns') && is_file('/usr/local/bin/slirp4netns')) {
-        if (@unlink('/usr/local/bin/slirp4netns')) {
-            logMessage('dist-upgrade: removed stale /usr/local/bin/slirp4netns');
-        } else {
-            logMessage('[WARN] dist-upgrade: failed to remove /usr/local/bin/slirp4netns');
-        }
+    if (!is_file('/usr/bin/slirp4netns') || !is_file('/usr/local/bin/slirp4netns')) {
+        return;
     }
+    logMessage(@unlink('/usr/local/bin/slirp4netns') ? 'dist-upgrade: removed stale /usr/local/bin/slirp4netns' : '[WARN] dist-upgrade: failed to remove /usr/local/bin/slirp4netns');
 }
 
 /**
@@ -260,10 +253,10 @@ function pmssEnsureInitrdAfterDistUpgrade(): void
     }
 
     logMessage('dist-upgrade: initrd missing for kernel '.$latest.'; generating with update-initramfs');
-    if (!pmssDistUpgradeWaitForLocksOrLog('[WARN] dist-upgrade: dpkg lock did not clear; skipping initrd generation')) {
+    if (($rc = pmssDistUpgradeRunLockedCommand('update-initramfs -c -k '.escapeshellarg($latest), '[WARN] dist-upgrade: dpkg lock did not clear; skipping initrd generation')) === null) {
         return;
     }
-    if (runCommand('update-initramfs -c -k '.escapeshellarg($latest), true) !== 0) {
+    if ($rc !== 0) {
         logMessage('[WARN] dist-upgrade: update-initramfs failed for kernel '.$latest);
         return;
     }
@@ -367,17 +360,16 @@ function pmssRepairNginxAfterDistUpgrade(): void
     }
 
     logMessage('dist-upgrade: nginx ABI mismatch detected; purging and reinstalling nginx packages');
-    if (!pmssDistUpgradeWaitForLocksOrLog('[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall')) {
-        return;
-    }
-
     list($env, $hasTty) = pmssDistUpgradeAptEnv();
+    $lockMessage = '[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall';
 
-    runCommand("$env apt-get purge -y 'nginx*'", true, null, $hasTty);
-    if (!pmssDistUpgradeWaitForLocksOrLog('[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall')) {
+    if (pmssDistUpgradeRunLockedCommand("$env apt-get purge -y 'nginx*'", $lockMessage, $hasTty) === null) {
         return;
     }
-    if (runCommand(pmssDistUpgradeAptCommand($env, 'install', 'nginx nginx-full nginx-common'), true, null, $hasTty) !== 0) {
+    if (($installRc = pmssDistUpgradeRunLockedCommand(pmssDistUpgradeAptCommand($env, 'install', 'nginx nginx-full nginx-common'), $lockMessage, $hasTty)) === null) {
+        return;
+    }
+    if ($installRc !== 0) {
         logMessage('[WARN] dist-upgrade: nginx reinstall failed; leaving existing config in place');
         return;
     }
@@ -552,6 +544,12 @@ function pmssDistUpgradeWaitForLocksOrLog(string $message): bool
     return false;
 }
 
+/** Run one dist-upgrade command after the standard dpkg/apt lock wait. */
+function pmssDistUpgradeRunLockedCommand(string $command, string $lockMessage, bool $inheritTty = false): ?int
+{
+    return pmssDistUpgradeWaitForLocksOrLog($lockMessage) ? runCommand($command, true, null, $inheritTty) : null;
+}
+
 /**
  * Check if any dpkg/apt lock files are currently held.
  */
@@ -578,11 +576,9 @@ function pmssExecuteUpgrade(): bool
 {
     list($env, $hasTty) = pmssDistUpgradeAptEnv();
 
-    if (!pmssDistUpgradeWaitForLocksOrLog('[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt phase')) {
+    if (pmssDistUpgradeRunLockedCommand("$env apt-get update", '[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt phase', $hasTty) === null) {
         return false;
     }
-
-    runCommand("$env apt-get update", true, null, $hasTty);
 
     pmssRunUpgradeWithRecovery(
         pmssDistUpgradeAptCommand($env, 'upgrade'),
@@ -598,15 +594,14 @@ function pmssExecuteUpgrade(): bool
         $hasTty
     );
 
-    if (!pmssDistUpgradeWaitForLocksOrLog('[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt autoremove')) {
-        return false;
+    foreach ([
+        ["$env apt-get autoremove -y", '[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt autoremove'],
+        ["$env dpkg --configure -a", '[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg --configure -a'],
+    ] as $lockedStep) {
+        if (pmssDistUpgradeRunLockedCommand($lockedStep[0], $lockedStep[1], $hasTty) === null) {
+            return false;
+        }
     }
-    runCommand("$env apt-get autoremove -y", true, null, $hasTty);
-
-    if (!pmssDistUpgradeWaitForLocksOrLog('[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg --configure -a')) {
-        return false;
-    }
-    runCommand("$env dpkg --configure -a", true, null, $hasTty);
 
     return true;
 }
@@ -619,10 +614,7 @@ function pmssExecuteUpgrade(): bool
  */
 function pmssRunUpgradeWithRecovery(string $command, string $env, string $recoveryMessage, bool $inheritTty = false): void
 {
-    if (!pmssDistUpgradeWaitForLocksOrLog('[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt action')) {
-        return;
-    }
-    if (runCommand($command, true, null, $inheritTty) === 0) {
+    if (($rc = pmssDistUpgradeRunLockedCommand($command, '[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt action', $inheritTty)) === null || $rc === 0) {
         return;
     }
 
@@ -633,10 +625,9 @@ function pmssRunUpgradeWithRecovery(string $command, string $env, string $recove
         ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt update', "$env apt-get update"],
         ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt retry', $command],
     ] as $recoveryStep) {
-        if (!pmssDistUpgradeWaitForLocksOrLog($recoveryStep[0])) {
+        if (pmssDistUpgradeRunLockedCommand($recoveryStep[1], $recoveryStep[0], $inheritTty) === null) {
             return;
         }
-        runCommand($recoveryStep[1], true, null, $inheritTty);
     }
 }
 
@@ -674,17 +665,12 @@ function pmssEnsureLibcryptBeforeUpgrade(string $fromMajor, string $toMajor): vo
     }
 
     logMessage('dist-upgrade: ensuring libcrypt1 is installed before Debian 11 → 12 upgrade');
-    if (!pmssDistUpgradeWaitForLocksOrLog('[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 preinstall')) {
-        return;
-    }
-
     list($env, $hasTty) = pmssDistUpgradeAptEnv();
 
-    runCommand("$env apt-get update", true, null, $hasTty);
-    if (!pmssDistUpgradeWaitForLocksOrLog('[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 install')) {
+    if (pmssDistUpgradeRunLockedCommand("$env apt-get update", '[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 preinstall', $hasTty) === null) {
         return;
     }
-    if (runCommand(pmssDistUpgradeAptCommand($env, 'install', 'libcrypt1'), true, null, $hasTty) !== 0) {
+    if (($installRc = pmssDistUpgradeRunLockedCommand(pmssDistUpgradeAptCommand($env, 'install', 'libcrypt1'), '[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 install', $hasTty)) !== null && $installRc !== 0) {
         logMessage('[WARN] dist-upgrade: libcrypt1 preinstall failed; continuing');
     }
 }
