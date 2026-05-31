@@ -7,15 +7,13 @@ class IndexSkeletonFrameDataTest extends TestCase
 {
     public function testCustomFrameAccumulatorStartsAsArrayBeforeMerge(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/index.php');
-
-        $this->assertOrderedStrings(
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'etc/skel/www/index.php',
             [
                 '$frameData = array();',
                 "if (file_exists('../.customFrames')) {",
                 '$frames = array_merge($frames, $frameData);',
             ],
-            $source,
             'Missing index.php frame handling fragment: ',
             'index.php custom frame initialization order changed at: '
         );
@@ -23,46 +21,42 @@ class IndexSkeletonFrameDataTest extends TestCase
 
     public function testWikiFrameUsesNewWindowTargetInsteadOfIframe(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/index.php');
-
-        $this->assertOrderedStrings(
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'etc/skel/www/index.php',
             [
                 'function pmssFrameOpensInNewWindow(array $frame)',
                 "'wiki' => array(",
                 "'target'   => '_blank',",
             ],
-            $source,
             'Missing index.php new-window fragment: ',
             'index.php wiki target order changed at: '
         );
 
-        $this->assertStringContainsAllStrings(
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'etc/skel/www/index.php',
             [
                 'target="_blank" rel="noopener noreferrer"',
                 'if (pmssFrameOpensInNewWindow($thisFrame)) {',
                 "\$styleList[] = '#' . \$thisId;",
             ],
-            $source,
             'Missing external-tab handling fragment: '
         );
 
-        $this->pmssAssertStringNotContainsString(
+        $this->pmssAssertRepoFileNotContainsString(
+            'etc/skel/www/index.php',
             "<iframe id=\"wikiFrame\"",
-            $source,
             'Wiki should no longer be hard-wired into an iframe container.'
         );
     }
 
     public function testLocalFallbackFrameUsesQuotaAwareWelcomeBuilder(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/index.php');
-
-        $this->assertOrderedStrings(
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'etc/skel/www/index.php',
             [
                 'function pmssLocalFrameWelcomeUrlBuild($quotaPath = \'../.quota\')',
                 "'url'      => pmssLocalFrameWelcomeUrlBuild(),",
             ],
-            $source,
             'Missing local welcome quota fragment: ',
             'Local welcome URL builder must be defined before frame fallback use: '
         );
@@ -70,12 +64,11 @@ class IndexSkeletonFrameDataTest extends TestCase
 
     public function testIndexUsesBundledLocalFrameDefinitionsOnly(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/index.php');
-
-        $this->pmssAssertStringNotContainsString('gui'.'Frames.php', $source);
-        $this->pmssAssertStringNotContainsString('$frames'.'Code', $source);
-        $this->pmssAssertStringNotContainsString('eval'.'($frames'.'Code)', $source);
-        $this->assertStringContainsString('$useLocalFrames = true;', $source);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'etc/skel/www/index.php',
+            ['$useLocalFrames = true;'],
+            ['gui'.'Frames.php', '$frames'.'Code', 'eval'.'($frames'.'Code)']
+        );
     }
 
     public function testLocalFallbackWelcomeUrlCarriesSerializedQuotaSnapshot(): void
@@ -264,15 +257,13 @@ class IndexSkeletonFrameDataTest extends TestCase
 
     public function testUserSkeletonSyncIncludesIndexTemplate(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
-
-        $this->assertStringContainsString("'www/index.php',", $source);
-        $this->assertOrderedStrings(
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/filesystem.php', "'www/index.php',");
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/lib/update/users/filesystem.php',
             [
                 'pmssUserRefreshPanelIndexForFrameDataCompat($ctx);',
                 "'www/index.php',",
             ],
-            $source,
             'Missing panel index compatibility refresh wiring: ',
             'Panel index compatibility refresh should run before normal skeleton sync: '
         );
@@ -282,14 +273,14 @@ class IndexSkeletonFrameDataTest extends TestCase
     {
         $guard = 'function pmssFrameOpensInNewWindow(array $frame)';
 
-        $this->assertStringContainsString(
+        $this->pmssAssertRepoFileContainsString(
+            'etc/skel/www/index.php',
             $guard,
-            $this->pmssReadRepoFile('etc/skel/www/index.php'),
             'Skeleton helper signature changed: '
         );
-        $this->assertStringContainsString(
+        $this->pmssAssertRepoFileContainsString(
+            'scripts/lib/update/users/filesystem.php',
             $guard,
-            $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php'),
             'Panel index migration guard should track the current skeleton helper signature: '
         );
     }

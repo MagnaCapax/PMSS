@@ -68,11 +68,11 @@ final class UserPasswordsCustomerHelperTest extends TestCase
 
     public function testCustomerHelperKeepsRotationInsideCustomerTree(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/userPasswords.php');
-
-        $this->assertStringContainsString('function pmssDelugeServicePasswordRotate', $source);
-        $this->assertStringNotContainsString("require_once '/scripts", $source);
-        $this->assertStringNotContainsString('require_once "/scripts', $source);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'etc/skel/www/userPasswords.php',
+            ['function pmssDelugeServicePasswordRotate'],
+            ["require_once '/scripts", 'require_once "/scripts']
+        );
     }
 
     public function testRotateDelugeServicePasswordUpdatesAuthAndWebUiTogether(): void
@@ -102,9 +102,10 @@ final class UserPasswordsCustomerHelperTest extends TestCase
 
     public function testWelcomePageGatesRotateFormOnRotateHelper(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-
-        $this->assertStringContainsAllStrings(["'delugePasswordCanRotate' => \$delugeState['canRotate']", 'if ($delugePasswordCanRotate)', "\$canRotate = function_exists('pmssDelugeServicePasswordRotate')", 'pmssDelugeServicePasswordRotate((string) $username)'], $source);
-        $this->assertStringNotContainsString('if ($delugePasswordHelpersAvailable) {', $source);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'etc/skel/www/welcome.php',
+            ["'delugePasswordCanRotate' => \$delugeState['canRotate']", 'if ($delugePasswordCanRotate)', "\$canRotate = function_exists('pmssDelugeServicePasswordRotate')", 'pmssDelugeServicePasswordRotate((string) $username)'],
+            ['if ($delugePasswordHelpersAvailable) {']
+        );
     }
 }

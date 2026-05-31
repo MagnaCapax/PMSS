@@ -56,17 +56,18 @@ class CgroupBfqWeightApplyTest extends TestCase
 
     public function testCronValidatesConfigUsernameBeforeUserPaths(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/cron/cgroupBfqWeightApply.php');
-
-        $this->assertStringContainsAllStrings(["require_once __DIR__.'/../lib/user/identity.php';", 'if (!pmssValidateUsername($user)) {', 'pmssBfqUserBonusPercentRead($user)'], $source);
-        $this->assertOrderedStrings(
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/cron/cgroupBfqWeightApply.php',
+            ["require_once __DIR__.'/../lib/user/identity.php';", 'if (!pmssValidateUsername($user)) {', 'pmssBfqUserBonusPercentRead($user)']
+        );
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/cron/cgroupBfqWeightApply.php',
             [
                 "\$user = basename(\$cfgPath, '.json');",
                 'syslog(LOG_WARNING, "invalid username config "',
                 '$json = pmssJsonFileReadAssoc($cfgPath);',
                 'pmssBfqUserBonusPercentRead($user)',
             ],
-            $source,
             'missing BFQ username boundary guard: ',
             'BFQ username guard must run before user paths: '
         );
@@ -74,8 +75,9 @@ class CgroupBfqWeightApplyTest extends TestCase
 
     public function testCronReadsBonusMarkerAsTinyRegularFile(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/cron/cgroupBfqWeightApply.php');
-
-        $this->assertStringContainsAllStrings(['function pmssBfqUserBonusPercentRead(string $user): int', '$stat = @lstat($path);', "((\$stat['mode'] ?? 0) & 0170000) !== 0100000", "(int) (\$stat['size'] ?? 0) > 64", '@file_get_contents($path, false, null, 0, 64)'], $source);
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/cron/cgroupBfqWeightApply.php',
+            ['function pmssBfqUserBonusPercentRead(string $user): int', '$stat = @lstat($path);', "((\$stat['mode'] ?? 0) & 0170000) !== 0100000", "(int) (\$stat['size'] ?? 0) > 64", '@file_get_contents($path, false, null, 0, 64)']
+        );
     }
 }

@@ -7,10 +7,9 @@ class UpdateBootstrapDistUpgradeTest extends TestCase
 {
     public function testBootstrapRestoresCronAfterDistUpgrade(): void
     {
-        $data = $this->pmssReadRepoFile('scripts/update.php');
-
-        $this->assertTrue(
-            strpos($data, "restoreRootCronBestEffort('dist-upgrade')") !== false,
+        $this->pmssAssertRepoFileContainsString(
+            'scripts/update.php',
+            "restoreRootCronBestEffort('dist-upgrade')",
             'dist-upgrade flow should restore root cron (setupRootCron.php) before exiting'
         );
     }
@@ -29,8 +28,10 @@ class UpdateBootstrapDistUpgradeTest extends TestCase
             "restoreRootCronBestEffort('update-step2 handoff');",
             'if ($rc !== 0) {',
         ], $runUpdateStep2);
-        $this->assertStringContainsString("register_shutdown_function('pmssRootCronShutdownRestore', 'shutdown')", $data);
-        $this->assertStringContainsString("pcntl_signal(constant(\$signalName), 'pmssRootCronSignalHandler')", $data);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/update.php', [
+            "register_shutdown_function('pmssRootCronShutdownRestore', 'shutdown')",
+            "pcntl_signal(constant(\$signalName), 'pmssRootCronSignalHandler')",
+        ]);
     }
 
     public function testBootstrapDelaysRootCronDisableUntilStep2Handoff(): void
