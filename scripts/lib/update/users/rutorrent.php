@@ -58,8 +58,25 @@ function pmssUserEnsurePlugins(array $ctx): void
  */
 function pmssUserMaintainRutorrentPhpCompatibility(array $ctx): void
 {
+    $settingsIntervalGuardLegacy = <<<'PHP'
+		$tm = getdate();
+		$startAt = mktime($tm["hours"],
+PHP;
+    $settingsIntervalGuardPatched = <<<'PHP'
+		$tm = getdate();
+		$interval = (int)$interval;
+		if($interval<1)
+			$interval = 30;
+		$startAt = mktime($tm["hours"],
+PHP;
+
     // Keep these compatibility shims in one literal patch table.
     foreach ([
+        [
+            'path' => $ctx['home'].'/www/rutorrent/php/settings.php',
+            'legacy' => $settingsIntervalGuardLegacy,
+            'patched' => $settingsIntervalGuardPatched,
+        ],
         [
             'path' => $ctx['home'].'/www/rutorrent/php/settings.php',
             'legacy' => '((integer)($tm["minutes"]/$interval))*$interval+$interval,',

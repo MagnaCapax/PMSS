@@ -68,7 +68,7 @@ file_put_contents($home.'/.rtorrent.rc', "dummy\n");
 file_put_contents($home.'/.lighttpd/php.ini', "display_errors = On\n");
 file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', "[BitTorrent]\nSession\\DiskCacheSize=16384\nSession\\MaxConnections=9999\n\n[Preferences]\nWebUI\\CSRFProtection=true\nWebUI\\ClickjackingProtection=true\nWebUI\\HostHeaderValidation=true\nDownloads\\DiskWriteCacheSize=16384\nBittorrent\\MaxConnecs=9999\n");
 file_put_contents($home.'/www/filemanager.php', "before\n        ob_flush();\nafter\n");
-file_put_contents($home.'/www/rutorrent/php/settings.php', '((integer)($tm["minutes"]/$interval))*$interval+$interval,');
+file_put_contents($home.'/www/rutorrent/php/settings.php', "\t\t\$tm = getdate();\n\t\t\$startAt = mktime(\$tm[\"hours\"],\n\t\t\t((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\n");
 file_put_contents($home.'/www/rutorrent/plugins/rss/action.php', "before\nob_flush();\nafter\n");
 copy($repoRoot.'/etc/skel/www/deluge.php', $skelRoot.'/www/deluge.php');
 copy($repoRoot.'/etc/skel/www/qbittorrent.php', $skelRoot.'/www/qbittorrent.php');
@@ -124,6 +124,8 @@ PHP
         $this->assertStringNotContainsString("require_once '/scripts/lib/user/torrentPort.php';", $result['qbittorrent_frontend']);
         $this->assertStringNotContainsString('pmssQbittorrentPortEnsureCurrentUser', $result['qbittorrent_frontend']);
         $this->assertStringNotContainsString('.qbittorrentPort.py', $result['qbittorrent_frontend']);
+        $this->assertStringContainsString('$interval = (int)$interval;', $result['settings']);
+        $this->assertStringContainsString('if($interval<1)', $result['settings']);
         $this->assertStringContainsString('((integer)($tm["minutes"]/((', str_replace('(int)$interval', '((int)$interval)', $result['settings']));
         $this->assertStringContainsString('@ob_flush();', $result['rss']);
         $this->assertStringContainsString('return (int) $field;', $result['hddquota']);

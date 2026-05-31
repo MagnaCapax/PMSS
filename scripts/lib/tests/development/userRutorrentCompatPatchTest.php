@@ -19,6 +19,19 @@ class UserRutorrentCompatPatchTest extends TestCase
         }
     }
 
+    public function testCompatibilityAddsIntervalGuardToPreviouslyPatchedSettings(): void
+    {
+        $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', 'www/rutorrent/php');
+        $path = $this->pmssWriteRelativeFile($home, 'www/rutorrent/php/settings.php', "prefix\n\t\t\$tm = getdate();\n\t\t\$startAt = mktime(\$tm[\"hours\"],\n\t\t\t((integer)(\$tm[\"minutes\"]/((int)\$interval)))*((int)\$interval)+((int)\$interval),\nsuffix\n");
+
+        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+        $content = (string) file_get_contents($path);
+
+        $this->assertStringContainsString("\$interval = (int)\$interval;\n\t\tif(\$interval<1)\n\t\t\t\$interval = 30;", $content);
+        $this->assertEquals(1, substr_count($content, '$interval = (int)$interval;'));
+        $this->assertStringContainsString('((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),', $content);
+    }
+
     public function testCompatibilityLeavesPatchedTargetsUntouched(): void
     {
         foreach ($this->compatPatchCases() as $case) {
@@ -58,12 +71,13 @@ class UserRutorrentCompatPatchTest extends TestCase
     public function testCompatibilityPatchesAllKnownTargetsInSinglePass(): void
     {
         $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', 'www/rutorrent/php');
-        $settingsPath = $this->pmssWriteRelativeFile($home, 'www/rutorrent/php/settings.php', "((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\n");
+        $settingsPath = $this->pmssWriteRelativeFile($home, 'www/rutorrent/php/settings.php', "\t\t\$tm = getdate();\n\t\t\$startAt = mktime(\$tm[\"hours\"],\n\t\t\t((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\n");
         $rssPath = $this->pmssWriteRelativeFile($home, 'www/rutorrent/plugins/rss/action.php', "ob_flush();\n");
         $hddquotaPath = $this->pmssWriteRelativeFile($home, 'www/rutorrent/plugins/hddquota/action.php', "return \$field;\n");
 
         \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
 
+        $this->assertStringContainsString("\$interval = (int)\$interval;\n\t\tif(\$interval<1)\n\t\t\t\$interval = 30;", (string) file_get_contents($settingsPath));
         $this->assertStringContainsString('((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),', (string) file_get_contents($settingsPath));
         $this->assertStringContainsString('@ob_flush();', (string) file_get_contents($rssPath));
         $this->assertStringContainsString('return (int) $field;', (string) file_get_contents($hddquotaPath));
@@ -92,8 +106,8 @@ class UserRutorrentCompatPatchTest extends TestCase
             [
                 'dir' => 'www/rutorrent/php',
                 'path' => 'www/rutorrent/php/settings.php',
-                'legacy' => "prefix\n((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\nsuffix\n",
-                'patched' => "prefix\n((integer)(\$tm[\"minutes\"]/((int)\$interval)))*((int)\$interval)+((int)\$interval),\nsuffix\n",
+                'legacy' => "prefix\n\t\t\$tm = getdate();\n\t\t\$startAt = mktime(\$tm[\"hours\"],\n\t\t\t((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\nsuffix\n",
+                'patched' => "prefix\n\t\t\$tm = getdate();\n\t\t\$interval = (int)\$interval;\n\t\tif(\$interval<1)\n\t\t\t\$interval = 30;\n\t\t\$startAt = mktime(\$tm[\"hours\"],\n\t\t\t((integer)(\$tm[\"minutes\"]/((int)\$interval)))*((int)\$interval)+((int)\$interval),\nsuffix\n",
                 'expected' => '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),',
                 'unexpected' => '((integer)($tm["minutes"]/$interval))*$interval+$interval,',
             ],
