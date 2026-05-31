@@ -33,33 +33,26 @@ final class SystemStatusCharacterizationTest extends TestCase
     public function tearDown(): void
     {
         pmssResetOsReleaseCache();
-        $this->pmssRemoveTree(dirname($this->osReleasePath));
     }
 
     private function buildSystemStatusDependencies(): array
     {
         $sourcesPath = (string) getenv('PMSS_APT_SOURCES_PATH');
         $commandMap = [];
-        foreach ([
-            'rtorrent' => ['rtorrent -h 2>&1 | head -n 1', '/usr/bin/rtorrent', 'rtorrent 0.9.8'],
-            'nginx' => ['nginx -v 2>&1', '/usr/sbin/nginx', 'nginx version: nginx/1.22.0'],
-            'lighttpd' => ['lighttpd -v 2>&1 | head -n 1', '/usr/sbin/lighttpd', 'lighttpd/1.4.69'],
-            'php' => ['php -v 2>&1 | head -n 1', '/usr/bin/php', 'PHP 8.2.0'],
-            'proftpd' => ['proftpd -v 2>&1 | head -n 1', '/usr/sbin/proftpd', 'ProFTPD Version 1.3.7'],
-            'openvpn' => ['openvpn --version 2>&1 | head -n 1', '/usr/sbin/openvpn', 'OpenVPN 2.6.0'],
-            'tar' => ['tar --version 2>&1 | head -n 1', '/usr/bin/tar', 'tar (GNU tar) 1.34'],
-            'pigz' => ['pigz --version 2>&1 | head -n 1', '/usr/bin/pigz', 'pigz 2.8'],
-            'gpg' => ['gpg --version 2>&1 | head -n 1', '/usr/bin/gpg', 'gpg (GnuPG) 2.2.40'],
-            'curl' => ['curl --version 2>&1 | head -n 1', '/usr/bin/curl', 'curl 8.4.0'],
-            'wget' => ['wget --version 2>&1 | head -n 1', '/usr/bin/wget', 'GNU Wget 1.21.3'],
-            'rsync' => ['rsync --version 2>&1 | head -n 1', '/usr/bin/rsync', 'rsync  version 3.2.7'],
-            'python3' => ['python3 --version 2>&1 | head -n 1', '/usr/bin/python3', 'Python 3.11.2'],
-            'git' => ['git --version 2>&1 | head -n 1', '/usr/bin/git', 'git version 2.39.2'],
-            'flexget' => ['flexget --version 2>&1 | head -n 1', '/opt/flexget/bin/flexget', '3.8.51'],
-            'pyload' => ['pyload --version 2>&1 | head -n 1', '/opt/pyload/bin/pyload', 'pyLoad 0.5.0'],
-        ] as $binary => $spec) {
-            $commandMap["command -v '".$binary."'"] = $spec[1];
-            $commandMap[$spec[0]] = $spec[2];
+        $binaryPaths = [
+            'nginx' => '/usr/sbin/nginx', 'lighttpd' => '/usr/sbin/lighttpd', 'proftpd' => '/usr/sbin/proftpd',
+            'openvpn' => '/usr/sbin/openvpn', 'flexget' => '/opt/flexget/bin/flexget', 'pyload' => '/opt/pyload/bin/pyload',
+        ];
+        $binaryDetails = [
+            'rtorrent' => 'rtorrent 0.9.8', 'nginx' => 'nginx version: nginx/1.22.0', 'lighttpd' => 'lighttpd/1.4.69',
+            'php' => 'PHP 8.2.0', 'proftpd' => 'ProFTPD Version 1.3.7', 'openvpn' => 'OpenVPN 2.6.0',
+            'tar' => 'tar (GNU tar) 1.34', 'pigz' => 'pigz 2.8', 'gpg' => 'gpg (GnuPG) 2.2.40', 'curl' => 'curl 8.4.0',
+            'wget' => 'GNU Wget 1.21.3', 'rsync' => 'rsync  version 3.2.7', 'python3' => 'Python 3.11.2',
+            'git' => 'git version 2.39.2', 'flexget' => '3.8.51', 'pyload' => 'pyLoad 0.5.0',
+        ];
+        foreach (pmssStatusProbeSpecs($sourcesPath)['binaries'] as $binary => $spec) {
+            $commandMap["command -v '".$binary."'"] = $binaryPaths[$binary] ?? '/usr/bin/'.$binary;
+            $commandMap[(string) $spec['infoCommand']] = $binaryDetails[$binary] ?? '';
         }
 
         return [
@@ -96,13 +89,7 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     private function buildComponentStatusDependencies(): array
     {
-        $dependencies = $this->buildSystemStatusDependencies();
-        return [
-            'runCommand' => $dependencies['runCommand'],
-            'pathExists' => $dependencies['pathExists'],
-            'readFile' => $dependencies['readFile'],
-            'isExecutable' => $dependencies['isExecutable'],
-        ];
+        return array_intersect_key($this->buildSystemStatusDependencies(), array_flip(['runCommand', 'pathExists', 'readFile', 'isExecutable']));
     }
 
     private function runStatusEmitScript(string $script): array
@@ -118,28 +105,19 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testComponentChecksStayStableWithHermeticInputs(): void
     {
-        $checks = pmssComponentStatusChecks([
-            'runCommand' => static function (string $command): string {
-                $map = [
-                    "command -v 'rtorrent'" => '/usr/bin/rtorrent',
-                    "command -v 'nginx'" => '/usr/sbin/nginx',
-                    "command -v 'php'" => '/usr/bin/php',
-                    "command -v 'proftpd'" => '',
-                    "command -v 'openvpn'" => '/usr/sbin/openvpn',
-                    "command -v 'curl'" => '/usr/bin/curl',
-                ];
-                return $map[$command] ?? '';
-            },
-            'pathExists' => static function (string $path): bool {
-                return in_array($path, ['/etc/openvpn', '/etc/nginx'], true);
-            },
-            'readFile' => static function (string $path): string {
-                return is_file($path) ? (string) file_get_contents($path) : '';
-            },
-            'isExecutable' => static function (string $path): bool {
-                return in_array($path, ['/usr/bin/rtorrent', '/usr/sbin/nginx', '/usr/bin/php', '/usr/sbin/openvpn', '/usr/bin/curl'], true);
-            },
-        ]);
+        $dependencies = $this->buildComponentStatusDependencies();
+        $baseRunCommand = $dependencies['runCommand'];
+        $dependencies['runCommand'] = static function (string $command) use ($baseRunCommand): string {
+            return $command === "command -v 'proftpd'" ? '' : $baseRunCommand($command);
+        };
+        $dependencies['pathExists'] = static function (string $path): bool {
+            return in_array($path, ['/etc/openvpn', '/etc/nginx'], true);
+        };
+        $dependencies['isExecutable'] = static function (string $path): bool {
+            return in_array($path, ['/usr/bin/rtorrent', '/usr/sbin/nginx', '/usr/bin/php', '/usr/sbin/openvpn', '/usr/bin/curl'], true);
+        };
+
+        $checks = pmssComponentStatusChecks($dependencies);
 
         $this->assertEquals(
             [
@@ -185,32 +163,13 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testComponentChecksTreatWhitespaceBinaryPathsAsMissing(): void
     {
-        $checks = pmssComponentStatusChecks([
-            'runCommand' => static function (string $command): string {
-                if ($command === "command -v 'nginx'") {
-                    return " \n\t ";
-                }
+        $dependencies = $this->buildComponentStatusDependencies();
+        $baseRunCommand = $dependencies['runCommand'];
+        $dependencies['runCommand'] = static function (string $command) use ($baseRunCommand): string {
+            return $command === "command -v 'nginx'" ? " \n\t " : $baseRunCommand($command);
+        };
 
-                $map = [
-                    "command -v 'rtorrent'" => '/usr/bin/rtorrent',
-                    "command -v 'php'" => '/usr/bin/php',
-                    "command -v 'proftpd'" => '/usr/sbin/proftpd',
-                    "command -v 'openvpn'" => '/usr/sbin/openvpn',
-                    "command -v 'curl'" => '/usr/bin/curl',
-                ];
-
-                return $map[$command] ?? '';
-            },
-            'pathExists' => static function (string $path): bool {
-                return in_array($path, ['/etc/openvpn', '/etc/nginx'], true);
-            },
-            'readFile' => static function (string $path): string {
-                return is_file($path) ? (string) file_get_contents($path) : '';
-            },
-            'isExecutable' => static function (string $path): bool {
-                return in_array($path, ['/usr/bin/rtorrent', '/usr/bin/php', '/usr/sbin/proftpd', '/usr/sbin/openvpn', '/usr/bin/curl'], true);
-            },
-        ]);
+        $checks = pmssComponentStatusChecks($dependencies);
 
         $this->assertEquals('bin.nginx', $checks[3]['name']);
         $this->assertEquals('WARN', $checks[3]['status']);
@@ -254,17 +213,9 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testSharedBinaryProbeRendererKeepsSystemAndComponentViewsStable(): void
     {
-        $runCommand = static function (string $command): string {
-            $map = [
-                "command -v 'nginx'" => '/usr/sbin/nginx',
-                'nginx -v 2>&1' => 'nginx version: nginx/1.22.0',
-            ];
-
-            return $map[$command] ?? '';
-        };
-        $isExecutable = static function (string $path): bool {
-            return $path === '/usr/sbin/nginx';
-        };
+        $dependencies = $this->buildComponentStatusDependencies();
+        $runCommand = $dependencies['runCommand'];
+        $isExecutable = $dependencies['isExecutable'];
         $binarySpec = [
             'infoCommand' => 'nginx -v 2>&1',
             'componentName' => 'bin.nginx',
@@ -576,7 +527,6 @@ final class SystemStatusCharacterizationTest extends TestCase
             }
 
             return [
-                '/usr/local/bin/flexget' => '/opt/flexget/bin/flexget',
                 '/usr/local/bin/pyload' => '/opt/pyload/bin/pyload',
             ][$path] ?? '';
         };
