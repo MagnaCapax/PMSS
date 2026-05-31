@@ -5,10 +5,11 @@ Responsibilities are intentionally limited to:
 
 1. Ensure core tooling (`bash`, `php` CLI, `git`, `curl`, `wget`, `ca-certificates`, `rsync`).
 2. Capture essential initial host config when an operator is present (hostname and `/etc/fstab` quota guidance).
-3. Apply the minimum multi-tenant hardening required by the update workflow:
+3. Pass non-interactive hostname/quota intent to `update-step2.php` through the existing `PMSS_HOSTNAME`, `PMSS_SKIP_HOSTNAME`, `PMSS_QUOTA_MOUNT`, and `PMSS_SKIP_QUOTA` environment flags.
+4. Delegate recurring convergence and hardening to the update/system-prep path:
    - `/proc` mounted with `hidepid=2`.
    - `systemd.unified_cgroup_hierarchy=0` present in `/etc/default/grub` (reboot required) so rootless Docker remains compatible with `hidepid=2`.
-4. Pull the repository into `/scripts`, `/etc`, and `/var`, then hand off to `/scripts/update.php`.
+5. Pull the repository into `/scripts`, `/etc`, and `/var`, then hand off to `/scripts/update.php`.
 
 Interactivity contract:
 - The documented pipe installer (`wget -qO- .../install.sh | bash -s -- ...`) must still be able to prompt in SSH/console sessions by using the controlling TTY (`/dev/tty`) when present.

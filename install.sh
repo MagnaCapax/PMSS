@@ -236,6 +236,22 @@ if [ "$SCRIPTS_ONLY" = true ]; then
 	UPDATE_ARGS+=("--scripts-only")
 fi
 
+export_update_bootstrap_env() {
+	unset PMSS_HOSTNAME PMSS_SKIP_HOSTNAME PMSS_QUOTA_MOUNT PMSS_SKIP_QUOTA
+	if [ -n "$hostname_override" ]; then
+		export PMSS_HOSTNAME="$hostname_override"
+	fi
+	if [ "$skip_hostname_edit" = true ]; then
+		export PMSS_SKIP_HOSTNAME=1
+	fi
+	if [ -n "$quota_mountpoint" ]; then
+		export PMSS_QUOTA_MOUNT="$quota_mountpoint"
+	fi
+	if [ "$skip_quota_edit" = true ]; then
+		export PMSS_SKIP_QUOTA=1
+	fi
+}
+
 if pmssDetectExistingInstall; then
 	log_warn "ALREADY INSTALLED -- UPDATING"
 
@@ -254,6 +270,7 @@ if pmssDetectExistingInstall; then
 		fi
 
 		log_info "Handing off to /scripts/update.php (logs: /var/log/pmss/update.log, /var/log/pmss-update.jsonl)"
+		export_update_bootstrap_env
 		run_cmd /scripts/update.php "${UPDATE_ARGS[@]}"
 		exit $?
 	fi
@@ -513,119 +530,11 @@ else
 	log_info "Skipping apt full-upgrade as requested"
 fi
 
-# Ensure baseline sysctl, bashrc, and permissions only once.
-install_sysctl_defaults() {
-	local target="/etc/sysctl.d/99-pmss.conf"
-	cat <<'CONF' >"$target"
-# Pulsed Media Config
-block/sda/queue/scheduler = bfq
-block/sdb/queue/scheduler = bfq
-block/sdc/queue/scheduler = bfq
-block/sdd/queue/scheduler = bfq
-block/sde/queue/scheduler = bfq
-block/sdf/queue/scheduler = bfq
-
-block/sda/queue/read_ahead_kb = 1024
-block/sdb/queue/read_ahead_kb = 1024
-block/sdc/queue/read_ahead_kb = 1024
-block/sdd/queue/read_ahead_kb = 1024
-block/sde/queue/read_ahead_kb = 1024
-block/sdf/queue/read_ahead_kb = 1024
-
-net.ipv4.ip_forward = 1
-CONF
-}
-
-install_detect_debian_major() {
-	local codename=""
-	local version=""
-
-	if [ -r /etc/os-release ]; then
-		# shellcheck disable=SC1091
-		. /etc/os-release
-		codename="${VERSION_CODENAME:-}"
-		version="${VERSION_ID:-}"
-	fi
-
-	case "${codename,,}" in
-	trixie)
-		echo 13
-		return 0
-		;;
-	bookworm)
-		echo 12
-		return 0
-		;;
-	bullseye)
-		echo 11
-		return 0
-		;;
-	buster)
-		echo 10
-		return 0
-		;;
-	esac
-
-	version="${version%%.*}"
-	if [[ "$version" =~ ^[0-9]+$ ]]; then
-		echo "$version"
-		return 0
-	fi
-
-	echo 0
-}
-
-install_configure_temp_disk_backed_mount() {
-	local distro_major
-	distro_major="$(install_detect_debian_major)"
-
-	if [ "$distro_major" -lt 13 ]; then
-		log_info "Leaving /tmp mount policy unchanged for Debian ${distro_major}"
-		return 0
-	fi
-
-	if ! command -v systemctl >/dev/null 2>&1; then
-		log_warn "systemctl unavailable; unable to mask tmp.mount on Debian ${distro_major}"
-		return 0
-	fi
-
-	if ! run_cmd systemctl mask tmp.mount; then
-		log_warn "Failed to mask tmp.mount on Debian ${distro_major}; /tmp may stay tmpfs-backed until corrected"
-		return 0
-	fi
-
-	log_info "Masked tmp.mount to keep /tmp disk-backed on Debian ${distro_major}"
-}
-
-install_root_shell_defaults() {
-	local bashrc="/root/.bashrc"
-	local alias_line="alias ls='ls --color=auto'"
-	local path_line="PATH=\$PATH:/scripts"
-
-	grep -Fqx "${alias_line}" "$bashrc" 2>/dev/null || echo "${alias_line}" >>"$bashrc"
-	grep -Fqx "${path_line}" "$bashrc" 2>/dev/null || echo "${path_line}" >>"$bashrc"
-}
-
 # First Let's verify hostname
 ensure_packages nano vim quota
 
-# Update the hostname file and apply it via hostnamectl when available.
-update_hostname() {
-	local new_host="$1"
-	if [[ -z "$new_host" ]]; then
-		return
-	fi
-
-	if hostnamectl >/dev/null 2>&1; then
-		hostnamectl set-hostname "$new_host" >/dev/null 2>&1 &&
-			log_info "Hostname set via hostnamectl"
-	fi
-	echo "$new_host" >/etc/hostname
-	log_info "/etc/hostname updated"
-}
-
 if [[ -n "$hostname_override" ]]; then
-	update_hostname "$hostname_override"
+	log_info "Hostname override will be applied by update-step2"
 elif [[ "$skip_hostname_edit" == true ]]; then
 	log_info "Skipping hostname confirmation"
 else
@@ -640,268 +549,27 @@ append_unique_block \
 	"#usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1" \
 	$'\n# PMSS: quota/performance mount options sample for /home (edit the /home mount line)\n#usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1\n#defaults,nofail,lazytime,noatime,commit=30,usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1\n# Optional (risky on hosts without a protected write cache): nobarrier\n'
 
-quota_options="usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1"
-perf_options_base="nofail,noatime,lazytime"
-
 # Return 0 if /etc/fstab contains a non-comment line for the mount point
 fstab_has_mount() {
 	local mp="$1"
 	grep -Eq "^[[:space:]]*[^#]+[[:space:]]+${mp//\//\/}[[:space:]]+" /etc/fstab
 }
 
-fstab_mount_fstype() {
-	local mp="$1"
-	awk -v mp="$mp" '
-        /^[ \t]*#/ { next }
-        NF < 3 { next }
-        $2 == mp { print $3; exit }
-    ' /etc/fstab
-}
-
-fstab_perf_options_for_mount() {
-	local mp="$1"
-	local options="$perf_options_base"
-	local fstype
-
-	fstype="$(fstab_mount_fstype "$mp")"
-	if [ "$fstype" = "ext4" ] || [ "$fstype" = "ext3" ]; then
-		options="${options},commit=30"
-	fi
-
-	printf '%s' "$options"
-}
-
-# Return 0 if fstab line for mount contains known quota options
-fstab_mount_has_quota() {
-	local mp="$1"
-	grep -Eq "^[[:space:]]*[^#]+[[:space:]]+${mp//\//\/}[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]*(usrjquota=|grpjquota=|usrquota|grpquota)" /etc/fstab
-}
-
-# Ensure the mount options for a mount point contain the given CSV list of options.
-# Creates a timestamped backup of /etc/fstab when making changes.
-ensure_fstab_options() {
-	local mount_point="$1"
-	local required_csv="$2"
-
-	if [[ -z "$mount_point" || -z "$required_csv" ]]; then
-		return 1
-	fi
-
-	local tmpfile backup
-	tmpfile=$(mktemp)
-
-	awk -v mp="$mount_point" -v reqcsv="$required_csv" '
-        BEGIN {
-            reqn = split(reqcsv, req, ",");
-        }
-        /^[ \t]*#/ { print; next }
-        NF < 2 { print; next }
-        {
-            if ($2 == mp) {
-                # Normalize option field
-                opts = $4;
-                if (opts == "" || opts == "-" ) {
-                    opts = "defaults";
-                }
-                n = split(opts, cur, ",");
-                delete have;
-                newopts = "";
-                for (i = 1; i <= n; i++) {
-                    o = cur[i];
-                    if (o == "") continue;
-                    if (o in have) continue;
-                    have[o] = 1;
-                    if (newopts == "") newopts = o; else newopts = newopts","o;
-                }
-                # Append required options in a deterministic order.
-                for (i = 1; i <= reqn; i++) {
-                    o = req[i];
-                    if (o == "" ) continue;
-                    if (!(o in have)) {
-                        have[o] = 1;
-                        if (newopts == "") newopts = o; else newopts = newopts","o;
-                    }
-                }
-                $4 = newopts;
-                # Rebuild standard six columns with tabs
-                out = $1"\t"$2"\t"$3"\t"$4;
-                if (NF >= 5) out = out"\t"$5; else out = out"\t0";
-                if (NF >= 6) out = out"\t"$6; else out = out"\t0";
-                print out;
-                next;
-            }
-        }
-        { print }
-    ' /etc/fstab >"$tmpfile"
-
-	# Only replace if content changed
-	if ! cmp -s /etc/fstab "$tmpfile"; then
-		backup="/etc/fstab.pmss-backup-$(date +%Y%m%d%H%M%S)"
-		cp /etc/fstab "$backup" 2>/dev/null || true
-		mv "$tmpfile" /etc/fstab
-		log_info "Updated /etc/fstab for $mount_point (backup: ${backup##*/})"
-		return 0
-	fi
-
-	rm -f "$tmpfile"
-	return 0
-}
-
-ensure_grub_cmdline_option() {
-	local option="$1"
-	local file="/etc/default/grub"
-
-	if [ -z "$option" ]; then
-		return 1
-	fi
-
-	if [ ! -f "$file" ]; then
-		log_warn "/etc/default/grub not found; unable to persist required boot option: ${option}"
-		return 0
-	fi
-
-	append_unique_block \
-		"$file" \
-		"# PMSS: required boot parameters" \
-		$'\n# PMSS: required boot parameters\n# - /proc hidepid=2 is enabled for tenant privacy.\n# - Rootless Docker is expected to work under this default.\n#\n# Ensure this exists in GRUB_CMDLINE_LINUX_DEFAULT (or GRUB_CMDLINE_LINUX):\n# systemd.unified_cgroup_hierarchy=0\n#\n# After editing, run: update-grub && reboot\n'
-
-	if grep -E '^GRUB_CMDLINE_LINUX(_DEFAULT)?="' "$file" | grep -Fq "$option"; then
-		return 0
-	fi
-
-	local tmpfile backup
-	tmpfile=$(mktemp)
-	if grep -Eq '^GRUB_CMDLINE_LINUX_DEFAULT="' "$file"; then
-		sed -E "s/^(GRUB_CMDLINE_LINUX_DEFAULT=\"[^\"]*)\"/\\1 ${option}\"/" "$file" >"$tmpfile"
-	elif grep -Eq '^GRUB_CMDLINE_LINUX="' "$file"; then
-		sed -E "s/^(GRUB_CMDLINE_LINUX=\"[^\"]*)\"/\\1 ${option}\"/" "$file" >"$tmpfile"
-	else
-		cat "$file" >"$tmpfile"
-		printf '\nGRUB_CMDLINE_LINUX_DEFAULT="%s"\n' "$option" >>"$tmpfile"
-	fi
-
-	if cmp -s "$file" "$tmpfile"; then
-		rm -f "$tmpfile"
-		return 0
-	fi
-
-	backup="/etc/default/grub.pmss-backup-$(date +%Y%m%d%H%M%S)"
-	cp "$file" "$backup" 2>/dev/null || true
-	mv "$tmpfile" "$file"
-	chmod 0644 "$file" 2>/dev/null || true
-	log_info "Updated /etc/default/grub (backup: ${backup##*/})"
-	return 0
-}
-
-ensure_proc_hidepid() {
-	local tmpfile backup
-	tmpfile=$(mktemp)
-
-	awk '
-        BEGIN { touched=0 }
-        /^[ \t]*#/ { print; next }
-        NF < 2 { print; next }
-        {
-            if ($2 == "/proc" && $3 == "proc") {
-                opts = $4;
-                if (opts == "" || opts == "-" ) {
-                    opts = "defaults";
-                }
-                n = split(opts, cur, ",");
-                newopts = "";
-                seen = 0;
-                for (i = 1; i <= n; i++) {
-                    o = cur[i];
-                    if (o == "") continue;
-                    if (o ~ /^hidepid=/) {
-                        if (seen == 0) {
-                            o = "hidepid=2";
-                            seen = 1;
-                        } else {
-                            continue;
-                        }
-                    }
-                    if (newopts == "") newopts = o; else newopts = newopts","o;
-                }
-                if (seen == 0) {
-                    if (newopts == "") newopts = "hidepid=2"; else newopts = newopts",hidepid=2";
-                }
-                $4 = newopts;
-                out = $1"\t"$2"\t"$3"\t"$4;
-                if (NF >= 5) out = out"\t"$5; else out = out"\t0";
-                if (NF >= 6) out = out"\t"$6; else out = out"\t0";
-                print out;
-                touched = 1;
-                next;
-            }
-        }
-        { print }
-    ' /etc/fstab >"$tmpfile"
-
-	if cmp -s /etc/fstab "$tmpfile"; then
-		rm -f "$tmpfile"
-		return 0
-	fi
-
-	backup="/etc/fstab.pmss-backup-$(date +%Y%m%d%H%M%S)"
-	cp /etc/fstab "$backup" 2>/dev/null || true
-	mv "$tmpfile" /etc/fstab
-	log_info "Updated /etc/fstab /proc options (backup: ${backup##*/})"
-	return 0
-}
-
-if fstab_has_mount "/proc"; then
-	ensure_proc_hidepid || true
-else
-	backup="/etc/fstab.pmss-backup-$(date +%Y%m%d%H%M%S)"
-	cp /etc/fstab "$backup" 2>/dev/null || true
-	printf '\nproc\t/proc\tproc\tdefaults,hidepid=2\t0\t0\n' >>/etc/fstab
-	log_info "Added /proc mount with hidepid=2 to /etc/fstab (backup: ${backup##*/})"
-fi
-
-# Best-effort remount to apply hidepid immediately.
-mount -o remount,hidepid=2 /proc 2>/dev/null || true
-
-ensure_grub_cmdline_option "systemd.unified_cgroup_hierarchy=0" || true
-if [ -f /etc/default/grub ] && [ "$FORCE_NONINTERACTIVE" != true ]; then
-	log_step "Review /etc/default/grub (press Ctrl+X to exit nano)"
-	run_editor /etc/default/grub
-fi
-
-if [ -f /etc/default/grub ] && command -v update-grub >/dev/null 2>&1; then
-	log_step "Updating GRUB configuration"
-	run_cmd update-grub
-else
-	log_warn "update-grub not available; run update-grub (or grub-mkconfig) manually after editing /etc/default/grub"
-fi
-
-if [ -r /proc/cmdline ] && ! grep -q 'systemd.unified_cgroup_hierarchy=0' /proc/cmdline 2>/dev/null; then
-	log_warn "Boot parameter systemd.unified_cgroup_hierarchy=0 will apply after reboot (required for rootless Docker with hidepid=2)"
-fi
+log_info "Boot defaults will be applied by update-step2"
 
 if [[ -n "$quota_mountpoint" ]]; then
-	required_options="$(fstab_perf_options_for_mount "$quota_mountpoint"),$quota_options"
-	ensure_fstab_options "$quota_mountpoint" "$required_options" || true
+	log_info "Quota options for $quota_mountpoint will be applied by update-step2"
 elif [[ "$skip_quota_edit" == true ]]; then
 	log_info "Skipping quota configuration as requested"
 else
-	# Default to /home logic: if /home defined, ensure options automatically; if already has quota, skip editor
 	if fstab_has_mount "/home"; then
-		if fstab_mount_has_quota "/home"; then
-			log_info "Quota already configured in /etc/fstab for /home; skipping editor"
-		else
-			required_options="$(fstab_perf_options_for_mount "/home"),$quota_options"
-			ensure_fstab_options "/home" "$required_options" || true
-		fi
+		log_info "Quota options for /home will be applied by update-step2"
 	else
 		log_step "Review /etc/fstab quota options (Ctrl+X to exit editor)"
 		log_warn "PMSS expects /home to be a dedicated filesystem (with quotas). Configure it now."
 		run_editor /etc/fstab
 	fi
 fi
-
-# Best-effort remount to pick up option changes (may be no-op on fresh installs)
-mount -o remount /home 2>/dev/null || true
 
 # Minimal prerequisites; remaining packages arrive via update-step2/pmssApplyDpkgSelections.
 log_step "Ensuring minimal prerequisites are present"
@@ -962,13 +630,6 @@ fi
 mkdir -p /etc/seedbox/config/
 echo "$VERSION" >/etc/seedbox/config/version
 
-log_step "Deploying legacy BFQ/sysctl tuning (ensure rc.local unchanged)"
-install_sysctl_defaults
-install_configure_temp_disk_backed_mount
-
-log_step "Configuring root shell defaults"
-install_root_shell_defaults
-
 log_step "Adjusting /home permissions"
 chmod o-rw /home
 
@@ -978,6 +639,7 @@ run_cmd apt update
 if [ "$RUN_UPDATE" = true ]; then
 	log_step "Handing off to /scripts/update.php"
 	log_info "Update logs: /var/log/pmss/update.log (bootstrap), /var/log/pmss-update.log (phase 2), /var/log/pmss-update.jsonl (JSON)"
+	export_update_bootstrap_env
 	run_cmd /scripts/update.php "${UPDATE_ARGS[@]}"
 	run_cmd /scripts/util/setupRootCron.php
 	run_cmd /scripts/util/setupPermissions.php
