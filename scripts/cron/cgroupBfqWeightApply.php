@@ -43,6 +43,11 @@ $FALLBACK_MAX = PMSS_BFQ_FALLBACK_BASE_MAX;      // reserves 300% bonus headroom
 $DRY_RUN    = in_array('--dry-run', $argv ?? [], true);
 
 // Pre-flight — fail loud rather than silent no-op on misconfig.
+if (!function_exists('posix_geteuid') || !function_exists('posix_getpwnam')) {
+    fwrite(STDERR, "FATAL: POSIX extension required to resolve managed user UIDs\n");
+    exit(2);
+}
+
 if (posix_geteuid() !== 0) {
     fwrite(STDERR, "FATAL: must run as root (writes to /sys/fs/cgroup/blkio/)\n");
     exit(2);
@@ -121,7 +126,12 @@ foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
         syslog(LOG_WARNING, "no passwd entry $user");
         continue;
     }
-    $uid = (int) $pwd['uid'];
+    $uid = pmssBfqUserPasswdUid($pwd);
+    if ($uid === null) {
+        $errors++;
+        syslog(LOG_WARNING, "unsafe passwd uid $user");
+        continue;
+    }
 
     // Prefer explicit JSON IOWeight; fall back to ramMiB-derived formula.
     if (isset($json['IOWeight']) && is_numeric($json['IOWeight'])) {

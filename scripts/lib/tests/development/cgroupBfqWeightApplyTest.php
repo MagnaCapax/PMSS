@@ -92,6 +92,26 @@ class CgroupBfqWeightApplyTest extends TestCase
         }
     }
 
+    public function testPasswdUidParserAcceptsOnlyPositiveIntegerUid(): void
+    {
+        foreach ([
+            [['uid' => 1], 1],
+            [['uid' => 1000], 1000],
+            [['uid' => '1000'], 1000],
+            [['uid' => 0], null],
+            [['uid' => '0'], null],
+            [['uid' => -1], null],
+            [['uid' => '12x'], null],
+            [['uid' => ''], null],
+            [['uid' => 1.5], null],
+            [['gid' => 1000], null],
+            [false, null],
+            [['uid' => '9999999999999999999999999'], null],
+        ] as [$passwdEntry, $expected]) {
+            $this->assertSame($expected, \pmssBfqUserPasswdUid($passwdEntry));
+        }
+    }
+
     public function testCustomParametersAndInvalidCeilings(): void
     {
         foreach ([
@@ -106,6 +126,20 @@ class CgroupBfqWeightApplyTest extends TestCase
                 'Unexpected weight for '.$label
             );
         }
+    }
+
+    public function testCronRequiresPosixBeforeRootCheck(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/cron/cgroupBfqWeightApply.php',
+            [
+                "if (!function_exists('posix_geteuid') || !function_exists('posix_getpwnam')) {",
+                'FATAL: POSIX extension required to resolve managed user UIDs',
+                'if (posix_geteuid() !== 0) {',
+            ],
+            'missing BFQ POSIX extension guard: ',
+            'BFQ POSIX guard must run before root preflight: '
+        );
     }
 
     public function testCronValidatesConfigUsernameBeforeUserPaths(): void
@@ -129,6 +163,21 @@ class CgroupBfqWeightApplyTest extends TestCase
             ],
             'missing BFQ username boundary guard: ',
             'BFQ username guard must run before user paths: '
+        );
+    }
+
+    public function testCronRejectsUnsafePasswdUidBeforeCgroupPath(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/cron/cgroupBfqWeightApply.php',
+            [
+                '$pwd = posix_getpwnam($user);',
+                '$uid = pmssBfqUserPasswdUid($pwd);',
+                'syslog(LOG_WARNING, "unsafe passwd uid $user");',
+                "\$cgPath = '/sys/fs/cgroup/blkio/user.slice/user-'.\$uid.'.slice/blkio.bfq.weight';",
+            ],
+            'missing BFQ passwd UID guard: ',
+            'BFQ passwd UID guard must run before sysfs path assembly: '
         );
     }
 
