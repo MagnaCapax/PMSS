@@ -391,18 +391,12 @@ jellyfin_ffmpeg_configure_fallback() {
 	log_warn "Continuing with Radarr, Sonarr, Prowlarr, SABnzbd, and Cloudplow."
 }
 
-managed_install_path_reset_target_is_safe() {
-	local path="$1"
-
-	media_stack_home_path_is_safe || return 1
-	[[ "$path" == "$HOME/.bin/"* && "$path" != "$HOME/.bin" && "$path" != "$HOME/.bin/" ]] || return 1
-	[[ "$path" == *"/../"* || "$path" == *"/.." || "$path" == *"../"* ]] && return 1
-	return 0
-}
-
 managed_install_path_reset() {
 	local path="$1"
-	if ! managed_install_path_reset_target_is_safe "$path"; then
+
+	if ! media_stack_home_path_is_safe ||
+		[[ "$path" != "$HOME/.bin/"* || "$path" == "$HOME/.bin" || "$path" == "$HOME/.bin/" ]] ||
+		[[ "$path" == *"/../"* || "$path" == *"/.." || "$path" == *"../"* ]]; then
 		log_err "Refusing to refresh unsafe managed install path: $path"
 		return 1
 	fi
@@ -415,16 +409,10 @@ managed_install_path_reset() {
 	fi
 }
 
-jellyfin_config_dir_reset_target_is_safe() {
-	local path="$1"
-
-	media_stack_home_path_is_safe && [[ "$path" == "$HOME/.config/jellyfin" ]]
-}
-
 jellyfin_config_dir_reset() {
 	local path="$HOME/.config/jellyfin"
 
-	if ! jellyfin_config_dir_reset_target_is_safe "$path"; then
+	if ! media_stack_home_path_is_safe || [[ "$path" != "$HOME/.config/jellyfin" ]]; then
 		log_err "Refusing to remove unsafe Jellyfin config path: $path"
 		return 1
 	fi

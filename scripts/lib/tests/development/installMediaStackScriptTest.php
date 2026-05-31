@@ -244,9 +244,10 @@ LIGHTTPD;
 
     public function testManagedBinPathsRefreshInPlace(): void
     {
+        $removedHelper = 'managed_install_path_reset_target'.'_is_safe';
         $this->assertStringContainsString('Keeping existing ~/.bin contents outside PMSS-managed app paths.', $this->script);
         $this->assertStringContainsString('managed_install_path_reset', $this->script);
-        $this->assertStringContainsString('managed_install_path_reset_target_is_safe', $this->script);
+        $this->assertStringNotContainsString($removedHelper, $this->script);
         $this->assertTrue(
             strpos($this->script, 'rm -rf "$HOME/.bin"') === false,
             'Installer must not delete the entire ~/.bin directory on reruns'
@@ -263,7 +264,6 @@ LIGHTTPD;
 
         $functions = $this->pmssExtractShellFunctions($this->script, array(
             'media_stack_home_path_is_safe',
-            'managed_install_path_reset_target_is_safe',
             'managed_install_path_reset',
         ));
         $script = implode("\n", array(
@@ -295,8 +295,9 @@ LIGHTTPD;
 
     public function testJellyfinConfigResetUsesExactPathGuard(): void
     {
-        $this->assertStringContainsString('jellyfin_config_dir_reset_target_is_safe', $this->script);
-        $this->assertStringContainsString('[[ "$path" == "$HOME/.config/jellyfin" ]]', $this->script);
+        $removedHelper = 'jellyfin_config_dir_reset_target'.'_is_safe';
+        $this->assertStringNotContainsString($removedHelper, $this->script);
+        $this->assertStringContainsString('if ! media_stack_home_path_is_safe || [[ "$path" != "$HOME/.config/jellyfin" ]]; then', $this->script);
         $this->assertTrue(
             strpos($this->script, 'rm -rf "$HOME/.config/jellyfin"') === false,
             'Jellyfin config reset must route through the exact-path guard'
