@@ -8,7 +8,14 @@ class UserRutorrentCompatPatchTest extends TestCase
     public function testCompatibilityPatchesLegacyTargets(): void
     {
         foreach ($this->compatPatchCases() as $case) {
-            $this->assertCompatibilityPatch($case);
+            $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', $case['dir']);
+            $path = $this->pmssWriteRelativeFile($home, $case['path'], $case['legacy']);
+
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            $content = (string) file_get_contents($path);
+
+            $this->assertStringContainsString($case['expected'], $content);
+            $this->pmssAssertStringNotContainsString($case['unexpected'], $content);
         }
     }
 
@@ -68,18 +75,6 @@ class UserRutorrentCompatPatchTest extends TestCase
         $content = (string) file_get_contents($path);
 
         $this->assertStringContainsString('return (int) $field;', $content);
-    }
-
-    private function assertCompatibilityPatch(array $case): void
-    {
-        $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', $case['dir']);
-        $path = $this->pmssWriteRelativeFile($home, $case['path'], $case['legacy']);
-
-        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
-        $content = (string) file_get_contents($path);
-
-        $this->assertStringContainsString($case['expected'], $content);
-        $this->pmssAssertStringNotContainsString($case['unexpected'], $content);
     }
 
     private function assertCompatibilityContentUntouched(array $case, string $content): void

@@ -28,7 +28,7 @@ class SysctlBaselineTest extends TestCase
             'net.netfilter.nf_conntrack_max = 524288', 'kernel.kptr_restrict = 1', 'kernel.yama.ptrace_scope = 2',
             'fs.protected_regular = 2',
         ], 'expected sysctl file to be written');
-        $this->assertStringContainsString("/etc/sysctl.d/99-pmss.conf", $this->systemPrepSource());
+        $this->assertStringContainsString("/etc/sysctl.d/99-pmss.conf", $this->pmssReadRepoFile('scripts/lib/update/systemPrep.php'));
 
         $this->cleanup($dir);
     }
@@ -258,11 +258,6 @@ class SysctlBaselineTest extends TestCase
         $logger = $this->pmssMakeArrayLogger($messages);
         $modulesLoad = $modulesLoad ?? dirname($target).'/modules-load.conf';
         \pmssEnsureLegacySysctlBaseline($logger, $target, $reload, $modulesLoad);
-    }
-
-    private function systemPrepSource(): string
-    {
-        return $this->pmssReadRepoFile('scripts/lib/update/systemPrep.php');
     }
 
 }

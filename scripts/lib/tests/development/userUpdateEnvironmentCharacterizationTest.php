@@ -129,41 +129,18 @@ PHP
         $this->assertStringContainsString('return (int) $field;', $result['hddquota']);
         $this->assertStringContainsAllStrings(['WebUI\\CSRFProtection=false', 'WebUI\\ClickjackingProtection=false', 'WebUI\\HostHeaderValidation=false', 'Session\\DiskCacheSize=128', 'Session\\MaxConnections=300', 'Downloads\\DiskWriteCacheSize=128', 'Bittorrent\\MaxConnecs=300'], $result['qbittorrent']);
 
-        $this->assertPhaseOrder(
-            $result['descriptions'],
-            [
-                'Configuring lighttpd vhost',
-                'Installing ruTorrent theme Agent34',
-                'Installing unpack plugin',
-                'Refreshing user permissions',
-            ]
+        $expectedPhases = [
+            'Configuring lighttpd vhost',
+            'Installing ruTorrent theme Agent34',
+            'Installing unpack plugin',
+            'Refreshing user permissions',
+        ];
+        $this->assertEquals(
+            $expectedPhases,
+            array_values(array_filter($result['descriptions'], static function (string $description) use ($expectedPhases): bool {
+                return in_array($description, $expectedPhases, true);
+            }))
         );
-    }
-
-    /**
-     * Assert that the listed phase descriptions appear in order.
-     *
-     * @param array<int, string> $descriptions
-     * @param array<int, string> $expected
-     */
-    private function assertPhaseOrder(array $descriptions, array $expected): void
-    {
-        $offset = -1;
-        foreach ($expected as $needle) {
-            $found = false;
-            foreach ($descriptions as $index => $description) {
-                if ($index <= $offset) {
-                    continue;
-                }
-                if ($description !== $needle) {
-                    continue;
-                }
-                $offset = $index;
-                $found = true;
-                break;
-            }
-            $this->assertTrue($found, 'Expected phase in order: '.$needle);
-        }
     }
 
     /**

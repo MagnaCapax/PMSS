@@ -10,31 +10,22 @@ class UpdateAppsBootstrapTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-update-app-bootstrap', 0700);
     }
 
-    private function appBootstrapOutput(string $installerFile): string
+    public function testServarrInstallerWarnsForEveryAppWhenRuntimeHelperMissing(): void
     {
+        $installerFile = 'servarr.php';
         $sourceDir = dirname(__DIR__, 2).'/update/apps';
         $sandboxDir = $this->tempDir.'/apps-'.basename($installerFile, '.php');
         $this->assertTrue(@mkdir($sandboxDir, 0700, true), 'Unable to create sandbox app dir');
 
         foreach ([$installerFile, 'bootstrap.php', 'arr.php'] as $file) {
             $sourcePath = $sourceDir.'/'.$file;
-            if (!is_file($sourcePath)) {
-                continue;
+            if (is_file($sourcePath)) {
+                $this->assertTrue(@copy($sourcePath, $sandboxDir.'/'.$file), 'Unable to copy '.$file.' into sandbox');
             }
-
-            $targetPath = $sandboxDir.'/'.$file;
-            $this->assertTrue(@copy($sourcePath, $targetPath), 'Unable to copy '.$file.' into sandbox');
         }
 
         $output = $this->pmssRunInlinePhp('include '.var_export($sandboxDir.'/'.$installerFile, true).';', [], '2>&1');
         $this->assertTrue(is_string($output), 'Unable to execute sandboxed installer');
-
-        return $output;
-    }
-
-    public function testServarrInstallerWarnsForEveryAppWhenRuntimeHelperMissing(): void
-    {
-        $output = $this->appBootstrapOutput('servarr.php');
 
         foreach (['Lidarr', 'Prowlarr', 'Radarr', 'Readarr', 'Sonarr'] as $label) {
             $this->assertStringContainsString($label.' updater: missing runtime helper', $output);

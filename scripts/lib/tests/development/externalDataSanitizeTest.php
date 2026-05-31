@@ -59,7 +59,9 @@ class ExternalDataSanitizeTest extends TestCase
         ]);
         $this->assertEquals(0, $rc1);
         $this->assertEquals(0, $rc2);
-        $this->assertTrue($this->extractTagId($out1) !== $this->extractTagId($out2), 'Expected tag id to change when env changes');
+        $this->assertEquals(1, preg_match('/<pmss-external-data id=\"([a-f0-9]{64})\">/', $out1, $firstMatches));
+        $this->assertEquals(1, preg_match('/<pmss-external-data id=\"([a-f0-9]{64})\">/', $out2, $secondMatches));
+        $this->assertTrue($firstMatches[1] !== $secondMatches[1], 'Expected tag id to change when env changes');
     }
 
     public function testEncodedOutputHidesInput(): void
@@ -120,17 +122,4 @@ class ExternalDataSanitizeTest extends TestCase
         return [$status, $stdout, $stderr];
     }
 
-    /**
-     * @param string $output
-     * @return string
-     */
-    private function extractTagId(string $output): string
-    {
-        if (preg_match('/<pmss-external-data id=\"([a-f0-9]{64})\">/', $output, $matches) === 1) {
-            return $matches[1];
-        }
-
-        $this->fail('Tag id not found in output');
-        return '';
-    }
 }
