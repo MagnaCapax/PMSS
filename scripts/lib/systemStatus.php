@@ -269,6 +269,8 @@ function pmssSystemStatusChecks(array $dependencies = []): array
     $hostname = trim((string) $readFile('/etc/hostname'));
     if ($hostname === '') {
         $checks[] = pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname unknown');
+    } elseif (!pmssHostnameIsValid($hostname)) {
+        $checks[] = pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname invalid');
     } else {
         $fqdn = strpos($hostname, '.pulsedmedia.com') !== false ? $hostname : $hostname.'.pulsedmedia.com';
         $slug = str_replace('.', '-', $fqdn);

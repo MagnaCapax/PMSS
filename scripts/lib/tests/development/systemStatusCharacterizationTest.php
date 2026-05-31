@@ -421,6 +421,28 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertEquals(42, count($checks));
     }
 
+    public function testSystemStatusRejectsInvalidOpenvpnHostnameBeforeArtifactProbe(): void
+    {
+        $dependencies = $this->buildSystemStatusDependencies();
+        $readFile = $dependencies['readFile'];
+        $isFile = $dependencies['isFile'];
+        $dependencies['readFile'] = static function (string $path) use ($readFile): string {
+            return $path === '/etc/hostname' ? "bad/host\n" : $readFile($path);
+        };
+        $dependencies['isFile'] = static function (string $path) use ($isFile): bool {
+            if (strpos($path, '/home/openvpn-') === 0) {
+                throw new \AssertionError('invalid OpenVPN hostname must not reach artifact paths');
+            }
+            return $isFile($path);
+        };
+
+        $checks = pmssSystemStatusChecks($dependencies);
+
+        $this->assertEquals('OpenVPN client artifacts', $checks[25]['name']);
+        $this->assertEquals('WARN', $checks[25]['status']);
+        $this->assertEquals('hostname invalid', $checks[25]['detail']);
+    }
+
     public function testSystemStatusCheckOrderStaysStableWithHermeticInputs(): void
     {
         $checks = pmssSystemStatusChecks($this->buildSystemStatusDependencies());

@@ -24,8 +24,18 @@ class OpenvpnHelpersTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/configureOpenvpn.php', [
             "\$bundleTgz    = '/etc/skel/www/openvpn-config.tgz';",
-            '&& is_file($bundleTgz);',
+            '&& (!$clientArtifactsEnabled || (is_file($clientOvpn) && is_file($clientCrt) && is_file($bundleTgz)));',
             "escapeshellarg(\$bundleTgz)",
+        ]);
+    }
+
+    public function testConfigureOpenvpnValidatesHostnameBeforeHomeArtifacts(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/configureOpenvpn.php', [
+            'if (!pmssHostnameIsValid($hostname)) {',
+            "\$clientArtifactsEnabled = false;",
+            "OpenVPN hostname invalid; skipping client artifact publication",
+            'if ($clientArtifactsEnabled && file_exists($tplClient)',
         ]);
     }
 
@@ -41,6 +51,14 @@ class OpenvpnHelpersTest extends TestCase
         $this->pmssAssertRepoFileContainsString(
             'scripts/lib/systemStatus.php',
             "pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname unknown')"
+        );
+    }
+
+    public function testSystemTestStillWarnsWhenHostnameIsInvalid(): void
+    {
+        $this->pmssAssertRepoFileContainsString(
+            'scripts/lib/systemStatus.php',
+            "pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname invalid')"
         );
     }
 }

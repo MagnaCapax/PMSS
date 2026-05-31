@@ -20,6 +20,12 @@ require_once __DIR__.'/../lib/update/runtime/commands.php';
 requireRoot();
 
 $hostname = pmssHostnameRead('localhost');
+$clientArtifactsEnabled = true;
+if (!pmssHostnameIsValid($hostname)) {
+    logmsg('[WARN] OpenVPN hostname invalid; skipping client artifact publication');
+    $hostname = 'localhost';
+    $clientArtifactsEnabled = false;
+}
 $fqdn = strpos($hostname, '.pulsedmedia.com') !== false ? $hostname : $hostname.'.pulsedmedia.com';
 $slug = str_replace('.', '-', $fqdn);
 
@@ -37,9 +43,7 @@ $bundleTgz    = '/etc/skel/www/openvpn-config.tgz';
 $alreadyConfigured = pmssCommandPath('openvpn') !== ''
     && is_file($serverConf)
     && (is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt'))
-    && is_file($clientOvpn)
-    && is_file($clientCrt)
-    && is_file($bundleTgz);
+    && (!$clientArtifactsEnabled || (is_file($clientOvpn) && is_file($clientCrt) && is_file($bundleTgz)));
 if ($alreadyConfigured) {
     pmssLogStatus('SKIP', 'OpenVPN already configured; skipping provisioning', 0);
     return;
@@ -52,7 +56,11 @@ if (!is_file('/usr/sbin/openvpn') || (!is_dir($easyRsaShare) && !is_dir($easyRsa
 }
 
 // 2) Ensure directories
-runStep('Ensuring OpenVPN directory', 'install -d -m 0755 '.escapeshellarg($openvpnDir));
+if (runStep('Ensuring OpenVPN directory', 'install -d -m 0755 '.escapeshellarg($openvpnDir)) !== 0
+    || (!pmssEnvFlagEnabled('PMSS_DRY_RUN') && !is_dir($openvpnDir))) {
+    logmsg('[WARN] Unable to ensure OpenVPN directory; skipping provisioning');
+    return;
+}
 
 // 3) Seed EasyRSA
 if (!is_dir($easyRsaDir) || !file_exists($easyRsaDir.'/easyrsa')) {
@@ -80,10 +88,13 @@ set_var EASYRSA_REQ_ORG "Pulsed Media"
 set_var EASYRSA_REQ_EMAIL "sales@pulsedmedia.com"
 set_var EASYRSA_BATCH "1"
 EOF;
+    $varsPath = $easyRsaDir.'/vars';
     if (!is_dir($easyRsaDir)) {
         runStep('Creating EasyRSA directory (vars)', 'install -d -m 0755 '.escapeshellarg($easyRsaDir));
     }
-    @file_put_contents($easyRsaDir.'/vars', $vars);
+    if (@file_put_contents($varsPath, $vars) === false) {
+        logmsg('[WARN] Failed to write EasyRSA vars at '.$varsPath);
+    }
 }
 
 // 5) Initialize PKI if missing
@@ -109,7 +120,7 @@ if (pmssSystemdRuntimeAvailable()) {
 }
 
 // 8) Client artifacts (.ovpn + CA)
-if (file_exists($tplClient) && !file_exists($clientOvpn) && ($content = file_get_contents($tplClient)) !== false) {
+if ($clientArtifactsEnabled && file_exists($tplClient) && !file_exists($clientOvpn) && ($content = file_get_contents($tplClient)) !== false) {
     $rendered = str_replace([
         '##SERVER_HOSTNAME##',
         '##CONFIG_FILENAME##',
@@ -117,12 +128,17 @@ if (file_exists($tplClient) && !file_exists($clientOvpn) && ($content = file_get
         $fqdn,
         'openvpn-'.$slug,
     ], $content);
-    @file_put_contents($clientOvpn, $rendered);
-    @chmod($clientOvpn, 0644);
-    logmsg('OpenVPN client profile written to '.$clientOvpn);
+    if (@file_put_contents($clientOvpn, $rendered) === false) {
+        logmsg('[WARN] Failed to write OpenVPN client profile at '.$clientOvpn);
+    } else {
+        if (!@chmod($clientOvpn, 0644)) {
+            logmsg('[WARN] Failed to chmod OpenVPN client profile at '.$clientOvpn);
+        }
+        logmsg('OpenVPN client profile written to '.$clientOvpn);
+    }
 }
 
-if (!file_exists($clientCrt) && file_exists($easyRsaDir.'/pki/ca.crt')) {
+if ($clientArtifactsEnabled && !file_exists($clientCrt) && file_exists($easyRsaDir.'/pki/ca.crt')) {
     runStep('Exporting CA certificate for clients', sprintf('cp -p %s %s', escapeshellarg($easyRsaDir.'/pki/ca.crt'), escapeshellarg($clientCrt)));
 }
 
@@ -131,7 +147,7 @@ if (!file_exists($clientCrt) && file_exists($easyRsaDir.'/pki/ca.crt')) {
 // users can download the config package via the web root. AGENTS.md mandates a
 // lockdown for /etc/skel/www unless explicitly instructed — and this path is
 // explicitly approved here for OpenVPN client bundle publication.
-if (file_exists($clientOvpn) && file_exists($clientCrt) && is_dir('/etc/skel/www')) {
+if ($clientArtifactsEnabled && file_exists($clientOvpn) && file_exists($clientCrt) && is_dir('/etc/skel/www')) {
     $cmd = 'bash -lc '.escapeshellarg('cd /home; tar -czf '.escapeshellarg($bundleTgz).' '
         .escapeshellarg(basename($clientOvpn)).' '.escapeshellarg(basename($clientCrt)));
     runStep('Bundling OpenVPN client package for web download', $cmd);
