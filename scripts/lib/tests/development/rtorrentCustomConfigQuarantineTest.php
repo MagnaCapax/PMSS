@@ -68,6 +68,27 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
         $this->assertTrue(is_link($src), 'Symlink should remain untouched');
     }
 
+    public function testQuarantineRefusesSymlinkedHome(): void
+    {
+        if (!function_exists('symlink')) {
+            throw new SkipTest('symlink unavailable');
+        }
+
+        $targetHome = $this->tempHome.'-target';
+        $linkHome = $this->tempHome.'-link';
+        @mkdir($targetHome, 0755, true);
+        @file_put_contents($targetHome.'/.rtorrent.rc.custom', "broken_line\n");
+        if (@symlink($targetHome, $linkHome) === false) {
+            throw new SkipTest('symlink() failed');
+        }
+
+        $dst = \rtorrentCustomConfigQuarantine($linkHome, $this->resolveTestUser(), $this->noOpLogFn());
+
+        $this->assertTrue($dst === null);
+        $this->assertTrue(is_link($linkHome), 'Home symlink should remain untouched');
+        $this->assertTrue(is_file($targetHome.'/.rtorrent.rc.custom'), 'Config behind symlinked home should remain untouched');
+    }
+
     public function testQuarantineRefusesUnexpectedOwnerWhenUserIsDifferent(): void
     {
         $src = $this->tempHome.'/.rtorrent.rc.custom';

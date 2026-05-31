@@ -399,6 +399,52 @@ function rtorrentProcessClearStaleState(string $stateFile): void
 }
 
 /**
+ * Validate a destructive per-user rTorrent target before moving or creating it.
+ *
+ * Production callers must stay inside the canonical /home/<user> tree. Tests
+ * may use temporary homes, but still exercise absolute path and symlink guards.
+ */
+function rtorrentProcessUserTargetPathIsSafe(
+    string $home,
+    string $user,
+    string $relativePath,
+    bool $directoryTarget,
+    bool $requireUserTailInTest = false
+): bool {
+    $home = rtrim($home, '/');
+    $testMode = pmssTestModeEnabled();
+    if ((!$testMode && !pmssValidateUsername($user))
+        || $home === ''
+        || $home[0] !== '/'
+        || strpos($home, "\0") !== false
+        || !is_dir($home)
+        || is_link($home)
+        || $relativePath === ''
+        || $relativePath[0] === '/'
+        || strpos($relativePath, "\0") !== false
+    ) {
+        return false;
+    }
+
+    foreach (explode('/', $relativePath) as $segment) {
+        if ($segment === '' || $segment === '.' || $segment === '..') {
+            return false;
+        }
+    }
+
+    if (!$testMode && $home !== '/home/'.$user) {
+        return false;
+    }
+    if ($testMode && $requireUserTailInTest && substr($home, -strlen('/'.$user)) !== '/'.$user) {
+        return false;
+    }
+
+    $target = $home.'/'.$relativePath;
+    return strpos($target, $home.'/') === 0
+        && pmssPathTargetIsSafe($target, $directoryTarget, false, false);
+}
+
+/**
  * Reset a user's rTorrent session directory conservatively.
  *
  * Persistent start failures can leave the session state corrupted. Move the
@@ -427,6 +473,10 @@ function rtorrentProcessResetSessionDirectory(string $home, string $user, callab
     }
     if (is_link($sessionDir)) {
         $logFn("Refusing to reset symlinked session directory: {$sessionDir}", true);
+        return false;
+    }
+    if (!rtorrentProcessUserTargetPathIsSafe($home, $user, 'session', true, true)) {
+        $logFn("Refusing to reset unsafe session directory: {$sessionDir}", true);
         return false;
     }
 
@@ -506,6 +556,10 @@ function rtorrentCustomConfigQuarantine(string $home, string $user, callable $lo
 {
     $home = rtrim($home, '/');
     $src = $home.'/.rtorrent.rc.custom';
+    if (!rtorrentProcessUserTargetPathIsSafe($home, $user, '.rtorrent.rc.custom', false)) {
+        $logFn("Refusing to quarantine unsafe custom rTorrent config: {$src}", true);
+        return null;
+    }
     if (!is_file($src) || is_link($src)) {
         return null;
     }

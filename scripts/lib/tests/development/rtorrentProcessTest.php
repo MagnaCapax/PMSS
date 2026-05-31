@@ -456,6 +456,30 @@ class RtorrentProcessTest extends TestCase
         $this->assertTrue(strpos(implode("\n", $messages), 'Refusing to reset symlinked session directory') !== false);
     }
 
+    public function testResetSessionDirectoryRejectsSymlinkedHome(): void
+    {
+        if (!function_exists('symlink')) {
+            throw new SkipTest('symlink unavailable');
+        }
+
+        $home = $this->tempDir.'/alice';
+        $targetHome = $this->tempDir.'/target-home';
+        @mkdir($targetHome.'/session', 0755, true);
+        file_put_contents($targetHome.'/session/resume.dat', 'state');
+        if (@symlink($targetHome, $home) === false) {
+            throw new SkipTest('symlink() failed');
+        }
+
+        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home): bool {
+            return rtorrentProcessResetSessionDirectory($home, 'alice', $logger);
+        });
+
+        $this->assertTrue(!$result, 'Symlinked user home should be rejected');
+        $this->assertTrue(is_link($home), 'Home symlink should remain untouched');
+        $this->assertTrue(is_file($targetHome.'/session/resume.dat'), 'Session data behind symlinked home should remain untouched');
+        $this->assertTrue(strpos(implode("\n", $messages), 'Refusing to reset unsafe session directory') !== false);
+    }
+
     public function testResetSessionDirectoryCanRunTwice(): void
     {
         $home = $this->tempDir.'/alice';
