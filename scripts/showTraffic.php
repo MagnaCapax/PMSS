@@ -123,16 +123,17 @@ function pmssShowTrafficMain(array $argv): int
         }
 
         $data = pmssReadSerializedArrayFile($statsPath);
-        if ($data === null || empty($data['raw']['month'])) {
+        $rawCounters = $data === null ? null : pmssShowTrafficRawCounters($data);
+        if ($rawCounters === null) {
             continue;
         }
 
-        $dataMonthTotal += (float) $data['raw']['month'];
+        $dataMonthTotal += $rawCounters['month'];
         if ($isLocalnet) {
-            $dataMonthTotalLocal += (float) $data['raw']['month'];
+            $dataMonthTotalLocal += $rawCounters['month'];
         }
 
-        $dataDisplay = array_map('pmssTrafficFormatAmount', $data['raw']);
+        $dataDisplay = array_map('pmssTrafficFormatAmount', $rawCounters);
 
         $ingressPath = pmssTrafficDataPaths($baseUser)[pmssTrafficDataPathKey($isLocalnet, 'ingress')];
         $inboundMonth = null;
@@ -140,18 +141,18 @@ function pmssShowTrafficMain(array $argv): int
         $ingressData !== null && $inboundMonth = (float) $ingressData['raw']['month'];
 
         $inboundRatio = null;
-        if ($inboundMonth !== null && (float) $data['raw']['month'] > 0) {
-            $inboundRatio = round($inboundMonth / (float) $data['raw']['month'], 2);
+        if ($inboundMonth !== null && $rawCounters['month'] > 0) {
+            $inboundRatio = round($inboundMonth / $rawCounters['month'], 2);
         }
 
         $inboundDisplay = $inboundMonth !== null ? pmssTrafficFormatAmount($inboundMonth) : '-';
         $ratioDisplay = $inboundRatio !== null ? sprintf('%.2f', $inboundRatio) : 'n/a';
 
         $dataRates = [
-            'week' => round(((float) $data['raw']['week'] / (7 * 24 * 60 * 60)), 2),
-            'day' => round(((float) $data['raw']['day'] / (24 * 60 * 60)), 2),
-            'hour' => round(((float) $data['raw']['hour'] / (60 * 60)), 2),
-            '15min' => round(((float) $data['raw']['15min'] / (15 * 60)), 2),
+            'week' => round(($rawCounters['week'] / (7 * 24 * 60 * 60)), 2),
+            'day' => round(($rawCounters['day'] / (24 * 60 * 60)), 2),
+            'hour' => round(($rawCounters['hour'] / (60 * 60)), 2),
+            '15min' => round(($rawCounters['15min'] / (15 * 60)), 2),
         ];
 
         $displayUser = $isLocalnet ? "{$baseUser} (L)" : $baseUser;
@@ -167,7 +168,7 @@ function pmssShowTrafficMain(array $argv): int
         $overLimit = false;
         $nearLimit = false;
         if ($limitMiB !== null && $limitMiB > 0) {
-            $pctUsed = (((float) $data['raw']['month']) / $limitMiB) * 100;
+            $pctUsed = ($rawCounters['month'] / $limitMiB) * 100;
             $overLimit = ($pctUsed >= 100);
             $nearLimit = (!$overLimit && $pctUsed >= 80);
         }
@@ -183,7 +184,7 @@ function pmssShowTrafficMain(array $argv): int
         $rows[] = [
             'user' => $thisUser,
             'displayUser' => $displayUser,
-            'monthMiB' => (float) $data['raw']['month'],
+            'monthMiB' => $rawCounters['month'],
             'display' => [
                 'month' => $dataDisplay['month'] ?? null,
                 'week'  => $dataDisplay['week'] ?? null,
@@ -348,6 +349,32 @@ function pmssShowTrafficMain(array $argv): int
     }
 
     return 0;
+}
+
+/**
+ * Validate and normalize the raw traffic counters needed by the report.
+ *
+ * Runtime traffic snapshots are serialized files, so treat their contents as a
+ * boundary: malformed rows are skipped instead of emitting PHP notices or
+ * coercing arbitrary strings into counters.
+ *
+ * @return array{month:float,week:float,day:float,hour:float,15min:float}|null
+ */
+function pmssShowTrafficRawCounters(array $payload): ?array
+{
+    if (!isset($payload['raw']) || !is_array($payload['raw']) || empty($payload['raw']['month'])) {
+        return null;
+    }
+
+    $counters = [];
+    foreach (['month', 'week', 'day', 'hour', '15min'] as $key) {
+        if (!array_key_exists($key, $payload['raw']) || !is_numeric($payload['raw'][$key])) {
+            return null;
+        }
+        $counters[$key] = (float) $payload['raw'][$key];
+    }
+
+    return $counters;
 }
 
 /**

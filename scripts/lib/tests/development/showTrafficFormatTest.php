@@ -32,8 +32,42 @@ class ShowTrafficFormatTest extends TestCase
 
     public function testShowTrafficUsesSharedManagedUsersParser(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/showTraffic.php', ["pmssListManagedUsersResult(__DIR__.'/listUsers.php')", "array_map('pmssTrafficFormatAmount', \$data['raw'])"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/showTraffic.php', ["pmssListManagedUsersResult(__DIR__.'/listUsers.php')", 'pmssShowTrafficRawCounters($data)', "array_map('pmssTrafficFormatAmount', \$rawCounters)"]);
         $this->pmssAssertRepoFileNotContainsString('scripts/showTraffic.php', "exec(escapeshellarg(__DIR__.'/listUsers.php')");
+    }
+
+    public function testRawCountersNormalizeRequiredTrafficStats(): void
+    {
+        $this->assertEquals([
+            'month' => 2048.0,
+            'week' => 1024.0,
+            'day' => 512.5,
+            'hour' => 0.0,
+            '15min' => 12.0,
+        ], \pmssShowTrafficRawCounters([
+            'raw' => [
+                'month' => '2048',
+                'week' => 1024,
+                'day' => '512.5',
+                'hour' => 0,
+                '15min' => '12',
+                'extra' => 'preserved in raw JSON payload only',
+            ],
+        ]));
+    }
+
+    public function testRawCountersRejectMalformedTrafficStats(): void
+    {
+        $complete = ['month' => 10, 'week' => 7, 'day' => 1, 'hour' => 1, '15min' => 1];
+        foreach ([
+            [],
+            ['raw' => 'not-array'],
+            ['raw' => array_replace($complete, ['month' => 0])],
+            ['raw' => array_diff_key($complete, ['week' => true])],
+            ['raw' => array_replace($complete, ['15min' => 'bad'])],
+        ] as $payload) {
+            $this->assertSame(null, \pmssShowTrafficRawCounters($payload));
+        }
     }
 
     public function testFormatRateDisplay(): void
