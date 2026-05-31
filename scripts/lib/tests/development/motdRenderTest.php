@@ -29,7 +29,9 @@ class MotdRenderTest extends TestCase
 
     public function testRenderMotdTemplateReplacesPlaceholders(): void
     {
-        $tpl = "Host=%HOSTNAME% IP=%SERVER_IP% Version=%PMSS_VERSION% APT=%APT_LAST_UPDATE%\n";
+        $tpl = 'Host=%HOSTNAME% IP=%SERVER_IP% CPU=%SERVER_CPU% RAM=%SERVER_RAM% Storage=%SERVER_STORAGE% '
+            ."Version=%PMSS_VERSION% Updated=%UPDATE_DATE% APT=%APT_LAST_UPDATE% Up=%UPTIME% "
+            ."Kernel=%KERNEL_VERSION% Net=%NETWORK_SPEED% WG=%WIREGUARD_STATUS% OVPN=%OPENVPN_STATUS% Distro=%DISTRO%\n";
         $model = $this->motdModel([
             'host'          => 'example-host',
             'ip'            => '192.0.2.10',
@@ -49,14 +51,12 @@ class MotdRenderTest extends TestCase
         ]);
 
         $out = \Motd::renderMotdTemplate($tpl, $model, false);
-        $this->pmssAssertStringNotContainsString('%HOSTNAME%', $out, 'HOSTNAME placeholder should be replaced');
-        $this->pmssAssertStringNotContainsString('%SERVER_IP%', $out, 'SERVER_IP placeholder should be replaced');
-        $this->pmssAssertStringNotContainsString('%PMSS_VERSION%', $out, 'PMSS_VERSION placeholder should be replaced');
-        $this->pmssAssertStringNotContainsString('%APT_LAST_UPDATE%', $out, 'APT_LAST_UPDATE placeholder should be replaced');
-        $this->assertStringContainsString('example-host', $out);
-        $this->assertStringContainsString('192.0.2.10', $out);
-        $this->assertStringContainsString('git/main:2026-02-01@00:00', $out);
-        $this->assertStringContainsString('2026-02-01', $out);
+        $this->assertSame(
+            'Host=example-host IP=192.0.2.10 CPU=CPU RAM=RAM Storage=STOR '
+            ."Version=git/main:2026-02-01@00:00 Updated=2026-02-01 00:00 APT=2026-02-01 Up=up 1 day "
+            ."Kernel=6.1.0 Net=1000Mb/s WG=active OVPN=inactive Distro=Debian 12 (bookworm)\n",
+            $out
+        );
     }
 
     public function testRenderMotdTemplateStripsLegacyRuntimeVersionLines(): void

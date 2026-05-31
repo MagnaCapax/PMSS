@@ -103,6 +103,14 @@ final class SystemStatusCharacterizationTest extends TestCase
         );
     }
 
+    private function statusSnapshot(array $checks): array
+    {
+        $sourcesPath = (string) getenv('PMSS_APT_SOURCES_PATH');
+        return array_map(static function (array $check) use ($sourcesPath): string {
+            return $check['name'].'|'.$check['status'].'|'.str_replace($sourcesPath, '<sources>', (string) ($check['detail'] ?? ''));
+        }, $checks);
+    }
+
     public function testComponentChecksStayStableWithHermeticInputs(): void
     {
         $dependencies = $this->buildComponentStatusDependencies();
@@ -260,61 +268,50 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertSame(["command -v 'nginx'"], $commands);
     }
 
-    public function testSharedProbeCollectorPreservesCatalogOrderWhileFilteringNulls(): void
+    public function testSharedProbeRendererPreservesCatalogOrderAndViewFiltering(): void
     {
-        $checks = pmssStatusCollectProbeChecks(
-            [
-                'binaries' => [
-                    'alpha' => ['label' => 'first'],
-                    'beta' => ['skip' => true],
-                ],
-                'paths' => [
-                    ['path' => '/one', 'label' => 'third'],
-                    ['path' => '/two', 'skip' => true],
-                ],
+        $specs = [
+            'binaries' => [
+                'alpha' => ['infoCommand' => 'alpha --version', 'componentName' => 'bin.alpha'],
+                'beta' => ['infoCommand' => 'beta --version'],
             ],
-            static function (string $binary, array $binarySpec): ?array {
-                if (isset($binarySpec['skip'])) {
-                    return null;
-                }
-
-                return pmssStatus('Binary: '.$binary, 'OK', (string) $binarySpec['label']);
-            },
-            static function (array $pathSpec): ?array {
-                if (isset($pathSpec['skip'])) {
-                    return null;
-                }
-
-                return pmssStatus('Path: '.$pathSpec['path'], 'WARN', (string) $pathSpec['label']);
-            }
-        );
-
-        $this->assertSame(
-            [
-                ['name' => 'Binary: alpha', 'status' => 'OK', 'detail' => 'first'],
-                ['name' => 'Path: /one', 'status' => 'WARN', 'detail' => 'third'],
+            'paths' => [
+                ['systemLabel' => 'Alpha config', 'componentName' => 'config.alpha', 'path' => '/alpha'],
+                ['systemLabel' => 'Beta config', 'path' => '/beta'],
             ],
-            $checks
-        );
-    }
+        ];
+        $runCommand = static function (string $command): string {
+            return [
+                "command -v 'alpha'" => '/usr/bin/alpha',
+                'alpha --version' => 'alpha 1.0',
+            ][$command] ?? '';
+        };
+        $isExecutable = static function (string $path): bool {
+            return $path === '/usr/bin/alpha';
+        };
+        $pathExists = static function (string $path): bool {
+            return $path === '/alpha';
+        };
 
-    public function testSharedProbeCollectorTreatsMissingCatalogBucketsAsEmptyArrays(): void
-    {
-        $checks = null;
-
-        $this->pmssAssertNoPhpWarnings(function () use (&$checks): void {
-            $checks = pmssStatusCollectProbeChecks(
-                [],
-                static function (string $binary, array $binarySpec): ?array {
-                    return pmssStatus('Binary: '.$binary, 'OK', 'unexpected');
-                },
-                static function (array $pathSpec): ?array {
-                    return pmssStatus('Path: '.(string) ($pathSpec['path'] ?? ''), 'OK', 'unexpected');
-                }
+        $this->pmssAssertNoPhpWarnings(function () use ($specs, $runCommand, $isExecutable, $pathExists): void {
+            $this->assertSame([], pmssStatusProbeChecks([], $runCommand, $isExecutable, $pathExists));
+            $this->assertSame(
+                [
+                    ['name' => 'Binary: alpha', 'status' => 'OK', 'detail' => 'alpha 1.0'],
+                    ['name' => 'Binary: beta', 'status' => 'WARN', 'detail' => 'Not found in PATH'],
+                    ['name' => 'Alpha config', 'status' => 'OK', 'detail' => '/alpha'],
+                    ['name' => 'Beta config', 'status' => 'WARN', 'detail' => '/beta missing'],
+                ],
+                pmssStatusProbeChecks($specs, $runCommand, $isExecutable, $pathExists)
+            );
+            $this->assertSame(
+                [
+                    ['name' => 'bin.alpha', 'status' => 'OK', 'detail' => '/usr/bin/alpha'],
+                    ['name' => 'config.alpha', 'status' => 'OK', 'detail' => '/alpha'],
+                ],
+                pmssStatusProbeChecks($specs, $runCommand, $isExecutable, $pathExists, true)
             );
         });
-
-        $this->assertSame([], $checks);
     }
 
     public function testStatusSummaryCountsOkWarnAndErr(): void
@@ -403,22 +400,53 @@ final class SystemStatusCharacterizationTest extends TestCase
     {
         $checks = pmssSystemStatusChecks($this->buildSystemStatusDependencies());
 
-        $this->assertEquals('OS codename', $checks[0]['name']);
-        $this->assertEquals('OK', $checks[0]['status']);
-        $this->assertEquals('bookworm', $checks[0]['detail']);
-        $this->assertEquals('Binary: rtorrent', $checks[1]['name']);
-        $this->assertEquals('rtorrent 0.9.8', $checks[1]['detail']);
-        $this->assertEquals('Seedbox localnet (config)', $checks[23]['name']);
-        $this->assertEquals('OK', $checks[23]['status']);
-        $this->assertEquals('Sources codename match', $checks[24]['name']);
-        $this->assertEquals('OK', $checks[24]['status']);
-        $this->assertEquals('OpenVPN client artifacts', $checks[25]['name']);
-        $this->assertEquals('OK', $checks[25]['status']);
-        $this->assertEquals('CLI symlink: pyLoad', $checks[29]['name']);
-        $this->assertEquals('OK', $checks[29]['status']);
-        $this->assertEquals('Component: os.codename', $checks[30]['name']);
-        $this->assertEquals('Component: config.nginx', $checks[41]['name']);
-        $this->assertEquals(42, count($checks));
+        $this->assertSame(
+            [
+                'OS codename|OK|bookworm',
+                'Binary: rtorrent|OK|rtorrent 0.9.8',
+                'Binary: nginx|OK|nginx version: nginx/1.22.0',
+                'Binary: lighttpd|OK|lighttpd/1.4.69',
+                'Binary: php|OK|PHP 8.2.0',
+                'Binary: proftpd|OK|ProFTPD Version 1.3.7',
+                'Binary: openvpn|OK|OpenVPN 2.6.0',
+                'Binary: tar|OK|tar (GNU tar) 1.34',
+                'Binary: pigz|OK|pigz 2.8',
+                'Binary: gpg|OK|gpg (GnuPG) 2.2.40',
+                'Binary: curl|OK|curl 8.4.0',
+                'Binary: wget|OK|GNU Wget 1.21.3',
+                'Binary: rsync|OK|rsync  version 3.2.7',
+                'Binary: python3|OK|Python 3.11.2',
+                'Binary: git|OK|git version 2.39.2',
+                'Binary: flexget|OK|3.8.51',
+                'Binary: pyload|OK|pyLoad 0.5.0',
+                'Apt sources|OK|<sources>',
+                'ProFTPD configuration|OK|/etc/proftpd/proftpd.conf',
+                'OpenVPN directory|OK|/etc/openvpn',
+                'VPN Easy-RSA|OK|/etc/openvpn/easy-rsa',
+                'Seedbox localnet|OK|/etc/seedbox/localnet',
+                'Nginx directory|OK|/etc/nginx',
+                'Seedbox localnet (config)|OK|/etc/seedbox/config/localnet readable via 0664 + traversable dirs',
+                'Sources codename match|OK|sources.list references bookworm',
+                'OpenVPN client artifacts|OK|openvpn-host-pulsedmedia-com.ovpn, openvpn-host-pulsedmedia-com.crt',
+                'Virtualenv: FlexGet binary|OK|/opt/flexget/bin/flexget',
+                'Virtualenv: pyLoad binary|OK|/opt/pyload/bin/pyload',
+                'CLI symlink: flexget|OK|/usr/local/bin/flexget -> /opt/flexget/bin/flexget',
+                'CLI symlink: pyLoad|OK|/usr/local/bin/pyload -> /opt/pyload/bin/pyload',
+                'Component: os.codename|OK|bookworm',
+                'Component: apt.sources|OK|contains bookworm',
+                'Component: bin.rtorrent|OK|/usr/bin/rtorrent',
+                'Component: bin.nginx|OK|/usr/sbin/nginx',
+                'Component: bin.php|OK|/usr/bin/php',
+                'Component: bin.proftpd|OK|/usr/sbin/proftpd',
+                'Component: bin.openvpn|OK|/usr/sbin/openvpn',
+                'Component: bin.curl|OK|/usr/bin/curl',
+                'Component: config.proftpd|OK|/etc/proftpd/proftpd.conf',
+                'Component: config.openvpn|OK|/etc/openvpn',
+                'Component: config.seedbox.localnet|OK|/etc/seedbox/localnet',
+                'Component: config.nginx|OK|/etc/nginx',
+            ],
+            $this->statusSnapshot($checks)
+        );
     }
 
     public function testSystemStatusRejectsInvalidOpenvpnHostnameBeforeArtifactProbe(): void
@@ -441,59 +469,6 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertEquals('OpenVPN client artifacts', $checks[25]['name']);
         $this->assertEquals('WARN', $checks[25]['status']);
         $this->assertEquals('hostname invalid', $checks[25]['detail']);
-    }
-
-    public function testSystemStatusCheckOrderStaysStableWithHermeticInputs(): void
-    {
-        $checks = pmssSystemStatusChecks($this->buildSystemStatusDependencies());
-
-        $this->assertEquals(
-            [
-                'OS codename',
-                'Binary: rtorrent',
-                'Binary: nginx',
-                'Binary: lighttpd',
-                'Binary: php',
-                'Binary: proftpd',
-                'Binary: openvpn',
-                'Binary: tar',
-                'Binary: pigz',
-                'Binary: gpg',
-                'Binary: curl',
-                'Binary: wget',
-                'Binary: rsync',
-                'Binary: python3',
-                'Binary: git',
-                'Binary: flexget',
-                'Binary: pyload',
-                'Apt sources',
-                'ProFTPD configuration',
-                'OpenVPN directory',
-                'VPN Easy-RSA',
-                'Seedbox localnet',
-                'Nginx directory',
-                'Seedbox localnet (config)',
-                'Sources codename match',
-                'OpenVPN client artifacts',
-                'Virtualenv: FlexGet binary',
-                'Virtualenv: pyLoad binary',
-                'CLI symlink: flexget',
-                'CLI symlink: pyLoad',
-                'Component: os.codename',
-                'Component: apt.sources',
-                'Component: bin.rtorrent',
-                'Component: bin.nginx',
-                'Component: bin.php',
-                'Component: bin.proftpd',
-                'Component: bin.openvpn',
-                'Component: bin.curl',
-                'Component: config.proftpd',
-                'Component: config.openvpn',
-                'Component: config.seedbox.localnet',
-                'Component: config.nginx',
-            ],
-            array_column($checks, 'name')
-        );
     }
 
     public function testSystemStatusIncludesComponentProjectionVerbatim(): void

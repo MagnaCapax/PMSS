@@ -92,55 +92,40 @@ class Motd
      */
     public static function renderMotdTemplate(string $template, array $model, bool $colorEnabled): string
     {
-        [$host, $ip, $cpu, $ram, $storage,
-            $pmssVersion, $updateDate, $aptLastUpdate, $uptime, $kernel,
-            $netSpeed, $wg, $ovpn, $distro, $storageWarn] = array_map(
-            static function (string $key) use ($model): string {
-                return isset($model[$key]) ? (string) $model[$key] : '';
-            },
-            ['host', 'ip', 'cpu', 'ram', 'storage', 'pmssVersion', 'updateDate', 'aptLastUpdate', 'uptime', 'kernel', 'netSpeed', 'wgStatus', 'ovpnStatus', 'distro', 'storageWarn']
-        );
+        $values = [];
+        foreach (['host', 'ip', 'cpu', 'ram', 'storage', 'pmssVersion', 'updateDate', 'aptLastUpdate', 'uptime', 'kernel', 'netSpeed', 'wgStatus', 'ovpnStatus', 'distro', 'storageWarn'] as $key) {
+            $values[$key] = isset($model[$key]) ? (string) $model[$key] : '';
+        }
 
         // Light color accents for readability (opt-out via PMSS_MOTD_COLOR=0)
         if ($colorEnabled) {
-            $host = self::c($host, '1;36'); // bold cyan
-            $ip = self::c($ip, '32'); // green
-            $cpu = self::c($cpu, '37'); // white
-            $ram = self::c($ram, '36'); // cyan
-            $storage = self::c($storage, '35'); // magenta
-            $pmssVersion = self::c($pmssVersion, '1;34'); // bold blue
-            $kernel = self::c($kernel, '34'); // blue
-            $distro = self::c($distro, '1;35'); // bold magenta
-            $netSpeed = trim($netSpeed);
-            $netSpeed = ($netSpeed !== '' && !in_array(strtolower($netSpeed), ['unknown', 'n/a'], true))
+            foreach (['host' => '1;36', 'ip' => '32', 'cpu' => '37', 'ram' => '36', 'storage' => '35', 'pmssVersion' => '1;34', 'kernel' => '34', 'distro' => '1;35'] as $key => $code) {
+                $values[$key] = self::c($values[$key], $code);
+            }
+            $netSpeed = trim($values['netSpeed']);
+            $values['netSpeed'] = ($netSpeed !== '' && !in_array(strtolower($netSpeed), ['unknown', 'n/a'], true))
                 ? self::c($netSpeed, '32') // green when detected
                 : self::c('Unknown', '33'); // yellow when unknown
         }
 
-        $repl = [
-            '%HOSTNAME%'         => $host,
-            '%SERVER_IP%'        => $ip,
-            '%SERVER_CPU%'       => $cpu,
-            '%SERVER_RAM%'       => $ram,
-            '%SERVER_STORAGE%'   => $storage,
-            '%PMSS_VERSION%'     => $pmssVersion,
-            '%UPDATE_DATE%'      => $updateDate,
-            '%APT_LAST_UPDATE%'  => $aptLastUpdate,
-            '%UPTIME%'           => $uptime,
-            '%KERNEL_VERSION%'   => $kernel,
-            '%NETWORK_SPEED%'    => $netSpeed,
-            '%WIREGUARD_STATUS%' => $wg,
-            '%OPENVPN_STATUS%'   => $ovpn,
-            '%DISTRO%'           => $distro,
-        ];
+        $repl = [];
+        foreach ([
+            '%HOSTNAME%' => 'host', '%SERVER_IP%' => 'ip', '%SERVER_CPU%' => 'cpu', '%SERVER_RAM%' => 'ram',
+            '%SERVER_STORAGE%' => 'storage', '%PMSS_VERSION%' => 'pmssVersion', '%UPDATE_DATE%' => 'updateDate',
+            '%APT_LAST_UPDATE%' => 'aptLastUpdate', '%UPTIME%' => 'uptime', '%KERNEL_VERSION%' => 'kernel',
+            '%NETWORK_SPEED%' => 'netSpeed', '%WIREGUARD_STATUS%' => 'wgStatus', '%OPENVPN_STATUS%' => 'ovpnStatus',
+            '%DISTRO%' => 'distro',
+        ] as $placeholder => $key) {
+            $repl[$placeholder] = $values[$key];
+        }
 
         $rendered = strtr($template, $repl);
         $rendered = str_replace('Runtime Version: %RUN_VERSION%', '', $rendered);
         $patched = preg_replace('/^\s*Runtime Version:.*$/m', '', $rendered);
         $rendered = is_string($patched) ? $patched : $rendered;
 
-        if ($storageWarn !== '') {
-            $rendered .= "\n\e[33mStorage WARN:\e[0m ".$storageWarn."\n";
+        if ($values['storageWarn'] !== '') {
+            $rendered .= "\n\e[33mStorage WARN:\e[0m ".$values['storageWarn']."\n";
         }
 
         return $rendered;
@@ -206,14 +191,15 @@ class Motd
     {
         $uptime  = trim((string) shell_exec('uptime -p'));
         $kernel  = trim((string) shell_exec('uname -r'));
-        // Discover the primary interface via routing table
-        $route = preg_split('/\s+/', trim((string) shell_exec('ip -o route get 1 2>/dev/null')));
-        $ifaceIndex = is_array($route) ? array_search('dev', $route, true) : false;
-        $iface = ($ifaceIndex !== false && isset($route[$ifaceIndex + 1])) ? $route[$ifaceIndex + 1] : '';
-        if ($iface === '') {
-            $route = preg_split('/\s+/', trim((string) shell_exec('ip route show default 2>/dev/null')));
+        $iface = '';
+        // Discover the primary interface via routing table, preferring route-get.
+        foreach (['ip -o route get 1 2>/dev/null', 'ip route show default 2>/dev/null'] as $routeCommand) {
+            $route = preg_split('/\s+/', trim((string) shell_exec($routeCommand)));
             $ifaceIndex = is_array($route) ? array_search('dev', $route, true) : false;
             $iface = ($ifaceIndex !== false && isset($route[$ifaceIndex + 1])) ? $route[$ifaceIndex + 1] : '';
+            if ($iface !== '') {
+                break;
+            }
         }
         $net = 'Unknown';
         if ($iface !== '') {

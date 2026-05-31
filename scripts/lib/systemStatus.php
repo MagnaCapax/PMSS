@@ -105,21 +105,31 @@ function pmssStatusProbeSpecs(string $sourcesPath): array
     ];
 }
 
-/** @return array<int, array<string, string>> Walk the shared status probe catalog once. */
-function pmssStatusCollectProbeChecks(array $probeSpecs, callable $binaryProbe, callable $pathProbe): array
+/** @return array<int, array<string, string>> Render shared binary/path probes for one status view. */
+function pmssStatusProbeChecks(array $probeSpecs, callable $runCommand, callable $isExecutable, callable $pathExists, bool $componentView = false): array
 {
     $checks = [];
     $binarySpecs = isset($probeSpecs['binaries']) && is_array($probeSpecs['binaries'])
         ? $probeSpecs['binaries']
         : [];
     foreach ($binarySpecs as $binary => $binarySpec) {
-        ($check = $binaryProbe((string) $binary, $binarySpec)) !== null && $checks[] = $check;
+        if (!is_array($binarySpec)) {
+            $binarySpec = [];
+        }
+        ($check = pmssStatusBinaryProbeCheck((string) $binary, $binarySpec, $runCommand, $isExecutable, $componentView)) !== null && $checks[] = $check;
     }
     $pathSpecs = isset($probeSpecs['paths']) && is_array($probeSpecs['paths'])
         ? $probeSpecs['paths']
         : [];
     foreach ($pathSpecs as $pathSpec) {
-        ($check = $pathProbe($pathSpec)) !== null && $checks[] = $check;
+        if (!is_array($pathSpec) || ($componentView && !isset($pathSpec['componentName']))) {
+            continue;
+        }
+        $path = (string) ($pathSpec['path'] ?? '');
+        $exists = $pathExists($path);
+        $checks[] = $componentView
+            ? pmssStatus((string) $pathSpec['componentName'], $exists ? 'OK' : 'WARN', $exists ? $path : 'missing')
+            : pmssStatus((string) ($pathSpec['systemLabel'] ?? $path), $exists ? 'OK' : 'WARN', $exists ? $path : $path.' missing');
     }
     return $checks;
 }
@@ -170,17 +180,7 @@ function pmssComponentStatusChecks(array $dependencies = []): array
         ? pmssStatus('apt.sources', ($matches = $codename === '' || stripos($readFile($sourcesPath), $codename) !== false) ? 'OK' : 'WARN', $matches ? 'contains '.$codename : 'codename mismatch')
         : pmssStatus('apt.sources', 'WARN', 'missing sources.list');
 
-    return array_merge($results, pmssStatusCollectProbeChecks(
-        $context['probeSpecs'],
-        static function (string $binary, array $binarySpec) use ($runCommand, $isExecutable): ?array {
-            return pmssStatusBinaryProbeCheck($binary, $binarySpec, $runCommand, $isExecutable, true);
-        },
-        static function (array $pathSpec) use ($pathExists): ?array {
-            if (!isset($pathSpec['componentName'])) return null;
-            $path = (string) $pathSpec['path'];
-            return pmssStatus((string) $pathSpec['componentName'], ($exists = $pathExists($path)) ? 'OK' : 'WARN', $exists ? $path : 'missing');
-        }
-    ));
+    return array_merge($results, pmssStatusProbeChecks($context['probeSpecs'], $runCommand, $isExecutable, $pathExists, true));
 }
 
 /**
@@ -201,17 +201,7 @@ function pmssSystemStatusChecks(array $dependencies = []): array
     $checks[] = $codename === ''
         ? pmssStatus('OS codename', 'WARN', 'VERSION_CODENAME missing')
         : pmssStatus('OS codename', 'OK', $codename);
-    $checks = array_merge($checks, pmssStatusCollectProbeChecks(
-        $context['probeSpecs'],
-        static function (string $binary, array $binarySpec) use ($runCommand, $isExecutable): ?array {
-            return pmssStatusBinaryProbeCheck($binary, $binarySpec, $runCommand, $isExecutable);
-        },
-        static function (array $pathSpec) use ($pathExists): array {
-            $path = (string) $pathSpec['path'];
-            $exists = $pathExists($path);
-            return pmssStatus((string) $pathSpec['systemLabel'], $exists ? 'OK' : 'WARN', $exists ? $path : $path.' missing');
-        }
-    ));
+    $checks = array_merge($checks, pmssStatusProbeChecks($context['probeSpecs'], $runCommand, $isExecutable, $pathExists));
 
     $localnetConfig = '/etc/seedbox/config/localnet';
     if ($isFile($localnetConfig)) {
