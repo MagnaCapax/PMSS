@@ -35,10 +35,7 @@ class NginxConfigWriteGuardTest extends TestCase
 
     public function testWriteFileRejectsSymlinkTarget(): void
     {
-        $realPath = $this->tempDir.'/real.conf';
-        $linkPath = $this->tempDir.'/link.conf';
-        file_put_contents($realPath, "keep\n");
-        symlink($realPath, $linkPath);
+        [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real.conf', $this->tempDir.'/link.conf', "keep\n");
 
         $this->assertFalse(\pmssCreateNginxConfigWriteFile($linkPath, "replace\n", 'alice', 'user config'));
         $this->assertEquals("keep\n", (string) file_get_contents($realPath));

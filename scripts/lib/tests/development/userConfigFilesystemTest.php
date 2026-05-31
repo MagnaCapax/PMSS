@@ -38,10 +38,7 @@ class UserConfigFilesystemTest extends TestCase
     public function testReadSerializedArrayFileRejectsSymlinkPayloads(): void
     {
         $root = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700);
-        $target = $root.'/target.serialized';
-        file_put_contents($target, serialize(['ramBlock' => 128]));
-        $link = $root.'/link.serialized';
-        $this->pmssCreateSymlinkOrSkip($target, $link);
+        [, $link] = $this->pmssCreateSymlinkedFileOrSkip($root.'/target.serialized', $root.'/link.serialized', serialize(['ramBlock' => 128]), 0700);
 
         $this->assertSame(null, \pmssReadSerializedArrayFile($link));
     }
@@ -85,10 +82,7 @@ class UserConfigFilesystemTest extends TestCase
     public function testReadRequiredFileThrowsForSymlink(): void
     {
         $root = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700);
-        $target = $root.'/target.conf';
-        file_put_contents($target, "enabled = no\n");
-        $link = $root.'/link.conf';
-        $this->pmssCreateSymlinkOrSkip($target, $link);
+        [, $link] = $this->pmssCreateSymlinkedFileOrSkip($root.'/target.conf', $root.'/link.conf', "enabled = no\n", 0700);
 
         try {
             \pmssReadRequiredRegularFile($link, 'demo defaults');

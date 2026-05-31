@@ -105,10 +105,7 @@ class NetworkConfigTest extends TestCase
     public function testLoadLocalnetsRejectsSymlinkedConfigFile(): void
     {
         $root = $this->pmssMakeTempDir('pmss-localnets-symlink-');
-        $target = $root.'/target-localnet';
-        file_put_contents($target, "10.0.0.0/8\n");
-        $link = $root.'/localnet';
-        $this->pmssCreateSymlinkOrSkip($target, $link);
+        [, $link] = $this->pmssCreateSymlinkedFileOrSkip($root.'/target-localnet', $root.'/localnet', "10.0.0.0/8\n");
 
         $this->pmssWithEnv(['PMSS_LOCALNET_FILE' => $link], function (): void {
             $this->assertEquals([], \networkLoadLocalnets());
@@ -118,10 +115,7 @@ class NetworkConfigTest extends TestCase
     public function testLoadLocalnetsDoesNotPersistDefaultThroughSymlinkedParent(): void
     {
         $root = $this->pmssMakeTempDir('pmss-localnets-parent-');
-        $targetDir = $root.'/target';
-        @mkdir($targetDir, 0755, true);
-        $linkDir = $root.'/linked';
-        $this->pmssCreateSymlinkOrSkip($targetDir, $linkDir);
+        [$targetDir, $linkDir] = $this->pmssCreateSymlinkedDirectoryOrSkip($root.'/target', $root.'/linked');
         $path = $linkDir.'/localnet';
 
         $this->pmssWithEnv([

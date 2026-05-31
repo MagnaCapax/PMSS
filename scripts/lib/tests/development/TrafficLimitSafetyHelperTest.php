@@ -27,10 +27,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testEnsureStorageDirRejectsSymlink(): void
     {
-        $realDir = $this->tempDir.'/real';
-        $linkDir = $this->tempDir.'/link';
-        mkdir($realDir, 0755, true);
-        symlink($realDir, $linkDir);
+        [, $linkDir] = $this->pmssCreateSymlinkedDirectoryOrSkip($this->tempDir.'/real', $this->tempDir.'/link');
 
         $this->assertTrue(\pmssTrafficLimitEnsureStorageDir($linkDir) === false);
     }
@@ -70,10 +67,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testRemoveGiBFileRejectsSymlink(): void
     {
-        $realPath = $this->tempDir.'/real';
-        $linkPath = $this->tempDir.'/link';
-        file_put_contents($realPath, '12');
-        symlink($realPath, $linkPath);
+        [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real', $this->tempDir.'/link', '12');
 
         $this->assertTrue(\pmssTrafficLimitRemoveGiBFile($linkPath) === false);
         $this->assertTrue(file_exists($realPath));
@@ -107,10 +101,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testConvergeFileModeRejectsSymlink(): void
     {
-        $realPath = $this->tempDir.'/real';
-        $linkPath = $this->tempDir.'/link';
-        file_put_contents($realPath, '12');
-        symlink($realPath, $linkPath);
+        [, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real', $this->tempDir.'/link', '12');
 
         $this->assertTrue(\pmssTrafficLimitConvergeFileMode($linkPath, 0600) === false);
     }
@@ -140,11 +131,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testThrottleFileWriteRejectsSymlinkTarget(): void
     {
-        $realPath = $this->tempDir.'/real';
-        $linkPath = $this->tempDir.'/home/alice/.throttle';
-        mkdir(dirname($linkPath), 0755, true);
-        file_put_contents($realPath, 'old');
-        symlink($realPath, $linkPath);
+        [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real', $this->tempDir.'/home/alice/.throttle', 'old');
 
         $error = null;
         $this->assertFalse(\pmssTrafficLimitThrottleFileWrite($linkPath, 25, $error));
@@ -164,11 +151,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testThrottleFileRemoveRejectsSymlinkTarget(): void
     {
-        $realPath = $this->tempDir.'/real';
-        $linkPath = $this->tempDir.'/home/alice/.throttle';
-        mkdir(dirname($linkPath), 0755, true);
-        file_put_contents($realPath, 'old');
-        symlink($realPath, $linkPath);
+        [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real', $this->tempDir.'/home/alice/.throttle', 'old');
 
         $error = null;
         $this->assertFalse(\pmssTrafficLimitThrottleFileRemove($linkPath, $error));
@@ -188,11 +171,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testMarkerTouchRejectsSymlinkTarget(): void
     {
-        $realPath = $this->tempDir.'/real-marker';
-        $linkPath = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
-        mkdir(dirname($linkPath), 0700, true);
-        file_put_contents($realPath, 'old');
-        symlink($realPath, $linkPath);
+        [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real-marker', $this->tempDir.'/runtime/trafficLimits/alice.enabled', 'old', 0700);
 
         ob_start();
         $result = \pmssTrafficLimitMarkerTouch('alice', $linkPath);
@@ -210,11 +189,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testMarkerRemoveRejectsSymlinkTarget(): void
     {
-        $realPath = $this->tempDir.'/real-marker';
-        $linkPath = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
-        mkdir(dirname($linkPath), 0700, true);
-        file_put_contents($realPath, 'old');
-        symlink($realPath, $linkPath);
+        [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real-marker', $this->tempDir.'/runtime/trafficLimits/alice.enabled', 'old', 0700);
 
         ob_start();
         $result = \pmssTrafficLimitMarkerRemove('alice', $linkPath);
@@ -264,10 +239,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testPersistTargetModesRejectsUnsafeRemovalTargets(): void
     {
-        $realPath = $this->tempDir.'/real';
-        $linkPath = $this->tempDir.'/link';
-        file_put_contents($realPath, '12');
-        symlink($realPath, $linkPath);
+        [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real', $this->tempDir.'/link', '12');
 
         $error = null;
         $this->assertFalse(\pmssTrafficLimitPersistTargetModes([$linkPath => 0600], 0, $error));

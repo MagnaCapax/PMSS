@@ -1117,6 +1117,24 @@ abstract class TestCase
         }
     }
 
+    /** Create a symlinked file fixture and return [target, link]. */
+    protected function pmssCreateSymlinkedFileOrSkip(string $target, string $link, string $content = '', int $dirMode = 0755): array
+    {
+        $this->pmssWriteFile($target, $content, $dirMode);
+        $this->pmssEnsureDir(dirname($link), $dirMode);
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+        return [$target, $link];
+    }
+
+    /** Create a symlinked directory fixture and return [target, link]. */
+    protected function pmssCreateSymlinkedDirectoryOrSkip(string $target, string $link, int $mode = 0755): array
+    {
+        $this->pmssEnsureDir($target, $mode);
+        $this->pmssEnsureDir(dirname($link), $mode);
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+        return [$target, $link];
+    }
+
     /** Resolve the repository root from the development test tree. */
     protected function pmssRepoRoot(): string
     {

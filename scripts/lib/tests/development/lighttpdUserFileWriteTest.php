@@ -32,10 +32,7 @@ class LighttpdUserFileWriteTest extends TestCase
 
     public function testAppendUserFileRejectsSymlinkTarget(): void
     {
-        $realPath = $this->tempDir.'/real.htpasswd';
-        $linkPath = $this->tempDir.'/link.htpasswd';
-        file_put_contents($realPath, "user:hash\n");
-        symlink($realPath, $linkPath);
+        [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real.htpasswd', $this->tempDir.'/link.htpasswd', "user:hash\n");
 
         $this->assertFalse(\pmssAppendUserFile($linkPath, "other:hash\n", $this->pmssCurrentOwner(), 0640));
         $this->assertEquals("user:hash\n", file_get_contents($realPath));
@@ -69,10 +66,7 @@ class LighttpdUserFileWriteTest extends TestCase
 
     public function testWriteUserFileRejectsSymlinkedParentDirectory(): void
     {
-        $realDir = $this->tempDir.'/real';
-        $linkDir = $this->tempDir.'/linked';
-        @mkdir($realDir, 0755, true);
-        symlink($realDir, $linkDir);
+        [, $linkDir] = $this->pmssCreateSymlinkedDirectoryOrSkip($this->tempDir.'/real', $this->tempDir.'/linked');
 
         $this->assertFalse(\pmssWriteUserFile($linkDir.'/.htpasswd', "user:hash\n", $this->pmssCurrentOwner(), 0640));
     }
