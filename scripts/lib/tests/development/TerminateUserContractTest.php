@@ -80,6 +80,40 @@ final class TerminateUserContractTest extends TestCase
         $this->assertFalse(\pmssUserHomeReclaimPathIsSafe('/tmp/.terminating-user1234-20260101000000-42'), 'reclaim path must stay under /home');
     }
 
+    public function testHomeReclaimLaunchRejectsUnsafePath(): void
+    {
+        $this->assertSame('', \pmssUserHomeReclaimLaunchCommand('/home/user1234'));
+
+        $command = \pmssUserHomeReclaimLaunchCommand('/home/.terminating-user1234-20260101000000-42');
+        $this->assertStringContainsString('/scripts/util/userHomeReclaim.php', $command);
+        $this->assertStringContainsString('ionice -c3 nice -n 19', $command);
+    }
+
+    public function testTerminateUserHomeInvariantIsExact(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/terminateUser.php',
+            [
+                '$realHome !== $expectedHome',
+                'Prefix checks are too loose',
+            ],
+            'terminateUser.php should reject prefix-confusable home paths: '
+        );
+    }
+
+    public function testTerminateUserHandlesUnreadableRtorrentConfig(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/terminateUser.php',
+            [
+                '$configLines = @file($portFile',
+                'cleanup_ports_config_read',
+                '$configLines = array();',
+            ],
+            'terminateUser.php should not parse unreadable rTorrent config as port data: '
+        );
+    }
+
     public function testTerminateUserFinalCleanupDoesNotDeleteActiveHomeName(): void
     {
         $this->pmssAssertRepoFileContainsString(

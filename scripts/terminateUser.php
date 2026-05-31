@@ -149,12 +149,12 @@ if (pmssUserAccountLookup($username) === null) {
     die("Refusing to terminate {$username}: no passwd entry found\n");
 }
 
-// Invariant: refuse to operate when the resolved home directory does not
-// match the expected /home/<username> prefix. This protects against path
-// tricks or unexpected symlinks.
+// Invariant: refuse to operate when the resolved home directory is not exactly
+// the expected /home/<username>. Prefix checks are too loose for destructive
+// cleanup because /home/user2 also starts with /home/user.
 $expectedHome = "/home/{$username}";
 $realHome = realpath($expectedHome);
-if ($realHome === false || strpos($realHome, $expectedHome) !== 0) {
+if ($realHome === false || $realHome !== $expectedHome) {
     pmssUserLifecycleContextLogStatusMessage(
         'terminate',
         'invariant_home_prefix',
@@ -211,7 +211,18 @@ $portFile = "/home/{$username}/.rtorrent.rc";
 $ports = [];
 if (file_exists($portFile)) {
     // #TODO consider parsing ports via shared helper instead of ad-hoc regex when refactoring rtorrent config handling.
-    $configLines = file($portFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $configLines = @file($portFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if (!is_array($configLines)) {
+        pmssUserLifecycleContextLogStatusMessage(
+            'terminate',
+            'cleanup_ports_config_read',
+            $username,
+            'WARN',
+            'Unable to read rTorrent config; skipping reserved port cleanup',
+            array('path' => $portFile)
+        );
+        $configLines = array();
+    }
     foreach ($configLines as $line) {
         $line = trim($line);
         if ($line === '' || $line[0] == '#') continue;

@@ -73,6 +73,10 @@ function pmssUserHomeReclaimPathNext(string $username): string
 /** Build the detached, low-priority command that reclaims a renamed home tree. */
 function pmssUserHomeReclaimLaunchCommand(string $targetPath): string
 {
+    if (!pmssUserHomeReclaimPathIsSafe($targetPath)) {
+        return '';
+    }
+
     $launcher = 'if command -v ionice >/dev/null 2>&1; then exec ionice -c3 nice -n 19 "$@"; fi; exec nice -n 19 "$@"';
     $command = pmssBuildCommand('sh', array(
         '-c',
