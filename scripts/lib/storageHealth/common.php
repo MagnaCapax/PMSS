@@ -27,6 +27,21 @@ function pmssStorageHealthDiskInventoryFromLsblk(string $lsblkOut): array
 }
 
 /**
+ * Read disk inventory only after lsblk reports a clean exit.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function pmssStorageHealthDiskInventoryRead(): array
+{
+    $result = pmssCommandCapture('lsblk -dn -o KNAME,TYPE,ROTA,MODEL,SERIAL,SIZE', 30);
+    if ((int) ($result['rc'] ?? 1) !== 0) {
+        return [];
+    }
+
+    return pmssStorageHealthDiskInventoryFromLsblk((string) ($result['stdout'] ?? ''));
+}
+
+/**
  * Read the latest entry per (kind, device/array) key from a JSONL file.
  *
  * @return array<string, array<string, mixed>>

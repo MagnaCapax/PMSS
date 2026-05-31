@@ -38,7 +38,7 @@ function pmssStorageHealthSnapshotMain(array $argv): int
     $last = pmssStorageHealthReadLastEntries($logPath);
 
     $snapshotEntries = [];
-    $disks = pmssStorageHealthDiskInventoryFromLsblk((string) shell_exec('lsblk -dn -o KNAME,TYPE,ROTA,MODEL,SERIAL,SIZE 2>/dev/null'));
+    $disks = pmssStorageHealthDiskInventoryRead();
     foreach ($disks as $disk) {
         $snapshotEntries[] = pmssStorageHealthSnapshotSmart($disk, $last, $timestamp);
         if (is_array($nvme = pmssStorageHealthSnapshotNvme($disk, $last, $timestamp))) {

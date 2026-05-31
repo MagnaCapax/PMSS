@@ -253,6 +253,41 @@ class StorageBenchSecurityTest extends TestCase
         $this->assertStringNotContainsString("\$free=(int)trim((string) shell_exec('df -PB1 ", $source);
     }
 
+    public function testDeviceProbesUseCheckedCommandCapture(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/storageBenchmark.php');
+
+        $this->assertStringContainsAllStrings(['pmssStorageHealthDiskInventoryRead()', 'storageBenchmarkDeviceSizeBytesRead', "pmssCommandCapture('blockdev --getsize64 "], $source);
+        $this->assertStringNotContainsString("shell_exec('lsblk -dn", $source);
+        $this->assertStringNotContainsString("shell_exec('blockdev --getsize64 ", $source);
+    }
+
+    public function testDiskInventoryRejectsNonzeroCommandOutput(): void
+    {
+        require_once $this->pmssRepoPath('scripts/lib/storageHealth/common.php');
+        $stubDir = $this->pmssMakeTempDir('pmss-bench-lsblk-', 0700);
+        $this->pmssWriteExecutableFiles($stubDir, [
+            'lsblk' => "#!/bin/sh\nprintf '%s\\n' 'pmssfake0 disk 1 PMSSSERIAL 1T'\nexit 1\n",
+        ]);
+
+        $this->pmssWithPathPrefix($stubDir, function (): void {
+            $this->assertSame([], \pmssStorageHealthDiskInventoryRead());
+        });
+    }
+
+    public function testBlockDeviceSizeRejectsNonzeroCommandOutput(): void
+    {
+        require_once $this->pmssRepoPath('scripts/lib/storageBenchmark.php');
+        $stubDir = $this->pmssMakeTempDir('pmss-bench-blockdev-', 0700);
+        $this->pmssWriteExecutableFiles($stubDir, [
+            'blockdev' => "#!/bin/sh\nprintf '%s\\n' '1048576'\nexit 1\n",
+        ]);
+
+        $this->pmssWithPathPrefix($stubDir, function (): void {
+            $this->assertSame(null, \storageBenchmarkDeviceSizeBytesRead('/dev/pmss-test'));
+        });
+    }
+
     public function testFileBackedTempFileIsCleanedAfterLateAppendFailure(): void
     {
         $target = $this->pmssMakeTempDir('pmss-bench-target-', 0700);

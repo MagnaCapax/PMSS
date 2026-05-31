@@ -223,13 +223,22 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $symbol = 'pmssStorageHealthDisk'.'InventoryFromLsblk';
 
         $this->assertTrue(!is_file($this->pmssRepoPath('scripts/lib/storageHealth/disks.php')), 'Expected one-call storageHealth/disks.php helper file to be removed');
-        $this->pmssAssertRepoFileContainsString('scripts/lib/storageHealth/common.php', 'function '.$symbol.'(');
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/storageHealth/common.php', [
+            'function '.$symbol.'(',
+            'function pmssStorageHealthDiskInventoryRead(): array',
+            'return '.$symbol."((string) (\$result['stdout'] ?? ''));",
+        ]);
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/storageHealthSnapshot.php', [
-            $symbol.'((string) shell_exec',
+            '$disks = pmssStorageHealthDiskInventoryRead();',
         ], [
             "preg_split('/\\r?\\n/', trim((string) \$lsblkOut))" => 'snapshot should not keep a local lsblk parser',
+            $symbol.'((string) shell_exec' => 'snapshot should check lsblk exit status before parsing inventory output',
         ]);
-        $this->pmssAssertRepoFileContainsString('scripts/lib/storageBenchmark.php', $symbol.'((string) shell_exec');
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/storageBenchmark.php', [
+            'foreach (pmssStorageHealthDiskInventoryRead() as $meta)',
+        ], [
+            $symbol.'((string) shell_exec' => 'storageBenchmark.php should check lsblk exit status before parsing inventory output',
+        ]);
         $this->pmssAssertRepoFileContainsString('scripts/util/storageBenchmark.php', "require_once __DIR__.'/../lib/storageBenchmark.php';");
         $this->pmssAssertRepoFileNotContainsString('scripts/lib/storageHealth.php', "'disks'", 'storageHealth.php should stop requiring the removed disks.php module');
     }
