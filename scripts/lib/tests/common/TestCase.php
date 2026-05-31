@@ -347,6 +347,23 @@ abstract class TestCase
         return $path;
     }
 
+    /** Assert that a callback leaves no new paths behind for a glob pattern. */
+    protected function pmssAssertNoNewGlobMatches(string $pattern, callable $callback, string $message = ''): void
+    {
+        $before = $this->pmssGlobMatches($pattern);
+        $callback();
+        $after = $this->pmssGlobMatches($pattern);
+
+        $this->assertEquals([], array_values(array_diff($after, $before)), $message !== '' ? $message : 'Expected no new paths for '.$pattern);
+    }
+
+    /** Return glob matches as an array, treating unsupported patterns as empty. */
+    protected function pmssGlobMatches(string $pattern): array
+    {
+        $matches = glob($pattern);
+        return is_array($matches) ? array_values($matches) : [];
+    }
+
     /** Create a tracked temporary PHP fixture path keyed by a readable suffix. */
     protected function pmssMakeTempPhpPath(string $prefix, string $suffix): string
     {
@@ -584,6 +601,21 @@ abstract class TestCase
         $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $dir], function () use ($callback, $dir): void {
             $callback($dir);
         });
+    }
+
+    /**
+     * Create paired config and rsyslog target directories for remote logging tests.
+     *
+     * @return array{cfgDir:string,targetDir:string,target:string}
+     */
+    protected function pmssRemoteLoggingFixture(string $prefix = 'pmss-remote-logging-'): array
+    {
+        $targetDir = $this->pmssMakeTempDir($prefix.'rsyslog-');
+        return [
+            'cfgDir' => $this->pmssMakeTempDir($prefix.'cfg-'),
+            'targetDir' => $targetDir,
+            'target' => $targetDir.'/50-pmss-remote.conf',
+        ];
     }
 
     /**

@@ -12,18 +12,12 @@ class SystemdServicesGuardBootUnitTest extends TestCase
     {
         $this->pmssResetRuntimeProfile();
 
-        $tmp = sys_get_temp_dir().'/pmss-systemd-boot-unit-'.bin2hex(random_bytes(4));
-        @mkdir($tmp, 0755, true);
-        $template = $tmp.'/template.systemd.pmss-systemd-services-guard.service';
-        @file_put_contents($template, "[Unit]\nDescription=test\n");
+        $tmp = $this->pmssMakeTempDir('pmss-systemd-boot-unit-');
+        $template = $this->pmssWriteFile($tmp.'/template.systemd.pmss-systemd-services-guard.service', "[Unit]\nDescription=test\n");
 
-        putenv('PMSS_CONFIG_DIR='.$tmp);
-        putenv('PMSS_DRY_RUN=1');
-
-        pmssEnsureSystemdServicesGuardBootUnit();
-
-        putenv('PMSS_DRY_RUN');
-        putenv('PMSS_CONFIG_DIR');
+        $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $tmp, 'PMSS_DRY_RUN' => '1'], function (): void {
+            pmssEnsureSystemdServicesGuardBootUnit();
+        });
 
         $this->assertEquals([
             "install -m 0644 '".$template."' '/etc/systemd/system/pmss-systemd-services-guard.service'",
@@ -35,13 +29,10 @@ class SystemdServicesGuardBootUnitTest extends TestCase
     public function testStopDisableMaskSystemdUnitKeepsStopDisableMaskOrderInDryRun(): void
     {
         $this->pmssResetRuntimeProfile();
-        putenv('PMSS_DRY_RUN=1');
 
-        try {
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function (): void {
             pmssStopDisableMaskSystemdUnit('demo.service', 'Demo', true);
-        } finally {
-            putenv('PMSS_DRY_RUN');
-        }
+        });
 
         $this->assertEquals([
             "systemctl stop 'demo.service' || true",
@@ -53,13 +44,10 @@ class SystemdServicesGuardBootUnitTest extends TestCase
     public function testStopDisableMaskSystemdUnitOmitsMaskWhenDisabled(): void
     {
         $this->pmssResetRuntimeProfile();
-        putenv('PMSS_DRY_RUN=1');
 
-        try {
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function (): void {
             pmssStopDisableMaskSystemdUnit('demo.service', 'Demo', false);
-        } finally {
-            putenv('PMSS_DRY_RUN');
-        }
+        });
 
         $this->assertEquals([
             "systemctl stop 'demo.service' || true",

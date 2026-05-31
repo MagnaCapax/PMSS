@@ -8,16 +8,11 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
 {
     public function testInstallsConfiguredSoftHardLimits(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-systemd-user-at-install-');
-        $this->pmssWithEnv(['PMSS_SYSTEMD_USER_AT_SERVICE_DIR' => $dir], function (): void {
-            \pmssSystemdUserManagerNoFileLimitInstall([
-                'limitNoFileSoft' => 8192,
-                'limitNoFileHard' => 16384,
-            ], function (): void {
-            });
-        });
+        $target = $this->installUserAtDropin([
+            'limitNoFileSoft' => 8192,
+            'limitNoFileHard' => 16384,
+        ], 'pmss-systemd-user-at-install-');
 
-        $target = $dir.'/20-pmss-limits.conf';
         $this->assertTrue(is_file($target), 'Expected user@.service drop-in to be created');
         $body = (string)file_get_contents($target);
         $this->assertStringContainsString('LimitNOFILE=8192:16384', $body);
@@ -27,16 +22,11 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
 
     public function testClampsHardLimitUpToSoftLimit(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-systemd-user-at-clamp-');
-        $this->pmssWithEnv(['PMSS_SYSTEMD_USER_AT_SERVICE_DIR' => $dir], function (): void {
-            \pmssSystemdUserManagerNoFileLimitInstall([
-                'limitNoFileSoft' => 4096,
-                'limitNoFileHard' => 1024,
-            ], function (): void {
-            });
-        });
+        $target = $this->installUserAtDropin([
+            'limitNoFileSoft' => 4096,
+            'limitNoFileHard' => 1024,
+        ], 'pmss-systemd-user-at-clamp-');
 
-        $target = $dir.'/20-pmss-limits.conf';
         $this->assertTrue(is_file($target), 'Expected user@.service drop-in to be created');
         $body = (string)file_get_contents($target);
         $this->assertStringContainsString('LimitNOFILE=4096:4096', $body);
@@ -44,15 +34,10 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
 
     public function testSkipsWhenPolicyDoesNotProvideNoFileValues(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-systemd-user-at-skip-');
-        $this->pmssWithEnv(['PMSS_SYSTEMD_USER_AT_SERVICE_DIR' => $dir], function (): void {
-            \pmssSystemdUserManagerNoFileLimitInstall([
-                'cpuWeight' => 100,
-            ], function (): void {
-            });
-        });
+        $target = $this->installUserAtDropin([
+            'cpuWeight' => 100,
+        ], 'pmss-systemd-user-at-skip-');
 
-        $target = $dir.'/20-pmss-limits.conf';
         $this->assertTrue(!is_file($target), 'Unexpected user@.service drop-in without LimitNOFILE policy');
     }
 
@@ -84,5 +69,16 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
         $this->assertStringContainsString('LogNamespace=user-%i', $body);
         $this->assertSame(0644, fileperms($target) & 0777);
         $this->assertTrue(!file_exists($target.'.tmp'), 'Temporary log namespace drop-in should not remain after install');
+    }
+
+    private function installUserAtDropin(array $policy, string $dirPrefix): string
+    {
+        $dir = $this->pmssMakeTempDir($dirPrefix);
+        $this->pmssWithEnv(['PMSS_SYSTEMD_USER_AT_SERVICE_DIR' => $dir], function () use ($policy): void {
+            \pmssSystemdUserManagerNoFileLimitInstall($policy, function (): void {
+            });
+        });
+
+        return $dir.'/20-pmss-limits.conf';
     }
 }

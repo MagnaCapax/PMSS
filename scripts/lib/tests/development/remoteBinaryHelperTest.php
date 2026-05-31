@@ -108,15 +108,13 @@ SH
 
     public function testFetchPinnedRemoteFileCleansChecksumMismatchTemps(): void
     {
-        $before = glob(sys_get_temp_dir().'/pmss-remote-bin-*') ?: [];
+        $this->pmssAssertNoNewGlobMatches(sys_get_temp_dir().'/pmss-remote-bin-*', function (): void {
+            $this->withFakeDownloadBody('payload', function (): void {
+                $path = \pmssFetchPinnedRemoteFile('demo archive', 'https://example.invalid/archive', str_repeat('a', 64));
 
-        $this->withFakeDownloadBody('payload', function () use ($before): void {
-            $path = \pmssFetchPinnedRemoteFile('demo archive', 'https://example.invalid/archive', str_repeat('a', 64));
-            $after = glob(sys_get_temp_dir().'/pmss-remote-bin-*') ?: [];
-
-            $this->assertTrue($path === null, 'Expected checksum mismatch to reject the download');
-            $this->assertEquals([], array_values(array_diff($after, $before)), 'Checksum mismatch should not leave temp files behind');
-        });
+                $this->assertTrue($path === null, 'Expected checksum mismatch to reject the download');
+            });
+        }, 'Checksum mismatch should not leave temp files behind');
     }
 
     public function testRunPinnedRemoteArchiveStepRejectsUnsafeExtractionInputsBeforeDownload(): void
@@ -219,32 +217,28 @@ SH
 
     public function testInstallPinnedRemoteDebPackageInvokesDpkgForMatchingPackage(): void
     {
-        $before = glob(sys_get_temp_dir().'/pmss-remote-deb-*') ?: [];
+        $this->pmssAssertNoNewGlobMatches(sys_get_temp_dir().'/pmss-remote-deb-*', function (): void {
+            $this->withFakeDownloadBody('package-payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
+                $result = \pmssInstallPinnedRemoteDebPackage('demo package', 'https://example.invalid/demo.deb', $expectedSha256);
 
-        $this->withFakeDownloadBody('package-payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256) use ($before): void {
-            $result = \pmssInstallPinnedRemoteDebPackage('demo package', 'https://example.invalid/demo.deb', $expectedSha256);
-            $after = glob(sys_get_temp_dir().'/pmss-remote-deb-*') ?: [];
-
-            $this->assertTrue($result, 'Expected matching package install to succeed');
-            $this->assertEquals($body, (string) file_get_contents($dpkgCapture));
-            $this->assertStringContainsString('wget ', $this->pmssReadFileOrEmpty($commandLog));
-            $this->assertStringContainsString('dpkg ', $this->pmssReadFileOrEmpty($commandLog));
-            $this->assertEquals([], array_values(array_diff($after, $before)), 'Successful package install should clean temp files');
-        });
+                $this->assertTrue($result, 'Expected matching package install to succeed');
+                $this->assertEquals($body, (string) file_get_contents($dpkgCapture));
+                $this->assertStringContainsString('wget ', $this->pmssReadFileOrEmpty($commandLog));
+                $this->assertStringContainsString('dpkg ', $this->pmssReadFileOrEmpty($commandLog));
+            });
+        }, 'Successful package install should clean temp files');
     }
 
     public function testInstallPinnedRemoteDebPackageReturnsDryRunSuccessWithoutCommands(): void
     {
-        $before = glob(sys_get_temp_dir().'/pmss-remote-deb-*') ?: [];
+        $this->pmssAssertNoNewGlobMatches(sys_get_temp_dir().'/pmss-remote-deb-*', function (): void {
+            $this->withFakeDownloadBody('package-payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
+                $result = \pmssInstallPinnedRemoteDebPackage('demo package', 'https://example.invalid/demo.deb', $expectedSha256);
 
-        $this->withFakeDownloadBody('package-payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256) use ($before): void {
-            $result = \pmssInstallPinnedRemoteDebPackage('demo package', 'https://example.invalid/demo.deb', $expectedSha256);
-            $after = glob(sys_get_temp_dir().'/pmss-remote-deb-*') ?: [];
-
-            $this->assertTrue($result, 'Expected dry-run package install to report success');
-            $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
-            $this->assertTrue(!is_file($dpkgCapture), 'Dry-run should not invoke dpkg');
-            $this->assertEquals([], array_values(array_diff($after, $before)), 'Dry-run package install should clean temp files');
-        }, ['PMSS_DRY_RUN' => '1']);
+                $this->assertTrue($result, 'Expected dry-run package install to report success');
+                $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
+                $this->assertTrue(!is_file($dpkgCapture), 'Dry-run should not invoke dpkg');
+            }, ['PMSS_DRY_RUN' => '1']);
+        }, 'Dry-run package install should clean temp files');
     }
 }
