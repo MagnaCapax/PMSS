@@ -83,8 +83,7 @@ while [[ $# -gt 0 ]]; do
 		break
 		;;
 	-h | --help)
-		usage
-		exit 0
+		codex_usage_exit usage
 		;;
 	*)
 		passthrough+=("$1")

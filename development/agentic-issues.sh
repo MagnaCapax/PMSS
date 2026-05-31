@@ -73,12 +73,10 @@ while [[ $# -gt 0 ]]; do
 		shift || true
 		;;
 	-h | --help)
-		usage
-		exit 0
+		codex_usage_exit usage
 		;;
 	*)
-		echo "[agentic-issues] unknown option: $1" >&2
-		exit 2
+		codex_cli_error_exit agentic-issues "unknown option: $1"
 		;;
 	esac
 done

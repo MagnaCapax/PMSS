@@ -24,6 +24,16 @@ codex_set_error_trap() {
 	trap 'echo "['"$prefix"'] ERROR rc=$? at line $LINENO while: $BASH_COMMAND" >&1' ERR
 }
 
+codex_usage_exit() { "$1"; exit 0; }
+
+codex_cli_error_exit() {
+	local prefix="$1" message="$2" line
+	shift 2 || true
+	echo "[$prefix] $message" >&2
+	for line in "$@"; do echo "$line" >&2; done
+	exit 2
+}
+
 # Apply the common agentic launcher root, debug, and ERR-trap setup.
 codex_agentic_bootstrap() {
 	local here="$1" debug_env="$2" prefix="$3" cd_root="${4:-0}"

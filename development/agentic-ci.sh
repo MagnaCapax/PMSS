@@ -78,12 +78,10 @@ while [[ $# -gt 0 ]]; do
 	fi
 	case "$1" in
 	-h | --help)
-		usage
-		exit 0
+		codex_usage_exit usage
 		;;
 	*)
-		echo "[codex-ci] unknown option: $1" >&2
-		exit 2
+		codex_cli_error_exit codex-ci "unknown option: $1"
 		;;
 	esac
 done
