@@ -6,57 +6,56 @@ require_once __DIR__.'/../common/updateBootstrapShim.php';
 
 class ParseSpecTest extends TestCase
 {
-    public function testParsesReleaseLatestWithoutTag(): void
+    public function testParsesSpecs(): void
     {
-        $parsed = parseSpec('release');
-        $this->assertEquals('release', $parsed['type']);
-        $this->assertEquals(DEFAULT_REPO, $parsed['repo']);
-        $this->assertEquals('', $parsed['branch']);
-        $this->assertEquals('', $parsed['pin']);
-    }
-
-    public function testParsesReleaseLatestWithEmptyDelimiterForms(): void
-    {
-        foreach (['release:', 'release/'] as $input) {
+        foreach ([
+            'release' => [
+                'type' => 'release',
+                'repo' => DEFAULT_REPO,
+                'branch' => '',
+                'pin' => '',
+            ],
+            'release:' => [
+                'type' => 'release',
+                'repo' => DEFAULT_REPO,
+                'branch' => '',
+                'pin' => '',
+            ],
+            'release/' => [
+                'type' => 'release',
+                'repo' => DEFAULT_REPO,
+                'branch' => '',
+                'pin' => '',
+            ],
+            'git/main:2025-05-11' => [
+                'type' => 'git',
+                'repo' => DEFAULT_REPO,
+                'branch' => 'main',
+                'pin' => '2025-05-11',
+            ],
+            'git/https://example.com/repo.git:beta' => [
+                'type' => 'git',
+                'repo' => 'https://example.com/repo.git',
+                'branch' => 'beta',
+                'pin' => '',
+            ],
+            'release:2025-07-12' => [
+                'type' => 'release',
+                'repo' => DEFAULT_REPO,
+                'branch' => '',
+                'pin' => '2025-07-12',
+            ],
+            normaliseSpec('dev') => [
+                'type' => 'git',
+                'repo' => DEFAULT_REPO,
+                'branch' => 'dev',
+                'pin' => '',
+            ],
+        ] as $input => $expected) {
             $parsed = parseSpec($input);
-            $this->assertEquals('release', $parsed['type']);
-            $this->assertEquals(DEFAULT_REPO, $parsed['repo']);
-            $this->assertEquals('', $parsed['branch']);
-            $this->assertEquals('', $parsed['pin']);
+            foreach ($expected as $key => $value) {
+                $this->assertEquals($value, $parsed[$key], $input.' '.$key);
+            }
         }
-    }
-
-    public function testParsesGitBranchWithDate(): void
-    {
-        $parsed = parseSpec('git/main:2025-05-11');
-        $this->assertEquals('git', $parsed['type']);
-        $this->assertEquals(DEFAULT_REPO, $parsed['repo']);
-        $this->assertEquals('main', $parsed['branch']);
-        $this->assertEquals('2025-05-11', $parsed['pin']);
-    }
-
-    public function testParsesCustomRepoAndBranch(): void
-    {
-        $spec = 'git/https://example.com/repo.git:beta';
-        $parsed = parseSpec($spec);
-        $this->assertEquals('git', $parsed['type']);
-        $this->assertEquals('https://example.com/repo.git', $parsed['repo']);
-        $this->assertEquals('beta', $parsed['branch']);
-        $this->assertEquals('', $parsed['pin']);
-    }
-
-    public function testParsesReleaseWithTag(): void
-    {
-        $parsed = parseSpec('release:2025-07-12');
-        $this->assertEquals('release', $parsed['type']);
-        $this->assertEquals('2025-07-12', $parsed['pin']);
-    }
-
-    public function testNormaliseAndParseBareBranch(): void
-    {
-        $normalised = normaliseSpec('dev');
-        $this->assertEquals('git/dev', $normalised);
-        $parsed = parseSpec($normalised);
-        $this->assertEquals('dev', $parsed['branch']);
     }
 }

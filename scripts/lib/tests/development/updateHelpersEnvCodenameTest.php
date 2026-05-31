@@ -7,56 +7,31 @@ require_once dirname(__DIR__, 2).'/update/distro.php';
 
 class UpdateHelpersEnvCodenameTest extends TestCase
 {
-    public function testGetDistroVersionStripsSuffix(): void
+    public function testOsReleaseAccessors(): void
     {
-        $this->pmssWithOsRelease(['ID' => 'debian', 'VERSION_ID' => '12 (bookworm)'], function (): void {
-            $this->assertEquals('12', \getDistroVersion());
-        });
+        foreach ([
+            [['ID' => 'debian', 'VERSION_ID' => '12 (bookworm)'], 'getDistroVersion', '12'],
+            [['ID' => 'debian', 'VERSION_ID' => 'sid'], 'getDistroVersion', 'sid'],
+            [['VERSION_ID' => '11'], 'getDistroName', ''],
+            [['ID' => 'debian', 'VERSION_CODENAME' => '  BULLSEYE  '], 'getDistroCodename', 'bullseye'],
+            [['ID' => 'debian', 'VERSION_ID' => '12'], 'getDistroCodename', ''],
+        ] as [$fields, $function, $expected]) {
+            $this->pmssWithOsRelease($fields, function () use ($function, $expected): void {
+                $this->assertEquals($expected, \call_user_func('\\'.$function));
+            });
+        }
     }
 
-    public function testGetDistroVersionReturnsRawWhenNonNumeric(): void
-    {
-        $this->pmssWithOsRelease(['ID' => 'debian', 'VERSION_ID' => 'sid'], function (): void {
-            $this->assertEquals('sid', \getDistroVersion());
-        });
-    }
-
-    public function testGetDistroNameEmptyWhenMissing(): void
-    {
-        $this->pmssWithOsRelease(['VERSION_ID' => '11'], function (): void {
-            $this->assertEquals('', \getDistroName());
-        });
-    }
-
-    public function testGetDistroCodenameLowercasesAndTrims(): void
-    {
-        $this->pmssWithOsRelease(['ID' => 'debian', 'VERSION_CODENAME' => '  BULLSEYE  '], function (): void {
-            $this->assertEquals('bullseye', \getDistroCodename());
-        });
-    }
-
-    public function testGetDistroCodenameEmptyWhenNotPresent(): void
-    {
-        $this->pmssWithOsRelease(['ID' => 'debian', 'VERSION_ID' => '12'], function (): void {
-            $this->assertEquals('', \getDistroCodename());
-        });
-    }
-
-    public function testPmssVersionFromCodenameUnknownReturnsZero(): void
+    public function testVersionHelpers(): void
     {
         $this->assertEquals(0, \pmssVersionFromCodename('unknown-planet'));
-    }
 
-    public function testGetPmssVersionTrimsWhitespace(): void
-    {
-        $file = $this->pmssWriteTempFile('version-file', "git/main:2025-01-01\n\n", 'pmss-env');
-        $this->assertEquals('git/main:2025-01-01', \getPmssVersion($file));
+        foreach ([
+            ['version-file', "git/main:2025-01-01\n\n", 'git/main:2025-01-01'],
+            ['empty-version', '', 'unknown'],
+        ] as [$prefix, $content, $expected]) {
+            $file = $this->pmssWriteTempFile($prefix, $content, 'pmss-env');
+            $this->assertEquals($expected, \getPmssVersion($file));
+        }
     }
-
-    public function testGetPmssVersionReturnsUnknownForEmptyFile(): void
-    {
-        $file = $this->pmssWriteTempFile('empty-version', '', 'pmss-env');
-        $this->assertEquals('unknown', \getPmssVersion($file));
-    }
-
 }
