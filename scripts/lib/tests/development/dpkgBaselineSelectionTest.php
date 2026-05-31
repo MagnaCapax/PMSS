@@ -6,26 +6,17 @@ require_once dirname(__DIR__, 2).'/update/environment.php';
 
 class DpkgBaselineSelectionTest extends TestCase
 {
-    public function testSelectsDebian10BaselineWhenAvailable(): void
+    public function testSelectsAvailableValidatedBaselines(): void
     {
-        [$path, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger): string {
-            return \pmssSelectDpkgSelectionsBaseline(10, $logger);
-        });
+        foreach ([10, 12] as $version) {
+            [$path, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($version): string {
+                return \pmssSelectDpkgSelectionsBaseline($version, $logger);
+            });
 
-        $this->assertTrue(is_string($path) && $path !== '', 'Expected a dpkg baseline path');
-        $this->assertStringContainsString('selections-debian10.txt', $path);
-        $this->assertEquals([], $logs, 'Did not expect warnings when Debian 10 baseline exists');
-    }
-
-    public function testSelectsDebian12BaselineWhenAvailable(): void
-    {
-        [$path, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger): string {
-            return \pmssSelectDpkgSelectionsBaseline(12, $logger);
-        });
-
-        $this->assertTrue(is_string($path) && $path !== '', 'Expected a dpkg baseline path');
-        $this->assertStringContainsString('selections-debian12.txt', $path);
-        $this->assertEquals([], $logs, 'Did not expect warnings when Debian 12 baseline exists');
+            $this->assertTrue(is_string($path) && $path !== '', 'Expected a dpkg baseline path');
+            $this->assertStringContainsString('selections-debian'.$version.'.txt', $path);
+            $this->assertEquals([], $logs, 'Did not expect warnings when Debian '.$version.' baseline exists');
+        }
     }
 
     public function testKeepsDebian13OnValidatedFallbackUntilPromotion(): void

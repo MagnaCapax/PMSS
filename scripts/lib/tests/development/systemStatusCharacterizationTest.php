@@ -103,14 +103,6 @@ final class SystemStatusCharacterizationTest extends TestCase
         );
     }
 
-    private function statusSnapshot(array $checks): array
-    {
-        $sourcesPath = (string) getenv('PMSS_APT_SOURCES_PATH');
-        return array_map(static function (array $check) use ($sourcesPath): string {
-            return $check['name'].'|'.$check['status'].'|'.str_replace($sourcesPath, '<sources>', (string) ($check['detail'] ?? ''));
-        }, $checks);
-    }
-
     public function testComponentChecksStayStableWithHermeticInputs(): void
     {
         $dependencies = $this->buildComponentStatusDependencies();
@@ -399,6 +391,7 @@ final class SystemStatusCharacterizationTest extends TestCase
     public function testSystemStatusChecksStayStableWithHermeticInputs(): void
     {
         $checks = pmssSystemStatusChecks($this->buildSystemStatusDependencies());
+        $sourcesPath = $this->sourcesPath;
 
         $this->assertSame(
             [
@@ -445,7 +438,10 @@ final class SystemStatusCharacterizationTest extends TestCase
                 'Component: config.seedbox.localnet|OK|/etc/seedbox/localnet',
                 'Component: config.nginx|OK|/etc/nginx',
             ],
-            $this->statusSnapshot($checks)
+            array_map(static function (array $check) use ($sourcesPath): string {
+                $detail = str_replace($sourcesPath, '<sources>', (string) ($check['detail'] ?? ''));
+                return $check['name'].'|'.$check['status'].'|'.$detail;
+            }, $checks)
         );
     }
 

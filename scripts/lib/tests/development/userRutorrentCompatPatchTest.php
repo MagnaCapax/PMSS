@@ -63,7 +63,18 @@ class UserRutorrentCompatPatchTest extends TestCase
 
     public function testCompatibilityLeavesNonMatchingContentUntouched(): void
     {
-        foreach ($this->compatUntouchedCases() as $case) {
+        foreach ([
+            [
+                'dir' => 'www/rutorrent/php',
+                'path' => 'www/rutorrent/php/settings.php',
+                'content' => "prefix\n\$interval = \$interval * 60;\nsuffix\n",
+            ],
+            [
+                'dir' => 'www/rutorrent/plugins/rss',
+                'path' => 'www/rutorrent/plugins/rss/action.php',
+                'content' => "before\nflush();\nafter\n",
+            ],
+        ] as $case) {
             $this->assertCompatibilityContentUntouched($case, $case['content']);
         }
     }
@@ -126,22 +137,6 @@ class UserRutorrentCompatPatchTest extends TestCase
                 'patched' => "prefix\n        return (int) \$field;\nsuffix\n",
                 'expected' => 'return (int) $field;',
                 'unexpected' => 'return $field;',
-            ],
-        ];
-    }
-
-    private function compatUntouchedCases(): array
-    {
-        return [
-            [
-                'dir' => 'www/rutorrent/php',
-                'path' => 'www/rutorrent/php/settings.php',
-                'content' => "prefix\n\$interval = \$interval * 60;\nsuffix\n",
-            ],
-            [
-                'dir' => 'www/rutorrent/plugins/rss',
-                'path' => 'www/rutorrent/plugins/rss/action.php',
-                'content' => "before\nflush();\nafter\n",
             ],
         ];
     }

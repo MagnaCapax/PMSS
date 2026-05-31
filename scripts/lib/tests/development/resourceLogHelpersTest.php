@@ -78,21 +78,14 @@ class ResourceLogHelpersTest extends TestCase
     public function testEnsureDirRejectsSymlink(): void
     {
         $root = $this->makeRoot();
-        $target = $root.'/target';
-        @mkdir($target, 0700, true);
-        $link = $root.'/link';
-        $this->pmssCreateSymlinkOrSkip($target, $link);
+        $link = $this->pmssCreateSymlinkedDirectoryOrSkip($root.'/target', $root.'/link', 0700)[1];
         $this->assertTrue(!\pmssEnsureSafeDir($link, 0700));
     }
 
     public function testEnsureDirRejectsSymlinkedParentDirectory(): void
     {
         $root = $this->makeRoot();
-        $target = $root.'/target';
-        $this->pmssEnsureDir($target, 0700);
-
-        $symlinkedParent = $root.'/state';
-        $this->pmssCreateSymlinkOrSkip($target, $symlinkedParent);
+        [$target, $symlinkedParent] = $this->pmssCreateSymlinkedDirectoryOrSkip($root.'/target', $root.'/state', 0700);
 
         $this->assertTrue(!\pmssEnsureSafeDir($symlinkedParent.'/daily', 0700));
         $this->assertTrue(!is_dir($target.'/daily'), 'must not create directories via symlinked parent');
@@ -281,49 +274,35 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertTrue(!is_file($legacyPath), 'Expected the legacy resource helper shim to be removed');
     }
 
-    public function testReadCountersParsesSystemctlOutput(): void
+    public function testReadCountersHandlesSystemctlOutputScenarios(): void
     {
-        $this->assertReadCounters([
-            'IOReadBytes=11',
-            'IOWriteBytes=22',
-            'IOReadOperations=33',
-            'IOWriteOperations=44',
-            'CPUUsageNSec=55',
-            'MemoryCurrent=66',
-            'TasksCurrent=77',
-        ], ['io_read' => 11, 'io_write' => 22, 'io_read_ops' => 33, 'io_write_ops' => 44, 'cpu_nsec' => 55, 'memory' => 66, 'tasks' => 77]);
-    }
-
-    public function testReadCountersReturnsNullWhenRequiredFieldMissing(): void
-    {
-        $this->assertReadCounters([
-            'IOReadBytes=11',
-            'IOWriteBytes=22',
-            'CPUUsageNSec=55',
-            'MemoryCurrent=66',
-        ], null);
-    }
-
-    public function testReadCountersDefaultsMissingOpsToZero(): void
-    {
-        $this->assertReadCounters([
-            'IOReadBytes=11',
-            'IOWriteBytes=22',
-            'CPUUsageNSec=55',
-            'MemoryCurrent=66',
-            'TasksCurrent=77',
-        ], ['io_read_ops' => 0, 'io_write_ops' => 0]);
-    }
-
-    public function testReadCountersReturnsNullWhenRequiredValueIsNotNumeric(): void
-    {
-        $this->assertReadCounters([
-            'IOReadBytes=11',
-            'IOWriteBytes=22',
-            'CPUUsageNSec=55',
-            'MemoryCurrent=oops',
-            'TasksCurrent=77',
-        ], null);
+        foreach ([
+            [
+                [
+                    'IOReadBytes=11', 'IOWriteBytes=22',
+                    'IOReadOperations=33', 'IOWriteOperations=44',
+                    'CPUUsageNSec=55', 'MemoryCurrent=66', 'TasksCurrent=77',
+                ],
+                ['io_read' => 11, 'io_write' => 22, 'io_read_ops' => 33, 'io_write_ops' => 44, 'cpu_nsec' => 55, 'memory' => 66, 'tasks' => 77],
+            ],
+            [
+                ['IOReadBytes=11', 'IOWriteBytes=22', 'CPUUsageNSec=55', 'MemoryCurrent=66'],
+                null,
+            ],
+            [
+                [
+                    'IOReadBytes=11', 'IOWriteBytes=22',
+                    'CPUUsageNSec=55', 'MemoryCurrent=66', 'TasksCurrent=77',
+                ],
+                ['io_read_ops' => 0, 'io_write_ops' => 0],
+            ],
+            [
+                ['IOReadBytes=11', 'IOWriteBytes=22', 'CPUUsageNSec=55', 'MemoryCurrent=oops', 'TasksCurrent=77'],
+                null,
+            ],
+        ] as [$outputLines, $expected]) {
+            $this->assertReadCounters($outputLines, $expected);
+        }
     }
 
     public function testReadMemoryBreakdownParsesMemoryStat(): void
