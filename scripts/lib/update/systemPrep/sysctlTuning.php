@@ -23,17 +23,81 @@ function pmssSystemPrepReadBoolEnv(string $key): ?bool
 function pmssSystemPrepNonEmptyLinesRead(string $path): array
 {
     $lines = preg_split('/\r?\n/', pmssReadRegularFileContents($path) ?? '');
-    return array_values(array_filter(is_array($lines) ? $lines : [], static function (string $line): bool {
-        return $line !== '';
-    }));
+    return array_values(array_filter(is_array($lines) ? $lines : [], 'strlen'));
+}
+
+/** Refresh one managed sysctl-adjacent file and report whether it changed. */
+function pmssSysctlManagedContentRefresh(string $path, string $content, string $label, callable $log, int $mode = 0644): array
+{
+    $skipLog = '[SKIP] '.ucfirst($label).' already present and up to date';
+    $warnLog = '[WARN] Unable to write '.$label.' at '.$path;
+    if (($existing = @file_get_contents($path)) !== false && trim($existing) === trim($content)) {
+        $log($skipLog);
+        return [true, true];
+    }
+
+    if (!pmssDirEnsureExists(dirname($path), 0755)) {
+        $log($warnLog);
+        return [false, false];
+    }
+
+    return [
+        false,
+        pmssWriteManagedPathFile($path, $content, $label, $log, null, null, $mode, $warnLog),
+    ];
+}
+
+/**
+ * Recreate the PMSS-owned hardware-aware sysctl baseline.
+ */
+function pmssEnsureLegacySysctlBaseline(?callable $logger = null, ?string $targetOverride = null, bool $reload = true, ?string $modulesLoadOverride = null): void
+{
+    $log             = $logger ?: 'logMessage';
+    $target          = $targetOverride ?? '/etc/sysctl.d/99-pmss.conf';
+    $modulesLoadPath = $modulesLoadOverride ?? '/etc/modules-load.d/pmss-bbr.conf';
+    $overridePath    = pmssResolvePathFromEnv('PMSS_SYSCTL_OVERRIDES_PATH', '/etc/sysctl.d/90-pmss-overrides.conf');
+    // Persist TCP BBR module loading across reboots.
+    $modulesContent = "# PMSS: enable TCP BBR\ntcp_bbr\n";
+
+    // /sys block tuning is handled by the boot-time tuning service; sysctl only covers /proc/sys.
+    $profile = pmssSysctlProfileDetect();
+    $overrideKeys = pmssSysctlOverridesParse($overridePath);
+    $groupedSettings = pmssSysctlSettingsFilterOverrides(pmssSysctlSettingsBuild($profile), $overrideKeys);
+    $content = pmssSysctlConfigRender($groupedSettings);
+    $existingSettings = pmssSysctlFileParse($target);
+    $changes = pmssSysctlChangesDescribe($existingSettings, $groupedSettings);
+
+    [$sysctlUpToDate, $sysctlWriteOk] = pmssSysctlManagedContentRefresh(
+        $target,
+        $content.PHP_EOL,
+        'legacy sysctl defaults',
+        $log
+    );
+
+    pmssSysctlSummaryWrite($logger, $profile, $groupedSettings, $overrideKeys, $changes);
+
+    [$modulesUpToDate, $modulesWriteOk] = pmssSysctlManagedContentRefresh(
+        $modulesLoadPath,
+        $modulesContent,
+        'TCP BBR modules-load configuration',
+        $log
+    );
+    if (!$modulesUpToDate && $modulesWriteOk) {
+        $log('Refreshed TCP BBR modules-load configuration at '.$modulesLoadPath);
+    }
+
+    if ($sysctlUpToDate || !$sysctlWriteOk) {
+        return;
+    }
+
+    $reload ? runStep('Reloading sysctl configuration', 'sysctl --system') : $log('[SKIP] sysctl reload disabled');
+    $log('Refreshed legacy sysctl defaults at '.$target);
 }
 
 /** Detect whether any swap device is configured. */
 function pmssSysctlHasSwap(): bool
 {
-    if (($override = pmssSystemPrepReadBoolEnv('PMSS_SYSCTL_HAS_SWAP')) !== null) {
-        return $override;
-    }
+    if (($override = pmssSystemPrepReadBoolEnv('PMSS_SYSCTL_HAS_SWAP')) !== null) return $override;
 
     return count(pmssSystemPrepNonEmptyLinesRead('/proc/swaps')) > 1;
 }
@@ -64,9 +128,7 @@ function pmssSysctlBlockDeviceIsFast(string $deviceName, string $sysClassBlockRo
 /** Detect whether swap lives on non-rotational storage. */
 function pmssSysctlSwapIsFast(): bool
 {
-    if (($override = pmssSystemPrepReadBoolEnv('PMSS_SYSCTL_SWAP_IS_FAST')) !== null) {
-        return $override;
-    }
+    if (($override = pmssSystemPrepReadBoolEnv('PMSS_SYSCTL_SWAP_IS_FAST')) !== null) return $override;
 
     if (!pmssSysctlHasSwap()) {
         return false;
@@ -128,9 +190,7 @@ function pmssSysctlNicSpeedMbps(): int
 /** Detect whether the current host is a virtual machine. */
 function pmssSysctlIsVm(): bool
 {
-    if (($override = pmssSystemPrepReadBoolEnv('PMSS_SYSCTL_IS_VM')) !== null) {
-        return $override;
-    }
+    if (($override = pmssSystemPrepReadBoolEnv('PMSS_SYSCTL_IS_VM')) !== null) return $override;
 
     if (($systemdDetectVirt = pmssCommandPath('systemd-detect-virt')) !== '') {
         return trim((string) @shell_exec(escapeshellcmd($systemdDetectVirt).' --quiet >/dev/null 2>&1; echo $?')) === '0';
@@ -149,9 +209,7 @@ function pmssSysctlIsVm(): bool
 /** Detect whether conntrack sysctls are available on this host. */
 function pmssSysctlHasConntrack(): bool
 {
-    if (($override = pmssSystemPrepReadBoolEnv('PMSS_SYSCTL_HAS_CONNTRACK')) !== null) {
-        return $override;
-    }
+    if (($override = pmssSystemPrepReadBoolEnv('PMSS_SYSCTL_HAS_CONNTRACK')) !== null) return $override;
 
     $procSysRoot = pmssResolvePathFromEnv('PMSS_SYSCTL_PROC_SYS_PATH', '/proc/sys');
     return is_dir($procSysRoot.'/net/netfilter') || is_dir($procSysRoot.'/net/ipv4/netfilter');
@@ -283,19 +341,23 @@ function pmssSysctlSettingsBuild(array $profile): array
     return $settings;
 }
 
+/** Parse one sysctl assignment while preserving each caller's comment policy. */
+function pmssSysctlAssignmentLineParse(string $line, bool $stripInlineComment = false): ?array
+{
+    $trimmed = trim($stripInlineComment ? (string) preg_replace('/\s+#.*$/', '', $line) : $line);
+    if ($trimmed === '' || $trimmed[0] === '#' || preg_match('/^([A-Za-z0-9_.]+)\s*=\s*(.*)$/', $trimmed, $matches) !== 1) {
+        return null;
+    }
+
+    return [$matches[1], trim($matches[2])];
+}
+
 /** Parse operator-owned sysctl overrides from a config file. */
 function pmssSysctlOverridesParse(string $path): array
 {
     $keys = [];
     foreach (pmssSystemPrepNonEmptyLinesRead($path) as $line) {
-        $line = trim((string) preg_replace('/\s+#.*$/', '', $line));
-        if ($line === '' || $line[0] === '#') {
-            continue;
-        }
-
-        if (preg_match('/^([A-Za-z0-9_.]+)\s*=/', $line, $matches) === 1) {
-            $keys[$matches[1]] = true;
-        }
+        if (($assignment = pmssSysctlAssignmentLineParse($line, true)) !== null) $keys[$assignment[0]] = true;
     }
 
     return array_keys($keys);
@@ -325,14 +387,8 @@ function pmssSysctlFileParse(string $path): array
 {
     $settings = [];
     foreach (pmssSystemPrepNonEmptyLinesRead($path) as $line) {
-        $trimmed = trim((string) $line);
-        if ($trimmed === '' || $trimmed[0] === '#') {
-            continue;
-        }
-
-        if (preg_match('/^([A-Za-z0-9_.]+)\s*=\s*(.+)$/', $trimmed, $matches) === 1) {
-            $settings[$matches[1]] = trim($matches[2]);
-        }
+        $assignment = pmssSysctlAssignmentLineParse($line);
+        if ($assignment !== null && $assignment[1] !== '') $settings[$assignment[0]] = $assignment[1];
     }
 
     return $settings;
@@ -364,25 +420,30 @@ function pmssSysctlConfigRender(array $groupedSettings): string
     return implode(PHP_EOL, $lines).PHP_EOL;
 }
 
+/** Return ordered key/value rows from grouped sysctl settings. */
+function pmssSysctlGroupedSettingsRows(array $groupedSettings): array
+{
+    $rows = [];
+    foreach ($groupedSettings as $settings) {
+        if (!is_array($settings)) continue;
+        foreach ($settings as $key => $value) $rows[] = [(string) $key, (string) $value];
+    }
+
+    return $rows;
+}
+
 /** Describe value changes between the existing file and the next applied profile. */
 function pmssSysctlChangesDescribe(array $existingSettings, array $groupedSettings): array
 {
     $changes = [];
-    foreach ($groupedSettings as $settings) {
-        if (!is_array($settings)) {
-            continue;
-        }
+    foreach (pmssSysctlGroupedSettingsRows($groupedSettings) as $row) {
+        [$key, $value] = $row;
+        $previousValue = array_key_exists($key, $existingSettings) ? (string) $existingSettings[$key] : null;
+        if ($previousValue === $value) continue;
 
-        foreach ($settings as $key => $value) {
-            $previousValue = array_key_exists($key, $existingSettings) ? (string) $existingSettings[$key] : null;
-            if ($previousValue === (string) $value) {
-                continue;
-            }
-
-            $changes[] = $previousValue === null
-                ? $key.': <unset> -> '.$value
-                : $key.': '.$previousValue.' -> '.$value;
-        }
+        $changes[] = $previousValue === null
+            ? $key.': <unset> -> '.$value
+            : $key.': '.$previousValue.' -> '.$value;
     }
 
     return $changes;
@@ -403,13 +464,8 @@ function pmssSysctlSummaryWrite(?callable $logger, array $profile, array $groupe
     $payload = is_string($existing) ? (pmssJsonDecodeAssoc($existing) ?? []) : [];
 
     $applied = [];
-    foreach ($groupedSettings as $settings) {
-        if (!is_array($settings)) {
-            continue;
-        }
-        foreach ($settings as $key => $value) {
-            $applied[$key] = $value;
-        }
+    foreach (pmssSysctlGroupedSettingsRows($groupedSettings) as $row) {
+        $applied[$row[0]] = $row[1];
     }
     ksort($applied);
 

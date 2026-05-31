@@ -28,7 +28,7 @@ class SysctlBaselineTest extends TestCase
             'net.netfilter.nf_conntrack_max = 524288', 'kernel.kptr_restrict = 1', 'kernel.yama.ptrace_scope = 2',
             'fs.protected_regular = 2',
         ], 'expected sysctl file to be written');
-        $this->assertStringContainsString("/etc/sysctl.d/99-pmss.conf", $this->pmssReadRepoFile('scripts/lib/update/systemPrep.php'));
+        $this->assertStringContainsString("/etc/sysctl.d/99-pmss.conf", $this->pmssReadRepoFile('scripts/lib/update/systemPrep/sysctlTuning.php'));
     }
 
     public function testWritesBbrModulesLoadFile(): void
@@ -204,6 +204,62 @@ class SysctlBaselineTest extends TestCase
             ['vm.swappiness', 'net.core.somaxconn'],
             $summary['sysctl']['overrides_respected'],
             'expected override keys to be reported'
+        );
+    }
+
+    public function testSysctlConfigAssignmentParsersKeepLegacyCommentHandling(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-parser-', 0700);
+        $path = $dir.'/sysctl.conf';
+        file_put_contents($path, implode("\n", [
+            '# operator notes',
+            'vm.swappiness = 70 # override comment',
+            'net.core.somaxconn = 9000',
+            'empty.value =',
+            'bad-key = 1',
+            '',
+        ])."\n");
+
+        $this->assertSame(
+            [
+                'vm.swappiness',
+                'net.core.somaxconn',
+                'empty.value',
+            ],
+            \pmssSysctlOverridesParse($path),
+            'override parser should strip inline comments and accept key-only overrides'
+        );
+        $this->assertSame(
+            [
+                'vm.swappiness' => '70 # override comment',
+                'net.core.somaxconn' => '9000',
+            ],
+            \pmssSysctlFileParse($path),
+            'file parser should preserve inline comments as legacy value text'
+        );
+    }
+
+    public function testSysctlGroupedSettingsRowsLockChangeOrder(): void
+    {
+        $grouped = [
+            'vm' => ['vm.swappiness' => '10'],
+            'ignored' => 'not-array',
+            'net' => ['net.core.somaxconn' => 2000],
+        ];
+
+        $this->assertSame(
+            [
+                ['vm.swappiness', '10'],
+                ['net.core.somaxconn', '2000'],
+            ],
+            \pmssSysctlGroupedSettingsRows($grouped)
+        );
+        $this->assertSame(
+            [
+                'vm.swappiness: 60 -> 10',
+                'net.core.somaxconn: <unset> -> 2000',
+            ],
+            \pmssSysctlChangesDescribe(['vm.swappiness' => '60'], $grouped)
         );
     }
 
