@@ -13,6 +13,26 @@
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/user/homeReclaim.php';
 
+/**
+ * Refuse reclaim when the target no longer satisfies the terminating-home contract.
+ */
+function pmssUserHomeReclaimRefuseUnsafePath(?string $username, string $targetPath, string $phase): int
+{
+    fwrite(STDERR, "Refusing unsafe reclaim path: {$targetPath}\n");
+    if ($username !== null) {
+        pmssUserLifecycleContextLogStatusMessage(
+            'terminate',
+            $phase,
+            $username,
+            'ERR',
+            'Refusing unsafe reclaim path',
+            array('path' => $targetPath)
+        );
+    }
+
+    return 1;
+}
+
 /** Execute the asynchronous home reclaim worker. */
 function pmssUserHomeReclaimMain(array $argv): int
 {
@@ -42,8 +62,7 @@ function pmssUserHomeReclaimMain(array $argv): int
 
     $username = pmssUserHomeReclaimPathUsername($targetPath);
     if ($username === null || !pmssUserHomeReclaimPathIsSafe($targetPath)) {
-        fwrite(STDERR, "Refusing unsafe reclaim path: {$targetPath}\n");
-        return 1;
+        return pmssUserHomeReclaimRefuseUnsafePath($username, $targetPath, 'home_reclaim_unsafe');
     }
 
     if (!file_exists($targetPath)) {
@@ -61,6 +80,15 @@ function pmssUserHomeReclaimMain(array $argv): int
             'home_reclaim_clear_immutable',
             pmssBuildCommand('find', array($targetPath, '-xdev', '-exec', $chattr, '-i', '--', '{}', '+')),
             false
+        );
+    }
+
+    clearstatcache(true, $targetPath);
+    if (!pmssUserHomeReclaimPathIsSafe($targetPath)) {
+        return pmssUserHomeReclaimRefuseUnsafePath(
+            $username,
+            $targetPath,
+            'home_reclaim_unsafe_after_immutable_clear'
         );
     }
 
