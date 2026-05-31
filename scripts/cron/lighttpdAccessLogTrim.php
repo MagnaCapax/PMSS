@@ -12,7 +12,7 @@ require_once __DIR__.'/../lib/logger.php';
 require_once __DIR__.'/../lib/user/selection.php';
 require_once __DIR__.'/../lib/lighttpd/accessLog.php';
 
-$debug = pmssCliArgvHasToken($argv ?? null, '--debug');
+[$debug] = pmssCliArgvDebugSplit($argv ?? null);
 $logger = new Logger(__FILE__);
 $trimmed = 0;
 $thresholdBytes = PMSS_LIGHTTPD_ACCESS_LOG_THRESHOLD_BYTES;

@@ -41,7 +41,7 @@ require_once __DIR__.'/../lib/user/traffic.php';
 
 require_once __DIR__.'/../lib/user/watchdog.php';
 
-$debug = pmssCliArgvHasToken($argv ?? null, '--debug');
+[$debug] = pmssCliArgvDebugSplit($argv ?? null);
 
 // Grace periods for transient conditions (seconds).
 define('PMSS_RTORRENT_MISSING_GRACE', 180);

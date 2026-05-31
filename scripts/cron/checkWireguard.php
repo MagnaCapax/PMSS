@@ -9,7 +9,7 @@
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
-$debug = pmssCliArgvHasToken($argv ?? null, '--debug');
+[$debug] = pmssCliArgvDebugSplit($argv ?? null);
 
 $logPrefix = date('c') . ' ';
 if (!file_exists('/etc/wireguard/wg0.conf')) {

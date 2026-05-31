@@ -18,6 +18,7 @@ function pmssCliArgvHasToken(?array $argv, string $token): bool { return in_arra
 /** Remove exact option tokens from argv while preserving positional order. */
 function pmssCliArgvWithoutTokens(?array $argv, array $tokens): array { $blocked = array_flip($tokens); return array_values(array_filter(pmssCliArgv($argv), static function ($arg) use ($blocked): bool { return !isset($blocked[(string) $arg]); })); }
 
+function pmssCliArgvDebugSplit(?array $argv = null): array { return [pmssCliArgvHasToken($argv, '--debug'), pmssCliArgvWithoutTokens($argv, ['--debug'])]; }
 /**
  * Split argv tokens into associative options and positional arguments.
  * @param array<int,string> $valueOptions Option names that may consume dashed values.

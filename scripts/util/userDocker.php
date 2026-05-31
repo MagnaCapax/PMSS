@@ -55,8 +55,7 @@ require_once __DIR__.'/../lib/user/log.php';
 require_once __DIR__.'/../lib/user/rootlessDockerConfig.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
 
-$debug = pmssCliArgvHasToken($argv ?? null, '--debug');
-$args = pmssCliArgvWithoutTokens($argv ?? null, ['--debug']);
+[$debug, $args] = pmssCliArgvDebugSplit($argv ?? null);
 
 if (count($args) < 3) {
     fwrite(STDERR, "Usage: /scripts/util/userDocker.php USER {start|stop|restart|status} [--debug]\n");

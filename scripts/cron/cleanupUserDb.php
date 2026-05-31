@@ -10,7 +10,7 @@
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/users.php';
 
-$debug = pmssCliArgvHasToken($argv ?? null, '--debug');
+[$debug] = pmssCliArgvDebugSplit($argv ?? null);
 
 $db = new users();
 $removed = $db->prune();

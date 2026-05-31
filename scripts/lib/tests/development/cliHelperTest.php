@@ -39,8 +39,7 @@ class CliHelperTest extends TestCase
         foreach ([['runtime', 60, 60], ['idle-util', 85, 70], ['empty', 85, 0]] as $case) {
             $this->assertEquals($case[2], \pmssCliOptionInt($parsed, $case[0], null, $case[1]));
         }
-        $this->assertTrue(\pmssCliArgvHasToken(['script.php', '--debug'], '--debug'));
-        $this->assertEquals(['script.php', 'alice'], \pmssCliArgvWithoutTokens(['script.php', '--debug', 'alice'], ['--debug']));
+        $this->assertEquals([true, ['script.php', 'alice']], \pmssCliArgvDebugSplit(['script.php', '--debug', 'alice']));
     }
 
     public function testSupportsLongAndShortOptionValues(): void
