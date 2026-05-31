@@ -83,4 +83,24 @@ class ShowTrafficFormatTest extends TestCase
             $this->assertEquals($case[1], \pmssShowTrafficFormatRateDisplay($case[0]));
         }
     }
+
+    public function testJsonPayloadBuilderMatchesSnapshot(): void
+    {
+        $row = [
+            'user' => 'alice', 'display' => ['month' => '1GiB', 'week' => '2MiB', 'day' => '3MiB'], 'rates' => ['week' => 1.25, 'day' => 2.5, 'hour' => 3.75, '15min' => 4.0],
+            'inboundMonthMiB' => 256.5, 'inboundRatio' => 0.25, 'limitMiB' => 2048.0, 'pctUsed' => 87.654, 'overLimit' => false, 'nearLimit' => true,
+            'rawMiB' => ['month' => 1024.0, 'week' => 2.0, 'day' => 3.0, 'hour' => 4.0, '15min' => 5.0],
+        ];
+
+        $this->assertEquals([
+            'users' => [[
+                'user' => 'alice', 'display' => ['month' => '1GiB', 'week' => '2MiB', 'day' => '3MiB'], 'rates' => ['week' => 1.25, 'day' => 2.5, 'hour' => 3.75, '15min' => 4.0],
+                'inboundMonthMiB' => 256.5, 'inboundOutboundRatio' => 0.25, 'limitMiB' => 2048.0, 'pctUsed' => 87.65, 'overLimit' => false, 'nearLimit' => true,
+                'rawMiB' => ['month' => 1024.0, 'week' => 2.0, 'day' => 3.0, 'hour' => 4.0, '15min' => 5.0],
+            ]],
+            'totals' => ['monthMiB' => 1536.25, 'monthLocalMiB' => 512.0, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0],
+            'summary' => ['totalUsers' => 2, 'usersWithStats' => 1, 'overLimit' => 0, 'nearLimit' => 1, 'missingStats' => 1],
+            'missingStatsUsers' => ['ghost'],
+        ], \pmssShowTrafficJsonPayload([$row], 1536.25, 512.0, ['alice' => true, 'bob' => true], ['alice' => true], 0, 1, ['ghost']));
+    }
 }
