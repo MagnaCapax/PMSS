@@ -17,6 +17,9 @@ require_once __DIR__ . '/../update/runtime/commands.php'; // for runStep
 class Manager
 {
     private const IO_CLI_PROPERTY_MAP = ['io-read-bw' => 'IOReadBandwidthMax', 'io-write-bw' => 'IOWriteBandwidthMax', 'io-read-iops' => 'IOReadIOPSMax', 'io-write-iops' => 'IOWriteIOPSMax'];
+    private const RESOURCE_OPTION_NAMES = ['cpu-weight', 'io-weight', 'tasks-max', 'memory-high', 'memory-max', 'cpu-quota-percent', 'io-latency-ms', 'cpu-profile', 'mem-profile', 'tasks-profile'];
+    private const INTEGER_OPTION_NAMES = ['cpu-weight', 'io-weight', 'tasks-max', 'memory-high', 'memory-max', 'io-latency-ms'];
+    private const POLICY_OPTION_MAP = ['cpu-weight' => 'cpuWeight', 'io-weight' => 'ioWeight', 'tasks-max' => 'tasksMax', 'cpu-quota-percent' => 'cpuQuotaPercent', 'io-latency-ms' => 'ioLatencyMs', 'memory-high' => 'memoryHighMiB', 'memory-max' => 'memoryMaxMiB'];
     private const IO_PROFILE_MAP = [
         'hdd' => ['defaults' => ['io-weight' => '200'], 'limits' => ['readBw' => '5M', 'writeBw' => '10M', 'readIops' => 100, 'writeIops' => 100]],
         'nvme' => ['defaults' => ['io-weight' => '200'], 'limits' => []],
@@ -57,21 +60,9 @@ class Manager
 
         $user  = $args[0];
         $flags = array_slice($args, 1);
-        $inlineOptions = [];
-        $ioSpecs = [];
-        foreach ($flags as $flag) {
-            if (strpos($flag, '--') !== 0 || ($separator = strpos($flag, '=')) === false) {
-                continue;
-            }
-
-            $name = substr($flag, 2, $separator - 2);
-            $value = substr($flag, $separator + 1);
-            if (isset(self::IO_CLI_PROPERTY_MAP[$name])) {
-                $ioSpecs[$name][] = $value;
-            } else {
-                $inlineOptions[$name] = $value;
-            }
-        }
+        $parseError = null;
+        $parsedOptions = $this->parseFlagInputs($flags, $parseError);
+        $inlineOptions = $parsedOptions['inline'];
         $uid   = $this->sys->getUid($user);
 
         if ($uid < 0) {
@@ -83,7 +74,6 @@ class Manager
         $mode  = $this->sys->getCgroupMode();
         echo "user=$user uid=$uid slice=$slice mode=$mode\n";
 
-        $opt = [];
         $wantStatus = in_array('--status', $flags, true);
         $wantConfig = in_array('--config', $flags, true);
         $apply      = in_array('--apply', $flags, true);
@@ -95,27 +85,14 @@ class Manager
         $ioProfile = strtolower((string) ($inlineOptions['io-profile'] ?? ''));
         $ioCostQos = (string) ($inlineOptions['io-cost-qos'] ?? '');
         $ioCostModel = (string) ($inlineOptions['io-cost-model'] ?? '');
-        $ioPairs = [];
+        $ioPairs = $parsedOptions['io'];
         $policyIoPairs = [];
         $ioCostWrites = [];
+        $opt = $parsedOptions['resource'];
 
-        foreach (['cpu-weight', 'io-weight', 'tasks-max', 'memory-high', 'memory-max', 'cpu-quota-percent', 'io-latency-ms', 'cpu-profile', 'mem-profile', 'tasks-profile'] as $name) {
-            if (!array_key_exists($name, $inlineOptions)) continue;
-            $value = (string) $inlineOptions[$name];
-            $opt[$name] = strpos($name, '-profile') !== false ? strtolower($value) : $value;
-        }
-
-        foreach (self::IO_CLI_PROPERTY_MAP as $flagName => $propertyName) {
-            foreach ($ioSpecs[$flagName] ?? [] as $spec) {
-                $specText = trim($spec);
-                if (preg_match('/^([^:\s]+):([^\s]+)$/', $specText, $matches) !== 1
-                    || !\pmssCgroupPolicyDeviceTargetIsSafe($matches[1])
-                    || strpos($matches[2], "\0") !== false) {
-                    fwrite(STDERR, 'Invalid --'.$flagName.' specification: '.$spec."\n");
-                    return 2;
-                }
-                $ioPairs[] = $propertyName.'='.$matches[1].' '.$matches[2];
-            }
+        if ($parseError !== null) {
+            fwrite(STDERR, $parseError."\n");
+            return 2;
         }
 
         if (($invalidMessage = $this->validateFlagOptions($opt, $ioCostQos, $ioCostModel)) !== null) {
@@ -125,13 +102,13 @@ class Manager
 
         if ($doWipe) {
             $hasConflictingInput = !empty($opt)
+                || !empty($ioPairs)
                 || $defaultsRequested
                 || $respectExisting
                 || $device !== ''
                 || $ioProfile !== ''
                 || $ioCostQos !== ''
-                || $ioCostModel !== ''
-                || !empty($ioPairs);
+                || $ioCostModel !== '';
             if ($hasConflictingInput) {
                 fwrite(STDERR, "Invalid --wipe combination: remove resource, IO, defaults, and respect-existing options before wiping\n");
                 return 2;
@@ -249,28 +226,8 @@ class Manager
                 }
 
                 $this->sys->requireRoot();
-                $steps = [];
-                if ($doWipe) {
-                    $steps[] = ['Reverting user slice', \pmssBuildCommand('systemctl', ['revert', $slice])];
-                    $steps[] = ['Unlimiting core properties', \pmssBuildCommand('systemctl', ['set-property', $slice, 'MemoryHigh=infinity', 'MemoryMax=infinity', 'TasksMax=infinity', 'CPUWeight=100', 'IOWeight=100'])];
-                } else {
-                    $pairs = [];
-                    foreach ($props as $k=>$v) { $pairs[] = $k.'='.$v; }
-                    $allPairs = array_merge($pairs, $ioPairs);
-                    if (!empty($allPairs)) {
-                        $steps[] = ['Applying cgroup properties', \pmssBuildCommand('systemctl', array_merge(['set-property', $slice], $allPairs))];
-                    }
-                    foreach ($ioCostWrites as $write) {
-                        $script = 'if [ -w '.escapeshellarg($write['path']).' ]; then printf \'%s\\n\' '
-                            .escapeshellarg($write['value'])
-                            .' > '.escapeshellarg($write['path'])
-                            .'; else echo '.escapeshellarg('[ERR] io.cost path not writable: '.$write['path']).'; exit 1; fi';
-                        $steps[] = ['Applying io.cost setting', \pmssBuildCommand('sh', ['-c', $script])];
-                    }
-                }
-
                 $applyFailed = false;
-                foreach ($steps as $step) {
+                foreach ($this->buildApplySteps($slice, $doWipe, $props, $ioPairs, $ioCostWrites) as $step) {
                     $applyFailed = (int) call_user_func($this->stepRunner, $step[0], $step[1]) !== 0 || $applyFailed;
                 }
 
@@ -337,12 +294,78 @@ class Manager
         return $props;
     }
 
+    private function parseFlagInputs(array $flags, ?string &$error): array
+    {
+        $error = null;
+        $inlineOptions = $ioSpecs = $ioPairs = $resourceOptions = [];
+        foreach ($flags as $flag) {
+            if (strpos($flag, '--') !== 0 || ($separator = strpos($flag, '=')) === false) {
+                continue;
+            }
+
+            $name = substr($flag, 2, $separator - 2);
+            $value = substr($flag, $separator + 1);
+            if (isset(self::IO_CLI_PROPERTY_MAP[$name])) {
+                $ioSpecs[$name][] = $value;
+                continue;
+            }
+
+            $inlineOptions[$name] = $value;
+        }
+
+        foreach (self::RESOURCE_OPTION_NAMES as $name) {
+            if (!array_key_exists($name, $inlineOptions)) continue;
+            $resourceOptions[$name] = strpos($name, '-profile') !== false ? strtolower((string) $inlineOptions[$name]) : (string) $inlineOptions[$name];
+        }
+        foreach (self::IO_CLI_PROPERTY_MAP as $flagName => $propertyName) {
+            foreach ($ioSpecs[$flagName] ?? [] as $spec) {
+                $specText = trim($spec);
+                if (preg_match('/^([^:\s]+):([^\s]+)$/', $specText, $matches) !== 1
+                    || !\pmssCgroupPolicyDeviceTargetIsSafe($matches[1])
+                    || strpos($matches[2], "\0") !== false) {
+                    $error = 'Invalid --'.$flagName.' specification: '.$spec;
+                    return [];
+                }
+                $ioPairs[] = $propertyName.'='.$matches[1].' '.$matches[2];
+            }
+        }
+
+        return ['inline' => $inlineOptions, 'resource' => $resourceOptions, 'io' => $ioPairs];
+    }
+
+    private function buildApplySteps(string $slice, bool $doWipe, array $props, array $ioPairs, array $ioCostWrites): array
+    {
+        if ($doWipe) {
+            return [
+                ['Reverting user slice', \pmssBuildCommand('systemctl', ['revert', $slice])],
+                ['Unlimiting core properties', \pmssBuildCommand('systemctl', ['set-property', $slice, 'MemoryHigh=infinity', 'MemoryMax=infinity', 'TasksMax=infinity', 'CPUWeight=100', 'IOWeight=100'])],
+            ];
+        }
+
+        $steps = [];
+        $propertyPairs = [];
+        foreach ($props as $key => $value) { $propertyPairs[] = $key.'='.$value; }
+        $allPairs = array_merge($propertyPairs, $ioPairs);
+        if (!empty($allPairs)) {
+            $steps[] = ['Applying cgroup properties', \pmssBuildCommand('systemctl', array_merge(['set-property', $slice], $allPairs))];
+        }
+        foreach ($ioCostWrites as $write) {
+            $script = 'if [ -w '.escapeshellarg($write['path']).' ]; then printf \'%s\\n\' '
+                .escapeshellarg($write['value'])
+                .' > '.escapeshellarg($write['path'])
+                .'; else echo '.escapeshellarg('[ERR] io.cost path not writable: '.$write['path']).'; exit 1; fi';
+            $steps[] = ['Applying io.cost setting', \pmssBuildCommand('sh', ['-c', $script])];
+        }
+
+        return $steps;
+    }
+
     /**
      * Reject malformed CLI values before they reach systemctl.
      */
     private function validateFlagOptions(array $opt, string $ioCostQos, string $ioCostModel): ?string
     {
-        foreach (['cpu-weight', 'io-weight', 'tasks-max', 'memory-high', 'memory-max', 'io-latency-ms'] as $key) {
+        foreach (self::INTEGER_OPTION_NAMES as $key) {
             if (isset($opt[$key]) && preg_match('/^-?[0-9]+$/', (string)$opt[$key]) !== 1) {
                 return 'Invalid --'.$key.' value: expected integer';
             }
@@ -388,7 +411,7 @@ class Manager
     {
         $policy = \pmssCgroupPolicyLoad();
 
-        foreach (['cpu-weight' => 'cpuWeight', 'io-weight' => 'ioWeight', 'tasks-max' => 'tasksMax', 'cpu-quota-percent' => 'cpuQuotaPercent', 'io-latency-ms' => 'ioLatencyMs', 'memory-high' => 'memoryHighMiB', 'memory-max' => 'memoryMaxMiB'] as $optionKey => $policyKey) {
+        foreach (self::POLICY_OPTION_MAP as $optionKey => $policyKey) {
             if (!isset($opt[$optionKey]) && isset($policy[$policyKey]) && is_numeric($policy[$policyKey])) {
                 $opt[$optionKey] = (string)$policy[$policyKey];
             }

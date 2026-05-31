@@ -45,6 +45,17 @@ function pmssCgroupPolicyPositiveValue(array $source, string $key, bool $numeric
     return $value === '' ? null : $value;
 }
 
+/** Derive a customer-tier-clamped bfq.weight value from a memory baseline. */
+function pmssBfqFormulaWeight(int $memoryMiB, float $coefficient = 3.535, int $customerMax = 700): int
+{
+    if ($memoryMiB <= 0) {
+        return 1;
+    }
+    $customerMax = max(1, $customerMax);
+    $derived = (int) round($coefficient * sqrt($memoryMiB));
+    return max(1, min($customerMax, $derived));
+}
+
 /** Resolve one numeric profile value from policy overrides plus built-in defaults. */
 function pmssCgroupPolicyNumericProfileValue(array $policy, string $family, string $profileName, array $defaults, string $fallback): string
 {

@@ -349,6 +349,31 @@ class CgroupUserConfigTest extends TestCase
         );
     }
 
+    public function testIoFlagPlanSnapshotLocksParserPropertyOrder(): void
+    {
+        $res = $this->runMgr([
+            'testuser',
+            '--apply',
+            '--dry-run',
+            '--io-write-bw=/dev/sdb:10M',
+            '--io-read-bw=/dev/sda:5M',
+            '--io-write-iops=/dev/sdc:7',
+            '--io-read-iops=/dev/sdd:8',
+        ]);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertSame(
+            "user=testuser uid=1000 slice=user-1000.slice mode=v2\n"
+            ."[Planned IO properties]\n"
+            ."IOReadBandwidthMax=/dev/sda 5M\n"
+            ."IOWriteBandwidthMax=/dev/sdb 10M\n"
+            ."IOReadIOPSMax=/dev/sdd 8\n"
+            ."IOWriteIOPSMax=/dev/sdc 7\n"
+            ."(dry-run or no --apply; not changing system)\n",
+            $res['out']
+        );
+    }
+
     public function testIoLatencyDefaultsToHomeBackingDevice()
     {
         $this->sys->findmnt['/home'] = '/dev/md0';

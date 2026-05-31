@@ -30,7 +30,7 @@
 
 declare(strict_types=1);
 
-require_once __DIR__.'/../lib/cgroup/bfqFormula.php';
+require_once __DIR__.'/../lib/cgroup/policy.php';
 require_once __DIR__.'/../lib/log.php';
 require_once __DIR__.'/../lib/user/identity.php';
 

@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../../cgroup/bfqFormula.php';
+require_once __DIR__.'/../../cgroup/policy.php';
 
 /**
  * Hermetic tests for pmssBfqFormulaWeight() — the per-user bfq.weight curve
