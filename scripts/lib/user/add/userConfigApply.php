@@ -29,7 +29,7 @@ function pmssAddUserBuildUserConfigCommand(array $user): string
     if (isset($user['dockerEnabled']) && $user['dockerEnabled'] !== '') {
         $command[] = '--docker-enabled='.(string) $user['dockerEnabled'];
     }
-    return implode(' ', array_map('escapeshellarg', $command));
+    return pmssCommandArgvShellQuote($command);
 }
 
 /**

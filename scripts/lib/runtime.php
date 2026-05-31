@@ -61,6 +61,8 @@ function pmssStatsCompareTimesBuild(?int $now = null): array { $now = $now ?? ti
         $path = trim($resolved);
         return $path !== '' && strpos($path, '/') === 0 && is_executable($path) ? $path : '';
     }
+    // Quote argv fragments consistently before composing shell command strings.
+    function pmssCommandArgvShellQuote(array $argv): string { return implode(' ', array_map(static function ($arg): string { return escapeshellarg((string) $arg); }, $argv)); }
     // Return a 10-sample direct-I/O ioping average normalized to milliseconds.
     function pmssIopingAverageMs(?string $target): ?float
     {

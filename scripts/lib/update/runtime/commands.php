@@ -122,7 +122,7 @@ function dpkgCmd(string $args): string
 function pmssBuildCommand(string $program, array $args = []): string
 {
     $prog = escapeshellcmd($program);
-    return empty($args) ? $prog : $prog.' '.implode(' ', array_map(static function ($a) { return escapeshellarg((string) $a); }, $args));
+    return empty($args) ? $prog : $prog.' '.pmssCommandArgvShellQuote($args);
 }
 
 /**

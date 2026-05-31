@@ -14,12 +14,8 @@ require_once __DIR__.'/lighttpd/userFileWrite.php';
  */
 function pmssSetupLetsEncryptCommandBuild(string $binary, array $args = array()): string
 {
-    $command = escapeshellcmd($binary);
-    foreach ($args as $arg) {
-        $command .= ' '.escapeshellarg((string) $arg);
-    }
-
-    return $command;
+    $quotedArgs = pmssCommandArgvShellQuote($args);
+    return escapeshellcmd($binary).($quotedArgs === '' ? '' : ' '.$quotedArgs);
 }
 
 /**

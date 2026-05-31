@@ -74,7 +74,7 @@ function pmssDockerInstallLsioDisplayCommand(array $command): string
  */
 function pmssDockerInstallLsioShellCommand(array $command): string
 {
-    return implode(' ', array_map('escapeshellarg', $command));
+    return pmssCommandArgvShellQuote($command);
 }
 
 /**
