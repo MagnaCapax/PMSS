@@ -103,6 +103,10 @@ function pmssEnsureCronRestartDropin(
         logMessage('[ERR] Refusing unsafe cron systemd drop-in path: '.$dropinFile);
         return false;
     }
+    if (!pmssPathTargetIsSafe($dropinDir, true, false, false)) {
+        logMessage('[ERR] Refusing unsafe cron systemd drop-in directory path: '.$dropinDir);
+        return false;
+    }
     if (!is_dir($dropinDir)) {
         $rc = runStep('Ensuring cron systemd drop-in directory', 'install -d -m 0755 '.escapeshellarg($dropinDir));
         if ($rc !== 0 || !is_dir($dropinDir)) {
@@ -115,6 +119,10 @@ function pmssEnsureCronRestartDropin(
         return false;
     }
 
+    if (!pmssPathTargetIsSafe($dropinFile, false, true, false)) {
+        logMessage('[ERR] Refusing unsafe cron systemd drop-in target path: '.$dropinFile);
+        return false;
+    }
     if (is_link($dropinFile) || (file_exists($dropinFile) && !is_file($dropinFile))) {
         logMessage('[ERR] Refusing unsafe cron systemd drop-in target: '.$dropinFile);
         return false;

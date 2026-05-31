@@ -144,6 +144,21 @@ class UpdateServicesRuntimeTest extends TestCase
         $this->assertFalse(file_exists($realDir.'/pmss-restart.conf'));
     }
 
+    public function testCronRestartDropinRefusesSymlinkedAncestor(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-cron-dropin-ancestor-link-');
+        $realRoot = $root.'/real';
+        $linkRoot = $root.'/link';
+        $this->pmssEnsureDir($realRoot.'/system');
+        $this->pmssCreateSymlinkOrSkip($realRoot, $linkRoot);
+        $dropinDir = $linkRoot.'/system/cron.service.d';
+        $changed = true;
+
+        $this->assertFalse(\pmssEnsureCronRestartDropin($dropinDir, $dropinDir.'/pmss-restart.conf', $root, $changed));
+        $this->assertFalse($changed);
+        $this->assertFalse(file_exists($realRoot.'/system/cron.service.d/pmss-restart.conf'));
+    }
+
     public function testCronRestartDropinRequiresTargetInsideDirectory(): void
     {
         $root = $this->pmssMakeTempDir('pmss-cron-dropin-outside-');
