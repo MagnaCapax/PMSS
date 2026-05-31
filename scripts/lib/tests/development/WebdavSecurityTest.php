@@ -55,24 +55,6 @@ class WebdavSecurityTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-webdav-test', 0700);
     }
 
-    private function assertNotFalse($value, string $msg = ''): void
-    {
-        $this->assertTrue($value !== false, $msg !== '' ? $msg : 'Expected value to not be false');
-    }
-
-    private function assertGreaterThan($expected, $actual, string $msg = ''): void
-    {
-        $this->assertTrue(
-            $actual > $expected,
-            $msg !== '' ? $msg : "Expected $actual to be greater than $expected"
-        );
-    }
-
-    private function assertNotEmpty($value, string $msg = ''): void
-    {
-        $this->assertTrue(!empty($value), $msg !== '' ? $msg : 'Expected value to not be empty');
-    }
-
     // =========================================================================
     // SECTION 1: USERNAME VALIDATION
     // =========================================================================
@@ -87,9 +69,11 @@ class WebdavSecurityTest extends TestCase
         $user = 'testuser';
         $policy = pmssWebdavWwwPolicyBlock($user);
 
-        $this->assertStringContainsString('/webdav-testuser/www', $policy);
-        $this->assertStringContainsString('$HTTP["url"]', $policy);
-        $this->assertStringContainsString('webdav.is-readonly', $policy);
+        $this->assertStringContainsAllStrings([
+            '/webdav-testuser/www',
+            '$HTTP["url"]',
+            'webdav.is-readonly',
+        ], $policy);
     }
 
     /**
@@ -174,9 +158,7 @@ class WebdavSecurityTest extends TestCase
      */
     public function testDotfileDenyPatternExistsInTemplate(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
-
-        $this->assertStringContainsString('url.access-deny = ( "/." )', $template);
+        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/template.lighttpd', 'url.access-deny = ( "/." )');
     }
 
     /**
@@ -304,7 +286,6 @@ LIGHTTPD;
         $stripped = pmssStripLighttpdWebdavConfig($template);
 
         $this->assertStringContainsString('#"mod_webdav",', $stripped);
-        $this->assertNotEmpty($stripped);
         $this->assertStringContainsString('alias.url', $stripped);
     }
 
@@ -386,9 +367,11 @@ LIGHTTPD;
         $user = 'testuser';
         $policy = pmssWebdavWwwPolicyBlock($user);
 
-        $this->assertStringContainsString('webdav.is-readonly = "enable"', $policy);
-        $this->assertStringContainsString('/webdav-testuser/www($|/)', $policy);
-        $this->assertStringContainsString('/webdav-testuser/www/public($|/)', $policy);
+        $this->assertStringContainsAllStrings([
+            'webdav.is-readonly = "enable"',
+            '/webdav-testuser/www($|/)',
+            '/webdav-testuser/www/public($|/)',
+        ], $policy);
     }
 
     /**
@@ -432,9 +415,9 @@ LIGHTTPD;
         $wwwPos = strpos($policy, '/www($|/)');
         $publicPos = strpos($policy, '/www/public($|/)');
 
-        $this->assertNotFalse($wwwPos, 'www block must exist');
-        $this->assertNotFalse($publicPos, 'www/public block must exist');
-        $this->assertGreaterThan($wwwPos, $publicPos,
+        $this->assertTrue($wwwPos !== false, 'www block must exist');
+        $this->assertTrue($publicPos !== false, 'www/public block must exist');
+        $this->assertTrue($publicPos > $wwwPos,
             'www/public block must come after www block for lighttpd precedence');
     }
 
@@ -482,11 +465,10 @@ LIGHTTPD;
      */
     public function testAuthRequirementIsUserSpecific(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
-
-        $this->assertStringContainsString('"/webdav-##username/"', $template);
-        $this->assertStringContainsString('"require" => "user=##username"', $template);
-        $this->assertStringNotContainsString('"require" => "valid-user"', $template);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/seedbox/config/template.lighttpd', [
+            '"/webdav-##username/"',
+            '"require" => "user=##username"',
+        ], ['"require" => "valid-user"' => 'WebDAV auth must remain user-specific']);
     }
 
     // =========================================================================
@@ -500,13 +482,14 @@ LIGHTTPD;
      */
     public function testLockFilePathIsSecure(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
-
-        $this->assertStringContainsString(
-            'webdav.sqlite-db-name = "/home/##username/.lighttpd/webdav.lock.db"',
-            $template
+        $this->pmssAssertRepoFileContainsString(
+            'etc/seedbox/config/template.lighttpd',
+            'webdav.sqlite-db-name = "/home/##username/.lighttpd/webdav.lock.db"'
         );
-        $this->assertStringNotContainsString('webdav.sqlite-db-name = "/tmp/', $template);
+        $this->pmssAssertRepoFileNotContainsString(
+            'etc/seedbox/config/template.lighttpd',
+            'webdav.sqlite-db-name = "/tmp/'
+        );
     }
 
     /**
@@ -516,11 +499,9 @@ LIGHTTPD;
      */
     public function testAliasMappingPointsToCorrectHome(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
-
-        $this->assertStringContainsString(
-            '"/webdav-##username/" => "/home/##username/"',
-            $template
+        $this->pmssAssertRepoFileContainsString(
+            'etc/seedbox/config/template.lighttpd',
+            '"/webdav-##username/" => "/home/##username/"'
         );
     }
 
@@ -546,9 +527,7 @@ LIGHTTPD;
      */
     public function testTemplateHasCorrectRegexAnchors(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
-
-        $this->assertStringContainsString('"^/webdav-##username($|/)"', $template);
+        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/template.lighttpd', '"^/webdav-##username($|/)"');
     }
 
     /**
@@ -575,10 +554,11 @@ LIGHTTPD;
      */
     public function testNginxRedirectUses301(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
-
-        $this->assertStringContainsString('return 301 https://$host$request_uri;', $template);
-        $this->assertStringNotContainsString('return 302', $template);
+        $this->pmssAssertRepoFileContainsString(
+            'etc/seedbox/config/template.nginx-user',
+            'return 301 https://$host$request_uri;'
+        );
+        $this->pmssAssertRepoFileNotContainsString('etc/seedbox/config/template.nginx-user', 'return 302');
     }
 
     /**
@@ -588,11 +568,9 @@ LIGHTTPD;
      */
     public function testNginxForwardsAuthorizationHeader(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-proxy_params');
-
-        $this->assertStringContainsString(
-            'proxy_set_header Authorization $http_authorization;',
-            $template
+        $this->pmssAssertRepoFileContainsString(
+            'etc/seedbox/config/template.nginx-proxy_params',
+            'proxy_set_header Authorization $http_authorization;'
         );
     }
 
@@ -607,13 +585,17 @@ LIGHTTPD;
         $proxyParams = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-proxy_params');
         $webdavProxyParams = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-webdav_proxy_params');
 
-        $this->assertStringContainsString('proxy_read_timeout 300s;', $proxyParams);
-        $this->assertStringContainsString('proxy_send_timeout 300s;', $proxyParams);
-        $this->assertStringContainsString('proxy_buffering off;', $proxyParams);
-        $this->assertStringContainsString('proxy_read_timeout 600s;', $webdavProxyParams);
-        $this->assertStringContainsString('proxy_send_timeout 600s;', $webdavProxyParams);
-        $this->assertStringContainsString('client_body_timeout 600s;', $webdavProxyParams);
-        $this->assertStringContainsString('proxy_request_buffering off;', $webdavProxyParams);
+        $this->assertStringContainsAllStrings([
+            'proxy_read_timeout 300s;',
+            'proxy_send_timeout 300s;',
+            'proxy_buffering off;',
+        ], $proxyParams);
+        $this->assertStringContainsAllStrings([
+            'proxy_read_timeout 600s;',
+            'proxy_send_timeout 600s;',
+            'client_body_timeout 600s;',
+            'proxy_request_buffering off;',
+        ], $webdavProxyParams);
 
         $nginxConf = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-conf');
         $this->assertStringContainsString('client_max_body_size 8192M;', $nginxConf);
@@ -950,11 +932,9 @@ LIGHTTPD;
      */
     public function testProxyParamsContainsReadTimeout(): void
     {
-        $proxyParams = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-proxy_params');
-
-        $this->assertStringContainsString(
+        $this->pmssAssertRepoFileContainsString(
+            'etc/seedbox/config/template.nginx-proxy_params',
             'proxy_read_timeout',
-            $proxyParams,
             'proxy_params must contain proxy_read_timeout (WebDAV blocks must not include it AND set explicitly)'
         );
     }
@@ -991,10 +971,10 @@ LIGHTTPD;
      */
     public function testCreateNginxConfigCopiesWebdavProxyParams(): void
     {
-        $setup = $this->pmssReadRepoFile('scripts/lib/nginxConfig/setup.php');
-
-        $this->assertStringContainsString("'/etc/nginx/webdav_proxy_params'", $setup);
-        $this->assertStringContainsString("'/etc/seedbox/config/template.nginx-webdav_proxy_params'", $setup);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/nginxConfig/setup.php', [
+            "'/etc/nginx/webdav_proxy_params'",
+            "'/etc/seedbox/config/template.nginx-webdav_proxy_params'",
+        ]);
     }
 
     /**
@@ -1014,7 +994,7 @@ LIGHTTPD;
         // Extract WebDAV location block - find from "location /webdav-" to the matching
         // closing brace, handling nested braces (e.g., if blocks inside).
         $webdavBlock = $this->extractNginxLocationBlock($template, '/webdav-');
-        $this->assertNotEmpty($webdavBlock, 'WebDAV location block must exist in template');
+        $this->assertTrue($webdavBlock !== '', 'WebDAV location block must exist in template');
 
         // Either include proxy params OR set timeouts explicitly, not both.
         $this->assertTrue(
@@ -1035,7 +1015,7 @@ LIGHTTPD;
 
         // Extract WebDAV location block with nested brace handling.
         $webdavBlock = $this->extractNginxLocationBlock($template, '/webdav-');
-        $this->assertNotEmpty($webdavBlock, 'WebDAV location block must exist in template');
+        $this->assertTrue($webdavBlock !== '', 'WebDAV location block must exist in template');
 
         $this->assertStringContainsString(
             'include /etc/nginx/webdav_proxy_params',
@@ -1056,7 +1036,7 @@ LIGHTTPD;
         $blocks = array_values(array_filter($matches[1], static function (string $locationBlock): bool {
             return strpos($locationBlock, 'proxy_pass') !== false;
         }));
-        $this->assertGreaterThan(0, count($blocks), 'Must have at least one WebDAV proxy block');
+        $this->assertTrue(count($blocks) > 0, 'Must have at least one WebDAV proxy block');
 
         return $blocks;
     }
