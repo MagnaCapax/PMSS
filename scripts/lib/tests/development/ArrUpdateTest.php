@@ -60,6 +60,25 @@ class ArrUpdateTest extends TestCase
         }
     }
 
+    public function testUpdateKeepsExistingInstallWhenDownloadFails(): void
+    {
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-download-fail-');
+        $app = 'PmssArrDownloadFail'.bin2hex(random_bytes(3));
+        $installPath = $baseDir.'/install'; $shimDir = $this->writeCurlShim($baseDir);
+        $metadataPath = $this->writeMetadata($baseDir, 'bundle-1.2.3.tar.gz', $baseDir.'/missing.tar.gz');
+        $workPattern = sys_get_temp_dir().'/'.strtolower($app).'-*';
+        @mkdir($installPath, 0755, true); @file_put_contents($installPath.'/marker.txt', 'existing');
+
+        try {
+            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath): void { $this->runArrUpdate($app, $installPath, $metadataPath, 'PackageDir'); });
+
+            $this->assertEquals('existing', (string) @file_get_contents($installPath.'/marker.txt'));
+            $this->assertEquals([], glob($workPattern) ?: [], 'expected workspace cleanup after download failure');
+        } finally {
+            $this->cleanup($baseDir); $this->cleanupGlob($workPattern);
+        }
+    }
+
     public function testUpdatePrefersHostArchitectureAssetWhenMultipleBuildsMatch(): void
     {
         $baseDir = $this->pmssMakeTempDir('pmss-arr-update-arch-match-');

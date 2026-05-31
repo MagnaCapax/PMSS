@@ -181,19 +181,6 @@ function pmssArrInstalledVersionRead(string $installPath, string $app): ?string
     return null;
 }
 
-/** Remove a PMSS-created temporary workspace only after runtime scope checks. */
-function pmssArrCleanupWorkspace(string $workDir, string $prefix): void
-{
-    if (!function_exists('pmssPrivateTempDirRealpath')) {
-        return;
-    }
-
-    $real = pmssPrivateTempDirRealpath($workDir, $prefix);
-    if ($real !== null) {
-        runCommand('rm -rf '.escapeshellarg($real));
-    }
-}
-
 /** Select the release asset matching the host architecture, or a generic build.
  * @return array{0:string,1:string,2:string}|null
  */
@@ -225,6 +212,26 @@ function pmssArrReleaseAssetSelect(array $releases, string $assetPattern, string
     }
 
     return $genericAsset;
+}
+
+/** Download, extract, and atomically activate one prepared ARR release asset. */
+function pmssArrReleaseActivate(array $config, string $app, string $downloadUrl, string $assetName, callable $log): bool
+{
+    $workPrefix = strtolower($app).'-'; $workDir = pmssCreatePrivateTempDir($workPrefix);
+    if ($workDir === null) { $log('Failed to create temporary workspace'); return false; }
+    $archivePath = $workDir.'/'.$assetName; $extractPath = $workDir.'/'.$config['extract_dir']; $installPath = $config['install_path'];
+    $steps = [
+        ['Download failed; keeping existing installation', sprintf('curl -sSL --fail -o %s %s', escapeshellarg($archivePath), escapeshellarg($downloadUrl)), $archivePath, 'is_file'],
+        ['Extraction failed; keeping existing installation', sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($workDir)), $extractPath, 'is_dir'],
+        ['Install parent directory missing; refusing to replace application', '', dirname($installPath), 'is_dir'],
+        ['Failed to remove existing installation; keeping existing installation', 'rm -rf '.escapeshellarg($installPath), '', ''],
+        ['Failed to activate extracted release', sprintf('mv %s %s', escapeshellarg($extractPath), escapeshellarg($installPath)), $installPath, 'is_dir'],
+    ];
+
+    $ok = true; $message = '';
+    foreach ($steps as $step) { if ($step[1] !== '' && runCommand($step[1]) !== 0) { $message = $step[0]; $ok = false; break; } if ($step[2] !== '' && !$step[3]($step[2])) { $message = $step[0]; $ok = false; break; } }
+    if ($message !== '') { $log($message); } $real = pmssPrivateTempDirRealpath($workDir, $workPrefix);
+    if ($real !== null) { runCommand('rm -rf '.escapeshellarg($real)); } return $ok;
 }
 
 function pmssArrUpdate(array $config): void
@@ -282,35 +289,7 @@ function pmssArrUpdate(array $config): void
         $log('Unknown installed version; reinstalling to avoid stale binaries');
     }
 
-    $workPrefix = strtolower($app).'-';
-    $workDir = pmssCreatePrivateTempDir($workPrefix);
-    if ($workDir === null) { $log('Failed to create temporary workspace'); return; }
-
-    $archivePath = $workDir.'/'.$assetName;
-    $extractPath = $workDir.'/'.$config['extract_dir'];
-    $installed = false;
-    if (runCommand(sprintf('curl -sSL --fail -o %s %s', escapeshellarg($archivePath), escapeshellarg($downloadUrl))) !== 0
-        || !is_file($archivePath)
-    ) {
-        $log('Download failed; keeping existing installation');
-    } elseif (runCommand(sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($workDir))) !== 0
-        || !is_dir($extractPath)
-    ) {
-        $log('Extraction failed; keeping existing installation');
-    } elseif (!is_dir(dirname($installPath))) {
-        $log('Install parent directory missing; refusing to replace application');
-    } elseif (runCommand('rm -rf '.escapeshellarg($installPath)) !== 0) {
-        $log('Failed to remove existing installation; keeping existing installation');
-    } elseif (runCommand(sprintf('mv %s %s', escapeshellarg($extractPath), escapeshellarg($installPath))) !== 0
-        || !is_dir($installPath)
-    ) {
-        $log('Failed to activate extracted release');
-    } else {
-        $installed = true;
-    }
-
-    pmssArrCleanupWorkspace($workDir, $workPrefix);
-    if ($installed) {
+    if (pmssArrReleaseActivate($config, $app, $downloadUrl, $assetName, $log)) {
         if (@file_put_contents($installPath.'/version.txt', $latestVersion.PHP_EOL) === false) {
             $log('Failed to persist installed version marker');
         }
