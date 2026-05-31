@@ -84,6 +84,22 @@ function pmssBfqApplyBonusWeight(int $baseWeight, int $bonusPct, int $kernelMax 
     return max(1, min($kernelMax, $weighted));
 }
 
+/** Parse one kernel bfq.weight sysfs payload without silently coercing errors. */
+function pmssBfqKernelWeightParse($raw): ?int
+{
+    if (!is_string($raw)) {
+        return null;
+    }
+
+    $value = trim($raw);
+    if ($value === '' || preg_match('/^\d+$/', $value) !== 1) {
+        return null;
+    }
+
+    $weight = (int) $value;
+    return $weight >= 1 && $weight <= PMSS_BFQ_KERNEL_MAX ? $weight : null;
+}
+
 /** Resolve one numeric profile value from policy overrides plus built-in defaults. */
 function pmssCgroupPolicyNumericProfileValue(array $policy, string $family, string $profileName, array $defaults, string $fallback): string
 {

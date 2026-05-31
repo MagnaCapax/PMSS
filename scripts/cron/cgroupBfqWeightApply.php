@@ -141,7 +141,13 @@ foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
         continue;
     }
 
-    $cur = (int) trim((string) @file_get_contents($cgPath));
+    $cur = pmssBfqKernelWeightParse(@file_get_contents($cgPath));
+    if ($cur === null) {
+        $errors++;
+        syslog(LOG_WARNING, "unreadable bfq weight $user uid=$uid");
+        continue;
+    }
+
     if ($cur === $w) {
         continue;
     }

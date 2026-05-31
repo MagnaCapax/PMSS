@@ -74,6 +74,24 @@ class CgroupBfqWeightApplyTest extends TestCase
         }
     }
 
+    public function testKernelWeightParserAcceptsOnlyKernelRange(): void
+    {
+        foreach ([
+            ["1\n", 1],
+            ['250', 250],
+            ["1000\n", 1000],
+            ['001', 1],
+            ['', null],
+            [" \n", null],
+            ['0', null],
+            ['1001', null],
+            ['42 extra', null],
+            [false, null],
+        ] as [$raw, $expected]) {
+            $this->assertSame($expected, \pmssBfqKernelWeightParse($raw));
+        }
+    }
+
     public function testCustomParametersAndInvalidCeilings(): void
     {
         foreach ([
@@ -119,6 +137,20 @@ class CgroupBfqWeightApplyTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings(
             'scripts/cron/cgroupBfqWeightApply.php',
             ['function pmssBfqUserBonusPercentRead(string $user): int', '$stat = @lstat($path);', "((\$stat['mode'] ?? 0) & 0170000) !== 0100000", "(int) (\$stat['size'] ?? 0) > 64", '@file_get_contents($path, false, null, 0, 64)']
+        );
+    }
+
+    public function testCronRejectsUnreadableCurrentKernelWeight(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/cron/cgroupBfqWeightApply.php',
+            [
+                '$cur = pmssBfqKernelWeightParse(@file_get_contents($cgPath));',
+                "if (\$cur === null) {\n        \$errors++;\n        syslog(LOG_WARNING, \"unreadable bfq weight \$user uid=\$uid\");\n        continue;\n    }",
+                'if ($cur === $w) {',
+            ],
+            'missing BFQ current-weight parse guard: ',
+            'BFQ current-weight guard must run before compare/write: '
         );
     }
 }
