@@ -187,6 +187,23 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
         $this->assertStringContainsString('randread-small', $out);
     }
 
+    public function testStructuredMetricFieldsRenderAsZero(): void
+    {
+        $rid='structmetric'; $ts=date('c');
+        $log = $this->writeEdgeRunLog($rid, $ts, [$this->pmssStorageBenchmarkFileEntry($rid, $ts, 'randread-small', ['read_bw_MBps'=>['bad'=>1],'write_bw_MBps'=>['bad'=>2],'read_iops'=>['bad'=>3],'write_iops'=>['bad'=>4],'read_p95_ms'=>['bad'=>5],'write_p95_ms'=>['bad'=>6]])]);
+        $out = $this->pmssRunStorageBenchmarkShowLast($log);
+        $this->assertStringContainsString("randread-small\t0.00\t0.00\t0.0\t0.0\t0.00\t0.00", $out);
+    }
+
+    public function testStructuredDeviceNameIsSkippedSafely(): void
+    {
+        $rid='structdev'; $ts=date('c');
+        $log = $this->writeEdgeRunLog($rid, $ts, [$this->pmssStorageBenchmarkEntry($rid, $ts, 'device-seqread-dd', ['device'=>['bad'=>'/dev/sdz'],'metrics'=>['seqread_MBps'=>1,'elapsed_s'=>1]])]);
+        $out = $this->pmssRunStorageBenchmarkShowLast($log);
+        $this->assertStringContainsString('Per-device tests', $out);
+        $this->assertStringNotContainsString('/dev/sdz', $out);
+    }
+
     public function testDuplicateDeviceEntriesAreAllShown(): void
     {
         $rid='dup'; $ts=date('c');
