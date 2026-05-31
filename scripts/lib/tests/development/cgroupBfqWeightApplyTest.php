@@ -5,36 +5,72 @@ require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../../cgroup/policy.php';
 
 /**
- * Hermetic tests for pmssBfqFormulaWeight() — the per-user bfq.weight curve
- * extracted from /scripts/cron/cgroupBfqWeightApply.php into a lib for testability.
+ * Hermetic tests for the per-user bfq.weight fallback and bonus helpers
+ * shared by /scripts/cron/cgroupBfqWeightApply.php.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
  */
 class CgroupBfqWeightApplyTest extends TestCase
 {
-    // Curve points with default coefficient 3.535, customer max 700.
-    // round(3.535 * sqrt(MiB)) clamped [1, 700].
+    // Curve points with the default bonus-headroom curve.
+    // round(0.690533966002 * sqrt(MiB)) clamped [1, 250].
 
     public function testDefaultCurvePointsAndClamps(): void
     {
         foreach ([
-            [250, 56],
-            [500, 79],
-            [1000, 112],
-            [2000, 158],
-            [4000, 224],
-            [8000, 316],
-            [16000, 447],
-            [32768, 640],
-            [64000, 700],
-            [1000000, 700],
+            [250, 11],
+            [500, 15],
+            [1000, 22],
+            [2000, 31],
+            [4000, 44],
+            [8000, 62],
+            [16000, 87],
+            [32768, 125],
+            [64000, 175],
+            [\PMSS_BFQ_FALLBACK_REFERENCE_MEMORY_MIB, \PMSS_BFQ_FALLBACK_BASE_MAX],
+            [262144, \PMSS_BFQ_FALLBACK_BASE_MAX],
+            [1000000, \PMSS_BFQ_FALLBACK_BASE_MAX],
             [0, 1],
             [-1, 1],
         ] as [$memoryMiB, $expected]) {
             $actual = \pmssBfqFormulaWeight($memoryMiB);
             $this->assertEquals($expected, $actual, 'Unexpected weight for '.$memoryMiB.' MiB');
             $this->assertTrue(is_int($actual) && $actual > 0);
+        }
+    }
+
+    public function testDefaultCurveReservesDocumentedBonusHeadroom(): void
+    {
+        foreach ([250, 32768, 64000, \PMSS_BFQ_FALLBACK_REFERENCE_MEMORY_MIB, 262144] as $memoryMiB) {
+            $base = \pmssBfqFormulaWeight($memoryMiB);
+            $boosted = \pmssBfqApplyBonusWeight($base, \PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT);
+            $this->assertTrue($boosted <= \PMSS_BFQ_KERNEL_MAX, 'Bonus overflow for '.$memoryMiB.' MiB');
+        }
+
+        $this->assertSame(500, \pmssBfqApplyBonusWeight(\pmssBfqFormulaWeight(32768), 300));
+        $this->assertSame(700, \pmssBfqApplyBonusWeight(\pmssBfqFormulaWeight(64000), 300));
+        $referenceBase = \pmssBfqFormulaWeight(\PMSS_BFQ_FALLBACK_REFERENCE_MEMORY_MIB);
+        $this->assertSame(1000, \pmssBfqApplyBonusWeight($referenceBase, 300));
+    }
+
+    public function testBonusApplicationClampsAfterMultiplier(): void
+    {
+        foreach ([
+            [125, 0, 125],
+            [125, 300, 500],
+            [250, 300, 1000],
+            [250, 400, 1000],
+            [-10, 0, 1],
+            [10, -50, 10],
+            [1000, 0, 1000],
+            [1000, 1, 1000],
+        ] as [$baseWeight, $bonusPct, $expected]) {
+            $this->assertSame(
+                $expected,
+                \pmssBfqApplyBonusWeight($baseWeight, $bonusPct),
+                'Unexpected bonus weight for base '.$baseWeight.' and bonus '.$bonusPct
+            );
         }
     }
 
@@ -58,7 +94,12 @@ class CgroupBfqWeightApplyTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAllStrings(
             'scripts/cron/cgroupBfqWeightApply.php',
-            ["require_once __DIR__.'/../lib/user/identity.php';", 'if (!pmssValidateUsername($user)) {', 'pmssBfqUserBonusPercentRead($user)']
+            [
+                "require_once __DIR__.'/../lib/user/identity.php';",
+                'if (!pmssValidateUsername($user)) {',
+                'pmssBfqUserBonusPercentRead($user)',
+                'pmssBfqApplyBonusWeight($wRaw, $bonusPct',
+            ]
         );
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'scripts/cron/cgroupBfqWeightApply.php',

@@ -154,6 +154,11 @@ Inspect and apply limits per user:
   - It keeps the systemd slice settings as the operator-facing source of truth, then writes
     `/sys/fs/cgroup/blkio/.../blkio.bfq.weight` directly so Debian 12/systemd 252
     BFQ translation caps do not collapse weights above `IOWeight=200`.
+  - Users without explicit `IOWeight` use the shared BFQ RAM fallback curve.
+    The fallback maps 128 GiB to base weight 250 so the documented 300%
+    bonus path reaches the kernel cap of 1000 without collapsing earlier tiers.
+    This direct kernel fallback is separate from the `userConfigCgroup.php`
+    MemoryHigh-derived CPU/systemd weight helper.
 - User termination clears slice overrides:
   - `systemctl revert user-UID.slice` before deleting OS user data.
 

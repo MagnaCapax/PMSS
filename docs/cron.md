@@ -46,7 +46,8 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
 - `backupEtc.sh` – Snapshot `/etc` into timestamped archives.
 - `cgroupBfqWeightApply.php` - Reapply per-user cgroup-v1 BFQ kernel
   weights directly from PMSS user configuration so systemd translation caps do
-  not flatten higher IOWeight tiers on BFQ hosts.
+  not flatten higher IOWeight tiers on BFQ hosts. Users without explicit
+  `IOWeight` use the shared RAM fallback curve with 300% bonus headroom.
 - `cgroup.php` – Apply cgroup limits for active users.
 - `checkDelugeInstances.php` – Ensure Deluge daemons stay running when enabled.
 - `checkDirectories.php` – Repair expected directory hierarchy if it drifts.

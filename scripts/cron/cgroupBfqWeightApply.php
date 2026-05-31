@@ -12,9 +12,10 @@
  *
  * Per-user IOWeight in /etc/seedbox/config/users/<user>.json drives the
  * target, clamped to [1, 1000] (the kernel BFQ range) for every user.
- * Fallback formula round(3.535 * sqrt(ramMiB)) applies when JSON
- * IOWeight is absent. The Free Bonus Disk Policy percent from
- * /home/<user>/.bonus multiplies the selected base before the clamp.
+ * When JSON IOWeight is absent, the RAM fallback uses the shared BFQ
+ * headroom curve so a 300% bonus can fit under the kernel cap. The Free
+ * Bonus Disk Policy percent from /home/<user>/.bonus multiplies the
+ * selected base before the final kernel clamp.
  *
  * Idempotent: writes only when current kernel value differs from
  * desired. Hard fail on missing prerequisites (root, cgroup-v1, BFQ
@@ -36,8 +37,9 @@ require_once __DIR__.'/../lib/user/identity.php';
 
 // Constants — tunable top-of-file per AGENTS.md doctrine.
 $USERS_DIR  = '/etc/seedbox/config/users';
-$KERN_MAX   = 1000;      // kernel BFQ absolute max — single clamp for every user
-$FORMULA_K  = 3.535;     // round(K * sqrt(ramMiB)) — produces 640 at 32768 MiB
+$KERN_MAX   = PMSS_BFQ_KERNEL_MAX;               // kernel BFQ absolute max
+$FORMULA_K  = PMSS_BFQ_FALLBACK_COEFFICIENT;     // 128 GiB fallback base = 250
+$FALLBACK_MAX = PMSS_BFQ_FALLBACK_BASE_MAX;      // reserves 300% bonus headroom
 $DRY_RUN    = in_array('--dry-run', $argv ?? [], true);
 
 // Pre-flight — fail loud rather than silent no-op on misconfig.
@@ -126,14 +128,12 @@ foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
         $wRaw = (int) $json['IOWeight'];
     } else {
         $ramMiB = isset($json['ramMiB']) && is_numeric($json['ramMiB']) ? (int) $json['ramMiB'] : 0;
-        $wRaw = pmssBfqFormulaWeight($ramMiB, (float) $FORMULA_K, (int) $KERN_MAX);
+        $wRaw = pmssBfqFormulaWeight($ramMiB, (float) $FORMULA_K, (int) $FALLBACK_MAX);
     }
 
     // Free Bonus Disk Policy: ~/.bonus holds tenure/spend bonus percent.
     $bonusPct = pmssBfqUserBonusPercentRead($user);
-    $wRaw     = (int) round($wRaw * (1 + $bonusPct / 100));
-
-    $w = max(1, min($KERN_MAX, $wRaw));
+    $w        = pmssBfqApplyBonusWeight($wRaw, $bonusPct, (int) $KERN_MAX);
 
     $cgPath = '/sys/fs/cgroup/blkio/user.slice/user-'.$uid.'.slice/blkio.bfq.weight';
     if (!file_exists($cgPath)) {

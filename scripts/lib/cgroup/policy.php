@@ -8,6 +8,12 @@
 
 require_once dirname(__DIR__).'/pathSafety.php';
 
+const PMSS_BFQ_KERNEL_MAX = 1000;
+const PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT = 300;
+const PMSS_BFQ_FALLBACK_BASE_MAX = 250;
+const PMSS_BFQ_FALLBACK_REFERENCE_MEMORY_MIB = 131072; // 128 GiB.
+const PMSS_BFQ_FALLBACK_COEFFICIENT = 0.690533966002; // 250 / sqrt(131072).
+
 /** Load the PMSS cgroup policy array from the configured seedbox config tree. */
 function pmssCgroupPolicyLoad(?string $configDir = null): array
 {
@@ -45,8 +51,19 @@ function pmssCgroupPolicyPositiveValue(array $source, string $key, bool $numeric
     return $value === '' ? null : $value;
 }
 
-/** Derive a customer-tier-clamped bfq.weight value from a memory baseline. */
-function pmssBfqFormulaWeight(int $memoryMiB, float $coefficient = 3.535, int $customerMax = 700): int
+/**
+ * Derive a bonus-headroom bfq.weight base from a memory baseline.
+ *
+ * The default curve maps 128 GiB to 250 so the documented 300% bonus
+ * multiplier can reach, but not exceed, the kernel bfq.weight cap of 1000.
+ * This is the cgroup-v1 direct BFQ kernel fallback curve; systemd slice
+ * MemoryHigh-derived CPU defaults remain separate.
+ */
+function pmssBfqFormulaWeight(
+    int $memoryMiB,
+    float $coefficient = PMSS_BFQ_FALLBACK_COEFFICIENT,
+    int $customerMax = PMSS_BFQ_FALLBACK_BASE_MAX
+): int
 {
     if ($memoryMiB <= 0) {
         return 1;
@@ -54,6 +71,17 @@ function pmssBfqFormulaWeight(int $memoryMiB, float $coefficient = 3.535, int $c
     $customerMax = max(1, $customerMax);
     $derived = (int) round($coefficient * sqrt($memoryMiB));
     return max(1, min($customerMax, $derived));
+}
+
+/**
+ * Apply a non-negative BFQ bonus percent and clamp to the kernel range.
+ */
+function pmssBfqApplyBonusWeight(int $baseWeight, int $bonusPct, int $kernelMax = PMSS_BFQ_KERNEL_MAX): int
+{
+    $kernelMax = max(1, $kernelMax);
+    $bonusPct = max(0, $bonusPct);
+    $weighted = (int) round($baseWeight * (1 + $bonusPct / 100));
+    return max(1, min($kernelMax, $weighted));
 }
 
 /** Resolve one numeric profile value from policy overrides plus built-in defaults. */
