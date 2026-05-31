@@ -51,15 +51,11 @@ function pmssShowTrafficMain(array $argv): int
     }
 
     $colorRequested = pmssCliOptionPresent($parsed, 'color');
-    $noColorRequested = pmssCliOptionPresent($parsed, 'no-color');
-    if ($colorRequested && $noColorRequested) {
-        fwrite(STDERR, "Error: --color and --no-color are mutually exclusive.\n");
-        return 2;
-    }
+    if (pmssCliRejectMutuallyExclusiveOptions($parsed, ['color', 'no-color'], "Error: --color and --no-color are mutually exclusive.\n")) return 2;
 
     $useColor = false;
     if (!$asJson && $extended) {
-        if ($colorRequested || $noColorRequested) {
+        if ($colorRequested || pmssCliOptionPresent($parsed, 'no-color')) {
             $useColor = $colorRequested;
         } else {
             $useColor = pmssStreamIsTty(STDOUT);

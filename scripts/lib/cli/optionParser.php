@@ -86,6 +86,17 @@ function pmssCliOptionPresent(array $parsed, string $long, ?string $short = null
     return $bareFlagOnly ? $value === true : $value !== false;
 }
 
+/** Emit a shared mutual-exclusion error when more than one long option is selected. */
+function pmssCliRejectMutuallyExclusiveOptions(array $parsed, array $longOptions, string $message, string $presenceMode = 'present'): bool
+{
+    $matches = 0;
+    foreach ($longOptions as $longOption) {
+        $longOption = (string) $longOption;
+        $present = $presenceMode === 'bare' ? pmssCliOptionPresent($parsed, $longOption, null, true) : ($presenceMode === 'truthy' ? (bool) pmssCliOption($parsed, $longOption) : pmssCliOptionPresent($parsed, $longOption));
+        if ($present && ++$matches > 1) { fwrite(STDERR, $message); return true; }
+    }
+    return false;
+}
 /** Return whether the standard help option was requested. */
 function pmssCliHelpRequested(array $parsed, ?string $short = 'h'): bool
 {

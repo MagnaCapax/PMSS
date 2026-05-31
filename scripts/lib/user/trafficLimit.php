@@ -372,8 +372,7 @@ if (!function_exists('pmssUserGiBSettingCli')) {
         if (($parsed = pmssParseCliTokensOrHelp($argv, $usage."\n")) === null) return 0;
 
         $userName = (string) pmssCliOption($parsed, 'user', 'u', $parsed['arguments'][0] ?? '');
-        $show = (pmssCliOption($parsed, 'show') === true);
-        $unset = (pmssCliOption($parsed, 'unset') === true);
+        $show = (pmssCliOption($parsed, 'show') === true); $unset = (pmssCliOption($parsed, 'unset') === true);
         $valueRaw = pmssCliOption($parsed, (string) $spec['valueOption'], (string) $spec['valueShortOption'], $parsed['arguments'][1] ?? null);
 
         $exitCode = null;
@@ -382,10 +381,7 @@ if (!function_exists('pmssUserGiBSettingCli')) {
 
         $userName = $resolvedUser['user'];
         $homeDir = $resolvedUser['home'];
-        if ($show && $unset) {
-            fwrite(STDERR, "Error: --show and --unset are mutually exclusive.\n");
-            return 2;
-        }
+        if (pmssCliRejectMutuallyExclusiveOptions($parsed, ['show', 'unset'], "Error: --show and --unset are mutually exclusive.\n", 'bare')) return 2;
 
         $targetModes = call_user_func($spec['targetModesResolver'], $userName, $homeDir);
 

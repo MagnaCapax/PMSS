@@ -166,10 +166,7 @@ function pmssUserResourcesListMain(array $argv): int
     $outputJsonl = (bool) pmssCliOption($parsed, 'jsonl');
     $outputJson = !$outputJsonl && (bool) pmssCliOption($parsed, 'json');
     $fullMode = (bool) pmssCliOption($parsed, 'full');
-    if ((bool) pmssCliOption($parsed, 'brief') && $fullMode) {
-        fwrite(STDERR, "Error: choose either --brief or --full (not both).\n");
-        return 1;
-    }
+    if (pmssCliRejectMutuallyExclusiveOptions($parsed, ['brief', 'full'], "Error: choose either --brief or --full (not both).\n", 'truthy')) return 1;
     $format = $fullMode
         ? "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s %-6s %-6s %-7s %-7s %-7s %-7s %-8s %-9s\n"
         : "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s\n";
