@@ -11,16 +11,6 @@ require_once dirname(__DIR__, 2).'/wireguard.php';
 
 class WireGuardInstallerTest extends TestCase
 {
-    /** @var array<string> */
-    private array $cleanupPaths = [];
-
-    public function __destruct()
-    {
-        foreach ($this->cleanupPaths as $path) {
-            $this->cleanup($path);
-        }
-    }
-
     public function testResolveEndpointPrefersDns(): void
     {
         $this->pmssWithEnv([
@@ -490,9 +480,7 @@ class WireGuardInstallerTest extends TestCase
 
     private function createTempDir(): string
     {
-        $dir = $this->pmssMakeNamedTempDir('pmss-wireguard-tests-', 0700);
-        $this->cleanupPaths[] = $dir;
-        return $dir;
+        return $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
     }
 
 }

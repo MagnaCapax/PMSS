@@ -29,8 +29,6 @@ class SysctlBaselineTest extends TestCase
             'fs.protected_regular = 2',
         ], 'expected sysctl file to be written');
         $this->assertStringContainsString("/etc/sysctl.d/99-pmss.conf", $this->pmssReadRepoFile('scripts/lib/update/systemPrep.php'));
-
-        $this->cleanup($dir);
     }
 
     public function testWritesBbrModulesLoadFile(): void
@@ -43,8 +41,6 @@ class SysctlBaselineTest extends TestCase
         $this->runBaseline($target, $messages, false, $modulesLoad);
 
         $this->pmssAssertFileContainsAllStrings($modulesLoad, ['tcp_bbr'], 'expected BBR modules-load file to be written');
-
-        $this->cleanup($dir);
     }
 
     public function testSkipsWhenUpToDate(): void
@@ -63,8 +59,6 @@ class SysctlBaselineTest extends TestCase
 
         $this->assertEquals($first, $second, 'expected sysctl file unchanged');
         $this->assertTrue($this->pmssMessagesContain($messages, 'already present and up to date'), 'expected skip log');
-
-        $this->cleanup($dir);
     }
 
     public function testCreatesTargetDirectory(): void
@@ -79,8 +73,6 @@ class SysctlBaselineTest extends TestCase
 
         $this->assertTrue(is_dir($targetDir), 'expected target directory to exist');
         $this->assertTrue(file_exists($target), 'expected sysctl file to be written');
-
-        $this->cleanup($dir);
     }
 
     public function testReloadSkipLogWhenDisabled(): void
@@ -92,8 +84,6 @@ class SysctlBaselineTest extends TestCase
         $this->runBaseline($target, $messages, false);
 
         $this->assertTrue($this->pmssMessagesContain($messages, 'sysctl reload disabled'), 'expected reload skip log');
-
-        $this->cleanup($dir);
     }
 
     public function testUpdatesWhenContentDiffers(): void
@@ -109,8 +99,6 @@ class SysctlBaselineTest extends TestCase
         $content = (string)file_get_contents($target);
         $this->assertStringContainsString('kernel.kptr_restrict = 1', $content);
         $this->assertTrue($content !== "kernel.kptr_restrict = 0\n", 'expected content updated');
-
-        $this->cleanup($dir);
     }
 
     public function testWarnsWhenSysctlTargetWriteFails(): void
@@ -129,8 +117,6 @@ class SysctlBaselineTest extends TestCase
         $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to write legacy sysctl defaults'), 'expected write failure warning');
         $this->assertFalse($this->pmssMessagesContain($messages, 'Refreshed legacy sysctl defaults'), 'did not expect success log');
         $this->assertFalse($this->pmssMessagesContain($messages, 'sysctl reload disabled'), 'did not expect reload log after failed write');
-
-        $this->cleanup($dir);
     }
 
     public function testVmProfileUsesConservativeMemorySettings(): void
@@ -153,8 +139,6 @@ class SysctlBaselineTest extends TestCase
             'vm.min_free_kbytes = 131072',
             'vm.dirty_ratio = 20',
         ]);
-
-        $this->cleanup($dir);
     }
 
     public function testNoSwapProfileFallsBackToBalancedDefaults(): void
@@ -175,8 +159,6 @@ class SysctlBaselineTest extends TestCase
             'vm.vfs_cache_pressure = 50',
             'vm.dirty_background_ratio = 5',
         ]);
-
-        $this->cleanup($dir);
     }
 
     public function testSettingsBuildKeepsProfileBranchSnapshot(): void
@@ -223,8 +205,6 @@ class SysctlBaselineTest extends TestCase
             $summary['sysctl']['overrides_respected'],
             'expected override keys to be reported'
         );
-
-        $this->cleanup($dir);
     }
 
     public function testWritesHardwareSummaryJson(): void
@@ -249,8 +229,6 @@ class SysctlBaselineTest extends TestCase
         $this->assertEquals(64, $summary['sysctl']['detection']['ram_gb'], 'expected RAM detection in summary');
         $this->assertFalse($summary['sysctl']['detection']['swap_is_fast'], 'expected slow swap summary');
         $this->assertEquals('10', $summary['sysctl']['applied']['vm.swappiness'], 'expected applied swappiness in summary');
-
-        $this->cleanup($dir);
     }
 
     private function runBaseline(string $target, array &$messages, bool $reload, ?string $modulesLoad = null): void
