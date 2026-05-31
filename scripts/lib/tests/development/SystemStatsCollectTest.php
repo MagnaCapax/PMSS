@@ -47,15 +47,17 @@ class SystemStatsCollectTest extends TestCase
             $this->assertMatches('/^(?:[0-9]+\.[0-9][GM]|[0-9]+K)$/', $stats[$key], $key.' should keep compact memory units');
         }
 
-        // psiIo / psiMem now expose three slash-joined timescales matching the
-        // node-collect parser contract: some_avg10/some_avg60/full_avg10.
-        // Each field is either a one-decimal float or 'na'. Whole field can
-        // still degrade to 'na' if /proc/pressure/* is unreadable.
+        // psiIo / psiMem expose an append-only slash-joined field set. The first
+        // three (some_avg10/some_avg60/full_avg10) are the legacy node-collect
+        // parser contract, kept byte-identical; appended after them:
+        // some_avg300/full_avg60/full_avg300 (one-decimal floats) and
+        // some_total/full_total (integer microseconds since boot). Whole field
+        // still degrades to 'na' if /proc/pressure/* is unreadable.
         foreach (['psiIo', 'psiMem'] as $key) {
             $this->assertMatches(
-                '#^(?:na|(?:na|[0-9]+\.[0-9])/(?:na|[0-9]+\.[0-9])/(?:na|[0-9]+\.[0-9]))$#',
+                '#^(?:na|(?:na|[0-9]+\.[0-9])(?:/(?:na|[0-9]+\.[0-9])){5}/(?:na|[0-9]+)/(?:na|[0-9]+))$#',
                 $stats[$key],
-                $key.' should be three slash-joined timescales (avg10/avg60/full10) or na'
+                $key.' should be 8 slash-joined PSI fields (6 avg + 2 total) or na'
             );
         }
 

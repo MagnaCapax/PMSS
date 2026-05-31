@@ -57,11 +57,9 @@ function pmssSystemStatsCollect(): array
         // /proc/pressure/io and /proc/pressure/memory expose:
         //   some avg10=X.XX avg60=X.XX avg300=X.XX total=N
         //   full avg10=X.XX avg60=X.XX avg300=X.XX total=N
-        // Emit three timescales (some_avg10/some_avg60/full_avg10) as a
-        // slash-joined string so the log format stays single-field per
-        // metric and matches the downstream node-collect parser contract
-        // (tools/fleet/node-collect splits on '/' into some_avg10,
-        // some_avg60, full_avg10 indices).
+        // Emit ALL of it as one slash-joined field (append-only; first three
+        // indices preserve the legacy tools/fleet/node-collect parser contract
+        // some_avg10/some_avg60/full_avg10). `full` is the actionable signal.
         if (!is_readable($path)) {
             return 'na';
         }
@@ -78,9 +76,31 @@ function pmssSystemStatsCollect(): array
         if (($someAvg10 = $find('some', 'avg10')) === null) {
             return 'na';
         }
-        return implode('/', array_map(static function (?float $v): string {
+        // Append-only field order. The first three fields are the legacy
+        // node-collect parser contract and MUST stay byte-identical for
+        // backward compatibility; everything after is appended:
+        //   some_avg10/some_avg60/full_avg10/some_avg300/full_avg60/full_avg300/some_total/full_total
+        // `full` (all non-idle tasks stalled) is the actionable I/O signal —
+        // psi-notify's default alert is io.full.avg10 >= 15. The *_total fields
+        // are cumulative microseconds stalled since boot; downstream consumers
+        // delta them over the collection interval for a lossless, cadence-immune
+        // average (the kernel avgN windows are point samples).
+        $fmtAvg = static function (?float $v): string {
             return $v === null ? 'na' : number_format($v, 1, '.', '');
-        }, [$someAvg10, $find('some', 'avg60'), $find('full', 'avg10')]));
+        };
+        $fmtTotal = static function (?float $v): string {
+            return $v === null ? 'na' : number_format($v, 0, '', '');
+        };
+        return implode('/', [
+            $fmtAvg($someAvg10),
+            $fmtAvg($find('some', 'avg60')),
+            $fmtAvg($find('full', 'avg10')),
+            $fmtAvg($find('some', 'avg300')),
+            $fmtAvg($find('full', 'avg60')),
+            $fmtAvg($find('full', 'avg300')),
+            $fmtTotal($find('some', 'total')),
+            $fmtTotal($find('full', 'total')),
+        ]);
     };
     $iopingMs = static function (string $path): string { $value = is_dir($path) ? pmssIopingAverageMs($path) : null; return $value === null ? 'na' : number_format($value, 1, '.', '').'ms'; };
 

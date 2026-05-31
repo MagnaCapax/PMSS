@@ -823,3 +823,4 @@ zip						install
 zlib1g:amd64					install
 zlib1g-dev:amd64				install
 zstd						install
+ioping	install

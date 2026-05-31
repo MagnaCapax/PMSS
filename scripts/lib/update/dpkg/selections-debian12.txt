@@ -1494,3 +1494,4 @@ znc-tcl	install
 zsh	install
 zsh-common	install
 zstd	install
+ioping	install

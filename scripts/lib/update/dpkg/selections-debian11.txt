@@ -1486,3 +1486,4 @@ znc-python					install
 znc-tcl						install
 zsh						install
 zsh-common					install
+ioping	install

@@ -46,7 +46,7 @@ MAILTO=""
 */5 * * * *   root    /scripts/cron/resourceLog.php >> /var/log/pmss/resourceLog.log 2>&1
 */5 * * * *    root    /scripts/cron/diskIostat.php >> /var/log/pmss/iostatLog.log 2>&1
 */15 * * * *    root    /scripts/cron/cpuStat.php >> /var/log/pmss/cpuStat.log 2>&1
-*/30 * * * *    root    /scripts/cron/systemStatsLog.php >> /var/log/pmss/systemStatsLog.log 2>&1
+3-58/5 * * * *    root    /scripts/cron/systemStatsLog.php >> /var/log/pmss/systemStatsLog.log 2>&1
 0 0 * * *   root    /scripts/cron/quotaSnapshot.php >/dev/null 2>&1
 0 0 * * *   root    /scripts/cron/resourceSnapshot.php >/dev/null 2>&1
 */30 * * * *   root    /scripts/cron/processSnapshot.php >/dev/null 2>&1
