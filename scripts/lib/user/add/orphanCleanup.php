@@ -11,7 +11,7 @@ require_once __DIR__.'/../../userLifecycle.php';
 /**
  * Keep failed-provision cleanup scoped to one validated /home target.
  */
-function pmssAddUserCleanupFailedProvisionTargetValid(string $userName, string $homePath): bool
+function pmssAddUserCleanupFailedProvisionTargetValid(string $userName, string $homePath, ?callable $pathSafetyChecker = null): bool
 {
     if (!pmssValidateUsername($userName)) {
         return false;
@@ -21,7 +21,12 @@ function pmssAddUserCleanupFailedProvisionTargetValid(string $userName, string $
         return false;
     }
 
-    return $homePath === '/home/'.$userName;
+    if ($homePath !== '/home/'.$userName) {
+        return false;
+    }
+
+    $pathSafetyChecker = $pathSafetyChecker ?? 'pmssPathTargetIsSafe';
+    return (bool) $pathSafetyChecker($homePath, true, false, false);
 }
 
 /**
