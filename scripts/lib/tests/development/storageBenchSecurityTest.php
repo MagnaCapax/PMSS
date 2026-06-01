@@ -23,12 +23,34 @@ class StorageBenchSecurityTest extends TestCase
         $this->pmssAssertCommandFailsToStderr($run['result'], $run['stderrPath'], $expectedMessage);
     }
 
+    private function assertShowPathContains(string $path, string $expected, string $case = ''): void
+    {
+        $this->assertStringContainsString($expected, $this->runShow($path), $case);
+    }
+
+    private function assertSecurityLogContains(array $entries, string $expected, string $case = ''): void
+    {
+        $this->assertShowPathContains($this->pmssWriteStorageBenchmarkLog($entries, 'pmss-bench-sec-'), $expected, $case);
+    }
+
+    private function assertSecurityRunContains(
+        string $runId,
+        string $expected,
+        array $preflightExtra = [],
+        array $entries = [],
+        ?string $runTs = null,
+        string $case = ''
+    ): void {
+        $runTs = $runTs ?? date('c');
+        array_unshift($entries, $this->pmssStorageBenchmarkPreflightEntry($runId, $runTs, $preflightExtra));
+        $this->assertSecurityLogContains($entries, $expected, $case);
+    }
+
     public function testPathTraversalInJsonPathIsRead(): void
     {
         $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); @touch($log);
         $up = dirname($log).'/../'.basename(dirname($log)).'/'.basename($log);
-        $out = $this->runShow($up);
-        $this->assertStringContainsString('No runs found.', $out);
+        $this->assertShowPathContains($up, 'No runs found.');
     }
 
     public function testSymlinkJsonLogIsHandled(): void
@@ -36,22 +58,19 @@ class StorageBenchSecurityTest extends TestCase
         $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); $dir = dirname($log); @mkdir($dir, 0700, true);
         $real = $dir.'/real.jsonl'; @file_put_contents($real, json_encode($this->pmssStorageBenchmarkPreflightEntry('r', date('c')))."\n");
         $link = $dir.'/link.jsonl'; @symlink($real, $link);
-        $out = $this->runShow($link);
-        $this->assertStringContainsString('Storage benchmark (last run)', $out);
+        $this->assertShowPathContains($link, 'Storage benchmark (last run)');
     }
 
     public function testDirectoryAsLogPathPrintsNoLog(): void
     {
         $dir = sys_get_temp_dir().'/pmss-bench-sec-dir-'.bin2hex(random_bytes(2)); @mkdir($dir, 0700, true);
-        $out = $this->runShow($dir);
-        $this->assertStringContainsString('No log at', $out);
+        $this->assertShowPathContains($dir, 'No log at');
     }
 
     public function testUnreadableLogDoesNotCrash(): void
     {
         $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); @file_put_contents($log, ''); @chmod($log, 0000);
-        $out = $this->runShow($log);
-        $this->assertStringContainsString('No runs found.', $out);
+        $this->assertShowPathContains($log, 'No runs found.');
         @chmod($log, 0600);
     }
 
@@ -60,40 +79,28 @@ class StorageBenchSecurityTest extends TestCase
         $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
         $big = str_repeat('A', 50000);
         file_put_contents($log, '{"run_id":"r","run_ts":"'.date('c').'","test":"preflight-idle","label":"'.$big.'","ok":true}'."\n");
-        $out = $this->runShow($log);
-        $this->assertStringContainsString('Storage benchmark (last run)', $out);
+        $this->assertShowPathContains($log, 'Storage benchmark (last run)');
     }
 
     public function testNullBytesInLogAreIgnored(): void
     {
         $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
         file_put_contents($log, "\0\0\0\n", FILE_APPEND);
-        $out = $this->runShow($log);
-        $this->assertStringContainsString('No runs found.', $out);
+        $this->assertShowPathContains($log, 'No runs found.');
     }
 
-    public function testDeviceFieldLooksLikeShellInjection(): void
+    public function testUntrustedMetricAndDeviceFieldsAreTolerated(): void
     {
-        $rid='inj'; $ts=date('c');
-        $log = $this->pmssWriteStorageBenchmarkLog([$this->pmssStorageBenchmarkPreflightEntry($rid, $ts), $this->pmssStorageBenchmarkEntry($rid, $ts, 'device-seqread-dd', ["device"=>'$(id)','metrics'=>['seqread_MBps'=>1,'elapsed_s'=>1]])], 'pmss-bench-sec-');
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('Per-device tests', $out);
-    }
-
-    public function testMetricsLookLikeCommands(): void
-    {
-        $rid='cmd'; $ts=date('c');
-        $log = $this->pmssWriteStorageBenchmarkLog([$this->pmssStorageBenchmarkPreflightEntry($rid, $ts), $this->pmssStorageBenchmarkFileEntry($rid, $ts, 'randread-small', ['read_bw_MBps'=>'`rm -rf /`','read_iops'=>0,'read_p95_ms'=>0])], 'pmss-bench-sec-');
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('randread-small', $out);
-    }
-
-    public function testWeirdUnicodeInLabel(): void
-    {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
-        $this->pmssAppendFixtureLines($log, [$this->pmssStorageBenchmarkPreflightEntry('u', date('c'), ['label'=>"Δδοκιμή😀"])]);
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('Storage benchmark (last run)', $out);
+        $ts = date('c');
+        foreach ([
+            ['device shell text', 'inj', $this->pmssStorageBenchmarkEntry('inj', $ts, 'device-seqread-dd', ['device' => '$(id)', 'metrics' => ['seqread_MBps' => 1, 'elapsed_s' => 1]]), 'Per-device tests'],
+            ['metric command text', 'cmd', $this->pmssStorageBenchmarkFileEntry('cmd', $ts, 'randread-small', ['read_bw_MBps' => '`rm -rf /`', 'read_iops' => 0, 'read_p95_ms' => 0]), 'randread-small'],
+            ['nested object metric', 'obj', $this->pmssStorageBenchmarkEntry('obj', $ts, 'randread-small', ['params' => ['rw' => 'randread'], 'metrics' => ['nested' => ['x' => 1]]]), 'randread-small'],
+            ['unknown nested metric', 'nest', $this->pmssStorageBenchmarkEntry('nest', $ts, 'seqread-large', ['params' => ['rw' => 'read'], 'metrics' => ['deep' => ['a' => 1]]]), 'seqread-large'],
+            ['device traversal text', 'trav', $this->pmssStorageBenchmarkEntry('trav', $ts, 'device-seqread-dd', ['device' => '/dev/../../etc/passwd', 'metrics' => ['seqread_MBps' => 1, 'elapsed_s' => 1]]), 'Per-device tests'],
+        ] as $case) {
+            $this->assertSecurityRunContains($case[1], $case[3], [], [$case[2]], $ts, $case[0].': ');
+        }
     }
 
     public function testMalformedUtf8InLabel(): void
@@ -101,40 +108,21 @@ class StorageBenchSecurityTest extends TestCase
         $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
         $label = "bad\x80utf8"; // invalid byte sequence
         file_put_contents($log, '{"run_id":"x","run_ts":"'.date('c').'","label":"'.$label.'","test":"preflight-idle","ok":true}'."\n");
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('Storage benchmark (last run)', $out);
+        $this->assertShowPathContains($log, 'Storage benchmark (last run)');
     }
 
     public function testManyLinesDoNotTimeout(): void
     {
         $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
         for($i=0;$i<200;$i++){ $ts = gmdate('c', time()-200+$i); $this->pmssAppendFixtureLines($log, [$this->pmssStorageBenchmarkPreflightEntry('r'.$i, $ts)]); }
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('Storage benchmark (last run)', $out);
-    }
-
-    public function testRunTsExtremelyLongString(): void
-    {
-        $rid='longts'; $ts=str_repeat('2025-01-01T00:00:00Z', 10);
-        $log = $this->pmssWriteStorageBenchmarkLog([$this->pmssStorageBenchmarkPreflightEntry($rid, $ts)], 'pmss-bench-sec-');
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('Run ID: '.$rid, $out);
+        $this->assertShowPathContains($log, 'Storage benchmark (last run)');
     }
 
     public function testRunIdAsArrayDoesNotCrash(): void
     {
         $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
         file_put_contents($log, '{"run_id":["a"],"run_ts":"'.date('c').'","test":"preflight-idle","ok":true}'."\n");
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('No runs found.', $out);
-    }
-
-    public function testObjectMetricsDoNotCrash(): void
-    {
-        $rid='obj'; $ts=date('c');
-        $log = $this->pmssWriteStorageBenchmarkLog([ $this->pmssStorageBenchmarkPreflightEntry($rid, $ts), $this->pmssStorageBenchmarkEntry($rid, $ts, 'randread-small', ['params'=>['rw'=>'randread'],'metrics'=>['nested'=>['x'=>1]]]) ], 'pmss-bench-sec-');
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('randread-small', $out);
+        $this->assertShowPathContains($log, 'No runs found.');
     }
 
     public function testLeadingBOMInFileIsTolerated(): void
@@ -142,31 +130,20 @@ class StorageBenchSecurityTest extends TestCase
         $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
         file_put_contents($log, "\xEF\xBB\xBF", FILE_APPEND);
         file_put_contents($log, json_encode($this->pmssStorageBenchmarkPreflightEntry('bom', date('c')))."\n", FILE_APPEND);
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('Storage benchmark (last run)', $out);
+        $this->assertShowPathContains($log, 'Storage benchmark (last run)');
     }
 
     public function testNonexistentPathReportsNicely(): void
     {
         $path = sys_get_temp_dir().'/pmss-bench-missing-'.bin2hex(random_bytes(2)).'/nope.jsonl';
-        $out=$this->runShow($path);
-        $this->assertStringContainsString('No log at', $out);
+        $this->assertShowPathContains($path, 'No log at');
     }
 
     public function testSymlinkToDirectoryIsRejected(): void
     {
         $dir = sys_get_temp_dir().'/pmss-bench-linkdir-'.bin2hex(random_bytes(2));
         @mkdir($dir,0700,true); $link=$dir.'/l.jsonl'; @symlink($dir,$link);
-        $out=$this->runShow($link);
-        $this->assertStringContainsString('No log at', $out);
-    }
-
-    public function testNestedMetricsIgnoreUnknown(): void
-    {
-        $rid='nest'; $ts=date('c');
-        $log = $this->pmssWriteStorageBenchmarkLog([ $this->pmssStorageBenchmarkPreflightEntry($rid, $ts), $this->pmssStorageBenchmarkEntry($rid, $ts, 'seqread-large', ['params'=>['rw'=>'read'],'metrics'=>['deep'=>['a'=>1]]]) ], 'pmss-bench-sec-');
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('seqread-large', $out);
+        $this->assertShowPathContains($link, 'No log at');
     }
 
     public function testMalformedThenValidLineWorks(): void
@@ -174,39 +151,20 @@ class StorageBenchSecurityTest extends TestCase
         $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
         file_put_contents($log, "{bad}\n", FILE_APPEND);
         $this->pmssAppendFixtureLines($log, [$this->pmssStorageBenchmarkPreflightEntry('ok', date('c'))]);
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('Storage benchmark (last run)', $out);
+        $this->assertShowPathContains($log, 'Storage benchmark (last run)');
     }
 
-    public function testVeryLargeUnicodeLabel(): void
+    public function testUntrustedPreflightDisplayValuesAreTolerated(): void
     {
-        $label=str_repeat('嗨', 1000);
-        $log = $this->pmssWriteStorageBenchmarkLog([$this->pmssStorageBenchmarkPreflightEntry('ul', date('c'), ['label'=>$label])], 'pmss-bench-sec-');
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('Storage benchmark (last run)', $out);
-    }
-
-    public function testDevicePathTraversalStringDoesNotCrash(): void
-    {
-        $rid='trav'; $ts=date('c');
-        $log = $this->pmssWriteStorageBenchmarkLog([$this->pmssStorageBenchmarkPreflightEntry($rid, $ts), $this->pmssStorageBenchmarkEntry($rid, $ts, 'device-seqread-dd', ['device'=>'/dev/../../etc/passwd','metrics'=>['seqread_MBps'=>1,'elapsed_s'=>1]])], 'pmss-bench-sec-');
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('Per-device tests', $out);
-    }
-
-    public function testVeryOldRunTsStillParses(): void
-    {
-        $log = $this->pmssWriteStorageBenchmarkLog([$this->pmssStorageBenchmarkPreflightEntry('old', '1999-01-01T00:00:00Z')], 'pmss-bench-sec-');
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('Run ID: old', $out);
-    }
-
-    public function testLabelWithNewlinesIsTolerated(): void
-    {
-        $label="line1\nline2";
-        $log = $this->pmssWriteStorageBenchmarkLog([$this->pmssStorageBenchmarkPreflightEntry('nl', date('c'), ['label'=>$label])], 'pmss-bench-sec-');
-        $out=$this->runShow($log);
-        $this->assertStringContainsString('Storage benchmark (last run)', $out);
+        foreach ([
+            ['unicode label', 'u', date('c'), ['label' => "Δδοκιμή😀"], 'Storage benchmark (last run)'],
+            ['large unicode label', 'ul', date('c'), ['label' => str_repeat('嗨', 1000)], 'Storage benchmark (last run)'],
+            ['label newline', 'nl', date('c'), ['label' => "line1\nline2"], 'Storage benchmark (last run)'],
+            ['very old timestamp', 'old', '1999-01-01T00:00:00Z', [], 'Run ID: old'],
+            ['long timestamp', 'longts', str_repeat('2025-01-01T00:00:00Z', 10), [], 'Run ID: longts'],
+        ] as $case) {
+            $this->assertSecurityRunContains($case[1], $case[4], $case[3], [], $case[2], $case[0].': ');
+        }
     }
 
     public function testBenchmarkInputGuardsRejectInvalidScalarOptions(): void
