@@ -32,6 +32,7 @@ function pmssDelugeManagedConfigEntries(): array
         'max_active_limit' => 500,
         'max_connections_global' => 300,
         'max_upload_slots_global' => 15,
+        'pre_allocate_storage' => true,
     ];
 }
 

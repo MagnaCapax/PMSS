@@ -33,7 +33,7 @@ class CronInlineCharacterizationTest extends TestCase
             ],
             [
                 'scripts/cron/checkDelugeInstances.php',
-                ['pmssUserWatchdogRunService(', 'pmssUserWatchdogRestartProcessesIf(', "'deluge stopped due to suspension'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'"],
+                ['pmssUserWatchdogRunService(', 'pmssUserWatchdogRestartProcessesIf(', 'pmssDelugeApplyManagedConfig(', "'deluge stopped due to suspension'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'"],
             ],
         ] as $case) {
             $this->pmssAssertRepoFileContainsAllStrings($case[0], $case[1]);

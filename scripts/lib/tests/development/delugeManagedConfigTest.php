@@ -27,7 +27,7 @@ JSON
         $this->assertTrue(\pmssDelugeApplyManagedConfig('alice'));
 
         $updated = (string) file_get_contents($configPath);
-        $this->assertStringContainsAllStrings(['"download_location": "/srv/downloads"', '"max_active_downloading": 5', '"max_active_limit": 500', '"max_connections_global": 300', '"max_upload_slots_global": 15'], $updated);
+        $this->assertStringContainsAllStrings(['"download_location": "/srv/downloads"', '"max_active_downloading": 5', '"max_active_limit": 500', '"max_connections_global": 300', '"max_upload_slots_global": 15', '"pre_allocate_storage": true'], $updated);
         $this->assertSame(0640, fileperms($configPath) & 0777);
     }
 
@@ -68,7 +68,8 @@ JSON
     "max_active_downloading": 5,
     "max_active_limit": 500,
     "max_connections_global": 300,
-    "max_upload_slots_global": 15
+    "max_upload_slots_global": 15,
+    "pre_allocate_storage": true
 }
 JSON
         );
