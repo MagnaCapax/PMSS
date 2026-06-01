@@ -129,7 +129,7 @@ class StorageBenchmarkShowLastTest extends TestCase
         ], ['timestamp' => $runTs, 'ioping_avg_ms' => 2.5]);
 
         [$rc, $libraryOut] = $this->pmssCaptureStdout(static function () use ($log): int {
-            return \storageBenchmarkShowLast($log);
+            return \storageBenchmarkMain(['storageBenchmark.php', '--show-last', '--json', $log]);
         });
 
         $this->assertSame(0, $rc);

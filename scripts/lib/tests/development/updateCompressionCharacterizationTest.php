@@ -272,14 +272,16 @@ class UpdateCompressionCharacterizationTest extends TestCase
         ]);
     }
 
-    public function testStorageBenchmarkDropsStandaloneCliConsumeHelper(): void
+    public function testStorageBenchmarkUsesSingleLibraryCliDispatcher(): void
     {
         $helperSymbol = 'consume'.'CliValue';
 
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/storageBenchmark.php', [
+        $this->pmssAssertRepoFileContainsString('scripts/util/storageBenchmark.php', 'exit(storageBenchmarkMain($argv ?? []));');
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/storageBenchmark.php', [
+            'function storageBenchmarkMain(array $argv): int',
             "'--device-runtime'",
             "'--require-idle'",
-        ], ['function '.$helperSymbol.'(' => 'storageBenchmark.php should inline CLI option consumption instead of keeping a standalone helper']);
+        ], ['function '.$helperSymbol.'(' => 'storageBenchmark.php should keep one shared CLI dispatcher instead of a standalone consume helper']);
     }
 
     public function testStorageHealthFacadeDropsStandaloneExecModule(): void
