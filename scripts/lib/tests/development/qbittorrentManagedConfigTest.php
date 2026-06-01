@@ -76,7 +76,7 @@ class QbittorrentManagedConfigTest extends TestCase
         $this->assertTrue(pmssQbittorrentApplyManagedConfig('alice'));
 
         $updated = (string) file_get_contents($configPath);
-        $this->assertStringContainsAllStrings(["Session\\DiskIOType=Posix\n", "Session\\AsyncIOThreadsCount=4\n", "Downloads\\PreAllocation=false\n"], $updated);
+        $this->assertStringContainsAllStrings(["Session\\DiskIOType=Posix\n", "Session\\AsyncIOThreadsCount=4\n", "Downloads\\PreAllocation=true\n"], $updated);
     }
 
     public function testApplyManagedConfigCreatesMissingManagedSections(): void

@@ -89,7 +89,7 @@ class UserUpdateHttpTest extends TestCase
         $this->assertStringContainsString('WebUI\\Port=12345', $updatedConfig);
         $this->assertStringContainsString('WebUI\\Address=*', $updatedConfig);
         $this->assertStringContainsString('WebUI\\CSRFProtection=false', $updatedConfig);
-        $this->assertStringContainsString('Downloads\\PreAllocation=false', $updatedConfig);
+        $this->assertStringContainsString('Downloads\\PreAllocation=true', $updatedConfig);
         $this->assertStringContainsString('Session\\DiskCacheSize=128', $updatedConfig);
     }
 
