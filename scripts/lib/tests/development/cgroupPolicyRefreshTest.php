@@ -14,6 +14,14 @@ class cgroupPolicyRefreshTest extends TestCase
         $this->assertTrue(\pmssCgroupRefreshHasExplicitIoPolicy(['ioCostModel' => 'ctrl=user model=linear']));
     }
 
+    public function testHasExplicitIoPolicyMatchesIopsMaxKnobs(): void
+    {
+        $this->assertTrue(\pmssCgroupRefreshHasExplicitIoPolicy(['IOReadIOPS' => '/home:200']));
+        $this->assertTrue(\pmssCgroupRefreshHasExplicitIoPolicy(['IOWriteIOPS' => '/home:100']));
+        $this->assertFalse(\pmssCgroupRefreshHasExplicitIoPolicy(['IOReadIOPS' => '']));
+        $this->assertFalse(\pmssCgroupRefreshHasExplicitIoPolicy(['IOWriteIOPS' => '']));
+    }
+
     public function testBuildCommandCarriesIoCostAndLatencyFlags(): void
     {
         $command = \pmssCgroupRefreshBuildCommand('alice', [

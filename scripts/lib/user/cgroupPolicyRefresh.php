@@ -18,7 +18,9 @@ function pmssCgroupRefreshHasExplicitIoPolicy(array $payload): bool
     $latencyMs = $payload['ioLatencyMs'] ?? null;
     return (is_numeric($latencyMs) && (int) $latencyMs > 0)
         || trim((string) ($payload['ioCostQos'] ?? '')) !== ''
-        || trim((string) ($payload['ioCostModel'] ?? '')) !== '';
+        || trim((string) ($payload['ioCostModel'] ?? '')) !== ''
+        || trim((string) ($payload['IOReadIOPS'] ?? '')) !== ''
+        || trim((string) ($payload['IOWriteIOPS'] ?? '')) !== '';
 }
 
 /** Build the canonical per-user cgroup refresh command from stored config. */

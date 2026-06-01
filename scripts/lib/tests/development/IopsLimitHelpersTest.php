@@ -149,4 +149,13 @@ class IopsLimitHelpersTest extends TestCase
             $this->assertSame($case[3], \pmssIopsLimitEnforcementPlan($case[0], $case[1], $case[2])['action']);
         }
     }
+
+    public function testRootCronSchedulesIopsLimits(): void
+    {
+        $this->pmssAssertRepoFileContainsString(
+            'etc/seedbox/config/root.cron',
+            '/scripts/cron/iopsLimits.php',
+            'root.cron should schedule iopsLimits.php hourly so monthly IOPS budget enforcer actually runs'
+        );
+    }
 }

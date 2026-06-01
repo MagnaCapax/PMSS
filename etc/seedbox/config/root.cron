@@ -52,6 +52,7 @@ MAILTO=""
 */30 * * * *   root    /scripts/cron/processSnapshot.php >/dev/null 2>&1
 0 6,18 * * *   root    /scripts/cron/storageHealthSnapshot.php >> /var/log/pmss/storageHealthSnapshot.log 2>&1
 7 * * * *   root    sleep 45; /scripts/cron/trafficLimits.php >> /var/log/pmss/trafficLimits.log 2>&1
+7 * * * *   root    sleep 55; /scripts/cron/iopsLimits.php >> /var/log/pmss/iopsLimits.log 2>&1
 25,55 * * * *   root    /bin/sleep 20; /scripts/cron/trafficStats.php >> /var/log/pmss/trafficStats.log 2>&1
 25,55 * * * *   root    /bin/sleep 25; /scripts/cron/trafficIngressStats.php >> /var/log/pmss/trafficIngressStats.log 2>&1
 25,55 * * * *   root    /bin/sleep 30; /scripts/cron/resourceStats.php >> /var/log/pmss/resourceStats.log 2>&1
