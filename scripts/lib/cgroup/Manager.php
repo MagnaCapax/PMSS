@@ -320,13 +320,26 @@ class Manager
         foreach (self::IO_CLI_PROPERTY_MAP as $flagName => $propertyName) {
             foreach ($ioSpecs[$flagName] ?? [] as $spec) {
                 $specText = trim($spec);
-                if (in_array($flagName, ['io-read-iops', 'io-write-iops'], true) && $specText === '/home:max') {
+                // /home: shorthand — generalized to accept "max" (clear) or positive integer (apply cap).
+                // Resolves /home backing device on the host at apply-time; hallinta + iopsLimitEnforcer
+                // can stay device-agnostic. Matches /dev/<device>:N format for explicit-device callers.
+                if (in_array($flagName, ['io-read-iops', 'io-write-iops'], true)
+                    && preg_match('#^/home:(.+)$#', $specText, $homeMatches) === 1) {
                     $homeDevice = trim($this->sys->resolveDevice('/home'));
                     if ($homeDevice === '' || !\pmssCgroupPolicyDeviceTargetIsSafe($homeDevice)) {
-                        $error = 'Invalid --'.$flagName.' clear target: unable to resolve safe /home backing device';
+                        $error = 'Invalid --'.$flagName.' /home shorthand: unable to resolve safe backing device';
                         return [];
                     }
-                    $ioPairs[] = $propertyName.'='.$homeDevice.' infinity';
+                    $rawValue = $homeMatches[1];
+                    if ($rawValue === 'max') {
+                        $resolvedValue = 'infinity';
+                    } elseif (preg_match('/^[0-9]+$/', $rawValue) === 1) {
+                        $resolvedValue = $rawValue;
+                    } else {
+                        $error = 'Invalid --'.$flagName.' /home value: expected positive integer or "max"';
+                        return [];
+                    }
+                    $ioPairs[] = $propertyName.'='.$homeDevice.' '.$resolvedValue;
                     continue;
                 }
 

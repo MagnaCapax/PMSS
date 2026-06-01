@@ -391,6 +391,43 @@ class CgroupUserConfigTest extends TestCase
         );
     }
 
+    public function testIopsPositiveIntShorthandResolvesHomeDeviceToValue(): void
+    {
+        $this->sys->findmnt['/home'] = '/dev/md0';
+
+        $res = $this->runMgr([
+            'testuser',
+            '--apply',
+            '--dry-run',
+            '--io-read-iops=/home:2000',
+            '--io-write-iops=/home:1000',
+        ]);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertSame(
+            "user=testuser uid=1000 slice=user-1000.slice mode=v2\n"
+            ."[Planned IO properties]\n"
+            ."IOReadIOPSMax=/dev/md0 2000\n"
+            ."IOWriteIOPSMax=/dev/md0 1000\n"
+            ."(dry-run or no --apply; not changing system)\n",
+            $res['out']
+        );
+    }
+
+    public function testIopsHomeShorthandRejectsNonNumericNonMaxValue(): void
+    {
+        $this->sys->findmnt['/home'] = '/dev/md0';
+
+        $res = $this->runMgr([
+            'testuser',
+            '--apply',
+            '--dry-run',
+            '--io-read-iops=/home:foobar',
+        ]);
+
+        $this->assertTrue($res['rc'] !== 0);
+    }
+
     public function testApplyIopsClearSentinelClearsStaleSystemdDropin(): void
     {
         $steps = [];
