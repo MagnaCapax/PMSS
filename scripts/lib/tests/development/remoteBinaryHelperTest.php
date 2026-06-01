@@ -223,8 +223,7 @@ SH
 
                 $this->assertTrue($result, 'Expected matching package install to succeed');
                 $this->assertEquals($body, (string) file_get_contents($dpkgCapture));
-                $this->assertStringContainsString('wget ', $this->pmssReadFileOrEmpty($commandLog));
-                $this->assertStringContainsString('dpkg ', $this->pmssReadFileOrEmpty($commandLog));
+                $this->assertStringContainsAllStrings(['wget ', 'dpkg '], $this->pmssReadFileOrEmpty($commandLog));
             });
         }, 'Successful package install should clean temp files');
     }

@@ -76,8 +76,7 @@ class WireGuardInstallerTest extends TestCase
 	        });
 
         $contents = (string) file_get_contents($config);
-        $this->assertStringContainsString('PrivateKey = dummy', $contents);
-        $this->assertStringContainsString('ListenPort = 12345', $contents);
+        $this->assertStringContainsAllStrings(['PrivateKey = dummy', 'ListenPort = 12345'], $contents);
     }
 
     public function testWriteConfigIncludesPeersFromUserKeys(): void
@@ -229,9 +228,7 @@ class WireGuardInstallerTest extends TestCase
         $guide = \wgBuildClientGuide('server-pub', 'vpn.example.com', 51820);
 
         $this->assertSame('c1501d1931af0c6ec16f58213b837615451961175ada7caefb6679d21ec6ce80', hash('sha256', $guide));
-        $this->assertStringContainsString("PrivateKey = <client private key>\n", $guide);
-        $this->assertStringContainsString("PublicKey = server-pub\n", $guide);
-        $this->assertStringContainsString("Endpoint = vpn.example.com:51820\n", $guide);
+        $this->assertStringContainsAllStrings(["PrivateKey = <client private key>\n", "PublicKey = server-pub\n", "Endpoint = vpn.example.com:51820\n"], $guide);
         $this->assertTrue(strpos($guide, 'WireGuard server ready') === false, 'client guide should be importable without prose');
     }
 
@@ -333,8 +330,7 @@ class WireGuardInstallerTest extends TestCase
 
         $updated = \wgApplyAssignedIpToGuide($guide, '10.90.90.42');
 
-        $this->assertStringContainsString("Address = 10.90.90.42/32\n", $updated);
-        $this->assertStringContainsString("AllowedIPs = 10.90.90.42/32\n", $updated);
+        $this->assertStringContainsAllStrings(["Address = 10.90.90.42/32\n", "AllowedIPs = 10.90.90.42/32\n"], $updated);
         $this->assertTrue(strpos($updated, '10.90.90.X/32') === false, 'placeholder should be removed from the guide');
     }
 
@@ -345,8 +341,7 @@ class WireGuardInstallerTest extends TestCase
 
         $updated = \wgApplyAssignedIpToGuide($guide, '10.90.90.77');
 
-        $this->assertStringContainsString("Address = 10.90.90.77/32\n", $updated);
-        $this->assertStringContainsString("AllowedIPs = 10.90.90.77/32\n", $updated);
+        $this->assertStringContainsAllStrings(["Address = 10.90.90.77/32\n", "AllowedIPs = 10.90.90.77/32\n"], $updated);
         $this->assertTrue(strpos($updated, '10.90.90.9/32') === false, 'stale assigned IP should be replaced');
     }
 
@@ -377,8 +372,7 @@ class WireGuardInstallerTest extends TestCase
         });
 
         $updated = (string) file_get_contents($homeBase.'/alice/wireguard.txt');
-        $this->assertStringContainsString("Address = 10.90.90.42/32\n", $updated);
-        $this->assertStringContainsString("AllowedIPs = 10.90.90.42/32\n", $updated);
+        $this->assertStringContainsAllStrings(["Address = 10.90.90.42/32\n", "AllowedIPs = 10.90.90.42/32\n"], $updated);
     }
 
     public function testSyncUserGuideAddressesCreatesGuideFromFallback(): void
@@ -408,8 +402,7 @@ class WireGuardInstallerTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/lib/wireguard.php');
 
-        $this->assertStringContainsString('template.wireguard.readme', $source);
-        $this->assertStringContainsString("wgWriteManagedFile(\$configDir.'/README', \$guide, 0644, 'WireGuard README')", $source);
+        $this->assertStringContainsAllStrings(['template.wireguard.readme', "wgWriteManagedFile(\$configDir.'/README', \$guide, 0644, 'WireGuard README')"], $source);
         $this->assertTrue(strpos($source, 'function wgWrite'.'Readme') === false, 'README helper should stay inlined in pmssWireguardConfigure');
     }
 
@@ -417,9 +410,7 @@ class WireGuardInstallerTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/lib/wireguard.php');
 
-        $this->assertStringContainsString('PMSS_WG_SKIP_SERVICE', $source);
-        $this->assertStringContainsString('systemctl enable --now wg-quick@wg0', $source);
-        $this->assertStringContainsString('systemd unavailable; skipping wg-quick@wg0 enable', $source);
+        $this->assertStringContainsAllStrings(['PMSS_WG_SKIP_SERVICE', 'systemctl enable --now wg-quick@wg0', 'systemd unavailable; skipping wg-quick@wg0 enable'], $source);
         $this->assertTrue(strpos($source, 'function wgEnable'.'Service') === false, 'Service enable helper should stay inlined in pmssWireguardConfigure');
     }
 
@@ -427,8 +418,7 @@ class WireGuardInstallerTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/lib/wireguard.php');
 
-        $this->assertStringContainsString("require_once __DIR__.'/log.php';", $source);
-        $this->assertStringContainsString("require_once __DIR__.'/update/runtime/commands.php';", $source);
+        $this->assertStringContainsAllStrings(["require_once __DIR__.'/log.php';", "require_once __DIR__.'/update/runtime/commands.php';"], $source);
         $this->assertTrue(strpos($source, "require_once __DIR__.'/update.php';") === false, 'wireguard.php should not pull update.php just to get logmsg()');
         $this->assertTrue(strpos($source, "if (!function_exists('logmsg')) {") === false, 'wireguard.php should rely on require_once instead of logmsg guards');
         $this->assertTrue(strpos($source, "if (!function_exists('runStep')) {") === false, 'wireguard.php should rely on require_once instead of runStep guards');

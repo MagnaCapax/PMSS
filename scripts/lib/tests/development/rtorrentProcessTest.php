@@ -355,7 +355,7 @@ class RtorrentProcessTest extends TestCase
         $this->assertTrue(is_dir($sessionDir), 'Session directory should exist after reset');
         $this->assertTrue(!file_exists($sessionDir.'/resume.dat'), 'Old session files should not remain in the new directory');
         $this->assertTrue(count(glob($home.'/session.broken-*')) === 1, 'Original directory should be quarantined once');
-        $this->assertTrue(strpos(implode("\n", $messages), 'Quarantined broken session directory') !== false);
+        $this->pmssAssertMessagesContain($messages, 'Quarantined broken session directory');
     }
 
     public function testResetSessionDirectoryCreatesMissingDirectory(): void
@@ -377,7 +377,7 @@ class RtorrentProcessTest extends TestCase
         });
 
         $this->assertTrue(!$result, 'Unexpected home path should be rejected');
-        $this->assertTrue(strpos(implode("\n", $messages), 'Refusing to reset unexpected session directory') !== false);
+        $this->pmssAssertMessagesContain($messages, 'Refusing to reset unexpected session directory');
     }
 
     public function testResetSessionDirectoryRejectsSymlink(): void
@@ -395,7 +395,7 @@ class RtorrentProcessTest extends TestCase
         });
 
         $this->assertTrue(!$result, 'Symlinked session directory should be rejected');
-        $this->assertTrue(strpos(implode("\n", $messages), 'Refusing to reset symlinked session directory') !== false);
+        $this->pmssAssertMessagesContain($messages, 'Refusing to reset symlinked session directory');
     }
 
     public function testResetSessionDirectoryRejectsSymlinkedHome(): void
@@ -419,7 +419,7 @@ class RtorrentProcessTest extends TestCase
         $this->assertTrue(!$result, 'Symlinked user home should be rejected');
         $this->assertTrue(is_link($home), 'Home symlink should remain untouched');
         $this->assertTrue(is_file($targetHome.'/session/resume.dat'), 'Session data behind symlinked home should remain untouched');
-        $this->assertTrue(strpos(implode("\n", $messages), 'Refusing to reset unsafe session directory') !== false);
+        $this->pmssAssertMessagesContain($messages, 'Refusing to reset unsafe session directory');
     }
 
     public function testResetSessionDirectoryCanRunTwice(): void

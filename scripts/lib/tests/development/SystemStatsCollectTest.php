@@ -135,23 +135,15 @@ class SystemStatsCollectTest extends TestCase
         ]));
     }
 
-    public function testTopMemoryProcessesReturnNaWhenCommandFails(): void
+    public function testTopMemoryProcessesSummarizeRunnerStatus(): void
     {
-        $summary = \pmssSystemStatsTopMemoryProcesses(static function (array &$output, int &$rc): void {
-            $output = ['php-fpm 2048'];
-            $rc = 1;
-        });
+        foreach ([1 => 'na', 0 => 'php-fpm:2.0M'] as $rc => $expected) {
+            $summary = \pmssSystemStatsTopMemoryProcesses(static function (array &$output, int &$commandRc) use ($rc): void {
+                $output = ['php-fpm 2048'];
+                $commandRc = $rc;
+            });
 
-        $this->assertEquals('na', $summary);
-    }
-
-    public function testTopMemoryProcessesUseRunnerOutputWhenCommandPasses(): void
-    {
-        $summary = \pmssSystemStatsTopMemoryProcesses(static function (array &$output, int &$rc): void {
-            $output = ['php-fpm 2048'];
-            $rc = 0;
-        });
-
-        $this->assertEquals('php-fpm:2.0M', $summary);
+            $this->assertEquals($expected, $summary);
+        }
     }
 }

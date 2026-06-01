@@ -331,8 +331,7 @@ final class SystemStatusCharacterizationTest extends TestCase
         );
 
         $this->pmssAssertCommandSucceedsWithoutStderr($command['result'], $command['stderrPath']);
-        $this->assertStringContainsString('"results"', $command['result']['output']);
-        $this->assertStringContainsString('\\ufffd', $command['result']['output']);
+        $this->assertStringContainsAllStrings(['"results"', '\\ufffd'], $command['result']['output']);
     }
 
     public function testStatusEmitReturnsErrorWhenJsonEncodingFails(): void
@@ -362,8 +361,7 @@ final class SystemStatusCharacterizationTest extends TestCase
             .'exit(pmssStatusEmit($checks, "PMSS Status", false, [], null, 0, false, 8, false));'
         );
         $this->pmssAssertCommandSucceedsWithoutStderr($command['result'], $command['stderrPath']);
-        $this->assertStringContainsString('PMSS Status (', $command['result']['output']);
-        $this->assertStringContainsString('Summary: 1 OK, 1 WARN, 1 ERR', $command['result']['output']);
+        $this->assertStringContainsAllStrings(['PMSS Status (', 'Summary: 1 OK, 1 WARN, 1 ERR'], $command['result']['output']);
     }
 
     public function testStatusEmitTextDefaultsMissingSummaryKeysToZero(): void
@@ -534,18 +532,21 @@ final class SystemStatusCharacterizationTest extends TestCase
         $systemSource = $this->pmssReadRepoFile('scripts/util/systemTest.php');
         $librarySource = $this->pmssReadRepoFile('scripts/lib/systemStatus.php');
 
-        $this->assertStringContainsString("require_once __DIR__.'/../lib/cli/optionParser.php';", $componentSource);
-        $this->assertStringContainsString("require_once __DIR__.'/../lib/systemStatus.php';", $componentSource);
-        $this->assertStringContainsString("pmssParseCliTokens(pmssCliArgv(\$argv ?? null));", $componentSource);
+        $this->assertStringContainsAllStrings([
+            "require_once __DIR__.'/../lib/cli/optionParser.php';",
+            "require_once __DIR__.'/../lib/systemStatus.php';",
+            "pmssParseCliTokens(pmssCliArgv(\$argv ?? null));",
+            "pmssCliOptionPresent(\$parsed, 'json')",
+            'pmssComponentStatusChecks()',
+            'pmssStatusEmit(',
+        ], $componentSource);
         $this->pmssAssertStringNotContainsString('getopt(', $componentSource);
-        $this->assertStringContainsString("pmssCliOptionPresent(\$parsed, 'json')", $componentSource);
-        $this->assertStringContainsString('pmssComponentStatusChecks()', $componentSource);
-        $this->assertStringContainsString('pmssSystemStatusChecks()', $systemSource);
-        $this->assertStringContainsString('function pmssStatusEmit(', $librarySource);
-        $this->assertStringContainsString('function pmssSystemStatusChecks(', $librarySource);
-        $this->assertStringContainsString('function pmssComponentStatusChecks(array $dependencies = [])', $librarySource);
-        $this->assertStringContainsString('pmssStatusEmit(', $componentSource);
-        $this->assertStringContainsString('pmssStatusEmit(', $systemSource);
+        $this->assertStringContainsAllStrings(['pmssSystemStatusChecks()', 'pmssStatusEmit('], $systemSource);
+        $this->assertStringContainsAllStrings([
+            'function pmssStatusEmit(',
+            'function pmssSystemStatusChecks(',
+            'function pmssComponentStatusChecks(array $dependencies = [])',
+        ], $librarySource);
         $this->pmssAssertStringNotContainsString('json_decode($componentJson, true);', $systemSource);
     }
 }
