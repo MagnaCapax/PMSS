@@ -38,10 +38,7 @@ class RemoteLoggingCharacterizationTest extends TestCase
             '*.* @@logs.example.net:514',
             '# protocol=tcp',
         ], 'Expected rendered remote logging config');
-        $this->assertTrue(
-            $this->pmssMessagesContain($messages, 'Applied remote logging: logs.example.net:514 (tcp)'),
-            'Expected apply log to reflect defaulted port and protocol'
-        );
+        $this->pmssAssertMessagesContain($messages, 'Applied remote logging: logs.example.net:514 (tcp)', 'Expected apply log to reflect defaulted port and protocol');
     }
 
     public function testTemplateReplacementStaysGlobalAcrossRepeatedPlaceholders(): void

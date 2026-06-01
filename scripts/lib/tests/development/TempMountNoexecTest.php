@@ -37,7 +37,7 @@ class TempMountNoexecTest extends TestCase
 
             $messages = $this->runNoexecHardening($fstab, $mounts, $flag);
             $this->assertEquals($original, (string) file_get_contents($fstab));
-            $this->assertTrue($this->pmssMessagesContain($messages, $needle), 'expected disabled log');
+            $this->pmssAssertMessagesContain($messages, $needle, 'expected disabled log');
         }
     }
 
@@ -56,7 +56,7 @@ class TempMountNoexecTest extends TestCase
 
         $updated = (string)file_get_contents($fstab);
         $this->assertStringContainsAllStrings(['/tmp', '/dev/shm', 'noexec'], $updated);
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Updated /tmp mount options'), 'expected /tmp update log');
+        $this->pmssAssertMessagesContain($messages, 'Updated /tmp mount options', 'expected /tmp update log');
     }
 
     public function testRemovesConflictingOptions(): void
@@ -85,7 +85,7 @@ class TempMountNoexecTest extends TestCase
         $messages = $this->runNoexecHardening($fstab, $mounts);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'already hardened'), 'expected already hardened log');
+        $this->pmssAssertMessagesContain($messages, 'already hardened', 'expected already hardened log');
     }
 
     public function testMountMissingLeavesFstabUntouched(): void
@@ -100,7 +100,7 @@ class TempMountNoexecTest extends TestCase
         $messages = $this->runNoexecHardening($fstab, $mounts);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'not found'), 'expected not found log');
+        $this->pmssAssertMessagesContain($messages, 'not found', 'expected not found log');
     }
 
     public function testUnreadableFstabWarns(): void
@@ -114,7 +114,7 @@ class TempMountNoexecTest extends TestCase
 
         $messages = $this->runNoexecHardening($fstab, $mounts);
 
-        $this->assertTrue($this->pmssMessagesContain($messages, 'not readable'), 'expected not readable log');
+        $this->pmssAssertMessagesContain($messages, 'not readable', 'expected not readable log');
         chmod($fstab, 0600);
     }
 
@@ -131,7 +131,7 @@ class TempMountNoexecTest extends TestCase
         $messages = $this->runNoexecHardening($fstab, $mounts);
 
         $this->assertEquals(["mount '-o' 'remount,noexec,nosuid,nodev' '/tmp'"], $this->pmssProfileCommands());
-        $this->assertTrue($this->pmssMessagesContain($messages, 'not readable'), 'expected not readable log');
+        $this->pmssAssertMessagesContain($messages, 'not readable', 'expected not readable log');
         chmod($fstab, 0600);
     }
 
@@ -149,7 +149,7 @@ class TempMountNoexecTest extends TestCase
         $messages = $this->runNoexecHardening($fstab, $mounts);
 
         $this->assertEquals("tmpfs /tmp tmpfs defaults 0 0\n", (string) file_get_contents($fstabTarget));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'not a regular file'), 'expected regular-file guard log');
+        $this->pmssAssertMessagesContain($messages, 'not a regular file', 'expected regular-file guard log');
     }
 
     public function testWriteFailureSkipsRemountsWhenFstabUpdateCannotPersist(): void
@@ -165,8 +165,8 @@ class TempMountNoexecTest extends TestCase
         $messages = $this->runNoexecHardening($fstab, $mounts);
 
         $this->assertEquals([], $this->pmssProfileCommands());
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Failed writing updated '.$fstab), 'expected write failure log');
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Skipping live mount hardening because '.$fstab.' could not be updated'), 'expected remount skip log');
+        $this->pmssAssertMessagesContain($messages, 'Failed writing updated '.$fstab, 'expected write failure log');
+        $this->pmssAssertMessagesContain($messages, 'Skipping live mount hardening because '.$fstab.' could not be updated', 'expected remount skip log');
 
         chmod($dir, 0700);
     }

@@ -31,7 +31,7 @@ class HomeInodeDensityTest extends TestCase
             \pmssHomeInodeDensityCheck($this->pmssMakeArrayLogger($messages), $home, 262144);
         });
 
-        $this->assertTrue($this->pmssMessagesContain($messages, '[OK] Home inode density'));
+        $this->pmssAssertMessagesContain($messages, '[OK] Home inode density');
     }
 
     public function testLogsWarnWhenInodeDensityExceedsThreshold(): void
@@ -44,8 +44,8 @@ class HomeInodeDensityTest extends TestCase
             \pmssHomeInodeDensityCheck($this->pmssMakeArrayLogger($messages), $home, 262144);
         });
 
-        $this->assertTrue($this->pmssMessagesContain($messages, '[WARN] Home inode density'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'media-stack workloads may exhaust inodes'));
+        $this->pmssAssertMessagesContain($messages, '[WARN] Home inode density');
+        $this->pmssAssertMessagesContain($messages, 'media-stack workloads may exhaust inodes');
     }
 
     public function testWarnsWhenStatFails(): void
@@ -58,7 +58,7 @@ class HomeInodeDensityTest extends TestCase
             \pmssHomeInodeDensityCheck($this->pmssMakeArrayLogger($messages), $home, 262144);
         });
 
-        $this->assertTrue($this->pmssMessagesContain($messages, 'stat rc=9'));
+        $this->pmssAssertMessagesContain($messages, 'stat rc=9');
     }
 
     public function testSkipsWhenHomePathIsMissing(): void
@@ -67,7 +67,7 @@ class HomeInodeDensityTest extends TestCase
 
         \pmssHomeInodeDensityCheck($this->pmssMakeArrayLogger($messages), '/tmp/pmss-missing-home-path', 262144);
 
-        $this->assertTrue($this->pmssMessagesContain($messages, 'path missing'));
+        $this->pmssAssertMessagesContain($messages, 'path missing');
     }
 
     public function testUpdateStep2PreflightKeepsFatalAndWarningOnlyContracts(): void

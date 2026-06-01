@@ -58,7 +58,7 @@ class SysctlBaselineTest extends TestCase
         $second = (string)file_get_contents($target);
 
         $this->assertEquals($first, $second, 'expected sysctl file unchanged');
-        $this->assertTrue($this->pmssMessagesContain($messages, 'already present and up to date'), 'expected skip log');
+        $this->pmssAssertMessagesContain($messages, 'already present and up to date', 'expected skip log');
     }
 
     public function testCreatesTargetDirectory(): void
@@ -83,7 +83,7 @@ class SysctlBaselineTest extends TestCase
         $messages = [];
         $this->runBaseline($target, $messages, false);
 
-        $this->assertTrue($this->pmssMessagesContain($messages, 'sysctl reload disabled'), 'expected reload skip log');
+        $this->pmssAssertMessagesContain($messages, 'sysctl reload disabled', 'expected reload skip log');
     }
 
     public function testUpdatesWhenContentDiffers(): void
@@ -114,7 +114,7 @@ class SysctlBaselineTest extends TestCase
         $this->runBaseline($target, $messages, false);
 
         $this->assertFalse(file_exists($target), 'expected sysctl file write to fail');
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to write legacy sysctl defaults'), 'expected write failure warning');
+        $this->pmssAssertMessagesContain($messages, 'Unable to write legacy sysctl defaults', 'expected write failure warning');
         $this->assertFalse($this->pmssMessagesContain($messages, 'Refreshed legacy sysctl defaults'), 'did not expect success log');
         $this->assertFalse($this->pmssMessagesContain($messages, 'sysctl reload disabled'), 'did not expect reload log after failed write');
     }

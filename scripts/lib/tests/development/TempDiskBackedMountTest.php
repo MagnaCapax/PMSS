@@ -12,7 +12,7 @@ class TempDiskBackedMountTest extends TestCase
         $messages = [];
         \pmssConfigureTempDiskBackedMount($this->pmssMakeArrayLogger($messages), 12);
 
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Leaving /tmp mount policy unchanged'));
+        $this->pmssAssertMessagesContain($messages, 'Leaving /tmp mount policy unchanged');
     }
 
     public function testMasksTmpMountOnDebian13(): void
@@ -26,7 +26,7 @@ class TempDiskBackedMountTest extends TestCase
         });
 
         $this->assertEquals("mask tmp.mount\n", (string) file_get_contents($logPath));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Masked tmp.mount'));
+        $this->pmssAssertMessagesContain($messages, 'Masked tmp.mount');
     }
 
     public function testMasksTmpMountOnLaterDebianVersions(): void
@@ -49,7 +49,7 @@ class TempDiskBackedMountTest extends TestCase
             \pmssConfigureTempDiskBackedMount($this->pmssMakeArrayLogger($messages), 13);
         });
 
-        $this->assertTrue($this->pmssMessagesContain($messages, 'systemctl unavailable'));
+        $this->pmssAssertMessagesContain($messages, 'systemctl unavailable');
     }
 
     public function testDetectsDebian13FromOsReleaseWhenVersionMissing(): void

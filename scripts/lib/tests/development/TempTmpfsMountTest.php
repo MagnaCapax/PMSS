@@ -33,7 +33,7 @@ class TempTmpfsMountTest extends TestCase
 
             $messages = $this->runTmpfsHardening($fstab, $mounts, $flag);
             $this->assertEquals($original, (string) file_get_contents($fstab));
-            $this->assertTrue($this->pmssMessagesContain($messages, $needle), 'expected disabled log');
+            $this->pmssAssertMessagesContain($messages, $needle, 'expected disabled log');
         }
     }
 
@@ -58,7 +58,7 @@ class TempTmpfsMountTest extends TestCase
         $messages = $this->runTmpfsHardening($fstab, $mounts);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'non-tmpfs'), 'expected non-tmpfs log');
+        $this->pmssAssertMessagesContain($messages, 'non-tmpfs', 'expected non-tmpfs log');
     }
 
     public function testUpdatesTmpfsEntryOptions(): void
@@ -73,7 +73,7 @@ class TempTmpfsMountTest extends TestCase
         $messages = $this->runTmpfsHardening($fstab, $mounts);
 
         $this->pmssAssertFstabOptions($fstab, '/tmp', ['noexec', 'nosuid', 'nodev', 'size=2G'], ['exec', 'suid', 'dev']);
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Updated /tmp tmpfs options'), 'expected update log');
+        $this->pmssAssertMessagesContain($messages, 'Updated /tmp tmpfs options', 'expected update log');
     }
 
     public function testUnreadableMountsWarns(): void
@@ -87,7 +87,7 @@ class TempTmpfsMountTest extends TestCase
 
         $messages = $this->runTmpfsHardening($fstab, $mounts);
 
-        $this->assertTrue($this->pmssMessagesContain($messages, 'not readable'), 'expected not readable log');
+        $this->pmssAssertMessagesContain($messages, 'not readable', 'expected not readable log');
         chmod($mounts, 0600);
     }
 
@@ -104,8 +104,8 @@ class TempTmpfsMountTest extends TestCase
         $messages = $this->runTmpfsHardening($fstab, $mounts);
 
         $this->assertEquals([], $this->pmssProfileCommands());
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Failed writing updated '.$fstab), 'expected write failure log');
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Skipping live mount hardening because '.$fstab.' could not be updated'), 'expected remount skip log');
+        $this->pmssAssertMessagesContain($messages, 'Failed writing updated '.$fstab, 'expected write failure log');
+        $this->pmssAssertMessagesContain($messages, 'Skipping live mount hardening because '.$fstab.' could not be updated', 'expected remount skip log');
 
         chmod($dir, 0700);
     }
