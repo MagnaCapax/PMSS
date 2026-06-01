@@ -15,6 +15,9 @@
 
 require_once __DIR__.'/integerSetting.php';
 
+const PMSS_IOPS_LIMIT_MAX_MONTHLY_OPERATIONS = 1.0E14;
+const PMSS_IOPS_LIMIT_SENTINEL_FLOOR = 9.0E18;
+
 /** @param mixed $raw */
 function pmssIopsLimitParseMonthlyOperations($raw, ?string &$error = null): ?int
 {
@@ -40,6 +43,21 @@ function pmssIopsLimitTargetModes(string $username, ?string $homeDir = null, ?st
     ];
 }
 
+/** @param mixed $raw */
+function pmssIopsLimitMonthlyUsageValue($raw): float
+{
+    if (!is_numeric($raw)) {
+        return 0.0;
+    }
+
+    $value = (float) $raw;
+    return $value >= 0.0
+        && $value <= PMSS_IOPS_LIMIT_MAX_MONTHLY_OPERATIONS
+        && $value < PMSS_IOPS_LIMIT_SENTINEL_FLOOR
+        ? $value
+        : 0.0;
+}
+
 function pmssReadUserMonthlyIopsUsage(string $path): int
 {
     $data = pmssReadSerializedArrayFile($path);
@@ -47,12 +65,8 @@ function pmssReadUserMonthlyIopsUsage(string $path): int
         return 0;
     }
 
-    $read = isset($data['io_read_ops']['raw']['month']) && is_numeric($data['io_read_ops']['raw']['month'])
-        ? (float) $data['io_read_ops']['raw']['month']
-        : 0.0;
-    $write = isset($data['io_write_ops']['raw']['month']) && is_numeric($data['io_write_ops']['raw']['month'])
-        ? (float) $data['io_write_ops']['raw']['month']
-        : 0.0;
+    $read = pmssIopsLimitMonthlyUsageValue($data['io_read_ops']['raw']['month'] ?? null);
+    $write = pmssIopsLimitMonthlyUsageValue($data['io_write_ops']['raw']['month'] ?? null);
 
     return (int) round($read + $write);
 }

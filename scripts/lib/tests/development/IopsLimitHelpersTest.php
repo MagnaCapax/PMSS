@@ -37,6 +37,26 @@ class IopsLimitHelpersTest extends TestCase
         $this->assertSame(2000, \pmssReadUserMonthlyIopsUsage($path));
     }
 
+    public function testMonthlyIopsUsageIgnoresSentinelValues(): void
+    {
+        $path = $this->pmssWriteTempFile('iops-sentinel-resource-', serialize([
+            'io_read_ops' => ['raw' => ['month' => '9223372036854775808']],
+            'io_write_ops' => ['raw' => ['month' => '18446744073709551615']],
+        ]));
+
+        $this->assertSame(0, \pmssReadUserMonthlyIopsUsage($path));
+    }
+
+    public function testMonthlyIopsUsageKeepsPlausibleSideWhenOtherSideIsSentinel(): void
+    {
+        $path = $this->pmssWriteTempFile('iops-partial-sentinel-resource-', serialize([
+            'io_read_ops' => ['raw' => ['month' => '9223372036854775808']],
+            'io_write_ops' => ['raw' => ['month' => 1234.0]],
+        ]));
+
+        $this->assertSame(1234, \pmssReadUserMonthlyIopsUsage($path));
+    }
+
     public function testTargetModePersistenceWritesRuntimeAndHomeFiles(): void
     {
         $root = $this->pmssMakeTempDir('pmss-iops-targets-');

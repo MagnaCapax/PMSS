@@ -394,6 +394,51 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertDeltaFields($result, ['io_read' => 10, 'io_write' => 20, 'cpu_nsec' => 30]);
     }
 
+    public function testUpdateStateSuppressesImplausibleIoDeltas(): void
+    {
+        $statePath = $this->makeStatePath([
+            'io_read' => 10,
+            'io_write' => 20,
+            'io_read_ops' => 30,
+            'io_write_ops' => 40,
+            'cpu_nsec' => 50,
+            'ts' => 1,
+        ]);
+
+        $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(
+            PHP_INT_MAX,
+            PHP_INT_MAX,
+            60,
+            1024,
+            2,
+            PHP_INT_MAX,
+            PHP_INT_MAX
+        ));
+
+        $this->assertDeltaFields($result, ['io_read' => 0, 'io_write' => 0, 'io_read_ops' => 0, 'io_write_ops' => 0, 'cpu_nsec' => 10]);
+    }
+
+    public function testUpdateStateTreatsResetAsDeltaOnlyWhenPlausible(): void
+    {
+        $statePath = $this->makeStatePath([
+            'io_read_ops' => PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_OPS + 2000,
+            'io_write_ops' => 2000,
+            'ts' => 1,
+        ]);
+
+        $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(
+            1,
+            1,
+            1,
+            1024,
+            2,
+            PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_OPS + 1,
+            20
+        ));
+
+        $this->assertDeltaFields($result, ['io_read_ops' => 0, 'io_write_ops' => 20]);
+    }
+
     public function testUpdateStateHandlesInvalidJson(): void
     {
         $statePath = $this->makeStatePath('{invalid json}');
