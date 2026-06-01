@@ -53,6 +53,47 @@ class UpdateStep2IncompleteUserMaintenanceTest extends TestCase
         }
     }
 
+    public function testIncompleteTailMarkerRejectsRelativeOverridePath(): void
+    {
+        $relative = 'pmss-test-incomplete-relative.json';
+        putenv('PMSS_INCOMPLETE_USER_MAINTENANCE_PATH='.$relative);
+        try {
+            pmssUpdateRecordIncompleteUserMaintenance(1, 2, ['alice: skipped']);
+            $this->assertFalse(is_file($relative), 'relative marker path must not be written');
+            $this->assertFalse(pmssUpdateIncompleteUserMaintenancePathIsSafe($relative));
+        } finally {
+            putenv('PMSS_INCOMPLETE_USER_MAINTENANCE_PATH');
+            if (is_file($relative)) { @unlink($relative); }
+        }
+    }
+
+    public function testIncompleteTailMarkerRejectsSymlinkedParentOnClear(): void
+    {
+        $root = sys_get_temp_dir().'/pmss-test-incomplete-root-'.bin2hex(random_bytes(4));
+        $targetDir = $root.'/target';
+        $linkDir = $root.'/link';
+        @mkdir($targetDir, 0755, true);
+        if (!@symlink($targetDir, $linkDir)) {
+            throw new SkipTest('symlink unavailable');
+        }
+
+        $marker = $linkDir.'/marker.json';
+        $realMarker = $targetDir.'/marker.json';
+        file_put_contents($realMarker, "{}\n");
+        putenv('PMSS_INCOMPLETE_USER_MAINTENANCE_PATH='.$marker);
+        try {
+            pmssUpdateClearIncompleteUserMaintenance();
+            $this->assertTrue(is_file($realMarker), 'marker behind symlinked parent must not be removed');
+            $this->assertFalse(pmssUpdateIncompleteUserMaintenancePathIsSafe($marker));
+        } finally {
+            putenv('PMSS_INCOMPLETE_USER_MAINTENANCE_PATH');
+            if (is_file($realMarker)) { @unlink($realMarker); }
+            if (is_link($linkDir)) { @unlink($linkDir); }
+            if (is_dir($targetDir)) { @rmdir($targetDir); }
+            if (is_dir($root)) { @rmdir($root); }
+        }
+    }
+
     public function testFullCompletionClearsStaleMarker(): void
     {
         // The policy helper clears the marker on a clean run.

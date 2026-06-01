@@ -52,4 +52,19 @@ class CreateNginxConfigPermissionHardeningTest extends TestCase
         $this->assertEquals(0640, @fileperms($target) & 0777);
         $this->assertEquals(0666, @fileperms($other) & 0777);
     }
+
+    public function testChmodGlobRefusesSymlinkTargets(): void
+    {
+        $target = $this->root.'/real-target.txt';
+        $link = $this->root.'/linked.conf';
+        file_put_contents($target, "target\n");
+        @chmod($target, 0600);
+        if (!@symlink($target, $link)) {
+            throw new SkipTest('symlink unavailable');
+        }
+
+        \pmssCreateNginxConfigChmodGlob(0640, $this->root.'/*.conf');
+
+        $this->assertEquals(0600, @fileperms($target) & 0777);
+    }
 }

@@ -60,6 +60,15 @@ function pmssUpdateIncompleteUserMaintenancePath(): string
 }
 
 /**
+ * Validate the durable marker path before creating/removing it.
+ */
+function pmssUpdateIncompleteUserMaintenancePathIsSafe(string $path): bool
+{
+    return pmssPathAbsoluteStringIsSafe($path, ['allowRoot' => false, 'allowTrailingSlash' => false])
+        && pmssPathTargetIsSafe($path, false);
+}
+
+/**
  * Record that per-user maintenance finished with a skipped tail (GH#592).
  *
  * Replaces the only real benefit the former MUST_SUCCEED hard-fail provided —
@@ -72,14 +81,27 @@ function pmssUpdateIncompleteUserMaintenancePath(): string
 function pmssUpdateRecordIncompleteUserMaintenance(int $processed, int $total, array $skipReasons): void
 {
     $path = pmssUpdateIncompleteUserMaintenancePath();
-    @mkdir(dirname($path), 0755, true);
+    if (!pmssUpdateIncompleteUserMaintenancePathIsSafe($path)) {
+        logmsg('[WARN] Refusing unsafe incomplete user maintenance marker path: '.$path);
+        return;
+    }
+
+    $dir = dirname($path);
+    if (!(is_dir($dir) || @mkdir($dir, 0755, true) || is_dir($dir))) {
+        logmsg('[WARN] Unable to create incomplete user maintenance marker directory: '.$dir);
+        return;
+    }
+
     $payload = [
         'ts'        => gmdate('c'),
         'processed' => $processed,
         'total'     => $total,
         'skipped'   => array_values($skipReasons),
     ];
-    @file_put_contents($path, (pmssJsonEncodePretty($payload) ?? '')."\n");
+    $encoded = pmssJsonEncodePretty($payload);
+    if (!is_string($encoded) || @file_put_contents($path, $encoded."\n") === false) {
+        logmsg('[WARN] Unable to write incomplete user maintenance marker: '.$path);
+    }
 }
 
 /**
@@ -88,8 +110,13 @@ function pmssUpdateRecordIncompleteUserMaintenance(int $processed, int $total, a
 function pmssUpdateClearIncompleteUserMaintenance(): void
 {
     $path = pmssUpdateIncompleteUserMaintenancePath();
-    if (is_file($path)) {
-        @unlink($path);
+    if (!pmssUpdateIncompleteUserMaintenancePathIsSafe($path)) {
+        logmsg('[WARN] Refusing unsafe incomplete user maintenance marker path: '.$path);
+        return;
+    }
+
+    if (is_file($path) && !@unlink($path)) {
+        logmsg('[WARN] Unable to clear incomplete user maintenance marker: '.$path);
     }
 }
 

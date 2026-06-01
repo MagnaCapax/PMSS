@@ -13,10 +13,11 @@ require_once __DIR__.'/userConfigsGenerate.php';
 require_once __DIR__.'/configTest.php';
 
 /**
- * Apply chmod to files matched by a glob without relying on shell expansion.
+ * Apply chmod to regular files matched by a glob without invoking a shell.
  *
  * This keeps permission hardening aligned with historical intent while
- * quoting every path before it reaches the shell.
+ * refusing symlinked or non-file targets that should never appear in generated
+ * nginx config paths.
  */
 function pmssCreateNginxConfigChmodGlob(int $mode, string $pattern): void
 {
@@ -26,8 +27,15 @@ function pmssCreateNginxConfigChmodGlob(int $mode, string $pattern): void
     }
 
     sort($matches, SORT_STRING);
-    $quotedPaths = array_map('escapeshellarg', $matches);
-    passthru(sprintf('chmod %o %s', $mode, implode(' ', $quotedPaths)));
+    foreach ($matches as $path) {
+        if (is_link($path) || !is_file($path)) {
+            fwrite(STDERR, '[WARN] Skipping unsafe nginx chmod target: '.$path.PHP_EOL);
+            continue;
+        }
+        if (!@chmod($path, $mode)) {
+            fwrite(STDERR, sprintf('[WARN] Failed to chmod %04o nginx config target: %s', $mode, $path).PHP_EOL);
+        }
+    }
 }
 
 function pmssCreateNginxConfigMain(array $argv): int
