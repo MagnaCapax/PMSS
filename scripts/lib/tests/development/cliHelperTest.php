@@ -93,5 +93,6 @@ class CliHelperTest extends TestCase
         $this->assertSame(null, $parsed);
         $this->assertEquals("Usage: script.php\n", $output);
         $this->assertSame(['options' => ['json' => true], 'arguments' => []], \pmssParseCliTokensOrHelp(['script.php', '--json'], ''));
+        $this->assertStringContainsString("  --help  Show this help.\n", \pmssCliHelpUsageOptions('script.php', [], 8, [], false));
     }
 }

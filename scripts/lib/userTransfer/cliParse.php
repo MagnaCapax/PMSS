@@ -25,11 +25,10 @@ function pmssUserTransferParseCli(array $argv): array
         ['--no-sleep', 'Disable sleeping between passes'],
         ['--dry-run', 'Log planned steps without executing commands'],
         ['--print-password', 'Print the supplied password at the end (unsafe)'],
-        ['--help, -h', 'Show this help'],
     ], 20, [
         'If REMOTE_HOSTNAME does not contain a dot, ".pulsedmedia.com" is appended.',
         'Password can be provided via env: PMSS_USER_TRANSFER_PASSWORD',
-    ], false);
+    ], false, ['--help, -h', 'Show this help']);
 
     $optionSpecs = [
         'main-passes' => ['field' => 'mainPasses', 'default' => 31, 'expectsValue' => true, 'range' => [1, 500]],

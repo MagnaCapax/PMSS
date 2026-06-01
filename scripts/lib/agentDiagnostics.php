@@ -182,8 +182,7 @@ function pmssAgentDiagnosticsMain(array $argv): int
         ['--json', 'Emit JSON output.'],
         ['--pretty', 'Pretty-print JSON output.'],
         ['--user USER', 'Include per-user diagnostics.'],
-        ['-h, --help', 'Show this help text.'],
-    ], 16, [], false);
+    ], 16, [], false, ['-h, --help', 'Show this help text.']);
     if (($parsed = pmssParseCliTokensOrHelp($argv, $usage, ['user'])) === null) return 0;
 
     if (!pmssTestModeEnabled()) requireRoot();

@@ -48,7 +48,6 @@ function pmssShowResourcesMain(array $argv): int
         ['--json', 'Emit JSON instead of human text output.'],
         ['--show-missing', 'Print missing stats usernames (text mode only).'],
         ['--user', 'Show only the named user.'],
-        ['--help', 'Show this help.'],
     ]);
     if (($parsed = pmssParseCliTokensOrHelp($argv, $usage, ['user'], null)) === null) return 0;
     $userFilter = trim((string) pmssCliOptionString($parsed, 'user', null, ''));

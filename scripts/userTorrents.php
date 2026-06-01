@@ -51,7 +51,6 @@ pmssRunCliEntrypointWithArgv(__FILE__, static function (array $argv): int {
     $self = basename(__FILE__);
     $usage = pmssCliHelpUsageOptions($self.' [--by-client]', [
         ['--by-client', 'Show per-client breakdown (rtorrent/deluge/qbittorrent).'],
-        ['--help', 'Show this help.'],
     ], 13);
     if (($parsed = pmssParseCliTokensOrHelp($argv, $usage, [], null)) === null) return 0;
     $byClient = pmssCliOptionPresent($parsed, 'by-client');

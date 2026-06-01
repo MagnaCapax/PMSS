@@ -22,7 +22,6 @@ if (pmssCliHelpRequested($parsed)) {
         ['--idle-latency-ms <ms>', 'ioping avg latency threshold (default 100).'],
         ['--idle-util <percent>', 'iostat util threshold (default 85).'],
         ['--show-last', 'Print the last run human summary and exit.'],
-        ['--help', 'Show this help.'],
     ], 28, ['Also accepts --key=value form for all value options.']);
     exit(0);
 }

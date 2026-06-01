@@ -38,8 +38,7 @@ function pmssCreateNginxConfigMain(array $argv): int
     ], [
         ['--user, -u USERNAME', 'Only regenerate nginx config for USERNAME (keeps other user configs intact)'],
         ['--restart, -r', 'Restart nginx after writing configs (only if config test passes)'],
-        ['--help, -h', 'Show this help'],
-    ], 21);
+    ], 21, [], true, ['--help, -h', 'Show this help']);
 
     if (($parsed = pmssParseCliTokensOrHelp($argv, $usage)) === null) return 0;
 

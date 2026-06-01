@@ -110,7 +110,6 @@ function pmssStatsParseOptions(array $argv)
         ['--json', 'Emit machine-readable JSON.'],
         ['--mini', 'Show a compact four-line summary.'],
         ['--no-header', 'Skip the title box.'],
-        ['--help', 'Show this help.'],
     ], 13);
     if (($parsed = pmssParseCliTokensOrHelp($argv, $usage)) === null) return false;
 

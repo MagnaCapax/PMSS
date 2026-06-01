@@ -64,9 +64,14 @@ function pmssCliHelpLine(string $label, string $description, int $width = 40): s
  * @param string|array<int,string>            $usage
  * @param array<int,array{0:string,1:string}> $options
  * @param array<int,string>                   $notes
+ * @param array<int,string>                   $helpOption
  */
-function pmssCliHelpUsageOptions($usage, array $options, int $width = 16, array $notes = [], bool $trailingBlank = true): string
+function pmssCliHelpUsageOptions($usage, array $options, int $width = 16, array $notes = [], bool $trailingBlank = true, array $helpOption = ['--help', 'Show this help.']): string
 {
+    foreach ($options as $option) {
+        if (stripos((string) ($option[0] ?? ''), 'help') !== false) { $helpOption = []; break; }
+    }
+    if (isset($helpOption[0], $helpOption[1])) $options[] = [(string) $helpOption[0], (string) $helpOption[1]];
     $lines = is_array($usage) ? array_merge(['Usage:'], array_map(static function (string $line): string { return '  '.$line; }, $usage)) : ['Usage: '.$usage];
     array_push($lines, '', 'Options:');
     foreach ($options as $option) $lines[] = pmssCliHelpLine($option[0], $option[1], $width);

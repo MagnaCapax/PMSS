@@ -45,7 +45,6 @@ function pmssShowTrafficMain(array $argv): int
             ['--sort=<mode>', 'Sort output by name, month, pct, or rate (default: name).'],
             ['--color', 'Force ANSI colors in extended text output.'],
             ['--no-color', 'Disable ANSI colors in extended text output.'],
-            ['--help', 'Show this help.'],
         ]);
         return $helpExitCode;
     }
