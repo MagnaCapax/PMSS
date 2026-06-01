@@ -16,7 +16,7 @@ class RemoteLoggingTest extends TestCase
         $fixture = $this->pmssRemoteLoggingFixture();
         $messages = [];
 
-        $this->applyRemoteLogging($fixture, $messages);
+        $this->pmssApplyRemoteLoggingFixture($fixture, $messages);
 
         $this->assertTrue(!file_exists($fixture['target']), 'unexpected remote logging config created');
         $this->assertEquals([], $messages);
@@ -31,7 +31,7 @@ class RemoteLoggingTest extends TestCase
         file_put_contents($fixture['cfgDir'].'/logging.conf', "remote_logging_enabled=0\n");
         file_put_contents($target, "*.* @@old.example:514\n");
 
-        $this->applyRemoteLogging($fixture, $messages);
+        $this->pmssApplyRemoteLoggingFixture($fixture, $messages);
 
         $this->assertTrue(!file_exists($target), 'stale remote logging config should be removed');
         $this->pmssAssertMessagesContain($messages, 'Removed remote logging config (disabled)', 'expected removal log');
@@ -47,7 +47,7 @@ class RemoteLoggingTest extends TestCase
         file_put_contents($fixture['cfgDir'].'/logging.conf', "remote_logging_enabled=1\n");
         file_put_contents($target, "*.* @@old.example:514\n");
 
-        $this->applyRemoteLogging($fixture, $messages);
+        $this->pmssApplyRemoteLoggingFixture($fixture, $messages);
 
         $this->assertTrue(!file_exists($target), 'invalid config should remove stale forwarding file');
         $this->pmssAssertMessagesContain($messages, 'Remote logging enabled but invalid: Remote host not configured', 'expected invalid-config warning');
@@ -73,7 +73,7 @@ class RemoteLoggingTest extends TestCase
             '',
         ]));
 
-        $this->applyRemoteLogging($fixture, $messages);
+        $this->pmssApplyRemoteLoggingFixture($fixture, $messages);
 
         $this->pmssAssertFileContainsAllStrings($target, [
             '*.* @logserver.example.com:1514',
@@ -93,7 +93,7 @@ class RemoteLoggingTest extends TestCase
             '',
         ]));
 
-        $this->applyRemoteLogging($fixture, $messages);
+        $this->pmssApplyRemoteLoggingFixture($fixture, $messages);
 
         $this->assertTrue(!file_exists($fixture['target']), 'target config should not be created without a template');
         $this->pmssAssertMessagesContain($messages, 'Remote logging template missing', 'expected missing-template warning');
@@ -134,7 +134,7 @@ class RemoteLoggingTest extends TestCase
         file_put_contents($realTarget, "*.* @@old.example:514\n");
         symlink($realTarget, $target);
 
-        $this->applyRemoteLogging($fixture, $messages);
+        $this->pmssApplyRemoteLoggingFixture($fixture, $messages);
 
         $this->assertEquals("*.* @@old.example:514\n", file_get_contents($realTarget));
         $this->pmssAssertMessagesContain($messages, 'Unsafe remote logging config target', 'expected unsafe-target warning');
@@ -155,7 +155,7 @@ class RemoteLoggingTest extends TestCase
         symlink($realTargetDir, $targetDir);
 
         try {
-            $this->applyRemoteLogging($fixture, $messages);
+            $this->pmssApplyRemoteLoggingFixture($fixture, $messages);
 
             $this->assertEquals("*.* @@old.example:514\n", file_get_contents($realTarget));
             $this->pmssAssertMessagesContain($messages, 'Unsafe remote logging config directory', 'expected unsafe-directory warning');
@@ -167,13 +167,4 @@ class RemoteLoggingTest extends TestCase
         }
     }
 
-    private function applyRemoteLogging(array $fixture, array &$messages): void
-    {
-        $this->pmssWithEnv([
-            'PMSS_CONFIG_DIR' => $fixture['cfgDir'],
-            'PMSS_RSYSLOG_CONF_DIR' => $fixture['targetDir'],
-        ], function () use (&$messages): void {
-            \pmssApplyRemoteLogging($this->pmssMakeArrayLogger($messages));
-        });
-    }
 }

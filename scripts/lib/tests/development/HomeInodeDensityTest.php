@@ -6,6 +6,42 @@ require_once dirname(__DIR__, 2).'/update/filesystem.php';
 
 class HomeInodeDensityTest extends TestCase
 {
+    private function runHomeInodeDensityCheck(string $home, ?string $binDir = null): array
+    {
+        $messages = [];
+        $callback = function () use (&$messages, $home): void {
+            \pmssHomeInodeDensityCheck($this->pmssMakeArrayLogger($messages), $home, 262144);
+        };
+
+        if ($binDir === null) {
+            $callback();
+        } else {
+            $this->pmssWithPathPrefix($binDir, $callback);
+        }
+        return $messages;
+    }
+
+    private function runHomeInodeDensityCheckWithStat(array $statOutput, string $prefix): array
+    {
+        $home = $this->pmssMakeTempDir($prefix.'home-');
+        $binDir = $this->pmssMakeLineOutputStub('stat', $statOutput, $prefix.'bin-');
+        return $this->runHomeInodeDensityCheck($home, $binDir);
+    }
+
+    private function runUpdateStep2PreflightChecks(array $homePaths, array $lockPaths, array $cachePaths, float $minBytes = 1.0): array
+    {
+        $messages = [];
+        $result = \pmssUpdateStep2PreflightChecks(
+            $this->pmssMakeArrayLogger($messages),
+            $homePaths,
+            $lockPaths,
+            $cachePaths,
+            '',
+            $minBytes
+        );
+        return [$result, $messages];
+    }
+
     public function testParsesStatLineAndComputesBytesPerInode(): void
     {
         $stats = \pmssFilesystemStatLineParse('4096 1024 128');
@@ -23,26 +59,14 @@ class HomeInodeDensityTest extends TestCase
 
     public function testLogsOkWhenInodeDensityIsBelowThreshold(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-inode-ok-home-');
-        $binDir = $this->pmssMakeLineOutputStub('stat', ['4096 1024 128'], 'pmss-inode-ok-bin-');
-        $messages = [];
-
-        $this->pmssWithPathPrefix($binDir, function () use (&$messages, $home): void {
-            \pmssHomeInodeDensityCheck($this->pmssMakeArrayLogger($messages), $home, 262144);
-        });
+        $messages = $this->runHomeInodeDensityCheckWithStat(['4096 1024 128'], 'pmss-inode-ok-');
 
         $this->pmssAssertMessagesContain($messages, '[OK] Home inode density');
     }
 
     public function testLogsWarnWhenInodeDensityExceedsThreshold(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-inode-warn-home-');
-        $binDir = $this->pmssMakeLineOutputStub('stat', ['4096 1048576 1024'], 'pmss-inode-warn-bin-');
-        $messages = [];
-
-        $this->pmssWithPathPrefix($binDir, function () use (&$messages, $home): void {
-            \pmssHomeInodeDensityCheck($this->pmssMakeArrayLogger($messages), $home, 262144);
-        });
+        $messages = $this->runHomeInodeDensityCheckWithStat(['4096 1048576 1024'], 'pmss-inode-warn-');
 
         $this->pmssAssertMessagesContain($messages, '[WARN] Home inode density');
         $this->pmssAssertMessagesContain($messages, 'media-stack workloads may exhaust inodes');
@@ -52,20 +76,14 @@ class HomeInodeDensityTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-inode-fail-home-');
         $binDir = $this->pmssMakeExecutableStub('stat', "#!/bin/sh\nexit 9\n", 'pmss-inode-fail-bin-');
-        $messages = [];
-
-        $this->pmssWithPathPrefix($binDir, function () use (&$messages, $home): void {
-            \pmssHomeInodeDensityCheck($this->pmssMakeArrayLogger($messages), $home, 262144);
-        });
+        $messages = $this->runHomeInodeDensityCheck($home, $binDir);
 
         $this->pmssAssertMessagesContain($messages, 'stat rc=9');
     }
 
     public function testSkipsWhenHomePathIsMissing(): void
     {
-        $messages = [];
-
-        \pmssHomeInodeDensityCheck($this->pmssMakeArrayLogger($messages), '/tmp/pmss-missing-home-path', 262144);
+        $messages = $this->runHomeInodeDensityCheck('/tmp/pmss-missing-home-path');
 
         $this->pmssAssertMessagesContain($messages, 'path missing');
     }
@@ -73,19 +91,13 @@ class HomeInodeDensityTest extends TestCase
     public function testUpdateStep2PreflightKeepsFatalAndWarningOnlyContracts(): void
     {
         $home = $this->pmssMakeTempDir('pmss-preflight-disk-home-');
-        $messages = [];
-        $this->assertFalse(
-            \pmssUpdateStep2PreflightChecks($this->pmssMakeArrayLogger($messages), [$home], [], [], '', 1.0E20),
-            'Fatal disk-space failures should abort the caller'
-        );
+        [$result, $messages] = $this->runUpdateStep2PreflightChecks([$home], [], [], 1.0E20);
+        $this->assertFalse($result, 'Fatal disk-space failures should abort the caller');
         $this->assertStringContainsAllStrings(['Insufficient free space on', 'Preflight checks failed (fatal)'], implode("\n", $messages));
 
-        $messages = [];
         $missingBase = sys_get_temp_dir().'/pmss-preflight-missing-'.uniqid('', true);
-        $this->assertTrue(
-            \pmssUpdateStep2PreflightChecks($this->pmssMakeArrayLogger($messages), [], [$missingBase.'/dpkg.lock'], [$missingBase.'/apt-cache'], ''),
-            'Warning-only preflight failures should not abort update-step2'
-        );
+        [$result, $messages] = $this->runUpdateStep2PreflightChecks([], [$missingBase.'/dpkg.lock'], [$missingBase.'/apt-cache']);
+        $this->assertTrue($result, 'Warning-only preflight failures should not abort update-step2');
         $this->assertStringContainsAllStrings(['Unable to open dpkg lock file', 'APT cache path missing or not writable'], implode("\n", $messages));
     }
 }

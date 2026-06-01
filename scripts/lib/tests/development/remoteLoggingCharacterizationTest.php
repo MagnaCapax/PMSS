@@ -26,13 +26,7 @@ class RemoteLoggingCharacterizationTest extends TestCase
             '',
         ]));
 
-        $this->pmssWithEnv([
-            'PMSS_CONFIG_DIR' => $fixture['cfgDir'],
-            'PMSS_RSYSLOG_CONF_DIR' => $fixture['targetDir'],
-            'PMSS_DRY_RUN' => '1',
-        ], function () use (&$messages): void {
-            \pmssApplyRemoteLogging($this->pmssMakeArrayLogger($messages));
-        });
+        $this->pmssApplyRemoteLoggingFixture($fixture, $messages, ['PMSS_DRY_RUN' => '1']);
 
         $this->pmssAssertFileContainsAllStrings($fixture['target'], [
             '*.* @@logs.example.net:514',
@@ -59,13 +53,8 @@ class RemoteLoggingCharacterizationTest extends TestCase
             '',
         ]));
 
-        $this->pmssWithEnv([
-            'PMSS_CONFIG_DIR' => $fixture['cfgDir'],
-            'PMSS_RSYSLOG_CONF_DIR' => $fixture['targetDir'],
-            'PMSS_DRY_RUN' => '1',
-        ], function (): void {
-            \pmssApplyRemoteLogging();
-        });
+        $messages = [];
+        $this->pmssApplyRemoteLoggingFixture($fixture, $messages, ['PMSS_DRY_RUN' => '1']);
 
         $this->pmssAssertFileContainsAllStrings($fixture['target'], [
             '*.* @mirror.example.net:10514',

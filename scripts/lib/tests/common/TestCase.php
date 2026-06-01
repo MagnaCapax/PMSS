@@ -618,6 +618,17 @@ abstract class TestCase
         ];
     }
 
+    /** Apply a remote logging fixture under its hermetic config and target directories. */
+    protected function pmssApplyRemoteLoggingFixture(array $fixture, array &$messages, array $extraEnv = []): void
+    {
+        $this->pmssWithEnv(array_merge([
+            'PMSS_CONFIG_DIR' => $fixture['cfgDir'],
+            'PMSS_RSYSLOG_CONF_DIR' => $fixture['targetDir'],
+        ], $extraEnv), function () use (&$messages): void {
+            \pmssApplyRemoteLogging($this->pmssMakeArrayLogger($messages));
+        });
+    }
+
     /**
      * Prepare a hermetic systemd user-slice fixture with templates, policy, and env overrides.
      *

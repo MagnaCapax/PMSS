@@ -5,18 +5,39 @@ require_once dirname(__DIR__, 2).'/update/services/quota.php';
 
 class QuotaFstabOptionsTest extends TestCase
 {
+    private function makeQuotaFstab(string $content): string
+    {
+        ['fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-quota-', $content);
+        return $fstab;
+    }
+
+    private function ensureQuotaOptions(string $fstab): array
+    {
+        $messages = [];
+        \pmssEnsureQuotaOptions('/home', null, $this->pmssMakeArrayLogger($messages), $fstab);
+        return $messages;
+    }
+
+    private function warnUnexpectedQuotaFiles(string $dir): array
+    {
+        $messages = [];
+        \pmssWarnUnexpectedQuotaFiles($dir, $this->pmssMakeArrayLogger($messages));
+        return $messages;
+    }
+
+    private function removeStaleQuotaCheckFiles(string $path): array
+    {
+        $messages = [];
+        $removed = \pmssRemoveStaleQuotaCheckFiles($path, $this->pmssMakeArrayLogger($messages));
+        return [$removed, $messages];
+    }
+
     public function testNoChangeWhenQuotaOptionsPresent(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-quota-', 0700);
-        $fstab = $dir.'/fstab';
-
         $original = "UUID=abc /home ext4 defaults,noatime,usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1 0 0\n";
-        file_put_contents($fstab, $original);
+        $fstab = $this->makeQuotaFstab($original);
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
+        $messages = $this->ensureQuotaOptions($fstab);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
         $this->assertTrue($this->pmssMessagesContain($messages, 'Quota options already present'), 'expected skip log');
@@ -24,16 +45,10 @@ class QuotaFstabOptionsTest extends TestCase
 
     public function testAddsQuotaOptionsAndCreatesBackup(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-quota-', 0700);
-        $fstab = $dir.'/fstab';
-
         $original = "UUID=abc /home ext4 defaults,noatime 0 0\n";
-        file_put_contents($fstab, $original);
+        $fstab = $this->makeQuotaFstab($original);
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
+        $messages = $this->ensureQuotaOptions($fstab);
 
         $updated = $this->pmssAssertFileContainsAllStrings($fstab, [
             'usrjquota=aquota.user',
@@ -51,15 +66,9 @@ class QuotaFstabOptionsTest extends TestCase
 
     public function testDefaultsOnlyLineDropsDefaultsToken(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-quota-', 0700);
-        $fstab = $dir.'/fstab';
+        $fstab = $this->makeQuotaFstab("UUID=abc /home ext4 defaults 0 0\n");
 
-        file_put_contents($fstab, "UUID=abc /home ext4 defaults 0 0\n");
-
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
+        $this->ensureQuotaOptions($fstab);
 
         $updated = $this->pmssAssertFileContainsAllStrings($fstab, [
             'usrjquota=aquota.user',
@@ -71,16 +80,10 @@ class QuotaFstabOptionsTest extends TestCase
 
     public function testMountPointMissingDoesNotTouchFile(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-quota-', 0700);
-        $fstab = $dir.'/fstab';
-
         $original = "UUID=abc /srv ext4 defaults,noatime 0 0\n";
-        file_put_contents($fstab, $original);
+        $fstab = $this->makeQuotaFstab($original);
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
+        $messages = $this->ensureQuotaOptions($fstab);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
         $this->assertTrue($this->pmssMessagesContain($messages, 'not found'), 'expected not-found log');
@@ -88,16 +91,10 @@ class QuotaFstabOptionsTest extends TestCase
 
     public function testUnreadableFstabSkipsConfiguration(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-quota-', 0700);
-        $fstab = $dir.'/fstab';
-
-        file_put_contents($fstab, "UUID=abc /home ext4 defaults 0 0\n");
+        $fstab = $this->makeQuotaFstab("UUID=abc /home ext4 defaults 0 0\n");
         chmod($fstab, 0000);
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
+        $messages = $this->ensureQuotaOptions($fstab);
 
         $this->assertTrue($this->pmssMessagesContain($messages, 'not readable'), 'expected not-readable log');
         chmod($fstab, 0600);
@@ -109,10 +106,7 @@ class QuotaFstabOptionsTest extends TestCase
         file_put_contents($dir.'/aquota.user', 'x');
         file_put_contents($dir.'/aquota.group', 'x');
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        \pmssWarnUnexpectedQuotaFiles($dir, $logger);
+        $messages = $this->warnUnexpectedQuotaFiles($dir);
         $this->assertEquals([], $messages);
     }
 
@@ -125,10 +119,7 @@ class QuotaFstabOptionsTest extends TestCase
             throw new SkipTest('filesystem does not support control character filenames');
         }
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        \pmssWarnUnexpectedQuotaFiles($dir, $logger);
+        $messages = $this->warnUnexpectedQuotaFiles($dir);
         $this->assertTrue(count($messages) === 1, 'expected exactly one warning');
         $this->assertStringContainsString('aquota.gro\\003', $messages[0]);
     }
@@ -137,10 +128,7 @@ class QuotaFstabOptionsTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-quota-clean-', 0700);
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        $removed = \pmssRemoveStaleQuotaCheckFiles($dir, $logger);
+        [$removed, $messages] = $this->removeStaleQuotaCheckFiles($dir);
 
         $this->assertEquals(0, $removed);
         $this->assertTrue($this->pmssMessagesContain($messages, 'No stale files found'), 'expected no-stale log');
@@ -152,10 +140,7 @@ class QuotaFstabOptionsTest extends TestCase
         $stale = $dir.'/aquota.user.new';
         file_put_contents($stale, 'stale');
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        $removed = \pmssRemoveStaleQuotaCheckFiles($dir, $logger);
+        [$removed, $messages] = $this->removeStaleQuotaCheckFiles($dir);
 
         $this->assertEquals(1, $removed);
         $this->assertFalse(file_exists($stale), 'expected stale file removed');
@@ -168,10 +153,7 @@ class QuotaFstabOptionsTest extends TestCase
         $staleDir = $dir.'/aquota.user.new';
         mkdir($staleDir, 0700);
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        $removed = \pmssRemoveStaleQuotaCheckFiles($dir, $logger);
+        [$removed, $messages] = $this->removeStaleQuotaCheckFiles($dir);
 
         $this->assertEquals(0, $removed);
         $this->assertTrue(is_dir($staleDir), 'expected matched directory to remain');
@@ -180,10 +162,7 @@ class QuotaFstabOptionsTest extends TestCase
 
     public function testRemoveStaleQuotaCheckFilesRejectsRelativeMountPoint(): void
     {
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        $removed = \pmssRemoveStaleQuotaCheckFiles('relative/home', $logger);
+        [$removed, $messages] = $this->removeStaleQuotaCheckFiles('relative/home');
 
         $this->assertEquals(0, $removed);
         $this->assertTrue($this->pmssMessagesContain($messages, 'refusing unsafe quota cleanup path'), 'expected unsafe mount log');
@@ -197,10 +176,7 @@ class QuotaFstabOptionsTest extends TestCase
             throw new SkipTest('filesystem does not support symlinks');
         }
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        $removed = \pmssRemoveStaleQuotaCheckFiles($link, $logger);
+        [$removed, $messages] = $this->removeStaleQuotaCheckFiles($link);
 
         $this->assertEquals(0, $removed);
         $this->assertTrue($this->pmssMessagesContain($messages, 'refusing quota cleanup outside stable mount point'), 'expected symlink mount log');
@@ -214,10 +190,7 @@ class QuotaFstabOptionsTest extends TestCase
             throw new SkipTest('filesystem does not support control character filenames');
         }
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-
-        $removed = \pmssRemoveStaleQuotaCheckFiles($dir, $logger);
+        [$removed, $messages] = $this->removeStaleQuotaCheckFiles($dir);
 
         $this->assertEquals(1, $removed);
         $this->assertTrue(count($messages) === 1, 'expected one removal log');

@@ -7,10 +7,34 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class TempDiskBackedMountTest extends TestCase
 {
-    public function testSkipsBeforeDebian13(): void
+    private function configureTempDiskBacked(?int $distroVersion = null, ?string $pathPrefix = null): array
     {
         $messages = [];
-        \pmssConfigureTempDiskBackedMount($this->pmssMakeArrayLogger($messages), 12);
+        $callback = function () use (&$messages, $distroVersion): void {
+            \pmssConfigureTempDiskBackedMount($this->pmssMakeArrayLogger($messages), $distroVersion);
+        };
+
+        if ($pathPrefix === null) {
+            $callback();
+        } else {
+            $this->pmssWithPathPrefix($pathPrefix, $callback);
+        }
+        return $messages;
+    }
+
+    private function assertTmpMountMasked(int $distroVersion, string $prefix): void
+    {
+        $logPath = $this->pmssMakeTempPath($prefix, '.log');
+        $binDir = $this->pmssMakeInvocationLogStub('systemctl', $logPath, $prefix.'bin-');
+
+        $this->configureTempDiskBacked($distroVersion, $binDir);
+
+        $this->assertEquals("mask tmp.mount\n", (string) file_get_contents($logPath));
+    }
+
+    public function testSkipsBeforeDebian13(): void
+    {
+        $messages = $this->configureTempDiskBacked(12);
 
         $this->pmssAssertMessagesContain($messages, 'Leaving /tmp mount policy unchanged');
     }
@@ -20,10 +44,7 @@ class TempDiskBackedMountTest extends TestCase
         $logPath = $this->pmssMakeTempPath('pmss-tmp-mask-', '.log');
         $binDir = $this->pmssMakeInvocationLogStub('systemctl', $logPath, 'pmss-tmp-mask-bin-');
 
-        $messages = [];
-        $this->pmssWithPathPrefix($binDir, function () use (&$messages): void {
-            \pmssConfigureTempDiskBackedMount($this->pmssMakeArrayLogger($messages), 13);
-        });
+        $messages = $this->configureTempDiskBacked(13, $binDir);
 
         $this->assertEquals("mask tmp.mount\n", (string) file_get_contents($logPath));
         $this->pmssAssertMessagesContain($messages, 'Masked tmp.mount');
@@ -31,14 +52,7 @@ class TempDiskBackedMountTest extends TestCase
 
     public function testMasksTmpMountOnLaterDebianVersions(): void
     {
-        $logPath = $this->pmssMakeTempPath('pmss-tmp-mask-later-', '.log');
-        $binDir = $this->pmssMakeInvocationLogStub('systemctl', $logPath, 'pmss-tmp-mask-later-bin-');
-
-        $this->pmssWithPathPrefix($binDir, function (): void {
-            \pmssConfigureTempDiskBackedMount(null, 14);
-        });
-
-        $this->assertEquals("mask tmp.mount\n", (string) file_get_contents($logPath));
+        $this->assertTmpMountMasked(14, 'pmss-tmp-mask-later-');
     }
 
     public function testWarnsWhenSystemctlMissing(): void
@@ -46,7 +60,7 @@ class TempDiskBackedMountTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-tmp-missing-', 0700);
         $messages = [];
         $this->pmssWithEnv(['PATH' => $root], function () use (&$messages): void {
-            \pmssConfigureTempDiskBackedMount($this->pmssMakeArrayLogger($messages), 13);
+            $messages = $this->configureTempDiskBacked(13);
         });
 
         $this->pmssAssertMessagesContain($messages, 'systemctl unavailable');
@@ -58,9 +72,7 @@ class TempDiskBackedMountTest extends TestCase
         $binDir = $this->pmssMakeInvocationLogStub('systemctl', $logPath, 'pmss-tmp-detect-bin-');
 
         $this->pmssWithOsRelease(['ID' => 'debian', 'VERSION_ID' => '12', 'VERSION_CODENAME' => 'trixie'], function () use ($binDir): void {
-            $this->pmssWithPathPrefix($binDir, function (): void {
-                \pmssConfigureTempDiskBackedMount();
-            });
+            $this->configureTempDiskBacked(null, $binDir);
         });
 
         $this->assertEquals("mask tmp.mount\n", (string) file_get_contents($logPath));
