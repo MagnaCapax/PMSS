@@ -67,6 +67,31 @@ function pmssSystemStatsTopMemoryProcesses(?callable $runner = null): string
 }
 
 /**
+ * Render the three load averages from /proc/loadavg after boundary checks.
+ */
+function pmssSystemStatsLoadAverageFromRaw(?string $raw): string
+{
+    if ($raw === null) {
+        return 'na,na,na';
+    }
+
+    $parts = preg_split('/\s+/', trim($raw));
+    if (!is_array($parts) || count($parts) < 3) {
+        return 'na,na,na';
+    }
+
+    $load = array_slice($parts, 0, 3);
+    foreach ($load as $value) {
+        $value = (string) $value;
+        if (strlen($value) > 16 || preg_match('/^\d+(?:\.\d+)?$/', $value) !== 1) {
+            return 'na,na,na';
+        }
+    }
+
+    return implode(',', $load);
+}
+
+/**
  * Collect a single snapshot of system metrics for logging.
  *
  * @return array<string, string> Metric values formatted for log output.
@@ -183,14 +208,7 @@ function pmssSystemStatsCollect(): array
     }
     $diskBusy = number_format(min(100, $maxPct), 1, '.', '');
 
-    $load = ['na', 'na', 'na'];
-    if (
-        is_string($loadRaw = pmssReadRegularFileContents('/proc/loadavg'))
-        && is_array($parts = preg_split('/\s+/', trim($loadRaw)))
-        && count($parts) >= 3
-    ) {
-        $load = array_slice($parts, 0, 3);
-    }
+    $load = pmssSystemStatsLoadAverageFromRaw(pmssReadRegularFileContents('/proc/loadavg'));
 
     $meminfo = pmssProcMeminfoFieldsRead();
 
@@ -200,7 +218,7 @@ function pmssSystemStatsCollect(): array
     $topMem = pmssSystemStatsTopMemoryProcesses();
 
     return [
-        'load'       => implode(',', $load),
+        'load'       => $load,
         'cpuIowait'   => $cpuIowait,
         'memTotal'    => pmssSystemStatsKbToHuman($meminfo['MemTotal'] ?? 0),
         'memFree'     => pmssSystemStatsKbToHuman($meminfo['MemFree'] ?? 0),

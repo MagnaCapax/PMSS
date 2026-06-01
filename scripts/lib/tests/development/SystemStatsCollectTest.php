@@ -75,6 +75,30 @@ class SystemStatsCollectTest extends TestCase
         $this->assertTrue($elapsed < 0.9, 'Expected PMSS_TEST_MODE sampling window to stay short, got '.$elapsed.'s');
     }
 
+    public function testLoadAverageParserKeepsValidKernelFields(): void
+    {
+        $this->assertEquals(
+            '0.00,0.11,1.25',
+            \pmssSystemStatsLoadAverageFromRaw("0.00 0.11 1.25 3/212 12345\n")
+        );
+    }
+
+    public function testLoadAverageParserRejectsMalformedBoundaryInput(): void
+    {
+        $malformedRows = [
+            null,
+            '',
+            '0.01 0.02',
+            '0.01 stack 0.03',
+            '0.01 0.02 -0.03',
+            '0.01 0.02 12345678901234567',
+        ];
+
+        foreach ($malformedRows as $raw) {
+            $this->assertEquals('na,na,na', \pmssSystemStatsLoadAverageFromRaw($raw));
+        }
+    }
+
     public function testTopMemoryRowsRenderValidatedCompactValues(): void
     {
         $this->assertEquals(
