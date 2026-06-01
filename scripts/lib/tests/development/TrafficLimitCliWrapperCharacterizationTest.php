@@ -9,31 +9,26 @@ final class TrafficLimitCliWrapperCharacterizationTest extends TestCase
 {
     public function testUtilityWrapperKeepsUsageTextButDelegatesExecution(): void
     {
-        $path = 'scripts/util/userTrafficLimit.php';
-
-        $this->pmssAssertRepoFileContainsAllStrings(
-            $path,
-            [
-                "require_once __DIR__.'/../lib/runtime.php';",
-                "require_once __DIR__.'/../lib/user/trafficLimit.php';",
-                "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserTrafficLimitCli');",
-            ]
-        );
-        $this->pmssAssertRepoFileNotContainsStrings(
-            $path,
-            [
-                'pmssParseCliTokens($argv',
-                'pmssTrafficLimitWriteGiBFile($target, $trafficLimit)',
-                '  ./userTrafficLimit.php --user=<username> --limit=<GiB>',
-            ]
-        );
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/util/userTrafficLimit.php' => [
+                'required' => [
+                    "require_once __DIR__.'/../lib/runtime.php';",
+                    "require_once __DIR__.'/../lib/user/trafficLimit.php';",
+                    "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserTrafficLimitCli');",
+                ],
+                'forbidden' => [
+                    'pmssParseCliTokens($argv',
+                    'pmssTrafficLimitWriteGiBFile($target, $trafficLimit)',
+                    '  ./userTrafficLimit.php --user=<username> --limit=<GiB>',
+                ],
+            ],
+        ]);
     }
 
     public function testLibraryOwnsTheTrafficLimitCliImplementation(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/lib/user/trafficLimit.php',
-            [
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/user/trafficLimit.php' => ['required' => [
                 'function pmssUserGiBSettingCli(array $argv, array $spec): int',
                 'function pmssUserGiBSettingUsageText(',
                 'function pmssTrafficLimitCliTargetModes(string $userName, string $homeDir): array',
@@ -42,11 +37,10 @@ final class TrafficLimitCliWrapperCharacterizationTest extends TestCase
                 'function pmssUserTrafficLimitCli(array $argv, ?string $usage = null): int',
                 "'targetModesResolver' => 'pmssTrafficLimitCliTargetModes'",
                 'traffic limit set to %d GiB (monthly quota)',
-            ]
-        );
-        $this->pmssAssertRepoFileNotContainsStrings(
-            'scripts/lib/user/bonusTraffic.php',
-            ['pmssParseCliTokens($argv)', 'pmssTrafficLimitWriteGiBFile($bonusFile']
-        );
+            ]],
+            'scripts/lib/user/bonusTraffic.php' => [
+                'forbidden' => ['pmssParseCliTokens($argv)', 'pmssTrafficLimitWriteGiBFile($bonusFile'],
+            ],
+        ]);
     }
 }

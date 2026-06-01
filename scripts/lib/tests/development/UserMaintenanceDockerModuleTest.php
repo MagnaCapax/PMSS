@@ -27,8 +27,12 @@ class UserMaintenanceDockerModuleTest extends TestCase
             return 'function '.$function.'(';
         }, ['pmssEnsureLingerAndDocker', 'pmssEnsureRootlessDockerInstalled', 'pmssEnsureDockerDependencies']);
 
-        $this->pmssAssertRepoFileContainsString('scripts/lib/update/userMaintenance.php', "require_once __DIR__.'/users/docker.php';");
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/docker.php', $dockerFunctions);
-        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/update/userMaintenance.php', $dockerFunctions);
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/update/userMaintenance.php' => [
+                'required' => ["require_once __DIR__.'/users/docker.php';"],
+                'forbidden' => $dockerFunctions,
+            ],
+            'scripts/lib/update/users/docker.php' => ['required' => $dockerFunctions],
+        ]);
     }
 }

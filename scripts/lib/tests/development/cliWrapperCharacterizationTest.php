@@ -9,22 +9,20 @@ final class CliWrapperCharacterizationTest extends TestCase
 {
     public function testThinWrappersDelegateDirectlyToUtilScripts(): void
     {
-        $cases = [
-            'scripts/systemTest.php' => 'util/systemTest.php',
-            'scripts/userDocker.php' => 'util/userDocker.php',
-            'scripts/userResourcesList.php' => 'util/userResourcesList.php',
-        ];
-
-        foreach ($cases as $path => $target) {
-            $this->pmssAssertRepoFileContainsAllStrings(
-                $path,
-                [
-                    "require_once __DIR__.'/lib/runtime.php';",
-                    "pmssRequireCliEntrypointScript(__DIR__, '{$target}');",
-                ]
-            );
-            $this->pmssAssertRepoFileNotContainsStrings($path, ['$argv'], $path.' should stay a thin wrapper');
-        }
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/systemTest.php' => [
+                'required' => ["require_once __DIR__.'/lib/runtime.php';", "pmssRequireCliEntrypointScript(__DIR__, 'util/systemTest.php');"],
+                'forbidden' => ['$argv'],
+            ],
+            'scripts/userDocker.php' => [
+                'required' => ["require_once __DIR__.'/lib/runtime.php';", "pmssRequireCliEntrypointScript(__DIR__, 'util/userDocker.php');"],
+                'forbidden' => ['$argv'],
+            ],
+            'scripts/userResourcesList.php' => [
+                'required' => ["require_once __DIR__.'/lib/runtime.php';", "pmssRequireCliEntrypointScript(__DIR__, 'util/userResourcesList.php');"],
+                'forbidden' => ['$argv'],
+            ],
+        ]);
     }
 
     public function testUserDockerKeepsSharedStopAndSocketGuardsInline(): void
@@ -42,15 +40,30 @@ final class CliWrapperCharacterizationTest extends TestCase
 
     public function testArgvCliEntrypointsUseSharedRuntimeHelper(): void
     {
-        foreach (['scripts/showResources.php', 'scripts/showTraffic.php', 'scripts/util/dockerInstallLsio.php', 'scripts/util/portManager.php', 'scripts/util/userConfigCgroup.php', 'scripts/util/userConfigLighttpd.php'] as $path) {
-            $this->pmssAssertRepoFileContainsAllStrings($path, ['pmssRunCliEntrypointWithArgv(__FILE__,']);
-        }
+        $this->pmssAssertRepoFileContractCases(array_fill_keys(
+            [
+                'scripts/showResources.php',
+                'scripts/showTraffic.php',
+                'scripts/util/dockerInstallLsio.php',
+                'scripts/util/portManager.php',
+                'scripts/util/userConfigCgroup.php',
+                'scripts/util/userConfigLighttpd.php',
+            ],
+            ['required' => ['pmssRunCliEntrypointWithArgv(__FILE__,']]
+        ));
     }
 
     public function testLegacyCheckInstancesWrapperDelegatesInProcess(): void
     {
-        $path = 'scripts/cron/checkInstances.php';
-        $this->pmssAssertRepoFileContainsAllStrings($path, ["\$target = __DIR__.'/checkRtorrent.php';", 'missing; cannot run rTorrent watchdog', 'require $target;']);
-        $this->pmssAssertRepoFileNotContainsStrings($path, ['pmss-check'.'Instances.lock', 'passthru($cmd', 'array_shift($args)', 'escapeshellarg($target)']);
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/cron/checkInstances.php' => [
+                'required' => [
+                    "\$target = __DIR__.'/checkRtorrent.php';",
+                    'missing; cannot run rTorrent watchdog',
+                    'require $target;',
+                ],
+                'forbidden' => ['pmss-check'.'Instances.lock', 'passthru($cmd', 'array_shift($args)', 'escapeshellarg($target)'],
+            ],
+        ]);
     }
 }
