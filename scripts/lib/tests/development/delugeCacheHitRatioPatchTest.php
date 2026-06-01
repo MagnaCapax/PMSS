@@ -22,6 +22,31 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
         $this->assertEquals($this->patchedCacheRatioSource(), $content);
     }
 
+    public function testPatchEnsureVisitsUniqueGlobMatchesInOrder(): void
+    {
+        $first = $this->tempDir.'/alpha.py';
+        $second = $this->tempDir.'/beta.py';
+        file_put_contents($first, "alpha\n");
+        file_put_contents($second, "beta\n");
+
+        $visited = [];
+        $patch = static function (string $path, bool $dryRun, callable $log) use (&$visited, $second): bool {
+            $visited[] = [$path, $dryRun];
+            $log('visited '.$path);
+            return $path === $second;
+        };
+
+        $result = \pmssDelugePatchEnsure([
+            $this->tempDir.'/*.py',
+            $first,
+            $this->tempDir.'/missing-*',
+        ], $patch, true, $this->logger);
+
+        $this->assertTrue($result, 'Expected dispatcher to report when any unique target patched');
+        $this->assertEquals([[$first, true], [$second, true]], $visited, 'Patch candidates should be de-duplicated in glob order');
+        $this->assertEquals(['visited '.$first, 'visited '.$second], $this->logs, 'Dispatcher must pass the shared logger through');
+    }
+
     public function testPatchReturnsTrueWhenGuardAlreadyPresent(): void
     {
         $path = $this->tempDir.'/core.py';

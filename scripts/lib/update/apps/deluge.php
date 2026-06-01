@@ -219,6 +219,23 @@ function pmssPatchDelugeFindCallerSignature(string $path, bool $dryRun, callable
 }
 
 /**
+ * Apply one Deluge patch callback across unique filesystem candidates.
+ */
+function pmssDelugePatchEnsure(array $patterns, callable $patch, bool $dryRun, callable $log): bool
+{
+    $patched = false;
+    $seen = [];
+    foreach ($patterns as $pattern) {
+        foreach (glob($pattern) ?: [] as $path) {
+            if ($path === '' || isset($seen[$path])) continue;
+            $seen[$path] = true;
+            if ($patch($path, $dryRun, $log)) $patched = true;
+        }
+    }
+    return $patched;
+}
+
+/**
  * Keep Deluge command resolution anchored to distro package binaries.
  *
  * Legacy Debian 10 pip installs may leave direct binaries in /usr/local/bin.
@@ -347,37 +364,17 @@ if (!$isDebian10) {
     }
 }
 
-$delugeCandidates = static function (array $patterns): array {
-    $candidates = [];
-    foreach ($patterns as $pattern) {
-        foreach (glob($pattern) ?: [] as $match) {
-            if ($match !== '' && !in_array($match, $candidates, true)) {
-                $candidates[] = $match;
-            }
-        }
-    }
-    return $candidates;
-};
-
-$ensurePatch = static function (array $patterns, callable $patch, string $message) use ($delugeCandidates, $dryRun, $log): void {
-    $patched = false;
-    foreach ($delugeCandidates($patterns) as $path) {
-        if ($patch($path, $dryRun, $log)) {
-            $patched = true;
-        }
-    }
-    if ($patched) {
-        echo $message;
-    }
-};
-
-$ensurePatch([
+if (pmssDelugePatchEnsure([
     '/usr/lib/python3/dist-packages/deluge/core/core.py',
     '/usr/lib/python3*/dist-packages/deluge/core/core.py',
     '/usr/local/lib/python3*/dist-packages/deluge/core/core.py',
-], 'pmssPatchDelugeCacheHitRatio', "\t*** Deluge cache ratio guard ensured\n");
-$ensurePatch([
+], 'pmssPatchDelugeCacheHitRatio', $dryRun, $log)) {
+    echo "\t*** Deluge cache ratio guard ensured\n";
+}
+if (pmssDelugePatchEnsure([
     '/usr/lib/python3/dist-packages/deluge/log.py',
     '/usr/lib/python3*/dist-packages/deluge/log.py',
     '/usr/local/lib/python3*/dist-packages/deluge/log.py',
-], 'pmssPatchDelugeFindCallerSignature', "\t*** Deluge Python 3.11 findCaller compatibility ensured\n");
+], 'pmssPatchDelugeFindCallerSignature', $dryRun, $log)) {
+    echo "\t*** Deluge Python 3.11 findCaller compatibility ensured\n";
+}
