@@ -16,7 +16,7 @@ class QbittorrentTemplateDefaultsTest extends TestCase
     {
         $template = $this->loadTemplate();
 
-        $this->assertStringContainsAllStrings(["Session\\DiskCacheSize=128\n", "Session\\DiskCacheTTL=120\n", "Downloads\\DiskWriteCacheSize=128\n", "Downloads\\DiskWriteCacheTTL=120\n", "Session\\Preallocation=false\n", "Downloads\\PreAllocation=false\n"], $template);
+        $this->assertStringContainsAllStrings(["Session\\DiskCacheSize=128\n", "Session\\DiskCacheTTL=120\n", "Downloads\\DiskWriteCacheSize=128\n", "Downloads\\DiskWriteCacheTTL=120\n", "Session\\Preallocation=true\n", "Downloads\\PreAllocation=true\n"], $template);
     }
 
     public function testTemplateUsesPosixDiskIoAndLimitedAsyncThreads(): void
