@@ -25,7 +25,7 @@ class CronInlineCharacterizationTest extends TestCase
         foreach ([
             [
                 'scripts/cron/checkQbittorrentInstances.php',
-                ['pmssUserWatchdogRunService(', 'pmssUserWatchdogRestartProcessesIf(', 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox stopped due to suspension'", "'qbittorrent-nox start requested'"],
+                ['pmssUserWatchdogRunService(', 'pmssUserWatchdogRestartProcessesIf(', 'pmssQbittorrentApplyManagedConfig(', 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox stopped due to suspension'", "'qbittorrent-nox start requested'"],
             ],
             [
                 'scripts/cron/checkRcloneInstances.php',
