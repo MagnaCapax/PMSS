@@ -70,9 +70,11 @@ MAILTO=""
 @reboot root    sleep 25; /scripts/cron/systemdServicesGuard.php >> /var/log/pmss/systemdServicesGuard.log 2>&1
 @reboot root    sleep 30; /scripts/cron/cgroupPolicyRefresh.php >> /var/log/pmss/cgroupPolicyRefresh.log 2>&1
 @reboot root    sleep 35; /scripts/cron/cgroupBfqWeightApply.php >> /var/log/pmss/cgroupBfqWeightApply.log 2>&1
+@reboot root    sleep 38; /scripts/cron/cgroupIopsLimitApply.php >> /var/log/pmss/cgroupIopsLimitApply.log 2>&1
 0 */2 * * *   root    /scripts/cron/cgroupRootCheck.php >> /var/log/pmss/cgroupRootCheck.log 2>&1
 20 */2 * * *   root    /scripts/cron/cgroupPolicyRefresh.php >> /var/log/pmss/cgroupPolicyRefresh.log 2>&1
 */5 * * * *   root    sleep 40; /scripts/cron/cgroupBfqWeightApply.php >> /var/log/pmss/cgroupBfqWeightApply.log 2>&1
+*/5 * * * *   root    sleep 50; /scripts/cron/cgroupIopsLimitApply.php >> /var/log/pmss/cgroupIopsLimitApply.log 2>&1
 
 # MD array integrity check — quarterly, staggered by hostname
 # Replaces Debian default /etc/cron.d/mdadm (monthly, all servers at 00:57 first Sunday)
