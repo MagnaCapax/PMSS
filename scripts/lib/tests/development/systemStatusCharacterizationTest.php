@@ -330,10 +330,9 @@ final class SystemStatusCharacterizationTest extends TestCase
             .'));'
         );
 
-        $this->assertEquals(0, $command['result']['rc']);
+        $this->pmssAssertCommandSucceedsWithoutStderr($command['result'], $command['stderrPath']);
         $this->assertStringContainsString('"results"', $command['result']['output']);
         $this->assertStringContainsString('\\ufffd', $command['result']['output']);
-        $this->assertEquals('', (string) file_get_contents($command['stderrPath']));
     }
 
     public function testStatusEmitReturnsErrorWhenJsonEncodingFails(): void
@@ -362,10 +361,9 @@ final class SystemStatusCharacterizationTest extends TestCase
             '$checks = '.var_export($checks, true).';'
             .'exit(pmssStatusEmit($checks, "PMSS Status", false, [], null, 0, false, 8, false));'
         );
-        $this->assertEquals(0, $command['result']['rc']);
+        $this->pmssAssertCommandSucceedsWithoutStderr($command['result'], $command['stderrPath']);
         $this->assertStringContainsString('PMSS Status (', $command['result']['output']);
         $this->assertStringContainsString('Summary: 1 OK, 1 WARN, 1 ERR', $command['result']['output']);
-        $this->assertEquals('', (string) file_get_contents($command['stderrPath']));
     }
 
     public function testStatusEmitTextDefaultsMissingSummaryKeysToZero(): void
@@ -383,9 +381,8 @@ final class SystemStatusCharacterizationTest extends TestCase
             .'false'
             .'));'
         );
-        $this->assertEquals(0, $command['result']['rc']);
+        $this->pmssAssertCommandSucceedsWithoutStderr($command['result'], $command['stderrPath']);
         $this->assertStringContainsString('Summary: 1 OK, 0 WARN, 0 ERR', $command['result']['output']);
-        $this->assertEquals('', (string) file_get_contents($command['stderrPath']));
     }
 
     public function testSystemStatusChecksStayStableWithHermeticInputs(): void

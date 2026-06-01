@@ -20,9 +20,7 @@ class StorageBenchSecurityTest extends TestCase
             $arguments
         );
 
-        $this->assertEquals(1, $run['result']['rc']);
-        $this->assertEquals('', $run['result']['output']);
-        $this->assertEquals($expectedMessage, (string) @file_get_contents($run['stderrPath']));
+        $this->pmssAssertCommandFailsToStderr($run['result'], $run['stderrPath'], $expectedMessage);
     }
 
     public function testPathTraversalInJsonPathIsRead(): void
@@ -499,9 +497,7 @@ SH,
             $this->pmssPathPrefixedEnvironment($stubDir, ['PMSS_TEST_INVOCATION_LOG' => $invocations])
         );
 
-        $this->assertSame(1, $run['result']['rc']);
-        $this->assertSame('', $run['result']['output']);
-        $this->assertSame("Error: failed to read free space.\n", (string) @file_get_contents($run['stderrPath']));
+        $this->pmssAssertCommandFailsToStderr($run['result'], $run['stderrPath'], "Error: failed to read free space.\n");
         $this->assertStringNotContainsString('FALLOCATE ', (string) @file_get_contents($invocations));
         $this->assertStringNotContainsString('FIO ', (string) @file_get_contents($invocations));
     }

@@ -1112,6 +1112,12 @@ abstract class TestCase
         $this->assertEquals($expectedMessage, (string) @file_get_contents($stderrPath));
     }
 
+    protected function pmssAssertCommandSucceedsWithoutStderr(array $result, string $stderrPath): void
+    {
+        $this->assertEquals(0, $result['rc']);
+        $this->assertEquals('', (string) @file_get_contents($stderrPath));
+    }
+
     protected function pmssAssertEnvResolvedPath(string $envKey, ?string $envValue, string $expected, callable $resolver): void
     {
         $this->pmssWithEnv([$envKey => $envValue], function () use ($expected, $resolver): void {
