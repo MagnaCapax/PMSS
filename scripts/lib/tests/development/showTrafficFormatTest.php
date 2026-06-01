@@ -32,7 +32,7 @@ class ShowTrafficFormatTest extends TestCase
 
     public function testShowTrafficUsesSharedManagedUsersParser(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/showTraffic.php', ["pmssListManagedUsersResult(__DIR__.'/listUsers.php')", 'pmssShowTrafficRawCounters($data)', "array_map('pmssTrafficFormatAmount', \$rawCounters)"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/showTraffic.php', ["pmssListManagedUsersResult(__DIR__.'/listUsers.php')", 'pmssShowTrafficRawCounters($data)', "pmssShowTrafficDisplayAmounts(\$row['rawMiB'])"]);
         $this->pmssAssertRepoFileNotContainsString('scripts/showTraffic.php', "exec(escapeshellarg(__DIR__.'/listUsers.php')");
     }
 
@@ -84,17 +84,23 @@ class ShowTrafficFormatTest extends TestCase
         }
     }
 
+    public function testDisplayAmountsDeriveOutputFromCanonicalRawCounters(): void
+    {
+        $rawMiB = ['month' => 1025.0, 'week' => 512.0, 'day' => 2.0, 'hour' => 1.0, '15min' => 0.5];
+        $this->assertEquals(['month' => '1GiB', 'week' => '512MiB', 'day' => '2MiB'], \pmssShowTrafficDisplayAmounts($rawMiB));
+    }
+
     public function testJsonPayloadBuilderMatchesSnapshot(): void
     {
         $row = [
-            'user' => 'alice', 'display' => ['month' => '1GiB', 'week' => '2MiB', 'day' => '3MiB'], 'rates' => ['week' => 1.25, 'day' => 2.5, 'hour' => 3.75, '15min' => 4.0],
+            'user' => 'alice', 'rates' => ['week' => 1.25, 'day' => 2.5, 'hour' => 3.75, '15min' => 4.0],
             'inboundMonthMiB' => 256.5, 'inboundRatio' => 0.25, 'limitMiB' => 2048.0, 'pctUsed' => 87.654, 'overLimit' => false, 'nearLimit' => true,
             'rawMiB' => ['month' => 1024.0, 'week' => 2.0, 'day' => 3.0, 'hour' => 4.0, '15min' => 5.0],
         ];
 
         $this->assertEquals([
             'users' => [[
-                'user' => 'alice', 'display' => ['month' => '1GiB', 'week' => '2MiB', 'day' => '3MiB'], 'rates' => ['week' => 1.25, 'day' => 2.5, 'hour' => 3.75, '15min' => 4.0],
+                'user' => 'alice', 'display' => ['month' => '1024MiB', 'week' => '2MiB', 'day' => '3MiB'], 'rates' => ['week' => 1.25, 'day' => 2.5, 'hour' => 3.75, '15min' => 4.0],
                 'inboundMonthMiB' => 256.5, 'inboundOutboundRatio' => 0.25, 'limitMiB' => 2048.0, 'pctUsed' => 87.65, 'overLimit' => false, 'nearLimit' => true,
                 'rawMiB' => ['month' => 1024.0, 'week' => 2.0, 'day' => 3.0, 'hour' => 4.0, '15min' => 5.0],
             ]],

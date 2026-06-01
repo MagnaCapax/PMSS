@@ -132,8 +132,6 @@ function pmssShowTrafficMain(array $argv): int
             $dataMonthTotalLocal += $rawCounters['month'];
         }
 
-        $dataDisplay = array_map('pmssTrafficFormatAmount', $rawCounters);
-
         $ingressPath = pmssTrafficDataPaths($baseUser)[pmssTrafficDataPathKey($isLocalnet, 'ingress')];
         $inboundMonth = null;
         $ingressData = pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser);
@@ -144,17 +142,12 @@ function pmssShowTrafficMain(array $argv): int
             $inboundRatio = round($inboundMonth / $rawCounters['month'], 2);
         }
 
-        $inboundDisplay = $inboundMonth !== null ? pmssTrafficFormatAmount($inboundMonth) : '-';
-        $ratioDisplay = $inboundRatio !== null ? sprintf('%.2f', $inboundRatio) : 'n/a';
-
         $dataRates = [
             'week' => round(($rawCounters['week'] / (7 * 24 * 60 * 60)), 2),
             'day' => round(($rawCounters['day'] / (24 * 60 * 60)), 2),
             'hour' => round(($rawCounters['hour'] / (60 * 60)), 2),
             '15min' => round(($rawCounters['15min'] / (15 * 60)), 2),
         ];
-
-        $displayUser = $isLocalnet ? "{$baseUser} (L)" : $baseUser;
 
         if (!array_key_exists($baseUser, $limitCache)) {
             $limitPath = pmssTrafficLimitPath($baseUser);
@@ -182,18 +175,9 @@ function pmssShowTrafficMain(array $argv): int
 
         $rows[] = [
             'user' => $thisUser,
-            'displayUser' => $displayUser,
-            'monthMiB' => $rawCounters['month'],
-            'display' => [
-                'month' => $dataDisplay['month'] ?? null,
-                'week'  => $dataDisplay['week'] ?? null,
-                'day'   => $dataDisplay['day'] ?? null,
-            ],
             'rates' => $dataRates,
             'inboundMonthMiB' => $inboundMonth,
-            'inboundDisplay' => $inboundDisplay,
             'inboundRatio' => $inboundRatio,
-            'ratioDisplay' => $ratioDisplay,
             'limitMiB' => $limitMiB,
             'pctUsed' => $pctUsed,
             'overLimit' => $overLimit,
@@ -208,7 +192,7 @@ function pmssShowTrafficMain(array $argv): int
         usort($rows, static function (array $a, array $b) use ($sort): int {
             switch ($sort) {
                 case 'month':
-                    $cmp = $b['monthMiB'] <=> $a['monthMiB'];
+                    $cmp = $b['rawMiB']['month'] <=> $a['rawMiB']['month'];
                     break;
                 case 'pct':
                     $aPct = ($a['pctUsed'] === null) ? -1 : $a['pctUsed'];
@@ -259,7 +243,7 @@ function pmssShowTrafficJsonRow(array $row): array
 {
     return [
         'user' => $row['user'],
-        'display' => ['month' => $row['display']['month'], 'week' => $row['display']['week'], 'day' => $row['display']['day']],
+        'display' => pmssShowTrafficDisplayAmounts($row['rawMiB']),
         'rates' => $row['rates'],
         'inboundMonthMiB' => $row['inboundMonthMiB'],
         'inboundOutboundRatio' => $row['inboundRatio'],
@@ -273,16 +257,26 @@ function pmssShowTrafficJsonRow(array $row): array
 
 function pmssShowTrafficPrintRow(array $row, bool $extended, bool $useColor): void
 {
-    $label = "{$row['displayUser']}:";
+    $isLocalnet = pmssTrafficUserKeyIsLocalnet((string) $row['user']);
+    $baseUser = pmssTrafficUserKeyBaseUser((string) $row['user']);
+    $label = ($isLocalnet ? "{$baseUser} (L)" : $baseUser).':';
+    $display = pmssShowTrafficDisplayAmounts($row['rawMiB']);
+    $inboundText = $row['inboundMonthMiB'] !== null ? pmssTrafficFormatAmount((float) $row['inboundMonthMiB']) : '-';
+    $ratioText = $row['inboundRatio'] !== null ? sprintf('%.2f', (float) $row['inboundRatio']) : 'n/a';
     if ($extended) {
         [$limitDisplay, $pctDisplay, $statusDisplay, $barDisplay] = pmssShowTrafficLimitDisplays($row, $useColor);
         $format = "%-14s %9s / %9s %4s %s %s IN: %9s R: %5s  Datarates: %10s / %10s / %10s / %10s\n";
-        $values = array_merge([$label, (string) $row['display']['month'], $limitDisplay, $pctDisplay, $statusDisplay, $barDisplay, $row['inboundDisplay'], $row['ratioDisplay']], pmssShowTrafficRateColumns($row['rates'], true));
+        $values = array_merge([$label, (string) $display['month'], $limitDisplay, $pctDisplay, $statusDisplay, $barDisplay, $inboundText, $ratioText], pmssShowTrafficRateColumns($row['rates'], true));
     } else {
         $format = "%-14s %9s / %9s / %9s  IN: %9s R: %5s  Datarates: %5s / %5s / %5s / %5s\n";
-        $values = array_merge([$label, (string) ($row['display']['month'] ?? ''), (string) ($row['display']['week'] ?? ''), (string) ($row['display']['day'] ?? ''), $row['inboundDisplay'], $row['ratioDisplay']], pmssShowTrafficRateColumns($row['rates'], false));
+        $values = array_merge([$label, (string) $display['month'], (string) $display['week'], (string) $display['day'], $inboundText, $ratioText], pmssShowTrafficRateColumns($row['rates'], false));
     }
     printf($format, ...$values);
+}
+
+function pmssShowTrafficDisplayAmounts(array $rawMiB): array
+{
+    return array_map('pmssTrafficFormatAmount', array_intersect_key($rawMiB, ['month' => true, 'week' => true, 'day' => true]));
 }
 
 function pmssShowTrafficRateColumns(array $rates, bool $withUnits): array
