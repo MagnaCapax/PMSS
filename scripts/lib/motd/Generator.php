@@ -25,8 +25,8 @@ class Motd
      */
     public static function motdGenerate(): void
     {
-        $tplPath = getenv('PMSS_MOTD_TEMPLATE_PATH') ?: '/etc/seedbox/config/template.motd';
-        $outPath = getenv('PMSS_MOTD_OUTPUT_PATH') ?: '/etc/motd';
+        $tplPath = pmssResolvePathFromEnv('PMSS_MOTD_TEMPLATE_PATH', '/etc/seedbox/config/template.motd');
+        $outPath = pmssResolvePathFromEnv('PMSS_MOTD_OUTPUT_PATH', '/etc/motd');
         $tpl = @file_get_contents($tplPath);
         if (!is_string($tpl)) {
             return;
@@ -264,7 +264,7 @@ class Motd
 
     private static function storageWarnings(): string
     {
-        $path = getenv('PMSS_HEALTH_LOG_PATH') ?: '/var/log/pmss/storage-health.jsonl';
+        $path = pmssResolvePathFromEnv('PMSS_HEALTH_LOG_PATH', '/var/log/pmss/storage-health.jsonl');
         if (!is_file($path)) return '';
         $raidWarn = null; $nvmeCrit=[]; $lastSmart=[]; $raidPerf=null;
         pmssJsonLineFileEach($path, static function (array $j) use (&$raidWarn, &$nvmeCrit, &$lastSmart, &$raidPerf): void {

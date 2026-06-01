@@ -100,7 +100,7 @@ function pmssKernelHardeningBuiltIn(array $spec): bool
 
 function pmssKernelHardeningLoadedModules(array $modules): ?array
 {
-    $snapshotPath = getenv('PMSS_LSMOD_OUTPUT_PATH');
+    $snapshotPath = pmssResolvePathFromEnv('PMSS_LSMOD_OUTPUT_PATH', '');
     $snapshot = is_string($snapshotPath) && $snapshotPath !== '' ? @file_get_contents($snapshotPath) : @shell_exec('lsmod 2>/dev/null');
     if (!is_string($snapshot)) return null;
 

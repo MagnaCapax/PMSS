@@ -10,6 +10,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../../pathSafety.php';
+
 /**
  * Provisioning fatal-path tests load this helper in isolation, so defer the
  * heavier runtime bootstrap until a caller needs runtime-specific functions.
@@ -24,11 +26,7 @@ function pmssAddUserRuntimeBootstrap(): void
  */
 function pmssAddUserProvisioningLogPath(): string
 {
-    $default = '/var/log/pmss/addUser.log';
-    $value = getenv('PMSS_ADDUSER_LOG_PATH');
-    $value = ($value === false || $value === '') ? $default : $value;
-    $value = rtrim($value, '/');
-    return $value !== '' ? $value : $default;
+    return pmssResolvePathFromEnv('PMSS_ADDUSER_LOG_PATH', '/var/log/pmss/addUser.log');
 }
 
 /**

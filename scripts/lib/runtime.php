@@ -21,18 +21,6 @@ const PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT = 5;
 const PMSS_TIMEOUT_FIRE_LOG_DEFAULT = '/var/log/pmss-timeout-fires.jsonl';
 const PMSS_BLOCK_DATA_DEVICE_NAME_PATTERN = '/^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme\d+n\d+|mmcblk\d+)$/';
 
-    // Resolve a filesystem path from an environment variable with a default.
-    function pmssResolvePathFromEnv(string $envKey, string $default): string
-    {
-        $value = getenv($envKey);
-        $value = ($value === false || $value === '') ? $default : $value;
-        $value = rtrim($value, '/');
-        return $value !== '' ? $value : rtrim($default, '/');
-    }
-    // Normalize directory paths while preserving `/` and intentional empty overrides.
-    function pmssDirPathNormalize(string $path): string { $trimmed = rtrim($path, '/'); return $trimmed !== '' ? $trimmed : ($path !== '' ? '/' : ''); }
-    // Resolve a directory path from an explicit override or env-backed default.
-    function pmssDirPathResolve(?string $override, string $envKey, string $default): string { return pmssDirPathNormalize((string) ($override !== null ? $override : pmssResolvePathFromEnv($envKey, $default))); }
 // Build the standard month/week/day/hour/15min thresholds used by PMSS stats processors.
 function pmssStatsCompareTimesBuild(?int $now = null): array { $now = $now ?? time(); return ['month' => $now - (30 * 24 * 60 * 60), 'week' => $now - (7 * 24 * 60 * 60), 'day' => $now - (24 * 60 * 60), 'hour' => $now - (60 * 60), '15min' => $now - (15 * 60)]; }
     // Accept only bare binary names before crossing the shell boundary.

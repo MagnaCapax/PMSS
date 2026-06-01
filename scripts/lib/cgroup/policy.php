@@ -18,8 +18,7 @@ const PMSS_BFQ_FALLBACK_COEFFICIENT = 0.690533966002; // 250 / sqrt(131072).
 function pmssCgroupPolicyLoad(?string $configDir = null): array
 {
     if ($configDir === null) {
-        $envDir = getenv('PMSS_CONFIG_DIR');
-        $configDir = ($envDir === false || $envDir === '') ? '/etc/seedbox/config' : $envDir;
+        $configDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
     }
     $cfgDir = rtrim($configDir, '/');
     $policyFile = ($cfgDir !== '' ? $cfgDir : '/etc/seedbox/config').'/cgroup.policy.php';

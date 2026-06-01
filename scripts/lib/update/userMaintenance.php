@@ -30,8 +30,7 @@ require_once __DIR__.'/users/docker.php';
     /** Marker path for a username when the boundary inputs are safe. */
     function pmssUserRefreshMarkerPath(string $user): string
     {
-        $override = (string) getenv('PMSS_USER_REFRESH_STATE_DIR');
-        $dir = $override !== '' ? $override : '/var/lib/pmss/user-refresh';
+        $dir = pmssResolvePathFromEnv('PMSS_USER_REFRESH_STATE_DIR', '/var/lib/pmss/user-refresh');
         if (!pmssValidateUsername($user) || !pmssPathTargetIsSafe($dir, true, false, false)) {
             return '';
         }

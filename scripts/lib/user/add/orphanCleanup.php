@@ -33,7 +33,7 @@ function pmssAddUserLatestProvisionSummary(string $userName): ?array
 {
     $logPath = function_exists('pmssAddUserProvisioningLogPath')
         ? pmssAddUserProvisioningLogPath()
-        : ((string) getenv('PMSS_ADDUSER_LOG_PATH') ?: '/var/log/pmss/addUser.log');
+        : pmssResolvePathFromEnv('PMSS_ADDUSER_LOG_PATH', '/var/log/pmss/addUser.log');
     if (!is_file($logPath) || is_link($logPath)) {
         return null;
     }

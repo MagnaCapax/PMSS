@@ -56,8 +56,7 @@ function pmssUpdateStep2HandleClassifiedFailure(string $description, string $cla
  */
 function pmssUpdateIncompleteUserMaintenancePath(): string
 {
-    $override = (string) getenv('PMSS_INCOMPLETE_USER_MAINTENANCE_PATH');
-    return $override !== '' ? $override : '/var/lib/pmss/update-incomplete-users.json';
+    return pmssResolvePathFromEnv('PMSS_INCOMPLETE_USER_MAINTENANCE_PATH', '/var/lib/pmss/update-incomplete-users.json');
 }
 
 /**

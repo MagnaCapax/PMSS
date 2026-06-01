@@ -8,6 +8,20 @@
  * @license GPL-3.0-only
  */
 
+/** Resolve a filesystem path from an environment variable with a default. */
+function pmssResolvePathFromEnv(string $envKey, string $default): string
+{
+    $value = getenv($envKey);
+    $value = ($value === false || $value === '') ? $default : $value;
+    $value = rtrim($value, '/');
+    return $value !== '' ? $value : rtrim($default, '/');
+}
+
+/** Normalize directory paths while preserving `/` and intentional empty overrides. */
+function pmssDirPathNormalize(string $path): string { $trimmed = rtrim($path, '/'); return $trimmed !== '' ? $trimmed : ($path !== '' ? '/' : ''); }
+/** Resolve a directory path from an explicit override or env-backed default. */
+function pmssDirPathResolve(?string $override, string $envKey, string $default): string { return pmssDirPathNormalize((string) ($override !== null ? $override : pmssResolvePathFromEnv($envKey, $default))); }
+
 /**
  * FHS-standard root-owned symlinks that are safe to traverse.
  *

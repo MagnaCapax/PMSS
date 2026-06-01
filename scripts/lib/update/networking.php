@@ -24,18 +24,12 @@ require_once __DIR__.'/managedPath.php';
 function pmssEnsureNetworkTemplate(?callable $logger = null): void
 {
     $log  = $logger ?: 'logMessage';
-    $path = getenv('PMSS_NETWORK_CONFIG');
-    $path = is_string($path) && trim($path) !== ''
-        ? rtrim($path, '/')
-        : '/etc/seedbox/config/network';
+    $path = pmssResolvePathFromEnv('PMSS_NETWORK_CONFIG', '/etc/seedbox/config/network');
     if (file_exists($path)) {
         return;
     }
 
-    $configDir = getenv('PMSS_CONFIG_DIR');
-    $configDir = is_string($configDir) && trim($configDir) !== ''
-        ? rtrim($configDir, '/')
-        : '/etc/seedbox/config';
+    $configDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
     $templatePath = $configDir.'/template.network';
     $template = @file_get_contents($templatePath);
     if (!is_string($template) || trim($template) === '') {
