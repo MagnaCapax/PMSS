@@ -167,14 +167,34 @@ function pmssUserConfigCliBuildCgroupApplyArgs(string $username, int $memoryMiB,
 {
     $args = ['/scripts/util/userConfigCgroup.php', $username, '--apply', '--memory-high='.(string) $memoryMiB];
     foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        if (!empty($spec['cgroupFlag']) && !empty($user[$key])) {
+        if (empty($spec['cgroupFlag'])) {
+            continue;
+        }
+
+        if (!empty($user[$key])) {
             $args[] = $spec['cgroupFlag'].$user[$key];
+            continue;
+        }
+
+        if (pmssUserConfigCliCgroupIoClearRequested($user, $key)) {
+            $args[] = $spec['cgroupFlag'].'/home:max';
         }
     }
     if (isset($user['cpuQuotaPercent']) && $user['cpuQuotaPercent'] !== '') {
         $args[] = '--cpu-quota-percent='.(string) $user['cpuQuotaPercent'];
     }
     return $args;
+}
+
+/** Return true when an explicit stored IOPS zero/blank should clear a stale systemd throttle. */
+function pmssUserConfigCliCgroupIoClearRequested(array $user, string $key): bool
+{
+    if (!in_array($key, ['IOReadIOPS', 'IOWriteIOPS'], true) || !array_key_exists($key, $user) || $user[$key] === null || !is_scalar($user[$key])) {
+        return false;
+    }
+
+    $value = trim((string) $user[$key]);
+    return $value === '' || $value === '0';
 }
 
 /** @return array<int,string>|null Build cgroup apply args from a stored payload. */

@@ -179,6 +179,23 @@ class userConfigCliCharacterizationTest extends TestCase
         ], $args);
     }
 
+    public function testCgroupApplyArgsClearExplicitZeroIopsCaps(): void
+    {
+        $args = \pmssUserConfigCliBuildCgroupApplyArgs('alice', 1024, [
+            'IOReadIOPS' => '0',
+            'IOWriteIOPS' => 0,
+        ]);
+
+        $this->assertSame([
+            '/scripts/util/userConfigCgroup.php',
+            'alice',
+            '--apply',
+            '--memory-high=1024',
+            '--io-read-iops=/home:max',
+            '--io-write-iops=/home:max',
+        ], $args);
+    }
+
     public function testStoredCgroupApplyArgsRequireMemoryBaseline(): void
     {
         $this->assertSame(null, \pmssUserConfigCliBuildStoredCgroupApplyArgs('alice', ['IOWeight' => 300]));

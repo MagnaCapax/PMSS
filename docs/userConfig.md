@@ -19,8 +19,8 @@ Usage
 - `IOWEIGHT` — optional systemd `IOWeight`; systemd expects `1-10000` and PMSS auto-derives a value from RAM when omitted.
 - `IO_READ_BW` — optional read bandwidth cap in `/dev/DEVICE:RATE` form.
 - `IO_WRITE_BW` — optional write bandwidth cap in `/dev/DEVICE:RATE` form.
-- `IO_READ_IOPS` — optional read IOPS cap in `/dev/DEVICE:IOPS` form.
-- `IO_WRITE_IOPS` — optional write IOPS cap in `/dev/DEVICE:IOPS` form.
+- `IO_READ_IOPS` — optional read IOPS cap in `/dev/DEVICE:IOPS` form; `0` clears an existing `/home` IOPS cap.
+- `IO_WRITE_IOPS` — optional write IOPS cap in `/dev/DEVICE:IOPS` form; `0` clears an existing `/home` IOPS cap.
 - `CPU_QUOTA_PERCENT` — optional CPU quota percentage; use `infinity` to remove the limit. If omitted, the current slice policy stays unchanged.
 - `TRAFFIC_CAP_MBIT` — optional traffic shaper ceiling in Mbit/s; `0` disables shaping.
 - `IO_LATENCY_MS` — optional `IODeviceLatencyTargetSec` target in milliseconds; defaults to the `/home` backing device.
@@ -35,8 +35,8 @@ Usage
 - `--io-weight=WEIGHT` — systemd `IOWeight`; systemd expects `1-10000` and PMSS auto-derives a value from RAM when omitted.
 - `--io-read-bw=/dev/DEVICE:RATE` — read bandwidth cap in `/dev/DEVICE:RATE` form.
 - `--io-write-bw=/dev/DEVICE:RATE` — write bandwidth cap in `/dev/DEVICE:RATE` form.
-- `--io-read-iops=/dev/DEVICE:IOPS` — read IOPS cap in `/dev/DEVICE:IOPS` form.
-- `--io-write-iops=/dev/DEVICE:IOPS` — write IOPS cap in `/dev/DEVICE:IOPS` form.
+- `--io-read-iops=/dev/DEVICE:IOPS` — read IOPS cap in `/dev/DEVICE:IOPS` form; `0` clears an existing `/home` IOPS cap.
+- `--io-write-iops=/dev/DEVICE:IOPS` — write IOPS cap in `/dev/DEVICE:IOPS` form; `0` clears an existing `/home` IOPS cap.
 - `--cpu-quota-percent=PERCENT|infinity` — CPU quota percentage; use `infinity` to remove the limit. If omitted, the current slice policy stays unchanged.
 - `--traffic-cap-mbit=MBIT` — traffic shaper ceiling in Mbit/s; `0` disables shaping.
 - `--io-latency-ms=MS` — `IODeviceLatencyTargetSec` target in milliseconds; defaults to the `/home` backing device.

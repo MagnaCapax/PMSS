@@ -320,6 +320,16 @@ class Manager
         foreach (self::IO_CLI_PROPERTY_MAP as $flagName => $propertyName) {
             foreach ($ioSpecs[$flagName] ?? [] as $spec) {
                 $specText = trim($spec);
+                if (in_array($flagName, ['io-read-iops', 'io-write-iops'], true) && $specText === '/home:max') {
+                    $homeDevice = trim($this->sys->resolveDevice('/home'));
+                    if ($homeDevice === '' || !\pmssCgroupPolicyDeviceTargetIsSafe($homeDevice)) {
+                        $error = 'Invalid --'.$flagName.' clear target: unable to resolve safe /home backing device';
+                        return [];
+                    }
+                    $ioPairs[] = $propertyName.'='.$homeDevice.' infinity';
+                    continue;
+                }
+
                 if (preg_match('/^([^:\s]+):([^\s]+)$/', $specText, $matches) !== 1
                     || !\pmssCgroupPolicyDeviceTargetIsSafe($matches[1])
                     || strpos($matches[2], "\0") !== false) {

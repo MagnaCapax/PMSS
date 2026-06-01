@@ -481,6 +481,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Applies quota settings and rTorrent/ruTorrent configs; seeds dotfiles; safe to re-run.
   - qBittorrent bootstrap: seeds `~/.config/qBittorrent/qBittorrent.conf` from `/etc/seedbox/config/template.qbittorrent.conf`, pinning shared-host defaults such as POSIX disk I/O, 128 MiB disk cache, 4 async I/O threads, and moderate connection/upload caps for new accounts; later maintenance refreshes that PMSS-managed subset without replacing user-owned settings.
   - Optional flags: `--upload-throttle-kib=<KiB>` updates torrent upload throttle; `--welcome-message=<HTML>` sets/clears the per-user welcome banner override file at `~/.config/welcome-message.html` (empty value clears).
+  - IOPS downgrade semantics: explicit `IOReadIOPS` / `IOWriteIOPS` values of `0` are forwarded to `userConfigCgroup.php` as `/home:max`, which resolves `/home` to a safe block device and applies `IOReadIOPSMax=<device> infinity` / `IOWriteIOPSMax=<device> infinity`.
   - Help: `-h` / `--help` prints structured usage and exits successfully.
   - Welcome-only mode: `scripts/util/userConfig.php <user> --welcome-message=<HTML>` updates only the welcome banner override file and exits without running service/quota orchestration.
   - Docker floor: when `ramMiB < 245`, persists `dockerEnabled=false` for the user. Storage Box product payloads also default `dockerEnabled=false` unless explicitly overridden.

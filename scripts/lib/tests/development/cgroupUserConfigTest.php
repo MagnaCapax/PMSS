@@ -368,6 +368,53 @@ class CgroupUserConfigTest extends TestCase
         );
     }
 
+    public function testIopsClearSentinelResolvesHomeDeviceToInfinity(): void
+    {
+        $this->sys->findmnt['/home'] = '/dev/md0';
+
+        $res = $this->runMgr([
+            'testuser',
+            '--apply',
+            '--dry-run',
+            '--io-read-iops=/home:max',
+            '--io-write-iops=/home:max',
+        ]);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertSame(
+            "user=testuser uid=1000 slice=user-1000.slice mode=v2\n"
+            ."[Planned IO properties]\n"
+            ."IOReadIOPSMax=/dev/md0 infinity\n"
+            ."IOWriteIOPSMax=/dev/md0 infinity\n"
+            ."(dry-run or no --apply; not changing system)\n",
+            $res['out']
+        );
+    }
+
+    public function testApplyIopsClearSentinelClearsStaleSystemdDropin(): void
+    {
+        $steps = [];
+        $this->sys->findmnt['/home'] = '/dev/md0';
+        $this->mgr = new Manager($this->sys, function (string $description, string $command) use (&$steps): int {
+            $steps[] = [$description, $command];
+            return 0;
+        });
+
+        $res = $this->runMgr(['testuser', '--apply', '--io-read-iops=/home:max']);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertSame([
+            [
+                'Applying cgroup properties',
+                \pmssBuildCommand('systemctl', [
+                    'set-property',
+                    'user-1000.slice',
+                    'IOReadIOPSMax=/dev/md0 infinity',
+                ]),
+            ],
+        ], $steps);
+    }
+
     public function testIoLatencyDefaultsToHomeBackingDevice()
     {
         $this->sys->findmnt['/home'] = '/dev/md0';

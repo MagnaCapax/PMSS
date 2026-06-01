@@ -134,6 +134,7 @@ Inspect and apply limits per user:
 ### Behavior
 
 - All flags are additive. If you pass only one flag (e.g., `--cpu-weight=300`), only that property is changed. Unspecified settings remain as they are.
+- `userConfig.php` treats an explicit `IO_READ_IOPS` or `IO_WRITE_IOPS` value of `0` as a request to clear the matching `/home` systemd IOPS cap, so plan downgrades do not leave stale `IOReadIOPSMax` or `IOWriteIOPSMax` drop-ins behind.
 - `--wipe` reverts the user slice (`systemctl revert user-UID.slice`) and sets MemoryHigh/Max to infinity and resets weights to defaults. It is rejected when mixed with resource, IO, defaults, or respect-existing modifier flags.
 - `--dry-run` prints planned K=V and IO properties without changing the system.
 
