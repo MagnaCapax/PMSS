@@ -15,6 +15,8 @@
  * @author PMSS Team
  */
 
+require_once dirname(__DIR__).'/pathSafety.php';
+
 if (!function_exists('pmssEnsureDir')) {
     /**
      * Ensure a directory exists with desired ownership and mode.
@@ -187,18 +189,9 @@ if (!function_exists('pmssEnsureUserHomeDir')) {
             return false;
         }
         $relative = trim($relative);
-        if ($relative === '' || $relative[0] === '/' || strpos($relative, "\0") !== false) {
+        if (!pmssPathRelativeStringIsSafe($relative, ['allowEmptySegments' => true, 'allowDotSegments' => true, 'allowControlChars' => true])) {
             $log('[WARN] Refusing to ensure user dir; invalid relative path');
             return false;
-        }
-        foreach (explode('/', $relative) as $seg) {
-            if ($seg === '' || $seg === '.') {
-                continue;
-            }
-            if ($seg === '..') {
-                $log('[WARN] Refusing to ensure user dir; path traversal detected');
-                return false;
-            }
         }
 
         $path = $home.'/'.$relative;

@@ -67,6 +67,23 @@ function pmssPathAbsoluteStringIsSafe(string $path, array $options = []): bool
 }
 
 /**
+ * Validate relative path strings before joining them to a trusted root.
+ */
+function pmssPathRelativeStringIsSafe(string $path, array $options = []): bool
+{
+    if ($path === '' || $path[0] === '/' || strpos($path, "\0") !== false) return false;
+    if (empty($options['allowControlChars']) && preg_match('/[\r\n]/', $path) === 1) return false;
+    if (!empty($options['rejectDotDotSubstring']) && strpos($path, '..') !== false) return false;
+
+    $allowEmptySegments = !empty($options['allowEmptySegments']); $allowDotSegments = !empty($options['allowDotSegments']);
+    foreach (explode('/', $path) as $segment) {
+        if ($segment === '..' || ($segment === '' && !$allowEmptySegments) || ($segment === '.' && !$allowDotSegments)) return false;
+    }
+
+    return true;
+}
+
+/**
  * Validate path segments while preserving caller-specific absolute/leaf policy.
  */
 function pmssPathSegmentsAreSafe(

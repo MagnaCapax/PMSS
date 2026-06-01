@@ -34,9 +34,7 @@ function pmssSupportConfigRead(): array
     }
 
     $snapshotDirectory = trim((string) ($config['snapshotDirectory'] ?? '.support/requests'));
-    if ($snapshotDirectory === ''
-        || strpos($snapshotDirectory, '..') !== false
-        || $snapshotDirectory[0] === '/') {
+    if (!pmssPathRelativeStringIsSafe($snapshotDirectory, ['allowEmptySegments' => true, 'allowDotSegments' => true, 'allowControlChars' => true, 'rejectDotDotSubstring' => true])) {
         throw new RuntimeException('Support snapshot directory must be a safe relative path.');
     }
 

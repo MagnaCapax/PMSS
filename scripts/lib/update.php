@@ -48,7 +48,7 @@ function updateUserFile($file, $user) {
         return;
     }
 
-    if ($file[0] === '/' || preg_match('#(^|/)\.{1,2}(/|$)|[\r\n\0]#', $file) === 1) {
+    if (!pmssPathRelativeStringIsSafe($file)) {
         logMessage("[user:{$logUser}] updateUserFile skipped (unsafe relative path): {$logFile}");
         return;
     }

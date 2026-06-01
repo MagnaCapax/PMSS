@@ -419,17 +419,9 @@ function rtorrentProcessUserTargetPathIsSafe(
         || strpos($home, "\0") !== false
         || !is_dir($home)
         || is_link($home)
-        || $relativePath === ''
-        || $relativePath[0] === '/'
-        || strpos($relativePath, "\0") !== false
+        || !pmssPathRelativeStringIsSafe($relativePath, ['allowControlChars' => true])
     ) {
         return false;
-    }
-
-    foreach (explode('/', $relativePath) as $segment) {
-        if ($segment === '' || $segment === '.' || $segment === '..') {
-            return false;
-        }
     }
 
     if (!$testMode && $home !== '/home/'.$user) {
