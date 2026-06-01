@@ -26,32 +26,24 @@ class SystemdServicesGuardBootUnitTest extends TestCase
         ], $this->pmssProfileCommands());
     }
 
-    public function testStopDisableMaskSystemdUnitKeepsStopDisableMaskOrderInDryRun(): void
+    public function testStopDisableMaskSystemdUnitHonorsMaskFlagInDryRun(): void
     {
-        $this->pmssResetRuntimeProfile();
+        foreach ([true, false] as $mask) {
+            $this->pmssResetRuntimeProfile();
 
-        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function (): void {
-            pmssStopDisableMaskSystemdUnit('demo.service', 'Demo', true);
-        });
+            $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use ($mask): void {
+                pmssStopDisableMaskSystemdUnit('demo.service', 'Demo', $mask);
+            });
 
-        $this->assertEquals([
-            "systemctl stop 'demo.service' || true",
-            "systemctl disable 'demo.service' || true",
-            "systemctl mask 'demo.service' || true",
-        ], $this->pmssProfileCommands());
-    }
+            $expected = [
+                "systemctl stop 'demo.service' || true",
+                "systemctl disable 'demo.service' || true",
+            ];
+            if ($mask) {
+                $expected[] = "systemctl mask 'demo.service' || true";
+            }
 
-    public function testStopDisableMaskSystemdUnitOmitsMaskWhenDisabled(): void
-    {
-        $this->pmssResetRuntimeProfile();
-
-        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function (): void {
-            pmssStopDisableMaskSystemdUnit('demo.service', 'Demo', false);
-        });
-
-        $this->assertEquals([
-            "systemctl stop 'demo.service' || true",
-            "systemctl disable 'demo.service' || true",
-        ], $this->pmssProfileCommands());
+            $this->assertEquals($expected, $this->pmssProfileCommands());
+        }
     }
 }

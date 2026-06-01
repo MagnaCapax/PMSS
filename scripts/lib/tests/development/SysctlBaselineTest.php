@@ -119,46 +119,29 @@ class SysctlBaselineTest extends TestCase
         $this->assertFalse($this->pmssMessagesContain($messages, 'sysctl reload disabled'), 'did not expect reload log after failed write');
     }
 
-    public function testVmProfileUsesConservativeMemorySettings(): void
+    public function testMemoryProfilesWriteExpectedSettings(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-sysctl-vm-', 0700);
-        $target = $dir.'/sysctl.conf';
-        $this->pmssTrackEnvOverrides([
-            'PMSS_CONFIG_DIR' => $dir.'/config',
-            'PMSS_SYSCTL_IS_VM' => '1',
-            'PMSS_SYSCTL_HAS_SWAP' => '1',
-            'PMSS_SYSCTL_SWAP_IS_FAST' => '1',
-        ]);
+        $cases = [
+            'vm' => [
+                ['PMSS_SYSCTL_IS_VM' => '1', 'PMSS_SYSCTL_HAS_SWAP' => '1', 'PMSS_SYSCTL_SWAP_IS_FAST' => '1'],
+                ['vm.swappiness = 10', 'vm.vfs_cache_pressure = 50', 'vm.min_free_kbytes = 131072', 'vm.dirty_ratio = 20'],
+            ],
+            'noswap' => [
+                ['PMSS_SYSCTL_IS_VM' => '0', 'PMSS_SYSCTL_HAS_SWAP' => '0', 'PMSS_SYSCTL_SWAP_IS_FAST' => '0'],
+                ['vm.swappiness = 60', 'vm.vfs_cache_pressure = 50', 'vm.dirty_background_ratio = 5'],
+            ],
+        ];
 
-        $messages = [];
-        $this->runBaseline($target, $messages, false);
+        foreach ($cases as $label => [$env, $expected]) {
+            $dir = $this->pmssMakeTempDir('pmss-sysctl-'.$label.'-', 0700);
+            $target = $dir.'/sysctl.conf';
+            $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir.'/config'] + $env);
 
-        $this->pmssAssertFileContainsAllStrings($target, [
-            'vm.swappiness = 10',
-            'vm.vfs_cache_pressure = 50',
-            'vm.min_free_kbytes = 131072',
-            'vm.dirty_ratio = 20',
-        ]);
-    }
+            $messages = [];
+            $this->runBaseline($target, $messages, false);
 
-    public function testNoSwapProfileFallsBackToBalancedDefaults(): void
-    {
-        $dir = $this->pmssMakeTempDir('pmss-sysctl-noswap-', 0700);
-        $target = $dir.'/sysctl.conf';
-        $this->pmssTrackEnvOverrides([
-            'PMSS_CONFIG_DIR' => $dir.'/config',
-            'PMSS_SYSCTL_HAS_SWAP' => '0',
-            'PMSS_SYSCTL_SWAP_IS_FAST' => '0',
-        ]);
-
-        $messages = [];
-        $this->runBaseline($target, $messages, false);
-
-        $this->pmssAssertFileContainsAllStrings($target, [
-            'vm.swappiness = 60',
-            'vm.vfs_cache_pressure = 50',
-            'vm.dirty_background_ratio = 5',
-        ]);
+            $this->pmssAssertFileContainsAllStrings($target, $expected);
+        }
     }
 
     public function testSettingsBuildKeepsProfileBranchSnapshot(): void

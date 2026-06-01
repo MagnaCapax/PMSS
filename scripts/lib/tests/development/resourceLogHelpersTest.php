@@ -448,25 +448,14 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertDeltaFields($result, ['io_read' => 9, 'io_write' => 0]);
     }
 
-    public function testUpdateStateReturnsDeltaWhenFileMissing(): void
+    public function testUpdateStateRejectsUnwritableStatePaths(): void
     {
-        $root = $this->makeRoot();
-        $statePath = $root.'/missing/state.json';
+        foreach ([$this->makeRoot().'/missing/state.json', 'relative/state.json'] as $statePath) {
+            $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(9, 8, 7, 512, 1));
 
-        $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(9, 8, 7, 512, 1));
-
-        $this->assertDeltaFields($result, ['io_read' => 9, 'io_write' => 8, 'cpu_nsec' => 7]);
-        $this->assertTrue(!is_file($statePath));
-    }
-
-    public function testUpdateStateRejectsRelativeStatePath(): void
-    {
-        $statePath = 'relative/state.json';
-
-        $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(9, 8, 7, 512, 1));
-
-        $this->assertDeltaFields($result, ['io_read' => 9, 'io_write' => 8, 'cpu_nsec' => 7]);
-        $this->assertTrue(!is_file($statePath));
+            $this->assertDeltaFields($result, ['io_read' => 9, 'io_write' => 8, 'cpu_nsec' => 7]);
+            $this->assertTrue(!is_file($statePath));
+        }
     }
 
     public function testUpdateStateRejectsSymlinkStatePath(): void

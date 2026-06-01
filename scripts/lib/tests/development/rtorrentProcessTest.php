@@ -91,44 +91,16 @@ class RtorrentProcessTest extends TestCase
         $this->assertTrue(true, 'No exception thrown');
     }
 
-    /**
-     * Test stale state handles invalid timestamp.
-     */
-    public function testStaleStateInvalidTimestamp(): void
+    public function testStaleStateMalformedValuesRecordFirstSeen(): void
     {
-        $stateFile = $this->tempDir.'/test-state.ts';
-        file_put_contents($stateFile, 'invalid');
+        foreach (['invalid', '', '0'] as $value) {
+            $stateFile = $this->tempDir.'/test-state-'.md5($value).'.ts';
+            file_put_contents($stateFile, $value);
 
-        $result = rtorrentProcessCheckStaleState($stateFile, 60);
+            $result = rtorrentProcessCheckStaleState($stateFile, 60);
 
-        // Invalid timestamp should be treated as first detection.
-        $this->assertEquals('record', $result['action']);
-    }
-
-    /**
-     * Test stale state handles empty file.
-     */
-    public function testStaleStateEmptyFile(): void
-    {
-        $stateFile = $this->tempDir.'/test-state.ts';
-        file_put_contents($stateFile, '');
-
-        $result = rtorrentProcessCheckStaleState($stateFile, 60);
-
-        $this->assertEquals('record', $result['action']);
-    }
-
-    /**
-     * Test stale state handles zero timestamp.
-     */
-    public function testStaleStateZeroTimestamp(): void
-    {
-        $stateFile = $this->tempDir.'/test-state.ts';
-        file_put_contents($stateFile, '0');
-
-        $result = rtorrentProcessCheckStaleState($stateFile, 60);
-
-        $this->assertEquals('record', $result['action']);
+            $this->assertEquals('record', $result['action'], 'Invalid timestamp should reset: '.var_export($value, true));
+        }
     }
 
     /**
@@ -173,32 +145,17 @@ class RtorrentProcessTest extends TestCase
         $this->assertEquals(4, $result['count']);
     }
 
-    /**
-     * Test failed-start state: invalid file contents reset to attempt 1.
-     */
     public function testFailureCountStateInvalidContentsResetCount(): void
     {
-        $stateFile = $this->tempDir.'/test-failure.count';
-        file_put_contents($stateFile, 'invalid');
+        foreach (['invalid', '-3'] as $value) {
+            $stateFile = $this->tempDir.'/test-failure-'.md5($value).'.count';
+            file_put_contents($stateFile, $value);
 
-        $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
+            $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
 
-        $this->assertEquals('record', $result['action']);
-        $this->assertEquals(1, $result['count']);
-    }
-
-    /**
-     * Test failed-start state: negative counts reset to attempt 1.
-     */
-    public function testFailureCountStateNegativeContentsResetCount(): void
-    {
-        $stateFile = $this->tempDir.'/test-failure.count';
-        file_put_contents($stateFile, '-3');
-
-        $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
-
-        $this->assertEquals('record', $result['action']);
-        $this->assertEquals(1, $result['count']);
+            $this->assertEquals('record', $result['action']);
+            $this->assertEquals(1, $result['count']);
+        }
     }
 
     /**
@@ -300,23 +257,12 @@ class RtorrentProcessTest extends TestCase
         $this->assertTrue(is_array($output), 'Expected raw output reference array');
     }
 
-    /**
-     * Test kill PIDs handles empty array.
-     */
-    public function testKillPidsEmptyArray(): void
+    public function testKillPidsIgnoresEmptyAndInvalidInputs(): void
     {
-        // Should not throw.
-        rtorrentProcessKillPids([], SIGTERM);
-        $this->assertTrue(true, 'No exception thrown');
-    }
+        foreach ([[], [0, -1, -999]] as $pids) {
+            rtorrentProcessKillPids($pids, SIGTERM);
+        }
 
-    /**
-     * Test kill PIDs handles invalid PIDs.
-     */
-    public function testKillPidsInvalidPids(): void
-    {
-        // Should not throw.
-        rtorrentProcessKillPids([0, -1, -999], SIGTERM);
         $this->assertTrue(true, 'No exception thrown');
     }
 
@@ -329,18 +275,14 @@ class RtorrentProcessTest extends TestCase
         $this->assertTrue(is_array($result));
     }
 
-    public function testProcessStateParserCapturesPidStatAndWchan(): void
+    public function testProcessStateParserCapturesPidStatAndOptionalWchan(): void
     {
-        $state = rtorrentProcessStateFromPsLine('1234 Sl+ futex_wait_queue');
-
-        $this->assertSame(['pid' => 1234, 'stat' => 'Sl+', 'wchan' => 'futex_wait_queue'], $state);
-    }
-
-    public function testProcessStateParserAllowsMissingWchan(): void
-    {
-        $state = rtorrentProcessStateFromPsLine('1234 Sl+');
-
-        $this->assertSame(['pid' => 1234, 'stat' => 'Sl+', 'wchan' => ''], $state);
+        foreach ([
+            '1234 Sl+ futex_wait_queue' => ['pid' => 1234, 'stat' => 'Sl+', 'wchan' => 'futex_wait_queue'],
+            '1234 Sl+' => ['pid' => 1234, 'stat' => 'Sl+', 'wchan' => ''],
+        ] as $line => $expected) {
+            $this->assertSame($expected, rtorrentProcessStateFromPsLine($line));
+        }
     }
 
     public function testProcessStateParserRejectsMalformedRows(): void

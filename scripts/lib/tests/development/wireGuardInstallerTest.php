@@ -11,17 +11,23 @@ require_once dirname(__DIR__, 2).'/wireguard.php';
 
 class WireGuardInstallerTest extends TestCase
 {
-    public function testResolveEndpointPrefersDns(): void
+    public function testResolveEndpointSourcePriority(): void
     {
-        $this->pmssWithEnv([
-            'PMSS_WG_DNS_IP'       => '198.51.100.10',
-            'PMSS_WG_EXTERNAL_IP'  => null,
-            'PMSS_WG_INTERFACE_IP' => null,
-        ], function (): void {
-            [$ip, $source] = \wgResolveEndpoint('seed.example.com');
-            $this->assertEquals('198.51.100.10', $ip);
-            $this->assertEquals('hostname', $source);
-        });
+        $cases = [
+            [['PMSS_WG_DNS_IP' => '198.51.100.10', 'PMSS_WG_EXTERNAL_IP' => null, 'PMSS_WG_INTERFACE_IP' => null], '198.51.100.10', 'hostname'],
+            [['PMSS_WG_DNS_IP' => '10.0.0.1', 'PMSS_WG_EXTERNAL_IP' => '203.0.113.5', 'PMSS_WG_INTERFACE_IP' => '10.0.0.2'], '203.0.113.5', 'external'],
+            [['PMSS_WG_DNS_IP' => '10.0.0.2', 'PMSS_WG_EXTERNAL_IP' => '10.0.0.5', 'PMSS_WG_INTERFACE_IP' => '198.51.100.20'], '198.51.100.20', 'interface'],
+            [['PMSS_WG_DNS_IP' => '10.0.0.3', 'PMSS_WG_EXTERNAL_IP' => '', 'PMSS_WG_INTERFACE_IP' => '10.0.0.4'], '10.0.0.4', 'interface_private'],
+            [['PMSS_WG_DNS_IP' => 'seed.example.com', 'PMSS_WG_EXTERNAL_IP' => '', 'PMSS_WG_INTERFACE_IP' => ''], '', 'unknown'],
+        ];
+
+        foreach ($cases as [$env, $expectedIp, $expectedSource]) {
+            $this->pmssWithEnv($env, function () use ($expectedIp, $expectedSource): void {
+                [$ip, $source] = \wgResolveEndpoint('seed.example.com');
+                $this->assertEquals($expectedIp, $ip);
+                $this->assertEquals($expectedSource, $source);
+            });
+        }
     }
 
     public function testExternalEndpointUrlCandidatesIncludePrimaryAndBackup(): void
@@ -32,62 +38,11 @@ class WireGuardInstallerTest extends TestCase
         $this->assertTrue(in_array('https://api.ipify.org', $urls, true), 'Backup endpoint missing from candidates');
     }
 
-    public function testResolveEndpointFallsBackToExternalLookup(): void
-    {
-        $this->pmssWithEnv([
-            'PMSS_WG_DNS_IP'       => '10.0.0.1',
-            'PMSS_WG_EXTERNAL_IP'  => '203.0.113.5',
-            'PMSS_WG_INTERFACE_IP' => '10.0.0.2',
-        ], function (): void {
-            [$ip, $source] = \wgResolveEndpoint('seed.example.com');
-            $this->assertEquals('203.0.113.5', $ip);
-            $this->assertEquals('external', $source);
-        });
-    }
-
-    public function testResolveEndpointUsesInterfaceIp(): void
-    {
-        $this->pmssWithEnv([
-            'PMSS_WG_DNS_IP'       => '10.0.0.2',
-            'PMSS_WG_EXTERNAL_IP'  => '10.0.0.5',
-            'PMSS_WG_INTERFACE_IP' => '198.51.100.20',
-        ], function (): void {
-            [$ip, $source] = \wgResolveEndpoint('seed.example.com');
-            $this->assertEquals('198.51.100.20', $ip);
-            $this->assertEquals('interface', $source);
-        });
-    }
-
-    public function testResolveEndpointMarksPrivateInterface(): void
-    {
-        $this->pmssWithEnv([
-            'PMSS_WG_DNS_IP'       => '10.0.0.3',
-            'PMSS_WG_EXTERNAL_IP'  => '',
-            'PMSS_WG_INTERFACE_IP' => '10.0.0.4',
-        ], function (): void {
-            [$ip, $source] = \wgResolveEndpoint('seed.example.com');
-            $this->assertEquals('10.0.0.4', $ip);
-            $this->assertEquals('interface_private', $source);
-        });
-    }
-
-    public function testResolveEndpointFallsBackToHostname(): void
-    {
-        $this->pmssWithEnv([
-            'PMSS_WG_DNS_IP'       => 'seed.example.com',
-            'PMSS_WG_EXTERNAL_IP'  => '',
-            'PMSS_WG_INTERFACE_IP' => '',
-        ], function (): void {
-            [$ip, $source] = \wgResolveEndpoint('seed.example.com');
-            $this->assertEquals('', $ip);
-            $this->assertEquals('unknown', $source);
-        });
-    }
-
     public function testValidatePublicIpRejectsPrivateRanges(): void
     {
-        $this->assertEquals(null, \wgValidatePublicIp('10.0.0.1'));
-        $this->assertEquals(null, \wgValidatePublicIp('127.0.0.1'));
+        foreach (['10.0.0.1', '127.0.0.1'] as $ip) {
+            $this->assertEquals(null, \wgValidatePublicIp($ip));
+        }
     }
 
     public function testValidatePublicKeyAcceptsBase64Key(): void
@@ -99,8 +54,9 @@ class WireGuardInstallerTest extends TestCase
 
     public function testValidatePublicKeyRejectsInvalidKey(): void
     {
-        $this->assertEquals(false, \wgValidatePublicKey('not-a-key'));
-        $this->assertEquals(false, \wgValidatePublicKey('AAAA'));
+        foreach (['not-a-key', 'AAAA'] as $key) {
+            $this->assertEquals(false, \wgValidatePublicKey($key));
+        }
     }
 
     public function testWriteConfigOverwritesExisting(): void
