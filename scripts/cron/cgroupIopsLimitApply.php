@@ -65,7 +65,40 @@ function pmssIopsResolveHomeMajorMinor(): ?string
         return null;
     }
     $majMin = trim((string) @file_get_contents($devFile));
-    return preg_match('/^[0-9]+:[0-9]+$/', $majMin) === 1 ? $majMin : null;
+    return pmssIopsMajorMinorValid($majMin) ? $majMin : null;
+}
+
+/** Accept only kernel major:minor tokens before composing cgroup writes. */
+function pmssIopsMajorMinorValid(string $majMin): bool
+{
+    return preg_match('/^[0-9]+:[0-9]+$/', $majMin) === 1;
+}
+
+/**
+ * Validate POSIX passwd data before using it in a sysfs cgroup path.
+ */
+function pmssIopsUserPasswdUid($passwdEntry): ?int
+{
+    if (!is_array($passwdEntry) || !array_key_exists('uid', $passwdEntry)) {
+        return null;
+    }
+
+    $uid = $passwdEntry['uid'];
+    if (is_int($uid)) {
+        $uidValue = $uid;
+    } elseif (is_string($uid) && ctype_digit($uid)) {
+        $uidValue = (int) $uid;
+    } else {
+        return null;
+    }
+
+    return $uidValue > 0 ? $uidValue : null;
+}
+
+/** Keep direct cgroup writes scoped to the expected per-user blkio throttle files. */
+function pmssIopsThrottlePathAllowed(string $cgPath): bool
+{
+    return preg_match('#^/sys/fs/cgroup/blkio/user\.slice/user-[1-9][0-9]*\.slice/blkio\.throttle\.(read|write)_iops_device$#', $cgPath) === 1;
 }
 
 /**
@@ -90,6 +123,9 @@ function pmssIopsParseSpec($raw): ?int
  */
 function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $dryRun): array
 {
+    if (!pmssIopsMajorMinorValid($majMin) || $iops <= 0 || !pmssIopsThrottlePathAllowed($cgPath)) {
+        return ['ok' => false, 'reason' => 'invalid-target', 'cur' => null];
+    }
     if (!is_file($cgPath) || !is_writable($cgPath)) {
         return ['ok' => false, 'reason' => 'unwritable', 'cur' => null];
     }
@@ -150,8 +186,8 @@ foreach (glob(PMSS_IOPS_USERS_DIR.'/*.json') ?: [] as $cfgPath) {
         syslog(LOG_WARNING, "no passwd entry $user");
         continue;
     }
-    $uid = (int) ($pwd['uid'] ?? -1);
-    if ($uid <= 0) {
+    $uid = pmssIopsUserPasswdUid($pwd);
+    if ($uid === null) {
         $errors++;
         syslog(LOG_WARNING, "unsafe passwd uid $user");
         continue;
