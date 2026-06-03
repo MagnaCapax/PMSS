@@ -10,12 +10,12 @@
  * cgroup files read here (/sys/fs/cgroup/user.slice/user-<UID>.slice/memory.*)
  * are world-readable kernel paths; the customer can read their own slice.
  *
- * Uses the customer-side pmssFormatBytes copy from ../.scriptsInc.php because
+ * Uses the customer-side pmssFormatBytes copy from scriptsInc.php because
  * /scripts/lib/runtime.php is intentionally outside the customer PHP boundary.
  *
  * @license GPL-3.0-only
  */
-require_once __DIR__.'/../.scriptsInc.php';
+require_once __DIR__.'/scriptsInc.php';
 
 /** Format bytes into a compact human-readable string. */
 function pmssWebCgroupMemoryStatusFormatBytes($bytes, $precision = 1)

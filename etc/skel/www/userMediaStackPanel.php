@@ -7,7 +7,7 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
-require_once __DIR__.'/../.scriptsInc.php';
+require_once __DIR__.'/scriptsInc.php';
 
 /**
  * Resolve a media-stack helper path relative to the tenant home.

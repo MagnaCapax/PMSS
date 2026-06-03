@@ -158,6 +158,7 @@ PHP;
         'bin/linuxserverInstall.sh',
         'bin/support',
         '.scriptsInc.php',
+        'www/scriptsInc.php',
         '.lighttpd/php.ini',
         'radarr-sonarr.txt',
         'www/deluge.php',

@@ -13,7 +13,7 @@
  * @package PMSS
  * @version 1.0
  */
-require_once __DIR__.'/../.scriptsInc.php';
+require_once __DIR__.'/scriptsInc.php';
 
 // Customer-side helpers MUST live in the customer tree (etc/skel/www/) because
 // per-user lighttpd runs as the customer UID and cannot traverse /scripts/

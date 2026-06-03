@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__.'/../.scriptsInc.php';
+require_once __DIR__.'/scriptsInc.php';
 /** Lightweight frontend toggle for rclone. */
 
 pmssFrontendToggleAction(

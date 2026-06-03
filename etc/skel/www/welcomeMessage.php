@@ -7,7 +7,7 @@
  *
  * @license GPL-3.0-only
  */
-require_once __DIR__.'/../.scriptsInc.php';
+require_once __DIR__.'/scriptsInc.php';
 
 /**
  * Read a JSON file into an associative array.

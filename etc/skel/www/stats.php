@@ -15,7 +15,7 @@
  * #TODO: Hover on status → show systemctl logs
  * #TODO: Click status → attempt restart (if allowed)
  */
-require_once __DIR__.'/../.scriptsInc.php';
+require_once __DIR__.'/scriptsInc.php';
 
 // Fail-soft: data collection must never abort page rendering. Show notes and
 // keep going if commands or files are unavailable.

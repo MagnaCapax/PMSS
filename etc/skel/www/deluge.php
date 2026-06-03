@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__.'/../.scriptsInc.php';
+require_once __DIR__.'/scriptsInc.php';
 // Port enforcement is operator-side work; this customer endpoint only toggles daemons.
 /** Lightweight frontend toggle for Deluge. */
 
