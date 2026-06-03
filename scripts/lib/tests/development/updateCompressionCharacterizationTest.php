@@ -207,14 +207,14 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $splitSymbol = 'pmssShowTrafficSplit'.'LocalnetUser';
         $barSymbol = 'pmssShowTrafficRender'.'Bar';
 
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/showTraffic.php', [
-            "pmssListManagedUsersResult(__DIR__.'/listUsers.php')",
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/traffic/report.php', [
+            'pmssListManagedUsersResult($listUsersScript)',
             'pmssTrafficUserKeyBaseUser($thisUser)',
             "str_repeat('#', \$filled)",
             "str_repeat('-', 10 - \$filled)",
         ], [
             'function '.$splitSymbol.'(' => 'showTraffic.php should reuse shared traffic user-key helpers instead of adding a local splitter',
-            'function '.$barSymbol.'(' => 'showTraffic.php should keep the extended output bar rendering inside pmssShowTrafficMain()',
+            'function '.$barSymbol.'(' => 'showTraffic.php should keep the extended output bar rendering in the shared report helper',
         ]);
     }
 

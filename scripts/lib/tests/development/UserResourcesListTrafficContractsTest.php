@@ -23,7 +23,7 @@ class UserResourcesListTrafficContractsTest extends TestCase
         $showTrafficReader = 'pmssShowTrafficRead'.'StatsPayload';
         $trafficLimitsReader = 'pmssRead'.'TrafficData';
 
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/showTraffic.php', [
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/traffic/report.php', [
             'pmssTrafficStatsPath($thisUser, $statsDir)',
             'pmssReadSerializedArrayFile($statsPath)',
             'pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser)',

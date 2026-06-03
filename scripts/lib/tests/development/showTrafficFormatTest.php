@@ -32,7 +32,8 @@ class ShowTrafficFormatTest extends TestCase
 
     public function testShowTrafficUsesSharedManagedUsersParser(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/showTraffic.php', ["pmssListManagedUsersResult(__DIR__.'/listUsers.php')", 'pmssShowTrafficRawCounters($data)', "pmssShowTrafficDisplayAmounts(\$row['rawMiB'])"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/showTraffic.php', ["require_once __DIR__.'/lib/traffic/report.php';", "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssShowTrafficMain');"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/traffic/report.php', ["pmssListManagedUsersResult(\$listUsersScript)", 'pmssShowTrafficRawCounters($data)', "pmssShowTrafficDisplayAmounts(\$row['rawMiB'])"]);
         $this->pmssAssertRepoFileNotContainsString('scripts/showTraffic.php', "exec(escapeshellarg(__DIR__.'/listUsers.php')");
     }
 
@@ -108,5 +109,38 @@ class ShowTrafficFormatTest extends TestCase
             'summary' => ['totalUsers' => 2, 'usersWithStats' => 1, 'overLimit' => 0, 'nearLimit' => 1, 'missingStats' => 1],
             'missingStatsUsers' => ['ghost'],
         ], \pmssShowTrafficJsonPayload([$row], 1536.25, 512.0, ['alice' => true, 'bob' => true], ['alice' => true], 0, 1, ['ghost']));
+    }
+
+    public function testReportBuilderSnapshotCoversTotalsLimitsAndSorting(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-show-traffic-report-');
+        $statsDir = $root.'/runtime/trafficStats';
+        $homeDir = $root.'/home';
+        @mkdir($statsDir, 0755, true);
+        @mkdir($homeDir.'/alice', 0755, true);
+        @mkdir($homeDir.'/bob', 0755, true);
+        file_put_contents($homeDir.'/alice/.trafficLimit', "1\n");
+        $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $homeDir]);
+
+        $payload = static function (float $month): array {
+            return ['raw' => ['month' => $month, 'week' => 700.0, 'day' => 144.0, 'hour' => 36.0, '15min' => 15.0], 'daily' => []];
+        };
+        file_put_contents($statsDir.'/alice', serialize($payload(900.0)));
+        file_put_contents($statsDir.'/alice-localnet', serialize($payload(50.0)));
+        file_put_contents($statsDir.'/bob', serialize($payload(500.0)));
+
+        $report = \pmssShowTrafficReportBuild(['bob', 'alice-localnet', 'ghost', 'alice'], $statsDir);
+        \pmssShowTrafficRowsSort($report['rows'], 'pct');
+
+        $this->assertEquals([
+            'users' => [
+                ['user' => 'alice', 'display' => ['month' => '900MiB', 'week' => '700MiB', 'day' => '144MiB'], 'rates' => ['week' => 0.0, 'day' => 0.0, 'hour' => 0.01, '15min' => 0.02], 'inboundMonthMiB' => null, 'inboundOutboundRatio' => null, 'limitMiB' => 1024, 'pctUsed' => 87.89, 'overLimit' => false, 'nearLimit' => true, 'rawMiB' => ['month' => 900.0, 'week' => 700.0, 'day' => 144.0, 'hour' => 36.0, '15min' => 15.0]],
+                ['user' => 'alice-localnet', 'display' => ['month' => '50MiB', 'week' => '700MiB', 'day' => '144MiB'], 'rates' => ['week' => 0.0, 'day' => 0.0, 'hour' => 0.01, '15min' => 0.02], 'inboundMonthMiB' => null, 'inboundOutboundRatio' => null, 'limitMiB' => 1024, 'pctUsed' => 4.88, 'overLimit' => false, 'nearLimit' => false, 'rawMiB' => ['month' => 50.0, 'week' => 700.0, 'day' => 144.0, 'hour' => 36.0, '15min' => 15.0]],
+                ['user' => 'bob', 'display' => ['month' => '500MiB', 'week' => '700MiB', 'day' => '144MiB'], 'rates' => ['week' => 0.0, 'day' => 0.0, 'hour' => 0.01, '15min' => 0.02], 'inboundMonthMiB' => null, 'inboundOutboundRatio' => null, 'limitMiB' => null, 'pctUsed' => null, 'overLimit' => false, 'nearLimit' => false, 'rawMiB' => ['month' => 500.0, 'week' => 700.0, 'day' => 144.0, 'hour' => 36.0, '15min' => 15.0]],
+            ],
+            'totals' => ['monthMiB' => 1450.0, 'monthLocalMiB' => 50.0, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0],
+            'summary' => ['totalUsers' => 3, 'usersWithStats' => 2, 'overLimit' => 0, 'nearLimit' => 1, 'missingStats' => 1],
+            'missingStatsUsers' => ['ghost'],
+        ], \pmssShowTrafficJsonPayload($report['rows'], $report['dataMonthTotal'], $report['dataMonthTotalLocal'], $report['baseUsers'], $report['baseUsersWithStats'], $report['overLimitCount'], $report['nearLimitCount'], $report['missingStats']));
     }
 }
