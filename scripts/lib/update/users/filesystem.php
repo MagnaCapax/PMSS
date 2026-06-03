@@ -165,6 +165,7 @@ PHP;
         'www/filemanager.php',
         'www/index.php',
         'www/jquery.tabs.css',
+        'www/jquery.tabs-ie.css',
         'www/mediaStack.php',
         'www/openvpn-config.tgz',
         'www/pmssTabs.js',
