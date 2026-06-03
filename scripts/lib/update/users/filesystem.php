@@ -161,6 +161,7 @@ PHP;
         '.lighttpd/php.ini',
         'radarr-sonarr.txt',
         'www/deluge.php',
+        'www/error-503.html',
         'www/filemanager.php',
         'www/index.php',
         'www/jquery.tabs.css',

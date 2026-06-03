@@ -19,33 +19,32 @@ class IndexSkeletonFrameDataTest extends TestCase
         );
     }
 
-    public function testWikiFrameUsesNewWindowTargetInsteadOfIframe(): void
+    public function testWikiFrameUsesInPageTabWithoutNewWindowTarget(): void
     {
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'etc/skel/www/index.php',
             [
                 'function pmssFrameOpensInNewWindow(array $frame)',
                 "'wiki' => array(",
-                "'target'   => '_blank',",
+                "'url'      => 'https://wiki.pulsedmedia.com',",
             ],
-            'Missing index.php new-window fragment: ',
+            'Missing index.php in-page wiki fragment: ',
             'index.php wiki target order changed at: '
         );
 
         $this->pmssAssertRepoFileContainsAllStrings(
             'etc/skel/www/index.php',
             [
-                'target="_blank" rel="noopener noreferrer"',
-                'if (pmssFrameOpensInNewWindow($thisFrame)) {',
+                'Wiki is an in-page iframe tab, not a new window.',
                 "\$styleList[] = '#' . \$thisId;",
             ],
-            'Missing external-tab handling fragment: '
+            'Missing in-page wiki handling fragment: '
         );
 
         $this->pmssAssertRepoFileNotContainsString(
             'etc/skel/www/index.php',
-            "<iframe id=\"wikiFrame\"",
-            'Wiki should no longer be hard-wired into an iframe container.'
+            "'target'   => '_blank',",
+            'Wiki should not define a new-window target.'
         );
     }
 
@@ -212,16 +211,31 @@ class IndexSkeletonFrameDataTest extends TestCase
         }
     }
 
-    public function testRemoteDisabledRenderAddsTorrentFramesFromLocalConfigDirs(): void
+    public function testRemoteEnabledRenderAddsTorrentFramesFromLocalConfigDirs(): void
     {
         $home = $this->pmssMakeUserWebHome('pmss-index-config-root-');
+        $this->pmssEnsureDir($home.'/.config/qBittorrent');
+        $this->pmssEnsureDir($home.'/.config/deluge');
+        touch($home.'/.qbittorrentEnable');
+        touch($home.'/.delugeEnable');
+
+        $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+
+        foreach (['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')", '<a href="#deluge"', "loadFrame('deluge', 'deluge/')"] as $needle) {
+            $this->assertStringContainsString($needle, $html);
+        }
+    }
+
+    public function testRemoteDisabledRenderSkipsTorrentFramesFromLocalConfigDirsWithoutEnableFlags(): void
+    {
+        $home = $this->pmssMakeUserWebHome('pmss-index-disabled-config-root-');
         $this->pmssEnsureDir($home.'/.config/qBittorrent');
         $this->pmssEnsureDir($home.'/.config/deluge');
 
         $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
         foreach (['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')", '<a href="#deluge"', "loadFrame('deluge', 'deluge/')"] as $needle) {
-            $this->assertStringContainsString($needle, $html);
+            $this->assertStringNotContainsString($needle, $html);
         }
     }
 

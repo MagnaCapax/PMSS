@@ -123,6 +123,7 @@ class SkeletonWebLocalAssetTest extends TestCase
             'scripts/lib/update/users/filesystem.php',
             [
                 "'www/deluge.php',",
+                "'www/error-503.html',",
                 "'www/filemanager.php',",
                 "'www/index.php',",
                 "'www/jquery.tabs.css',",

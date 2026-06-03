@@ -67,6 +67,30 @@ class ErrorPageTemplateTest extends TestCase
         $this->assertStringContainsAllStrings(['Your disk quota is full', 'connect with SFTP and delete files', 'account is suspended', 'server-wide storage pressure'], $contents);
     }
 
+    public function testPerUserLighttpdTemplateUsesCustomerTreeErrorFiles(): void
+    {
+        $this->pmssAssertRepoFileContainsString(
+            'etc/seedbox/config/template.lighttpd',
+            'server.errorfile-prefix    = "/home/##username/www/error-"'
+        );
+    }
+
+    public function testPerUserServiceUnavailablePagePollsAndReloads(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'etc/skel/www/error-503.html',
+            [
+                '503 - Service Unavailable',
+                'class="error-message"',
+                'The sage is waiting for this application to answer.',
+                'pmss503check=',
+                'window.fetch(retryUrl(), {',
+                'window.location.reload();',
+                '<a href="/">Return to the main page.</a>',
+            ]
+        );
+    }
+
     public function testSuspendedErrorPageDoesNotReferenceABrokenImage(): void
     {
         $contents = $this->pmssReadRepoFile('var/www/error-suspended.html');

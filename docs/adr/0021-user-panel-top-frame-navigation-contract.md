@@ -1,7 +1,7 @@
 # ADR 0021: User-panel top-frame navigation contract — in-page tabs only, enabled features only
 
 Date: 2026-06-03
-Category: customer-ux
+Category: domain
 
 ## Status
 Accepted (operator-directed, 2026-06-03)
