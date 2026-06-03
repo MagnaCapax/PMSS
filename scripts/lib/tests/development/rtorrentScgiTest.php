@@ -72,11 +72,14 @@ class RtorrentScgiTest extends TestCase
     {
         $xml = rtorrentScgiFormatXmlrpcParamsCall('d.multicall2', ['main', 'd.get_hash=', ['nested', 1]]);
 
-        $this->assertStringContainsString('<methodName>d.multicall2</methodName>', $xml);
-        $this->assertStringContainsString('<string>main</string>', $xml);
-        $this->assertStringContainsString('<string>d.get_hash=</string>', $xml);
-        $this->assertStringContainsString('<array><data>', $xml);
-        $this->assertStringContainsString('<int>1</int>', $xml);
+        $this->assertSame(
+            '<?xml version="1.0" encoding="UTF-8"?><methodCall><methodName>d.multicall2</methodName><params>'
+            .'<param><value><string>main</string></value></param>'
+            .'<param><value><string>d.get_hash=</string></value></param>'
+            .'<param><value><array><data><value><string>nested</string></value><value><int>1</int></value></data></array></value></param>'
+            .'</params></methodCall>',
+            $xml
+        );
     }
 
     public function testDecodeResponseParsesScalarAndArrayValues(): void

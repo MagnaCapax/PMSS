@@ -98,13 +98,9 @@ function pmssStatsReadRtorrentStats(callable $caller, string $socketPath): array
     $stats['ok'] = true;
     $stats['ratio'] = ($stats['download_total'] > 0.0) ? ($stats['upload_total'] / $stats['download_total']) : null;
 
-    $countView = static function (string $view) use ($caller, $socketPath): ?int {
-        $result = $caller($socketPath, 'd.multicall2', [$view, 'd.get_hash='], 2);
-        return ($result === false || !is_array($result)) ? null : count($result);
-    };
     foreach (['torrent_total' => 'main', 'torrent_active' => 'started', 'torrent_seeding' => 'seeding'] as $key => $view) {
-        $count = $countView($view);
-        if ($count !== null) $stats[$key] = $count;
+        $result = $caller($socketPath, 'd.multicall2', [$view, 'd.get_hash='], 2);
+        if (is_array($result)) $stats[$key] = count($result);
     }
     if ($stats['torrent_active'] !== null && $stats['torrent_seeding'] !== null) $stats['torrent_downloading'] = max(0, $stats['torrent_active'] - $stats['torrent_seeding']);
     if ($stats['torrent_total'] !== null && $stats['torrent_active'] !== null) $stats['torrent_stopped'] = max(0, $stats['torrent_total'] - $stats['torrent_active']);

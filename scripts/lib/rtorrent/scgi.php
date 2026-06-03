@@ -40,14 +40,12 @@ function rtorrentScgiFormatRequest(string $xmlData): string
 function rtorrentScgiFormatXmlrpcValue($value): string
 {
     if (is_array($value)) {
-        $items = '';
-        foreach ($value as $item) {
-            $items .= rtorrentScgiFormatXmlrpcValue($item);
-        }
-
+        $items = implode('', array_map('rtorrentScgiFormatXmlrpcValue', $value));
         return '<value><array><data>' . $items . '</data></array></value>';
     }
 
+    $type = null;
+    $body = null;
     if (is_int($value)) {
         $type = 'int';
         $body = (string) $value;
@@ -57,7 +55,9 @@ function rtorrentScgiFormatXmlrpcValue($value): string
     } elseif (is_float($value)) {
         $type = 'double';
         $body = (string) $value;
-    } else {
+    }
+
+    if ($type === null) {
         return '<value><string>' . htmlspecialchars((string) $value, ENT_XML1, 'UTF-8') . '</string></value>';
     }
 
@@ -181,12 +181,7 @@ function rtorrentScgiDecodeXmlrpcValue(\SimpleXMLElement $valueNode)
             return (string) $child;
 
         case 'array':
-            $values = [];
-            foreach ($child->data->value as $item) {
-                $values[] = rtorrentScgiDecodeXmlrpcValue($item);
-            }
-
-            return $values;
+            return array_map('rtorrentScgiDecodeXmlrpcValue', iterator_to_array($child->data->value, false));
 
         case 'struct':
             $values = [];
@@ -222,11 +217,7 @@ function rtorrentScgiDecodeResponse(string $response)
         return false;
     }
 
-    if (isset($xml->fault->value)) {
-        return false;
-    }
-
-    if (!isset($xml->params->param->value)) {
+    if (isset($xml->fault->value) || !isset($xml->params->param->value)) {
         return false;
     }
 
@@ -283,13 +274,12 @@ function rtorrentScgiSocketQueueSnapshotFromLines(array $lines, string $socketPa
         if (!is_array($columns) || count($columns) < 5) {
             continue;
         }
-        if (($columns[1] ?? '') !== 'LISTEN') {
-            continue;
-        }
-        if (!in_array($socketPath, $columns, true)) {
-            continue;
-        }
-        if (!preg_match('/^\d+$/', $columns[2] ?? '') || !preg_match('/^\d+$/', $columns[3] ?? '')) {
+        if (
+            ($columns[1] ?? '') !== 'LISTEN'
+            || !in_array($socketPath, $columns, true)
+            || !preg_match('/^\d+$/', $columns[2] ?? '')
+            || !preg_match('/^\d+$/', $columns[3] ?? '')
+        ) {
             continue;
         }
 
