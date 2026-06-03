@@ -301,11 +301,15 @@ EOF;
             'linkText' => 'info',
             'title'    => 'Information, quota, server RAM',
         ),
+        // Wiki is an in-page iframe tab, not a new window. wiki.pulsedmedia.com
+        // sends `CSP: frame-ancestors 'self' https://*.pulsedmedia.com`, so it
+        // frames cleanly from any per-user seedbox subdomain. (Reverts the
+        // b4d284f8 `target=_blank` workaround for the old SAMEORIGIN block,
+        // which no longer exists. Per ADR 0021: top frame = in-page tabs only.)
         'wiki' => array(
             'url'      => 'https://wiki.pulsedmedia.com',
             'linkText' => 'wiki',
             'title'    => 'Pulsed Media Wiki',
-            'target'   => '_blank',
         ),
     );
 }
