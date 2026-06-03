@@ -69,8 +69,7 @@ class statsDockerInactiveNoteTest extends TestCase
 
     private function renderNote(string $status, ?bool $policy, string $osRelease, string $debianVersion, string $cmdline): string
     {
-        $script = 'define("PMSS_STATS_HELPERS_ONLY", true);'
-            .'require '.var_export($this->pmssRepoPath('etc/skel/www/stats.php'), true).';'
+        $script = 'require '.var_export($this->pmssRepoPath('etc/skel/www/statsHelpers.php'), true).';'
             .'echo json_encode(array("note" => pmssStatsDockerInactiveNote('
             .var_export($status, true).','
             .var_export($policy, true).','

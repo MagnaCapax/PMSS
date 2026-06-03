@@ -140,6 +140,7 @@ class SkeletonWebLocalAssetTest extends TestCase
                 "'www/rclone.php',",
                 "'www/screen.css',",
                 "'www/stats.php',",
+                "'www/statsHelpers.php',",
                 "'www/welcome.php',",
             ],
             'Missing skeleton sync asset entry: '

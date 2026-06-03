@@ -39,4 +39,18 @@ final class CustomerStatsLayoutTest extends TestCase
             'overflow-y: visible;',
         ));
     }
+
+    public function testStatsPageLoadsBundledHelperLibrary(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/stats.php', array(
+            "require_once __DIR__.'/scriptsInc.php';",
+            "require_once __DIR__.'/statsHelpers.php';",
+        ));
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/statsHelpers.php', array(
+            'function pmssStatsDockerInactiveNote(',
+            'function pmssStatsRenderLineChart(',
+        ));
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/stats.php', 'function pmssStatsSerializedStateRead(');
+        $this->pmssAssertRepoFileNotContainsString('etc/skel/www/stats.php', 'PMSS_STATS'.'_HELPERS_ONLY');
+    }
 }

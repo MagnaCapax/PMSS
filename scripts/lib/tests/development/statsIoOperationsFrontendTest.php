@@ -7,10 +7,8 @@ class StatsIoOperationsFrontendTest extends TestCase
 {
     public function testStatsPageFormatsMonthlyIoOperationsSummary(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'etc/skel/www/stats.php',
-            ['function pmssFormatIoOperationsShort($operations)', 'Past 30 days total I/O operations:']
-        );
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/statsHelpers.php', 'function pmssFormatIoOperationsShort($operations)');
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/stats.php', 'Past 30 days total I/O operations:');
     }
 
     public function testStatsPageBuildsDailyIoOperationsChartFromTotals(): void

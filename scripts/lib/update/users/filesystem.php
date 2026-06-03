@@ -176,6 +176,7 @@ PHP;
         'www/rutorrent/js/content.js',
         'www/screen.css',
         'www/stats.php',
+        'www/statsHelpers.php',
         'www/rutorrent/php/settings.php',
         'www/rutorrent/plugins/theme/conf.php',
         'www/welcome.php',
