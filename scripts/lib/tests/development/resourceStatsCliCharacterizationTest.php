@@ -56,7 +56,7 @@ final class resourceStatsCliCharacterizationTest extends TestCase
     public function testCliFlowSharesProcessorHelpers(): void
     {
         $this->pmssAssertRepoFileContainsString('scripts/cron/resourceStats.php', 'pmssRunCliProcessorEntrypoint(__FILE__, new ResourceStatsProcessor(new resourceStatistics()))');
-        $this->pmssAssertRepoFileContainsString('scripts/lib/runtime.php', 'function pmssRunCliProcessorEntrypoint(string $scriptPath, object $processor): void');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/runtime/cli.php', 'function pmssRunCliProcessorEntrypoint(string $scriptPath, object $processor): void');
         $this->pmssAssertRepoFileNotContainsString('scripts/cron/resourceStats.php', "\$processor->spawnWorkers(\$_SERVER['argv'][0], \$users);");
         $this->pmssAssertRepoFileContainsString('scripts/lib/stats/userStatsProcessor.php', 'function runCli(array $argv, string $scriptPath): int');
         foreach (['scripts/lib/resources/processor.php', 'scripts/lib/traffic/processor.php'] as $path) {

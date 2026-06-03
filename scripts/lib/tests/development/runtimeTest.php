@@ -24,6 +24,36 @@ class RuntimeTest extends TestCase
         ], $this->pmssRunInlinePhpJson($script));
     }
 
+    public function testRuntimeFacadeExportsDecomposedHelperSurface(): void
+    {
+        $runtime = var_export(dirname(__DIR__, 3).'/lib/runtime.php', true);
+        $script = "require_once {$runtime}; echo json_encode([".
+            "'time_keys'=>array_keys(pmssStatsCompareTimesBuild(0)),".
+            "'size_bytes'=>(int) pmssParseSizeToBytes('1G', true, true),".
+            "'argv_quote'=>pmssCommandArgvShellQuote(['alpha beta', 'gamma']),".
+            "'config_columns'=>pmssConfigLineColumns('alpha beta', 2),".
+            "'port'=>pmssNetworkPortParseDigits('8443', 1024, 65535),".
+            "'lock'=>basename(pmssRuntimeLockPath('pmss-runtime-facade.lock')),".
+            "'tty_default'=>pmssStreamIsTty(null, true),".
+            "'systemd_action'=>pmssSystemdUnitActionNameIsSafe('restart'),".
+            "'hostname'=>pmssHostnameIsValid('example.com'),".
+            "'capture'=>function_exists('pmssCommandCapture')".
+            "]);";
+
+        $this->assertSame([
+            'time_keys'      => ['month', 'week', 'day', 'hour', '15min'],
+            'size_bytes'     => 1073741824,
+            'argv_quote'     => "'alpha beta' 'gamma'",
+            'config_columns' => ['alpha', 'beta'],
+            'port'           => 8443,
+            'lock'           => 'pmss-runtime-facade.lock',
+            'tty_default'    => true,
+            'systemd_action' => true,
+            'hostname'       => true,
+            'capture'        => true,
+        ], $this->pmssRunInlinePhpJson($script));
+    }
+
     public function testRuntimeKeepsCliGuardStubCompatibility(): void
     {
         $runtime = var_export(dirname(__DIR__, 3).'/lib/runtime.php', true);
