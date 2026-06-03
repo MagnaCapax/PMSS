@@ -150,91 +150,47 @@ class UserConfigStoreTest extends TestCase
         $this->assertEquals(987, $reloaded['billingClientId']);
     }
 
-    public function testDockerEnabledDefaultsTrue(): void
+    public function testFeatureToggleCharacterizationMatrix(): void
     {
-        $reloaded = $this->reloadBasePayload('docked', [
-            'ramMiB' => 512,
-            'rtorrentPort' => 5002,
-        ]);
-        $this->assertEquals(true, $reloaded['dockerEnabled']);
+        foreach ([
+            ['dckdef', ['ramMiB' => 512, 'rtorrentPort' => 5002], ['dockerEnabled' => true]],
+            ['lighton', ['ramMiB' => 512, 'rtorrentPort' => 5012], ['lighttpdEnabled' => true]],
+            ['dckprod', ['ramMiB' => 512, 'rtorrentPort' => 5007, 'productType' => 'storage-box'], ['dockerEnabled' => true]],
+            ['dckex', ['ramMiB' => 512, 'rtorrentPort' => 5008, 'product' => 'Storage Box 100', 'dockerEnabled' => true], ['dockerEnabled' => true]],
+            ['dckzero', ['rtorrentPort' => 5003, 'dockerEnabled' => 0], ['dockerEnabled' => false]],
+            ['dckstr', ['rtorrentPort' => 5004, 'dockerEnabled' => 'false'], ['dockerEnabled' => false]],
+            ['dcktrue', ['ramMiB' => 512, 'rtorrentPort' => 5005, 'dockerEnabled' => 'true'], ['dockerEnabled' => true]],
+            ['ltpoff', ['ramMiB' => 512, 'rtorrentPort' => 5013, 'lighttpdEnabled' => 'false'], ['lighttpdEnabled' => false]],
+            ['dcklow', ['ramMiB' => 244, 'rtorrentPort' => 5006, 'dockerEnabled' => true], ['dockerEnabled' => false]],
+        ] as $case) {
+            $reloaded = $this->reloadBasePayload($case[0], $case[1]);
+            foreach ($case[2] as $key => $expected) {
+                $this->assertEquals($expected, $reloaded[$key], $case[0].' '.$key);
+            }
+        }
     }
 
-    public function testLighttpdEnabledDefaultsTrue(): void
+    public function testToggleNormalizerCharacterizationMatrix(): void
     {
-        $reloaded = $this->reloadBasePayload('lighton', [
-            'ramMiB' => 512,
-            'rtorrentPort' => 5012,
-        ]);
-        $this->assertEquals(true, $reloaded['lighttpdEnabled']);
-    }
-
-    public function testDockerEnabledIgnoresProductMetadataWhenUnset(): void
-    {
-        $reloaded = $this->reloadBasePayload('dockst', [
-            'ramMiB' => 512,
-            'rtorrentPort' => 5007,
-            'productType' => 'storage-box',
-        ]);
-        $this->assertEquals(true, $reloaded['dockerEnabled']);
-    }
-
-    public function testDockerEnabledExplicitValueStillWinsWhenProductMetadataExists(): void
-    {
-        $reloaded = $this->reloadBasePayload('docksx', [
-            'ramMiB' => 512,
-            'rtorrentPort' => 5008,
-            'product' => 'Storage Box 100',
-            'dockerEnabled' => true,
-        ]);
-        $this->assertEquals(true, $reloaded['dockerEnabled']);
-    }
-
-    public function testDockerEnabledNormalisesFalse(): void
-    {
-        $reloaded = $this->reloadBasePayload('dockoff', [
-            'rtorrentPort' => 5003,
-            'dockerEnabled' => 0,
-        ]);
-        $this->assertEquals(false, $reloaded['dockerEnabled']);
-    }
-
-    public function testDockerEnabledNormalisesFalseString(): void
-    {
-        $reloaded = $this->reloadBasePayload('dockstr', [
-            'rtorrentPort' => 5004,
-            'dockerEnabled' => 'false',
-        ]);
-        $this->assertEquals(false, $reloaded['dockerEnabled']);
-    }
-
-    public function testDockerEnabledNormalisesTrueString(): void
-    {
-        $reloaded = $this->reloadBasePayload('dockon', [
-            'ramMiB' => 512,
-            'rtorrentPort' => 5005,
-            'dockerEnabled' => 'true',
-        ]);
-        $this->assertEquals(true, $reloaded['dockerEnabled']);
-    }
-
-    public function testLighttpdEnabledNormalisesFalseString(): void
-    {
-        $reloaded = $this->reloadBasePayload('lightoff', [
-            'ramMiB' => 512,
-            'rtorrentPort' => 5013,
-            'lighttpdEnabled' => 'false',
-        ]);
-        $this->assertEquals(false, $reloaded['lighttpdEnabled']);
-    }
-
-    public function testDockerEnabledForcedOffBelowRamFloor(): void
-    {
-        $reloaded = $this->reloadBasePayload('docklow', [
-            'ramMiB' => 244,
-            'rtorrentPort' => 5006,
-            'dockerEnabled' => true,
-        ]);
-        $this->assertEquals(false, $reloaded['dockerEnabled']);
+        foreach ([
+            ['dockerEnabled', 'false', false],
+            ['dockerEnabled', '0', false],
+            ['dockerEnabled', 'no', false],
+            ['dockerEnabled', 'off', false],
+            ['dockerEnabled', '', false],
+            ['dockerEnabled', 0, false],
+            ['dockerEnabled', false, false],
+            ['dockerEnabled', 'true', true],
+            ['dockerEnabled', '1', true],
+            ['dockerEnabled', 'yes', true],
+            ['dockerEnabled', 'on', true],
+            ['dockerEnabled', 1, true],
+            ['dockerEnabled', true, true],
+        ] as $case) {
+            $this->assertEquals($case[2], \pmssUserConfigNormaliseToggleValue([$case[0] => $case[1]], $case[0]));
+        }
+        $this->assertEquals(true, \pmssUserConfigNormaliseToggleValue([], 'lighttpdEnabled'));
+        $this->assertEquals(false, \pmssUserConfigNormaliseToggleValue([], 'lighttpdEnabled', false));
     }
 
     public function testPmssUserDockerEnabledDefaultsTrueWhenMissing(): void
@@ -283,6 +239,7 @@ class UserConfigStoreTest extends TestCase
     {
         $store = $this->newStore();
         $this->assertEquals(false, \pmssUserDockerEnabled('../evil', $store));
+        $this->assertEquals(false, \pmssUserDockerEnabled('../evil'));
     }
 
     public function testPmssUserLighttpdEnabledDefaultsTrueWhenMissing(): void
@@ -305,6 +262,16 @@ class UserConfigStoreTest extends TestCase
     {
         $store = $this->newStore();
         $this->assertEquals(false, \pmssUserLighttpdEnabled('../evil', $store));
+        $this->assertEquals(false, \pmssUserLighttpdEnabled('../evil'));
+    }
+
+    public function testResolvePayloadKeepsMissingValidUserAsEmptyArray(): void
+    {
+        $store = new \UserConfigStore($this->configDirPath());
+        $payload = \pmssUserConfigResolvePayload('alice', $store);
+
+        $this->assertEquals([], $payload);
+        $this->assertTrue($store instanceof \UserConfigStore);
     }
 
     public function testUsernameNormalizationStaysConsistentAcrossStoreOperations(): void

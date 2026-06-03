@@ -96,7 +96,7 @@ class UserConfigStore
             return null;
         }
 
-        $payload = $this->readJsonFile($this->userConfigPath($username));
+        $payload = pmssJsonFileReadAssoc($this->userConfigPath($username));
         return is_array($payload) ? $this->normalise($payload) : ($this->loadLegacyUsers()[$username] ?? null);
     }
 
@@ -201,7 +201,12 @@ class UserConfigStore
      */
     public function resolveRamMiB(string $username): int
     {
-        return ($username = $this->validatedUsername($username)) === null ? 0 : $this->resolveRamMiBFromSystemdSlice($username);
+        if (($username = $this->validatedUsername($username)) === null || pmssTestModeEnabled()) {
+            return 0;
+        }
+        $limits = pmssReadUserSlicePropertiesByUsername($username, ['MemoryHigh', 'MemoryMax']);
+        $bytes = (int) (pmssSystemdPropertyTrailingInt($limits['MemoryMax']) ?: pmssSystemdPropertyTrailingInt($limits['MemoryHigh']) ?: 0);
+        return $bytes > 0 ? max(0, (int) floor($bytes / 1048576)) : 0;
     }
 
     private function validatedUsername(string $username): ?string
@@ -223,7 +228,7 @@ class UserConfigStore
 
         $users = [];
         foreach ($files as $file) {
-            $users[basename($file, '.json')] = $this->readJsonFile($file);
+            $users[basename($file, '.json')] = pmssJsonFileReadAssoc($file);
         }
         return $this->normaliseUserMap($users);
     }
@@ -280,14 +285,9 @@ class UserConfigStore
         return $payload;
     }
 
-    private function readJsonFile(string $path): ?array
-    {
-        return pmssJsonFileReadAssoc($path);
-    }
-
     private function loadLegacyUsers(): array
     {
-        $data = $this->readJsonFile($this->legacyAggregatePath);
+        $data = pmssJsonFileReadAssoc($this->legacyAggregatePath);
         if (!is_array($data)) {
             return [];
         }
@@ -322,20 +322,6 @@ class UserConfigStore
         }
 
         return pmssWriteManagedFile($path, $encoded, $owner, $group, $mode);
-    }
-
-    private function resolveRamMiBFromSystemdSlice(string $username): int
-    {
-        if (pmssTestModeEnabled()) {
-            return 0;
-        }
-        $limits = pmssReadUserSlicePropertiesByUsername($username, ['MemoryHigh', 'MemoryMax']);
-        $bytes = (int) (pmssSystemdPropertyTrailingInt($limits['MemoryMax']) ?: pmssSystemdPropertyTrailingInt($limits['MemoryHigh']) ?: 0);
-        if ($bytes <= 0) {
-            return 0;
-        }
-
-        return max(0, (int) floor($bytes / 1048576));
     }
 
     private function readBillingServiceId(string $username): int
