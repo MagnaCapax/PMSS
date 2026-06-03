@@ -73,6 +73,29 @@ function pmssTerminateUserRemoveEmptyDir(string $username, string $phase, string
 }
 
 /**
+ * Remove nginx subdomain route files owned by this terminated user.
+ */
+function pmssTerminateUserRemoveNginxRouteFiles(string $username, bool $dryRun): bool
+{
+    $ok = true;
+    foreach (array(
+        array('', 'remove_nginx_route_file'),
+        array('-hash', 'remove_nginx_route_file_hash'),
+    ) as $routeFileSpec) {
+        $suffix = $routeFileSpec[0];
+        $phase = $routeFileSpec[1];
+        $ok = pmssTerminateUserUnlinkPath(
+            $username,
+            $phase,
+            "/etc/nginx/conf.d/pmss-user-{$username}{$suffix}.conf",
+            $dryRun
+        ) && $ok;
+    }
+
+    return $ok;
+}
+
+/**
  * Move the home out of the active username namespace before slow disk reclaim.
  */
 function pmssTerminateUserMoveHomeForReclaim(string $username, string $homePath, bool $dryRun): string
@@ -291,6 +314,7 @@ if ($homeReclaimPath !== '') {
     pmssUserLifecycleStep('terminate', $username, 'remove_home_fallback', 'cd /home && rm -rf -- '.escapeshellarg($username), $dryRun);
 }
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");
+pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);
 pmssUserLifecycleRefreshNginxConfig(
     'terminate',
     $username,

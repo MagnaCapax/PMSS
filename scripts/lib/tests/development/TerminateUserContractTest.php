@@ -130,6 +130,26 @@ final class TerminateUserContractTest extends TestCase
         );
     }
 
+    public function testTerminateUserRemovesNginxSubdomainRouteFiles(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/terminateUser.php',
+            [
+                'function pmssTerminateUserRemoveNginxRouteFiles',
+                'remove_nginx_route_file',
+                'remove_nginx_route_file_hash',
+                '"/etc/nginx/conf.d/pmss-user-{$username}{$suffix}.conf"',
+            ],
+            'terminateUser.php should remove lifecycle-owned nginx conf.d route files: '
+        );
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/terminateUser.php',
+            ['pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);', 'pmssUserLifecycleRefreshNginxConfig('],
+            'terminateUser.php should remove stale route files before nginx reload: ',
+            'terminateUser.php should reload nginx after route file cleanup: '
+        );
+    }
+
     public function testTerminateUserDryRunGuardsDirectCleanupMutations(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings(
@@ -138,6 +158,7 @@ final class TerminateUserContractTest extends TestCase
                 'function pmssTerminateUserUnlinkPath',
                 'function pmssTerminateUserRemoveEmptyDir',
                 "pmssTerminateUserUnlinkPath(\$username, 'remove_nginx_user_file'",
+                'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
                 '} elseif ($dryRun) {',
                 "'status'  => 'SKIP'",
             ],
