@@ -175,6 +175,8 @@ class IndexSkeletonFrameDataTest extends TestCase
     {
         $home = $this->pmssMakeUserWebHome('pmss-index-proxy-root-');
         $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
+        touch($home.'/.qbittorrentEnable');
+        touch($home.'/.delugeEnable');
         $this->pmssWriteFile(
             $home.'/.lighttpd/custom.d/pmss-qbittorrent.conf',
             '$HTTP["url"] =~ "^/user-alice/qbittorrent/" {'."\n}\n"
@@ -195,10 +197,31 @@ class IndexSkeletonFrameDataTest extends TestCase
         }
     }
 
+    public function testRemoteDisabledRenderSkipsToggleAppProxyFragmentsWithoutEnableFlags(): void
+    {
+        $home = $this->pmssMakeUserWebHome('pmss-index-disabled-proxy-root-');
+        $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
+        $this->pmssWriteFile(
+            $home.'/.lighttpd/custom.d/pmss-qbittorrent.conf',
+            '$HTTP["url"] =~ "^/user-alice/qbittorrent/" {'."\n}\n"
+        );
+        $this->pmssWriteFile(
+            $home.'/.lighttpd/custom.d/pmss-rclone.conf',
+            '$HTTP["url"] =~ "^/user-alice/rclone/" {'."\n}\n"
+        );
+
+        $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+
+        foreach (['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')", '<a href="#rclone"', "loadFrame('rclone', 'rclone/')"] as $needle) {
+            $this->assertStringNotContainsString($needle, $html);
+        }
+    }
+
     public function testRemoteDisabledRenderAddsRcloneFrameFromProxyFragment(): void
     {
         $home = $this->pmssMakeUserWebHome('pmss-index-rclone-root-');
         $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
+        touch($home.'/.rcloneEnable');
         $this->pmssWriteFile(
             $home.'/.lighttpd/custom.d/pmss-rclone.conf',
             '$HTTP["url"] =~ "^/user-alice/rclone/" {'."\n}\n"
@@ -216,12 +239,14 @@ class IndexSkeletonFrameDataTest extends TestCase
         $home = $this->pmssMakeUserWebHome('pmss-index-config-root-');
         $this->pmssEnsureDir($home.'/.config/qBittorrent');
         $this->pmssEnsureDir($home.'/.config/deluge');
+        $this->pmssWriteFile($home.'/.rclonePort', "45678\n");
         touch($home.'/.qbittorrentEnable');
         touch($home.'/.delugeEnable');
+        touch($home.'/.rcloneEnable');
 
         $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
-        foreach (['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')", '<a href="#deluge"', "loadFrame('deluge', 'deluge/')"] as $needle) {
+        foreach (['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')", '<a href="#deluge"', "loadFrame('deluge', 'deluge/')", '<a href="#rclone"', "loadFrame('rclone', 'rclone/')"] as $needle) {
             $this->assertStringContainsString($needle, $html);
         }
     }
@@ -231,10 +256,11 @@ class IndexSkeletonFrameDataTest extends TestCase
         $home = $this->pmssMakeUserWebHome('pmss-index-disabled-config-root-');
         $this->pmssEnsureDir($home.'/.config/qBittorrent');
         $this->pmssEnsureDir($home.'/.config/deluge');
+        $this->pmssWriteFile($home.'/.rclonePort', "45678\n");
 
         $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
-        foreach (['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')", '<a href="#deluge"', "loadFrame('deluge', 'deluge/')"] as $needle) {
+        foreach (['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')", '<a href="#deluge"', "loadFrame('deluge', 'deluge/')", '<a href="#rclone"', "loadFrame('rclone', 'rclone/')"] as $needle) {
             $this->assertStringNotContainsString($needle, $html);
         }
     }

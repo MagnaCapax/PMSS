@@ -85,6 +85,53 @@ if (!function_exists('pmssStatsDockerInactiveNote')) {
     }
 }
 
+if (!function_exists('pmssStatsAppToggleDefinitions')) {
+    /**
+     * Return customer-managed app toggle endpoints for the info-page app rows.
+     */
+    function pmssStatsAppToggleDefinitions(): array
+    {
+        return array(
+            'qBittorrent' => array('enable' => '../.qbittorrentEnable', 'endpoint' => 'qbittorrent.php'),
+            'Deluge'      => array('enable' => '../.delugeEnable',      'endpoint' => 'deluge.php'),
+            'rclone'      => array('enable' => '../.rcloneEnable',      'endpoint' => 'rclone.php'),
+        );
+    }
+}
+
+if (!function_exists('pmssStatsAppToggleButtonHtmlBuild')) {
+    /**
+     * Build an inline enable/disable control next to a customer-managed app status.
+     */
+    function pmssStatsAppToggleButtonHtmlBuild(string $appName, array $definitions): string
+    {
+        if (!isset($definitions[$appName]) || !is_array($definitions[$appName])) {
+            return '';
+        }
+
+        $definition = $definitions[$appName];
+        $endpoint = isset($definition['endpoint']) ? (string) $definition['endpoint'] : '';
+        $enableFile = isset($definition['enable']) ? (string) $definition['enable'] : '';
+        $endpointPath = __DIR__.'/'.$endpoint;
+        if ($endpoint === '' || $enableFile === '' || !is_file($endpointPath) || is_link($endpointPath)) {
+            return '';
+        }
+
+        $enabled = is_file($enableFile);
+        $action = $enabled ? 'disable' : 'start';
+        $label = $enabled ? 'Disable' : 'Enable';
+        $class = $enabled ? 'pmss-app-toggle-disable' : 'pmss-app-toggle-enable';
+
+        return '<button type="button" class="pmss-app-toggle '.$class.'"'
+            .' data-app="'.htmlspecialchars($appName, ENT_QUOTES, 'UTF-8').'"'
+            .' data-endpoint="'.htmlspecialchars($endpoint, ENT_QUOTES, 'UTF-8').'"'
+            .' data-action="'.htmlspecialchars($action, ENT_QUOTES, 'UTF-8').'"'
+            .' aria-label="'.htmlspecialchars($label.' '.$appName, ENT_QUOTES, 'UTF-8').'"'
+            .' onclick="return pmssStatsToggleApp(this);">'.$label.'</button>'
+            .'<span class="pmss-app-toggle-feedback" aria-live="polite"></span>';
+    }
+}
+
 if (defined('PMSS_STATS_HELPERS_ONLY') && PMSS_STATS_HELPERS_ONLY) {
     return;
 }
@@ -240,6 +287,12 @@ $pmssMemoryPressure = function_exists('pmssWebCgroupMemoryStatusRead')
     font-size: 0.95em;
 }
 .status-grid .label { color: #81c784; }
+.status-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
 .status {
     padding: 3px 8px;
     border-radius: 6px;
@@ -256,6 +309,26 @@ $pmssMemoryPressure = function_exists('pmssWebCgroupMemoryStatusRead')
 .status.high { background: #c62828; color: #fff; }
 .status.throttled { background: #8e0000; color: #fff; }
 .status.unavailable { background: #546e7a; color: #fff; }
+.pmss-app-toggle {
+    border: 0;
+    border-radius: 6px;
+    padding: 3px 8px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.85em;
+    line-height: 1.3;
+}
+.pmss-app-toggle-enable { background: #0277bd; }
+.pmss-app-toggle-disable { background: #6d4c41; }
+.pmss-app-toggle:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+.pmss-app-toggle-feedback {
+    min-width: 48px;
+    color: #b0bec5;
+    font-size: 0.85em;
+}
 .memory-pressure-note {
     margin-top: 12px;
     padding: 10px 12px;
@@ -314,6 +387,41 @@ function pmssStatsChartOptions() {
             y: { beginAtZero: true }
         }
     };
+}
+
+function pmssStatsToggleApp(button) {
+    if (!button) return false;
+    var endpoint = button.getAttribute('data-endpoint');
+    var action = button.getAttribute('data-action');
+    var feedback = button.parentNode ? button.parentNode.querySelector('.pmss-app-toggle-feedback') : null;
+    if (!endpoint || !action) return false;
+
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    if (feedback) feedback.textContent = action === 'start' ? 'Starting...' : 'Disabling...';
+
+    var request = new XMLHttpRequest();
+    request.onreadystatechange = function() {
+        if (request.readyState !== 4) return;
+        if (feedback) feedback.textContent = request.status >= 200 && request.status < 400 ? 'Updated' : 'Retry';
+        window.setTimeout(function() {
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.location.reload();
+                    return;
+                }
+            } catch (e) {}
+            window.location.reload();
+        }, 600);
+    };
+    request.onerror = function() {
+        if (feedback) feedback.textContent = 'Retry';
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+    };
+    request.open('POST', endpoint + '?action=' + encodeURIComponent(action), true);
+    request.send('');
+    return false;
 }
 </script>
 
@@ -409,20 +517,23 @@ echo htmlspecialchars($ip !== false ? trim($ip) : 'unknown');
     }
 
     // === App Status via ps aux | grep (hidepid safe) ===
-    $psResult = pmssInfoShellExec('ps aux | grep -E "(rtorrent|deluged|rclone)" | grep -v grep', 'App status');
+    $psResult = pmssInfoShellExec('ps aux | grep -E "(rtorrent|qbittorrent-nox|deluged|rclone)" | grep -v grep', 'App status');
+    $pmssStatsAppToggles = pmssStatsAppToggleDefinitions();
     if ($psResult['error'] !== null) {
-        $apps = [
-            'rTorrent' => 'error',
-            'Deluge'   => 'error',
-            'rclone'   => 'error',
-        ];
+        $apps = array(
+            'rTorrent'    => 'error',
+            'qBittorrent' => 'error',
+            'Deluge'      => 'error',
+            'rclone'      => 'error',
+        );
     } else {
         $psOutput = $psResult['output'];
-        $apps = [
-            'rTorrent' => (stripos($psOutput, 'rtorrent') !== false) ? 'active' : 'stopped',
-            'Deluge'   => (stripos($psOutput, 'deluged') !== false) ? 'active' : 'stopped',
-            'rclone'   => (stripos($psOutput, 'rclone') !== false) ? 'active' : 'stopped',
-        ];
+        $apps = array(
+            'rTorrent'    => (stripos($psOutput, 'rtorrent') !== false) ? 'active' : 'stopped',
+            'qBittorrent' => (stripos($psOutput, 'qbittorrent-nox') !== false) ? 'active' : 'stopped',
+            'Deluge'      => (stripos($psOutput, 'deluged') !== false) ? 'active' : 'stopped',
+            'rclone'      => (stripos($psOutput, 'rclone') !== false) ? 'active' : 'stopped',
+        );
     }
 
     // === Docker Rootless Status ===
@@ -470,7 +581,7 @@ echo htmlspecialchars($ip !== false ? trim($ip) : 'unknown');
         <div></div>
         <?php foreach ($apps as $name => $status): ?>
             <div><?php echo $name; ?></div>
-            <div><span class="status <?php echo $status; ?>"><?php echo ucfirst($status); ?></span><?php if ($name === 'Docker' && $pmssDockerInactiveNote !== ''): ?><span class="docker-note"><?php echo htmlspecialchars($pmssDockerInactiveNote, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?></div>
+            <div class="status-actions"><span class="status <?php echo $status; ?>"><?php echo ucfirst($status); ?></span><?php echo pmssStatsAppToggleButtonHtmlBuild($name, $pmssStatsAppToggles); ?><?php if ($name === 'Docker' && $pmssDockerInactiveNote !== ''): ?><span class="docker-note"><?php echo htmlspecialchars($pmssDockerInactiveNote, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?></div>
         <?php endforeach; ?>
     </div>
 

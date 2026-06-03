@@ -199,6 +199,21 @@ function pmssLocalFrameProxyFragmentMentionsApp($fragment, $app)
         || preg_match('/["\']\/'.$pathPrefix.$appPattern.'(?:\/|["\'])/i', $fragment) === 1;
 }
 
+/** Return true when an app proxy should surface as an enabled tab. */
+function pmssLocalFrameProxyAppEnabled($app, $homePath = '..')
+{
+    $toggleFiles = array(
+        'qbittorrent' => '.qbittorrentEnable',
+        'deluge'      => '.delugeEnable',
+        'rclone'      => '.rcloneEnable',
+    );
+    if (!isset($toggleFiles[$app])) {
+        return true;
+    }
+
+    return is_file(rtrim($homePath, '/').'/'.$toggleFiles[$app]);
+}
+
 /**
  * Discover locally proxied app tabs from customer-readable lighttpd fragments.
  *
@@ -232,6 +247,9 @@ function pmssLocalFrameProxyAppFramesRead($customDir = '../.lighttpd/custom.d', 
             if (isset($frames[$app]) || $frame['url'] === '') {
                 continue;
             }
+            if (!pmssLocalFrameProxyAppEnabled($app, $homePath)) {
+                continue;
+            }
 
             if (pmssLocalFrameProxyFragmentMentionsApp($fragment, $app)) {
                 $frames[$app] = $frame;
@@ -253,17 +271,14 @@ function pmssLocalFrameInstalledAppFramesRead($homePath = '..')
     $frames = array();
     $definitions = pmssLocalFrameProxyAppDefinitions(pmssLocalFrameCurrentUserRead($homePath));
     // A tab is shown only when the per-user enable flag is set — the SAME
-    // signal the service watchdog uses to decide whether the backend runs
-    // (checkQbittorrentInstances.php -> pmssUserWatchdogRunService(...
-    // 'qbittorrentEnable' ...)). A leftover .config/<app> dir from a disabled
-    // service must NOT surface a tab: clicking it loads a backend that is not
-    // running and the customer gets a raw 503. Per ADR 0021 #2: enabled
-    // features only. Requiring BOTH the config dir and the enable flag is
-    // conservative — it only ever removes false-positive tabs, never hides an
-    // app the watchdog is actually keeping alive.
+    // signal the service watchdog uses to decide whether the backend runs.
+    // A leftover config/port file from a disabled service must NOT surface a
+    // tab: clicking it loads a backend that is not running and the customer
+    // gets a raw 503. Per ADR 0021 #2: enabled features only.
     $signals = array(
-        'qbittorrent' => array('config' => '.config/qBittorrent', 'enable' => '.qbittorrentEnable'),
-        'deluge'      => array('config' => '.config/deluge',      'enable' => '.delugeEnable'),
+        'qbittorrent' => array('signal' => '.config/qBittorrent', 'type' => 'dir',  'enable' => '.qbittorrentEnable'),
+        'deluge'      => array('signal' => '.config/deluge',      'type' => 'dir',  'enable' => '.delugeEnable'),
+        'rclone'      => array('signal' => '.rclonePort',         'type' => 'file', 'enable' => '.rcloneEnable'),
     );
 
     $home = rtrim($homePath, '/');
@@ -271,7 +286,9 @@ function pmssLocalFrameInstalledAppFramesRead($homePath = '..')
         if (!isset($definitions[$app]) || $definitions[$app]['url'] === '') {
             continue;
         }
-        if (is_dir($home.'/'.$paths['config']) && is_file($home.'/'.$paths['enable'])) {
+        $signalPath = $home.'/'.$paths['signal'];
+        $signalPresent = $paths['type'] === 'file' ? is_file($signalPath) : is_dir($signalPath);
+        if ($signalPresent && is_file($home.'/'.$paths['enable'])) {
             $frames[$app] = $definitions[$app];
         }
     }

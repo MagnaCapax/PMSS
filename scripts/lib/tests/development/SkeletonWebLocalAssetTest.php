@@ -18,8 +18,8 @@ class SkeletonWebLocalAssetTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings(
             'etc/skel/www/screen.css',
             [
-                'font-size: 11px;',
-                'line-height: 1.25;',
+                'font-size: 13px;',
+                'line-height: 1.3;',
                 'padding: 6px;',
                 'gap: 8px;',
                 'font-size: 1.15rem;',
@@ -125,12 +125,15 @@ class SkeletonWebLocalAssetTest extends TestCase
                 "'www/deluge.php',",
                 "'www/error-503.html',",
                 "'www/filemanager.php',",
+                "'www/info.php',",
                 "'www/index.php',",
                 "'www/jquery.tabs.css',",
                 "'www/mediaStack.php',",
                 "'www/pmssTabs.js',",
                 "'www/qbittorrent.php',",
+                "'www/rclone.php',",
                 "'www/screen.css',",
+                "'www/stats.php',",
                 "'www/welcome.php',",
             ],
             'Missing skeleton sync asset entry: '
