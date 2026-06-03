@@ -109,6 +109,42 @@ class RuntimeTest extends TestCase
         }
     }
 
+    public function testCliEntrypointRelativePathSafetyMatrix(): void
+    {
+        foreach ([
+            'capture.php' => true,
+            'util/systemTest.php' => true,
+            'util/nested-name_1.php' => true,
+            '' => false,
+            '/absolute.php' => false,
+            '../outside.php' => false,
+            'util/../outside.php' => false,
+            'util//systemTest.php' => false,
+            "util/bad\npath.php" => false,
+            'util\\systemTest.php' => false,
+        ] as $relativePath => $expected) {
+            $this->assertSame($expected, \pmssCliEntrypointRelativePathIsSafe($relativePath), 'Unexpected CLI entrypoint path safety result for '.var_export($relativePath, true));
+        }
+    }
+
+    public function testRequireCliEntrypointScriptRejectsTraversalBeforeRequire(): void
+    {
+        $tempDir = $this->pmssMakeTempDir('pmss-runtime-entrypoint-safe-');
+        $baseDir = $tempDir.'/base';
+        $outsidePath = $tempDir.'/outside.php';
+        @mkdir($baseDir, 0755, true);
+        $this->pmssWriteFile(
+            $outsidePath,
+            "<?php\n\$GLOBALS['PMSS_RUNTIME_TEST_OUTSIDE_REQUIRE'] = true;\n"
+        );
+        unset($GLOBALS['PMSS_RUNTIME_TEST_OUTSIDE_REQUIRE']);
+
+        $this->assertThrowsRuntime(static function () use ($baseDir): void {
+            \pmssRequireCliEntrypointScript($baseDir, '../outside.php');
+        }, 'Unsafe CLI entrypoint relative path');
+        $this->assertFalse(isset($GLOBALS['PMSS_RUNTIME_TEST_OUTSIDE_REQUIRE']), 'Unsafe relative path must not be required');
+    }
+
     public function testDefaultCommandTimeoutIs1200Seconds(): void
     {
         $this->assertTrue(defined('PMSS_COMMAND_TIMEOUT_DEFAULT'));

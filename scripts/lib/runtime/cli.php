@@ -20,9 +20,29 @@ function pmssPrepareCliEntrypoint(bool $rootRequired = false, array $argvAppend 
     }
 }
 
+/** Keep wrapper delegation inside the caller-provided script tree. */
+function pmssCliEntrypointRelativePathIsSafe(string $relativePath): bool
+{
+    if ($relativePath === '' || $relativePath[0] === '/' || preg_match('/[\r\n\0\\\\]/', $relativePath) === 1) {
+        return false;
+    }
+
+    foreach (explode('/', $relativePath) as $segment) {
+        if ($segment === '' || $segment === '.' || $segment === '..') {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 function pmssRequireCliEntrypointScript(string $baseDir, string $relativePath, bool $rootRequired = false, array $argvAppend = []): void
 {
     pmssPrepareCliEntrypoint($rootRequired, $argvAppend);
+    if (!pmssCliEntrypointRelativePathIsSafe($relativePath)) {
+        throw new RuntimeException('Unsafe CLI entrypoint relative path');
+    }
+
     require_once rtrim($baseDir, '/').'/'.ltrim($relativePath, '/');
 }
 
