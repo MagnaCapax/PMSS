@@ -120,11 +120,11 @@ class UserLifecycleWatchdogTest extends TestCase
         $marker = $this->pmssMakeTempFile('watchdog-start-');
         @unlink($marker);
 
-        ob_start();
-        $states = pmssUserWatchdogEnsureServices('alice', [
-            pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'demo start requested', 'Demo'),
-        ], ['demo' => false]);
-        ob_end_clean();
+        list($states,) = $this->pmssCaptureStdout(function () use ($marker): array {
+            return pmssUserWatchdogEnsureServices('alice', [
+                pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'demo start requested', 'Demo'),
+            ], ['demo' => false]);
+        });
 
         $this->assertTrue(file_exists($marker));
         $this->assertEquals(['demo' => false], $states);
@@ -135,11 +135,11 @@ class UserLifecycleWatchdogTest extends TestCase
         $marker = $this->pmssMakeTempFile('watchdog-skip-');
         @unlink($marker);
 
-        ob_start();
-        $states = pmssUserWatchdogEnsureServices('alice', [
-            pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'demo start requested', 'Demo'),
-        ], ['demo' => true]);
-        ob_end_clean();
+        list($states,) = $this->pmssCaptureStdout(function () use ($marker): array {
+            return pmssUserWatchdogEnsureServices('alice', [
+                pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'demo start requested', 'Demo'),
+            ], ['demo' => true]);
+        });
 
         $this->assertFalse(file_exists($marker));
         $this->assertEquals(['demo' => true], $states);
@@ -150,13 +150,13 @@ class UserLifecycleWatchdogTest extends TestCase
         $marker = $this->pmssMakeTempFile('watchdog-callback-');
         @unlink($marker);
 
-        ob_start();
-        pmssUserWatchdogEnsureServices('alice', [
-            pmssUserWatchdogServiceSpec('demo', static function () use ($marker): string {
-                return 'touch '.escapeshellarg($marker);
-            }, 'demo start requested', 'Demo'),
-        ], ['demo' => false]);
-        ob_end_clean();
+        $this->pmssCaptureStdout(function () use ($marker): void {
+            pmssUserWatchdogEnsureServices('alice', [
+                pmssUserWatchdogServiceSpec('demo', static function () use ($marker): string {
+                    return 'touch '.escapeshellarg($marker);
+                }, 'demo start requested', 'Demo'),
+            ], ['demo' => false]);
+        });
 
         $this->assertTrue(file_exists($marker));
     }
@@ -166,11 +166,11 @@ class UserLifecycleWatchdogTest extends TestCase
         $marker = $this->pmssMakeTempFile('watchdog-invalid-');
         @unlink($marker);
 
-        ob_start();
-        $states = pmssUserWatchdogEnsureServices('bad-user', [
-            pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'demo start requested', 'Demo'),
-        ], ['demo' => false]);
-        ob_end_clean();
+        list($states,) = $this->pmssCaptureStdout(function () use ($marker): array {
+            return pmssUserWatchdogEnsureServices('bad-user', [
+                pmssUserWatchdogServiceSpec('demo', 'touch '.escapeshellarg($marker), 'demo start requested', 'Demo'),
+            ], ['demo' => false]);
+        });
 
         $this->assertFalse(file_exists($marker));
         $this->assertEquals(['demo' => false], $states);
@@ -259,36 +259,20 @@ class UserLifecycleWatchdogTest extends TestCase
         $this->assertSame(1500, pmssUserWatchdogLocalPortRead($path));
     }
 
-    public function testLocalPortReadRejectsMissingFile(): void
+    public function testLocalPortReadRejectsUnsafeInputs(): void
     {
-        $path = $this->pmssMakeTempPath('watchdog-port-missing-');
-
-        $this->assertSame(null, pmssUserWatchdogLocalPortRead($path));
-    }
-
-    public function testLocalPortReadRejectsMalformedFile(): void
-    {
+        $missing = $this->pmssMakeTempPath('watchdog-port-missing-');
         $path = $this->pmssMakeTempFile('watchdog-port-bad-');
         file_put_contents($path, '1500; touch /tmp/bad');
-
-        $this->assertSame(null, pmssUserWatchdogLocalPortRead($path));
-    }
-
-    public function testLocalPortReadRejectsOutOfRangePort(): void
-    {
-        $path = $this->pmssMakeTempFile('watchdog-port-high-');
-        file_put_contents($path, '65536');
-
-        $this->assertSame(null, pmssUserWatchdogLocalPortRead($path));
-    }
-
-    public function testLocalPortReadRejectsSymlink(): void
-    {
+        $outOfRange = $this->pmssMakeTempFile('watchdog-port-high-');
+        file_put_contents($outOfRange, '65536');
         $target = $this->pmssMakeTempFile('watchdog-port-target-');
         file_put_contents($target, '1500');
         $link = $this->pmssMakeTempPath('watchdog-port-link-');
         symlink($target, $link);
 
-        $this->assertSame(null, pmssUserWatchdogLocalPortRead($link));
+        foreach ([$missing, $path, $outOfRange, $link] as $candidate) {
+            $this->assertSame(null, pmssUserWatchdogLocalPortRead($candidate));
+        }
     }
 }

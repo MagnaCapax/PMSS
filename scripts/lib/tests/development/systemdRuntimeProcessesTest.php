@@ -8,21 +8,16 @@ class SystemdRuntimeProcessesTest extends TestCase
 {
     public function testSystemdUnitNameIsSafeAcceptsCommonUnitNames(): void
     {
-        $this->assertTrue(\pmssSystemdUnitNameIsSafe('lighttpd'));
-        $this->assertTrue(\pmssSystemdUnitNameIsSafe('docker.service'));
-        $this->assertTrue(\pmssSystemdUnitNameIsSafe('rpcbind.socket'));
-        $this->assertTrue(\pmssSystemdUnitNameIsSafe('user@1000.service'));
-        $this->assertTrue(\pmssSystemdUnitNameIsSafe('pmss-test_1.slice'));
+        foreach (['lighttpd', 'docker.service', 'rpcbind.socket', 'user@1000.service', 'pmss-test_1.slice'] as $unit) {
+            $this->assertTrue(\pmssSystemdUnitNameIsSafe($unit), $unit.' should be accepted');
+        }
     }
 
     public function testSystemdUnitNameIsSafeRejectsUnsafeUnitNames(): void
     {
-        $this->assertFalse(\pmssSystemdUnitNameIsSafe(''));
-        $this->assertFalse(\pmssSystemdUnitNameIsSafe('  '));
-        $this->assertFalse(\pmssSystemdUnitNameIsSafe('-demo.service'));
-        $this->assertFalse(\pmssSystemdUnitNameIsSafe('demo service'));
-        $this->assertFalse(\pmssSystemdUnitNameIsSafe("demo\nservice"));
-        $this->assertFalse(\pmssSystemdUnitNameIsSafe('demo;service'));
+        foreach (['', '  ', '-demo.service', 'demo service', "demo\nservice", 'demo;service'] as $unit) {
+            $this->assertFalse(\pmssSystemdUnitNameIsSafe($unit), var_export($unit, true).' should be rejected');
+        }
     }
 
     public function testSystemdUnitStateRejectsUnsafeRequestsBeforeShelling(): void
@@ -34,25 +29,17 @@ class SystemdRuntimeProcessesTest extends TestCase
     public function testStopDisableMaskSystemdUnitSkipsInvalidUnitNameDuringDryRun(): void
     {
         $this->pmssResetRuntimeProfile();
-        putenv('PMSS_DRY_RUN=1');
-
-        try {
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function (): void {
             \pmssStopDisableMaskSystemdUnit('-demo.service', 'Demo', true);
-        } finally {
-            putenv('PMSS_DRY_RUN');
-        }
+        });
 
         $this->assertSame([], $this->pmssProfileCommands());
     }
 
     public function testSystemdActionSkipReasonRejectsInvalidUnitNameDuringDryRun(): void
     {
-        putenv('PMSS_DRY_RUN=1');
-
-        try {
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function (): void {
             $this->assertSame('invalid unit name', \pmssSystemdActionSkipReason('-demo.service'));
-        } finally {
-            putenv('PMSS_DRY_RUN');
-        }
+        });
     }
 }

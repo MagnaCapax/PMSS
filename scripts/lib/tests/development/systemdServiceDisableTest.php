@@ -9,39 +9,42 @@ class SystemdServiceDisableTest extends TestCase
     public function testSeedboxSystemServicesDisableIsLoggedInDryRun(): void
     {
         $this->pmssResetRuntimeProfile();
-        putenv('PMSS_DRY_RUN=1');
-        pmssStopDisableMaskSeedboxSystemServices();
-        putenv('PMSS_DRY_RUN');
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function (): void {
+            pmssStopDisableMaskSeedboxSystemServices();
+        });
 
         $commands = $this->pmssProfileCommands();
-
         $joined = implode("\n", $commands);
-        $this->assertTrue(strpos($joined, "systemctl stop 'deluged'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl disable 'deluged'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'deluged'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl stop 'deluge-web'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl disable 'deluge-web'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'deluge-web'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl stop 'lighttpd'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl disable 'lighttpd'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'qbittorrent-nox'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'exim4'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'transmission-daemon'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'redis-server'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'memcached'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'rpcbind'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'nfs-kernel-server'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'smbd'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'avahi-daemon'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'cups'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'apache2'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'docker.service'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'docker.socket'") !== false);
-        $this->assertTrue(strpos($joined, 'apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold purge -y exim4 exim4-base exim4-config exim4-daemon-light') !== false);
-        $this->assertTrue(strpos($joined, 'apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold autoremove -y') !== false);
-        $this->assertTrue(strpos($joined, "find '/var/spool/exim4/input' -xdev -type f -delete") !== false);
-        $this->assertTrue(strpos($joined, "find '/var/spool/exim4/msglog' -xdev -type f -delete") !== false);
-        $this->assertTrue(strpos($joined, "find '/var/spool/exim4/db' -xdev -type f -delete") !== false);
+        foreach ([
+            "systemctl stop 'deluged'",
+            "systemctl disable 'deluged'",
+            "systemctl mask 'deluged'",
+            "systemctl stop 'deluge-web'",
+            "systemctl disable 'deluge-web'",
+            "systemctl mask 'deluge-web'",
+            "systemctl stop 'lighttpd'",
+            "systemctl disable 'lighttpd'",
+            "systemctl mask 'qbittorrent-nox'",
+            "systemctl mask 'exim4'",
+            "systemctl mask 'transmission-daemon'",
+            "systemctl mask 'redis-server'",
+            "systemctl mask 'memcached'",
+            "systemctl mask 'rpcbind'",
+            "systemctl mask 'nfs-kernel-server'",
+            "systemctl mask 'smbd'",
+            "systemctl mask 'avahi-daemon'",
+            "systemctl mask 'cups'",
+            "systemctl mask 'apache2'",
+            "systemctl mask 'docker.service'",
+            "systemctl mask 'docker.socket'",
+            'apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold purge -y exim4 exim4-base exim4-config exim4-daemon-light',
+            'apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold autoremove -y',
+            "find '/var/spool/exim4/input' -xdev -type f -delete",
+            "find '/var/spool/exim4/msglog' -xdev -type f -delete",
+            "find '/var/spool/exim4/db' -xdev -type f -delete",
+        ] as $fragment) {
+            $this->assertStringContainsString($fragment, $joined);
+        }
 
         $purgeIndex = array_search(
             \aptCmd('purge -y exim4 exim4-base exim4-config exim4-daemon-light'),

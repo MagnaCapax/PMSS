@@ -42,14 +42,14 @@ class rtorrentWatchdogDecisionTest extends TestCase
     {
         $marker = $this->tempDir.'/restart-marker';
 
-        file_put_contents($marker, '900');
-        $this->assertEquals(['grace' => 600, 'restartAge' => 100], \rtorrentProcessUnresponsiveGraceState($marker, 120, 1000));
-
-        file_put_contents($marker, '1000');
-        $this->assertEquals(['grace' => 1200, 'restartAge' => 8000], \rtorrentProcessUnresponsiveGraceState($marker, 120, 9000));
-
-        file_put_contents($marker, '1');
-        $this->assertEquals(['grace' => 120, 'restartAge' => 20000], \rtorrentProcessUnresponsiveGraceState($marker, 120, 20001));
+        foreach ([
+            ['900', 1000, 600, 100],
+            ['1000', 9000, 1200, 8000],
+            ['1', 20001, 120, 20000],
+        ] as $case) {
+            file_put_contents($marker, $case[0]);
+            $this->assertEquals(['grace' => $case[2], 'restartAge' => $case[3]], \rtorrentProcessUnresponsiveGraceState($marker, 120, $case[1]));
+        }
     }
 
     public function testScgiDecisionExtendsGraceWhenProcessStateUnavailable(): void
@@ -99,11 +99,13 @@ class rtorrentWatchdogDecisionTest extends TestCase
         $second = \rtorrentProcessScgiUnresponsiveDecision([44], $states, $queue, $this->wedgeStatePath(), 3);
         $third = \rtorrentProcessScgiUnresponsiveDecision([44], $states, $queue, $this->wedgeStatePath(), 3);
 
-        $this->assertSame('observe_wedge', $first['action']);
-        $this->assertStringContainsString('count=1/3', $first['message']);
-        $this->assertSame('observe_wedge', $second['action']);
-        $this->assertStringContainsString('count=2/3', $second['message']);
-        $this->assertSame('restart', $third['action']);
-        $this->assertStringContainsString('consecutive checks', $third['message']);
+        foreach ([
+            [$first, 'observe_wedge', 'count=1/3'],
+            [$second, 'observe_wedge', 'count=2/3'],
+            [$third, 'restart', 'consecutive checks'],
+        ] as $case) {
+            $this->assertSame($case[1], $case[0]['action']);
+            $this->assertStringContainsString($case[2], $case[0]['message']);
+        }
     }
 }

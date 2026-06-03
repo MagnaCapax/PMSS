@@ -26,8 +26,9 @@ class UpdateServicesRuntimeTest extends TestCase
             $this->pmssMakeArrayLogger($messages)
         );
 
-        $this->assertTrue($this->pmssMessagesContain($messages, 'HostKeyAlgorithms +ssh-rsa'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'PubkeyAcceptedKeyTypes +ssh-rsa'));
+        foreach (['HostKeyAlgorithms +ssh-rsa', 'PubkeyAcceptedKeyTypes +ssh-rsa'] as $message) {
+            $this->assertTrue($this->pmssMessagesContain($messages, $message));
+        }
     }
 
     public function testSshdValidationCommandUsesAbsolutePathWhenExecutable(): void
@@ -60,13 +61,9 @@ class UpdateServicesRuntimeTest extends TestCase
     public function testApplyRuntimeTemplatesLogsCommandsInStableOrderDuringDryRun(): void
     {
         $this->pmssResetRuntimeProfile();
-        putenv('PMSS_DRY_RUN=1');
-
-        try {
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function (): void {
             \pmssApplyRuntimeTemplates();
-        } finally {
-            putenv('PMSS_DRY_RUN');
-        }
+        });
 
         $commands = $this->pmssProfileCommands();
 
