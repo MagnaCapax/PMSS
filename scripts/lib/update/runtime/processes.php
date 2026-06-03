@@ -29,7 +29,7 @@ function pmssSystemdUnitExists(string $unit): bool
     if (!pmssSystemdUnitNameIsSafe($unit)) {
         return false;
     }
-    $candidate = preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $unit) ? $unit : $unit.'.service';
+    $candidate = pmssSystemdUnitDefaultServiceName($unit);
     exec('systemctl list-unit-files '.escapeshellarg($candidate).' 2>/dev/null', $output, $status);
     if ($status === 0) {
         foreach ($output as $line) {
@@ -54,11 +54,8 @@ function pmssSystemdUnitActionIfPresent(string $unit, string $description, strin
     $action = trim($action);
     if (!pmssSystemdUnitActionNameIsSafe($action)) { logmsg("[SKIP] {$description} (invalid systemd action)"); return; }
     if (($skipReason = pmssSystemdActionSkipReason($unit)) !== '') { logmsg("[SKIP] {$description} ({$skipReason})"); return; }
-    runStep($description, 'systemctl '.$action.' '.escapeshellarg(
-        $action === 'enable' && !preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $unit)
-            ? $unit.'.service'
-            : $unit
-    ));
+    $target = $action === 'enable' ? pmssSystemdUnitDefaultServiceName($unit) : $unit;
+    runStep($description, 'systemctl '.$action.' '.escapeshellarg($target));
 }
 
 /**
