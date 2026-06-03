@@ -61,8 +61,8 @@ class TorrentPortFrontendTest extends TestCase
         foreach ($this->frontendPortHelperCases() as $file => $forbidden) {
             $this->pmssAssertRepoFileContainsAndOmitsStrings(
                 'etc/skel/www/'.$file,
-                ["require_once __DIR__.'/../.scriptsInc.php';", 'pmssFrontendToggleAction(', 'static function ()'],
-                array_merge(["require_once '/scripts/lib/user/torrentPort.php';"], $forbidden)
+                ["require_once __DIR__.'/scriptsInc.php';", 'pmssFrontendToggleAction(', 'static function ()'],
+                array_merge(["require_once '/scripts/lib/user/torrentPort.php';", "require_once __DIR__.'/../.scriptsInc.php';"], $forbidden)
             );
         }
     }

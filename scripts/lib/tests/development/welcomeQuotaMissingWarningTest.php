@@ -16,9 +16,9 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-welcome-safety-');
         $www = $dir.'/www';
         $this->pmssEnsureDir($www);
-        $this->pmssWriteFile($dir.'/.scriptsInc.php', $this->pmssReadRepoFile('etc/skel/.scriptsInc.php'));
+        $this->pmssWriteFile($www.'/scriptsInc.php', $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php'));
         $fixture = $www.'/welcomeSafety.php';
-        return $this->pmssWriteFile($fixture, "<?php\nrequire_once __DIR__.'/../.scriptsInc.php';\n".substr($source, $start, $end - $start));
+        return $this->pmssWriteFile($fixture, "<?php\nrequire_once __DIR__.'/scriptsInc.php';\n".substr($source, $start, $end - $start));
     }
 
     private function runWelcomeSafetyScript(string $script): string
