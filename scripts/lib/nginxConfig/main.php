@@ -34,7 +34,9 @@ function pmssCreateNginxConfigChmodGlob(int $mode, string $pattern): void
         }
         if (!@chmod($path, $mode)) {
             fwrite(STDERR, sprintf('[WARN] Failed to chmod %04o nginx config target: %s', $mode, $path).PHP_EOL);
+            continue;
         }
+        clearstatcache(true, $path);
     }
 }
 
