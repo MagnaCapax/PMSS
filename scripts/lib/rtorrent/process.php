@@ -14,6 +14,7 @@ require_once __DIR__.'/../pathSafety.php';
 require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../user/watchdog.php';
 require_once __DIR__.'/legacyDirectives.php';
+require_once __DIR__.'/scgi.php';
 
 // Signal constants for systems without pcntl.
 if (!defined('SIGTERM')) {
@@ -269,6 +270,41 @@ function rtorrentProcessStatesHaveUninterruptibleIo(array $states): bool
     return false;
 }
 
+/** Decide what to do with an alive but SCGI-unresponsive process.
+ * @return array{action:string,message:string} action is extend_grace|observe_wedge|restart.
+ */
+function rtorrentProcessScgiUnresponsiveDecision(
+    array $rtorrentPids,
+    array $processStates,
+    ?array $queueSnapshot,
+    string $wedgeStateFile,
+    int $wedgeCycles
+): array {
+    $pidsText = implode(',', rtorrentProcessNormalizePids($rtorrentPids));
+    if ($processStates === []) {
+        return ['action' => 'extend_grace', 'message' => 'SCGI unresponsive but rtorrent process state is unavailable (pids='.$pidsText.'); extending grace'];
+    }
+
+    if (rtorrentProcessStatesHaveUninterruptibleIo($processStates)) {
+        return ['action' => 'extend_grace', 'message' => 'SCGI unresponsive but rtorrent is in uninterruptible I/O state (pids='.$pidsText.'); extending grace'];
+    }
+
+    if ($queueSnapshot === null || !rtorrentScgiSocketQueueSaturated($queueSnapshot)) {
+        $queueText = $queueSnapshot === null
+            ? 'queue=unavailable'
+            : 'recvQ='.(int) $queueSnapshot['recvQ'].' sendQ='.(int) $queueSnapshot['sendQ'];
+        return ['action' => 'extend_grace', 'message' => 'SCGI unresponsive but rtorrent still alive (pids='.$pidsText.'; '.$queueText.'); extending grace'];
+    }
+
+    $queueText = 'recvQ='.(int) $queueSnapshot['recvQ'].' sendQ='.(int) $queueSnapshot['sendQ'];
+    $wedgeState = rtorrentProcessCheckFailureCountState($wedgeStateFile, $wedgeCycles);
+    if (($wedgeState['action'] ?? '') !== 'stale') {
+        return ['action' => 'observe_wedge', 'message' => 'SCGI accept queue saturated for rtorrent (pids='.$pidsText.'; '.$queueText.'; count='.(int) ($wedgeState['count'] ?? 0).'/'.$wedgeCycles.'); observing'];
+    }
+
+    return ['action' => 'restart', 'message' => 'SCGI accept queue saturated for consecutive checks (pids='.$pidsText.'; '.$queueText.'); restarting rtorrent'];
+}
+
 /**
  * Send a signal to multiple PIDs.
  *
@@ -384,6 +420,51 @@ function rtorrentProcessCheckFailureCountState(string $stateFile, int $failureTh
     }
 
     return ['action' => $count === 1 ? 'record' : 'wait', 'count' => $count];
+}
+
+/** Return all watchdog state paths for a user in one canonical map. */
+function rtorrentProcessWatchdogStatePaths(string $stateDir, string $user): array
+{
+    $prefix = rtrim($stateDir, '/').'/checkRtorrent-';
+    return [
+        'missing' => $prefix.'missing-'.$user.'.ts',
+        'unresponsive' => $prefix.'unresponsive-'.$user.'.ts',
+        'acceptQueueWedge' => $prefix.'accept-queue-'.$user.'.count',
+        'startMarker' => $prefix.'started-'.$user.'.ts',
+        'startFailure' => $prefix.'start-failure-'.$user.'.count',
+        'sessionReset' => $prefix.'session-reset-'.$user.'.ts',
+        'escalation' => $prefix.'escalated-'.$user.'.flag',
+    ];
+}
+
+/** Clear watchdog markers whose underlying condition has resolved. */
+function rtorrentProcessClearResolvedWatchdogState(array $state, bool $rtorrentPresent, bool $executorPresent): void
+{
+    if ($rtorrentPresent || !$executorPresent) rtorrentProcessClearStaleState((string) $state['missing']);
+    if (!$rtorrentPresent) rtorrentProcessClearStaleState((string) $state['acceptQueueWedge']);
+    if ($rtorrentPresent || $executorPresent) {
+        foreach (['startMarker', 'startFailure', 'sessionReset', 'escalation'] as $key) {
+            rtorrentProcessClearStaleState((string) $state[$key]);
+        }
+    }
+}
+
+/** Return the SCGI grace period, extending it after recent restart markers.
+ * @return array{grace:int,restartAge:int}
+ */
+function rtorrentProcessUnresponsiveGraceState(string $restartMarker, int $baseGrace, ?int $now = null): array
+{
+    $now = $now ?? time();
+    $restartTs = is_file($restartMarker) ? (int) trim((string) @file_get_contents($restartMarker)) : 0;
+    $restartAge = $restartTs > 0 ? max(0, $now - $restartTs) : 0;
+    $grace = $baseGrace;
+    if ($restartAge > 0 && $restartAge < 7200) {
+        $grace = max($baseGrace, 600);
+    } elseif ($restartAge > 0 && $restartAge < 14400) {
+        $grace = max($baseGrace, 1200);
+    }
+
+    return ['grace' => $grace, 'restartAge' => $restartAge];
 }
 
 /**

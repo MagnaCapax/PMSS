@@ -10,24 +10,29 @@ class checkRtorrentRestartGraceContractTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings(
             'scripts/cron/checkRtorrent.php',
             [
-                'rtorrentProcessStart($user, $logCallback, $startMarkerState)',
-                '$restartAge < 7200',
-                '$restartAge < 14400',
-                'max(PMSS_RTORRENT_UNRESPONSIVE_GRACE, 600)',
-                'max(PMSS_RTORRENT_UNRESPONSIVE_GRACE, 1200)',
+                "rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])",
+                'rtorrentProcessUnresponsiveGraceState($restartMarker, PMSS_RTORRENT_UNRESPONSIVE_GRACE)',
+                '$restartAge = $graceState[\'restartAge\'];',
+                '$effectiveGrace = $graceState[\'grace\'];',
             ]
         );
         $this->pmssAssertRepoFileContainsAllStrings(
             'scripts/lib/rtorrent/process.php',
-            ['function rtorrentProcessStart(', "'/tmp/.pmss-rtorrent-restart-'.\$user"]
+            [
+                'function rtorrentProcessStart(',
+                "'/tmp/.pmss-rtorrent-restart-'.\$user",
+                '$restartAge < 7200',
+                '$restartAge < 14400',
+                'max($baseGrace, 600)',
+                'max($baseGrace, 1200)',
+            ]
         );
     }
 
-    public function testRestartGraceLogicStaysInlineAndLaunchIsShared(): void
+    public function testRestartGraceLogicUsesSharedHelperAndLaunchIsShared(): void
     {
         $path = 'scripts/cron/checkRtorrent.php';
-        $this->pmssAssertRepoFileNotContainsString($path, 'rtorrentProcessLastRestart'.'Age(', 'Restart age helper should stay inlined in checkRtorrent');
-        $this->pmssAssertRepoFileNotContainsString($path, 'rtorrentProcessExtended'.'Grace(', 'Extended grace helper should stay inlined in checkRtorrent');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/rtorrent/process.php', 'function rtorrentProcessUnresponsiveGraceState(');
         $this->pmssAssertRepoFileNotContainsString($path, "@passthru('/scripts/startRtorrent ", 'checkRtorrent should delegate direct starts to rtorrentProcessStart()');
     }
 }

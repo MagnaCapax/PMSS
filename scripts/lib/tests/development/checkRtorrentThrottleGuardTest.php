@@ -23,7 +23,7 @@ class checkRtorrentThrottleGuardTest extends TestCase
     public function testHealthyLogRemainsOutsideThrottleGuard(): void
     {
         $path = 'scripts/cron/checkRtorrent.php';
-        $this->pmssAssertRepoFileContainsString($path, 'rtorrentProcessStart($user, $logCallback, $startMarkerState)');
+        $this->pmssAssertRepoFileContainsString($path, "rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])");
         $this->pmssAssertRepoFileMatches(
             $path,
             '/if \(\$throttle !== null\) \{.*?\}\s*pmssCheckRtorrentLog\("rTorrent healthy for \{\$user\}", false, \$debug\);/s',

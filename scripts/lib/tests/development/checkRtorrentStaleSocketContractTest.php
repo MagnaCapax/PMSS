@@ -11,7 +11,7 @@ class checkRtorrentStaleSocketContractTest extends TestCase
         $this->pmssAssertRepoFileContainsString($path, 'function pmssCheckRtorrentCleanupStaleSocket(');
         $this->pmssAssertRepoFileMatches(
             $path,
-            '/if \(!\$executorPresent && empty\(\$rtorrentPids\)\) \{.*?\$socketPath = rtorrentScgiSocketPath\(\$user\);.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$unresponsiveState, \$debug\);.*?rtorrentProcessStart\(\$user, \$logCallback, \$startMarkerState\);/s',
+            '/if \(!\$executorPresent && empty\(\$rtorrentPids\)\) \{.*?\$socketPath = rtorrentScgiSocketPath\(\$user\);.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$state\[\'unresponsive\'\], \$debug\);.*?rtorrentProcessStart\(\$user, \$logCallback, \$state\[\'startMarker\'\]\);/s',
             'Missing-process recovery should use the shared stale-socket cleanup before starting rTorrent'
         );
     }
@@ -20,7 +20,7 @@ class checkRtorrentStaleSocketContractTest extends TestCase
     {
         $this->pmssAssertRepoFileMatches(
             'scripts/cron/checkRtorrent.php',
-            '/if \(\$executorPresent && empty\(\$rtorrentPids\)\) \{.*?\$socketPath = rtorrentScgiSocketPath\(\$user\);.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$unresponsiveState, \$debug\);.*?rtorrentProcessCheckStaleState\(\$missingState, PMSS_RTORRENT_MISSING_GRACE\);/s',
+            '/if \(\$executorPresent && empty\(\$rtorrentPids\)\) \{.*?\$socketPath = rtorrentScgiSocketPath\(\$user\);.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$state\[\'unresponsive\'\], \$debug\);.*?rtorrentProcessCheckStaleState\(\$state\[\'missing\'\], PMSS_RTORRENT_MISSING_GRACE\);/s',
             'Executor mismatch recovery should use the shared stale-socket cleanup before missing-process grace handling'
         );
     }
@@ -29,37 +29,38 @@ class checkRtorrentStaleSocketContractTest extends TestCase
     {
         $this->pmssAssertRepoFileMatches(
             'scripts/cron/checkRtorrent.php',
-            '/\$responsive = rtorrentScgiCall\(\$socketPath, \'system\.api_version\', \[\], 5\) !== false;.*?\$rtorrentPids = pmssUserWatchdogProcessPids\(\$user, \'\^rtorrent\'\);.*?if \(empty\(\$rtorrentPids\)\) \{.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$unresponsiveState, \$debug\);.*?rTorrent missing after SCGI probe; starting.*?rtorrentProcessStart\(\$user, \$logCallback, \$startMarkerState\);/s',
+            '/\$responsive = rtorrentScgiCall\(\$socketPath, \'system\.api_version\', \[\], 5\) !== false;.*?\$rtorrentPids = pmssUserWatchdogProcessPids\(\$user, \'\^rtorrent\'\);.*?if \(empty\(\$rtorrentPids\)\) \{.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$state\[\'unresponsive\'\], \$debug\);.*?rTorrent missing after SCGI probe; starting.*?rtorrentProcessStart\(\$user, \$logCallback, \$state\[\'startMarker\'\]\);/s',
             'SCGI recovery should reuse the shared cleanup and restart helpers after re-checking process liveness'
         );
     }
 
     public function testStaleScgiPathRefreshesGraceForNonWedgedAliveRtorrent(): void
     {
-        $path = 'scripts/cron/checkRtorrent.php';
+        $path = 'scripts/lib/rtorrent/process.php';
         $this->pmssAssertRepoFileContainsString(
             $path,
             'SCGI unresponsive but rtorrent still alive (pids='
         );
         $this->pmssAssertRepoFileMatches(
-            $path,
-            '/\$state = rtorrentProcessCheckStaleState\(\$unresponsiveState, \$effectiveGrace\);.*?\$rtorrentPids = pmssUserWatchdogProcessPids\(\$user, \'\^rtorrent\'\);.*?if \(!empty\(\$rtorrentPids\)\) \{.*?\$queueSnapshot = rtorrentScgiSocketQueueSnapshot\(\$socketPath\);.*?if \(\$queueSnapshot === null \|\| !rtorrentScgiSocketQueueSaturated\(\$queueSnapshot\)\) \{.*?pmssCheckRtorrentExtendUnresponsiveGrace\(\s*\$user,.*?\$unresponsiveState,\s*\$acceptQueueWedgeState,\s*\$debug\s*\);.*?continue;\s*\}/s',
-            'Stale SCGI recovery should still extend grace for live rtorrent processes without a saturated accept queue'
+            'scripts/cron/checkRtorrent.php',
+            '/rtorrentProcessScgiUnresponsiveDecision\(.*?\$state\[\'acceptQueueWedge\'\].*?if \(\$decision\[\'action\'\] === \'extend_grace\'\).*?pmssCheckRtorrentExtendUnresponsiveGrace\(\s*\$user,\s*\$decision\[\'message\'\],\s*\$state\[\'unresponsive\'\],\s*\$state\[\'acceptQueueWedge\'\],\s*\$debug\s*\);/s',
+            'Stale SCGI recovery should route live-process grace decisions through the shared decision helper'
         );
     }
 
     public function testStaleScgiPathCanRestartConfirmedAcceptQueueWedge(): void
     {
-        $path = 'scripts/cron/checkRtorrent.php';
-        $this->pmssAssertRepoFileContainsAllStrings($path, [
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkRtorrent.php', [
             'PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES',
-            '$acceptQueueWedgeState',
             'rtorrentProcessStatesForPids($rtorrentPids)',
-            'rtorrentProcessStatesHaveUninterruptibleIo($processStates)',
             'rtorrentScgiSocketQueueSnapshot($socketPath)',
-            'rtorrentScgiSocketQueueSaturated($queueSnapshot)',
-            'rtorrentProcessCheckFailureCountState(',
+            "if (\$decision['action'] === 'observe_wedge')",
             'rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/process.php', [
+            'rtorrentScgiSocketQueueSaturated($queueSnapshot)',
+            'rtorrentProcessCheckFailureCountState($wedgeStateFile, $wedgeCycles)',
+            "'action' => 'restart'",
         ]);
     }
 }

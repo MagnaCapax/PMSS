@@ -335,7 +335,7 @@ class RtorrentProcessTest extends TestCase
             '$rc = rtorrentProcessStart($user, $logFn);',
         ], $processSource);
         $this->assertStringContainsAllStrings([
-            'rtorrentProcessStart($user, $logCallback, $startMarkerState)',
+            "rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])",
             'rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);',
         ], $watchdogSource);
         $this->pmssAssertStringNotContainsString("@passthru('/scripts/startRtorrent ", $watchdogSource);
