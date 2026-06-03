@@ -5,7 +5,8 @@
  * Original concept and implementation: Aleksi Ursin, circa 2010–2015.
  *
  * Responsibilities:
- *  - Build the local tab set from bundled customer-tree definitions.
+ *  - Fetch remote frame definitions from pulsedmedia.com when available.
+ *  - Fallback to a local tab set when remote frames cannot be loaded.
  *  - Merge per-user custom tabs and enabled app tabs into the frame list.
  *
  * Copyright (C) 2010-2025 Magna Capax Finland Oy
@@ -296,10 +297,43 @@ function pmssLocalFrameInstalledAppFramesRead($homePath = '..')
     return $frames;
 }
 
-$useLocalFrames = true;
+// Remote frames can be disabled explicitly for debugging or fully offline
+// deployments by exporting PMSS_DISABLE_REMOTE_FRAMES=1. Local frames are the
+// FAILOVER, not a replacement: the remote guiFrames path is the primary on-load
+// GUI auto-update mechanism. Reverted #601 per operator directive 2026-06-03 —
+// removing the primary instead of keeping local as failover was the defect.
+if (!getenv('PMSS_DISABLE_REMOTE_FRAMES')) {
+    $framesUrl = 'https://pulsedmedia.com/remote/guiFrames.php?v=2';
+    $remoteFrames = function_exists('pmssWelcomeHttpContextCreate')
+        ? @file_get_contents($framesUrl, false, pmssWelcomeHttpContextCreate())
+        : false;
+    if ($remoteFrames !== false && $remoteFrames !== '') {
+        $decoded = @base64_decode($remoteFrames, true);
+        if ($decoded !== false) {
+            $framesCode = @unserialize($decoded);
+            if (is_string($framesCode) && $framesCode !== '') {
+                $frames = eval($framesCode);
+                if (!is_array($frames)) {
+                    $frames = array();
+                    $useLocalFrames = true;
+                }
+            } else {
+                $useLocalFrames = true;
+            }
+        } else {
+            $useLocalFrames = true;
+        }
+    } else {
+        $useLocalFrames = true;
+    }
+} else {
+    $useLocalFrames = true;
+}
 
 if ($useLocalFrames) {
-    // Bundled local tab set for the customer panel.
+    // Minimal local tab set used when remote frames are unavailable.
+    // This keeps the familiar tabbed GUI layout even when pulsedmedia.com
+    // is unreachable or remote frames are explicitly disabled.
     $htmlHead = <<<EOF
 <title>PM Seedbox</title>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>

@@ -108,12 +108,18 @@ class SkeletonWebLocalAssetTest extends TestCase
         );
     }
 
-    public function testLighttpdTemplateDisablesRemoteFrames(): void
+    public function testLighttpdTemplateEnablesRemoteFrames(): void
     {
-        $this->pmssAssertRepoFileContainsString(
+        // Reverted #601 per operator directive 2026-06-03: remote guiFrames is the
+        // PRIMARY on-load GUI auto-update path, local frames are the FAILOVER. The
+        // template must NOT set PMSS_DISABLE_REMOTE_FRAMES, so the per-user php-cgi
+        // environment leaves remote frames enabled. (Safe re-enable precondition:
+        // web4 serves current files via the daily guiv sync cron — see
+        // /home/billing/scripts/sync-guiv-from-pmss.sh.)
+        $this->pmssAssertRepoFileNotContainsStrings(
             'etc/seedbox/config/template.lighttpd',
-            '"PMSS_DISABLE_REMOTE_FRAMES" => "1"',
-            'lighttpd template must set PMSS_DISABLE_REMOTE_FRAMES to prevent remote self-updater from reverting deployed GUI files.'
+            ['PMSS_DISABLE_REMOTE_FRAMES'],
+            'lighttpd template must NOT disable remote frames (remote is primary, local is failover): '
         );
     }
 

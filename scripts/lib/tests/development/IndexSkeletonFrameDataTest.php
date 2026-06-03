@@ -61,12 +61,22 @@ class IndexSkeletonFrameDataTest extends TestCase
         );
     }
 
-    public function testIndexUsesBundledLocalFrameDefinitionsOnly(): void
+    public function testIndexFetchesRemoteFramesWithLocalFallback(): void
     {
+        // Remote guiFrames is the PRIMARY on-load GUI auto-update path; local
+        // frames are the FAILOVER. Reverted #601 per operator directive
+        // 2026-06-03 (removing the primary instead of keeping local as failover
+        // was the defect). The remote block must be present AND every failure
+        // path must fall back to the local frame set.
         $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'etc/skel/www/index.php',
-            ['$useLocalFrames = true;'],
-            ['gui'.'Frames.php', '$frames'.'Code', 'eval'.'($frames'.'Code)']
+            [
+                'gui'.'Frames.php?v=2',
+                "getenv('PMSS_DISABLE_REMOTE_FRAMES')",
+                'eval'.'($frames'.'Code)',
+                '$useLocalFrames = true;',
+            ],
+            ['Build the local tab set from bundled customer-tree definitions.']
         );
     }
 
@@ -365,7 +375,10 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $source = $this->pmssReadRepoFile('etc/skel/www/index.php');
         $start = strpos($source, '/** Detect frames that must open outside the iframe tab container. */');
-        $end = strpos($source, 'if ($useLocalFrames) {');
+        // Extract ONLY the helper-function definitions. End at the remote-frames
+        // procedural block (restored with #601 revert) so the extracted fixture
+        // does NOT execute the top-level guiFrames fetch/eval when required.
+        $end = strpos($source, '// Remote frames can be disabled explicitly for debugging or fully offline');
         $this->assertTrue($start !== false && $end !== false && $end > $start, 'index.php helper extraction markers changed');
 
         $fixture = $this->pmssMakeTempPath('pmss-index-frame-helpers-', '.php');
