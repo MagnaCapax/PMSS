@@ -61,7 +61,7 @@ class Manager
         $user  = $args[0];
         $flags = array_slice($args, 1);
         $parseError = null;
-        $parsedOptions = $this->parseFlagInputs($flags, $parseError);
+        $parsedOptions = $this->parseFlagInputs($flags, $parseError) + ['inline' => [], 'resource' => [], 'io' => []];
         $inlineOptions = $parsedOptions['inline'];
         $uid   = $this->sys->getUid($user);
 
