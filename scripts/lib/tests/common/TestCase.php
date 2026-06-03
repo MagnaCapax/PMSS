@@ -1145,6 +1145,79 @@ abstract class TestCase
         );
     }
 
+    /** Load the customer-panel render harness only for tests that need it. */
+    protected function pmssLoadCustomerPanelRenderHarness(): void
+    {
+        require_once dirname(__DIR__, 2).'/testing/customerPanelRenderEnvironment.php';
+        require_once dirname(__DIR__, 2).'/testing/customerPanelRenderProcess.php';
+    }
+
+    /** Render a customer-panel page in the shared synthetic customer tree. */
+    protected function pmssRenderCustomerPanelPage(string $page, array $homeFlags = [], array $expectation = []): string
+    {
+        $this->pmssLoadCustomerPanelRenderHarness();
+        $runRoot = \pmssCustomerPanelRenderTempRoot();
+        $homeRoot = $runRoot.'/home';
+        $home = $homeRoot.'/renderuser';
+        $www = $home.'/www';
+        $bootstrap = $runRoot.'/php-cli-bootstrap.php';
+
+        try {
+            $setup = \pmssCustomerPanelRenderPrepare($this->pmssRepoPath('etc/skel/www'), $home, $www, $bootstrap);
+            $this->assertTrue($setup['ok'], $setup['error']);
+            foreach ($homeFlags as $flag) {
+                @touch($home.'/'.ltrim((string) $flag, '/'));
+            }
+
+            $result = \pmssCustomerPanelRenderPage(
+                $www,
+                $bootstrap,
+                $homeRoot,
+                $home,
+                $page,
+                array_merge(['minBytes' => 5000, 'query' => ''], $expectation)
+            );
+            $this->assertEquals([], $result['errors'], implode('; ', $result['errors']));
+            return $result['stdout'];
+        } finally {
+            \pmssCustomerPanelRenderCleanup($runRoot);
+        }
+    }
+
+    /** Render a copied user-panel index fixture from its customer www directory. */
+    protected function pmssRenderCopiedUserPanelIndex(array $homeFlags = [], array $configDirs = []): string
+    {
+        $home = $this->pmssMakeUserWebHome('panel-home-');
+        $sourceWww = $this->pmssRepoPath('etc/skel/www');
+        foreach (['index.php', 'pmssTabs.js', 'jquery.tabs.css', 'welcome.php'] as $file) {
+            if (is_file($sourceWww.'/'.$file)) {
+                $this->assertTrue(@copy($sourceWww.'/'.$file, $home.'/www/'.$file), 'Expected copied panel fixture: '.$file);
+            }
+        }
+        foreach ($configDirs as $dir) {
+            $this->pmssEnsureDir($home.'/'.ltrim((string) $dir, '/'));
+        }
+        foreach ($homeFlags as $flag) {
+            @touch($home.'/'.ltrim((string) $flag, '/'));
+        }
+
+        return $this->pmssRunShellCommand(
+            'cd '.escapeshellarg($home.'/www').' && '.escapeshellarg(PHP_BINARY).' index.php',
+            [],
+            '2>/dev/null'
+        );
+    }
+
+    /** Render the repository index.php while using the supplied customer home as cwd. */
+    protected function pmssRenderUserPanelIndexFromHome(string $home, array $environment = [], bool $displayErrors = false): string
+    {
+        $script = ($displayErrors ? 'error_reporting(E_ALL); ini_set("display_errors", "1"); ' : '')
+            .'chdir('.var_export($home.'/www', true).'); '
+            .'ob_start(); include '.var_export($this->pmssRepoPath('etc/skel/www/index.php'), true).'; echo ob_get_clean();';
+
+        return $this->pmssRunInlinePhp($script, $environment, '2>&1');
+    }
+
     private function pmssBuildCommandEnvironmentPrefix(array $environment): string
     {
         $prefix = '';

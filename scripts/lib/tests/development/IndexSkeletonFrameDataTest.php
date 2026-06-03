@@ -157,12 +157,9 @@ class IndexSkeletonFrameDataTest extends TestCase
             ."       /dev/md4    594G   1380G   1725G            5642    690k    863k\n"
         );
 
-        $script = 'chdir('.var_export($home.'/www', true).'); '
-            .'ob_start(); include '.var_export($this->pmssRepoPath('etc/skel/www/index.php'), true).'; $html = ob_get_clean(); '
-            .'if (preg_match(\'/<iframe id="welcomeFrame"[^>]*src="([^"]+)"/\', $html, $m) !== 1) { fwrite(STDERR, "missing welcome iframe\n"); exit(2); } '
-            .'echo html_entity_decode($m[1], ENT_QUOTES, "UTF-8");';
-
-        $src = trim($this->pmssRunInlinePhp($script, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'), '2>&1'));
+        $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+        $this->assertSame(1, preg_match('/<iframe id="welcomeFrame"[^>]*src="([^"]+)"/', $html, $m), 'missing welcome iframe');
+        $src = html_entity_decode($m[1], ENT_QUOTES, 'UTF-8');
 
         $quotaInfo = $this->quotaInfoFromWelcomeUrl($src);
         $this->assertSame(594 * 1024 * 1024 * 1024, $quotaInfo['usedBytes']);
@@ -174,7 +171,7 @@ class IndexSkeletonFrameDataTest extends TestCase
         touch($home.'/.delugeEnable');
         touch($home.'/www/deluge.php');
 
-        $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+        $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
         foreach (['<a href="#deluge"', 'title="Deluge - Torrent web UI"', "loadFrame('deluge', 'deluge/')", '<div id="deluge" class="tabs-container"></div>'] as $needle) {
             $this->assertStringContainsString($needle, $html);
@@ -196,7 +193,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             '$HTTP["url"] =~ "^/user-alice/deluge/" {'."\n}\n"
         );
 
-        $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+        $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
         foreach (['qbittorrent', 'deluge'] as $frame) {
             $this->assertStringContainsString('<a href="#'.$frame.'"', $html);
@@ -220,7 +217,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             '$HTTP["url"] =~ "^/user-alice/rclone/" {'."\n}\n"
         );
 
-        $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+        $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
         foreach (['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')", '<a href="#rclone"', "loadFrame('rclone', 'rclone/')"] as $needle) {
             $this->assertStringNotContainsString($needle, $html);
@@ -237,7 +234,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             '$HTTP["url"] =~ "^/user-alice/rclone/" {'."\n}\n"
         );
 
-        $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+        $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
         foreach (['<a href="#rclone"', 'title="Rclone Web UI"', "loadFrame('rclone', 'rclone/')", '<div id="rclone" class="tabs-container"></div>'] as $needle) {
             $this->assertStringContainsString($needle, $html);
@@ -254,7 +251,7 @@ class IndexSkeletonFrameDataTest extends TestCase
         touch($home.'/.delugeEnable');
         touch($home.'/.rcloneEnable');
 
-        $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+        $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
         foreach (['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')", '<a href="#deluge"', "loadFrame('deluge', 'deluge/')", '<a href="#rclone"', "loadFrame('rclone', 'rclone/')"] as $needle) {
             $this->assertStringContainsString($needle, $html);
@@ -268,7 +265,7 @@ class IndexSkeletonFrameDataTest extends TestCase
         $this->pmssEnsureDir($home.'/.config/deluge');
         $this->pmssWriteFile($home.'/.rclonePort', "45678\n");
 
-        $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+        $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
         foreach (['<a href="#qbittorrent"', "loadFrame('qbittorrent', 'qbittorrent/')", '<a href="#deluge"', "loadFrame('deluge', 'deluge/')", '<a href="#rclone"', "loadFrame('rclone', 'rclone/')"] as $needle) {
             $this->assertStringNotContainsString($needle, $html);
@@ -301,7 +298,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             ))."\n"
         );
 
-        $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+        $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
         foreach (['sabnzbd', 'radarr', 'prowlarr', 'sonarr', 'lidarr', 'readarr'] as $app) {
             $this->assertStringContainsString("loadFrame('".$app."', '/public-alice/".$app."/')", $html);
@@ -315,7 +312,7 @@ class IndexSkeletonFrameDataTest extends TestCase
         $home = $this->pmssMakeUserWebHome('pmss-index-custom-home-');
         $this->pmssWriteFile($home.'/.customFrames', "custom|Custom tooltip|Custom|custom/\n\n");
 
-        $output = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'), true);
+        $output = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'), true);
 
         $this->assertStringContainsString('<a href="#custom"', $output);
         $this->assertStringNotContainsString('Undefined array key', $output);
@@ -420,12 +417,4 @@ class IndexSkeletonFrameDataTest extends TestCase
         return $quotaInfo;
     }
 
-    private function renderIndexFromHome(string $home, array $environment = [], bool $displayErrors = false): string
-    {
-        $script = ($displayErrors ? 'error_reporting(E_ALL); ini_set("display_errors", "1"); ' : '')
-            .'chdir('.var_export($home.'/www', true).'); '
-            .'ob_start(); include '.var_export($this->pmssRepoPath('etc/skel/www/index.php'), true).'; echo ob_get_clean();';
-
-        return $this->pmssRunInlinePhp($script, $environment, '2>&1');
-    }
 }

@@ -1,8 +1,6 @@
 <?php
 namespace PMSS\Tests;
 
-require_once dirname(__DIR__, 2).'/testing/customerPanelRenderEnvironment.php';
-require_once dirname(__DIR__, 2).'/testing/customerPanelRenderProcess.php';
 require_once __DIR__.'/../common/TestCase.php';
 
 class StatsDockerPolicyFrontendTest extends TestCase
@@ -25,27 +23,10 @@ class StatsDockerPolicyFrontendTest extends TestCase
 
     public function testStatsRenderShowsReadOnlyDockerPolicy(): void
     {
-        $sourceWww = $this->pmssRepoPath('etc/skel/www');
-        $runRoot = \pmssCustomerPanelRenderTempRoot();
-        $homeRoot = $runRoot.'/home';
-        $home = $homeRoot.'/renderuser';
-        $www = $home.'/www';
-        $bootstrap = $runRoot.'/php-cli-bootstrap.php';
+        $html = $this->pmssRenderCustomerPanelPage('stats.php');
 
-        try {
-            $setup = \pmssCustomerPanelRenderPrepare($sourceWww, $home, $www, $bootstrap);
-            $this->assertTrue($setup['ok'], $setup['error']);
-
-            $result = \pmssCustomerPanelRenderPage($www, $bootstrap, $homeRoot, $home, 'stats.php', [
-                'minBytes' => 5000,
-                'query' => '',
-            ]);
-            $this->assertEquals([], $result['errors'], implode('; ', $result['errors']));
-            $this->assertStringContainsString('Docker policy:', $result['stdout']);
-            $this->assertStringContainsString('Platform managed', $result['stdout']);
-            $this->assertStringNotContainsString('docker_toggle_state', $result['stdout']);
-        } finally {
-            \pmssCustomerPanelRenderCleanup($runRoot);
-        }
+        $this->assertStringContainsString('Docker policy:', $html);
+        $this->assertStringContainsString('Platform managed', $html);
+        $this->assertStringNotContainsString('docker_toggle_state', $html);
     }
 }

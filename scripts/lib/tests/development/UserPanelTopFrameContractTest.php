@@ -17,35 +17,6 @@ namespace PMSS\Tests;
  */
 class UserPanelTopFrameContractTest extends TestCase
 {
-    /**
-     * Render etc/skel/www/index.php in a throwaway customer home.
-     *
-     * @param string[] $homeFlags  per-user enable flags to touch in the home dir (e.g. '.qbittorrentEnable')
-     * @param string[] $configDirs config dirs to create in the home dir (e.g. '.config/qBittorrent')
-     */
-    private function renderIndex(array $homeFlags = [], array $configDirs = []): string
-    {
-        $home = $this->pmssMakeTempDir('panel-home-');
-        $www = $home.'/www';
-        $this->assertTrue(@mkdir($www, 0755, true) || is_dir($www), 'temp www dir must exist');
-
-        $src = $this->pmssRepoPath('etc/skel/www');
-        foreach (['index.php', 'pmssTabs.js', 'jquery.tabs.css', 'welcome.php'] as $file) {
-            if (is_file($src.'/'.$file)) {
-                copy($src.'/'.$file, $www.'/'.$file);
-            }
-        }
-        foreach ($configDirs as $dir) {
-            @mkdir($home.'/'.$dir, 0755, true);
-        }
-        foreach ($homeFlags as $flag) {
-            touch($home.'/'.$flag);
-        }
-
-        $command = 'cd '.escapeshellarg($www).' && '.escapeshellarg(PHP_BINARY).' index.php 2>/dev/null';
-        return (string) shell_exec($command);
-    }
-
     /** Return the id of the first in-page tab anchor (the default tab), or '' if none. */
     private function firstTabId(string $html): string
     {
@@ -55,7 +26,7 @@ class UserPanelTopFrameContractTest extends TestCase
     /** ADR 0021 #1 — no top-frame entry opens a new window. */
     public function testNavHasNoNewWindowTargets(): void
     {
-        $html = $this->renderIndex();
+        $html = $this->pmssRenderCopiedUserPanelIndex();
         $this->assertStringNotContainsString('target="_blank"', $html,
             'ADR 0021 #1: top-frame navigation must use in-page tabs, never target=_blank / new windows');
     }
@@ -63,7 +34,7 @@ class UserPanelTopFrameContractTest extends TestCase
     /** ADR 0021 #1 — wiki specifically is an in-page tab, not a new-window link. */
     public function testWikiIsInPageTab(): void
     {
-        $html = $this->renderIndex();
+        $html = $this->pmssRenderCopiedUserPanelIndex();
         $this->assertStringContainsString("loadFrame('wiki'", $html,
             'ADR 0021 #1: wiki must render as an in-page tab (loadFrame), not a new-window link');
     }
@@ -71,7 +42,7 @@ class UserPanelTopFrameContractTest extends TestCase
     /** ADR 0021 #3 — the panel opens on welcome by default. */
     public function testDefaultTabIsWelcome(): void
     {
-        $html = $this->renderIndex();
+        $html = $this->pmssRenderCopiedUserPanelIndex();
         $this->assertSame('welcome', $this->firstTabId($html),
             'ADR 0021 #3: the default (first) top-frame tab must be welcome, never a feature tab that may 503');
     }
@@ -79,7 +50,7 @@ class UserPanelTopFrameContractTest extends TestCase
     /** ADR 0021 #2 — a disabled app (config dir present, enable flag absent) must NOT surface a tab. */
     public function testDisabledAppHasNoTab(): void
     {
-        $html = $this->renderIndex([], ['.config/qBittorrent']);
+        $html = $this->pmssRenderCopiedUserPanelIndex([], ['.config/qBittorrent']);
         $this->assertStringNotContainsString("loadFrame('qbittorrent'", $html,
             'ADR 0021 #2: a disabled app (leftover config dir, no enable flag) must not surface a tab — it would 503 on click');
     }
@@ -87,7 +58,7 @@ class UserPanelTopFrameContractTest extends TestCase
     /** ADR 0021 #2 — an enabled app surfaces its tab. */
     public function testEnabledAppShowsTab(): void
     {
-        $html = $this->renderIndex(['.qbittorrentEnable'], ['.config/qBittorrent']);
+        $html = $this->pmssRenderCopiedUserPanelIndex(['.qbittorrentEnable'], ['.config/qBittorrent']);
         $this->assertStringContainsString("loadFrame('qbittorrent'", $html,
             'ADR 0021 #2: an enabled app (enable flag present) must surface its top-frame tab');
     }
@@ -95,7 +66,7 @@ class UserPanelTopFrameContractTest extends TestCase
     /** The panel references its local tab CSS asset (regression guard for missing-asset drift). */
     public function testTabCssAssetReferenced(): void
     {
-        $html = $this->renderIndex();
+        $html = $this->pmssRenderCopiedUserPanelIndex();
         $this->assertStringContainsString('jquery.tabs.css', $html,
             'panel must reference its local tab CSS asset (jquery.tabs.css)');
     }
