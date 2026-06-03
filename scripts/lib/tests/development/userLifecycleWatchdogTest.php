@@ -6,6 +6,37 @@ require_once dirname(__DIR__, 2).'/user/watchdog.php';
 
 class UserLifecycleWatchdogTest extends TestCase
 {
+    public function testManagedConfigAppliesOnlyWhenServiceIsStopped(): void
+    {
+        $calledFor = [];
+
+        $applied = pmssUserWatchdogApplyManagedConfigWhenStopped(
+            'alice',
+            false,
+            static function (string $username) use (&$calledFor): bool {
+                $calledFor[] = $username;
+                return true;
+            }
+        );
+
+        $this->assertTrue($applied);
+        $this->assertEquals(['alice'], $calledFor);
+    }
+
+    public function testManagedConfigSkipsRunningMissingAndInvalidTargets(): void
+    {
+        $called = false;
+        $applier = static function () use (&$called): bool {
+            $called = true;
+            return true;
+        };
+
+        $this->assertFalse(pmssUserWatchdogApplyManagedConfigWhenStopped('alice', true, $applier));
+        $this->assertFalse(pmssUserWatchdogApplyManagedConfigWhenStopped('alice', false, 'pmssMissingConfigApplierForTest'));
+        $this->assertFalse(pmssUserWatchdogApplyManagedConfigWhenStopped('bad-user', false, $applier));
+        $this->assertFalse($called);
+    }
+
     public function testRestartProcessesIfSkipsCallbackWhenServiceIsStopped(): void
     {
         $called = false;

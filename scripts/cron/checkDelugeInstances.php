@@ -21,13 +21,7 @@ pmssUserWatchdogRunService('Deluge', 'delugeEnable', ['deluged', 'deluge-web'], 
     }, 'deluge-web start requested'),
 ], function (string $thisUser): array {
     $running = pmssUserWatchdogProcessRunning($thisUser, 'deluged');
-    // Clobber-safe managed-config enforcement (mirrors checkQbittorrentInstances): apply the
-    // PMSS-managed Deluge config ONLY while deluged is stopped, so the imminent same-pass start
-    // reads it. deluged rewrites core.conf from memory on exit, so a live edit would be clobbered;
-    // managed defaults (incl. pre_allocate_storage) thus land on the next start.
-    if (!$running && function_exists('pmssDelugeApplyManagedConfig')) {
-        pmssDelugeApplyManagedConfig($thisUser);
-    }
+    pmssUserWatchdogApplyManagedConfigWhenStopped($thisUser, $running, 'pmssDelugeApplyManagedConfig');
     $delugedRunning = pmssUserWatchdogRestartProcessesIf($thisUser, $running, ['deluged', 'deluge-web'], static function () use ($thisUser): bool { return function_exists('pmssDelugeApplyUploadThrottle') && pmssDelugeApplyUploadThrottle($thisUser); }, 'deluge restarted to apply upload throttle');
     return ['deluged' => $delugedRunning];
 }, __DIR__.'/../lib/user/deluge.php');

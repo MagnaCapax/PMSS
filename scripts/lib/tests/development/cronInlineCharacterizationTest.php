@@ -25,7 +25,7 @@ class CronInlineCharacterizationTest extends TestCase
         foreach ([
             [
                 'scripts/cron/checkQbittorrentInstances.php',
-                ['pmssUserWatchdogRunService(', 'pmssUserWatchdogRestartProcessesIf(', 'pmssQbittorrentApplyManagedConfig(', 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox stopped due to suspension'", "'qbittorrent-nox start requested'"],
+                ['pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssQbittorrentApplyManagedConfig'", 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox stopped due to suspension'", "'qbittorrent-nox start requested'"],
             ],
             [
                 'scripts/cron/checkRcloneInstances.php',
@@ -33,7 +33,7 @@ class CronInlineCharacterizationTest extends TestCase
             ],
             [
                 'scripts/cron/checkDelugeInstances.php',
-                ['pmssUserWatchdogRunService(', 'pmssUserWatchdogRestartProcessesIf(', 'pmssDelugeApplyManagedConfig(', "'deluge stopped due to suspension'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'"],
+                ['pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssDelugeApplyManagedConfig'", "'deluge stopped due to suspension'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'"],
             ],
         ] as $case) {
             $this->pmssAssertRepoFileContainsAllStrings($case[0], $case[1]);
@@ -83,6 +83,7 @@ class CronInlineCharacterizationTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/watchdog.php', [
             'function pmssUserWatchdogRestartProcessesIf(',
+            'function pmssUserWatchdogApplyManagedConfigWhenStopped(',
             'function pmssUserWatchdogServiceSpec(',
             'function pmssUserWatchdogEnsureServices(',
             'function pmssUserWatchdogRunService(',

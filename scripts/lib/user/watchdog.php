@@ -113,6 +113,16 @@ function pmssUserWatchdogRestartProcessesIf(string $username, bool $running, arr
     return false;
 }
 
+/** Apply daemon-owned config only while stopped so live daemons cannot clobber it on exit. */
+function pmssUserWatchdogApplyManagedConfigWhenStopped(string $username, bool $running, $configApplier): bool
+{
+    if (!pmssValidateUsername($username) || $running || !is_callable($configApplier)) {
+        return false;
+    }
+
+    return (bool) $configApplier($username);
+}
+
 function pmssUserWatchdogServiceSpec(string $processName, $command, string $userLogMessage, string $serviceLabel = ''): array { return $serviceLabel === '' ? ['processName' => $processName, 'command' => $command, 'userLogMessage' => $userLogMessage] : ['processName' => $processName, 'serviceLabel' => $serviceLabel, 'command' => $command, 'userLogMessage' => $userLogMessage]; }
 
 /** @param array<int,array<string,mixed>> $serviceSpecs @param array<string,bool> $runningStates @return array<string,bool> */
