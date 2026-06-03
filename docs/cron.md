@@ -103,6 +103,12 @@ monitoring hooks are missed.
 PMSS does not overwrite per-user crontabs. Users can manage their own schedules
 with `crontab -e` / `crontab -l`.
 
+`scripts/util/setupRootCron.php` also keeps a PMSS-owned `cron.service` drop-in
+under `/etc/systemd/system/cron.service.d/`. The drop-in restarts cron when it
+exits and sets `TasksMax=8192` on the service as an aggregate guard: Debian cron
+does not place per-user crontab jobs inside `user-UID.slice`, so this cap bounds
+cron fork storms while PMSS continues to use the stable vixie-cron path.
+
 Universal PMSS watchdogs (rTorrent, lighttpd, rootless Docker, quotas, traffic
 aggregation, etc.) are owned by root and deployed via `/etc/cron.d/pmss` from
 `etc/seedbox/config/root.cron`.

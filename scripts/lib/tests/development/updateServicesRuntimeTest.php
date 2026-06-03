@@ -100,6 +100,16 @@ class UpdateServicesRuntimeTest extends TestCase
         $this->assertSame(0644, fileperms($dropinFile) & 0777);
     }
 
+    public function testCronRestartDropinBoundsAggregateCronTasks(): void
+    {
+        $content = \pmssCronRestartDropinContent();
+
+        $this->assertTrue(strpos($content, "[Service]\n") === 0);
+        $this->assertStringContainsString("TasksAccounting=yes\n", $content);
+        $this->assertStringContainsString("TasksMax=8192\n", $content);
+        $this->assertStringContainsString("Restart=always\n", $content);
+    }
+
     public function testCronRestartDropinSkipsUnchangedContent(): void
     {
         $root = $this->pmssMakeTempDir('pmss-cron-dropin-same-');

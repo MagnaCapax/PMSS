@@ -465,6 +465,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/setupRootCron.php
   - Behavior: Installs/updates root cron entries from `/etc/seedbox/config/root.cron`.
+  - Behavior: Maintains the PMSS-owned `cron.service` drop-in with `Restart=always` and an aggregate `TasksMax=8192` cap so cron-spawned user jobs cannot consume host-wide pid capacity.
 
 - scripts/util/setupNetwork.php
   - Behavior: Renders and applies FireQOS from `template.fireqos` using `networkLoadConfig()` and `networkLoadLocalnets()`; writes config under `/etc/seedbox/config` and applies rules.

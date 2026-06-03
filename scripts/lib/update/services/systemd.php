@@ -77,10 +77,16 @@ function pmssEnsureCronServiceActive(string $context = 'update'): void
     runStep('Enabling and starting cron service ('.$context.')', 'systemctl enable --now cron.service || true');
 }
 
-/** Return the PMSS-owned restart policy payload for cron.service. */
+/** Return the PMSS-owned cron.service drop-in payload. */
 function pmssCronRestartDropinContent(): string
 {
-    return "[Service]\nRestart=always\nRestartSec=10\n";
+    return "[Service]\n"
+        ."# Debian cron runs user crontabs inside cron.service rather than user-UID.slice.\n"
+        ."# Bound aggregate fork damage until per-user cron isolation is proven safe.\n"
+        ."TasksAccounting=yes\n"
+        ."TasksMax=8192\n"
+        ."Restart=always\n"
+        ."RestartSec=10\n";
 }
 
 /**
