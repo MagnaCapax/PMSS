@@ -252,16 +252,26 @@ function pmssLocalFrameInstalledAppFramesRead($homePath = '..')
 {
     $frames = array();
     $definitions = pmssLocalFrameProxyAppDefinitions(pmssLocalFrameCurrentUserRead($homePath));
+    // A tab is shown only when the per-user enable flag is set — the SAME
+    // signal the service watchdog uses to decide whether the backend runs
+    // (checkQbittorrentInstances.php -> pmssUserWatchdogRunService(...
+    // 'qbittorrentEnable' ...)). A leftover .config/<app> dir from a disabled
+    // service must NOT surface a tab: clicking it loads a backend that is not
+    // running and the customer gets a raw 503. Per ADR 0021 #2: enabled
+    // features only. Requiring BOTH the config dir and the enable flag is
+    // conservative — it only ever removes false-positive tabs, never hides an
+    // app the watchdog is actually keeping alive.
     $signals = array(
-        'qbittorrent' => '.config/qBittorrent',
-        'deluge' => '.config/deluge',
+        'qbittorrent' => array('config' => '.config/qBittorrent', 'enable' => '.qbittorrentEnable'),
+        'deluge'      => array('config' => '.config/deluge',      'enable' => '.delugeEnable'),
     );
 
-    foreach ($signals as $app => $relativePath) {
+    $home = rtrim($homePath, '/');
+    foreach ($signals as $app => $paths) {
         if (!isset($definitions[$app]) || $definitions[$app]['url'] === '') {
             continue;
         }
-        if (is_dir(rtrim($homePath, '/').'/'.$relativePath)) {
+        if (is_dir($home.'/'.$paths['config']) && is_file($home.'/'.$paths['enable'])) {
             $frames[$app] = $definitions[$app];
         }
     }
