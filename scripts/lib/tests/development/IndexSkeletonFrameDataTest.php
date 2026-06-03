@@ -196,6 +196,22 @@ class IndexSkeletonFrameDataTest extends TestCase
         }
     }
 
+    public function testRemoteDisabledRenderAddsRcloneFrameFromProxyFragment(): void
+    {
+        $home = $this->pmssMakeUserWebHome('pmss-index-rclone-root-');
+        $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
+        $this->pmssWriteFile(
+            $home.'/.lighttpd/custom.d/pmss-rclone.conf',
+            '$HTTP["url"] =~ "^/user-alice/rclone/" {'."\n}\n"
+        );
+
+        $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+
+        foreach (['<a href="#rclone"', 'title="Rclone Web UI"', "loadFrame('rclone', 'rclone/')", '<div id="rclone" class="tabs-container"></div>'] as $needle) {
+            $this->assertStringContainsString($needle, $html);
+        }
+    }
+
     public function testRemoteDisabledRenderAddsTorrentFramesFromLocalConfigDirs(): void
     {
         $home = $this->pmssMakeUserWebHome('pmss-index-config-root-');

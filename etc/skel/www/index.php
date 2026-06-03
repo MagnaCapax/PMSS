@@ -142,6 +142,11 @@ function pmssLocalFrameProxyAppDefinitions($username = '')
             'linkText' => 'Deluge',
             'title'    => 'Deluge - Torrent web UI',
         ),
+        'rclone' => array(
+            'url'      => 'rclone/',
+            'linkText' => 'Rclone',
+            'title'    => 'Rclone Web UI',
+        ),
         'jellyfin' => array(
             'url'      => $publicBase === '' ? '' : $publicBase.'jellyfin/web/index.html',
             'linkText' => 'Jellyfin',
