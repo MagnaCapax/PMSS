@@ -215,4 +215,18 @@ class UpdateAppInstallerContractsTest extends TestCase
         }
     }
 
+    public function testSyncthingPinMatchesCheckedReleaseManifest(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/update/apps/syncthing.php');
+        $this->assertSame(1, preg_match('/\$syncthingVersion\s*=\s*\'([^\']+)\';/', $source, $versionMatch), 'Unable to read Syncthing version pin');
+        $this->assertSame(1, preg_match('/\$syncthingSha256\s*=\s*\'([a-f0-9]{64})\';/', $source, $shaMatch), 'Unable to read Syncthing SHA256 pin');
+
+        $manifestPins = [
+            'v2.0.13' => '55ffe8a5deefc373c95a760ab71c3cbe77da493bb9bf426525d33c2fe22ead88',
+        ];
+
+        $this->assertTrue(isset($manifestPins[$versionMatch[1]]), 'Update the Syncthing release manifest pin map when bumping Syncthing');
+        $this->assertSame($manifestPins[$versionMatch[1]], $shaMatch[1], 'Syncthing SHA256 pin does not match the checked release manifest');
+    }
+
 }
