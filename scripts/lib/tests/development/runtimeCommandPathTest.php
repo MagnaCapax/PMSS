@@ -82,6 +82,36 @@ class RuntimeCommandPathTest extends TestCase
         });
     }
 
+    public function testIopingAverageMsDoesNotInvokePathTail(): void
+    {
+        $binDir = $this->pmssMakeTempDir('pmss-ioping-tail-');
+        $marker = $binDir.'/tail-invoked';
+        $this->pmssWriteExecutableFiles($binDir, [
+            'ioping' => "#!/bin/sh\nprintf '%s\\n' 'warmup line'\nprintf '%s\\n' 'min/avg/max/mdev = 1.0 / 4.5 ms / 3.0 / 0.1'\n",
+            'tail' => "#!/bin/sh\n: > ".escapeshellarg($marker)."\nprintf '%s\\n' 'not ioping statistics'\n",
+        ]);
+
+        $this->pmssWithPathPrefix($binDir, function () use ($marker): void {
+            $this->assertEquals(4.5, pmssIopingAverageMs('/tmp'));
+            $this->assertFalse(file_exists($marker), 'PATH-provided tail must not be invoked');
+        });
+    }
+
+    public function testIopingAverageMsSkipsEmptyTargetBeforeLaunching(): void
+    {
+        $binDir = $this->pmssMakeTempDir('pmss-ioping-empty-');
+        $marker = $binDir.'/ioping-invoked';
+        $this->pmssWriteExecutableFiles($binDir, [
+            'ioping' => "#!/bin/sh\n: > ".escapeshellarg($marker)."\nprintf '%s\\n' 'min/avg/max/mdev = 1.0 / 4.5 ms / 3.0 / 0.1'\n",
+        ]);
+
+        $this->pmssWithPathPrefix($binDir, function () use ($marker): void {
+            $this->assertSame(null, pmssIopingAverageMs(null));
+            $this->assertSame(null, pmssIopingAverageMs('  '));
+            $this->assertFalse(file_exists($marker), 'empty target must not launch ioping');
+        });
+    }
+
     public function testIopingAverageMsReturnsNullWhenIopingIsMissing(): void
     {
         $this->pmssWithEnv(['PATH' => '/nonexistent'], function (): void {

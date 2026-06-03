@@ -28,8 +28,13 @@ function pmssCommandArgvShellQuote(array $argv): string { return implode(' ', ar
 function pmssIopingAverageMs(?string $target): ?float
 {
     $bin = pmssCommandPath('ioping');
-    if ($bin === '') return null;
-    $out = trim((string) shell_exec(escapeshellcmd($bin).' -c 10 -i 0.1 -D '.escapeshellarg((string) $target).' 2>&1 | tail -n1'));
+    if ($bin === '' || $target === null || trim($target) === '') return null;
+    $result = pmssCommandCapture(pmssCommandArgvShellQuote([$bin, '-c', '10', '-i', '0.1', '-D', $target]), 10);
+    $out = trim($result['stdout'] !== '' ? $result['stdout'] : $result['stderr']);
+    if ($out !== '') {
+        $lines = preg_split('/\R/', $out);
+        $out = is_array($lines) ? trim((string) end($lines)) : '';
+    }
     if (!preg_match('/min\/avg\/max\/mdev\s*=\s*[^\/]+\/\s*([0-9.]+)\s*(us|ms|s)\s*\//i', $out, $m)) return null;
     $value = (float) $m[1];
     return strtolower($m[2]) === 'us' ? $value / 1000.0 : (strtolower($m[2]) === 's' ? $value * 1000.0 : $value);
