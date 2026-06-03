@@ -9,42 +9,34 @@ final class BonusTrafficCliWrapperCharacterizationTest extends TestCase
 {
     public function testUtilityWrapperDelegatesToSharedTrafficLimitLibrary(): void
     {
-        $path = 'scripts/util/userBonusTraffic.php';
-
-        $this->pmssAssertRepoFileContainsAllStrings(
-            $path,
-            [
-                "require_once __DIR__.'/../lib/user/trafficLimit.php';",
-                "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserBonusTrafficCli');",
-            ]
-        );
-        $this->pmssAssertRepoFileNotContainsStrings(
-            $path,
-            [
-                "require_once '/scripts/lib/user/bonusTraffic.php';",
-                'pmssParseCliTokens($argv',
-                '  ./userBonusTraffic.php --user=<username> --bonus=<GiB>',
-            ]
-        );
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/util/userBonusTraffic.php' => [
+                'required' => [
+                    "require_once __DIR__.'/../lib/user/trafficLimit.php';",
+                    "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserBonusTrafficCli');",
+                ],
+                'forbidden' => [
+                    "require_once '/scripts/lib/user/bonusTraffic.php';",
+                    'pmssParseCliTokens($argv',
+                    '  ./userBonusTraffic.php --user=<username> --bonus=<GiB>',
+                ],
+            ],
+        ]);
     }
 
     public function testCompatibilityShimKeepsLegacyLibraryPathAlive(): void
     {
-        $path = 'scripts/lib/user/bonusTraffic.php';
-
-        $this->pmssAssertRepoFileContainsAllStrings(
-            $path,
-            [
-                'Backward-compatible bonus traffic entrypoint.',
-                "require_once __DIR__.'/trafficLimit.php';",
-            ]
-        );
-        $this->pmssAssertRepoFileNotContainsStrings(
-            $path,
-            [
-                'function pmssUserBonusTrafficCli(array $argv): int',
-                'pmssParseCliTokens($argv)',
-            ]
-        );
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/user/bonusTraffic.php' => [
+                'required' => [
+                    'Backward-compatible bonus traffic entrypoint.',
+                    "require_once __DIR__.'/trafficLimit.php';",
+                ],
+                'forbidden' => [
+                    'function pmssUserBonusTrafficCli(array $argv): int',
+                    'pmssParseCliTokens($argv)',
+                ],
+            ],
+        ]);
     }
 }

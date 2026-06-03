@@ -22,31 +22,16 @@ class CronInlineCharacterizationTest extends TestCase
 
     public function testServiceWatchdogsUseSharedHelpersAndKeepCommands(): void
     {
-        foreach ([
-            [
-                'scripts/cron/checkQbittorrentInstances.php',
-                ['pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssQbittorrentApplyManagedConfig'", 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox stopped due to suspension'", "'qbittorrent-nox start requested'"],
-            ],
-            [
-                'scripts/cron/checkRcloneInstances.php',
-                ['pmssUserWatchdogRunService(', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone stopped due to suspension'", "'rclone start requested'"],
-            ],
-            [
-                'scripts/cron/checkDelugeInstances.php',
-                ['pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssDelugeApplyManagedConfig'", "'deluge stopped due to suspension'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'"],
-            ],
-        ] as $case) {
-            $this->pmssAssertRepoFileContainsAllStrings($case[0], $case[1]);
-        }
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/cron/checkQbittorrentInstances.php' => ['required' => ['pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssQbittorrentApplyManagedConfig'", 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox stopped due to suspension'", "'qbittorrent-nox start requested'"]],
+            'scripts/cron/checkRcloneInstances.php' => ['required' => ['pmssUserWatchdogRunService(', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone stopped due to suspension'", "'rclone start requested'"]],
+            'scripts/cron/checkDelugeInstances.php' => ['required' => ['pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssDelugeApplyManagedConfig'", "'deluge stopped due to suspension'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'"]],
+        ]);
     }
 
     public function testServiceWatchdogsQuoteSuShellBoundaries(): void
     {
-        foreach ([
-            'scripts/cron/checkQbittorrentInstances.php',
-            'scripts/cron/checkRcloneInstances.php',
-            'scripts/cron/checkDelugeInstances.php',
-        ] as $path) {
+        foreach (['scripts/cron/checkQbittorrentInstances.php', 'scripts/cron/checkRcloneInstances.php', 'scripts/cron/checkDelugeInstances.php'] as $path) {
             $src = $this->pmssReadRepoFile($path);
             $unsafeNeedle = 'su '.'{$thisUser}';
             $this->assertStringNotContainsString($unsafeNeedle, $src);

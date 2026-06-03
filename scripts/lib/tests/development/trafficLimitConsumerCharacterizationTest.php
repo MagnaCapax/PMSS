@@ -7,24 +7,20 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 {
     public function testTrafficConsumersUseSharedReaders(): void
     {
-        foreach ([
-            'scripts/cron/trafficLimits.php' => ['pmssTrafficLimitStateRead('],
-            'scripts/lib/stats/collect.php' => ['pmssTrafficLimitStateRead(', 'pmssReadSerializedArrayFile('],
-            'etc/skel/www/stats.php' => ['pmssTrafficLimitStateRead(', 'pmssReadSerializedArrayFile('],
-            'etc/skel/www/welcome.php' => ['pmssTrafficLimitStateRead(', 'pmssReadSerializedArrayFile('],
-        ] as $path => $needles) {
-            $this->pmssAssertRepoFileContainsAllStrings($path, $needles);
-        }
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/cron/trafficLimits.php' => ['required' => ['pmssTrafficLimitStateRead(']],
+            'scripts/lib/stats/collect.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssReadSerializedArrayFile(']],
+            'etc/skel/www/stats.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssReadSerializedArrayFile(']],
+            'etc/skel/www/welcome.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssReadSerializedArrayFile(']],
+        ]);
     }
 
     public function testWebConsumersNoLongerInlineTrafficLimitFileReads(): void
     {
-        foreach ([
-            'etc/skel/www/stats.php' => ["file_get_contents('../.trafficLimit')", "file_get_contents('../.bonusTraffic')"],
-            'etc/skel/www/welcome.php' => ["file_get_contents('../.trafficLimit')", "pmssWelcomeInteger"."FileRead('../.bonusTraffic'"],
-        ] as $path => $needles) {
-            $this->pmssAssertRepoFileNotContainsStrings($path, $needles);
-        }
+        $this->pmssAssertRepoFileContractCases([
+            'etc/skel/www/stats.php' => ['forbidden' => ["file_get_contents('../.trafficLimit')", "file_get_contents('../.bonusTraffic')"]],
+            'etc/skel/www/welcome.php' => ['forbidden' => ["file_get_contents('../.trafficLimit')", "pmssWelcomeInteger"."FileRead('../.bonusTraffic'"]],
+        ]);
     }
 
     public function testPmssStatsNoLongerCarriesLocalIntegerReader(): void
@@ -85,12 +81,10 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
         $slidingKey = 'sliding'.'ThrottleStart';
         $legacyFileKey = 'throttle'.'_mbit';
 
-        foreach ([
-            'scripts/cron/trafficLimits.php' => [$slidingKey, $legacyFileKey],
-            'scripts/lib/network/fireqos.php' => [$legacyFileKey],
-            'scripts/lib/update/networking.php' => [$slidingKey],
-        ] as $path => $needles) {
-            $this->pmssAssertRepoFileNotContainsStrings($path, $needles);
-        }
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/cron/trafficLimits.php' => ['forbidden' => [$slidingKey, $legacyFileKey]],
+            'scripts/lib/network/fireqos.php' => ['forbidden' => [$legacyFileKey]],
+            'scripts/lib/update/networking.php' => ['forbidden' => [$slidingKey]],
+        ]);
     }
 }

@@ -11,7 +11,10 @@ class PackageStateTest extends TestCase
             'function pmssPackageStatus(string $package): string',
             'function pmssPackageAvailable(string $package): bool',
         ]);
-        foreach (['scripts/lib/update/apps/deluge.php', 'scripts/lib/update/distUpgrade.php'] as $file) { $this->pmssAssertRepoFileContainsAndOmitsStrings($file, ['pmssPackageStatus('], ['dpkg -s ' => $file.' should use packageState.php for installed checks', 'dpkg-query -W -f=' => $file.' should use packageState.php for installed checks']); }
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/update/apps/deluge.php' => ['required' => ['pmssPackageStatus('], 'forbidden' => ['dpkg -s ', 'dpkg-query -W -f=']],
+            'scripts/lib/update/distUpgrade.php' => ['required' => ['pmssPackageStatus('], 'forbidden' => ['dpkg -s ', 'dpkg-query -W -f=']],
+        ]);
         $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/update/packageState.php', [
             'PMSS_PACKAGE'.'_QUEUE',
             'pmss'.'QueuePackages',
