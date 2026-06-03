@@ -133,9 +133,9 @@ class ArrUpdateTest extends TestCase
 
         try {
             $this->pmssWithEnv([], function () use ($baseDir, &$output): void {
-                ob_start();
-                $this->runArrUpdate('PmssArrUnsafeExtract', $baseDir.'/install', $baseDir.'/missing-releases.json', '../PackageDir');
-                $output = (string) ob_get_clean();
+                list(, $output) = $this->pmssCaptureStdout(function () use ($baseDir): void {
+                    $this->runArrUpdate('PmssArrUnsafeExtract', $baseDir.'/install', $baseDir.'/missing-releases.json', '../PackageDir');
+                });
             });
 
             $this->assertStringContainsString('Invalid updater configuration: extract_dir', $output);
@@ -152,9 +152,9 @@ class ArrUpdateTest extends TestCase
 
         try {
             $this->pmssWithEnv([], function () use ($baseDir, &$output): void {
-                ob_start();
-                $this->runArrUpdate('PmssArrUnsafeInstall', $baseDir.'/../install', $baseDir.'/missing-releases.json', 'PackageDir');
-                $output = (string) ob_get_clean();
+                list(, $output) = $this->pmssCaptureStdout(function () use ($baseDir): void {
+                    $this->runArrUpdate('PmssArrUnsafeInstall', $baseDir.'/../install', $baseDir.'/missing-releases.json', 'PackageDir');
+                });
             });
 
             $this->assertStringContainsString('Invalid updater configuration: install_path', $output);
@@ -169,9 +169,9 @@ class ArrUpdateTest extends TestCase
         $output = '';
 
         $this->pmssWithEnv([], function () use (&$output): void {
-            ob_start();
-            $this->runArrUpdate('PmssArrUnsafeTopLevel', '/opt', '/tmp/pmss-arr-missing-releases.json', 'PackageDir');
-            $output = (string) ob_get_clean();
+            list(, $output) = $this->pmssCaptureStdout(function (): void {
+                $this->runArrUpdate('PmssArrUnsafeTopLevel', '/opt', '/tmp/pmss-arr-missing-releases.json', 'PackageDir');
+            });
         });
 
         $this->assertStringContainsString('Invalid updater configuration: install_path', $output);
@@ -187,9 +187,9 @@ class ArrUpdateTest extends TestCase
         try {
             $this->pmssCreateSymlinkOrSkip($baseDir, $link);
             $this->pmssWithEnv([], function () use ($link, &$output): void {
-                ob_start();
-                $this->runArrUpdate('PmssArrUnsafeSymlink', $link.'/install', $link.'/missing-releases.json', 'PackageDir');
-                $output = (string) ob_get_clean();
+                list(, $output) = $this->pmssCaptureStdout(function () use ($link): void {
+                    $this->runArrUpdate('PmssArrUnsafeSymlink', $link.'/install', $link.'/missing-releases.json', 'PackageDir');
+                });
             });
 
             $this->assertStringContainsString('Invalid updater configuration: install_path', $output);
@@ -209,9 +209,9 @@ class ArrUpdateTest extends TestCase
         try {
             @file_put_contents($installPath, 'not a directory');
             $this->pmssWithEnv([], function () use ($installPath, $baseDir, &$output): void {
-                ob_start();
-                $this->runArrUpdate('PmssArrUnsafeFile', $installPath, $baseDir.'/missing-releases.json', 'PackageDir');
-                $output = (string) ob_get_clean();
+                list(, $output) = $this->pmssCaptureStdout(function () use ($installPath, $baseDir): void {
+                    $this->runArrUpdate('PmssArrUnsafeFile', $installPath, $baseDir.'/missing-releases.json', 'PackageDir');
+                });
             });
 
             $this->assertStringContainsString('Invalid updater configuration: install_path', $output);
@@ -234,9 +234,9 @@ class ArrUpdateTest extends TestCase
 
         try {
             $this->pmssWithPathPrefix($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir, &$output): void {
-                ob_start();
-                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
-                $output = (string) ob_get_clean();
+                list(, $output) = $this->pmssCaptureStdout(function () use ($app, $installPath, $metadataPath, $extractDir): void {
+                    $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
+                });
             });
 
             $this->assertFalse(is_dir($installPath), 'install path should stay absent when its parent directory is missing');

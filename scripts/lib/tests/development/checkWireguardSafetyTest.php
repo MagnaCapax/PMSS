@@ -49,9 +49,9 @@ class CheckWireguardSafetyTest extends TestCase
         mkdir($configPath);
 
         $this->pmssWithEnv(['PMSS_WIREGUARD_CONFIG_PATH' => $configPath], function (): void {
-            ob_start();
-            $rc = \pmssWireguardCheckMain(['checkWireguard.php']);
-            $output = (string) ob_get_clean();
+            list($rc, $output) = $this->pmssCaptureStdout(function (): int {
+                return \pmssWireguardCheckMain(['checkWireguard.php']);
+            });
 
             $this->assertSame(0, $rc);
             $this->assertStringContainsString('wireguard config not_regular; skipping check', $output);

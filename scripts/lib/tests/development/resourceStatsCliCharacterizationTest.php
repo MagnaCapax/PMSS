@@ -71,18 +71,18 @@ final class resourceStatsCliCharacterizationTest extends TestCase
     {
         $processor = new ResourceStatsCliHarness(['alice'], ['alice', 'bob']);
 
-        ob_start();
-        $userRc = $processor->runCli(['resourceStats.php', 'alice!'], '/scripts/cron/resourceStats.php');
-        $userOutput = ob_get_clean();
+        list($userRc, $userOutput) = $this->pmssCaptureStdout(function () use ($processor): int {
+            return $processor->runCli(['resourceStats.php', 'alice!'], '/scripts/cron/resourceStats.php');
+        });
 
         $this->assertSame(0, $userRc);
         $this->assertSame('', $userOutput);
         $this->assertEquals(['alice', ['month', 'week', 'day', 'hour', '15min']], $processor->processed);
         $this->assertEquals([], $processor->spawned);
 
-        ob_start();
-        $spawnRc = $processor->runCli(['resourceStats.php'], '/scripts/cron/resourceStats.php');
-        $spawnOutput = ob_get_clean();
+        list($spawnRc, $spawnOutput) = $this->pmssCaptureStdout(function () use ($processor): int {
+            return $processor->runCli(['resourceStats.php'], '/scripts/cron/resourceStats.php');
+        });
 
         $this->assertSame(0, $spawnRc);
         $this->assertSame('', $spawnOutput);
@@ -93,9 +93,9 @@ final class resourceStatsCliCharacterizationTest extends TestCase
     {
         $processor = new ResourceStatsCliHarness([], []);
 
-        ob_start();
-        $rc = $processor->runCli(['resourceStats.php', 'bad!'], '/scripts/cron/resourceStats.php');
-        $output = ob_get_clean();
+        list($rc, $output) = $this->pmssCaptureStdout(function () use ($processor): int {
+            return $processor->runCli(['resourceStats.php', 'bad!'], '/scripts/cron/resourceStats.php');
+        });
 
         $this->assertSame(0, $rc);
         $this->assertSame("Invalid user specified: bad\n", $output);

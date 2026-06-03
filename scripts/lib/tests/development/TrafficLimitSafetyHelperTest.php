@@ -173,9 +173,9 @@ class TrafficLimitSafetyHelperTest extends TestCase
     {
         [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real-marker', $this->tempDir.'/runtime/trafficLimits/alice.enabled', 'old', 0700);
 
-        ob_start();
-        $result = \pmssTrafficLimitMarkerTouch('alice', $linkPath);
-        ob_end_clean();
+        list($result) = $this->pmssCaptureStdout(function () use ($linkPath): bool {
+            return \pmssTrafficLimitMarkerTouch('alice', $linkPath);
+        });
 
         $this->assertFalse($result);
         $this->assertTrue(is_link($linkPath));
@@ -191,9 +191,9 @@ class TrafficLimitSafetyHelperTest extends TestCase
     {
         [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real-marker', $this->tempDir.'/runtime/trafficLimits/alice.enabled', 'old', 0700);
 
-        ob_start();
-        $result = \pmssTrafficLimitMarkerRemove('alice', $linkPath);
-        ob_end_clean();
+        list($result) = $this->pmssCaptureStdout(function () use ($linkPath): bool {
+            return \pmssTrafficLimitMarkerRemove('alice', $linkPath);
+        });
 
         $this->assertFalse($result);
         $this->assertTrue(is_link($linkPath));

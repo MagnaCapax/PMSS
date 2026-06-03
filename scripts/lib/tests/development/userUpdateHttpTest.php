@@ -59,12 +59,9 @@ class UserUpdateHttpTest extends TestCase
 
         $ctx = $this->pmssUserUpdateContext($tempHome);
 
-        ob_start();
-        try {
+        list(, $output) = $this->pmssCaptureStdout(function () use ($ctx): void {
             \pmssUserConfigureHttp($ctx);
-        } finally {
-            $output = (string) ob_get_clean();
-        }
+        });
 
         $this->assertEquals("display_errors = On\n", (string) file_get_contents($target));
         $this->assertTrue(strpos($output, 'Updated php.ini for user dummy') === false);
