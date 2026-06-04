@@ -146,4 +146,37 @@ class SkeletonWebLocalAssetTest extends TestCase
             'Missing skeleton sync asset entry: '
         );
     }
+
+    /**
+     * Self-containment safeguard (GH#423 class): every RELATIVE .css/.js asset the
+     * customer panel references MUST exist in skel AND be listed in the per-user
+     * update manifest, so update.php delivers it. References are extracted
+     * DYNAMICALLY (not a hardcoded list) so future additions are covered without
+     * editing this test. Origin: 2026-06-03 — index.php referenced bundled
+     * jquery.tabs.css/pmssTabs.js (GH#423) but the remote heal deleted them and only
+     * update.php delivered them; a referenced-but-undeliverable asset 404s and
+     * breaks/unstyles the dashboard. This test fails the build if any panel file
+     * references a local asset that skel or the manifest does not provide.
+     */
+    public function testReferencedLocalAssetsAreDeliverableViaManifest(): void
+    {
+        $panelFiles = ['etc/skel/www/index.php', 'etc/skel/www/welcome.php', 'etc/skel/www/info.php'];
+        $manifest = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
+        $repoRoot = $this->pmssRepoRoot();
+        $missing = [];
+        foreach ($panelFiles as $panel) {
+            $src = $this->pmssReadRepoFile($panel);
+            if (!preg_match_all('/(?:src|href)="(?!https?:)(?!\/)([^"?]+\.(?:css|js))(?:\?[^"]*)?"/', $src, $matches)) {
+                continue;
+            }
+            foreach (array_unique($matches[1]) as $asset) {
+                if (!is_file($repoRoot.'/etc/skel/www/'.$asset)) {
+                    $missing[] = $panel.' references "'.$asset.'" but it is missing from etc/skel/www/';
+                } elseif (strpos($manifest, "'www/".$asset."'") === false) {
+                    $missing[] = $panel.' references "'.$asset.'" but "www/'.$asset.'" is NOT in the update.php manifest (filesystem.php) — update.php will not deliver it';
+                }
+            }
+        }
+        $this->assertSame([], $missing, "Customer-panel local asset(s) referenced but not deliverable:\n".implode("\n", $missing));
+    }
 }
