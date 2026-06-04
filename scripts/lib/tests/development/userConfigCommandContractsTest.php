@@ -34,7 +34,7 @@ class userConfigCommandContractsTest extends TestCase
                     "runStep('Installing systemd-container tools', 'apt-get install -y systemd-container');",
                     "'Configuring rootless Docker'",
                     "'machinectl shell %1\$s@ /usr/bin/dockerd-rootless-setuptool.sh install'",
-                    '@file_put_contents($rclonePortFile, (string) rand(1500, 65500)) === false',
+                    'pmssNetworkPortFileWrite($rclonePortFile, (int) rand(1500, 65500), 1024, 65500, 0644)',
                     'Warning: failed to write rclone port',
                     'Warning: failed to create qBittorrent config directory',
                     '@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false',

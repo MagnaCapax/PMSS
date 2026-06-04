@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/../update/runtime/commands.php';
 require_once __DIR__.'/../update/distro.php';
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/traffic.php';
 require_once __DIR__.'/passwords.php';
 
@@ -123,7 +124,7 @@ function userConfigureDeluge(array $user, array $configuration): void
     $webConfig   = str_replace(['##WEBPORT', '##USER'], [$delugePort + 1, $username], $webTemplate);
     $webConfChanged = is_string($existingWebConfig) && $existingWebConfig !== $webConfig;
     file_put_contents($webConfPath, $webConfig);
-    file_put_contents("$home/.delugePort", $delugePort);
+    pmssNetworkPortFileWrite("$home/.delugePort", (int) $delugePort, 1024, 65000, 0644);
 
     if (!file_exists("$configDir/auth")) {
         $authTemplate = pmssDelugeTemplatePath('template.deluge.auth');

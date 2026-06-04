@@ -18,6 +18,7 @@ foreach (['traffic', 'iopsLimit', 'deluge', 'qbittorrent', 'userConfigStore'] as
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/user/userConfigCli.php';
 require_once __DIR__.'/../lib/user/userConfigRuntime.php';
+require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 require_once __DIR__.'/../lib/rtorrentConfig.php';
 require_once __DIR__.'/../lib/rutorrent/config.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
@@ -209,10 +210,8 @@ if ($scgiPort > 0 && (!isset($payload['rtorrentPort']) || (int) $payload['rtorre
 echo "Changing ruTorrent config\n";
 updateRutorrentConfig($user['name'], $scgiPort);
 $rclonePortFile = sprintf('/home/%s/.rclonePort', $user['name']);
-if (!file_exists($rclonePortFile)) {
-    if (@file_put_contents($rclonePortFile, (string) rand(1500, 65500)) === false) {
-        fwrite(STDERR, "Warning: failed to write rclone port for {$user['name']}\n");
-    }
+if (!file_exists($rclonePortFile) && !pmssNetworkPortFileWrite($rclonePortFile, (int) rand(1500, 65500), 1024, 65500, 0644)) {
+    fwrite(STDERR, "Warning: failed to write rclone port for {$user['name']}\n");
 }
 userConfigureDeluge($user, $configuration);
 $qbittorrentConfigDir = sprintf('/home/%s/.config/qBittorrent', $user['name']);
@@ -245,7 +244,7 @@ if (!file_exists($qbittorrentConfigFile)) {
     if (@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false) {
         fwrite(STDERR, "Warning: failed to write qBittorrent config for {$user['name']}\n");
     }
-    if (@file_put_contents(sprintf('/home/%s/.qbittorrentPort', $user['name']), (string) $qbittorrentPort) === false) {
+    if (!pmssNetworkPortFileWrite(sprintf('/home/%s/.qbittorrentPort', $user['name']), $qbittorrentPort, 1024, 65500, 0644)) {
         fwrite(STDERR, "Warning: failed to write qBittorrent port for {$user['name']}\n");
     }
 }

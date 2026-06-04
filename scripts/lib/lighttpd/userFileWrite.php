@@ -7,6 +7,7 @@
 
 require_once __DIR__.'/../pathSafety.php';
 require_once __DIR__.'/../log.php';
+require_once __DIR__.'/../runtime/filesystem.php';
 
 function pmssUserFilePathIsSafe(string $path): bool
 {
@@ -156,6 +157,13 @@ function pmssReplaceUserFilePreservingMetadata(string $path, string $content, in
         if ($owner !== null) @chown($tmpPath, $owner);
         if ($group !== null) @chgrp($tmpPath, $group);
     });
+}
+
+/** Persist a numeric network port through the shared symlink-safe writer. */
+function pmssNetworkPortFileWrite(string $path, int $port, int $min = 1, int $max = 65535, int $fallbackMode = 0640): bool
+{
+    return pmssNetworkPortInRange($port, $min, $max)
+        && pmssReplaceUserFilePreservingMetadata($path, (string) $port, $fallbackMode);
 }
 
 function pmssAtomicWriteFile(string $path, string $content, ?int $mode = null): bool
