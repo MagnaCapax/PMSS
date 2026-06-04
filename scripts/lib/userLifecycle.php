@@ -224,6 +224,40 @@ function pmssUserLifecycleRequireUserRoots(array $argv, string $scriptName, stri
 }
 
 /**
+ * Validate a lifecycle web root before rename, restore, or marker decisions.
+ */
+function pmssUserLifecycleWebRootPathIsSafe(string $homeDir, string $path, string $expectedBasename, bool $requireExistingDir): bool
+{
+    $homeDir = rtrim($homeDir, '/');
+    if (
+        $homeDir === ''
+        || $path === ''
+        || $expectedBasename === ''
+        || preg_match('/[\r\n\0\/]/', $expectedBasename) === 1
+        || pmssFilesystemPathHasNulByte($homeDir)
+        || pmssFilesystemPathHasNulByte($path)
+        || is_link($homeDir)
+    ) {
+        return false;
+    }
+
+    $realHome = realpath($homeDir);
+    if ($realHome === false || $realHome !== $homeDir || dirname($path) !== $homeDir || basename($path) !== $expectedBasename) {
+        return false;
+    }
+
+    if (is_link($path)) {
+        return false;
+    }
+    if (!file_exists($path)) {
+        return !$requireExistingDir;
+    }
+
+    $realPath = realpath($path);
+    return $realPath !== false && $realPath === $path && is_dir($realPath);
+}
+
+/**
  * Mirror the best-effort suspended flag into the durable user config store.
  */
 function pmssUserLifecycleSetSuspendedState(string $username, bool $suspended, ?callable $stateWriter = null): bool

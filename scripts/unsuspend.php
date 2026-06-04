@@ -22,11 +22,24 @@ pmssRequireHomeMounted('unsuspend.php');
 
 ['username' => $username, 'homeDir' => $homeDir, 'activeRoot' => $activeRoot, 'disabledRoot' => $disabledRoot] = pmssUserLifecycleRequireUserRoots($argv, 'unsuspend.php', 'unsuspend');
 
+$activeRootExists = file_exists($activeRoot) || is_link($activeRoot);
+$disabledRootExists = file_exists($disabledRoot) || is_link($disabledRoot);
+$activeRootSafe = pmssUserLifecycleWebRootPathIsSafe($homeDir, $activeRoot, 'www', $activeRootExists);
+$disabledRootSafe = pmssUserLifecycleWebRootPathIsSafe($homeDir, $disabledRoot, 'www-disabled', $disabledRootExists);
+if (!$activeRootSafe) {
+    pmssUserLifecycleContextLogStatusMessage('unsuspend', 'validate_web_root', $username, 'ERR', 'Refusing unsafe active web root', array('path' => $activeRoot));
+    die("Refusing unsafe active web root\n");
+}
+if (!$disabledRootSafe) {
+    pmssUserLifecycleContextLogStatusMessage('unsuspend', 'validate_web_root', $username, 'ERR', 'Refusing unsafe suspended web root', array('path' => $disabledRoot));
+    die("Refusing unsafe suspended web root\n");
+}
+
 $restoredFromBackup = false;
 // Canonical suspended detection: only the presence of www-disabled matters.
 // Recovery path: if both www-disabled and www are absent, restore a backup.
-if (!is_dir($disabledRoot)) {
-    if (!is_dir($activeRoot)) {
+if (!$disabledRootExists) {
+    if (!$activeRootExists) {
         $candidate = pmssUserLifecycleFindSuspendedBackup($homeDir);
         if ($candidate !== null && @rename($candidate, $activeRoot)) {
             echo "Notice: restored {$activeRoot} from {$candidate}\n";
@@ -69,16 +82,17 @@ if (!$htpasswdSynced) {
 
 // Preserve any unexpected www/ content created during suspension (or by legacy
 // scripts) before restoring the original web root.
-if (is_dir($activeRoot) && !$restoredFromBackup && is_dir($disabledRoot)) {
+if ($activeRootExists && !$restoredFromBackup && $disabledRootExists) {
     $backup = $homeDir.'/www-suspended-'.date('YmdHis');
     if (@rename($activeRoot, $backup)) {
         echo "Notice: moved existing {$activeRoot} to {$backup} before restore\n";
+        $activeRootExists = false;
     } else {
         echo "Warning: existing {$activeRoot} may prevent restore; please inspect and clean up manually\n";
     }
 }
 
-if (is_dir($disabledRoot) && !@rename($disabledRoot, $activeRoot)) {
+if ($disabledRootExists && !$activeRootExists && !@rename($disabledRoot, $activeRoot)) {
     echo "Warning: failed to restore {$disabledRoot}\n";
 }
 // Best-effort: mirror the state in the user config store (marker is canonical).

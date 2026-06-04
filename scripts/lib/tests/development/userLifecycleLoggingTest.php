@@ -162,6 +162,50 @@ class userLifecycleLoggingTest extends TestCase
         );
     }
 
+    public function testWebRootPathGuardRequiresDirectNonSymlinkedHomeChild(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-user-lifecycle-webroot-guard-');
+        $valid = $home.'/www';
+        $missing = $home.'/www-disabled';
+        $nested = $home.'/nested/www';
+        $outside = $this->pmssMakeTempDir('pmss-user-lifecycle-webroot-outside-').'/www';
+        $wrongName = $home.'/public';
+
+        foreach (array($valid, $nested, $outside, $wrongName) as $path) {
+            $this->pmssEnsureDir($path);
+        }
+
+        $this->assertTrue(\pmssUserLifecycleWebRootPathIsSafe($home, $valid, 'www', true));
+        $this->assertTrue(\pmssUserLifecycleWebRootPathIsSafe($home, $missing, 'www-disabled', false));
+        $this->assertFalse(\pmssUserLifecycleWebRootPathIsSafe($home, $missing, 'www-disabled', true));
+        $this->assertFalse(\pmssUserLifecycleWebRootPathIsSafe($home, $nested, 'www', true));
+        $this->assertFalse(\pmssUserLifecycleWebRootPathIsSafe($home, $outside, 'www', true));
+        $this->assertFalse(\pmssUserLifecycleWebRootPathIsSafe($home, $wrongName, 'www', true));
+        $this->assertFalse(\pmssUserLifecycleWebRootPathIsSafe('', $valid, 'www', true));
+        $this->assertFalse(\pmssUserLifecycleWebRootPathIsSafe($home, $valid, "bad\nname", true));
+
+        $link = $home.'/www-link';
+        if (@symlink($valid, $link)) {
+            $this->assertFalse(\pmssUserLifecycleWebRootPathIsSafe($home, $link, 'www-link', true));
+        }
+    }
+
+    public function testSuspendAndUnsuspendGuardWebRootRenameTargets(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/suspend.php', array(
+            "pmssUserLifecycleWebRootPathIsSafe(\$homeDir, \$activeRoot, 'www', \$activeRootExists)",
+            "pmssUserLifecycleWebRootPathIsSafe(\$homeDir, \$disabledRoot, 'www-disabled', \$disabledRootExists)",
+            "if (!\$activeRootSafe)",
+            "if (!\$disabledRootSafe)",
+        ));
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/unsuspend.php', array(
+            "pmssUserLifecycleWebRootPathIsSafe(\$homeDir, \$activeRoot, 'www', \$activeRootExists)",
+            "pmssUserLifecycleWebRootPathIsSafe(\$homeDir, \$disabledRoot, 'www-disabled', \$disabledRootExists)",
+            "if (!\$activeRootSafe)",
+            "if (!\$disabledRootSafe)",
+        ));
+    }
+
     public function testFindSuspendedBackupSelectsNewestContentfulCandidate(): void
     {
         $home = $this->pmssMakeTempDir('pmss-user-lifecycle-backup-');

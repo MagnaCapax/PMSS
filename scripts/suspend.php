@@ -22,8 +22,21 @@ pmssRequireHomeMounted('suspend.php');
 
 ['username' => $username, 'homeDir' => $homeDir, 'activeRoot' => $activeRoot, 'disabledRoot' => $disabledRoot] = pmssUserLifecycleRequireUserRoots($argv, 'suspend.php', 'suspend');
 
+$activeRootExists = file_exists($activeRoot) || is_link($activeRoot);
+$disabledRootExists = file_exists($disabledRoot) || is_link($disabledRoot);
+$activeRootSafe = pmssUserLifecycleWebRootPathIsSafe($homeDir, $activeRoot, 'www', $activeRootExists);
+$disabledRootSafe = pmssUserLifecycleWebRootPathIsSafe($homeDir, $disabledRoot, 'www-disabled', $disabledRootExists);
+if (!$activeRootSafe) {
+    pmssUserLifecycleContextLogStatusMessage('suspend', 'validate_web_root', $username, 'ERR', 'Refusing unsafe active web root', array('path' => $activeRoot));
+    die("Refusing unsafe active web root\n");
+}
+if (!$disabledRootSafe) {
+    pmssUserLifecycleContextLogStatusMessage('suspend', 'validate_web_root', $username, 'ERR', 'Refusing unsafe suspended web root', array('path' => $disabledRoot));
+    die("Refusing unsafe suspended web root\n");
+}
+
 // Canonical suspended detection: only the presence of www-disabled matters.
-if (is_dir($disabledRoot)) {
+if ($disabledRootExists) {
     pmssUserLifecycleSetSuspendedState($username, true);
     pmssUserLifecycleContextLogStatusMessage('suspend', 'already_suspended', $username, 'SKIP', 'User already suspended');
     die("User already suspended\n");
@@ -40,7 +53,7 @@ pmssUserLifecycleRunSteps('suspend', $username, array(
 
 // Best-effort archive of the original web root. We only create a placeholder
 // landing page if the original content is safely moved aside.
-if (is_dir($activeRoot)) {
+if ($activeRootExists) {
     if (!@rename($activeRoot, $disabledRoot)) {
         echo "Warning: failed to archive {$activeRoot}, attempting to continue\n";
     }
@@ -48,7 +61,7 @@ if (is_dir($activeRoot)) {
 
 // The canonical suspended marker is www-disabled. Ensure it exists even when the
 // user did not have a www/ directory at suspend time (rare legacy state).
-if (!is_dir($disabledRoot)) {
+if (!file_exists($disabledRoot) && !is_link($disabledRoot)) {
     if (@mkdir($disabledRoot, 0755, true)) {
         @chown($disabledRoot, $username);
         @chgrp($disabledRoot, $username);
