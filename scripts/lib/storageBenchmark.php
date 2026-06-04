@@ -2,9 +2,6 @@
 /**
  * Shared execution helpers for the non-destructive storage benchmark CLI.
  *
- * The util wrapper stays thin; this file owns argument parsing, benchmark
- * validation, JSONL entry construction, fio execution, and summaries.
- *
  * @license GPL-3.0-only
  * @author PMSS Team
  */
@@ -66,6 +63,7 @@ function storageBenchmarkMain(array $argv): int
 
 function storageBenchmarkAppendJsonLine(string $jsonLog, array $entry): void { if (!pmssJsonLineAppend($jsonLog, $entry)) { fwrite(STDERR, "Error: failed to append JSON log entry: {$jsonLog}\n"); exit(1); } }
 function storageBenchmarkEntryBase(string $runTs, string $label, string $runId): array { return ['timestamp' => $runTs, 'label' => $label ?: null, 'run_id' => $runId, 'run_ts' => $runTs]; }
+function storageBenchmarkApplyRunResult(array $entry, array $res, string $fallbackError = 'unknown'): array { if ($res['ok']) $entry['metrics'] = $res['result']; else $entry['error'] = $res['error'] ?? $fallbackError; return $entry; }
 function storageBenchmarkIostatUtilPctRead(string $path): ?float { $payload = pmssReadSerializedArrayFile($path); if ($payload === null || !array_key_exists('diskUtil', $payload)) return null; $util = $payload['diskUtil']; return (is_int($util) || is_float($util) || (is_string($util) && is_numeric(trim($util)))) ? (float) trim((string) $util) : null; }
 function storageBenchmarkRequireCommandField(string $command, string $label): string { $result = pmssCommandCapture($command, 30); $value = trim((string) ($result['stdout'] ?? '')); if ((int) ($result['rc'] ?? 1) !== 0 || $value === '' || preg_match('/[\r\n\0]/', $value) === 1) { fwrite(STDERR, "Error: failed to read {$label}.\n"); exit(1); } return $value; }
 function storageBenchmarkRequirePositiveIntCommandField(string $command, string $label): int { $value = storageBenchmarkRequireCommandField($command, $label); if (!ctype_digit($value) || (int) $value <= 0) { fwrite(STDERR, "Error: failed to read {$label}.\n"); exit(1); } return (int) $value; }
@@ -89,7 +87,7 @@ function fioRun(string $file, int $size, int $runtime, array $job): array { $jso
 function storageBenchmarkFileJobs(): array { return [['name' => 'randmix-large-95r5w', 'rw' => 'randrw', 'rwmixread' => 95, 'bssplit' => '4k/2:64k/3:128k/5:256k/10:512k/20:768k/25:1024k/35', 'iodepth' => 32, 'numjobs' => 4, 'direct' => 1], ['name' => 'randread-large', 'rw' => 'randread', 'bs' => '1M', 'iodepth' => 32, 'numjobs' => 4, 'direct' => 1], ['name' => 'randread-small', 'rw' => 'randread', 'bs' => '4k', 'iodepth' => 64, 'numjobs' => 4, 'direct' => 1], ['name' => 'randwrite-small-short', 'rw' => 'randwrite', 'bs' => '4k', 'iodepth' => 32, 'numjobs' => 2, 'direct' => 1], ['name' => 'seqread-large', 'rw' => 'read', 'bs' => '1M', 'iodepth' => 32, 'numjobs' => 2, 'direct' => 1]]; }
 function storageBenchmarkDeviceJobs(): array { return [['name' => 'dev-randread-4k', 'rw' => 'randread', 'bs' => '4k', 'iodepth' => 64], ['name' => 'dev-randread-1M', 'rw' => 'randread', 'bs' => '1M', 'iodepth' => 32]]; }
 
-function storageBenchmarkFileEntryBuild(array $base, string $targetDir, string $mntDev, string $fs, array $job, int $runtime, int $use, array $res): array { $entry = $base + ['target_dir' => $targetDir, 'device' => $mntDev, 'filesystem' => $fs, 'test' => $job['name'], 'params' => ['rw' => $job['rw'], 'rwmixread' => $job['rwmixread'] ?? null, 'bs' => $job['bs'] ?? null, 'bssplit' => $job['bssplit'] ?? null, 'iodepth' => $job['iodepth'], 'numjobs' => $job['numjobs'], 'direct' => $job['direct'], 'runtime' => (int) ($job['runtime'] ?? $runtime), 'size_bytes' => $use], 'ok' => $res['ok']]; if ($res['ok']) $entry['metrics'] = $res['result']; else $entry['error'] = $res['error'] ?? 'unknown'; return $entry; }
+function storageBenchmarkFileEntryBuild(array $base, string $targetDir, string $mntDev, string $fs, array $job, int $runtime, int $use, array $res): array { return storageBenchmarkApplyRunResult($base + ['target_dir' => $targetDir, 'device' => $mntDev, 'filesystem' => $fs, 'test' => $job['name'], 'params' => ['rw' => $job['rw'], 'rwmixread' => $job['rwmixread'] ?? null, 'bs' => $job['bs'] ?? null, 'bssplit' => $job['bssplit'] ?? null, 'iodepth' => $job['iodepth'], 'numjobs' => $job['numjobs'], 'direct' => $job['direct'], 'runtime' => (int) ($job['runtime'] ?? $runtime), 'size_bytes' => $use], 'ok' => $res['ok']], $res); }
 
 function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string $runTs, string $label, string $runId, string $mntDev, string $fs, int $requested, int $runtime): array
 {
@@ -112,13 +110,14 @@ function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string
 
 function storageBenchmarkPrintFileSummary(string $targetDir, string $jsonLog, string $label, array $summary): void { echo "\n== Storage benchmark summary ".($label !== '' ? '(' . $label . ' on '.$targetDir.')' : "(on {$targetDir})")." ==\n"; echo "test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95_ms\twrite_p95_ms\n"; foreach ($summary as $row) printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n", ...$row); echo "\nJSON log: {$jsonLog}\n"; }
 function storageBenchmarkDeviceEntryBuild(array $base, array $meta, string $path, string $test, array $extra = []): array { return $base + ['device' => $path, 'model' => $meta['model'], 'serial' => $meta['serial'], 'rota' => $meta['rota'], 'size' => $meta['size'], 'test' => $test] + $extra; }
+function storageBenchmarkDevicePreflightSkip(string $jsonLog, array $base, array $meta, string $path, string $error): void { storageBenchmarkAppendJsonLine($jsonLog, storageBenchmarkDeviceEntryBuild($base, $meta, $path, 'device-preflight', ['ok' => false, 'error' => $error])); printf("%s\tskipped: %s\n", $path, $error); }
 function storageBenchmarkDdSeqread(string $path, int $count, int $skip): array { $dd = sprintf('dd if=%s of=/dev/null bs=1M count=%d skip=%d iflag=direct 2>&1', escapeshellarg($path), $count, $skip); [$rc, $so, $se] = [runCommand($dd, true), $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '', $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stderr'] ?? '']; $line = trim($se !== '' ? $se : $so); $mbps = null; $secs = null; if (preg_match('/\s([0-9.]+)\s+s,\s+([0-9.]+)\s+MB\/s/', $line, $m)) { $secs = (float) $m[1]; $mbps = (float) $m[2]; } return ['rc' => $rc, 'mbps' => $mbps, 'secs' => $secs]; }
-function storageBenchmarkMetricValues(array $peer, string $key): array { $arr = []; foreach ($peer as $v) if (isset($v[$key]) && $v[$key] !== null) $arr[] = $v[$key]; return $arr; }
 function storageBenchmarkMedian(array $values): float { sort($values); $n = count($values); if ($n === 0) return 0.0; $m = (int) floor(($n - 1) / 2); return $n % 2 ? (float) $values[$m] : (($values[$m] + $values[$m + 1]) / 2); }
+function storageBenchmarkPeerMedian(array $peer, string $key): float { return storageBenchmarkMedian(array_values(array_filter(array_column($peer, $key), static function ($value): bool { return $value !== null; }))); }
 
 function storageBenchmarkPrintPeerWarnings(array $peer): void
 {
-    $medDd = storageBenchmarkMedian(storageBenchmarkMetricValues($peer, 'dd_mb')); $medIop = storageBenchmarkMedian(storageBenchmarkMetricValues($peer, 'iop_ms')); $med4k = storageBenchmarkMedian(storageBenchmarkMetricValues($peer, 'fio4k_mb'));
+    $medDd = storageBenchmarkPeerMedian($peer, 'dd_mb'); $medIop = storageBenchmarkPeerMedian($peer, 'iop_ms'); $med4k = storageBenchmarkPeerMedian($peer, 'fio4k_mb');
     foreach ($peer as $p => $r) { if ($medDd > 0 && isset($r['dd_mb']) && $r['dd_mb'] !== null && $r['dd_mb'] < 0.6 * $medDd) echo "WARN: {$p} seqread < 60% median\n"; if ($medIop > 0 && isset($r['iop_ms']) && $r['iop_ms'] !== null && $r['iop_ms'] > max(50, 2 * $medIop)) echo "WARN: {$p} ioping > 2x median\n"; if ($med4k > 0 && isset($r['fio4k_mb']) && $r['fio4k_mb'] !== null && $r['fio4k_mb'] < 0.5 * $med4k) echo "WARN: {$p} 4k randread < 50% median\n"; }
 }
 
@@ -129,9 +128,9 @@ function storageBenchmarkRunDeviceTests(string $jsonLog, string $runTs, string $
     $peer = [];
     foreach (pmssStorageHealthDiskInventoryRead() as $meta) {
         $path = $meta['path'];
-        if (!storageBenchmarkDeviceIsReadableBlock($path)) { storageBenchmarkAppendJsonLine($jsonLog, storageBenchmarkDeviceEntryBuild($base, $meta, $path, 'device-preflight', ['ok' => false, 'error' => 'not a readable block device'])); printf("%s\tskipped: not a readable block device\n", $path); continue; }
+        if (!storageBenchmarkDeviceIsReadableBlock($path)) { storageBenchmarkDevicePreflightSkip($jsonLog, $base, $meta, $path, 'not a readable block device'); continue; }
         $size = storageBenchmarkDeviceSizeBytesRead($path);
-        if ($size === null) { storageBenchmarkAppendJsonLine($jsonLog, storageBenchmarkDeviceEntryBuild($base, $meta, $path, 'device-preflight', ['ok' => false, 'error' => 'unable to determine block device size'])); printf("%s\tskipped: unable to determine block device size\n", $path); continue; }
+        if ($size === null) { storageBenchmarkDevicePreflightSkip($jsonLog, $base, $meta, $path, 'unable to determine block device size'); continue; }
         $count = (int) floor($ddSizeBytes / (1024 * 1024));
         $skip = $size > ($count * 1024 * 1024 + 4 * 1024 * 1024) ? random_int(0, (int) floor(($size - $count * 1024 * 1024) / (1024 * 1024))) : 0;
         $dd = storageBenchmarkDdSeqread($path, $count, $skip);
@@ -145,7 +144,7 @@ function storageBenchmarkRunDeviceTests(string $jsonLog, string $runTs, string $
         foreach (storageBenchmarkDeviceJobs() as $job) {
             $res = fioRun($path, $size, $devRuntime, ['name' => $job['name'], 'rw' => $job['rw'], 'bs' => $job['bs'], 'iodepth' => $job['iodepth'], 'numjobs' => 1, 'direct' => 1]);
             $entry = storageBenchmarkDeviceEntryBuild($base, $meta, $path, $job['name'], ['params' => ['rw' => $job['rw'], 'bs' => $job['bs'], 'iodepth' => $job['iodepth'], 'numjobs' => 1, 'runtime' => $devRuntime], 'ok' => $res['ok']]);
-            if ($res['ok']) { $entry['metrics'] = $res['result']; printf("%s\t%s\tread_MB/s=%.2f\tread_IOPS=%.1f\tread_p95_ms=%.2f\n", $path, $job['name'], $res['result']['read_bw_MBps'], $res['result']['read_iops'], $res['result']['read_p95_ms']); } else { $entry['error'] = $res['error'] ?? 'fio failed'; }
+            $entry = storageBenchmarkApplyRunResult($entry, $res, 'fio failed'); if ($res['ok']) printf("%s\t%s\tread_MB/s=%.2f\tread_IOPS=%.1f\tread_p95_ms=%.2f\n", $path, $job['name'], $res['result']['read_bw_MBps'], $res['result']['read_iops'], $res['result']['read_p95_ms']);
             storageBenchmarkAppendJsonLine($jsonLog, $entry);
             if ($res['ok'] && $job['name'] === 'dev-randread-4k') $peer[$path]['fio4k_mb'] = $res['result']['read_bw_MBps'];
         }

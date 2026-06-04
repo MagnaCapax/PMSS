@@ -193,6 +193,26 @@ class StorageBenchSecurityTest extends TestCase
         );
     }
 
+    public function testSharedBenchmarkEntryHelpersPreserveExecutionShape(): void
+    {
+        require_once $this->pmssRepoPath('scripts/lib/storageBenchmark.php');
+
+        $success = \storageBenchmarkApplyRunResult(['test' => 'randread', 'ok' => true], ['ok' => true, 'result' => ['read_bw_MBps' => 12.5]]);
+        $failure = \storageBenchmarkApplyRunResult(['test' => 'randwrite', 'ok' => false], ['ok' => false], 'fio failed');
+        $log = $this->pmssMakeJsonLogPath('pmss-bench-shared-', 'benchmark-storage.jsonl');
+        [$unused, $output] = $this->pmssCaptureStdout(static function () use ($log): void {
+            \storageBenchmarkDevicePreflightSkip($log, \storageBenchmarkEntryBase('2025-01-01T00:00:00Z', '', 'run'), ['model' => 'M', 'serial' => 'S', 'rota' => 1, 'size' => '1T'], '/dev/null', 'not a readable block device');
+        });
+        $entries = \pmssJsonLineFileRead($log);
+
+        $this->assertSame(['test' => 'randread', 'ok' => true, 'metrics' => ['read_bw_MBps' => 12.5]], $success);
+        $this->assertSame(['test' => 'randwrite', 'ok' => false, 'error' => 'fio failed'], $failure);
+        $this->assertSame(15.0, \storageBenchmarkPeerMedian([['dd_mb' => null], ['dd_mb' => 20], ['dd_mb' => 10]], 'dd_mb'));
+        $this->assertStringContainsString("/dev/null\tskipped: not a readable block device", $output);
+        $this->assertSame('device-preflight', $entries[0]['test'] ?? '');
+        $this->assertSame('not a readable block device', $entries[0]['error'] ?? '');
+    }
+
     public function testIostatPreflightUsesSafeSerializedArrayReader(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/storageBenchmark.php');
