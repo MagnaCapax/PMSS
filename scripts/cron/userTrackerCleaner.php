@@ -27,7 +27,11 @@ if ($lockHandle === false) {
         @fclose($lockHandle);
         exit(0);
     }
-    pmssLockHandleWritePid($lockHandle);
+    if (!pmssLockHandleWritePid($lockHandle)) {
+        pmssTrackerCleanerLog("WARN: Unable to record lock pid in {$lockPath}; continuing without single-instance guard.");
+        @fclose($lockHandle);
+        $lockHandle = false;
+    }
 }
 
 $blockRules = pmssTrackerCleanerBlockRules();

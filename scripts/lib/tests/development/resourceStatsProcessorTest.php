@@ -313,6 +313,37 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertEquals([['/scripts/cron/resourceStats.php', ['alice', 'bob']]], $processor->spawnCalls);
     }
 
+    public function testBeforeSpawnSkipsWhenResourceStatsLockIsBusy(): void
+    {
+        $lockPath = $this->paths['runtime_dir'].'/resourceStats.lock';
+        $busy = false;
+        $handle = \pmssLockFileAcquire($lockPath, true, 'c+', false, true, $busy);
+        $this->assertTrue(is_resource($handle), 'Expected test to acquire resource stats lock');
+
+        try {
+            $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
+            $this->assertFalse($processor->beforeSpawn());
+        } finally {
+            if (is_resource($handle)) {
+                \pmssLockHandleRelease($handle);
+            }
+        }
+    }
+
+    public function testBeforeSpawnLogsUnsafeResourceStatsLockPathAndContinues(): void
+    {
+        $messages = [];
+        $target = $this->pmssWriteFile($this->paths['runtime_dir'].'/lock-target', '');
+        $this->pmssCreateSymlinkOrSkip($target, $this->paths['runtime_dir'].'/resourceStats.lock');
+
+        $processor = new \ResourceStatsProcessor(new StubResourceStatsProcessorStatistics(), $this->paths + [
+            'logger' => $this->pmssMakeArrayLogger($messages),
+        ]);
+
+        $this->assertTrue($processor->beforeSpawn());
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to open lock file '.$this->paths['runtime_dir'].'/resourceStats.lock'));
+    }
+
     /**
      * @return array<string, mixed>|null
      */

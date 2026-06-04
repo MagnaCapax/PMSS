@@ -6,12 +6,20 @@
  * @author PMSS Team
  */
 
+/** Lock files must be plain files; refuse symlinks and device paths. */
+function pmssLockFilePathIsSafe(string $path): bool
+{
+    if ($path === '' || pmssFilesystemPathHasNulByte($path) || is_link($path)) return false;
+    return !file_exists($path) || is_file($path);
+}
+
 function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mode = 'c', bool $createParentDir = false, bool $closeOnBusy = true, ?bool &$busy = null)
 {
     $busy = false;
-    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return false;
+    if (!pmssLockFilePathIsSafe($path)) return false;
     if ($createParentDir && !pmssDirEnsureExists(dirname($path), 0755)) return false;
     if (($handle = @fopen($path, $mode)) === false) return false;
+    if (!pmssLockFilePathIsSafe($path)) { @fclose($handle); return false; }
     if (!@flock($handle, LOCK_EX | ($nonBlocking ? LOCK_NB : 0))) {
         $busy = true;
         if ($closeOnBusy) { @fclose($handle); return false; }
@@ -19,7 +27,14 @@ function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mo
     return $handle;
 }
 
-function pmssLockHandleWritePid($handle): void { @ftruncate($handle, 0); @rewind($handle); @fwrite($handle, (string) getmypid()); @fflush($handle); }
+/** Record the current process id in an acquired lock handle. */
+function pmssLockHandleWritePid($handle): bool
+{
+    if (!is_resource($handle)) return false;
+    $pid = (string) getmypid();
+    if (!@ftruncate($handle, 0) || !@rewind($handle)) return false;
+    return @fwrite($handle, $pid) === strlen($pid) && @fflush($handle);
+}
 
 function pmssRuntimeLockBasename(string $basename): string
 {

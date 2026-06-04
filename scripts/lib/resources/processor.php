@@ -55,8 +55,20 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
         $lockFile = $this->runtimeDir.'/resourceStats.lock';
         $lockBusy = false;
         $this->lockHandle = pmssLockFileAcquire($lockFile, true, 'c+', false, true, $lockBusy);
-        if ($this->lockHandle !== false) { if ($lockBusy) { return false; } pmssLockHandleWritePid($this->lockHandle); return true; }
-        logMessage(date('c').": Unable to open lock file {$lockFile} for resourceStats"); return true;
+        if ($this->lockHandle === false) {
+            if ($lockBusy) {
+                return false;
+            }
+            $this->log(date('c').": Unable to open lock file {$lockFile} for resourceStats");
+            return true;
+        }
+        if (!pmssLockHandleWritePid($this->lockHandle)) {
+            pmssLockHandleRelease($this->lockHandle);
+            $this->lockHandle = false;
+            $this->log(date('c').": Unable to record lock pid in {$lockFile} for resourceStats; continuing without spawn lock");
+            return true;
+        }
+        return true;
     }
 
     public function validateUser(string $user): bool

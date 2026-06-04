@@ -373,6 +373,34 @@ class RuntimeTest extends TestCase
         $this->assertFalse($busy);
     }
 
+    public function testRuntimeLockAcquireRejectsSymlinkedLockPathFailSoft(): void
+    {
+        $tempDir = $this->pmssMakeTempDir('pmss-runtime-lock-');
+        $target = $this->pmssWriteFile($tempDir.'/target', '');
+        $lockPath = $tempDir.'/lock';
+        $this->pmssCreateSymlinkOrSkip($target, $lockPath);
+
+        $this->assertFalse(\pmssLockFileAcquire($lockPath, true, 'c', false, true));
+    }
+
+    public function testRuntimeLockHandleWritePidReportsWriteResult(): void
+    {
+        $path = $this->pmssMakeTempDir('pmss-runtime-lock-pid-').'/lock';
+        $handle = fopen($path, 'c+');
+        $this->assertTrue(is_resource($handle));
+
+        try {
+            $this->assertTrue(\pmssLockHandleWritePid($handle));
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+        }
+
+        $this->assertSame((string) getmypid(), (string) file_get_contents($path));
+        $this->assertFalse(\pmssLockHandleWritePid(false));
+    }
+
     public function testReadRegularFileIntReturnsParsedDigits(): void
     {
         $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-runtime-int-').'/port', "123\n");
