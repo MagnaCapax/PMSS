@@ -6,7 +6,7 @@
  * @author PMSS Team
  */
 
-function pmssDirEnsureExists(string $path, int $mode = 0755): bool { return is_dir($path) || @mkdir($path, $mode, true) || is_dir($path); }
+function pmssDirEnsureExists(string $path, int $mode = 0755): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && (is_dir($path) || @mkdir($path, $mode, true) || is_dir($path)); }
 function pmssPrivateTempPrefixIsSafe(string $prefix): bool { return preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $prefix) === 1; }
 function pmssCreatePrivateTempFile(string $prefix): ?string { return pmssPrivateTempPrefixIsSafe($prefix) && is_string($path = @tempnam(sys_get_temp_dir(), $prefix)) ? $path : null; }
 
@@ -20,8 +20,10 @@ function pmssCreatePrivateTempDir(string $prefix): ?string
 
 function pmssPrivateTempDirRealpath(string $path, string $prefix, ?callable $logger = null): ?string
 {
-    $log = $logger ?: 'logMessage'; $base = realpath(sys_get_temp_dir()); $real = $path !== '' && !is_link($path) ? realpath($path) : false;
+    $log = $logger ?: 'logMessage';
     if (!pmssPrivateTempPrefixIsSafe($prefix)) { $log('[WARN] Refusing temporary directory cleanup for unsafe prefix'); return null; }
+    if (pmssFilesystemPathHasNulByte($path)) { $log('[WARN] Refusing temporary directory cleanup for unsafe path'); return null; }
+    $base = realpath(sys_get_temp_dir()); $real = $path !== '' && !is_link($path) ? realpath($path) : false;
     if ($base === false || $base === DIRECTORY_SEPARATOR || $real === false || !is_dir($real)) { $log('[WARN] Refusing temporary directory cleanup for unresolved path: '.$path); return null; }
     $basePrefix = rtrim($base, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
     if (strpos($real, $basePrefix) !== 0 || strpos(basename($real), $prefix) !== 0) { $log('[WARN] Refusing temporary directory cleanup outside PMSS temp scope: '.$real); return null; }

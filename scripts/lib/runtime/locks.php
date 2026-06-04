@@ -9,6 +9,7 @@
 function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mode = 'c', bool $createParentDir = false, bool $closeOnBusy = true, ?bool &$busy = null)
 {
     $busy = false;
+    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return false;
     if ($createParentDir && !pmssDirEnsureExists(dirname($path), 0755)) return false;
     if (($handle = @fopen($path, $mode)) === false) return false;
     if (!@flock($handle, LOCK_EX | ($nonBlocking ? LOCK_NB : 0))) {

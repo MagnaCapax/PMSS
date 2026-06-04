@@ -360,6 +360,15 @@ class RuntimeTest extends TestCase
         $this->assertTrue($path === '/run/lock/pmss-runtime-test.lock' || $path === '/tmp/pmss-runtime-test.lock');
     }
 
+    public function testRuntimeLockAcquireRejectsNulBytePathFailSoft(): void
+    {
+        $busy = null;
+        $path = $this->pmssMakeTempDir('pmss-runtime-lock-').'/lock';
+
+        $this->assertFalse(\pmssLockFileAcquire($path."\0suffix", true, 'c', true, true, $busy));
+        $this->assertFalse($busy);
+    }
+
     public function testReadRegularFileIntReturnsParsedDigits(): void
     {
         $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-runtime-int-').'/port', "123\n");

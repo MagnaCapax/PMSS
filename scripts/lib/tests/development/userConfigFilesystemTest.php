@@ -114,6 +114,16 @@ class UserConfigFilesystemTest extends TestCase
         $this->assertSame('fallback-host', \pmssHostnameRead('fallback-host', $config."\0suffix"));
     }
 
+    public function testFilesystemDirectoryHelpersRejectNulBytePathsFailSoft(): void
+    {
+        $logs = [];
+        $root = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700);
+
+        $this->assertFalse(\pmssDirEnsureExists($root."\0suffix", 0755));
+        $this->assertSame(null, \pmssPrivateTempDirRealpath($root."\0suffix", 'pmss-user-config-fs-', $this->pmssMakeArrayLogger($logs)));
+        $this->assertTrue($this->pmssMessagesContain($logs, 'Refusing temporary directory cleanup for unsafe path'));
+    }
+
     public function testRequiredFileRejectsNulBytePathBeforeFilesystemCall(): void
     {
         $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/defaults.conf', "enabled = yes\n");
