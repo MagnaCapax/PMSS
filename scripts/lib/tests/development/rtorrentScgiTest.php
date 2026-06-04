@@ -160,38 +160,18 @@ class RtorrentScgiTest extends TestCase
         $this->assertFalse(rtorrentScgiSocketQueueSaturated(['recvQ' => 1, 'sendQ' => 0]));
     }
 
-    public function testCallReturnsFalseForMissingSocket(): void
+    public function testCallAndSendRejectInvalidBoundaries(): void
     {
-        $result = rtorrentScgiCall($this->fakeSocketPath(), 'system.api_version', [], 1);
-
-        $this->assertTrue($result === false, 'Call should return false for missing socket');
-    }
-
-    public function testCallWithEmptyPathReturnsFalse(): void
-    {
-        $result = rtorrentScgiCall('', 'system.api_version', [], 1);
-        $this->assertTrue($result === false, 'Call should return false for empty path');
-    }
-
-    public function testScgiSendReturnsFalseForMissingSocket(): void
-    {
-        $result = rtorrentScgiSend($this->fakeSocketPath(), 'test', 1);
-
-        $this->assertTrue($result === false, 'Send should return false for missing socket');
-    }
-
-    public function testScgiSendReturnsFalseForEmptyRequest(): void
-    {
-        $result = rtorrentScgiSend($this->fakeSocketPath(), '', 1);
-
-        $this->assertTrue($result === false, 'Send should return false for empty requests');
-    }
-
-    public function testScgiSendReturnsFalseForInvalidTimeout(): void
-    {
-        $result = rtorrentScgiSend($this->fakeSocketPath(), 'test', 0);
-
-        $this->assertTrue($result === false, 'Send should return false for invalid timeouts');
+        $missingSocket = $this->fakeSocketPath();
+        foreach ([
+            'call should reject missing socket' => function () use ($missingSocket) { return rtorrentScgiCall($missingSocket, 'system.api_version', [], 1); },
+            'call should reject empty path' => function () { return rtorrentScgiCall('', 'system.api_version', [], 1); },
+            'send should reject missing socket' => function () use ($missingSocket) { return rtorrentScgiSend($missingSocket, 'test', 1); },
+            'send should reject empty request' => function () use ($missingSocket) { return rtorrentScgiSend($missingSocket, '', 1); },
+            'send should reject invalid timeout' => function () use ($missingSocket) { return rtorrentScgiSend($missingSocket, 'test', 0); },
+        ] as $message => $callback) {
+            $this->assertSame(false, $callback(), $message);
+        }
     }
 
     public function testScgiSendReturnsFalseForRegularFilePath(): void

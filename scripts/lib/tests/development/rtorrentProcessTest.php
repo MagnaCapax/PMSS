@@ -103,46 +103,26 @@ class RtorrentProcessTest extends TestCase
         }
     }
 
-    /**
-     * Test failed-start state: first failure records attempt 1.
-     */
-    public function testFailureCountStateRecordsFirstAttempt(): void
+    public function testFailureCountStateTransitions(): void
     {
-        $stateFile = $this->tempDir.'/test-failure.count';
+        foreach ([
+            'first attempt' => [null, 4, 'record', 1],
+            'before threshold' => ['2', 4, 'wait', 3],
+            'at threshold' => ['3', 4, 'stale', 4],
+            'zero threshold' => [null, 0, 'stale', 1],
+        ] as $label => $case) {
+            list($initial, $threshold, $action, $count) = $case;
+            $stateFile = $this->tempDir.'/test-failure-'.md5($label).'.count';
+            if ($initial !== null) {
+                file_put_contents($stateFile, $initial);
+            }
 
-        $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
+            $result = rtorrentProcessCheckFailureCountState($stateFile, $threshold);
 
-        $this->assertEquals('record', $result['action']);
-        $this->assertEquals(1, $result['count']);
-        $this->assertEquals('1', trim((string) file_get_contents($stateFile)));
-    }
-
-    /**
-     * Test failed-start state: intermediate failures keep waiting.
-     */
-    public function testFailureCountStateWaitsBeforeThreshold(): void
-    {
-        $stateFile = $this->tempDir.'/test-failure.count';
-        file_put_contents($stateFile, '2');
-
-        $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
-
-        $this->assertEquals('wait', $result['action']);
-        $this->assertEquals(3, $result['count']);
-    }
-
-    /**
-     * Test failed-start state: reaching threshold becomes stale.
-     */
-    public function testFailureCountStateBecomesStaleAtThreshold(): void
-    {
-        $stateFile = $this->tempDir.'/test-failure.count';
-        file_put_contents($stateFile, '3');
-
-        $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
-
-        $this->assertEquals('stale', $result['action']);
-        $this->assertEquals(4, $result['count']);
+            $this->assertEquals($action, $result['action'], $label);
+            $this->assertEquals($count, $result['count'], $label);
+            $this->assertEquals((string) $count, trim((string) file_get_contents($stateFile)), $label);
+        }
     }
 
     public function testFailureCountStateInvalidContentsResetCount(): void
@@ -156,19 +136,6 @@ class RtorrentProcessTest extends TestCase
             $this->assertEquals('record', $result['action']);
             $this->assertEquals(1, $result['count']);
         }
-    }
-
-    /**
-     * Test failed-start state: thresholds below 1 escalate immediately.
-     */
-    public function testFailureCountStateNormalizesZeroThreshold(): void
-    {
-        $stateFile = $this->tempDir.'/test-failure.count';
-
-        $result = rtorrentProcessCheckFailureCountState($stateFile, 0);
-
-        $this->assertEquals('stale', $result['action']);
-        $this->assertEquals(1, $result['count']);
     }
 
     public function testStateFilePathSafetyAcceptsNormalTempFile(): void
