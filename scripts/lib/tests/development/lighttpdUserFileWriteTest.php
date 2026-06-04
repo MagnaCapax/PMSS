@@ -110,14 +110,11 @@ class LighttpdUserFileWriteTest extends TestCase
         $before = glob(dirname($path).'/.htpasswd.pmss-tmp-*');
         $before = is_array($before) ? $before : [];
 
-        try {
+        $this->assertThrowsRuntime(static function () use ($path): void {
             \pmssReplaceUserFile($path, "user:hash\n", static function (): void {
                 throw new \RuntimeException('metadata failure');
             });
-            $this->fail('Expected pmssReplaceUserFile() to rethrow callback failure.');
-        } catch (\RuntimeException $exception) {
-            $this->assertEquals('metadata failure', $exception->getMessage());
-        }
+        }, 'metadata failure');
 
         $after = glob(dirname($path).'/.htpasswd.pmss-tmp-*');
         $after = is_array($after) ? $after : [];

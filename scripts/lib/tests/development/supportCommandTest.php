@@ -45,14 +45,9 @@ class SupportCommandTest extends TestCase
 
     public function testMessageNormalizeRejectsEmptyInput(): void
     {
-        $caught = false;
-        try {
+        $this->assertThrows(\InvalidArgumentException::class, static function (): void {
             \pmssSupportMessageNormalize(" \n ");
-        } catch (\InvalidArgumentException $exception) {
-            $caught = true;
-        }
-
-        $this->assertTrue($caught, 'empty messages must be rejected');
+        });
     }
 
     public function testBillingServiceIdReadAcceptsPositiveInteger(): void
@@ -116,17 +111,13 @@ class SupportCommandTest extends TestCase
         chmod($customPath, 0000);
         putenv('PMSS_SUPPORT_CONFIG_PATH='.$customPath);
 
-        $caught = false;
         try {
-            \pmssSupportConfigRead();
-        } catch (\RuntimeException $exception) {
-            $caught = true;
-            $this->assertSame('Support command config is missing or unreadable.', $exception->getMessage());
+            $this->assertThrowsRuntime(static function (): void {
+                \pmssSupportConfigRead();
+            }, 'Support command config is missing or unreadable.');
         } finally {
             chmod($customPath, 0600);
         }
-
-        $this->assertTrue($caught, 'unreadable support config overrides must be rejected');
     }
 
     public function testIdentityReadRejectsUnsafeEnvironmentUsername(): void
@@ -207,14 +198,9 @@ class SupportCommandTest extends TestCase
         $diagnostics = \pmssSupportDiagnosticsBuild('Please investigate', $this->pmssCommandEchoRunner());
         $config = \pmssSupportConfigRead();
 
-        $caught = false;
-        try {
+        $this->assertThrowsRuntime(static function () use ($diagnostics, $config): void {
             \pmssSupportSnapshotWrite($diagnostics, $config);
-        } catch (\RuntimeException $exception) {
-            $caught = true;
-        }
-
-        $this->assertTrue($caught, 'symlinked support snapshot parents must be rejected');
+        });
     }
 
     public function testRequestSubmitWritesSnapshotAndUsesTransport(): void

@@ -53,12 +53,9 @@ class UserConfigFilesystemTest extends TestCase
         $path = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/invalid-resources';
         file_put_contents($path, serialize('nope'));
 
-        try {
+        $this->assertThrowsRuntime(static function () use ($path): void {
             \pmssReadOptionalSerializedArrayFile($path, 'rTorrent resource configuration');
-            $this->fail('Expected invalid rTorrent resource payload to throw');
-        } catch (\RuntimeException $exception) {
-            $this->assertStringContainsString('Invalid rTorrent resource configuration:', $exception->getMessage());
-        }
+        }, 'Invalid rTorrent resource configuration:');
     }
 
     public function testReadRequiredFileReturnsContents(): void
@@ -71,12 +68,9 @@ class UserConfigFilesystemTest extends TestCase
 
     public function testReadRequiredFileThrowsWhenPathMissing(): void
     {
-        try {
+        $this->assertThrowsRuntime(static function (): void {
             \pmssReadRequiredRegularFile('/nonexistent/pmss-required-file', 'demo defaults');
-            $this->fail('Expected missing required file to throw');
-        } catch (\RuntimeException $exception) {
-            $this->assertStringContainsString('Missing demo defaults:', $exception->getMessage());
-        }
+        }, 'Missing demo defaults:');
     }
 
     public function testReadRequiredFileThrowsForSymlink(): void
@@ -84,12 +78,9 @@ class UserConfigFilesystemTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700);
         [, $link] = $this->pmssCreateSymlinkedFileOrSkip($root.'/target.conf', $root.'/link.conf', "enabled = no\n", 0700);
 
-        try {
+        $this->assertThrowsRuntime(static function () use ($link): void {
             \pmssReadRequiredRegularFile($link, 'demo defaults');
-            $this->fail('Expected symlinked required file to throw');
-        } catch (\RuntimeException $exception) {
-            $this->assertStringContainsString('Missing demo defaults:', $exception->getMessage());
-        }
+        }, 'Missing demo defaults:');
     }
 
     public function testReadRegularFileContentsPreservesWhitespace(): void
@@ -128,12 +119,9 @@ class UserConfigFilesystemTest extends TestCase
     {
         $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/defaults.conf', "enabled = yes\n");
 
-        try {
+        $this->assertThrowsRuntime(static function () use ($path): void {
             \pmssReadRequiredRegularFile($path."\0suffix", 'demo defaults');
-            $this->fail('Expected NUL-byte required file path to throw');
-        } catch (\RuntimeException $exception) {
-            $this->assertStringContainsString('Missing demo defaults:', $exception->getMessage());
-        }
+        }, 'Missing demo defaults:');
     }
 
     public function testUserConfigUsesSharedRuntimeFilesystemHelpers(): void

@@ -227,20 +227,29 @@ abstract class TestCase
         throw new \AssertionError($message !== '' ? $message : 'Test failed');
     }
 
-    /** Assert that a callback throws RuntimeException with the expected message fragment. */
-    protected function assertThrowsRuntime(callable $callback, string $messageFragment, ?int $code = null): void
+    /** Assert that a callback throws the expected exception type and optional message fragment. */
+    protected function assertThrows(string $class, callable $callback, string $messageFragment = '', ?int $code = null): void
     {
         try {
             $callback();
-        } catch (\RuntimeException $e) {
-            $this->assertStringContainsString($messageFragment, $e->getMessage());
+        } catch (\Throwable $e) {
+            $this->assertTrue(is_a($e, $class), sprintf('Expected %s, got %s', $class, get_class($e)));
+            if ($messageFragment !== '') {
+                $this->assertStringContainsString($messageFragment, $e->getMessage());
+            }
             if ($code !== null) {
                 $this->assertEquals($code, $e->getCode());
             }
             return;
         }
 
-        $this->fail('Expected RuntimeException, none thrown');
+        $this->fail('Expected '.$class.', none thrown');
+    }
+
+    /** Assert that a callback throws RuntimeException with an optional message fragment. */
+    protected function assertThrowsRuntime(callable $callback, string $messageFragment = '', ?int $code = null): void
+    {
+        $this->assertThrows(\RuntimeException::class, $callback, $messageFragment, $code);
     }
 
     /** Skip the current test when an optional helper is unavailable. */

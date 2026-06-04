@@ -22,40 +22,34 @@ class SupportMailTest extends TestCase
 
     public function testMailSendRejectsEnvelopeWithMissingRecipient(): void
     {
-        $caught = false;
-        try {
-            \pmssSupportMailSend(
-                ['targetEmail' => 'support@example.com', 'smtpPort' => 25, 'connectTimeout' => 5],
-                ['from' => 'sender@example.com', 'data' => 'payload'],
-                static function (): void {
-                    throw new \RuntimeException('transport must not run');
-                }
-            );
-        } catch (\RuntimeException $exception) {
-            $caught = true;
-            $this->assertStringContainsString('Support mail envelope recipient is invalid.', $exception->getMessage());
-        }
-
-        $this->assertTrue($caught, 'mail send must reject envelopes without a recipient');
+        $this->assertThrowsRuntime(
+            static function (): void {
+                \pmssSupportMailSend(
+                    ['targetEmail' => 'support@example.com', 'smtpPort' => 25, 'connectTimeout' => 5],
+                    ['from' => 'sender@example.com', 'data' => 'payload'],
+                    static function (): void {
+                        throw new \RuntimeException('transport must not run');
+                    }
+                );
+            },
+            'Support mail envelope recipient is invalid.'
+        );
     }
 
     public function testMailSendRejectsEnvelopeWithControlCharacters(): void
     {
-        $caught = false;
-        try {
-            \pmssSupportMailSend(
-                ['targetEmail' => 'support@example.com', 'smtpPort' => 25, 'connectTimeout' => 5],
-                ['from' => "sender@example.com\nX-Test: injected", 'to' => 'support@example.com', 'data' => 'payload'],
-                static function (): void {
-                    throw new \RuntimeException('transport must not run');
-                }
-            );
-        } catch (\RuntimeException $exception) {
-            $caught = true;
-            $this->assertStringContainsString('Support mail envelope sender is invalid.', $exception->getMessage());
-        }
-
-        $this->assertTrue($caught, 'mail send must reject header injection attempts');
+        $this->assertThrowsRuntime(
+            static function (): void {
+                \pmssSupportMailSend(
+                    ['targetEmail' => 'support@example.com', 'smtpPort' => 25, 'connectTimeout' => 5],
+                    ['from' => "sender@example.com\nX-Test: injected", 'to' => 'support@example.com', 'data' => 'payload'],
+                    static function (): void {
+                        throw new \RuntimeException('transport must not run');
+                    }
+                );
+            },
+            'Support mail envelope sender is invalid.'
+        );
     }
 
     public function testStreamWriteAllWritesFullPayload(): void
@@ -83,15 +77,9 @@ class SupportMailTest extends TestCase
         $stream = fopen('php://temp', 'w+');
         fclose($stream);
 
-        $caught = false;
-        try {
+        $this->assertThrowsRuntime(static function () use ($stream): void {
             \pmssSupportStreamWriteAll($stream, 'payload', 'closed stream');
-        } catch (\RuntimeException $exception) {
-            $caught = true;
-            $this->assertStringContainsString('Unable to write closed stream.', $exception->getMessage());
-        }
-
-        $this->assertTrue($caught, 'closed streams must be rejected');
+        }, 'Unable to write closed stream.');
     }
 
     public function testSmtpExpectAcceptsMultilineReplies(): void
@@ -111,15 +99,9 @@ class SupportMailTest extends TestCase
         fwrite($stream, "550 rejected\r\n");
         rewind($stream);
 
-        $caught = false;
-        try {
+        $this->assertThrowsRuntime(static function () use ($stream): void {
             \pmssSupportSmtpExpect($stream, [250]);
-        } catch (\RuntimeException $exception) {
-            $caught = true;
-            $this->assertStringContainsString('Support SMTP error: 550 rejected', $exception->getMessage());
-        }
-
+        }, 'Support SMTP error: 550 rejected');
         fclose($stream);
-        $this->assertTrue($caught, 'unexpected SMTP codes must throw');
     }
 }
