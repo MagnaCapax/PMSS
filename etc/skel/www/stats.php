@@ -30,107 +30,11 @@ if (file_exists($pmssUserTrafficLimitLib)) {
 }
 // pmssTrafficLimitStateRead lives in userTrafficLimit.php (see ADR 0016).
 
-/**
- * Read one customer-visible serialized state file.
- *
- * @return array{data:?array,time:int|false|null,error:?string}
- */
-function pmssStatsSerializedStateRead(string $path, string $invalidMessage): array
-{
-    $state = array('data' => null, 'time' => null, 'error' => null);
-    if (!is_file($path) || is_link($path)) {
-        return $state;
-    }
-
-    $state['time'] = @filemtime($path);
-    $state['data'] = function_exists('pmssReadSerializedArrayFile')
-        ? pmssReadSerializedArrayFile($path)
-        : null;
-    if ($state['data'] === null) {
-        $state['error'] = $invalidMessage;
-    }
-
-    return $state;
-}
-
 $pmssDockerEnabledPolicy = null;
 $pmssMemoryPressure = function_exists('pmssWebCgroupMemoryStatusRead')
     ? pmssWebCgroupMemoryStatusRead()
     : array('available' => false, 'status' => 'UNAVAILABLE');
-
-// === Resource Usage ===
 $resourceState = pmssStatsSerializedStateRead('../.resourceData', 'Invalid resource data format.');
-$resourceData = $resourceState['data'];
-$resourceTime = $resourceState['time'];
-$resourceDataError = $resourceState['error'];
-$resourceAvailable = is_array($resourceData);
-$resourceMessage = $resourceDataError !== null ? $resourceDataError : 'Resource data not available.';
-$ioReadDisplay = array();
-$ioWriteDisplay = array();
-$cpuDisplay = array();
-$memoryDisplay = array();
-$ramHoursDisplay = array();
-$memoryCurrent = 'n/a';
-$memoryAnon = 'n/a';
-$memoryFile = 'n/a';
-$tasksCurrent = 'n/a';
-$ioOperationsMonth = 0.0;
-$ioDailyLabels = array();
-$ioDailyRead = array();
-$ioDailyWrite = array();
-$ioDailyOperations = array();
-$cpuDailyHours = array();
-
-if ($resourceAvailable) {
-    $ioReadDisplay = pmssStatsNestedArrayRead($resourceData, 'io_read', 'display');
-    $ioWriteDisplay = pmssStatsNestedArrayRead($resourceData, 'io_write', 'display');
-    $cpuDisplay = pmssStatsNestedArrayRead($resourceData, 'cpu', 'display');
-    $cpuRaw = pmssStatsNestedArrayRead($resourceData, 'cpu', 'raw');
-    $ioReadOpsRaw = pmssStatsNestedArrayRead($resourceData, 'io_read_ops', 'raw');
-    $ioWriteOpsRaw = pmssStatsNestedArrayRead($resourceData, 'io_write_ops', 'raw');
-    $ioOperationsMonth = (float)($ioReadOpsRaw['month'] ?? 0.0) + (float)($ioWriteOpsRaw['month'] ?? 0.0);
-    if (isset($cpuRaw['month'])) {
-        $cpuDisplay['month'] = pmssFormatCpuHours($cpuRaw['month']);
-    }
-    if (!isset($cpuDisplay['week']) && isset($cpuRaw['week'])) {
-        $cpuDisplay['week'] = pmssFormatDurationSeconds($cpuRaw['week'] / 1000000000);
-    }
-    if (!isset($cpuDisplay['day']) && isset($cpuRaw['day'])) {
-        $cpuDisplay['day'] = pmssFormatDurationSeconds($cpuRaw['day'] / 1000000000);
-    }
-    if (!isset($cpuDisplay['hour']) && isset($cpuRaw['hour'])) {
-        $cpuDisplay['hour'] = pmssFormatDurationSeconds($cpuRaw['hour'] / 1000000000);
-    }
-    $memoryDisplay = pmssStatsNestedArrayRead($resourceData, 'memory', 'display');
-    $ramHoursDisplay = pmssStatsNestedArrayRead($resourceData, 'ram_hours', 'display');
-    $memoryCurrent = isset($resourceData['memory']['current'])
-        ? pmssFormatBytesShort($resourceData['memory']['current'])
-        : 'n/a';
-    $memoryAnon = isset($resourceData['memory']['anon'])
-        ? pmssFormatBytesShort($resourceData['memory']['anon'])
-        : 'n/a';
-    $memoryFile = isset($resourceData['memory']['file'])
-        ? pmssFormatBytesShort($resourceData['memory']['file'])
-        : 'n/a';
-    $tasksCurrent = isset($resourceData['tasks']['current'])
-        ? (string)round((float)$resourceData['tasks']['current'], 2)
-        : 'n/a';
-
-    if (isset($resourceData['daily']) && is_array($resourceData['daily'])) {
-        foreach ($resourceData['daily'] as $day => $totals) {
-            $ioDailyLabels[] = $day;
-            $readBytes = isset($totals['io_read']) ? (float)$totals['io_read'] : 0.0;
-            $writeBytes = isset($totals['io_write']) ? (float)$totals['io_write'] : 0.0;
-            $readOps = isset($totals['io_read_ops']) ? (float)$totals['io_read_ops'] : 0.0;
-            $writeOps = isset($totals['io_write_ops']) ? (float)$totals['io_write_ops'] : 0.0;
-            $cpuNanoseconds = isset($totals['cpu']) ? (float)$totals['cpu'] : 0.0;
-            $ioDailyRead[] = round($readBytes / 1024 / 1024, 2);
-            $ioDailyWrite[] = round($writeBytes / 1024 / 1024, 2);
-            $ioDailyOperations[] = round($readOps + $writeOps, 2);
-            $cpuDailyHours[] = round(($cpuNanoseconds / 1000000000) / 3600, 4);
-        }
-    }
-}
 ?>
 
 <style>
@@ -570,86 +474,7 @@ if ($meminfo && preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m)) {
 
 </div>
 
-<?php if (!$resourceAvailable): ?>
-<div class="stats-block resource-summary-block">
-    <h6>Resource snapshot</h6>
-    <pre><?php echo htmlspecialchars($resourceMessage, ENT_QUOTES, 'UTF-8'); ?></pre>
-</div>
-<?php else: ?>
-<div class="stats-block resource-summary-block">
-    <h6>Resource snapshot</h6>
-    <div class="resource-summary-strip">
-        <div class="resource-summary-item">
-            <span class="resource-summary-label">CPU</span>
-            <span class="resource-summary-value"><?php echo htmlspecialchars((string)($cpuDisplay['month'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?></span>
-            <span class="resource-summary-detail">Week/day/hour: <?php echo htmlspecialchars((string)($cpuDisplay['week'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string)($cpuDisplay['day'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string)($cpuDisplay['hour'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?></span>
-        </div>
-        <div class="resource-summary-item">
-            <span class="resource-summary-label">Memory</span>
-            <span class="resource-summary-value"><?php echo htmlspecialchars($memoryCurrent, ENT_QUOTES, 'UTF-8'); ?></span>
-            <span class="resource-summary-detail">Process: <?php echo htmlspecialchars($memoryAnon, ENT_QUOTES, 'UTF-8'); ?> / Cache: <?php echo htmlspecialchars($memoryFile, ENT_QUOTES, 'UTF-8'); ?></span>
-            <span class="resource-summary-detail">RAM-hours: <?php echo htmlspecialchars((string)($ramHoursDisplay['month'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string)($ramHoursDisplay['week'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string)($ramHoursDisplay['day'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?></span>
-            <span class="resource-summary-detail">Average: <?php echo htmlspecialchars((string)($memoryDisplay['month'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string)($memoryDisplay['week'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string)($memoryDisplay['day'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?></span>
-        </div>
-        <div class="resource-summary-item">
-            <span class="resource-summary-label">Processes</span>
-            <span class="resource-summary-value"><?php echo htmlspecialchars($tasksCurrent, ENT_QUOTES, 'UTF-8'); ?></span>
-            <span class="resource-summary-detail">Current account process count</span>
-        </div>
-    </div>
-    <?php if (count($cpuDailyHours) >= 2): ?>
-    <div class="resource-summary-chart">
-        <?php
-        pmssStatsRenderLineChart('cpuChart', $ioDailyLabels, array(array(
-            'label' => 'Daily CPU (hours)',
-            'data' => $cpuDailyHours,
-            'backgroundColor' => 'rgba(129, 199, 132, 0.2)',
-            'borderColor' => 'rgb(129, 199, 132)',
-        )));
-        ?>
-    </div>
-    <?php else: ?>
-        <div class="docker-note">CPU chart requires 2+ days of data.</div>
-    <?php endif; ?>
-</div>
-
-<div class="stats-block">
-    <h6>Storage I/O</h6>
-    <pre style="margin-bottom:12px;">
-Resource usage at <?php echo date('Y-m-d H:i:s', (int)$resourceTime); ?>:
-I/O Read (month/week/day/hour): <?php echo htmlspecialchars((string)($ioReadDisplay['month'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string)($ioReadDisplay['week'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string)($ioReadDisplay['day'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string)($ioReadDisplay['hour'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?>
-I/O Write (month/week/day/hour): <?php echo htmlspecialchars((string)($ioWriteDisplay['month'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string)($ioWriteDisplay['week'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string)($ioWriteDisplay['day'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string)($ioWriteDisplay['hour'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?>
-Past 30 days total I/O operations: <?php echo htmlspecialchars(pmssFormatIoOperationsShort($ioOperationsMonth), ENT_QUOTES, 'UTF-8'); ?>
-    </pre>
-
-    <?php if (count($ioDailyLabels) >= 2): ?>
-        <?php
-        pmssStatsRenderLineChart('ioChart', $ioDailyLabels, array(
-            array(
-                'label' => 'Daily I/O Read (MiB)',
-                'data' => $ioDailyRead,
-                'backgroundColor' => 'rgba(75, 192, 192, 0.2)',
-                'borderColor' => 'rgb(75, 192, 192)',
-            ),
-            array(
-                'label' => 'Daily I/O Write (MiB)',
-                'data' => $ioDailyWrite,
-                'backgroundColor' => 'rgba(244, 67, 54, 0.2)',
-                'borderColor' => 'rgb(244, 67, 54)',
-            ),
-        ));
-        pmssStatsRenderLineChart('iopsChart', $ioDailyLabels, array(array(
-            'label' => 'Daily I/O Operations',
-            'data' => $ioDailyOperations,
-            'backgroundColor' => 'rgba(255, 193, 7, 0.2)',
-            'borderColor' => 'rgb(255, 193, 7)',
-        )));
-        ?>
-    <?php else: ?>
-        <div class="docker-note">Chart requires 2+ days of data.</div>
-    <?php endif; ?>
-</div>
-<?php endif; ?>
+<?php pmssStatsRenderResourceBlocks($resourceState); ?>
 
 <div class="stats-block">
     <h6>Memory pressure</h6>
@@ -770,12 +595,9 @@ Inbound:Outbound ratio (month): <span class="traffic-ratio <?php echo $trafficRa
         <?php if ($trafficData !== null && !empty($trafficData['daily']) && count($trafficData['daily']) >= 2): ?>
             <?php
             $trafficValues = array_map(function ($value) { return round((float)$value, 2); }, array_values($trafficData['daily']));
-            pmssStatsRenderLineChart('trafficChart', array_keys($trafficData['daily']), array(array(
-                'label' => 'Daily Traffic (MiB)',
-                'data' => $trafficValues,
-                'backgroundColor' => 'rgba(75, 192, 192, 0.2)',
-                'borderColor' => 'rgb(75, 192, 192)',
-            )));
+            pmssStatsRenderLineChart('trafficChart', array_keys($trafficData['daily']), array(
+                pmssStatsChartDataset('Daily Traffic (MiB)', $trafficValues, 'rgba(75, 192, 192, 0.2)', 'rgb(75, 192, 192)'),
+            ));
             ?>
         <?php elseif ($trafficData !== null): ?>
             <div class="docker-note">Chart requires 2+ days of data.</div>

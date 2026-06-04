@@ -7,7 +7,7 @@ final class CustomerStatsLayoutTest extends TestCase
 {
     public function testResourceBasicsRenderAsCompactTopSnapshot(): void
     {
-        $stats = $this->pmssReadRepoFile('etc/skel/www/stats.php');
+        $stats = $this->pmssRenderCustomerPanelPage('stats.php');
 
         $this->assertOrderedStrings(
             array('<h6>Resource snapshot</h6>', '<h6>Storage I/O</h6>', '<h6>Memory pressure</h6>'),
@@ -15,7 +15,7 @@ final class CustomerStatsLayoutTest extends TestCase
             'Missing stats layout marker: ',
             'Resource summary order changed at: '
         );
-        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/stats.php', array(
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/statsHelpers.php', array(
             'class="stats-block resource-summary-block"',
             'class="resource-summary-strip"',
             'class="resource-summary-label">CPU</span>',
@@ -45,12 +45,14 @@ final class CustomerStatsLayoutTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/stats.php', array(
             "require_once __DIR__.'/scriptsInc.php';",
             "require_once __DIR__.'/statsHelpers.php';",
+            'pmssStatsRenderResourceBlocks($resourceState);',
         ));
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/statsHelpers.php', array(
             'function pmssStatsDockerInactiveNote(',
             'function pmssStatsRenderLineChart(',
+            'function pmssStatsRenderResourceBlocks(',
         ));
-        $this->pmssAssertRepoFileContainsString('etc/skel/www/stats.php', 'function pmssStatsSerializedStateRead(');
+        $this->pmssAssertRepoFileNotContainsString('etc/skel/www/stats.php', 'function pmssStatsSerializedStateRead(');
         $this->pmssAssertRepoFileNotContainsString('etc/skel/www/stats.php', 'PMSS_STATS'.'_HELPERS_ONLY');
     }
 }
