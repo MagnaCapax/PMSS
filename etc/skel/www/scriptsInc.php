@@ -88,14 +88,23 @@ if (!function_exists('pmssWelcomeSerializedArrayDecode')) {
  }
 }
 
-if (!function_exists('pmssWelcomeMessageCustomerPathIsSafe')) {
+if (!function_exists('pmssCustomerHomeRoot')) {
+ /** Return the configured customer home root without a trailing slash. */
+ function pmssCustomerHomeRoot() { $homeRoot = getenv('PMSS_HOME_DIR'); return (is_string($homeRoot) && trim($homeRoot) !== '') ? rtrim($homeRoot, '/') : '/home'; }
+}
+
+if (!function_exists('pmssCustomerHomePath')) {
+ /** Build a path under a customer home while preserving legacy suffix handling. */
+ function pmssCustomerHomePath($home, $suffix) { return rtrim((string) $home, '/').'/'.(string) $suffix; }
+}
+
+if (!function_exists('pmssCustomerPathIsSafe')) {
  /**
-  * Keep customer-side file reads below the configured home root.
+  * Keep customer-side file access below the configured home root.
   */
- function pmssWelcomeMessageCustomerPathIsSafe($path) {
+ function pmssCustomerPathIsSafe($path) {
   if (!is_string($path) || $path === '' || strpos($path, "\0") !== false || is_link($path)) return false;
-  $homeRoot = getenv('PMSS_HOME_DIR');
-  $homeRoot = (is_string($homeRoot) && trim($homeRoot) !== '') ? rtrim($homeRoot, '/') : '/home';
+  $homeRoot = pmssCustomerHomeRoot();
   $real = realpath($path);
   if ($real === false) {
    $real = realpath(dirname($path));
@@ -104,6 +113,11 @@ if (!function_exists('pmssWelcomeMessageCustomerPathIsSafe')) {
   }
   return strpos($real, $homeRoot.'/') === 0;
  }
+}
+
+if (!function_exists('pmssWelcomeMessageCustomerPathIsSafe')) {
+ /** Backward-compatible welcome helper wrapper around the generic path guard. */
+ function pmssWelcomeMessageCustomerPathIsSafe($path) { return pmssCustomerPathIsSafe($path); }
 }
 
 if (!function_exists('pmssWelcomeRequireLocalHelper')) {

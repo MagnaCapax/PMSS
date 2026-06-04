@@ -7,6 +7,7 @@
  *
  * @license GPL-3.0-only
  */
+require_once __DIR__.'/scriptsInc.php';
 
 /** Read the localclient password from a Deluge auth file. */
 function pmssDelugeAuthReadLocalclientPassword(string $authPath): string
@@ -26,32 +27,18 @@ function pmssDelugeAuthReadLocalclientPassword(string $authPath): string
 /** Return the configured home root without a trailing slash. */
 function pmssUserPasswordsHomeRoot(): string
 {
-    $homeRoot = getenv('PMSS_HOME_DIR');
-    return is_string($homeRoot) && trim($homeRoot) !== '' ? rtrim($homeRoot, '/') : '/home';
+    return pmssCustomerHomeRoot();
 }
 
 function pmssUserPasswordsPath(string $username, string $leaf): string
 {
-    return pmssUserPasswordsHomeRoot().'/'.$username.'/.config/deluge/'.$leaf;
+    return pmssCustomerHomePath(pmssUserPasswordsHomeRoot().'/'.$username, '.config/deluge/'.$leaf);
 }
 
 /** Accept only non-symlink paths under the configured home root. */
 function pmssUserPasswordsPathIsSafe(string $path): bool
 {
-    if ($path === '' || strpos($path, "\0") !== false || is_link($path)) {
-        return false;
-    }
-
-    $real = realpath($path);
-    if ($real === false) {
-        $parent = realpath(dirname($path));
-        if ($parent === false) {
-            return false;
-        }
-        $real = $parent.'/'.basename($path);
-    }
-
-    return strpos($real, pmssUserPasswordsHomeRoot().'/') === 0;
+    return pmssCustomerPathIsSafe($path);
 }
 
 /** Write through a same-directory temp file so partial writes do not leak. */

@@ -14,7 +14,7 @@ require_once __DIR__.'/scriptsInc.php';
  */
 function pmssWelcomeReadJson(string $path): array
 {
-    if ($path === '' || !pmssWelcomeMessageCustomerPathIsSafe($path) || !is_file($path) || is_link($path)) {
+    if ($path === '' || !pmssCustomerPathIsSafe($path) || !is_file($path) || is_link($path)) {
         return [];
     }
     $raw = @file_get_contents($path);
@@ -29,7 +29,7 @@ function pmssWelcomeReadJson(string $path): array
  */
 function pmssWelcomeUserMessagePath(string $userHome): string
 {
-    return rtrim($userHome, '/').'/.config/welcome-message.html';
+    return pmssCustomerHomePath($userHome, '.config/welcome-message.html');
 }
 
 /**
@@ -38,7 +38,7 @@ function pmssWelcomeUserMessagePath(string $userHome): string
 function pmssWelcomeUserMessageRead(string $userHome): string
 {
     $path = pmssWelcomeUserMessagePath($userHome);
-    if (!pmssWelcomeMessageCustomerPathIsSafe($path) || !is_file($path) || is_link($path)) {
+    if (!pmssCustomerPathIsSafe($path) || !is_file($path) || is_link($path)) {
         return '';
     }
 
@@ -63,10 +63,8 @@ function pmssWelcomeMessageForUser(
             break;
         }
     }
-    if ($productKey === '' && is_file($productFile = $userHome.'/.product') && !is_link($productFile)) {
-        if (pmssWelcomeMessageCustomerPathIsSafe($productFile)) {
-            $productKey = trim((string) @file_get_contents($productFile));
-        }
+    if ($productKey === '' && is_file($productFile = pmssCustomerHomePath($userHome, '.product')) && !is_link($productFile) && pmssCustomerPathIsSafe($productFile)) {
+        $productKey = trim((string) @file_get_contents($productFile));
     }
 
     $template = pmssWelcomeUserMessageRead($userHome);

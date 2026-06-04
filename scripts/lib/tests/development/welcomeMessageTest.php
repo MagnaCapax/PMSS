@@ -287,7 +287,7 @@ class WelcomeMessageTest extends TestCase
             'pmssEnsureSafeDir',
             'pmssUserFilePathIsSafe',
         ]);
-        $this->assertStringContainsString('pmssWelcomeMessageCustomerPathIsSafe($path)', $source);
+        $this->assertStringContainsString('pmssCustomerPathIsSafe($path)', $source);
     }
 
     public function testProductConfigUsesUnifiedWelcomeLibrary(): void

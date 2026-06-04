@@ -14,7 +14,7 @@ require_once __DIR__.'/scriptsInc.php';
  */
 function pmssMediaStackPanelHomePath(string $home, string $suffix): string
 {
-    return rtrim($home, '/').'/'.$suffix;
+    return pmssCustomerHomePath($home, $suffix);
 }
 
 /**
@@ -33,12 +33,11 @@ function pmssMediaStackPanelDirectoryPopulated(string $path): bool
  */
 function pmssMediaStackPanelStartGateRead(string $home): array
 {
-    $home = rtrim($home, '/');
     foreach (array(
         array(!is_file(pmssMediaStackPanelHomePath($home, 'install-media-stack.sh')), 'Media stack installer is missing from this account.'),
         array(!pmssFrontendShellExecAvailable(), 'PHP shell execution is unavailable on this host.'),
-        array(pmssMediaStackPanelDirectoryPopulated($home.'/.bin'), 'Web install is limited to the first run because existing ~/.bin content triggers interactive prompts.'),
-        array(pmssMediaStackPanelDirectoryPopulated($home.'/.config/jellyfin'), 'Web install is limited to the first run because existing Jellyfin data must be reviewed over SSH.'),
+        array(pmssMediaStackPanelDirectoryPopulated(pmssMediaStackPanelHomePath($home, '.bin')), 'Web install is limited to the first run because existing ~/.bin content triggers interactive prompts.'),
+        array(pmssMediaStackPanelDirectoryPopulated(pmssMediaStackPanelHomePath($home, '.config/jellyfin')), 'Web install is limited to the first run because existing Jellyfin data must be reviewed over SSH.'),
     ) as $gate) {
         if ($gate[0]) {
             return array('ok' => false, 'message' => $gate[1]);
@@ -135,7 +134,7 @@ function pmssMediaStackPanelStartCommandBuild(string $home, string $username): s
  */
 function pmssMediaStackPanelStatusRead(string $home, string $username, string $hostname): array
 {
-    $installed = is_file(rtrim($home, '/').'/.config/jellyfin/config/network.xml');
+    $installed = is_file(pmssMediaStackPanelHomePath($home, '.config/jellyfin/config/network.xml'));
     $pid = pmssMediaStackPanelPidRead($home);
     $running = pmssMediaStackPanelPidRunning($pid);
     $logTail = pmssMediaStackPanelLogTailRead($home);
