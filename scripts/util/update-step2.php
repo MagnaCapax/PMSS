@@ -162,54 +162,6 @@ function pmssConfigureWebStack(): void
 }
 
 /**
- * Run non-shell orchestration work with profiling metadata.
- *
- * Wrapper keeps phase-2 profiling complete even when a step is pure PHP and
- * does not invoke runStep() directly.
- *
- * @param callable $step
- * @return mixed
- */
-function pmssRunProfiledStep(string $description, callable $step)
-{
-    $started = microtime(true);
-    logmsg('[START] '.$description.' :: [callable]');
-
-    try {
-        $result = $step();
-    } catch (\Throwable $throwable) {
-        $duration = microtime(true) - $started;
-        pmssLogStatus('ERR', $description, 1, $duration);
-        throw $throwable;
-    }
-
-    $duration = microtime(true) - $started;
-    pmssLogStatus('OK', $description, 0, $duration);
-
-    return $result;
-}
-
-/**
- * Profile a direct function/method invocation with optional arguments.
- *
- * @param callable $callable
- * @param array<int, mixed> $arguments
- * @return mixed
- */
-function pmssRunProfiledCallable(string $description, callable $callable, array $arguments = [], string $classification = '')
-{
-    try {
-        return pmssRunProfiledStep($description, static function () use ($callable, $arguments) { return $callable(...$arguments); });
-    } catch (\Throwable $throwable) {
-        if ($classification === '') {
-            throw $throwable;
-        }
-        $reason = get_class($throwable).($throwable->getMessage() !== '' ? ': '.$throwable->getMessage() : '');
-        pmssUpdateStep2HandleClassifiedFailure($description, $classification, 1, $reason);
-    }
-}
-
-/**
  * Mark that nginx has been stopped and needs a final refresh before exit.
  */
 function pmssUpdateStep2MarkWebRefreshRequired(): void
@@ -451,35 +403,12 @@ if (!$dpkgBaselineOk) {
 // hosts already at broken versions and ensures convergence to exactly 3.0.17.
 // Uses simulate-guarded downgrade logic with a dpkg-direct fallback path when
 // apt predicts openssh removals. Refs #436.
-pmssRunProfiledCallable(
-    'Holding libssl3/openssl for PECL ssh2 compat (dpkg-direct guard)',
-    'pmssHoldLibssl3ForPeclSsh2Compat',
-    [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null]
-);
-
-// Heal openssh-server residual cascade damage. The libssl3 healer above prevents
-// NEW removals, but cannot detect/repair hosts already left in `rc`, missing-binary,
-// or deleted-exe state from the 2026-04-30 cascade incident. Idempotent — no-ops
-// on healthy hosts. Refs #436.
-pmssRunProfiledCallable(
-    'Healing openssh-server post-cascade if missing/deleted',
-    'pmssHealOpensshServerIfMissing',
-    [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null]
-);
-
-// Ensure openssh-server is at a libssl3-3.0.17-compatible version (deb12u7 or
-// older). Cascade-victim hosts that were emergency-recovered with a
-// `dpkg -i openssh-server_deb12u9_amd64.deb` from apt cache end up in an
-// unconfigured/broken-dep state — the binary runs but `dpkg --configure -a`
-// fails every PMSS update, and any apt resolver pass could re-trigger the
-// 2026-04-30 cascade. This step converges them to canonical baseline (matches
-// never-cascaded sea-sparrow: openssh-server at deb12u7, in ii state, unheld).
-// Idempotent — no-ops on hosts already at deb12u7 or older. Refs #436.
-pmssRunProfiledCallable(
-    'Ensuring openssh-server is libssl3-3.0.17-compatible (canonical baseline downgrade)',
-    'pmssEnsureOpensshCompatibleWithHeldLibssl3',
-    [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null]
-);
+$opensslCompatArgs = [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null];
+pmssRunProfiledCallableBatch([
+    ['Holding libssl3/openssl for PECL ssh2 compat (dpkg-direct guard)', 'pmssHoldLibssl3ForPeclSsh2Compat', $opensslCompatArgs],
+    ['Healing openssh-server post-cascade if missing/deleted', 'pmssHealOpensshServerIfMissing', $opensslCompatArgs],
+    ['Ensuring openssh-server is libssl3-3.0.17-compatible (canonical baseline downgrade)', 'pmssEnsureOpensshCompatibleWithHeldLibssl3', $opensslCompatArgs],
+]);
 
 // Package convergence: dpkg selections are the authoritative source of package
 // state.

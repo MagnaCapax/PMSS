@@ -9,12 +9,16 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
     {
         $removedWrapper = 'function pmssUpdateStep2Run'.'ClassifiedCallable(';
 
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/update-step2.php', [
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/runtime/profile.php', [
             'function pmssRunProfiledStep(',
             'function pmssRunProfiledCallable(',
+            'function pmssRunProfiledCallableBatch(',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/update-step2.php', [
             'Preparing noninteractive apt defaults',
             'Refreshing package repositories',
             'Applying distro dpkg baseline selections',
+            'pmssRunProfiledCallableBatch([',
             'Configuring web stack',
             'Updating all user environments',
             'Ensuring network template baseline',

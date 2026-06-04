@@ -13,6 +13,7 @@
 
 require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/../../runtime.php';
+require_once __DIR__.'/stepPolicy.php';
 
 /**
  * Track a single step execution in memory and JSON logs.
@@ -24,6 +25,69 @@ function pmssRecordProfile(array $entry): void
     }
     $GLOBALS['PMSS_PROFILE'][] = $entry;
     pmssLogJson(['event' => 'step', 'data' => $entry]);
+}
+
+/**
+ * Run non-shell orchestration work with profiling metadata.
+ *
+ * Wrapper keeps phase-2 profiling complete even when a step is pure PHP and
+ * does not invoke runStep() directly.
+ *
+ * @param callable $step
+ * @return mixed
+ */
+function pmssRunProfiledStep(string $description, callable $step)
+{
+    $started = microtime(true);
+    logmsg('[START] '.$description.' :: [callable]');
+
+    try {
+        $result = $step();
+    } catch (\Throwable $throwable) {
+        $duration = microtime(true) - $started;
+        pmssLogStatus('ERR', $description, 1, $duration);
+        throw $throwable;
+    }
+
+    $duration = microtime(true) - $started;
+    pmssLogStatus('OK', $description, 0, $duration);
+
+    return $result;
+}
+
+/**
+ * Profile a direct function/method invocation with optional arguments.
+ *
+ * @param callable $callable
+ * @param array<int, mixed> $arguments
+ * @return mixed
+ */
+function pmssRunProfiledCallable(string $description, callable $callable, array $arguments = [], string $classification = '')
+{
+    try {
+        return pmssRunProfiledStep($description, static function () use ($callable, $arguments) { return $callable(...$arguments); });
+    } catch (\Throwable $throwable) {
+        if ($classification === '') {
+            throw $throwable;
+        }
+        $reason = get_class($throwable).($throwable->getMessage() !== '' ? ': '.$throwable->getMessage() : '');
+        pmssUpdateStep2HandleClassifiedFailure($description, $classification, 1, $reason);
+    }
+}
+
+/**
+ * Run a table of profiled callables in order.
+ *
+ * @param array<int,array{0:string,1:callable,2?:array<int,mixed>,3?:string}> $steps
+ */
+function pmssRunProfiledCallableBatch(array $steps): void
+{
+    foreach ($steps as $step) {
+        $description = (string) $step[0];
+        $arguments = isset($step[2]) && is_array($step[2]) ? $step[2] : [];
+        $classification = isset($step[3]) ? (string) $step[3] : '';
+        pmssRunProfiledCallable($description, $step[1], $arguments, $classification);
+    }
 }
 
 /**

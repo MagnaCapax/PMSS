@@ -205,9 +205,9 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
    and logs to `/var/log/pmss/iptables.log`.
 
 Every shell command flows through `runStep()`, and non-shell module calls are
-wrapped by `pmssRunProfiledStep()`/`pmssRunProfiledCallable()` (plus classified
-wrapper helpers where strict handling is required) in
-`scripts/util/update-step2.php` so profile JSON captures each orchestration
+wrapped by `pmssRunProfiledStep()`/`pmssRunProfiledCallable()` from
+`scripts/lib/update/runtime/profile.php` (plus classified wrapper helpers where
+strict handling is required) so profile JSON captures each orchestration
 step with stable labels. `PMSS_DRY_RUN=1` still logs planned work while command
 execution is skipped.
 
