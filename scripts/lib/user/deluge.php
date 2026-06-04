@@ -77,6 +77,19 @@ function pmssDelugeRenderCoreConfig(array $user, int $delugePort, string $upload
     );
 }
 
+/**
+ * Persist a Deluge config file through the shared symlink-safe writer.
+ */
+function pmssDelugeConfigFileWrite(string $path, string $content, string $label): bool
+{
+    if (pmssReplaceUserFilePreservingMetadata($path, $content, 0644)) {
+        return true;
+    }
+
+    pmssLogStatus('WARN', sprintf('Failed to write Deluge %s config: %s', $label, $path), 1);
+    return false;
+}
+
 function userConfigureDeluge(array $user, array $configuration): void
 {
     $username = $user['name'];
@@ -113,8 +126,8 @@ function userConfigureDeluge(array $user, array $configuration): void
         return;
     }
 
-    file_put_contents("$configDir/core.conf", $coreConfig);
-    file_put_contents("$configDir/hostlist.conf", str_replace('##DAEMONPORT', $delugePort, $hostlistTemplate));
+    pmssDelugeConfigFileWrite("$configDir/core.conf", $coreConfig, 'core');
+    pmssDelugeConfigFileWrite("$configDir/hostlist.conf", str_replace('##DAEMONPORT', $delugePort, $hostlistTemplate), 'hostlist');
     if (!file_exists("$configDir/hostlist.conf.1.2")) {
         @symlink("$configDir/hostlist.conf", "$configDir/hostlist.conf.1.2");
     }
@@ -123,7 +136,7 @@ function userConfigureDeluge(array $user, array $configuration): void
     $existingWebConfig = @file_get_contents($webConfPath);
     $webConfig   = str_replace(['##WEBPORT', '##USER'], [$delugePort + 1, $username], $webTemplate);
     $webConfChanged = is_string($existingWebConfig) && $existingWebConfig !== $webConfig;
-    file_put_contents($webConfPath, $webConfig);
+    pmssDelugeConfigFileWrite($webConfPath, $webConfig, 'web');
     pmssNetworkPortFileWrite("$home/.delugePort", (int) $delugePort, 1024, 65000, 0644);
 
     if (!file_exists("$configDir/auth")) {
@@ -175,5 +188,5 @@ function pmssDelugeApplyUploadThrottle(string $username, ?int $throttle = null):
     return $count > 0
         && $updated !== null
         && $updated !== $config
-        && file_put_contents($configFile, $updated) !== false;
+        && pmssDelugeConfigFileWrite($configFile, $updated, 'upload throttle');
 }
