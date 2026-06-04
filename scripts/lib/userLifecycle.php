@@ -251,18 +251,35 @@ function pmssUserLifecycleSyncSuspendedState(string $username, string $disabledR
 }
 
 /**
+ * Validate that a suspended backup candidate is a direct non-symlinked home child.
+ */
+function pmssUserLifecycleSuspendedBackupCandidateIsSafe(string $homeDir, string $candidate): bool
+{
+    $homeDir = rtrim($homeDir, '/');
+    if ($homeDir === '' || is_link($candidate) || !is_dir($candidate)) {
+        return false;
+    }
+    if (dirname($candidate) !== $homeDir) {
+        return false;
+    }
+
+    return strpos(basename($candidate), 'www-suspended-') === 0;
+}
+
+/**
  * Find the newest suspended web backup that still contains user content.
  */
 function pmssUserLifecycleFindSuspendedBackup(string $homeDir): ?string
 {
+    $homeDir = rtrim($homeDir, '/');
     $candidates = glob($homeDir.'/www-suspended-*', GLOB_NOSORT);
     if (!is_array($candidates) || empty($candidates)) {
         return null;
     }
     $bestPath = null;
     $bestMtime = 0;
-    $hasSuspendedContent = static function (string $candidate): bool {
-        if (!is_dir($candidate)) {
+    $hasSuspendedContent = static function (string $candidate) use ($homeDir): bool {
+        if (!pmssUserLifecycleSuspendedBackupCandidateIsSafe($homeDir, $candidate)) {
             return false;
         }
         if (is_dir($candidate.'/rutorrent') || is_file($candidate.'/index.php')) {

@@ -193,4 +193,46 @@ class userLifecycleLoggingTest extends TestCase
 
         $this->assertSame(null, \pmssUserLifecycleFindSuspendedBackup($emptyHome));
     }
+
+    public function testSuspendedBackupCandidateGuardRequiresDirectHomeDirectory(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-user-lifecycle-backup-guard-');
+        $valid = $home.'/www-suspended-valid';
+        $outside = $this->pmssMakeTempDir('pmss-user-lifecycle-backup-outside-').'/www-suspended-outside';
+        $nested = $home.'/nested/www-suspended-nested';
+        $wrongPrefix = $home.'/www-disabled';
+
+        foreach (array($valid, $outside, $nested, $wrongPrefix) as $path) {
+            $this->pmssWriteFile($path.'/index.php', '');
+        }
+
+        $this->assertTrue(\pmssUserLifecycleSuspendedBackupCandidateIsSafe($home, $valid));
+        $this->assertFalse(\pmssUserLifecycleSuspendedBackupCandidateIsSafe($home, $outside));
+        $this->assertFalse(\pmssUserLifecycleSuspendedBackupCandidateIsSafe($home, $nested));
+        $this->assertFalse(\pmssUserLifecycleSuspendedBackupCandidateIsSafe($home, $wrongPrefix));
+        $this->assertFalse(\pmssUserLifecycleSuspendedBackupCandidateIsSafe('', $valid));
+
+        $link = $home.'/www-suspended-link';
+        if (@symlink($valid, $link)) {
+            $this->assertFalse(\pmssUserLifecycleSuspendedBackupCandidateIsSafe($home, $link));
+        }
+    }
+
+    public function testFindSuspendedBackupSkipsSymlinkedCandidates(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-user-lifecycle-backup-link-');
+        $target = $this->pmssMakeTempDir('pmss-user-lifecycle-backup-target-');
+        $link = $home.'/www-suspended-link';
+        if (!@symlink($target, $link)) {
+            throw new SkipTest('symlink creation unavailable');
+        }
+
+        $this->pmssWriteFile($target.'/index.php', '');
+        $valid = $home.'/www-suspended-valid';
+        $this->pmssWriteFile($valid.'/index.php', '');
+        touch($target, 3000);
+        touch($valid, 1000);
+
+        $this->assertSame($valid, \pmssUserLifecycleFindSuspendedBackup($home));
+    }
 }
