@@ -37,33 +37,6 @@ function pmssTotalCpuThreads(): int
 }
 
 /**
- * Detect cgroup mode: 'v2', 'v1', or 'unknown'.
- */
-function pmssCgroupMode(): string
-{
-    if (($override = getenv('PMSS_CGROUP_MODE')) === 'v1' || $override === 'v2') {
-        return $override;
-    }
-
-    if (is_file('/sys/fs/cgroup/cgroup.controllers')
-        || strpos(pmssReadRegularFileContents('/proc/self/mountinfo') ?? '', ' - cgroup2 ') !== false) {
-        return 'v2';
-    }
-
-    if (strpos(pmssReadRegularFileContents('/proc/cmdline') ?? '', 'systemd.unified_cgroup_hierarchy=0') !== false) {
-        return 'v1';
-    }
-
-    foreach (glob('/sys/fs/cgroup/*', GLOB_ONLYDIR) ?: [] as $dir) {
-        if (basename($dir) !== 'unified') {
-            return 'v1';
-        }
-    }
-
-    return 'unknown';
-}
-
-/**
  * Guarantee that cgroup mounts and PID limits are configured sanely.
  */
 function pmssEnsureCgroupsConfigured(?callable $logger = null): void

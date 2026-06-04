@@ -25,6 +25,18 @@ function pmssSystemdUnitQuietStatus(string $action, string $unit): ?bool { if (!
 function pmssSystemdUnitIsActive(string $unit): ?bool { return pmssSystemdUnitQuietStatus('is-active', $unit); }
 function pmssSystemdUnitIsEnabled(string $unit): ?bool { return pmssSystemdUnitQuietStatus('is-enabled', $unit); }
 
+/** Detect the active cgroup hierarchy from explicit override and kernel state. */
+function pmssCgroupMode(): string
+{
+    if (($override = getenv('PMSS_CGROUP_MODE')) === 'v1' || $override === 'v2') return $override;
+    if (is_file('/sys/fs/cgroup/cgroup.controllers') || strpos(pmssReadRegularFileContents('/proc/self/mountinfo') ?? '', ' - cgroup2 ') !== false) return 'v2';
+    if (strpos(pmssReadRegularFileContents('/proc/cmdline') ?? '', 'systemd.unified_cgroup_hierarchy=0') !== false) return 'v1';
+    foreach (glob('/sys/fs/cgroup/*', GLOB_ONLYDIR) ?: [] as $dir) if (basename($dir) !== 'unified') return 'v1';
+    return 'unknown';
+}
+
+function pmssCgroupModeWithDefault(string $default): string { $mode = pmssCgroupMode(); return $mode === 'unknown' ? $default : $mode; }
+
 function requireRoot(): void
 {
     if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {

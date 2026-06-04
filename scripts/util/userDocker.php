@@ -135,17 +135,7 @@ function userDockerRunAs(string $user, string $cmd, ?int $timeoutSeconds = null,
  */
 function userDockerCgroupMode(): string
 {
-    if (($override = getenv('PMSS_CGROUP_MODE')) === 'v1' || $override === 'v2') {
-        return $override;
-    }
-
-    if (is_file('/sys/fs/cgroup/cgroup.controllers')) {
-        return 'v2';
-    }
-
-    return strpos((string) @file_get_contents('/proc/self/mountinfo'), ' - cgroup2 ') !== false
-        ? 'v2'
-        : 'v1';
+    return pmssCgroupModeWithDefault('v1');
 }
 
 /**

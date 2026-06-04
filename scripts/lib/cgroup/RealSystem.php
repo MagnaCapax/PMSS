@@ -16,7 +16,7 @@ class RealSystem implements SystemInterface
 {
     public function getCgroupMode(): string
     {
-        return is_file('/sys/fs/cgroup/cgroup.controllers') ? 'v2' : 'v1';
+        return \pmssCgroupModeWithDefault('v1');
     }
 
     public function getUid(string $user): int

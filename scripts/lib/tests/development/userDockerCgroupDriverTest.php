@@ -21,8 +21,7 @@ class UserDockerCgroupDriverTest extends TestCase
             [
                 "require_once __DIR__.'/../lib/user/rootlessDockerConfig.php';",
                 'function userDockerCgroupMode(): string',
-                "getenv('PMSS_CGROUP_MODE')",
-                "'/sys/fs/cgroup/cgroup.controllers'",
+                "pmssCgroupModeWithDefault('v1')",
                 'pmssUserRootlessDockerConfigConverge($user, $home, $uid, $gid',
                 'userDockerEnsureCgroupfsDaemonConfig($user, $home, $uid, (int) $info[\'gid\']);',
                 'userDocker: wrote ~/.config/docker/daemon.json for cgroup v2 rootless Docker',
