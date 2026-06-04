@@ -70,7 +70,7 @@ class ConfigBackupsTest extends TestCase
             ), true).'); '
             .'echo is_string($backup) ? basename($backup) : "null";';
 
-        $output = $this->pmssRunInlinePhpRequire(dirname(__DIR__, 2).'/configBackups.php', $script, [], '2>&1');
+        $output = $this->pmssRunRepoInlinePhpRequire('scripts/lib/configBackups.php', $script, [], '2>&1');
 
         $this->assertTrue(is_string($output));
         $this->assertStringContainsString('.bak', $output);

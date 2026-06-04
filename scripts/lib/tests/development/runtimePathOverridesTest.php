@@ -31,8 +31,7 @@ class RuntimePathOverridesTest extends TestCase
     public function testUpdateLoggingResolvesPmssLogFileFromLogDirOverride(): void
     {
         $logDir = '/tmp/pmss-log-bootstrap-'.bin2hex(random_bytes(4));
-        $libraryPath = dirname(__DIR__, 3).'/lib/update.php';
-        $output = trim($this->pmssRunInlinePhpRequire($libraryPath, 'echo PMSS_LOG_FILE;', ['PMSS_LOG_DIR' => $logDir]));
+        $output = trim($this->pmssRunRepoInlinePhpRequire('scripts/lib/update.php', 'echo PMSS_LOG_FILE;', ['PMSS_LOG_DIR' => $logDir]));
 
         $this->assertEquals($logDir.'/update.log', $output);
     }

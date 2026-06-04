@@ -8,7 +8,7 @@ class MotdTest extends TestCase
 {
     public function testGeneratorLoadsVersionHelperForStandaloneUse(): void
     {
-        $this->assertEquals('loaded', trim($this->pmssRunInlinePhpRequire(dirname(__DIR__, 3).'/motd/Generator.php', 'echo function_exists("getPmssVersion") ? "loaded" : "missing";', ['PMSS_TEST_MODE' => '1'])));
+        $this->assertEquals('loaded', trim($this->pmssRunRepoInlinePhpRequire('scripts/motd/Generator.php', 'echo function_exists("getPmssVersion") ? "loaded" : "missing";', ['PMSS_TEST_MODE' => '1'])));
     }
 
     public function testGenerateMotdWritesToOutputWithTemplate(): void
@@ -72,7 +72,7 @@ class MotdTest extends TestCase
 
     public function testUpdateStep2CallsGenerateMotdNearEnd(): void
     {
-        $path = dirname(__DIR__, 3).'/util/update-step2.php';
+        $path = $this->pmssRepoPath('scripts/util/update-step2.php');
         $this->assertTrue(file_exists($path), 'update-step2.php missing');
         $lines = file($path, FILE_IGNORE_NEW_LINES);
         $this->assertTrue(is_array($lines) && count($lines) > 0, 'unable to read update-step2.php');

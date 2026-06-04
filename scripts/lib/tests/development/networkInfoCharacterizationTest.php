@@ -7,7 +7,7 @@ class NetworkInfoCharacterizationTest extends TestCase
 {
     public function testGlobalsStayAlignedWithHelperResults(): void
     {
-        $result = $this->pmssRunInlinePhpRequireJson($this->pmssRepoPath('scripts/lib/networkInfo.php'), 'echo json_encode(['
+        $result = $this->pmssRunRepoInlinePhpRequireJson('scripts/lib/networkInfo.php', 'echo json_encode(['
             .'"link" => $link,'
             .'"linkSpeed" => $linkSpeed,'
             .'"detect" => detectPrimaryInterface(),'

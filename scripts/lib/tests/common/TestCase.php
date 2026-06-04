@@ -1033,6 +1033,12 @@ abstract class TestCase
     /** Run required inline PHP and decode its JSON array output. */
     protected function pmssRunInlinePhpRequireJson(string $requiredPath, string $script, array $environment = [], string $stderrRedirect = '2>/dev/null', bool $requireOnce = false): array { return $this->pmssDecodeJsonArray($this->pmssRunInlinePhpRequire($requiredPath, $script, $environment, $stderrRedirect, $requireOnce)); }
 
+    /** Run inline PHP after loading a repository-relative fixture path. */
+    protected function pmssRunRepoInlinePhpRequire(string $relativePath, string $script, array $environment = [], string $stderrRedirect = '2>/dev/null', bool $requireOnce = false): string { return $this->pmssRunInlinePhpRequire($this->pmssRepoPath($relativePath), $script, $environment, $stderrRedirect, $requireOnce); }
+
+    /** Run repository-relative inline PHP and decode its JSON array output. */
+    protected function pmssRunRepoInlinePhpRequireJson(string $relativePath, string $script, array $environment = [], string $stderrRedirect = '2>/dev/null', bool $requireOnce = false): array { return $this->pmssRunInlinePhpRequireJson($this->pmssRepoPath($relativePath), $script, $environment, $stderrRedirect, $requireOnce); }
+
     /** Return inline PHP shims shared by traffic-limit style CLI subprocess tests. */
     protected function pmssInlinePhpTrafficCliShims(string $homeGlobalName, string $logGlobalName, ?string $runtimeGlobalName = null): string
     {

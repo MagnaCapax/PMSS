@@ -43,8 +43,7 @@ class DistroDetectionTest extends TestCase
 
     public function testStandaloneDistroLibraryStillBootstrapsLegacyLogmsg(): void
     {
-        $path = dirname(__DIR__, 2).'/update/distro.php';
-        $source = trim($this->pmssRunInlinePhpRequire($path, '$function = new ReflectionFunction("logmsg"); echo str_replace("\\\\", "/", $function->getFileName());', ['PMSS_TEST_MODE' => '1']));
+        $source = trim($this->pmssRunRepoInlinePhpRequire('scripts/lib/update/distro.php', '$function = new ReflectionFunction("logmsg"); echo str_replace("\\\\", "/", $function->getFileName());', ['PMSS_TEST_MODE' => '1']));
 
         $this->assertStringContainsString('/scripts/lib/log.php', $source);
     }
