@@ -1124,6 +1124,17 @@ abstract class TestCase
         );
     }
 
+    /** Run a repository PHP entry point and assert successful output fragments. */
+    protected function pmssAssertRepoPhpScriptOutputContains(string $relativePath, array $arguments, array $needles, array $environment = [], string $stderrRedirect = '2>&1'): array
+    {
+        $result = $this->pmssRunRepoPhpScriptCommand($relativePath, $arguments, $environment, $stderrRedirect);
+
+        $this->assertSame(0, $result['rc']);
+        $this->assertStringContainsAllStrings($needles, $result['output']);
+
+        return $result;
+    }
+
     /** @return array{result:array{rc:int, output:string, lines:array<int, string>},stderrPath:string} */
     protected function pmssExecShellCommandWithTempStderr(string $command, array $environment = [], string $stderrPrefix = 'pmss-stderr-'): array
     {

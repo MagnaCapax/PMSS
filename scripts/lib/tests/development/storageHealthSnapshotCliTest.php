@@ -7,9 +7,7 @@ class StorageHealthSnapshotCliTest extends TestCase
 {
     public function testHelpShowsUsage(): void
     {
-        $result = $this->runSnapshotCommand(['--help']);
-        $this->assertSame(0, $result['rc']);
-        $this->assertStringContainsString('Usage: storageHealthSnapshot.php', $result['output']);
+        $this->pmssAssertRepoPhpScriptOutputContains('scripts/util/storageHealthSnapshot.php', ['--help'], ['Usage: storageHealthSnapshot.php'], $this->storageHealthSnapshotCommandEnvironment());
     }
 
     public function testWritesJsonlToExplicitPath(): void
@@ -78,16 +76,22 @@ class StorageHealthSnapshotCliTest extends TestCase
     /** @return array{rc:int,output:string,lines:array<int,string>} */
     private function runSnapshotCommand(array $arguments): array
     {
+        return $this->pmssRunRepoPhpScriptCommand(
+            'scripts/util/storageHealthSnapshot.php',
+            $arguments,
+            $this->storageHealthSnapshotCommandEnvironment()
+        );
+    }
+
+    /** Return the command environment shared by storage health CLI assertions. */
+    private function storageHealthSnapshotCommandEnvironment(): array
+    {
         $stubDir = $this->pmssMakeLineOutputStub(
             'lsblk',
             ['pmssfake0 disk 1 PMSSSERIAL 1T'],
             'pmss-storage-health-lsblk-'
         );
 
-        return $this->pmssRunRepoPhpScriptCommand(
-            'scripts/util/storageHealthSnapshot.php',
-            $arguments,
-            $this->pmssPathPrefixedEnvironment($stubDir)
-        );
+        return $this->pmssPathPrefixedEnvironment($stubDir);
     }
 }

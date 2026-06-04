@@ -17,9 +17,10 @@ class UserCgroupCliWipeDryRunTest extends TestCase
 
     public function testDryRunPrintsPlannedWhenPropsPresent(): void
     {
-        $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--cpu-weight=123', '--io-weight=321']);
-        $this->assertStringContainsString('Planned properties', $out);
-        $this->assertStringContainsString('CPUWeight=123', $out);
-        $this->assertStringContainsString('IOWeight=321', $out);
+        $this->pmssAssertRepoPhpScriptOutputContains(
+            'scripts/util/userConfigCgroup.php',
+            ['root', '--apply', '--dry-run', '--cpu-weight=123', '--io-weight=321'],
+            ['Planned properties', 'CPUWeight=123', 'IOWeight=321']
+        );
     }
 }

@@ -24,10 +24,7 @@ class ShowTrafficFormatTest extends TestCase
 
     public function testHelpIncludesJsonOption(): void
     {
-        $out = $this->pmssRunRepoPhpScript('scripts/showTraffic.php', ['--help'], [], '');
-
-        $this->assertTrue(is_string($out));
-        $this->assertStringContainsAllStrings(['--json', '--show-missing', '--extended', '--sort', '--color', '--no-color'], $out);
+        $this->pmssAssertRepoPhpScriptOutputContains('scripts/showTraffic.php', ['--help'], ['--json', '--show-missing', '--extended', '--sort', '--color', '--no-color'], [], '');
     }
 
     public function testShowTrafficUsesSharedManagedUsersParser(): void

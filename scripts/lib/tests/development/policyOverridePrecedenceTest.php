@@ -18,8 +18,7 @@ class PolicyOverridePrecedenceTest extends TestCase
     public function testDefaultsApplyWhenExplicitMissing(): void
     {
         $cfgDir = $this->createPolicyDir('policy', "<?php return ['cpuWeight'=>123,'ioWeight'=>321,'tasksMax'=>777];\n");
-        $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--defaults'], ['PMSS_CONFIG_DIR' => $cfgDir]);
-        $this->assertStringContainsAllStrings(['CPUWeight=123', 'IOWeight=321', 'TasksMax=777'], $out);
+        $this->pmssAssertRepoPhpScriptOutputContains('scripts/util/userConfigCgroup.php', ['root', '--apply', '--dry-run', '--defaults'], ['CPUWeight=123', 'IOWeight=321', 'TasksMax=777'], ['PMSS_CONFIG_DIR' => $cfgDir]);
     }
 
     public function testExplicitOverridesPolicyDefaults(): void
@@ -36,12 +35,12 @@ class PolicyOverridePrecedenceTest extends TestCase
             "<?php return ['mounts' => ['/home' => ['ioWeight' => 320, 'readBw' => '25M', 'writeBw' => '10M', 'readIops' => 150, 'writeIops' => 90]]];\n"
         );
 
-        $out = $this->pmssRunUserConfigCgroupCli(
+        $this->pmssAssertRepoPhpScriptOutputContains(
+            'scripts/util/userConfigCgroup.php',
             ['root', '--apply', '--dry-run', '--defaults'],
+            ['IODeviceWeight=/dev/testhome 320', 'IOReadBandwidthMax=/dev/testhome 25M', 'IOWriteBandwidthMax=/dev/testhome 10M', 'IOReadIOPSMax=/dev/testhome 150', 'IOWriteIOPSMax=/dev/testhome 90'],
             ['PMSS_CONFIG_DIR' => $cfgDir, 'PMSS_HOME_DEVICE' => '/dev/testhome']
         );
-
-        $this->assertStringContainsAllStrings(['IODeviceWeight=/dev/testhome 320', 'IOReadBandwidthMax=/dev/testhome 25M', 'IOWriteBandwidthMax=/dev/testhome 10M', 'IOReadIOPSMax=/dev/testhome 150', 'IOWriteIOPSMax=/dev/testhome 90'], $out);
     }
 
     public function testExplicitIoFlagsOverridePolicyMountIoPairs(): void

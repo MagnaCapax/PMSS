@@ -10,8 +10,7 @@ final class agentDiagnosticsCliTest extends TestCase
 {
     public function testHelpShowsUsage(): void
     {
-        $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', ['--help']);
-        $this->assertStringContainsString('agentDiagnostics.php [--json] [--pretty] [--user USERNAME]', $output);
+        $this->pmssAssertRepoPhpScriptOutputContains('scripts/util/agentDiagnostics.php', ['--help'], ['agentDiagnostics.php [--json] [--pretty] [--user USERNAME]']);
     }
 
     public function testJsonCollectsServerAndUserSections(): void
@@ -72,12 +71,10 @@ final class agentDiagnosticsCliTest extends TestCase
     {
         $scriptRoot = $this->makeScriptRoot();
         $binDir = $this->makeCommandStubs();
-        $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', [], $this->pmssPathPrefixedEnvironment($binDir, [
+        $this->pmssAssertRepoPhpScriptOutputContains('scripts/util/agentDiagnostics.php', [], ['PMSS Agent Diagnostics', 'user: -', '== services =='], $this->pmssPathPrefixedEnvironment($binDir, [
             'PMSS_TEST_MODE' => '1',
             'PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $scriptRoot,
         ]));
-
-        $this->assertStringContainsAllStrings(['PMSS Agent Diagnostics', 'user: -', '== services =='], $output);
     }
 
     public function testJsonSectionReportsScriptFailure(): void

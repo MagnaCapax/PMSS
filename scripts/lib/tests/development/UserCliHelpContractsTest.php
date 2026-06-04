@@ -7,9 +7,7 @@ final class UserCliHelpContractsTest extends TestCase
 {
     public function testAddUserLongHelpIncludesStructuredSectionsAndRanges(): void
     {
-        $output = $this->pmssRunRepoPhpScript('scripts/addUser.php', ['--help']);
-
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoPhpScriptOutputContains('scripts/addUser.php', ['--help'], [
             'Usage',
             'Positional Parameters',
             'Named Options',
@@ -20,7 +18,7 @@ final class UserCliHelpContractsTest extends TestCase
             '--io-cost-model=SETTING',
             '1-10000',
             '250 MiB',
-        ], $output);
+        ]);
     }
 
     public function testAddUserShortHelpMatchesLongHelp(): void
@@ -33,7 +31,7 @@ final class UserCliHelpContractsTest extends TestCase
 
     public function testUserConfigHelpBypassesUserLookup(): void
     {
-        $this->assertHelpCommandContains('scripts/util/userConfig.php', ['ghostuser', '--help'], [
+        $this->pmssAssertRepoPhpScriptOutputContains('scripts/util/userConfig.php', ['ghostuser', '--help'], [
             'Usage',
             '--welcome-message=HTML',
             '--iops-limit=OPS',
@@ -48,7 +46,7 @@ final class UserCliHelpContractsTest extends TestCase
 
     public function testUserConfigCgroupHelpIncludesProfilesAndRanges(): void
     {
-        $this->assertHelpCommandContains('scripts/util/userConfigCgroup.php', ['--help'], [
+        $this->pmssAssertRepoPhpScriptOutputContains('scripts/util/userConfigCgroup.php', ['--help'], [
             'Resource Options',
             '--defaults',
             '--io-profile=hdd|nvme|bulk',
@@ -63,7 +61,7 @@ final class UserCliHelpContractsTest extends TestCase
 
     public function testUserResourcesListHelpBypassesRootGuard(): void
     {
-        $result = $this->assertHelpCommandContains('scripts/util/userResourcesList.php', ['--help'], [
+        $result = $this->pmssAssertRepoPhpScriptOutputContains('scripts/util/userResourcesList.php', ['--help'], [
             '--brief',
             '--full',
             '--json',
@@ -102,15 +100,5 @@ final class UserCliHelpContractsTest extends TestCase
                 '/scripts/util/userConfig.php alice 1024 200',
             ]
         );
-    }
-
-    private function assertHelpCommandContains(string $script, array $args, array $needles): array
-    {
-        $result = $this->pmssRunRepoPhpScriptCommand($script, $args);
-
-        $this->assertSame(0, $result['rc']);
-        $this->assertStringContainsAllStrings($needles, $result['output']);
-
-        return $result;
     }
 }

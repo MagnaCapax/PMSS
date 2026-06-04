@@ -25,9 +25,7 @@ class ShowResourcesFormatTest extends TestCase
 
     public function testHelpIncludesCoreOptions(): void
     {
-        $out = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--help']);
-
-        $this->assertStringContainsAllStrings(['--json', '--show-missing', '--user', '--help'], $out);
+        $this->pmssAssertRepoPhpScriptOutputContains('scripts/showResources.php', ['--help'], ['--json', '--show-missing', '--user', '--help']);
     }
 
     public function testHelpOutputMatchesSnapshot(): void
@@ -60,11 +58,7 @@ class ShowResourcesFormatTest extends TestCase
     {
         $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
         $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/alice', $this->pmssBuildResourceStatsPayloadFromValues($this->sampleUsageValues()));
-        $result = $this->pmssRunRepoPhpScriptCommand('scripts/showResources.php', ['--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
-
-        $textOutput = $result['output'];
-        $this->assertEquals(0, $result['rc']);
-        $this->assertStringContainsAllStrings(['IO Ops/mo', '70 ops', '1.0 hrs', '2.50 GB-hrs', '1.00 GiB', '2.00'], $textOutput);
+        $this->pmssAssertRepoPhpScriptOutputContains('scripts/showResources.php', ['--user=alice'], ['IO Ops/mo', '70 ops', '1.0 hrs', '2.50 GB-hrs', '1.00 GiB', '2.00'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
     }
 
     public function testUserFilteredOutputFormatsMonthlyIoOpsWithSuffixes(): void
