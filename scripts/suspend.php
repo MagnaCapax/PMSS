@@ -31,10 +31,12 @@ if (is_dir($disabledRoot)) {
 
 pmssUserLifecycleContextLogHomeInfo('suspend', 'start', $username, $homeDir);
 
-pmssUserLifecycleStep('suspend', $username, 'lock_account', 'usermod -L '.escapeshellarg($username), false);
-pmssUserLifecycleStep('suspend', $username, 'set_expiry', 'usermod --expiredate 1 '.escapeshellarg($username), false);
-pmssUserLifecycleStep('suspend', $username, 'list_processes', 'ps aux|grep '.escapeshellarg($username), false);
-pmssUserLifecycleStep('suspend', $username, 'kill_processes', 'killall -9 -u '.escapeshellarg($username), false);
+pmssUserLifecycleRunSteps('suspend', $username, array(
+    array('lock_account', 'usermod -L '.escapeshellarg($username)),
+    array('set_expiry', 'usermod --expiredate 1 '.escapeshellarg($username)),
+    array('list_processes', 'ps aux|grep '.escapeshellarg($username)),
+    array('kill_processes', 'killall -9 -u '.escapeshellarg($username)),
+), false);
 
 // Best-effort archive of the original web root. We only create a placeholder
 // landing page if the original content is safely moved aside.

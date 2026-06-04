@@ -26,27 +26,14 @@ $lighttpdDir   = $homeDir.'/.lighttpd/custom.d';
 
 // Align with historical behaviour but quote paths defensively.
 if (file_exists($rtorrentRc)) {
-    pmssUserLifecycleStep(
-        'permissions',
-        $userName,
-        'chown_rtorrent_rc',
-        'chown root:root '.escapeshellarg($rtorrentRc),
-        false
-    );
-    pmssUserLifecycleStep(
-        'permissions',
-        $userName,
-        'chmod_rtorrent_rc',
-        'chmod 775 '.escapeshellarg($rtorrentRc),
-        false
-    );
+    pmssUserLifecycleRunSteps('permissions', $userName, array(
+        array('chown_rtorrent_rc', 'chown root:root '.escapeshellarg($rtorrentRc)),
+        array('chmod_rtorrent_rc', 'chmod 775 '.escapeshellarg($rtorrentRc)),
+    ), false);
 }
 
-$steps = [
-    ['chown_rutorrent_conf', 'chown root:root '.escapeshellarg($rutorrentConf)],
-    ['chmod_rutorrent_conf', 'chmod 775 '.escapeshellarg($rutorrentConf)],
-    ['chmod_lighttpd_custom', 'chmod 750 '.escapeshellarg($lighttpdDir)],
-];
-foreach ($steps as $step) {
-    pmssUserLifecycleStep('permissions', $userName, $step[0], $step[1], false);
-}
+pmssUserLifecycleRunSteps('permissions', $userName, array(
+    array('chown_rutorrent_conf', 'chown root:root '.escapeshellarg($rutorrentConf)),
+    array('chmod_rutorrent_conf', 'chmod 775 '.escapeshellarg($rutorrentConf)),
+    array('chmod_lighttpd_custom', 'chmod 750 '.escapeshellarg($lighttpdDir)),
+), false);

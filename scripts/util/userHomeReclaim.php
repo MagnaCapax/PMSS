@@ -92,22 +92,13 @@ function pmssUserHomeReclaimMain(array $argv): int
         );
     }
 
-    $deleteRc = pmssUserLifecycleStep(
-        'terminate',
-        $username,
-        'home_reclaim_delete_contents',
-        pmssBuildCommand('find', array($targetPath, '-xdev', '-depth', '-mindepth', '1', '-delete')),
-        false
-    );
-    $rootRc = pmssUserLifecycleStep(
-        'terminate',
-        $username,
-        'home_reclaim_remove_root',
-        pmssBuildCommand('rmdir', array('--', $targetPath)),
-        false
-    );
+    $reclaimRc = pmssUserLifecycleRunSteps('terminate', $username, array(
+        array('home_reclaim_delete_contents', pmssBuildCommand('find', array($targetPath, '-xdev', '-depth', '-mindepth', '1', '-delete'))),
+        array('home_reclaim_remove_root', pmssBuildCommand('rmdir', array('--', $targetPath))),
+    ), false);
 
-    $ok = $deleteRc === 0 && $rootRc === 0;
+    $ok = ($reclaimRc['home_reclaim_delete_contents'] ?? 1) === 0
+        && ($reclaimRc['home_reclaim_remove_root'] ?? 1) === 0;
     pmssUserLifecycleContextLogStatusMessage(
         'terminate',
         'home_reclaim_end',

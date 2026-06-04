@@ -299,14 +299,12 @@ $trafficFiles = array_values(pmssTrafficDataPaths($username));
 $trafficArgs = array_map('escapeshellarg', $trafficFiles);
 $clearImmutableCmd = 'if command -v chattr >/dev/null 2>&1; then chattr -i '.implode(' ', $trafficArgs).' 2>/dev/null || true; fi';
 $homePath = "/home/{$username}";
-foreach (array(
+pmssUserLifecycleRunSteps('terminate', $username, array(
     array('crontab_remove', 'crontab -r -u '.escapeshellarg($username).' || true'),
     array('crontab_spool_remove', 'rm -f -- '.escapeshellarg($crontabSpoolPaths[0]).' '.escapeshellarg($crontabSpoolPaths[1]).' || true'),
     array('userdel_initial', $userdelCommand),
     array('clear_immutable_traffic', $clearImmutableCmd),
-) as $stepSpec) {
-    pmssUserLifecycleStep('terminate', $username, $stepSpec[0], $stepSpec[1], $dryRun);
-}
+), $dryRun);
 $homeReclaimPath = pmssTerminateUserMoveHomeForReclaim($username, $homePath, $dryRun);
 if ($homeReclaimPath !== '') {
     pmssUserLifecycleStep('terminate', $username, 'queue_home_reclaim', pmssUserHomeReclaimLaunchCommand($homeReclaimPath), $dryRun);
@@ -326,15 +324,13 @@ pmssUserLifecycleRefreshNginxConfig(
         'initStep' => 'restart_nginx_init',
     )
 );   // Reconfig nginx
-foreach (array(
+pmssUserLifecycleRunSteps('terminate', $username, array(
     array('userdel_groupdel_retry', $userdelCommand),
     array('groupdel_retry', $groupdelCommand),
     array('remove_screen_socket', 'rm -rf -- '.escapeshellarg("/var/run/screen/S-{$username}")),
     array('remove_nginx_user', 'rm -rf -- '.escapeshellarg("/etc/nginx/users/{$username}")),
     array('release_lighttpd_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' lighttpd'),
-) as $stepSpec) {
-    pmssUserLifecycleStep('terminate', $username, $stepSpec[0], $stepSpec[1], $dryRun);
-}
+), $dryRun);
 pmssTerminateUserUnlinkPath($username, 'remove_nginx_user_file', "/etc/nginx/users/{$username}", $dryRun);
 
 $db = new users();
@@ -356,14 +352,12 @@ if (pmssUserAccountLookup($username) !== null) {
 
 // If attemps 1 and 2 failed ...
 // If attempts 1 and 2 failed, keep the final cleanup order explicit.
-foreach (array(
+pmssUserLifecycleRunSteps('terminate', $username, array(
     array('kill_processes_final', $killUserCommand),
     array('userdel_groupdel_final', $userdelCommand),
     array('groupdel_final', $groupdelCommand),
     array('cleanup_lock_files', 'rm -f -- /run/lock/pmss-*-'.$username.'.lock /tmp/pmss-*-'.$username.'.lock'),
-) as $stepSpec) {
-    pmssUserLifecycleStep('terminate', $username, $stepSpec[0], $stepSpec[1], $dryRun);
-}
+), $dryRun);
 
 // We don't need setup network here because ... well that chain is not going to get any additional data anymore
 

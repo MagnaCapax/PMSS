@@ -72,6 +72,19 @@ class userLifecycleLoggingTest extends TestCase
         ], $source);
     }
 
+    public function testRunStepsPreservesOrderAndDryRunResults(): void
+    {
+        list($result, $output) = $this->pmssCaptureStdout(static function (): array {
+            return \pmssUserLifecycleRunSteps('test', 'alice', array(
+                array('first', 'printf first'),
+                array('second', 'printf second'),
+            ), true);
+        });
+
+        $this->assertSame(array('first' => 0, 'second' => 0), $result);
+        $this->assertStringContainsAllStrings(array('[DRY-RUN][test] first: printf first', '[DRY-RUN][test] second: printf second'), $output);
+    }
+
     public function testRefreshNginxConfigKeepsFallbackOrder(): void
     {
         $cases = array(

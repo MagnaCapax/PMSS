@@ -186,6 +186,21 @@ function pmssUserLifecycleStep(string $action, string $username, string $step, s
     return $rc;
 }
 
+/**
+ * Run an ordered table of lifecycle shell steps through the shared logger.
+ *
+ * @param array<int,array{0:string,1:string}> $steps
+ * @return array<string,int>
+ */
+function pmssUserLifecycleRunSteps(string $action, string $username, array $steps, bool $dryRun): array
+{
+    $results = array();
+    foreach ($steps as $stepSpec) {
+        $results[(string) $stepSpec[0]] = pmssUserLifecycleStep($action, $username, (string) $stepSpec[0], (string) $stepSpec[1], $dryRun);
+    }
+    return $results;
+}
+
 /** @return array<string,string> */
 function pmssUserLifecycleRequireUserRoots(array $argv, string $scriptName, string $action): array
 {

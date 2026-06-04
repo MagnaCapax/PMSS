@@ -47,15 +47,11 @@ if (!is_dir($disabledRoot)) {
 pmssUserLifecycleContextLogHomeInfo('unsuspend', 'start', $username, $homeDir);
 
 // Unlock and extend expiry before restoring services.
-pmssUserLifecycleStep('unsuspend', $username, 'unlock_account', 'usermod -U '.escapeshellarg($username), false);
 $farFuture = date('Y-m-d', time() + (60 * 60 * 24 * 365 * 10));
-pmssUserLifecycleStep(
-    'unsuspend',
-    $username,
-    'set_expiry',
-    'usermod --expiredate '.escapeshellarg($farFuture).' '.escapeshellarg($username),
-    false
-);
+pmssUserLifecycleRunSteps('unsuspend', $username, array(
+    array('unlock_account', 'usermod -U '.escapeshellarg($username)),
+    array('set_expiry', 'usermod --expiredate '.escapeshellarg($farFuture).' '.escapeshellarg($username)),
+), false);
 
 $htpasswdSynced = pmssUserHtpasswdSyncFromShadow($username);
 pmssUserLifecycleContextLogStatusMessage(
