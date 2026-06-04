@@ -11,52 +11,6 @@ const PMSS_ARR_VERSION_PROBE_TIMEOUT_SECONDS = 50;
 const PMSS_ARR_APP_BRANCHES = ['Lidarr' => 'develop|master', 'Prowlarr' => 'develop|master', 'Radarr' => 'develop|master', 'Readarr' => 'develop|master', 'Sonarr' => 'main|develop'];
 
 /**
- * Orchestrate the full update flow for a Starr-family application.
- *
- * Expected keys in the configuration array:
- *  - app: Human-readable application label (e.g. "Radarr")
- *  - install_path: Destination directory for the unpacked application
- *  - releases_url: GitHub API URL listing release metadata
- *  - asset_pattern: PCRE that captures the semantic version from asset names
- *  - extract_dir: Directory name created inside the tarball after extraction
- *  - user_agent: HTTP user-agent value for GitHub API requests
- */
-function pmssArrAssetNameHasToken(string $assetName, array $tokens): bool
-{
-    $name = strtolower($assetName);
-    foreach ($tokens as $token) {
-        if (preg_match('/(?:^|[^a-z0-9])'.preg_quote(strtolower($token), '/').'(?=[^a-z0-9]|$)/', $name)) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-/** Build the canonical updater config for a supported Starr-family app. */
-function pmssArrAppConfig(string $app): ?array
-{
-    if (!isset(PMSS_ARR_APP_BRANCHES[$app])) {
-        return null;
-    }
-
-    return [
-        'app' => $app,
-        'install_path' => '/opt/'.$app,
-        'releases_url' => 'https://api.github.com/repos/'.$app.'/'.$app.'/releases',
-        'asset_pattern' => sprintf('/%s\\.(?:%s)\\.([0-9.]+).*linux.*tar\\.gz/i', preg_quote($app, '/'), PMSS_ARR_APP_BRANCHES[$app]),
-        'extract_dir' => $app,
-        'user_agent' => 'PMSS-'.$app,
-    ];
-}
-
-/** Return the supported Servarr app labels in deterministic installer order. */
-function pmssArrSupportedApps(): array
-{
-    return array_keys(PMSS_ARR_APP_BRANCHES);
-}
-
-/**
  * Reject config values that could break shell/file boundaries.
  */
 function pmssArrIsSafeConfigValue(string $value): bool
@@ -188,6 +142,9 @@ function pmssArrReleaseAssetSelect(array $releases, string $assetPattern, string
 {
     $targetArchitectureTokens = ['arm64' => ['arm64', 'aarch64'], 'armhf' => ['armhf', 'armv7', 'arm']][$architecture] ?? ['x64', 'amd64'];
     $knownArchitectureTokens = ['x64', 'amd64', 'arm64', 'aarch64', 'armhf', 'armv7', 'arm'];
+    $tokenPattern = static function (array $tokens): string { return '/(?:^|[^a-z0-9])(?:'.implode('|', array_map(static function (string $token): string { return preg_quote(strtolower($token), '/'); }, $tokens)).')(?=[^a-z0-9]|$)/'; };
+    $targetArchitecturePattern = $tokenPattern($targetArchitectureTokens);
+    $knownArchitecturePattern = $tokenPattern($knownArchitectureTokens);
     $genericAsset = null;
 
     foreach ($releases as $release) {
@@ -202,10 +159,11 @@ function pmssArrReleaseAssetSelect(array $releases, string $assetPattern, string
             $url = (string) ($candidateAsset['browser_download_url'] ?? '');
             if ($url === '') { continue; }
             $candidate = [$match[1], $url, $name];
-            if (pmssArrAssetNameHasToken($name, $targetArchitectureTokens)) {
+            $nameLower = strtolower($name);
+            if (preg_match($targetArchitecturePattern, $nameLower) === 1) {
                 return $candidate;
             }
-            if ($genericAsset === null && !pmssArrAssetNameHasToken($name, $knownArchitectureTokens)) {
+            if ($genericAsset === null && preg_match($knownArchitecturePattern, $nameLower) !== 1) {
                 $genericAsset = $candidate;
             }
         }
@@ -300,10 +258,16 @@ function pmssArrUpdate(array $config): void
 /** Run every supported Servarr updater from the single app entrypoint. */
 function pmssArrUpdateSupportedApps(): void
 {
-    foreach (pmssArrSupportedApps() as $app) {
+    foreach (PMSS_ARR_APP_BRANCHES as $app => $branchPattern) {
         if ($app === 'Sonarr') { @unlink('/etc/apt/sources.list.d/sonarr.list'); @passthru('apt-key del 0xA236C58F409091A18ACA53CBEBFF6B99D9B78493 2>/dev/null'); }
 
-        $config = pmssArrAppConfig($app);
-        if ($config !== null) { pmssArrUpdate($config); }
+        pmssArrUpdate([
+            'app' => $app,
+            'install_path' => '/opt/'.$app,
+            'releases_url' => 'https://api.github.com/repos/'.$app.'/'.$app.'/releases',
+            'asset_pattern' => sprintf('/%s\\.(?:%s)\\.([0-9.]+).*linux.*tar\\.gz/i', preg_quote($app, '/'), $branchPattern),
+            'extract_dir' => $app,
+            'user_agent' => 'PMSS-'.$app,
+        ]);
     }
 }

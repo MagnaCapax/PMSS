@@ -26,14 +26,15 @@ class ArrProbeTimeoutPolicyTest extends TestCase
         $this->assertSame('Prowlarr 1.2.3', \pmssArrVersionProbeRun($probe, '--version'));
     }
 
-    public function testSupportedStarrAppsUseSharedInstallPathPreset(): void
+    public function testSupportedStarrAppsKeepCanonicalBranchMapOrder(): void
     {
-        foreach (\pmssArrSupportedApps() as $app) {
-            $config = \pmssArrAppConfig($app);
-
-            $this->assertTrue(is_array($config), $app.' config should exist');
-            $this->assertSame('/opt/'.$app, (string) $config['install_path']);
-        }
+        $this->assertSame([
+            'Lidarr' => 'develop|master',
+            'Prowlarr' => 'develop|master',
+            'Radarr' => 'develop|master',
+            'Readarr' => 'develop|master',
+            'Sonarr' => 'main|develop',
+        ], \PMSS_ARR_APP_BRANCHES);
     }
 
     public function testSharedAppVersionProbeCapturesOutput(): void
@@ -75,7 +76,7 @@ class ArrProbeTimeoutPolicyTest extends TestCase
     {
         $appRoot = dirname(__DIR__, 2).'/update/apps';
 
-        $this->assertSame(['Lidarr', 'Prowlarr', 'Radarr', 'Readarr', 'Sonarr'], \pmssArrSupportedApps());
+        $this->assertSame(['Lidarr', 'Prowlarr', 'Radarr', 'Readarr', 'Sonarr'], array_keys(\PMSS_ARR_APP_BRANCHES));
         $this->assertTrue(is_file($appRoot.'/servarr.php'), 'single Servarr entrypoint should exist');
         foreach (['lidarr.php', 'prowlarr.php', 'radarr.php', 'readarr.php', 'sonarr.php'] as $wrapper) {
             $this->assertFalse(is_file($appRoot.'/'.$wrapper), $wrapper.' should not remain as a parallel app wrapper');
