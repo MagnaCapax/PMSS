@@ -12,7 +12,7 @@ final class UserPasswordsCustomerHelperTest extends TestCase
 
     private function runHelperJson(string $script, array $environment = []): array
     {
-        return $this->pmssRunInlinePhpJson('require '.var_export($this->helperPath(), true).';'.$script, $environment);
+        return $this->pmssRunInlinePhpRequireJson($this->helperPath(), $script, $environment);
     }
 
     public function testReadLocalclientPasswordReturnsEmptyWhenMissing(): void
@@ -79,9 +79,9 @@ final class UserPasswordsCustomerHelperTest extends TestCase
             .json_encode(array('pwd_salt' => $salt, 'pwd_sha1' => sha1($salt.'old-secret'), 'sessions' => (object) array()), JSON_UNESCAPED_SLASHES)
         );
 
-        $result = $this->pmssRunInlinePhpJson(
-            'require '.var_export($this->helperPath(), true).';'
-            .'$rotated = pmssDelugeServicePasswordRotate("alice");'
+        $result = $this->pmssRunInlinePhpRequireJson(
+            $this->helperPath(),
+            '$rotated = pmssDelugeServicePasswordRotate("alice");'
             .'$parsed = pmssUserPasswordsWebConfRead('.var_export($webConfPath, true).');'
             .'echo json_encode(array("rotated" => $rotated, "parsed" => $parsed));',
             array('PMSS_HOME_DIR' => $homeRoot)

@@ -24,15 +24,15 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     private function runWelcomeSafetyScript(string $script): string
     {
         $fixture = $this->makeWelcomeSafetyFixture();
-        return $this->pmssRunInlinePhp('require '.var_export($fixture, true).'; '.$script);
+        return $this->pmssRunInlinePhpRequire($fixture, $script);
     }
 
     private function runWelcomePageStateBonusQuota(string $home): int
     {
         $fixture = $this->makeWelcomeSafetyFixture();
-        $output = $this->pmssRunInlinePhp(
-            'require '.var_export($fixture, true).';'
-            .'if (!function_exists("pmssWelcomeVendorRead")) { function pmssWelcomeVendorRead() { return array("name" => "Pulsed Media"); } }'
+        $output = $this->pmssRunInlinePhpRequire(
+            $fixture,
+            'if (!function_exists("pmssWelcomeVendorRead")) { function pmssWelcomeVendorRead() { return array("name" => "Pulsed Media"); } }'
             .'if (!function_exists("pmssWelcomeContextualMessageBuild")) { function pmssWelcomeContextualMessageBuild($quotaInfo) { return ""; } }'
             .'if (!function_exists("pmssWelcomeDelugeStateBuild")) { function pmssWelcomeDelugeStateBuild($username, $path) { return array("canRotate" => false, "passwordNotice" => "", "password" => ""); } }'
             .'if (!function_exists("pmssWelcomeUserConfigNumber")) { function pmssWelcomeUserConfigNumber($key, $allowSymlink = false) { return null; } }'
@@ -69,7 +69,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     private function runWelcomeUsageScript(string $script, string $stderrRedirect = '2>/dev/null'): string
     {
         $fixture = $this->makeWelcomeUsageFixture();
-        return $this->pmssRunInlinePhp('require '.var_export($fixture, true).'; '.$script, [], $stderrRedirect);
+        return $this->pmssRunInlinePhpRequire($fixture, $script, [], $stderrRedirect);
     }
 
     public function testQuotaMissingWarningGuardUsesOnlyQuotaLimitFields(): void
@@ -168,9 +168,9 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $fixture = $this->makeWelcomeSafetyFixture();
         $this->pmssWriteFile(dirname($fixture).'/safeHelper.php', "<?php\nfunction pmssWelcomeSafeHelperLoaded() { return true; }\n");
 
-        $output = $this->pmssRunInlinePhp(
-            'require '.var_export($fixture, true).';'
-            .'echo json_encode(array('
+        $output = $this->pmssRunInlinePhpRequire(
+            $fixture,
+            'echo json_encode(array('
             .'"safe" => pmssWelcomeRequireLocalHelper("safeHelper.php"),'
             .'"loaded" => function_exists("pmssWelcomeSafeHelperLoaded"),'
             .'"traversal" => pmssWelcomeRequireLocalHelper("../safeHelper.php"),'
@@ -336,9 +336,9 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     {
         $fixture = $this->makeWelcomeUsageFixture();
         $home = $this->pmssMakeUserWebHome('pmss-welcome-memory-', 'home').'/www';
-        $output = $this->pmssRunInlinePhp(
-            'require '.var_export($fixture, true).';'
-            .'$home = '.var_export($home, true).';'
+        $output = $this->pmssRunInlinePhpRequire(
+            $fixture,
+            '$home = '.var_export($home, true).';'
             .'chdir($home);'
             .'@mkdir("../.config", 0755, true);'
             .'file_put_contents("../.config/pmss-user.json", json_encode(array("ramMiB" => 1024)));'

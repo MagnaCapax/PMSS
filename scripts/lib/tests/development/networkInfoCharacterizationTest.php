@@ -7,15 +7,12 @@ class NetworkInfoCharacterizationTest extends TestCase
 {
     public function testGlobalsStayAlignedWithHelperResults(): void
     {
-        $result = $this->pmssRunInlinePhpJson(
-            'require_once '.var_export($this->pmssRepoPath('scripts/lib/networkInfo.php'), true).';'
-            .'echo json_encode(['
+        $result = $this->pmssRunInlinePhpRequireJson($this->pmssRepoPath('scripts/lib/networkInfo.php'), 'echo json_encode(['
             .'"link" => $link,'
             .'"linkSpeed" => $linkSpeed,'
             .'"detect" => detectPrimaryInterface(),'
             .'"speed" => getLinkSpeed(detectPrimaryInterface()),'
-            .']);'
-        );
+            .']);', [], '2>/dev/null', true);
 
         $this->assertSame($result['detect'], $result['link']);
         $this->assertSame($result['speed'], $result['linkSpeed']);

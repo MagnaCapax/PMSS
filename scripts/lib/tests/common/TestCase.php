@@ -1027,6 +1027,12 @@ abstract class TestCase
         );
     }
 
+    /** Run inline PHP after loading a required file fixture. */
+    protected function pmssRunInlinePhpRequire(string $requiredPath, string $script, array $environment = [], string $stderrRedirect = '2>/dev/null', bool $requireOnce = false): string { return $this->pmssRunInlinePhp(($requireOnce ? 'require_once ' : 'require ').var_export($requiredPath, true).'; '.$script, $environment, $stderrRedirect); }
+
+    /** Run required inline PHP and decode its JSON array output. */
+    protected function pmssRunInlinePhpRequireJson(string $requiredPath, string $script, array $environment = [], string $stderrRedirect = '2>/dev/null', bool $requireOnce = false): array { return $this->pmssDecodeJsonArray($this->pmssRunInlinePhpRequire($requiredPath, $script, $environment, $stderrRedirect, $requireOnce)); }
+
     /** Return inline PHP shims shared by traffic-limit style CLI subprocess tests. */
     protected function pmssInlinePhpTrafficCliShims(string $homeGlobalName, string $logGlobalName, ?string $runtimeGlobalName = null): string
     {

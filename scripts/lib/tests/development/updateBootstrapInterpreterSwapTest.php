@@ -46,10 +46,7 @@ class UpdateBootstrapInterpreterSwapTest extends TestCase
             'pmss-php-cli-'
         );
 
-        $script = 'require '.var_export(dirname(__DIR__).'/common/updateBootstrapShim.php', true).'; '
-            .'echo pmssResolvePhpCliBinary();';
-
-        $this->assertEquals($binDir.'/php', trim($this->pmssRunInlinePhp($script, ['PATH' => $binDir])));
+        $this->assertEquals($binDir.'/php', trim($this->pmssRunInlinePhpRequire(dirname(__DIR__).'/common/updateBootstrapShim.php', 'echo pmssResolvePhpCliBinary();', ['PATH' => $binDir])));
     }
 
     public function testDiagnosticsHelperUsesPathResolvedPhp(): void

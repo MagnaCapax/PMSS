@@ -55,8 +55,7 @@ class ConfigBackupsTest extends TestCase
         $source = $root.'/etc/nginx/nginx.conf';
         $this->pmssWriteFile($source, "worker_processes auto;\n");
 
-        $script = 'require '.var_export(dirname(__DIR__, 2).'/configBackups.php', true).'; '
-            .'$backup = pmssBackupCriticalConfig('.var_export('nginx', true).', '.var_export($source, true).', '
+        $script = '$backup = pmssBackupCriticalConfig('.var_export('nginx', true).', '.var_export($source, true).', '
             .var_export(array(
                 'backupRoot' => $backupRoot,
                 'timestamp' => '20260131123456',
@@ -71,7 +70,7 @@ class ConfigBackupsTest extends TestCase
             ), true).'); '
             .'echo is_string($backup) ? basename($backup) : "null";';
 
-        $output = $this->pmssRunInlinePhp($script, [], '2>&1');
+        $output = $this->pmssRunInlinePhpRequire(dirname(__DIR__, 2).'/configBackups.php', $script, [], '2>&1');
 
         $this->assertTrue(is_string($output));
         $this->assertStringContainsString('.bak', $output);
