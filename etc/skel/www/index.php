@@ -429,6 +429,19 @@ hr {background-color: #4b4b4b;}
     justify-content: center;
 }
 
+/* Tab container + content-frame styling, inlined so the panel renders correctly even
+   when jquery.tabs.css is not yet present (the on-load heal delivers PHP only; without
+   #tabs's background the container renders white = the thin white bar above the frames).
+   jquery.tabs.css keeps its own copy; this is the self-contained fallback. */
+#tabs {
+    background: black;
+}
+.tabs-container {
+    border-top: 1px solid #4f4f4f;
+    padding: 1em 8px;
+    background: #fff;
+}
+
 .full_body {
     background: none;
     border: none;
