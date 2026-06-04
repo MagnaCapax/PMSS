@@ -14,6 +14,6 @@ pmssUserWatchdogRunService('qBittorrent', 'qbittorrentEnable', ['qbittorrent-nox
 ], function (string $thisUser): array {
     $running = pmssUserWatchdogProcessRunning($thisUser, 'qbittorrent-nox');
     pmssUserWatchdogApplyManagedConfigWhenStopped($thisUser, $running, 'pmssQbittorrentApplyManagedConfig');
-    $qbittorrentRunning = pmssUserWatchdogRestartProcessesIf($thisUser, $running, ['qbittorrent-nox'], static function () use ($thisUser): bool { return function_exists('pmssQbittorrentApplyUploadThrottle') && pmssQbittorrentApplyUploadThrottle($thisUser); }, 'qbittorrent-nox restarted to apply upload throttle', 15, static function () use ($thisUser): void { passthru('killall -u '.escapeshellarg($thisUser).' -TERM qbittorrent-nox 2>/dev/null'); });
+    $qbittorrentRunning = pmssUserWatchdogRestartProcessesIf($thisUser, $running, ['qbittorrent-nox'], static function () use ($thisUser): bool { return function_exists('pmssQbittorrentApplyUploadThrottle') && pmssQbittorrentApplyUploadThrottle($thisUser); }, 'qbittorrent-nox restarted to apply upload throttle', 15, static function () use ($thisUser): void { pmssUserWatchdogTerminateProcesses($thisUser, ['qbittorrent-nox'], 15); });
     return ['qbittorrent-nox' => $qbittorrentRunning];
 }, __DIR__.'/../lib/user/qbittorrent.php');

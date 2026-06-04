@@ -176,6 +176,20 @@ class UserLifecycleWatchdogTest extends TestCase
         $this->assertEquals(['demo' => false], $states);
     }
 
+    public function testTerminateProcessesSeparatesKillallOptionsFromProcessNames(): void
+    {
+        $log = $this->pmssMakeTempFile('watchdog-killall-');
+        @file_put_contents($log, '');
+        $binDir = $this->pmssMakeInvocationLogStub('killall', $log, 'watchdog-killall-bin-');
+
+        $this->pmssWithPathPrefix($binDir, function (): void {
+            pmssUserWatchdogTerminateProcesses('alice', ['demo', '-TERM', 'php-cgi', "bad\nname"], 15);
+        });
+
+        $lines = file($log, FILE_IGNORE_NEW_LINES);
+        $this->assertEquals(['-15 -u alice -- demo', '-15 -u alice -- php-cgi'], $lines);
+    }
+
     public function testRunServiceStartsOnlyEnabledStoppedUsers(): void
     {
         $homeRoot = $this->pmssMakeTempDir('watchdog-run-service-');

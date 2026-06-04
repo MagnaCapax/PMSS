@@ -26,10 +26,10 @@ function pmssUserWatchdogTerminateProcesses(string $username, array $processName
 
     $signal = $signal === 15 ? 15 : 9;
     foreach ($processNames as $processName) {
-        if (!is_string($processName) || $processName === '') {
+        if (!is_string($processName) || $processName === '' || $processName[0] === '-' || !pmssCommandBinaryNameIsSafe($processName)) {
             continue;
         }
-        @passthru('killall -'.$signal.' -u '.escapeshellarg($username).' '.escapeshellarg($processName).' 2>/dev/null');
+        @passthru(pmssBuildCommand('killall', ['-'.$signal, '-u', $username, '--', $processName]).' 2>/dev/null');
     }
 }
 
