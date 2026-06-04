@@ -115,17 +115,6 @@ function dpkgCmd(string $args): string
 }
 
 /**
- * Build a shell-safe command string from a binary and arguments.
- * Uses escapeshellarg on each argument; intended for simple argv-style
- * commands without shell metacharacter features.
- */
-function pmssBuildCommand(string $program, array $args = []): string
-{
-    $prog = escapeshellcmd($program);
-    return empty($args) ? $prog : $prog.' '.pmssCommandArgvShellQuote($args);
-}
-
-/**
  * Log a status line with duration/rc in the same format as runStep(), without executing a command.
  */
 function pmssLogStatus(string $status, string $description, int $rc = 0, ?float $duration = null): void

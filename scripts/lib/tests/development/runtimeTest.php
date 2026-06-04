@@ -14,12 +14,14 @@ class RuntimeTest extends TestCase
         $script = "require_once {$runtime}; require_once {$runtime}; echo json_encode([".
             "'runCommand'=>function_exists('runCommand'),".
             "'capture'=>function_exists('pmssCommandCapture'),".
+            "'build'=>function_exists('pmssBuildCommand'),".
             "'snapshot'=>function_exists('pmssRunSnapshotLogTask')".
             "]);";
 
         $this->assertSame([
             'runCommand' => true,
             'capture'    => true,
+            'build'      => true,
             'snapshot'   => true,
         ], $this->pmssRunInlinePhpJson($script));
     }
@@ -31,6 +33,7 @@ class RuntimeTest extends TestCase
             "'time_keys'=>array_keys(pmssStatsCompareTimesBuild(0)),".
             "'size_bytes'=>(int) pmssParseSizeToBytes('1G', true, true),".
             "'argv_quote'=>pmssCommandArgvShellQuote(['alpha beta', 'gamma']),".
+            "'build_command'=>pmssBuildCommand('printf', ['alpha beta', 'gamma']),".
             "'config_columns'=>pmssConfigLineColumns('alpha beta', 2),".
             "'port'=>pmssNetworkPortParseDigits('8443', 1024, 65535),".
             "'lock'=>basename(pmssRuntimeLockPath('pmss-runtime-facade.lock')),".
@@ -44,6 +47,7 @@ class RuntimeTest extends TestCase
             'time_keys'      => ['month', 'week', 'day', 'hour', '15min'],
             'size_bytes'     => 1073741824,
             'argv_quote'     => "'alpha beta' 'gamma'",
+            'build_command'  => "printf 'alpha beta' 'gamma'",
             'config_columns' => ['alpha', 'beta'],
             'port'           => 8443,
             'lock'           => 'pmss-runtime-facade.lock',

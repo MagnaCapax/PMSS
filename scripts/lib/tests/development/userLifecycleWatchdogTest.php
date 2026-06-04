@@ -190,6 +190,24 @@ class UserLifecycleWatchdogTest extends TestCase
         $this->assertEquals(['-15 -u alice -- demo', '-15 -u alice -- php-cgi'], $lines);
     }
 
+    public function testTerminateProcessesWorksAfterIsolatedWatchdogLoad(): void
+    {
+        $log = $this->pmssMakeTempFile('watchdog-isolated-killall-');
+        @file_put_contents($log, '');
+        $binDir = $this->pmssMakeInvocationLogStub('killall', $log, 'watchdog-isolated-killall-bin-');
+        $watchdog = var_export(dirname(__DIR__, 2).'/user/watchdog.php', true);
+
+        $script = "require_once {$watchdog}; ".
+            "pmssUserWatchdogTerminateProcesses('alice', ['php-cgi'], 15); ".
+            "echo json_encode(['ok'=>true]);";
+
+        $this->assertSame(
+            ['ok' => true],
+            $this->pmssRunInlinePhpJson($script, ['PATH' => $binDir.':'.getenv('PATH')], '2>&1')
+        );
+        $this->assertEquals(['-15 -u alice -- php-cgi'], file($log, FILE_IGNORE_NEW_LINES));
+    }
+
     public function testRunServiceStartsOnlyEnabledStoppedUsers(): void
     {
         $homeRoot = $this->pmssMakeTempDir('watchdog-run-service-');

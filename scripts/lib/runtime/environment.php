@@ -25,6 +25,15 @@ function pmssCommandPath(string $binary): string
 
 function pmssCommandArgvShellQuote(array $argv): string { return implode(' ', array_map(static function ($arg): string { return escapeshellarg((string) $arg); }, $argv)); }
 
+/**
+ * Build a shell-safe argv-style command string from a program and arguments.
+ */
+function pmssBuildCommand(string $program, array $args = []): string
+{
+    $prog = escapeshellcmd($program);
+    return empty($args) ? $prog : $prog.' '.pmssCommandArgvShellQuote($args);
+}
+
 function pmssIopingAverageMs(?string $target): ?float
 {
     $bin = pmssCommandPath('ioping');
