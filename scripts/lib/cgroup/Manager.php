@@ -20,6 +20,7 @@ class Manager
     private const RESOURCE_OPTION_NAMES = ['cpu-weight', 'io-weight', 'tasks-max', 'memory-high', 'memory-max', 'cpu-quota-percent', 'io-latency-ms', 'cpu-profile', 'mem-profile', 'tasks-profile'];
     private const INTEGER_OPTION_NAMES = ['cpu-weight', 'io-weight', 'tasks-max', 'memory-high', 'memory-max', 'io-latency-ms'];
     private const POLICY_OPTION_MAP = ['cpu-weight' => 'cpuWeight', 'io-weight' => 'ioWeight', 'tasks-max' => 'tasksMax', 'cpu-quota-percent' => 'cpuQuotaPercent', 'io-latency-ms' => 'ioLatencyMs', 'memory-high' => 'memoryHighMiB', 'memory-max' => 'memoryMaxMiB'];
+    private const ACTION_FLAG_MAP = ['status' => '--status', 'config' => '--config', 'apply' => '--apply', 'dryRun' => '--dry-run', 'respectExisting' => '--respect-existing', 'defaults' => '--defaults', 'wipe' => '--wipe'];
     private const IO_PROFILE_MAP = [
         'hdd' => ['defaults' => ['io-weight' => '200'], 'limits' => ['readBw' => '5M', 'writeBw' => '10M', 'readIops' => 100, 'writeIops' => 100]],
         'nvme' => ['defaults' => ['io-weight' => '200'], 'limits' => []],
@@ -74,13 +75,7 @@ class Manager
         $mode  = $this->sys->getCgroupMode();
         echo "user=$user uid=$uid slice=$slice mode=$mode\n";
 
-        $wantStatus = in_array('--status', $flags, true);
-        $wantConfig = in_array('--config', $flags, true);
-        $apply      = in_array('--apply', $flags, true);
-        $dryRun     = in_array('--dry-run', $flags, true);
-        $respectExisting = in_array('--respect-existing', $flags, true);
-        $defaultsRequested = in_array('--defaults', $flags, true);
-        $doWipe = in_array('--wipe', $flags, true);
+        $actions = $this->actionFlags($flags);
         $device = (string) ($inlineOptions['device'] ?? '');
         $ioProfile = strtolower((string) ($inlineOptions['io-profile'] ?? ''));
         $ioCostQos = (string) ($inlineOptions['io-cost-qos'] ?? '');
@@ -100,30 +95,18 @@ class Manager
             return 2;
         }
 
-        if ($doWipe) {
-            $hasConflictingInput = !empty($opt)
-                || !empty($ioPairs)
-                || $defaultsRequested
-                || $respectExisting
-                || $device !== ''
-                || $ioProfile !== ''
-                || $ioCostQos !== ''
-                || $ioCostModel !== '';
-            if ($hasConflictingInput) {
-                fwrite(STDERR, "Invalid --wipe combination: remove resource, IO, defaults, and respect-existing options before wiping\n");
-                return 2;
-            }
+        if ($actions['wipe'] && $this->wipeHasConflictingInput($opt, $ioPairs, $actions, $device, $ioProfile, $ioCostQos, $ioCostModel)) {
+            fwrite(STDERR, "Invalid --wipe combination: remove resource, IO, defaults, and respect-existing options before wiping\n");
+            return 2;
         }
 
-        // Defaults policy
-        if ($defaultsRequested) {
+        if ($actions['defaults']) {
             $policyIoPairs = $this->applyDefaults($opt);
         }
 
-        if ($wantConfig) $this->showConfig($slice);
-        if ($wantStatus) $this->showStatus($slice, $uid);
+        if ($actions['config']) $this->showConfig($slice);
+        if ($actions['status']) $this->showStatus($slice, $uid);
 
-        // Profiles
         $this->expandProfiles($opt);
 
         if (($invalidDeviceMessage = $this->validateDeviceSelector($device)) !== null) {
@@ -131,116 +114,35 @@ class Manager
             return 2;
         }
 
-        // IO Device resolution
-        $devResolved = '';
-        if ($device !== '') {
-            $devResolved = strpos($device, '/dev/') === 0 ? $device : $this->sys->resolveDevice($device);
-
-            if ($devResolved !== '' && !\pmssCgroupPolicyDeviceTargetIsSafe($devResolved)) {
-                fwrite(STDERR, "Invalid resolved --device target: expected /dev/... without whitespace or NUL bytes\n");
-                return 2;
-            }
+        $devicePlan = $this->resolveDevicePlan($device, isset($opt['io-latency-ms']));
+        if ($devicePlan['error'] !== '') {
+            fwrite(STDERR, $devicePlan['error']."\n");
+            return 2;
         }
+        if ($devicePlan['warning'] !== '') echo $devicePlan['warning']."\n";
+        $devResolved = $devicePlan['device'];
 
-        if (isset($opt['io-latency-ms']) && $devResolved === '') {
-            $devResolved = $this->sys->resolveDevice('/home');
-            if ($devResolved !== '' && !\pmssCgroupPolicyDeviceTargetIsSafe($devResolved)) {
-                echo "[WARN] IODeviceLatencyTargetSec skipped: unsafe /home backing device target\n";
-                $devResolved = '';
-            }
-        }
-
-        // IO Profile
         if ($ioProfile !== '' && $devResolved !== '') {
             $this->applyIoProfile($ioProfile, $devResolved, $opt, $ioPairs);
         }
 
-        if (isset($opt['io-latency-ms']) && (int)$opt['io-latency-ms'] > 0) {
-            if ($mode === 'v2' && $devResolved !== '') {
-                $ioPairs[] = 'IODeviceLatencyTargetSec='.$devResolved.' '.(int)$opt['io-latency-ms'].'ms';
-            } elseif ($mode !== 'v2') {
-                echo "[SKIP] IODeviceLatencyTargetSec requires cgroup v2\n";
-            }
-        }
+        $this->appendIoLatencyPair($mode, $devResolved, $opt, $ioPairs);
+        $ioCostWrites = $this->collectIoCostWrites($slice, $mode, $devResolved, $ioCostQos, $ioCostModel);
 
-        if ($ioCostQos !== '' || $ioCostModel !== '') {
-            $ioCostPlan = $this->buildIoCostWrites($slice, $mode, $devResolved, $ioCostQos, $ioCostModel);
-            if (!empty($ioCostPlan['messages'])) {
-                foreach ($ioCostPlan['messages'] as $message) {
-                    echo $message."\n";
-                }
-            }
-            if (!empty($ioCostPlan['writes'])) {
-                $ioCostWrites = $ioCostPlan['writes'];
-            }
-        }
-
-        // Policy mount defaults apply only when no explicit IO input is given.
         if (!empty($policyIoPairs) && empty($ioPairs) && $ioProfile === '' && $device === '') {
             $ioPairs = array_merge($ioPairs, $policyIoPairs);
         }
 
-        // Default view if no actions
-        if (!$wantStatus && !$wantConfig) {
-            $hasPlanInput = !empty($opt) || !empty($ioPairs) || !empty($ioCostWrites) || $device !== '' || $ioProfile !== '' || $doWipe;
-            if (!$hasPlanInput) {
-                $this->showConfig($slice);
-                $this->showStatus($slice, $uid);
-            }
+        if (!$actions['status'] && !$actions['config'] && !$this->hasPlanInput($opt, $ioPairs, $ioCostWrites, $device, $ioProfile, $actions['wipe'])) {
+            $this->showConfig($slice);
+            $this->showStatus($slice, $uid);
         }
 
-        $sysMem = $this->sys->getTotalMemoryMiB();
-        $props = !empty($opt) ? $this->computeSetProps($opt, $sysMem) : [];
+        $props = !empty($opt) ? $this->computeSetProps($opt, $this->sys->getTotalMemoryMiB()) : [];
 
-        if ($defaultsRequested && $respectExisting && !empty($props)) {
-            $current = $this->readCurrentProps($slice);
-            foreach (array_keys($props) as $k) {
-                if (isset($current[$k]) && trim((string)$current[$k]) !== '') {
-                    unset($props[$k]);
-                }
-            }
-        }
-
-        if (!empty($props)) {
-            echo "\n[Planned properties]\n";
-            foreach ($props as $k=>$v) { echo "$k=$v\n"; }
-        }
-        if (!empty($ioPairs)) {
-            echo "[Planned IO properties]\n";
-            foreach ($ioPairs as $p) echo $p."\n";
-        }
-        if (!empty($ioCostWrites)) {
-            echo "[Planned io.cost writes]\n";
-            foreach ($ioCostWrites as $write) {
-                echo $write['path'].' <= '.$write['value']."\n";
-            }
-        }
-
-        $hasPlan = !empty($props) || !empty($ioPairs) || !empty($ioCostWrites) || $doWipe;
-
-        if ($hasPlan) {
-            if ($apply && !$dryRun) {
-                if ($uid === 0) {
-                    fwrite(STDERR, "Refusing to apply cgroup changes to root slice; use cgroupRootCheck.php for root guard repair.\n");
-                    return 1;
-                }
-
-                $this->sys->requireRoot();
-                $applyFailed = false;
-                foreach ($this->buildApplySteps($slice, $doWipe, $props, $ioPairs, $ioCostWrites) as $step) {
-                    $applyFailed = (int) call_user_func($this->stepRunner, $step[0], $step[1]) !== 0 || $applyFailed;
-                }
-
-                if ($applyFailed) {
-                    fwrite(STDERR, "One or more cgroup apply operations failed; inspect the logged command output above.\n");
-                    return 1;
-                }
-            } else {
-                echo "(dry-run or no --apply; not changing system)\n";
-            }
-        }
-
-        return 0;
+        $this->filterExistingProps($slice, $actions['defaults'] && $actions['respectExisting'], $props);
+        $this->printPlan($props, $ioPairs, $ioCostWrites);
+        return $this->finishPlan($slice, $uid, $actions, $props, $ioPairs, $ioCostWrites);
     }
 
     public function computeSetProps(array $opts, int $sysMemMiB): array
@@ -292,6 +194,100 @@ class Manager
         }
 
         return $props;
+    }
+
+    /** Resolve top-level CLI booleans once so the run path carries one action shape. */
+    private function actionFlags(array $flags): array { $actions = []; foreach (self::ACTION_FLAG_MAP as $key => $flag) $actions[$key] = in_array($flag, $flags, true); return $actions; }
+
+    private function wipeHasConflictingInput(array $opt, array $ioPairs, array $actions, string $device, string $ioProfile, string $ioCostQos, string $ioCostModel): bool
+    { return !empty($opt) || !empty($ioPairs) || $actions['defaults'] || $actions['respectExisting'] || $device !== '' || $ioProfile !== '' || $ioCostQos !== '' || $ioCostModel !== ''; }
+
+    private function hasPlanInput(array $opt, array $ioPairs, array $ioCostWrites, string $device, string $ioProfile, bool $wipe): bool
+    { return !empty($opt) || !empty($ioPairs) || !empty($ioCostWrites) || $device !== '' || $ioProfile !== '' || $wipe; }
+
+    /** @return array{device:string,error:string,warning:string} */
+    private function resolveDevicePlan(string $device, bool $needsHomeLatency): array
+    {
+        if ($device !== '') {
+            $resolved = strpos($device, '/dev/') === 0 ? $device : $this->sys->resolveDevice($device);
+            return $resolved !== '' && !\pmssCgroupPolicyDeviceTargetIsSafe($resolved)
+                ? ['device' => '', 'error' => 'Invalid resolved --device target: expected /dev/... without whitespace or NUL bytes', 'warning' => '']
+                : ['device' => $resolved, 'error' => '', 'warning' => ''];
+        }
+
+        if (!$needsHomeLatency) return ['device' => '', 'error' => '', 'warning' => ''];
+        $resolved = $this->sys->resolveDevice('/home');
+        return $resolved !== '' && !\pmssCgroupPolicyDeviceTargetIsSafe($resolved)
+            ? ['device' => '', 'error' => '', 'warning' => '[WARN] IODeviceLatencyTargetSec skipped: unsafe /home backing device target']
+            : ['device' => $resolved, 'error' => '', 'warning' => ''];
+    }
+
+    private function appendIoLatencyPair(string $mode, string $devResolved, array $opt, array &$ioPairs): void
+    {
+        if (!isset($opt['io-latency-ms']) || (int)$opt['io-latency-ms'] <= 0) return;
+        if ($mode === 'v2' && $devResolved !== '') {
+            $ioPairs[] = 'IODeviceLatencyTargetSec='.$devResolved.' '.(int)$opt['io-latency-ms'].'ms';
+        } elseif ($mode !== 'v2') {
+            echo "[SKIP] IODeviceLatencyTargetSec requires cgroup v2\n";
+        }
+    }
+
+    private function collectIoCostWrites(string $slice, string $mode, string $devResolved, string $ioCostQos, string $ioCostModel): array
+    {
+        if ($ioCostQos === '' && $ioCostModel === '') return [];
+        $plan = $this->buildIoCostWrites($slice, $mode, $devResolved, $ioCostQos, $ioCostModel);
+        foreach ($plan['messages'] ?? [] as $message) echo $message."\n";
+        return !empty($plan['writes']) ? $plan['writes'] : [];
+    }
+
+    private function filterExistingProps(string $slice, bool $enabled, array &$props): void
+    {
+        if (!$enabled || empty($props)) return;
+        $current = $this->readCurrentProps($slice);
+        foreach (array_keys($props) as $key) {
+            if (isset($current[$key]) && trim((string)$current[$key]) !== '') unset($props[$key]);
+        }
+    }
+
+    private function printPlan(array $props, array $ioPairs, array $ioCostWrites): void
+    {
+        if (!empty($props)) {
+            echo "\n[Planned properties]\n";
+            foreach ($props as $key => $value) echo $key.'='.$value."\n";
+        }
+        if (!empty($ioPairs)) {
+            echo "[Planned IO properties]\n";
+            foreach ($ioPairs as $pair) echo $pair."\n";
+        }
+        if (!empty($ioCostWrites)) {
+            echo "[Planned io.cost writes]\n";
+            foreach ($ioCostWrites as $write) echo $write['path'].' <= '.$write['value']."\n";
+        }
+    }
+
+    private function finishPlan(string $slice, int $uid, array $actions, array $props, array $ioPairs, array $ioCostWrites): int
+    {
+        if (!$this->hasPlanInput($props, $ioPairs, $ioCostWrites, '', '', $actions['wipe'])) return 0;
+        if (!$actions['apply'] || $actions['dryRun']) {
+            echo "(dry-run or no --apply; not changing system)\n";
+            return 0;
+        }
+        if ($uid === 0) {
+            fwrite(STDERR, "Refusing to apply cgroup changes to root slice; use cgroupRootCheck.php for root guard repair.\n");
+            return 1;
+        }
+
+        $this->sys->requireRoot();
+        $applyFailed = false;
+        foreach ($this->buildApplySteps($slice, $actions['wipe'], $props, $ioPairs, $ioCostWrites) as $step) {
+            $applyFailed = (int) call_user_func($this->stepRunner, $step[0], $step[1]) !== 0 || $applyFailed;
+        }
+        if ($applyFailed) {
+            fwrite(STDERR, "One or more cgroup apply operations failed; inspect the logged command output above.\n");
+            return 1;
+        }
+
+        return 0;
     }
 
     private function parseFlagInputs(array $flags, ?string &$error): array

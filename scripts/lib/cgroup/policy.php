@@ -17,10 +17,7 @@ const PMSS_BFQ_FALLBACK_COEFFICIENT = 0.690533966002; // 250 / sqrt(131072).
 /** Load the PMSS cgroup policy array from the configured seedbox config tree. */
 function pmssCgroupPolicyLoad(?string $configDir = null): array
 {
-    if ($configDir === null) {
-        $configDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
-    }
-    $cfgDir = rtrim($configDir, '/');
+    $cfgDir = rtrim($configDir ?? pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config'), '/');
     $policyFile = ($cfgDir !== '' ? $cfgDir : '/etc/seedbox/config').'/cgroup.policy.php';
     $loaded = file_exists($policyFile) ? @include $policyFile : null;
 
@@ -123,11 +120,8 @@ function pmssBfqUserPasswdUid($passwdEntry): ?int
 function pmssCgroupPolicyNumericProfileValue(array $policy, string $family, string $profileName, array $defaults, string $fallback): string
 {
     $profileName = strtolower($profileName);
-    if (!isset($policy['profiles']) || !is_array($policy['profiles']) || !isset($policy['profiles'][$family]) || !is_array($policy['profiles'][$family])) {
-        return $defaults[$profileName] ?? $fallback;
-    }
-
-    foreach ($policy['profiles'][$family] as $name => $value) {
+    $profiles = isset($policy['profiles'][$family]) && is_array($policy['profiles'][$family]) ? $policy['profiles'][$family] : [];
+    foreach ($profiles as $name => $value) {
         if (!is_string($name) || $name === '' || !is_numeric($value) || (int) $value <= 0) {
             continue;
         }

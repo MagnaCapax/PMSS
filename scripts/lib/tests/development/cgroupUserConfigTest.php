@@ -165,6 +165,20 @@ class CgroupUserConfigTest extends TestCase
         );
     }
 
+    public function testIoLatencyDryRunPlanSnapshot(): void
+    {
+        $res = $this->runMgr(['testuser', '--dry-run', '--io-latency-ms=50']);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertSame(
+            "user=testuser uid=1000 slice=user-1000.slice mode=v2\n"
+            ."[Planned IO properties]\n"
+            ."IODeviceLatencyTargetSec=/dev/sda 50ms\n"
+            ."(dry-run or no --apply; not changing system)\n",
+            $res['out']
+        );
+    }
+
     public function testScalarOptionParserKeepsInlineOnlyContract(): void
     {
         $split = $this->runMgr(['testuser', '--memory-high', '600']);

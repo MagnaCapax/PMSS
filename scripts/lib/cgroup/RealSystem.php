@@ -57,13 +57,6 @@ class RealSystem implements SystemInterface
 
     public function requireRoot(): void
     {
-        if (function_exists('requireRoot')) {
-            requireRoot();
-            return;
-        }
-
-        if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
-            die("This script must be run as root.\n");
-        }
+        \requireRoot();
     }
 }
