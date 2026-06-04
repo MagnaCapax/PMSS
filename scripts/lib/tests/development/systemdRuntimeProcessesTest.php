@@ -6,17 +6,22 @@ require_once dirname(__DIR__, 2).'/update/services/systemd.php';
 
 class SystemdRuntimeProcessesTest extends TestCase
 {
-    public function testSystemdUnitNameIsSafeAcceptsCommonUnitNames(): void
+    public function testSystemdUnitNameIsSafeMatrix(): void
     {
-        foreach (['lighttpd', 'docker.service', 'rpcbind.socket', 'user@1000.service', 'pmss-test_1.slice'] as $unit) {
-            $this->assertTrue(\pmssSystemdUnitNameIsSafe($unit), $unit.' should be accepted');
-        }
-    }
-
-    public function testSystemdUnitNameIsSafeRejectsUnsafeUnitNames(): void
-    {
-        foreach (['', '  ', '-demo.service', 'demo service', "demo\nservice", 'demo;service'] as $unit) {
-            $this->assertFalse(\pmssSystemdUnitNameIsSafe($unit), var_export($unit, true).' should be rejected');
+        foreach ([
+            'lighttpd' => true,
+            'docker.service' => true,
+            'rpcbind.socket' => true,
+            'user@1000.service' => true,
+            'pmss-test_1.slice' => true,
+            '' => false,
+            '  ' => false,
+            '-demo.service' => false,
+            'demo service' => false,
+            "demo\nservice" => false,
+            'demo;service' => false,
+        ] as $unit => $expected) {
+            $this->assertSame($expected, \pmssSystemdUnitNameIsSafe($unit), var_export($unit, true).' unit safety classification');
         }
     }
 

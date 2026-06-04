@@ -7,7 +7,7 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class BonusTrafficCliWrapperCharacterizationTest extends TestCase
 {
-    public function testUtilityWrapperDelegatesToSharedTrafficLimitLibrary(): void
+    public function testWrapperAndCompatibilityShimContractsRemainStable(): void
     {
         $this->pmssAssertRepoFileContractCases([
             'scripts/util/userBonusTraffic.php' => [
@@ -21,12 +21,6 @@ final class BonusTrafficCliWrapperCharacterizationTest extends TestCase
                     '  ./userBonusTraffic.php --user=<username> --bonus=<GiB>',
                 ],
             ],
-        ]);
-    }
-
-    public function testCompatibilityShimKeepsLegacyLibraryPathAlive(): void
-    {
-        $this->pmssAssertRepoFileContractCases([
             'scripts/lib/user/bonusTraffic.php' => [
                 'required' => [
                     'Backward-compatible bonus traffic entrypoint.',

@@ -88,22 +88,36 @@ class DistroDetectionTest extends TestCase
         ], 'debian', 11, 'bullseye');
     }
 
-    public function testDetectTrimsCodenameWhitespace(): void
+    public function testDetectHandlesCodenameAndVersionEdgeCases(): void
     {
-        $this->pmssAssertDetectedDistro([
-            'ID'                => 'debian',
-            'VERSION_ID'        => '13',
-            'VERSION_CODENAME'  => '  trixie  ',
-        ], 'debian', 13, 'trixie');
-    }
-
-    public function testDetectKeepsVersionForUnknownCodename(): void
-    {
-        $this->pmssAssertDetectedDistro([
-            'ID'                => 'debian',
-            'VERSION_ID'        => '77',
-            'VERSION_CODENAME'  => 'aurora',
-        ], 'debian', 77, 'aurora');
+        foreach ([
+            'trimmed codename' => [
+                ['ID' => 'debian', 'VERSION_ID' => '13', 'VERSION_CODENAME' => '  trixie  '],
+                13,
+                'trixie',
+                false,
+            ],
+            'unknown codename keeps version' => [
+                ['ID' => 'debian', 'VERSION_ID' => '77', 'VERSION_CODENAME' => 'aurora'],
+                77,
+                'aurora',
+                false,
+            ],
+            'missing version signals' => [
+                ['ID' => 'debian'],
+                0,
+                '',
+                true,
+            ],
+            'messy VERSION_ID' => [
+                ['ID' => 'debian', 'VERSION_ID' => '12 (testing snapshot)'],
+                12,
+                '',
+                true,
+            ],
+        ] as $label => $case) {
+            $this->pmssAssertDetectedDistro($case[0], 'debian', $case[1], $case[2], $case[3]);
+        }
     }
 
     public function testOsReleaseHelpersNormalizeCodenameAndMajorVersion(): void
@@ -116,27 +130,6 @@ class DistroDetectionTest extends TestCase
             $this->assertEquals('12', \getDistroVersion());
             $this->assertEquals('bookworm', \getDistroCodename());
         });
-    }
-
-    /**
-     * If both codename and version are missing we should surface zero.
-     */
-    public function testDetectHandlesMissingVersionSignals(): void
-    {
-        $this->pmssAssertDetectedDistro([
-            'ID' => 'debian',
-        ], 'debian', 0, '', true);
-    }
-
-    /**
-     * Non-numeric VERSION_ID strings should still produce an integer.
-     */
-    public function testDetectParsesMessyVersionId(): void
-    {
-        $this->pmssAssertDetectedDistro([
-            'ID'         => 'debian',
-            'VERSION_ID' => '12 (testing snapshot)',
-        ], 'debian', 12, '', true);
     }
 
     /**

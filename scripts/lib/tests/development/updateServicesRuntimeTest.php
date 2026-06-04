@@ -31,17 +31,17 @@ class UpdateServicesRuntimeTest extends TestCase
         }
     }
 
-    public function testSshdValidationCommandUsesAbsolutePathWhenExecutable(): void
+    public function testSshdValidationCommandUsesAbsolutePathAndFallbacks(): void
     {
         $sshd = $this->pmssMakeTempDir('pmss-sshd-bin-').'/sshd';
         $this->pmssWriteExecutableFile($sshd, "#!/bin/sh\nexit 0\n");
 
-        $this->assertSame(\pmssBuildCommand($sshd, ['-t']), \pmssSshdValidationCommand($sshd));
-    }
-
-    public function testSshdValidationCommandFallsBackToBareCommandWhenMissing(): void
-    {
-        $this->assertSame('sshd -t', \pmssSshdValidationCommand($this->pmssMakeTempPath('pmss-missing-sshd-')));
+        foreach ([
+            [$sshd, \pmssBuildCommand($sshd, ['-t'])],
+            [$this->pmssMakeTempPath('pmss-missing-sshd-'), 'sshd -t'],
+        ] as $case) {
+            $this->assertSame($case[1], \pmssSshdValidationCommand($case[0]));
+        }
     }
 
     public function testSshdValidationRc127SkipsLegacyFallbackMutation(): void

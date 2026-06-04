@@ -210,7 +210,7 @@ class CgroupUserConfigTest extends TestCase
     public function testCpuQuotaInfinity()
     {
         $res = $this->runMgr(['testuser', '--cpu-quota-percent=infinity']);
-        // Should result in empty string
+        // Should result in empty string.
         $this->assertStringContainsString('CPUQuota=', $res['out']);
         $this->assertStringNotContainsString('CPUQuota=infinity', $res['out']);
     }
@@ -228,46 +228,20 @@ class CgroupUserConfigTest extends TestCase
         $this->assertStringContainsString('CPUQuota=200%', $res['out']);
     }
 
-    public function testRejectsInvalidCpuWeightValue()
+    public function testRejectsInvalidScalarAndDeviceValues()
     {
-        $res = $this->runMgr(['testuser', '--cpu-weight=abc']);
-        $this->assertEquals(2, $res['rc']);
-    }
-
-    public function testRejectsDecimalMemoryHighValue()
-    {
-        $res = $this->runMgr(['testuser', '--memory-high=12.5']);
-        $this->assertEquals(2, $res['rc']);
-    }
-
-    public function testRejectsInvalidCpuQuotaValue()
-    {
-        $res = $this->runMgr(['testuser', '--cpu-quota-percent=fast']);
-        $this->assertEquals(2, $res['rc']);
-    }
-
-    public function testRejectsMalformedIoBandwidthSpec()
-    {
-        $res = $this->runMgr(['testuser', '--io-read-bw=/dev/sda']);
-        $this->assertEquals(2, $res['rc']);
-    }
-
-    public function testRejectsRelativeIoBandwidthDeviceSpec()
-    {
-        $res = $this->runMgr(['testuser', '--io-read-bw=tmp/device:5M']);
-        $this->assertEquals(2, $res['rc']);
-    }
-
-    public function testRejectsNonDeviceIoBandwidthPathSpec()
-    {
-        $res = $this->runMgr(['testuser', '--io-read-bw=/tmp/device:5M']);
-        $this->assertEquals(2, $res['rc']);
-    }
-
-    public function testRejectsWhitespaceInDeviceValue()
-    {
-        $res = $this->runMgr(['testuser', '--device=/dev/sda bad', '--io-profile=hdd']);
-        $this->assertEquals(2, $res['rc']);
+        foreach ([
+            'cpu weight string' => ['--cpu-weight=abc'],
+            'decimal memory high' => ['--memory-high=12.5'],
+            'cpu quota string' => ['--cpu-quota-percent=fast'],
+            'malformed IO bandwidth' => ['--io-read-bw=/dev/sda'],
+            'relative IO bandwidth device' => ['--io-read-bw=tmp/device:5M'],
+            'non-device IO bandwidth path' => ['--io-read-bw=/tmp/device:5M'],
+            'whitespace in device value' => ['--device=/dev/sda bad', '--io-profile=hdd'],
+        ] as $label => $args) {
+            $res = $this->runMgr(array_merge(['testuser'], $args));
+            $this->assertEquals(2, $res['rc'], $label);
+        }
     }
 
     public function testApplyBuildsShellSafeIoPropertyArguments()

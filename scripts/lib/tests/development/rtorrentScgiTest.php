@@ -82,27 +82,18 @@ class RtorrentScgiTest extends TestCase
         );
     }
 
-    public function testDecodeResponseParsesScalarAndArrayValues(): void
+    public function testDecodeResponseParsesXmlrpcValues(): void
     {
-        $scalar = $this->xmlrpcResponseWrap('<?xml version="1.0"?><methodResponse><params><param><value><i8>42</i8></value></param></params></methodResponse>');
-        $decodedScalar = rtorrentScgiDecodeResponse($scalar);
-        $this->assertEquals(42, $decodedScalar);
-
-        $array = $this->xmlrpcResponseWrap('<?xml version="1.0"?><methodResponse><params><param><value><array><data><value><string>a</string></value><value><string>b</string></value></data></array></value></param></params></methodResponse>');
-        $decodedArray = rtorrentScgiDecodeResponse($array);
-        $this->assertEquals(['a', 'b'], $decodedArray);
-    }
-
-    public function testDecodeResponseParsesBooleanDoubleAndStructValues(): void
-    {
-        $boolean = $this->xmlrpcResponseWrap('<?xml version="1.0"?><methodResponse><params><param><value><boolean>1</boolean></value></param></params></methodResponse>');
-        $this->assertTrue(rtorrentScgiDecodeResponse($boolean));
-
-        $double = $this->xmlrpcResponseWrap('<?xml version="1.0"?><methodResponse><params><param><value><double>4.25</double></value></param></params></methodResponse>');
-        $this->assertSame(4.25, rtorrentScgiDecodeResponse($double));
-
-        $struct = $this->xmlrpcResponseWrap('<?xml version="1.0"?><methodResponse><params><param><value><struct><member><name>enabled</name><value><boolean>0</boolean></value></member><member><name>rate</name><value><int>9</int></value></member></struct></value></param></params></methodResponse>');
-        $this->assertSame(['enabled' => false, 'rate' => 9], rtorrentScgiDecodeResponse($struct));
+        foreach ([
+            'scalar i8' => ['<i8>42</i8>', 42],
+            'array' => ['<array><data><value><string>a</string></value><value><string>b</string></value></data></array>', ['a', 'b']],
+            'boolean' => ['<boolean>1</boolean>', true],
+            'double' => ['<double>4.25</double>', 4.25],
+            'struct' => ['<struct><member><name>enabled</name><value><boolean>0</boolean></value></member><member><name>rate</name><value><int>9</int></value></member></struct>', ['enabled' => false, 'rate' => 9]],
+        ] as $label => $case) {
+            $response = $this->xmlrpcResponseWrap('<?xml version="1.0"?><methodResponse><params><param><value>'.$case[0].'</value></param></params></methodResponse>');
+            $this->assertSame($case[1], rtorrentScgiDecodeResponse($response), $label);
+        }
     }
 
     public function testXmlrpcCallEscapesSpecialChars(): void
@@ -124,33 +115,30 @@ class RtorrentScgiTest extends TestCase
         $this->assertEquals('/home/bob123/.rtorrent.socket', $path);
     }
 
-    public function testSocketQueueSnapshotParsesMatchingListenSocket(): void
+    public function testSocketQueueSnapshotParsesOnlyMatchingListenSockets(): void
     {
-        $snapshot = rtorrentScgiSocketQueueSnapshotFromLines([
-            'Netid State  Recv-Q Send-Q Local Address:Port Peer Address:Port',
-            'u_str LISTEN 101    100    /home/alice/.rtorrent.socket 12345 * 0',
-        ], '/home/alice/.rtorrent.socket');
-
-        $this->assertSame(['recvQ' => 101, 'sendQ' => 100], $snapshot);
-    }
-
-    public function testSocketQueueSnapshotIgnoresOtherSockets(): void
-    {
-        $snapshot = rtorrentScgiSocketQueueSnapshotFromLines([
-            'u_str LISTEN 101 100 /home/bob/.rtorrent.socket 12345 * 0',
-        ], '/home/alice/.rtorrent.socket');
-
-        $this->assertSame(null, $snapshot);
-    }
-
-    public function testSocketQueueSnapshotRejectsMalformedColumns(): void
-    {
-        $snapshot = rtorrentScgiSocketQueueSnapshotFromLines([
-            'u_str LISTEN nope 100 /home/alice/.rtorrent.socket 12345 * 0',
-            'u_str ESTAB 101 100 /home/alice/.rtorrent.socket 12345 * 0',
-        ], '/home/alice/.rtorrent.socket');
-
-        $this->assertSame(null, $snapshot);
+        foreach ([
+            'matching listen socket' => [
+                [
+                    'Netid State  Recv-Q Send-Q Local Address:Port Peer Address:Port',
+                    'u_str LISTEN 101    100    /home/alice/.rtorrent.socket 12345 * 0',
+                ],
+                ['recvQ' => 101, 'sendQ' => 100],
+            ],
+            'other socket' => [
+                ['u_str LISTEN 101 100 /home/bob/.rtorrent.socket 12345 * 0'],
+                null,
+            ],
+            'malformed columns' => [
+                [
+                    'u_str LISTEN nope 100 /home/alice/.rtorrent.socket 12345 * 0',
+                    'u_str ESTAB 101 100 /home/alice/.rtorrent.socket 12345 * 0',
+                ],
+                null,
+            ],
+        ] as $label => $case) {
+            $this->assertSame($case[1], rtorrentScgiSocketQueueSnapshotFromLines($case[0], '/home/alice/.rtorrent.socket'), $label);
+        }
     }
 
     public function testSocketQueueSaturatedRequiresRecvQAtBacklog(): void
