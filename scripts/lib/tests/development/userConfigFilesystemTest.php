@@ -100,6 +100,32 @@ class UserConfigFilesystemTest extends TestCase
         $this->assertSame("  enabled = yes\n", \pmssReadRegularFileContents($path));
     }
 
+    public function testFilesystemReadersRejectNulBytePathsFailSoft(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700);
+        $config = $this->pmssWriteFile($root.'/content.txt', "enabled = yes\n");
+        $serialized = $this->pmssWriteFile($root.'/resources.serialized', serialize(['ramBlock' => 256]));
+        $passwd = $this->pmssWriteFile($root.'/passwd', "alice:x:1001:1001::/home/alice:/bin/bash\n");
+
+        $this->assertTrue(\pmssFilesystemPathHasNulByte($config."\0suffix"));
+        $this->assertSame(null, \pmssReadRegularFileContents($config."\0suffix"));
+        $this->assertSame([], \pmssReadOptionalSerializedArrayFile($serialized."\0suffix", 'demo resources'));
+        $this->assertSame(null, \pmssColonRecordFieldsLookup($passwd."\0suffix", 'alice', 7, false));
+        $this->assertSame('fallback-host', \pmssHostnameRead('fallback-host', $config."\0suffix"));
+    }
+
+    public function testRequiredFileRejectsNulBytePathBeforeFilesystemCall(): void
+    {
+        $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/defaults.conf', "enabled = yes\n");
+
+        try {
+            \pmssReadRequiredRegularFile($path."\0suffix", 'demo defaults');
+            $this->fail('Expected NUL-byte required file path to throw');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('Missing demo defaults:', $exception->getMessage());
+        }
+    }
+
     public function testUserConfigUsesSharedRuntimeFilesystemHelpers(): void
     {
         $this->pmssAssertRepoFileContainsString('scripts/util/userConfig.php', "pmssReadOptionalSerializedArrayFile('/etc/seedbox/config/system.rtorrent.resources', 'rTorrent resource configuration')");

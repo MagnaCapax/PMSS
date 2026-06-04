@@ -28,7 +28,11 @@ function pmssPrivateTempDirRealpath(string $path, string $prefix, ?callable $log
     return $real;
 }
 
-function pmssReadRegularFileContents(string $path): ?string { return (!is_file($path) || is_link($path) || !is_string($contents = @file_get_contents($path))) ? null : $contents; }
+// NUL bytes make PHP filesystem calls version-dependent; reject them at the
+// runtime boundary and keep callers on the existing fail-soft path.
+function pmssFilesystemPathHasNulByte(string $path): bool { return strpos($path, "\0") !== false; }
+function pmssRegularFilePathIsReadable(string $path): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && is_file($path) && !is_link($path); }
+function pmssReadRegularFileContents(string $path): ?string { return (!pmssRegularFilePathIsReadable($path) || !is_string($contents = @file_get_contents($path))) ? null : $contents; }
 function pmssReadRegularFileTrimmed(string $path): ?string { return (($contents = pmssReadRegularFileContents($path)) === null) ? null : trim($contents); }
 
 function pmssProcMeminfoFieldsRead(string $path = '/proc/meminfo'): array
@@ -50,6 +54,7 @@ function pmssReadSerializedArrayFile(string $path): ?array
 
 function pmssReadOptionalSerializedArrayFile(string $path, string $label = 'serialized array file'): array
 {
+    if (pmssFilesystemPathHasNulByte($path)) return [];
     if (!file_exists($path)) return [];
     $payload = pmssReadSerializedArrayFile($path);
     if ($payload === null) throw new RuntimeException('Invalid '.$label.': '.$path);
@@ -58,7 +63,7 @@ function pmssReadOptionalSerializedArrayFile(string $path, string $label = 'seri
 
 function pmssReadRequiredRegularFile(string $path, string $label = 'required file'): string
 {
-    if (!is_file($path) || is_link($path)) throw new RuntimeException('Missing '.$label.': '.$path);
+    if (!pmssRegularFilePathIsReadable($path)) throw new RuntimeException('Missing '.$label.': '.$path);
     $contents = pmssReadRegularFileContents($path);
     if ($contents === null) throw new RuntimeException('Unable to read '.$label.': '.$path);
     return $contents;
@@ -84,7 +89,7 @@ function pmssReadRegularFileNetworkPort(string $path, int $min = 1, int $max = 6
 
 function pmssColonRecordFieldsLookup(string $path, string $recordName, int $minFields = 2, bool $skipEmptyLines = true): ?array
 {
-    if ($recordName === '' || $minFields < 1 || strpos($recordName, ':') !== false || preg_match('/[\r\n\0\/]/', $recordName) === 1 || !is_file($path) || is_link($path)) return null;
+    if ($recordName === '' || $minFields < 1 || strpos($recordName, ':') !== false || preg_match('/[\r\n\0\/]/', $recordName) === 1 || !pmssRegularFilePathIsReadable($path)) return null;
     $flags = FILE_IGNORE_NEW_LINES | ($skipEmptyLines ? FILE_SKIP_EMPTY_LINES : 0);
     $lines = @file($path, $flags);
     if (!is_array($lines)) return null;
@@ -98,7 +103,7 @@ function pmssColonRecordFieldsLookup(string $path, string $recordName, int $minF
 }
 
 function pmssReadRegularFileInt(string $path, int $default = 0): int { $raw = pmssReadRegularFileDigits($path); return $raw === null ? $default : (int) $raw; }
-function pmssHostnameRead(string $default = '', string $path = '/etc/hostname'): string { return is_string($hostname = @file_get_contents($path)) ? trim($hostname) : $default; }
+function pmssHostnameRead(string $default = '', string $path = '/etc/hostname'): string { return !pmssFilesystemPathHasNulByte($path) && is_string($hostname = @file_get_contents($path)) ? trim($hostname) : $default; }
 
 function pmssHostnameIsValid(string $hostname, bool $allowIpv4 = true): bool
 {
