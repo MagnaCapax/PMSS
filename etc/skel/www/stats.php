@@ -362,7 +362,7 @@ echo htmlspecialchars($ip !== false ? trim($ip) : 'unknown');
 
     // === App Status via ps aux | grep (hidepid safe) ===
     $psResult = pmssInfoShellExec('ps aux | grep -E "(rtorrent|qbittorrent-nox|deluged|rclone)" | grep -v grep', 'App status');
-    $pmssStatsAppToggles = pmssStatsAppToggleDefinitions();
+    $pmssStatsAppToggles = pmssCustomerManagedAppDefinitions();
     if ($psResult['error'] !== null) {
         $apps = array(
             'rTorrent'    => 'error',

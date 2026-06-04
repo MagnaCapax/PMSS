@@ -245,20 +245,6 @@ function pmssStatsDockerInactiveNote(
 }
 
 /**
- * Return customer-managed app toggle endpoints for the info-page app rows.
- *
- * @return array<string,array{enable:string,endpoint:string}>
- */
-function pmssStatsAppToggleDefinitions(): array
-{
-    return array(
-        'qBittorrent' => array('enable' => '../.qbittorrentEnable', 'endpoint' => 'qbittorrent.php'),
-        'Deluge'      => array('enable' => '../.delugeEnable',      'endpoint' => 'deluge.php'),
-        'rclone'      => array('enable' => '../.rcloneEnable',      'endpoint' => 'rclone.php'),
-    );
-}
-
-/**
  * Build an inline enable/disable control next to a customer-managed app status.
  */
 function pmssStatsAppToggleButtonHtmlBuild(string $appName, array $definitions): string

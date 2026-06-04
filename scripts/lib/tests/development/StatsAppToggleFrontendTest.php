@@ -8,10 +8,10 @@ class StatsAppToggleFrontendTest extends TestCase
     public function testStatsPageShowsInlineEnableTogglesForCustomerManagedApps(): void
     {
         $html = $this->pmssRenderCustomerPanelPage('stats.php');
-
-        foreach (['qBittorrent' => 'qbittorrent.php', 'Deluge' => 'deluge.php', 'rclone' => 'rclone.php'] as $app => $endpoint) {
+        require_once $this->pmssRepoPath('etc/skel/www/scriptsInc.php');
+        foreach (pmssCustomerManagedAppDefinitions() as $app => $definition) {
             $this->assertStringContainsString('data-app="'.$app.'"', $html);
-            $this->assertStringContainsString('data-endpoint="'.$endpoint.'"', $html);
+            $this->assertStringContainsString('data-endpoint="'.$definition['endpoint'].'"', $html);
         }
 
         $this->assertStringContainsString('class="status-actions"', $html);

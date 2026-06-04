@@ -141,6 +141,15 @@ if (!function_exists('pmssWelcomeRequireLocalHelper')) {
  }
 }
 
+if (!function_exists('pmssCustomerManagedAppDefinitions')) {
+ /** Return metadata for customer-managed app frontends copied into www/. */
+ function pmssCustomerManagedAppDefinitions() { return array(
+   'qBittorrent' => array('enable' => '../.qbittorrentEnable', 'endpoint' => 'qbittorrent.php', 'binaries' => array('/usr/bin/qbittorrent-nox', '/usr/local/bin/qbittorrent-nox')),
+   'Deluge'      => array('enable' => '../.delugeEnable',      'endpoint' => 'deluge.php',      'binaries' => array('/usr/bin/deluged', '/usr/local/bin/deluged')),
+   'rclone'      => array('enable' => '../.rcloneEnable',      'endpoint' => 'rclone.php',      'binaries' => array('/usr/bin/rclone')),
+  ); }
+}
+
 if (!function_exists('pmssWelcomeHttpContextCreate')) {
  /**
   * Build the standard remote-request context used by PMSS GUI pages.
