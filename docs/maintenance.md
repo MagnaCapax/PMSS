@@ -20,7 +20,7 @@ are frequently used during day-to-day operations:
 - `scripts/userTorrents.php` - count torrents per user (`--by-client` for breakdown).
 - `scripts/addUser.php` - provision a new user account (creates services/config).
 - `scripts/suspend.php` / `scripts/unsuspend.php` - toggle user suspension state.
-- `scripts/terminateUser.php` - terminate a user account (`--confirm` required for non-interactive runs); homes are renamed aside and reclaimed asynchronously by `scripts/util/userHomeReclaim.php`.
+- `scripts/terminateUser.php` - terminate a user account (`--confirm` required for non-interactive runs); homes and matching `backup-<user>` recreate backups are renamed aside and reclaimed asynchronously by `scripts/util/userHomeReclaim.php`.
 
 ## 2. Dry-Run The Updater
 ```

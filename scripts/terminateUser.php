@@ -118,6 +118,43 @@ function pmssTerminateUserMoveHomeForReclaim(string $username, string $homePath,
     return $targetPath;
 }
 
+/**
+ * Move a recreateUser safety backup into the asynchronous reclaim namespace.
+ */
+function pmssTerminateUserMoveBackupForReclaim(string $username, string $backupPath, bool $dryRun): string
+{
+    if (is_link($backupPath)) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'reclaim_user_backup_dir', $username, 'ERR', 'Refusing symlinked user backup directory', array('source' => $backupPath));
+        return '';
+    }
+    if (!is_dir($backupPath)) {
+        return '';
+    }
+
+    $realBackup = realpath($backupPath);
+    if ($realBackup === false || $realBackup !== $backupPath) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'reclaim_user_backup_dir', $username, 'ERR', 'Refusing unexpected user backup path', array('source' => $backupPath, 'real_backup' => $realBackup));
+        return '';
+    }
+
+    $targetPath = pmssUserHomeReclaimPathNext($username);
+    if ($targetPath === '') {
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'reclaim_user_backup_dir', $username, 'ERR', 'Unable to allocate reclaim path', array('source' => $backupPath));
+        return '';
+    }
+    if ($dryRun) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'reclaim_user_backup_dir', $username, 'SKIP', 'Dry run; user backup not renamed', array('source' => $backupPath, 'target' => $targetPath));
+        return $targetPath;
+    }
+    if (!pmssUserHomeReclaimPathIsSafe($targetPath) || !@rename($backupPath, $targetPath)) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'reclaim_user_backup_dir', $username, 'ERR', 'Failed to rename user backup for background reclaim', array('source' => $backupPath, 'target' => $targetPath));
+        return '';
+    }
+
+    pmssUserLifecycleContextLogStatusMessage('terminate', 'reclaim_user_backup_dir', $username, 'OK', 'Renamed user backup for background reclaim', array('source' => $backupPath, 'target' => $targetPath));
+    return $targetPath;
+}
+
 $continue = '-';
 $dryRun   = false;
 $usage    = "Usage: terminateUser.php [--dry-run] [--confirm] USERNAME\n";
@@ -310,6 +347,11 @@ if ($homeReclaimPath !== '') {
     pmssUserLifecycleStep('terminate', $username, 'queue_home_reclaim', pmssUserHomeReclaimLaunchCommand($homeReclaimPath), $dryRun);
 } else {
     pmssUserLifecycleStep('terminate', $username, 'remove_home_fallback', 'cd /home && rm -rf -- '.escapeshellarg($username), $dryRun);
+}
+$backupPath = "/home/backup-{$username}";
+$backupReclaimPath = pmssTerminateUserMoveBackupForReclaim($username, $backupPath, $dryRun);
+if ($backupReclaimPath !== '') {
+    pmssUserLifecycleStep('terminate', $username, 'queue_user_backup_reclaim', pmssUserHomeReclaimLaunchCommand($backupReclaimPath), $dryRun);
 }
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");
 pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);

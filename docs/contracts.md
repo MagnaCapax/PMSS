@@ -551,6 +551,10 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Sets Unix password (generated if omitted) and per-user htpasswd; prints the password.
     With `--jsonl`, suppresses human status lines and emits one JSON object with the new credential, sync return codes, and `qbittorrent_updated` (`true` when the existing qBittorrent config was updated, `false` when no qBittorrent config was present, `null` before that sync step is reached).
 
+- scripts/terminateUser.php [--dry-run] [--confirm] USERNAME
+  - Behavior: Validates the managed user and exact `/home/<user>` path, removes account-owned runtime/config state, renames `/home/<user>` aside for asynchronous reclaim, and when `/home/backup-<user>` exists from `recreateUser.php`, validates that exact directory before queueing it for the same reclaim worker. It never sweeps `backup-*` prefixes.
+  - Dry-run: Logs planned home and backup reclaim work without renaming or deleting those paths.
+
 - scripts/recreateUser.php USERNAME RAM_MiB QUOTA_GiB
   - Behavior: Kills user processes; if `/home/<user>` exists, moves to `/home/backup-<user>`;
     recreates from `/etc/skel`, ensures dirs (`data`, `session`, `.lighttpd`);

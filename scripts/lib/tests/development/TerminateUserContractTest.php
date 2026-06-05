@@ -70,6 +70,41 @@ final class TerminateUserContractTest extends TestCase
         );
     }
 
+    public function testTerminateUserReclaimsExactRecreateBackupDir(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/terminateUser.php',
+            [
+                'function pmssTerminateUserMoveBackupForReclaim',
+                '$backupPath = "/home/backup-{$username}";',
+                'is_link($backupPath)',
+                '$realBackup !== $backupPath',
+                "'reclaim_user_backup_dir'",
+                "'queue_user_backup_reclaim'",
+                'pmssUserHomeReclaimLaunchCommand($backupReclaimPath)',
+            ],
+            'terminateUser.php should reclaim the exact recreateUser backup dir: '
+        );
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/terminateUser.php',
+            [
+                '$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim',
+                '$backupReclaimPath = pmssTerminateUserMoveBackupForReclaim',
+                'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
+            ],
+            'terminateUser.php should define backup reclaim flow: ',
+            'terminateUser.php should queue backup reclaim before nginx cleanup: '
+        );
+        $this->pmssAssertRepoFileNotContainsStrings(
+            'scripts/terminateUser.php',
+            [
+                '/home/backup-*',
+                'glob(',
+            ],
+            'terminateUser.php must not sweep backup prefixes: '
+        );
+    }
+
     public function testHomeReclaimPathContract(): void
     {
         $path = \pmssUserHomeReclaimPathBuild('user1234', 1767225600, 42);
