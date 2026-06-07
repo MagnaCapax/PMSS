@@ -259,11 +259,16 @@ LIGHTTPD;
         $home = $this->pmssMakeTempDir('pmss-media-stack-reset-home-');
         mkdir($home.'/.bin/Radarr', 0755, true);
         mkdir($home.'/.bin/keep', 0755, true);
+        mkdir($home.'/.config/sabnzbd', 0755, true);
+        mkdir($home.'/.config/unmanaged', 0755, true);
         file_put_contents($home.'/.bin/Radarr/file', 'managed');
         file_put_contents($home.'/.bin/keep/file', 'preserve');
 
         $functions = $this->pmssExtractShellFunctions($this->script, array(
             'media_stack_home_path_is_safe',
+            'media_stack_managed_paths',
+            'media_stack_managed_path_allowed',
+            'media_stack_managed_path_remove',
             'managed_install_path_reset',
         ));
         $script = implode("\n", array(
@@ -278,6 +283,9 @@ LIGHTTPD;
             'if [[ -e "$HOME/.bin/Radarr" ]]; then echo "safe_still_exists"; fi',
             'if managed_install_path_reset "$HOME/.bin"; then echo "unsafe_allowed"; else echo "unsafe_refused"; fi',
             'if managed_install_path_reset "$HOME/.bin/../outside"; then echo "traversal_allowed"; else echo "traversal_refused"; fi',
+            'media_stack_managed_path_allowed "$HOME/.config/sabnzbd" && echo "managed_allowed"',
+            'if media_stack_managed_path_allowed "$HOME/.config/unmanaged"; then echo "unmanaged_allowed"; elif [[ -d "$HOME/.config/unmanaged" ]]; then echo "unmanaged_preserved"; fi',
+            'media_stack_managed_path_remove "$HOME/.config/sabnzbd" && [[ ! -e "$HOME/.config/sabnzbd" ]] && echo "managed_removed"',
             'if [[ -f "$HOME/.bin/keep/file" ]]; then echo "keep_preserved"; fi',
             '',
         ));
@@ -287,10 +295,12 @@ LIGHTTPD;
         $this->assertStringContainsString('safe_removed', $output);
         $this->assertStringContainsString('unsafe_refused', $output);
         $this->assertStringContainsString('traversal_refused', $output);
+        $this->assertStringContainsAllStrings(array('managed_allowed', 'managed_removed', 'unmanaged_preserved'), $output);
         $this->assertStringContainsString('keep_preserved', $output);
         $this->assertTrue(strpos($output, 'safe_still_exists') === false, $output);
         $this->assertTrue(strpos($output, 'unsafe_allowed') === false, $output);
         $this->assertTrue(strpos($output, 'traversal_allowed') === false, $output);
+        $this->assertTrue(strpos($output, 'unmanaged_allowed') === false, $output);
     }
 
     public function testJellyfinConfigResetUsesExactPathGuard(): void

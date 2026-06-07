@@ -836,12 +836,17 @@ media_stack_memory_preflight_guard() {
 	exit 1
 }
 
+media_stack_managed_paths() {
+	printf '%s\n' "$HOME/.bin/cloudplow" "$HOME/.bin/sabnzbd" "$HOME/.bin/Radarr" "$HOME/.bin/Prowlarr" "$HOME/.bin/Sonarr" "$HOME/.bin/dotnet" "$HOME/.bin/jellyfin" \
+		"$HOME/.config/cloudplow" "$HOME/.config/sabnzbd" "$HOME/.config/radarr" "$HOME/.config/prowlarr" "$HOME/.config/sonarr" "$HOME/.config/jellyfin" "$HOME/.lighttpd/custom.d/media-stack.conf"
+}
+
 media_stack_managed_path_allowed() {
-	case "$1" in
-	"$HOME/.bin/cloudplow" | "$HOME/.bin/sabnzbd" | "$HOME/.bin/Radarr" | "$HOME/.bin/Prowlarr" | "$HOME/.bin/Sonarr" | "$HOME/.bin/dotnet" | "$HOME/.bin/jellyfin" | "$HOME/.config/cloudplow" | "$HOME/.config/sabnzbd" | "$HOME/.config/radarr" | "$HOME/.config/prowlarr" | "$HOME/.config/sonarr" | "$HOME/.config/jellyfin" | "$HOME/.lighttpd/custom.d/media-stack.conf")
-		return 0
-		;;
-	esac
+	local candidate="$1" managed_path
+
+	while IFS= read -r managed_path; do
+		[[ "$candidate" == "$managed_path" ]] && return 0
+	done < <(media_stack_managed_paths)
 	return 1
 }
 
@@ -941,22 +946,6 @@ bashrc_custom_media_stack_blocks_strip() {
 
 media_stack_uninstall() {
 	local app username managed_path
-	local managed_paths=(
-		"$HOME/.bin/cloudplow"
-		"$HOME/.bin/sabnzbd"
-		"$HOME/.bin/Radarr"
-		"$HOME/.bin/Prowlarr"
-		"$HOME/.bin/Sonarr"
-		"$HOME/.bin/dotnet"
-		"$HOME/.bin/jellyfin"
-		"$HOME/.config/cloudplow"
-		"$HOME/.config/sabnzbd"
-		"$HOME/.config/radarr"
-		"$HOME/.config/prowlarr"
-		"$HOME/.config/sonarr"
-		"$HOME/.config/jellyfin"
-		"$HOME/.lighttpd/custom.d/media-stack.conf"
-	)
 
 	username=$(whoami)
 	log_step "Uninstalling PMSS media stack"
@@ -975,9 +964,9 @@ media_stack_uninstall() {
 		log_info "[dry-run] would stop media stack tmux sessions and app processes"
 	fi
 
-	for managed_path in "${managed_paths[@]}"; do
+	while IFS= read -r managed_path; do
 		media_stack_managed_path_remove "$managed_path"
-	done
+	done < <(media_stack_managed_paths)
 	bashrc_custom_media_stack_blocks_strip
 	log_ok "PMSS media stack uninstall complete."
 }
