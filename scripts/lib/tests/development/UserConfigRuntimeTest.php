@@ -15,21 +15,23 @@ class UserConfigRuntimeTest extends TestCase
         return $procRoot;
     }
 
-    public function testRtorrentLockPidParsesCanonicalLock(): void
+    private function assertRtorrentLockPid(?int $expected, string $content): void
     {
         $lockFile = $this->pmssMakeTempFile('pmss-rtorrent-lock-');
-        file_put_contents($lockFile, "12345:+session\n");
+        file_put_contents($lockFile, $content);
 
-        $this->assertSame(12345, \pmssUserConfigRtorrentLockPid($lockFile));
+        $this->assertSame($expected, \pmssUserConfigRtorrentLockPid($lockFile));
+    }
+
+    public function testRtorrentLockPidParsesCanonicalLock(): void
+    {
+        $this->assertRtorrentLockPid(12345, "12345:+session\n");
     }
 
     public function testRtorrentLockPidRejectsMalformedValues(): void
     {
         foreach (['', '0:+session', '1:+session', 'abc:+session', '-5:+session'] as $content) {
-            $lockFile = $this->pmssMakeTempFile('pmss-rtorrent-lock-');
-            file_put_contents($lockFile, $content);
-
-            $this->assertSame(null, \pmssUserConfigRtorrentLockPid($lockFile));
+            $this->assertRtorrentLockPid(null, $content);
         }
     }
 

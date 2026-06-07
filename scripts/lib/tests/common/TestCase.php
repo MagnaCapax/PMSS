@@ -202,6 +202,17 @@ abstract class TestCase
         }
     }
 
+    /** Assert required and forbidden substrings against one haystack. */
+    protected function assertStringContainsAndOmitsStrings(array $required, array $forbidden, string $haystack, string $messagePrefix = ''): void
+    {
+        $this->assertStringContainsAllStrings($required, $haystack, $messagePrefix);
+        foreach ($forbidden as $key => $value) {
+            $needle = is_int($key) ? (string) $value : (string) $key;
+            $message = is_int($key) ? ($messagePrefix !== '' ? $messagePrefix.$needle : '') : (string) $value;
+            $this->pmssAssertStringNotContainsString($needle, $haystack, $message);
+        }
+    }
+
     /** Assert that a generated fixture file exists and contains every expected fragment. */
     protected function pmssAssertFileContainsAllStrings(string $path, array $needles, string $missingMessage = '', string $messagePrefix = ''): string
     {
@@ -1364,12 +1375,7 @@ abstract class TestCase
     protected function pmssAssertRepoFileContainsAndOmitsStrings(string $relativePath, array $required = [], array $forbidden = []): string
     {
         $source = $this->pmssReadRepoFile($relativePath);
-        $this->assertStringContainsAllStrings($required, $source);
-        foreach ($forbidden as $key => $value) {
-            $needle = is_int($key) ? (string) $value : (string) $key;
-            $message = is_int($key) ? '' : (string) $value;
-            $this->pmssAssertStringNotContainsString($needle, $source, $message);
-        }
+        $this->assertStringContainsAndOmitsStrings($required, $forbidden, $source);
 
         return $source;
     }

@@ -6,30 +6,7 @@ require_once dirname(__DIR__, 2).'/userLifecycle.php';
 
 class userLifecycleLoggingTest extends TestCase
 {
-    public function testFormatTextFieldLeavesPlainTextUntouched(): void
-    {
-        $this->assertEquals('plain text', \pmssUserLifecycleFormatTextField('plain text'));
-    }
-
-    public function testFormatTextFieldCollapsesControlCharacters(): void
-    {
-        $this->assertEquals('hello world line', \pmssUserLifecycleFormatTextField("hello\r\nworld\tline"));
-    }
-
-    public function testFormatTextFieldNormalizesNonStringScalars(): void
-    {
-        $this->assertEquals('42', \pmssUserLifecycleFormatTextField(42));
-        $this->assertEquals('true', \pmssUserLifecycleFormatTextField(true));
-        $this->assertEquals('false', \pmssUserLifecycleFormatTextField(false));
-    }
-
-    public function testFormatTextFieldHandlesNullAndArraySafely(): void
-    {
-        $this->assertEquals('', \pmssUserLifecycleFormatTextField(null));
-        $this->assertEquals('array', \pmssUserLifecycleFormatTextField(['nested' => 'value']));
-    }
-
-    public function testFormatTextFieldUsesStringableObjects(): void
+    public function testFormatTextFieldNormalizesSupportedInputShapes(): void
     {
         $stringable = new class {
             public function __toString(): string
@@ -38,7 +15,18 @@ class userLifecycleLoggingTest extends TestCase
             }
         };
 
-        $this->assertEquals('hello world', \pmssUserLifecycleFormatTextField($stringable));
+        foreach (array(
+            array('plain text', 'plain text'),
+            array("hello\r\nworld\tline", 'hello world line'),
+            array(42, '42'),
+            array(true, 'true'),
+            array(false, 'false'),
+            array(null, ''),
+            array(array('nested' => 'value'), 'array'),
+            array($stringable, 'hello world'),
+        ) as $case) {
+            $this->assertEquals($case[1], \pmssUserLifecycleFormatTextField($case[0]));
+        }
     }
 
     public function testUserLifecycleWriterUsesFormattingHelperForTextLogFields(): void

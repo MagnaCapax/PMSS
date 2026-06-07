@@ -14,9 +14,7 @@ final class UserCliHelpContractsTest extends TestCase
             ['scripts/util/userResourcesList.php', ['--help'], ['--brief', '--full', '--json', '--jsonl', '--help works without root'], ['must be run as root']],
         ] as $case) {
             $result = $this->pmssAssertRepoPhpScriptOutputContains($case[0], $case[1], $case[2]);
-            foreach ($case[3] ?? [] as $forbidden) {
-                $this->pmssAssertStringNotContainsString($forbidden, $result['output']);
-            }
+            $this->assertStringContainsAndOmitsStrings(array(), $case[3] ?? array(), $result['output']);
         }
     }
 
