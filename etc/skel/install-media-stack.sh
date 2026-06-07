@@ -34,8 +34,18 @@
 # #TODO: Click status → attempt restart (if allowed)
 #
 
-# Self-update unless explicitly skipped, but only when running interactively (TTY)
-if [[ "${1:-}" != "--skip-update" ]] && [[ -t 0 ]]; then
+# Self-update unless explicitly skipped, but only when running interactively (TTY).
+# Uninstall intentionally uses the local copy so cleanup never turns into install
+# if an older remote copy does not know the new mode yet.
+PMSS_MEDIA_STACK_SELF_UPDATE=1
+for pmss_media_stack_arg in "$@"; do
+	case "$pmss_media_stack_arg" in
+	--skip-update | --uninstall) PMSS_MEDIA_STACK_SELF_UPDATE=0 ;;
+	esac
+done
+unset pmss_media_stack_arg
+
+if [[ $PMSS_MEDIA_STACK_SELF_UPDATE -eq 1 && -t 0 ]]; then
 	REMOTE_RAW_URL="https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/main/etc/skel/install-media-stack.sh"
 	tmp=$(mktemp) || true
 	if [[ -n "$tmp" ]]; then
@@ -70,6 +80,11 @@ set -euo pipefail # Exit on error, undefined vars, pipe failures
 # Defaults
 DRY_RUN=0
 VERIFY_ONLY=0
+FORCE_INSTALL=0
+UNINSTALL=0
+MEDIA_STACK_MIN_MEMORY_MIB=1024
+MEDIA_STACK_MIN_MEMORY_BYTES=$((MEDIA_STACK_MIN_MEMORY_MIB * 1024 * 1024))
+MEDIA_STACK_UNLIMITED_MEMORY_BYTES=$((1024 * 1024 * 1024 * 1024 * 1024))
 
 # Overrides (initialized empty)
 OVR_SONARR_URL=""
@@ -112,6 +127,8 @@ Overrides:
 Modes:
   --dry-run                   Verify endpoints and show actions; do not modify system
   --verify-only               Only verify URLs (alias: implies --dry-run) and exit
+  --force                     Continue below the ${MEDIA_STACK_MIN_MEMORY_MIB} MiB memory guard
+  --uninstall                 Stop media-stack sessions and remove PMSS-managed files
 USAGE
 }
 
@@ -122,6 +139,8 @@ for arg in "$@"; do
 		exit 0
 		;;
 	--dry-run) DRY_RUN=1 ;;
+	--force) FORCE_INSTALL=1 ;;
+	--uninstall) UNINSTALL=1 ;;
 	--verify-only)
 		VERIFY_ONLY=1
 		DRY_RUN=1
@@ -708,6 +727,261 @@ append_to_bashrc_custom_if_missing() {
 	fi
 }
 
+media_stack_memory_value_is_finite() {
+	local value="$1"
+
+	[[ "$value" =~ ^[0-9]+$ ]] || return 1
+	if ((value > 0 && value < MEDIA_STACK_UNLIMITED_MEMORY_BYTES)); then
+		return 0
+	fi
+	return 1
+}
+
+media_stack_cgroup_limit_file_read() {
+	local path="$1" value=""
+
+	[[ -r "$path" ]] || return 0
+	read -r value <"$path" || true
+	if media_stack_memory_value_is_finite "$value"; then
+		printf '%s\n' "$value"
+	fi
+}
+
+media_stack_cgroup_limits_from_path() {
+	local base="$1" rel="$2" file dir
+
+	rel="/${rel#/}"
+	while :; do
+		dir="${base%/}${rel}"
+		for file in "${@:3}"; do
+			media_stack_cgroup_limit_file_read "$dir/$file"
+		done
+		[[ "$rel" == "/" ]] && break
+		rel=$(dirname "$rel")
+		[[ "$rel" == "." ]] && rel="/"
+	done
+}
+
+media_stack_detected_memory_limit_bytes() {
+	local cgroup_file="${PMSS_MEDIA_STACK_CGROUP_FILE:-/proc/self/cgroup}"
+	local cgroup_root="${PMSS_MEDIA_STACK_CGROUP_ROOT:-/sys/fs/cgroup}"
+	local hierarchy controllers rel candidate min_limit=""
+
+	[[ -r "$cgroup_file" ]] || return 0
+	while IFS=: read -r hierarchy controllers rel; do
+		: "$hierarchy"
+		[[ -n "$rel" ]] || continue
+		if [[ "$controllers" == "" ]]; then
+			while read -r candidate; do
+				[[ -n "$candidate" ]] || continue
+				if [[ -z "$min_limit" || "$candidate" -lt "$min_limit" ]]; then
+					min_limit="$candidate"
+				fi
+			done < <(media_stack_cgroup_limits_from_path "$cgroup_root" "$rel" memory.high memory.max)
+		elif [[ ",$controllers," == *",memory,"* ]]; then
+			while read -r candidate; do
+				[[ -n "$candidate" ]] || continue
+				if [[ -z "$min_limit" || "$candidate" -lt "$min_limit" ]]; then
+					min_limit="$candidate"
+				fi
+			done < <(media_stack_cgroup_limits_from_path "$cgroup_root/memory" "$rel" memory.soft_limit_in_bytes memory.limit_in_bytes)
+		fi
+	done <"$cgroup_file"
+
+	if [[ -n "$min_limit" ]]; then
+		printf '%s\n' "$min_limit"
+	fi
+	return 0
+}
+
+media_stack_memory_limit_mib_label() {
+	local bytes="$1"
+	printf '%s' $(((bytes + 1048575) / 1048576))
+}
+
+media_stack_memory_preflight_guard() {
+	local limit_bytes="" limit_mib=""
+
+	limit_bytes=$(media_stack_detected_memory_limit_bytes || true)
+	if [[ -z "$limit_bytes" ]]; then
+		log_warn "Could not detect account memory limit; continuing without memory pre-flight enforcement."
+		return 0
+	fi
+
+	limit_mib=$(media_stack_memory_limit_mib_label "$limit_bytes")
+	if ((limit_bytes >= MEDIA_STACK_MIN_MEMORY_BYTES)); then
+		log_info "Detected account memory limit: ${limit_mib} MiB"
+		return 0
+	fi
+
+	log_warn "Detected account memory limit: ${limit_mib} MiB"
+	log_warn "This media stack needs roughly ${MEDIA_STACK_MIN_MEMORY_MIB} MiB or more to run without throttling the account."
+	log_warn "On low-memory shared plans it can stall rtorrent and the web panel."
+
+	if [[ $DRY_RUN -eq 1 ]]; then
+		log_warn "Dry-run mode: reporting memory warning without blocking."
+		return 0
+	fi
+	if [[ $FORCE_INSTALL -eq 1 ]]; then
+		log_warn "--force supplied; continuing despite the memory warning."
+		return 0
+	fi
+	if [[ -t 0 ]]; then
+		printf "Continue anyway? (y/N): "
+		read -r confirm
+		[[ $confirm == [yY] ]] && return 0
+	fi
+
+	log_err "Aborting. Re-run with --force only if you accept the memory throttling risk."
+	exit 1
+}
+
+media_stack_managed_path_allowed() {
+	case "$1" in
+	"$HOME/.bin/cloudplow" | "$HOME/.bin/sabnzbd" | "$HOME/.bin/Radarr" | "$HOME/.bin/Prowlarr" | "$HOME/.bin/Sonarr" | "$HOME/.bin/dotnet" | "$HOME/.bin/jellyfin" | "$HOME/.config/cloudplow" | "$HOME/.config/sabnzbd" | "$HOME/.config/radarr" | "$HOME/.config/prowlarr" | "$HOME/.config/sonarr" | "$HOME/.config/jellyfin" | "$HOME/.lighttpd/custom.d/media-stack.conf")
+		return 0
+		;;
+	esac
+	return 1
+}
+
+media_stack_managed_path_remove() {
+	local path="$1" home_real="" parent_real=""
+
+	if ! media_stack_home_path_is_safe || ! media_stack_managed_path_allowed "$path"; then
+		log_err "Refusing to remove unmanaged media stack path: $path"
+		return 1
+	fi
+	if command -v realpath >/dev/null 2>&1; then
+		home_real=$(realpath -m "$HOME")
+		parent_real=$(realpath -m "$(dirname "$path")")
+		if [[ "$parent_real" != "$home_real" && "$parent_real" != "$home_real/"* ]]; then
+			log_err "Refusing to remove media stack path with unsafe parent: $path"
+			return 1
+		fi
+	fi
+	if [[ $DRY_RUN -eq 1 ]]; then
+		log_info "[dry-run] would remove $path"
+		return 0
+	fi
+	rm -rf -- "$path"
+}
+
+bashrc_custom_media_stack_blocks_strip() {
+	local target="$HOME/.bashrc.custom" backup="" temp=""
+
+	[[ -f "$target" ]] || {
+		log_info "No ~/.bashrc.custom found; alias cleanup not needed."
+		return 0
+	}
+	if [[ $DRY_RUN -eq 1 ]]; then
+		log_info "[dry-run] would backup and strip PMSS media stack blocks from ~/.bashrc.custom"
+		return 0
+	fi
+
+	backup="$target.pmss-media-stack.$(date +%Y%m%d%H%M%S).bak"
+	temp="$target.pmss.$$"
+	if ! cp "$target" "$backup"; then
+		log_err "Failed to backup ~/.bashrc.custom"
+		return 1
+	fi
+
+	if ! awk '
+    function flush_pending(i) {
+      for (i = 1; i <= pending_count; i++) print pending[i]
+      pending_count = 0
+    }
+    function terminal(mode, line) {
+      return (mode == "dotnet" && line == "export PATH") ||
+        (mode == "jellyfin" && line ~ /^alias jellyfin=/) ||
+        (mode == "media" && line ~ /^alias sabnzbd=/)
+    }
+    {
+      if (skip != "") {
+        pending[++pending_count] = $0
+        if (terminal(skip, $0)) {
+          skip = ""
+          pending_count = 0
+        }
+        next
+      }
+      if ($0 == "# Added by PMSS media stack installer (.NET 8)") {
+        skip = "dotnet"
+        pending_count = 1
+        pending[1] = $0
+        next
+      }
+      if ($0 == "# PMSS Jellyfin alias (updated Nov 2025)") {
+        skip = "jellyfin"
+        pending_count = 1
+        pending[1] = $0
+        next
+      }
+      if ($0 == "# PMSS Media stack aliases (updated Nov 2025)") {
+        skip = "media"
+        pending_count = 1
+        pending[1] = $0
+        next
+      }
+      print
+    }
+    END {
+      flush_pending()
+    }
+  ' "$target" >"$temp"; then
+		rm -f "$temp"
+		log_err "Failed to strip PMSS media stack blocks from ~/.bashrc.custom"
+		return 1
+	fi
+
+	mv "$temp" "$target"
+	chmod 0640 "$target" 2>/dev/null || true
+	log_info "Backed up ~/.bashrc.custom to $(basename "$backup")"
+}
+
+media_stack_uninstall() {
+	local app username managed_path
+	local managed_paths=(
+		"$HOME/.bin/cloudplow"
+		"$HOME/.bin/sabnzbd"
+		"$HOME/.bin/Radarr"
+		"$HOME/.bin/Prowlarr"
+		"$HOME/.bin/Sonarr"
+		"$HOME/.bin/dotnet"
+		"$HOME/.bin/jellyfin"
+		"$HOME/.config/cloudplow"
+		"$HOME/.config/sabnzbd"
+		"$HOME/.config/radarr"
+		"$HOME/.config/prowlarr"
+		"$HOME/.config/sonarr"
+		"$HOME/.config/jellyfin"
+		"$HOME/.lighttpd/custom.d/media-stack.conf"
+	)
+
+	username=$(whoami)
+	log_step "Uninstalling PMSS media stack"
+	if [[ $DRY_RUN -eq 0 ]]; then
+		for app in jellyfin sabnzbd radarr prowlarr sonarr cloudplow jellyfin-smoke; do
+			if command -v tmux >/dev/null 2>&1; then
+				tmux kill-session -t "$app" 2>/dev/null || true
+			fi
+		done
+		if command -v pkill >/dev/null 2>&1; then
+			for app in jellyfin.dll SABnzbd.py Radarr.dll Prowlarr.dll Sonarr.dll cloudplow.py; do
+				pkill -9 -f -u "$username" "$app" >/dev/null 2>&1 || true
+			done
+		fi
+	else
+		log_info "[dry-run] would stop media stack tmux sessions and app processes"
+	fi
+
+	for managed_path in "${managed_paths[@]}"; do
+		media_stack_managed_path_remove "$managed_path"
+	done
+	bashrc_custom_media_stack_blocks_strip
+	log_ok "PMSS media stack uninstall complete."
+}
+
 # Central configuration (keep multi-use constants here)
 SONARR_BRANCH="${OVR_SONARR_BRANCH:-main}"
 RADARR_BRANCH="${OVR_RADARR_BRANCH:-master}"
@@ -727,6 +1001,11 @@ MEDIA_STACK_BASE_SESSIONS=(sonarr radarr prowlarr sabnzbd cloudplow)
 MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow)
 # Determine public IP from default route (no external HTTP request needed)
 PUBLIC_IP=$(ip -4 route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "unavailable")
+
+if [[ $UNINSTALL -eq 1 ]]; then
+	media_stack_uninstall
+	exit 0
+fi
 
 # Check required dependencies early
 log_step "Checking dependencies..."
@@ -751,6 +1030,7 @@ if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
 fi
 
 log_ok "All required dependencies found"
+media_stack_memory_preflight_guard
 
 # Fetch latest checksums for download verification
 [[ $DRY_RUN -eq 0 ]] && fetch_checksums_file

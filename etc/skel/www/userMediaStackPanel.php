@@ -27,15 +27,158 @@ function pmssMediaStackPanelDirectoryPopulated(string $path): bool
 }
 
 /**
+ * Return the installer memory floor used by both panel messaging and shell.
+ */
+function pmssMediaStackPanelMemoryMinimumBytes(): int
+{
+    return 1024 * 1024 * 1024;
+}
+
+/**
+ * Treat kernel sentinel values above this as unlimited for pre-flight checks.
+ */
+function pmssMediaStackPanelMemoryUnlimitedBytes(): int
+{
+    return 1024 * 1024 * 1024 * 1024 * 1024;
+}
+
+/**
+ * Read one cgroup memory limit file and ignore unlimited/sentinel values.
+ */
+function pmssMediaStackPanelMemoryLimitFileRead(string $path): ?int
+{
+    $raw = @file_get_contents($path);
+    if (!is_string($raw)) {
+        return null;
+    }
+
+    $value = trim($raw);
+    if ($value === '' || !ctype_digit($value)) {
+        return null;
+    }
+
+    $bytes = (int) $value;
+    if ($bytes <= 0 || $bytes >= pmssMediaStackPanelMemoryUnlimitedBytes()) {
+        return null;
+    }
+
+    return $bytes;
+}
+
+/**
+ * Walk a cgroup path upward so parent slice limits are honored.
+ *
+ * @param array<int,string> $filenames
+ * @return array<int,int>
+ */
+function pmssMediaStackPanelCgroupMemoryLimitsRead(string $root, string $relativePath, array $filenames): array
+{
+    $limits = array();
+    $relativePath = '/'.ltrim($relativePath, '/');
+    $root = rtrim($root, '/');
+
+    while (true) {
+        $dir = $root.$relativePath;
+        foreach ($filenames as $filename) {
+            $limit = pmssMediaStackPanelMemoryLimitFileRead($dir.'/'.$filename);
+            if ($limit !== null) {
+                $limits[] = $limit;
+            }
+        }
+
+        if ($relativePath === '/') {
+            break;
+        }
+
+        $parent = dirname($relativePath);
+        $relativePath = ($parent === '.' || $parent === '') ? '/' : $parent;
+    }
+
+    return $limits;
+}
+
+/**
+ * Detect the current account cgroup memory limit from v2 or v1 files.
+ */
+function pmssMediaStackPanelMemoryLimitBytesRead(): ?int
+{
+    $cgroupFile = getenv('PMSS_MEDIA_STACK_CGROUP_FILE');
+    $cgroupRoot = getenv('PMSS_MEDIA_STACK_CGROUP_ROOT');
+    $cgroupFile = is_string($cgroupFile) && $cgroupFile !== '' ? $cgroupFile : '/proc/self/cgroup';
+    $cgroupRoot = is_string($cgroupRoot) && $cgroupRoot !== '' ? $cgroupRoot : '/sys/fs/cgroup';
+
+    $lines = @file($cgroupFile, FILE_IGNORE_NEW_LINES);
+    if (!is_array($lines)) {
+        return null;
+    }
+
+    $limits = array();
+    foreach ($lines as $line) {
+        $parts = explode(':', (string) $line, 3);
+        if (count($parts) !== 3 || $parts[2] === '') {
+            continue;
+        }
+
+        if ($parts[1] === '') {
+            $limits = array_merge($limits, pmssMediaStackPanelCgroupMemoryLimitsRead($cgroupRoot, $parts[2], array('memory.high', 'memory.max')));
+            continue;
+        }
+
+        if (in_array('memory', explode(',', $parts[1]), true)) {
+            $limits = array_merge($limits, pmssMediaStackPanelCgroupMemoryLimitsRead($cgroupRoot.'/memory', $parts[2], array('memory.soft_limit_in_bytes', 'memory.limit_in_bytes')));
+        }
+    }
+
+    return $limits === array() ? null : min($limits);
+}
+
+/**
+ * Build the customer-facing memory pre-flight status.
+ *
+ * @return array{ok:bool,message:string,limitBytes:?int,minimumBytes:int}
+ */
+function pmssMediaStackPanelMemoryPreflightRead(): array
+{
+    $minimum = pmssMediaStackPanelMemoryMinimumBytes();
+    $limit = pmssMediaStackPanelMemoryLimitBytesRead();
+    if ($limit === null) {
+        return array(
+            'ok' => true,
+            'message' => 'Account memory limit could not be detected; SSH install will perform the same check.',
+            'limitBytes' => null,
+            'minimumBytes' => $minimum,
+        );
+    }
+
+    if ($limit >= $minimum) {
+        return array(
+            'ok' => true,
+            'message' => 'Detected account memory limit: '.pmssFormatBytes($limit, 0, 2, true).'.',
+            'limitBytes' => $limit,
+            'minimumBytes' => $minimum,
+        );
+    }
+
+    return array(
+        'ok' => false,
+        'message' => 'Media stack needs about '.pmssFormatBytes($minimum, 0, 2, true).' of memory; this account is limited to '.pmssFormatBytes($limit, 0, 2, true).'. Use SSH with install-media-stack.sh --force only if you accept the throttling risk.',
+        'limitBytes' => $limit,
+        'minimumBytes' => $minimum,
+    );
+}
+
+/**
  * Gate web installs to the first run so the wrapper never hangs on prompts.
  *
  * @return array{ok:bool,message:string}
  */
 function pmssMediaStackPanelStartGateRead(string $home): array
 {
+    $memory = pmssMediaStackPanelMemoryPreflightRead();
     foreach (array(
         array(!is_file(pmssMediaStackPanelHomePath($home, 'install-media-stack.sh')), 'Media stack installer is missing from this account.'),
         array(!pmssFrontendShellExecAvailable(), 'PHP shell execution is unavailable on this host.'),
+        array(!$memory['ok'], $memory['message']),
         array(pmssMediaStackPanelDirectoryPopulated(pmssMediaStackPanelHomePath($home, '.bin')), 'Web install is limited to the first run because existing ~/.bin content triggers interactive prompts.'),
         array(pmssMediaStackPanelDirectoryPopulated(pmssMediaStackPanelHomePath($home, '.config/jellyfin')), 'Web install is limited to the first run because existing Jellyfin data must be reviewed over SSH.'),
     ) as $gate) {

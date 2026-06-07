@@ -6,6 +6,11 @@ require_once dirname(__DIR__, 4).'/etc/skel/www/userMediaStackPanel.php';
 
 class MediaStackPanelTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        $this->pmssTrackEnvOverrides($this->mediaStackCgroupV2Fixture(2 * 1024 * 1024 * 1024));
+    }
+
     private function mediaHomeCreate(string $prefix): string
     {
         $home = $this->pmssMakeTempDir($prefix);
@@ -47,6 +52,47 @@ class MediaStackPanelTest extends TestCase
 
         $this->assertSame('blocked', $status['state']);
         $this->assertFalse($status['canStart']);
+    }
+
+    public function testStatusBlocksLowMemoryAccount(): void
+    {
+        $home = $this->mediaHomeCreate('pmss-media-blocked-memory-');
+        $fixture = $this->mediaStackCgroupV2Fixture(512 * 1024 * 1024);
+
+        $this->pmssWithEnv($fixture, function () use ($home): void {
+            $status = \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
+
+            $this->assertSame('blocked', $status['state']);
+            $this->assertFalse($status['canStart']);
+            $this->assertStringContainsString('install-media-stack.sh --force', $status['message']);
+        });
+    }
+
+    public function testStatusAllowsAdequateMemoryAccount(): void
+    {
+        $home = $this->mediaHomeCreate('pmss-media-ready-memory-');
+        $fixture = $this->mediaStackCgroupV2Fixture(2 * 1024 * 1024 * 1024);
+
+        $this->pmssWithEnv($fixture, function () use ($home): void {
+            $status = \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
+
+            $this->assertSame('ready', $status['state']);
+            $this->assertTrue($status['canStart']);
+        });
+    }
+
+    public function testMemoryLimitReaderUsesParentV1CgroupLimit(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-media-cgroup-v1-');
+        $cgroupFile = $this->pmssWriteFile($root.'/proc-self-cgroup', "8:memory:/user.slice/user-1000.slice/session.scope\n");
+        $this->pmssWriteFile($root.'/memory/user.slice/user-1000.slice/memory.limit_in_bytes', (string) (768 * 1024 * 1024)."\n");
+
+        $this->pmssWithEnv(array(
+            'PMSS_MEDIA_STACK_CGROUP_FILE' => $cgroupFile,
+            'PMSS_MEDIA_STACK_CGROUP_ROOT' => $root,
+        ), function (): void {
+            $this->assertSame(768 * 1024 * 1024, \pmssMediaStackPanelMemoryLimitBytesRead());
+        });
     }
 
     public function testStartGateReportsMissingInstallerBeforePopulatedBin(): void
@@ -124,5 +170,18 @@ class MediaStackPanelTest extends TestCase
         $this->pmssWriteRelativeFile($home, $relativePath, $content);
 
         return \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
+    }
+
+    private function mediaStackCgroupV2Fixture(int $limitBytes): array
+    {
+        $root = $this->pmssMakeTempDir('pmss-media-cgroup-v2-');
+        $cgroupFile = $this->pmssWriteFile($root.'/proc-self-cgroup', "0::/user.slice/user-1000.slice/session.scope\n");
+        $this->pmssWriteFile($root.'/user.slice/user-1000.slice/session.scope/memory.high', "max\n");
+        $this->pmssWriteFile($root.'/user.slice/user-1000.slice/memory.high', (string) $limitBytes."\n");
+
+        return array(
+            'PMSS_MEDIA_STACK_CGROUP_FILE' => $cgroupFile,
+            'PMSS_MEDIA_STACK_CGROUP_ROOT' => $root,
+        );
     }
 }

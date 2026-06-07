@@ -15,6 +15,8 @@ All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to
 - Monolithic but structured: single file with small helpers for clarity and reuse.
 - Idempotent: re‑runs converge to the same state; dry‑run exists for verification.
 - Safe defaults: localhost binding; randomized high ports; aliases to launch in `tmux`.
+- Memory pre-flight: accounts below 1024 MiB are warned and must use `--force` from SSH.
+- Uninstall path: `--uninstall` stops media-stack sessions, removes PMSS-managed app/config paths, and backs up/strips managed shell aliases.
 - Logging: colored console output and log tee to `~/.install-media-stack.log`.
 
 ## Web Panel Wrapper
@@ -61,6 +63,8 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
   - `--skip-update`        Skip self‑update from GitHub
   - `--dry-run`            Verify URLs and show actions; do not change the system
   - `--verify-only`        Only verify URLs (alias to `--dry-run`) and exit early
+  - `--force`              Continue below the 1024 MiB account-memory guard
+  - `--uninstall`          Remove the PMSS-managed media stack from this account
 
 - Sonarr
   - `--sonarr-url=URL`     Use exact URL
@@ -152,14 +156,25 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 
 ## Operations & Safety
 - The script preserves unrelated `~/.bin` contents on reruns and refreshes only PMSS-managed media-stack paths in place.
+- The full stack is not suitable for very small shared-hosting memory budgets. If the detected account cgroup limit is below 1024 MiB, the installer warns and aborts unless run interactively with confirmation or explicitly with `--force`. The welcome-page wrapper surfaces the same warning and does not force installs from the browser.
 - The script still prompts before removing existing Jellyfin state because stale config can hang reruns and the deletion is destructive.
 - Media-stack ports are still chosen locally from `10000-65000`; they are not yet registered with `scripts/util/portManager.php`.
 - All app binds are `127.0.0.1`. Exposure to the Internet is not supported without proper SSL/reverse proxy hardening.
 - Conflicts with global `/opt` installs may occur; this is a per‑user stack by design.
 
+## Uninstall
+Run from SSH:
+
+- `bash install-media-stack.sh --uninstall`
+- Add `--dry-run` to preview the cleanup without removing files.
+
+The uninstall mode stops the media-stack `tmux` sessions, removes only the PMSS-managed app directories under `~/.bin`, removes the matching config directories under `~/.config`, removes `~/.lighttpd/custom.d/media-stack.conf`, and backs up `~/.bashrc.custom` before stripping the installer-managed alias/PATH blocks. It does not remove unrelated files from `~/.bin`, `~/.config`, or user-owned lighttpd custom fragments.
+
 ## Troubleshooting
 - Check `~/.install-media-stack.log` for a full run transcript.
 - Use `--dry-run` to verify endpoint reachability and planned actions.
+- If the installer reports a low memory limit, use a larger plan for the full stack. `--force` is available for deliberate SSH-only installs, but throttling can make rtorrent and the panel unresponsive on small accounts.
+- Use `--uninstall` to remove a user-local media stack that was installed on an unsuitable account.
 - If Servarr apps fail to start on Debian 11 due to sqlite/GLIBC errors, confirm Radarr pinning occurred or pass `--radarr-version=v5.10.4.9218`.
 - If Jellyfin is skipped or exits immediately with an FFmpeg validation error, verify `~/.config/jellyfin/config/system.xml` points to a usable FFmpeg 4.4+ binary. On Debian 11, install a user-local static build under `~/.bin/ffmpeg` and rerun with `--jellyfin-ffmpeg=$HOME/.bin/ffmpeg`. Follow `docs/hardware-transcoding.md` for driver and acceleration troubleshooting.
 
