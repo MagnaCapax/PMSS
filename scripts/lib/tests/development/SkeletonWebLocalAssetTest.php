@@ -15,7 +15,7 @@ class SkeletonWebLocalAssetTest extends TestCase
 
     public function testBundledScreenStylesheetKeepsWelcomePanelCompact(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'etc/skel/www/screen.css',
             [
                 'font-size: 13px;',
@@ -26,37 +26,29 @@ class SkeletonWebLocalAssetTest extends TestCase
                 'font-size: 0.8rem;',
                 'height: 12px;',
             ],
-            'Missing compact welcome stylesheet rule: '
-        );
-
-        $this->pmssAssertRepoFileNotContainsStrings(
-            'etc/skel/www/screen.css',
             [
                 'padding: 24px 16px;',
                 'gap: 24px;',
                 'font-size: 2rem;',
                 'font-size: 1.05rem;',
                 'padding: 9px 14px;',
-            ],
-            'Large welcome stylesheet rule should not return: '
+            ]
         );
     }
 
     public function testIndexLocalFallbackUsesBundledTabsAssets(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'etc/skel/www/index.php',
             [
                 '<script src="pmssTabs.js"></script>',
                 '<link rel="stylesheet" href="jquery.tabs.css"',
             ],
-            'Missing local tabs asset reference: '
+            [
+                'static.pulsedmedia.com/jquery.tabs.pack.js',
+                'static.pulsedmedia.com/jquery.tabs.css',
+            ]
         );
-
-        $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/index.php', [
-            'static.pulsedmedia.com/jquery.tabs.pack.js',
-            'static.pulsedmedia.com/jquery.tabs.css',
-        ], 'index.php should not depend on remote tabs assets: ');
     }
 
     public function testLocalTabsHelperAddsNavigationClass(): void
@@ -76,7 +68,7 @@ class SkeletonWebLocalAssetTest extends TestCase
 
     public function testIndexTabsOverrideLegacySpriteGeometry(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'etc/skel/www/index.php',
             [
                 'top: 34px;',
@@ -89,11 +81,12 @@ class SkeletonWebLocalAssetTest extends TestCase
                 'background-image: none;',
                 'var offsetHeight = -34;',
             ],
-            'Missing tab geometry override: '
+            []
         );
 
-        $this->pmssAssertRepoFileNotContainsStrings(
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'etc/skel/www/jquery.tabs.css',
+            [],
             [
                 'background: url(tab.png) no-repeat;',
                 'background-position:',
@@ -103,8 +96,7 @@ class SkeletonWebLocalAssetTest extends TestCase
                 'min-height: 18px;',
                 'padding-top: 6px;',
                 'padding-right: 0;',
-            ],
-            'Legacy sprite tab geometry should not constrain flex tabs: '
+            ]
         );
     }
 

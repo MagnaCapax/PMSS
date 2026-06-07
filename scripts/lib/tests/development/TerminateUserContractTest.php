@@ -72,7 +72,7 @@ final class TerminateUserContractTest extends TestCase
 
     public function testTerminateUserReclaimsExactRecreateBackupDir(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'scripts/terminateUser.php',
             [
                 'function pmssTerminateUserMoveBackupForReclaim',
@@ -83,7 +83,10 @@ final class TerminateUserContractTest extends TestCase
                 "'queue_user_backup_reclaim'",
                 'pmssUserHomeReclaimLaunchCommand($backupReclaimPath)',
             ],
-            'terminateUser.php should reclaim the exact recreateUser backup dir: '
+            [
+                '/home/backup-*',
+                'glob(',
+            ]
         );
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'scripts/terminateUser.php',
@@ -94,14 +97,6 @@ final class TerminateUserContractTest extends TestCase
             ],
             'terminateUser.php should define backup reclaim flow: ',
             'terminateUser.php should queue backup reclaim before nginx cleanup: '
-        );
-        $this->pmssAssertRepoFileNotContainsStrings(
-            'scripts/terminateUser.php',
-            [
-                '/home/backup-*',
-                'glob(',
-            ],
-            'terminateUser.php must not sweep backup prefixes: '
         );
     }
 
@@ -151,17 +146,12 @@ final class TerminateUserContractTest extends TestCase
 
     public function testTerminateUserFinalCleanupDoesNotDeleteActiveHomeName(): void
     {
-        $this->pmssAssertRepoFileContainsString(
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'scripts/terminateUser.php',
-            "'remove_nginx_user'",
-            'terminateUser.php should still clean nginx user config: '
-        );
-        $this->pmssAssertRepoFileNotContainsStrings(
-            'scripts/terminateUser.php',
+            ["'remove_nginx_user'"],
             [
                 'escapeshellarg("/home/{$username}")',
-            ],
-            'terminateUser.php final cleanup must not target a potentially re-created active home: '
+            ]
         );
     }
 
@@ -187,7 +177,7 @@ final class TerminateUserContractTest extends TestCase
 
     public function testTerminateUserDryRunGuardsDirectCleanupMutations(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'scripts/terminateUser.php',
             [
                 'function pmssTerminateUserUnlinkPath',
@@ -197,22 +187,17 @@ final class TerminateUserContractTest extends TestCase
                 '} elseif ($dryRun) {',
                 "'status'  => 'SKIP'",
             ],
-            'terminateUser.php should route direct cleanup through dry-run-aware helpers: '
+            [
+                '@unlink("/etc/nginx/users/{$username}")',
+                'unlink($filePath)',
+                'rmdir($portsBase)',
+            ]
         );
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'scripts/terminateUser.php',
             ['} elseif ($dryRun) {', '$db->removeUser($username);'],
             'terminateUser.php should guard DB removal: ',
             'terminateUser.php should check dry-run before DB removal: '
-        );
-        $this->pmssAssertRepoFileNotContainsStrings(
-            'scripts/terminateUser.php',
-            [
-                '@unlink("/etc/nginx/users/{$username}")',
-                'unlink($filePath)',
-                'rmdir($portsBase)',
-            ],
-            'terminateUser.php should not keep unguarded cleanup mutation: '
         );
     }
 }

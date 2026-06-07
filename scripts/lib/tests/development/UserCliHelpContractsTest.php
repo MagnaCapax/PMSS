@@ -73,9 +73,8 @@ final class UserCliHelpContractsTest extends TestCase
 
     public function testOperatorDocsStayAlignedWithStructuredHelp(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'docs/addUser.md',
-            [
+        $this->pmssAssertRepoFileContractCases([
+            'docs/addUser.md' => ['required' => [
                 'addUser.php USERNAME PASSWORD RAM_MiB DISK_QUOTA_GiB',
                 '--cpu-weight=WEIGHT',
                 '--io-latency-ms=MS',
@@ -84,11 +83,8 @@ final class UserCliHelpContractsTest extends TestCase
                 '250 MiB',
                 '--docker-enabled=true|false',
                 '/scripts/addUser.php alice rand 1024 200',
-            ]
-        );
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'docs/userConfig.md',
-            [
+            ]],
+            'docs/userConfig.md' => ['required' => [
                 './userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB',
                 '--welcome-message=HTML',
                 '--iops-limit=OPS',
@@ -98,7 +94,7 @@ final class UserCliHelpContractsTest extends TestCase
                 '1-10000',
                 '250 MiB',
                 '/scripts/util/userConfig.php alice 1024 200',
-            ]
-        );
+            ]],
+        ]);
     }
 }
