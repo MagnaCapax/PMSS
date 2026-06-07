@@ -31,6 +31,31 @@ class rtorrentWatchdogDecisionTest extends TestCase
         ], $paths);
     }
 
+    public function testClearResolvedWatchdogStatePreservesExistingMarkerSemantics(): void
+    {
+        $state = \rtorrentProcessWatchdogStatePaths($this->tempDir, 'alice');
+        foreach ($state as $path) {
+            file_put_contents($path, '1');
+        }
+
+        \rtorrentProcessClearResolvedWatchdogState($state, true, false);
+        $this->assertFalse(file_exists($state['missing']), 'missing marker clears once rtorrent is present');
+        $this->assertTrue(file_exists($state['acceptQueueWedge']), 'queue wedge marker remains while rtorrent is present');
+        foreach (['startMarker', 'startFailure', 'sessionReset', 'escalation'] as $key) {
+            $this->assertFalse(file_exists($state[$key]), $key.' clears once start path has resolved');
+        }
+
+        foreach ($state as $path) {
+            file_put_contents($path, '1');
+        }
+        \rtorrentProcessClearResolvedWatchdogState($state, false, false);
+        $this->assertFalse(file_exists($state['missing']), 'missing marker clears when no executor remains');
+        $this->assertFalse(file_exists($state['acceptQueueWedge']), 'queue wedge marker clears when rtorrent is gone');
+        foreach (['startMarker', 'startFailure', 'sessionReset', 'escalation'] as $key) {
+            $this->assertTrue(file_exists($state[$key]), $key.' remains until a process or executor appears');
+        }
+    }
+
     public function testGraceStateUsesBaseGraceWithoutRestartMarker(): void
     {
         $state = \rtorrentProcessUnresponsiveGraceState($this->tempDir.'/missing', 120, 1000);

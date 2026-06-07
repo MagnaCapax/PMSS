@@ -9,6 +9,7 @@ class checkRtorrentRestartGraceContractTest extends TestCase
     {
         $watchdog = 'scripts/cron/checkRtorrent.php';
         $process = 'scripts/lib/rtorrent/process.php';
+        $watchdogState = 'scripts/lib/rtorrent/watchdogState.php';
 
         $this->pmssAssertRepoFileContainsAllStrings(
             $watchdog,
@@ -22,9 +23,15 @@ class checkRtorrentRestartGraceContractTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings(
             $process,
             [
-                'function rtorrentProcessUnresponsiveGraceState(',
+                "require_once __DIR__.'/watchdogState.php';",
                 'function rtorrentProcessStart(',
                 "'/tmp/.pmss-rtorrent-restart-'.\$user",
+            ]
+        );
+        $this->pmssAssertRepoFileContainsAllStrings(
+            $watchdogState,
+            [
+                'function rtorrentProcessUnresponsiveGraceState(',
                 '$restartAge < 7200',
                 '$restartAge < 14400',
                 'max($baseGrace, 600)',
