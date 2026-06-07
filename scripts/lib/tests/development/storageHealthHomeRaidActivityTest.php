@@ -11,14 +11,8 @@ class StorageHealthHomeRaidActivityTest extends TestCase
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tmpDir', 'pmss-storage-health-home-', 0700);
-        @mkdir($this->tmpDir.'/sys/class/block', 0700, true);
-        @mkdir($this->tmpDir.'/dev/mapper', 0700, true);
-    }
-
-    protected function tearDown(): void
-    {
-        $this->cleanup($this->tmpDir);
-        $this->tmpDir = '';
+        $this->pmssEnsureDir($this->tmpDir.'/sys/class/block', 0700);
+        $this->pmssEnsureDir($this->tmpDir.'/dev/mapper', 0700);
     }
 
     public function testParsesRaidActivitySummaryDetails(): void

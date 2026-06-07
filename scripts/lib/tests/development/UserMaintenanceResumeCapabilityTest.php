@@ -16,19 +16,15 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
 {
     public function testMarkerSkipsSameSignatureAndInvalidatesOnChange(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-urefresh-'.bin2hex(random_bytes(4));
-        putenv('PMSS_USER_REFRESH_STATE_DIR='.$dir);
-        try {
+        $dir = $this->pmssMakeTempDir('pmss-urefresh-', 0700);
+        $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $dir], function (): void {
             $sig = pmssUserRefreshSignature('skel-sha-A');
             $this->assertTrue(!pmssUserRefreshAlreadyDone('alice', $sig), 'fresh user must not be marked done');
             pmssUserRefreshMarkDone('alice', $sig);
             $this->assertTrue(pmssUserRefreshAlreadyDone('alice', $sig), 'same-signature re-run must skip the user');
             $sig2 = pmssUserRefreshSignature('skel-sha-B');
             $this->assertTrue(!pmssUserRefreshAlreadyDone('alice', $sig2), 'version/skel change must invalidate → full refresh');
-        } finally {
-            putenv('PMSS_USER_REFRESH_STATE_DIR');
-            if (is_dir($dir)) { @array_map('unlink', glob($dir.'/*') ?: []); @rmdir($dir); }
-        }
+        });
     }
 
     public function testMarkerRejectsInvalidUsernameBeforeFilesystemWrite(): void

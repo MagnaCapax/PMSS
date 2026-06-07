@@ -8,11 +8,9 @@ require_once dirname(__DIR__, 3).'/lib/userTransfer.php';
  */
 class UserTransferTest extends TestCase
 {
-    public function tearDown(): void
+    public function setUp(): void
     {
-        putenv('PMSS_HOME_DIR');
-        putenv('PMSS_DRY_RUN');
-        putenv('PMSS_LOG_DIR');
+        $this->pmssTrackEnvKeys(['PMSS_HOME_DIR', 'PMSS_DRY_RUN', 'PMSS_LOG_DIR']);
     }
 
     public function testHostnameValidationAcceptsExpectedNames(): void
@@ -335,10 +333,8 @@ SNAP;
 
     public function testRewriteRtorrentSessionPathsUpdatesSessionFilesForUserRename(): void
     {
-        $base = sys_get_temp_dir().'/pmss-userTransfer-session-rewrite-'.uniqid('', true);
-        $home = $base.'/home/newuser';
+        $home = $this->pmssMakeUserHomeTree('pmss-userTransfer-session-rewrite-', 'session', 'home/newuser');
         $sessionDir = $home.'/session';
-        @mkdir($sessionDir, 0755, true);
 
         $sessionFile = $sessionDir.'/test.torrent.rtorrent';
         $oldPath = '/home/olduser/data/movie';
@@ -359,22 +355,24 @@ SNAP;
 
     public function testRewriteRtorrentSessionPathsReportsWhenNothingNeedsRewrite(): void
     {
-        $base = sys_get_temp_dir().'/pmss-userTransfer-session-nochange-'.uniqid('', true);
+        $base = $this->pmssMakeTempDir('pmss-userTransfer-session-nochange-');
         $home = $base.'/home/newuser';
         $sessionDir = $home.'/session';
         $logDir = $base.'/logs';
-        @mkdir($sessionDir, 0755, true);
-        @mkdir($logDir, 0755, true);
+        $this->pmssEnsureDir($sessionDir);
+        $this->pmssEnsureDir($logDir);
 
         $path = '/home/another/data/movie';
         file_put_contents($sessionDir.'/test.torrent.rtorrent', 'd9:directory'.strlen($path).':'.$path.'e');
-        putenv('PMSS_LOG_DIR='.$logDir);
 
-        list(, $output) = $this->pmssCaptureStdout(function () use ($home): void {
-            \pmssUserTransferRewriteRtorrentSessionPaths([
-                'localUser' => 'newuser',
-                'remoteUser' => 'olduser',
-            ], $home);
+        $output = '';
+        $this->pmssWithEnv(['PMSS_LOG_DIR' => $logDir], function () use ($home, &$output): void {
+            list(, $output) = $this->pmssCaptureStdout(function () use ($home): void {
+                \pmssUserTransferRewriteRtorrentSessionPaths([
+                    'localUser' => 'newuser',
+                    'remoteUser' => 'olduser',
+                ], $home);
+            });
         });
 
         $this->assertStringContainsString('[INFO] rTorrent session rewrite found no /home path references to update', $output);
@@ -391,11 +389,11 @@ SNAP;
 
     public function testIsPathWithinHomeRejectsSymlinkEscapes(): void
     {
-        $base = sys_get_temp_dir().'/pmss-userTransfer-path-escape-'.uniqid('', true);
+        $base = $this->pmssMakeTempDir('pmss-userTransfer-path-escape-');
         $home = $base.'/home/testuser';
         $outside = $base.'/outside';
-        @mkdir($home, 0755, true);
-        @mkdir($outside, 0755, true);
+        $this->pmssEnsureDir($home);
+        $this->pmssEnsureDir($outside);
         file_put_contents($outside.'/secret', 'x');
 
         if (!function_exists('symlink') || @symlink($outside, $home.'/escape') === false) {
@@ -418,7 +416,7 @@ SNAP;
 
     public function testWriteFilePersistsPayloadAndMode(): void
     {
-        $path = sys_get_temp_dir().'/pmss-userTransfer-write-'.uniqid('', true);
+        $path = $this->pmssMakeTempPath('pmss-userTransfer-write-');
         \pmssUserTransferWriteFile($path, 'payload', 0600);
 
         $this->assertEquals('payload', (string) file_get_contents($path));
@@ -427,7 +425,7 @@ SNAP;
 
     public function testWriteFileThrowsWhenParentDirectoryIsMissing(): void
     {
-        $path = sys_get_temp_dir().'/pmss-userTransfer-missing-'.uniqid('', true).'/payload';
+        $path = $this->pmssMakeTempPath('pmss-userTransfer-missing-').'/payload';
 
         $this->assertThrowsRuntime(static function () use ($path): void {
             \pmssUserTransferWriteFile($path, 'payload', 0600);
@@ -436,26 +434,17 @@ SNAP;
 
     public function testWriteFileRejectsSymlinkTarget(): void
     {
-        $base = sys_get_temp_dir().'/pmss-userTransfer-symlink-'.uniqid('', true);
-        $realTarget = $base.'-real';
-        $target = $base.'-link';
+        $base = $this->pmssMakeTempDir('pmss-userTransfer-symlink-');
+        $realTarget = $base.'/real';
+        $target = $base.'/link';
         file_put_contents($realTarget, 'original');
         symlink($realTarget, $target);
 
-        try {
-            $this->assertThrowsRuntime(static function () use ($target): void {
-                \pmssUserTransferWriteFile($target, 'payload', 0600);
-            }, 'Failed writing: ');
+        $this->assertThrowsRuntime(static function () use ($target): void {
+            \pmssUserTransferWriteFile($target, 'payload', 0600);
+        }, 'Failed writing: ');
 
-            $this->assertEquals('original', (string) file_get_contents($realTarget));
-        } finally {
-            if (is_link($target) || file_exists($target)) {
-                @unlink($target);
-            }
-            if (file_exists($realTarget)) {
-                @unlink($realTarget);
-            }
-        }
+        $this->assertEquals('original', (string) file_get_contents($realTarget));
     }
 
     public function testSleepReturnsImmediatelyDuringDryRun(): void

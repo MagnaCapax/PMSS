@@ -16,16 +16,14 @@ class A00_JsonLogPathTest extends TestCase
     public function setUp(): void
     {
         $this->previousCorrelationId = getenv('PMSS_CORRELATION_ID');
+        $this->pmssTrackEnvKeys(['PMSS_JSON_LOG'], true);
         $this->resetCorrelationId();
+        $this->resetJsonLogPath();
     }
 
     public function tearDown(): void
     {
-        if ($this->previousCorrelationId === false || $this->previousCorrelationId === '') {
-            putenv('PMSS_CORRELATION_ID');
-        } else {
-            putenv('PMSS_CORRELATION_ID='.$this->previousCorrelationId);
-        }
+        $this->pmssRestoreEnv('PMSS_CORRELATION_ID', $this->previousCorrelationId, true);
         $this->resetCorrelationIdCache();
         $this->resetJsonLogPath();
     }

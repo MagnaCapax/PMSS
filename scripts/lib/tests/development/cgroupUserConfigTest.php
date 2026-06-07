@@ -42,6 +42,8 @@ class CgroupUserConfigTest extends TestCase
     private $sys;
     /** @var Manager|null */
     private $mgr;
+    /** @var string */
+    private $configDir = '';
 
     /**
      * Ensure the manager/system fixtures are initialised for the current test.
@@ -51,25 +53,23 @@ class CgroupUserConfigTest extends TestCase
      */
     private function ensureManager(): void
     {
+        if ($this->configDir === '') {
+            $this->pmssAssignTempDirProperty('configDir', 'pmss-cgroup-config-', 0700);
+            $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $this->configDir, 'PMSS_DRY_RUN' => null]);
+        }
+
         if ($this->sys === null || $this->mgr === null) {
             $this->sys = new MockSystem();
             $this->mgr = new Manager($this->sys);
-            putenv('PMSS_CONFIG_DIR=' . sys_get_temp_dir());
         }
     }
 
     protected function setUp(): void
     {
-        $this->sys = new MockSystem();
-        $this->mgr = new Manager($this->sys);
-        putenv('PMSS_CONFIG_DIR=' . sys_get_temp_dir());
-    }
-
-    protected function tearDown(): void
-    {
         $this->sys = null;
         $this->mgr = null;
-        @unlink(sys_get_temp_dir().'/cgroup.policy.php');
+        $this->configDir = '';
+        $this->ensureManager();
     }
 
     private function runMgr(array $args)
@@ -83,7 +83,8 @@ class CgroupUserConfigTest extends TestCase
 
     private function writePolicy(array $policy): void
     {
-        file_put_contents(sys_get_temp_dir().'/cgroup.policy.php', '<?php return '.var_export($policy, true).";\n");
+        $this->ensureManager();
+        $this->pmssWriteFile($this->configDir.'/cgroup.policy.php', '<?php return '.var_export($policy, true).";\n", 0700);
     }
 
     public function testUsage()
@@ -247,11 +248,7 @@ class CgroupUserConfigTest extends TestCase
     public function testApplyBuildsShellSafeIoPropertyArguments()
     {
         putenv('PMSS_DRY_RUN=1');
-        try {
-            $res = $this->runMgr(['testuser', '--apply', '--io-read-bw=/dev/sda:5M']);
-        } finally {
-            putenv('PMSS_DRY_RUN');
-        }
+        $res = $this->runMgr(['testuser', '--apply', '--io-read-bw=/dev/sda:5M']);
 
         $this->assertEquals(0, $res['rc']);
         $this->assertStringContainsString("'IOReadBandwidthMax=/dev/sda 5M'", $res['out']);

@@ -21,14 +21,8 @@ class UpdateUserFileSafeWriteTest extends TestCase
         $this->user = 'user'.bin2hex(random_bytes(2));
         $this->homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-userfile-');
 
-        $this->skelDirName = 'pmss-userfile-'.bin2hex(random_bytes(3));
-        $this->skelDirPath = $skelBase.'/'.$this->skelDirName;
-        @mkdir($this->skelDirPath, 0755, true);
-    }
-
-    protected function tearDown(): void
-    {
-        $this->cleanup($this->skelDirPath);
+        $this->pmssAssignTempDirProperty('skelDirPath', 'pmss-userfile', 0755, $skelBase);
+        $this->skelDirName = basename($this->skelDirPath);
     }
 
     public function testCreatesParentDirectoriesForMissingPath(): void
@@ -191,7 +185,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
     {
         $home = $this->homeRoot.'/'.$this->user;
         if (!is_dir($home)) {
-            @mkdir($home, 0755, true);
+            $this->pmssEnsureDir($home);
         }
         return $home;
     }
