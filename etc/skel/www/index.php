@@ -330,6 +330,22 @@ if (!getenv('PMSS_DISABLE_REMOTE_FRAMES')) {
     $useLocalFrames = true;
 }
 
+// On-load heal (remote guiFrames self-updater) may have overwritten guiv files
+// THIS request — including index.php itself. The executing index.php is the
+// pre-heal copy, so its wrapper renders stale until the next load. When the heal
+// reports it applied a fresh file ($pmssHealReload, set inside the eval'd payload),
+// redirect ONCE so the freshly-written wrapper renders now instead of one load later.
+// The pmssr=1 one-shot guard bounds this to a SINGLE redirect — never a loop — even
+// if a healed file fails to converge (e.g. a 0-byte write). The headers_sent() guard
+// degrades safely to the prior one-load-lag behaviour if output already started.
+if (!empty($pmssHealReload) && !headers_sent()
+        && strpos($_SERVER['REQUEST_URI'] ?? '', 'pmssr=') === false) {
+    $pmssReloadUri  = $_SERVER['REQUEST_URI'];
+    $pmssReloadUri .= (strpos($pmssReloadUri, '?') !== false) ? '&pmssr=1' : '?pmssr=1';
+    header('Location: ' . $pmssReloadUri, true, 302);
+    exit;
+}
+
 if ($useLocalFrames) {
     // Minimal local tab set used when remote frames are unavailable.
     // This keeps the familiar tabbed GUI layout even when pulsedmedia.com
