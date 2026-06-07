@@ -6,6 +6,15 @@ require_once dirname(__DIR__, 2).'/user/userConfigRuntime.php';
 
 class UserConfigRuntimeTest extends TestCase
 {
+    private function writeRtorrentProcFixture(string $name = 'rtorrent', int $uid = 1500, string $comm = 'rtorrent'): string
+    {
+        $procRoot = $this->pmssMakeTempDir('pmss-proc-');
+        mkdir($procRoot.'/12345');
+        file_put_contents($procRoot.'/12345/status', "Name:\t{$name}\nUid:\t{$uid}\t{$uid}\t{$uid}\t{$uid}\n");
+        file_put_contents($procRoot.'/12345/comm', $comm."\n");
+        return $procRoot;
+    }
+
     public function testRtorrentLockPidParsesCanonicalLock(): void
     {
         $lockFile = $this->pmssMakeTempFile('pmss-rtorrent-lock-');
@@ -36,29 +45,17 @@ class UserConfigRuntimeTest extends TestCase
 
     public function testProcStatusUidParsesRealUid(): void
     {
-        $procRoot = $this->pmssMakeTempDir('pmss-proc-');
-        mkdir($procRoot.'/12345');
-        file_put_contents($procRoot.'/12345/status', "Name:\trtorrent\nUid:\t1500\t1500\t1500\t1500\n");
-
-        $this->assertSame(1500, \pmssUserConfigProcStatusUid(12345, $procRoot));
+        $this->assertSame(1500, \pmssUserConfigProcStatusUid(12345, $this->writeRtorrentProcFixture()));
     }
 
     public function testRtorrentProcessOwnedByAcceptsMatchingRtorrent(): void
     {
-        $procRoot = $this->pmssMakeTempDir('pmss-proc-');
-        mkdir($procRoot.'/12345');
-        file_put_contents($procRoot.'/12345/status', "Name:\trtorrent\nUid:\t1500\t1500\t1500\t1500\n");
-        file_put_contents($procRoot.'/12345/comm', "rtorrent\n");
-
-        $this->assertTrue(\pmssUserConfigRtorrentProcessOwnedBy(12345, 1500, $procRoot));
+        $this->assertTrue(\pmssUserConfigRtorrentProcessOwnedBy(12345, 1500, $this->writeRtorrentProcFixture()));
     }
 
     public function testRtorrentProcessOwnedByRejectsWrongUidOrCommand(): void
     {
-        $procRoot = $this->pmssMakeTempDir('pmss-proc-');
-        mkdir($procRoot.'/12345');
-        file_put_contents($procRoot.'/12345/status', "Name:\tbash\nUid:\t1500\t1500\t1500\t1500\n");
-        file_put_contents($procRoot.'/12345/comm', "bash\n");
+        $procRoot = $this->writeRtorrentProcFixture('bash', 1500, 'bash');
 
         $this->assertFalse(\pmssUserConfigRtorrentProcessOwnedBy(12345, 1500, $procRoot));
         $this->assertFalse(\pmssUserConfigRtorrentProcessOwnedBy(12345, 1600, $procRoot));

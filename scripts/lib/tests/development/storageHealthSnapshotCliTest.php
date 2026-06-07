@@ -10,32 +10,33 @@ class StorageHealthSnapshotCliTest extends TestCase
         $this->pmssAssertRepoPhpScriptOutputContains('scripts/util/storageHealthSnapshot.php', ['--help'], ['Usage: storageHealthSnapshot.php'], $this->storageHealthSnapshotCommandEnvironment());
     }
 
-    public function testWritesJsonlToExplicitPath(): void
+    public function testJsonOptionWritesSnapshotVariants(): void
     {
-        $jsonPath = $this->pmssMakeTempPath('pmss-storage-health-snapshot-', '.jsonl');
-        $result = $this->runSnapshotCommand(['--json', $jsonPath]);
-        $this->assertSame(0, $result['rc']);
-        $this->assertStringContainsString('Storage health snapshot written to '.$jsonPath, $result['output']);
-        $this->assertTrue(is_file($jsonPath), 'expected JSONL file to be created');
-        $this->assertStringContainsString('"kind":"smart"', (string) file_get_contents($jsonPath));
-    }
+        foreach ([
+            ['pmss-storage-health-snapshot-', false, false, 'Storage health snapshot written to ', '"kind":"smart"'],
+            ['pmss-storage-health-snapshot-', true, false, '', ''],
+            ['pmss-storage-health-inline-', false, true, null, '"device":"/dev/pmssfake0"'],
+        ] as $case) {
+            [$prefix, $quiet, $inline, $outputPrefix, $jsonNeedle] = $case;
+            $jsonPath = $this->pmssMakeTempPath($prefix, '.jsonl');
+            $arguments = $inline ? ['--json='.$jsonPath] : ['--json', $jsonPath];
+            if ($quiet) {
+                $arguments[] = '--quiet';
+            }
 
-    public function testQuietSuppressesSuccessMessage(): void
-    {
-        $jsonPath = $this->pmssMakeTempPath('pmss-storage-health-snapshot-', '.jsonl');
-        $result = $this->runSnapshotCommand(['--json', $jsonPath, '--quiet']);
-        $this->assertSame(0, $result['rc']);
-        $this->assertSame('', trim($result['output']));
-        $this->assertTrue(is_file($jsonPath), 'expected quiet mode to still write the snapshot');
-    }
+            $result = $this->runSnapshotCommand($arguments);
 
-    public function testInlineJsonOptionWritesSnapshot(): void
-    {
-        $jsonPath = $this->pmssMakeTempPath('pmss-storage-health-inline-', '.jsonl');
-        $result = $this->runSnapshotCommand(['--json='.$jsonPath]);
-        $this->assertSame(0, $result['rc']);
-        $this->assertTrue(is_file($jsonPath), 'expected inline --json option to be honored');
-        $this->assertStringContainsString('"device":"/dev/pmssfake0"', (string) file_get_contents($jsonPath));
+            $this->assertSame(0, $result['rc']);
+            $this->assertTrue(is_file($jsonPath), 'expected JSONL file to be created');
+            if ($outputPrefix === '') {
+                $this->assertSame('', trim($result['output']));
+            } elseif ($outputPrefix !== null) {
+                $this->assertStringContainsString($outputPrefix.$jsonPath, $result['output']);
+            }
+            if ($jsonNeedle !== '') {
+                $this->assertStringContainsString($jsonNeedle, (string) file_get_contents($jsonPath));
+            }
+        }
     }
 
     public function testFailsWhenLogDirectoryCannotBeCreated(): void

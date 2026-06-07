@@ -29,18 +29,15 @@ class UserCgroupSliceHealthTest extends TestCase
 
     public function testRefreshPlanSkipsHealthyOrUnreadableSlice(): void
     {
-        $healthy = \pmssUserCgroupSliceMemoryRefreshPlan(
-            'alice',
-            ['ramMiB' => 8192],
-            ['MemoryMax' => (string) (12000 * 1048576)],
-            32768
-        );
-        $this->assertFalse($healthy['needed']);
-        $this->assertSame('memory_max_at_or_above_plan', $healthy['reason']);
+        foreach ([
+            [(string) (12000 * 1048576), 'memory_max_at_or_above_plan'],
+            ['infinity', 'memory_max_unset_or_unreadable'],
+        ] as $case) {
+            $plan = \pmssUserCgroupSliceMemoryRefreshPlan('alice', ['ramMiB' => 8192], ['MemoryMax' => $case[0]], 32768);
 
-        $unreadable = \pmssUserCgroupSliceMemoryRefreshPlan('alice', ['ramMiB' => 8192], ['MemoryMax' => 'infinity'], 32768);
-        $this->assertFalse($unreadable['needed']);
-        $this->assertSame('memory_max_unset_or_unreadable', $unreadable['reason']);
+            $this->assertFalse($plan['needed']);
+            $this->assertSame($case[1], $plan['reason']);
+        }
     }
 
     public function testApplyCommandUsesStoredCgroupArgs(): void

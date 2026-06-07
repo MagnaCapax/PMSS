@@ -23,11 +23,6 @@ class ShowResourcesFormatTest extends TestCase
         ];
     }
 
-    public function testHelpIncludesCoreOptions(): void
-    {
-        $this->pmssAssertRepoPhpScriptOutputContains('scripts/showResources.php', ['--help'], ['--json', '--show-missing', '--user', '--help']);
-    }
-
     public function testHelpOutputMatchesSnapshot(): void
     {
         $out = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--help']);
