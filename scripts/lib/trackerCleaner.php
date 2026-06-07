@@ -145,6 +145,24 @@ function pmssTrackerCleanerBackupTorrent(string $username, string $torrentPath, 
     return ['ok' => true, 'stop_reason' => '', 'verbose_log' => $verbose];
 }
 
+/**
+ * Atomically replace a cleaned torrent only when it is still inside its session root.
+ *
+ * @return int|false
+ */
+function pmssTrackerCleanerWriteCleanedTorrent(string $torrentPath, string $payload, string $sessionDir)
+{
+    if (!is_file($torrentPath) || is_link($torrentPath) || !pmssPathWithinRootIsSafe($torrentPath, $sessionDir)) {
+        return false;
+    }
+
+    if (!pmssReplaceUserFilePreservingMetadata($torrentPath, $payload, 0640)) {
+        return false;
+    }
+
+    return strlen($payload);
+}
+
 function pmssTrackerCleanerAppendUserChangeLog(string $username, array $changes): string
 {
     if ($changes === []) return '';

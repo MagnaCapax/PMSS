@@ -68,4 +68,38 @@ class TrackerCleanerLibraryTest extends TestCase
             $this->assertSame($case[3], pmssTrackerCleanerRunOutcomeLogLine($case[0], $case[1], $case[2]));
         }
     }
+
+    public function testCleanedTorrentWriteReplacesSessionFileAndPreservesMode(): void
+    {
+        $sessionDir = $this->pmssMakeTempDir('pmss-tracker-cleaner-session-');
+        $torrentPath = $sessionDir.'/sample.torrent';
+        file_put_contents($torrentPath, 'old');
+        chmod($torrentPath, 0640);
+
+        $this->assertSame(7, pmssTrackerCleanerWriteCleanedTorrent($torrentPath, 'cleaned', $sessionDir));
+        $this->assertSame('cleaned', (string) file_get_contents($torrentPath));
+        $this->assertSame(0640, fileperms($torrentPath) & 0777);
+    }
+
+    public function testCleanedTorrentWriteRejectsSymlinkTarget(): void
+    {
+        $sessionDir = $this->pmssMakeTempDir('pmss-tracker-cleaner-session-');
+        $outsidePath = $this->pmssMakeTempFile('pmss-tracker-cleaner-outside-');
+        file_put_contents($outsidePath, 'outside');
+        $linkPath = $sessionDir.'/sample.torrent';
+        symlink($outsidePath, $linkPath);
+
+        $this->assertFalse(pmssTrackerCleanerWriteCleanedTorrent($linkPath, 'cleaned', $sessionDir));
+        $this->assertSame('outside', (string) file_get_contents($outsidePath));
+    }
+
+    public function testCleanedTorrentWriteRejectsFileOutsideSessionRoot(): void
+    {
+        $sessionDir = $this->pmssMakeTempDir('pmss-tracker-cleaner-session-');
+        $outsidePath = $this->pmssMakeTempFile('pmss-tracker-cleaner-outside-');
+        file_put_contents($outsidePath, 'outside');
+
+        $this->assertFalse(pmssTrackerCleanerWriteCleanedTorrent($outsidePath, 'cleaned', $sessionDir));
+        $this->assertSame('outside', (string) file_get_contents($outsidePath));
+    }
 }

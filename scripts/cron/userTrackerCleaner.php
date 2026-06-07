@@ -176,7 +176,7 @@ foreach($users AS $thisUser) {
           $comment = (string) $torrent->getComment();
           $markedComment = pmssTrackerCleanerCommentWithMarker($comment);
           if ($markedComment !== $comment) $torrent->setComment($markedComment);
-          $written = @file_put_contents($thisTorrent, $torrent->serialize());
+          $written = pmssTrackerCleanerWriteCleanedTorrent($thisTorrent, $torrent->serialize(), $expectedSessionDir);
           $writtenBytes = $written === false ? -1 : (int) $written;
           $userVerboseLog .= pmssTrackerCleanerTimestamp()
               ." torrent_write bytes={$writtenBytes} file={$thisTorrent}\n";
