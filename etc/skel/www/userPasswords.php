@@ -124,16 +124,16 @@ function pmssUserPasswordsWebConfRead(string $path): ?array
         return null;
     }
 
-    $meta = json_decode(substr($raw, $start, $end - $start), true);
-    $config = json_decode(ltrim(substr($raw, $end)), true);
+    $meta = pmssJsonDecodeAssoc(substr($raw, $start, $end - $start));
+    $config = pmssJsonDecodeAssoc(ltrim(substr($raw, $end)));
     return is_array($meta) && is_array($config) ? array('meta' => $meta, 'config' => $config) : null;
 }
 
 function pmssUserPasswordsWebConfWrite(string $path, array $meta, array $config): bool
 {
-    $metaJson = json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    if ($metaJson === false || $configJson === false) {
+    $metaJson = pmssJsonEncodePretty($meta, JSON_UNESCAPED_UNICODE);
+    $configJson = pmssJsonEncodePretty($config, JSON_UNESCAPED_UNICODE);
+    if ($metaJson === null || $configJson === null) {
         return false;
     }
 

@@ -88,6 +88,26 @@ if (!function_exists('pmssWelcomeSerializedArrayDecode')) {
  }
 }
 
+if (!function_exists('pmssJsonDecodeAssoc')) {
+ /** Decode JSON through associative arrays, rejecting invalid or scalar payloads. */
+ function pmssJsonDecodeAssoc($payload) { $decoded = json_decode((string) $payload, true); return is_array($decoded) ? $decoded : null; }
+}
+
+if (!function_exists('pmssJsonEncodePretty')) {
+ /** Encode data with PMSS's standard pretty file-output flags. */
+ function pmssJsonEncodePretty($payload, $extraFlags = 0) { $encoded = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | (int) $extraFlags); return is_string($encoded) ? $encoded : null; }
+}
+
+if (!function_exists('pmssJsonFileReadAssoc')) {
+ /** Read a JSON object file as an associative array, optionally requiring a customer-safe path. */
+ function pmssJsonFileReadAssoc($path, $safePathRequired = false) {
+  if (!is_string($path) || $path === '' || ($safePathRequired && !pmssCustomerPathIsSafe($path)) || !is_file($path) || is_link($path)) return null;
+  $raw = @file_get_contents($path);
+  if (!is_string($raw) || trim($raw) === '') return null;
+  return pmssJsonDecodeAssoc($raw);
+ }
+}
+
 if (!function_exists('pmssCustomerHomeRoot')) {
  /** Return the configured customer home root without a trailing slash. */
  function pmssCustomerHomeRoot() { $homeRoot = getenv('PMSS_HOME_DIR'); return (is_string($homeRoot) && trim($homeRoot) !== '') ? rtrim($homeRoot, '/') : '/home'; }

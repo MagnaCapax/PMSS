@@ -10,21 +10,6 @@
 require_once __DIR__.'/scriptsInc.php';
 
 /**
- * Read a JSON file into an associative array.
- */
-function pmssWelcomeReadJson(string $path): array
-{
-    if ($path === '' || !pmssCustomerPathIsSafe($path) || !is_file($path) || is_link($path)) {
-        return [];
-    }
-    $raw = @file_get_contents($path);
-    if (!is_string($raw) || trim($raw) === '') {
-        return [];
-    }
-    return is_array($decoded = json_decode($raw, true)) ? $decoded : [];
-}
-
-/**
  * Resolve the per-user welcome-message override path.
  */
 function pmssWelcomeUserMessagePath(string $userHome): string
@@ -56,7 +41,7 @@ function pmssWelcomeMessageForUser(
     string $productMessagesPath = '/etc/seedbox/config/welcomeMessages.json'
 ): string {
     $userHome = rtrim($userHome, '/');
-    $userConfig = pmssWelcomeReadJson($userHome.'/.config/pmss-user.json');
+    $userConfig = pmssJsonFileReadAssoc($userHome.'/.config/pmss-user.json', true) ?? [];
     $productKey = '';
     foreach (['product', 'productName'] as $candidateKey) {
         if (is_string($candidateValue = $userConfig[$candidateKey] ?? null) && ($productKey = trim($candidateValue)) !== '') {
@@ -72,7 +57,7 @@ function pmssWelcomeMessageForUser(
         $template = $userConfig['welcomeMessage'];
     }
     if ($template === '' && $productKey !== '') {
-        $messageRootMap = pmssWelcomeReadJson($productMessagesPath);
+        $messageRootMap = pmssJsonFileReadAssoc($productMessagesPath, true) ?? [];
         $messageMap = is_array($messageRootMap['products'] ?? null) ? $messageRootMap['products'] : $messageRootMap;
         if (!is_string($template = $messageMap[$productKey] ?? null)) {
             $template = '';

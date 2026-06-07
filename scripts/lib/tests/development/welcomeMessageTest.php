@@ -287,7 +287,7 @@ class WelcomeMessageTest extends TestCase
             'pmssEnsureSafeDir',
             'pmssUserFilePathIsSafe',
         ]);
-        $this->assertStringContainsString('pmssCustomerPathIsSafe($path)', $source);
+        $this->assertStringContainsString('pmssCustomerPathIsSafe($path)', $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php'));
     }
 
     public function testProductConfigUsesUnifiedWelcomeLibrary(): void

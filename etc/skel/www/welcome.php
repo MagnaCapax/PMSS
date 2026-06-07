@@ -893,12 +893,7 @@ function pmssWelcomeUserConfigNumber($key, $allowSymlink = false) {
         return null;
     }
 
-    $raw = @file_get_contents($configPath);
-    if (!is_string($raw) || trim($raw) === '') {
-        return null;
-    }
-
-    $userConfig = json_decode($raw, true);
+    $userConfig = $allowSymlink ? pmssJsonDecodeAssoc((string) @file_get_contents($configPath)) : pmssJsonFileReadAssoc($configPath);
     return is_array($userConfig) && isset($userConfig[$key]) && is_numeric($userConfig[$key])
         ? (float) $userConfig[$key]
         : null;
