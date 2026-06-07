@@ -99,6 +99,64 @@ class RuntimeProfileTest extends TestCase
         @unlink($tmpProfile);
     }
 
+    public function testProfileSummaryToleratesMalformedEntries(): void
+    {
+        $this->resetState();
+
+        $tmpJson = sys_get_temp_dir().'/pmss-profile-json-'.bin2hex(random_bytes(4));
+        $tmpProfile = sys_get_temp_dir().'/pmss-profile-malformed-'.bin2hex(random_bytes(4));
+        $this->pmssTrackEnvOverrides([
+            'PMSS_JSON_LOG' => $tmpJson,
+            'PMSS_PROFILE_OUTPUT' => $tmpProfile,
+        ]);
+
+        $stringableCommand = new class {
+            public function __toString(): string
+            {
+                return "cmd\ntext";
+            }
+        };
+        $GLOBALS['PMSS_PROFILE'] = [
+            [
+                'description' => "valid\nstep",
+                'command' => 'true',
+                'status' => 'OK',
+                'rc' => 0,
+                'duration' => 0.5,
+            ],
+            [
+                'description' => ['not' => 'scalar'],
+                'command' => $stringableCommand,
+                'status' => null,
+                'rc' => 'bad',
+                'duration' => 'bad',
+            ],
+            'diagnostic garbage',
+        ];
+
+        pmssProfileSummary();
+
+        $summaryEvents = array_values(array_filter(pmssJsonLineFileRead($tmpJson), static function (array $decoded): bool {
+            return ($decoded['event'] ?? '') === 'profile_summary';
+        }));
+        $this->assertTrue(count($summaryEvents) >= 1, 'Expected profile_summary despite malformed profile rows');
+        $last = end($summaryEvents);
+        $this->assertEquals(1, $last['status_counts']['OK'] ?? null);
+        $this->assertEquals(1, $last['status_counts']['OTHER'] ?? null);
+
+        $profile = $this->pmssReadJsonArrayFile($tmpProfile, null, 'Profile output should contain normalized entries');
+        $this->assertSame(2, count($profile));
+        $this->assertSame('valid step', $profile[0]['description']);
+        $this->assertSame('array', $profile[1]['description']);
+        $this->assertSame('cmd text', $profile[1]['command']);
+        $this->assertSame('OTHER', $profile[1]['status']);
+        $this->assertSame(0, $profile[1]['rc']);
+        $this->assertEquals(0.0, $profile[1]['duration']);
+
+        @unlink($tmpJson);
+        @unlink($tmpProfile);
+    }
+
     public function testProfileSummaryIncludesStatusCountsAndJsonEvent(): void
     {
         $this->resetState();
