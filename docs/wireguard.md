@@ -26,10 +26,11 @@ If a PMSS-generated single-device `~/wireguard.txt` already exists but its
 matching `~/.wireguard-public-key` entry goes missing, the periodic refresh can
 re-register that first profile automatically from the managed guide.
 
-A cron watchdog (`checkWireguard.php`) ensures the kernel module stays loaded and
-`wg-quick@wg0` remains active. Logs are written to `/var/log/pmss/checkWireguard.log`
-when taking action (module load/restart); use `checkWireguard.php --debug` to
-also log healthy checks.
+A cron watchdog (`checkWireguard.php`) ensures the kernel module stays loaded,
+`wg-quick@wg0` remains active, and configured peers are loaded into the running
+interface. Logs are written to `/var/log/pmss/checkWireguard.log` when taking
+action (module load/restart/peer sync); use `checkWireguard.php --debug` to also
+log healthy checks.
 
 Endpoint detection prefers resolving the host's FQDN and falls back to a public
 IP lookup plus interface inspection. Make sure the hostname resolves externally
