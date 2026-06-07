@@ -146,20 +146,18 @@ class SysctlBaselineTest extends TestCase
 
     public function testSettingsBuildKeepsProfileBranchSnapshot(): void
     {
+        $procSysRoot = $this->pmssMakeTempDir('pmss-sysctl-proc-', 0700);
+        $this->pmssTrackEnvOverrides(['PMSS_SYSCTL_PROC_SYS_PATH' => $procSysRoot]);
         $cases = [
-            'no_swap' => [['ram_gb' => 64, 'has_swap' => false, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], ['60', '50', '327680', '20', '16777216']],
-            'vm' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => true, 'nic_speed_gbps' => 1], ['10', '50', '131072', '20', '16777216']],
-            'fast_swap_10g' => [['ram_gb' => 256, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => false, 'nic_speed_gbps' => 10], ['100', '2', '2621440', '40', '67108864']],
-            'slow_swap' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], ['10', '50', '327680', '20', '16777216']],
+            'no_swap' => [['ram_gb' => 64, 'has_swap' => false, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], 'f17ce9f43100072f8679109d605b3cc1c01914da07c2fdb62a6af83502c2699d'],
+            'vm' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => true, 'nic_speed_gbps' => 1], '0dcb0cf026bf5548df788c2ff2afa42b4625a5c35020919bb2dcb8ce42593c95'],
+            'fast_swap_10g_conntrack' => [['ram_gb' => 256, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => false, 'nic_speed_gbps' => 10, 'has_conntrack' => true], '9f472ab7b28e0bafb66f0e0264698e6521d1cd6a54721e79fa14fabee5079d49'],
+            'slow_swap' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '8bbb1aaa16004a899de6a90f55657493e47496151b6ffe36b1a0d5d9934efc92'],
         ];
 
-        foreach ($cases as $label => [$profile, $expected]) {
-            $settings = \pmssSysctlSettingsBuild($profile);
-            $this->assertSame($expected[0], $settings['vm']['vm.swappiness'], $label.' swappiness changed');
-            $this->assertSame($expected[1], $settings['vm']['vm.vfs_cache_pressure'], $label.' cache pressure changed');
-            $this->assertSame($expected[2], $settings['vm']['vm.min_free_kbytes'], $label.' min_free_kbytes changed');
-            $this->assertSame($expected[3], $settings['vm']['vm.dirty_ratio'], $label.' dirty ratio changed');
-            $this->assertSame($expected[4], $settings['net']['net.core.rmem_max'], $label.' network buffer changed');
+        foreach ($cases as $label => [$profile, $expectedHash]) {
+            $rendered = \pmssSysctlConfigRender(\pmssSysctlSettingsBuild($profile));
+            $this->assertSame($expectedHash, hash('sha256', $rendered), $label.' rendered sysctl profile changed');
         }
     }
 

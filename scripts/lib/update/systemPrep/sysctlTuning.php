@@ -9,14 +9,9 @@
 function pmssSystemPrepReadBoolEnv(string $key): ?bool
 {
     $override = getenv($key);
-    if ($override === false) {
-        return null;
-    }
-
+    if ($override === false) return null;
     if (pmssValueMatchesNormalized($override, ['1', 'true', 'yes'])) return true;
-    if (pmssValueMatchesNormalized($override, ['0', 'false', 'no'])) return false;
-
-    return null;
+    return pmssValueMatchesNormalized($override, ['0', 'false', 'no']) ? false : null;
 }
 
 /** Read non-empty config/procfs lines with a consistent fail-soft fallback. */
@@ -236,40 +231,42 @@ function pmssSysctlProfileDetect(): array
     ];
 }
 
-/** Build the ordered sysctl settings for the detected host profile. */
-function pmssSysctlSettingsBuild(array $profile): array
+/** Build memory sysctl settings for the detected host profile. */
+function pmssSysctlMemorySettingsBuild(array $profile): array
 {
     $fastSwap = !empty($profile['swap_is_fast']);
     $hasSwap = !empty($profile['has_swap']);
     $isVm = !empty($profile['is_vm']);
     $ramGb = max(1, (int) ($profile['ram_gb'] ?? 1));
-    $tenGigabit = (int) ($profile['nic_speed_gbps'] ?? 1) >= 10;
 
-    $memorySettings = [
+    $settings = [
         'vm.swappiness' => '10',
         'vm.vfs_cache_pressure' => '50',
         'vm.min_free_kbytes' => (string) min(2097152, max(131072, $ramGb * 5120)),
         'vm.dirty_ratio' => '20',
         'vm.dirty_background_ratio' => '5',
     ];
-    if (!$hasSwap) {
-        $memorySettings['vm.swappiness'] = '60';
-    } elseif ($isVm) {
-        $memorySettings['vm.min_free_kbytes'] = '131072';
-    } elseif ($fastSwap) {
-        $memorySettings['vm.swappiness'] = '100';
-        $memorySettings['vm.vfs_cache_pressure'] = '2';
-        $memorySettings['vm.min_free_kbytes'] = (string) min(4194304, max(131072, $ramGb * 10240));
-        $memorySettings['vm.dirty_ratio'] = '40';
-        $memorySettings['vm.dirty_background_ratio'] = '10';
-    }
 
-    $memorySettings['vm.dirty_expire_centisecs'] = '1500';
-    $memorySettings['vm.dirty_writeback_centisecs'] = '500';
+    if (!$hasSwap) $settings['vm.swappiness'] = '60';
+    elseif ($isVm) $settings['vm.min_free_kbytes'] = '131072';
+    elseif ($fastSwap) $settings = array_merge($settings, [
+        'vm.swappiness' => '100',
+        'vm.vfs_cache_pressure' => '2',
+        'vm.min_free_kbytes' => (string) min(4194304, max(131072, $ramGb * 10240)),
+        'vm.dirty_ratio' => '40',
+        'vm.dirty_background_ratio' => '10',
+    ]);
 
+    return $settings + ['vm.dirty_expire_centisecs' => '1500', 'vm.dirty_writeback_centisecs' => '500'];
+}
+
+/** Build network sysctl settings for the detected host profile. */
+function pmssSysctlNetworkSettingsBuild(array $profile): array
+{
+    $tenGigabit = (int) ($profile['nic_speed_gbps'] ?? 1) >= 10;
     $networkBufferBytes = $tenGigabit ? '67108864' : '16777216';
     $networkTcpBytes = $tenGigabit ? '134217728' : '67110000';
-    $networkAdaptiveSettings = [
+    return [
         'net.core.rmem_max' => $networkBufferBytes,
         'net.core.wmem_max' => $networkBufferBytes,
         'net.core.rmem_default' => $networkBufferBytes,
@@ -279,65 +276,77 @@ function pmssSysctlSettingsBuild(array $profile): array
         'net.core.somaxconn' => $tenGigabit ? '4096' : '2000',
         'net.ipv4.tcp_rmem' => '4096 524000 '.$networkTcpBytes,
         'net.ipv4.tcp_wmem' => '4096 524000 '.$networkTcpBytes,
+        'net.core.default_qdisc' => 'fq',
+        'net.ipv4.tcp_congestion_control' => 'bbr',
+        'net.ipv4.tcp_mtu_probing' => '1',
+        'net.ipv4.tcp_keepalive_time' => '1200',
+        'net.ipv4.tcp_keepalive_probes' => '9',
+        'net.ipv4.tcp_keepalive_intvl' => '60',
+        'net.ipv4.tcp_max_syn_backlog' => '4096',
+        'net.ipv4.tcp_fin_timeout' => '60',
+        'net.ipv4.tcp_max_tw_buckets' => '1440000',
+        'net.ipv4.tcp_tw_reuse' => '1',
+        'net.ipv4.ip_local_port_range' => '1024 65535',
+        'net.ipv4.tcp_mem' => '3086631 4115510 6173262',
+        'net.ipv4.ip_forward' => '1',
     ];
+}
+
+/** Build PMSS security sysctl settings. */
+function pmssSysctlSecuritySettingsBuild(): array
+{
+    return [
+        'kernel.pid_max' => '262144',
+        'kernel.unprivileged_userns_clone' => '1',
+        'fs.suid_dumpable' => '0',
+        'fs.file-max' => '3000000',
+        'fs.protected_regular' => '2',
+        'fs.protected_fifos' => '2',
+        // scope=2 (admin-only ptrace) blocks pidfd_getfd-via-mm=NULL exploit class
+        // (Linus commit 31e62c2ebbfd, Qualys-reported 2026-05-14, ssh-keysign-pwn).
+        // scope=1 allows ptrace of descendants - attacker forks the SUID target,
+        // child IS descendant, scope=1 permits attach. scope=2 requires CAP_SYS_PTRACE.
+        // Customer impact on PMSS: none verified (no debuggers installed by default,
+        // no PMSS scripts use ptrace, no customer ptrace activity observed in fleet sample).
+        'kernel.yama.ptrace_scope' => '2',
+        'kernel.kptr_restrict' => '1',
+        'net.ipv4.conf.all.rp_filter' => '1',
+        'net.ipv4.conf.all.accept_source_route' => '0',
+        'net.ipv4.conf.all.send_redirects' => '0',
+        'net.ipv4.icmp_echo_ignore_broadcasts' => '1',
+        'net.ipv4.icmp_ignore_bogus_error_responses' => '1',
+        'net.ipv6.conf.all.disable_ipv6' => '1',
+        'net.ipv6.conf.default.disable_ipv6' => '1',
+    ];
+}
+
+/** Build conntrack settings only when the host exposes conntrack sysctls. */
+function pmssSysctlConntrackSettingsBuild(array $profile): array
+{
+    if (empty($profile['has_conntrack'])) return [];
 
     $settings = [
-        'vm' => $memorySettings,
-        'net' => array_merge($networkAdaptiveSettings, [
-            'net.core.default_qdisc' => 'fq',
-            'net.ipv4.tcp_congestion_control' => 'bbr',
-            'net.ipv4.tcp_mtu_probing' => '1',
-            'net.ipv4.tcp_keepalive_time' => '1200',
-            'net.ipv4.tcp_keepalive_probes' => '9',
-            'net.ipv4.tcp_keepalive_intvl' => '60',
-            'net.ipv4.tcp_max_syn_backlog' => '4096',
-            'net.ipv4.tcp_fin_timeout' => '60',
-            'net.ipv4.tcp_max_tw_buckets' => '1440000',
-            'net.ipv4.tcp_tw_reuse' => '1',
-            'net.ipv4.ip_local_port_range' => '1024 65535',
-            'net.ipv4.tcp_mem' => '3086631 4115510 6173262',
-            'net.ipv4.ip_forward' => '1',
-        ]),
-        'security' => [
-            'kernel.pid_max' => '262144',
-            'kernel.unprivileged_userns_clone' => '1',
-            'fs.suid_dumpable' => '0',
-            'fs.file-max' => '3000000',
-            'fs.protected_regular' => '2',
-            'fs.protected_fifos' => '2',
-            // scope=2 (admin-only ptrace) blocks pidfd_getfd-via-mm=NULL exploit class
-            // (Linus commit 31e62c2ebbfd, Qualys-reported 2026-05-14, ssh-keysign-pwn).
-            // scope=1 allows ptrace of descendants - attacker forks the SUID target,
-            // child IS descendant, scope=1 permits attach. scope=2 requires CAP_SYS_PTRACE.
-            // Customer impact on PMSS: none verified (no debuggers installed by default,
-            // no PMSS scripts use ptrace, no customer ptrace activity observed in fleet sample).
-            'kernel.yama.ptrace_scope' => '2',
-            'kernel.kptr_restrict' => '1',
-            'net.ipv4.conf.all.rp_filter' => '1',
-            'net.ipv4.conf.all.accept_source_route' => '0',
-            'net.ipv4.conf.all.send_redirects' => '0',
-            'net.ipv4.icmp_echo_ignore_broadcasts' => '1',
-            'net.ipv4.icmp_ignore_bogus_error_responses' => '1',
-            'net.ipv6.conf.all.disable_ipv6' => '1',
-            'net.ipv6.conf.default.disable_ipv6' => '1',
-        ],
+        'net.netfilter.nf_conntrack_max' => '524288',
+        'net.netfilter.nf_conntrack_generic_timeout' => '6',
+        'net.netfilter.nf_conntrack_tcp_timeout_established' => '1200',
     ];
+    $procSysRoot = pmssResolvePathFromEnv('PMSS_SYSCTL_PROC_SYS_PATH', '/proc/sys');
+    $settings[is_file($procSysRoot.'/net/ipv4/netfilter/ip_conntrack_tcp_timeout_time_wait')
+        ? 'net.ipv4.netfilter.ip_conntrack_tcp_timeout_time_wait'
+        : 'net.netfilter.nf_conntrack_tcp_timeout_time_wait'] = '15';
+    return $settings;
+}
 
-    if (!empty($profile['has_conntrack'])) {
-        $settings['conntrack'] = [
-            'net.netfilter.nf_conntrack_max' => '524288',
-            'net.netfilter.nf_conntrack_generic_timeout' => '6',
-            'net.netfilter.nf_conntrack_tcp_timeout_established' => '1200',
-        ];
-
-        $procSysRoot = pmssResolvePathFromEnv('PMSS_SYSCTL_PROC_SYS_PATH', '/proc/sys');
-        if (is_file($procSysRoot.'/net/ipv4/netfilter/ip_conntrack_tcp_timeout_time_wait')) {
-            $settings['conntrack']['net.ipv4.netfilter.ip_conntrack_tcp_timeout_time_wait'] = '15';
-        } else {
-            $settings['conntrack']['net.netfilter.nf_conntrack_tcp_timeout_time_wait'] = '15';
-        }
-    }
-
+/** Build the ordered sysctl settings for the detected host profile. */
+function pmssSysctlSettingsBuild(array $profile): array
+{
+    $settings = [
+        'vm' => pmssSysctlMemorySettingsBuild($profile),
+        'net' => pmssSysctlNetworkSettingsBuild($profile),
+        'security' => pmssSysctlSecuritySettingsBuild(),
+    ];
+    $conntrackSettings = pmssSysctlConntrackSettingsBuild($profile);
+    if ($conntrackSettings !== []) $settings['conntrack'] = $conntrackSettings;
     return $settings;
 }
 
@@ -356,41 +365,27 @@ function pmssSysctlAssignmentLineParse(string $line, bool $stripInlineComment = 
 function pmssSysctlOverridesParse(string $path): array
 {
     $keys = [];
-    foreach (pmssSystemPrepNonEmptyLinesRead($path) as $line) {
-        if (($assignment = pmssSysctlAssignmentLineParse($line, true)) !== null) $keys[$assignment[0]] = true;
-    }
-
+    foreach (pmssSystemPrepNonEmptyLinesRead($path) as $line) if (($assignment = pmssSysctlAssignmentLineParse($line, true)) !== null) $keys[$assignment[0]] = true;
     return array_keys($keys);
 }
 
 /** Filter grouped sysctl settings while respecting explicit operator overrides. */
 function pmssSysctlSettingsFilterOverrides(array $groupedSettings, array $overrideKeys): array
 {
-    $flattened = [];
+    $filtered = [];
+    $overrides = array_flip($overrideKeys);
     foreach ($groupedSettings as $group => $settings) {
-        if (!is_array($settings)) {
-            continue;
-        }
-
-        foreach ($settings as $key => $value) {
-            if (!in_array($key, $overrideKeys, true)) {
-                $flattened[$group][$key] = (string) $value;
-            }
-        }
+        if (!is_array($settings)) continue;
+        foreach ($settings as $key => $value) if (!isset($overrides[$key])) $filtered[$group][$key] = (string) $value;
     }
-
-    return $flattened;
+    return $filtered;
 }
 
 /** Parse a sysctl config file into key/value pairs for change reporting. */
 function pmssSysctlFileParse(string $path): array
 {
     $settings = [];
-    foreach (pmssSystemPrepNonEmptyLinesRead($path) as $line) {
-        $assignment = pmssSysctlAssignmentLineParse($line);
-        if ($assignment !== null && $assignment[1] !== '') $settings[$assignment[0]] = $assignment[1];
-    }
-
+    foreach (pmssSystemPrepNonEmptyLinesRead($path) as $line) if (($assignment = pmssSysctlAssignmentLineParse($line)) !== null && $assignment[1] !== '') $settings[$assignment[0]] = $assignment[1];
     return $settings;
 }
 
@@ -428,7 +423,6 @@ function pmssSysctlGroupedSettingsRows(array $groupedSettings): array
         if (!is_array($settings)) continue;
         foreach ($settings as $key => $value) $rows[] = [(string) $key, (string) $value];
     }
-
     return $rows;
 }
 
