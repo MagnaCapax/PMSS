@@ -5,6 +5,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/user/homeReclaim.php';
+require_once dirname(__DIR__, 2).'/user/terminationCleanup.php';
 
 final class TerminateUserContractTest extends TestCase
 {
@@ -73,15 +74,12 @@ final class TerminateUserContractTest extends TestCase
     public function testTerminateUserReclaimsExactRecreateBackupDir(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings(
-            'scripts/terminateUser.php',
+            'scripts/lib/user/terminationCleanup.php',
             [
                 'function pmssTerminateUserMoveBackupForReclaim',
-                '$backupPath = "/home/backup-{$username}";',
                 'is_link($backupPath)',
                 '$realBackup !== $backupPath',
                 "'reclaim_user_backup_dir'",
-                "'queue_user_backup_reclaim'",
-                'pmssUserHomeReclaimLaunchCommand($backupReclaimPath)',
             ],
             [
                 '/home/backup-*',
@@ -93,6 +91,8 @@ final class TerminateUserContractTest extends TestCase
             [
                 '$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim',
                 '$backupReclaimPath = pmssTerminateUserMoveBackupForReclaim',
+                "'queue_user_backup_reclaim'",
+                'pmssUserHomeReclaimLaunchCommand($backupReclaimPath)',
                 'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
             ],
             'terminateUser.php should define backup reclaim flow: ',
@@ -158,7 +158,7 @@ final class TerminateUserContractTest extends TestCase
     public function testTerminateUserRemovesNginxSubdomainRouteFiles(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/terminateUser.php',
+            'scripts/lib/user/terminationCleanup.php',
             [
                 'function pmssTerminateUserRemoveNginxRouteFiles',
                 'remove_nginx_route_file',
@@ -178,19 +178,27 @@ final class TerminateUserContractTest extends TestCase
     public function testTerminateUserDryRunGuardsDirectCleanupMutations(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings(
-            'scripts/terminateUser.php',
+            'scripts/lib/user/terminationCleanup.php',
             [
                 'function pmssTerminateUserUnlinkPath',
                 'function pmssTerminateUserRemoveEmptyDir',
-                "pmssTerminateUserUnlinkPath(\$username, 'remove_nginx_user_file'",
-                'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
-                '} elseif ($dryRun) {',
-                "'status'  => 'SKIP'",
+                "'SKIP'",
+                'Dry run; file not removed',
+                'Dry run; directory not removed',
             ],
             [
                 '@unlink("/etc/nginx/users/{$username}")',
                 'unlink($filePath)',
                 'rmdir($portsBase)',
+            ]
+        );
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/terminateUser.php',
+            [
+                "pmssTerminateUserUnlinkPath(\$username, 'remove_nginx_user_file'",
+                'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
+                '} elseif ($dryRun) {',
+                "'status'  => 'SKIP'",
             ]
         );
         $this->pmssAssertRepoFileContainsOrderedStrings(
@@ -199,5 +207,30 @@ final class TerminateUserContractTest extends TestCase
             'terminateUser.php should guard DB removal: ',
             'terminateUser.php should check dry-run before DB removal: '
         );
+    }
+
+    public function testTerminationCleanupHelpersPreserveDryRunAndRemovalContracts(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-terminate-cleanup-');
+        $file = $dir.'/route.conf';
+        $emptyDir = $dir.'/empty';
+        $backupDir = $dir.'/backup-user1234';
+        $this->pmssWriteFile($file, 'managed');
+        $this->pmssEnsureDir($emptyDir);
+        $this->pmssEnsureDir($backupDir);
+
+        $this->assertTrue(\pmssTerminateUserUnlinkPath('user1234', 'remove_file', $file, true));
+        $this->assertTrue(is_file($file), 'dry-run unlink must not remove file');
+        $this->assertTrue(\pmssTerminateUserUnlinkPath('user1234', 'remove_file', $file, false));
+        $this->assertFalse(file_exists($file), 'non-dry unlink should remove file');
+
+        $this->assertTrue(\pmssTerminateUserRemoveEmptyDir('user1234', 'remove_dir', $emptyDir, true));
+        $this->assertTrue(is_dir($emptyDir), 'dry-run rmdir must not remove directory');
+        $this->assertTrue(\pmssTerminateUserRemoveEmptyDir('user1234', 'remove_dir', $emptyDir, false));
+        $this->assertFalse(is_dir($emptyDir), 'non-dry rmdir should remove empty directory');
+
+        $target = \pmssTerminateUserMoveBackupForReclaim('user1234', $backupDir, true);
+        $this->assertStringContainsString('/home/.terminating-user1234-', $target);
+        $this->assertTrue(is_dir($backupDir), 'dry-run backup reclaim must not move source');
     }
 }

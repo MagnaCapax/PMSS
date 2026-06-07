@@ -21,19 +21,7 @@ require_once __DIR__.'/lib/homeMount.php';
 pmssRequireHomeMounted('suspend.php');
 
 ['username' => $username, 'homeDir' => $homeDir, 'activeRoot' => $activeRoot, 'disabledRoot' => $disabledRoot] = pmssUserLifecycleRequireUserRoots($argv, 'suspend.php', 'suspend');
-
-$activeRootExists = file_exists($activeRoot) || is_link($activeRoot);
-$disabledRootExists = file_exists($disabledRoot) || is_link($disabledRoot);
-$activeRootSafe = pmssUserLifecycleWebRootPathIsSafe($homeDir, $activeRoot, 'www', $activeRootExists);
-$disabledRootSafe = pmssUserLifecycleWebRootPathIsSafe($homeDir, $disabledRoot, 'www-disabled', $disabledRootExists);
-if (!$activeRootSafe) {
-    pmssUserLifecycleContextLogStatusMessage('suspend', 'validate_web_root', $username, 'ERR', 'Refusing unsafe active web root', array('path' => $activeRoot));
-    die("Refusing unsafe active web root\n");
-}
-if (!$disabledRootSafe) {
-    pmssUserLifecycleContextLogStatusMessage('suspend', 'validate_web_root', $username, 'ERR', 'Refusing unsafe suspended web root', array('path' => $disabledRoot));
-    die("Refusing unsafe suspended web root\n");
-}
+['activeRootExists' => $activeRootExists, 'disabledRootExists' => $disabledRootExists] = pmssUserLifecycleRequireWebRootState('suspend', $username, $homeDir, $activeRoot, $disabledRoot);
 
 // Canonical suspended detection: only the presence of www-disabled matters.
 if ($disabledRootExists) {

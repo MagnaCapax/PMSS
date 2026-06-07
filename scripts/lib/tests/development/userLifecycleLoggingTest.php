@@ -192,18 +192,19 @@ class userLifecycleLoggingTest extends TestCase
 
     public function testSuspendAndUnsuspendGuardWebRootRenameTargets(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/suspend.php', array(
-            "pmssUserLifecycleWebRootPathIsSafe(\$homeDir, \$activeRoot, 'www', \$activeRootExists)",
-            "pmssUserLifecycleWebRootPathIsSafe(\$homeDir, \$disabledRoot, 'www-disabled', \$disabledRootExists)",
-            "if (!\$activeRootSafe)",
-            "if (!\$disabledRootSafe)",
-        ));
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/unsuspend.php', array(
-            "pmssUserLifecycleWebRootPathIsSafe(\$homeDir, \$activeRoot, 'www', \$activeRootExists)",
-            "pmssUserLifecycleWebRootPathIsSafe(\$homeDir, \$disabledRoot, 'www-disabled', \$disabledRootExists)",
-            "if (!\$activeRootSafe)",
-            "if (!\$disabledRootSafe)",
-        ));
+        $home = $this->pmssMakeTempDir('pmss-user-lifecycle-webroot-state-');
+        $activeRoot = $home.'/www';
+        $disabledRoot = $home.'/www-disabled';
+        $this->pmssEnsureDir($activeRoot);
+
+        $active = \pmssUserLifecycleRequireWebRootState('suspend', 'alice', $home, $activeRoot, $disabledRoot);
+        $this->pmssEnsureDir($disabledRoot);
+        $suspended = \pmssUserLifecycleRequireWebRootState('unsuspend', 'alice', $home, $activeRoot, $disabledRoot);
+
+        $this->assertSame(array('activeRootExists' => true, 'disabledRootExists' => false), $active);
+        $this->assertSame(array('activeRootExists' => true, 'disabledRootExists' => true), $suspended);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/suspend.php', array("pmssUserLifecycleRequireWebRootState('suspend'"));
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/unsuspend.php', array("pmssUserLifecycleRequireWebRootState('unsuspend'"));
     }
 
     public function testFindSuspendedBackupSelectsNewestContentfulCandidate(): void
