@@ -17,7 +17,6 @@ require_once __DIR__ . '/../update/runtime/commands.php'; // for runStep
 class Manager
 {
     private const IO_CLI_PROPERTY_MAP = ['io-read-bw' => 'IOReadBandwidthMax', 'io-write-bw' => 'IOWriteBandwidthMax', 'io-read-iops' => 'IOReadIOPSMax', 'io-write-iops' => 'IOWriteIOPSMax'];
-    private const RESOURCE_OPTION_NAMES = ['cpu-weight', 'io-weight', 'tasks-max', 'memory-high', 'memory-max', 'cpu-quota-percent', 'io-latency-ms', 'cpu-profile', 'mem-profile', 'tasks-profile'];
     private const INTEGER_OPTION_NAMES = ['cpu-weight', 'io-weight', 'tasks-max', 'memory-high', 'memory-max', 'io-latency-ms'];
     private const POLICY_OPTION_MAP = ['cpu-weight' => 'cpuWeight', 'io-weight' => 'ioWeight', 'tasks-max' => 'tasksMax', 'cpu-quota-percent' => 'cpuQuotaPercent', 'io-latency-ms' => 'ioLatencyMs', 'memory-high' => 'memoryHighMiB', 'memory-max' => 'memoryMaxMiB'];
     private const ACTION_FLAG_MAP = ['status' => '--status', 'config' => '--config', 'apply' => '--apply', 'dryRun' => '--dry-run', 'respectExisting' => '--respect-existing', 'defaults' => '--defaults', 'wipe' => '--wipe'];
@@ -27,9 +26,9 @@ class Manager
         'bulk' => ['defaults' => ['io-weight' => '500', 'cpu-weight' => '300', 'tasks-max' => '8192'], 'limits' => []],
     ];
     private const NUMERIC_PROFILE_MAP = [
-        'cpu' => ['cpu-profile', 'cpu-weight', '100', ['low' => '50', 'high' => '300']],
-        'tasks' => ['tasks-profile', 'tasks-max', '4096', ['low' => '1024', 'high' => '8192']],
-        'mem' => ['mem-profile', 'memory-high', '500', ['low' => '250', 'heavy' => '1024']],
+        'cpu-profile' => ['family' => 'cpu', 'target' => 'cpu-weight', 'fallback' => '100', 'profiles' => ['low' => '50', 'high' => '300']],
+        'tasks-profile' => ['family' => 'tasks', 'target' => 'tasks-max', 'fallback' => '4096', 'profiles' => ['low' => '1024', 'high' => '8192']],
+        'mem-profile' => ['family' => 'mem', 'target' => 'memory-high', 'fallback' => '500', 'profiles' => ['low' => '250', 'heavy' => '1024']],
     ];
 
     /** @var SystemInterface */
@@ -133,7 +132,7 @@ class Manager
             $ioPairs = array_merge($ioPairs, $policyIoPairs);
         }
 
-        if (!$actions['status'] && !$actions['config'] && !$this->hasPlanInput($opt, $ioPairs, $ioCostWrites, $device, $ioProfile, $actions['wipe'])) {
+        if (!$actions['status'] && !$actions['config'] && !$this->planHasWork([$opt, $ioPairs, $ioCostWrites, $device, $ioProfile], $actions['wipe'])) {
             $this->showConfig($slice);
             $this->showStatus($slice, $uid);
         }
@@ -199,8 +198,8 @@ class Manager
     private function wipeHasConflictingInput(array $opt, array $ioPairs, array $actions, string $device, string $ioProfile, string $ioCostQos, string $ioCostModel): bool
     { return !empty($opt) || !empty($ioPairs) || $actions['defaults'] || $actions['respectExisting'] || $device !== '' || $ioProfile !== '' || $ioCostQos !== '' || $ioCostModel !== ''; }
 
-    private function hasPlanInput(array $opt, array $ioPairs, array $ioCostWrites, string $device, string $ioProfile, bool $wipe): bool
-    { return !empty($opt) || !empty($ioPairs) || !empty($ioCostWrites) || $device !== '' || $ioProfile !== '' || $wipe; }
+    private function planHasWork(array $items, bool $wipe = false): bool
+    { if ($wipe) return true; foreach ($items as $item) if (!empty($item)) return true; return false; }
 
     /** @return array{device:string,error:string,warning:string} */
     private function resolveDevicePlan(string $device, bool $needsHomeLatency): array
@@ -264,7 +263,7 @@ class Manager
 
     private function finishPlan(string $slice, int $uid, array $actions, array $props, array $ioPairs, array $ioCostWrites): int
     {
-        if (!$this->hasPlanInput($props, $ioPairs, $ioCostWrites, '', '', $actions['wipe'])) return 0;
+        if (!$this->planHasWork([$props, $ioPairs, $ioCostWrites], $actions['wipe'])) return 0;
         if (!$actions['apply'] || $actions['dryRun']) {
             echo "(dry-run or no --apply; not changing system)\n";
             return 0;
@@ -304,12 +303,11 @@ class Manager
             }
 
             $inlineOptions[$name] = $value;
+            if (isset(self::POLICY_OPTION_MAP[$name]) || isset(self::NUMERIC_PROFILE_MAP[$name])) {
+                $resourceOptions[$name] = isset(self::NUMERIC_PROFILE_MAP[$name]) ? strtolower((string) $value) : (string) $value;
+            }
         }
 
-        foreach (self::RESOURCE_OPTION_NAMES as $name) {
-            if (!array_key_exists($name, $inlineOptions)) continue;
-            $resourceOptions[$name] = strpos($name, '-profile') !== false ? strtolower((string) $inlineOptions[$name]) : (string) $inlineOptions[$name];
-        }
         foreach (self::IO_CLI_PROPERTY_MAP as $flagName => $propertyName) {
             foreach ($ioSpecs[$flagName] ?? [] as $spec) {
                 $specText = trim($spec);
@@ -392,7 +390,7 @@ class Manager
         }
 
         foreach (['io-cost-qos' => $ioCostQos, 'io-cost-model' => $ioCostModel] as $flagName => $value) {
-            if ($value !== '' && (strpos($value, "\0") !== false || strpos($value, "\n") !== false || strpos($value, "\r") !== false)) {
+            if ($value !== '' && preg_match('/[\r\n\0]/', $value) === 1) {
                 return 'Invalid --'.$flagName.' value: newline and NUL bytes are not allowed';
             }
         }
@@ -459,12 +457,8 @@ class Manager
             }
         }
 
-        if (!isset($policy['mounts']) || !is_array($policy['mounts'])) {
-            return [];
-        }
-
         $pairsByKey = [];
-        foreach ($policy['mounts'] as $mountPath => $mountPolicy) {
+        foreach (is_array($policy['mounts'] ?? null) ? $policy['mounts'] : [] as $mountPath => $mountPolicy) {
             if (!is_string($mountPath) || $mountPath === '' || !is_array($mountPolicy)) {
                 continue;
             }
@@ -488,17 +482,16 @@ class Manager
     private function expandProfiles(array &$opt): void
     {
         $policy = \pmssCgroupPolicyLoad();
-        foreach (self::NUMERIC_PROFILE_MAP as $family => $profile) {
-            $profileKey = $profile[0];
+        foreach (self::NUMERIC_PROFILE_MAP as $profileKey => $profile) {
             if (!isset($opt[$profileKey])) {
                 continue;
             }
 
             $profileName = strtolower($opt[$profileKey]);
             $opt[$profileKey] = $profileName;
-            $targetKey = $profile[1];
+            $targetKey = $profile['target'];
             if (!isset($opt[$targetKey])) {
-                $opt[$targetKey] = \pmssCgroupPolicyNumericProfileValue($policy, $family, $profileName, $profile[3], $profile[2]);
+                $opt[$targetKey] = \pmssCgroupPolicyNumericProfileValue($policy, $profile['family'], $profileName, $profile['profiles'], $profile['fallback']);
             }
         }
     }
@@ -511,19 +504,13 @@ class Manager
             return;
         }
 
-        if (isset($entry['defaults']) && is_array($entry['defaults'])) {
-            foreach ($entry['defaults'] as $key => $value) {
-                if (!isset($opt[$key])) {
-                    $opt[$key] = $value;
-                }
+        foreach (is_array($entry['defaults'] ?? null) ? $entry['defaults'] : [] as $key => $value) {
+            if (!isset($opt[$key])) {
+                $opt[$key] = $value;
             }
         }
 
-        if (!isset($entry['limits']) || !is_array($entry['limits'])) {
-            return;
-        }
-
-        foreach (\pmssCgroupPolicyIoPairs($entry['limits'], $dev, false) as $pair) {
+        foreach (\pmssCgroupPolicyIoPairs(is_array($entry['limits'] ?? null) ? $entry['limits'] : [], $dev, false) as $pair) {
             $pairs[] = $pair;
         }
     }
