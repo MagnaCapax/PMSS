@@ -98,4 +98,49 @@ class ArrProbeTimeoutPolicyTest extends TestCase
 
         $this->assertSame(['1.2.3.', 'https://example.invalid/x64', 'Radarr.develop.1.2.3.linux-x64.tar.gz'], $asset);
     }
+
+    public function testReleaseActivationPathGuardAllowsPrivateWorkChild(): void
+    {
+        $workDir = $this->pmssMakeTempDir('pmss-arr-work-', 0700);
+        $extractPath = $workDir.'/Radarr';
+        $installParent = $this->pmssMakeTempDir('pmss-arr-install-', 0700);
+        @mkdir($extractPath, 0700);
+
+        $this->assertTrue(\pmssArrReleaseActivationPathsAreSafe(
+            $workDir,
+            'pmss-arr-work-',
+            $extractPath,
+            $installParent.'/Radarr'
+        ));
+    }
+
+    public function testReleaseActivationPathGuardRejectsUnsafeInstallRoot(): void
+    {
+        $workDir = $this->pmssMakeTempDir('pmss-arr-work-', 0700);
+        $extractPath = $workDir.'/Radarr';
+        @mkdir($extractPath, 0700);
+
+        $this->assertFalse(\pmssArrReleaseActivationPathsAreSafe(
+            $workDir,
+            'pmss-arr-work-',
+            $extractPath,
+            '/opt'
+        ));
+    }
+
+    public function testReleaseActivationPathGuardRejectsSymlinkedExtractPath(): void
+    {
+        $workDir = $this->pmssMakeTempDir('pmss-arr-work-', 0700);
+        $outside = $this->pmssMakeTempDir('pmss-arr-outside-', 0700);
+        $extractPath = $workDir.'/Radarr';
+        $installParent = $this->pmssMakeTempDir('pmss-arr-install-', 0700);
+        $this->pmssCreateSymlinkOrSkip($outside, $extractPath);
+
+        $this->assertFalse(\pmssArrReleaseActivationPathsAreSafe(
+            $workDir,
+            'pmss-arr-work-',
+            $extractPath,
+            $installParent.'/Radarr'
+        ));
+    }
 }

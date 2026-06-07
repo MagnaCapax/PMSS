@@ -172,6 +172,26 @@ function pmssArrReleaseAssetSelect(array $releases, string $assetPattern, string
     return $genericAsset;
 }
 
+/**
+ * Re-check activation paths immediately before replacing an installed app tree.
+ */
+function pmssArrReleaseActivationPathsAreSafe(string $workDir, string $workPrefix, string $extractPath, string $installPath): bool
+{
+    if (!pmssArrInstallPathIsSafe($installPath) || is_link($workDir) || is_link($extractPath)) {
+        return false;
+    }
+
+    $workReal = function_exists('pmssPrivateTempDirRealpath')
+        ? pmssPrivateTempDirRealpath($workDir, $workPrefix)
+        : realpath($workDir);
+    $extractReal = realpath($extractPath);
+    if (!is_string($workReal) || !is_string($extractReal) || !is_dir($extractReal)) {
+        return false;
+    }
+
+    return strpos($extractReal, rtrim($workReal, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR) === 0;
+}
+
 /** Download, extract, and atomically activate one prepared ARR release asset. */
 function pmssArrReleaseActivate(array $config, string $app, string $downloadUrl, string $assetName, callable $log): bool
 {
@@ -182,12 +202,18 @@ function pmssArrReleaseActivate(array $config, string $app, string $downloadUrl,
         ['Download failed; keeping existing installation', sprintf('curl -sSL --fail -o %s %s', escapeshellarg($archivePath), escapeshellarg($downloadUrl)), $archivePath, 'is_file'],
         ['Extraction failed; keeping existing installation', sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($workDir)), $extractPath, 'is_dir'],
         ['Install parent directory missing; refusing to replace application', '', dirname($installPath), 'is_dir'],
-        ['Failed to remove existing installation; keeping existing installation', 'rm -rf '.escapeshellarg($installPath), '', ''],
-        ['Failed to activate extracted release', sprintf('mv %s %s', escapeshellarg($extractPath), escapeshellarg($installPath)), $installPath, 'is_dir'],
     ];
 
     $ok = true; $message = '';
     foreach ($steps as $step) { if ($step[1] !== '' && runCommand($step[1]) !== 0) { $message = $step[0]; $ok = false; break; } if ($step[2] !== '' && !$step[3]($step[2])) { $message = $step[0]; $ok = false; break; } }
+    if ($ok && !pmssArrReleaseActivationPathsAreSafe($workDir, $workPrefix, $extractPath, $installPath)) {
+        $message = 'Unsafe activation paths; keeping existing installation';
+        $ok = false;
+    }
+    foreach ($ok ? [
+        ['Failed to remove existing installation; keeping existing installation', 'rm -rf '.escapeshellarg($installPath), '', ''],
+        ['Failed to activate extracted release', sprintf('mv %s %s', escapeshellarg($extractPath), escapeshellarg($installPath)), $installPath, 'is_dir'],
+    ] : [] as $step) { if ($step[1] !== '' && runCommand($step[1]) !== 0) { $message = $step[0]; $ok = false; break; } if ($step[2] !== '' && !$step[3]($step[2])) { $message = $step[0]; $ok = false; break; } }
     if ($message !== '') { $log($message); } $real = pmssPrivateTempDirRealpath($workDir, $workPrefix);
     if ($real !== null) { runCommand('rm -rf '.escapeshellarg($real)); } return $ok;
 }
