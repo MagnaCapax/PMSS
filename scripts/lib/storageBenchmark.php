@@ -67,12 +67,24 @@ function storageBenchmarkApplyRunResult(array $entry, array $res, string $fallba
 function storageBenchmarkIostatUtilPctRead(string $path): ?float { $payload = pmssReadSerializedArrayFile($path); if ($payload === null || !array_key_exists('diskUtil', $payload)) return null; $util = $payload['diskUtil']; return (is_int($util) || is_float($util) || (is_string($util) && is_numeric(trim($util)))) ? (float) trim((string) $util) : null; }
 function storageBenchmarkRequireCommandField(string $command, string $label): string { $result = pmssCommandCapture($command, 30); $value = trim((string) ($result['stdout'] ?? '')); if ((int) ($result['rc'] ?? 1) !== 0 || $value === '' || preg_match('/[\r\n\0]/', $value) === 1) { fwrite(STDERR, "Error: failed to read {$label}.\n"); exit(1); } return $value; }
 function storageBenchmarkRequirePositiveIntCommandField(string $command, string $label): int { $value = storageBenchmarkRequireCommandField($command, $label); if (!ctype_digit($value) || (int) $value <= 0) { fwrite(STDERR, "Error: failed to read {$label}.\n"); exit(1); } return (int) $value; }
-function storageBenchmarkDeviceIsReadableBlock(string $path): bool { return strpos($path, '/dev/') === 0 && strpos($path, "\0") === false && !is_link($path) && is_readable($path) && @filetype($path) === 'block'; }
+/** Return true only for raw block-device paths safe to pass to read-only probes. */
+function storageBenchmarkDevicePathIsSafe(string $path): bool
+{
+    return strpos($path, '/dev/') === 0
+        && preg_match('/[\r\n\0]/', $path) !== 1
+        && pmssPathSegmentsAreSafe($path, false, false);
+}
+
+function storageBenchmarkDeviceIsReadableBlock(string $path): bool { return storageBenchmarkDevicePathIsSafe($path) && is_readable($path) && @filetype($path) === 'block'; }
 function storageBenchmarkRegisterFileCleanup(string $path): void { register_shutdown_function(static function () use ($path): void { if ($path !== '' && is_file($path)) @unlink($path); }); }
 
 /** Read block-device size through a checked command boundary. */
 function storageBenchmarkDeviceSizeBytesRead(string $path): ?int
 {
+    if (!storageBenchmarkDevicePathIsSafe($path)) {
+        return null;
+    }
+
     $result = pmssCommandCapture('blockdev --getsize64 '.escapeshellarg($path), 30);
     $value = trim((string) ($result['stdout'] ?? ''));
     if ((int) ($result['rc'] ?? 1) !== 0 || $value === '' || preg_match('/[\r\n\0]/', $value) === 1 || !ctype_digit($value) || (int) $value <= 0) {
@@ -95,7 +107,7 @@ function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string
     $use = (int) min($requested, floor($free * 0.8));
     if ($use <= 0) { fwrite(STDERR, "Insufficient free space.\n"); exit(1); }
     $testFile = rtrim($targetDir, '/').'/pmss-fio-'.bin2hex(random_bytes(4)).'.dat'; storageBenchmarkRegisterFileCleanup($testFile);
-    if (pmssCommandPath('fallocate') !== '') runCommand('fallocate -l '.$use.' '.escapeshellarg($testFile));
+    if (pmssCommandPath('fallocate') !== '' && runCommand('fallocate -l '.$use.' '.escapeshellarg($testFile)) !== 0) { fwrite(STDERR, "Error: failed to preallocate benchmark file.\n"); exit(1); }
     $summary = [];
     foreach (storageBenchmarkFileJobs() as $job) {
         if ($job['name'] === 'randwrite-small-short') $job['runtime'] = max(15, (int) floor($runtime / 3));

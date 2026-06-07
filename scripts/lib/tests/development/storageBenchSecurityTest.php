@@ -264,6 +264,22 @@ class StorageBenchSecurityTest extends TestCase
         });
     }
 
+    public function testBlockDeviceSizeRejectsUnsafePathBeforeCommand(): void
+    {
+        require_once $this->pmssRepoPath('scripts/lib/storageBenchmark.php');
+        $stubDir = $this->pmssMakeTempDir('pmss-bench-blockdev-', 0700);
+        $invocations = $this->pmssMakeTempPath('pmss-bench-blockdev-', '.log');
+        @file_put_contents($invocations, '');
+        $this->pmssWriteExecutableFiles($stubDir, [
+            'blockdev' => "#!/bin/sh\nprintf '%s\\n' \"\$*\" >>\"\${PMSS_TEST_INVOCATION_LOG:?}\"\nprintf '%s\\n' '1048576'\n",
+        ]);
+
+        $this->pmssWithPathPrefixedEnv($stubDir, ['PMSS_TEST_INVOCATION_LOG' => $invocations], function () use ($invocations): void {
+            $this->assertSame(null, \storageBenchmarkDeviceSizeBytesRead('/tmp/pmss-test'));
+            $this->assertSame('', (string) @file_get_contents($invocations));
+        });
+    }
+
     public function testFileBackedTempFileIsCleanedAfterLateAppendFailure(): void
     {
         $target = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
@@ -319,6 +335,44 @@ SH
 
         $this->assertSame(1, $run['result']['rc']);
         $this->assertSame("Error: failed to append JSON log entry: {$jsonLog}\n", (string) @file_get_contents($run['stderrPath']));
+        $this->assertSame([], glob($target.'/pmss-fio-*.dat'));
+    }
+
+    public function testFileBackedPreallocationFailureFailsBeforeFioWork(): void
+    {
+        $target = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
+        $jsonLog = $this->pmssMakeJsonLogPath('pmss-bench-fallocate-', 'benchmark-storage.jsonl');
+        $stubDir = $this->pmssMakeTempDir('pmss-bench-stubs-', 0700);
+        $invocations = $this->pmssMakeTempPath('pmss-bench-invocations-', '.log');
+        @file_put_contents($invocations, '');
+
+        $this->pmssWriteExecutableFiles($stubDir, [
+            'stat' => "#!/bin/sh\nprintf '%s\\n' 'ext2/ext3'\n",
+            'df' => <<<'SH'
+#!/bin/sh
+if [ "${1:-}" = "-PB1" ]; then
+    printf '%s\n' 'Filesystem 1B-blocks Used Available Use% Mounted on'
+    printf '%s\n' 'pmssfs 10485760 0 10485760 1% /tmp'
+    exit 0
+fi
+printf '%s\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on'
+printf '%s\n' 'pmssfs 10240 0 10240 1% /tmp'
+SH,
+            'fallocate' => "#!/bin/sh\nlast=''\nfor arg in \"\$@\"; do last=\"\$arg\"; done\n: >\"\$last\"\nprintf 'FALLOCATE %s\\n' \"\$*\" >>\"\${PMSS_TEST_INVOCATION_LOG:?}\"\nexit 1\n",
+            'ioping' => "#!/bin/sh\nprintf '%s\\n' 'min/avg/max/mdev = 1.0/2.0/3.0/0.1 ms'\n",
+            'fio' => "#!/bin/sh\nprintf 'FIO %s\\n' \"\$*\" >>\"\${PMSS_TEST_INVOCATION_LOG:?}\"\nexit 0\n",
+        ]);
+
+        $run = $this->pmssRunRepoPhpScriptCommandWithTempStderr(
+            'scripts/util/storageBenchmark.php',
+            ['--target='.$target, '--json='.$jsonLog, '--size=1M', '--runtime=1'],
+            $this->pmssPathPrefixedEnvironment($stubDir, ['PMSS_TEST_INVOCATION_LOG' => $invocations])
+        );
+
+        $this->assertSame(1, $run['result']['rc']);
+        $this->assertStringContainsString("Error: failed to preallocate benchmark file.\n", (string) @file_get_contents($run['stderrPath']));
+        $this->assertStringContainsString('FALLOCATE ', (string) @file_get_contents($invocations));
+        $this->assertStringNotContainsString('FIO ', (string) @file_get_contents($invocations));
         $this->assertSame([], glob($target.'/pmss-fio-*.dat'));
     }
 
