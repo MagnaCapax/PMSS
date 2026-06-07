@@ -491,17 +491,24 @@ if (file_exists('../.customFrames')) {
     }
     $file = null;
 }
+// Case-insensitive set of keys already present in the primary frame set ($frames, from the
+// remote guiFrames master or the local failover). The remote master keys some app tabs with
+// mixed case (e.g. 'qBittorrent') while the local installed/proxy readers key them lower-case
+// ('qbittorrent'); an exact-key isset() guard misses that case difference and renders the tab
+// TWICE. Dedup case-insensitively so a tab the master already provides is never re-added.
+$pmssFramesKeysLower = array();
+foreach (array_keys($frames) as $pmssFrameKey) { $pmssFramesKeysLower[strtolower($pmssFrameKey)] = true; }
 foreach (pmssLocalFrameInstalledAppFramesRead() as $app => $frame) {
-    if (!isset($frames[$app]) && !isset($frameData[$app])) {
+    if (!isset($pmssFramesKeysLower[strtolower($app)]) && !isset($frameData[$app])) {
         $frameData[$app] = $frame;
     }
 }
 foreach (pmssLocalFrameProxyAppFramesRead() as $app => $frame) {
-    if (!isset($frames[$app]) && !isset($frameData[$app])) {
+    if (!isset($pmssFramesKeysLower[strtolower($app)]) && !isset($frameData[$app])) {
         $frameData[$app] = $frame;
     }
 }
-if (file_exists('../.delugeEnable') && file_exists('deluge.php') && !isset($frames['deluge']) && !isset($frameData['deluge'])) {
+if (file_exists('../.delugeEnable') && file_exists('deluge.php') && !isset($pmssFramesKeysLower['deluge']) && !isset($frameData['deluge'])) {
     $frameData['deluge'] = array(
         'title' => 'Deluge - Torrent web UI',
         'linkText' => 'Deluge',
