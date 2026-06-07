@@ -183,6 +183,75 @@ function pmssComponentStatusChecks(array $dependencies = []): array
     return array_merge($results, pmssStatusProbeChecks($context['probeSpecs'], $runCommand, $isExecutable, $pathExists, true));
 }
 
+/** Check localnet readability and parent traversal as one system-test result. */
+function pmssSystemStatusLocalnetConfigCheck(callable $isFile, callable $isDir, callable $filePerms): array
+{
+    $localnetConfig = '/etc/seedbox/config/localnet';
+    if (!$isFile($localnetConfig)) return pmssStatus('Seedbox localnet (config)', 'WARN', $localnetConfig.' missing');
+    $issues = [];
+    $configPerms = $filePerms($localnetConfig);
+    if ($configPerms === false) $issues[] = 'unable to read localnet file permissions';
+    elseif ((($configPerms & 0777) & 0004) === 0) $issues[] = sprintf('%s mode %o missing world-read (rtorrent users may not read filter)', $localnetConfig, $configPerms & 0777);
+    foreach (['/etc/seedbox', '/etc/seedbox/config'] as $dir) {
+        if (!$isDir($dir)) { $issues[] = $dir.' missing'; continue; }
+        $dirPerms = $filePerms($dir);
+        if ($dirPerms === false) { $issues[] = 'unable to read permissions for '.$dir; continue; }
+        if ((($dirPerms & 0777) & 0001) === 0) $issues[] = sprintf('%s mode %o missing world-exec (users cannot traverse to localnet)', $dir, $dirPerms & 0777);
+    }
+    return pmssStatus('Seedbox localnet (config)', $issues === [] ? 'OK' : 'ERR', $issues === [] ? $localnetConfig.' readable via 0664 + traversable dirs' : implode('; ', $issues));
+}
+
+/** Return the sources/codename status when both inputs are known enough to compare. */
+function pmssSystemStatusSourcesCodenameCheck(string $codename, string $sourcesPath, callable $isFile, callable $readFile): ?array
+{
+    if ($codename === '' || !$isFile($sourcesPath)) return null;
+    $sources = $readFile($sourcesPath);
+    $matches = $sources !== '' && stripos($sources, $codename) !== false;
+    return pmssStatus('Sources codename match', $matches ? 'OK' : 'WARN', $matches ? 'sources.list references '.$codename : sprintf('%s not present in sources.list', $codename));
+}
+
+/** Check OpenVPN client artifacts without probing generated paths for invalid hostnames. */
+function pmssSystemStatusOpenvpnClientArtifactCheck(callable $isFile, string $hostname): array
+{
+    $hostname = trim($hostname);
+    if ($hostname === '') return pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname unknown');
+    if (!pmssHostnameIsValid($hostname)) return pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname invalid');
+    $fqdn = strpos($hostname, '.pulsedmedia.com') !== false ? $hostname : $hostname.'.pulsedmedia.com';
+    $slug = str_replace('.', '-', $fqdn);
+    $artifacts = ['/home/openvpn-'.$slug.'.ovpn', '/home/openvpn-'.$slug.'.crt'];
+    $missing = array_values(array_map('basename', array_filter($artifacts, static function (string $path) use ($isFile): bool { return !$isFile($path); })));
+    return $missing === []
+        ? pmssStatus('OpenVPN client artifacts', 'OK', basename($artifacts[0]).', '.basename($artifacts[1]))
+        : pmssStatus('OpenVPN client artifacts', 'WARN', 'missing: '.implode(', ', $missing));
+}
+
+/** Render binary path checks that require both a file and executable bit. */
+function pmssSystemStatusExecutablePathChecks(array $paths, callable $isFile, callable $isExecutable): array
+{
+    return array_map(static function (string $label, string $path) use ($isFile, $isExecutable): array {
+        $valid = $isFile($path) && $isExecutable($path);
+        return pmssStatus($label, $valid ? 'OK' : 'WARN', $valid ? $path : $path.' missing or not executable');
+    }, array_keys($paths), array_values($paths));
+}
+
+/** Render CLI symlink checks while preserving unreadable-target diagnostics. */
+function pmssSystemStatusSymlinkChecks(array $targets, callable $isFile, callable $isLink, callable $readLink): array
+{
+    return array_map(static function (string $label, array $target) use ($isFile, $isLink, $readLink): array {
+        [$link, $expected] = $target;
+        if (!$isLink($link)) return pmssStatus($label, 'WARN', $isFile($link) ? sprintf('%s present but not a symlink', $link) : sprintf('%s missing', $link));
+        $actual = $readLink($link);
+        if ($actual === '') return pmssStatus($label, 'WARN', sprintf('%s symlink target unreadable', $link));
+        return pmssStatus($label, $actual === $expected ? 'OK' : 'WARN', $actual === $expected ? sprintf('%s -> %s', $link, $actual) : sprintf('%s -> %s (expected %s)', $link, $actual, $expected));
+    }, array_keys($targets), array_values($targets));
+}
+
+/** Prefix component status rows for the richer system-test report. */
+function pmssSystemStatusComponentProjection(array $checks): array
+{
+    return array_map(static function (array $entry): array { return pmssStatus('Component: '.(string) $entry['name'], (string) $entry['status'], (string) ($entry['detail'] ?? '')); }, $checks);
+}
+
 /**
  * Collect the richer system-test probe used by scripts/util/systemTest.php.
  *
@@ -203,117 +272,14 @@ function pmssSystemStatusChecks(array $dependencies = []): array
         : pmssStatus('OS codename', 'OK', $codename);
     $checks = array_merge($checks, pmssStatusProbeChecks($context['probeSpecs'], $runCommand, $isExecutable, $pathExists));
 
-    $localnetConfig = '/etc/seedbox/config/localnet';
-    if ($isFile($localnetConfig)) {
-        $issues = [];
-        $configPerms = $filePerms($localnetConfig);
-        if ($configPerms === false) {
-            $issues[] = 'unable to read localnet file permissions';
-        } elseif ((($configPerms & 0777) & 0004) === 0) {
-            $issues[] = sprintf(
-                '%s mode %o missing world-read (rtorrent users may not read filter)',
-                $localnetConfig,
-                $configPerms & 0777
-            );
-        }
-
-        foreach (['/etc/seedbox', '/etc/seedbox/config'] as $dir) {
-            if (!$isDir($dir)) {
-                $issues[] = $dir.' missing';
-                continue;
-            }
-
-            $dirPerms = $filePerms($dir);
-            if ($dirPerms === false) {
-                $issues[] = 'unable to read permissions for '.$dir;
-                continue;
-            }
-            if ((($dirPerms & 0777) & 0001) === 0) {
-                $issues[] = sprintf(
-                    '%s mode %o missing world-exec (users cannot traverse to localnet)',
-                    $dir,
-                    $dirPerms & 0777
-                );
-            }
-        }
-
-        $checks[] = pmssStatus(
-            'Seedbox localnet (config)',
-            $issues === [] ? 'OK' : 'ERR',
-            $issues === [] ? $localnetConfig.' readable via 0664 + traversable dirs' : implode('; ', $issues)
-        );
-    } else {
-        $checks[] = pmssStatus('Seedbox localnet (config)', 'WARN', $localnetConfig.' missing');
-    }
-
-    if ($codename !== '' && $isFile($sourcesPath)) {
-        $sources = $readFile($sourcesPath);
-        $matches = $sources !== '' && stripos($sources, $codename) !== false;
-        $checks[] = pmssStatus(
-            'Sources codename match',
-            $matches ? 'OK' : 'WARN',
-            $matches ? 'sources.list references '.$codename : sprintf('%s not present in sources.list', $codename)
-        );
-    }
-
-    $hostname = trim((string) $readFile('/etc/hostname'));
-    if ($hostname === '') {
-        $checks[] = pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname unknown');
-    } elseif (!pmssHostnameIsValid($hostname)) {
-        $checks[] = pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname invalid');
-    } else {
-        $fqdn = strpos($hostname, '.pulsedmedia.com') !== false ? $hostname : $hostname.'.pulsedmedia.com';
-        $slug = str_replace('.', '-', $fqdn);
-        $ovpn = '/home/openvpn-'.$slug.'.ovpn';
-        $crt = '/home/openvpn-'.$slug.'.crt';
-        $checks[] = $isFile($ovpn) && $isFile($crt)
-            ? pmssStatus('OpenVPN client artifacts', 'OK', basename($ovpn).', '.basename($crt))
-            : pmssStatus(
-                'OpenVPN client artifacts',
-                'WARN',
-                'missing: '.implode(', ', array_filter([
-                    !$isFile($ovpn) ? basename($ovpn) : '',
-                    !$isFile($crt) ? basename($crt) : '',
-                ]))
-            );
-    }
-
-    foreach ([
+    $sourcesCheck = pmssSystemStatusSourcesCodenameCheck($codename, $sourcesPath, $isFile, $readFile);
+    $checks = array_merge($checks, [pmssSystemStatusLocalnetConfigCheck($isFile, $isDir, $filePerms)], $sourcesCheck !== null ? [$sourcesCheck] : [], [pmssSystemStatusOpenvpnClientArtifactCheck($isFile, (string) $readFile('/etc/hostname'))], pmssSystemStatusExecutablePathChecks([
         'Virtualenv: FlexGet binary' => '/opt/flexget/bin/flexget',
         'Virtualenv: pyLoad binary' => '/opt/pyload/bin/pyload',
-    ] as $label => $path) {
-        $valid = $isFile($path) && $isExecutable($path);
-        $checks[] = pmssStatus($label, $valid ? 'OK' : 'WARN', $valid ? $path : $path.' missing or not executable');
-    }
-
-    foreach ([
+    ], $isFile, $isExecutable), pmssSystemStatusSymlinkChecks([
         'CLI symlink: flexget' => ['/usr/local/bin/flexget', '/opt/flexget/bin/flexget'],
         'CLI symlink: pyLoad' => ['/usr/local/bin/pyload', '/opt/pyload/bin/pyload'],
-    ] as $label => $target) {
-        $link = $target[0];
-        $expected = $target[1];
-        if ($isLink($link)) {
-            $actual = $readLink($link);
-            if ($actual === '') {
-                $checks[] = pmssStatus($label, 'WARN', sprintf('%s symlink target unreadable', $link));
-                continue;
-            }
+    ], $isFile, $isLink, $readLink));
 
-            $checks[] = pmssStatus(
-                $label,
-                $actual === $expected ? 'OK' : 'WARN',
-                $actual === $expected ? sprintf('%s -> %s', $link, $actual) : sprintf('%s -> %s (expected %s)', $link, $actual, $expected)
-            );
-            continue;
-        }
-
-        $checks[] = pmssStatus($label, 'WARN', $isFile($link) ? sprintf('%s present but not a symlink', $link) : sprintf('%s missing', $link));
-    }
-
-    return array_merge($checks, array_map(
-        static function (array $entry): array {
-            return pmssStatus('Component: '.(string) $entry['name'], (string) $entry['status'], (string) ($entry['detail'] ?? ''));
-        },
-        pmssComponentStatusChecks($context)
-    ));
+    return array_merge($checks, pmssSystemStatusComponentProjection(pmssComponentStatusChecks($context)));
 }

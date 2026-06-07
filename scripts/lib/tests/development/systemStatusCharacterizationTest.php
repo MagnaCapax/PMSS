@@ -462,6 +462,22 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertEquals('hostname invalid', $checks[25]['detail']);
     }
 
+    public function testSystemStatusReportsMissingOpenvpnArtifactsAfterValidHostname(): void
+    {
+        $dependencies = $this->buildSystemStatusDependencies();
+        $isFile = $dependencies['isFile'];
+        $dependencies['isFile'] = static function (string $path) use ($isFile): bool {
+            return $path === '/home/openvpn-host-pulsedmedia-com.crt' ? false : $isFile($path);
+        };
+
+        $checks = pmssSystemStatusChecks($dependencies);
+
+        $this->assertSame(
+            ['name' => 'OpenVPN client artifacts', 'status' => 'WARN', 'detail' => 'missing: openvpn-host-pulsedmedia-com.crt'],
+            $checks[25]
+        );
+    }
+
     public function testSystemStatusIncludesComponentProjectionVerbatim(): void
     {
         $dependencies = $this->buildSystemStatusDependencies();
