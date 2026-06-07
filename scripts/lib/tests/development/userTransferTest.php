@@ -253,7 +253,8 @@ class UserTransferTest extends TestCase
     public function testGeneratedTransferScriptsMatchSnapshot(): void
     {
         $cfg = $this->baseConfig();
-        $expectedScratchPaths = ['expect' => '/root/pmss-userTransfer-<generated>/transfer.expect', 'authProbe' => '/root/pmss-userTransfer-<generated>/auth-probe.sh', 'mainScript' => '/root/pmss-userTransfer-<generated>/rsync-main.sh', 'finalScript' => '/root/pmss-userTransfer-<generated>/rsync-final.sh', 'remoteSizeScript' => '/root/pmss-userTransfer-<generated>/remote-size.sh'];
+        $expectedScratchPaths = ['expect' => '/root/pmss-userTransfer-<generated>/transfer.expect', 'authProbe' => '/root/pmss-userTransfer-<generated>/auth-probe.sh', 'mainScript' => '/root/pmss-userTransfer-<generated>/rsync-main.sh', 'finalScript' => '/root/pmss-userTransfer-<generated>/rsync-final.sh', 'remoteSizeScript' => '/root/pmss-userTransfer-<generated>/remote-size.sh', 'qbittorrentProbeScript' => '/root/pmss-userTransfer-<generated>/qbittorrent-categories.sh', 'qbittorrentConfig' => '/root/pmss-userTransfer-<generated>/qBittorrent.conf', 'qbittorrentCategories' => '/root/pmss-userTransfer-<generated>/categories.json'];
+        $expectedPayloadKeys = ['expect', 'authProbe', 'mainScript', 'finalScript', 'remoteSizeScript', 'qbittorrentProbeScript'];
         $expectedMain = <<<'SNAP'
 #!/bin/bash
 set -e
@@ -274,7 +275,80 @@ SNAP;
         $this->assertEquals($expectedFinal."\n", \pmssUserTransferBuildRsyncFinal($cfg));
         $this->assertEquals($expectedAuth."\n", \pmssUserTransferBuildAuthProbe($cfg));
         $this->assertSame($expectedScratchPaths, \pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>/'));
-        $this->assertSame(array_keys($expectedScratchPaths), array_keys(\pmssUserTransferScratchPayloads($cfg)));
+        $this->assertSame($expectedPayloadKeys, array_keys(\pmssUserTransferScratchPayloads($cfg)));
+    }
+
+    public function testBuildQbittorrentCategoryProbeWritesRemoteMetadataToScratchFiles(): void
+    {
+        $script = \pmssUserTransferBuildQbittorrentCategoryProbe(
+            $this->baseConfig(),
+            '/root/scratch/qBittorrent.conf',
+            '/root/scratch/categories.json'
+        );
+
+        $this->assertStringContainsAllStrings([
+            "ssh -o Compression=no",
+            "-o NumberOfPasswordPrompts=1",
+            "-l 'deefbox'",
+            "'example.com'",
+            '/home/deefbox/.config/qBittorrent/qBittorrent.conf',
+            '/home/deefbox/.config/qBittorrent/categories.json',
+            "> '/root/scratch/qBittorrent.conf'",
+            "> '/root/scratch/categories.json'",
+        ], $script);
+    }
+
+    public function testLegacyQbittorrentCategoriesExtractsQtVariantMap(): void
+    {
+        $variant = $this->pmssQtSettingsEscapedBytes($this->pmssQtVariantStringMap([
+            'Movies' => '/home/olduser/data/Movies',
+            'sonarr' => '',
+        ]));
+        $config = "[Preferences]\nSession\\Categories=@Variant(ignored)\n[BitTorrent]\nSession\\Categories=@Variant({$variant})\n";
+
+        $categories = \pmssUserTransferQbittorrentLegacyCategoriesFromConfig($config, [
+            'localUser' => 'newuser',
+            'remoteUser' => 'olduser',
+        ]);
+
+        $this->assertEquals([
+            'Movies' => ['save_path' => '/home/newuser/data/Movies'],
+            'sonarr' => ['save_path' => ''],
+        ], $categories);
+    }
+
+    public function testLegacyQbittorrentCategoriesRejectsMalformedVariant(): void
+    {
+        $this->assertEquals([], \pmssUserTransferQbittorrentLegacyCategoriesFromConfig(
+            "[BitTorrent]\nSession\\Categories=@Variant(garbage)\n",
+            $this->baseConfig()
+        ));
+    }
+
+    public function testQbittorrentCategoriesMergeWritesJsonWithoutOverwritingExisting(): void
+    {
+        $target = $this->pmssMakeTempPath('pmss-userTransfer-qbit-categories-').'/categories.json';
+        $added = \pmssUserTransferQbittorrentCategoriesMerge($target, [
+            'Movies' => ['save_path' => '/existing'],
+        ], [
+            'Movies' => ['save_path' => '/source'],
+            'Books' => ['savePath' => '/books'],
+        ]);
+
+        $decoded = json_decode((string) file_get_contents($target), true);
+
+        $this->assertEquals(1, $added);
+        $this->assertEquals('/existing', $decoded['Movies']['save_path']);
+        $this->assertEquals('/books', $decoded['Books']['save_path']);
+        $this->assertTrue(!isset($decoded['Books']['savePath']), 'expected API-style savePath key to be normalized');
+    }
+
+    public function testQbittorrentCategoriesJsonReadRejectsInvalidJson(): void
+    {
+        $path = $this->pmssMakeTempPath('pmss-userTransfer-qbit-invalid-');
+        file_put_contents($path, '{not json');
+
+        $this->assertSame(null, \pmssUserTransferQbittorrentCategoriesJsonRead($path));
     }
 
     public function testSharedRsyncCommandBuilderMatchesSnapshot(): void
@@ -468,5 +542,43 @@ SNAP;
     private function baseConfig(array $overrides = []): array
     {
         return array_replace(['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'], $overrides);
+    }
+
+    private function pmssQtVariantStringMap(array $values): string
+    {
+        $bytes = pack('N', 8).pack('N', count($values));
+        foreach ($values as $key => $value) {
+            $bytes .= $this->pmssQtString((string) $key);
+            $bytes .= pack('N', 10);
+            $bytes .= $this->pmssQtString((string) $value);
+        }
+        return $bytes;
+    }
+
+    private function pmssQtString(string $value): string
+    {
+        $raw = '';
+        for ($i = 0; $i < strlen($value); $i++) {
+            $raw .= "\0".$value[$i];
+        }
+        return pack('N', strlen($raw)).$raw;
+    }
+
+    private function pmssQtSettingsEscapedBytes(string $bytes): string
+    {
+        $escaped = '';
+        for ($i = 0; $i < strlen($bytes); $i++) {
+            $ord = ord($bytes[$i]);
+            if ($ord === 0) {
+                $escaped .= '\0';
+            } elseif ($ord === 10) {
+                $escaped .= '\n';
+            } elseif ($ord >= 32 && $ord <= 126 && $bytes[$i] !== '\\') {
+                $escaped .= $bytes[$i];
+            } else {
+                $escaped .= '\x'.str_pad(dechex($ord), 2, '0', STR_PAD_LEFT);
+            }
+        }
+        return $escaped;
     }
 }

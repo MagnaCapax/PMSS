@@ -24,6 +24,7 @@ require_once __DIR__.'/lighttpd/userFileWrite.php';
 require_once __DIR__.'/userTransfer/cliParse.php';
 require_once __DIR__.'/userTransfer/completenessVerify.php';
 require_once __DIR__.'/userTransfer/localUserSafety.php';
+require_once __DIR__.'/userTransfer/qbittorrentCategories.php';
 require_once __DIR__.'/userTransfer/sessionRewrite.php';
 
 /**
@@ -39,7 +40,7 @@ function pmssUserTransferWriteFile(string $path, string $contents, int $mode): v
 }
 
 /** Return scratch paths shared by dry-run and live transfer flows. */
-function pmssUserTransferScratchPaths(string $scratchRoot): array { $scratchRoot = rtrim($scratchRoot, '/'); return ['expect' => $scratchRoot.'/transfer.expect', 'authProbe' => $scratchRoot.'/auth-probe.sh', 'mainScript' => $scratchRoot.'/rsync-main.sh', 'finalScript' => $scratchRoot.'/rsync-final.sh', 'remoteSizeScript' => $scratchRoot.'/remote-size.sh']; }
+function pmssUserTransferScratchPaths(string $scratchRoot): array { $scratchRoot = rtrim($scratchRoot, '/'); return ['expect' => $scratchRoot.'/transfer.expect', 'authProbe' => $scratchRoot.'/auth-probe.sh', 'mainScript' => $scratchRoot.'/rsync-main.sh', 'finalScript' => $scratchRoot.'/rsync-final.sh', 'remoteSizeScript' => $scratchRoot.'/remote-size.sh', 'qbittorrentProbeScript' => $scratchRoot.'/qbittorrent-categories.sh', 'qbittorrentConfig' => $scratchRoot.'/qBittorrent.conf', 'qbittorrentCategories' => $scratchRoot.'/categories.json']; }
 
 /**
  * Sleep between passes (optionally randomised) while logging the reason.
@@ -205,7 +206,7 @@ EXP;
 }
 
 /** Build scratch script payloads keyed to pmssUserTransferScratchPaths(). */
-function pmssUserTransferScratchPayloads(array $cfg): array { return ['expect' => pmssUserTransferBuildExpectWrapper()."\n", 'authProbe' => pmssUserTransferBuildAuthProbe($cfg), 'mainScript' => pmssUserTransferBuildRsyncMain($cfg), 'finalScript' => pmssUserTransferBuildRsyncFinal($cfg), 'remoteSizeScript' => pmssUserTransferBuildRemoteSizeProbe($cfg)]; }
+function pmssUserTransferScratchPayloads(array $cfg, array $paths = []): array { $paths = $paths ?: pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>'); return ['expect' => pmssUserTransferBuildExpectWrapper()."\n", 'authProbe' => pmssUserTransferBuildAuthProbe($cfg), 'mainScript' => pmssUserTransferBuildRsyncMain($cfg), 'finalScript' => pmssUserTransferBuildRsyncFinal($cfg), 'remoteSizeScript' => pmssUserTransferBuildRemoteSizeProbe($cfg), 'qbittorrentProbeScript' => pmssUserTransferBuildQbittorrentCategoryProbe($cfg, $paths['qbittorrentConfig'], $paths['qbittorrentCategories'])]; }
 
 /**
  * Entry point used by scripts/util/userTransfer.php.
@@ -314,7 +315,7 @@ function pmssUserTransferMain(array $argv): int
         };
         register_shutdown_function($cleanup);
 
-        foreach (pmssUserTransferScratchPayloads($cfg) as $key => $contents) {
+        foreach (pmssUserTransferScratchPayloads($cfg, $scratchPaths) as $key => $contents) {
             pmssUserTransferWriteFile($scratchPaths[$key], $contents, 0700);
         }
 
@@ -329,7 +330,7 @@ function pmssUserTransferMain(array $argv): int
             $lastMainRc = pmssUserTransferRunPasses('Pulling home data', $scratchPaths['expect'], $scratchPaths['mainScript'], $cfg['mainPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
             $lastFinalRc = pmssUserTransferRunPasses('Pulling volatile data', $scratchPaths['expect'], $scratchPaths['finalScript'], $cfg['finalPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
 
-            pmssUserTransferPostSetup($cfg, $home, $scratchPaths['expect'], $scratchPaths['remoteSizeScript']);
+            pmssUserTransferPostSetup($cfg, $home, $scratchPaths);
 
             if ($cfg['printPassword']) {
                 logMessage('[WARN] Remote password: '.$password);
@@ -360,7 +361,7 @@ function pmssUserTransferMain(array $argv): int
 /**
  * Apply post-transfer steps (rename ruTorrent user dir, normalise permissions, restart marker).
  */
-function pmssUserTransferPostSetup(array $cfg, string $home, string $expectPath, string $remoteSizeScriptPath): void
+function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths): void
 {
     $localUser = $cfg['localUser'];
     $remoteUser = $cfg['remoteUser'];
@@ -389,6 +390,17 @@ function pmssUserTransferPostSetup(array $cfg, string $home, string $expectPath,
     // source and destination accounts.
     pmssUserTransferRewriteRtorrentSessionPaths($cfg, $home);
 
+    // Preserve qBittorrent category labels without copying the excluded,
+    // server-specific qBittorrent.conf wholesale.
+    pmssUserTransferPreserveQbittorrentCategories(
+        $cfg,
+        $home,
+        $scratchPaths['expect'],
+        $scratchPaths['qbittorrentProbeScript'],
+        $scratchPaths['qbittorrentConfig'],
+        $scratchPaths['qbittorrentCategories']
+    );
+
     // Normalise ownership/permissions via the shared helper, which avoids unsafe
     // recursive chown dereferencing symlinks into the host filesystem.
     runStep(
@@ -408,5 +420,5 @@ function pmssUserTransferPostSetup(array $cfg, string $home, string $expectPath,
 
     // Advisory only: keep the existing exit-code semantics while surfacing
     // suspiciously incomplete copies before operators clean up the source.
-    pmssUserTransferVerifyCompleteness($cfg, $home, $expectPath, $remoteSizeScriptPath);
+    pmssUserTransferVerifyCompleteness($cfg, $home, $scratchPaths['expect'], $scratchPaths['remoteSizeScript']);
 }

@@ -217,6 +217,22 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## User Environment Orchestration – `scripts/lib/update/users.php` and submodules
 
+- User transfer – `scripts/util/userTransfer.php`
+  - Main rsync excludes server-specific torrent client configs such as
+    `~/.config/qBittorrent/qBittorrent.conf`.
+  - Post-transfer qBittorrent category preservation reads only category-bearing
+    source metadata into the private scratch directory, prefers a non-empty
+    source `categories.json`, and falls back to legacy `Session\Categories` from
+    `qBittorrent.conf`.
+  - Output: merges missing category entries into
+    `~/.config/qBittorrent/categories.json` without overwriting existing local
+    category names; `/home/<remoteUser>/...` save paths are rewritten to
+    `/home/<localUser>/...` when usernames differ.
+  - Side-effects: writes the merged JSON with mode `0600` before the existing
+    `userPermissions.php` normalization step fixes final ownership.
+  - Errors: fail-soft; invalid/missing category metadata logs a warning or info
+    line and does not abort the transfer.
+
 - pmssUpdateAllUsers(string $rutorrentIndexSha): array
   - Enumerates users from `users::listHomeUsers()`, runs per-user maintenance, and returns summary keys: `total`, `processed`, `skipped`.
   - Emits end-of-loop summary log line `Processed N of M users` and JSON event `user_maintenance_summary`.
