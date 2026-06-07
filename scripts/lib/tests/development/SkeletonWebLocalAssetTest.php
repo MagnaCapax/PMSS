@@ -128,6 +128,7 @@ class SkeletonWebLocalAssetTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings(
             'scripts/lib/update/users/filesystem.php',
             [
+                "'www/scriptsInc.php',",
                 "'www/deluge.php',",
                 "'www/error-503.html',",
                 "'www/filemanager.php',",
@@ -144,6 +145,47 @@ class SkeletonWebLocalAssetTest extends TestCase
                 "'www/welcome.php',",
             ],
             'Missing skeleton sync asset entry: '
+        );
+    }
+
+    public function testWelcomeStartupCallsStayInsideWelcomeAndScriptsInc(): void
+    {
+        $welcome = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+        $scriptsInc = $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php');
+
+        $startup = $this->welcomeStartupPhpBlock($welcome);
+        preg_match_all('/\b(pmss[A-Za-z0-9_]*)\s*\(/', $startup, $callMatches);
+        $calls = array_unique($callMatches[1]);
+        sort($calls);
+
+        $definitions = array_fill_keys(array_merge(
+            $this->phpFunctionNames($welcome),
+            $this->phpFunctionNames($scriptsInc)
+        ), true);
+        $missing = array();
+        foreach ($calls as $function) {
+            if (!isset($definitions[$function])) {
+                $missing[] = $function;
+            }
+        }
+
+        $this->assertSame(
+            array(),
+            $missing,
+            'welcome.php startup calls must be defined by welcome.php or its required scriptsInc.php'
+        );
+    }
+
+    public function testWelcomeAndScriptsIncStayOrderedInUserDeliveryManifest(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/lib/update/users/filesystem.php',
+            [
+                "'www/scriptsInc.php',",
+                "'www/welcome.php',",
+            ],
+            'Missing panel delivery-set manifest entry: ',
+            'scriptsInc.php must be delivered before welcome.php: '
         );
     }
 
@@ -178,5 +220,20 @@ class SkeletonWebLocalAssetTest extends TestCase
             }
         }
         $this->assertSame([], $missing, "Customer-panel local asset(s) referenced but not deliverable:\n".implode("\n", $missing));
+    }
+
+    private function welcomeStartupPhpBlock(string $welcome): string
+    {
+        $start = strpos($welcome, "require_once __DIR__.'/scriptsInc.php';");
+        $end = strpos($welcome, '?>', $start === false ? 0 : $start);
+        $this->assertTrue($start !== false && $end !== false && $end > $start, 'welcome.php startup block markers changed');
+
+        return substr($welcome, $start, $end - $start);
+    }
+
+    private function phpFunctionNames(string $source): array
+    {
+        preg_match_all('/\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/', $source, $matches);
+        return array_unique($matches[1]);
     }
 }
