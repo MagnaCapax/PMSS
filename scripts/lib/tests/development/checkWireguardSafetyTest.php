@@ -67,6 +67,13 @@ class CheckWireguardSafetyTest extends TestCase
         $this->assertSame([$this->validPeerA, $this->validPeerB], $result['keys']);
     }
 
+    public function testLsmodParserMatchesExactWireguardModuleOnly(): void
+    {
+        $this->assertTrue(\pmssWireguardLsmodOutputHasModule("wireguard 118784 0\n"));
+        $this->assertFalse(\pmssWireguardLsmodOutputHasModule("wireguarded 118784 0\n"));
+        $this->assertFalse(\pmssWireguardLsmodOutputHasModule("foo_wireguard 118784 0\n"));
+    }
+
     public function testMissingPeerPublicKeysReturnsConfiguredRuntimeDifference(): void
     {
         $this->assertSame(

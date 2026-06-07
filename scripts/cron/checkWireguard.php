@@ -94,6 +94,46 @@ function pmssWireguardPublicKeyIsValid(string $key): bool
 }
 
 /**
+ * Run one WireGuard maintenance command through a bounded capture boundary.
+ *
+ * @return array{rc:int,stdout:string,stderr:string}
+ */
+function pmssWireguardCommandCapture(string $program, array $args, int $timeoutSec = 30): array
+{
+    $result = pmssCommandCapture(pmssBuildCommand($program, $args), $timeoutSec);
+
+    return [
+        'rc' => (int) ($result['rc'] ?? 1),
+        'stdout' => (string) ($result['stdout'] ?? ''),
+        'stderr' => (string) ($result['stderr'] ?? ''),
+    ];
+}
+
+/** Parse lsmod output without shell pipelines or regexing command strings. */
+function pmssWireguardLsmodOutputHasModule(string $output): bool
+{
+    foreach (preg_split('/\R/', $output) ?: [] as $line) {
+        $columns = preg_split('/\s+/', trim($line));
+        if (is_array($columns) && ($columns[0] ?? '') === 'wireguard') {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/** Return whether the WireGuard kernel module appears in lsmod output. */
+function pmssWireguardKernelModuleLoaded(): bool
+{
+    $result = pmssWireguardCommandCapture('lsmod', []);
+    if ($result['rc'] !== 0) {
+        return false;
+    }
+
+    return pmssWireguardLsmodOutputHasModule($result['stdout']);
+}
+
+/**
  * Read configured peer public keys from wg0.conf.
  *
  * @return array{status:string,keys:array<int,string>}
@@ -128,13 +168,13 @@ function pmssWireguardPeerPublicKeysFromConfig(string $configPath): array
  */
 function pmssWireguardRunningPeerPublicKeys(): array
 {
-    $output = [];
-    exec(pmssBuildCommand('wg', ['show', 'wg0', 'peers']), $output, $rc);
-    if ($rc !== 0) {
-        return ['status' => 'unreadable', 'keys' => [], 'rc' => $rc];
+    $result = pmssWireguardCommandCapture('wg', ['show', 'wg0', 'peers']);
+    if ($result['rc'] !== 0) {
+        return ['status' => 'unreadable', 'keys' => [], 'rc' => $result['rc']];
     }
 
     $keys = [];
+    $output = trim($result['stdout']) === '' ? [] : (preg_split('/\R/', trim($result['stdout'])) ?: []);
     foreach ($output as $line) {
         $key = trim($line);
         if (pmssWireguardPublicKeyIsValid($key)) {
@@ -168,7 +208,7 @@ function pmssWireguardMissingPeerPublicKeys(array $configuredKeys, array $runnin
  */
 function pmssWireguardSyncconfFromConfig(): array
 {
-    $strip = pmssCommandCapture(pmssBuildCommand('wg-quick', ['strip', 'wg0']), 30);
+    $strip = pmssWireguardCommandCapture('wg-quick', ['strip', 'wg0']);
     if ((int) $strip['rc'] !== 0 || trim((string) $strip['stdout']) === '') {
         return ['stage' => 'strip', 'rc' => (int) $strip['rc']];
     }
@@ -185,7 +225,7 @@ function pmssWireguardSyncconfFromConfig(): array
         return ['stage' => 'tempfile', 'rc' => 1];
     }
 
-    $sync = pmssCommandCapture(pmssBuildCommand('wg', ['syncconf', 'wg0', $tmp]), 30);
+    $sync = pmssWireguardCommandCapture('wg', ['syncconf', 'wg0', $tmp]);
     @unlink($tmp);
 
     return ['stage' => 'syncconf', 'rc' => (int) $sync['rc']];
@@ -194,7 +234,7 @@ function pmssWireguardSyncconfFromConfig(): array
 /** Restart wg-quick@wg0 and report the outcome consistently. */
 function pmssWireguardRestartWgQuick(array $peerUsers, string $logPrefix): void
 {
-    exec(pmssBuildCommand('systemctl', ['restart', 'wg-quick@wg0']), $out, $restartStatus);
+    $restartStatus = pmssWireguardCommandCapture('systemctl', ['restart', 'wg-quick@wg0'])['rc'];
     if ($restartStatus === 0) {
         echo $logPrefix . "wg-quick@wg0 restarted successfully\n";
         pmssWireguardLogUsers($peerUsers, 'wireguard: wg-quick@wg0 restarted');
@@ -262,9 +302,8 @@ function pmssWireguardCheckMain(array $argv): int
         return 0;
     }
 
-    exec('lsmod | grep -q "^wireguard\b"', $null, $moduleStatus);
-    if ($moduleStatus !== 0) {
-        exec('modprobe wireguard', $out, $rc);
+    if (!pmssWireguardKernelModuleLoaded()) {
+        $rc = pmssWireguardCommandCapture('modprobe', ['wireguard'])['rc'];
         if ($rc !== 0) {
             echo $logPrefix . "failed to load wireguard kernel module (rc={$rc})\n";
             pmssWireguardLogUsers($peerUsers, sprintf('wireguard: failed to load kernel module (rc=%d)', $rc));
@@ -287,10 +326,10 @@ function pmssWireguardCheckMain(array $argv): int
         return 0;
     }
 
-    exec('wg show', $out, $status);
+    $status = pmssWireguardCommandCapture('wg', ['show'])['rc'];
     if ($status !== 0) {
         echo $logPrefix . "wg0 interface missing; attempting wg-quick up\n";
-        exec('wg-quick up wg0', $out, $rc);
+        $rc = pmssWireguardCommandCapture('wg-quick', ['up', 'wg0'])['rc'];
         if ($rc === 0) {
             echo $logPrefix . "wg0 brought up successfully\n";
             pmssWireguardLogUsers($peerUsers, 'wireguard: wg0 brought up');
