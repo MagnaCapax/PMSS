@@ -12,6 +12,7 @@ require_once __DIR__.'/users.php';
 require_once __DIR__.'/../pathSafety.php';
 require_once __DIR__.'/../users.php';
 require_once __DIR__.'/../userLifecycle.php';
+require_once __DIR__.'/../user/userCgroupSliceHealth.php';
 require_once __DIR__.'/../user/directories.php';
 require_once __DIR__.'/users/docker.php';
 
@@ -93,6 +94,7 @@ require_once __DIR__.'/users/docker.php';
         // but unrelated host state (see GH#591). Compact list only; detailed
         // traces already go to per-user logs.
         $skipReasons = [];
+        $userConfigStore = new UserConfigStore();
         logMessage(sprintf('Per-user maintenance: %d user(s) to process', $totalUsers));
         $isTty = pmssStreamIsTty(STDOUT);
         $phases = ['Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)'];
@@ -135,7 +137,8 @@ require_once __DIR__.'/users/docker.php';
             // Resume: this user was already fully refreshed against the current
             // PMSS version (e.g. a prior run that timed out further down the
             // queue). Count as processed and skip the expensive home traversal.
-            if (pmssUserRefreshAlreadyDone($userTrim, $refreshSignature)) {
+            $resumeAlreadyDone = pmssUserRefreshAlreadyDone($userTrim, $refreshSignature);
+            if ($resumeAlreadyDone && pmssUserCgroupSliceSelfHeal($userTrim, $userConfigStore)) {
                 $processedUsers++;
                 logMessage(sprintf('User %s already refreshed this version; skipping (resume)', $userTrim));
                 continue;
@@ -153,6 +156,14 @@ require_once __DIR__.'/users/docker.php';
             $userStart = microtime(true);
 
             try {
+                if ($resumeAlreadyDone) {
+                    throw new RuntimeException('cgroup slice memory policy refresh failed');
+                }
+
+                if (!pmssUserCgroupSliceSelfHeal($userTrim, $userConfigStore)) {
+                    throw new RuntimeException('cgroup slice memory policy refresh failed');
+                }
+
                 // #TODO Remove this fix block by end of 2027.
                 // Legacy fix: Detect "CPUQuota=85%" overrides on per-user slices and
                 // bump them to a host-based quota derived from total CPU threads so

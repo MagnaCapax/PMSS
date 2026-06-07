@@ -70,12 +70,16 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
             'the per-user loop must check the resume marker before the expensive refresh'
         );
         $this->assertTrue(
+            strpos($src, 'pmssUserCgroupSliceSelfHeal($userTrim, $userConfigStore)') !== false,
+            'resume skips must still run the cheap per-user cgroup slice health check'
+        );
+        $this->assertTrue(
             strpos($src, 'pmssUserRefreshMarkDone($userTrim, $refreshSignature)') !== false,
             'the loop must mark a user done after a successful refresh'
         );
         // The skip must count as processed (so a fully-resumed run reports complete).
         $this->assertTrue(
-            preg_match('/pmssUserRefreshAlreadyDone\([^)]*\)\)\s*\{\s*\$processedUsers\+\+;/s', $src) === 1,
+            preg_match('/\$resumeAlreadyDone\s*&&\s*pmssUserCgroupSliceSelfHeal\([^)]*\)\)\s*\{\s*\$processedUsers\+\+;/s', $src) === 1,
             'a resumed (skipped) user must count as processed, not skipped'
         );
     }

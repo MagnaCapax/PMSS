@@ -148,20 +148,17 @@ class Manager
     public function computeSetProps(array $opts, int $sysMemMiB): array
     {
         $props = [];
-        $minHigh = 250;
         $memoryHighMiB = null;
-        $maxCap = $sysMemMiB > 0 ? (int)floor($sysMemMiB * 0.95) : PHP_INT_MAX;
 
         if (isset($opts['memory-high']) || isset($opts['memory-max'])) {
-            $memoryHighMiB = isset($opts['memory-high'])
-                ? max($minHigh, (int)$opts['memory-high'])
-                : max($minHigh, (int)($sysMemMiB*0.10));
-            $props['MemoryHigh'] = $memoryHighMiB.'M';
-            $memoryMax = isset($opts['memory-max'])
-                ? (int)$opts['memory-max']
-                : (int) floor($memoryHighMiB * 1.25);
-            // MemoryMax cannot exceed High + 2048 MiB whether explicit or derived.
-            $props['MemoryMax'] = max($memoryHighMiB, min($memoryMax, $memoryHighMiB + 2048, $maxCap)).'M';
+            $memory = self::computeMemoryProperties(
+                isset($opts['memory-high']) ? (int)$opts['memory-high'] : null,
+                isset($opts['memory-max']) ? (int)$opts['memory-max'] : null,
+                $sysMemMiB
+            );
+            $memoryHighMiB = $memory['memoryHighMiB'];
+            $props['MemoryHigh'] = $memory['MemoryHigh'];
+            $props['MemoryMax'] = $memory['MemoryMax'];
         }
 
         $derivedWeight = $memoryHighMiB !== null ? self::calculateWeightFromMemory($memoryHighMiB) : null;
@@ -424,6 +421,32 @@ class Manager
     public static function calculateWeightFromMemory(int $memoryHighMiB): int
     {
         return max(10, min(1000, (int) round(8 * sqrt(max(0, $memoryHighMiB)))));
+    }
+
+    /**
+     * Compute the canonical memory properties used by userConfigCgroup.php.
+     *
+     * @return array{memoryHighMiB:int,memoryMaxMiB:int,MemoryHigh:string,MemoryMax:string}
+     */
+    public static function computeMemoryProperties(?int $memoryHighMiB, ?int $memoryMaxMiB, int $sysMemMiB): array
+    {
+        $minHigh = 250;
+        $high = $memoryHighMiB !== null
+            ? max($minHigh, $memoryHighMiB)
+            : max($minHigh, (int)($sysMemMiB * 0.10));
+        $maxCap = $sysMemMiB > 0 ? (int) floor($sysMemMiB * 0.95) : PHP_INT_MAX;
+        $max = $memoryMaxMiB !== null
+            ? $memoryMaxMiB
+            : (int) floor($high * 1.25);
+        // MemoryMax cannot exceed High + 2048 MiB whether explicit or derived.
+        $max = max($high, min($max, $high + 2048, $maxCap));
+
+        return [
+            'memoryHighMiB' => $high,
+            'memoryMaxMiB' => $max,
+            'MemoryHigh' => $high.'M',
+            'MemoryMax' => $max.'M',
+        ];
     }
 
     private function applyDefaults(array &$opt): array
