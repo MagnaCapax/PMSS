@@ -32,16 +32,7 @@ class RuntimeProfileTest extends TestCase
         $this->resetState();
         $this->assertTrue(empty($GLOBALS['PMSS_PROFILE'] ?? []));
 
-        pmssRecordProfile([
-            'description' => 'Init',
-            'command' => 'true',
-            'status' => 'OK',
-            'rc' => 0,
-            'duration' => 0.0,
-            'dry_run' => false,
-            'stdout_excerpt' => '',
-            'stderr_excerpt' => '',
-        ]);
+        $this->recordProfileEntry(['description' => 'Init']);
 
         $this->assertTrue(is_array($GLOBALS['PMSS_PROFILE']));
     }
@@ -49,62 +40,42 @@ class RuntimeProfileTest extends TestCase
     public function testRecordProfileAppendsEntry(): void
     {
         $this->resetState();
-        pmssRecordProfile([
-            'description' => 'Sample',
-            'command' => 'true',
-            'status' => 'OK',
-            'rc' => 0,
-            'duration' => 0.1,
-            'dry_run' => false,
-            'stdout_excerpt' => '',
-            'stderr_excerpt' => '',
-        ]);
+        $this->recordProfileEntry(['description' => 'Sample', 'duration' => 0.1]);
         $this->assertEquals(1, count($GLOBALS['PMSS_PROFILE'] ?? []));
     }
 
     public function testProfileSummaryWritesJsonLog(): void
     {
         $this->resetState();
-        $tmpProfile = sys_get_temp_dir().'/pmss-profile-'.bin2hex(random_bytes(4));
+        $tmpProfile = $this->pmssMakeTempPath('pmss-profile-');
         $this->pmssTrackEnvOverrides([
             'PMSS_PROFILE_OUTPUT' => $tmpProfile,
             'PMSS_JSON_LOG' => null,
         ]);
-        pmssRecordProfile([
-            'description' => 'First',
-            'command' => 'true',
-            'status' => 'OK',
-            'rc' => 0,
-            'duration' => 0.2,
-            'dry_run' => false,
-            'stdout_excerpt' => '',
-            'stderr_excerpt' => '',
-        ]);
+        $this->recordProfileEntry(['description' => 'First', 'duration' => 0.2]);
         pmssProfileSummary();
         $this->assertTrue(file_exists($tmpProfile));
-        $payload = $this->pmssReadJsonArrayFile($tmpProfile, null, 'Profile output should contain recorded entries');
-        @unlink($tmpProfile);
+        $this->pmssReadJsonArrayFile($tmpProfile, null, 'Profile output should contain recorded entries');
     }
 
     public function testProfileSummarySkipsWhenEmpty(): void
     {
         $this->resetState();
-        $tmpProfile = sys_get_temp_dir().'/pmss-profile-empty-'.bin2hex(random_bytes(4));
+        $tmpProfile = $this->pmssMakeTempPath('pmss-profile-empty-');
         $this->pmssTrackEnvOverrides([
             'PMSS_PROFILE_OUTPUT' => $tmpProfile,
             'PMSS_JSON_LOG' => null,
         ]);
         pmssProfileSummary();
         $this->assertTrue(!file_exists($tmpProfile), 'No file should be written when profile is empty');
-        @unlink($tmpProfile);
     }
 
     public function testProfileSummaryToleratesMalformedEntries(): void
     {
         $this->resetState();
 
-        $tmpJson = sys_get_temp_dir().'/pmss-profile-json-'.bin2hex(random_bytes(4));
-        $tmpProfile = sys_get_temp_dir().'/pmss-profile-malformed-'.bin2hex(random_bytes(4));
+        $tmpJson = $this->pmssMakeTempPath('pmss-profile-json-');
+        $tmpProfile = $this->pmssMakeTempPath('pmss-profile-malformed-');
         $this->pmssTrackEnvOverrides([
             'PMSS_JSON_LOG' => $tmpJson,
             'PMSS_PROFILE_OUTPUT' => $tmpProfile,
@@ -136,9 +107,7 @@ class RuntimeProfileTest extends TestCase
 
         pmssProfileSummary();
 
-        $summaryEvents = array_values(array_filter(pmssJsonLineFileRead($tmpJson), static function (array $decoded): bool {
-            return ($decoded['event'] ?? '') === 'profile_summary';
-        }));
+        $summaryEvents = $this->profileSummaryEvents($tmpJson);
         $this->assertTrue(count($summaryEvents) >= 1, 'Expected profile_summary despite malformed profile rows');
         $last = end($summaryEvents);
         $this->assertEquals(1, $last['status_counts']['OK'] ?? null);
@@ -152,9 +121,6 @@ class RuntimeProfileTest extends TestCase
         $this->assertSame('OTHER', $profile[1]['status']);
         $this->assertSame(0, $profile[1]['rc']);
         $this->assertEquals(0.0, $profile[1]['duration']);
-
-        @unlink($tmpJson);
-        @unlink($tmpProfile);
     }
 
     public function testProfileSummaryIncludesStatusCountsAndJsonEvent(): void
@@ -162,96 +128,64 @@ class RuntimeProfileTest extends TestCase
         $this->resetState();
 
         // Route JSON events to a temp file so we can inspect the payload.
-        $tmpJson = sys_get_temp_dir().'/pmss-profile-json-'.bin2hex(random_bytes(4));
+        $tmpJson = $this->pmssMakeTempPath('pmss-profile-json-');
         $this->pmssTrackEnvOverrides(['PMSS_JSON_LOG' => $tmpJson]);
 
-        pmssRecordProfile([
-            'description' => 'ok-step',
-            'command' => 'true',
-            'status' => 'OK',
-            'rc' => 0,
-            'duration' => 0.1,
-            'dry_run' => false,
-            'stdout_excerpt' => '',
-            'stderr_excerpt' => '',
-        ]);
-        pmssRecordProfile([
-            'description' => 'err-step',
-            'command' => 'false',
-            'status' => 'ERR',
-            'rc' => 1,
-            'duration' => 0.2,
-            'dry_run' => false,
-            'stdout_excerpt' => '',
-            'stderr_excerpt' => '',
-        ]);
-        pmssRecordProfile([
-            'description' => 'skip-step',
-            'command' => '',
-            'status' => 'SKIP',
-            'rc' => 0,
-            'duration' => 0.3,
-            'dry_run' => true,
-            'stdout_excerpt' => '',
-            'stderr_excerpt' => '',
-        ]);
+        $this->recordProfileEntry(['description' => 'ok-step', 'duration' => 0.1]);
+        $this->recordProfileEntry(['description' => 'err-step', 'command' => 'false', 'status' => 'ERR', 'rc' => 1, 'duration' => 0.2]);
+        $this->recordProfileEntry(['description' => 'skip-step', 'command' => '', 'status' => 'SKIP', 'duration' => 0.3, 'dry_run' => true]);
 
         pmssProfileSummary();
 
         // The JSON log should contain a profile_summary event with status_counts.
         $this->assertTrue(file_exists($tmpJson));
-        $summaryEvents = array_values(array_filter(pmssJsonLineFileRead($tmpJson), static function (array $decoded): bool {
-            return ($decoded['event'] ?? '') === 'profile_summary';
-        }));
+        $summaryEvents = $this->profileSummaryEvents($tmpJson);
         $this->assertTrue(count($summaryEvents) >= 1, 'Expected at least one profile_summary JSON event');
         $last = end($summaryEvents);
         $this->assertTrue(isset($last['status_counts']) && is_array($last['status_counts']));
         $this->assertEquals(1, $last['status_counts']['OK'] ?? null);
         $this->assertEquals(1, $last['status_counts']['ERR'] ?? null);
         $this->assertEquals(1, $last['status_counts']['SKIP'] ?? null);
-
-        @unlink($tmpJson);
     }
 
     public function testProfileSummaryNormalizesKnownStatusesAndBucketsUnknownOnes(): void
     {
         $this->resetState();
 
-        $tmpJson = sys_get_temp_dir().'/pmss-profile-json-'.bin2hex(random_bytes(4));
+        $tmpJson = $this->pmssMakeTempPath('pmss-profile-json-');
         $this->pmssTrackEnvOverrides(['PMSS_JSON_LOG' => $tmpJson]);
 
-        pmssRecordProfile([
-            'description' => 'ok-step',
-            'command' => 'true',
-            'status' => 'ok',
-            'rc' => 0,
-            'duration' => 0.1,
-            'dry_run' => false,
-            'stdout_excerpt' => '',
-            'stderr_excerpt' => '',
-        ]);
-        pmssRecordProfile([
-            'description' => 'warn-step',
-            'command' => 'true',
-            'status' => 'warn',
-            'rc' => 0,
-            'duration' => 0.2,
-            'dry_run' => false,
-            'stdout_excerpt' => '',
-            'stderr_excerpt' => '',
-        ]);
+        $this->recordProfileEntry(['description' => 'ok-step', 'status' => 'ok', 'duration' => 0.1]);
+        $this->recordProfileEntry(['description' => 'warn-step', 'status' => 'warn', 'duration' => 0.2]);
 
         pmssProfileSummary();
 
-        $summaryEvents = array_values(array_filter(pmssJsonLineFileRead($tmpJson), static function (array $decoded): bool {
-            return ($decoded['event'] ?? '') === 'profile_summary';
-        }));
+        $summaryEvents = $this->profileSummaryEvents($tmpJson);
 
         $this->assertTrue(count($summaryEvents) >= 1, 'Expected at least one profile_summary JSON event');
         $last = end($summaryEvents);
         $this->assertEquals(1, $last['status_counts']['OK'] ?? null);
         $this->assertEquals(1, $last['status_counts']['OTHER'] ?? null);
+    }
 
-        @unlink($tmpJson);
+    private function recordProfileEntry(array $overrides = []): void
+    {
+        pmssRecordProfile(array_replace([
+            'description' => 'step',
+            'command' => 'true',
+            'status' => 'OK',
+            'rc' => 0,
+            'duration' => 0.0,
+            'dry_run' => false,
+            'stdout_excerpt' => '',
+            'stderr_excerpt' => '',
+        ], $overrides));
+    }
+
+    private function profileSummaryEvents(string $jsonPath): array
+    {
+        return array_values(array_filter(pmssJsonLineFileRead($jsonPath), static function (array $decoded): bool {
+            return ($decoded['event'] ?? '') === 'profile_summary';
+        }));
     }
 }

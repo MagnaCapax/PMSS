@@ -18,6 +18,11 @@ class MediaStackPanelTest extends TestCase
         return $home;
     }
 
+    private function mediaStatusRead(string $home): array
+    {
+        return \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
+    }
+
     public function testEndpointRequiresCustomerTreeHelper(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/mediaStack.php', [
@@ -36,7 +41,7 @@ class MediaStackPanelTest extends TestCase
     {
         $home = $this->mediaHomeCreate('pmss-media-ready-');
 
-        $status = \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
+        $status = $this->mediaStatusRead($home);
 
         $this->assertSame('ready', $status['state']);
         $this->assertTrue($status['canStart']);
@@ -48,7 +53,7 @@ class MediaStackPanelTest extends TestCase
         @mkdir($home.'/.bin', 0755, true);
         @file_put_contents($home.'/.bin/existing', '1');
 
-        $status = \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
+        $status = $this->mediaStatusRead($home);
 
         $this->assertSame('blocked', $status['state']);
         $this->assertFalse($status['canStart']);
@@ -60,7 +65,7 @@ class MediaStackPanelTest extends TestCase
         $fixture = $this->mediaStackCgroupV2Fixture(512 * 1024 * 1024);
 
         $this->pmssWithEnv($fixture, function () use ($home): void {
-            $status = \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
+            $status = $this->mediaStatusRead($home);
 
             $this->assertSame('blocked', $status['state']);
             $this->assertFalse($status['canStart']);
@@ -74,7 +79,7 @@ class MediaStackPanelTest extends TestCase
         $fixture = $this->mediaStackCgroupV2Fixture(2 * 1024 * 1024 * 1024);
 
         $this->pmssWithEnv($fixture, function () use ($home): void {
-            $status = \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
+            $status = $this->mediaStatusRead($home);
 
             $this->assertSame('ready', $status['state']);
             $this->assertTrue($status['canStart']);
@@ -169,7 +174,7 @@ class MediaStackPanelTest extends TestCase
         $home = $this->mediaHomeCreate($prefix);
         $this->pmssWriteRelativeFile($home, $relativePath, $content);
 
-        return \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
+        return $this->mediaStatusRead($home);
     }
 
     private function mediaStackCgroupV2Fixture(int $limitBytes): array

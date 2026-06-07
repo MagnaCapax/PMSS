@@ -23,6 +23,27 @@ class ShowResourcesFormatTest extends TestCase
         ];
     }
 
+    private function numericUsageValues(): array
+    {
+        return [
+            'io_read' => $this->pmssBuildWindowValues(1.0), 'io_write' => $this->pmssBuildWindowValues(2.0), 'io_read_ops' => $this->pmssBuildWindowValues(3.0),
+            'io_write_ops' => $this->pmssBuildWindowValues(4.0), 'cpu' => $this->pmssBuildWindowValues(5.0), 'memory' => $this->pmssBuildWindowValues(7.0), 'memory_current' => 6.0,
+            'memory_avg_month' => 7.0, 'ram_hours' => $this->pmssBuildWindowValues(8.0), 'tasks' => $this->pmssBuildWindowValues(9.0), 'tasks_current' => 9.0,
+        ];
+    }
+
+    private function resourceStatsRuntimeWithAlice(array $values): string
+    {
+        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
+        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/alice', $this->pmssBuildResourceStatsPayloadFromValues($values));
+        return $runtimeDir;
+    }
+
+    private function runShowResources(array $arguments, string $runtimeDir): string
+    {
+        return $this->pmssRunRepoPhpScript('scripts/showResources.php', $arguments, ['PMSS_RUNTIME_DIR' => $runtimeDir]);
+    }
+
     public function testHelpOutputMatchesSnapshot(): void
     {
         $out = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--help']);
@@ -40,31 +61,28 @@ class ShowResourcesFormatTest extends TestCase
 
     public function testFormatBytesTiB(): void
     {
-        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
-        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/alice', $this->pmssBuildResourceStatsPayloadFromValues($this->sampleUsageValues([
+        $runtimeDir = $this->resourceStatsRuntimeWithAlice($this->sampleUsageValues([
             'io_read' => $this->pmssBuildWindowValues(2 * 1024 * 1024 * 1024 * 1024, 1, 1, 1),
-        ])));
-        $out = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
+        ]));
+        $out = $this->runShowResources(['--user=alice'], $runtimeDir);
 
         $this->assertStringContainsString('2.00 TiB', $out);
     }
 
     public function testUserFilteredOutputFormatsCpuRamAndIops(): void
     {
-        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
-        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/alice', $this->pmssBuildResourceStatsPayloadFromValues($this->sampleUsageValues()));
+        $runtimeDir = $this->resourceStatsRuntimeWithAlice($this->sampleUsageValues());
         $this->pmssAssertRepoPhpScriptOutputContains('scripts/showResources.php', ['--user=alice'], ['IO Ops/mo', '70 ops', '1.0 hrs', '2.50 GB-hrs', '1.00 GiB', '2.00'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
     }
 
     public function testUserFilteredOutputFormatsMonthlyIoOpsWithSuffixes(): void
     {
-        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
-        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/alice', $this->pmssBuildResourceStatsPayloadFromValues($this->sampleUsageValues([
+        $runtimeDir = $this->resourceStatsRuntimeWithAlice($this->sampleUsageValues([
             'io_read_ops' => $this->pmssBuildWindowValues(2500000, 30, 30, 3600),
             'io_write_ops' => $this->pmssBuildWindowValues(3500000, 40, 40, 3600),
-        ])));
+        ]));
 
-        $out = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
+        $out = $this->runShowResources(['--user=alice'], $runtimeDir);
 
         $this->assertStringContainsString('6.00 M ops', $out);
     }
@@ -72,15 +90,11 @@ class ShowResourcesFormatTest extends TestCase
     public function testUserFilteredJsonOutputKeepsExpectedPayloadShape(): void
     {
         $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
-        $values = [
-            'io_read' => $this->pmssBuildWindowValues(1.0), 'io_write' => $this->pmssBuildWindowValues(2.0), 'io_read_ops' => $this->pmssBuildWindowValues(3.0),
-            'io_write_ops' => $this->pmssBuildWindowValues(4.0), 'cpu' => $this->pmssBuildWindowValues(5.0), 'memory' => $this->pmssBuildWindowValues(7.0), 'memory_current' => 6.0,
-            'memory_avg_month' => 7.0, 'ram_hours' => $this->pmssBuildWindowValues(8.0), 'tasks' => $this->pmssBuildWindowValues(9.0), 'tasks_current' => 9.0,
-        ];
+        $values = $this->numericUsageValues();
         $payload = $this->pmssBuildResourceStatsPayloadFromValues($values);
         $payload['ignored_field'] = ['month' => 999.0];
         $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/alice', $payload);
-        $json = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--json', '--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
+        $json = $this->runShowResources(['--json', '--user=alice'], $runtimeDir);
 
         $payload = $this->pmssDecodeJsonArray($json);
         $this->assertEquals(6.0, $payload['users']['alice']['memory']['current']);
@@ -92,18 +106,13 @@ class ShowResourcesFormatTest extends TestCase
 
     public function testUserFilteredJsonOutputMatchesSnapshot(): void
     {
-        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
-        $values = [
-            'io_read' => $this->pmssBuildWindowValues(1.0), 'io_write' => $this->pmssBuildWindowValues(2.0), 'io_read_ops' => $this->pmssBuildWindowValues(3.0),
-            'io_write_ops' => $this->pmssBuildWindowValues(4.0), 'cpu' => $this->pmssBuildWindowValues(5.0), 'memory' => $this->pmssBuildWindowValues(7.0), 'memory_current' => 6.0,
-            'memory_avg_month' => 7.0, 'ram_hours' => $this->pmssBuildWindowValues(8.0), 'tasks' => $this->pmssBuildWindowValues(9.0), 'tasks_current' => 9.0,
-        ];
+        $values = $this->numericUsageValues();
         $expectedRow = $this->pmssBuildResourceReportRowFromValues($values);
-        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/alice', $this->pmssBuildResourceStatsPayloadFromValues($values));
+        $runtimeDir = $this->resourceStatsRuntimeWithAlice($values);
 
         $this->assertEquals(
             ['users' => ['alice' => $expectedRow], 'totals' => $expectedRow, 'missing' => []],
-            $this->pmssDecodeJsonArray($this->pmssRunRepoPhpScript('scripts/showResources.php', ['--json', '--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]))
+            $this->pmssDecodeJsonArray($this->runShowResources(['--json', '--user=alice'], $runtimeDir))
         );
     }
 

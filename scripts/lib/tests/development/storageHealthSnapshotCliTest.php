@@ -42,9 +42,7 @@ class StorageHealthSnapshotCliTest extends TestCase
     public function testFailsWhenLogDirectoryCannotBeCreated(): void
     {
         $parentPath = $this->pmssMakeTempFile('pmss-storage-health-parent-');
-        $result = $this->runSnapshotCommand(['--json', $parentPath.'/child.jsonl']);
-        $this->assertSame(1, $result['rc']);
-        $this->assertStringContainsString('Refusing unsafe storage health log path', $result['output']);
+        $this->assertSnapshotRejectsUnsafeLogTarget(['--json', $parentPath.'/child.jsonl']);
     }
 
     public function testRejectsSymlinkLogTargetBeforeReading(): void
@@ -53,10 +51,8 @@ class StorageHealthSnapshotCliTest extends TestCase
         $link = $this->pmssMakeTempDir('pmss-storage-health-link-').'/events.jsonl';
         $this->pmssCreateSymlinkOrSkip($target, $link);
 
-        $result = $this->runSnapshotCommand(['--json', $link]);
+        $result = $this->assertSnapshotRejectsUnsafeLogTarget(['--json', $link]);
 
-        $this->assertSame(1, $result['rc']);
-        $this->assertStringContainsString('Refusing unsafe storage health log path', $result['output']);
         $this->assertSame('', (string) file_get_contents($target));
     }
 
@@ -67,11 +63,18 @@ class StorageHealthSnapshotCliTest extends TestCase
         $linkDir = $linkRoot.'/redirected';
         $this->pmssCreateSymlinkOrSkip($targetDir, $linkDir);
 
-        $result = $this->runSnapshotCommand(['--json', $linkDir.'/nested/events.jsonl']);
+        $this->assertSnapshotRejectsUnsafeLogTarget(['--json', $linkDir.'/nested/events.jsonl']);
 
+        $this->assertTrue(!is_dir($targetDir.'/nested'), 'must not create log directories through symlinked parents');
+    }
+
+    /** @return array{rc:int,output:string,lines:array<int,string>} */
+    private function assertSnapshotRejectsUnsafeLogTarget(array $arguments): array
+    {
+        $result = $this->runSnapshotCommand($arguments);
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Refusing unsafe storage health log path', $result['output']);
-        $this->assertTrue(!is_dir($targetDir.'/nested'), 'must not create log directories through symlinked parents');
+        return $result;
     }
 
     /** @return array{rc:int,output:string,lines:array<int,string>} */

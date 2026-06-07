@@ -15,6 +15,11 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $this->pmssEnsureDir($this->tmpDir.'/dev/mapper', 0700);
     }
 
+    private function homeMountsPath(string $device): string
+    {
+        return $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', $device." /home ext4 rw 0 0\n", 0700);
+    }
+
     public function testParsesRaidActivitySummaryDetails(): void
     {
         $summary = \pmssStorageHealthRaidActivitySummaryParse(
@@ -29,9 +34,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     public function testResolvesHomeArrayFromDirectMdMount(): void
     {
-        $mountsPath = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/md0 /home ext4 rw 0 0\n", 0700);
-
-        $homeArray = \pmssStorageHealthHomeArrayResolve($mountsPath);
+        $homeArray = \pmssStorageHealthHomeArrayResolve($this->homeMountsPath('/dev/md0'));
         $this->assertEquals('md0', $homeArray);
     }
 
@@ -49,13 +52,12 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     public function testHomeRaidActivityReturnsOnlyHomeArrayWork(): void
     {
-        $mountsPath = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/md1 /home ext4 rw 0 0\n", 0700);
         $raidEntries = [
             ['array' => 'md0', 'resync' => '      [>....................]  resync = 5.1% finish=90.0min speed=1000K/sec'],
             ['array' => 'md1', 'resync' => '      [>....................]  recovery = 7.5% finish=60.0min speed=2000K/sec'],
         ];
 
-        $activity = \pmssStorageHealthHomeRaidActivity($mountsPath, $raidEntries);
+        $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/md1'), $raidEntries);
 
         $this->assertTrue(is_array($activity), 'Expected activity for /home array');
         $this->assertEquals('md1', $activity['array']);
@@ -65,23 +67,21 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     public function testHomeRaidActivityReturnsNullWhenHomeIsNotOnMd(): void
     {
-        $mountsPath = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/vda1 /home ext4 rw 0 0\n", 0700);
         $raidEntries = [
             ['array' => 'md1', 'resync' => '      [>....................]  resync = 5.1% finish=90.0min speed=1000K/sec'],
         ];
 
-        $activity = \pmssStorageHealthHomeRaidActivity($mountsPath, $raidEntries);
+        $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/vda1'), $raidEntries);
         $this->assertTrue($activity === null, 'Expected no activity when /home is not backed by md');
     }
 
     public function testHomeRaidActivityReturnsDegradedNoticeWithoutRebuild(): void
     {
-        $mountsPath = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/md1 /home ext4 rw 0 0\n", 0700);
         $raidEntries = [
             ['array' => 'md1', 'flags' => ['degraded'], 'severity' => 'fail'],
         ];
 
-        $activity = \pmssStorageHealthHomeRaidActivity($mountsPath, $raidEntries);
+        $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/md1'), $raidEntries);
 
         $this->assertTrue(is_array($activity), 'Expected degraded notice for /home array');
         $this->assertEquals('md1', $activity['array']);
@@ -90,7 +90,6 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     public function testHomeRaidActivityPrefersActiveRebuildOverDegradedNotice(): void
     {
-        $mountsPath = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/md1 /home ext4 rw 0 0\n", 0700);
         $raidEntries = [
             [
                 'array' => 'md1',
@@ -100,7 +99,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
             ],
         ];
 
-        $activity = \pmssStorageHealthHomeRaidActivity($mountsPath, $raidEntries);
+        $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/md1'), $raidEntries);
 
         $this->assertTrue(is_array($activity), 'Expected active rebuild for /home array');
         $this->assertEquals('recovery', $activity['operation']);

@@ -42,8 +42,8 @@ class StorageBenchSecurityTest extends TestCase
         string $case = ''
     ): void {
         $runTs = $runTs ?? date('c');
-        array_unshift($entries, $this->pmssStorageBenchmarkPreflightEntry($runId, $runTs, $preflightExtra));
-        $this->assertSecurityLogContains($entries, $expected, $case);
+        $log = $this->pmssWriteStorageBenchmarkRunLog($runId, $runTs, $entries, $preflightExtra, 'pmss-bench-sec-');
+        $this->assertShowPathContains($log, $expected, $case);
     }
 
     public function testPathTraversalInJsonPathIsRead(): void
@@ -63,8 +63,7 @@ class StorageBenchSecurityTest extends TestCase
 
     public function testDirectoryAsLogPathPrintsNoLog(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-bench-sec-dir-'.bin2hex(random_bytes(2)); @mkdir($dir, 0700, true);
-        $this->assertShowPathContains($dir, 'No log at');
+        $this->assertShowPathContains($this->pmssMakeTempDir('pmss-bench-sec-dir-', 0700), 'No log at');
     }
 
     public function testUnreadableLogDoesNotCrash(): void
@@ -141,8 +140,9 @@ class StorageBenchSecurityTest extends TestCase
 
     public function testSymlinkToDirectoryIsRejected(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-bench-linkdir-'.bin2hex(random_bytes(2));
-        @mkdir($dir,0700,true); $link=$dir.'/l.jsonl'; @symlink($dir,$link);
+        $dir = $this->pmssMakeTempDir('pmss-bench-linkdir-', 0700);
+        $link = $dir.'/l.jsonl';
+        @symlink($dir, $link);
         $this->assertShowPathContains($link, 'No log at');
     }
 
