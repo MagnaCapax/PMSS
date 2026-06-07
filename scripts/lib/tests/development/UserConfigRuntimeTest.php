@@ -63,4 +63,14 @@ class UserConfigRuntimeTest extends TestCase
         $this->assertFalse(\pmssUserConfigRtorrentProcessOwnedBy(12345, 1500, $procRoot));
         $this->assertFalse(\pmssUserConfigRtorrentProcessOwnedBy(12345, 1600, $procRoot));
     }
+
+    public function testCgroupApplyFailureMessageIsSingleLine(): void
+    {
+        $message = \pmssUserConfigCgroupApplyFailureMessage("ali\nce", 7);
+
+        $this->assertSame(
+            'Warning: cgroup configuration failed for ali?ce (rc=7); update-step2 will check and retry slice policy drift',
+            $message
+        );
+    }
 }

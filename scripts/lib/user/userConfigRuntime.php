@@ -64,3 +64,39 @@ function pmssUserConfigRtorrentProcessOwnedBy(int $pid, int $uid, string $procRo
     $comm = pmssReadRegularFileTrimmed(rtrim($procRoot, '/').'/'.$pid.'/comm');
     return $comm !== null && strpos($comm, 'rtorrent') === 0;
 }
+
+/**
+ * Build the operator-facing cgroup failure warning.
+ */
+function pmssUserConfigCgroupApplyFailureMessage(string $username, int $rc): string
+{
+    $safeUser = preg_replace('/[\r\n\0]+/', '?', $username);
+    $safeUser = is_string($safeUser) && $safeUser !== '' ? $safeUser : '(empty)';
+    return sprintf(
+        'Warning: cgroup configuration failed for %s (rc=%d); update-step2 will check and retry slice policy drift',
+        $safeUser,
+        $rc
+    );
+}
+
+/**
+ * Surface a failed cgroup apply without converting it into fresh-account rollback.
+ */
+function pmssUserConfigCgroupApplyFailureLog(string $username, int $rc): void
+{
+    $message = pmssUserConfigCgroupApplyFailureMessage($username, $rc);
+    $safeUser = preg_replace('/[\r\n\0]+/', '?', $username);
+    $safeUser = is_string($safeUser) && $safeUser !== '' ? $safeUser : '(empty)';
+    fwrite(STDERR, $message."\n");
+    if (function_exists('logMessage')) {
+        logMessage($message);
+    }
+    if (function_exists('pmssLogJson')) {
+        pmssLogJson([
+            'event' => 'user_config_cgroup_apply_failed',
+            'level' => 'warn',
+            'user'  => $safeUser,
+            'rc'    => $rc,
+        ]);
+    }
+}

@@ -274,10 +274,13 @@ if (isset($user['cpuQuotaPercent']) && $user['cpuQuotaPercent'] !== '') {
     echo 'Applying CPU quota: '.$quotaLabel."\n";
 }
 
-runStep(
+$cgroupRc = runStep(
     'Configuring cgroups',
     pmssBuildCommand('php', $args)
 );
+if ($cgroupRc !== 0) {
+    pmssUserConfigCgroupApplyFailureLog($user['name'], $cgroupRc);
+}
 
 if (!pmssUserDockerEnabled($user['name'], $store)) {
     pmssLogStatus('SKIP', 'Rootless Docker disabled by config for '.$user['name']);

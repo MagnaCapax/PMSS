@@ -59,6 +59,7 @@ Usage
 ## Notes
 
 - `RAM_MiB` is applied through `userConfigCgroup.php`; PMSS clamps the effective `MemoryHigh` floor to 250 MiB and derives `MemoryMax` at roughly 1.25x with at most 2048 MiB of headroom.
+- If the cgroup apply step returns non-zero, `userConfig.php` emits a warning and JSON event without rolling back the account; update-step2 checks the stored plan against the live slice policy and retries drifted memory settings.
 - If `RAM_MiB` is below `245`, PMSS persists `dockerEnabled=false` for safety.
 - Named resource options override legacy positional values, and `USERNAME` plus named options reuses the stored RAM/quota baseline.
 - Use `userConfigCgroup.php` directly when you only need targeted slice tuning without the wider quota and service orchestration performed by `userConfig.php`.
