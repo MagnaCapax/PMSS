@@ -52,6 +52,23 @@ function pmssAppendRootTimestampedLogEntry(string $path, string $message, int $m
     return pmssAppendUserFile($path, date('Y-m-d H:i:s').$message, 'root', $mode);
 }
 
+/**
+ * Acquire a counter state file lock while creating missing files owner-only.
+ */
+function pmssCounterStateLockAcquire(string $statePath)
+{
+    if (!pmssPathTargetIsSafe($statePath, false)) {
+        return false;
+    }
+
+    $previousUmask = umask(0177);
+    try {
+        return pmssLockFileAcquire($statePath, false, 'c+');
+    } finally {
+        umask($previousUmask);
+    }
+}
+
 /** Persist counter state under lock and return deltas for the selected fields.
  *
  * @param array<string, int> $deltaCeilings
@@ -59,7 +76,7 @@ function pmssAppendRootTimestampedLogEntry(string $path, string $message, int $m
  */
 function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFields, array $deltaCeilings = []): array
 {
-    $handle = pmssPathTargetIsSafe($statePath, false) ? pmssLockFileAcquire($statePath, false, 'c+') : false;
+    $handle = pmssCounterStateLockAcquire($statePath);
     $previousState = $handle !== false ? (pmssJsonDecodeAssoc((string) @stream_get_contents($handle)) ?? []) : [];
     $delta = [];
     foreach ($deltaFields as $field) {
@@ -83,7 +100,7 @@ function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFie
         @rewind($handle);
         @fwrite($handle, $payload);
         @fflush($handle);
-        @chmod($statePath, 0600);
+        chmod($statePath, 0600);
     }
     if ($handle !== false) { pmssLockHandleRelease($handle); }
     return ['delta' => $delta, 'previous_state' => $previousState, 'state' => $state];
