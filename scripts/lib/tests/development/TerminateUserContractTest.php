@@ -122,6 +122,12 @@ final class TerminateUserContractTest extends TestCase
                 '$configLines = @file($portFile',
                 'cleanup_ports_config_read',
                 '$configLines = array();',
+                'pmssTerminateUserRtorrentPortRecord',
+            ]],
+            'scripts/lib/user/terminationCleanup.php' => ['required' => [
+                'function pmssTerminateUserRtorrentPortRecord',
+                'pmssNetworkPortParseDigits',
+                'cleanup_ports_config_invalid',
             ]],
         ]);
     }
@@ -207,5 +213,59 @@ final class TerminateUserContractTest extends TestCase
         $target = \pmssTerminateUserMoveBackupForReclaim('user1234', $backupDir, true);
         $this->assertStringContainsString('/home/.terminating-user1234-', $target);
         $this->assertTrue(is_dir($backupDir), 'dry-run backup reclaim must not move source');
+    }
+
+    public function testTerminationCleanupHelpersRejectUnsafePathInputs(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-terminate-unsafe-cleanup-');
+        $file = $dir.'/route.conf';
+        $emptyDir = $dir.'/empty';
+        $this->pmssWriteFile($file, 'managed');
+        $this->pmssEnsureDir($emptyDir);
+
+        $this->assertFalse(\pmssTerminateUserUnlinkPath('user1234', 'remove_file', "bad\0path", false));
+        $this->assertTrue(is_file($file), 'unsafe unlink input must not affect nearby files');
+        $this->assertFalse(\pmssTerminateUserRemoveEmptyDir('user1234', 'remove_dir', "bad\0path", false));
+        $this->assertTrue(is_dir($emptyDir), 'unsafe rmdir input must not affect nearby dirs');
+
+        $this->assertSame(
+            '',
+            \pmssTerminateUserMovePathForReclaim(
+                'user1234',
+                'home_reclaim_rename',
+                $dir."\0bad",
+                true,
+                'Dry run; home not renamed',
+                'Failed to rename home for background reclaim',
+                'Renamed home for background reclaim'
+            )
+        );
+        $this->assertSame(
+            '',
+            \pmssTerminateUserMovePathForReclaim(
+                'user1234',
+                'home_reclaim_rename',
+                $dir,
+                true,
+                'Dry run; home not renamed',
+                'Failed to rename home for background reclaim',
+                'Renamed home for background reclaim',
+                array(),
+                true
+            )
+        );
+    }
+
+    public function testTerminateUserRtorrentPortRecorderRejectsInvalidPorts(): void
+    {
+        $ports = array();
+
+        \pmssTerminateUserRtorrentPortRecord('user1234', $ports, 'scgi', '2000');
+        \pmssTerminateUserRtorrentPortRecord('user1234', $ports, 'dht', '0');
+        \pmssTerminateUserRtorrentPortRecord('user1234', $ports, 'listen', '65536');
+        \pmssTerminateUserRtorrentPortRecord('user1234', $ports, 'bad', 'not-a-port');
+        \pmssTerminateUserRtorrentPortRecord('user1234', $ports, 'bad', '2001');
+
+        $this->assertSame(array('scgi' => 2000), $ports);
     }
 }

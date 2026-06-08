@@ -15,6 +15,10 @@ require_once __DIR__.'/homeReclaim.php';
 /** Remove a lifecycle-owned file while preserving dry-run semantics. */
 function pmssTerminateUserUnlinkPath(string $username, string $phase, string $path, bool $dryRun): bool
 {
+    if (pmssFilesystemPathHasNulByte($path)) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', 'Refusing unsafe file path', array('path' => $path));
+        return false;
+    }
     if (!file_exists($path) && !is_link($path)) return true;
     if ($dryRun) {
         pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'SKIP', 'Dry run; file not removed', array('path' => $path));
@@ -28,6 +32,10 @@ function pmssTerminateUserUnlinkPath(string $username, string $phase, string $pa
 /** Remove an empty lifecycle-owned directory without hiding dry-run mutations. */
 function pmssTerminateUserRemoveEmptyDir(string $username, string $phase, string $path, bool $dryRun): bool
 {
+    if (pmssFilesystemPathHasNulByte($path)) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', 'Refusing unsafe directory path', array('path' => $path));
+        return false;
+    }
     if (!is_dir($path)) return true;
     $entries = @scandir($path);
     if (!is_array($entries) || array_diff($entries, array('.', '..')) !== array()) return true;
@@ -50,9 +58,49 @@ function pmssTerminateUserRemoveNginxRouteFiles(string $username, bool $dryRun):
     return $ok;
 }
 
+/**
+ * Record a parsed rTorrent reservation port only when it is a valid network port.
+ *
+ * @param array<string,int> $ports
+ */
+function pmssTerminateUserRtorrentPortRecord(string $username, array &$ports, string $type, string $rawPort): void
+{
+    if (!in_array($type, array('scgi', 'dht', 'listen'), true)) {
+        pmssUserLifecycleContextLogStatusMessage(
+            'terminate',
+            'cleanup_ports_config_invalid',
+            $username,
+            'WARN',
+            'Invalid rTorrent port type in config; skipping port reservation cleanup',
+            array('type' => $type, 'raw_port' => $rawPort)
+        );
+        return;
+    }
+
+    $port = pmssNetworkPortParseDigits($rawPort);
+    if ($port === null) {
+        pmssUserLifecycleContextLogStatusMessage(
+            'terminate',
+            'cleanup_ports_config_invalid',
+            $username,
+            'WARN',
+            'Invalid rTorrent port in config; skipping port reservation cleanup',
+            array('type' => $type, 'raw_port' => $rawPort)
+        );
+        return;
+    }
+
+    $ports[$type] = $port;
+}
+
 /** Move a validated source path into the asynchronous reclaim namespace. */
 function pmssTerminateUserMovePathForReclaim(string $username, string $phase, string $sourcePath, bool $dryRun, string $dryRunMessage, string $failureMessage, string $successMessage, array $allocationContext = array(), bool $sourceUnsafe = false): string
 {
+    if (pmssFilesystemPathHasNulByte($sourcePath) || $sourceUnsafe || is_link($sourcePath)) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', 'Refusing unsafe reclaim source path', array('source' => $sourcePath));
+        return '';
+    }
+
     $targetPath = pmssUserHomeReclaimPathNext($username);
     if ($targetPath === '') {
         pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', 'Unable to allocate reclaim path', $allocationContext);
@@ -64,8 +112,13 @@ function pmssTerminateUserMovePathForReclaim(string $username, string $phase, st
         pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'SKIP', $dryRunMessage, $context);
         return $targetPath;
     }
-    if ($sourceUnsafe || !pmssUserHomeReclaimPathIsSafe($targetPath) || !@rename($sourcePath, $targetPath)) {
+    if (!pmssUserHomeReclaimPathIsSafe($targetPath) || !@rename($sourcePath, $targetPath)) {
         pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', $failureMessage, $context);
+        return '';
+    }
+    clearstatcache(true, $targetPath);
+    if (!pmssUserHomeReclaimPathIsSafe($targetPath)) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', 'Renamed reclaim target failed safety validation', $context);
         return '';
     }
     pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'OK', $successMessage, $context);

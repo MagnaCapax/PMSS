@@ -570,6 +570,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - scripts/terminateUser.php [--dry-run] [--confirm] USERNAME
   - Behavior: Validates the managed user and exact `/home/<user>` path, removes account-owned runtime/config state, renames `/home/<user>` aside for asynchronous reclaim, and when `/home/backup-<user>` exists from `recreateUser.php`, validates that exact directory before queueing it for the same reclaim worker. It never sweeps `backup-*` prefixes.
   - Dry-run: Logs planned home and backup reclaim work without renaming or deleting those paths.
+  - Safety: Direct cleanup helpers reject NUL-containing paths, refuse symlinked reclaim sources, revalidate the hidden reclaim target after rename, and skip malformed/out-of-range rTorrent port values before unlinking reservation files.
 
 - scripts/recreateUser.php USERNAME RAM_MiB QUOTA_GiB
   - Behavior: Kills user processes; if `/home/<user>` exists, moves to `/home/backup-<user>`;

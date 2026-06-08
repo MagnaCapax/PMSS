@@ -161,11 +161,11 @@ if (file_exists($portFile)) {
         $line = trim($line);
         if ($line === '' || $line[0] == '#') continue;
         if (preg_match('/^scgi_port\s*=\s*(?:[^:]*:)?(\d+)/i', $line, $m)) {
-            $ports['scgi'] = (int)$m[1];
+            pmssTerminateUserRtorrentPortRecord($username, $ports, 'scgi', $m[1]);
         } elseif (preg_match('/dht.*port.*=\s*(\d+)/i', $line, $m)) {
-            $ports['dht'] = (int)$m[1];
+            pmssTerminateUserRtorrentPortRecord($username, $ports, 'dht', $m[1]);
         } elseif (preg_match('/port_range.*=\s*(\d+)/i', $line, $m)) {
-            $ports['listen'] = (int)$m[1];
+            pmssTerminateUserRtorrentPortRecord($username, $ports, 'listen', $m[1]);
         }
     }
     $portsBase = '/var/lib/pmss/ports';
