@@ -489,7 +489,7 @@ function pmssWelcomePageStateBuild() {
 
     return array(
         'quotaInfo' => $quotaInfo,
-        'bonusQuota' => (int) (pmssWelcomePositiveIntegerFileRead('../.bonusQuota') ?? 0),
+        'bonusQuota' => (int) (pmssCustomerPositiveIntegerFileRead('../.bonusQuota') ?? 0),
         'trafficLimitState' => $trafficLimitState,
         'vendor' => pmssWelcomeVendorRead(),
         'contextualWelcomeMessage' => pmssWelcomeContextualMessageBuild($quotaInfo),
@@ -507,35 +507,13 @@ function pmssWelcomePageStateBuild() {
  */
 function pmssWelcomeBillingServiceIdRead($primaryPath, $legacyPath) {
     foreach (array($primaryPath, $legacyPath) as $path) {
-        $billingServiceId = pmssWelcomePositiveIntegerFileRead($path);
+        $billingServiceId = pmssCustomerPositiveIntegerFileRead($path);
         if ($billingServiceId !== null) {
             return $billingServiceId;
         }
     }
 
     return 0;
-}
-
-/**
- * Read one positive integer file without following symlinks.
- */
-function pmssWelcomePositiveIntegerFileRead($path) {
-    if (!is_file($path) || is_link($path)) {
-        return null;
-    }
-
-    $raw = @file_get_contents($path);
-    if (!is_string($raw)) {
-        return null;
-    }
-
-    $trimmed = trim($raw);
-    if ($trimmed === '' || !ctype_digit($trimmed)) {
-        return null;
-    }
-
-    $value = (int) $trimmed;
-    return $value > 0 ? $value : null;
 }
 
 /**
@@ -547,7 +525,7 @@ function pmssWelcomeTrafficBandwidthStateBuild($throttlePath) {
     $defaultCapMbit = pmssWelcomeTrafficDefaultCapMbitRead();
     $effectiveCapMbit = $defaultCapMbit;
 
-    $parsedCap = pmssWelcomePositiveIntegerFileRead($throttlePath);
+    $parsedCap = pmssCustomerPositiveIntegerFileRead($throttlePath);
     if ($parsedCap !== null) {
         $effectiveCapMbit = $parsedCap;
     }
@@ -889,11 +867,8 @@ function pmssWelcomeRemoteFetch($url) {
 
 function pmssWelcomeUserConfigNumber($key, $allowSymlink = false) {
     $configPath = '../.config/pmss-user.json';
-    if ($allowSymlink ? !file_exists($configPath) : (!is_file($configPath) || is_link($configPath))) {
-        return null;
-    }
-
-    $userConfig = $allowSymlink ? pmssJsonDecodeAssoc((string) @file_get_contents($configPath)) : pmssJsonFileReadAssoc($configPath);
+    $raw = pmssCustomerFileRead($configPath, $allowSymlink);
+    $userConfig = is_string($raw) ? pmssJsonDecodeAssoc($raw) : null;
     return is_array($userConfig) && isset($userConfig[$key]) && is_numeric($userConfig[$key])
         ? (float) $userConfig[$key]
         : null;

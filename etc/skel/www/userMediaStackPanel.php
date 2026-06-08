@@ -47,22 +47,8 @@ function pmssMediaStackPanelMemoryUnlimitedBytes(): int
  */
 function pmssMediaStackPanelMemoryLimitFileRead(string $path): ?int
 {
-    $raw = @file_get_contents($path);
-    if (!is_string($raw)) {
-        return null;
-    }
-
-    $value = trim($raw);
-    if ($value === '' || !ctype_digit($value)) {
-        return null;
-    }
-
-    $bytes = (int) $value;
-    if ($bytes <= 0 || $bytes >= pmssMediaStackPanelMemoryUnlimitedBytes()) {
-        return null;
-    }
-
-    return $bytes;
+    $bytes = pmssCustomerPositiveIntegerFileRead($path);
+    return $bytes !== null && $bytes < pmssMediaStackPanelMemoryUnlimitedBytes() ? $bytes : null;
 }
 
 /**

@@ -20,6 +20,7 @@
  *
  * @license GPL-3.0-only
  */
+require_once __DIR__.'/scriptsInc.php';
 
 if (!function_exists('pmssTrafficLimitParseGiB')) {
     /** Parse "<integer>", "<integer>GiB" or null; return non-negative int or null. */
@@ -63,14 +64,7 @@ if (!function_exists('pmssTrafficLimitReadGiBFile')) {
     /** Read a GiB quota file as a non-negative int; 0 if missing/unreadable/invalid. */
     function pmssTrafficLimitReadGiBFile(string $path): int
     {
-        if ($path === '' || !is_file($path) || is_link($path)) {
-            return 0;
-        }
-        $raw = @file_get_contents($path);
-        if ($raw === false) {
-            return 0;
-        }
-        $trim = trim($raw);
+        $trim = pmssCustomerTrimmedFileRead($path);
         if ($trim === '') {
             return 0;
         }

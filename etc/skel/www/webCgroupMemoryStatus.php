@@ -66,22 +66,6 @@ function pmssWebCgroupMemoryStatusDetectDir(array $overrides = [])
     return '';
 }
 
-/** Parse a simple whitespace-delimited key/value file into an array. */
-function pmssWebCgroupMemoryStatusReadMap($path)
-{
-    $raw = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    $map = [];
-    foreach (is_array($raw) ? $raw : [] as $line) {
-        $parts = preg_split('/\s+/', trim((string) $line), 2);
-        if (count($parts) !== 2) {
-            continue;
-        }
-        $map[$parts[0]] = $parts[1];
-    }
-
-    return $map;
-}
-
 /** Return candidate memory.stat paths for the current account slice. */
 function pmssWebCgroupMemoryStatusMemoryStatCandidatePaths($uid)
 {
@@ -156,19 +140,17 @@ function pmssWebCgroupMemoryStatusClassify(array $stats)
 function pmssWebCgroupMemoryStatusRead(array $overrides = [])
 {
     $cgroupDir = pmssWebCgroupMemoryStatusDetectDir($overrides);
-    $memoryCurrentRaw = is_dir($cgroupDir) ? trim((string) @file_get_contents($cgroupDir.'/memory.current')) : '';
-    $memoryHighRaw = is_dir($cgroupDir) ? trim((string) @file_get_contents($cgroupDir.'/memory.high')) : '';
-    $memoryMaxRaw = is_dir($cgroupDir) ? trim((string) @file_get_contents($cgroupDir.'/memory.max')) : '';
-    $events = is_dir($cgroupDir) ? pmssWebCgroupMemoryStatusReadMap($cgroupDir.'/memory.events') : [];
-    $pressure = is_dir($cgroupDir) ? pmssWebCgroupMemoryStatusReadMap($cgroupDir.'/memory.pressure') : [];
+    $cgroupAvailable = is_dir($cgroupDir);
+    $memoryCurrent = $cgroupAvailable ? pmssCustomerUnsignedIntegerFileRead($cgroupDir.'/memory.current') : null;
+    $memoryHigh = $cgroupAvailable ? pmssCustomerUnsignedIntegerFileRead($cgroupDir.'/memory.high') : null;
+    $memoryMax = $cgroupAvailable ? pmssCustomerUnsignedIntegerFileRead($cgroupDir.'/memory.max') : null;
+    $events = $cgroupAvailable ? pmssCustomerKeyValueFileRead($cgroupDir.'/memory.events') : [];
+    $pressure = $cgroupAvailable ? pmssCustomerKeyValueFileRead($cgroupDir.'/memory.pressure') : [];
 
-    $memoryCurrent = ctype_digit($memoryCurrentRaw) ? (int) $memoryCurrentRaw : null;
-    $memoryHigh = ctype_digit($memoryHighRaw) ? (int) $memoryHighRaw : null;
-    $memoryMax = ctype_digit($memoryMaxRaw) ? (int) $memoryMaxRaw : null;
-    $throttleEvents = isset($events['high']) && ctype_digit((string) $events['high']) ? (int) $events['high'] : 0;
-    $maxEvents = isset($events['max']) && ctype_digit((string) $events['max']) ? (int) $events['max'] : 0;
-    $oomEvents = isset($events['oom']) && ctype_digit((string) $events['oom']) ? (int) $events['oom'] : 0;
-    $oomKillEvents = isset($events['oom_kill']) && ctype_digit((string) $events['oom_kill']) ? (int) $events['oom_kill'] : 0;
+    $throttleEvents = pmssCustomerUnsignedIntegerValue($events['high'] ?? null) ?? 0;
+    $maxEvents = pmssCustomerUnsignedIntegerValue($events['max'] ?? null) ?? 0;
+    $oomEvents = pmssCustomerUnsignedIntegerValue($events['oom'] ?? null) ?? 0;
+    $oomKillEvents = pmssCustomerUnsignedIntegerValue($events['oom_kill'] ?? null) ?? 0;
     $limitBytes = $memoryMax !== null ? $memoryMax : $memoryHigh;
     $usagePercent = ($memoryCurrent !== null && $limitBytes !== null && $limitBytes > 0)
         ? round(($memoryCurrent / $limitBytes) * 100, 1)
@@ -242,9 +224,8 @@ function pmssWelcomeMemoryStateBuild($pressureStatusOverride = null)
         && function_exists('pmssFrontendShellExec')
         && pmssFrontendShellExecAvailable()) {
         $uidRaw = @pmssFrontendShellExec('/usr/bin/id -u 2>/dev/null');
-        if (is_string($uidRaw) && ctype_digit(trim($uidRaw))) {
-            $uid = (int) trim($uidRaw);
-        }
+        $uidValue = is_string($uidRaw) ? pmssCustomerUnsignedIntegerValue(trim($uidRaw)) : null;
+        if ($uidValue !== null) $uid = $uidValue;
     }
     $uid = is_int($uid) && $uid >= 0 ? $uid : null;
 
