@@ -11,11 +11,9 @@ final class TerminateUserContractTest extends TestCase
 {
     public function testTerminateUserConfirmationLoopHandlesEof(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/terminateUser.php',
-            ['confirmation input unavailable (EOF)', 'Unable to read confirmation input (EOF)'],
-            'terminateUser.php should handle EOF confirmation: '
-        );
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/terminateUser.php' => ['required' => ['confirmation input unavailable (EOF)', 'Unable to read confirmation input (EOF)']],
+        ]);
     }
 
     public function testTerminateUserInvokesSystemdRevertOnSlice(): void
@@ -29,75 +27,63 @@ final class TerminateUserContractTest extends TestCase
 
     public function testTerminateUserClearsCrontabBeforeUserdel(): void
     {
-        $this->pmssAssertRepoFileContainsOrderedStrings(
-            'scripts/terminateUser.php',
-            ["'crontab_remove'", "'userdel_initial'"],
-            'terminateUser.php should define step ',
-            'terminateUser.php should clear crontab before deleting the user account: '
-        );
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/terminateUser.php' => ['ordered' => [[
+                "'crontab_remove'",
+                "'userdel_initial'",
+            ]]],
+        ]);
     }
 
     public function testTerminateUserClearsImmutableTrafficBeforeHomeReclaim(): void
     {
-        $this->pmssAssertRepoFileContainsOrderedStrings(
-            'scripts/terminateUser.php',
-            ["'clear_immutable_traffic'", '$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim'],
-            'terminateUser.php should define step ',
-            'terminateUser.php should clear immutable traffic files before moving the home aside: '
-        );
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/terminateUser.php',
-            ['command -v chattr', 'array_values(pmssTrafficDataPaths($username))'],
-            'terminateUser.php should keep immutable traffic handling: '
-        );
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/terminateUser.php' => [
+                'required' => ['command -v chattr', 'array_values(pmssTrafficDataPaths($username))'],
+                'ordered' => [[
+                    "'clear_immutable_traffic'",
+                    '$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim',
+                ]],
+            ],
+        ]);
     }
 
     public function testTerminateUserQueuesHomeReclaimAfterTrafficImmutableCleanup(): void
     {
-        $this->pmssAssertRepoFileContainsOrderedStrings(
-            'scripts/terminateUser.php',
-            ["'clear_immutable_traffic'", '$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim', "'queue_home_reclaim'"],
-            'terminateUser.php should define step ',
-            'terminateUser.php should queue home reclaim after traffic immutability cleanup: '
-        );
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/lib/user/homeReclaim.php',
-            [
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/terminateUser.php' => ['ordered' => [[
+                "'clear_immutable_traffic'",
+                '$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim',
+                "'queue_home_reclaim'",
+            ]]],
+            'scripts/lib/user/homeReclaim.php' => ['required' => [
                 'PMSS_USER_HOME_RECLAIM_LOG',
                 'ionice -c3 nice -n 19',
                 '/scripts/util/userHomeReclaim.php',
-            ],
-            'home reclaim should run asynchronously at low priority: '
-        );
+            ]],
+        ]);
     }
 
     public function testTerminateUserReclaimsExactRecreateBackupDir(): void
     {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings(
-            'scripts/lib/user/terminationCleanup.php',
-            [
-                'function pmssTerminateUserMoveBackupForReclaim',
-                'is_link($backupPath)',
-                '$realBackup !== $backupPath',
-                "'reclaim_user_backup_dir'",
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/user/terminationCleanup.php' => [
+                'required' => [
+                    'function pmssTerminateUserMoveBackupForReclaim',
+                    'is_link($backupPath)',
+                    '$realBackup !== $backupPath',
+                    "'reclaim_user_backup_dir'",
+                ],
+                'forbidden' => ['/home/backup-*', 'glob('],
             ],
-            [
-                '/home/backup-*',
-                'glob(',
-            ]
-        );
-        $this->pmssAssertRepoFileContainsOrderedStrings(
-            'scripts/terminateUser.php',
-            [
+            'scripts/terminateUser.php' => ['ordered' => [[
                 '$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim',
                 '$backupReclaimPath = pmssTerminateUserMoveBackupForReclaim',
                 "'queue_user_backup_reclaim'",
                 'pmssUserHomeReclaimLaunchCommand($backupReclaimPath)',
                 'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
-            ],
-            'terminateUser.php should define backup reclaim flow: ',
-            'terminateUser.php should queue backup reclaim before nginx cleanup: '
-        );
+            ]]],
+        ]);
     }
 
     public function testHomeReclaimPathContract(): void
@@ -121,92 +107,81 @@ final class TerminateUserContractTest extends TestCase
 
     public function testTerminateUserHomeInvariantIsExact(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/terminateUser.php',
-            [
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/terminateUser.php' => ['required' => [
                 '$realHome !== $expectedHome',
                 'Prefix checks are too loose',
-            ],
-            'terminateUser.php should reject prefix-confusable home paths: '
-        );
+            ]],
+        ]);
     }
 
     public function testTerminateUserHandlesUnreadableRtorrentConfig(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/terminateUser.php',
-            [
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/terminateUser.php' => ['required' => [
                 '$configLines = @file($portFile',
                 'cleanup_ports_config_read',
                 '$configLines = array();',
-            ],
-            'terminateUser.php should not parse unreadable rTorrent config as port data: '
-        );
+            ]],
+        ]);
     }
 
     public function testTerminateUserFinalCleanupDoesNotDeleteActiveHomeName(): void
     {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings(
-            'scripts/terminateUser.php',
-            ["'remove_nginx_user'"],
-            [
-                'escapeshellarg("/home/{$username}")',
-            ]
-        );
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/terminateUser.php' => [
+                'required' => ["'remove_nginx_user'"],
+                'forbidden' => ['escapeshellarg("/home/{$username}")'],
+            ],
+        ]);
     }
 
     public function testTerminateUserRemovesNginxSubdomainRouteFiles(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/lib/user/terminationCleanup.php',
-            [
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/user/terminationCleanup.php' => ['required' => [
                 'function pmssTerminateUserRemoveNginxRouteFiles',
                 'remove_nginx_route_file',
                 'remove_nginx_route_file_hash',
                 '"/etc/nginx/conf.d/pmss-user-{$username}{$suffix}.conf"',
-            ],
-            'terminateUser.php should remove lifecycle-owned nginx conf.d route files: '
-        );
-        $this->pmssAssertRepoFileContainsOrderedStrings(
-            'scripts/terminateUser.php',
-            ['pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);', 'pmssUserLifecycleRefreshNginxConfig('],
-            'terminateUser.php should remove stale route files before nginx reload: ',
-            'terminateUser.php should reload nginx after route file cleanup: '
-        );
+            ]],
+            'scripts/terminateUser.php' => ['ordered' => [[
+                'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
+                'pmssUserLifecycleRefreshNginxConfig(',
+            ]]],
+        ]);
     }
 
     public function testTerminateUserDryRunGuardsDirectCleanupMutations(): void
     {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings(
-            'scripts/lib/user/terminationCleanup.php',
-            [
-                'function pmssTerminateUserUnlinkPath',
-                'function pmssTerminateUserRemoveEmptyDir',
-                "'SKIP'",
-                'Dry run; file not removed',
-                'Dry run; directory not removed',
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/user/terminationCleanup.php' => [
+                'required' => [
+                    'function pmssTerminateUserUnlinkPath',
+                    'function pmssTerminateUserRemoveEmptyDir',
+                    "'SKIP'",
+                    'Dry run; file not removed',
+                    'Dry run; directory not removed',
+                ],
+                'forbidden' => [
+                    '@unlink("/etc/nginx/users/{$username}")',
+                    'unlink($filePath)',
+                    'rmdir($portsBase)',
+                ],
             ],
-            [
-                '@unlink("/etc/nginx/users/{$username}")',
-                'unlink($filePath)',
-                'rmdir($portsBase)',
-            ]
-        );
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/terminateUser.php',
-            [
-                "pmssTerminateUserUnlinkPath(\$username, 'remove_nginx_user_file'",
-                'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
-                '} elseif ($dryRun) {',
-                "'status'  => 'SKIP'",
-            ]
-        );
-        $this->pmssAssertRepoFileContainsOrderedStrings(
-            'scripts/terminateUser.php',
-            ['} elseif ($dryRun) {', '$db->removeUser($username);'],
-            'terminateUser.php should guard DB removal: ',
-            'terminateUser.php should check dry-run before DB removal: '
-        );
+            'scripts/terminateUser.php' => [
+                'required' => [
+                    "pmssTerminateUserUnlinkPath(\$username, 'remove_nginx_user_file'",
+                    'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
+                    '} elseif ($dryRun) {',
+                    "'status'  => 'SKIP'",
+                ],
+                'ordered' => [[
+                    '} elseif ($dryRun) {',
+                    '$db->removeUser($username);',
+                ]],
+            ],
+        ]);
     }
 
     public function testTerminationCleanupHelpersPreserveDryRunAndRemovalContracts(): void

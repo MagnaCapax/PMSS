@@ -28,7 +28,7 @@ class SysctlBaselineTest extends TestCase
             'net.netfilter.nf_conntrack_max = 524288', 'kernel.kptr_restrict = 1', 'kernel.yama.ptrace_scope = 2',
             'fs.protected_regular = 2',
         ], 'expected sysctl file to be written');
-        $this->assertStringContainsString("/etc/sysctl.d/99-pmss.conf", $this->pmssReadRepoFile('scripts/lib/update/systemPrep/sysctlTuning.php'));
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/systemPrep/sysctlTuning.php', "/etc/sysctl.d/99-pmss.conf");
     }
 
     public function testWritesBbrModulesLoadFile(): void

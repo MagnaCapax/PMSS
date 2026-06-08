@@ -31,33 +31,38 @@ class userLifecycleLoggingTest extends TestCase
 
     public function testUserLifecycleWriterUsesFormattingHelperForTextLogFields(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/userLifecycle.php');
-
-        $this->assertStringContainsAllStrings([
-            "pmssUserLifecycleFormatTextField(\$payload['status'] ?? 'INFO')",
-            "pmssUserLifecycleFormatTextField(\$payload['action'] ?? 'unknown')",
-            "pmssUserLifecycleFormatTextField(\$payload['phase'] ?? 'unknown')",
-            "pmssUserLifecycleFormatTextField(\$payload['username'] ?? '')",
-            "pmssUserLifecycleFormatTextField(\$payload['message'])",
-            "pmssUserLifecycleFormatTextField(\$payload['step'])",
-        ], $source);
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/userLifecycle.php' => ['required' => [
+                "pmssUserLifecycleFormatTextField(\$payload['status'] ?? 'INFO')",
+                "pmssUserLifecycleFormatTextField(\$payload['action'] ?? 'unknown')",
+                "pmssUserLifecycleFormatTextField(\$payload['phase'] ?? 'unknown')",
+                "pmssUserLifecycleFormatTextField(\$payload['username'] ?? '')",
+                "pmssUserLifecycleFormatTextField(\$payload['message'])",
+                "pmssUserLifecycleFormatTextField(\$payload['step'])",
+            ]],
+        ]);
     }
 
     public function testContextLogHelperDelegatesToBaseContextAndWriter(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/userLifecycle.php', ['function pmssUserLifecycleContextLog(', 'pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));']);
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/userLifecycle.php' => ['required' => [
+                'function pmssUserLifecycleContextLog(',
+                'pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));',
+            ]],
+        ]);
     }
 
     public function testContextLogStatusMessageHelperBuildsSharedPayload(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/userLifecycle.php');
-
-        $this->assertStringContainsAllStrings([
-            'function pmssUserLifecycleContextLogStatusMessage(',
-            '\'status\' => $status',
-            '\'message\' => $message',
-            'pmssUserLifecycleContextLog(',
-        ], $source);
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/userLifecycle.php' => ['required' => [
+                'function pmssUserLifecycleContextLogStatusMessage(',
+                '\'status\' => $status',
+                '\'message\' => $message',
+                'pmssUserLifecycleContextLog(',
+            ]],
+        ]);
     }
 
     public function testRunStepsPreservesOrderAndDryRunResults(): void
@@ -191,8 +196,10 @@ class userLifecycleLoggingTest extends TestCase
 
         $this->assertSame(array('activeRootExists' => true, 'disabledRootExists' => false), $active);
         $this->assertSame(array('activeRootExists' => true, 'disabledRootExists' => true), $suspended);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/suspend.php', array("pmssUserLifecycleRequireWebRootState('suspend'"));
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/unsuspend.php', array("pmssUserLifecycleRequireWebRootState('unsuspend'"));
+        $this->pmssAssertRepoFileContractCases(array(
+            'scripts/suspend.php' => array('required' => array("pmssUserLifecycleRequireWebRootState('suspend'")),
+            'scripts/unsuspend.php' => array('required' => array("pmssUserLifecycleRequireWebRootState('unsuspend'")),
+        ));
     }
 
     public function testFindSuspendedBackupSelectsNewestContentfulCandidate(): void

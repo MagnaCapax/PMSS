@@ -1392,6 +1392,15 @@ abstract class TestCase
             foreach ($case['matches'] ?? [] as $pattern) {
                 $this->assertMatches((string) $pattern, $source);
             }
+            foreach ($case['ordered'] ?? [] as $ordered) {
+                $needles = array_key_exists('needles', $ordered) ? $ordered['needles'] : $ordered;
+                $this->assertOrderedStrings(
+                    $needles,
+                    $source,
+                    (string) ($ordered['missingPrefix'] ?? ''),
+                    (string) ($ordered['orderPrefix'] ?? '')
+                );
+            }
         }
     }
 
