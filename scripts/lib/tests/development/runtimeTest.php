@@ -73,6 +73,44 @@ class RuntimeTest extends TestCase
         }
     }
 
+    public function testPrivateTempBaseDirRejectsUnsafeBoundaryMatrix(): void
+    {
+        $file = $this->pmssMakeTempFile('pmss-temp-base-file-');
+        foreach (['', '/', '/definitely-not-a-real-pmss-temp-dir', $file, "/tmp/pmss\0bad"] as $path) {
+            $this->assertSame(null, \pmssPrivateTempBaseDirRealpath($path), 'Unexpected temp base result for '.var_export($path, true));
+        }
+    }
+
+    public function testPrivateTempBaseDirAcceptsWritableDirectory(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-temp-base-ok-');
+        $this->assertSame(realpath($dir), \pmssPrivateTempBaseDirRealpath($dir));
+    }
+
+    public function testCreatePrivateTempFileKeepsPrivateScope(): void
+    {
+        $prefix = 'pmss-runtime-file-';
+        $path = \pmssCreatePrivateTempFile($prefix);
+        $base = \pmssPrivateTempBaseDirRealpath();
+        $this->assertTrue(is_string($path) && is_file($path), 'Expected private temp file');
+
+        try {
+            $real = realpath((string) $path);
+            $this->assertTrue(is_string($base), 'Expected usable system temp base');
+            $this->assertTrue(is_string($real) && strpos($real, $base.DIRECTORY_SEPARATOR) === 0, 'Temp file escaped system temp base');
+            $this->assertTrue(strpos(basename((string) $real), $prefix) === 0, 'Temp file prefix mismatch');
+        } finally {
+            if (is_string($path) && is_file($path) && !is_link($path)) {
+                @unlink($path);
+            }
+        }
+    }
+
+    public function testCreatePrivateTempFileRejectsUnsafePrefix(): void
+    {
+        $this->assertSame(null, \pmssCreatePrivateTempFile('../pmss-runtime-private'));
+    }
+
     public function testCreatePrivateTempDirRejectsUnsafePrefix(): void
     {
         ob_start();
