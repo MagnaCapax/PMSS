@@ -14,7 +14,16 @@ function pmssCreatePrivateTempDir(string $prefix): ?string
 {
     if (!pmssPrivateTempPrefixIsSafe($prefix)) { logMessage('[WARN] Refusing private temporary directory with unsafe prefix'); return null; }
     $path = pmssCreatePrivateTempFile($prefix);
-    if ($path === null || !@unlink($path) || !@mkdir($path, 0700)) return null;
+    if ($path === null) return null;
+    if (!@unlink($path) || !@mkdir($path, 0700)) {
+        if (is_file($path) && !is_link($path)) @unlink($path);
+        return null;
+    }
+    @chmod($path, 0700);
+    if (pmssPrivateTempDirRealpath($path, $prefix) === null) {
+        @rmdir($path);
+        return null;
+    }
     return $path;
 }
 

@@ -58,6 +58,31 @@ class RuntimeTest extends TestCase
         ], $this->pmssRunInlinePhpJson($script));
     }
 
+    public function testCreatePrivateTempDirKeepsPrivateScopeAndMode(): void
+    {
+        $path = \pmssCreatePrivateTempDir('pmss-runtime-private-');
+        $this->assertTrue(is_string($path) && is_dir($path), 'Expected private temp directory');
+
+        try {
+            $this->assertSame($path, \pmssPrivateTempDirRealpath($path, 'pmss-runtime-private-'));
+            $this->assertSame('0700', sprintf('%04o', fileperms($path) & 0777));
+        } finally {
+            if (is_string($path) && is_dir($path)) {
+                @rmdir($path);
+            }
+        }
+    }
+
+    public function testCreatePrivateTempDirRejectsUnsafePrefix(): void
+    {
+        ob_start();
+        try {
+            $this->assertSame(null, \pmssCreatePrivateTempDir('../pmss-runtime-private'));
+        } finally {
+            ob_end_clean();
+        }
+    }
+
     public function testRuntimeKeepsCliGuardStubCompatibility(): void
     {
         $runtime = var_export(dirname(__DIR__, 3).'/lib/runtime.php', true);
