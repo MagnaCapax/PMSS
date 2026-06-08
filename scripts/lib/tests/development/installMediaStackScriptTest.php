@@ -39,19 +39,21 @@ class installMediaStackScriptTest extends TestCase
 
     public function testProwlarrRuntimeNetcorePresent(): void
     {
-        $this->assertStringContainsString('runtime=netcore&arch=${SERVARR_ARCH}', $this->script);
-        $this->assertStringContainsString('SERVARR_DOWNLOAD_URL="${PROWLARR_UPDATE_BASE}/${PROWLARR_BRANCH}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"', $this->script);
+        $this->assertStringContainsAllStrings([
+            'runtime=netcore&arch=${SERVARR_ARCH}',
+            'SERVARR_DOWNLOAD_URL="${PROWLARR_UPDATE_BASE}/${PROWLARR_BRANCH}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"',
+        ], $this->script);
     }
 
     public function testInstallServarrAppCreatesLoopbackPublicConfig(): void
     {
-        $this->assertStringContainsString('<Config>', $this->script);
-        $this->assertTrue(
-            strpos($this->script, '<BindAddress>*</BindAddress>') === false,
-            'Servarr defaults must not bind wildcard address'
-        );
-        $this->assertStringContainsString('/public-${USERNAME}/${app}</UrlBase>', $this->script);
-        $this->assertStringContainsString('<BindAddress>127.0.0.1</BindAddress>', $this->script);
+        $this->assertStringContainsAndOmitsStrings([
+            '<Config>',
+            '/public-${USERNAME}/${app}</UrlBase>',
+            '<BindAddress>127.0.0.1</BindAddress>',
+        ], [
+            '<BindAddress>*</BindAddress>' => 'Servarr defaults must not bind wildcard address',
+        ], $this->script);
     }
 
     public function testCloudplowUsesBinDir(): void
@@ -90,9 +92,11 @@ class installMediaStackScriptTest extends TestCase
 
     public function testSabnzbdAllowsProxiedWizardAccess(): void
     {
-        $this->assertStringContainsString('inet_exposure = 4', $this->script);
-        $this->assertStringContainsString('sabnzbd_misc_value_set() {', $this->script);
-        $this->assertStringContainsString('sabnzbd_misc_value_set "$datadir/${app}.ini" inet_exposure "4"', $this->script);
+        $this->assertStringContainsAllStrings([
+            'inet_exposure = 4',
+            'sabnzbd_misc_value_set() {',
+            'sabnzbd_misc_value_set "$datadir/${app}.ini" inet_exposure "4"',
+        ], $this->script);
     }
 
     public function testDotnetRootExportedInBashrc(): void
@@ -137,22 +141,24 @@ class installMediaStackScriptTest extends TestCase
 
     public function testJellyfinFfmpegFallbackUsesExistingOverridePath(): void
     {
-        $this->assertStringContainsString('JELLYFIN_MIN_FFMPEG_VERSION="4.4"', $this->script);
-        $this->assertStringContainsString('jellyfin_ffmpeg_configure_fallback', $this->script);
-        $this->assertStringContainsString('OVR_JELLYFIN_FFMPEG="$home_ffmpeg"', $this->script);
-        $this->assertStringContainsString('dpkg --compare-versions "$version" ge "$JELLYFIN_MIN_FFMPEG_VERSION"', $this->script);
+        $this->assertStringContainsAllStrings([
+            'JELLYFIN_MIN_FFMPEG_VERSION="4.4"',
+            'jellyfin_ffmpeg_configure_fallback',
+            'OVR_JELLYFIN_FFMPEG="$home_ffmpeg"',
+            'dpkg --compare-versions "$version" ge "$JELLYFIN_MIN_FFMPEG_VERSION"',
+        ], $this->script);
     }
 
     public function testJellyfinFfmpegFallbackSkipsWithoutImplicitDownload(): void
     {
-        $this->assertStringContainsString('JELLYFIN_INSTALL_ENABLED=0', $this->script);
-        $this->assertStringContainsString('Skipping Jellyfin: FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is required', $this->script);
-        $this->assertStringContainsString('bash install-media-stack.sh --jellyfin-ffmpeg=$home_ffmpeg', $this->script);
         $staticFfmpegPrefix = 'JELLYFIN_STATIC_'.'FFMPEG';
-        $this->assertTrue(
-            strpos($this->script, $staticFfmpegPrefix) === false,
-            'Installer must not auto-download third-party static FFmpeg builds'
-        );
+        $this->assertStringContainsAndOmitsStrings([
+            'JELLYFIN_INSTALL_ENABLED=0',
+            'Skipping Jellyfin: FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is required',
+            'bash install-media-stack.sh --jellyfin-ffmpeg=$home_ffmpeg',
+        ], [
+            $staticFfmpegPrefix => 'Installer must not auto-download third-party static FFmpeg builds',
+        ], $this->script);
     }
 
     public function testJellyfinSystemXmlTagSetterLocksSnapshot(): void
@@ -245,13 +251,13 @@ LIGHTTPD;
     public function testManagedBinPathsRefreshInPlace(): void
     {
         $removedHelper = 'managed_install_path_reset_target'.'_is_safe';
-        $this->assertStringContainsString('Keeping existing ~/.bin contents outside PMSS-managed app paths.', $this->script);
-        $this->assertStringContainsString('managed_install_path_reset', $this->script);
-        $this->assertStringNotContainsString($removedHelper, $this->script);
-        $this->assertTrue(
-            strpos($this->script, 'rm -rf "$HOME/.bin"') === false,
-            'Installer must not delete the entire ~/.bin directory on reruns'
-        );
+        $this->assertStringContainsAndOmitsStrings([
+            'Keeping existing ~/.bin contents outside PMSS-managed app paths.',
+            'managed_install_path_reset',
+        ], [
+            $removedHelper,
+            'rm -rf "$HOME/.bin"' => 'Installer must not delete the entire ~/.bin directory on reruns',
+        ], $this->script);
     }
 
     public function testManagedInstallPathResetRefusesUnsafeTargets(): void
@@ -405,13 +411,11 @@ LIGHTTPD;
 
         $output = $this->pmssRunShellHarness($script);
 
-        $this->assertStringContainsString('safe_home', $output);
-        $this->assertStringContainsString('root_refused', $output);
-        $this->assertStringContainsString('unset_refused', $output);
-        $this->assertStringContainsString('relative_refused', $output);
-        $this->assertTrue(strpos($output, 'root_allowed') === false, $output);
-        $this->assertTrue(strpos($output, 'unset_allowed') === false, $output);
-        $this->assertTrue(strpos($output, 'relative_allowed') === false, $output);
+        $this->assertStringContainsAndOmitsStrings(
+            ['safe_home', 'root_refused', 'unset_refused', 'relative_refused'],
+            ['root_allowed' => $output, 'unset_allowed' => $output, 'relative_allowed' => $output],
+            $output
+        );
     }
 
     public function testDryRunLoggingPresent(): void
@@ -438,12 +442,14 @@ LIGHTTPD;
 
     public function testMetadataFetchUsesCurlOrWgetHelper(): void
     {
-        $this->assertStringContainsString('fetch_text() {', $this->script);
-        $this->assertStringContainsString('curl -fsSL --max-time 20 "$url"', $this->script);
-        $this->assertStringContainsString('wget -q -O - --timeout=20 --tries=1 "$url"', $this->script);
-        $this->assertStringContainsString('SABNZBD_RELEASE_JSON=$(fetch_text "https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest")', $this->script);
-        $this->assertStringContainsString('JF_REPO_INDEX=$(fetch_text "$JF_REPO_BASE")', $this->script);
-        $this->assertStringContainsString('Could not resolve SABnzbd release metadata from GitHub', $this->script);
+        $this->assertStringContainsAllStrings([
+            'fetch_text() {',
+            'curl -fsSL --max-time 20 "$url"',
+            'wget -q -O - --timeout=20 --tries=1 "$url"',
+            'SABNZBD_RELEASE_JSON=$(fetch_text "https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest")',
+            'JF_REPO_INDEX=$(fetch_text "$JF_REPO_BASE")',
+            'Could not resolve SABnzbd release metadata from GitHub',
+        ], $this->script);
     }
 
     public function testLogFilePathSetOnce(): void
@@ -458,10 +464,12 @@ LIGHTTPD;
 
     public function testTmuxKillIsScopedToNamedSessions(): void
     {
-        $this->assertStringContainsString('MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow)', $this->script);
-        $this->assertStringContainsString('media_stack_sessions "${MEDIA_STACK_STOP_SESSIONS[@]}"', $this->script);
-        $this->assertStringContainsString('while IFS= read -r app; do', $this->script);
-        $this->assertStringContainsString('tmux kill-session -t "${app}"', $this->script);
+        $this->assertStringContainsAllStrings([
+            'MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow)',
+            'media_stack_sessions "${MEDIA_STACK_STOP_SESSIONS[@]}"',
+            'while IFS= read -r app; do',
+            'tmux kill-session -t "${app}"',
+        ], $this->script);
     }
 
     public function testSourceBashrcIsFailSoft(): void
@@ -490,20 +498,25 @@ LIGHTTPD;
 
         $output = $this->pmssRunShellHarness($script);
 
-        $this->assertStringContainsString('valid=8080', $output);
-        $this->assertStringContainsString('zero=23456', $output);
-        $this->assertStringContainsString('text=23456', $output);
-        $this->assertStringContainsString('high=23456', $output);
-        $this->assertStringContainsString("WARN:Ignoring invalid existing port '0'", $output);
-        $this->assertStringContainsString("WARN:Ignoring invalid existing port 'abc'", $output);
-        $this->assertStringContainsString("WARN:Ignoring invalid existing port '70000'", $output);
+        $this->assertStringContainsAllStrings([
+            'valid=8080',
+            'zero=23456',
+            'text=23456',
+            'high=23456',
+            "WARN:Ignoring invalid existing port '0'",
+            "WARN:Ignoring invalid existing port 'abc'",
+            "WARN:Ignoring invalid existing port '70000'",
+        ], $output);
     }
 
     public function testJellyfinSedDoesNotUseSlashDelimitersWithClosingTags(): void
     {
-        $this->assertTrue(strpos($this->script, 's/\\(<PublicHttpPort>\\)') === false, 'Must not use / delimiters that break on </tag>');
-        $this->assertStringContainsString('s|(<PublicHttpPort>)[^<]*(</PublicHttpPort>)|', $this->script);
-        $this->assertStringContainsString('s|(<InternalHttpPort>)[^<]*(</InternalHttpPort>)|', $this->script);
+        $this->assertStringContainsAndOmitsStrings([
+            's|(<PublicHttpPort>)[^<]*(</PublicHttpPort>)|',
+            's|(<InternalHttpPort>)[^<]*(</InternalHttpPort>)|',
+        ], [
+            's/\\(<PublicHttpPort>\\)' => 'Must not use / delimiters that break on </tag>',
+        ], $this->script);
     }
 
     public function testServarrDownloadResolversPreserveUrlContracts(): void

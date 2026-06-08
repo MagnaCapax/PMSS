@@ -217,25 +217,21 @@ class StorageBenchSecurityTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/lib/storageBenchmark.php');
 
-        $this->assertStringContainsAllStrings(['storageBenchmarkIostatUtilPctRead', 'pmssReadSerializedArrayFile($path)'], $source);
-        $this->assertStringNotContainsString('unserialize(', $source);
+        $this->assertStringContainsAndOmitsStrings(['storageBenchmarkIostatUtilPctRead', 'pmssReadSerializedArrayFile($path)'], ['unserialize('], $source);
     }
 
     public function testFileBackedProbesUseCheckedCommandCapture(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/storageBenchmark.php');
 
-        $this->assertStringContainsAllStrings(['storageBenchmarkRequireCommandField', 'pmssCommandCapture($command, 30)', "storageBenchmarkRequirePositiveIntCommandField('df -PB1 "], $source);
-        $this->assertStringNotContainsString("\$free=(int)trim((string) shell_exec('df -PB1 ", $source);
+        $this->assertStringContainsAndOmitsStrings(['storageBenchmarkRequireCommandField', 'pmssCommandCapture($command, 30)', "storageBenchmarkRequirePositiveIntCommandField('df -PB1 "], ["\$free=(int)trim((string) shell_exec('df -PB1 "], $source);
     }
 
     public function testDeviceProbesUseCheckedCommandCapture(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/storageBenchmark.php');
 
-        $this->assertStringContainsAllStrings(['pmssStorageHealthDiskInventoryRead()', 'storageBenchmarkDeviceSizeBytesRead', "pmssCommandCapture('blockdev --getsize64 "], $source);
-        $this->assertStringNotContainsString("shell_exec('lsblk -dn", $source);
-        $this->assertStringNotContainsString("shell_exec('blockdev --getsize64 ", $source);
+        $this->assertStringContainsAndOmitsStrings(['pmssStorageHealthDiskInventoryRead()', 'storageBenchmarkDeviceSizeBytesRead', "pmssCommandCapture('blockdev --getsize64 "], ["shell_exec('lsblk -dn", "shell_exec('blockdev --getsize64 "], $source);
     }
 
     public function testDiskInventoryRejectsNonzeroCommandOutput(): void
@@ -491,11 +487,8 @@ SH
 
         $this->assertSame(0, $result['rc']);
         $log = (string) @file_get_contents($jsonLog);
-        $this->assertStringContainsString('"device":"/dev/null"', $log);
-        $this->assertStringContainsString('"test":"device-preflight"', $log);
-        $this->assertStringContainsString('"error":"not a readable block device"', $log);
-        $this->assertStringNotContainsString('DD if=/dev/null', (string) @file_get_contents($invocations));
-        $this->assertStringNotContainsString('--filename=/dev/null', (string) @file_get_contents($invocations));
+        $this->assertStringContainsAllStrings(['"device":"/dev/null"', '"test":"device-preflight"', '"error":"not a readable block device"'], $log);
+        $this->assertStringContainsAndOmitsStrings([], ['DD if=/dev/null', '--filename=/dev/null'], (string) @file_get_contents($invocations));
     }
 
     public function testInvalidFreeSpaceProbeFailsBeforeFileBackedBenchmarkWork(): void
@@ -530,7 +523,6 @@ SH,
         );
 
         $this->pmssAssertCommandFailsToStderr($run['result'], $run['stderrPath'], "Error: failed to read free space.\n");
-        $this->assertStringNotContainsString('FALLOCATE ', (string) @file_get_contents($invocations));
-        $this->assertStringNotContainsString('FIO ', (string) @file_get_contents($invocations));
+        $this->assertStringContainsAndOmitsStrings([], ['FALLOCATE ', 'FIO '], (string) @file_get_contents($invocations));
     }
 }

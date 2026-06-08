@@ -116,9 +116,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
             'speed' => '123456K/sec',
         ]);
 
-        $this->assertStringContainsString('Home storage maintenance in progress', $html);
-        $this->assertStringContainsString('Progress: 12.3%', $html);
-        $this->assertStringContainsString('ETA: 15.4min', $html);
+        $this->assertStringContainsAllStrings(['Home storage maintenance in progress', 'Progress: 12.3%', 'ETA: 15.4min'], $html);
     }
 
     public function testHomeRaidNoticeHtmlOmitsMetaWhenNoDetailsProvided(): void
@@ -140,10 +138,11 @@ class StorageHealthHomeRaidActivityTest extends TestCase
             'flags' => ['degraded'],
         ]);
 
-        $this->assertStringContainsString('Storage array degraded', $html);
-        $this->assertStringContainsString('without full redundancy', $html);
-        $this->assertStringContainsString('pmss-raid-notice-error', $html);
-        $this->assertTrue(strpos($html, 'Progress:') === false, 'Degraded notice should not show rebuild metadata');
+        $this->assertStringContainsAndOmitsStrings(
+            ['Storage array degraded', 'without full redundancy', 'pmss-raid-notice-error'],
+            ['Progress:' => 'Degraded notice should not show rebuild metadata'],
+            $html
+        );
     }
 
     public function testPerformanceStatusUsesCheckOperationInReason(): void

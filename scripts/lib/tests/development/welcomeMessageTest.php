@@ -277,8 +277,6 @@ class WelcomeMessageTest extends TestCase
 
     public function testCustomerWelcomeMessageHelperStaysReadOnly(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/welcomeMessage.php');
-
         $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/welcomeMessage.php', [
             'function pmssWelcomeProductMessageSet(',
             'function pmssWelcomeUserMessageSet(',

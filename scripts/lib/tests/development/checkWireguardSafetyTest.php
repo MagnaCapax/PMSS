@@ -99,70 +99,38 @@ class CheckWireguardSafetyTest extends TestCase
 
     public function testMainSyncsActiveInterfaceWhenConfiguredPeerIsMissing(): void
     {
-        $configPath = $this->writePeerConfig([$this->validPeerA]);
-        $logPath = $this->pmssMakeTempPath('pmss-check-wireguard-', '.log');
-        $binDir = $this->writeWireguardCommandStubs($configPath, $logPath, [], true);
-
-        $this->pmssWithPathPrefixedEnv($binDir, [
-            'PMSS_TEST_MODE' => '1',
-            'PMSS_WIREGUARD_CONFIG_PATH' => $configPath,
-        ], function () use ($logPath): void {
-            list($rc, $output) = $this->pmssCaptureStdout(function (): int {
-                return \pmssWireguardCheckMain(['checkWireguard.php', '--debug']);
-            });
-
-            $this->assertSame(0, $rc);
-            $this->assertStringContainsString('wg0 missing 1 configured peer(s), attempting syncconf', $output);
-            $this->assertStringContainsString('wg0 peer set reconciled with syncconf', $output);
-            $log = (string) file_get_contents($logPath);
-            $this->assertStringContainsString('wg syncconf wg0 ', $log);
-            $this->assertStringNotContainsString('systemctl restart wg-quick@wg0', $log);
-        });
+        $this->assertWireguardMainRun(
+            [$this->validPeerA],
+            [],
+            true,
+            ['wg0 missing 1 configured peer(s), attempting syncconf', 'wg0 peer set reconciled with syncconf'],
+            ['wg syncconf wg0 '],
+            ['systemctl restart wg-quick@wg0']
+        );
     }
 
     public function testMainSkipsSyncWhenRuntimePeersMatchConfig(): void
     {
-        $configPath = $this->writePeerConfig([$this->validPeerA]);
-        $logPath = $this->pmssMakeTempPath('pmss-check-wireguard-', '.log');
-        $binDir = $this->writeWireguardCommandStubs($configPath, $logPath, [$this->validPeerA], true);
-
-        $this->pmssWithPathPrefixedEnv($binDir, [
-            'PMSS_TEST_MODE' => '1',
-            'PMSS_WIREGUARD_CONFIG_PATH' => $configPath,
-        ], function () use ($logPath): void {
-            list($rc, $output) = $this->pmssCaptureStdout(function (): int {
-                return \pmssWireguardCheckMain(['checkWireguard.php', '--debug']);
-            });
-
-            $this->assertSame(0, $rc);
-            $this->assertStringContainsString('wg0 runtime peers match config', $output);
-            $log = (string) file_get_contents($logPath);
-            $this->assertStringNotContainsString('wg syncconf wg0 ', $log);
-            $this->assertStringNotContainsString('systemctl restart wg-quick@wg0', $log);
-        });
+        $this->assertWireguardMainRun(
+            [$this->validPeerA],
+            [$this->validPeerA],
+            true,
+            ['wg0 runtime peers match config'],
+            [],
+            ['wg syncconf wg0 ', 'systemctl restart wg-quick@wg0']
+        );
     }
 
     public function testMainFallsBackToRestartWhenSyncFails(): void
     {
-        $configPath = $this->writePeerConfig([$this->validPeerA]);
-        $logPath = $this->pmssMakeTempPath('pmss-check-wireguard-', '.log');
-        $binDir = $this->writeWireguardCommandStubs($configPath, $logPath, [], false);
-
-        $this->pmssWithPathPrefixedEnv($binDir, [
-            'PMSS_TEST_MODE' => '1',
-            'PMSS_WIREGUARD_CONFIG_PATH' => $configPath,
-        ], function () use ($logPath): void {
-            list($rc, $output) = $this->pmssCaptureStdout(function (): int {
-                return \pmssWireguardCheckMain(['checkWireguard.php', '--debug']);
-            });
-
-            $this->assertSame(0, $rc);
-            $this->assertStringContainsString('wg peer reconcile failed during syncconf (rc=1), attempting restart', $output);
-            $this->assertStringContainsString('wg-quick@wg0 restarted successfully', $output);
-            $log = (string) file_get_contents($logPath);
-            $this->assertStringContainsString('wg syncconf wg0 ', $log);
-            $this->assertStringContainsString('systemctl restart wg-quick@wg0', $log);
-        });
+        $this->assertWireguardMainRun(
+            [$this->validPeerA],
+            [],
+            false,
+            ['wg peer reconcile failed during syncconf (rc=1), attempting restart', 'wg-quick@wg0 restarted successfully'],
+            ['wg syncconf wg0 ', 'systemctl restart wg-quick@wg0'],
+            []
+        );
     }
 
     /** @param array<int,string> $keys */
@@ -176,6 +144,33 @@ class CheckWireguardSafetyTest extends TestCase
         $this->pmssWriteFile($configPath, $content, 0700);
 
         return $configPath;
+    }
+
+    /** Assert WireGuard main output and service command traces for one peer fixture. */
+    private function assertWireguardMainRun(
+        array $configuredPeers,
+        array $runningPeers,
+        bool $syncSucceeds,
+        array $outputNeedles,
+        array $logRequired,
+        array $logForbidden
+    ): void {
+        $configPath = $this->writePeerConfig($configuredPeers);
+        $logPath = $this->pmssMakeTempPath('pmss-check-wireguard-', '.log');
+        $binDir = $this->writeWireguardCommandStubs($configPath, $logPath, $runningPeers, $syncSucceeds);
+
+        $this->pmssWithPathPrefixedEnv($binDir, [
+            'PMSS_TEST_MODE' => '1',
+            'PMSS_WIREGUARD_CONFIG_PATH' => $configPath,
+        ], function () use ($logPath, $outputNeedles, $logRequired, $logForbidden): void {
+            list($rc, $output) = $this->pmssCaptureStdout(function (): int {
+                return \pmssWireguardCheckMain(['checkWireguard.php', '--debug']);
+            });
+
+            $this->assertSame(0, $rc);
+            $this->assertStringContainsAllStrings($outputNeedles, $output);
+            $this->assertStringContainsAndOmitsStrings($logRequired, $logForbidden, (string) file_get_contents($logPath));
+        });
     }
 
     /** @param array<int,string> $runningPeers */
