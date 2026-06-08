@@ -15,6 +15,16 @@ require_once __DIR__.'/../version.php';
 
 class Motd
 {
+    private const MOTD_PLACEHOLDERS = [
+        '%HOSTNAME%' => 'host', '%SERVER_IP%' => 'ip', '%SERVER_CPU%' => 'cpu', '%SERVER_RAM%' => 'ram',
+        '%SERVER_STORAGE%' => 'storage', '%PMSS_VERSION%' => 'pmssVersion', '%UPDATE_DATE%' => 'updateDate', '%APT_LAST_UPDATE%' => 'aptLastUpdate',
+        '%UPTIME%' => 'uptime', '%KERNEL_VERSION%' => 'kernel', '%NETWORK_SPEED%' => 'netSpeed', '%WIREGUARD_STATUS%' => 'wgStatus', '%OPENVPN_STATUS%' => 'ovpnStatus', '%DISTRO%' => 'distro',
+    ];
+    private const MOTD_COLOR_CODES = [
+        '%HOSTNAME%' => '1;36', '%SERVER_IP%' => '32', '%SERVER_CPU%' => '37', '%SERVER_RAM%' => '36', '%SERVER_STORAGE%' => '35',
+        '%PMSS_VERSION%' => '1;34', '%KERNEL_VERSION%' => '34', '%DISTRO%' => '1;35',
+    ];
+
     /**
      * Controller: generate + write MOTD from the template.
      *
@@ -92,40 +102,29 @@ class Motd
      */
     public static function renderMotdTemplate(string $template, array $model, bool $colorEnabled): string
     {
-        $values = [];
-        foreach (['host', 'ip', 'cpu', 'ram', 'storage', 'pmssVersion', 'updateDate', 'aptLastUpdate', 'uptime', 'kernel', 'netSpeed', 'wgStatus', 'ovpnStatus', 'distro', 'storageWarn'] as $key) {
-            $values[$key] = isset($model[$key]) ? (string) $model[$key] : '';
+        $repl = [];
+        foreach (self::MOTD_PLACEHOLDERS as $placeholder => $key) {
+            $repl[$placeholder] = isset($model[$key]) ? (string) $model[$key] : '';
         }
 
         // Light color accents for readability (opt-out via PMSS_MOTD_COLOR=0)
         if ($colorEnabled) {
-            foreach (['host' => '1;36', 'ip' => '32', 'cpu' => '37', 'ram' => '36', 'storage' => '35', 'pmssVersion' => '1;34', 'kernel' => '34', 'distro' => '1;35'] as $key => $code) {
-                $values[$key] = self::c($values[$key], $code);
+            foreach (self::MOTD_COLOR_CODES as $placeholder => $code) {
+                $repl[$placeholder] = self::c($repl[$placeholder], $code);
             }
-            $netSpeed = trim($values['netSpeed']);
-            $values['netSpeed'] = ($netSpeed !== '' && !in_array(strtolower($netSpeed), ['unknown', 'n/a'], true))
+            $netSpeed = trim($repl['%NETWORK_SPEED%']);
+            $repl['%NETWORK_SPEED%'] = ($netSpeed !== '' && !in_array(strtolower($netSpeed), ['unknown', 'n/a'], true))
                 ? self::c($netSpeed, '32') // green when detected
                 : self::c('Unknown', '33'); // yellow when unknown
         }
 
-        $repl = [];
-        foreach ([
-            '%HOSTNAME%' => 'host', '%SERVER_IP%' => 'ip', '%SERVER_CPU%' => 'cpu', '%SERVER_RAM%' => 'ram',
-            '%SERVER_STORAGE%' => 'storage', '%PMSS_VERSION%' => 'pmssVersion', '%UPDATE_DATE%' => 'updateDate',
-            '%APT_LAST_UPDATE%' => 'aptLastUpdate', '%UPTIME%' => 'uptime', '%KERNEL_VERSION%' => 'kernel',
-            '%NETWORK_SPEED%' => 'netSpeed', '%WIREGUARD_STATUS%' => 'wgStatus', '%OPENVPN_STATUS%' => 'ovpnStatus',
-            '%DISTRO%' => 'distro',
-        ] as $placeholder => $key) {
-            $repl[$placeholder] = $values[$key];
-        }
-
         $rendered = strtr($template, $repl);
-        $rendered = str_replace('Runtime Version: %RUN_VERSION%', '', $rendered);
         $patched = preg_replace('/^\s*Runtime Version:.*$/m', '', $rendered);
         $rendered = is_string($patched) ? $patched : $rendered;
 
-        if ($values['storageWarn'] !== '') {
-            $rendered .= "\n\e[33mStorage WARN:\e[0m ".$values['storageWarn']."\n";
+        $storageWarn = isset($model['storageWarn']) ? (string) $model['storageWarn'] : '';
+        if ($storageWarn !== '') {
+            $rendered .= "\n\e[33mStorage WARN:\e[0m ".$storageWarn."\n";
         }
 
         return $rendered;
@@ -155,11 +154,8 @@ class Motd
                 $usesStatic = true;
             }
         }
-        $dynamicPath = '/run/motd.dynamic';
-        if ($usesDynamic && !$usesStatic) {
-            pmssWriteManagedFile($dynamicPath, $rendered, 'root', 'root', 0644);
-        } elseif ($usesDynamic && $usesStatic) {
-            pmssWriteManagedFile($dynamicPath, '', 'root', 'root', 0644);
+        if ($usesDynamic) {
+            pmssWriteManagedFile('/run/motd.dynamic', $usesStatic ? '' : $rendered, 'root', 'root', 0644);
         }
     }
 
@@ -232,17 +228,13 @@ class Motd
 
     private static function distroInfo(): string
     {
-        // Prefer codename mapping to ensure correct major version
         $info = \pmssDetectDistro();
-        $name = $info['name'] ?? '';
+        $name = (string) ($info['name'] ?? '');
         $ver  = (int) ($info['version'] ?? 0);
-        $code = $info['codename'] ?? '';
+        $code = (string) ($info['codename'] ?? '');
         if ($name === '') $name = 'debian';
         $name = ucfirst(strtolower($name));
-        if ($ver > 0 && $code !== '') return sprintf('%s %d (%s)', $name, $ver, $code);
-        if ($ver > 0) return sprintf('%s %d', $name, $ver);
-        if ($code !== '') return sprintf('%s (%s)', $name, $code);
-        return $name;
+        return $name.($ver > 0 ? ' '.$ver : '').($code !== '' ? ' ('.$code.')' : '');
     }
 
     private static function serviceStatuses(): array

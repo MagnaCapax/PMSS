@@ -152,6 +152,26 @@ function pmssStatusBinaryProbeCheck(string $binary, array $binarySpec, callable 
     return pmssStatus('Binary: '.$binary, 'OK', $detail !== '' ? $detail : 'present');
 }
 
+/** Return the codename check for either system-test or component-status output. */
+function pmssStatusCodenameCheck(string $codename, bool $componentView = false): array
+{
+    $name = $componentView ? 'os.codename' : 'OS codename';
+    return $codename === '' ? pmssStatus($name, 'WARN', 'VERSION_CODENAME missing') : pmssStatus($name, 'OK', $codename);
+}
+
+/** Return the apt-sources/codename check while preserving each caller's label contract. */
+function pmssStatusSourcesCodenameCheck(string $codename, string $sourcesPath, callable $isFile, callable $readFile, bool $componentView = false): ?array
+{
+    if (!$isFile($sourcesPath)) return $componentView ? pmssStatus('apt.sources', 'WARN', 'missing sources.list') : null;
+    if (!$componentView && $codename === '') return null;
+    $sources = $readFile($sourcesPath);
+    $matches = $componentView
+        ? ($codename === '' || stripos($sources, $codename) !== false)
+        : ($sources !== '' && stripos($sources, $codename) !== false);
+    if ($componentView) return pmssStatus('apt.sources', $matches ? 'OK' : 'WARN', $matches ? 'contains '.$codename : 'codename mismatch');
+    return pmssStatus('Sources codename match', $matches ? 'OK' : 'WARN', $matches ? 'sources.list references '.$codename : sprintf('%s not present in sources.list', $codename));
+}
+
 function pmssStatusContextResolve(array $dependencies = []): array
 {
     $sourcesPath = pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
@@ -175,10 +195,8 @@ function pmssComponentStatusChecks(array $dependencies = []): array
     $context = isset($dependencies['probeSpecs']) ? $dependencies : pmssStatusContextResolve($dependencies);
     $runCommand = $context['runCommand']; $pathExists = $context['pathExists']; $readFile = $context['readFile']; $isExecutable = $context['isExecutable'];
     $codename = (string) $context['codename']; $sourcesPath = (string) $context['sourcesPath'];
-    $results[] = $codename === '' ? pmssStatus('os.codename', 'WARN', 'VERSION_CODENAME missing') : pmssStatus('os.codename', 'OK', $codename);
-    $results[] = is_file($sourcesPath)
-        ? pmssStatus('apt.sources', ($matches = $codename === '' || stripos($readFile($sourcesPath), $codename) !== false) ? 'OK' : 'WARN', $matches ? 'contains '.$codename : 'codename mismatch')
-        : pmssStatus('apt.sources', 'WARN', 'missing sources.list');
+    $results[] = pmssStatusCodenameCheck($codename, true);
+    $results[] = pmssStatusSourcesCodenameCheck($codename, $sourcesPath, 'is_file', $readFile, true);
 
     return array_merge($results, pmssStatusProbeChecks($context['probeSpecs'], $runCommand, $isExecutable, $pathExists, true));
 }
@@ -199,15 +217,6 @@ function pmssSystemStatusLocalnetConfigCheck(callable $isFile, callable $isDir, 
         if ((($dirPerms & 0777) & 0001) === 0) $issues[] = sprintf('%s mode %o missing world-exec (users cannot traverse to localnet)', $dir, $dirPerms & 0777);
     }
     return pmssStatus('Seedbox localnet (config)', $issues === [] ? 'OK' : 'ERR', $issues === [] ? $localnetConfig.' readable via 0664 + traversable dirs' : implode('; ', $issues));
-}
-
-/** Return the sources/codename status when both inputs are known enough to compare. */
-function pmssSystemStatusSourcesCodenameCheck(string $codename, string $sourcesPath, callable $isFile, callable $readFile): ?array
-{
-    if ($codename === '' || !$isFile($sourcesPath)) return null;
-    $sources = $readFile($sourcesPath);
-    $matches = $sources !== '' && stripos($sources, $codename) !== false;
-    return pmssStatus('Sources codename match', $matches ? 'OK' : 'WARN', $matches ? 'sources.list references '.$codename : sprintf('%s not present in sources.list', $codename));
 }
 
 /** Check OpenVPN client artifacts without probing generated paths for invalid hostnames. */
@@ -267,12 +276,10 @@ function pmssSystemStatusChecks(array $dependencies = []): array
     $checks = [];
     $codename = (string) $context['codename'];
     $sourcesPath = (string) $context['sourcesPath'];
-    $checks[] = $codename === ''
-        ? pmssStatus('OS codename', 'WARN', 'VERSION_CODENAME missing')
-        : pmssStatus('OS codename', 'OK', $codename);
+    $checks[] = pmssStatusCodenameCheck($codename);
     $checks = array_merge($checks, pmssStatusProbeChecks($context['probeSpecs'], $runCommand, $isExecutable, $pathExists));
 
-    $sourcesCheck = pmssSystemStatusSourcesCodenameCheck($codename, $sourcesPath, $isFile, $readFile);
+    $sourcesCheck = pmssStatusSourcesCodenameCheck($codename, $sourcesPath, $isFile, $readFile);
     $checks = array_merge($checks, [pmssSystemStatusLocalnetConfigCheck($isFile, $isDir, $filePerms)], $sourcesCheck !== null ? [$sourcesCheck] : [], [pmssSystemStatusOpenvpnClientArtifactCheck($isFile, (string) $readFile('/etc/hostname'))], pmssSystemStatusExecutablePathChecks([
         'Virtualenv: FlexGet binary' => '/opt/flexget/bin/flexget',
         'Virtualenv: pyLoad binary' => '/opt/pyload/bin/pyload',
