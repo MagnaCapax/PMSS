@@ -352,6 +352,13 @@ class RuntimeTest extends TestCase
         $this->assertSame('', $result['stderr']);
     }
 
+    public function testInheritedTtyCaptureKeepsResultShape(): void
+    {
+        $result = \pmssCommandInheritedTtyCapture('/bin/bash -lc '.escapeshellarg('exit 5'), 'tty-shape-test', 0);
+
+        $this->assertSame(['rc' => 5, 'stdout' => '', 'stderr' => '', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => false], $result);
+    }
+
     public function testProcessCloseExitCodeUsesObservedStatusAfterPolling(): void
     {
         $process = proc_open(

@@ -138,6 +138,36 @@ function pmssProcessCloseExitCode($process, $lastStatus = null): int
     return ($rc === -1 && $fallbackExitCode !== null) ? $fallbackExitCode : (int) $rc;
 }
 
+// Inherited-stdio commands still report the same result shape as piped capture.
+function pmssCommandInheritedTtyCapture(string $bash, string $timeoutCommand, int $timeoutSec): array
+{
+    $descriptor = [0 => STDIN, 1 => STDOUT, 2 => STDERR];
+    $process = proc_open($bash, $descriptor, $pipes);
+    if (!is_resource($process)) {
+        usleep(500000);
+        $process = proc_open($bash, $descriptor, $pipes);
+    }
+    if (!is_resource($process)) {
+        return ['rc' => 1, 'stdout' => '', 'stderr' => '', 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];
+    }
+
+    $startedAt = microtime(true);
+    $timedOut = false;
+    $lastStatus = null;
+    while (true) {
+        $status = proc_get_status($process);
+        $lastStatus = is_array($status) ? $status : $lastStatus;
+        if (!is_array($status) || empty($status['running'])) break;
+        if ($timeoutSec > 0 && (microtime(true) - $startedAt) > $timeoutSec) { $timedOut = true; break; }
+        usleep(200000);
+    }
+
+    $rc = $timedOut
+        ? pmssCommandTimeoutClose($process, $timeoutCommand, $timeoutSec, $startedAt)
+        : pmssProcessCloseExitCode($process, $lastStatus);
+    return ['rc' => $rc, 'stdout' => '', 'stderr' => '', 'timed_out' => $timedOut, 'launch_failed' => false, 'pipe_failed' => false];
+}
+
 /**
  * @return array{rc:int,stdout:string,stderr:string,timed_out:bool,launch_failed:bool,pipe_failed:bool}
  */
@@ -202,11 +232,6 @@ function pmssCommandCapture(string $cmd, int $timeoutSec = 0, bool $loginShell =
     $bash = '/bin/bash '.($loginShell ? '-lc ' : '-c ').escapeshellarg($cmd);
     $result = pmssCommandPipedCapture($bash, $cmd, $timeoutSec, 0, false, $launchError, $launchRc);
     return ['rc' => $result['rc'], 'stdout' => $result['stdout'], 'stderr' => $result['stderr']];
-}
-
-function pmssOutputIndicatesForkFailure(string $stdout, string $stderr): bool
-{
-    return preg_match('/\b(Cannot fork|fork failed|Unable to fork|Resource temporarily unavailable)\b/i', $stdout."\n".$stderr) === 1;
 }
 
 function pmssCommandIsAptDpkg(string $cmd): bool
@@ -509,53 +534,20 @@ function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null
 
     $useInheritedIO = $inheritTty && pmssStandardStreamsAreTty();
     $bash = pmssCommandBashInvocation($cmd);
-    if ($useInheritedIO) {
-        $descriptor = [0 => STDIN, 1 => STDOUT, 2 => STDERR];
-        $process = proc_open($bash, $descriptor, $pipes);
-        if (!is_resource($process)) {
-            usleep(500000);
-            $process = proc_open($bash, $descriptor, $pipes);
-        }
-        if (!is_resource($process)) {
-            return $failLaunch();
-        }
-
-        $startedAt = microtime(true);
-        $timedOut = false;
-        $lastStatus = null;
-        while (true) {
-            $status = proc_get_status($process);
-            $lastStatus = is_array($status) ? $status : $lastStatus;
-            if (!is_array($status) || empty($status['running'])) {
-                break;
-            }
-            if ($timeoutSec > 0 && (microtime(true) - $startedAt) > $timeoutSec) {
-                $timedOut = true;
-                break;
-            }
-            usleep(200000);
-        }
-
-        $exitCode = $timedOut
-            ? pmssCommandTimeoutClose($process, $cmd, $timeoutSec, $startedAt)
-            : pmssProcessCloseExitCode($process, $lastStatus);
-        $stdout = '';
-        $stderr = '';
-    } else {
-        $result = pmssCommandPipedCapture($bash, $cmd, $timeoutSec, 1048576, true, '', 1, true);
-        if ($result['launch_failed']) {
-            return $failLaunch();
-        }
-        if ($result['pipe_failed']) {
-            return $failPipeCapture('proc_open pipes unavailable for command capture: '.$cmd);
-        }
-
-        $exitCode = $result['rc'];
-        $stdout = $result['stdout'];
-        $stderr = $result['stderr'];
-        $timedOut = $result['timed_out'];
+    $result = $useInheritedIO
+        ? pmssCommandInheritedTtyCapture($bash, $cmd, $timeoutSec)
+        : pmssCommandPipedCapture($bash, $cmd, $timeoutSec, 1048576, true, '', 1, true);
+    if ($result['launch_failed']) {
+        return $failLaunch();
+    }
+    if ($result['pipe_failed']) {
+        return $failPipeCapture('proc_open pipes unavailable for command capture: '.$cmd);
     }
 
+    $exitCode = $result['rc'];
+    $stdout = $result['stdout'];
+    $stderr = $result['stderr'];
+    $timedOut = $result['timed_out'];
     $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => $stdout, 'stderr' => $stderr];
     if ($exitCode !== 0) {
         $excerpt = trim($stderr);

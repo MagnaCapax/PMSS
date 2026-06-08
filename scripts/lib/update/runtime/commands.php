@@ -10,6 +10,21 @@ require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/profile.php';
 require_once __DIR__.'/../../runtime.php';
 
+/** Record one command-style profile entry with the stable runStep fields. */
+function pmssCommandProfileRecord(string $description, string $command, string $status, int $rc, float $duration, bool $dryRun, string $stdoutExcerpt = '', string $stderrExcerpt = ''): void
+{
+    pmssRecordProfile([
+        'description'    => $description,
+        'command'        => $command,
+        'status'         => $status,
+        'rc'             => $rc,
+        'duration'       => round($duration, 4),
+        'dry_run'        => $dryRun,
+        'stdout_excerpt' => $stdoutExcerpt,
+        'stderr_excerpt' => $stderrExcerpt,
+    ]);
+}
+
 /**
  * Execute a shell command, keeping failures soft.
  *
@@ -44,7 +59,7 @@ function runStep(string $description, string $command): int
     // Fork failures may occur inside nested scripts (e.g. find/chown) while the
     // wrapper command itself still exits rc=0. Detect known strings and emit a
     // non-shell diagnostics snapshot so we have the cgroup/rlimit context.
-    if (!$dryRun && pmssOutputIndicatesForkFailure($stdout, $stderr)) {
+    if (!$dryRun && preg_match('/\b(Cannot fork|fork failed|Unable to fork|Resource temporarily unavailable)\b/i', $stdout."\n".$stderr) === 1) {
         pmssDumpForkDiagnostics('runStep: '.$description.' :: '.$command, 'logMessage');
     }
 
@@ -64,16 +79,7 @@ function runStep(string $description, string $command): int
     // Use structured logger from logging.php to avoid missing logmsg() when
     // this runtime is invoked outside update.php/bootstrap paths.
     logMessage($message);
-    pmssRecordProfile([
-        'description'    => $description,
-        'command'        => $command,
-        'status'         => $status,
-        'rc'             => $rc,
-        'duration'       => round($duration, 4),
-        'dry_run'        => $dryRun,
-        'stdout_excerpt' => $stdoutShort,
-        'stderr_excerpt' => $stderrShort,
-    ]);
+    pmssCommandProfileRecord($description, $command, $status, $rc, $duration, $dryRun, $stdoutShort, $stderrShort);
     return $rc;
 }
 
@@ -122,14 +128,5 @@ function pmssLogStatus(string $status, string $description, int $rc = 0, ?float 
     $dur = $duration ?? 0.0;
     $statusUpper = strtoupper($status);
     logMessage(sprintf('[%s %.3fs rc=%d] %s', $statusUpper, $dur, $rc, $description));
-    pmssRecordProfile([
-        'description'    => $description,
-        'command'        => '',
-        'status'         => $statusUpper,
-        'rc'             => $rc,
-        'duration'       => round($dur, 4),
-        'dry_run'        => false,
-        'stdout_excerpt' => '',
-        'stderr_excerpt' => '',
-    ]);
+    pmssCommandProfileRecord($description, '', $statusUpper, $rc, $dur, false);
 }
