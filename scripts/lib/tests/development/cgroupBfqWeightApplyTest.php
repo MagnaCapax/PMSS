@@ -3,6 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../../cgroup/policy.php';
+require_once __DIR__.'/../../user/identity.php';
 
 /**
  * Hermetic tests for the per-user bfq.weight fallback and bonus helpers
@@ -92,7 +93,7 @@ class CgroupBfqWeightApplyTest extends TestCase
         }
     }
 
-    public function testPasswdUidParserAcceptsOnlyPositiveIntegerUid(): void
+    public function testSharedPasswdUidParserAcceptsOnlyPositiveIntegerUid(): void
     {
         foreach ([
             [['uid' => 1], 1],
@@ -108,7 +109,7 @@ class CgroupBfqWeightApplyTest extends TestCase
             [false, null],
             [['uid' => '9999999999999999999999999'], null],
         ] as [$passwdEntry, $expected]) {
-            $this->assertSame($expected, \pmssBfqUserPasswdUid($passwdEntry));
+            $this->assertSame($expected, \pmssPasswdEntryPositiveUid($passwdEntry));
         }
     }
 
@@ -172,7 +173,7 @@ class CgroupBfqWeightApplyTest extends TestCase
             'scripts/cron/cgroupBfqWeightApply.php',
             [
                 '$pwd = posix_getpwnam($user);',
-                '$uid = pmssBfqUserPasswdUid($pwd);',
+                '$uid = pmssPasswdEntryPositiveUid($pwd);',
                 'syslog(LOG_WARNING, "unsafe passwd uid $user");',
                 "\$cgPath = '/sys/fs/cgroup/blkio/user.slice/user-'.\$uid.'.slice/blkio.bfq.weight';",
             ],

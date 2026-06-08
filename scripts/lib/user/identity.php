@@ -132,6 +132,26 @@ function pmssPasswdEntryLookup(string $username, string $passwdPath = '/etc/pass
     );
 }
 
+/** Resolve a strictly positive UID from POSIX/passwd entry data. */
+function pmssPasswdEntryPositiveUid($passwdEntry): ?int
+{
+    if (!is_array($passwdEntry) || !array_key_exists('uid', $passwdEntry)) {
+        return null;
+    }
+
+    $uid = $passwdEntry['uid'];
+    if (is_int($uid)) {
+        return $uid > 0 ? $uid : null;
+    }
+
+    if (!is_string($uid) || preg_match('/^[1-9][0-9]*$/D', $uid) !== 1) {
+        return null;
+    }
+
+    $parsed = filter_var($uid, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    return is_int($parsed) ? $parsed : null;
+}
+
 /** @return array<string,mixed>|null */
 function pmssUserAccountLookup(string $username): ?array
 {

@@ -24,7 +24,8 @@ function pmssResourceLogLookupManagedUid(string $user): ?int
         return null;
     }
     if (($info = pmssUserAccountLookup($user)) !== null) {
-        return (int) $info['uid'];
+        $uid = pmssPasswdEntryPositiveUid($info);
+        if ($uid !== null) return $uid;
     }
 
     $uid = trim((string) @shell_exec('id -u '.escapeshellarg($user).' 2>/dev/null'));

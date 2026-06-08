@@ -96,26 +96,6 @@ function pmssBfqKernelWeightParse($raw): ?int
     return $weight >= 1 && $weight <= PMSS_BFQ_KERNEL_MAX ? $weight : null;
 }
 
-/** Resolve a safe non-root UID from a passwd entry before sysfs path assembly. */
-function pmssBfqUserPasswdUid($passwdEntry): ?int
-{
-    if (!is_array($passwdEntry) || !array_key_exists('uid', $passwdEntry)) {
-        return null;
-    }
-
-    $uid = $passwdEntry['uid'];
-    if (is_int($uid)) {
-        return $uid > 0 ? $uid : null;
-    }
-
-    if (!is_string($uid) || preg_match('/^[1-9][0-9]*$/', $uid) !== 1) {
-        return null;
-    }
-
-    $parsed = filter_var($uid, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-    return is_int($parsed) ? $parsed : null;
-}
-
 /** Resolve one numeric profile value from policy overrides plus built-in defaults. */
 function pmssCgroupPolicyNumericProfileValue(array $policy, string $family, string $profileName, array $defaults, string $fallback): string
 {

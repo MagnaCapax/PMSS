@@ -126,7 +126,7 @@ foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
         syslog(LOG_WARNING, "no passwd entry $user");
         continue;
     }
-    $uid = pmssBfqUserPasswdUid($pwd);
+    $uid = pmssPasswdEntryPositiveUid($pwd);
     if ($uid === null) {
         $errors++;
         syslog(LOG_WARNING, "unsafe passwd uid $user");

@@ -74,27 +74,6 @@ function pmssIopsMajorMinorValid(string $majMin): bool
     return preg_match('/^[0-9]+:[0-9]+$/', $majMin) === 1;
 }
 
-/**
- * Validate POSIX passwd data before using it in a sysfs cgroup path.
- */
-function pmssIopsUserPasswdUid($passwdEntry): ?int
-{
-    if (!is_array($passwdEntry) || !array_key_exists('uid', $passwdEntry)) {
-        return null;
-    }
-
-    $uid = $passwdEntry['uid'];
-    if (is_int($uid)) {
-        $uidValue = $uid;
-    } elseif (is_string($uid) && ctype_digit($uid)) {
-        $uidValue = (int) $uid;
-    } else {
-        return null;
-    }
-
-    return $uidValue > 0 ? $uidValue : null;
-}
-
 /** Keep direct cgroup writes scoped to the expected per-user blkio throttle files. */
 function pmssIopsThrottlePathAllowed(string $cgPath): bool
 {
@@ -186,7 +165,7 @@ foreach (glob(PMSS_IOPS_USERS_DIR.'/*.json') ?: [] as $cfgPath) {
         syslog(LOG_WARNING, "no passwd entry $user");
         continue;
     }
-    $uid = pmssIopsUserPasswdUid($pwd);
+    $uid = pmssPasswdEntryPositiveUid($pwd);
     if ($uid === null) {
         $errors++;
         syslog(LOG_WARNING, "unsafe passwd uid $user");

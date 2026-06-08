@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/user/identity.php';
+
 /** @param array<int, string> $propertyNames @return array<string, string> */
 function pmssParseSystemdPropertyOutput(array $propertyNames, string $output): array
 {
@@ -75,8 +77,7 @@ function pmssReadSystemdIntProperties(string $unit, array $fieldMap, array $defa
 /** @param array<int, string> $propertyNames @return array<string, string> */
 function pmssReadUserSlicePropertiesByUsername(string $username, array $propertyNames): array
 {
-    $account = function_exists('posix_getpwnam') ? @posix_getpwnam($username) : null;
-    $uid = (is_array($account) && isset($account['uid'])) ? (int) $account['uid'] : 0;
+    $uid = pmssPasswdEntryPositiveUid(pmssUserAccountLookup($username)) ?? 0;
     return $uid > 0
         ? pmssReadSystemdProperties(sprintf('user-%d.slice', $uid), $propertyNames)
         : pmssParseSystemdPropertyOutput($propertyNames, '');

@@ -20,7 +20,7 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
             'scripts/cron/cgroupIopsLimitApply.php',
             [
                 '$pwd = posix_getpwnam($user);',
-                '$uid = pmssIopsUserPasswdUid($pwd);',
+                '$uid = pmssPasswdEntryPositiveUid($pwd);',
                 'syslog(LOG_WARNING, "unsafe passwd uid $user");',
                 "\$sliceDir = '/sys/fs/cgroup/blkio/user.slice/user-'.\$uid.'.slice';",
             ],
