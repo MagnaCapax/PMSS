@@ -11,8 +11,8 @@ class UpdateServicesRuntimeTest extends TestCase
         $normalized = \pmssSshdLegacyParserTemplateNormalize("Port 22\nCiphers +aes128-ctr\nHostKeyAlgorithms ssh-ed25519");
 
         $this->assertStringContainsAllStrings(["Port 22\n", '# HostKeyAlgorithms ssh-ed25519'], $normalized);
-        foreach (["\nCiphers aes128-gcm@openssh.com", "\nKexAlgorithms curve25519-sha256@libssh.org", "\nMACs hmac-sha2-512-etm@openssh.com"] as $needle) {
-            $this->assertSame(1, substr_count($normalized, $needle));
+        foreach (["\nCiphers aes128-gcm@openssh.com", "\nKexAlgorithms curve25519-sha256@libssh.org", "\nMACs hmac-sha2-512-etm@openssh.com"] as $directive) {
+            $this->assertSame(1, substr_count($normalized, $directive));
         }
         $this->assertStringNotContainsString('hmac-ripemd160', $normalized);
     }
@@ -26,7 +26,7 @@ class UpdateServicesRuntimeTest extends TestCase
         );
 
         foreach (['HostKeyAlgorithms +ssh-rsa', 'PubkeyAcceptedKeyTypes +ssh-rsa'] as $message) {
-            $this->assertTrue($this->pmssMessagesContain($messages, $message));
+            $this->pmssAssertMessagesContain($messages, $message);
         }
     }
 
@@ -83,9 +83,7 @@ class UpdateServicesRuntimeTest extends TestCase
 
     public function testCronRestartDropinCreatesDirectoryAndFileSafely(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-cron-dropin-');
-        $dropinDir = $root.'/cron.service.d';
-        $dropinFile = $dropinDir.'/pmss-restart.conf';
+        list($root, $dropinDir, $dropinFile) = $this->pmssCronDropinFixture('pmss-cron-dropin-');
         $changed = false;
 
         $this->assertTrue(\pmssEnsureCronRestartDropin($dropinDir, $dropinFile, $root, $changed));
@@ -104,9 +102,7 @@ class UpdateServicesRuntimeTest extends TestCase
 
     public function testCronRestartDropinSkipsUnchangedContent(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-cron-dropin-same-');
-        $dropinDir = $root.'/cron.service.d';
-        $dropinFile = $dropinDir.'/pmss-restart.conf';
+        list($root, $dropinDir, $dropinFile) = $this->pmssCronDropinFixture('pmss-cron-dropin-same-');
         $this->pmssWriteFile($dropinFile, \pmssCronRestartDropinContent());
         $mtime = filemtime($dropinFile);
         $changed = true;
@@ -118,9 +114,7 @@ class UpdateServicesRuntimeTest extends TestCase
 
     public function testCronRestartDropinRefusesSymlinkTarget(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-cron-dropin-link-');
-        $dropinDir = $root.'/cron.service.d';
-        $dropinFile = $dropinDir.'/pmss-restart.conf';
+        list($root, $dropinDir, $dropinFile) = $this->pmssCronDropinFixture('pmss-cron-dropin-link-');
         $outside = $root.'/outside.conf';
         $this->pmssWriteFile($outside, 'original');
         $this->pmssEnsureDir($dropinDir);
@@ -134,9 +128,9 @@ class UpdateServicesRuntimeTest extends TestCase
 
     public function testCronRestartDropinRefusesSymlinkedDirectory(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-cron-dropin-dirlink-');
+        list($root, , $dropinFile) = $this->pmssCronDropinFixture('pmss-cron-dropin-dirlink-');
         $realDir = $root.'/real';
-        $linkDir = $root.'/cron.service.d';
+        $linkDir = dirname($dropinFile);
         $this->pmssEnsureDir($realDir);
         symlink($realDir, $linkDir);
         $changed = true;
@@ -163,13 +157,19 @@ class UpdateServicesRuntimeTest extends TestCase
 
     public function testCronRestartDropinRequiresTargetInsideDirectory(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-cron-dropin-outside-');
-        $dropinDir = $root.'/cron.service.d';
+        list($root, $dropinDir) = $this->pmssCronDropinFixture('pmss-cron-dropin-outside-');
         $outside = $root.'/outside.conf';
         $changed = true;
 
         $this->assertFalse(\pmssEnsureCronRestartDropin($dropinDir, $outside, $root, $changed));
         $this->assertFalse($changed);
         $this->assertFalse(file_exists($outside));
+    }
+
+    private function pmssCronDropinFixture(string $prefix): array
+    {
+        $root = $this->pmssMakeTempDir($prefix);
+        $dropinDir = $root.'/cron.service.d';
+        return [$root, $dropinDir, $dropinDir.'/pmss-restart.conf'];
     }
 }

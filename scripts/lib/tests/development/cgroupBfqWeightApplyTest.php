@@ -130,92 +130,71 @@ class CgroupBfqWeightApplyTest extends TestCase
         }
     }
 
-    public function testCronRequiresPosixBeforeRootCheck(): void
+    public function testCronSourceSafetyContracts(): void
     {
-        $this->pmssAssertRepoFileContainsOrderedStrings(
-            'scripts/cron/cgroupBfqWeightApply.php',
-            [
-                "require_once __DIR__.'/../lib/cgroup/directApply.php';",
-                "pmssCgroupDirectRequireRuntime('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); script does not apply here');",
-                '// BFQ scheduler must be the active elevator on at least one block device.',
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/cron/cgroupBfqWeightApply.php' => [
+                'required' => [
+                    "require_once __DIR__.'/../lib/cgroup/directApply.php';",
+                    'pmssCgroupDirectUserConfigs($USERS_DIR, $errors)',
+                    'pmssBfqUserBonusPercentRead($user)',
+                    'pmssBfqApplyBonusWeight($wRaw, $bonusPct',
+                    'function pmssBfqUserBonusPercentRead(string $user): int',
+                    '$stat = @lstat($path);',
+                    "((\$stat['mode'] ?? 0) & 0170000) !== 0100000",
+                    "(int) (\$stat['size'] ?? 0) > 64",
+                    '@file_get_contents($path, false, null, 0, 64)',
+                ],
+                'ordered' => [
+                    [
+                        'needles' => [
+                            "require_once __DIR__.'/../lib/cgroup/directApply.php';",
+                            "pmssCgroupDirectRequireRuntime('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); script does not apply here');",
+                            '// BFQ scheduler must be the active elevator on at least one block device.',
+                        ],
+                        'missingPrefix' => 'missing BFQ POSIX extension guard: ',
+                        'orderPrefix' => 'BFQ POSIX guard must run before root preflight: ',
+                    ],
+                    [
+                        'needles' => [
+                            'foreach (pmssCgroupDirectUserConfigs($USERS_DIR, $errors) as $entry) {',
+                            'list($user, $json) = $entry;',
+                            '$total++;',
+                            'pmssBfqUserBonusPercentRead($user)',
+                        ],
+                        'missingPrefix' => 'missing BFQ username boundary guard: ',
+                        'orderPrefix' => 'BFQ username guard must run before user paths: ',
+                    ],
+                    [
+                        'needles' => [
+                            '$uid = pmssCgroupDirectUserUidOrError($user, $errors);',
+                            'if ($uid === null) {',
+                            "pmssCgroupDirectUserBlkioFilePath(\$uid, 'blkio.bfq.weight');",
+                        ],
+                        'missingPrefix' => 'missing BFQ passwd UID guard: ',
+                        'orderPrefix' => 'BFQ passwd UID guard must run before sysfs path assembly: ',
+                    ],
+                    [
+                        'needles' => [
+                            "pmssCgroupDirectUserBlkioFilePath(\$uid, 'blkio.bfq.weight');",
+                            "if (!pmssCgroupDirectUserBlkioPathAllowed(\$cgPath, ['blkio.bfq.weight'])) {",
+                            'syslog(LOG_WARNING, "unsafe bfq target $user uid=$uid");',
+                            'if (@file_put_contents($cgPath, (string) $w) === false)',
+                        ],
+                        'missingPrefix' => 'missing BFQ direct-write target guard: ',
+                        'orderPrefix' => 'BFQ direct-write target guard must run before file_put_contents: ',
+                    ],
+                    [
+                        'needles' => [
+                            '$cur = pmssBfqKernelWeightParse(@file_get_contents($cgPath));',
+                            "if (\$cur === null) {\n        \$errors++;\n        syslog(LOG_WARNING, \"unreadable bfq weight \$user uid=\$uid\");\n        continue;\n    }",
+                            'if ($cur === $w) {',
+                        ],
+                        'missingPrefix' => 'missing BFQ current-weight parse guard: ',
+                        'orderPrefix' => 'BFQ current-weight guard must run before compare/write: ',
+                    ],
+                ],
             ],
-            'missing BFQ POSIX extension guard: ',
-            'BFQ POSIX guard must run before root preflight: '
-        );
-    }
-
-    public function testCronValidatesConfigUsernameBeforeUserPaths(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/cron/cgroupBfqWeightApply.php',
-            [
-                "require_once __DIR__.'/../lib/cgroup/directApply.php';",
-                'pmssCgroupDirectUserConfigs($USERS_DIR, $errors)',
-                'pmssBfqUserBonusPercentRead($user)',
-                'pmssBfqApplyBonusWeight($wRaw, $bonusPct',
-            ]
-        );
-        $this->pmssAssertRepoFileContainsOrderedStrings(
-            'scripts/cron/cgroupBfqWeightApply.php',
-            [
-                'foreach (pmssCgroupDirectUserConfigs($USERS_DIR, $errors) as $entry) {',
-                'list($user, $json) = $entry;',
-                '$total++;',
-                'pmssBfqUserBonusPercentRead($user)',
-            ],
-            'missing BFQ username boundary guard: ',
-            'BFQ username guard must run before user paths: '
-        );
-    }
-
-    public function testCronRejectsUnsafePasswdUidBeforeCgroupPath(): void
-    {
-        $this->pmssAssertRepoFileContainsOrderedStrings(
-            'scripts/cron/cgroupBfqWeightApply.php',
-            [
-                '$uid = pmssCgroupDirectUserUidOrError($user, $errors);',
-                'if ($uid === null) {',
-                "pmssCgroupDirectUserBlkioFilePath(\$uid, 'blkio.bfq.weight');",
-            ],
-            'missing BFQ passwd UID guard: ',
-            'BFQ passwd UID guard must run before sysfs path assembly: '
-        );
-    }
-
-    public function testCronValidatesDirectWriteTargetBeforeFilePutContents(): void
-    {
-        $this->pmssAssertRepoFileContainsOrderedStrings(
-            'scripts/cron/cgroupBfqWeightApply.php',
-            [
-                "pmssCgroupDirectUserBlkioFilePath(\$uid, 'blkio.bfq.weight');",
-                "if (!pmssCgroupDirectUserBlkioPathAllowed(\$cgPath, ['blkio.bfq.weight'])) {",
-                'syslog(LOG_WARNING, "unsafe bfq target $user uid=$uid");',
-                'if (@file_put_contents($cgPath, (string) $w) === false)',
-            ],
-            'missing BFQ direct-write target guard: ',
-            'BFQ direct-write target guard must run before file_put_contents: '
-        );
-    }
-
-    public function testCronReadsBonusMarkerAsTinyRegularFile(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/cron/cgroupBfqWeightApply.php',
-            ['function pmssBfqUserBonusPercentRead(string $user): int', '$stat = @lstat($path);', "((\$stat['mode'] ?? 0) & 0170000) !== 0100000", "(int) (\$stat['size'] ?? 0) > 64", '@file_get_contents($path, false, null, 0, 64)']
-        );
-    }
-
-    public function testCronRejectsUnreadableCurrentKernelWeight(): void
-    {
-        $this->pmssAssertRepoFileContainsOrderedStrings(
-            'scripts/cron/cgroupBfqWeightApply.php',
-            [
-                '$cur = pmssBfqKernelWeightParse(@file_get_contents($cgPath));',
-                "if (\$cur === null) {\n        \$errors++;\n        syslog(LOG_WARNING, \"unreadable bfq weight \$user uid=\$uid\");\n        continue;\n    }",
-                'if ($cur === $w) {',
-            ],
-            'missing BFQ current-weight parse guard: ',
-            'BFQ current-weight guard must run before compare/write: '
-        );
+        ]);
     }
 }
