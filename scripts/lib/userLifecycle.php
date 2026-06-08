@@ -374,7 +374,11 @@ function pmssUserLifecycleRefreshNginxConfig(string $action, string $username, b
     $initStep = isset($restartOptions['initStep']) ? (string) $restartOptions['initStep'] : 'restart_nginx_init';
     $initCommand = isset($restartOptions['initCommand']) ? (string) $restartOptions['initCommand'] : '/etc/init.d/nginx restart';
 
-    $runner($action, $username, $configStep, $configCommand, $dryRun);
+    $configRc = (int) $runner($action, $username, $configStep, $configCommand, $dryRun);
+    if ($configRc !== 0) {
+        return $configRc;
+    }
+
     $restartRc = (int) $runner($action, $username, $systemctlStep, $systemctlCommand, $dryRun);
     if ($restartRc === 0) {
         return 0;
