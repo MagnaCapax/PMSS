@@ -39,16 +39,41 @@ function pmssCliEntrypointRelativePathIsSafe(string $relativePath): bool
 function pmssRequireCliEntrypointScript(string $baseDir, string $relativePath, bool $rootRequired = false, array $argvAppend = []): void
 {
     pmssPrepareCliEntrypoint($rootRequired, $argvAppend);
-    if (!pmssCliEntrypointRelativePathIsSafe($relativePath)) {
-        throw new RuntimeException('Unsafe CLI entrypoint relative path');
-    }
-
-    $scriptPath = rtrim($baseDir, '/').'/'.ltrim($relativePath, '/');
+    $scriptPath = pmssCliEntrypointScriptResolve($baseDir, $relativePath);
     if (pmssCliEntrypointScriptStartsWithShebang($scriptPath)) {
         pmssRunCliEntrypointScriptProcess($scriptPath);
     }
 
     require_once $scriptPath;
+}
+
+function pmssCliEntrypointScriptResolve(string $baseDir, string $relativePath): string
+{
+    if (!pmssCliEntrypointRelativePathIsSafe($relativePath)) {
+        throw new RuntimeException('Unsafe CLI entrypoint relative path');
+    }
+
+    if ($baseDir === '' || pmssFilesystemPathHasNulByte($baseDir)) {
+        throw new RuntimeException('Unsafe CLI entrypoint base directory');
+    }
+
+    $baseReal = realpath($baseDir);
+    if ($baseReal === false || $baseReal === DIRECTORY_SEPARATOR || !is_dir($baseReal)) {
+        throw new RuntimeException('Unsafe CLI entrypoint base directory');
+    }
+
+    $scriptReal = realpath(rtrim($baseReal, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$relativePath);
+    if ($scriptReal === false || !is_file($scriptReal)) {
+        throw new RuntimeException('Unable to resolve CLI entrypoint script');
+    }
+
+    // Symlinked path segments must not escape the wrapper-owned script tree.
+    $basePrefix = rtrim($baseReal, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
+    if (strpos($scriptReal, $basePrefix) !== 0) {
+        throw new RuntimeException('Unsafe CLI entrypoint script path');
+    }
+
+    return $scriptReal;
 }
 
 /** Detect executable PHP scripts that cannot be safely included before strict_types. */

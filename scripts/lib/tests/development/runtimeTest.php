@@ -192,6 +192,28 @@ class RuntimeTest extends TestCase
         }
     }
 
+    public function testCliEntrypointScriptResolveReturnsCanonicalTarget(): void
+    {
+        $tempDir = $this->pmssMakeTempDir('pmss-runtime-entrypoint-resolve-');
+        $baseDir = $tempDir.'/base';
+        $scriptPath = $this->pmssWriteFile($baseDir.'/util/target.php', "<?php\n");
+
+        $this->assertSame(realpath($scriptPath), \pmssCliEntrypointScriptResolve($baseDir, 'util/target.php'));
+    }
+
+    public function testCliEntrypointScriptResolveRejectsSymlinkEscape(): void
+    {
+        $tempDir = $this->pmssMakeTempDir('pmss-runtime-entrypoint-symlink-');
+        $baseDir = $tempDir.'/base';
+        $outsidePath = $this->pmssWriteFile($tempDir.'/outside.php', "<?php\n");
+        @mkdir($baseDir.'/util', 0755, true);
+        $this->pmssCreateSymlinkOrSkip($outsidePath, $baseDir.'/util/escaped.php');
+
+        $this->assertThrowsRuntime(static function () use ($baseDir): void {
+            \pmssCliEntrypointScriptResolve($baseDir, 'util/escaped.php');
+        }, 'Unsafe CLI entrypoint script path');
+    }
+
     public function testRequireCliEntrypointScriptRejectsTraversalBeforeRequire(): void
     {
         $tempDir = $this->pmssMakeTempDir('pmss-runtime-entrypoint-safe-');
