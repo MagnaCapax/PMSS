@@ -1,4 +1,5 @@
 limit_conn_zone $binary_remote_addr zone=addr:10m;
+limit_conn_zone $binary_remote_addr zone=testfile:10m;
 
 server {
 	listen   80 default_server; ## listen for ipv4; this line is default and implied
@@ -14,6 +15,12 @@ server {
 		try_files $uri $uri/ /index.html;
 		# Uncomment to enable naxsi on this location
 		# include /etc/nginx/naxsi.rules
+	}
+
+	location = /testfile {
+		# Preserve speed-test throughput while bounding per-IP parallel downloads.
+		limit_conn testfile 16;
+		limit_conn_status 429;
 	}
 	include /etc/nginx/users/*;
 
@@ -58,6 +65,12 @@ server {
 
 	location / {
 		try_files $uri $uri/ =404;
+	}
+
+	location = /testfile {
+		# Preserve speed-test throughput while bounding per-IP parallel downloads.
+		limit_conn testfile 16;
+		limit_conn_status 429;
 	}
     
     include /etc/nginx/users/*;

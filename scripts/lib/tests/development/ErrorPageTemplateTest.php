@@ -19,6 +19,15 @@ class ErrorPageTemplateTest extends TestCase
         $this->assertEquals(2, substr_count($contents, 'location = /error-403.html {'));
     }
 
+    public function testNginxTemplateLimitsPublicTestfileInHttpAndHttpsServers(): void
+    {
+        $contents = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-site-default');
+        $this->assertEquals(1, substr_count($contents, 'limit_conn_zone $binary_remote_addr zone=testfile:10m;'));
+        $this->assertEquals(2, substr_count($contents, 'location = /testfile {'));
+        $this->assertEquals(2, substr_count($contents, 'limit_conn testfile 16;'));
+        $this->assertEquals(2, substr_count($contents, 'limit_conn_status 429;'));
+    }
+
     public function testAuthenticationErrorPageIncludesHelpfulTextAndHomeLink(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('var/www/error-401.html', [
