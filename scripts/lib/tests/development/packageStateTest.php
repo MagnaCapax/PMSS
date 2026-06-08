@@ -7,20 +7,22 @@ class PackageStateTest extends TestCase
 {
     public function testPackageStateModuleHasNoLegacyQueueSurface(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/packageState.php', [
-            'function pmssPackageStatus(string $package): string',
-            'function pmssPackageAvailable(string $package): bool',
-        ]);
         $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/update/packageState.php' => [
+                'required' => [
+                    'function pmssPackageStatus(string $package): string',
+                    'function pmssPackageAvailable(string $package): bool',
+                ],
+                'forbidden' => [
+                    'PMSS_PACKAGE'.'_QUEUE',
+                    'pmss'.'QueuePackages',
+                    'pmss'.'FlushPackageQueue',
+                    'pmss'.'InstallBestEffort',
+                ],
+            ],
             'scripts/lib/update/apps/deluge.php' => ['required' => ['pmssPackageStatus('], 'forbidden' => ['dpkg -s ', 'dpkg-query -W -f=']],
             'scripts/lib/update/distUpgrade/docker.php' => ['required' => ['pmssPackageStatus('], 'forbidden' => ['dpkg -s ', 'dpkg-query -W -f=']],
         ]);
-        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/update/packageState.php', [
-            'PMSS_PACKAGE'.'_QUEUE',
-            'pmss'.'QueuePackages',
-            'pmss'.'FlushPackageQueue',
-            'pmss'.'InstallBestEffort',
-        ], 'packageState.php must stay read-only: ');
     }
 
     public function testRetiredPackageQueueFilesStayRemoved(): void
@@ -31,11 +33,15 @@ class PackageStateTest extends TestCase
 
     public function testUpdateStep2DoesNotCarryPackageQueueSkipPath(): void
     {
-        $this->pmssAssertRepoFileNotContainsStrings('scripts/util/update-step2.php', [
-            "'packages.php'",
-            'PMSS_PACKAGE_INSTALL'.'_WARNINGS',
-            'PMSS_PACKAGE_INSTALL'.'_ERRORS',
-        ], 'retired package queue surface should not stay in update-step2: ');
-        $this->pmssAssertRepoFileContainsString('scripts/util/update-step2.php', 'dpkg selections are the authoritative source of package');
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/util/update-step2.php' => [
+                'required' => ['dpkg selections are the authoritative source of package'],
+                'forbidden' => [
+                    "'packages.php'",
+                    'PMSS_PACKAGE_INSTALL'.'_WARNINGS',
+                    'PMSS_PACKAGE_INSTALL'.'_ERRORS',
+                ],
+            ],
+        ]);
     }
 }

@@ -30,9 +30,9 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
     public function testLegacyWebConsumersNoLongerInlineUnserializeFileReads(): void
     {
-        $this->pmssAssertRepoFileNotContainsString('etc/skel/www/stats.php', '@unserialize(@file_get_contents(');
-        $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/welcome.php', [
-            '@unserialize(trim(@file_get_contents(',
+        $this->pmssAssertRepoFileContractCases([
+            'etc/skel/www/stats.php' => ['forbidden' => ['@unserialize(@file_get_contents(']],
+            'etc/skel/www/welcome.php' => ['forbidden' => ['@unserialize(trim(@file_get_contents(']],
         ]);
     }
 
@@ -55,25 +55,31 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
     public function testTrafficLimitCronChecksRuntimeMarkerWrites(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLimits.php', [
-            'if (!pmssTrafficLimitMarkerTouch($thisUser, $userTrafficLimitEnabledFile)) {',
-            'if (!pmssTrafficLimitMarkerRemove($thisUser, $userTrafficLimitEnabledFile)) {',
-        ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/trafficLimit.php', [
-            'function pmssTrafficLimitMarkerTouch(string $user, string $path): bool',
-            'function pmssTrafficLimitMarkerRemove(string $user, string $path): bool',
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/cron/trafficLimits.php' => ['required' => [
+                'if (!pmssTrafficLimitMarkerTouch($thisUser, $userTrafficLimitEnabledFile)) {',
+                'if (!pmssTrafficLimitMarkerRemove($thisUser, $userTrafficLimitEnabledFile)) {',
+            ]],
+            'scripts/lib/user/trafficLimit.php' => ['required' => [
+                'function pmssTrafficLimitMarkerTouch(string $user, string $path): bool',
+                'function pmssTrafficLimitMarkerRemove(string $user, string $path): bool',
+            ]],
         ]);
     }
 
     public function testTrafficLimitCronValidatesThrottleFileBoundary(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/trafficLimit.php', [
-            "function pmssTrafficLimitThrottleFilePath(string \$user, string \$homeRoot = '/home'): ?string",
-            'pmssTrafficLimitCliUsernameNormalize($user)',
-            '@realpath($home) !== $home',
-            'pmssUserFilePathIsSafe($path)',
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/user/trafficLimit.php' => ['required' => [
+                "function pmssTrafficLimitThrottleFilePath(string \$user, string \$homeRoot = '/home'): ?string",
+                'pmssTrafficLimitCliUsernameNormalize($user)',
+                '@realpath($home) !== $home',
+                'pmssUserFilePathIsSafe($path)',
+            ]],
+            'scripts/cron/trafficLimits.php' => ['required' => [
+                'pmssTrafficLimitThrottleApply($thisUser, $throttlePlan[\'effectiveCapMbit\']);',
+            ]],
         ]);
-        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLimits.php', 'pmssTrafficLimitThrottleApply($thisUser, $throttlePlan[\'effectiveCapMbit\']);');
     }
 
     public function testThrottlePolicyNoLongerUsesSlidingStateFiles(): void

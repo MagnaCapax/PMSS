@@ -103,43 +103,27 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $this->assertHomeRaidActivity($raidEntries, ['operation' => 'recovery', 'progress' => '7.5%']);
     }
 
-    public function testHomeRaidNoticeHtmlIncludesAvailableDetails(): void
+    public function testHomeRaidNoticeHtmlBuildsExpectedVariants(): void
     {
-        $html = \pmssStorageHealthHomeRaidNoticeHtmlBuild([
-            'array' => 'md0',
-            'operation' => 'check',
-            'progress' => '12.3%',
-            'eta' => '15.4min',
-            'speed' => '123456K/sec',
-        ]);
-
-        $this->assertStringContainsAllStrings(['Home storage maintenance in progress', 'Progress: 12.3%', 'ETA: 15.4min'], $html);
-    }
-
-    public function testHomeRaidNoticeHtmlOmitsMetaWhenNoDetailsProvided(): void
-    {
-        $html = \pmssStorageHealthHomeRaidNoticeHtmlBuild([
-            'array' => 'md0',
-            'operation' => 'check',
-        ]);
-
-        $this->assertStringContainsString('Home storage maintenance in progress', $html);
-        $this->assertStringContainsString('RAID array md0 is running a check', $html);
-        $this->assertTrue(strpos($html, 'pmss-raid-meta') === false, 'Meta details should be omitted when no values exist');
-    }
-
-    public function testHomeRaidNoticeHtmlBuildsDegradedAlert(): void
-    {
-        $html = \pmssStorageHealthHomeRaidNoticeHtmlBuild([
-            'array' => 'md1',
-            'flags' => ['degraded'],
-        ]);
-
-        $this->assertStringContainsAndOmitsStrings(
-            ['Storage array degraded', 'without full redundancy', 'pmss-raid-notice-error'],
-            ['Progress:' => 'Degraded notice should not show rebuild metadata'],
-            $html
-        );
+        foreach ([
+            [
+                ['array' => 'md0', 'operation' => 'check', 'progress' => '12.3%', 'eta' => '15.4min', 'speed' => '123456K/sec'],
+                ['Home storage maintenance in progress', 'Progress: 12.3%', 'ETA: 15.4min'],
+                [],
+            ],
+            [
+                ['array' => 'md0', 'operation' => 'check'],
+                ['Home storage maintenance in progress', 'RAID array md0 is running a check'],
+                ['pmss-raid-meta' => 'Meta details should be omitted when no values exist'],
+            ],
+            [
+                ['array' => 'md1', 'flags' => ['degraded']],
+                ['Storage array degraded', 'without full redundancy', 'pmss-raid-notice-error'],
+                ['Progress:' => 'Degraded notice should not show rebuild metadata'],
+            ],
+        ] as [$payload, $required, $forbidden]) {
+            $this->assertStringContainsAndOmitsStrings($required, $forbidden, \pmssStorageHealthHomeRaidNoticeHtmlBuild($payload));
+        }
     }
 
     public function testPerformanceStatusUsesCheckOperationInReason(): void
