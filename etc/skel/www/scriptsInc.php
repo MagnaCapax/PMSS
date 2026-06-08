@@ -98,6 +98,7 @@ if (!function_exists('pmssJsonEncodePretty')) {
  function pmssJsonEncodePretty($payload, $extraFlags = 0) { $encoded = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | (int) $extraFlags); return is_string($encoded) ? $encoded : null; }
 }
 
+if (!function_exists('pmssCustomerHtmlAttr')) { /** Escape customer GUI text and attributes with the shared PMSS flags. */ function pmssCustomerHtmlAttr($value) { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); } }
 if (!function_exists('pmssJsonFileReadAssoc')) {
  /** Read a JSON object file as an associative array, optionally requiring a customer-safe path. */
  function pmssJsonFileReadAssoc($path, $safePathRequired = false) {

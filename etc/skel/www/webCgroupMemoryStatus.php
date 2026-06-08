@@ -365,11 +365,11 @@ function pmssWelcomeMemorySectionHtmlBuild($pressureStatusOverride = null)
     $pressureIndicator = '';
     if (is_array($pressureStatus)) {
         $pressureParts = array(
-            '<br /><b>Memory pressure:</b> <span style="color: '.$pressureStatus['status_color'].';">&#9679; '.htmlspecialchars($pressureStatus['status'], ENT_QUOTES, 'UTF-8').'</span>',
+            '<br /><b>Memory pressure:</b> <span style="color: '.$pressureStatus['status_color'].';">&#9679; '.pmssCustomerHtmlAttr($pressureStatus['status']).'</span>',
             '<br />Throttle events: '.number_format((int) $pressureStatus['throttle_events']),
         );
         if ($pressureStatus['message'] !== '') {
-            $pressureParts[] = '<br /><b style="color: '.$pressureStatus['status_color'].';">'.htmlspecialchars($pressureStatus['message'], ENT_QUOTES, 'UTF-8').'</b>';
+            $pressureParts[] = '<br /><b style="color: '.$pressureStatus['status_color'].';">'.pmssCustomerHtmlAttr($pressureStatus['message']).'</b>';
         }
         $pressureIndicator = implode('', $pressureParts).'<br />';
     }

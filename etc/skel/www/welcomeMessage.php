@@ -80,9 +80,9 @@ function pmssWelcomeMessageForUser(
         : '';
 
     return strtr($template, [
-        '{{username}}' => htmlspecialchars($username, ENT_QUOTES, 'UTF-8'),
-        '{{quota}}'    => htmlspecialchars($quota, ENT_QUOTES, 'UTF-8'),
-        '{{ramMiB}}'   => htmlspecialchars(is_numeric($userConfig['ramMiB'] ?? null) ? (string) ((int) $userConfig['ramMiB']) : '', ENT_QUOTES, 'UTF-8'),
-        '{{product}}'  => htmlspecialchars($productKey, ENT_QUOTES, 'UTF-8'),
+        '{{username}}' => pmssCustomerHtmlAttr($username),
+        '{{quota}}'    => pmssCustomerHtmlAttr($quota),
+        '{{ramMiB}}'   => pmssCustomerHtmlAttr(is_numeric($userConfig['ramMiB'] ?? null) ? (string) ((int) $userConfig['ramMiB']) : ''),
+        '{{product}}'  => pmssCustomerHtmlAttr($productKey),
     ]);
 }

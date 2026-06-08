@@ -345,25 +345,25 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
  */
 function pmssMediaStackPanelHtmlBuild(array $status): string
 {
-    $html = '<div class="pmss-media-stack-box pmss-media-stack-state-'.htmlspecialchars((string) ($status['state'] ?? 'unknown'), ENT_QUOTES, 'UTF-8').'">';
-    $html .= '<p><b>'.htmlspecialchars((string) ($status['message'] ?? ''), ENT_QUOTES, 'UTF-8').'</b></p>';
+    $html = '<div class="pmss-media-stack-box pmss-media-stack-state-'.pmssCustomerHtmlAttr($status['state'] ?? 'unknown').'">';
+    $html .= '<p><b>'.pmssCustomerHtmlAttr($status['message'] ?? '').'</b></p>';
 
     foreach (($status['details'] ?? array()) as $detail) {
-        $html .= '<p>'.htmlspecialchars((string) $detail, ENT_QUOTES, 'UTF-8').'</p>';
+        $html .= '<p>'.pmssCustomerHtmlAttr($detail).'</p>';
     }
 
     if (!empty($status['urls']) && is_array($status['urls'])) {
         $html .= '<ul>';
         foreach ($status['urls'] as $label => $url) {
-            $html .= '<li><b>'.htmlspecialchars((string) $label, ENT_QUOTES, 'UTF-8').':</b> '
-                .'<a href="'.htmlspecialchars((string) $url, ENT_QUOTES, 'UTF-8').'" target="_blank">'
-                .htmlspecialchars((string) $url, ENT_QUOTES, 'UTF-8').'</a></li>';
+            $html .= '<li><b>'.pmssCustomerHtmlAttr($label).':</b> '
+                .'<a href="'.pmssCustomerHtmlAttr($url).'" target="_blank">'
+                .pmssCustomerHtmlAttr($url).'</a></li>';
         }
         $html .= '</ul>';
     }
 
     if (!empty($status['tail'])) {
-        $html .= '<pre>'.htmlspecialchars((string) $status['tail'], ENT_QUOTES, 'UTF-8').'</pre>';
+        $html .= '<pre>'.pmssCustomerHtmlAttr($status['tail']).'</pre>';
     }
 
     return $html.'</div>';

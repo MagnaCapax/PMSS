@@ -425,7 +425,7 @@ echo htmlspecialchars($ip !== false ? trim($ip) : 'unknown');
         <div></div>
         <?php foreach ($apps as $name => $status): ?>
             <div><?php echo $name; ?></div>
-            <div class="status-actions"><span class="status <?php echo $status; ?>"><?php echo ucfirst($status); ?></span><?php echo pmssStatsAppToggleButtonHtmlBuild($name, $pmssStatsAppToggles); ?><?php if ($name === 'Docker' && $pmssDockerInactiveNote !== ''): ?><span class="docker-note"><?php echo htmlspecialchars($pmssDockerInactiveNote, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?></div>
+            <div class="status-actions"><span class="status <?php echo $status; ?>"><?php echo ucfirst($status); ?></span><?php echo pmssStatsAppToggleButtonHtmlBuild($name, $pmssStatsAppToggles); ?><?php if ($name === 'Docker' && $pmssDockerInactiveNote !== ''): ?><span class="docker-note"><?php echo pmssCustomerHtmlAttr($pmssDockerInactiveNote); ?></span><?php endif; ?></div>
         <?php endforeach; ?>
     </div>
 

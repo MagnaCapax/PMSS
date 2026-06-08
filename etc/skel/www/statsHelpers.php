@@ -129,7 +129,7 @@ function pmssStatsRenderResourceBlocks(array $resourceState): void
     $resourceData = isset($resourceState['data']) && is_array($resourceState['data']) ? $resourceState['data'] : null;
     if ($resourceData === null) {
         $message = $resourceState['error'] !== null ? $resourceState['error'] : 'Resource data not available.';
-        echo '<div class="stats-block resource-summary-block"><h6>Resource snapshot</h6><pre>'.htmlspecialchars((string) $message, ENT_QUOTES, 'UTF-8').'</pre></div>';
+        echo '<div class="stats-block resource-summary-block"><h6>Resource snapshot</h6><pre>'.pmssCustomerHtmlAttr($message).'</pre></div>';
         return;
     }
 
@@ -141,19 +141,19 @@ function pmssStatsRenderResourceBlocks(array $resourceState): void
     <div class="resource-summary-strip">
         <div class="resource-summary-item">
             <span class="resource-summary-label">CPU</span>
-            <span class="resource-summary-value"><?php echo htmlspecialchars((string) ($snapshot['cpuDisplay']['month'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?></span>
-            <span class="resource-summary-detail">Week/day/hour: <?php echo htmlspecialchars((string) ($snapshot['cpuDisplay']['week'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string) ($snapshot['cpuDisplay']['day'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string) ($snapshot['cpuDisplay']['hour'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?></span>
+            <span class="resource-summary-value"><?php echo pmssCustomerHtmlAttr($snapshot['cpuDisplay']['month'] ?? 'n/a'); ?></span>
+            <span class="resource-summary-detail">Week/day/hour: <?php echo pmssCustomerHtmlAttr($snapshot['cpuDisplay']['week'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['cpuDisplay']['day'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['cpuDisplay']['hour'] ?? 'n/a'); ?></span>
         </div>
         <div class="resource-summary-item">
             <span class="resource-summary-label">Memory</span>
-            <span class="resource-summary-value"><?php echo htmlspecialchars((string) $snapshot['memoryCurrent'], ENT_QUOTES, 'UTF-8'); ?></span>
-            <span class="resource-summary-detail">Process: <?php echo htmlspecialchars((string) $snapshot['memoryAnon'], ENT_QUOTES, 'UTF-8'); ?> / Cache: <?php echo htmlspecialchars((string) $snapshot['memoryFile'], ENT_QUOTES, 'UTF-8'); ?></span>
-            <span class="resource-summary-detail">RAM-hours: <?php echo htmlspecialchars((string) ($snapshot['ramHoursDisplay']['month'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string) ($snapshot['ramHoursDisplay']['week'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string) ($snapshot['ramHoursDisplay']['day'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?></span>
-            <span class="resource-summary-detail">Average: <?php echo htmlspecialchars((string) ($snapshot['memoryDisplay']['month'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string) ($snapshot['memoryDisplay']['week'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string) ($snapshot['memoryDisplay']['day'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?></span>
+            <span class="resource-summary-value"><?php echo pmssCustomerHtmlAttr($snapshot['memoryCurrent']); ?></span>
+            <span class="resource-summary-detail">Process: <?php echo pmssCustomerHtmlAttr($snapshot['memoryAnon']); ?> / Cache: <?php echo pmssCustomerHtmlAttr($snapshot['memoryFile']); ?></span>
+            <span class="resource-summary-detail">RAM-hours: <?php echo pmssCustomerHtmlAttr($snapshot['ramHoursDisplay']['month'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ramHoursDisplay']['week'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ramHoursDisplay']['day'] ?? 'n/a'); ?></span>
+            <span class="resource-summary-detail">Average: <?php echo pmssCustomerHtmlAttr($snapshot['memoryDisplay']['month'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['memoryDisplay']['week'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['memoryDisplay']['day'] ?? 'n/a'); ?></span>
         </div>
         <div class="resource-summary-item">
             <span class="resource-summary-label">Processes</span>
-            <span class="resource-summary-value"><?php echo htmlspecialchars((string) $snapshot['tasksCurrent'], ENT_QUOTES, 'UTF-8'); ?></span>
+            <span class="resource-summary-value"><?php echo pmssCustomerHtmlAttr($snapshot['tasksCurrent']); ?></span>
             <span class="resource-summary-detail">Current account process count</span>
         </div>
     </div>
@@ -174,9 +174,9 @@ function pmssStatsRenderResourceBlocks(array $resourceState): void
     <h6>Storage I/O</h6>
     <pre style="margin-bottom:12px;">
 Resource usage at <?php echo date('Y-m-d H:i:s', (int)$resourceTime); ?>:
-I/O Read (month/week/day/hour): <?php echo htmlspecialchars((string) ($snapshot['ioReadDisplay']['month'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string) ($snapshot['ioReadDisplay']['week'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string) ($snapshot['ioReadDisplay']['day'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string) ($snapshot['ioReadDisplay']['hour'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?>
-I/O Write (month/week/day/hour): <?php echo htmlspecialchars((string) ($snapshot['ioWriteDisplay']['month'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string) ($snapshot['ioWriteDisplay']['week'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string) ($snapshot['ioWriteDisplay']['day'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?> / <?php echo htmlspecialchars((string) ($snapshot['ioWriteDisplay']['hour'] ?? 'n/a'), ENT_QUOTES, 'UTF-8'); ?>
-Past 30 days total I/O operations: <?php echo htmlspecialchars((string) pmssFormatIoOperationsShort($snapshot['ioOperationsMonth']), ENT_QUOTES, 'UTF-8'); ?>
+I/O Read (month/week/day/hour): <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['month'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['week'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['day'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['hour'] ?? 'n/a'); ?>
+I/O Write (month/week/day/hour): <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['month'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['week'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['day'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['hour'] ?? 'n/a'); ?>
+Past 30 days total I/O operations: <?php echo pmssCustomerHtmlAttr(pmssFormatIoOperationsShort($snapshot['ioOperationsMonth'])); ?>
     </pre>
 
     <?php if (count($snapshot['ioDailyLabels']) >= 2): ?>
@@ -267,12 +267,11 @@ function pmssStatsAppToggleButtonHtmlBuild(string $appName, array $definitions):
     $class = $enabled ? 'pmss-app-toggle-disable' : 'pmss-app-toggle-enable';
 
     return '<button type="button" class="pmss-app-toggle '.$class.'"'
-        .' data-app="'.htmlspecialchars($appName, ENT_QUOTES, 'UTF-8').'"'
-        .' data-endpoint="'.htmlspecialchars($endpoint, ENT_QUOTES, 'UTF-8').'"'
-        .' data-action="'.htmlspecialchars($action, ENT_QUOTES, 'UTF-8').'"'
-        .' aria-label="'.htmlspecialchars($label.' '.$appName, ENT_QUOTES, 'UTF-8').'"'
-        .' onclick="return pmssStatsToggleApp(this);">'.$label.'</button>'
-        .'<span class="pmss-app-toggle-feedback" aria-live="polite"></span>';
+        .' data-app="'.pmssCustomerHtmlAttr($appName).'"'
+        .' data-endpoint="'.pmssCustomerHtmlAttr($endpoint).'"'
+        .' data-action="'.pmssCustomerHtmlAttr($action).'"'
+        .' aria-label="'.pmssCustomerHtmlAttr($label.' '.$appName).'"'
+        .' onclick="return pmssStatsToggleApp(this);">'.$label.'</button><span class="pmss-app-toggle-feedback" aria-live="polite"></span>';
 }
 
 /** Build one Chart.js dataset row with the defaults expected by stats.php. */
@@ -314,7 +313,7 @@ function pmssStatsRenderLineChart($canvasId, array $labels, array $datasets): vo
         return;
     }
 
-    $safeCanvasId = htmlspecialchars((string) $canvasId, ENT_QUOTES, 'UTF-8');
+    $safeCanvasId = pmssCustomerHtmlAttr($canvasId);
     echo '<div class="traffic-chart"><canvas id="'.$safeCanvasId.'" width="600" height="250"></canvas></div>'."\n";
     echo "<script>\n";
     echo "document.addEventListener('DOMContentLoaded', () => {\n";
