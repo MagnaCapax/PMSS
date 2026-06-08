@@ -522,27 +522,19 @@ class RuntimeTest extends TestCase
         $this->assertFalse(\pmssLockHandleWritePid(false));
     }
 
-    public function testReadRegularFileIntReturnsParsedDigits(): void
+    public function testReadRegularFileIntParsesDigitsAndRejectsUnsafeInputs(): void
     {
-        $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-runtime-int-').'/port', "123\n");
+        $symlinkDir = $this->pmssMakeTempDir('pmss-runtime-int-');
+        $symlinkPath = $symlinkDir.'/port';
+        $this->pmssCreateSymlinkOrSkip($this->pmssWriteFile($symlinkDir.'/target', "123\n"), $symlinkPath);
 
-        $this->assertEquals(123, \pmssReadRegularFileInt($path, 99));
-    }
-
-    public function testReadRegularFileIntFallsBackForNonDigitContent(): void
-    {
-        $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-runtime-int-').'/port', "123oops\n");
-
-        $this->assertEquals(99, \pmssReadRegularFileInt($path, 99));
-    }
-
-    public function testReadRegularFileIntFallsBackForSymlinkedFile(): void
-    {
-        $tempDir = $this->pmssMakeTempDir('pmss-runtime-int-');
-        $path = $tempDir.'/port';
-        $this->pmssCreateSymlinkOrSkip($this->pmssWriteFile($tempDir.'/target', "123\n"), $path);
-
-        $this->assertEquals(99, \pmssReadRegularFileInt($path, 99));
+        foreach ([
+            'digits' => [$this->pmssWriteFile($this->pmssMakeTempDir('pmss-runtime-int-').'/port', "123\n"), 123],
+            'non-digit content' => [$this->pmssWriteFile($this->pmssMakeTempDir('pmss-runtime-int-').'/port', "123oops\n"), 99],
+            'symlinked file' => [$symlinkPath, 99],
+        ] as $label => [$path, $expected]) {
+            $this->assertEquals($expected, \pmssReadRegularFileInt($path, 99), $label);
+        }
     }
 
     public function testSnapshotLogTaskKeepsLifecycleContract(): void

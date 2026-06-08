@@ -68,42 +68,22 @@ SH
         });
     }
 
-    public function testFetchPinnedRemoteFileRejectsNonHttpsUrls(): void
+    public function testFetchPinnedRemoteFileRejectsInvalidInputsBeforeDownload(): void
     {
-        $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
-            $path = \pmssFetchPinnedRemoteFile('demo archive', 'http://example.invalid/archive', $expectedSha256);
+        foreach ([
+            'http url' => ['http://example.invalid/archive', null],
+            'newline url' => ['https://example.invalid/archive'."\n".'next', null],
+            'scheme only' => ['https://', null],
+            'empty url' => ['', null],
+            'bad checksum' => ['https://example.invalid/archive', 'not-a-sha256'],
+        ] as $label => [$url, $checksum]) {
+            $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256) use ($label, $url, $checksum): void {
+                $path = \pmssFetchPinnedRemoteFile('demo archive', $url, $checksum ?? $expectedSha256);
 
-            $this->assertTrue($path === null, 'Expected HTTP download to be rejected');
-            $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
-        });
-    }
-
-    public function testFetchPinnedRemoteFileRejectsMalformedUrlsBeforeDownload(): void
-    {
-        $cases = [
-            'https://example.invalid/archive'."\n".'next',
-            'https://',
-            '',
-        ];
-
-        foreach ($cases as $url) {
-            $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256) use ($url): void {
-                $path = \pmssFetchPinnedRemoteFile('demo archive', $url, $expectedSha256);
-
-                $this->assertTrue($path === null, 'Expected malformed URL to be rejected');
-                $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
+                $this->assertTrue($path === null, 'Expected '.$label.' to be rejected');
+                $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog), $label);
             });
         }
-    }
-
-    public function testFetchPinnedRemoteFileRejectsMalformedChecksumBeforeDownload(): void
-    {
-        $this->withFakeDownloadBody('payload', function ($root, $commandLog): void {
-            $path = \pmssFetchPinnedRemoteFile('demo archive', 'https://example.invalid/archive', 'not-a-sha256');
-
-            $this->assertTrue($path === null, 'Expected malformed checksum to be rejected');
-            $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
-        });
     }
 
     public function testFetchPinnedRemoteFileCleansChecksumMismatchTemps(): void

@@ -155,14 +155,14 @@ class UserTransferTest extends TestCase
         }
     }
 
-    public function testParseDuBytesReturnsLeadingByteCount(): void
+    public function testParseDuBytesHandlesReadableAndUnreadableOutput(): void
     {
-        $this->assertEquals(12345, \pmssUserTransferParseDuBytes("12345\t/home/deefbox/\n"));
-    }
-
-    public function testParseDuBytesRejectsUnreadableOutput(): void
-    {
-        $this->assertSame(null, \pmssUserTransferParseDuBytes("du: cannot access '/home/deefbox': Permission denied\n"));
+        foreach ([
+            "12345\t/home/deefbox/\n" => 12345,
+            "du: cannot access '/home/deefbox': Permission denied\n" => null,
+        ] as $output => $expected) {
+            $this->assertSame($expected, \pmssUserTransferParseDuBytes($output), $output);
+        }
     }
 
     public function testEvaluateCompletenessHandlesThresholdCases(): void
@@ -300,43 +300,30 @@ SNAP;
         );
     }
 
-    public function testRewriteBencodedHomePathsAdjustsStringLengths(): void
+    public function testRewriteBencodedHomePathsHandlesRewriteNoopAndMalformedInput(): void
     {
         $oldPath = '/home/olduser/data/movie';
-        $payload = 'd9:directory'.strlen($oldPath).':'.$oldPath.'4:name4:teste';
-
-        $replacements = 0;
-        $rewritten = \pmssUserTransferRewriteBencodedHomePaths($payload, 'olduser', 'new', $replacements);
+        $rewritePayload = 'd9:directory'.strlen($oldPath).':'.$oldPath.'4:name4:teste';
         $newPath = '/home/new/data/movie';
-        $expected = 'd9:directory'.strlen($newPath).':'.$newPath.'4:name4:teste';
-
-        $this->assertTrue($rewritten !== null, 'expected valid bencode payload rewrite');
-        $this->assertEquals(1, $replacements);
-        $this->assertEquals($expected, $rewritten);
-    }
-
-    public function testRewriteBencodedHomePathsReturnsInputWhenNoPathMatch(): void
-    {
-        $path = '/home/another/data';
-        $payload = 'd9:directory'.strlen($path).':'.$path.'e';
-
-        $replacements = 0;
-        $rewritten = \pmssUserTransferRewriteBencodedHomePaths($payload, 'olduser', 'newuser', $replacements);
-
-        $this->assertTrue($rewritten !== null, 'expected valid payload to remain valid');
-        $this->assertEquals(0, $replacements);
-        $this->assertEquals($payload, $rewritten);
-    }
-
-    public function testRewriteBencodedHomePathsRejectsMalformedInput(): void
-    {
+        $otherPath = '/home/another/data';
+        $noopPayload = 'd9:directory'.strlen($otherPath).':'.$otherPath.'e';
         $malformed = 'd9:directory999:/home/olduser/datae';
-        $replacements = 0;
 
-        $rewritten = \pmssUserTransferRewriteBencodedHomePaths($malformed, 'olduser', 'newuser', $replacements);
+        foreach ([
+            'rewrite' => [$rewritePayload, 'olduser', 'new', 1, 'd9:directory'.strlen($newPath).':'.$newPath.'4:name4:teste'],
+            'noop' => [$noopPayload, 'olduser', 'newuser', 0, $noopPayload],
+            'malformed' => [$malformed, 'olduser', 'newuser', 0, null],
+        ] as $label => [$payload, $oldUser, $newUser, $expectedReplacements, $expected]) {
+            $replacements = 0;
+            $rewritten = \pmssUserTransferRewriteBencodedHomePaths($payload, $oldUser, $newUser, $replacements);
 
-        $this->assertTrue($rewritten === null, 'expected malformed payload to be rejected');
-        $this->assertEquals(0, $replacements);
+            $this->assertEquals($expectedReplacements, $replacements, $label);
+            if ($expected === null) {
+                $this->assertTrue($rewritten === null, 'expected malformed payload to be rejected');
+            } else {
+                $this->assertEquals($expected, $rewritten, $label);
+            }
+        }
     }
 
     public function testRewriteRtorrentSessionPathsUpdatesSessionFilesForUserRename(): void

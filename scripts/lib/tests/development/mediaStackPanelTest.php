@@ -57,14 +57,14 @@ class MediaStackPanelTest extends TestCase
         $this->pmssAssertArraySubsetSame(['state' => 'blocked', 'canStart' => false], $status);
     }
 
-    public function testStatusBlocksLowMemoryAccount(): void
+    public function testStatusHandlesMemoryLimitBoundaries(): void
     {
-        $this->assertMediaStatusForMemoryLimit(512 * 1024 * 1024, 'blocked', false, 'install-media-stack.sh --force');
-    }
-
-    public function testStatusAllowsAdequateMemoryAccount(): void
-    {
-        $this->assertMediaStatusForMemoryLimit(2 * 1024 * 1024 * 1024, 'ready', true);
+        foreach ([
+            [512 * 1024 * 1024, 'blocked', false, 'install-media-stack.sh --force'],
+            [2 * 1024 * 1024 * 1024, 'ready', true, ''],
+        ] as [$limitBytes, $expectedState, $expectedCanStart, $messageNeedle]) {
+            $this->assertMediaStatusForMemoryLimit($limitBytes, $expectedState, $expectedCanStart, $messageNeedle);
+        }
     }
 
     public function testMemoryLimitReaderUsesParentV1CgroupLimit(): void
