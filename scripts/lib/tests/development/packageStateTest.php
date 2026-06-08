@@ -13,7 +13,7 @@ class PackageStateTest extends TestCase
         ]);
         $this->pmssAssertRepoFileContractCases([
             'scripts/lib/update/apps/deluge.php' => ['required' => ['pmssPackageStatus('], 'forbidden' => ['dpkg -s ', 'dpkg-query -W -f=']],
-            'scripts/lib/update/distUpgrade.php' => ['required' => ['pmssPackageStatus('], 'forbidden' => ['dpkg -s ', 'dpkg-query -W -f=']],
+            'scripts/lib/update/distUpgrade/docker.php' => ['required' => ['pmssPackageStatus('], 'forbidden' => ['dpkg -s ', 'dpkg-query -W -f=']],
         ]);
         $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/update/packageState.php', [
             'PMSS_PACKAGE'.'_QUEUE',

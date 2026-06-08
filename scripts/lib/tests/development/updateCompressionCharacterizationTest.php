@@ -522,8 +522,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testDistUpgradeUsesRequiredRepairHelpersDirectly(): void
     {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/distUpgrade.php', [
-            'pmssEnsureBootDefaults(',
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/distUpgrade.php', 'pmssEnsureBootDefaults(');
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/distUpgrade/docker.php', [
             'pmssEnsureRootlessDockerInstalled($user);',
             'pmssEnsureDockerDependencies($user);',
             "pmssUserLog(\$userTrim, '[SKIP] dist-upgrade: user appears suspended; skipping rootless Docker repair');",

@@ -13,6 +13,27 @@ class DistUpgradeHelpersTest extends TestCase
         $this->pmssAssignTempDirProperty('tmpDir', 'pmss-dist-upgrade-helpers-');
     }
 
+    public function testDistUpgradeFacadeLoadsDecomposedHelperSurface(): void
+    {
+        foreach ([
+            'pmssRunDistUpgrade',
+            'pmssResolveDistUpgradeStep',
+            'pmssDistUpgradeAptCommand',
+            'pmssExecuteUpgrade',
+            'pmssRewriteSources',
+            'pmssEnsureFuseOverlayfsAfterDistUpgrade',
+            'pmssRepairDockerRootlessAfterDistUpgrade',
+            'pmssVerifyDistUpgradeBootReadiness',
+        ] as $function) {
+            $this->assertTrue(\function_exists($function), 'Missing dist-upgrade helper: '.$function);
+        }
+
+        $this->assertSame(
+            ['action' => 'upgrade', 'from' => '10', 'to' => '11', 'message' => 'Requested maximum is 12; performing safe incremental upgrade to 11.'],
+            \pmssResolveDistUpgradeStep('10', '12')
+        );
+    }
+
     public function testResolveTargetVersionAcceptsNumbersAndCodenames(): void
     {
         $this->assertEquals('10', \pmssResolveTargetVersion('10'));
@@ -85,12 +106,16 @@ class DistUpgradeHelpersTest extends TestCase
 
     public function testDistUpgradeLockedCommandMessagesStayStable(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/distUpgrade.php', [
-            '[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt phase',
-            '[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt action',
-            '[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg recovery',
-            '[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall',
-            '[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 install',
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/update/distUpgrade/apt.php' => ['required' => [
+                '[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt phase',
+                '[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt action',
+                '[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg recovery',
+                '[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 install',
+            ]],
+            'scripts/lib/update/distUpgrade/boot.php' => ['required' => [
+                '[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall',
+            ]],
         ]);
     }
 
