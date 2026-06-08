@@ -82,7 +82,7 @@ function pmssAgentDiagnosticsSpecLabel(array $spec): string
 {
     $path = trim((string) ($spec['path'] ?? ''));
     if ($path === '') return trim((string) ($spec['command'] ?? 'diagnostics command'));
-    $args = array_values(array_filter(array_map('strval', (array) ($spec['args'] ?? [])), 'strlen'));
+    $args = pmssNonEmptyStrings(array_map('strval', (array) ($spec['args'] ?? [])));
     return $args === [] ? basename($path) : basename($path).' '.implode(' ', $args);
 }
 
@@ -124,7 +124,7 @@ function pmssAgentDiagnosticsSpecCollect(array $spec)
 
     if ($format === 'lines') {
         $lines = (int) ($result['rc'] ?? 1) === 0 ? preg_split('/\r?\n/', $stdout) : [];
-        return array_values(array_filter(is_array($lines) ? $lines : [], 'strlen'));
+        return pmssNonEmptyStrings(is_array($lines) ? $lines : []);
     }
     if ($format === 'json') {
         if ((int) ($result['rc'] ?? 1) !== 0) {

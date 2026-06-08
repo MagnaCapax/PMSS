@@ -45,11 +45,12 @@ function pmssFilesystemPathHasNulByte(string $path): bool { return strpos($path,
 function pmssRegularFilePathIsReadable(string $path): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && is_file($path) && !is_link($path); }
 function pmssReadRegularFileContents(string $path): ?string { return (!pmssRegularFilePathIsReadable($path) || !is_string($contents = @file_get_contents($path))) ? null : $contents; }
 function pmssReadRegularFileTrimmed(string $path): ?string { return (($contents = pmssReadRegularFileContents($path)) === null) ? null : trim($contents); }
+function pmssReadRegularFileNonEmptyLines(string $path): array { $lines = preg_split('/\r?\n/', pmssReadRegularFileContents($path) ?? ''); return array_values(array_filter(is_array($lines) ? $lines : [], 'strlen')); }
 
 function pmssProcMeminfoFieldsRead(string $path = '/proc/meminfo'): array
 {
     $fields = [];
-    foreach (explode("\n", pmssReadRegularFileContents($path) ?? '') as $line) if (preg_match('/^(\w+):\s+(\d+)/', $line, $matches) === 1) $fields[$matches[1]] = (int) $matches[2];
+    foreach (pmssReadRegularFileNonEmptyLines($path) as $line) if (preg_match('/^(\w+):\s+(\d+)/', $line, $matches) === 1) $fields[$matches[1]] = (int) $matches[2];
     return $fields;
 }
 

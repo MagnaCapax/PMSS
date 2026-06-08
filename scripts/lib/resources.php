@@ -112,7 +112,7 @@ class resourceStatistics
     public function collectWindowResultsFromData(string $dataLines, array $compareTimes, ?callable $parseErrorLogger = null): ?array
     {
         if ($compareTimes === []) return null;
-        $resourceData = array_filter(explode("\n", trim($dataLines)), 'strlen');
+        $resourceData = pmssNonEmptyStrings(explode("\n", trim($dataLines)));
         if (count($resourceData) < 2) return null;
         $threshold = (int) min($compareTimes);
         $accumulator = new ResourceStatsAccumulator($compareTimes);

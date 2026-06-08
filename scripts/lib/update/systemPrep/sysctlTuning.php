@@ -14,13 +14,6 @@ function pmssSystemPrepReadBoolEnv(string $key): ?bool
     return pmssValueMatchesNormalized($override, ['0', 'false', 'no']) ? false : null;
 }
 
-/** Read non-empty config/procfs lines with a consistent fail-soft fallback. */
-function pmssSystemPrepNonEmptyLinesRead(string $path): array
-{
-    $lines = preg_split('/\r?\n/', pmssReadRegularFileContents($path) ?? '');
-    return array_values(array_filter(is_array($lines) ? $lines : [], 'strlen'));
-}
-
 /** Refresh one managed sysctl-adjacent file and report whether it changed. */
 function pmssSysctlManagedContentRefresh(string $path, string $content, string $label, callable $log, int $mode = 0644): array
 {
@@ -94,7 +87,7 @@ function pmssSysctlHasSwap(): bool
 {
     if (($override = pmssSystemPrepReadBoolEnv('PMSS_SYSCTL_HAS_SWAP')) !== null) return $override;
 
-    return count(pmssSystemPrepNonEmptyLinesRead('/proc/swaps')) > 1;
+    return count(pmssReadRegularFileNonEmptyLines('/proc/swaps')) > 1;
 }
 
 /** Return true when a block device or one of its slaves is non-rotational. */
@@ -130,7 +123,7 @@ function pmssSysctlSwapIsFast(): bool
     }
 
     $sysClassBlockRoot = pmssResolvePathFromEnv('PMSS_SYSCTL_SYS_CLASS_BLOCK_PATH', '/sys/class/block');
-    foreach (pmssSystemPrepNonEmptyLinesRead('/proc/swaps') as $index => $line) {
+    foreach (pmssReadRegularFileNonEmptyLines('/proc/swaps') as $index => $line) {
         if ($index === 0) {
             continue;
         }
@@ -161,7 +154,7 @@ function pmssSysctlNicSpeedMbps(): int
 
     $routePath = pmssResolvePathFromEnv('PMSS_SYSCTL_PROC_NET_ROUTE_PATH', '/proc/net/route');
     $iface = '';
-    foreach (pmssSystemPrepNonEmptyLinesRead($routePath) as $index => $line) {
+    foreach (pmssReadRegularFileNonEmptyLines($routePath) as $index => $line) {
         if ($index === 0) {
             continue;
         }
@@ -365,7 +358,7 @@ function pmssSysctlAssignmentLineParse(string $line, bool $stripInlineComment = 
 function pmssSysctlOverridesParse(string $path): array
 {
     $keys = [];
-    foreach (pmssSystemPrepNonEmptyLinesRead($path) as $line) if (($assignment = pmssSysctlAssignmentLineParse($line, true)) !== null) $keys[$assignment[0]] = true;
+    foreach (pmssReadRegularFileNonEmptyLines($path) as $line) if (($assignment = pmssSysctlAssignmentLineParse($line, true)) !== null) $keys[$assignment[0]] = true;
     return array_keys($keys);
 }
 
@@ -385,7 +378,7 @@ function pmssSysctlSettingsFilterOverrides(array $groupedSettings, array $overri
 function pmssSysctlFileParse(string $path): array
 {
     $settings = [];
-    foreach (pmssSystemPrepNonEmptyLinesRead($path) as $line) if (($assignment = pmssSysctlAssignmentLineParse($line)) !== null && $assignment[1] !== '') $settings[$assignment[0]] = $assignment[1];
+    foreach (pmssReadRegularFileNonEmptyLines($path) as $line) if (($assignment = pmssSysctlAssignmentLineParse($line)) !== null && $assignment[1] !== '') $settings[$assignment[0]] = $assignment[1];
     return $settings;
 }
 

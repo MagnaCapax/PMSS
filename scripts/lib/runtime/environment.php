@@ -55,6 +55,7 @@ function pmssEnvValueIsFalsey($value): bool { return pmssValueMatchesNormalized(
 function pmssEnvValueIsTruthy($value): bool { return pmssValueMatchesNormalized($value, ['1', 'true', 'yes', 'on']); }
 function pmssEnvFlagEnabled(string $envKey): bool { return getenv($envKey) === '1'; }
 function pmssTestModeEnabled(): bool { return (defined('PMSS_TEST_MODE') && pmssEnvValueIsTruthy(constant('PMSS_TEST_MODE'))) || pmssEnvValueIsTruthy(getenv('PMSS_TEST_MODE')); }
+function pmssNonEmptyStrings(array $values): array { return array_values(array_filter($values, 'strlen')); }
 
 function pmssParseSizeToBytes(string $value, bool $wholeNumberOnly = false, bool $allowBareBinarySuffix = false): ?float
 {
@@ -92,7 +93,7 @@ function pmssConfigLineColumns(string $line, int $minColumns = 0, array $comment
 
 function pmssConfigOptionsUpdatePlan(string $optionList, array $requiredOptions = [], array $removeOptions = [], bool $dropDefaultsOnly = false): array
 {
-    $options = array_values(array_filter(explode(',', $optionList), 'strlen'));
+    $options = pmssNonEmptyStrings(explode(',', $optionList));
     if ($dropDefaultsOnly && $options === ['defaults']) $options = [];
     $removed = [];
     foreach ($removeOptions as $removeOption) {

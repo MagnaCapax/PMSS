@@ -29,7 +29,7 @@ function pmssMountHardeningReadMounts(string $mountsPath): array
     foreach ($lines as $line) {
         $columns = pmssConfigLineColumns($line, 4, []);
         if ($columns === []) continue;
-        $mounts[$columns[1]] = ['type' => $columns[2], 'options' => array_values(array_filter(explode(',', $columns[3]), 'strlen'))];
+        $mounts[$columns[1]] = ['type' => $columns[2], 'options' => pmssNonEmptyStrings(explode(',', $columns[3]))];
     }
     return $mounts;
 }

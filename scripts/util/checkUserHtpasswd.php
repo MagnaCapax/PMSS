@@ -53,7 +53,7 @@ function pmssCheckUserHtpasswdMain(array $argv): int
         return 0;
     }
 
-    $passwords = array_filter(explode("\n", $globalContents), 'strlen');
+    $passwords = pmssNonEmptyStrings(explode("\n", $globalContents));
 
     foreach ($selection['users'] as $thisUser) {
         if (!pmssValidateUsername($thisUser)) {

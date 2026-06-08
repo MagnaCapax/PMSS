@@ -62,7 +62,7 @@ function pmssBootDefaultsEnsureGrubOptions(array &$lines, array $requiredGrubOpt
     foreach ($lines as $idx => $line) {
         if (!preg_match('/^(GRUB_CMDLINE_LINUX_DEFAULT|GRUB_CMDLINE_LINUX)=("|\')([^"\']*)("|\')/', $line, $match)) continue;
         $found = true;
-        $currentOptions = array_values(array_filter(preg_split('/\s+/', trim($match[3])) ?: [], 'strlen'));
+        $currentOptions = pmssNonEmptyStrings(preg_split('/\s+/', trim($match[3])) ?: []);
         foreach ($requiredGrubOptions as $option) {
             if (!in_array($option, $currentOptions, true)) $currentOptions[] = $option;
         }
