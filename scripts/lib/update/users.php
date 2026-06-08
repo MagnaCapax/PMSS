@@ -17,6 +17,8 @@ require_once __DIR__.'/users/filesystem.php';
 require_once __DIR__.'/users/permissions.php';
 require_once __DIR__.'/users/rutorrent.php';
 
+function pmssUserEnvironmentHandlers(): array { return ['pmssUserConfigureHttp', 'pmssUserApplySkeletonFiles', 'pmssUserUpdateThemes', 'pmssUserUpgradeRutorrent', 'pmssUserMaintainRutorrentPhpCompatibility', 'pmssUserEnsurePlugins', 'pmssUserRefreshPermissions']; }
+
 /**
  * Refresh a single user's environment (HTTP, skeleton, ruTorrent, plugins, permissions).
  *
@@ -35,15 +37,7 @@ function pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha = '')
     echo "***** Updating user {$user}\n";
     logmsg("Updating user {$user}");
 
-    foreach ([
-        'pmssUserConfigureHttp',
-        'pmssUserApplySkeletonFiles',
-        'pmssUserUpdateThemes',
-        'pmssUserUpgradeRutorrent',
-        'pmssUserMaintainRutorrentPhpCompatibility',
-        'pmssUserEnsurePlugins',
-        'pmssUserRefreshPermissions',
-    ] as $handler) {
+    foreach (pmssUserEnvironmentHandlers() as $handler) {
         $handler($ctx);
     }
 }

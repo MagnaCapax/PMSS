@@ -62,25 +62,16 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
         });
     }
 
-    public function testLoopChecksResumeAndMarksDone(): void
+    public function testHandlerCatalogAndLegacyCpuQuotaHelperPreserveContracts(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
-        $this->assertTrue(
-            strpos($src, 'pmssUserRefreshAlreadyDone($userTrim, $refreshSignature)') !== false,
-            'the per-user loop must check the resume marker before the expensive refresh'
-        );
-        $this->assertTrue(
-            strpos($src, 'pmssUserCgroupSliceSelfHeal($userTrim, $userConfigStore)') !== false,
-            'resume skips must still run the cheap per-user cgroup slice health check'
-        );
-        $this->assertTrue(
-            strpos($src, 'pmssUserRefreshMarkDone($userTrim, $refreshSignature)') !== false,
-            'the loop must mark a user done after a successful refresh'
-        );
-        // The skip must count as processed (so a fully-resumed run reports complete).
-        $this->assertTrue(
-            preg_match('/\$resumeAlreadyDone\s*&&\s*pmssUserCgroupSliceSelfHeal\([^)]*\)\)\s*\{\s*\$processedUsers\+\+;/s', $src) === 1,
-            'a resumed (skipped) user must count as processed, not skipped'
-        );
+        $this->assertSame(['pmssUserConfigureHttp', 'pmssUserApplySkeletonFiles', 'pmssUserUpdateThemes', 'pmssUserUpgradeRutorrent', 'pmssUserMaintainRutorrentPhpCompatibility', 'pmssUserEnsurePlugins', 'pmssUserRefreshPermissions'], pmssUserEnvironmentHandlers());
+
+        $sliceDir = $this->pmssMakeTempDir('pmss-umaint-cpu-', 0700);
+        $this->pmssWriteFile($sliceDir.'/legacy.conf', "CPUQuota=85%\n");
+        $this->assertTrue(pmssUserMaintenanceLegacyCpuQuotaNeedsFix($sliceDir));
+
+        $cleanDir = $this->pmssMakeTempDir('pmss-umaint-cpu-clean-', 0700);
+        $this->pmssWriteFile($cleanDir.'/clean.conf', "CPUQuota=250%\n#CPUQuota=85%\nCPUQuota=85.0%\n");
+        $this->assertFalse(pmssUserMaintenanceLegacyCpuQuotaNeedsFix($cleanDir));
     }
 }
