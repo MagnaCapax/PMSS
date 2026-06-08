@@ -103,6 +103,30 @@ class ResourceStatisticsTest extends TestCase
         $this->assertEquals(5.0, $results['tasks']['day']);
     }
 
+    public function testResourceLogLineCodecMatchesStableSnapshot(): void
+    {
+        $stats = new \resourceStatistics();
+        $timestamp = strtotime('2026-05-16 12:34:56');
+        $parts = \pmssResourceLogLineParts(
+            ['io_read' => 1024, 'io_write' => 2048, 'io_read_ops' => 12, 'io_write_ops' => 34],
+            ['cpu_nsec' => 3000, 'memory' => 4096, 'tasks' => 7, 'memory_anon' => 512, 'memory_file' => 1024]
+        );
+
+        $this->assertEquals(['1024', '2048', '12', '34', '3000', '4096', '7', '512', '1024'], $parts);
+        $this->assertEquals([
+            'timestamp' => $timestamp,
+            'io_read' => 1024.0,
+            'io_write' => 2048.0,
+            'io_read_ops' => 12.0,
+            'io_write_ops' => 34.0,
+            'cpu' => 3000.0,
+            'memory' => 4096.0,
+            'tasks' => 7.0,
+            'memory_anon' => 512.0,
+            'memory_file' => 1024.0,
+        ], $stats->parseLine($this->resourceLine($timestamp, implode(' ', $parts))));
+    }
+
     public function testParseLineValid(): void
     {
         $stats = new \resourceStatistics();

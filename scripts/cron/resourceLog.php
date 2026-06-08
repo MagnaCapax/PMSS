@@ -26,18 +26,7 @@ foreach ($userUids as $user => $uid) {
 
     ['delta' => $delta, 'state' => $state] = pmssResourceLogUpdateState($stateDir.'/'.$user.'.json', $counters);
 
-    $lineParts = [
-        (string) $delta['io_read'],
-        (string) $delta['io_write'],
-        (string) $delta['io_read_ops'],
-        (string) $delta['io_write_ops'],
-        (string) $delta['cpu_nsec'],
-        (string) $state['memory'],
-        (string) $state['tasks'],
-    ];
-    isset($state['memory_anon'], $state['memory_file'])
-        && array_push($lineParts, (string) $state['memory_anon'], (string) $state['memory_file']);
-    if (!pmssAppendRootTimestampedLogEntry($logDir.'/'.$user, ' '.implode(' ', $lineParts).PHP_EOL)) {
+    if (!pmssAppendRootTimestampedLogEntry($logDir.'/'.$user, ' '.implode(' ', pmssResourceLogLineParts($delta, $state)).PHP_EOL)) {
         fwrite(STDERR, "Failed to append resource log for {$user}.\n");
     }
 }

@@ -98,18 +98,7 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
             return;
         }
 
-        $data = ['daily' => $results['daily']];
-        foreach ($results['raw'] + ['memory' => $results['memory'], 'tasks' => $results['tasks']] as $metric => $values) {
-            $data[$metric] = ['raw' => $values];
-        }
-        $data['memory']['current'] = $results['current_memory'];
-        foreach (pmssResourceMemoryBreakdownFieldMap('current_memory_') as $field => $resultKey) {
-            if (isset($results[$resultKey]) && is_numeric($results[$resultKey])) {
-                $data['memory'][$field] = (float) $results[$resultKey];
-            }
-        }
-        $data['tasks']['current'] = $results['current_tasks'];
-
+        $data = pmssResourceStoredPayloadFromResults($results);
         $this->ensureRuntime();
         if (!$this->save($user, $data, $logPrefix)) {
             return;

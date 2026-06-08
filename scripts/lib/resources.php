@@ -63,6 +63,65 @@ function pmssResourceStoredPayloadReportRow(array $data): ?array
     return $row;
 }
 
+/** Build the persisted per-user resource payload from accumulator results. */
+function pmssResourceStoredPayloadFromResults(array $results): array
+{
+    $data = ['daily' => $results['daily']];
+    foreach ($results['raw'] + ['memory' => $results['memory'], 'tasks' => $results['tasks']] as $metric => $values) {
+        $data[$metric] = ['raw' => $values];
+    }
+    $data['memory']['current'] = $results['current_memory'];
+    foreach (pmssResourceMemoryBreakdownFieldMap('current_memory_') as $field => $resultKey) {
+        if (isset($results[$resultKey]) && is_numeric($results[$resultKey])) $data['memory'][$field] = (float) $results[$resultKey];
+    }
+    $data['tasks']['current'] = $results['current_tasks'];
+    return $data;
+}
+
+/** Extract one accumulator window into the resource-snapshot metric shape. */
+function pmssResourceResultsWindowMetrics(array $results, string $window): ?array
+{
+    if (!isset($results['memory'][$window], $results['tasks'][$window]) || !isset($results['raw']) || !is_array($results['raw'])) return null;
+    $metrics = ['memory' => $results['memory'][$window], 'tasks' => $results['tasks'][$window]];
+    foreach (ResourceStatsAccumulator::RAW_METRICS as $metric) {
+        if (!isset($results['raw'][$metric][$window])) return null;
+        $metrics[$metric] = $results['raw'][$metric][$window];
+    }
+    return $metrics;
+}
+
+/** Compose the stable resource cron text-record payload after the timestamp. */
+function pmssResourceLogLineParts(array $delta, array $state): array
+{
+    $parts = [];
+    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops'] as $field) $parts[] = (string) ($delta[$field] ?? 0);
+    foreach (['cpu_nsec', 'memory', 'tasks'] as $field) $parts[] = (string) ($state[$field] ?? 0);
+    if (isset($state['memory_anon'], $state['memory_file'])) array_push($parts, (string) $state['memory_anon'], (string) $state['memory_file']);
+    return $parts;
+}
+
+/** Parse one resource cron text record into the accumulator sample schema. */
+function pmssResourceLogLineParse($line)
+{
+    $tokens = preg_split('/\s+/', trim((string) $line)) ?: [];
+    $tokenCount = count($tokens);
+    if ($tokenCount < 7 || $tokenCount === 10) return false;
+    $timestamp = strtotime($tokens[0].' '.$tokens[1]);
+    if ($timestamp === false) return false;
+
+    $parsed = ['timestamp' => (int) $timestamp] + array_fill_keys(['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks'], 0.0);
+    $maps = [
+        7 => [2 => 'io_read', 3 => 'io_write', 4 => 'cpu', 5 => 'memory', 6 => 'tasks'],
+        9 => [2 => 'io_read', 3 => 'io_write', 4 => 'io_read_ops', 5 => 'io_write_ops', 6 => 'cpu', 7 => 'memory', 8 => 'tasks'],
+        11 => [2 => 'io_read', 3 => 'io_write', 4 => 'io_read_ops', 5 => 'io_write_ops', 6 => 'cpu', 7 => 'memory', 8 => 'tasks', 9 => 'memory_anon', 10 => 'memory_file'],
+    ];
+    foreach ($maps[$tokenCount > 10 ? 11 : ($tokenCount >= 9 ? 9 : 7)] as $index => $field) {
+        if (!ctype_digit($tokens[$index] ?? '')) return false;
+        $parsed[$field] = (float) $tokens[$index];
+    }
+    return $parsed;
+}
+
 /**
  * Read and persist per-user resource statistics for PMSS hosts.
  */
@@ -151,27 +210,6 @@ class resourceStatistics
      */
     public function parseLine($thisLine)
     {
-        $tokenCount = count($tokens = preg_split('/\s+/', trim((string) $thisLine)) ?: []);
-        if ($tokenCount < 7 || $tokenCount === 10) return false;
-
-        $timestamp = strtotime($tokens[0].' '.$tokens[1]);
-        if ($timestamp === false) return false;
-
-        $parsed = ['timestamp' => (int) $timestamp] + array_fill_keys(['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks'], 0.0);
-        $fields = $tokenCount >= 9
-            ? [2 => 'io_read', 3 => 'io_write', 4 => 'io_read_ops', 5 => 'io_write_ops', 6 => 'cpu', 7 => 'memory', 8 => 'tasks']
-            : [2 => 'io_read', 3 => 'io_write', 4 => 'cpu', 5 => 'memory', 6 => 'tasks'];
-        if ($tokenCount > 10) {
-            $fields += [9 => 'memory_anon', 10 => 'memory_file'];
-        }
-
-        foreach ($fields as $index => $field) {
-            if (!ctype_digit($tokens[$index] ?? '')) {
-                return false;
-            }
-            $parsed[$field] = (float) $tokens[$index];
-        }
-
-        return $parsed;
+        return pmssResourceLogLineParse($thisLine);
     }
 }

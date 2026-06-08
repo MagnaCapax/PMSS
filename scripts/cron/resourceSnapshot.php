@@ -30,13 +30,7 @@ function pmssResourceSnapshotRun(): int
             if ($metrics === null && ($dataLines = $stats->getData($user, 350)) !== '') {
                 $threshold = time() - (24 * 60 * 60);
                 if (($results = $stats->collectWindowResultsFromData($dataLines, ['day' => $threshold])) !== null) {
-                    $metrics = [
-                        'memory' => $results['memory']['day'],
-                        'tasks' => $results['tasks']['day'],
-                    ];
-                    foreach (ResourceStatsAccumulator::RAW_METRICS as $metricName) {
-                        $metrics[$metricName] = $results['raw'][$metricName]['day'];
-                    }
+                    $metrics = pmssResourceResultsWindowMetrics($results, 'day');
                 }
             }
 
