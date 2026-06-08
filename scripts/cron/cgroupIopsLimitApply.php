@@ -89,9 +89,12 @@ function pmssIopsParseSpec($raw): ?int
     if (!is_string($raw) || $raw === '' || $raw === '0') {
         return null;
     }
-    if (preg_match('/:([0-9]+)$/', $raw, $m) !== 1) {
+
+    // Do not let an arbitrary "label:number" string trigger a /home throttle.
+    if (preg_match('#^(?:/home|/dev/[^:\r\n\x00]+):([0-9]+)$#', $raw, $m) !== 1) {
         return null;
     }
+
     $n = (int) $m[1];
     return $n > 0 ? $n : null;
 }

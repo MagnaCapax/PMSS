@@ -57,4 +57,19 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
             'missing IOPS sysfs path guard: '
         );
     }
+
+    public function testCronValidatesIopsSpecPrefixBeforeParsingNumericSuffix(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/cron/cgroupIopsLimitApply.php',
+            [
+                'function pmssIopsParseSpec($raw): ?int',
+                'Do not let an arbitrary "label:number" string trigger a /home throttle.',
+                "if (preg_match('#^(?:/home|/dev/[^:\\r\\n\\x00]+):([0-9]+)$#', \$raw, \$m) !== 1) {",
+                '$n = (int) $m[1];',
+            ],
+            'missing IOPS config spec guard: ',
+            'IOPS config spec guard must run before suffix parsing: '
+        );
+    }
 }
