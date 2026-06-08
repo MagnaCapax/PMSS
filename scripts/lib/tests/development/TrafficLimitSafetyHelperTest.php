@@ -43,8 +43,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testEnsureStorageDirConvergesExistingDirectoryMode(): void
     {
-        $path = $this->tempDir.'/existing';
-        mkdir($path, 0755, true);
+        $path = $this->pmssEnsureDir($this->tempDir.'/existing');
         chmod($path, 0755);
 
         $this->assertTrue(\pmssTrafficLimitEnsureStorageDir($path));
@@ -75,8 +74,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testRemoveGiBFileRejectsDirectory(): void
     {
-        $path = $this->tempDir.'/dir';
-        mkdir($path, 0755, true);
+        $path = $this->pmssEnsureDir($this->tempDir.'/dir');
 
         $this->assertTrue(\pmssTrafficLimitRemoveGiBFile($path) === false);
     }
@@ -93,8 +91,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testConvergeFileModeAcceptsExistingDirectoryMode(): void
     {
-        $path = $this->tempDir.'/dir';
-        mkdir($path, 0700, true);
+        $path = $this->pmssEnsureDir($this->tempDir.'/dir', 0700);
 
         $this->assertTrue(\pmssTrafficLimitConvergeFileMode($path, 0700));
     }
@@ -109,7 +106,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
     public function testThrottleFileWritePersistsCapWithReadableMode(): void
     {
         $path = $this->tempDir.'/home/alice/.throttle';
-        mkdir(dirname($path), 0755, true);
+        $this->pmssEnsureDir(dirname($path));
 
         $error = 'stale';
         $this->assertTrue(\pmssTrafficLimitThrottleFileWrite($path, 25, $error));
@@ -121,7 +118,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
     public function testThrottleFileWriteRejectsNegativeCap(): void
     {
         $path = $this->tempDir.'/home/alice/.throttle';
-        mkdir(dirname($path), 0755, true);
+        $this->pmssEnsureDir(dirname($path));
 
         $error = null;
         $this->assertFalse(\pmssTrafficLimitThrottleFileWrite($path, -1, $error));
@@ -142,7 +139,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
     public function testThrottleFileRemoveTreatsMissingFileAsSuccess(): void
     {
         $path = $this->tempDir.'/home/alice/.throttle';
-        mkdir(dirname($path), 0755, true);
+        $this->pmssEnsureDir(dirname($path));
 
         $error = 'stale';
         $this->assertTrue(\pmssTrafficLimitThrottleFileRemove($path, $error));
@@ -162,7 +159,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
     public function testMarkerTouchCreatesSafeMarkerWithStrictMode(): void
     {
         $path = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
-        mkdir(dirname($path), 0700, true);
+        $this->pmssEnsureDir(dirname($path), 0700);
 
         $this->assertTrue(\pmssTrafficLimitMarkerTouch('alice', $path));
         $this->assertTrue(is_file($path));
@@ -202,10 +199,8 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
     public function testPersistTargetModesWritesAllTargetsWithRequestedModes(): void
     {
-        $runtimeDir = $this->tempDir.'/runtime/trafficLimits';
-        $homeDir = $this->tempDir.'/home/alice';
-        mkdir($runtimeDir, 0700, true);
-        mkdir($homeDir, 0755, true);
+        $runtimeDir = $this->pmssEnsureDir($this->tempDir.'/runtime/trafficLimits', 0700);
+        $homeDir = $this->pmssEnsureDir($this->tempDir.'/home/alice');
 
         $targets = [
             $runtimeDir.'/alice' => 0600,
@@ -225,8 +220,8 @@ class TrafficLimitSafetyHelperTest extends TestCase
     {
         $runtimePath = $this->tempDir.'/runtime/trafficLimits/alice';
         $homePath = $this->tempDir.'/home/alice/.trafficLimit';
-        mkdir(dirname($runtimePath), 0700, true);
-        mkdir(dirname($homePath), 0755, true);
+        $this->pmssEnsureDir(dirname($runtimePath), 0700);
+        $this->pmssEnsureDir(dirname($homePath));
         file_put_contents($runtimePath, '5');
         file_put_contents($homePath, '5');
 

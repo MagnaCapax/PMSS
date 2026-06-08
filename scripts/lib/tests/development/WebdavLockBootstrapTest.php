@@ -9,8 +9,7 @@ class WebdavLockBootstrapTest extends TestCase
     public function testCreatesLockFileWithSafePerms(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-webdav-lock-', 0700);
-        $userHome = $dir.'/home/deefbox';
-        mkdir($userHome.'/.lighttpd', 0700, true);
+        $userHome = dirname($this->pmssEnsureDir($dir.'/home/deefbox/.lighttpd', 0700));
 
         \pmssEnsureWebdavLockDatabase('deefbox', $userHome);
 
@@ -22,8 +21,7 @@ class WebdavLockBootstrapTest extends TestCase
     public function testFixesLockFilePermissions(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-webdav-lock-perms-', 0700);
-        $userHome = $dir.'/home/deefbox';
-        mkdir($userHome.'/.lighttpd', 0700, true);
+        $userHome = dirname($this->pmssEnsureDir($dir.'/home/deefbox/.lighttpd', 0700));
 
         $lockFile = $userHome.'/.lighttpd/webdav.lock.db';
         file_put_contents($lockFile, '');
@@ -37,8 +35,7 @@ class WebdavLockBootstrapTest extends TestCase
     public function testSkipsWhenLighttpdDirMissing(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-webdav-lock-skip-', 0700);
-        $userHome = $dir.'/home/deefbox';
-        mkdir($userHome, 0700, true);
+        $userHome = $this->pmssEnsureDir($dir.'/home/deefbox', 0700);
 
         \pmssEnsureWebdavLockDatabase('deefbox', $userHome);
 

@@ -92,8 +92,7 @@ final class BonusTrafficTest extends TestCase
     private function runBonusTrafficCli(array $argv, string $existingContents = ''): array
     {
         $repoRoot = $this->pmssRepoRoot();
-        $homeDir = $this->pmssMakeTempDir('pmss-bonus-home-').'/alice';
-        @mkdir($homeDir, 0755, true);
+        $homeDir = $this->pmssEnsureDir($this->pmssMakeTempDir('pmss-bonus-home-').'/alice');
 
         $bonusFile = $homeDir.'/.bonusTraffic';
         if ($existingContents !== '') {

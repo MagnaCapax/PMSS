@@ -156,9 +156,8 @@ class RtorrentProcessTest extends TestCase
             throw new SkipTest('symlink unavailable');
         }
 
-        $targetDir = $this->tempDir.'/target';
+        $targetDir = $this->pmssEnsureDir($this->tempDir.'/target');
         $linkDir = $this->tempDir.'/link';
-        @mkdir($targetDir, 0755, true);
         if (@symlink($targetDir, $linkDir) === false) {
             throw new SkipTest('symlink() failed');
         }
@@ -171,8 +170,7 @@ class RtorrentProcessTest extends TestCase
 
     public function testFailureCountStateRefusesDirectoryTarget(): void
     {
-        $stateFile = $this->tempDir.'/state.count';
-        @mkdir($stateFile, 0755, true);
+        $stateFile = $this->pmssEnsureDir($this->tempDir.'/state.count');
 
         $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
 
@@ -311,8 +309,7 @@ class RtorrentProcessTest extends TestCase
     public function testResetSessionDirectoryQuarantinesAndRecreatesDirectory(): void
     {
         $home = $this->tempDir.'/alice';
-        $sessionDir = $home.'/session';
-        @mkdir($sessionDir, 0755, true);
+        $sessionDir = $this->pmssEnsureDir($home.'/session');
         file_put_contents($sessionDir.'/resume.dat', 'state');
         [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home): bool {
             return rtorrentProcessResetSessionDirectory($home, 'alice', $logger);
@@ -327,8 +324,7 @@ class RtorrentProcessTest extends TestCase
 
     public function testResetSessionDirectoryCreatesMissingDirectory(): void
     {
-        $home = $this->tempDir.'/alice';
-        @mkdir($home, 0755, true);
+        $home = $this->pmssEnsureDir($this->tempDir.'/alice');
 
         $result = rtorrentProcessResetSessionDirectory($home, 'alice', function (): void {
         });
@@ -354,8 +350,8 @@ class RtorrentProcessTest extends TestCase
         }
 
         $home = $this->tempDir.'/alice';
-        @mkdir($home, 0755, true);
-        @mkdir($this->tempDir.'/target', 0755, true);
+        $this->pmssEnsureDir($home);
+        $this->pmssEnsureDir($this->tempDir.'/target');
         @symlink($this->tempDir.'/target', $home.'/session');
         [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home): bool {
             return rtorrentProcessResetSessionDirectory($home, 'alice', $logger);
@@ -372,8 +368,7 @@ class RtorrentProcessTest extends TestCase
         }
 
         $home = $this->tempDir.'/alice';
-        $targetHome = $this->tempDir.'/target-home';
-        @mkdir($targetHome.'/session', 0755, true);
+        $targetHome = dirname($this->pmssEnsureDir($this->tempDir.'/target-home/session'));
         file_put_contents($targetHome.'/session/resume.dat', 'state');
         if (@symlink($targetHome, $home) === false) {
             throw new SkipTest('symlink() failed');
@@ -392,8 +387,7 @@ class RtorrentProcessTest extends TestCase
     public function testResetSessionDirectoryCanRunTwice(): void
     {
         $home = $this->tempDir.'/alice';
-        $sessionDir = $home.'/session';
-        @mkdir($sessionDir, 0755, true);
+        $sessionDir = $this->pmssEnsureDir($home.'/session');
 
         $first = rtorrentProcessResetSessionDirectory($home, 'alice', function (): void {
         });

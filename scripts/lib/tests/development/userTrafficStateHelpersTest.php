@@ -108,8 +108,7 @@ class UserTrafficStateHelpersTest extends TestCase
 
     public function testManagedDirsEnsureContinuesAfterUnsafeDirectory(): void
     {
-        $unsafeTarget = $this->tempDir.'/runtime-target';
-        @mkdir($unsafeTarget, 0755, true);
+        $unsafeTarget = $this->pmssEnsureDir($this->tempDir.'/runtime-target');
         $unsafePath = $this->tempDir.'/runtime-link';
         $safePath = $this->tempDir.'/runtime-safe';
         $failures = [];
@@ -154,7 +153,7 @@ class UserTrafficStateHelpersTest extends TestCase
         $homeDir = $this->tempDir.'/home';
         $runtimeDir = $this->tempDir.'/runtime';
         $messages = [];
-        @mkdir($homeDir.'/alice', 0755, true);
+        $this->pmssEnsureDir($homeDir.'/alice');
 
         $this->assertFalse(\pmssTrafficSeedInitialState('alice', $homeDir, $runtimeDir, $this->pmssMakeArrayLogger($messages)));
 
@@ -171,7 +170,7 @@ class UserTrafficStateHelpersTest extends TestCase
 
     public function testReadUserTrafficStatesRejectsInvalidUsernameBeforePathResolution(): void
     {
-        @mkdir($this->tempDir.'/home/alice/evil', 0755, true);
+        $this->pmssEnsureDir($this->tempDir.'/home/alice/evil');
         file_put_contents(
             $this->tempDir.'/home/alice/evil/.trafficData',
             serialize(['raw' => ['month' => 4096]])
@@ -219,8 +218,7 @@ class UserTrafficStateHelpersTest extends TestCase
     public function testTrafficStorageEnsureRuntimeRejectsSymlinkedRuntimeDir(): void
     {
         $messages = [];
-        $targetRuntime = $this->tempDir.'/runtime-target';
-        @mkdir($targetRuntime, 0755, true);
+        $targetRuntime = $this->pmssEnsureDir($this->tempDir.'/runtime-target');
         $runtimeLink = $this->tempDir.'/runtime-link';
         $this->pmssCreateSymlinkOrSkip($targetRuntime, $runtimeLink);
 
@@ -242,7 +240,7 @@ class UserTrafficStateHelpersTest extends TestCase
         $homeDir = $this->tempDir.'/home';
         $runtimeDir = $this->tempDir.'/runtime';
         $messages = [];
-        @mkdir($homeDir.'/alice', 0755, true);
+        $this->pmssEnsureDir($homeDir.'/alice');
 
         $storage = new \TrafficStorage([
             'home_dir' => $homeDir,
@@ -268,8 +266,8 @@ class UserTrafficStateHelpersTest extends TestCase
         $homeDir = $this->tempDir.'/home';
         $statsDir = $this->tempDir.'/trafficStats';
         $payload = ['raw' => ['month' => 4096], 'daily' => ['today' => 2048]];
-        @mkdir($homeDir.'/alice', 0755, true);
-        @mkdir($statsDir, 0755, true);
+        $this->pmssEnsureDir($homeDir.'/alice');
+        $this->pmssEnsureDir($statsDir);
 
         $storage = new \TrafficStorage([
             'home_dir' => $homeDir,

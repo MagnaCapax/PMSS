@@ -44,7 +44,7 @@ class ArrUpdateTest extends TestCase
         $shimDir = $this->writeCurlShim($baseDir);
         $workPattern = sys_get_temp_dir().'/'.strtolower($app).'-*';
 
-        @mkdir($installPath, 0755, true);
+        $this->pmssEnsureDir($installPath);
         @file_put_contents($installPath.'/marker.txt', 'existing');
 
         try {
@@ -67,7 +67,7 @@ class ArrUpdateTest extends TestCase
         $installPath = $baseDir.'/install'; $shimDir = $this->writeCurlShim($baseDir);
         $metadataPath = $this->writeMetadata($baseDir, 'bundle-1.2.3.tar.gz', $baseDir.'/missing.tar.gz');
         $workPattern = sys_get_temp_dir().'/'.strtolower($app).'-*';
-        @mkdir($installPath, 0755, true); @file_put_contents($installPath.'/marker.txt', 'existing');
+        $this->pmssWriteFile($installPath.'/marker.txt', 'existing');
 
         try {
             $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath): void { $this->runArrUpdate($app, $installPath, $metadataPath, 'PackageDir'); });
@@ -258,7 +258,7 @@ class ArrUpdateTest extends TestCase
         $shimDir = $this->writeCurlShim($baseDir);
         $probeLog = $baseDir.'/probe.log';
 
-        @mkdir($installPath, 0755, true);
+        $this->pmssEnsureDir($installPath);
         @file_put_contents($installPath.'/marker.txt', 'existing');
         $this->writeVersionBinary($installPath.'/'.$app, '1.2.3', $probeLog);
 
@@ -288,7 +288,7 @@ class ArrUpdateTest extends TestCase
         $shimDir = $this->writeCurlShim($baseDir);
         $probeLog = $baseDir.'/probe.log';
 
-        @mkdir($installPath, 0755, true);
+        $this->pmssEnsureDir($installPath);
         @file_put_contents($installPath.'/marker.txt', 'existing');
         $this->writeVersionBinary($installPath.'/'.$app, '', $probeLog);
 
@@ -310,8 +310,7 @@ class ArrUpdateTest extends TestCase
     private function createArchive(string $baseDir, string $extractDir, array $files, string $archiveName = 'bundle-1.2.3.tar.gz'): string
     {
         $archiveRoot = $baseDir.'/archive';
-        $payloadDir = $archiveRoot.'/'.$extractDir;
-        @mkdir($payloadDir, 0755, true);
+        $payloadDir = $this->pmssEnsureDir($archiveRoot.'/'.$extractDir);
         foreach ($files as $name => $contents) {
             @file_put_contents($payloadDir.'/'.$name, $contents);
         }

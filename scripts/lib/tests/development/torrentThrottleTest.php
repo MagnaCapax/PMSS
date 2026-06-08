@@ -12,7 +12,7 @@ class TorrentThrottleTest extends TestCase
     {
         $this->homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-throttle-');
         $this->user = 'alice';
-        @mkdir($this->homeRoot.'/'.$this->user, 0755, true);
+        $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
     }
 
     private function throttlePath(): string
@@ -58,7 +58,7 @@ class TorrentThrottleTest extends TestCase
 
     public function testReadRejectsInvalidUsernameBeforePathResolution(): void
     {
-        @mkdir($this->homeRoot.'/alice/evil', 0755, true);
+        $this->pmssEnsureDir($this->homeRoot.'/alice/evil');
         file_put_contents($this->homeRoot.'/alice/evil/.torrentThrottle', '77');
 
         $this->assertEquals(null, pmssReadTorrentThrottle('alice/evil'));
@@ -95,8 +95,7 @@ class TorrentThrottleTest extends TestCase
 
     public function testWriteRejectsDirectoryWhenRemovingThrottle(): void
     {
-        $path = $this->throttlePath();
-        @mkdir($path, 0755, true);
+        $path = $this->pmssEnsureDir($this->throttlePath());
 
         $this->assertTrue(!pmssWriteTorrentThrottle($this->user, 0), 'Expected removal to fail on directory');
         $this->assertTrue(is_dir($path), 'Throttle directory should remain untouched');
@@ -104,8 +103,7 @@ class TorrentThrottleTest extends TestCase
 
     public function testWriteRejectsDirectoryWhenWritingThrottle(): void
     {
-        $path = $this->throttlePath();
-        @mkdir($path, 0755, true);
+        $path = $this->pmssEnsureDir($this->throttlePath());
 
         $this->assertTrue(!pmssWriteTorrentThrottle($this->user, 10), 'Expected write to fail on directory');
         $this->assertTrue(is_dir($path), 'Throttle directory should remain untouched');
@@ -113,7 +111,7 @@ class TorrentThrottleTest extends TestCase
 
     public function testWriteRejectsInvalidUsernameBeforePathResolution(): void
     {
-        @mkdir($this->homeRoot.'/alice/evil', 0755, true);
+        $this->pmssEnsureDir($this->homeRoot.'/alice/evil');
 
         $this->assertTrue(!pmssWriteTorrentThrottle('alice/evil', 10), 'Expected invalid username write to fail');
         $this->assertTrue(!is_file($this->homeRoot.'/alice/evil/.torrentThrottle'), 'Traversal-like path should remain untouched');

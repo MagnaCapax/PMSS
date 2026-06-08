@@ -82,7 +82,7 @@ class NetworkFireqosTest extends TestCase
     {
         $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
         $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
-        @mkdir($homeDir.'/root', 0755, true);
+        $this->pmssEnsureDir($homeDir.'/root');
         @file_put_contents($stateDir.'/root.enabled', '1');
         @file_put_contents($homeDir.'/root/.throttle', '25');
 
@@ -104,7 +104,7 @@ class NetworkFireqosTest extends TestCase
         $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
         $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
         $templatePath = $this->pmssMakeTempPath('pmss-fireqos-template-', '.conf');
-        @mkdir($homeDir.'/root', 0755, true);
+        $this->pmssEnsureDir($homeDir.'/root');
         @file_put_contents($stateDir.'/root.enabled', '1');
         @file_put_contents($homeDir.'/root/.throttle', '25');
         @file_put_contents($templatePath, $this->pmssReadRepoFile('etc/seedbox/config/template.fireqos'));
@@ -133,7 +133,7 @@ class NetworkFireqosTest extends TestCase
     {
         $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
         $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
-        @mkdir($homeDir.'/root', 0755, true);
+        $this->pmssEnsureDir($homeDir.'/root');
         @file_put_contents($stateDir.'/root.enabled', '1');
 
         $this->pmssWithEnv([
@@ -154,7 +154,7 @@ class NetworkFireqosTest extends TestCase
         $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
         $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
         $templatePath = $this->pmssMakeTempPath('fireqos-template-', '.conf');
-        @mkdir($homeDir.'/root', 0755, true);
+        $this->pmssEnsureDir($homeDir.'/root');
         @file_put_contents($homeDir.'/root/.throttle', '10');
         @file_put_contents($templatePath, "interface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n");
 

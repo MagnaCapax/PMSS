@@ -48,13 +48,14 @@ trait FilesystemCleanupTrait
     }
 
     /** Ensure a directory exists for hermetic filesystem fixtures. */
-    protected function pmssEnsureDir(string $path, int $mode = 0755): void
+    protected function pmssEnsureDir(string $path, int $mode = 0755): string
     {
         if (is_dir($path)) {
-            return;
+            return $path;
         }
 
         $this->assertTrue(@mkdir($path, $mode, true) || is_dir($path), 'Expected fixture directory to exist: '.$path);
+        return $path;
     }
 
     /** Write fixture content while creating parent directories when needed. */

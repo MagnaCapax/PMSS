@@ -84,8 +84,8 @@ class NetconsoleConfigureTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-netconsole-unchanged-');
         $spec = '6665@192.0.2.10/eth0,6666@192.0.2.20/aa:bb:cc:dd:ee:ff';
-        @mkdir($dir.'/modprobe.d', 0755, true);
-        @mkdir($dir.'/modules-load.d', 0755, true);
+        $this->pmssEnsureDir($dir.'/modprobe.d');
+        $this->pmssEnsureDir($dir.'/modules-load.d');
         file_put_contents($dir.'/netconsole', $spec);
         file_put_contents($dir.'/modprobe.d/netconsole.conf', "options netconsole netconsole={$spec}\n");
         file_put_contents($dir.'/modules-load.d/pmss-netconsole.conf', "netconsole\n");
