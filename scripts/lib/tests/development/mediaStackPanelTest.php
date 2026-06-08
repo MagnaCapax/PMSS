@@ -43,8 +43,7 @@ class MediaStackPanelTest extends TestCase
 
         $status = $this->mediaStatusRead($home);
 
-        $this->assertSame('ready', $status['state']);
-        $this->assertTrue($status['canStart']);
+        $this->pmssAssertArraySubsetSame(['state' => 'ready', 'canStart' => true], $status);
     }
 
     public function testStatusBlocksWhenBinAlreadyPopulated(): void
@@ -55,8 +54,7 @@ class MediaStackPanelTest extends TestCase
 
         $status = $this->mediaStatusRead($home);
 
-        $this->assertSame('blocked', $status['state']);
-        $this->assertFalse($status['canStart']);
+        $this->pmssAssertArraySubsetSame(['state' => 'blocked', 'canStart' => false], $status);
     }
 
     public function testStatusBlocksLowMemoryAccount(): void
@@ -91,8 +89,7 @@ class MediaStackPanelTest extends TestCase
 
         $gate = \pmssMediaStackPanelStartGateRead($home);
 
-        $this->assertFalse($gate['ok']);
-        $this->assertSame('Media stack installer is missing from this account.', $gate['message']);
+        $this->pmssAssertArraySubsetSame(['ok' => false, 'message' => 'Media stack installer is missing from this account.'], $gate);
     }
 
     public function testStatusShowsInstalledUrlsWhenJellyfinConfigExists(): void
@@ -107,8 +104,7 @@ class MediaStackPanelTest extends TestCase
     {
         $status = $this->mediaStatusFixture('pmss-media-running-', '.install-media-stack-web.pid', (string) getmypid());
 
-        $this->assertSame('running', $status['state']);
-        $this->assertTrue($status['poll']);
+        $this->pmssAssertArraySubsetSame(['state' => 'running', 'poll' => true], $status);
     }
 
     public function testStatusShowsFailedLogWhenPreviousRunStopped(): void
@@ -181,8 +177,7 @@ class MediaStackPanelTest extends TestCase
         $this->pmssWithEnv($this->mediaStackCgroupV2Fixture($limitBytes), function () use ($home, $expectedState, $expectedCanStart, $messageNeedle): void {
             $status = $this->mediaStatusRead($home);
 
-            $this->assertSame($expectedState, $status['state']);
-            $this->assertSame($expectedCanStart, $status['canStart']);
+            $this->pmssAssertArraySubsetSame(['state' => $expectedState, 'canStart' => $expectedCanStart], $status);
             if ($messageNeedle !== '') {
                 $this->assertStringContainsString($messageNeedle, $status['message']);
             }

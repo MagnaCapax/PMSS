@@ -72,7 +72,7 @@ class StorageHealthSnapshotCliTest extends TestCase
     private function assertSnapshotRejectsUnsafeLogTarget(array $arguments): array
     {
         $result = $this->runSnapshotCommand($arguments);
-        $this->assertSame(1, $result['rc']);
+        $this->pmssAssertArraySubsetSame(['rc' => 1], $result, 'snapshot rejection ');
         $this->assertStringContainsString('Refusing unsafe storage health log path', $result['output']);
         return $result;
     }

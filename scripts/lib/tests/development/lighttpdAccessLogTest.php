@@ -23,8 +23,7 @@ class LighttpdAccessLogTest extends TestCase
 
         $result = \pmssLighttpdAccessLogTrimFile($path, 64);
 
-        $this->assertEquals('trimmed', $result['status']);
-        $this->assertEquals(128, $result['sizeBefore']);
+        $this->pmssAssertArraySubsetSame(['status' => 'trimmed', 'sizeBefore' => 128], $result);
         $this->assertEquals(0, filesize($path));
     }
 
@@ -35,8 +34,7 @@ class LighttpdAccessLogTest extends TestCase
 
         $result = \pmssLighttpdAccessLogTrimFile($path, 64);
 
-        $this->assertEquals('skip', $result['status']);
-        $this->assertEquals('below_threshold', $result['reason']);
+        $this->pmssAssertArraySubsetSame(['status' => 'skip', 'reason' => 'below_threshold'], $result);
         $this->assertEquals(16, filesize($path));
     }
 
@@ -50,8 +48,7 @@ class LighttpdAccessLogTest extends TestCase
 
         $result = \pmssLighttpdAccessLogTrimFile($linkPath, 64);
 
-        $this->assertEquals('skip', $result['status']);
-        $this->assertEquals('unsafe_target', $result['reason']);
+        $this->pmssAssertArraySubsetSame(['status' => 'skip', 'reason' => 'unsafe_target'], $result);
         $this->assertEquals(128, filesize($realPath));
     }
 
@@ -64,8 +61,7 @@ class LighttpdAccessLogTest extends TestCase
 
         $result = \pmssLighttpdAccessLogTrimFile($path, 64);
 
-        $this->assertEquals('skip', $result['status']);
-        $this->assertEquals('multiple_links', $result['reason']);
+        $this->pmssAssertArraySubsetSame(['status' => 'skip', 'reason' => 'multiple_links'], $result);
         $this->assertEquals(128, filesize($path));
         $this->assertEquals(128, filesize($linkedPath));
     }
@@ -84,8 +80,7 @@ class LighttpdAccessLogTest extends TestCase
         flock($lockHandle, LOCK_UN);
         fclose($lockHandle);
 
-        $this->assertEquals('skip', $result['status']);
-        $this->assertEquals('lock_busy', $result['reason']);
+        $this->pmssAssertArraySubsetSame(['status' => 'skip', 'reason' => 'lock_busy'], $result);
         $this->assertEquals(128, filesize($path));
     }
 
@@ -93,8 +88,7 @@ class LighttpdAccessLogTest extends TestCase
     {
         $result = \pmssLighttpdAccessLogTrimFile('access.log', 64);
 
-        $this->assertEquals('skip', $result['status']);
-        $this->assertEquals('unsafe_target', $result['reason']);
+        $this->pmssAssertArraySubsetSame(['status' => 'skip', 'reason' => 'unsafe_target'], $result);
     }
 
     public function testRootCronSchedulesHourlyAccessLogTrim(): void

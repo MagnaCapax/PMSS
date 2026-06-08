@@ -14,10 +14,7 @@ class StatsAppToggleFrontendTest extends TestCase
             $this->assertStringContainsString('data-endpoint="'.$definition['endpoint'].'"', $html);
         }
 
-        $this->assertStringContainsString('class="status-actions"', $html);
-        $this->assertStringContainsString('data-action="start"', $html);
-        $this->assertStringNotContainsString('data-endpoint="rtorrent', $html);
-        $this->assertStringNotContainsString('data-endpoint="docker', $html);
+        $this->assertStringContainsAndOmitsStrings(['class="status-actions"', 'data-action="start"'], ['data-endpoint="rtorrent', 'data-endpoint="docker'], $html);
     }
 
     public function testStatsPageShowsDisableTogglesWhenEnableFlagsExist(): void

@@ -165,6 +165,16 @@ abstract class TestCase
         }
     }
 
+    /** Assert expected key/value pairs inside an array without requiring an exact shape. */
+    protected function pmssAssertArraySubsetSame(array $expected, array $actual, string $messagePrefix = ''): void
+    {
+        foreach ($expected as $key => $value) {
+            $label = ($messagePrefix !== '' ? $messagePrefix : 'array key ').(string) $key;
+            $this->assertTrue(array_key_exists($key, $actual), 'Missing '.$label);
+            $this->assertSame($value, $actual[$key], $label);
+        }
+    }
+
     protected function assertMatches(string $pattern, string $value, string $message = ''): void
     {
         if (!preg_match($pattern, $value)) {
