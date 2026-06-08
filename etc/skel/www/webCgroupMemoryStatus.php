@@ -204,7 +204,7 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
  */
 function pmssWelcomeMemoryStateBuild($pressureStatusOverride = null)
 {
-    $memory = pmssWelcomeSerializedArrayRead('../.resourceData');
+    $memory = pmssCustomerSerializedArrayFileRead('../.resourceData', 1048576);
     $memory = is_array($memory) && isset($memory['memory']) && is_array($memory['memory'])
         ? $memory['memory']
         : array();

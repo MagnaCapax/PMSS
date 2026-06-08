@@ -707,16 +707,7 @@ function pmssWelcomeVendorRead() {
         'name' => 'Pulsed Media'
     );
 
-    if (!is_file('/etc/seedbox/config/vendor') || is_link('/etc/seedbox/config/vendor')) {
-        return $vendorDefault;
-    }
-
-    $vendor = @file_get_contents('/etc/seedbox/config/vendor');
-    if (!is_string($vendor)) {
-        return $vendorDefault;
-    }
-
-    $vendor = pmssWelcomeSerializedArrayDecode($vendor, 4096);
+    $vendor = pmssCustomerSerializedArrayFileRead('/etc/seedbox/config/vendor', 4096);
     if (!is_array($vendor) || count($vendor) == 0 || !isset($vendor['name']) || empty($vendor['name'])) {
         return $vendorDefault;
     }
@@ -875,12 +866,7 @@ function pmssWelcomeUserConfigNumber($key, $allowSymlink = false) {
 }
 
 function pmssWelcomeSerializedArrayRead($path) {
-    if (!is_file($path) || is_link($path) || !function_exists('pmssReadSerializedArrayFile')) {
-        return null;
-    }
-
-    $data = pmssReadSerializedArrayFile($path);
-    return is_array($data) ? $data : null;
+    return pmssCustomerSerializedArrayFileRead($path, 1048576);
 }
 
 function pmssWelcomeTrafficMonthValueRead($trafficState) {

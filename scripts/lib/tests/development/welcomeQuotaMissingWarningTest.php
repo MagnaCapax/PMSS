@@ -60,7 +60,6 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         return $this->pmssWriteFile(
             $fixture,
             "<?php\n"
-            ."if (!function_exists('pmssReadSerializedArrayFile')) { function pmssReadSerializedArrayFile(\$path) { \$raw = @file_get_contents(\$path); if (!is_string(\$raw)) return null; \$data = @unserialize(\$raw, array('allowed_classes' => false)); return is_array(\$data) ? \$data : null; } }\n"
             .'require_once '.var_export($memoryHelper, true).";\n"
             .$tail
         );
@@ -101,7 +100,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
 
-        $this->assertStringContainsString('pmssWelcomeSerializedArrayDecode($vendor, 4096)', $source);
+        $this->assertStringContainsString("pmssCustomerSerializedArrayFileRead('/etc/seedbox/config/vendor', 4096)", $source);
         $this->pmssAssertStringNotContainsString('$vendor = @unserialize($vendor)', $source);
     }
 

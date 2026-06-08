@@ -88,6 +88,13 @@ if (!function_exists('pmssWelcomeSerializedArrayDecode')) {
  }
 }
 
+if (!function_exists('pmssCustomerSerializedArrayFileRead')) {
+ /** Read a guarded customer-visible serialized array file. */
+ function pmssCustomerSerializedArrayFileRead($path, $maxBytes = 8192, $allowSymlink = false) {
+  return pmssWelcomeSerializedArrayDecode(pmssCustomerFileRead($path, $allowSymlink), $maxBytes);
+ }
+}
+
 if (!function_exists('pmssJsonDecodeAssoc')) {
  /** Decode JSON through associative arrays, rejecting invalid or scalar payloads. */
  function pmssJsonDecodeAssoc($payload) { $decoded = json_decode((string) $payload, true); return is_array($decoded) ? $decoded : null; }

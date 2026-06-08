@@ -40,10 +40,8 @@ function pmssStatsSerializedStateRead(string $path, string $invalidMessage): arr
     }
 
     $state['time'] = @filemtime($path);
-    if (function_exists('pmssReadSerializedArrayFile')) {
-        $state['data'] = pmssReadSerializedArrayFile($path);
-    } elseif (function_exists('pmssWelcomeSerializedArrayDecode')) {
-        $state['data'] = pmssWelcomeSerializedArrayDecode(@file_get_contents($path), 1048576);
+    if (function_exists('pmssCustomerSerializedArrayFileRead')) {
+        $state['data'] = pmssCustomerSerializedArrayFileRead($path, 1048576);
     }
     if ($state['data'] === null) {
         $state['error'] = $invalidMessage;

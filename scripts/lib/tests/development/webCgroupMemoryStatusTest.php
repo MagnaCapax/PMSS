@@ -32,11 +32,13 @@ class WebCgroupMemoryStatusTest extends TestCase
         file_put_contents($dir.'/memory.zero', "0\n");
         $this->pmssCreateSymlinkOrSkip($integerPath, $integerLink);
         file_put_contents($dir.'/memory.events', "high 7\nfull avg10=0.25 avg60=0.00\nbadline\n");
+        file_put_contents($dir.'/resource.data', serialize(['memory' => ['current' => 42]]));
 
         $this->assertSame(42, \pmssCustomerUnsignedIntegerFileRead($integerPath));
         $this->assertSame(null, \pmssCustomerPositiveIntegerFileRead($dir.'/memory.zero'));
         $this->assertSame(null, \pmssCustomerUnsignedIntegerFileRead($integerLink));
         $this->assertSame(42, \pmssCustomerUnsignedIntegerFileRead($integerLink, true));
+        $this->assertSame(['memory' => ['current' => 42]], \pmssCustomerSerializedArrayFileRead($dir.'/resource.data'));
         $this->assertSame(
             ['high' => '7', 'full' => 'avg10=0.25 avg60=0.00'],
             \pmssCustomerKeyValueFileRead($dir.'/memory.events')
