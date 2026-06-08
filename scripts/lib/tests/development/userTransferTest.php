@@ -15,26 +15,19 @@ class UserTransferTest extends TestCase
 
     public function testHostnameValidationAcceptsExpectedNames(): void
     {
-        $valid = [
+        $this->assertHostnameValidity([
             'lt5-1-56-138anger-core.pulsedmedia.com',
             'le4-0-78-95wheatley.pulsedmedia.com',
             '185.148.1.138',
             'a.b',
             'abc123.example',
             'a-b.c-d',
-        ];
-
-        foreach ($valid as $hostname) {
-            $this->assertTrue(
-                \pmssHostnameIsValid($hostname),
-                'expected hostname to be valid: '.$hostname
-            );
-        }
+        ], true, 'valid');
     }
 
     public function testHostnameValidationRejectsBadNames(): void
     {
-        $invalid = [
+        $this->assertHostnameValidity([
             '',
             ' host',
             'host name',
@@ -45,14 +38,7 @@ class UserTransferTest extends TestCase
             'host-.example',
             'host_underscore.example',
             'host;rm -rf /',
-        ];
-
-        foreach ($invalid as $hostname) {
-            $this->assertTrue(
-                !\pmssHostnameIsValid($hostname),
-                'expected hostname to be invalid: '.$hostname
-            );
-        }
+        ], false, 'invalid');
     }
 
     public function testParseCliHandlesSupportedForms(): void
@@ -159,10 +145,14 @@ class UserTransferTest extends TestCase
         $cfg = $this->baseConfig();
         $sharedFlags = 'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no';
 
-        $this->assertStringContainsString($sharedFlags, \pmssUserTransferBuildRsyncMain($cfg));
-        $this->assertStringContainsString($sharedFlags, \pmssUserTransferBuildRsyncFinal($cfg));
-        $this->assertStringContainsString($sharedFlags, \pmssUserTransferBuildAuthProbe($cfg));
-        $this->assertStringContainsString($sharedFlags, \pmssUserTransferBuildRemoteSizeProbe($cfg + ['verifyThreshold' => 90]));
+        foreach ([
+            \pmssUserTransferBuildRsyncMain($cfg),
+            \pmssUserTransferBuildRsyncFinal($cfg),
+            \pmssUserTransferBuildAuthProbe($cfg),
+            \pmssUserTransferBuildRemoteSizeProbe($cfg + ['verifyThreshold' => 90]),
+        ] as $script) {
+            $this->assertStringContainsString($sharedFlags, $script);
+        }
     }
 
     public function testParseDuBytesReturnsLeadingByteCount(): void
@@ -478,6 +468,13 @@ SNAP;
     private function baseConfig(array $overrides = []): array
     {
         return array_replace(['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'], $overrides);
+    }
+
+    private function assertHostnameValidity(array $hostnames, bool $expected, string $label): void
+    {
+        foreach ($hostnames as $hostname) {
+            $this->assertSame($expected, \pmssHostnameIsValid($hostname), 'expected '.$label.' hostname: '.$hostname);
+        }
     }
 
     private function pmssQtVariantStringMap(array $values): string

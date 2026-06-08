@@ -56,11 +56,6 @@ class installMediaStackScriptTest extends TestCase
         ], $this->script);
     }
 
-    public function testCloudplowUsesBinDir(): void
-    {
-        $this->assertStringContainsString('$HOME/.bin/cloudplow', $this->script);
-    }
-
     public function testVenvPipBootstrapUsesPython3(): void
     {
         $this->assertStringContainsString('python_venv_install_requirements() {', $this->script);
@@ -85,11 +80,6 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringNotContainsString($oldRemoveCommand, $this->script);
     }
 
-    public function testSabnzbdUsesConfigDir(): void
-    {
-        $this->assertStringContainsString('$HOME/.config/sabnzbd', $this->script);
-    }
-
     public function testSabnzbdAllowsProxiedWizardAccess(): void
     {
         $this->assertStringContainsAllStrings([
@@ -99,20 +89,16 @@ class installMediaStackScriptTest extends TestCase
         ], $this->script);
     }
 
-    public function testDotnetRootExportedInBashrc(): void
+    public function testManagedAppShellPathMarkersPresent(): void
     {
-        $this->assertStringContainsString('export DOTNET_ROOT=$HOME/.bin/dotnet', $this->script);
-    }
-
-    public function testBinDirAppendedToPath(): void
-    {
-        $this->assertStringContainsString('PATH="$PATH:$DOTNET_ROOT"', $this->script);
-        $this->assertStringContainsString('PATH="$PATH:$HOME/.bin"', $this->script);
-    }
-
-    public function testBashrcCustomUsedForAppends(): void
-    {
-        $this->assertStringContainsString('.bashrc.custom', $this->script);
+        $this->assertStringContainsAllStrings([
+            '$HOME/.bin/cloudplow',
+            '$HOME/.config/sabnzbd',
+            'export DOTNET_ROOT=$HOME/.bin/dotnet',
+            'PATH="$PATH:$DOTNET_ROOT"',
+            'PATH="$PATH:$HOME/.bin"',
+            '.bashrc.custom',
+        ], $this->script);
     }
 
     public function testJellyfinRemoteAccessDisabled(): void
@@ -135,8 +121,10 @@ class installMediaStackScriptTest extends TestCase
 
     public function testJellyfinAspNetCoreUrlsUsed(): void
     {
-        $this->assertStringContainsString('ASPNETCORE_URLS=', $this->script);
-        $this->assertStringContainsString('127.0.0.1:', $this->script);
+        $this->assertStringContainsAllStrings([
+            'ASPNETCORE_URLS=',
+            '127.0.0.1:',
+        ], $this->script);
     }
 
     public function testJellyfinFfmpegFallbackUsesExistingOverridePath(): void
@@ -183,22 +171,16 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('Leaving existing Jellyfin config untouched because this run will skip Jellyfin.', $this->script);
     }
 
-    public function testLighttpdMediaStackFragmentPathExists(): void
+    public function testLighttpdMediaStackMigrationMarkersPresent(): void
     {
-        $this->assertStringContainsString('/.lighttpd/custom.d/media-stack.conf', $this->script);
-        $this->assertStringContainsString('prepare_lighttpd_media_stack_paths', $this->script);
-    }
-
-    public function testLegacyLighttpdCustomMigrationPreservesUserRules(): void
-    {
-        $this->assertStringContainsString('custom-migrated.conf', $this->script);
-        $this->assertStringContainsString('lighttpd_custom_has_legacy_media_stack_rules', $this->script);
-    }
-
-    public function testLegacyLighttpdCustomMigrationPrunesManagedProxyRoutes(): void
-    {
-        $this->assertStringContainsString('lighttpd_custom_strip_managed_media_stack_routes', $this->script);
-        $this->assertStringContainsString('Removed PMSS-managed media stack proxy routes', $this->script);
+        $this->assertStringContainsAllStrings([
+            '/.lighttpd/custom.d/media-stack.conf',
+            'prepare_lighttpd_media_stack_paths',
+            'custom-migrated.conf',
+            'lighttpd_custom_has_legacy_media_stack_rules',
+            'lighttpd_custom_strip_managed_media_stack_routes',
+            'Removed PMSS-managed media stack proxy routes',
+        ], $this->script);
     }
 
     public function testLighttpdManagedRouteStripPreservesUserRulesSnapshot(): void
@@ -298,15 +280,20 @@ LIGHTTPD;
 
         $output = $this->pmssRunShellHarness($script);
 
-        $this->assertStringContainsString('safe_removed', $output);
-        $this->assertStringContainsString('unsafe_refused', $output);
-        $this->assertStringContainsString('traversal_refused', $output);
-        $this->assertStringContainsAllStrings(array('managed_allowed', 'managed_removed', 'unmanaged_preserved'), $output);
-        $this->assertStringContainsString('keep_preserved', $output);
-        $this->assertTrue(strpos($output, 'safe_still_exists') === false, $output);
-        $this->assertTrue(strpos($output, 'unsafe_allowed') === false, $output);
-        $this->assertTrue(strpos($output, 'traversal_allowed') === false, $output);
-        $this->assertTrue(strpos($output, 'unmanaged_allowed') === false, $output);
+        $this->assertStringContainsAndOmitsStrings([
+            'safe_removed',
+            'unsafe_refused',
+            'traversal_refused',
+            'managed_allowed',
+            'managed_removed',
+            'unmanaged_preserved',
+            'keep_preserved',
+        ], [
+            'safe_still_exists' => $output,
+            'unsafe_allowed' => $output,
+            'traversal_allowed' => $output,
+            'unmanaged_allowed' => $output,
+        ], $output);
     }
 
     public function testJellyfinConfigResetUsesExactPathGuard(): void
@@ -428,16 +415,14 @@ LIGHTTPD;
         $this->assertStringContainsString('--verify-only', $this->script);
     }
 
-    public function testFetchUsesCheckUrlOnDryRun(): void
+    public function testDryRunUrlChecksUseHttpProbeHelpers(): void
     {
-        $this->assertStringContainsString('if [[ $DRY_RUN -eq 1 ]]; then', $this->script);
-        $this->assertStringContainsString('check_url "$url"', $this->script);
-    }
-
-    public function testCheckUrlUsesCurlOrWget(): void
-    {
-        $this->assertStringContainsString('curl -fsIL --max-time 10 "$url"', $this->script);
-        $this->assertStringContainsString('wget -q --spider --timeout=10 "$url"', $this->script);
+        $this->assertStringContainsAllStrings([
+            'if [[ $DRY_RUN -eq 1 ]]; then',
+            'check_url "$url"',
+            'curl -fsIL --max-time 10 "$url"',
+            'wget -q --spider --timeout=10 "$url"',
+        ], $this->script);
     }
 
     public function testMetadataFetchUsesCurlOrWgetHelper(): void
@@ -521,13 +506,16 @@ LIGHTTPD;
 
     public function testServarrDownloadResolversPreserveUrlContracts(): void
     {
-        $this->assertStringContainsString('for servarr_spec in \\', $this->script);
-        $this->assertStringContainsString('"radarr|Radarr|$HOME/.config/radarr|$RADARR_PORT|7878|echo"', $this->script);
-        $this->assertStringContainsString('"prowlarr|Prowlarr|$HOME/.config/prowlarr|$PROWLARR_PORT|9696|log_step"', $this->script);
-        $this->assertStringContainsString('"sonarr|Sonarr|$HOME/.config/sonarr|$SONARR_PORT|8989|log_step"', $this->script);
-        $this->pmssAssertStringNotContainsString('servarr_resolve'.'_radarr_download_url', $this->script);
-        $this->pmssAssertStringNotContainsString('servarr_resolve'.'_prowlarr_download_url', $this->script);
-        $this->pmssAssertStringNotContainsString('servarr_resolve'.'_sonarr_download_url', $this->script);
+        $this->assertStringContainsAndOmitsStrings([
+            'for servarr_spec in \\',
+            '"radarr|Radarr|$HOME/.config/radarr|$RADARR_PORT|7878|echo"',
+            '"prowlarr|Prowlarr|$HOME/.config/prowlarr|$PROWLARR_PORT|9696|log_step"',
+            '"sonarr|Sonarr|$HOME/.config/sonarr|$SONARR_PORT|8989|log_step"',
+        ], [
+            'servarr_resolve'.'_radarr_download_url',
+            'servarr_resolve'.'_prowlarr_download_url',
+            'servarr_resolve'.'_sonarr_download_url',
+        ], $this->script);
 
         $functions = $this->pmssExtractShellFunctions($this->script, array(
             'servarr_resolve_download_url',
@@ -577,13 +565,15 @@ LIGHTTPD;
 
         $output = $this->pmssRunShellHarness($script);
 
-        $this->assertStringContainsString('radarr_override=https://mirror.example/radarr.tar.gz', $output);
-        $this->assertStringContainsString('radarr_pin=https://github.com/Radarr/Radarr/releases/download/v5.10.4.9218/Radarr.master.5.10.4.9218.linux-core-x64.tar.gz', $output);
-        $this->assertStringContainsString('radarr_api=https://radarr.servarr.com/v1/update/master/updatefile?os=linux&runtime=netcore&arch=x64', $output);
-        $this->assertStringContainsString('prowlarr_override=https://mirror.example/prowlarr.tar.gz', $output);
-        $this->assertStringContainsString('prowlarr_api=https://prowlarr.servarr.com/v1/update/master/updatefile?os=linux&runtime=netcore&arch=x64', $output);
-        $this->assertStringContainsString('sonarr_override=https://mirror.example/sonarr.tar.gz', $output);
-        $this->assertStringContainsString('sonarr_api=https://services.sonarr.tv/v1/download/main/latest?version=4&os=linux&arch=x64', $output);
+        $this->assertStringContainsAllStrings([
+            'radarr_override=https://mirror.example/radarr.tar.gz',
+            'radarr_pin=https://github.com/Radarr/Radarr/releases/download/v5.10.4.9218/Radarr.master.5.10.4.9218.linux-core-x64.tar.gz',
+            'radarr_api=https://radarr.servarr.com/v1/update/master/updatefile?os=linux&runtime=netcore&arch=x64',
+            'prowlarr_override=https://mirror.example/prowlarr.tar.gz',
+            'prowlarr_api=https://prowlarr.servarr.com/v1/update/master/updatefile?os=linux&runtime=netcore&arch=x64',
+            'sonarr_override=https://mirror.example/sonarr.tar.gz',
+            'sonarr_api=https://services.sonarr.tv/v1/download/main/latest?version=4&os=linux&arch=x64',
+        ], $output);
     }
 
     public function testServarrRadarrResolverPreservesOldGlibcPin(): void
@@ -611,8 +601,10 @@ LIGHTTPD;
 
         $output = $this->pmssRunShellHarness($script);
 
-        $this->assertStringContainsString('WARN:Detected GLIBC 2.31 < 2.33', $output);
-        $this->assertStringContainsString('url=https://github.com/Radarr/Radarr/releases/download/v5.10.4.9218/Radarr.master.5.10.4.9218.linux-core-x64.tar.gz', $output);
+        $this->assertStringContainsAllStrings([
+            'WARN:Detected GLIBC 2.31 < 2.33',
+            'url=https://github.com/Radarr/Radarr/releases/download/v5.10.4.9218/Radarr.master.5.10.4.9218.linux-core-x64.tar.gz',
+        ], $output);
     }
 
     public function testServarrInstallHelperRunsSharedDownloadAndConfigSequence(): void

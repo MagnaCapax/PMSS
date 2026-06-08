@@ -107,11 +107,7 @@ class RuntimeProfileTest extends TestCase
 
         pmssProfileSummary();
 
-        $summaryEvents = $this->profileSummaryEvents($tmpJson);
-        $this->assertTrue(count($summaryEvents) >= 1, 'Expected profile_summary despite malformed profile rows');
-        $last = end($summaryEvents);
-        $this->assertEquals(1, $last['status_counts']['OK'] ?? null);
-        $this->assertEquals(1, $last['status_counts']['OTHER'] ?? null);
+        $this->assertProfileStatusCounts($tmpJson, ['OK' => 1, 'OTHER' => 1]);
 
         $profile = $this->pmssReadJsonArrayFile($tmpProfile, null, 'Profile output should contain normalized entries');
         $this->assertSame(2, count($profile));
@@ -139,13 +135,7 @@ class RuntimeProfileTest extends TestCase
 
         // The JSON log should contain a profile_summary event with status_counts.
         $this->assertTrue(file_exists($tmpJson));
-        $summaryEvents = $this->profileSummaryEvents($tmpJson);
-        $this->assertTrue(count($summaryEvents) >= 1, 'Expected at least one profile_summary JSON event');
-        $last = end($summaryEvents);
-        $this->assertTrue(isset($last['status_counts']) && is_array($last['status_counts']));
-        $this->assertEquals(1, $last['status_counts']['OK'] ?? null);
-        $this->assertEquals(1, $last['status_counts']['ERR'] ?? null);
-        $this->assertEquals(1, $last['status_counts']['SKIP'] ?? null);
+        $this->assertProfileStatusCounts($tmpJson, ['OK' => 1, 'ERR' => 1, 'SKIP' => 1]);
     }
 
     public function testProfileSummaryNormalizesKnownStatusesAndBucketsUnknownOnes(): void
@@ -160,12 +150,7 @@ class RuntimeProfileTest extends TestCase
 
         pmssProfileSummary();
 
-        $summaryEvents = $this->profileSummaryEvents($tmpJson);
-
-        $this->assertTrue(count($summaryEvents) >= 1, 'Expected at least one profile_summary JSON event');
-        $last = end($summaryEvents);
-        $this->assertEquals(1, $last['status_counts']['OK'] ?? null);
-        $this->assertEquals(1, $last['status_counts']['OTHER'] ?? null);
+        $this->assertProfileStatusCounts($tmpJson, ['OK' => 1, 'OTHER' => 1]);
     }
 
     private function recordProfileEntry(array $overrides = []): void
@@ -187,5 +172,16 @@ class RuntimeProfileTest extends TestCase
         return array_values(array_filter(pmssJsonLineFileRead($jsonPath), static function (array $decoded): bool {
             return ($decoded['event'] ?? '') === 'profile_summary';
         }));
+    }
+
+    private function assertProfileStatusCounts(string $jsonPath, array $expected): void
+    {
+        $summaryEvents = $this->profileSummaryEvents($jsonPath);
+        $this->assertTrue(count($summaryEvents) >= 1, 'Expected at least one profile_summary JSON event');
+        $last = end($summaryEvents);
+        $this->assertTrue(isset($last['status_counts']) && is_array($last['status_counts']));
+        foreach ($expected as $status => $count) {
+            $this->assertEquals($count, $last['status_counts'][$status] ?? null);
+        }
     }
 }

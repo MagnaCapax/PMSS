@@ -89,11 +89,13 @@ class DistUpgradeHelpersTest extends TestCase
         [$env, $hasTty] = \pmssDistUpgradeAptEnv(false);
 
         $this->assertEquals(false, $hasTty);
-        $this->assertStringContainsString('DEBIAN_FRONTEND=noninteractive', $env);
-        $this->assertStringContainsString('APT_LISTCHANGES_FRONTEND=none', $env);
-        $this->assertStringContainsString('UCF_FORCE_CONFDEF=1', $env);
-        $this->assertStringContainsString('UCF_FORCE_CONFOLD=1', $env);
-        $this->assertStringContainsString('NEEDRESTART_MODE=a', $env);
+        $this->assertStringContainsAllStrings([
+            'DEBIAN_FRONTEND=noninteractive',
+            'APT_LISTCHANGES_FRONTEND=none',
+            'UCF_FORCE_CONFDEF=1',
+            'UCF_FORCE_CONFOLD=1',
+            'NEEDRESTART_MODE=a',
+        ], $env);
     }
 
     public function testDistUpgradeAptCommandRejectsShellShapedInput(): void
@@ -144,10 +146,12 @@ class DistUpgradeHelpersTest extends TestCase
             "BOOT_DEGRADED=true\n"
         );
 
-        $this->assertStringContainsString('[SKIP] dist-upgrade: RAID arrays appear healthy', $output);
-        $this->assertStringContainsString('[SKIP] dist-upgrade: grub config present', $output);
-        $this->assertStringContainsString('[SKIP] dist-upgrade: mdadm ARRAY definitions found', $output);
-        $this->assertStringContainsString('[SKIP] dist-upgrade: BOOT_DEGRADED=true is configured', $output);
+        $this->assertStringContainsAllStrings([
+            '[SKIP] dist-upgrade: RAID arrays appear healthy',
+            '[SKIP] dist-upgrade: grub config present',
+            '[SKIP] dist-upgrade: mdadm ARRAY definitions found',
+            '[SKIP] dist-upgrade: BOOT_DEGRADED=true is configured',
+        ], $output);
     }
 
     public function testVerifyDistUpgradeBootReadinessWarnsForUnsafeRaidBootConfig(): void
@@ -159,9 +163,11 @@ class DistUpgradeHelpersTest extends TestCase
             "BOOT_DEGRADED=false\n"
         );
 
-        $this->assertStringContainsString('degraded RAID array detected', $output);
-        $this->assertStringContainsString('lacks ARRAY definitions', $output);
-        $this->assertStringContainsString('missing BOOT_DEGRADED=true', $output);
+        $this->assertStringContainsAllStrings([
+            'degraded RAID array detected',
+            'lacks ARRAY definitions',
+            'missing BOOT_DEGRADED=true',
+        ], $output);
     }
 
     private function captureBootReadinessOutput(
