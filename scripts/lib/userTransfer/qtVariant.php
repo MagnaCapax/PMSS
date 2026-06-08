@@ -10,20 +10,15 @@ function pmssUserTransferQtSettingsBytesDecode(string $encoded): string
 {
     $out = '';
     $length = strlen($encoded);
+    $escapes = ['0' => "\0", 'n' => "\n", 'r' => "\r", 't' => "\t"];
     for ($i = 0; $i < $length; $i++) {
         if ($encoded[$i] !== '\\' || $i + 1 >= $length) {
             $out .= $encoded[$i];
             continue;
         }
         $next = $encoded[++$i];
-        if ($next === '0') {
-            $out .= "\0";
-        } elseif ($next === 'n') {
-            $out .= "\n";
-        } elseif ($next === 'r') {
-            $out .= "\r";
-        } elseif ($next === 't') {
-            $out .= "\t";
+        if (isset($escapes[$next])) {
+            $out .= $escapes[$next];
         } elseif ($next === 'x') {
             $hex = '';
             while ($i + 1 < $length && strlen($hex) < 2 && ctype_xdigit($encoded[$i + 1])) {
@@ -51,11 +46,7 @@ function pmssUserTransferQtVariantStringMap(string $bytes): array
     for ($i = 0; $i < $count; $i++) {
         $key = pmssUserTransferQtReadString($bytes, $offset);
         $valueType = pmssUserTransferQtReadInt32($bytes, $offset);
-        if ($key === null || $valueType !== 10) {
-            return [];
-        }
-        $value = pmssUserTransferQtReadString($bytes, $offset);
-        if ($value === null) {
+        if ($key === null || $valueType !== 10 || ($value = pmssUserTransferQtReadString($bytes, $offset)) === null) {
             return [];
         }
         $map[$key] = $value;
@@ -88,8 +79,7 @@ function pmssUserTransferQtReadString(string $bytes, int &$offset): ?string
 
     $raw = substr($bytes, $offset, $length);
     $offset += $length;
-    $converted = function_exists('iconv') ? @iconv('UTF-16BE', 'UTF-8//IGNORE', $raw) : false;
-    if (is_string($converted)) {
+    if (is_string($converted = function_exists('iconv') ? @iconv('UTF-16BE', 'UTF-8//IGNORE', $raw) : false)) {
         return $converted;
     }
 

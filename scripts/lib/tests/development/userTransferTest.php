@@ -500,12 +500,11 @@ SNAP;
     private function pmssQtSettingsEscapedBytes(string $bytes): string
     {
         $escaped = '';
+        $escapes = array(0 => '\0', 10 => '\n');
         for ($i = 0; $i < strlen($bytes); $i++) {
             $ord = ord($bytes[$i]);
-            if ($ord === 0) {
-                $escaped .= '\0';
-            } elseif ($ord === 10) {
-                $escaped .= '\n';
+            if (isset($escapes[$ord])) {
+                $escaped .= $escapes[$ord];
             } elseif ($ord >= 32 && $ord <= 126 && $bytes[$i] !== '\\') {
                 $escaped .= $bytes[$i];
             } else {
