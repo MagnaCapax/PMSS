@@ -49,17 +49,8 @@ $explicitResourceOverrides = pmssUserConfigCliExplicitResources($parsed, $args, 
 $namedConfigChange = $uploadThrottleKib !== null
     || $dockerEnabled !== null
     || count($explicitResourceOverrides) > 0;
-$namedConfigMode = !empty($args[1])
-    && empty($args[2])
-    && empty($args[3])
-    && $namedConfigChange;
-$fullConfigMode = !empty($args[1]) && !empty($args[2]) && !empty($args[3]);
-$welcomeOnlyMode = !empty($args[1])
-    && $welcomeMessage !== null
-    && empty($args[2])
-    && empty($args[3])
-    && !$namedConfigMode;
-if (!$fullConfigMode && !$welcomeOnlyMode && !$namedConfigMode) {
+$configMode = pmssUserConfigInvocationMode($args, $welcomeMessage !== null, $namedConfigChange);
+if ($configMode === '') {
     die($usage."\n");
 }
 
@@ -93,59 +84,28 @@ if ($accountHome !== $expectedHome || !file_exists($expectedHome)) {
 $store = new UserConfigStore();
 $existing = $store->get($user['name']) ?? [];
 
-if ($welcomeOnlyMode) {
-    $payload = $existing;
-    $requiredBaselineKeys = ['ramMiB', 'rtorrentPort', 'quota', 'quotaBurst'];
-    foreach ($requiredBaselineKeys as $requiredBaselineKey) {
-        if (!isset($payload[$requiredBaselineKey]) || !is_numeric($payload[$requiredBaselineKey])) {
-            fwrite(STDERR, "Error: missing existing {$requiredBaselineKey}; rerun full userConfig.php first.\n");
-            exit(1);
-        }
-    }
-
-    if (!pmssWelcomeUserMessageSet($user['name'], $expectedHome, $welcomeMessage)) {
-        fwrite(STDERR, "Error: failed to persist welcome message for {$user['name']}\n");
-        exit(1);
-    }
-    unset($payload['welcomeMessage']);
-    if (!$store->persist($user['name'], $payload)) {
-        fwrite(STDERR, "Error: failed to persist user config for {$user['name']}\n");
+if ($configMode === 'welcome') {
+    $error = pmssUserConfigWelcomeOnlyPersist($store, $user['name'], $expectedHome, $welcomeMessage, $existing);
+    if ($error !== null) {
+        fwrite(STDERR, $error."\n");
         exit(1);
     }
     exit(0);
 }
 
-if ($namedConfigMode) {
-    foreach (['ramMiB', 'quota'] as $requiredBaselineKey) {
-        if (!isset($existing[$requiredBaselineKey]) || !is_numeric($existing[$requiredBaselineKey])) {
-            fwrite(STDERR, "Error: missing existing {$requiredBaselineKey}; rerun full userConfig.php first.\n");
-            exit(1);
-        }
+if ($configMode === 'named') {
+    $error = pmssUserConfigBaselineError($existing, ['ramMiB', 'quota']);
+    if ($error !== null) {
+        fwrite(STDERR, $error."\n");
+        exit(1);
     }
 
-    $user['memory'] = (int) $existing['ramMiB'];
-    $user['quota'] = (int) $existing['quota'];
-    $user = array_merge($user, pmssUserConfigCliPersistedStoredResources($existing));
-    $user = array_merge($user, $explicitResourceOverrides);
+    $user = pmssUserConfigNamedModeUser($user, $existing, $explicitResourceOverrides);
 }
 
 $presence = array_fill_keys(array_keys($explicitResourceOverrides), true);
 
-$payload = $existing;
-$payload['ramMiB'] = $user['memory'];
-$payload['rtorrentPort'] = isset($existing['rtorrentPort']) ? (int) $existing['rtorrentPort'] : 0;
-$payload['quota'] = $user['quota'];
-$payload['quotaBurst'] = (int) round(((float) $user['quota']) * 1.25);
-$payload['trafficLimit'] = 0;
-$payload = pmssUserConfigCliApplyPersistedResources($payload, $user, $presence);
-$payload['billingServiceId'] = $payload['billingServiceId'] ?? 0;
-$payload['billingClientId'] = $payload['billingClientId'] ?? 0;
-if ($payload['billingServiceId'] === 0 || $payload['billingClientId'] === 0) {
-    $payload = $store->applyFallbacks($user['name'], $payload);
-}
-if ($dockerEnabled !== null) {
-    $payload['dockerEnabled'] = $dockerEnabled;
-}
+$payload = pmssUserConfigPayloadBuild($store, $existing, $user, $presence, $dockerEnabled);
 if ($welcomeMessage !== null) {
     if (!pmssWelcomeUserMessageSet($user['name'], $expectedHome, $welcomeMessage)) {
         fwrite(STDERR, "Warning: failed to persist welcome message for {$user['name']}\n");
@@ -263,32 +223,4 @@ if (file_exists('/bin/bash')) {
     runStep('Ensuring bash shell', sprintf('chsh -s /bin/bash %s', escapeshellarg($user['name'])));
 }
 
-// Delegate cgroup configuration to the dedicated utility.
-// This ensures v1/v2 compatibility and automatic weight calculation.
-$args = pmssUserConfigCliBuildCgroupApplyArgs($user['name'], (int) $user['memory'], $user);
-if (isset($user['cpuQuotaPercent']) && $user['cpuQuotaPercent'] !== '') {
-    $quotaVal = $user['cpuQuotaPercent'];
-    $quotaLabel = (is_string($quotaVal) && strtolower((string) $quotaVal) === 'infinity')
-        ? 'infinity'
-        : $quotaVal.'%';
-    echo 'Applying CPU quota: '.$quotaLabel."\n";
-}
-
-$cgroupRc = runStep(
-    'Configuring cgroups',
-    pmssBuildCommand('php', $args)
-);
-if ($cgroupRc !== 0) {
-    pmssUserConfigCgroupApplyFailureLog($user['name'], $cgroupRc);
-}
-
-if (!pmssUserDockerEnabled($user['name'], $store)) {
-    pmssLogStatus('SKIP', 'Rootless Docker disabled by config for '.$user['name']);
-} else {
-    runStep('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg($user['name'])));
-    runStep('Installing systemd-container tools', 'apt-get install -y systemd-container');
-    runStep(
-        'Configuring rootless Docker',
-        sprintf('machinectl shell %1$s@ /usr/bin/dockerd-rootless-setuptool.sh install', escapeshellarg($user['name']))
-    );
-}
+pmssUserConfigApplyCgroupAndDocker($user, $store);

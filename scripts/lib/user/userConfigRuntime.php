@@ -100,3 +100,69 @@ function pmssUserConfigCgroupApplyFailureLog(string $username, int $rc): void
         ]);
     }
 }
+
+function pmssUserConfigInvocationMode(array $args, bool $welcomeMessageProvided, bool $namedConfigChange): string
+{
+    if (!empty($args[1]) && !empty($args[2]) && !empty($args[3])) return 'full';
+    if (!empty($args[1]) && empty($args[2]) && empty($args[3]) && $namedConfigChange) return 'named';
+    if (!empty($args[1]) && $welcomeMessageProvided && empty($args[2]) && empty($args[3])) return 'welcome';
+    return '';
+}
+function pmssUserConfigBaselineError(array $payload, array $requiredKeys): ?string
+{
+    foreach ($requiredKeys as $requiredKey) {
+        if (!isset($payload[$requiredKey]) || !is_numeric($payload[$requiredKey])) return "Error: missing existing {$requiredKey}; rerun full userConfig.php first.";
+    }
+    return null;
+}
+function pmssUserConfigWelcomeOnlyPersist($store, string $username, string $home, ?string $welcomeMessage, array $existing): ?string
+{
+    $baselineError = pmssUserConfigBaselineError($existing, ['ramMiB', 'rtorrentPort', 'quota', 'quotaBurst']);
+    if ($baselineError !== null) return $baselineError;
+    if (!pmssWelcomeUserMessageSet($username, $home, $welcomeMessage)) return "Error: failed to persist welcome message for {$username}";
+
+    $payload = $existing;
+    unset($payload['welcomeMessage']);
+    return $store->persist($username, $payload) ? null : "Error: failed to persist user config for {$username}";
+}
+function pmssUserConfigNamedModeUser(array $user, array $existing, array $explicitResourceOverrides): array
+{
+    $user['memory'] = (int) $existing['ramMiB'];
+    $user['quota'] = (int) $existing['quota'];
+    return array_merge($user, pmssUserConfigCliPersistedStoredResources($existing), $explicitResourceOverrides);
+}
+function pmssUserConfigPayloadBuild($store, array $existing, array $user, array $presence, ?bool $dockerEnabled): array
+{
+    $payload = array_merge($existing, ['ramMiB' => $user['memory'], 'rtorrentPort' => isset($existing['rtorrentPort']) ? (int) $existing['rtorrentPort'] : 0, 'quota' => $user['quota'], 'quotaBurst' => (int) round(((float) $user['quota']) * 1.25), 'trafficLimit' => 0]);
+    $payload = pmssUserConfigCliApplyPersistedResources($payload, $user, $presence);
+    $payload['billingServiceId'] = $payload['billingServiceId'] ?? 0;
+    $payload['billingClientId'] = $payload['billingClientId'] ?? 0;
+    if ($payload['billingServiceId'] === 0 || $payload['billingClientId'] === 0) {
+        $payload = $store->applyFallbacks($user['name'], $payload);
+    }
+    if ($dockerEnabled !== null) $payload['dockerEnabled'] = $dockerEnabled;
+    return $payload;
+}
+function pmssUserConfigApplyCgroupAndDocker(array $user, $store): void
+{
+    $args = pmssUserConfigCliBuildCgroupApplyArgs($user['name'], (int) $user['memory'], $user);
+    if (isset($user['cpuQuotaPercent']) && $user['cpuQuotaPercent'] !== '') {
+        $quotaVal = $user['cpuQuotaPercent'];
+        $quotaLabel = (is_string($quotaVal) && strtolower((string) $quotaVal) === 'infinity')
+            ? 'infinity'
+            : $quotaVal.'%';
+        echo 'Applying CPU quota: '.$quotaLabel."\n";
+    }
+
+    $cgroupRc = runStep('Configuring cgroups', pmssBuildCommand('php', $args));
+    if ($cgroupRc !== 0) pmssUserConfigCgroupApplyFailureLog($user['name'], $cgroupRc);
+
+    if (!pmssUserDockerEnabled($user['name'], $store)) {
+        pmssLogStatus('SKIP', 'Rootless Docker disabled by config for '.$user['name']);
+        return;
+    }
+
+    runStep('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg($user['name'])));
+    runStep('Installing systemd-container tools', 'apt-get install -y systemd-container');
+    runStep('Configuring rootless Docker', sprintf('machinectl shell %1$s@ /usr/bin/dockerd-rootless-setuptool.sh install', escapeshellarg($user['name'])));
+}
