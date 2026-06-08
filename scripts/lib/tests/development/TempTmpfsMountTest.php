@@ -91,6 +91,31 @@ class TempTmpfsMountTest extends TestCase
         chmod($mounts, 0600);
     }
 
+    public function testUnsafeInputPathsWarnAndSkipUnsafeReads(): void
+    {
+        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+            'pmss-tmpfs-unsafe-fstab-',
+            "UUID=abc / ext4 defaults 0 0\n",
+            "tmpfs /tmp tmpfs rw 0 0\n"
+        );
+
+        $fstabMessages = $this->runTmpfsHardening($fstab."\0bad", $mounts);
+
+        $this->assertEquals("UUID=abc / ext4 defaults 0 0\n", (string) file_get_contents($fstab));
+        $this->pmssAssertMessagesContain($fstabMessages, 'Unsafe fstab path', 'expected unsafe fstab warning');
+
+        ['fstab' => $mountsFstab, 'mounts' => $mountsPath] = $this->pmssMountFixtureCreate(
+            'pmss-tmpfs-unsafe-mounts-',
+            "tmpfs /tmp tmpfs defaults,noexec,nosuid,nodev,size=2G 0 0\n",
+            "tmpfs /tmp tmpfs rw 0 0\n"
+        );
+
+        $mountsMessages = $this->runTmpfsHardening($mountsFstab, $mountsPath."\0bad");
+
+        $this->assertEquals("tmpfs /tmp tmpfs defaults,noexec,nosuid,nodev,size=2G 0 0\n", (string) file_get_contents($mountsFstab));
+        $this->pmssAssertMessagesContain($mountsMessages, 'not readable', 'expected mounts path warning');
+    }
+
     public function testWriteFailureSkipsTmpfsRemountWhenFstabUpdateCannotPersist(): void
     {
         ['dir' => $dir, 'fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(

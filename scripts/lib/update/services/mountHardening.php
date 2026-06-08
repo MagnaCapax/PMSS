@@ -25,13 +25,19 @@ function pmssMountHardeningFlagEnabled(string $envKey, string $notSetMessage, st
 function pmssMountHardeningReadMounts(string $mountsPath): array
 {
     $mounts = [];
-    if (!is_readable($mountsPath) || ($lines = @file($mountsPath, FILE_IGNORE_NEW_LINES)) === false) return $mounts;
+    if (!pmssMountHardeningReadablePath($mountsPath) || ($lines = @file($mountsPath, FILE_IGNORE_NEW_LINES)) === false) return $mounts;
     foreach ($lines as $line) {
         $columns = pmssConfigLineColumns($line, 4, []);
         if ($columns === []) continue;
         $mounts[$columns[1]] = ['type' => $columns[2], 'options' => pmssNonEmptyStrings(explode(',', $columns[3]))];
     }
     return $mounts;
+}
+
+/** Keep invalid override paths away from PHP filesystem calls. */
+function pmssMountHardeningReadablePath(string $path): bool
+{
+    return $path !== '' && !pmssFilesystemPathHasNulByte($path) && is_readable($path);
 }
 
 /** Persist fstab mutations before any live remount is attempted. */
@@ -50,7 +56,7 @@ function pmssMountHardeningContext(string $fstabContext, string $mountsWarn, cal
     $fstabPath = $fstabPath ?? '/etc/fstab';
     $mountsPath = $mountsPath ?? pmssResolvePathFromEnv('PMSS_PROC_MOUNTS_PATH', '/proc/mounts');
     $mounts = pmssMountHardeningReadMounts($mountsPath);
-    if ($mounts === [] && !is_readable($mountsPath)) $logger($mountsWarn);
+    if ($mounts === [] && !pmssMountHardeningReadablePath($mountsPath)) $logger($mountsWarn);
     return ['fstab_path' => $fstabPath, 'mounts' => $mounts, 'lines' => pmssFstabLinesRead($fstabPath, $logger, $fstabContext), 'required' => ['noexec', 'nosuid', 'nodev'], 'conflicts' => ['exec', 'suid', 'dev']];
 }
 

@@ -13,6 +13,7 @@ require_once dirname(__DIR__).'/runtime.php';
  */
 function pmssFstabLinesRead(string $fstabPath, callable $logger, string $context): ?array
 {
+    if ($fstabPath === '' || pmssFilesystemPathHasNulByte($fstabPath)) { $logger('[WARN] Unsafe fstab path; skipping '.$context); return null; }
     if (is_link($fstabPath) || !is_file($fstabPath)) { $logger('[WARN] '.$fstabPath.' is not a regular file; skipping '.$context); return null; }
     if (!is_readable($fstabPath)) { $logger('[WARN] '.$fstabPath.' not readable; skipping '.$context); return null; }
     $lines = file($fstabPath, FILE_IGNORE_NEW_LINES);

@@ -118,6 +118,34 @@ class TempMountNoexecTest extends TestCase
         chmod($fstab, 0600);
     }
 
+    public function testUnsafeFstabPathWarnsAndSkips(): void
+    {
+        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+            'pmss-noexec-unsafe-fstab-',
+            "tmpfs /tmp tmpfs defaults 0 0\n",
+            "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n"
+        );
+
+        $messages = $this->runNoexecHardening($fstab."\0bad", $mounts);
+
+        $this->assertEquals("tmpfs /tmp tmpfs defaults 0 0\n", (string) file_get_contents($fstab));
+        $this->pmssAssertMessagesContain($messages, 'Unsafe fstab path', 'expected unsafe fstab path log');
+    }
+
+    public function testUnsafeMountsPathWarnsWithoutFilesystemWarning(): void
+    {
+        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+            'pmss-noexec-unsafe-mounts-',
+            "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0\n",
+            "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n"
+        );
+
+        $messages = $this->runNoexecHardening($fstab, $mounts."\0bad");
+
+        $this->assertStringContainsString('noexec', (string) file_get_contents($fstab));
+        $this->pmssAssertMessagesContain($messages, 'not readable', 'expected mounts path warning');
+    }
+
     public function testUnreadableFstabStillProfilesLiveRemounts(): void
     {
         ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
