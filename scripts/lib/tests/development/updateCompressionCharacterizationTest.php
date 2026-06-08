@@ -14,25 +14,111 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->pmssAssertRepoFileNotContainsString('scripts/lib/rtorrent/process.php', 'function rtorrentProcess'.'PgrepExact(');
     }
 
-    public function testUpdateStep2KeepsInlineLighttpdHardeningStep(): void
+    public function testInlineHelperCompressionContractsStayLocal(): void
     {
-        $symbol = 'pmssAdjust'.'LighttpdSecurity';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/update-step2.php', [
-            "pmssRunProfiledStep('Adjusting lighttpd security settings'",
-            "runStep('Restricting /etc/lighttpd directory permissions', 'chmod 750 /etc/lighttpd');",
-            "logmsg('[SKIP] lighttpd .htpasswd missing; per-user instances manage authentication');",
-        ], [$symbol => 'update-step2.php should own the lighttpd hardening block directly']);
-    }
-
-    public function testAptSourcesDebianSelectionUsesSharedReleaseSpecs(): void
-    {
-        $legacyTable = 'static $targets = [';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apt.php', [
-            "require_once __DIR__.'/distro.php';",
-            'pmssDebianReleaseSpecs()[$version] ?? null',
-        ], [$legacyTable => 'apt.php should not keep a second Debian release target table']);
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/util/update-step2.php' => [
+                'required' => [
+                    "pmssRunProfiledStep('Adjusting lighttpd security settings'",
+                    "runStep('Restricting /etc/lighttpd directory permissions', 'chmod 750 /etc/lighttpd');",
+                    "logmsg('[SKIP] lighttpd .htpasswd missing; per-user instances manage authentication');",
+                    "pmssRunProfiledStep('Cleaning mediaarea bootstrap package state'",
+                    "dpkg-query -W -f=\${Status} repo-mediaarea 2>/dev/null",
+                    "runStep('Marking repo-mediaarea for deinstallation', \$setSelection);",
+                ],
+                'forbidden' => [
+                    'pmssAdjust'.'LighttpdSecurity' => 'update-step2.php should own the lighttpd hardening block directly',
+                    'pmssCleanup'.'MediaareaBootstrapPackage' => 'update-step2.php should own the mediaarea bootstrap cleanup directly',
+                ],
+            ],
+            'scripts/lib/update/apt.php' => [
+                'required' => [
+                    "require_once __DIR__.'/distro.php';",
+                    'pmssDebianReleaseSpecs()[$version] ?? null',
+                ],
+                'forbidden' => [
+                    'static $targets = [' => 'apt.php should not keep a second Debian release target table',
+                ],
+            ],
+            'scripts/lib/update/runtime/processes.php' => [
+                'required' => [
+                    "foreach (['TERM' => max(0, \$timeoutSeconds), 'KILL' => 5] as \$signal => \$waitSeconds)",
+                    "runStep(\$description.' (SIG'.\$signal.')'",
+                    'graceful stop',
+                    'processes linger after SIGKILL',
+                    "\$probeCommand = 'pgrep -x '.escapeshellarg(\$name).' >/dev/null 2>&1';",
+                    'exec($probeCommand, $_, $probeStatus);',
+                    '[SKIP] {$description} (no {$name} processes)',
+                    '$deadline = microtime(true) + $waitSeconds;',
+                    'usleep(250000);',
+                ],
+                'forbidden' => [
+                    'function pmssWaitFor'.'ProcessExit(' => 'process wait logic should be localized inside killProcess()',
+                    'function pmssProcess'.'Running(' => 'process presence checks should stay localized inside killProcess()',
+                    '$process'.'Running = static function' => 'killProcess() should keep the process probe inline without a local closure',
+                    '$waitFor'.'ProcessExit = static function' => 'killProcess() should keep the wait loops inline without a local closure',
+                ],
+            ],
+            'scripts/lib/update/systemPrep/systemdSlicesEnsure.php' => [
+                'required' => [
+                    "pmssWriteManagedPathFile(\$target, \$raw, 'systemd drop-in'",
+                    "pmssWriteManagedPathFile(\$userAtTarget, \$userAtBody, 'systemd drop-in'",
+                ],
+                'forbidden' => [
+                    'function pmssSystemdDropin'.'Install(' => 'systemd drop-in writes should use the shared managed-file writer directly',
+                    '$write'.'FailurePrefix' => 'systemd drop-in writes should not keep a dead temp-write prefix concept',
+                    'Failed to write'.' temp' => 'systemd drop-in callers should log the single managed-write failure path',
+                ],
+            ],
+            'scripts/lib/update/logging.php' => [
+                'required' => [
+                    "gmdate('Ymd-His')",
+                    "bin2hex(random_bytes(3))",
+                    "substr(hash('sha256', \$timestamp.\$host.microtime(true)), 0, 6)",
+                ],
+                'forbidden' => [
+                    'function pmssBuild'.'CorrelationId(' => 'logging.php should keep correlation ID generation inside pmssCorrelationId()',
+                ],
+            ],
+            'scripts/update.php' => [
+                'required' => [
+                    "bin2hex(random_bytes(3))",
+                    "PMSS_CORRELATION_ENV.'='.\$generated",
+                ],
+                'forbidden' => [
+                    'function pmssBuild'.'CorrelationId(' => 'update.php should keep correlation ID generation inside pmssCorrelationId()',
+                ],
+            ],
+            'scripts/lib/quotaSnapshot.php' => [
+                'required' => [
+                    "preg_match('/^([0-9]+)(\\*)?$/', \$tokens[\$index], \$matches)",
+                    "\$tokens[\$index] = \$matches[1].'K'.(\$matches[2] ?? '');",
+                ],
+                'forbidden' => [
+                    'function pmssQuotaSnapshotNormalize'.'SizeToken(' => 'quotaSnapshot.php should keep bare-size token normalization inside the line normalizer',
+                ],
+            ],
+            'scripts/lib/user/torrentPort.php' => [
+                'required' => [
+                    "require_once __DIR__.'/qbittorrent.php';",
+                    'pmssQbittorrentConfigMutate(',
+                ],
+                'forbidden' => [
+                    'function pmssTorrentPort'.'FileWrite(' => 'torrentPort.php should not grow a second qBittorrent file-writer helper',
+                    '@tempnam($dir, basename($configPath).\'.pmss-tmp-\')' => 'qBittorrent port repair should use the shared config writer instead of an inline temp-file path',
+                ],
+            ],
+            'scripts/suspend.php' => [
+                'required' => [
+                    "/etc/seedbox/config/template.suspended.notice.html",
+                    "pmssSuspendedFallbackHtml(\$username)",
+                    "@file_put_contents(\$suspendRoot.'/index.html', \$html)",
+                ],
+                'forbidden' => [
+                    'function pmssRender'.'SuspendedHtml(' => 'suspend.php should keep suspended landing template selection inside pmssCreateSuspendedLanding()',
+                ],
+            ],
+        ]);
     }
 
     public function testNginxSubdomainTemplateOutputSnapshot(): void
@@ -55,54 +141,6 @@ class UpdateCompressionCharacterizationTest extends TestCase
         ]);
     }
 
-    public function testKillProcessKeepsGracefulAndForcedWaitPhasesLocally(): void
-    {
-        $symbol = 'pmssWaitFor'.'ProcessExit';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/runtime/processes.php', [
-            "foreach (['TERM' => max(0, \$timeoutSeconds), 'KILL' => 5] as \$signal => \$waitSeconds)",
-            "runStep(\$description.' (SIG'.\$signal.')'",
-            'graceful stop',
-            'processes linger after SIGKILL',
-        ], ['function '.$symbol.'(' => 'process wait logic should be localized inside killProcess()']);
-    }
-
-    public function testKillProcessKeepsProcessProbeLocal(): void
-    {
-        $symbol = 'pmssProcess'.'Running';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/runtime/processes.php', [
-            "\$probeCommand = 'pgrep -x '.escapeshellarg(\$name).' >/dev/null 2>&1';",
-            'exec($probeCommand, $_, $probeStatus);',
-            '[SKIP] {$description} (no {$name} processes)',
-        ], ['function '.$symbol.'(' => 'process presence checks should stay localized inside killProcess()']);
-    }
-
-    public function testKillProcessKeepsLocalWaitLoopsInlineWithoutClosures(): void
-    {
-        $probeNeedle = '$process'.'Running = static function';
-        $waitNeedle = '$waitFor'.'ProcessExit = static function';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/runtime/processes.php', [
-            '$deadline = microtime(true) + $waitSeconds;',
-            'usleep(250000);',
-        ], [
-            $probeNeedle => 'killProcess() should keep the process probe inline without a local closure',
-            $waitNeedle => 'killProcess() should keep the wait loops inline without a local closure',
-        ]);
-    }
-
-    public function testUpdateStep2KeepsMediaareaBootstrapCleanupInline(): void
-    {
-        $symbol = 'pmssCleanup'.'MediaareaBootstrapPackage';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/update-step2.php', [
-            "pmssRunProfiledStep('Cleaning mediaarea bootstrap package state'",
-            "dpkg-query -W -f=\${Status} repo-mediaarea 2>/dev/null",
-            "runStep('Marking repo-mediaarea for deinstallation', \$setSelection);",
-        ], [$symbol => 'update-step2.php should own the mediaarea bootstrap cleanup directly']);
-    }
-
     public function testRootlessDockerUnitParsingBelongsToDockerMaintenanceModule(): void
     {
         $symbol = 'pmssReadSystemd'.'UnitExecStartBinary';
@@ -120,66 +158,6 @@ class UpdateCompressionCharacterizationTest extends TestCase
         );
     }
 
-    public function testSystemdDropinInstallerKeepsSingleFailurePrefix(): void
-    {
-        $removedHelper = 'pmssSystemdDropin'.'Install';
-        $deadPrefixSymbol = '$write'.'FailurePrefix';
-        $deadTempPrefixMessage = 'Failed to write'.' temp';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPrep/systemdSlicesEnsure.php', [
-            "pmssWriteManagedPathFile(\$target, \$raw, 'systemd drop-in'",
-            "pmssWriteManagedPathFile(\$userAtTarget, \$userAtBody, 'systemd drop-in'",
-        ], [
-            'function '.$removedHelper.'(' => 'systemd drop-in writes should use the shared managed-file writer directly',
-            $deadPrefixSymbol => 'systemd drop-in writes should not keep a dead temp-write prefix concept',
-            $deadTempPrefixMessage => 'systemd drop-in callers should log the single managed-write failure path',
-        ]);
-    }
-
-    public function testUpdateLoggingKeepsCorrelationIdBuildLocal(): void
-    {
-        $symbol = 'pmssBuild'.'CorrelationId';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/logging.php', [
-            "gmdate('Ymd-His')",
-            "bin2hex(random_bytes(3))",
-            "substr(hash('sha256', \$timestamp.\$host.microtime(true)), 0, 6)",
-        ], ['function '.$symbol.'(' => 'logging.php should keep correlation ID generation inside pmssCorrelationId()']);
-    }
-
-    public function testBootstrapUpdateKeepsCorrelationIdBuildLocal(): void
-    {
-        $symbol = 'pmssBuild'.'CorrelationId';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/update.php', [
-            "bin2hex(random_bytes(3))",
-            "PMSS_CORRELATION_ENV.'='.\$generated",
-        ], ['function '.$symbol.'(' => 'update.php should keep correlation ID generation inside pmssCorrelationId()']);
-    }
-
-    public function testQuotaSnapshotKeepsSizeTokenNormalizationLocal(): void
-    {
-        $symbol = 'pmssQuotaSnapshotNormalize'.'SizeToken';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/quotaSnapshot.php', [
-            "preg_match('/^([0-9]+)(\\*)?$/', \$tokens[\$index], \$matches)",
-            "\$tokens[\$index] = \$matches[1].'K'.(\$matches[2] ?? '');",
-        ], ['function '.$symbol.'(' => 'quotaSnapshot.php should keep bare-size token normalization inside the line normalizer']);
-    }
-
-    public function testQbittorrentPortEnsureUsesSharedConfigWriter(): void
-    {
-        $symbol = 'pmssTorrentPort'.'FileWrite';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/torrentPort.php', [
-            "require_once __DIR__.'/qbittorrent.php';",
-            'pmssQbittorrentConfigMutate(',
-        ], [
-            'function '.$symbol.'(' => 'torrentPort.php should not grow a second qBittorrent file-writer helper',
-            '@tempnam($dir, basename($configPath).\'.pmss-tmp-\')' => 'qBittorrent port repair should use the shared config writer instead of an inline temp-file path',
-        ]);
-    }
-
     public function testUserConfigKeepsQbittorrentBootstrapInline(): void
     {
         $symbol = 'userConfigure'.'Qbittorrent';
@@ -189,17 +167,6 @@ class UpdateCompressionCharacterizationTest extends TestCase
             'template.qbittorrent.conf',
             "pmssQbittorrentApplyUploadThrottle(\$user['name'], \$throttle);",
         ]);
-    }
-
-    public function testSuspendLandingKeepsTemplateLoadInline(): void
-    {
-        $symbol = 'pmssRender'.'SuspendedHtml';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/suspend.php', [
-            "/etc/seedbox/config/template.suspended.notice.html",
-            "pmssSuspendedFallbackHtml(\$username)",
-            "@file_put_contents(\$suspendRoot.'/index.html', \$html)",
-        ], ['function '.$symbol.'(' => 'suspend.php should keep suspended landing template selection inside pmssCreateSuspendedLanding()']);
     }
 
     public function testShowTrafficKeepsLocalnetSplitAndBarRenderingInline(): void
