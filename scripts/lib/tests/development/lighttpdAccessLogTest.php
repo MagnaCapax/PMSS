@@ -16,26 +16,18 @@ class LighttpdAccessLogTest extends TestCase
         $this->assertEquals(100 * 1024 * 1024, \PMSS_LIGHTTPD_ACCESS_LOG_THRESHOLD_BYTES);
     }
 
-    public function testTrimFileTruncatesOversizedRegularFile(): void
+    public function testTrimFileHandlesRegularFilesBySize(): void
     {
-        $path = $this->tempDir.'/alice/.lighttpd/access.log';
-        $this->pmssWriteFile($path, str_repeat('x', 128));
+        foreach ([
+            [128, 64, ['status' => 'trimmed', 'sizeBefore' => 128], 0],
+            [16, 64, ['status' => 'skip', 'reason' => 'below_threshold'], 16],
+        ] as [$bytes, $threshold, $expected, $finalSize]) {
+            $path = $this->tempDir.'/alice/.lighttpd/access.log';
+            $this->pmssWriteFile($path, str_repeat('x', $bytes));
 
-        $result = \pmssLighttpdAccessLogTrimFile($path, 64);
-
-        $this->pmssAssertArraySubsetSame(['status' => 'trimmed', 'sizeBefore' => 128], $result);
-        $this->assertEquals(0, filesize($path));
-    }
-
-    public function testTrimFileSkipsLogsBelowThreshold(): void
-    {
-        $path = $this->tempDir.'/alice/.lighttpd/access.log';
-        $this->pmssWriteFile($path, str_repeat('x', 16));
-
-        $result = \pmssLighttpdAccessLogTrimFile($path, 64);
-
-        $this->pmssAssertArraySubsetSame(['status' => 'skip', 'reason' => 'below_threshold'], $result);
-        $this->assertEquals(16, filesize($path));
+            $this->pmssAssertArraySubsetSame($expected, \pmssLighttpdAccessLogTrimFile($path, $threshold));
+            $this->assertEquals($finalSize, filesize($path));
+        }
     }
 
     public function testTrimFileRejectsSymlinkTarget(): void

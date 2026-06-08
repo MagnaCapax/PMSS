@@ -65,9 +65,13 @@ class CheckWireguardSafetyTest extends TestCase
 
     public function testLsmodParserMatchesExactWireguardModuleOnly(): void
     {
-        $this->assertTrue(\pmssWireguardLsmodOutputHasModule("wireguard 118784 0\n"));
-        $this->assertFalse(\pmssWireguardLsmodOutputHasModule("wireguarded 118784 0\n"));
-        $this->assertFalse(\pmssWireguardLsmodOutputHasModule("foo_wireguard 118784 0\n"));
+        foreach ([
+            ["wireguard 118784 0\n", true],
+            ["wireguarded 118784 0\n", false],
+            ["foo_wireguard 118784 0\n", false],
+        ] as [$output, $expected]) {
+            $this->assertSame($expected, \pmssWireguardLsmodOutputHasModule($output));
+        }
     }
 
     public function testMissingPeerPublicKeysReturnsConfiguredRuntimeDifference(): void
@@ -114,8 +118,8 @@ class CheckWireguardSafetyTest extends TestCase
                 ['wg syncconf wg0 ', 'systemctl restart wg-quick@wg0'],
                 [],
             ],
-        ] as $case) {
-            $this->assertWireguardMainRun($case[0], $case[1], $case[2], $case[3], $case[4], $case[5]);
+        ] as [$configuredPeers, $runningPeers, $syncSucceeds, $outputNeedles, $logRequired, $logForbidden]) {
+            $this->assertWireguardMainRun($configuredPeers, $runningPeers, $syncSucceeds, $outputNeedles, $logRequired, $logForbidden);
         }
     }
 

@@ -10,11 +10,10 @@ class UpdateServicesRuntimeTest extends TestCase
     {
         $normalized = \pmssSshdLegacyParserTemplateNormalize("Port 22\nCiphers +aes128-ctr\nHostKeyAlgorithms ssh-ed25519");
 
-        $this->assertStringContainsString("Port 22\n", $normalized);
-        $this->assertSame(1, substr_count($normalized, "\nCiphers aes128-gcm@openssh.com"));
-        $this->assertSame(1, substr_count($normalized, "\nKexAlgorithms curve25519-sha256@libssh.org"));
-        $this->assertSame(1, substr_count($normalized, "\nMACs hmac-sha2-512-etm@openssh.com"));
-        $this->assertStringContainsString('# HostKeyAlgorithms ssh-ed25519', $normalized);
+        $this->assertStringContainsAllStrings(["Port 22\n", '# HostKeyAlgorithms ssh-ed25519'], $normalized);
+        foreach (["\nCiphers aes128-gcm@openssh.com", "\nKexAlgorithms curve25519-sha256@libssh.org", "\nMACs hmac-sha2-512-etm@openssh.com"] as $needle) {
+            $this->assertSame(1, substr_count($normalized, $needle));
+        }
         $this->assertStringNotContainsString('hmac-ripemd160', $normalized);
     }
 
@@ -39,8 +38,8 @@ class UpdateServicesRuntimeTest extends TestCase
         foreach ([
             [$sshd, \pmssBuildCommand($sshd, ['-t'])],
             [$this->pmssMakeTempPath('pmss-missing-sshd-'), 'sshd -t'],
-        ] as $case) {
-            $this->assertSame($case[1], \pmssSshdValidationCommand($case[0]));
+        ] as [$path, $expected]) {
+            $this->assertSame($expected, \pmssSshdValidationCommand($path));
         }
     }
 

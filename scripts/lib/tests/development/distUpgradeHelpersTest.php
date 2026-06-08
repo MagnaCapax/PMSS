@@ -70,12 +70,13 @@ class DistUpgradeHelpersTest extends TestCase
         $env = 'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none';
         $opts = ' -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
-        $this->assertSame(
-            $env.' apt-get install'.$opts.' fuse-overlayfs nginx-full',
-            \pmssDistUpgradeAptCommand($env, 'install', 'fuse-overlayfs nginx-full')
-        );
-        $this->assertSame($env.' apt-get upgrade'.$opts, \pmssDistUpgradeAptCommand($env, 'upgrade'));
-        $this->assertSame($env.' apt-get full-upgrade'.$opts, \pmssDistUpgradeAptCommand($env, 'full-upgrade'));
+        foreach ([
+            ['install', 'fuse-overlayfs nginx-full', $env.' apt-get install'.$opts.' fuse-overlayfs nginx-full'],
+            ['upgrade', '', $env.' apt-get upgrade'.$opts],
+            ['full-upgrade', '', $env.' apt-get full-upgrade'.$opts],
+        ] as [$action, $arguments, $expected]) {
+            $this->assertSame($expected, \pmssDistUpgradeAptCommand($env, $action, $arguments));
+        }
     }
 
     public function testDistUpgradeAptEnvCarriesUnattendedRecoveryVariables(): void
@@ -94,10 +95,14 @@ class DistUpgradeHelpersTest extends TestCase
 
     public function testDistUpgradeAptCommandRejectsShellShapedInput(): void
     {
-        $this->assertDistUpgradeAptCommandFails('install; reboot', 'libcrypt1', 'Unsafe dist-upgrade apt action');
-        $this->assertDistUpgradeAptCommandFails('install', 'libcrypt1; reboot', 'Unsafe dist-upgrade apt arguments');
-        $this->assertDistUpgradeAptCommandFails('install', "libcrypt1\nnginx", 'Unsafe dist-upgrade apt arguments');
-        $this->assertDistUpgradeAptCommandFails('install', '/tmp/package.deb', 'Unsafe dist-upgrade apt arguments');
+        foreach ([
+            ['install; reboot', 'libcrypt1', 'Unsafe dist-upgrade apt action'],
+            ['install', 'libcrypt1; reboot', 'Unsafe dist-upgrade apt arguments'],
+            ['install', "libcrypt1\nnginx", 'Unsafe dist-upgrade apt arguments'],
+            ['install', '/tmp/package.deb', 'Unsafe dist-upgrade apt arguments'],
+        ] as [$action, $arguments, $message]) {
+            $this->assertDistUpgradeAptCommandFails($action, $arguments, $message);
+        }
     }
 
     public function testDistUpgradeLockedCommandMessagesStayStable(): void

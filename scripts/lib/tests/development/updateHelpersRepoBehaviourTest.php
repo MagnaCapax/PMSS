@@ -9,25 +9,17 @@ require_once dirname(__DIR__, 2).'/update/runtime/commands.php';
 
 class UpdateHelpersRepoBehaviourTest extends TestCase
 {
-    public function testUpdateAptSourcesUnsupportedDistroLogsMessage(): void
+    public function testUpdateAptSourcesLogsUnsupportedInputs(): void
     {
-        $logs = [];
-        \pmssUpdateAptSources('arch', 1, '', [], $this->pmssMakeArrayLogger($logs));
-        $this->pmssAssertMessagesContain($logs, 'Unsupported distro: arch');
-    }
-
-    public function testUpdateAptSourcesUbuntuLogsMessage(): void
-    {
-        $logs = [];
-        \pmssUpdateAptSources('ubuntu', 22, '', [], $this->pmssMakeArrayLogger($logs));
-        $this->pmssAssertMessagesContain($logs, 'Ubuntu is not supported yet');
-    }
-
-    public function testUpdateAptSourcesUnsupportedVersionLogs(): void
-    {
-        $logs = [];
-        \pmssUpdateAptSources('debian', 19, '', $this->pmssDebianRepoTemplates(), $this->pmssMakeArrayLogger($logs));
-        $this->pmssAssertMessagesContain($logs, 'Unsupported Debian version');
+        foreach ([
+            ['arch', 1, [], 'Unsupported distro: arch'],
+            ['ubuntu', 22, [], 'Ubuntu is not supported yet'],
+            ['debian', 19, $this->pmssDebianRepoTemplates(), 'Unsupported Debian version'],
+        ] as [$name, $version, $repos, $message]) {
+            $logs = [];
+            \pmssUpdateAptSources($name, $version, '', $repos, $this->pmssMakeArrayLogger($logs));
+            $this->pmssAssertMessagesContain($logs, $message);
+        }
     }
 
     public function testUpdateAptSourcesBusterWritesTemplate(): void
