@@ -60,6 +60,29 @@ class ResourceStatisticsTest extends TestCase
         $this->assertSame('second', $stats->getData('www-data', 1));
     }
 
+    public function testGetDataRejectsUnsafeResourceDirectories(): void
+    {
+        foreach (['relative-resource-dir', "/tmp/pmss-resource\0dir"] as $resourceDir) {
+            $stats = new \resourceStatistics(['resource_dir' => $resourceDir]);
+
+            $this->assertSame('', $stats->getData('www-data', 1), 'Unsafe resource dir should not be tailed: '.var_export($resourceDir, true));
+        }
+    }
+
+    public function testGetDataRejectsSymlinkedResourceDirectory(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-resource-getdata-link-');
+        $target = $root.'/target';
+        @mkdir($target, 0700);
+        file_put_contents($target.'/www-data', "should-not-read\n");
+        $link = $root.'/link';
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+
+        $stats = new \resourceStatistics(['resource_dir' => $link]);
+
+        $this->assertSame('', $stats->getData('www-data', 1));
+    }
+
     public function testCollectWindowResultsFromDataKeepsSnapshotFallbackInDayWindow(): void
     {
         $stats = new \resourceStatistics();

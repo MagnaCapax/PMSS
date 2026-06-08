@@ -23,6 +23,17 @@ function pmssResourceUserIsValid(string $user): bool
         || pmssValidateUsername($user));
 }
 
+/** Resolve a safe per-user resource log path before shelling to tail. */
+function pmssResourceLogFilePath(string $resourceDir, string $user): ?string
+{
+    if (!pmssResourceUserIsValid($user)) {
+        return null;
+    }
+
+    $path = rtrim($resourceDir, '/').'/'.$user;
+    return pmssPathTargetIsSafe($path, false, true) ? $path : null;
+}
+
 /** Return the shared schema used by resource rows and totals. */
 function pmssResourceReportTemplate(): array
 {
@@ -74,13 +85,14 @@ class resourceStatistics
      */
     public function getData($user, $timePeriod = 10080)
     {
-        if (!pmssResourceUserIsValid((string) $user)) {
+        $path = pmssResourceLogFilePath($this->resourceDir, (string) $user);
+        if ($path === null) {
             return '';
         }
 
         $lines = max(1, (int) $timePeriod);
-        $path = escapeshellarg($this->resourceDir.'/'.$user);
-        return trim(`tail -n{$lines} {$path} 2>/dev/null`);
+        $pathArg = escapeshellarg($path);
+        return trim(`tail -n{$lines} {$pathArg} 2>/dev/null`);
     }
 
     /**
