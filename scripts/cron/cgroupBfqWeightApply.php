@@ -93,6 +93,12 @@ function pmssBfqUserBonusPercentRead(string $user): int
     return is_string($raw) ? max(0, (int) trim($raw)) : 0;
 }
 
+/** Keep direct BFQ writes scoped to the expected per-user cgroup-v1 weight files. */
+function pmssBfqWeightPathAllowed(string $cgPath): bool
+{
+    return preg_match('#^/sys/fs/cgroup/blkio/user\.slice/user-[1-9][0-9]*\.slice/blkio\.bfq\.weight$#', $cgPath) === 1;
+}
+
 openlog('pmss-bfq', LOG_PID, LOG_DAEMON);
 
 $total = 0;
@@ -146,6 +152,12 @@ foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
     $w        = pmssBfqApplyBonusWeight($wRaw, $bonusPct, (int) $KERN_MAX);
 
     $cgPath = '/sys/fs/cgroup/blkio/user.slice/user-'.$uid.'.slice/blkio.bfq.weight';
+    if (!pmssBfqWeightPathAllowed($cgPath)) {
+        $errors++;
+        syslog(LOG_WARNING, "unsafe bfq target $user uid=$uid");
+        continue;
+    }
+
     if (!file_exists($cgPath)) {
         $skippedNoSlice++;
         continue;

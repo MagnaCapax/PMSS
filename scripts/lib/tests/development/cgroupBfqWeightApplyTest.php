@@ -182,6 +182,23 @@ class CgroupBfqWeightApplyTest extends TestCase
         );
     }
 
+    public function testCronValidatesDirectWriteTargetBeforeFilePutContents(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/cron/cgroupBfqWeightApply.php',
+            [
+                'function pmssBfqWeightPathAllowed(string $cgPath): bool',
+                '#^/sys/fs/cgroup/blkio/user\.slice/user-[1-9][0-9]*\.slice/blkio\.bfq\.weight$#',
+                "\$cgPath = '/sys/fs/cgroup/blkio/user.slice/user-'.\$uid.'.slice/blkio.bfq.weight';",
+                'if (!pmssBfqWeightPathAllowed($cgPath)) {',
+                'syslog(LOG_WARNING, "unsafe bfq target $user uid=$uid");',
+                'if (@file_put_contents($cgPath, (string) $w) === false)',
+            ],
+            'missing BFQ direct-write target guard: ',
+            'BFQ direct-write target guard must run before file_put_contents: '
+        );
+    }
+
     public function testCronReadsBonusMarkerAsTinyRegularFile(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings(
