@@ -28,7 +28,7 @@ if (!function_exists('pmssTrafficLimitParseGiB')) {
     {
         $error = null;
         if ($raw === null || $raw === false || $raw === true) {
-            $error = 'missing';
+            $error = ($raw === true) ? 'missing value' : 'missing';
             return null;
         }
 
@@ -45,7 +45,11 @@ if (!function_exists('pmssTrafficLimitParseGiB')) {
                 return null;
             }
             $value = (int) $matches[1];
-        } elseif (is_float($raw) && floor($raw) == $raw) {
+        } elseif (is_float($raw)) {
+            if (floor($raw) != $raw) {
+                $error = 'must be an integer';
+                return null;
+            }
             $value = (int) $raw;
         } else {
             $error = 'invalid type';
@@ -53,7 +57,7 @@ if (!function_exists('pmssTrafficLimitParseGiB')) {
         }
 
         if ($value < 0) {
-            $error = 'negative';
+            $error = 'must be >= 0';
             return null;
         }
         return $value;

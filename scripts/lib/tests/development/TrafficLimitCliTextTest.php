@@ -8,33 +8,34 @@ class TrafficLimitCliTextTest extends TestCase
 {
     public function testUsageTextKeepsSupportedFormsAndNotes(): void
     {
-        $this->assertOrderedStrings(
-            [
-                'Usage:',
-                '  ./userTrafficLimit.php --user=<username> --limit=<GiB>',
-                '  ./userTrafficLimit.php --user=<username> --show',
-                '  ./userTrafficLimit.php --user=<username> --unset',
-                '  ./userTrafficLimit.php <username> <GiB>',
-                'Notes:',
-                '  - Limit unit is GiB (monthly quota).',
-                '  - Use 0 (or --unset) to remove a limit.',
-            ],
-            \pmssUserGiBSettingUsageText(
-                'userTrafficLimit.php',
-                'limit',
-                'Limit unit is GiB (monthly quota).',
-                'Use 0 (or --unset) to remove a limit.'
-            ),
-            'Missing usage line: ',
-            'Usage line order changed at: '
-        );
+        foreach ([
+            ['userTrafficLimit.php', 'limit', 'Limit unit is GiB (monthly quota).', 'Use 0 (or --unset) to remove a limit.'],
+            ['userBonusTraffic.php', 'bonus', 'Bonus unit is GiB (monthly quota add-on).', 'Use 0 (or --unset) to remove the bonus.'],
+        ] as [$script, $option, $unitNote, $removeNote]) {
+            $this->assertOrderedStrings(
+                [
+                    'Usage:',
+                    "  ./{$script} --user=<username> --{$option}=<GiB>",
+                    "  ./{$script} --user=<username> --show",
+                    "  ./{$script} --user=<username> --unset",
+                    "  ./{$script} <username> <GiB>",
+                    'Notes:',
+                    '  - '.$unitNote,
+                    '  - '.$removeNote,
+                ],
+                \pmssUserGiBSettingUsageText($script, $option, $unitNote, $removeNote),
+                'Missing usage line: ',
+                'Usage line order changed at: '
+            );
+        }
     }
 
-    public function testWrapperDelegatesToSharedLibraryUsageHandling(): void
+    public function testWrappersDelegateToSharedLibraryUsageHandling(): void
     {
-        $this->pmssAssertRepoFileContainsString(
-            'scripts/util/userTrafficLimit.php',
-            "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserTrafficLimitCli');"
-        );
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/user/trafficLimit.php' => ['required' => ['pmssUserGiBSettingUsageText(']],
+            'scripts/util/userTrafficLimit.php' => ['required' => ["pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserTrafficLimitCli');"]],
+            'scripts/lib/user/bonusTraffic.php' => ['required' => ["require_once __DIR__.'/trafficLimit.php';"]],
+        ]);
     }
 }

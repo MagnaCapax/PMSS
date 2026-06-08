@@ -12,11 +12,6 @@ class UserTrafficStateHelpersTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-traffic-state-');
     }
 
-    public function testReadUserTrafficMonthReturnsZeroForMissingFile(): void
-    {
-        $this->assertEquals(0, \pmssReadUserTrafficMonth($this->tempDir.'/missing'));
-    }
-
     public function testSharedTrafficPayloadReaderReturnsSerializedArrays(): void
     {
         $path = $this->tempDir.'/traffic-data-array';
@@ -46,28 +41,21 @@ class UserTrafficStateHelpersTest extends TestCase
         $this->assertEquals(0, \pmssReadUserTrafficMonth($link));
     }
 
-    public function testReadUserTrafficMonthRejectsInvalidPayload(): void
+    public function testReadUserTrafficMonthHandlesPayloadCases(): void
     {
-        $path = $this->tempDir.'/traffic-data-invalid';
-        file_put_contents($path, 'not serialized');
+        foreach ([
+            ['missing', null, 0],
+            ['invalid', 'not serialized', 0],
+            ['missing-month', serialize(['raw' => ['week' => 128]]), 0],
+            ['valid', serialize(['raw' => ['month' => 1536.4]]), 1536],
+        ] as [$name, $payload, $expected]) {
+            $path = $this->tempDir.'/traffic-data-'.$name;
+            if ($payload !== null) {
+                file_put_contents($path, $payload);
+            }
 
-        $this->assertEquals(0, \pmssReadUserTrafficMonth($path));
-    }
-
-    public function testReadUserTrafficMonthRejectsMissingMonthField(): void
-    {
-        $path = $this->tempDir.'/traffic-data-missing-month';
-        file_put_contents($path, serialize(['raw' => ['week' => 128]]));
-
-        $this->assertEquals(0, \pmssReadUserTrafficMonth($path));
-    }
-
-    public function testReadUserTrafficMonthRoundsNumericMonthTotals(): void
-    {
-        $path = $this->tempDir.'/traffic-data-valid';
-        file_put_contents($path, serialize(['raw' => ['month' => 1536.4]]));
-
-        $this->assertEquals(1536, \pmssReadUserTrafficMonth($path));
+            $this->assertEquals($expected, \pmssReadUserTrafficMonth($path), 'case '.$name);
+        }
     }
 
     public function testTrafficDataPathsUseEnvOverrideAndModeSuffix(): void
@@ -308,11 +296,6 @@ class UserTrafficStateHelpersTest extends TestCase
         $this->assertTrue(!file_exists($this->tempDir.'/home/alice/.trafficDataIngressLocal'));
     }
 
-    public function testTrafficLimitReadGiBFileReturnsZeroForMissingFile(): void
-    {
-        $this->assertEquals(0, \pmssTrafficLimitReadGiBFile($this->tempDir.'/missing-limit'));
-    }
-
     public function testTrafficLimitReadGiBFileRejectsSymlinkedFile(): void
     {
         $target = $this->tempDir.'/limit-target';
@@ -323,49 +306,37 @@ class UserTrafficStateHelpersTest extends TestCase
         $this->assertEquals(0, \pmssTrafficLimitReadGiBFile($link));
     }
 
-    public function testTrafficLimitReadGiBFileAcceptsPlainIntegerGiB(): void
+    public function testTrafficLimitReadGiBFileHandlesContentCases(): void
     {
-        $path = $this->tempDir.'/limit-plain';
-        file_put_contents($path, "500\n");
+        foreach ([
+            ['missing', null, 0],
+            ['plain', "500\n", 500],
+            ['suffixed', "750GiB\n", 750],
+            ['invalid', "five hundred\n", 0],
+        ] as [$name, $payload, $expected]) {
+            $path = $this->tempDir.'/limit-'.$name;
+            if ($payload !== null) {
+                file_put_contents($path, $payload);
+            }
 
-        $this->assertEquals(500, \pmssTrafficLimitReadGiBFile($path));
+            $this->assertEquals($expected, \pmssTrafficLimitReadGiBFile($path), 'case '.$name);
+        }
     }
 
-    public function testTrafficLimitReadGiBFileAcceptsGibSuffix(): void
+    public function testTrafficLimitStateReadHandlesBaseAndBonusCases(): void
     {
-        $path = $this->tempDir.'/limit-suffixed';
-        file_put_contents($path, "750GiB\n");
+        foreach ([
+            ['combined', "5\n", "2GiB\n", ['limitGiB' => 5, 'bonusGiB' => 2, 'effectiveLimitGiB' => 7]],
+            ['bonus-only', null, "9\n", ['limitGiB' => 0, 'bonusGiB' => 9, 'effectiveLimitGiB' => 0]],
+        ] as [$name, $limitPayload, $bonusPayload, $expected]) {
+            $limitPath = $this->tempDir.'/traffic-limit-'.$name;
+            $bonusPath = $this->tempDir.'/bonus-traffic-'.$name;
+            if ($limitPayload !== null) {
+                file_put_contents($limitPath, $limitPayload);
+            }
+            file_put_contents($bonusPath, $bonusPayload);
 
-        $this->assertEquals(750, \pmssTrafficLimitReadGiBFile($path));
-    }
-
-    public function testTrafficLimitReadGiBFileRejectsInvalidContent(): void
-    {
-        $path = $this->tempDir.'/limit-invalid';
-        file_put_contents($path, "five hundred\n");
-
-        $this->assertEquals(0, \pmssTrafficLimitReadGiBFile($path));
-    }
-
-    public function testTrafficLimitStateReadCombinesBaseLimitAndBonus(): void
-    {
-        $limitPath = $this->tempDir.'/traffic-limit';
-        $bonusPath = $this->tempDir.'/bonus-traffic';
-        file_put_contents($limitPath, "5\n");
-        file_put_contents($bonusPath, "2GiB\n");
-
-        $state = \pmssTrafficLimitStateRead($limitPath, $bonusPath);
-
-        $this->assertEquals(['limitGiB' => 5, 'bonusGiB' => 2, 'effectiveLimitGiB' => 7], $state);
-    }
-
-    public function testTrafficLimitStateReadKeepsBonusButDisablesEffectiveLimitWithoutBaseLimit(): void
-    {
-        $bonusPath = $this->tempDir.'/bonus-only';
-        file_put_contents($bonusPath, "9\n");
-
-        $state = \pmssTrafficLimitStateRead($this->tempDir.'/missing-limit', $bonusPath);
-
-        $this->assertEquals(['limitGiB' => 0, 'bonusGiB' => 9, 'effectiveLimitGiB' => 0], $state);
+            $this->assertEquals($expected, \pmssTrafficLimitStateRead($limitPath, $bonusPath), 'case '.$name);
+        }
     }
 }

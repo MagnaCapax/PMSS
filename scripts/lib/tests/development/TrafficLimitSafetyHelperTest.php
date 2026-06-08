@@ -126,16 +126,6 @@ class TrafficLimitSafetyHelperTest extends TestCase
         $this->assertFalse(file_exists($path));
     }
 
-    public function testThrottleFileWriteRejectsSymlinkTarget(): void
-    {
-        [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real', $this->tempDir.'/home/alice/.throttle', 'old');
-
-        $error = null;
-        $this->assertFalse(\pmssTrafficLimitThrottleFileWrite($linkPath, 25, $error));
-        $this->assertSame('unsafe throttle path', $error);
-        $this->assertSame('old', file_get_contents($realPath));
-    }
-
     public function testThrottleFileRemoveTreatsMissingFileAsSuccess(): void
     {
         $path = $this->tempDir.'/home/alice/.throttle';
@@ -146,14 +136,23 @@ class TrafficLimitSafetyHelperTest extends TestCase
         $this->assertSame(null, $error);
     }
 
-    public function testThrottleFileRemoveRejectsSymlinkTarget(): void
+    public function testThrottleFileOperationsRejectSymlinkTargets(): void
     {
-        [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real', $this->tempDir.'/home/alice/.throttle', 'old');
+        foreach ([
+            'write' => function (string $path, ?string &$error): bool {
+                return \pmssTrafficLimitThrottleFileWrite($path, 25, $error);
+            },
+            'remove' => function (string $path, ?string &$error): bool {
+                return \pmssTrafficLimitThrottleFileRemove($path, $error);
+            },
+        ] as $name => $operation) {
+            [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real-'.$name, $this->tempDir.'/home/alice/.throttle-'.$name, 'old');
 
-        $error = null;
-        $this->assertFalse(\pmssTrafficLimitThrottleFileRemove($linkPath, $error));
-        $this->assertSame('unsafe throttle path', $error);
-        $this->assertTrue(file_exists($realPath));
+            $error = null;
+            $this->assertFalse($operation($linkPath, $error), 'operation '.$name);
+            $this->assertSame('unsafe throttle path', $error, 'operation '.$name);
+            $this->assertSame('old', file_get_contents($realPath), 'operation '.$name);
+        }
     }
 
     public function testMarkerTouchCreatesSafeMarkerWithStrictMode(): void
@@ -166,35 +165,31 @@ class TrafficLimitSafetyHelperTest extends TestCase
         $this->assertEquals(0600, fileperms($path) & 0777);
     }
 
-    public function testMarkerTouchRejectsSymlinkTarget(): void
-    {
-        [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real-marker', $this->tempDir.'/runtime/trafficLimits/alice.enabled', 'old', 0700);
-
-        list($result) = $this->pmssCaptureStdout(function () use ($linkPath): bool {
-            return \pmssTrafficLimitMarkerTouch('alice', $linkPath);
-        });
-
-        $this->assertFalse($result);
-        $this->assertTrue(is_link($linkPath));
-        $this->assertSame('old', file_get_contents($realPath));
-    }
-
     public function testMarkerRemoveTreatsMissingFileAsSuccess(): void
     {
         $this->assertTrue(\pmssTrafficLimitMarkerRemove('alice', $this->tempDir.'/runtime/trafficLimits/alice.enabled'));
     }
 
-    public function testMarkerRemoveRejectsSymlinkTarget(): void
+    public function testMarkerOperationsRejectSymlinkTargets(): void
     {
-        [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real-marker', $this->tempDir.'/runtime/trafficLimits/alice.enabled', 'old', 0700);
+        foreach ([
+            'touch' => function (string $path): bool {
+                return \pmssTrafficLimitMarkerTouch('alice', $path);
+            },
+            'remove' => function (string $path): bool {
+                return \pmssTrafficLimitMarkerRemove('alice', $path);
+            },
+        ] as $name => $operation) {
+            [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real-marker-'.$name, $this->tempDir.'/runtime/trafficLimits/alice-'.$name.'.enabled', 'old', 0700);
 
-        list($result) = $this->pmssCaptureStdout(function () use ($linkPath): bool {
-            return \pmssTrafficLimitMarkerRemove('alice', $linkPath);
-        });
+            list($result) = $this->pmssCaptureStdout(function () use ($operation, $linkPath): bool {
+                return $operation($linkPath);
+            });
 
-        $this->assertFalse($result);
-        $this->assertTrue(is_link($linkPath));
-        $this->assertTrue(file_exists($realPath));
+            $this->assertFalse($result, 'operation '.$name);
+            $this->assertTrue(is_link($linkPath), 'operation '.$name);
+            $this->assertSame('old', file_get_contents($realPath), 'operation '.$name);
+        }
     }
 
     public function testPersistTargetModesWritesAllTargetsWithRequestedModes(): void
