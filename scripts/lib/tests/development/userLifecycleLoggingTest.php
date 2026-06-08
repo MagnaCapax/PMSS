@@ -168,14 +168,18 @@ class userLifecycleLoggingTest extends TestCase
             $this->pmssEnsureDir($path);
         }
 
-        $this->assertTrue(\pmssUserLifecycleWebRootPathIsSafe($home, $valid, 'www', true));
-        $this->assertTrue(\pmssUserLifecycleWebRootPathIsSafe($home, $missing, 'www-disabled', false));
-        $this->assertFalse(\pmssUserLifecycleWebRootPathIsSafe($home, $missing, 'www-disabled', true));
-        $this->assertFalse(\pmssUserLifecycleWebRootPathIsSafe($home, $nested, 'www', true));
-        $this->assertFalse(\pmssUserLifecycleWebRootPathIsSafe($home, $outside, 'www', true));
-        $this->assertFalse(\pmssUserLifecycleWebRootPathIsSafe($home, $wrongName, 'www', true));
-        $this->assertFalse(\pmssUserLifecycleWebRootPathIsSafe('', $valid, 'www', true));
-        $this->assertFalse(\pmssUserLifecycleWebRootPathIsSafe($home, $valid, "bad\nname", true));
+        foreach (array(
+            'active direct child' => array($home, $valid, 'www', true, true),
+            'missing disabled marker allowed' => array($home, $missing, 'www-disabled', false, true),
+            'missing required marker' => array($home, $missing, 'www-disabled', true, false),
+            'nested child' => array($home, $nested, 'www', true, false),
+            'outside child' => array($home, $outside, 'www', true, false),
+            'wrong basename' => array($home, $wrongName, 'www', true, false),
+            'empty home' => array('', $valid, 'www', true, false),
+            'unsafe expected name' => array($home, $valid, "bad\nname", true, false),
+        ) as $label => $case) {
+            $this->assertSame($case[4], \pmssUserLifecycleWebRootPathIsSafe($case[0], $case[1], $case[2], $case[3]), $label);
+        }
 
         $link = $home.'/www-link';
         if (@symlink($valid, $link)) {
@@ -246,11 +250,15 @@ class userLifecycleLoggingTest extends TestCase
             $this->pmssWriteFile($path.'/index.php', '');
         }
 
-        $this->assertTrue(\pmssUserLifecycleSuspendedBackupCandidateIsSafe($home, $valid));
-        $this->assertFalse(\pmssUserLifecycleSuspendedBackupCandidateIsSafe($home, $outside));
-        $this->assertFalse(\pmssUserLifecycleSuspendedBackupCandidateIsSafe($home, $nested));
-        $this->assertFalse(\pmssUserLifecycleSuspendedBackupCandidateIsSafe($home, $wrongPrefix));
-        $this->assertFalse(\pmssUserLifecycleSuspendedBackupCandidateIsSafe('', $valid));
+        foreach (array(
+            'direct suspended backup' => array($home, $valid, true),
+            'outside path' => array($home, $outside, false),
+            'nested path' => array($home, $nested, false),
+            'wrong prefix' => array($home, $wrongPrefix, false),
+            'empty home' => array('', $valid, false),
+        ) as $label => $case) {
+            $this->assertSame($case[2], \pmssUserLifecycleSuspendedBackupCandidateIsSafe($case[0], $case[1]), $label);
+        }
 
         $link = $home.'/www-suspended-link';
         if (@symlink($valid, $link)) {

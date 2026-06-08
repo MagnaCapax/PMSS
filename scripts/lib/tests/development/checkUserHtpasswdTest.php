@@ -12,51 +12,23 @@ class CheckUserHtpasswdTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-check-user-htpasswd-');
     }
 
-    public function testMissingFileReturnsFalse(): void
+    public function testUserEntryLookupReturnsExpectedResultForSimpleCases(): void
     {
-        $path = $this->tempDir.'/missing.htpasswd';
+        foreach ([
+            'missing file' => ['missing.htpasswd', null, 'alice', false],
+            'matching user' => ['matching.htpasswd', "alice:hash\n", 'alice', true],
+            'absent user' => ['absent.htpasswd', "bob:hash\n", 'alice', false],
+            'empty username' => ['empty-username.htpasswd', "alice:hash\n", '', false],
+            'unsafe username' => ['unsafe-username.htpasswd', "alice:hash\n", '../alice', false],
+            'empty file' => ['empty.htpasswd', '', 'alice', false],
+        ] as $label => $case) {
+            $path = $this->tempDir.'/'.$case[0];
+            if ($case[1] !== null) {
+                file_put_contents($path, $case[1]);
+            }
 
-        $this->assertFalse(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === true);
-    }
-
-    public function testMatchingUserReturnsTrue(): void
-    {
-        $path = $this->tempDir.'/user.htpasswd';
-        file_put_contents($path, "alice:hash\n");
-
-        $this->assertTrue(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === true);
-    }
-
-    public function testAbsentUserReturnsFalse(): void
-    {
-        $path = $this->tempDir.'/user.htpasswd';
-        file_put_contents($path, "bob:hash\n");
-
-        $this->assertFalse(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === true);
-    }
-
-    public function testEmptyUsernameReturnsFalseWithoutTreatingEveryFileAsMatched(): void
-    {
-        $path = $this->tempDir.'/user.htpasswd';
-        file_put_contents($path, "alice:hash\n");
-
-        $this->assertFalse(\pmssCheckUserHtpasswdHasUserEntry($path, '') === true);
-    }
-
-    public function testUnsafeUsernameReturnsFalseBeforeReadingContents(): void
-    {
-        $path = $this->tempDir.'/user.htpasswd';
-        file_put_contents($path, "alice:hash\n");
-
-        $this->assertFalse(\pmssCheckUserHtpasswdHasUserEntry($path, '../alice') === true);
-    }
-
-    public function testEmptyFileReturnsFalse(): void
-    {
-        $path = $this->tempDir.'/empty.htpasswd';
-        file_put_contents($path, '');
-
-        $this->assertFalse(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === true);
+            $this->assertSame($case[3], \pmssCheckUserHtpasswdHasUserEntry($path, $case[2]) === true, $label);
+        }
     }
 
     public function testUnreadableFileReturnsNullWhenReadFails(): void

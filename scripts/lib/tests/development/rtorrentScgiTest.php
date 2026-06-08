@@ -99,11 +99,12 @@ class RtorrentScgiTest extends TestCase
 
     public function testSocketPathGeneration(): void
     {
-        $path = rtorrentScgiSocketPath('alice');
-        $this->assertEquals('/home/alice/.rtorrent.socket', $path);
-
-        $path = rtorrentScgiSocketPath('bob123');
-        $this->assertEquals('/home/bob123/.rtorrent.socket', $path);
+        foreach ([
+            'alice' => '/home/alice/.rtorrent.socket',
+            'bob123' => '/home/bob123/.rtorrent.socket',
+        ] as $username => $expected) {
+            $this->assertEquals($expected, rtorrentScgiSocketPath($username), $username);
+        }
     }
 
     public function testSocketQueueSnapshotParsesOnlyMatchingListenSockets(): void
@@ -134,9 +135,13 @@ class RtorrentScgiTest extends TestCase
 
     public function testSocketQueueSaturatedRequiresRecvQAtBacklog(): void
     {
-        $this->assertTrue(rtorrentScgiSocketQueueSaturated(['recvQ' => 100, 'sendQ' => 100]));
-        $this->assertFalse(rtorrentScgiSocketQueueSaturated(['recvQ' => 99, 'sendQ' => 100]));
-        $this->assertFalse(rtorrentScgiSocketQueueSaturated(['recvQ' => 1, 'sendQ' => 0]));
+        foreach ([
+            'recv queue at backlog' => [['recvQ' => 100, 'sendQ' => 100], true],
+            'recv queue below backlog' => [['recvQ' => 99, 'sendQ' => 100], false],
+            'idle queue' => [['recvQ' => 1, 'sendQ' => 0], false],
+        ] as $label => $case) {
+            $this->assertSame($case[1], rtorrentScgiSocketQueueSaturated($case[0]), $label);
+        }
     }
 
     public function testCallAndSendRejectInvalidBoundaries(): void

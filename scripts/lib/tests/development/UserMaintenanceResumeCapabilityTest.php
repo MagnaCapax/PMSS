@@ -66,12 +66,13 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
     {
         $this->assertSame(['pmssUserConfigureHttp', 'pmssUserApplySkeletonFiles', 'pmssUserUpdateThemes', 'pmssUserUpgradeRutorrent', 'pmssUserMaintainRutorrentPhpCompatibility', 'pmssUserEnsurePlugins', 'pmssUserRefreshPermissions'], pmssUserEnvironmentHandlers());
 
-        $sliceDir = $this->pmssMakeTempDir('pmss-umaint-cpu-', 0700);
-        $this->pmssWriteFile($sliceDir.'/legacy.conf', "CPUQuota=85%\n");
-        $this->assertTrue(pmssUserMaintenanceLegacyCpuQuotaNeedsFix($sliceDir));
-
-        $cleanDir = $this->pmssMakeTempDir('pmss-umaint-cpu-clean-', 0700);
-        $this->pmssWriteFile($cleanDir.'/clean.conf', "CPUQuota=250%\n#CPUQuota=85%\nCPUQuota=85.0%\n");
-        $this->assertFalse(pmssUserMaintenanceLegacyCpuQuotaNeedsFix($cleanDir));
+        foreach (array(
+            'legacy quota' => array('pmss-umaint-cpu-', 'legacy.conf', "CPUQuota=85%\n", true),
+            'clean quota' => array('pmss-umaint-cpu-clean-', 'clean.conf', "CPUQuota=250%\n#CPUQuota=85%\nCPUQuota=85.0%\n", false),
+        ) as $label => $case) {
+            $sliceDir = $this->pmssMakeTempDir($case[0], 0700);
+            $this->pmssWriteFile($sliceDir.'/'.$case[1], $case[2]);
+            $this->assertSame($case[3], pmssUserMaintenanceLegacyCpuQuotaNeedsFix($sliceDir), $label);
+        }
     }
 }

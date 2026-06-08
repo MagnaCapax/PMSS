@@ -49,18 +49,16 @@ class UserConfigRuntimeTest extends TestCase
 
     public function testRtorrentProcFixtureSupportsUidAndOwnershipChecks(): void
     {
-        $procRoot = $this->writeRtorrentProcFixture();
+        foreach ([
+            'matching rtorrent process' => ['rtorrent', 1500, 'rtorrent', 1500, true],
+            'wrong command' => ['bash', 1500, 'bash', 1500, false],
+            'wrong uid' => ['rtorrent', 1500, 'rtorrent', 1600, false],
+        ] as $label => $case) {
+            $procRoot = $this->writeRtorrentProcFixture($case[0], $case[1], $case[2]);
 
-        $this->assertSame(1500, \pmssUserConfigProcStatusUid(12345, $procRoot));
-        $this->assertTrue(\pmssUserConfigRtorrentProcessOwnedBy(12345, 1500, $procRoot));
-    }
-
-    public function testRtorrentProcessOwnedByRejectsWrongUidOrCommand(): void
-    {
-        $procRoot = $this->writeRtorrentProcFixture('bash', 1500, 'bash');
-
-        $this->assertFalse(\pmssUserConfigRtorrentProcessOwnedBy(12345, 1500, $procRoot));
-        $this->assertFalse(\pmssUserConfigRtorrentProcessOwnedBy(12345, 1600, $procRoot));
+            $this->assertSame($case[1], \pmssUserConfigProcStatusUid(12345, $procRoot), $label.' uid');
+            $this->assertSame($case[4], \pmssUserConfigRtorrentProcessOwnedBy(12345, $case[3], $procRoot), $label);
+        }
     }
 
     public function testCgroupApplyFailureMessageIsSingleLine(): void
