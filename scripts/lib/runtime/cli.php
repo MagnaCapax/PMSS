@@ -43,7 +43,46 @@ function pmssRequireCliEntrypointScript(string $baseDir, string $relativePath, b
         throw new RuntimeException('Unsafe CLI entrypoint relative path');
     }
 
-    require_once rtrim($baseDir, '/').'/'.ltrim($relativePath, '/');
+    $scriptPath = rtrim($baseDir, '/').'/'.ltrim($relativePath, '/');
+    if (pmssCliEntrypointScriptStartsWithShebang($scriptPath)) {
+        pmssRunCliEntrypointScriptProcess($scriptPath);
+    }
+
+    require_once $scriptPath;
+}
+
+/** Detect executable PHP scripts that cannot be safely included before strict_types. */
+function pmssCliEntrypointScriptStartsWithShebang(string $scriptPath): bool
+{
+    $handle = @fopen($scriptPath, 'rb');
+    if (!is_resource($handle)) {
+        return false;
+    }
+
+    $prefix = @fread($handle, 2);
+    @fclose($handle);
+
+    return $prefix === '#!';
+}
+
+/** @param array<int, string> $argv */
+function pmssCliEntrypointScriptCommand(string $scriptPath, array $argv): string
+{
+    $command = escapeshellarg('php').' '.escapeshellarg($scriptPath);
+    for ($i = 1, $argc = count($argv); $i < $argc; $i++) {
+        $command .= ' '.escapeshellarg((string) $argv[$i]);
+    }
+
+    return $command;
+}
+
+function pmssRunCliEntrypointScriptProcess(string $scriptPath): void
+{
+    $argv = $_SERVER['argv'] ?? ($GLOBALS['argv'] ?? []);
+    $command = pmssCliEntrypointScriptCommand($scriptPath, is_array($argv) ? $argv : []);
+    $rc = 1;
+    passthru($command, $rc);
+    exit((int) $rc);
 }
 
 function pmssRunCliEntrypoint(string $scriptPath, callable $main): void

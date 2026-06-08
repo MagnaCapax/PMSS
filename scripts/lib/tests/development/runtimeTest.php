@@ -138,6 +138,42 @@ class RuntimeTest extends TestCase
         }
     }
 
+    public function testPmssRequireCliEntrypointScriptRunsShebangTargetAsMainScript(): void
+    {
+        $runtime = var_export(dirname(__DIR__, 3).'/lib/runtime.php', true);
+        $tempDir = $this->pmssMakeTempDir('pmss-runtime-entrypoint-shebang-');
+        $baseDir = $tempDir.'/base';
+        $targetPath = $baseDir.'/util/shebangTarget.php';
+        $wrapperPath = $baseDir.'/wrapper.php';
+
+        $this->pmssWriteExecutableFile(
+            $targetPath,
+            "#!/usr/bin/env php\n".
+            "<?php\n".
+            "declare(strict_types=1);\n".
+            "require_once {$runtime};\n".
+            "function pmssRuntimeTestShebangMain(array \$argv): int {\n".
+            "    echo json_encode(['script' => basename((string) (\$_SERVER['SCRIPT_FILENAME'] ?? '')), 'argv' => array_map('basename', \$argv)]);\n".
+            "    return 0;\n".
+            "}\n".
+            "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssRuntimeTestShebangMain');\n"
+        );
+        $this->pmssWriteFile(
+            $wrapperPath,
+            "<?php\n".
+            "require_once {$runtime};\n".
+            "pmssRequireCliEntrypointScript(__DIR__, 'util/shebangTarget.php', false, ['--appended']);\n"
+        );
+
+        $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' '.escapeshellarg($wrapperPath).' --json', [], '2>&1');
+        $this->assertSame(0, $result['rc'], $result['output']);
+        $this->pmssAssertStringNotContainsString('#!/usr/bin/env php', $result['output']);
+        $this->assertSame([
+            'script' => 'shebangTarget.php',
+            'argv' => ['shebangTarget.php', '--json', '--appended'],
+        ], $this->pmssDecodeJsonArray($result['output']));
+    }
+
     public function testCliEntrypointRelativePathSafetyMatrix(): void
     {
         foreach ([
