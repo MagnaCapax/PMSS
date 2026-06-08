@@ -325,7 +325,7 @@ function pmssStatsToggleApp(button) {
 
   <!-- RIGHT: Server info -->
   <div class="stats-block">
-    <h6><?php echo htmlspecialchars(isset($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : 'server'); ?> info</h6>
+    <h6><?php echo pmssCustomerHtmlAttr(isset($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : 'server'); ?> info</h6>
 
     <div class="info-line">
         <span class="label">IP:</span>
@@ -336,7 +336,7 @@ if (file_exists(__DIR__.'/welcomeMessage.php')) require_once __DIR__.'/welcomeMe
 $ip = function_exists('pmssWelcomeHttpContextCreate')
     ? @file_get_contents($ipUrl, false, pmssWelcomeHttpContextCreate())
     : false;
-echo htmlspecialchars($ip !== false ? trim($ip) : 'unknown');
+echo pmssCustomerHtmlAttr($ip !== false ? trim($ip) : 'unknown');
 ?>
         </span>
     </div>
@@ -483,11 +483,11 @@ if ($meminfo && preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m)) {
 <?php else: ?>
     <div class="info-line">
         <span class="label">Memory usage:</span>
-        <span class="value"><?php echo htmlspecialchars($pmssMemoryPressure['usage_text']); ?></span>
+        <span class="value"><?php echo pmssCustomerHtmlAttr($pmssMemoryPressure['usage_text']); ?></span>
     </div>
     <div class="info-line">
         <span class="label">Memory pressure:</span>
-        <span class="value"><span class="status <?php echo strtolower($pmssMemoryPressure['status']); ?>"><?php echo htmlspecialchars($pmssMemoryPressure['status']); ?></span></span>
+        <span class="value"><span class="status <?php echo strtolower($pmssMemoryPressure['status']); ?>"><?php echo pmssCustomerHtmlAttr($pmssMemoryPressure['status']); ?></span></span>
     </div>
     <div class="info-line">
         <span class="label">Throttle events:</span>
@@ -503,11 +503,11 @@ if ($meminfo && preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m)) {
     <?php if ($pmssMemoryPressure['memory_high'] !== null): ?>
     <div class="info-line">
         <span class="label">Throttle threshold:</span>
-        <span class="value"><?php echo htmlspecialchars(pmssWebCgroupMemoryStatusFormatBytes($pmssMemoryPressure['memory_high'])); ?></span>
+        <span class="value"><?php echo pmssCustomerHtmlAttr(pmssWebCgroupMemoryStatusFormatBytes($pmssMemoryPressure['memory_high'])); ?></span>
     </div>
     <?php endif; ?>
     <?php if ($pmssMemoryPressure['message'] !== ''): ?>
-    <div class="memory-pressure-note"><?php echo htmlspecialchars($pmssMemoryPressure['message']); ?></div>
+    <div class="memory-pressure-note"><?php echo pmssCustomerHtmlAttr($pmssMemoryPressure['message']); ?></div>
     <?php endif; ?>
 <?php endif; ?>
 </div>

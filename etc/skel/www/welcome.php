@@ -624,7 +624,7 @@ function pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingSe
     $effectiveText = number_format(max(0, $effectiveCapMbit));
 
     return '<span style="font-size: 0.82em; color: #7a1a1a;">Current effective: '.$effectiveText.' Mbps (reduced)</span>'
-        . '<br /><span style="font-size: 0.82em;"><a href="'.htmlspecialchars($upgradeUrl, ENT_QUOTES, 'UTF-8').'" target="_blank">Need more bandwidth? Upgrade your plan.</a></span>';
+        . '<br /><span style="font-size: 0.82em;"><a href="'.pmssCustomerHtmlAttr($upgradeUrl).'" target="_blank">Need more bandwidth? Upgrade your plan.</a></span>';
 }
 
 /**
@@ -815,7 +815,7 @@ function pmssWelcomeDelugeStateBuild($username, $delugeAuthPath) {
     );
 }
 
-function pmssWelcomeHtmlAttr($value) { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); }
+function pmssWelcomeHtmlAttr($value) { return pmssCustomerHtmlAttr($value); }
 
 function pmssWelcomeJsSingleQuoted($value) { return str_replace(array('\\', "'", "\r", "\n"), array('\\\\', "\\'", '\\r', '\\n'), (string) $value); }
 

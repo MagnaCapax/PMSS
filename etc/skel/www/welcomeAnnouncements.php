@@ -8,6 +8,7 @@
  *
  * @license GPL-3.0-only
  */
+require_once __DIR__.'/scriptsInc.php';
 
 /**
  * Parse announcement RSS content into the welcome-page list-item HTML.
@@ -59,7 +60,7 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
         }
 
         $itemsHtml .= '<li>('.date('d/m', strtotime((string) $thisItem->pubDate)).') <a href="'.(string) $thisItem->link.'" target="_blank">'
-            .htmlspecialchars((string) $thisItem->title)."</a></li>\n";
+            .pmssCustomerHtmlAttr($thisItem->title)."</a></li>\n";
         if (++$renderedItems === 4) {
             break;
         }

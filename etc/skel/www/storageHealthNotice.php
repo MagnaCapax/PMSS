@@ -22,6 +22,7 @@
  *
  * @license GPL-3.0-only
  */
+require_once __DIR__.'/scriptsInc.php';
 
 if (!function_exists('pmssStorageHealthHomeArrayResolve')) {
     /** Resolve which md array backs /home via /proc/mounts. Returns 'mdN' or null. */
@@ -168,14 +169,14 @@ HTML;
         $parts = [];
         foreach (['progress' => 'Progress', 'eta' => 'ETA', 'speed' => 'Speed'] as $key => $label) {
             if (!empty($activity[$key])) {
-                $parts[] = $label.': '.htmlspecialchars((string) $activity[$key], ENT_QUOTES, 'UTF-8');
+                $parts[] = $label.': '.pmssCustomerHtmlAttr($activity[$key]);
             }
         }
         $detailHtml = empty($parts)
             ? ''
             : '<div class="pmss-raid-meta">'.implode(' <span aria-hidden="true">&bull;</span> ', $parts).'</div>';
-        $operation = htmlspecialchars((string) $activity['operation'], ENT_QUOTES, 'UTF-8');
-        $arrayName = htmlspecialchars((string) $activity['array'], ENT_QUOTES, 'UTF-8');
+        $operation = pmssCustomerHtmlAttr($activity['operation']);
+        $arrayName = pmssCustomerHtmlAttr($activity['array']);
         return <<<HTML
 <div class="pmss-raid-notice" role="status" aria-live="polite">
     <strong><span class="pmss-raid-icon" aria-hidden="true">&#10071;</span> Home storage maintenance in progress</strong>

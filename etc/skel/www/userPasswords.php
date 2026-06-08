@@ -24,28 +24,16 @@ function pmssDelugeAuthReadLocalclientPassword(string $authPath): string
     return preg_match('/^localclient:([^:\r\n]+):[0-9]+$/m', $content, $matches) === 1 ? $matches[1] : '';
 }
 
-/** Return the configured home root without a trailing slash. */
-function pmssUserPasswordsHomeRoot(): string
-{
-    return pmssCustomerHomeRoot();
-}
-
 function pmssUserPasswordsPath(string $username, string $leaf): string
 {
-    return pmssCustomerHomePath(pmssUserPasswordsHomeRoot().'/'.$username, '.config/deluge/'.$leaf);
-}
-
-/** Accept only non-symlink paths under the configured home root. */
-function pmssUserPasswordsPathIsSafe(string $path): bool
-{
-    return pmssCustomerPathIsSafe($path);
+    return pmssCustomerHomePath(pmssCustomerHomeRoot().'/'.$username, '.config/deluge/'.$leaf);
 }
 
 /** Write through a same-directory temp file so partial writes do not leak. */
 function pmssUserPasswordsAtomicWrite(string $path, string $contents, int $mode = 0600): bool
 {
     $dir = dirname($path);
-    if (!pmssUserPasswordsPathIsSafe($path) || !is_dir($dir) || !is_writable($dir)) {
+    if (!pmssCustomerPathIsSafe($path) || !is_dir($dir) || !is_writable($dir)) {
         return false;
     }
 
@@ -162,7 +150,7 @@ if (!function_exists('pmssDelugeServicePasswordRotate')) {
         $authPath = pmssUserPasswordsPath($username, 'auth');
         $webConfPath = pmssUserPasswordsPath($username, 'web.conf');
         $original = pmssUserPasswordsWebConfRead($webConfPath);
-        if (!is_array($original) || !pmssUserPasswordsPathIsSafe($authPath) || !pmssUserPasswordsPathIsSafe($webConfPath)) {
+        if (!is_array($original) || !pmssCustomerPathIsSafe($authPath) || !pmssCustomerPathIsSafe($webConfPath)) {
             return '';
         }
 
