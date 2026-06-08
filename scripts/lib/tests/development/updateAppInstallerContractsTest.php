@@ -128,9 +128,14 @@ class UpdateAppInstallerContractsTest extends TestCase
                     'Warning: Unable to determine latest rclone version, falling back to pinned release.',
                     '/usr/bin/rclone version 2>/dev/null',
                     '/usr/bin/rclone -V 2>/dev/null',
-                    'mandb;',
-                    "passthru('mv /usr/sbin/rclone /usr/bin/rclone')",
+                    'pmssCreatePrivateTempDir(',
+                    "runStep('Installing rclone '.\$version",
+                    "pmssBuildCommand('wget'",
+                    "pmssBuildCommand('install'",
+                    "pmssBuildCommand('mv'",
+                    'pmssPrivateTempDirRealpath',
                 ],
+                'forbidden' => ['passthru(' => 'rclone.php should route shelling through runStep()'],
             ],
             'remoteBinary.php' => [
                 'required' => [

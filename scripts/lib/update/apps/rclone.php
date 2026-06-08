@@ -10,17 +10,79 @@
 
 require_once __DIR__.'/remoteBinary.php';
 
+function pmssRcloneVersionIsSafe(string $version): bool
+{
+    return preg_match('/\A\d+\.\d+\.\d+\z/', $version) === 1;
+}
+
+function pmssRcloneLatestVersionFetch(array $urls): ?string
+{
+    foreach ($urls as $url) {
+        $payload = @file_get_contents((string) $url, false, null, 0, 65536);
+        if (is_string($payload) && preg_match('/v?(\d+\.\d+\.\d+)/', $payload, $match) === 1) {
+            return $match[1];
+        }
+    }
+
+    return null;
+}
+
+function pmssRcloneInstallCommand(string $version, string $workDir): string
+{
+    $archive = 'rclone-v'.$version.'-linux-amd64.zip';
+    $sourceDir = 'rclone-v'.$version.'-linux-amd64';
+    $url = 'https://downloads.rclone.org/v'.$version.'/'.$archive;
+    $commands = [
+        'set -e',
+        'cd '.escapeshellarg($workDir),
+        pmssBuildCommand('wget', [$url]),
+        pmssBuildCommand('unzip', [$archive]),
+        'cd '.escapeshellarg($sourceDir),
+        pmssBuildCommand('install', ['-m', '0755', '-o', 'root', '-g', 'root', 'rclone', '/usr/bin/rclone']),
+        pmssBuildCommand('mkdir', ['-p', '/usr/local/share/man/man1']),
+        pmssBuildCommand('install', ['-m', '0644', 'rclone.1', '/usr/local/share/man/man1/rclone.1']),
+        pmssBuildCommand('mandb'),
+    ];
+
+    return implode(' && ', $commands);
+}
+
+function pmssRcloneInstallFromZip(string $version): void
+{
+    if (!pmssRcloneVersionIsSafe($version)) {
+        logmsg("[WARN] Refusing unsafe rclone version: {$version}");
+        return;
+    }
+
+    if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+        runStep('Installing rclone '.$version, pmssRcloneInstallCommand($version, '/tmp/pmss-rclone-dry-run'));
+        return;
+    }
+
+    $workDir = pmssCreatePrivateTempDir('pmss-rclone-');
+    if ($workDir === null) {
+        logmsg('[WARN] Unable to create private rclone installer workspace');
+        return;
+    }
+
+    try {
+        runStep('Installing rclone '.$version, pmssRcloneInstallCommand($version, $workDir));
+    } finally {
+        $real = pmssPrivateTempDirRealpath($workDir, 'pmss-rclone-', 'logmsg');
+        if ($real !== null) {
+            runStep('Cleaning rclone installer workspace', 'rm -rf '.escapeshellarg($real));
+        }
+    }
+}
+
 // Version pinning keeps deployments reproducible; opt-in fetch updates on demand.
 $rcloneVersion = '1.69.1';
 $fetchedLatest = false;
 if (pmssEnvFlagEnabled('PMSS_RCLONE_FETCH_LATEST')) {
-    foreach (['https://downloads.rclone.org/version.txt', 'https://rclone.org/downloads/'] as $url) {
-        $payload = @file_get_contents($url);
-        if ($payload !== false && preg_match('/v?(\d+\.\d+\.\d+)/', $payload, $match)) {
-            $rcloneVersion = $match[1];
-            $fetchedLatest = true;
-            break;
-        }
+    $latestVersion = pmssRcloneLatestVersionFetch(['https://downloads.rclone.org/version.txt', 'https://rclone.org/downloads/']);
+    if ($latestVersion !== null) {
+        $rcloneVersion = $latestVersion;
+        $fetchedLatest = true;
     }
     if (!$fetchedLatest) {
         echo "Warning: Unable to determine latest rclone version, falling back to pinned release.\n";
@@ -35,17 +97,22 @@ $currentRclone = file_exists('/usr/bin/rclone')
     ? pmssAppVersionProbeMatch(['/usr/bin/rclone version 2>/dev/null', '/usr/bin/rclone -V 2>/dev/null'], '/rclone v?(\d+\.\d+\.\d+)/i', 1)
     : null;
 if ($currentRclone !== null && $currentRclone !== $rcloneVersion) {
-    unlink('/usr/bin/rclone');    // This forces following code to install rclone .. thus updating it :)
+    if (!pmssPathTargetIsSafe('/usr/bin/rclone', false, true) || !@unlink('/usr/bin/rclone')) {
+        logmsg('[WARN] Unable to remove mismatched rclone binary; leaving existing install in place');
+    }
 }
 
 #Install rclone
 if (!file_exists('/usr/bin/rclone')) {
-    // We use random directory so a potential malicious user could not try to pass their binary to be global. Extremely unlikely, and will require already "local" access to even attempt (ie. have non-privileged access already via local user account)
-    $randomDirectory = sha1('rclone' . time() . rand(100, 900000));
-    mkdir("/tmp/{$randomDirectory}", 0755);
-    passthru("cd  /tmp/{$randomDirectory}; wget https://downloads.rclone.org/v{$rcloneVersion}/rclone-v{$rcloneVersion}-linux-amd64.zip; unzip rclone-v{$rcloneVersion}-linux-amd64.zip; cd rclone-v{$rcloneVersion}-linux-amd64; cp rclone /usr/bin/; chown root:root /usr/bin/rclone; chmod 755 /usr/bin/rclone; mkdir -p /usr/local/share/man/man1; cp rclone.1 /usr/local/share/man/man1/; mandb;");
+    pmssRcloneInstallFromZip($rcloneVersion);
 }
 
 #Fix for rclone install path / paths lacking. Not included in above because in many places needs to fixed
 if (file_exists('/usr/sbin/rclone') &&
-    !file_exists('/usr/bin/rclone') )   passthru('mv /usr/sbin/rclone /usr/bin/rclone');
+    !file_exists('/usr/bin/rclone') ) {
+    if (!pmssPathTargetIsSafe('/usr/sbin/rclone', false, true) || !pmssPathTargetIsSafe('/usr/bin/rclone', false, true)) {
+        logmsg('[WARN] Refusing unsafe legacy rclone path repair');
+    } else {
+        runStep('Moving legacy rclone binary into /usr/bin', pmssBuildCommand('mv', ['/usr/sbin/rclone', '/usr/bin/rclone']));
+    }
+}

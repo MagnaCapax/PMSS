@@ -32,7 +32,6 @@ phpAllowlistedFile() {
 
 	# Legacy direct shell_exec/backticks or informational strings.
 	"$ROOT_DIR/scripts/util/checkRutorrentPlugins.php") return 0 ;;
-	"$ROOT_DIR/scripts/lib/update/apps/rclone.php") return 0 ;;
 	"$ROOT_DIR/scripts/recreateUser.php") return 0 ;;
 	esac
 	return 1
