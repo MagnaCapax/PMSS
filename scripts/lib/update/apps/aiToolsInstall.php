@@ -21,8 +21,7 @@ $supportsPinnedArtifacts = pmssPinnedRemoteAmd64ArtifactsSupported($architecture
 $nodeBinary = '';
 $systemNode = pmssCommandPath('node');
 if ($systemNode !== '') {
-    $systemVersion = trim(pmssAppVersionProbeOutput(escapeshellarg($systemNode).' --version 2>/dev/null'));
-    if (preg_match('/^v?([0-9]+)/', $systemVersion, $match) && (int) $match[1] >= 22) {
+    if ((int) (pmssAppVersionProbeMatch([escapeshellarg($systemNode).' --version 2>/dev/null'], '/^v?([0-9]+)/', 1) ?? 0) >= 22) {
         $nodeBinary = $systemNode;
     }
 }

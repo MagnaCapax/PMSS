@@ -111,11 +111,7 @@ if (empty($debianVersion)) $debianVersion = (string) @file_get_contents('/etc/de
 echo "#### Deluge install // update\n";
 
 // Detect currently installed Deluge version if possible.
-$currentVersion = '';
-$out = pmssAppVersionProbeOutput('deluge-console --version 2>/dev/null');
-if (is_string($out) && preg_match('/deluge\s+([0-9.]+)/i', $out, $m)) {
-    $currentVersion = $m[1];
-}
+$currentVersion = pmssAppVersionProbeMatch(['deluge-console --version 2>/dev/null'], '/deluge\s+([0-9.]+)/i', 1) ?? '';
 
 // Debian 10 uses a pip/build route for v2.0.5; make it idempotent.
 $isDebian10 = (substr($debianVersion, 0, 2) === '10');

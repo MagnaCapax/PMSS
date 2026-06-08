@@ -31,15 +31,9 @@ if (pmssEnvFlagEnabled('PMSS_RCLONE_FETCH_LATEST')) {
 if ($fetchedLatest) {
     echo "Requested latest rclone release: {$rcloneVersion}\n";
 }
-$currentRclone = null;
-if (file_exists('/usr/bin/rclone')) {
-    foreach (['/usr/bin/rclone version 2>/dev/null', '/usr/bin/rclone -V 2>/dev/null'] as $command) {
-        if (preg_match('/rclone v?(\d+\.\d+\.\d+)/i', pmssAppVersionProbeOutput($command), $match)) {
-            $currentRclone = $match[1];
-            break;
-        }
-    }
-}
+$currentRclone = file_exists('/usr/bin/rclone')
+    ? pmssAppVersionProbeMatch(['/usr/bin/rclone version 2>/dev/null', '/usr/bin/rclone -V 2>/dev/null'], '/rclone v?(\d+\.\d+\.\d+)/i', 1)
+    : null;
 if ($currentRclone !== null && $currentRclone !== $rcloneVersion) {
     unlink('/usr/bin/rclone');    // This forces following code to install rclone .. thus updating it :)
 }

@@ -42,6 +42,7 @@ class ArrProbeTimeoutPolicyTest extends TestCase
         $output = \pmssAppVersionProbeOutput('printf %s '.escapeshellarg('v1.2.3'), 5);
 
         $this->assertSame('v1.2.3', $output);
+        $this->assertSame('1.2.3', \pmssAppVersionProbeMatch(['printf %s '.escapeshellarg('tool v1.2.3')], '/v([0-9.]+)/', 1, 5));
     }
 
     public function testSharedAppVersionProbeLogsTimeouts(): void

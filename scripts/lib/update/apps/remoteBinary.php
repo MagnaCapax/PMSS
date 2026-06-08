@@ -25,6 +25,15 @@ function pmssAppVersionProbeOutput(string $command, int $timeoutSeconds = PMSS_A
     return is_string($result['stdout'] ?? null) ? $result['stdout'] : '';
 }
 
+/** Return the first regex capture from bounded app version probes. */
+function pmssAppVersionProbeMatch(array $commands, string $pattern, int $capture = 0, int $timeoutSeconds = PMSS_APP_VERSION_PROBE_TIMEOUT_SECONDS): ?string
+{
+    foreach ($commands as $command) {
+        if (preg_match($pattern, pmssAppVersionProbeOutput((string) $command, $timeoutSeconds), $match) === 1) return (string) ($match[$capture] ?? $match[0]);
+    }
+    return null;
+}
+
 /** Reject archive basenames that could become shell options or path escapes. */
 function pmssPinnedRemoteArchiveComponentIsSafe(string $component): bool
 {
