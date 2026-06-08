@@ -128,6 +128,7 @@ SH
             ['archive.tar.gz', '-source', 'compile'],
             ['archive.tar.gz', 'source', ''],
             ['archive.tar.gz', 'source', 'compile/../outside'],
+            ['archive.zip', 'source', 'compile'],
         ];
 
         foreach ($cases as $case) {
@@ -143,6 +144,36 @@ SH
                     'Extracting demo archive',
                     [],
                     $workDir
+                );
+
+                $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
+            });
+        }
+    }
+
+    public function testRunPinnedRemoteArchiveStepRejectsUnsafePostExtractCommandsBeforeDownload(): void
+    {
+        $cases = [
+            [''],
+            ["make\ninstall"],
+            ['make; install'],
+            ['make && install'],
+            ['make || true'],
+            ["make\0install"],
+            [123],
+        ];
+
+        foreach ($cases as $commands) {
+            $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256) use ($commands): void {
+                \pmssRunPinnedRemoteArchiveStep(
+                    'demo archive',
+                    'https://example.invalid/archive',
+                    $expectedSha256,
+                    'archive.tar.gz',
+                    'source',
+                    'Extracting demo archive',
+                    $commands,
+                    $root.'/compile'
                 );
 
                 $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));

@@ -46,6 +46,25 @@ function pmssPinnedRemoteArchiveComponentIsSafe(string $component): bool
         && strpos($component, "\0") === false;
 }
 
+/** Reject archive names outside the tar formats this helper knows how to unpack. */
+function pmssPinnedRemoteArchiveNameIsSafe(string $archiveName): bool
+{
+    return pmssPinnedRemoteArchiveComponentIsSafe($archiveName)
+        && (substr($archiveName, -7) === '.tar.gz' || substr($archiveName, -7) === '.tar.xz');
+}
+
+/** Reject post-extract shell fragments that would break the generated command chain. */
+function pmssPinnedRemoteArchivePostCommandIsSafe(string $command): bool
+{
+    $trimmed = trim($command);
+    return $trimmed !== ''
+        && strpos($command, "\0") === false
+        && preg_match('/[\r\n]/', $command) !== 1
+        && strpos($command, ';') === false
+        && strpos($command, '&&') === false
+        && strpos($command, '||') === false;
+}
+
 // Download a pinned artifact to a temp file; caller owns cleanup.
 function pmssDownloadPinnedRemoteTempFile(
     string $label,
@@ -120,11 +139,10 @@ function pmssFetchPinnedRemoteFile(string $label, string $url, string $expectedS
 function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expectedSha256, string $archiveName, string $sourceDir, string $description, array $postExtractCommands, string $workDir = '/root/compile'): void
 {
     $trimmedWorkDir = rtrim($workDir, '/');
-    foreach ([$archiveName, $sourceDir] as $component) {
-        if (!pmssPinnedRemoteArchiveComponentIsSafe($component)) {
-            logmsg("[WARN] Refusing unsafe archive extraction path for {$label}");
-            return;
-        }
+    if (!pmssPinnedRemoteArchiveNameIsSafe($archiveName)
+        || !pmssPinnedRemoteArchiveComponentIsSafe($sourceDir)) {
+        logmsg("[WARN] Refusing unsafe archive extraction path for {$label}");
+        return;
     }
     if ($workDir === ''
         || $trimmedWorkDir === ''
@@ -132,6 +150,12 @@ function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expe
     ) {
         logmsg("[WARN] Refusing unsafe archive extraction path for {$label}");
         return;
+    }
+    foreach ($postExtractCommands as $command) {
+        if (!is_string($command) || !pmssPinnedRemoteArchivePostCommandIsSafe($command)) {
+            logmsg("[WARN] Refusing unsafe archive post-extract command for {$label}");
+            return;
+        }
     }
 
     $archivePath = pmssFetchPinnedRemoteFile($label, $url, $expectedSha256);
