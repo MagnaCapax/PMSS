@@ -15,12 +15,12 @@
  */
 
 require_once __DIR__.'/network/config.php';
+require_once __DIR__.'/network/interface.php';
 
 /** Normalize interface names before they reach shell commands. */
 function networkInterfaceNameNormalized(string $iface): string
 {
-    $iface = trim($iface);
-    return $iface !== '' && preg_match('/^[A-Za-z0-9_.:-]+$/', $iface) === 1 ? $iface : '';
+    return pmssNetworkInterfaceNameNormalize($iface);
 }
 
 /** Determine the primary network interface name. */

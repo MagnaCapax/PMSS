@@ -5,6 +5,8 @@
  * @license GPL-3.0-only
  */
 
+require_once dirname(__DIR__, 2).'/network/interface.php';
+
 /** Read a boolean-like environment override when present. */
 function pmssSystemPrepReadBoolEnv(string $key): ?bool
 {
@@ -161,7 +163,10 @@ function pmssSysctlNicSpeedMbps(): int
 
         $columns = preg_split('/\s+/', trim($line));
         if (is_array($columns) && isset($columns[0], $columns[1]) && $columns[1] === '00000000') {
-            $iface = (string) $columns[0];
+            $iface = pmssNetworkInterfaceNameNormalize((string) $columns[0], 15);
+            if ($iface === '') {
+                continue;
+            }
             break;
         }
     }
