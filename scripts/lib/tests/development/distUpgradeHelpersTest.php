@@ -101,7 +101,9 @@ class DistUpgradeHelpersTest extends TestCase
             ['install', "libcrypt1\nnginx", 'Unsafe dist-upgrade apt arguments'],
             ['install', '/tmp/package.deb', 'Unsafe dist-upgrade apt arguments'],
         ] as [$action, $arguments, $message]) {
-            $this->assertDistUpgradeAptCommandFails($action, $arguments, $message);
+            $this->assertThrows(\InvalidArgumentException::class, static function () use ($action, $arguments): void {
+                \pmssDistUpgradeAptCommand('DEBIAN_FRONTEND=noninteractive', $action, $arguments);
+            }, $message);
         }
     }
 
@@ -190,15 +192,4 @@ class DistUpgradeHelpersTest extends TestCase
         return $output;
     }
 
-    private function assertDistUpgradeAptCommandFails(string $action, string $arguments, string $message): void
-    {
-        try {
-            \pmssDistUpgradeAptCommand('DEBIAN_FRONTEND=noninteractive', $action, $arguments);
-        } catch (\InvalidArgumentException $exception) {
-            $this->assertStringContainsString($message, $exception->getMessage());
-            return;
-        }
-
-        $this->fail('Expected dist-upgrade apt command guard failure: '.$message);
-    }
 }

@@ -416,12 +416,7 @@ class RuntimeTest extends TestCase
         $this->pmssWithEnv(['PATH' => '/tmp/pmss-test-bin'], function (): void {
             $bash = \pmssCommandBashInvocation('DEBIAN_FRONTEND=noninteractive apt-get update');
 
-            $this->assertStringContainsString('/tmp/pmss-test-bin', $bash);
-            $this->assertStringContainsString('export PATH=', $bash);
-            $this->assertStringContainsString('APT_LISTCHANGES_FRONTEND=none', $bash);
-            $this->assertStringContainsString('UCF_FORCE_CONFOLD=1', $bash);
-            $this->assertStringContainsString('NEEDRESTART_MODE=a', $bash);
-            $this->assertStringContainsString('DEBIAN_FRONTEND=noninteractive exec apt-get update', $bash);
+            $this->assertStringContainsAllStrings(['/tmp/pmss-test-bin', 'export PATH=', 'APT_LISTCHANGES_FRONTEND=none', 'UCF_FORCE_CONFOLD=1', 'NEEDRESTART_MODE=a', 'DEBIAN_FRONTEND=noninteractive exec apt-get update'], $bash);
         });
     }
 
@@ -429,13 +424,7 @@ class RuntimeTest extends TestCase
     {
         $bash = \pmssCommandBashInvocation('dpkg --configure -a');
 
-        $this->assertStringContainsString('export ', $bash);
-        $this->assertStringContainsString('DEBIAN_FRONTEND=noninteractive', $bash);
-        $this->assertStringContainsString('APT_LISTCHANGES_FRONTEND=none', $bash);
-        $this->assertStringContainsString('UCF_FORCE_CONFDEF=1', $bash);
-        $this->assertStringContainsString('UCF_FORCE_CONFOLD=1', $bash);
-        $this->assertStringContainsString('NEEDRESTART_MODE=a', $bash);
-        $this->assertStringContainsString('exec dpkg --configure -a', $bash);
+        $this->assertStringContainsAllStrings(['export ', 'DEBIAN_FRONTEND=noninteractive', 'APT_LISTCHANGES_FRONTEND=none', 'UCF_FORCE_CONFDEF=1', 'UCF_FORCE_CONFOLD=1', 'NEEDRESTART_MODE=a', 'exec dpkg --configure -a'], $bash);
     }
 
     public function testRunCommandTimeoutWritesStructuredTimeoutFireLog(): void
@@ -548,8 +537,7 @@ class RuntimeTest extends TestCase
             return;
         }
         $this->assertEquals([7, true, '0600'], [$result['rc'], $result['exists'], $result['mode']]);
-        $this->assertStringContainsString(' SNAPSHOT_BEGIN', $result['body']);
-        $this->assertStringContainsString(' WARN sample_warn rc=2 msg=alpha beta', $result['body']);
+        $this->assertStringContainsAllStrings([' SNAPSHOT_BEGIN', ' WARN sample_warn rc=2 msg=alpha beta'], $result['body']);
     }
 
     public function testSnapshotWarnNormalizesControlCharacters(): void

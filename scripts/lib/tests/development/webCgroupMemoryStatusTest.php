@@ -89,14 +89,7 @@ class WebCgroupMemoryStatusTest extends TestCase
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir]);
 
         $this->assertTrue($status['available']);
-        $this->assertSame(4294967296, $status['memory_current']);
-        $this->assertSame(4831838208, $status['memory_high']);
-        $this->assertSame(5368709120, $status['memory_max']);
-        $this->assertSame(17, $status['throttle_events']);
-        $this->assertSame(0, $status['max_events']);
-        $this->assertSame(0, $status['oom_events']);
-        $this->assertSame(0, $status['oom_kill_events']);
-        $this->assertSame('MEDIUM', $status['status']);
+        $this->pmssAssertArraySubsetSame(['memory_current' => 4294967296, 'memory_high' => 4831838208, 'memory_max' => 5368709120, 'throttle_events' => 17, 'max_events' => 0, 'oom_events' => 0, 'oom_kill_events' => 0, 'status' => 'MEDIUM'], $status);
         $this->assertStringContainsString('4.0 GiB / 5.0 GiB', $status['usage_text']);
     }
 
@@ -144,8 +137,7 @@ class WebCgroupMemoryStatusTest extends TestCase
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir]);
 
-        $this->assertSame('THROTTLED', $status['status']);
-        $this->assertSame('#d2691e', $status['status_color']);
+        $this->pmssAssertArraySubsetSame(['status' => 'THROTTLED', 'status_color' => '#d2691e'], $status);
         $this->assertStringContainsString('reduced speed', $status['message']);
         $this->assertStringContainsString('upgrading your plan', $status['message']);
         $this->pmssAssertStringNotContainsString('killed', $status['message']);

@@ -71,45 +71,21 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         return $this->pmssRunInlinePhpRequire($fixture, $script, [], $stderrRedirect);
     }
 
-    public function testQuotaMissingWarningGuardUsesOnlyQuotaLimitFields(): void
+    public function testWelcomeSourceContractsUseSafeCustomerHelpers(): void
     {
-        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-
-        $this->assertStringContainsString('if ($hardLimit == 0 || $totalSpace == 0)', $source);
-        $this->pmssAssertStringNotContainsString('$freeSpace == 0', $source);
-        $this->pmssAssertStringNotContainsString('|| $usedBytes == 0', $source);
-    }
-
-    public function testWelcomePageLabelsDelugeWebUiPasswordClearly(): void
-    {
-        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-
-        $this->assertStringContainsString('Deluge Web UI password:', $source);
-        $this->pmssAssertStringNotContainsString('Deluge password: <b>', $source);
-    }
-
-    public function testWelcomePageUsesCustomerDelugePasswordRotationHelper(): void
-    {
-        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-
-        $this->assertStringContainsString('pmssDelugeServicePasswordRotate((string) $username)', $source);
-        $this->pmssAssertStringNotContainsString('pmssDelugeAuthWriteLocalclientPassword($delugeAuthPath, $newDelugePassword)', $source);
-    }
-
-    public function testWelcomeVendorReaderUsesSafeSerializedArrayDecoder(): void
-    {
-        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-
-        $this->assertStringContainsString("pmssCustomerSerializedArrayFileRead('/etc/seedbox/config/vendor', 4096)", $source);
-        $this->pmssAssertStringNotContainsString('$vendor = @unserialize($vendor)', $source);
-    }
-
-    public function testWelcomeMemoryProbeBuildsUidCommandWithoutShellSubstitution(): void
-    {
-        $source = $this->pmssReadRepoFile('etc/skel/www/webCgroupMemoryStatus.php');
-
-        $this->assertStringContainsString("'systemctl show user-'.\$uid.'.slice -p MemoryCurrent --value 2>/dev/null'", $source);
-        $this->pmssAssertStringNotContainsString("systemctl show user-$('/usr/bin/id' -u).slice", $source);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/welcome.php', [
+            'if ($hardLimit == 0 || $totalSpace == 0)',
+            'Deluge Web UI password:',
+            'pmssDelugeServicePasswordRotate((string) $username)',
+            "pmssCustomerSerializedArrayFileRead('/etc/seedbox/config/vendor', 4096)",
+        ], [
+            '$freeSpace == 0',
+            '|| $usedBytes == 0',
+            'Deluge password: <b>',
+            'pmssDelugeAuthWriteLocalclientPassword($delugeAuthPath, $newDelugePassword)',
+            '$vendor = @unserialize($vendor)',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/webCgroupMemoryStatus.php', ["'systemctl show user-'.\$uid.'.slice -p MemoryCurrent --value 2>/dev/null'"], ["systemctl show user-$('/usr/bin/id' -u).slice"]);
         $this->pmssAssertRepoFileNotContainsString('etc/skel/www/welcome.php', 'function '.'memory'.'CreateSection(');
     }
 
@@ -157,9 +133,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         );
 
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-        $this->assertStringContainsString("'https://pulsedmedia.com/remote/welcomeHeadingText.php'", $source);
-        $this->assertStringContainsString("'https://pulsedmedia.com/clients/announcementsrss.php'", $source);
-        $this->assertStringContainsString('@file_get_contents($url, false, pmssWelcomeHttpContextCreate(), 0, 1048576)', $source);
+        $this->assertStringContainsAllStrings(["'https://pulsedmedia.com/remote/welcomeHeadingText.php'", "'https://pulsedmedia.com/clients/announcementsrss.php'", '@file_get_contents($url, false, pmssWelcomeHttpContextCreate(), 0, 1048576)'], $source);
     }
 
     public function testWelcomeLocalHelperRejectsTraversalPaths(): void

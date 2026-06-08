@@ -89,15 +89,13 @@ class ErrorPageTemplateTest extends TestCase
 
     public function testSuspendedErrorPageKeepsReadableSupportCallToAction(): void
     {
-        $contents = $this->pmssReadRepoFile('var/www/error-suspended.html');
-        $this->assertStringNotContainsString('<img', $contents);
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('var/www/error-suspended.html', [
             'Account Suspended',
             'https://pulsedmedia.com/contact/',
             'class="cta"',
             '.cta:visited',
             'color:#fff;',
-        ], $contents);
+        ], ['<img']);
     }
 
     public function testUserNginxTemplateUsesPerUser502FallbackPage(): void
