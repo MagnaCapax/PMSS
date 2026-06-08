@@ -239,16 +239,186 @@ class UpdateCompressionCharacterizationTest extends TestCase
         ]);
     }
 
-    public function testStorageBenchmarkUsesSingleLibraryCliDispatcher(): void
+    public function testSharedCompressionSourceContractsStayTableDriven(): void
     {
-        $helperSymbol = 'consume'.'CliValue';
-
-        $this->pmssAssertRepoFileContainsString('scripts/util/storageBenchmark.php', 'exit(storageBenchmarkMain($argv ?? []));');
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/storageBenchmark.php', [
-            'function storageBenchmarkMain(array $argv): int',
-            "'--device-runtime'",
-            "'--require-idle'",
-        ], ['function '.$helperSymbol.'(' => 'storageBenchmark.php should keep one shared CLI dispatcher instead of a standalone consume helper']);
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/util/storageBenchmark.php' => [
+                'required' => ['exit(storageBenchmarkMain($argv ?? []));'],
+            ],
+            'scripts/lib/storageBenchmark.php' => [
+                'required' => [
+                    'function storageBenchmarkMain(array $argv): int',
+                    "'--device-runtime'",
+                    "'--require-idle'",
+                ],
+                'forbidden' => [
+                    'function consume'.'CliValue(' => 'storageBenchmark.php should keep one shared CLI dispatcher instead of a standalone consume helper',
+                ],
+            ],
+            'scripts/lib/update.php' => [
+                'required' => [
+                    "pmssSkeletonBase().'/'.\$file",
+                    "require_once __DIR__.'/version.php';",
+                ],
+                'forbidden' => [
+                    'function pmssSkeleton'.'Path(' => 'update.php should keep skeleton path joins inline inside updateUserFile()',
+                    'function update'.'AptSources(' => 'update.php should keep the canonical pmssUpdateAptSources() symbol only',
+                    'function generate'.'Motd(' => 'update.php should not keep a dead MOTD wrapper once callers use Motd::motdGenerate() directly',
+                ],
+            ],
+            'scripts/lib/version.php' => [
+                'required' => ['function getPmssVersion('],
+            ],
+            'scripts/lib/update/users/filesystem.php' => [
+                'forbidden' => [
+                    'function pmssUserPatch'.'TorrentFrontends(' => 'filesystem.php should not restore removed torrent frontend patch wrappers',
+                    "require_once '/scripts/lib/user/torrentPort.php';",
+                    "is_readable('/scripts/lib/user/torrentPort.php')",
+                    'pmssDelugePortEnsureCurrentUser',
+                    'pmssQbittorrentPortEnsureCurrentUser',
+                ],
+            ],
+            'scripts/lib/update/users.php' => [
+                'required' => [
+                    "require_once __DIR__.'/../user/log.php';",
+                    "require_once __DIR__.'/users/filesystem.php';",
+                    "require_once __DIR__.'/users/rutorrent.php';",
+                    "require_once __DIR__.'/users/context.php';",
+                    "require_once __DIR__.'/users/http.php';",
+                    "require_once __DIR__.'/users/permissions.php';",
+                    "'pmssUserConfigureHttp'",
+                    "'pmssUserApplySkeletonFiles'",
+                    "'pmssUserUpgradeRutorrent'",
+                    "'pmssUserRefreshPermissions'",
+                ],
+                'forbidden' => [
+                    'function pmssUserUpgrade'.'Rutorrent(' => 'users.php should stay thin and delegate ruTorrent maintenance',
+                    'function pmssBuildUserContext(' => 'users.php should delegate context building to a domain module',
+                    'function pmssUserConfigureHttp(' => 'users.php should delegate HTTP maintenance to a domain module',
+                    'function pmssUserRefreshPermissions(' => 'users.php should delegate permission refresh to permissions.php',
+                    'pmssEnsureLingerAndDocker($user)' => 'users.php should keep single-user refresh limited to environment handlers',
+                    'Missing handler' => 'users.php should not keep a dead missing-handler warning branch once domain modules are required directly',
+                ],
+            ],
+            'scripts/lib/update/users/rutorrent.php' => [
+                'required' => [
+                    'function pmssUserUpgradeRutorrent(',
+                    'function pmssUserMaintainRutorrentPhpCompatibility(',
+                    'function pmssUserUpdateThemes(',
+                    'retrackers.dat',
+                    'Creating ruTorrent RSS settings directory',
+                ],
+                'forbidden' => [
+                    'function pmssUserMaintain'.'Retracker(' => 'rutorrent.php should keep retracker cleanup inside pmssUserEnsurePlugins()',
+                ],
+            ],
+            'scripts/lib/update/osRelease.php' => [
+                'required' => ["pmssResolvePathFromEnv('PMSS_OS_RELEASE_PATH', '/etc/os-release')"],
+                'forbidden' => [
+                    'function pmssOsRelease'.'Path(' => 'osRelease.php should keep the os-release path lookup inline inside cache helpers',
+                ],
+            ],
+            'scripts/lib/update/runtime/profile.php' => [
+                'required' => [
+                    "if (!is_array(\$GLOBALS['PMSS_PROFILE'] ?? null))",
+                    "\$GLOBALS['PMSS_PROFILE'][] = \$entry;",
+                ],
+                'forbidden' => [
+                    'function pmssInit'.'ProfileStore(' => 'runtime/profile.php should keep profile-store initialization inside pmssRecordProfile()',
+                ],
+            ],
+            'scripts/lib/update/userMaintenance.php' => [
+                'required' => [
+                    'Synchronizing per-user htpasswd',
+                    'Checking lighttpd instance',
+                    "'description'    => 'updateUser '.\$user",
+                    "'stdout_excerpt' => ''",
+                    "'stderr_excerpt' => \$stderrExcerpt",
+                    'Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)',
+                    "require_once __DIR__.'/users/docker.php';",
+                    "\$postChecks['Checking lighttpd instance'] = '/scripts/cron/checkLighttpdInstances.php';",
+                    "pmssUserLog(\$userTrim, '[WARN] update-step2 user maintenance aborted: '.\$reason);",
+                    'pmssLogJson([',
+                ],
+                'forbidden' => array_merge([
+                    'function pmssRunUser'.'PostCheck(' => 'userMaintenance.php should keep optional htpasswd/lighttpd checks inside pmssUpdateAllUsers()',
+                    'function pmssBuild'.'UserMaintenanceProfile(' => 'userMaintenance.php should keep per-user profile payload assembly inside pmssUpdateAllUsers()',
+                    "function_exists('pmssUpdateUserEnvironment')" => 'userMaintenance.php should not guard helpers that are required at file load time',
+                    "function_exists('pmssLogJson')" => 'userMaintenance.php should log its JSON summary directly through the required logging runtime',
+                    "function_exists('pmssUserDockerEnabled')" => 'userMaintenance.php should call the required Docker config helper directly',
+                ], array_fill_keys([
+                    "if (!function_exists('pmssRunAndLog'))",
+                    "if (!function_exists('pmssUpdateAllUsers'))",
+                    "if (!function_exists('pmssEnsureLingerAndDocker'))",
+                    "if (!function_exists('pmssEnsureRootlessDockerInstalled'))",
+                    "if (!function_exists('pmssEnsureDockerDependencies'))",
+                ], 'userMaintenance.php should not keep dead self-guard wrappers once runtime callers use require_once')),
+                'ordered' => [[
+                    'needles' => [
+                        'pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);',
+                        'pmssEnsureLingerAndDocker($userTrim);',
+                        'foreach ($postChecks as $label => $helperPath)',
+                    ],
+                    'missingPrefix' => 'Missing user-maintenance phase: ',
+                    'orderPrefix' => 'User-maintenance phase order changed at: ',
+                ]],
+            ],
+            'scripts/lib/update/users/docker.php' => [
+                'required' => [
+                    "require_once dirname(__DIR__, 2).'/user/rootlessDockerConfig.php';",
+                    "pmssUserRootlessDockerConfigConverge(\$user, \$home, (int) \$uinfo['uid'], (int) \$uinfo['gid']",
+                ],
+                'forbidden' => [
+                    'function pmssWrite'.'DockerDaemonConfig(' => 'daemon.json convergence should not grow a second local writer',
+                    'pmssJsonEncodePretty($payload)' => 'docker.php should use the shared rootless Docker config writer',
+                ],
+            ],
+            'scripts/lib/update/repositories.php' => [
+                'required' => [
+                    "preg_match('/^[ \\t]*#/', \$line) === 1",
+                    'signed-by=',
+                ],
+                'forbidden' => [
+                    'function pmssSonarr'.'SourceLine(' => 'repositories.php should keep Sonarr source detection inside signed-by rewriting',
+                ],
+            ],
+            'scripts/lib/update/users/context.php' => [
+                'required' => [
+                    'function pmssBuildUserContext(',
+                    'www-disabled',
+                ],
+            ],
+            'scripts/lib/update/users/http.php' => [
+                'required' => [
+                    'function pmssUserConfigureHttp(',
+                    'HostHeaderValidation',
+                ],
+            ],
+            'scripts/lib/update/users/permissions.php' => [
+                'required' => [
+                    'function pmssUserRefreshPermissions(',
+                    'PMSS_USER_PERMISSIONS_TIMEOUT',
+                    "'-c3'",
+                ],
+            ],
+            'scripts/lib/update/distUpgrade.php' => [
+                'required' => ['pmssEnsureBootDefaults('],
+            ],
+            'scripts/lib/update/distUpgrade/docker.php' => [
+                'required' => [
+                    'pmssEnsureRootlessDockerInstalled($user);',
+                    'pmssEnsureDockerDependencies($user);',
+                    "pmssUserLog(\$userTrim, '[SKIP] dist-upgrade: user appears suspended; skipping rootless Docker repair');",
+                    "pmssUserLog(\$user, 'dist-upgrade: rootless Docker repair start');",
+                ],
+                'forbidden' => [
+                    "function_exists('pmssEnsureBootDefaults')" => 'distUpgrade.php should call the required boot defaults helper directly',
+                    'class_exists(\'users\')' => 'distUpgrade.php should not keep a dead users class guard once userMaintenance.php is required',
+                    "function_exists('pmssEnsureRootlessDockerInstalled')" => 'distUpgrade.php should not keep dead rootless helper guards once userMaintenance.php is required',
+                    "function_exists('pmssUserLog')" => 'distUpgrade.php should log through the required user logger directly',
+                ],
+            ],
+        ]);
     }
 
     public function testStorageHealthFacadeDropsStandaloneExecModule(): void
@@ -277,163 +447,6 @@ class UpdateCompressionCharacterizationTest extends TestCase
         ], ['new ResourceStatsAccumulator([\'day\' => $threshold])']);
     }
 
-    public function testUpdateLibraryDropsStandaloneSkeletonPathHelper(): void
-    {
-        $symbol = 'pmssSkeleton'.'Path';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update.php', [
-            "pmssSkeletonBase().'/'.\$file",
-        ], ['function '.$symbol.'(' => 'update.php should keep skeleton path joins inline inside updateUserFile()']);
-    }
-
-    public function testUpdateLibraryDropsLegacyFacadeWrappers(): void
-    {
-        $aptFacade = 'function update'.'AptSources(';
-        $motdFacade = 'function generate'.'Motd(';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update.php', [
-            "require_once __DIR__.'/version.php';",
-        ], [
-            $aptFacade => 'update.php should keep the canonical pmssUpdateAptSources() symbol only',
-            $motdFacade => 'update.php should not keep a dead MOTD wrapper once callers use Motd::motdGenerate() directly',
-        ]);
-        $this->pmssAssertRepoFileContainsString('scripts/lib/version.php', 'function getPmssVersion(');
-    }
-
-    public function testSkeletonMaintenanceDoesNotInjectTorrentFrontendOperatorRequires(): void
-    {
-        $symbol = 'pmssUserPatch'.'TorrentFrontends';
-
-        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users.php', "require_once __DIR__.'/users/filesystem.php';");
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/filesystem.php', [], [
-            'function '.$symbol.'(' => 'filesystem.php should not restore removed torrent frontend patch wrappers',
-            "require_once '/scripts/lib/user/torrentPort.php';",
-            "is_readable('/scripts/lib/user/torrentPort.php')",
-            'pmssDelugePortEnsureCurrentUser',
-            'pmssQbittorrentPortEnsureCurrentUser',
-        ]);
-    }
-
-    public function testUserUpdateModuleOwnsRutorrentHelpers(): void
-    {
-        $symbol = 'pmssUserUpgrade'.'Rutorrent';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users.php', [
-            "require_once __DIR__.'/users/rutorrent.php';",
-        ], ['function '.$symbol.'(' => 'users.php should stay thin and delegate ruTorrent maintenance']);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/rutorrent.php', [
-            'function pmssUserUpgradeRutorrent(',
-            'function pmssUserMaintainRutorrentPhpCompatibility(',
-            'function pmssUserUpdateThemes(',
-        ]);
-    }
-
-    public function testOsReleaseHelpersKeepPathLookupInline(): void
-    {
-        $symbol = 'pmssOsRelease'.'Path';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/osRelease.php', [
-            "pmssResolvePathFromEnv('PMSS_OS_RELEASE_PATH', '/etc/os-release')",
-        ], ['function '.$symbol.'(' => 'osRelease.php should keep the os-release path lookup inline inside cache helpers']);
-    }
-
-    public function testRuntimeProfileKeepsStoreInitializationInsideRecordProfile(): void
-    {
-        $symbol = 'pmssInit'.'ProfileStore';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/runtime/profile.php', [
-            "if (!is_array(\$GLOBALS['PMSS_PROFILE'] ?? null))",
-            "\$GLOBALS['PMSS_PROFILE'][] = \$entry;",
-        ], ['function '.$symbol.'(' => 'runtime/profile.php should keep profile-store initialization inside pmssRecordProfile()']);
-    }
-
-    public function testUserMaintenanceKeepsOptionalPostChecksInline(): void
-    {
-        $symbol = 'pmssRunUser'.'PostCheck';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/userMaintenance.php', [
-            'Synchronizing per-user htpasswd',
-            'Checking lighttpd instance',
-        ], ['function '.$symbol.'(' => 'userMaintenance.php should keep optional htpasswd/lighttpd checks inside pmssUpdateAllUsers()']);
-    }
-
-    public function testUserMaintenanceKeepsProfilePayloadLocal(): void
-    {
-        $symbol = 'pmssBuild'.'UserMaintenanceProfile';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/userMaintenance.php', [
-            "'description'    => 'updateUser '.\$user",
-            "'stdout_excerpt' => ''",
-            "'stderr_excerpt' => \$stderrExcerpt",
-        ], ['function '.$symbol.'(' => 'userMaintenance.php should keep per-user profile payload assembly inside pmssUpdateAllUsers()']);
-    }
-
-    public function testDockerDependenciesUseSharedDaemonJsonConvergence(): void
-    {
-        $symbol = 'pmssWrite'.'DockerDaemonConfig';
-
-        $this->pmssAssertRepoFileContainsString('scripts/lib/update/userMaintenance.php', "require_once __DIR__.'/users/docker.php';");
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/docker.php', [
-            "require_once dirname(__DIR__, 2).'/user/rootlessDockerConfig.php';",
-            "pmssUserRootlessDockerConfigConverge(\$user, \$home, (int) \$uinfo['uid'], (int) \$uinfo['gid']",
-        ], [
-            'function '.$symbol.'(' => 'daemon.json convergence should not grow a second local writer',
-            'pmssJsonEncodePretty($payload)' => 'docker.php should use the shared rootless Docker config writer',
-        ]);
-    }
-
-    public function testRepositoryPrerequisitesKeepSonarrDetectionInline(): void
-    {
-        $symbol = 'pmssSonarr'.'SourceLine';
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/repositories.php', [
-            "preg_match('/^[ \\t]*#/', \$line) === 1",
-            'signed-by=',
-        ], ['function '.$symbol.'(' => 'repositories.php should keep Sonarr source detection inside signed-by rewriting']);
-    }
-
-    public function testPluginMaintenanceOwnsRetrackerCleanup(): void
-    {
-        $symbol = 'pmssUserMaintain'.'Retracker';
-
-        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users.php', "require_once __DIR__.'/users/rutorrent.php';");
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/rutorrent.php', [
-            'retrackers.dat',
-            'Creating ruTorrent RSS settings directory',
-        ], ['function '.$symbol.'(' => 'rutorrent.php should keep retracker cleanup inside pmssUserEnsurePlugins()']);
-    }
-
-    public function testUserUpdateModuleOwnsContextAndHttpHelpers(): void
-    {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users.php', [
-            "require_once __DIR__.'/users/context.php';",
-            "require_once __DIR__.'/users/http.php';",
-        ], [
-            'function pmssBuildUserContext(' => 'users.php should delegate context building to a domain module',
-            'function pmssUserConfigureHttp(' => 'users.php should delegate HTTP maintenance to a domain module',
-        ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/context.php', [
-            'function pmssBuildUserContext(',
-            'www-disabled',
-        ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/http.php', [
-            'function pmssUserConfigureHttp(',
-            'HostHeaderValidation',
-        ]);
-    }
-
-    public function testUserUpdateModuleOwnsPermissionRefreshHelper(): void
-    {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users.php', [
-            "require_once __DIR__.'/users/permissions.php';",
-        ], ['function pmssUserRefreshPermissions(' => 'users.php should delegate permission refresh to permissions.php']);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/permissions.php', [
-            'function pmssUserRefreshPermissions(',
-            'PMSS_USER_PERMISSIONS_TIMEOUT',
-            "'-c3'",
-        ]);
-    }
-
     public function testUserDomainModulesDoNotCrossRequireEachOther(): void
     {
         foreach (['context', 'http', 'filesystem', 'permissions', 'rutorrent', 'docker'] as $module) {
@@ -445,61 +458,4 @@ class UpdateCompressionCharacterizationTest extends TestCase
         }
     }
 
-    public function testUserUpdateEntrypointKeepsDirectHandlerSequence(): void
-    {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users.php', [
-            "require_once __DIR__.'/../user/log.php';",
-            "'pmssUserConfigureHttp'",
-            "'pmssUserApplySkeletonFiles'",
-            "'pmssUserUpgradeRutorrent'",
-            "'pmssUserRefreshPermissions'",
-        ], [
-            'pmssEnsureLingerAndDocker($user)' => 'users.php should keep single-user refresh limited to environment handlers',
-            'Missing handler' => 'users.php should not keep a dead missing-handler warning branch once domain modules are required directly',
-        ]);
-    }
-
-    public function testUserMaintenanceKeepsDirectPhaseSummaryAndSummaryLogging(): void
-    {
-        $deadGuards = [
-            "if (!function_exists('pmssRunAndLog'))",
-            "if (!function_exists('pmssUpdateAllUsers'))",
-            "if (!function_exists('pmssEnsureLingerAndDocker'))",
-            "if (!function_exists('pmssEnsureRootlessDockerInstalled'))",
-            "if (!function_exists('pmssEnsureDockerDependencies'))",
-        ];
-
-        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/update/userMaintenance.php', [
-            'pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);',
-            'pmssEnsureLingerAndDocker($userTrim);',
-            'foreach ($postChecks as $label => $helperPath)',
-        ], 'Missing user-maintenance phase: ', 'User-maintenance phase order changed at: ');
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/userMaintenance.php', [
-            'Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)',
-            "require_once __DIR__.'/users/docker.php';",
-            "\$postChecks['Checking lighttpd instance'] = '/scripts/cron/checkLighttpdInstances.php';",
-            "pmssUserLog(\$userTrim, '[WARN] update-step2 user maintenance aborted: '.\$reason);",
-            'pmssLogJson([',
-        ], array_merge([
-            "function_exists('pmssUpdateUserEnvironment')" => 'userMaintenance.php should not guard helpers that are required at file load time',
-            "function_exists('pmssLogJson')" => 'userMaintenance.php should log its JSON summary directly through the required logging runtime',
-            "function_exists('pmssUserDockerEnabled')" => 'userMaintenance.php should call the required Docker config helper directly',
-        ], array_fill_keys($deadGuards, 'userMaintenance.php should not keep dead self-guard wrappers once runtime callers use require_once')));
-    }
-
-    public function testDistUpgradeUsesRequiredRepairHelpersDirectly(): void
-    {
-        $this->pmssAssertRepoFileContainsString('scripts/lib/update/distUpgrade.php', 'pmssEnsureBootDefaults(');
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/distUpgrade/docker.php', [
-            'pmssEnsureRootlessDockerInstalled($user);',
-            'pmssEnsureDockerDependencies($user);',
-            "pmssUserLog(\$userTrim, '[SKIP] dist-upgrade: user appears suspended; skipping rootless Docker repair');",
-            "pmssUserLog(\$user, 'dist-upgrade: rootless Docker repair start');",
-        ], [
-            "function_exists('pmssEnsureBootDefaults')" => 'distUpgrade.php should call the required boot defaults helper directly',
-            'class_exists(\'users\')' => 'distUpgrade.php should not keep a dead users class guard once userMaintenance.php is required',
-            "function_exists('pmssEnsureRootlessDockerInstalled')" => 'distUpgrade.php should not keep dead rootless helper guards once userMaintenance.php is required',
-            "function_exists('pmssUserLog')" => 'distUpgrade.php should log through the required user logger directly',
-        ]);
-    }
 }
