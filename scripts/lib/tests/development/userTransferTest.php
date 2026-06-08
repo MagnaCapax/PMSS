@@ -55,32 +55,21 @@ class UserTransferTest extends TestCase
         }
     }
 
-    public function testParseCliTwoArgsAppendsSuffix(): void
+    public function testParseCliHandlesSupportedForms(): void
     {
-        $cfg = \pmssUserTransferParseCli(['userTransfer.php', 'deefbox', 'lt5-1-56-138anger-core']);
-
-        $this->assertEquals('deefbox', $cfg['localUser']);
-        $this->assertEquals('deefbox', $cfg['remoteUser']);
-        $this->assertEquals('lt5-1-56-138anger-core.pulsedmedia.com', $cfg['hostname']);
-        $this->assertTrue($cfg['suffixAppended'], 'expected suffix appended');
-    }
-
-    public function testParseCliThreeArgsKeepsRemoteUser(): void
-    {
-        $cfg = \pmssUserTransferParseCli(['userTransfer.php', 'deefbox', 'remote01', 'example.com']);
-
-        $this->assertEquals('deefbox', $cfg['localUser']);
-        $this->assertEquals('remote01', $cfg['remoteUser']);
-        $this->assertEquals('example.com', $cfg['hostname']);
-        $this->assertFalse($cfg['suffixAppended'], 'expected no suffix appended');
-        $this->assertEquals([31, 3, 60, 360, 90, false, false], [$cfg['mainPasses'], $cfg['finalPasses'], $cfg['sleepMin'], $cfg['sleepMax'], $cfg['verifyThreshold'], $cfg['dryRun'], $cfg['printPassword']]);
-    }
-
-    public function testParseCliNormalisesUsernamesToLowercase(): void
-    {
-        $cfg = \pmssUserTransferParseCli(['userTransfer.php', 'DeefBox', 'example.com']);
-        $this->assertEquals('deefbox', $cfg['localUser']);
-        $this->assertEquals('deefbox', $cfg['remoteUser']);
+        foreach ([
+            [['userTransfer.php', 'deefbox', 'lt5-1-56-138anger-core'], ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'lt5-1-56-138anger-core.pulsedmedia.com', 'suffixAppended' => true]],
+            [['userTransfer.php', 'deefbox', 'remote01', 'example.com'], ['localUser' => 'deefbox', 'remoteUser' => 'remote01', 'hostname' => 'example.com', 'suffixAppended' => false, 'mainPasses' => 31, 'finalPasses' => 3, 'sleepMin' => 60, 'sleepMax' => 360, 'verifyThreshold' => 90, 'dryRun' => false, 'printPassword' => false]],
+            [['userTransfer.php', 'DeefBox', 'example.com'], ['localUser' => 'deefbox', 'remoteUser' => 'deefbox']],
+            [['userTransfer.php', '--', 'deefbox', 'example.com'], ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com']],
+            [['userTransfer.php', '--no-sleep', 'deefbox', 'example.com'], ['sleepMin' => 0, 'sleepMax' => 0]],
+            [['userTransfer.php', '--verify-threshold=95', 'deefbox', 'example.com'], ['verifyThreshold' => 95]],
+        ] as [$argv, $expected]) {
+            $cfg = \pmssUserTransferParseCli($argv);
+            foreach ($expected as $key => $value) {
+                $this->assertSame($value, $cfg[$key], 'unexpected '.$key.' for '.implode(' ', $argv));
+            }
+        }
     }
 
     public function testParseCliRejectsInvalidInputs(): void
@@ -151,63 +140,18 @@ class UserTransferTest extends TestCase
         $this->assertSame('33448dbf45fb18a2927929b8432652ed3eaaef39908fd9e27f8535de57377990', hash('sha256', json_encode($cfg)));
     }
 
-    public function testParseCliStopsOptionParsingAfterDoubleDash(): void
-    {
-        $cfg = \pmssUserTransferParseCli(['userTransfer.php', '--', 'deefbox', 'example.com']);
-
-        $this->assertEquals('deefbox', $cfg['localUser']);
-        $this->assertEquals('deefbox', $cfg['remoteUser']);
-        $this->assertEquals('example.com', $cfg['hostname']);
-    }
-
-    public function testParseCliNoSleepOverridesSleepRange(): void
-    {
-        $cfg = \pmssUserTransferParseCli(['userTransfer.php', '--no-sleep', 'deefbox', 'example.com']);
-        $this->assertEquals(0, $cfg['sleepMin']);
-        $this->assertEquals(0, $cfg['sleepMax']);
-    }
-
-    public function testParseCliAcceptsVerifyThreshold(): void
-    {
-        $cfg = \pmssUserTransferParseCli(['userTransfer.php', '--verify-threshold=95', 'deefbox', 'example.com']);
-
-        $this->assertEquals(95, $cfg['verifyThreshold']);
-    }
-
-    public function testBuildRsyncMainUsesTrailingSlashAndExcludes(): void
+    public function testGeneratedProbeScriptsContainExpectedFragments(): void
     {
         $cfg = $this->baseConfig();
-        $script = \pmssUserTransferBuildRsyncMain($cfg);
 
-        $this->assertStringContainsAllStrings(['rsync -av', ':/home/deefbox/', '/home/deefbox/', "--exclude='.rtorrent.rc'", "--exclude='.trafficDataIngress'", "--exclude='.trafficDataIngressLocal'"], $script);
-        $this->assertStringNotContainsString('--exclude={', $script, 'expected no brace-expanded excludes');
-    }
-
-    public function testBuildRsyncFinalUsesExplicitSources(): void
-    {
-        $cfg = $this->baseConfig();
-        $script = \pmssUserTransferBuildRsyncFinal($cfg);
-
-        $this->assertStringContainsString('rsync -av', $script);
-        $this->assertStringContainsString(':/home/deefbox/session', $script);
-        $this->assertStringContainsString(':/home/deefbox/www/public', $script);
-        $this->assertStringNotContainsString('{session', $script, 'expected no brace-expanded sources');
-    }
-
-    public function testBuildAuthProbeUsesSinglePasswordPrompt(): void
-    {
-        $cfg = $this->baseConfig();
-        $script = \pmssUserTransferBuildAuthProbe($cfg);
-
-        $this->assertStringContainsAllStrings(['ssh -o Compression=no', '-o NumberOfPasswordPrompts=1', "-l 'deefbox'", "'example.com'", "'/bin/true'"], $script);
-    }
-
-    public function testBuildRemoteSizeProbeUsesByteAccurateDu(): void
-    {
-        $cfg = $this->baseConfig(['remoteUser' => 'remote01', 'verifyThreshold' => 90]);
-        $script = \pmssUserTransferBuildRemoteSizeProbe($cfg);
-
-        $this->assertStringContainsAllStrings(['-o NumberOfPasswordPrompts=1', "'example.com'", "/home/remote01/", "'du '\\''-sb'\\''"], $script);
+        foreach ([
+            [\pmssUserTransferBuildRsyncMain($cfg), ['rsync -av', ':/home/deefbox/', '/home/deefbox/', "--exclude='.rtorrent.rc'", "--exclude='.trafficDataIngress'", "--exclude='.trafficDataIngressLocal'"], ['--exclude={' => 'expected no brace-expanded excludes']],
+            [\pmssUserTransferBuildRsyncFinal($cfg), ['rsync -av', ':/home/deefbox/session', ':/home/deefbox/www/public'], ['{session' => 'expected no brace-expanded sources']],
+            [\pmssUserTransferBuildAuthProbe($cfg), ['ssh -o Compression=no', '-o NumberOfPasswordPrompts=1', "-l 'deefbox'", "'example.com'", "'/bin/true'"], []],
+            [\pmssUserTransferBuildRemoteSizeProbe($this->baseConfig(['remoteUser' => 'remote01', 'verifyThreshold' => 90])), ['-o NumberOfPasswordPrompts=1', "'example.com'", "/home/remote01/", "'du '\\''-sb'\\''"], []],
+        ] as [$script, $required, $forbidden]) {
+            $this->assertStringContainsAndOmitsStrings($required, $forbidden, $script);
+        }
     }
 
     public function testGeneratedScriptsKeepSharedSshFlagsAligned(): void
@@ -521,22 +465,14 @@ SNAP;
         $this->assertEquals('original', (string) file_get_contents($realTarget));
     }
 
-    public function testSleepReturnsImmediatelyDuringDryRun(): void
+    public function testSleepReturnsImmediatelyWhenNoLiveDelayIsAllowed(): void
     {
-        putenv('PMSS_DRY_RUN=1');
-
-        $started = microtime(true);
-        \pmssUserTransferSleep(1, 1, 'Unit test');
-
-        $this->assertTrue((microtime(true) - $started) < 0.2, 'expected dry-run sleep to return immediately');
-    }
-
-    public function testSleepReturnsImmediatelyWhenMaximumIsNonPositive(): void
-    {
-        $started = microtime(true);
-        \pmssUserTransferSleep(0, 0, 'Unit test');
-
-        $this->assertTrue((microtime(true) - $started) < 0.2, 'expected non-positive max sleep to return immediately');
+        foreach ([[1, 1, true, 'dry-run'], [0, 0, false, 'non-positive max']] as [$min, $max, $dryRun, $label]) {
+            putenv($dryRun ? 'PMSS_DRY_RUN=1' : 'PMSS_DRY_RUN');
+            $started = microtime(true);
+            \pmssUserTransferSleep($min, $max, 'Unit test');
+            $this->assertTrue((microtime(true) - $started) < 0.2, 'expected '.$label.' sleep to return immediately');
+        }
     }
 
     private function baseConfig(array $overrides = []): array
