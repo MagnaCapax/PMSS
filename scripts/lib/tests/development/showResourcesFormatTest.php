@@ -59,32 +59,29 @@ class ShowResourcesFormatTest extends TestCase
         );
     }
 
-    public function testFormatBytesTiB(): void
-    {
-        $runtimeDir = $this->resourceStatsRuntimeWithAlice($this->sampleUsageValues([
-            'io_read' => $this->pmssBuildWindowValues(2 * 1024 * 1024 * 1024 * 1024, 1, 1, 1),
-        ]));
-        $out = $this->runShowResources(['--user=alice'], $runtimeDir);
-
-        $this->assertStringContainsString('2.00 TiB', $out);
-    }
-
     public function testUserFilteredOutputFormatsCpuRamAndIops(): void
     {
         $runtimeDir = $this->resourceStatsRuntimeWithAlice($this->sampleUsageValues());
         $this->pmssAssertRepoPhpScriptOutputContains('scripts/showResources.php', ['--user=alice'], ['IO Ops/mo', '70 ops', '1.0 hrs', '2.50 GB-hrs', '1.00 GiB', '2.00'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
     }
 
-    public function testUserFilteredOutputFormatsMonthlyIoOpsWithSuffixes(): void
+    public function testUserFilteredOutputFormatsLargeByteAndIoOperationSuffixes(): void
     {
-        $runtimeDir = $this->resourceStatsRuntimeWithAlice($this->sampleUsageValues([
-            'io_read_ops' => $this->pmssBuildWindowValues(2500000, 30, 30, 3600),
-            'io_write_ops' => $this->pmssBuildWindowValues(3500000, 40, 40, 3600),
-        ]));
-
-        $out = $this->runShowResources(['--user=alice'], $runtimeDir);
-
-        $this->assertStringContainsString('6.00 M ops', $out);
+        foreach ([
+            [
+                ['io_read' => $this->pmssBuildWindowValues(2 * 1024 * 1024 * 1024 * 1024, 1, 1, 1)],
+                '2.00 TiB',
+            ],
+            [
+                [
+                    'io_read_ops' => $this->pmssBuildWindowValues(2500000, 30, 30, 3600),
+                    'io_write_ops' => $this->pmssBuildWindowValues(3500000, 40, 40, 3600),
+                ],
+                '6.00 M ops',
+            ],
+        ] as [$overrides, $needle]) {
+            $this->assertStringContainsString($needle, $this->runShowResources(['--user=alice'], $this->resourceStatsRuntimeWithAlice($this->sampleUsageValues($overrides))));
+        }
     }
 
     public function testUserFilteredJsonOutputKeepsExpectedPayloadShape(): void

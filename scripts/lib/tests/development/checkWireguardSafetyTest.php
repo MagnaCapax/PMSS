@@ -30,23 +30,19 @@ class CheckWireguardSafetyTest extends TestCase
         $this->assertSame(['alice', 'bob'], $result['users']);
     }
 
-    public function testPeerUserParserReportsMissingConfig(): void
+    public function testPeerUserParserReportsUnavailableConfigStates(): void
     {
-        $result = \pmssWireguardPeerUsersFromConfig('/tmp/pmss-check-wireguard-missing/wg0.conf');
+        $nonRegularConfig = $this->pmssMakeNamedTempDir('pmss-check-wireguard-', 0700).'/wg0.conf';
+        mkdir($nonRegularConfig);
 
-        $this->assertSame('missing', $result['status']);
-        $this->assertSame([], $result['users']);
-    }
-
-    public function testPeerUserParserRefusesNonRegularConfig(): void
-    {
-        $configPath = $this->pmssMakeNamedTempDir('pmss-check-wireguard-', 0700).'/wg0.conf';
-        mkdir($configPath);
-
-        $result = \pmssWireguardPeerUsersFromConfig($configPath);
-
-        $this->assertSame('not_regular', $result['status']);
-        $this->assertSame([], $result['users']);
+        foreach ([
+            [$this->pmssMakeTempPath('pmss-check-wireguard-missing-', '.conf'), 'missing'],
+            [$nonRegularConfig, 'not_regular'],
+        ] as [$path, $status]) {
+            $result = \pmssWireguardPeerUsersFromConfig($path);
+            $this->assertSame($status, $result['status']);
+            $this->assertSame([], $result['users']);
+        }
     }
 
     public function testPeerPublicKeyParserFiltersInvalidKeysAndDeduplicates(): void

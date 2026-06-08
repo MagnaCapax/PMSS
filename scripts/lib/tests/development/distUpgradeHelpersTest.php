@@ -36,18 +36,12 @@ class DistUpgradeHelpersTest extends TestCase
 
     public function testResolveTargetVersionAcceptsNumbersAndCodenames(): void
     {
-        $this->assertEquals('10', \pmssResolveTargetVersion('10'));
-        $this->assertEquals('10', \pmssResolveTargetVersion('buster'));
-        $this->assertEquals('11', \pmssResolveTargetVersion('bullseye'));
-        $this->assertEquals('12', \pmssResolveTargetVersion('Bookworm'));
-        $this->assertEquals('13', \pmssResolveTargetVersion('TRIXIE'));
-        $this->assertEquals('', \pmssResolveTargetVersion('jessie'));
-        $this->assertEquals('', \pmssResolveTargetVersion('stretch'));
-        $this->assertEquals('', \pmssResolveTargetVersion('8'));
-        $this->assertEquals('', \pmssResolveTargetVersion('9'));
-        $this->assertEquals('', \pmssResolveTargetVersion('10 '));
-        $this->assertEquals('', \pmssResolveTargetVersion(''));
-        $this->assertEquals('', \pmssResolveTargetVersion('nonesuch'));
+        foreach ([
+            '10' => '10', 'buster' => '10', 'bullseye' => '11', 'Bookworm' => '12', 'TRIXIE' => '13',
+            'jessie' => '', 'stretch' => '', '8' => '', '9' => '', '10 ' => '', '' => '', 'nonesuch' => '',
+        ] as $input => $expected) {
+            $this->assertEquals($expected, \pmssResolveTargetVersion((string) $input), 'target '.$input);
+        }
     }
 
     public function testResolveDistUpgradeStepHonorsMaximum(): void
@@ -137,37 +131,35 @@ class DistUpgradeHelpersTest extends TestCase
         }
     }
 
-    public function testVerifyDistUpgradeBootReadinessLogsHealthyConfigs(): void
+    public function testVerifyDistUpgradeBootReadinessReportsConfigStates(): void
     {
-        $output = $this->captureBootReadinessOutput(
-            "md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/2] [UU]\n",
-            str_repeat('menuentry test\n', 100),
-            "ARRAY /dev/md0 metadata=1.2 UUID=abc\n",
-            "BOOT_DEGRADED=true\n"
-        );
-
-        $this->assertStringContainsAllStrings([
-            '[SKIP] dist-upgrade: RAID arrays appear healthy',
-            '[SKIP] dist-upgrade: grub config present',
-            '[SKIP] dist-upgrade: mdadm ARRAY definitions found',
-            '[SKIP] dist-upgrade: BOOT_DEGRADED=true is configured',
-        ], $output);
-    }
-
-    public function testVerifyDistUpgradeBootReadinessWarnsForUnsafeRaidBootConfig(): void
-    {
-        $output = $this->captureBootReadinessOutput(
-            "md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/1] [U_]\n",
-            str_repeat('menuentry test\n', 100),
-            "DEVICE partitions\nMAILADDR root\n",
-            "BOOT_DEGRADED=false\n"
-        );
-
-        $this->assertStringContainsAllStrings([
-            'degraded RAID array detected',
-            'lacks ARRAY definitions',
-            'missing BOOT_DEGRADED=true',
-        ], $output);
+        foreach ([
+            [
+                "md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/2] [UU]\n",
+                str_repeat('menuentry test\n', 100),
+                "ARRAY /dev/md0 metadata=1.2 UUID=abc\n",
+                "BOOT_DEGRADED=true\n",
+                [
+                    '[SKIP] dist-upgrade: RAID arrays appear healthy',
+                    '[SKIP] dist-upgrade: grub config present',
+                    '[SKIP] dist-upgrade: mdadm ARRAY definitions found',
+                    '[SKIP] dist-upgrade: BOOT_DEGRADED=true is configured',
+                ],
+            ],
+            [
+                "md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/1] [U_]\n",
+                str_repeat('menuentry test\n', 100),
+                "DEVICE partitions\nMAILADDR root\n",
+                "BOOT_DEGRADED=false\n",
+                [
+                    'degraded RAID array detected',
+                    'lacks ARRAY definitions',
+                    'missing BOOT_DEGRADED=true',
+                ],
+            ],
+        ] as [$mdstat, $grub, $mdadmConfig, $initramfsMdadm, $needles]) {
+            $this->assertStringContainsAllStrings($needles, $this->captureBootReadinessOutput($mdstat, $grub, $mdadmConfig, $initramfsMdadm));
+        }
     }
 
     private function captureBootReadinessOutput(

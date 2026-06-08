@@ -60,47 +60,44 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $this->assertEquals('md7', $homeArray);
     }
 
-    public function testHomeRaidActivityReturnsOnlyHomeArrayWork(): void
+    public function testHomeRaidActivitySelectsHomeArrayStateVariants(): void
     {
-        $raidEntries = [
-            ['array' => 'md0', 'resync' => '      [>....................]  resync = 5.1% finish=90.0min speed=1000K/sec'],
-            ['array' => 'md1', 'resync' => '      [>....................]  recovery = 7.5% finish=60.0min speed=2000K/sec'],
-        ];
-
-        $this->assertHomeRaidActivity($raidEntries, ['array' => 'md1', 'operation' => 'recovery', 'progress' => '7.5%']);
+        foreach ([
+            [
+                [
+                    ['array' => 'md0', 'resync' => '      [>....................]  resync = 5.1% finish=90.0min speed=1000K/sec'],
+                    ['array' => 'md1', 'resync' => '      [>....................]  recovery = 7.5% finish=60.0min speed=2000K/sec'],
+                ],
+                ['array' => 'md1', 'operation' => 'recovery', 'progress' => '7.5%'],
+            ],
+            [
+                [
+                    ['array' => 'md1', 'flags' => ['degraded'], 'severity' => 'fail'],
+                ],
+                ['array' => 'md1', 'flags' => ['degraded']],
+            ],
+            [
+                [
+                    [
+                        'array' => 'md1',
+                        'flags' => ['degraded', 'rebuild_in_progress'],
+                        'severity' => 'fail',
+                        'resync' => '      [>....................]  recovery = 7.5% finish=60.0min speed=2000K/sec',
+                    ],
+                ],
+                ['operation' => 'recovery', 'progress' => '7.5%'],
+            ],
+        ] as [$raidEntries, $expected]) {
+            $this->assertHomeRaidActivity($raidEntries, $expected);
+        }
     }
 
     public function testHomeRaidActivityReturnsNullWhenHomeIsNotOnMd(): void
     {
-        $raidEntries = [
+        $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/vda1'), [
             ['array' => 'md1', 'resync' => '      [>....................]  resync = 5.1% finish=90.0min speed=1000K/sec'],
-        ];
-
-        $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/vda1'), $raidEntries);
+        ]);
         $this->assertTrue($activity === null, 'Expected no activity when /home is not backed by md');
-    }
-
-    public function testHomeRaidActivityReturnsDegradedNoticeWithoutRebuild(): void
-    {
-        $raidEntries = [
-            ['array' => 'md1', 'flags' => ['degraded'], 'severity' => 'fail'],
-        ];
-
-        $this->assertHomeRaidActivity($raidEntries, ['array' => 'md1', 'flags' => ['degraded']]);
-    }
-
-    public function testHomeRaidActivityPrefersActiveRebuildOverDegradedNotice(): void
-    {
-        $raidEntries = [
-            [
-                'array' => 'md1',
-                'flags' => ['degraded', 'rebuild_in_progress'],
-                'severity' => 'fail',
-                'resync' => '      [>....................]  recovery = 7.5% finish=60.0min speed=2000K/sec',
-            ],
-        ];
-
-        $this->assertHomeRaidActivity($raidEntries, ['operation' => 'recovery', 'progress' => '7.5%']);
     }
 
     public function testHomeRaidNoticeHtmlBuildsExpectedVariants(): void

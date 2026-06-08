@@ -5,18 +5,13 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class ErrorPageTemplateTest extends TestCase
 {
-    public function testNginxTemplateDefinesAuthenticationErrorPageInHttpAndHttpsServers(): void
+    public function testNginxTemplateDefinesErrorPagesInHttpAndHttpsServers(): void
     {
         $contents = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-site-default');
-        $this->assertEquals(2, substr_count($contents, 'error_page 401 /error-401.html;'));
-        $this->assertEquals(2, substr_count($contents, 'location = /error-401.html {'));
-    }
-
-    public function testNginxTemplateDefinesForbiddenErrorPageInHttpAndHttpsServers(): void
-    {
-        $contents = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-site-default');
-        $this->assertEquals(2, substr_count($contents, 'error_page 403 /error-403.html;'));
-        $this->assertEquals(2, substr_count($contents, 'location = /error-403.html {'));
+        foreach (['401', '403'] as $code) {
+            $this->assertEquals(2, substr_count($contents, 'error_page '.$code.' /error-'.$code.'.html;'));
+            $this->assertEquals(2, substr_count($contents, 'location = /error-'.$code.'.html {'));
+        }
     }
 
     public function testNginxTemplateLimitsPublicTestfileInHttpAndHttpsServers(): void
@@ -38,10 +33,19 @@ class ErrorPageTemplateTest extends TestCase
         ]);
     }
 
-    public function testAuthenticationErrorPageDefinesImageVariantsAndHomeLink(): void
+    public function testErrorPagesDefineImageVariantsAndHomeLinks(): void
     {
-        $contents = $this->assertErrorPageImagePool('var/www/error-401.html', '/401_images/401-', 3);
-        $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
+        foreach ([
+            ['var/www/error-401.html', '/401_images/401-', 3, true],
+            ['var/www/error-403.html', '/404_images/404-', 22, false],
+            ['var/www/error-404.html', '/404_images/404-', 22, true],
+            ['var/www/error-502.html', '/502_images/502-', 13, true],
+        ] as [$path, $prefix, $count, $hasHomeLink]) {
+            $contents = $this->assertErrorPageImagePool($path, $prefix, $count);
+            if ($hasHomeLink) {
+                $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
+            }
+        }
     }
 
     public function testForbiddenErrorPageIncludesFriendlyTextAndHomeLink(): void
@@ -51,23 +55,6 @@ class ErrorPageTemplateTest extends TestCase
             'The sage guards this path.',
             '<a href="/">Return to the main page.</a>',
         ]);
-    }
-
-    public function testForbiddenErrorPageDefinesTwentyTwoImageVariants(): void
-    {
-        $this->assertErrorPageImagePool('var/www/error-403.html', '/404_images/404-', 22);
-    }
-
-    public function testNotFoundErrorPageDefinesTwentyTwoImageVariantsAndHomeLink(): void
-    {
-        $contents = $this->assertErrorPageImagePool('var/www/error-404.html', '/404_images/404-', 22);
-        $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
-    }
-
-    public function testBadGatewayErrorPageDefinesThirteenImageVariantsAndHomeLink(): void
-    {
-        $contents = $this->assertErrorPageImagePool('var/www/error-502.html', '/502_images/502-', 13);
-        $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
     }
 
     public function testBadGatewayErrorPageRestoresActionableRecoveryGuidance(): void
@@ -100,18 +87,17 @@ class ErrorPageTemplateTest extends TestCase
         );
     }
 
-    public function testSuspendedErrorPageDoesNotReferenceABrokenImage(): void
+    public function testSuspendedErrorPageKeepsReadableSupportCallToAction(): void
     {
         $contents = $this->pmssReadRepoFile('var/www/error-suspended.html');
         $this->assertStringNotContainsString('<img', $contents);
-        $this->assertStringContainsString('Account Suspended', $contents);
-        $this->assertStringContainsString('https://pulsedmedia.com/contact/', $contents);
-    }
-
-    public function testSuspendedErrorPageKeepsSupportCallToActionReadable(): void
-    {
-        $contents = $this->pmssReadRepoFile('var/www/error-suspended.html');
-        $this->assertStringContainsAllStrings(['class="cta"', '.cta:visited', 'color:#fff;'], $contents);
+        $this->assertStringContainsAllStrings([
+            'Account Suspended',
+            'https://pulsedmedia.com/contact/',
+            'class="cta"',
+            '.cta:visited',
+            'color:#fff;',
+        ], $contents);
     }
 
     public function testUserNginxTemplateUsesPerUser502FallbackPage(): void

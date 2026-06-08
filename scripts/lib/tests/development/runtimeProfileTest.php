@@ -27,47 +27,34 @@ class RuntimeProfileTest extends TestCase
         ]);
     }
 
-    public function testRecordProfileInitializesStoreWhenMissing(): void
+    public function testRecordProfileInitializesStoreAndAppendsEntry(): void
     {
         $this->resetState();
         $this->assertTrue(empty($GLOBALS['PMSS_PROFILE'] ?? []));
 
-        $this->recordProfileEntry(['description' => 'Init']);
+        $this->recordProfileEntry(['description' => 'Sample', 'duration' => 0.1]);
 
         $this->assertTrue(is_array($GLOBALS['PMSS_PROFILE']));
-    }
-
-    public function testRecordProfileAppendsEntry(): void
-    {
-        $this->resetState();
-        $this->recordProfileEntry(['description' => 'Sample', 'duration' => 0.1]);
         $this->assertEquals(1, count($GLOBALS['PMSS_PROFILE'] ?? []));
     }
 
-    public function testProfileSummaryWritesJsonLog(): void
+    public function testProfileSummaryOutputFileWriteDependsOnRecordedEntries(): void
     {
-        $this->resetState();
-        $tmpProfile = $this->pmssMakeTempPath('pmss-profile-');
-        $this->pmssTrackEnvOverrides([
-            'PMSS_PROFILE_OUTPUT' => $tmpProfile,
-            'PMSS_JSON_LOG' => null,
-        ]);
-        $this->recordProfileEntry(['description' => 'First', 'duration' => 0.2]);
-        pmssProfileSummary();
-        $this->assertTrue(file_exists($tmpProfile));
-        $this->pmssReadJsonArrayFile($tmpProfile, null, 'Profile output should contain recorded entries');
-    }
+        foreach ([['pmss-profile-', true], ['pmss-profile-empty-', false]] as [$prefix, $hasEntry]) {
+            $this->resetState();
+            $tmpProfile = $this->pmssMakeTempPath($prefix);
+            $this->pmssTrackEnvOverrides(['PMSS_PROFILE_OUTPUT' => $tmpProfile, 'PMSS_JSON_LOG' => null]);
+            if ($hasEntry) {
+                $this->recordProfileEntry(['description' => 'First', 'duration' => 0.2]);
+            }
 
-    public function testProfileSummarySkipsWhenEmpty(): void
-    {
-        $this->resetState();
-        $tmpProfile = $this->pmssMakeTempPath('pmss-profile-empty-');
-        $this->pmssTrackEnvOverrides([
-            'PMSS_PROFILE_OUTPUT' => $tmpProfile,
-            'PMSS_JSON_LOG' => null,
-        ]);
-        pmssProfileSummary();
-        $this->assertTrue(!file_exists($tmpProfile), 'No file should be written when profile is empty');
+            pmssProfileSummary();
+
+            $this->assertSame($hasEntry, file_exists($tmpProfile), 'profile output file state');
+            if ($hasEntry) {
+                $this->pmssReadJsonArrayFile($tmpProfile, null, 'Profile output should contain recorded entries');
+            }
+        }
     }
 
     public function testProfileSummaryToleratesMalformedEntries(): void
