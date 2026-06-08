@@ -47,6 +47,21 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
         $this->assertEquals(['visited '.$first, 'visited '.$second], $this->logs, 'Dispatcher must pass the shared logger through');
     }
 
+    public function testLineSearchHonorsForwardBackwardAndRegexWindows(): void
+    {
+        $lines = [
+            'alpha',
+            '    if blocks_read:',
+            '        metric = disk.num_blocks_cache_hits',
+            '    else:',
+        ];
+
+        $this->assertEquals(2, \pmssDelugeLineSearch($lines, 'num_blocks', 0));
+        $this->assertEquals(1, \pmssDelugeLineSearch($lines, '/^\\s*if blocks_read:\\s*$/', 3, 0, -1, true));
+        $this->assertEquals(null, \pmssDelugeLineSearch($lines, 'else', 0, 2));
+        $this->assertEquals(null, \pmssDelugeLineSearch($lines, 'alpha', 0, null, 0));
+    }
+
     public function testPatchReturnsTrueWhenGuardAlreadyPresent(): void
     {
         $path = $this->tempDir.'/core.py';
