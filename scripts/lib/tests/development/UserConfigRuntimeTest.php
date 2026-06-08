@@ -23,15 +23,17 @@ class UserConfigRuntimeTest extends TestCase
         $this->assertSame($expected, \pmssUserConfigRtorrentLockPid($lockFile));
     }
 
-    public function testRtorrentLockPidParsesCanonicalLock(): void
+    public function testRtorrentLockPidParsesCanonicalAndRejectsMalformedValues(): void
     {
-        $this->assertRtorrentLockPid(12345, "12345:+session\n");
-    }
-
-    public function testRtorrentLockPidRejectsMalformedValues(): void
-    {
-        foreach (['', '0:+session', '1:+session', 'abc:+session', '-5:+session'] as $content) {
-            $this->assertRtorrentLockPid(null, $content);
+        foreach ([
+            ["12345:+session\n", 12345],
+            ['', null],
+            ['0:+session', null],
+            ['1:+session', null],
+            ['abc:+session', null],
+            ['-5:+session', null],
+        ] as $case) {
+            $this->assertRtorrentLockPid($case[1], $case[0]);
         }
     }
 
@@ -45,14 +47,12 @@ class UserConfigRuntimeTest extends TestCase
         $this->assertSame(null, \pmssUserConfigRtorrentLockPid($link));
     }
 
-    public function testProcStatusUidParsesRealUid(): void
+    public function testRtorrentProcFixtureSupportsUidAndOwnershipChecks(): void
     {
-        $this->assertSame(1500, \pmssUserConfigProcStatusUid(12345, $this->writeRtorrentProcFixture()));
-    }
+        $procRoot = $this->writeRtorrentProcFixture();
 
-    public function testRtorrentProcessOwnedByAcceptsMatchingRtorrent(): void
-    {
-        $this->assertTrue(\pmssUserConfigRtorrentProcessOwnedBy(12345, 1500, $this->writeRtorrentProcFixture()));
+        $this->assertSame(1500, \pmssUserConfigProcStatusUid(12345, $procRoot));
+        $this->assertTrue(\pmssUserConfigRtorrentProcessOwnedBy(12345, 1500, $procRoot));
     }
 
     public function testRtorrentProcessOwnedByRejectsWrongUidOrCommand(): void

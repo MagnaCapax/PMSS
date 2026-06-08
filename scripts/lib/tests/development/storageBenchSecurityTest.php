@@ -46,16 +46,28 @@ class StorageBenchSecurityTest extends TestCase
         $this->assertShowPathContains($log, $expected, $case);
     }
 
+    private function benchmarkSecurityLogPath(): string
+    {
+        return $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
+    }
+
+    private function writeBenchmarkSecurityLog(string $content, int $flags = 0): string
+    {
+        $log = $this->benchmarkSecurityLogPath();
+        file_put_contents($log, $content, $flags);
+        return $log;
+    }
+
     public function testPathTraversalInJsonPathIsRead(): void
     {
-        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); @touch($log);
+        $log = $this->benchmarkSecurityLogPath(); @touch($log);
         $up = dirname($log).'/../'.basename(dirname($log)).'/'.basename($log);
         $this->assertShowPathContains($up, 'No runs found.');
     }
 
     public function testSymlinkJsonLogIsHandled(): void
     {
-        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); $dir = dirname($log); @mkdir($dir, 0700, true);
+        $log = $this->benchmarkSecurityLogPath(); $dir = dirname($log); @mkdir($dir, 0700, true);
         $real = $dir.'/real.jsonl'; @file_put_contents($real, json_encode($this->pmssStorageBenchmarkPreflightEntry('r', date('c')))."\n");
         $link = $dir.'/link.jsonl'; @symlink($real, $link);
         $this->assertShowPathContains($link, 'Storage benchmark (last run)');
@@ -68,24 +80,21 @@ class StorageBenchSecurityTest extends TestCase
 
     public function testUnreadableLogDoesNotCrash(): void
     {
-        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); @file_put_contents($log, ''); @chmod($log, 0000);
+        $log = $this->writeBenchmarkSecurityLog(''); @chmod($log, 0000);
         $this->assertShowPathContains($log, 'No runs found.');
         @chmod($log, 0600);
     }
 
     public function testHugeLineDoesNotCrash(): void
     {
-        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
         $big = str_repeat('A', 50000);
-        file_put_contents($log, '{"run_id":"r","run_ts":"'.date('c').'","test":"preflight-idle","label":"'.$big.'","ok":true}'."\n");
+        $log = $this->writeBenchmarkSecurityLog('{"run_id":"r","run_ts":"'.date('c').'","test":"preflight-idle","label":"'.$big.'","ok":true}'."\n");
         $this->assertShowPathContains($log, 'Storage benchmark (last run)');
     }
 
     public function testNullBytesInLogAreIgnored(): void
     {
-        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
-        file_put_contents($log, "\0\0\0\n", FILE_APPEND);
-        $this->assertShowPathContains($log, 'No runs found.');
+        $this->assertShowPathContains($this->writeBenchmarkSecurityLog("\0\0\0\n", FILE_APPEND), 'No runs found.');
     }
 
     public function testUntrustedMetricAndDeviceFieldsAreTolerated(): void
@@ -104,29 +113,26 @@ class StorageBenchSecurityTest extends TestCase
 
     public function testMalformedUtf8InLabel(): void
     {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
         $label = "bad\x80utf8"; // invalid byte sequence
-        file_put_contents($log, '{"run_id":"x","run_ts":"'.date('c').'","label":"'.$label.'","test":"preflight-idle","ok":true}'."\n");
+        $log = $this->writeBenchmarkSecurityLog('{"run_id":"x","run_ts":"'.date('c').'","label":"'.$label.'","test":"preflight-idle","ok":true}'."\n");
         $this->assertShowPathContains($log, 'Storage benchmark (last run)');
     }
 
     public function testManyLinesDoNotTimeout(): void
     {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
+        $log = $this->benchmarkSecurityLogPath();
         for($i=0;$i<200;$i++){ $ts = gmdate('c', time()-200+$i); $this->pmssAppendFixtureLines($log, [$this->pmssStorageBenchmarkPreflightEntry('r'.$i, $ts)]); }
         $this->assertShowPathContains($log, 'Storage benchmark (last run)');
     }
 
     public function testRunIdAsArrayDoesNotCrash(): void
     {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
-        file_put_contents($log, '{"run_id":["a"],"run_ts":"'.date('c').'","test":"preflight-idle","ok":true}'."\n");
-        $this->assertShowPathContains($log, 'No runs found.');
+        $this->assertShowPathContains($this->writeBenchmarkSecurityLog('{"run_id":["a"],"run_ts":"'.date('c').'","test":"preflight-idle","ok":true}'."\n"), 'No runs found.');
     }
 
     public function testLeadingBOMInFileIsTolerated(): void
     {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
+        $log = $this->benchmarkSecurityLogPath();
         file_put_contents($log, "\xEF\xBB\xBF", FILE_APPEND);
         file_put_contents($log, json_encode($this->pmssStorageBenchmarkPreflightEntry('bom', date('c')))."\n", FILE_APPEND);
         $this->assertShowPathContains($log, 'Storage benchmark (last run)');
@@ -148,7 +154,7 @@ class StorageBenchSecurityTest extends TestCase
 
     public function testMalformedThenValidLineWorks(): void
     {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
+        $log = $this->benchmarkSecurityLogPath();
         file_put_contents($log, "{bad}\n", FILE_APPEND);
         $this->pmssAppendFixtureLines($log, [$this->pmssStorageBenchmarkPreflightEntry('ok', date('c'))]);
         $this->assertShowPathContains($log, 'Storage benchmark (last run)');
@@ -377,10 +383,9 @@ SH,
         $base = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
         @mkdir($base.'/safe', 0700, true);
         $target = $base.'/safe/../safe';
-        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
 
         $this->assertBenchmarkInputGuard(
-            ['--target='.$target, '--json='.$log],
+            ['--target='.$target, '--json='.$this->benchmarkSecurityLogPath()],
             "Error: unsafe target directory: {$target}\n"
         );
     }
@@ -390,10 +395,9 @@ SH,
         $real = $this->pmssMakeTempDir('pmss-bench-target-real-', 0700);
         $link = sys_get_temp_dir().'/pmss-bench-target-link-'.bin2hex(random_bytes(2));
         $this->pmssCreateSymlinkOrSkip($real, $link);
-        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
 
         $this->assertBenchmarkInputGuard(
-            ['--target='.$link, '--json='.$log],
+            ['--target='.$link, '--json='.$this->benchmarkSecurityLogPath()],
             "Error: unsafe target directory: {$link}\n"
         );
     }

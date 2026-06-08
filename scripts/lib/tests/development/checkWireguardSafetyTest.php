@@ -97,40 +97,30 @@ class CheckWireguardSafetyTest extends TestCase
         });
     }
 
-    public function testMainSyncsActiveInterfaceWhenConfiguredPeerIsMissing(): void
+    public function testMainHandlesPeerReconcileStates(): void
     {
-        $this->assertWireguardMainRun(
-            [$this->validPeerA],
-            [],
-            true,
-            ['wg0 missing 1 configured peer(s), attempting syncconf', 'wg0 peer set reconciled with syncconf'],
-            ['wg syncconf wg0 '],
-            ['systemctl restart wg-quick@wg0']
-        );
-    }
-
-    public function testMainSkipsSyncWhenRuntimePeersMatchConfig(): void
-    {
-        $this->assertWireguardMainRun(
-            [$this->validPeerA],
-            [$this->validPeerA],
-            true,
-            ['wg0 runtime peers match config'],
-            [],
-            ['wg syncconf wg0 ', 'systemctl restart wg-quick@wg0']
-        );
-    }
-
-    public function testMainFallsBackToRestartWhenSyncFails(): void
-    {
-        $this->assertWireguardMainRun(
-            [$this->validPeerA],
-            [],
-            false,
-            ['wg peer reconcile failed during syncconf (rc=1), attempting restart', 'wg-quick@wg0 restarted successfully'],
-            ['wg syncconf wg0 ', 'systemctl restart wg-quick@wg0'],
-            []
-        );
+        foreach ([
+            [
+                [$this->validPeerA], [], true,
+                ['wg0 missing 1 configured peer(s), attempting syncconf', 'wg0 peer set reconciled with syncconf'],
+                ['wg syncconf wg0 '],
+                ['systemctl restart wg-quick@wg0'],
+            ],
+            [
+                [$this->validPeerA], [$this->validPeerA], true,
+                ['wg0 runtime peers match config'],
+                [],
+                ['wg syncconf wg0 ', 'systemctl restart wg-quick@wg0'],
+            ],
+            [
+                [$this->validPeerA], [], false,
+                ['wg peer reconcile failed during syncconf (rc=1), attempting restart', 'wg-quick@wg0 restarted successfully'],
+                ['wg syncconf wg0 ', 'systemctl restart wg-quick@wg0'],
+                [],
+            ],
+        ] as $case) {
+            $this->assertWireguardMainRun($case[0], $case[1], $case[2], $case[3], $case[4], $case[5]);
+        }
     }
 
     /** @param array<int,string> $keys */

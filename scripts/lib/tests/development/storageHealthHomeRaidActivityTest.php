@@ -20,6 +20,16 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         return $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', $device." /home ext4 rw 0 0\n", 0700);
     }
 
+    private function assertHomeRaidActivity(array $raidEntries, array $expected): void
+    {
+        $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/md1'), $raidEntries);
+
+        $this->assertTrue(is_array($activity), 'Expected activity for /home array');
+        foreach ($expected as $key => $value) {
+            $this->assertEquals($value, $activity[$key]);
+        }
+    }
+
     public function testParsesRaidActivitySummaryDetails(): void
     {
         $summary = \pmssStorageHealthRaidActivitySummaryParse(
@@ -57,12 +67,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
             ['array' => 'md1', 'resync' => '      [>....................]  recovery = 7.5% finish=60.0min speed=2000K/sec'],
         ];
 
-        $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/md1'), $raidEntries);
-
-        $this->assertTrue(is_array($activity), 'Expected activity for /home array');
-        $this->assertEquals('md1', $activity['array']);
-        $this->assertEquals('recovery', $activity['operation']);
-        $this->assertEquals('7.5%', $activity['progress']);
+        $this->assertHomeRaidActivity($raidEntries, ['array' => 'md1', 'operation' => 'recovery', 'progress' => '7.5%']);
     }
 
     public function testHomeRaidActivityReturnsNullWhenHomeIsNotOnMd(): void
@@ -81,11 +86,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
             ['array' => 'md1', 'flags' => ['degraded'], 'severity' => 'fail'],
         ];
 
-        $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/md1'), $raidEntries);
-
-        $this->assertTrue(is_array($activity), 'Expected degraded notice for /home array');
-        $this->assertEquals('md1', $activity['array']);
-        $this->assertEquals(['degraded'], $activity['flags']);
+        $this->assertHomeRaidActivity($raidEntries, ['array' => 'md1', 'flags' => ['degraded']]);
     }
 
     public function testHomeRaidActivityPrefersActiveRebuildOverDegradedNotice(): void
@@ -99,11 +100,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
             ],
         ];
 
-        $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/md1'), $raidEntries);
-
-        $this->assertTrue(is_array($activity), 'Expected active rebuild for /home array');
-        $this->assertEquals('recovery', $activity['operation']);
-        $this->assertEquals('7.5%', $activity['progress']);
+        $this->assertHomeRaidActivity($raidEntries, ['operation' => 'recovery', 'progress' => '7.5%']);
     }
 
     public function testHomeRaidNoticeHtmlIncludesAvailableDetails(): void

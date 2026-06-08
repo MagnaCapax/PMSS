@@ -81,7 +81,7 @@ class TrackerCleanerLibraryTest extends TestCase
         $this->assertSame(0640, fileperms($torrentPath) & 0777);
     }
 
-    public function testCleanedTorrentWriteRejectsSymlinkTarget(): void
+    public function testCleanedTorrentWriteRejectsUnsafeTargets(): void
     {
         $sessionDir = $this->pmssMakeTempDir('pmss-tracker-cleaner-session-');
         $outsidePath = $this->pmssMakeTempFile('pmss-tracker-cleaner-outside-');
@@ -89,17 +89,9 @@ class TrackerCleanerLibraryTest extends TestCase
         $linkPath = $sessionDir.'/sample.torrent';
         symlink($outsidePath, $linkPath);
 
-        $this->assertFalse(pmssTrackerCleanerWriteCleanedTorrent($linkPath, 'cleaned', $sessionDir));
-        $this->assertSame('outside', (string) file_get_contents($outsidePath));
-    }
-
-    public function testCleanedTorrentWriteRejectsFileOutsideSessionRoot(): void
-    {
-        $sessionDir = $this->pmssMakeTempDir('pmss-tracker-cleaner-session-');
-        $outsidePath = $this->pmssMakeTempFile('pmss-tracker-cleaner-outside-');
-        file_put_contents($outsidePath, 'outside');
-
-        $this->assertFalse(pmssTrackerCleanerWriteCleanedTorrent($outsidePath, 'cleaned', $sessionDir));
-        $this->assertSame('outside', (string) file_get_contents($outsidePath));
+        foreach ([$linkPath, $outsidePath] as $targetPath) {
+            $this->assertFalse(pmssTrackerCleanerWriteCleanedTorrent($targetPath, 'cleaned', $sessionDir));
+            $this->assertSame('outside', (string) file_get_contents($outsidePath));
+        }
     }
 }
