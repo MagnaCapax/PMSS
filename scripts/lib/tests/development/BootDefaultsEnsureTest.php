@@ -63,10 +63,7 @@ class BootDefaultsEnsureTest extends TestCase
         );
 
         $updatedGrub = (string) file_get_contents($grub);
-        $this->assertStringContainsString('console=tty0', $updatedGrub);
-        $this->assertStringContainsString('console=ttyS0,115200n8', $updatedGrub);
-        $this->assertStringContainsString('GRUB_TERMINAL="console serial"', $updatedGrub);
-        $this->assertStringContainsString('GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"', $updatedGrub);
+        $this->assertStringContainsAllStrings(['console=tty0', 'console=ttyS0,115200n8', 'GRUB_TERMINAL="console serial"', 'GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"'], $updatedGrub);
     }
 
     public function testBootDefaultsNormalizesExtraGrubInputs(): void

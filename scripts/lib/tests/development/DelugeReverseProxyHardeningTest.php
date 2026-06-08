@@ -167,11 +167,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
         $block = \pmssNginxUserSubdomainTemplates()['private'];
 
-        $this->assertStringContainsString('Keep for compatibility until at least 2028-01-28', $block);
-        $this->assertStringContainsString('location = /deluge-##user## {', $block);
-        $this->assertStringContainsString('return 308 /deluge-##user##/$is_args$args;', $block);
-        $this->assertStringContainsString('location /deluge-##user##/ {', $block);
-        $this->assertStringContainsString('proxy_pass http://127.0.0.1:##port##/deluge-##user##/;', $block);
+        $this->assertStringContainsAllStrings(['Keep for compatibility until at least 2028-01-28', 'location = /deluge-##user## {', 'return 308 /deluge-##user##/$is_args$args;', 'location /deluge-##user##/ {', 'proxy_pass http://127.0.0.1:##port##/deluge-##user##/;'], $block);
     }
 
     public function testCreateNginxConfigAddsBaseHostnameToDefaultServerName(): void
@@ -209,9 +205,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
         // Regression guard: if we ever need to render a legacy template placeholder,
         // never trust user-owned/symlinked port files.
-        $this->assertStringContainsString("'/.delugePort'", $script);
-        $this->assertStringContainsString('fileowner(', $script);
-        $this->assertStringContainsString('is_link(', $script);
+        $this->assertStringContainsAllStrings(["'/.delugePort'", 'fileowner(', 'is_link('], $script);
     }
 
     // =========================================================================
@@ -222,19 +216,14 @@ class DelugeReverseProxyHardeningTest extends TestCase
     {
         $fragment = \pmssLighttpdManagedProxyFragment('deluge', 'testuser', 31111);
 
-        $this->assertStringContainsString('^/user-testuser/deluge($|/)', $fragment);
-        $this->assertStringContainsString('"port" => 31111', $fragment);
-        $this->assertStringContainsString('"host" => "127.0.0.1"', $fragment);
+        $this->assertStringContainsAllStrings(['^/user-testuser/deluge($|/)', '"port" => 31111', '"host" => "127.0.0.1"'], $fragment);
     }
 
     public function testDelugeLighttpdProxyFragmentContainsLegacyMapping(): void
     {
         $fragment = \pmssLighttpdManagedProxyFragment('deluge', 'testuser', 31111);
 
-        $this->assertStringContainsString('^/deluge-testuser($|/)', $fragment);
-        $this->assertStringContainsString('"map-urlpath"', $fragment);
-        $this->assertStringContainsString('"/deluge-testuser/"  => "/"', $fragment);
-        $this->assertStringContainsString('"/deluge-testuser" => ""', $fragment);
+        $this->assertStringContainsAllStrings(['^/deluge-testuser($|/)', '"map-urlpath"', '"/deluge-testuser/"  => "/"', '"/deluge-testuser" => ""'], $fragment);
     }
 
     public function testDelugeLighttpdProxyFragmentDisablesBasicAuthForDelugePaths(): void
@@ -496,10 +485,8 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $templates = \pmssNginxUserSubdomainTemplates();
 
         // Keep upload-specific timeout and streaming directives in one WebDAV include.
-        $this->assertStringContainsString('location /webdav-##user##/', $templates['public']);
-        $this->assertStringContainsString('include /etc/nginx/webdav_proxy_params;', $templates['public']);
-        $this->assertStringContainsString('location /webdav-##user##/', $templates['private']);
-        $this->assertStringContainsString('include /etc/nginx/webdav_proxy_params;', $templates['private']);
+        $this->assertStringContainsAllStrings(['location /webdav-##user##/', 'include /etc/nginx/webdav_proxy_params;'], $templates['public']);
+        $this->assertStringContainsAllStrings(['location /webdav-##user##/', 'include /etc/nginx/webdav_proxy_params;'], $templates['private']);
     }
 
     public function testWebdavLocationsAllowLargeUploads(): void

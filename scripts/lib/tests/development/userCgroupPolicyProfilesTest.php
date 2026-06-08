@@ -115,11 +115,7 @@ class UserCgroupPolicyProfilesTest extends TestCase
             ['PMSS_CONFIG_DIR' => $configDirectory]
         );
 
-        $this->assertStringContainsString('IOWeight=240', $output);
-        $this->assertStringContainsString('IOReadBandwidthMax=/dev/sda 7M', $output);
-        $this->assertStringContainsString('IOWriteBandwidthMax=/dev/sda 13M', $output);
-        $this->assertStringContainsString('IOReadIOPSMax=/dev/sda 77', $output);
-        $this->assertStringContainsString('IOWriteIOPSMax=/dev/sda 88', $output);
+        $this->assertStringContainsAllStrings(['IOWeight=240', 'IOReadBandwidthMax=/dev/sda 7M', 'IOWriteBandwidthMax=/dev/sda 13M', 'IOReadIOPSMax=/dev/sda 77', 'IOWriteIOPSMax=/dev/sda 88'], $output);
     }
 
     public function testIoProfilePolicyCanDefineCustomProfile(): void
@@ -165,8 +161,6 @@ class UserCgroupPolicyProfilesTest extends TestCase
             ['PMSS_CONFIG_DIR' => $configDirectory]
         );
 
-        $this->assertStringContainsString('IOWeight=333', $output);
-        $this->assertStringContainsString('CPUWeight=444', $output);
-        $this->assertStringContainsString('TasksMax=9999', $output);
+        $this->assertStringContainsAllStrings(['IOWeight=333', 'CPUWeight=444', 'TasksMax=9999'], $output);
     }
 }

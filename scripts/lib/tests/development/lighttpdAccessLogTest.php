@@ -108,10 +108,10 @@ class LighttpdAccessLogTest extends TestCase
 
     public function testCronScriptUsesSharedTrimHelper(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/cron/lighttpdAccessLogTrim.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/../lib/lighttpd/accessLog.php';", $src);
-        $this->assertStringContainsString('pmssLighttpdAccessLogTrimFile($logPath, $thresholdBytes);', $src);
-        $this->assertStringContainsString('Trimmed oversized lighttpd access log for', $src);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/lighttpdAccessLogTrim.php', [
+            "require_once __DIR__.'/../lib/lighttpd/accessLog.php';",
+            'pmssLighttpdAccessLogTrimFile($logPath, $thresholdBytes);',
+            'Trimmed oversized lighttpd access log for',
+        ]);
     }
 }

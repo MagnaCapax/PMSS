@@ -27,9 +27,7 @@ class UserUpdateHttpTest extends TestCase
 
         $updated = file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf');
         $updatedConfig = ($updated === false) ? '' : $updated;
-        $this->assertStringContainsString('WebUI\\CSRFProtection=false', $updatedConfig);
-        $this->assertStringContainsString('WebUI\\ClickjackingProtection=false', $updatedConfig);
-        $this->assertStringContainsString('WebUI\\HostHeaderValidation=false', $updatedConfig);
+        $this->assertStringContainsAllStrings(['WebUI\\CSRFProtection=false', 'WebUI\\ClickjackingProtection=false', 'WebUI\\HostHeaderValidation=false'], $updatedConfig);
         $this->assertTrue(strpos($updatedConfig, 'WebUI\\CSRFProtection=true') === false);
         $this->assertTrue(strpos($updatedConfig, 'WebUI\\ClickjackingProtection=true') === false);
         $this->assertTrue(strpos($updatedConfig, 'WebUI\\HostHeaderValidation=true') === false);
@@ -83,11 +81,7 @@ class UserUpdateHttpTest extends TestCase
 
         $updated = file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf');
         $updatedConfig = ($updated === false) ? '' : $updated;
-        $this->assertStringContainsString('WebUI\\Port=12345', $updatedConfig);
-        $this->assertStringContainsString('WebUI\\Address=*', $updatedConfig);
-        $this->assertStringContainsString('WebUI\\CSRFProtection=false', $updatedConfig);
-        $this->assertStringContainsString('Downloads\\PreAllocation=true', $updatedConfig);
-        $this->assertStringContainsString('Session\\DiskCacheSize=128', $updatedConfig);
+        $this->assertStringContainsAllStrings(['WebUI\\Port=12345', 'WebUI\\Address=*', 'WebUI\\CSRFProtection=false', 'Downloads\\PreAllocation=true', 'Session\\DiskCacheSize=128'], $updatedConfig);
     }
 
     public function testConfigureHttpRefreshesDelugeManagedKeys(): void
@@ -116,13 +110,7 @@ JSON
         \pmssUserConfigureHttp($ctx);
 
         $updated = (string) file_get_contents($home.'/.config/deluge/core.conf');
-        $this->assertStringContainsString('"download_location": "/home/dummy/data"', $updated);
-        $this->assertStringContainsString('"enabled_plugins": [', $updated);
-        $this->assertStringContainsString('"Label"', $updated);
-        $this->assertStringContainsString('"max_active_downloading": 5', $updated);
-        $this->assertStringContainsString('"max_active_limit": 500', $updated);
-        $this->assertStringContainsString('"max_connections_global": 300', $updated);
-        $this->assertStringContainsString('"max_upload_slots_global": 15', $updated);
+        $this->assertStringContainsAllStrings(['"download_location": "/home/dummy/data"', '"enabled_plugins": [', '"Label"', '"max_active_downloading": 5', '"max_active_limit": 500', '"max_connections_global": 300', '"max_upload_slots_global": 15'], $updated);
     }
 
     public function testConfigureHttpUsesDefaultSkelPathForIrssiCopy(): void

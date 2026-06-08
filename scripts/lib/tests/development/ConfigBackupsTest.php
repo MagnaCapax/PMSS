@@ -28,10 +28,7 @@ class ConfigBackupsTest extends TestCase
         $this->assertEquals("Port 22\n", file_get_contents($backup));
 
         $expectedKey = \pmssConfigBackupsPathKey($source);
-        $this->assertStringContainsString('/sshd/', (string) $backup);
-        $this->assertStringContainsString('20260131123456__'.$expectedKey, (string) $backup);
-        $this->assertStringContainsString('__v=git_main_2026-01-31', (string) $backup);
-        $this->assertStringContainsString('__cid=abc-123', (string) $backup);
+        $this->assertStringContainsAllStrings(['/sshd/', '20260131123456__'.$expectedKey, '__v=git_main_2026-01-31', '__cid=abc-123'], (string) $backup);
         $this->assertTrue((fileperms($backup) & 0777) === 0600);
     }
 

@@ -100,9 +100,7 @@ class UpdateServicesRuntimeTest extends TestCase
         $content = \pmssCronRestartDropinContent();
 
         $this->assertTrue(strpos($content, "[Service]\n") === 0);
-        $this->assertStringContainsString("TasksAccounting=yes\n", $content);
-        $this->assertStringContainsString("TasksMax=8192\n", $content);
-        $this->assertStringContainsString("Restart=always\n", $content);
+        $this->assertStringContainsAllStrings(["TasksAccounting=yes\n", "TasksMax=8192\n", "Restart=always\n"], $content);
     }
 
     public function testCronRestartDropinSkipsUnchangedContent(): void

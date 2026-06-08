@@ -25,8 +25,6 @@ class StatsAppToggleFrontendTest extends TestCase
         $html = $this->pmssRenderCustomerPanelPage('stats.php', array('.qbittorrentEnable', '.delugeEnable', '.rcloneEnable'));
 
         $this->assertEquals(3, substr_count($html, 'data-action="disable"'));
-        $this->assertStringContainsString('aria-label="Disable qBittorrent"', $html);
-        $this->assertStringContainsString('aria-label="Disable Deluge"', $html);
-        $this->assertStringContainsString('aria-label="Disable rclone"', $html);
+        $this->assertStringContainsAllStrings(['aria-label="Disable qBittorrent"', 'aria-label="Disable Deluge"', 'aria-label="Disable rclone"'], $html);
     }
 }

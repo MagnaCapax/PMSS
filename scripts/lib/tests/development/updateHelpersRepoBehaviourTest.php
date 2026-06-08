@@ -125,10 +125,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
     {
         $cmd = \aptCmd('install -y');
         $this->assertTrue(strpos($cmd, 'apt-get') !== false);
-        $this->assertStringContainsString('DEBIAN_FRONTEND=noninteractive', $cmd);
-        $this->assertStringContainsString('APT_LISTCHANGES_FRONTEND=none', $cmd);
-        $this->assertStringContainsString('UCF_FORCE_CONFOLD=1', $cmd);
-        $this->assertStringContainsString('NEEDRESTART_MODE=a', $cmd);
+        $this->assertStringContainsAllStrings(['DEBIAN_FRONTEND=noninteractive', 'APT_LISTCHANGES_FRONTEND=none', 'UCF_FORCE_CONFOLD=1', 'NEEDRESTART_MODE=a'], $cmd);
         $this->assertEquals('install -y', substr($cmd, -strlen('install -y')));
     }
 

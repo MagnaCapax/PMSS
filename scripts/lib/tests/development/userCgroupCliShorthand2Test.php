@@ -13,10 +13,7 @@ class UserCgroupCliShorthand2Test extends TestCase
         $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--device=/home', '--io-profile=hdd'], [
             'PMSS_HOME_DEVICE' => '/dev/pmssHOME',
         ]);
-        $this->assertStringContainsString('user=root', $out);
-        $this->assertStringContainsString('Planned IO properties', $out);
-        $this->assertStringContainsString('IOReadBandwidthMax=/dev/pmssHOME 5M', $out);
-        $this->assertStringContainsString('IOWriteIOPSMax=/dev/pmssHOME 100', $out);
+        $this->assertStringContainsAllStrings(['user=root', 'Planned IO properties', 'IOReadBandwidthMax=/dev/pmssHOME 5M', 'IOWriteIOPSMax=/dev/pmssHOME 100'], $out);
     }
 
     public function testSingleCpuWeightFlagOnly(): void

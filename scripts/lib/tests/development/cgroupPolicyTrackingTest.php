@@ -9,9 +9,7 @@ class CgroupPolicyTrackingTest extends TestCase
     {
         $policy = $this->pmssReadRepoFile('etc/seedbox/config/cgroup.policy.php');
 
-        $this->assertStringContainsString('scheduler-aware IO auto-policy', $policy);
-        $this->assertStringContainsString('per-user burst allowances', $policy);
-        $this->assertStringContainsString('network shaping hints in cgroup policy', $policy);
+        $this->assertStringContainsAllStrings(['scheduler-aware IO auto-policy', 'per-user burst allowances', 'network shaping hints in cgroup policy'], $policy);
         $this->pmssAssertStringNotContainsString('LimitNOFILE', $policy, 'Implemented NOFILE support should not remain a policy TODO');
     }
 

@@ -27,9 +27,7 @@ class RtorrentScgiTest extends TestCase
         $xmlData = '<test>data</test>';
         $request = rtorrentScgiFormatRequest($xmlData);
 
-        $this->assertStringContainsString('CONTENT_LENGTH', $request);
-        $this->assertStringContainsString('SCGI', $request);
-        $this->assertStringContainsString($xmlData, $request);
+        $this->assertStringContainsAllStrings(['CONTENT_LENGTH', 'SCGI', $xmlData], $request);
 
         $this->assertTrue(
             preg_match('/^(\d+):/', $request, $m) === 1,
@@ -53,19 +51,14 @@ class RtorrentScgiTest extends TestCase
         $method = 'system.api_version';
         $xml = rtorrentScgiFormatXmlrpcParamsCall($method);
 
-        $this->assertStringContainsString('<?xml version="1.0"', $xml);
-        $this->assertStringContainsString('<methodCall>', $xml);
-        $this->assertStringContainsString('<methodName>system.api_version</methodName>', $xml);
-        $this->assertStringContainsString('</methodCall>', $xml);
+        $this->assertStringContainsAllStrings(['<?xml version="1.0"', '<methodCall>', '<methodName>system.api_version</methodName>', '</methodCall>'], $xml);
     }
 
     public function testXmlrpcIntCallFormattingProducesValidXml(): void
     {
         $xml = rtorrentScgiFormatXmlrpcParamsCall('throttle.global_up.max_rate.set', [42]);
 
-        $this->assertStringContainsString('<methodName>throttle.global_up.max_rate.set</methodName>', $xml);
-        $this->assertStringContainsString('<int>42</int>', $xml);
-        $this->assertStringContainsString('<params>', $xml);
+        $this->assertStringContainsAllStrings(['<methodName>throttle.global_up.max_rate.set</methodName>', '<int>42</int>', '<params>'], $xml);
     }
 
     public function testXmlrpcParamsCallFormatsStringAndListValues(): void
@@ -101,9 +94,7 @@ class RtorrentScgiTest extends TestCase
         $method = 'test<>&method';
         $xml = rtorrentScgiFormatXmlrpcParamsCall($method);
 
-        $this->assertStringContainsString('&lt;', $xml);
-        $this->assertStringContainsString('&gt;', $xml);
-        $this->assertStringContainsString('&amp;', $xml);
+        $this->assertStringContainsAllStrings(['&lt;', '&gt;', '&amp;'], $xml);
     }
 
     public function testSocketPathGeneration(): void
@@ -181,9 +172,7 @@ class RtorrentScgiTest extends TestCase
         $xmlrpc = rtorrentScgiFormatXmlrpcParamsCall($method);
         $request = rtorrentScgiFormatRequest($xmlrpc);
 
-        $this->assertStringContainsString('CONTENT_LENGTH', $request);
-        $this->assertStringContainsString('system.hostname', $request);
-        $this->assertStringContainsString('methodCall', $request);
+        $this->assertStringContainsAllStrings(['CONTENT_LENGTH', 'system.hostname', 'methodCall'], $request);
 
         $this->assertTrue(strlen($request) > 50, 'Complete request should be substantial');
     }
