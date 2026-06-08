@@ -28,26 +28,13 @@
  */
 declare(strict_types=1);
 
-require_once __DIR__.'/../lib/log.php';
-require_once __DIR__.'/../lib/user/identity.php';
+require_once __DIR__.'/../lib/cgroup/directApply.php';
 
 const PMSS_IOPS_USERS_DIR = '/etc/seedbox/config/users';
 
 $DRY_RUN = in_array('--dry-run', $argv ?? [], true);
 
-if (!function_exists('posix_geteuid') || !function_exists('posix_getpwnam')) {
-    fwrite(STDERR, "FATAL: POSIX extension required to resolve managed user UIDs\n");
-    exit(2);
-}
-if (posix_geteuid() !== 0) {
-    fwrite(STDERR, "FATAL: must run as root (writes to /sys/fs/cgroup/blkio/)\n");
-    exit(2);
-}
-if (!is_dir('/sys/fs/cgroup/blkio')) {
-    // v2 unified host — systemd IOReadIOPSMax already maps to io.max, no direct-write needed.
-    fwrite(STDERR, "INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); not applicable here\n");
-    exit(0);
-}
+pmssCgroupDirectRequireRuntime('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); not applicable here');
 
 /**
  * Resolve /home backing device to "major:minor" decimal string.
@@ -72,12 +59,6 @@ function pmssIopsResolveHomeMajorMinor(): ?string
 function pmssIopsMajorMinorValid(string $majMin): bool
 {
     return preg_match('/^[0-9]+:[0-9]+$/', $majMin) === 1;
-}
-
-/** Keep direct cgroup writes scoped to the expected per-user blkio throttle files. */
-function pmssIopsThrottlePathAllowed(string $cgPath): bool
-{
-    return preg_match('#^/sys/fs/cgroup/blkio/user\.slice/user-[1-9][0-9]*\.slice/blkio\.throttle\.(read|write)_iops_device$#', $cgPath) === 1;
 }
 
 /**
@@ -105,7 +86,10 @@ function pmssIopsParseSpec($raw): ?int
  */
 function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $dryRun): array
 {
-    if (!pmssIopsMajorMinorValid($majMin) || $iops <= 0 || !pmssIopsThrottlePathAllowed($cgPath)) {
+    if (!pmssIopsMajorMinorValid($majMin)
+        || $iops <= 0
+        || !pmssCgroupDirectUserBlkioPathAllowed($cgPath, ['blkio.throttle.read_iops_device', 'blkio.throttle.write_iops_device'])
+    ) {
         return ['ok' => false, 'reason' => 'invalid-target', 'cur' => null];
     }
     if (!is_file($cgPath) || !is_writable($cgPath)) {
@@ -140,21 +124,8 @@ openlog('pmss-iops', LOG_PID, LOG_DAEMON);
 
 $total = 0; $written = 0; $skippedNoSlice = 0; $errors = 0;
 
-foreach (glob(PMSS_IOPS_USERS_DIR.'/*.json') ?: [] as $cfgPath) {
-    $user = basename($cfgPath, '.json');
-    if (!pmssValidateUsername($user)) {
-        $errors++;
-        syslog(LOG_WARNING, "invalid username config ".str_replace(["\r", "\n", "\0"], '?', $user));
-        continue;
-    }
-
-    $json = pmssJsonFileReadAssoc($cfgPath);
-    if (!is_array($json)) {
-        $errors++;
-        syslog(LOG_WARNING, "bad json $user");
-        continue;
-    }
-
+foreach (pmssCgroupDirectUserConfigs(PMSS_IOPS_USERS_DIR, $errors) as $entry) {
+    list($user, $json) = $entry;
     $readIops  = pmssIopsParseSpec($json['IOReadIOPS']  ?? null);
     $writeIops = pmssIopsParseSpec($json['IOWriteIOPS'] ?? null);
     if ($readIops === null && $writeIops === null) {
@@ -162,28 +133,20 @@ foreach (glob(PMSS_IOPS_USERS_DIR.'/*.json') ?: [] as $cfgPath) {
     }
     $total++;
 
-    $pwd = posix_getpwnam($user);
-    if ($pwd === false) {
-        $errors++;
-        syslog(LOG_WARNING, "no passwd entry $user");
-        continue;
-    }
-    $uid = pmssPasswdEntryPositiveUid($pwd);
+    $uid = pmssCgroupDirectUserUidOrError($user, $errors);
     if ($uid === null) {
-        $errors++;
-        syslog(LOG_WARNING, "unsafe passwd uid $user");
         continue;
     }
 
-    $sliceDir = '/sys/fs/cgroup/blkio/user.slice/user-'.$uid.'.slice';
+    $sliceDir = pmssCgroupDirectUserSliceDir($uid);
     if (!is_dir($sliceDir)) {
         $skippedNoSlice++;
         continue;
     }
 
     foreach ([
-        ['read', $readIops, $sliceDir.'/blkio.throttle.read_iops_device'],
-        ['write', $writeIops, $sliceDir.'/blkio.throttle.write_iops_device'],
+        ['read', $readIops, pmssCgroupDirectUserBlkioFilePath($uid, 'blkio.throttle.read_iops_device')],
+        ['write', $writeIops, pmssCgroupDirectUserBlkioFilePath($uid, 'blkio.throttle.write_iops_device')],
     ] as $entry) {
         list($dir, $iops, $cgPath) = $entry;
         if ($iops === null) {
@@ -204,11 +167,4 @@ foreach (glob(PMSS_IOPS_USERS_DIR.'/*.json') ?: [] as $cfgPath) {
     }
 }
 
-$tag = $DRY_RUN ? 'DRY-RUN' : 'apply';
-$msg = "$tag cycle total=$total written=$written skipped_no_slice=$skippedNoSlice errors=$errors";
-syslog(LOG_INFO, $msg);
-if ($DRY_RUN) {
-    echo "$msg\n";
-}
-closelog();
-exit($errors > 0 ? 1 : 0);
+exit(pmssCgroupDirectFinishCycle($DRY_RUN, $total, $written, $skippedNoSlice, $errors));

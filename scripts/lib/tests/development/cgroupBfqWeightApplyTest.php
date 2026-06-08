@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../../cgroup/directApply.php';
 require_once __DIR__.'/../../cgroup/policy.php';
 require_once __DIR__.'/../../user/identity.php';
 
@@ -134,9 +135,9 @@ class CgroupBfqWeightApplyTest extends TestCase
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'scripts/cron/cgroupBfqWeightApply.php',
             [
-                "if (!function_exists('posix_geteuid') || !function_exists('posix_getpwnam')) {",
-                'FATAL: POSIX extension required to resolve managed user UIDs',
-                'if (posix_geteuid() !== 0) {',
+                "require_once __DIR__.'/../lib/cgroup/directApply.php';",
+                "pmssCgroupDirectRequireRuntime('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); script does not apply here');",
+                '// BFQ scheduler must be the active elevator on at least one block device.',
             ],
             'missing BFQ POSIX extension guard: ',
             'BFQ POSIX guard must run before root preflight: '
@@ -148,8 +149,8 @@ class CgroupBfqWeightApplyTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings(
             'scripts/cron/cgroupBfqWeightApply.php',
             [
-                "require_once __DIR__.'/../lib/user/identity.php';",
-                'if (!pmssValidateUsername($user)) {',
+                "require_once __DIR__.'/../lib/cgroup/directApply.php';",
+                'pmssCgroupDirectUserConfigs($USERS_DIR, $errors)',
                 'pmssBfqUserBonusPercentRead($user)',
                 'pmssBfqApplyBonusWeight($wRaw, $bonusPct',
             ]
@@ -157,9 +158,9 @@ class CgroupBfqWeightApplyTest extends TestCase
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'scripts/cron/cgroupBfqWeightApply.php',
             [
-                "\$user = basename(\$cfgPath, '.json');",
-                'syslog(LOG_WARNING, "invalid username config "',
-                '$json = pmssJsonFileReadAssoc($cfgPath);',
+                'foreach (pmssCgroupDirectUserConfigs($USERS_DIR, $errors) as $entry) {',
+                'list($user, $json) = $entry;',
+                '$total++;',
                 'pmssBfqUserBonusPercentRead($user)',
             ],
             'missing BFQ username boundary guard: ',
@@ -172,10 +173,9 @@ class CgroupBfqWeightApplyTest extends TestCase
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'scripts/cron/cgroupBfqWeightApply.php',
             [
-                '$pwd = posix_getpwnam($user);',
-                '$uid = pmssPasswdEntryPositiveUid($pwd);',
-                'syslog(LOG_WARNING, "unsafe passwd uid $user");',
-                "\$cgPath = '/sys/fs/cgroup/blkio/user.slice/user-'.\$uid.'.slice/blkio.bfq.weight';",
+                '$uid = pmssCgroupDirectUserUidOrError($user, $errors);',
+                'if ($uid === null) {',
+                "pmssCgroupDirectUserBlkioFilePath(\$uid, 'blkio.bfq.weight');",
             ],
             'missing BFQ passwd UID guard: ',
             'BFQ passwd UID guard must run before sysfs path assembly: '
@@ -187,10 +187,8 @@ class CgroupBfqWeightApplyTest extends TestCase
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'scripts/cron/cgroupBfqWeightApply.php',
             [
-                'function pmssBfqWeightPathAllowed(string $cgPath): bool',
-                '#^/sys/fs/cgroup/blkio/user\.slice/user-[1-9][0-9]*\.slice/blkio\.bfq\.weight$#',
-                "\$cgPath = '/sys/fs/cgroup/blkio/user.slice/user-'.\$uid.'.slice/blkio.bfq.weight';",
-                'if (!pmssBfqWeightPathAllowed($cgPath)) {',
+                "pmssCgroupDirectUserBlkioFilePath(\$uid, 'blkio.bfq.weight');",
+                "if (!pmssCgroupDirectUserBlkioPathAllowed(\$cgPath, ['blkio.bfq.weight'])) {",
                 'syslog(LOG_WARNING, "unsafe bfq target $user uid=$uid");',
                 'if (@file_put_contents($cgPath, (string) $w) === false)',
             ],

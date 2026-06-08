@@ -31,33 +31,15 @@
 
 declare(strict_types=1);
 
+require_once __DIR__.'/../lib/cgroup/directApply.php';
 require_once __DIR__.'/../lib/cgroup/policy.php';
-require_once __DIR__.'/../lib/log.php';
-require_once __DIR__.'/../lib/user/identity.php';
 
 // Constants — tunable top-of-file per AGENTS.md doctrine.
 $USERS_DIR  = '/etc/seedbox/config/users';
-$KERN_MAX   = PMSS_BFQ_KERNEL_MAX;               // kernel BFQ absolute max
-$FORMULA_K  = PMSS_BFQ_FALLBACK_COEFFICIENT;     // 128 GiB fallback base = 250
-$FALLBACK_MAX = PMSS_BFQ_FALLBACK_BASE_MAX;      // reserves 300% bonus headroom
 $DRY_RUN    = in_array('--dry-run', $argv ?? [], true);
 
 // Pre-flight — fail loud rather than silent no-op on misconfig.
-if (!function_exists('posix_geteuid') || !function_exists('posix_getpwnam')) {
-    fwrite(STDERR, "FATAL: POSIX extension required to resolve managed user UIDs\n");
-    exit(2);
-}
-
-if (posix_geteuid() !== 0) {
-    fwrite(STDERR, "FATAL: must run as root (writes to /sys/fs/cgroup/blkio/)\n");
-    exit(2);
-}
-
-// cgroup-v2 unified hosts have no /sys/fs/cgroup/blkio — exit cleanly.
-if (!is_dir('/sys/fs/cgroup/blkio')) {
-    fwrite(STDERR, "INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); script does not apply here\n");
-    exit(0);
-}
+pmssCgroupDirectRequireRuntime('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); script does not apply here');
 
 // BFQ scheduler must be the active elevator on at least one block device.
 $bfqActive = false;
@@ -93,49 +75,20 @@ function pmssBfqUserBonusPercentRead(string $user): int
     return is_string($raw) ? max(0, (int) trim($raw)) : 0;
 }
 
-/** Keep direct BFQ writes scoped to the expected per-user cgroup-v1 weight files. */
-function pmssBfqWeightPathAllowed(string $cgPath): bool
-{
-    return preg_match('#^/sys/fs/cgroup/blkio/user\.slice/user-[1-9][0-9]*\.slice/blkio\.bfq\.weight$#', $cgPath) === 1;
-}
-
 openlog('pmss-bfq', LOG_PID, LOG_DAEMON);
 
-$total = 0;
-$written = 0;
-$skippedNoSlice = 0;
-$errors = 0;
+$total = 0; $written = 0; $skippedNoSlice = 0; $errors = 0;
 
 // Root (uid 0) is intentionally NOT in /etc/seedbox/config/users/ — leave
 // root.slice unmanaged. cgroupRootCheck.php enforces root's memory/tasks
 // policy separately.
 
-foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
-    $user = basename($cfgPath, '.json');
-    if (!pmssValidateUsername($user)) {
-        $errors++;
-        syslog(LOG_WARNING, "invalid username config ".str_replace(["\r", "\n", "\0"], '?', $user));
-        continue;
-    }
-
-    $json = pmssJsonFileReadAssoc($cfgPath);
-    if (!is_array($json)) {
-        $errors++;
-        syslog(LOG_WARNING, "bad json $user");
-        continue;
-    }
+foreach (pmssCgroupDirectUserConfigs($USERS_DIR, $errors) as $entry) {
+    list($user, $json) = $entry;
     $total++;
 
-    $pwd = posix_getpwnam($user);
-    if ($pwd === false) {
-        $errors++;
-        syslog(LOG_WARNING, "no passwd entry $user");
-        continue;
-    }
-    $uid = pmssPasswdEntryPositiveUid($pwd);
+    $uid = pmssCgroupDirectUserUidOrError($user, $errors);
     if ($uid === null) {
-        $errors++;
-        syslog(LOG_WARNING, "unsafe passwd uid $user");
         continue;
     }
 
@@ -144,15 +97,15 @@ foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
         $wRaw = (int) $json['IOWeight'];
     } else {
         $ramMiB = isset($json['ramMiB']) && is_numeric($json['ramMiB']) ? (int) $json['ramMiB'] : 0;
-        $wRaw = pmssBfqFormulaWeight($ramMiB, (float) $FORMULA_K, (int) $FALLBACK_MAX);
+        $wRaw = pmssBfqFormulaWeight($ramMiB);
     }
 
     // Free Bonus Disk Policy: ~/.bonus holds tenure/spend bonus percent.
     $bonusPct = pmssBfqUserBonusPercentRead($user);
-    $w        = pmssBfqApplyBonusWeight($wRaw, $bonusPct, (int) $KERN_MAX);
+    $w        = pmssBfqApplyBonusWeight($wRaw, $bonusPct);
 
-    $cgPath = '/sys/fs/cgroup/blkio/user.slice/user-'.$uid.'.slice/blkio.bfq.weight';
-    if (!pmssBfqWeightPathAllowed($cgPath)) {
+    $cgPath = pmssCgroupDirectUserBlkioFilePath($uid, 'blkio.bfq.weight');
+    if (!pmssCgroupDirectUserBlkioPathAllowed($cgPath, ['blkio.bfq.weight'])) {
         $errors++;
         syslog(LOG_WARNING, "unsafe bfq target $user uid=$uid");
         continue;
@@ -189,11 +142,4 @@ foreach (glob($USERS_DIR.'/*.json') ?: [] as $cfgPath) {
     syslog(LOG_INFO, "bfq $user uid=$uid: $cur -> $w");
 }
 
-$tag = $DRY_RUN ? 'DRY-RUN' : 'apply';
-$msg = "$tag cycle total=$total written=$written skipped_no_slice=$skippedNoSlice errors=$errors";
-syslog(LOG_INFO, $msg);
-if ($DRY_RUN) {
-    echo "$msg\n";
-}
-closelog();
-exit($errors > 0 ? 1 : 0);
+exit(pmssCgroupDirectFinishCycle($DRY_RUN, $total, $written, $skippedNoSlice, $errors));

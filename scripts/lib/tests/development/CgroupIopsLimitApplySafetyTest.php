@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../../cgroup/directApply.php';
 
 /**
  * Source-level guards for the direct cgroup-v1 IOPS writer.
@@ -19,10 +20,9 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'scripts/cron/cgroupIopsLimitApply.php',
             [
-                '$pwd = posix_getpwnam($user);',
-                '$uid = pmssPasswdEntryPositiveUid($pwd);',
-                'syslog(LOG_WARNING, "unsafe passwd uid $user");',
-                "\$sliceDir = '/sys/fs/cgroup/blkio/user.slice/user-'.\$uid.'.slice';",
+                '$uid = pmssCgroupDirectUserUidOrError($user, $errors);',
+                'if ($uid === null) {',
+                '$sliceDir = pmssCgroupDirectUserSliceDir($uid);',
             ],
             'missing IOPS passwd UID guard: ',
             'IOPS UID guard must run before sysfs path assembly: '
@@ -35,7 +35,7 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
             'scripts/cron/cgroupIopsLimitApply.php',
             [
                 'function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $dryRun): array',
-                'if (!pmssIopsMajorMinorValid($majMin) || $iops <= 0 || !pmssIopsThrottlePathAllowed($cgPath))',
+                "pmssCgroupDirectUserBlkioPathAllowed(\$cgPath, ['blkio.throttle.read_iops_device', 'blkio.throttle.write_iops_device'])",
                 "return ['ok' => false, 'reason' => 'invalid-target', 'cur' => null];",
                 'if (@file_put_contents($cgPath, $desired) === false)',
             ],
@@ -44,18 +44,21 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
         );
     }
 
-    public function testCronKeepsThrottlePathPatternPinnedToPerUserBlkioFiles(): void
+    public function testSharedDirectBlkioPathGuardLocksPerUserTargetShapes(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/cron/cgroupIopsLimitApply.php',
-            [
-                'function pmssIopsThrottlePathAllowed(string $cgPath): bool',
-                '#^/sys/fs/cgroup/blkio/user\.slice/user-[1-9][0-9]*\.slice/blkio\.throttle\.(read|write)_iops_device$#',
-                'function pmssIopsMajorMinorValid(string $majMin): bool',
-                "return preg_match('/^[0-9]+:[0-9]+$/', \$majMin) === 1;",
-            ],
-            'missing IOPS sysfs path guard: '
-        );
+        $allowed = ['blkio.throttle.read_iops_device', 'blkio.throttle.write_iops_device'];
+        $this->assertSame('/sys/fs/cgroup/blkio/user.slice/user-1000.slice', \pmssCgroupDirectUserSliceDir(1000));
+        $this->assertSame('/sys/fs/cgroup/blkio/user.slice/user-1000.slice/blkio.bfq.weight', \pmssCgroupDirectUserBlkioFilePath(1000, 'blkio.bfq.weight'));
+        $this->assertTrue(\pmssCgroupDirectUserBlkioPathAllowed('/sys/fs/cgroup/blkio/user.slice/user-1000.slice/blkio.bfq.weight', ['blkio.bfq.weight']));
+        foreach ([
+            ['/sys/fs/cgroup/blkio/user.slice/user-1000.slice/blkio.throttle.read_iops_device', true],
+            ['/sys/fs/cgroup/blkio/user.slice/user-1000.slice/blkio.throttle.write_iops_device', true],
+            ['/sys/fs/cgroup/blkio/user.slice/user-1000.slice/blkio.bfq.weight', false],
+            ['/sys/fs/cgroup/blkio/user.slice/user-0.slice/blkio.throttle.read_iops_device', false],
+            ['/sys/fs/cgroup/blkio/user.slice/user-1000.slice/../blkio.throttle.read_iops_device', false],
+        ] as $case) {
+            $this->assertSame($case[1], \pmssCgroupDirectUserBlkioPathAllowed($case[0], $allowed));
+        }
     }
 
     public function testCronValidatesIopsSpecPrefixBeforeParsingNumericSuffix(): void
