@@ -5,6 +5,10 @@
  * @license GPL-3.0-only
  */
 
+require_once dirname(__DIR__, 2).'/runtime.php';
+require_once dirname(__DIR__).'/fstab.php';
+require_once dirname(__DIR__).'/managedPath.php';
+
 /** Read a non-negative integer override from the environment. */
 function pmssSystemPrepReadDigitEnv(string $key): ?int
 {
@@ -37,6 +41,31 @@ function pmssTotalCpuThreads(): int
 }
 
 /**
+ * Ensure the cgroup v1 mount is present in fstab before attempting a live mount.
+ */
+function pmssCgroupV1FstabMountEnsure(string $fstabPath, callable $log): ?bool
+{
+    $lines = pmssFstabLinesRead($fstabPath, $log, 'cgroup v1 mount configuration');
+    if ($lines === null) {
+        return null;
+    }
+
+    if (pmssFstabMountEntryRead($lines, '/sys/fs/cgroup', 'cgroup') !== null) {
+        $log('[SKIP] cgroup v1 mount already present in '.$fstabPath);
+        return false;
+    }
+
+    $lines[] = "cgroup\t/sys/fs/cgroup\tcgroup\tdefaults\t0\t0";
+    if (!pmssWriteManagedPathFileWithBackup($fstabPath, $lines, 'fstab', $log, true)) {
+        $log('[WARN] Unable to append cgroup mount to '.$fstabPath);
+        return null;
+    }
+
+    $log('Appended cgroup mount configuration to '.$fstabPath.' (v1)');
+    return true;
+}
+
+/**
  * Guarantee that cgroup mounts and PID limits are configured sanely.
  */
 function pmssEnsureCgroupsConfigured(?callable $logger = null): void
@@ -44,17 +73,8 @@ function pmssEnsureCgroupsConfigured(?callable $logger = null): void
     $log = $logger ?: 'logMessage';
     $mode = pmssCgroupMode();
     if ($mode === 'v1') {
-        $fstab = @file_get_contents('/etc/fstab');
-        if ($fstab === false || strpos($fstab, ' /sys/fs/cgroup ') === false) {
-            $mountLine = "\ncgroup  /sys/fs/cgroup  cgroup  defaults  0   0\n";
-            if (@file_put_contents('/etc/fstab', $mountLine, FILE_APPEND) === false) {
-                $log('[WARN] Unable to append cgroup mount to /etc/fstab');
-            } else {
-                $log('Appended cgroup mount configuration to /etc/fstab (v1)');
-            }
+        if (pmssCgroupV1FstabMountEnsure('/etc/fstab', $log) === true) {
             runStep('Mounting /sys/fs/cgroup (v1)', 'mount /sys/fs/cgroup');
-        } else {
-            $log('[SKIP] cgroup v1 mount already present in /etc/fstab');
         }
     } elseif ($mode === 'v2') {
         $log('[SKIP] cgroup v2 detected; no fstab mount or cgroup-bin needed');

@@ -286,7 +286,7 @@ Sub-handlers:
     uses imjournal for systemd compatibility; restarts rsyslog.
     Best-effort only (never fatal); disabled by default.
 
-- pmssEnsureCgroupsConfigured(?callable $logger=null): void → appends cgroup mount to `/etc/fstab` if missing, installs `cgroup-bin`, mounts path, attempts to raise root slice PID limit.
+- pmssEnsureCgroupsConfigured(?callable $logger=null): void → on cgroup v1, ensures `/sys/fs/cgroup` is present in `/etc/fstab` through the managed fstab reader/writer (regular-file guard + backup) and only mounts after a successful new entry; attempts to raise root slice PID limit. On cgroup v2, leaves fstab untouched.
 
 - pmssEnsureSystemdSlices(?callable $logger=null): void → writes user slice override template to `/etc/systemd/system/user-.slice.d/15-pmss.conf` (never vendor paths), resolves the `/home` backing device for optional `IODeviceLatencyTargetSec` rendering from `cgroup.policy.php` on cgroup v2 hosts, optionally installs user manager `LimitNOFILE` drop-in at `/etc/systemd/system/user@.service.d/20-pmss-limits.conf` from `cgroup.policy.php` (`limitNoFileSoft`/`limitNoFileHard`), installs per-user log namespace drop-in at `/etc/systemd/system/user@.service.d/30-pmss-log-namespace.conf` (`LogNamespace=user-%i`), then runs `daemon-reload`.
 
