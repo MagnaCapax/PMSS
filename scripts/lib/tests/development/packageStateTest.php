@@ -33,15 +33,13 @@ class PackageStateTest extends TestCase
 
     public function testUpdateStep2DoesNotCarryPackageQueueSkipPath(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/util/update-step2.php' => [
+        $this->pmssAssertRepoFileContract('scripts/util/update-step2.php', [
                 'required' => ['dpkg selections are the authoritative source of package'],
                 'forbidden' => [
                     "'packages.php'",
                     'PMSS_PACKAGE_INSTALL'.'_WARNINGS',
                     'PMSS_PACKAGE_INSTALL'.'_ERRORS',
                 ],
-            ],
-        ]);
+            ]);
     }
 }

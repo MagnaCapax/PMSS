@@ -17,8 +17,7 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
 {
     public function testCronSourceSafetyContracts(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/cron/cgroupIopsLimitApply.php' => [
+        $this->pmssAssertRepoFileContract('scripts/cron/cgroupIopsLimitApply.php', [
                 'ordered' => [
                     [
                         'needles' => [
@@ -50,8 +49,7 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
                         'orderPrefix' => 'IOPS config spec guard must run before suffix parsing: ',
                     ],
                 ],
-            ],
-        ]);
+            ]);
     }
 
     public function testSharedDirectBlkioPathGuardLocksPerUserTargetShapes(): void

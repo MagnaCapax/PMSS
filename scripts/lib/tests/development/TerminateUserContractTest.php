@@ -11,9 +11,7 @@ final class TerminateUserContractTest extends TestCase
 {
     public function testTerminateUserConfirmationLoopHandlesEof(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/terminateUser.php' => ['required' => ['confirmation input unavailable (EOF)', 'Unable to read confirmation input (EOF)']],
-        ]);
+        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['required' => ['confirmation input unavailable (EOF)', 'Unable to read confirmation input (EOF)']]);
     }
 
     public function testTerminateUserInvokesSystemdRevertOnSlice(): void
@@ -27,25 +25,21 @@ final class TerminateUserContractTest extends TestCase
 
     public function testTerminateUserClearsCrontabBeforeUserdel(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/terminateUser.php' => ['ordered' => [[
+        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['ordered' => [[
                 "'crontab_remove'",
                 "'userdel_initial'",
-            ]]],
-        ]);
+            ]]]);
     }
 
     public function testTerminateUserClearsImmutableTrafficBeforeHomeReclaim(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/terminateUser.php' => [
+        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', [
                 'required' => ['command -v chattr', 'array_values(pmssTrafficDataPaths($username))'],
                 'ordered' => [[
                     "'clear_immutable_traffic'",
                     '$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim',
                 ]],
-            ],
-        ]);
+            ]);
     }
 
     public function testTerminateUserQueuesHomeReclaimAfterTrafficImmutableCleanup(): void
@@ -107,12 +101,10 @@ final class TerminateUserContractTest extends TestCase
 
     public function testTerminateUserHomeInvariantIsExact(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/terminateUser.php' => ['required' => [
+        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['required' => [
                 '$realHome !== $expectedHome',
                 'Prefix checks are too loose',
-            ]],
-        ]);
+            ]]);
     }
 
     public function testTerminateUserHandlesUnreadableRtorrentConfig(): void
@@ -134,12 +126,10 @@ final class TerminateUserContractTest extends TestCase
 
     public function testTerminateUserFinalCleanupDoesNotDeleteActiveHomeName(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/terminateUser.php' => [
+        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', [
                 'required' => ["'remove_nginx_user'"],
                 'forbidden' => ['escapeshellarg("/home/{$username}")'],
-            ],
-        ]);
+            ]);
     }
 
     public function testTerminateUserRemovesNginxSubdomainRouteFiles(): void

@@ -31,38 +31,32 @@ class userLifecycleLoggingTest extends TestCase
 
     public function testUserLifecycleWriterUsesFormattingHelperForTextLogFields(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/userLifecycle.php' => ['required' => [
+        $this->pmssAssertRepoFileContract('scripts/lib/userLifecycle.php', ['required' => [
                 "pmssUserLifecycleFormatTextField(\$payload['status'] ?? 'INFO')",
                 "pmssUserLifecycleFormatTextField(\$payload['action'] ?? 'unknown')",
                 "pmssUserLifecycleFormatTextField(\$payload['phase'] ?? 'unknown')",
                 "pmssUserLifecycleFormatTextField(\$payload['username'] ?? '')",
                 "pmssUserLifecycleFormatTextField(\$payload['message'])",
                 "pmssUserLifecycleFormatTextField(\$payload['step'])",
-            ]],
-        ]);
+            ]]);
     }
 
     public function testContextLogHelperDelegatesToBaseContextAndWriter(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/userLifecycle.php' => ['required' => [
+        $this->pmssAssertRepoFileContract('scripts/lib/userLifecycle.php', ['required' => [
                 'function pmssUserLifecycleContextLog(',
                 'pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));',
-            ]],
-        ]);
+            ]]);
     }
 
     public function testContextLogStatusMessageHelperBuildsSharedPayload(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/userLifecycle.php' => ['required' => [
+        $this->pmssAssertRepoFileContract('scripts/lib/userLifecycle.php', ['required' => [
                 'function pmssUserLifecycleContextLogStatusMessage(',
                 '\'status\' => $status',
                 '\'message\' => $message',
                 'pmssUserLifecycleContextLog(',
-            ]],
-        ]);
+            ]]);
     }
 
     public function testRunStepsPreservesOrderAndDryRunResults(): void

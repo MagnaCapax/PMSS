@@ -1496,6 +1496,12 @@ PHP
         }
     }
 
+    /** Assert one repository source-contract case without one-entry table boilerplate. */
+    protected function pmssAssertRepoFileContract(string $relativePath, array $case, string $pathPrefix = ''): void
+    {
+        $this->pmssAssertRepoFileContractCases([$relativePath => $case], $pathPrefix);
+    }
+
     /** Read a repository file and assert a fixed substring count. */
     protected function pmssAssertRepoFileSubstringCount(string $relativePath, string $needle, int $expectedCount, string $message = ''): void
     {

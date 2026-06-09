@@ -7,8 +7,7 @@ class RecreateUserSafetyGuardTest extends TestCase
 {
     public function testRecreateUserSafetyGuardsRemainInPlace(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/recreateUser.php' => ['required' => [
+        $this->pmssAssertRepoFileContract('scripts/recreateUser.php', ['required' => [
                 "pmssRequireSafeRecreateUserPath(\$homeDir, 'home');",
                 "pmssRequireSafeRecreateUserPath(\$backupDir, 'backup');",
                 'Refusing to operate on symlinked',
@@ -18,7 +17,6 @@ class RecreateUserSafetyGuardTest extends TestCase
                 'Unable to create required directory',
                 '$stat = @stat($homeDir);',
                 'Validation failed: unable to stat homeDir',
-            ]],
-        ]);
+            ]]);
     }
 }

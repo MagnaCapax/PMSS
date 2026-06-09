@@ -132,8 +132,7 @@ class CgroupBfqWeightApplyTest extends TestCase
 
     public function testCronSourceSafetyContracts(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/cron/cgroupBfqWeightApply.php' => [
+        $this->pmssAssertRepoFileContract('scripts/cron/cgroupBfqWeightApply.php', [
                 'required' => [
                     "require_once __DIR__.'/../lib/cgroup/directApply.php';",
                     'pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors',
@@ -192,7 +191,6 @@ class CgroupBfqWeightApplyTest extends TestCase
                         'orderPrefix' => 'BFQ current-weight guard must run before compare/write: ',
                     ],
                 ],
-            ],
-        ]);
+            ]);
     }
 }
