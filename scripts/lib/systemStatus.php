@@ -194,9 +194,10 @@ function pmssComponentStatusChecks(array $dependencies = []): array
 {
     $context = isset($dependencies['probeSpecs']) ? $dependencies : pmssStatusContextResolve($dependencies);
     $runCommand = $context['runCommand']; $pathExists = $context['pathExists']; $readFile = $context['readFile']; $isExecutable = $context['isExecutable'];
+    $isFile = $context['isFile'] ?? 'is_file';
     $codename = (string) $context['codename']; $sourcesPath = (string) $context['sourcesPath'];
     $results[] = pmssStatusCodenameCheck($codename, true);
-    $results[] = pmssStatusSourcesCodenameCheck($codename, $sourcesPath, 'is_file', $readFile, true);
+    $results[] = pmssStatusSourcesCodenameCheck($codename, $sourcesPath, $isFile, $readFile, true);
 
     return array_merge($results, pmssStatusProbeChecks($context['probeSpecs'], $runCommand, $isExecutable, $pathExists, true));
 }
@@ -234,33 +235,6 @@ function pmssSystemStatusOpenvpnClientArtifactCheck(callable $isFile, string $ho
         : pmssStatus('OpenVPN client artifacts', 'WARN', 'missing: '.implode(', ', $missing));
 }
 
-/** Render binary path checks that require both a file and executable bit. */
-function pmssSystemStatusExecutablePathChecks(array $paths, callable $isFile, callable $isExecutable): array
-{
-    return array_map(static function (string $label, string $path) use ($isFile, $isExecutable): array {
-        $valid = $isFile($path) && $isExecutable($path);
-        return pmssStatus($label, $valid ? 'OK' : 'WARN', $valid ? $path : $path.' missing or not executable');
-    }, array_keys($paths), array_values($paths));
-}
-
-/** Render CLI symlink checks while preserving unreadable-target diagnostics. */
-function pmssSystemStatusSymlinkChecks(array $targets, callable $isFile, callable $isLink, callable $readLink): array
-{
-    return array_map(static function (string $label, array $target) use ($isFile, $isLink, $readLink): array {
-        [$link, $expected] = $target;
-        if (!$isLink($link)) return pmssStatus($label, 'WARN', $isFile($link) ? sprintf('%s present but not a symlink', $link) : sprintf('%s missing', $link));
-        $actual = $readLink($link);
-        if ($actual === '') return pmssStatus($label, 'WARN', sprintf('%s symlink target unreadable', $link));
-        return pmssStatus($label, $actual === $expected ? 'OK' : 'WARN', $actual === $expected ? sprintf('%s -> %s', $link, $actual) : sprintf('%s -> %s (expected %s)', $link, $actual, $expected));
-    }, array_keys($targets), array_values($targets));
-}
-
-/** Prefix component status rows for the richer system-test report. */
-function pmssSystemStatusComponentProjection(array $checks): array
-{
-    return array_map(static function (array $entry): array { return pmssStatus('Component: '.(string) $entry['name'], (string) $entry['status'], (string) ($entry['detail'] ?? '')); }, $checks);
-}
-
 /**
  * Collect the richer system-test probe used by scripts/util/systemTest.php.
  *
@@ -280,13 +254,32 @@ function pmssSystemStatusChecks(array $dependencies = []): array
     $checks = array_merge($checks, pmssStatusProbeChecks($context['probeSpecs'], $runCommand, $isExecutable, $pathExists));
 
     $sourcesCheck = pmssStatusSourcesCodenameCheck($codename, $sourcesPath, $isFile, $readFile);
-    $checks = array_merge($checks, [pmssSystemStatusLocalnetConfigCheck($isFile, $isDir, $filePerms)], $sourcesCheck !== null ? [$sourcesCheck] : [], [pmssSystemStatusOpenvpnClientArtifactCheck($isFile, (string) $readFile('/etc/hostname'))], pmssSystemStatusExecutablePathChecks([
+    $checks[] = pmssSystemStatusLocalnetConfigCheck($isFile, $isDir, $filePerms);
+    $sourcesCheck !== null && $checks[] = $sourcesCheck;
+    $checks[] = pmssSystemStatusOpenvpnClientArtifactCheck($isFile, (string) $readFile('/etc/hostname'));
+
+    foreach ([
         'Virtualenv: FlexGet binary' => '/opt/flexget/bin/flexget',
         'Virtualenv: pyLoad binary' => '/opt/pyload/bin/pyload',
-    ], $isFile, $isExecutable), pmssSystemStatusSymlinkChecks([
+    ] as $label => $path) {
+        $checks[] = pmssStatus($label, ($valid = $isFile($path) && $isExecutable($path)) ? 'OK' : 'WARN', $valid ? $path : $path.' missing or not executable');
+    }
+    foreach ([
         'CLI symlink: flexget' => ['/usr/local/bin/flexget', '/opt/flexget/bin/flexget'],
         'CLI symlink: pyLoad' => ['/usr/local/bin/pyload', '/opt/pyload/bin/pyload'],
-    ], $isFile, $isLink, $readLink));
+    ] as $label => $target) {
+        [$link, $expected] = $target;
+        if (!$isLink($link)) {
+            $checks[] = pmssStatus($label, 'WARN', $isFile($link) ? sprintf('%s present but not a symlink', $link) : sprintf('%s missing', $link));
+            continue;
+        }
+        $actual = $readLink($link);
+        $checks[] = $actual === ''
+            ? pmssStatus($label, 'WARN', sprintf('%s symlink target unreadable', $link))
+            : pmssStatus($label, $actual === $expected ? 'OK' : 'WARN', $actual === $expected ? sprintf('%s -> %s', $link, $actual) : sprintf('%s -> %s (expected %s)', $link, $actual, $expected));
+    }
 
-    return array_merge($checks, pmssSystemStatusComponentProjection(pmssComponentStatusChecks($context)));
+    foreach (pmssComponentStatusChecks($context) as $entry) $checks[] = pmssStatus('Component: '.(string) $entry['name'], (string) $entry['status'], (string) ($entry['detail'] ?? ''));
+
+    return $checks;
 }

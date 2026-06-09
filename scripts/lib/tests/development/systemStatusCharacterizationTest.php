@@ -161,6 +161,18 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertEquals('codename mismatch', $checks[1]['detail']);
     }
 
+    public function testComponentChecksUseInjectedSourcesFilePredicate(): void
+    {
+        $dependencies = $this->buildComponentStatusDependencies();
+        $dependencies['isFile'] = static function (string $path): bool {
+            return false;
+        };
+
+        $checks = pmssComponentStatusChecks($dependencies);
+
+        $this->assertSame(['name' => 'apt.sources', 'status' => 'WARN', 'detail' => 'missing sources.list'], $checks[1]);
+    }
+
     public function testComponentChecksTreatWhitespaceBinaryPathsAsMissing(): void
     {
         $dependencies = $this->buildComponentStatusDependencies();
