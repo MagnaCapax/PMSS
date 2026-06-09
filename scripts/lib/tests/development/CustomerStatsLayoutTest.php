@@ -63,6 +63,46 @@ final class CustomerStatsLayoutTest extends TestCase
         ));
     }
 
+    public function testTrafficUsageRendersRawOnlyTrafficSnapshots(): void
+    {
+        $home = $this->pmssMakeUserHomeTree('pmss-stats-traffic-', 'www');
+        $www = $home.'/www';
+        $trafficData = array(
+            'raw' => array('month' => 1025.0, 'week' => 512.0, 'day' => 2.0),
+            'daily' => array('2026-06-01' => 1.0, '2026-06-02' => 2.0),
+        );
+        $trafficIngressData = array('raw' => array('month' => 2048.0), 'daily' => array());
+        $this->pmssWriteSerializedFixture($home.'/.trafficData', $trafficData);
+        $this->pmssWriteSerializedFixture($home.'/.trafficDataIngress', $trafficIngressData);
+
+        $cwd = getcwd();
+        $this->assertTrue(is_string($cwd), 'Expected current working directory to be available.');
+        chdir($www);
+        try {
+            [, $output] = $this->pmssCaptureStdout(function (): void {
+                \pmssStatsRenderTrafficUsageBlock();
+            });
+        } finally {
+            chdir($cwd);
+        }
+
+        $this->assertStringContainsString('Week: 512MiB, Day: 2MiB', $output);
+        $this->assertStringContainsString('Past 30 days upload traffic: 1GiB', $output);
+        $this->assertStringContainsString('Past 30 days inbound traffic: 2GiB', $output);
+    }
+
+    public function testTrafficDisplayValueKeepsDisplayAndFallsBackToRaw(): void
+    {
+        $this->assertSame(
+            'operator display',
+            \pmssStatsTrafficDisplayValue(array('display' => array('month' => 'operator display'), 'raw' => array('month' => 1025.0)), 'month')
+        );
+        $this->assertSame('1GiB', \pmssStatsTrafficDisplayValue(array('raw' => array('month' => 1025.0)), 'month'));
+        $this->assertSame('1024MiB', \pmssStatsTrafficDisplayValue(array('raw' => array('month' => 1024.0)), 'month'));
+        $this->assertSame('1TiB', \pmssStatsTrafficDisplayValue(array('raw' => array('month' => 1048577.0)), 'month'));
+        $this->assertSame('n/a', \pmssStatsTrafficDisplayValue(array('raw' => array('month' => 'bad')), 'month'));
+    }
+
     public function testStatsStatusHelpersCharacterizeShellDerivedContracts(): void
     {
         $runner = function (string $command, string $label): array {

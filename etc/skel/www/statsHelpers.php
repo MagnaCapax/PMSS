@@ -50,6 +50,36 @@ function pmssStatsSerializedStateRead(string $path, string $invalidMessage): arr
     return $state;
 }
 
+/** Format traffic counters stored as MiB without requiring operator-side code. */
+function pmssStatsTrafficAmountFormat($valueMiB): string
+{
+    $valueMiB = max(0.0, (float) $valueMiB);
+    if ($valueMiB > (1024 * 1024)) {
+        return round($valueMiB / 1024 / 1024, 2).'TiB';
+    }
+    if ($valueMiB > 1024) {
+        return round($valueMiB / 1024, 2).'GiB';
+    }
+
+    return round($valueMiB, 2).'MiB';
+}
+
+/** Return a display value from persisted traffic state, deriving it from raw MiB when absent. */
+function pmssStatsTrafficDisplayValue(array $trafficData, string $period): string
+{
+    if (isset($trafficData['display']) && is_array($trafficData['display'])
+        && isset($trafficData['display'][$period]) && trim((string) $trafficData['display'][$period]) !== '') {
+        return (string) $trafficData['display'][$period];
+    }
+
+    if (isset($trafficData['raw']) && is_array($trafficData['raw'])
+        && isset($trafficData['raw'][$period]) && is_numeric($trafficData['raw'][$period])) {
+        return pmssStatsTrafficAmountFormat($trafficData['raw'][$period]);
+    }
+
+    return 'n/a';
+}
+
 /** Keep systemctl output readable by moving the cgroup tree to the end. */
 function pmssStatsSystemctlStatusTextBuild(string $output): string
 {
@@ -199,8 +229,8 @@ function pmssStatsRenderTrafficUsageBlock(): void
     echo '<div class="stats-block"><h6>Traffic usage</h6><pre style="margin-bottom:12px;">'."\n";
     if ($trafficData !== null) {
         echo 'Traffic consumption at '.date('Y-m-d H:i:s', (int) $trafficState['time']).":\n";
-        echo 'Week: '.$trafficData['display']['week'].', Day: '.$trafficData['display']['day']."\n";
-        echo 'Past 30 days upload traffic: '.$trafficData['display']['month']."\n";
+        echo 'Week: '.pmssStatsTrafficDisplayValue($trafficData, 'week').', Day: '.pmssStatsTrafficDisplayValue($trafficData, 'day')."\n";
+        echo 'Past 30 days upload traffic: '.pmssStatsTrafficDisplayValue($trafficData, 'month')."\n";
         if (file_exists('../.trafficLimit') && (int) $trafficLimitState['limitGiB'] > 0) {
             echo 'Traffic limit: '.number_format((int) $trafficLimitState['effectiveLimitGiB'])." GiB\n";
             if ($trafficLimitState['bonusGiB'] > 0) {
@@ -214,7 +244,7 @@ function pmssStatsRenderTrafficUsageBlock(): void
     echo "\n";
     if ($trafficIngressData !== null) {
         echo 'Inbound traffic at '.date('Y-m-d H:i:s', (int) $trafficIngressState['time']).":\n";
-        echo 'Past 30 days inbound traffic: '.$trafficIngressData['display']['month']."\n";
+        echo 'Past 30 days inbound traffic: '.pmssStatsTrafficDisplayValue($trafficIngressData, 'month')."\n";
     } elseif ($trafficIngressState['error'] !== null) {
         echo $trafficIngressState['error']."\n";
     }
