@@ -352,6 +352,46 @@ class RuntimeTest extends TestCase
         $this->assertSame('', $result['stderr']);
     }
 
+    public function testPipedCaptureRejectsUnsafeCwdBeforeLaunch(): void
+    {
+        $filePath = $this->pmssMakeTempFile('pmss-piped-cwd-file-');
+        $bash = '/bin/bash -lc '.escapeshellarg('printf SHOULD_NOT_RUN');
+
+        foreach (['', $filePath, '/definitely-not-a-real-pmss-cwd', "/tmp/pmss\0bad"] as $cwd) {
+            $result = \pmssCommandPipedCapture($bash, 'pipe-cwd-safety-test', 0, 0, false, 'proc_open failed', 17, false, 'stream_select failed', $cwd);
+
+            $this->assertSame(17, $result['rc'], 'Unexpected rc for cwd '.str_replace("\0", '\\0', $cwd));
+            $this->assertSame('', $result['stdout']);
+            $this->assertSame('unsafe proc_open cwd', $result['stderr']);
+            $this->assertFalse($result['timed_out']);
+            $this->assertTrue($result['launch_failed']);
+            $this->assertFalse($result['pipe_failed']);
+        }
+    }
+
+    public function testPipedCaptureRejectsUnsafeEnvironmentBeforeLaunch(): void
+    {
+        $cwd = $this->pmssMakeTempDir('pmss-piped-env-');
+        $bash = '/bin/bash -lc '.escapeshellarg('printf SHOULD_NOT_RUN');
+
+        foreach ([
+            ['' => 'empty-key'],
+            ['BAD=KEY' => 'value'],
+            ["BAD\nKEY" => 'value'],
+            ['PMSS_PIPE_ENV' => "bad\0value"],
+            ['PMSS_PIPE_ENV' => ['not' => 'scalar']],
+        ] as $env) {
+            $result = \pmssCommandPipedCapture($bash, 'pipe-env-safety-test', 0, 0, false, 'proc_open failed', 19, false, 'stream_select failed', $cwd, $env);
+
+            $this->assertSame(19, $result['rc']);
+            $this->assertSame('', $result['stdout']);
+            $this->assertSame('unsafe proc_open environment', $result['stderr']);
+            $this->assertFalse($result['timed_out']);
+            $this->assertTrue($result['launch_failed']);
+            $this->assertFalse($result['pipe_failed']);
+        }
+    }
+
     public function testInheritedTtyCaptureKeepsResultShape(): void
     {
         $result = \pmssCommandInheritedTtyCapture('/bin/bash -lc '.escapeshellarg('exit 5'), 'tty-shape-test', 0);

@@ -173,6 +173,27 @@ function pmssCommandInheritedTtyCapture(string $bash, string $timeoutCommand, in
  */
 function pmssCommandPipedCapture(string $bash, string $timeoutCommand, int $timeoutSec, int $maxBuffer = 0, bool $mirrorOutput = false, string $launchError = 'proc_open failed', int $launchRc = 1, bool $retryLaunch = false, string $streamSelectError = 'stream_select failed', ?string $cwd = null, ?array $env = null): array
 {
+    if ($cwd !== null && ($cwd === '' || pmssFilesystemPathHasNulByte($cwd) || !is_dir($cwd))) {
+        return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'unsafe proc_open cwd', 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];
+    }
+    if ($env !== null) {
+        $normalizedEnv = [];
+        foreach ($env as $key => $value) {
+            if (!is_string($key)
+                || preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key) !== 1
+                || (!is_string($value) && !is_int($value) && !is_float($value) && !is_bool($value))
+            ) {
+                return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'unsafe proc_open environment', 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];
+            }
+            $value = (string) $value;
+            if (strpos($value, "\0") !== false) {
+                return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'unsafe proc_open environment', 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];
+            }
+            $normalizedEnv[$key] = $value;
+        }
+        $env = $normalizedEnv;
+    }
+
     $pipes = [];
     $process = @proc_open($bash, pmssProcessPipeDescriptorSpec(), $pipes, $cwd, $env);
     if (!is_resource($process) && $retryLaunch) {
