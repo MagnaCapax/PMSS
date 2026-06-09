@@ -17,17 +17,19 @@ final class CustomerStatsLayoutTest extends TestCase
             'Missing stats layout marker: ',
             'Resource summary order changed at: '
         );
-        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/statsHelpers.php', array(
-            'class="stats-block resource-summary-block"',
-            'class="resource-summary-strip"',
-            'class="resource-summary-label">CPU</span>',
-            'class="resource-summary-label">Memory</span>',
-            'class="resource-summary-label">Processes</span>',
-        ));
-        $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/stats.php', array(
-            '<h6>CPU usage</h6>',
-            '<h6>Memory usage</h6>',
-            '<h6>Process count</h6>',
+        $this->pmssAssertRepoFileContractCases(array(
+            'etc/skel/www/statsHelpers.php' => array('required' => array(
+                'class="stats-block resource-summary-block"',
+                'class="resource-summary-strip"',
+                'class="resource-summary-label">CPU</span>',
+                'class="resource-summary-label">Memory</span>',
+                'class="resource-summary-label">Processes</span>',
+            )),
+            'etc/skel/www/stats.php' => array('forbidden' => array(
+                '<h6>CPU usage</h6>',
+                '<h6>Memory usage</h6>',
+                '<h6>Process count</h6>',
+            )),
         ));
     }
 
@@ -44,18 +46,21 @@ final class CustomerStatsLayoutTest extends TestCase
 
     public function testStatsPageLoadsBundledHelperLibrary(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/stats.php', array(
-            "require_once __DIR__.'/scriptsInc.php';",
-            "require_once __DIR__.'/statsHelpers.php';",
-            'pmssStatsRenderResourceBlocks($resourceState);',
+        $this->pmssAssertRepoFileContractCases(array(
+            'etc/skel/www/stats.php' => array(
+                'required' => array(
+                    "require_once __DIR__.'/scriptsInc.php';",
+                    "require_once __DIR__.'/statsHelpers.php';",
+                    'pmssStatsRenderResourceBlocks($resourceState);',
+                ),
+                'forbidden' => array('function pmssStatsSerializedStateRead(', 'PMSS_STATS'.'_HELPERS_ONLY'),
+            ),
+            'etc/skel/www/statsHelpers.php' => array('required' => array(
+                'function pmssStatsDockerInactiveNote(',
+                'function pmssStatsRenderLineChart(',
+                'function pmssStatsRenderResourceBlocks(',
+            )),
         ));
-        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/statsHelpers.php', array(
-            'function pmssStatsDockerInactiveNote(',
-            'function pmssStatsRenderLineChart(',
-            'function pmssStatsRenderResourceBlocks(',
-        ));
-        $this->pmssAssertRepoFileNotContainsString('etc/skel/www/stats.php', 'function pmssStatsSerializedStateRead(');
-        $this->pmssAssertRepoFileNotContainsString('etc/skel/www/stats.php', 'PMSS_STATS'.'_HELPERS_ONLY');
     }
 
     public function testStatsStatusHelpersCharacterizeShellDerivedContracts(): void

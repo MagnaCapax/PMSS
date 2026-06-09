@@ -16,28 +16,19 @@ class UserTrafficStateHelpersTest extends TestCase
     {
         $path = $this->tempDir.'/traffic-data-array';
         $expected = ['raw' => ['month' => 1536.4], 'extra' => ['week' => 12]];
-        file_put_contents($path, serialize($expected));
+        $this->pmssWriteSerializedFixture($path, $expected);
 
         $this->assertEquals($expected, \pmssReadSerializedArrayFile($path));
     }
 
-    public function testSharedTrafficPayloadReaderRejectsSymlinkedFile(): void
+    public function testSharedTrafficReadersRejectSymlinkedFile(): void
     {
         $target = $this->tempDir.'/traffic-data-target';
-        file_put_contents($target, serialize(['raw' => ['month' => 2048]]));
+        $this->pmssWriteSerializedFixture($target, ['raw' => ['month' => 2048]]);
         $link = $this->tempDir.'/traffic-data-link-for-array-reader';
         $this->pmssCreateSymlinkOrSkip($target, $link);
 
         $this->assertEquals(null, \pmssReadSerializedArrayFile($link));
-    }
-
-    public function testReadUserTrafficMonthRejectsSymlinkedFile(): void
-    {
-        $target = $this->tempDir.'/traffic-data-target';
-        file_put_contents($target, serialize(['raw' => ['month' => 2048]]));
-        $link = $this->tempDir.'/traffic-data-link';
-        $this->pmssCreateSymlinkOrSkip($target, $link);
-
         $this->assertEquals(0, \pmssReadUserTrafficMonth($link));
     }
 
@@ -171,14 +162,13 @@ class UserTrafficStateHelpersTest extends TestCase
 
     public function testTrafficLimitAndStatsPathsHonorExplicitBases(): void
     {
-        $this->assertEquals(
-            $this->tempDir.'/home/alice/.trafficLimit',
-            \pmssTrafficLimitPath('alice', $this->tempDir.'/home')
-        );
-        $this->assertEquals(
-            $this->tempDir.'/runtime/trafficStats/alice-localnet',
-            \pmssTrafficStatsPath('alice-localnet', null, $this->tempDir.'/runtime')
-        );
+        $this->assertEquals([
+            'limit' => $this->tempDir.'/home/alice/.trafficLimit',
+            'stats' => $this->tempDir.'/runtime/trafficStats/alice-localnet',
+        ], [
+            'limit' => \pmssTrafficLimitPath('alice', $this->tempDir.'/home'),
+            'stats' => \pmssTrafficStatsPath('alice-localnet', null, $this->tempDir.'/runtime'),
+        ]);
     }
 
     public function testTrafficStorageSaveRejectsSymlinkedRuntimeStatsFile(): void

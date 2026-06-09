@@ -6,15 +6,11 @@ require_once dirname(__DIR__, 4).'/etc/skel/www/webCgroupMemoryStatus.php';
 
 class WebCgroupMemoryStatusTest extends TestCase
 {
-    public function testFormatBytesHandlesInvalidValues(): void
+    public function testFormatBytesCoversInvalidAndGiBValues(): void
     {
-        $this->assertSame('n/a', \pmssWebCgroupMemoryStatusFormatBytes(null));
-        $this->assertSame('n/a', \pmssWebCgroupMemoryStatusFormatBytes(-1));
-    }
-
-    public function testFormatBytesScalesToGiB(): void
-    {
-        $this->assertSame('5.0 GiB', \pmssWebCgroupMemoryStatusFormatBytes(5 * 1024 * 1024 * 1024));
+        foreach ([[null, 'n/a'], [-1, 'n/a'], [5 * 1024 * 1024 * 1024, '5.0 GiB']] as [$value, $expected]) {
+            $this->assertSame($expected, \pmssWebCgroupMemoryStatusFormatBytes($value));
+        }
     }
 
     public function testDetectDirPrefersExplicitOverride(): void
@@ -157,24 +153,16 @@ class WebCgroupMemoryStatusTest extends TestCase
         );
     }
 
-    public function testMemoryStatParserAcceptsCgroupV1Totals(): void
+    public function testMemoryStatParserKeepsCgroupV1AndV2MemoryFields(): void
     {
-        $breakdown = \pmssWebCgroupMemoryStatusMemoryStatBreakdownParse(
-            "total_rss 134217728\nhierarchical_memory_limit 999\ntotal_cache 67108864\n"
-        );
-
-        $this->assertSame(134217728.0, (float) $breakdown['anon']);
-        $this->assertSame(67108864.0, (float) $breakdown['file']);
-    }
-
-    public function testMemoryStatParserKeepsCgroupV2Fields(): void
-    {
-        $breakdown = \pmssWebCgroupMemoryStatusMemoryStatBreakdownParse(
-            "anon 268435456\nslab 123\nfile 33554432\n"
-        );
-
-        $this->assertSame(268435456.0, (float) $breakdown['anon']);
-        $this->assertSame(33554432.0, (float) $breakdown['file']);
+        foreach ([
+            ["total_rss 134217728\nhierarchical_memory_limit 999\ntotal_cache 67108864\n", 134217728.0, 67108864.0],
+            ["anon 268435456\nslab 123\nfile 33554432\n", 268435456.0, 33554432.0],
+        ] as [$raw, $anon, $file]) {
+            $breakdown = \pmssWebCgroupMemoryStatusMemoryStatBreakdownParse($raw);
+            $this->assertSame($anon, (float) $breakdown['anon']);
+            $this->assertSame($file, (float) $breakdown['file']);
+        }
     }
 
     public function testMemoryStatCandidatePathsPreferV2BeforeV1(): void
