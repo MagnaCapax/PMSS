@@ -9,7 +9,18 @@ class checkRtorrentThrottleGuardTest extends TestCase
     {
         $this->pmssAssertRepoFileContractCases([
             'scripts/lib/rtorrent/watchdog.php' => [
+                'required' => [
+                    '$skelHash = @md5_file($skelScript);',
+                    '$userHash = @md5_file($userScript);',
+                    'executor refresh skipped (checksum unavailable)',
+                    "if (!@copy(\$skelScript, \$userScript))",
+                    'executor refresh failed (copy error)',
+                    "if (!@chown(\$userScript, \$user))",
+                    'refreshed stale executor from skel (ownership update failed)',
+                ],
                 'forbidden' => [
+                    'copy($skelScript, $userScript);',
+                    '@chown($userScript, $user);',
                     '$throttleValue = ($throttle !== null && $throttle > 0) ? $throttle : 0;',
                 ],
                 'ordered' => [[

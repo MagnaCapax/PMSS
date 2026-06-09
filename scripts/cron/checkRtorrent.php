@@ -43,7 +43,10 @@ $users = $listUsersResult['users'];
 
 $changedConfig = [];
 $stateDir = '/run/pmss';
-pmssDirEnsureExists($stateDir, 0755);
+if (!pmssDirEnsureExists($stateDir, 0755)) {
+    pmssCheckRtorrentLog('ERROR: failed to create runtime state directory: '.$stateDir, true, $debug);
+    exit(1);
+}
 
 // Create logging callback for restart helper.
 $logCallback = function (string $msg, bool $force) use ($debug): void {

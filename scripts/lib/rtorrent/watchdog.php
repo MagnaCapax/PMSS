@@ -68,10 +68,24 @@ function pmssCheckRtorrentRefreshExecutorFromSkel(string $user, string $home, bo
 {
     $skelScript = '/etc/skel/.rtorrentExecute.php';
     $userScript = rtrim($home, '/').'/.rtorrentExecute.php';
-    if (!is_file($skelScript) || !is_file($userScript) || md5_file($skelScript) === md5_file($userScript)) return;
+    if (!is_file($skelScript) || !is_file($userScript)) return;
 
-    copy($skelScript, $userScript);
-    @chown($userScript, $user);
+    $skelHash = @md5_file($skelScript);
+    $userHash = @md5_file($userScript);
+    if (!is_string($skelHash) || !is_string($userHash)) {
+        pmssCheckRtorrentLogBoth($user, 'executor refresh skipped (checksum unavailable)', $debug);
+        return;
+    }
+    if ($skelHash === $userHash) return;
+
+    if (!@copy($skelScript, $userScript)) {
+        pmssCheckRtorrentLogBoth($user, 'executor refresh failed (copy error)', $debug);
+        return;
+    }
+    if (!@chown($userScript, $user)) {
+        pmssCheckRtorrentLogBoth($user, 'refreshed stale executor from skel (ownership update failed)', $debug);
+        return;
+    }
     pmssCheckRtorrentLogBoth($user, 'refreshed stale executor from skel', $debug);
 }
 

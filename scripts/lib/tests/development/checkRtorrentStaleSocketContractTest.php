@@ -25,6 +25,8 @@ class checkRtorrentStaleSocketContractTest extends TestCase
             'scripts/cron/checkRtorrent.php' => [
                 'required' => [
                     'PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES',
+                    "if (!pmssDirEnsureExists(\$stateDir, 0755))",
+                    "ERROR: failed to create runtime state directory: ",
                     'rtorrentProcessStatesForPids($rtorrentPids)',
                     'rtorrentScgiSocketQueueSnapshot($socketPath)',
                     "if (\$decision['action'] === 'observe_wedge')",
