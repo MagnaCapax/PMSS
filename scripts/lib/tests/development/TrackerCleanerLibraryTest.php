@@ -94,4 +94,36 @@ class TrackerCleanerLibraryTest extends TestCase
             $this->assertSame('outside', (string) file_get_contents($outsidePath));
         }
     }
+
+    public function testBackupTorrentRejectsUnsafeInputsBeforeShelling(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-tracker-cleaner-backups-');
+        $backupDir = $root.'/'.date('Y-m-d_Hi');
+        $torrentPath = $this->pmssMakeTempDir('pmss-tracker-cleaner-session-').'/sample.torrent';
+        file_put_contents($torrentPath, 'torrent payload');
+
+        foreach ([
+            'bad_user' => ['bad-user', $torrentPath, $backupDir, $root, 'invalid_username'],
+            'bad_source' => ['validusr', $this->pmssMakeTempFile('pmss-tracker-cleaner-source-'), $backupDir, $root, 'torrent_path_unsafe'],
+            'bad_destination' => ['validusr', $torrentPath, $this->pmssMakeTempDir('pmss-tracker-cleaner-outside-').'/backup', $root, 'backup_path_unsafe'],
+        ] as $label => $case) {
+            [$result, $output] = $this->pmssCaptureStdout(static function () use ($case): array {
+                return pmssTrackerCleanerBackupTorrent($case[0], $case[1], $case[2], $case[3], 'tracker');
+            });
+
+            $this->assertFalse($result['ok'], $label);
+            $this->assertSame('backup_failed', $result['stop_reason'], $label);
+            $this->assertStringContainsString('reason='.$case[4], $result['verbose_log'], $label);
+            $this->assertStringContainsString('ERR:', $output, $label);
+        }
+    }
+
+    public function testBackupDestinationGuardRejectsTraversalAndPrefixSiblings(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-tracker-cleaner-backups-');
+
+        $this->assertTrue(pmssTrackerCleanerBackupDestinationIsSafe($root.'/2026-06-09', $root));
+        $this->assertFalse(pmssTrackerCleanerBackupDestinationIsSafe($root.'-sibling/2026-06-09', $root));
+        $this->assertFalse(pmssTrackerCleanerBackupDestinationIsSafe($root.'/../escape', $root));
+    }
 }

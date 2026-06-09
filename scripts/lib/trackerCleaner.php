@@ -3,6 +3,7 @@
 
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/lighttpd/userFileWrite.php';
+require_once __DIR__.'/user/identity.php';
 
 function pmssTrackerCleanerTimestamp(): string { return '['.date('Y-m-d H:i:s').']'; }
 
@@ -107,9 +108,49 @@ function pmssTrackerCleanerUserSessionPlan(string $username): array
 
 function pmssTrackerCleanerTorrentCandidates(string $sessionDir, int $maxTorrents): array { $torrents = glob($sessionDir.'/*.torrent'); if (!is_array($torrents) || $torrents === []) return []; shuffle($torrents); return count($torrents) > $maxTorrents ? array_slice($torrents, 0, $maxTorrents) : $torrents; }
 
+function pmssTrackerCleanerBackupFailure(string $reason, string $message, string $detail): array
+{
+    pmssTrackerCleanerLog($message);
+    $suffix = $detail !== '' ? ' '.$detail : '';
+    return ['ok' => false, 'stop_reason' => 'backup_failed', 'verbose_log' => pmssTrackerCleanerTimestamp()." torrent_skip reason={$reason}{$suffix}\n".pmssTrackerCleanerTimestamp()." run_stop reason=backup_failed\n"];
+}
+
+function pmssTrackerCleanerBackupTorrentSourceIsSafe(string $torrentPath): bool
+{
+    $fileName = basename($torrentPath);
+    return $fileName !== ''
+        && substr($fileName, -8) === '.torrent'
+        && is_file($torrentPath)
+        && !is_link($torrentPath)
+        && pmssPathTargetIsSafe($torrentPath, false);
+}
+
+function pmssTrackerCleanerBackupDestinationIsSafe(string $backupDir, string $backupsRoot): bool
+{
+    $dir = rtrim($backupDir, '/');
+    $root = rtrim($backupsRoot, '/');
+    if ($dir === '' || $root === '' || $root === '/') {
+        return false;
+    }
+
+    return pmssPathSegmentsAreSafe($root, false, true, false, true)
+        && pmssPathSegmentsAreSafe($dir, false, true, false, true)
+        && ($dir === $root || strpos($dir, $root.'/') === 0);
+}
+
 /** @return array{ok:bool,stop_reason:string,verbose_log:string} */
 function pmssTrackerCleanerBackupTorrent(string $username, string $torrentPath, string $backupDir, string $backupsRoot, string $removedList): array
 {
+    if (!pmssValidateUsername($username)) {
+        return pmssTrackerCleanerBackupFailure('invalid_username', 'ERR: Refusing tracker backup for invalid username.', 'user='.pmssTrackerCleanerLogValue($username));
+    }
+    if (!pmssTrackerCleanerBackupTorrentSourceIsSafe($torrentPath)) {
+        return pmssTrackerCleanerBackupFailure('torrent_path_unsafe', "ERR: Refusing unsafe torrent backup source for user {$username}.", 'src='.pmssTrackerCleanerLogValue($torrentPath));
+    }
+    if (!pmssTrackerCleanerBackupDestinationIsSafe($backupDir, $backupsRoot)) {
+        return pmssTrackerCleanerBackupFailure('backup_path_unsafe', "ERR: Backup path unsafe for user {$username} ({$backupDir}).", 'backup_dir='.pmssTrackerCleanerLogValue($backupDir));
+    }
+
     $sourcePerms = @fileperms($torrentPath);
     $sourceModeText = sprintf('%o', $sourcePerms === false ? 0640 : ($sourcePerms & 0777));
     $sourceSize = @filesize($torrentPath);
