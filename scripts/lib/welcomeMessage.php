@@ -41,14 +41,12 @@ function pmssWelcomeProductMessageSet(
         ? array_replace($rootMap, ['products' => $productMap])
         : $productMap;
 
-    if (($encoded = pmssJsonEncodePretty($rootMap)) === null) {
-        return false;
-    }
+    if (($encoded = pmssJsonEncodePrettyLine($rootMap)) === null) return false;
 
     return function_exists('pmssReplaceUserFile')
         && pmssReplaceUserFile(
             $productMessagesPath,
-            $encoded.PHP_EOL,
+            $encoded,
             static function (string $temporaryPath): void {
                 @chmod($temporaryPath, 0640);
             }

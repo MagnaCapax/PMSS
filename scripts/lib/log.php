@@ -44,6 +44,8 @@ function pmssJsonDecodeAssoc(string $payload): ?array { $decoded = json_decode($
 
 /** Encode data with PMSS's standard pretty file-output flags. */
 function pmssJsonEncodePretty($payload, int $extraFlags = 0): ?string { $encoded = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | $extraFlags); return is_string($encoded) ? $encoded : null; }
+/** Encode pretty JSON with the newline expected by PMSS file writers. */
+function pmssJsonEncodePrettyLine($payload, int $extraFlags = 0): ?string { $encoded = pmssJsonEncodePretty($payload, $extraFlags); return is_string($encoded) ? $encoded.PHP_EOL : null; }
 
 /** Read a JSON object file as an associative array, rejecting unsafe paths when requested. */
 function pmssJsonFileReadAssoc(string $path, bool $safePathRequired = false): ?array

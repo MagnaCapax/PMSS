@@ -493,14 +493,14 @@ function pmssSysctlSummaryWrite(?callable $logger, array $profile, array $groupe
         'changes_made' => array_values($changes),
     ];
 
-    if (($json = pmssJsonEncodePretty($payload)) === null) {
+    if (($json = pmssJsonEncodePrettyLine($payload)) === null) {
         $log('[WARN] Unable to encode hardware summary JSON for '.$target);
         return;
     }
 
     pmssWriteManagedPathFile(
         $target,
-        $json.PHP_EOL,
+        $json,
         'hardware summary JSON',
         $log,
         null,
