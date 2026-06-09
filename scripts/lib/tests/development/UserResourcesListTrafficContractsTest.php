@@ -23,14 +23,13 @@ class UserResourcesListTrafficContractsTest extends TestCase
         $showTrafficReader = 'pmssShowTrafficRead'.'StatsPayload';
         $trafficLimitsReader = 'pmssRead'.'TrafficData';
 
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/traffic/report.php', [
-            'pmssTrafficStatsPath($thisUser, $statsDir)',
-            'pmssReadSerializedArrayFile($statsPath)',
-            'pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser)',
-        ], ['function '.$showTrafficReader, 'unserialize(']);
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/resources/show.php', ['pmssReadSerializedArrayFile("{$statsDir}/{$thisUser}")'], ['unserialize(']);
-
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/trafficLimits.php', ['pmssTrafficReadRootOwnedStatsPayload($trafficDataFile, $thisUser)'], ['function '.$trafficLimitsReader, '@unserialize']);
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/traffic/report.php' => [
+                'required' => ['pmssTrafficStatsPath($thisUser, $statsDir)', 'pmssReadSerializedArrayFile($statsPath)', 'pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser)'],
+                'forbidden' => ['function '.$showTrafficReader, 'unserialize('],
+            ],
+            'scripts/lib/resources/show.php' => ['required' => ['pmssReadSerializedArrayFile("{$statsDir}/{$thisUser}")'], 'forbidden' => ['unserialize(']],
+            'scripts/cron/trafficLimits.php' => ['required' => ['pmssTrafficReadRootOwnedStatsPayload($trafficDataFile, $thisUser)'], 'forbidden' => ['function '.$trafficLimitsReader, '@unserialize']],
+        ]);
     }
 }

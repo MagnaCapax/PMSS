@@ -7,17 +7,12 @@ class CronInlineCharacterizationTest extends TestCase
 {
     public function testBootTuningUsesSharedManagedPathWrites(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/lib/update/systemPrep.php');
-        $wrapperNeedle = '$write'.'Target = static function';
-
-        $this->assertTrue(
-            strpos($src, $wrapperNeedle) === false,
-            'pmssEnsureBootTuning() should keep its two file writes inline rather than via a local wrapper'
-        );
-        $this->assertStringContainsString('[$scriptTarget, $scriptRaw, 0755, \'Boot tuning script\']', $src);
-        $this->assertStringContainsString('[$serviceTarget, $serviceRaw, 0644, \'Boot tuning service\']', $src);
-        $this->assertStringContainsString('pmssWriteManagedPathFile($path, $content, $label, $log, null, null, $mode', $src);
-        $this->assertStringContainsString('$log(\'Installed \'.$label.\' at \'.$path);', $src);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPrep.php', [
+            '[$scriptTarget, $scriptRaw, 0755, \'Boot tuning script\']',
+            '[$serviceTarget, $serviceRaw, 0644, \'Boot tuning service\']',
+            'pmssWriteManagedPathFile($path, $content, $label, $log, null, null, $mode',
+            '$log(\'Installed \'.$label.\' at \'.$path);',
+        ], ['$write'.'Target = static function' => 'pmssEnsureBootTuning() should keep its two file writes inline rather than via a local wrapper']);
     }
 
     public function testServiceWatchdogsUseSharedHelpersAndKeepCommands(): void
@@ -38,8 +33,10 @@ class CronInlineCharacterizationTest extends TestCase
             $this->assertStringContainsString('pmssUserWatchdogSuCommand($thisUser,', $src);
         }
 
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/runtime/environment.php', ['function pmssBuildUserShellCommand(', 'escapeshellarg($username)', 'escapeshellarg($command)']);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/watchdog.php', ['function pmssUserWatchdogSuCommand(', 'pmssBuildUserShellCommand($username, $innerCommand)']);
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/runtime/environment.php' => ['required' => ['function pmssBuildUserShellCommand(', 'escapeshellarg($username)', 'escapeshellarg($command)']],
+            'scripts/lib/user/watchdog.php' => ['required' => ['function pmssUserWatchdogSuCommand(', 'pmssBuildUserShellCommand($username, $innerCommand)']],
+        ]);
     }
 
     public function testLighttpdWatchdogUsesSharedHelpersAndKeepsRestartFlow(): void
