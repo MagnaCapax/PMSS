@@ -38,7 +38,8 @@ class CronInlineCharacterizationTest extends TestCase
             $this->assertStringContainsString('pmssUserWatchdogSuCommand($thisUser,', $src);
         }
 
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/watchdog.php', ['function pmssUserWatchdogSuCommand(', 'escapeshellarg($username)', 'escapeshellarg($innerCommand)']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/runtime/environment.php', ['function pmssBuildUserShellCommand(', 'escapeshellarg($username)', 'escapeshellarg($command)']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/watchdog.php', ['function pmssUserWatchdogSuCommand(', 'pmssBuildUserShellCommand($username, $innerCommand)']);
     }
 
     public function testLighttpdWatchdogUsesSharedHelpersAndKeepsRestartFlow(): void

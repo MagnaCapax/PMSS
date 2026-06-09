@@ -34,6 +34,7 @@ function pmssBuildCommand(string $program, array $args = []): string
     return empty($args) ? $prog : $prog.' '.pmssCommandArgvShellQuote($args);
 }
 
+function pmssBuildUserShellCommand(string $username, string $command, string $shell = ''): string { return $shell === '' ? 'su '.escapeshellarg($username).' -c '.escapeshellarg($command) : 'su -s '.escapeshellarg($shell).' -c '.escapeshellarg($command).' '.escapeshellarg($username); }
 function pmssIopingAverageMs(?string $target): ?float
 {
     $bin = pmssCommandPath('ioping');

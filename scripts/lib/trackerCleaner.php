@@ -30,8 +30,6 @@ function pmssTrackerCleanerShouldScrubTracker(string $trackerUrl, array $blockRu
 
 function pmssTrackerCleanerLogValue($value): string { return str_replace(["\r", "\n"], ' ', (string) $value); }
 
-function pmssTrackerCleanerSuCommand(string $username, string $command): string { return 'su -s /bin/bash -c '.escapeshellarg($command).' '.escapeshellarg($username); }
-
 function pmssTrackerCleanerChangeLog(array $changes, ?string $timestamp = null): string
 {
     $timestamp = $timestamp ?? pmssTrackerCleanerTimestamp();
@@ -74,7 +72,7 @@ function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload
     }
     @chgrp($tmpLogPath, $username); @chmod($tmpLogPath, 0640);
 
-    pmssUserLifecycleStep('trackerCleaner', $username, 'ensure_user_logs_dir', pmssTrackerCleanerSuCommand($username, 'mkdir -p ~/.logs'), false);
+    pmssUserLifecycleStep('trackerCleaner', $username, 'ensure_user_logs_dir', pmssBuildUserShellCommand($username, 'mkdir -p ~/.logs', '/bin/bash'), false);
     if (!is_dir($userLogsDir) || !pmssPathWithinRootIsSafe($userLogsDir, $userHome, true)) {
         pmssTrackerCleanerLog("WARN: User log directory is unsafe or missing for {$username} ({$userLogsDir}); skipping per-user verbose log.");
         @unlink($tmpLogPath);
@@ -86,7 +84,7 @@ function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload
         return;
     }
 
-    pmssUserLifecycleStep('trackerCleaner', $username, 'append_user_verbose_log', pmssTrackerCleanerSuCommand($username, 'cat '.escapeshellarg($tmpLogPath).' >> ~/.logs/trackerCleaner.log'), false);
+    pmssUserLifecycleStep('trackerCleaner', $username, 'append_user_verbose_log', pmssBuildUserShellCommand($username, 'cat '.escapeshellarg($tmpLogPath).' >> ~/.logs/trackerCleaner.log', '/bin/bash'), false);
     if (file_exists($userLogFile) && !is_link($userLogFile) && pmssPathWithinRootIsSafe($userLogFile, $userHome)) {
         pmssUserFileApplyOwnership($userLogFile, $username);
     }
@@ -118,7 +116,7 @@ function pmssTrackerCleanerBackupTorrent(string $username, string $torrentPath, 
     $sourceSizeText = $sourceSize === false ? 'unknown' : (string) $sourceSize;
 
     if (!is_dir($backupDir)) {
-        $prepareRc = pmssUserLifecycleStep('trackerCleaner', $username, 'prepare_backup_dir', pmssTrackerCleanerSuCommand($username, 'mkdir -p '.escapeshellarg($backupDir).' && chmod 750 '.escapeshellarg($backupDir)), false);
+        $prepareRc = pmssUserLifecycleStep('trackerCleaner', $username, 'prepare_backup_dir', pmssBuildUserShellCommand($username, 'mkdir -p '.escapeshellarg($backupDir).' && chmod 750 '.escapeshellarg($backupDir), '/bin/bash'), false);
         if ($prepareRc !== 0) {
             pmssTrackerCleanerLog("ERR: Failed to prepare backup dir for user {$username} (dir={$backupDir}, rc={$prepareRc}).");
             return ['ok' => false, 'stop_reason' => 'backup_failed', 'verbose_log' => pmssTrackerCleanerTimestamp()." torrent_skip reason=backup_dir_prepare_failed rc={$prepareRc} backup_dir={$backupDir}\n".pmssTrackerCleanerTimestamp()." run_stop reason=backup_failed\n"];
@@ -130,7 +128,7 @@ function pmssTrackerCleanerBackupTorrent(string $username, string $torrentPath, 
     }
 
     $backupTarget = $backupDir.'/'.basename($torrentPath);
-    $backupRc = pmssUserLifecycleStep('trackerCleaner', $username, 'backup_torrent', pmssTrackerCleanerSuCommand($username, 'cp -p '.escapeshellarg($torrentPath).' '.escapeshellarg($backupTarget).' && chmod '.$sourceModeText.' '.escapeshellarg($backupTarget)), false);
+    $backupRc = pmssUserLifecycleStep('trackerCleaner', $username, 'backup_torrent', pmssBuildUserShellCommand($username, 'cp -p '.escapeshellarg($torrentPath).' '.escapeshellarg($backupTarget).' && chmod '.$sourceModeText.' '.escapeshellarg($backupTarget), '/bin/bash'), false);
     $backupSize = @filesize($backupTarget);
     $backupSizeText = $backupSize === false ? 'unknown' : (string) $backupSize;
     $backupOk = $backupRc === 0 && $sourceSize !== false && $backupSize !== false && $backupSize === $sourceSize

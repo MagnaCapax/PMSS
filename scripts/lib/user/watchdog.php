@@ -71,7 +71,7 @@ function pmssUserWatchdogProcessRunning(string $username, string $processName): 
     return $exitCode === 0 && $pids !== array();
 }
 
-function pmssUserWatchdogSuCommand(string $username, string $innerCommand): string { return 'su '.escapeshellarg($username).' -c '.escapeshellarg($innerCommand); }
+function pmssUserWatchdogSuCommand(string $username, string $innerCommand): string { return pmssBuildUserShellCommand($username, $innerCommand); }
 
 /** Read a watchdog-owned local TCP port, failing closed on malformed files. */
 function pmssUserWatchdogLocalPortRead(string $path): ?int

@@ -34,7 +34,7 @@ function pmssRunAndLog(string $user, string $label, string $command, bool $asUse
         return 127;
     }
 
-    $inner = $asUser ? sprintf('su %s -c %s', escapeshellarg($user), escapeshellarg($command)) : $command;
+    $inner = $asUser ? pmssBuildUserShellCommand($user, $command) : $command;
     pmssUserLog($user, "[CMD] {$label}: {$command}");
     $result = pmssCommandCapture($inner, 0, true, 'Failed to start process', 127);
     if ((int) $result['rc'] === 127 && $result['stdout'] === '' && $result['stderr'] === 'Failed to start process') {

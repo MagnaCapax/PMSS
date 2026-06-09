@@ -93,7 +93,7 @@ function userDockerRunAs(string $user, string $cmd, ?int $timeoutSeconds = null,
     static $timeoutBinResolved = false;
     static $timeoutBin = null;
 
-    $wrapper = sprintf('su %s -c %s', escapeshellarg($user), escapeshellarg($cmd));
+    $wrapper = pmssBuildUserShellCommand($user, $cmd);
     $target = pmssUserAccountLookup($user);
     $currentUid = function_exists('posix_geteuid') ? (int) posix_geteuid() : -1;
     if ($target !== null && $currentUid > 0 && $currentUid === (int) $target['uid']) {
