@@ -230,7 +230,7 @@ class StorageBenchSecurityTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/lib/storageBenchmark.php');
 
-        $this->assertStringContainsAndOmitsStrings(['storageBenchmarkRequireCommandField', 'pmssCommandCapture($command, 30)', "storageBenchmarkRequirePositiveIntCommandField('df -PB1 "], ["\$free=(int)trim((string) shell_exec('df -PB1 "], $source);
+        $this->assertStringContainsAndOmitsStrings(['storageBenchmarkRequireCommandField', 'pmssCommandCapture($command, 30)', "'free space', true"], ["\$free=(int)trim((string) shell_exec('df -PB1 ", 'storageBenchmarkRequirePositive'.'IntCommandField'], $source);
     }
 
     public function testDeviceProbesUseCheckedCommandCapture(): void
