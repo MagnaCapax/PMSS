@@ -180,13 +180,29 @@ function pmssSysctlNicSpeedMbps(): int
     return ctype_digit($speed) ? (int) $speed : 1000;
 }
 
+/** Run one quiet probe command and return only its exit-status meaning. */
+function pmssSysctlCommandQuietSucceeds(string $binaryPath, array $args = []): ?bool
+{
+    if ($binaryPath === '' || strpos($binaryPath, "\0") !== false || !is_executable($binaryPath) || !function_exists('exec')) {
+        return null;
+    }
+
+    $status = 1;
+    $output = [];
+    @exec(pmssCommandArgvShellQuote(array_merge([$binaryPath], $args)).' >/dev/null 2>&1', $output, $status);
+    return $status === 0;
+}
+
 /** Detect whether the current host is a virtual machine. */
 function pmssSysctlIsVm(): bool
 {
     if (($override = pmssSystemPrepReadBoolEnv('PMSS_SYSCTL_IS_VM')) !== null) return $override;
 
     if (($systemdDetectVirt = pmssCommandPath('systemd-detect-virt')) !== '') {
-        return trim((string) @shell_exec(escapeshellcmd($systemdDetectVirt).' --quiet >/dev/null 2>&1; echo $?')) === '0';
+        $virtualized = pmssSysctlCommandQuietSucceeds($systemdDetectVirt, ['--quiet']);
+        if ($virtualized !== null) {
+            return $virtualized;
+        }
     }
 
     foreach (['/sys/class/dmi/id/product_name', '/sys/class/dmi/id/sys_vendor'] as $path) {

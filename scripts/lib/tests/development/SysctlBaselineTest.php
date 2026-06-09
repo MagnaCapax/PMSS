@@ -196,6 +196,40 @@ class SysctlBaselineTest extends TestCase
         $this->assertSame(1000, \pmssSysctlNicSpeedMbps());
     }
 
+    public function testVmDetectionUsesSystemdDetectVirtSuccessStatus(): void
+    {
+        $binDir = $this->pmssMakeExecutableStub(
+            'systemd-detect-virt',
+            "#!/bin/sh\n[ \"\$1\" = '--quiet' ] || exit 9\nexit 0\n",
+            'pmss-sysctl-virt-'
+        );
+
+        $this->pmssWithPathPrefixedEnv($binDir, ['PMSS_SYSCTL_IS_VM' => null], function (): void {
+            $this->assertTrue(\pmssSysctlIsVm());
+        });
+    }
+
+    public function testVmDetectionUsesSystemdDetectVirtFailureStatus(): void
+    {
+        $binDir = $this->pmssMakeExecutableStub(
+            'systemd-detect-virt',
+            "#!/bin/sh\n[ \"\$1\" = '--quiet' ] || exit 9\nexit 1\n",
+            'pmss-sysctl-virt-'
+        );
+
+        $this->pmssWithPathPrefixedEnv($binDir, ['PMSS_SYSCTL_IS_VM' => null], function (): void {
+            $this->assertFalse(\pmssSysctlIsVm());
+        });
+    }
+
+    public function testVmDetectionAvoidsShellStatusPipeline(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/update/systemPrep/sysctlTuning.php');
+
+        $this->pmssAssertStringNotContainsString('; echo '.'$?', $source);
+        $this->pmssAssertStringNotContainsString('shell_exec'.'(', $source);
+    }
+
     public function testRespectsOperatorOwnedOverrideKeys(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-overrides-', 0700);
