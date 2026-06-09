@@ -28,7 +28,11 @@ done
 if [ "$out" = "" ]; then
     exit 2
 fi
-printf '%s' "${PMSS_TEST_WGET_BODY}" > "$out"
+if [ "${PMSS_TEST_WGET_FILE:-}" != "" ]; then
+    cat "${PMSS_TEST_WGET_FILE}" > "$out"
+else
+    printf '%s' "${PMSS_TEST_WGET_BODY}" > "$out"
+fi
 printf 'wget %s\n' "$out" >> "${PMSS_TEST_COMMAND_LOG}"
 SH,
             'install' => <<<'SH'
@@ -50,10 +54,31 @@ SH
         $env = $this->pmssPathPrefixedEnvironment($binDir, array_merge(['PMSS_TEST_WGET_BODY' => $body], $extraEnv));
         $env['PMSS_TEST_COMMAND_LOG'] = $commandLog;
         $env['PMSS_TEST_DPKG_CAPTURE'] = $dpkgCapture;
+        $sourceFile = isset($extraEnv['PMSS_TEST_WGET_FILE']) ? (string) $extraEnv['PMSS_TEST_WGET_FILE'] : '';
+        $expectedSha256 = $sourceFile !== '' && is_file($sourceFile) ? (string) hash_file('sha256', $sourceFile) : hash('sha256', $body);
 
-        $this->pmssWithEnv($env, function () use ($callback, $root, $commandLog, $dpkgCapture, $body): void {
-            $callback($root, $commandLog, $dpkgCapture, $body, hash('sha256', $body));
+        $this->pmssWithEnv($env, function () use ($callback, $root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
+            $callback($root, $commandLog, $dpkgCapture, $body, $expectedSha256);
         });
+    }
+
+    private function createSourceArchive(string $root): string
+    {
+        $archiveRoot = $root.'/archive-root';
+        $sourceDir = $archiveRoot.'/source';
+        @mkdir($sourceDir, 0755, true);
+        @file_put_contents($sourceDir.'/payload.txt', 'archive-ok');
+
+        $archivePath = $root.'/archive.tar.gz';
+        $output = [];
+        $rc = 0;
+        exec(
+            sprintf('tar -czf %s -C %s source 2>&1', escapeshellarg($archivePath), escapeshellarg($archiveRoot)),
+            $output,
+            $rc
+        );
+        $this->assertEquals(0, $rc, implode("\n", $output));
+        return $archivePath;
     }
 
     public function testFetchPinnedRemoteFileReturnsTempPathForMatchingChecksum(): void
@@ -182,6 +207,28 @@ SH
 
             $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
         });
+    }
+
+    public function testRunPinnedRemoteArchiveStepReturnsTrueForSharedExtraction(): void
+    {
+        $archivePath = $this->createSourceArchive($this->pmssMakeTempDir('pmss-remote-archive-', 0700));
+
+        $this->withFakeDownloadBody('', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
+            $result = \pmssRunPinnedRemoteArchiveStep(
+                'demo archive',
+                'https://example.invalid/archive',
+                $expectedSha256,
+                'archive.tar.gz',
+                'source',
+                'Extracting demo archive',
+                [],
+                $root.'/compile'
+            );
+
+            $this->assertTrue($result, 'Expected successful archive extraction to report success');
+            $this->assertEquals('archive-ok', (string) @file_get_contents($root.'/compile/source/payload.txt'));
+            $this->assertStringContainsString('wget ', $this->pmssReadFileOrEmpty($commandLog));
+        }, ['PMSS_TEST_WGET_FILE' => $archivePath]);
     }
 
     public function testInstallPinnedRemoteBinarySkipsDownloadWhenChecksumAlreadyMatches(): void

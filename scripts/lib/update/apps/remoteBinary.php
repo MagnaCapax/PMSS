@@ -152,29 +152,29 @@ function pmssFetchPinnedRemoteFile(string $label, string $url, string $expectedS
 }
 
 /** Download a verified archive, unpack it in the compile workspace, then run caller steps. */
-function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expectedSha256, string $archiveName, string $sourceDir, string $description, array $postExtractCommands, string $workDir = '/root/compile'): void
+function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expectedSha256, string $archiveName, string $sourceDir, string $description, array $postExtractCommands, string $workDir = '/root/compile'): bool
 {
     $trimmedWorkDir = rtrim($workDir, '/');
     if (!pmssPinnedRemoteArchiveNameIsSafe($archiveName)
         || !pmssPinnedRemoteArchiveComponentIsSafe($sourceDir)) {
         logmsg("[WARN] Refusing unsafe archive extraction path for {$label}");
-        return;
+        return false;
     }
     if ($workDir === ''
         || $trimmedWorkDir === ''
         || !pmssPathTargetIsSafe($trimmedWorkDir, true, false, false)
     ) {
         logmsg("[WARN] Refusing unsafe archive extraction path for {$label}");
-        return;
+        return false;
     }
     foreach ($postExtractCommands as $command) {
         if (!is_string($command) || !pmssPinnedRemoteArchivePostCommandIsSafe($command)) {
             logmsg("[WARN] Refusing unsafe archive post-extract command for {$label}");
-            return;
+            return false;
         }
     }
 
-    pmssPinnedRemoteArtifactTempFileUse($label, $url, $expectedSha256, static function (string $archivePath) use ($archiveName, $sourceDir, $description, $postExtractCommands, $workDir): void {
+    $result = pmssPinnedRemoteArtifactTempFileUse($label, $url, $expectedSha256, static function (string $archivePath) use ($archiveName, $sourceDir, $description, $postExtractCommands, $workDir): bool {
         $tarMode = substr($archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf';
         $commands = ['set -e', 'mkdir -p '.escapeshellarg($workDir), 'cd '.escapeshellarg($workDir),
             'rm -rf '.escapeshellarg($sourceDir).' '.escapeshellarg($archiveName),
@@ -182,8 +182,9 @@ function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expe
         foreach ($postExtractCommands as $command) {
             $commands[] = (string) $command;
         }
-        runStep($description, implode(' && ', $commands));
+        return runStep($description, implode(' && ', $commands)) === 0;
     });
+    return $result === true;
 }
 
 /** Install a verified remote binary, refreshing only when needed. */

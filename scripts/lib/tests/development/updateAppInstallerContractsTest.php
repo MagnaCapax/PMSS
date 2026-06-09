@@ -140,6 +140,7 @@ class UpdateAppInstallerContractsTest extends TestCase
             'remoteBinary.php' => [
                 'required' => [
                     'function pmssRunPinnedRemoteArchiveStep(',
+                    'function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expectedSha256, string $archiveName, string $sourceDir, string $description, array $postExtractCommands, string $workDir = \'/root/compile\'): bool',
                     'function pmssPinnedRemoteTempFileUse(',
                     'function pmssPinnedRemoteArtifactTempFileUse(',
                     "substr(\$archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf'",
@@ -213,7 +214,20 @@ class UpdateAppInstallerContractsTest extends TestCase
                 "@hash_file('sha256'" => $installer.' should delegate checksum verification to remoteBinary.php',
             ]);
 
-            $this->assertTrue(preg_match('/pmss(?:DownloadPinnedRemoteTempFile|FetchPinnedRemoteFile|PinnedRemote(?:TempFile|ArtifactTempFile)Use)\(/', $contents) === 1, $installer.' should call a remoteBinary.php pinned download helper');
+            $this->assertTrue(preg_match('/pmss(?:DownloadPinnedRemoteTempFile|FetchPinnedRemoteFile|RunPinnedRemoteArchiveStep|PinnedRemote(?:TempFile|ArtifactTempFile)Use)\(/', $contents) === 1, $installer.' should call a remoteBinary.php pinned download helper');
+        }
+    }
+
+    public function testSourceArchiveInstallersReuseRemoteArchiveExtraction(): void
+    {
+        foreach (['deluge.php', 'rtorrent.php'] as $installer) {
+            $contents = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/'.$installer, [
+                'pmssRunPinnedRemoteArchiveStep(',
+            ], [
+                "pmssBuildCommand('tar'" => $installer.' should delegate source archive extraction to remoteBinary.php',
+            ]);
+
+            $this->assertTrue(strpos($contents, "pmssPinnedRemoteArtifactTempFileUse(") === false, $installer.' should not keep a parallel source extraction callback');
         }
     }
 

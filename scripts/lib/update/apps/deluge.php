@@ -101,7 +101,8 @@ if (pmssEnvFlagEnabled('PMSS_DELUGE_NO_ENTRYPOINT')) {
     return;
 }
 
-$delugeTarballUrl = 'https://ftp.osuosl.org/pub/deluge/source/2.0/deluge-2.0.5.tar.xz';
+$delugeTarballArchive = 'deluge-2.0.5.tar.xz';
+$delugeTarballUrl = 'https://ftp.osuosl.org/pub/deluge/source/2.0/'.$delugeTarballArchive;
 $delugeTarballSha256 = 'c4bd04abfd211b65218be03f3c46d26f44024884de10e01859fb856fdd6f25d8';
 $delugeTarballLabel = 'Deluge 2.0.5 source tarball';
 $dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
@@ -124,15 +125,7 @@ if ($isDebian10) {
             pmssBuildCommand('pip', array_merge(['install'], pmssDelugeLegacyPipDependencyPackages()))
         );
 
-        $extracted = pmssPinnedRemoteArtifactTempFileUse($delugeTarballLabel, $delugeTarballUrl, $delugeTarballSha256, static function (string $tmp): bool {
-            runStep('Cleaning previous Deluge source', 'rm -rf /tmp/deluge-2*');
-            runStep(
-                'Extracting Deluge source',
-                'cd /tmp && '.pmssBuildCommand('tar', ['-xvf', $tmp])
-            );
-            return true;
-        });
-        if ($extracted !== true) {
+        if (!pmssRunPinnedRemoteArchiveStep($delugeTarballLabel, $delugeTarballUrl, $delugeTarballSha256, $delugeTarballArchive, 'deluge-2.0.5', 'Extracting Deluge source', [], '/tmp')) {
             return;
         }
 
