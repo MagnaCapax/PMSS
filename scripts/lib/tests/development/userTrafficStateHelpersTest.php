@@ -69,12 +69,12 @@ class UserTrafficStateHelpersTest extends TestCase
 
     public function testTrafficDataPathsExposeCanonicalKeys(): void
     {
-        $paths = \pmssTrafficDataPaths('alice', $this->tempDir.'/home');
-
-        $this->assertEquals($this->tempDir.'/home/alice/.trafficData', $paths['normal']);
-        $this->assertEquals($this->tempDir.'/home/alice/.trafficDataLocal', $paths['local']);
-        $this->assertEquals($this->tempDir.'/home/alice/.trafficDataIngress', $paths['ingress']);
-        $this->assertEquals($this->tempDir.'/home/alice/.trafficDataIngressLocal', $paths['ingressLocal']);
+        $this->assertEquals([
+            'normal' => $this->tempDir.'/home/alice/.trafficData',
+            'local' => $this->tempDir.'/home/alice/.trafficDataLocal',
+            'ingress' => $this->tempDir.'/home/alice/.trafficDataIngress',
+            'ingressLocal' => $this->tempDir.'/home/alice/.trafficDataIngressLocal',
+        ], \pmssTrafficDataPaths('alice', $this->tempDir.'/home'));
     }
 
     public function testTrafficDataPathKeyCharacterizationCoversModeAndBucketMatrix(): void
@@ -268,7 +268,7 @@ class UserTrafficStateHelpersTest extends TestCase
         $this->assertEquals($payload, \pmssReadSerializedArrayFile($statsDir.'/alice-localnet'));
     }
 
-    public function testTrafficStorageSaveRejectsInvalidUsername(): void
+    public function testTrafficStorageSaveRejectsInvalidUserKeys(): void
     {
         $storage = new \TrafficStorage([
             'home_dir' => $this->tempDir.'/home',
@@ -276,24 +276,21 @@ class UserTrafficStateHelpersTest extends TestCase
         ]);
         $storage->ensureRuntime();
 
-        $storage->save('../evil', ['raw' => ['month' => 1024]]);
-
-        $this->assertTrue(!file_exists($this->tempDir.'/runtime/trafficStats/../evil'));
-        $this->assertTrue(!file_exists($this->tempDir.'/home/../evil/.trafficData'));
-    }
-
-    public function testTrafficStorageSaveRejectsInvalidLocalnetKey(): void
-    {
-        $storage = new \TrafficStorage([
-            'home_dir' => $this->tempDir.'/home',
-            'runtime_dir' => $this->tempDir.'/runtime',
-        ]);
-        $storage->ensureRuntime();
-
-        $storage->save('alice-localnet-extra', ['raw' => ['month' => 1024]]);
-
-        $this->assertTrue(!file_exists($this->tempDir.'/runtime/trafficStats/alice-localnet-extra'));
-        $this->assertTrue(!file_exists($this->tempDir.'/home/alice/.trafficDataIngressLocal'));
+        foreach ([
+            '../evil' => [
+                $this->tempDir.'/runtime/trafficStats/../evil',
+                $this->tempDir.'/home/../evil/.trafficData',
+            ],
+            'alice-localnet-extra' => [
+                $this->tempDir.'/runtime/trafficStats/alice-localnet-extra',
+                $this->tempDir.'/home/alice/.trafficDataIngressLocal',
+            ],
+        ] as $userKey => $unexpectedPaths) {
+            $storage->save($userKey, ['raw' => ['month' => 1024]]);
+            foreach ($unexpectedPaths as $path) {
+                $this->assertTrue(!file_exists($path), $userKey.' wrote '.$path);
+            }
+        }
     }
 
     public function testTrafficLimitReadGiBFileRejectsSymlinkedFile(): void

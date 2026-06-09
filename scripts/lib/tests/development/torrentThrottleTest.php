@@ -27,33 +27,22 @@ class TorrentThrottleTest extends TestCase
         chmod($path, $mode);
     }
 
-    public function testReadReturnsNullWhenMissing(): void
+    public function testReadHandlesContentAndModeCases(): void
     {
-        $this->assertEquals(null, pmssReadTorrentThrottle($this->user));
-    }
+        foreach ([
+            'missing file' => [null, 0640, null],
+            'invalid content' => ['nope', 0640, null],
+            'zero value' => ['0', 0640, 0],
+            'positive value' => ['123', 0640, 123],
+            'group writable' => ['10', 0666, null],
+        ] as $label => [$content, $mode, $expected]) {
+            @unlink($this->throttlePath());
+            if ($content !== null) {
+                $this->writeThrottleFile($content, $mode);
+            }
 
-    public function testReadReturnsNullForInvalidContent(): void
-    {
-        $this->writeThrottleFile('nope');
-        $this->assertEquals(null, pmssReadTorrentThrottle($this->user));
-    }
-
-    public function testReadReturnsZeroForZeroValue(): void
-    {
-        $this->writeThrottleFile('0');
-        $this->assertEquals(0, pmssReadTorrentThrottle($this->user));
-    }
-
-    public function testReadReturnsValueForPositive(): void
-    {
-        $this->writeThrottleFile('123');
-        $this->assertEquals(123, pmssReadTorrentThrottle($this->user));
-    }
-
-    public function testReadRejectsGroupWritable(): void
-    {
-        $this->writeThrottleFile('10', 0666);
-        $this->assertEquals(null, pmssReadTorrentThrottle($this->user));
+            $this->assertEquals($expected, pmssReadTorrentThrottle($this->user), $label);
+        }
     }
 
     public function testReadRejectsInvalidUsernameBeforePathResolution(): void
@@ -93,20 +82,14 @@ class TorrentThrottleTest extends TestCase
         $this->assertTrue(!pmssWriteTorrentThrottle($this->user, 10), 'Expected write to fail on symlink');
     }
 
-    public function testWriteRejectsDirectoryWhenRemovingThrottle(): void
+    public function testWriteRejectsDirectoryTargets(): void
     {
         $path = $this->pmssEnsureDir($this->throttlePath());
 
-        $this->assertTrue(!pmssWriteTorrentThrottle($this->user, 0), 'Expected removal to fail on directory');
-        $this->assertTrue(is_dir($path), 'Throttle directory should remain untouched');
-    }
-
-    public function testWriteRejectsDirectoryWhenWritingThrottle(): void
-    {
-        $path = $this->pmssEnsureDir($this->throttlePath());
-
-        $this->assertTrue(!pmssWriteTorrentThrottle($this->user, 10), 'Expected write to fail on directory');
-        $this->assertTrue(is_dir($path), 'Throttle directory should remain untouched');
+        foreach ([0 => 'removal', 10 => 'write'] as $value => $operation) {
+            $this->assertTrue(!pmssWriteTorrentThrottle($this->user, $value), 'Expected '.$operation.' to fail on directory');
+            $this->assertTrue(is_dir($path), 'Throttle directory should remain untouched after '.$operation);
+        }
     }
 
     public function testWriteRejectsInvalidUsernameBeforePathResolution(): void

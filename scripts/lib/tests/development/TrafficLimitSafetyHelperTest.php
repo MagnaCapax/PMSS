@@ -12,24 +12,19 @@ class TrafficLimitSafetyHelperTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-traffic-limit-safety-');
     }
 
-    public function testEnsureStorageDirRejectsRelativePath(): void
+    public function testEnsureStorageDirRejectsUnsafeTargets(): void
     {
-        $this->assertTrue(\pmssTrafficLimitEnsureStorageDir('relative/path') === false);
-    }
-
-    public function testEnsureStorageDirRejectsExistingFile(): void
-    {
-        $path = $this->tempDir.'/not-a-dir';
-        file_put_contents($path, 'x');
-
-        $this->assertTrue(\pmssTrafficLimitEnsureStorageDir($path) === false);
-    }
-
-    public function testEnsureStorageDirRejectsSymlink(): void
-    {
+        $filePath = $this->tempDir.'/not-a-dir';
+        file_put_contents($filePath, 'x');
         [, $linkDir] = $this->pmssCreateSymlinkedDirectoryOrSkip($this->tempDir.'/real', $this->tempDir.'/link');
 
-        $this->assertTrue(\pmssTrafficLimitEnsureStorageDir($linkDir) === false);
+        foreach ([
+            'relative path' => 'relative/path',
+            'existing file' => $filePath,
+            'symlink' => $linkDir,
+        ] as $label => $path) {
+            $this->assertTrue(\pmssTrafficLimitEnsureStorageDir($path) === false, $label);
+        }
     }
 
     public function testEnsureStorageDirCreatesDirectoryWithStrictMode(): void
@@ -50,36 +45,26 @@ class TrafficLimitSafetyHelperTest extends TestCase
         $this->assertEquals(0700, fileperms($path) & 0777);
     }
 
-    public function testRemoveGiBFileTreatsMissingFileAsSuccess(): void
+    public function testRemoveGiBFileHandlesFilesystemCases(): void
     {
         $this->assertTrue(\pmssTrafficLimitRemoveGiBFile($this->tempDir.'/missing'));
-    }
 
-    public function testRemoveGiBFileDeletesRegularFile(): void
-    {
         $path = $this->tempDir.'/quota';
         file_put_contents($path, '12');
 
         $this->assertTrue(\pmssTrafficLimitRemoveGiBFile($path));
         $this->assertTrue(!file_exists($path));
-    }
 
-    public function testRemoveGiBFileRejectsSymlink(): void
-    {
         [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real', $this->tempDir.'/link', '12');
-
         $this->assertTrue(\pmssTrafficLimitRemoveGiBFile($linkPath) === false);
         $this->assertTrue(file_exists($realPath));
+
+        $dirPath = $this->pmssEnsureDir($this->tempDir.'/dir');
+        $this->assertTrue(\pmssTrafficLimitRemoveGiBFile($dirPath) === false);
+        $this->assertTrue(is_dir($dirPath));
     }
 
-    public function testRemoveGiBFileRejectsDirectory(): void
-    {
-        $path = $this->pmssEnsureDir($this->tempDir.'/dir');
-
-        $this->assertTrue(\pmssTrafficLimitRemoveGiBFile($path) === false);
-    }
-
-    public function testConvergeFileModeAppliesRequestedMode(): void
+    public function testConvergeFileModeHandlesFileDirectoryAndSymlinkCases(): void
     {
         $path = $this->tempDir.'/quota';
         file_put_contents($path, '12');
@@ -87,19 +72,11 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
         $this->assertTrue(\pmssTrafficLimitConvergeFileMode($path, 0600));
         $this->assertEquals(0600, fileperms($path) & 0777);
-    }
 
-    public function testConvergeFileModeAcceptsExistingDirectoryMode(): void
-    {
-        $path = $this->pmssEnsureDir($this->tempDir.'/dir', 0700);
+        $dirPath = $this->pmssEnsureDir($this->tempDir.'/dir', 0700);
+        $this->assertTrue(\pmssTrafficLimitConvergeFileMode($dirPath, 0700));
 
-        $this->assertTrue(\pmssTrafficLimitConvergeFileMode($path, 0700));
-    }
-
-    public function testConvergeFileModeRejectsSymlink(): void
-    {
         [, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real', $this->tempDir.'/link', '12');
-
         $this->assertTrue(\pmssTrafficLimitConvergeFileMode($linkPath, 0600) === false);
     }
 
