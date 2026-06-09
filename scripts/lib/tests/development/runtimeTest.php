@@ -427,6 +427,30 @@ class RuntimeTest extends TestCase
         });
     }
 
+    public function testAptDpkgEnvAssignmentsRejectShellShapedOverrides(): void
+    {
+        $assignments = \pmssAptDpkgEnvAssignments([
+            'DEBIAN_FRONTEND' => 'readline',
+            'BAD;KEY' => 'x',
+            "BAD\nKEY" => 'x',
+            'PMSS_BAD_VALUE' => 'value; reboot',
+            'PMSS_SPACE_VALUE' => 'two words',
+            'PMSS_ARRAY_VALUE' => ['not' => 'scalar'],
+        ]);
+
+        $this->assertSame('readline', $assignments['DEBIAN_FRONTEND']);
+        foreach (['BAD;KEY', "BAD\nKEY", 'PMSS_BAD_VALUE', 'PMSS_SPACE_VALUE', 'PMSS_ARRAY_VALUE'] as $key) {
+            $this->assertFalse(array_key_exists($key, $assignments), 'Unsafe env override survived: '.str_replace("\n", '\\n', $key));
+        }
+
+        $prefix = \pmssAptDpkgEnvPrefix([
+            'DEBIAN_FRONTEND' => 'readline',
+            'PMSS_BAD_VALUE' => '$(reboot)',
+        ]);
+        $this->assertStringContainsString('DEBIAN_FRONTEND=readline', $prefix);
+        $this->assertStringNotContainsString('$(reboot)', $prefix);
+    }
+
     public function testCommandBashInvocationExportsEnvForBareDpkgRecovery(): void
     {
         $bash = \pmssCommandBashInvocation('dpkg --configure -a');

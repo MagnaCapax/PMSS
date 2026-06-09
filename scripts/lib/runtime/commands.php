@@ -250,13 +250,32 @@ function pmssCommandIsAptDpkg(string $cmd): bool
  */
 function pmssAptDpkgEnvAssignments(array $overrides = []): array
 {
-    return array_replace([
+    $assignments = [
         'DEBIAN_FRONTEND' => 'noninteractive',
         'APT_LISTCHANGES_FRONTEND' => 'none',
         'UCF_FORCE_CONFDEF' => '1',
         'UCF_FORCE_CONFOLD' => '1',
         'NEEDRESTART_MODE' => 'a',
-    ], $overrides);
+    ];
+
+    foreach ($overrides as $key => $value) {
+        if (!is_string($key) || (!is_string($value) && !is_int($value) && !is_float($value))) {
+            continue;
+        }
+        $value = (string) $value;
+        if (pmssAptDpkgEnvAssignmentIsSafe($key, $value)) {
+            $assignments[$key] = $value;
+        }
+    }
+
+    return $assignments;
+}
+
+/** Keep generated shell prefixes to simple KEY=value environment assignments. */
+function pmssAptDpkgEnvAssignmentIsSafe(string $key, string $value): bool
+{
+    return preg_match('/^[A-Z_][A-Z0-9_]*$/', $key) === 1
+        && preg_match('/^[A-Za-z0-9_@%+=:,.\/-]*$/', $value) === 1;
 }
 
 function pmssAptDpkgEnvPrefix(array $overrides = []): string
