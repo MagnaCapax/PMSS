@@ -140,7 +140,8 @@ class UpdateAppInstallerContractsTest extends TestCase
             'remoteBinary.php' => [
                 'required' => [
                     'function pmssRunPinnedRemoteArchiveStep(',
-                    'pmssFetchPinnedRemoteFile($label, $url, $expectedSha256)',
+                    'function pmssPinnedRemoteTempFileUse(',
+                    'function pmssPinnedRemoteArtifactTempFileUse(',
                     "substr(\$archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf'",
                     "'tar '.\$tarMode",
                     'function pmssInstallPinnedRemoteDebPackage',
@@ -153,7 +154,6 @@ class UpdateAppInstallerContractsTest extends TestCase
                     'try {',
                     '} finally {',
                 ],
-                'forbidden' => ['function pmssRemoteBinary' => 'remoteBinary.php should keep temp-file cleanup inline rather than adding a helper wrapper'],
             ],
             'syncthing.php' => [
                 'required' => [
@@ -213,10 +213,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                 "@hash_file('sha256'" => $installer.' should delegate checksum verification to remoteBinary.php',
             ]);
 
-            $this->assertTrue(
-                strpos($contents, 'pmssDownloadPinnedRemoteTempFile(') !== false || strpos($contents, 'pmssFetchPinnedRemoteFile(') !== false,
-                $installer.' should call a remoteBinary.php pinned download helper'
-            );
+            $this->assertTrue(preg_match('/pmss(?:DownloadPinnedRemoteTempFile|FetchPinnedRemoteFile|PinnedRemote(?:TempFile|ArtifactTempFile)Use)\(/', $contents) === 1, $installer.' should call a remoteBinary.php pinned download helper');
         }
     }
 

@@ -40,30 +40,25 @@ if ($nodeBinary === '') {
 
         if (!is_executable($nodeBinary)) {
             runStep('Ensuring AI tools install root exists', 'mkdir -p '.escapeshellarg($installRoot));
-            $downloadPath = pmssDownloadPinnedRemoteTempFile(
+            $resolvedNodeBinary = pmssPinnedRemoteTempFileUse(
                 'Node.js runtime for AI CLI tools',
                 $downloadUrl,
                 $nodeSha256,
                 'pmss-ai-node-',
-                'Downloading pinned Node.js runtime for AI CLI tools'
-            );
-
-            if ($downloadPath === null) {
-                $nodeBinary = '';
-            } else {
-                try {
+                'Downloading pinned Node.js runtime for AI CLI tools',
+                static function (string $downloadPath) use ($dryRun, $installRoot, $nodeBinary): string {
                     // Dry-run keeps the historical path: later npm checks
                     // still report what would be missing without extracting.
-                    if (!$dryRun) {
-                        runStep('Extracting pinned Node.js runtime for AI CLI tools', sprintf('tar -xJf %s -C %s', escapeshellarg($downloadPath), escapeshellarg($installRoot)));
-                        if (!is_executable($nodeBinary)) {
-                            $nodeBinary = '';
-                        }
+                    if ($dryRun) {
+                        return $nodeBinary;
                     }
-                } finally {
-                    @unlink($downloadPath);
+
+                    runStep('Extracting pinned Node.js runtime for AI CLI tools', sprintf('tar -xJf %s -C %s', escapeshellarg($downloadPath), escapeshellarg($installRoot)));
+                    return is_executable($nodeBinary) ? $nodeBinary : '';
                 }
-            }
+            );
+
+            $nodeBinary = is_string($resolvedNodeBinary) ? $resolvedNodeBinary : '';
         }
     }
 }
@@ -112,16 +107,13 @@ if (!is_file($destination) || $force) {
         $downloadDir = sys_get_temp_dir().'/pmss-ai-tools-codex';
 
         runStep('Preparing Codex download directory', 'mkdir -p '.escapeshellarg($downloadDir));
-        $archivePath = pmssDownloadPinnedRemoteTempFile(
+        pmssPinnedRemoteTempFileUse(
             'Codex CLI archive',
             $url,
             $sha256,
             'pmss-ai-codex-',
-            'Downloading pinned Codex CLI archive'
-        );
-
-        if ($archivePath !== null) {
-            try {
+            'Downloading pinned Codex CLI archive',
+            static function (string $archivePath) use ($downloadDir, $destination, $dryRun): void {
                 runStep('Extracting Codex CLI archive', sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($downloadDir)));
                 runStep('Installing Codex CLI binary', sprintf('install -m 0755 %s %s', escapeshellarg($downloadDir.'/codex-x86_64-unknown-linux-musl'), escapeshellarg($destination)));
 
@@ -133,9 +125,7 @@ if (!is_file($destination) || $force) {
                         @chmod('/etc/codex/config.toml', 0644);
                     }
                 }
-            } finally {
-                @unlink($archivePath);
             }
-        }
+        );
     }
 }

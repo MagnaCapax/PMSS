@@ -114,6 +114,22 @@ function pmssDownloadPinnedRemoteTempFile(
     return $tmp;
 }
 
+/**
+ * Run a caller callback with a verified pinned artifact and always clean it up.
+ */
+function pmssPinnedRemoteTempFileUse(string $label, string $url, string $expectedSha256, string $tempPrefix, string $downloadDescription, callable $callback, string $artifactLabel = '', bool $runCallbackInDryRun = true)
+{
+    $tmp = pmssDownloadPinnedRemoteTempFile($label, $url, $expectedSha256, $tempPrefix, $downloadDescription, $artifactLabel);
+    if ($tmp === null) return null;
+    try { return (!$runCallbackInDryRun && pmssEnvFlagEnabled('PMSS_DRY_RUN')) ? null : $callback($tmp); } finally { @unlink($tmp); }
+}
+
+/** Run a callback with the default verified remote artifact temp-file policy. */
+function pmssPinnedRemoteArtifactTempFileUse(string $label, string $url, string $expectedSha256, callable $callback, bool $runCallbackInDryRun = false)
+{
+    return pmssPinnedRemoteTempFileUse($label, $url, $expectedSha256, 'pmss-remote-bin-', "Downloading {$label}", $callback, '', $runCallbackInDryRun);
+}
+
 /** Fetch a verified remote file; returns null in dry-run mode. */
 function pmssFetchPinnedRemoteFile(string $label, string $url, string $expectedSha256): ?string
 {
@@ -158,24 +174,16 @@ function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expe
         }
     }
 
-    $archivePath = pmssFetchPinnedRemoteFile($label, $url, $expectedSha256);
-    if ($archivePath === null) {
-        return;
-    }
-
-    $tarMode = substr($archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf';
-    $commands = ['set -e', 'mkdir -p '.escapeshellarg($workDir), 'cd '.escapeshellarg($workDir),
-        'rm -rf '.escapeshellarg($sourceDir).' '.escapeshellarg($archiveName),
-        'cp '.escapeshellarg($archivePath).' '.escapeshellarg($archiveName), 'tar '.$tarMode.' '.escapeshellarg($archiveName)];
-    foreach ($postExtractCommands as $command) {
-        $commands[] = (string) $command;
-    }
-
-    try {
+    pmssPinnedRemoteArtifactTempFileUse($label, $url, $expectedSha256, static function (string $archivePath) use ($archiveName, $sourceDir, $description, $postExtractCommands, $workDir): void {
+        $tarMode = substr($archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf';
+        $commands = ['set -e', 'mkdir -p '.escapeshellarg($workDir), 'cd '.escapeshellarg($workDir),
+            'rm -rf '.escapeshellarg($sourceDir).' '.escapeshellarg($archiveName),
+            'cp '.escapeshellarg($archivePath).' '.escapeshellarg($archiveName), 'tar '.$tarMode.' '.escapeshellarg($archiveName)];
+        foreach ($postExtractCommands as $command) {
+            $commands[] = (string) $command;
+        }
         runStep($description, implode(' && ', $commands));
-    } finally {
-        @unlink($archivePath);
-    }
+    });
 }
 
 /** Install a verified remote binary, refreshing only when needed. */
@@ -202,37 +210,25 @@ function pmssInstallPinnedRemoteBinary(
         }
     }
 
-    $tmp = pmssFetchPinnedRemoteFile($label, $url, $expectedSha256);
-    if ($tmp === null) {
-        return;
-    }
-
-    try {
+    pmssPinnedRemoteArtifactTempFileUse($label, $url, $expectedSha256, static function (string $tmp) use ($label, $destination): void {
         runStep("Installing {$label}", pmssBuildCommand('install', ['-m', '0755', $tmp, $destination]));
-    } finally {
-        @unlink($tmp);
-    }
+    });
 }
 
 /** Install a verified Debian package; dry-run still reports success. */
 function pmssInstallPinnedRemoteDebPackage(string $label, string $url, string $expectedSha256): bool
 {
-    $tmp = pmssDownloadPinnedRemoteTempFile(
+    $result = pmssPinnedRemoteTempFileUse(
         $label,
         $url,
         $expectedSha256,
         'pmss-remote-deb-',
         "Downloading {$label} package",
+        static function (string $tmp) use ($label): bool {
+            return pmssEnvFlagEnabled('PMSS_DRY_RUN')
+                || runStep("Installing {$label}", dpkgCmd('-i '.escapeshellarg($tmp))) === 0;
+        },
         ' package'
     );
-    if ($tmp === null) {
-        return false;
-    }
-
-    try {
-        return pmssEnvFlagEnabled('PMSS_DRY_RUN')
-            || runStep("Installing {$label}", dpkgCmd('-i '.escapeshellarg($tmp))) === 0;
-    } finally {
-        @unlink($tmp);
-    }
+    return $result === true;
 }

@@ -228,21 +228,27 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
 
     $rtorrentUrl = "https://pulsedmedia.com/remote/pkg/{$rtorrentTarball}";
     $libtorrentUrl = "https://pulsedmedia.com/remote/pkg/{$libtorrentTarball}";
-    $rtorrentTmp = pmssFetchPinnedRemoteFile("rtorrent {$rtorrentVersionTarget} source", $rtorrentUrl, $rtorrentSha);
-    if ($rtorrentTmp === null) {
+    $extracted = pmssPinnedRemoteArtifactTempFileUse(
+        "rtorrent {$rtorrentVersionTarget} source",
+        $rtorrentUrl,
+        $rtorrentSha,
+        static function (string $rtorrentTmp) use ($rtorrentVersionTargetLib, $libtorrentUrl, $libtorrentSha): ?bool {
+            return pmssPinnedRemoteArtifactTempFileUse(
+                "libtorrent {$rtorrentVersionTargetLib} source",
+                $libtorrentUrl,
+                $libtorrentSha,
+                static function (string $libtorrentTmp) use ($rtorrentTmp): bool {
+                    echo "**** uncompressing ...\n";
+                    runStep('Extracting rtorrent source', 'cd /tmp && '.pmssBuildCommand('tar', ['-zxf', $rtorrentTmp]));
+                    runStep('Extracting libtorrent source', 'cd /tmp && '.pmssBuildCommand('tar', ['-zxf', $libtorrentTmp]));
+                    return true;
+                }
+            );
+        }
+    );
+    if ($extracted !== true) {
         return;
     }
-    $libtorrentTmp = pmssFetchPinnedRemoteFile("libtorrent {$rtorrentVersionTargetLib} source", $libtorrentUrl, $libtorrentSha);
-    if ($libtorrentTmp === null) {
-        @unlink($rtorrentTmp);
-        return;
-    }
-        
-    echo "**** uncompressing ...\n";
-    runStep('Extracting rtorrent source', 'cd /tmp && '.pmssBuildCommand('tar', ['-zxf', $rtorrentTmp]));
-    runStep('Extracting libtorrent source', 'cd /tmp && '.pmssBuildCommand('tar', ['-zxf', $libtorrentTmp]));
-    @unlink($rtorrentTmp);
-    @unlink($libtorrentTmp);
     
     echo "**** compiling ....\n";
     echo "***** libtorrent\n";

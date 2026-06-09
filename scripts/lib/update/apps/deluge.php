@@ -124,17 +124,18 @@ if ($isDebian10) {
             pmssBuildCommand('pip', array_merge(['install'], pmssDelugeLegacyPipDependencyPackages()))
         );
 
-        $tmp = pmssFetchPinnedRemoteFile($delugeTarballLabel, $delugeTarballUrl, $delugeTarballSha256);
-        if ($tmp === null) {
+        $extracted = pmssPinnedRemoteArtifactTempFileUse($delugeTarballLabel, $delugeTarballUrl, $delugeTarballSha256, static function (string $tmp): bool {
+            runStep('Cleaning previous Deluge source', 'rm -rf /tmp/deluge-2*');
+            runStep(
+                'Extracting Deluge source',
+                'cd /tmp && '.pmssBuildCommand('tar', ['-xvf', $tmp])
+            );
+            return true;
+        });
+        if ($extracted !== true) {
             return;
         }
 
-        runStep('Cleaning previous Deluge source', 'rm -rf /tmp/deluge-2*');
-        runStep(
-            'Extracting Deluge source',
-            'cd /tmp && '.pmssBuildCommand('tar', ['-xvf', $tmp])
-        );
-        @unlink($tmp);
         runStep('Building Deluge from source', 'cd /tmp/deluge-2.0.5; python3 setup.py build; python setup.py install');
     } else {
         echo "\t*** Deluge already at target version ({$currentVersion}); skipping pip build\n";
