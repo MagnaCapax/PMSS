@@ -7,60 +7,16 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class BonusTrafficTest extends TestCase
 {
-    public function testShowModeReadsBonusThroughSharedTrafficHelper(): void
+    public function testBonusTrafficCliModesPreserveContracts(): void
     {
-        $result = $this->runBonusTrafficCli(
-            ['userBonusTraffic.php', '--user=alice', '--show'],
-            "15GiB\n"
-        );
+        foreach ($this->bonusTrafficCliCases() as $label => $case) {
+            $result = $this->runBonusTrafficCli($case['argv'], $case['existing']);
 
-        $this->assertEquals(0, $result['rc']);
-        $this->assertEquals("Bonus traffic for alice: 15 GiB\n", $result['stdout']);
-        $this->assertEquals('15GiB', $result['files']['home']);
-        $this->assertEquals([], $result['logs']);
-    }
-
-    public function testHelpModePrintsCanonicalUsageText(): void
-    {
-        $result = $this->runBonusTrafficCli(['userBonusTraffic.php', '--help']);
-
-        $this->assertEquals(0, $result['rc']);
-        $this->assertEquals(
-            "Usage:\n"
-            ."  ./userBonusTraffic.php --user=<username> --bonus=<GiB>\n"
-            ."  ./userBonusTraffic.php --user=<username> --show\n"
-            ."  ./userBonusTraffic.php --user=<username> --unset\n"
-            ."  ./userBonusTraffic.php <username> <GiB>\n\n"
-            ."Notes:\n"
-            ."  - Bonus unit is GiB (monthly quota add-on).\n"
-            ."  - Use 0 (or --unset) to remove the bonus.\n",
-            $result['stdout']
-        );
-        $this->assertEquals(null, $result['files']['home']);
-        $this->assertEquals([], $result['logs']);
-    }
-
-    public function testSetModeWritesBonusAndLogsChange(): void
-    {
-        $result = $this->runBonusTrafficCli(['userBonusTraffic.php', '--user=alice', '--bonus=20']);
-
-        $this->assertEquals(0, $result['rc']);
-        $this->assertEquals("Bonus traffic for alice set to 20 GiB\n", $result['stdout']);
-        $this->assertEquals('20', $result['files']['home']);
-        $this->assertEquals([['alice', 'bonus traffic set to 20 GiB (monthly add-on)']], $result['logs']);
-    }
-
-    public function testUnsetModeRemovesBonusAndLogsChange(): void
-    {
-        $result = $this->runBonusTrafficCli(
-            ['userBonusTraffic.php', '--user=alice', '--unset'],
-            "9\n"
-        );
-
-        $this->assertEquals(0, $result['rc']);
-        $this->assertEquals("Bonus traffic for alice set to 0 GiB\n", $result['stdout']);
-        $this->assertEquals(null, $result['files']['home']);
-        $this->assertEquals([['alice', 'bonus traffic unset (GiB add-on removed)']], $result['logs']);
+            $this->assertEquals(0, $result['rc'], $label);
+            $this->assertEquals($case['stdout'], $result['stdout'], $label);
+            $this->assertEquals($case['files'], $result['files'], $label);
+            $this->assertEquals($case['logs'], $result['logs'], $label);
+        }
     }
 
     public function testBonusTrafficCliLivesInSharedTrafficLimitLibrary(): void
@@ -101,5 +57,52 @@ final class BonusTrafficTest extends TestCase
             'logGlobal' => 'PMSS_BONUS_TEST_LOGS',
             'existingFiles' => $existingContents !== '' ? ['home' => $existingContents] : [],
         ]);
+    }
+
+    /** @return array<string,array{argv:array<int,string>,existing:string,stdout:string,files:array<string,?string>,logs:array<int,array<int,string>>}> */
+    private function bonusTrafficCliCases(): array
+    {
+        return [
+            'show' => [
+                'argv' => ['userBonusTraffic.php', '--user=alice', '--show'],
+                'existing' => "15GiB\n",
+                'stdout' => "Bonus traffic for alice: 15 GiB\n",
+                'files' => ['home' => '15GiB'],
+                'logs' => [],
+            ],
+            'help' => [
+                'argv' => ['userBonusTraffic.php', '--help'],
+                'existing' => '',
+                'stdout' => $this->bonusTrafficUsageText(),
+                'files' => ['home' => null],
+                'logs' => [],
+            ],
+            'set' => [
+                'argv' => ['userBonusTraffic.php', '--user=alice', '--bonus=20'],
+                'existing' => '',
+                'stdout' => "Bonus traffic for alice set to 20 GiB\n",
+                'files' => ['home' => '20'],
+                'logs' => [['alice', 'bonus traffic set to 20 GiB (monthly add-on)']],
+            ],
+            'unset' => [
+                'argv' => ['userBonusTraffic.php', '--user=alice', '--unset'],
+                'existing' => "9\n",
+                'stdout' => "Bonus traffic for alice set to 0 GiB\n",
+                'files' => ['home' => null],
+                'logs' => [['alice', 'bonus traffic unset (GiB add-on removed)']],
+            ],
+        ];
+    }
+
+    private function bonusTrafficUsageText(): string
+    {
+        return "Usage:\n"
+            ."  ./userBonusTraffic.php --user=<username> --bonus=<GiB>\n"
+            ."  ./userBonusTraffic.php --user=<username> --show\n"
+            ."  ./userBonusTraffic.php --user=<username> --unset\n"
+            ."  ./userBonusTraffic.php <username> <GiB>\n\n"
+            ."Notes:\n"
+            ."  - Bonus unit is GiB (monthly quota add-on).\n"
+            ."  - Use 0 (or --unset) to remove the bonus.\n";
     }
 }
