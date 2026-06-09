@@ -6,24 +6,24 @@ require_once dirname(__DIR__, 2).'/netconsole.php';
 
 class NetconsoleConfigureTest extends TestCase
 {
-    public function testParsesValidSpec(): void
+    public function testParsesTargetSpecsAndRejectsUnsafeVariants(): void
     {
-        $target = \pmssNetconsoleTargetFromSpec('6665@192.0.2.10/eth0,6666@192.0.2.20/aa:bb:cc:dd:ee:ff');
-        $this->assertEquals('eth0', $target['interface']);
-        $this->assertEquals('192.0.2.20', $target['targetIp']);
-        $this->assertEquals('aa:bb:cc:dd:ee:ff', $target['targetMac']);
-    }
-
-    public function testRejectsSpecWithoutDeviceSegment(): void
-    {
-        $target = \pmssNetconsoleTargetFromSpec('6665@192.0.2.10,6666@192.0.2.20/aa:bb:cc:dd:ee:ff');
-        $this->assertTrue($target === null, 'expected missing device segment to be rejected');
-    }
-
-    public function testRejectsSpecWithUnsafeInterfaceName(): void
-    {
-        $target = \pmssNetconsoleTargetFromSpec('6665@192.0.2.10/eth0 bad,6666@192.0.2.20/aa:bb:cc:dd:ee:ff');
-        $this->assertTrue($target === null, 'expected whitespace-bearing interface to be rejected');
+        foreach ([
+            'valid' => [
+                '6665@192.0.2.10/eth0,6666@192.0.2.20/aa:bb:cc:dd:ee:ff',
+                ['interface' => 'eth0', 'targetIp' => '192.0.2.20', 'targetMac' => 'aa:bb:cc:dd:ee:ff'],
+            ],
+            'missing device segment' => ['6665@192.0.2.10,6666@192.0.2.20/aa:bb:cc:dd:ee:ff', null],
+            'unsafe interface' => ['6665@192.0.2.10/eth0 bad,6666@192.0.2.20/aa:bb:cc:dd:ee:ff', null],
+        ] as $label => [$spec, $expected]) {
+            $target = \pmssNetconsoleTargetFromSpec($spec);
+            $actual = $target === null ? null : [
+                'interface' => $target['interface'],
+                'targetIp' => $target['targetIp'],
+                'targetMac' => $target['targetMac'],
+            ];
+            $this->assertEquals($expected, $actual, $label);
+        }
     }
 
     public function testSkipsWhenConfigMissing(): void

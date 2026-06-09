@@ -10,20 +10,20 @@ class PolicyOverridePrecedenceTest extends TestCase
 
     public function testDefaultsApplyWhenExplicitMissing(): void
     {
-        $out = $this->pmssRunUserConfigCgroupCliWithPolicy(
-            ['cpuWeight' => 123, 'ioWeight' => 321, 'tasksMax' => 777],
-            ['root', '--apply', '--dry-run', '--defaults']
-        );
-        $this->assertStringContainsAllStrings(['CPUWeight=123', 'IOWeight=321', 'TasksMax=777'], $out);
-    }
-
-    public function testExplicitOverridesPolicyDefaults(): void
-    {
-        $out = $this->pmssRunUserConfigCgroupCliWithPolicy(
-            ['cpuWeight' => 111],
-            ['root', '--apply', '--dry-run', '--defaults', '--cpu-weight=999']
-        );
-        $this->assertStringContainsString('CPUWeight=999', $out);
+        foreach ([
+            [
+                ['cpuWeight' => 123, 'ioWeight' => 321, 'tasksMax' => 777],
+                ['root', '--apply', '--dry-run', '--defaults'],
+                ['CPUWeight=123', 'IOWeight=321', 'TasksMax=777'],
+            ],
+            [
+                ['cpuWeight' => 111],
+                ['root', '--apply', '--dry-run', '--defaults', '--cpu-weight=999'],
+                ['CPUWeight=999'],
+            ],
+        ] as [$policy, $argv, $expected]) {
+            $this->assertStringContainsAllStrings($expected, $this->pmssRunUserConfigCgroupCliWithPolicy($policy, $argv));
+        }
     }
 
     public function testDefaultsExpandPolicyMountIoPairs(): void

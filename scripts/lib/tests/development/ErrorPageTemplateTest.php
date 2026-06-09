@@ -5,22 +5,21 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class ErrorPageTemplateTest extends TestCase
 {
-    public function testNginxTemplateDefinesErrorPagesInHttpAndHttpsServers(): void
+    public function testNginxTemplateKeepsErrorAndTestfileGuards(): void
     {
         $contents = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-site-default');
-        foreach (['401', '403'] as $code) {
-            $this->assertEquals(2, substr_count($contents, 'error_page '.$code.' /error-'.$code.'.html;'));
-            $this->assertEquals(2, substr_count($contents, 'location = /error-'.$code.'.html {'));
+        foreach ([
+            'error_page 401 /error-401.html;' => 2,
+            'location = /error-401.html {' => 2,
+            'error_page 403 /error-403.html;' => 2,
+            'location = /error-403.html {' => 2,
+            'limit_conn_zone $binary_remote_addr zone=testfile:10m;' => 1,
+            'location = /testfile {' => 2,
+            'limit_conn testfile 16;' => 2,
+            'limit_conn_status 429;' => 2,
+        ] as $needle => $count) {
+            $this->assertEquals($count, substr_count($contents, $needle), $needle);
         }
-    }
-
-    public function testNginxTemplateLimitsPublicTestfileInHttpAndHttpsServers(): void
-    {
-        $contents = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-site-default');
-        $this->assertEquals(1, substr_count($contents, 'limit_conn_zone $binary_remote_addr zone=testfile:10m;'));
-        $this->assertEquals(2, substr_count($contents, 'location = /testfile {'));
-        $this->assertEquals(2, substr_count($contents, 'limit_conn testfile 16;'));
-        $this->assertEquals(2, substr_count($contents, 'limit_conn_status 429;'));
     }
 
     public function testAuthenticationErrorPageIncludesHelpfulTextAndHomeLink(): void

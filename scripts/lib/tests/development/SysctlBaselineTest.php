@@ -196,30 +196,19 @@ class SysctlBaselineTest extends TestCase
         $this->assertSame(1000, \pmssSysctlNicSpeedMbps());
     }
 
-    public function testVmDetectionUsesSystemdDetectVirtSuccessStatus(): void
+    public function testVmDetectionUsesSystemdDetectVirtStatus(): void
     {
-        $binDir = $this->pmssMakeExecutableStub(
-            'systemd-detect-virt',
-            "#!/bin/sh\n[ \"\$1\" = '--quiet' ] || exit 9\nexit 0\n",
-            'pmss-sysctl-virt-'
-        );
+        foreach ([0 => true, 1 => false] as $exitCode => $expected) {
+            $binDir = $this->pmssMakeExecutableStub(
+                'systemd-detect-virt',
+                "#!/bin/sh\n[ \"\$1\" = '--quiet' ] || exit 9\nexit ".$exitCode."\n",
+                'pmss-sysctl-virt-'
+            );
 
-        $this->pmssWithPathPrefixedEnv($binDir, ['PMSS_SYSCTL_IS_VM' => null], function (): void {
-            $this->assertTrue(\pmssSysctlIsVm());
-        });
-    }
-
-    public function testVmDetectionUsesSystemdDetectVirtFailureStatus(): void
-    {
-        $binDir = $this->pmssMakeExecutableStub(
-            'systemd-detect-virt',
-            "#!/bin/sh\n[ \"\$1\" = '--quiet' ] || exit 9\nexit 1\n",
-            'pmss-sysctl-virt-'
-        );
-
-        $this->pmssWithPathPrefixedEnv($binDir, ['PMSS_SYSCTL_IS_VM' => null], function (): void {
-            $this->assertFalse(\pmssSysctlIsVm());
-        });
+            $this->pmssWithPathPrefixedEnv($binDir, ['PMSS_SYSCTL_IS_VM' => null], function () use ($expected, $exitCode): void {
+                $this->assertSame($expected, \pmssSysctlIsVm(), 'unexpected VM detection for exit '.$exitCode);
+            });
+        }
     }
 
     public function testVmDetectionAvoidsShellStatusPipeline(): void
