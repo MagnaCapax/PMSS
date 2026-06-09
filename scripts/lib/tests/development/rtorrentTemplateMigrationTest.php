@@ -2,8 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-putenv('PMSS_RTORRENT_NO_ENTRYPOINT=1');
-require_once dirname(__DIR__, 2).'/update/apps/rtorrent.php';
+require_once dirname(__DIR__, 2).'/rtorrent/legacyDirectives.php';
 
 class RtorrentTemplateMigrationTest extends TestCase
 {
@@ -37,6 +36,10 @@ class RtorrentTemplateMigrationTest extends TestCase
             'duplicate modern directive' => [
                 "trackers.use_udp.set = yes\nuse_udp_trackers = yes\n",
                 "trackers.use_udp.set = yes\n",
+            ],
+            'duplicate legacy directive' => [
+                "tracker_numwant = 42\ntracker_numwant = 42\n",
+                "trackers.numwant.set = 42\n",
             ],
             'unrelated lines and CRLF endings' => [
                 "directory = ~/data\r\ntracker_numwant = -1\r\ncustom = keep\r\n",

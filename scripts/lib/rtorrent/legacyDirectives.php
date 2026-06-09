@@ -29,6 +29,83 @@ function pmssRtorrentLegacyDirectiveCatalog(): array
 }
 
 /**
+ * Normalize legacy rTorrent template directives to the modern syntax.
+ *
+ * Existing hosts can still carry historical `template.rtorrent.rc` copies from
+ * long-lived installs. Rewriting known legacy keys keeps operator intent intact
+ * while removing aliases that newer rTorrent versions reject.
+ */
+function pmssRtorrentNormalizeLegacyTemplate(string $template): string
+{
+    $lineSeparator = strpos($template, "\r\n") !== false ? "\r\n" : (strpos($template, "\r") !== false ? "\r" : "\n");
+    $lines = preg_split('/\r\n|\r|\n/', $template);
+    if (!is_array($lines)) {
+        return $template;
+    }
+    if ($lines !== [] && end($lines) === '') {
+        array_pop($lines);
+    }
+
+    $remove = [];
+    $replace = [];
+    $inline = [];
+    foreach (pmssRtorrentLegacyDirectiveCatalog() as $legacy => $rule) {
+        if ($rule['replacement'] === null) {
+            $remove[] = $legacy;
+            continue;
+        }
+        $replace[$legacy] = $rule['replacement'];
+        if (isset($rule['inline'])) {
+            $inline['/(?<![A-Za-z0-9_.])'.preg_quote($legacy, '/').'(?==)/'] = $rule['inline'];
+        }
+    }
+
+    $normalizeInlineAliases = static function (string $line) use ($inline): string {
+        return $inline === [] ? $line : (string) preg_replace(array_keys($inline), array_values($inline), $line);
+    };
+
+    $normalizedLines = [];
+    $seenManagedLines = [];
+    foreach ($lines as $line) {
+        foreach ($remove as $legacy) {
+            if (preg_match('/^\s*'.preg_quote($legacy, '/').'\s*=\s*.+?\s*$/', $line) === 1) {
+                continue 2;
+            }
+        }
+
+        foreach ($replace as $legacy => $modern) {
+            $matches = [];
+            if (preg_match('/^\s*'.preg_quote($legacy, '/').'\s*=\s*(.+?)\s*$/', $line, $matches) === 1) {
+                $line = $normalizeInlineAliases($modern.' = '.$matches[1]);
+                $trimmed = trim($line);
+                if (!isset($seenManagedLines[$trimmed])) {
+                    $normalizedLines[] = $line;
+                    $seenManagedLines[$trimmed] = true;
+                }
+                continue 2;
+            }
+        }
+
+        $line = $normalizeInlineAliases($line);
+        $trimmed = trim($line);
+        foreach ($replace as $modern) {
+            if (strpos($trimmed, $modern.' = ') !== 0) {
+                continue;
+            }
+            if (isset($seenManagedLines[$trimmed])) {
+                continue 2;
+            }
+            $seenManagedLines[$trimmed] = true;
+            break;
+        }
+        $normalizedLines[] = $line;
+    }
+
+    $normalized = implode($lineSeparator, $normalizedLines);
+    return ($template !== '' && preg_match('/(?:\r\n|\r|\n)\z/', $template) === 1) ? $normalized.$lineSeparator : $normalized;
+}
+
+/**
  * Return legacy directive names in diagnostic order.
  *
  * @return string[]
