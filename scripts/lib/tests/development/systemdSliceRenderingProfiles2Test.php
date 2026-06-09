@@ -10,7 +10,7 @@ class SystemdSliceRenderingProfiles2Test extends TestCase
     {
         $out = $this->pmssSystemdSliceRender([
             'v2Template' => "[Slice]\nCPUQuota=%%USER_CGROUP_CPU_QUOTA%%\n",
-            'policy' => $this->pmssSystemdSlicePolicySource(['cpuQuotaPercent' => 85]),
+            'policy' => ['cpuQuotaPercent' => 85],
             'totalMemMiB' => 4096,
         ]);
         $this->assertTrue(strpos($out, 'CPUQuota=85%') !== false, 'CPUQuota percent not expanded');
@@ -22,7 +22,7 @@ class SystemdSliceRenderingProfiles2Test extends TestCase
             'cfgPrefix' => 'pmss-cg-cfginf-',
             'dropPrefix' => 'pmss-cg-dropinf-',
             'v2Template' => "[Slice]\nCPUQuota=%%USER_CGROUP_CPU_QUOTA%%\n",
-            'policy' => $this->pmssSystemdSlicePolicySource(['cpuQuotaPercent' => 'infinity']),
+            'policy' => ['cpuQuotaPercent' => 'infinity'],
             'totalMemMiB' => 2048,
         ]);
         $this->assertTrue(strpos($out, 'CPUQuota=infinity') !== false, 'CPUQuota infinity not rendered');
@@ -34,10 +34,10 @@ class SystemdSliceRenderingProfiles2Test extends TestCase
             'cfgPrefix' => 'pmss-cg-cfg2-',
             'dropPrefix' => 'pmss-cg-drop2-',
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
-            'policy' => $this->pmssSystemdSlicePolicySource([
+            'policy' => [
                 'tasksMax' => 512,
                 'mounts' => ['/'=> ['readBw' => '1M', 'writeBw' => '2M']],
-            ]),
+            ],
             'totalMemMiB' => 2048,
         ]);
         // Device string varies; assert IO lines present.

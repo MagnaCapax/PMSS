@@ -446,6 +446,26 @@ abstract class TestCase
         return $this->pmssWriteFile($path, "<?php return ".var_export($value, true).";\n");
     }
 
+    /** Build the on-disk cgroup policy PHP fixture source from an array payload. */
+    protected function pmssCgroupPolicySource(array $policy): string
+    {
+        return '<?php return '.var_export($policy, true).";\n";
+    }
+
+    /** Write a cgroup.policy.php fixture under a caller-provided config directory. */
+    protected function pmssWriteCgroupPolicyFixture(string $configDir, array $policy, int $dirMode = 0700): string
+    {
+        return $this->pmssWriteFile(rtrim($configDir, '/').'/cgroup.policy.php', $this->pmssCgroupPolicySource($policy), $dirMode);
+    }
+
+    /** Create a PMSS_CONFIG_DIR-style fixture containing cgroup.policy.php. */
+    protected function pmssMakeCgroupPolicyConfigDir(array $policy, string $prefix = 'pmss-cgroup-policy-', int $mode = 0700): string
+    {
+        $configDir = $this->pmssMakeNamedTempDir($prefix, $mode);
+        $this->pmssWriteCgroupPolicyFixture($configDir, $policy, $mode);
+        return $configDir;
+    }
+
     /** Read an array-shaped JSON fixture and optionally fall back on decode failures. */
     protected function pmssReadJsonArrayFile(string $path, ?array $default = null, string $message = ''): array
     {
@@ -682,7 +702,10 @@ abstract class TestCase
             $this->pmssWriteFile($cfgDir.'/template.cgroup.user-slice.v2.conf', (string) $v2Template);
         }
         if (array_key_exists('policy', $options)) {
-            $this->pmssWriteFile($cfgDir.'/cgroup.policy.php', (string) $options['policy']);
+            $policySource = is_array($options['policy'])
+                ? $this->pmssCgroupPolicySource($options['policy'])
+                : (string) $options['policy'];
+            $this->pmssWriteFile($cfgDir.'/cgroup.policy.php', $policySource);
         }
 
         $env = [
@@ -735,12 +758,6 @@ abstract class TestCase
         $lines[] = 'TasksMax=%%USER_CGROUP_TASKS_MAX%%';
         return implode("\n", $lines)."\n";
     }
-    /** Build a PHP policy fixture matching the on-disk cgroup policy contract. */
-    protected function pmssSystemdSlicePolicySource(array $policy): string
-    {
-        return '<?php return '.var_export($policy, true).";\n";
-    }
-
     /** Create an executable test stub in a fresh PATH directory. */
     protected function pmssMakeExecutableStub(string $binaryName, string $script, string $dirPrefix): string
     {

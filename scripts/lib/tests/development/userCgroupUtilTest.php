@@ -111,8 +111,7 @@ class UserCgroupUtilTest extends TestCase
 
     public function testIoPolicyProfileKeepsOnlyPositiveValues(): void
     {
-        $cfgDir = $this->pmssMakeTempDir('pmss-cgroup-policy-');
-        $this->pmssWriteFile($cfgDir.'/cgroup.policy.php', '<?php return '.var_export([
+        $cfgDir = $this->pmssMakeCgroupPolicyConfigDir([
             'profiles' => [
                 'io' => [
                     'archive' => [
@@ -124,7 +123,7 @@ class UserCgroupUtilTest extends TestCase
                     ],
                 ],
             ],
-        ], true).";\n");
+        ]);
 
         $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $cfgDir], function (): void {
             $mgr = $this->makeManager();
@@ -182,12 +181,11 @@ class UserCgroupUtilTest extends TestCase
 
     public function testPolicyDefaultsSkipUnsafeDeviceTargets(): void
     {
-        $cfgDir = $this->pmssMakeTempDir('pmss-cgroup-policy-');
-        $this->pmssWriteFile($cfgDir.'/cgroup.policy.php', '<?php return '.var_export([
+        $cfgDir = $this->pmssMakeCgroupPolicyConfigDir([
             'mounts' => [
                 '/dev/bad target' => ['ioWeight' => 200],
             ],
-        ], true).";\n");
+        ]);
 
         $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $cfgDir], function (): void {
             $mgr = $this->makeManager();

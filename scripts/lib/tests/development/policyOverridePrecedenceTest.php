@@ -8,51 +8,40 @@ class PolicyOverridePrecedenceTest extends TestCase
 {
     use UserConfigCgroupCliTrait;
 
-    private function createPolicyDir(string $suffix, string $body): string
-    {
-        $cfgDir = $this->pmssMakeNamedTempDir('pmss-cg-'.$suffix.'-', 0700);
-        file_put_contents($cfgDir.'/cgroup.policy.php', $body);
-        return $cfgDir;
-    }
-
     public function testDefaultsApplyWhenExplicitMissing(): void
     {
-        $cfgDir = $this->createPolicyDir('policy', "<?php return ['cpuWeight'=>123,'ioWeight'=>321,'tasksMax'=>777];\n");
-        $this->pmssAssertRepoPhpScriptOutputContains('scripts/util/userConfigCgroup.php', ['root', '--apply', '--dry-run', '--defaults'], ['CPUWeight=123', 'IOWeight=321', 'TasksMax=777'], ['PMSS_CONFIG_DIR' => $cfgDir]);
+        $out = $this->pmssRunUserConfigCgroupCliWithPolicy(
+            ['cpuWeight' => 123, 'ioWeight' => 321, 'tasksMax' => 777],
+            ['root', '--apply', '--dry-run', '--defaults']
+        );
+        $this->assertStringContainsAllStrings(['CPUWeight=123', 'IOWeight=321', 'TasksMax=777'], $out);
     }
 
     public function testExplicitOverridesPolicyDefaults(): void
     {
-        $cfgDir = $this->createPolicyDir('policy2', "<?php return ['cpuWeight'=>111];\n");
-        $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--defaults', '--cpu-weight=999'], ['PMSS_CONFIG_DIR' => $cfgDir]);
+        $out = $this->pmssRunUserConfigCgroupCliWithPolicy(
+            ['cpuWeight' => 111],
+            ['root', '--apply', '--dry-run', '--defaults', '--cpu-weight=999']
+        );
         $this->assertStringContainsString('CPUWeight=999', $out);
     }
 
     public function testDefaultsExpandPolicyMountIoPairs(): void
     {
-        $cfgDir = $this->createPolicyDir(
-            'mount-io',
-            "<?php return ['mounts' => ['/home' => ['ioWeight' => 320, 'readBw' => '25M', 'writeBw' => '10M', 'readIops' => 150, 'writeIops' => 90]]];\n"
-        );
-
-        $this->pmssAssertRepoPhpScriptOutputContains(
-            'scripts/util/userConfigCgroup.php',
+        $out = $this->pmssRunUserConfigCgroupCliWithPolicy(
+            ['mounts' => ['/home' => ['ioWeight' => 320, 'readBw' => '25M', 'writeBw' => '10M', 'readIops' => 150, 'writeIops' => 90]]],
             ['root', '--apply', '--dry-run', '--defaults'],
-            ['IODeviceWeight=/dev/testhome 320', 'IOReadBandwidthMax=/dev/testhome 25M', 'IOWriteBandwidthMax=/dev/testhome 10M', 'IOReadIOPSMax=/dev/testhome 150', 'IOWriteIOPSMax=/dev/testhome 90'],
-            ['PMSS_CONFIG_DIR' => $cfgDir, 'PMSS_HOME_DEVICE' => '/dev/testhome']
+            ['PMSS_HOME_DEVICE' => '/dev/testhome']
         );
+        $this->assertStringContainsAllStrings(['IODeviceWeight=/dev/testhome 320', 'IOReadBandwidthMax=/dev/testhome 25M', 'IOWriteBandwidthMax=/dev/testhome 10M', 'IOReadIOPSMax=/dev/testhome 150', 'IOWriteIOPSMax=/dev/testhome 90'], $out);
     }
 
     public function testExplicitIoFlagsOverridePolicyMountIoPairs(): void
     {
-        $cfgDir = $this->createPolicyDir(
-            'mount-io-explicit',
-            "<?php return ['mounts' => ['/home' => ['readBw' => '25M']]];\n"
-        );
-
-        $out = $this->pmssRunUserConfigCgroupCli(
+        $out = $this->pmssRunUserConfigCgroupCliWithPolicy(
+            ['mounts' => ['/home' => ['readBw' => '25M']]],
             ['root', '--apply', '--dry-run', '--defaults', '--io-read-bw=/dev/manual:9M'],
-            ['PMSS_CONFIG_DIR' => $cfgDir, 'PMSS_HOME_DEVICE' => '/dev/testhome']
+            ['PMSS_HOME_DEVICE' => '/dev/testhome']
         );
 
         $this->assertStringContainsString('IOReadBandwidthMax=/dev/manual 9M', $out);
@@ -61,14 +50,10 @@ class PolicyOverridePrecedenceTest extends TestCase
 
     public function testIoProfileOverridesPolicyMountIoPairs(): void
     {
-        $cfgDir = $this->createPolicyDir(
-            'mount-io-profile',
-            "<?php return ['mounts' => ['/home' => ['readBw' => '25M']]];\n"
-        );
-
-        $out = $this->pmssRunUserConfigCgroupCli(
+        $out = $this->pmssRunUserConfigCgroupCliWithPolicy(
+            ['mounts' => ['/home' => ['readBw' => '25M']]],
             ['root', '--apply', '--dry-run', '--defaults', '--device=/dev/manual', '--io-profile=hdd'],
-            ['PMSS_CONFIG_DIR' => $cfgDir, 'PMSS_HOME_DEVICE' => '/dev/testhome']
+            ['PMSS_HOME_DEVICE' => '/dev/testhome']
         );
 
         $this->assertStringContainsString('IOReadBandwidthMax=/dev/manual 5M', $out);

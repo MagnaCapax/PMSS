@@ -81,12 +81,6 @@ class CgroupUserConfigTest extends TestCase
         return ['rc' => $rc, 'out' => $out];
     }
 
-    private function writePolicy(array $policy): void
-    {
-        $this->ensureManager();
-        $this->pmssWriteFile($this->configDir.'/cgroup.policy.php', '<?php return '.var_export($policy, true).";\n", 0700);
-    }
-
     /** Run the manager and assert the common rc/output contract. */
     private function assertRunOutput(array $args, array $required = array(), array $forbidden = array(), int $expectedRc = 0): array
     {
@@ -117,7 +111,7 @@ class CgroupUserConfigTest extends TestCase
 
     public function testMemoryDefaultCalculation()
     {
-        $this->writePolicy(['memoryHighMiB' => 1000]);
+        $this->pmssWriteCgroupPolicyFixture($this->configDir, ['memoryHighMiB' => 1000], 0700);
         
         // Max should be derived: 1000 * 1.25 = 1250
         $this->assertRunOutput(array('testuser', '--defaults'), array('MemoryHigh=1000M', 'MemoryMax=1250M'));
@@ -428,7 +422,7 @@ class CgroupUserConfigTest extends TestCase
 
     public function testDefaultsApplyPolicyLatencyToHomeDevice()
     {
-        $this->writePolicy(['ioLatencyMs' => 45]);
+        $this->pmssWriteCgroupPolicyFixture($this->configDir, ['ioLatencyMs' => 45], 0700);
         $this->sys->findmnt['/home'] = '/dev/md0';
 
         $this->assertRunOutput(array('testuser', '--defaults'), array('IODeviceLatencyTargetSec=/dev/md0 45ms'));
@@ -550,11 +544,11 @@ class CgroupUserConfigTest extends TestCase
 
     public function testDefaultsApplyPolicyMountIoPairsWithoutExplicitIoInput()
     {
-        $this->writePolicy([
+        $this->pmssWriteCgroupPolicyFixture($this->configDir, [
             'mounts' => [
                 '/home' => ['ioWeight' => 333, 'readBw' => '6M', 'readIops' => 123],
             ],
-        ]);
+        ], 0700);
         $this->sys->findmnt['/home'] = '/dev/md0';
 
         $this->assertRunOutput(
@@ -565,11 +559,11 @@ class CgroupUserConfigTest extends TestCase
 
     public function testDefaultsSkipPolicyMountIoPairsWhenExplicitIoInputIsPresent(): void
     {
-        $this->writePolicy([
+        $this->pmssWriteCgroupPolicyFixture($this->configDir, [
             'mounts' => [
                 '/home' => ['ioWeight' => 333, 'readBw' => '6M', 'readIops' => 123],
             ],
-        ]);
+        ], 0700);
         $this->sys->findmnt['/home'] = '/dev/md0';
 
         $res = $this->runMgr(['testuser', '--defaults', '--io-read-bw=/dev/sda:5M']);
@@ -586,13 +580,13 @@ class CgroupUserConfigTest extends TestCase
 
     public function testIoProfilePolicyOverridesPreserveBuiltInFallbacks()
     {
-        $this->writePolicy([
+        $this->pmssWriteCgroupPolicyFixture($this->configDir, [
             'profiles' => [
                 'io' => [
                     'hdd' => ['ioWeight' => 777, 'writeBw' => '12M'],
                 ],
             ],
-        ]);
+        ], 0700);
         $this->sys->findmnt['/dev/sdb'] = '/dev/sdb';
 
         $this->assertRunOutput(
@@ -605,19 +599,19 @@ class CgroupUserConfigTest extends TestCase
 
     public function testDefaultsApplication()
     {
-        $this->writePolicy(['cpuWeight' => 500, 'tasksMax' => 2048]);
+        $this->pmssWriteCgroupPolicyFixture($this->configDir, ['cpuWeight' => 500, 'tasksMax' => 2048], 0700);
         $this->assertRunOutput(array('testuser', '--defaults'), array('CPUWeight=500', 'TasksMax=2048'));
     }
 
     public function testCliOverridesDefaults()
     {
-        $this->writePolicy(['cpuWeight' => 500]);
+        $this->pmssWriteCgroupPolicyFixture($this->configDir, ['cpuWeight' => 500], 0700);
         $this->assertRunOutput(array('testuser', '--defaults', '--cpu-weight=100'), array('CPUWeight=100'), array('CPUWeight=500'));
     }
 
     public function testRespectExisting()
     {
-        $this->writePolicy(['cpuWeight' => 500]);
+        $this->pmssWriteCgroupPolicyFixture($this->configDir, ['cpuWeight' => 500], 0700);
         $this->sys->commands['systemctl show'] = "CPUWeight=123\n";
         
         // Should NOT apply 500 because 123 exists

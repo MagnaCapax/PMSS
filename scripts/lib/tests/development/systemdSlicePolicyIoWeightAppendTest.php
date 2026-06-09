@@ -10,10 +10,10 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
     {
         $out = $this->pmssSystemdSliceRender([
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
-            'policy' => $this->pmssSystemdSlicePolicySource([
+            'policy' => [
                 'tasksMax' => 512,
                 'mounts' => ['/'=> ['ioWeight' => 90]],
-            ]),
+            ],
             'totalMemMiB' => 2048,
         ]);
         $this->assertTrue(strpos($out, 'IODeviceWeight=') !== false, 'IODeviceWeight not appended');
@@ -24,10 +24,10 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
         $out = $this->pmssSystemdSliceRender([
             'mode' => 'v1',
             'v1Template' => $this->pmssSystemdSliceTasksTemplate(),
-            'policy' => $this->pmssSystemdSlicePolicySource([
+            'policy' => [
                 'tasksMax' => 512,
                 'mounts' => ['/'=> ['ioWeight' => 90]],
-            ]),
+            ],
             'totalMemMiB' => 2048,
         ]);
         $this->assertTrue(strpos($out, 'IODeviceWeight=') === false, 'IODeviceWeight should be skipped on v1');
@@ -37,10 +37,10 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
     {
         $out = $this->pmssSystemdSliceRender([
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
-            'policy' => $this->pmssSystemdSlicePolicySource([
+            'policy' => [
                 'tasksMax' => 512,
                 'mounts' => ['/'=> ['readIops' => 77, 'writeIops' => 88]],
-            ]),
+            ],
             'totalMemMiB' => 2048,
         ]);
         $this->assertTrue(strpos($out, 'IOReadIOPSMax=') !== false, 'IOReadIOPSMax not appended');
@@ -52,10 +52,10 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
         $findmntPath = $this->pmssMakeExecutableStub('findmnt', "#!/bin/sh\nprintf '%s\\n' '/dev/md0'\n", 'pmss-findmnt-bandwidth-');
         $out = $this->pmssSystemdSliceRender([
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
-            'policy' => $this->pmssSystemdSlicePolicySource([
+            'policy' => [
                 'tasksMax' => 512,
                 'mounts' => ['/'=> ['readBw' => '100M', 'writeBw' => '120M']],
-            ]),
+            ],
             'env' => $this->pmssPathPrefixedEnvironment($findmntPath),
             'totalMemMiB' => 2048,
         ]);
@@ -75,9 +75,9 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
         );
         $out = $this->pmssSystemdSliceRender([
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(['%%USER_CGROUP_IO_DEVICE_LATENCY%%']),
-            'policy' => $this->pmssSystemdSlicePolicySource([
+            'policy' => [
                 'ioLatencyMs' => 50,
-            ]),
+            ],
             'env' => $this->pmssPathPrefixedEnvironment($findmntPath),
             'totalMemMiB' => 2048,
         ]);
@@ -93,9 +93,9 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
         );
         $out = $this->pmssSystemdSliceRender([
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(['%%USER_CGROUP_IO_DEVICE_LATENCY%%']),
-            'policy' => $this->pmssSystemdSlicePolicySource([
+            'policy' => [
                 'ioLatencyMs' => 50,
-            ]),
+            ],
             'env' => $this->pmssPathPrefixedEnvironment($findmntPath),
             'totalMemMiB' => 2048,
         ]);
@@ -112,10 +112,10 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
         );
         $out = $this->pmssSystemdSliceRender([
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
-            'policy' => $this->pmssSystemdSlicePolicySource([
+            'policy' => [
                 'tasksMax' => 512,
                 'mounts' => ['/'=> ['readBw' => '100M']],
-            ]),
+            ],
             'env' => $this->pmssPathPrefixedEnvironment($findmntPath),
             'totalMemMiB' => 2048,
         ]);
@@ -131,7 +131,7 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
         );
         $out = $this->pmssSystemdSliceRender([
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
-            'policy' => $this->pmssSystemdSlicePolicySource([
+            'policy' => [
                 'tasksMax' => 512,
                 'mounts' => [
                     '/' => [
@@ -139,7 +139,7 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
                         'writeBw' => '120M',
                     ],
                 ],
-            ]),
+            ],
             'env' => $this->pmssPathPrefixedEnvironment($findmntPath),
             'totalMemMiB' => 2048,
         ]);

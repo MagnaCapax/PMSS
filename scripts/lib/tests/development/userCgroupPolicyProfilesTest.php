@@ -8,59 +8,35 @@ class UserCgroupPolicyProfilesTest extends TestCase
 {
     use UserConfigCgroupCliTrait;
 
-    private function createPolicyDir(array $policy): string
-    {
-        $directory = $this->pmssMakeNamedTempDir('pmss-cgroup-policy-profiles-', 0700);
-
-        $body = "<?php\nreturn ".var_export($policy, true).";\n";
-        file_put_contents($directory.'/cgroup.policy.php', $body);
-
-        return $directory;
-    }
     public function testCpuProfileUsesPolicyFamilyWhenDefined(): void
     {
-        $configDirectory = $this->createPolicyDir([
+        $output = $this->pmssRunUserConfigCgroupCliWithPolicy([
             'profiles' => [
                 'cpu' => ['balanced' => 180],
             ],
-        ]);
-
-        $output = $this->pmssRunUserConfigCgroupCli(
-            ['root', '--apply', '--dry-run', '--cpu-profile=balanced'],
-            ['PMSS_CONFIG_DIR' => $configDirectory]
-        );
+        ], ['root', '--apply', '--dry-run', '--cpu-profile=balanced']);
 
         $this->assertStringContainsString('CPUWeight=180', $output);
     }
 
     public function testTasksProfileUsesPolicyFamilyWhenDefined(): void
     {
-        $configDirectory = $this->createPolicyDir([
+        $output = $this->pmssRunUserConfigCgroupCliWithPolicy([
             'profiles' => [
                 'tasks' => ['service' => 12000],
             ],
-        ]);
-
-        $output = $this->pmssRunUserConfigCgroupCli(
-            ['root', '--apply', '--dry-run', '--tasks-profile=service'],
-            ['PMSS_CONFIG_DIR' => $configDirectory]
-        );
+        ], ['root', '--apply', '--dry-run', '--tasks-profile=service']);
 
         $this->assertStringContainsString('TasksMax=12000', $output);
     }
 
     public function testMemProfileUsesPolicyFamilyWhenDefined(): void
     {
-        $configDirectory = $this->createPolicyDir([
+        $output = $this->pmssRunUserConfigCgroupCliWithPolicy([
             'profiles' => [
                 'mem' => ['streaming' => 1536],
             ],
-        ]);
-
-        $output = $this->pmssRunUserConfigCgroupCli(
-            ['root', '--apply', '--dry-run', '--mem-profile=streaming'],
-            ['PMSS_CONFIG_DIR' => $configDirectory]
-        );
+        ], ['root', '--apply', '--dry-run', '--mem-profile=streaming']);
 
         $this->assertStringContainsString('MemoryHigh=1536M', $output);
         $this->assertStringContainsString('MemoryMax=', $output);
@@ -68,35 +44,25 @@ class UserCgroupPolicyProfilesTest extends TestCase
 
     public function testBuiltInProfileStillWorksWithoutPolicyFamily(): void
     {
-        $configDirectory = $this->createPolicyDir([]);
-
-        $output = $this->pmssRunUserConfigCgroupCli(
-            ['root', '--apply', '--dry-run', '--cpu-profile=low'],
-            ['PMSS_CONFIG_DIR' => $configDirectory]
-        );
+        $output = $this->pmssRunUserConfigCgroupCliWithPolicy([], ['root', '--apply', '--dry-run', '--cpu-profile=low']);
 
         $this->assertStringContainsString('CPUWeight=50', $output);
     }
 
     public function testInvalidPolicyProfileValueFallsBackToBuiltIn(): void
     {
-        $configDirectory = $this->createPolicyDir([
+        $output = $this->pmssRunUserConfigCgroupCliWithPolicy([
             'profiles' => [
                 'cpu' => ['low' => 'invalid'],
             ],
-        ]);
-
-        $output = $this->pmssRunUserConfigCgroupCli(
-            ['root', '--apply', '--dry-run', '--cpu-profile=low'],
-            ['PMSS_CONFIG_DIR' => $configDirectory]
-        );
+        ], ['root', '--apply', '--dry-run', '--cpu-profile=low']);
 
         $this->assertStringContainsString('CPUWeight=50', $output);
     }
 
     public function testIoProfileUsesPolicyFamilyWhenDefined(): void
     {
-        $configDirectory = $this->createPolicyDir([
+        $output = $this->pmssRunUserConfigCgroupCliWithPolicy([
             'profiles' => [
                 'io' => [
                     'hdd' => [
@@ -108,19 +74,14 @@ class UserCgroupPolicyProfilesTest extends TestCase
                     ],
                 ],
             ],
-        ]);
-
-        $output = $this->pmssRunUserConfigCgroupCli(
-            ['root', '--apply', '--dry-run', '--device=/dev/sda', '--io-profile=hdd'],
-            ['PMSS_CONFIG_DIR' => $configDirectory]
-        );
+        ], ['root', '--apply', '--dry-run', '--device=/dev/sda', '--io-profile=hdd']);
 
         $this->assertStringContainsAllStrings(['IOWeight=240', 'IOReadBandwidthMax=/dev/sda 7M', 'IOWriteBandwidthMax=/dev/sda 13M', 'IOReadIOPSMax=/dev/sda 77', 'IOWriteIOPSMax=/dev/sda 88'], $output);
     }
 
     public function testIoProfilePolicyCanDefineCustomProfile(): void
     {
-        $configDirectory = $this->createPolicyDir([
+        $output = $this->pmssRunUserConfigCgroupCliWithPolicy([
             'profiles' => [
                 'io' => [
                     'archive' => [
@@ -132,19 +93,14 @@ class UserCgroupPolicyProfilesTest extends TestCase
                     ],
                 ],
             ],
-        ]);
-
-        $output = $this->pmssRunUserConfigCgroupCli(
-            ['root', '--apply', '--dry-run', '--device=/dev/sda', '--io-profile=archive'],
-            ['PMSS_CONFIG_DIR' => $configDirectory]
-        );
+        ], ['root', '--apply', '--dry-run', '--device=/dev/sda', '--io-profile=archive']);
 
         $this->assertStringContainsAllStrings(['IOWeight=150', 'IOReadBandwidthMax=/dev/sda 3M', 'IOWriteBandwidthMax=/dev/sda 4M', 'IOReadIOPSMax=/dev/sda 30', 'IOWriteIOPSMax=/dev/sda 40'], $output);
     }
 
     public function testIoProfilePolicyCanOverrideBulkCpuAndTasksDefaults(): void
     {
-        $configDirectory = $this->createPolicyDir([
+        $output = $this->pmssRunUserConfigCgroupCliWithPolicy([
             'profiles' => [
                 'io' => [
                     'bulk' => [
@@ -154,12 +110,7 @@ class UserCgroupPolicyProfilesTest extends TestCase
                     ],
                 ],
             ],
-        ]);
-
-        $output = $this->pmssRunUserConfigCgroupCli(
-            ['root', '--apply', '--dry-run', '--device=/dev/sda', '--io-profile=bulk'],
-            ['PMSS_CONFIG_DIR' => $configDirectory]
-        );
+        ], ['root', '--apply', '--dry-run', '--device=/dev/sda', '--io-profile=bulk']);
 
         $this->assertStringContainsAllStrings(['IOWeight=333', 'CPUWeight=444', 'TasksMax=9999'], $output);
     }

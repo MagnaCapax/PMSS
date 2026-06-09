@@ -11,4 +11,11 @@ trait UserConfigCgroupCliTrait
     {
         return $this->pmssRunPhpScript(getcwd().'/scripts/util/userConfigCgroup.php', $args, $env);
     }
+
+    /** Execute userConfigCgroup with a generated cgroup.policy.php fixture. */
+    protected function pmssRunUserConfigCgroupCliWithPolicy(array $policy, array $args, array $env = []): string
+    {
+        $configDirectory = $this->pmssMakeCgroupPolicyConfigDir($policy);
+        return $this->pmssRunUserConfigCgroupCli($args, array_merge($env, ['PMSS_CONFIG_DIR' => $configDirectory]));
+    }
 }
