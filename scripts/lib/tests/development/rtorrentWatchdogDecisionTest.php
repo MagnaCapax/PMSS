@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/rtorrent/process.php';
+require_once dirname(__DIR__, 2).'/rtorrent/watchdog.php';
 
 class rtorrentWatchdogDecisionTest extends TestCase
 {
@@ -14,6 +14,20 @@ class rtorrentWatchdogDecisionTest extends TestCase
     private function wedgeStatePath(): string
     {
         return $this->tempDir.'/accept-queue.count';
+    }
+
+    public function testCronLogHonorsForceAndDebugFlags(): void
+    {
+        $this->assertSame('', $this->pmssCaptureStdout(static function (): void {
+            \pmssCheckRtorrentLog('hidden', false, false);
+        })[1]);
+
+        foreach ([[true, false], [false, true]] as $case) {
+            $output = $this->pmssCaptureStdout(static function () use ($case): void {
+                \pmssCheckRtorrentLog('visible', $case[0], $case[1]);
+            })[1];
+            $this->assertStringContainsString(' visible', $output);
+        }
     }
 
     public function testWatchdogStatePathsPreserveExistingFileNames(): void

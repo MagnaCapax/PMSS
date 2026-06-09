@@ -7,10 +7,10 @@ class checkRtorrentMissingConfigRecoveryContractTest extends TestCase
 {
     public function testMissingConfigBranchRecoversInsteadOfSilentlySkipping(): void
     {
-        $path = 'scripts/cron/checkRtorrent.php';
+        $path = 'scripts/lib/rtorrent/watchdog.php';
         $this->pmssAssertRepoFileContainsString($path, 'function pmssCheckRtorrentRecoverMissingConfig(');
         $this->pmssAssertRepoFileMatches(
-            $path,
+            'scripts/cron/checkRtorrent.php',
             '/if \(!is_file\(\$home\.\'\/\\.rtorrent\\.rc\'\)\) \{\s*if \(!pmssCheckRtorrentRecoverMissingConfig\(\$user, \$home, \$debug\)\) \{\s*continue;\s*\}\s*\}/s',
             'checkRtorrent should attempt recovery before skipping users with missing configs'
         );
@@ -19,10 +19,10 @@ class checkRtorrentMissingConfigRecoveryContractTest extends TestCase
     public function testRecoveryUsesCanonicalConfigInputsAndLogsOutcome(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/cron/checkRtorrent.php',
+            'scripts/lib/rtorrent/watchdog.php',
             [
                 'new UserConfigStore()',
-                "applyFallbacks(\$user, is_array(\$payload) ? \$payload : [])",
+                "applyFallbacks(\$user, is_array(\$payload = \$userConfigStore->get(\$user)) ? \$payload : [])",
                 "'/etc/seedbox/config/user.rtorrent.defaults.dht'",
                 "'/etc/seedbox/config/user.rtorrent.defaults.pex'",
                 'pmssReadTorrentThrottle($user)',

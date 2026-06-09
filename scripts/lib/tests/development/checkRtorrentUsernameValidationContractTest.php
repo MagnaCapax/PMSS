@@ -13,10 +13,11 @@ class checkRtorrentUsernameValidationContractTest extends TestCase
             $path,
             [
                 "pmssListManagedUsersResult('/scripts/listUsers.php')",
-                'function pmssCheckRtorrentCleanupStaleSocket(',
+                "require_once __DIR__.'/../lib/rtorrent/watchdog.php';",
                 "rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])",
             ]
         );
+        $this->pmssAssertRepoFileContainsString('scripts/lib/rtorrent/watchdog.php', 'function pmssCheckRtorrentCleanupStaleSocket(');
         $this->pmssAssertRepoFileNotContainsStrings($path, ["@exec('/scripts/listUsers.php'", '/^[a-z][a-z0-9]{0,7}$/']);
     }
 }

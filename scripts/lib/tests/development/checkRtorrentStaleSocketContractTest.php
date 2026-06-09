@@ -7,10 +7,10 @@ class checkRtorrentStaleSocketContractTest extends TestCase
 {
     public function testMissingProcessStartPathUsesSharedCleanupBeforeRestart(): void
     {
-        $path = 'scripts/cron/checkRtorrent.php';
+        $path = 'scripts/lib/rtorrent/watchdog.php';
         $this->pmssAssertRepoFileContainsString($path, 'function pmssCheckRtorrentCleanupStaleSocket(');
         $this->pmssAssertRepoFileMatches(
-            $path,
+            'scripts/cron/checkRtorrent.php',
             '/if \(!\$executorPresent && empty\(\$rtorrentPids\)\) \{.*?\$socketPath = rtorrentScgiSocketPath\(\$user\);.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$state\[\'unresponsive\'\], \$debug\);.*?rtorrentProcessStart\(\$user, \$logCallback, \$state\[\'startMarker\'\]\);/s',
             'Missing-process recovery should use the shared stale-socket cleanup before starting rTorrent'
         );
@@ -57,6 +57,10 @@ class checkRtorrentStaleSocketContractTest extends TestCase
             "if (\$decision['action'] === 'observe_wedge')",
             'rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);',
         ]);
+        $this->pmssAssertRepoFileContainsString(
+            'scripts/lib/rtorrent/watchdog.php',
+            'function pmssCheckRtorrentExtendUnresponsiveGrace('
+        );
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/rtorrent/process.php', [
             'rtorrentScgiSocketQueueSaturated($queueSnapshot)',
             'rtorrentProcessCheckFailureCountState($wedgeStateFile, $wedgeCycles)',

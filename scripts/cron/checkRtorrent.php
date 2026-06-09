@@ -14,14 +14,7 @@
 
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/runtime.php';
-require_once __DIR__.'/../lib/user/log.php';
-require_once __DIR__.'/../lib/rtorrent/scgi.php';
-require_once __DIR__.'/../lib/rtorrent/process.php';
-require_once __DIR__.'/../lib/rtorrentConfig.php';
-require_once __DIR__.'/../lib/user/userConfigStore.php';
-require_once __DIR__.'/../lib/user/traffic.php';
-
-require_once __DIR__.'/../lib/user/watchdog.php';
+require_once __DIR__.'/../lib/rtorrent/watchdog.php';
 
 [$debug] = pmssCliArgvDebugSplit($argv ?? null);
 
@@ -31,141 +24,6 @@ define('PMSS_RTORRENT_UNRESPONSIVE_GRACE', 120);
 define('PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES', 3);
 define('PMSS_RTORRENT_START_FAILURE_SESSION_RESET', 3);
 define('PMSS_RTORRENT_START_FAILURE_ESCALATE', 6);
-
-/**
- * Emit a log line to stdout (captured by cron redirection).
- *
- * @param string $message Log message.
- * @param bool   $force   Always log, even without debug mode.
- * @param bool   $debug   Debug mode enabled.
- *
- * @return void
- */
-function pmssCheckRtorrentLog(string $message, bool $force = false, bool $debug = false): void
-{
-    if (!$force && !$debug) {
-        return;
-    }
-    echo date('c').' '.$message."\n";
-}
-
-/**
- * Log to both cron output and per-user log file.
- *
- * @param string $user    Username for per-user log.
- * @param string $message Log message.
- * @param bool   $debug   Debug mode.
- *
- * @return void
- */
-function pmssCheckRtorrentLogBoth(string $user, string $message, bool $debug): void
-{
-    pmssCheckRtorrentLog($message, true, $debug);
-    pmssUserLog($user, 'checkRtorrent: '.$message);
-}
-
-// Clear a stale SCGI socket before restart or grace tracking.
-function pmssCheckRtorrentCleanupStaleSocket(string $user, string $socketPath, string $unresponsiveState, bool $debug): void
-{
-    rtorrentProcessClearStaleState($unresponsiveState);
-    if (!file_exists($socketPath)) {
-        return;
-    }
-
-    pmssCheckRtorrentLogBoth($user, 'stale socket detected, process not running, cleaning up', $debug);
-    $socketRemoved = @unlink($socketPath);
-    if (!$socketRemoved && file_exists($socketPath)) {
-        pmssCheckRtorrentLogBoth($user, "stale socket cleanup failed (socket={$socketPath})", $debug);
-    }
-}
-
-// Delay starts shortly after reboot so many users do not hit storage at once.
-function pmssCheckRtorrentStaggerAfterRecentReboot(string $user, string $messagePrefix, bool $debug): bool
-{
-    if (!rtorrentProcessRecentReboot(600)) {
-        return false;
-    }
-
-    $delay = rtorrentProcessStaggerDelay($user, 300);
-    pmssCheckRtorrentLogBoth($user, "{$messagePrefix}staggering start by {$delay}s (post-reboot)", $debug);
-    sleep($delay);
-    return true;
-}
-
-// Keep alive-but-unresponsive rTorrent handling in one conservative path.
-function pmssCheckRtorrentExtendUnresponsiveGrace(
-    string $user,
-    string $message,
-    string $unresponsiveState,
-    string $acceptQueueWedgeState,
-    bool $debug
-): void {
-    rtorrentProcessWriteStateFile($unresponsiveState, (string) time());
-    rtorrentProcessClearStaleState($acceptQueueWedgeState);
-    pmssCheckRtorrentLogBoth($user, $message, $debug);
-}
-
-/**
- * Rebuild a missing per-user rTorrent config from the canonical templates.
- *
- * @param string $user  Username whose config should be recreated.
- * @param string $home  User home directory.
- * @param bool   $debug Debug mode.
- *
- * @return bool True when the config exists after recovery.
- */
-function pmssCheckRtorrentRecoverMissingConfig(string $user, string $home, bool $debug): bool
-{
-    if (!is_dir($home)) {
-        return false;
-    }
-
-    pmssCheckRtorrentLogBoth($user, 'missing .rtorrent.rc detected; regenerating', $debug);
-
-    $userConfigStore = new UserConfigStore();
-    $payload = $userConfigStore->get($user);
-    $payload = $userConfigStore->applyFallbacks($user, is_array($payload) ? $payload : []);
-    $ramMiB = (int) ($payload['ramMiB'] ?? 0);
-    if ($ramMiB <= 0) {
-        pmssCheckRtorrentLogBoth($user, 'missing .rtorrent.rc recovery skipped (unable to resolve ramMiB)', $debug);
-        return false;
-    }
-
-    $dhtDefault = @file_get_contents('/etc/seedbox/config/user.rtorrent.defaults.dht');
-    $pexDefault = @file_get_contents('/etc/seedbox/config/user.rtorrent.defaults.pex');
-    if (!is_string($dhtDefault) || !is_string($pexDefault)) {
-        pmssCheckRtorrentLogBoth($user, 'missing .rtorrent.rc recovery failed (defaults unavailable)', $debug);
-        return false;
-    }
-
-    $resourceFile = '/etc/seedbox/config/system.rtorrent.resources';
-    $resources = is_file($resourceFile) ? (pmssReadSerializedArrayFile($resourceFile) ?? []) : [];
-
-    $configInput = [
-        'ram' => $ramMiB,
-        'dht' => $dhtDefault,
-        'pex' => $pexDefault,
-        'uploadThrottle' => (($throttle = pmssReadTorrentThrottle($user)) === null) ? 0 : $throttle,
-    ];
-    if (isset($payload['rtorrentPort']) && is_numeric($payload['rtorrentPort']) && (int) $payload['rtorrentPort'] > 0) {
-        $configInput['scgiPort'] = (int) $payload['rtorrentPort'];
-    }
-
-    try {
-        $rtorrentConfig = new rtorrentConfig($resources);
-        $configuration = $rtorrentConfig->createConfig($configInput);
-        if (!$rtorrentConfig->writeConfig($user, $configuration['configFile'])) {
-            pmssCheckRtorrentLogBoth($user, 'missing .rtorrent.rc recovery failed (write error)', $debug);
-            return false;
-        }
-    } catch (Throwable $exception) {
-        pmssCheckRtorrentLogBoth($user, 'missing .rtorrent.rc recovery failed: '.$exception->getMessage(), $debug);
-        return false;
-    }
-
-    pmssCheckRtorrentLogBoth($user, 'missing .rtorrent.rc recovered', $debug);
-    return true;
-}
 
 // --- Main execution ---
 
@@ -316,15 +174,7 @@ foreach ($users as $user) {
             continue;
         }
 
-        $skelScript = '/etc/skel/.rtorrentExecute.php';
-        $userScript = $home.'/.rtorrentExecute.php';
-        if (is_file($skelScript) && is_file($userScript)
-            && md5_file($skelScript) !== md5_file($userScript)
-        ) {
-            copy($skelScript, $userScript);
-            @chown($userScript, $user);
-            pmssCheckRtorrentLogBoth($user, 'refreshed stale executor from skel', $debug);
-        }
+        pmssCheckRtorrentRefreshExecutorFromSkel($user, $home, $debug);
 
         pmssCheckRtorrentLogBoth(
             $user,
@@ -346,19 +196,7 @@ foreach ($users as $user) {
         if ($responsive) {
             rtorrentProcessClearStaleState($state['unresponsive']);
             rtorrentProcessClearStaleState($state['acceptQueueWedge']);
-            $throttle = pmssReadTorrentThrottle($user);
-            if ($throttle !== null) {
-                $throttleValue = $throttle > 0 ? $throttle : 0;
-                if (rtorrentScgiCall($socketPath, 'throttle.global_up.max_rate.set', [$throttleValue], 5) === false) {
-                    pmssCheckRtorrentLogBoth($user, 'failed to apply upload throttle', $debug);
-                } else {
-                    pmssCheckRtorrentLog(
-                        "Applied upload throttle (up={$throttleValue} KiB/s) for {$user}",
-                        false,
-                        $debug
-                    );
-                }
-            }
+            pmssCheckRtorrentApplyThrottle($user, $socketPath, $debug);
             pmssCheckRtorrentLog("rTorrent healthy for {$user}", false, $debug);
             continue;
         }
