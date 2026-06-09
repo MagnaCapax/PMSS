@@ -16,7 +16,7 @@ final class BonusTrafficTest extends TestCase
 
         $this->assertEquals(0, $result['rc']);
         $this->assertEquals("Bonus traffic for alice: 15 GiB\n", $result['stdout']);
-        $this->assertEquals('15GiB', $result['file']);
+        $this->assertEquals('15GiB', $result['files']['home']);
         $this->assertEquals([], $result['logs']);
     }
 
@@ -36,7 +36,7 @@ final class BonusTrafficTest extends TestCase
             ."  - Use 0 (or --unset) to remove the bonus.\n",
             $result['stdout']
         );
-        $this->assertEquals(null, $result['file']);
+        $this->assertEquals(null, $result['files']['home']);
         $this->assertEquals([], $result['logs']);
     }
 
@@ -46,7 +46,7 @@ final class BonusTrafficTest extends TestCase
 
         $this->assertEquals(0, $result['rc']);
         $this->assertEquals("Bonus traffic for alice set to 20 GiB\n", $result['stdout']);
-        $this->assertEquals('20', $result['file']);
+        $this->assertEquals('20', $result['files']['home']);
         $this->assertEquals([['alice', 'bonus traffic set to 20 GiB (monthly add-on)']], $result['logs']);
     }
 
@@ -59,7 +59,7 @@ final class BonusTrafficTest extends TestCase
 
         $this->assertEquals(0, $result['rc']);
         $this->assertEquals("Bonus traffic for alice set to 0 GiB\n", $result['stdout']);
-        $this->assertEquals(null, $result['file']);
+        $this->assertEquals(null, $result['files']['home']);
         $this->assertEquals([['alice', 'bonus traffic unset (GiB add-on removed)']], $result['logs']);
     }
 
@@ -87,52 +87,19 @@ final class BonusTrafficTest extends TestCase
     /**
      * Execute the bonus traffic CLI in a subprocess with hermetic path stubs.
      *
-     * @return array{rc:int,stdout:string,file:?string,logs:array<int,array<int,string>>}
+     * @return array{rc:int,stdout:string,files:array<string,?string>,modes:array<string,?int>,logs:array<int,array<int,string>>}
      */
     private function runBonusTrafficCli(array $argv, string $existingContents = ''): array
     {
-        $repoRoot = $this->pmssRepoRoot();
-        $homeDir = $this->pmssEnsureDir($this->pmssMakeTempDir('pmss-bonus-home-').'/alice');
-
-        $bonusFile = $homeDir.'/.bonusTraffic';
-        if ($existingContents !== '') {
-            file_put_contents($bonusFile, $existingContents);
-        }
-
-        $script = <<<'PHP'
-$homeDir = __HOME_DIR__;
-$argv = __ARGV__;
-$repoRoot = __REPO_ROOT__;
-$GLOBALS['PMSS_BONUS_TEST_HOME'] = $homeDir;
-$GLOBALS['PMSS_BONUS_TEST_LOGS'] = [];
-__TRAFFIC_CLI_SHIMS__
-
-require $repoRoot.'/scripts/lib/user/bonusTraffic.php';
-
-ob_start();
-$rc = pmssUserBonusTrafficCli($argv);
-$stdout = ob_get_clean();
-$bonusFile = $homeDir.'/.bonusTraffic';
-
-echo json_encode([
-    'rc' => $rc,
-    'stdout' => $stdout,
-    'file' => is_file($bonusFile) ? trim((string) file_get_contents($bonusFile)) : null,
-    'logs' => $GLOBALS['PMSS_BONUS_TEST_LOGS'],
-]);
-PHP;
-
-        $script = str_replace(
-            ['__HOME_DIR__', '__ARGV__', '__REPO_ROOT__', '__TRAFFIC_CLI_SHIMS__'],
-            [
-                var_export($homeDir, true),
-                var_export($argv, true),
-                var_export($repoRoot, true),
-                $this->pmssInlinePhpTrafficCliShims('PMSS_BONUS_TEST_HOME', 'PMSS_BONUS_TEST_LOGS'),
-            ],
-            $script
-        );
-
-        return $this->pmssRunInlinePhpJson($script);
+        return $this->pmssRunUserGiBSettingCliFixture([
+            'argv' => $argv,
+            'library' => 'scripts/lib/user/bonusTraffic.php',
+            'function' => 'pmssUserBonusTrafficCli',
+            'homeFile' => '.bonusTraffic',
+            'homePrefix' => 'pmss-bonus-home-',
+            'homeGlobal' => 'PMSS_BONUS_TEST_HOME',
+            'logGlobal' => 'PMSS_BONUS_TEST_LOGS',
+            'existingFiles' => $existingContents !== '' ? ['home' => $existingContents] : [],
+        ]);
     }
 }

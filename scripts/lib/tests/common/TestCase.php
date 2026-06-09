@@ -1111,6 +1111,77 @@ abstract class TestCase
         return implode("\n", $lines)."\n";
     }
 
+    /**
+     * Execute a traffic-limit style GiB CLI in a hermetic subprocess fixture.
+     *
+     * @param array{argv:array<int,string>,library:string,function:string,homeFile:string,homeGlobal:string,logGlobal:string,existingFiles?:array<string,string>,homePrefix?:string,runtimePrefix?:string,runtimeFile?:string,runtimeGlobal?:string,usage?:?string,passUsage?:bool,user?:string} $fixture
+     * @return array{rc:int,stdout:string,files:array<string,?string>,modes:array<string,?int>,logs:array<int,array<int,string>>}
+     */
+    protected function pmssRunUserGiBSettingCliFixture(array $fixture): array
+    {
+        $user = (string) ($fixture['user'] ?? 'alice');
+        $homeDir = $this->pmssEnsureDir($this->pmssMakeTempDir((string) ($fixture['homePrefix'] ?? 'pmss-gib-home-')).'/'.$user);
+        $paths = ['home' => $homeDir.'/'.ltrim((string) $fixture['homeFile'], '/')];
+
+        if (isset($fixture['runtimeFile'])) {
+            $runtimeDir = $this->pmssEnsureDir($this->pmssMakeTempDir((string) ($fixture['runtimePrefix'] ?? 'pmss-gib-runtime-')).'/trafficLimits');
+            $paths['runtime'] = $runtimeDir.'/'.ltrim((string) $fixture['runtimeFile'], '/');
+        }
+
+        foreach (($fixture['existingFiles'] ?? []) as $key => $contents) {
+            $this->assertTrue(isset($paths[$key]), 'Unknown GiB fixture file key: '.$key);
+            file_put_contents($paths[$key], $contents);
+        }
+
+        $library = (string) $fixture['library'];
+        $function = (string) $fixture['function'];
+        $homeGlobal = (string) $fixture['homeGlobal'];
+        $logGlobal = (string) $fixture['logGlobal'];
+        $runtimeGlobal = isset($fixture['runtimeGlobal']) ? (string) $fixture['runtimeGlobal'] : null;
+        $this->assertTrue(strpos($library, '..') === false, 'Invalid fixture library path: '.$library);
+        $this->assertMatches('/^[A-Za-z0-9_\/.-]+\.php$/', $library, 'Invalid fixture library path: '.$library);
+        $this->assertMatches('/^[A-Za-z0-9_]+$/', $function, 'Invalid fixture function: '.$function);
+
+        $globals = '$GLOBALS['.var_export($homeGlobal, true).'] = '.var_export($homeDir, true).";\n"
+            .'$GLOBALS['.var_export($logGlobal, true)."] = [];\n";
+        if ($runtimeGlobal !== null) {
+            $globals .= '$GLOBALS['.var_export($runtimeGlobal, true).'] = '.var_export(dirname($paths['runtime']), true).";\n";
+        }
+
+        $script = '$argv = '.var_export($fixture['argv'], true).";\n"
+            .'$usage = '.(array_key_exists('usage', $fixture) ? var_export($fixture['usage'], true) : 'null').";\n"
+            .'$function = '.var_export($function, true).";\n"
+            .'$callWithUsage = '.(!empty($fixture['passUsage']) ? 'true' : 'false').";\n"
+            .'$paths = '.var_export($paths, true).";\n"
+            .'$logGlobal = '.var_export($logGlobal, true).";\n"
+            .$globals
+            .$this->pmssInlinePhpTrafficCliShims($homeGlobal, $logGlobal, $runtimeGlobal)
+            .'require '.var_export($this->pmssRepoPath($library), true).";\n"
+            .<<<'PHP'
+
+ob_start();
+$rc = $callWithUsage ? (($usage === null) ? $function($argv) : $function($argv, $usage)) : $function($argv);
+$stdout = ob_get_clean();
+$files = [];
+$modes = [];
+foreach ($paths as $key => $path) {
+    $files[$key] = is_file($path) ? trim((string) file_get_contents($path)) : null;
+    $modes[$key] = is_file($path) ? (fileperms($path) & 0777) : null;
+}
+
+echo json_encode([
+    'rc' => $rc,
+    'stdout' => $stdout,
+    'files' => $files,
+    'modes' => $modes,
+    'logs' => $GLOBALS[$logGlobal],
+]);
+PHP
+        ;
+
+        return $this->pmssRunInlinePhpJson($script);
+    }
+
     /** Return an inline PHP user-log shim that appends log calls to a global array. */
     protected function pmssInlinePhpUserLogShim(string $logGlobalName): string
     {
