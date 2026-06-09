@@ -60,6 +60,17 @@ class ResourceStatisticsTest extends TestCase
         $this->assertSame('second', $stats->getData('www-data', 1));
     }
 
+    public function testResourceTailLineCountBoundsShellBoundary(): void
+    {
+        $max = (int) constant('PMSS_RESOURCE_LOG_TAIL_LINES_MAX');
+
+        foreach ([0, -10, 'not-a-number'] as $value) {
+            $this->assertSame(1, \pmssResourceTailLineCount($value));
+        }
+        $this->assertSame(42, \pmssResourceTailLineCount('42'));
+        $this->assertSame($max, \pmssResourceTailLineCount($max + 50000));
+    }
+
     public function testGetDataRejectsUnsafeResourceDirectories(): void
     {
         foreach (['relative-resource-dir', "/tmp/pmss-resource\0dir"] as $resourceDir) {
@@ -81,6 +92,41 @@ class ResourceStatisticsTest extends TestCase
         $stats = new \resourceStatistics(['resource_dir' => $link]);
 
         $this->assertSame('', $stats->getData('www-data', 1));
+    }
+
+    public function testResourceResultsWindowMetricsValidatesSnapshotFallbackShape(): void
+    {
+        $results = [
+            'memory' => ['day' => '1024'],
+            'tasks' => ['day' => '3'],
+            'raw' => [
+                'io_read' => ['day' => '1'],
+                'io_write' => ['day' => '2'],
+                'io_read_ops' => ['day' => '3'],
+                'io_write_ops' => ['day' => '4'],
+                'cpu' => ['day' => '5'],
+                'ram_hours' => ['day' => '6.5'],
+            ],
+        ];
+
+        $this->assertEquals([
+            'memory' => 1024.0,
+            'tasks' => 3.0,
+            'io_read' => 1.0,
+            'io_write' => 2.0,
+            'io_read_ops' => 3.0,
+            'io_write_ops' => 4.0,
+            'cpu' => 5.0,
+            'ram_hours' => 6.5,
+        ], \pmssResourceResultsWindowMetrics($results, 'day'));
+
+        $badCpu = $results;
+        $badCpu['raw']['cpu']['day'] = 'bad';
+        $this->assertSame(null, \pmssResourceResultsWindowMetrics($badCpu, 'day'));
+
+        $missingRamHours = $results;
+        unset($missingRamHours['raw']['ram_hours']['day']);
+        $this->assertSame(null, \pmssResourceResultsWindowMetrics($missingRamHours, 'day'));
     }
 
     public function testCollectWindowResultsFromDataKeepsSnapshotFallbackInDayWindow(): void

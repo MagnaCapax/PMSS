@@ -339,6 +339,22 @@ iptables helpers:
 
 ---
 
+## Resource Statistics
+
+- resourceStatistics::getData($user, $timePeriod=10080): string
+  - Inputs: managed username and requested resource-log tail line count.
+  - Safety: validates username/resource path before shelling, clamps line count
+    to `1..10080`, resolves `tail` through runtime command helpers, and returns
+    `''` on invalid paths, missing commands, non-zero tail exit, or timeout.
+
+- pmssResourceResultsWindowMetrics(array $results, string $window): ?array
+  - Extracts one accumulator window for resource snapshot rows.
+  - Safety: requires `memory`, `tasks`, and all raw metrics to be present and
+    numeric; malformed shapes return `null` so the caller can keep the existing
+    fail-soft missing-resource path.
+
+---
+
 ## Package State Helpers
 
 `update-step2.php` relies on dpkg baseline selections as the sole package

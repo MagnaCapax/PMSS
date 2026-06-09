@@ -10,6 +10,10 @@ require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/lighttpd/userFileWrite.php';
 require_once __DIR__.'/resources/accumulator.php';
 
+const PMSS_RESOURCE_LOG_TAIL_LINES_DEFAULT = 10080;
+const PMSS_RESOURCE_LOG_TAIL_LINES_MAX = 10080;
+const PMSS_RESOURCE_LOG_TAIL_TIMEOUT_SECONDS = 5;
+
 /** @return array<string, string> */
 function pmssResourceMemoryBreakdownFieldMap(string $prefix = 'memory_'): array { return ['anon' => $prefix.'anon', 'file' => $prefix.'file']; }
 
@@ -34,6 +38,18 @@ function pmssResourceLogFilePath(string $resourceDir, string $user): ?string
     return pmssPathTargetIsSafe($path, false, true) ? $path : null;
 }
 
+/** Keep resource tail calls bounded before they reach the shell. */
+function pmssResourceTailLineCount($timePeriod): int { return max(1, min((int) $timePeriod, PMSS_RESOURCE_LOG_TAIL_LINES_MAX)); }
+
+/** Read recent resource log records through the bounded runtime command helper. */
+function pmssResourceTailLogContents(string $path, int $lines): string
+{
+    $tail = pmssCommandPath('tail');
+    if ($tail === '') return '';
+    $result = pmssCommandCapture(pmssCommandArgvShellQuote([$tail, '-n', (string) $lines, $path]), PMSS_RESOURCE_LOG_TAIL_TIMEOUT_SECONDS);
+    return $result['rc'] === 0 ? trim($result['stdout']) : '';
+}
+
 /** Return the shared schema used by resource rows and totals. */
 function pmssResourceReportTemplate(): array
 {
@@ -41,11 +57,14 @@ function pmssResourceReportTemplate(): array
     return array_fill_keys(ResourceStatsAccumulator::RAW_METRICS, $windows) + ['memory' => ['current' => 0.0, 'avg_month' => 0.0], 'tasks' => ['current' => 0.0]];
 }
 
+/** Normalize scalar metric values while rejecting malformed persisted/fallback data. */
+function pmssResourceMetricValueNormalize($value): ?float { return is_numeric($value) ? (float) $value : null; }
+
 /** Read a stored payload metric window, defaulting missing ops windows to zero. */
 function pmssResourceStoredPayloadWindowValue(array $data, string $metric, string $window): ?float
 {
     $value = $data[$metric]['raw'][$window] ?? (substr($metric, -4) === '_ops' ? 0.0 : null);
-    return ($value !== null && is_numeric($value)) ? (float) $value : null;
+    return $value !== null ? pmssResourceMetricValueNormalize($value) : null;
 }
 
 /** Normalize persisted resource stats into the row shape used by reports. */
@@ -81,11 +100,14 @@ function pmssResourceStoredPayloadFromResults(array $results): array
 /** Extract one accumulator window into the resource-snapshot metric shape. */
 function pmssResourceResultsWindowMetrics(array $results, string $window): ?array
 {
-    if (!isset($results['memory'][$window], $results['tasks'][$window]) || !isset($results['raw']) || !is_array($results['raw'])) return null;
-    $metrics = ['memory' => $results['memory'][$window], 'tasks' => $results['tasks'][$window]];
+    if (!isset($results['memory'], $results['tasks'], $results['raw']) || !is_array($results['memory']) || !is_array($results['tasks']) || !is_array($results['raw'])) return null;
+    $metrics = [];
+    foreach (['memory', 'tasks'] as $metric) {
+        if (!array_key_exists($window, $results[$metric]) || ($metrics[$metric] = pmssResourceMetricValueNormalize($results[$metric][$window])) === null) return null;
+    }
     foreach (ResourceStatsAccumulator::RAW_METRICS as $metric) {
-        if (!isset($results['raw'][$metric][$window])) return null;
-        $metrics[$metric] = $results['raw'][$metric][$window];
+        if (!isset($results['raw'][$metric]) || !is_array($results['raw'][$metric]) || !array_key_exists($window, $results['raw'][$metric])) return null;
+        if (($metrics[$metric] = pmssResourceMetricValueNormalize($results['raw'][$metric][$window])) === null) return null;
     }
     return $metrics;
 }
@@ -142,16 +164,14 @@ class resourceStatistics
      * @param int $timePeriod Number of log lines to read from tail.
      * @return string Raw log text, possibly empty when no entries exist.
      */
-    public function getData($user, $timePeriod = 10080)
+    public function getData($user, $timePeriod = PMSS_RESOURCE_LOG_TAIL_LINES_DEFAULT)
     {
         $path = pmssResourceLogFilePath($this->resourceDir, (string) $user);
         if ($path === null) {
             return '';
         }
 
-        $lines = max(1, (int) $timePeriod);
-        $pathArg = escapeshellarg($path);
-        return trim(`tail -n{$lines} {$pathArg} 2>/dev/null`);
+        return pmssResourceTailLogContents($path, pmssResourceTailLineCount($timePeriod));
     }
 
     /**
