@@ -106,6 +106,11 @@ foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (str
         $skippedNoSlice++;
         continue;
     }
+    if (!pmssCgroupDirectWritableFileTarget($cgPath)) {
+        $errors++;
+        syslog(LOG_WARNING, "unwritable bfq target $user uid=$uid");
+        continue;
+    }
 
     $cur = pmssBfqKernelWeightParse(@file_get_contents($cgPath));
     if ($cur === null) {

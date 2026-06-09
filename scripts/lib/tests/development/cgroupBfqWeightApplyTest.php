@@ -94,6 +94,23 @@ class CgroupBfqWeightApplyTest extends TestCase
         }
     }
 
+    public function testSharedWritableTargetGuardRejectsUnsafeShapes(): void
+    {
+        $file = $this->pmssMakeTempFile('pmss-bfq-target-');
+        $this->assertTrue(\pmssCgroupDirectWritableFileTarget($file));
+
+        $directory = $this->pmssMakeTempDir('pmss-bfq-target-dir-');
+        $this->assertFalse(\pmssCgroupDirectWritableFileTarget($directory));
+
+        $missing = $this->pmssMakeTempPath('pmss-bfq-target-missing-');
+        $this->assertFalse(\pmssCgroupDirectWritableFileTarget($missing));
+        $this->assertFalse(\pmssCgroupDirectWritableFileTarget("bad\0path"));
+
+        $link = $this->pmssMakeTempPath('pmss-bfq-target-link-');
+        $this->pmssCreateSymlinkOrSkip($file, $link);
+        $this->assertFalse(\pmssCgroupDirectWritableFileTarget($link));
+    }
+
     public function testSharedPasswdUidParserAcceptsOnlyPositiveIntegerUid(): void
     {
         foreach ([
@@ -143,6 +160,7 @@ class CgroupBfqWeightApplyTest extends TestCase
                     "((\$stat['mode'] ?? 0) & 0170000) !== 0100000",
                     "(int) (\$stat['size'] ?? 0) > 64",
                     '@file_get_contents($path, false, null, 0, 64)',
+                    'pmssCgroupDirectWritableFileTarget($cgPath)',
                 ],
                 'ordered' => [
                     [
@@ -176,6 +194,7 @@ class CgroupBfqWeightApplyTest extends TestCase
                             "pmssCgroupDirectUserBlkioFilePath(\$uid, 'blkio.bfq.weight');",
                             "if (!pmssCgroupDirectUserBlkioPathAllowed(\$cgPath, ['blkio.bfq.weight'])) {",
                             'syslog(LOG_WARNING, "unsafe bfq target $user uid=$uid");',
+                            'pmssCgroupDirectWritableFileTarget($cgPath)',
                             'if (@file_put_contents($cgPath, (string) $w) === false)',
                         ],
                         'missingPrefix' => 'missing BFQ direct-write target guard: ',

@@ -97,6 +97,16 @@ function pmssCgroupDirectUserBlkioPathAllowed(string $cgPath, array $allowedFile
         && preg_match('#^'.preg_quote(PMSS_CGROUP_DIRECT_BLKIO_ROOT, '#').'/user\.slice/user-[1-9][0-9]*\.slice/(?:'.implode('|', $patterns).')$#', $cgPath) === 1;
 }
 
+/** Refuse links, directories, and missing targets before direct cgroup writes. */
+function pmssCgroupDirectWritableFileTarget(string $path): bool
+{
+    return $path !== ''
+        && strpos($path, "\0") === false
+        && is_file($path)
+        && !is_link($path)
+        && is_writable($path);
+}
+
 /** Log and optionally print the legacy cycle summary, then return process rc. */
 function pmssCgroupDirectFinishCycle(bool $dryRun, int $total, int $written, int $skippedNoSlice, int $errors): int
 {
