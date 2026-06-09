@@ -16,6 +16,20 @@ class rtorrentWatchdogDecisionTest extends TestCase
         return $this->tempDir.'/accept-queue.count';
     }
 
+    private function assertScgiDecisionExtendsGrace(
+        array $pids,
+        array $processStates,
+        ?array $queueSnapshot,
+        string $messageNeedle,
+        string $label
+    ): void {
+        $decision = \rtorrentProcessScgiUnresponsiveDecision($pids, $processStates, $queueSnapshot, $this->wedgeStatePath(), 3);
+
+        $this->assertSame('extend_grace', $decision['action'], $label);
+        $this->assertStringContainsString($messageNeedle, $decision['message'], $label);
+        $this->assertFalse(file_exists($this->wedgeStatePath()), $label.' must not advance queue wedge count');
+    }
+
     public function testCronLogHonorsForceAndDebugFlags(): void
     {
         $this->assertSame('', $this->pmssCaptureStdout(static function (): void {
@@ -70,51 +84,36 @@ class rtorrentWatchdogDecisionTest extends TestCase
         }
     }
 
-    public function testGraceStateUsesBaseGraceWithoutRestartMarker(): void
-    {
-        $state = \rtorrentProcessUnresponsiveGraceState($this->tempDir.'/missing', 120, 1000);
-
-        $this->assertEquals(['grace' => 120, 'restartAge' => 0], $state);
-    }
-
-    public function testGraceStateExtendsAfterRecentRestartMarkers(): void
+    public function testGraceStateUsesBaseAndExtendsAfterRecentRestartMarkers(): void
     {
         $marker = $this->tempDir.'/restart-marker';
 
         foreach ([
+            [null, 1000, 120, 0],
             ['900', 1000, 600, 100],
             ['1000', 9000, 1200, 8000],
             ['1', 20001, 120, 20000],
         ] as $case) {
-            file_put_contents($marker, $case[0]);
+            if ($case[0] === null) {
+                @unlink($marker);
+            } else {
+                file_put_contents($marker, $case[0]);
+            }
             $this->assertEquals(['grace' => $case[2], 'restartAge' => $case[3]], \rtorrentProcessUnresponsiveGraceState($marker, 120, $case[1]));
         }
     }
 
-    public function testScgiDecisionExtendsGraceForUnavailableOrUnsafeProcessStates(): void
+    public function testScgiDecisionExtendsGraceForUnsafeStatesOrOpenQueue(): void
     {
+        $aliveStates = [44 => ['pid' => 44, 'stat' => 'Sl', 'wchan' => 'poll_schedule_timeout']];
+
         foreach ([
-            'missing process state' => [[], 'process state is unavailable'],
-            'uninterruptible I/O state' => [[44 => ['pid' => 44, 'stat' => 'Dl', 'wchan' => 'io_schedule']], 'uninterruptible I/O state'],
+            'missing process state' => [[44], [], ['recvQ' => 100, 'sendQ' => 100], 'process state is unavailable'],
+            'uninterruptible I/O state' => [[44], [44 => ['pid' => 44, 'stat' => 'Dl', 'wchan' => 'io_schedule']], ['recvQ' => 100, 'sendQ' => 100], 'uninterruptible I/O state'],
+            'missing queue' => [[44], $aliveStates, null, 'queue=unavailable'],
+            'open queue' => [[44], $aliveStates, ['recvQ' => 1, 'sendQ' => 100], 'recvQ=1 sendQ=100'],
         ] as $label => $case) {
-            $decision = \rtorrentProcessScgiUnresponsiveDecision([44], $case[0], ['recvQ' => 100, 'sendQ' => 100], $this->wedgeStatePath(), 3);
-
-            $this->assertSame('extend_grace', $decision['action'], $label);
-            $this->assertStringContainsString($case[1], $decision['message'], $label);
-            $this->assertFalse(file_exists($this->wedgeStatePath()), $label.' must not advance queue wedge count');
-        }
-    }
-
-    public function testScgiDecisionExtendsGraceWhenQueueIsUnavailableOrOpen(): void
-    {
-        $states = [44 => ['pid' => 44, 'stat' => 'Sl', 'wchan' => 'poll_schedule_timeout']];
-
-        foreach ([[null, 'queue=unavailable'], [['recvQ' => 1, 'sendQ' => 100], 'recvQ=1 sendQ=100']] as $case) {
-            $decision = \rtorrentProcessScgiUnresponsiveDecision([44], $states, $case[0], $this->wedgeStatePath(), 3);
-
-            $this->assertSame('extend_grace', $decision['action']);
-            $this->assertStringContainsString($case[1], $decision['message']);
-            $this->assertFalse(file_exists($this->wedgeStatePath()), 'Unsaturated queue must not advance wedge count');
+            $this->assertScgiDecisionExtendsGrace($case[0], $case[1], $case[2], $case[3], $label);
         }
     }
 

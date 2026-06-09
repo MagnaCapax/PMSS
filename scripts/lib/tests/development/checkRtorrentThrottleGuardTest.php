@@ -7,23 +7,25 @@ class checkRtorrentThrottleGuardTest extends TestCase
 {
     public function testScgiThrottleCallRequiresConfiguredThrottleAndKeepsHealthyLogOutsideGuard(): void
     {
-        $path = 'scripts/lib/rtorrent/watchdog.php';
-        $this->pmssAssertRepoFileNotContainsString(
-            $path,
-            '$throttleValue = ($throttle !== null && $throttle > 0) ? $throttle : 0;',
-            'Legacy unconditional throttle assignment should be removed'
-        );
-        $this->pmssAssertRepoFileContainsOrderedStrings($path, [
-            '$throttle = pmssReadTorrentThrottle($user);',
-            'if ($throttle === null) return;',
-            '$throttleValue = $throttle > 0 ? $throttle : 0;',
-            "rtorrentScgiCall(\$socketPath, 'throttle.global_up.max_rate.set', [\$throttleValue], 5)",
-        ], 'checkRtorrent should guard the SCGI throttle call behind an existing throttle file');
-        $this->pmssAssertRepoFileContainsString('scripts/cron/checkRtorrent.php', "rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])");
-        $this->pmssAssertRepoFileMatches(
-            'scripts/cron/checkRtorrent.php',
-            '/pmssCheckRtorrentApplyThrottle\(\$user, \$socketPath, \$debug\);\s*pmssCheckRtorrentLog\("rTorrent healthy for \{\$user\}", false, \$debug\);/s',
-            'Healthy watchdog logging should still run when no throttle file exists'
-        );
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/rtorrent/watchdog.php' => [
+                'forbidden' => [
+                    '$throttleValue = ($throttle !== null && $throttle > 0) ? $throttle : 0;',
+                ],
+                'ordered' => [[
+                    'needles' => [
+                        '$throttle = pmssReadTorrentThrottle($user);',
+                        'if ($throttle === null) return;',
+                        '$throttleValue = $throttle > 0 ? $throttle : 0;',
+                        "rtorrentScgiCall(\$socketPath, 'throttle.global_up.max_rate.set', [\$throttleValue], 5)",
+                    ],
+                    'missingPrefix' => 'checkRtorrent throttle guard missing: ',
+                ]],
+            ],
+            'scripts/cron/checkRtorrent.php' => [
+                'required' => ["rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])"],
+                'matches' => ['/pmssCheckRtorrentApplyThrottle\(\$user, \$socketPath, \$debug\);\s*pmssCheckRtorrentLog\("rTorrent healthy for \{\$user\}", false, \$debug\);/s'],
+            ],
+        ]);
     }
 }

@@ -7,20 +7,20 @@ class checkRtorrentMissingConfigRecoveryContractTest extends TestCase
 {
     public function testMissingConfigBranchRecoversInsteadOfSilentlySkipping(): void
     {
-        $path = 'scripts/lib/rtorrent/watchdog.php';
-        $this->pmssAssertRepoFileContainsString($path, 'function pmssCheckRtorrentRecoverMissingConfig(');
-        $this->pmssAssertRepoFileMatches(
-            'scripts/cron/checkRtorrent.php',
-            '/if \(!is_file\(\$home\.\'\/\\.rtorrent\\.rc\'\)\) \{\s*if \(!pmssCheckRtorrentRecoverMissingConfig\(\$user, \$home, \$debug\)\) \{\s*continue;\s*\}\s*\}/s',
-            'checkRtorrent should attempt recovery before skipping users with missing configs'
-        );
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/rtorrent/watchdog.php' => [
+                'required' => ['function pmssCheckRtorrentRecoverMissingConfig('],
+            ],
+            'scripts/cron/checkRtorrent.php' => [
+                'matches' => ['/if \(!is_file\(\$home\.\'\/\\.rtorrent\\.rc\'\)\) \{\s*if \(!pmssCheckRtorrentRecoverMissingConfig\(\$user, \$home, \$debug\)\) \{\s*continue;\s*\}\s*\}/s'],
+            ],
+        ]);
     }
 
     public function testRecoveryUsesCanonicalConfigInputsAndLogsOutcome(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/lib/rtorrent/watchdog.php',
-            [
+        $this->pmssAssertRepoFileContract('scripts/lib/rtorrent/watchdog.php', [
+            'required' => [
                 'new UserConfigStore()',
                 "applyFallbacks(\$user, is_array(\$payload = \$userConfigStore->get(\$user)) ? \$payload : [])",
                 "'/etc/seedbox/config/user.rtorrent.defaults.dht'",
@@ -28,7 +28,7 @@ class checkRtorrentMissingConfigRecoveryContractTest extends TestCase
                 'pmssReadTorrentThrottle($user)',
                 "new rtorrentConfig(\$resources)",
                 "pmssCheckRtorrentLogBoth(\$user, 'missing .rtorrent.rc recovered', \$debug);",
-            ]
-        );
+            ],
+        ]);
     }
 }
