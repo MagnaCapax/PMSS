@@ -124,19 +124,13 @@ openlog('pmss-iops', LOG_PID, LOG_DAEMON);
 
 $total = 0; $written = 0; $skippedNoSlice = 0; $errors = 0;
 
-foreach (pmssCgroupDirectUserConfigs(PMSS_IOPS_USERS_DIR, $errors) as $entry) {
-    list($user, $json) = $entry;
+foreach (pmssCgroupDirectPlannedUsers(PMSS_IOPS_USERS_DIR, $total, $errors, function (string $user, array $json): ?array {
     $readIops  = pmssIopsParseSpec($json['IOReadIOPS']  ?? null);
     $writeIops = pmssIopsParseSpec($json['IOWriteIOPS'] ?? null);
-    if ($readIops === null && $writeIops === null) {
-        continue; // no caps configured for this user
-    }
-    $total++;
-
-    $uid = pmssCgroupDirectUserUidOrError($user, $errors);
-    if ($uid === null) {
-        continue;
-    }
+    if ($readIops === null && $writeIops === null) return null; // no caps configured for this user
+    return [$readIops, $writeIops];
+}) as $entry) {
+    list($user, $uid, $limits) = $entry;
 
     $sliceDir = pmssCgroupDirectUserSliceDir($uid);
     if (!is_dir($sliceDir)) {
@@ -145,8 +139,8 @@ foreach (pmssCgroupDirectUserConfigs(PMSS_IOPS_USERS_DIR, $errors) as $entry) {
     }
 
     foreach ([
-        ['read', $readIops, pmssCgroupDirectUserBlkioFilePath($uid, 'blkio.throttle.read_iops_device')],
-        ['write', $writeIops, pmssCgroupDirectUserBlkioFilePath($uid, 'blkio.throttle.write_iops_device')],
+        ['read', $limits[0], pmssCgroupDirectUserBlkioFilePath($uid, 'blkio.throttle.read_iops_device')],
+        ['write', $limits[1], pmssCgroupDirectUserBlkioFilePath($uid, 'blkio.throttle.write_iops_device')],
     ] as $entry) {
         list($dir, $iops, $cgPath) = $entry;
         if ($iops === null) {

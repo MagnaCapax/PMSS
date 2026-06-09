@@ -83,22 +83,13 @@ $total = 0; $written = 0; $skippedNoSlice = 0; $errors = 0;
 // root.slice unmanaged. cgroupRootCheck.php enforces root's memory/tasks
 // policy separately.
 
-foreach (pmssCgroupDirectUserConfigs($USERS_DIR, $errors) as $entry) {
-    list($user, $json) = $entry;
-    $total++;
-
-    $uid = pmssCgroupDirectUserUidOrError($user, $errors);
-    if ($uid === null) {
-        continue;
-    }
-
+foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (string $user, array $json): int {
     // Prefer explicit JSON IOWeight; fall back to ramMiB-derived formula.
-    if (isset($json['IOWeight']) && is_numeric($json['IOWeight'])) {
-        $wRaw = (int) $json['IOWeight'];
-    } else {
-        $ramMiB = isset($json['ramMiB']) && is_numeric($json['ramMiB']) ? (int) $json['ramMiB'] : 0;
-        $wRaw = pmssBfqFormulaWeight($ramMiB);
-    }
+    if (isset($json['IOWeight']) && is_numeric($json['IOWeight'])) return (int) $json['IOWeight'];
+    $ramMiB = isset($json['ramMiB']) && is_numeric($json['ramMiB']) ? (int) $json['ramMiB'] : 0;
+    return pmssBfqFormulaWeight($ramMiB);
+}) as $entry) {
+    list($user, $uid, $wRaw) = $entry;
 
     // Free Bonus Disk Policy: ~/.bonus holds tenure/spend bonus percent.
     $bonusPct = pmssBfqUserBonusPercentRead($user);

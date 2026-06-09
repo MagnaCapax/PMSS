@@ -136,7 +136,7 @@ class CgroupBfqWeightApplyTest extends TestCase
             'scripts/cron/cgroupBfqWeightApply.php' => [
                 'required' => [
                     "require_once __DIR__.'/../lib/cgroup/directApply.php';",
-                    'pmssCgroupDirectUserConfigs($USERS_DIR, $errors)',
+                    'pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors',
                     'pmssBfqUserBonusPercentRead($user)',
                     'pmssBfqApplyBonusWeight($wRaw, $bonusPct',
                     'function pmssBfqUserBonusPercentRead(string $user): int',
@@ -157,9 +157,8 @@ class CgroupBfqWeightApplyTest extends TestCase
                     ],
                     [
                         'needles' => [
-                            'foreach (pmssCgroupDirectUserConfigs($USERS_DIR, $errors) as $entry) {',
-                            'list($user, $json) = $entry;',
-                            '$total++;',
+                            'foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors',
+                            'list($user, $uid, $wRaw) = $entry;',
                             'pmssBfqUserBonusPercentRead($user)',
                         ],
                         'missingPrefix' => 'missing BFQ username boundary guard: ',
@@ -167,8 +166,7 @@ class CgroupBfqWeightApplyTest extends TestCase
                     ],
                     [
                         'needles' => [
-                            '$uid = pmssCgroupDirectUserUidOrError($user, $errors);',
-                            'if ($uid === null) {',
+                            'list($user, $uid, $wRaw) = $entry;',
                             "pmssCgroupDirectUserBlkioFilePath(\$uid, 'blkio.bfq.weight');",
                         ],
                         'missingPrefix' => 'missing BFQ passwd UID guard: ',

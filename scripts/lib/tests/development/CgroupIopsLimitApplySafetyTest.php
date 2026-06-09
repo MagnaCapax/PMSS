@@ -22,8 +22,8 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
                 'ordered' => [
                     [
                         'needles' => [
-                            '$uid = pmssCgroupDirectUserUidOrError($user, $errors);',
-                            'if ($uid === null) {',
+                            'foreach (pmssCgroupDirectPlannedUsers(PMSS_IOPS_USERS_DIR, $total, $errors',
+                            'list($user, $uid, $limits) = $entry;',
                             '$sliceDir = pmssCgroupDirectUserSliceDir($uid);',
                         ],
                         'missingPrefix' => 'missing IOPS passwd UID guard: ',
@@ -69,6 +69,44 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
         ] as $case) {
             $this->assertSame($case[1], \pmssCgroupDirectUserBlkioPathAllowed($case[0], $allowed));
         }
+    }
+
+    public function testPlannedUsersPreserveCycleAccountingAndResolverFailures(): void
+    {
+        $usersDir = $this->pmssMakeTempDir('pmss-cgroup-users-', 0700);
+        $this->pmssWriteFile($usersDir.'/alice.json', '{"enabled":true}', 0700);
+        $this->pmssWriteFile($usersDir.'/bob.json', '{"enabled":true}', 0700);
+        $this->pmssWriteFile($usersDir.'/skipme.json', '{"enabled":false}', 0700);
+        $this->pmssWriteFile($usersDir.'/badjson.json', '{', 0700);
+        $this->pmssWriteFile($usersDir.'/bad name.json', '{"enabled":true}', 0700);
+
+        $total = 0;
+        $errors = 0;
+        $seenResolvers = [];
+        $planned = iterator_to_array(\pmssCgroupDirectPlannedUsers(
+            $usersDir,
+            $total,
+            $errors,
+            static function (string $user, array $json): ?array {
+                return ($json['enabled'] ?? false) === true ? ['plan' => $user.'-work'] : null;
+            },
+            static function (string $user, int &$errors) use (&$seenResolvers): ?int {
+                $seenResolvers[] = $user;
+                if ($user === 'bob') {
+                    $errors++;
+                    return null;
+                }
+                return 1000 + count($seenResolvers);
+            }
+        ), false);
+
+        $this->assertSame(2, $total, 'only planned valid configs count toward total');
+        $this->assertSame(3, $errors, 'bad json, invalid username, and failed UID resolution count as errors');
+        $this->assertEquals(['alice', 'bob'], $seenResolvers, 'skipped plans must not resolve UIDs');
+        $this->assertSame(1, count($planned));
+        $this->assertSame('alice', $planned[0][0]);
+        $this->assertSame(1001, $planned[0][1]);
+        $this->assertEquals(['plan' => 'alice-work'], $planned[0][2]);
     }
 
 }

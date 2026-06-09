@@ -48,6 +48,19 @@ function pmssCgroupDirectUserConfigs(string $usersDir, int &$errors): iterable
     }
 }
 
+/** Yield counted user plans after shared config filtering and UID validation. */
+function pmssCgroupDirectPlannedUsers(string $usersDir, int &$total, int &$errors, callable $planner, ?callable $uidResolver = null): iterable
+{
+    $uidResolver = $uidResolver ?: 'pmssCgroupDirectUserUidOrError';
+    foreach (pmssCgroupDirectUserConfigs($usersDir, $errors) as $entry) {
+        list($user, $json) = $entry;
+        if (($plan = $planner($user, $json)) === null) continue;
+        $total++;
+        if (($uid = $uidResolver($user, $errors)) === null) continue;
+        yield [$user, $uid, $plan];
+    }
+}
+
 /** Resolve a managed user's positive UID, logging legacy-compatible failures. */
 function pmssCgroupDirectUserUidOrError(string $user, int &$errors): ?int
 {
