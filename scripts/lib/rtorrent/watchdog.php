@@ -90,6 +90,26 @@ function pmssCheckRtorrentApplyThrottle(string $user, string $socketPath, bool $
     pmssCheckRtorrentLog("Applied upload throttle (up={$throttleValue} KiB/s) for {$user}", false, $debug);
 }
 
+/** Publish or clear the ownership drift report without hiding write failures. */
+function pmssCheckRtorrentPublishChangedConfigReport(array $changedConfig, string $path, bool $debug): void
+{
+    if (!pmssPathTargetIsSafe($path, false, true, false)) {
+        pmssCheckRtorrentLog("WARN: unsafe changed config report path: {$path}", true, $debug);
+        return;
+    }
+
+    if ($changedConfig !== array()) {
+        if (@file_put_contents($path, implode("\n", $changedConfig)) === false) {
+            pmssCheckRtorrentLog("WARN: failed to write changed config report: {$path}", true, $debug);
+        }
+        return;
+    }
+
+    if (file_exists($path) && !@unlink($path) && file_exists($path)) {
+        pmssCheckRtorrentLog("WARN: failed to remove stale changed config report: {$path}", true, $debug);
+    }
+}
+
 /** Rebuild a missing per-user rTorrent config from the canonical templates. */
 function pmssCheckRtorrentRecoverMissingConfig(string $user, string $home, bool $debug): bool
 {

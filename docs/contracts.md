@@ -478,6 +478,10 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Restarts the per-user lighttpd/php-cgi stack when the rendered config, `~/.lighttpd/custom`, or `~/.lighttpd/custom.d/*.conf` fragments are newer than the running lighttpd process.
   - Per-user toggle: when user config `lighttpdEnabled` is false, kills any running `lighttpd`/`php-cgi` for that user, removes the watchdog error page, and skips restart. Default remains true.
 
+- scripts/cron/checkRtorrent.php
+  - Behavior: Keeps per-user rTorrent/executor processes healthy and recovers missing `.rtorrent.rc` files from canonical templates when enough user config data exists.
+  - Side-effects: Publishes `/root/changedConfigs` when a user's `.rtorrent.rc` is not owned by root; clears the stale report when no drift remains; write/remove failures are logged instead of hidden.
+
 - scripts/util/createNginxConfig.php
   - Behavior: Regenerates nginx global and per-user config from templates; adds per-user subdomain vhosts under `/etc/nginx/conf.d/pmss-user-*.conf` when `/etc/hostname` is a valid FQDN.
   - Public proxy contract: `/public-<user>/` forwards the original scheme via `X-Forwarded-Proto` and only restores generic lighttpd redirects back under `/public-<user>/`; per-app media-stack redirect and cookie-path rewriting stays in the user's `~/.lighttpd/custom.d/media-stack.conf` fragment.

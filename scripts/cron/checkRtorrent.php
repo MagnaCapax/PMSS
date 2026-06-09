@@ -305,8 +305,4 @@ foreach ($users as $user) {
     }
 }
 
-if (count($changedConfig) !== 0) {
-    file_put_contents('/root/changedConfigs', implode("\n", $changedConfig));
-} elseif (file_exists('/root/changedConfigs')) {
-    unlink('/root/changedConfigs');
-}
+pmssCheckRtorrentPublishChangedConfigReport($changedConfig, '/root/changedConfigs', $debug);

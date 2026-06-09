@@ -136,4 +136,27 @@ class rtorrentWatchdogDecisionTest extends TestCase
             $this->assertStringContainsString($case[2], $case[0]['message']);
         }
     }
+
+    public function testChangedConfigReportPublishesAndClearsStateFile(): void
+    {
+        $path = $this->tempDir.'/changedConfigs';
+
+        \pmssCheckRtorrentPublishChangedConfigReport(['alice -> bob'], $path, false);
+        $this->assertSame('alice -> bob', (string) file_get_contents($path));
+
+        \pmssCheckRtorrentPublishChangedConfigReport([], $path, false);
+        $this->assertFalse(file_exists($path));
+    }
+
+    public function testChangedConfigReportRejectsUnsafeReportPath(): void
+    {
+        $path = $this->tempDir.'/nested/../changedConfigs';
+
+        $output = $this->pmssCaptureStdout(static function () use ($path): void {
+            \pmssCheckRtorrentPublishChangedConfigReport(['alice -> bob'], $path, false);
+        })[1];
+
+        $this->assertStringContainsString('WARN: unsafe changed config report path:', $output);
+        $this->assertFalse(file_exists($this->tempDir.'/changedConfigs'));
+    }
 }
