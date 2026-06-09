@@ -1,19 +1,10 @@
 <?php
 /**
- * PMSS: Frontend Statistics Section on Info Page
+ * PMSS frontend statistics section on the customer info page.
  *
- * Live `systemctl` status for WG/OpenVPN, accurate Docker detection,
- * traffic chart (2+ days), taller CGroup block, responsive layout.
- *
- * Original concept and implementation: Aleksi Ursin, circa 2010–2015.
- *
+ * Original concept and implementation: Aleksi Ursin, circa 2010-2015.
  * Copyright (C) 2010-2025 Magna Capax Finland Oy
- *
- * @author  Pulsed Media Dev Team
- * @package PMSS
- *
- * #TODO: Hover on status → show systemctl logs
- * #TODO: Click status → attempt restart (if allowed)
+ * TODO: status hover logs and allowed restarts.
  */
 require_once __DIR__.'/scriptsInc.php';
 require_once __DIR__.'/statsHelpers.php';
@@ -23,18 +14,21 @@ if (file_exists($pmssWebCgroupMemoryStatusLib)) {
     require_once $pmssWebCgroupMemoryStatusLib;
 }
 
-// Customer-side traffic-limit reader: see userTrafficLimit.php for rationale.
+// Customer-side traffic-limit reader; see ADR 0016.
 $pmssUserTrafficLimitLib = __DIR__.'/userTrafficLimit.php';
 if (file_exists($pmssUserTrafficLimitLib)) {
     require_once $pmssUserTrafficLimitLib;
 }
-// pmssTrafficLimitStateRead lives in userTrafficLimit.php (see ADR 0016).
 
 $pmssDockerEnabledPolicy = null;
 $pmssMemoryPressure = function_exists('pmssWebCgroupMemoryStatusRead')
     ? pmssWebCgroupMemoryStatusRead()
     : array('available' => false, 'status' => 'UNAVAILABLE');
 $resourceState = pmssStatsSerializedStateRead('../.resourceData', 'Invalid resource data format.');
+$pmssBaseResources = pmssStatsBaseResourcesBuild();
+$uid = $pmssBaseResources['uid'];
+$pmssStatsStatusModel = pmssStatsStatusModelBuild($uid, $pmssDockerEnabledPolicy);
+$pmssStatsAppToggles = pmssCustomerManagedAppDefinitions();
 ?>
 
 <style>
@@ -274,53 +268,7 @@ function pmssStatsToggleApp(button) {
   <!-- LEFT: Base resources -->
   <div class="stats-block stats-block-base-resources">
     <h6>Base Resources (current)</h6>
-    <pre class="stats-base-resources-pre"><?php
-    $uid = null;
-    $uidResult = pmssInfoShellExec('/usr/bin/id -u', 'User ID');
-    if ($uidResult['error'] !== null) {
-        echo $uidResult['error'] . "\n";
-    } else {
-        $uid = trim($uidResult['output']);
-        if ($uid === '' || !is_numeric($uid)) {
-            echo "Error: Could not determine user ID.\n";
-            $uid = null;
-        } else {
-            $sliceUnit = 'user-' . $uid . '.slice';
-            $statusResult = pmssInfoShellExec('systemctl status ' . escapeshellarg($sliceUnit) . ' 2>&1', 'User slice status');
-            if ($statusResult['error'] !== null) {
-                echo $statusResult['error'] . "\n";
-            } else {
-                $output = $statusResult['output'];
-                if (!$output) {
-                    echo "Failed to retrieve slice status.\n";
-                } else {
-                    $lines = explode("\n", $output);
-                    $cgroupSection = [];
-                    $mainSection = [];
-                    $inCgroup = false;
-
-                    foreach ($lines as $line) {
-                        if (strpos($line, 'CGroup:') === 0) {
-                            $inCgroup = true;
-                            $cgroupSection[] = $line;
-                            continue;
-                        }
-                        if ($inCgroup && trim($line) && $line[0] === ' ') {
-                            $cgroupSection[] = $line;
-                        } else {
-                            $mainSection[] = $line;
-                        }
-                    }
-
-                    echo implode("\n", $mainSection);
-                    if (!empty($cgroupSection)) {
-                        echo "\n" . implode("\n", $cgroupSection);
-                    }
-                }
-            }
-        }
-    }
-    ?></pre>
+    <pre class="stats-base-resources-pre"><?php echo $pmssBaseResources['text']; ?></pre>
   </div>
 
   <!-- RIGHT: Server info -->
@@ -341,75 +289,12 @@ echo pmssCustomerHtmlAttr($ip !== false ? trim($ip) : 'unknown');
         </span>
     </div>
 
-    <?php
-    // === Live systemctl status for WG & OpenVPN ===
-    $wgStatus = 'inactive';
-    $ovpnStatus = 'inactive';
-
-    $wgResult = pmssInfoShellExec('systemctl is-active wg-quick@wg0 2>/dev/null', 'WireGuard status');
-    if ($wgResult['error'] !== null) {
-        $wgStatus = 'error';
-    } elseif (trim($wgResult['output']) === 'active') {
-        $wgStatus = 'active';
-    }
-
-    $ovpnResult = pmssInfoShellExec('systemctl is-active openvpn 2>/dev/null', 'OpenVPN status');
-    if ($ovpnResult['error'] !== null) {
-        $ovpnStatus = 'error';
-    } elseif (trim($ovpnResult['output']) === 'active') {
-        $ovpnStatus = 'active';
-    }
-
-    // === App Status via ps aux | grep (hidepid safe) ===
-    $psResult = pmssInfoShellExec('ps aux | grep -E "(rtorrent|qbittorrent-nox|deluged|rclone)" | grep -v grep', 'App status');
-    $pmssStatsAppToggles = pmssCustomerManagedAppDefinitions();
-    if ($psResult['error'] !== null) {
-        $apps = array(
-            'rTorrent'    => 'error',
-            'qBittorrent' => 'error',
-            'Deluge'      => 'error',
-            'rclone'      => 'error',
-        );
-    } else {
-        $psOutput = $psResult['output'];
-        $apps = array(
-            'rTorrent'    => (stripos($psOutput, 'rtorrent') !== false) ? 'active' : 'stopped',
-            'qBittorrent' => (stripos($psOutput, 'qbittorrent-nox') !== false) ? 'active' : 'stopped',
-            'Deluge'      => (stripos($psOutput, 'deluged') !== false) ? 'active' : 'stopped',
-            'rclone'      => (stripos($psOutput, 'rclone') !== false) ? 'active' : 'stopped',
-        );
-    }
-
-    // === Docker Rootless Status ===
-    $dockerStatus = 'inactive';
-    if ($uid === null) {
-        $dockerStatus = 'error';
-    } else {
-        $dockerSock = "/run/user/$uid/docker.sock";
-        if (file_exists($dockerSock)) {
-            $dockerStatus = 'active';
-        } else {
-            $dockerResult = pmssInfoShellExec('docker ps --no-trunc 2>&1', 'Docker status');
-            if ($dockerResult['error'] !== null) {
-                $dockerStatus = 'error';
-            } else {
-                $dockerOutput = $dockerResult['output'];
-                if (strpos($dockerOutput, 'docker ps') === false && trim($dockerOutput) === '') {
-                    $dockerStatus = 'active';
-                }
-            }
-        }
-    }
-    $apps['Docker'] = $dockerStatus;
-    $pmssDockerInactiveNote = pmssStatsDockerInactiveNote($dockerStatus, $pmssDockerEnabledPolicy);
-    ?>
-
     <div class="status-grid">
         <div class="label">Services:</div>
         <div></div>
 
         <div>WireGuard</div>
-        <div><span class="status <?php echo $wgStatus; ?>"><?php echo ucfirst($wgStatus); ?></span></div>
+        <div><span class="status <?php echo $pmssStatsStatusModel['wgStatus']; ?>"><?php echo ucfirst($pmssStatsStatusModel['wgStatus']); ?></span></div>
 
         <div>
             <a href="<?php echo file_exists('openvpn-config.tgz') ? 'openvpn-config.tgz' : '#'; ?>"
@@ -417,15 +302,15 @@ echo pmssCustomerHtmlAttr($ip !== false ? trim($ip) : 'unknown');
                 OpenVPN
             </a>
         </div>
-        <div><span class="status <?php echo $ovpnStatus; ?>"><?php echo ucfirst($ovpnStatus); ?></span></div>
+        <div><span class="status <?php echo $pmssStatsStatusModel['ovpnStatus']; ?>"><?php echo ucfirst($pmssStatsStatusModel['ovpnStatus']); ?></span></div>
     </div>
 
     <div class="status-grid" style="margin-top:12px;">
         <div class="label">Apps:</div>
         <div></div>
-        <?php foreach ($apps as $name => $status): ?>
+        <?php foreach ($pmssStatsStatusModel['apps'] as $name => $status): ?>
             <div><?php echo $name; ?></div>
-            <div class="status-actions"><span class="status <?php echo $status; ?>"><?php echo ucfirst($status); ?></span><?php echo pmssStatsAppToggleButtonHtmlBuild($name, $pmssStatsAppToggles); ?><?php if ($name === 'Docker' && $pmssDockerInactiveNote !== ''): ?><span class="docker-note"><?php echo pmssCustomerHtmlAttr($pmssDockerInactiveNote); ?></span><?php endif; ?></div>
+            <div class="status-actions"><span class="status <?php echo $status; ?>"><?php echo ucfirst($status); ?></span><?php echo pmssStatsAppToggleButtonHtmlBuild($name, $pmssStatsAppToggles); ?><?php if ($name === 'Docker' && $pmssStatsStatusModel['dockerInactiveNote'] !== ''): ?><span class="docker-note"><?php echo pmssCustomerHtmlAttr($pmssStatsStatusModel['dockerInactiveNote']); ?></span><?php endif; ?></div>
         <?php endforeach; ?>
     </div>
 
@@ -436,39 +321,7 @@ echo pmssCustomerHtmlAttr($ip !== false ? trim($ip) : 'unknown');
     <div class="memory-pressure-note">Docker policy changes are handled by platform tooling.</div>
 
     <pre style="margin-top:16px; font-size:0.9em;">
-<?php
-$uptimeResult = pmssInfoShellExec('uptime', 'Uptime');
-if ($uptimeResult['error'] !== null) {
-    echo $uptimeResult['error'] . "\n\n";
-} else {
-    echo trim($uptimeResult['output']) . "\n\n";
-}
-echo "Memory usage:\n";
-
-$meminfo = @file_get_contents('/proc/meminfo');
-if ($meminfo && preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m)) {
-    $info = array_combine($m[1], $m[2]);
-    $fmt = function ($k) use ($info) {
-        return isset($info[$k]) ? $info[$k] : 0;
-    };
-    echo sprintf("Memory total:     %6s MiB\n", round($fmt('MemTotal') / 1024, 0));
-    echo sprintf("Memory available: %6s MiB\n", round($fmt('MemAvailable') / 1024, 0));
-    echo sprintf("Swap total:       %6s MiB\n", round($fmt('SwapTotal') / 1024, 0));
-    echo sprintf("Swap free:        %6s MiB\n", round($fmt('SwapFree') / 1024, 0));
-
-    $psi = @file_get_contents('/proc/pressure/memory');
-    if ($psi && preg_match('/some avg10=([0-9.]+) avg60=([0-9.]+) avg300=([0-9.]+)/', $psi, $m)) {
-        echo sprintf("Memory pressure (some):  %s / %s / %s\n", $m[1], $m[2], $m[3]);
-        if (preg_match('/full avg10=([0-9.]+) avg60=([0-9.]+) avg300=([0-9.]+)/', $psi, $f)) {
-            echo sprintf("Memory pressure (full):  %s / %s / %s\n", $f[1], $f[2], $f[3]);
-        }
-    } else {
-        echo "Memory pressure: unavailable\n";
-    }
-} else {
-    echo "Failed to read /proc/meminfo\n";
-}
-?>
+<?php echo pmssStatsServerResourceTextBuild(); ?>
     </pre>
   </div>
 
@@ -512,7 +365,6 @@ if ($meminfo && preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m)) {
 <?php endif; ?>
 </div>
 
-<!-- Disk Quota -->
 <div class="stats-block">
     <h6>Disk usage / Quota</h6>
     <pre><?php
@@ -532,76 +384,4 @@ if ($meminfo && preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m)) {
     ?></pre>
 </div>
 
-<?php
-// === Traffic Usage ===
-$trafficState = pmssStatsSerializedStateRead('../.trafficData', 'Invalid traffic data format.');
-$trafficData = $trafficState['data'];
-$trafficTime = $trafficState['time'];
-$trafficDataError = $trafficState['error'];
-$trafficIngressState = pmssStatsSerializedStateRead('../.trafficDataIngress', 'Invalid inbound traffic data format.');
-$trafficIngressData = $trafficIngressState['data'];
-$trafficIngressTime = $trafficIngressState['time'];
-$trafficIngressError = $trafficIngressState['error'];
-$trafficLimitState = function_exists('pmssTrafficLimitStateRead') ? pmssTrafficLimitStateRead('../.trafficLimit', '../.bonusTraffic') : array('limitGiB' => 0, 'bonusGiB' => 0, 'effectiveLimitGiB' => 0);
-$trafficOutboundMonth = null;
-$trafficInboundMonth = null;
-
-if ($trafficData !== null && isset($trafficData['raw']['month']) && is_numeric($trafficData['raw']['month'])) {
-    $trafficOutboundMonth = (float) $trafficData['raw']['month'];
-}
-if ($trafficIngressData !== null && isset($trafficIngressData['raw']['month']) && is_numeric($trafficIngressData['raw']['month'])) {
-    $trafficInboundMonth = (float) $trafficIngressData['raw']['month'];
-}
-$trafficRatioState = function_exists('pmssTrafficRatioStateBuild') ? pmssTrafficRatioStateBuild($trafficOutboundMonth, $trafficInboundMonth) : array('available' => false);
-
-if ($trafficData === null && $trafficIngressData === null) {
-    echo '<div class="stats-block"><h6>Traffic usage</h6><pre>Traffic data not available.</pre></div>';
-} else {
-    ?>
-    <div class="stats-block">
-        <h6>Traffic usage</h6>
-        <pre style="margin-bottom:12px;">
-<?php if ($trafficData !== null): ?>
-Traffic consumption at <?php echo date('Y-m-d H:i:s', (int)$trafficTime); ?>:
-Week: <?php echo $trafficData['display']['week']; ?>, Day: <?php echo $trafficData['display']['day']; ?>
-Past 30 days upload traffic: <?php echo $trafficData['display']['month']; ?>
-<?php if (file_exists('../.trafficLimit')): ?>
-<?php
-$limit = (int) $trafficLimitState['limitGiB'];
-if ($limit > 0) {
-    $effectiveLimit = (int) $trafficLimitState['effectiveLimitGiB'];
-    echo "Traffic limit: " . number_format($effectiveLimit) . " GiB\n";
-    if ($trafficLimitState['bonusGiB'] > 0) {
-        echo "Bonus traffic: " . number_format($trafficLimitState['bonusGiB']) . " GiB\n";
-    }
-}
-?>
-<?php endif; ?>
-<?php elseif ($trafficDataError !== null): ?>
-<?php echo $trafficDataError . "\n"; ?>
-<?php endif; ?>
-
-<?php if ($trafficIngressData !== null): ?>
-Inbound traffic at <?php echo date('Y-m-d H:i:s', (int)$trafficIngressTime); ?>:
-Past 30 days inbound traffic: <?php echo $trafficIngressData['display']['month']; ?>
-<?php elseif ($trafficIngressError !== null): ?>
-<?php echo $trafficIngressError . "\n"; ?>
-<?php endif; ?>
-<?php if (!empty($trafficRatioState['available'])): ?>
-Inbound:Outbound ratio (month): <span class="traffic-ratio <?php echo $trafficRatioState['class']; ?>"><?php echo $trafficRatioState['display']; ?></span>
-<?php endif; ?>
-        </pre>
-
-        <?php if ($trafficData !== null && !empty($trafficData['daily']) && count($trafficData['daily']) >= 2): ?>
-            <?php
-            $trafficValues = array_map(function ($value) { return round((float)$value, 2); }, array_values($trafficData['daily']));
-            pmssStatsRenderLineChart('trafficChart', array_keys($trafficData['daily']), array(
-                pmssStatsChartDataset('Daily Traffic (MiB)', $trafficValues, 'rgba(75, 192, 192, 0.2)', 'rgb(75, 192, 192)'),
-            ));
-            ?>
-        <?php elseif ($trafficData !== null): ?>
-            <div class="docker-note">Chart requires 2+ days of data.</div>
-        <?php endif; ?>
-    </div>
-    <?php
-}
+<?php pmssStatsRenderTrafficUsageBlock(); ?>

@@ -50,6 +50,190 @@ function pmssStatsSerializedStateRead(string $path, string $invalidMessage): arr
     return $state;
 }
 
+/** Keep systemctl output readable by moving the cgroup tree to the end. */
+function pmssStatsSystemctlStatusTextBuild(string $output): string
+{
+    $cgroupSection = array();
+    $mainSection = array();
+    $inCgroup = false;
+    foreach (explode("\n", $output) as $line) {
+        if (strpos($line, 'CGroup:') === 0) {
+            $inCgroup = true;
+            $cgroupSection[] = $line;
+            continue;
+        }
+        if ($inCgroup && trim($line) && $line[0] === ' ') {
+            $cgroupSection[] = $line;
+            continue;
+        }
+        $mainSection[] = $line;
+    }
+
+    return implode("\n", $mainSection).($cgroupSection === array() ? '' : "\n".implode("\n", $cgroupSection));
+}
+
+/**
+ * Build the base-resource text and UID without mixing shelling into the page.
+ *
+ * @return array{uid:?string,text:string}
+ */
+function pmssStatsBaseResourcesBuild(?callable $runner = null): array
+{
+    $runner = $runner ?? 'pmssInfoShellExec';
+    $uidResult = $runner('/usr/bin/id -u', 'User ID');
+    if ($uidResult['error'] !== null) {
+        return array('uid' => null, 'text' => $uidResult['error']."\n");
+    }
+
+    $uid = trim((string) $uidResult['output']);
+    if ($uid === '' || !is_numeric($uid)) {
+        return array('uid' => null, 'text' => "Error: Could not determine user ID.\n");
+    }
+
+    $sliceUnit = 'user-'.$uid.'.slice';
+    $statusResult = $runner('systemctl status '.escapeshellarg($sliceUnit).' 2>&1', 'User slice status');
+    if ($statusResult['error'] !== null) {
+        return array('uid' => $uid, 'text' => $statusResult['error']."\n");
+    }
+
+    $output = (string) $statusResult['output'];
+    return array('uid' => $uid, 'text' => !$output ? "Failed to retrieve slice status.\n" : pmssStatsSystemctlStatusTextBuild($output));
+}
+
+/**
+ * Read service, app, and Docker states for the compact server-info grid.
+ *
+ * @return array{wgStatus:string,ovpnStatus:string,apps:array<string,string>,dockerInactiveNote:string}
+ */
+function pmssStatsStatusModelBuild(?string $uid, ?bool $dockerEnabledPolicy, ?callable $runner = null): array
+{
+    $runner = $runner ?? 'pmssInfoShellExec';
+    $serviceStatus = static function (string $command, string $label) use ($runner): string {
+        $result = $runner($command, $label);
+        if ($result['error'] !== null) {
+            return 'error';
+        }
+        return trim((string) $result['output']) === 'active' ? 'active' : 'inactive';
+    };
+
+    $processNeedles = array('rTorrent' => 'rtorrent', 'qBittorrent' => 'qbittorrent-nox', 'Deluge' => 'deluged', 'rclone' => 'rclone');
+    $psResult = $runner('ps aux | grep -E "(rtorrent|qbittorrent-nox|deluged|rclone)" | grep -v grep', 'App status');
+    $psOutput = $psResult['error'] === null ? (string) $psResult['output'] : null;
+    $apps = array();
+    foreach ($processNeedles as $name => $needle) {
+        $apps[$name] = $psOutput === null ? 'error' : (stripos($psOutput, $needle) !== false ? 'active' : 'stopped');
+    }
+
+    $dockerStatus = 'error';
+    if ($uid !== null && file_exists('/run/user/'.$uid.'/docker.sock')) {
+        $dockerStatus = 'active';
+    } elseif ($uid !== null) {
+        $dockerResult = $runner('docker ps --no-trunc 2>&1', 'Docker status');
+        $dockerStatus = $dockerResult['error'] !== null
+            ? 'error'
+            : (strpos((string) $dockerResult['output'], 'docker ps') === false && trim((string) $dockerResult['output']) === '' ? 'active' : 'inactive');
+    }
+    $apps['Docker'] = $dockerStatus;
+
+    return array(
+        'wgStatus' => $serviceStatus('systemctl is-active wg-quick@wg0 2>/dev/null', 'WireGuard status'),
+        'ovpnStatus' => $serviceStatus('systemctl is-active openvpn 2>/dev/null', 'OpenVPN status'),
+        'apps' => $apps,
+        'dockerInactiveNote' => pmssStatsDockerInactiveNote($dockerStatus, $dockerEnabledPolicy),
+    );
+}
+
+/** Build the server resource text block from bounded local reads. */
+function pmssStatsServerResourceTextBuild(): string
+{
+    $uptimeResult = pmssInfoShellExec('uptime', 'Uptime');
+    $text = $uptimeResult['error'] !== null
+        ? $uptimeResult['error']."\n\n"
+        : trim((string) $uptimeResult['output'])."\n\n";
+    $text .= "Memory usage:\n";
+
+    $meminfo = @file_get_contents('/proc/meminfo');
+    if (!$meminfo || preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m) !== 1) {
+        return $text."Failed to read /proc/meminfo\n";
+    }
+
+    $info = array_combine($m[1], $m[2]);
+    $fmt = static function (string $key) use ($info) { return isset($info[$key]) ? $info[$key] : 0; };
+    $text .= sprintf("Memory total:     %6s MiB\n", round($fmt('MemTotal') / 1024, 0));
+    $text .= sprintf("Memory available: %6s MiB\n", round($fmt('MemAvailable') / 1024, 0));
+    $text .= sprintf("Swap total:       %6s MiB\n", round($fmt('SwapTotal') / 1024, 0));
+    $text .= sprintf("Swap free:        %6s MiB\n", round($fmt('SwapFree') / 1024, 0));
+
+    $psi = @file_get_contents('/proc/pressure/memory');
+    if ($psi && preg_match('/some avg10=([0-9.]+) avg60=([0-9.]+) avg300=([0-9.]+)/', $psi, $m) === 1) {
+        $text .= sprintf("Memory pressure (some):  %s / %s / %s\n", $m[1], $m[2], $m[3]);
+        if (preg_match('/full avg10=([0-9.]+) avg60=([0-9.]+) avg300=([0-9.]+)/', $psi, $f) === 1) {
+            $text .= sprintf("Memory pressure (full):  %s / %s / %s\n", $f[1], $f[2], $f[3]);
+        }
+    } else {
+        $text .= "Memory pressure: unavailable\n";
+    }
+
+    return $text;
+}
+
+/** Render the outbound/inbound traffic block from customer-readable snapshots. */
+function pmssStatsRenderTrafficUsageBlock(): void
+{
+    $trafficState = pmssStatsSerializedStateRead('../.trafficData', 'Invalid traffic data format.');
+    $trafficIngressState = pmssStatsSerializedStateRead('../.trafficDataIngress', 'Invalid inbound traffic data format.');
+    $trafficData = $trafficState['data'];
+    $trafficIngressData = $trafficIngressState['data'];
+    $trafficLimitState = function_exists('pmssTrafficLimitStateRead')
+        ? pmssTrafficLimitStateRead('../.trafficLimit', '../.bonusTraffic')
+        : array('limitGiB' => 0, 'bonusGiB' => 0, 'effectiveLimitGiB' => 0);
+    $trafficOutboundMonth = ($trafficData !== null && isset($trafficData['raw']['month']) && is_numeric($trafficData['raw']['month'])) ? (float) $trafficData['raw']['month'] : null;
+    $trafficInboundMonth = ($trafficIngressData !== null && isset($trafficIngressData['raw']['month']) && is_numeric($trafficIngressData['raw']['month'])) ? (float) $trafficIngressData['raw']['month'] : null;
+    $trafficRatioState = function_exists('pmssTrafficRatioStateBuild') ? pmssTrafficRatioStateBuild($trafficOutboundMonth, $trafficInboundMonth) : array('available' => false);
+
+    if ($trafficData === null && $trafficIngressData === null) {
+        echo '<div class="stats-block"><h6>Traffic usage</h6><pre>Traffic data not available.</pre></div>';
+        return;
+    }
+
+    echo '<div class="stats-block"><h6>Traffic usage</h6><pre style="margin-bottom:12px;">'."\n";
+    if ($trafficData !== null) {
+        echo 'Traffic consumption at '.date('Y-m-d H:i:s', (int) $trafficState['time']).":\n";
+        echo 'Week: '.$trafficData['display']['week'].', Day: '.$trafficData['display']['day']."\n";
+        echo 'Past 30 days upload traffic: '.$trafficData['display']['month']."\n";
+        if (file_exists('../.trafficLimit') && (int) $trafficLimitState['limitGiB'] > 0) {
+            echo 'Traffic limit: '.number_format((int) $trafficLimitState['effectiveLimitGiB'])." GiB\n";
+            if ($trafficLimitState['bonusGiB'] > 0) {
+                echo 'Bonus traffic: '.number_format((int) $trafficLimitState['bonusGiB'])." GiB\n";
+            }
+        }
+    } elseif ($trafficState['error'] !== null) {
+        echo $trafficState['error']."\n";
+    }
+
+    echo "\n";
+    if ($trafficIngressData !== null) {
+        echo 'Inbound traffic at '.date('Y-m-d H:i:s', (int) $trafficIngressState['time']).":\n";
+        echo 'Past 30 days inbound traffic: '.$trafficIngressData['display']['month']."\n";
+    } elseif ($trafficIngressState['error'] !== null) {
+        echo $trafficIngressState['error']."\n";
+    }
+    if (!empty($trafficRatioState['available'])) {
+        echo 'Inbound:Outbound ratio (month): <span class="traffic-ratio '.$trafficRatioState['class'].'">'.$trafficRatioState['display']."</span>\n";
+    }
+    echo "</pre>\n";
+
+    if ($trafficData !== null && !empty($trafficData['daily']) && count($trafficData['daily']) >= 2) {
+        $trafficValues = array_map(static function ($value) { return round((float) $value, 2); }, array_values($trafficData['daily']));
+        pmssStatsRenderLineChart('trafficChart', array_keys($trafficData['daily']), array(
+            pmssStatsChartDataset('Daily Traffic (MiB)', $trafficValues, 'rgba(75, 192, 192, 0.2)', 'rgb(75, 192, 192)'),
+        ));
+    } elseif ($trafficData !== null) {
+        echo '<div class="docker-note">Chart requires 2+ days of data.</div>';
+    }
+    echo "</div>\n";
+}
+
 /**
  * Build the resource display model consumed by the resource and I/O blocks.
  */

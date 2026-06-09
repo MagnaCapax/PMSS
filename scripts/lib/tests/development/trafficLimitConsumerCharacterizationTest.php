@@ -10,7 +10,8 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
         $this->pmssAssertRepoFileContractCases([
             'scripts/cron/trafficLimits.php' => ['required' => ['pmssTrafficLimitStateRead(']],
             'scripts/lib/stats/collect.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssReadSerializedArrayFile(']],
-            'etc/skel/www/stats.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssStatsSerializedStateRead(']],
+            'etc/skel/www/stats.php' => ['required' => ['pmssStatsRenderTrafficUsageBlock(', 'pmssStatsSerializedStateRead(']],
+            'etc/skel/www/statsHelpers.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssStatsSerializedStateRead(']],
             'etc/skel/www/welcome.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssCustomerSerializedArrayFileRead(']],
         ]);
     }

@@ -32,7 +32,7 @@ final class CustomerTrafficRatioTest extends TestCase
             'pmssTrafficRatioStateBuild($outboundMonth, $inboundMonth)',
             '$ratioState[\'color\']',
         ]);
-        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/stats.php', [
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/statsHelpers.php', [
             'pmssTrafficRatioStateBuild($trafficOutboundMonth, $trafficInboundMonth)',
             '$trafficRatioState[\'class\']',
         ]);
@@ -41,7 +41,7 @@ final class CustomerTrafficRatioTest extends TestCase
             '$ratio >= 1.0',
             '$ratio'.'Color',
         ]);
-        $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/stats.php', [
+        $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/statsHelpers.php', [
             '$trafficRatio'.'GoodMin',
             '$trafficRatio'.'WarnMin',
             '$trafficRatio >=',

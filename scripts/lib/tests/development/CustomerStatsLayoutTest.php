@@ -2,6 +2,8 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 4).'/etc/skel/www/scriptsInc.php';
+require_once dirname(__DIR__, 4).'/etc/skel/www/statsHelpers.php';
 
 final class CustomerStatsLayoutTest extends TestCase
 {
@@ -54,5 +56,36 @@ final class CustomerStatsLayoutTest extends TestCase
         ));
         $this->pmssAssertRepoFileNotContainsString('etc/skel/www/stats.php', 'function pmssStatsSerializedStateRead(');
         $this->pmssAssertRepoFileNotContainsString('etc/skel/www/stats.php', 'PMSS_STATS'.'_HELPERS_ONLY');
+    }
+
+    public function testStatsStatusHelpersCharacterizeShellDerivedContracts(): void
+    {
+        $runner = function (string $command, string $label): array {
+            return $label === 'User ID'
+                ? array('output' => "1001\n", 'error' => null)
+                : array('output' => "Loaded: loaded\nCGroup:\n /user.slice\nStatus: ok", 'error' => null);
+        };
+
+        $this->assertSame(
+            array('uid' => '1001', 'text' => "Loaded: loaded\nStatus: ok\nCGroup:\n /user.slice"),
+            \pmssStatsBaseResourcesBuild($runner)
+        );
+
+        $statusRunner = function (string $command, string $label): array {
+            $outputs = array('WireGuard status' => "active\n", 'OpenVPN status' => "inactive\n", 'App status' => "alice rtorrent\nbob deluged\ncarol rclone\n", 'Docker status' => '');
+            return array('output' => $outputs[$label] ?? '', 'error' => null);
+        };
+
+        $this->assertSame(
+            array(
+                'wgStatus' => 'active',
+                'ovpnStatus' => 'inactive',
+                'apps' => array(
+                    'rTorrent' => 'active', 'qBittorrent' => 'stopped', 'Deluge' => 'active', 'rclone' => 'active', 'Docker' => 'active',
+                ),
+                'dockerInactiveNote' => '',
+            ),
+            \pmssStatsStatusModelBuild('999999', null, $statusRunner)
+        );
     }
 }
