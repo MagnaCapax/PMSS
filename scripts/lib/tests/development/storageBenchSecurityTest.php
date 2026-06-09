@@ -186,17 +186,10 @@ class StorageBenchSecurityTest extends TestCase
             [['--runtime=15junk'], "Error: --runtime must be a positive integer.\n"],
             [['--devices', '--device-runtime=0'], "Error: --device-runtime must be a positive integer.\n"],
             [['--idle-util=85percent'], "Error: --idle-util must be a non-negative integer.\n"],
+            [['--devices', '--dd-size=512K'], "Error: --dd-size must be at least 1 MiB.\n"],
         ] as $case) {
             $this->assertBenchmarkInputGuard($case[0], $case[1]);
         }
-    }
-
-    public function testDeviceDdSizeBelowOneMegabyteFailsBeforeBenchmarkWork(): void
-    {
-        $this->assertBenchmarkInputGuard(
-            ['--devices', '--dd-size=512K'],
-            "Error: --dd-size must be at least 1 MiB.\n"
-        );
     }
 
     public function testSharedBenchmarkEntryHelpersPreserveExecutionShape(): void
@@ -219,25 +212,17 @@ class StorageBenchSecurityTest extends TestCase
         $this->assertSame('not a readable block device', $entries[0]['error'] ?? '');
     }
 
-    public function testIostatPreflightUsesSafeSerializedArrayReader(): void
+    public function testStorageBenchmarkSourceKeepsSafetyHelpers(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/storageBenchmark.php');
 
-        $this->assertStringContainsAndOmitsStrings(['storageBenchmarkIostatUtilPctRead', 'pmssReadSerializedArrayFile($path)'], ['unserialize('], $source);
-    }
-
-    public function testFileBackedProbesUseCheckedCommandCapture(): void
-    {
-        $source = $this->pmssReadRepoFile('scripts/lib/storageBenchmark.php');
-
-        $this->assertStringContainsAndOmitsStrings(['storageBenchmarkRequireCommandField', 'pmssCommandCapture($command, 30)', "'free space', true"], ["\$free=(int)trim((string) shell_exec('df -PB1 ", 'storageBenchmarkRequirePositive'.'IntCommandField'], $source);
-    }
-
-    public function testDeviceProbesUseCheckedCommandCapture(): void
-    {
-        $source = $this->pmssReadRepoFile('scripts/lib/storageBenchmark.php');
-
-        $this->assertStringContainsAndOmitsStrings(['pmssStorageHealthDiskInventoryRead()', 'storageBenchmarkDeviceSizeBytesRead', "pmssCommandCapture('blockdev --getsize64 "], ["shell_exec('lsblk -dn", "shell_exec('blockdev --getsize64 "], $source);
+        foreach ([
+            'iostat serialized array reader' => [['storageBenchmarkIostatUtilPctRead', 'pmssReadSerializedArrayFile($path)'], ['unserialize(']],
+            'file-backed checked capture' => [['storageBenchmarkRequireCommandField', 'pmssCommandCapture($command, 30)', "'free space', true"], ["\$free=(int)trim((string) shell_exec('df -PB1 ", 'storageBenchmarkRequirePositive'.'IntCommandField']],
+            'device checked capture' => [['pmssStorageHealthDiskInventoryRead()', 'storageBenchmarkDeviceSizeBytesRead', "pmssCommandCapture('blockdev --getsize64 "], ["shell_exec('lsblk -dn", "shell_exec('blockdev --getsize64 "]],
+        ] as $label => $case) {
+            $this->assertStringContainsAndOmitsStrings($case[0], $case[1], $source, $label.': ');
+        }
     }
 
     public function testDiskInventoryRejectsNonzeroCommandOutput(): void
@@ -378,72 +363,50 @@ SH,
         $this->assertSame([], glob($target.'/pmss-fio-*.dat'));
     }
 
-    public function testUnsafeTargetTraversalFailsBeforeBenchmarkWork(): void
+    public function testBenchmarkPathGuardsFailBeforeBenchmarkWork(): void
     {
-        $base = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
-        @mkdir($base.'/safe', 0700, true);
-        $target = $base.'/safe/../safe';
-
-        $this->assertBenchmarkInputGuard(
-            ['--target='.$target, '--json='.$this->benchmarkSecurityLogPath()],
-            "Error: unsafe target directory: {$target}\n"
-        );
-    }
-
-    public function testSymlinkTargetFailsBeforeBenchmarkWork(): void
-    {
-        $real = $this->pmssMakeTempDir('pmss-bench-target-real-', 0700);
-        $link = sys_get_temp_dir().'/pmss-bench-target-link-'.bin2hex(random_bytes(2));
-        $this->pmssCreateSymlinkOrSkip($real, $link);
-
-        $this->assertBenchmarkInputGuard(
-            ['--target='.$link, '--json='.$this->benchmarkSecurityLogPath()],
-            "Error: unsafe target directory: {$link}\n"
-        );
-    }
-
-    public function testJsonLogParentFileFailsBeforeBenchmarkWork(): void
-    {
+        $targetBase = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
+        @mkdir($targetBase.'/safe', 0700, true);
+        $target = $targetBase.'/safe/../safe';
         $parent = $this->pmssMakeTempFile('pmss-bench-parent-');
-        $this->assertBenchmarkInputGuard(
-            ['--json='.$parent.'/benchmark-storage.jsonl'],
-            "Error: failed to create JSON log directory: {$parent}\n"
-        );
-    }
-
-    public function testDirectoryJsonLogPathFailsBeforeBenchmarkWork(): void
-    {
         $dir = $this->pmssMakeTempDir('pmss-bench-logdir-', 0700);
-        $this->assertBenchmarkInputGuard(
-            ['--json='.$dir],
-            "Error: unsafe JSON log path: {$dir}\n"
-        );
-    }
-
-    public function testUnsafeJsonLogTraversalDoesNotCreateParents(): void
-    {
         $base = $this->pmssMakeTempDir('pmss-bench-traversal-', 0700);
         $log = $base.'/unsafe/../blocked/benchmark-storage.jsonl';
-        $this->assertBenchmarkInputGuard(
-            ['--json='.$log],
-            "Error: unsafe JSON log path: {$log}\n"
-        );
+
+        foreach ([
+            'target traversal' => [['--target='.$target, '--json='.$this->benchmarkSecurityLogPath()], "Error: unsafe target directory: {$target}\n"],
+            'JSON log parent file' => [['--json='.$parent.'/benchmark-storage.jsonl'], "Error: failed to create JSON log directory: {$parent}\n"],
+            'directory JSON log path' => [['--json='.$dir], "Error: unsafe JSON log path: {$dir}\n"],
+            'JSON log traversal' => [['--json='.$log], "Error: unsafe JSON log path: {$log}\n"],
+        ] as $case) {
+            $this->assertBenchmarkInputGuard($case[0], $case[1]);
+        }
+
         $this->assertFalse(is_dir($base.'/unsafe'), 'unsafe traversal prefix should not be created');
         $this->assertFalse(is_dir($base.'/blocked'), 'unsafe traversal target should not be created');
     }
 
-    public function testSymlinkJsonLogParentDoesNotCreateBehindLink(): void
+    public function testBenchmarkPathGuardsRejectSymlinksBeforeBenchmarkWork(): void
     {
-        $real = $this->pmssMakeTempDir('pmss-bench-real-', 0700);
-        $link = sys_get_temp_dir().'/pmss-bench-link-'.bin2hex(random_bytes(2));
-        $this->pmssCreateSymlinkOrSkip($real, $link);
+        $targetReal = $this->pmssMakeTempDir('pmss-bench-target-real-', 0700);
+        $targetLink = sys_get_temp_dir().'/pmss-bench-target-link-'.bin2hex(random_bytes(2));
+        $this->pmssCreateSymlinkOrSkip($targetReal, $targetLink);
 
-        $log = $link.'/child/benchmark-storage.jsonl';
+        $this->assertBenchmarkInputGuard(
+            ['--target='.$targetLink, '--json='.$this->benchmarkSecurityLogPath()],
+            "Error: unsafe target directory: {$targetLink}\n"
+        );
+
+        $logReal = $this->pmssMakeTempDir('pmss-bench-real-', 0700);
+        $logLink = sys_get_temp_dir().'/pmss-bench-link-'.bin2hex(random_bytes(2));
+        $this->pmssCreateSymlinkOrSkip($logReal, $logLink);
+
+        $log = $logLink.'/child/benchmark-storage.jsonl';
         $this->assertBenchmarkInputGuard(
             ['--json='.$log],
             "Error: unsafe JSON log path: {$log}\n"
         );
-        $this->assertFalse(is_dir($real.'/child'), 'symlinked parent should not receive new benchmark directories');
+        $this->assertFalse(is_dir($logReal.'/child'), 'symlinked parent should not receive new benchmark directories');
     }
 
     public function testDeviceBenchmarksSkipNonBlockDevicesBeforeRawReads(): void
