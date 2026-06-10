@@ -18,7 +18,10 @@ class UserValidator
             return false;
         }
         $normalized = pmssNormalizeUsername($username);
+        // '.' and '..' pass the charset check but resolve "/home/{$username}"
+        // to filesystem parents — never valid account names.
         return $normalized === $username
+            && $normalized !== '.' && $normalized !== '..'
             && preg_match('/^[a-z0-9._-]+$/', $normalized) === 1;
     }
 
