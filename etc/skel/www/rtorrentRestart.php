@@ -8,4 +8,4 @@
 *
 **/
 
-echo exec('touch .rtorrentRestart; chown 777 .rtorrentRestart;');
+echo exec('touch .rtorrentRestart; chmod 777 .rtorrentRestart;');
