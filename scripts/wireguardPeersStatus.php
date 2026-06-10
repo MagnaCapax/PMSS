@@ -16,40 +16,16 @@ require_once __DIR__.'/lib/wireguard.php';
 
 $configPath = wgConfigDir().'/wg0.conf';
 $peers = [];
-if (!is_file($configPath)) {
+$config = pmssWireguardConfigLines($configPath);
+if ($config['status'] === 'missing') {
     fwrite(STDERR, "WireGuard config not found at {$configPath}\n");
-} elseif (($lines = @file($configPath, FILE_IGNORE_NEW_LINES)) === false) {
+} elseif ($config['status'] !== 'ok') {
     fwrite(STDERR, "Unable to read {$configPath}\n");
 } else {
-    $current = ['user' => '-', 'key' => '', 'ip' => ''];
-    foreach (array_merge($lines, ['[Peer]']) as $line) {
-        $trimmed = trim($line);
-        if ($trimmed === '') {
-            continue;
-        }
-        if (strpos($trimmed, '[Peer]') === 0) {
-            if ($current['key'] !== '' && $current['ip'] !== '') {
-                $peers[] = $current;
-            }
-            $current = ['user' => '-', 'key' => '', 'ip' => ''];
-            continue;
-        }
-        if (strpos($trimmed, '# user=') === 0) {
-            $current['user'] = trim(substr($trimmed, strlen('# user=')));
-            if ($current['user'] === '') {
-                $current['user'] = '-';
-            }
-            continue;
-        }
-        if (stripos($trimmed, 'PublicKey =') === 0) {
-            $current['key'] = trim(substr($trimmed, strlen('PublicKey =')));
-            continue;
-        }
-        if (stripos($trimmed, 'AllowedIPs =') === 0) {
-            $value = trim(substr($trimmed, strlen('AllowedIPs =')));
-            // Take the first CIDR entry before any comma.
-            $cidr = trim(explode(',', $value, 2)[0]);
-            $current['ip'] = trim(explode('/', $cidr, 2)[0]);
+    foreach (wgConfigPeerBlocksFromLines($config['lines']) as $peer) {
+        if ($peer['key'] !== '' && $peer['ip'] !== '') {
+            $peer['user'] = $peer['user'] !== '' ? $peer['user'] : '-';
+            $peers[] = $peer;
         }
     }
 }
