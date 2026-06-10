@@ -54,7 +54,7 @@ function pmssUserRefreshMarkDone(string $user, string $signature): void
     }
 
     $dir = dirname($path);
-    if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+    if (!pmssDirEnsureExists($dir, 0755)) {
         logMessage('[WARN] Unable to create user refresh state directory: '.$dir);
         return;
     }

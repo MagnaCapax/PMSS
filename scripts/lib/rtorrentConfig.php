@@ -14,6 +14,7 @@
  * @license GPL-3.0-only
  */
 require_once __DIR__.'/log.php';
+require_once __DIR__.'/runtime/filesystem.php';
 
 class rtorrentConfig
 {
@@ -224,10 +225,7 @@ class rtorrentConfig
 
     private function ensureDirectory(string $directory, string $errorPrefix): void
     {
-        if (is_dir($directory)) {
-            return;
-        }
-        if (!@mkdir($directory, 0755, true) && !is_dir($directory)) {
+        if (!pmssDirEnsureExists($directory, 0755)) {
             throw new RuntimeException($errorPrefix.$directory);
         }
     }

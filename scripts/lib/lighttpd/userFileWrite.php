@@ -52,7 +52,7 @@ function pmssEnsureSafeDir(string $path, int $mode): bool
         return false;
     }
 
-    if (!is_dir($path) && !@mkdir($path, $mode, true) && !is_dir($path)) {
+    if (!pmssDirEnsureExists($path, $mode)) {
         return false;
     }
 

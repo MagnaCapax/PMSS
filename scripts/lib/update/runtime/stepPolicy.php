@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/../logging.php';
+require_once __DIR__.'/../../runtime/filesystem.php';
 
 defined('PMSS_UPDATE_STEP_CLASS_SOFT_FAIL') || define('PMSS_UPDATE_STEP_CLASS_SOFT_FAIL', 'soft_fail');
 defined('PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED') || define('PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED', 'must_succeed');
@@ -87,7 +88,7 @@ function pmssUpdateRecordIncompleteUserMaintenance(int $processed, int $total, a
     }
 
     $dir = dirname($path);
-    if (!(is_dir($dir) || @mkdir($dir, 0755, true) || is_dir($dir))) {
+    if (!pmssDirEnsureExists($dir, 0755)) {
         logmsg('[WARN] Unable to create incomplete user maintenance marker directory: '.$dir);
         return;
     }

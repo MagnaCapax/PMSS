@@ -71,7 +71,7 @@ function pmssCheckGuiEnsureUserDirectory(string $directory, string $user, string
     }
 
     $log("Restoring {$label} directory for user {$user}");
-    if (!@mkdir($directory, 0755, true) && !is_dir($directory)) {
+    if (!pmssDirEnsureExists($directory, 0755)) {
         $log("Skipping {$user}: unable to create {$label} directory at {$directory}");
         return false;
     }

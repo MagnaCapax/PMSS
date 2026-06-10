@@ -178,10 +178,7 @@ $qbittorrentConfigDir = sprintf('/home/%s/.config/qBittorrent', $user['name']);
 $qbittorrentConfigFile = $qbittorrentConfigDir.'/qBittorrent.conf';
 if (!file_exists($qbittorrentConfigFile)) {
     $qbittorrentPort = (int) round(rand(1500, 65500));
-    if (!is_dir($qbittorrentConfigDir)
-        && !@mkdir($qbittorrentConfigDir, 0770, true)
-        && !is_dir($qbittorrentConfigDir)
-    ) {
+    if (!pmssDirEnsureExists($qbittorrentConfigDir, 0770)) {
         fwrite(STDERR, "Warning: failed to create qBittorrent config directory for {$user['name']}\n");
     }
 
