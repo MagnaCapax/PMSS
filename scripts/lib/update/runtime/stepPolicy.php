@@ -13,12 +13,26 @@ defined('PMSS_UPDATE_STEP_CLASS_SOFT_FAIL') || define('PMSS_UPDATE_STEP_CLASS_SO
 defined('PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED') || define('PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED', 'must_succeed');
 defined('PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING') || define('PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING', 'skip_if_missing');
 
+/** Return true only for documented update-step2 failure classes. */
+function pmssUpdateStep2ClassificationIsKnown(string $classification): bool
+{
+    return in_array($classification, [
+        PMSS_UPDATE_STEP_CLASS_SOFT_FAIL,
+        PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED,
+        PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING,
+    ], true);
+}
+
 /**
  * Log classified step failures and abort on post-package MUST_SUCCEED steps.
  */
 function pmssUpdateStep2HandleClassifiedFailure(string $description, string $classification, int $rc, string $reason): void
 {
-    $mustSucceed = $classification === PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED;
+    $classificationKnown = pmssUpdateStep2ClassificationIsKnown($classification);
+    if (!$classificationKnown) {
+        $reason = 'unknown_classification'.($reason !== '' ? ':'.$reason : '');
+    }
+    $mustSucceed = $classification === PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED || !$classificationKnown;
     $severity = $mustSucceed ? 'error' : 'warn';
     pmssLogJson([
         'event'          => 'step_failed',
