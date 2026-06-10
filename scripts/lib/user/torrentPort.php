@@ -74,7 +74,10 @@ function pmssDelugePortEnsure(string $user, string $home): bool
     if (!pmssTorrentPortUserHomeContextIsSafe($user, $home)) {
         return false;
     }
-    $expectedPort = pmssTorrentPortExpectedRead($home.'/.delugePort');
+    $expectedPort = pmssTorrentPortExpectedRead($home.'/.delugeWebPort');
+    if ($expectedPort === null) {
+        $expectedPort = pmssTorrentPortExpectedRead($home.'/.delugePort');
+    }
     $parsed = pmssDelugeReadWebConf($home.'/.config/deluge/web.conf');
     $port = is_array($parsed) ? ($parsed['config']['port'] ?? null) : null;
     if ($expectedPort === null || !is_array($parsed) || !is_int($port)) {

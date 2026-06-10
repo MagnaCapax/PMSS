@@ -82,15 +82,14 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
         'rclone' => $homePath.'/.rclonePort',
         'qbittorrent' => $homePath.'/.qbittorrentPort',
         'deluge' => $homePath.'/.delugePort',
+        'deluge-web' => $homePath.'/.delugeWebPort',
     ];
     foreach ($portFiles as $label => $path) {
         $port = pmssReadRegularFileInt($path);
         if ($port <= 0) {
             continue;
         }
-        logProvisionMessage($label === 'deluge'
-            ? 'Assigned deluge ports: scgi='.$port.' web='.($port + 1)
-            : 'Assigned '.$label.' port: '.$port);
+        logProvisionMessage('Assigned '.$label.' port: '.$port);
     }
 
     runProvisionStep(

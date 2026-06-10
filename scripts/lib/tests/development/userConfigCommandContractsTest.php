@@ -12,7 +12,7 @@ class userConfigCommandContractsTest extends TestCase
             'pmssUserConfigInvocationMode($args, $welcomeMessage !== null, $namedConfigChange)',
             'pmssUserConfigWelcomeOnlyPersist($store, $user[\'name\'], $expectedHome, $welcomeMessage, $existing)',
             'pmssUserConfigPayloadBuild($store, $existing, $user, $presence, $dockerEnabled)',
-            'pmssNetworkPortFileWrite($rclonePortFile, (int) rand(1500, 65500), 1024, 65500, 0644)',
+            "pmssPortManagerAssignServicePort(\$user['name'], 'rclone')",
             '@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false',
             'pmssUserConfigApplyCgroupAndDocker($user, $store)',
         ]);

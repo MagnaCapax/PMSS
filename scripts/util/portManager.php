@@ -30,6 +30,54 @@ function pmssPortManagerReadAssignedPort(string $portFile): ?int
 }
 
 /**
+ * Keep test-mode allocator state under the shared hermetic test root.
+ */
+function pmssPortManagerDefaultPath(string $leaf, string $productionPath): string
+{
+    if (getenv('PMSS_TEST_MODE') !== '1') {
+        return $productionPath;
+    }
+
+    $testRoot = getenv('PMSS_TEST_TEMP_ROOT');
+    $testRoot = is_string($testRoot) && $testRoot !== '' ? rtrim($testRoot, '/') : sys_get_temp_dir();
+
+    return $testRoot.'/'.$leaf;
+}
+
+/**
+ * Resolve and initialize the shared service-port reservation directory.
+ */
+function pmssPortManagerReservationDir(): ?string
+{
+    $portDir = rtrim(pmssResolvePathFromEnv('PMSS_PORT_MANAGER_DIR', pmssPortManagerDefaultPath('port-manager', '/etc/seedbox/runtime/ports')), '/');
+    if (!pmssPathTargetIsSafe($portDir, true)
+        || !pmssDirEnsureExists($portDir, 0755)
+        || !is_dir($portDir)
+        || is_link($portDir)
+    ) {
+        return null;
+    }
+
+    return $portDir;
+}
+
+/**
+ * Service names are persisted in filenames, so keep them path-safe.
+ */
+function pmssPortManagerServiceNameIsValid(string $service): bool
+{
+    return preg_match('/^[a-z][a-z0-9-]{0,31}$/', $service) === 1;
+}
+
+/**
+ * Resolve the legacy rTorrent reservation root used for collision avoidance.
+ */
+function pmssPortManagerLegacyReservationDir(): string
+{
+    return rtrim(pmssResolvePathFromEnv('PMSS_PORT_MANAGER_LEGACY_DIR', pmssPortManagerDefaultPath('legacy-rtorrent-ports', '/var/lib/pmss/ports')), '/');
+}
+
+/**
  * Guard assignment file reads/writes/removals against symlink and type tricks.
  */
 function pmssPortManagerAssignmentPathIsSafe(string $portDir, string $portFile): bool
@@ -43,6 +91,38 @@ function pmssPortManagerAssignmentPathIsSafe(string $portDir, string $portFile):
         && !is_link($portDir)
         && !is_link($portFile)
         && (!file_exists($portFile) || is_file($portFile));
+}
+
+/** @return array<int, bool> */
+function pmssPortManagerLegacyUsedPorts(string $portsBase = '/var/lib/pmss/ports'): array
+{
+    $used = array();
+    foreach ((glob(rtrim($portsBase, '/').'/*/*') ?: array()) as $path) {
+        $port = pmssNetworkPortParseDigits(basename($path));
+        if ($port !== null) {
+            $used[$port] = true;
+        }
+    }
+
+    return $used;
+}
+
+/**
+ * Return all ports already reserved in the shared service-port namespace.
+ *
+ * @return array<int, bool>
+ */
+function pmssPortManagerUsedPorts(string $portDir, string $legacyPortsBase = '/var/lib/pmss/ports'): array
+{
+    $used = pmssPortManagerLegacyUsedPorts($legacyPortsBase);
+    foreach ((glob(rtrim($portDir, '/').'/*') ?: array()) as $path) {
+        $assignedPort = pmssPortManagerReadAssignedPort($path);
+        if ($assignedPort !== null) {
+            $used[$assignedPort] = true;
+        }
+    }
+
+    return $used;
 }
 
 /**
@@ -64,6 +144,58 @@ function pmssPortManagerSelectAvailablePort(array $used): ?int
     }
 
     return $available[rand(0, count($available) - 1)];
+}
+
+/**
+ * Assign one managed service port, optionally adopting an existing safe port.
+ */
+function pmssPortManagerAssignServicePort(string $user, string $service, ?int $preferredPort = null): ?int
+{
+    if (!pmssValidateUsername($user) || !pmssPortManagerServiceNameIsValid($service)) {
+        return null;
+    }
+
+    $portDir = pmssPortManagerReservationDir();
+    if ($portDir === null) {
+        return null;
+    }
+
+    $portFile = $portDir.'/'.$service.'-'.$user;
+    $portFilePresent = file_exists($portFile) || is_link($portFile);
+    if ($portFilePresent && !pmssPortManagerAssignmentPathIsSafe($portDir, $portFile)) {
+        return null;
+    }
+
+    $lockHandle = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-portManager.lock'));
+    try {
+        if ($portFilePresent) {
+            return pmssPortManagerReadAssignedPort($portFile);
+        }
+
+        $used = pmssPortManagerUsedPorts($portDir, pmssPortManagerLegacyReservationDir());
+        if ($preferredPort !== null && pmssNetworkPortInRange($preferredPort, PMSS_PORT_MANAGER_MIN_PORT, PMSS_PORT_MANAGER_MAX_PORT) && !isset($used[$preferredPort])) {
+            $port = $preferredPort;
+        } else {
+            $port = pmssPortManagerSelectAvailablePort($used);
+            if ($port === null) {
+                return null;
+            }
+        }
+
+        if (!pmssPortManagerAssignmentPathIsSafe($portDir, $portFile)) {
+            return null;
+        }
+        if (@file_put_contents($portFile, $port, LOCK_EX) === false) {
+            return null;
+        }
+        !@chmod($portFile, 0640) && pmssPortManagerLog($user, 'assign', $service, $port, 'WARN', 'chmod_failed');
+
+        return $port;
+    } finally {
+        if ($lockHandle !== false) {
+            pmssLockHandleRelease($lockHandle);
+        }
+    }
 }
 
 /** Emit the public error text and optionally mirror it to user logs. */
@@ -95,17 +227,12 @@ function pmssPortManagerMain(array $argv): int
     }
 
     $service = isset($argv[3]) ? strtolower(trim((string) $argv[3])) : 'lighttpd';
-    // Service names are persisted in filenames, so keep them path-safe.
-    if (preg_match('/^[a-z][a-z0-9-]{0,31}$/', $service) !== 1) {
+    if (!pmssPortManagerServiceNameIsValid($service)) {
         return pmssPortManagerFail("Error: invalid service\n");
     }
 
-    $portDir = rtrim(pmssResolvePathFromEnv('PMSS_PORT_MANAGER_DIR', '/etc/seedbox/runtime/ports'), '/');
-    if (!pmssPathTargetIsSafe($portDir, true)
-        || !pmssDirEnsureExists($portDir, 0755)
-        || !is_dir($portDir)
-        || is_link($portDir)
-    ) {
+    $portDir = pmssPortManagerReservationDir();
+    if ($portDir === null) {
         return pmssPortManagerFail("Error: unable to initialize port directory\n");
     }
 
@@ -117,7 +244,7 @@ function pmssPortManagerMain(array $argv): int
 
     $lockHandle = false;
     if ($action !== 'view') {
-        $lockHandle = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-portManager-'.$service.'.lock'));
+        $lockHandle = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-portManager.lock'));
         if ($lockHandle === false) {
             pmssPortManagerLog($user, $action, $service, null, 'WARN', 'lock_failed');
         }
@@ -144,13 +271,7 @@ function pmssPortManagerMain(array $argv): int
         }
 
         if ($action === 'assign') {
-            $used = array();
-            foreach ((glob($portDir.'/'.$service.'-*') ?: array()) as $path) {
-                $assignedPort = pmssPortManagerReadAssignedPort($path);
-                if ($assignedPort !== null) {
-                    $used[$assignedPort] = true;
-                }
-            }
+            $used = pmssPortManagerUsedPorts($portDir, pmssPortManagerLegacyReservationDir());
             $port = pmssPortManagerSelectAvailablePort($used);
             if ($port === null) return pmssPortManagerFail("Error: no free port available\n", $user, $action, $service, null, 'ERR', 'port_range_exhausted');
             if (!pmssPortManagerAssignmentPathIsSafe($portDir, $portFile)) return pmssPortManagerFail("Error: invalid port assignment path\n", $user, $action, $service, null, 'ERR', 'unsafe_assignment_path');

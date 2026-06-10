@@ -11,6 +11,7 @@ require_once __DIR__.'/../update/distro.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/traffic.php';
 require_once __DIR__.'/passwords.php';
+require_once __DIR__.'/../../util/portManager.php';
 
 /**
  * Pick the Deluge core template path for the active Debian release.
@@ -90,6 +91,27 @@ function pmssDelugeConfigFileWrite(string $path, string $content, string $label)
     return false;
 }
 
+function pmssDelugeWebPortEnsure(string $username, string $home, int $delugePort): ?int
+{
+    $webPortFile = $home.'/.delugeWebPort';
+    $existingWebPort = pmssReadRegularFileNetworkPort($webPortFile, 1024, 65000);
+    if ($existingWebPort !== null) {
+        pmssPortManagerAssignServicePort($username, 'deluge-web', $existingWebPort);
+        return $existingWebPort;
+    }
+
+    $preferredWebPort = $delugePort + 1;
+    $preferredWebPort = pmssNetworkPortInRange($preferredWebPort, PMSS_PORT_MANAGER_MIN_PORT, PMSS_PORT_MANAGER_MAX_PORT)
+        ? $preferredWebPort
+        : null;
+    $webPort = pmssPortManagerAssignServicePort($username, 'deluge-web', $preferredWebPort);
+    if ($webPort === null || !pmssNetworkPortFileWrite($webPortFile, $webPort, 1024, 65000, 0644)) {
+        return null;
+    }
+
+    return $webPort;
+}
+
 function userConfigureDeluge(array $user, array $configuration): void
 {
     $username = $user['name'];
@@ -125,6 +147,11 @@ function userConfigureDeluge(array $user, array $configuration): void
         pmssLogStatus('WARN', 'Skipping Deluge configuration update because one or more templates are unavailable', 1);
         return;
     }
+    $delugeWebPort = pmssDelugeWebPortEnsure($username, $home, (int) $delugePort);
+    if ($delugeWebPort === null) {
+        pmssLogStatus('WARN', 'Skipping Deluge configuration update because no web port could be assigned', 1);
+        return;
+    }
 
     pmssDelugeConfigFileWrite("$configDir/core.conf", $coreConfig, 'core');
     pmssDelugeConfigFileWrite("$configDir/hostlist.conf", str_replace('##DAEMONPORT', $delugePort, $hostlistTemplate), 'hostlist');
@@ -134,7 +161,7 @@ function userConfigureDeluge(array $user, array $configuration): void
 
     $webConfPath = "$configDir/web.conf";
     $existingWebConfig = @file_get_contents($webConfPath);
-    $webConfig   = str_replace(['##WEBPORT', '##USER'], [$delugePort + 1, $username], $webTemplate);
+    $webConfig   = str_replace(['##WEBPORT', '##USER'], [$delugeWebPort, $username], $webTemplate);
     $webConfChanged = is_string($existingWebConfig) && $existingWebConfig !== $webConfig;
     pmssDelugeConfigFileWrite($webConfPath, $webConfig, 'web');
     pmssNetworkPortFileWrite("$home/.delugePort", (int) $delugePort, 1024, 65000, 0644);

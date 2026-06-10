@@ -159,8 +159,14 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
         // to deluge-web (historically scgi+1). Keep supporting the placeholder, but
         // treat the port file as untrusted input (must be root-owned + non-symlink).
         $delugeWebPort = 1;
-        $delugePortPath = $homeDir.'/.delugePort';
-        if (is_file($delugePortPath) && !is_link($delugePortPath)) {
+        foreach (['/.delugeWebPort' => 0, '/.delugePort' => 1] as $portFile => $offset) {
+            $delugePortPath = $homeDir.$portFile;
+            if (!is_file($delugePortPath) || is_link($delugePortPath)) {
+                if (is_link($delugePortPath) && function_exists('pmssUserLog')) {
+                    pmssUserLog($thisUser, '[WARN] Ignoring symlinked '.$portFile.' while rendering nginx template');
+                }
+                continue;
+            }
             $owner = @fileowner($delugePortPath);
             if ($owner !== false && (int)$owner === 0) {
                 $raw = @file_get_contents($delugePortPath);
@@ -168,20 +174,20 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
                     $raw = trim($raw);
                     if ($raw !== '' && ctype_digit($raw)) {
                         $delugePort = (int) $raw;
-                        if (pmssNetworkPortInRange($delugePort, 1024, 65534)) {
-                            $delugeWebPort = $delugePort + 1;
+                        $maxPort = $offset === 1 ? 65534 : 65535;
+                        if (pmssNetworkPortInRange($delugePort, 1024, $maxPort)) {
+                            $delugeWebPort = $delugePort + $offset;
+                            break;
                         } elseif (function_exists('pmssUserLog')) {
-                            pmssUserLog($thisUser, '[WARN] Ignoring invalid .delugePort value while rendering nginx template');
+                            pmssUserLog($thisUser, '[WARN] Ignoring invalid '.$portFile.' value while rendering nginx template');
                         }
                     } elseif (function_exists('pmssUserLog')) {
-                        pmssUserLog($thisUser, '[WARN] Ignoring non-numeric .delugePort value while rendering nginx template');
+                        pmssUserLog($thisUser, '[WARN] Ignoring non-numeric '.$portFile.' value while rendering nginx template');
                     }
                 }
             } elseif (function_exists('pmssUserLog')) {
-                pmssUserLog($thisUser, '[WARN] Ignoring non-root-owned .delugePort while rendering nginx template');
+                pmssUserLog($thisUser, '[WARN] Ignoring non-root-owned '.$portFile.' while rendering nginx template');
             }
-        } elseif (is_link($delugePortPath) && function_exists('pmssUserLog')) {
-            pmssUserLog($thisUser, '[WARN] Ignoring symlinked .delugePort while rendering nginx template');
         }
         $placeholders[] = "##delugeWebPort";
         $replacements[] = $delugeWebPort;

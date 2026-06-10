@@ -72,6 +72,11 @@ function pmssLighttpdDelugeWebPortFromConfig(string $user, string $path): ?int
 
 function pmssLighttpdDelugeWebPortFallback(string $homeDir): ?int
 {
+    $webPort = pmssReadRegularFileNetworkPort($homeDir.'/.delugeWebPort', 1024);
+    if ($webPort !== null) {
+        return $webPort;
+    }
+
     $delugePort = pmssReadRegularFileNetworkPort($homeDir.'/.delugePort', 1024);
     if ($delugePort === null) {
         return null;

@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__.'/userFileWrite.php';
+require_once __DIR__.'/../../util/portManager.php';
 
 function pmssLighttpdProxyRuleFragment(
     string $pattern,
@@ -88,18 +89,57 @@ function pmssLighttpdWriteManagedProxyFragment(string $proxyName, string $user, 
     return false;
 }
 
-function pmssLighttpdProxyPortsEnsure(array $proxyPortFiles): array
+function pmssLighttpdProxyPortEnsure(string $user, string $proxyName, string $proxyPortFile): int
 {
+    $proxyPort = pmssReadRegularFileInt($proxyPortFile);
+    if (pmssNetworkPortInRange($proxyPort, 1024, 65500)) {
+        // Preserve live service ports while adopting them into the shared allocator
+        // when the reservation slot is still free.
+        if ($user !== '') {
+            pmssPortManagerAssignServicePort($user, $proxyName, $proxyPort);
+        }
+        return $proxyPort;
+    }
+
+    $proxyPort = $user !== ''
+        ? pmssPortManagerAssignServicePort($user, $proxyName)
+        : pmssLighttpdProxyLocalPortAssign($proxyPortFile);
+    if ($proxyPort === null || !pmssNetworkPortFileWrite($proxyPortFile, $proxyPort, 1024, 65500, 0640)) {
+        return 0;
+    }
+
+    return $proxyPort;
+}
+
+function pmssLighttpdProxyLocalPortAssign(string $proxyPortFile): ?int
+{
+    $portDir = dirname($proxyPortFile);
+    if (!pmssPathTargetIsSafe($portDir, true) || !is_dir($portDir) || is_link($portDir)) {
+        return null;
+    }
+
+    return pmssPortManagerSelectAvailablePort(pmssPortManagerUsedPorts($portDir, $portDir.'/.pmss-no-legacy'));
+}
+
+function pmssLighttpdProxyUserFromPortFile(string $proxyPortFile): string
+{
+    $user = basename(dirname($proxyPortFile));
+
+    return pmssValidateUsername($user) ? $user : '';
+}
+
+function pmssLighttpdProxyPortsEnsure($userOrProxyPortFiles, ?array $proxyPortFiles = null): array
+{
+    $user = is_string($userOrProxyPortFiles) ? $userOrProxyPortFiles : '';
+    if ($proxyPortFiles === null) {
+        $proxyPortFiles = is_array($userOrProxyPortFiles) ? $userOrProxyPortFiles : [];
+    }
+
     $proxyPorts = [];
     foreach ($proxyPortFiles as $proxyName => $proxyPortFile) {
-        $proxyPort = pmssReadRegularFileInt($proxyPortFile);
-        if (!pmssNetworkPortInRange($proxyPort, 1024, 65500)) {
-            $proxyPort = (int) round(rand(1500, 65500));
-            if (!pmssNetworkPortFileWrite($proxyPortFile, $proxyPort, 1024, 65500, 0640)) {
-                $proxyPort = 0;
-            }
-        }
-        $proxyPorts[$proxyName] = $proxyPort;
+        $proxyFile = (string) $proxyPortFile;
+        $proxyUser = $user !== '' ? $user : pmssLighttpdProxyUserFromPortFile($proxyFile);
+        $proxyPorts[$proxyName] = pmssLighttpdProxyPortEnsure($proxyUser, (string) $proxyName, $proxyFile);
     }
 
     return $proxyPorts;

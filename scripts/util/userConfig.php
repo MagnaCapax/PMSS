@@ -24,6 +24,7 @@ require_once __DIR__.'/../lib/rutorrent/config.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/welcomeMessage.php';
+require_once __DIR__.'/portManager.php';
 
 /**
  * Main entry point for user configuration changes.
@@ -178,39 +179,46 @@ if ($rtorrentPortsChanged && !$store->persist($user['name'], $payload)) {
 echo "Changing ruTorrent config\n";
 updateRutorrentConfig($user['name'], $scgiPort);
 $rclonePortFile = sprintf('/home/%s/.rclonePort', $user['name']);
-if (!file_exists($rclonePortFile) && !pmssNetworkPortFileWrite($rclonePortFile, (int) rand(1500, 65500), 1024, 65500, 0644)) {
-    fwrite(STDERR, "Warning: failed to write rclone port for {$user['name']}\n");
+if (!file_exists($rclonePortFile)) {
+    $rclonePort = pmssPortManagerAssignServicePort($user['name'], 'rclone');
+    if ($rclonePort === null || !pmssNetworkPortFileWrite($rclonePortFile, $rclonePort, 1024, 65500, 0644)) {
+        fwrite(STDERR, "Warning: failed to write rclone port for {$user['name']}\n");
+    }
 }
 userConfigureDeluge($user, $configuration);
 $qbittorrentConfigDir = sprintf('/home/%s/.config/qBittorrent', $user['name']);
 $qbittorrentConfigFile = $qbittorrentConfigDir.'/qBittorrent.conf';
 if (!file_exists($qbittorrentConfigFile)) {
-    $qbittorrentPort = (int) round(rand(1500, 65500));
+    $qbittorrentPort = pmssPortManagerAssignServicePort($user['name'], 'qbittorrent');
     if (!pmssDirEnsureExists($qbittorrentConfigDir, 0770)) {
         fwrite(STDERR, "Warning: failed to create qBittorrent config directory for {$user['name']}\n");
     }
+    if ($qbittorrentPort === null) {
+        fwrite(STDERR, "Warning: failed to assign qBittorrent port for {$user['name']}\n");
+    } else {
 
-    try {
-        $qbittorrentTemplate = pmssReadRequiredRegularFile('/etc/seedbox/config/template.qbittorrent.conf', 'qBittorrent template');
-    } catch (RuntimeException $exception) {
-        fwrite(STDERR, 'Error: '.$exception->getMessage()."\n");
-        exit(1);
-    }
+        try {
+            $qbittorrentTemplate = pmssReadRequiredRegularFile('/etc/seedbox/config/template.qbittorrent.conf', 'qBittorrent template');
+        } catch (RuntimeException $exception) {
+            fwrite(STDERR, 'Error: '.$exception->getMessage()."\n");
+            exit(1);
+        }
 
-    $qbittorrentConfig = str_replace(
-        ['##username', '##port', '##uploadThrottleLine'],
-        [
-            $user['name'],
-            $qbittorrentPort,
-            ($throttle !== null && $throttle > 0) ? 'Connection\\GlobalUPLimit='.(int) $throttle : '',
-        ],
-        $qbittorrentTemplate
-    );
-    if (@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false) {
-        fwrite(STDERR, "Warning: failed to write qBittorrent config for {$user['name']}\n");
-    }
-    if (!pmssNetworkPortFileWrite(sprintf('/home/%s/.qbittorrentPort', $user['name']), $qbittorrentPort, 1024, 65500, 0644)) {
-        fwrite(STDERR, "Warning: failed to write qBittorrent port for {$user['name']}\n");
+        $qbittorrentConfig = str_replace(
+            ['##username', '##port', '##uploadThrottleLine'],
+            [
+                $user['name'],
+                $qbittorrentPort,
+                ($throttle !== null && $throttle > 0) ? 'Connection\\GlobalUPLimit='.(int) $throttle : '',
+            ],
+            $qbittorrentTemplate
+        );
+        if (@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false) {
+            fwrite(STDERR, "Warning: failed to write qBittorrent config for {$user['name']}\n");
+        }
+        if (!pmssNetworkPortFileWrite(sprintf('/home/%s/.qbittorrentPort', $user['name']), $qbittorrentPort, 1024, 65500, 0644)) {
+            fwrite(STDERR, "Warning: failed to write qBittorrent port for {$user['name']}\n");
+        }
     }
 }
 pmssQbittorrentApplyUploadThrottle($user['name'], $throttle);

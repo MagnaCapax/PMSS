@@ -204,6 +204,9 @@ pmssUserLifecycleRunSteps('terminate', $username, array(
     array('remove_screen_socket', 'rm -rf -- '.escapeshellarg("/var/run/screen/S-{$username}")),
     array('remove_nginx_user', 'rm -rf -- '.escapeshellarg("/etc/nginx/users/{$username}")),
     array('release_lighttpd_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' lighttpd'),
+    array('release_rclone_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' rclone'),
+    array('release_qbittorrent_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' qbittorrent'),
+    array('release_deluge_web_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' deluge-web'),
 ), $dryRun);
 pmssTerminateUserUnlinkPath($username, 'remove_nginx_user_file', "/etc/nginx/users/{$username}", $dryRun);
 
