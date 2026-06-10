@@ -328,30 +328,7 @@ $managedApps = pmssCustomerManagedAppDefinitions();
                             <li><a href="https://filezilla-project.org/download.php?platform=win64" target="_blank">FileZilla - Popular opensource client</a></li>
                         </ul>
 
-<?php
-if (pmssWelcomeServiceAvailable($managedApps['Deluge']['endpoint'], $managedApps['Deluge']['binaries'])) {
-    echo '<h6>Deluge</h6>';
-    echo '<p>Deluge Web UI password: <b>'.pmssWelcomeHtmlAttr($delugePassword === '' ? 'Unavailable' : $delugePassword).'</b> (also used for the daemon connection; separate from your account password)</p>';
-    if ($delugePasswordCanRotate) echo '<form method="post" action=""><input type="hidden" name="delugePasswordRotate" value="1" /><input type="submit" value="Rotate Deluge Password" /></form>';
-    else echo '<p><b>Deluge password rotation is unavailable on this host.</b></p>';
-    if ($delugePasswordNotice !== '') {
-        echo '<p><b>'.pmssWelcomeHtmlAttr($delugePasswordNotice).'</b></p>';
-    }
-    echo !file_exists($managedApps['Deluge']['enable']) ? pmssWelcomeActionButtonHtmlBuild('delugeStart', 'Start Deluge', 'deluge.php?action=start', 'Deluge starting. Accessible at /deluge-USERNAME/. Refresh GUI to see tab.', true, 'Deluge start request sent...') : pmssWelcomeActionButtonHtmlBuild('delugeDisable', 'Disable Deluge', 'deluge.php?action=disable', 'Deluge disabled.', true, 'Disabling Deluge...').pmssWelcomeActionButtonHtmlBuild('delugeRestart', 'Restart Deluge', 'deluge.php?action=restart', 'Deluge restart requested.', false, 'Restarting Deluge...');
-}
-
-if (pmssWelcomeServiceAvailable($managedApps['rclone']['endpoint'], $managedApps['rclone']['binaries'])) {
-    echo '<h6>Rclone Web UI</h6>';
-    echo '<p>Rclone password is the same as your web access password</p>';
-    echo !file_exists($managedApps['rclone']['enable']) ? pmssWelcomeActionButtonHtmlBuild('rcloneStart', 'Start Rclone', 'rclone.php?action=start', 'Rclone starting, access at /user-USERNAME/rclone. Refresh GUI to see tab.', true, 'Starting Rclone...') : pmssWelcomeActionButtonHtmlBuild('rcloneDisable', 'Disable Rclone', 'rclone.php?action=disable', 'Rclone disabled.', true, 'Disabling Rclone...').pmssWelcomeActionButtonHtmlBuild('rcloneRestart', 'Restart Rclone', 'rclone.php?action=restart', 'Rclone restart requested.', false, 'Restarting Rclone...');
-}
-
-if (pmssWelcomeServiceAvailable($managedApps['qBittorrent']['endpoint'], $managedApps['qBittorrent']['binaries'])) {
-    echo '<h6>qBittorrent</h6>';
-    echo '<p>qBittorrent username is your own username and password matches your account password. Change it once logged in if you want a separate WebUI password. If you get 503, try restarting Lighttpd — port may have changed.</p>';
-    echo !file_exists($managedApps['qBittorrent']['enable']) ? pmssWelcomeActionButtonHtmlBuild('qbittorrentStart', 'Start qBittorrent', 'qbittorrent.php?action=start', 'qBittorrent starting, access at /user-USERNAME/qbittorrent/ — Refresh GUI to see tab.', true, 'Starting qBittorrent...') : pmssWelcomeActionButtonHtmlBuild('qbittorrentDisable', 'Disable qBittorrent', 'qbittorrent.php?action=disable', 'qBittorrent disabled.', true, 'Disabling qBittorrent...').pmssWelcomeActionButtonHtmlBuild('qbittorrentRestart', 'Restart qBittorrent', 'qbittorrent.php?action=restart', 'qBittorrent restart requested.', false, 'Restarting qBittorrent...');
-}
-?>
+<?php echo pmssWelcomeManagedAppsHtmlBuild($managedApps, $delugePasswordCanRotate, $delugePasswordNotice, $delugePassword); ?>
 
 <?php
 if (file_exists('mediaStack.php') && function_exists('pmssMediaStackPanelHtmlBuild')) {
@@ -788,11 +765,7 @@ function pmssWelcomeHtmlAttr($value) { return pmssCustomerHtmlAttr($value); }
 
 function pmssWelcomeJsSingleQuoted($value) { return str_replace(array('\\', "'", "\r", "\n"), array('\\\\', "\\'", '\\r', '\\n'), (string) $value); }
 
-function pmssWelcomeServiceAvailable($scriptPath, array $binaryPaths) {
-    if (!file_exists($scriptPath)) return false;
-    foreach ($binaryPaths as $binaryPath) if (file_exists((string) $binaryPath)) return true;
-    return false;
-}
+function pmssWelcomeServiceAvailable($scriptPath, array $binaryPaths) { if (!file_exists($scriptPath)) return false; foreach ($binaryPaths as $binaryPath) if (file_exists((string) $binaryPath)) return true; return false; }
 
 function pmssWelcomeActionButtonHtmlBuild($name, $value, $url, $successMessage, $shouldReload, $pendingMessage) {
     return '<input type="button" name="'.pmssWelcomeHtmlAttr($name).'" value="'.pmssWelcomeHtmlAttr($value).'" onClick="pmssRunAction(this, \''
@@ -800,6 +773,30 @@ function pmssWelcomeActionButtonHtmlBuild($name, $value, $url, $successMessage, 
         .pmssWelcomeJsSingleQuoted($successMessage).'\', '
         .($shouldReload ? 'true' : 'false').', \''
         .pmssWelcomeJsSingleQuoted($pendingMessage).'\');" />';
+}
+
+function pmssWelcomeManagedAppsHtmlBuild(array $managedApps, $delugePasswordCanRotate, $delugePasswordNotice, $delugePassword) {
+    $delugeHtml = '<p>Deluge Web UI password: <b>'.pmssWelcomeHtmlAttr($delugePassword === '' ? 'Unavailable' : $delugePassword).'</b> (also used for the daemon connection; separate from your account password)</p>';
+    if ($delugePasswordCanRotate) $delugeHtml .= '<form method="post" action=""><input type="hidden" name="delugePasswordRotate" value="1" /><input type="submit" value="Rotate Deluge Password" /></form>';
+    else $delugeHtml .= '<p><b>Deluge password rotation is unavailable on this host.</b></p>';
+    $delugeHtml .= $delugePasswordNotice !== '' ? '<p><b>'.pmssWelcomeHtmlAttr($delugePasswordNotice).'</b></p>' : '';
+
+    $specs = array(
+        array('Deluge', 'deluge', 'Deluge', $delugeHtml, 'Start Deluge', 'Deluge starting. Accessible at /deluge-USERNAME/. Refresh GUI to see tab.', 'Deluge start request sent...', 'Disable Deluge', 'Deluge disabled.', 'Disabling Deluge...', 'Restart Deluge', 'Deluge restart requested.', 'Restarting Deluge...'),
+        array('rclone', 'rclone', 'Rclone Web UI', '<p>Rclone password is the same as your web access password</p>', 'Start Rclone', 'Rclone starting, access at /user-USERNAME/rclone. Refresh GUI to see tab.', 'Starting Rclone...', 'Disable Rclone', 'Rclone disabled.', 'Disabling Rclone...', 'Restart Rclone', 'Rclone restart requested.', 'Restarting Rclone...'),
+        array('qBittorrent', 'qbittorrent', 'qBittorrent', '<p>qBittorrent username is your own username and password matches your account password. Change it once logged in if you want a separate WebUI password. If you get 503, try restarting Lighttpd — port may have changed.</p>', 'Start qBittorrent', 'qBittorrent starting, access at /user-USERNAME/qbittorrent/ — Refresh GUI to see tab.', 'Starting qBittorrent...', 'Disable qBittorrent', 'qBittorrent disabled.', 'Disabling qBittorrent...', 'Restart qBittorrent', 'qBittorrent restart requested.', 'Restarting qBittorrent...'),
+    );
+
+    $html = '';
+    foreach ($specs as list($appName, $prefix, $heading, $body, $startLabel, $startSuccess, $startPending, $disableLabel, $disableSuccess, $disablePending, $restartLabel, $restartSuccess, $restartPending)) {
+        $definition = isset($managedApps[$appName]) && is_array($managedApps[$appName]) ? $managedApps[$appName] : array();
+        if (!isset($definition['endpoint'], $definition['binaries'], $definition['enable']) || !is_array($definition['binaries']) || !pmssWelcomeServiceAvailable($definition['endpoint'], $definition['binaries'])) continue;
+        $endpoint = (string) $definition['endpoint'];
+        $html .= '<h6>'.pmssWelcomeHtmlAttr($heading).'</h6>'.$body;
+        $html .= !file_exists((string) $definition['enable']) ? pmssWelcomeActionButtonHtmlBuild($prefix.'Start', $startLabel, $endpoint.'?action=start', $startSuccess, true, $startPending) : pmssWelcomeActionButtonHtmlBuild($prefix.'Disable', $disableLabel, $endpoint.'?action=disable', $disableSuccess, true, $disablePending).pmssWelcomeActionButtonHtmlBuild($prefix.'Restart', $restartLabel, $endpoint.'?action=restart', $restartSuccess, false, $restartPending);
+    }
+
+    return $html;
 }
 
 function pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage) {
@@ -982,12 +979,7 @@ function gaugeColor($percent) {
 
     $startColor = array(0x99, 0xE6, 0x99);
     $endColor = array(0xEE, 0x99, 0x99);
-    $channels = array();
-    foreach (array(0, 1, 2) as $index) {
-        $channels[] = dechex($startColor[$index] - round(($startColor[$index] - $endColor[$index]) * ($percent / 100)));
-    }
-
-    return implode('', $channels);
+    return dechex($startColor[0] - round(($startColor[0] - $endColor[0]) * ($percent / 100))).dechex($startColor[1] - round(($startColor[1] - $endColor[1]) * ($percent / 100))).dechex($startColor[2] - round(($startColor[2] - $endColor[2]) * ($percent / 100)));
 }
 
 function quotaCreateSection($quotaInfo, $bonusQuota = 0) {
