@@ -22,7 +22,13 @@
  */
 
 if ($argc != 2) die("Usage: startLighttpd USERNAME\n");
-$user = $argv[1];
+
+// Validate username defensively even when invoked from internal scripts,
+// same as startRtorrent (ADR 0005) — '../etc' style values would otherwise
+// pass the file_exists() checks below and unlink/chdir outside /home.
+require_once __DIR__.'/lib/userLifecycle.php';
+$user = pmssUsernameNormalizeIfValid((string) $argv[1]);
+if ($user === null) die("Invalid username\n");
 $homeDir = '/home/'.$user;
 $configPath = $homeDir.'/.lighttpd.conf';
 
