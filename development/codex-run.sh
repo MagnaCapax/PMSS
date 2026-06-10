@@ -197,7 +197,8 @@ if [[ "$autocommit" == "1" ]]; then
 		[[ -n "$mode_prefix" ]] && commit_prefix="$mode_prefix"
 	fi
 
-	cat <<EOF >>"$prompt_out"
+	{
+		cat <<'EOF'
 
 ----------------------------------------------------------------------
 AUTOCOMMIT MODE (ACTIVE)
@@ -241,9 +242,13 @@ BEFORE ANY COMMIT — grep for EVERY deleted/renamed symbol:
 
 COMMIT:
   git add <specific_files_only>
+EOF
+		cat <<EOF
   git commit -m "${commit_prefix} <scope> — <description>"
   One commit per logical change.
   PREFIX = ${commit_prefix}
+EOF
+		cat <<'EOF'
 
 COMMIT MESSAGE RULE (PUBLIC REPO — BINDING):
   NEVER include in commit messages:
@@ -358,6 +363,7 @@ Key rules for autocommit integration:
 
 ---- Autocommit is explicitly operator-approved with arguments, never the default.
 EOF
+	} >>"$prompt_out"
 fi
 
 prompt_bytes=$(wc -c <"$prompt_out" | tr -d ' ')

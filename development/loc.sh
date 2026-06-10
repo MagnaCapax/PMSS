@@ -167,15 +167,15 @@ echo "Advisory complexity (Bash only)"
 echo "-------------------------------"
 
 declare -a BASH_FILES=()
-	for rel in "${TRACKED_FILES[@]}"; do
-		# Exclude third-party trees and non-.sh files
-		if is_excluded_relative "$rel"; then
-			continue
-		fi
-		[[ "$rel" == *.sh ]] || continue
-		[[ -f "$ROOT_DIR/$rel" ]] || continue
-		BASH_FILES+=("$rel")
-	done
+for rel in "${TRACKED_FILES[@]}"; do
+	# Exclude third-party trees and non-.sh files
+	if is_excluded_relative "$rel"; then
+		continue
+	fi
+	[[ "$rel" == *.sh ]] || continue
+	[[ -f "$ROOT_DIR/$rel" ]] || continue
+	BASH_FILES+=("$rel")
+done
 
 total_complex=0
 declare -a COMPLEX_ROWS=()
@@ -227,14 +227,14 @@ echo "Advisory complexity (PHP heuristic)"
 echo "-----------------------------------"
 
 declare -a PHP_FILES=()
-	for rel in "${TRACKED_FILES[@]}"; do
-		if is_excluded_relative "$rel"; then
-			continue
-		fi
-		[[ "$rel" == *.php ]] || continue
-		[[ -f "$ROOT_DIR/$rel" ]] || continue
-		PHP_FILES+=("$rel")
-	done
+for rel in "${TRACKED_FILES[@]}"; do
+	if is_excluded_relative "$rel"; then
+		continue
+	fi
+	[[ "$rel" == *.php ]] || continue
+	[[ -f "$ROOT_DIR/$rel" ]] || continue
+	PHP_FILES+=("$rel")
+done
 
 php_total_complex=0
 declare -a PHP_COMPLEX_ROWS=()
