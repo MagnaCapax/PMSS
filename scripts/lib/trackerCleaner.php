@@ -111,9 +111,10 @@ function pmssTrackerCleanerTorrentCandidates(string $sessionDir, int $maxTorrent
 function pmssTrackerCleanerBackupFailure(string $reason, string $message, string $detail): array
 {
     pmssTrackerCleanerLog($message);
-    $suffix = $detail !== '' ? ' '.$detail : '';
-    return ['ok' => false, 'stop_reason' => 'backup_failed', 'verbose_log' => pmssTrackerCleanerTimestamp()." torrent_skip reason={$reason}{$suffix}\n".pmssTrackerCleanerTimestamp()." run_stop reason=backup_failed\n"];
+    return pmssTrackerCleanerBackupFailedResult($reason, $detail);
 }
+
+function pmssTrackerCleanerBackupFailedResult(string $reason, string $detail = '', string $prefix = ''): array { $suffix = $detail !== '' ? ' '.$detail : ''; return ['ok' => false, 'stop_reason' => 'backup_failed', 'verbose_log' => $prefix.pmssTrackerCleanerTimestamp()." torrent_skip reason={$reason}{$suffix}\n".pmssTrackerCleanerTimestamp()." run_stop reason=backup_failed\n"]; }
 
 function pmssTrackerCleanerBackupTorrentSourceIsSafe(string $torrentPath): bool
 {
@@ -160,12 +161,12 @@ function pmssTrackerCleanerBackupTorrent(string $username, string $torrentPath, 
         $prepareRc = pmssUserLifecycleStep('trackerCleaner', $username, 'prepare_backup_dir', pmssBuildUserShellCommand($username, 'mkdir -p '.escapeshellarg($backupDir).' && chmod 750 '.escapeshellarg($backupDir), '/bin/bash'), false);
         if ($prepareRc !== 0) {
             pmssTrackerCleanerLog("ERR: Failed to prepare backup dir for user {$username} (dir={$backupDir}, rc={$prepareRc}).");
-            return ['ok' => false, 'stop_reason' => 'backup_failed', 'verbose_log' => pmssTrackerCleanerTimestamp()." torrent_skip reason=backup_dir_prepare_failed rc={$prepareRc} backup_dir={$backupDir}\n".pmssTrackerCleanerTimestamp()." run_stop reason=backup_failed\n"];
+            return pmssTrackerCleanerBackupFailedResult('backup_dir_prepare_failed', "rc={$prepareRc} backup_dir={$backupDir}");
         }
     }
     if (!pmssPathWithinRootIsSafe($backupDir, $backupsRoot, true)) {
         pmssTrackerCleanerLog("ERR: Backup path unsafe for user {$username} ({$backupDir}).");
-        return ['ok' => false, 'stop_reason' => 'backup_failed', 'verbose_log' => pmssTrackerCleanerTimestamp()." torrent_skip reason=backup_path_unsafe backup_dir={$backupDir}\n".pmssTrackerCleanerTimestamp()." run_stop reason=backup_failed\n"];
+        return pmssTrackerCleanerBackupFailedResult('backup_path_unsafe', "backup_dir={$backupDir}");
     }
 
     $backupTarget = $backupDir.'/'.basename($torrentPath);
@@ -177,8 +178,7 @@ function pmssTrackerCleanerBackupTorrent(string $username, string $torrentPath, 
     $verbose = pmssTrackerCleanerTimestamp()." torrent_backup rc={$backupRc} src={$torrentPath} dst={$backupTarget}\n";
     if (!$backupOk) {
         pmssTrackerCleanerLog("ERR: Backup verification failed for user {$username} (file=".basename($torrentPath).", rc={$backupRc}, src_bytes={$sourceSizeText}, dst_bytes={$backupSizeText}).");
-        $verbose .= pmssTrackerCleanerTimestamp()." torrent_skip reason=backup_failed rc={$backupRc} src={$torrentPath} dst={$backupTarget} src_bytes={$sourceSizeText} dst_bytes={$backupSizeText} removed_trackers={$removedList}\n".pmssTrackerCleanerTimestamp()." run_stop reason=backup_failed\n";
-        return ['ok' => false, 'stop_reason' => 'backup_failed', 'verbose_log' => $verbose];
+        return pmssTrackerCleanerBackupFailedResult('backup_failed', "rc={$backupRc} src={$torrentPath} dst={$backupTarget} src_bytes={$sourceSizeText} dst_bytes={$backupSizeText} removed_trackers={$removedList}", $verbose);
     }
 
     return ['ok' => true, 'stop_reason' => '', 'verbose_log' => $verbose];
@@ -195,11 +195,7 @@ function pmssTrackerCleanerWriteCleanedTorrent(string $torrentPath, string $payl
         return false;
     }
 
-    if (!pmssReplaceUserFilePreservingMetadata($torrentPath, $payload, 0640)) {
-        return false;
-    }
-
-    return strlen($payload);
+    return pmssReplaceUserFilePreservingMetadata($torrentPath, $payload, 0640) ? strlen($payload) : false;
 }
 
 function pmssTrackerCleanerAppendUserChangeLog(string $username, array $changes): string
@@ -286,6 +282,5 @@ function pmssTrackerCleanerScrubTorrent($torrent, array $blockRules): array
 function pmssTrackerCleanerCommentWithMarker(string $comment): string
 {
     $marker = 'Trackers cleaned by PMSS tracker cleaner';
-    if (strpos($comment, $marker) !== false) return $comment;
-    return $comment.'; '.$marker.' (https://github.com/MagnaCapax/PMSS/blob/main/docs/tracker-cleaner.md)';
+    return strpos($comment, $marker) !== false ? $comment : $comment.'; '.$marker.' (https://github.com/MagnaCapax/PMSS/blob/main/docs/tracker-cleaner.md)';
 }
