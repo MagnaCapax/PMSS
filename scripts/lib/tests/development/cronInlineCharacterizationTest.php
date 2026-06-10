@@ -57,4 +57,14 @@ class CronInlineCharacterizationTest extends TestCase
         ]);
     }
 
+    public function testWireguardSyncconfRejectsPartialTempfileWrites(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkWireguard.php', [
+            '$config = (string) $strip[\'stdout\'];',
+            '$written = @file_put_contents($tmp, $config);',
+            '$written === false || $written !== strlen($config)',
+            "pmssWireguardCommandCapture('wg', ['syncconf', 'wg0', \$tmp])",
+        ]);
+    }
+
 }
