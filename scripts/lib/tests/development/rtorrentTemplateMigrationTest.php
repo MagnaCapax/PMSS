@@ -45,8 +45,8 @@ class RtorrentTemplateMigrationTest extends TestCase
                 "directory = ~/data\r\ntracker_numwant = -1\r\ncustom = keep\r\n",
                 "directory = ~/data\r\ntrackers.numwant.set = -1\r\ncustom = keep\r\n",
             ],
-        ] as $label => $case) {
-            $this->assertEquals($case[1], \pmssRtorrentNormalizeLegacyTemplate($case[0]), $label);
+        ] as $label => [$input, $expected]) {
+            $this->assertEquals($expected, \pmssRtorrentNormalizeLegacyTemplate($input), $label);
         }
     }
 

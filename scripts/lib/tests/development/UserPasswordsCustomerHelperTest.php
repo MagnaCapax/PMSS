@@ -15,30 +15,30 @@ final class UserPasswordsCustomerHelperTest extends TestCase
         return $this->pmssRunInlinePhpRequireJson($this->helperPath(), $script, $environment);
     }
 
+    private function assertLocalclientPassword(string $expected, string $path): void
+    {
+        $script = 'echo json_encode(array("password" => pmssDelugeAuthReadLocalclientPassword('.var_export($path, true).')));';
+        $this->assertSame($expected, $this->runHelperJson($script)['password']);
+    }
+
     public function testReadLocalclientPasswordReturnsEmptyWhenMissing(): void
     {
         $path = $this->pmssMakeTempPath('pmss-missing-auth-');
-        $result = $this->runHelperJson('echo json_encode(array("password" => pmssDelugeAuthReadLocalclientPassword('.var_export($path, true).')));');
-
-        $this->assertSame('', $result['password']);
+        $this->assertLocalclientPassword('', $path);
     }
 
     public function testReadLocalclientPasswordParsesValidLine(): void
     {
         $path = $this->pmssMakeTempPath('pmss-deluge-auth-');
         file_put_contents($path, "user:ignored:5\nlocalclient:display-secret:10\n");
-        $result = $this->runHelperJson('echo json_encode(array("password" => pmssDelugeAuthReadLocalclientPassword('.var_export($path, true).')));');
-
-        $this->assertSame('display-secret', $result['password']);
+        $this->assertLocalclientPassword('display-secret', $path);
     }
 
     public function testReadLocalclientPasswordRejectsMalformedLine(): void
     {
         $path = $this->pmssMakeTempPath('pmss-deluge-auth-bad-');
         file_put_contents($path, "localclient:bad:secret:10\nlocalclient:has-newline\n:10\n");
-        $result = $this->runHelperJson('echo json_encode(array("password" => pmssDelugeAuthReadLocalclientPassword('.var_export($path, true).')));');
-
-        $this->assertSame('', $result['password']);
+        $this->assertLocalclientPassword('', $path);
     }
 
     public function testReadLocalclientPasswordRejectsSymlink(): void
@@ -51,9 +51,7 @@ final class UserPasswordsCustomerHelperTest extends TestCase
             throw new SkipTest('symlink not supported in this environment');
         }
 
-        $result = $this->runHelperJson('echo json_encode(array("password" => pmssDelugeAuthReadLocalclientPassword('.var_export($link, true).')));');
-
-        $this->assertSame('', $result['password']);
+        $this->assertLocalclientPassword('', $link);
     }
 
     public function testCustomerHelperKeepsRotationInsideCustomerTree(): void

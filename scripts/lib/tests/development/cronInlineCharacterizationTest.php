@@ -22,7 +22,15 @@ class CronInlineCharacterizationTest extends TestCase
             'scripts/cron/checkRcloneInstances.php' => ['required' => ['pmssUserWatchdogRunService(', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone stopped due to suspension'", "'rclone start requested'", 'pmssUserWatchdogSuCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'rclone watchdog must quote su shell boundaries through the shared helper']],
             'scripts/cron/checkDelugeInstances.php' => ['required' => ['pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssDelugeApplyManagedConfig'", "'deluge stopped due to suspension'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'", 'pmssUserWatchdogSuCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'deluge watchdog must quote su shell boundaries through the shared helper']],
             'scripts/lib/runtime/environment.php' => ['required' => ['function pmssBuildUserShellCommand(', 'escapeshellarg($username)', 'escapeshellarg($command)']],
-            'scripts/lib/user/watchdog.php' => ['required' => ['function pmssUserWatchdogSuCommand(', 'pmssBuildUserShellCommand($username, $innerCommand)']],
+            'scripts/lib/user/watchdog.php' => ['required' => [
+                'function pmssUserWatchdogSuCommand(',
+                'pmssBuildUserShellCommand($username, $innerCommand)',
+                'function pmssUserWatchdogRestartProcessesIf(',
+                'function pmssUserWatchdogApplyManagedConfigWhenStopped(',
+                'function pmssUserWatchdogServiceSpec(',
+                'function pmssUserWatchdogEnsureServices(',
+                'function pmssUserWatchdogRunService(',
+            ]],
         ]);
     }
 
@@ -46,17 +54,6 @@ class CronInlineCharacterizationTest extends TestCase
             'Killing (if any) lighttpd for user: {$thisUser}',
             "'lighttpd restart requested'",
             "'lighttpd start requested'",
-        ]);
-    }
-
-    public function testServiceWatchdogsUseSharedWatchdogSpecHelpers(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/watchdog.php', [
-            'function pmssUserWatchdogRestartProcessesIf(',
-            'function pmssUserWatchdogApplyManagedConfigWhenStopped(',
-            'function pmssUserWatchdogServiceSpec(',
-            'function pmssUserWatchdogEnsureServices(',
-            'function pmssUserWatchdogRunService(',
         ]);
     }
 

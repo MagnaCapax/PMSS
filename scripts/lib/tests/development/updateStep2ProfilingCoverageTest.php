@@ -7,8 +7,6 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
 {
     public function testUpdateStep2UsesProfiledWrappersForModuleCalls(): void
     {
-        $removedWrapper = 'function pmssUpdateStep2Run'.'ClassifiedCallable(';
-
         $this->pmssAssertRepoFileContractCases([
             'scripts/lib/update/runtime/profile.php' => ['required' => ['function pmssRunProfiledStep(', 'function pmssRunProfiledCallable(', 'function pmssRunProfiledCallableBatch(']],
             'scripts/util/update-step2.php' => [
@@ -23,7 +21,7 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
                 ],
                 'forbidden' => [
                     '#TODO profiling (GH #120)' => 'Profiling TODO marker should be removed once coverage is wired',
-                    $removedWrapper => 'Classified callable handling should be folded into pmssRunProfiledCallable',
+                    'function pmssUpdateStep2Run'.'ClassifiedCallable(' => 'Classified callable handling should be folded into pmssRunProfiledCallable',
                 ],
                 'ordered' => [[
                     'needles' => [
