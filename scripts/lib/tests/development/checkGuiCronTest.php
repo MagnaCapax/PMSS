@@ -24,9 +24,20 @@ class CheckGuiCronTest extends TestCase
                 'pmssCheckGuiEnsureUserDirectory($wwwDir',
                 'pmssCheckGuiEnsureUserDirectory($dataDir',
                 'pmssCheckGuiRestoreUserIndex',
+                'pmssCheckGuiManagedUserNameNormalize($thisUser)',
             ],
             'checkGui should keep core userspace repair wiring: '
         );
+    }
+
+    public function testManagedUserNameNormalizeRejectsUnsafeEntries(): void
+    {
+        $this->assertSame('dummy', \pmssCheckGuiManagedUserNameNormalize('dummy'));
+        $this->assertSame(null, \pmssCheckGuiManagedUserNameNormalize(''));
+        $this->assertSame(null, \pmssCheckGuiManagedUserNameNormalize('Dummy'));
+        $this->assertSame(null, \pmssCheckGuiManagedUserNameNormalize('../dummy'));
+        $this->assertSame(null, \pmssCheckGuiManagedUserNameNormalize('Fatal error: boom'));
+        $this->assertSame(null, \pmssCheckGuiManagedUserNameNormalize(array('dummy')));
     }
 
     public function testEnsureUserDirectoryCreatesSafeDirectory(): void

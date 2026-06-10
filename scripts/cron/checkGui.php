@@ -20,6 +20,23 @@ require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 require_once __DIR__.'/../lib/user/selection.php';
 
 /**
+ * Normalize and revalidate a managed-user iterator value before composing paths.
+ */
+function pmssCheckGuiManagedUserNameNormalize($rawUser): ?string
+{
+    if (!is_scalar($rawUser)) {
+        return null;
+    }
+
+    $username = trim((string) $rawUser);
+    if (!pmssValidateUsername($username)) {
+        return null;
+    }
+
+    return pmssNormalizeUsername($username);
+}
+
+/**
  * Confirm a GUI repair target stays inside the expected home directory.
  */
 function pmssCheckGuiUserPathIsSafe(string $path, string $homeDir, bool $directoryTarget): bool
@@ -137,8 +154,14 @@ function pmssCheckGuiMain(array $argv): int
     $skeletonIndex = '/etc/skel/www/index.php';
 
     foreach (pmssManagedHomeUsersList() as $thisUser) {
-        // User suspended check (skip empty usernames too).
-        if (empty($thisUser) || file_exists("/home/{$thisUser}/www-disabled")) continue;
+        $thisUser = pmssCheckGuiManagedUserNameNormalize($thisUser);
+        if ($thisUser === null) {
+            $logger->msg('Skipping invalid managed-user entry while checking GUI files');
+            continue;
+        }
+
+        // User suspended check after the iterator value has been revalidated.
+        if (file_exists("/home/{$thisUser}/www-disabled")) continue;
 
         $homeDir = "/home/{$thisUser}";
         $wwwDir = $homeDir.'/www';
