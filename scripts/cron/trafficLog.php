@@ -12,10 +12,20 @@ require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/network/iptables.php';
 require_once '/scripts/lib/resources/log.php';
+require_once '/scripts/lib/runtime.php';
 require_once '/scripts/lib/traffic.php';
 require_once '/scripts/lib/user/log.php';
 
 $logger = new Logger(__FILE__);
+
+// Counters are listed then flushed below; an overlapping run would read the
+// same counters twice and double-bill traffic. Hold the handle until exit —
+// an unassigned handle is closed immediately, which releases the flock.
+$pmssTrafficLogLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-trafficLog.lock'), true);
+if ($pmssTrafficLogLock === false) {
+    $logger->msg('trafficLog already running; skipping');
+    exit(0);
+}
 $logdir = '/var/log/pmss/traffic/';
 $userUids = pmssResourceLogManagedUserUids();
 if (count($userUids) == 0) exit;    // Nothing to collect
@@ -74,5 +84,5 @@ foreach ($userUids as $thisUser => $thisUid) {
 // Let's take unmatched!
 $trafficUnmatched = $parsedUsage['unmatched'];
 if ($trafficUnmatched > 0) {
-    pmssAppendRootTimestampedLogEntry($logdir . 'unmatched-traffic', ": {$trafficUnmatched}");
+    pmssAppendRootTimestampedLogEntry($logdir . 'unmatched-traffic', ": {$trafficUnmatched}\n");
 }
