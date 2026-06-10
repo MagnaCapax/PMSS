@@ -42,8 +42,16 @@ $requiredDirectories = array(
 
 foreach($requiredDirectories AS $thisDir) {
     if (!file_exists($thisDir)) {
-        mkdir($thisDir);
+        if (!@mkdir($thisDir)) {
+            $logger->msg("WARN: failed to create $thisDir");
+            continue;
+        }
         $logger->msg("Created $thisDir");
+    } elseif (!is_dir($thisDir)) {
+        // A stale plain file squatting the path would otherwise get chmod 0700
+        // and silently keep blocking the directory forever.
+        $logger->msg("WARN: $thisDir exists but is not a directory; skipping");
+        continue;
     }
     // Ensure the directory is usable by root
     chown($thisDir, 'root');
