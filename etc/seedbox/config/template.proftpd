@@ -15,6 +15,10 @@ DeferWelcome                    off
 DefaultServer                   on
 ShowSymlinks                    on
 
+# Privacy hardening (multi-tenant): keep process titles terse so per-session
+# details are not exposed to other shell users on shared hosts.
+ProcessTitles                   terse
+
 # Timeouts
 TimeoutNoTransfer               180
 TimeoutStalled                  300
