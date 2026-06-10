@@ -74,7 +74,7 @@ if (!function_exists('pmssStorageHealthSnapshotRaid')) {
         $entries = [];
         foreach (preg_split('/\r?\n/', $mdstat) as $line) {
             $trimmed = trim($line);
-            if (preg_match('/^(md\d+)\s*:\s*(\w+)\s+(raid\d)\s+(.*)$/', $trimmed, $matches)) {
+            if (preg_match('/^(md\d+)\s*:\s*(\w+)\s+(raid\d+)\s+(.*)$/', $trimmed, $matches)) {
                 $entry = [
                     'timestamp' => $timestamp,
                     'kind' => 'raid',
