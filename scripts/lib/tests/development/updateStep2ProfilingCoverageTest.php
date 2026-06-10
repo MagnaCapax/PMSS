@@ -25,16 +25,16 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
                     '#TODO profiling (GH #120)' => 'Profiling TODO marker should be removed once coverage is wired',
                     $removedWrapper => 'Classified callable handling should be folded into pmssRunProfiledCallable',
                 ],
+                'ordered' => [[
+                    'needles' => [
+                        "runStep('Refreshing root cron configuration'",
+                        "pmssRunProfiledCallable('Refreshing MOTD'",
+                        'pmssProfileSummary();',
+                    ],
+                    'missingPrefix' => 'Missing final profiling step: ',
+                    'orderPrefix' => 'Profile summary should run after: ',
+                ]],
             ],
         ]);
-    }
-
-    public function testUpdateStep2EmitsProfileSummaryAfterFinalWork(): void
-    {
-        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/util/update-step2.php', [
-            "runStep('Refreshing root cron configuration'",
-            "pmssRunProfiledCallable('Refreshing MOTD'",
-            'pmssProfileSummary();',
-        ], 'Missing final profiling step: ', 'Profile summary should run after: ');
     }
 }

@@ -29,7 +29,7 @@ class userLifecycleLoggingTest extends TestCase
         }
     }
 
-    public function testUserLifecycleWriterUsesFormattingHelperForTextLogFields(): void
+    public function testUserLifecycleSourceContractsUseSharedHelpers(): void
     {
         $this->pmssAssertRepoFileContract('scripts/lib/userLifecycle.php', ['required' => [
                 "pmssUserLifecycleFormatTextField(\$payload['status'] ?? 'INFO')",
@@ -38,20 +38,8 @@ class userLifecycleLoggingTest extends TestCase
                 "pmssUserLifecycleFormatTextField(\$payload['username'] ?? '')",
                 "pmssUserLifecycleFormatTextField(\$payload['message'])",
                 "pmssUserLifecycleFormatTextField(\$payload['step'])",
-            ]]);
-    }
-
-    public function testContextLogHelperDelegatesToBaseContextAndWriter(): void
-    {
-        $this->pmssAssertRepoFileContract('scripts/lib/userLifecycle.php', ['required' => [
                 'function pmssUserLifecycleContextLog(',
                 'pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));',
-            ]]);
-    }
-
-    public function testContextLogStatusMessageHelperBuildsSharedPayload(): void
-    {
-        $this->pmssAssertRepoFileContract('scripts/lib/userLifecycle.php', ['required' => [
                 'function pmssUserLifecycleContextLogStatusMessage(',
                 '\'status\' => $status',
                 '\'message\' => $message',

@@ -22,16 +22,6 @@ class ErrorPageTemplateTest extends TestCase
         }
     }
 
-    public function testAuthenticationErrorPageIncludesHelpfulTextAndHomeLink(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings('var/www/error-401.html', [
-            '401 - Authentication Required',
-            'Enter your PMSS username',
-            'refresh this page to try again',
-            '<a href="/">Return to the main page.</a>',
-        ]);
-    }
-
     public function testErrorPagesDefineImageVariantsAndHomeLinks(): void
     {
         foreach ([
@@ -47,34 +37,23 @@ class ErrorPageTemplateTest extends TestCase
         }
     }
 
-    public function testForbiddenErrorPageIncludesFriendlyTextAndHomeLink(): void
+    public function testErrorPageSourceContractsStayReadable(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('var/www/error-403.html', [
-            '403 - Forbidden',
-            'The sage guards this path.',
-            '<a href="/">Return to the main page.</a>',
-        ]);
-    }
-
-    public function testBadGatewayErrorPageRestoresActionableRecoveryGuidance(): void
-    {
-        $contents = $this->pmssReadRepoFile('var/www/error-502.html');
-        $this->assertStringContainsAllStrings(['Your disk quota is full', 'connect with SFTP and delete files', 'account is suspended', 'server-wide storage pressure'], $contents);
-    }
-
-    public function testPerUserLighttpdTemplateUsesCustomerTreeErrorFiles(): void
-    {
-        $this->pmssAssertRepoFileContainsString(
-            'etc/seedbox/config/template.lighttpd',
-            'server.errorfile-prefix    = "/home/##username/www/error-"'
-        );
-    }
-
-    public function testPerUserServiceUnavailablePagePollsAndReloads(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'etc/skel/www/error-503.html',
-            [
+        $this->pmssAssertRepoFileContractCases([
+            'var/www/error-401.html' => ['required' => [
+                '401 - Authentication Required',
+                'Enter your PMSS username',
+                'refresh this page to try again',
+                '<a href="/">Return to the main page.</a>',
+            ]],
+            'var/www/error-403.html' => ['required' => [
+                '403 - Forbidden',
+                'The sage guards this path.',
+                '<a href="/">Return to the main page.</a>',
+            ]],
+            'var/www/error-502.html' => ['required' => ['Your disk quota is full', 'connect with SFTP and delete files', 'account is suspended', 'server-wide storage pressure']],
+            'etc/seedbox/config/template.lighttpd' => ['required' => ['server.errorfile-prefix    = "/home/##username/www/error-"']],
+            'etc/skel/www/error-503.html' => ['required' => [
                 '503 - Service Unavailable',
                 'class="error-message"',
                 'The sage is waiting for this application to answer.',
@@ -82,19 +61,12 @@ class ErrorPageTemplateTest extends TestCase
                 'window.fetch(retryUrl(), {',
                 'window.location.reload();',
                 '<a href="/">Return to the main page.</a>',
-            ]
-        );
-    }
-
-    public function testSuspendedErrorPageKeepsReadableSupportCallToAction(): void
-    {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('var/www/error-suspended.html', [
-            'Account Suspended',
-            'https://pulsedmedia.com/contact/',
-            'class="cta"',
-            '.cta:visited',
-            'color:#fff;',
-        ], ['<img']);
+            ]],
+            'var/www/error-suspended.html' => [
+                'required' => ['Account Suspended', 'https://pulsedmedia.com/contact/', 'class="cta"', '.cta:visited', 'color:#fff;'],
+                'forbidden' => ['<img'],
+            ],
+        ]);
     }
 
     public function testUserNginxTemplateUsesPerUser502FallbackPage(): void

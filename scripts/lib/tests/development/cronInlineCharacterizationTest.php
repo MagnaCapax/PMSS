@@ -18,22 +18,9 @@ class CronInlineCharacterizationTest extends TestCase
     public function testServiceWatchdogsUseSharedHelpersAndKeepCommands(): void
     {
         $this->pmssAssertRepoFileContractCases([
-            'scripts/cron/checkQbittorrentInstances.php' => ['required' => ['pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssQbittorrentApplyManagedConfig'", 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox stopped due to suspension'", "'qbittorrent-nox start requested'"]],
-            'scripts/cron/checkRcloneInstances.php' => ['required' => ['pmssUserWatchdogRunService(', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone stopped due to suspension'", "'rclone start requested'"]],
-            'scripts/cron/checkDelugeInstances.php' => ['required' => ['pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssDelugeApplyManagedConfig'", "'deluge stopped due to suspension'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'"]],
-        ]);
-    }
-
-    public function testServiceWatchdogsQuoteSuShellBoundaries(): void
-    {
-        foreach (['scripts/cron/checkQbittorrentInstances.php', 'scripts/cron/checkRcloneInstances.php', 'scripts/cron/checkDelugeInstances.php'] as $path) {
-            $src = $this->pmssReadRepoFile($path);
-            $unsafeNeedle = 'su '.'{$thisUser}';
-            $this->assertStringNotContainsString($unsafeNeedle, $src);
-            $this->assertStringContainsString('pmssUserWatchdogSuCommand($thisUser,', $src);
-        }
-
-        $this->pmssAssertRepoFileContractCases([
+            'scripts/cron/checkQbittorrentInstances.php' => ['required' => ['pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssQbittorrentApplyManagedConfig'", 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox stopped due to suspension'", "'qbittorrent-nox start requested'", 'pmssUserWatchdogSuCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'qBittorrent watchdog must quote su shell boundaries through the shared helper']],
+            'scripts/cron/checkRcloneInstances.php' => ['required' => ['pmssUserWatchdogRunService(', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone stopped due to suspension'", "'rclone start requested'", 'pmssUserWatchdogSuCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'rclone watchdog must quote su shell boundaries through the shared helper']],
+            'scripts/cron/checkDelugeInstances.php' => ['required' => ['pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssDelugeApplyManagedConfig'", "'deluge stopped due to suspension'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'", 'pmssUserWatchdogSuCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'deluge watchdog must quote su shell boundaries through the shared helper']],
             'scripts/lib/runtime/environment.php' => ['required' => ['function pmssBuildUserShellCommand(', 'escapeshellarg($username)', 'escapeshellarg($command)']],
             'scripts/lib/user/watchdog.php' => ['required' => ['function pmssUserWatchdogSuCommand(', 'pmssBuildUserShellCommand($username, $innerCommand)']],
         ]);

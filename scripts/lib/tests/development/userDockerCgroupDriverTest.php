@@ -6,35 +6,20 @@ require_once dirname(__DIR__, 2).'/user/rootlessDockerConfig.php';
 
 class UserDockerCgroupDriverTest extends TestCase
 {
-    public function testSkelSeedsCgroupfsDriverOverride(): void
+    public function testUserDockerSourceContractsKeepRootlessConfigFlow(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'etc/skel/.config/docker/daemon.json',
-            ['"exec-opts"', '"native.cgroupdriver=cgroupfs"']
-        );
-    }
-
-    public function testUserDockerBackfillsCgroupV2DaemonConfigBeforeStart(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/util/userDocker.php',
-            [
-                "require_once __DIR__.'/../lib/user/rootlessDockerConfig.php';",
-                'function userDockerCgroupMode(): string',
-                "pmssCgroupModeWithDefault('v1')",
-                'pmssUserRootlessDockerConfigConverge($user, $home, $uid, $gid',
-                'userDockerEnsureCgroupfsDaemonConfig($user, $home, $uid, (int) $info[\'gid\']);',
-                'userDocker: wrote ~/.config/docker/daemon.json for cgroup v2 rootless Docker',
-                'userDocker: updated ~/.config/docker/daemon.json for cgroup v2 rootless Docker',
-                'unsafe_config_file',
-            ]
-        );
-    }
-
-    public function testUserDockerValidatesManagedAccountBeforeShellBoundaries(): void
-    {
-        $this->pmssAssertRepoFileContract('scripts/util/userDocker.php', [
+        $this->pmssAssertRepoFileContractCases([
+            'etc/skel/.config/docker/daemon.json' => ['required' => ['"exec-opts"', '"native.cgroupdriver=cgroupfs"']],
+            'scripts/util/userDocker.php' => [
                 'required' => [
+                    "require_once __DIR__.'/../lib/user/rootlessDockerConfig.php';",
+                    'function userDockerCgroupMode(): string',
+                    "pmssCgroupModeWithDefault('v1')",
+                    'pmssUserRootlessDockerConfigConverge($user, $home, $uid, $gid',
+                    'userDockerEnsureCgroupfsDaemonConfig($user, $home, $uid, (int) $info[\'gid\']);',
+                    'userDocker: wrote ~/.config/docker/daemon.json for cgroup v2 rootless Docker',
+                    'userDocker: updated ~/.config/docker/daemon.json for cgroup v2 rootless Docker',
+                    'unsafe_config_file',
                     'function userDockerSafeLabel(string $value): string',
                     'function userDockerAccountInfo(string $user, ?string &$reason = null): ?array',
                     'pmssValidateUsername($user)',
@@ -65,7 +50,8 @@ class UserDockerCgroupDriverTest extends TestCase
                         'orderPrefix' => 'userDockerRunAs must validate account before shell builder: ',
                     ],
                 ],
-            ]);
+            ],
+        ]);
     }
 
     public function testSharedRootlessDockerConfigCreatesCgroupfsOnlyConfig(): void
