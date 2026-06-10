@@ -40,8 +40,10 @@ if ($rc === 0) {
             continue;
         }
 
+        // wg dump peer fields: pubkey, preshared-key, endpoint, allowed-ips,
+        // latest-handshake, rx, tx, keepalive.
         $status[$parts[0]] = [
-            'endpoint' => $parts[1],
+            'endpoint' => $parts[2],
             'latest'   => (int) $parts[4],
             'rx'       => $parts[5],
             'tx'       => $parts[6],
