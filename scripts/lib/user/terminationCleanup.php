@@ -11,6 +11,7 @@
 
 require_once dirname(__DIR__).'/userLifecycle.php';
 require_once __DIR__.'/homeReclaim.php';
+require_once __DIR__.'/userConfigStore.php';
 
 /** Remove a lifecycle-owned file while preserving dry-run semantics. */
 function pmssTerminateUserUnlinkPath(string $username, string $phase, string $path, bool $dryRun): bool
@@ -91,6 +92,111 @@ function pmssTerminateUserRtorrentPortRecord(string $username, array &$ports, st
     }
 
     $ports[$type] = $port;
+}
+
+/**
+ * Load rTorrent reservation ports from the durable per-user payload.
+ *
+ * @return array<string,int>
+ */
+function pmssTerminateUserRtorrentStoredPorts(string $username, ?UserConfigStore $store = null): array
+{
+    $store = $store ?: new UserConfigStore();
+    $payload = $store->get($username);
+    if (!is_array($payload)) {
+        return array();
+    }
+
+    $ports = array();
+    foreach (array('scgi' => 'rtorrentPort', 'dht' => 'rtorrentDhtPort', 'listen' => 'rtorrentListenPort') as $type => $key) {
+        if (array_key_exists($key, $payload)) {
+            pmssTerminateUserRtorrentPortRecord($username, $ports, $type, (string) $payload[$key]);
+        }
+    }
+
+    return $ports;
+}
+
+/**
+ * Fill missing rTorrent reservation ports from old directive-style configs.
+ *
+ * @param array<string,int> $ports
+ * @return array<string,int>
+ */
+function pmssTerminateUserRtorrentLegacyPorts(string $username, string $portFile, array $ports): array
+{
+    if (!file_exists($portFile)) {
+        return $ports;
+    }
+
+    $configLines = @file($portFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if (!is_array($configLines)) {
+        pmssUserLifecycleContextLogStatusMessage(
+            'terminate',
+            'cleanup_ports_config_read',
+            $username,
+            'WARN',
+            'Unable to read rTorrent config; skipping reserved port cleanup',
+            array('path' => $portFile)
+        );
+    } else {
+        $patterns = array(
+            'scgi' => '/^scgi_port\s*=\s*(?:[^:]*:)?(\d+)/i',
+            'dht' => '/^(?:dht_?port|dht\.port(?:\.set)?)\s*=\s*(\d+)/i',
+            'listen' => '/^port_range\s*=\s*(\d+)(?:\s*-\s*\d+)?/i',
+        );
+        foreach ($configLines as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#') {
+                continue;
+            }
+            foreach ($patterns as $type => $pattern) {
+                if (isset($ports[$type])) {
+                    continue;
+                }
+                if (preg_match($pattern, $line, $m) !== 1) {
+                    continue;
+                }
+                pmssTerminateUserRtorrentPortRecord($username, $ports, $type, $m[1]);
+                break;
+            }
+        }
+    }
+
+    return $ports;
+}
+
+/** Release rTorrent reservation files recorded for a user. */
+function pmssTerminateUserReleaseRtorrentPortReservations(string $username, string $portFile, bool $dryRun, string $portsBase = '/var/lib/pmss/ports', ?UserConfigStore $store = null): bool
+{
+    $portsBase = rtrim($portsBase, '/');
+    $ports = pmssTerminateUserRtorrentLegacyPorts(
+        $username,
+        $portFile,
+        pmssTerminateUserRtorrentStoredPorts($username, $store)
+    );
+
+    if (count($ports) === 0 && !file_exists($portFile)) {
+        return true;
+    }
+
+    $ok = true;
+    foreach ($ports as $type => $port) {
+        $filePath = $portsBase.'/'.$type.'/'.$port;
+        if (!file_exists($filePath) && !is_link($filePath)) {
+            continue;
+        }
+        $ok = pmssTerminateUserUnlinkPath($username, 'release_rtorrent_'.$type.'_port', $filePath, $dryRun) && $ok;
+        $ok = pmssTerminateUserRemoveEmptyDir($username, 'remove_empty_rtorrent_'.$type.'_port_dir', dirname($filePath), $dryRun) && $ok;
+    }
+    $ok = pmssTerminateUserRemoveEmptyDir($username, 'remove_empty_rtorrent_ports_root', $portsBase, $dryRun) && $ok;
+    pmssUserLifecycleContextLog('terminate', 'cleanup_ports', $username, array(
+        'status'  => $dryRun ? 'SKIP' : ($ok ? 'OK' : 'ERR'),
+        'ports'   => $ports,
+        'dry_run' => $dryRun,
+    ));
+
+    return $ok;
 }
 
 /** Move a validated source path into the asynchronous reclaim namespace. */

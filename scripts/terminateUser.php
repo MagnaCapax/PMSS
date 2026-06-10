@@ -140,50 +140,8 @@ sleep(3);   // Allow time for rTorrent to die
 
 pmssUserLifecycleStep('terminate', $username, 'kill_processes_retry', $killUserCommand, $dryRun);  // Sometimes things just don't dieee!
 
-// Clean up reserved rTorrent ports before removing the home directory
-$portFile = "/home/{$username}/.rtorrent.rc";
-$ports = [];
-if (file_exists($portFile)) {
-    // #TODO consider parsing ports via shared helper instead of ad-hoc regex when refactoring rtorrent config handling.
-    $configLines = @file($portFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (!is_array($configLines)) {
-        pmssUserLifecycleContextLogStatusMessage(
-            'terminate',
-            'cleanup_ports_config_read',
-            $username,
-            'WARN',
-            'Unable to read rTorrent config; skipping reserved port cleanup',
-            array('path' => $portFile)
-        );
-        $configLines = array();
-    }
-    foreach ($configLines as $line) {
-        $line = trim($line);
-        if ($line === '' || $line[0] == '#') continue;
-        if (preg_match('/^scgi_port\s*=\s*(?:[^:]*:)?(\d+)/i', $line, $m)) {
-            pmssTerminateUserRtorrentPortRecord($username, $ports, 'scgi', $m[1]);
-        } elseif (preg_match('/dht.*port.*=\s*(\d+)/i', $line, $m)) {
-            pmssTerminateUserRtorrentPortRecord($username, $ports, 'dht', $m[1]);
-        } elseif (preg_match('/port_range.*=\s*(\d+)/i', $line, $m)) {
-            pmssTerminateUserRtorrentPortRecord($username, $ports, 'listen', $m[1]);
-        }
-    }
-    $portsBase = '/var/lib/pmss/ports';
-    $portCleanupOk = true;
-    foreach ($ports as $type => $port) {
-        $filePath = "$portsBase/{$type}/{$port}";
-        if (file_exists($filePath) || is_link($filePath)) {
-            $portCleanupOk = pmssTerminateUserUnlinkPath($username, 'release_rtorrent_'.$type.'_port', $filePath, $dryRun) && $portCleanupOk;
-            $portCleanupOk = pmssTerminateUserRemoveEmptyDir($username, 'remove_empty_rtorrent_'.$type.'_port_dir', dirname($filePath), $dryRun) && $portCleanupOk;
-        }
-    }
-    $portCleanupOk = pmssTerminateUserRemoveEmptyDir($username, 'remove_empty_rtorrent_ports_root', $portsBase, $dryRun) && $portCleanupOk;
-    pmssUserLifecycleContextLog('terminate', 'cleanup_ports', $username, array(
-        'status'  => $dryRun ? 'SKIP' : ($portCleanupOk ? 'OK' : 'ERR'),
-        'ports'   => $ports,
-        'dry_run' => $dryRun,
-    ));
-}
+// Clean up reserved rTorrent ports before removing the home directory.
+pmssTerminateUserReleaseRtorrentPortReservations($username, "/home/{$username}/.rtorrent.rc", $dryRun);
 
 // Reset per-user slice properties so no stale limits linger (safe if slice missing)
 if (($info = pmssUserAccountLookup($username)) !== null) {

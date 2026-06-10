@@ -110,16 +110,24 @@ final class TerminateUserContractTest extends TestCase
     public function testTerminateUserHandlesUnreadableRtorrentConfig(): void
     {
         $this->pmssAssertRepoFileContractCases([
+            'scripts/util/userConfig.php' => ['required' => [
+                'rtorrentDhtPort',
+                'rtorrentListenPort',
+                'failed to persist rTorrent ports',
+            ]],
             'scripts/terminateUser.php' => ['required' => [
-                '$configLines = @file($portFile',
-                'cleanup_ports_config_read',
-                '$configLines = array();',
-                'pmssTerminateUserRtorrentPortRecord',
+                'pmssTerminateUserReleaseRtorrentPortReservations($username',
             ]],
             'scripts/lib/user/terminationCleanup.php' => ['required' => [
+                'function pmssTerminateUserReleaseRtorrentPortReservations',
                 'function pmssTerminateUserRtorrentPortRecord',
+                'pmssTerminateUserRtorrentStoredPorts',
+                '$configLines = @file($portFile',
                 'pmssNetworkPortParseDigits',
+                'cleanup_ports_config_read',
                 'cleanup_ports_config_invalid',
+                'rtorrentDhtPort',
+                'rtorrentListenPort',
             ]],
         ]);
     }
@@ -246,16 +254,67 @@ final class TerminateUserContractTest extends TestCase
         );
     }
 
-    public function testTerminateUserRtorrentPortRecorderRejectsInvalidPorts(): void
+    public function testTerminateUserRtorrentPortCleanupPreservesDryRunAndRemovesFiles(): void
     {
-        $ports = array();
+        $base = $this->pmssMakeTempDir('pmss-terminate-ports-');
+        $store = new \UserConfigStore($this->pmssMakeTempDir('pmss-terminate-store-').'/seedbox/config');
+        $this->assertTrue($store->set('user1234', [
+            'ramMiB' => 512,
+            'rtorrentPort' => '5050',
+            'rtorrentDhtPort' => '5051',
+            'rtorrentListenPort' => '5052',
+            'quota' => 10,
+            'quotaBurst' => 12,
+        ]));
+        $config = $this->pmssMakeTempFile('pmss-terminate-ports-config-');
+        $this->pmssWriteFile($config, "# ignored\nscgi_port = 127.0.0.1:6050\ndht.port.set = 0\nnetwork.port_range.set = 20000-60000\n");
+        $this->pmssWriteFile($base.'/scgi/5050', 'user1234');
+        $this->pmssWriteFile($base.'/scgi/6050', 'legacy');
+        $this->pmssWriteFile($base.'/dht/5051', 'user1234');
+        $this->pmssWriteFile($base.'/dht/0', 'invalid');
+        $this->pmssWriteFile($base.'/listen/5052', 'user1234');
+        $this->pmssWriteFile($base.'/listen/20000', 'static-template');
 
-        \pmssTerminateUserRtorrentPortRecord('user1234', $ports, 'scgi', '2000');
-        \pmssTerminateUserRtorrentPortRecord('user1234', $ports, 'dht', '0');
-        \pmssTerminateUserRtorrentPortRecord('user1234', $ports, 'listen', '65536');
-        \pmssTerminateUserRtorrentPortRecord('user1234', $ports, 'bad', 'not-a-port');
-        \pmssTerminateUserRtorrentPortRecord('user1234', $ports, 'bad', '2001');
+        $this->assertTrue(\pmssTerminateUserReleaseRtorrentPortReservations('user1234', $config, true, $base, $store));
+        $this->assertSame(array(true, true, true), array(is_file($base.'/scgi/5050'), is_file($base.'/dht/5051'), is_file($base.'/listen/5052')));
 
-        $this->assertSame(array('scgi' => 2000), $ports);
+        $this->assertTrue(\pmssTerminateUserReleaseRtorrentPortReservations('user1234', $config, false, $base, $store));
+        $this->assertSame(
+            array(false, true, false, true, false, true, true, true),
+            array(
+                file_exists($base.'/scgi/5050'),
+                is_file($base.'/scgi/6050'),
+                file_exists($base.'/dht/5051'),
+                is_file($base.'/dht/0'),
+                file_exists($base.'/listen/5052'),
+                is_file($base.'/listen/20000'),
+                is_dir($base.'/dht'),
+                is_dir($base.'/listen')
+            )
+        );
+    }
+
+    public function testTerminateUserRtorrentPortCleanupKeepsLegacyFallback(): void
+    {
+        $base = $this->pmssMakeTempDir('pmss-terminate-legacy-ports-');
+        $store = new \UserConfigStore($this->pmssMakeTempDir('pmss-terminate-empty-store-').'/seedbox/config');
+        $config = $this->pmssMakeTempFile('pmss-terminate-legacy-ports-config-');
+        $this->pmssWriteFile($config, "scgi_port = localhost:6060\ndht_port = 6061\nport_range = 6062-6062\nnetwork.port_range.set = 20000-60000\n");
+        $this->pmssWriteFile($base.'/scgi/6060', 'legacy');
+        $this->pmssWriteFile($base.'/dht/6061', 'legacy');
+        $this->pmssWriteFile($base.'/listen/6062', 'legacy');
+        $this->pmssWriteFile($base.'/listen/20000', 'static-template');
+
+        $this->assertTrue(\pmssTerminateUserReleaseRtorrentPortReservations('user1234', $config, false, $base, $store));
+        $this->assertSame(
+            array(false, false, false, true, true),
+            array(
+                file_exists($base.'/scgi/6060'),
+                file_exists($base.'/dht/6061'),
+                file_exists($base.'/listen/6062'),
+                is_file($base.'/listen/20000'),
+                is_dir($base.'/listen')
+            )
+        );
     }
 }

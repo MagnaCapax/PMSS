@@ -158,14 +158,22 @@ try {
 }
 $rtorrentConfig->writeConfig($user['name'], $configuration['configFile']);
 
-// Persist derived ports once rTorrent config is generated so they survive
-// re-runs and other tooling can read a single source of truth.
-$scgiPort = (int) ($configuration['config']['scgiPort'] ?? 0);
-if ($scgiPort > 0 && (!isset($payload['rtorrentPort']) || (int) $payload['rtorrentPort'] !== $scgiPort)) {
-    $payload['rtorrentPort'] = $scgiPort;
-    if (!$store->persist($user['name'], $payload)) {
-        fwrite(STDERR, "Warning: failed to persist rtorrentPort for {$user['name']}\n");
+// Persist derived ports once rTorrent config is generated so termination and
+// watchdog tooling read the same source of truth as the reservation path.
+$rtorrentPortsChanged = false;
+foreach (array(
+    'rtorrentPort' => (int) ($configuration['config']['scgiPort'] ?? 0),
+    'rtorrentDhtPort' => (int) ($configuration['config']['dhtPort'] ?? 0),
+    'rtorrentListenPort' => (int) ($configuration['config']['listenPort'] ?? 0),
+) as $key => $port) {
+    if ($port > 0 && (!isset($payload[$key]) || (int) $payload[$key] !== $port)) {
+        $payload[$key] = $port;
+        $rtorrentPortsChanged = true;
     }
+}
+$scgiPort = (int) ($payload['rtorrentPort'] ?? 0);
+if ($rtorrentPortsChanged && !$store->persist($user['name'], $payload)) {
+    fwrite(STDERR, "Warning: failed to persist rTorrent ports for {$user['name']}\n");
 }
 echo "Changing ruTorrent config\n";
 updateRutorrentConfig($user['name'], $scgiPort);
