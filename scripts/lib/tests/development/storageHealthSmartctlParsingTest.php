@@ -73,24 +73,16 @@ class StorageHealthSmartctlParsingTest extends TestCase
         $this->assertTrue(in_array('health_unknown', $entry['flags'], true));
     }
 
-    public function testFailedHealthBecomesFailSeverity(): void
+    public function testFailedHealthVariantsBecomeFailSeverity(): void
     {
-        $out = "SMART Health Status: FAILED\n";
-        $disk = ['path' => '/dev/sdd', 'kname' => 'sdd', 'model' => 'TEST', 'serial' => 'W', 'rota' => 1, 'size' => '9T'];
-        $entry = \pmssStorageHealthParseSmartctlOutput($out, $disk, null, '2025-01-01T00:00:00+00:00');
-
-        $this->assertEquals('fail', $entry['severity']);
-        $this->assertTrue(in_array('health_not_ok', $entry['flags'], true));
-    }
-
-    public function testFailKeywordOverridesOkKeyword(): void
-    {
-        $out = "SMART Health Status: OK FAIL\n";
-        $disk = ['path' => '/dev/sdy', 'kname' => 'sdy', 'model' => 'TEST', 'serial' => 'Q', 'rota' => 1, 'size' => '9T'];
-        $entry = \pmssStorageHealthParseSmartctlOutput($out, $disk, null, '2025-01-01T00:00:00+00:00');
-
-        $this->assertEquals('fail', $entry['severity']);
-        $this->assertTrue(in_array('health_not_ok', $entry['flags'], true));
+        foreach ([
+            ["SMART Health Status: FAILED\n", ['path' => '/dev/sdd', 'kname' => 'sdd', 'serial' => 'W']],
+            ["SMART Health Status: OK FAIL\n", ['path' => '/dev/sdy', 'kname' => 'sdy', 'serial' => 'Q']],
+        ] as [$out, $disk]) {
+            $entry = \pmssStorageHealthParseSmartctlOutput($out, $disk + ['model' => 'TEST', 'rota' => 1, 'size' => '9T'], null, '2025-01-01T00:00:00+00:00');
+            $this->assertEquals('fail', $entry['severity']);
+            $this->assertTrue(in_array('health_not_ok', $entry['flags'], true));
+        }
     }
 
     public function testStandbyIsOk(): void

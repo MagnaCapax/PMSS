@@ -17,15 +17,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
 {
     $entry = pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1);
 
-    $defaultMetrics = [
-        'health' => 'UNKNOWN',
-        'reallocated' => null,
-        'pending' => null,
-        'udma_crc' => null,
-        'temp_c' => null,
-        'power_on_hours' => null,
-        'link_errors' => null,
-    ];
+    $defaultMetrics = ['health' => 'UNKNOWN'] + array_fill_keys(['reallocated', 'pending', 'udma_crc', 'temp_c', 'power_on_hours', 'link_errors'], null);
 
     if (stripos($out, 'Device is in STANDBY') !== false || stripos($out, 'Device is in SLEEP') !== false) {
         $entry['metrics'] = $defaultMetrics;
@@ -113,12 +105,8 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         foreach (['reallocated' => false, 'pending' => true, 'link_errors' => false] as $metric => $raiseWarn) {
             $current = $metrics[$metric] ?? null;
             $previous = $prevMetrics[$metric] ?? null;
-            if (!is_int($current) || !is_int($previous) || $current <= $previous) {
-                continue;
-            }
-            if ($raiseWarn) {
-                $sev = pmssStorageHealthWarnSeverity($sev);
-            }
+            if (!is_int($current) || !is_int($previous) || $current <= $previous) continue;
+            if ($raiseWarn) $sev = pmssStorageHealthWarnSeverity($sev);
             $flags[] = $metric.'_increase';
         }
     }

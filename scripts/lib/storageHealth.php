@@ -28,13 +28,7 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
     if ($out === '') {
         return null;
     }
-    $metrics = [
-        'critical_warnings' => null,
-        'temperature' => null,
-        'media_errors' => null,
-        'num_err_log_entries' => null,
-        'percentage_used' => null,
-    ];
+    $metrics = array_fill_keys(['critical_warnings', 'temperature', 'media_errors', 'num_err_log_entries', 'percentage_used'], null);
     foreach ([
         '/critical_warning\\s*:\\s*(\\d+)/i' => 'critical_warnings',
         '/media_errors\\s*:\\s*(\\d+)/i' => 'media_errors',
@@ -70,12 +64,10 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
     $previous = $last['nvme::'.$dev]['metrics'] ?? null;
     if (is_array($previous)) {
         foreach (['media_errors' => 'media_errors_increase', 'num_err_log_entries' => 'err_log_increase'] as $metric => $flag) {
-            if (!isset($metrics[$metric], $previous[$metric]) || $metrics[$metric] <= $previous[$metric]) {
-                continue;
-            }
-            if ($metric === 'media_errors') {
-                $severity = pmssStorageHealthWarnSeverity($severity);
-            }
+            $current = $metrics[$metric] ?? null;
+            $old = $previous[$metric] ?? null;
+            if (!is_int($current) || !is_int($old) || $current <= $old) continue;
+            if ($metric === 'media_errors') $severity = pmssStorageHealthWarnSeverity($severity);
             $flags[] = $flag;
         }
     }

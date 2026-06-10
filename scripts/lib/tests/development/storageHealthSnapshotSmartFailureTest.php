@@ -6,7 +6,7 @@ require_once dirname(__DIR__, 2).'/storageHealth.php';
 
 class StorageHealthSnapshotSmartFailureTest extends TestCase
 {
-    public function testSnapshotSmartReturnsUnreadableFailureForMissingDevice(): void
+    public function testSnapshotSmartGuardFailures(): void
     {
         $disk = ['path' => sys_get_temp_dir().'/pmss-smart-missing-'.bin2hex(random_bytes(4)), 'kname' => 'sdx'];
 
@@ -18,10 +18,7 @@ class StorageHealthSnapshotSmartFailureTest extends TestCase
         $this->assertEquals(['device_unreadable'], $entry['flags']);
         $this->assertEquals('warn', $entry['severity']);
         $this->assertTrue(!$entry['ok']);
-    }
 
-    public function testSnapshotSmartReturnsMissingToolFailureBeforeExecution(): void
-    {
         $device = $this->pmssMakeReadableTempPath('pmss-smart-readable-', 'dev-');
 
         $entry = [];
