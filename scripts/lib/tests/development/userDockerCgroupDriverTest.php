@@ -31,6 +31,43 @@ class UserDockerCgroupDriverTest extends TestCase
         );
     }
 
+    public function testUserDockerValidatesManagedAccountBeforeShellBoundaries(): void
+    {
+        $this->pmssAssertRepoFileContract('scripts/util/userDocker.php', [
+                'required' => [
+                    'function userDockerSafeLabel(string $value): string',
+                    'function userDockerAccountInfo(string $user, ?string &$reason = null): ?array',
+                    'pmssValidateUsername($user)',
+                    'pmssPasswdEntryPositiveUid($info) === null',
+                    '$info = userDockerAccountInfo($user, $accountReason);',
+                    '$safeUser = userDockerSafeLabel($user);',
+                    '$target = userDockerAccountInfo($user);',
+                    '$rc = 127;',
+                ],
+                'ordered' => [
+                    [
+                        'needles' => [
+                            '$user = $args[1];',
+                            '$info = userDockerAccountInfo($user, $accountReason);',
+                            '$uid = (int) $info[\'uid\'];',
+                            '$runtimeDir = "/run/user/{$uid}";',
+                        ],
+                        'missingPrefix' => 'missing userDocker CLI account guard: ',
+                        'orderPrefix' => 'userDocker must validate account before runtime paths: ',
+                    ],
+                    [
+                        'needles' => [
+                            'function userDockerRunAs(string $user, string $cmd, ?int $timeoutSeconds = null, ?int &$rc = null): string',
+                            '$target = userDockerAccountInfo($user);',
+                            '$wrapper = pmssBuildUserShellCommand($user, $cmd);',
+                        ],
+                        'missingPrefix' => 'missing userDockerRunAs account guard: ',
+                        'orderPrefix' => 'userDockerRunAs must validate account before shell builder: ',
+                    ],
+                ],
+            ]);
+    }
+
     public function testSharedRootlessDockerConfigCreatesCgroupfsOnlyConfig(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');

@@ -71,9 +71,50 @@ if (!in_array($action, $valid, true)) {
     exit(1);
 }
 
+/** Return a single-line value safe for stderr and log context. */
+function userDockerSafeLabel(string $value): string
+{
+    $label = preg_replace('/[\r\n\0]+/', '?', $value);
+    return is_string($label) && $label !== '' ? $label : '(empty)';
+}
+
+/** Resolve only managed account names with a positive UID before shelling out. */
+function userDockerAccountInfo(string $user, ?string &$reason = null): ?array
+{
+    $reason = null;
+    if (!pmssValidateUsername($user)) {
+        $reason = 'invalid';
+        return null;
+    }
+
+    $info = pmssUserAccountLookup($user);
+    if ($info === null) {
+        $reason = 'unknown';
+        return null;
+    }
+
+    if (pmssPasswdEntryPositiveUid($info) === null) {
+        $reason = 'unsafe_uid';
+        return null;
+    }
+
+    return $info;
+}
+
 // Resolve UID so we can derive runtime paths.
-$info = pmssUserAccountLookup($user);
-if ($info === null) { fwrite(STDERR, "Unknown user: {$user}\n"); exit(1); }
+$accountReason = null;
+$info = userDockerAccountInfo($user, $accountReason);
+if ($info === null) {
+    $safeUser = userDockerSafeLabel($user);
+    if ($accountReason === 'invalid') {
+        fwrite(STDERR, "Invalid user: {$safeUser}\n");
+    } elseif ($accountReason === 'unsafe_uid') {
+        fwrite(STDERR, "Unsafe user UID: {$safeUser}\n");
+    } else {
+        fwrite(STDERR, "Unknown user: {$safeUser}\n");
+    }
+    exit(1);
+}
 $uid = (int) $info['uid'];
 $runtimeDir = "/run/user/{$uid}";
 $dockerSock = $runtimeDir.'/docker.sock';
@@ -93,8 +134,13 @@ function userDockerRunAs(string $user, string $cmd, ?int $timeoutSeconds = null,
     static $timeoutBinResolved = false;
     static $timeoutBin = null;
 
+    $target = userDockerAccountInfo($user);
+    if ($target === null) {
+        $rc = 127;
+        return '';
+    }
+
     $wrapper = pmssBuildUserShellCommand($user, $cmd);
-    $target = pmssUserAccountLookup($user);
     $currentUid = function_exists('posix_geteuid') ? (int) posix_geteuid() : -1;
     if ($target !== null && $currentUid > 0 && $currentUid === (int) $target['uid']) {
         // When already running as the target user (e.g. per-user web UI),
