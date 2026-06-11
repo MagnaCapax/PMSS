@@ -129,17 +129,26 @@ function pmssWireguardSyncconfFromConfig(): array
     return ['stage' => 'syncconf', 'rc' => (int) $sync['rc']];
 }
 
+/** Emit the standard command rc status to stdout and per-user logs. */
+function pmssWireguardReportCommandRc(
+    array $peerUsers, string $logPrefix, int $rc, string $okLine,
+    string $failLine, string $okUserLog, string $failUserLog
+): void {
+    $ok = $rc === 0;
+    echo $logPrefix . ($ok ? $okLine : sprintf($failLine, $rc)) . "\n";
+    pmssWireguardLogUsers($peerUsers, $ok ? $okUserLog : sprintf($failUserLog, $rc));
+}
+
 /** Restart wg-quick@wg0 and report the outcome consistently. */
 function pmssWireguardRestartWgQuick(array $peerUsers, string $logPrefix): void
 {
     $restartStatus = pmssWireguardCommandCapture('systemctl', ['restart', 'wg-quick@wg0'])['rc'];
-    if ($restartStatus === 0) {
-        echo $logPrefix . "wg-quick@wg0 restarted successfully\n";
-        pmssWireguardLogUsers($peerUsers, 'wireguard: wg-quick@wg0 restarted');
-    } else {
-        echo $logPrefix . "failed to restart wg-quick@wg0 (rc={$restartStatus})\n";
-        pmssWireguardLogUsers($peerUsers, sprintf('wireguard: wg-quick@wg0 restart failed (rc=%d)', $restartStatus));
-    }
+    pmssWireguardReportCommandRc($peerUsers, $logPrefix, $restartStatus,
+        'wg-quick@wg0 restarted successfully',
+        'failed to restart wg-quick@wg0 (rc=%d)',
+        'wireguard: wg-quick@wg0 restarted',
+        'wireguard: wg-quick@wg0 restart failed (rc=%d)'
+    );
 }
 
 /** Verify that configured peers are loaded into the running wg0 interface. */
@@ -202,13 +211,12 @@ function pmssWireguardCheckMain(array $argv): int
 
     if (!pmssWireguardKernelModuleLoaded()) {
         $rc = pmssWireguardCommandCapture('modprobe', ['wireguard'])['rc'];
-        if ($rc !== 0) {
-            echo $logPrefix . "failed to load wireguard kernel module (rc={$rc})\n";
-            pmssWireguardLogUsers($peerUsers, sprintf('wireguard: failed to load kernel module (rc=%d)', $rc));
-        } else {
-            echo $logPrefix . "loaded wireguard kernel module\n";
-            pmssWireguardLogUsers($peerUsers, 'wireguard: kernel module loaded');
-        }
+        pmssWireguardReportCommandRc($peerUsers, $logPrefix, $rc,
+            'loaded wireguard kernel module',
+            'failed to load wireguard kernel module (rc=%d)',
+            'wireguard: kernel module loaded',
+            'wireguard: failed to load kernel module (rc=%d)'
+        );
     }
 
     $wgQuickActive = pmssSystemdUnitIsActive('wg-quick@wg0');
@@ -228,13 +236,12 @@ function pmssWireguardCheckMain(array $argv): int
     if ($status !== 0) {
         echo $logPrefix . "wg0 interface missing; attempting wg-quick up\n";
         $rc = pmssWireguardCommandCapture('wg-quick', ['up', 'wg0'])['rc'];
-        if ($rc === 0) {
-            echo $logPrefix . "wg0 brought up successfully\n";
-            pmssWireguardLogUsers($peerUsers, 'wireguard: wg0 brought up');
-        } else {
-            echo $logPrefix . "failed to bring up wg0 (rc={$rc})\n";
-            pmssWireguardLogUsers($peerUsers, sprintf('wireguard: wg0 bring-up failed (rc=%d)', $rc));
-        }
+        pmssWireguardReportCommandRc($peerUsers, $logPrefix, $rc,
+            'wg0 brought up successfully',
+            'failed to bring up wg0 (rc=%d)',
+            'wireguard: wg0 brought up',
+            'wireguard: wg0 bring-up failed (rc=%d)'
+        );
     } elseif ($debug) {
         echo $logPrefix . "wg show reports interface active\n";
     }

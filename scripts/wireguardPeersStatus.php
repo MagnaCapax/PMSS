@@ -56,21 +56,11 @@ if (empty($peers)) {
     exit(0);
 }
 
-echo str_pad('USER', 16)
-    .str_pad('ADDRESS', 18)
-    .str_pad('CONNECTED', 12)
-    .str_pad('RX (bytes)', 14)
-    .str_pad('TX (bytes)', 14)
-    ."ENDPOINT\n";
+printf("%-16s%-18s%-12s%-14s%-14s%s\n", 'USER', 'ADDRESS', 'CONNECTED', 'RX (bytes)', 'TX (bytes)', 'ENDPOINT');
 
 foreach ($peers as $peer) {
     $entry = $status[$peer['key']] ?? ['endpoint' => '-', 'latest' => 0, 'rx' => '-', 'tx' => '-'];
     $endpoint = $entry['endpoint'] !== '' ? $entry['endpoint'] : '-';
 
-    echo str_pad($peer['user'], 16)
-        .str_pad($peer['ip'], 18)
-        .str_pad($entry['latest'] > 0 ? 'yes' : 'no', 12)
-        .str_pad($entry['rx'], 14)
-        .str_pad($entry['tx'], 14)
-        .$endpoint."\n";
+    printf("%-16s%-18s%-12s%-14s%-14s%s\n", $peer['user'], $peer['ip'], $entry['latest'] > 0 ? 'yes' : 'no', $entry['rx'], $entry['tx'], $endpoint);
 }
