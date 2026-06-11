@@ -56,8 +56,7 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
         $severity = pmssStorageHealthWarnSeverity($severity);
         $flags[] = 'hot_nvme';
     }
-    $percentageUsed = (int) ($metrics['percentage_used'] ?? 0);
-    if ($percentageUsed >= 80) {
+    if (($percentageUsed = (int) ($metrics['percentage_used'] ?? 0)) >= 80) {
         $severity = pmssStorageHealthWarnSeverity($severity);
         $flags[] = $percentageUsed >= 95 ? 'wearout_critical' : 'wearout_high';
     }

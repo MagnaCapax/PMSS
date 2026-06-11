@@ -10,18 +10,13 @@ class StorageHealthSnapshotSmartFailureTest extends TestCase
     {
         $disk = ['path' => sys_get_temp_dir().'/pmss-smart-missing-'.bin2hex(random_bytes(4)), 'kname' => 'sdx'];
 
-        $entry = \pmssStorageHealthSnapshotSmart($disk, [], '2025-01-01T00:00:00+00:00');
-
-        $this->assertSmartGuardEntry($entry, $disk['path'], 'device unreadable', 'device_unreadable');
+        $this->assertSmartGuardEntry(\pmssStorageHealthSnapshotSmart($disk, [], '2025-01-01T00:00:00+00:00'), $disk['path'], 'device unreadable', 'device_unreadable');
 
         $device = $this->pmssMakeReadableTempPath('pmss-smart-readable-', 'dev-');
 
-        $entry = [];
-        $this->pmssWithEnv(['PATH' => ''], function () use ($device, &$entry): void {
-            $entry = \pmssStorageHealthSnapshotSmart(['path' => $device, 'kname' => 'sdy'], [], '2025-01-01T00:00:00+00:00');
+        $this->pmssWithEnv(['PATH' => ''], function () use ($device): void {
+            $this->assertSmartGuardEntry(\pmssStorageHealthSnapshotSmart(['path' => $device, 'kname' => 'sdy'], [], '2025-01-01T00:00:00+00:00'), $device, 'smartctl missing', 'smartctl_missing');
         });
-
-        $this->assertSmartGuardEntry($entry, $device, 'smartctl missing', 'smartctl_missing');
     }
 
     private function assertSmartGuardEntry(array $entry, string $device, string $error, string $flag): void

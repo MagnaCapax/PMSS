@@ -2,13 +2,12 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/storageHealth/common.php';
 
 final class StorageHealthFacadeCharacterizationTest extends TestCase
 {
     public function testDiskInventoryParserMatchesSharedLsblkShape(): void
     {
-        require_once dirname(__DIR__, 2).'/storageHealth/common.php';
-
         $lsblk = "sda disk 0 Samsung SSD SN123 1.8T\n"
             ."loop0 loop 0 Loop Dev L0 1G\n"
             ."ram0 disk 0 Ram Disk R0 64M\n"
@@ -25,8 +24,6 @@ final class StorageHealthFacadeCharacterizationTest extends TestCase
 
     public function testDiskInventoryParserRejectsUnsafeKernelNames(): void
     {
-        require_once dirname(__DIR__, 2).'/storageHealth/common.php';
-
         $lsblk = "../sda disk 0 Bad Traversal BAD 1T\n"
             ."sdb/evil disk 0 Bad Slash BAD 1T\n"
             ."sdc\\evil disk 0 Bad Backslash BAD 1T\n"
