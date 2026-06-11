@@ -26,25 +26,6 @@ if (!defined('PMSS_USER_LOG_JSON')) {
 }
 
 /**
- * Normalize a CLI username argument, log validation failure, and abort on error.
- *
- * Shared by operator-facing scripts so they all enforce the same trust boundary
- * while keeping each script's public error text intact.
- */
-function pmssRequireCliUsername(string $rawUsername, string $action, string $errorFormat, string $logMessage = 'Rejected username due to validation failure'): string
-{
-    $normalized = pmssUsernameNormalizeIfValid($rawUsername);
-    if ($normalized !== null) {
-        return $normalized;
-    }
-
-    $normalized = pmssNormalizeUsername($rawUsername);
-    pmssUserLifecycleContextLogStatusMessage($action, 'validate', $normalized, 'ERR', $logMessage);
-
-    die(sprintf($errorFormat, $normalized));
-}
-
-/**
  * Build a shared context payload for user lifecycle audit logging.
  */
 function pmssUserBaseContext(string $action, string $phase, string $username, array $extra = array()): array

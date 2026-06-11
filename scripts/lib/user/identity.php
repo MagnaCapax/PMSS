@@ -116,6 +116,21 @@ function pmssUsernameNormalizeIfValid(string $rawUsername): ?string
     return pmssValidateUsername($normalized) ? $normalized : null;
 }
 
+/** Normalize a CLI username argument and abort with the legacy error text when invalid. */
+function pmssRequireCliUsername(string $rawUsername, string $action, string $errorFormat, string $logMessage = 'Rejected username due to validation failure'): string
+{
+    $normalized = pmssUsernameNormalizeIfValid($rawUsername);
+    if ($normalized !== null) {
+        return $normalized;
+    }
+
+    $normalized = pmssNormalizeUsername($rawUsername);
+    if (function_exists('pmssUserLifecycleContextLogStatusMessage')) {
+        pmssUserLifecycleContextLogStatusMessage($action, 'validate', $normalized, 'ERR', $logMessage);
+    }
+    die(sprintf($errorFormat, $normalized));
+}
+
 /** @return array{name:string,uid:int,gid:int,dir:string}|null */
 function pmssPasswdEntryLookup(string $username, string $passwdPath = '/etc/passwd'): ?array
 {

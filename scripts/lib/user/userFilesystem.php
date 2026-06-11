@@ -6,7 +6,7 @@
  * @author PMSS Team
  */
 
-require_once dirname(__DIR__).'/userLifecycle.php';
+require_once __DIR__.'/selection.php';
 
 class userFilesystem
 {
