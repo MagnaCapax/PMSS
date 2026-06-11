@@ -8,6 +8,7 @@
  */
 
 require_once __DIR__.'/../lib/runtime.php';
+require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
 const PMSS_PORT_MANAGER_MIN_PORT = 2000;
@@ -91,6 +92,17 @@ function pmssPortManagerAssignmentPathIsSafe(string $portDir, string $portFile):
         && !is_link($portDir)
         && !is_link($portFile)
         && (!file_exists($portFile) || is_file($portFile));
+}
+
+/**
+ * Persist one assignment through the shared symlink-safe port writer.
+ */
+function pmssPortManagerWriteAssignedPort(string $portDir, string $portFile, int $port): bool
+{
+    return pmssPortManagerAssignmentPathIsSafe($portDir, $portFile)
+        && pmssNetworkPortFileWrite($portFile, $port, PMSS_PORT_MANAGER_MIN_PORT, PMSS_PORT_MANAGER_MAX_PORT, 0640)
+        && pmssPortManagerAssignmentPathIsSafe($portDir, $portFile)
+        && pmssPortManagerReadAssignedPort($portFile) === $port;
 }
 
 /** @return array<int, bool> */
@@ -186,9 +198,7 @@ function pmssPortManagerAssignServicePort(string $user, string $service, ?int $p
             }
         }
 
-        if (!pmssPortManagerAssignmentPathIsSafe($portDir, $portFile)) { $status = 'unsafe_assignment_path'; return null; }
-        if (@file_put_contents($portFile, $port, LOCK_EX) === false) { $status = 'write_failed'; return null; }
-        !@chmod($portFile, 0640) && pmssPortManagerLog($user, 'assign', $service, $port, 'WARN', 'chmod_failed');
+        if (!pmssPortManagerWriteAssignedPort($portDir, $portFile, $port)) { $status = 'write_failed'; return null; }
 
         $status = 'assigned';
         return $port;

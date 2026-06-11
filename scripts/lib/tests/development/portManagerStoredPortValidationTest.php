@@ -48,6 +48,34 @@ class PortManagerStoredPortValidationTest extends TestCase
         $this->assertSame(null, \pmssPortManagerReadAssignedPort($linkPath));
     }
 
+    public function testWriteAssignedPortPersistsReadablePortWithSafeMode(): void
+    {
+        $path = $this->portDir.'/lighttpd-alice';
+
+        $this->assertTrue(\pmssPortManagerWriteAssignedPort($this->portDir, $path, 22000));
+        $this->assertSame(22000, \pmssPortManagerReadAssignedPort($path));
+        $this->assertSame(0640, fileperms($path) & 0777);
+    }
+
+    public function testWriteAssignedPortRejectsSymlinkWithoutTouchingTarget(): void
+    {
+        $realPath = $this->pmssMakeTempFile('pmss-port-real-');
+        $linkPath = $this->portDir.'/lighttpd-alice';
+        file_put_contents($realPath, "22000\n");
+        $this->pmssCreateSymlinkOrSkip($realPath, $linkPath);
+
+        $this->assertFalse(\pmssPortManagerWriteAssignedPort($this->portDir, $linkPath, 23000));
+        $this->assertSame("22000\n", (string) file_get_contents($realPath));
+    }
+
+    public function testWriteAssignedPortRejectsOutOfRangePort(): void
+    {
+        $path = $this->portDir.'/lighttpd-alice';
+
+        $this->assertFalse(\pmssPortManagerWriteAssignedPort($this->portDir, $path, 80));
+        $this->assertFalse(file_exists($path));
+    }
+
     public function testSelectAvailablePortReturnsNullWhenRangeExhausted(): void
     {
         $used = [];
