@@ -62,7 +62,8 @@ class CronInlineCharacterizationTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkWireguard.php', [
             '$config = (string) $strip[\'stdout\'];',
             '$written = @file_put_contents($tmp, $config);',
-            '$written === false || $written !== strlen($config)',
+            '$secured = @chmod($tmp, 0600);',
+            '$written === false || $written !== strlen($config) || !$secured',
             "pmssWireguardCommandCapture('wg', ['syncconf', 'wg0', \$tmp])",
         ]);
     }

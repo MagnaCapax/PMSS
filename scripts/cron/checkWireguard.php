@@ -117,8 +117,8 @@ function pmssWireguardSyncconfFromConfig(): array
 
     $config = (string) $strip['stdout'];
     $written = @file_put_contents($tmp, $config);
-    @chmod($tmp, 0600);
-    if ($written === false || $written !== strlen($config)) {
+    $secured = @chmod($tmp, 0600);
+    if ($written === false || $written !== strlen($config) || !$secured) {
         @unlink($tmp);
         return ['stage' => 'tempfile', 'rc' => 1];
     }
