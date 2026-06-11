@@ -193,12 +193,8 @@ function userConfigureDeluge(array $user, array $configuration): void
 function pmssDelugeApplyUploadThrottle(string $username, ?int $throttle = null): bool
 {
     $configFile = "/home/{$username}/.config/deluge/core.conf";
-    if (!is_file($configFile) || is_link($configFile)) {
-        return false;
-    }
-
-    $config = file_get_contents($configFile);
-    if ($config === false) {
+    $config = pmssReadRegularFileContents($configFile);
+    if ($config === null) {
         return false;
     }
 

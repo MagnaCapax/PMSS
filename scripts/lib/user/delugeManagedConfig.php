@@ -120,12 +120,8 @@ function pmssDelugeConfigEncode(array $meta, array $config): ?string
 function pmssDelugeConfigMutate(string $username, callable $mutator, ?string $configFile = null): bool
 {
     $configFile = $configFile ?? pmssDelugeConfigPath($username);
-    if (!is_file($configFile) || is_link($configFile)) {
-        return false;
-    }
-
-    $raw = @file_get_contents($configFile);
-    $parsed = is_string($raw) ? pmssDelugeConfigDecode($raw) : null;
+    $raw = pmssReadRegularFileContents($configFile);
+    $parsed = $raw !== null ? pmssDelugeConfigDecode($raw) : null;
     if (!is_array($parsed)) {
         return false;
     }

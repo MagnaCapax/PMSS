@@ -54,12 +54,8 @@ function pmssDelugeWebConfPath(string $username): string
 
 function pmssDelugeAuthLocalclientPasswordRead(string $authPath): string
 {
-    if (!is_file($authPath) || is_link($authPath)) {
-        return '';
-    }
-
-    $content = @file_get_contents($authPath);
-    if (!is_string($content) || $content === '') {
+    $content = pmssReadRegularFileContents($authPath);
+    if ($content === null || $content === '') {
         return '';
     }
 
