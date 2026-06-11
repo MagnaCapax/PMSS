@@ -88,6 +88,20 @@ function pmssStorageHealthWarnSeverity(string $severity): string
 {
     return $severity === 'ok' ? 'warn' : $severity;
 }
+
+/** Append flags when current metrics exceed the previous snapshot. */
+function pmssStorageHealthAppendMetricIncreaseFlags(array $metrics, array $previous, array $metricFlags, array $warningMetrics, array &$flags, string $severity): string
+{
+    foreach ($metricFlags as $metric => $flag) {
+        $current = $metrics[$metric] ?? null;
+        $old = $previous[$metric] ?? null;
+        if (!is_int($current) || !is_int($old) || $current <= $old) continue;
+        if (in_array($metric, $warningMetrics, true)) $severity = pmssStorageHealthWarnSeverity($severity);
+        $flags[] = $flag;
+    }
+    return $severity;
+}
+
 /**
  * Execute a shell command with captured output (no streaming).
  *

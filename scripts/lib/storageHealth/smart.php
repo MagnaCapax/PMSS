@@ -102,13 +102,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
     }
 
     if (is_array($prevMetrics)) {
-        foreach (['reallocated' => false, 'pending' => true, 'link_errors' => false] as $metric => $raiseWarn) {
-            $current = $metrics[$metric] ?? null;
-            $previous = $prevMetrics[$metric] ?? null;
-            if (!is_int($current) || !is_int($previous) || $current <= $previous) continue;
-            if ($raiseWarn) $sev = pmssStorageHealthWarnSeverity($sev);
-            $flags[] = $metric.'_increase';
-        }
+        $sev = pmssStorageHealthAppendMetricIncreaseFlags($metrics, $prevMetrics, ['reallocated' => 'reallocated_increase', 'pending' => 'pending_increase', 'link_errors' => 'link_errors_increase'], ['pending'], $flags, $sev);
     }
 
     return pmssStorageHealthEntryFinalize($entry, $flags, $sev);

@@ -12,12 +12,7 @@ class StorageHealthSnapshotSmartFailureTest extends TestCase
 
         $entry = \pmssStorageHealthSnapshotSmart($disk, [], '2025-01-01T00:00:00+00:00');
 
-        $this->assertEquals('smart', $entry['kind']);
-        $this->assertEquals($disk['path'], $entry['device']);
-        $this->assertEquals('device unreadable', $entry['error']);
-        $this->assertEquals(['device_unreadable'], $entry['flags']);
-        $this->assertEquals('warn', $entry['severity']);
-        $this->assertTrue(!$entry['ok']);
+        $this->assertSmartGuardEntry($entry, $disk['path'], 'device unreadable', 'device_unreadable');
 
         $device = $this->pmssMakeReadableTempPath('pmss-smart-readable-', 'dev-');
 
@@ -26,9 +21,11 @@ class StorageHealthSnapshotSmartFailureTest extends TestCase
             $entry = \pmssStorageHealthSnapshotSmart(['path' => $device, 'kname' => 'sdy'], [], '2025-01-01T00:00:00+00:00');
         });
 
-        $this->assertEquals('smartctl missing', $entry['error']);
-        $this->assertEquals(['smartctl_missing'], $entry['flags']);
-        $this->assertEquals('warn', $entry['severity']);
-        $this->assertTrue(!$entry['ok']);
+        $this->assertSmartGuardEntry($entry, $device, 'smartctl missing', 'smartctl_missing');
+    }
+
+    private function assertSmartGuardEntry(array $entry, string $device, string $error, string $flag): void
+    {
+        $this->pmssAssertArraySubsetSame(['kind' => 'smart', 'device' => $device, 'error' => $error, 'flags' => [$flag], 'severity' => 'warn', 'ok' => false], $entry);
     }
 }

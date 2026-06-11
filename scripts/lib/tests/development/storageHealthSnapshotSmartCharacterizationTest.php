@@ -24,13 +24,8 @@ final class StorageHealthSnapshotSmartCharacterizationTest extends TestCase
                 '2025-01-01T00:00:00+00:00'
             );
 
-            $this->assertEquals('smart', $entry['kind']);
-            $this->assertEquals($device, $entry['device']);
-            $this->assertEquals(4, $entry['metrics']['udma_crc']);
-            $this->assertEquals(4, $entry['metrics']['link_errors']);
-            $this->assertTrue(in_array('link_errors_increase', $entry['flags'], true));
-            $this->assertEquals('ok', $entry['severity']);
-            $this->assertTrue($entry['ok']);
+            $this->pmssAssertArraySubsetSame(['kind' => 'smart', 'device' => $device, 'flags' => ['link_errors_increase'], 'severity' => 'ok', 'ok' => true], $entry);
+            $this->pmssAssertArraySubsetSame(['udma_crc' => 4, 'link_errors' => 4], $entry['metrics']);
         });
     }
 }

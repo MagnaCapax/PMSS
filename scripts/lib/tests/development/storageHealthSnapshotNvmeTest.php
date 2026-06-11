@@ -18,8 +18,7 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
     public function testSnapshotNvmeParsesMetricsAndFlags(): void
     {
         $device = $this->createFakeNvmeDevice();
-        $stubDir = $this->pmssMakeExecutableStub('nvme', implode("\n", [
-            '#!/bin/sh',
+        $stubDir = $this->createNvmeStub([
             'cat <<\'EOF\'',
             'critical_warning : 1',
             'temperature : 343 K',
@@ -27,7 +26,7 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
             'num_err_log_entries : 9',
             'percentage_used : 96',
             'EOF',
-        ])."\n", 'pmss-nvme-bin-');
+        ]);
 
         $this->pmssWithPathPrefix($stubDir, function () use ($device): void {
             $entry = \pmssStorageHealthSnapshotNvme([
@@ -39,22 +38,15 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
             ], [], '2025-01-01T00:00:00+00:00');
 
             $this->assertTrue(is_array($entry));
-            $this->assertEquals('nvme', $entry['kind']);
-            $this->assertEquals($device, $entry['device']);
-            $this->assertEquals(1, $entry['metrics']['critical_warnings']);
-            $this->assertEquals(70, $entry['metrics']['temperature']);
-            $this->assertEquals(96, $entry['metrics']['percentage_used']);
-            $this->assertEquals('fail', $entry['severity']);
-            $this->assertTrue(!$entry['ok']);
-            $this->assertEquals(['nvme_critical_warning', 'hot_nvme', 'wearout_critical'], $entry['flags']);
+            $this->pmssAssertArraySubsetSame(['kind' => 'nvme', 'device' => $device, 'severity' => 'fail', 'ok' => false, 'flags' => ['nvme_critical_warning', 'hot_nvme', 'wearout_critical']], $entry);
+            $this->pmssAssertArraySubsetSame(['critical_warnings' => 1, 'temperature' => 70, 'percentage_used' => 96], $entry['metrics']);
         });
     }
 
     public function testSnapshotNvmeTracksMetricGrowthAgainstPreviousEntry(): void
     {
         $device = $this->createFakeNvmeDevice();
-        $stubDir = $this->pmssMakeExecutableStub('nvme', implode("\n", [
-            '#!/bin/sh',
+        $stubDir = $this->createNvmeStub([
             'cat <<\'EOF\'',
             'critical_warning : 0',
             'temperature : 42 C',
@@ -62,7 +54,7 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
             'num_err_log_entries : 7',
             'percentage_used : 10',
             'EOF',
-        ])."\n", 'pmss-nvme-bin-');
+        ]);
 
         $this->pmssWithPathPrefix($stubDir, function () use ($device): void {
             $entry = \pmssStorageHealthSnapshotNvme(
@@ -72,8 +64,7 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
             );
 
             $this->assertTrue(is_array($entry));
-            $this->assertEquals('warn', $entry['severity']);
-            $this->assertEquals(['media_errors_increase', 'err_log_increase'], $entry['flags']);
+            $this->pmssAssertArraySubsetSame(['severity' => 'warn', 'flags' => ['media_errors_increase', 'err_log_increase']], $entry);
         });
     }
 
@@ -82,5 +73,10 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
         $path = $this->pmssMakeReadableTempPath('pmss-nvme-device-', 'dev-');
         file_put_contents($path, 'device');
         return $path;
+    }
+
+    private function createNvmeStub(array $body): string
+    {
+        return $this->pmssMakeExecutableStub('nvme', implode("\n", array_merge(['#!/bin/sh'], $body))."\n", 'pmss-nvme-bin-');
     }
 }

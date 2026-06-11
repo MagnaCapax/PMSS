@@ -63,13 +63,7 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
     }
     $previous = $last['nvme::'.$dev]['metrics'] ?? null;
     if (is_array($previous)) {
-        foreach (['media_errors' => 'media_errors_increase', 'num_err_log_entries' => 'err_log_increase'] as $metric => $flag) {
-            $current = $metrics[$metric] ?? null;
-            $old = $previous[$metric] ?? null;
-            if (!is_int($current) || !is_int($old) || $current <= $old) continue;
-            if ($metric === 'media_errors') $severity = pmssStorageHealthWarnSeverity($severity);
-            $flags[] = $flag;
-        }
+        $severity = pmssStorageHealthAppendMetricIncreaseFlags($metrics, $previous, ['media_errors' => 'media_errors_increase', 'num_err_log_entries' => 'err_log_increase'], ['media_errors'], $flags, $severity);
     }
     return pmssStorageHealthEntryFinalize($entry, $flags, $severity);
 }
