@@ -443,6 +443,32 @@ SNAP;
         $this->assertEquals('original', (string) file_get_contents($realTarget));
     }
 
+    public function testScratchCleanupRejectsPathsOutsideScratchRoot(): void
+    {
+        $base = $this->pmssMakeTempDir('pmss-userTransfer-cleanup-');
+        $scratch = $base.'/scratch';
+        $outside = $base.'/outside';
+        $logDir = $base.'/logs';
+        $this->pmssEnsureDir($scratch);
+        $this->pmssEnsureDir($logDir);
+        file_put_contents($scratch.'/transfer.expect', 'scratch');
+        file_put_contents($outside, 'keep');
+
+        $this->pmssWithEnv(['PMSS_LOG_DIR' => $logDir], function () use ($scratch, $outside): void {
+            \pmssUserTransferScratchCleanup($scratch, [
+                $scratch.'/transfer.expect',
+                $scratch.'/../outside',
+                $outside,
+                '',
+                '/',
+            ]);
+        });
+
+        $this->assertFalse(file_exists($scratch.'/transfer.expect'), 'expected scratch file cleanup');
+        $this->assertFalse(is_dir($scratch), 'expected empty scratch root cleanup');
+        $this->assertEquals('keep', (string) file_get_contents($outside), 'outside file must not be unlinked');
+    }
+
     public function testSleepReturnsImmediatelyWhenNoLiveDelayIsAllowed(): void
     {
         foreach ([[1, 1, true, 'dry-run'], [0, 0, false, 'non-positive max']] as [$min, $max, $dryRun, $label]) {

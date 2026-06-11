@@ -97,14 +97,55 @@ function pmssUserTransferCreateScratchRoot(): string
     return $scratch;
 }
 
+/**
+ * Check generated cleanup targets before unlinking them.
+ */
+function pmssUserTransferScratchPathIsInsideRoot(string $path, string $scratch): bool
+{
+    $path = pmssUserTransferScratchPathNormalize($path);
+    $scratch = pmssUserTransferScratchPathNormalize($scratch);
+    if ($path === null || $scratch === null || $scratch === '/') {
+        return false;
+    }
+
+    return strpos($path.'/', rtrim($scratch, '/').'/') === 0;
+}
+
+/**
+ * Normalize absolute scratch paths without resolving symlink targets.
+ */
+function pmssUserTransferScratchPathNormalize(string $path): ?string
+{
+    if ($path === '' || $path[0] !== '/' || strpos($path, "\0") !== false) {
+        return null;
+    }
+
+    $parts = [];
+    foreach (explode('/', $path) as $part) {
+        if ($part === '' || $part === '.') {
+            continue;
+        }
+        if ($part === '..') {
+            return null;
+        }
+        $parts[] = $part;
+    }
+
+    return '/'.implode('/', $parts);
+}
+
 function pmssUserTransferScratchCleanup(string $scratch, array $scratchPaths): void
 {
     foreach ($scratchPaths as $path) {
+        if (!is_string($path) || !pmssUserTransferScratchPathIsInsideRoot($path, $scratch)) {
+            logMessage('[WARN] Skipping unsafe user transfer scratch cleanup path');
+            continue;
+        }
         if (file_exists($path)) {
             @unlink($path);
         }
     }
-    if (is_dir($scratch)) {
+    if (pmssUserTransferScratchPathIsInsideRoot($scratch, $scratch) && is_dir($scratch)) {
         @rmdir($scratch);
     }
 }
