@@ -48,6 +48,17 @@ function pmssMountHardeningPersistFstabChanges(string $fstabPath, array $lines, 
     return false;
 }
 
+/** Run a live mount operation and surface non-zero returns through the caller logger. */
+function pmssMountHardeningRunMountStep(string $description, array $args, callable $logger): int
+{
+    $rc = runStep($description, pmssBuildCommand('mount', $args));
+    if ($rc !== 0) {
+        $logger('[WARN] Mount hardening command failed (rc='.$rc.'): '.$description);
+    }
+
+    return $rc;
+}
+
 /** Resolve the shared inputs used by optional temp mount hardening modes. */
 function pmssMountHardeningContext(string $fstabContext, string $mountsWarn, callable $logger, ?string $fstabPath, ?string $mountsPath): array
 {
@@ -85,7 +96,11 @@ function pmssConfigureTempMountNoexec(?callable $logger = null, ?string $fstabPa
     }
     if ($fstabChanged && is_array($lines) && !pmssMountHardeningPersistFstabChanges($fstabPath, $lines, $log)) return;
     foreach ($remounts as $mountPoint) {
-        runStep('Remounting '.$mountPoint.' with noexec hardening', pmssBuildCommand('mount', ['-o', 'remount,'.implode(',', $required), $mountPoint]));
+        pmssMountHardeningRunMountStep(
+            'Remounting '.$mountPoint.' with noexec hardening',
+            ['-o', 'remount,'.implode(',', $required), $mountPoint],
+            $log
+        );
     }
 }
 
@@ -124,6 +139,13 @@ function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPat
     if (!is_dir('/tmp') || is_link('/tmp')) { $log('[WARN] /tmp is not a directory; skipping tmpfs mount'); return; }
     $needsMount = $added || ($tmpMount['type'] !== 'tmpfs');
     if (!$needsMount && array_diff($required, $tmpMount['options']) === []) { $log('[SKIP] /tmp already mounted as tmpfs with hardened options'); return; }
-    if ($tmpMount['type'] === 'tmpfs') { runStep('Remounting /tmp tmpfs with hardened options', pmssBuildCommand('mount', ['-o', 'remount,'.implode(',', array_merge($required, ['size='.$size])), '/tmp'])); return; }
-    runStep('Mounting /tmp tmpfs from fstab', pmssBuildCommand('mount', ['/tmp']));
+    if ($tmpMount['type'] === 'tmpfs') {
+        pmssMountHardeningRunMountStep(
+            'Remounting /tmp tmpfs with hardened options',
+            ['-o', 'remount,'.implode(',', array_merge($required, ['size='.$size])), '/tmp'],
+            $log
+        );
+        return;
+    }
+    pmssMountHardeningRunMountStep('Mounting /tmp tmpfs from fstab', ['/tmp'], $log);
 }
