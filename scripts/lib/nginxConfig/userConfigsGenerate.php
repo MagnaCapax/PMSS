@@ -16,6 +16,12 @@ function pmssCreateNginxConfigLogSkippedUser(string $user, string $reason): void
     if (function_exists('pmssCreateNginxConfigAppendLog')) {
         pmssCreateNginxConfigAppendLog($message);
     }
+    pmssCreateNginxConfigUserLog($user, $message);
+}
+
+/** Mirror nginx generation notes into the per-user log when that logger is loaded. */
+function pmssCreateNginxConfigUserLog(string $user, string $message): void
+{
     if (function_exists('pmssUserLog')) {
         pmssUserLog($user, $message);
     }
@@ -61,44 +67,89 @@ function pmssCreateNginxConfigRemoveFile(string $path, string $user, string $lab
 }
 
 /**
+ * Write public/private subdomain vhosts from the shared render context.
+ */
+function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, string $subdomainBase, ?string $hashHost, bool $suspended, ?int $serverPort = null): bool
+{
+    $replacements = [
+        '##user##' => $user,
+        '##ssl_block##' => (string) ($ctx['nginxSslBlock'] ?? ''),
+    ];
+    if ($serverPort !== null) {
+        $replacements['##port##'] = (string) $serverPort;
+    }
+
+    $prefix = $suspended ? 'Suspended' : 'Subdomain';
+    $label = $suspended ? ' suspended' : '';
+    foreach ([[$user.'.'.$subdomainBase, 'public'.$prefix.'Template', '', 'public'.$label.' subdomain config'], [$hashHost, 'private'.$prefix.'Template', '-hash', 'private'.$label.' subdomain config']] as $target) {
+        if ($target[0] === null) {
+            continue;
+        }
+        $config = strtr((string) ($ctx[$target[1]] ?? ''), $replacements + ['##host##' => $target[0]]);
+        if (!pmssCreateNginxConfigWriteFile((string) ($ctx['subdomainConfigDir'] ?? '/etc/nginx/conf.d').'/pmss-user-'.$user.$target[2].'.conf', $config, $user, $target[3])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Resolve legacy Deluge web ports from root-owned, non-symlinked port files.
+ */
+function pmssCreateNginxConfigLegacyDelugeWebPort(string $homeDir, string $user): int
+{
+    foreach (['/.delugeWebPort' => 0, '/.delugePort' => 1] as $portFile => $offset) {
+        $delugePortPath = $homeDir.$portFile;
+        if (!is_file($delugePortPath) || is_link($delugePortPath)) {
+            if (is_link($delugePortPath)) pmssCreateNginxConfigUserLog($user, '[WARN] Ignoring symlinked '.$portFile.' while rendering nginx template');
+            continue;
+        }
+
+        $owner = @fileowner($delugePortPath);
+        if ($owner === false || (int) $owner !== 0) {
+            pmssCreateNginxConfigUserLog($user, '[WARN] Ignoring non-root-owned '.$portFile.' while rendering nginx template');
+            continue;
+        }
+
+        $raw = @file_get_contents($delugePortPath);
+        if (!is_string($raw)) continue;
+        $raw = trim($raw);
+        if ($raw === '' || !ctype_digit($raw)) {
+            pmssCreateNginxConfigUserLog($user, '[WARN] Ignoring non-numeric '.$portFile.' value while rendering nginx template');
+            continue;
+        }
+
+        $delugePort = (int) $raw;
+        $maxPort = $offset === 1 ? 65534 : 65535;
+        if (pmssNetworkPortInRange($delugePort, 1024, $maxPort)) {
+            return $delugePort + $offset;
+        }
+        pmssCreateNginxConfigUserLog($user, '[WARN] Ignoring invalid '.$portFile.' value while rendering nginx template');
+    }
+
+    return 1;
+}
+
+/**
  * Generate per-user configs under /etc/nginx/users and optional subdomain vhosts.
  */
 function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $singleUser): void
 {
     $thisUser = trim($thisUser);
-    if ($thisUser === '') {
-        return;
-    }
-    if (!pmssValidateUsername($thisUser)) {
-        return;
-    }
+    if ($thisUser === '' || !pmssValidateUsername($thisUser)) return;
 
     $homeDir = "/home/{$thisUser}";
-    if (!is_dir($homeDir)) {
-        return;
-    }
+    if (!is_dir($homeDir)) return;
 
     $portFile = "/etc/seedbox/runtime/ports/lighttpd-{$thisUser}";
     $isSuspended = is_dir($homeDir.'/www-disabled');
 
     $suspendedTemplate = $ctx['suspendedTemplate'] ?? false;
     $userTemplate = $ctx['userTemplate'] ?? false;
-    $needsDelugeWebPort = $ctx['needsDelugeWebPort'] ?? false;
     $subdomainEnabled = $ctx['subdomainEnabled'] ?? false;
     $subdomainBase = (string)($ctx['subdomainBase'] ?? '');
-    $subdomainConfigDir = (string)($ctx['subdomainConfigDir'] ?? '/etc/nginx/conf.d');
-    $nginxSslBlock = (string)($ctx['nginxSslBlock'] ?? '');
     $hashHost = null;
-
-    $renderSubdomainConfig = static function (string $template, string $host, string $user, string $sslBlock, ?int $serverPort = null): string {
-        $placeholders = ['##host##', '##user##', '##ssl_block##'];
-        $replacements = [$host, $user, $sslBlock];
-        if ($serverPort !== null) {
-            array_splice($placeholders, 2, 0, ['##port##']);
-            array_splice($replacements, 2, 0, [(string) $serverPort]);
-        }
-        return str_replace($placeholders, $replacements, $template);
-    };
 
     if ($subdomainEnabled) {
         $billingServiceId = pmssNginxUserBillingServiceIdFromHome($homeDir);
@@ -118,27 +169,10 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
             }
             return;
         }
-        if ($subdomainEnabled) {
-            $publicHost = $thisUser.'.'.$subdomainBase;
-            $publicConfig = $renderSubdomainConfig((string) $ctx['publicSuspendedTemplate'], $publicHost, $thisUser, $nginxSslBlock);
-            if (!pmssCreateNginxConfigWriteFile($subdomainConfigDir.'/pmss-user-'.$thisUser.'.conf', $publicConfig, $thisUser, 'public suspended subdomain config')) {
-                return;
-            }
-
-            if ($hashHost !== null) {
-                $hashConfig = $renderSubdomainConfig((string) $ctx['privateSuspendedTemplate'], $hashHost, $thisUser, $nginxSslBlock);
-                if (!pmssCreateNginxConfigWriteFile($subdomainConfigDir.'/pmss-user-'.$thisUser.'-hash.conf', $hashConfig, $thisUser, 'private suspended subdomain config')) {
-                    return;
-                }
-            }
-        }
+        if ($subdomainEnabled && !pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, true)) return;
         $userConfig = str_replace('##username', $thisUser, $suspendedTemplate);
-        if (!pmssCreateNginxConfigWriteFile("/etc/nginx/users/{$thisUser}", $userConfig, $thisUser, 'user suspended config')) {
-            return;
-        }
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($thisUser, 'nginx config regenerated (suspended template)');
-        }
+        if (!pmssCreateNginxConfigWriteFile("/etc/nginx/users/{$thisUser}", $userConfig, $thisUser, 'user suspended config')) return;
+        pmssCreateNginxConfigUserLog($thisUser, 'nginx config regenerated (suspended template)');
         return;
     }
 
@@ -158,72 +192,20 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
         return;
     }
 
-    if ($subdomainEnabled) {
-        $publicHost = $thisUser.'.'.$subdomainBase;
-        $publicConfig = $renderSubdomainConfig((string) $ctx['publicSubdomainTemplate'], $publicHost, $thisUser, $nginxSslBlock, $serverPort);
-        if (!pmssCreateNginxConfigWriteFile($subdomainConfigDir.'/pmss-user-'.$thisUser.'.conf', $publicConfig, $thisUser, 'public subdomain config')) {
-            return;
-        }
+    if ($subdomainEnabled && !pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, false, $serverPort)) return;
 
-        if ($hashHost !== null) {
-            $hashConfig = $renderSubdomainConfig((string) $ctx['privateSubdomainTemplate'], $hashHost, $thisUser, $nginxSslBlock, $serverPort);
-            if (!pmssCreateNginxConfigWriteFile($subdomainConfigDir.'/pmss-user-'.$thisUser.'-hash.conf', $hashConfig, $thisUser, 'private subdomain config')) {
-                return;
-            }
-        }
-    }
-
-    if ($userTemplate === false || $userTemplate === '') {
-        return;
-    }
+    if ($userTemplate === false || $userTemplate === '') return;
 
     $placeholders = array("##username", "##serverPort");
     $replacements = array($thisUser, $serverPort);
-    if ($needsDelugeWebPort) {
-        // Backward compatibility: some older templates proxy /deluge-<user>/ directly
-        // to deluge-web (historically scgi+1). Keep supporting the placeholder, but
-        // treat the port file as untrusted input (must be root-owned + non-symlink).
-        $delugeWebPort = 1;
-        foreach (['/.delugeWebPort' => 0, '/.delugePort' => 1] as $portFile => $offset) {
-            $delugePortPath = $homeDir.$portFile;
-            if (!is_file($delugePortPath) || is_link($delugePortPath)) {
-                if (is_link($delugePortPath) && function_exists('pmssUserLog')) {
-                    pmssUserLog($thisUser, '[WARN] Ignoring symlinked '.$portFile.' while rendering nginx template');
-                }
-                continue;
-            }
-            $owner = @fileowner($delugePortPath);
-            if ($owner !== false && (int)$owner === 0) {
-                $raw = @file_get_contents($delugePortPath);
-                if (is_string($raw)) {
-                    $raw = trim($raw);
-                    if ($raw !== '' && ctype_digit($raw)) {
-                        $delugePort = (int) $raw;
-                        $maxPort = $offset === 1 ? 65534 : 65535;
-                        if (pmssNetworkPortInRange($delugePort, 1024, $maxPort)) {
-                            $delugeWebPort = $delugePort + $offset;
-                            break;
-                        } elseif (function_exists('pmssUserLog')) {
-                            pmssUserLog($thisUser, '[WARN] Ignoring invalid '.$portFile.' value while rendering nginx template');
-                        }
-                    } elseif (function_exists('pmssUserLog')) {
-                        pmssUserLog($thisUser, '[WARN] Ignoring non-numeric '.$portFile.' value while rendering nginx template');
-                    }
-                }
-            } elseif (function_exists('pmssUserLog')) {
-                pmssUserLog($thisUser, '[WARN] Ignoring non-root-owned '.$portFile.' while rendering nginx template');
-            }
-        }
+    if ($ctx['needsDelugeWebPort'] ?? false) {
+        // Backward compatibility: older templates may still use ##delugeWebPort.
         $placeholders[] = "##delugeWebPort";
-        $replacements[] = $delugeWebPort;
+        $replacements[] = pmssCreateNginxConfigLegacyDelugeWebPort($homeDir, $thisUser);
     }
 
     $userConfig = str_replace($placeholders, $replacements, $userTemplate);
 
-    if (!pmssCreateNginxConfigWriteFile("/etc/nginx/users/{$thisUser}", $userConfig, $thisUser, 'user config')) {
-        return;
-    }
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog($thisUser, 'nginx config regenerated');
-    }
+    if (!pmssCreateNginxConfigWriteFile("/etc/nginx/users/{$thisUser}", $userConfig, $thisUser, 'user config')) return;
+    pmssCreateNginxConfigUserLog($thisUser, 'nginx config regenerated');
 }

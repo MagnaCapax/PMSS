@@ -84,6 +84,23 @@ class NginxConfigWriteGuardTest extends TestCase
         $this->assertTrue(is_dir($path), 'directory target must remain untouched');
     }
 
+    public function testExtractedGenerationHelpersKeepSubdomainAndLegacyDelugeContracts(): void
+    {
+        $configDir = $this->tempDir.'/conf.d';
+        @mkdir($configDir, 0755, true);
+        $ctx = ['subdomainConfigDir' => $configDir, 'nginxSslBlock' => 'ssl-on', 'publicSubdomainTemplate' => 'public ##host## ##user## ##port## ##ssl_block##', 'privateSubdomainTemplate' => 'private ##host## ##user## ##port## ##ssl_block##'];
+        $this->assertTrue(\pmssCreateNginxConfigWriteSubdomainConfigs($ctx, 'alice', 'example.test', 'hash.example.test', false, 12345));
+        $this->assertEquals('public alice.example.test alice 12345 ssl-on', (string) file_get_contents($configDir.'/pmss-user-alice.conf'));
+        $this->assertEquals('private hash.example.test alice 12345 ssl-on', (string) file_get_contents($configDir.'/pmss-user-alice-hash.conf'));
+
+        $homeDir = $this->tempDir.'/home/alice';
+        @mkdir($homeDir, 0755, true);
+        $target = $this->pmssWriteFile($this->tempDir.'/outside-port', "62000\n");
+        if (!@symlink($target, $homeDir.'/.delugeWebPort')) throw new SkipTest('symlink unavailable');
+        $this->pmssWriteFile($homeDir.'/.delugePort', "65535\n");
+        $this->assertEquals(1, \pmssCreateNginxConfigLegacyDelugeWebPort($homeDir, 'alice'));
+    }
+
     public function testGeneratorUsesGuardedWriterForNginxOutputs(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/nginxConfig/userConfigsGenerate.php', [
