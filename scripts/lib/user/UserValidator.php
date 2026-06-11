@@ -38,10 +38,4 @@ class UserValidator
         }
         return true;
     }
-
-    public static function normalisedPayload(array $data): array
-    {
-        ksort($data);
-        return $data;
-    }
 }

@@ -7,11 +7,13 @@ class UserValidatorTest extends TestCase
 {
     public function testIsValidUsername(): void
     {
-        $this->assertTrue(\UserValidator::isValidUsername('alice_01'));
-        $this->assertTrue(\UserValidator::isValidUsername('bob-02'));
-        $this->assertFalse(\UserValidator::isValidUsername('Admin'));
-        $this->assertFalse(\UserValidator::isValidUsername('bad user'));
-        $this->assertFalse(\UserValidator::isValidUsername('evil!'));
+        foreach (['alice_01', 'bob-02', 'user_123'] as $username) {
+            $this->assertTrue(\UserValidator::isValidUsername($username), $username);
+        }
+
+        foreach (['Admin', 'bad user', 'evil!', '../etc/passwd', 'user/../foo', "admin\x00", "user\u200Dname"] as $username) {
+            $this->assertFalse(\UserValidator::isValidUsername($username), $username);
+        }
     }
 
     public function testValidatePayloadRequiresFields(): void
@@ -35,10 +37,4 @@ class UserValidatorTest extends TestCase
         $this->assertTrue(\UserValidator::validatePayload($legacy));
     }
 
-    public function testNormalisedPayloadSortsKeys(): void
-    {
-        $raw = ['b' => 2, 'a' => 1];
-        $normalised = \UserValidator::normalisedPayload($raw);
-        $this->assertEquals(['a' => 1, 'b' => 2], $normalised);
-    }
 }
