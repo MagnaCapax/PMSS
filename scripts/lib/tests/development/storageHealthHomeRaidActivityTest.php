@@ -37,6 +37,21 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $this->assertSame(['operation' => 'check', 'progress' => '12.3%', 'eta' => '15.4min', 'speed' => '123456K/sec'], $summary);
     }
 
+    public function testRaidEntriesParserKeepsDegradedRebuildShape(): void
+    {
+        $entries = \pmssStorageHealthRaidEntriesParse(
+            "md1 : active raid1 sda1[0] sdb1[1] 1047552 blocks [2/1] [U_]\n".
+            "      [>....................]  recovery = 7.5% finish=60.0min speed=2000K/sec\n",
+            '2025-01-01T00:00:00+00:00'
+        );
+
+        $this->assertEquals(1, count($entries));
+        $this->pmssAssertArraySubsetSame(
+            ['timestamp' => '2025-01-01T00:00:00+00:00', 'kind' => 'raid', 'array' => 'md1', 'level' => 'raid1', 'state' => 'active', 'severity' => 'fail', 'ok' => false, 'flags' => ['degraded', 'rebuild_in_progress'], 'operation' => 'recovery'],
+            $entries[0]
+        );
+    }
+
     public function testResolvesHomeArrayFromDirectMdMount(): void
     {
         $homeArray = \pmssStorageHealthHomeArrayResolve($this->homeMountsPath('/dev/md0'));

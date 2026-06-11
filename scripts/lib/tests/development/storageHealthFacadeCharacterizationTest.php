@@ -44,15 +44,12 @@ final class StorageHealthFacadeCharacterizationTest extends TestCase
         );
     }
 
-    public function testFacadeOwnsNvmeAndRaidSnapshotEntrypoints(): void
+    public function testFacadeLoadsSnapshotBackendEntrypoints(): void
     {
-        $facadePath = $this->pmssRepoPath('scripts/lib/storageHealth.php');
-        $facadeSource = @file_get_contents($facadePath);
-
-        $this->assertTrue(is_string($facadeSource) && $facadeSource !== '', 'Expected to read '.$facadePath);
-        $this->assertStringContainsString('function pmssStorageHealthSnapshotNvme(', $facadeSource);
-        $this->assertStringContainsString('function pmssStorageHealthSnapshotRaid(', $facadeSource);
-        $this->assertTrue(!is_file(dirname($facadePath).'/storageHealth/nvme.php'));
-        $this->assertTrue(!is_file(dirname($facadePath).'/storageHealth/raid.php'));
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/storageHealth.php', ["storageHealth/nvme.php", "storageHealth/raid.php"]);
+        $this->pmssAssertRepoFileNotContainsString('scripts/lib/storageHealth.php', 'function pmssStorageHealthSnapshotNvme(');
+        $this->pmssAssertRepoFileNotContainsString('scripts/lib/storageHealth.php', 'function pmssStorageHealthSnapshotRaid(');
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/storageHealth/nvme.php', ['function pmssStorageHealthSnapshotNvme(']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/storageHealth/raid.php', ['function pmssStorageHealthSnapshotRaid(']);
     }
 }
