@@ -101,10 +101,26 @@ final class TerminateUserContractTest extends TestCase
 
     public function testTerminateUserHomeInvariantIsExact(): void
     {
-        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['required' => [
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/terminateUser.php' => ['required' => [
                 '$realHome !== $expectedHome',
                 'Prefix checks are too loose',
-            ]]);
+            ]],
+            'scripts/lib/user/terminationCleanup.php' => ['required' => [
+                'function pmssTerminateUserHomePathIsExact',
+                '$realHome !== false && $homePath === $expectedHome && $realHome === $expectedHome',
+                'Refusing unexpected home reclaim source path',
+            ]],
+        ]);
+    }
+
+    public function testTerminateUserHomeReclaimRejectsNonHomeSource(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-terminate-home-source-');
+
+        $this->assertFalse(\pmssTerminateUserHomePathIsExact('user1234', $dir));
+        $this->assertSame('', \pmssTerminateUserMoveHomeForReclaim('user1234', $dir, true));
+        $this->assertTrue(is_dir($dir), 'unsafe home reclaim source must not be renamed');
     }
 
     public function testTerminateUserHandlesUnreadableRtorrentConfig(): void

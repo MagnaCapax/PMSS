@@ -231,10 +231,33 @@ function pmssTerminateUserMovePathForReclaim(string $username, string $phase, st
     return $targetPath;
 }
 
+/** Validate the active home path before a destructive termination rename. */
+function pmssTerminateUserHomePathIsExact(string $username, string $homePath): bool
+{
+    if (!pmssUsernameIsValid($username) || pmssFilesystemPathHasNulByte($homePath) || is_link($homePath)) {
+        return false;
+    }
+
+    $expectedHome = "/home/{$username}";
+    $realHome = realpath($homePath);
+
+    return $realHome !== false && $homePath === $expectedHome && $realHome === $expectedHome && is_dir($realHome);
+}
+
 /** Move the home out of the active username namespace before slow disk reclaim. */
 function pmssTerminateUserMoveHomeForReclaim(string $username, string $homePath, bool $dryRun): string
 {
-    return pmssTerminateUserMovePathForReclaim($username, 'home_reclaim_rename', $homePath, $dryRun, 'Dry run; home not renamed', 'Failed to rename home for background reclaim', 'Renamed home for background reclaim', array(), is_link($homePath));
+    if (!pmssTerminateUserHomePathIsExact($username, $homePath)) {
+        $realHome = pmssFilesystemPathHasNulByte($homePath) ? false : realpath($homePath);
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'home_reclaim_rename', $username, 'ERR', 'Refusing unexpected home reclaim source path', array(
+            'expected_home' => "/home/{$username}",
+            'source'        => $homePath,
+            'real_home'     => $realHome,
+        ));
+        return '';
+    }
+
+    return pmssTerminateUserMovePathForReclaim($username, 'home_reclaim_rename', $homePath, $dryRun, 'Dry run; home not renamed', 'Failed to rename home for background reclaim', 'Renamed home for background reclaim');
 }
 
 /** Move a recreateUser safety backup into the asynchronous reclaim namespace. */
