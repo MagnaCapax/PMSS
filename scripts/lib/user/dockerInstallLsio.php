@@ -68,27 +68,6 @@ function pmssDockerInstallLsioDisplayCommand(array $command): string
 }
 
 /**
- * Render a command array for actual shell execution.
- *
- * @param array<int,string> $command
- */
-function pmssDockerInstallLsioShellCommand(array $command): string
-{
-    return pmssCommandArgvShellQuote($command);
-}
-
-/**
- * Execute a command and capture its exit status and output.
- *
- * @param array<int,string> $command
- * @return array{rc:int,stdout:string,stderr:string}
- */
-function pmssDockerInstallLsioCommandCapture(array $command): array
-{
-    return pmssCommandCapture(pmssDockerInstallLsioShellCommand($command));
-}
-
-/**
  * Execute a command while streaming output to the caller.
  *
  * @param array<int,string> $command
@@ -96,7 +75,7 @@ function pmssDockerInstallLsioCommandCapture(array $command): array
 function pmssDockerInstallLsioPassthru(array $command): int
 {
     $rc = 0;
-    passthru(pmssDockerInstallLsioShellCommand($command), $rc);
+    passthru(pmssCommandArgvShellQuote($command), $rc);
     return (int) $rc;
 }
 
@@ -170,13 +149,13 @@ function pmssDockerInstallLsioHostPort(?string $value, string $defaultPort): ?st
 function pmssDockerInstallLsioAppCatalog(): array
 {
     return [
-        'jellyfin' => ['port' => '8096', 'mkdir' => ['media'], 'volumes' => ['config:/config', 'media:/data']],
-        'qbittorrent' => ['port' => '8080', 'mkdir' => ['downloads'], 'extraArgs' => ['-e', 'WEBUI_PORT=8080'], 'volumes' => ['config:/config', 'downloads:/downloads']],
-        'radarr' => ['port' => '7878', 'mkdir' => ['movies', 'downloads'], 'volumes' => ['config:/config', 'movies:/movies', 'downloads:/downloads']],
-        'sonarr' => ['port' => '8989', 'mkdir' => ['tv', 'downloads'], 'volumes' => ['config:/config', 'tv:/tv', 'downloads:/downloads']],
-        'prowlarr' => ['port' => '9696', 'volumes' => ['config:/config']],
-        'mariadb' => ['port' => '3306', 'bindHost' => '127.0.0.1', 'credentials' => true, 'volumes' => ['config:/config']],
-        'phpmyadmin' => ['port' => '8082', 'containerPort' => '80', 'bindHost' => '127.0.0.1', 'extraArgs' => ['-e', 'PMA_HOST=mariadb', '-e', 'PMA_PORT=3306'], 'volumes' => ['config:/config']],
+        'jellyfin' => ['port' => '8096', 'mkdir' => ['media'], 'volumes' => ['config' => '/config', 'media' => '/data']],
+        'qbittorrent' => ['port' => '8080', 'mkdir' => ['downloads'], 'extraArgs' => ['-e', 'WEBUI_PORT=8080'], 'volumes' => ['config' => '/config', 'downloads' => '/downloads']],
+        'radarr' => ['port' => '7878', 'mkdir' => ['movies', 'downloads'], 'volumes' => ['config' => '/config', 'movies' => '/movies', 'downloads' => '/downloads']],
+        'sonarr' => ['port' => '8989', 'mkdir' => ['tv', 'downloads'], 'volumes' => ['config' => '/config', 'tv' => '/tv', 'downloads' => '/downloads']],
+        'prowlarr' => ['port' => '9696', 'volumes' => ['config' => '/config']],
+        'mariadb' => ['port' => '3306', 'bindHost' => '127.0.0.1', 'credentials' => true, 'volumes' => ['config' => '/config']],
+        'phpmyadmin' => ['port' => '8082', 'containerPort' => '80', 'bindHost' => '127.0.0.1', 'extraArgs' => ['-e', 'PMA_HOST=mariadb', '-e', 'PMA_PORT=3306'], 'volumes' => ['config' => '/config']],
     ];
 }
 
@@ -207,7 +186,7 @@ function pmssDockerInstallLsioAppSpec(string $app, string $homeDir, bool $dryRun
         'bindHost' => (string) ($appSpec['bindHost'] ?? ''),
         'containerPort' => (string) ($appSpec['containerPort'] ?? $appSpec['port']),
         'defaultPort' => (string) $appSpec['port'],
-        'extraArgs' => isset($appSpec['extraArgs']) ? $appSpec['extraArgs'] : [],
+        'extraArgs' => $appSpec['extraArgs'] ?? [],
         'volumeArgs' => [],
         'credentialFile' => '',
     ];
@@ -218,8 +197,7 @@ function pmssDockerInstallLsioAppSpec(string $app, string $homeDir, bool $dryRun
         }
     }
 
-    foreach ($appSpec['volumes'] ?? [] as $volume) {
-        [$pathKey, $containerPath] = array_pad(explode(':', (string) $volume, 2), 2, '');
+    foreach ($appSpec['volumes'] ?? [] as $pathKey => $containerPath) {
         if (!isset($paths[$pathKey]) || $containerPath === '') {
             continue;
         }
@@ -252,13 +230,10 @@ function pmssDockerInstallLsioDockerRunCommand(string $app, string $hostPort, st
 {
     $command = ['docker', 'run', '-d', '--name', $app, '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ='.$timezone, '--network', 'pmss-media'];
 
-    if ((string) $spec['bindHost'] !== '') {
-        $command[] = '-p';
-        $command[] = $spec['bindHost'].':'.$hostPort.':'.$spec['containerPort'];
-    } else {
-        $command[] = '-p';
-        $command[] = $hostPort.':'.$spec['containerPort'];
-    }
+    $command[] = '-p';
+    $command[] = (string) $spec['bindHost'] !== ''
+        ? $spec['bindHost'].':'.$hostPort.':'.$spec['containerPort']
+        : $hostPort.':'.$spec['containerPort'];
 
     foreach (['extraArgs', 'volumeArgs'] as $key) {
         foreach ($spec[$key] as $argument) {
@@ -328,17 +303,17 @@ function pmssDockerInstallLsioMain(array $argv): int
         return 1;
     }
 
-    if (pmssDockerInstallLsioCommandCapture(['docker', 'info'])['rc'] !== 0) {
+    if (pmssCommandCapture(pmssCommandArgvShellQuote(['docker', 'info']))['rc'] !== 0) {
         fwrite(STDERR, "Docker daemon unavailable; wait for the PMSS rootless Docker watchdog and retry.\n");
         return 1;
     }
 
-    if (pmssDockerInstallLsioCommandCapture(['docker', 'container', 'inspect', $app])['rc'] === 0) {
+    if (pmssCommandCapture(pmssCommandArgvShellQuote(['docker', 'container', 'inspect', $app]))['rc'] === 0) {
         fwrite(STDERR, "Container {$app} already exists; remove it manually if you want to recreate it.\n");
         return 1;
     }
 
-    if (pmssDockerInstallLsioCommandCapture(['docker', 'network', 'inspect', 'pmss-media'])['rc'] !== 0) {
+    if (pmssCommandCapture(pmssCommandArgvShellQuote(['docker', 'network', 'inspect', 'pmss-media']))['rc'] !== 0) {
         if (pmssDockerInstallLsioPassthru(['docker', 'network', 'create', 'pmss-media']) !== 0) {
             return 1;
         }
