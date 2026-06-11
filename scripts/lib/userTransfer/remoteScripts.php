@@ -43,7 +43,7 @@ function pmssUserTransferBuildRsyncCommand(array $cfg, array $sources, array $ex
 function pmssUserTransferBuildRsyncMain(array $cfg): string
 {
     $excludes = [
-        '.rtorrent.rc', '.config/qBittorrent/qBittorrent.conf', '.config/deluge/core.conf',
+        '.rtorrent.rc', '.config/qBittorrent/qBittorrent.conf', '.config/pmss-user.json', '.config/deluge/core.conf',
         '.config/deluge/web.conf', '.cache', 'www', 'session', 'www/rutorrent/share',
         '.lighttpd', '.logs', '.local', '.lighttpd.conf', '.quota', '.rtorrentExecuteRun', '.trafficData',
         '.trafficDataLocal', '.trafficDataIngress', '.trafficDataIngressLocal', 'rTorrentLog', '.bonusQuota',
