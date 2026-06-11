@@ -6,8 +6,7 @@
  */
 
 require_once __DIR__.'/update/runtime/commands.php';
-require_once __DIR__.'/lighttpd/userFileWrite.php';
-require_once __DIR__.'/network/interface.php';
+pmssRequireRelativeFiles(__DIR__, ['lighttpd/userFileWrite.php', 'network/interface.php']);
 
 /**
  * Validate Linux interface names accepted from the operator netconsole file.

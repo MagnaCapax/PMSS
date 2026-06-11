@@ -7,8 +7,7 @@
  */
 
 require_once __DIR__.'/../runtime.php';
-require_once __DIR__.'/userFileWrite.php';
-require_once __DIR__.'/../user/shadow.php';
+pmssRequireRelativeFiles(__DIR__, ['userFileWrite.php', '../user/shadow.php']);
 
 /**
  * Write a crypt()-compatible htpasswd entry for a managed user.

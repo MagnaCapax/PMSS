@@ -19,10 +19,7 @@
  **/
 
 require_once __DIR__.'/userLifecycle.php';
-require_once __DIR__.'/update/runtime/commands.php';
-require_once __DIR__.'/userTransfer/cliParse.php';
-require_once __DIR__.'/userTransfer/postSetup.php';
-require_once __DIR__.'/userTransfer/transferRuntime.php';
+pmssRequireRelativeFiles(__DIR__, ['update/runtime/commands.php', 'userTransfer/cliParse.php', 'userTransfer/postSetup.php', 'userTransfer/transferRuntime.php']);
 
 /** Build scratch script payloads keyed to pmssUserTransferScratchPaths(). */
 function pmssUserTransferScratchPayloads(array $cfg, array $paths = []): array { $paths = $paths ?: pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>'); return ['expect' => pmssUserTransferBuildExpectWrapper()."\n", 'authProbe' => pmssUserTransferBuildAuthProbe($cfg), 'mainScript' => pmssUserTransferBuildRsyncMain($cfg), 'finalScript' => pmssUserTransferBuildRsyncFinal($cfg), 'remoteSizeScript' => pmssUserTransferBuildRemoteSizeProbe($cfg), 'qbittorrentProbeScript' => pmssUserTransferBuildQbittorrentCategoryProbe($cfg, $paths['qbittorrentConfig'], $paths['qbittorrentCategories'])]; }
