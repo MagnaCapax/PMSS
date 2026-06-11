@@ -6,6 +6,18 @@ require_once dirname(__DIR__, 2).'/update/services/logging.php';
 
 class RemoteLoggingCharacterizationTest extends TestCase
 {
+    public function testInvalidReasonClassifierKeepsRemoteLoggingBranchLabels(): void
+    {
+        foreach ([
+            [['enabled' => false, 'host' => '', 'port' => 514, 'protocol' => 'tcp'], 'Remote logging not enabled'],
+            [['enabled' => true, 'host' => '', 'port' => 514, 'protocol' => 'tcp'], 'Remote host not configured'],
+            [['enabled' => true, 'host' => 'bad host', 'port' => 514, 'protocol' => 'tcp'], 'Invalid remote host format'],
+            [['enabled' => true, 'host' => 'logs.example.net', 'port' => 514, 'protocol' => 'tcp'], ''],
+        ] as [$config, $expected]) {
+            $this->assertSame($expected, \pmssRemoteLoggingInvalidReason($config));
+        }
+    }
+
     public function testInvalidOverridesFallBackToDefaultPortAndProtocol(): void
     {
         $fixture = $this->pmssRemoteLoggingFixture('pmss-remote-logging-char-');
