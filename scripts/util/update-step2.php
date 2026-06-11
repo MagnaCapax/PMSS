@@ -265,16 +265,10 @@ pmssRunProfiledCallable('Acquiring update-step2 lock', static function (): void 
 });
 pmssRunProfiledCallable('Running update-step2 preflight checks', static function (): void { if (!pmssUpdateStep2PreflightChecks('logmsg')) { exit(1); } });
 
-putenv('DEBIAN_FRONTEND=noninteractive');
-putenv('APT_LISTCHANGES_FRONTEND=none');
-putenv('UCF_FORCE_CONFOLD=1');
-putenv('UCF_FORCE_CONFNEW=0');
-putenv('UCF_FORCE_CONFDEF=1');
-putenv('NEEDRESTART_MODE=a');
+foreach (array('DEBIAN_FRONTEND=noninteractive', 'APT_LISTCHANGES_FRONTEND=none', 'UCF_FORCE_CONFOLD=1', 'UCF_FORCE_CONFNEW=0', 'UCF_FORCE_CONFDEF=1', 'NEEDRESTART_MODE=a') as $envDefault) { putenv($envDefault); }
 
 $GLOBALS['PMSS_PACKAGES_READY'] = false;
-// PMSS_PACKAGE_PHASE advertises coarse progress (`initializing`/`complete`); unknown values mean "in progress".
-// Flip it after logging the matching step so external monitors keep ordering intact.
+// PMSS_PACKAGE_PHASE exposes coarse progress while packages converge.
 putenv('PMSS_PACKAGE_PHASE=initializing');
 
 pmssRunProfiledCallable('Completing pending dpkg configurations', 'pmssCompletePendingDpkg');
@@ -361,14 +355,9 @@ pmssRunProfiledStep('Cleaning mediaarea bootstrap package state', static functio
 pmssRunProfiledCallable('Pruning legacy MediaArea repository entries', 'pmssPruneLegacyMediaArea');
 
 // --- PACKAGE PHASE: DO NOT REORDER ---------------------------------------------------------
-// The first dpkg configure pass intentionally ran immediately after preflight so a host
-// stuck with half-configured packages can recover before PHP or apt-adjacent probes run.
-// Everything below assumes that early pass cleared the package state enough for apt work.
-//   1. Attempt to recover partially configured packages (`apt --fix-broken`)
-//   2. Refresh repositories (apt update) so we pull the latest metadata
-//   3. Autoremove strays that block upgrades
-//   4. Apply the dpkg baseline and queued package installs
-// Resist the urge to move or delete any of these steps.
+// Early dpkg recovery lets wedged hosts converge before PHP or apt-adjacent
+// probes run. The invariant order is fix-broken -> repository refresh -> dpkg
+// baseline -> recovery/autoremove; package state stays owned by dpkg selections.
 // -------------------------------------------------------------------------------------------
 
 runStep('Attempting apt fix-broken install (pre-package phase)', aptCmd('--fix-broken install -y'));
