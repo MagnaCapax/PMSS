@@ -77,6 +77,41 @@ function pmssWebCgroupMemoryStatusMemoryStatCandidatePaths($uid)
     ] : [];
 }
 
+/** Return candidate cgroup counter paths for v2 and production v1 hosts. */
+function pmssWebCgroupMemoryStatusCounterCandidatePaths($uid, $cgroupDir, $v2File, $v1File)
+{
+    $uid = (int) $uid;
+    $paths = array();
+    $cgroupDir = is_string($cgroupDir) ? rtrim($cgroupDir, '/') : '';
+    if ($cgroupDir !== '') {
+        $paths[] = $cgroupDir.'/'.$v2File;
+        $paths[] = $cgroupDir.'/'.$v1File;
+    }
+    if ($uid >= 0) {
+        $slice = 'user.slice/user-'.$uid.'.slice';
+        $paths[] = '/sys/fs/cgroup/'.$slice.'/'.$v2File;
+        $paths[] = '/sys/fs/cgroup/unified/'.$slice.'/'.$v2File;
+        $paths[] = '/sys/fs/cgroup/memory/'.$slice.'/'.$v1File;
+    }
+
+    return array_values(array_unique($paths));
+}
+
+/** Read the first numeric memory counter, skipping unlimited v1 limit sentinels. */
+function pmssWebCgroupMemoryStatusCounterRead(array $paths, $limit = false)
+{
+    foreach ($paths as $path) {
+        $value = pmssCustomerUnsignedIntegerFileRead($path);
+        if ($value === null || ($limit && $value >= 1125899906842624)) {
+            continue;
+        }
+
+        return $value;
+    }
+
+    return null;
+}
+
 /** Parse cgroup v1/v2 memory.stat anon+file counters into byte values. */
 function pmssWebCgroupMemoryStatusMemoryStatBreakdownParse($raw)
 {
@@ -141,9 +176,11 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
 {
     $cgroupDir = pmssWebCgroupMemoryStatusDetectDir($overrides);
     $cgroupAvailable = is_dir($cgroupDir);
-    $memoryCurrent = $cgroupAvailable ? pmssCustomerUnsignedIntegerFileRead($cgroupDir.'/memory.current') : null;
-    $memoryHigh = $cgroupAvailable ? pmssCustomerUnsignedIntegerFileRead($cgroupDir.'/memory.high') : null;
-    $memoryMax = $cgroupAvailable ? pmssCustomerUnsignedIntegerFileRead($cgroupDir.'/memory.max') : null;
+    $uid = $overrides['uid'] ?? (function_exists('posix_getuid') ? posix_getuid() : null);
+    $uid = is_int($uid) && $uid >= 0 ? $uid : -1;
+    $memoryCurrent = $cgroupAvailable ? pmssWebCgroupMemoryStatusCounterRead(pmssWebCgroupMemoryStatusCounterCandidatePaths($uid, $cgroupDir, 'memory.current', 'memory.usage_in_bytes')) : null;
+    $memoryHigh = $cgroupAvailable ? pmssWebCgroupMemoryStatusCounterRead(pmssWebCgroupMemoryStatusCounterCandidatePaths($uid, $cgroupDir, 'memory.high', 'memory.soft_limit_in_bytes'), true) : null;
+    $memoryMax = $cgroupAvailable ? pmssWebCgroupMemoryStatusCounterRead(pmssWebCgroupMemoryStatusCounterCandidatePaths($uid, $cgroupDir, 'memory.max', 'memory.limit_in_bytes'), true) : null;
     $events = $cgroupAvailable ? pmssCustomerKeyValueFileRead($cgroupDir.'/memory.events') : [];
     $pressure = $cgroupAvailable ? pmssCustomerKeyValueFileRead($cgroupDir.'/memory.pressure') : [];
 
@@ -229,14 +266,11 @@ function pmssWelcomeMemoryStateBuild($pressureStatusOverride = null)
     }
     $uid = is_int($uid) && $uid >= 0 ? $uid : null;
 
-    if ($currentBytes === null
-        && $uid !== null
-        && function_exists('pmssFrontendShellExecAvailable')
-        && function_exists('pmssFrontendShellExec')
-        && pmssFrontendShellExecAvailable()) {
-        $memoryCurrent = @pmssFrontendShellExec('systemctl show user-'.$uid.'.slice -p MemoryCurrent --value 2>/dev/null');
-        if (is_string($memoryCurrent) && is_numeric(trim($memoryCurrent))) {
-            $currentBytes = (float) trim($memoryCurrent);
+    $readPressureStatus = null;
+    if (function_exists('pmssWebCgroupMemoryStatusRead')) {
+        $readPressureStatus = pmssWebCgroupMemoryStatusRead();
+        if ($currentBytes === null && !empty($readPressureStatus['available']) && is_numeric($readPressureStatus['memory_current'] ?? null)) {
+            $currentBytes = (float) $readPressureStatus['memory_current'];
         }
     }
 
@@ -259,8 +293,7 @@ function pmssWelcomeMemoryStateBuild($pressureStatusOverride = null)
     $pressureStatus = null;
     if (is_array($pressureStatusOverride)) {
         $pressureStatus = !empty($pressureStatusOverride['available']) ? $pressureStatusOverride : null;
-    } elseif (function_exists('pmssWebCgroupMemoryStatusRead')) {
-        $readPressureStatus = pmssWebCgroupMemoryStatusRead();
+    } elseif (is_array($readPressureStatus)) {
         if (!empty($readPressureStatus['available'])) {
             $pressureStatus = $readPressureStatus;
         }

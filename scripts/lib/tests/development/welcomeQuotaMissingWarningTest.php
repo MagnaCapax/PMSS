@@ -85,7 +85,12 @@ final class welcomeQuotaMissingWarningTest extends TestCase
             'pmssDelugeAuthWriteLocalclientPassword($delugeAuthPath, $newDelugePassword)',
             '$vendor = @unserialize($vendor)',
         ]);
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/webCgroupMemoryStatus.php', ["'systemctl show user-'.\$uid.'.slice -p MemoryCurrent --value 2>/dev/null'"], ["systemctl show user-$('/usr/bin/id' -u).slice"]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/webCgroupMemoryStatus.php', [
+            '$readPressureStatus = pmssWebCgroupMemoryStatusRead();',
+            '$currentBytes = (float) $readPressureStatus',
+        ], [
+            'systemctl show user-',
+        ]);
         $this->pmssAssertRepoFileNotContainsString('etc/skel/www/welcome.php', 'function '.'memory'.'CreateSection(');
     }
 

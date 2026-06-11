@@ -103,18 +103,39 @@ final class CustomerStatsLayoutTest extends TestCase
         $this->assertSame('n/a', \pmssStatsTrafficDisplayValue(array('raw' => array('month' => 'bad')), 'month'));
     }
 
-    public function testStatsStatusHelpersCharacterizeShellDerivedContracts(): void
+    public function testStatsStatusHelpersCharacterizeLocalResourceContracts(): void
     {
-        $runner = function (string $command, string $label): array {
-            return $label === 'User ID'
-                ? array('output' => "1001\n", 'error' => null)
-                : array('output' => "Loaded: loaded\nCGroup:\n /user.slice\nStatus: ok", 'error' => null);
+        $cgroupDir = $this->pmssMakeTempDir('pmss-stats-cgroup-');
+        $this->pmssWriteFile($cgroupDir.'/memory.current', (string) (256 * 1024 * 1024)."\n");
+        $this->pmssWriteFile($cgroupDir.'/memory.high', (string) (512 * 1024 * 1024)."\n");
+        $this->pmssWriteFile($cgroupDir.'/memory.max', (string) (1024 * 1024 * 1024)."\n");
+        $this->pmssWriteFile($cgroupDir.'/pids.current', "7\n");
+        $commands = array();
+        $runner = function (string $command, string $label) use (&$commands): array {
+            $commands[] = $command;
+            if ($label === 'User ID') {
+                return array('output' => "1001\n", 'error' => null);
+            }
+            if ($label === 'User process list') {
+                return array('output' => " 123     1 Ss   rtorrent        /usr/bin/rtorrent\n", 'error' => null);
+            }
+
+            return array('output' => '', 'error' => null);
         };
 
+        $baseResources = \pmssStatsBaseResourcesBuild($runner, array('cgroup_dir' => $cgroupDir));
         $this->assertSame(
-            array('uid' => '1001', 'text' => "Loaded: loaded\nStatus: ok\nCGroup:\n /user.slice"),
-            \pmssStatsBaseResourcesBuild($runner)
+            '1001',
+            $baseResources['uid']
         );
+        $this->assertStringContainsAllStrings(
+            array('User slice: user-1001.slice', 'Memory current: 256.0 MiB', 'Memory high: 512.0 MiB', 'Memory max: 1.0 GiB', 'Tasks current: 7', 'Processes:', '/usr/bin/rtorrent'),
+            $baseResources['text']
+        );
+        foreach ($commands as $command) {
+            $this->assertStringNotContainsString('systemctl status', $command);
+            $this->assertStringNotContainsString('systemctl show', $command);
+        }
 
         $statusRunner = function (string $command, string $label): array {
             $outputs = array('WireGuard status' => "active\n", 'OpenVPN status' => "inactive\n", 'App status' => "alice rtorrent\nbob deluged\ncarol rclone\n", 'Docker status' => '');

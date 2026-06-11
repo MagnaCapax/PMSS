@@ -80,54 +80,158 @@ function pmssStatsTrafficDisplayValue(array $trafficData, string $period): strin
     return 'n/a';
 }
 
-/** Keep systemctl output readable by moving the cgroup tree to the end. */
-function pmssStatsSystemctlStatusTextBuild(string $output): string
+/**
+ * Resolve the current account UID without depending on systemd status output.
+ *
+ * @return array{uid:?string,error:?string}
+ */
+function pmssStatsCurrentUidResolve(?callable $runner = null): array
 {
-    $cgroupSection = array();
-    $mainSection = array();
-    $inCgroup = false;
-    foreach (explode("\n", $output) as $line) {
-        if (strpos($line, 'CGroup:') === 0) {
-            $inCgroup = true;
-            $cgroupSection[] = $line;
-            continue;
-        }
-        if ($inCgroup && trim($line) && $line[0] === ' ') {
-            $cgroupSection[] = $line;
-            continue;
-        }
-        $mainSection[] = $line;
+    if ($runner === null && function_exists('posix_getuid')) {
+        return array('uid' => (string) posix_getuid(), 'error' => null);
     }
 
-    return implode("\n", $mainSection).($cgroupSection === array() ? '' : "\n".implode("\n", $cgroupSection));
-}
-
-/**
- * Build the base-resource text and UID without mixing shelling into the page.
- *
- * @return array{uid:?string,text:string}
- */
-function pmssStatsBaseResourcesBuild(?callable $runner = null): array
-{
     $runner = $runner ?? 'pmssInfoShellExec';
     $uidResult = $runner('/usr/bin/id -u', 'User ID');
     if ($uidResult['error'] !== null) {
-        return array('uid' => null, 'text' => $uidResult['error']."\n");
+        return array('uid' => null, 'error' => $uidResult['error']);
     }
 
     $uid = trim((string) $uidResult['output']);
-    if ($uid === '' || !is_numeric($uid)) {
-        return array('uid' => null, 'text' => "Error: Could not determine user ID.\n");
+    if ($uid === '' || !ctype_digit($uid)) {
+        return array('uid' => null, 'error' => 'Error: Could not determine user ID.');
     }
 
-    $sliceUnit = 'user-'.$uid.'.slice';
-    $statusResult = $runner('systemctl status '.escapeshellarg($sliceUnit).' 2>&1', 'User slice status');
-    if ($statusResult['error'] !== null) {
-        return array('uid' => $uid, 'text' => $statusResult['error']."\n");
+    return array('uid' => $uid, 'error' => null);
+}
+
+/** Detect a readable cgroup directory for display purposes. */
+function pmssStatsCgroupDirDetect(string $uid, array $overrides = []): string
+{
+    if (isset($overrides['cgroup_dir']) && is_string($overrides['cgroup_dir']) && $overrides['cgroup_dir'] !== '') {
+        return rtrim($overrides['cgroup_dir'], '/');
     }
 
-    $output = (string) $statusResult['output'];
-    return array('uid' => $uid, 'text' => !$output ? "Failed to retrieve slice status.\n" : pmssStatsSystemctlStatusTextBuild($output));
+    foreach (array('/sys/fs/cgroup/user.slice/user-'.$uid.'.slice', '/sys/fs/cgroup/unified/user.slice/user-'.$uid.'.slice', '/sys/fs/cgroup/memory/user.slice/user-'.$uid.'.slice') as $candidate) {
+        if (is_dir($candidate)) {
+            return $candidate;
+        }
+    }
+
+    $cgroupFile = (string) ($overrides['self_cgroup_file'] ?? '/proc/self/cgroup');
+    $entries = function_exists('pmssCustomerCgroupSelfEntries') ? pmssCustomerCgroupSelfEntries($cgroupFile) : array();
+    foreach ($entries as $entry) {
+        $controllers = isset($entry['controllers']) && is_array($entry['controllers']) ? $entry['controllers'] : array();
+        $roots = in_array('memory', $controllers, true)
+            ? array('/sys/fs/cgroup/memory', '/sys/fs/cgroup', '/sys/fs/cgroup/unified')
+            : array('/sys/fs/cgroup', '/sys/fs/cgroup/unified');
+        foreach ($roots as $root) {
+            $candidate = $root.(string) ($entry['path'] ?? '');
+            if (is_dir($candidate)) {
+                return $candidate;
+            }
+        }
+    }
+
+    return '';
+}
+
+/** Build cgroup v2 and v1 candidate paths for one counter. */
+function pmssStatsCgroupCounterCandidatePaths(string $uid, string $cgroupDir, string $v2File, string $v1Controller, string $v1File): array
+{
+    $paths = array();
+    if ($cgroupDir !== '') {
+        $paths[] = $cgroupDir.'/'.$v2File;
+        $paths[] = $cgroupDir.'/'.$v1File;
+    }
+
+    $slice = 'user.slice/user-'.$uid.'.slice';
+    $paths[] = '/sys/fs/cgroup/'.$slice.'/'.$v2File;
+    $paths[] = '/sys/fs/cgroup/unified/'.$slice.'/'.$v2File;
+    $paths[] = '/sys/fs/cgroup/'.$v1Controller.'/'.$slice.'/'.$v1File;
+
+    return array_values(array_unique($paths));
+}
+
+/** Read the first valid unsigned cgroup counter, ignoring v1 unlimited sentinels for limits. */
+function pmssStatsCgroupUnsignedIntegerRead(array $paths, bool $limit = false)
+{
+    foreach ($paths as $path) {
+        $value = function_exists('pmssCustomerUnsignedIntegerFileRead')
+            ? pmssCustomerUnsignedIntegerFileRead($path)
+            : null;
+        if ($value === null || ($limit && $value >= 1125899906842624)) {
+            continue;
+        }
+
+        return $value;
+    }
+
+    return null;
+}
+
+/**
+ * Read user-slice counters directly from cgroupfs.
+ *
+ * @return array<string,int|null>
+ */
+function pmssStatsCgroupCountersRead(string $uid, string $cgroupDir): array
+{
+    return array(
+        'memory_current' => pmssStatsCgroupUnsignedIntegerRead(pmssStatsCgroupCounterCandidatePaths($uid, $cgroupDir, 'memory.current', 'memory', 'memory.usage_in_bytes')),
+        'memory_high' => pmssStatsCgroupUnsignedIntegerRead(pmssStatsCgroupCounterCandidatePaths($uid, $cgroupDir, 'memory.high', 'memory', 'memory.soft_limit_in_bytes'), true),
+        'memory_max' => pmssStatsCgroupUnsignedIntegerRead(pmssStatsCgroupCounterCandidatePaths($uid, $cgroupDir, 'memory.max', 'memory', 'memory.limit_in_bytes'), true),
+        'tasks_current' => pmssStatsCgroupUnsignedIntegerRead(pmssStatsCgroupCounterCandidatePaths($uid, $cgroupDir, 'pids.current', 'pids', 'pids.current')),
+    );
+}
+
+/** Format a cgroup counter for the base-resource text block. */
+function pmssStatsCgroupCounterText($value, bool $bytes = false): string
+{
+    if ($value === null) {
+        return 'n/a';
+    }
+
+    return $bytes && function_exists('pmssFormatBytes') ? pmssFormatBytes((float) $value) : (string) $value;
+}
+
+/**
+ * Build the base-resource text from cgroupfs plus a bounded user process list.
+ *
+ * @return array{uid:?string,text:string}
+ */
+function pmssStatsBaseResourcesBuild(?callable $runner = null, array $overrides = []): array
+{
+    $commandRunner = $runner ?? 'pmssInfoShellExec';
+    $uidState = pmssStatsCurrentUidResolve($runner);
+    if ($uidState['error'] !== null) {
+        return array('uid' => null, 'text' => $uidState['error']."\n");
+    }
+
+    $uid = (string) $uidState['uid'];
+    $cgroupDir = pmssStatsCgroupDirDetect($uid, $overrides);
+    $counters = pmssStatsCgroupCountersRead($uid, $cgroupDir);
+    $processResult = $commandRunner('ps -u '.escapeshellarg($uid).' --forest -o pid=,ppid=,stat=,comm=,args= 2>&1', 'User process list');
+    $processText = $processResult['error'] !== null
+        ? $processResult['error']
+        : trim((string) $processResult['output']);
+    if ($processText === '') {
+        $processText = 'No user processes found.';
+    }
+
+    $lines = array(
+        'User slice: user-'.$uid.'.slice',
+        'Cgroup path: '.($cgroupDir !== '' ? $cgroupDir : 'unavailable'),
+        'Memory current: '.pmssStatsCgroupCounterText($counters['memory_current'], true),
+        'Memory high: '.pmssStatsCgroupCounterText($counters['memory_high'], true),
+        'Memory max: '.pmssStatsCgroupCounterText($counters['memory_max'], true),
+        'Tasks current: '.pmssStatsCgroupCounterText($counters['tasks_current']),
+        '',
+        'Processes:',
+        $processText,
+    );
+
+    return array('uid' => $uid, 'text' => implode("\n", $lines));
 }
 
 /**

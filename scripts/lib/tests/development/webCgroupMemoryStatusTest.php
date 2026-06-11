@@ -122,6 +122,28 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->assertStringContainsString('2.0 GiB / 3.0 GiB', $status['usage_text']);
     }
 
+    public function testReadUsesCgroupV1MemoryCountersWithoutSystemctlFallback(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-v1-');
+        $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "2147483648\n");
+        $this->pmssWriteFile($dir.'/memory.soft_limit_in_bytes', "3221225472\n");
+        $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "9223372036854771712\n");
+        $this->pmssWriteFile($dir.'/memory.events', "high 0\n");
+        $this->pmssWriteFile($dir.'/memory.pressure', "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n");
+
+        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234]);
+
+        $this->assertTrue($status['available']);
+        $this->assertSame(2147483648, $status['memory_current']);
+        $this->assertSame(3221225472, $status['memory_high']);
+        $this->assertSame(null, $status['memory_max']);
+        $this->assertSame('memory.high', $status['limit_source']);
+        $this->assertStringContainsString('2.0 GiB / 3.0 GiB', $status['usage_text']);
+        $this->pmssAssertRepoFileContract('etc/skel/www/webCgroupMemoryStatus.php', array(
+            'forbidden' => array('systemctl show user-'),
+        ));
+    }
+
     public function testThrottleMessageUsesReducedSpeedCopyWithoutOomLanguage(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-web-cgroup-');
