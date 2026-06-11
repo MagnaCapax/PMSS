@@ -36,6 +36,31 @@ function pmssCreateNginxConfigWriteFile(string $path, string $content, string $u
 }
 
 /**
+ * Remove a stale managed nginx config without following unsafe filesystem edges.
+ */
+function pmssCreateNginxConfigRemoveFile(string $path, string $user, string $label): bool
+{
+    if (!pmssUserFilePathIsSafe($path)) {
+        pmssCreateNginxConfigLogSkippedUser($user, 'unsafe '.$label.' path ('.$path.')');
+        return false;
+    }
+    if (!file_exists($path)) {
+        return true;
+    }
+    if (is_link($path) || !is_file($path)) {
+        pmssCreateNginxConfigLogSkippedUser($user, 'refusing to remove non-regular '.$label.' ('.$path.')');
+        return false;
+    }
+    if (@unlink($path)) {
+        return true;
+    }
+
+    pmssCreateNginxConfigLogSkippedUser($user, 'failed to remove '.$label.' ('.$path.')');
+
+    return false;
+}
+
+/**
  * Generate per-user configs under /etc/nginx/users and optional subdomain vhosts.
  */
 function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $singleUser): void
@@ -89,7 +114,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
             // No dedicated suspended template found; skip generating a per-user
             // config so nginx falls back to generic defaults.
             if ($singleUser) {
-                @unlink("/etc/nginx/users/{$thisUser}");
+                pmssCreateNginxConfigRemoveFile("/etc/nginx/users/{$thisUser}", $thisUser, 'stale user config');
             }
             return;
         }
