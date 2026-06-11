@@ -210,6 +210,7 @@ SNAP;
         $this->assertEquals($expectedAuth."\n", \pmssUserTransferBuildAuthProbe($cfg));
         $this->assertSame($expectedScratchPaths, \pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>/'));
         $this->assertSame($expectedPayloadKeys, array_keys(\pmssUserTransferScratchPayloads($cfg)));
+        $this->assertSame('e2c137e398a439e15957459afa20eefa2583183e7c86e97e36945a3d4b806647', hash('sha256', json_encode(\pmssUserTransferScratchPayloads($cfg))));
     }
 
     public function testBuildQbittorrentCategoryProbeWritesRemoteMetadataToScratchFiles(): void

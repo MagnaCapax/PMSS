@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__.'/qbittorrentLegacyCategories.php';
+require_once __DIR__.'/remoteScripts.php';
 /** Build a remote probe that stores qBittorrent category-bearing files in scratch. */
 function pmssUserTransferBuildQbittorrentCategoryProbe(array $cfg, string $localConfigPath, string $localCategoriesPath): string
 {

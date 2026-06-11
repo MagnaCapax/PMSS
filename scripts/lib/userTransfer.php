@@ -20,190 +20,9 @@
 
 require_once __DIR__.'/userLifecycle.php';
 require_once __DIR__.'/update/runtime/commands.php';
-require_once __DIR__.'/lighttpd/userFileWrite.php';
 require_once __DIR__.'/userTransfer/cliParse.php';
-require_once __DIR__.'/userTransfer/completenessVerify.php';
-require_once __DIR__.'/userTransfer/localUserSafety.php';
-require_once __DIR__.'/userTransfer/qbittorrentCategories.php';
-require_once __DIR__.'/userTransfer/sessionRewrite.php';
-
-/**
- * Write a file with the given contents and permissions.
- */
-function pmssUserTransferWriteFile(string $path, string $contents, int $mode): void
-{
-    if (pmssAtomicWriteFile($path, $contents, $mode)) {
-        return;
-    }
-
-    throw new RuntimeException('Failed writing: '.$path, 1);
-}
-
-/** Return scratch paths shared by dry-run and live transfer flows. */
-function pmssUserTransferScratchPaths(string $scratchRoot): array { $scratchRoot = rtrim($scratchRoot, '/'); return ['expect' => $scratchRoot.'/transfer.expect', 'authProbe' => $scratchRoot.'/auth-probe.sh', 'mainScript' => $scratchRoot.'/rsync-main.sh', 'finalScript' => $scratchRoot.'/rsync-final.sh', 'remoteSizeScript' => $scratchRoot.'/remote-size.sh', 'qbittorrentProbeScript' => $scratchRoot.'/qbittorrent-categories.sh', 'qbittorrentConfig' => $scratchRoot.'/qBittorrent.conf', 'qbittorrentCategories' => $scratchRoot.'/categories.json']; }
-
-/**
- * Sleep between passes (optionally randomised) while logging the reason.
- */
-function pmssUserTransferSleep(int $min, int $max, string $reason): void
-{
-    // Dry runs should never stall for long-running sleeps.
-    if (pmssEnvFlagEnabled('PMSS_DRY_RUN') || $max <= 0) {
-        return;
-    }
-
-    $seconds = $min;
-    if ($max > $min) {
-        try {
-            $seconds = random_int($min, $max);
-        } catch (Throwable $e) { $seconds = rand($min, $max); }
-    }
-
-    logMessage(sprintf('[SLEEP] %s (%ds)', $reason, $seconds));
-    sleep($seconds);
-}
-
-/**
- * Build the SSH command shared by rsync wrappers and the auth probe.
- */
-function pmssUserTransferBuildSshCommand(string $remoteUser, array $extraOptions = []): string
-{
-    return 'ssh '.implode(' ', array_merge([
-        '-o Compression=no', '-o UserKnownHostsFile=/dev/null', '-o StrictHostKeyChecking=no',
-    ], $extraOptions, ['-l '.escapeshellarg($remoteUser)]));
-}
-
-/** Build an rsync wrapper script with explicit sources and excludes. */
-function pmssUserTransferBuildRsyncCommand(array $cfg, array $sources, array $excludes = []): string
-{
-    $arguments = array_map(static function (string $item): string { return '--exclude='.escapeshellarg($item); }, $excludes);
-    $prefix = $cfg['remoteUser'].'@'.$cfg['hostname'].':';
-    foreach ($sources as $source) {
-        $arguments[] = escapeshellarg($prefix.$source);
-    }
-
-    return "#!/bin/bash\nset -e\n".'rsync -av -e '.escapeshellarg(pmssUserTransferBuildSshCommand($cfg['remoteUser']))
-        .' '.implode(' ', $arguments).' '.escapeshellarg('/home/'.$cfg['localUser'].'/')."\n";
-}
-
-/**
- * Build the bash script that performs the main rsync pull (excluding volatile paths).
- */
-function pmssUserTransferBuildRsyncMain(array $cfg): string
-{
-    // Keep the exclude list in a stable order for readability and diffing.
-    $excludes = [
-        '.rtorrent.rc',
-        '.config/qBittorrent/qBittorrent.conf',
-        '.config/deluge/core.conf',
-        '.config/deluge/web.conf',
-        '.cache',
-        'www',
-        'session',
-        'www/rutorrent/share',
-        '.lighttpd',
-        '.logs',
-        '.local',
-        '.lighttpd.conf',
-        '.quota',
-        '.rtorrentExecuteRun',
-        '.trafficData',
-        '.trafficDataLocal',
-        '.trafficDataIngress',
-        '.trafficDataIngressLocal',
-        'rTorrentLog',
-        '.bonusQuota',
-        '.bonusTraffic',
-        '.trafficLimit',
-    ];
-
-    return pmssUserTransferBuildRsyncCommand($cfg, ['/home/'.$cfg['remoteUser'].'/'], $excludes);
-}
-
-/**
- * Build the bash script that pulls volatile paths after the main sync.
- */
-function pmssUserTransferBuildRsyncFinal(array $cfg): string
-{
-    // Keep this list explicit; do not rely on brace expansion inside expect.
-    $sources = [
-        '/home/'.$cfg['remoteUser'].'/session',
-        '/home/'.$cfg['remoteUser'].'/www/rutorrent/share',
-        '/home/'.$cfg['remoteUser'].'/.lighttpd/custom',
-        '/home/'.$cfg['remoteUser'].'/.lighttpd/custom.d',
-        '/home/'.$cfg['remoteUser'].'/.local',
-        '/home/'.$cfg['remoteUser'].'/www/public',
-    ];
-
-    return pmssUserTransferBuildRsyncCommand($cfg, $sources);
-}
-
-/** Run repeated expect/rsync passes, sleeping between intermediate passes. */
-function pmssUserTransferRunPasses(
-    string $description,
-    string $expectPath,
-    string $scriptPath,
-    int $passes,
-    int $sleepMin,
-    int $sleepMax
-): int {
-    $lastRc = 0;
-    for ($i = 1; $i <= $passes; $i++) {
-        $lastRc = runStep(sprintf('%s (pass %d/%d)', $description, $i, $passes), pmssBuildCommand($expectPath, [$scriptPath]));
-        if ($i < $passes) pmssUserTransferSleep($sleepMin, $sleepMax, sprintf('Waiting before next %s pass', strtolower($description)));
-    }
-
-    return $lastRc;
-}
-
-/**
- * Build a cheap SSH auth probe used to fail fast on bad credentials.
- */
-function pmssUserTransferBuildAuthProbe(array $cfg): string
-{
-    [$remoteUser, $hostname] = [$cfg['remoteUser'], $cfg['hostname']];
-
-    return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshCommand(
-        $remoteUser,
-        ['-o ConnectTimeout=20', '-o NumberOfPasswordPrompts=1']
-    ).' '.escapeshellarg($hostname).' '.escapeshellarg('/bin/true')."\n";
-}
-
-/**
- * Build a minimal Expect wrapper that injects the password via env and propagates exit codes.
- */
-function pmssUserTransferBuildExpectWrapper(): string
-{
-    return <<<'EXP'
-#!/usr/bin/expect -f
-set timeout -1
-
-if {[llength $argv] != 1} {
-    puts stderr "Usage: transfer.expect <command-path>"
-    exit 2
-}
-
-if {![info exists env(PMSS_USER_TRANSFER_PASSWORD)]} {
-    puts stderr "Missing env PMSS_USER_TRANSFER_PASSWORD"
-    exit 2
-}
-
-set password $env(PMSS_USER_TRANSFER_PASSWORD)
-set cmd [lindex $argv 0]
-
-spawn -noecho $cmd
-expect {
-    -re "(?i)assword:" {
-        send -- "$password\r"
-        exp_continue
-    }
-    eof
-}
-
-set result [wait]
-exit [lindex $result 3]
-EXP;
-}
+require_once __DIR__.'/userTransfer/postSetup.php';
+require_once __DIR__.'/userTransfer/transferRuntime.php';
 
 /** Build scratch script payloads keyed to pmssUserTransferScratchPaths(). */
 function pmssUserTransferScratchPayloads(array $cfg, array $paths = []): array { $paths = $paths ?: pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>'); return ['expect' => pmssUserTransferBuildExpectWrapper()."\n", 'authProbe' => pmssUserTransferBuildAuthProbe($cfg), 'mainScript' => pmssUserTransferBuildRsyncMain($cfg), 'finalScript' => pmssUserTransferBuildRsyncFinal($cfg), 'remoteSizeScript' => pmssUserTransferBuildRemoteSizeProbe($cfg), 'qbittorrentProbeScript' => pmssUserTransferBuildQbittorrentCategoryProbe($cfg, $paths['qbittorrentConfig'], $paths['qbittorrentCategories'])]; }
@@ -254,64 +73,13 @@ function pmssUserTransferMain(array $argv): int
             return 0;
         }
 
-        $fromEnv = getenv('PMSS_USER_TRANSFER_PASSWORD');
-        if ($fromEnv !== false && $fromEnv !== '') {
-            $password = $fromEnv;
-        } else {
-            $isTty = pmssStreamIsTty(STDIN);
-            if (!$isTty) {
-                throw new RuntimeException('Password missing (set PMSS_USER_TRANSFER_PASSWORD for non-interactive runs)', 1);
-            }
-
-            // Avoid echoing the password on the console.
-            $mode = trim((string) @shell_exec('stty -g 2>/dev/null'));
-            $pass1 = '';
-            $pass2 = '';
-            try {
-                @shell_exec('stty -echo 2>/dev/null');
-                echo 'Remote user password: ';
-                $pass1 = (string) fgets(STDIN);
-                echo PHP_EOL.'Re-type password: ';
-                $pass2 = (string) fgets(STDIN);
-                echo PHP_EOL;
-            } finally {
-                if ($mode !== '') {
-                    @shell_exec('stty '.escapeshellarg($mode).' 2>/dev/null');
-                } else {
-                    @shell_exec('stty echo 2>/dev/null');
-                }
-            }
-
-            $pass1 = trim($pass1);
-            $pass2 = trim($pass2);
-            if ($pass1 === '' || $pass1 !== $pass2) {
-                throw new RuntimeException('Password mismatch', 1);
-            }
-            $password = $pass1;
-        }
+        $password = pmssUserTransferResolvePassword();
         putenv('PMSS_USER_TRANSFER_PASSWORD='.$password);
 
-        try {
-            $token = bin2hex(random_bytes(12));
-        } catch (Throwable $e) {
-            $token = sha1(microtime(true).'-'.mt_rand());
-        }
-        $scratch = '/root/pmss-userTransfer-'.$token;
-        if (!pmssDirEnsureExists($scratch, 0700)) {
-            throw new RuntimeException('Failed to create scratch directory: '.$scratch, 1);
-        }
-        @chmod($scratch, 0700);
-
+        $scratch = pmssUserTransferCreateScratchRoot();
         $scratchPaths = pmssUserTransferScratchPaths($scratch);
-        $cleanup = function () use ($scratchPaths, $scratch): void {
-            foreach ($scratchPaths as $path) {
-                if (file_exists($path)) {
-                    @unlink($path);
-                }
-            }
-            if (is_dir($scratch)) {
-                @rmdir($scratch);
-            }
+        $cleanup = static function () use ($scratchPaths, $scratch): void {
+            pmssUserTransferScratchCleanup($scratch, $scratchPaths);
         };
         register_shutdown_function($cleanup);
 
@@ -344,7 +112,7 @@ function pmssUserTransferMain(array $argv): int
             logMessage('[OK] User transfer complete');
             return 0;
         } finally {
-            $cleanup();
+            pmssUserTransferScratchCleanup($scratch, $scratchPaths);
             putenv('PMSS_USER_TRANSFER_PASSWORD');
         }
     } catch (RuntimeException $e) {
@@ -356,69 +124,4 @@ function pmssUserTransferMain(array $argv): int
         fwrite(STDERR, $e->getMessage().PHP_EOL);
         return is_int($code) && $code > 0 ? $code : 1;
     }
-}
-
-/**
- * Apply post-transfer steps (rename ruTorrent user dir, normalise permissions, restart marker).
- */
-function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths): void
-{
-    $localUser = $cfg['localUser'];
-    $remoteUser = $cfg['remoteUser'];
-
-    // Rename ruTorrent user directory when remote/local user differs.
-    if ($remoteUser !== $localUser) {
-        $src = $home.'/www/rutorrent/share/users/'.$remoteUser;
-        $dst = $home.'/www/rutorrent/share/users/'.$localUser;
-        if (file_exists($src) && !file_exists($dst)) {
-            if (pmssUserTransferIsPathWithinHome($src, $home) && pmssUserTransferIsPathWithinHome(dirname($dst), $home)) {
-                if (!@rename($src, $dst)) {
-                    runStep(
-                        'Renaming ruTorrent user directory',
-                        pmssBuildCommand('mv', [$src, $dst])
-                    );
-                } else {
-                    logMessage('[OK] Renamed ruTorrent user directory');
-                }
-            } else {
-                logMessage('[WARN] Skipping ruTorrent rename (path escapes home)');
-            }
-        }
-    }
-
-    // Keep migrated rTorrent sessions usable when usernames differ between
-    // source and destination accounts.
-    pmssUserTransferRewriteRtorrentSessionPaths($cfg, $home);
-
-    // Preserve qBittorrent category labels without copying the excluded,
-    // server-specific qBittorrent.conf wholesale.
-    pmssUserTransferPreserveQbittorrentCategories(
-        $cfg,
-        $home,
-        $scratchPaths['expect'],
-        $scratchPaths['qbittorrentProbeScript'],
-        $scratchPaths['qbittorrentConfig'],
-        $scratchPaths['qbittorrentCategories']
-    );
-
-    // Normalise ownership/permissions via the shared helper, which avoids unsafe
-    // recursive chown dereferencing symlinks into the host filesystem.
-    runStep(
-        'Normalising user permissions',
-        pmssBuildCommand('php', [dirname(__DIR__).'/../util/userPermissions.php', $localUser])
-    );
-
-    // Request rTorrent restart (best effort) so migrated data is picked up.
-    $wwwDir = $home.'/www';
-    if (is_dir($wwwDir) && !is_link($wwwDir) && pmssUserTransferIsPathWithinHome($wwwDir, $home)) {
-        $marker = $wwwDir.'/.rtorrentRestart';
-        runStep('Requesting rTorrent restart marker', pmssBuildCommand('touch', [$marker]));
-        runStep('Setting rTorrent restart marker owner', pmssBuildCommand('chown', [$localUser.':'.$localUser, $marker]));
-    } else {
-        logMessage('[WARN] Skipping rTorrent restart marker (www dir missing or unsafe)');
-    }
-
-    // Advisory only: keep the existing exit-code semantics while surfacing
-    // suspiciously incomplete copies before operators clean up the source.
-    pmssUserTransferVerifyCompleteness($cfg, $home, $scratchPaths['expect'], $scratchPaths['remoteSizeScript']);
 }

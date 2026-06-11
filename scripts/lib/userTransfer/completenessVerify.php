@@ -5,6 +5,8 @@
  * @license GPL-3.0-only
  */
 
+require_once __DIR__.'/remoteScripts.php';
+
 /**
  * Build a remote size probe script that returns `du -sb` output over SSH.
  */
