@@ -12,8 +12,7 @@
  * @license GPL-3.0-only
  */
 require_once __DIR__.'/lib/runtime.php';
-require_once __DIR__.'/lib/userLifecycle.php';
-require_once __DIR__.'/lib/cli/optionParser.php';
+pmssRequireRelativeFiles(__DIR__, ['lib/userLifecycle.php', 'lib/cli/optionParser.php']);
 
 function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
 {

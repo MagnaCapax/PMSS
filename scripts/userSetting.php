@@ -11,9 +11,7 @@
  */
 
 require_once __DIR__.'/lib/runtime.php';
-require_once __DIR__.'/lib/user/userConfigStore.php';
-require_once __DIR__.'/lib/user/UserValidator.php';
-require_once __DIR__.'/lib/userLifecycle.php';
+pmssRequireRelativeFiles(__DIR__, ['lib/user/userConfigStore.php', 'lib/user/UserValidator.php', 'lib/userLifecycle.php']);
 
 requireRoot();
 

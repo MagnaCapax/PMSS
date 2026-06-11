@@ -18,11 +18,7 @@
  * @license GPL-3.0-only
  */
 require_once __DIR__.'/lib/userLifecycle.php';
-require_once __DIR__.'/lib/users.php';
-require_once __DIR__.'/lib/homeMount.php';
-require_once __DIR__.'/lib/traffic/storage.php';
-require_once __DIR__.'/lib/user/homeReclaim.php';
-require_once __DIR__.'/lib/user/terminationCleanup.php';
+pmssRequireRelativeFiles(__DIR__, ['lib/users.php', 'lib/homeMount.php', 'lib/traffic/storage.php', 'lib/user/homeReclaim.php', 'lib/user/terminationCleanup.php']);
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Terminating
 // a user when /home is unavailable could lead to incomplete cleanup or acting on

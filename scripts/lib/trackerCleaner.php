@@ -2,8 +2,7 @@
 /** Shared tracker-cleaner policy and in-memory torrent mutation helpers. */
 
 require_once __DIR__.'/runtime.php';
-require_once __DIR__.'/lighttpd/userFileWrite.php';
-require_once __DIR__.'/user/identity.php';
+pmssRequireRelativeFiles(__DIR__, ['lighttpd/userFileWrite.php', 'user/identity.php']);
 
 function pmssTrackerCleanerTimestamp(): string { return '['.date('Y-m-d H:i:s').']'; }
 

@@ -10,13 +10,6 @@
  */
 
 require_once __DIR__.'/runtime.php';
-require_once __DIR__.'/rtorrent/scgi.php';
-require_once __DIR__.'/traffic.php';
-require_once __DIR__.'/update.php';
-require_once __DIR__.'/user/userConfigStore.php';
+pmssRequireRelativeFiles(__DIR__, ['rtorrent/scgi.php', 'traffic.php', 'update.php', 'user/userConfigStore.php']);
 require_once __DIR__.'/user/trafficLimit.php';
-require_once __DIR__.'/cli/optionParser.php';
-
-require_once __DIR__.'/stats/context.php';
-require_once __DIR__.'/stats/collect.php';
-require_once __DIR__.'/stats/render.php';
+pmssRequireRelativeFiles(__DIR__, ['cli/optionParser.php', 'stats/context.php', 'stats/collect.php', 'stats/render.php']);

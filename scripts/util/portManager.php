@@ -8,8 +8,7 @@
  */
 
 require_once __DIR__.'/../lib/runtime.php';
-require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
-require_once __DIR__.'/../lib/userLifecycle.php';
+pmssRequireRelativeFiles(__DIR__, ['../lib/lighttpd/userFileWrite.php', '../lib/userLifecycle.php']);
 
 const PMSS_PORT_MANAGER_MIN_PORT = 2000;
 const PMSS_PORT_MANAGER_MAX_PORT = 38000;
