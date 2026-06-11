@@ -7,10 +7,7 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
-require_once __DIR__.'/../userLifecycle.php';
-require_once __DIR__.'/userConfigCli.php';
-require_once __DIR__.'/userConfigStore.php';
-require_once __DIR__.'/iopsLimit.php';
+pmssRequireRelativeFiles(__DIR__, ['../userLifecycle.php', 'userConfigCli.php', 'userConfigStore.php', 'iopsLimit.php']);
 
 function pmssIopsLimitBuildThrottleCommand(string $username, int $iops): string
 {

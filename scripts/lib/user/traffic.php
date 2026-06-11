@@ -14,9 +14,7 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
-require_once __DIR__.'/../lighttpd/userFileWrite.php';
-require_once __DIR__.'/../traffic/storage.php';
-require_once __DIR__.'/integerSetting.php';
+pmssRequireRelativeFiles(__DIR__, ['../lighttpd/userFileWrite.php', '../traffic/storage.php', 'integerSetting.php']);
 
 /**
  * Apply or refresh the user-specific traffic cap.

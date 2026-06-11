@@ -7,10 +7,7 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
-require_once __DIR__.'/../runtime.php';
-require_once __DIR__.'/../userLifecycle.php';
-require_once __DIR__.'/userConfigCli.php';
-require_once __DIR__.'/userConfigStore.php';
+pmssRequireRelativeFiles(__DIR__, ['../runtime.php', '../userLifecycle.php', 'userConfigCli.php', 'userConfigStore.php']);
 
 /** Return true when the payload includes explicit io.latency/io.cost knobs. */
 function pmssCgroupRefreshHasExplicitIoPolicy(array $payload): bool

@@ -6,11 +6,7 @@
  */
 
 require_once __DIR__.'/../userLifecycle.php';
-require_once __DIR__.'/../cli/optionParser.php';
-require_once __DIR__.'/../nginxUserHosts.php';
-require_once __DIR__.'/setup.php';
-require_once __DIR__.'/userConfigsGenerate.php';
-require_once __DIR__.'/configTest.php';
+pmssRequireRelativeFiles(__DIR__, ['../cli/optionParser.php', '../nginxUserHosts.php', 'setup.php', 'userConfigsGenerate.php', 'configTest.php']);
 
 /**
  * Apply chmod to regular files matched by a glob without invoking a shell.
