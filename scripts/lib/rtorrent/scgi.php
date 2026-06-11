@@ -41,26 +41,29 @@ function rtorrentScgiFormatXmlrpcValue($value): string
 {
     if (is_array($value)) {
         $items = implode('', array_map('rtorrentScgiFormatXmlrpcValue', $value));
-        return '<value><array><data>' . $items . '</data></array></value>';
+        return rtorrentScgiFormatXmlrpcTypedValue('array', '<data>' . $items . '</data>');
     }
 
-    $type = null;
-    $body = null;
     if (is_int($value)) {
-        $type = 'int';
-        $body = (string) $value;
-    } elseif (is_bool($value)) {
-        $type = 'boolean';
-        $body = $value ? '1' : '0';
-    } elseif (is_float($value)) {
-        $type = 'double';
-        $body = (string) $value;
+        return rtorrentScgiFormatXmlrpcTypedValue('int', (string) $value);
     }
 
-    if ($type === null) {
-        return '<value><string>' . htmlspecialchars((string) $value, ENT_XML1, 'UTF-8') . '</string></value>';
+    if (is_bool($value)) {
+        return rtorrentScgiFormatXmlrpcTypedValue('boolean', $value ? '1' : '0');
     }
 
+    if (is_float($value)) {
+        return rtorrentScgiFormatXmlrpcTypedValue('double', (string) $value);
+    }
+
+    return rtorrentScgiFormatXmlrpcTypedValue('string', htmlspecialchars((string) $value, ENT_XML1, 'UTF-8'));
+}
+
+/**
+ * Wrap one xmlrpc typed value node.
+ */
+function rtorrentScgiFormatXmlrpcTypedValue(string $type, string $body): string
+{
     return '<value><' . $type . '>' . $body . '</' . $type . '></value>';
 }
 
@@ -74,16 +77,14 @@ function rtorrentScgiFormatXmlrpcValue($value): string
  */
 function rtorrentScgiFormatXmlrpcParamsCall(string $method, array $params = []): string
 {
-    $xml = '<?xml version="1.0" encoding="UTF-8"?>'
+    $paramsXml = implode('', array_map(static function ($param): string {
+        return '<param>' . rtorrentScgiFormatXmlrpcValue($param) . '</param>';
+    }, $params));
+
+    return '<?xml version="1.0" encoding="UTF-8"?>'
         . '<methodCall>'
         . '<methodName>' . htmlspecialchars($method, ENT_XML1, 'UTF-8') . '</methodName>'
-        . '<params>';
-
-    foreach ($params as $param) {
-        $xml .= '<param>' . rtorrentScgiFormatXmlrpcValue($param) . '</param>';
-    }
-
-    return $xml . '</params></methodCall>';
+        . '<params>' . $paramsXml . '</params></methodCall>';
 }
 
 /**
@@ -165,31 +166,28 @@ function rtorrentScgiDecodeXmlrpcValue(\SimpleXMLElement $valueNode)
     $child = $children[0];
     $name = $child->getName();
 
-    switch ($name) {
-        case 'int':
-        case 'i4':
-        case 'i8':
-            return (int) ((string) $child);
+    if (in_array($name, ['int', 'i4', 'i8'], true)) {
+        return (int) ((string) $child);
+    }
+    if ($name === 'double') {
+        return (float) ((string) $child);
+    }
+    if ($name === 'boolean') {
+        return ((string) $child) === '1';
+    }
+    if ($name === 'string') {
+        return (string) $child;
+    }
+    if ($name === 'array') {
+        return array_map('rtorrentScgiDecodeXmlrpcValue', iterator_to_array($child->data->value, false));
+    }
+    if ($name === 'struct') {
+        $values = [];
+        foreach ($child->member as $member) {
+            $values[(string) $member->name] = rtorrentScgiDecodeXmlrpcValue($member->value);
+        }
 
-        case 'double':
-            return (float) ((string) $child);
-
-        case 'boolean':
-            return ((string) $child) === '1';
-
-        case 'string':
-            return (string) $child;
-
-        case 'array':
-            return array_map('rtorrentScgiDecodeXmlrpcValue', iterator_to_array($child->data->value, false));
-
-        case 'struct':
-            $values = [];
-            foreach ($child->member as $member) {
-                $values[(string) $member->name] = rtorrentScgiDecodeXmlrpcValue($member->value);
-            }
-
-            return $values;
+        return $values;
     }
 
     return (string) $child;
@@ -265,27 +263,21 @@ function rtorrentScgiSocketQueueSnapshotFromLines(array $lines, string $socketPa
     }
 
     foreach ($lines as $line) {
-        $line = trim((string) $line);
-        if ($line === '' || strpos($line, $socketPath) === false) {
-            continue;
-        }
-
-        $columns = preg_split('/\s+/', $line);
-        if (!is_array($columns) || count($columns) < 5) {
-            continue;
-        }
-        if (
-            ($columns[1] ?? '') !== 'LISTEN'
+        $columns = preg_split('/\s+/', trim((string) $line));
+        $recvQ = (string) ($columns[2] ?? '');
+        $sendQ = (string) ($columns[3] ?? '');
+        if (!is_array($columns)
+            || count($columns) < 5
+            || ($columns[1] ?? '') !== 'LISTEN'
             || !in_array($socketPath, $columns, true)
-            || !preg_match('/^\d+$/', $columns[2] ?? '')
-            || !preg_match('/^\d+$/', $columns[3] ?? '')
-        ) {
+            || !ctype_digit($recvQ)
+            || !ctype_digit($sendQ)) {
             continue;
         }
 
         return [
-            'recvQ' => (int) $columns[2],
-            'sendQ' => (int) $columns[3],
+            'recvQ' => (int) $recvQ,
+            'sendQ' => (int) $sendQ,
         ];
     }
 
@@ -324,10 +316,9 @@ function rtorrentScgiSocketQueueSnapshot(string $socketPath): ?array
  */
 function rtorrentScgiSocketQueueSaturated(array $snapshot): bool
 {
-    $recvQ = (int) ($snapshot['recvQ'] ?? 0);
     $sendQ = (int) ($snapshot['sendQ'] ?? 0);
 
-    return $sendQ > 0 && $recvQ >= $sendQ;
+    return $sendQ > 0 && (int) ($snapshot['recvQ'] ?? 0) >= $sendQ;
 }
 
 /**

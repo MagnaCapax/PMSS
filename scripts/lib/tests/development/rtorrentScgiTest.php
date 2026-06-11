@@ -63,13 +63,16 @@ class RtorrentScgiTest extends TestCase
 
     public function testXmlrpcParamsCallFormatsStringAndListValues(): void
     {
-        $xml = rtorrentScgiFormatXmlrpcParamsCall('d.multicall2', ['main', 'd.get_hash=', ['nested', 1]]);
+        $xml = rtorrentScgiFormatXmlrpcParamsCall('d.multicall2', ['main', 'd.get_hash=', ['nested', 1], true, 4.25, 'x<y&z']);
 
         $this->assertSame(
             '<?xml version="1.0" encoding="UTF-8"?><methodCall><methodName>d.multicall2</methodName><params>'
             .'<param><value><string>main</string></value></param>'
             .'<param><value><string>d.get_hash=</string></value></param>'
             .'<param><value><array><data><value><string>nested</string></value><value><int>1</int></value></data></array></value></param>'
+            .'<param><value><boolean>1</boolean></value></param>'
+            .'<param><value><double>4.25</double></value></param>'
+            .'<param><value><string>x&lt;y&amp;z</string></value></param>'
             .'</params></methodCall>',
             $xml
         );
@@ -119,6 +122,10 @@ class RtorrentScgiTest extends TestCase
             ],
             'other socket' => [
                 ['u_str LISTEN 101 100 /home/bob/.rtorrent.socket 12345 * 0'],
+                null,
+            ],
+            'substring path without exact socket column' => [
+                ['u_str LISTEN 101 100 /srv/home/alice/.rtorrent.socket.backup 12345 * 0'],
                 null,
             ],
             'malformed columns' => [
