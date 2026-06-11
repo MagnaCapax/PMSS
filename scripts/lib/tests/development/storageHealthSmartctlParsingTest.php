@@ -27,6 +27,12 @@ class StorageHealthSmartctlParsingTest extends TestCase
         }
     }
 
+    private function assertSeverityFlags(array $entry, string $severity, array $flags): void
+    {
+        $this->assertEquals($severity, $entry['severity']);
+        $this->assertFlags($entry, $flags);
+    }
+
     public function testAtaSmartPassedParsesMetrics(): void
     {
         $out = $this->smartctlOutput([
@@ -76,8 +82,7 @@ class StorageHealthSmartctlParsingTest extends TestCase
         $out = "Some output without explicit health lines\n";
         $entry = $this->smartctlEntry($out, 'sdc');
 
-        $this->assertEquals('warn', $entry['severity']);
-        $this->assertFlags($entry, ['health_unknown']);
+        $this->assertSeverityFlags($entry, 'warn', ['health_unknown']);
     }
 
     public function testFailedHealthVariantsBecomeFailSeverity(): void
@@ -87,8 +92,7 @@ class StorageHealthSmartctlParsingTest extends TestCase
             ["SMART Health Status: OK FAIL\n", 'sdy'],
         ] as [$out, $device]) {
             $entry = $this->smartctlEntry($out, $device);
-            $this->assertEquals('fail', $entry['severity']);
-            $this->assertFlags($entry, ['health_not_ok']);
+            $this->assertSeverityFlags($entry, 'fail', ['health_not_ok']);
         }
     }
 
@@ -111,8 +115,7 @@ class StorageHealthSmartctlParsingTest extends TestCase
         ]);
         $entry = $this->smartctlEntry($out, 'sdx');
 
-        $this->assertEquals('fail', $entry['severity']);
-        $this->assertFlags($entry, ['health_not_ok', 'pending_sectors']);
+        $this->assertSeverityFlags($entry, 'fail', ['health_not_ok', 'pending_sectors']);
     }
 
     public function testSsdTemperatureThresholdUsesHotSsdFlag(): void
@@ -124,8 +127,7 @@ class StorageHealthSmartctlParsingTest extends TestCase
 
         $entry = $this->smartctlEntry($out, 'nvme0n1', ['model' => 'SSD', 'rota' => 0, 'size' => '1T']);
 
-        $this->assertEquals('warn', $entry['severity']);
-        $this->assertFlags($entry, ['hot_ssd']);
+        $this->assertSeverityFlags($entry, 'warn', ['hot_ssd']);
     }
 
     public function testPreviousMetricIncreasesSetExpectedFlags(): void
@@ -139,7 +141,6 @@ class StorageHealthSmartctlParsingTest extends TestCase
 
         $entry = $this->smartctlEntry($out, 'sdf', [], ['reallocated' => 1, 'pending' => 0, 'link_errors' => 2]);
 
-        $this->assertFlags($entry, ['reallocated_increase', 'pending_increase', 'link_errors_increase']);
-        $this->assertEquals('warn', $entry['severity']);
+        $this->assertSeverityFlags($entry, 'warn', ['reallocated_increase', 'pending_increase', 'link_errors_increase']);
     }
 }

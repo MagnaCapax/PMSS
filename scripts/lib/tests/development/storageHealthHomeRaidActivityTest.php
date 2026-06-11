@@ -25,9 +25,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/md1'), $raidEntries);
 
         $this->assertTrue(is_array($activity), 'Expected activity for /home array');
-        foreach ($expected as $key => $value) {
-            $this->assertEquals($value, $activity[$key]);
-        }
+        $this->pmssAssertArraySubsetSame($expected, $activity);
     }
 
     public function testParsesRaidActivitySummaryDetails(): void
@@ -36,10 +34,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
             '[==>..................]  check = 12.3% (120/999) finish=15.4min speed=123456K/sec'
         );
 
-        $this->assertEquals('check', $summary['operation']);
-        $this->assertEquals('12.3%', $summary['progress']);
-        $this->assertEquals('15.4min', $summary['eta']);
-        $this->assertEquals('123456K/sec', $summary['speed']);
+        $this->assertSame(['operation' => 'check', 'progress' => '12.3%', 'eta' => '15.4min', 'speed' => '123456K/sec'], $summary);
     }
 
     public function testResolvesHomeArrayFromDirectMdMount(): void
@@ -129,7 +124,6 @@ class StorageHealthHomeRaidActivityTest extends TestCase
             ['array' => 'md2', 'severity' => 'warn', 'flags' => ['rebuild_in_progress'], 'operation' => 'check'],
         ]);
 
-        $this->assertTrue(is_array($status), 'Expected performance status for RAID check');
-        $this->assertStringContainsString('check', $status['reason']);
+        $this->assertSame(['status' => 'performance_limited', 'reason' => 'RAID md2 check in progress', 'array' => 'md2'], $status);
     }
 }
