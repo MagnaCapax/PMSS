@@ -6,6 +6,15 @@ require_once __DIR__.'/../../../util/portManager.php';
 
 final class PortManagerSharedNamespaceTest extends TestCase
 {
+    private function runPortManagerMain(array $arguments): array
+    {
+        ob_start();
+        $rc = \pmssPortManagerMain(array_merge(['portManager.php'], $arguments));
+        $output = ob_get_clean();
+
+        return ['rc' => $rc, 'output' => $output];
+    }
+
     private function makePortDir(): string
     {
         return $this->pmssMakeTempDir('pmss-port-shared-', 0755);
@@ -68,5 +77,25 @@ final class PortManagerSharedNamespaceTest extends TestCase
         $this->assertTrue(is_int($port));
         $this->assertTrue($port !== 25000);
         $this->assertSame((string) $port, trim((string) file_get_contents($portDir.'/deluge-web-bob')));
+    }
+
+    public function testAssignHelperReportsCliStatusWithoutChangingPortContract(): void
+    {
+        $portDir = $this->makePortDir();
+        $legacyDir = $this->makePortDir();
+        $this->pmssTrackEnvOverrides(['PMSS_PORT_MANAGER_DIR' => $portDir, 'PMSS_PORT_MANAGER_LEGACY_DIR' => $legacyDir]);
+
+        $assigned = '';
+        $port = \pmssPortManagerAssignServicePort('alice', 'rclone', 25000, $assigned);
+        $cli = $this->runPortManagerMain(['assign', 'alice', 'rclone']);
+        $existing = '';
+        $again = \pmssPortManagerAssignServicePort('alice', 'rclone', null, $existing);
+
+        $this->assertSame(25000, $port);
+        $this->assertSame('assigned', $assigned);
+        $this->assertSame(0, $cli['rc']);
+        $this->assertSame('25000', $cli['output']);
+        $this->assertSame(25000, $again);
+        $this->assertSame('already_assigned', $existing);
     }
 }
