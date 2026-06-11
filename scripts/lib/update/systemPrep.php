@@ -11,16 +11,11 @@
  */
 
 require_once __DIR__.'/logging.php';
-require_once __DIR__.'/fstab.php';
-require_once __DIR__.'/managedPath.php';
-require_once __DIR__.'/runtime/commands.php';
-require_once __DIR__.'/runtime/processes.php';
 require_once __DIR__.'/../runtime.php';
-require_once __DIR__.'/systemPrep/hostEnvironment.php';
-require_once __DIR__.'/systemPrep/bootDefaults.php';
-require_once __DIR__.'/systemPrep/sysctlTuning.php';
-
-require_once __DIR__.'/systemPrep/systemdSlicesEnsure.php';
+pmssRequireRelativeFiles(__DIR__, [
+    'fstab.php', 'managedPath.php', 'runtime/commands.php', 'runtime/processes.php',
+    'systemPrep/hostEnvironment.php', 'systemPrep/bootDefaults.php', 'systemPrep/sysctlTuning.php', 'systemPrep/systemdSlicesEnsure.php',
+]);
 
 /**
  * Keep /tmp disk-backed on Debian 13+ by masking the systemd tmpfs unit.

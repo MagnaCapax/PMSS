@@ -10,14 +10,10 @@
  */
 
 require_once __DIR__.'/../update.php';
-require_once __DIR__.'/distro.php';
-require_once __DIR__.'/packageState.php';
-require_once __DIR__.'/userMaintenance.php';
-require_once __DIR__.'/distUpgrade/plan.php';
-require_once __DIR__.'/distUpgrade/sources.php';
-require_once __DIR__.'/distUpgrade/apt.php';
-require_once __DIR__.'/distUpgrade/docker.php';
-require_once __DIR__.'/distUpgrade/boot.php';
+pmssRequireRelativeFiles(__DIR__, [
+    'distro.php', 'packageState.php', 'userMaintenance.php', 'distUpgrade/plan.php',
+    'distUpgrade/sources.php', 'distUpgrade/apt.php', 'distUpgrade/docker.php', 'distUpgrade/boot.php',
+]);
 
 /**
  * Entry point used by scripts/update.php for --dist-upgrade runs.

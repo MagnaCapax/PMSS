@@ -22,6 +22,19 @@ const PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT = 5;
 const PMSS_TIMEOUT_FIRE_LOG_DEFAULT = '/var/log/pmss-timeout-fires.jsonl';
 const PMSS_BLOCK_DATA_DEVICE_NAME_PATTERN = '/^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme\d+n\d+|mmcblk\d+)$/';
 
+/**
+ * Load static helper-module require lists relative to a bootstrap file.
+ *
+ * @param string[] $relativePaths
+ */
+function pmssRequireRelativeFiles(string $baseDir, array $relativePaths): void
+{
+    $baseDir = rtrim($baseDir, '/');
+    foreach ($relativePaths as $relativePath) {
+        require_once $baseDir.'/'.$relativePath;
+    }
+}
+
 if (!function_exists('pmssFormatBytes')) {
     // Format byte counts with binary IEC units for compact human output.
     function pmssFormatBytes(float $bytes, int $precision = 1, int $minimumUnitIndex = 0): string

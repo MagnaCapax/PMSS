@@ -7,10 +7,8 @@
  */
 
 require_once __DIR__.'/../logging.php';
-require_once __DIR__.'/../managedPath.php';
-require_once __DIR__.'/../runtime/commands.php';
-require_once __DIR__.'/../runtime/processes.php';
 require_once __DIR__.'/../../runtime.php';
+pmssRequireRelativeFiles(__DIR__, ['../managedPath.php', '../runtime/commands.php', '../runtime/processes.php']);
 
 /** Read a logging template and replace placeholders in one pass. */
 function pmssRenderLoggingTemplate(

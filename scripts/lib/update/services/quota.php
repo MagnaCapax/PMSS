@@ -7,9 +7,8 @@
  */
 
 require_once __DIR__.'/../logging.php';
-require_once __DIR__.'/../fstab.php';
-require_once __DIR__.'/../managedPath.php';
 require_once __DIR__.'/../../runtime.php';
+pmssRequireRelativeFiles(__DIR__, ['../fstab.php', '../managedPath.php']);
 
 /**
  * Ensure the given mount point in /etc/fstab contains the quota options.

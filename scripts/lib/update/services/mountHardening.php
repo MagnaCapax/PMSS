@@ -6,10 +6,8 @@
  * @author PMSS Team
  */
 require_once __DIR__.'/../logging.php';
-require_once __DIR__.'/../fstab.php';
-require_once __DIR__.'/../managedPath.php';
-require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../../runtime.php';
+pmssRequireRelativeFiles(__DIR__, ['../fstab.php', '../managedPath.php', '../runtime/commands.php']);
 
 /** Check whether an opt-in hardening flag is enabled. */
 function pmssMountHardeningFlagEnabled(string $envKey, string $notSetMessage, string $disabledMessage, callable $logger): bool
