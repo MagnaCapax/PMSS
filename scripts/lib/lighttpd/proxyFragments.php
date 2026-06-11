@@ -101,31 +101,19 @@ function pmssLighttpdProxyPortEnsure(string $user, string $proxyName, string $pr
         return $proxyPort;
     }
 
-    $proxyPort = $user !== ''
-        ? pmssPortManagerAssignServicePort($user, $proxyName)
-        : pmssLighttpdProxyLocalPortAssign($proxyPortFile);
+    if ($user !== '') {
+        $proxyPort = pmssPortManagerAssignServicePort($user, $proxyName);
+    } else {
+        $portDir = dirname($proxyPortFile);
+        $proxyPort = (!pmssPathTargetIsSafe($portDir, true) || !is_dir($portDir) || is_link($portDir))
+            ? null
+            : pmssPortManagerSelectAvailablePort(pmssPortManagerUsedPorts($portDir, $portDir.'/.pmss-no-legacy'));
+    }
     if ($proxyPort === null || !pmssNetworkPortFileWrite($proxyPortFile, $proxyPort, 1024, 65500, 0640)) {
         return 0;
     }
 
     return $proxyPort;
-}
-
-function pmssLighttpdProxyLocalPortAssign(string $proxyPortFile): ?int
-{
-    $portDir = dirname($proxyPortFile);
-    if (!pmssPathTargetIsSafe($portDir, true) || !is_dir($portDir) || is_link($portDir)) {
-        return null;
-    }
-
-    return pmssPortManagerSelectAvailablePort(pmssPortManagerUsedPorts($portDir, $portDir.'/.pmss-no-legacy'));
-}
-
-function pmssLighttpdProxyUserFromPortFile(string $proxyPortFile): string
-{
-    $user = basename(dirname($proxyPortFile));
-
-    return pmssValidateUsername($user) ? $user : '';
 }
 
 function pmssLighttpdProxyPortsEnsure($userOrProxyPortFiles, ?array $proxyPortFiles = null): array
@@ -138,7 +126,10 @@ function pmssLighttpdProxyPortsEnsure($userOrProxyPortFiles, ?array $proxyPortFi
     $proxyPorts = [];
     foreach ($proxyPortFiles as $proxyName => $proxyPortFile) {
         $proxyFile = (string) $proxyPortFile;
-        $proxyUser = $user !== '' ? $user : pmssLighttpdProxyUserFromPortFile($proxyFile);
+        $candidateUser = basename(dirname($proxyFile));
+        $proxyUser = $user !== ''
+            ? $user
+            : (pmssValidateUsername($candidateUser) ? $candidateUser : '');
         $proxyPorts[$proxyName] = pmssLighttpdProxyPortEnsure($proxyUser, (string) $proxyName, $proxyFile);
     }
 

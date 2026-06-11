@@ -86,16 +86,6 @@ function pmssRemoteLoggingReadConfig(string $loggingConf): array
     return $config;
 }
 
-/** Explain why remote logging should not be applied. */
-function pmssRemoteLoggingInvalidReason(array $config): string
-{
-    if (!$config['enabled']) { return 'Remote logging not enabled'; }
-    if ($config['host'] === '') { return 'Remote host not configured'; }
-    return preg_match('/^[a-zA-Z0-9][a-zA-Z0-9.\-:]+$/', $config['host']) === 1
-        ? ''
-        : 'Invalid remote host format';
-}
-
 /**
  * Render and install journald limits template, then restart journald.
  */
@@ -172,7 +162,14 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
     $skipRestart = $skipRestartReason !== '';
     if (!is_file($loggingConf)) return;
     $config = pmssRemoteLoggingReadConfig($loggingConf);
-    $invalidReason = pmssRemoteLoggingInvalidReason($config);
+    $invalidReason = '';
+    if (!$config['enabled']) {
+        $invalidReason = 'Remote logging not enabled';
+    } elseif ($config['host'] === '') {
+        $invalidReason = 'Remote host not configured';
+    } elseif (preg_match('/^[a-zA-Z0-9][a-zA-Z0-9.\-:]+$/', $config['host']) !== 1) {
+        $invalidReason = 'Invalid remote host format';
+    }
     if ($invalidReason !== '') {
         if ($config['enabled']) {
             // Only warn if explicitly enabled but misconfigured
