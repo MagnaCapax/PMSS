@@ -12,6 +12,14 @@
 /* use UPnP for port mapping */
   "use_upnp" : true,
 
+/* Resilio Sync 2.6+ expects directory_root at the global/top level.
+   Older BitTorrent Sync samples placed this under the webui block. */
+// "directory_root" : "/home/user/MySharedFolders/",
+
+/* dir_whitelist defines which directories can be shown to user or have folders added (linux only)
+   relative paths are relative to directory_root setting */
+// "dir_whitelist" : [ "/home/user/MySharedFolders/personal", "work" ],
+
 /* limits in kB/s. 0 - no limit */
   "download_limit" : 0,
   "upload_limit" : 0,
@@ -37,13 +45,6 @@
 //  ,"force_https" : true // disable http
 //  ,"ssl_certificate" : "/path/to/cert.pem"
 //  ,"ssl_private_key" : "/path/to/private.key"
-
-/* directory_root path defines where the WebUI Folder browser starts (linux only). Default value is / */
-//  ,"directory_root" : "/home/user/MySharedFolders/"
-
-/* dir_whitelist defines which directories can be shown to user or have folders added (linux only)
-   relative paths are relative to directory_root setting */
-//  ,"dir_whitelist" : [ "/home/user/MySharedFolders/personal", "work" ]
   }
 
 /* !!! if you set shared folders in config file WebUI will be DISABLED !!!

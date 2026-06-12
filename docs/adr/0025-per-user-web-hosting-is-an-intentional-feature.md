@@ -1,7 +1,7 @@
 # ADR 0025: Per-user web hosting (unauthenticated /public, PHP, network-reachable panel) is an intentional product feature
 
 Date: 2026-06-12
-Category: product / architecture
+Category: domain
 
 ## Status
 
