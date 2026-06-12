@@ -46,18 +46,30 @@ foreach($users AS $thisUser) {
 
     if (!$phpCgiRunning) {
         echo "php-cgi not running, for user: {$thisUser}. Killing lighttpd instances.\n";
+        pmssLighttpdWatchdogClearSocketFailure($thisUser);
         $socketError = true;
     } else {
         // Probe every expected php-cgi socket so partial worker crashes become
         // visible instead of leaving the user with intermittent 502 responses.
+        $socketProbeFailed = false;
         foreach ($socketPaths as $socketPath) {
             $probeResult = pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);
             if (!$probeResult['ok']) {
+                $socketProbeFailed = true;
+                $failureState = pmssLighttpdWatchdogRecordSocketFailure($thisUser);
                 echo "Error when attempting to connect to socket {$socketPath}: {$probeResult['errno']}, {$probeResult['errstr']} (after {$probeResult['attempts']} attempts)\n";
-                echo "php-cgi, for user: {$thisUser}. Killing lighttpd instances.\n";
-                $socketError = true;
+                echo "php-cgi socket probe failed for user: {$thisUser}; consecutive failures {$failureState['count']}/{$failureState['threshold']}.\n";
+                if ($failureState['action'] === 'restart') {
+                    echo "php-cgi, for user: {$thisUser}. Killing lighttpd instances.\n";
+                    $socketError = true;
+                } else {
+                    echo "Deferring lighttpd restart for user: {$thisUser}; waiting for sustained socket failure.\n";
+                }
                 break;
             }
+        }
+        if (!$socketProbeFailed) {
+            pmssLighttpdWatchdogClearSocketFailure($thisUser);
         }
     }
     $lighttpdRunningBeforeRestart = pmssUserWatchdogProcessRunning($thisUser, 'lighttpd');

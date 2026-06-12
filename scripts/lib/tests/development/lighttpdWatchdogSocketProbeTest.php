@@ -9,6 +9,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
     public function testDefaultRetryPolicyConstantsAreExpanded(): void
     {
         $this->assertSame(4, \PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_ATTEMPTS);
+        $this->assertSame(3, \PMSS_LIGHTTPD_WATCHDOG_SOCKET_FAILURE_CYCLES);
         $this->assertSame(2, \PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_RETRY_DELAY_SECONDS);
     }
 
@@ -146,5 +147,63 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         $this->assertEquals(1, $result['attempts']);
         $this->assertEquals(0, $probeCalls);
         $this->assertEquals('socket path missing', $result['errstr']);
+    }
+
+    public function testSocketFailureStateWaitsUntilThreshold(): void
+    {
+        $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-state-');
+
+        $first = \pmssLighttpdWatchdogRecordSocketFailure('alice', array(
+            'runtimeDir' => $runtimeDir,
+            'threshold' => 3,
+        ));
+        $second = \pmssLighttpdWatchdogRecordSocketFailure('alice', array(
+            'runtimeDir' => $runtimeDir,
+            'threshold' => 3,
+        ));
+        $third = \pmssLighttpdWatchdogRecordSocketFailure('alice', array(
+            'runtimeDir' => $runtimeDir,
+            'threshold' => 3,
+        ));
+
+        $this->assertSame(array('action' => 'wait', 'count' => 1, 'threshold' => 3), $first);
+        $this->assertSame(array('action' => 'wait', 'count' => 2, 'threshold' => 3), $second);
+        $this->assertSame(array('action' => 'restart', 'count' => 3, 'threshold' => 3), $third);
+    }
+
+    public function testSocketFailureStateClearsAfterHealthyProbe(): void
+    {
+        $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-clear-');
+        $options = array('runtimeDir' => $runtimeDir, 'threshold' => 2);
+
+        $this->assertSame(
+            array('action' => 'wait', 'count' => 1, 'threshold' => 2),
+            \pmssLighttpdWatchdogRecordSocketFailure('alice', $options)
+        );
+        \pmssLighttpdWatchdogClearSocketFailure('alice', $options);
+        $this->assertSame(
+            array('action' => 'wait', 'count' => 1, 'threshold' => 2),
+            \pmssLighttpdWatchdogRecordSocketFailure('alice', $options)
+        );
+    }
+
+    public function testSocketFailureStateRejectsInvalidUsername(): void
+    {
+        $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-invalid-');
+
+        $this->assertSame('', \pmssLighttpdWatchdogSocketFailureStatePath('bad/user', $runtimeDir));
+        $this->assertSame(
+            array('action' => 'wait', 'count' => 0, 'threshold' => 2),
+            \pmssLighttpdWatchdogRecordSocketFailure('bad/user', array(
+                'runtimeDir' => $runtimeDir,
+                'threshold' => 2,
+            ))
+        );
+    }
+
+    public function testSocketFailureStateRejectsUnsafeRuntimeDir(): void
+    {
+        $this->assertSame('', \pmssLighttpdWatchdogSocketFailureStatePath('alice', 'relative/runtime'));
+        $this->assertSame('', \pmssLighttpdWatchdogSocketFailureStatePath('alice', '/'));
     }
 }

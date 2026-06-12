@@ -5,8 +5,15 @@
  * @license GPL-3.0-only
  */
 
+require_once dirname(__DIR__).'/pathSafety.php';
+require_once dirname(__DIR__).'/user/identity.php';
+
 if (!defined('PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_ATTEMPTS')) {
     define('PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_ATTEMPTS', 4);
+}
+
+if (!defined('PMSS_LIGHTTPD_WATCHDOG_SOCKET_FAILURE_CYCLES')) {
+    define('PMSS_LIGHTTPD_WATCHDOG_SOCKET_FAILURE_CYCLES', 3);
 }
 
 if (!defined('PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_RETRY_DELAY_SECONDS')) {
@@ -69,4 +76,62 @@ function pmssLighttpdWatchdogSocketProbeWithRetry(string $socketPath, array $opt
     }
 
     return $result;
+}
+
+/** Return the per-user marker path for consecutive php-cgi socket failures. */
+function pmssLighttpdWatchdogSocketFailureStatePath(string $username, string $runtimeDir = ''): string
+{
+    if (!pmssValidateUsername($username)) {
+        return '';
+    }
+
+    $runtimeDir = $runtimeDir === '' ? pmssRuntimeDir() : rtrim($runtimeDir, '/');
+    if ($runtimeDir === ''
+        || !pmssPathAbsoluteStringIsSafe($runtimeDir)
+        || !pmssPathTargetIsSafe($runtimeDir, true)
+    ) {
+        return '';
+    }
+
+    return $runtimeDir.'/checkLighttpdInstances-socket-'.$username.'.count';
+}
+
+/**
+ * Record a failed socket probe and say whether the destructive restart gate is met.
+ *
+ * @return array{action:string,count:int,threshold:int}
+ */
+function pmssLighttpdWatchdogRecordSocketFailure(string $username, array $options = array()): array
+{
+    $threshold = isset($options['threshold'])
+        ? (int) $options['threshold']
+        : PMSS_LIGHTTPD_WATCHDOG_SOCKET_FAILURE_CYCLES;
+    $threshold = max(1, $threshold);
+    $runtimeDir = isset($options['runtimeDir']) ? (string) $options['runtimeDir'] : '';
+    $statePath = pmssLighttpdWatchdogSocketFailureStatePath($username, $runtimeDir);
+
+    if ($statePath === '' || !pmssDirEnsureExists(dirname($statePath), 0755)) {
+        return array('action' => 'wait', 'count' => 0, 'threshold' => $threshold);
+    }
+
+    $count = max(0, pmssReadRegularFileInt($statePath)) + 1;
+    if (@file_put_contents($statePath, (string) $count, LOCK_EX) === false) {
+        return array('action' => 'wait', 'count' => 0, 'threshold' => $threshold);
+    }
+
+    return array(
+        'action' => $count >= $threshold ? 'restart' : 'wait',
+        'count' => $count,
+        'threshold' => $threshold,
+    );
+}
+
+/** Clear resolved php-cgi socket failure state for a user. */
+function pmssLighttpdWatchdogClearSocketFailure(string $username, array $options = array()): void
+{
+    $runtimeDir = isset($options['runtimeDir']) ? (string) $options['runtimeDir'] : '';
+    $statePath = pmssLighttpdWatchdogSocketFailureStatePath($username, $runtimeDir);
+    if ($statePath !== '' && is_file($statePath) && !is_link($statePath)) {
+        @unlink($statePath);
+    }
 }

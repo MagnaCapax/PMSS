@@ -59,7 +59,7 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   failed-start counter. A live-but-unresponsive rTorrent is restarted only when
   the SCGI accept queue is saturated for consecutive watchdog runs and the
   process is not in uninterruptible I/O sleep.
-- `checkLighttpdInstances.php` – Confirm each user’s lighttpd/php-cgi pair and probe the php-cgi sockets that should exist immediately after startup before restarting the stack.
+- `checkLighttpdInstances.php` – Confirm each user’s lighttpd/php-cgi pair and probe the php-cgi sockets that should exist immediately after startup. Socket-probe failures must persist across consecutive watchdog runs before the stack is restarted.
 - `lighttpdAccessLogTrim.php` – Truncate `~/.lighttpd/access.log` in place once
   it exceeds 100 MiB so long-lived reverse-proxied web UIs do not silently
   consume user quota. The root cron template runs it hourly and logs trims to
