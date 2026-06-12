@@ -249,7 +249,46 @@ function pmssUpdateStep2RegisterWebRefreshShutdownGuard(): void
     });
 }
 
+/**
+ * Restore tenant-visible config traversal if phase 2 exits before final perms.
+ */
+function pmssUpdateStep2RegisterPermissionShutdownGuard(): void
+{
+    register_shutdown_function(static function (): void {
+        if (!empty($GLOBALS['PMSS_UPDATE_STEP2_COMPLETED']) || pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+            return;
+        }
+
+        $helper = '/scripts/util/setupPermissions.php';
+        if (!is_file($helper)) {
+            logmsg('[WARN] update-step2 exited before final permission refresh; setupPermissions.php missing');
+            return;
+        }
+
+        $error = error_get_last();
+        $reason = (is_array($error) && is_string($error['message'] ?? null) && $error['message'] !== '')
+            ? $error['message']
+            : 'early_exit';
+
+        logmsg('[WARN] update-step2 exited before final permission refresh; attempting permission rescue run (reason: '.$reason.')');
+        pmssLogJson([
+            'event' => 'permission_refresh_rescue',
+            'status' => 'start',
+            'reason' => $reason,
+        ]);
+
+        $rc = runStep('Restoring system permissions (shutdown)', $helper);
+
+        pmssLogJson([
+            'event' => 'permission_refresh_rescue',
+            'status' => $rc === 0 ? 'ok' : 'error',
+            'rc' => $rc,
+        ]);
+    });
+}
+
 pmssUpdateStep2RegisterWebRefreshShutdownGuard();
+pmssUpdateStep2RegisterPermissionShutdownGuard();
 
 pmssRunProfiledCallable('Acquiring update-step2 lock', static function (): void {
     pmssUpdateStep2AcquireUpdateLock();

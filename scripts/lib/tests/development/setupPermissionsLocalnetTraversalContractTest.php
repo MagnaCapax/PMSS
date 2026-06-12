@@ -76,4 +76,27 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
             'ls -ld /etc/seedbox /etc/seedbox/config {$localnet}',
         ]);
     }
+
+    public function testUpdateStep2RegistersPermissionShutdownRescueBeforeWork(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
+            'function pmssUpdateStep2RegisterPermissionShutdownGuard(): void',
+            'update-step2 exited before final permission refresh',
+            "'event' => 'permission_refresh_rescue'",
+            "\$rc = runStep('Restoring system permissions (shutdown)', \$helper);",
+            'pmssUpdateStep2RegisterPermissionShutdownGuard();',
+        ]);
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/util/update-step2.php',
+            [
+                'pmssUpdateStep2RegisterPermissionShutdownGuard();',
+                "pmssRunProfiledCallable('Acquiring update-step2 lock'",
+                "pmssRunProfiledCallable('Applying runtime service templates'",
+                "pmssLogJson(['event' => 'phase', 'name' => 'setupPermissions', 'status' => 'start']);",
+                "\$GLOBALS['PMSS_UPDATE_STEP2_COMPLETED'] = true;",
+            ],
+            'update-step2.php missing shutdown permission guard substring: ',
+            'Permission rescue guard must be registered before phase-2 work can exit early: '
+        );
+    }
 }
