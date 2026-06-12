@@ -602,7 +602,7 @@ if (file_exists($logrotateTemplate)) {
 
 pmssRunProfiledCallable('Ensuring network template baseline', 'pmssEnsureNetworkTemplate', ['logmsg']);
 runStep('Reapplying network configuration', '/scripts/util/setupNetwork.php');
-runStep('Hardening access to session and network binaries', 'chmod o-r /var/log/wtmp /var/run/utmp /usr/bin/netstat /usr/bin/who /usr/bin/w');
+runStep('Hardening access to session and network binaries', 'chmod o-r /var/log/wtmp /var/run/utmp /var/log/lastlog /var/log/faillog /usr/bin/netstat /usr/bin/who /usr/bin/w');
 
 // Cleanup legacy runtime metadata that should never have shipped with snapshots.
 if (is_dir('/etc/seedbox/config/app-versions')) { runStep('Removing legacy app version records', 'rm -rf '.escapeshellarg('/etc/seedbox/config/app-versions')); }
