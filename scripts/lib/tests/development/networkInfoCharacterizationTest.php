@@ -26,4 +26,20 @@ class NetworkInfoCharacterizationTest extends TestCase
             ['/etc/seedbox/config/network']
         );
     }
+
+    public function testSetupNetworkKeepsConfiguredCapAndWarnsOnPhysicalSpeedDrift(): void
+    {
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'scripts/util/setupNetwork.php',
+            [
+                '$detectedLinkSpeed = getDetectedLinkSpeed($link);',
+                'detected %s link speed %dMbit exceeds configured FireQOS speed %dMbit; keeping configured cap',
+                '$fireqosNetworkConfig[\'interface\'] = $interface;',
+                '$fireqosNetworkConfig[\'speed\'] = $linkSpeed;',
+            ],
+            [
+                '$networkConfig + [\'interface\' => $interface, \'speed\' => $networkConfig[\'speed\'] ?? $linkSpeed]',
+            ]
+        );
+    }
 }

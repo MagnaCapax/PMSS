@@ -3,9 +3,9 @@
  * Utilities for retrieving network interface details.
  *
  * Including this file defines `$link` and `$linkSpeed` variables for the
- * primary interface and its speed in Mbps. Configuration values from the
- * seedbox network config are used when available and otherwise
- * detection falls back to `ip` and `ethtool`.
+ * primary interface and its configured speed in Mbps. Configuration values
+ * from the seedbox network config remain authoritative for shaping caps, while
+ * the physical link probe can be used to surface drift.
  *
  * Verified to work on Debian 10, 11 and 12. Older releases like Debian 8
  * should also function provided `iproute2` and `ethtool` are available.
@@ -38,7 +38,49 @@ function detectPrimaryInterface(): string
     return $iface !== '' ? $iface : 'eth0';
 }
 
-/** Detect interface speed in Mbps using configuration or ethtool. */
+/** Probe the physical interface speed from sysfs, returning 0 when unknown. */
+function pmssNetworkProbeSysfsLinkSpeed(string $iface): int
+{
+    $iface = networkInterfaceNameNormalized($iface);
+    if ($iface === '') {
+        return 0;
+    }
+
+    $baseDir = getenv('PMSS_NETWORK_SYS_CLASS_NET_DIR');
+    if (!is_string($baseDir) || trim($baseDir) === '' || strpos($baseDir, "\0") !== false) {
+        $baseDir = '/sys/class/net';
+    }
+
+    $raw = @file_get_contents(rtrim($baseDir, '/').'/'.$iface.'/speed');
+    $speed = is_string($raw) ? trim($raw) : '';
+    if ($speed === '' || ctype_digit($speed) === false) {
+        return 0;
+    }
+
+    $speedMbit = (int) $speed;
+    return $speedMbit > 0 ? $speedMbit : 0;
+}
+
+/** Probe the physical interface speed with ethtool, returning 0 when unknown. */
+function pmssNetworkProbeEthtoolLinkSpeed(string $iface): int
+{
+    $iface = networkInterfaceNameNormalized($iface);
+    if ($iface === '') {
+        return 0;
+    }
+
+    $raw = shell_exec('/sbin/ethtool '.escapeshellarg($iface).' 2>/dev/null');
+    return $raw && preg_match('/Speed:\s*(\d+)Mb/', $raw, $m) ? (int) $m[1] : 0;
+}
+
+/** Detect physical interface speed in Mbps without applying config overrides. */
+function getDetectedLinkSpeed(string $iface): int
+{
+    $speed = pmssNetworkProbeSysfsLinkSpeed($iface);
+    return $speed > 0 ? $speed : pmssNetworkProbeEthtoolLinkSpeed($iface);
+}
+
+/** Resolve configured link speed in Mbps, falling back to physical detection. */
 function getLinkSpeed(string $iface): int
 {
     $config = networkLoadConfig();
@@ -46,13 +88,8 @@ function getLinkSpeed(string $iface): int
         return (int) $config['speed'];
     }
 
-    $iface = networkInterfaceNameNormalized($iface);
-    if ($iface === '') {
-        return 1000;
-    }
-
-    $raw = shell_exec('/sbin/ethtool '.escapeshellarg($iface).' 2>/dev/null');
-    return $raw && preg_match('/Speed:\s*(\d+)Mb/', $raw, $m) ? (int) $m[1] : 1000;
+    $speed = getDetectedLinkSpeed($iface);
+    return $speed > 0 ? $speed : 1000;
 }
 
 $link = detectPrimaryInterface();

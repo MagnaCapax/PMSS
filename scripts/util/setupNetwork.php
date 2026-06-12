@@ -37,6 +37,7 @@ if ($configuredInterface !== '') {
 }
 $interface = $link;
 $linkSpeed = getLinkSpeed($link);
+$detectedLinkSpeed = getDetectedLinkSpeed($link);
 
 // If no explicit interface is configured, avoid tunnel defaults (tun/wg/tap).
 if (empty($networkConfig['interface']) && preg_match('/^(tun|tap|wg)/', $interface)) {
@@ -58,11 +59,22 @@ if (empty($networkConfig['interface']) && preg_match('/^(tun|tap|wg)/', $interfa
         $interface = $fallback;
         $link = $fallback;
         $linkSpeed = getLinkSpeed($fallback);
+        $detectedLinkSpeed = getDetectedLinkSpeed($fallback);
     }
 }
 
 if ($interface === '') {
     die("Error: Could not determine primary interface\n");
+}
+
+$configuredSpeed = isset($networkConfig['speed']) ? (int) $networkConfig['speed'] : 0;
+if ($configuredSpeed > 0 && $detectedLinkSpeed > $configuredSpeed) {
+    logMessage(sprintf(
+        'setupNetwork: detected %s link speed %dMbit exceeds configured FireQOS speed %dMbit; keeping configured cap',
+        $interface,
+        $detectedLinkSpeed,
+        $configuredSpeed
+    ));
 }
 
 // Pull optional monitoring chain additions from helper script output.
@@ -175,8 +187,13 @@ if (!networkApplyIptablesAtomically($renderedFilter, $renderedNat)) {
 }
 
 // Render FireQOS shaping rules with the refreshed tenant list.
+$fireqosNetworkConfig = $networkConfig;
+$fireqosNetworkConfig['interface'] = $interface;
+if (!array_key_exists('speed', $fireqosNetworkConfig)) {
+    $fireqosNetworkConfig['speed'] = $linkSpeed;
+}
 $fireqosConfig = networkBuildFireqosConfig(
-    $networkConfig + ['interface' => $interface, 'speed' => $networkConfig['speed'] ?? $linkSpeed],
+    $fireqosNetworkConfig,
     $users,
     $localnets
 );

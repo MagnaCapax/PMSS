@@ -7,6 +7,14 @@ require_once dirname(__DIR__, 2).'/networkInfo.php';
 
 class NetworkInfoTest extends TestCase
 {
+    private function networkSpeedFixture(string $iface, string $speed): string
+    {
+        $root = $this->pmssMakeTempDir('pmss-network-sys-class-net-');
+        $this->pmssEnsureDir($root.'/'.$iface);
+        file_put_contents($root.'/'.$iface.'/speed', $speed);
+        return $root;
+    }
+
     public function testNetworkInterfaceNameNormalizedKeepsSafeNames(): void
     {
         $this->assertSame('bond0.100', \networkInterfaceNameNormalized(' bond0.100 '));
@@ -50,9 +58,42 @@ class NetworkInfoTest extends TestCase
         });
     }
 
+    public function testDetectedLinkSpeedReadsSysfsFixture(): void
+    {
+        $root = $this->networkSpeedFixture('eth0', '10000');
+
+        $this->pmssWithEnv(['PMSS_NETWORK_SYS_CLASS_NET_DIR' => $root], function (): void {
+            $this->assertSame(10000, \getDetectedLinkSpeed('eth0'));
+        });
+    }
+
+    public function testDetectedLinkSpeedTreatsUnknownSysfsSpeedAsNoDetection(): void
+    {
+        $root = $this->networkSpeedFixture('eth0', '-1');
+
+        $this->pmssWithEnv(['PMSS_NETWORK_SYS_CLASS_NET_DIR' => $root], function (): void {
+            $this->assertSame(0, \getDetectedLinkSpeed('eth0'));
+        });
+    }
+
+    public function testConfiguredSpeedRemainsAuthoritativeWhenPhysicalSpeedIsHigher(): void
+    {
+        $config = $this->pmssWritePhpArrayFixture(['speed' => '1000'], 'pmss-network-info-');
+        $root = $this->networkSpeedFixture('eth0', '10000');
+
+        $this->pmssWithEnv([
+            'PMSS_NETWORK_CONFIG' => $config,
+            'PMSS_NETWORK_SYS_CLASS_NET_DIR' => $root,
+        ], function (): void {
+            $this->assertSame(1000, \getLinkSpeed('eth0'));
+            $this->assertSame(10000, \getDetectedLinkSpeed('eth0'));
+        });
+    }
+
     public function testGetLinkSpeedFallsBackForUnsafeInterfaceName(): void
     {
         $this->assertSame(1000, \getLinkSpeed('eth0 && rm -rf /'));
+        $this->assertSame(0, \getDetectedLinkSpeed('eth0 && rm -rf /'));
     }
 
     public function testDetectPrimaryInterfaceIgnoresUnsafeConfigOverride(): void
