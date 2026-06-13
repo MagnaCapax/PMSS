@@ -102,6 +102,47 @@ class UpdateBootstrapLockReleaseTest extends TestCase
         $this->assertStringContainsString('printf ok', $result['output']);
     }
 
+    public function testRuntimeLockFdListRejectsUnsafeFdRootFailSoft(): void
+    {
+        $runtime = dirname(__DIR__, 3).'/lib/runtime.php';
+        $result = $this->pmssExecShellCommand(
+            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
+                'require '.var_export($runtime, true).'; '
+                .'$path = tempnam(sys_get_temp_dir(), "pmss-lock-"); '
+                .'$handle = fopen($path, "c+"); '
+                .'echo json_encode(['
+                .'"empty" => pmssLockHandleFdList($handle, ""), '
+                .'"nul" => pmssLockHandleFdList($handle, "/tmp".chr(0)."fd")'
+                .']); '
+                .'fclose($handle); @unlink($path);'
+            ),
+            ['PMSS_TEST_MODE' => '1'],
+            '2>&1'
+        );
+
+        $this->assertEquals(0, $result['rc'], 'runtime lock fd scan should reject unsafe roots without warnings');
+        $payload = $this->pmssDecodeJsonArray($result['output']);
+        $this->assertSame([], $payload['empty']);
+        $this->assertSame([], $payload['nul']);
+    }
+
+    public function testRuntimeLockReleaseIgnoresInvalidHandleFailSoft(): void
+    {
+        $runtime = dirname(__DIR__, 3).'/lib/runtime.php';
+        $result = $this->pmssExecShellCommand(
+            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
+                'require '.var_export($runtime, true).'; '
+                .'pmssLockHandleRelease(false); '
+                .'echo "ok";'
+            ),
+            ['PMSS_TEST_MODE' => '1'],
+            '2>&1'
+        );
+
+        $this->assertEquals(0, $result['rc'], 'runtime lock release should tolerate invalid handles');
+        $this->assertSame('ok', trim($result['output']));
+    }
+
     public function testPhase2ExportsAndClearsLockFdList(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [

@@ -38,7 +38,7 @@ function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mo
  */
 function pmssLockHandleFdList($handle, string $fdRoot = '/proc/self/fd'): array
 {
-    if (!is_resource($handle) || !is_dir($fdRoot)) return [];
+    if (!is_resource($handle) || $fdRoot === '' || pmssFilesystemPathHasNulByte($fdRoot) || !is_dir($fdRoot)) return [];
     $handleStat = @fstat($handle);
     if (!is_array($handleStat) || !isset($handleStat['dev'], $handleStat['ino'])) return [];
 
@@ -102,4 +102,4 @@ function pmssRuntimeLockBasename(string $basename): string
 }
 
 function pmssRuntimeLockPath(string $basename): string { return (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/'.pmssRuntimeLockBasename($basename); }
-function pmssLockHandleRelease($handle, bool $unlock = true): void { $unlock && @flock($handle, LOCK_UN); @fclose($handle); }
+function pmssLockHandleRelease($handle, bool $unlock = true): void { if (!is_resource($handle)) return; $unlock && @flock($handle, LOCK_UN); @fclose($handle); }
