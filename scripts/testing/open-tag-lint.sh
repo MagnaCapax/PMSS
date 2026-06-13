@@ -6,25 +6,17 @@ set -euo pipefail
 
 # shellcheck source=scripts/testing/testingPaths.sh
 source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
-mapfile -d '' PHP_FILES < <(pmss_testing_list_tracked_php_files "$ROOT_DIR")
-
-echo "[open-tag-lint] scanning ${#PHP_FILES[@]} PHP files" >&2
+pmss_testing_load_tracked_php_scan "open-tag-lint"
 
 fail=0
 for rel in "${PHP_FILES[@]}"; do
 	file="$ROOT_DIR/$rel"
 
-	if grep -q -E '<\?php|<\?=' "$file"; then
-		continue
-	fi
-
 	# Allow empty placeholders; otherwise require a PHP open tag.
-	if [[ ! -s "$file" ]]; then
-		continue
+	if [[ -s "$file" ]] && ! grep -q -E '<\?php|<\?=' "$file"; then
+		echo "[open-tag-lint] $rel: missing '<?php' or '<?=' tag" >&2
+		fail=1
 	fi
-
-	echo "[open-tag-lint] $rel: missing '<?php' or '<?=' tag" >&2
-	fail=1
 done
 
 pmss_testing_count_lint_finish "$fail" "[open-tag-lint] ERROR: PHP files must contain a PHP open tag" "[open-tag-lint] OK" >&2
