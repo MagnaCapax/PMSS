@@ -179,25 +179,36 @@ function pmssUpdateStep2MarkWebRefreshCompleted(): void
 }
 
 /**
+ * Return a stable abnormal-exit reason for shutdown rescue logs.
+ */
+function pmssUpdateStep2ShutdownReason(): string
+{
+    $error = error_get_last();
+    return (is_array($error) && is_string($error['message'] ?? null) && $error['message'] !== '')
+        ? $error['message']
+        : 'early_exit';
+}
+
+/**
+ * Emit a structured JSON marker for best-effort shutdown rescue steps.
+ */
+function pmssUpdateStep2LogRescueEvent(string $event, string $status, array $context = array()): void
+{
+    pmssLogJson(array('event' => $event, 'status' => $status) + $context);
+}
+
+/**
  * Attempt a best-effort nginx start when the final refresh could not finish.
  */
 function pmssUpdateStep2StartNginxShutdownFallback(string $reason): void
 {
     logmsg('[WARN] update-step2 exited with nginx still pending final refresh; attempting direct start (reason: '.$reason.')');
-    pmssLogJson([
-        'event' => 'post_update_nginx_start_fallback',
-        'status' => 'start',
-        'reason' => $reason,
-    ]);
+    pmssUpdateStep2LogRescueEvent('post_update_nginx_start_fallback', 'start', ['reason' => $reason]);
 
     $rc = 0;
     passthru(pmssLockChildClosePrefix().'systemctl start nginx 2>/dev/null || /etc/init.d/nginx start 2>/dev/null', $rc);
 
-    pmssLogJson([
-        'event' => 'post_update_nginx_start_fallback',
-        'status' => $rc === 0 ? 'ok' : 'error',
-        'rc' => $rc,
-    ]);
+    pmssUpdateStep2LogRescueEvent('post_update_nginx_start_fallback', $rc === 0 ? 'ok' : 'error', ['rc' => $rc]);
     logmsg(sprintf('[WARN] Direct nginx start fallback completed with rc=%d', $rc));
 }
 
@@ -220,26 +231,15 @@ function pmssUpdateStep2RegisterWebRefreshShutdownGuard(): void
             return;
         }
 
-        $error = error_get_last();
-        $reason = (is_array($error) && is_string($error['message'] ?? null) && $error['message'] !== '')
-            ? $error['message']
-            : 'early_exit';
+        $reason = pmssUpdateStep2ShutdownReason();
 
         logmsg('[WARN] update-step2 exited before final nginx refresh; attempting rescue run (reason: '.$reason.')');
-        pmssLogJson([
-            'event' => 'post_update_web_refresh_rescue',
-            'status' => 'start',
-            'reason' => $reason,
-        ]);
+        pmssUpdateStep2LogRescueEvent('post_update_web_refresh_rescue', 'start', ['reason' => $reason]);
 
         $rc = 0;
         passthru(pmssLockChildClosePrefix().'/scripts/util/createNginxConfig.php --restart', $rc);
 
-        pmssLogJson([
-            'event' => 'post_update_web_refresh_rescue',
-            'status' => $rc === 0 ? 'ok' : 'error',
-            'rc' => $rc,
-        ]);
+        pmssUpdateStep2LogRescueEvent('post_update_web_refresh_rescue', $rc === 0 ? 'ok' : 'error', ['rc' => $rc]);
         logmsg(sprintf('[WARN] Rescue nginx refresh completed with rc=%d', $rc));
         if ($rc === 0) {
             pmssUpdateStep2MarkWebRefreshCompleted();
@@ -266,25 +266,14 @@ function pmssUpdateStep2RegisterPermissionShutdownGuard(): void
             return;
         }
 
-        $error = error_get_last();
-        $reason = (is_array($error) && is_string($error['message'] ?? null) && $error['message'] !== '')
-            ? $error['message']
-            : 'early_exit';
+        $reason = pmssUpdateStep2ShutdownReason();
 
         logmsg('[WARN] update-step2 exited before final permission refresh; attempting permission rescue run (reason: '.$reason.')');
-        pmssLogJson([
-            'event' => 'permission_refresh_rescue',
-            'status' => 'start',
-            'reason' => $reason,
-        ]);
+        pmssUpdateStep2LogRescueEvent('permission_refresh_rescue', 'start', ['reason' => $reason]);
 
         $rc = runStep('Restoring system permissions (shutdown)', $helper);
 
-        pmssLogJson([
-            'event' => 'permission_refresh_rescue',
-            'status' => $rc === 0 ? 'ok' : 'error',
-            'rc' => $rc,
-        ]);
+        pmssUpdateStep2LogRescueEvent('permission_refresh_rescue', $rc === 0 ? 'ok' : 'error', ['rc' => $rc]);
     });
 }
 
