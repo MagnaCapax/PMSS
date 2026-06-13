@@ -77,7 +77,15 @@ function pmssNetworkProbeEthtoolLinkSpeed(string $iface): int
 function getDetectedLinkSpeed(string $iface): int
 {
     $speed = pmssNetworkProbeSysfsLinkSpeed($iface);
-    return $speed > 0 ? $speed : pmssNetworkProbeEthtoolLinkSpeed($iface);
+    $sysfsOverride = getenv('PMSS_NETWORK_SYS_CLASS_NET_DIR');
+    $hasSysfsOverride = is_string($sysfsOverride)
+        && trim($sysfsOverride) !== ''
+        && strpos($sysfsOverride, "\0") === false;
+    if ($speed > 0 || $hasSysfsOverride) {
+        return $speed;
+    }
+
+    return pmssNetworkProbeEthtoolLinkSpeed($iface);
 }
 
 /** Resolve configured link speed in Mbps, falling back to physical detection. */

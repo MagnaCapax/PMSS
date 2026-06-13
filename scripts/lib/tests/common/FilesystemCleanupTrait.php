@@ -164,6 +164,12 @@ trait FilesystemCleanupTrait
         return [$callback($this->pmssMakeArrayLogger($messages)), $messages];
     }
 
+    /** Run a callback with an array-backed logger and return only captured logs. */
+    protected function pmssArrayLoggerMessages(callable $callback): array
+    {
+        return $this->pmssArrayLoggerCapture($callback)[1];
+    }
+
     /** Assert that a callback runs without emitting PHP warnings/notices. */
     protected function pmssAssertNoPhpWarnings(callable $callback): void
     {
