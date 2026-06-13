@@ -99,6 +99,15 @@ class SystemStatsCollectTest extends TestCase
         }
     }
 
+    public function testPsiParserSnapshotKeepsAppendOnlyFieldOrder(): void
+    {
+        $raw = "some avg10=1.23 avg60=4.56 avg300=7.89 total=123\nfull avg10=0.12 avg60=0.34 avg300=0.56 total=456\n";
+        $this->assertSame('1.2/4.6/0.1/7.9/0.3/0.6/123/456', \pmssSystemStatsPsiFromRaw($raw));
+        foreach ([null, "full avg10=1.0 total=1\n"] as $invalid) {
+            $this->assertSame('na', \pmssSystemStatsPsiFromRaw($invalid));
+        }
+    }
+
     public function testTopMemoryRowsRenderValidatedCompactValues(): void
     {
         $this->assertEquals(

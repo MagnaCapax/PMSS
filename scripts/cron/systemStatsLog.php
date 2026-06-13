@@ -15,23 +15,15 @@ pmssDirEnsureExists($logDir, 0755);
 
 // Gather metrics from procfs + optional ioping/ps.
 $stats = pmssSystemStatsCollect();
-$line = sprintf(
-    '%s | load:%s | cpu_iowait:%s | mem_total:%s | mem_free:%s | mem_cache:%s | mem_buffers:%s | swap_total:%s | swap_free:%s | disk_busy:%s | ioping_root:%s | ioping_home:%s | top_mem:%s | psi_io:%s | psi_mem:%s',
-    date('Ymd H:i:s'),
-    $stats['load'],
-    $stats['cpuIowait'],
-    $stats['memTotal'],
-    $stats['memFree'],
-    $stats['memCache'],
-    $stats['memBuffers'],
-    $stats['swapTotal'],
-    $stats['swapFree'],
-    $stats['diskBusy'],
-    $stats['iopingRoot'],
-    $stats['iopingHome'],
-    $stats['topMem'],
-    $stats['psiIo'],
-    $stats['psiMem']
-);
+$line = date('Ymd H:i:s');
+$fields = [
+    'load' => 'load', 'cpu_iowait' => 'cpuIowait', 'mem_total' => 'memTotal', 'mem_free' => 'memFree',
+    'mem_cache' => 'memCache', 'mem_buffers' => 'memBuffers', 'swap_total' => 'swapTotal', 'swap_free' => 'swapFree',
+    'disk_busy' => 'diskBusy', 'ioping_root' => 'iopingRoot', 'ioping_home' => 'iopingHome', 'top_mem' => 'topMem',
+    'psi_io' => 'psiIo', 'psi_mem' => 'psiMem',
+];
+foreach ($fields as $label => $key) {
+    $line .= ' | '.$label.':'.$stats[$key];
+}
 // Append as a single parseable line for later analysis.
 file_put_contents($logFile, $line."\n", FILE_APPEND);

@@ -91,6 +91,95 @@ function pmssSystemStatsLoadAverageFromRaw(?string $raw): string
     return implode(',', $load);
 }
 
+/** Read the raw CPU tick counters from /proc/stat. */
+function pmssSystemStatsCpuCountersRead(): array
+{
+    $lines = preg_split('/\r?\n/', pmssReadRegularFileContents('/proc/stat') ?? '');
+    $parts = is_array($lines) && isset($lines[0]) ? preg_split('/\s+/', trim((string) $lines[0])) : false;
+    if (!is_array($parts) || count($parts) < 2) {
+        return [];
+    }
+    array_shift($parts);
+    return array_map('intval', $parts);
+}
+
+/** Format CPU iowait percentage from two /proc/stat samples. */
+function pmssSystemStatsCpuIowaitPercent(array $before, array $after): string
+{
+    $diff = [];
+    foreach ($before as $index => $value) {
+        $diff[$index] = max(0, ($after[$index] ?? 0) - $value);
+    }
+
+    $total = array_sum($diff);
+    return $total > 0 ? number_format((($diff[4] ?? 0) / $total) * 100, 1, '.', '') : '0.0';
+}
+
+/** Read per-device busy-time counters from /proc/diskstats. */
+function pmssSystemStatsDiskIoTimeRead(): array
+{
+    $stats = [];
+    foreach (preg_split('/\r?\n/', pmssReadRegularFileContents('/proc/diskstats') ?? '') ?: [] as $line) {
+        $parts = preg_split('/\s+/', trim($line));
+        if (!is_array($parts) || count($parts) < 13) {
+            continue;
+        }
+        $name = $parts[2] ?? '';
+        if (pmssBlockDeviceNameIsDataDevice($name)) {
+            $stats[$name] = (int) ($parts[12] ?? 0);
+        }
+    }
+    return $stats;
+}
+
+/** Format the busiest data-device percentage from two diskstats samples. */
+function pmssSystemStatsDiskBusyPercent(array $before, array $after, float $sampleSeconds): string
+{
+    $maxPct = 0.0;
+    foreach ($after as $name => $ioTime) {
+        $delta = max(0, $ioTime - ($before[$name] ?? $ioTime));
+        // /proc/diskstats io_time is in milliseconds spent doing IO.
+        $pct = $sampleSeconds > 0 ? ($delta / ($sampleSeconds * 1000)) * 100 : 0.0;
+        if ($pct > $maxPct) {
+            $maxPct = $pct;
+        }
+    }
+    return number_format(min(100, $maxPct), 1, '.', '');
+}
+
+/** Parse PSI content into the append-only slash-joined stats log field. */
+function pmssSystemStatsPsiFromRaw(?string $raw): string
+{
+    if ($raw === null) {
+        return 'na';
+    }
+
+    $fields = [
+        ['some', 'avg10', 1], ['some', 'avg60', 1], ['full', 'avg10', 1],
+        ['some', 'avg300', 1], ['full', 'avg60', 1], ['full', 'avg300', 1],
+        ['some', 'total', 0], ['full', 'total', 0],
+    ];
+    $values = [];
+    foreach ($fields as $field) {
+        list($row, $name, $decimals) = $field;
+        if (!preg_match('/^'.preg_quote($row, '/').'\s.*?'.preg_quote($name, '/').'=([0-9.]+)/m', $raw, $match)) {
+            if ($row === 'some' && $name === 'avg10') {
+                return 'na';
+            }
+            $values[] = 'na';
+            continue;
+        }
+        $values[] = number_format((float) $match[1], (int) $decimals, $decimals > 0 ? '.' : '', '');
+    }
+    return implode('/', $values);
+}
+
+/** Read one PSI file and degrade missing/unreadable hosts to `na`. */
+function pmssSystemStatsPsiRead(string $path): string { return is_readable($path) ? pmssSystemStatsPsiFromRaw(pmssReadRegularFileContents($path)) : 'na'; }
+
+/** Format optional ioping latency for the stats log. */
+function pmssSystemStatsIopingMs(string $path): string { $value = is_dir($path) ? pmssIopingAverageMs($path) : null; return $value === null ? 'na' : number_format($value, 1, '.', '').'ms'; }
+
 /**
  * Collect a single snapshot of system metrics for logging.
  *
@@ -98,139 +187,33 @@ function pmssSystemStatsLoadAverageFromRaw(?string $raw): string
  */
 function pmssSystemStatsCollect(): array
 {
-    // These routines only serve the snapshot collector, so keep them local and
-    // avoid exporting extra global helpers from the cron logging path.
-    $readCpuStat = static function (): array {
-        $lines = preg_split('/\r?\n/', pmssReadRegularFileContents('/proc/stat') ?? '');
-        if (!is_array($lines) || !isset($lines[0])) {
-            return [];
-        }
-        $parts = preg_split('/\s+/', trim((string) $lines[0]));
-        if (!is_array($parts) || count($parts) < 2) {
-            return [];
-        }
-        array_shift($parts);
-        return array_map('intval', $parts);
-    };
-    $readDiskIoTime = static function (): array {
-        $stats = [];
-        foreach (preg_split('/\r?\n/', pmssReadRegularFileContents('/proc/diskstats') ?? '') ?: [] as $line) {
-            $parts = preg_split('/\s+/', trim($line));
-            if (!is_array($parts) || count($parts) < 13) {
-                continue;
-            }
-            $name = $parts[2] ?? '';
-            if (!pmssBlockDeviceNameIsDataDevice($name)) {
-                continue;
-            }
-            $stats[$name] = (int) ($parts[12] ?? 0);
-        }
-        return $stats;
-    };
-    $readPsi = static function (string $path): string {
-        // /proc/pressure/io and /proc/pressure/memory expose:
-        //   some avg10=X.XX avg60=X.XX avg300=X.XX total=N
-        //   full avg10=X.XX avg60=X.XX avg300=X.XX total=N
-        // Emit ALL of it as one slash-joined field (append-only; first three
-        // indices preserve the legacy tools/fleet/node-collect parser contract
-        // some_avg10/some_avg60/full_avg10). `full` is the actionable signal.
-        if (!is_readable($path)) {
-            return 'na';
-        }
-        $raw = pmssReadRegularFileContents($path);
-        if ($raw === null) {
-            return 'na';
-        }
-        $find = static function (string $row, string $field) use ($raw): ?float {
-            if (!preg_match('/^'.preg_quote($row, '/').'\s.*?'.preg_quote($field, '/').'=([0-9.]+)/m', $raw, $m)) {
-                return null;
-            }
-            return (float) $m[1];
-        };
-        if (($someAvg10 = $find('some', 'avg10')) === null) {
-            return 'na';
-        }
-        // Append-only field order. The first three fields are the legacy
-        // node-collect parser contract and MUST stay byte-identical for
-        // backward compatibility; everything after is appended:
-        //   some_avg10/some_avg60/full_avg10/some_avg300/full_avg60/full_avg300/some_total/full_total
-        // `full` (all non-idle tasks stalled) is the actionable I/O signal —
-        // psi-notify's default alert is io.full.avg10 >= 15. The *_total fields
-        // are cumulative microseconds stalled since boot; downstream consumers
-        // delta them over the collection interval for a lossless, cadence-immune
-        // average (the kernel avgN windows are point samples).
-        $fmtAvg = static function (?float $v): string {
-            return $v === null ? 'na' : number_format($v, 1, '.', '');
-        };
-        $fmtTotal = static function (?float $v): string {
-            return $v === null ? 'na' : number_format($v, 0, '', '');
-        };
-        return implode('/', [
-            $fmtAvg($someAvg10),
-            $fmtAvg($find('some', 'avg60')),
-            $fmtAvg($find('full', 'avg10')),
-            $fmtAvg($find('some', 'avg300')),
-            $fmtAvg($find('full', 'avg60')),
-            $fmtAvg($find('full', 'avg300')),
-            $fmtTotal($find('some', 'total')),
-            $fmtTotal($find('full', 'total')),
-        ]);
-    };
-    $iopingMs = static function (string $path): string { $value = is_dir($path) ? pmssIopingAverageMs($path) : null; return $value === null ? 'na' : number_format($value, 1, '.', '').'ms'; };
-
     // Keep this low in test mode so hermetic tests don't waste time sleeping.
     $sampleUsec = pmssTestModeEnabled() ? 50000 : 1000000;
-    $sampleSeconds = $sampleUsec / 1000000;
 
-    $cpu1 = $readCpuStat();
-    $disk1 = $readDiskIoTime();
+    $cpu1 = pmssSystemStatsCpuCountersRead();
+    $disk1 = pmssSystemStatsDiskIoTimeRead();
     usleep($sampleUsec);
-    $cpu2 = $readCpuStat();
-    $disk2 = $readDiskIoTime();
-
-    $cpuDiff = [];
-    foreach ($cpu1 as $i => $val) {
-        $cpuDiff[$i] = max(0, ($cpu2[$i] ?? 0) - $val);
-    }
-    $cpuTotal = array_sum($cpuDiff);
-    $cpuIowait = $cpuTotal > 0
-        ? number_format((($cpuDiff[4] ?? 0) / $cpuTotal) * 100, 1, '.', '')
-        : '0.0';
-
-    $maxPct = 0.0;
-    foreach ($disk2 as $name => $ioTime) {
-        $delta = max(0, $ioTime - ($disk1[$name] ?? $ioTime));
-        // /proc/diskstats io_time is in milliseconds spent doing IO.
-        $pct = $sampleSeconds > 0 ? ($delta / ($sampleSeconds * 1000)) * 100 : 0.0;
-        if ($pct > $maxPct) {
-            $maxPct = $pct;
-        }
-    }
-    $diskBusy = number_format(min(100, $maxPct), 1, '.', '');
-
-    $load = pmssSystemStatsLoadAverageFromRaw(pmssReadRegularFileContents('/proc/loadavg'));
+    $cpu2 = pmssSystemStatsCpuCountersRead();
+    $disk2 = pmssSystemStatsDiskIoTimeRead();
 
     $meminfo = pmssProcMeminfoFieldsRead();
 
     $hasIoping = pmssCommandPath('ioping') !== '';
-    $iopingRoot = $hasIoping ? $iopingMs('/') : 'na';
-    $iopingHome = $hasIoping ? $iopingMs('/home') : 'na';
-    $topMem = pmssSystemStatsTopMemoryProcesses();
 
     return [
-        'load'       => $load,
-        'cpuIowait'   => $cpuIowait,
+        'load'       => pmssSystemStatsLoadAverageFromRaw(pmssReadRegularFileContents('/proc/loadavg')),
+        'cpuIowait'   => pmssSystemStatsCpuIowaitPercent($cpu1, $cpu2),
         'memTotal'    => pmssSystemStatsKbToHuman($meminfo['MemTotal'] ?? 0),
         'memFree'     => pmssSystemStatsKbToHuman($meminfo['MemFree'] ?? 0),
         'memCache'    => pmssSystemStatsKbToHuman($meminfo['Cached'] ?? 0),
         'memBuffers'  => pmssSystemStatsKbToHuman($meminfo['Buffers'] ?? 0),
         'swapTotal'   => pmssSystemStatsKbToHuman($meminfo['SwapTotal'] ?? 0),
         'swapFree'    => pmssSystemStatsKbToHuman($meminfo['SwapFree'] ?? 0),
-        'diskBusy'    => $diskBusy,
-        'iopingRoot'  => $iopingRoot,
-        'iopingHome'  => $iopingHome,
-        'topMem'      => $topMem,
-        'psiIo'       => $readPsi('/proc/pressure/io'),
-        'psiMem'      => $readPsi('/proc/pressure/memory'),
+        'diskBusy'    => pmssSystemStatsDiskBusyPercent($disk1, $disk2, $sampleUsec / 1000000),
+        'iopingRoot'  => $hasIoping ? pmssSystemStatsIopingMs('/') : 'na',
+        'iopingHome'  => $hasIoping ? pmssSystemStatsIopingMs('/home') : 'na',
+        'topMem'      => pmssSystemStatsTopMemoryProcesses(),
+        'psiIo'       => pmssSystemStatsPsiRead('/proc/pressure/io'),
+        'psiMem'      => pmssSystemStatsPsiRead('/proc/pressure/memory'),
     ];
 }
