@@ -319,18 +319,46 @@ function pmssTrackerCleanerWriteCleanedTorrent(string $torrentPath, string $payl
     return pmssReplaceUserFilePreservingMetadata($torrentPath, $payload, 0640) ? strlen($payload) : false;
 }
 
-function pmssTrackerCleanerAppendUserChangeLog(string $username, array $changes): string
+/** Resolve the per-user tracker-cleaner change log path after boundary checks. */
+function pmssTrackerCleanerUserChangeLogPath(string $username, string $homeRoot = '/home'): ?string
+{
+    if (!pmssValidateUsername($username)) {
+        return null;
+    }
+
+    $homeRoot = rtrim($homeRoot, '/');
+    if ($homeRoot === '' || !pmssPathAbsoluteStringIsSafe($homeRoot, ['allowRoot' => false])) {
+        return null;
+    }
+
+    return $homeRoot.'/'.$username.'/.trackerCleaner.log';
+}
+
+function pmssTrackerCleanerAppendUserChangeLog(string $username, array $changes, string $homeRoot = '/home'): string
 {
     if ($changes === []) return '';
     $log = pmssTrackerCleanerChangeLog($changes);
-    $userLogPath = "/home/{$username}/.trackerCleaner.log";
+    $userLogPath = pmssTrackerCleanerUserChangeLogPath($username, $homeRoot);
+    if ($userLogPath === null) {
+        pmssTrackerCleanerLog('ERR: Refusing to write tracker change log for invalid user/home root.');
+        return $log;
+    }
     if (file_exists($userLogPath) && is_link($userLogPath)) {
         pmssTrackerCleanerLog("SKIP: refusing to write log; path is symlink for user {$username} ({$userLogPath}).");
         return $log;
     }
+    if (!pmssUserFilePathIsSafe($userLogPath)) {
+        pmssTrackerCleanerLog("WARN: User change log path is unsafe or missing for {$username} ({$userLogPath}); skipping write.");
+        return $log;
+    }
 
-    file_put_contents($userLogPath, $log, FILE_APPEND);
-    if (file_exists($userLogPath) && !is_link($userLogPath) && pmssPathWithinRootIsSafe($userLogPath, "/home/{$username}")) {
+    $written = @file_put_contents($userLogPath, $log, FILE_APPEND | LOCK_EX);
+    if ($written === false || $written !== strlen($log)) {
+        pmssTrackerCleanerLog("WARN: Failed to append tracker change log for user {$username} ({$userLogPath}).");
+        return $log;
+    }
+    $userHome = dirname($userLogPath);
+    if (file_exists($userLogPath) && !is_link($userLogPath) && pmssPathWithinRootIsSafe($userLogPath, $userHome)) {
         pmssUserFileApplyOwnership($userLogPath, $username);
     }
     return $log;
