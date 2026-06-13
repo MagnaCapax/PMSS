@@ -89,6 +89,7 @@ function pmssUpdateStep2AcquireUpdateLock(): void
         if ($fh !== false) {
             $GLOBALS['PMSS_UPDATE_LOCK_HANDLE'] = $fh;
             putenv(PMSS_UPDATE_LOCK_ENV.'=1');
+            pmssLockHandleExportChildCloseFds($fh);
             pmssLogJson(['event' => 'update_lock_acquired', 'path' => PMSS_UPDATE_LOCK_FILE]);
             return;
         }
@@ -190,7 +191,7 @@ function pmssUpdateStep2StartNginxShutdownFallback(string $reason): void
     ]);
 
     $rc = 0;
-    passthru('systemctl start nginx 2>/dev/null || /etc/init.d/nginx start 2>/dev/null', $rc);
+    passthru(pmssLockChildClosePrefix().'systemctl start nginx 2>/dev/null || /etc/init.d/nginx start 2>/dev/null', $rc);
 
     pmssLogJson([
         'event' => 'post_update_nginx_start_fallback',
@@ -232,7 +233,7 @@ function pmssUpdateStep2RegisterWebRefreshShutdownGuard(): void
         ]);
 
         $rc = 0;
-        passthru('/scripts/util/createNginxConfig.php --restart', $rc);
+        passthru(pmssLockChildClosePrefix().'/scripts/util/createNginxConfig.php --restart', $rc);
 
         pmssLogJson([
             'event' => 'post_update_web_refresh_rescue',
@@ -299,6 +300,7 @@ pmssRunProfiledCallable('Acquiring update-step2 lock', static function (): void 
         pmssLockHandleRelease($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
         unset($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
         putenv(PMSS_UPDATE_LOCK_ENV);
+        putenv(PMSS_UPDATE_LOCK_FDS_ENV);
         pmssLogJson(['event' => 'update_lock_released', 'path' => PMSS_UPDATE_LOCK_FILE]);
     });
 });
@@ -378,7 +380,7 @@ pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'start'])
 
 pmssRunProfiledCallable('Preparing noninteractive apt defaults', 'pmssConfigureAptNonInteractive', ['logmsg']);
 pmssRunProfiledStep('Cleaning mediaarea bootstrap package state', static function (): void {
-    $status = trim((string) @shell_exec('dpkg-query -W -f=${Status} repo-mediaarea 2>/dev/null'));
+    $status = trim((string) @shell_exec(pmssLockChildClosePrefix().'dpkg-query -W -f=${Status} repo-mediaarea 2>/dev/null'));
     if ($status === '' || stripos($status, 'not-installed') !== false) {
         return;
     }

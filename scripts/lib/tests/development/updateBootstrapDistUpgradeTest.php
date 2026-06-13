@@ -24,7 +24,7 @@ class UpdateBootstrapDistUpgradeTest extends TestCase
 
         $this->assertOrderedStrings([
             'pmssDisableRootCronForUpdateStep2();',
-            "passthru(pmssBootstrapPhpCommand('/scripts/util/update-step2.php'), \$rc);",
+            "passthru(pmssShellCommandWithoutInheritedUpdateLock(pmssBootstrapPhpCommand('/scripts/util/update-step2.php')), \$rc);",
             "restoreRootCronBestEffort('update-step2 handoff');",
             'if ($rc !== 0) {',
         ], $runUpdateStep2);

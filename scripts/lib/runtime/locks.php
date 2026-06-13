@@ -6,6 +6,10 @@
  * @author PMSS Team
  */
 
+if (!defined('PMSS_UPDATE_LOCK_FDS_ENV')) {
+    define('PMSS_UPDATE_LOCK_FDS_ENV', 'PMSS_UPDATE_LOCK_FDS');
+}
+
 /** Lock files must be plain files; refuse symlinks and device paths. */
 function pmssLockFilePathIsSafe(string $path): bool
 {
@@ -25,6 +29,58 @@ function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mo
         if ($closeOnBusy) { @fclose($handle); return false; }
     }
     return $handle;
+}
+
+/**
+ * Resolve numeric fd entries that reference an acquired lock handle.
+ *
+ * @return array<int, int>
+ */
+function pmssLockHandleFdList($handle, string $fdRoot = '/proc/self/fd'): array
+{
+    if (!is_resource($handle) || !is_dir($fdRoot)) return [];
+    $handleStat = @fstat($handle);
+    if (!is_array($handleStat) || !isset($handleStat['dev'], $handleStat['ino'])) return [];
+
+    $fds = [];
+    foreach (scandir($fdRoot) ?: [] as $entry) {
+        if (!ctype_digit($entry)) continue;
+        $fd = (int) $entry;
+        if ($fd <= 2) continue;
+        $fdStat = @stat(rtrim($fdRoot, '/').'/'.$entry);
+        if (is_array($fdStat)
+            && isset($fdStat['dev'], $fdStat['ino'])
+            && (int) $fdStat['dev'] === (int) $handleStat['dev']
+            && (int) $fdStat['ino'] === (int) $handleStat['ino']) {
+            $fds[] = $fd;
+        }
+    }
+
+    sort($fds);
+    return array_values(array_unique($fds));
+}
+
+function pmssLockHandleExportChildCloseFds($handle): void
+{
+    $fds = pmssLockHandleFdList($handle);
+    putenv($fds === [] ? PMSS_UPDATE_LOCK_FDS_ENV : PMSS_UPDATE_LOCK_FDS_ENV.'='.implode(',', $fds));
+}
+
+function pmssLockChildClosePrefix(): string
+{
+    $raw = getenv(PMSS_UPDATE_LOCK_FDS_ENV);
+    if (!is_string($raw) || trim($raw) === '') return '';
+
+    $closeParts = [];
+    foreach (explode(',', $raw) as $fdRaw) {
+        $fdRaw = trim($fdRaw);
+        if ($fdRaw === '' || !ctype_digit($fdRaw)) continue;
+        $fd = (int) $fdRaw;
+        if ($fd < 3 || $fd > 1048576) continue;
+        $closeParts[$fd] = $fd.'>&-';
+    }
+
+    return $closeParts === [] ? '' : 'exec '.implode(' ', $closeParts).'; ';
 }
 
 /** Record the current process id in an acquired lock handle. */

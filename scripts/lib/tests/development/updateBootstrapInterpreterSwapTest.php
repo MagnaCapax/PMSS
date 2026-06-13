@@ -23,7 +23,7 @@ class UpdateBootstrapInterpreterSwapTest extends TestCase
     {
         $data = $this->pmssReadRepoFile('scripts/update.php');
         $this->assertStringContainsAllStrings([
-            "passthru(pmssBootstrapPhpCommand('/scripts/util/update-step2.php')",
+            "passthru(pmssShellCommandWithoutInheritedUpdateLock(pmssBootstrapPhpCommand('/scripts/util/update-step2.php'))",
             '$command = pmssBootstrapPhpCommand(__FILE__, $args);',
         ], $data);
         $this->pmssAssertStringNotContainsString(

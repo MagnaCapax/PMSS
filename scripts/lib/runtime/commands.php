@@ -352,6 +352,8 @@ function pmssCommandBashInvocation(string $cmd): string
         $cmdForShell = 'PATH='.escapeshellarg($pathOverride).' '.$cmdForShell;
     }
 
+    $cmdForShell = pmssLockChildClosePrefix().$cmdForShell;
+
     return '/bin/bash -lc '.escapeshellarg($cmdForShell);
 }
 

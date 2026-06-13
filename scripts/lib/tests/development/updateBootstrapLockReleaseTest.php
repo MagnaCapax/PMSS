@@ -62,6 +62,56 @@ class UpdateBootstrapLockReleaseTest extends TestCase
         $this->assertFalse($payload['handle_is_resource'], 'pmssReleaseUpdateLock should close the lock handle directly');
     }
 
+    public function testBootstrapExportsHeldLockFdClosePrefix(): void
+    {
+        $result = $this->runBootstrapInline(
+            '$path = tempnam(sys_get_temp_dir(), "pmss-lock-"); '
+            .'$handle = fopen($path, "c+"); '
+            .'flock($handle, LOCK_EX); '
+            .'pmssUpdateLockExportChildCloseFds($handle); '
+            .'echo json_encode(['
+            .'"env" => getenv("PMSS_UPDATE_LOCK_FDS"), '
+            .'"prefix" => pmssUpdateLockChildClosePrefix(), '
+            .'"command" => pmssShellCommandWithoutInheritedUpdateLock("printf ok")'
+            .']); '
+            .'fclose($handle); @unlink($path);'
+        );
+
+        $this->assertEquals(0, $result['rc'], 'bootstrap lock fd export should complete');
+        $payload = $this->pmssDecodeJsonArray($result['output']);
+        $this->assertTrue(is_string($payload['env']) && preg_match('/^\d+(,\d+)*$/', $payload['env']) === 1, 'Expected numeric lock fd env list');
+        $this->assertStringContainsString('>&-; ', $payload['prefix']);
+        $this->assertStringContainsString($payload['prefix'], $payload['command']);
+    }
+
+    public function testRuntimeShellInvocationClosesExportedUpdateLockFds(): void
+    {
+        $runtime = dirname(__DIR__, 3).'/lib/runtime.php';
+        $result = $this->pmssExecShellCommand(
+            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg(
+                'putenv("PMSS_UPDATE_LOCK_FDS=4,9"); '
+                .'require '.var_export($runtime, true).'; '
+                .'echo pmssCommandBashInvocation("printf ok");'
+            ),
+            ['PMSS_TEST_MODE' => '1'],
+            '2>&1'
+        );
+
+        $this->assertEquals(0, $result['rc'], 'runtime shell invocation should complete');
+        $this->assertStringContainsString('exec 4>&- 9>&-; ', $result['output']);
+        $this->assertStringContainsString('printf ok', $result['output']);
+    }
+
+    public function testPhase2ExportsAndClearsLockFdList(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
+            'pmssLockHandleExportChildCloseFds($fh);',
+            'putenv(PMSS_UPDATE_LOCK_FDS_ENV);',
+            "passthru(pmssLockChildClosePrefix().'systemctl start nginx",
+            "passthru(pmssLockChildClosePrefix().'/scripts/util/createNginxConfig.php --restart'",
+        ]);
+    }
+
     public function testReleaseUpdateLockIsSafeWhenHandleAlreadyMissing(): void
     {
         $result = $this->runBootstrapInline(

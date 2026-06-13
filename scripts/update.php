@@ -53,6 +53,7 @@ const SCRIPTS_ONLY_FLAG     = '--scripts-only';
 const PMSS_CORRELATION_ENV  = 'PMSS_CORRELATION_ID';
 define('PMSS_UPDATE_LOCK_FILE', '/var/lib/pmss/update.lock');
 define('PMSS_UPDATE_LOCK_ENV', 'PMSS_UPDATE_LOCK_HELD');
+define('PMSS_UPDATE_LOCK_FDS_ENV', 'PMSS_UPDATE_LOCK_FDS');
 const PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS = 30;
 const PMSS_UPDATE_LOCK_RETRY_SECONDS = 2;
 
@@ -155,6 +156,88 @@ function fatal(string $message, int $code): void
 }
 
 /**
+ * Resolve the numeric file descriptors that point at the active lock handle.
+ *
+ * PHP 7.3 has no portable fcntl/O_CLOEXEC API, so child shell wrappers close
+ * these inherited descriptors explicitly before execing long-running commands.
+ *
+ * @return array<int, int>
+ */
+function pmssUpdateLockHandleFdList($handle): array
+{
+    if (!is_resource($handle) || !is_dir('/proc/self/fd')) {
+        return [];
+    }
+
+    $handleStat = @fstat($handle);
+    if (!is_array($handleStat) || !isset($handleStat['dev'], $handleStat['ino'])) {
+        return [];
+    }
+
+    $fds = [];
+    foreach (scandir('/proc/self/fd') ?: [] as $entry) {
+        if (!ctype_digit($entry)) {
+            continue;
+        }
+        $fd = (int) $entry;
+        if ($fd <= 2) {
+            continue;
+        }
+
+        $fdStat = @stat('/proc/self/fd/'.$entry);
+        if (is_array($fdStat)
+            && isset($fdStat['dev'], $fdStat['ino'])
+            && (int) $fdStat['dev'] === (int) $handleStat['dev']
+            && (int) $fdStat['ino'] === (int) $handleStat['ino']
+        ) {
+            $fds[] = $fd;
+        }
+    }
+
+    sort($fds);
+    return array_values(array_unique($fds));
+}
+
+function pmssUpdateLockExportChildCloseFds($handle): void
+{
+    $fds = pmssUpdateLockHandleFdList($handle);
+    if ($fds === []) {
+        putenv(PMSS_UPDATE_LOCK_FDS_ENV);
+        return;
+    }
+
+    putenv(PMSS_UPDATE_LOCK_FDS_ENV.'='.implode(',', $fds));
+}
+
+function pmssUpdateLockChildClosePrefix(): string
+{
+    $raw = getenv(PMSS_UPDATE_LOCK_FDS_ENV);
+    if (!is_string($raw) || trim($raw) === '') {
+        return '';
+    }
+
+    $closeParts = [];
+    foreach (explode(',', $raw) as $fdRaw) {
+        $fdRaw = trim($fdRaw);
+        if ($fdRaw === '' || !ctype_digit($fdRaw)) {
+            continue;
+        }
+        $fd = (int) $fdRaw;
+        if ($fd < 3 || $fd > 1048576) {
+            continue;
+        }
+        $closeParts[$fd] = $fd.'>&-';
+    }
+
+    return $closeParts === [] ? '' : 'exec '.implode(' ', $closeParts).'; ';
+}
+
+function pmssShellCommandWithoutInheritedUpdateLock(string $command): string
+{
+    return pmssUpdateLockChildClosePrefix().$command;
+}
+
+/**
  * Acquire a global update lock to prevent overlapping runs.
  */
 function pmssAcquireUpdateLock(): void
@@ -201,6 +284,7 @@ function pmssAcquireUpdateLock(): void
 
     $GLOBALS['PMSS_UPDATE_LOCK_HANDLE'] = $fh;
     putenv(PMSS_UPDATE_LOCK_ENV.'=1');
+    pmssUpdateLockExportChildCloseFds($fh);
     pmssCorrelationId();
     logEvent('update_lock_acquired', ['path' => PMSS_UPDATE_LOCK_FILE]);
 
@@ -229,6 +313,7 @@ function pmssReleaseUpdateLock(): void
         unset($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
     }
     putenv(PMSS_UPDATE_LOCK_ENV);
+    putenv(PMSS_UPDATE_LOCK_FDS_ENV);
     $released = true;
     logEvent('update_lock_released', ['path' => PMSS_UPDATE_LOCK_FILE]);
 }
@@ -593,7 +678,7 @@ function fetchSnapshot(array $spec, string $tmp): void
 function pmssRunBootstrapCommand(string $command, ?int $fatalCode = null): int
 {
     logmsg('[RUN] '.$command);
-    passthru($command, $rc);
+    passthru(pmssShellCommandWithoutInheritedUpdateLock($command), $rc);
     if ($rc !== 0 && $fatalCode !== null) {
         fatal("Command failed (rc={$rc}): {$command}", $fatalCode);
     }
@@ -621,7 +706,7 @@ function pmssPhpCliCandidateIsUsable(string $candidate): bool
     $command = escapeshellarg($candidate).' -r '.escapeshellarg('exit(PHP_SAPI === "cli" ? 0 : 1);');
     $output = [];
     $rc = 1;
-    @exec($command, $output, $rc);
+    @exec(pmssShellCommandWithoutInheritedUpdateLock($command), $output, $rc);
     return $rc === 0;
 }
 
@@ -630,7 +715,7 @@ function pmssPhpCliCandidateIsUsable(string $candidate): bool
  */
 function pmssResolvePhpCliBinary(): string
 {
-    $pathResolved = trim((string) @shell_exec('command -v php 2>/dev/null'));
+    $pathResolved = trim((string) @shell_exec(pmssShellCommandWithoutInheritedUpdateLock('command -v php 2>/dev/null')));
     $candidates = $pathResolved !== '' ? [$pathResolved] : [];
     foreach ([
         '/usr/bin/php',
@@ -1008,13 +1093,13 @@ function pmssEnsureCronServiceActiveBootstrap(string $context): void
         logmsg('[SKIP] Ensuring cron service is active (systemd unavailable)');
         return;
     }
-    $systemctl = trim((string) @shell_exec('command -v systemctl 2>/dev/null'));
+    $systemctl = trim((string) @shell_exec(pmssShellCommandWithoutInheritedUpdateLock('command -v systemctl 2>/dev/null')));
     if ($systemctl === '') {
         logmsg('[SKIP] Ensuring cron service is active (systemctl missing)');
         return;
     }
 
-    $state = trim((string) @shell_exec('systemctl is-enabled cron.service 2>/dev/null'));
+    $state = trim((string) @shell_exec(pmssShellCommandWithoutInheritedUpdateLock('systemctl is-enabled cron.service 2>/dev/null')));
     if ($state === 'masked') {
         logmsg('[WARN] cron.service is masked during '.$context.'; unmasking immediately');
         pmssRunBootstrapCommand('systemctl unmask cron.service || true');
@@ -1456,7 +1541,7 @@ function flattenScriptsLayout(): void
 
 function collectCommitHash(string $tmp): string
 {
-    $rev = @shell_exec('cd '.escapeshellarg($tmp).' && git rev-parse HEAD');
+    $rev = @shell_exec(pmssShellCommandWithoutInheritedUpdateLock('cd '.escapeshellarg($tmp).' && git rev-parse HEAD'));
     return trim((string)$rev);
 }
 
@@ -1531,7 +1616,7 @@ function maybeSelfUpdate(array $argv, bool $dryRun, bool $skipSelfUpdate, string
 
     $command = pmssBootstrapPhpCommand(__FILE__, $args);
 
-    passthru($command, $rc);
+    passthru(pmssShellCommandWithoutInheritedUpdateLock($command), $rc);
     if ($rc !== 0) {
         fatal('Self-refresh of update.php failed with status '.$rc, $rc);
     }
@@ -1580,7 +1665,7 @@ function runUpdateStep2(bool $dryRun): void
     logEvent('update_step2_start');
     pmssDisableRootCronForUpdateStep2();
     $start = microtime(true);
-    passthru(pmssBootstrapPhpCommand('/scripts/util/update-step2.php'), $rc);
+    passthru(pmssShellCommandWithoutInheritedUpdateLock(pmssBootstrapPhpCommand('/scripts/util/update-step2.php')), $rc);
     $duration = round(microtime(true) - $start, 3);
     restoreRootCronBestEffort('update-step2 handoff');
     $GLOBALS['PMSS_ROOT_CRON_DISABLED_BY_UPDATE'] = false;
