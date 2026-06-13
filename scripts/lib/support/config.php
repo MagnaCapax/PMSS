@@ -12,6 +12,28 @@
 require_once dirname(__DIR__).'/runtime.php';
 
 /**
+ * Normalize an optional SMTP relay host from support configuration.
+ *
+ * @param mixed $relayHost
+ */
+function pmssSupportRelayHostNormalize($relayHost): string
+{
+    if ($relayHost === null || $relayHost === false) {
+        return '';
+    }
+    if (!is_scalar($relayHost)) {
+        throw new RuntimeException('Support relay host is invalid.');
+    }
+
+    $relayHost = trim((string) $relayHost);
+    if ($relayHost !== '' && !pmssHostnameIsValid($relayHost)) {
+        throw new RuntimeException('Support relay host is invalid.');
+    }
+
+    return $relayHost;
+}
+
+/**
  * Load and validate support command settings.
  *
  * @return array<string,mixed>
@@ -53,6 +75,6 @@ function pmssSupportConfigRead(): array
         'snapshotDirectory' => $snapshotDirectory,
         'smtpPort' => $smtpPort,
         'connectTimeout' => $connectTimeout,
-        'relayHost' => trim((string) ($config['relayHost'] ?? '')),
+        'relayHost' => pmssSupportRelayHostNormalize($config['relayHost'] ?? ''),
     ];
 }
