@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 3).'/util/portManager.php';
+require_once dirname(__DIR__, 2).'/portManager.php';
 
 class PortManagerStoredPortValidationTest extends TestCase
 {

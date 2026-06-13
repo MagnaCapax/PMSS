@@ -24,7 +24,7 @@ require_once __DIR__.'/../lib/rutorrent/config.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/welcomeMessage.php';
-require_once __DIR__.'/portManager.php';
+require_once __DIR__.'/../lib/portManager.php';
 
 /**
  * Main entry point for user configuration changes.

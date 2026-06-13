@@ -6,7 +6,7 @@
  */
 
 require_once __DIR__.'/userFileWrite.php';
-require_once __DIR__.'/../../util/portManager.php';
+require_once __DIR__.'/../portManager.php';
 
 function pmssLighttpdProxyRuleFragment(
     string $pattern,

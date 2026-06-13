@@ -7,7 +7,7 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
-pmssRequireRelativeFiles(__DIR__, ['../update/distro.php', '../lighttpd/userFileWrite.php', 'traffic.php', 'passwords.php', '../../util/portManager.php']);
+pmssRequireRelativeFiles(__DIR__, ['../update/distro.php', '../lighttpd/userFileWrite.php', 'traffic.php', 'passwords.php', '../portManager.php']);
 
 /**
  * Pick the Deluge core template path for the active Debian release.
