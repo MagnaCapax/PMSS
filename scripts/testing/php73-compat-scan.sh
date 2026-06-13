@@ -57,9 +57,4 @@ scan "(^|[[:space:](=,;?])match\\s*\\(" "match expression (PHP 8.0)"
 scan ":\\s*(mixed|static)\\b" "Return type mixed/static (PHP 8.0)"
 scan "function[^(]*\(([^)]*\|[^)]*)\)" "Union types in parameters (PHP 8.0)"
 
-if [[ $fail -ne 0 ]]; then
-	echo "php73-compat-scan: incompatible constructs detected" >&2
-	exit 1
-fi
-
-echo "OK: php73-compat-scan" >&2
+pmss_testing_count_lint_finish "$fail" "php73-compat-scan: incompatible constructs detected" "OK: php73-compat-scan" >&2

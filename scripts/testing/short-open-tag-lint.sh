@@ -27,9 +27,4 @@ for rel in "${PHP_FILES[@]}"; do
 	rm -f /tmp/shorttag.$$ || true
 done
 
-if ((fail)); then
-	echo "[short-open-tag-lint] ERROR: Replace '<?' with '<?php' (short tags are disabled by default)." >&2
-	exit 1
-fi
-
-echo "[short-open-tag-lint] OK: no disallowed short open tags detected" >&2
+pmss_testing_count_lint_finish "$fail" "[short-open-tag-lint] ERROR: Replace '<?' with '<?php' (short tags are disabled by default)." "[short-open-tag-lint] OK: no disallowed short open tags detected" >&2

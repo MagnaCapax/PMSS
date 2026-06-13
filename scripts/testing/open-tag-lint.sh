@@ -27,9 +27,4 @@ for rel in "${PHP_FILES[@]}"; do
 	fail=1
 done
 
-if ((fail)); then
-	echo "[open-tag-lint] ERROR: PHP files must contain a PHP open tag" >&2
-	exit 1
-fi
-
-echo "[open-tag-lint] OK" >&2
+pmss_testing_count_lint_finish "$fail" "[open-tag-lint] ERROR: PHP files must contain a PHP open tag" "[open-tag-lint] OK" >&2
