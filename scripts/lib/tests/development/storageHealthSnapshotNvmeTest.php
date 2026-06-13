@@ -8,7 +8,7 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
 {
     public function testSnapshotNvmeReturnsNullWhenBinaryMissing(): void
     {
-        $device = $this->createFakeNvmeDevice();
+        $device = $this->pmssMakeReadableTempPath('pmss-nvme-device-', 'dev-');
 
         $this->pmssWithEnv(['PATH' => ''], function () use ($device): void {
             $this->assertEquals(null, \pmssStorageHealthSnapshotNvme(['path' => $device], [], '2025-01-01T00:00:00+00:00'));
@@ -17,7 +17,7 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
 
     public function testSnapshotNvmeParsesMetricsAndFlags(): void
     {
-        $device = $this->createFakeNvmeDevice();
+        $device = $this->pmssMakeReadableTempPath('pmss-nvme-device-', 'dev-');
         $stubDir = $this->createNvmeStub([
             'critical_warning : 1',
             'temperature : 343 K',
@@ -43,7 +43,7 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
 
     public function testSnapshotNvmeTracksMetricGrowthAgainstPreviousEntry(): void
     {
-        $device = $this->createFakeNvmeDevice();
+        $device = $this->pmssMakeReadableTempPath('pmss-nvme-device-', 'dev-');
         $stubDir = $this->createNvmeStub([
             'critical_warning : 0',
             'temperature : 42 C',
@@ -62,11 +62,6 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
             $this->assertTrue(is_array($entry));
             $this->pmssAssertArraySubsetSame(['severity' => 'warn', 'flags' => ['media_errors_increase', 'err_log_increase']], $entry);
         });
-    }
-
-    private function createFakeNvmeDevice(): string
-    {
-        return $this->pmssMakeReadableTempPath('pmss-nvme-device-', 'dev-');
     }
 
     private function createNvmeStub(array $body): string

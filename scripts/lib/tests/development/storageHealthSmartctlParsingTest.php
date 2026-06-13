@@ -16,17 +16,12 @@ class StorageHealthSmartctlParsingTest extends TestCase
         );
     }
 
-    private function assertFlags(array $entry, array $flags): void
-    {
-        foreach ($flags as $flag) {
-            $this->assertTrue(in_array($flag, $entry['flags'], true), 'Missing storage-health flag: '.$flag);
-        }
-    }
-
     private function assertSeverityFlags(array $entry, string $severity, array $flags): void
     {
         $this->assertEquals($severity, $entry['severity']);
-        $this->assertFlags($entry, $flags);
+        foreach ($flags as $flag) {
+            $this->assertTrue(in_array($flag, $entry['flags'], true), 'Missing storage-health flag: '.$flag);
+        }
     }
 
     public function testAtaSmartPassedParsesMetrics(): void
@@ -92,7 +87,7 @@ class StorageHealthSmartctlParsingTest extends TestCase
         $entry = $this->smartctlEntry($out, 'sde');
 
         $this->pmssAssertArraySubsetSame(['severity' => 'ok', 'ok' => true], $entry);
-        $this->assertFlags($entry, ['standby']);
+        $this->assertSeverityFlags($entry, 'ok', ['standby']);
         $this->assertEquals('STANDBY', $entry['metrics']['health']);
     }
 

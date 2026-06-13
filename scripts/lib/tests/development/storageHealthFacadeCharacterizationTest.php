@@ -46,9 +46,7 @@ final class StorageHealthFacadeCharacterizationTest extends TestCase
 
     public function testFacadeLoadsSnapshotBackendEntrypoints(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/storageHealth.php', ["storageHealth/nvme.php", "storageHealth/raid.php"]);
-        $this->pmssAssertRepoFileNotContainsString('scripts/lib/storageHealth.php', 'function pmssStorageHealthSnapshotNvme(');
-        $this->pmssAssertRepoFileNotContainsString('scripts/lib/storageHealth.php', 'function pmssStorageHealthSnapshotRaid(');
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/storageHealth.php', ["storageHealth/nvme.php", "storageHealth/raid.php"], ['function pmssStorageHealthSnapshotNvme(', 'function pmssStorageHealthSnapshotRaid(']);
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/storageHealth/nvme.php', ['function pmssStorageHealthSnapshotNvme(']);
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/storageHealth/raid.php', ['function pmssStorageHealthSnapshotRaid(']);
     }

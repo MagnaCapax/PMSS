@@ -9,9 +9,7 @@ class StorageHealthExecCaptureTest extends TestCase
     {
         $result = \pmssStorageHealthExecCapture("printf 'alpha\\n'; printf 'beta\\n' >&2; exit 7", 5);
 
-        $this->assertEquals(7, $result['rc']);
-        $this->assertEquals("alpha\n", $result['stdout']);
-        $this->assertEquals("beta\n", $result['stderr']);
+        $this->pmssAssertArraySubsetSame(['rc' => 7, 'stdout' => "alpha\n", 'stderr' => "beta\n"], $result);
     }
 
     public function testExecCaptureReturnsTimeoutCodeAndKeepsPartialStdout(): void

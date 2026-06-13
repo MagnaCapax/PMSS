@@ -20,14 +20,6 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         return $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', $device." /home ext4 rw 0 0\n", 0700);
     }
 
-    private function assertHomeRaidActivity(array $raidEntries, array $expected): void
-    {
-        $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/md1'), $raidEntries);
-
-        $this->assertTrue(is_array($activity), 'Expected activity for /home array');
-        $this->pmssAssertArraySubsetSame($expected, $activity);
-    }
-
     public function testParsesRaidActivitySummaryDetails(): void
     {
         $summary = \pmssStorageHealthRaidActivitySummaryParse(
@@ -98,7 +90,9 @@ class StorageHealthHomeRaidActivityTest extends TestCase
                 ['operation' => 'recovery', 'progress' => '7.5%'],
             ],
         ] as [$raidEntries, $expected]) {
-            $this->assertHomeRaidActivity($raidEntries, $expected);
+            $activity = \pmssStorageHealthHomeRaidActivity($this->homeMountsPath('/dev/md1'), $raidEntries);
+            $this->assertTrue(is_array($activity), 'Expected activity for /home array');
+            $this->pmssAssertArraySubsetSame($expected, $activity);
         }
     }
 
