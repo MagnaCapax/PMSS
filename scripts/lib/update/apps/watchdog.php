@@ -24,9 +24,9 @@ if (!is_file($configTemplate) || !is_file($scriptTemplate)) {
     return;
 }
 
-runStep('Ensuring watchdog script directory exists', 'mkdir -p '.$scriptDir);
-runStep('Installing watchdog configuration', 'install -m 0644 '.$configTemplate.' /etc/watchdog.conf');
-runStep('Installing watchdog network check', 'install -m 0755 '.$scriptTemplate.' '.$scriptTarget);
+runStep('Ensuring watchdog script directory exists', pmssBuildCommand('mkdir', ['-p', $scriptDir]));
+runStep('Installing watchdog configuration', pmssBuildCommand('install', ['-m', '0644', $configTemplate, '/etc/watchdog.conf']));
+runStep('Installing watchdog network check', pmssBuildCommand('install', ['-m', '0755', $scriptTemplate, $scriptTarget]));
 
 $device = is_file('/dev/watchdog') ? '/dev/watchdog' : (is_file('/dev/watchdog0') ? '/dev/watchdog0' : '');
 if ($device === '') {

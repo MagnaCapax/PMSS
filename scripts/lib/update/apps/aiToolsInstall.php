@@ -39,7 +39,7 @@ if ($nodeBinary === '') {
         $downloadUrl  = 'https://nodejs.org/dist/v'.$nodeVersion.'/'.$nodeArchive;
 
         if (!is_executable($nodeBinary)) {
-            runStep('Ensuring AI tools install root exists', 'mkdir -p '.escapeshellarg($installRoot));
+            runStep('Ensuring AI tools install root exists', pmssBuildCommand('mkdir', ['-p', $installRoot]));
             $resolvedNodeBinary = pmssPinnedRemoteTempFileUse(
                 'Node.js runtime for AI CLI tools',
                 $downloadUrl,
@@ -53,7 +53,7 @@ if ($nodeBinary === '') {
                         return $nodeBinary;
                     }
 
-                    runStep('Extracting pinned Node.js runtime for AI CLI tools', sprintf('tar -xJf %s -C %s', escapeshellarg($downloadPath), escapeshellarg($installRoot)));
+                    runStep('Extracting pinned Node.js runtime for AI CLI tools', pmssBuildCommand('tar', ['-xJf', $downloadPath, '-C', $installRoot]));
                     return is_executable($nodeBinary) ? $nodeBinary : '';
                 }
             );
@@ -89,9 +89,9 @@ if ($nodeBinary !== '') {
             continue;
         }
 
-        runStep('Ensuring '.$toolSpec[0].' install prefix exists', 'mkdir -p '.escapeshellarg($prefixDir));
-        runStep('Installing '.$toolSpec[0], sprintf('%s install --prefix %s -g --no-audit --no-fund %s', escapeshellarg($npmBinary), escapeshellarg($prefixDir), escapeshellarg($toolSpec[1])));
-        runStep('Linking '.$toolSpec[0].' command', sprintf('ln -sf %s %s', escapeshellarg($binaryPath), escapeshellarg('/usr/local/bin/'.$toolSpec[2])));
+        runStep('Ensuring '.$toolSpec[0].' install prefix exists', pmssBuildCommand('mkdir', ['-p', $prefixDir]));
+        runStep('Installing '.$toolSpec[0], pmssBuildCommand($npmBinary, ['install', '--prefix', $prefixDir, '-g', '--no-audit', '--no-fund', $toolSpec[1]]));
+        runStep('Linking '.$toolSpec[0].' command', pmssBuildCommand('ln', ['-sf', $binaryPath, '/usr/local/bin/'.$toolSpec[2]]));
     }
 }
 
@@ -106,7 +106,7 @@ if (!is_file($destination) || $force) {
         $url         = 'https://github.com/openai/codex/releases/download/'.$tag.'/'.$archive;
         $downloadDir = sys_get_temp_dir().'/pmss-ai-tools-codex';
 
-        runStep('Preparing Codex download directory', 'mkdir -p '.escapeshellarg($downloadDir));
+        runStep('Preparing Codex download directory', pmssBuildCommand('mkdir', ['-p', $downloadDir]));
         pmssPinnedRemoteTempFileUse(
             'Codex CLI archive',
             $url,
@@ -114,12 +114,12 @@ if (!is_file($destination) || $force) {
             'pmss-ai-codex-',
             'Downloading pinned Codex CLI archive',
             static function (string $archivePath) use ($downloadDir, $destination, $dryRun): void {
-                runStep('Extracting Codex CLI archive', sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($downloadDir)));
-                runStep('Installing Codex CLI binary', sprintf('install -m 0755 %s %s', escapeshellarg($downloadDir.'/codex-x86_64-unknown-linux-musl'), escapeshellarg($destination)));
+                runStep('Extracting Codex CLI archive', pmssBuildCommand('tar', ['-xzf', $archivePath, '-C', $downloadDir]));
+                runStep('Installing Codex CLI binary', pmssBuildCommand('install', ['-m', '0755', $downloadDir.'/codex-x86_64-unknown-linux-musl', $destination]));
 
                 // Landlock sandbox requires kernel 5.13+; keep old kernels usable.
                 if (preg_match('/^([0-9]+)\.([0-9]+)/', php_uname('r'), $kernel) && (((int) $kernel[1] < 5) || ((int) $kernel[1] === 5 && (int) $kernel[2] < 13))) {
-                    runStep('Ensuring /etc/codex exists', 'mkdir -p /etc/codex');
+                    runStep('Ensuring /etc/codex exists', pmssBuildCommand('mkdir', ['-p', '/etc/codex']));
                     if (!$dryRun && !is_file('/etc/codex/config.toml')) {
                         @file_put_contents('/etc/codex/config.toml', "# PMSS compatibility fallback for kernels without Landlock support.\n"."sandbox = \"danger-full-access\"\n");
                         @chmod('/etc/codex/config.toml', 0644);

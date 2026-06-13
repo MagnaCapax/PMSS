@@ -31,7 +31,7 @@ function pmssPythonVenvEnsure(
         return '';
     }
     if (!is_dir($venvDir)) {
-        runStep('Creating '.$label.' virtualenv', sprintf('%s -m venv %s', escapeshellarg($python), escapeshellarg($venvDir)));
+        runStep('Creating '.$label.' virtualenv', pmssBuildCommand($python, ['-m', 'venv', $venvDir]));
     }
 
     $pythonBin = rtrim($venvDir, '/').'/bin/python';
@@ -41,24 +41,24 @@ function pmssPythonVenvEnsure(
     }
 
     // Determine if pip is actually importable, not just if a script exists.
-    exec(escapeshellarg($pythonBin).' -m pip --version 1>/dev/null 2>&1', $out, $rc);
+    exec(pmssBuildCommand($pythonBin, ['-m', 'pip', '--version']).' 1>/dev/null 2>&1', $out, $rc);
     $hasPip = $rc === 0;
     if (!$hasPip) {
-        runStep('Bootstrapping pip in '.$label.' virtualenv', sprintf('%s -m ensurepip --upgrade --default-pip', escapeshellarg($pythonBin)));
+        runStep('Bootstrapping pip in '.$label.' virtualenv', pmssBuildCommand($pythonBin, ['-m', 'ensurepip', '--upgrade', '--default-pip']));
         // Emit minimal debug context to help diagnose odd hosts.
-        runStep('Debug '.$label.' ensurepip context', sprintf("%s -c 'import sys,ensurepip; print(sys.version); print(getattr(ensurepip,\"__file__\",\"n/a\"))'", escapeshellarg($pythonBin)));
-        exec(escapeshellarg($pythonBin).' -m pip --version 1>/dev/null 2>&1', $out, $rc);
+        runStep('Debug '.$label.' ensurepip context', pmssBuildCommand($pythonBin, ['-c', 'import sys,ensurepip; print(sys.version); print(getattr(ensurepip,"__file__","n/a"))']));
+        exec(pmssBuildCommand($pythonBin, ['-m', 'pip', '--version']).' 1>/dev/null 2>&1', $out, $rc);
         $hasPip = $rc === 0;
     }
 
     if (!$hasPip) {
         $log('[ERR] '.$label.' virtualenv missing pip after ensurepip; ensure python3-venv is installed and rerun update');
         // List venv bin dir to aid debugging.
-        @runStep('Debug '.$label.' venv bin listing', sprintf('ls -la %s || true', escapeshellarg(dirname($pythonBin))));
+        @runStep('Debug '.$label.' venv bin listing', pmssBuildCommand('ls', ['-la', dirname($pythonBin)]).' || true');
         return '';
     }
 
-    runStep('Upgrading '.$label.' virtualenv tooling', sprintf('%s -m pip install --upgrade pip setuptools wheel', escapeshellarg($pythonBin)));
+    runStep('Upgrading '.$label.' virtualenv tooling', pmssBuildCommand($pythonBin, ['-m', 'pip', 'install', '--upgrade', 'pip', 'setuptools', 'wheel']));
     return $pythonBin;
 }
 
@@ -78,15 +78,15 @@ function pmssPythonVenvInstallCli(
     if ($venvPython === '') {
         return;
     }
-    $venvPython = escapeshellarg($venvPython);
+    $pipInstallPrefix = pmssBuildCommand($venvPython, ['-m', 'pip', 'install', '--upgrade']);
     foreach ($installSteps as $installStep) {
-        runStep($installStep[0], sprintf('%s -m pip install --upgrade %s', $venvPython, $installStep[1]));
+        runStep($installStep[0], $pipInstallPrefix.' '.$installStep[1]);
     }
     if (!is_file($cliBin)) {
         if (!pmssEnvFlagEnabled('PMSS_DRY_RUN')) $log($missingCliMessage);
         return;
     }
     if (!is_link($linkPath) || readlink($linkPath) !== $cliBin) {
-        runStep('Linking '.$label.' CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg($linkPath)));
+        runStep('Linking '.$label.' CLI', pmssBuildCommand('ln', ['-sf', $cliBin, $linkPath]));
     }
 }
