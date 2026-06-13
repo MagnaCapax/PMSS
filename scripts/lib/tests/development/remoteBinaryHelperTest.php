@@ -6,6 +6,27 @@ require_once dirname(__DIR__, 2).'/update/apps/remoteBinary.php';
 
 class RemoteBinaryHelperTest extends TestCase
 {
+    public function testAppVersionProbeOutputReturnsStdoutForSuccessfulProbe(): void
+    {
+        $output = \pmssAppVersionProbeOutput('printf %s '.escapeshellarg('tool version 1.2.3'), 5);
+
+        $this->assertSame('tool version 1.2.3', $output);
+    }
+
+    public function testAppVersionProbeOutputRejectsStdoutFromFailedProbe(): void
+    {
+        $command = 'php -r '.escapeshellarg('fwrite(STDOUT, "tool version 1.2.3"); exit(127);');
+
+        $this->assertSame('', \pmssAppVersionProbeOutput($command, 5));
+    }
+
+    public function testAppVersionProbeOutputReturnsStderrForFailedProbeDiagnostics(): void
+    {
+        $command = 'php -r '.escapeshellarg('fwrite(STDERR, "libtorrent.so.21 => not found"); exit(127);');
+
+        $this->assertSame('libtorrent.so.21 => not found', \pmssAppVersionProbeOutput($command, 5));
+    }
+
     private function withFakeDownloadBody(string $body, callable $callback, array $extraEnv = array()): void
     {
         $root = $this->pmssMakeTempDir('pmss-remote-binary-', 0700);

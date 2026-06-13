@@ -22,6 +22,10 @@ function pmssPinnedRemoteAmd64ArtifactsSupported(?string $architecture = null): 
 function pmssAppVersionProbeOutput(string $command, int $timeoutSeconds = PMSS_APP_VERSION_PROBE_TIMEOUT_SECONDS): string
 {
     $result = pmssCommandCapture($command, max(1, $timeoutSeconds));
+    if ((int) ($result['rc'] ?? 1) !== 0) {
+        return is_string($result['stderr'] ?? null) ? $result['stderr'] : '';
+    }
+
     return is_string($result['stdout'] ?? null) ? $result['stdout'] : '';
 }
 
