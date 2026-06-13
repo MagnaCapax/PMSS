@@ -466,6 +466,7 @@ runStep('Restricting world access to /home', 'chmod o-rw /home');
 
 pmssRunProfiledCallable('Ensuring cgroup configuration', 'pmssEnsureCgroupsConfigured', ['logmsg']);
 pmssRunProfiledCallable('Ensuring systemd slices', 'pmssEnsureSystemdSlices', ['logmsg']);
+pmssRunProfiledCallable('Hardening systemd D-Bus cross-user disclosure', 'pmssEnsureSystemdDbusDisclosureHardening', ['logmsg']);
 runStep('Resetting /etc/seedbox permissions', 'find /etc/seedbox -not -type l -not -perm 0755 -exec chmod 0755 {} +');
 runStep('Resetting /scripts permissions', 'find /scripts -not -type l -not -perm 0750 -exec chmod 0750 {} +');
 pmssRunProfiledCallable('Ensuring locale baseline', 'pmssEnsureLocaleBaseline');

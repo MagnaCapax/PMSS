@@ -14,7 +14,7 @@ require_once __DIR__.'/logging.php';
 require_once __DIR__.'/../runtime.php';
 pmssRequireRelativeFiles(__DIR__, [
     'fstab.php', 'managedPath.php', 'runtime/commands.php', 'runtime/processes.php',
-    'systemPrep/hostEnvironment.php', 'systemPrep/bootDefaults.php', 'systemPrep/sysctlTuning.php', 'systemPrep/systemdSlicesEnsure.php',
+    'systemPrep/hostEnvironment.php', 'systemPrep/bootDefaults.php', 'systemPrep/sysctlTuning.php', 'systemPrep/systemdSlicesEnsure.php', 'systemPrep/dbusPolicyHardening.php',
 ]);
 
 /**
