@@ -13,20 +13,44 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         $this->assertSame(2, \PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_RETRY_DELAY_SECONDS);
     }
 
-    public function testProbeSucceedsOnFirstAttemptWithoutSleeping(): void
+    /**
+     * Run the socket probe against scripted probe responses and captured sleeps.
+     *
+     * @param array<int,array<string,mixed>> $probeResults
+     * @param array<string,mixed> $options
+     * @return array{0:array<string,mixed>,1:int,2:array<int,int>}
+     */
+    private function runSocketProbeFixture(array $probeResults, array $options = array()): array
     {
         $probeCalls = 0;
         $sleepCalls = array();
+        $socketPath = isset($options['socketPath']) ? (string) $options['socketPath'] : '/tmp/php.socket-0';
+        unset($options['socketPath']);
 
-        $result = \pmssLighttpdWatchdogSocketProbeWithRetry('/tmp/php.socket-0', array(
-            'probe' => static function (string $socketPath, int $timeoutSeconds) use (&$probeCalls): array {
+        $result = \pmssLighttpdWatchdogSocketProbeWithRetry($socketPath, $options + array(
+            'probe' => static function (string $socketPath, int $timeoutSeconds) use (&$probeCalls, $probeResults): array {
                 $probeCalls++;
-                return array('ok' => true, 'errno' => 0, 'errstr' => '');
+                $probeResult = $probeResults[min($probeCalls - 1, max(0, count($probeResults) - 1))] ?? array();
+
+                return array(
+                    'ok' => !empty($probeResult['ok']),
+                    'errno' => isset($probeResult['errno']) ? (int) $probeResult['errno'] : 0,
+                    'errstr' => isset($probeResult['errstr']) ? (string) $probeResult['errstr'] : '',
+                );
             },
             'sleep' => static function (int $seconds) use (&$sleepCalls): void {
                 $sleepCalls[] = $seconds;
             },
         ));
+
+        return array($result, $probeCalls, $sleepCalls);
+    }
+
+    public function testProbeSucceedsOnFirstAttemptWithoutSleeping(): void
+    {
+        [$result, $probeCalls, $sleepCalls] = $this->runSocketProbeFixture([
+            array('ok' => true, 'errno' => 0, 'errstr' => ''),
+        ]);
 
         $this->assertTrue($result['ok']);
         $this->assertEquals(1, $result['attempts']);
@@ -36,22 +60,10 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
     public function testProbeRetriesBeforeDeclaringFailure(): void
     {
-        $probeCalls = 0;
-        $sleepCalls = array();
-
-        $result = \pmssLighttpdWatchdogSocketProbeWithRetry('/tmp/php.socket-0', array(
-            'probe' => static function (string $socketPath, int $timeoutSeconds) use (&$probeCalls): array {
-                $probeCalls++;
-                if ($probeCalls === 1) {
-                    return array('ok' => false, 'errno' => 111, 'errstr' => 'Connection refused');
-                }
-
-                return array('ok' => true, 'errno' => 0, 'errstr' => '');
-            },
-            'sleep' => static function (int $seconds) use (&$sleepCalls): void {
-                $sleepCalls[] = $seconds;
-            },
-        ));
+        [$result, $probeCalls, $sleepCalls] = $this->runSocketProbeFixture([
+            array('ok' => false, 'errno' => 111, 'errstr' => 'Connection refused'),
+            array('ok' => true, 'errno' => 0, 'errstr' => ''),
+        ]);
 
         $this->assertTrue($result['ok']);
         $this->assertEquals(2, $result['attempts']);
@@ -61,19 +73,12 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
     public function testProbeReturnsLastFailureWhenAllAttemptsFail(): void
     {
-        $probeCalls = 0;
-        $sleepCalls = array();
-
-        $result = \pmssLighttpdWatchdogSocketProbeWithRetry('/tmp/php.socket-0', array(
-            'probe' => static function (string $socketPath, int $timeoutSeconds) use (&$probeCalls): array {
-                $probeCalls++;
-
-                return array('ok' => false, 'errno' => 111 + $probeCalls, 'errstr' => 'Connection refused '.$probeCalls);
-            },
-            'sleep' => static function (int $seconds) use (&$sleepCalls): void {
-                $sleepCalls[] = $seconds;
-            },
-        ));
+        [$result, $probeCalls, $sleepCalls] = $this->runSocketProbeFixture([
+            array('ok' => false, 'errno' => 112, 'errstr' => 'Connection refused 1'),
+            array('ok' => false, 'errno' => 113, 'errstr' => 'Connection refused 2'),
+            array('ok' => false, 'errno' => 114, 'errstr' => 'Connection refused 3'),
+            array('ok' => false, 'errno' => 115, 'errstr' => 'Connection refused 4'),
+        ]);
 
         $this->assertFalse($result['ok']);
         $this->assertEquals(4, $result['attempts']);
@@ -85,18 +90,9 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
     public function testProbeCoercesAttemptCountBelowOneToSingleAttempt(): void
     {
-        $probeCalls = 0;
-
-        $result = \pmssLighttpdWatchdogSocketProbeWithRetry('/tmp/php.socket-0', array(
-            'attemptCount' => 0,
-            'probe' => static function (string $socketPath, int $timeoutSeconds) use (&$probeCalls): array {
-                $probeCalls++;
-
-                return array('ok' => false, 'errno' => 111, 'errstr' => 'Connection refused');
-            },
-            'sleep' => static function (): void {
-            },
-        ));
+        [$result, $probeCalls] = $this->runSocketProbeFixture([
+            array('ok' => false, 'errno' => 111, 'errstr' => 'Connection refused'),
+        ], array('attemptCount' => 0));
 
         $this->assertFalse($result['ok']);
         $this->assertEquals(1, $result['attempts']);
@@ -105,23 +101,10 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
     public function testProbeSkipsSleepWhenRetryDelayIsZero(): void
     {
-        $probeCalls = 0;
-        $sleepCalls = array();
-
-        $result = \pmssLighttpdWatchdogSocketProbeWithRetry('/tmp/php.socket-0', array(
-            'retryDelaySeconds' => 0,
-            'probe' => static function (string $socketPath, int $timeoutSeconds) use (&$probeCalls): array {
-                $probeCalls++;
-                if ($probeCalls === 1) {
-                    return array('ok' => false, 'errno' => 111, 'errstr' => 'Connection refused');
-                }
-
-                return array('ok' => true, 'errno' => 0, 'errstr' => '');
-            },
-            'sleep' => static function (int $seconds) use (&$sleepCalls): void {
-                $sleepCalls[] = $seconds;
-            },
-        ));
+        [$result, $probeCalls, $sleepCalls] = $this->runSocketProbeFixture([
+            array('ok' => false, 'errno' => 111, 'errstr' => 'Connection refused'),
+            array('ok' => true, 'errno' => 0, 'errstr' => ''),
+        ], array('retryDelaySeconds' => 0));
 
         $this->assertTrue($result['ok']);
         $this->assertEquals(2, $result['attempts']);
@@ -131,17 +114,9 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
     public function testProbeRejectsEmptySocketPathImmediately(): void
     {
-        $probeCalls = 0;
-
-        $result = \pmssLighttpdWatchdogSocketProbeWithRetry('', array(
-            'probe' => static function (string $socketPath, int $timeoutSeconds) use (&$probeCalls): array {
-                $probeCalls++;
-
-                return array('ok' => true, 'errno' => 0, 'errstr' => '');
-            },
-            'sleep' => static function (): void {
-            },
-        ));
+        [$result, $probeCalls] = $this->runSocketProbeFixture([
+            array('ok' => true, 'errno' => 0, 'errstr' => ''),
+        ], array('socketPath' => ''));
 
         $this->assertFalse($result['ok']);
         $this->assertEquals(1, $result['attempts']);
