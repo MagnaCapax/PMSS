@@ -118,10 +118,11 @@ class DbusPolicyHardeningTest extends TestCase
     public function testRunSystemdUsersTmpfilesRenderRestrictsMode(): void
     {
         $body = \pmssRunSystemdUsersTmpfilesRender();
-        // tmpfiles `z` adjusts existing per-UID files to 0640 (root + group), closing
-        // the world-readable UID->username map without creating anything.
-        $this->assertStringContainsString('z /run/systemd/users/* 0640 root root', $body);
+        // tmpfiles `d` restricts the /run/systemd/users DIRECTORY to 0750 (robust: the dir
+        // is not recreated per-login, so non-root cannot traverse in to read any per-UID file).
+        $this->assertStringContainsString('d /run/systemd/users 0750 root root', $body);
         $this->assertStringNotContainsString('0644', $body);
+        $this->assertStringNotContainsString('0755', $body);
     }
 
     public function testTmpfilesInstallIsIdempotent(): void

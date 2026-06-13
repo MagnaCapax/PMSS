@@ -272,24 +272,23 @@ function pmssRunSystemdUsersTmpfilesBasename(): string
 }
 
 /**
- * Render the tmpfiles.d drop-in restricting /run/systemd/users/<UID> to 0640.
+ * Render the tmpfiles.d drop-in restricting the /run/systemd/users DIRECTORY to 0750.
  *
- * logind creates these 0644 (world-readable). usernames are already public via
- * panel URLs, so this is the lowest-sensitivity channel. The `z` type adjusts
- * mode/ownership of existing matching paths without creating them.
- *
- * MECHANISM CAVEAT: logind re-creates a per-UID file 0644 on each user's first
- * login; tmpfiles applies at boot and on `systemd-tmpfiles --create`, so it does
- * NOT continuously re-assert on subsequent new logins. One-host test MUST confirm
- * the achieved mode and that logind still functions (login/linger/sessions). If
- * the mode does not hold across logins, escalate (path-unit) or accept — this
- * channel only hides the public UID->username map.
+ * logind creates the per-UID files 0644 (world-readable UID->username map) and
+ * RE-creates them on each login, so a per-file `z 0640` rule does not hold between
+ * tmpfiles runs. Restricting the PARENT DIRECTORY to 0750 instead is robust: the
+ * directory is created once by logind at boot and is NOT recreated per-login, so a
+ * non-root user simply cannot traverse into it to read any per-UID file regardless
+ * of the files' own modes. tmpfiles `d` sets+re-asserts the directory mode at boot
+ * and on `systemd-tmpfiles --create`. loginctl reaches this data over the login1
+ * D-Bus (restricted separately, Channel B), not the filesystem, so the 0750 dir
+ * does not break it; nothing in PMSS reads /run/systemd/users as non-root.
  */
 function pmssRunSystemdUsersTmpfilesRender(): string
 {
-    return "# PMSS-managed: restrict /run/systemd/users/<UID> (UID->username map) to root + group.\n"
+    return "# PMSS-managed: restrict the /run/systemd/users directory (UID->username map) to root.\n"
         ."# Managed by scripts/lib/update/systemPrep/dbusPolicyHardening.php; edits are overwritten.\n"
-        ."z /run/systemd/users/* 0640 root root -\n";
+        ."d /run/systemd/users 0750 root root -\n";
 }
 
 /**
@@ -335,9 +334,11 @@ function pmssEnsureRunSystemdUsersTmpfiles(?callable $logger = null): void
         return;
     }
 
+    // tmpfiles `d` re-asserts the directory mode at boot; also chmod the already-existing
+    // directory now so the restriction takes effect immediately on this update run.
     runStep(
-        'Applying /run/systemd/users tmpfiles policy',
-        'systemd-tmpfiles --create '.escapeshellarg($target).' 2>/dev/null || true'
+        'Restricting /run/systemd/users directory mode',
+        'systemd-tmpfiles --create '.escapeshellarg($target).' 2>/dev/null; [ -d /run/systemd/users ] && chmod 0750 /run/systemd/users 2>/dev/null || true'
     );
 }
 
