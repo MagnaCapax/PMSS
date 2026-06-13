@@ -107,7 +107,7 @@ function pmssLighttpdSyncPhpIni(string $phpIniPath, string $user, int $memoryLim
             return false;
         }
     }
-    $phpIniContent = !is_link($phpIniPath) && is_file($phpIniPath) ? @file_get_contents($phpIniPath) : false;
+    $phpIniContent = pmssReadRegularFileContents($phpIniPath);
     if (is_string($phpIniContent) && !pmssAtomicWriteFile($phpIniPath, pmssLighttpdApplyPhpIniContent($phpIniContent, $user, $memoryLimitMiB))) {
         $failureReason = 'update';
         return false;

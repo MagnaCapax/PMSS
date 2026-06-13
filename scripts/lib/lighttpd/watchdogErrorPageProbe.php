@@ -64,11 +64,9 @@ function pmssLighttpdWatchdogQuotaExceeded(string $username, string $homeDir): b
 
     if ($output === '') {
         $quotaFile = rtrim($homeDir, '/').'/.quota';
-        if (is_file($quotaFile) && !is_link($quotaFile)) {
-            $snapshot = @file_get_contents($quotaFile);
-            if (is_string($snapshot)) {
-                $output = $snapshot;
-            }
+        $snapshot = pmssReadRegularFileContents($quotaFile);
+        if ($snapshot !== null) {
+            $output = $snapshot;
         }
     }
 

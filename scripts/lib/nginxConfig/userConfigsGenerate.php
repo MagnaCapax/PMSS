@@ -101,7 +101,7 @@ function pmssCreateNginxConfigLegacyDelugeWebPort(string $homeDir, string $user)
 {
     foreach (['/.delugeWebPort' => 0, '/.delugePort' => 1] as $portFile => $offset) {
         $delugePortPath = $homeDir.$portFile;
-        if (!is_file($delugePortPath) || is_link($delugePortPath)) {
+        if (!pmssRegularFilePathIsReadable($delugePortPath)) {
             if (is_link($delugePortPath)) pmssCreateNginxConfigUserLog($user, '[WARN] Ignoring symlinked '.$portFile.' while rendering nginx template');
             continue;
         }
@@ -112,9 +112,8 @@ function pmssCreateNginxConfigLegacyDelugeWebPort(string $homeDir, string $user)
             continue;
         }
 
-        $raw = @file_get_contents($delugePortPath);
-        if (!is_string($raw)) continue;
-        $raw = trim($raw);
+        $raw = pmssReadRegularFileTrimmed($delugePortPath);
+        if ($raw === null) continue;
         if ($raw === '' || !ctype_digit($raw)) {
             pmssCreateNginxConfigUserLog($user, '[WARN] Ignoring non-numeric '.$portFile.' value while rendering nginx template');
             continue;

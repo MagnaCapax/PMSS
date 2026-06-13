@@ -140,7 +140,7 @@ function pmssReadTorrentThrottle(string $username): ?int
     }
 
     $path = pmssUserHomeFilePath($username, '.torrentThrottle');
-    if (!is_file($path) || is_link($path)) {
+    if (!pmssRegularFilePathIsReadable($path)) {
         return null;
     }
 

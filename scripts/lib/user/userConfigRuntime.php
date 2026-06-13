@@ -16,10 +16,6 @@ require_once __DIR__.'/../runtime.php';
  */
 function pmssUserConfigRtorrentLockPid(string $lockFile): ?int
 {
-    if (!is_file($lockFile) || is_link($lockFile)) {
-        return null;
-    }
-
     $raw = pmssReadRegularFileTrimmed($lockFile);
     if ($raw === null) {
         return null;

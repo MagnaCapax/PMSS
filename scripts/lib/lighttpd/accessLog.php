@@ -18,7 +18,7 @@ if (!defined('PMSS_LIGHTTPD_ACCESS_LOG_THRESHOLD_BYTES')) {
  */
 function pmssLighttpdAccessLogTrimFile(string $path, int $thresholdBytes): array
 {
-    if ($thresholdBytes < 0 || !pmssUserFilePathIsSafe($path) || !is_file($path) || is_link($path)) {
+    if ($thresholdBytes < 0 || !pmssUserFilePathIsSafe($path) || !pmssRegularFilePathIsReadable($path)) {
         return ['status' => 'skip', 'reason' => 'unsafe_target'];
     }
 

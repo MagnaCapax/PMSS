@@ -14,7 +14,7 @@ require_once __DIR__.'/../runtime.php';
 /** Read a positive digit-only identifier without following symlinks. */
 function pmssUserBillingDigitsFileRead(string $path, bool $requireRootOwner = false): ?string
 {
-    if (!is_file($path) || is_link($path)) {
+    if (!pmssRegularFilePathIsReadable($path)) {
         return null;
     }
     if ($requireRootOwner && @fileowner($path) !== 0) {
