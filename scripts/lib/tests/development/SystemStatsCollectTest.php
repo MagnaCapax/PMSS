@@ -30,6 +30,17 @@ class SystemStatsCollectTest extends TestCase
         );
     }
 
+    public function testLogLineSnapshotKeepsLegacyFieldOrder(): void
+    {
+        $stats = array_fill_keys(array_keys(\pmssSystemStatsCollect()), 'value');
+        $this->assertSame(
+            '20250613 09:10:11 | load:value | cpu_iowait:value | mem_total:value | mem_free:value'
+            .' | mem_cache:value | mem_buffers:value | swap_total:value | swap_free:value | disk_busy:value'
+            .' | ioping_root:value | ioping_home:value | top_mem:value | psi_io:value | psi_mem:value',
+            \pmssSystemStatsLogLine($stats, '20250613 09:10:11')
+        );
+    }
+
     public function testCollectValuesRemainStringFormatted(): void
     {
         $stats = \pmssSystemStatsCollect();

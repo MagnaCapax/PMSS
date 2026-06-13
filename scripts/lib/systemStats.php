@@ -11,11 +11,8 @@ require_once __DIR__.'/runtime.php';
 /** Convert KiB counters to the compact legacy units used by stats logs. */
 function pmssSystemStatsKbToHuman(int $kb): string
 {
-    if ($kb >= 1048576) {
-        return number_format($kb / 1048576, 1, '.', '').'G';
-    }
-    if ($kb >= 1024) {
-        return number_format($kb / 1024, 1, '.', '').'M';
+    foreach ([1048576 => 'G', 1024 => 'M'] as $divisor => $suffix) {
+        if ($kb >= $divisor) return number_format($kb / $divisor, 1, '.', '').$suffix;
     }
     return $kb.'K';
 }
@@ -55,8 +52,7 @@ function pmssSystemStatsTopMemoryProcesses(?callable $runner = null): string
         exec('/bin/bash -o pipefail -c '.escapeshellarg('ps -eo comm=,rss= --sort=-rss | head -n 3'), $output, $rc);
     };
 
-    $output = [];
-    $rc = 1;
+    $output = []; $rc = 1;
     try {
         $runner($output, $rc);
     } catch (Throwable $exception) {
@@ -71,14 +67,10 @@ function pmssSystemStatsTopMemoryProcesses(?callable $runner = null): string
  */
 function pmssSystemStatsLoadAverageFromRaw(?string $raw): string
 {
-    if ($raw === null) {
-        return 'na,na,na';
-    }
+    if ($raw === null) return 'na,na,na';
 
     $parts = preg_split('/\s+/', trim($raw));
-    if (!is_array($parts) || count($parts) < 3) {
-        return 'na,na,na';
-    }
+    if (!is_array($parts) || count($parts) < 3) return 'na,na,na';
 
     $load = array_slice($parts, 0, 3);
     foreach ($load as $value) {
@@ -96,9 +88,7 @@ function pmssSystemStatsCpuCountersRead(): array
 {
     $lines = preg_split('/\r?\n/', pmssReadRegularFileContents('/proc/stat') ?? '');
     $parts = is_array($lines) && isset($lines[0]) ? preg_split('/\s+/', trim((string) $lines[0])) : false;
-    if (!is_array($parts) || count($parts) < 2) {
-        return [];
-    }
+    if (!is_array($parts) || count($parts) < 2) return [];
     array_shift($parts);
     return array_map('intval', $parts);
 }
@@ -121,9 +111,7 @@ function pmssSystemStatsDiskIoTimeRead(): array
     $stats = [];
     foreach (preg_split('/\r?\n/', pmssReadRegularFileContents('/proc/diskstats') ?? '') ?: [] as $line) {
         $parts = preg_split('/\s+/', trim($line));
-        if (!is_array($parts) || count($parts) < 13) {
-            continue;
-        }
+        if (!is_array($parts) || count($parts) < 13) continue;
         $name = $parts[2] ?? '';
         if (pmssBlockDeviceNameIsDataDevice($name)) {
             $stats[$name] = (int) ($parts[12] ?? 0);
@@ -140,9 +128,7 @@ function pmssSystemStatsDiskBusyPercent(array $before, array $after, float $samp
         $delta = max(0, $ioTime - ($before[$name] ?? $ioTime));
         // /proc/diskstats io_time is in milliseconds spent doing IO.
         $pct = $sampleSeconds > 0 ? ($delta / ($sampleSeconds * 1000)) * 100 : 0.0;
-        if ($pct > $maxPct) {
-            $maxPct = $pct;
-        }
+        $maxPct = max($maxPct, $pct);
     }
     return number_format(min(100, $maxPct), 1, '.', '');
 }
@@ -150,9 +136,7 @@ function pmssSystemStatsDiskBusyPercent(array $before, array $after, float $samp
 /** Parse PSI content into the append-only slash-joined stats log field. */
 function pmssSystemStatsPsiFromRaw(?string $raw): string
 {
-    if ($raw === null) {
-        return 'na';
-    }
+    if ($raw === null) return 'na';
 
     $fields = [
         ['some', 'avg10', 1], ['some', 'avg60', 1], ['full', 'avg10', 1],
@@ -163,9 +147,7 @@ function pmssSystemStatsPsiFromRaw(?string $raw): string
     foreach ($fields as $field) {
         list($row, $name, $decimals) = $field;
         if (!preg_match('/^'.preg_quote($row, '/').'\s.*?'.preg_quote($name, '/').'=([0-9.]+)/m', $raw, $match)) {
-            if ($row === 'some' && $name === 'avg10') {
-                return 'na';
-            }
+            if ($row === 'some' && $name === 'avg10') return 'na';
             $values[] = 'na';
             continue;
         }
@@ -179,6 +161,19 @@ function pmssSystemStatsPsiRead(string $path): string { return is_readable($path
 
 /** Format optional ioping latency for the stats log. */
 function pmssSystemStatsIopingMs(string $path): string { $value = is_dir($path) ? pmssIopingAverageMs($path) : null; return $value === null ? 'na' : number_format($value, 1, '.', '').'ms'; }
+
+/** Render one parseable cron log line from collected stats. */
+function pmssSystemStatsLogLine(array $stats, ?string $timestamp = null): string
+{
+    $line = $timestamp ?? date('Ymd H:i:s');
+    foreach ([
+        'load' => 'load', 'cpu_iowait' => 'cpuIowait', 'mem_total' => 'memTotal', 'mem_free' => 'memFree',
+        'mem_cache' => 'memCache', 'mem_buffers' => 'memBuffers', 'swap_total' => 'swapTotal', 'swap_free' => 'swapFree', 'disk_busy' => 'diskBusy', 'ioping_root' => 'iopingRoot', 'ioping_home' => 'iopingHome', 'top_mem' => 'topMem', 'psi_io' => 'psiIo', 'psi_mem' => 'psiMem',
+    ] as $label => $key) {
+        $line .= ' | '.$label.':'.(string) ($stats[$key] ?? 'na');
+    }
+    return $line;
+}
 
 /**
  * Collect a single snapshot of system metrics for logging.
