@@ -102,6 +102,25 @@ SH
         return $archivePath;
     }
 
+    private function runDemoArchiveStep(
+        string $expectedSha256,
+        string $workDir,
+        string $archiveName = 'archive.tar.gz',
+        string $sourceDir = 'source',
+        array $postExtractCommands = array()
+    ): bool {
+        return \pmssRunPinnedRemoteArchiveStep(
+            'demo archive',
+            'https://example.invalid/archive',
+            $expectedSha256,
+            $archiveName,
+            $sourceDir,
+            'Extracting demo archive',
+            $postExtractCommands,
+            $workDir
+        );
+    }
+
     public function testFetchPinnedRemoteFileReturnsTempPathForMatchingChecksum(): void
     {
         $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
@@ -161,16 +180,7 @@ SH
             $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256) use ($case): void {
                 $workDir = $case[2] === '' ? '' : $root.'/'.$case[2];
 
-                \pmssRunPinnedRemoteArchiveStep(
-                    'demo archive',
-                    'https://example.invalid/archive',
-                    $expectedSha256,
-                    $case[0],
-                    $case[1],
-                    'Extracting demo archive',
-                    [],
-                    $workDir
-                );
+                $this->runDemoArchiveStep($expectedSha256, $workDir, $case[0], $case[1]);
 
                 $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
             });
@@ -191,16 +201,7 @@ SH
 
         foreach ($cases as $commands) {
             $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256) use ($commands): void {
-                \pmssRunPinnedRemoteArchiveStep(
-                    'demo archive',
-                    'https://example.invalid/archive',
-                    $expectedSha256,
-                    'archive.tar.gz',
-                    'source',
-                    'Extracting demo archive',
-                    $commands,
-                    $root.'/compile'
-                );
+                $this->runDemoArchiveStep($expectedSha256, $root.'/compile', 'archive.tar.gz', 'source', $commands);
 
                 $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
             });
@@ -215,16 +216,7 @@ SH
             @mkdir($target, 0755, true);
             $this->pmssCreateSymlinkOrSkip($target, $link);
 
-            \pmssRunPinnedRemoteArchiveStep(
-                'demo archive',
-                'https://example.invalid/archive',
-                $expectedSha256,
-                'archive.tar.gz',
-                'source',
-                'Extracting demo archive',
-                [],
-                $link
-            );
+            $this->runDemoArchiveStep($expectedSha256, $link);
 
             $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
         });
@@ -235,16 +227,7 @@ SH
         $archivePath = $this->createSourceArchive($this->pmssMakeTempDir('pmss-remote-archive-', 0700));
 
         $this->withFakeDownloadBody('', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
-            $result = \pmssRunPinnedRemoteArchiveStep(
-                'demo archive',
-                'https://example.invalid/archive',
-                $expectedSha256,
-                'archive.tar.gz',
-                'source',
-                'Extracting demo archive',
-                [],
-                $root.'/compile'
-            );
+            $result = $this->runDemoArchiveStep($expectedSha256, $root.'/compile');
 
             $this->assertTrue($result, 'Expected successful archive extraction to report success');
             $this->assertEquals('archive-ok', (string) @file_get_contents($root.'/compile/source/payload.txt'));
