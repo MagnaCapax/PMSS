@@ -104,8 +104,13 @@ function pmssPortManagerWriteAssignedPort(string $portDir, string $portFile, int
 /** @return array<int, bool> */
 function pmssPortManagerLegacyUsedPorts(string $portsBase = '/var/lib/pmss/ports'): array
 {
+    $portsBase = rtrim($portsBase, '/');
+    if ($portsBase === '' || strpos($portsBase, "\0") !== false || !is_dir($portsBase) || is_link($portsBase)) {
+        return [];
+    }
+
     $used = array();
-    foreach ((glob(rtrim($portsBase, '/').'/*/*') ?: array()) as $path) {
+    foreach ((glob($portsBase.'/*/*') ?: array()) as $path) {
         $port = pmssNetworkPortParseDigits(basename($path));
         if ($port !== null) {
             $used[$port] = true;
@@ -122,7 +127,12 @@ function pmssPortManagerLegacyUsedPorts(string $portsBase = '/var/lib/pmss/ports
 function pmssPortManagerUsedPorts(string $portDir, string $legacyPortsBase = '/var/lib/pmss/ports'): array
 {
     $used = pmssPortManagerLegacyUsedPorts($legacyPortsBase);
-    foreach ((glob(rtrim($portDir, '/').'/*') ?: array()) as $path) {
+    $portDir = rtrim($portDir, '/');
+    if ($portDir === '' || strpos($portDir, "\0") !== false || !is_dir($portDir) || is_link($portDir)) {
+        return $used;
+    }
+
+    foreach ((glob($portDir.'/*') ?: array()) as $path) {
         $assignedPort = pmssPortManagerReadAssignedPort($path);
         if ($assignedPort !== null) {
             $used[$assignedPort] = true;
