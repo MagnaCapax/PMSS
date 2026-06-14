@@ -26,7 +26,14 @@ function pmssEnsureQuotaOptions(string $mountPoint, ?array $requiredOptions = nu
     }
 
     $requiredOptions = $requiredOptions ?? ['usrjquota=aquota.user', 'grpjquota=aquota.group', 'jqfmt=vfsv1'];
-    $plan = pmssFstabMountOptionsEnsure($lines, $mountPoint, $requiredOptions, [], true);
+    $replacePrefixedOptions = [];
+    foreach ($requiredOptions as $requiredOption) {
+        $equalsPosition = strpos($requiredOption, '=');
+        if ($equalsPosition !== false) {
+            $replacePrefixedOptions[substr($requiredOption, 0, $equalsPosition + 1)] = $requiredOption;
+        }
+    }
+    $plan = pmssFstabMountOptionsEnsure($lines, $mountPoint, $requiredOptions, [], true, null, $replacePrefixedOptions);
     if ($plan === null) {
         $log('[WARN] Mount point '.$mountPoint.' not found in '.$fstab.'; skipping quota updates.');
         return;
