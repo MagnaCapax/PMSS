@@ -17,13 +17,27 @@ function pmssLockFilePathIsSafe(string $path): bool
     return !file_exists($path) || is_file($path);
 }
 
+/** Confirm an opened lock handle still points at the guarded lock path. */
+function pmssLockFileHandleMatchesPath($handle, string $path): bool
+{
+    if (!is_resource($handle) || !pmssLockFilePathIsSafe($path)) return false;
+
+    $handleStat = @fstat($handle);
+    $pathStat = @stat($path);
+    if (!is_array($handleStat) || !is_array($pathStat)) return false;
+
+    return isset($handleStat['dev'], $handleStat['ino'], $pathStat['dev'], $pathStat['ino'])
+        && (int) $handleStat['dev'] === (int) $pathStat['dev']
+        && (int) $handleStat['ino'] === (int) $pathStat['ino'];
+}
+
 function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mode = 'c', bool $createParentDir = false, bool $closeOnBusy = true, ?bool &$busy = null)
 {
     $busy = false;
     if (!pmssLockFilePathIsSafe($path)) return false;
     if ($createParentDir && !pmssDirEnsureExists(dirname($path), 0755)) return false;
     if (($handle = @fopen($path, $mode)) === false) return false;
-    if (!pmssLockFilePathIsSafe($path)) { @fclose($handle); return false; }
+    if (!pmssLockFileHandleMatchesPath($handle, $path)) { @fclose($handle); return false; }
     if (!@flock($handle, LOCK_EX | ($nonBlocking ? LOCK_NB : 0))) {
         $busy = true;
         if ($closeOnBusy) { @fclose($handle); return false; }
