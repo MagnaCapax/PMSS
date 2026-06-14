@@ -75,11 +75,8 @@ while [[ $# -gt 0 ]]; do
 		continue
 	fi
 	case "$1" in
-	-h | --help)
-		codex_usage_exit usage
-		;;
 	*)
-		codex_cli_error_exit codex-ci "unknown option: $1"
+		codex_cli_help_or_error_exit "$1" codex-ci usage "unknown option: $1"
 		;;
 	esac
 done

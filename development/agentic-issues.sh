@@ -70,11 +70,8 @@ while [[ $# -gt 0 ]]; do
 		force_target=1
 		shift || true
 		;;
-	-h | --help)
-		codex_usage_exit usage
-		;;
 	*)
-		codex_cli_error_exit agentic-issues "unknown option: $1"
+		codex_cli_help_or_error_exit "$1" agentic-issues usage "unknown option: $1"
 		;;
 	esac
 done

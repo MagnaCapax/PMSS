@@ -80,7 +80,7 @@ while [[ $# -gt 0 ]]; do
 		break
 		;;
 	-h | --help)
-		codex_usage_exit usage
+		codex_cli_help_or_error_exit "$1" agentic usage "unknown option: $1"
 		;;
 	*)
 		passthrough+=("$1")

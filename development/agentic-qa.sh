@@ -54,11 +54,8 @@ codex_parse_launcher_common_args agent exec_cmd dry_run autocommit remaining_arg
 set -- "${remaining_args[@]}"
 while [[ $# -gt 0 ]]; do
 	case "$1" in
-	-h | --help)
-		codex_usage_exit usage
-		;;
 	*)
-		codex_cli_error_exit agentic-qa "unknown option: $1"
+		codex_cli_help_or_error_exit "$1" agentic-qa usage "unknown option: $1"
 		;;
 	esac
 done

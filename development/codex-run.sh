@@ -83,11 +83,8 @@ shift || true
 
 case "$cmd" in
 run) ;;
--h | --help | "")
-	codex_usage_exit usage
-	;;
 *)
-	codex_cli_error_exit codex-run "unknown command: $cmd"
+	codex_cli_help_or_error_exit "$cmd" codex-run usage "unknown command: $cmd"
 	;;
 esac
 
@@ -118,11 +115,8 @@ while [[ $# -gt 0 ]]; do
 		fi
 		shift || true
 		;;
-	-h | --help)
-		codex_usage_exit usage
-		;;
 	*)
-		codex_cli_error_exit codex-run "unknown option: $1"
+		codex_cli_help_or_error_exit "$1" codex-run usage "unknown option: $1"
 		;;
 	esac
 done

@@ -37,6 +37,19 @@ codex_cli_error_exit() {
 	exit 2
 }
 
+codex_cli_help_or_error_exit() {
+	local arg="$1" prefix="$2" usage_func="$3" message="$4"
+	shift 4 || true
+	case "$arg" in
+	-h | --help | "")
+		codex_usage_exit "$usage_func"
+		;;
+	*)
+		codex_cli_error_exit "$prefix" "$message" "$@"
+		;;
+	esac
+}
+
 # Apply the common agentic launcher root, debug, ERR-trap, and defaults setup.
 # shellcheck disable=SC2034
 codex_agentic_bootstrap() {

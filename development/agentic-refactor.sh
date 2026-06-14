@@ -90,16 +90,13 @@ while [[ $# -gt 0 ]]; do
 		fi
 		break
 		;;
-	-h | --help)
-		codex_usage_exit usage
-		;;
 	*)
 		if [[ "$1" == --* ]]; then
-			codex_cli_error_exit agentic-refactor "unknown option: $1" \
+			codex_cli_help_or_error_exit "$1" agentic-refactor usage "unknown option: $1" \
 				"[agentic-refactor] hint: pass assistant CLI args after '--', e.g.:" \
 				"  development/agentic-refactor.sh --agent=gemini -- --approval-mode yolo"
 		else
-			codex_cli_error_exit agentic-refactor "unknown option: $1"
+			codex_cli_help_or_error_exit "$1" agentic-refactor usage "unknown option: $1"
 		fi
 		;;
 	esac
