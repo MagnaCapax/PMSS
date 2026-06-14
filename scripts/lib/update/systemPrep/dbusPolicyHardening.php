@@ -202,30 +202,14 @@ function pmssEnsureDbusManagedPolicy(string $basename, string $content, string $
     $policyDir = pmssResolvePathFromEnv('PMSS_DBUS_SYSTEM_POLICY_DIR', '/etc/dbus-1/system.d');
     $target = $policyDir.'/'.$basename;
 
-    $existing = @file_get_contents($target);
-    if ($existing !== false && $existing === $content) {
-        $log('[SKIP] '.$label.' already present and up to date');
+    if (!pmssRefreshManagedPathFile($target, $content, $label, $log, [
+        'skipMessage' => '[SKIP] '.$label.' already present and up to date',
+        'directoryFailureMessage' => '[WARN] Unable to create D-Bus system policy directory: '.$policyDir,
+        'writeFailureMessage' => '[WARN] Unable to install '.$label.' at '.$target,
+        'successMessage' => 'Installed '.$label.' at '.$target,
+    ])) {
         return;
     }
-
-    if (!pmssDirEnsureExists($policyDir, 0755)) {
-        $log('[WARN] Unable to create D-Bus system policy directory: '.$policyDir);
-        return;
-    }
-
-    if (!pmssWriteManagedPathFile(
-        $target,
-        $content,
-        $label,
-        $log,
-        null,
-        null,
-        0644,
-        '[WARN] Unable to install '.$label.' at '.$target
-    )) {
-        return;
-    }
-    $log('Installed '.$label.' at '.$target);
 
     if (($skipReason = pmssSystemdActionSkipReason('dbus.service', true, true)) !== '') {
         pmssLogStatus('SKIP', 'Reloading dbus for '.$label.' ('.$skipReason.')');
@@ -304,30 +288,14 @@ function pmssEnsureRunSystemdUsersTmpfiles(?callable $logger = null): void
     $target = $dir.'/'.pmssRunSystemdUsersTmpfilesBasename();
     $content = pmssRunSystemdUsersTmpfilesRender();
 
-    $existing = @file_get_contents($target);
-    if ($existing !== false && $existing === $content) {
-        $log('[SKIP] /run/systemd/users tmpfiles policy already present and up to date');
+    if (!pmssRefreshManagedPathFile($target, $content, '/run/systemd/users tmpfiles policy', $log, [
+        'skipMessage' => '[SKIP] /run/systemd/users tmpfiles policy already present and up to date',
+        'directoryFailureMessage' => '[WARN] Unable to create tmpfiles.d directory: '.$dir,
+        'writeFailureMessage' => '[WARN] Unable to install /run/systemd/users tmpfiles policy at '.$target,
+        'successMessage' => 'Installed /run/systemd/users tmpfiles policy at '.$target,
+    ])) {
         return;
     }
-
-    if (!pmssDirEnsureExists($dir, 0755)) {
-        $log('[WARN] Unable to create tmpfiles.d directory: '.$dir);
-        return;
-    }
-
-    if (!pmssWriteManagedPathFile(
-        $target,
-        $content,
-        '/run/systemd/users tmpfiles policy',
-        $log,
-        null,
-        null,
-        0644,
-        '[WARN] Unable to install /run/systemd/users tmpfiles policy at '.$target
-    )) {
-        return;
-    }
-    $log('Installed /run/systemd/users tmpfiles policy at '.$target);
 
     if (function_exists('pmssTestModeEnabled') && pmssTestModeEnabled()) {
         pmssLogStatus('SKIP', 'Applying /run/systemd/users tmpfiles policy (test mode)');

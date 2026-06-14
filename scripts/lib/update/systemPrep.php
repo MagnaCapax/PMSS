@@ -86,23 +86,13 @@ function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = 
         [$serviceTarget, $serviceRaw, 0644, 'Boot tuning service'],
     ] as $targetSpec) {
         [$path, $content, $mode, $label] = $targetSpec;
-        $existing = @file_get_contents($path);
-        if ($existing !== false && $existing === $content) {
-            $log('[SKIP] '.$label.' already present and up to date');
-            continue;
-        }
-
-        $dir = dirname($path);
-        if (!pmssDirEnsureExists($dir, 0755)) {
-            $log('[WARN] Unable to create '.$label.' directory: '.$dir);
-            continue;
-        }
-
-        if (!pmssWriteManagedPathFile($path, $content, $label, $log, null, null, $mode, '[WARN] Unable to install '.$label.' at '.$path)) {
-            continue;
-        }
-
-        $log('Installed '.$label.' at '.$path);
+        pmssRefreshManagedPathFile($path, $content, $label, $log, [
+            'mode' => $mode,
+            'skipMessage' => '[SKIP] '.$label.' already present and up to date',
+            'directoryFailureMessage' => '[WARN] Unable to create '.$label.' directory: '.dirname($path),
+            'writeFailureMessage' => '[WARN] Unable to install '.$label.' at '.$path,
+            'successMessage' => 'Installed '.$label.' at '.$path,
+        ]);
     }
 
     if (($skipReason = pmssSystemdActionSkipReason(null, true, true)) !== '') {

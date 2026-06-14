@@ -49,6 +49,43 @@ function pmssWriteManagedPathFile(
     return false;
 }
 
+/**
+ * Refresh managed file content only when it changed.
+ *
+ * Returns true only when a write was completed; unchanged or failed writes
+ * return false so callers can gate reload work on real mutations.
+ */
+function pmssRefreshManagedPathFile(string $path, string $contents, string $label, callable $logger, array $options = []): bool
+{
+    $existing = @file_get_contents($path);
+    if ($existing !== false && $existing === $contents) {
+        if (($options['skipMessage'] ?? '') !== '') {
+            $logger((string) $options['skipMessage']);
+        }
+        return false;
+    }
+
+    $dir = dirname($path);
+    $dirMode = isset($options['directoryMode']) ? (int) $options['directoryMode'] : 0755;
+    if (!pmssDirEnsureExists($dir, $dirMode)) {
+        $logger((string) ($options['directoryFailureMessage'] ?? '[WARN] Unable to create '.$label.' directory: '.$dir));
+        return false;
+    }
+
+    $mode = isset($options['mode']) ? (int) $options['mode'] : 0644;
+    $owner = array_key_exists('owner', $options) && $options['owner'] !== null ? (string) $options['owner'] : null;
+    $group = array_key_exists('group', $options) && $options['group'] !== null ? (string) $options['group'] : null;
+    $writeFailure = (string) ($options['writeFailureMessage'] ?? '');
+    if (!pmssWriteManagedPathFile($path, $contents, $label, $logger, $owner, $group, $mode, $writeFailure)) {
+        return false;
+    }
+
+    if (($options['successMessage'] ?? '') !== '') {
+        $logger((string) $options['successMessage']);
+    }
+    return true;
+}
+
 /** Build the timestamped backup path, adding a suffix after collisions. */
 function pmssManagedPathBackupCandidate(string $path, string $timestamp, int $attempt): string
 {

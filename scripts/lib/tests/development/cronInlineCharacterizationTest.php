@@ -10,8 +10,8 @@ class CronInlineCharacterizationTest extends TestCase
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPrep.php', [
             '[$scriptTarget, $scriptRaw, 0755, \'Boot tuning script\']',
             '[$serviceTarget, $serviceRaw, 0644, \'Boot tuning service\']',
-            'pmssWriteManagedPathFile($path, $content, $label, $log, null, null, $mode',
-            '$log(\'Installed \'.$label.\' at \'.$path);',
+            'pmssRefreshManagedPathFile($path, $content, $label, $log, [',
+            '\'successMessage\' => \'Installed \'.$label.\' at \'.$path,',
         ], ['$write'.'Target = static function' => 'pmssEnsureBootTuning() should keep its two file writes inline rather than via a local wrapper']);
     }
 
