@@ -89,12 +89,7 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-codex_prepare_agent_exec "$ASSIST_DIR" "$default_agent" agent exec_cmd || exit $?
-
-if [[ "${#exec_extra_args[@]}" -gt 0 ]]; then
-	# Append extra assistant CLI args (shell-escaped) to the exec string.
-	codex_append_exec_extra_args exec_cmd "$agent" "${exec_extra_args[@]}"
-fi
+codex_prepare_agent_exec_command "$ASSIST_DIR" "$default_agent" agent exec_cmd exec_extra_args || exit $?
 
 if [[ "$verbose" == "1" ]]; then
 	echo "[agentic] agent: $agent" >&1

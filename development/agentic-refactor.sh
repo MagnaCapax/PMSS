@@ -107,14 +107,7 @@ if ! [[ "$commits" =~ ^[0-9]+$ ]] || [[ "$commits" -le 0 ]]; then
 	exit 2
 fi
 
-codex_prepare_agent_exec "$ASSIST_DIR" "$default_agent" agent exec_cmd || exit $?
-
-if [[ "${#exec_extra_args[@]}" -gt 0 ]]; then
-	# Append extra assistant CLI args (shell-escaped) to the exec string.
-	# This keeps agent selection stable while allowing per-run tuning like:
-	#   ... -- --approval-mode yolo
-	codex_append_exec_extra_args exec_cmd "$agent" "${exec_extra_args[@]}"
-fi
+codex_prepare_agent_exec_command "$ASSIST_DIR" "$default_agent" agent exec_cmd exec_extra_args || exit $?
 
 # In dry-run mode, avoid running git/phploc/gh/etc. Only show what would run and
 # let codex-run.sh print the final assistant invocation.

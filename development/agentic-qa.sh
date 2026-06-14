@@ -60,7 +60,7 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-codex_prepare_agent_exec "$ASSIST_DIR" "$default_agent" agent exec_cmd || exit $?
+codex_prepare_agent_exec_command "$ASSIST_DIR" "$default_agent" agent exec_cmd || exit $?
 
 echo "[agentic-qa] output directory: $OUTDIR" >&1
 

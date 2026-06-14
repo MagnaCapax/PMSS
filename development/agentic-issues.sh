@@ -89,7 +89,7 @@ if [[ "$force_target" == "1" && -z "$target_issue" ]]; then
 	exit 2
 fi
 
-codex_prepare_agent_exec "$ASSIST_DIR" "$default_agent" agent exec_cmd || exit $?
+codex_prepare_agent_exec_command "$ASSIST_DIR" "$default_agent" agent exec_cmd || exit $?
 
 echo "[agentic-issues] output directory: $OUTDIR" >&1
 

@@ -421,6 +421,16 @@ codex_prepare_agent_exec() {
 	exec_ref="$(codex_resolve_exec_cmd "$assist_dir" "$agent_ref" "$exec_ref")" || return $?
 }
 
+# Resolve an agent command and append optional assistant CLI arguments.
+codex_prepare_agent_exec_command() {
+	local assist_dir="$1" default_agent="$2" agent_name="$3" exec_name="$4" extra_args_name="${5-}"
+	local -n agent_final_ref="$agent_name"
+	codex_prepare_agent_exec "$assist_dir" "$default_agent" "$agent_name" "$exec_name" || return $?
+	[[ -n "$extra_args_name" ]] || return 0
+	local -n extra_args_ref="$extra_args_name"
+	[[ "${#extra_args_ref[@]}" -gt 0 ]] && codex_append_exec_extra_args "$exec_name" "$agent_final_ref" "${extra_args_ref[@]}"
+}
+
 codex_make_temp_workspace() {
 	local prefix="$1"
 	mktemp -d "${TMPDIR:-/tmp}/${prefix}-XXXXXXXX"
