@@ -25,6 +25,12 @@ function pmssUserBillingDigitsFileRead(string $path, bool $requireRootOwner = fa
     return ($raw !== null && (int) $raw > 0) ? $raw : null;
 }
 
+/** Accept only the billing dot-file basenames this helper is meant to probe. */
+function pmssUserBillingFileNameIsSafe(string $fileName): bool
+{
+    return preg_match('/^\.[A-Za-z0-9][A-Za-z0-9._-]*$/D', $fileName) === 1;
+}
+
 /** Read the first positive billing identifier from an ordered file list. */
 function pmssUserBillingDigitsRead(string $home, array $fileNames, bool $requireRootOwner = false): ?string
 {
@@ -34,7 +40,12 @@ function pmssUserBillingDigitsRead(string $home, array $fileNames, bool $require
     }
 
     foreach ($fileNames as $fileName) {
-        $raw = pmssUserBillingDigitsFileRead($home.'/'.ltrim((string) $fileName, '/'), $requireRootOwner);
+        $fileName = (string) $fileName;
+        if (!pmssUserBillingFileNameIsSafe($fileName)) {
+            continue;
+        }
+
+        $raw = pmssUserBillingDigitsFileRead($home.'/'.$fileName, $requireRootOwner);
         if ($raw !== null) {
             return $raw;
         }
