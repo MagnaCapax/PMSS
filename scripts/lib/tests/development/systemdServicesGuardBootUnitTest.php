@@ -44,4 +44,23 @@ class SystemdServicesGuardBootUnitTest extends TestCase
             $this->assertEquals($expected, $this->pmssProfileCommands());
         }
     }
+
+    public function testStopDisableMaskSystemdUnitUsesSharedFailSoftActionPath(): void
+    {
+        $this->pmssResetRuntimeProfile();
+
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function (): void {
+            pmssStopDisableMaskSystemdUnit('demo.service', 'Demo', false);
+        });
+
+        $viaPolicy = $this->pmssProfileCommands();
+        $this->pmssResetRuntimeProfile();
+
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function (): void {
+            pmssSystemdUnitActionIfPresent('demo.service', 'Stopping Demo system service', 'stop', true);
+            pmssSystemdUnitActionIfPresent('demo.service', 'Disabling Demo system service', 'disable', true);
+        });
+
+        $this->assertEquals($this->pmssProfileCommands(), $viaPolicy);
+    }
 }

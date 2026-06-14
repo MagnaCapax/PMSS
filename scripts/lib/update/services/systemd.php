@@ -21,16 +21,12 @@ require_once __DIR__.'/../runtime/processes.php';
  */
 function pmssStopDisableMaskSystemdUnit(string $unit, string $label, bool $mask): void
 {
-    $actions = ['stop' => 'Stopping', 'disable' => 'Disabling'] + ($mask ? ['mask' => 'Masking'] : []);
-    if (($skipReason = pmssSystemdActionSkipReason($unit)) !== '') {
-        foreach ($actions as $prefix) {
-            logmsg('[SKIP] '.$prefix.' '.$label.' system service ('.$skipReason.')');
-        }
-        return;
+    $actions = ['stop' => 'Stopping', 'disable' => 'Disabling'];
+    if ($mask) {
+        $actions['mask'] = 'Masking';
     }
-
     foreach ($actions as $verb => $prefix) {
-        runStep($prefix.' '.$label.' system service', 'systemctl '.$verb.' '.escapeshellarg($unit).' || true');
+        pmssSystemdUnitActionIfPresent($unit, $prefix.' '.$label.' system service', $verb, true);
     }
 }
 

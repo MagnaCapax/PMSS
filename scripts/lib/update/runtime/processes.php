@@ -49,13 +49,14 @@ function pmssSystemdUnitExists(string $unit): bool
 /**
  * Run a systemd unit action only when the unit is available on the host.
  */
-function pmssSystemdUnitActionIfPresent(string $unit, string $description, string $action): void
+function pmssSystemdUnitActionIfPresent(string $unit, string $description, string $action, bool $allowFailure = false): void
 {
     $action = trim($action);
     if (!pmssSystemdUnitActionNameIsSafe($action)) { logmsg("[SKIP] {$description} (invalid systemd action)"); return; }
     if (($skipReason = pmssSystemdActionSkipReason($unit)) !== '') { logmsg("[SKIP] {$description} ({$skipReason})"); return; }
     $target = $action === 'enable' ? pmssSystemdUnitDefaultServiceName($unit) : $unit;
-    runStep($description, 'systemctl '.$action.' '.escapeshellarg($target));
+    $command = 'systemctl '.$action.' '.escapeshellarg($target);
+    runStep($description, $allowFailure ? $command.' || true' : $command);
 }
 
 /**
