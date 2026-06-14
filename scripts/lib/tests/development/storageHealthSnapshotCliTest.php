@@ -1,8 +1,6 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
-
 class StorageHealthSnapshotCliTest extends TestCase
 {
     public function testHelpShowsUsage(): void

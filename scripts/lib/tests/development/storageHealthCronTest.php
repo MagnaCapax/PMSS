@@ -1,8 +1,6 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
-
 class StorageHealthCronTest extends TestCase
 {
     public function testCronAndLogrotatePoliciesCoverStorageHealthSnapshots(): void

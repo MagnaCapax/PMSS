@@ -1,7 +1,6 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/portManager.php';
 
 final class PortManagerNamespaceRootGuardTest extends TestCase

@@ -2,7 +2,6 @@
 namespace PMSS\Tests;
 
 require_once dirname(__DIR__, 2).'/lighttpd/accessLog.php';
-require_once __DIR__.'/../common/TestCase.php';
 
 class LighttpdAccessLogTest extends TestCase
 {
