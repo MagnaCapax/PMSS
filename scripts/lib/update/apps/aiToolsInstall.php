@@ -12,6 +12,30 @@
 
 require_once __DIR__.'/remoteBinary.php';
 
+/** Write the Codex fallback config only when the target is a regular file path. */
+function pmssAiToolsCodexFallbackConfigEnsure(bool $dryRun, ?callable $logger = null): void
+{
+    $log = $logger ?: 'logmsg';
+    $path = '/etc/codex/config.toml';
+
+    if ($dryRun || is_file($path)) {
+        return;
+    }
+    if (is_link($path) || file_exists($path)) {
+        $log('[WARN] Refusing to write Codex fallback config: unsafe target exists.');
+        return;
+    }
+
+    $content = "# PMSS compatibility fallback for kernels without Landlock support.\n"."sandbox = \"danger-full-access\"\n";
+    if (@file_put_contents($path, $content) === false) {
+        $log('[WARN] Unable to write Codex fallback config.');
+        return;
+    }
+    if (!@chmod($path, 0644)) {
+        $log('[WARN] Unable to set Codex fallback config mode.');
+    }
+}
+
 $logger = 'logmsg';
 $force = pmssEnvFlagEnabled('PMSS_FORCE_AI_TOOLS_REFRESH');
 $dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
@@ -120,10 +144,7 @@ if (!is_file($destination) || $force) {
                 // Landlock sandbox requires kernel 5.13+; keep old kernels usable.
                 if (preg_match('/^([0-9]+)\.([0-9]+)/', php_uname('r'), $kernel) && (((int) $kernel[1] < 5) || ((int) $kernel[1] === 5 && (int) $kernel[2] < 13))) {
                     runStep('Ensuring /etc/codex exists', pmssBuildCommand('mkdir', ['-p', '/etc/codex']));
-                    if (!$dryRun && !is_file('/etc/codex/config.toml')) {
-                        @file_put_contents('/etc/codex/config.toml', "# PMSS compatibility fallback for kernels without Landlock support.\n"."sandbox = \"danger-full-access\"\n");
-                        @chmod('/etc/codex/config.toml', 0644);
-                    }
+                    pmssAiToolsCodexFallbackConfigEnsure($dryRun);
                 }
             }
         );
