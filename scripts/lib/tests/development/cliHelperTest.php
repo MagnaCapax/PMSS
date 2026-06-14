@@ -95,4 +95,13 @@ class CliHelperTest extends TestCase
         $this->assertSame(['options' => ['json' => true], 'arguments' => []], \pmssParseCliTokensOrHelp(['script.php', '--json'], ''));
         $this->assertStringContainsString("  --help  Show this help.\n", \pmssCliHelpUsageOptions('script.php', [], 8, [], false));
     }
+
+    public function testCliExitWithStderrPreservesPayloadAndStatus(): void
+    {
+        $script = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-cli-exit-', '.php'), "<?php\nrequire_once ".var_export(dirname(__DIR__, 2).'/cli/optionParser.php', true).";\npmssCliExitWithStderr(\"exact failure\\n\", 7);\n");
+        $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script), [], '2>&1');
+
+        $this->assertSame(7, $result['rc']);
+        $this->assertSame('exact failure', $result['output']);
+    }
 }

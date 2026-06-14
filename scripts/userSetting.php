@@ -11,7 +11,7 @@
  */
 
 require_once __DIR__.'/lib/runtime.php';
-pmssRequireRelativeFiles(__DIR__, ['lib/user/userConfigStore.php', 'lib/user/UserValidator.php', 'lib/userLifecycle.php']);
+pmssRequireRelativeFiles(__DIR__, ['lib/cli/optionParser.php', 'lib/user/userConfigStore.php', 'lib/user/UserValidator.php', 'lib/userLifecycle.php']);
 
 requireRoot();
 
@@ -42,35 +42,30 @@ if ($action === 'list') {
 
 $user = pmssNormalizeUsername(trim((string) ($argv[2] ?? '')));
 if ($user === '' || !UserValidator::isValidUsername($user)) {
-    fwrite(STDERR, "Invalid username\n");
-    exit(1);
+    pmssCliExitWithStderr("Invalid username\n", 1);
 }
 
 if ($action === 'view') {
     $payload = $store->get($user);
     if (!is_array($payload)) {
-        fwrite(STDERR, "User not found\n");
-        exit(1);
+        pmssCliExitWithStderr("User not found\n", 1);
     }
     exit(pmssJsonEmitPayload($payload, 'Failed to encode user settings JSON.', JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 }
 
 $key = $argv[3] ?? '';
 if ($key === '') {
-    fwrite(STDERR, $usage);
-    exit(1);
+    pmssCliExitWithStderr($usage, 1);
 }
 
 $payload = $store->get($user);
 if (!is_array($payload)) {
-    fwrite(STDERR, "User not found\n");
-    exit(1);
+    pmssCliExitWithStderr("User not found\n", 1);
 }
 
 if ($action === 'get') {
     if (!array_key_exists($key, $payload)) {
-        fwrite(STDERR, "Key not found\n");
-        exit(1);
+        pmssCliExitWithStderr("Key not found\n", 1);
     }
     $value = $payload[$key];
     if (is_array($value)) {
@@ -85,8 +80,7 @@ if ($action === 'unset' || $action === 'set') {
     if ($action === 'set') {
         $value = $argv[4] ?? null;
         if ($value === null) {
-            fwrite(STDERR, $usage);
-            exit(1);
+            pmssCliExitWithStderr($usage, 1);
         }
         $payload[$key] = $value;
     } elseif (array_key_exists($key, $payload)) {
@@ -102,12 +96,10 @@ if ($action === 'unset' || $action === 'set') {
         array('key' => $key)
     );
     if (!$saved) {
-        fwrite(STDERR, "Failed to save settings\n");
-        exit(1);
+        pmssCliExitWithStderr("Failed to save settings\n", 1);
     }
     echo "OK\n";
     exit(0);
 }
 
-fwrite(STDERR, $usage);
-exit(1);
+pmssCliExitWithStderr($usage, 1);

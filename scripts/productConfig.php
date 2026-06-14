@@ -25,21 +25,18 @@ requireRoot();
 
 $productKey = trim((string) ($parsed['arguments'][0] ?? ''));
 if ($productKey === '') {
-    fwrite(STDERR, "Error: missing product.\n".$usage);
-    exit(2);
+    pmssCliExitWithStderr("Error: missing product.\n".$usage, 2);
 }
 
 $welcomeMessage = pmssCliOption($parsed, 'welcome-message');
 $welcomeMessage = ($welcomeMessage === true || $welcomeMessage === null) ? null : (string) $welcomeMessage;
 
 if ($welcomeMessage === null) {
-    fwrite(STDERR, "Error: missing --welcome-message option.\n".$usage);
-    exit(2);
+    pmssCliExitWithStderr("Error: missing --welcome-message option.\n".$usage, 2);
 }
 
 if (!pmssWelcomeProductMessageSet($productKey, $welcomeMessage)) {
-    fwrite(STDERR, "Error: failed to update welcome message config.\n");
-    exit(1);
+    pmssCliExitWithStderr("Error: failed to update welcome message config.\n", 1);
 }
 
 echo (trim($welcomeMessage) === '' ? 'Cleared' : 'Updated')." welcome message for product '{$productKey}'.\n";

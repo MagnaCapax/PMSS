@@ -18,19 +18,19 @@
  */
 
 require_once __DIR__.'/lib/runtime.php';
+require_once __DIR__.'/lib/cli/optionParser.php';
 require_once __DIR__.'/lib/userLifecycle.php';
 
 pmssRequireCli();
 
 if ($argc !== 2) {
-    fwrite(STDERR, "Usage: /scripts/userSlice.php USERNAME\n");
-    exit(1);
+    pmssCliExitWithStderr("Usage: /scripts/userSlice.php USERNAME\n", 1);
 }
 
 $user = $argv[1];
 
 $info = pmssUserAccountLookup($user);
-if ($info === null) { fwrite(STDERR, "Unknown user: {$user}\n"); exit(1); }
+if ($info === null) { pmssCliExitWithStderr("Unknown user: {$user}\n", 1); }
 
 $uid = (int) $info['uid'];
 $slice = 'user-' . $uid . '.slice';

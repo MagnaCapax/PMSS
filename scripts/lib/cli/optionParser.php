@@ -98,6 +98,10 @@ function pmssCliRejectMutuallyExclusiveOptions(array $parsed, array $longOptions
     }
     return false;
 }
+
+/** Emit an exact stderr payload and terminate the current CLI process. */
+function pmssCliExitWithStderr(string $message, int $exitCode): void { fwrite(STDERR, $message); exit($exitCode); }
+
 /** Return whether the standard help option was requested. */
 function pmssCliHelpRequested(array $parsed, ?string $short = 'h'): bool
 {
