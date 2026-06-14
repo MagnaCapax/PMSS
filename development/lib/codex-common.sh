@@ -37,12 +37,21 @@ codex_cli_error_exit() {
 	exit 2
 }
 
-# Apply the common agentic launcher root, debug, and ERR-trap setup.
+# Apply the common agentic launcher root, debug, ERR-trap, and defaults setup.
+# shellcheck disable=SC2034
 codex_agentic_bootstrap() {
 	local here="$1" debug_env="$2" prefix="$3" cd_root="${4:-0}"
 	codex_init_root "$here" "$cd_root"
 	codex_enable_debug "$debug_env" "$prefix"
 	codex_set_error_trap "$prefix"
+	ASSIST_DIR="$here/assistants"
+	default_agent="${PMSS_AGENTIC_DEFAULT_AGENT:-codex}"
+}
+
+# Bootstrap from a sourced launcher without repeating path/default setup.
+codex_agentic_bootstrap_self() {
+	HERE="$(cd "$(dirname "${BASH_SOURCE[1]:-$0}")" && pwd)"
+	codex_agentic_bootstrap "$HERE" "$@"
 }
 
 # Millisecond timestamp helper with a portable fallback.

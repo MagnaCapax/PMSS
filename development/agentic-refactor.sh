@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2154
 set -euo pipefail
 set -o errtrace
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
-source "$HERE/lib/codex-common.sh"
-codex_agentic_bootstrap "$HERE" "PMSS_REFACTOR_CODEX_DEBUG" "agentic-refactor"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/codex-common.sh"
+codex_agentic_bootstrap_self "PMSS_REFACTOR_CODEX_DEBUG" "agentic-refactor"
 
 echo "[agentic-refactor] start: assembling refactor context and invoking assistant" >&1
 
@@ -53,8 +53,6 @@ Examples:
 EOF
 }
 
-ASSIST_DIR="$HERE/assistants"
-default_agent="${PMSS_AGENTIC_DEFAULT_AGENT:-codex}"
 OUTDIR="$(codex_make_temp_workspace pmss-refactor-codex)"
 
 CLAIMS_DIR="${PMSS_REFACTOR_CLAIMS_DIR:-/tmp/pmss-refactor-claims}"

@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2154
 set -euo pipefail
 set -o errtrace
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
-source "$HERE/lib/codex-common.sh"
-codex_agentic_bootstrap "$HERE" "PMSS_AGENTIC_DEBUG" "agentic"
-
-ASSIST_DIR="$HERE/assistants"
-default_agent="${PMSS_AGENTIC_DEFAULT_AGENT:-codex}"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/codex-common.sh"
+codex_agentic_bootstrap_self "PMSS_AGENTIC_DEBUG" "agentic"
 
 agent=""
 exec_cmd=""

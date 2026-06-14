@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # DEPRECATED (2026-02-15): Code-level-only QA replaced by full E2E QA.
 # Full E2E QA runs externally. This script is retained for manual/fallback use only.
+# shellcheck disable=SC2154
 set -uo pipefail
 set -o errtrace
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
-source "$HERE/lib/codex-common.sh"
-codex_agentic_bootstrap "$HERE" "PMSS_QA_CODEX_DEBUG" "agentic-qa" 1
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/codex-common.sh"
+codex_agentic_bootstrap_self "PMSS_QA_CODEX_DEBUG" "agentic-qa" 1
 
 echo "[agentic-qa] DEPRECATED: Full E2E QA runs externally. Running code-level fallback." >&2
 echo "[agentic-qa] start: fetching complete-verify issues and invoking assistant" >&1
@@ -35,8 +35,6 @@ Environment:
 EOF
 }
 
-ASSIST_DIR="$HERE/assistants"
-default_agent="${PMSS_AGENTIC_DEFAULT_AGENT:-codex}"
 OUTDIR="$(codex_make_temp_workspace pmss-qa-codex)"
 QA_FILE="$OUTDIR/qa-context.txt"
 

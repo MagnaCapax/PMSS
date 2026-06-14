@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2154
 set -euo pipefail
 set -o errtrace
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
-source "$HERE/lib/codex-common.sh"
-codex_agentic_bootstrap "$HERE" "PMSS_ISSUES_CODEX_DEBUG" "agentic-issues" 1
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/codex-common.sh"
+codex_agentic_bootstrap_self "PMSS_ISSUES_CODEX_DEBUG" "agentic-issues" 1
 
 echo "[agentic-issues] start: fetching open issues and invoking assistant" >&1
 
@@ -37,8 +37,6 @@ Environment:
 EOF
 }
 
-ASSIST_DIR="$HERE/assistants"
-default_agent="${PMSS_AGENTIC_DEFAULT_AGENT:-codex}"
 OUTDIR="$(codex_make_temp_workspace pmss-issues-codex)"
 ISSUES_FILE="$OUTDIR/issues-context.txt"
 

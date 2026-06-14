@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016
+# shellcheck disable=SC2154
 set -euo pipefail
 set -o errtrace
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
-source "$HERE/lib/codex-common.sh"
-codex_agentic_bootstrap "$HERE" "PMSS_CI_CODEX_DEBUG" "codex-ci" 1
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/codex-common.sh"
+codex_agentic_bootstrap_self "PMSS_CI_CODEX_DEBUG" "codex-ci" 1
 
 echo "[codex-ci] start: assembling CI context and invoking Codex" >&1
 
@@ -47,8 +47,6 @@ Examples:
 EOF
 }
 
-ASSIST_DIR="$HERE/assistants"
-default_agent="${PMSS_AGENTIC_DEFAULT_AGENT:-codex}"
 OUTDIR="$(codex_make_temp_workspace pmss-codex-ci)"
 ARTDIR="$OUTDIR/artifacts"
 JOBLOG="$OUTDIR/job.log"
