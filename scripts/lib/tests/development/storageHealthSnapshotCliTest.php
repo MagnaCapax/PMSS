@@ -16,8 +16,7 @@ class StorageHealthSnapshotCliTest extends TestCase
             ['pmss-storage-health-snapshot-', false, false, 'Storage health snapshot written to ', '"kind":"smart"'],
             ['pmss-storage-health-snapshot-', true, false, '', ''],
             ['pmss-storage-health-inline-', false, true, null, '"device":"/dev/pmssfake0"'],
-        ] as $case) {
-            [$prefix, $quiet, $inline, $outputPrefix, $jsonNeedle] = $case;
+        ] as [$prefix, $quiet, $inline, $outputPrefix, $jsonNeedle]) {
             $jsonPath = $this->pmssMakeTempPath($prefix, '.jsonl');
             $arguments = $inline ? ['--json='.$jsonPath] : ['--json', $jsonPath];
             if ($quiet) {

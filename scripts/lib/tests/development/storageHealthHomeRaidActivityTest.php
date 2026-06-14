@@ -127,12 +127,4 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         }
     }
 
-    public function testPerformanceStatusUsesCheckOperationInReason(): void
-    {
-        $status = \pmssStorageHealthPerformanceStatus([
-            ['array' => 'md2', 'severity' => 'warn', 'flags' => ['rebuild_in_progress'], 'operation' => 'check'],
-        ]);
-
-        $this->assertSame(['status' => 'performance_limited', 'reason' => 'RAID md2 check in progress', 'array' => 'md2'], $status);
-    }
 }

@@ -76,8 +76,7 @@ class StorageHealthSmartctlParsingTest extends TestCase
             ["SMART Health Status: FAILED\n", 'sdd'],
             ["SMART Health Status: OK FAIL\n", 'sdy'],
         ] as [$out, $device]) {
-            $entry = $this->smartctlEntry($out, $device);
-            $this->assertSeverityFlags($entry, 'fail', ['health_not_ok']);
+            $this->assertSeverityFlags($this->smartctlEntry($out, $device), 'fail', ['health_not_ok']);
         }
     }
 

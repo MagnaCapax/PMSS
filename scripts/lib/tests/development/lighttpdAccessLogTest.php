@@ -83,17 +83,14 @@ class LighttpdAccessLogTest extends TestCase
         $this->pmssAssertArraySubsetSame(['status' => 'skip', 'reason' => 'unsafe_target'], $result);
     }
 
-    public function testRootCronSchedulesHourlyAccessLogTrim(): void
+    public function testCronWiringSchedulesAndUsesSharedTrimHelper(): void
     {
         $this->pmssAssertRepoFileContainsString(
             'etc/seedbox/config/root.cron',
             '17 * * * *   root    /scripts/cron/lighttpdAccessLogTrim.php >> /var/log/pmss/lighttpdAccessLogTrim.log 2>&1',
             'root.cron should schedule lighttpd access log trimming hourly'
         );
-    }
 
-    public function testCronScriptUsesSharedTrimHelper(): void
-    {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/lighttpdAccessLogTrim.php', [
             "require_once __DIR__.'/../lib/lighttpd/accessLog.php';",
             'pmssLighttpdAccessLogTrimFile($logPath, $thresholdBytes);',
