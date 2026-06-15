@@ -196,16 +196,18 @@ $managedApps = pmssCustomerManagedAppDefinitions();
             }
         }
 
-        function pmssRunAction(button, url, successMessage, shouldReload, pendingMessage) {
+        function pmssRunAction(button, url, successMessage, shouldReload, pendingMessage, passwordFieldName, passwordValue) {
             pmssSetActionLoading(button, true);
 
             if (pendingMessage) {
                 pmssShowActionNotice(pendingMessage, false);
             }
 
-            $.ajax({
+            var request = {
                 url: url,
                 cache: false,
+                data: null,
+                type: 'GET',
                 success: function() {
                     pmssSetActionLoading(button, false);
 
@@ -219,11 +221,25 @@ $managedApps = pmssCustomerManagedAppDefinitions();
                         }, 900);
                     }
                 },
-                error: function() {
+                error: function(xhr) {
                     pmssSetActionLoading(button, false);
+                    var retryPasswordField = passwordFieldName || (url.indexOf('qbittorrent.php') === 0 ? 'qbittorrentPassword' : '');
+                    if (xhr.status === 428 && retryPasswordField) {
+                        var password = window.prompt('Enter your account password to sync qBittorrent WebUI login.');
+                        if (password !== null) {
+                            pmssRunAction(button, url, successMessage, shouldReload, pendingMessage, retryPasswordField, password);
+                        }
+                        return;
+                    }
                     pmssShowActionNotice('Action failed. Please try again in a moment.', true);
                 }
-            });
+            };
+            if (passwordFieldName && passwordValue !== undefined) {
+                request.type = 'POST';
+                request.data = {};
+                request.data[passwordFieldName] = passwordValue;
+            }
+            $.ajax(request);
         }
 
         function pmssMediaStackPollSchedule(delay) {

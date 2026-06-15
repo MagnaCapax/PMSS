@@ -49,4 +49,34 @@ class addUserQbittorrentPasswordSyncTest extends TestCase
         $this->pmssAssertRepoFileNotContainsString('etc/skel/www/welcome.php', $legacyPassword, 'welcome page must not advertise the legacy qBittorrent password');
         $this->pmssAssertRepoFileContainsString('etc/skel/www/welcome.php', 'password matches your account password');
     }
+
+    public function testQbittorrentFrontendRequestsPasswordOnlyWhenHashIsMissing(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/www/qbittorrent.php', [
+            "\$action = pmssFrontendActionRequest();",
+            'pmssQbittorrentFrontendPasswordSync($action);',
+            'pmssFrontendToggleAction(',
+            "isset(\$_POST['qbittorrentPassword'])",
+            "http_response_code(428);",
+            "'WebUI\\\\Password_PBKDF2'",
+            'hash_pbkdf2(',
+        ]);
+        $this->pmssAssertRepoFileNotContainsString(
+            'etc/skel/www/qbittorrent.php',
+            "require_once '/scripts/",
+            'customer qBittorrent endpoint must stay self-contained in the customer tree'
+        );
+    }
+
+    public function testWelcomeRetriesQbittorrentStartWithPasswordPost(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/www/welcome.php', [
+            'function pmssRunAction(button, url, successMessage, shouldReload, pendingMessage, passwordFieldName, passwordValue)',
+            "url.indexOf('qbittorrent.php') === 0 ? 'qbittorrentPassword' : ''",
+            'if (xhr.status === 428 && retryPasswordField)',
+            "window.prompt('Enter your account password to sync qBittorrent WebUI login.')",
+            "request.type = 'POST';",
+            'request.data[passwordFieldName] = passwordValue;',
+        ]);
+    }
 }
