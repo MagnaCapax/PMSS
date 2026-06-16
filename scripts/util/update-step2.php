@@ -384,6 +384,14 @@ pmssRunProfiledStep('Cleaning mediaarea bootstrap package state', static functio
 });
 pmssRunProfiledCallable('Pruning legacy MediaArea repository entries', 'pmssPruneLegacyMediaArea');
 
+// Pin libssl3/openssl + OpenSSH to the PECL-ssh2-compatible set BEFORE the package
+// phase below. The declarative Pin-Priority 1001 makes apt's resolver DOWNGRADE
+// (never REMOVE) OpenSSH, so the early fix-broken / dpkg-selection steps cannot
+// resolve the held-libssl3-3.0.17-vs-newer-openssh conflict by removing OpenSSH.
+// Cascade-prevention at source; the imperative convergence batch below remains as
+// recovery for already-damaged hosts. Debian 12 only. Refs #436/#585.
+pmssRunProfiledCallable('Writing libssl3/openssh APT pin (Debian 12 cascade-prevention)', 'pmssWriteLibssl3OpensshAptPin', [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null]);
+
 // --- PACKAGE PHASE: DO NOT REORDER ---------------------------------------------------------
 // Early dpkg recovery lets wedged hosts converge before PHP or apt-adjacent
 // probes run. The invariant order is fix-broken -> repository refresh -> dpkg
