@@ -12,6 +12,24 @@ function pmssUserRootlessDockerConfigTargetIsSafe(string $configFile): bool
         && (!file_exists($configFile) || is_file($configFile));
 }
 
+/**
+ * Commands that establish a persistent user runtime dir (/run/user/UID) by enabling
+ * linger, so rootless dockerd can bind its API socket there. Pure builder for test coverage.
+ *
+ * Rootless Docker binds its socket in XDG_RUNTIME_DIR=/run/user/UID, which logind only
+ * creates for a logged-in OR lingering user. Accounts whose linger wiring did not complete
+ * at provisioning have no runtime dir; the 5-minute checkRootlessDocker watchdog then retries
+ * dockerd-rootless.sh forever against a missing dir. Enabling linger makes logind create the
+ * persistent dir; starting user@UID brings the user manager up immediately.
+ */
+function pmssUserDockerLingerEnsureCommands(string $user, int $uid): array
+{
+    return [
+        sprintf('loginctl enable-linger %s', escapeshellarg($user)),
+        sprintf('systemctl start user@%d.service', $uid),
+    ];
+}
+
 /** Atomically write daemon.json without following unsafe existing targets. */
 function pmssUserRootlessDockerConfigWrite(string $configFile, string $json, int $uid, int $gid, ?string &$reason = null): bool
 {

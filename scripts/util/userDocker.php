@@ -370,6 +370,31 @@ if ($action === 'start' || $action === 'restart') {
         exit(0);
     }
 
+    // Rootless dockerd binds its socket in /run/user/UID, which logind only creates for a
+    // logged-in or LINGERING user. Accounts whose linger wiring did not complete at
+    // provisioning land here with no runtime dir, and the 5-min checkRootlessDocker watchdog
+    // would otherwise retry forever (it only calls this start path, never enabling linger).
+    // Enable linger (root) so logind creates the persistent runtime dir before we start.
+    if (!is_dir($runtimeDir)) {
+        if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
+            pmssUserLog($user, sprintf('userDocker: %s missing and not running as root; cannot enable linger before start', $runtimeDir));
+        } else {
+            pmssUserLog($user, sprintf('userDocker: %s missing; enabling linger so logind creates the runtime dir', $runtimeDir));
+            $userDockerLingerLog = static function (string $message) use ($user): void {
+                pmssUserLog($user, $message);
+            };
+            foreach (pmssUserDockerLingerEnsureCommands($user, $uid) as $lingerCmd) {
+                runCommand($lingerCmd, false, $userDockerLingerLog);
+            }
+            for ($waitTick = 0; $waitTick < 15 && !is_dir($runtimeDir); $waitTick++) {
+                usleep(200000);
+            }
+            pmssUserLog($user, is_dir($runtimeDir)
+                ? sprintf('userDocker: linger enabled; %s now present', $runtimeDir)
+                : sprintf('userDocker: %s still absent after enabling linger; start may fail', $runtimeDir));
+        }
+    }
+
     // Default to non-systemd rootless mode for robustness; check running
     // processes before attempting to start a new daemon.
     $startCheckOk = true;
