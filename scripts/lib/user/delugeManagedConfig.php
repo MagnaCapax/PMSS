@@ -1,6 +1,6 @@
 <?php
 /**
- * Deluge managed core.conf helpers.
+ * Deluge managed configuration helpers.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -15,6 +15,37 @@ require_once __DIR__.'/integerSetting.php';
 function pmssDelugeConfigPath(string $username): string
 {
     return pmssUserHomeFilePath($username, '.config/deluge/core.conf');
+}
+
+/**
+ * Resolve the canonical Deluge auth path for a user.
+ */
+function pmssDelugeManagedAuthPath(string $username): string
+{
+    return dirname(pmssDelugeConfigPath($username)).'/auth';
+}
+
+/**
+ * Resolve the canonical Deluge hostlist.conf path for a user.
+ */
+function pmssDelugeHostlistPath(string $username): string
+{
+    return dirname(pmssDelugeConfigPath($username)).'/hostlist.conf';
+}
+
+/**
+ * Read the daemon localclient password from a Deluge auth file.
+ */
+function pmssDelugeManagedAuthLocalclientPasswordRead(string $authPath): string
+{
+    $content = pmssReadRegularFileContents($authPath);
+    if ($content === null || $content === '') {
+        return '';
+    }
+
+    return preg_match('/^localclient:([^:\r\n]+):[0-9]+$/m', $content, $matches) === 1
+        ? $matches[1]
+        : '';
 }
 
 /**
@@ -148,11 +179,84 @@ function pmssDelugeConfigMutate(string $username, callable $mutator, ?string $co
 }
 
 /**
+ * Return true for the hostlist entry Deluge Web UI uses for the local daemon.
+ *
+ * @param mixed $host
+ * @param mixed $login
+ */
+function pmssDelugeHostlistEntryIsLocalclient($host, $login): bool
+{
+    return is_string($host)
+        && is_string($login)
+        && $login === 'localclient'
+        && in_array($host, ['127.0.0.1', 'localhost'], true);
+}
+
+/**
+ * Synchronize hostlist.conf with the current daemon localclient password.
+ */
+function pmssDelugeHostlistSyncLocalclientPassword(string $username, ?string $hostlistFile = null, ?string $authFile = null): bool
+{
+    $authFile = $authFile ?? pmssDelugeManagedAuthPath($username);
+    $localclientPassword = pmssDelugeManagedAuthLocalclientPasswordRead($authFile);
+    if ($localclientPassword === '') {
+        return false;
+    }
+
+    $hostlistFile = $hostlistFile ?? pmssDelugeHostlistPath($username);
+    $raw = pmssReadRegularFileContents($hostlistFile);
+    $parsed = $raw !== null ? pmssDelugeConfigDecode($raw) : null;
+    if (!is_array($parsed) || !is_array($parsed['config']['hosts'] ?? null)) {
+        return false;
+    }
+
+    $config = $parsed['config'];
+    $changed = false;
+    foreach ($config['hosts'] as $index => $entry) {
+        if (!is_array($entry) || count($entry) < 5 || !pmssDelugeHostlistEntryIsLocalclient($entry[1] ?? null, $entry[3] ?? null)) {
+            continue;
+        }
+
+        if (($entry[4] ?? null) === $localclientPassword) {
+            continue;
+        }
+
+        $entry[4] = $localclientPassword;
+        $config['hosts'][$index] = $entry;
+        $changed = true;
+    }
+
+    if (!$changed) {
+        return false;
+    }
+
+    $updatedRaw = pmssDelugeConfigEncode($parsed['meta'], $config);
+    return is_string($updatedRaw)
+        && $updatedRaw !== $raw
+        && pmssReplaceUserFilePreservingMetadata($hostlistFile, $updatedRaw, 0644);
+}
+
+/**
+ * Restart Deluge Web UI after hostlist.conf changes so it reloads daemon auth.
+ */
+function pmssDelugeRestartWebIfEnabled(string $username): void
+{
+    if (!is_file(pmssUserHomeFilePath($username, '.delugeEnable'))) {
+        return;
+    }
+
+    runStep('Restarting Deluge Web UI (hostlist auth changed)', sprintf(
+        'killall -u %s -TERM deluge-web 2>/dev/null || true',
+        escapeshellarg($username)
+    ));
+}
+
+/**
  * Refresh the PMSS-managed subset of a user's Deluge core.conf.
  */
 function pmssDelugeApplyManagedConfig(string $username, ?string $configFile = null): bool
 {
-    return pmssDelugeConfigMutate(
+    $coreChanged = pmssDelugeConfigMutate(
         $username,
         static function (array $config): array {
             foreach (pmssDelugeManagedConfigEntries() as $key => $value) {
@@ -163,4 +267,10 @@ function pmssDelugeApplyManagedConfig(string $username, ?string $configFile = nu
         },
         $configFile
     );
+    $hostlistChanged = pmssDelugeHostlistSyncLocalclientPassword($username);
+    if ($hostlistChanged) {
+        pmssDelugeRestartWebIfEnabled($username);
+    }
+
+    return $coreChanged || $hostlistChanged;
 }
