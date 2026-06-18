@@ -257,7 +257,7 @@ function pmssShowTrafficPrintSummary(bool $extended, bool $showMissing, array $m
     echo $line."\n";
 }
 
-/** @return array{month:float,week:float,day:float,hour:float,15min:float}|null */
+/** @return array{month:float,week:float,day:float,hour:float,'15min':float}|null */
 function pmssShowTrafficRawCounters(array $payload): ?array
 {
     if (!isset($payload['raw']) || !is_array($payload['raw']) || empty($payload['raw']['month'])) {

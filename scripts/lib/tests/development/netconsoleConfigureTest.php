@@ -103,6 +103,9 @@ class NetconsoleConfigureTest extends TestCase
 
         $this->assertEquals(2, count($calls));
         $this->assertEquals('Priming netconsole target neighbor cache', $calls[0][0]);
+        if (!isset($calls[1])) {
+            $this->fail('Expected reachability verification call.');
+        }
         $this->assertEquals('Verifying netconsole target reachability', $calls[1][0]);
     }
 

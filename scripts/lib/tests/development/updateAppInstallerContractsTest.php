@@ -133,7 +133,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                     "pmssBuildCommand('wget'",
                     "pmssBuildCommand('install'",
                     "pmssBuildCommand('mv'",
-                    'pmssPrivateTempDirRealpath',
+                    'pmssRemovePrivateTempDir',
                 ],
                 'forbidden' => ['passthru(' => 'rclone.php should route shelling through runStep()'],
             ],

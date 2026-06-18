@@ -111,19 +111,6 @@ CONF;
 }
 
 /**
-     * Remove a PMSS-owned temporary directory after verifying its scope.
-     */
-    function pmssRemovePrivateTempDir(string $path, string $prefix, string $description): int
-    {
-        $real = pmssPrivateTempDirRealpath($path, $prefix);
-        if ($real === null) {
-            return 1;
-        }
-
-        return runStep($description, 'rm -rf '.escapeshellarg($real));
-}
-
-/**
      * Apply the baseline dpkg selection snapshot so required packages stay present.
      *
      * @return bool True when the baseline was parsed and applied successfully.

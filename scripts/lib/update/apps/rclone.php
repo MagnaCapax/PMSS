@@ -68,10 +68,7 @@ function pmssRcloneInstallFromZip(string $version): void
     try {
         runStep('Installing rclone '.$version, pmssRcloneInstallCommand($version, $workDir));
     } finally {
-        $real = pmssPrivateTempDirRealpath($workDir, 'pmss-rclone-', 'logmsg');
-        if ($real !== null) {
-            runStep('Cleaning rclone installer workspace', 'rm -rf '.escapeshellarg($real));
-        }
+        pmssRemovePrivateTempDir($workDir, 'pmss-rclone-', 'Cleaning rclone installer workspace', 'logmsg');
     }
 }
 

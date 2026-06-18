@@ -59,6 +59,21 @@ function pmssPrivateTempDirRealpath(string $path, string $prefix, ?callable $log
     return $real;
 }
 
+/** Remove a PMSS-owned private temporary directory after validating its scope. */
+function pmssRemovePrivateTempDir(string $path, string $prefix, string $description, ?callable $logger = null, ?callable $runner = null): int
+{
+    $real = pmssPrivateTempDirRealpath($path, $prefix, $logger);
+    if ($real === null) return 1;
+    $command = 'rm -rf '.escapeshellarg($real);
+    if ($runner !== null) return (int) $runner($description, $command);
+    if (!function_exists('runStep')) {
+        $log = $logger ?: 'logMessage';
+        $log('[WARN] Unable to remove private temporary directory; runStep unavailable');
+        return 1;
+    }
+    return runStep($description, $command);
+}
+
 // NUL bytes make PHP filesystem calls version-dependent; reject them at the
 // runtime boundary and keep callers on the existing fail-soft path.
 function pmssFilesystemPathHasNulByte(string $path): bool { return strpos($path, "\0") !== false; }

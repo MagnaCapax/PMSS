@@ -239,6 +239,9 @@ class CgroupUserConfigTest extends TestCase
         $this->assertEquals(2, count($steps));
         $this->assertStringContainsString('systemctl', $steps[0][1]);
         $this->assertStringNotContainsString('|| true', $steps[0][1]);
+        if (!isset($steps[1])) {
+            $this->fail('Expected unlimit step after revert failure.');
+        }
         $this->assertSame('Unlimiting core properties', $steps[1][0]);
     }
 
