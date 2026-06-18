@@ -1166,9 +1166,9 @@ nzbdrone	install
 ocl-icd-libopencl1:amd64	install
 opensc	install
 opensc-pkcs11:amd64	install
-openssh-client	install
-openssh-server	install
-openssh-sftp-server	install
+openssh-client	hold
+openssh-server	hold
+openssh-sftp-server	hold
 # held to preserve PECL/ssh2 1.10.0 compat per #436.
 # Do not flip back without addressing the libssh2/PECL upgrade on the upstream client tooling first.
 openssl	hold
