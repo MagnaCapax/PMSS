@@ -384,6 +384,14 @@ pmssRunProfiledStep('Cleaning mediaarea bootstrap package state', static functio
 });
 pmssRunProfiledCallable('Pruning legacy MediaArea repository entries', 'pmssPruneLegacyMediaArea');
 
+// Remove the legacy bespoke libssl3/openssh APT pin (commit fee5cc71, reverted in
+// 2ac6386d). The openssh trio is now held in the dpkg selection baseline, which is
+// the canonical control point; the standalone preferences file is superseded cruft.
+// Idempotent (rm -f no-ops when absent); self-heals hosts that ran update.php during
+// the fee5cc71 window. Refs #436/#585.
+runStep('Removing legacy bespoke libssl3/openssh APT pin (superseded by dpkg selection hold)',
+    'rm -f /etc/apt/preferences.d/pmss-libssl3-openssh.pref');
+
 // --- PACKAGE PHASE: DO NOT REORDER ---------------------------------------------------------
 // Early dpkg recovery lets wedged hosts converge before PHP or apt-adjacent
 // probes run. The invariant order is fix-broken -> repository refresh -> dpkg
