@@ -160,6 +160,9 @@ function pmssArrReleaseAssetSelect(array $releases, string $assetPattern, string
             if ($url === '') { continue; }
             $candidate = [$match[1], $url, $name];
             $nameLower = strtolower($name);
+            if (strpos($nameLower, 'musl') !== false) {
+                continue; // skip musl builds: dynamic loader /lib/ld-musl-* is absent on glibc Debian -> non-executable (#489, libc filter missing post-#447)
+            }
             if (preg_match($targetArchitecturePattern, $nameLower) === 1) {
                 return $candidate;
             }
@@ -214,8 +217,8 @@ function pmssArrReleaseActivate(array $config, string $app, string $downloadUrl,
         ['Failed to remove existing installation; keeping existing installation', 'rm -rf '.escapeshellarg($installPath), '', ''],
         ['Failed to activate extracted release', sprintf('mv %s %s', escapeshellarg($extractPath), escapeshellarg($installPath)), $installPath, 'is_dir'],
     ] : [] as $step) { if ($step[1] !== '' && runCommand($step[1]) !== 0) { $message = $step[0]; $ok = false; break; } if ($step[2] !== '' && !$step[3]($step[2])) { $message = $step[0]; $ok = false; break; } }
-    if ($message !== '') { $log($message); } $real = pmssPrivateTempDirRealpath($workDir, $workPrefix);
-    if ($real !== null) { runCommand('rm -rf '.escapeshellarg($real)); } return $ok;
+    if ($message !== '') { $log($message); }
+    pmssRemovePrivateTempDir($workDir, $workPrefix, 'Cleaning '.$app.' updater workspace', $log, static function (string $description, string $command): int { return runCommand($command); }); return $ok;
 }
 
 function pmssArrUpdate(array $config): void
