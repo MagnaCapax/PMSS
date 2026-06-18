@@ -43,6 +43,14 @@ class UserTransferGuardTest extends TestCase
         );
     }
 
+    public function testUserTransferPermissionNormalisationUsesScriptsUtilPath(): void
+    {
+        foreach (['scripts/lib/userTransfer.php', 'scripts/lib/userTransfer/postSetup.php'] as $path) {
+            $this->pmssAssertRepoFileContainsString($path, "'/util/userPermissions.php'", 'userTransfer permission normalisation should target /scripts/util: ');
+            $this->pmssAssertRepoFileNotContainsString($path, "'/../util/userPermissions.php'", 'userTransfer permission normalisation must not resolve to /util: ');
+        }
+    }
+
     public function testUserTransferLibraryLoadsSharedHelpersThroughTopLevelInclude(): void
     {
         require_once __DIR__.'/../../userTransfer.php';

@@ -33,7 +33,7 @@ function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths
 
     runStep(
         'Normalising user permissions',
-        pmssBuildCommand('php', [dirname(__DIR__, 2).'/../util/userPermissions.php', $localUser])
+        pmssBuildCommand('php', [dirname(__DIR__, 2).'/util/userPermissions.php', $localUser])
     );
     pmssUserTransferRequestRtorrentRestart($home, $localUser);
 

@@ -65,7 +65,7 @@ function pmssUserTransferMain(array $argv): int
             runStep('Validating remote SSH authentication', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['authProbe']]));
             pmssUserTransferRunPasses('Pulling home data', $scratchPaths['expect'], $scratchPaths['mainScript'], 1, 0, 0);
             pmssUserTransferRunPasses('Pulling volatile data', $scratchPaths['expect'], $scratchPaths['finalScript'], 1, 0, 0);
-            runStep('Normalising user permissions', pmssBuildCommand('php', [dirname(__DIR__).'/../util/userPermissions.php', $cfg['localUser']]));
+            runStep('Normalising user permissions', pmssBuildCommand('php', [dirname(__DIR__).'/util/userPermissions.php', $cfg['localUser']]));
             logMessage('[SKIP] Dry run complete');
             return 0;
         }
