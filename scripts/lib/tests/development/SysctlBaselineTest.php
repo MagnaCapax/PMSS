@@ -25,10 +25,22 @@ class SysctlBaselineTest extends TestCase
         $this->pmssAssertFileContainsAllStrings($target, [
             '# Pulsed Media Config', 'vm.swappiness = 100', 'vm.vfs_cache_pressure = 2', 'vm.min_free_kbytes = 2621440',
             'net.core.rmem_max = 67108864', 'net.core.default_qdisc = fq', 'net.ipv4.tcp_congestion_control = bbr',
+            'net.ipv4.ip_local_reserved_ports = 2000-38000',
             'net.netfilter.nf_conntrack_max = 524288', 'kernel.kptr_restrict = 1', 'kernel.yama.ptrace_scope = 2',
             'fs.protected_regular = 2',
         ], 'expected sysctl file to be written');
         $this->pmssAssertRepoFileContainsString('scripts/lib/update/systemPrep/sysctlTuning.php', "/etc/sysctl.d/99-pmss.conf");
+    }
+
+    public function testNetworkSettingsReservePortManagerBand(): void
+    {
+        $settings = \pmssSysctlNetworkSettingsBuild(['nic_speed_gbps' => 1]);
+
+        $this->assertSame(
+            \PMSS_PORT_MANAGER_MIN_PORT.'-'.\PMSS_PORT_MANAGER_MAX_PORT,
+            $settings['net.ipv4.ip_local_reserved_ports'],
+            'expected kernel ephemeral source ports to avoid the managed service-port band'
+        );
     }
 
     public function testWritesBbrModulesLoadFile(): void
@@ -149,10 +161,10 @@ class SysctlBaselineTest extends TestCase
         $procSysRoot = $this->pmssMakeTempDir('pmss-sysctl-proc-', 0700);
         $this->pmssTrackEnvOverrides(['PMSS_SYSCTL_PROC_SYS_PATH' => $procSysRoot]);
         $cases = [
-            'no_swap' => [['ram_gb' => 64, 'has_swap' => false, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], 'f17ce9f43100072f8679109d605b3cc1c01914da07c2fdb62a6af83502c2699d'],
-            'vm' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => true, 'nic_speed_gbps' => 1], '0dcb0cf026bf5548df788c2ff2afa42b4625a5c35020919bb2dcb8ce42593c95'],
-            'fast_swap_10g_conntrack' => [['ram_gb' => 256, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => false, 'nic_speed_gbps' => 10, 'has_conntrack' => true], '9f472ab7b28e0bafb66f0e0264698e6521d1cd6a54721e79fa14fabee5079d49'],
-            'slow_swap' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '8bbb1aaa16004a899de6a90f55657493e47496151b6ffe36b1a0d5d9934efc92'],
+            'no_swap' => [['ram_gb' => 64, 'has_swap' => false, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '68c03c71f756713da409528b510a143926626c71f82268f2bdcd182354551d8f'],
+            'vm' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => true, 'nic_speed_gbps' => 1], 'a387e515b36ef9c3cbc79dcbedce499f71e2f615303a47f359a70b774b0cee67'],
+            'fast_swap_10g_conntrack' => [['ram_gb' => 256, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => false, 'nic_speed_gbps' => 10, 'has_conntrack' => true], '402571fbb9ae5d029df3984910e3b78cecc76d6363f445370c9603703b712a8c'],
+            'slow_swap' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], 'e2e283040d7da3b9520f169a53b8694677c78121ee54d30d0ba51dec653f8f78'],
         ];
 
         foreach ($cases as $label => [$profile, $expectedHash]) {

@@ -199,6 +199,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 - pmssEnsureLegacySysctlBaseline(?callable $logger=null, ?string $targetOverride=null, bool $reload=true, ?string $modulesLoadOverride=null): void
   - Writes `/etc/sysctl.d/99-pmss.conf` (override path) with the PMSS-owned hardware-aware baseline.
+  - Reserves the PMSS port-manager service band from kernel ephemeral source-port selection via `net.ipv4.ip_local_reserved_ports`.
   - Ensures `/etc/modules-load.d/pmss-bbr.conf` contains `tcp_bbr` (override path).
   - Respects operator-owned keys from `/etc/sysctl.d/90-pmss-overrides.conf` and records the applied profile under the `sysctl` section in `/etc/seedbox/config/hardware.json`.
   - When `$reload=true`, runs `sysctl --system` to apply the baseline.

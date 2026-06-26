@@ -6,6 +6,7 @@
  */
 
 require_once dirname(__DIR__, 2).'/network/interface.php';
+require_once dirname(__DIR__, 2).'/portManager.php';
 
 /** Read a boolean-like environment override when present. */
 function pmssSystemPrepReadBoolEnv(string $key): ?bool
@@ -274,6 +275,12 @@ function pmssSysctlMemorySettingsBuild(array $profile): array
     return $settings + ['vm.dirty_expire_centisecs' => '1500', 'vm.dirty_writeback_centisecs' => '500'];
 }
 
+/** Return the managed service-port band reserved from kernel ephemeral picks. */
+function pmssSysctlReservedServicePortRange(): string
+{
+    return PMSS_PORT_MANAGER_MIN_PORT.'-'.PMSS_PORT_MANAGER_MAX_PORT;
+}
+
 /** Build network sysctl settings for the detected host profile. */
 function pmssSysctlNetworkSettingsBuild(array $profile): array
 {
@@ -301,6 +308,7 @@ function pmssSysctlNetworkSettingsBuild(array $profile): array
         'net.ipv4.tcp_max_tw_buckets' => '1440000',
         'net.ipv4.tcp_tw_reuse' => '1',
         'net.ipv4.ip_local_port_range' => '1024 65535',
+        'net.ipv4.ip_local_reserved_ports' => pmssSysctlReservedServicePortRange(),
         'net.ipv4.tcp_mem' => '3086631 4115510 6173262',
         'net.ipv4.ip_forward' => '1',
     ];
