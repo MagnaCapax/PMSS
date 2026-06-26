@@ -1,4 +1,7 @@
-# ADR 0023 — PMSS must NOT manage /etc/resolv.conf (portability boundary)
+# ADR 0023: PMSS must not manage /etc/resolv.conf
+
+Date: 2026-06-26
+Category: architecture
 
 ## Status
 Accepted (2026-06-26). Supersedes and rejects the reverted "converge resolv.conf onto PM resolvers"
