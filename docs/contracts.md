@@ -273,9 +273,11 @@ Sub-handlers:
   - A final nginx config refresh and restart still runs later in `scripts/util/update-step2.php` after app installers finish.
 
 - pmssApplyRuntimeTemplates(): void
-  - Installs `rc.local`, systemd `system.conf`, and `sshd_config` from templates;
-    converges `AuthorizedKeysFile` if the template leaves it commented; sets
-    perms and ownership; reexecs systemd and restarts sshd; runs rc.local.
+  - Installs `rc.local`, systemd `system.conf`, `sshd_config`, and the
+    `ssh.service` starvation-resistance drop-in from templates; converges
+    `AuthorizedKeysFile` if the template leaves it commented; sets perms and
+    ownership; reexecs/reloads systemd as needed and restarts sshd; runs
+    rc.local.
 
 - pmssApplyJournaldLimits(?callable $logger=null): void
   - Renders `/etc/systemd/journald.conf.d/pmss-limits.conf` from template;

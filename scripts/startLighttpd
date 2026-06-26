@@ -27,6 +27,7 @@ if ($argc != 2) die("Usage: startLighttpd USERNAME\n");
 // same as startRtorrent (ADR 0005) — '../etc' style values would otherwise
 // pass the file_exists() checks below and unlink/chdir outside /home.
 require_once __DIR__.'/lib/userLifecycle.php';
+require_once __DIR__.'/lib/user/serviceLaunch.php';
 $user = pmssUsernameNormalizeIfValid((string) $argv[1]);
 if ($user === null) die("Invalid username\n");
 $homeDir = '/home/'.$user;
@@ -65,7 +66,12 @@ if (!@chdir($homeDir)) {
     fwrite(STDERR, "Unable to enter user home\n");
     exit(1);
 }
-$startCommand = '/usr/sbin/lighttpd -f '.escapeshellarg($configPath);
-passthru('su '.escapeshellarg($user).' -c '.escapeshellarg($startCommand));
+$startCommand = 'cd '.escapeshellarg($homeDir).' && /usr/sbin/lighttpd -f '.escapeshellarg($configPath);
+$startRc = 0;
+passthru(pmssBuildUserServiceShellCommand($user, $startCommand), $startRc);
+if ($startRc !== 0) {
+    fwrite(STDERR, "Unable to start lighttpd inside user slice\n");
+    exit(1);
+}
 
 passthru('ps aux | grep '.escapeshellarg($user)); // Output running processes

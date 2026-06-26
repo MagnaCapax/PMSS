@@ -15,6 +15,7 @@ $userLogLib = __DIR__.'/lib/user/log.php';
 if (is_file($userLogLib)) {
     require_once $userLogLib;
 }
+require_once __DIR__.'/lib/user/serviceLaunch.php';
 require_once __DIR__.'/lib/rtorrent/process.php';
 
 if ($argc !== 2) {
@@ -55,14 +56,14 @@ function pmssStartRtorrentLaunch(string $user, string $home, string $executor): 
                 }
             }
         }
-        $cmd = 'su - '.escapeshellarg($user).' -c '.escapeshellarg('screen -S rtorrent -fa -d -m rtorrent');
+        $cmd = pmssBuildUserServiceShellCommand($user, 'screen -S rtorrent -fa -d -m rtorrent', true);
         passthru($cmd);
         return;
     }
 
     // Newer versions use .rtorrentExecute.php wrapper.
     logmsg("Starting rTorrent for {$user} via .rtorrentExecute.php");
-    $cmd = 'su - '.escapeshellarg($user).' -c '.escapeshellarg('screen -S rtorrent -fa -d -m ./.rtorrentExecute.php');
+    $cmd = pmssBuildUserServiceShellCommand($user, 'screen -S rtorrent -fa -d -m ./.rtorrentExecute.php', true);
     passthru($cmd);
 }
 

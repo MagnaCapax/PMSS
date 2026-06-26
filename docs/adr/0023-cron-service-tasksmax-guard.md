@@ -4,7 +4,7 @@ Date: 2026-06-03
 Category: architecture
 
 ## Status
-Accepted
+Accepted, amended 2026-06-26
 
 ## Context
 PMSS applies per-user process limits through `user-UID.slice` drop-ins, but
@@ -12,6 +12,14 @@ Debian cron starts user crontab jobs inside `cron.service` under `system.slice`.
 Those jobs therefore do not inherit the per-user `TasksMax` limit. A runaway
 user crontab can consume host-wide pid capacity even when the user's interactive
 slice is capped.
+
+The 2026-06-03 cron.service cap did not contain PMSS per-user services started
+by root cron through `su - <user> -c ...`. Once cron launched `su`, descendants
+such as `screen`, `rtorrent`, `lighttpd`, and `php-cgi` could remain outside
+`user-UID.slice`; the existing per-user `TasksMax` policy therefore never
+charged the runaway process tree. A php-cgi storm could still exhaust the host
+pid table, making sshd unable to fork even though cron.service itself had an
+aggregate `TasksMax=8192`.
 
 PMSS already owns a `cron.service` drop-in through `scripts/util/setupRootCron.php`
 to keep cron available for watchdogs and quota jobs. Any fix must preserve the
@@ -36,21 +44,44 @@ Choose Option B as the immediate PMSS-controlled guard. The existing
 `TasksMax=8192` for `cron.service`, while keeping `Restart=always`.
 
 This records an aggregate damage cap, not a claim that per-user cron fairness is
-fully solved. Options A and C remain deferred until an operator selects a
-single-host validation target and phased rollout plan.
+fully solved.
+
+2026-06-26 amendment: PMSS per-user service launchers now use a shared scoped
+launch helper that resolves the user's UID with `id -u`, ensures
+`user-UID.slice` exists, and starts the legacy `su` command inside a
+`systemd-run --scope --slice=user-UID.slice` transient scope. This preserves the
+old command shapes for service detection while making the user slice, not
+cron.service, the accounting parent for `rtorrent`, `screen`, `lighttpd`,
+`php-cgi`, qBittorrent, Deluge, rclone, and their descendants. The cron.service
+cap remains defense-in-depth for user cron jobs that are not PMSS service
+launches.
+
+PMSS also installs an `ssh.service` drop-in with high CPU/IO weights,
+`OOMScoreAdjust=-1000`, and `MemoryMin=64M`. This is defense-in-depth for
+CPU/IO/OOM pressure only; the pid-exhaustion fix is the per-user slice
+containment above.
 
 ## Consequences
 - Positive: Runaway cron jobs can hit a bounded service-level task cap instead
   of host-wide pid capacity.
 - Positive: The change reuses the existing PMSS-owned drop-in and does not touch
   package baselines or user crontabs.
-- Negative: One user can still consume the cron aggregate cap, so this is not
-  equivalent to placing every cron job in `user-UID.slice`.
-- Follow-up: Revisit systemd-cron or a proven per-user launch wrapper only after
-  live-host validation is explicitly planned.
+- Positive: PMSS-managed per-user daemons now enter `user-UID.slice`, so the
+  existing per-user `TasksMax` policy contains runaway descendants before the
+  host pid table is exhausted.
+- Positive: Watchdog process detection still uses the same process names and
+  command payloads; only the cgroup parent changes.
+- Negative: User-authored crontab commands outside PMSS service launch helpers
+  remain bounded only by the aggregate cron.service cap.
+- Follow-up: Revisit systemd-cron only if PMSS needs per-user isolation for
+  arbitrary customer crontab entries.
 
 ## References
 - PMSS issue #579
 - ADR 0019: Production cgroup v1 pin
 - `scripts/lib/update/services/systemd.php`
 - `scripts/util/setupRootCron.php`
+- `scripts/lib/user/serviceLaunch.php`
+- `scripts/startRtorrent`
+- `scripts/startLighttpd`
+- `etc/seedbox/config/template.ssh.service.pmss-starvation.conf`

@@ -137,6 +137,62 @@ function pmssSshdValidationCommand(string $sshdPath = '/usr/sbin/sshd'): string
         : ($sshdPath === '/usr/sbin/sshd' ? '/usr/sbin/sshd -t' : pmssBuildCommand($sshdPath, ['-t']));
 }
 
+/** Return the PMSS ssh.service starvation-resistance drop-in template path. */
+function pmssSshdStarvationDropinTemplatePath(): string
+{
+    return pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/template.ssh.service.pmss-starvation.conf';
+}
+
+/**
+ * Install ssh.service resource-priority drop-in for recovery access.
+ *
+ * This is defense-in-depth. User-slice service placement prevents pid-table
+ * exhaustion; the sshd drop-in helps keep port 22 responsive under CPU/IO/OOM
+ * pressure while an operator recovers the host.
+ */
+function pmssEnsureSshdStarvationDropin(
+    string $dropinDir = '/etc/systemd/system/ssh.service.d',
+    string $dropinFile = '',
+    string $systemdRuntimeDir = '/run/systemd/system'
+): bool {
+    $dropinDir = rtrim($dropinDir, '/');
+    $dropinFile = $dropinFile !== '' ? $dropinFile : $dropinDir.'/10-pmss-starvation-resistance.conf';
+    $template = pmssSshdStarvationDropinTemplatePath();
+
+    if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+        runStep('Ensuring ssh.service starvation-resistance drop-in directory', 'install -d -m 0755 '.escapeshellarg($dropinDir));
+        runStep('Installing ssh.service starvation-resistance drop-in', sprintf('cp %s %s', escapeshellarg($template), escapeshellarg($dropinFile)));
+        runStep('Reloading systemd unit files (ssh starvation resistance)', '/usr/bin/systemctl daemon-reload || true');
+        return true;
+    }
+
+    if (!is_dir($systemdRuntimeDir)) {
+        logMessage('[SKIP] Installing ssh.service starvation-resistance drop-in (systemd unavailable)');
+        return true;
+    }
+    if ($dropinDir === '' || $dropinDir[0] !== '/' || $dropinFile[0] !== '/' || dirname($dropinFile) !== $dropinDir) {
+        logMessage('[ERR] Refusing unsafe ssh.service drop-in path: '.$dropinFile);
+        return false;
+    }
+    if (!is_string($content = @file_get_contents($template))) {
+        logMessage('[ERR] Missing ssh.service starvation-resistance template: '.$template);
+        return false;
+    }
+
+    $changed = pmssRefreshManagedPathFile(
+        $dropinFile,
+        $content,
+        'ssh.service starvation-resistance drop-in',
+        'logMessage',
+        pmssManagedPathInstallOptions($dropinFile, 'ssh.service starvation-resistance drop-in')
+    );
+    if ($changed) {
+        runStep('Reloading systemd unit files (ssh starvation resistance)', '/usr/bin/systemctl daemon-reload || true');
+    }
+
+    return true;
+}
+
 /**
  * Validate sshd_config, applying the legacy-parser fallback only on parser errors.
  */
@@ -185,6 +241,8 @@ function pmssApplyRuntimeTemplates(): void
         ['Setting permissions on systemd system.conf', 'chmod 644 /etc/systemd/system.conf'],
         ['Reexecuting systemd to pick up configuration', '/usr/bin/systemctl daemon-reexec'],
     ] as $action) { runStep(...$action); }
+
+    pmssEnsureSshdStarvationDropin();
 
     pmssBackupCriticalConfig('sshd', '/etc/ssh/sshd_config');
     foreach ([

@@ -74,6 +74,9 @@ class UpdateServicesRuntimeTest extends TestCase
             'cp /etc/seedbox/config/template.systemd.system.conf /etc/systemd/system.conf',
             'chmod 644 /etc/systemd/system.conf',
             '/usr/bin/systemctl daemon-reexec',
+            "install -d -m 0755 '/etc/systemd/system/ssh.service.d'",
+            "cp '/etc/seedbox/config/template.ssh.service.pmss-starvation.conf' '/etc/systemd/system/ssh.service.d/10-pmss-starvation-resistance.conf'",
+            '/usr/bin/systemctl daemon-reload || true',
             'cp /etc/seedbox/config/template.sshd_config /etc/ssh/sshd_config',
             'chmod 644 /etc/ssh/sshd_config',
             \pmssSshdValidationCommand(),
@@ -98,6 +101,20 @@ class UpdateServicesRuntimeTest extends TestCase
 
         $this->assertTrue(strpos($content, "[Service]\n") === 0);
         $this->assertStringContainsAllStrings(["TasksAccounting=yes\n", "TasksMax=8192\n", "Restart=always\n"], $content);
+    }
+
+    public function testSshdStarvationDropinTemplateDocumentsDefenseInDepth(): void
+    {
+        $content = $this->pmssReadRepoFile('etc/seedbox/config/template.ssh.service.pmss-starvation.conf');
+
+        $this->assertStringContainsAllStrings([
+            "[Service]\n",
+            'per-user slice containment prevents pid exhaustion',
+            "CPUWeight=10000\n",
+            "IOWeight=10000\n",
+            "OOMScoreAdjust=-1000\n",
+            "MemoryMin=64M\n",
+        ], $content);
     }
 
     public function testCronRestartDropinSkipsUnchangedContent(): void

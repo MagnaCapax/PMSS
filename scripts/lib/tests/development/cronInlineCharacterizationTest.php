@@ -22,9 +22,10 @@ class CronInlineCharacterizationTest extends TestCase
             'scripts/cron/checkRcloneInstances.php' => ['required' => ['pmssUserWatchdogRunService(', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone stopped due to suspension'", "'rclone start requested'", 'pmssUserWatchdogSuCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'rclone watchdog must quote su shell boundaries through the shared helper']],
             'scripts/cron/checkDelugeInstances.php' => ['required' => ['pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssDelugeApplyManagedConfig'", "'deluge stopped due to suspension'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'", 'pmssUserWatchdogSuCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'deluge watchdog must quote su shell boundaries through the shared helper']],
             'scripts/lib/runtime/environment.php' => ['required' => ['function pmssBuildUserShellCommand(', 'escapeshellarg($username)', 'escapeshellarg($command)']],
+            'scripts/lib/user/serviceLaunch.php' => ['required' => ['function pmssBuildUserServiceShellCommand(', "'--scope'", "'--slice='.\$slice", "pmssBuildCommand('systemd-run'", "pmssBuildCommand('systemctl', ['start', \$slice])"]],
             'scripts/lib/user/watchdog.php' => ['required' => [
                 'function pmssUserWatchdogSuCommand(',
-                'pmssBuildUserShellCommand($username, $innerCommand)',
+                'pmssBuildUserServiceShellCommand($username, $innerCommand)',
                 'function pmssUserWatchdogRestartProcessesIf(',
                 'function pmssUserWatchdogApplyManagedConfigWhenStopped(',
                 'function pmssUserWatchdogServiceSpec(',
