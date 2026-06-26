@@ -23,8 +23,10 @@
  */
 function updateRutorrentConfig($username, $scgiPort)
 {
-    $templateConfigPath = '/etc/seedbox/config/template.rutorrent.config';
-    $templateAccessPath = '/etc/seedbox/config/template.rutorrent.access';
+    $configRoot = pmssRutorrentConfigResolveBasePath('PMSS_CONFIG_DIR', '/etc/seedbox/config');
+    $homeRoot = pmssRutorrentConfigResolveBasePath('PMSS_HOME_DIR', '/home');
+    $templateConfigPath = $configRoot.'/template.rutorrent.config';
+    $templateAccessPath = $configRoot.'/template.rutorrent.access';
 
     $rutorrentConfig = file_get_contents($templateConfigPath);
     $accessIni = file_get_contents($templateAccessPath);
@@ -33,7 +35,7 @@ function updateRutorrentConfig($username, $scgiPort)
         return;
     }
 
-    $homeDir = "/home/{$username}";
+    $homeDir = ($homeRoot === '/' ? '' : $homeRoot)."/{$username}";
     $rutorrentDir = $homeDir.'/www/rutorrent';
     foreach ([
         '$scgi_host = "";' => '$scgi_host = "unix://'.$homeDir.'/.rtorrent.socket";',
@@ -53,5 +55,49 @@ function updateRutorrentConfig($username, $scgiPort)
     if (file_put_contents($accessPath, $accessIni) === false) {
         echo "Failed to write ruTorrent access config to {$accessPath}\n";
         return;
+    }
+
+    foreach ([$configPath, $accessPath] as $path) {
+        pmssRutorrentConfigConvergeFilePermissions($path, $username);
+    }
+}
+
+/**
+ * Resolve a configurable base path while preserving the production default.
+ *
+ * @param string $envName Environment variable to inspect.
+ * @param string $default Production path used when the variable is empty.
+ *
+ * @return string
+ */
+function pmssRutorrentConfigResolveBasePath($envName, $default)
+{
+    $value = getenv($envName);
+    if (!is_string($value) || trim($value) === '') {
+        return $default;
+    }
+
+    $path = rtrim($value, '/');
+    return $path === '' ? '/' : $path;
+}
+
+/**
+ * Keep per-user ruTorrent config files owned and readable only inside the account.
+ *
+ * @param string $path     Config file path.
+ * @param string $username Account owner and group name.
+ *
+ * @return void
+ */
+function pmssRutorrentConfigConvergeFilePermissions($path, $username)
+{
+    if (!@chown($path, $username)) {
+        echo "Warning: failed to set ruTorrent config owner on {$path}\n";
+    }
+    if (!@chgrp($path, $username)) {
+        echo "Warning: failed to set ruTorrent config group on {$path}\n";
+    }
+    if (!@chmod($path, 0750)) {
+        echo "Warning: failed to set ruTorrent config mode on {$path}\n";
     }
 }
