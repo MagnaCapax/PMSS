@@ -933,9 +933,9 @@ function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = nul
         ? '<br /><b style="color: red;">OVER TRAFFIC LIMIT WARNING - REDUCED BANDWIDTH</b><br />You are beyond your traffic limit. Consider upgrading your plan or adding extra traffic.<br />Datacenter external outbound (TO internet) bandwidth limited to 100 Mbps. Datacenter internal and inbound bandwidth is unrestricted.'
         : '';
     $titleText = "{$trafficUsed} / {$limitTotal} GiB";
-    $bonusLine = ($bonusTraffic > 0) ? '<br />Bonus traffic: ' . number_format($bonusTraffic) . ' GiB' : '';
+    $bonusLine = ($bonusTraffic > 0) ? 'Bonus traffic: ' . number_format($bonusTraffic) . ' GiB' : '';
     $usageLine = 'Used: '.$trafficUsed.' / Limit: '.number_format($limitTotal).' GiB (30-day window)';
-    $gauge = createGauge($titleText, $titleText . $bonusLine, $percent);
+    $gauge = createGauge($titleText, $bonusLine, $percent);
 
     echo pmssWelcomeMetricSectionHtmlBuild('Traffic Info', "\n{$usageLine}<br />\n{$gauge}\n{$warning}\n{$trafficDisclosure}\n{$inboundLine}{$ratioLine}\nThis is rolling past 30 days, <a href=\"https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/\" target=\"_blank\">read more</a>.\n");
 }
