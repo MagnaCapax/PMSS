@@ -200,7 +200,10 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
    linger/rootless-Docker wiring and the optional post-refresh checks
    (user crontabs are user-owned and not rewritten).
 10. Reapply network templates, apply security hardening, summarise profiling, and
-   log completion markers. Per-user traffic monitoring rules rely on the
+   log completion markers. Tenant-empty fresh installs also run the existing
+   storage benchmark once with `--require-idle --devices` before root cron is
+   restored, recording a durable success marker so later empty-host updates do
+   not repeat the benchmark. Per-user traffic monitoring rules rely on the
    iptables owner match; when unavailable `setupNetwork.php` skips those rules
    and logs to `/var/log/pmss/iptables.log`.
 

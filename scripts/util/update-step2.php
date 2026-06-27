@@ -46,6 +46,7 @@ require_once __DIR__.'/../lib/update/opensslSsh2Compat.php';
 require_once __DIR__.'/../lib/update/distro.php';
 require_once __DIR__.'/../lib/update/kernelHardening.php';
 require_once __DIR__.'/../lib/update/repositories.php';
+require_once __DIR__.'/../lib/update/storageBenchmark.php';
 require_once __DIR__.'/../lib/update/systemPrep.php';
 require_once __DIR__.'/../lib/update/services/systemd.php';
 require_once __DIR__.'/../lib/update/services/logging.php';
@@ -606,6 +607,19 @@ runStep('Hardening access to session and network binaries', 'chmod o-r /var/log/
 
 // Cleanup legacy runtime metadata that should never have shipped with snapshots.
 if (is_dir('/etc/seedbox/config/app-versions')) { runStep('Removing legacy app version records', 'rm -rf '.escapeshellarg('/etc/seedbox/config/app-versions')); }
+
+// On tenant-empty fresh installs, capture one idle storage baseline before root
+// cron resumes. Failures stay soft: the benchmark has its own --require-idle
+// gate and must never block normal update convergence.
+$storageBenchmarkRc = pmssRunProfiledCallable('Running post-install storage benchmark', 'pmssStorageBenchmarkPostInstallRun', [], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
+if ((int) $storageBenchmarkRc !== 0) {
+    pmssUpdateStep2HandleClassifiedFailure(
+        'Running post-install storage benchmark',
+        PMSS_UPDATE_STEP_CLASS_SOFT_FAIL,
+        (int) $storageBenchmarkRc,
+        'storage_benchmark_exit'
+    );
+}
 
 // Restore root cron at the very end. update.php only disables it for the
 // phase-2 handoff window; we want it back for normal operations.
