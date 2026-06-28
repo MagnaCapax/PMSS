@@ -123,19 +123,30 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
     // Ensure build/runtime dependencies exist BEFORE any destructive cleanup.
     // #TODO migrate to shared package helper. (GH #132)
     runCommand(aptCmd('install -y libudns0 libudns-dev libcppunit-dev'));
-    // libssl-dev provides libcrypto.pc, which libtorrent's ./configure requires; it is NOT
-    // pulled in transitively on dist-upgraded hosts. Installed separately so a held-package
-    // conflict (libssl3/openssl held below the candidate) cannot fail the core-deps transaction.
-    runCommand(aptCmd('install -y libssl-dev'));
-
-    // Preflight: if libcrypto is still absent (e.g. libssl3/openssl held below the
-    // libssl-dev candidate version after a dist-upgrade), ABORT loudly and NON-destructively
-    // instead of wiping the existing libtorrent libs and leaving rtorrent unrunnable. This
-    // is the GH #662 silent-fleet-breakage guard: a failed prereq must not destroy state.
+    // libssl-dev provides libcrypto.pc, which libtorrent's ./configure requires. On Debian 12
+    // PMSS DELIBERATELY holds libssl3/openssl at a PECL-ssh2-compatible version
+    // (pmssHoldLibssl3ForPeclSsh2Compat, #436/#585), so the default libssl-dev candidate (a
+    // newer point release) conflicts. Install libssl-dev MATCHED to the installed libssl3 so it
+    // satisfies the hold instead of fighting it (the matched -dev is in bookworm-updates); this
+    // needs NO hold release and does NOT disturb openssh. Fall back to unversioned where libssl3
+    // is absent/unpinned (legacy Debian / fresh installs).
+    $libssl3Ver = trim((string) @shell_exec('dpkg-query -W -f='.escapeshellarg('${Version}').' libssl3 2>/dev/null'));
+    if ($libssl3Ver !== '' && preg_match('/^[0-9][A-Za-z0-9.+:~-]*$/', $libssl3Ver) === 1) {
+        runCommand(aptCmd('install -y libssl-dev='.$libssl3Ver));
+    }
     if (!pmssRtorrentBuildPrereqsPresent()) {
-        $log('[ERR] rtorrent rebuild BLOCKED: pkg-config libcrypto missing (libssl-dev not installable; '
-            .'libssl3/openssl likely held from a dist-upgrade). Not wiping existing libtorrent libraries; '
-            .'rtorrent left as-is. Release the hold or install libssl-dev, then re-run update. See GH #662.');
+        runCommand(aptCmd('install -y libssl-dev')); // unpinned/legacy fallback
+    }
+
+    // Preflight: if libcrypto is STILL absent (version-matched libssl-dev not in the repo), ABORT
+    // loudly and NON-destructively instead of wiping the existing libtorrent libs and leaving
+    // rtorrent unrunnable. This is the GH #662 silent-fleet-breakage guard: a failed prereq must
+    // not destroy state. Do NOT release the libssl3 hold — it is deliberate (PECL ssh2 #436/#585).
+    if (!pmssRtorrentBuildPrereqsPresent()) {
+        $log('[ERR] rtorrent rebuild BLOCKED: pkg-config libcrypto missing — version-matched '
+            .'libssl-dev (=installed libssl3 '.$libssl3Ver.') is unavailable in the repo. Not wiping existing '
+            .'libtorrent libraries; rtorrent left as-is. Do NOT release the PECL-ssh2 libssl3 hold; instead make '
+            .'the matching libssl-dev available, then re-run update. See GH #662.');
         pmssRtorrentMarkBuildFailure('libcrypto-prereq-missing');
         return;
     }
