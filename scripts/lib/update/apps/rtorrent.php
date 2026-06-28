@@ -58,6 +58,46 @@ if (pmssEnvFlagEnabled('PMSS_RTORRENT_NO_ENTRYPOINT')) {
 
 $log = 'logmsg';
 
+/**
+ * Preflight: libtorrent's ./configure hard-requires pkg-config libcrypto (from
+ * libssl-dev). On Debian 11->12 dist-upgraded hosts where libssl3/openssl were
+ * held during the openssh-removal-cascade mitigation, libssl-dev cannot install
+ * and libcrypto.pc is absent — which silently broke the rebuild fleet-wide (GH #662).
+ */
+function pmssRtorrentBuildPrereqsPresent(): bool
+{
+    $out = [];
+    $rc = 1;
+    @exec('pkg-config --exists libcrypto 2>/dev/null', $out, $rc);
+    return $rc === 0;
+}
+
+/** Verify the freshly built rtorrent binary actually loads its libraries and runs. */
+function pmssRtorrentBinaryRuns(): bool
+{
+    if (!is_file('/usr/local/bin/rtorrent')) {
+        return false;
+    }
+    $out = [];
+    $rc = 1;
+    @exec('/usr/local/bin/rtorrent -h >/dev/null 2>&1', $out, $rc);
+    return $rc === 0;
+}
+
+/** Persist a queryable marker so a silent build failure becomes fleet-detectable. */
+function pmssRtorrentMarkBuildFailure(string $reason): void
+{
+    @file_put_contents('/var/log/pmss/rtorrent-build-failed', date('c').' '.$reason."\n", FILE_APPEND);
+}
+
+/** Clear the build-failure marker once a verified-good binary is in place. */
+function pmssRtorrentClearBuildFailure(): void
+{
+    if (is_file('/var/log/pmss/rtorrent-build-failed')) {
+        @unlink('/var/log/pmss/rtorrent-build-failed');
+    }
+}
+
 $rtorrentVersion = pmssAppVersionProbeOutput('rtorrent -h');
 // Resolve the target branch from distro detection instead of string-prefix
 // checks on /etc/debian_version so codename/major overrides stay consistent.
@@ -79,11 +119,28 @@ $checksums = [
 
 if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  // Yeah i know kinda stupid place to look if we got the latest but ...
     echo "*** Updating rTorrent\n";
-    
-    runStep('Cleaning legacy libtorrent libraries', 'rm -rf /usr/local/lib/libtorrent*; ldconfig;'); // Clean up old libtorrent installed files
-    
-    // Ensure build/runtime dependencies exist. #TODO migrate to shared package helper. (GH #132)
+
+    // Ensure build/runtime dependencies exist BEFORE any destructive cleanup.
+    // #TODO migrate to shared package helper. (GH #132)
     runCommand(aptCmd('install -y libudns0 libudns-dev libcppunit-dev'));
+    // libssl-dev provides libcrypto.pc, which libtorrent's ./configure requires; it is NOT
+    // pulled in transitively on dist-upgraded hosts. Installed separately so a held-package
+    // conflict (libssl3/openssl held below the candidate) cannot fail the core-deps transaction.
+    runCommand(aptCmd('install -y libssl-dev'));
+
+    // Preflight: if libcrypto is still absent (e.g. libssl3/openssl held below the
+    // libssl-dev candidate version after a dist-upgrade), ABORT loudly and NON-destructively
+    // instead of wiping the existing libtorrent libs and leaving rtorrent unrunnable. This
+    // is the GH #662 silent-fleet-breakage guard: a failed prereq must not destroy state.
+    if (!pmssRtorrentBuildPrereqsPresent()) {
+        $log('[ERR] rtorrent rebuild BLOCKED: pkg-config libcrypto missing (libssl-dev not installable; '
+            .'libssl3/openssl likely held from a dist-upgrade). Not wiping existing libtorrent libraries; '
+            .'rtorrent left as-is. Release the hold or install libssl-dev, then re-run update. See GH #662.');
+        pmssRtorrentMarkBuildFailure('libcrypto-prereq-missing');
+        return;
+    }
+
+    runStep('Cleaning legacy libtorrent libraries', 'rm -rf /usr/local/lib/libtorrent*; ldconfig;'); // Clean up old libtorrent installed files
 
     echo "**** Remove old rtorrent packages\n";
     //passthru('rm -rf /tmp/rtorrent*; rm -rf /tmp/libtorrent*; rm -rf /tmp/xmlrpc*');
@@ -156,5 +213,15 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
     }
     
 
-    echo "*** Update done - rtorrent instances will restart within minute\n";
+    // Post-build verification. A failed build previously completed update.php "successfully"
+    // (runStep does not abort the run) and left rtorrent crash-looping fleet-wide (GH #662).
+    // Confirm the freshly built binary loads its libraries and runs; surface failure loudly.
+    if (!pmssRtorrentBinaryRuns()) {
+        $log('[ERR] rtorrent rebuild FAILED verification: /usr/local/bin/rtorrent does not load/run after build '
+            .'(check `ldd /usr/local/bin/rtorrent` for missing libtorrent.so/libcppunit). rTorrent is DOWN on this host. See GH #662.');
+        pmssRtorrentMarkBuildFailure('post-build-verify-failed');
+    } else {
+        pmssRtorrentClearBuildFailure();
+        echo "*** Update done - rtorrent instances will restart within minute\n";
+    }
 }
