@@ -15,6 +15,7 @@
 require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/traffic/storage.php';
 require_once '/scripts/lib/user/selection.php';
+require_once '/scripts/lib/user/log.php';
 require_once '/scripts/lib/user/userConfigStore.php';
 require_once __DIR__.'/../lib/user/trafficLimit.php';
 if (!pmssDirEnsureExists('/var/run/pmss/trafficLimits', 0755)) {

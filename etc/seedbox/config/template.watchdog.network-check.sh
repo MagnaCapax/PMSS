@@ -6,7 +6,17 @@ FAIL_THRESHOLD=1800
 PING_COUNT=2
 PING_TIMEOUT=5
 
-TARGETS=$(ip -4 route show default 2>/dev/null | awk '{print $3}')
+DEFAULT_GATEWAYS=$(ip -4 route show default 2>/dev/null | awk '
+	$1 == "default" {
+		for (i = 1; i < NF; i++) {
+			if ($i == "via") {
+				print $(i + 1)
+			}
+		}
+	}
+')
+EXTERNAL_TARGETS="1.1.1.1 8.8.8.8"
+TARGETS="$DEFAULT_GATEWAYS $EXTERNAL_TARGETS"
 
 if command -v ping >/dev/null 2>&1; then
 	for ip in $TARGETS; do

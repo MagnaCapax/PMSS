@@ -83,15 +83,24 @@ function pmssSystemStatsLoadAverageFromRaw(?string $raw): string
     return implode(',', $load);
 }
 
-/** Read the raw CPU tick counters from /proc/stat. */
-function pmssSystemStatsCpuCountersRead(): array
+/** Parse raw CPU tick counters from /proc/stat after validating the boundary shape. */
+function pmssSystemStatsCpuCountersFromRaw(?string $raw): array
 {
-    $lines = preg_split('/\r?\n/', pmssReadRegularFileContents('/proc/stat') ?? '');
+    if ($raw === null) return [];
+
+    $lines = preg_split('/\r?\n/', $raw);
     $parts = is_array($lines) && isset($lines[0]) ? preg_split('/\s+/', trim((string) $lines[0])) : false;
-    if (!is_array($parts) || count($parts) < 2) return [];
-    array_shift($parts);
+    if (!is_array($parts) || count($parts) < 6 || array_shift($parts) !== 'cpu') return [];
+
+    foreach ($parts as $value) {
+        if (!is_string($value) || $value === '' || !ctype_digit($value)) return [];
+    }
+
     return array_map('intval', $parts);
 }
+
+/** Read the raw CPU tick counters from /proc/stat. */
+function pmssSystemStatsCpuCountersRead(): array { return pmssSystemStatsCpuCountersFromRaw(pmssReadRegularFileContents('/proc/stat')); }
 
 /** Format CPU iowait percentage from two /proc/stat samples. */
 function pmssSystemStatsCpuIowaitPercent(array $before, array $after): string
@@ -105,20 +114,26 @@ function pmssSystemStatsCpuIowaitPercent(array $before, array $after): string
     return $total > 0 ? number_format((($diff[4] ?? 0) / $total) * 100, 1, '.', '') : '0.0';
 }
 
-/** Read per-device busy-time counters from /proc/diskstats. */
-function pmssSystemStatsDiskIoTimeRead(): array
+/** Parse per-device busy-time counters from raw /proc/diskstats content. */
+function pmssSystemStatsDiskIoTimeFromRaw(?string $raw): array
 {
     $stats = [];
-    foreach (preg_split('/\r?\n/', pmssReadRegularFileContents('/proc/diskstats') ?? '') ?: [] as $line) {
+    if ($raw === null) return $stats;
+
+    foreach (preg_split('/\r?\n/', $raw) ?: [] as $line) {
         $parts = preg_split('/\s+/', trim($line));
         if (!is_array($parts) || count($parts) < 13) continue;
         $name = $parts[2] ?? '';
-        if (pmssBlockDeviceNameIsDataDevice($name)) {
-            $stats[$name] = (int) ($parts[12] ?? 0);
+        $ioTime = (string) ($parts[12] ?? '');
+        if (pmssBlockDeviceNameIsDataDevice($name) && ctype_digit($ioTime)) {
+            $stats[$name] = (int) $ioTime;
         }
     }
     return $stats;
 }
+
+/** Read per-device busy-time counters from /proc/diskstats. */
+function pmssSystemStatsDiskIoTimeRead(): array { return pmssSystemStatsDiskIoTimeFromRaw(pmssReadRegularFileContents('/proc/diskstats')); }
 
 /** Format the busiest data-device percentage from two diskstats samples. */
 function pmssSystemStatsDiskBusyPercent(array $before, array $after, float $sampleSeconds): string
@@ -173,6 +188,17 @@ function pmssSystemStatsLogLine(array $stats, ?string $timestamp = null): string
         $line .= ' | '.$label.':'.(string) ($stats[$key] ?? 'na');
     }
     return $line;
+}
+
+/** Append one system-stats log line after checking the target path shape. */
+function pmssSystemStatsAppendLogLine(string $path, string $line): bool
+{
+    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return false;
+    if ($path[0] !== '/') return false;
+    if (!pmssDirEnsureExists(dirname($path), 0755)) return false;
+    if (is_link($path) || (file_exists($path) && !is_file($path))) return false;
+
+    return @file_put_contents($path, rtrim($line, "\r\n")."\n", FILE_APPEND | LOCK_EX) !== false;
 }
 
 /**

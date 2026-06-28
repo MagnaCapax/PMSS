@@ -10,7 +10,6 @@ require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/lighttpd/userFileWrite.php';
 require_once __DIR__.'/resources/accumulator.php';
 
-const PMSS_RESOURCE_LOG_TAIL_LINES_DEFAULT = 10080;
 const PMSS_RESOURCE_LOG_TAIL_LINES_MAX = 10080;
 const PMSS_RESOURCE_LOG_TAIL_TIMEOUT_SECONDS = 5;
 
@@ -60,11 +59,24 @@ function pmssResourceReportTemplate(): array
 /** Normalize scalar metric values while rejecting malformed persisted/fallback data. */
 function pmssResourceMetricValueNormalize($value): ?float { return is_numeric($value) ? (float) $value : null; }
 
+/** Return metrics shared by resource snapshot rows and fallback calculations. */
+function pmssResourceSnapshotMetricKeys(): array { return array_merge(ResourceStatsAccumulator::RAW_METRICS, ResourceStatsAccumulator::AVERAGE_METRICS); }
+
 /** Read a stored payload metric window, defaulting missing ops windows to zero. */
 function pmssResourceStoredPayloadWindowValue(array $data, string $metric, string $window): ?float
 {
     $value = $data[$metric]['raw'][$window] ?? (substr($metric, -4) === '_ops' ? 0.0 : null);
     return $value !== null ? pmssResourceMetricValueNormalize($value) : null;
+}
+
+/** Read all metrics for a stored payload window. */
+function pmssResourceStoredPayloadWindowMetrics(array $data, string $window): ?array
+{
+    $metrics = [];
+    foreach (pmssResourceSnapshotMetricKeys() as $key) {
+        if (($metrics[$key] = pmssResourceStoredPayloadWindowValue($data, $key, $window)) === null) return null;
+    }
+    return $metrics;
 }
 
 /** Normalize persisted resource stats into the row shape used by reports. */
@@ -100,14 +112,10 @@ function pmssResourceStoredPayloadFromResults(array $results): array
 /** Extract one accumulator window into the resource-snapshot metric shape. */
 function pmssResourceResultsWindowMetrics(array $results, string $window): ?array
 {
-    if (!isset($results['memory'], $results['tasks'], $results['raw']) || !is_array($results['memory']) || !is_array($results['tasks']) || !is_array($results['raw'])) return null;
     $metrics = [];
-    foreach (['memory', 'tasks'] as $metric) {
-        if (!array_key_exists($window, $results[$metric]) || ($metrics[$metric] = pmssResourceMetricValueNormalize($results[$metric][$window])) === null) return null;
-    }
-    foreach (ResourceStatsAccumulator::RAW_METRICS as $metric) {
-        if (!isset($results['raw'][$metric]) || !is_array($results['raw'][$metric]) || !array_key_exists($window, $results['raw'][$metric])) return null;
-        if (($metrics[$metric] = pmssResourceMetricValueNormalize($results['raw'][$metric][$window])) === null) return null;
+    foreach (pmssResourceSnapshotMetricKeys() as $metric) {
+        $source = in_array($metric, ResourceStatsAccumulator::AVERAGE_METRICS, true) ? ($results[$metric] ?? null) : ($results['raw'][$metric] ?? null);
+        if (!is_array($source) || !array_key_exists($window, $source) || ($metrics[$metric] = pmssResourceMetricValueNormalize($source[$window])) === null) return null;
     }
     return $metrics;
 }
@@ -122,24 +130,31 @@ function pmssResourceLogLineParts(array $delta, array $state): array
     return $parts;
 }
 
+/** Return the payload fields accepted by each historical resource-log line shape. */
+function pmssResourceLogPayloadFields(int $payloadCount): ?array
+{
+    static $layouts = [
+        ['io_read', 'io_write', 'cpu', 'memory', 'tasks'],
+        ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks'],
+        ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks', 'memory_anon', 'memory_file'],
+    ];
+    return ($payloadCount < 5 || $payloadCount === 8) ? null : ($payloadCount >= 9 ? $layouts[2] : ($payloadCount >= 7 ? $layouts[1] : $layouts[0]));
+}
+
 /** Parse one resource cron text record into the accumulator sample schema. */
 function pmssResourceLogLineParse($line)
 {
     $tokens = preg_split('/\s+/', trim((string) $line)) ?: [];
-    $tokenCount = count($tokens);
-    if ($tokenCount < 7 || $tokenCount === 10) return false;
+    $fields = pmssResourceLogPayloadFields(count($tokens) - 2);
+    if ($fields === null) return false;
     $timestamp = strtotime($tokens[0].' '.$tokens[1]);
     if ($timestamp === false) return false;
 
     $parsed = ['timestamp' => (int) $timestamp] + array_fill_keys(['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks'], 0.0);
-    $maps = [
-        7 => [2 => 'io_read', 3 => 'io_write', 4 => 'cpu', 5 => 'memory', 6 => 'tasks'],
-        9 => [2 => 'io_read', 3 => 'io_write', 4 => 'io_read_ops', 5 => 'io_write_ops', 6 => 'cpu', 7 => 'memory', 8 => 'tasks'],
-        11 => [2 => 'io_read', 3 => 'io_write', 4 => 'io_read_ops', 5 => 'io_write_ops', 6 => 'cpu', 7 => 'memory', 8 => 'tasks', 9 => 'memory_anon', 10 => 'memory_file'],
-    ];
-    foreach ($maps[$tokenCount > 10 ? 11 : ($tokenCount >= 9 ? 9 : 7)] as $index => $field) {
-        if (!ctype_digit($tokens[$index] ?? '')) return false;
-        $parsed[$field] = (float) $tokens[$index];
+    foreach ($fields as $offset => $field) {
+        $value = $tokens[$offset + 2] ?? '';
+        if (!ctype_digit($value)) return false;
+        $parsed[$field] = (float) $value;
     }
     return $parsed;
 }
@@ -164,7 +179,7 @@ class resourceStatistics
      * @param int $timePeriod Number of log lines to read from tail.
      * @return string Raw log text, possibly empty when no entries exist.
      */
-    public function getData($user, $timePeriod = PMSS_RESOURCE_LOG_TAIL_LINES_DEFAULT)
+    public function getData($user, $timePeriod = PMSS_RESOURCE_LOG_TAIL_LINES_MAX)
     {
         $path = pmssResourceLogFilePath($this->resourceDir, (string) $user);
         if ($path === null) {
@@ -172,24 +187,6 @@ class resourceStatistics
         }
 
         return pmssResourceTailLogContents($path, pmssResourceTailLineCount($timePeriod));
-    }
-
-    /**
-     * Read the persisted day window payload used by resource snapshots.
-     *
-     * @param string $path Serialized resource payload path.
-     * @return array<string, float>|null
-     */
-    public function readSnapshotMetricsFromPath(string $path): ?array
-    {
-        $data = pmssReadSerializedArrayFile($path);
-        if ($data === null) return null;
-        $metrics = [];
-        foreach (array_merge(ResourceStatsAccumulator::RAW_METRICS, ['memory', 'tasks']) as $key) {
-            if (($metrics[$key] = pmssResourceStoredPayloadWindowValue($data, $key, 'day')) === null) return null;
-        }
-
-        return $metrics;
     }
 
     /**

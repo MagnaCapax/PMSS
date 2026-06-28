@@ -10,6 +10,7 @@ class StorageBenchSecurityTest extends TestCase
         if ($this->isSandbox()) {
             throw new SkipTest('skip in sandbox');
         }
+
         return $this->pmssRunStorageBenchmarkShowLast($path);
     }
 
@@ -26,11 +27,6 @@ class StorageBenchSecurityTest extends TestCase
     private function assertShowPathContains(string $path, string $expected, string $case = ''): void
     {
         $this->assertStringContainsString($expected, $this->runShow($path), $case);
-    }
-
-    private function assertSecurityLogContains(array $entries, string $expected, string $case = ''): void
-    {
-        $this->assertShowPathContains($this->pmssWriteStorageBenchmarkLog($entries, 'pmss-bench-sec-'), $expected, $case);
     }
 
     private function assertSecurityRunContains(

@@ -93,7 +93,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
                 .'require '.var_export($runtime, true).'; '
                 .'echo pmssCommandBashInvocation("printf ok");'
             ),
-            ['PMSS_TEST_MODE' => '1'],
+            $this->pmssTestModeEnv(),
             '2>&1'
         );
 
@@ -116,7 +116,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
                 .']); '
                 .'fclose($handle); @unlink($path);'
             ),
-            ['PMSS_TEST_MODE' => '1'],
+            $this->pmssTestModeEnv(),
             '2>&1'
         );
 
@@ -135,7 +135,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
                 .'pmssLockHandleRelease(false); '
                 .'echo "ok";'
             ),
-            ['PMSS_TEST_MODE' => '1'],
+            $this->pmssTestModeEnv(),
             '2>&1'
         );
 
@@ -176,7 +176,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
         $libraryPath = dirname(__DIR__).'/common/updateBootstrapShim.php';
         return $this->pmssExecShellCommand(
             escapeshellarg(PHP_BINARY).' -r '.escapeshellarg('require '.var_export($libraryPath, true).'; '.$script),
-            ['PMSS_TEST_MODE' => '1'],
+            $this->pmssTestModeEnv(),
             '2>&1'
         );
     }

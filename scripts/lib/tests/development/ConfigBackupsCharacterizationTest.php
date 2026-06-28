@@ -6,20 +6,9 @@ require_once dirname(__DIR__, 2).'/configBackups.php';
 
 class ConfigBackupsCharacterizationTest extends TestCase
 {
-    /** @return array{0:string,1:string}|array{0:string,1:string,2:string} */
-    private function makeBackupRoots(bool $withOutside = false): array
-    {
-        $roots = [$this->pmssMakeTempDir('pmss-backups-src-'), $this->pmssMakeTempDir('pmss-backups-root-')];
-        if ($withOutside) {
-            $roots[] = $this->pmssMakeTempDir('pmss-backups-outside-');
-        }
-
-        return $roots;
-    }
-
     public function testBackupFilenameFormatRemainsStable(): void
     {
-        [$sourceRoot, $backupRoot] = $this->makeBackupRoots();
+        [$sourceRoot, $backupRoot] = $this->pmssConfigBackupsFixtureRoots();
         $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/ssh/sshd_config', "Port 22\n");
 
         $backup = \pmssBackupCriticalConfig('sshd', $source, array(
@@ -39,7 +28,7 @@ class ConfigBackupsCharacterizationTest extends TestCase
 
     public function testPruneOnlyRemovesBackupsForMatchingSourceKey(): void
     {
-        [$sourceRoot, $backupRoot] = $this->makeBackupRoots();
+        [$sourceRoot, $backupRoot] = $this->pmssConfigBackupsFixtureRoots();
         $serviceDir = $backupRoot.'/nginx';
         @mkdir($serviceDir, 0700, true);
 
@@ -68,7 +57,7 @@ class ConfigBackupsCharacterizationTest extends TestCase
 
     public function testBackupRejectsSymlinkSourcePath(): void
     {
-        [$sourceRoot, $backupRoot] = $this->makeBackupRoots();
+        [$sourceRoot, $backupRoot] = $this->pmssConfigBackupsFixtureRoots();
         $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/ssh/sshd_config', "Port 22\n");
         $sourceLink = $sourceRoot.'/etc/ssh/sshd_config.link';
         symlink($source, $sourceLink);
@@ -84,7 +73,7 @@ class ConfigBackupsCharacterizationTest extends TestCase
 
     public function testBackupRejectsSymlinkedServiceDirectory(): void
     {
-        [$sourceRoot, $backupRoot, $outsideRoot] = $this->makeBackupRoots(true);
+        [$sourceRoot, $backupRoot, $outsideRoot] = $this->pmssConfigBackupsFixtureRoots(true);
         $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
         symlink($outsideRoot, $backupRoot.'/nginx');
 
@@ -99,7 +88,7 @@ class ConfigBackupsCharacterizationTest extends TestCase
 
     public function testPruneSkipsSymlinkedServiceDirectory(): void
     {
-        [$sourceRoot, $backupRoot, $outsideRoot] = $this->makeBackupRoots(true);
+        [$sourceRoot, $backupRoot, $outsideRoot] = $this->pmssConfigBackupsFixtureRoots(true);
         $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/proftpd/proftpd.conf', "ServerName pmss\n");
 
         $sourceKey = \pmssConfigBackupsPathKey($source);

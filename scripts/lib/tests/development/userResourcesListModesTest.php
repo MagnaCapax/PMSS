@@ -7,8 +7,7 @@ class UserResourcesListModesTest extends TestCase
 {
     public function testResourcesListModeContractsArePresent(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/lib/user/resourcesList.php');
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/resourcesList.php', [
             "pmssCliOption(",
             "'brief'",
             "'full'",
@@ -19,6 +18,6 @@ class UserResourcesListModesTest extends TestCase
             "'network_used_gib'",
             "'process_max'",
             "'suspended'",
-        ], $src);
+        ]);
     }
 }

@@ -15,9 +15,7 @@ require_once __DIR__.'/rutorrent/config.php';
 // so update helpers always keep the context-aware logging contract.
 require_once __DIR__.'/update/logging.php';
 require_once __DIR__.'/runtime.php';
-require_once __DIR__.'/version.php';
-require_once __DIR__.'/update/apt.php';
-require_once __DIR__.'/update/osRelease.php';
+pmssRequireRelativeFiles(__DIR__, ['version.php', 'update/apt.php', 'update/osRelease.php']);
 
 /**
  * Locate the base directory for skeleton files.

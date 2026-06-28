@@ -89,13 +89,10 @@ $pmssStatsAppToggles = pmssCustomerManagedAppDefinitions();
     text-align: center;
     min-width: 70px;
 }
-.status.active   { background: #2e7d32; color: #fff; }
-.status.inactive { background: #c62828; color: #fff; }
-.status.stopped  { background: #c62828; color: #fff; }
+.status.active, .status.low { background: #2e7d32; color: #fff; }
+.status.inactive, .status.stopped, .status.high { background: #c62828; color: #fff; }
 .status.error    { background: #d32f2f; color: #fff; }
-.status.low { background: #2e7d32; color: #fff; }
 .status.medium { background: #ef6c00; color: #fff; }
-.status.high { background: #c62828; color: #fff; }
 .status.throttled { background: #8e0000; color: #fff; }
 .status.unavailable { background: #546e7a; color: #fff; }
 .pmss-app-toggle {
@@ -268,7 +265,7 @@ function pmssStatsToggleApp(button) {
   <!-- LEFT: Base resources -->
   <div class="stats-block stats-block-base-resources">
     <h6>Base Resources (current)</h6>
-    <pre class="stats-base-resources-pre"><?php echo $pmssBaseResources['text']; ?></pre>
+    <pre class="stats-base-resources-pre"><?php echo pmssCustomerHtmlAttr($pmssBaseResources['text']); ?></pre>
   </div>
 
   <!-- RIGHT: Server info -->

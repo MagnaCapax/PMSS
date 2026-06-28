@@ -175,3 +175,24 @@ function pmssPathTargetIsSafe(
 
     return true;
 }
+
+/** Confirm that a candidate path lives below an existing resolved root. */
+function pmssPathWithinResolvedRoot(string $path, string $root): bool
+{
+    $root = rtrim($root, '/');
+    if (!pmssPathAbsoluteStringIsSafe($root, ['allowRoot' => false])
+        || $path === ''
+        || $path[0] !== '/'
+        || strpos($path, "\0") !== false) {
+        return false;
+    }
+
+    $realRoot = realpath($root);
+    $realParent = realpath(dirname($path));
+    if ($realRoot === false || $realParent === false) {
+        return false;
+    }
+
+    $candidate = rtrim($realParent, '/').'/'.basename($path);
+    return strpos($candidate, rtrim($realRoot, '/').'/') === 0;
+}

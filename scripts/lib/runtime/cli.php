@@ -20,6 +20,13 @@ function pmssPrepareCliEntrypoint(bool $rootRequired = false, array $argvAppend 
     }
 }
 
+/** Write one CLI diagnostic to stderr and return the caller's exit code. */
+function pmssCliReturnWithStderr(string $message, int $exitCode = 1): int
+{
+    fwrite(STDERR, $message);
+    return $exitCode;
+}
+
 /** Keep wrapper delegation inside the caller-provided script tree. */
 function pmssCliEntrypointRelativePathIsSafe(string $relativePath): bool
 {

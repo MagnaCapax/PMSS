@@ -21,20 +21,16 @@ class UpdateBootstrapInterpreterSwapTest extends TestCase
 {
     public function testBootstrapExecPathsResolvePhpAtRuntime(): void
     {
-        $data = $this->pmssReadRepoFile('scripts/update.php');
-        $this->assertStringContainsAllStrings([
-            "passthru(pmssShellCommandWithoutInheritedUpdateLock(pmssBootstrapPhpCommand('/scripts/util/update-step2.php'))",
-            '$command = pmssBootstrapPhpCommand(__FILE__, $args);',
-        ], $data);
-        $this->pmssAssertStringNotContainsString(
-            'passthru(PHP_BINARY',
-            $data,
-            'no passthru() may use the stale PHP_BINARY constant (GH#589)'
-        );
-        $this->pmssAssertStringNotContainsString(
-            'escapeshellarg(PHP_BINARY)',
-            $data,
-            'no escapeshellarg(PHP_BINARY) invocation may remain; use the PHP CLI resolver (GH#589)'
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'scripts/update.php',
+            [
+                "passthru(pmssShellCommandWithoutInheritedUpdateLock(pmssBootstrapPhpCommand('/scripts/util/update-step2.php'))",
+                '$command = pmssBootstrapPhpCommand(__FILE__, $args);',
+            ],
+            [
+                'passthru(PHP_BINARY' => 'no passthru() may use the stale PHP_BINARY constant (GH#589)',
+                'escapeshellarg(PHP_BINARY)' => 'no escapeshellarg(PHP_BINARY) invocation may remain; use the PHP CLI resolver (GH#589)',
+            ]
         );
     }
 
@@ -51,14 +47,10 @@ class UpdateBootstrapInterpreterSwapTest extends TestCase
 
     public function testDiagnosticsHelperUsesPathResolvedPhp(): void
     {
-        $data = $this->pmssReadRepoFile('scripts/lib/agentDiagnostics.php');
-        $this->assertTrue(
-            strpos($data, 'escapeshellarg(PHP_BINARY)') === false,
-            "agentDiagnostics must not use PHP_BINARY for child invocation (GH#589)"
-        );
-        $this->assertTrue(
-            strpos($data, "escapeshellarg('php')") !== false,
-            "agentDiagnostics must invoke child scripts via literal 'php' (GH#589)"
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'scripts/lib/agentDiagnostics.php',
+            ["escapeshellarg('php')"],
+            ['escapeshellarg(PHP_BINARY)' => "agentDiagnostics must not use PHP_BINARY for child invocation (GH#589)"]
         );
     }
 }

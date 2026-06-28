@@ -8,7 +8,7 @@ class DbusPolicyHardeningTest extends TestCase
     protected function setUp(): void
     {
         // Strict test mode keeps pmssSystemdActionSkipReason from shelling out to systemctl reload.
-        $this->pmssTrackEnvOverrides(['PMSS_TEST_MODE' => '1'], true);
+        $this->pmssTrackEnvOverrides($this->pmssTestModeEnv(), true);
     }
 
     public function testRenderDeniesDestinationButPreservesSelfQuery(): void

@@ -202,12 +202,9 @@ function pmssEnsureDbusManagedPolicy(string $basename, string $content, string $
     $policyDir = pmssResolvePathFromEnv('PMSS_DBUS_SYSTEM_POLICY_DIR', '/etc/dbus-1/system.d');
     $target = $policyDir.'/'.$basename;
 
-    if (!pmssRefreshManagedPathFile($target, $content, $label, $log, [
-        'skipMessage' => '[SKIP] '.$label.' already present and up to date',
+    if (!pmssRefreshManagedPathFile($target, $content, $label, $log, pmssManagedPathInstallOptions($target, $label, [
         'directoryFailureMessage' => '[WARN] Unable to create D-Bus system policy directory: '.$policyDir,
-        'writeFailureMessage' => '[WARN] Unable to install '.$label.' at '.$target,
-        'successMessage' => 'Installed '.$label.' at '.$target,
-    ])) {
+    ]))) {
         return;
     }
 
@@ -287,13 +284,11 @@ function pmssEnsureRunSystemdUsersTmpfiles(?callable $logger = null): void
     $dir = pmssResolvePathFromEnv('PMSS_TMPFILES_DIR', '/etc/tmpfiles.d');
     $target = $dir.'/'.pmssRunSystemdUsersTmpfilesBasename();
     $content = pmssRunSystemdUsersTmpfilesRender();
+    $label = '/run/systemd/users tmpfiles policy';
 
-    if (!pmssRefreshManagedPathFile($target, $content, '/run/systemd/users tmpfiles policy', $log, [
-        'skipMessage' => '[SKIP] /run/systemd/users tmpfiles policy already present and up to date',
+    if (!pmssRefreshManagedPathFile($target, $content, $label, $log, pmssManagedPathInstallOptions($target, $label, [
         'directoryFailureMessage' => '[WARN] Unable to create tmpfiles.d directory: '.$dir,
-        'writeFailureMessage' => '[WARN] Unable to install /run/systemd/users tmpfiles policy at '.$target,
-        'successMessage' => 'Installed /run/systemd/users tmpfiles policy at '.$target,
-    ])) {
+    ]))) {
         return;
     }
 

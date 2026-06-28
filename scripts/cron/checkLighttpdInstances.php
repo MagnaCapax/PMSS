@@ -23,6 +23,7 @@ $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
 $watchdogWebRoot = pmssResolvePathFromEnv('PMSS_LIGHTTPD_WATCHDOG_WEB_ROOT', '/var/www');
 foreach($users AS $thisUser) {
     $homeDir = rtrim($homeRoot, '/')."/{$thisUser}";
+    $configPath = $homeDir.'/.lighttpd.conf';
     if (pmssUserWatchdogHandleSuspended($thisUser, ['lighttpd', 'php-cgi'], 'lighttpd stopped due to suspension', $homeRoot)) {
         pmssLighttpdWatchdogDeleteErrorPage($thisUser, $watchdogWebRoot);
         continue;
@@ -34,7 +35,7 @@ foreach($users AS $thisUser) {
         continue;
     }
 
-    if (!file_exists($homeDir.'/.lighttpd.conf') && is_dir($homeDir)) {
+    if (!file_exists($configPath) && is_dir($homeDir)) {
         echo "Config missing for user: {$thisUser} — generating\n";
         passthru('/scripts/util/userConfigLighttpd.php '.escapeshellarg($thisUser));
         pmssUserLog($thisUser, 'lighttpd config generated (missing config detected)');
@@ -42,7 +43,7 @@ foreach($users AS $thisUser) {
 
     $phpCgiRunning = pmssUserWatchdogProcessRunning($thisUser, 'php-cgi');
     $socketError = false;
-    $socketPaths = pmssLighttpdWatchdogSocketPaths($homeDir, $homeDir.'/.lighttpd.conf');
+    $socketPaths = pmssLighttpdWatchdogSocketPaths($homeDir, $configPath);
 
     if (!$phpCgiRunning) {
         echo "php-cgi not running, for user: {$thisUser}. Killing lighttpd instances.\n";
@@ -77,7 +78,7 @@ foreach($users AS $thisUser) {
         ? pmssUserWatchdogProcessStartTime($thisUser, 'lighttpd')
         : null;
     $configChangedAfterStart = $lighttpdRunningBeforeRestart
-        && pmssLighttpdConfigNewerThanProcess($homeDir, $homeDir.'/.lighttpd.conf', $lighttpdStartTime);
+        && pmssLighttpdConfigNewerThanProcess($homeDir, $configPath, $lighttpdStartTime);
     if ($configChangedAfterStart) {
         echo "lighttpd config newer than running process, for user: {$thisUser}. Restarting lighttpd instances.\n";
         pmssUserLog($thisUser, 'lighttpd restart requested (config newer than process)');
@@ -86,7 +87,7 @@ foreach($users AS $thisUser) {
     if ($socketError || !$lighttpdRunningBeforeRestart) {
         pmssLighttpdWatchdogWriteErrorPage(
             $thisUser,
-            pmssLighttpdWatchdogDetectReason($thisUser, $homeDir, $homeDir.'/.lighttpd.conf', $socketError),
+            pmssLighttpdWatchdogDetectReason($thisUser, $homeDir, $configPath, $socketError),
             $watchdogWebRoot
         );
     } else {

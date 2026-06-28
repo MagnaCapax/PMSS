@@ -90,10 +90,7 @@ scan_file() {
 }
 
 # Collect target files (updater libraries only)
-mapfile -t FILES < <(
-	find "$ROOT_DIR/scripts/lib/update" -type f -name "*.php" | sort -u
-	find "$ROOT_DIR/scripts/lib" -maxdepth 1 -type f -name "*.php" | sort -u
-)
+mapfile -t FILES < <(pmss_testing_find_docblock_php_files "$ROOT_DIR")
 
 for f in "${FILES[@]}"; do
 	scan_file "$f"

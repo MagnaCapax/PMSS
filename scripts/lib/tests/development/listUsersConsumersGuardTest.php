@@ -11,23 +11,22 @@ class ListUsersConsumersGuardTest extends TestCase
      */
     public function testHelperConsumersRelyOnSharedManagedUserParser(): void
     {
+        $legacyInlineParsers = [
+            "array_map('trim', pmssListManagedUsers",
+            "array_filter(pmssListManagedUsers('/scripts/listUsers.php'), 'pmssValidateUsername')",
+            'pmssManagedUsersSelectFromList(pmssListManagedUsers(',
+        ];
+
         foreach ($this->pmssListUsersConsumerMap() as $needle => $files) {
             foreach ($files as $file) {
                 $this->pmssAssertRepoFileContainsAllStrings($file, [$needle], $file.' must use shared listUsers parsing');
-            }
-            if ($needle === 'pmssListManagedUsersResult(') {
-                continue;
-            }
-            foreach ($files as $file) {
-                $this->pmssAssertRepoFileNotContainsStrings(
-                    $file,
-                    [
-                        "array_map('trim', pmssListManagedUsers",
-                        "array_filter(pmssListManagedUsers('/scripts/listUsers.php'), 'pmssValidateUsername')",
-                        'pmssManagedUsersSelectFromList(pmssListManagedUsers(',
-                    ],
-                    $file.' should keep pmssListManagedUsers() output as-is '
-                );
+                if ($needle !== 'pmssListManagedUsersResult(') {
+                    $this->pmssAssertRepoFileNotContainsStrings(
+                        $file,
+                        $legacyInlineParsers,
+                        $file.' should keep pmssListManagedUsers() output as-is '
+                    );
+                }
             }
         }
     }

@@ -24,6 +24,12 @@ function pmssFrameOpensInNewWindow(array $frame)
     return isset($frame['target']) && $frame['target'] === '_blank';
 }
 
+/** Build one local tab frame record. */
+function pmssLocalFrameDefinition($url, $linkText, $title)
+{
+    return array('url' => $url, 'linkText' => $linkText, 'title' => $title);
+}
+
 /** Parse a human-readable quota token into bytes. */
 function pmssLocalFrameQuotaSizeToBytes($value)
 {
@@ -133,62 +139,30 @@ function pmssLocalFrameProxyAppDefinitions($username = '')
 {
     $publicBase = $username !== '' ? '/public-'.$username.'/' : '';
     return array(
-        'qbittorrent' => array(
-            'url'      => 'qbittorrent/',
-            'linkText' => 'qBittorrent',
-            'title'    => 'qBittorrent - Torrent web UI',
-        ),
-        'deluge' => array(
-            'url'      => 'deluge/',
-            'linkText' => 'Deluge',
-            'title'    => 'Deluge - Torrent web UI',
-        ),
-        'rclone' => array(
-            'url'      => 'rclone/',
-            'linkText' => 'Rclone',
-            'title'    => 'Rclone Web UI',
-        ),
-        'jellyfin' => array(
-            'url'      => $publicBase === '' ? '' : $publicBase.'jellyfin/web/index.html',
-            'linkText' => 'Jellyfin',
-            'title'    => 'Jellyfin - Media server',
-        ),
-        'radarr' => array(
-            'url'      => $publicBase === '' ? '' : $publicBase.'radarr/',
-            'linkText' => 'Radarr',
-            'title'    => 'Radarr - Movie manager',
-        ),
-        'sonarr' => array(
-            'url'      => $publicBase === '' ? '' : $publicBase.'sonarr/',
-            'linkText' => 'Sonarr',
-            'title'    => 'Sonarr - TV manager',
-        ),
-        'prowlarr' => array(
-            'url'      => $publicBase === '' ? '' : $publicBase.'prowlarr/',
-            'linkText' => 'Prowlarr',
-            'title'    => 'Prowlarr - Indexer manager',
-        ),
-        'lidarr' => array(
-            'url'      => $publicBase === '' ? '' : $publicBase.'lidarr/',
-            'linkText' => 'Lidarr',
-            'title'    => 'Lidarr - Music manager',
-        ),
-        'readarr' => array(
-            'url'      => $publicBase === '' ? '' : $publicBase.'readarr/',
-            'linkText' => 'Readarr',
-            'title'    => 'Readarr - Book manager',
-        ),
-        'sabnzbd' => array(
-            'url'      => $publicBase === '' ? '' : $publicBase.'sabnzbd/',
-            'linkText' => 'SABnzbd',
-            'title'    => 'SABnzbd - Usenet downloader',
-        ),
-        'invidious' => array(
-            'url'      => 'apps/invidious/',
-            'linkText' => 'Invidious',
-            'title'    => 'Invidious - Video frontend',
-        ),
+        'qbittorrent' => pmssLocalFrameDefinition('qbittorrent/', 'qBittorrent', 'qBittorrent - Torrent web UI'),
+        'deluge' => pmssLocalFrameDefinition('deluge/', 'Deluge', 'Deluge - Torrent web UI'),
+        'rclone' => pmssLocalFrameDefinition('rclone/', 'Rclone', 'Rclone Web UI'),
+        'jellyfin' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'jellyfin/web/index.html', 'Jellyfin', 'Jellyfin - Media server'),
+        'radarr' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'radarr/', 'Radarr', 'Radarr - Movie manager'),
+        'sonarr' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'sonarr/', 'Sonarr', 'Sonarr - TV manager'),
+        'prowlarr' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'prowlarr/', 'Prowlarr', 'Prowlarr - Indexer manager'),
+        'lidarr' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'lidarr/', 'Lidarr', 'Lidarr - Music manager'),
+        'readarr' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'readarr/', 'Readarr', 'Readarr - Book manager'),
+        'sabnzbd' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'sabnzbd/', 'SABnzbd', 'SABnzbd - Usenet downloader'),
+        'invidious' => pmssLocalFrameDefinition('apps/invidious/', 'Invidious', 'Invidious - Video frontend'),
     );
+}
+
+/** Return the per-user enable flag for toggle-gated app tabs. */
+function pmssLocalFrameProxyAppEnableFile($app)
+{
+    $toggleFiles = array(
+        'qbittorrent' => '.qbittorrentEnable',
+        'deluge'      => '.delugeEnable',
+        'rclone'      => '.rcloneEnable',
+    );
+
+    return isset($toggleFiles[$app]) ? $toggleFiles[$app] : '';
 }
 
 /** Return true when a lighttpd proxy fragment exposes the named app path. */
@@ -203,16 +177,12 @@ function pmssLocalFrameProxyFragmentMentionsApp($fragment, $app)
 /** Return true when an app proxy should surface as an enabled tab. */
 function pmssLocalFrameProxyAppEnabled($app, $homePath = '..')
 {
-    $toggleFiles = array(
-        'qbittorrent' => '.qbittorrentEnable',
-        'deluge'      => '.delugeEnable',
-        'rclone'      => '.rcloneEnable',
-    );
-    if (!isset($toggleFiles[$app])) {
+    $toggleFile = pmssLocalFrameProxyAppEnableFile($app);
+    if ($toggleFile === '') {
         return true;
     }
 
-    return is_file(rtrim($homePath, '/').'/'.$toggleFiles[$app]);
+    return is_file(rtrim($homePath, '/').'/'.$toggleFile);
 }
 
 /**
@@ -277,9 +247,9 @@ function pmssLocalFrameInstalledAppFramesRead($homePath = '..')
     // tab: clicking it loads a backend that is not running and the customer
     // gets a raw 503. Per ADR 0021 #2: enabled features only.
     $signals = array(
-        'qbittorrent' => array('signal' => '.config/qBittorrent', 'type' => 'dir',  'enable' => '.qbittorrentEnable'),
-        'deluge'      => array('signal' => '.config/deluge',      'type' => 'dir',  'enable' => '.delugeEnable'),
-        'rclone'      => array('signal' => '.rclonePort',         'type' => 'file', 'enable' => '.rcloneEnable'),
+        'qbittorrent' => array('signal' => '.config/qBittorrent', 'type' => 'dir'),
+        'deluge'      => array('signal' => '.config/deluge',      'type' => 'dir'),
+        'rclone'      => array('signal' => '.rclonePort',         'type' => 'file'),
     );
 
     $home = rtrim($homePath, '/');
@@ -289,12 +259,38 @@ function pmssLocalFrameInstalledAppFramesRead($homePath = '..')
         }
         $signalPath = $home.'/'.$paths['signal'];
         $signalPresent = $paths['type'] === 'file' ? is_file($signalPath) : is_dir($signalPath);
-        if ($signalPresent && is_file($home.'/'.$paths['enable'])) {
+        if ($signalPresent && pmssLocalFrameProxyAppEnabled($app, $homePath)) {
             $frames[$app] = $definitions[$app];
         }
     }
 
     return $frames;
+}
+
+/**
+ * Read customer-owned custom tabs.
+ *
+ * Each non-comment line defines: appname|tooltip|label|url.
+ *
+ * @return array<string,array<string,string>>
+ */
+function pmssLocalFrameCustomFramesRead($path = '../.customFrames')
+{
+    $frameData = array();
+    if (!file_exists($path)) {
+        return $frameData;
+    }
+
+    $file = new SplFileObject($path);
+    while (!$file->eof()) {
+        $line = trim($file->fgets());
+        if ($line === '' || strpos($line, "#") === 0) continue;
+        $frameArray = explode("|", $line);
+        if (count($frameArray) < 4 || $frameArray[3] === '') continue;
+        $frameData[$frameArray[0]] = pmssLocalFrameDefinition($frameArray[3], $frameArray[2], $frameArray[1]);
+    }
+
+    return $frameData;
 }
 
 // Remote frames can be disabled explicitly for debugging or fully offline
@@ -358,36 +354,16 @@ if ($useLocalFrames) {
 EOF;
 
     $frames = array(
-        'welcome' => array(
-            'url'      => pmssLocalFrameWelcomeUrlBuild(),
-            'linkText' => 'welcome',
-            'title'    => 'Welcome to your seedbox. Basic information',
-        ),
-        'rutorrent' => array(
-            'url'      => 'rutorrent/',
-            'linkText' => 'ruTorrent',
-            'title'    => 'ruTorrent - Torrent web UI',
-        ),
-        'filemanager' => array(
-            'url'      => (file_exists('filemanager.php') ? 'filemanager.php' : 'ajax/'),
-            'linkText' => 'File manager',
-            'title'    => 'Manage your files',
-        ),
-        'info' => array(
-            'url'      => 'info.php',
-            'linkText' => 'info',
-            'title'    => 'Information, quota, server RAM',
-        ),
+        'welcome' => pmssLocalFrameDefinition(pmssLocalFrameWelcomeUrlBuild(), 'welcome', 'Welcome to your seedbox. Basic information'),
+        'rutorrent' => pmssLocalFrameDefinition('rutorrent/', 'ruTorrent', 'ruTorrent - Torrent web UI'),
+        'filemanager' => pmssLocalFrameDefinition((file_exists('filemanager.php') ? 'filemanager.php' : 'ajax/'), 'File manager', 'Manage your files'),
+        'info' => pmssLocalFrameDefinition('info.php', 'info', 'Information, quota, server RAM'),
         // Wiki is an in-page iframe tab, not a new window. wiki.pulsedmedia.com
         // sends `CSP: frame-ancestors 'self' https://*.pulsedmedia.com`, so it
         // frames cleanly from any per-user seedbox subdomain. (Reverts the
         // b4d284f8 `target=_blank` workaround for the old SAMEORIGIN block,
         // which no longer exists. Per ADR 0021: top frame = in-page tabs only.)
-        'wiki' => array(
-            'url'      => 'https://wiki.pulsedmedia.com',
-            'linkText' => 'wiki',
-            'title'    => 'Pulsed Media Wiki',
-        ),
+        'wiki' => pmssLocalFrameDefinition('https://wiki.pulsedmedia.com', 'wiki', 'Pulsed Media Wiki'),
     );
 }
 ?>
@@ -465,32 +441,7 @@ hr {background-color: #4b4b4b;}
 }
 
 <?php
-// Load custom frames from ~/.customFrames
-// Each non-comment line defines one additional tab in the GUI:
-//   appname|tooltip|label|url
-//   |       |       |     |
-//   |       |       |     \--- URL to the application
-//   |       |       \--------- Tab label
-//   |       \----------------- Hover text (tooltip)
-//   \------------------------- Internal name, must be alphanumeric and
-//                              must not start with a number.
-
-$frameData = array();
-if (file_exists('../.customFrames')) {
-    $file = new SplFileObject('../.customFrames');
-    while (!$file->eof()) {
-        $line = trim($file->fgets());
-        if ($line === '' || strpos($line, "#") === 0) continue;
-        $frameArray = explode("|", $line);
-        if (count($frameArray) < 4 || $frameArray[3] === '') continue; // Drop invalid lines
-        $frameData[$frameArray[0]] = array(
-            'title' => $frameArray[1],
-            'linkText' => $frameArray[2],
-            'url' => $frameArray[3]
-        );
-    }
-    $file = null;
-}
+$frameData = pmssLocalFrameCustomFramesRead();
 // Case-insensitive set of keys already present in the primary frame set ($frames, from the
 // remote guiFrames master or the local failover). The remote master keys some app tabs with
 // mixed case (e.g. 'qBittorrent') while the local installed/proxy readers key them lower-case
@@ -498,22 +449,15 @@ if (file_exists('../.customFrames')) {
 // TWICE. Dedup case-insensitively so a tab the master already provides is never re-added.
 $pmssFramesKeysLower = array();
 foreach (array_keys($frames) as $pmssFrameKey) { $pmssFramesKeysLower[strtolower($pmssFrameKey)] = true; }
-foreach (pmssLocalFrameInstalledAppFramesRead() as $app => $frame) {
-    if (!isset($pmssFramesKeysLower[strtolower($app)]) && !isset($frameData[$app])) {
-        $frameData[$app] = $frame;
-    }
-}
-foreach (pmssLocalFrameProxyAppFramesRead() as $app => $frame) {
-    if (!isset($pmssFramesKeysLower[strtolower($app)]) && !isset($frameData[$app])) {
-        $frameData[$app] = $frame;
+foreach (array(pmssLocalFrameInstalledAppFramesRead(), pmssLocalFrameProxyAppFramesRead()) as $pmssCandidateFrames) {
+    foreach ($pmssCandidateFrames as $app => $frame) {
+        if (!isset($pmssFramesKeysLower[strtolower($app)]) && !isset($frameData[$app])) {
+            $frameData[$app] = $frame;
+        }
     }
 }
 if (file_exists('../.delugeEnable') && file_exists('deluge.php') && !isset($pmssFramesKeysLower['deluge']) && !isset($frameData['deluge'])) {
-    $frameData['deluge'] = array(
-        'title' => 'Deluge - Torrent web UI',
-        'linkText' => 'Deluge',
-        'url' => 'deluge/'
-    );
+    $frameData['deluge'] = pmssLocalFrameDefinition('deluge/', 'Deluge', 'Deluge - Torrent web UI');
 }
 $frames = array_merge($frames, $frameData);
 
@@ -538,14 +482,25 @@ echo $styleList . '{';
         <ul class="tabs-nav">
 <?php
 foreach($frames AS $thisId => $thisFrame) {
+    // Frame fields can come from the customer-owned .customFrames file;
+    // escape for the HTML and JS-in-attribute contexts below.
+    $frameTitleHtml = htmlspecialchars((string) ($thisFrame['title'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $frameTextHtml  = htmlspecialchars((string) ($thisFrame['linkText'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $frameUrlHtml   = htmlspecialchars((string) ($thisFrame['url'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $frameIdHtml    = htmlspecialchars((string) $thisId, ENT_QUOTES, 'UTF-8');
+    // JS string context: escape backslashes/quotes first, then HTML-escape
+    // for the surrounding attribute.
+    $frameIdJs  = htmlspecialchars(str_replace(array('\\', "'"), array('\\\\', "\\'"), (string) $thisId), ENT_QUOTES, 'UTF-8');
+    $frameUrlJs = htmlspecialchars(str_replace(array('\\', "'"), array('\\\\', "\\'"), (string) ($thisFrame['url'] ?? '')), ENT_QUOTES, 'UTF-8');
+
     if (pmssFrameOpensInNewWindow($thisFrame)) {
-        echo "\t\t" . '<li><a href="' . $thisFrame['url'] . '" title="' . $thisFrame['title'] . '" target="_blank" rel="noopener noreferrer"><span>' .
-            $thisFrame['linkText'] . '</span></a></li>' . "\n";
+        echo "\t\t" . '<li><a href="' . $frameUrlHtml . '" title="' . $frameTitleHtml . '" target="_blank" rel="noopener noreferrer"><span>' .
+            $frameTextHtml . '</span></a></li>' . "\n";
         continue;
     }
 
-    echo "\t\t" . '<li><a href="#' . $thisId . '" title="' . $thisFrame['title'] . '" onClick="loadFrame(\'' . $thisId . '\', \'' . $thisFrame['url'] . '\'); setTimeout(\'setHeights();\', 500); "><span>' .
-        $thisFrame['linkText'] . '</span></a></li>' . "\n";
+    echo "\t\t" . '<li><a href="#' . $frameIdHtml . '" title="' . $frameTitleHtml . '" onClick="loadFrame(\'' . $frameIdJs . '\', \'' . $frameUrlJs . '\'); setTimeout(\'setHeights();\', 500); "><span>' .
+        $frameTextHtml . '</span></a></li>' . "\n";
 }
 ?>
         </ul>
@@ -556,11 +511,13 @@ foreach($frames AS $thisId => $thisFrame) {
         continue;
     }
 
+    $frameIdHtml  = htmlspecialchars((string) $thisId, ENT_QUOTES, 'UTF-8');
+    $frameUrlHtml = htmlspecialchars((string) ($thisFrame['url'] ?? ''), ENT_QUOTES, 'UTF-8');
     if ($thisId != 'welcome') {
-        echo "\t" . '<div id="' . $thisId . '" class="tabs-container"></div>' . "\n";
+        echo "\t" . '<div id="' . $frameIdHtml . '" class="tabs-container"></div>' . "\n";
     } else {
-        echo "\n\t" . '<div id="' . $thisId . '" class="tabs-container">
-        <iframe id="' . $thisId . 'Frame" width=100% height=100% src="' . $thisFrame['url'] . '" frameborder="0"></iframe>
+        echo "\n\t" . '<div id="' . $frameIdHtml . '" class="tabs-container">
+        <iframe id="' . $frameIdHtml . 'Frame" width=100% height=100% src="' . $frameUrlHtml . '" frameborder="0"></iframe>
      </div>' . "\n";
     }
 }

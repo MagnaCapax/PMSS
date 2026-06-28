@@ -72,17 +72,12 @@ class PmssStatsCliTest extends TestCase
             'socket_path' => $this->home.'/.rtorrent.socket',
         ]);
 
-        $this->assertEquals('alice', $stats['context']['user']);
-        $this->assertEquals('M10G S', $stats['product']);
-        $this->assertEquals('2.8.14', $stats['pmss_version']);
+        $this->pmssAssertArraySubsetSame(['user' => 'alice'], $stats['context']);
+        $this->pmssAssertArraySubsetSame(['product' => 'M10G S', 'pmss_version' => '2.8.14'], $stats);
         $this->assertEquals(30.0, round((float) $stats['disk']['percent'], 2));
-        $this->assertEquals(6144.0, $stats['traffic']['limit_mib']);
-        $this->assertEquals(12, $stats['cgroup']['pids_current']);
-        $this->assertEquals(6, $stats['rtorrent']['torrent_total']);
-        $this->assertEquals(4, $stats['rtorrent']['torrent_active']);
-        $this->assertEquals(2, $stats['rtorrent']['torrent_stopped']);
-        $this->assertEquals(2, $stats['rtorrent']['torrent_downloading']);
-        $this->assertEquals(2.0, $stats['rtorrent']['ratio']);
+        $this->pmssAssertArraySubsetSame(['limit_mib' => 6144.0], $stats['traffic']);
+        $this->pmssAssertArraySubsetSame(['pids_current' => 12], $stats['cgroup']);
+        $this->pmssAssertArraySubsetSame(['torrent_total' => 6, 'torrent_active' => 4, 'torrent_stopped' => 2, 'torrent_downloading' => 2, 'ratio' => 2.0], $stats['rtorrent']);
     }
 
     public function testRenderTextShowsCompactLayout(): void

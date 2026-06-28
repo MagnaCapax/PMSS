@@ -44,19 +44,9 @@ function pmssWebCgroupMemoryStatusDetectDir(array $overrides = [])
     }
 
     $cgroupFile = (string) ($overrides['self_cgroup_file'] ?? '/proc/self/cgroup');
-    $lines = @file($cgroupFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (!is_array($lines)) {
-        return '';
-    }
-
-    foreach ($lines as $line) {
-        $parts = explode(':', (string) $line, 3);
-        if (count($parts) !== 3 || trim($parts[2]) === '') {
-            continue;
-        }
-
+    foreach (pmssCustomerCgroupSelfEntries($cgroupFile) as $entry) {
         foreach (['/sys/fs/cgroup', '/sys/fs/cgroup/unified'] as $root) {
-            $candidate = $root.'/'.ltrim(trim($parts[2]), '/');
+            $candidate = $root.$entry['path'];
             if (is_dir($candidate)) {
                 return $candidate;
             }

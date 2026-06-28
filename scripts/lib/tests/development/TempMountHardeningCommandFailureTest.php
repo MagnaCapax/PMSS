@@ -26,6 +26,21 @@ class TempMountHardeningCommandFailureTest extends TestCase
         );
     }
 
+    private function runWithFailingMount(array $env, callable $callback): array
+    {
+        $messages = [];
+        $this->pmssResetRuntimeProfile();
+        $this->pmssWithPathPrefixedEnv(
+            $this->failingMountPath(),
+            $env + ['PMSS_DRY_RUN' => null],
+            function () use (&$messages, $callback): void {
+                $messages = $this->pmssArrayLoggerMessages($callback);
+            }
+        );
+
+        return $messages;
+    }
+
     public function testNoexecRemountFailureIsLogged(): void
     {
         ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
@@ -34,17 +49,10 @@ class TempMountHardeningCommandFailureTest extends TestCase
             "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\n"
         );
 
-        $this->pmssResetRuntimeProfile();
-        $messages = [];
-        $this->pmssWithPathPrefixedEnv(
-            $this->failingMountPath(),
-            ['PMSS_HARDEN_TMP_NOEXEC' => '1', 'PMSS_DRY_RUN' => null],
-            function () use (&$messages, $fstab, $mounts): void {
-                $messages = $this->pmssArrayLoggerMessages(
-                    function (callable $logger) use ($fstab, $mounts): void {
-                        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
-                    }
-                );
+        $messages = $this->runWithFailingMount(
+            ['PMSS_HARDEN_TMP_NOEXEC' => '1'],
+            function (callable $logger) use ($fstab, $mounts): void {
+                \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
             }
         );
 
@@ -63,17 +71,10 @@ class TempMountHardeningCommandFailureTest extends TestCase
             ''
         );
 
-        $this->pmssResetRuntimeProfile();
-        $messages = [];
-        $this->pmssWithPathPrefixedEnv(
-            $this->failingMountPath(),
-            ['PMSS_HARDEN_TMP_TMPFS' => '1', 'PMSS_DRY_RUN' => null],
-            function () use (&$messages, $fstab, $mounts): void {
-                $messages = $this->pmssArrayLoggerMessages(
-                    function (callable $logger) use ($fstab, $mounts): void {
-                        \pmssConfigureTempTmpfsMount($logger, $fstab, $mounts);
-                    }
-                );
+        $messages = $this->runWithFailingMount(
+            ['PMSS_HARDEN_TMP_TMPFS' => '1'],
+            function (callable $logger) use ($fstab, $mounts): void {
+                \pmssConfigureTempTmpfsMount($logger, $fstab, $mounts);
             }
         );
 

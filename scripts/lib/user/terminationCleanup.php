@@ -1,9 +1,6 @@
 <?php
 /**
- * Termination cleanup helpers shared by foreground account removal flows.
- *
- * The operator script keeps orchestration order; this module owns the small
- * filesystem cleanup primitives and reclaim-path moves used during termination.
+ * Termination cleanup primitives for foreground account removal flows.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -13,92 +10,114 @@ require_once dirname(__DIR__).'/userLifecycle.php';
 require_once __DIR__.'/homeReclaim.php';
 require_once __DIR__.'/userConfigStore.php';
 
-/** Remove a lifecycle-owned file while preserving dry-run semantics. */
-function pmssTerminateUserUnlinkPath(string $username, string $phase, string $path, bool $dryRun): bool
+function pmssTerminateUserRejectUnsafePath(string $username, string $phase, string $path, string $message, string $contextKey = 'path'): bool
 {
-    if (pmssFilesystemPathHasNulByte($path)) {
-        pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', 'Refusing unsafe file path', array('path' => $path));
+    if (!pmssFilesystemPathHasNulByte($path)) {
         return false;
     }
-    if (!file_exists($path) && !is_link($path)) return true;
+
+    pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', $message, array($contextKey => $path));
+    return true;
+}
+
+function pmssTerminateUserPathExistsOrLink(string $path): bool
+{
+    return file_exists($path) || is_link($path);
+}
+
+function pmssTerminateUserUnlinkPath(string $username, string $phase, string $path, bool $dryRun): bool
+{
+    if (pmssTerminateUserRejectUnsafePath($username, $phase, $path, 'Refusing unsafe file path')) {
+        return false;
+    }
+    if (!pmssTerminateUserPathExistsOrLink($path)) {
+        return true;
+    }
     if ($dryRun) {
         pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'SKIP', 'Dry run; file not removed', array('path' => $path));
         return true;
     }
-    if (@unlink($path)) { pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'OK', 'Removed file', array('path' => $path)); return true; }
+    if (@unlink($path)) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'OK', 'Removed file', array('path' => $path));
+        return true;
+    }
+
     pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', 'Failed to remove file', array('path' => $path));
     return false;
 }
 
-/** Remove an empty lifecycle-owned directory without hiding dry-run mutations. */
 function pmssTerminateUserRemoveEmptyDir(string $username, string $phase, string $path, bool $dryRun): bool
 {
-    if (pmssFilesystemPathHasNulByte($path)) {
-        pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', 'Refusing unsafe directory path', array('path' => $path));
+    if (pmssTerminateUserRejectUnsafePath($username, $phase, $path, 'Refusing unsafe directory path')) {
         return false;
     }
-    if (!is_dir($path)) return true;
+    if (!is_dir($path)) {
+        return true;
+    }
+
     $entries = @scandir($path);
-    if (!is_array($entries) || array_diff($entries, array('.', '..')) !== array()) return true;
+    if (!is_array($entries) || array_diff($entries, array('.', '..')) !== array()) {
+        return true;
+    }
     if ($dryRun) {
         pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'SKIP', 'Dry run; directory not removed', array('path' => $path));
         return true;
     }
-    if (@rmdir($path)) { pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'OK', 'Removed empty directory', array('path' => $path)); return true; }
+    if (@rmdir($path)) {
+        pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'OK', 'Removed empty directory', array('path' => $path));
+        return true;
+    }
+
     pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', 'Failed to remove empty directory', array('path' => $path));
     return false;
 }
 
-/** Remove nginx subdomain route files owned by this terminated user. */
+function pmssTerminateUserNginxRouteFileSpecs(string $username): array
+{
+    return array(array('phase' => 'remove_nginx_route_file', 'path' => "/etc/nginx/conf.d/pmss-user-{$username}.conf"), array('phase' => 'remove_nginx_route_file_hash', 'path' => "/etc/nginx/conf.d/pmss-user-{$username}-hash.conf"));
+}
+
 function pmssTerminateUserRemoveNginxRouteFiles(string $username, bool $dryRun): bool
 {
     $ok = true;
-    foreach (array('' => 'remove_nginx_route_file', '-hash' => 'remove_nginx_route_file_hash') as $suffix => $phase) {
-        $ok = pmssTerminateUserUnlinkPath($username, $phase, "/etc/nginx/conf.d/pmss-user-{$username}{$suffix}.conf", $dryRun) && $ok;
+    foreach (pmssTerminateUserNginxRouteFileSpecs($username) as $spec) {
+        $ok = pmssTerminateUserUnlinkPath($username, $spec['phase'], $spec['path'], $dryRun) && $ok;
     }
     return $ok;
 }
 
-/**
- * Record a parsed rTorrent reservation port only when it is a valid network port.
- *
- * @param array<string,int> $ports
- */
+function pmssTerminateUserRtorrentPortKeys(): array
+{
+    return array('scgi' => 'rtorrentPort', 'dht' => 'rtorrentDhtPort', 'listen' => 'rtorrentListenPort');
+}
+
+function pmssTerminateUserRtorrentLegacyPatterns(): array
+{
+    return array('scgi' => '/^scgi_port\s*=\s*(?:[^:]*:)?(\d+)/i', 'dht' => '/^(?:dht_?port|dht\.port(?:\.set)?)\s*=\s*(\d+)/i', 'listen' => '/^port_range\s*=\s*(\d+)(?:\s*-\s*\d+)?/i');
+}
+
+function pmssTerminateUserRtorrentPortInvalid(string $username, string $type, string $rawPort, string $message): void
+{
+    pmssUserLifecycleContextLogStatusMessage('terminate', 'cleanup_ports_config_invalid', $username, 'WARN', $message, array('type' => $type, 'raw_port' => $rawPort));
+}
+
+/** @param array<string,int> $ports */
 function pmssTerminateUserRtorrentPortRecord(string $username, array &$ports, string $type, string $rawPort): void
 {
-    if (!in_array($type, array('scgi', 'dht', 'listen'), true)) {
-        pmssUserLifecycleContextLogStatusMessage(
-            'terminate',
-            'cleanup_ports_config_invalid',
-            $username,
-            'WARN',
-            'Invalid rTorrent port type in config; skipping port reservation cleanup',
-            array('type' => $type, 'raw_port' => $rawPort)
-        );
+    if (!array_key_exists($type, pmssTerminateUserRtorrentPortKeys())) {
+        pmssTerminateUserRtorrentPortInvalid($username, $type, $rawPort, 'Invalid rTorrent port type in config; skipping port reservation cleanup');
         return;
     }
 
     $port = pmssNetworkPortParseDigits($rawPort);
     if ($port === null) {
-        pmssUserLifecycleContextLogStatusMessage(
-            'terminate',
-            'cleanup_ports_config_invalid',
-            $username,
-            'WARN',
-            'Invalid rTorrent port in config; skipping port reservation cleanup',
-            array('type' => $type, 'raw_port' => $rawPort)
-        );
+        pmssTerminateUserRtorrentPortInvalid($username, $type, $rawPort, 'Invalid rTorrent port in config; skipping port reservation cleanup');
         return;
     }
 
     $ports[$type] = $port;
 }
 
-/**
- * Load rTorrent reservation ports from the durable per-user payload.
- *
- * @return array<string,int>
- */
 function pmssTerminateUserRtorrentStoredPorts(string $username, ?UserConfigStore $store = null): array
 {
     $store = $store ?: new UserConfigStore();
@@ -108,21 +127,15 @@ function pmssTerminateUserRtorrentStoredPorts(string $username, ?UserConfigStore
     }
 
     $ports = array();
-    foreach (array('scgi' => 'rtorrentPort', 'dht' => 'rtorrentDhtPort', 'listen' => 'rtorrentListenPort') as $type => $key) {
+    foreach (pmssTerminateUserRtorrentPortKeys() as $type => $key) {
         if (array_key_exists($key, $payload)) {
             pmssTerminateUserRtorrentPortRecord($username, $ports, $type, (string) $payload[$key]);
         }
     }
-
     return $ports;
 }
 
-/**
- * Fill missing rTorrent reservation ports from old directive-style configs.
- *
- * @param array<string,int> $ports
- * @return array<string,int>
- */
+/** @param array<string,int> $ports @return array<string,int> */
 function pmssTerminateUserRtorrentLegacyPorts(string $username, string $portFile, array $ports): array
 {
     if (!file_exists($portFile)) {
@@ -131,51 +144,31 @@ function pmssTerminateUserRtorrentLegacyPorts(string $username, string $portFile
 
     $configLines = @file($portFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     if (!is_array($configLines)) {
-        pmssUserLifecycleContextLogStatusMessage(
-            'terminate',
-            'cleanup_ports_config_read',
-            $username,
-            'WARN',
-            'Unable to read rTorrent config; skipping reserved port cleanup',
-            array('path' => $portFile)
-        );
-    } else {
-        $patterns = array(
-            'scgi' => '/^scgi_port\s*=\s*(?:[^:]*:)?(\d+)/i',
-            'dht' => '/^(?:dht_?port|dht\.port(?:\.set)?)\s*=\s*(\d+)/i',
-            'listen' => '/^port_range\s*=\s*(\d+)(?:\s*-\s*\d+)?/i',
-        );
-        foreach ($configLines as $line) {
-            $line = trim($line);
-            if ($line === '' || $line[0] === '#') {
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'cleanup_ports_config_read', $username, 'WARN', 'Unable to read rTorrent config; skipping reserved port cleanup', array('path' => $portFile));
+        return $ports;
+    }
+
+    foreach ($configLines as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#') {
+            continue;
+        }
+        foreach (pmssTerminateUserRtorrentLegacyPatterns() as $type => $pattern) {
+            if (isset($ports[$type]) || preg_match($pattern, $line, $matches) !== 1) {
                 continue;
             }
-            foreach ($patterns as $type => $pattern) {
-                if (isset($ports[$type])) {
-                    continue;
-                }
-                if (preg_match($pattern, $line, $m) !== 1) {
-                    continue;
-                }
-                pmssTerminateUserRtorrentPortRecord($username, $ports, $type, $m[1]);
-                break;
-            }
+            pmssTerminateUserRtorrentPortRecord($username, $ports, $type, $matches[1]);
+            break;
         }
     }
 
     return $ports;
 }
 
-/** Release rTorrent reservation files recorded for a user. */
 function pmssTerminateUserReleaseRtorrentPortReservations(string $username, string $portFile, bool $dryRun, string $portsBase = '/var/lib/pmss/ports', ?UserConfigStore $store = null): bool
 {
     $portsBase = rtrim($portsBase, '/');
-    $ports = pmssTerminateUserRtorrentLegacyPorts(
-        $username,
-        $portFile,
-        pmssTerminateUserRtorrentStoredPorts($username, $store)
-    );
-
+    $ports = pmssTerminateUserRtorrentLegacyPorts($username, $portFile, pmssTerminateUserRtorrentStoredPorts($username, $store));
     if (count($ports) === 0 && !file_exists($portFile)) {
         return true;
     }
@@ -183,23 +176,18 @@ function pmssTerminateUserReleaseRtorrentPortReservations(string $username, stri
     $ok = true;
     foreach ($ports as $type => $port) {
         $filePath = $portsBase.'/'.$type.'/'.$port;
-        if (!file_exists($filePath) && !is_link($filePath)) {
+        if (!pmssTerminateUserPathExistsOrLink($filePath)) {
             continue;
         }
         $ok = pmssTerminateUserUnlinkPath($username, 'release_rtorrent_'.$type.'_port', $filePath, $dryRun) && $ok;
         $ok = pmssTerminateUserRemoveEmptyDir($username, 'remove_empty_rtorrent_'.$type.'_port_dir', dirname($filePath), $dryRun) && $ok;
     }
     $ok = pmssTerminateUserRemoveEmptyDir($username, 'remove_empty_rtorrent_ports_root', $portsBase, $dryRun) && $ok;
-    pmssUserLifecycleContextLog('terminate', 'cleanup_ports', $username, array(
-        'status'  => $dryRun ? 'SKIP' : ($ok ? 'OK' : 'ERR'),
-        'ports'   => $ports,
-        'dry_run' => $dryRun,
-    ));
+    pmssUserLifecycleContextLog('terminate', 'cleanup_ports', $username, array('status' => $dryRun ? 'SKIP' : ($ok ? 'OK' : 'ERR'), 'ports' => $ports, 'dry_run' => $dryRun));
 
     return $ok;
 }
 
-/** Move a validated source path into the asynchronous reclaim namespace. */
 function pmssTerminateUserMovePathForReclaim(string $username, string $phase, string $sourcePath, bool $dryRun, string $dryRunMessage, string $failureMessage, string $successMessage, array $allocationContext = array(), bool $sourceUnsafe = false): string
 {
     if (pmssFilesystemPathHasNulByte($sourcePath) || $sourceUnsafe || is_link($sourcePath)) {
@@ -222,6 +210,7 @@ function pmssTerminateUserMovePathForReclaim(string $username, string $phase, st
         pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', $failureMessage, $context);
         return '';
     }
+
     clearstatcache(true, $targetPath);
     if (!pmssUserHomeReclaimPathIsSafe($targetPath)) {
         pmssUserLifecycleContextLogStatusMessage('terminate', $phase, $username, 'ERR', 'Renamed reclaim target failed safety validation', $context);
@@ -231,7 +220,6 @@ function pmssTerminateUserMovePathForReclaim(string $username, string $phase, st
     return $targetPath;
 }
 
-/** Validate the active home path before a destructive termination rename. */
 function pmssTerminateUserHomePathIsExact(string $username, string $homePath): bool
 {
     if (!pmssUsernameIsValid($username) || pmssFilesystemPathHasNulByte($homePath) || is_link($homePath)) {
@@ -244,34 +232,32 @@ function pmssTerminateUserHomePathIsExact(string $username, string $homePath): b
     return $realHome !== false && $homePath === $expectedHome && $realHome === $expectedHome && is_dir($realHome);
 }
 
-/** Move the home out of the active username namespace before slow disk reclaim. */
 function pmssTerminateUserMoveHomeForReclaim(string $username, string $homePath, bool $dryRun): string
 {
     if (!pmssTerminateUserHomePathIsExact($username, $homePath)) {
         $realHome = pmssFilesystemPathHasNulByte($homePath) ? false : realpath($homePath);
-        pmssUserLifecycleContextLogStatusMessage('terminate', 'home_reclaim_rename', $username, 'ERR', 'Refusing unexpected home reclaim source path', array(
-            'expected_home' => "/home/{$username}",
-            'source'        => $homePath,
-            'real_home'     => $realHome,
-        ));
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'home_reclaim_rename', $username, 'ERR', 'Refusing unexpected home reclaim source path', array('expected_home' => "/home/{$username}", 'source' => $homePath, 'real_home' => $realHome));
         return '';
     }
 
     return pmssTerminateUserMovePathForReclaim($username, 'home_reclaim_rename', $homePath, $dryRun, 'Dry run; home not renamed', 'Failed to rename home for background reclaim', 'Renamed home for background reclaim');
 }
 
-/** Move a recreateUser safety backup into the asynchronous reclaim namespace. */
 function pmssTerminateUserMoveBackupForReclaim(string $username, string $backupPath, bool $dryRun): string
 {
     if (is_link($backupPath)) {
         pmssUserLifecycleContextLogStatusMessage('terminate', 'reclaim_user_backup_dir', $username, 'ERR', 'Refusing symlinked user backup directory', array('source' => $backupPath));
         return '';
     }
-    if (!is_dir($backupPath)) return '';
+    if (!is_dir($backupPath)) {
+        return '';
+    }
+
     $realBackup = realpath($backupPath);
     if ($realBackup === false || $realBackup !== $backupPath) {
         pmssUserLifecycleContextLogStatusMessage('terminate', 'reclaim_user_backup_dir', $username, 'ERR', 'Refusing unexpected user backup path', array('source' => $backupPath, 'real_backup' => $realBackup));
         return '';
     }
+
     return pmssTerminateUserMovePathForReclaim($username, 'reclaim_user_backup_dir', $backupPath, $dryRun, 'Dry run; user backup not renamed', 'Failed to rename user backup for background reclaim', 'Renamed user backup for background reclaim', array('source' => $backupPath));
 }

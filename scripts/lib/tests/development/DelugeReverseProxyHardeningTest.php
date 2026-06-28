@@ -44,9 +44,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
     {
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
 
-        $this->assertStringContainsString('location /deluge-##username/ {', $template);
-        $this->assertStringContainsString('proxy_pass http://127.0.0.1:##serverPort/deluge-##username/;', $template);
-        $this->assertStringContainsString('include /etc/nginx/proxy_params;', $template);
+        $this->assertStringContainsAllStrings(['location /deluge-##username/ {', 'proxy_pass http://127.0.0.1:##serverPort/deluge-##username/;', 'include /etc/nginx/proxy_params;'], $template);
     }
 
     public function testNginxUserTemplateDelugeCanonicalCookiePathIsNormalized(): void
@@ -98,8 +96,10 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
 
         // Regression guard: legacy configs proxied directly to deluge-web.
-        $this->assertStringNotContainsString('##delugeWebPort', $template, 'nginx user template must not use delugeWebPort placeholder');
-        $this->assertStringNotContainsString('proxy_pass http://127.0.0.1:##delugeWebPort', $template, 'nginx must not proxy deluge-web directly');
+        $this->assertStringContainsAndOmitsStrings([], [
+            '##delugeWebPort' => 'nginx user template must not use delugeWebPort placeholder',
+            'proxy_pass http://127.0.0.1:##delugeWebPort' => 'nginx must not proxy deluge-web directly',
+        ], $template);
     }
 
     public function testNginxUserTemplateDelugeLegacyRedirectIsNotAnOpenRedirect(): void
@@ -130,8 +130,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
         $script = \pmssNginxUserSubdomainTemplates()['private'];
 
-        $this->assertStringContainsString('location ^~ /user-##user##/ {', $script);
-        $this->assertStringContainsString('proxy_pass http://127.0.0.1:##port##;', $script);
+        $this->assertStringContainsAllStrings(['location ^~ /user-##user##/ {', 'proxy_pass http://127.0.0.1:##port##;'], $script);
     }
 
     public function testCreateNginxConfigPrivateSubdomainStillPrefixesRootToUserArea(): void
@@ -139,16 +138,14 @@ class DelugeReverseProxyHardeningTest extends TestCase
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
         $script = \pmssNginxUserSubdomainTemplates()['private'];
 
-        $this->assertStringContainsString('location / {', $script);
-        $this->assertStringContainsString('proxy_pass http://127.0.0.1:##port##/user-##user##/;', $script);
+        $this->assertStringContainsAllStrings(['location / {', 'proxy_pass http://127.0.0.1:##port##/user-##user##/;'], $script);
     }
 
     public function testCreateNginxConfigPrivateSubdomainAsIsLocationUsesProxyParams(): void
     {
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
         $script = \pmssNginxUserSubdomainTemplates()['private'];
-        $this->assertStringContainsString('location ^~ /user-##user##/', $script);
-        $this->assertStringContainsString('include /etc/nginx/proxy_params;', $script);
+        $this->assertStringContainsAllStrings(['location ^~ /user-##user##/', 'include /etc/nginx/proxy_params;'], $script);
     }
 
     public function testCreateNginxConfigPrivateSubdomainNormalizesDelugeCookiePath(): void
@@ -176,8 +173,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
         // Regression guard: base-host requests (FQDN) must land on the main vhost
         // where /etc/nginx/users/* is included (legacy Deluge redirects live there).
-        $this->assertStringContainsString("'server_name localhost;'", $script);
-        $this->assertStringContainsString("'server_name localhost '.\$subdomainBase.';'", $script);
+        $this->assertStringContainsAllStrings(["'server_name localhost;'", "'server_name localhost '.\$subdomainBase.';'"], $script);
     }
 
     public function testCreateNginxConfigPrivateSubdomainDoesNotExposePublicPrefix(): void
@@ -194,8 +190,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $generator = $this->pmssReadRepoFile('scripts/lib/nginxConfig/userConfigsGenerate.php');
 
         // Backward compat: older nginx user templates may still use ##delugeWebPort.
-        $this->assertStringContainsString('##delugeWebPort', $setup);
-        $this->assertStringContainsString("strpos(\$userTemplate, '##delugeWebPort')", $setup);
+        $this->assertStringContainsAllStrings(['##delugeWebPort', "strpos(\$userTemplate, '##delugeWebPort')"], $setup);
         $this->assertStringContainsString('##delugeWebPort', $generator);
     }
 
@@ -244,18 +239,14 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $fragment = \pmssLighttpdManagedProxyFragment('deluge', 'testuser', 31111);
 
         // Regression guard: avoid permissive patterns (e.g., ".*") that could match other paths.
-        $this->assertStringNotContainsString('.*', $fragment);
-        $this->assertStringContainsString('^/user-testuser/deluge', $fragment);
-        $this->assertStringContainsString('^/deluge-testuser', $fragment);
+        $this->assertStringContainsAndOmitsStrings(['^/user-testuser/deluge', '^/deluge-testuser'], ['.*'], $fragment);
     }
 
     public function testDelugeLighttpdProxyFragmentIsLoopbackOnly(): void
     {
         $fragment = \pmssLighttpdManagedProxyFragment('deluge', 'testuser', 31111);
 
-        $this->assertStringContainsString('"host" => "127.0.0.1"', $fragment);
-        $this->assertStringNotContainsString('"host" => "0.0.0.0"', $fragment);
-        $this->assertStringNotContainsString('"host" => "::"', $fragment);
+        $this->assertStringContainsAndOmitsStrings(['"host" => "127.0.0.1"'], ['"host" => "0.0.0.0"', '"host" => "::"'], $fragment);
     }
 
     // =========================================================================
@@ -463,8 +454,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
     public function testDelugeWebTemplateBaseIsCanonical(): void
     {
         $tpl = $this->pmssReadRepoFile('etc/seedbox/config/template.deluge.web.conf');
-        $this->assertStringContainsString('"base": "/user-##USER/deluge/"', $tpl);
-        $this->assertStringNotContainsString('"/deluge-##USER/"', $tpl);
+        $this->assertStringContainsAndOmitsStrings(['"base": "/user-##USER/deluge/"'], ['"/deluge-##USER/"'], $tpl);
     }
 
     public function testDelugeWebTemplateDisablesFirstLoginWizard(): void
@@ -492,12 +482,11 @@ class DelugeReverseProxyHardeningTest extends TestCase
     public function testWebdavLocationsAllowLargeUploads(): void
     {
         $userTpl = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
-        $this->assertStringContainsString('location /webdav-##username/', $userTpl);
-        $this->assertStringContainsString('client_max_body_size 0;', $userTpl);
+        $this->assertStringContainsAllStrings(['location /webdav-##username/', 'client_max_body_size 0;'], $userTpl);
 
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
         $templates = \pmssNginxUserSubdomainTemplates();
-        $this->assertStringContainsString('client_max_body_size 0;', $templates['public']);
-        $this->assertStringContainsString('client_max_body_size 0;', $templates['private']);
+        $this->assertStringContainsAllStrings(['client_max_body_size 0;'], $templates['public']);
+        $this->assertStringContainsAllStrings(['client_max_body_size 0;'], $templates['private']);
     }
 }

@@ -68,6 +68,27 @@ BASH
         $this->assertEquals([], $this->pmssProfileCommands());
     }
 
+    public function testKillProcessSkipsWhenProcessToolingIsUnavailable(): void
+    {
+        $this->pmssTrackEnvOverrides(['PATH' => $this->tempDir.'/bin']);
+
+        foreach (['pgrep', 'pkill'] as $missingTool) {
+            $toolPath = $this->tempDir.'/bin/'.$missingTool;
+            $backupPath = $toolPath.'.disabled';
+            $this->assertTrue(rename($toolPath, $backupPath), 'Failed to disable '.$missingTool.' fixture');
+            @file_put_contents($this->tempDir.'/state', "running\n");
+            $this->pmssResetRuntimeProfile();
+
+            try {
+                \killProcess('demo', 'Stopping demo process', null, 0);
+            } finally {
+                $this->assertTrue(rename($backupPath, $toolPath), 'Failed to restore '.$missingTool.' fixture');
+            }
+
+            $this->assertEquals([], $this->pmssProfileCommands(), $missingTool.' absence should skip kill commands');
+        }
+    }
+
     public function testSystemdUnitActionNameAllowsKnownUnitActions(): void
     {
         foreach (['enable', 'disable', 'start', 'stop', 'restart', 'reload', 'mask', 'unmask', 'try-restart'] as $action) {

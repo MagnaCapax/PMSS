@@ -33,7 +33,7 @@ PHP
 PHP
         );
 
-        $result = $this->pmssRunInlinePhpJson(str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script), ['PMSS_TEST_MODE' => '1']);
+        $result = $this->pmssRunInlinePhpJson(str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script), $this->pmssTestModeEnv());
 
         $this->assertEquals([], $result['steps']);
         $this->assertEquals([], $result['linger']);
@@ -108,7 +108,7 @@ PHP
 PHP
         );
 
-        $result = $this->pmssRunInlinePhpJson(str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script), ['PMSS_TEST_MODE' => '1']);
+        $result = $this->pmssRunInlinePhpJson(str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script), $this->pmssTestModeEnv());
 
         $this->assertStringContainsString('***** Updating user alice', $result['output']);
         $this->assertEquals([], $result['linger']);

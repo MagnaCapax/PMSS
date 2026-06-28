@@ -18,13 +18,11 @@ class TrafficStatsProcessorTest extends TrafficTestCase
             'over_tib' => (1024 * 1024) + 1,
         ]);
 
-        $this->assertEquals('100MiB', $formatted['15min']);
-        $this->assertTrue(strpos($formatted['hour'], 'GiB') !== false);
-        $this->assertTrue(strpos($formatted['day'], 'TiB') !== false);
-        $this->assertEquals('1024MiB', $formatted['exact_gib']);
-        $this->assertEquals('1GiB', $formatted['over_gib']);
-        $this->assertEquals('1024GiB', $formatted['exact_tib']);
-        $this->assertEquals('1TiB', $formatted['over_tib']);
+        $this->assertEquals([
+            '15min' => '100MiB', 'hour' => '2GiB', 'day' => '4TiB',
+            'exact_gib' => '1024MiB', 'over_gib' => '1GiB',
+            'exact_tib' => '1024GiB', 'over_tib' => '1TiB',
+        ], $formatted);
     }
 
     public function testProcessorSavesBaseAndLocalnetPayloads(): void

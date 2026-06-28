@@ -19,8 +19,7 @@ class statsDockerInactiveNoteTest extends TestCase
 
         $note = $this->renderNote('inactive', true, $fixture.'/os-release', $fixture.'/debian_version', $fixture.'/cmdline');
 
-        $this->assertStringContainsString('Debian 12: User bus restricted.', $note);
-        $this->assertStringContainsString('systemd.unified_cgroup_hierarchy=0', $note);
+        $this->assertStringContainsAllStrings(['Debian 12: User bus restricted.', 'systemd.unified_cgroup_hierarchy=0'], $note);
     }
 
     public function testFallsBackToDebianVersionFileWhenOsReleaseIsMissing(): void
@@ -31,8 +30,7 @@ class statsDockerInactiveNoteTest extends TestCase
 
         $note = $this->renderNote('inactive', null, $fixture.'/missing-os-release', $fixture.'/debian_version', $fixture.'/cmdline');
 
-        $this->assertStringContainsString('Debian 11', $note);
-        $this->assertStringContainsString('User bus restricted.', $note);
+        $this->assertStringContainsAllStrings(['Debian 11', 'User bus restricted.'], $note);
     }
 
     public function testShowsDisabledPolicyGuidanceWhenBootSettingIsPresent(): void
@@ -42,8 +40,7 @@ class statsDockerInactiveNoteTest extends TestCase
 
         $note = $this->renderNote('inactive', false, $fixture.'/missing-os-release', $fixture.'/missing-debian-version', $fixture.'/cmdline');
 
-        $this->assertStringContainsString('currently disabled by policy', $note);
-        $this->assertStringContainsString('Contact support if it should be enabled', $note);
+        $this->assertStringContainsAllStrings(['currently disabled by policy', 'Contact support if it should be enabled'], $note);
     }
 
     public function testShowsRuntimeGuidanceWhenPolicyIsEnabled(): void
@@ -53,8 +50,7 @@ class statsDockerInactiveNoteTest extends TestCase
 
         $note = $this->renderNote('inactive', true, $fixture.'/missing-os-release', $fixture.'/missing-debian-version', $fixture.'/cmdline');
 
-        $this->assertStringContainsString('not currently running', $note);
-        $this->assertStringContainsString('Contact support if it should be restarted', $note);
+        $this->assertStringContainsAllStrings(['not currently running', 'Contact support if it should be restarted'], $note);
     }
 
     public function testShowsGenericControlGuidanceWhenPolicyIsUnknown(): void

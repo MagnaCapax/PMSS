@@ -25,7 +25,7 @@ function pmssResourceSnapshotRun(): int
 
         foreach ($userUids as $user => $uid) {
             $dataPath = $homeDir.'/'.$user.'/.resourceData';
-            $metrics = $stats->readSnapshotMetricsFromPath($dataPath);
+            $metrics = is_array($data = pmssReadSerializedArrayFile($dataPath)) ? pmssResourceStoredPayloadWindowMetrics($data, 'day') : null;
 
             if ($metrics === null && ($dataLines = $stats->getData($user, 350)) !== '') {
                 $threshold = time() - (24 * 60 * 60);

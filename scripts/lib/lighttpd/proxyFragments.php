@@ -49,21 +49,24 @@ function pmssLighttpdProxyRuleFragment(
 
 function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $port): string
 {
+    $pathMap = static function (string $basePath): array {
+        return [$basePath.'/' => '/', $basePath => ''];
+    };
     $definitions = [
         'deluge' => [
             "# PMSS-managed: Deluge reverse proxy.\n# Legacy path /deluge-{$user}/ kept for compatibility until at least 2028-01-28.\n\n",
             [
-                ['^/user-'.$user.'/deluge($|/)', ['/user-'.$user.'/deluge/' => '/', '/user-'.$user.'/deluge' => ''], true, false],
-                ['^/deluge-'.$user.'($|/)', ['/deluge-'.$user.'/' => '/', '/deluge-'.$user => ''], true, false],
+                ['^/user-'.$user.'/deluge($|/)', $pathMap('/user-'.$user.'/deluge'), true, false],
+                ['^/deluge-'.$user.'($|/)', $pathMap('/deluge-'.$user), true, false],
             ],
         ],
         'rclone' => ["# PMSS-managed: rclone reverse proxy.\n\n", [['^/user-'.$user.'/rclone/', [], true, false, true]]],
-        'qbittorrent' => ["# PMSS-managed: qBittorrent reverse proxy.\n\n", [['^/user-'.$user.'/qbittorrent($|/)', ['/user-'.$user.'/qbittorrent/' => '/', '/user-'.$user.'/qbittorrent' => ''], false, true]]],
+        'qbittorrent' => ["# PMSS-managed: qBittorrent reverse proxy.\n\n", [['^/user-'.$user.'/qbittorrent($|/)', $pathMap('/user-'.$user.'/qbittorrent'), false, true]]],
         'invidious' => [
             "# PMSS-managed: Invidious reverse proxy.\n\n",
             [
-                ['^/public-'.$user.'/invidious($|/)', ['/public-'.$user.'/invidious/' => '/', '/public-'.$user.'/invidious' => ''], false, true],
-                ['^/user-'.$user.'/apps/invidious($|/)', ['/user-'.$user.'/apps/invidious/' => '/', '/user-'.$user.'/apps/invidious' => ''], false, true],
+                ['^/public-'.$user.'/invidious($|/)', $pathMap('/public-'.$user.'/invidious'), false, true],
+                ['^/user-'.$user.'/apps/invidious($|/)', $pathMap('/user-'.$user.'/apps/invidious'), false, true],
             ],
         ],
     ];

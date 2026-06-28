@@ -25,22 +25,20 @@ final class CustomerStatsLayoutTest extends TestCase
                 'class="resource-summary-label">Memory</span>',
                 'class="resource-summary-label">Processes</span>',
             )),
-            'etc/skel/www/stats.php' => array('forbidden' => array(
-                '<h6>CPU usage</h6>',
-                '<h6>Memory usage</h6>',
-                '<h6>Process count</h6>',
-            )),
-        ));
-    }
-
-    public function testBaseResourcesCgroupOutputIsNotHeightClipped(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/stats.php', array(
-            'class="stats-block stats-block-base-resources"',
-            'class="stats-base-resources-pre"',
-            '.stats-block-base-resources .stats-base-resources-pre',
-            'max-height: none;',
-            'overflow-y: visible;',
+            'etc/skel/www/stats.php' => array(
+                'required' => array(
+                    'class="stats-block stats-block-base-resources"',
+                    'class="stats-base-resources-pre"',
+                    '.stats-block-base-resources .stats-base-resources-pre',
+                    'max-height: none;',
+                    'overflow-y: visible;',
+                ),
+                'forbidden' => array(
+                    '<h6>CPU usage</h6>',
+                    '<h6>Memory usage</h6>',
+                    '<h6>Process count</h6>',
+                ),
+            ),
         ));
     }
 

@@ -51,13 +51,11 @@ function pmssUserHomeReclaimMain(array $argv): int
             $targetPath = $arg;
             continue;
         }
-        fwrite(STDERR, $usage);
-        return 2;
+        return pmssCliReturnWithStderr($usage, 2);
     }
 
     if (!$confirm || $targetPath === '') {
-        fwrite(STDERR, $usage);
-        return 2;
+        return pmssCliReturnWithStderr($usage, 2);
     }
 
     $username = pmssUserHomeReclaimPathUsername($targetPath);

@@ -86,12 +86,12 @@ function pmssDistUpgradeVerifyGrubConfig(string $grubConfigPath): void
 
 function pmssDistUpgradeVerifyReadablePattern(string $path, string $unreadableMessage, string $pattern, bool $warnWhenMatched, string $warnMessage, string $skipMessage): void
 {
-    if (!is_readable($path)) {
+    if (($contents = pmssReadRegularFileContents($path)) === null) {
         logMessage($unreadableMessage);
         return;
     }
 
-    $matched = preg_match($pattern, (string) @file_get_contents($path)) === 1;
+    $matched = preg_match($pattern, $contents) === 1;
     logMessage($matched === $warnWhenMatched ? $warnMessage : $skipMessage);
 }
 

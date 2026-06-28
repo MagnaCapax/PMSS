@@ -29,7 +29,7 @@ class UserMaintenanceDockerModuleTest extends TestCase
 
         $this->pmssAssertRepoFileContractCases([
             'scripts/lib/update/userMaintenance.php' => [
-                'required' => ["require_once __DIR__.'/users/docker.php';"],
+                'required' => ["'users/docker.php'"],
                 'forbidden' => $dockerFunctions,
             ],
             'scripts/lib/update/users/docker.php' => ['required' => $dockerFunctions],

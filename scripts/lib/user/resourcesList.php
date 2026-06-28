@@ -139,25 +139,24 @@ function pmssUserResourcesListRowBuild(array $resourceData, string $displayMode)
 function pmssUserResourcesListMain(array $argv): int
 {
     $useColor = pmssCliHelpSupportsColor();
-    $usage = implode("\n", [
-        pmssCliHelpHeading('Usage', $useColor),
-        '  /scripts/util/userResourcesList.php [--brief|--full] [--json|--jsonl]',
-        '',
-        pmssCliHelpHeading('Options', $useColor),
-        pmssCliHelpLine('--brief', 'Show the compact RAM/CPU/IO table.'.pmssCliHelpDim(' (default)', $useColor)),
-        pmssCliHelpLine('--full', 'Include disk quota, traffic, TasksMax, and suspension columns.'),
-        pmssCliHelpLine('--json', 'Emit one JSON array instead of text output.'),
-        pmssCliHelpLine('--jsonl', 'Emit one JSON object per line for pipelines.'),
-        pmssCliHelpLine('-h, --help', 'Show this help and exit.'),
-        '',
-        pmssCliHelpHeading('Examples', $useColor),
-        '  /scripts/util/userResourcesList.php --full',
-        '  /scripts/util/userResourcesList.php --json',
-        '',
-        pmssCliHelpHeading('Notes', $useColor),
-        '  - Run as root when querying real slice data; --help works without root.',
-        '  - --brief and --full are mutually exclusive.',
-    ])."\n";
+    $usage = pmssCliHelpSectionText([
+        'Usage' => ['  /scripts/util/userResourcesList.php [--brief|--full] [--json|--jsonl]'],
+        'Options' => [
+            pmssCliHelpLine('--brief', 'Show the compact RAM/CPU/IO table.'.pmssCliHelpDim(' (default)', $useColor)),
+            pmssCliHelpLine('--full', 'Include disk quota, traffic, TasksMax, and suspension columns.'),
+            pmssCliHelpLine('--json', 'Emit one JSON array instead of text output.'),
+            pmssCliHelpLine('--jsonl', 'Emit one JSON object per line for pipelines.'),
+            pmssCliHelpLine('-h, --help', 'Show this help and exit.'),
+        ],
+        'Examples' => [
+            '  /scripts/util/userResourcesList.php --full',
+            '  /scripts/util/userResourcesList.php --json',
+        ],
+        'Notes' => [
+            '  - Run as root when querying real slice data; --help works without root.',
+            '  - --brief and --full are mutually exclusive.',
+        ],
+    ], $useColor)."\n";
     if (($parsed = pmssParseCliTokensOrHelp($argv, $usage)) === null) return 0;
     if (posix_getuid() !== 0) {
         fwrite(STDERR, "Error: This script must be run as root to query systemd slices.\n");

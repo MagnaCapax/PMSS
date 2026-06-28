@@ -7,11 +7,7 @@ class SysctlBaselineTest extends TestCase
 {
     public function testWritesBaselineWithKptrRestrict(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-sysctl-', 0700);
-        $target = $dir.'/sysctl.conf';
-        $configDir = $dir.'/config';
-        $this->pmssTrackEnvOverrides([
-            'PMSS_CONFIG_DIR' => $configDir,
+        $fixture = $this->runBaselineFixture('pmss-sysctl-', [
             'PMSS_TOTAL_MEM_MIB' => '262144',
             'PMSS_SYSCTL_HAS_SWAP' => '1',
             'PMSS_SYSCTL_SWAP_IS_FAST' => '1',
@@ -19,10 +15,8 @@ class SysctlBaselineTest extends TestCase
             'PMSS_SYSCTL_IS_VM' => '0',
             'PMSS_SYSCTL_HAS_CONNTRACK' => '1',
         ]);
-        $messages = [];
-        $this->runBaseline($target, $messages, false);
 
-        $this->pmssAssertFileContainsAllStrings($target, [
+        $this->pmssAssertFileContainsAllStrings($fixture['target'], [
             '# Pulsed Media Config', 'vm.swappiness = 100', 'vm.vfs_cache_pressure = 2', 'vm.min_free_kbytes = 2621440',
             'net.core.rmem_max = 67108864', 'net.core.default_qdisc = fq', 'net.ipv4.tcp_congestion_control = bbr',
             'net.ipv4.ip_local_reserved_ports = 2000-38000',
@@ -45,29 +39,20 @@ class SysctlBaselineTest extends TestCase
 
     public function testWritesBbrModulesLoadFile(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-sysctl-bbr-', 0700);
-        $target = $dir.'/sysctl.conf';
-        $modulesLoad = $dir.'/modules-load.conf';
-        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir.'/config']);
-        $messages = [];
-        $this->runBaseline($target, $messages, false, $modulesLoad);
+        $fixture = $this->runBaselineFixture('pmss-sysctl-bbr-');
 
-        $this->pmssAssertFileContainsAllStrings($modulesLoad, ['tcp_bbr'], 'expected BBR modules-load file to be written');
+        $this->pmssAssertFileContainsAllStrings($fixture['modulesLoad'], ['tcp_bbr'], 'expected BBR modules-load file to be written');
     }
 
     public function testSkipsWhenUpToDate(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-sysctl-skip-', 0700);
-        $target = $dir.'/sysctl.conf';
-        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir.'/config']);
+        $fixture = $this->runBaselineFixture('pmss-sysctl-skip-');
+        $target = $fixture['target'];
+        $first = (string) file_get_contents($target);
 
         $messages = [];
         $this->runBaseline($target, $messages, false);
-        $first = (string)file_get_contents($target);
-
-        $messages = [];
-        $this->runBaseline($target, $messages, false);
-        $second = (string)file_get_contents($target);
+        $second = (string) file_get_contents($target);
 
         $this->assertEquals($first, $second, 'expected sysctl file unchanged');
         $this->pmssAssertMessagesContain($messages, 'already present and up to date', 'expected skip log');
@@ -75,34 +60,24 @@ class SysctlBaselineTest extends TestCase
 
     public function testCreatesTargetDirectory(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-sysctl-dir-', 0700);
-        $targetDir = $dir.'/nested';
-        $target = $targetDir.'/sysctl.conf';
-        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir.'/config']);
-
-        $messages = [];
-        $this->runBaseline($target, $messages, false);
+        $fixture = $this->runBaselineFixture('pmss-sysctl-dir-', [], false, 'nested/sysctl.conf');
+        $targetDir = dirname($fixture['target']);
 
         $this->assertTrue(is_dir($targetDir), 'expected target directory to exist');
-        $this->assertTrue(file_exists($target), 'expected sysctl file to be written');
+        $this->assertTrue(file_exists($fixture['target']), 'expected sysctl file to be written');
     }
 
     public function testReloadSkipLogWhenDisabled(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-sysctl-reload-', 0700);
-        $target = $dir.'/sysctl.conf';
-        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir.'/config']);
-        $messages = [];
-        $this->runBaseline($target, $messages, false);
+        $fixture = $this->runBaselineFixture('pmss-sysctl-reload-');
 
-        $this->pmssAssertMessagesContain($messages, 'sysctl reload disabled', 'expected reload skip log');
+        $this->pmssAssertMessagesContain($fixture['messages'], 'sysctl reload disabled', 'expected reload skip log');
     }
 
     public function testUpdatesWhenContentDiffers(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-sysctl-update-', 0700);
-        $target = $dir.'/sysctl.conf';
-        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir.'/config']);
+        $fixture = $this->makeBaselineFixture('pmss-sysctl-update-');
+        $target = $fixture['target'];
         file_put_contents($target, "kernel.kptr_restrict = 0\n");
 
         $messages = [];
@@ -145,14 +120,9 @@ class SysctlBaselineTest extends TestCase
         ];
 
         foreach ($cases as $label => [$env, $expected]) {
-            $dir = $this->pmssMakeTempDir('pmss-sysctl-'.$label.'-', 0700);
-            $target = $dir.'/sysctl.conf';
-            $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir.'/config'] + $env);
+            $fixture = $this->runBaselineFixture('pmss-sysctl-'.$label.'-', $env);
 
-            $messages = [];
-            $this->runBaseline($target, $messages, false);
-
-            $this->pmssAssertFileContainsAllStrings($target, $expected);
+            $this->pmssAssertFileContainsAllStrings($fixture['target'], $expected);
         }
     }
 
@@ -316,26 +286,47 @@ class SysctlBaselineTest extends TestCase
 
     public function testWritesHardwareSummaryJson(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-sysctl-summary-', 0700);
-        $target = $dir.'/sysctl.conf';
-        $configDir = $dir.'/config';
-        $this->pmssTrackEnvOverrides([
-            'PMSS_CONFIG_DIR' => $configDir,
+        $fixture = $this->runBaselineFixture('pmss-sysctl-summary-', [
             'PMSS_TOTAL_MEM_MIB' => '65536',
             'PMSS_SYSCTL_HAS_SWAP' => '1',
             'PMSS_SYSCTL_SWAP_IS_FAST' => '0',
             'PMSS_SYSCTL_NIC_SPEED_MBPS' => '1000',
         ]);
 
-        $messages = [];
-        $this->runBaseline($target, $messages, false);
-
-        $summaryPath = $configDir.'/hardware.json';
+        $summaryPath = $fixture['configDir'].'/hardware.json';
         $this->assertTrue(file_exists($summaryPath), 'expected hardware summary to be written');
         $summary = $this->pmssReadJsonArrayFile($summaryPath, null, 'expected hardware summary json');
         $this->assertEquals(64, $summary['sysctl']['detection']['ram_gb'], 'expected RAM detection in summary');
         $this->assertFalse($summary['sysctl']['detection']['swap_is_fast'], 'expected slow swap summary');
         $this->assertEquals('10', $summary['sysctl']['applied']['vm.swappiness'], 'expected applied swappiness in summary');
+    }
+
+    /**
+     * @return array{dir:string,target:string,configDir:string,modulesLoad:string}
+     */
+    private function makeBaselineFixture(string $prefix, array $env = [], string $targetRelativePath = 'sysctl.conf'): array
+    {
+        $dir = $this->pmssMakeTempDir($prefix, 0700);
+        $fixture = [
+            'dir' => $dir,
+            'target' => $dir.'/'.$targetRelativePath,
+            'configDir' => $dir.'/config',
+            'modulesLoad' => $dir.'/modules-load.conf',
+        ];
+        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $fixture['configDir']] + $env);
+        return $fixture;
+    }
+
+    /**
+     * @return array{dir:string,target:string,configDir:string,modulesLoad:string,messages:array<int,string>}
+     */
+    private function runBaselineFixture(string $prefix, array $env = [], bool $reload = false, string $targetRelativePath = 'sysctl.conf'): array
+    {
+        $fixture = $this->makeBaselineFixture($prefix, $env, $targetRelativePath);
+        $messages = [];
+        $this->runBaseline($fixture['target'], $messages, $reload, $fixture['modulesLoad']);
+        $fixture['messages'] = $messages;
+        return $fixture;
     }
 
     private function runBaseline(string $target, array &$messages, bool $reload, ?string $modulesLoad = null): void

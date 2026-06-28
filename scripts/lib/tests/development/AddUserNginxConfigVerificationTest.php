@@ -10,11 +10,10 @@ class AddUserNginxConfigVerificationTest extends TestCase
 {
     public function testCanonicalNginxConfigPathStaysInProvisioningGuards(): void
     {
-        $userConfigApply = $this->pmssReadRepoFile('scripts/lib/user/add/userConfigApply.php');
-        $artifactVerification = $this->pmssReadRepoFile('scripts/lib/user/add/artifactVerification.php');
-
-        $this->assertStringContainsString("'/etc/nginx/users/'.\$user['name']", $userConfigApply);
-        $this->assertStringContainsString("'/etc/nginx/users/'.\$userName", $artifactVerification);
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/user/add/userConfigApply.php' => ['required' => ["'/etc/nginx/users/'.\$user['name']"]],
+            'scripts/lib/user/add/artifactVerification.php' => ['required' => ["'/etc/nginx/users/'.\$userName"]],
+        ]);
     }
 
     public function testProvisioningFailsLoudlyWhenConfigIsMissing(): void
@@ -24,15 +23,13 @@ class AddUserNginxConfigVerificationTest extends TestCase
 
     public function testRequiredArtifactsStayAlongsideSuccessGuard(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/user/add/artifactVerification.php');
-
-        $this->assertStringContainsAllStrings(array(
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/add/artifactVerification.php', array(
             "'nginx_config' => '/etc/nginx/users/'.\$userName",
             "'rtorrent_config' => \$homePath.'/.rtorrent.rc'",
             "'lighttpd_config' => \$homePath.'/.lighttpd.conf'",
             "'lighttpd_htpasswd' => \$homePath.'/.lighttpd/.htpasswd'",
             "'quota_snapshot' => \$homePath.'/.quota'",
-        ), $source);
+        ));
     }
 
     public function testAddUserVerifiesArtifactsBeforeReportingSuccess(): void

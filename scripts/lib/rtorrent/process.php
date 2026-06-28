@@ -381,6 +381,11 @@ function rtorrentProcessStaggerDelay(string $user, int $maxDelay = 300): int
  */
 function rtorrentProcessStart(string $user, callable $logFn, ?string $startMarkerState = null): int
 {
+    if (!pmssValidateUsername($user)) {
+        $logFn('Refusing to start rTorrent for invalid username', true);
+        return 1;
+    }
+
     $rc = 0;
     @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
     $logFn("startRtorrent {$user} completed (rc={$rc})", true);
@@ -413,6 +418,11 @@ function rtorrentProcessRestart(
     callable $logFn,
     bool $debug = false
 ): int {
+    if (!pmssValidateUsername($user)) {
+        $logFn('Refusing to restart rTorrent for invalid username', true);
+        return 1;
+    }
+
     // Capture before snapshot.
     $before = rtorrentProcessSnapshot($user);
     $logFn("Process snapshot BEFORE ({$user})", true);

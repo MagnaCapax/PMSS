@@ -249,30 +249,32 @@ function pmssSysctlProfileDetect(): array
 /** Build memory sysctl settings for the detected host profile. */
 function pmssSysctlMemorySettingsBuild(array $profile): array
 {
-    $fastSwap = !empty($profile['swap_is_fast']);
     $hasSwap = !empty($profile['has_swap']);
     $isVm = !empty($profile['is_vm']);
+    $fastSwap = !empty($profile['swap_is_fast']);
     $ramGb = max(1, (int) ($profile['ram_gb'] ?? 1));
+    $memoryProfile = !$hasSwap ? 'no_swap' : ($isVm ? 'vm' : ($fastSwap ? 'fast_swap' : ''));
 
-    $settings = [
+    return array_merge([
         'vm.swappiness' => '10',
         'vm.vfs_cache_pressure' => '50',
         'vm.min_free_kbytes' => (string) min(2097152, max(131072, $ramGb * 5120)),
         'vm.dirty_ratio' => '20',
         'vm.dirty_background_ratio' => '5',
-    ];
-
-    if (!$hasSwap) $settings['vm.swappiness'] = '60';
-    elseif ($isVm) $settings['vm.min_free_kbytes'] = '131072';
-    elseif ($fastSwap) $settings = array_merge($settings, [
-        'vm.swappiness' => '100',
-        'vm.vfs_cache_pressure' => '2',
-        'vm.min_free_kbytes' => (string) min(4194304, max(131072, $ramGb * 10240)),
-        'vm.dirty_ratio' => '40',
-        'vm.dirty_background_ratio' => '10',
+    ], [
+        'no_swap' => ['vm.swappiness' => '60'],
+        'vm' => ['vm.min_free_kbytes' => '131072'],
+        'fast_swap' => [
+            'vm.swappiness' => '100',
+            'vm.vfs_cache_pressure' => '2',
+            'vm.min_free_kbytes' => (string) min(4194304, max(131072, $ramGb * 10240)),
+            'vm.dirty_ratio' => '40',
+            'vm.dirty_background_ratio' => '10',
+        ],
+    ][$memoryProfile] ?? [], [
+        'vm.dirty_expire_centisecs' => '1500',
+        'vm.dirty_writeback_centisecs' => '500',
     ]);
-
-    return $settings + ['vm.dirty_expire_centisecs' => '1500', 'vm.dirty_writeback_centisecs' => '500'];
 }
 
 /** Return the managed service-port band reserved from kernel ephemeral picks. */
@@ -287,12 +289,7 @@ function pmssSysctlNetworkSettingsBuild(array $profile): array
     $tenGigabit = (int) ($profile['nic_speed_gbps'] ?? 1) >= 10;
     $networkBufferBytes = $tenGigabit ? '67108864' : '16777216';
     $networkTcpBytes = $tenGigabit ? '134217728' : '67110000';
-    return [
-        'net.core.rmem_max' => $networkBufferBytes,
-        'net.core.wmem_max' => $networkBufferBytes,
-        'net.core.rmem_default' => $networkBufferBytes,
-        'net.core.wmem_default' => $networkBufferBytes,
-        'net.core.optmem_max' => $networkBufferBytes,
+    return array_fill_keys(['net.core.rmem_max', 'net.core.wmem_max', 'net.core.rmem_default', 'net.core.wmem_default', 'net.core.optmem_max'], $networkBufferBytes) + [
         'net.core.netdev_max_backlog' => $tenGigabit ? '524288' : '262144',
         'net.core.somaxconn' => $tenGigabit ? '4096' : '2000',
         'net.ipv4.tcp_rmem' => '4096 524000 '.$networkTcpBytes,
@@ -347,16 +344,15 @@ function pmssSysctlConntrackSettingsBuild(array $profile): array
 {
     if (empty($profile['has_conntrack'])) return [];
 
-    $settings = [
+    $procSysRoot = pmssResolvePathFromEnv('PMSS_SYSCTL_PROC_SYS_PATH', '/proc/sys');
+    return [
         'net.netfilter.nf_conntrack_max' => '524288',
         'net.netfilter.nf_conntrack_generic_timeout' => '6',
         'net.netfilter.nf_conntrack_tcp_timeout_established' => '1200',
+        (is_file($procSysRoot.'/net/ipv4/netfilter/ip_conntrack_tcp_timeout_time_wait')
+            ? 'net.ipv4.netfilter.ip_conntrack_tcp_timeout_time_wait'
+            : 'net.netfilter.nf_conntrack_tcp_timeout_time_wait') => '15',
     ];
-    $procSysRoot = pmssResolvePathFromEnv('PMSS_SYSCTL_PROC_SYS_PATH', '/proc/sys');
-    $settings[is_file($procSysRoot.'/net/ipv4/netfilter/ip_conntrack_tcp_timeout_time_wait')
-        ? 'net.ipv4.netfilter.ip_conntrack_tcp_timeout_time_wait'
-        : 'net.netfilter.nf_conntrack_tcp_timeout_time_wait'] = '15';
-    return $settings;
 }
 
 /** Build the ordered sysctl settings for the detected host profile. */
@@ -367,8 +363,7 @@ function pmssSysctlSettingsBuild(array $profile): array
         'net' => pmssSysctlNetworkSettingsBuild($profile),
         'security' => pmssSysctlSecuritySettingsBuild(),
     ];
-    $conntrackSettings = pmssSysctlConntrackSettingsBuild($profile);
-    if ($conntrackSettings !== []) $settings['conntrack'] = $conntrackSettings;
+    if (($conntrackSettings = pmssSysctlConntrackSettingsBuild($profile)) !== []) $settings['conntrack'] = $conntrackSettings;
     return $settings;
 }
 

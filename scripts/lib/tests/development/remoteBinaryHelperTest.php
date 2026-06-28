@@ -60,9 +60,16 @@ SH,
 #!/bin/sh
 src="$3"
 dest="$4"
-cat "$src" > "$dest"
-chmod 0755 "$dest" 2>/dev/null || true
 printf 'install %s %s\n' "$src" "$dest" >> "${PMSS_TEST_COMMAND_LOG}"
+if [ "${PMSS_TEST_INSTALL_MODE:-}" = "fail" ]; then
+    exit 42
+fi
+if [ "${PMSS_TEST_INSTALL_MODE:-}" = "corrupt" ]; then
+    printf 'corrupt' > "$dest"
+else
+    cat "$src" > "$dest"
+fi
+chmod 0755 "$dest" 2>/dev/null || true
 SH,
             'dpkg' => <<<'SH'
 #!/bin/sh
@@ -258,6 +265,36 @@ SH
             $this->assertEquals($body, (string) file_get_contents($destination));
             $this->assertStringContainsString('install ', $this->pmssReadFileOrEmpty($commandLog));
         });
+    }
+
+    public function testInstallPinnedRemoteBinaryLogsFailedInstallCommand(): void
+    {
+        $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
+            $destination = $root.'/safe-binary';
+
+            [, $stdout] = $this->pmssCaptureStdout(function () use ($expectedSha256, $destination): void {
+                \pmssInstallPinnedRemoteBinary('demo binary', 'https://example.invalid/binary', $expectedSha256, $destination, true);
+            });
+
+            $this->assertTrue(!is_file($destination), 'Failed install should not create the destination');
+            $this->assertStringContainsString('install command failed with rc=42', $stdout);
+            $this->assertStringContainsString('install ', $this->pmssReadFileOrEmpty($commandLog));
+        }, ['PMSS_TEST_INSTALL_MODE' => 'fail']);
+    }
+
+    public function testInstallPinnedRemoteBinaryLogsPostInstallChecksumMismatch(): void
+    {
+        $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
+            $destination = $root.'/safe-binary';
+
+            [, $stdout] = $this->pmssCaptureStdout(function () use ($expectedSha256, $destination): void {
+                \pmssInstallPinnedRemoteBinary('demo binary', 'https://example.invalid/binary', $expectedSha256, $destination, true);
+            });
+
+            $this->assertEquals('corrupt', (string) file_get_contents($destination));
+            $this->assertStringContainsString('installed checksum mismatch', $stdout);
+            $this->assertStringContainsString('install ', $this->pmssReadFileOrEmpty($commandLog));
+        }, ['PMSS_TEST_INSTALL_MODE' => 'corrupt']);
     }
 
     public function testInstallPinnedRemoteBinaryRejectsUnsafeDestinationsBeforeDownload(): void

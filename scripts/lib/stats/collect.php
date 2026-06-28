@@ -20,13 +20,12 @@ function pmssStatsReadQuotaSnapshot(string $home): array
     $result['raw'] = $raw;
 
     foreach (preg_split('/\r?\n/', trim($raw)) ?: [] as $line) {
-        if (preg_match('/^\s*\/dev\/\S+\s+(\S+)\s+(\S+)\s+(\S+)/', trim($line), $matches) !== 1) continue;
-        $result['used_text'] = $matches[1];
-        $result['soft_text'] = $matches[2];
-        $result['hard_text'] = $matches[3];
-        $result['used_bytes'] = pmssParseSizeToBytes($matches[1]);
-        $result['soft_bytes'] = pmssParseSizeToBytes($matches[2]);
-        $result['hard_bytes'] = pmssParseSizeToBytes($matches[3]);
+        $columns = pmssConfigLineColumns($line, 4, []);
+        if ($columns === [] || strpos($columns[0], '/dev/') !== 0) continue;
+        foreach (['used' => 1, 'soft' => 2, 'hard' => 3] as $key => $column) {
+            $result[$key.'_text'] = $columns[$column];
+            $result[$key.'_bytes'] = pmssParseSizeToBytes($columns[$column]);
+        }
         break;
     }
     return $result;

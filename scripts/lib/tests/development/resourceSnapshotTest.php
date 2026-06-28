@@ -7,7 +7,7 @@ class ResourceSnapshotTest extends TestCase
 {
     public function testSnapshotCronDelegatesToSharedResourceReaders(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/resourceSnapshot.php', ['readSnapshotMetricsFromPath($dataPath)', "collectWindowResultsFromData(\$dataLines, ['day' => \$threshold])"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/resourceSnapshot.php', ['pmssResourceStoredPayloadWindowMetrics($data, \'day\')', "collectWindowResultsFromData(\$dataLines, ['day' => \$threshold])"]);
         $this->pmssAssertRepoFileNotContainsStrings('scripts/cron/resourceSnapshot.php', ['@unserialize($raw)', 'new ResourceStatsAccumulator(']);
     }
 

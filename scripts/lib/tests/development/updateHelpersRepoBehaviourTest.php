@@ -1,7 +1,6 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../common/updateBootstrapShim.php';
 require_once dirname(__DIR__, 2).'/update/apt.php';
 require_once dirname(__DIR__, 2).'/update/repositories.php';

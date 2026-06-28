@@ -11,7 +11,6 @@
 
 namespace PMSS\Tests\Production;
 
-require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../common/updateBootstrapShim.php';
 require_once dirname(__DIR__, 2).'/update/distro.php';
 

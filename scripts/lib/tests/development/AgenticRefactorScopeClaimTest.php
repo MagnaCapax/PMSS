@@ -28,9 +28,7 @@ class AgenticRefactorScopeClaimTest extends TestCase
             ."printf 'claims=%s\\n' \"\${claimed[*]}\"\n"
         );
 
-        $this->assertStringContainsString("counts=2/4\n", $output);
-        $this->assertStringContainsString("candidates=scripts/update.php,scripts/lib/log.php,\n", $output);
-        $this->assertStringContainsString('claims=scripts_update.php scripts_lib_log.php', $output);
+        $this->assertStringContainsAllStrings(["counts=2/4\n", "candidates=scripts/update.php,scripts/lib/log.php,\n", 'claims=scripts_update.php scripts_lib_log.php'], $output);
     }
 
     public function testClaimReleaseOnlyRemovesOwnedClaimKeys(): void
@@ -51,9 +49,7 @@ class AgenticRefactorScopeClaimTest extends TestCase
             ."[[ ! -e ".escapeshellarg($claimsDir.'/owned_two')." ]] && printf 'owned_two=removed\\n'\n"
         );
 
-        $this->assertStringContainsString("held=kept\n", $output);
-        $this->assertStringContainsString("owned_one=removed\n", $output);
-        $this->assertStringContainsString('owned_two=removed', $output);
+        $this->assertStringContainsAllStrings(["held=kept\n", "owned_one=removed\n", 'owned_two=removed'], $output);
     }
 
     public function testClaimFilterPrunesStaleClaimDirectories(): void
@@ -78,8 +74,7 @@ class AgenticRefactorScopeClaimTest extends TestCase
             ."[[ -d ".escapeshellarg($claimsDir.'/fresh_claim')." ]] && printf 'fresh=kept\\n'\n"
         );
 
-        $this->assertStringContainsString("stale=removed\n", $output);
-        $this->assertStringContainsString('fresh=kept', $output);
+        $this->assertStringContainsAllStrings(["stale=removed\n", 'fresh=kept'], $output);
     }
 
     public function testLauncherUsesSharedScopeClaimHelperOnly(): void
@@ -87,9 +82,7 @@ class AgenticRefactorScopeClaimTest extends TestCase
         $launcher = $this->pmssReadRepoFile('development/agentic-refactor.sh');
         $library = $this->pmssReadRepoFile('development/lib/codex-common.sh');
 
-        $this->assertStringContainsString('codex_scope_claim_filter_candidates', $launcher);
+        $this->assertStringContainsAndOmitsStrings(['codex_scope_claim_filter_candidates'], ['candidate-files.filtered.txt', 'pmss_refactor'.'_key='], $launcher);
         $this->assertStringContainsString('codex_scope_claim_filter_candidates()', $library);
-        $this->assertStringNotContainsString('candidate-files.filtered.txt', $launcher);
-        $this->assertStringNotContainsString('pmss_refactor'.'_key=', $launcher);
     }
 }

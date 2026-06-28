@@ -240,6 +240,78 @@ class rtorrentConfigCreateConfigTest extends TestCase
         $this->assertFalse(file_exists($target.'/.rtorrent.rc'));
     }
 
+    public function testPortReservationRejectsUnsafeTypeBeforeFilesystemTouch(): void
+    {
+        $portRoot = $this->pmssMakeTempPath('pmss-rtorrent-ports-');
+        $cfg = $this->rtorrentPortReservationFixture($portRoot);
+
+        foreach (['', '../scgi', 'scgi/evil', 'Scgi', str_repeat('a', 33)] as $type) {
+            $this->assertThrows(\InvalidArgumentException::class, static function () use ($cfg, $type): void {
+                $cfg->reservePrivatePort($type, 4000, 4001);
+            }, 'reservation type');
+        }
+
+        $this->assertFalse(file_exists($portRoot), 'unsafe types must not create reservation directories');
+    }
+
+    public function testPortReservationRejectsInvalidRangesBeforeFilesystemTouch(): void
+    {
+        $portRoot = $this->pmssMakeTempPath('pmss-rtorrent-ports-');
+        $cfg = $this->rtorrentPortReservationFixture($portRoot);
+        $cases = [
+            [0, 1],
+            [1, 0],
+            [65536, 65537],
+            ['abc', 4000],
+            [4000, 'abc'],
+        ];
+
+        foreach ($cases as $case) {
+            $this->assertThrows(\InvalidArgumentException::class, static function () use ($cfg, $case): void {
+                $cfg->reservePrivatePort('scgi', $case[0], $case[1]);
+            }, 'reservation range');
+        }
+
+        $this->assertFalse(file_exists($portRoot), 'invalid ranges must not create reservation directories');
+    }
+
+    public function testPortReservationSkipsOccupiedFilesAndCreatesExclusiveReservation(): void
+    {
+        $portRoot = $this->pmssMakeTempDir('pmss-rtorrent-ports-');
+        @mkdir($portRoot.'/scgi', 0755, true);
+        file_put_contents($portRoot.'/scgi/4000', '');
+        $cfg = $this->rtorrentPortReservationFixture($portRoot);
+
+        $port = $cfg->reservePrivatePort('scgi', 4000, 4001);
+
+        $this->assertEquals(4001, $port);
+        $this->assertTrue(is_file($portRoot.'/scgi/4001'), 'expected reservation file to be created');
+        $this->assertFalse(is_link($portRoot.'/scgi/4001'), 'reservation file must not be a symlink');
+    }
+
+    public function testPortReservationRefusesExhaustedOrSymlinkedRange(): void
+    {
+        $portRoot = $this->pmssMakeTempDir('pmss-rtorrent-ports-');
+        @mkdir($portRoot.'/dht', 0755, true);
+        file_put_contents($portRoot.'/dht/24001', '');
+        file_put_contents($portRoot.'/dht/24002', '');
+        $cfg = $this->rtorrentPortReservationFixture($portRoot);
+
+        $this->assertThrowsRuntime(static function () use ($cfg): void {
+            $cfg->reservePrivatePort('dht', 24001, 24002);
+        }, 'No available rTorrent dht port reservation slots');
+
+        @mkdir($portRoot.'/listen', 0755, true);
+        if (!@symlink($portRoot.'/missing', $portRoot.'/listen/44001')) {
+            throw new SkipTest('symlink fixtures unavailable');
+        }
+
+        $this->assertThrowsRuntime(static function () use ($cfg): void {
+            $cfg->reservePrivatePort('listen', 44001, 44001);
+        }, 'No available rTorrent listen port reservation slots');
+        $this->assertTrue(is_link($portRoot.'/listen/44001'), 'dangling symlink should remain untouched');
+    }
+
     private function rtorrentConfigFixture(): \rtorrentConfig
     {
         return new \rtorrentConfig([
@@ -247,5 +319,32 @@ class rtorrentConfigCreateConfigTest extends TestCase
             'peers' => ['minimum' => 1, 'maximum' => 2],
             'uploadSlots' => 1,
         ], "mem=##memoryMax\n");
+    }
+
+    private function rtorrentPortReservationFixture(string $portRoot)
+    {
+        return new class($portRoot, [
+            'ramBlock' => 250,
+            'peers' => ['minimum' => 1, 'maximum' => 2],
+            'uploadSlots' => 1,
+        ], "mem=##memoryMax\n") extends \rtorrentConfig {
+            private $portRoot;
+
+            public function __construct(string $portRoot, array $resourceConfig, string $template)
+            {
+                $this->portRoot = $portRoot;
+                parent::__construct($resourceConfig, $template);
+            }
+
+            protected function portReservationBaseDir(): string
+            {
+                return $this->portRoot;
+            }
+
+            public function reservePrivatePort($type, $rangeStart, $rangeEnd): int
+            {
+                return $this->_configPortPrivate($type, $rangeStart, $rangeEnd);
+            }
+        };
     }
 }

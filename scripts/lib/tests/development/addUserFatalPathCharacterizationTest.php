@@ -13,8 +13,7 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
         ));
 
         $this->assertSame(1, $result['rc']);
-        $this->assertStringContainsString('FATAL: User already exists; refusing to overwrite', $result['output']);
-        $this->assertStringContainsString('###ADDUSER:ERROR user=alice', $result['output']);
+        $this->assertStringContainsAllStrings(['FATAL: User already exists; refusing to overwrite', '###ADDUSER:ERROR user=alice'], $result['output']);
         $this->assertTrue(strpos($result['output'], 'FATAL: User already exists; refusing to overwrite') < strpos($result['output'], '###ADDUSER:ERROR user=alice'));
         $this->assertTrue(is_array($result['summary_json']), 'Expected fatal exit to emit a JSON summary line');
         $this->assertSame('ERROR', $result['summary_json']['status']);
@@ -45,26 +44,26 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
             'stderr' => 'ERROR: Invalid username "alice/evil": slash not allowed',
         ));
 
-        $this->assertStringContainsString('ERROR: Invalid username "alice/evil": slash not allowed', $result['output']);
+        $this->assertStringContainsAllStrings(['ERROR: Invalid username "alice/evil": slash not allowed', '###ADDUSER_JSON:'], $result['output']);
         $this->assertStringContainsString('ERROR: Invalid username "alice/evil": slash not allowed', $result['stderr']);
-        $this->assertStringContainsString('###ADDUSER_JSON:', $result['output']);
     }
 
     public function testAddUserWrapperDropsLegacyFatalFunctionExistsGuards(): void
     {
         $source = $this->pmssReadRepoFile('scripts/addUser.php');
 
-        $this->pmssAssertStringNotContainsString("function_exists('logProvisionMessage')", $source);
-        $this->pmssAssertStringNotContainsString("function_exists('finalizeProvision')", $source);
-        $this->assertStringContainsString('pmssAddUserFatalExit(', $source);
+        $this->assertStringContainsAndOmitsStrings(['pmssAddUserFatalExit('], ["function_exists('logProvisionMessage')", "function_exists('finalizeProvision')"], $source);
     }
 
     public function testUserConfigApplyUsesSharedFatalHelperForNginxGuard(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/user/add/userConfigApply.php');
 
-        $this->pmssAssertStringNotContainsString("finalizeProvision('FAIL', 'nginx_config_missing', 1)", $source);
-        $this->assertStringContainsString("pmssAddUserFatalExit('FAIL', 'nginx config missing after regeneration; aborting provisioning', 'nginx_config_missing');", $source);
+        $this->assertStringContainsAndOmitsStrings(
+            ["pmssAddUserFatalExit('FAIL', 'nginx config missing after regeneration; aborting provisioning', 'nginx_config_missing');"],
+            ["finalizeProvision('FAIL', 'nginx_config_missing', 1)"],
+            $source
+        );
     }
 
     /**

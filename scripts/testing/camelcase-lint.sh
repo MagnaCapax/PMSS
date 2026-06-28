@@ -32,11 +32,9 @@ check_tree() {
 
 # Enforce for selected first-party directories
 check_tree "$ROOT_DIR/scripts" -maxdepth 1
-check_tree "$ROOT_DIR/scripts/util"
-check_tree "$ROOT_DIR/scripts/cron"
-check_tree "$ROOT_DIR/scripts/lib/update"
-check_tree "$ROOT_DIR/scripts/lib/network"
-check_tree "$ROOT_DIR/scripts/lib/traffic"
+for rel in scripts/util scripts/cron scripts/lib/update scripts/lib/network scripts/lib/traffic; do
+	check_tree "$ROOT_DIR/$rel"
+done
 
 # Explicitly skip: tests, devristo, user class libs (mixed historical casing), web skel
 

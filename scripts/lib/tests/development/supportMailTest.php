@@ -52,6 +52,14 @@ class SupportMailTest extends TestCase
         );
     }
 
+    public function testMailLoadsStreamWriterWithoutDiagnostics(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/support/mail.php');
+
+        $this->assertStringContainsString("require_once __DIR__.'/stream.php';", $source);
+        $this->assertStringNotContainsString("require_once __DIR__.'/diagnostics.php';", $source);
+    }
+
     public function testStreamWriteAllWritesFullPayload(): void
     {
         $stream = fopen('php://temp', 'w+');

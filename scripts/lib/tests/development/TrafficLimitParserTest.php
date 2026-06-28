@@ -15,6 +15,42 @@ class TrafficLimitParserTest extends TestCase
         }
     }
 
+    public function testOperatorLibraryKeepsCliOverrideHooks(): void
+    {
+        $script = sprintf(
+            <<<'PHP'
+function pmssTrafficLimitResolveCliUserHome($rawUserName, string $usage, ?int &$exitCode = null): ?array
+{
+    $exitCode = null;
+    return ['user' => 'override', 'home' => '/tmp/override-home'];
+}
+function pmssTrafficLimitCliTargetModes(string $userName, string $homeDir): array
+{
+    return ['/tmp/override-target' => 0600];
+}
+require_once %s;
+$error = null;
+$errorCode = null;
+echo json_encode([
+    'resolved' => pmssTrafficLimitResolveCliUserHome('alice', '', $errorCode),
+    'targetModes' => pmssTrafficLimitCliTargetModes('alice', '/tmp/home'),
+    'parsed' => pmssTrafficLimitParseGiB('42GiB', $error),
+    'error' => $error,
+    'operatorWriterLoaded' => function_exists('pmssTrafficLimitWriteGiBFile'),
+]);
+PHP,
+            var_export($this->pmssRepoPath('scripts/lib/user/trafficLimit.php'), true)
+        );
+
+        $result = $this->pmssRunInlinePhpJson($script);
+
+        $this->assertEquals(['user' => 'override', 'home' => '/tmp/override-home'], $result['resolved']);
+        $this->assertEquals(['/tmp/override-target' => 0600], $result['targetModes']);
+        $this->assertEquals(42, $result['parsed']);
+        $this->assertEquals(null, $result['error']);
+        $this->assertTrue($result['operatorWriterLoaded']);
+    }
+
     public function testRejectsInvalidGiBValues(): void
     {
         $cases = [

@@ -27,6 +27,32 @@ function pmssCgroupPolicyLoad(?string $configDir = null): array
 /** Keep systemd IO property device targets to plain block-device paths. */
 function pmssCgroupPolicyDeviceTargetIsSafe(string $device): bool { return pmssPathAbsoluteStringIsSafe($device, ['allowTrailingSlash' => false, 'allowWhitespace' => false, 'requiredPrefix' => '/dev/']); }
 
+/** Resolve a mount source with the shared findmnt command shape. */
+function pmssCgroupPolicyMountSourceResolve(string $mountPath, ?callable $runner = null): string
+{
+    $mountPath = trim($mountPath);
+    if ($mountPath === '' || preg_match('/[\r\n\0]/', $mountPath) === 1) return '';
+    if ($runner === null) {
+        $runner = function (string $command): string { return trim((string) @shell_exec($command)); };
+    }
+    $target = $mountPath === '/home' ? '/home' : escapeshellarg($mountPath);
+    return trim((string) $runner('findmnt -no SOURCE '.$target.' 2>/dev/null'));
+}
+
+/** Accept only kernel major:minor tokens before composing cgroup writes. */
+function pmssCgroupPolicyMajorMinorIsValid(string $majorMinor): bool { return preg_match('/^[0-9]+:[0-9]+$/', $majorMinor) === 1; }
+
+/** Resolve a block device's kernel major:minor token from /sys/block. */
+function pmssCgroupPolicyDeviceMajorMinorResolve(string $devicePath, ?callable $reader = null): ?string
+{
+    if (!pmssCgroupPolicyDeviceTargetIsSafe($devicePath)) return null;
+    if ($reader === null) {
+        $reader = function (string $path): string { return trim((string) @file_get_contents($path)); };
+    }
+    $majorMinor = trim((string) $reader('/sys/block/'.basename($devicePath).'/dev'));
+    return pmssCgroupPolicyMajorMinorIsValid($majorMinor) ? $majorMinor : null;
+}
+
 /** Map IO profile default policy keys to userConfigCgroup option keys. */
 function pmssCgroupPolicyIoDefaultMap(): array { return ['ioWeight' => 'io-weight', 'cpuWeight' => 'cpu-weight', 'tasksMax' => 'tasks-max']; }
 

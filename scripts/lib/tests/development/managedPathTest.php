@@ -6,10 +6,15 @@ use PMSS\Tests\TestCase;
 
 class ManagedPathTest extends TestCase
 {
+    private function managedPathFixture(string $prefix): array
+    {
+        $root = $this->pmssMakeTempDir($prefix);
+        return [$root, $root.'/managed.conf'];
+    }
+
     public function testManagedPathAcceptsRegularFileTarget(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-env-write-');
-        $path = $root.'/managed.conf';
+        [, $path] = $this->managedPathFixture('pmss-env-write-');
         $messages = [];
 
         $this->assertTrue(\pmssManagedPathIsSafe($path, 'test target', $this->pmssMakeArrayLogger($messages)));
@@ -18,7 +23,7 @@ class ManagedPathTest extends TestCase
 
     public function testManagedPathRejectsSymlinkedParentDirectory(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-env-link-');
+        [$root] = $this->managedPathFixture('pmss-env-link-');
         [, $linkDir] = $this->pmssCreateSymlinkedDirectoryOrSkip($root.'/real', $root.'/link');
         $messages = [];
 
@@ -28,7 +33,7 @@ class ManagedPathTest extends TestCase
 
     public function testManagedPathRejectsFileAsParent(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-env-parent-file-');
+        [$root] = $this->managedPathFixture('pmss-env-parent-file-');
         $parentFile = $root.'/not-a-dir';
         file_put_contents($parentFile, 'x');
         $messages = [];
@@ -39,8 +44,7 @@ class ManagedPathTest extends TestCase
 
     public function testManagedWriteCreatesRegularFile(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-env-write-ok-');
-        $path = $root.'/managed.conf';
+        [, $path] = $this->managedPathFixture('pmss-env-write-ok-');
         $messages = [];
 
         $this->assertTrue(\pmssWriteManagedPathFile($path, "alpha\n", 'test target', $this->pmssMakeArrayLogger($messages)));
@@ -50,8 +54,7 @@ class ManagedPathTest extends TestCase
 
     public function testManagedWriteAppliesRequestedModeWhenMetadataProvided(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-env-write-meta-');
-        $path = $root.'/managed.conf';
+        [, $path] = $this->managedPathFixture('pmss-env-write-meta-');
         $messages = [];
 
         $this->assertTrue(
@@ -64,7 +67,7 @@ class ManagedPathTest extends TestCase
 
     public function testManagedWriteRejectsSymlinkTarget(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-env-target-link-');
+        [$root] = $this->managedPathFixture('pmss-env-target-link-');
         [$target, $link] = $this->pmssCreateSymlinkedFileOrSkip($root.'/target.conf', $root.'/managed.conf', "old\n");
         $messages = [];
 
@@ -75,8 +78,7 @@ class ManagedPathTest extends TestCase
 
     public function testManagedWriteWithBackupPreservesOriginalAndLogsSuccess(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-env-write-backup-');
-        $path = $root.'/managed.conf';
+        [, $path] = $this->managedPathFixture('pmss-env-write-backup-');
         file_put_contents($path, "before\n");
         $messages = [];
 
@@ -99,8 +101,7 @@ class ManagedPathTest extends TestCase
 
     public function testManagedBackupSkipsPreExistingSymlinkCandidate(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-env-backup-symlink-');
-        $path = $root.'/managed.conf';
+        [$root, $path] = $this->managedPathFixture('pmss-env-backup-symlink-');
         file_put_contents($path, "before\n");
         $outside = $root.'/outside.conf';
         $timestamp = '20260102030405';
@@ -118,8 +119,7 @@ class ManagedPathTest extends TestCase
 
     public function testManagedBackupSkipsPreExistingRegularCandidate(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-env-backup-collision-');
-        $path = $root.'/managed.conf';
+        [, $path] = $this->managedPathFixture('pmss-env-backup-collision-');
         file_put_contents($path, "before\n");
         $timestamp = '20260102030406';
         $blocked = \pmssManagedPathBackupCandidate($path, $timestamp, 0);
@@ -136,8 +136,7 @@ class ManagedPathTest extends TestCase
 
     public function testManagedBackupLogsWhenAllTimestampCandidatesExist(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-env-backup-full-');
-        $path = $root.'/managed.conf';
+        [, $path] = $this->managedPathFixture('pmss-env-backup-full-');
         file_put_contents($path, "before\n");
         $timestamp = '20260102030407';
         for ($attempt = 0; $attempt < 10; $attempt++) {
@@ -153,7 +152,7 @@ class ManagedPathTest extends TestCase
 
     public function testManagedWriteWithBackupRejectsSymlinkTarget(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-env-write-backup-link-');
+        [$root] = $this->managedPathFixture('pmss-env-write-backup-link-');
         [$target, $link] = $this->pmssCreateSymlinkedFileOrSkip($root.'/target.conf', $root.'/managed.conf', "before\n");
         $messages = [];
 
@@ -173,7 +172,7 @@ class ManagedPathTest extends TestCase
 
     public function testManagedRemoveRejectsSymlinkTarget(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-env-remove-link-');
+        [$root] = $this->managedPathFixture('pmss-env-remove-link-');
         [$target, $link] = $this->pmssCreateSymlinkedFileOrSkip($root.'/target.conf', $root.'/managed.conf', "old\n");
         $messages = [];
 
@@ -184,7 +183,7 @@ class ManagedPathTest extends TestCase
 
     public function testManagedRemoveLogsFailedUnlink(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-env-remove-missing-');
+        [$root] = $this->managedPathFixture('pmss-env-remove-missing-');
         $path = $root.'/missing.conf';
         $messages = [];
 

@@ -7,7 +7,7 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
-pmssRequireRelativeFiles(__DIR__, ['../update/distro.php', '../lighttpd/userFileWrite.php', 'traffic.php', 'passwords.php', '../portManager.php']);
+pmssRequireRelativeFiles(__DIR__, ['../update/distro.php', '../lighttpd/userFileWrite.php', 'traffic.php', 'delugeManagedConfig.php', 'passwords.php', '../portManager.php']);
 
 /**
  * Pick the Deluge core template path for the active Debian release.
@@ -192,7 +192,7 @@ function userConfigureDeluge(array $user, array $configuration): void
  */
 function pmssDelugeApplyUploadThrottle(string $username, ?int $throttle = null): bool
 {
-    $configFile = "/home/{$username}/.config/deluge/core.conf";
+    $configFile = pmssDelugeConfigPath($username);
     $config = pmssReadRegularFileContents($configFile);
     if ($config === null) {
         return false;

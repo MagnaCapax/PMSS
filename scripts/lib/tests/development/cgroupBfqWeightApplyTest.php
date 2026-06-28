@@ -111,6 +111,55 @@ class CgroupBfqWeightApplyTest extends TestCase
         $this->assertFalse(\pmssCgroupDirectWritableFileTarget($link));
     }
 
+    public function testSharedIntegerWriteGuardWritesOnlyBoundedRegularFiles(): void
+    {
+        $file = $this->pmssMakeTempFile('pmss-bfq-write-');
+        $this->assertTrue(\pmssCgroupDirectIntegerFileWrite($file, 250, 1, 1000));
+        $this->assertSame('250', (string) file_get_contents($file));
+
+        foreach ([[0, 1, 1000], [1001, 1, 1000], [5, 10, 1]] as $case) {
+            list($value, $minimum, $maximum) = $case;
+            $this->assertFalse(\pmssCgroupDirectIntegerFileWrite($file, $value, $minimum, $maximum));
+            $this->assertSame('250', (string) file_get_contents($file));
+        }
+
+        $directory = $this->pmssMakeTempDir('pmss-bfq-write-dir-');
+        $this->assertFalse(\pmssCgroupDirectIntegerFileWrite($directory, 250, 1, 1000));
+
+        $missing = $this->pmssMakeTempPath('pmss-bfq-write-missing-');
+        $this->assertFalse(\pmssCgroupDirectIntegerFileWrite($missing, 250, 1, 1000));
+
+        $link = $this->pmssMakeTempPath('pmss-bfq-write-link-');
+        $this->pmssCreateSymlinkOrSkip($file, $link);
+        $this->assertFalse(\pmssCgroupDirectIntegerFileWrite($link, 250, 1, 1000));
+    }
+
+    public function testSharedDirectWriteSourceChecksExactByteCount(): void
+    {
+        $this->pmssAssertRepoFileContract('scripts/lib/cgroup/directApply.php', [
+                'required' => [
+                    'function pmssCgroupDirectIntegerFileWrite(string $path, int $value, int $minimum, int $maximum): bool',
+                    'if ($minimum > $maximum || $value < $minimum || $value > $maximum) {',
+                    'if (!pmssCgroupDirectWritableFileTarget($path)) {',
+                    '$payload = (string) $value;',
+                    '$bytes = @file_put_contents($path, $payload);',
+                    'return is_int($bytes) && $bytes === strlen($payload);',
+                ],
+                'ordered' => [
+                    [
+                        'needles' => [
+                            'if ($minimum > $maximum || $value < $minimum || $value > $maximum) {',
+                            'if (!pmssCgroupDirectWritableFileTarget($path)) {',
+                            '$bytes = @file_put_contents($path, $payload);',
+                            'return is_int($bytes) && $bytes === strlen($payload);',
+                        ],
+                        'missingPrefix' => 'missing direct cgroup exact-write guard: ',
+                        'orderPrefix' => 'direct cgroup write guard order changed: ',
+                    ],
+                ],
+            ]);
+    }
+
     public function testSharedPasswdUidParserAcceptsOnlyPositiveIntegerUid(): void
     {
         foreach ([
@@ -161,6 +210,7 @@ class CgroupBfqWeightApplyTest extends TestCase
                     "(int) (\$stat['size'] ?? 0) > 64",
                     '@file_get_contents($path, false, null, 0, 64)',
                     'pmssCgroupDirectWritableFileTarget($cgPath)',
+                    'pmssCgroupDirectIntegerFileWrite($cgPath, $w, 1, PMSS_BFQ_KERNEL_MAX)',
                 ],
                 'ordered' => [
                     [
@@ -195,10 +245,10 @@ class CgroupBfqWeightApplyTest extends TestCase
                             "if (!pmssCgroupDirectUserBlkioPathAllowed(\$cgPath, ['blkio.bfq.weight'])) {",
                             'syslog(LOG_WARNING, "unsafe bfq target $user uid=$uid");',
                             'pmssCgroupDirectWritableFileTarget($cgPath)',
-                            'if (@file_put_contents($cgPath, (string) $w) === false)',
+                            'pmssCgroupDirectIntegerFileWrite($cgPath, $w, 1, PMSS_BFQ_KERNEL_MAX)',
                         ],
                         'missingPrefix' => 'missing BFQ direct-write target guard: ',
-                        'orderPrefix' => 'BFQ direct-write target guard must run before file_put_contents: ',
+                        'orderPrefix' => 'BFQ direct-write target guard must run before the write helper: ',
                     ],
                     [
                         'needles' => [

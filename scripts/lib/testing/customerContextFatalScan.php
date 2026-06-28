@@ -130,67 +130,65 @@ final class PmssCustomerContextFatalScanner
     private function guarded(array $tokens, int $call, string $name): bool
     {
         $guards = strpos($name, 'zip_') === 0 && $name !== 'zip_open' ? [$name, 'zip_open'] : [$name];
-        return $this->sameExpressionGuarded($tokens, $call, $guards)
-            || $this->enclosingIfGuarded($tokens, $call, $guards)
-            || $this->previousIfReturns($tokens, $call, $guards);
+        if ($this->statementGuarded($tokens, $call, $guards)) return true;
+
+        $cursor = $call;
+        while (($brace = $this->nearestOpenBrace($tokens, $cursor)) !== null) {
+            $range = $this->ifConditionRange($tokens, $brace);
+            if ($range !== null && $this->conditionHasGuard($tokens, $range, $guards, false)) return true;
+            $cursor = $brace;
+        }
+
+        $boundary = $this->boundary($tokens, $call);
+        if ($boundary < 0 || $this->text($tokens[$boundary]) !== '}') return false;
+        $openBrace = $this->matchOpen($tokens, $boundary, '{', '}');
+        $range = $openBrace === null || !$this->blockReturns($tokens, $openBrace, $boundary)
+            ? null
+            : $this->ifConditionRange($tokens, $openBrace);
+        return $range !== null && $this->conditionHasGuard($tokens, $range, $guards, true);
     }
 
-    private function sameExpressionGuarded(array $tokens, int $call, array $guards): bool
+    private function statementGuarded(array $tokens, int $call, array $guards): bool
     {
         for ($i = $this->boundary($tokens, $call) + 1; $i < $call; $i++) {
             $guard = $this->functionExistsAt($tokens, $i, $guards);
             if ($guard === null) continue;
-            $operator = '';
             for ($j = $guard['end'] + 1; $j < $call; $j++) {
-                if ($this->is($tokens[$j], T_BOOLEAN_AND) || $this->text($tokens[$j]) === '&&') { $operator = 'and'; break; }
-                if ($this->is($tokens[$j], T_BOOLEAN_OR) || $this->text($tokens[$j]) === '||') { $operator = 'or'; break; }
-                if ($this->text($tokens[$j]) === '?') { $operator = 'ternary'; break; }
+                $text = $this->text($tokens[$j]);
+                if ((!$guard['negated'] && ($this->is($tokens[$j], T_BOOLEAN_AND) || $text === '&&' || $text === '?'))
+                    || ($guard['negated'] && ($this->is($tokens[$j], T_BOOLEAN_OR) || $text === '||'))
+                ) return true;
             }
-            if ((!$guard['negated'] && ($operator === 'and' || $operator === 'ternary')) || ($guard['negated'] && $operator === 'or')) return true;
         }
         return false;
     }
 
-    private function enclosingIfGuarded(array $tokens, int $call, array $guards): bool
+    /** @return array{start:int,end:int}|null */
+    private function ifConditionRange(array $tokens, int $openBrace): ?array
     {
-        $cursor = $call;
-        while (($brace = $this->nearestOpenBrace($tokens, $cursor)) !== null) {
-            $closeParen = $this->walk($tokens, $brace, -1);
-            $openParen = ($closeParen !== null && $this->text($tokens[$closeParen]) === ')') ? $this->matchOpen($tokens, $closeParen, '(', ')') : null;
-            $before = $openParen === null ? null : $this->walk($tokens, $openParen, -1);
-            if ($before !== null && $this->is($tokens[$before], T_IF)) {
-                for ($i = $openParen + 1; $i < $closeParen; $i++) {
-                    $guard = $this->functionExistsAt($tokens, $i, $guards);
-                    if ($guard !== null && !$guard['negated']) return true;
-                }
-            }
-            $cursor = $brace;
-        }
-        return false;
-    }
-
-    private function previousIfReturns(array $tokens, int $call, array $guards): bool
-    {
-        $boundary = $this->boundary($tokens, $call);
-        if ($boundary < 0 || $this->text($tokens[$boundary]) !== '}') return false;
-
-        $openBrace = $this->matchOpen($tokens, $boundary, '{', '}');
-        if ($openBrace === null) return false;
-
-        $blockReturns = false;
-        for ($i = $openBrace + 1; $i < $boundary; $i++) {
-            if ($this->is($tokens[$i], T_RETURN) || $this->is($tokens[$i], T_EXIT)) { $blockReturns = true; break; }
-        }
-        if (!$blockReturns) return false;
-
         $closeParen = $this->walk($tokens, $openBrace, -1);
-        $openParen = ($closeParen !== null && $this->text($tokens[$closeParen]) === ')') ? $this->matchOpen($tokens, $closeParen, '(', ')') : null;
+        $openParen = ($closeParen !== null && $this->text($tokens[$closeParen]) === ')')
+            ? $this->matchOpen($tokens, $closeParen, '(', ')')
+            : null;
         $before = $openParen === null ? null : $this->walk($tokens, $openParen, -1);
-        if ($before === null || !$this->is($tokens[$before], T_IF)) return false;
+        return $before !== null && $this->is($tokens[$before], T_IF)
+            ? ['start' => $openParen + 1, 'end' => $closeParen]
+            : null;
+    }
 
-        for ($i = $openParen + 1; $i < $closeParen; $i++) {
+    private function conditionHasGuard(array $tokens, array $range, array $guards, bool $negated): bool
+    {
+        for ($i = $range['start']; $i < $range['end']; $i++) {
             $guard = $this->functionExistsAt($tokens, $i, $guards);
-            if ($guard !== null && $guard['negated']) return true;
+            if ($guard !== null && $guard['negated'] === $negated) return true;
+        }
+        return false;
+    }
+
+    private function blockReturns(array $tokens, int $openBrace, int $closeBrace): bool
+    {
+        for ($i = $openBrace + 1; $i < $closeBrace; $i++) {
+            if ($this->is($tokens[$i], T_RETURN) || $this->is($tokens[$i], T_EXIT)) return true;
         }
         return false;
     }

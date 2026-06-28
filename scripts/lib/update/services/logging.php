@@ -22,7 +22,7 @@ function pmssRenderLoggingTemplate(
         $logger($missingMessage.$template);
         return null;
     }
-    if (($raw = @file_get_contents($template)) === false) {
+    if (($raw = pmssReadRegularFileContents($template)) === null) {
         $logger($readErrorMessage.$template);
         return null;
     }

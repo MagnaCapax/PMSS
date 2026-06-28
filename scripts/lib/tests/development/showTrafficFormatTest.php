@@ -22,16 +22,18 @@ class ShowTrafficFormatTest extends TestCase
         }
     }
 
-    public function testHelpIncludesJsonOption(): void
+    public function testCliHelpAndSourceContracts(): void
     {
         $this->pmssAssertRepoPhpScriptOutputContains('scripts/showTraffic.php', ['--help'], ['--json', '--show-missing', '--extended', '--sort', '--color', '--no-color'], [], '');
-    }
-
-    public function testShowTrafficUsesSharedManagedUsersParser(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/showTraffic.php', ["require_once __DIR__.'/lib/traffic/report.php';", "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssShowTrafficMain');"]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/traffic/report.php', ["pmssListManagedUsersResult(\$listUsersScript)", 'pmssShowTrafficRawCounters($data)', "pmssShowTrafficDisplayAmounts(\$row['rawMiB'])"]);
-        $this->pmssAssertRepoFileNotContainsString('scripts/showTraffic.php', "exec(escapeshellarg(__DIR__.'/listUsers.php')");
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/showTraffic.php' => [
+                'required' => ["require_once __DIR__.'/lib/traffic/report.php';", "pmssRunCliEntrypointWithArgv(__FILE__, 'pmssShowTrafficMain');"],
+                'forbidden' => ["exec(escapeshellarg(__DIR__.'/listUsers.php')"],
+            ],
+            'scripts/lib/traffic/report.php' => [
+                'required' => ["pmssListManagedUsersResult(\$listUsersScript)", 'pmssShowTrafficRawCounters($data)', "pmssShowTrafficDisplayAmounts(\$row['rawMiB'])"],
+            ],
+        ]);
     }
 
     public function testRawCountersNormalizeRequiredTrafficStats(): void

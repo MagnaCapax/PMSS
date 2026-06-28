@@ -20,8 +20,7 @@ class NginxConfigTestTest extends TestCase
         list($rc, $out) = $this->runConfigTestWithCommands($this->tempDir.'/nginx-test-success.sh', null, false);
 
         $this->assertEquals(0, $rc);
-        $this->assertStringContainsString('nginx configuration test passed', $out);
-        $this->assertStringContainsString('You should restart nginx', $out);
+        $this->assertStringContainsAllStrings(['nginx configuration test passed', 'You should restart nginx'], $out);
         $this->assertStringContainsString('nginx -t passed (rc=0)', $this->pmssReadFileOrEmpty($this->tempDir.'/logs/update.log'));
     }
 
@@ -32,8 +31,7 @@ class NginxConfigTestTest extends TestCase
         list($rc, $out) = $this->runConfigTestWithCommands($this->tempDir.'/nginx-test-fail.sh', null, false);
 
         $this->assertEquals(1, $rc);
-        $this->assertStringContainsString('FAILED', $out);
-        $this->assertStringContainsString('Fix the configuration errors above before restarting nginx', $out);
+        $this->assertStringContainsAllStrings(['FAILED', 'Fix the configuration errors above before restarting nginx'], $out);
         $this->assertStringContainsString('CRITICAL: nginx -t failed (rc=1): bad directive', $this->pmssReadFileOrEmpty($this->tempDir.'/logs/update.log'));
     }
 
@@ -91,8 +89,7 @@ class NginxConfigTestTest extends TestCase
         list($rc, $out) = $this->runConfigTestWithCommands($this->tempDir.'/nginx-test-success.sh', $this->tempDir.'/restart-fail.sh', true);
 
         $this->assertEquals(1, $rc);
-        $this->assertStringContainsString('nginx restart', $out);
-        $this->assertStringContainsString('FAILED', $out);
+        $this->assertStringContainsAllStrings(['nginx restart', 'FAILED'], $out);
         $this->assertStringContainsString('CRITICAL: nginx restart failed (rc=4)', $this->pmssReadFileOrEmpty($this->tempDir.'/logs/update.log'));
     }
 

@@ -14,16 +14,12 @@ fail=0
 
 while IFS= read -r -d '' file; do
 	first_line="$(head -n1 "$file")"
-	if [[ "$first_line" == '#!'*php* ]]; then
-		if [[ ! -x "$file" ]]; then
-			echo "[exec-lint] missing exec bit for php shebang: $file  (fix: chmod +x $file)" >&2
-			fail=1
-		fi
-	else
-		if [[ -x "$file" ]]; then
-			echo "[exec-lint] unexpected exec bit (no php shebang): $file  (fix: chmod -x $file)" >&2
-			fail=1
-		fi
+	if [[ "$first_line" == '#!'*php* && ! -x "$file" ]]; then
+		echo "[exec-lint] missing exec bit for php shebang: $file  (fix: chmod +x $file)" >&2
+		fail=1
+	elif [[ "$first_line" != '#!'*php* && -x "$file" ]]; then
+		echo "[exec-lint] unexpected exec bit (no php shebang): $file  (fix: chmod -x $file)" >&2
+		fail=1
 	fi
 done < <(pmss_testing_find_first_party_php_files "$ROOT_DIR")
 

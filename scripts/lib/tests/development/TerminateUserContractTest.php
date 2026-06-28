@@ -161,15 +161,28 @@ final class TerminateUserContractTest extends TestCase
         $this->pmssAssertRepoFileContractCases([
             'scripts/lib/user/terminationCleanup.php' => ['required' => [
                 'function pmssTerminateUserRemoveNginxRouteFiles',
+                'function pmssTerminateUserNginxRouteFileSpecs',
                 'remove_nginx_route_file',
                 'remove_nginx_route_file_hash',
-                '"/etc/nginx/conf.d/pmss-user-{$username}{$suffix}.conf"',
+                '"/etc/nginx/conf.d/pmss-user-{$username}.conf"',
+                '"/etc/nginx/conf.d/pmss-user-{$username}-hash.conf"',
             ]],
             'scripts/terminateUser.php' => ['ordered' => [[
                 'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
                 'pmssUserLifecycleRefreshNginxConfig(',
             ]]],
         ]);
+    }
+
+    public function testTerminateUserNginxRoutePlanIsStable(): void
+    {
+        $this->assertSame(
+            array(
+                array('phase' => 'remove_nginx_route_file', 'path' => '/etc/nginx/conf.d/pmss-user-user1234.conf'),
+                array('phase' => 'remove_nginx_route_file_hash', 'path' => '/etc/nginx/conf.d/pmss-user-user1234-hash.conf'),
+            ),
+            \pmssTerminateUserNginxRouteFileSpecs('user1234')
+        );
     }
 
     public function testTerminateUserDryRunGuardsDirectCleanupMutations(): void

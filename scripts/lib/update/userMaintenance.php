@@ -7,13 +7,10 @@
  */
 
 require_once __DIR__.'/runtime/commands.php';
-require_once __DIR__.'/systemPrep.php';
-require_once __DIR__.'/users.php';
-require_once __DIR__.'/../pathSafety.php';
-require_once __DIR__.'/../users.php';
-require_once __DIR__.'/../userLifecycle.php';
-require_once __DIR__.'/../user/userCgroupSliceHealth.php';
-require_once __DIR__.'/../user/directories.php';
+pmssRequireRelativeFiles(__DIR__, [
+    'systemPrep.php', 'users.php', '../pathSafety.php', '../users.php', '../userLifecycle.php',
+    '../user/userCgroupSliceHealth.php', '../user/directories.php',
+]);
 require_once __DIR__.'/users/docker.php';
 
 /**

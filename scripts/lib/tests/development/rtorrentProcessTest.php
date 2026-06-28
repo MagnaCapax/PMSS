@@ -295,6 +295,8 @@ class RtorrentProcessTest extends TestCase
         $this->assertSame(1, substr_count($processSource, "@passthru('/scripts/startRtorrent "));
         $this->assertStringContainsAllStrings([
             'function rtorrentProcessStart(',
+            'Refusing to start rTorrent for invalid username',
+            'Refusing to restart rTorrent for invalid username',
             "'/tmp/.pmss-rtorrent-restart-'.\$user",
             'rtorrentProcessWriteStateFile($startMarkerState, $now)',
             '$rc = rtorrentProcessStart($user, $logFn);',
@@ -304,6 +306,34 @@ class RtorrentProcessTest extends TestCase
             'rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);',
         ], $watchdogSource);
         $this->pmssAssertStringNotContainsString("@passthru('/scripts/startRtorrent ", $watchdogSource);
+    }
+
+    public function testProcessStartRejectsInvalidUsernameBeforeLaunch(): void
+    {
+        $marker = $this->tempDir.'/start-marker.ts';
+        $messages = [];
+        $logger = static function (string $message, bool $force = false) use (&$messages): void {
+            $messages[] = $message;
+        };
+
+        $result = rtorrentProcessStart('bad;name', $logger, $marker);
+
+        $this->assertEquals(1, $result);
+        $this->assertFalse(file_exists($marker), 'Invalid start must not write the supplied marker');
+        $this->pmssAssertMessagesContain($messages, 'Refusing to start rTorrent for invalid username');
+    }
+
+    public function testProcessRestartRejectsInvalidUsernameBeforeSnapshot(): void
+    {
+        $messages = [];
+        $logger = static function (string $message, bool $force = false) use (&$messages): void {
+            $messages[] = $message;
+        };
+
+        $result = rtorrentProcessRestart('bad;name', [1], [2], $logger);
+
+        $this->assertEquals(1, $result);
+        $this->assertEquals(['Refusing to restart rTorrent for invalid username'], $messages);
     }
 
     public function testResetSessionDirectoryQuarantinesAndRecreatesDirectory(): void

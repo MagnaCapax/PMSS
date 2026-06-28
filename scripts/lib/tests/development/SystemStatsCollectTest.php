@@ -166,4 +166,38 @@ class SystemStatsCollectTest extends TestCase
             $this->assertEquals($expected, $summary);
         }
     }
+
+    public function testCpuCountersParserRejectsMalformedBoundaryInput(): void
+    {
+        $this->assertSame([1, 2, 3, 4, 5], \pmssSystemStatsCpuCountersFromRaw("cpu 1 2 3 4 5\n"));
+
+        foreach ([null, '', "intr 1 2 3 4 5\n", "cpu 1 2 x 4 5\n", "cpu 1 2 3 4\n", "cpu -1 2 3 4 5\n"] as $raw) {
+            $this->assertSame([], \pmssSystemStatsCpuCountersFromRaw($raw));
+        }
+    }
+
+    public function testDiskIoTimeParserRejectsMalformedBoundaryInput(): void
+    {
+        $raw = "8 0 sda 0 0 0 0 0 0 0 0 0 123\n"
+            ."259 0 nvme0n1 0 0 0 0 0 0 0 0 0 456\n"
+            ."7 0 loop0 0 0 0 0 0 0 0 0 0 789\n"
+            ."8 16 sdb 0 0 0 0 0 0 0 0 0 not-a-number\n";
+
+        $this->assertSame(['sda' => 123, 'nvme0n1' => 456], \pmssSystemStatsDiskIoTimeFromRaw($raw));
+        $this->assertSame([], \pmssSystemStatsDiskIoTimeFromRaw(null));
+    }
+
+    public function testAppendLogLineChecksTargetPath(): void
+    {
+        $dir = $this->pmssMakeTempDir('system-stats-log-');
+        $path = $dir.'/system-stats.log';
+
+        $this->assertTrue(\pmssSystemStatsAppendLogLine($path, "first\n"));
+        $this->assertTrue(\pmssSystemStatsAppendLogLine($path, 'second'));
+        $this->assertSame("first\nsecond\n", (string) file_get_contents($path));
+
+        $this->assertFalse(\pmssSystemStatsAppendLogLine($dir, 'blocked'));
+        $this->assertFalse(\pmssSystemStatsAppendLogLine('relative.log', 'blocked'));
+        $this->assertFalse(\pmssSystemStatsAppendLogLine($dir."/bad\0path", 'blocked'));
+    }
 }

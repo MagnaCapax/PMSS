@@ -38,8 +38,8 @@ function pmssWireguardCommandCapture(string $program, array $args, int $timeoutS
 function pmssWireguardLsmodOutputHasModule(string $output): bool
 {
     foreach (preg_split('/\R/', $output) ?: [] as $line) {
-        $columns = preg_split('/\s+/', trim($line));
-        if (is_array($columns) && ($columns[0] ?? '') === 'wireguard') {
+        $columns = pmssConfigLineColumns($line, 1, []);
+        if (($columns[0] ?? '') === 'wireguard') {
             return true;
         }
     }

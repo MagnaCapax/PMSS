@@ -53,8 +53,11 @@ function pmssUserTransferPreserveQbittorrentCategories(
         logMessage('[WARN] Ignoring invalid remote qBittorrent categories.json');
         $source = [];
     }
-    if (count($source) < 1) {
-        $source = pmssUserTransferQbittorrentLegacyCategoriesFromConfigFile($remoteConfigPath, $cfg);
+    if (count($source) < 1 && is_file($remoteConfigPath)) {
+        $source = pmssUserTransferQbittorrentLegacyCategoriesFromConfig(
+            (string) @file_get_contents($remoteConfigPath),
+            $cfg
+        );
     }
     if (count($source) < 1) {
         logMessage('[INFO] No remote qBittorrent categories found to preserve');

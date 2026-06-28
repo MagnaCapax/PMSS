@@ -11,6 +11,21 @@
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../logging.php';
 
+/** Validate common venv setup inputs before probing Python or creating files. */
+function pmssPythonVenvBaseInputsAreSafe(string $venvDir, string $label, callable $log): bool
+{
+    if (trim($label) === '' || preg_match('/[\x00-\x1F\x7F]/', $label) === 1) {
+        $log('[WARN] Skipping Python virtualenv setup: unsafe label');
+        return false;
+    }
+    if ($venvDir === '' || strpos($venvDir, "\0") !== false) {
+        $log('[WARN] Skipping '.$label.' virtualenv setup: unsafe venv path');
+        return false;
+    }
+
+    return true;
+}
+
 /**
  * Ensure a Python 3 venv exists at $venvDir with pip usable and upgraded.
  *
@@ -25,6 +40,10 @@ function pmssPythonVenvEnsure(
 ): string
 {
     $log = $logger ?: 'logMessage';
+    if (!pmssPythonVenvBaseInputsAreSafe($venvDir, $label, $log)) {
+        return '';
+    }
+
     $python = pmssCommandPath('python3');
     if ($python === '') {
         $log($missingPythonMessage !== null ? $missingPythonMessage : '[WARN] Skipping '.$label.' setup: python3 missing');
@@ -74,12 +93,45 @@ function pmssPythonVenvInstallCli(
     ?callable $logger = null
 ): void {
     $log = $logger ?: 'logmsg';
+    if (!pmssPythonVenvBaseInputsAreSafe($venvDir, $label, $log)) {
+        return;
+    }
+    if ($cliBin === '' || $linkPath === '' || strpos($cliBin, "\0") !== false || strpos($linkPath, "\0") !== false) {
+        $log('[WARN] Skipping '.$label.' install: unsafe CLI path');
+        return;
+    }
+
+    $normalizedInstallSteps = [];
+    foreach ($installSteps as $installStep) {
+        if (!is_array($installStep)
+            || !isset($installStep[0], $installStep[1])
+            || !is_scalar($installStep[0])
+            || !is_scalar($installStep[1])
+        ) {
+            $log('[WARN] Skipping '.$label.' install: unsafe install step');
+            return;
+        }
+
+        $description = trim((string) $installStep[0]);
+        $args = trim((string) $installStep[1]);
+        if ($description === ''
+            || $args === ''
+            || preg_match('/[\x00-\x1F\x7F]/', $description.$args) === 1
+            || preg_match('/[;&|`$<>\\\\]/', $args) === 1
+        ) {
+            $log('[WARN] Skipping '.$label.' install: unsafe install step');
+            return;
+        }
+
+        $normalizedInstallSteps[] = [$description, $args];
+    }
+
     $venvPython = pmssPythonVenvEnsure($venvDir, $label, $log, $missingPythonMessage);
     if ($venvPython === '') {
         return;
     }
     $pipInstallPrefix = pmssBuildCommand($venvPython, ['-m', 'pip', 'install', '--upgrade']);
-    foreach ($installSteps as $installStep) {
+    foreach ($normalizedInstallSteps as $installStep) {
         runStep($installStep[0], $pipInstallPrefix.' '.$installStep[1]);
     }
     if (!is_file($cliBin)) {

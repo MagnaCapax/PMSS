@@ -360,12 +360,7 @@ class RuntimeTest extends TestCase
         foreach (['', $filePath, '/definitely-not-a-real-pmss-cwd', "/tmp/pmss\0bad"] as $cwd) {
             $result = \pmssCommandPipedCapture($bash, 'pipe-cwd-safety-test', 0, 0, false, 'proc_open failed', 17, false, 'stream_select failed', $cwd);
 
-            $this->assertSame(17, $result['rc'], 'Unexpected rc for cwd '.str_replace("\0", '\\0', $cwd));
-            $this->assertSame('', $result['stdout']);
-            $this->assertSame('unsafe proc_open cwd', $result['stderr']);
-            $this->assertFalse($result['timed_out']);
-            $this->assertTrue($result['launch_failed']);
-            $this->assertFalse($result['pipe_failed']);
+            $this->assertPipedCaptureLaunchFailure($result, 17, 'unsafe proc_open cwd', 'cwd '.str_replace("\0", '\\0', $cwd));
         }
     }
 
@@ -383,12 +378,7 @@ class RuntimeTest extends TestCase
         ] as $env) {
             $result = \pmssCommandPipedCapture($bash, 'pipe-env-safety-test', 0, 0, false, 'proc_open failed', 19, false, 'stream_select failed', $cwd, $env);
 
-            $this->assertSame(19, $result['rc']);
-            $this->assertSame('', $result['stdout']);
-            $this->assertSame('unsafe proc_open environment', $result['stderr']);
-            $this->assertFalse($result['timed_out']);
-            $this->assertTrue($result['launch_failed']);
-            $this->assertFalse($result['pipe_failed']);
+            $this->assertPipedCaptureLaunchFailure($result, 19, 'unsafe proc_open environment');
         }
     }
 
@@ -633,6 +623,18 @@ class RuntimeTest extends TestCase
     }
 
     // Note: logMessage() in lib/update.php targets a fixed log location; avoid writing system logs here.
+
+    /** Assert the common launch-failure shape for piped command capture. */
+    private function assertPipedCaptureLaunchFailure(array $result, int $rc, string $stderr, string $label = ''): void
+    {
+        $prefix = $label !== '' ? $label.': ' : '';
+        $this->assertSame($rc, $result['rc'], $prefix.'rc');
+        $this->assertSame('', $result['stdout'], $prefix.'stdout');
+        $this->assertSame($stderr, $result['stderr'], $prefix.'stderr');
+        $this->assertFalse($result['timed_out'], $prefix.'timed_out');
+        $this->assertTrue($result['launch_failed'], $prefix.'launch_failed');
+        $this->assertFalse($result['pipe_failed'], $prefix.'pipe_failed');
+    }
 
     private function withRuntimeArgv(array $argv, callable $callback): void
     {

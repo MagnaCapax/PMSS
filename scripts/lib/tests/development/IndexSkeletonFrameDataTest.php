@@ -5,17 +5,18 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class IndexSkeletonFrameDataTest extends TestCase
 {
-    public function testCustomFrameAccumulatorStartsAsArrayBeforeMerge(): void
+    public function testCustomFrameReaderRunsBeforeLocalFrameMerge(): void
     {
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'etc/skel/www/index.php',
             [
-                '$frameData = array();',
-                "if (file_exists('../.customFrames')) {",
+                'function pmssLocalFrameCustomFramesRead($path = \'../.customFrames\')',
+                '$frameData = pmssLocalFrameCustomFramesRead();',
+                'foreach (array(pmssLocalFrameInstalledAppFramesRead(), pmssLocalFrameProxyAppFramesRead()) as $pmssCandidateFrames) {',
                 '$frames = array_merge($frames, $frameData);',
             ],
             'Missing index.php frame handling fragment: ',
-            'index.php custom frame initialization order changed at: '
+            'index.php custom frame merge order changed at: '
         );
     }
 
@@ -25,8 +26,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             'etc/skel/www/index.php',
             [
                 'function pmssFrameOpensInNewWindow(array $frame)',
-                "'wiki' => array(",
-                "'url'      => 'https://wiki.pulsedmedia.com',",
+                "'wiki' => pmssLocalFrameDefinition('https://wiki.pulsedmedia.com', 'wiki', 'Pulsed Media Wiki'),",
             ],
             'Missing index.php in-page wiki fragment: ',
             'index.php wiki target order changed at: '
@@ -54,7 +54,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             'etc/skel/www/index.php',
             [
                 'function pmssLocalFrameWelcomeUrlBuild($quotaPath = \'../.quota\')',
-                "'url'      => pmssLocalFrameWelcomeUrlBuild(),",
+                "'welcome' => pmssLocalFrameDefinition(pmssLocalFrameWelcomeUrlBuild(), 'welcome', 'Welcome to your seedbox. Basic information'),",
             ],
             'Missing local welcome quota fragment: ',
             'Local welcome URL builder must be defined before frame fallback use: '
@@ -318,6 +318,37 @@ class IndexSkeletonFrameDataTest extends TestCase
         $this->assertStringNotContainsString('Undefined array key', $output);
     }
 
+    public function testCustomFrameParserLocksAcceptedRows(): void
+    {
+        $this->loadIndexFrameHelpers();
+        $path = $this->pmssMakeTempPath('pmss-index-custom-frames-', '.txt');
+        $this->pmssWriteFile(
+            $path,
+            "# comment\n"
+            ."\n"
+            ."custom|Custom tooltip|Custom|custom/\n"
+            ."missing-url|Missing URL|Missing|\n"
+            ."short|Short row|Short\n"
+            ."second|Second tooltip|Second|https://example.test/app/\n"
+        );
+
+        $this->assertSame(
+            array(
+                'custom' => array(
+                    'url' => 'custom/',
+                    'linkText' => 'Custom',
+                    'title' => 'Custom tooltip',
+                ),
+                'second' => array(
+                    'url' => 'https://example.test/app/',
+                    'linkText' => 'Second',
+                    'title' => 'Second tooltip',
+                ),
+            ),
+            $this->localFrameCustomFramesRead($path)
+        );
+    }
+
     public function testUserSkeletonSyncIncludesIndexTemplate(): void
     {
         $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/filesystem.php', "'www/index.php',");
@@ -397,6 +428,14 @@ class IndexSkeletonFrameDataTest extends TestCase
         /** @var callable(string): array<string,mixed> $reader */
         $reader = 'pmssLocalFrameQuotaInfoRead';
         return $reader($quotaPath);
+    }
+
+    private function localFrameCustomFramesRead(string $path): array
+    {
+        $this->loadIndexFrameHelpers();
+        /** @var callable(string): array<string,array<string,string>> $reader */
+        $reader = 'pmssLocalFrameCustomFramesRead';
+        return $reader($path);
     }
 
     private function writeQuotaSnapshotContent(string $content): string

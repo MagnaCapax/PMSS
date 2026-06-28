@@ -53,8 +53,7 @@ function pmssCreateNginxConfigMain(array $argv): int
     if ($requestedUser === '' && count($positionals) === 1) {
         $requestedUser = (string) $positionals[0];
     } elseif (count($positionals) > 1) {
-        fwrite(STDERR, $usage);
-        return 1;
+        return pmssCliReturnWithStderr($usage);
     }
 
     $restartNginx = pmssCliOptionPresent($parsed, 'restart', 'r');

@@ -25,22 +25,16 @@ $networkConfig = networkLoadConfig();
 $localnets     = networkLoadLocalnets();
 
 // Resolve the uplink interface and current speed capacity.
-$configuredInterface = isset($networkConfig['interface']) ? (string) $networkConfig['interface'] : '';
-if ($configuredInterface !== '') {
-    $link = networkInterfaceNameNormalized($configuredInterface);
-    if ($link === '') {
-        logMessage('setupNetwork: unsafe configured interface name');
-        die("Error: Unsafe configured network interface\n");
-    }
-} else {
-    $link = detectPrimaryInterface();
+$configuredInterface = trim((string) ($networkConfig['interface'] ?? ''));
+$link = $configuredInterface === '' ? detectPrimaryInterface() : networkInterfaceNameNormalized($configuredInterface);
+if ($configuredInterface !== '' && $link === '') {
+    logMessage('setupNetwork: unsafe configured interface name');
+    die("Error: Unsafe configured network interface\n");
 }
 $interface = $link;
-$linkSpeed = getLinkSpeed($link);
-$detectedLinkSpeed = getDetectedLinkSpeed($link);
 
 // If no explicit interface is configured, avoid tunnel defaults (tun/wg/tap).
-if (empty($networkConfig['interface']) && preg_match('/^(tun|tap|wg)/', $interface)) {
+if ($configuredInterface === '' && preg_match('/^(tun|tap|wg)/', $interface)) {
     $routes = trim((string) shell_exec('/sbin/ip route show default 2>/dev/null'));
     $fallback = '';
     if ($routes !== '') {
@@ -56,10 +50,7 @@ if (empty($networkConfig['interface']) && preg_match('/^(tun|tap|wg)/', $interfa
     }
     if ($fallback !== '' && $fallback !== $interface) {
         logMessage("setupNetwork: detected tunnel uplink {$interface}; using {$fallback} instead");
-        $interface = $fallback;
-        $link = $fallback;
-        $linkSpeed = getLinkSpeed($fallback);
-        $detectedLinkSpeed = getDetectedLinkSpeed($fallback);
+        $interface = $link = $fallback;
     }
 }
 
@@ -67,6 +58,8 @@ if ($interface === '') {
     die("Error: Could not determine primary interface\n");
 }
 
+$linkSpeed = getLinkSpeed($link);
+$detectedLinkSpeed = getDetectedLinkSpeed($link);
 $configuredSpeed = isset($networkConfig['speed']) ? (int) $networkConfig['speed'] : 0;
 if ($configuredSpeed > 0 && $detectedLinkSpeed > $configuredSpeed) {
     logMessage(sprintf(
@@ -171,17 +164,9 @@ if (@file_put_contents('/proc/sys/net/ipv4/ip_forward', '1') === false) {
     logMessage('setupNetwork: unable to enable IPv4 forwarding');
 }
 
-$renderedFilter = array_map(
-    function (string $cmd) use ($replacements) { return str_replace(array_keys($replacements), array_values($replacements), $cmd); },
-    $filterCommands
-);
-$renderedNat = array_map(
-    function (string $cmd) use ($replacements) { return str_replace(array_keys($replacements), array_values($replacements), $cmd); },
-    $natCommands
-);
-
 // Prefer atomic iptables-restore to minimise transient inconsistencies.
-if (!networkApplyIptablesAtomically($renderedFilter, $renderedNat)) {
+$renderedIptables = networkIptablesRenderCommandSets($filterCommands, $natCommands, $replacements);
+if ($renderedIptables !== null && !networkApplyIptablesAtomically($renderedIptables['filter'], $renderedIptables['nat'])) {
     logMessage('iptables-restore failed, falling back to sequential rules');
     networkApplyIptablesFallback($filterCommands, $natCommands, $replacements);
 }

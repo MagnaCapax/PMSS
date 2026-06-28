@@ -11,7 +11,9 @@ class TempDiskBackedMountTest extends TestCase
     {
         $messages = [];
         $callback = function () use (&$messages, $distroVersion): void {
-            \pmssConfigureTempDiskBackedMount($this->pmssMakeArrayLogger($messages), $distroVersion);
+            $messages = $this->pmssArrayLoggerMessages(function (callable $logger) use ($distroVersion): void {
+                \pmssConfigureTempDiskBackedMount($logger, $distroVersion);
+            });
         };
 
         if ($pathPrefix === null) {

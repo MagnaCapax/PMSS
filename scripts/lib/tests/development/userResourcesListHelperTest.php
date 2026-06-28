@@ -58,15 +58,9 @@ class UserResourcesListHelperTest extends TestCase
             'suspended' => true,
         ], 'full');
 
-        $this->assertEquals('alice', $row[0]);
-        $this->assertEquals('1G', $row[2]);
-        $this->assertEquals('2G', $row[3]);
-        $this->assertEquals('1M', $row[7]);
-        $this->assertEquals('50G', $row[11]);
-        $this->assertEquals('inf', $row[15]);
-        $this->assertEquals('12.5G', $row[16]);
-        $this->assertEquals('inf', $row[17]);
-        $this->assertEquals('yes', $row[18]);
+        foreach ([0 => 'alice', 2 => '1G', 3 => '2G', 7 => '1M', 11 => '50G', 15 => 'inf', 16 => '12.5G', 17 => 'inf', 18 => 'yes'] as $index => $expected) {
+            $this->assertEquals($expected, $row[$index], 'column '.$index);
+        }
     }
 
     public function testRowBuildBriefModeSnapshot(): void

@@ -29,9 +29,12 @@ function pmssExtractCpuQuotaPercent(array $props, array $policyDefaults): int
     return max(200, pmssTotalCpuThreads() * 85);
 }
 
-function pmssComputePhpProcessPlan(float $cpuQuotaPercent): array
+function pmssComputePhpProcessPlan(float $cpuQuotaPercent, int $minThreads = 0): array
 {
     $targetThreads = (int) ceil((($cpuQuotaPercent > 0 ? $cpuQuotaPercent : 100) / 100) * 4);
+    if ($minThreads > 0) {
+        $targetThreads = max($targetThreads, $minThreads);
+    }
     $targetThreads = max(PMSS_PHP_THREADS_MIN, min(PMSS_PHP_THREADS_MAX, $targetThreads));
     $maxProcs = (int) ceil($targetThreads / PMSS_LIGHTTPD_CHILDREN_PER_PROC);
     $totalThreads = $maxProcs * PMSS_LIGHTTPD_CHILDREN_PER_PROC;
@@ -44,7 +47,17 @@ function pmssComputePhpProcessPlan(float $cpuQuotaPercent): array
     return ['max_procs' => $maxProcs, 'children' => PMSS_LIGHTTPD_CHILDREN_PER_PROC, 'totalThreads' => $totalThreads];
 }
 
-function pmssLighttpdResourcePlan(array $props, array $policyDefaults): array
+function pmssLighttpdMinThreadsFromUserConfig(array $userConfig): int
+{
+    if (!isset($userConfig['lighttpdMinThreads']) || !is_numeric($userConfig['lighttpdMinThreads'])) {
+        return 0;
+    }
+
+    $minThreads = (int) $userConfig['lighttpdMinThreads'];
+    return $minThreads > 0 ? min(PMSS_PHP_THREADS_MAX, $minThreads) : 0;
+}
+
+function pmssLighttpdResourcePlan(array $props, array $policyDefaults, array $userConfig = []): array
 {
     $memoryHigh = null;
     foreach (['MemoryHigh', 'MemoryMax'] as $field) {
@@ -54,7 +67,7 @@ function pmssLighttpdResourcePlan(array $props, array $policyDefaults): array
     }
 
     $cpuQuotaPercent = pmssExtractCpuQuotaPercent($props, $policyDefaults);
-    $processPlan = pmssComputePhpProcessPlan($cpuQuotaPercent);
+    $processPlan = pmssComputePhpProcessPlan($cpuQuotaPercent, pmssLighttpdMinThreadsFromUserConfig($userConfig));
     $memoryDefault = isset($policyDefaults['memoryHighMiB']) ? (int) $policyDefaults['memoryHighMiB'] : 512;
 
     return [

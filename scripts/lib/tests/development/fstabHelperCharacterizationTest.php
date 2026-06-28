@@ -13,10 +13,10 @@ class FstabHelperCharacterizationTest extends TestCase
         file_put_contents($target, "tmpfs /tmp tmpfs defaults 0 0\n");
         $this->pmssCreateSymlinkOrSkip($target, $link);
 
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
+        $messages = $this->pmssArrayLoggerMessages(function (callable $logger) use ($link): void {
+            $this->assertSame(null, \pmssFstabLinesRead($link, $logger, 'fstab characterization'));
+        });
 
-        $this->assertSame(null, \pmssFstabLinesRead($link, $logger, 'fstab characterization'));
         $this->assertTrue($this->pmssMessagesContain($messages, 'not a regular file'), 'expected regular-file guard log');
     }
 

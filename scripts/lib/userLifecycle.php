@@ -11,11 +11,7 @@
 
 require_once __DIR__.'/user/log.php';
 require_once __DIR__.'/runtime.php';
-require_once __DIR__.'/user/identity.php';
-require_once __DIR__.'/user/selection.php';
-require_once __DIR__.'/user/watchdog.php';
-require_once __DIR__.'/user/userFilesystem.php';
-require_once __DIR__.'/user/userConfigStore.php';
+pmssRequireRelativeFiles(__DIR__, ['user/identity.php', 'user/selection.php', 'user/watchdog.php', 'user/userFilesystem.php', 'user/userConfigStore.php']);
 
 if (!defined('PMSS_USER_LOG_TEXT')) {
     define('PMSS_USER_LOG_TEXT', '/var/log/pmss/users.log');

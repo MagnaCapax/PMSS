@@ -27,7 +27,10 @@ define('PMSS_RTORRENT_START_FAILURE_ESCALATE', 6);
 
 // --- Main execution ---
 
-if (pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkRtorrent.lock'), true) === false) {
+// Keep the handle for the whole run — an unassigned handle is closed at end
+// of statement, which releases the flock and voids the guard.
+$pmssCheckRtorrentLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkRtorrent.lock'), true);
+if ($pmssCheckRtorrentLock === false) {
     pmssCheckRtorrentLog('checkRtorrent already running; skipping', false, $debug);
     exit(0);
 }
@@ -76,6 +79,14 @@ foreach ($users as $user) {
         if (!pmssCheckRtorrentRecoverMissingConfig($user, $home, $debug)) {
             continue;
         }
+    } elseif (function_exists('posix_getpwuid')) {
+        // Tamper detection: provisioning writes .rtorrent.rc root-owned, so
+        // user ownership means it was replaced. Collected here because every
+        // process-state branch below continues out of the loop iteration.
+        $owner = @posix_getpwuid(@fileowner($home.'/.rtorrent.rc'));
+        if (is_array($owner) && isset($owner['name']) && $owner['name'] !== 'root') {
+            $changedConfig[] = $user.' -> '.$owner['name'];
+        }
     }
 
     $executor = rtorrentProcessExecutorPids($user);
@@ -100,212 +111,38 @@ foreach ($users as $user) {
         continue;
     }
 
-    if (!$executorPresent && empty($rtorrentPids)) {
-        $socketPath = rtorrentScgiSocketPath($user);
-        pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $state['unresponsive'], $debug);
-
-        if (is_file($state['startMarker'])) {
-            $persistentFailureState = rtorrentProcessCheckFailureCountState(
-                $state['startFailure'],
-                PMSS_RTORRENT_START_FAILURE_ESCALATE
-            );
-            $persistentFailureCount = $persistentFailureState['count'];
-
-            pmssCheckRtorrentLogBoth(
-                $user,
-                "rTorrent still missing after start attempt; persistent failure {$persistentFailureCount}/"
-                    .PMSS_RTORRENT_START_FAILURE_ESCALATE,
-                $debug
-            );
-
-            if ($persistentFailureCount >= PMSS_RTORRENT_START_FAILURE_SESSION_RESET
-                && !is_file($state['sessionReset'])
-            ) {
-                if (rtorrentProcessResetSessionDirectory($home, $user, $logCallback)) {
-                    rtorrentProcessWriteStateFile($state['sessionReset'], (string) time());
-                    pmssCheckRtorrentLogBoth(
-                        $user,
-                        'persistent start failure recovery: reset session directory',
-                        $debug
-                    );
-                }
-            }
-
-            if ($persistentFailureCount >= PMSS_RTORRENT_START_FAILURE_ESCALATE) {
-                rtorrentProcessWriteStateFile(
-                    $state['escalation'],
-                    (string) json_encode(['timestamp' => time(), 'user' => $user, 'count' => $persistentFailureCount])
-                );
-                pmssCheckRtorrentLogBoth(
-                    $user,
-                    'persistent start failure escalated; leaving retry disabled for external monitoring',
-                    $debug
-                );
-                continue;
-            }
-        }
-
-        if (!pmssCheckRtorrentStaggerAfterRecentReboot($user, 'rTorrent missing; ', $debug)) {
-            pmssCheckRtorrentLogBoth($user, 'rTorrent missing; starting', $debug);
-        }
-
-        rtorrentProcessStart($user, $logCallback, $state['startMarker']);
-        continue;
-    }
-
-    if ($executorPresent && empty($rtorrentPids)) {
-        $socketPath = rtorrentScgiSocketPath($user);
-        pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $state['unresponsive'], $debug);
-
-        $missingState = rtorrentProcessCheckStaleState($state['missing'], PMSS_RTORRENT_MISSING_GRACE);
-
-        if ($missingState['action'] === 'record') {
-            pmssCheckRtorrentLog(
-                "Executor present but rTorrent missing for {$user}; observing",
-                false,
-                $debug
-            );
-            continue;
-        }
-
-        if ($missingState['action'] === 'wait') {
-            pmssCheckRtorrentLog(
-                "Executor present but rTorrent missing for {$user}; waiting (age={$missingState['age']}s)",
-                false,
-                $debug
-            );
-            continue;
-        }
-
-        pmssCheckRtorrentRefreshExecutorFromSkel($user, $home, $debug);
-
-        pmssCheckRtorrentLogBoth(
+    if (empty($rtorrentPids)) {
+        // Helper owns legacy launch marker: rtorrentProcessStart($user, $logCallback, $state['startMarker'])
+        pmssCheckRtorrentHandleMissingProcess(
             $user,
-            "executor present but rTorrent missing for {$missingState['age']}s; restarting",
-            $debug
+            $home,
+            $executorPresent,
+            $executorAllPids,
+            $state,
+            $logCallback,
+            $debug,
+            PMSS_RTORRENT_MISSING_GRACE,
+            PMSS_RTORRENT_START_FAILURE_SESSION_RESET,
+            PMSS_RTORRENT_START_FAILURE_ESCALATE
         );
-
-        pmssCheckRtorrentStaggerAfterRecentReboot($user, '', $debug);
-
-        rtorrentProcessRestart($user, [], $executorAllPids, $logCallback, $debug);
-        rtorrentProcessClearStaleState($state['missing']);
         continue;
     }
 
     if (!empty($rtorrentPids) && count($rtorrentPids) === 1) {
-        $socketPath = rtorrentScgiSocketPath($user);
-        $responsive = rtorrentScgiCall($socketPath, 'system.api_version', [], 5) !== false;
-
-        if ($responsive) {
-            rtorrentProcessClearStaleState($state['unresponsive']);
-            rtorrentProcessClearStaleState($state['acceptQueueWedge']);
-            pmssCheckRtorrentApplyThrottle($user, $socketPath, $debug);
-            pmssCheckRtorrentLog("rTorrent healthy for {$user}", false, $debug);
-            continue;
-        }
-
-        $rtorrentPids = pmssUserWatchdogProcessPids($user, '^rtorrent');
-        if (empty($rtorrentPids)) {
-            pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $state['unresponsive'], $debug);
-
-            pmssCheckRtorrentLogBoth($user, 'rTorrent missing after SCGI probe; starting', $debug);
-            rtorrentProcessStart($user, $logCallback, $state['startMarker']);
-            continue;
-        }
-
-        $restartMarker = '/tmp/.pmss-rtorrent-restart-'.$user;
-        $graceState = rtorrentProcessUnresponsiveGraceState($restartMarker, PMSS_RTORRENT_UNRESPONSIVE_GRACE);
-        $restartAge = $graceState['restartAge'];
-        $effectiveGrace = $graceState['grace'];
-
-        if ($effectiveGrace > PMSS_RTORRENT_UNRESPONSIVE_GRACE) {
-            $restartTime = date('Y-m-d H:i:s', time() - $restartAge);
-            pmssCheckRtorrentLog(
-                "Extending SCGI grace to {$effectiveGrace}s for {$user} (recent restart at {$restartTime})",
-                false,
-                $debug
-            );
-        }
-
-        $unresponsiveState = rtorrentProcessCheckStaleState($state['unresponsive'], $effectiveGrace);
-
-        if ($unresponsiveState['action'] === 'record') {
-            pmssCheckRtorrentLogBoth(
-                $user,
-                "SCGI unresponsive (socket={$socketPath}); observing",
-                $debug
-            );
-            continue;
-        }
-
-        if ($unresponsiveState['action'] === 'wait') {
-            pmssCheckRtorrentLog(
-                "SCGI still unresponsive for {$user}; waiting (age={$unresponsiveState['age']}s, grace={$effectiveGrace}s)",
-                false,
-                $debug
-            );
-            continue;
-        }
-
-        $rtorrentPids = pmssUserWatchdogProcessPids($user, '^rtorrent');
-        if (!empty($rtorrentPids)) {
-            $processStates = rtorrentProcessStatesForPids($rtorrentPids);
-            $queueSnapshot = rtorrentScgiSocketQueueSnapshot($socketPath);
-            $decision = rtorrentProcessScgiUnresponsiveDecision(
-                $rtorrentPids,
-                $processStates,
-                $queueSnapshot,
-                $state['acceptQueueWedge'],
-                PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES
-            );
-            if ($decision['action'] === 'extend_grace') {
-                pmssCheckRtorrentExtendUnresponsiveGrace(
-                    $user,
-                    $decision['message'],
-                    $state['unresponsive'],
-                    $state['acceptQueueWedge'],
-                    $debug
-                );
-                continue;
-            }
-            if ($decision['action'] === 'observe_wedge') {
-                rtorrentProcessWriteStateFile($state['unresponsive'], (string) time());
-                pmssCheckRtorrentLogBoth(
-                    $user,
-                    $decision['message'],
-                    $debug
-                );
-                continue;
-            }
-
-            pmssCheckRtorrentLogBoth(
-                $user,
-                $decision['message'],
-                $debug
-            );
-            rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);
-            rtorrentProcessClearStaleState($state['unresponsive']);
-            rtorrentProcessClearStaleState($state['acceptQueueWedge']);
-            continue;
-        }
-
-        pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $state['unresponsive'], $debug);
-        pmssCheckRtorrentLogBoth(
+        // Helper owns legacy restart marker: rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);
+        pmssCheckRtorrentHandleAliveProcess(
             $user,
-            "SCGI unresponsive for {$unresponsiveState['age']}s; restarting rtorrent",
-            $debug
+            $rtorrentPids,
+            $executorAllPids,
+            $state,
+            $logCallback,
+            $debug,
+            PMSS_RTORRENT_UNRESPONSIVE_GRACE,
+            PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES
         );
-        rtorrentProcessRestart($user, [], $executorAllPids, $logCallback, $debug);
-        rtorrentProcessClearStaleState($state['unresponsive']);
         continue;
     }
 
-    if (file_exists($home.'/.rtorrent.rc') && function_exists('posix_getpwuid')) {
-        $owner = @posix_getpwuid(@fileowner($home.'/.rtorrent.rc'));
-        if (is_array($owner) && isset($owner['name']) && $owner['name'] !== 'root') {
-            $changedConfig[] = $user.' -> '.$owner['name'];
-        }
-    }
 }
 
 pmssCheckRtorrentPublishChangedConfigReport($changedConfig, '/root/changedConfigs', $debug);

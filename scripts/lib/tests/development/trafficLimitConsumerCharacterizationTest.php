@@ -5,36 +5,25 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class trafficLimitConsumerCharacterizationTest extends TestCase
 {
-    public function testTrafficConsumersUseSharedReaders(): void
+    public function testTrafficStateReadersAvoidInlineParsing(): void
     {
         $this->pmssAssertRepoFileContractCases([
             'scripts/cron/trafficLimits.php' => ['required' => ['pmssTrafficLimitStateRead(']],
             'scripts/lib/stats/collect.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssReadSerializedArrayFile(']],
-            'etc/skel/www/stats.php' => ['required' => ['pmssStatsRenderTrafficUsageBlock(', 'pmssStatsSerializedStateRead(']],
+            'scripts/lib/pmssStats.php' => [
+                'required' => ["require_once __DIR__.'/user/trafficLimit.php';"],
+                'forbidden' => ['function '.'pmssStats'.'ReadIntegerFile('],
+            ],
+            'etc/skel/www/stats.php' => [
+                'required' => ['pmssStatsRenderTrafficUsageBlock(', 'pmssStatsSerializedStateRead('],
+                'forbidden' => ["file_get_contents('../.trafficLimit')", "file_get_contents('../.bonusTraffic')", '@unserialize(@file_get_contents('],
+            ],
             'etc/skel/www/statsHelpers.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssStatsSerializedStateRead(']],
-            'etc/skel/www/welcome.php' => ['required' => ['pmssTrafficLimitStateRead(', 'pmssCustomerSerializedArrayFileRead(']],
+            'etc/skel/www/welcome.php' => [
+                'required' => ['pmssTrafficLimitStateRead(', 'pmssCustomerSerializedArrayFileRead('],
+                'forbidden' => ["file_get_contents('../.trafficLimit')", "pmssWelcomeInteger"."FileRead('../.bonusTraffic'", '@unserialize(trim(@file_get_contents('],
+            ],
         ]);
-    }
-
-    public function testWebConsumersUseSharedReadersInsteadOfInlineFileParsing(): void
-    {
-        $this->pmssAssertRepoFileContractCases([
-            'etc/skel/www/stats.php' => ['forbidden' => [
-                "file_get_contents('../.trafficLimit')",
-                "file_get_contents('../.bonusTraffic')",
-                '@unserialize(@file_get_contents(',
-            ]],
-            'etc/skel/www/welcome.php' => ['forbidden' => [
-                "file_get_contents('../.trafficLimit')",
-                "pmssWelcomeInteger"."FileRead('../.bonusTraffic'",
-                '@unserialize(trim(@file_get_contents(',
-            ]],
-        ]);
-    }
-
-    public function testPmssStatsNoLongerCarriesLocalIntegerReader(): void
-    {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/pmssStats.php', ["require_once __DIR__.'/user/trafficLimit.php';"], ['function '.'pmssStats'.'ReadIntegerFile(']);
     }
 
     public function testTrafficLimitCronUsesSharedSafeHelpers(): void

@@ -141,7 +141,7 @@ PHP;
                 [var_export($repoRoot, true), (string) $rc],
                 $script
             ),
-            ['PMSS_TEST_MODE' => '1']
+            $this->pmssTestModeEnv()
         );
     }
 }

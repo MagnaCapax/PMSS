@@ -23,6 +23,22 @@ function pmssDockerSlirpArchitectureFromOutput($archOutput, ?callable $logger = 
     return $arch;
 }
 
+/** Allocate a root-owned temporary download path before installing the helper. */
+function pmssDockerSlirpTemporaryPath(bool $dryRun = false, ?callable $logger = null): string
+{
+    if ($dryRun) {
+        return sys_get_temp_dir().'/pmss-slirp4netns-dry-run';
+    }
+
+    $path = @tempnam(sys_get_temp_dir(), 'pmss-slirp4netns-');
+    if (!is_string($path) || $path === '') {
+        ($logger ?: 'logmsg')('[docker] Warning: unable to allocate temporary slirp4netns download path.');
+        return '';
+    }
+
+    return $path;
+}
+
 logmsg('[docker] Starting Docker rootless configuration');
 // Disable Docker system service and remove stray socket
 runStep('[docker] Docker: disabling system service', pmssBuildCommand('systemctl', ['disable', '--now', 'docker.service', 'docker.socket']));
@@ -40,10 +56,18 @@ if ($version > 0 && $version < 12) {
     // #TODO: Generalize this to a version-managed dependency system
     $url  = 'https://github.com/rootless-containers/slirp4netns/releases/download/v1.3.2/slirp4netns-'.$arch;
 
-    runStep('[docker] Docker: downloading slirp4netns helper ('.$arch.')', pmssBuildCommand('curl', ['-fsSL', '-o', 'slirp4netns', $url]));
-    runStep('[docker] Docker: installing slirp4netns helper', pmssBuildCommand('install', ['slirp4netns', '/usr/local/bin/']));
-    if (file_exists('slirp4netns') && !@unlink('slirp4netns')) {
-        logmsg('[docker] Warning: unable to remove temporary slirp4netns helper from working directory.');
+    $dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
+    $downloadPath = pmssDockerSlirpTemporaryPath($dryRun);
+    if ($downloadPath !== '') {
+        $downloadRc = runStep('[docker] Docker: downloading slirp4netns helper ('.$arch.')', pmssBuildCommand('curl', ['-fsSL', '-o', $downloadPath, $url]));
+        if ($downloadRc === 0 && ($dryRun || is_file($downloadPath))) {
+            runStep('[docker] Docker: installing slirp4netns helper', pmssBuildCommand('install', [$downloadPath, '/usr/local/bin/']));
+        } else {
+            logmsg('[docker] Warning: slirp4netns download failed; skipping helper install.');
+        }
+        if (!$dryRun && file_exists($downloadPath) && !@unlink($downloadPath)) {
+            logmsg('[docker] Warning: unable to remove temporary slirp4netns helper from download directory.');
+        }
     }
     runStep('[docker] Docker: creating iptables symlink', pmssBuildCommand('ln', ['-sf', '/usr/sbin/iptables', '/usr/local/bin/iptables']));
 }

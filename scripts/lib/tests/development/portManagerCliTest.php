@@ -10,10 +10,20 @@ final class PortManagerCliTest extends TestCase
         return $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', $arguments, $environment);
     }
 
+    private function makePortDir(): string
+    {
+        return $this->pmssMakeTempDir('pmss-port-dir-', 0755);
+    }
+
+    private function runPortManagerInDir(array $arguments, string $portDir): array
+    {
+        return $this->runPortManager($arguments, ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+    }
+
     public function testAssignPersistsPortInsideOverrideDirectory(): void
     {
-        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
-        $result = $this->runPortManager(['assign', 'alice', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+        $portDir = $this->makePortDir();
+        $result = $this->runPortManagerInDir(['assign', 'alice', 'lighttpd'], $portDir);
 
         $this->assertSame(0, $result['rc']);
         $this->assertMatches('/^\d+$/', trim($result['output']));
@@ -22,13 +32,13 @@ final class PortManagerCliTest extends TestCase
 
     public function testDefaultServiceLifecycleKeepsStableCliOutputs(): void
     {
-        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
+        $portDir = $this->makePortDir();
 
-        $assign = $this->runPortManager(['assign', 'alice'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+        $assign = $this->runPortManagerInDir(['assign', 'alice'], $portDir);
         $assignedPort = trim($assign['output']);
-        $viewAssigned = $this->runPortManager(['view', 'alice'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
-        $release = $this->runPortManager(['release', 'alice'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
-        $viewReleased = $this->runPortManager(['view', 'alice'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+        $viewAssigned = $this->runPortManagerInDir(['view', 'alice'], $portDir);
+        $release = $this->runPortManagerInDir(['release', 'alice'], $portDir);
+        $viewReleased = $this->runPortManagerInDir(['view', 'alice'], $portDir);
 
         $this->assertSame(0, $assign['rc']);
         $this->assertMatches('/^\d+$/', $assignedPort);
@@ -42,10 +52,10 @@ final class PortManagerCliTest extends TestCase
 
     public function testAssignReusesExistingPort(): void
     {
-        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
+        $portDir = $this->makePortDir();
         file_put_contents($portDir.'/lighttpd-alice', "24567\n");
 
-        $result = $this->runPortManager(['assign', 'alice', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+        $result = $this->runPortManagerInDir(['assign', 'alice', 'lighttpd'], $portDir);
 
         $this->assertSame(0, $result['rc']);
         $this->assertSame('24567', trim($result['output']));
@@ -53,10 +63,10 @@ final class PortManagerCliTest extends TestCase
 
     public function testAssignFailsWhenExistingPortFileIsMalformed(): void
     {
-        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
+        $portDir = $this->makePortDir();
         file_put_contents($portDir.'/lighttpd-alice', "not-a-port\n");
 
-        $result = $this->runPortManager(['assign', 'alice', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+        $result = $this->runPortManagerInDir(['assign', 'alice', 'lighttpd'], $portDir);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: invalid stored port assignment', $result['output']);
@@ -64,10 +74,10 @@ final class PortManagerCliTest extends TestCase
 
     public function testAssignIgnoresMalformedSiblingAssignments(): void
     {
-        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
+        $portDir = $this->makePortDir();
         file_put_contents($portDir.'/lighttpd-bob', "not-a-port\n");
 
-        $result = $this->runPortManager(['assign', 'alice', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+        $result = $this->runPortManagerInDir(['assign', 'alice', 'lighttpd'], $portDir);
 
         $this->assertSame(0, $result['rc']);
         $this->assertMatches('/^\d+$/', trim($result['output']));
@@ -76,10 +86,10 @@ final class PortManagerCliTest extends TestCase
 
     public function testReleaseRemovesAssignedPort(): void
     {
-        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
+        $portDir = $this->makePortDir();
         file_put_contents($portDir.'/lighttpd-alice', "24567\n");
 
-        $result = $this->runPortManager(['release', 'alice', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+        $result = $this->runPortManagerInDir(['release', 'alice', 'lighttpd'], $portDir);
 
         $this->assertSame(0, $result['rc']);
         $this->assertStringContainsString('Port released', $result['output']);
@@ -88,10 +98,10 @@ final class PortManagerCliTest extends TestCase
 
     public function testViewFailsWhenStoredAssignmentIsMalformed(): void
     {
-        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
+        $portDir = $this->makePortDir();
         file_put_contents($portDir.'/lighttpd-alice', "not-a-port\n");
 
-        $result = $this->runPortManager(['view', 'alice', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+        $result = $this->runPortManagerInDir(['view', 'alice', 'lighttpd'], $portDir);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: invalid stored port assignment', $result['output']);
@@ -99,8 +109,8 @@ final class PortManagerCliTest extends TestCase
 
     public function testRejectsInvalidUsernameBeforeTouchingFilesystem(): void
     {
-        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
-        $result = $this->runPortManager(['assign', '../alice', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+        $portDir = $this->makePortDir();
+        $result = $this->runPortManagerInDir(['assign', '../alice', 'lighttpd'], $portDir);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: invalid username', $result['output']);
@@ -109,8 +119,8 @@ final class PortManagerCliTest extends TestCase
 
     public function testRejectsInvalidServiceBeforeTouchingFilesystem(): void
     {
-        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
-        $result = $this->runPortManager(['assign', 'alice', '../lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+        $portDir = $this->makePortDir();
+        $result = $this->runPortManagerInDir(['assign', 'alice', '../lighttpd'], $portDir);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: invalid service', $result['output']);
@@ -120,10 +130,7 @@ final class PortManagerCliTest extends TestCase
     public function testFailsWhenPortDirectoryCannotBeCreated(): void
     {
         $blockedParent = $this->pmssMakeTempFile('pmss-port-blocked-');
-        $result = $this->runPortManager(
-            ['assign', 'alice', 'lighttpd'],
-            ['PMSS_PORT_MANAGER_DIR' => $blockedParent.'/ports']
-        );
+        $result = $this->runPortManagerInDir(['assign', 'alice', 'lighttpd'], $blockedParent.'/ports');
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: unable to initialize port directory', $result['output']);
@@ -135,10 +142,7 @@ final class PortManagerCliTest extends TestCase
         $linkDir = $this->pmssMakeTempPath('pmss-port-link-');
         $this->pmssCreateSymlinkOrSkip($realDir, $linkDir);
 
-        $result = $this->runPortManager(
-            ['assign', 'alice', 'lighttpd'],
-            ['PMSS_PORT_MANAGER_DIR' => $linkDir]
-        );
+        $result = $this->runPortManagerInDir(['assign', 'alice', 'lighttpd'], $linkDir);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: unable to initialize port directory', $result['output']);
@@ -147,12 +151,12 @@ final class PortManagerCliTest extends TestCase
 
     public function testAssignRejectsBrokenSymlinkAssignment(): void
     {
-        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
+        $portDir = $this->makePortDir();
         $outsideTarget = $this->pmssMakeTempPath('pmss-port-outside-');
         $portFile = $portDir.'/lighttpd-alice';
         $this->pmssCreateSymlinkOrSkip($outsideTarget, $portFile);
 
-        $result = $this->runPortManager(['assign', 'alice', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+        $result = $this->runPortManagerInDir(['assign', 'alice', 'lighttpd'], $portDir);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: invalid stored port assignment', $result['output']);
@@ -162,13 +166,13 @@ final class PortManagerCliTest extends TestCase
 
     public function testReleaseRejectsSymlinkAssignmentWithoutRemovingTarget(): void
     {
-        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
+        $portDir = $this->makePortDir();
         $outsideTarget = $this->pmssMakeTempFile('pmss-port-outside-');
         file_put_contents($outsideTarget, "24567\n");
         $portFile = $portDir.'/lighttpd-alice';
         $this->pmssCreateSymlinkOrSkip($outsideTarget, $portFile);
 
-        $result = $this->runPortManager(['release', 'alice', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+        $result = $this->runPortManagerInDir(['release', 'alice', 'lighttpd'], $portDir);
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Error: invalid stored port assignment', $result['output']);

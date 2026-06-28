@@ -11,75 +11,180 @@
  */
 
 require_once __DIR__.'/environment.php';
+
+const PMSS_OPENSSL_SSH2_LIBSSL_TARGET = '3.0.17-1~deb12u2';
+const PMSS_OPENSSL_SSH2_OPENSSH_TARGET = '1:9.2p1-2+deb12u7';
+const PMSS_OPENSSL_SSH2_OPENSSH_PACKAGES = ['openssh-server', 'openssh-client', 'openssh-sftp-server'];
+
+// Shared guard: these repairs are Debian 12-only and must honor dry-run mode.
+function pmssOpenSslSsh2CompatCanMutate(string $functionName, ?int $distroVersion): bool
+{
+    if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+        logMessage('[DRY-RUN] '.$functionName.': skipping all mutations');
+        return false;
+    }
+
+    $effectiveVersion = pmssDistroVersionFromEnv($distroVersion);
+    if ($effectiveVersion !== 12) {
+        logMessage('[SKIP] '.$functionName.': not Debian 12 (detected: '.$effectiveVersion.')');
+        return false;
+    }
+
+    return true;
+}
+
+function pmssOpenSslSsh2CompatVersionQueryCommand(string $package): string
+{
+    return 'dpkg-query -W -f='.escapeshellarg('${Version}').' '.escapeshellarg($package).' 2>/dev/null';
+}
+
+// Use dpkg for version ordering so epoch/suffix comparisons stay correct.
+function pmssOpenSslSsh2CompatVersionCompare(string $left, string $operator, string $right): bool
+{
+    $rc = 1;
+    @exec(
+        'dpkg --compare-versions '
+        .escapeshellarg($left).' '
+        .escapeshellarg($operator).' '
+        .escapeshellarg($right),
+        $unused,
+        $rc
+    );
+
+    return $rc === 0;
+}
+
+function pmssOpenSslSsh2CompatPackageHeld(string $heldList, string $package): bool
+{
+    return preg_match('/(^|\R)'.preg_quote($package, '/').'($|\R)/', $heldList) === 1;
+}
+
+// Return space-separated package=version specs for apt commands.
+function pmssOpenSslSsh2CompatPackageVersionSpecs(array $packages, string $version, bool $escapeVersion = false): string
+{
+    return implode(' ', array_map(static function (string $package) use ($version, $escapeVersion): string {
+        return $package.'='.($escapeVersion ? escapeshellarg($version) : $version);
+    }, $packages));
+}
+
+function pmssOpenSslSsh2CompatOpenSshPackages(?string $version = null, bool $escapeVersion = false): string
+{
+    return $version === null
+        ? implode(' ', PMSS_OPENSSL_SSH2_OPENSSH_PACKAGES)
+        : pmssOpenSslSsh2CompatPackageVersionSpecs(PMSS_OPENSSL_SSH2_OPENSSH_PACKAGES, $version, $escapeVersion);
+}
+
+function pmssOpenSslSsh2CompatDownloadedDebs(string $tmpDir): array
+{
+    $debs = glob($tmpDir.'/*.deb') ?: [];
+    sort($debs);
+
+    return $debs;
+}
+
+function pmssOpenSslSsh2CompatDebsByPrefix(array $debs, string $prefix): array
+{
+    return array_values(array_filter($debs, static function (string $deb) use ($prefix): bool {
+        return strpos(basename($deb), $prefix) === 0;
+    }));
+}
+
+function pmssOpenSslSsh2CompatFirstDebByPrefix(array $debs, string $prefix): string
+{
+    foreach ($debs as $deb) {
+        if (strpos(basename($deb), $prefix) === 0) {
+            return $deb;
+        }
+    }
+
+    return '';
+}
+
+function pmssOpenSslSsh2CompatDpkgInstallCommand(array $debs): string
+{
+    return dpkgCmd('--force-confdef --force-confold -i '.implode(' ', array_map('escapeshellarg', $debs)));
+}
+
+// Re-deploy the PMSS sshd_config template after package repair paths touch OpenSSH.
+function pmssOpenSslSsh2CompatRedeploySshdConfigTemplate(
+    string $backupLabel,
+    string $backupPrefix,
+    string $redeployLabel,
+    ?string $missingWarningFunction = null
+): void {
+    $tmpl = '/etc/seedbox/config/template.sshd_config';
+    $live = '/etc/ssh/sshd_config';
+    if (file_exists($tmpl)) {
+        runStep('Backing up sshd_config before re-deploying PMSS template ('.$backupLabel.')',
+            'cp '.escapeshellarg($live).' '.escapeshellarg($live.'.'.$backupPrefix.'-'.date('Ymd-His')));
+        runStep('Re-deploying PMSS sshd_config template ('.$redeployLabel.')',
+            'cp '.escapeshellarg($tmpl).' '.escapeshellarg($live));
+        runStep('Setting sshd_config permissions after template re-deploy',
+            'chmod 644 '.escapeshellarg($live));
+    } elseif ($missingWarningFunction !== null) {
+        logMessage('[WARN] '.$missingWarningFunction.': '.$tmpl.' missing on host; cannot re-deploy template — sshd_config may be at package default (no HostkeyAlgorithms +ssh-rsa)');
+    }
+}
+
+function pmssOpenSslSsh2CompatVerifySshdConfig(string $functionName, string $logContext, string $exceptionSuffix): void
+{
+    $sshdT = 1;
+    @exec('/usr/sbin/sshd -t 2>&1', $sshdTOut, $sshdT);
+    if ($sshdT !== 0) {
+        logMessage('[ERROR] '.$functionName.': sshd -t failed '.$logContext.': '.implode(' '.chr(124).' ', array_slice($sshdTOut, 0, 5)));
+        throw new RuntimeException($functionName.': '.$exceptionSuffix);
+    }
+}
+
+function pmssOpenSslSsh2CompatPort22Listening(): bool
+{
+    return trim((string) @shell_exec("ss -tln 2>/dev/null | grep -q ':22 ' && echo yes || echo no")) === 'yes';
+}
+
+// Restart ssh.service and fail closed when port 22 does not return.
+function pmssOpenSslSsh2CompatRestartSshAndVerify(
+    string $description,
+    string $command,
+    string $functionName,
+    string $portLogContext,
+    string $exceptionSuffix
+): void {
+    runStep($description, $command);
+    sleep(2);
+    if (!pmssOpenSslSsh2CompatPort22Listening()) {
+        logMessage('[ERROR] '.$functionName.': port 22 not listening '.$portLogContext);
+        throw new RuntimeException($functionName.': '.$exceptionSuffix);
+    }
+}
+
 /**
-     * Converge libssl3 + openssl to 3.0.17-1~deb12u2 for PECL/ssh2 compatibility.
+     * Hold Debian 12 libssl3/openssl at the PECL ssh2-compatible version.
      *
-     * Why this exists:
-     * - Debian 12.13 ships libssl3 3.0.18/3.0.19 paths that break ssh2_exec()
-     *   for legacy PECL/ssh2 + libssh2 1.10.0 callers.
-     * - The dpkg baseline replay can overwrite ad-hoc host holds during updates.
-     *
-     * Safety invariants:
-     * - Debian 12 only (Debian 13 uses libssl3t64 and is out of scope).
-     * - Downgrade the FULL compatible set in one apt transaction (libssl3 +
-     *   openssl + openssh-server/client/sftp-server) so apt downgrades openssh
-     *   together instead of removing it (openssh depends on libssl3 >= 3.0.19).
-     * - --allow-change-held-packages converges hosts whose libssl3/openssl are
-     *   already apt-mark held without an unhold/re-hold dance.
-     *
-     * Idempotent behavior:
-     * - If already at 3.0.17-1~deb12u2 and both packages are held, no-op.
-     *
-     * Refs #436, #585.
+     * When downgrading, converge libssl3, openssl, and the OpenSSH trio in one
+     * apt transaction so openssh is downgraded instead of removed. Refs #436/#585.
      */
     function pmssHoldLibssl3ForPeclSsh2Compat(?int $distroVersion = null): void
     {
-        $targetVersion = '3.0.17-1~deb12u2';
-        // openssh-server/client/sftp-server depend on libssl3 >= 3.0.19. Downgrading
-        // libssl3 ALONE makes apt REMOVE the openssh trio. Converging the trio to its
-        // matching 3.0.17-era version (deb12u7) in the SAME apt transaction makes apt
-        // downgrade them together instead. Refs #436, #585.
-        $opensshTarget = '1:9.2p1-2+deb12u7';
+        $targetVersion = PMSS_OPENSSL_SSH2_LIBSSL_TARGET;
 
-        if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
-            logMessage('[DRY-RUN] pmssHoldLibssl3ForPeclSsh2Compat: skipping all mutations');
+        if (!pmssOpenSslSsh2CompatCanMutate(__FUNCTION__, $distroVersion)) {
             return;
         }
 
-        $effectiveVersion = pmssDistroVersionFromEnv($distroVersion);
-        if ($effectiveVersion !== 12) {
-            logMessage('[SKIP] pmssHoldLibssl3ForPeclSsh2Compat: not Debian 12 (detected: '.$effectiveVersion.')');
-            return;
-        }
-
-        $versionQuery = 'dpkg-query -W -f='.escapeshellarg('${Version}').' libssl3 2>/dev/null';
+        $versionQuery = pmssOpenSslSsh2CompatVersionQueryCommand('libssl3');
         $rawVer = trim((string) @shell_exec($versionQuery));
         if ($rawVer === '') {
             logMessage('[SKIP] pmssHoldLibssl3ForPeclSsh2Compat: libssl3 is not installed');
             return;
         }
 
-        $compareVersions = static function (string $left, string $operator, string $right): bool {
-            $rc = 1;
-            @exec(
-                'dpkg --compare-versions '
-                .escapeshellarg($left).' '
-                .escapeshellarg($operator).' '
-                .escapeshellarg($right),
-                $unused,
-                $rc
-            );
-
-            return $rc === 0;
-        };
-
         $heldList   = (string) @shell_exec('apt-mark showhold 2>/dev/null');
-        $libsslHeld = preg_match('/(^|\R)libssl3($|\R)/', $heldList) === 1;
-        $opensslHeld = preg_match('/(^|\R)openssl($|\R)/', $heldList) === 1;
+        $libsslHeld = pmssOpenSslSsh2CompatPackageHeld($heldList, 'libssl3');
+        $opensslHeld = pmssOpenSslSsh2CompatPackageHeld($heldList, 'openssl');
 
-        $needsDowngrade = $compareVersions($rawVer, 'gt', $targetVersion);
-        $needsUpgrade   = $compareVersions($rawVer, 'lt', $targetVersion);
-        $atTarget       = $compareVersions($rawVer, 'eq', $targetVersion);
+        $needsDowngrade = pmssOpenSslSsh2CompatVersionCompare($rawVer, 'gt', $targetVersion);
+        $needsUpgrade   = pmssOpenSslSsh2CompatVersionCompare($rawVer, 'lt', $targetVersion);
+        $atTarget       = pmssOpenSslSsh2CompatVersionCompare($rawVer, 'eq', $targetVersion);
         if ($atTarget && $libsslHeld && $opensslHeld) {
             logMessage('[SKIP] pmssHoldLibssl3ForPeclSsh2Compat: already at '.$targetVersion.' with libssl3+openssl held');
             return;
@@ -94,19 +199,8 @@ require_once __DIR__.'/environment.php';
                 throw new RuntimeException('Unable to upgrade libssl3/openssl to '.$targetVersion);
             }
         } elseif ($needsDowngrade) {
-            // Converge the FULL libssl3-3.0.17-compatible set in ONE apt transaction so
-            // apt's resolver downgrades the openssh trio alongside libssl3 instead of
-            // removing it. Verified 2026-05-24 on fact-core via --simulate: this set
-            // produces "5 downgraded, 1 to remove (libssl-dev only), 0 not upgraded" —
-            // openssh-server is downgraded to deb12u7, NOT removed. This replaces the
-            // former simulate-detect + dpkg-direct-download fallback (apt finds deb12u7
-            // in bookworm-updates natively). --allow-change-held-packages converges hosts
-            // whose libssl3/openssl are already apt-mark held without an unhold/re-hold
-            // dance. Refs #436, #585.
-            $compatSet = 'libssl3='.$targetVersion.' openssl='.$targetVersion
-                .' openssh-server='.$opensshTarget
-                .' openssh-client='.$opensshTarget
-                .' openssh-sftp-server='.$opensshTarget;
+            $compatSet = pmssOpenSslSsh2CompatPackageVersionSpecs(['libssl3', 'openssl'], $targetVersion)
+                .' '.pmssOpenSslSsh2CompatOpenSshPackages(PMSS_OPENSSL_SSH2_OPENSSH_TARGET);
             $downgradeRc = runStep(
                 'Converging libssl3/openssl/openssh to the 3.0.17-compatible set',
                 aptCmd('install -y --allow-downgrades --allow-change-held-packages '.$compatSet)
@@ -124,7 +218,7 @@ require_once __DIR__.'/environment.php';
             logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: unable to read libssl3 version after convergence');
             throw new RuntimeException('Unable to read libssl3 version after convergence');
         }
-        if (!$compareVersions($postVer, 'eq', $targetVersion)) {
+        if (!pmssOpenSslSsh2CompatVersionCompare($postVer, 'eq', $targetVersion)) {
             logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: libssl3 remains at '.$postVer.' after convergence attempt');
             throw new RuntimeException('libssl3 convergence failed: expected '.$targetVersion.', got '.$postVer);
         }
@@ -136,8 +230,7 @@ require_once __DIR__.'/environment.php';
         }
 
         if ($downgraded) {
-            $sshListening = trim((string) @shell_exec("ss -tln 2>/dev/null | grep -q ':22 ' && echo yes || echo no")) === 'yes';
-            if ($sshListening) {
+            if (pmssOpenSslSsh2CompatPort22Listening()) {
                 runStep('Restarting sshd after libssl3 downgrade', '/usr/bin/systemctl restart ssh');
             } else {
                 logMessage('[SKIP] pmssHoldLibssl3ForPeclSsh2Compat: SSH port 22 not listening; skipping restart');
@@ -146,73 +239,24 @@ require_once __DIR__.'/environment.php';
     }
 
     /**
-     * Heal openssh-server after the 2026-04-30 libssl3 cascade left dpkg in
-     * `rc` state (config-only) or with `/usr/sbin/sshd` removed while a running
-     * sshd PID kept a deleted-binary in-memory copy alive. PMSS update on its
-     * own only converges libssl3+openssl (the proximate cause) and does not
-     * detect or repair the residual openssh-server damage — so cascade victims
-     * stay as silent time bombs that die at the next reboot.
+     * Reinstall OpenSSH when the Debian 12 libssl cascade left sshd missing or deleted.
      *
-     * This function detects three independent signals and reinstalls if any is
-     * unhealthy: openssh-server is not in `ii` state, `/usr/sbin/sshd` is
-     * missing on disk, or the running sshd PID's `/proc/PID/exe` symlink resolves
-     * to a "(deleted)" path.
-     *
-     * Recovery uses the same dpkg-direct path that the libssl3 healer uses, so
-     * the apt resolver cannot re-trigger the cascade. The freshly-installed
-     * binary then gets `apt-mark hold` plus sshd_config sanitization (legacy
-     * hmac-ripemd160 removed in OpenSSH 9.2) and an explicit /run/sshd tmpfs
-     * directory before sshd -t verification. ssh.service is restarted ONLY when
-     * the live sshd PID is running on a deleted binary — restarting a healthy
-     * sshd would needlessly drop active SSH sessions.
-     *
-     * Idempotent: a host where sshd is healthy on disk and in memory exits with
-     * a single `[SKIP]` log line and zero mutations.
-     *
-     * Refs #436. Discovered 2026-05-20 during fleet sweep finding 5 silent-time
-     * bomb hosts (akelarre, oceanic, stafford, roger, voodoo) all on recent
-     * PMSS updates with libssl3 correctly held but openssh-server still absent.
+     * Uses dpkg-direct installation, preserves sshd_config, validates with
+     * sshd -t, and restarts ssh only when the listener is on a deleted binary.
      */
     function pmssHealOpensshServerIfMissing(?int $distroVersion = null): void
     {
-        if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
-            logMessage('[DRY-RUN] pmssHealOpensshServerIfMissing: skipping all mutations');
+        if (!pmssOpenSslSsh2CompatCanMutate(__FUNCTION__, $distroVersion)) {
             return;
         }
 
-        $effectiveVersion = pmssDistroVersionFromEnv($distroVersion);
-        if ($effectiveVersion !== 12) {
-            logMessage('[SKIP] pmssHealOpensshServerIfMissing: not Debian 12 (detected: '.$effectiveVersion.')');
-            return;
-        }
-
-        // Functional health signals — the test is "does sshd actually work" not
-        // "does dpkg metadata look pretty." A host with `install ok unpacked`
-        // openssh-server but a working on-disk binary and a non-deleted-exe sshd
-        // PID is functionally healthy and a re-install of the same version would
-        // not change real state (it would just re-fail the postinst). The narrow
-        // heal-triggers are the two ways the cascade actually breaks SSH:
-        //
-        //   (1) binary missing on disk — sshd will fail to start on next reboot
-        //   (2) sshd PID is running off a deleted binary — same as (1) but the
-        //       fuse will blow at next ssh.service restart instead of next reboot
-
-        // Signal A: on-disk binary present?
+        // Health is functional: repair only when the binary is missing or the
+        // listener still runs from a deleted executable.
         $sshdFile = is_file('/usr/sbin/sshd');
 
-        // Signal B: the SSHD LISTENER process is on a deleted binary?
-        //
-        // Caveat: `pgrep -x sshd` can return MANY pids — every active SSH session
-        // is a per-session sshd fork that survives configured into a child until
-        // the user disconnects. When ssh.service is restarted, the parent daemon
-        // (PID = ssh.service MainPID) gets the fresh on-disk binary, but the
-        // pre-restart per-session forks continue to run on the now-deleted parent
-        // inode. That's healthy state — the listener is fresh, the stragglers
-        // are short-lived. The condition we actually care about is "the LISTENING
-        // daemon is on a deleted binary" — checked via ssh.service MainPID.
-        //
-        // Fallback: if MainPID is 0 / not running, fall back to checking ANY
-        // sshd PID — if NONE has a non-deleted exe, the host is a time bomb.
+        // Prefer ssh.service MainPID so old per-session sshd forks do not cause
+        // false positives after a healthy restart. Without MainPID, require at
+        // least one sshd process with a non-deleted executable.
         $sshdExeDeleted = false;
         $mainPidRaw = trim((string) @shell_exec("systemctl show -p MainPID --value ssh 2>/dev/null"));
         if ($mainPidRaw !== '' && ctype_digit($mainPidRaw) && (int) $mainPidRaw > 0) {
@@ -268,8 +312,7 @@ require_once __DIR__.'/environment.php';
             throw new RuntimeException('pmssHealOpensshServerIfMissing: download failed');
         }
 
-        $debs = glob($tmpDir.'/*.deb') ?: [];
-        sort($debs);
+        $debs = pmssOpenSslSsh2CompatDownloadedDebs($tmpDir);
         if (count($debs) < 3) {
             pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-', 'Cleaning openssh-direct download cache');
             logMessage('[ERROR] pmssHealOpensshServerIfMissing: expected openssh-* .deb files were not downloaded (got '.count($debs).')');
@@ -277,32 +320,17 @@ require_once __DIR__.'/environment.php';
         }
 
         // Install runit-helper FIRST (openssh-server postinst depends on it on recent bookworm).
-        $runitDeb = '';
-        foreach ($debs as $deb) {
-            if (strpos(basename($deb), 'runit-helper') === 0) {
-                $runitDeb = $deb;
-                break;
-            }
-        }
+        $runitDeb = pmssOpenSslSsh2CompatFirstDebByPrefix($debs, 'runit-helper');
         if ($runitDeb !== '') {
             runStep('Installing runit-helper via dpkg-direct (openssh-server dep)',
                 dpkgCmd('--force-confdef --force-confold -i '.escapeshellarg($runitDeb)));
         }
 
-        // Install openssh-server/client/sftp via dpkg-direct so the apt resolver
-        // cannot re-trigger the original cascade-removal pattern. --force-conf{def,old}
-        // preserves the user's existing /etc/ssh/sshd_config — without these flags,
-        // dpkg's default behavior in non-interactive contexts REPLACES the active
-        // sshd_config with the package default, wiping the PMSS template's
-        // HostkeyAlgorithms +ssh-rsa / PubkeyAcceptedKeyTypes +ssh-rsa lines (libssh2
-        // 1.4.3 compat for hallinta/sbautomage). Observed breakage on 5 hosts
-        // 2026-05-20 (akelarre/oceanic/stafford/roger/voodoo).
-        $opensshDebs = array_values(array_filter($debs, static function ($d) {
-            return strpos(basename($d), 'openssh') === 0;
-        }));
+        // dpkg-direct avoids apt resolver removal; conf flags preserve PMSS sshd_config.
+        $opensshDebs = pmssOpenSslSsh2CompatDebsByPrefix($debs, 'openssh');
         $installRc = runStep(
             'Installing openssh-server/client/sftp via dpkg-direct (cascade-heal, conf-preserve)',
-            dpkgCmd('--force-confdef --force-confold -i '.implode(' ', array_map('escapeshellarg', $opensshDebs)))
+            pmssOpenSslSsh2CompatDpkgInstallCommand($opensshDebs)
         );
         if ($installRc !== 0) {
             // dpkg -i may exit non-zero when libssl3 ABI is older than openssh-server
@@ -313,31 +341,16 @@ require_once __DIR__.'/environment.php';
 
         pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-', 'Cleaning openssh-direct download cache');
 
-        // Belt-and-suspenders: re-deploy the PMSS sshd_config template if available on
-        // the host. --force-conf{def,old} above SHOULD already preserve the user's
-        // sshd_config, but dpkg's behavior depends on whether the file matches a known
-        // package-version-hash AND on the `rc` (removed-not-purged) state path. The
-        // explicit template re-deploy guarantees the PMSS-customized config is active
-        // regardless of dpkg's conf-handling decision tree. Mirrors
-        // pmssApplyRuntimeTemplates() inline so the heal function does not depend on a
-        // later step in the update-step2 flow firing for the sshd restart this function
-        // is about to do.
-        $tmpl = '/etc/seedbox/config/template.sshd_config';
-        $live = '/etc/ssh/sshd_config';
-        if (file_exists($tmpl)) {
-            runStep('Backing up sshd_config before re-deploying PMSS template (cascade-heal)',
-                'cp '.escapeshellarg($live).' '.escapeshellarg($live.'.pre-heal-'.date('Ymd-His')));
-            runStep('Re-deploying PMSS sshd_config template (libssh2 1.4.3 compat lines)',
-                'cp '.escapeshellarg($tmpl).' '.escapeshellarg($live));
-            runStep('Setting sshd_config permissions after template re-deploy',
-                'chmod 644 '.escapeshellarg($live));
-        } else {
-            logMessage('[WARN] pmssHealOpensshServerIfMissing: '.$tmpl.' missing on host; cannot re-deploy template — sshd_config may be at package default (no HostkeyAlgorithms +ssh-rsa)');
-        }
+        pmssOpenSslSsh2CompatRedeploySshdConfigTemplate(
+            'cascade-heal',
+            'pre-heal',
+            'libssh2 1.4.3 compat lines',
+            __FUNCTION__
+        );
 
         $holdRc = runStep(
             'Holding openssh-server/client/sftp to prevent re-removal',
-            pmssAptDpkgEnvPrefix().' apt-mark hold openssh-server openssh-client openssh-sftp-server'
+            pmssAptDpkgEnvPrefix().' apt-mark hold '.pmssOpenSslSsh2CompatOpenSshPackages()
         );
         if ($holdRc !== 0) {
             logMessage('[ERROR] pmssHealOpensshServerIfMissing: apt-mark hold failed');
@@ -359,26 +372,19 @@ require_once __DIR__.'/environment.php';
             @mkdir('/run/sshd', 0755, true);
         }
 
-        // Verify sshd config parses BEFORE any restart that would drop the live session.
-        $sshdT = 1;
-        @exec('/usr/sbin/sshd -t 2>&1', $sshdTOut, $sshdT);
-        if ($sshdT !== 0) {
-            logMessage('[ERROR] pmssHealOpensshServerIfMissing: sshd -t failed after install: '.implode(' | ', array_slice($sshdTOut, 0, 5)));
-            throw new RuntimeException('pmssHealOpensshServerIfMissing: sshd -t failed after install');
-        }
+        pmssOpenSslSsh2CompatVerifySshdConfig(__FUNCTION__, 'after install', 'sshd -t failed after install');
 
         if ($sshdExeDeleted) {
             // Live sshd is on a deleted binary — restart so the new on-disk binary
             // becomes the running process. This kills any active SSH session, so
             // we ONLY do it when the deleted-exe state was actually detected.
-            runStep('Restarting ssh.service to swap deleted-binary sshd for the freshly-installed one',
-                'systemctl daemon-reload && systemctl enable ssh && systemctl restart ssh');
-            sleep(2);
-            $listening = trim((string) @shell_exec("ss -tln 2>/dev/null | grep -q ':22 ' && echo yes || echo no")) === 'yes';
-            if (!$listening) {
-                logMessage('[ERROR] pmssHealOpensshServerIfMissing: port 22 not listening after restart');
-                throw new RuntimeException('pmssHealOpensshServerIfMissing: sshd not listening after restart');
-            }
+            pmssOpenSslSsh2CompatRestartSshAndVerify(
+                'Restarting ssh.service to swap deleted-binary sshd for the freshly-installed one',
+                'systemctl daemon-reload && systemctl enable ssh && systemctl restart ssh',
+                __FUNCTION__,
+                'after restart',
+                'sshd not listening after restart'
+            );
             logMessage('[OK] pmssHealOpensshServerIfMissing: openssh-server reinstalled, ssh.service restarted, port 22 listening');
         } else {
             // Binary was missing on disk but no live PID was running on a deleted
@@ -391,48 +397,16 @@ require_once __DIR__.'/environment.php';
     }
 
     /**
-     * Ensure openssh-server is at a version that's compatible with the held
-     * libssl3 (3.0.17). When libssl3 is held at 3.0.17 (per
-     * pmssHoldLibssl3ForPeclSsh2Compat), openssh-server MUST be at deb12u7 or
-     * older — anything newer (deb12u8, deb12u9, deb12u10, ...) requires libssl3
-     * >= 3.0.18 or 3.0.19 and lives in an unconfigured/broken-dep state that
-     * fails `dpkg --configure -a` every PMSS update.
+     * Downgrade OpenSSH when held libssl3 3.0.17 makes newer OpenSSH unconfigurable.
      *
-     * Cascade-victim hosts that were emergency-recovered with `dpkg -i
-     * openssh-server_deb12u9_amd64.deb` from the live apt cache end up in this
-     * broken state — the binary runs (sshd is alive) but dpkg metadata says
-     * "unconfigured" and any subsequent apt-resolver decision could re-trigger
-     * the 2026-04-30 cascade-removal pattern (`apt --fix-broken install` would
-     * try to either remove openssh-server or unhold libssl3 to satisfy the
-     * dep).
-     *
-     * Canonical baseline (verified on sea-sparrow 2026-05-21): never-cascaded
-     * Debian 12 hosts have openssh-server at deb12u7 in `ii` state, NOT held;
-     * libssl3+openssl held at 3.0.17 alone is sufficient because apt sees
-     * deb12u9 candidate cannot satisfy held libssl3 and leaves the package at
-     * deb12u7.
-     *
-     * This function brings cascade-victim hosts to the same canonical state.
-     *
-     * Idempotent: no-op on hosts already at deb12u7 or older.
-     *
-     * Refs #436. Origin: SUPER JOUKO 2026-05-21 — manual openssh-* holds on
-     * cascade-recovered hosts were the symptom; the disease is unconfigured
-     * deb12u9. Operator directive: "PMSS CONFIG CHANGES ARE ONLY THROUGH PMSS
-     * UPDATE NEVER MANUAL."
+     * Canonical Debian 12 state is OpenSSH <= deb12u7 with libssl3/openssl held;
+     * the downgrade uses dpkg-direct and validates sshd before restart. Refs #436.
      */
     function pmssEnsureOpensshCompatibleWithHeldLibssl3(?int $distroVersion = null): void
     {
-        $targetOpenssh = '1:9.2p1-2+deb12u7';
+        $targetOpenssh = PMSS_OPENSSL_SSH2_OPENSSH_TARGET;
 
-        if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
-            logMessage('[DRY-RUN] pmssEnsureOpensshCompatibleWithHeldLibssl3: skipping all mutations');
-            return;
-        }
-
-        $effectiveVersion = pmssDistroVersionFromEnv($distroVersion);
-        if ($effectiveVersion !== 12) {
-            logMessage('[SKIP] pmssEnsureOpensshCompatibleWithHeldLibssl3: not Debian 12 (detected: '.$effectiveVersion.')');
+        if (!pmssOpenSslSsh2CompatCanMutate(__FUNCTION__, $distroVersion)) {
             return;
         }
 
@@ -452,20 +426,7 @@ require_once __DIR__.'/environment.php';
             return;
         }
 
-        $compareVersions = static function (string $left, string $operator, string $right): bool {
-            $rc = 1;
-            @exec(
-                'dpkg --compare-versions '
-                .escapeshellarg($left).' '
-                .escapeshellarg($operator).' '
-                .escapeshellarg($right),
-                $unused,
-                $rc
-            );
-            return $rc === 0;
-        };
-
-        if (!$compareVersions($opensshVer, 'gt', $targetOpenssh)) {
+        if (!pmssOpenSslSsh2CompatVersionCompare($opensshVer, 'gt', $targetOpenssh)) {
             logMessage('[SKIP] pmssEnsureOpensshCompatibleWithHeldLibssl3: openssh-server already at '.$opensshVer.' (<= target '.$targetOpenssh.')');
             return;
         }
@@ -481,16 +442,14 @@ require_once __DIR__.'/environment.php';
         // Unhold openssh-* before downgrade so dpkg doesn't refuse (manual holds
         // from emergency recovery are common; canonical state has them unheld).
         runStep('Unholding openssh-* for downgrade (if held)',
-            pmssAptDpkgEnvPrefix().' apt-mark unhold openssh-server openssh-client openssh-sftp-server 2>/dev/null || true');
+            pmssAptDpkgEnvPrefix().' apt-mark unhold '.pmssOpenSslSsh2CompatOpenSshPackages().' 2>/dev/null || true');
 
         // Download the target version trio.
         $downloadRc = runStep(
             'Downloading openssh-server/client/sftp at '.$targetOpenssh.' for libssl3-3.0.17-compat downgrade',
             'cd '.escapeshellarg($tmpDir).' && '
             .pmssAptDpkgEnvPrefix().' apt-get download '
-            .'openssh-server='.escapeshellarg($targetOpenssh).' '
-            .'openssh-client='.escapeshellarg($targetOpenssh).' '
-            .'openssh-sftp-server='.escapeshellarg($targetOpenssh).' 2>&1'
+            .pmssOpenSslSsh2CompatOpenSshPackages($targetOpenssh, true).' 2>&1'
         );
         if ($downloadRc !== 0) {
             pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-downgrade-', 'Cleaning openssh-downgrade download cache');
@@ -498,8 +457,7 @@ require_once __DIR__.'/environment.php';
             throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: download failed');
         }
 
-        $debs = glob($tmpDir.'/*.deb') ?: [];
-        sort($debs);
+        $debs = pmssOpenSslSsh2CompatDownloadedDebs($tmpDir);
         if (count($debs) < 3) {
             pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-downgrade-', 'Cleaning openssh-downgrade download cache');
             logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: incomplete deb set (got '.count($debs).')');
@@ -510,7 +468,7 @@ require_once __DIR__.'/environment.php';
         // as pmssHealOpensshServerIfMissing — never replace site sshd_config).
         $installRc = runStep(
             'Installing openssh-server/client/sftp '.$targetOpenssh.' via dpkg-direct (conf-preserve, libssl3-3.0.17-compat downgrade)',
-            dpkgCmd('--force-confdef --force-confold -i '.implode(' ', array_map('escapeshellarg', $debs)))
+            pmssOpenSslSsh2CompatDpkgInstallCommand($debs)
         );
         pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-downgrade-', 'Cleaning openssh-downgrade download cache');
         if ($installRc !== 0) {
@@ -518,38 +476,84 @@ require_once __DIR__.'/environment.php';
             throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: dpkg -i failed');
         }
 
-        // After downgrade, sshd_config may have been touched by dpkg's
-        // conf-handling decision tree. Re-deploy the PMSS template explicitly
-        // (mirror pmssHealOpensshServerIfMissing belt-and-suspenders posture).
-        $tmpl = '/etc/seedbox/config/template.sshd_config';
-        $live = '/etc/ssh/sshd_config';
-        if (file_exists($tmpl)) {
-            runStep('Backing up sshd_config before re-deploying PMSS template (post-downgrade)',
-                'cp '.escapeshellarg($live).' '.escapeshellarg($live.'.pre-downgrade-'.date('Ymd-His')));
-            runStep('Re-deploying PMSS sshd_config template (post-downgrade)',
-                'cp '.escapeshellarg($tmpl).' '.escapeshellarg($live));
-            runStep('Setting sshd_config permissions after template re-deploy',
-                'chmod 644 '.escapeshellarg($live));
-        }
+        pmssOpenSslSsh2CompatRedeploySshdConfigTemplate('post-downgrade', 'pre-downgrade', 'post-downgrade');
 
-        // Verify sshd config parses before restart.
-        $sshdT = 1;
-        @exec('/usr/sbin/sshd -t 2>&1', $sshdTOut, $sshdT);
-        if ($sshdT !== 0) {
-            logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: sshd -t failed after downgrade: '.implode(' | ', array_slice($sshdTOut, 0, 5)));
-            throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: sshd -t failed');
-        }
+        pmssOpenSslSsh2CompatVerifySshdConfig(__FUNCTION__, 'after downgrade', 'sshd -t failed');
 
         // Restart ssh.service so the downgraded sshd takes over.
-        runStep('Restarting ssh.service to load downgraded openssh-server',
-            'systemctl daemon-reload && systemctl restart ssh');
-        sleep(2);
-        $listening = trim((string) @shell_exec("ss -tln 2>/dev/null | grep -q ':22 ' && echo yes || echo no")) === 'yes';
-        if (!$listening) {
-            logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: port 22 not listening after downgrade-restart');
-            throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: sshd not listening after restart');
-        }
+        pmssOpenSslSsh2CompatRestartSshAndVerify(
+            'Restarting ssh.service to load downgraded openssh-server',
+            'systemctl daemon-reload && systemctl restart ssh',
+            __FUNCTION__,
+            'after downgrade-restart',
+            'sshd not listening after restart'
+        );
 
         $newVer = trim((string) @shell_exec('dpkg-query -W -f=\'${Version}\' openssh-server 2>/dev/null'));
         logMessage('[OK] pmssEnsureOpensshCompatibleWithHeldLibssl3: openssh-server downgraded from '.$opensshVer.' to '.$newVer.' (libssl3-3.0.17-compatible canonical state)');
     }
+
+/**
+ * Build the APT preferences (Pin-Priority) body that pins libssl3/openssl and the
+ * OpenSSH trio to the PECL-ssh2-compatible set.
+ *
+ * Pin-Priority 1001 forces these exact versions even when a downgrade is required,
+ * while keeping dependents satisfiable — so apt's resolver DOWNGRADES OpenSSH to the
+ * libssl3-3.0.17-compatible deb12u7 instead of REMOVING it. apt-mark hold only blocks
+ * automatic upgrades; it does NOT prevent removal during dependency resolution, which
+ * is what produced the OpenSSH-removal cascade (openssh deb12u9/u10 Depends
+ * libssl3>=3.0.19 vs the held 3.0.17). Pure builder — no side effects. Refs #436/#585.
+ */
+function pmssOpenSslSsh2CompatAptPinContents(): string
+{
+    return "# Managed by PMSS update-step2 (opensslSsh2Compat). Do not edit by hand.\n"
+        ."# Pins libssl3/openssl + OpenSSH to the PECL-ssh2-compatible set (Debian 12)\n"
+        ."# so apt downgrades OpenSSH instead of triggering the libssl3>=3.0.19 removal\n"
+        ."# cascade. apt-mark hold is insufficient (blocks upgrades, not removals during\n"
+        ."# dependency resolution). Refs #436/#585.\n"
+        ."\n"
+        ."Package: libssl3 openssl\n"
+        ."Pin: version ".PMSS_OPENSSL_SSH2_LIBSSL_TARGET."\n"
+        ."Pin-Priority: 1001\n"
+        ."\n"
+        ."Package: ".pmssOpenSslSsh2CompatOpenSshPackages()."\n"
+        ."Pin: version ".PMSS_OPENSSL_SSH2_OPENSSH_TARGET."\n"
+        ."Pin-Priority: 1001\n";
+}
+
+/**
+ * Write the libssl3/openssh APT pin (Debian 12 only).
+ *
+ * This is the declarative, durable counterpart to the imperative convergence/heal
+ * functions above. The pin is enforced by apt's own resolver and lives on disk, so
+ * it (a) survives the package removal/reinstall that clobbers apt-mark hold, and
+ * (b) is in place BEFORE the early fix-broken / dpkg-selection phases that otherwise
+ * resolve the held-libssl3-vs-newer-openssh conflict by REMOVING OpenSSH. It pins to
+ * the same versions the convergence functions already force fleet-wide, so it is
+ * behaviour-consistent — declarative prevention layered ahead of the imperative heal,
+ * which is retained as recovery for already-damaged hosts. Idempotent (rewrites only
+ * on content drift). Refs #436/#585.
+ */
+function pmssWriteLibssl3OpensshAptPin(?int $distroVersion = null): void
+{
+    if (!pmssOpenSslSsh2CompatCanMutate(__FUNCTION__, $distroVersion)) {
+        return;
+    }
+
+    $pinPath  = '/etc/apt/preferences.d/pmss-libssl3-openssh.pref';
+    $contents = pmssOpenSslSsh2CompatAptPinContents();
+
+    if (is_file($pinPath) && (string) @file_get_contents($pinPath) === $contents) {
+        logMessage('[SKIP] pmssWriteLibssl3OpensshAptPin: pin already current at '.$pinPath);
+        return;
+    }
+
+    $tmpPath = $pinPath.'.pmss-tmp';
+    if (@file_put_contents($tmpPath, $contents) === false || !@rename($tmpPath, $pinPath)) {
+        @unlink($tmpPath);
+        logMessage('[ERROR] pmssWriteLibssl3OpensshAptPin: failed to write '.$pinPath);
+        throw new RuntimeException('pmssWriteLibssl3OpensshAptPin: unable to write APT pin');
+    }
+    @chmod($pinPath, 0644);
+    logMessage('[OK] pmssWriteLibssl3OpensshAptPin: wrote APT Pin-Priority 1001 for libssl3/openssl + OpenSSH at '.$pinPath);
+}

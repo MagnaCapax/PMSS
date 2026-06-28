@@ -10,10 +10,8 @@ pmss_testing_load_tracked_php_scan "open-tag-lint"
 
 fail=0
 for rel in "${PHP_FILES[@]}"; do
-	file="$ROOT_DIR/$rel"
-
 	# Allow empty placeholders; otherwise require a PHP open tag.
-	if [[ -s "$file" ]] && ! grep -q -E '<\?php|<\?=' "$file"; then
+	if [[ -s "$ROOT_DIR/$rel" ]] && ! grep -q -E '<\?php|<\?=' "$ROOT_DIR/$rel"; then
 		echo "[open-tag-lint] $rel: missing '<?php' or '<?=' tag" >&2
 		fail=1
 	fi

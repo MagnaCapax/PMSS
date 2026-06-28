@@ -113,8 +113,7 @@ SH
     public function testRenderErrorPageUsesNoActionGuidanceForPhpReason(): void
     {
         $contents = pmssLighttpdWatchdogRenderErrorPage('php');
-        $this->assertStringContainsString('This usually resolves within 1-2 minutes. No action needed.', $contents);
-        $this->assertStringNotContainsString('If the issue persists, please open a support ticket.', $contents);
+        $this->assertStringContainsAndOmitsStrings(['This usually resolves within 1-2 minutes. No action needed.'], ['If the issue persists, please open a support ticket.'], $contents);
     }
 
     public function testRenderErrorPageUsesNoActionGuidanceForRestartingReason(): void

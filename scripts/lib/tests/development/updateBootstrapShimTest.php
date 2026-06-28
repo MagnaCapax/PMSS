@@ -10,7 +10,7 @@ class UpdateBootstrapShimTest extends TestCase
         $shimPath = dirname(__DIR__).'/common/updateBootstrapShim.php';
         $result = $this->pmssExecShellCommand(
             escapeshellarg(PHP_BINARY).' -r '.escapeshellarg('require '.var_export($shimPath, true).'; echo function_exists("parseArguments") ? "ok" : "missing";'),
-            ['PMSS_TEST_MODE' => '1'],
+            $this->pmssTestModeEnv(),
             '2>&1'
         );
 

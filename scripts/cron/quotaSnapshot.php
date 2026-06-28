@@ -21,8 +21,8 @@ function pmssQuotaSnapshotParseRepquotaUserRows(array $lines): array
 {
     $rows = [];
     foreach ($lines as $line) {
-        $tokens = preg_split('/\\s+/', trim((string) $line));
-        if (!is_array($tokens) || count($tokens) < 2 || preg_match('/^#?([0-9]+)$/', $tokens[0], $m) !== 1) {
+        $tokens = pmssConfigLineColumns((string) $line, 2, []);
+        if ($tokens === [] || preg_match('/^#?([0-9]+)$/', $tokens[0], $m) !== 1) {
             continue;
         }
 

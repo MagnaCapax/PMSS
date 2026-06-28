@@ -27,6 +27,31 @@ class RuntimeCommandPathTest extends TestCase
         }
     }
 
+    public function testCommandPathCandidateSafetyMatrix(): void
+    {
+        foreach ([
+            '/usr/bin/php' => true,
+            '/opt/pmss tools/bin/helper' => true,
+            '' => false,
+            'php' => false,
+            " /usr/bin/php" => false,
+            "/usr/bin/php\nwarning" => false,
+            "/usr/bin/php\rbad" => false,
+            "/usr/bin/php\0bad" => false,
+        ] as $path => $expected) {
+            $this->assertSame($expected, pmssCommandPathCandidateIsSafe($path), 'Unexpected command path safety result for '.str_replace("\0", '\\0', $path));
+        }
+    }
+
+    public function testCommandPathRejectsResolvedPathsWithLineBreaks(): void
+    {
+        $binDir = $this->pmssMakeTempDir("pmss-command-path-newline-\n");
+        $this->pmssWriteExecutableFile($binDir.'/pmss-newline-binary', "#!/bin/sh\nexit 0\n");
+        $this->prependCommandPath($binDir);
+
+        $this->assertEquals('', pmssCommandPath('pmss-newline-binary'));
+    }
+
     public function testBlockDeviceNameIsDataDeviceMatchesBaseStorageDevicesOnly(): void
     {
         foreach (['sda', 'vda', 'xvda', 'nvme0n1', 'mmcblk0'] as $device) {

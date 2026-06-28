@@ -25,8 +25,6 @@ class StatsDockerPolicyFrontendTest extends TestCase
     {
         $html = $this->pmssRenderCustomerPanelPage('stats.php');
 
-        $this->assertStringContainsString('Docker policy:', $html);
-        $this->assertStringContainsString('Platform managed', $html);
-        $this->assertStringNotContainsString('docker_toggle_state', $html);
+        $this->assertStringContainsAndOmitsStrings(['Docker policy:', 'Platform managed'], ['docker_toggle_state'], $html);
     }
 }

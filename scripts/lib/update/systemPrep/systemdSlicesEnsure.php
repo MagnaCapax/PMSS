@@ -133,7 +133,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
             '%%USER_CGROUP_IO_DEVICE_LATENCY%%' => '',
         ];
         if ($mode === 'v2' && isset($policy['ioLatencyMs']) && is_numeric($policy['ioLatencyMs']) && (int) $policy['ioLatencyMs'] > 0) {
-            $homeDevice = trim((string) @shell_exec('findmnt -no SOURCE /home 2>/dev/null'));
+            $homeDevice = pmssCgroupPolicyMountSourceResolve('/home');
             if ($homeDevice !== '' && pmssCgroupPolicyDeviceTargetIsSafe($homeDevice)) {
                 $repl['%%USER_CGROUP_IO_DEVICE_LATENCY%%'] = 'IODeviceLatencyTargetSec='.$homeDevice.' '.(int) $policy['ioLatencyMs'].'ms';
             } elseif ($homeDevice !== '') {
@@ -150,8 +150,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
             $append = [];
             $skippedDeviceWeights = false;
             foreach ($policy['mounts'] as $mount => $def) {
-                if (!is_array($def)
-                    || ($src = trim((string) @shell_exec('findmnt -no SOURCE '.escapeshellarg($mount).' 2>/dev/null'))) === '') {
+                if (!is_array($def) || ($src = pmssCgroupPolicyMountSourceResolve((string) $mount)) === '') {
                     continue;
                 }
                 if (!pmssCgroupPolicyDeviceTargetIsSafe($src)) {

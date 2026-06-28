@@ -104,13 +104,3 @@ function pmssRtorrentNormalizeLegacyTemplate(string $template): string
     $normalized = implode($lineSeparator, $normalizedLines);
     return ($template !== '' && preg_match('/(?:\r\n|\r|\n)\z/', $template) === 1) ? $normalized.$lineSeparator : $normalized;
 }
-
-/**
- * Return legacy directive names in diagnostic order.
- *
- * @return string[]
- */
-function pmssRtorrentLegacyDirectiveNames(): array
-{
-    return array_keys(pmssRtorrentLegacyDirectiveCatalog());
-}

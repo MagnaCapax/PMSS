@@ -67,14 +67,15 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
         }
     };
 
-    pmssBackupCriticalConfig('nginx', '/etc/nginx/nginx.conf');
-    @copy('/etc/seedbox/config/template.nginx-conf', '/etc/nginx/nginx.conf');
-    pmssBackupCriticalConfig('nginx', '/etc/nginx/proxy_params');
-    @copy('/etc/seedbox/config/template.nginx-proxy_params', '/etc/nginx/proxy_params');
-    pmssBackupCriticalConfig('nginx', '/etc/nginx/webdav_proxy_params');
-    @copy('/etc/seedbox/config/template.nginx-webdav_proxy_params', '/etc/nginx/webdav_proxy_params');
+    foreach ([
+        '/etc/seedbox/config/template.nginx-conf' => '/etc/nginx/nginx.conf',
+        '/etc/seedbox/config/template.nginx-proxy_params' => '/etc/nginx/proxy_params',
+        '/etc/seedbox/config/template.nginx-webdav_proxy_params' => '/etc/nginx/webdav_proxy_params',
+    ] as $templatePath => $targetPath) {
+        pmssBackupCriticalConfig('nginx', $targetPath);
+        @copy($templatePath, $targetPath);
+    }
 
-    // Configure site default
     $serverHostname = pmssHostnameRead();
     // /etc/hostname should be a single token; trim defensively to avoid whitespace surprises.
     $serverHostnameParts = preg_split('/\\s+/', $serverHostname);
@@ -85,7 +86,6 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
     $nginxConfigSiteDefault = @file_get_contents('/etc/seedbox/config/template.nginx-site-default');
     $nginxConfigSiteDefaultSsl = @file_get_contents('/etc/seedbox/config/template.nginx-site-default-ssl');
     $nginxConfigSiteDefaultSslLetsEncrypt = @file_get_contents('/etc/seedbox/config/template.nginx-site-default-ssl-lets-encrypt');
-    // Do we have let's encrypt cert done?
     $certificatePath = "/etc/letsencrypt/live/{$serverHostname}";
     $certificateFiles = [
         "{$certificatePath}/fullchain.pem",
@@ -113,7 +113,6 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
         }
     }
 
-    // Create config and save it :)
     if ($nginxConfigSiteDefault !== false) {
         $nginxConfigSiteDefault = pmssNginxConfigEnsureSiteDefaultDefinesDefaultServer((string)$nginxConfigSiteDefault);
 

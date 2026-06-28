@@ -149,10 +149,10 @@ function pmssDockerInstallLsioHostPort(?string $value, string $defaultPort): ?st
 function pmssDockerInstallLsioAppCatalog(): array
 {
     return [
-        'jellyfin' => ['port' => '8096', 'mkdir' => ['media'], 'volumes' => ['config' => '/config', 'media' => '/data']],
-        'qbittorrent' => ['port' => '8080', 'mkdir' => ['downloads'], 'extraArgs' => ['-e', 'WEBUI_PORT=8080'], 'volumes' => ['config' => '/config', 'downloads' => '/downloads']],
-        'radarr' => ['port' => '7878', 'mkdir' => ['movies', 'downloads'], 'volumes' => ['config' => '/config', 'movies' => '/movies', 'downloads' => '/downloads']],
-        'sonarr' => ['port' => '8989', 'mkdir' => ['tv', 'downloads'], 'volumes' => ['config' => '/config', 'tv' => '/tv', 'downloads' => '/downloads']],
+        'jellyfin' => ['port' => '8096', 'volumes' => ['config' => '/config', 'media' => '/data']],
+        'qbittorrent' => ['port' => '8080', 'extraArgs' => ['-e', 'WEBUI_PORT=8080'], 'volumes' => ['config' => '/config', 'downloads' => '/downloads']],
+        'radarr' => ['port' => '7878', 'volumes' => ['config' => '/config', 'movies' => '/movies', 'downloads' => '/downloads']],
+        'sonarr' => ['port' => '8989', 'volumes' => ['config' => '/config', 'tv' => '/tv', 'downloads' => '/downloads']],
         'prowlarr' => ['port' => '9696', 'volumes' => ['config' => '/config']],
         'mariadb' => ['port' => '3306', 'bindHost' => '127.0.0.1', 'credentials' => true, 'volumes' => ['config' => '/config']],
         'phpmyadmin' => ['port' => '8082', 'containerPort' => '80', 'bindHost' => '127.0.0.1', 'extraArgs' => ['-e', 'PMA_HOST=mariadb', '-e', 'PMA_PORT=3306'], 'volumes' => ['config' => '/config']],
@@ -182,7 +182,7 @@ function pmssDockerInstallLsioAppSpec(string $app, string $homeDir, bool $dryRun
 
     $spec = [
         'image' => 'lscr.io/linuxserver/'.$app.':latest',
-        'mkdirPaths' => [$paths['config']],
+        'mkdirPaths' => [],
         'bindHost' => (string) ($appSpec['bindHost'] ?? ''),
         'containerPort' => (string) ($appSpec['containerPort'] ?? $appSpec['port']),
         'defaultPort' => (string) $appSpec['port'],
@@ -191,16 +191,11 @@ function pmssDockerInstallLsioAppSpec(string $app, string $homeDir, bool $dryRun
         'credentialFile' => '',
     ];
 
-    foreach ($appSpec['mkdir'] ?? [] as $pathKey) {
-        if (isset($paths[$pathKey])) {
-            $spec['mkdirPaths'][] = $paths[$pathKey];
-        }
-    }
-
     foreach ($appSpec['volumes'] ?? [] as $pathKey => $containerPath) {
         if (!isset($paths[$pathKey]) || $containerPath === '') {
             continue;
         }
+        $spec['mkdirPaths'][] = $paths[$pathKey];
         $spec['volumeArgs'][] = '-v';
         $spec['volumeArgs'][] = $paths[$pathKey].':'.$containerPath;
     }
@@ -323,8 +318,7 @@ function pmssDockerInstallLsioMain(array $argv): int
         return 1;
     }
 
-    if ($app === 'mariadb'
-        && (string) $spec['credentialFile'] !== ''
+    if ((string) $spec['credentialFile'] !== ''
         && !is_file((string) $spec['credentialFile'])
         && !pmssDockerInstallLsioWriteCredentialFile((string) $spec['credentialFile'], (string) $spec['dbName'], (string) $spec['dbUser'])) {
         return 1;

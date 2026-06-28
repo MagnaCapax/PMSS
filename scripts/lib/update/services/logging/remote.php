@@ -14,7 +14,7 @@
 function pmssRemoteLoggingReadConfig(string $loggingConf): array
 {
     $config = ['enabled' => false, 'host' => '', 'port' => 514, 'protocol' => 'tcp'];
-    if (!is_readable($loggingConf) || ($rawConfig = @file_get_contents($loggingConf)) === false || trim($rawConfig) === '') {
+    if (($rawConfig = pmssReadRegularFileContents($loggingConf)) === null || trim($rawConfig) === '') {
         return $config;
     }
     if (!is_array($parsed = @parse_ini_string($rawConfig, false, INI_SCANNER_RAW))) {

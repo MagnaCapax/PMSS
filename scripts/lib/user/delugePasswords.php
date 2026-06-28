@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/delugeManagedConfig.php';
 require_once __DIR__.'/../lighttpd/userConfigApply.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
@@ -31,12 +32,7 @@ function pmssDelugeServicePasswordGenerate(int $length = 24): string
  */
 function pmssDelugeAuthPath(string $username): string
 {
-    $homeRoot = getenv('PMSS_HOME_DIR');
-    if (!is_string($homeRoot) || trim($homeRoot) === '') {
-        $homeRoot = '/home';
-    }
-
-    return rtrim($homeRoot, '/').'/'.$username.'/.config/deluge/auth';
+    return dirname(pmssDelugeConfigPath($username)).'/auth';
 }
 
 /**
@@ -44,12 +40,7 @@ function pmssDelugeAuthPath(string $username): string
  */
 function pmssDelugeWebConfPath(string $username): string
 {
-    $homeRoot = getenv('PMSS_HOME_DIR');
-    if (!is_string($homeRoot) || trim($homeRoot) === '') {
-        $homeRoot = '/home';
-    }
-
-    return rtrim($homeRoot, '/').'/'.$username.'/.config/deluge/web.conf';
+    return dirname(pmssDelugeConfigPath($username)).'/web.conf';
 }
 
 function pmssDelugeAuthLocalclientPasswordRead(string $authPath): string

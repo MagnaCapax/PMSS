@@ -15,6 +15,24 @@ require_once __DIR__.'/delugeWebConf.php';
 require_once __DIR__.'/proxyFragments.php';
 require_once __DIR__.'/resourcePlan.php';
 require_once __DIR__.'/userDirectoriesPrepare.php';
+require_once __DIR__.'/../user/userConfigStore.php';
+
+function pmssLighttpdUserConfigLoad(string $thisUser, ?UserConfigStore $store = null): array
+{
+    if ($store === null) {
+        static $defaultStore = null;
+        if ($defaultStore === null) {
+            $configDir = function_exists('pmssResolvePathFromEnv')
+                ? pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config')
+                : '/etc/seedbox/config';
+            $defaultStore = new UserConfigStore($configDir);
+        }
+        $store = $defaultStore;
+    }
+
+    $payload = $store->get($thisUser);
+    return is_array($payload) ? $payload : [];
+}
 
 function pmssUserConfigLighttpdConfigureUser(
     string $thisUser,
@@ -87,7 +105,7 @@ function pmssUserConfigLighttpdConfigureUser(
         $thisUser,
         ['MemoryHigh', 'MemoryMax', 'CPUQuotaPerSecUSec', 'CPUQuotaPeriodUSec', 'CPUQuota']
     );
-    $resources = pmssLighttpdResourcePlan($props, $policyDefaults);
+    $resources = pmssLighttpdResourcePlan($props, $policyDefaults, pmssLighttpdUserConfigLoad($thisUser));
     $thisUserConfig = pmssLighttpdRenderUserConfig($template, $thisUser, $serverPort, $rclonePort, $qbittorrentPort, $resources);
     if (!pmssWriteUserFile($homeDir.'/.lighttpd.conf', $thisUserConfig, $thisUser, 0741)) {
         fwrite(STDERR, "[user:{$thisUser}] Failed to write .lighttpd.conf; skipping user\n");

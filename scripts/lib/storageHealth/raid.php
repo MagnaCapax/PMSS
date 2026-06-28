@@ -69,8 +69,8 @@ function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
         return null;
     }
     foreach ($mounts as $line) {
-        $fields = preg_split('/\s+/', trim($line));
-        if (!is_array($fields) || count($fields) < 2 || str_replace('\\040', ' ', (string) $fields[1]) !== '/home') {
+        $fields = pmssConfigLineColumns($line, 2, []);
+        if ($fields === [] || str_replace('\\040', ' ', (string) $fields[1]) !== '/home') {
             continue;
         }
         $source = str_replace('\\040', ' ', (string) $fields[0]);

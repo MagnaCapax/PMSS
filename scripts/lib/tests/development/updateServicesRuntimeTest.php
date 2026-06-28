@@ -19,11 +19,9 @@ class UpdateServicesRuntimeTest extends TestCase
 
     public function testSshdLegacyParserNormalizationWarnsWhenCommentingSecurityDirectives(): void
     {
-        $messages = [];
-        \pmssSshdLegacyParserTemplateNormalize(
-            "HostKeyAlgorithms +ssh-rsa\nPubkeyAcceptedKeyTypes +ssh-rsa\n",
-            $this->pmssMakeArrayLogger($messages)
-        );
+        $messages = $this->pmssArrayLoggerMessages(function (callable $logger): void {
+            \pmssSshdLegacyParserTemplateNormalize("HostKeyAlgorithms +ssh-rsa\nPubkeyAcceptedKeyTypes +ssh-rsa\n", $logger);
+        });
 
         foreach (['HostKeyAlgorithms +ssh-rsa', 'PubkeyAcceptedKeyTypes +ssh-rsa'] as $message) {
             $this->pmssAssertMessagesContain($messages, $message);

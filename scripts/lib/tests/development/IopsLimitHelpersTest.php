@@ -70,6 +70,7 @@ class IopsLimitHelpersTest extends TestCase
 
         $this->assertTrue(is_string($runtimePath) && $runtimePath !== '');
         $this->assertTrue(\pmssIntegerSettingStorageDirEnsure(dirname($runtimePath), 0700));
+        $this->assertSame(0700, fileperms(dirname($runtimePath)) & 0777);
         $this->assertTrue(\pmssIntegerSettingTargetModesPersist($targets, 777, $error, 'invalid operations value'));
         $this->assertSame(null, $error);
         $this->assertSame('777', trim((string) file_get_contents($runtimeRoot.'/iopsLimits/alice')));

@@ -8,9 +8,9 @@ final class PortManagerSharedNamespaceTest extends TestCase
 {
     private function runPortManagerMain(array $arguments): array
     {
-        ob_start();
-        $rc = \pmssPortManagerMain(array_merge(['portManager.php'], $arguments));
-        $output = ob_get_clean();
+        [$rc, $output] = $this->pmssCaptureStdout(static function () use ($arguments): int {
+            return \pmssPortManagerMain(array_merge(['portManager.php'], $arguments));
+        });
 
         return ['rc' => $rc, 'output' => $output];
     }
@@ -18,6 +18,15 @@ final class PortManagerSharedNamespaceTest extends TestCase
     private function makePortDir(): string
     {
         return $this->pmssMakeTempDir('pmss-port-shared-', 0755);
+    }
+
+    private function trackPortNamespace(): array
+    {
+        $portDir = $this->makePortDir();
+        $legacyDir = $this->makePortDir();
+        $this->pmssTrackEnvOverrides(['PMSS_PORT_MANAGER_DIR' => $portDir, 'PMSS_PORT_MANAGER_LEGACY_DIR' => $legacyDir]);
+
+        return [$portDir, $legacyDir];
     }
 
     public function testUsedPortsIncludeAllManagedServices(): void
@@ -40,9 +49,7 @@ final class PortManagerSharedNamespaceTest extends TestCase
 
     public function testAssignServicePortAdoptsAvailablePreferredPort(): void
     {
-        $portDir = $this->makePortDir();
-        $legacyDir = $this->makePortDir();
-        $this->pmssTrackEnvOverrides(['PMSS_PORT_MANAGER_DIR' => $portDir, 'PMSS_PORT_MANAGER_LEGACY_DIR' => $legacyDir]);
+        [$portDir] = $this->trackPortNamespace();
 
         $port = \pmssPortManagerAssignServicePort('alice', 'rclone', 25000);
 
@@ -52,10 +59,8 @@ final class PortManagerSharedNamespaceTest extends TestCase
 
     public function testAssignServicePortDoesNotReuseOtherServicePort(): void
     {
-        $portDir = $this->makePortDir();
-        $legacyDir = $this->makePortDir();
+        [$portDir] = $this->trackPortNamespace();
         file_put_contents($portDir.'/lighttpd-alice', "25000\n");
-        $this->pmssTrackEnvOverrides(['PMSS_PORT_MANAGER_DIR' => $portDir, 'PMSS_PORT_MANAGER_LEGACY_DIR' => $legacyDir]);
 
         $port = \pmssPortManagerAssignServicePort('bob', 'rclone', 25000);
 
@@ -66,11 +71,9 @@ final class PortManagerSharedNamespaceTest extends TestCase
 
     public function testAssignServicePortDoesNotReuseLegacyRtorrentReservation(): void
     {
-        $portDir = $this->makePortDir();
-        $legacyDir = $this->makePortDir();
+        [$portDir, $legacyDir] = $this->trackPortNamespace();
         mkdir($legacyDir.'/scgi', 0755, true);
         file_put_contents($legacyDir.'/scgi/25000', '');
-        $this->pmssTrackEnvOverrides(['PMSS_PORT_MANAGER_DIR' => $portDir, 'PMSS_PORT_MANAGER_LEGACY_DIR' => $legacyDir]);
 
         $port = \pmssPortManagerAssignServicePort('bob', 'deluge-web', 25000);
 
@@ -81,9 +84,7 @@ final class PortManagerSharedNamespaceTest extends TestCase
 
     public function testAssignHelperReportsCliStatusWithoutChangingPortContract(): void
     {
-        $portDir = $this->makePortDir();
-        $legacyDir = $this->makePortDir();
-        $this->pmssTrackEnvOverrides(['PMSS_PORT_MANAGER_DIR' => $portDir, 'PMSS_PORT_MANAGER_LEGACY_DIR' => $legacyDir]);
+        $this->trackPortNamespace();
 
         $assigned = '';
         $port = \pmssPortManagerAssignServicePort('alice', 'rclone', 25000, $assigned);

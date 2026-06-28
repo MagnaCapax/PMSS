@@ -25,7 +25,7 @@ function pmssStatusBinaryPathResolve(string $binary, callable $runCommand, ?call
     }
 
     $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
-    if ($path === '' || strpos($path, '/') !== 0) {
+    if (!pmssCommandPathCandidateIsSafe($path)) {
         return '';
     }
 

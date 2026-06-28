@@ -14,26 +14,43 @@ class PortManagerStoredPortValidationTest extends TestCase
         $this->portDir = $this->pmssMakeTempDir('pmss-port-manager-');
     }
 
-    public function testReadAssignedPortAcceptsDigitsOnlyPayload(): void
+    private function assignmentPath(?string $payload = null): string
     {
         $path = $this->portDir.'/lighttpd-alice';
-        file_put_contents($path, "22000\n");
+        if ($payload !== null) file_put_contents($path, $payload);
+
+        return $path;
+    }
+
+    private function assertMalformedAssignmentFailsForAction(string $action): void
+    {
+        $this->assignmentPath("22000oops\n");
+        $command = $this->pmssRunRepoPhpScriptCommandWithTempStderr(
+            'scripts/util/portManager.php',
+            [$action, 'alice'],
+            ['PMSS_PORT_MANAGER_DIR' => $this->portDir],
+            'pmss-port-'.$action.'-stderr-'
+        );
+        $this->pmssAssertCommandFailsToStderr($command['result'], $command['stderrPath'], "Error: invalid stored port assignment\n");
+    }
+
+    public function testReadAssignedPortAcceptsDigitsOnlyPayload(): void
+    {
+        $path = $this->assignmentPath("22000\n");
 
         $this->assertSame(22000, \pmssPortManagerReadAssignedPort($path));
     }
 
     public function testReadAssignedPortRejectsTrailingGarbage(): void
     {
-        $path = $this->portDir.'/lighttpd-alice';
-        file_put_contents($path, "22000oops\n");
+        $path = $this->assignmentPath("22000oops\n");
 
         $this->assertSame(null, \pmssPortManagerReadAssignedPort($path));
     }
 
     public function testReadAssignedPortRejectsOutOfRangeValues(): void
     {
-        $path = $this->portDir.'/lighttpd-alice';
-        file_put_contents($path, "70000\n");
+        $path = $this->assignmentPath("70000\n");
 
         $this->assertSame(null, \pmssPortManagerReadAssignedPort($path));
     }
@@ -41,7 +58,7 @@ class PortManagerStoredPortValidationTest extends TestCase
     public function testReadAssignedPortRejectsSymlink(): void
     {
         $realPath = $this->portDir.'/real';
-        $linkPath = $this->portDir.'/lighttpd-alice';
+        $linkPath = $this->assignmentPath();
         file_put_contents($realPath, "22000\n");
         $this->pmssCreateSymlinkOrSkip($realPath, $linkPath);
 
@@ -50,7 +67,7 @@ class PortManagerStoredPortValidationTest extends TestCase
 
     public function testWriteAssignedPortPersistsReadablePortWithSafeMode(): void
     {
-        $path = $this->portDir.'/lighttpd-alice';
+        $path = $this->assignmentPath();
 
         $this->assertTrue(\pmssPortManagerWriteAssignedPort($this->portDir, $path, 22000));
         $this->assertSame(22000, \pmssPortManagerReadAssignedPort($path));
@@ -60,7 +77,7 @@ class PortManagerStoredPortValidationTest extends TestCase
     public function testWriteAssignedPortRejectsSymlinkWithoutTouchingTarget(): void
     {
         $realPath = $this->pmssMakeTempFile('pmss-port-real-');
-        $linkPath = $this->portDir.'/lighttpd-alice';
+        $linkPath = $this->assignmentPath();
         file_put_contents($realPath, "22000\n");
         $this->pmssCreateSymlinkOrSkip($realPath, $linkPath);
 
@@ -70,7 +87,7 @@ class PortManagerStoredPortValidationTest extends TestCase
 
     public function testWriteAssignedPortRejectsOutOfRangePort(): void
     {
-        $path = $this->portDir.'/lighttpd-alice';
+        $path = $this->assignmentPath();
 
         $this->assertFalse(\pmssPortManagerWriteAssignedPort($this->portDir, $path, 80));
         $this->assertFalse(file_exists($path));
@@ -99,25 +116,11 @@ class PortManagerStoredPortValidationTest extends TestCase
 
     public function testViewFailsWhenStoredAssignmentIsMalformed(): void
     {
-        file_put_contents($this->portDir.'/lighttpd-alice', "22000oops\n");
-        $command = $this->pmssRunRepoPhpScriptCommandWithTempStderr(
-            'scripts/util/portManager.php',
-            ['view', 'alice'],
-            ['PMSS_PORT_MANAGER_DIR' => $this->portDir],
-            'pmss-port-view-stderr-'
-        );
-        $this->pmssAssertCommandFailsToStderr($command['result'], $command['stderrPath'], "Error: invalid stored port assignment\n");
+        $this->assertMalformedAssignmentFailsForAction('view');
     }
 
     public function testAssignFailsWhenExistingAssignmentIsMalformed(): void
     {
-        file_put_contents($this->portDir.'/lighttpd-alice', "22000oops\n");
-        $command = $this->pmssRunRepoPhpScriptCommandWithTempStderr(
-            'scripts/util/portManager.php',
-            ['assign', 'alice'],
-            ['PMSS_PORT_MANAGER_DIR' => $this->portDir],
-            'pmss-port-assign-stderr-'
-        );
-        $this->pmssAssertCommandFailsToStderr($command['result'], $command['stderrPath'], "Error: invalid stored port assignment\n");
+        $this->assertMalformedAssignmentFailsForAction('assign');
     }
 }

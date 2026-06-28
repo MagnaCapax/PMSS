@@ -96,8 +96,7 @@ function pmssStorageHealthReportMain(array $argv): int
 
     $jsonPath = pmssCliOptionString($parsed, 'json', null, $jsonPath) ?? $jsonPath;
     if (!is_file($jsonPath)) {
-        fwrite(STDERR, "No snapshot file found at {$jsonPath}\n");
-        return 1;
+        return pmssCliReturnWithStderr("No snapshot file found at {$jsonPath}\n");
     }
 
     [$disks, $raid, $latestTs] = pmssStorageHealthReportEntries($jsonPath);

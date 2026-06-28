@@ -55,8 +55,7 @@ function pmssShowResourcesMain(array $argv): int
 
     if ($userFilter !== '') {
         if (!pmssResourceUserIsValid($userFilter)) {
-            fwrite(STDERR, "Invalid user specified: {$userFilter}\n");
-            return 1;
+            return pmssCliReturnWithStderr("Invalid user specified: {$userFilter}\n");
         }
         $users = [$userFilter];
     } else {

@@ -7,29 +7,33 @@ class userConfigCommandContractsTest extends TestCase
 {
     public function testUserConfigSourceContractsRemainStable(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', [
-            "require_once __DIR__.'/../lib/user/userConfigRuntime.php';",
-            'pmssUserConfigInvocationMode($args, $welcomeMessage !== null, $namedConfigChange)',
-            'pmssUserConfigWelcomeOnlyPersist($store, $user[\'name\'], $expectedHome, $welcomeMessage, $existing)',
-            'pmssUserConfigPayloadBuild($store, $existing, $user, $presence, $dockerEnabled)',
-            "pmssPortManagerAssignServicePort(\$user['name'], 'rclone')",
-            '@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false',
-            'pmssUserConfigApplyCgroupAndDocker($user, $store)',
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/util/userConfig.php' => [
+                'required' => [
+                    "require_once __DIR__.'/../lib/user/userConfigRuntime.php';",
+                    'pmssUserConfigInvocationMode($args, $welcomeMessage !== null, $namedConfigChange)',
+                    'pmssUserConfigWelcomeOnlyPersist($store, $user[\'name\'], $expectedHome, $welcomeMessage, $existing)',
+                    'pmssUserConfigPayloadBuild($store, $existing, $user, $presence, $dockerEnabled)',
+                    "pmssPortManagerAssignServicePort(\$user['name'], 'rclone')",
+                    '@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false',
+                    'pmssUserConfigApplyCgroupAndDocker($user, $store)',
+                ],
+                'forbidden' => [
+                    '(int) $pid'.'Chunk',
+                    "strpos(\$arg, '--upload-throttle-kib=')" => 'userConfig.php should not keep a manual scan: --upload-throttle-kib',
+                    'pmssUserConfigCli'.'PersistedResourcePresence' => 'userConfig.php should not keep duplicated resource presence logic',
+                    "'--cpu-weight=' . \$user['CPUWeight']" => 'userConfig.php should not keep duplicated CPU weight CLI rendering',
+                ],
+            ],
+            'scripts/lib/user/userConfigRuntime.php' => ['required' => [
+                'function pmssUserConfigPayloadBuild(',
+                'function pmssUserConfigApplyCgroupAndDocker(',
+                "runStep('Configuring cgroups', pmssBuildCommand('php', \$args));",
+                "'Rootless Docker disabled by config for '.\$user['name']",
+                "'machinectl shell %1\$s@ /usr/bin/dockerd-rootless-setuptool.sh install'",
+            ]],
+            'scripts/lib/user/userConfigCli.php' => ['required' => ["'/scripts/util/userConfigCgroup.php'"]],
         ]);
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/userConfig.php', [], [
-            '(int) $pid'.'Chunk',
-            "strpos(\$arg, '--upload-throttle-kib=')" => 'userConfig.php should not keep a manual scan: --upload-throttle-kib',
-            'pmssUserConfigCli'.'PersistedResourcePresence' => 'userConfig.php should not keep duplicated resource presence logic',
-            "'--cpu-weight=' . \$user['CPUWeight']" => 'userConfig.php should not keep duplicated CPU weight CLI rendering',
-        ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/userConfigRuntime.php', [
-            'function pmssUserConfigPayloadBuild(',
-            'function pmssUserConfigApplyCgroupAndDocker(',
-            "runStep('Configuring cgroups', pmssBuildCommand('php', \$args));",
-            "'Rootless Docker disabled by config for '.\$user['name']",
-            "'machinectl shell %1\$s@ /usr/bin/dockerd-rootless-setuptool.sh install'",
-        ]);
-        $this->pmssAssertRepoFileContainsString('scripts/lib/user/userConfigCli.php', "'/scripts/util/userConfigCgroup.php'");
     }
 
     public function testUsageTextSeparatesNamedOptionsFromPositionals(): void

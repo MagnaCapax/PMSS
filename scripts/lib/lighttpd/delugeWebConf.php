@@ -26,7 +26,7 @@ function pmssDelugeNormalizeEmptySessionsObject(array &$config): bool
 
 function pmssDelugeReadWebConf(string $path): ?array
 {
-    $raw = @file_get_contents($path);
+    $raw = pmssReadRegularFileContents($path);
 
     return is_string($raw) ? pmssDelugeConfigDecode($raw) : null;
 }
@@ -41,13 +41,13 @@ function pmssDelugeWriteWebConf(string $path, array $meta, array $config, string
 
 function pmssLighttpdDelugeWebPortFromConfig(string $user, string $path): ?int
 {
-    if (!is_readable($path)) {
+    $raw = pmssReadRegularFileContents($path);
+    if ($raw === null) {
         return null;
     }
 
-    $raw = @file_get_contents($path);
-    $needsWrite = is_string($raw) && pmssDelugeSessionsListDetected($raw);
-    $parsed = pmssDelugeReadWebConf($path);
+    $needsWrite = pmssDelugeSessionsListDetected($raw);
+    $parsed = pmssDelugeConfigDecode($raw);
     if (!is_array($parsed) || !isset($parsed['config'], $parsed['meta']) || !is_array($parsed['config']) || !is_array($parsed['meta'])) {
         return null;
     }

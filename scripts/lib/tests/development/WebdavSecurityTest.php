@@ -86,8 +86,7 @@ class WebdavSecurityTest extends TestCase
         $user = 'a';
         $policy = pmssWebdavWwwPolicyBlock($user);
 
-        $this->assertStringContainsString('/webdav-a/www', $policy);
-        $this->assertStringContainsString('($|/)', $policy);
+        $this->assertStringContainsAllStrings(['/webdav-a/www', '($|/)'], $policy);
     }
 
     /**
@@ -128,8 +127,7 @@ class WebdavSecurityTest extends TestCase
         $malicious = 'test.*';
         $policy = @pmssWebdavWwwPolicyBlock($malicious);
 
-        $this->assertStringContainsString('invalid username', $policy);
-        $this->assertStringNotContainsString('test.*', $policy);
+        $this->assertStringContainsAndOmitsStrings(['invalid username'], ['test.*'], $policy);
     }
 
     /**
@@ -143,8 +141,7 @@ class WebdavSecurityTest extends TestCase
     {
         $policy = @pmssWebdavWwwPolicyBlock('');
 
-        $this->assertStringContainsString('invalid username', $policy);
-        $this->assertStringNotContainsString('webdav.is-readonly', $policy);
+        $this->assertStringContainsAndOmitsStrings(['invalid username'], ['webdav.is-readonly'], $policy);
     }
 
     // =========================================================================
@@ -262,10 +259,7 @@ LIGHTTPD;
 
         $stripped = pmssStripLighttpdWebdavConfig($template);
 
-        $this->assertStringNotContainsString('webdav.activate', $stripped);
-        $this->assertStringNotContainsString('PMSS_WEBDAV_BEGIN', $stripped);
-        $this->assertStringContainsString('#"mod_webdav",', $stripped);
-        $this->assertStringContainsString('alias.url', $stripped);
+        $this->assertStringContainsAndOmitsStrings(['#"mod_webdav",', 'alias.url'], ['webdav.activate', 'PMSS_WEBDAV_BEGIN'], $stripped);
     }
 
     /**
@@ -285,8 +279,7 @@ LIGHTTPD;
 
         $stripped = pmssStripLighttpdWebdavConfig($template);
 
-        $this->assertStringContainsString('#"mod_webdav",', $stripped);
-        $this->assertStringContainsString('alias.url', $stripped);
+        $this->assertStringContainsAllStrings(['#"mod_webdav",', 'alias.url'], $stripped);
     }
 
     /**
@@ -308,8 +301,7 @@ LIGHTTPD;
 
         $stripped = pmssStripLighttpdWebdavConfig($template);
 
-        $this->assertStringContainsString('#"mod_webdav",', $stripped);
-        $this->assertStringContainsString('webdav.activate', $stripped);
+        $this->assertStringContainsAllStrings(['#"mod_webdav",', 'webdav.activate'], $stripped);
     }
 
     /**
@@ -435,11 +427,8 @@ LIGHTTPD;
         $alicePolicy = pmssWebdavWwwPolicyBlock('alice');
         $bobPolicy = pmssWebdavWwwPolicyBlock('bob');
 
-        $this->assertStringContainsString('/webdav-alice/', $alicePolicy);
-        $this->assertStringNotContainsString('/webdav-bob/', $alicePolicy);
-
-        $this->assertStringContainsString('/webdav-bob/', $bobPolicy);
-        $this->assertStringNotContainsString('/webdav-alice/', $bobPolicy);
+        $this->assertStringContainsAndOmitsStrings(['/webdav-alice/'], ['/webdav-bob/'], $alicePolicy);
+        $this->assertStringContainsAndOmitsStrings(['/webdav-bob/'], ['/webdav-alice/'], $bobPolicy);
     }
 
     /**
@@ -453,9 +442,7 @@ LIGHTTPD;
     {
         $policy = pmssWebdavWwwPolicyBlock('testuser');
 
-        $this->assertStringNotContainsString('/webdav-*/', $policy);
-        $this->assertStringNotContainsString('/webdav-[', $policy);
-        $this->assertStringNotContainsString('/webdav-.*/', $policy);
+        $this->assertStringContainsAndOmitsStrings([], ['/webdav-*/', '/webdav-[', '/webdav-.*/'], $policy);
     }
 
     /**
@@ -616,8 +603,7 @@ LIGHTTPD;
     {
         $policy = @pmssWebdavWwwPolicyBlock('1admin');
 
-        $this->assertStringContainsString('invalid username', $policy);
-        $this->assertStringNotContainsString('1admin', $policy);
+        $this->assertStringContainsAndOmitsStrings(['invalid username'], ['1admin'], $policy);
     }
 
     /**
@@ -800,8 +786,7 @@ LIGHTTPD;
         foreach ($unicodeUsers as $user) {
             $policy = @pmssWebdavWwwPolicyBlock($user);
             $this->assertTrue(is_string($policy), 'Expected invalid username policy to be string');
-            $this->assertStringNotContainsString($user, $policy);
-            $this->assertStringContainsString('invalid username', $policy);
+            $this->assertStringContainsAndOmitsStrings(['invalid username'], [$user], $policy);
         }
     }
 
@@ -959,8 +944,7 @@ LIGHTTPD;
         sort($webdavProxyHeaderLines);
 
         $this->assertEquals($proxyHeaderLines, $webdavProxyHeaderLines);
-        $this->assertStringContainsString('proxy_request_buffering off;', $webdavProxyParams);
-        $this->assertStringContainsString('client_body_timeout 600s;', $webdavProxyParams);
+        $this->assertStringContainsAllStrings(['proxy_request_buffering off;', 'client_body_timeout 600s;'], $webdavProxyParams);
     }
 
     /**

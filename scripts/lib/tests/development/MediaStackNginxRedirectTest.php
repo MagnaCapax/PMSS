@@ -51,8 +51,7 @@ class MediaStackNginxRedirectTest extends TestCase
         $block = $this->publicProxyBlock();
         $genericRule = 'proxy_redirect ~^(https?://[^/]+)?/(.+)$ /public-##username/$2;';
 
-        $this->assertTrue(strpos($block, $genericRule) !== false, 'Expected generic redirect rule in public block');
-        $this->assertFalse(strpos($block, '/jellyfin(/.*)?$') !== false, 'Expected nginx public block to stay free of app-specific redirect rules');
+        $this->assertStringContainsAndOmitsStrings([$genericRule], ['/jellyfin(/.*)?$' => 'Expected nginx public block to stay free of app-specific redirect rules'], $block);
     }
 
     public function testProxyParamsForwardOriginalScheme(): void

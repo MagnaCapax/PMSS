@@ -15,6 +15,12 @@ class NetworkInfoTest extends TestCase
         return $root;
     }
 
+    private function withNetworkConfig(array $config, callable $callback, array $env = []): void
+    {
+        $path = $this->pmssWritePhpArrayFixture($config, 'pmss-network-info-');
+        $this->pmssWithEnv(array_merge(['PMSS_NETWORK_CONFIG' => $path], $env), $callback);
+    }
+
     public function testNetworkInterfaceNameNormalizedKeepsSafeNames(): void
     {
         $this->assertSame('bond0.100', \networkInterfaceNameNormalized(' bond0.100 '));
@@ -42,18 +48,14 @@ class NetworkInfoTest extends TestCase
 
     public function testDetectPrimaryInterfaceUsesSharedConfigOverride(): void
     {
-        $tmp = $this->pmssWritePhpArrayFixture(['interface' => 'bond9'], 'pmss-network-info-');
-
-        $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $tmp], function (): void {
+        $this->withNetworkConfig(['interface' => 'bond9'], function (): void {
             $this->assertSame('bond9', \detectPrimaryInterface());
         });
     }
 
     public function testGetLinkSpeedUsesSharedConfigOverride(): void
     {
-        $tmp = $this->pmssWritePhpArrayFixture(['speed' => '4321'], 'pmss-network-info-');
-
-        $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $tmp], function (): void {
+        $this->withNetworkConfig(['speed' => '4321'], function (): void {
             $this->assertSame(4321, \getLinkSpeed('eth0'));
         });
     }
@@ -78,16 +80,12 @@ class NetworkInfoTest extends TestCase
 
     public function testConfiguredSpeedRemainsAuthoritativeWhenPhysicalSpeedIsHigher(): void
     {
-        $config = $this->pmssWritePhpArrayFixture(['speed' => '1000'], 'pmss-network-info-');
         $root = $this->networkSpeedFixture('eth0', '10000');
 
-        $this->pmssWithEnv([
-            'PMSS_NETWORK_CONFIG' => $config,
-            'PMSS_NETWORK_SYS_CLASS_NET_DIR' => $root,
-        ], function (): void {
+        $this->withNetworkConfig(['speed' => '1000'], function (): void {
             $this->assertSame(1000, \getLinkSpeed('eth0'));
             $this->assertSame(10000, \getDetectedLinkSpeed('eth0'));
-        });
+        }, ['PMSS_NETWORK_SYS_CLASS_NET_DIR' => $root]);
     }
 
     public function testGetLinkSpeedFallsBackForUnsafeInterfaceName(): void
@@ -98,9 +96,7 @@ class NetworkInfoTest extends TestCase
 
     public function testDetectPrimaryInterfaceIgnoresUnsafeConfigOverride(): void
     {
-        $tmp = $this->pmssWritePhpArrayFixture(['interface' => 'eth0; touch /tmp/pwned'], 'pmss-network-info-');
-
-        $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $tmp], function (): void {
+        $this->withNetworkConfig(['interface' => 'eth0; touch /tmp/pwned'], function (): void {
             $iface = \detectPrimaryInterface();
             $this->assertTrue($iface !== '');
             $this->assertSame('', \networkInterfaceNameNormalized('eth0; touch /tmp/pwned'));

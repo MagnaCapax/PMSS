@@ -8,8 +8,7 @@
 
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../runtime.php';
-require_once __DIR__.'/../user/identity.php';
-require_once __DIR__.'/../user/integerSetting.php';
+pmssRequireRelativeFiles(__DIR__, ['../user/identity.php', '../user/integerSetting.php']);
 
 /** @return array<string,string> Resolve the canonical per-user traffic data files. */
 function pmssTrafficDataPaths(string $username, ?string $homeDir = null): array

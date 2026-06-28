@@ -111,12 +111,13 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
     public function testLegacyDirectiveDetectorPreservesDirectiveOrderSnapshot(): void
     {
         $content = '';
-        foreach (\pmssRtorrentLegacyDirectiveNames() as $label) {
+        $legacyDirectiveNames = array_keys(\pmssRtorrentLegacyDirectiveCatalog());
+        foreach ($legacyDirectiveNames as $label) {
             $content .= $label." = value\n";
         }
 
         $this->assertEquals(
-            \pmssRtorrentLegacyDirectiveNames(),
+            $legacyDirectiveNames,
             \rtorrentCustomConfigFindLegacyDirectives($content)
         );
     }

@@ -8,7 +8,7 @@ class MotdTest extends TestCase
 {
     public function testGeneratorLoadsVersionHelperForStandaloneUse(): void
     {
-        $this->assertEquals('loaded', trim($this->pmssRunRepoInlinePhpRequire('scripts/motd/Generator.php', 'echo function_exists("getPmssVersion") ? "loaded" : "missing";', ['PMSS_TEST_MODE' => '1'])));
+        $this->assertEquals('loaded', trim($this->pmssRunRepoInlinePhpRequire('scripts/motd/Generator.php', 'echo function_exists("getPmssVersion") ? "loaded" : "missing";', $this->pmssTestModeEnv())));
     }
 
     public function testGenerateMotdWritesToOutputWithTemplate(): void

@@ -56,4 +56,22 @@ class SupportConfigRelayHostSafetyTest extends TestCase
             }, 'Support relay host is invalid.');
         }
     }
+
+    public function testConfigReadRejectsNonScalarBoundaryValues(): void
+    {
+        foreach ([
+            ['targetEmail' => ['support@example.com'], 'message' => 'Support target email is invalid.'],
+            ['snapshotDirectory' => ['.support/requests'], 'message' => 'Support snapshot directory must be a safe relative path.'],
+            ['smtpPort' => [25], 'message' => 'Support SMTP port is invalid.'],
+            ['connectTimeout' => [5], 'message' => 'Support SMTP timeout is invalid.'],
+        ] as $case) {
+            $message = $case['message'];
+            unset($case['message']);
+            $this->writeConfig($case);
+
+            $this->assertThrowsRuntime(static function (): void {
+                \pmssSupportConfigRead();
+            }, $message);
+        }
+    }
 }

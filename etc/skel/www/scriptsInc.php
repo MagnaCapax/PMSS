@@ -158,6 +158,20 @@ if (!function_exists('pmssCustomerKeyValueFileRead')) {
  }
 }
 
+if (!function_exists('pmssCustomerCgroupSelfEntries')) {
+ /** Parse the current process cgroup membership into normalized entries. */
+ function pmssCustomerCgroupSelfEntries($path = '/proc/self/cgroup') {
+  $lines = @file((string) $path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+  $entries = array();
+  foreach (is_array($lines) ? $lines : array() as $line) {
+   $parts = explode(':', (string) $line, 3);
+   if (count($parts) !== 3 || trim($parts[2]) === '') continue;
+   $entries[] = array('hierarchy' => trim($parts[0]), 'controllers' => $parts[1] === '' ? array() : array_values(array_filter(array_map('trim', explode(',', $parts[1])), 'strlen')), 'path' => '/'.ltrim(trim($parts[2]), '/'));
+  }
+  return $entries;
+ }
+}
+
 if (!function_exists('pmssCustomerHtmlAttr')) { /** Escape customer GUI text and attributes with the shared PMSS flags. */ function pmssCustomerHtmlAttr($value) { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); } }
 if (!function_exists('pmssJsonFileReadAssoc')) {
  /** Read a JSON object file as an associative array, optionally requiring a customer-safe path. */

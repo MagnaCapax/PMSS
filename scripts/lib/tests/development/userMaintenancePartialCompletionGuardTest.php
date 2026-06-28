@@ -35,55 +35,38 @@ PHP,
         $this->assertStringContainsString('pmssRunAndLog refused invalid username', $result['output']);
     }
 
-    public function testUserMaintenanceShellBoundaryHelpersShareUsernameGuard(): void
+    public function testUserMaintenanceSourceContractsStayWired(): void
     {
-        $maintenanceSrc = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
-        $dockerSrc = $this->pmssReadRepoFile('scripts/lib/update/users/docker.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/users/docker.php';", $maintenanceSrc);
-
-        foreach ([
-            'pmssRunAndLog',
-            'pmssEnsureLingerAndDocker',
-            'pmssEnsureRootlessDockerInstalled',
-            'pmssEnsureDockerDependencies',
-        ] as $functionName) {
-            $this->assertStringContainsString(
-                "pmssUserMaintenanceUsernameAllowed(\$user, '{$functionName}')",
-                $dockerSrc,
-                'Expected username guard in '.$functionName
-            );
-        }
-    }
-
-    public function testUserMaintenanceEmitsProcessedSummaryAndJsonEvent(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/userMaintenance.php', [
-            'Processed %d of %d users',
-            "Account '(empty)' skipped during environment refresh: empty username entry",
-            "Account '%s' skipped during environment refresh: invalid username",
-            "Account '%s' skipped during environment refresh: %s",
-            "'event'     => 'user_maintenance_summary'",
-            "'processed' => ",
-            "'skipped'   => ",
-        ]);
-    }
-
-    public function testUpdateStep2DelegatesPartialUserProcessingPolicy(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
-            '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',
-            'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
-        ]);
-    }
-
-    public function testUserPermissionsRefreshUsesScopedTimeoutAndIonice(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/permissions.php', [
-            'PMSS_USER_PERMISSIONS_TIMEOUT',
-            'PMSS_COMMAND_TIMEOUT',
-            "'-c3'",
-            'RuntimeException',
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/update/userMaintenance.php' => [
+                'required' => [
+                    "require_once __DIR__.'/users/docker.php';",
+                    'Processed %d of %d users',
+                    "Account '(empty)' skipped during environment refresh: empty username entry",
+                    "Account '%s' skipped during environment refresh: invalid username",
+                    "Account '%s' skipped during environment refresh: %s",
+                    "'event'     => 'user_maintenance_summary'",
+                    "'processed' => ",
+                    "'skipped'   => ",
+                ],
+            ],
+            'scripts/lib/update/users/docker.php' => [
+                'required' => [
+                    "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssRunAndLog')",
+                    "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureLingerAndDocker')",
+                    "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureRootlessDockerInstalled')",
+                    "pmssUserMaintenanceUsernameAllowed(\$user, 'pmssEnsureDockerDependencies')",
+                ],
+            ],
+            'scripts/util/update-step2.php' => [
+                'required' => [
+                    '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',
+                    'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
+                ],
+            ],
+            'scripts/lib/update/users/permissions.php' => [
+                'required' => ['PMSS_USER_PERMISSIONS_TIMEOUT', 'PMSS_COMMAND_TIMEOUT', "'-c3'", 'RuntimeException'],
+            ],
         ]);
     }
 }

@@ -7,8 +7,9 @@ class UpdateBootstrapStep2FailureRecoveryTest extends TestCase
 {
     public function testPhase2FailureRefreshesPermissionsBeforeFatal(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/update.php' => [
+        $this->pmssAssertRepoFileContract(
+            'scripts/update.php',
+            [
                 'required' => [
                     'function restorePermissionsBestEffort(string $context): void',
                     "restorePermissionsBestEffort('update-step2 failure');",
@@ -19,7 +20,7 @@ class UpdateBootstrapStep2FailureRecoveryTest extends TestCase
                     'missingPrefix' => 'update.php should still fatal when update-step2 exits non-zero: ',
                     'orderPrefix' => 'Permission recovery must run before update.php surfaces the update-step2 failure: ',
                 ]],
-            ],
-        ]);
+            ]
+        );
     }
 }

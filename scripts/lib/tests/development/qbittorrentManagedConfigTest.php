@@ -12,7 +12,7 @@ class QbittorrentManagedConfigTest extends TestCase
     protected function setUp(): void
     {
         $this->homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-qbittorrent-managed-');
-        $this->pmssTrackEnvOverrides(['PMSS_TEST_MODE' => '1'], true);
+        $this->pmssTrackEnvOverrides($this->pmssTestModeEnv(), true);
     }
 
     public function testConfigPathHonoursManagedHomeOverride(): void

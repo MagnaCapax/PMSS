@@ -239,6 +239,25 @@ LIGHTTPD;
         );
     }
 
+    public function testLighttpdTemplatePassesPerUserPhpIniInBinPath(): void
+    {
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
+        $rendered = \pmssLighttpdRenderUserConfig(
+            $template,
+            'alice',
+            31234,
+            0,
+            0,
+            ['maxProcs' => 2, 'children' => 6]
+        );
+
+        $this->assertStringContainsString(
+            '"bin-path"              => "/usr/bin/php-cgi -c /home/alice/.lighttpd/php.ini",',
+            $rendered
+        );
+        $this->pmssAssertStringNotContainsString('"bin-args"', $rendered);
+    }
+
     public function testPhpIniContentRendererAppendsMissingDirectives(): void
     {
         $updated = \pmssLighttpdApplyPhpIniContent("engine = On\n", 'bob', 256);

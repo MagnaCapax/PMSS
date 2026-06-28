@@ -7,8 +7,7 @@ function pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defa
     $timestamp = date('Y-m-d\\TH:i:s'); $oldUmask = null; $handle = false;
     try {
         if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
-            fwrite(STDERR, basename($scriptName)." must be run as root.\n");
-            return 1;
+            return pmssCliReturnWithStderr(basename($scriptName)." must be run as root.\n");
         }
         $oldUmask = umask(0077);
         $logPath = pmssResolvePathFromEnv($envKey, $defaultLogPath);

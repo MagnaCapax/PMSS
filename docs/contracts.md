@@ -430,6 +430,9 @@ Functions documented inline above. Entrypoint (guarded by `PMSS_WIREGUARD_NO_ENT
 
 Environment overrides: `PMSS_WG_CONFIG_DIR`, `PMSS_WG_HOME_BASE`, `PMSS_WG_USER_LIST`, `PMSS_WG_PRIVATE_KEY`, `PMSS_WG_PUBLIC_KEY`, `PMSS_WG_CLIENT_PRIVATE_KEY`, `PMSS_WG_CLIENT_PUBLIC_KEY`, `PMSS_WG_EXTERNAL_IP`, `PMSS_WG_INTERFACE_IP`, `PMSS_WG_DNS_IP`, `PMSS_WG_SKIP_SERVICE`.
 
+Safety: per-user public-key reads revalidate the username and ignore missing,
+non-regular, symlinked, unreadable, or invalid-key registry files.
+
 ---
 
 ## Application Installers (Contracts)

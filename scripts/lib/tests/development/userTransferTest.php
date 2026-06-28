@@ -374,6 +374,44 @@ SNAP;
         $this->assertStringContainsString('[INFO] rTorrent session rewrite found no /home path references to update', $output);
     }
 
+    public function testRtorrentRestartScriptUsesLiveUserProcessFallback(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/.rtorrentRestart.php', [
+            'function pmssRtorrentRestartPidIsRtorrent(int $pid, int $uid): bool',
+            'ps -p \' . (int) $pid . \' -o euid=,comm=',
+            'pgrep -u \' . (int) $uid . \' -x rtorrent',
+            'rtorrent lock pid is stale or not rtorrent',
+            'pmssRtorrentRestartSignalPids($rtorrentPids, 15)',
+        ], 'Missing robust rTorrent restart fragment: ');
+
+        $this->pmssAssertRepoFileNotContainsStrings('etc/skel/.rtorrentRestart.php', [
+            "system('kill ' . \$pid);",
+            "system('kill -9 ' . \$pid);",
+        ], 'Restart script must not blindly kill the lock PID: ');
+    }
+
+    public function testUserTransferRtorrentRestartVerificationHelpers(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-userTransfer-rtorrent-verify-');
+        $this->pmssEnsureDir($home.'/session');
+        file_put_contents($home.'/session/a.torrent', 'a');
+        file_put_contents($home.'/session/b.torrent', 'b');
+
+        $this->assertSame(2, \pmssUserTransferRtorrentSessionTorrentCount($home));
+
+        $calls = 0;
+        $count = \pmssUserTransferWaitForRtorrentDownloadListCount($home, 0, static function () use (&$calls): array {
+            $calls++;
+            return ['hash-a', 'hash-b'];
+        });
+
+        $this->assertSame(2, $count);
+        $this->assertSame(1, $calls);
+        $this->assertSame(null, \pmssUserTransferRtorrentDownloadListCount($home, static function () {
+            return false;
+        }));
+    }
+
     public function testIsPathWithinHomeAcceptsRealChildPaths(): void
     {
         $home = $this->pmssMakeUserWebHome('pmss-userTransfer-path-within-', 'testuser');

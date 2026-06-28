@@ -10,7 +10,9 @@ class HomeInodeDensityTest extends TestCase
     {
         $messages = [];
         $callback = function () use (&$messages, $home): void {
-            \pmssHomeInodeDensityCheck($this->pmssMakeArrayLogger($messages), $home, 262144);
+            $messages = $this->pmssArrayLoggerMessages(function (callable $logger) use ($home): void {
+                \pmssHomeInodeDensityCheck($logger, $home, 262144);
+            });
         };
 
         if ($binDir === null) {
@@ -30,15 +32,10 @@ class HomeInodeDensityTest extends TestCase
 
     private function runUpdateStep2PreflightChecks(array $homePaths, array $lockPaths, array $cachePaths, float $minBytes = 1.0): array
     {
-        $messages = [];
-        $result = \pmssUpdateStep2PreflightChecks(
-            $this->pmssMakeArrayLogger($messages),
-            $homePaths,
-            $lockPaths,
-            $cachePaths,
-            '',
-            $minBytes
-        );
+        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($homePaths, $lockPaths, $cachePaths, $minBytes): bool {
+            return \pmssUpdateStep2PreflightChecks($logger, $homePaths, $lockPaths, $cachePaths, '', $minBytes);
+        });
+
         return [$result, $messages];
     }
 

@@ -64,8 +64,8 @@ class TrackerCleanerLibraryTest extends TestCase
         $this->assertSame("[2025-01-01 00:00:00] Changed Public Torrent (abc123)\n[2025-01-01 00:00:00] Changed Second Torrent (def456)\n", pmssTrackerCleanerChangeLog($changes, '[2025-01-01 00:00:00]'));
         $this->assertSame('tracker cleaner: processed=4 private=1 changed=2', pmssTrackerCleanerUserSummary(4, 1, 2));
         $this->assertSame('tracker cleaner: processed=4 private=1 changed=2 stop_reason=runtime_limit', pmssTrackerCleanerUserSummary(4, 1, 2, 'runtime_limit'));
-        foreach ([['runtime_limit', true, true, 'WARN: runtime limit reached; stopping early.'], ['backup_failed', true, false, 'ERR: backup verification failed; stopping early.'], ['modify_limit', true, true, 'WARN: modification limit reached; stopping early.'], ['', false, false, 'SKIP: no eligible torrents processed this run.'], ['', true, false, 'OK: run complete; no tracker changes needed.'], ['', true, true, 'OK: run complete; tracker changes applied.']] as $case) {
-            $this->assertSame($case[3], pmssTrackerCleanerRunOutcomeLogLine($case[0], $case[1], $case[2]));
+        foreach ([['runtime_limit', true, true, 'WARN: runtime limit reached; stopping early.'], ['backup_failed', true, false, 'ERR: backup verification failed; stopping early.'], ['modify_limit', true, true, 'WARN: modification limit reached; stopping early.'], ['', false, false, 'SKIP: no eligible torrents processed this run.'], ['', true, false, 'OK: run complete; no tracker changes needed.'], ['', true, true, 'OK: run complete; tracker changes applied.']] as [$stopReason, $processedAny, $changedAny, $expected]) {
+            $this->assertSame($expected, pmssTrackerCleanerRunOutcomeLogLine($stopReason, $processedAny, $changedAny));
         }
     }
 
@@ -106,14 +106,14 @@ class TrackerCleanerLibraryTest extends TestCase
             'bad_user' => ['bad-user', $torrentPath, $backupDir, $root, 'invalid_username'],
             'bad_source' => ['validusr', $this->pmssMakeTempFile('pmss-tracker-cleaner-source-'), $backupDir, $root, 'torrent_path_unsafe'],
             'bad_destination' => ['validusr', $torrentPath, $this->pmssMakeTempDir('pmss-tracker-cleaner-outside-').'/backup', $root, 'backup_path_unsafe'],
-        ] as $label => $case) {
-            [$result, $output] = $this->pmssCaptureStdout(static function () use ($case): array {
-                return pmssTrackerCleanerBackupTorrent($case[0], $case[1], $case[2], $case[3], 'tracker');
+        ] as $label => [$user, $sourcePath, $backupPath, $rootPath, $expectedReason]) {
+            [$result, $output] = $this->pmssCaptureStdout(static function () use ($user, $sourcePath, $backupPath, $rootPath): array {
+                return pmssTrackerCleanerBackupTorrent($user, $sourcePath, $backupPath, $rootPath, 'tracker');
             });
 
             $this->assertFalse($result['ok'], $label);
             $this->assertSame('backup_failed', $result['stop_reason'], $label);
-            $this->assertStringContainsString('reason='.$case[4], $result['verbose_log'], $label);
+            $this->assertStringContainsString('reason='.$expectedReason, $result['verbose_log'], $label);
             $this->assertStringContainsString('ERR:', $output, $label);
         }
     }

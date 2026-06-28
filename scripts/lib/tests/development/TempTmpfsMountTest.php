@@ -13,13 +13,12 @@ class TempTmpfsMountTest extends TestCase
 
     private function runTmpfsHardening(string $fstab, string $mounts, ?string $flag = '1', ?string $size = null): array
     {
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-        putenv($flag === null ? 'PMSS_HARDEN_TMP_TMPFS' : 'PMSS_HARDEN_TMP_TMPFS='.$flag);
-        $size !== null && putenv('PMSS_TMPFS_TMP_SIZE='.$size);
-        putenv('PMSS_DRY_RUN=1');
-        \pmssConfigureTempTmpfsMount($logger, $fstab, $mounts);
-        return $messages;
+        return $this->pmssArrayLoggerMessages(function (callable $logger) use ($fstab, $mounts, $flag, $size): void {
+            putenv($flag === null ? 'PMSS_HARDEN_TMP_TMPFS' : 'PMSS_HARDEN_TMP_TMPFS='.$flag);
+            $size !== null && putenv('PMSS_TMPFS_TMP_SIZE='.$size);
+            putenv('PMSS_DRY_RUN=1');
+            \pmssConfigureTempTmpfsMount($logger, $fstab, $mounts);
+        });
     }
 
     public function testSkipsWhenFlagDisabled(): void
@@ -144,9 +143,7 @@ class TempTmpfsMountTest extends TestCase
         );
 
         $this->pmssResetRuntimeProfile();
-        putenv('PMSS_HARDEN_TMP_TMPFS=1');
-        putenv('PMSS_DRY_RUN=1');
-        \pmssConfigureTempTmpfsMount(null, $fstab, $mounts);
+        $this->runTmpfsHardening($fstab, $mounts);
 
         $this->assertEquals([
             "mount '-o' 'remount,noexec,nosuid,nodev,size=2G' '/tmp'",

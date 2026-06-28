@@ -653,6 +653,17 @@ abstract class TestCase
         });
     }
 
+    /** Create the standard config-backup source and backup roots for fixture tests. */
+    protected function pmssConfigBackupsFixtureRoots(bool $withOutside = false): array
+    {
+        $roots = [$this->pmssMakeTempDir('pmss-backups-src-'), $this->pmssMakeTempDir('pmss-backups-root-')];
+        if ($withOutside) {
+            $roots[] = $this->pmssMakeTempDir('pmss-backups-outside-');
+        }
+
+        return $roots;
+    }
+
     /**
      * Create paired config and rsyslog target directories for remote logging tests.
      *

@@ -41,19 +41,18 @@ class QuotaFixGuardTest extends TestCase
 
     public function testQuotaFixSkipsQuotacheckWhenQuotaoffFails(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/quotaFix.php');
-
-        $this->assertOrderedStrings(
-            [
-                '$quotaOffResult = pmssQuotaFixRunCommand',
-                "if (\$quotaOffResult['ok']) {",
-                "pmssQuotaFixRunCommand(\n        '[quotaFix] Recalculating quota usage from disk",
-                '[quotaFix] WARNING: skipping quotacheck because quotaoff failed',
-                "pmssQuotaFixRunCommand('[quotaFix] Re-enabling quotas', 'quotaon -av', true, \$exitCode);",
-            ],
-            $source,
-            'quotaFix missing safety guard: ',
-            'quotaFix safety guard order changed near: '
-        );
+        $this->pmssAssertRepoFileContract('scripts/util/quotaFix.php', [
+            'ordered' => [[
+                'needles' => [
+                    '$quotaOffResult = pmssQuotaFixRunCommand',
+                    "if (\$quotaOffResult['ok']) {",
+                    "pmssQuotaFixRunCommand(\n        '[quotaFix] Recalculating quota usage from disk",
+                    '[quotaFix] WARNING: skipping quotacheck because quotaoff failed',
+                    "pmssQuotaFixRunCommand('[quotaFix] Re-enabling quotas', 'quotaon -av', true, \$exitCode);",
+                ],
+                'missingPrefix' => 'quotaFix missing safety guard: ',
+                'orderPrefix' => 'quotaFix safety guard order changed near: ',
+            ]],
+        ]);
     }
 }

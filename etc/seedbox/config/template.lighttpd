@@ -121,8 +121,7 @@ fastcgi.debug = 0
 
 fastcgi.server += ( ".php" =>
         ((
-                "bin-path"              => "/usr/bin/php-cgi ",
-                "bin-args"              => ( "-c", "/home/##username/.lighttpd/php.ini" ),
+                "bin-path"              => "/usr/bin/php-cgi -c /home/##username/.lighttpd/php.ini",
                 "socket"                => "/home/##username/.lighttpd/php.socket",
                 "max-procs"             => 6,
                 "min-procs"             => 1,

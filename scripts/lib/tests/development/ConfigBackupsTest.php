@@ -8,11 +8,8 @@ class ConfigBackupsTest extends TestCase
 {
     public function testBackupCreatesFileWithMetadataInName(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-backups-src-');
-        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
-
-        $source = $root.'/etc/ssh/sshd_config';
-        $this->pmssWriteFile($source, "Port 22\n");
+        [$sourceRoot, $backupRoot] = $this->pmssConfigBackupsFixtureRoots();
+        $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/ssh/sshd_config', "Port 22\n");
 
         $backup = \pmssBackupCriticalConfig('sshd', $source, array(
             'backupRoot' => $backupRoot,
@@ -34,7 +31,7 @@ class ConfigBackupsTest extends TestCase
 
     public function testBackupReturnsNullWhenSourceMissing(): void
     {
-        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
+        $backupRoot = $this->pmssConfigBackupsFixtureRoots()[1];
         $missing = $backupRoot.'/nope.conf';
 
         $backup = \pmssBackupCriticalConfig('sshd', $missing, array(
@@ -46,11 +43,8 @@ class ConfigBackupsTest extends TestCase
 
     public function testBackupHelpersStillWorkWithoutRuntimeLoggerBootstrap(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-backups-src-');
-        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
-
-        $source = $root.'/etc/nginx/nginx.conf';
-        $this->pmssWriteFile($source, "worker_processes auto;\n");
+        [$sourceRoot, $backupRoot] = $this->pmssConfigBackupsFixtureRoots();
+        $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
 
         $script = '$backup = pmssBackupCriticalConfig('.var_export('nginx', true).', '.var_export($source, true).', '
             .var_export(array(
@@ -75,11 +69,8 @@ class ConfigBackupsTest extends TestCase
 
     public function testPruneKeepsNewestNBackups(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-backups-src-');
-        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
-
-        $source = $root.'/etc/ssh/sshd_config';
-        $this->pmssWriteFile($source, "Port 22\n");
+        [$sourceRoot, $backupRoot] = $this->pmssConfigBackupsFixtureRoots();
+        $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/ssh/sshd_config', "Port 22\n");
 
         $serviceDir = $backupRoot.'/sshd';
         @mkdir($serviceDir, 0700, true);
@@ -111,11 +102,8 @@ class ConfigBackupsTest extends TestCase
 
     public function testPruneDropsBackupsOlderThanTtl(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-backups-src-');
-        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
-
-        $source = $root.'/etc/nginx/nginx.conf';
-        $this->pmssWriteFile($source, "worker_processes auto;\n");
+        [$sourceRoot, $backupRoot] = $this->pmssConfigBackupsFixtureRoots();
+        $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
 
         $serviceDir = $backupRoot.'/nginx';
         @mkdir($serviceDir, 0700, true);
@@ -143,11 +131,8 @@ class ConfigBackupsTest extends TestCase
 
     public function testPruneReturnsQuietlyWhenServiceDirectoryMissing(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-backups-src-');
-        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
-
-        $source = $root.'/etc/ssh/sshd_config';
-        $this->pmssWriteFile($source, "Port 22\n");
+        [$sourceRoot, $backupRoot] = $this->pmssConfigBackupsFixtureRoots();
+        $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/ssh/sshd_config', "Port 22\n");
 
         [, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($backupRoot, $source): void {
             \pmssPruneCriticalConfigBackups('sshd', $source, array(

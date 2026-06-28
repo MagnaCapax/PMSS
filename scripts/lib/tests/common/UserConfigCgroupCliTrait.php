@@ -1,6 +1,8 @@
 <?php
 namespace PMSS\Tests;
 
+require_once __DIR__.'/TestCase.php';
+
 /**
  * Shared CLI runner for hermetic `userConfigCgroup.php` contract tests.
  */

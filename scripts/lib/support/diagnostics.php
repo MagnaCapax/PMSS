@@ -10,34 +10,10 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/config.php';
+require_once dirname(__DIR__).'/runtime.php';
+require_once __DIR__.'/stream.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../user/billingIds.php';
-
-/**
- * Write an entire payload to a writable stream or fail loudly.
- *
- * @param resource $stream
- */
-function pmssSupportStreamWriteAll($stream, string $payload, string $context): void
-{
-    $offset = 0;
-    $length = strlen($payload);
-
-    if ($length > 0 && !is_resource($stream)) {
-        throw new RuntimeException('Unable to write '.$context.'.');
-    }
-
-    while ($offset < $length) {
-        $written = @fwrite($stream, substr($payload, $offset));
-        if (!is_int($written) || $written < 1) {
-            $meta = is_resource($stream) ? stream_get_meta_data($stream) : [];
-            $suffix = (!empty($meta['timed_out']) ? ' timed out' : '');
-            throw new RuntimeException('Unable to write '.$context.$suffix.'.');
-        }
-        $offset += $written;
-    }
-}
 
 /**
  * Resolve the current caller identity from trusted process state.
@@ -115,22 +91,6 @@ function pmssSupportMessageNormalize(string $message): string
 }
 
 /**
- * Read the billing service identifier from the user home.
- */
-function pmssSupportBillingServiceIdRead(string $home): int
-{
-    return pmssUserBillingServiceIdRead($home);
-}
-
-/**
- * Read the billing client/account identifier from the user home.
- */
-function pmssSupportBillingClientIdRead(string $home): int
-{
-    return pmssUserBillingClientIdRead($home);
-}
-
-/**
  * Build the read-only diagnostics snapshot body.
  *
  * @return array<string,mixed>
@@ -153,8 +113,8 @@ function pmssSupportDiagnosticsBuild(string $message, ?callable $runner = null):
     $username = (string) $identity['username'];
     $home = (string) $identity['home'];
     $hostname = (string) (gethostname() ?: 'unknown-host');
-    $billingServiceId = pmssSupportBillingServiceIdRead($home);
-    $billingClientId = pmssSupportBillingClientIdRead($home);
+    $billingServiceId = pmssUserBillingServiceIdRead($home);
+    $billingClientId = pmssUserBillingClientIdRead($home);
     $versionPath = pmssResolvePathFromEnv('PMSS_VERSION_FILE', pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/version');
     $pmssVersion = is_file($versionPath) ? trim((string) @file_get_contents($versionPath)) : 'unknown';
     $commands = [

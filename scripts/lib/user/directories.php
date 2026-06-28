@@ -174,17 +174,7 @@ if (!function_exists('pmssEnsureUserHomeDir')) {
 
         $home = rtrim($home, '/');
         $safeHome = str_replace(["\0", "\r", "\n"], '?', $home);
-        if ($home === '' || $home[0] !== '/' || strpos($home, "\0") !== false) {
-            $log('[WARN] Refusing to ensure user dir; invalid home path: '.$safeHome);
-            return false;
-        }
-        foreach (explode('/', trim($home, '/')) as $segment) {
-            if ($segment === '.' || $segment === '..') {
-                $log('[WARN] Refusing to ensure user dir; unsafe home path segment: '.$safeHome);
-                return false;
-            }
-        }
-        if (!is_dir($home) || is_link($home)) {
+        if (!pmssPathAbsoluteStringIsSafe($home, ['allowRoot' => false]) || !is_dir($home) || is_link($home)) {
             $log('[WARN] Refusing to ensure user dir; invalid home path: '.$safeHome);
             return false;
         }
@@ -194,12 +184,6 @@ if (!function_exists('pmssEnsureUserHomeDir')) {
             return false;
         }
 
-        $path = $home.'/'.$relative;
-        if (strpos($path, $home.'/') !== 0) {
-            $log('[WARN] Refusing to ensure user dir; path prefix mismatch');
-            return false;
-        }
-
-        return pmssEnsureDir($path, $mode, $user, $user, $logger, $parentMode);
+        return pmssEnsureDir($home.'/'.$relative, $mode, $user, $user, $logger, $parentMode);
     }
 }

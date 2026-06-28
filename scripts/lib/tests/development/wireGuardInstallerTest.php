@@ -61,11 +61,11 @@ class WireGuardInstallerTest extends TestCase
 
     public function testWriteConfigOverwritesExisting(): void
     {
-        $dir = $this->createTempDir();
+        $dir = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
         $config = $dir.'/wg0.conf';
-        file_put_contents($config, 'existing');
+        $this->pmssWriteFile($config, 'existing');
 
-        $homeBase = $this->createTempDir();
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
 
 	        $this->pmssWithEnv([
 	            'PMSS_WG_CONFIG_DIR' => $dir,
@@ -81,18 +81,15 @@ class WireGuardInstallerTest extends TestCase
 
     public function testWriteConfigIncludesPeersFromUserKeys(): void
     {
-        $dir      = $this->createTempDir();
-        $homeBase = $this->createTempDir();
-
-        @mkdir($homeBase.'/alice', 0755, true);
-        @mkdir($homeBase.'/bob', 0755, true);
+        $dir      = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
 
         // Base64-encoded 32-byte buffers as dummy public keys.
         $aliceKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
         $bobKey   = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=';
 
-        file_put_contents($homeBase.'/alice/.wireguard-public-key', $aliceKey."\n");
-        file_put_contents($homeBase.'/bob/.wireguard-public-key', $bobKey."\n");
+        $this->pmssWriteFile($homeBase.'/alice/.wireguard-public-key', $aliceKey."\n");
+        $this->pmssWriteFile($homeBase.'/bob/.wireguard-public-key', $bobKey."\n");
 
         $this->pmssWithEnv([
             'PMSS_WG_CONFIG_DIR' => $dir,
@@ -112,10 +109,10 @@ class WireGuardInstallerTest extends TestCase
 
     public function testWriteConfigReturnsFalseWhenConfigPathCannotBeWritten(): void
     {
-        $homeBase = $this->createTempDir();
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
 
         $this->pmssWithEnv([
-            'PMSS_WG_CONFIG_DIR' => $this->createTempDir().'/missing/config',
+            'PMSS_WG_CONFIG_DIR' => $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700).'/missing/config',
             'PMSS_WG_HOME_BASE'  => $homeBase,
             'PMSS_WG_USER_LIST'  => 'dummy',
         ], function (): void {
@@ -125,9 +122,9 @@ class WireGuardInstallerTest extends TestCase
 
     public function testEnsureKeysReusesExisting(): void
     {
-        $dir = $this->createTempDir();
-        file_put_contents($dir.'/server_private.key', "priv\n");
-        file_put_contents($dir.'/server_public.key', "pub\n");
+        $dir = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
+        $this->pmssWriteFile($dir.'/server_private.key', "priv\n");
+        $this->pmssWriteFile($dir.'/server_public.key', "pub\n");
 
         $this->pmssWithEnv([], function () use ($dir): void {
             [$priv, $pub] = \wgEnsureKeys($dir);
@@ -138,7 +135,7 @@ class WireGuardInstallerTest extends TestCase
 
     public function testEnsureKeysUsesEnvOverridesWhenGenerating(): void
     {
-        $dir = $this->createTempDir();
+        $dir = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
 
         $this->pmssWithEnv([
             'PMSS_WG_PRIVATE_KEY' => 'env-priv',
@@ -154,7 +151,7 @@ class WireGuardInstallerTest extends TestCase
 
     public function testEnsureKeysHandlesGenerationFailure(): void
     {
-        $dir = $this->createTempDir();
+        $dir = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
 
         $this->pmssWithEnv([
             'PMSS_WG_PRIVATE_KEY' => '',
@@ -169,7 +166,7 @@ class WireGuardInstallerTest extends TestCase
 
     public function testEnsureKeysReturnsEmptyWhenPersistFails(): void
     {
-        $dir = $this->createTempDir().'/missing';
+        $dir = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700).'/missing';
 
         $this->pmssWithEnv([
             'PMSS_WG_PRIVATE_KEY' => 'env-priv',
@@ -185,10 +182,9 @@ class WireGuardInstallerTest extends TestCase
 
     public function testBootstrapUserGuideSeedsTemplateWhenPublicKeyAlreadyRegistered(): void
     {
-        $homeBase = $this->createTempDir();
-        @mkdir($homeBase.'/alice', 0755, true);
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
         $publicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
-        file_put_contents($homeBase.'/alice/.wireguard-public-key', $publicKey."\n");
+        $this->pmssWriteFile($homeBase.'/alice/.wireguard-public-key', $publicKey."\n");
 
         $guide = \wgBuildClientGuide('server-pub', 'vpn.example.com', 51820);
 
@@ -207,10 +203,9 @@ class WireGuardInstallerTest extends TestCase
 
     public function testBootstrapUserGuideKeepsExistingReadyImportGuideForRegisteredKey(): void
     {
-        $homeBase = $this->createTempDir();
-        @mkdir($homeBase.'/alice', 0755, true);
-        file_put_contents($homeBase.'/alice/.wireguard-public-key', "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n");
-        file_put_contents($homeBase.'/alice/wireguard.txt', "[Interface]\nPrivateKey = keep-me\n");
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
+        $this->pmssWriteFile($homeBase.'/alice/.wireguard-public-key', "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n");
+        $this->pmssWriteFile($homeBase.'/alice/wireguard.txt', "[Interface]\nPrivateKey = keep-me\n");
 
         $guide = \wgBuildClientGuide('server-pub', 'vpn.example.com', 51820);
 
@@ -234,8 +229,8 @@ class WireGuardInstallerTest extends TestCase
 
     public function testBootstrapUserGuideGeneratesKeypairAndGuide(): void
     {
-        $homeBase = $this->createTempDir();
-        @mkdir($homeBase.'/alice', 0755, true);
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
+        $this->pmssEnsureDir($homeBase.'/alice');
 
         $guide = \wgBuildClientGuide('server-pub', 'vpn.example.com', 51820);
         $publicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
@@ -261,9 +256,8 @@ class WireGuardInstallerTest extends TestCase
 
     public function testBootstrapUserGuideSkipsExistingManualGuide(): void
     {
-        $homeBase = $this->createTempDir();
-        @mkdir($homeBase.'/alice', 0755, true);
-        file_put_contents($homeBase.'/alice/wireguard.txt', "[Interface]\nPrivateKey = manual-key\n");
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
+        $this->pmssWriteFile($homeBase.'/alice/wireguard.txt', "[Interface]\nPrivateKey = manual-key\n");
 
         $guide = \wgBuildClientGuide('server-pub', 'vpn.example.com', 51820);
 
@@ -281,14 +275,13 @@ class WireGuardInstallerTest extends TestCase
 
     public function testBootstrapUserGuideRepairsManagedGuideMissingPublicKeyFile(): void
     {
-        $homeBase = $this->createTempDir();
-        @mkdir($homeBase.'/alice', 0755, true);
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
 
         $guide = \wgApplyPrivateKeyToGuide(
             \wgBuildClientGuide('server-pub', 'vpn.example.com', 51820),
             'client-private'
         );
-        file_put_contents($homeBase.'/alice/wireguard.txt', $guide);
+        $this->pmssWriteFile($homeBase.'/alice/wireguard.txt', $guide);
 
         $publicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
         $this->pmssWithEnv([
@@ -304,12 +297,11 @@ class WireGuardInstallerTest extends TestCase
 
     public function testBootstrapUserGuideRestoresOriginalGuideWhenPublicKeyWriteFails(): void
     {
-        $homeBase = $this->createTempDir();
-        @mkdir($homeBase.'/alice', 0755, true);
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
 
         $guide = \wgBuildClientGuide('server-pub', 'vpn.example.com', 51820);
-        file_put_contents($homeBase.'/alice/wireguard.txt', $guide);
-        @mkdir($homeBase.'/alice/.wireguard-public-key', 0755, true);
+        $this->pmssWriteFile($homeBase.'/alice/wireguard.txt', $guide);
+        $this->pmssEnsureDir($homeBase.'/alice/.wireguard-public-key');
 
         $this->pmssWithEnv([
             'PMSS_WG_HOME_BASE'           => $homeBase,
@@ -356,12 +348,11 @@ class WireGuardInstallerTest extends TestCase
 
     public function testSyncUserGuideAddressesUpdatesExistingGuide(): void
     {
-        $homeBase = $this->createTempDir();
-        @mkdir($homeBase.'/alice', 0755, true);
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
 
         $guide = "[Interface]\nAddress = 10.90.90.X/32\n"
             ."[Peer]\nAllowedIPs = 10.90.90.X/32\n";
-        file_put_contents($homeBase.'/alice/wireguard.txt', $guide);
+        $this->pmssWriteFile($homeBase.'/alice/wireguard.txt', $guide);
 
         $this->pmssWithEnv([
             'PMSS_WG_HOME_BASE' => $homeBase,
@@ -377,8 +368,8 @@ class WireGuardInstallerTest extends TestCase
 
     public function testSyncUserGuideAddressesCreatesGuideFromFallback(): void
     {
-        $homeBase = $this->createTempDir();
-        @mkdir($homeBase.'/alice', 0755, true);
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
+        $this->pmssEnsureDir($homeBase.'/alice');
 
         $guide = "[Interface]\nAddress = 10.90.90.X/32\n"
             ."[Peer]\nAllowedIPs = 10.90.90.X/32\n";
@@ -422,11 +413,6 @@ class WireGuardInstallerTest extends TestCase
         $this->assertTrue(strpos($source, "require_once __DIR__.'/update.php';") === false, 'wireguard.php should not pull update.php just to get logmsg()');
         $this->assertTrue(strpos($source, "if (!function_exists('logmsg')) {") === false, 'wireguard.php should rely on require_once instead of logmsg guards');
         $this->assertTrue(strpos($source, "if (!function_exists('runStep')) {") === false, 'wireguard.php should rely on require_once instead of runStep guards');
-    }
-
-    private function createTempDir(): string
-    {
-        return $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
     }
 
 }

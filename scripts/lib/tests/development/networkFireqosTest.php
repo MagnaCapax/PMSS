@@ -5,6 +5,46 @@ require_once dirname(__DIR__, 2).'/network/fireqos.php';
 
 class NetworkFireqosTest extends TestCase
 {
+    private function fireqosThrottleFixture(bool $enabled, ?string $throttle = null): array
+    {
+        $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
+        $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
+        $this->pmssEnsureDir($homeDir.'/root');
+        if ($enabled) {
+            @file_put_contents($stateDir.'/root.enabled', '1');
+        }
+        if ($throttle !== null) {
+            @file_put_contents($homeDir.'/root/.throttle', $throttle);
+        }
+        return [$stateDir, $homeDir];
+    }
+
+    private function buildFireqosConfigWithThrottleFixture(
+        bool $enabled,
+        ?string $throttle,
+        array $networkConfig,
+        array $users = ['root'],
+        array $localnets = [],
+        string $templateContent = ''
+    ): string {
+        [$stateDir, $homeDir] = $this->fireqosThrottleFixture($enabled, $throttle);
+        $env = [
+            'PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir,
+            'PMSS_HOME_DIR' => $homeDir,
+        ];
+        if ($templateContent !== '') {
+            $templatePath = $this->pmssMakeTempPath('pmss-fireqos-template-', '.conf');
+            @file_put_contents($templatePath, $templateContent);
+            $env['PMSS_FIREQOS_TEMPLATE'] = $templatePath;
+        }
+
+        $config = '';
+        $this->pmssWithEnv($env, function () use (&$config, $networkConfig, $users, $localnets): void {
+            $config = \networkBuildFireqosConfig($networkConfig, $users, $localnets);
+        });
+        return $config;
+    }
+
     public function testApplyFireqosWritesConfigAndStartsCommand(): void
     {
         $configDir = $this->pmssMakeTempDir('pmss-fireqos-config-', 0700);
@@ -80,96 +120,46 @@ class NetworkFireqosTest extends TestCase
 
     public function testBuildFireqosConfigUsesUserThrottleCapWhenEnabled(): void
     {
-        $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
-        $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
-        $this->pmssEnsureDir($homeDir.'/root');
-        @file_put_contents($stateDir.'/root.enabled', '1');
-        @file_put_contents($homeDir.'/root/.throttle', '25');
-
-        $this->pmssWithEnv([
-            'PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir,
-            'PMSS_HOME_DIR' => $homeDir,
-        ], function (): void {
-            $config = \networkBuildFireqosConfig(
-                ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 100]],
-                ['root'],
-                []
-            );
-            $this->assertStringContainsString('class root ceil 25Mbit', $config);
-        });
+        $config = $this->buildFireqosConfigWithThrottleFixture(true, '25', ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 100]]);
+        $this->assertStringContainsString('class root ceil 25Mbit', $config);
     }
 
     public function testBuildFireqosConfigWithRepositoryTemplateKeepsLocalClassInsideInterfaceBlock(): void
     {
-        $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
-        $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
-        $templatePath = $this->pmssMakeTempPath('pmss-fireqos-template-', '.conf');
-        $this->pmssEnsureDir($homeDir.'/root');
-        @file_put_contents($stateDir.'/root.enabled', '1');
-        @file_put_contents($homeDir.'/root/.throttle', '25');
-        @file_put_contents($templatePath, $this->pmssReadRepoFile('etc/seedbox/config/template.fireqos'));
-
-        $this->pmssWithEnv([
-            'PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir,
-            'PMSS_HOME_DIR' => $homeDir,
-            'PMSS_FIREQOS_TEMPLATE' => $templatePath,
-        ], function (): void {
-            $config = \networkBuildFireqosConfig(
-                ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 100]],
-                ['root'],
-                ['10.0.0.0/8']
-            );
-            $interfacePos = strpos($config, 'interface $DEVICE outbound output rate $INTERFACE_SPEED');
-            $localPos = strpos($config, 'class local commit 10%');
-            $this->assertTrue($interfacePos !== false);
-            $this->assertTrue($localPos !== false);
-            $this->assertTrue($localPos > $interfacePos);
-            $this->assertEquals(1, substr_count($config, 'class local commit 10%'));
-            $this->assertStringContainsAllStrings(['class root ceil 25Mbit', 'match dst 10.0.0.0/8'], $config);
-        });
+        $config = $this->buildFireqosConfigWithThrottleFixture(
+            true,
+            '25',
+            ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 100]],
+            ['root'],
+            ['10.0.0.0/8'],
+            $this->pmssReadRepoFile('etc/seedbox/config/template.fireqos')
+        );
+        $interfacePos = strpos($config, 'interface $DEVICE outbound output rate $INTERFACE_SPEED');
+        $localPos = strpos($config, 'class local commit 10%');
+        $this->assertTrue($interfacePos !== false);
+        $this->assertTrue($localPos !== false);
+        $this->assertTrue($localPos > $interfacePos);
+        $this->assertEquals(1, substr_count($config, 'class local commit 10%'));
+        $this->assertStringContainsAllStrings(['class root ceil 25Mbit', 'match dst 10.0.0.0/8'], $config);
     }
 
     public function testBuildFireqosConfigFallsBackToDefaultCapWhenThrottleMissing(): void
     {
-        $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
-        $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
-        $this->pmssEnsureDir($homeDir.'/root');
-        @file_put_contents($stateDir.'/root.enabled', '1');
-
-        $this->pmssWithEnv([
-            'PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir,
-            'PMSS_HOME_DIR' => $homeDir,
-        ], function (): void {
-            $config = \networkBuildFireqosConfig(
-                ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 90]],
-                ['root'],
-                []
-            );
-            $this->assertStringContainsString('class root ceil 90Mbit', $config);
-        });
+        $config = $this->buildFireqosConfigWithThrottleFixture(true, null, ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 90]]);
+        $this->assertStringContainsString('class root ceil 90Mbit', $config);
     }
 
     public function testBuildFireqosConfigSkipsCapWhenNotEnabled(): void
     {
-        $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
-        $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
-        $templatePath = $this->pmssMakeTempPath('fireqos-template-', '.conf');
-        $this->pmssEnsureDir($homeDir.'/root');
-        @file_put_contents($homeDir.'/root/.throttle', '10');
-        @file_put_contents($templatePath, "interface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n");
-
-        $this->pmssWithEnv([
-            'PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir,
-            'PMSS_HOME_DIR' => $homeDir,
-            'PMSS_FIREQOS_TEMPLATE' => $templatePath,
-        ], function (): void {
-            $config = \networkBuildFireqosConfig(
-                ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 80]],
-                ['root'],
-                []
-            );
-            $this->assertStringNotContainsString('ceil', $config);
-        });
+        $config = $this->buildFireqosConfigWithThrottleFixture(
+            false,
+            '10',
+            ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 80]],
+            ['root'],
+            [],
+            "interface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n"
+        );
+        $this->assertStringNotContainsString('ceil', $config);
     }
 
     public function testBuildFireqosConfigRejectsInvalidUsernamesBeforeUidLookup(): void

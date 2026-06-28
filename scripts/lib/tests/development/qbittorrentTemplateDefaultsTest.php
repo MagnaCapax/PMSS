@@ -7,21 +7,21 @@ class QbittorrentTemplateDefaultsTest extends TestCase
 {
     public function testTemplatePinsSharedConnectionLimits(): void
     {
-        $template = $this->loadTemplate();
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.qbittorrent.conf');
 
         $this->assertStringContainsAllStrings(["Session\\MaxConnections=300\n", "Session\\MaxConnectionsPerTorrent=75\n", "Session\\MaxUploads=20\n", "Session\\MaxUploadsPerTorrent=4\n", "Bittorrent\\MaxConnecs=300\n", "Bittorrent\\MaxConnecsPerTorrent=75\n"], $template);
     }
 
     public function testTemplatePinsSharedDiskCacheDefaults(): void
     {
-        $template = $this->loadTemplate();
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.qbittorrent.conf');
 
         $this->assertStringContainsAllStrings(["Session\\DiskCacheSize=128\n", "Session\\DiskCacheTTL=120\n", "Downloads\\DiskWriteCacheSize=128\n", "Downloads\\DiskWriteCacheTTL=120\n", "Session\\Preallocation=true\n", "Downloads\\PreAllocation=true\n"], $template);
     }
 
     public function testTemplateUsesPosixDiskIoAndLimitedAsyncThreads(): void
     {
-        $template = $this->loadTemplate();
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.qbittorrent.conf');
 
         $this->assertStringContainsString("Session\\AsyncIOThreadsCount=4\n", $template);
         $this->assertStringContainsString("Session\\DiskIOType=Posix\n", $template);
@@ -29,20 +29,16 @@ class QbittorrentTemplateDefaultsTest extends TestCase
 
     public function testTemplatePinsSeedingAlgorithms(): void
     {
-        $template = $this->loadTemplate();
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.qbittorrent.conf');
 
         $this->assertStringContainsAllStrings(["Session\\uTPMixedMode=TCP\n", "Session\\ChokingAlgorithm=FixedSlots\n", "Session\\SeedChokingAlgorithm=FastestUpload\n"], $template);
     }
 
     public function testTemplatePinsSendBufferDefaults(): void
     {
-        $template = $this->loadTemplate();
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.qbittorrent.conf');
 
         $this->assertStringContainsAllStrings(["Session\\SendBufferWatermark=1024\n", "Session\\SendBufferLowWatermark=256\n", "Session\\SendBufferWatermarkFactor=150\n"], $template);
     }
 
-    private function loadTemplate(): string
-    {
-        return $this->pmssReadRepoFile('etc/seedbox/config/template.qbittorrent.conf');
-    }
 }

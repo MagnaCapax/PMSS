@@ -201,6 +201,30 @@ function pmssSeedboxSystemServiceSpecs(): array
 }
 
 /**
+ * Directories where PMSS may remove stale Exim queue files after purging exim4.
+ *
+ * @return string[]
+ */
+function pmssEximSpoolCleanupDirectories(): array
+{
+    return ['/var/spool/exim4/input', '/var/spool/exim4/msglog', '/var/spool/exim4/db'];
+}
+
+/**
+ * Build the destructive stale-spool cleanup command only for exact allowlist hits.
+ */
+function pmssEximSpoolCleanupCommand(string $dir): ?string
+{
+    $dir = rtrim($dir, '/');
+    $allowed = array_fill_keys(pmssEximSpoolCleanupDirectories(), true);
+    if (!isset($allowed[$dir]) || pmssFilesystemPathHasNulByte($dir)) {
+        return null;
+    }
+
+    return 'find '.escapeshellarg($dir).' -xdev -type f -delete 2>/dev/null || true';
+}
+
+/**
  * Stop/disable known risky system-wide services.
  *
  * Note: per-user instances are started via PMSS cron/util scripts and are
@@ -218,8 +242,13 @@ function pmssStopDisableMaskSeedboxSystemServices(): void
     // so this flow keeps the host converged back to a no-exim state.
     // Deletion is intentionally limited to known exim4 spool directories
     // and uses one command per directory for predictable logging/retries.
-    foreach (['/var/spool/exim4/input', '/var/spool/exim4/msglog', '/var/spool/exim4/db'] as $dir) {
-        runStep('Purging stale exim4 spool files in '.$dir, 'find '.escapeshellarg($dir).' -xdev -type f -delete 2>/dev/null || true');
+    foreach (pmssEximSpoolCleanupDirectories() as $dir) {
+        $command = pmssEximSpoolCleanupCommand($dir);
+        if ($command === null) {
+            logMessage('[WARN] Refusing unsafe exim4 spool cleanup path: '.$dir);
+            continue;
+        }
+        runStep('Purging stale exim4 spool files in '.$dir, $command);
     }
 }
 

@@ -160,10 +160,10 @@ class LighttpdUserFileWriteTest extends TestCase
 
     public function testCheckUserHtpasswdUsesSafeAppendHelper(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/util/checkUserHtpasswd.php');
-
-        $this->assertStringContainsString('pmssAppendUserFile(', $src);
-        $this->assertStringContainsString('Unable to append legacy credential to per-user htpasswd', $src);
-        $this->assertFalse(strpos($src, 'file_put_contents($userHtpasswd') !== false);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'scripts/util/checkUserHtpasswd.php',
+            ['pmssAppendUserFile(', 'Unable to append legacy credential to per-user htpasswd'],
+            ['file_put_contents($userHtpasswd']
+        );
     }
 }

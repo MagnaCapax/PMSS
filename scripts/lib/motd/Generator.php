@@ -15,14 +15,12 @@ require_once __DIR__.'/../version.php';
 
 class Motd
 {
-    private const MOTD_PLACEHOLDERS = [
-        '%HOSTNAME%' => 'host', '%SERVER_IP%' => 'ip', '%SERVER_CPU%' => 'cpu', '%SERVER_RAM%' => 'ram',
-        '%SERVER_STORAGE%' => 'storage', '%PMSS_VERSION%' => 'pmssVersion', '%UPDATE_DATE%' => 'updateDate', '%APT_LAST_UPDATE%' => 'aptLastUpdate',
-        '%UPTIME%' => 'uptime', '%KERNEL_VERSION%' => 'kernel', '%NETWORK_SPEED%' => 'netSpeed', '%WIREGUARD_STATUS%' => 'wgStatus', '%OPENVPN_STATUS%' => 'ovpnStatus', '%DISTRO%' => 'distro',
-    ];
-    private const MOTD_COLOR_CODES = [
-        '%HOSTNAME%' => '1;36', '%SERVER_IP%' => '32', '%SERVER_CPU%' => '37', '%SERVER_RAM%' => '36', '%SERVER_STORAGE%' => '35',
-        '%PMSS_VERSION%' => '1;34', '%KERNEL_VERSION%' => '34', '%DISTRO%' => '1;35',
+    /** Placeholder catalog: template token => model key plus optional ANSI color. */
+    private const MOTD_FIELDS = [
+        '%HOSTNAME%' => ['host', '1;36'], '%SERVER_IP%' => ['ip', '32'], '%SERVER_CPU%' => ['cpu', '37'], '%SERVER_RAM%' => ['ram', '36'],
+        '%SERVER_STORAGE%' => ['storage', '35'], '%PMSS_VERSION%' => ['pmssVersion', '1;34'], '%UPDATE_DATE%' => ['updateDate'], '%APT_LAST_UPDATE%' => ['aptLastUpdate'],
+        '%UPTIME%' => ['uptime'], '%KERNEL_VERSION%' => ['kernel', '34'], '%NETWORK_SPEED%' => ['netSpeed'], '%WIREGUARD_STATUS%' => ['wgStatus'],
+        '%OPENVPN_STATUS%' => ['ovpnStatus'], '%DISTRO%' => ['distro', '1;35'],
     ];
 
     /**
@@ -103,15 +101,12 @@ class Motd
     public static function renderMotdTemplate(string $template, array $model, bool $colorEnabled): string
     {
         $repl = [];
-        foreach (self::MOTD_PLACEHOLDERS as $placeholder => $key) {
-            $repl[$placeholder] = isset($model[$key]) ? (string) $model[$key] : '';
+        foreach (self::MOTD_FIELDS as $placeholder => $field) {
+            $value = isset($model[$field[0]]) ? (string) $model[$field[0]] : '';
+            $repl[$placeholder] = $colorEnabled && isset($field[1]) ? self::c($value, $field[1]) : $value;
         }
 
-        // Light color accents for readability (opt-out via PMSS_MOTD_COLOR=0)
         if ($colorEnabled) {
-            foreach (self::MOTD_COLOR_CODES as $placeholder => $code) {
-                $repl[$placeholder] = self::c($repl[$placeholder], $code);
-            }
             $netSpeed = trim($repl['%NETWORK_SPEED%']);
             $repl['%NETWORK_SPEED%'] = ($netSpeed !== '' && !in_array(strtolower($netSpeed), ['unknown', 'n/a'], true))
                 ? self::c($netSpeed, '32') // green when detected
@@ -258,25 +253,22 @@ class Motd
     {
         $path = pmssResolvePathFromEnv('PMSS_HEALTH_LOG_PATH', '/var/log/pmss/storage-health.jsonl');
         if (!is_file($path)) return '';
-        $raidWarn = null; $nvmeCrit=[]; $lastSmart=[]; $raidPerf=null;
-        pmssJsonLineFileEach($path, static function (array $j) use (&$raidWarn, &$nvmeCrit, &$lastSmart, &$raidPerf): void {
+        $raidWarnLine = ''; $raidPerfLine = ''; $nvmeCrit = []; $lastSmart = [];
+        pmssJsonLineFileEach($path, static function (array $j) use (&$raidWarnLine, &$raidPerfLine, &$nvmeCrit, &$lastSmart): void {
             $k = $j['kind'] ?? '';
             if ($k==='smart') { $lastSmart[$j['device'] ?? '']=$j; }
             elseif ($k==='raid') {
-                if (($j['severity'] ?? 'ok')!=='ok') $raidWarn=$j;
+                if (($j['severity'] ?? 'ok')!=='ok') {
+                    $flags = implode(',', (array) ($j['flags'] ?? []));
+                    $raidWarnLine = 'RAID '.($j['array'] ?? 'md').': '.($flags !== '' ? $flags : ($j['state'] ?? 'warn'));
+                }
                 if (in_array('rebuild_in_progress', (array)($j['flags'] ?? []), true)) {
-                    $raidPerf = 'RAID '.($j['array'] ?? 'md').' resync in progress';
+                    $raidPerfLine = 'Performance limited: RAID '.($j['array'] ?? 'md').' resync in progress';
                 }
             }
             elseif ($k==='nvme') { if ((int)($j['metrics']['critical_warnings'] ?? 0) > 0) $nvmeCrit[] = $j['device'] ?? 'nvme'; }
         });
-        $lines=[];
-        if ($raidWarn) {
-            $arr=$raidWarn['array'] ?? 'md'; $flags=implode(',',(array)($raidWarn['flags']??[]));
-            $lines[] = "RAID $arr: ".($flags!==''?$flags:($raidWarn['state']??'warn'));
-        }
-        if ($raidPerf) $lines[] = 'Performance limited: '.$raidPerf;
-        if (!empty($nvmeCrit)) $lines[] = 'NVMe critical warning: '.implode(', ', array_unique($nvmeCrit));
+        $lines = pmssNonEmptyStrings([$raidWarnLine, $raidPerfLine, empty($nvmeCrit) ? '' : 'NVMe critical warning: '.implode(', ', array_unique($nvmeCrit))]);
         foreach ($lastSmart as $dev=>$s) {
             if (in_array('udma_crc_increase',(array)($s['flags']??[]),true)) $lines[] = 'SATA UDMA CRC increased: '.$dev;
         }

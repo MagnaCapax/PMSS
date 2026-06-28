@@ -120,17 +120,14 @@ class NetworkHelpersTest extends TestCase
 
     public function testFallbackRenderValidatesRulesBeforeFlush(): void
     {
-        $this->assertSame(
-            [
-                '-A INPUT -i eth0 -j ACCEPT',
-                '-t nat -A POSTROUTING -o eth0 -j MASQUERADE',
-            ],
-            \networkIptablesFallbackRenderedCommands(
-                ['-A INPUT -i ##IFACE## -j ACCEPT'],
-                ['-A POSTROUTING -o ##IFACE## -j MASQUERADE'],
-                ['##IFACE##' => 'eth0']
-            )
+        $rendered = \networkIptablesRenderCommandSets(
+            ['-A INPUT -i ##IFACE## -j ACCEPT'],
+            ['-A POSTROUTING -o ##IFACE## -j MASQUERADE'],
+            ['##IFACE##' => 'eth0']
         );
+
+        $this->assertSame(['-A INPUT -i eth0 -j ACCEPT'], $rendered['filter']);
+        $this->assertSame(['-A POSTROUTING -o eth0 -j MASQUERADE'], $rendered['nat']);
     }
 
     public function testFallbackRenderRejectsUnsafeInputsBeforeFlush(): void
@@ -151,7 +148,7 @@ class NetworkHelpersTest extends TestCase
         ] as [$filterCommands, $natCommands, $replacements, $label]) {
             $this->assertSame(
                 null,
-                \networkIptablesFallbackRenderedCommands($filterCommands, $natCommands, $replacements),
+                \networkIptablesRenderCommandSets($filterCommands, $natCommands, $replacements),
                 'expected fallback render rejection for '.$label
             );
         }

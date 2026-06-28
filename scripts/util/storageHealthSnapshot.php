@@ -24,14 +24,12 @@ function pmssStorageHealthSnapshotMain(array $argv): int
     $logDir = dirname($logPath);
     $logDirError = null;
     if (!pmssLogWriteDirectoryPrepare($logDir, 0755, $logDirError)) {
-        fwrite(STDERR, $logDirError === 'create'
+        return pmssCliReturnWithStderr($logDirError === 'create'
             ? "Failed to create storage health log directory {$logDir}\n"
             : "Refusing unsafe storage health log path {$logPath}\n");
-        return 1;
     }
     if (!pmssLogWritePathIsSafe($logPath)) {
-        fwrite(STDERR, "Refusing unsafe storage health log path {$logPath}\n");
-        return 1;
+        return pmssCliReturnWithStderr("Refusing unsafe storage health log path {$logPath}\n");
     }
 
     $timestamp = date('c');
@@ -50,8 +48,7 @@ function pmssStorageHealthSnapshotMain(array $argv): int
     }
     foreach ($snapshotEntries as $entry) {
         if (!pmssJsonLineAppend($logPath, $entry)) {
-            fwrite(STDERR, "Failed to write storage health snapshot to {$logPath}\n");
-            return 1;
+            return pmssCliReturnWithStderr("Failed to write storage health snapshot to {$logPath}\n");
         }
     }
 

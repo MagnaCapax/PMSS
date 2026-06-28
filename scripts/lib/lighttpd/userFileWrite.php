@@ -184,7 +184,7 @@ function pmssWriteUserFile(string $path, string $content, string $owner, int $mo
 /** Best-effort immutable toggle for managed root-owned files. */
 function pmssManagedFileImmutableSet(string $path, bool $enable): void
 {
-    if (!is_file($path) || is_link($path)) {
+    if (!pmssUserFilePathIsSafe($path) || !is_file($path) || is_link($path)) {
         return;
     }
 
@@ -202,20 +202,60 @@ function pmssManagedFileImmutableSet(string $path, bool $enable): void
     $chattr === '' || @exec($chattr.' '.($enable ? '+i' : '-i').' '.escapeshellarg($path).' 2>/dev/null');
 }
 
+/**
+ * Normalize one serialized-target tuple before any shell-adjacent toggles run.
+ *
+ * @return array{0:string,1:string,2:int,3:bool}|null
+ */
+function pmssManagedSerializedTargetNormalize($target): ?array
+{
+    if (!is_array($target) || count($target) < 4) {
+        return null;
+    }
+
+    $path = $target[0] ?? null;
+    $group = $target[1] ?? null;
+    $mode = $target[2] ?? null;
+    if (!is_string($path)
+        || !is_string($group)
+        || (!is_int($mode) && !is_string($mode))
+        || !pmssUserFilePathIsSafe($path)
+    ) {
+        return null;
+    }
+
+    return [$path, $group, (int) $mode, (bool) ($target[3] ?? false)];
+}
+
+/** Return a printable target label for write failure callbacks. */
+function pmssManagedSerializedTargetFailurePath($target): string
+{
+    $path = is_array($target) ? ($target[0] ?? null) : null;
+    return is_string($path) && strpos($path, "\0") === false ? $path : '(invalid target)';
+}
+
 /** Write one serialized payload to each managed target while preserving partial success. */
 function pmssManagedSerializedTargetsWrite(string $serialized, array $targets, callable $failureLogger): bool
 {
     $allWritesSucceeded = true;
-    foreach ($targets as list($path, $group, $mode, $immutable)) {
-        (bool) $immutable && pmssManagedFileImmutableSet((string) $path, false);
+    foreach ($targets as $target) {
+        $normalized = pmssManagedSerializedTargetNormalize($target);
+        if ($normalized === null) {
+            $allWritesSucceeded = false;
+            $failureLogger(pmssManagedSerializedTargetFailurePath($target));
+            continue;
+        }
+
+        list($path, $group, $mode, $immutable) = $normalized;
+        $immutable && pmssManagedFileImmutableSet($path, false);
         try {
-            $ok = pmssWriteManagedFile((string) $path, $serialized, 'root', (string) $group, (int) $mode);
+            $ok = pmssWriteManagedFile($path, $serialized, 'root', $group, $mode);
         } finally {
-            (bool) $immutable && pmssManagedFileImmutableSet((string) $path, true);
+            $immutable && pmssManagedFileImmutableSet($path, true);
         }
         if (!$ok) {
             $allWritesSucceeded = false;
-            $failureLogger((string) $path);
+            $failureLogger($path);
         }
     }
     return $allWritesSucceeded;

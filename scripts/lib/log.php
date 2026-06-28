@@ -106,9 +106,19 @@ function pmssJsonLineAppend(string $path, array $payload): bool
         && @file_put_contents($path, $encoded.PHP_EOL, FILE_APPEND | LOCK_EX) !== false;
 }
 
+/** Validate a JSON Lines read target before streaming structured log data. */
+function pmssJsonLineReadPathIsSafe(string $path): bool
+{
+    return pmssLogWritePathIsSafe($path) && is_file($path) && !is_link($path);
+}
+
 /** Stream decodable JSON Lines entries to a caller-owned handler. */
 function pmssJsonLineFileEach(string $path, callable $handler): bool
 {
+    if (!pmssJsonLineReadPathIsSafe($path)) {
+        return false;
+    }
+
     $handle = @fopen($path, 'r');
     if ($handle === false) {
         return false;

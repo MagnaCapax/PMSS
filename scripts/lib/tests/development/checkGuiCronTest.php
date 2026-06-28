@@ -33,11 +33,9 @@ class CheckGuiCronTest extends TestCase
     public function testManagedUserNameNormalizeRejectsUnsafeEntries(): void
     {
         $this->assertSame('dummy', \pmssCheckGuiManagedUserNameNormalize('dummy'));
-        $this->assertSame(null, \pmssCheckGuiManagedUserNameNormalize(''));
-        $this->assertSame(null, \pmssCheckGuiManagedUserNameNormalize('Dummy'));
-        $this->assertSame(null, \pmssCheckGuiManagedUserNameNormalize('../dummy'));
-        $this->assertSame(null, \pmssCheckGuiManagedUserNameNormalize('Fatal error: boom'));
-        $this->assertSame(null, \pmssCheckGuiManagedUserNameNormalize(array('dummy')));
+        foreach (['', 'Dummy', '../dummy', 'Fatal error: boom', array('dummy')] as $entry) {
+            $this->assertSame(null, \pmssCheckGuiManagedUserNameNormalize($entry), 'entry '.var_export($entry, true));
+        }
     }
 
     public function testEnsureUserDirectoryCreatesSafeDirectory(): void

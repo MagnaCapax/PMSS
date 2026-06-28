@@ -10,23 +10,8 @@
  *
  * Payload is a simple associative array. Unknown keys are preserved.
  *
- * Known keys (documented for operators; not a strict schema):
- * - ramMiB (int)       Account RAM in MiB. (rTorrent RAM is derived elsewhere.)
- * - rtorrentPort (int) Assigned SCGI port for rTorrent.
- * - quota (int)        Disk quota in GiB.
- * - quotaBurst (int)   Burst quota in GiB (typically 125%).
- * - billingServiceId (int) 0 when missing; fallback reads /home/<user>/.billingServiceId
- *   then legacy /home/<user>/.billingId if root-owned.
- * - billingClientId (int) 0 when missing; fallback reads /home/<user>/.billingClientId if root-owned.
- * - trafficLimit (int) Always written as 0 (traffic caps live in runtime files).
- * - trafficCapMbit (int) Post-limit ceiling in Mbit (0/absent uses server default).
- * - suspended (bool)   Best-effort mirror of suspension state (marker remains www-disabled).
- * - dockerEnabled (bool) Rootless Docker enablement (default true unless the
- *   provisioner stores an explicit override).
- * - lighttpdEnabled (bool) Per-user lighttpd/php-cgi watchdog enablement
- *   (default true unless the operator stores an explicit override).
- * - CPUWeight/IOWeight/IOReadBW/... and ioCostQos/ioCostModel pass-through for
- *   cgroup resource controls.
+ * Known keys are documented for operators in the user-config CLI/resource
+ * helpers. Feature policy helpers are loaded below from userConfigPolicy.php.
  *
  * #TODO(Q4/2027): Remove legacy /etc/seedbox/runtime/users.json fallback.
  *
@@ -40,40 +25,6 @@ require_once __DIR__.'/UserValidator.php';
 require_once __DIR__.'/billingIds.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
-
-/**
- * Minimum RAM required for rootless Docker.
- */
-function pmssUserDockerMinRamMiB(): int
-{
-    return 245;
-}
-
-/** Convert stored feature-toggle values to a stable boolean. */
-function pmssUserConfigNormaliseToggleValue(array $payload, string $key, bool $default = true): bool
-{
-    if (!array_key_exists($key, $payload)) {
-        return $default;
-    }
-    $value = $payload[$key];
-
-    return is_string($value)
-        ? !pmssValueMatchesNormalized($value, ['false', '0', 'no', 'off', ''])
-        : (bool) $value;
-}
-
-/** Load one validated user's persisted payload for policy checks. */
-function pmssUserConfigResolvePayload(string $username, ?UserConfigStore &$store = null): ?array
-{
-    $username = pmssNormalizeUsername($username);
-    if (!UserValidator::isValidUsername($username)) {
-        return null;
-    }
-
-    $store = $store ?: new UserConfigStore();
-    $payload = $store->get($username);
-    return is_array($payload) ? $payload : [];
-}
 
 class UserConfigStore
 {
@@ -341,40 +292,4 @@ class UserConfigStore
     }
 }
 
-/**
- * Check whether rootless Docker should run for a user.
- */
-function pmssUserDockerEnabled(string $username, ?UserConfigStore $store = null): bool
-{
-    $username = pmssNormalizeUsername($username);
-    $payload = pmssUserConfigResolvePayload($username, $store);
-    if ($payload === null) {
-        return false;
-    }
-
-    if (!pmssUserConfigNormaliseToggleValue($payload, 'dockerEnabled')) {
-        return false;
-    }
-
-    $configuredRamMiB = isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) ? (int) $payload['ramMiB'] : 0;
-
-    $runtimeRamMiB = $store->resolveRamMiB($username);
-    $effectiveRamMiB = ($runtimeRamMiB > 0 && ($configuredRamMiB <= 0 || $runtimeRamMiB < $configuredRamMiB))
-        ? $runtimeRamMiB
-        : $configuredRamMiB;
-
-    return $effectiveRamMiB <= 0 || $effectiveRamMiB >= pmssUserDockerMinRamMiB();
-}
-
-/**
- * Check whether the per-user lighttpd/php-cgi web stack should run.
- */
-function pmssUserLighttpdEnabled(string $username, ?UserConfigStore $store = null): bool
-{
-    $payload = pmssUserConfigResolvePayload($username, $store);
-    if ($payload === null) {
-        return false;
-    }
-
-    return pmssUserConfigNormaliseToggleValue($payload, 'lighttpdEnabled');
-}
+require_once __DIR__.'/userConfigPolicy.php';

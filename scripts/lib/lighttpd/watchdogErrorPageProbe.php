@@ -12,20 +12,12 @@ if (!function_exists('pmssCommandPath') && is_file(__DIR__.'/../runtime.php')) {
 /** Return true when quota output shows either block or inode exhaustion. */
 function pmssLighttpdWatchdogQuotaOutputShowsExhaustion(string $output): bool
 {
-    if (trim($output) === '') {
-        return false;
-    }
-
     return preg_match('/^\s*\/\S+.*\*.*$/m', $output) === 1;
 }
 
 /** Parse the reported root inode-use percentage from `df -i` output. */
 function pmssLighttpdWatchdogParseDfInodeUsePercent(string $output): ?int
 {
-    if (trim($output) === '') {
-        return null;
-    }
-
     foreach (preg_split('/\r?\n/', trim($output)) as $line) {
         if (stripos($line, 'iused') !== false || stripos($line, 'filesystem') !== false) {
             continue;

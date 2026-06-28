@@ -9,13 +9,10 @@ final class StorageHealthSnapshotSmartCharacterizationTest extends TestCase
     public function testSnapshotSmartKeepsLegacyUdmaCrcHistoryCompatible(): void
     {
         $device = $this->pmssMakeReadableTempPath('pmss-smart-device-', 'dev-');
-        $stubDir = $this->pmssMakeExecutableStub('smartctl', implode("\n", [
-            '#!/bin/sh',
-            'cat <<\'EOF\'',
+        $stubDir = $this->pmssMakeLineOutputStub('smartctl', [
             'SMART overall-health self-assessment test result: PASSED',
             '199 UDMA_CRC_Error_Count    0x003e   200   200   000    Old_age   Always       -       4',
-            'EOF',
-        ])."\n", 'pmss-smart-bin-');
+        ], 'pmss-smart-bin-');
 
         $this->pmssWithPathPrefix($stubDir, function () use ($device): void {
             $entry = \pmssStorageHealthSnapshotSmart(

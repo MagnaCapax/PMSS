@@ -30,6 +30,13 @@ class rtorrentWatchdogDecisionTest extends TestCase
         $this->assertFalse(file_exists($this->wedgeStatePath()), $label.' must not advance queue wedge count');
     }
 
+    private function writeWatchdogStateFiles(array $state): void
+    {
+        foreach ($state as $path) {
+            file_put_contents($path, '1');
+        }
+    }
+
     public function testCronLogHonorsForceAndDebugFlags(): void
     {
         $this->assertSame('', $this->pmssCaptureStdout(static function (): void {
@@ -62,9 +69,7 @@ class rtorrentWatchdogDecisionTest extends TestCase
     public function testClearResolvedWatchdogStatePreservesExistingMarkerSemantics(): void
     {
         $state = \rtorrentProcessWatchdogStatePaths($this->tempDir, 'alice');
-        foreach ($state as $path) {
-            file_put_contents($path, '1');
-        }
+        $this->writeWatchdogStateFiles($state);
 
         \rtorrentProcessClearResolvedWatchdogState($state, true, false);
         $this->assertFalse(file_exists($state['missing']), 'missing marker clears once rtorrent is present');
@@ -73,9 +78,7 @@ class rtorrentWatchdogDecisionTest extends TestCase
             $this->assertFalse(file_exists($state[$key]), $key.' clears once start path has resolved');
         }
 
-        foreach ($state as $path) {
-            file_put_contents($path, '1');
-        }
+        $this->writeWatchdogStateFiles($state);
         \rtorrentProcessClearResolvedWatchdogState($state, false, false);
         $this->assertFalse(file_exists($state['missing']), 'missing marker clears when no executor remains');
         $this->assertFalse(file_exists($state['acceptQueueWedge']), 'queue wedge marker clears when rtorrent is gone');

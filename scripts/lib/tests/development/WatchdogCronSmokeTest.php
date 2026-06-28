@@ -53,13 +53,12 @@ class WatchdogCronSmokeTest extends TestCase
             'scripts/cron/checkDelugeInstances.php',
             'scripts/cron/checkQbittorrentInstances.php',
         ) as $entrypoint) {
-            $result = $this->pmssRunRepoPhpScriptCommand($entrypoint, array(), array(
+            $result = $this->pmssRunRepoPhpScriptCommand($entrypoint, array(), array_merge($this->pmssTestModeEnv(), array(
                 'PATH' => $this->binDir.':'.getenv('PATH'),
                 'PMSS_HOME_DIR' => $this->homeRoot,
                 'PMSS_LIGHTTPD_WATCHDOG_WEB_ROOT' => $this->pmssMakeTempDir('watchdog-cron-web-'),
                 'PMSS_TEST_LIST_USERS_COMMAND' => $this->listUsersScript,
-                'PMSS_TEST_MODE' => '1',
-            ));
+            )));
 
             $this->assertSame(0, $result['rc'], $entrypoint.' failed: '.$result['output']);
             $this->assertStringNotContainsString('Fatal error', $result['output'], $entrypoint.' emitted a PHP fatal');

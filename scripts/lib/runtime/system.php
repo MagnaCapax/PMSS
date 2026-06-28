@@ -37,6 +37,34 @@ function pmssCgroupMode(): string
 
 function pmssCgroupModeWithDefault(string $default): string { $mode = pmssCgroupMode(); return $mode === 'unknown' ? $default : $mode; }
 
+/**
+ * Parse the current process cgroup membership into normalized entries.
+ *
+ * @return array<int,array{hierarchy:string,controllers:array<int,string>,path:string}>
+ */
+function pmssCgroupSelfEntries(string $path = '/proc/self/cgroup'): array
+{
+    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $entries = [];
+    foreach (is_array($lines) ? $lines : [] as $line) {
+        $parts = explode(':', (string) $line, 3);
+        if (count($parts) !== 3 || trim($parts[2]) === '') continue;
+        $entries[] = ['hierarchy' => trim($parts[0]), 'controllers' => $parts[1] === '' ? [] : array_values(array_filter(array_map('trim', explode(',', $parts[1])), 'strlen')), 'path' => '/'.ltrim(trim($parts[2]), '/')];
+    }
+    return $entries;
+}
+
+/** Resolve the preferred current process cgroup path for diagnostics. */
+function pmssCgroupSelfPath(string $path = '/proc/self/cgroup'): string
+{
+    $fallback = '';
+    foreach (pmssCgroupSelfEntries($path) as $entry) {
+        $fallback = $entry['path'];
+        if ($entry['hierarchy'] === '0') return $entry['path'];
+    }
+    return $fallback;
+}
+
 function requireRoot(): void
 {
     if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {

@@ -54,21 +54,21 @@ class SupportCommandTest extends TestCase
     {
         file_put_contents($this->homeRoot.'/'.$this->user.'/.billingServiceId', "42\n");
 
-        $this->assertEquals(42, \pmssSupportBillingServiceIdRead($this->homeRoot.'/'.$this->user));
+        $this->assertEquals(42, \pmssUserBillingServiceIdRead($this->homeRoot.'/'.$this->user));
     }
 
     public function testBillingServiceIdReadFallsBackToLegacyName(): void
     {
         file_put_contents($this->homeRoot.'/'.$this->user.'/.billingId', "43\n");
 
-        $this->assertEquals(43, \pmssSupportBillingServiceIdRead($this->homeRoot.'/'.$this->user));
+        $this->assertEquals(43, \pmssUserBillingServiceIdRead($this->homeRoot.'/'.$this->user));
     }
 
     public function testBillingClientIdReadAcceptsPositiveInteger(): void
     {
         file_put_contents($this->homeRoot.'/'.$this->user.'/.billingClientId', "99\n");
 
-        $this->assertEquals(99, \pmssSupportBillingClientIdRead($this->homeRoot.'/'.$this->user));
+        $this->assertEquals(99, \pmssUserBillingClientIdRead($this->homeRoot.'/'.$this->user));
     }
 
     public function testBillingServiceIdReadRejectsSymlink(): void
@@ -77,7 +77,7 @@ class SupportCommandTest extends TestCase
         file_put_contents($target, "41\n");
         symlink($target, $this->homeRoot.'/'.$this->user.'/.billingServiceId');
 
-        $this->assertEquals(0, \pmssSupportBillingServiceIdRead($this->homeRoot.'/'.$this->user));
+        $this->assertEquals(0, \pmssUserBillingServiceIdRead($this->homeRoot.'/'.$this->user));
     }
 
     public function testConfigReadHonorsExplicitConfigPathOverride(): void
@@ -146,6 +146,19 @@ class SupportCommandTest extends TestCase
             ['pgrep', '-a', '-u', $this->user, '-x', 'deluge-web'],
             ['pgrep', '-a', '-u', $this->user, '-x', 'qbittorrent-nox'],
         ], $outputs);
+    }
+
+    public function testDiagnosticsBuildCarriesBillingIdentifiers(): void
+    {
+        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingServiceId', "42\n");
+        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingClientId', "99\n");
+
+        $diagnostics = \pmssSupportDiagnosticsBuild('Need help', $this->pmssCommandEchoRunner());
+
+        $this->assertSame(42, $diagnostics['billingServiceId']);
+        $this->assertSame(99, $diagnostics['billingClientId']);
+        $this->assertStringContainsString('billing_service_id=42', $diagnostics['body']);
+        $this->assertStringContainsString('billing_client_id=99', $diagnostics['body']);
     }
 
     public function testSnapshotWriteCreatesPrivateFile(): void

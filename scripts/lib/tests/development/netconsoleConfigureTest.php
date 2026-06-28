@@ -53,9 +53,7 @@ class NetconsoleConfigureTest extends TestCase
 
         $this->assertTrue(is_file($dir.'/modprobe.d/netconsole.conf'), 'expected modprobe config');
         $this->assertTrue(is_file($dir.'/modules-load.d/pmss-netconsole.conf'), 'expected modules-load config');
-        $descriptions = array_map(static function (array $call): string {
-            return $call[0];
-        }, $calls);
+        $descriptions = array_column($calls, 0);
         foreach ($calls as $call) {
             if (strpos($call[0], 'netconsole target') === false) {
                 continue;
@@ -118,5 +116,4 @@ class NetconsoleConfigureTest extends TestCase
             'PMSS_NETCONSOLE_MODULE_LOADED' => '',
         ];
     }
-
 }

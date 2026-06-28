@@ -13,12 +13,11 @@ class TempMountNoexecTest extends TestCase
 
     private function runNoexecHardening(string $fstab, string $mounts, ?string $flag = '1'): array
     {
-        $messages = [];
-        $logger = $this->pmssMakeArrayLogger($messages);
-        putenv($flag === null ? 'PMSS_HARDEN_TMP_NOEXEC' : 'PMSS_HARDEN_TMP_NOEXEC='.$flag);
-        putenv('PMSS_DRY_RUN=1');
-        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
-        return $messages;
+        return $this->pmssArrayLoggerMessages(function (callable $logger) use ($fstab, $mounts, $flag): void {
+            putenv($flag === null ? 'PMSS_HARDEN_TMP_NOEXEC' : 'PMSS_HARDEN_TMP_NOEXEC='.$flag);
+            putenv('PMSS_DRY_RUN=1');
+            \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
+        });
     }
 
     public function testSkipsWhenFlagDisabled(): void
@@ -208,9 +207,7 @@ class TempMountNoexecTest extends TestCase
         );
 
         $this->pmssResetRuntimeProfile();
-        putenv('PMSS_HARDEN_TMP_NOEXEC=1');
-        putenv('PMSS_DRY_RUN=1');
-        \pmssConfigureTempMountNoexec(null, $fstab, $mounts);
+        $this->runNoexecHardening($fstab, $mounts);
 
         $this->assertEquals([
             "mount '-o' 'remount,noexec,nosuid,nodev' '/tmp'",

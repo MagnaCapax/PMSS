@@ -9,7 +9,7 @@ class WireGuardPeersStatusTest extends TestCase
     {
         $configDir = $this->pmssMakeNamedTempDir('pmss-wireguard-status-', 0700);
         $configPath = $configDir.'/wg0.conf';
-        file_put_contents(
+        $this->pmssWriteFile(
             $configPath,
             "[Interface]\n"
             ."Address = 10.90.90.1/24\n"
@@ -50,19 +50,11 @@ class WireGuardPeersStatusTest extends TestCase
 
     private function runScript(string $configDir, string $dumpOutput): string
     {
-        $binDir = $this->pmssMakeNamedTempDir('pmss-wireguard-status-', 0700).'/bin';
+        $lines = $dumpOutput === '' ? [] : explode("\n", rtrim($dumpOutput, "\n"));
+        $binDir = $this->pmssMakeLineOutputStub('wg', $lines, 'pmss-wireguard-status-');
 
-        $wgScript = "#!/bin/sh\n";
-        if ($dumpOutput !== '') {
-            foreach (explode("\n", rtrim($dumpOutput, "\n")) as $line) {
-                $wgScript .= "printf '%s\\n' '".str_replace("'", "'\\''", $line)."'\n";
-            }
-        }
-        $wgScript .= "exit 0\n";
-        $this->pmssWriteExecutableFiles($binDir, ['wg' => $wgScript]);
-
-        return $this->pmssRunPhpScript(
-            dirname(__DIR__, 3).'/wireguardPeersStatus.php',
+        return $this->pmssRunRepoPhpScript(
+            'scripts/wireguardPeersStatus.php',
             [],
             $this->pmssPathPrefixedEnvironment($binDir, [
                 'PMSS_WG_CONFIG_DIR' => $configDir,

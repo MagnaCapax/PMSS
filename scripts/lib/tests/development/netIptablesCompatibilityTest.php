@@ -16,12 +16,21 @@ class NetIptablesCompatibilityTest extends TestCase
 
     public function testLegacyLibraryDelegatesToCanonicalNetworkHelpers(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/net/iptables.php');
-
-        $this->assertStringContainsAllStrings(["require_once __DIR__.'/../network/iptables.php';", 'networkRunIptables($rule);', 'return networkParseMonitoringCommands($raw);', 'return networkApplyIptablesAtomically($filterCommands, $natCommands);', 'networkApplyIptablesFallback($filterCommands, $natCommands, $replacements);'], $source);
-        $this->pmssAssertStringNotContainsString("if (!function_exists('iptablesRun')) {", $source, 'Legacy iptables shim should rely on require_once instead of project-function guards');
-        $this->pmssAssertStringNotContainsString("if (!function_exists('iptablesParseMonitoring')) {", $source, 'Legacy iptables shim should rely on require_once instead of project-function guards');
-        $this->pmssAssertStringNotContainsString("if (!function_exists('iptablesApplyAtomically')) {", $source, 'Legacy iptables shim should rely on require_once instead of project-function guards');
-        $this->pmssAssertStringNotContainsString("if (!function_exists('iptablesApplyFallback')) {", $source, 'Legacy iptables shim should rely on require_once instead of project-function guards');
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'scripts/lib/net/iptables.php',
+            [
+                "require_once __DIR__.'/../network/iptables.php';",
+                'networkRunIptables($rule);',
+                'return networkParseMonitoringCommands($raw);',
+                'return networkApplyIptablesAtomically($filterCommands, $natCommands);',
+                'networkApplyIptablesFallback($filterCommands, $natCommands, $replacements);',
+            ],
+            [
+                "if (!function_exists('iptablesRun')) {" => 'Legacy iptables shim should rely on require_once instead of project-function guards',
+                "if (!function_exists('iptablesParseMonitoring')) {" => 'Legacy iptables shim should rely on require_once instead of project-function guards',
+                "if (!function_exists('iptablesApplyAtomically')) {" => 'Legacy iptables shim should rely on require_once instead of project-function guards',
+                "if (!function_exists('iptablesApplyFallback')) {" => 'Legacy iptables shim should rely on require_once instead of project-function guards',
+            ]
+        );
     }
 }

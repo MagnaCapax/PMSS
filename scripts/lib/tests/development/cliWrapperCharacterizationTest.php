@@ -27,15 +27,14 @@ final class CliWrapperCharacterizationTest extends TestCase
 
     public function testUserDockerKeepsSharedStopAndSocketGuardsInline(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/util/userDocker.php',
-            [
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/util/userDocker.php' => ['required' => [
                 '$dockerStopCmd =',
                 '$socketPresent = file_exists($dockerSock);',
                 'Docker socket present for {$user}, but process check failed; skipping start',
                 'Docker start requested for {$user} via dockerd-rootless.sh',
-            ]
-        );
+            ]],
+        ]);
     }
 
     public function testArgvCliEntrypointsUseSharedRuntimeHelper(): void

@@ -129,7 +129,7 @@ foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (str
         continue;
     }
 
-    if (@file_put_contents($cgPath, (string) $w) === false) {
+    if (!pmssCgroupDirectIntegerFileWrite($cgPath, $w, 1, PMSS_BFQ_KERNEL_MAX)) {
         syslog(LOG_WARNING, "write failed $user uid=$uid desired=$w");
         $errors++;
         continue;

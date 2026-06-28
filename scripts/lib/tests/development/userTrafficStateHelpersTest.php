@@ -41,9 +41,7 @@ class UserTrafficStateHelpersTest extends TestCase
             ['valid', serialize(['raw' => ['month' => 1536.4]]), 1536],
         ] as [$name, $payload, $expected]) {
             $path = $this->tempDir.'/traffic-data-'.$name;
-            if ($payload !== null) {
-                file_put_contents($path, $payload);
-            }
+            $this->writeOptionalFixture($path, $payload);
 
             $this->assertEquals($expected, \pmssReadUserTrafficMonth($path), 'case '.$name);
         }
@@ -302,9 +300,7 @@ class UserTrafficStateHelpersTest extends TestCase
             ['invalid', "five hundred\n", 0],
         ] as [$name, $payload, $expected]) {
             $path = $this->tempDir.'/limit-'.$name;
-            if ($payload !== null) {
-                file_put_contents($path, $payload);
-            }
+            $this->writeOptionalFixture($path, $payload);
 
             $this->assertEquals($expected, \pmssTrafficLimitReadGiBFile($path), 'case '.$name);
         }
@@ -318,12 +314,17 @@ class UserTrafficStateHelpersTest extends TestCase
         ] as [$name, $limitPayload, $bonusPayload, $expected]) {
             $limitPath = $this->tempDir.'/traffic-limit-'.$name;
             $bonusPath = $this->tempDir.'/bonus-traffic-'.$name;
-            if ($limitPayload !== null) {
-                file_put_contents($limitPath, $limitPayload);
-            }
+            $this->writeOptionalFixture($limitPath, $limitPayload);
             file_put_contents($bonusPath, $bonusPayload);
 
             $this->assertEquals($expected, \pmssTrafficLimitStateRead($limitPath, $bonusPath), 'case '.$name);
+        }
+    }
+
+    private function writeOptionalFixture(string $path, ?string $payload): void
+    {
+        if ($payload !== null) {
+            file_put_contents($path, $payload);
         }
     }
 }

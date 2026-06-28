@@ -7,15 +7,6 @@
 
 require_once __DIR__.'/qtVariant.php';
 
-/** Load legacy qBittorrent category data from qBittorrent.conf. */
-function pmssUserTransferQbittorrentLegacyCategoriesFromConfigFile(string $path, array $cfg): array
-{
-    if (!is_file($path)) {
-        return [];
-    }
-    return pmssUserTransferQbittorrentLegacyCategoriesFromConfig((string) @file_get_contents($path), $cfg);
-}
-
 /** Extract legacy Session\Categories entries from qBittorrent.conf content. */
 function pmssUserTransferQbittorrentLegacyCategoriesFromConfig(string $contents, array $cfg): array
 {

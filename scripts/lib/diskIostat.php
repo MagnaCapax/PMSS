@@ -87,7 +87,7 @@ function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?i
         throw new RuntimeException('No iostat Device header found');
     }
 
-    $header = preg_split('/\s+/', trim($lines[$lastHeaderIdx]));
+    $header = pmssConfigLineColumns($lines[$lastHeaderIdx], 1, []);
     $colMap = array_flip($header);
     $grp1Line = null;
     for ($i = $lastHeaderIdx + 1; $i < count($lines); $i++) {
@@ -100,7 +100,7 @@ function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?i
         throw new RuntimeException('No grp1 line after iostat header');
     }
 
-    $values = preg_split('/\s+/', trim($grp1Line));
+    $values = pmssConfigLineColumns($grp1Line, 1, []);
     $getAny = static function (array $colNames) use ($colMap, $values): string {
         foreach ($colNames as $name) {
             if (isset($colMap[$name])) {

@@ -2,6 +2,8 @@
 declare(strict_types=1);
 
 namespace {
+    require_once __DIR__.'/TestCase.php';
+
     if (!function_exists('pmssTestRequireUpdateBootstrapShim')) {
         /**
          * Load the updater bootstrap in tests without tripping over its CLI shebang.

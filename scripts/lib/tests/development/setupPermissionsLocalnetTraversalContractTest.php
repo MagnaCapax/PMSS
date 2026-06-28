@@ -83,9 +83,9 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
             'function pmssUpdateStep2RegisterPermissionShutdownGuard(): void',
             'update-step2 exited before final permission refresh',
             'function pmssUpdateStep2ShutdownReason(): string',
-            "pmssUpdateStep2LogRescueEvent('permission_refresh_rescue', 'start', ['reason' => \$reason]);",
-            "pmssUpdateStep2LogRescueEvent('permission_refresh_rescue', \$rc === 0 ? 'ok' : 'error', ['rc' => \$rc]);",
-            "\$rc = runStep('Restoring system permissions (shutdown)', \$helper);",
+            "pmssUpdateStep2RunRescueAction('permission_refresh_rescue', ['reason' => \$reason], static function () use (\$helper): int {",
+            "pmssUpdateStep2LogRescueEvent(\$event, \$rc === 0 ? 'ok' : 'error', ['rc' => \$rc]);",
+            "return runStep('Restoring system permissions (shutdown)', \$helper);",
             'pmssUpdateStep2RegisterPermissionShutdownGuard();',
         ]);
         $this->pmssAssertRepoFileContainsOrderedStrings(

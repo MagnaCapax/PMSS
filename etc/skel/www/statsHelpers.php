@@ -287,7 +287,7 @@ function pmssStatsServerResourceTextBuild(): string
     $text .= "Memory usage:\n";
 
     $meminfo = @file_get_contents('/proc/meminfo');
-    if (!$meminfo || preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m) !== 1) {
+    if (!$meminfo || preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m) < 1) {
         return $text."Failed to read /proc/meminfo\n";
     }
 
@@ -394,45 +394,34 @@ function pmssStatsResourceSnapshotBuild(?array $resourceData): array
         return $snapshot;
     }
 
-    $snapshot['ioReadDisplay'] = pmssStatsNestedArrayRead($resourceData, 'io_read', 'display');
-    $snapshot['ioWriteDisplay'] = pmssStatsNestedArrayRead($resourceData, 'io_write', 'display');
-    $snapshot['cpuDisplay'] = pmssStatsNestedArrayRead($resourceData, 'cpu', 'display');
+    foreach (array('io_read' => 'ioReadDisplay', 'io_write' => 'ioWriteDisplay', 'cpu' => 'cpuDisplay', 'memory' => 'memoryDisplay', 'ram_hours' => 'ramHoursDisplay') as $section => $target) {
+        $snapshot[$target] = pmssStatsNestedArrayRead($resourceData, $section, 'display');
+    }
     $cpuRaw = pmssStatsNestedArrayRead($resourceData, 'cpu', 'raw');
     $ioReadOpsRaw = pmssStatsNestedArrayRead($resourceData, 'io_read_ops', 'raw');
     $ioWriteOpsRaw = pmssStatsNestedArrayRead($resourceData, 'io_write_ops', 'raw');
     $snapshot['ioOperationsMonth'] = (float)($ioReadOpsRaw['month'] ?? 0.0) + (float)($ioWriteOpsRaw['month'] ?? 0.0);
-    if (isset($cpuRaw['month'])) {
-        $snapshot['cpuDisplay']['month'] = pmssFormatCpuHours($cpuRaw['month']);
-    }
+    if (isset($cpuRaw['month'])) { $snapshot['cpuDisplay']['month'] = pmssFormatCpuHours($cpuRaw['month']); }
     foreach (array('week', 'day', 'hour') as $period) {
         if (!isset($snapshot['cpuDisplay'][$period]) && isset($cpuRaw[$period])) {
             $snapshot['cpuDisplay'][$period] = pmssFormatDurationSeconds($cpuRaw[$period] / 1000000000);
         }
     }
-
-    $snapshot['memoryDisplay'] = pmssStatsNestedArrayRead($resourceData, 'memory', 'display');
-    $snapshot['ramHoursDisplay'] = pmssStatsNestedArrayRead($resourceData, 'ram_hours', 'display');
     foreach (array('current' => 'memoryCurrent', 'anon' => 'memoryAnon', 'file' => 'memoryFile') as $source => $target) {
         if (isset($resourceData['memory'][$source])) {
             $snapshot[$target] = pmssFormatBytesShort($resourceData['memory'][$source]);
         }
     }
-    if (isset($resourceData['tasks']['current'])) {
-        $snapshot['tasksCurrent'] = (string) round((float)$resourceData['tasks']['current'], 2);
-    }
+    if (isset($resourceData['tasks']['current'])) { $snapshot['tasksCurrent'] = (string) round((float)$resourceData['tasks']['current'], 2); }
 
     if (isset($resourceData['daily']) && is_array($resourceData['daily'])) {
+        $dailySeries = array('ioDailyRead' => array('io_read', 1048576, 2), 'ioDailyWrite' => array('io_write', 1048576, 2), 'cpuDailyHours' => array('cpu', 3600000000000, 4));
         foreach ($resourceData['daily'] as $day => $totals) {
-            $readBytes = isset($totals['io_read']) ? (float)$totals['io_read'] : 0.0;
-            $writeBytes = isset($totals['io_write']) ? (float)$totals['io_write'] : 0.0;
-            $readOps = isset($totals['io_read_ops']) ? (float)$totals['io_read_ops'] : 0.0;
-            $writeOps = isset($totals['io_write_ops']) ? (float)$totals['io_write_ops'] : 0.0;
-            $cpuNanoseconds = isset($totals['cpu']) ? (float)$totals['cpu'] : 0.0;
             $snapshot['ioDailyLabels'][] = $day;
-            $snapshot['ioDailyRead'][] = round($readBytes / 1024 / 1024, 2);
-            $snapshot['ioDailyWrite'][] = round($writeBytes / 1024 / 1024, 2);
-            $snapshot['ioDailyOperations'][] = round($readOps + $writeOps, 2);
-            $snapshot['cpuDailyHours'][] = round(($cpuNanoseconds / 1000000000) / 3600, 4);
+            foreach ($dailySeries as $target => $series) {
+                $snapshot[$target][] = round((float)($totals[$series[0]] ?? 0.0) / $series[1], $series[2]);
+            }
+            $snapshot['ioDailyOperations'][] = round((float)($totals['io_read_ops'] ?? 0.0) + (float)($totals['io_write_ops'] ?? 0.0), 2);
         }
     }
 

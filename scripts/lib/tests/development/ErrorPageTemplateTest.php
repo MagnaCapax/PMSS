@@ -69,19 +69,17 @@ class ErrorPageTemplateTest extends TestCase
         ]);
     }
 
-    public function testUserNginxTemplateUsesPerUser502FallbackPage(): void
-    {
-        $contents = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
-        $this->assertEquals(3, substr_count($contents, 'error_page 502 /error-502-##username.html;'));
-        $this->assertStringContainsAllStrings(['location = /error-502-##username.html {', 'try_files $uri /error-502.html;'], $contents);
-    }
-
-    public function testPrivateSubdomainTemplateUsesPerUser502FallbackPage(): void
+    public function testNginxTemplatesUsePerUser502FallbackPages(): void
     {
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
-        $contents = \pmssNginxUserSubdomainTemplates()['private'];
-        $this->assertEquals(4, substr_count($contents, 'error_page 502 /error-502-##user##.html;'));
-        $this->assertStringContainsAllStrings(['location = /error-502-##user##.html {', 'try_files $uri /error-502.html;'], $contents);
+
+        foreach ([
+            'user template' => [$this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user'), '##username', 3],
+            'private subdomain template' => [\pmssNginxUserSubdomainTemplates()['private'], '##user##', 4],
+        ] as $label => [$contents, $token, $count]) {
+            $this->assertEquals($count, substr_count($contents, 'error_page 502 /error-502-'.$token.'.html;'), $label);
+            $this->assertStringContainsAllStrings(['location = /error-502-'.$token.'.html {', 'try_files $uri /error-502.html;'], $contents, $label.': ');
+        }
     }
 
     private function assertErrorPageImagePool(string $path, string $prefix, int $count): string

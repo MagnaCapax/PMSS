@@ -64,8 +64,8 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
             ['/sys/fs/cgroup/blkio/user.slice/user-1000.slice/blkio.bfq.weight', false],
             ['/sys/fs/cgroup/blkio/user.slice/user-0.slice/blkio.throttle.read_iops_device', false],
             ['/sys/fs/cgroup/blkio/user.slice/user-1000.slice/../blkio.throttle.read_iops_device', false],
-        ] as $case) {
-            $this->assertSame($case[1], \pmssCgroupDirectUserBlkioPathAllowed($case[0], $allowed));
+        ] as [$path, $expected]) {
+            $this->assertSame($expected, \pmssCgroupDirectUserBlkioPathAllowed($path, $allowed));
         }
     }
 

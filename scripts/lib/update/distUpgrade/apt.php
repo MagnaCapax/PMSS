@@ -27,7 +27,7 @@ function pmssDistUpgradeAptCommand(string $env, string $action, string $argument
     if (preg_match('/[\r\n\0]/', $arguments) === 1) {
         throw new InvalidArgumentException('Unsafe dist-upgrade apt arguments');
     }
-    foreach ($suffix === '' ? [] : (preg_split('/\s+/', $suffix) ?: []) as $token) {
+    foreach ($suffix === '' ? [] : pmssConfigLineColumns($suffix, 0, []) as $token) {
         if (preg_match('/^[A-Za-z0-9][A-Za-z0-9.+:~_-]*$/', $token) !== 1) {
             throw new InvalidArgumentException('Unsafe dist-upgrade apt arguments');
         }

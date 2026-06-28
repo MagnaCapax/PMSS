@@ -4,8 +4,7 @@ set -euo pipefail
 # shellcheck source=scripts/testing/testingPaths.sh
 source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 echo "[php-lint]" >&2
-pmss_testing_find_php_files "$ROOT_DIR" |
-	xargs -0 -n1 php -l >/dev/null
+pmss_testing_php_lint_files pmss_testing_find_php_files "$ROOT_DIR"
 
 echo "[customer-php-tree-isolation]" >&2
 # shellcheck disable=SC2097,SC2098  # Reason: env-injection idiom; ROOT_DIR is unexported, prefix passes it to subprocess.

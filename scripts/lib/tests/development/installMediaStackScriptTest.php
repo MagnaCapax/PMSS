@@ -14,10 +14,7 @@ class installMediaStackScriptTest extends TestCase
 
     public function setUp(): void
     {
-        // Walk to repo root and read the installer script directly.
-        $path = dirname(__DIR__, 4).'/etc/skel/install-media-stack.sh';
-        $this->script = file_get_contents($path);
-        $this->assertTrue($this->script !== false, 'Failed to read install-media-stack.sh');
+        $this->script = $this->pmssReadRepoFile('etc/skel/install-media-stack.sh');
     }
 
     public function testServarrBranchDefaultsAndOverridesPresent(): void
@@ -245,12 +242,10 @@ LIGHTTPD;
     public function testManagedInstallPathResetRefusesUnsafeTargets(): void
     {
         $home = $this->pmssMakeTempDir('pmss-media-stack-reset-home-');
-        mkdir($home.'/.bin/Radarr', 0755, true);
-        mkdir($home.'/.bin/keep', 0755, true);
-        mkdir($home.'/.config/sabnzbd', 0755, true);
-        mkdir($home.'/.config/unmanaged', 0755, true);
-        file_put_contents($home.'/.bin/Radarr/file', 'managed');
-        file_put_contents($home.'/.bin/keep/file', 'preserve');
+        $this->pmssWriteFile($home.'/.bin/Radarr/file', 'managed');
+        $this->pmssWriteFile($home.'/.bin/keep/file', 'preserve');
+        $this->pmssEnsureDir($home.'/.config/sabnzbd');
+        $this->pmssEnsureDir($home.'/.config/unmanaged');
 
         $functions = $this->pmssExtractShellFunctions($this->script, array(
             'media_stack_home_path_is_safe',
@@ -315,7 +310,7 @@ LIGHTTPD;
     public function testLighttpdMediaStackFragmentRendererPreservesProxyContracts(): void
     {
         $home = $this->pmssMakeTempDir('pmss-media-stack-lighttpd-render-home-');
-        mkdir($home.'/.lighttpd/custom.d', 0755, true);
+        $this->pmssEnsureDir($home.'/.lighttpd/custom.d');
 
         $functions = $this->pmssExtractShellFunctions($this->script, array(
             'lighttpd_media_stack_proxy_block_write',
@@ -611,7 +606,7 @@ LIGHTTPD;
     {
         $home = $this->pmssMakeTempDir('pmss-media-stack-servarr-home-');
         $trace = $home.'/trace.log';
-        mkdir($home.'/.bin', 0755, true);
+        $this->pmssEnsureDir($home.'/.bin');
 
         $functions = $this->pmssExtractShellFunctions($this->script, array('fetch_verified_archive', 'servarr_install_from_url'));
         $script = implode("\n", array(

@@ -19,9 +19,9 @@ function pmssTrafficFormatAmount(float $valueMiB): string
 /** Parse one iptables OUTPUT rule line into bytes, destination, and UID. */
 function pmssTrafficParseOutputRule(string $line): ?array
 {
-    $columns = preg_split('/\s+/', trim($line));
-    $ownerIndex = is_array($columns) ? array_search('owner', $columns, true) : false;
-    if (!is_array($columns) || count($columns) < 11 || !ctype_digit($columns[1]) || $columns[2] !== 'ACCEPT' || $ownerIndex === false || $ownerIndex < 1 || !isset($columns[$ownerIndex + 3]) || $columns[$ownerIndex + 1] !== 'UID' || $columns[$ownerIndex + 2] !== 'match' || !ctype_digit($columns[$ownerIndex + 3])) return null;
+    $columns = pmssConfigLineColumns($line, 11, []);
+    $ownerIndex = array_search('owner', $columns, true);
+    if ($columns === [] || !ctype_digit($columns[1]) || $columns[2] !== 'ACCEPT' || $ownerIndex === false || $ownerIndex < 1 || !isset($columns[$ownerIndex + 3]) || $columns[$ownerIndex + 1] !== 'UID' || $columns[$ownerIndex + 2] !== 'match' || !ctype_digit($columns[$ownerIndex + 3])) return null;
     return ['bytes' => (int) $columns[1], 'destination' => $columns[$ownerIndex - 1], 'uid' => (int) $columns[$ownerIndex + 3]];
 }
 

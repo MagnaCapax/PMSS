@@ -10,7 +10,8 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/diagnostics.php';
+require_once dirname(__DIR__).'/runtime.php';
+require_once __DIR__.'/stream.php';
 
 /**
  * Normalize a hostname/token used in SMTP commands and envelope headers.

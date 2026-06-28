@@ -49,7 +49,7 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
 
     public function testBandwidthLimitsAppendedWhenConfigured(): void
     {
-        $findmntPath = $this->pmssMakeExecutableStub('findmnt', "#!/bin/sh\nprintf '%s\\n' '/dev/md0'\n", 'pmss-findmnt-bandwidth-');
+        $findmntPath = $this->pmssMakeLineOutputStub('findmnt', ['/dev/md0'], 'pmss-findmnt-bandwidth-');
         $out = $this->pmssSystemdSliceRender([
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
             'policy' => [
@@ -105,11 +105,7 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
 
     public function testMountIoSkipsUnsafeBackingDevice(): void
     {
-        $findmntPath = $this->pmssMakeExecutableStub(
-            'findmnt',
-            "#!/bin/sh\nprintf '%s\\n' '/dev/bad target'\n",
-            'pmss-findmnt-mount-unsafe-'
-        );
+        $findmntPath = $this->pmssMakeLineOutputStub('findmnt', ['/dev/bad target'], 'pmss-findmnt-mount-unsafe-');
         $out = $this->pmssSystemdSliceRender([
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
             'policy' => [
@@ -124,11 +120,7 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
 
     public function testMountIoSkipsUnsafePolicyValue(): void
     {
-        $findmntPath = $this->pmssMakeExecutableStub(
-            'findmnt',
-            "#!/bin/sh\nprintf '%s\\n' '/dev/md0'\n",
-            'pmss-findmnt-policy-unsafe-'
-        );
+        $findmntPath = $this->pmssMakeLineOutputStub('findmnt', ['/dev/md0'], 'pmss-findmnt-policy-unsafe-');
         $out = $this->pmssSystemdSliceRender([
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
             'policy' => [

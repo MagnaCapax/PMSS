@@ -5,11 +5,6 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class StorageBenchmarkEdgeCasesTest extends TestCase
 {
-    private function writeEdgeRunLog(string $runId, string $runTs, array $entries = [], array $preflightExtra = []): string
-    {
-        return $this->pmssWriteStorageBenchmarkRunLog($runId, $runTs, $entries, $preflightExtra, 'pmss-bench-edge-');
-    }
-
     public function testEmptyLogShowsNoRuns(): void
     {
         $log = $this->pmssMakeJsonLogPath('pmss-bench-edge-', 'benchmark-storage.jsonl');
@@ -27,7 +22,7 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
     public function testRepresentativeMalformedAndExtremeEntriesRenderSafely(): void
     {
         foreach ($this->representativeEdgeCases() as $label => $case) {
-            $log = $this->writeEdgeRunLog($case['run_id'], $case['run_ts'], $case['entries'], $case['preflight'] ?? ['timestamp' => $case['run_ts']]);
+            $log = $this->pmssWriteStorageBenchmarkRunLog($case['run_id'], $case['run_ts'], $case['entries'], $case['preflight'] ?? ['timestamp' => $case['run_ts']], 'pmss-bench-edge-');
             $out = $this->pmssRunStorageBenchmarkShowLast($log);
 
             foreach ($case['contains'] as $needle) {
@@ -115,7 +110,7 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
     public function testLabelWithAnsiSequencesDoesNotCrash(): void
     {
         $ts = date('c');
-        $log = $this->writeEdgeRunLog('ansi', $ts, [], ['label' => chr(27).'[31mRED'.chr(27).'[0m', 'timestamp' => $ts]);
+        $log = $this->pmssWriteStorageBenchmarkRunLog('ansi', $ts, [], ['label' => chr(27).'[31mRED'.chr(27).'[0m', 'timestamp' => $ts], 'pmss-bench-edge-');
         $this->assertStringContainsString('Storage benchmark (last run)', $this->pmssRunStorageBenchmarkShowLast($log));
     }
 

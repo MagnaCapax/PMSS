@@ -145,7 +145,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
     {
         $symbol = 'pmssReadSystemd'.'UnitExecStartBinary';
 
-        $this->pmssAssertRepoFileContainsString('scripts/lib/update/userMaintenance.php', "require_once __DIR__.'/users/docker.php';");
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/userMaintenance.php', "'users/docker.php'");
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/docker.php', [
             'function pmssUserDockerUnitExecBinary(',
             "if (\$trim === '' || strpos(\$trim, 'ExecStart=') !== 0)",
@@ -258,7 +258,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
             'scripts/lib/update.php' => [
                 'required' => [
                     "pmssSkeletonBase().'/'.\$file",
-                    "require_once __DIR__.'/version.php';",
+                    "'version.php'",
                 ],
                 'forbidden' => [
                     'function pmssSkeleton'.'Path(' => 'update.php should keep skeleton path joins inline inside updateUserFile()',
@@ -335,7 +335,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
                     "'stdout_excerpt' => ''",
                     "'stderr_excerpt' => \$stderrExcerpt",
                     'Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)',
-                    "require_once __DIR__.'/users/docker.php';",
+                    "'users/docker.php'",
                     "\$postChecks['Checking lighttpd instance'] = '/scripts/cron/checkLighttpdInstances.php';",
                     "pmssUserLog(\$userTrim, '[WARN] update-step2 user maintenance aborted: '.\$reason);",
                     'pmssLogJson([',
@@ -440,7 +440,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/resourceSnapshot.php', [
             "require_once __DIR__.'/../lib/resources/log.php';",
             'const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT',
-            'readSnapshotMetricsFromPath($dataPath)',
+            "pmssResourceStoredPayloadWindowMetrics(\$data, 'day')",
             "collectWindowResultsFromData(\$dataLines, ['day' => \$threshold])",
             "pmssRunCliEntrypoint(__FILE__, 'pmssResourceSnapshotRun');",
             'function '.$symbol.'(): int',

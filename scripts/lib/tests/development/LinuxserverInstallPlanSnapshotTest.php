@@ -73,4 +73,16 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
             ),
         ), $snapshot);
     }
+
+    public function testLsioMariadbInstallPlanUsesEnvFileOutsideDryRun(): void
+    {
+        $spec = \pmssDockerInstallLsioAppSpec('mariadb', '/home/example', false);
+
+        $this->assertSame('/home/example/docker/mariadb/pmss-credentials.env', $spec['credentialFile']);
+        $this->assertSame(array('--env-file', '/home/example/docker/mariadb/pmss-credentials.env'), $spec['extraArgs']);
+        $this->assertSame(
+            array('docker', 'run', '-d', '--name', 'mariadb', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:3306:3306', '--env-file', '/home/example/docker/mariadb/pmss-credentials.env', '-v', '/home/example/docker/mariadb/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/mariadb:latest'),
+            \pmssDockerInstallLsioDockerRunCommand('mariadb', (string) $spec['defaultPort'], 'UTC', $spec)
+        );
+    }
 }

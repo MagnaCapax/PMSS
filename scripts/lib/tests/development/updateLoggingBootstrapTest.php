@@ -105,6 +105,6 @@ class UpdateLoggingBootstrapTest extends TestCase
 
     private function runLibraryScript(string $script): string
     {
-        return trim($this->pmssRunRepoInlinePhpRequire('scripts/lib/update.php', $script, ['PMSS_TEST_MODE' => '1']));
+        return trim($this->pmssRunRepoInlinePhpRequire('scripts/lib/update.php', $script, $this->pmssTestModeEnv()));
     }
 }

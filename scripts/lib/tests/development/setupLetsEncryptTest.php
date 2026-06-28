@@ -172,7 +172,7 @@ class SetupLetsEncryptTest extends TestCase
 
         \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'buster', $this->pmssLetsEncryptTestOptions([
             'commandRunner' => static function (string $command, string $description) use (&$commands): array {
-                $commands[] = $description;
+                $commands[] = ['command' => $command, 'description' => $description];
                 return ['rc' => 0, 'stdout' => '', 'stderr' => ''];
             },
         ]));
@@ -187,7 +187,16 @@ class SetupLetsEncryptTest extends TestCase
                 'Rebuild nginx configuration',
                 'Restart nginx',
             ],
-            $commands
+            array_column($commands, 'description')
+        );
+        $this->assertStringContainsAllStrings(
+            [
+                "python3 '-m' 'venv' '/opt/certbot/'",
+                "/opt/certbot/bin/pip 'install' '--upgrade' 'pip'",
+                "/opt/certbot/bin/pip 'install' 'certbot' 'certbot-nginx'",
+                "ln '-s' '/opt/certbot/bin/certbot' '/usr/bin/certbot'",
+            ],
+            implode("\n", array_column($commands, 'command'))
         );
     }
 

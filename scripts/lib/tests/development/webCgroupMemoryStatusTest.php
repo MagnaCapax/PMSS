@@ -75,12 +75,11 @@ class WebCgroupMemoryStatusTest extends TestCase
 
     public function testReadParsesCgroupCountersAndFormatsUsage(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-');
-        file_put_contents($dir.'/memory.current', "4294967296\n");
-        file_put_contents($dir.'/memory.high', "4831838208\n");
-        file_put_contents($dir.'/memory.max', "5368709120\n");
-        file_put_contents($dir.'/memory.events', "low 0\nhigh 17\nmax 0\noom 0\noom_kill 0\n");
-        file_put_contents($dir.'/memory.pressure', "some avg10=0.33 avg60=0.01 avg300=0.00 total=123\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n");
+        $dir = $this->writeMemoryStatusFixture(
+            '4294967296', '4831838208', '5368709120',
+            "low 0\nhigh 17\nmax 0\noom 0\noom_kill 0\n",
+            "some avg10=0.33 avg60=0.01 avg300=0.00 total=123\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n"
+        );
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir]);
 
@@ -91,12 +90,11 @@ class WebCgroupMemoryStatusTest extends TestCase
 
     public function testReadClassifiesSustainedSoftThrottleBeforeHardLimit(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-');
-        file_put_contents($dir.'/memory.current', "16774565888\n");
-        file_put_contents($dir.'/memory.high', "16777216000\n");
-        file_put_contents($dir.'/memory.max', "33554432000\n");
-        file_put_contents($dir.'/memory.events', "low 0\nhigh 137149598\nmax 0\noom 0\noom_kill 0\n");
-        file_put_contents($dir.'/memory.pressure', "some avg10=0.50 avg60=0.01 avg300=0.00 total=123\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n");
+        $dir = $this->writeMemoryStatusFixture(
+            '16774565888', '16777216000', '33554432000',
+            "low 0\nhigh 137149598\nmax 0\noom 0\noom_kill 0\n",
+            "some avg10=0.50 avg60=0.01 avg300=0.00 total=123\nfull avg10=0.00 avg60=0.01 avg300=0.00 total=0\n"
+        );
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir]);
 
@@ -108,12 +106,7 @@ class WebCgroupMemoryStatusTest extends TestCase
 
     public function testReadFallsBackToMemoryHighWhenMaxIsUnlimited(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-');
-        file_put_contents($dir.'/memory.current', "2147483648\n");
-        file_put_contents($dir.'/memory.high', "3221225472\n");
-        file_put_contents($dir.'/memory.max', "max\n");
-        file_put_contents($dir.'/memory.events', "high 0\n");
-        file_put_contents($dir.'/memory.pressure', "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n");
+        $dir = $this->writeMemoryStatusFixture('2147483648', '3221225472', 'max', "high 0\n");
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir]);
 
@@ -146,12 +139,7 @@ class WebCgroupMemoryStatusTest extends TestCase
 
     public function testThrottleMessageUsesReducedSpeedCopyWithoutOomLanguage(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-');
-        file_put_contents($dir.'/memory.current', "2147483648\n");
-        file_put_contents($dir.'/memory.high', "1073741824\n");
-        file_put_contents($dir.'/memory.max', "3221225472\n");
-        file_put_contents($dir.'/memory.events', "high 4\nmax 0\noom 0\noom_kill 0\n");
-        file_put_contents($dir.'/memory.pressure', "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n");
+        $dir = $this->writeMemoryStatusFixture('2147483648', '1073741824', '3221225472', "high 4\nmax 0\noom 0\noom_kill 0\n");
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir]);
 
@@ -207,5 +195,21 @@ class WebCgroupMemoryStatusTest extends TestCase
             'pressure_full_avg10' => 0.0,
             'throttle_events' => 0,
         ], $overrides)));
+    }
+
+    private function writeMemoryStatusFixture(
+        string $current,
+        string $high,
+        string $max,
+        string $events,
+        string $pressure = "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n"
+    ): string
+    {
+        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-');
+        foreach (['current' => $current, 'high' => $high, 'max' => $max, 'events' => $events, 'pressure' => $pressure] as $name => $contents) {
+            $this->pmssWriteFile($dir.'/memory.'.$name, rtrim((string) $contents, "\n")."\n");
+        }
+
+        return $dir;
     }
 }

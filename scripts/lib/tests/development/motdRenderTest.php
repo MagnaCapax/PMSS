@@ -79,6 +79,9 @@ class MotdRenderTest extends TestCase
         $this->pmssAssertStringNotContainsString("\e[", $plain, 'Plain render should not include ANSI escapes');
 
         $colored = \Motd::renderMotdTemplate($tpl, $model, true);
-        $this->assertStringContainsString("\e[", $colored, 'Colored render should include ANSI escapes');
+        $this->assertSame(
+            "Host=\e[1;36mhost\e[0m Kernel=\e[34mkernel\e[0m Net=\e[32m1000Mb/s\e[0m\n",
+            $colored
+        );
     }
 }

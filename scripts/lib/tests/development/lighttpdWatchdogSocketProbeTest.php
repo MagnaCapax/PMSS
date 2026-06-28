@@ -46,6 +46,16 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         return array($result, $probeCalls, $sleepCalls);
     }
 
+    private function socketFailureOptions(string $runtimeDir, int $threshold): array
+    {
+        return array('runtimeDir' => $runtimeDir, 'threshold' => $threshold);
+    }
+
+    private function recordSocketFailure(string $runtimeDir, int $threshold, string $username = 'alice'): array
+    {
+        return \pmssLighttpdWatchdogRecordSocketFailure($username, $this->socketFailureOptions($runtimeDir, $threshold));
+    }
+
     public function testProbeSucceedsOnFirstAttemptWithoutSleeping(): void
     {
         [$result, $probeCalls, $sleepCalls] = $this->runSocketProbeFixture([
@@ -128,18 +138,9 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
     {
         $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-state-');
 
-        $first = \pmssLighttpdWatchdogRecordSocketFailure('alice', array(
-            'runtimeDir' => $runtimeDir,
-            'threshold' => 3,
-        ));
-        $second = \pmssLighttpdWatchdogRecordSocketFailure('alice', array(
-            'runtimeDir' => $runtimeDir,
-            'threshold' => 3,
-        ));
-        $third = \pmssLighttpdWatchdogRecordSocketFailure('alice', array(
-            'runtimeDir' => $runtimeDir,
-            'threshold' => 3,
-        ));
+        $first = $this->recordSocketFailure($runtimeDir, 3);
+        $second = $this->recordSocketFailure($runtimeDir, 3);
+        $third = $this->recordSocketFailure($runtimeDir, 3);
 
         $this->assertSame(array('action' => 'wait', 'count' => 1, 'threshold' => 3), $first);
         $this->assertSame(array('action' => 'wait', 'count' => 2, 'threshold' => 3), $second);
@@ -149,7 +150,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
     public function testSocketFailureStateClearsAfterHealthyProbe(): void
     {
         $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-clear-');
-        $options = array('runtimeDir' => $runtimeDir, 'threshold' => 2);
+        $options = $this->socketFailureOptions($runtimeDir, 2);
 
         $this->assertSame(
             array('action' => 'wait', 'count' => 1, 'threshold' => 2),
@@ -169,10 +170,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         $this->assertSame('', \pmssLighttpdWatchdogSocketFailureStatePath('bad/user', $runtimeDir));
         $this->assertSame(
             array('action' => 'wait', 'count' => 0, 'threshold' => 2),
-            \pmssLighttpdWatchdogRecordSocketFailure('bad/user', array(
-                'runtimeDir' => $runtimeDir,
-                'threshold' => 2,
-            ))
+            $this->recordSocketFailure($runtimeDir, 2, 'bad/user')
         );
     }
 

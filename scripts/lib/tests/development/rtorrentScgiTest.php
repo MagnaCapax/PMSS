@@ -189,6 +189,24 @@ class RtorrentScgiTest extends TestCase
         $this->assertTrue(strlen($request) > 50, 'Complete request should be substantial');
     }
 
+    public function testCompleteRequestFormattingMatchesCharacterizationSnapshot(): void
+    {
+        $xmlrpc = rtorrentScgiFormatXmlrpcParamsCall('d.multicall2', ['main', 'd.get_hash=', ['nested', 1], true, 4.25, 'x<y&z']);
+        $request = str_replace("\0", '\0', rtorrentScgiFormatRequest($xmlrpc));
+
+        $this->assertSame(
+            '26:CONTENT_LENGTH\0509\0SCGI\01\0,<?xml version="1.0" encoding="UTF-8"?><methodCall><methodName>d.multicall2</methodName><params>'
+            .'<param><value><string>main</string></value></param>'
+            .'<param><value><string>d.get_hash=</string></value></param>'
+            .'<param><value><array><data><value><string>nested</string></value><value><int>1</int></value></data></array></value></param>'
+            .'<param><value><boolean>1</boolean></value></param>'
+            .'<param><value><double>4.25</double></value></param>'
+            .'<param><value><string>x&lt;y&amp;z</string></value></param>'
+            .'</params></methodCall>',
+            $request
+        );
+    }
+
     public function testRequestHeaderUsesNullByteSeparators(): void
     {
         $request = rtorrentScgiFormatRequest('data');

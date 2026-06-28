@@ -93,25 +93,15 @@ function pmssMediaStackPanelMemoryLimitBytesRead(): ?int
     $cgroupFile = is_string($cgroupFile) && $cgroupFile !== '' ? $cgroupFile : '/proc/self/cgroup';
     $cgroupRoot = is_string($cgroupRoot) && $cgroupRoot !== '' ? $cgroupRoot : '/sys/fs/cgroup';
 
-    $lines = @file($cgroupFile, FILE_IGNORE_NEW_LINES);
-    if (!is_array($lines)) {
-        return null;
-    }
-
     $limits = array();
-    foreach ($lines as $line) {
-        $parts = explode(':', (string) $line, 3);
-        if (count($parts) !== 3 || $parts[2] === '') {
+    foreach (pmssCustomerCgroupSelfEntries($cgroupFile) as $entry) {
+        if ($entry['controllers'] === array()) {
+            $limits = array_merge($limits, pmssMediaStackPanelCgroupMemoryLimitsRead($cgroupRoot, $entry['path'], array('memory.high', 'memory.max')));
             continue;
         }
 
-        if ($parts[1] === '') {
-            $limits = array_merge($limits, pmssMediaStackPanelCgroupMemoryLimitsRead($cgroupRoot, $parts[2], array('memory.high', 'memory.max')));
-            continue;
-        }
-
-        if (in_array('memory', explode(',', $parts[1]), true)) {
-            $limits = array_merge($limits, pmssMediaStackPanelCgroupMemoryLimitsRead($cgroupRoot.'/memory', $parts[2], array('memory.soft_limit_in_bytes', 'memory.limit_in_bytes')));
+        if (in_array('memory', $entry['controllers'], true)) {
+            $limits = array_merge($limits, pmssMediaStackPanelCgroupMemoryLimitsRead($cgroupRoot.'/memory', $entry['path'], array('memory.soft_limit_in_bytes', 'memory.limit_in_bytes')));
         }
     }
 

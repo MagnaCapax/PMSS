@@ -62,11 +62,8 @@ class UserDockerCgroupDriverTest extends TestCase
             'create_when_missing' => true,
         ]);
 
-        $this->assertTrue($result['ok']);
-        $this->assertTrue($result['changed']);
-        $this->assertTrue($result['created']);
-        $payload = $this->readDaemonConfig($home);
-        $this->assertEquals(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => true, 'created' => true], $result);
+        $payload = $this->assertDaemonConfigContainsCgroupfs($home);
         $this->assertTrue(!array_key_exists('storage-driver', $payload));
     }
 
@@ -81,12 +78,9 @@ class UserDockerCgroupDriverTest extends TestCase
             'preserve_custom_storage_driver' => true,
         ]);
 
-        $this->assertTrue($result['ok']);
-        $this->assertTrue($result['changed']);
-        $this->assertFalse($result['configured_storage_driver']);
-        $payload = $this->readDaemonConfig($home);
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => true, 'configured_storage_driver' => false], $result);
+        $payload = $this->assertDaemonConfigContainsCgroupfs($home);
         $this->assertEquals('overlay2', $payload['storage-driver']);
-        $this->assertEquals(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
     }
 
     public function testSharedRootlessDockerConfigDisablesContainerdSnapshotterWhenRequested(): void
@@ -99,13 +93,10 @@ class UserDockerCgroupDriverTest extends TestCase
             'disable_containerd_snapshotter' => true,
         ]);
 
-        $this->assertTrue($result['ok']);
-        $this->assertTrue($result['changed']);
-        $this->assertTrue($result['disabled_containerd_snapshotter']);
-        $payload = $this->readDaemonConfig($home);
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => true, 'disabled_containerd_snapshotter' => true], $result);
+        $payload = $this->assertDaemonConfigContainsCgroupfs($home);
         $this->assertEquals('fuse-overlayfs', $payload['storage-driver']);
         $this->assertFalse($payload['features']['containerd-snapshotter']);
-        $this->assertEquals(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
     }
 
     public function testSharedRootlessDockerConfigPreservesExistingFeatureKeys(): void
@@ -133,11 +124,9 @@ class UserDockerCgroupDriverTest extends TestCase
             'invalid_json_as_empty' => true,
         ]);
 
-        $this->assertTrue($result['ok']);
-        $this->assertTrue($result['removed_storage_driver']);
-        $payload = $this->readDaemonConfig($home);
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'removed_storage_driver' => true], $result);
+        $payload = $this->assertDaemonConfigContainsCgroupfs($home);
         $this->assertTrue(!array_key_exists('storage-driver', $payload));
-        $this->assertEquals(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
     }
 
     public function testSharedRootlessDockerConfigCanAbortOnInvalidJson(): void
@@ -150,8 +139,7 @@ class UserDockerCgroupDriverTest extends TestCase
             'create_when_missing' => true,
         ]);
 
-        $this->assertFalse($result['ok']);
-        $this->assertEquals('invalid_json', $result['reason']);
+        $this->pmssAssertArraySubsetSame(['ok' => false, 'reason' => 'invalid_json'], $result);
         $this->assertEquals('{broken', file_get_contents($home.'/.config/docker/daemon.json'));
     }
 
@@ -166,8 +154,7 @@ class UserDockerCgroupDriverTest extends TestCase
             'create_when_missing' => true,
         ]);
 
-        $this->assertFalse($result['ok']);
-        $this->assertEquals('unsafe_config_file', $result['reason']);
+        $this->pmssAssertArraySubsetSame(['ok' => false, 'reason' => 'unsafe_config_file'], $result);
         $this->assertEquals('{"keep":true}', file_get_contents($home.'/outside.json'));
     }
 
@@ -180,8 +167,14 @@ class UserDockerCgroupDriverTest extends TestCase
             'create_when_missing' => true,
         ]);
 
-        $this->assertFalse($result['ok']);
-        $this->assertEquals('unsafe_config_file', $result['reason']);
+        $this->pmssAssertArraySubsetSame(['ok' => false, 'reason' => 'unsafe_config_file'], $result);
+    }
+
+    private function assertDaemonConfigContainsCgroupfs(string $home): array
+    {
+        $payload = $this->readDaemonConfig($home);
+        $this->assertEquals(['native.cgroupdriver=cgroupfs'], $payload['exec-opts']);
+        return $payload;
     }
 
     private function writeDaemonConfig(string $home, array $payload): void

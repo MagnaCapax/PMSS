@@ -138,8 +138,7 @@ class ArrUpdateTest extends TestCase
                 });
             });
 
-            $this->assertStringContainsString('Invalid updater configuration: extract_dir', $output);
-            $this->assertStringNotContainsString('Unable to fetch release metadata', $output);
+            $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: extract_dir'], ['Unable to fetch release metadata'], $output);
         } finally {
             $this->cleanup($baseDir);
         }
@@ -157,8 +156,7 @@ class ArrUpdateTest extends TestCase
                 });
             });
 
-            $this->assertStringContainsString('Invalid updater configuration: install_path', $output);
-            $this->assertStringNotContainsString('Unable to fetch release metadata', $output);
+            $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: install_path'], ['Unable to fetch release metadata'], $output);
         } finally {
             $this->cleanup($baseDir);
         }
@@ -174,8 +172,7 @@ class ArrUpdateTest extends TestCase
             });
         });
 
-        $this->assertStringContainsString('Invalid updater configuration: install_path', $output);
-        $this->assertStringNotContainsString('Unable to fetch release metadata', $output);
+        $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: install_path'], ['Unable to fetch release metadata'], $output);
     }
 
     public function testUpdateRejectsSymlinkedInstallPathBeforeFetchingMetadata(): void
@@ -192,8 +189,7 @@ class ArrUpdateTest extends TestCase
                 });
             });
 
-            $this->assertStringContainsString('Invalid updater configuration: install_path', $output);
-            $this->assertStringNotContainsString('Unable to fetch release metadata', $output);
+            $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: install_path'], ['Unable to fetch release metadata'], $output);
         } finally {
             @unlink($link);
             $this->cleanup($baseDir);
@@ -214,8 +210,7 @@ class ArrUpdateTest extends TestCase
                 });
             });
 
-            $this->assertStringContainsString('Invalid updater configuration: install_path', $output);
-            $this->assertStringNotContainsString('Unable to fetch release metadata', $output);
+            $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: install_path'], ['Unable to fetch release metadata'], $output);
         } finally {
             $this->cleanup($baseDir);
         }
@@ -240,8 +235,7 @@ class ArrUpdateTest extends TestCase
             });
 
             $this->assertFalse(is_dir($installPath), 'install path should stay absent when its parent directory is missing');
-            $this->assertStringContainsString('Install parent directory missing; refusing to replace application', $output);
-            $this->assertStringNotContainsString('Installed version 1.2.3', $output);
+            $this->assertStringContainsAndOmitsStrings(['Install parent directory missing; refusing to replace application'], ['Installed version 1.2.3'], $output);
         } finally {
             $this->cleanup($baseDir);
         }

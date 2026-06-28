@@ -10,26 +10,23 @@ fail=0
 
 check_file_exists() {
 	local f="$1"
-	[[ -f "$f" ]] || {
-		echo "missing: $f" >&2
-		fail=1
-	}
+	[[ -f "$f" ]] && return
+	echo "missing: $f" >&2
+	fail=1
 }
 
 check_absent() {
 	local f="$1" pat="$2" why="$3"
-	if grep -Eq "$pat" "$f"; then
-		echo "$why in $f" >&2
-		fail=1
-	fi
+	! grep -Eq "$pat" "$f" && return
+	echo "$why in $f" >&2
+	fail=1
 }
 
 check_present() {
 	local f="$1" pat="$2" why="$3"
-	if ! grep -Eq "$pat" "$f"; then
-		echo "$why not found in $f" >&2
-		fail=1
-	fi
+	grep -Eq "$pat" "$f" && return
+	echo "$why not found in $f" >&2
+	fail=1
 }
 
 check_file_exists "$v2"

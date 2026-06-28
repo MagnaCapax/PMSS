@@ -11,7 +11,7 @@ final class RuntimeLoggingBootstrapTest extends TestCase
             'scripts/lib/runtime.php',
             '$function = new ReflectionFunction("logMessage"); '
             .'echo str_replace("\\\\", "/", $function->getFileName());',
-            ['PMSS_TEST_MODE' => '1']
+            $this->pmssTestModeEnv()
         ));
 
         $this->assertStringContainsString('/scripts/lib/update/logging.php', $source);
@@ -34,11 +34,10 @@ final class RuntimeLoggingBootstrapTest extends TestCase
             .'"payload" => $payload, '
             .'"file" => (string) @file_get_contents($logPath)'
             .']);',
-            [
+            $this->pmssTestModeEnv([
                 'PMSS_JSON_LOG' => $jsonPath,
                 'PMSS_LOG_DIR' => $logDir,
-                'PMSS_TEST_MODE' => '1',
-            ]
+            ])
         );
 
         $this->assertEquals("runtime structured test\n", $result['stdout']);
@@ -68,10 +67,9 @@ final class RuntimeLoggingBootstrapTest extends TestCase
             .'"fallback_exists" => file_exists('.var_export($fallbackPath, true).'), '
             .'"fallback" => (string) @file_get_contents('.var_export($fallbackPath, true).')'
             .']);',
-            [
+            $this->pmssTestModeEnv([
                 'PMSS_JSON_LOG' => $jsonPath,
-                'PMSS_TEST_MODE' => '1',
-            ]
+            ])
         );
 
         @unlink($fallbackPath);
@@ -102,7 +100,7 @@ final class RuntimeLoggingBootstrapTest extends TestCase
             .'"stdout" => $stdout, '
             .'"file" => (string) @file_get_contents('.var_export($logPath, true).')'
             .']);',
-            ['PMSS_TEST_MODE' => '1'],
+            $this->pmssTestModeEnv(),
             '2>'.escapeshellarg($stderrPath)
         );
 

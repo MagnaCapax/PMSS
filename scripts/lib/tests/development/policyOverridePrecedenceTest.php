@@ -36,27 +36,26 @@ class PolicyOverridePrecedenceTest extends TestCase
         $this->assertStringContainsAllStrings(['IODeviceWeight=/dev/testhome 320', 'IOReadBandwidthMax=/dev/testhome 25M', 'IOWriteBandwidthMax=/dev/testhome 10M', 'IOReadIOPSMax=/dev/testhome 150', 'IOWriteIOPSMax=/dev/testhome 90'], $out);
     }
 
-    public function testExplicitIoFlagsOverridePolicyMountIoPairs(): void
+    public function testExplicitIoInputsOverridePolicyMountIoPairs(): void
     {
-        $out = $this->pmssRunUserConfigCgroupCliWithPolicy(
-            ['mounts' => ['/home' => ['readBw' => '25M']]],
-            ['root', '--apply', '--dry-run', '--defaults', '--io-read-bw=/dev/manual:9M'],
-            ['PMSS_HOME_DEVICE' => '/dev/testhome']
-        );
+        foreach ([
+            'explicit read bandwidth' => [
+                ['root', '--apply', '--dry-run', '--defaults', '--io-read-bw=/dev/manual:9M'],
+                'IOReadBandwidthMax=/dev/manual 9M',
+            ],
+            'IO profile' => [
+                ['root', '--apply', '--dry-run', '--defaults', '--device=/dev/manual', '--io-profile=hdd'],
+                'IOReadBandwidthMax=/dev/manual 5M',
+            ],
+        ] as $label => [$argv, $expected]) {
+            $out = $this->pmssRunUserConfigCgroupCliWithPolicy(
+                ['mounts' => ['/home' => ['readBw' => '25M']]],
+                $argv,
+                ['PMSS_HOME_DEVICE' => '/dev/testhome']
+            );
 
-        $this->assertStringContainsString('IOReadBandwidthMax=/dev/manual 9M', $out);
-        $this->assertStringNotContainsString('IOReadBandwidthMax=/dev/testhome 25M', $out);
-    }
-
-    public function testIoProfileOverridesPolicyMountIoPairs(): void
-    {
-        $out = $this->pmssRunUserConfigCgroupCliWithPolicy(
-            ['mounts' => ['/home' => ['readBw' => '25M']]],
-            ['root', '--apply', '--dry-run', '--defaults', '--device=/dev/manual', '--io-profile=hdd'],
-            ['PMSS_HOME_DEVICE' => '/dev/testhome']
-        );
-
-        $this->assertStringContainsString('IOReadBandwidthMax=/dev/manual 5M', $out);
-        $this->assertStringNotContainsString('IOReadBandwidthMax=/dev/testhome 25M', $out);
+            $this->assertStringContainsString($expected, $out, $label);
+            $this->assertStringNotContainsString('IOReadBandwidthMax=/dev/testhome 25M', $out, $label);
+        }
     }
 }

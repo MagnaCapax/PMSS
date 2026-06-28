@@ -7,9 +7,7 @@
  */
 require_once dirname(__DIR__).'/userLifecycle.php';
 require_once dirname(__DIR__).'/runtime.php';
-require_once dirname(__DIR__).'/traffic.php';
-require_once dirname(__DIR__).'/cli/optionParser.php';
-require_once dirname(__DIR__).'/user/trafficLimit.php';
+pmssRequireRelativeFiles(dirname(__DIR__), ['traffic.php', 'cli/optionParser.php', 'user/trafficLimit.php']);
 
 function pmssShowTrafficMain(array $argv): int
 {

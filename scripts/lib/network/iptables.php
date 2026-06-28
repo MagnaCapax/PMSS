@@ -178,8 +178,8 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
 
 function networkApplyIptablesFallback(array $filterCommands, array $natCommands, array $replacements): void
 {
-    $renderedCommands = networkIptablesFallbackRenderedCommands($filterCommands, $natCommands, $replacements);
-    if ($renderedCommands === null) {
+    $renderedSets = networkIptablesRenderCommandSets($filterCommands, $natCommands, $replacements);
+    if ($renderedSets === null) {
         return;
     }
 
@@ -187,48 +187,51 @@ function networkApplyIptablesFallback(array $filterCommands, array $natCommands,
         networkRunIptables($flushCommand);
     }
 
-    foreach ($renderedCommands as $cmd) {
+    foreach ($renderedSets['filter'] as $cmd) {
+        networkRunIptables($cmd);
+    }
+    foreach ($renderedSets['nat'] as $cmd) {
+        if (strpos($cmd, '-t nat') !== 0) {
+            $cmd = '-t nat '.$cmd;
+        }
         networkRunIptables($cmd);
     }
 }
 
 /**
- * Render and validate sequential fallback rules before any chains are flushed.
+ * Render and validate iptables rules before any apply path sees them.
  *
  * @param array<int, mixed> $filterCommands
  * @param array<int, mixed> $natCommands
  * @param array<string, mixed> $replacements
- * @return ?array<int, string>
+ * @return ?array{filter:array<int,string>,nat:array<int,string>}
  */
-function networkIptablesFallbackRenderedCommands(array $filterCommands, array $natCommands, array $replacements): ?array
+function networkIptablesRenderCommandSets(array $filterCommands, array $natCommands, array $replacements): ?array
 {
     foreach ($replacements as $search => $replace) {
         if (!is_string($search) || !is_string($replace)) {
-            networkIptablesLog('ERROR', 'rejected non-string iptables fallback replacement');
+            networkIptablesLog('ERROR', 'rejected non-string iptables replacement');
             return null;
         }
     }
 
-    $renderedCommands = [];
+    $renderedSets = ['filter' => [], 'nat' => []];
     $search = array_keys($replacements);
     $replace = array_values($replacements);
-    foreach ([$filterCommands, $natCommands] as $index => $commands) {
+    foreach (['filter' => $filterCommands, 'nat' => $natCommands] as $section => $commands) {
         foreach ($commands as $cmd) {
             if (!is_string($cmd)) {
-                networkIptablesLog('ERROR', 'rejected non-string iptables fallback rule: '.gettype($cmd));
+                networkIptablesLog('ERROR', 'rejected non-string iptables rule: '.gettype($cmd));
                 return null;
             }
             $rendered = str_replace($search, $replace, $cmd);
-            if ($index === 1 && strpos($rendered, '-t nat') !== 0) {
-                $rendered = '-t nat '.$rendered;
-            }
             if (!networkIptablesCommandSafe($rendered)) {
-                networkIptablesLog('ERROR', "rejected unsafe rendered iptables fallback rule: {$rendered}");
+                networkIptablesLog('ERROR', "rejected unsafe rendered iptables rule: {$rendered}");
                 return null;
             }
-            $renderedCommands[] = $rendered;
+            $renderedSets[$section][] = $rendered;
         }
     }
 
-    return $renderedCommands;
+    return $renderedSets;
 }

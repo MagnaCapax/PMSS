@@ -10,31 +10,18 @@ pmss_testing_cd_root_dir "$ROOT_DIR"
 
 echo "[php73-compat-scan]" >&2
 
-paths=(
-	scripts
-	etc/skel/www
-)
-
 # Build ripgrep or grep command
 if command -v rg >/dev/null 2>&1; then
-	IS_RG=1
-	SEARCHER=(rg -n -H --hidden --no-ignore --glob '*.php')
-	EXCLUDES=(--glob '!vendor/**' --glob '!scripts/lib/tests/**')
+	SEARCHER=(rg -n -H --hidden --no-ignore --glob '*.php' --glob '!vendor/**' --glob '!scripts/lib/tests/**')
 else
-	IS_RG=0
-	SEARCHER=(grep -RIn)
-	EXCLUDES=(--exclude-dir=vendor --exclude-dir=tests --include='*.php')
+	SEARCHER=(grep -RIn -E --exclude-dir=vendor --exclude-dir=tests --include='*.php')
 fi
 
 fail=0
 
 scan() {
 	local pattern="$1" label="$2" out
-	if [[ "$IS_RG" -eq 1 ]]; then
-		out=$("${SEARCHER[@]}" "${EXCLUDES[@]}" "$pattern" "${paths[@]}" || true)
-	else
-		out=$("${SEARCHER[@]}" "${EXCLUDES[@]}" -E "$pattern" "${paths[@]}" || true)
-	fi
+	out=$("${SEARCHER[@]}" "$pattern" scripts etc/skel/www || true)
 	if [[ -n "$out" ]]; then
 		echo "[FAIL] $label found:" >&2
 		echo "$out" >&2

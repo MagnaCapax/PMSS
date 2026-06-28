@@ -534,8 +534,17 @@ function pmssWireguardPeerPublicKeysFromConfig(string $configPath): array
  */
 function wgReadUserPublicKeys(string $user): array
 {
+    if (!pmssValidateUsername($user)) {
+        wgLog('Ignoring WireGuard public keys for invalid user '.$user);
+        return [];
+    }
+
     $path = wgUserPublicKeyPath($user);
-    if (!is_file($path)) {
+    if (!file_exists($path)) {
+        return [];
+    }
+    if (!is_file($path) || is_link($path)) {
+        wgLog('Ignoring unsafe WireGuard public key path for user '.$user.': '.$path);
         return [];
     }
 

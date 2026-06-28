@@ -9,6 +9,7 @@
 namespace PMSS\Cgroup;
 
 require_once __DIR__ . '/SystemInterface.php';
+require_once __DIR__ . '/policy.php';
 require_once __DIR__ . '/../runtime.php'; // for requireRoot helper if needed
 require_once __DIR__ . '/../userLifecycle.php';
 
@@ -51,8 +52,9 @@ class RealSystem implements SystemInterface
             return $homeDev;
         }
 
-        $target = ($device === '/home') ? '/home' : escapeshellarg($device);
-        return trim((string) $this->execute('findmnt -no SOURCE '.$target.' 2>/dev/null'));
+        return \pmssCgroupPolicyMountSourceResolve($device, function (string $command): string {
+            return trim((string) $this->execute($command));
+        });
     }
 
     public function requireRoot(): void

@@ -457,29 +457,11 @@ function pmssDumpForkDiagnostics(string $context, ?callable $logger = null): voi
         }
     }
 
-    $cgPath = null;
-    $cgLines = @file('/proc/self/cgroup', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (is_array($cgLines)) {
-        foreach ($cgLines as $cgLine) {
-            $parts = explode(':', $cgLine, 3);
-            if (count($parts) === 3 && $parts[0] === '0') {
-                $cgPath = $parts[2];
-                break;
-            }
-        }
-        if ($cgPath === null && count($cgLines) > 0) {
-            $parts = explode(':', $cgLines[count($cgLines) - 1], 3);
-            if (count($parts) === 3) {
-                $cgPath = $parts[2];
-            }
-        }
-    }
-
-    if (!is_string($cgPath) || $cgPath === '') {
+    $cgPath = pmssCgroupSelfPath();
+    if ($cgPath === '') {
         return;
     }
 
-    $cgPath = '/'.ltrim($cgPath, '/');
     $ancestors = [];
     $cursor = $cgPath;
     for ($i = 0; $i < 10; $i++) {

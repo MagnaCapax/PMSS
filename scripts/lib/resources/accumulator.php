@@ -9,7 +9,7 @@
 class ResourceStatsAccumulator
 {
     public const RAW_METRICS = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'];
-    private const AVERAGE_METRICS = ['memory', 'tasks'];
+    public const AVERAGE_METRICS = ['memory', 'tasks'];
     private const CURRENT_RESULT_KEYS = ['memory' => 'current_memory', 'tasks' => 'current_tasks', 'memory_anon' => 'current_memory_anon', 'memory_file' => 'current_memory_file'];
 
     private $compareTimes;

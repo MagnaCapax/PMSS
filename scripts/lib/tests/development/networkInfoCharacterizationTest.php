@@ -33,6 +33,7 @@ class NetworkInfoCharacterizationTest extends TestCase
             'scripts/util/setupNetwork.php',
             [
                 '$detectedLinkSpeed = getDetectedLinkSpeed($link);',
+                '$renderedIptables = networkIptablesRenderCommandSets($filterCommands, $natCommands, $replacements);',
                 'detected %s link speed %dMbit exceeds configured FireQOS speed %dMbit; keeping configured cap',
                 '$fireqosNetworkConfig[\'interface\'] = $interface;',
                 '$fireqosNetworkConfig[\'speed\'] = $linkSpeed;',

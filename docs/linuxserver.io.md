@@ -315,6 +315,13 @@ PMSS. Treat them as **starting points**, not copy‑paste gospel:
 - Always cross‑check the official docs at https://docs.linuxserver.io/images/
   for the current list of environment variables and ports.
 
+PMSS-tested recipes are the Jellyfin walkthrough above and the apps supported by
+`docker-install-lsio`: `jellyfin`, `qbittorrent`, `radarr`, `sonarr`,
+`prowlarr`, `mariadb`, and `phpmyadmin`. Other catalog examples in this section
+are generic upstream LinuxServer.io recipes, not PMSS installer-backed or
+PMSS-tested deployments. PMSS installs and supports Jellyfin as its media
+server; Plex is included here only as an upstream-deferred catalog example.
+
 All examples follow the same baseline:
 
 ```bash

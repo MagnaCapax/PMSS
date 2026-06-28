@@ -6,13 +6,15 @@
  * @author PMSS Team
  */
 
+const PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY = ['ok' => ['color' => '32', 'mark' => 'OK', 'rank' => 2], 'warn' => ['color' => '33', 'mark' => '!!', 'rank' => 1], 'fail' => ['color' => '31', 'mark' => 'XX', 'rank' => 0]];
+
 /** Apply severity coloring only for interactive terminals. */
 function pmssStorageHealthColor(string $severity, string $text): string
 {
     if (!pmssStreamIsTty(STDOUT)) {
         return $text;
     }
-    $code = ['ok' => '32', 'warn' => '33', 'fail' => '31'][$severity] ?? '0';
+    $code = PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$severity]['color'] ?? '0';
     return "\033[".$code."m".$text."\033[0m";
 }
 
@@ -41,7 +43,6 @@ function pmssStorageHealthReportDiskRow(array $entry): array
 /** @param array<int, array<string, mixed>> $disks @param array<int, array<string, mixed>> $raid */
 function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestamp, string $jsonPath): void
 {
-    $markLabelMap = ['ok' => 'OK', 'warn' => '!!', 'fail' => 'XX'];
     $header = "Storage health (latest snapshot {$timestamp})";
     echo $header.PHP_EOL;
     echo str_repeat('=', strlen($header)).PHP_EOL.PHP_EOL;
@@ -57,9 +58,8 @@ function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestam
         echo "Disks\n-----\n";
         $rows = array_map('pmssStorageHealthReportDiskRow', $disks);
         usort($rows, static function (array $a, array $b): int {
-            $rank = ['fail' => 0, 'warn' => 1, 'ok' => 2];
-            $ra = $rank[$a['sev']] ?? 1;
-            $rb = $rank[$b['sev']] ?? 1;
+            $ra = PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$a['sev']]['rank'] ?? 1;
+            $rb = PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$b['sev']]['rank'] ?? 1;
             return $ra !== $rb ? $ra - $rb : strcmp($a['dev'], $b['dev']);
         });
         $modelWidth = 12;
@@ -70,7 +70,7 @@ function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestam
         echo $fmtHeader;
         echo str_repeat('-', max(20, strlen(rtrim($fmtHeader)))).PHP_EOL;
         foreach ($rows as $r) {
-            printf("%-4s %-4s %-5s %-5s %-".$modelWidth."s %-10s %-5s %-7s %-6s %-6s %s\n", pmssStorageHealthColor($r['sev'], $markLabelMap[$r['sev']] ?? '?'), strtoupper($r['sev']), $r['dev'], $r['size'], substr($r['model'], 0, $modelWidth), substr($r['health'], 0, 10), $r['temp'], $r['realloc'], $r['pend'], $r['link'], $r['flags']);
+            printf("%-4s %-4s %-5s %-5s %-".$modelWidth."s %-10s %-5s %-7s %-6s %-6s %s\n", pmssStorageHealthColor($r['sev'], PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$r['sev']]['mark'] ?? '?'), strtoupper($r['sev']), $r['dev'], $r['size'], substr($r['model'], 0, $modelWidth), substr($r['health'], 0, 10), $r['temp'], $r['realloc'], $r['pend'], $r['link'], $r['flags']);
         }
         echo PHP_EOL;
     }
@@ -81,7 +81,7 @@ function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestam
         echo str_repeat('-', 72).PHP_EOL;
         foreach ($raid as $entry) {
             $sev = (string) ($entry['severity'] ?? 'warn');
-            printf("%-4s %-4s %-6s %-6s %-10s %s\n", pmssStorageHealthColor($sev, $markLabelMap[$sev] ?? '?'), strtoupper($sev), (string) ($entry['array'] ?? ''), (string) ($entry['level'] ?? ''), (string) ($entry['state'] ?? ''), (string) ($entry['detail'] ?? ''));
+            printf("%-4s %-4s %-6s %-6s %-10s %s\n", pmssStorageHealthColor($sev, PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$sev]['mark'] ?? '?'), strtoupper($sev), (string) ($entry['array'] ?? ''), (string) ($entry['level'] ?? ''), (string) ($entry['state'] ?? ''), (string) ($entry['detail'] ?? ''));
         }
         echo PHP_EOL;
     }

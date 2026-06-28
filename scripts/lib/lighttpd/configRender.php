@@ -78,19 +78,18 @@ function pmssLighttpdRenderUserConfig(
 
 function pmssLighttpdApplyPhpIniContent(string $content, string $user, int $memoryLimitMiB): string
 {
-    $memoryLine = 'memory_limit = '.$memoryLimitMiB.'M';
-    $updated = preg_match('/^memory_limit\s*=.*$/m', $content)
-        ? preg_replace('/^memory_limit\s*=.*$/m', $memoryLine, $content, 1)
-        : rtrim($content, "\n")."\n".$memoryLine."\n";
-    $content = is_string($updated) ? $updated : $content;
+    // Keep upload temp files quota-bound while replacing managed php.ini lines consistently.
+    foreach ([
+        '/^memory_limit\s*=.*$/m' => 'memory_limit = '.$memoryLimitMiB.'M',
+        '/^\s*;?\s*upload_tmp_dir\s*=.*$/m' => 'upload_tmp_dir = /home/'.$user.'/.lighttpd/upload',
+    ] as $pattern => $line) {
+        $updated = preg_match($pattern, $content)
+            ? preg_replace($pattern, $line, $content, 1)
+            : rtrim($content, "\n")."\n".$line."\n";
+        $content = is_string($updated) ? $updated : $content;
+    }
 
-    // Keep upload temp files inside the user's quota-bound tree, not shared /tmp.
-    $uploadTmpDirLine = 'upload_tmp_dir = /home/'.$user.'/.lighttpd/upload';
-    $updated = preg_match('/^\s*;?\s*upload_tmp_dir\s*=.*$/m', $content)
-        ? preg_replace('/^\s*;?\s*upload_tmp_dir\s*=.*$/m', $uploadTmpDirLine, $content, 1)
-        : rtrim($content, "\n")."\n".$uploadTmpDirLine."\n";
-
-    return is_string($updated) ? $updated : $content;
+    return $content;
 }
 
 function pmssLighttpdSyncPhpIni(string $phpIniPath, string $user, int $memoryLimitMiB, &$failureReason = null): bool

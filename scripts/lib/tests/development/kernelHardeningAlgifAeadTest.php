@@ -1,10 +1,10 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/KernelHardeningTestCase.php';
 require_once dirname(__DIR__, 2).'/update/kernelHardening.php';
 
-class KernelHardeningAlgifAeadTest extends TestCase
+class KernelHardeningAlgifAeadTest extends KernelHardeningTestCase
 {
     public function testWritesBlacklistAndRunsUnloadStep(): void
     {
@@ -12,12 +12,7 @@ class KernelHardeningAlgifAeadTest extends TestCase
         $logs = [];
         $calls = [];
 
-        $this->pmssWithEnv($this->algifEnv($dir), function () use (&$logs, &$calls): void {
-            \pmssEnsureAlgifAeadBlacklist(
-                $this->pmssMakeArrayLogger($logs),
-                $this->captureKernelCalls($calls)
-            );
-        });
+        $this->pmssRunKernelHardeningWithCalls('\pmssEnsureAlgifAeadBlacklist', $this->algifEnv($dir), $logs, $calls);
 
         $this->assertEquals(\pmssAlgifAeadBlacklistBody(), file_get_contents($dir.'/modprobe.d/pmss-algif-blacklist.conf'));
         $this->assertTrue($this->pmssMessagesContain($logs, 'Updated '.$dir.'/modprobe.d/pmss-algif-blacklist.conf'), 'expected blacklist update log');
@@ -32,12 +27,7 @@ class KernelHardeningAlgifAeadTest extends TestCase
         $logs = [];
         $calls = [];
 
-        $this->pmssWithEnv($this->algifEnv($dir), function () use (&$logs, &$calls): void {
-            \pmssEnsureAlgifAeadBlacklist(
-                $this->pmssMakeArrayLogger($logs),
-                $this->captureKernelCalls($calls)
-            );
-        });
+        $this->pmssRunKernelHardeningWithCalls('\pmssEnsureAlgifAeadBlacklist', $this->algifEnv($dir), $logs, $calls);
 
         $this->assertTrue($this->pmssMessagesContain($logs, 'Copy Fail algif_aead blacklist already up to date'), 'expected idempotent skip log');
         $this->assertEquals(1, count($calls));
@@ -51,12 +41,7 @@ class KernelHardeningAlgifAeadTest extends TestCase
         $env = $this->algifEnv($dir);
         $env['PMSS_DRY_RUN'] = '1';
 
-        $this->pmssWithEnv($env, function () use (&$logs, &$calls): void {
-            \pmssEnsureAlgifAeadBlacklist(
-                $this->pmssMakeArrayLogger($logs),
-                $this->captureKernelCalls($calls)
-            );
-        });
+        $this->pmssRunKernelHardeningWithCalls('\pmssEnsureAlgifAeadBlacklist', $env, $logs, $calls);
 
         $this->assertTrue($this->pmssMessagesContain($logs, 'Copy Fail algif_aead blacklist: skipping all mutations'), 'expected dry-run skip log');
         $this->assertTrue(!is_file($dir.'/modprobe.d/pmss-algif-blacklist.conf'), 'expected dry-run to skip file creation');
@@ -70,12 +55,7 @@ class KernelHardeningAlgifAeadTest extends TestCase
         $env = $this->algifEnv($dir, "CONFIG_CRYPTO_USER_API_AEAD=y\n");
 
         list($ignored, $stdout) = $this->pmssCaptureStdout(function () use ($env, &$logs): void {
-            $this->pmssWithEnv($env, function () use (&$logs): void {
-                \pmssEnsureAlgifAeadBlacklist(
-                    $this->pmssMakeArrayLogger($logs),
-                    $this->noopKernelRunner()
-                );
-            });
+            $this->pmssRunKernelHardeningNoop('\pmssEnsureAlgifAeadBlacklist', $env, $logs);
         });
 
         $this->assertTrue($this->pmssMessagesContain($logs, 'algif_aead is built into this kernel'), 'expected built-in warning via custom logger');
@@ -92,12 +72,12 @@ class KernelHardeningAlgifAeadTest extends TestCase
 
         $logs = [];
         $calls = [];
-        $this->pmssWithEnv($this->dispatcherEnv($dir, "Module                  Size  Used by\n", "CONFIG_CRYPTO_USER_API_AEAD=m\n"), function () use (&$logs, &$calls): void {
-            \pmssApplyKernelHardening(
-                $this->pmssMakeArrayLogger($logs),
-                $this->captureKernelCalls($calls)
-            );
-        });
+        $this->pmssRunKernelHardeningWithCalls(
+            '\pmssApplyKernelHardening',
+            $this->dispatcherEnv($dir, "Module                  Size  Used by\n", "CONFIG_CRYPTO_USER_API_AEAD=m\n"),
+            $logs,
+            $calls
+        );
 
         foreach ($this->dispatcherCases($dir) as $case) {
             $this->assertTrue($this->pmssMessagesContain($logs, $case['skip']), 'expected skip log for '.$case['name']);
@@ -125,12 +105,7 @@ class KernelHardeningAlgifAeadTest extends TestCase
 
         $logs = [];
         list($ignored, $stdout) = $this->pmssCaptureStdout(function () use ($env, &$logs): void {
-            $this->pmssWithEnv($env, function () use (&$logs): void {
-                \pmssApplyKernelHardening(
-                    $this->pmssMakeArrayLogger($logs),
-                    $this->noopKernelRunner()
-                );
-            });
+            $this->pmssRunKernelHardeningNoop('\pmssApplyKernelHardening', $env, $logs);
         });
 
         $this->assertTrue($this->pmssMessagesContain($logs, 'algif_aead is built into this kernel'), 'expected copyfail built-in warning');
@@ -197,7 +172,4 @@ class KernelHardeningAlgifAeadTest extends TestCase
         ];
     }
 
-    private function captureKernelCalls(array &$calls): callable { return function (string $description, string $command) use (&$calls): int { $calls[] = [$description, $command]; return 0; }; }
-
-    private function noopKernelRunner(): callable { return function (): int { return 0; }; }
 }

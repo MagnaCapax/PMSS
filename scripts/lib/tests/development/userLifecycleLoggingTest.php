@@ -69,10 +69,7 @@ class userLifecycleLoggingTest extends TestCase
 
         foreach ($cases as $case) {
             $calls = array();
-            $result = \pmssUserLifecycleRefreshNginxConfig($case[0], 'alice', false, $case[1], $case[2], $case[3], static function (string $action, string $username, string $step, string $command, bool $dryRun) use (&$calls, $case): int {
-                $calls[] = array('action' => $action, 'username' => $username, 'step' => $step, 'command' => $command, 'dryRun' => $dryRun);
-                return $step === $case[4] ? 1 : 0;
-            });
+            $result = \pmssUserLifecycleRefreshNginxConfig($case[0], 'alice', false, $case[1], $case[2], $case[3], $this->recordLifecycleSteps($calls, $case[4]));
 
             $this->assertSame(0, $result);
             $this->assertSame($case[5], array_column($calls, 'step'));
@@ -88,10 +85,7 @@ class userLifecycleLoggingTest extends TestCase
             'unsuspend',
             'alice',
             true,
-            static function (string $action, string $username, string $step, string $command, bool $dryRun) use (&$calls): int {
-                $calls[] = array('action' => $action, 'username' => $username, 'step' => $step, 'command' => $command, 'dryRun' => $dryRun);
-                return 0;
-            }
+            $this->recordLifecycleSteps($calls)
         );
 
         $this->assertSame(0, $result);
@@ -264,5 +258,13 @@ class userLifecycleLoggingTest extends TestCase
         touch($valid, 1000);
 
         $this->assertSame($valid, \pmssUserLifecycleFindSuspendedBackup($home));
+    }
+
+    private function recordLifecycleSteps(array &$calls, ?string $failStep = null): callable
+    {
+        return static function (string $action, string $username, string $step, string $command, bool $dryRun) use (&$calls, $failStep): int {
+            $calls[] = array('action' => $action, 'username' => $username, 'step' => $step, 'command' => $command, 'dryRun' => $dryRun);
+            return $step === $failStep ? 1 : 0;
+        };
     }
 }

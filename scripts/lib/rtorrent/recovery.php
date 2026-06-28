@@ -111,7 +111,7 @@ function rtorrentCustomConfigFindLegacyDirectives(string $content): array
     }
 
     $matches = [];
-    foreach (pmssRtorrentLegacyDirectiveNames() as $label) {
+    foreach (array_keys(pmssRtorrentLegacyDirectiveCatalog()) as $label) {
         if (preg_match('/^\s*'.preg_quote($label, '/').'\s*=/m', $content) === 1) {
             $matches[] = $label;
         }

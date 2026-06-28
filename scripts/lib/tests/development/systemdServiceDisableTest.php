@@ -6,6 +6,26 @@ require_once dirname(__DIR__, 2).'/update/services/systemd.php';
 
 class SystemdServiceDisableTest extends TestCase
 {
+    public function testEximSpoolCleanupCommandOnlyAllowsExactManagedDirectories(): void
+    {
+        foreach (\pmssEximSpoolCleanupDirectories() as $dir) {
+            $this->assertSame(
+                'find '.escapeshellarg($dir).' -xdev -type f -delete 2>/dev/null || true',
+                \pmssEximSpoolCleanupCommand($dir)
+            );
+        }
+
+        foreach ([
+            '/var/spool/exim4',
+            '/var/spool/exim4/input/..',
+            '/var/spool/exim4/input/child',
+            '/var/spool/exim4/input'."\0".'suffix',
+            '/tmp/exim4/input',
+        ] as $unsafeDir) {
+            $this->assertSame(null, \pmssEximSpoolCleanupCommand($unsafeDir), $unsafeDir);
+        }
+    }
+
     public function testSeedboxSystemServicesDisableIsLoggedInDryRun(): void
     {
         $this->pmssResetRuntimeProfile();

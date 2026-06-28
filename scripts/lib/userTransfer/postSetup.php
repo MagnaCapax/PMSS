@@ -10,6 +10,7 @@ require_once __DIR__.'/completenessVerify.php';
 require_once __DIR__.'/localUserSafety.php';
 require_once __DIR__.'/qbittorrentCategories.php';
 require_once __DIR__.'/sessionRewrite.php';
+require_once dirname(__DIR__).'/rtorrent/scgi.php';
 
 function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths): void
 {
@@ -70,4 +71,89 @@ function pmssUserTransferRequestRtorrentRestart(string $home, string $localUser)
     $marker = $wwwDir.'/.rtorrentRestart';
     runStep('Requesting rTorrent restart marker', pmssBuildCommand('touch', [$marker]));
     runStep('Setting rTorrent restart marker owner', pmssBuildCommand('chown', [$localUser.':'.$localUser, $marker]));
+    pmssUserTransferRunRtorrentRestart($home, $localUser);
+}
+
+/**
+ * Execute the marker-driven restart immediately so migration is not cron-latent.
+ */
+function pmssUserTransferRunRtorrentRestart(string $home, string $localUser): void
+{
+    $restartScript = $home.'/.rtorrentRestart.php';
+    if (!is_file($restartScript) || is_link($restartScript) || !pmssUserTransferIsPathWithinHome($restartScript, $home)) {
+        logMessage('[WARN] Skipping rTorrent restart execution (restart script missing or unsafe)');
+        return;
+    }
+
+    $requestedAt = time();
+    runStep(
+        'Running rTorrent restart request',
+        pmssBuildUserShellCommand($localUser, 'cd '.escapeshellarg($home).' && php ./.rtorrentRestart.php')
+    );
+    pmssUserTransferVerifyRtorrentRestart($home, $localUser, $requestedAt);
+}
+
+/**
+ * Count migrated rTorrent session payloads that should be loaded after restart.
+ */
+function pmssUserTransferRtorrentSessionTorrentCount(string $home): int
+{
+    $matches = glob(rtrim($home, '/').'/session/*.torrent');
+    return is_array($matches) ? count($matches) : 0;
+}
+
+/**
+ * Return the live rTorrent download_list count, or null when SCGI is unavailable.
+ */
+function pmssUserTransferRtorrentDownloadListCount(string $home, ?callable $caller = null): ?int
+{
+    $caller = $caller ?? 'rtorrentScgiCall';
+    $downloads = $caller(rtrim($home, '/').'/.rtorrent.socket', 'download_list', [], 3);
+    return is_array($downloads) ? count($downloads) : null;
+}
+
+/**
+ * Wait briefly for rTorrent SCGI to answer after the restart request.
+ */
+function pmssUserTransferWaitForRtorrentDownloadListCount(string $home, int $timeoutSeconds = 30, ?callable $caller = null): ?int
+{
+    $deadline = time() + max(0, $timeoutSeconds);
+    do {
+        $count = pmssUserTransferRtorrentDownloadListCount($home, $caller);
+        if ($count !== null) {
+            return $count;
+        }
+        if (time() >= $deadline) {
+            break;
+        }
+        sleep(min(5, max(1, $deadline - time())));
+    } while (true);
+
+    return null;
+}
+
+/**
+ * Surface migration restart failures without changing transfer exit semantics.
+ */
+function pmssUserTransferVerifyRtorrentRestart(string $home, string $localUser, int $requestedAt): void
+{
+    $sessionCount = pmssUserTransferRtorrentSessionTorrentCount($home);
+    if ($sessionCount === 0) {
+        logMessage('[INFO] rTorrent restart verification skipped: no session torrent files found');
+        return;
+    }
+
+    $socketPath = rtrim($home, '/').'/.rtorrent.socket';
+    $loadedCount = pmssUserTransferWaitForRtorrentDownloadListCount($home);
+    $socketMtime = file_exists($socketPath) ? (int) @filemtime($socketPath) : 0;
+    if ($loadedCount === null && $socketMtime >= $requestedAt) {
+        logMessage('[OK] rTorrent restart verification: socket refreshed after restart request');
+        return;
+    }
+    if ($loadedCount !== null && $loadedCount > 0) {
+        logMessage('[OK] rTorrent restart verification: live session loaded '.$loadedCount.' torrents for '.$localUser);
+        return;
+    }
+
+    logMessage('[WARN] rTorrent restart verification could not confirm migrated session reload for '.$localUser.' (session files='.$sessionCount.', loaded='.($loadedCount === null ? 'unknown' : (string) $loadedCount).')');
 }

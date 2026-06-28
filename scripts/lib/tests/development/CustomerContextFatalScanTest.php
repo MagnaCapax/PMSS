@@ -99,6 +99,21 @@ PHP
         $this->assertSame(0, $result['rc']);
     }
 
+    public function testReportsMultipleLeaksWithOperatorSourcesInScanOrder(): void
+    {
+        $root = $this->pmssCustomerContextFixtureRoot([
+            'etc/skel/www/alpha.php' => "<?php\npmssAlphaOperator();\npmssUnknownOperator();\n",
+            'etc/skel/www/omega.php' => "<?php\npmssOmegaOperator();\n",
+            'scripts/lib/alpha.php' => "<?php\nfunction pmssAlphaOperator(): void {}\n",
+            'scripts/lib/nested/omega.php' => "<?php\nfunction pmssOmegaOperator(): void {}\n",
+        ]);
+
+        $result = $this->pmssCustomerContextRunScan($root);
+
+        $this->assertSame(1, $result['rc']);
+        $this->assertSame("[customer-context-fatal-scan] FAIL - OPERATOR_TREE_FUNCTION_LEAK: 3 unresolved customer PHP function call(s):\n  etc/skel/www/alpha.php:2 - pmssAlphaOperator() (operator tree definition: scripts/lib/alpha.php)\n  etc/skel/www/alpha.php:3 - pmssUnknownOperator()\n  etc/skel/www/omega.php:2 - pmssOmegaOperator() (operator tree definition: scripts/lib/nested/omega.php)\n\nPer ADR 0016 and ADR 0017, customer PHP must not depend on operator-tree functions.\nMove the customer-side subset into etc/skel/www/ or split operator-write/customer-read behavior.", $result['output']);
+    }
+
     private function pmssCustomerContextFixtureRoot(array $files): string
     {
         $root = $this->pmssMakeTempDir('pmss-customer-context-scan-', 0700);

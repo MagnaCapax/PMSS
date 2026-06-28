@@ -10,7 +10,6 @@ class UpdateRequireOnceTopologyTest extends TestCase
         $repoRoot = $this->pmssRepoRoot();
         $script = <<<'PHP'
 $repoRoot = __REPO_ROOT__;
-putenv('PMSS_TEST_MODE=1');
 
 require_once $repoRoot.'/scripts/lib/update/repositories.php';
 require_once $repoRoot.'/scripts/lib/update.php';
@@ -53,6 +52,6 @@ echo 'ok';
 PHP;
 
         $script = str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script);
-        $this->assertEquals('ok', trim($this->pmssRunInlinePhp($script, ['PMSS_TEST_MODE' => '1'], '2>&1')));
+        $this->assertEquals('ok', trim($this->pmssRunInlinePhp($script, $this->pmssTestModeEnv(), '2>&1')));
     }
 }

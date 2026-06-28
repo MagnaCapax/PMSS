@@ -7,22 +7,14 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
+require_once dirname(__DIR__, 2).'/pathSafety.php';
 
 /**
  * Confirm that a user maintenance path resolves beneath the configured home root.
  */
 function pmssUserPathWithinHomeRoot(string $path): bool
 {
-    $homeRoot = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/');
-    $realHomeRoot = realpath($homeRoot);
-    $realParent = realpath(dirname($path));
-    if ($homeRoot === '' || $homeRoot === '/' || $realHomeRoot === false || $realParent === false) {
-        return false;
-    }
-
-    $candidate = rtrim($realParent, '/').'/'.basename($path);
-    $prefix = rtrim($realHomeRoot, '/').'/';
-    return strpos($candidate, $prefix) === 0;
+    return pmssPathWithinResolvedRoot($path, pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'));
 }
 
 /**

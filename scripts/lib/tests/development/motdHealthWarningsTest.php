@@ -16,7 +16,7 @@ class MotdHealthWarningsTest extends TestCase
 
         // RAID degraded
         $this->pmssAppendFixtureLines($log, [
-            ['timestamp'=>date('c'),'kind'=>'raid','array'=>'md0','level'=>'raid5','state'=>'active','detail'=>'[5/4] [UU_U]','severity'=>'fail','ok'=>false],
+            ['timestamp'=>date('c'),'kind'=>'raid','array'=>'md0','level'=>'raid5','state'=>'active','detail'=>'[5/4] [UU_U]','severity'=>'fail','flags'=>['degraded'],'ok'=>false],
             ['timestamp'=>date('c'),'kind'=>'nvme','device'=>'/dev/nvme0n1','metrics'=>['critical_warnings'=>1]],
             ['timestamp'=>date('c'),'kind'=>'smart','device'=>'/dev/sda','flags'=>['udma_crc_increase']],
         ]);
@@ -28,7 +28,9 @@ class MotdHealthWarningsTest extends TestCase
         ], function (): void {
             \Motd::motdGenerate();
         });
-        $this->pmssAssertFileContainsAllStrings($out, ['Storage WARN:', 'RAID md0', 'NVMe critical warning', 'UDMA CRC increased']);
+        $this->pmssAssertFileContainsAllStrings($out, [
+            "\e[33mStorage WARN:\e[0m RAID md0: degraded | NVMe critical warning: /dev/nvme0n1 | SATA UDMA CRC increased: /dev/sda\n",
+        ]);
     }
 
     public function testMotdHandlesMalformedHealthLogGracefully(): void

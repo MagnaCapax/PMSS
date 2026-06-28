@@ -51,17 +51,17 @@ PHP;
 
     public function testGeneratorLogsMissingRtorrentPrerequisite(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/nginxConfig/userConfigsGenerate.php');
-
-        $this->assertStringContainsString('function pmssCreateNginxConfigLogSkippedUser(string $user, string $reason): void', $source);
-        $this->assertStringContainsString("pmssCreateNginxConfigLogSkippedUser(\$thisUser, 'missing .rtorrent.rc prerequisite');", $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/nginxConfig/userConfigsGenerate.php', [
+            'function pmssCreateNginxConfigLogSkippedUser(string $user, string $reason): void',
+            "pmssCreateNginxConfigLogSkippedUser(\$thisUser, 'missing .rtorrent.rc prerequisite');",
+        ]);
     }
 
     public function testGeneratorLogsInvalidLighttpdPortSkip(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/nginxConfig/userConfigsGenerate.php');
-
-        $this->assertStringContainsString('lighttpd port missing or invalid after refresh attempt', $source);
-        $this->assertStringContainsString('WARN: skipping nginx config for %s: %s', $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/nginxConfig/userConfigsGenerate.php', [
+            'lighttpd port missing or invalid after refresh attempt',
+            'WARN: skipping nginx config for %s: %s',
+        ]);
     }
 }

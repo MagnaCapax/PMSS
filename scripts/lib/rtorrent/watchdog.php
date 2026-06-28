@@ -168,3 +168,5 @@ function pmssCheckRtorrentRecoverMissingConfig(string $user, string $home, bool 
     pmssCheckRtorrentLogBoth($user, 'missing .rtorrent.rc recovered', $debug);
     return true;
 }
+
+require_once __DIR__.'/watchdogProcessFlow.php';

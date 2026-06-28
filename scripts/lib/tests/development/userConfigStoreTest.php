@@ -274,6 +274,17 @@ class UserConfigStoreTest extends TestCase
         $this->assertTrue($store instanceof \UserConfigStore);
     }
 
+    public function testStoreFacadeLoadsFeaturePolicyHelpers(): void
+    {
+        $store = $this->newStore();
+        $this->assertTrue(function_exists('pmssUserConfigFeatureEnabled'));
+        $this->assertEquals(true, \pmssUserConfigFeatureEnabled('alice', 'dockerEnabled', $store));
+
+        $payload = $this->basePayload(['lighttpdEnabled' => false]);
+        $this->assertTrue($store->set('facade', $payload));
+        $this->assertEquals(false, \pmssUserConfigFeatureEnabled('facade', 'lighttpdEnabled', $store));
+    }
+
     public function testUsernameNormalizationStaysConsistentAcrossStoreOperations(): void
     {
         $store = $this->newStore();

@@ -1,7 +1,6 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../common/UserConfigCgroupCliTrait.php';
 
 class UserCgroupCliShorthand2Test extends TestCase

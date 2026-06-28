@@ -108,8 +108,7 @@ BASH;
         $this->assertEquals(0, $result['rc']);
         $this->assertTrue(!is_dir($this->homeDir.'/docker/jellyfin/config'), 'dry-run must not create config dirs');
         $this->assertTrue(!is_dir($this->homeDir.'/media'), 'dry-run must not create data dirs');
-        $this->assertStringContainsString('--network pmss-media', $result['output']);
-        $this->assertStringContainsString($this->homeDir.'/media:/data', $result['output']);
+        $this->assertStringContainsAllStrings(['--network pmss-media', $this->homeDir.'/media:/data'], $result['output']);
     }
 
     public function testSupportedAppCatalogFeedsUsageText(): void
@@ -130,8 +129,7 @@ BASH;
 
         $this->assertEquals(0, $result['rc']);
         $this->assertTrue(!is_dir($this->homeDir.'/downloads'), 'dry-run must not create downloads dir');
-        $this->assertStringContainsString('WEBUI_PORT=8080', $result['output']);
-        $this->assertStringContainsString($this->homeDir.'/downloads:/downloads', $result['output']);
+        $this->assertStringContainsAllStrings(['WEBUI_PORT=8080', $this->homeDir.'/downloads:/downloads'], $result['output']);
     }
 
     public function testDryRunRadarrUsesMoviesAndSharedDownloads(): void
@@ -140,8 +138,7 @@ BASH;
 
         $this->assertEquals(0, $result['rc']);
         $this->assertTrue(!is_dir($this->homeDir.'/movies'), 'dry-run must not create movie dirs');
-        $this->assertStringContainsString($this->homeDir.'/movies:/movies', $result['output']);
-        $this->assertStringContainsString($this->homeDir.'/downloads:/downloads', $result['output']);
+        $this->assertStringContainsAllStrings([$this->homeDir.'/movies:/movies', $this->homeDir.'/downloads:/downloads'], $result['output']);
     }
 
     public function testCustomPortOverrideAppliesToSonarr(): void
@@ -158,9 +155,7 @@ BASH;
 
         $this->assertEquals(0, $result['rc']);
         $this->assertTrue(!is_dir($this->homeDir.'/docker/mariadb/config'), 'dry-run must not create config dirs');
-        $this->assertStringContainsString('-p 127.0.0.1:3306:3306', $result['output']);
-        $this->assertStringContainsString('generated-at-install', $result['output']);
-        $this->assertStringContainsString('MYSQL_USER=db_home', $result['output']);
+        $this->assertStringContainsAllStrings(['-p 127.0.0.1:3306:3306', 'generated-at-install', 'MYSQL_USER=db_home'], $result['output']);
         $this->assertTrue(!is_file($this->homeDir.'/docker/mariadb/pmss-credentials.env'), 'dry-run must not persist credentials');
     }
 
@@ -172,10 +167,8 @@ BASH;
         $this->assertEquals(0, $result['rc']);
         $this->assertTrue(is_file($credentialFile));
         $contents = (string) file_get_contents($credentialFile);
-        $this->assertStringContainsString('MYSQL_ROOT_PASSWORD=', $contents);
-        $this->assertStringContainsString('MYSQL_USER=db_home', $contents);
-        $this->assertStringContainsString('--env-file '.$credentialFile, $result['dockerLog']);
-        $this->assertStringContainsString('-p 127.0.0.1:3306:3306', $result['dockerLog']);
+        $this->assertStringContainsAllStrings(['MYSQL_ROOT_PASSWORD=', 'MYSQL_USER=db_home'], $contents);
+        $this->assertStringContainsAllStrings(['--env-file '.$credentialFile, '-p 127.0.0.1:3306:3306'], $result['dockerLog']);
     }
 
     public function testDryRunPhpMyAdminUsesLocalOnlyBindAndMariadbHost(): void
@@ -184,9 +177,7 @@ BASH;
 
         $this->assertEquals(0, $result['rc']);
         $this->assertTrue(!is_dir($this->homeDir.'/docker/phpmyadmin/config'), 'dry-run must not create config dirs');
-        $this->assertStringContainsString('-p 127.0.0.1:8082:80', $result['output']);
-        $this->assertStringContainsString('PMA_HOST=mariadb', $result['output']);
-        $this->assertStringContainsString('PMA_PORT=3306', $result['output']);
+        $this->assertStringContainsAllStrings(['-p 127.0.0.1:8082:80', 'PMA_HOST=mariadb', 'PMA_PORT=3306'], $result['output']);
     }
 
     public function testDryRunRejectsNonNumericHostPortOverride(): void

@@ -7,6 +7,7 @@
  */
 
 require_once dirname(__DIR__).'/runtime.php';
+require_once __DIR__.'/directories.php';
 
 if (is_file(dirname(__DIR__).'/lighttpd/userFileWrite.php')) {
     require_once dirname(__DIR__).'/lighttpd/userFileWrite.php';
@@ -117,19 +118,11 @@ function pmssIntegerSettingStorageDirEnsure(
     string $owner = 'root',
     string $group = 'root'
 ): bool {
-    if (!function_exists('pmssPathTargetIsSafe') || !pmssPathTargetIsSafe($path, true)) {
+    if (!pmssPathTargetIsSafe($path, true)) {
         return false;
     }
 
-    if (function_exists('pmssEnsureDir')) {
-        return pmssEnsureDir($path, $mode, $owner, $group) && is_dir($path) && !is_link($path);
-    }
-
-    if (!pmssDirEnsureExists($path, 0755) || !is_dir($path) || is_link($path)) {
-        return false;
-    }
-
-    return pmssIntegerSettingPathModeConverge($path, $mode);
+    return pmssEnsureDir($path, $mode, $owner, $group) && is_dir($path) && !is_link($path);
 }
 
 /** @param array<string,int> $targetModes */

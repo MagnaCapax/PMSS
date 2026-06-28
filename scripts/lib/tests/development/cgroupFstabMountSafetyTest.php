@@ -10,11 +10,11 @@ class CgroupFstabMountSafetyTest extends TestCase
     {
         $fstab = $this->pmssMakeTempFile('pmss-cgroup-fstab-');
         $this->pmssWriteFile($fstab, "UUID=abc / ext4 defaults 0 0\n");
-        $messages = [];
 
-        $changed = \pmssCgroupV1FstabMountEnsure($fstab, $this->pmssMakeArrayLogger($messages));
+        $messages = $this->pmssArrayLoggerMessages(function (callable $logger) use ($fstab): void {
+            $this->assertSame(true, \pmssCgroupV1FstabMountEnsure($fstab, $logger));
+        });
 
-        $this->assertSame(true, $changed);
         $this->assertStringContainsString(
             "cgroup\t/sys/fs/cgroup\tcgroup\tdefaults\t0\t0",
             (string) file_get_contents($fstab)
@@ -28,11 +28,11 @@ class CgroupFstabMountSafetyTest extends TestCase
         $original = "cgroup /sys/fs/cgroup cgroup defaults 0 0\n";
         $fstab = $this->pmssMakeTempFile('pmss-cgroup-fstab-existing-');
         $this->pmssWriteFile($fstab, $original);
-        $messages = [];
 
-        $changed = \pmssCgroupV1FstabMountEnsure($fstab, $this->pmssMakeArrayLogger($messages));
+        $messages = $this->pmssArrayLoggerMessages(function (callable $logger) use ($fstab): void {
+            $this->assertSame(false, \pmssCgroupV1FstabMountEnsure($fstab, $logger));
+        });
 
-        $this->assertSame(false, $changed);
         $this->assertEquals($original, (string) file_get_contents($fstab));
         $this->assertSame([], glob($fstab.'.pmss-backup-*') ?: []);
         $this->pmssAssertMessagesContain($messages, 'already present', 'expected skip log');
@@ -44,11 +44,11 @@ class CgroupFstabMountSafetyTest extends TestCase
         $link = $this->pmssMakeTempPath('pmss-cgroup-fstab-link-');
         $this->pmssWriteFile($target, "UUID=abc / ext4 defaults 0 0\n");
         $this->pmssCreateSymlinkOrSkip($target, $link);
-        $messages = [];
 
-        $changed = \pmssCgroupV1FstabMountEnsure($link, $this->pmssMakeArrayLogger($messages));
+        $messages = $this->pmssArrayLoggerMessages(function (callable $logger) use ($link): void {
+            $this->assertSame(null, \pmssCgroupV1FstabMountEnsure($link, $logger));
+        });
 
-        $this->assertSame(null, $changed);
         $this->assertEquals("UUID=abc / ext4 defaults 0 0\n", (string) file_get_contents($target));
         $this->pmssAssertMessagesContain($messages, 'not a regular file', 'expected symlink guard log');
     }

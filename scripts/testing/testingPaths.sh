@@ -6,7 +6,10 @@ pmss_testing_find_php_files() { find "$1" -type f -name "*.php" -not -path "*/ve
 pmss_testing_find_runtime_php_files() { find "$1" -type d \( -path "$1/vendor" -o -path "$1/scripts/lib/tests" \) -prune -o -type f -name "*.php" -print0; }
 pmss_testing_find_first_party_php_files() { find "$1" -type f -name "*.php" -not -path "*/.git/*" -not -path "*/vendor/*" -not -path "*/etc/skel/*" -not -path "*/scripts/lib/devristo/*" -print0; }
 pmss_testing_find_bash_files() { find "$1" -type f -name "*.sh" -not -path "*/vendor/*" -not -path "*/etc/skel/www/*" -print0; }
+pmss_testing_find_docblock_php_files() { find "$1/scripts/lib/update" -type f -name "*.php" | sort -u; find "$1/scripts/lib" -maxdepth 1 -type f -name "*.php" | sort -u; }
 pmss_testing_list_tracked_php_files() { git -C "$1" ls-files -z '*.php'; }
+pmss_testing_php_lint_files() { "$@" | xargs -0 -n1 php -l >/dev/null; }
+pmss_testing_run_bash_file_tool() { local root="$1"; shift; pmss_testing_find_bash_files "$root" | xargs -0 "$@"; }
 pmss_testing_load_tracked_php_scan() {
 	local label="$1"
 	mapfile -d '' PHP_FILES < <(pmss_testing_list_tracked_php_files "$ROOT_DIR")

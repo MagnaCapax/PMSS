@@ -27,15 +27,12 @@ if (!defined('PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_TIMEOUT_SECONDS')) {
 /** Retry a php-cgi Unix socket probe before treating the worker pool as dead. */
 function pmssLighttpdWatchdogSocketProbeWithRetry(string $socketPath, array $options = array()): array
 {
-    $attemptCount = isset($options['attemptCount']) ? (int) $options['attemptCount'] : PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_ATTEMPTS;
-    $retryDelaySeconds = isset($options['retryDelaySeconds']) ? (int) $options['retryDelaySeconds'] : PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_RETRY_DELAY_SECONDS;
-    $timeoutSeconds = isset($options['timeoutSeconds']) ? (int) $options['timeoutSeconds'] : PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_TIMEOUT_SECONDS;
+    $attemptCount = max(1, (int) ($options['attemptCount'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_ATTEMPTS));
+    $retryDelaySeconds = max(0, (int) ($options['retryDelaySeconds'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_RETRY_DELAY_SECONDS));
+    $timeoutSeconds = max(1, (int) ($options['timeoutSeconds'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_TIMEOUT_SECONDS));
     $probe = isset($options['probe']) && is_callable($options['probe']) ? $options['probe'] : null;
     $sleep = isset($options['sleep']) && is_callable($options['sleep']) ? $options['sleep'] : 'sleep';
 
-    $attemptCount = max(1, $attemptCount);
-    $retryDelaySeconds = max(0, $retryDelaySeconds);
-    $timeoutSeconds = max(1, $timeoutSeconds);
     if ($socketPath === '') {
         return array('ok' => false, 'errno' => 0, 'errstr' => 'socket path missing', 'attempts' => 1);
     }
@@ -103,11 +100,8 @@ function pmssLighttpdWatchdogSocketFailureStatePath(string $username, string $ru
  */
 function pmssLighttpdWatchdogRecordSocketFailure(string $username, array $options = array()): array
 {
-    $threshold = isset($options['threshold'])
-        ? (int) $options['threshold']
-        : PMSS_LIGHTTPD_WATCHDOG_SOCKET_FAILURE_CYCLES;
-    $threshold = max(1, $threshold);
-    $runtimeDir = isset($options['runtimeDir']) ? (string) $options['runtimeDir'] : '';
+    $threshold = max(1, (int) ($options['threshold'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_FAILURE_CYCLES));
+    $runtimeDir = (string) ($options['runtimeDir'] ?? '');
     $statePath = pmssLighttpdWatchdogSocketFailureStatePath($username, $runtimeDir);
 
     if ($statePath === '' || !pmssDirEnsureExists(dirname($statePath), 0755)) {
@@ -129,7 +123,7 @@ function pmssLighttpdWatchdogRecordSocketFailure(string $username, array $option
 /** Clear resolved php-cgi socket failure state for a user. */
 function pmssLighttpdWatchdogClearSocketFailure(string $username, array $options = array()): void
 {
-    $runtimeDir = isset($options['runtimeDir']) ? (string) $options['runtimeDir'] : '';
+    $runtimeDir = (string) ($options['runtimeDir'] ?? '');
     $statePath = pmssLighttpdWatchdogSocketFailureStatePath($username, $runtimeDir);
     if ($statePath !== '' && is_file($statePath) && !is_link($statePath)) {
         @unlink($statePath);

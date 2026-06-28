@@ -16,4 +16,6 @@ pmssDirEnsureExists($logDir, 0755);
 // Gather metrics from procfs + optional ioping/ps.
 $line = pmssSystemStatsLogLine(pmssSystemStatsCollect());
 // Append as a single parseable line for later analysis.
-file_put_contents($logFile, $line."\n", FILE_APPEND);
+if (!pmssSystemStatsAppendLogLine($logFile, $line)) {
+    fwrite(STDERR, "Warning: failed to append system stats log: {$logFile}\n");
+}

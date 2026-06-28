@@ -1,10 +1,10 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/KernelHardeningTestCase.php';
 require_once dirname(__DIR__, 2).'/update/kernelHardening.php';
 
-class KernelHardeningDirtyFragTest extends TestCase
+class KernelHardeningDirtyFragTest extends KernelHardeningTestCase
 {
     public function testWritesBlacklistAndRunsUnloadStep(): void
     {
@@ -12,15 +12,14 @@ class KernelHardeningDirtyFragTest extends TestCase
         $logs = [];
         $calls = [];
 
-        $this->pmssWithEnv($this->dirtyFragEnv($dir, "Module                  Size  Used by\n"), function () use ($dir, &$logs, &$calls): void {
-            \pmssEnsureDirtyFragBlacklist(
-                $this->pmssMakeArrayLogger($logs),
-                $this->captureKernelCalls($calls)
-            );
+        $this->pmssRunKernelHardeningWithCalls(
+            '\pmssEnsureDirtyFragBlacklist',
+            $this->dirtyFragEnv($dir, "Module                  Size  Used by\n"),
+            $logs,
+            $calls
+        );
 
-            $this->assertEquals(\pmssDirtyFragBlacklistBody(), file_get_contents($dir.'/modprobe.d/dirtyfrag.conf'));
-        });
-
+        $this->assertEquals(\pmssDirtyFragBlacklistBody(), file_get_contents($dir.'/modprobe.d/dirtyfrag.conf'));
         $this->assertTrue($this->pmssMessagesContain($logs, 'Updated '.$dir.'/modprobe.d/dirtyfrag.conf'), 'expected blacklist update log');
         $this->assertEquals('Unloading Dirty Frag modules (esp4 esp6 rxrpc ipcomp ipcomp6 espintcp)', $calls[0][0]);
         $this->assertTrue(!is_file($dir.'/runtime/dirtyfrag-modules-loaded'), 'expected runtime flag to stay absent');
@@ -32,9 +31,7 @@ class KernelHardeningDirtyFragTest extends TestCase
         $logs = [];
 
         $snapshot = "Module                  Size  Used by\nesp4                   20480  2\nrxrpc                  45056  1\n";
-        $this->pmssWithEnv($this->dirtyFragEnv($dir, $snapshot), function () use (&$logs): void {
-            \pmssEnsureDirtyFragBlacklist($this->pmssMakeArrayLogger($logs), $this->noopKernelRunner());
-        });
+        $this->pmssRunKernelHardeningNoop('\pmssEnsureDirtyFragBlacklist', $this->dirtyFragEnv($dir, $snapshot), $logs);
 
         $flagPath = $dir.'/runtime/dirtyfrag-modules-loaded';
         $this->assertTrue(is_file($flagPath), 'expected runtime flag for pinned modules');
@@ -48,9 +45,7 @@ class KernelHardeningDirtyFragTest extends TestCase
         $logs = [];
 
         $snapshot = "Module                  Size  Used by\nesp6                   20480  0\n";
-        $this->pmssWithEnv($this->dirtyFragEnv($dir, $snapshot), function () use (&$logs): void {
-            \pmssEnsureDirtyFragBlacklist($this->pmssMakeArrayLogger($logs), $this->noopKernelRunner());
-        });
+        $this->pmssRunKernelHardeningNoop('\pmssEnsureDirtyFragBlacklist', $this->dirtyFragEnv($dir, $snapshot), $logs);
 
         $this->assertTrue($this->pmssMessagesContain($logs, 'Dirty Frag modules still loaded after unload attempt'), 'expected residual module warning');
         $this->assertTrue(!is_file($dir.'/runtime/dirtyfrag-modules-loaded'), 'expected zero-use residual module to avoid runtime flag');
@@ -62,9 +57,8 @@ class KernelHardeningDirtyFragTest extends TestCase
         @mkdir($dir.'/runtime', 0755, true);
         file_put_contents($dir.'/runtime/dirtyfrag-modules-loaded', "esp4\t1\n");
 
-        $this->pmssWithEnv($this->dirtyFragEnv($dir, "Module                  Size  Used by\n"), function (): void {
-            \pmssEnsureDirtyFragBlacklist(function (): void {}, $this->noopKernelRunner());
-        });
+        $logs = [];
+        $this->pmssRunKernelHardeningNoop('\pmssEnsureDirtyFragBlacklist', $this->dirtyFragEnv($dir, "Module                  Size  Used by\n"), $logs);
 
         $this->assertTrue(!is_file($dir.'/runtime/dirtyfrag-modules-loaded'), 'expected stale runtime flag to be removed');
     }
@@ -76,9 +70,7 @@ class KernelHardeningDirtyFragTest extends TestCase
         $env = $this->dirtyFragEnv($dir, null);
         $env['PMSS_LSMOD_OUTPUT_PATH'] = $dir.'/missing-lsmod.txt';
 
-        $this->pmssWithEnv($env, function () use (&$logs): void {
-            \pmssEnsureDirtyFragBlacklist($this->pmssMakeArrayLogger($logs), $this->noopKernelRunner());
-        });
+        $this->pmssRunKernelHardeningNoop('\pmssEnsureDirtyFragBlacklist', $env, $logs);
 
         $this->assertTrue($this->pmssMessagesContain($logs, 'Unable to inspect Dirty Frag modules'), 'expected missing snapshot warning');
     }
@@ -91,12 +83,7 @@ class KernelHardeningDirtyFragTest extends TestCase
         $env = $this->dirtyFragEnv($dir, null);
         $env['PMSS_DRY_RUN'] = '1';
 
-        $this->pmssWithEnv($env, function () use (&$logs, &$calls): void {
-            \pmssEnsureDirtyFragBlacklist(
-                $this->pmssMakeArrayLogger($logs),
-                $this->captureKernelCalls($calls)
-            );
-        });
+        $this->pmssRunKernelHardeningWithCalls('\pmssEnsureDirtyFragBlacklist', $env, $logs, $calls);
 
         $this->assertTrue($this->pmssMessagesContain($logs, 'Dirty Frag blacklist: skipping all mutations'), 'expected dry-run skip log');
         $this->assertTrue(!is_file($dir.'/modprobe.d/dirtyfrag.conf'), 'expected dry-run to skip file creation');
@@ -119,7 +106,4 @@ class KernelHardeningDirtyFragTest extends TestCase
         return $env;
     }
 
-    private function captureKernelCalls(array &$calls): callable { return function (string $description, string $command) use (&$calls): int { $calls[] = [$description, $command]; return 0; }; }
-
-    private function noopKernelRunner(): callable { return function (): int { return 0; }; }
 }

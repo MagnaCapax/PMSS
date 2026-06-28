@@ -229,12 +229,6 @@ function pmssTrackerCleanerRunUser(
     return $stopReason;
 }
 
-function pmssTrackerCleanerBackupFailure(string $reason, string $message, string $detail): array
-{
-    pmssTrackerCleanerLog($message);
-    return pmssTrackerCleanerBackupFailedResult($reason, $detail);
-}
-
 function pmssTrackerCleanerBackupFailedResult(string $reason, string $detail = '', string $prefix = ''): array { $suffix = $detail !== '' ? ' '.$detail : ''; return ['ok' => false, 'stop_reason' => 'backup_failed', 'verbose_log' => $prefix.pmssTrackerCleanerTimestamp()." torrent_skip reason={$reason}{$suffix}\n".pmssTrackerCleanerTimestamp()." run_stop reason=backup_failed\n"]; }
 
 function pmssTrackerCleanerBackupTorrentSourceIsSafe(string $torrentPath): bool
@@ -264,13 +258,16 @@ function pmssTrackerCleanerBackupDestinationIsSafe(string $backupDir, string $ba
 function pmssTrackerCleanerBackupTorrent(string $username, string $torrentPath, string $backupDir, string $backupsRoot, string $removedList): array
 {
     if (!pmssValidateUsername($username)) {
-        return pmssTrackerCleanerBackupFailure('invalid_username', 'ERR: Refusing tracker backup for invalid username.', 'user='.pmssTrackerCleanerLogValue($username));
+        pmssTrackerCleanerLog('ERR: Refusing tracker backup for invalid username.');
+        return pmssTrackerCleanerBackupFailedResult('invalid_username', 'user='.pmssTrackerCleanerLogValue($username));
     }
     if (!pmssTrackerCleanerBackupTorrentSourceIsSafe($torrentPath)) {
-        return pmssTrackerCleanerBackupFailure('torrent_path_unsafe', "ERR: Refusing unsafe torrent backup source for user {$username}.", 'src='.pmssTrackerCleanerLogValue($torrentPath));
+        pmssTrackerCleanerLog("ERR: Refusing unsafe torrent backup source for user {$username}.");
+        return pmssTrackerCleanerBackupFailedResult('torrent_path_unsafe', 'src='.pmssTrackerCleanerLogValue($torrentPath));
     }
     if (!pmssTrackerCleanerBackupDestinationIsSafe($backupDir, $backupsRoot)) {
-        return pmssTrackerCleanerBackupFailure('backup_path_unsafe', "ERR: Backup path unsafe for user {$username} ({$backupDir}).", 'backup_dir='.pmssTrackerCleanerLogValue($backupDir));
+        pmssTrackerCleanerLog("ERR: Backup path unsafe for user {$username} ({$backupDir}).");
+        return pmssTrackerCleanerBackupFailedResult('backup_path_unsafe', 'backup_dir='.pmssTrackerCleanerLogValue($backupDir));
     }
 
     $sourcePerms = @fileperms($torrentPath);

@@ -14,9 +14,7 @@ class MediaStackLighttpdMigrationTest extends TestCase
 
     protected function setUp(): void
     {
-        $path = dirname(__DIR__, 4).'/etc/skel/install-media-stack.sh';
-        $this->script = (string) file_get_contents($path);
-        $this->assertTrue($this->script !== '', 'Failed to read install-media-stack.sh');
+        $this->script = $this->pmssReadRepoFile('etc/skel/install-media-stack.sh');
     }
 
     public function testPrepareLighttpdRemovesManagedRoutesFromMigratedFragment(): void
@@ -111,14 +109,14 @@ class MediaStackLighttpdMigrationTest extends TestCase
         $lighttpdDir = $home.'/.lighttpd';
         $customDir = $lighttpdDir.'/custom.d';
 
-        mkdir($customDir, 0755, true);
+        $this->pmssEnsureDir($customDir);
 
         if ($customContents !== null) {
-            file_put_contents($lighttpdDir.'/custom', $customContents);
+            $this->pmssWriteFile($lighttpdDir.'/custom', $customContents);
         }
 
         if ($migratedContents !== null) {
-            file_put_contents($customDir.'/custom-migrated.conf', $migratedContents);
+            $this->pmssWriteFile($customDir.'/custom-migrated.conf', $migratedContents);
         }
 
         $functions = $this->pmssExtractShellFunctions($this->script, [

@@ -11,6 +11,7 @@
 
 function pmssStatsCompareTimesBuild(?int $now = null): array { $now = $now ?? time(); return ['month' => $now - (30 * 24 * 60 * 60), 'week' => $now - (7 * 24 * 60 * 60), 'day' => $now - (24 * 60 * 60), 'hour' => $now - (60 * 60), '15min' => $now - (15 * 60)]; }
 function pmssCommandBinaryNameIsSafe(string $binary): bool { return preg_match('/^[A-Za-z0-9._+-]+$/', $binary) === 1; }
+function pmssCommandPathCandidateIsSafe(string $path): bool { return $path !== '' && strpos($path, '/') === 0 && strpbrk($path, "\0\r\n") === false; }
 function pmssBlockDeviceNameIsDataDevice(string $device): bool { return preg_match(PMSS_BLOCK_DATA_DEVICE_NAME_PATTERN, $device) === 1; }
 
 function pmssCommandPath(string $binary): string
@@ -20,7 +21,7 @@ function pmssCommandPath(string $binary): string
     $resolved = @shell_exec('command -v '.escapeshellarg($binary).' 2>/dev/null');
     if (!is_string($resolved)) return '';
     $path = trim($resolved);
-    return $path !== '' && strpos($path, '/') === 0 && is_executable($path) ? $path : '';
+    return pmssCommandPathCandidateIsSafe($path) && is_executable($path) ? $path : '';
 }
 
 function pmssCommandArgvShellQuote(array $argv): string { return implode(' ', array_map(static function ($arg): string { return escapeshellarg((string) $arg); }, $argv)); }

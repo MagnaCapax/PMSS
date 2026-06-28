@@ -72,6 +72,20 @@ class UserDirectoriesEnsureTest extends TestCase
         $this->assertTrue(!is_dir($other.'/.tmp'), 'must not create directories through a traversed home path');
     }
 
+    public function testResolvedRootGuardAcceptsOnlyPathsBelowExistingRoot(): void
+    {
+        $root = $this->tempDir.'/home';
+        $other = $this->tempDir.'/other';
+        $this->pmssEnsureDir($root.'/alice');
+        $this->pmssEnsureDir($other);
+
+        $this->assertTrue(\pmssPathWithinResolvedRoot($root.'/alice/.quota', $root));
+        $this->assertFalse(\pmssPathWithinResolvedRoot($other.'/.quota', $root));
+        $this->assertFalse(\pmssPathWithinResolvedRoot($root.'/missing/.quota', $root));
+        $this->assertFalse(\pmssPathWithinResolvedRoot($root.'/alice/.quota', '/'));
+        $this->assertFalse(\pmssPathWithinResolvedRoot("relative/.quota", $root));
+    }
+
     public function testRejectsSymlinkedTarget(): void
     {
         $home = $this->tempDir.'/home';

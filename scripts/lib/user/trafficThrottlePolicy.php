@@ -96,6 +96,9 @@ function pmssTrafficLimitThrottlePolicyFromNetworkConfig(array $networkConfig): 
 /**
  * Normalize operator-provided overage stages, dropping malformed rows.
  *
+ * Returned rows are already ordered for enforcement: highest overage first,
+ * then highest GiB threshold, then original operator order for exact ties.
+ *
  * @param array<int, array<string, float|int|string|bool|array|object>> $rawStages
  * @return array<int, array{overagePercent:float,minOverageGiB:float,capMbit:int,index:int}>
  */
@@ -119,17 +122,13 @@ function pmssTrafficLimitNormalizeOverageStages(array $rawStages): array
         $normalizedStages[] = ['overagePercent' => max(0.0, (float) $stage['overagePercent']), 'minOverageGiB' => $stageMinOverageGiB, 'capMbit' => $stageCapMbit, 'index' => (int) $index];
     }
 
-    return $normalizedStages;
-}
-
-/** @param array<int, array{overagePercent:float,minOverageGiB:float,capMbit:int,index:int}> $normalizedStages */
-function pmssTrafficLimitSortOverageStages(array &$normalizedStages): void
-{
     usort($normalizedStages, static function (array $left, array $right): int {
         return ($right['overagePercent'] <=> $left['overagePercent'])
             ?: ($right['minOverageGiB'] <=> $left['minOverageGiB'])
             ?: ($left['index'] <=> $right['index']);
     });
+
+    return $normalizedStages;
 }
 
 /** @param array<int, array<string, float|int|string|bool|array|object>> $rawStages */
@@ -137,8 +136,6 @@ function pmssTrafficLimitOverageStagesMatchLegacyDefault(array $rawStages): bool
 {
     $candidate = pmssTrafficLimitNormalizeOverageStages($rawStages);
     $legacy = pmssTrafficLimitNormalizeOverageStages(pmssTrafficLimitLegacyOverageStages());
-    pmssTrafficLimitSortOverageStages($candidate);
-    pmssTrafficLimitSortOverageStages($legacy);
 
     $stripIndex = static function (array $stage): array {
         unset($stage['index']);
@@ -216,8 +213,6 @@ function pmssTrafficLimitSelectTieredCapMbit(float $overagePercent, float $overa
     $overageGiB = max(0.0, $overageGiB);
 
     $normalizedStages = pmssTrafficLimitNormalizeOverageStages($rawStages);
-    pmssTrafficLimitSortOverageStages($normalizedStages);
-
     foreach ($normalizedStages as $stage) {
         if ($overagePercent < $stage['overagePercent'] || $overageGiB < $stage['minOverageGiB']) continue;
 

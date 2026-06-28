@@ -10,15 +10,6 @@ require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/lighttpd/userFileWrite.php';
 
 /**
- * Build a shell-safe argv command string for certbot setup primitives.
- */
-function pmssSetupLetsEncryptCommandBuild(string $binary, array $args = array()): string
-{
-    $quotedArgs = pmssCommandArgvShellQuote($args);
-    return escapeshellcmd($binary).($quotedArgs === '' ? '' : ' '.$quotedArgs);
-}
-
-/**
  * Execute one provisioning primitive and fail loudly when it does not succeed.
  */
 function pmssSetupLetsEncryptRunCommand(string $command, string $description, ?callable $runner = null): string
@@ -112,10 +103,10 @@ function pmssSetupLetsEncryptRun(string $domain, string $email, string $codename
     );
     $createNginxConfigCommand = isset($options['createNginxConfigCommand'])
         ? (string) $options['createNginxConfigCommand']
-        : pmssSetupLetsEncryptCommandBuild('/scripts/util/createNginxConfig.php');
+        : pmssBuildCommand('/scripts/util/createNginxConfig.php');
     $nginxRestartCommand = isset($options['nginxRestartCommand'])
         ? (string) $options['nginxRestartCommand']
-        : pmssSetupLetsEncryptCommandBuild('/etc/init.d/nginx', array('restart'));
+        : pmssBuildCommand('/etc/init.d/nginx', array('restart'));
     $certbotBinary = '/usr/bin/certbot';
     $certbotVirtualenvBinary = '/opt/certbot/bin/certbot';
     $liveCertPath = $liveDir.'/'.$domain;
@@ -130,11 +121,11 @@ function pmssSetupLetsEncryptRun(string $domain, string $email, string $codename
         if ($fileExists($certbotVirtualenvBinary)) {
             $versionCheck = $commandRunner !== null
                 ? $commandRunner(
-                    pmssSetupLetsEncryptCommandBuild($certbotVirtualenvBinary, array('--version')),
+                    pmssBuildCommand($certbotVirtualenvBinary, array('--version')),
                     'Verify certbot virtualenv functional'
                 )
                 : pmssCommandCapture(
-                    pmssSetupLetsEncryptCommandBuild($certbotVirtualenvBinary, array('--version'))
+                    pmssBuildCommand($certbotVirtualenvBinary, array('--version'))
                 );
             $venvFunctional = isset($versionCheck['rc']) && (int) $versionCheck['rc'] === 0;
         }
@@ -142,7 +133,7 @@ function pmssSetupLetsEncryptRun(string $domain, string $email, string $codename
         if (!$venvFunctional) {
             if ($fileExists($certbotVirtualenvBinary)) {
                 pmssSetupLetsEncryptRunCommand(
-                    pmssSetupLetsEncryptCommandBuild('rm', array('-rf', '/opt/certbot')),
+                    pmssBuildCommand('rm', array('-rf', '/opt/certbot')),
                     'Remove broken certbot virtualenv',
                     $commandRunner
                 );
@@ -153,7 +144,7 @@ function pmssSetupLetsEncryptRun(string $domain, string $email, string $codename
                 array('/opt/certbot/bin/pip', array('install', 'certbot', 'certbot-nginx'), 'Install certbot virtualenv packages'),
             ) as $step) {
                 pmssSetupLetsEncryptRunCommand(
-                    pmssSetupLetsEncryptCommandBuild($step[0], $step[1]),
+                    pmssBuildCommand($step[0], $step[1]),
                     $step[2],
                     $commandRunner
                 );
@@ -162,7 +153,7 @@ function pmssSetupLetsEncryptRun(string $domain, string $email, string $codename
 
         if (!$fileExists($certbotBinary)) {
             pmssSetupLetsEncryptRunCommand(
-                pmssSetupLetsEncryptCommandBuild('ln', array('-s', $certbotVirtualenvBinary, $certbotBinary)),
+                pmssBuildCommand('ln', array('-s', $certbotVirtualenvBinary, $certbotBinary)),
                 'Link certbot binary',
                 $commandRunner
             );
@@ -177,7 +168,7 @@ function pmssSetupLetsEncryptRun(string $domain, string $email, string $codename
 
     if (!$fileExists($liveCertPath)) {
         echo pmssSetupLetsEncryptRunCommand(
-            pmssSetupLetsEncryptCommandBuild(
+            pmssBuildCommand(
                 $certbotBinary,
                 array('certonly', '-d', $domain, '-n', '--nginx', '--agree-tos', '--email', $email)
             ),

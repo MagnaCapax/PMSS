@@ -83,19 +83,22 @@ class userPasswordShadowSyncTest extends TestCase
 
     public function testUnsuspendRequiresPasswordSyncLibraryAndHook(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/unsuspend.php');
-
-        $requirePos = strpos($source, "require_once __DIR__.'/lib/lighttpd/htpasswd.php';");
-        $unlockPos = strpos($source, "'unlock_account'");
-        $syncPos = strpos($source, 'pmssUserHtpasswdSyncFromShadow($username)');
-        $startRtorrentPos = strpos($source, "'start_rtorrent'");
-
-        $this->assertTrue($requirePos !== false, 'unsuspend.php must load the htpasswd shadow sync helper');
-        $this->assertTrue($unlockPos !== false, 'unsuspend.php must still unlock the Unix account');
-        $this->assertTrue($syncPos !== false, 'unsuspend.php must resync per-user htpasswd from shadow');
-        $this->assertTrue($startRtorrentPos !== false, 'unsuspend.php must still restart rTorrent');
-        $this->assertTrue($unlockPos < $syncPos, 'password resync must run after account unlock');
-        $this->assertTrue($syncPos < $startRtorrentPos, 'password resync must finish before service restart');
-        $this->assertStringContainsString('Unable to resync per-user htpasswd from unlocked shadow hash', $source);
+        $this->pmssAssertRepoFileContract('scripts/unsuspend.php', [
+            'required' => [
+                "require_once __DIR__.'/lib/lighttpd/htpasswd.php';",
+                "'unlock_account'",
+                'pmssUserHtpasswdSyncFromShadow($username)',
+                "'start_rtorrent'",
+                'Unable to resync per-user htpasswd from unlocked shadow hash',
+            ],
+            'ordered' => [[
+                'needles' => [
+                    "'unlock_account'",
+                    'pmssUserHtpasswdSyncFromShadow($username)',
+                    "'start_rtorrent'",
+                ],
+                'orderPrefix' => 'unsuspend password sync order changed near: ',
+            ]],
+        ]);
     }
 }

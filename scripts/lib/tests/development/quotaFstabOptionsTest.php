@@ -13,22 +13,24 @@ class QuotaFstabOptionsTest extends TestCase
 
     private function ensureQuotaOptions(string $fstab): array
     {
-        $messages = [];
-        \pmssEnsureQuotaOptions('/home', null, $this->pmssMakeArrayLogger($messages), $fstab);
-        return $messages;
+        return $this->pmssArrayLoggerMessages(function (callable $logger) use ($fstab): void {
+            \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
+        });
     }
 
     private function warnUnexpectedQuotaFiles(string $dir): array
     {
-        $messages = [];
-        \pmssWarnUnexpectedQuotaFiles($dir, $this->pmssMakeArrayLogger($messages));
-        return $messages;
+        return $this->pmssArrayLoggerMessages(function (callable $logger) use ($dir): void {
+            \pmssWarnUnexpectedQuotaFiles($dir, $logger);
+        });
     }
 
     private function removeStaleQuotaCheckFiles(string $path): array
     {
-        $messages = [];
-        $removed = \pmssRemoveStaleQuotaCheckFiles($path, $this->pmssMakeArrayLogger($messages));
+        [$removed, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($path): int {
+            return \pmssRemoveStaleQuotaCheckFiles($path, $logger);
+        });
+
         return [$removed, $messages];
     }
 

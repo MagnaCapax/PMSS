@@ -19,7 +19,7 @@ class UpdateHelpersTest extends TestCase
             .'require '.var_export(dirname(__DIR__, 2).'/update/apt.php', true).'; '
             .'pmssLoadRepoTemplate("this-code-name-does-not-exist");';
 
-        $output = trim($this->pmssRunInlinePhp($script, ['PMSS_TEST_MODE' => '1']));
+        $output = trim($this->pmssRunInlinePhp($script, $this->pmssTestModeEnv()));
 
         $this->assertStringContainsString('Repository template missing:', $output);
     }

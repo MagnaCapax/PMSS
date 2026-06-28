@@ -215,8 +215,17 @@ function pmssInstallPinnedRemoteBinary(
         }
     }
 
-    pmssPinnedRemoteArtifactTempFileUse($label, $url, $expectedSha256, static function (string $tmp) use ($label, $destination): void {
-        runStep("Installing {$label}", pmssBuildCommand('install', ['-m', '0755', $tmp, $destination]));
+    pmssPinnedRemoteArtifactTempFileUse($label, $url, $expectedSha256, static function (string $tmp) use ($label, $destination, $expectedSha256): void {
+        $rc = runStep("Installing {$label}", pmssBuildCommand('install', ['-m', '0755', $tmp, $destination]));
+        if ($rc !== 0) {
+            logMessage("[WARN] {$label} install command failed with rc={$rc}; destination checksum not trusted");
+            return;
+        }
+
+        $actualSha = pmssPinnedRemoteChecksum($destination);
+        if ($actualSha === '' || $actualSha !== $expectedSha256) {
+            logMessage("[WARN] {$label} installed checksum mismatch; expected {$expectedSha256}, got ".($actualSha ?: 'unknown'));
+        }
     });
 }
 

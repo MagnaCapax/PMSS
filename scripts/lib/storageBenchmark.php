@@ -11,10 +11,12 @@ require_once __DIR__.'/cli/optionParser.php';
 require_once __DIR__.'/storageBenchmark/report.php';
 require_once __DIR__.'/storageHealth/common.php';
 
-function storageBenchmarkRequireSizeBytes(string $optionName, string $value, int $minimumBytes = 1, string $minimumLabel = 'positive size'): int { $bytes = preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i', trim($value)) === 1 ? pmssParseSizeToBytes($value, true, true) : null; if ($bytes === null || $bytes <= 0.0) { fwrite(STDERR, "Error: {$optionName} must be a positive size (examples: 1G, 512M, 1048576).\n"); exit(1); } if ($bytes < $minimumBytes) { fwrite(STDERR, "Error: {$optionName} must be at least {$minimumLabel}.\n"); exit(1); } return (int) $bytes; }
-function storageBenchmarkRequireIntOption(array $parsed, string $optionName, int $default, int $minimum, string $minimumLabel): int { $value = pmssCliOption($parsed, $optionName, null, null); if ($value === null || $value === true) return $default; if (!is_string($value) || !ctype_digit($value) || (int) $value < $minimum) { fwrite(STDERR, "Error: --{$optionName} must be a {$minimumLabel} integer.\n"); exit(1); } return (int) $value; }
-function storageBenchmarkRequireJsonLogPath(string $jsonLog): void { $jsonDir = dirname($jsonLog); $jsonDirError = null; if (!pmssLogWriteDirectoryPrepare($jsonDir, 0755, $jsonDirError, true)) { fwrite(STDERR, $jsonDirError === 'create' ? "Error: failed to create JSON log directory: {$jsonDir}\n" : "Error: unsafe JSON log path: {$jsonLog}\n"); exit(1); } if (!pmssLogWritePathIsSafe($jsonLog)) { fwrite(STDERR, "Error: unsafe JSON log path: {$jsonLog}\n"); exit(1); } }
-function storageBenchmarkRequireTargetDir(string $targetDir): string { $path = rtrim($targetDir, '/'); if ($path === '' || preg_match('/[\r\n\0]/', $path) === 1 || !pmssPathSegmentsAreSafe($path, true, true, true, true)) { fwrite(STDERR, "Error: unsafe target directory: {$targetDir}\n"); exit(1); } if (!is_dir($path) || !is_writable($path)) { fwrite(STDERR, "Error: target not writable: {$targetDir}\n"); exit(1); } return $path; }
+/** Emit a legacy CLI fatal error and preserve the historical exit code. */
+function storageBenchmarkFail(string $message): void { fwrite(STDERR, $message); exit(1); }
+function storageBenchmarkRequireSizeBytes(string $optionName, string $value, int $minimumBytes = 1, string $minimumLabel = 'positive size'): int { $bytes = preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i', trim($value)) === 1 ? pmssParseSizeToBytes($value, true, true) : null; if ($bytes === null || $bytes <= 0.0) storageBenchmarkFail("Error: {$optionName} must be a positive size (examples: 1G, 512M, 1048576).\n"); if ($bytes < $minimumBytes) storageBenchmarkFail("Error: {$optionName} must be at least {$minimumLabel}.\n"); return (int) $bytes; }
+function storageBenchmarkRequireIntOption(array $parsed, string $optionName, int $default, int $minimum, string $minimumLabel): int { $value = pmssCliOption($parsed, $optionName, null, null); if ($value === null || $value === true) return $default; if (!is_string($value) || !ctype_digit($value) || (int) $value < $minimum) storageBenchmarkFail("Error: --{$optionName} must be a {$minimumLabel} integer.\n"); return (int) $value; }
+function storageBenchmarkRequireJsonLogPath(string $jsonLog): void { $jsonDir = dirname($jsonLog); $jsonDirError = null; if (!pmssLogWriteDirectoryPrepare($jsonDir, 0755, $jsonDirError, true)) storageBenchmarkFail($jsonDirError === 'create' ? "Error: failed to create JSON log directory: {$jsonDir}\n" : "Error: unsafe JSON log path: {$jsonLog}\n"); if (!pmssLogWritePathIsSafe($jsonLog)) storageBenchmarkFail("Error: unsafe JSON log path: {$jsonLog}\n"); }
+function storageBenchmarkRequireTargetDir(string $targetDir): string { $path = rtrim($targetDir, '/'); if ($path === '' || preg_match('/[\r\n\0]/', $path) === 1 || !pmssPathSegmentsAreSafe($path, true, true, true, true)) storageBenchmarkFail("Error: unsafe target directory: {$targetDir}\n"); if (!is_dir($path) || !is_writable($path)) storageBenchmarkFail("Error: target not writable: {$targetDir}\n"); return $path; }
 
 function storageBenchmarkMain(array $argv): int
 {
@@ -60,11 +62,11 @@ function storageBenchmarkMain(array $argv): int
     return 0;
 }
 
-function storageBenchmarkAppendJsonLine(string $jsonLog, array $entry): void { if (!pmssJsonLineAppend($jsonLog, $entry)) { fwrite(STDERR, "Error: failed to append JSON log entry: {$jsonLog}\n"); exit(1); } }
+function storageBenchmarkAppendJsonLine(string $jsonLog, array $entry): void { if (!pmssJsonLineAppend($jsonLog, $entry)) storageBenchmarkFail("Error: failed to append JSON log entry: {$jsonLog}\n"); }
 function storageBenchmarkEntryBase(string $runTs, string $label, string $runId): array { return ['timestamp' => $runTs, 'label' => $label ?: null, 'run_id' => $runId, 'run_ts' => $runTs]; }
 function storageBenchmarkApplyRunResult(array $entry, array $res, string $fallbackError = 'unknown'): array { if ($res['ok']) $entry['metrics'] = $res['result']; else $entry['error'] = $res['error'] ?? $fallbackError; return $entry; }
 function storageBenchmarkIostatUtilPctRead(string $path): ?float { $payload = pmssReadSerializedArrayFile($path); if ($payload === null || !array_key_exists('diskUtil', $payload)) return null; $util = $payload['diskUtil']; return (is_int($util) || is_float($util) || (is_string($util) && is_numeric(trim($util)))) ? (float) trim((string) $util) : null; }
-function storageBenchmarkRequireCommandField(string $command, string $label, bool $positiveInt = false): string { $result = pmssCommandCapture($command, 30); $value = trim((string) ($result['stdout'] ?? '')); if ((int) ($result['rc'] ?? 1) !== 0 || $value === '' || preg_match('/[\r\n\0]/', $value) === 1 || ($positiveInt && (!ctype_digit($value) || (int) $value <= 0))) { fwrite(STDERR, "Error: failed to read {$label}.\n"); exit(1); } return $value; }
+function storageBenchmarkRequireCommandField(string $command, string $label, bool $positiveInt = false): string { $result = pmssCommandCapture($command, 30); $value = trim((string) ($result['stdout'] ?? '')); if ((int) ($result['rc'] ?? 1) !== 0 || $value === '' || preg_match('/[\r\n\0]/', $value) === 1 || ($positiveInt && (!ctype_digit($value) || (int) $value <= 0))) storageBenchmarkFail("Error: failed to read {$label}.\n"); return $value; }
 /** Return true only for raw block-device paths safe to pass to read-only probes. */
 function storageBenchmarkDevicePathIsSafe(string $path): bool
 {
@@ -100,9 +102,9 @@ function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string
 {
     $free = (int) storageBenchmarkRequireCommandField('df -PB1 '.escapeshellarg($targetDir).' | awk '.escapeshellarg('NR==2 {print $4}'), 'free space', true);
     $use = (int) min($requested, floor($free * 0.8));
-    if ($use <= 0) { fwrite(STDERR, "Insufficient free space.\n"); exit(1); }
+    if ($use <= 0) storageBenchmarkFail("Insufficient free space.\n");
     $testFile = rtrim($targetDir, '/').'/pmss-fio-'.bin2hex(random_bytes(4)).'.dat'; storageBenchmarkRegisterFileCleanup($testFile);
-    if (pmssCommandPath('fallocate') !== '' && runCommand('fallocate -l '.$use.' '.escapeshellarg($testFile)) !== 0) { fwrite(STDERR, "Error: failed to preallocate benchmark file.\n"); exit(1); }
+    if (pmssCommandPath('fallocate') !== '' && runCommand('fallocate -l '.$use.' '.escapeshellarg($testFile)) !== 0) storageBenchmarkFail("Error: failed to preallocate benchmark file.\n");
     $summary = [];
     foreach (storageBenchmarkFileJobs() as $job) {
         if ($job['name'] === 'randwrite-small-short') $job['runtime'] = max(15, (int) floor($runtime / 3));

@@ -63,6 +63,24 @@ class CheckWireguardSafetyTest extends TestCase
         $this->assertSame([$this->validPeerA, $this->validPeerB], $result['keys']);
     }
 
+    public function testUserPublicKeyReaderRejectsUnsafeBoundaries(): void
+    {
+        $homeBase = $this->pmssMakeNamedTempDir('pmss-check-wireguard-home-', 0700);
+        $outsideDir = $this->pmssMakeNamedTempDir('pmss-check-wireguard-outside-', 0700);
+        $unsafeUser = '../'.basename($outsideDir);
+        $this->pmssWriteFile($homeBase.'/alice/.wireguard-public-key', $this->validPeerA."\n", 0700);
+        $this->pmssWriteFile($outsideDir.'/.wireguard-public-key', $this->validPeerB."\n", 0700);
+
+        $this->pmssWithEnv(['PMSS_WG_HOME_BASE' => $homeBase], function () use ($homeBase, $outsideDir, $unsafeUser): void {
+            $this->assertSame([$this->validPeerA], \wgReadUserPublicKeys('alice'));
+            $this->assertSame([], \wgReadUserPublicKeys($unsafeUser));
+
+            $this->assertTrue(@unlink($homeBase.'/alice/.wireguard-public-key'));
+            $this->assertTrue(@symlink($outsideDir.'/.wireguard-public-key', $homeBase.'/alice/.wireguard-public-key'));
+            $this->assertSame([], \wgReadUserPublicKeys('alice'));
+        });
+    }
+
     public function testLsmodParserMatchesExactWireguardModuleOnly(): void
     {
         foreach ([

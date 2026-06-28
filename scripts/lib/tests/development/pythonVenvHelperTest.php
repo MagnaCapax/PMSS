@@ -121,4 +121,66 @@ class PythonVenvHelperTest extends TestCase
         $this->assertTrue(is_link($linkPath), 'Expected installer to create a CLI symlink');
         $this->assertEquals($cliBin, readlink($linkPath));
     }
+
+    public function testInstallerRejectsUnsafeInstallStepsBeforeRunningCommands(): void
+    {
+        foreach ([
+            [[['Installing bad package', 'package; rm -rf /']]],
+            [[['Installing bad package', "package\nother"]]],
+            [[['Installing bad package']]],
+            [[[[], 'package']]],
+            [[['Installing bad package', ['package']]]],
+            [[['', 'package']]],
+        ] as $installSteps) {
+            $messages = [];
+            $this->pmssResetRuntimeProfile();
+
+            \pmssPythonVenvInstallCli(
+                '/tmp/pmss-python-venv-invalid-step',
+                'FlexGet',
+                $installSteps,
+                '/tmp/pmss-python-venv-invalid-step/bin/flexget',
+                '/tmp/pmss-python-venv-invalid-link',
+                '[WARN] Skipping FlexGet install: python3 missing from PATH',
+                '[WARN] FlexGet binary missing after install',
+                static function (string $message) use (&$messages): void {
+                    $messages[] = $message;
+                }
+            );
+
+            $this->assertEquals(['[WARN] Skipping FlexGet install: unsafe install step'], $messages);
+            $this->assertEquals([], $this->pmssProfileCommands());
+        }
+    }
+
+    public function testInstallerRejectsUnsafePathInputsBeforeRunningCommands(): void
+    {
+        foreach ([
+            ['', 'FlexGet', '/tmp/cli', '/tmp/link', '[WARN] Skipping FlexGet virtualenv setup: unsafe venv path'],
+            ["/tmp/venv\0bad", 'FlexGet', '/tmp/cli', '/tmp/link', '[WARN] Skipping FlexGet virtualenv setup: unsafe venv path'],
+            ['/tmp/venv', 'FlexGet', '', '/tmp/link', '[WARN] Skipping FlexGet install: unsafe CLI path'],
+            ['/tmp/venv', 'FlexGet', "/tmp/cli\0bad", '/tmp/link', '[WARN] Skipping FlexGet install: unsafe CLI path'],
+            ['/tmp/venv', 'FlexGet', '/tmp/cli', '', '[WARN] Skipping FlexGet install: unsafe CLI path'],
+            ['/tmp/venv', "Flex\nGet", '/tmp/cli', '/tmp/link', '[WARN] Skipping Python virtualenv setup: unsafe label'],
+        ] as $case) {
+            $messages = [];
+            $this->pmssResetRuntimeProfile();
+
+            \pmssPythonVenvInstallCli(
+                $case[0],
+                $case[1],
+                [['Installing FlexGet', 'flexget']],
+                $case[2],
+                $case[3],
+                '[WARN] Skipping FlexGet install: python3 missing from PATH',
+                '[WARN] FlexGet binary missing after install',
+                static function (string $message) use (&$messages): void {
+                    $messages[] = $message;
+                }
+            );
+
+            $this->assertEquals([$case[4]], $messages);
+            $this->assertEquals([], $this->pmssProfileCommands());
+        }
+    }
 }

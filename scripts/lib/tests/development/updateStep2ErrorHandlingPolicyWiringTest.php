@@ -23,15 +23,15 @@ class UpdateStep2ErrorHandlingPolicyWiringTest extends TestCase
     public function testStepPolicyClassificationsAreExplicitlyAllowlisted(): void
     {
         foreach ([
-            \PMSS_UPDATE_STEP_CLASS_SOFT_FAIL,
-            \PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED,
-            \PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING,
-        ] as $classification) {
-            $this->assertTrue(\pmssUpdateStep2ClassificationIsKnown($classification));
-        }
-
-        foreach (['', 'must-success', 'warning', "soft_fail\n"] as $classification) {
-            $this->assertFalse(\pmssUpdateStep2ClassificationIsKnown($classification));
+            \PMSS_UPDATE_STEP_CLASS_SOFT_FAIL => true,
+            \PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED => true,
+            \PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING => true,
+            '' => false,
+            'must-success' => false,
+            'warning' => false,
+            "soft_fail\n" => false,
+        ] as $classification => $expected) {
+            $this->assertSame($expected, \pmssUpdateStep2ClassificationIsKnown($classification), $classification);
         }
     }
 }

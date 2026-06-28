@@ -59,6 +59,14 @@ function pmssCliHelpLine(string $label, string $description, int $width = 40): s
     return '  '.str_pad($label, $width).$description;
 }
 
+/** @param array<string,array<int,string>> $sections */
+function pmssCliHelpSectionText(array $sections, bool $useColor): string
+{
+    $lines = [];
+    foreach ($sections as $title => $sectionLines) $lines = array_merge($lines, $lines === [] ? [] : [''], [pmssCliHelpHeading((string) $title, $useColor)], $sectionLines);
+    return implode("\n", $lines);
+}
+
 /**
  * Render the common Usage + Options block used by small CLI tools.
  * @param string|array<int,string>            $usage

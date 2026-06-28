@@ -7,17 +7,16 @@ class CgroupPolicyTrackingTest extends TestCase
 {
     public function testPolicyTodoMarkersOnlyDescribePendingExtensions(): void
     {
-        $policy = $this->pmssReadRepoFile('etc/seedbox/config/cgroup.policy.php');
-
-        $this->assertStringContainsAllStrings(['scheduler-aware IO auto-policy', 'per-user burst allowances', 'network shaping hints in cgroup policy'], $policy);
-        $this->pmssAssertStringNotContainsString('LimitNOFILE', $policy, 'Implemented NOFILE support should not remain a policy TODO');
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'etc/seedbox/config/cgroup.policy.php',
+            ['scheduler-aware IO auto-policy', 'per-user burst allowances', 'network shaping hints in cgroup policy'],
+            ['LimitNOFILE' => 'Implemented NOFILE support should not remain a policy TODO']
+        );
     }
 
     public function testCgroupDocsTrackImplementedAndPendingExtensions(): void
     {
-        $docs = $this->pmssReadRepoFile('docs/cgroup.md');
-
-        $this->assertStringContainsAllStrings([
+        $this->pmssAssertRepoFileContainsAllStrings('docs/cgroup.md', [
             '## Extension Status Matrix (#121)',
             '**Per-device IO controls**: Implemented.',
             '**NOFILE limits**: Implemented.',
@@ -27,19 +26,15 @@ class CgroupPolicyTrackingTest extends TestCase
             '| Per-user burst allowances | Pending |',
             '| Network shaping hints in policy | Pending |',
             '| Scheduler-aware IO auto-policy | Partially pending |',
-        ], $docs);
-
-        $this->assertStringContainsString(
             'Remaining TODOs: scheduler-aware IO auto-policy, burst allowances +',
-            $docs
-        );
+        ]);
     }
 
     public function testGlobalTodoIndexReferencesCgroupBacklog(): void
     {
-        $docs = $this->pmssReadRepoFile('docs/TODO.md');
-
-        $this->assertStringContainsString('#121: Cgroup policy extension backlog', $docs);
-        $this->assertStringContainsString('docs/cgroup.md', $docs);
+        $this->pmssAssertRepoFileContainsAllStrings('docs/TODO.md', [
+            '#121: Cgroup policy extension backlog',
+            'docs/cgroup.md',
+        ]);
     }
 }

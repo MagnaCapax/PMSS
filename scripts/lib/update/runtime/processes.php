@@ -74,6 +74,10 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
         logmsg("[WARN] {$description} (invalid process name)");
         return;
     }
+    if (pmssCommandPath('pgrep') === '' || pmssCommandPath('pkill') === '') {
+        logmsg("[WARN] {$description} (pgrep/pkill unavailable)");
+        return;
+    }
 
     $probeCommand = 'pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1';
     exec($probeCommand, $_, $probeStatus);

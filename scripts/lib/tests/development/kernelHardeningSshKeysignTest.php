@@ -1,10 +1,10 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/KernelHardeningTestCase.php';
 require_once dirname(__DIR__, 2).'/update/kernelHardening.php';
 
-class KernelHardeningSshKeysignTest extends TestCase
+class KernelHardeningSshKeysignTest extends KernelHardeningTestCase
 {
     public function testStripsSuidWhenPresent(): void
     {
@@ -18,9 +18,7 @@ class KernelHardeningSshKeysignTest extends TestCase
         }
         $logs = [];
 
-        $this->pmssWithEnv(['PMSS_SSH_KEYSIGN_PATH' => $target], function () use (&$logs): void {
-            \pmssEnsureSshKeysignSuidStrip($this->pmssMakeArrayLogger($logs));
-        });
+        $this->pmssRunKernelHardeningSshKeysign(['PMSS_SSH_KEYSIGN_PATH' => $target], $logs);
 
         clearstatcache(true, $target);
         $this->assertEquals(0755, fileperms($target) & 07777, 'expected SUID bit cleared');
@@ -35,9 +33,7 @@ class KernelHardeningSshKeysignTest extends TestCase
         chmod($target, 0755);
         $logs = [];
 
-        $this->pmssWithEnv(['PMSS_SSH_KEYSIGN_PATH' => $target], function () use (&$logs): void {
-            \pmssEnsureSshKeysignSuidStrip($this->pmssMakeArrayLogger($logs));
-        });
+        $this->pmssRunKernelHardeningSshKeysign(['PMSS_SSH_KEYSIGN_PATH' => $target], $logs);
 
         $this->assertEquals(0755, fileperms($target) & 07777, 'expected mode unchanged');
         $this->assertTrue($this->pmssMessagesContain($logs, 'ssh-keysign already non-SUID'), 'expected skip log');
@@ -49,9 +45,7 @@ class KernelHardeningSshKeysignTest extends TestCase
         $target = $dir.'/ssh-keysign-not-there';
         $logs = [];
 
-        $this->pmssWithEnv(['PMSS_SSH_KEYSIGN_PATH' => $target], function () use (&$logs): void {
-            \pmssEnsureSshKeysignSuidStrip($this->pmssMakeArrayLogger($logs));
-        });
+        $this->pmssRunKernelHardeningSshKeysign(['PMSS_SSH_KEYSIGN_PATH' => $target], $logs);
 
         $this->assertTrue($this->pmssMessagesContain($logs, 'ssh-keysign not installed'), 'expected absence log');
     }
@@ -64,9 +58,7 @@ class KernelHardeningSshKeysignTest extends TestCase
         chmod($target, 04755);
         $logs = [];
 
-        $this->pmssWithEnv(['PMSS_SSH_KEYSIGN_PATH' => $target, 'PMSS_DRY_RUN' => '1'], function () use (&$logs): void {
-            \pmssEnsureSshKeysignSuidStrip($this->pmssMakeArrayLogger($logs));
-        });
+        $this->pmssRunKernelHardeningSshKeysign(['PMSS_SSH_KEYSIGN_PATH' => $target, 'PMSS_DRY_RUN' => '1'], $logs);
 
         $this->assertEquals(04755, fileperms($target) & 07777, 'expected SUID preserved in dry-run');
         $this->assertTrue($this->pmssMessagesContain($logs, 'ssh-keysign SUID strip: skipping mutation'), 'expected dry-run log');

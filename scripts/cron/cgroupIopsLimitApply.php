@@ -29,37 +29,13 @@
 declare(strict_types=1);
 
 require_once __DIR__.'/../lib/cgroup/directApply.php';
+require_once __DIR__.'/../lib/cgroup/policy.php';
 
 const PMSS_IOPS_USERS_DIR = '/etc/seedbox/config/users';
 
 $DRY_RUN = in_array('--dry-run', $argv ?? [], true);
 
 pmssCgroupDirectRequireRuntime('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); not applicable here');
-
-/**
- * Resolve /home backing device to "major:minor" decimal string.
- * Returns null if /home isn't on a /dev/ block device or major:minor can't be read.
- */
-function pmssIopsResolveHomeMajorMinor(): ?string
-{
-    $devPath = trim((string) @shell_exec('findmnt -no SOURCE /home 2>/dev/null'));
-    if ($devPath === '' || strncmp($devPath, '/dev/', 5) !== 0) {
-        return null;
-    }
-    $devName = basename($devPath);
-    $devFile = '/sys/block/'.$devName.'/dev';
-    if (!is_file($devFile)) {
-        return null;
-    }
-    $majMin = trim((string) @file_get_contents($devFile));
-    return pmssIopsMajorMinorValid($majMin) ? $majMin : null;
-}
-
-/** Accept only kernel major:minor tokens before composing cgroup writes. */
-function pmssIopsMajorMinorValid(string $majMin): bool
-{
-    return preg_match('/^[0-9]+:[0-9]+$/', $majMin) === 1;
-}
 
 /**
  * Parse an IOReadIOPS/IOWriteIOPS spec into its positive-integer value.
@@ -86,7 +62,7 @@ function pmssIopsParseSpec($raw): ?int
  */
 function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $dryRun): array
 {
-    if (!pmssIopsMajorMinorValid($majMin)
+    if (!pmssCgroupPolicyMajorMinorIsValid($majMin)
         || $iops <= 0
         || !pmssCgroupDirectUserBlkioPathAllowed($cgPath, ['blkio.throttle.read_iops_device', 'blkio.throttle.write_iops_device'])
     ) {
@@ -114,7 +90,8 @@ function pmssIopsWriteThrottle(string $cgPath, string $majMin, int $iops, bool $
     return ['ok' => true, 'reason' => 'written', 'cur' => $cur];
 }
 
-$majMin = pmssIopsResolveHomeMajorMinor();
+$homeDevice = pmssCgroupPolicyMountSourceResolve('/home');
+$majMin = $homeDevice !== '' ? pmssCgroupPolicyDeviceMajorMinorResolve($homeDevice) : null;
 if ($majMin === null) {
     fwrite(STDERR, "FATAL: unable to resolve /home major:minor\n");
     exit(2);

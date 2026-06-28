@@ -208,6 +208,27 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertSame('', pmssStatusBinaryPathResolve('wget', $runCommand, $isExecutable));
     }
 
+    public function testBinaryPathResolveRejectsMultilineAndControlCharacterResults(): void
+    {
+        $runCommand = static function (string $command): string {
+            $map = [
+                "command -v 'nginx'" => "/usr/sbin/nginx\nWarning: noisy helper output",
+                "command -v 'php'" => "/usr/bin/php\rbad",
+                "command -v 'curl'" => "/usr/bin/curl\0bad",
+            ];
+
+            return $map[$command] ?? '';
+        };
+        $isExecutable = static function (string $path): bool {
+            throw new \AssertionError('unsafe command path must not reach executable probe: '.str_replace("\0", '\\0', $path));
+        };
+
+        foreach (['nginx', 'php', 'curl'] as $binary) {
+            $this->assertSame('', pmssStatusBinaryPathResolve($binary, $runCommand, $isExecutable));
+            $this->assertSame('', pmssStatusBinaryPathResolve($binary, $runCommand));
+        }
+    }
+
     public function testBinaryPathResolveRejectsUnsafeBinaryNamesBeforeShelling(): void
     {
         $commands = [];

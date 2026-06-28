@@ -63,4 +63,12 @@ final class TrackerCleanerChangeLogSafetyTest extends TestCase
         $this->assertStringContainsString('WARN: User change log path is unsafe or missing', $output);
         $this->assertFalse(file_exists($homeRoot.'/testuser/.trackerCleaner.log'));
     }
+
+    public function testBackupFailureResultKeepsVerboseShape(): void
+    {
+        $result = pmssTrackerCleanerBackupFailedResult('invalid_username', 'user=bad');
+        $this->assertFalse($result['ok']);
+        $this->assertSame('backup_failed', $result['stop_reason']);
+        $this->assertStringContainsAllStrings(['torrent_skip reason=invalid_username user=bad', 'run_stop reason=backup_failed'], $result['verbose_log']);
+    }
 }

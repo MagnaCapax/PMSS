@@ -78,9 +78,7 @@ class BootDefaultsEnsureTest extends TestCase
         \pmssEnsureBootDefaults($logger, $fstab, $grub, ' systemd.unified_cgroup_hierarchy=0 ', ['console=tty0', 'console=tty0', '  '], ['GRUB_TERMINAL' => ' console ', 'BAD-KEY' => 'ignored']);
         $updatedGrub = (string) file_get_contents($grub);
 
-        $this->assertStringContainsString('GRUB_CMDLINE_LINUX_DEFAULT="quiet systemd.unified_cgroup_hierarchy=0 console=tty0"', $updatedGrub);
-        $this->assertStringContainsString('GRUB_TERMINAL="console"', $updatedGrub);
-        $this->assertStringNotContainsString('BAD-KEY', $updatedGrub);
+        $this->assertStringContainsAndOmitsStrings(['GRUB_CMDLINE_LINUX_DEFAULT="quiet systemd.unified_cgroup_hierarchy=0 console=tty0"', 'GRUB_TERMINAL="console"'], ['BAD-KEY'], $updatedGrub);
     }
 
     public function testBootDefaultsPlanHelpersStayStable(): void

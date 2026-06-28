@@ -25,8 +25,8 @@ class ResourceStatisticsTest extends TestCase
             'io_read_ops' => $this->pmssBuildWindowValues(0, 0, 77, 0),
         ]));
 
-        $stats = new \resourceStatistics();
-        $metrics = $stats->readSnapshotMetricsFromPath($path);
+        $data = \pmssReadSerializedArrayFile($path);
+        $metrics = is_array($data) ? \pmssResourceStoredPayloadWindowMetrics($data, 'day') : null;
 
         $this->assertEquals([
             'io_read' => 11.0,
@@ -159,6 +159,7 @@ class ResourceStatisticsTest extends TestCase
         );
 
         $this->assertEquals(['1024', '2048', '12', '34', '3000', '4096', '7', '512', '1024'], $parts);
+        $this->assertEquals(['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks', 'memory_anon', 'memory_file'], \pmssResourceLogPayloadFields(count($parts)));
         $this->assertEquals([
             'timestamp' => $timestamp,
             'io_read' => 1024.0,

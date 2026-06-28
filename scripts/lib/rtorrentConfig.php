@@ -139,20 +139,93 @@ class rtorrentConfig
     }
     protected function _configPortPrivate($type, $rangeStart = 2000, $rangeEnd = 65000)
     {
-        $directoryBase = '/var/lib/pmss/ports';
+        $type = $this->normalizePortReservationType($type);
+        [$rangeStart, $rangeEnd] = $this->normalizePortReservationRange($rangeStart, $rangeEnd);
+
+        $directoryBase = $this->portReservationBaseDir();
         $directoryType = $directoryBase.'/'.$type;
 
         $this->ensureDirectory($directoryBase, 'Unable to create port reservation base directory: ');
         $this->ensureDirectory($directoryType, 'Unable to create port reservation directory: ');
 
-        do {
-            $port = round(rand($rangeStart, $rangeEnd));
-        } while (file_exists($directoryType.'/'.$port));
-
-        if (@touch($directoryType.'/'.$port) === false) {
-            throw new RuntimeException('Unable to reserve port file: '.$directoryType.'/'.$port);
+        $rangeSize = $rangeEnd - $rangeStart + 1;
+        $attempts = min(max($rangeSize * 2, 16), 4096);
+        for ($attempt = 0; $attempt < $attempts; $attempt++) {
+            $port = rand($rangeStart, $rangeEnd);
+            $reserved = $this->tryReservePortFile($directoryType, $port);
+            if ($reserved === true) {
+                return $port;
+            }
+            if ($reserved === null) {
+                throw new RuntimeException('Unable to reserve port file: '.$directoryType.'/'.$port);
+            }
         }
-        return $port;
+
+        for ($port = $rangeStart; $port <= $rangeEnd; $port++) {
+            $reserved = $this->tryReservePortFile($directoryType, $port);
+            if ($reserved === true) {
+                return $port;
+            }
+            if ($reserved === null) {
+                throw new RuntimeException('Unable to reserve port file: '.$directoryType.'/'.$port);
+            }
+        }
+
+        throw new RuntimeException('No available rTorrent '.$type.' port reservation slots');
+    }
+
+    /** Return the root directory used for legacy rTorrent port reservations. */
+    protected function portReservationBaseDir(): string
+    {
+        return '/var/lib/pmss/ports';
+    }
+
+    /** Validate the reservation namespace before deriving filesystem paths. */
+    private function normalizePortReservationType($type): string
+    {
+        $type = (string) $type;
+        if (preg_match('/^[a-z][a-z0-9_-]{0,31}$/D', $type) !== 1) {
+            throw new InvalidArgumentException('Invalid rTorrent port reservation type');
+        }
+        return $type;
+    }
+
+    /** Normalize and bound the port range before any reservation attempts. */
+    private function normalizePortReservationRange($rangeStart, $rangeEnd): array
+    {
+        $rangeStart = filter_var($rangeStart, FILTER_VALIDATE_INT);
+        $rangeEnd = filter_var($rangeEnd, FILTER_VALIDATE_INT);
+        if ($rangeStart === false || $rangeEnd === false || $rangeStart < 1 || $rangeEnd > 65535 || $rangeStart > $rangeEnd) {
+            throw new InvalidArgumentException('Invalid rTorrent port reservation range');
+        }
+
+        return [(int) $rangeStart, (int) $rangeEnd];
+    }
+
+    /**
+     * Create one reservation file without following pre-existing paths.
+     *
+     * Returns true when reserved, false when occupied, and null on write error.
+     */
+    private function tryReservePortFile(string $directoryType, int $port): ?bool
+    {
+        $path = $directoryType.'/'.$port;
+        if (is_link($path)) {
+            return false;
+        }
+
+        $handle = @fopen($path, 'x');
+        if ($handle === false) {
+            return (file_exists($path) || is_link($path)) ? false : null;
+        }
+
+        @fclose($handle);
+        if (!is_file($path) || is_link($path)) {
+            @unlink($path);
+            return null;
+        }
+
+        return true;
     }
     private function configWithPortDefaults(array $config): array
     {

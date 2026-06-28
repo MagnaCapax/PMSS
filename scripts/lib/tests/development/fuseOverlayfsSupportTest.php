@@ -15,7 +15,7 @@ class FuseOverlayfsSupportTest extends TestCase
                 'fuse-overlayfs',
             ]],
             'scripts/lib/update/distUpgrade/apt.php' => ['required' => ['apt-get install']],
-            'scripts/lib/update/userMaintenance.php' => ['required' => ["require_once __DIR__.'/users/docker.php';"]],
+            'scripts/lib/update/userMaintenance.php' => ['required' => ["'users/docker.php'"]],
             'scripts/lib/update/users/docker.php' => [
                 'required' => ['fuse-overlayfs', 'disable_containerd_snapshotter'],
                 'forbidden' => [

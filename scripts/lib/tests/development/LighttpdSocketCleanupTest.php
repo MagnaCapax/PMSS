@@ -8,27 +8,36 @@ class LighttpdSocketCleanupTest extends TestCase
     public function testStartScriptCreatesManagedDirectoriesViaSuBeforeLaunch(): void
     {
         $script = $this->readStartScript();
+        $helperPos = strpos($script, 'function pmssStartLighttpdEnsureDirectory(');
         $dirsPos = strpos($script, 'foreach ($requiredDirs as $dir) {');
-        $mkdirPos = strpos($script, "'mkdir -p '.escapeshellarg(\$dir)");
+        $mkdirPos = strpos($script, "passthru(pmssBuildUserShellCommand(\$user, 'mkdir -p '.escapeshellarg(\$dir)), \$rc);");
+        $guardCallPos = strpos($script, 'pmssStartLighttpdEnsureDirectory($user, $homeDir, $dir)');
         $launchPos = strpos($script, "\$startCommand = 'cd '.escapeshellarg(\$homeDir).' && /usr/sbin/lighttpd -f '.escapeshellarg(\$configPath);");
 
+        $this->assertTrue($helperPos !== false);
         $this->assertTrue($dirsPos !== false);
-        $this->assertTrue($mkdirPos !== false && $mkdirPos > $dirsPos);
-        $this->assertTrue($launchPos !== false && $mkdirPos < $launchPos);
+        $this->assertTrue($mkdirPos !== false && $mkdirPos > $helperPos);
+        $this->assertTrue($guardCallPos !== false && $guardCallPos > $dirsPos);
+        $this->assertTrue($launchPos !== false && $guardCallPos < $launchPos);
         $this->assertTrue(strpos($script, "if (\$deflateEnabled) {") !== false);
         $this->assertTrue(strpos($script, "\$requiredDirs[] = \$lighttpdDir.'/compress';") !== false);
+        $this->assertTrue(strpos($script, 'pmssStartLighttpdPathWithinHome($dir, $homeDir)') !== false);
+        $this->assertTrue(strpos($script, 'if ($rc !== 0) {') !== false);
+        $this->assertTrue(strpos($script, 'Unable to prepare lighttpd directory') !== false);
     }
 
     public function testStartScriptRemovesPhpSocketEntriesBeforeLaunch(): void
     {
         $script = $this->readStartScript();
         $cleanupPos = strpos($script, "foreach (glob(rtrim(\$lighttpdDir, '/').'/php.socket*') ?: [] as \$socketPath) {");
-        $unlinkPos = strpos($script, '@unlink($socketPath);');
+        $unlinkPos = strpos($script, 'pmssStartLighttpdRemoveSocket($homeDir, $socketPath)');
         $launchPos = strpos($script, "\$startCommand = 'cd '.escapeshellarg(\$homeDir).' && /usr/sbin/lighttpd -f '.escapeshellarg(\$configPath);");
 
         $this->assertTrue($cleanupPos !== false);
         $this->assertTrue($unlinkPos !== false && $unlinkPos > $cleanupPos);
         $this->assertTrue($launchPos !== false && $unlinkPos < $launchPos);
+        $this->assertTrue(strpos($script, 'is_link($socketPath)') !== false);
+        $this->assertTrue(strpos($script, 'Unable to remove stale lighttpd socket') !== false);
     }
 
     public function testStartScriptEntersUserHomeBeforeLaunchingLighttpd(): void

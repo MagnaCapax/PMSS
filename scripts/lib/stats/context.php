@@ -69,12 +69,8 @@ function pmssStatsResolveContext(array $overrides = []): array
     $versionFile = pmssStatsContextPathResolve(pmssStatsContextValue($overrides, 'version_file', 'PMSS_STATS_VERSION_FILE', '/etc/seedbox/config/version'), '/etc/seedbox/config/version');
     $cgroupDir = pmssStatsContextPathResolve(pmssStatsContextValue($overrides, 'cgroup_dir', 'PMSS_STATS_CGROUP_DIR', ''), '', true);
     if ($cgroupDir === '') {
-        $lines = @file('/proc/self/cgroup', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        foreach (is_array($lines) ? $lines : [] as $line) {
-            $parts = explode(':', (string) $line, 3);
-            if (count($parts) !== 3 || trim($parts[2]) === '') continue;
-            $path = '/'.ltrim(trim($parts[2]), '/');
-            foreach (['/sys/fs/cgroup'.$path, '/sys/fs/cgroup/unified'.$path] as $candidate) {
+        foreach (pmssCgroupSelfEntries() as $entry) {
+            foreach (['/sys/fs/cgroup'.$entry['path'], '/sys/fs/cgroup/unified'.$entry['path']] as $candidate) {
                 if (is_dir($candidate)) {
                     $cgroupDir = $candidate;
                     break 2;

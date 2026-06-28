@@ -431,6 +431,9 @@ function parseArguments(array $argv): array
         'branch'          => null,
     ];
 
+    $flagOptions = ['--dry-run' => 'dry_run', '--dist-upgrade' => 'dist_upgrade', SELF_UPDATE_SKIP_FLAG => 'skip_self_update', SCRIPTS_ONLY_FLAG => 'scripts_only', '--scriptonly' => 'scripts_only'];
+    $valueOptions = ['--dist-upgrade=' => ['dist_upgrade', false], '--repo=' => ['repo', true], '--branch=' => ['branch', true]];
+
     foreach (array_slice($argv, 1) as $arg) {
         if ($arg === '--help' || $arg === '-h') {
             $script = $argv[0];
@@ -444,33 +447,17 @@ function parseArguments(array $argv): array
                 ."  {$script} --scripts-only            # refresh scripts/skel only; never runs apt/apt-get\n";
             exit(0);
         }
-        if ($arg === '--dry-run') {
-            $options['dry_run'] = true;
+        if (isset($flagOptions[$arg])) {
+            $options[$flagOptions[$arg]] = true;
             continue;
         }
-        if (strncmp($arg, '--dist-upgrade=', 15) === 0) {
-            $options['dist_upgrade'] = substr($arg, 15);
-            continue;
-        }
-        if ($arg === '--dist-upgrade') {
-            $options['dist_upgrade'] = true;
-            continue;
-        }
-        if ($arg === SELF_UPDATE_SKIP_FLAG) {
-            $options['skip_self_update'] = true;
-            continue;
-        }
-        if ($arg === SCRIPTS_ONLY_FLAG || $arg === '--scriptonly') {
-            $options['scripts_only'] = true;
-            continue;
-        }
-        if (strncmp($arg, '--repo=', 7) === 0) {
-            $options['repo'] = trim(substr($arg, 7));
-            continue;
-        }
-        if (strncmp($arg, '--branch=', 9) === 0) {
-            $options['branch'] = trim(substr($arg, 9));
-            continue;
+        foreach ($valueOptions as $prefix => [$optionName, $trimValue]) {
+            if (strncmp($arg, $prefix, strlen($prefix)) !== 0) {
+                continue;
+            }
+            $value = substr($arg, strlen($prefix));
+            $options[$optionName] = $trimValue ? trim($value) : $value;
+            continue 2;
         }
         if ($options['spec'] === '') {
             $options['spec'] = $arg;
@@ -1605,13 +1592,7 @@ function maybeSelfUpdate(array $argv, bool $dryRun, bool $skipSelfUpdate, string
     logmsg('update.php changed during snapshot; re-running refreshed bootstrap');
     logEvent('self_update_restart', ['previous_hash' => $originalHash, 'new_hash' => $updatedHash]);
 
-    $args = [];
-    foreach (array_slice($argv, 1) as $arg) {
-        if ($arg === SELF_UPDATE_SKIP_FLAG) {
-            continue;
-        }
-        $args[] = $arg;
-    }
+    $args = array_values(array_filter(array_slice($argv, 1), static function (string $arg): bool { return $arg !== SELF_UPDATE_SKIP_FLAG; }));
     $args[] = SELF_UPDATE_SKIP_FLAG;
 
     $command = pmssBootstrapPhpCommand(__FILE__, $args);

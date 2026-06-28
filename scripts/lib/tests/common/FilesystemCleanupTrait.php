@@ -148,6 +148,12 @@ trait FilesystemCleanupTrait
         };
     }
 
+    /** Return environment overrides with PMSS test mode enabled. */
+    protected function pmssTestModeEnv(array $overrides = []): array
+    {
+        return array_merge($overrides, ['PMSS_TEST_MODE' => '1']);
+    }
+
     /** Return a hermetic command runner that echoes argv into diagnostic output. */
     protected function pmssCommandEchoRunner(?array &$commands = null): callable
     {

@@ -107,17 +107,6 @@ function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFie
     return ['delta' => $delta, 'previous_state' => $previousState, 'state' => $state];
 }
 
-/** Return per-sample ceilings for resource counters that can expose sentinel values. */
-function pmssResourceLogDeltaCeilings(): array
-{
-    return [
-        'io_read' => PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_BYTES,
-        'io_write' => PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_BYTES,
-        'io_read_ops' => PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_OPS,
-        'io_write_ops' => PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_OPS,
-    ];
-}
-
 /**
  * Check whether five minutes of usage exceed 90% of the configured link budget.
  */
@@ -207,7 +196,12 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
         $statePath,
         $state,
         ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'],
-        pmssResourceLogDeltaCeilings()
+        [
+            'io_read' => PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_BYTES,
+            'io_write' => PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_BYTES,
+            'io_read_ops' => PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_OPS,
+            'io_write_ops' => PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_OPS,
+        ]
     );
     return ['delta' => $result['delta'], 'state' => $state];
 }

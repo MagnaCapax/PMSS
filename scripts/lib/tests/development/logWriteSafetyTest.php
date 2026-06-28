@@ -35,6 +35,31 @@ final class LogWriteSafetyTest extends TestCase
         $this->assertFalse(\pmssJsonLineAppend($directory, ['event' => 'blocked']));
     }
 
+    public function testJsonLineReadRejectsSymlinkTarget(): void
+    {
+        $target = $this->pmssMakeTempFile('pmss-log-jsonl-target-');
+        file_put_contents($target, "{\"event\":\"blocked\"}\n");
+        $link = $this->pmssMakeTempDir('pmss-log-jsonl-link-dir-').'/events.jsonl';
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+
+        $handled = false;
+        $this->assertFalse(\pmssJsonLineFileEach($link, static function () use (&$handled): void {
+            $handled = true;
+        }));
+        $this->assertFalse($handled);
+        $this->assertEquals([], \pmssJsonLineFileRead($link));
+        $this->assertEquals(null, \pmssJsonLineFileLast($link));
+    }
+
+    public function testJsonLineReadAcceptsRegularFileTarget(): void
+    {
+        $path = $this->pmssMakeTempFile('pmss-log-jsonl-read-');
+        file_put_contents($path, "{\"event\":\"ready\"}\nnot-json\n{\"event\":\"done\"}\n");
+
+        $this->assertEquals([['event' => 'ready'], ['event' => 'done']], \pmssJsonLineFileRead($path));
+        $this->assertEquals(['event' => 'done'], \pmssJsonLineFileLast($path));
+    }
+
     public function testLogAppendTimestampedLineRejectsSymlinkedParentDirectory(): void
     {
         $targetDir = $this->pmssMakeTempDir('pmss-log-parent-real-');

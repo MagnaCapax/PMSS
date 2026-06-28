@@ -26,33 +26,32 @@ class UserMaintenanceSkipReasonReportingTest extends TestCase
      * pmssUpdateAllUsers must record a reason at every skip path and return the
      * compact reason list in its summary (and JSON event) so callers can report it.
      */
-    public function testUserMaintenanceCapturesAndReturnsSkipReasons(): void
+    public function testUserMaintenanceSkipReasonsUseSoftFailMarkerPolicy(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/userMaintenance.php', [
-            '$skipReasons = [];',
-            "\$skipReasons[] = '(empty): empty username entry';",
-            "\$skipReasons[] = \$userTrim.': invalid username';",
-            "\$skipReasons[] = \$userTrim.': '.\$reason;",
-            "'skip_reasons' => \$skipReasons,",
-        ]);
-    }
-
-    /**
-     * update-step2 must name skipped users in the partial-completion failure
-     * reason AND classify it SOFT_FAIL (GH#592 — #302's "prominent warning"
-     * option, not the queue-blocking hard-fail) AND record a durable marker.
-     */
-    public function testUpdateStep2SurfacesSkipReasonsWithSoftFailAndMarker(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
-            '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',
-            'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
-        ]);
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/runtime/stepPolicy.php', [
-            'processed_users_mismatch',
-            'PMSS_UPDATE_STEP_CLASS_SOFT_FAIL',
-            "' skipped=['.implode('; ', array_slice(\$skipReasons, 0, 10)).']'",
-            'pmssUpdateRecordIncompleteUserMaintenance(',
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/update/userMaintenance.php' => [
+                'required' => [
+                    '$skipReasons = [];',
+                    "\$skipReasons[] = '(empty): empty username entry';",
+                    "\$skipReasons[] = \$userTrim.': invalid username';",
+                    "\$skipReasons[] = \$userTrim.': '.\$reason;",
+                    "'skip_reasons' => \$skipReasons,",
+                ],
+            ],
+            'scripts/util/update-step2.php' => [
+                'required' => [
+                    '$userMaintenanceSummary = pmssRunProfiledCallable(\'Updating all user environments\'',
+                    'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
+                ],
+            ],
+            'scripts/lib/update/runtime/stepPolicy.php' => [
+                'required' => [
+                    'processed_users_mismatch',
+                    'PMSS_UPDATE_STEP_CLASS_SOFT_FAIL',
+                    "' skipped=['.implode('; ', array_slice(\$skipReasons, 0, 10)).']'",
+                    'pmssUpdateRecordIncompleteUserMaintenance(',
+                ],
+            ],
         ]);
     }
 

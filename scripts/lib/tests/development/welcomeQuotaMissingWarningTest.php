@@ -71,6 +71,14 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         return $this->pmssRunInlinePhpRequire($fixture, $script, [], $stderrRedirect);
     }
 
+    private function assertWelcomeUsageScriptContains(string $script, array $needles, string $stderrRedirect = '2>&1'): string
+    {
+        $output = $this->runWelcomeUsageScript($script, $stderrRedirect);
+        $this->assertStringContainsAllStrings($needles, $output);
+        $this->pmssAssertStringNotContainsString('Undefined', $output);
+        return $output;
+    }
+
     public function testWelcomeSourceContractsUseSafeCustomerHelpers(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/welcome.php', [
@@ -243,77 +251,52 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
     public function testWelcomeQuotaSectionHandlesMalformedPayloadWithoutNotice(): void
     {
-        $output = $this->runWelcomeUsageScript(
+        $this->assertWelcomeUsageScriptContains(
             'echo quotaCreateSection(array("hardLimit" => 100, "totalSpace" => 50));',
-            '2>&1'
+            ['Quota info is missing']
         );
-
-        $this->assertStringContainsString('Quota info is missing', $output);
-        $this->pmssAssertStringNotContainsString('Undefined', $output);
     }
 
     public function testWelcomeTrafficSectionHandlesMalformedPayloadWithoutNotice(): void
     {
-        $output = $this->runWelcomeUsageScript(
+        $this->assertWelcomeUsageScriptContains(
             'ob_start(); trafficCreateSection(array("raw" => array()), 100); echo ob_get_clean();',
-            '2>&1'
+            ['Traffic usage data is unavailable right now.']
         );
-
-        $this->assertStringContainsString('Traffic usage data is unavailable right now.', $output);
-        $this->pmssAssertStringNotContainsString('Undefined', $output);
     }
 
     public function testWelcomeTrafficSectionShowsRawUsedAndLimitLine(): void
     {
-        $output = $this->runWelcomeUsageScript(
+        $this->assertWelcomeUsageScriptContains(
             'ob_start(); trafficCreateSection(array("raw" => array("month" => 433152)), 1000); echo ob_get_clean();',
-            '2>&1'
+            ['Used: 423 GiB / Limit: 1,000 GiB (30-day window)', 'Current effective: full plan port speed']
         );
-
-        $this->assertStringContainsString('Used: 423 GiB / Limit: 1,000 GiB (30-day window)', $output);
-        $this->assertStringContainsString('Current effective: full plan port speed', $output);
-        $this->pmssAssertStringNotContainsString('Undefined', $output);
     }
 
     public function testWelcomeTrafficSectionShowsApproachDisclosure(): void
     {
-        $output = $this->runWelcomeUsageScript(
+        $this->assertWelcomeUsageScriptContains(
             'ob_start(); trafficCreateSection(array("raw" => array("month" => 716800)), 1000); echo ob_get_clean();',
-            '2>&1'
+            ['Usage: <b>70.0%</b> of monthly traffic cap.', 'Approaching monthly traffic cap', 'Bandwidth#Graduated_throttling']
         );
-
-        $this->assertStringContainsString('Usage: <b>70.0%</b> of monthly traffic cap.', $output);
-        $this->assertStringContainsString('Approaching monthly traffic cap', $output);
-        $this->assertStringContainsString('Bandwidth#Graduated_throttling', $output);
-        $this->pmssAssertStringNotContainsString('Undefined', $output);
     }
 
     public function testWelcomeTrafficSectionShowsActiveThrottleDisclosure(): void
     {
         $state = array('defaultCapMbit' => 100, 'effectiveCapMbit' => 25, 'isReduced' => true);
-        $output = $this->runWelcomeUsageScript(
+        $this->assertWelcomeUsageScriptContains(
             'ob_start(); trafficCreateSection(array("raw" => array("month" => 1536000)), 1000, null, 0, '.var_export($state, true).'); echo ob_get_clean();',
-            '2>&1'
+            ['Throttled to 25 Mbps', '50.0% over cap', 'Throttle lift requires 3 consecutive days under cap.']
         );
-
-        $this->assertStringContainsString('Throttled to 25 Mbps', $output);
-        $this->assertStringContainsString('50.0% over cap', $output);
-        $this->assertStringContainsString('Throttle lift requires 3 consecutive days under cap.', $output);
-        $this->pmssAssertStringNotContainsString('Undefined', $output);
     }
 
     public function testWelcomeTrafficSectionShowsCooldownDisclosure(): void
     {
         $state = array('defaultCapMbit' => 100, 'effectiveCapMbit' => 25, 'isReduced' => true, 'throttleFileMtime' => time() - 86400);
-        $output = $this->runWelcomeUsageScript(
+        $this->assertWelcomeUsageScriptContains(
             'ob_start(); trafficCreateSection(array("raw" => array("month" => 921600)), 1000, null, 0, '.var_export($state, true).'); echo ob_get_clean();',
-            '2>&1'
+            ['Throttle cooldown active', 'current ceiling is 25 Mbps', 'remaining under-cap cooldown: about 2 days']
         );
-
-        $this->assertStringContainsString('Throttle cooldown active', $output);
-        $this->assertStringContainsString('current ceiling is 25 Mbps', $output);
-        $this->assertStringContainsString('remaining under-cap cooldown: about 2 days', $output);
-        $this->pmssAssertStringNotContainsString('Undefined', $output);
     }
 
     public function testWelcomeMemorySectionSnapshots(): void

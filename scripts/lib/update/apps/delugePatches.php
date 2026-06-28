@@ -107,6 +107,36 @@ function pmssPatchDelugeFindCallerSignature(string $path, bool $dryRun, callable
     return false;
 }
 
+/** Patch removed gettext.bind_textdomain_codeset() calls for Python 3.10+. */
+function pmssPatchDelugeBindTextdomainCodeset(string $path, bool $dryRun, callable $log): bool
+{
+    $lines = pmssDelugeReadPatchLines($path, $log, '[WARN] Unable to read Deluge i18n util.py for patching: ');
+    if ($lines === null) return false;
+
+    $line = pmssDelugeLineSearch($lines, 'gettext.bind_textdomain_codeset(');
+    if ($line === null) return false;
+
+    $previous = $line > 0 ? trim($lines[$line - 1]) : '';
+    if (strpos($previous, "hasattr(gettext, 'bind_textdomain_codeset')") !== false
+        || strpos($previous, 'hasattr(gettext, "bind_textdomain_codeset")') !== false
+    ) {
+        return true;
+    }
+
+    if (preg_match('/^(\s*)gettext\.bind_textdomain_codeset\((.*)$/', $lines[$line], $matches) !== 1) {
+        $log('[WARN] Unable to locate Deluge bind_textdomain_codeset call in '.$path);
+        return false;
+    }
+
+    $indent = $matches[1];
+    array_splice($lines, $line, 1, [
+        $indent."if hasattr(gettext, 'bind_textdomain_codeset'):",
+        $indent.'    '.trim($lines[$line]),
+    ]);
+
+    return pmssDelugeWritePatchedLines($path, $lines, $dryRun, $log, '[DRYRUN] Would patch Deluge gettext codeset guard in ', '[WARN] Failed to write Deluge gettext codeset patch to ');
+}
+
 /** Apply one Deluge patch callback across unique filesystem candidates. */
 function pmssDelugePatchEnsure(array $patterns, callable $patch, bool $dryRun, callable $log): bool
 {
@@ -135,6 +165,11 @@ function pmssDelugePatchSpecs(): array
             'patterns' => ['/usr/lib/python3/dist-packages/deluge/log.py', '/usr/lib/python3*/dist-packages/deluge/log.py', '/usr/local/lib/python3*/dist-packages/deluge/log.py'],
             'patch' => 'pmssPatchDelugeFindCallerSignature',
             'message' => "\t*** Deluge Python 3.11 findCaller compatibility ensured\n",
+        ],
+        [
+            'patterns' => ['/usr/lib/python3/dist-packages/deluge/i18n/util.py', '/usr/lib/python3*/dist-packages/deluge/i18n/util.py', '/usr/local/lib/python3*/dist-packages/deluge/i18n/util.py'],
+            'patch' => 'pmssPatchDelugeBindTextdomainCodeset',
+            'message' => "\t*** Deluge gettext Python 3.11 compatibility ensured\n",
         ],
     ];
 }

@@ -188,10 +188,10 @@ PHP;
     private function trafficLimitCliCases(array $definition): array
     {
         return [
-            'traffic-limit show' => $this->trafficLimitCliCase($definition, ['--show'], "Traffic limit for alice: 15 GiB\n", ['runtime' => "15GiB\n"], ['home' => null, 'runtime' => '15GiB']),
-            'traffic-limit help' => $this->trafficLimitCliCase($definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null, 'runtime' => null]),
-            'traffic-limit set' => $this->trafficLimitCliCase($definition, ['--limit=20'], "Traffic limit for alice set at 20 GiB\n", [], ['home' => '20', 'runtime' => '20'], ['home' => 0664, 'runtime' => 0600], [['alice', 'traffic limit set to 20 GiB (monthly quota)']]),
-            'traffic-limit unset' => $this->trafficLimitCliCase($definition, ['--unset'], "Traffic limit for alice set at 0 GiB\n", ['runtime' => "8\n", 'home' => "8\n"], ['home' => null, 'runtime' => null], [], [['alice', 'traffic limit unset (GiB quota removed)']]),
+            'traffic-limit show' => $this->gibSettingCliCase('traffic', $definition, ['--show'], "Traffic limit for alice: 15 GiB\n", ['runtime' => "15GiB\n"], ['home' => null, 'runtime' => '15GiB']),
+            'traffic-limit help' => $this->gibSettingCliCase('traffic', $definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null, 'runtime' => null]),
+            'traffic-limit set' => $this->gibSettingCliCase('traffic', $definition, ['--limit=20'], "Traffic limit for alice set at 20 GiB\n", [], ['home' => '20', 'runtime' => '20'], ['home' => 0664, 'runtime' => 0600], [['alice', 'traffic limit set to 20 GiB (monthly quota)']]),
+            'traffic-limit unset' => $this->gibSettingCliCase('traffic', $definition, ['--unset'], "Traffic limit for alice set at 0 GiB\n", ['runtime' => "8\n", 'home' => "8\n"], ['home' => null, 'runtime' => null], [], [['alice', 'traffic limit unset (GiB quota removed)']]),
         ];
     }
 
@@ -199,23 +199,16 @@ PHP;
     private function bonusTrafficCliCases(array $definition): array
     {
         return [
-            'bonus show' => $this->bonusTrafficCliCase($definition, ['--show'], "Bonus traffic for alice: 15 GiB\n", ['home' => "15GiB\n"], ['home' => '15GiB']),
-            'bonus help' => $this->bonusTrafficCliCase($definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null]),
-            'bonus set' => $this->bonusTrafficCliCase($definition, ['--bonus=20'], "Bonus traffic for alice set to 20 GiB\n", [], ['home' => '20'], [['alice', 'bonus traffic set to 20 GiB (monthly add-on)']]),
-            'bonus unset' => $this->bonusTrafficCliCase($definition, ['--unset'], "Bonus traffic for alice set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [['alice', 'bonus traffic unset (GiB add-on removed)']]),
+            'bonus show' => $this->gibSettingCliCase('bonus', $definition, ['--show'], "Bonus traffic for alice: 15 GiB\n", ['home' => "15GiB\n"], ['home' => '15GiB']),
+            'bonus help' => $this->gibSettingCliCase('bonus', $definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null]),
+            'bonus set' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=20'], "Bonus traffic for alice set to 20 GiB\n", [], ['home' => '20'], [], [['alice', 'bonus traffic set to 20 GiB (monthly add-on)']]),
+            'bonus unset' => $this->gibSettingCliCase('bonus', $definition, ['--unset'], "Bonus traffic for alice set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['alice', 'bonus traffic unset (GiB add-on removed)']]),
         ];
     }
 
-    /**
-     * @param array<string,string> $definition
-     * @param array<int,string> $args
-     * @param array<string,string> $existingFiles
-     * @param array<string,?string> $files
-     * @param array<string,int> $modes
-     * @param array<int,array<int,string>> $logs
-     * @return array<string,mixed>
-     */
-    private function trafficLimitCliCase(
+    /** Build one shared GiB-setting CLI fixture. */
+    private function gibSettingCliCase(
+        string $kind,
         array $definition,
         array $args,
         string $stdout,
@@ -224,9 +217,8 @@ PHP;
         array $modes = [],
         array $logs = []
     ): array {
-        return [
-            'fixture' => [
-                'argv' => $this->gibSettingArgv($definition['script'], $args),
+        $fixtures = [
+            'traffic' => [
                 'library' => 'scripts/lib/user/trafficLimit.php',
                 'function' => 'pmssUserTrafficLimitCli',
                 'homeFile' => '.trafficLimit',
@@ -236,45 +228,26 @@ PHP;
                 'homeGlobal' => 'PMSS_TRAFFIC_LIMIT_TEST_HOME',
                 'runtimeGlobal' => 'PMSS_TRAFFIC_LIMIT_TEST_RUNTIME',
                 'logGlobal' => 'PMSS_TRAFFIC_LIMIT_TEST_LOGS',
-                'existingFiles' => $existingFiles,
             ],
-            'stdout' => $stdout,
-            'files' => $files,
-            'modes' => $modes,
-            'logs' => $logs,
-        ];
-    }
-
-    /**
-     * @param array<string,string> $definition
-     * @param array<int,string> $args
-     * @param array<string,string> $existingFiles
-     * @param array<string,?string> $files
-     * @param array<int,array<int,string>> $logs
-     * @return array<string,mixed>
-     */
-    private function bonusTrafficCliCase(
-        array $definition,
-        array $args,
-        string $stdout,
-        array $existingFiles,
-        array $files,
-        array $logs = []
-    ): array {
-        return [
-            'fixture' => [
-                'argv' => $this->gibSettingArgv($definition['script'], $args),
+            'bonus' => [
                 'library' => 'scripts/lib/user/bonusTraffic.php',
                 'function' => 'pmssUserBonusTrafficCli',
                 'homeFile' => '.bonusTraffic',
                 'homePrefix' => 'pmss-bonus-home-',
                 'homeGlobal' => 'PMSS_BONUS_TEST_HOME',
                 'logGlobal' => 'PMSS_BONUS_TEST_LOGS',
-                'existingFiles' => $existingFiles,
             ],
+        ];
+        $this->assertTrue(isset($fixtures[$kind]), 'Unknown GiB setting fixture kind: '.$kind);
+
+        return [
+            'fixture' => array_merge([
+                'argv' => $this->gibSettingArgv($definition['script'], $args),
+                'existingFiles' => $existingFiles,
+            ], $fixtures[$kind]),
             'stdout' => $stdout,
             'files' => $files,
-            'modes' => [],
+            'modes' => $modes,
             'logs' => $logs,
         ];
     }
