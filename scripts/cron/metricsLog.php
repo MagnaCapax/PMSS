@@ -15,18 +15,22 @@
 require_once '/scripts/lib/resources/log.php';
 require_once '/scripts/lib/resources/metrics.php';
 
+// Root-only: per-user performance metrics are customer data (MISSION #1 privacy).
+// 0700 dir + 0600 files keep them unreadable cross-tenant — no customer can read
+// another customer's resource usage. The customer-facing UI reads its own
+// /home/<user>/.resourceData, never this operator-side log.
 $logDir = '/var/log/pmss/metrics';
-if (!pmssEnsureSafeDir($logDir, 0755)) {
+if (!pmssEnsureSafeDir($logDir, 0700)) {
     fwrite(STDERR, "Failed to prepare metrics log directory.\n");
     exit(1);
 }
+@chmod($logDir, 0700);
 
 $userUids = pmssResourceLogManagedUserUids();
 if ($userUids === []) {
     exit(0);
 }
 
-$mode = pmssCgroupMode();
 $ts = date('Y-m-d\TH:i:s');
 
 foreach ($userUids as $user => $uid) {
@@ -35,12 +39,17 @@ foreach ($userUids as $user => $uid) {
         continue;
     }
 
-    $metrics = pmssUserMetricsCollect($uid, $mode, null);
+    $metrics = pmssUserMetricsCollect($uid, null);
     if ($metrics === []) {
         continue;
     }
 
+    $newFile = !is_file($path);
     if (!pmssJsonLineAppend($path, ['ts' => $ts, 'uid' => $uid] + $metrics)) {
         fwrite(STDERR, "Failed to append metrics for {$user}.\n");
+        continue;
+    }
+    if ($newFile) {
+        @chmod($path, 0600);
     }
 }
