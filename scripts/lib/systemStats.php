@@ -174,8 +174,8 @@ function pmssSystemStatsPsiFromRaw(?string $raw): string
 /** Read one PSI file and degrade missing/unreadable hosts to `na`. */
 function pmssSystemStatsPsiRead(string $path): string { return is_readable($path) ? pmssSystemStatsPsiFromRaw(pmssReadRegularFileContents($path)) : 'na'; }
 
-/** Format optional ioping latency for the stats log. */
-function pmssSystemStatsIopingMs(string $path): string { $value = is_dir($path) ? pmssIopingAverageMs($path) : null; return $value === null ? 'na' : number_format($value, 1, '.', '').'ms'; }
+/** Format optional representative ioping latency for the stats log. */
+function pmssSystemStatsIopingMs(string $path): string { $value = is_dir($path) ? pmssIopingMedianMs($path) : null; return $value === null ? 'na' : number_format($value, 1, '.', '').'ms'; }
 
 /** Render one parseable cron log line from collected stats. */
 function pmssSystemStatsLogLine(array $stats, ?string $timestamp = null): string

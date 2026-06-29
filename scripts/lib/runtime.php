@@ -21,6 +21,9 @@ const PMSS_COMMAND_TIMEOUT_APT_DEFAULT = 1200;
 const PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT = 5;
 const PMSS_TIMEOUT_FIRE_LOG_DEFAULT = '/var/log/pmss-timeout-fires.jsonl';
 const PMSS_BLOCK_DATA_DEVICE_NAME_PATTERN = '/^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme\d+n\d+|mmcblk\d+)$/';
+const PMSS_IOPING_PROBE_COUNT = 60;
+const PMSS_IOPING_PROBE_INTERVAL = '0.1';
+const PMSS_IOPING_PROBE_TIMEOUT = 15;
 
 /**
  * Load static helper-module require lists relative to a bootstrap file.

@@ -36,19 +36,50 @@ function pmssBuildCommand(string $program, array $args = []): string
 }
 
 function pmssBuildUserShellCommand(string $username, string $command, string $shell = ''): string { return $shell === '' ? 'su '.escapeshellarg($username).' -c '.escapeshellarg($command) : 'su -s '.escapeshellarg($shell).' -c '.escapeshellarg($command).' '.escapeshellarg($username); }
-function pmssIopingAverageMs(?string $target): ?float
+
+/** Run the canonical direct-I/O 4 KiB latency probe and return raw output. */
+function pmssIopingProbeOutput(?string $target): ?string
 {
     $bin = pmssCommandPath('ioping');
     if ($bin === '' || $target === null || trim($target) === '') return null;
-    $result = pmssCommandCapture(pmssCommandArgvShellQuote([$bin, '-c', '10', '-i', '0.1', '-D', $target]), 10);
+    $result = pmssCommandCapture(pmssCommandArgvShellQuote([$bin, '-c', (string) PMSS_IOPING_PROBE_COUNT, '-i', PMSS_IOPING_PROBE_INTERVAL, '-D', $target]), PMSS_IOPING_PROBE_TIMEOUT);
     $out = trim($result['stdout'] !== '' ? $result['stdout'] : $result['stderr']);
-    if ($out !== '') {
-        $lines = preg_split('/\R/', $out);
-        $out = is_array($lines) ? trim((string) end($lines)) : '';
-    }
-    if (!preg_match('/min\/avg\/max\/mdev\s*=\s*[^\/]+\/\s*([0-9.]+)\s*(us|ms|s)\s*\//i', $out, $m)) return null;
-    $value = (float) $m[1];
-    return strtolower($m[2]) === 'us' ? $value / 1000.0 : (strtolower($m[2]) === 's' ? $value * 1000.0 : $value);
+    return $out === '' ? null : $out;
+}
+
+function pmssIopingValueToMs(float $value, string $unit): float { return strtolower($unit) === 'us' ? $value / 1000.0 : (strtolower($unit) === 's' ? $value * 1000.0 : $value); }
+function pmssIopingAverageMsFromOutput(string $output): ?float { return preg_match('/min\/avg\/max\/mdev\s*=\s*[^\/]+\/\s*([0-9.]+)\s*(us|ms|s)\s*\//i', $output, $m) ? pmssIopingValueToMs((float) $m[1], $m[2]) : null; }
+
+/** Parse per-request ioping samples, ignoring summary lines. */
+function pmssIopingSamplesMsFromOutput(string $output): array
+{
+    preg_match_all('/\btime\s*=\s*([0-9.]+)\s*(us|ms|s)\b/i', $output, $matches, PREG_SET_ORDER);
+    return array_map(static function (array $match): float {
+        return pmssIopingValueToMs((float) $match[1], $match[2]);
+    }, $matches);
+}
+
+function pmssIopingMedianMsFromSamples(array $values): ?float
+{
+    if (empty($values)) return null;
+    sort($values, SORT_NUMERIC);
+    $count = count($values);
+    $mid = (int) floor(($count - 1) / 2);
+    return $count % 2 === 1 ? (float) $values[$mid] : ((float) $values[$mid] + (float) $values[$mid + 1]) / 2.0;
+}
+
+function pmssIopingAverageMs(?string $target): ?float
+{
+    $out = pmssIopingProbeOutput($target);
+    return $out === null ? null : pmssIopingAverageMsFromOutput($out);
+}
+
+function pmssIopingMedianMs(?string $target): ?float
+{
+    $out = pmssIopingProbeOutput($target);
+    if ($out === null) return null;
+    $median = pmssIopingMedianMsFromSamples(pmssIopingSamplesMsFromOutput($out));
+    return $median !== null ? $median : pmssIopingAverageMsFromOutput($out);
 }
 
 function pmssEnvValueNormalized($value): string { return strtolower(trim((string) $value)); }

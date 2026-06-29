@@ -115,6 +115,14 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 - aptCmd(string $args): string
   - Returns apt-get command prefix with non-interactive dpkg options.
+- pmssIopingAverageMs(?string $target): ?float
+  - Runs the canonical `ioping -c 60 -i 0.1 -D <target>` probe and parses the
+    summary average in milliseconds. Missing binaries, empty targets, and
+    malformed output return `null`.
+- pmssIopingMedianMs(?string $target): ?float
+  - Uses the same direct-I/O probe, parses per-request latency samples, and
+    returns their median in milliseconds. Falls back to the summary average
+    when older/stubbed output lacks individual sample lines.
 
 - pmssRecordProfile(array $entry): void → lazily initializes `$GLOBALS['PMSS_PROFILE']`, appends the entry, and emits JSON `step` event.
 - pmssProfileSummary(): void → logs status counts and top 5 durations; writes full JSON to `PMSS_PROFILE_OUTPUT` or `(<PMSS_JSON_LOG>.profile.json)`.

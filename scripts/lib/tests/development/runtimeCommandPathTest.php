@@ -99,6 +99,39 @@ class RuntimeCommandPathTest extends TestCase
         }
     }
 
+    public function testIopingProbeUsesRepresentativeSamplingWindow(): void
+    {
+        $argsLog = $this->pmssMakeTempFile('pmss-ioping-args-');
+        $binDir = $this->pmssMakeExecutableStub('ioping', "#!/bin/sh\nprintf '%s\\n' \"\$*\" > ".escapeshellarg($argsLog)."\nprintf '%s\\n' 'min/avg/max/mdev = 1.0 / 2.0 ms / 3.0 / 0.1'\n", 'pmss-ioping-args-');
+
+        $this->pmssWithPathPrefix($binDir, function () use ($argsLog): void {
+            $this->assertEquals(2.0, pmssIopingAverageMs('/tmp'));
+            $this->assertSame("-c 60 -i 0.1 -D /tmp\n", (string) file_get_contents($argsLog));
+        });
+    }
+
+    public function testIopingMedianMsUsesRequestSamples(): void
+    {
+        $binDir = $this->pmssMakeExecutableStub(
+            'ioping',
+            "#!/bin/sh\nprintf '%s\\n' '4 KiB <<< /tmp: request=1 time=1.0 ms'\nprintf '%s\\n' '4 KiB <<< /tmp: request=2 time=100.0 ms'\nprintf '%s\\n' '4 KiB <<< /tmp: request=3 time=3.0 ms'\nprintf '%s\\n' 'min/avg/max/mdev = 1.0 / 34.7 ms / 100.0 / 1.0'\n",
+            'pmss-ioping-median-'
+        );
+
+        $this->pmssWithPathPrefix($binDir, function (): void {
+            $this->assertEquals(3.0, pmssIopingMedianMs('/tmp'));
+        });
+    }
+
+    public function testIopingMedianMsFallsBackToAverageSummary(): void
+    {
+        $binDir = $this->pmssMakeExecutableStub('ioping', "#!/bin/sh\nprintf '%s\\n' 'min/avg/max/mdev = 1.0 / 4.5 ms / 8.0 / 0.1'\n", 'pmss-ioping-median-');
+
+        $this->pmssWithPathPrefix($binDir, function (): void {
+            $this->assertEquals(4.5, pmssIopingMedianMs('/tmp'));
+        });
+    }
+
     public function testIopingAverageMsReturnsNullForMalformedOutput(): void
     {
         $binDir = $this->pmssMakeExecutableStub('ioping', "#!/bin/sh\nprintf '%s\\n' 'not ioping statistics'\n", 'pmss-ioping-avg-');
