@@ -117,11 +117,29 @@ function pmssResourceLogExceedsFiveMinuteLinkBudget(int $bytes, ?float $linkSpee
         && $bytes > ($linkSpeed * 1000 * 1000 * 60 * 5) * 0.9;
 }
 
+// UINT64_MAX casts to PHP_INT_MAX (9223372036854775807) in PHP. systemd reports it
+// for unavailable slice properties on cgroup v1 (#467). Treat any value at/above this
+// sentinel as "absent" so it never poisons the per-user resource log.
+const PMSS_RESOURCE_COUNTER_SENTINEL = PHP_INT_MAX;
+
 /**
- * Read systemd slice counters for the given user.
+ * Read per-user slice counters, selecting the source by active cgroup hierarchy.
+ *
+ * On cgroup v1 (the Debian 12 fleet default, systemd.unified_cgroup_hierarchy=0),
+ * systemd does not populate IO* slice properties — it returns UINT64_MAX, which the
+ * delta logic silently floors to 0 (#467). On v1 we therefore read the real counters
+ * straight from the per-controller sysfs tree (the same tree directApply.php already
+ * writes to). On v2/unknown the systemd path is unchanged. Output keys are identical
+ * across both paths so the resource log line format is untouched.
+ *
+ * @param string|null $cgroupRoot sysfs cgroup root, injectable for tests (default /sys/fs/cgroup).
  */
-function pmssResourceLogReadCounters(int $uid): ?array
+function pmssResourceLogReadCounters(int $uid, ?string $cgroupRoot = null): ?array
 {
+    if (pmssCgroupMode() === 'v1') {
+        return pmssResourceLogReadCountersV1($uid, $cgroupRoot);
+    }
+
     $values = pmssReadSystemdIntProperties(
         sprintf('user-%d.slice', $uid),
         [
@@ -140,8 +158,87 @@ function pmssResourceLogReadCounters(int $uid): ?array
     );
     if (!is_array($values)) return null;
 
-    $memoryBreakdown = pmssResourceLogReadMemoryBreakdown($uid);
+    $memoryBreakdown = pmssResourceLogReadMemoryBreakdown($uid, $cgroupRoot);
     return is_array($memoryBreakdown) ? $values + $memoryBreakdown : $values;
+}
+
+/**
+ * Read per-user slice counters directly from the cgroup v1 sysfs tree.
+ *
+ * Every field is read independently and OMITTED when its source file is missing,
+ * unreadable, or non-numeric (graceful absence — downstream `?? 0` applies). A slice
+ * with no readable source at all returns null, matching the systemd path's contract.
+ * Output keys match the v2 path exactly.
+ */
+function pmssResourceLogReadCountersV1(int $uid, ?string $cgroupRoot = null): ?array
+{
+    $root = rtrim($cgroupRoot ?? '/sys/fs/cgroup', '/');
+    $slice = '/user.slice/user-'.$uid.'.slice/';
+    $values = [];
+
+    if (($cpu = pmssResourceLogReadSysfsCounter($root.'/cpuacct'.$slice.'cpuacct.usage')) !== null) $values['cpu_nsec'] = $cpu;
+    if (($mem = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.usage_in_bytes')) !== null) $values['memory'] = $mem;
+    if (($tasks = pmssResourceLogReadSysfsCounter($root.'/pids'.$slice.'pids.current')) !== null) $values['tasks'] = $tasks;
+
+    if (($bytes = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.throttle.io_service_bytes')) !== null) {
+        $values['io_read'] = $bytes['read'];
+        $values['io_write'] = $bytes['write'];
+    }
+    if (($ops = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.throttle.io_serviced')) !== null) {
+        $values['io_read_ops'] = $ops['read'];
+        $values['io_write_ops'] = $ops['write'];
+    }
+
+    // v1 memory.stat uses rss/cache where v2 uses anon/file; map to the shared output keys.
+    foreach (['rss' => 'memory_anon', 'cache' => 'memory_file'] as $field => $key) {
+        if (($value = pmssResourceLogReadMemoryStatField($root.'/memory'.$slice.'memory.stat', $field)) !== null) $values[$key] = $value;
+    }
+
+    return $values === [] ? null : $values;
+}
+
+/** Read one non-negative integer cgroup counter file, rejecting the UINT64_MAX sentinel. */
+function pmssResourceLogReadSysfsCounter(string $path): ?int
+{
+    $raw = pmssReadRegularFileTrimmed($path);
+    if ($raw === null || !ctype_digit($raw)) return null;
+    $value = (int) $raw;
+    return ($value < 0 || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) ? null : $value;
+}
+
+/** Sum the Read/Write rows of a v1 blkio per-device file (blkio.throttle.io_service_bytes / io_serviced). */
+function pmssResourceLogReadBlkioReadWrite(string $path): ?array
+{
+    $raw = pmssReadRegularFileContents($path);
+    if ($raw === null || trim($raw) === '') return null;
+
+    $totals = ['read' => 0, 'write' => 0];
+    $matched = false;
+    foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
+        if (preg_match('/^\S+\s+(Read|Write)\s+([0-9]+)$/', trim((string) $line), $m) !== 1) continue;
+        $value = (int) $m[2];
+        if ($value < 0 || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) continue;
+        $totals[$m[1] === 'Read' ? 'read' : 'write'] += $value;
+        $matched = true;
+    }
+
+    return $matched ? $totals : null;
+}
+
+/** Read one named field from a v1 memory.stat file. */
+function pmssResourceLogReadMemoryStatField(string $path, string $field): ?int
+{
+    $raw = pmssReadRegularFileContents($path);
+    if ($raw === null || trim($raw) === '') return null;
+
+    foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
+        [$name, $value] = array_pad(preg_split('/\s+/', trim((string) $line), 2), 2, null);
+        if ($name !== $field || !ctype_digit((string) $value)) continue;
+        $parsed = (int) $value;
+        return ($parsed < 0 || $parsed >= PMSS_RESOURCE_COUNTER_SENTINEL) ? null : $parsed;
+    }
+
+    return null;
 }
 
 /**

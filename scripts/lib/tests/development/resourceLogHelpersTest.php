@@ -35,21 +35,106 @@ class ResourceLogHelpersTest extends TestCase
 
     private function assertReadCounters(array $outputLines, ?array $expected): void
     {
-        $this->pmssWithPathPrefix(
-            $this->pmssMakeLineOutputStub('systemctl', $outputLines, 'pmss-resource-systemctl-'),
-            function () use ($expected): void {
-                $counters = \pmssResourceLogReadCounters(1000);
-                if ($expected === null) {
-                    $this->assertSame(null, $counters);
-                    return;
-                }
+        // Pin v2 so the systemd-property path is exercised regardless of the host's real hierarchy.
+        $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v2'], function () use ($outputLines, $expected): void {
+            $this->pmssWithPathPrefix(
+                $this->pmssMakeLineOutputStub('systemctl', $outputLines, 'pmss-resource-systemctl-'),
+                function () use ($expected): void {
+                    $counters = \pmssResourceLogReadCounters(1000);
+                    if ($expected === null) {
+                        $this->assertSame(null, $counters);
+                        return;
+                    }
 
-                $this->assertTrue(is_array($counters));
-                foreach ($expected as $field => $value) {
-                    $this->assertEquals($value, $counters[$field]);
+                    $this->assertTrue(is_array($counters));
+                    foreach ($expected as $field => $value) {
+                        $this->assertEquals($value, $counters[$field]);
+                    }
                 }
-            }
-        );
+            );
+        });
+    }
+
+    /** Build a fake cgroup v1 sysfs tree for one UID under a temp root. */
+    private function makeV1CgroupTree(int $uid, array $files): string
+    {
+        $root = $this->makeRoot();
+        foreach ($files as $relative => $contents) {
+            $path = $root.'/'.$relative;
+            @mkdir(dirname($path), 0755, true);
+            file_put_contents($path, $contents);
+        }
+        return $root;
+    }
+
+    public function testReadCountersV1ReadsRealCountersFromSysfs(): void
+    {
+        $slice = 'user.slice/user-1000.slice';
+        $root = $this->makeV1CgroupTree(1000, [
+            'cpuacct/'.$slice.'/cpuacct.usage' => "550000\n",
+            'memory/'.$slice.'/memory.usage_in_bytes' => "66000\n",
+            'pids/'.$slice.'/pids.current' => "77\n",
+            // Two device rows must sum; Total/Sync/Async rows must be ignored.
+            'blkio/'.$slice.'/blkio.throttle.io_service_bytes' =>
+                "8:0 Read 1000\n8:0 Write 2000\n8:16 Read 500\n8:16 Write 250\nTotal 3750\n",
+            'blkio/'.$slice.'/blkio.throttle.io_serviced' =>
+                "8:0 Read 10\n8:0 Write 20\n8:16 Read 5\n8:16 Write 2\nTotal 37\n",
+            'memory/'.$slice.'/memory.stat' => "cache 4444\nrss 3333\nrss_huge 0\n",
+        ]);
+
+        $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
+            $counters = \pmssResourceLogReadCounters(1000, $root);
+            $this->assertEquals([
+                'cpu_nsec' => 550000,
+                'memory' => 66000,
+                'tasks' => 77,
+                'io_read' => 1500,
+                'io_write' => 2250,
+                'io_read_ops' => 15,
+                'io_write_ops' => 22,
+                'memory_anon' => 3333,
+                'memory_file' => 4444,
+            ], $counters);
+        });
+    }
+
+    public function testReadCountersV1OmitsMissingFieldsWithoutGarbage(): void
+    {
+        $slice = 'user.slice/user-1000.slice';
+        // Only CPU present; every other source absent.
+        $root = $this->makeV1CgroupTree(1000, [
+            'cpuacct/'.$slice.'/cpuacct.usage' => "42\n",
+        ]);
+
+        $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
+            $counters = \pmssResourceLogReadCounters(1000, $root);
+            $this->assertEquals(['cpu_nsec' => 42], $counters);
+            // Missing keys must be ABSENT, not zero-sentinel garbage.
+            $this->assertTrue(!array_key_exists('io_read', $counters));
+            $this->assertTrue(!array_key_exists('memory', $counters));
+        });
+    }
+
+    public function testReadCountersV1ReturnsNullForUnreadableSlice(): void
+    {
+        $root = $this->makeRoot(); // empty tree, no slice files at all
+        $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
+            $this->assertSame(null, \pmssResourceLogReadCounters(1000, $root));
+        });
+    }
+
+    public function testReadCountersV1RejectsUint64Sentinel(): void
+    {
+        $slice = 'user.slice/user-1000.slice';
+        $root = $this->makeV1CgroupTree(1000, [
+            'memory/'.$slice.'/memory.usage_in_bytes' => "9223372036854775807\n", // PHP_INT_MAX sentinel
+            'pids/'.$slice.'/pids.current' => "5\n",
+        ]);
+        $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
+            $counters = \pmssResourceLogReadCounters(1000, $root);
+            $this->assertEquals(['tasks' => 5], $counters);
+            $this->assertTrue(!array_key_exists('memory', $counters));
+        });
     }
 
     private function makeStatePath($previousPayload = null): string
