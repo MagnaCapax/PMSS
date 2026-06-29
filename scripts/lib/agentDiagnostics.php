@@ -53,6 +53,16 @@ function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
             'rtorrent_count' => ['type' => 'command', 'command' => 'pgrep -cx rtorrent 2>/dev/null', 'format' => 'int'],
             'lighttpd_count' => ['type' => 'command', 'command' => 'pgrep -cx lighttpd 2>/dev/null', 'format' => 'int'],
         ],
+        'cgroup' => [
+            // Read-only cgroup-hierarchy + per-user-isolation posture probe (cgroup-v2 viability canary, GH #648).
+            'mode' => ['type' => 'command', 'command' => 'stat -fc %T /sys/fs/cgroup 2>/dev/null', 'format' => 'text', 'fallback' => 'unknown'],
+            'hierarchy_cmdline' => ['type' => 'command', 'command' => "grep -o 'systemd.unified_cgroup_hierarchy=[01]' /proc/cmdline 2>/dev/null", 'format' => 'text', 'fallback' => 'unset'],
+            'proc_hidepid' => ['type' => 'command', 'command' => 'grep -w hidepid /proc/mounts 2>/dev/null', 'format' => 'lines'],
+            'user_managers_active' => ['type' => 'command', 'command' => "systemctl list-units 'user@*.service' --state=active --no-legend --no-pager 2>/dev/null | wc -l", 'format' => 'int'],
+            'user_managers_failed' => ['type' => 'command', 'command' => "systemctl list-units 'user@*.service' --state=failed --no-legend --no-pager 2>/dev/null | wc -l", 'format' => 'int'],
+            'user_io_stat_sample' => ['type' => 'command', 'command' => 'cat /sys/fs/cgroup/user.slice/user-*.slice/io.stat 2>/dev/null | head -2', 'format' => 'lines'],
+            'user_cpu_pressure_sample' => ['type' => 'command', 'command' => 'cat /sys/fs/cgroup/user.slice/user-*.slice/cpu.pressure 2>/dev/null | head -2', 'format' => 'lines'],
+        ],
         'system_test' => ['type' => 'php', 'path' => 'scripts/util/systemTest.php', 'args' => ['--json'], 'format' => 'json'],
         'users' => [
             'list' => ['type' => 'php', 'path' => 'scripts/listUsers.php', 'format' => 'lines'],

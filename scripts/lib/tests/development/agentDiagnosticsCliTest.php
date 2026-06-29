@@ -36,8 +36,12 @@ final class agentDiagnosticsCliTest extends TestCase
         $payload = $this->pmssDecodeJsonArray($output);
 
         $this->assertSame(
-            ['motd', 'storage', 'services', 'system_test', 'users', 'resources', 'traffic', 'user_settings', 'user_processes', 'user_identity', 'user_quota', 'user_disk'],
+            ['motd', 'storage', 'services', 'cgroup', 'system_test', 'users', 'resources', 'traffic', 'user_settings', 'user_processes', 'user_identity', 'user_quota', 'user_disk'],
             array_keys($payload['sections'])
+        );
+        $this->assertSame(
+            ['mode', 'hierarchy_cmdline', 'proc_hidepid', 'user_managers_active', 'user_managers_failed', 'user_io_stat_sample', 'user_cpu_pressure_sample'],
+            array_keys($payload['sections']['cgroup'])
         );
         $this->assertSame(
             ['nginx', 'proftpd', 'cron', 'ssh', 'rtorrent_count', 'lighttpd_count'],
