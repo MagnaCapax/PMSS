@@ -342,6 +342,7 @@ LIGHTTPD;
             '"^/prowlarr$" => "/public-alice/prowlarr/"',
             '$HTTP["url"] =~ "^/sabnzbd(\$|/)" {',
             '"port" => 18080',
+            '"upgrade" => "enable"',
             '"/sabnzbd" => "/public-alice/sabnzbd"',
             '$HTTP["url"] =~ "^/radarr(\$|/)" {',
             '"port" => 17878',
@@ -356,6 +357,8 @@ LIGHTTPD;
             '"port" => 18096',
             '"/jellyfin" => "/public-alice/jellyfin"',
         ), $withJellyfin);
+        $this->assertSame(5, substr_count($withJellyfin, '"upgrade" => "enable"'));
+        $this->assertSame(4, substr_count($withoutJellyfin, '"upgrade" => "enable"'));
         $this->assertStringNotContainsString('jellyfin', $withoutJellyfin);
     }
 

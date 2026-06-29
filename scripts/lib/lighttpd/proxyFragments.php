@@ -16,7 +16,7 @@ function pmssLighttpdProxyRuleFragment(
     bool $forwardForwardedHeaders = false,
     bool $injectZeroContentLengthOnEmptyPost = false
 ): string {
-    $hasHeader = count($pathMap) > 0;
+    $hasPathMap = count($pathMap) > 0;
     $fragment = '$HTTP["url"] =~ "'.$pattern."\" {\n";
     if ($disableAuth) {
         $fragment .= "  auth.require = ()\n";
@@ -29,20 +29,21 @@ function pmssLighttpdProxyRuleFragment(
             .'  }'."\n";
     }
 
-    $fragment .= "  proxy.server = ( \"\" => ( (\n    \"host\" => \"127.0.0.1\",\n    \"port\" => {$port}\n  ) ) )";
-    $fragment .= ($forwardForwardedHeaders || $hasHeader) ? ",\n" : "\n";
+    $fragment .= "  proxy.server = ( \"\" => ( (\n    \"host\" => \"127.0.0.1\",\n    \"port\" => {$port}\n  ) ) ),\n";
     if ($forwardForwardedHeaders) {
         $fragment .= "  proxy.forwarded = ( \"for\" => 1,\n                      \"host\" => 1,\n                      \"by\" => 1\n  )";
-        $fragment .= $hasHeader ? ",\n" : "\n";
+        $fragment .= ",\n";
     }
-    if ($hasHeader) {
+    $fragment .= "  proxy.header = (\n      \"upgrade\" => \"enable\"";
+    if ($hasPathMap) {
         $mappings = [];
         $lastSource = array_key_last($pathMap);
         foreach ($pathMap as $source => $target) {
             $mappings[] = '         "'.$source.'"'.(substr($source, -1) === '/' ? '  ' : ' ').'=> "'.$target.'"'.($source === $lastSource ? '' : ',');
         }
-        $fragment .= "  proxy.header = (\n      \"map-urlpath\" => (\n".implode("\n", $mappings)."\n       )\n  )\n";
+        $fragment .= ",\n      \"map-urlpath\" => (\n".implode("\n", $mappings)."\n       )";
     }
+    $fragment .= "\n  )\n";
 
     return $fragment.'}';
 }

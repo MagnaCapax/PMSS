@@ -10,7 +10,8 @@ class InvidiousLighttpdProxyTest extends TestCase
     {
         $fragment = \pmssLighttpdManagedProxyFragment('invidious', 'alice', 4100);
 
-        $this->assertSame('a6b6484bc3cc4767978a2a1eeb23869d17438625d3c2c93ccc9151fac24cb6dd', hash('sha256', $fragment));
+        $this->assertStringContainsString('"upgrade" => "enable"', $fragment);
+        $this->assertSame('7c404b5aec18739b2757634de7acb0ec597330acebfde002e76d4f9717e12f0b', hash('sha256', $fragment));
     }
 
     public function testUserConfigApplyWiresOptionalPortFileAndManagedFragment(): void

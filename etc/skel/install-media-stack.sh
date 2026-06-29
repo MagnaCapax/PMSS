@@ -657,9 +657,12 @@ lighttpd_media_stack_proxy_block_write() {
 			    "host" => 1,
 			    "by" => 1
 			  ),
-			  proxy.header = ( "map-urlpath" => (
-			    "/${app}" => "/public-${USERNAME}/${app}"
-			  ) )
+			  proxy.header = (
+			    "upgrade" => "enable",
+			    "map-urlpath" => (
+			      "/${app}" => "/public-${USERNAME}/${app}"
+			    )
+			  )
 			}
 	EOF
 }
