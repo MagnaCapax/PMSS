@@ -101,6 +101,21 @@ class UpdateServicesRuntimeTest extends TestCase
         $this->assertStringContainsAllStrings(["TasksAccounting=yes\n", "TasksMax=8192\n", "Restart=always\n"], $content);
     }
 
+    public function testCronRestartDropinReservesCpuHeadroomForSystemSlice(): void
+    {
+        // 4 threads -> cron capped at 3 threads (300%), reserving 1 thread for sshd/root recovery.
+        $this->assertStringContainsAllStrings(["CPUAccounting=yes\n", "CPUQuota=300%\n"], \pmssCronRestartDropinContent(4));
+
+        // 8 threads -> 700%, still reserving exactly one thread.
+        $this->assertTrue(strpos(\pmssCronRestartDropinContent(8), "CPUQuota=700%\n") !== false);
+
+        // 2 threads -> 100% (1 reserved, 1 for cron).
+        $this->assertTrue(strpos(\pmssCronRestartDropinContent(2), "CPUQuota=100%\n") !== false);
+
+        // 1 thread -> nothing to reserve; no CPUQuota cap (never throttle a single-core host).
+        $this->assertTrue(strpos(\pmssCronRestartDropinContent(1), 'CPUQuota=') === false);
+    }
+
     public function testSshdStarvationDropinTemplateDocumentsDefenseInDepth(): void
     {
         $content = $this->pmssReadRepoFile('etc/seedbox/config/template.ssh.service.pmss-starvation.conf');

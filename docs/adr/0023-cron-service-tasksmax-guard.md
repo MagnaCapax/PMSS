@@ -76,6 +76,26 @@ containment above.
 - Follow-up: Revisit systemd-cron only if PMSS needs per-user isolation for
   arbitrary customer crontab entries.
 
+2026-06-29 amendment (operator directive — Refs #579): the operator has REVOKED
+the "accepted residual" above. User cronjobs escaping their per-user slice is NOT
+an accepted state; the durable goal is full per-user cron isolation so user cron
+lands in `user-UID.slice` (where the per-user CPUQuota/TasksMax bind it).
+
+As the immediate recoverability guarantee (shipped this change), the
+`cron.service` drop-in now also sets a core-aware `CPUQuota` that reserves at
+least one logical thread for `system.slice` (sshd + root recovery):
+`CPUQuota=(cpuThreads-1)*100%` for hosts with >=2 threads, no cap on single-thread
+hosts. Rationale: a runaway user crontab in `cron.service` could previously
+CPU-starve sshd's accept loop and lock root off the box (the romera wedge, where
+SSH/22 timed out even with pids capped). Reserving a thread means such a storm can
+never consume every core, so sshd stays answerable and the box stays recoverable
+WITHOUT a physical reboot. Side-effect analysis: PMSS's own light periodic root
+crons never approach this cap (it bites only during a storm); the per-user daemon
+slices (CPUQuota in `systemdSlicesEnsure.php`) already bound user services; common-
+case tenant CPU is unaffected. This is the recoverability floor, NOT the full
+isolation — per-user cron isolation (systemd-cron or scoped crontab execution)
+remains the open durable fix and closes the revoked residual.
+
 ## References
 - PMSS issue #579
 - ADR 0019: Production cgroup v1 pin

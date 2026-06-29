@@ -73,14 +73,46 @@ function pmssEnsureCronServiceActive(string $context = 'update'): void
     runStep('Enabling and starting cron service ('.$context.')', 'systemctl enable --now cron.service || true');
 }
 
-/** Return the PMSS-owned cron.service drop-in payload. */
-function pmssCronRestartDropinContent(): string
+/**
+ * Return the PMSS-owned cron.service drop-in payload.
+ *
+ * @param int|null $cpuThreads Logical CPU thread count; resolved from the host when null.
+ *                             Pass an explicit value in tests for deterministic output.
+ *
+ * Recoverability guarantee (Refs #579): Debian cron runs user crontabs inside
+ * cron.service (system.slice), so a runaway user crontab escapes the per-user
+ * user-UID.slice limits. A CPUQuota that reserves at least one logical thread for
+ * the rest of system.slice (sshd, root recovery) means such a storm can never
+ * consume every core and lock root/sshd off the box. PMSS's own light periodic
+ * root crons never approach this cap; only a storm does. This bounds the CPU-
+ * starvation failure mode while per-user cron isolation (the deeper fix) is
+ * developed; the TasksMax cap continues to bound fork/pid damage.
+ */
+function pmssCronRestartDropinContent(?int $cpuThreads = null): string
 {
+    if ($cpuThreads === null) {
+        $cpuThreads = function_exists('pmssTotalCpuThreads')
+            ? (int) pmssTotalCpuThreads()
+            : (int) trim((string) @shell_exec('nproc 2>/dev/null'));
+    }
+    if ($cpuThreads < 1) {
+        $cpuThreads = 1;
+    }
+
+    // Reserve >=1 thread for system.slice/sshd; only cap when there is headroom to reserve.
+    $cronQuotaLine = ($cpuThreads >= 2)
+        ? 'CPUQuota='.(($cpuThreads - 1) * 100)."%\n"
+        : '';
+
     return "[Service]\n"
         ."# Debian cron runs user crontabs inside cron.service rather than user-UID.slice.\n"
         ."# Bound aggregate fork damage until per-user cron isolation is proven safe.\n"
+        ."# CPUQuota reserves >=1 thread for system.slice/sshd so a user-cron storm cannot\n"
+        ."# CPU-starve root/sshd off the box (the recoverability guarantee, Refs #579).\n"
         ."TasksAccounting=yes\n"
         ."TasksMax=8192\n"
+        ."CPUAccounting=yes\n"
+        .$cronQuotaLine
         ."Restart=always\n"
         ."RestartSec=10\n";
 }
