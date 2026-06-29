@@ -83,6 +83,11 @@ if (is_file($systemCrontab)) {
 $dropinChanged = false;
 $failed = !pmssEnsureCronRestartDropin($cronDropinDir, $cronDropinFile, '/run/systemd/system', $dropinChanged) || $failed;
 
+// Contain user crontabs in their per-user slice (Refs #579 A1): add pam_systemd to
+// cron's PAM session stack so cron-spawned user jobs land in user-UID.slice instead
+// of escaping into cron.service. `optional` => cannot block cron execution on failure.
+$failed = !pmssEnsureCronPamSystemdSession() || $failed;
+
 if ($dropinChanged) {
     $failed = runStep('Reloading systemd unit files (cron restart policy)', 'systemctl daemon-reload || true') !== 0 || $failed;
 }

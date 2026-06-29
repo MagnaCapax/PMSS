@@ -116,6 +116,44 @@ class UpdateServicesRuntimeTest extends TestCase
         $this->assertTrue(strpos(\pmssCronRestartDropinContent(1), 'CPUQuota=') === false);
     }
 
+    public function testCronPamSystemdSessionContainsUserCronInUserSlice(): void
+    {
+        $this->assertSame("session    optional   pam_systemd.so\n", \pmssCronPamSystemdLine());
+
+        $f = tempnam(sys_get_temp_dir(), 'pmss-cron-pam-');
+        try {
+            file_put_contents($f, "@include common-auth\nsession    required     pam_loginuid.so\n");
+
+            // Appends pam_systemd to an existing regular cron PAM file.
+            $this->assertTrue(\pmssEnsureCronPamSystemdSession($f));
+            $this->assertTrue(strpos(file_get_contents($f), 'pam_systemd.so') !== false);
+            // Original lines preserved.
+            $this->assertTrue(strpos(file_get_contents($f), 'pam_loginuid.so') !== false);
+
+            // Idempotent: a second call does not duplicate the line.
+            $this->assertTrue(\pmssEnsureCronPamSystemdSession($f));
+            $this->assertSame(1, substr_count(file_get_contents($f), 'pam_systemd.so'));
+        } finally {
+            @unlink($f);
+        }
+
+        // A commented pam_systemd line does NOT count as present (real line is appended).
+        $g = tempnam(sys_get_temp_dir(), 'pmss-cron-pam2-');
+        try {
+            file_put_contents($g, "# session optional pam_systemd.so (disabled)\n@include common-auth\n");
+            $this->assertTrue(\pmssEnsureCronPamSystemdSession($g));
+            $this->assertSame(2, substr_count(file_get_contents($g), 'pam_systemd.so'));
+        } finally {
+            @unlink($g);
+        }
+
+        // Absent cron PAM file -> no-op success, file is NOT created.
+        $absent = sys_get_temp_dir().'/pmss-cron-pam-absent-'.getmypid();
+        @unlink($absent);
+        $this->assertTrue(\pmssEnsureCronPamSystemdSession($absent));
+        $this->assertFalse(file_exists($absent));
+    }
+
     public function testSshdStarvationDropinTemplateDocumentsDefenseInDepth(): void
     {
         $content = $this->pmssReadRepoFile('etc/seedbox/config/template.ssh.service.pmss-starvation.conf');

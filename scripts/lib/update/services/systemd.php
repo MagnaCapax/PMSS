@@ -187,6 +187,60 @@ function pmssEnsureCronRestartDropin(
     return true;
 }
 
+/** PAM session line that places cron-spawned user jobs into user-UID.slice. */
+function pmssCronPamSystemdLine(): string
+{
+    return "session    optional   pam_systemd.so\n";
+}
+
+/**
+ * Contain user crontabs in their per-user slice by adding pam_systemd to cron's
+ * PAM session stack (Refs #579 A1, operator directive 2026-06-29).
+ *
+ * Verified live 2026-06-29 (Debian 11, systemd 247, cgroup-v2): without this,
+ * every user crontab runs in cron.service (system.slice), escaping the per-user
+ * CPUQuota/TasksMax — a user-cron storm then starves the host. pam_systemd
+ * registers a logind background session for the job's UID, which places the job
+ * tree under user-UID.slice where the per-user limits bind it. The `optional`
+ * control means a pam_systemd failure can NEVER block cron job execution
+ * (services that run from cron stay safe even if logind is unavailable).
+ *
+ * Append-only and idempotent; only amends an EXISTING regular /etc/pam.d/cron
+ * (never creates it, never follows a symlink). File mode is preserved.
+ *
+ * @return bool True on success or no-op; false only on an unexpected unsafe state.
+ */
+function pmssEnsureCronPamSystemdSession(string $pamCronPath = '/etc/pam.d/cron'): bool
+{
+    if ($pamCronPath === '' || $pamCronPath[0] !== '/') {
+        logMessage('[ERR] Refusing unsafe cron PAM path: '.$pamCronPath);
+        return false;
+    }
+    if (!file_exists($pamCronPath)) {
+        return true; // no cron PAM file -> nothing to contain
+    }
+    if (is_link($pamCronPath) || !is_file($pamCronPath)) {
+        logMessage('[ERR] Refusing non-regular cron PAM target: '.$pamCronPath);
+        return false;
+    }
+    $content = @file_get_contents($pamCronPath);
+    if (!is_string($content)) {
+        logMessage('[ERR] Failed to read cron PAM file: '.$pamCronPath);
+        return false;
+    }
+    if (preg_match('/^[^#\n]*\bpam_systemd\.so\b/m', $content) === 1) {
+        return true; // already present
+    }
+    $perms = (fileperms($pamCronPath) & 0777) ?: 0644;
+    $new = rtrim($content, "\n")."\n".pmssCronPamSystemdLine();
+    if (@file_put_contents($pamCronPath, $new, LOCK_EX) === false) {
+        logMessage('[ERR] Failed to append pam_systemd to cron PAM file: '.$pamCronPath);
+        return false;
+    }
+    @chmod($pamCronPath, $perms);
+    return true;
+}
+
 /**
  * Specs for system-wide services that must stay disabled on seedbox hosts.
  *

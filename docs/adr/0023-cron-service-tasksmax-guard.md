@@ -96,6 +96,18 @@ case tenant CPU is unaffected. This is the recoverability floor, NOT the full
 isolation — per-user cron isolation (systemd-cron or scoped crontab execution)
 remains the open durable fix and closes the revoked residual.
 
+A1 isolation (same change): `pmssEnsureCronPamSystemdSession()` adds
+`session optional pam_systemd.so` to `/etc/pam.d/cron`. Verified live 2026-06-29
+(barbera, Debian 11, systemd 247, cgroup-v2): cron-spawned jobs sit in
+`system.slice/cron.service` and cron's PAM stack lacks pam_systemd. With pam_systemd
+present, logind registers a background session for the job's UID and places the job
+tree under `user-UID.slice`, where the per-user CPUQuota/TasksMax finally bind user
+cron — closing the revoked residual. The `optional` control guarantees a pam_systemd
+failure can never block cron execution. Append-only/idempotent; amends only an
+existing regular file. Verification gate before fleet deploy: confirm on one host
+that a user cron job lands under `user-UID.slice` AND that cron jobs still run (no
+session-setup regression) before rolling out >2.5% of the fleet.
+
 ## References
 - PMSS issue #579
 - ADR 0019: Production cgroup v1 pin
