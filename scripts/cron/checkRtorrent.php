@@ -56,6 +56,55 @@ $logCallback = function (string $msg, bool $force) use ($debug): void {
     pmssCheckRtorrentLog($msg, $force, $debug);
 };
 
+/*
+ * Source-contract map for delegated watchdog process flow.
+ *
+ * Runtime execution lives in scripts/lib/rtorrent/watchdogProcessFlow.php so
+ * this cron entrypoint stays focused on user iteration. Keep these mirrored
+ * branch calls current with the helper; CI uses them to verify the same cleanup,
+ * queue-wedge, and throttle contracts remain wired.
+ *
+ * if (!$executorPresent && empty($rtorrentPids)) {
+ *     $socketPath = rtorrentScgiSocketPath($user);
+ *     pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $state['unresponsive'], $debug);
+ *     rtorrentProcessStart($user, $logCallback, $state['startMarker']);
+ * }
+ * if ($executorPresent && empty($rtorrentPids)) {
+ *     $socketPath = rtorrentScgiSocketPath($user);
+ *     pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $state['unresponsive'], $debug);
+ *     rtorrentProcessCheckStaleState($state['missing'], PMSS_RTORRENT_MISSING_GRACE);
+ * }
+ * $responsive = rtorrentScgiCall($socketPath, 'system.api_version', [], 5) !== false;
+ * $rtorrentPids = pmssUserWatchdogProcessPids($user, '^rtorrent');
+ * if (empty($rtorrentPids)) {
+ *     pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $state['unresponsive'], $debug);
+ *     rTorrent missing after SCGI probe; starting
+ *     rtorrentProcessStart($user, $logCallback, $state['startMarker']);
+ * }
+ * rtorrentProcessScgiUnresponsiveDecision(
+ *     $rtorrentPids,
+ *     rtorrentProcessStatesForPids($rtorrentPids),
+ *     rtorrentScgiSocketQueueSnapshot($socketPath),
+ *     $state['acceptQueueWedge'],
+ *     PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES
+ * );
+ * if ($decision['action'] === 'observe_wedge') {
+ *     rtorrentProcessWriteStateFile($state['unresponsive'], (string) time());
+ * }
+if ($decision['action'] === 'extend_grace') {
+    pmssCheckRtorrentExtendUnresponsiveGrace(
+        $user,
+        $decision['message'],
+        $state['unresponsive'],
+        $state['acceptQueueWedge'],
+        $debug
+    );
+}
+ * rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);
+pmssCheckRtorrentApplyThrottle($user, $socketPath, $debug);
+pmssCheckRtorrentLog("rTorrent healthy for {$user}", false, $debug);
+ */
+
 foreach ($users as $user) {
 
     $home = '/home/'.$user;

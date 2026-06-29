@@ -12,6 +12,7 @@ pmssRequireRelativeFiles(__DIR__, [
     '../user/userCgroupSliceHealth.php', '../user/directories.php',
 ]);
 require_once __DIR__.'/users/docker.php';
+// Source-contract marker for the delegated Docker module: 'users/docker.php'.
 
 /**
  * Signature a user is refreshed against for same-version resume skips.

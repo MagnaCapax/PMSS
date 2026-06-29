@@ -7,10 +7,13 @@
  */
 
 require_once __DIR__.'/runtime/commands.php';
-pmssRequireRelativeFiles(__DIR__, [
-    '../user/directories.php', '../user/delugeManagedConfig.php', '../user/log.php', '../user/qbittorrent.php',
-    'users/context.php', 'users/http.php', 'users/filesystem.php', 'users/permissions.php', 'users/rutorrent.php',
-]);
+require_once __DIR__.'/../user/log.php';
+require_once __DIR__.'/users/filesystem.php';
+require_once __DIR__.'/users/rutorrent.php';
+require_once __DIR__.'/users/context.php';
+require_once __DIR__.'/users/http.php';
+require_once __DIR__.'/users/permissions.php';
+pmssRequireRelativeFiles(__DIR__, ['../user/directories.php', '../user/delugeManagedConfig.php', '../user/qbittorrent.php']);
 
 function pmssUserEnvironmentHandlers(): array { return ['pmssUserConfigureHttp', 'pmssUserApplySkeletonFiles', 'pmssUserUpdateThemes', 'pmssUserUpgradeRutorrent', 'pmssUserMaintainRutorrentPhpCompatibility', 'pmssUserEnsurePlugins', 'pmssUserRefreshPermissions']; }
 

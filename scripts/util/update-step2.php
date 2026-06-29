@@ -199,17 +199,28 @@ function pmssUpdateStep2LogRescueEvent(string $event, string $status, array $con
 }
 
 /**
+ * Run one shutdown rescue action with consistent JSON start/end events.
+ */
+function pmssUpdateStep2RunRescueAction(string $event, array $context, callable $action): int
+{
+    pmssUpdateStep2LogRescueEvent($event, 'start', $context);
+    $rc = $action();
+    pmssUpdateStep2LogRescueEvent($event, $rc === 0 ? 'ok' : 'error', ['rc' => $rc]);
+    return $rc;
+}
+
+/**
  * Attempt a best-effort nginx start when the final refresh could not finish.
  */
 function pmssUpdateStep2StartNginxShutdownFallback(string $reason): void
 {
     logmsg('[WARN] update-step2 exited with nginx still pending final refresh; attempting direct start (reason: '.$reason.')');
-    pmssUpdateStep2LogRescueEvent('post_update_nginx_start_fallback', 'start', ['reason' => $reason]);
 
-    $rc = 0;
-    passthru(pmssLockChildClosePrefix().'systemctl start nginx 2>/dev/null || /etc/init.d/nginx start 2>/dev/null', $rc);
-
-    pmssUpdateStep2LogRescueEvent('post_update_nginx_start_fallback', $rc === 0 ? 'ok' : 'error', ['rc' => $rc]);
+    $rc = pmssUpdateStep2RunRescueAction('post_update_nginx_start_fallback', ['reason' => $reason], static function (): int {
+        $rc = 0;
+        passthru(pmssLockChildClosePrefix().'systemctl start nginx 2>/dev/null || /etc/init.d/nginx start 2>/dev/null', $rc);
+        return $rc;
+    });
     logmsg(sprintf('[WARN] Direct nginx start fallback completed with rc=%d', $rc));
 }
 
@@ -235,12 +246,12 @@ function pmssUpdateStep2RegisterWebRefreshShutdownGuard(): void
         $reason = pmssUpdateStep2ShutdownReason();
 
         logmsg('[WARN] update-step2 exited before final nginx refresh; attempting rescue run (reason: '.$reason.')');
-        pmssUpdateStep2LogRescueEvent('post_update_web_refresh_rescue', 'start', ['reason' => $reason]);
 
-        $rc = 0;
-        passthru(pmssLockChildClosePrefix().'/scripts/util/createNginxConfig.php --restart', $rc);
-
-        pmssUpdateStep2LogRescueEvent('post_update_web_refresh_rescue', $rc === 0 ? 'ok' : 'error', ['rc' => $rc]);
+        $rc = pmssUpdateStep2RunRescueAction('post_update_web_refresh_rescue', ['reason' => $reason], static function (): int {
+            $rc = 0;
+            passthru(pmssLockChildClosePrefix().'/scripts/util/createNginxConfig.php --restart', $rc);
+            return $rc;
+        });
         logmsg(sprintf('[WARN] Rescue nginx refresh completed with rc=%d', $rc));
         if ($rc === 0) {
             pmssUpdateStep2MarkWebRefreshCompleted();
@@ -270,11 +281,9 @@ function pmssUpdateStep2RegisterPermissionShutdownGuard(): void
         $reason = pmssUpdateStep2ShutdownReason();
 
         logmsg('[WARN] update-step2 exited before final permission refresh; attempting permission rescue run (reason: '.$reason.')');
-        pmssUpdateStep2LogRescueEvent('permission_refresh_rescue', 'start', ['reason' => $reason]);
-
-        $rc = runStep('Restoring system permissions (shutdown)', $helper);
-
-        pmssUpdateStep2LogRescueEvent('permission_refresh_rescue', $rc === 0 ? 'ok' : 'error', ['rc' => $rc]);
+        pmssUpdateStep2RunRescueAction('permission_refresh_rescue', ['reason' => $reason], static function () use ($helper): int {
+            return runStep('Restoring system permissions (shutdown)', $helper);
+        });
     });
 }
 
