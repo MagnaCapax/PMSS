@@ -171,15 +171,14 @@ A GitHub issue requesting removal does not override the commit that created the 
 - **Ignore Noise**: If you see modified files unrelated to your task, ignore them. Do not touch them.                            
 - **Explicit Confirmation**: If a file blocks your progress, ASK the user before overwriting or reverting it.                    
                                                                                                                                  
-## Git / PR Workflow
+## Git Workflow — DIRECT-COMMIT-TO-MAIN ONLY (operator directive 2026-06-29)
 
+- **NO branches. NO stash. NO worktrees. NO pull requests.** Commit directly to `main`. These are DISABLED, not discouraged. A `reference-transaction` git hook aborts branch/stash ref creation for every process (this agent included) — do not attempt to work around it; if a step seems to need a branch/stash/worktree/PR, it does not.
 - Commit messages: describe what changed, why, and notable side effects. Reference ADRs or docs when relevant.
-- Prefer linear history (`rebase`) and avoid force pushes on shared branches.
-- Use PR templates to verify checklists (tests run, docs updated, ADR linked when required).
-- Before merge: CI must pass (lint, tests, basic bash checks). Production-impacting changes should include a dry-run validation note.
-- Commit cadence: frequent, small commits with meaningful messages. Aim for a logical checkpoint roughly every 10–120 minutes or at completion of a self‑contained micro‑feature/refactor. Many commits per day on feature branches are fine (10–50+); avoid giant monolithic commits.
-- Agent branching constraint: the agent must never create branches unless explicitly instructed by the operator. By default, the agent edits the current workspace without creating branches.
-- Session constraints: if the current session forbids auto‑commit/branch operations, the operator must explicitly instruct the agent to commit and/or create a branch. Otherwise changes remain as uncommitted workspace edits.
+- Linear history on `main` only; never force-push.
+- Before commit: CI must pass (lint, tests, basic bash checks). Production-impacting changes should include a dry-run validation note.
+- Commit cadence: frequent, small commits with meaningful messages — a logical checkpoint roughly every 10–120 minutes or at completion of a self‑contained micro‑feature/refactor; avoid giant monolithic commits. EVERY commit lands on `main`.
+- The agent must NEVER `git branch` / `git checkout -b` / `git switch -c` / `git worktree add` / `git stash` / open a PR. If the operator wants any of these, the operator removes the git hook themselves.
 
 ## Language & Tone
 
@@ -341,7 +340,7 @@ A GitHub issue requesting removal does not override the commit that created the 
 ## Documentation Updates
 - **Keep Docs Current**: Update README files, inline comments, usage examples, and configuration references whenever behavior or interfaces change.
 - **Cross-Checks**: Review the diff to confirm new or modified logic has matching narrative documentation and comment coverage aligned with the 1-in-10 guideline.
-- **Review Expectation**: Pull requests lacking necessary documentation revisions should be considered incomplete until updates accompany the code changes.
+- **Review Expectation**: Commits (to `main`) lacking necessary documentation revisions should be considered incomplete until updates accompany the code changes.
 
 ## Workflow Expectations
 - **Required Checks**: Run the linting and operational verification steps outlined above before committing. Document the commands and their results in your work notes.
