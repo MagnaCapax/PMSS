@@ -70,9 +70,32 @@ function pmssDiskIostatBuildCommand(array $devices, string $iostatBinary = ''): 
 }
 
 /**
+ * Read node-level I/O pressure (PSI) full avg300 from /proc/pressure/io.
+ *
+ * full_avg300 = percentage of the last 300s that ALL non-idle tasks were stalled
+ * on I/O — the sustained saturation signal consumed by hallinta's oversale gate.
+ * Returns null when PSI is unavailable (kernel <4.20 / CONFIG_PSI=n) so the brain
+ * treats it as "no signal" and falls back to its other gates (fail-safe: a missing
+ * value must never gate provisioning closed).
+ *
+ * @return float|null
+ */
+function pmssDiskIostatReadPsiFullAvg300(string $psiPath = '/proc/pressure/io'): ?float
+{
+    if (!is_readable($psiPath)) {
+        return null;
+    }
+    $raw = @file_get_contents($psiPath);
+    if (!is_string($raw) || !preg_match('/^full\s.*?avg300=([0-9.]+)/m', $raw, $matches)) {
+        return null;
+    }
+    return (float) $matches[1];
+}
+
+/**
  * Parse the second-sample iostat group row by column name.
  *
- * @return array<string, int|string>
+ * @return array<string, int|string|float|null>
  */
 function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?int $timestamp = null): array
 {
@@ -121,6 +144,7 @@ function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?i
         'diskServiceTime' => $getAny(['w_await', 'svctm']),
         'diskUtil'        => $getAny(['%util']),
         'avgQueueSize'    => $getAny(['aqu-sz', 'avgqu-sz']),
+        'psiFullAvg300'   => pmssDiskIostatReadPsiFullAvg300(),
         'diskQuantity'    => $deviceCount,
         'time'            => $timestamp ?? time(),
     ];
