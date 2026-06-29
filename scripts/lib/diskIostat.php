@@ -11,6 +11,7 @@
  */
 
 require_once __DIR__.'/runtime.php';
+require_once __DIR__.'/systemStats.php';   // for pmssSystemStatsIopingMs() — reused, not re-implemented (DRY)
 
 const PMSS_DISK_IOSTAT_HISTORY_LOG = '/var/log/pmss/iostat-history.log';
 const PMSS_DISK_IOSTAT_HISTORY_RAW_LOG = '/var/log/pmss/iostat-history-raw.log';
@@ -93,6 +94,26 @@ function pmssDiskIostatReadPsiFullAvg300(string $psiPath = '/proc/pressure/io'):
 }
 
 /**
+ * Read median ioping latency to /home in milliseconds for hallinta's I/O-health gate.
+ *
+ * Reuses the canonical pmssSystemStatsIopingMs() probe (DRY) rather than parsing it
+ * positionally out of system-stats.log (which would reintroduce the column-shift
+ * fragility class). Returns null when ioping is unavailable or the probe yields 'na'
+ * so the brain treats a missing measurement as no-signal (fail-safe — never gates
+ * provisioning on an absent value, in EITHER direction).
+ *
+ * @return float|null
+ */
+function pmssDiskIostatReadIopingHomeMs(): ?float
+{
+    $raw = pmssSystemStatsIopingMs('/home');           // e.g. "0.2ms" or "na"
+    if (!is_string($raw) || !preg_match('/^([0-9.]+)ms$/', $raw, $matches)) {
+        return null;
+    }
+    return (float) $matches[1];
+}
+
+/**
  * Parse the second-sample iostat group row by column name.
  *
  * @return array<string, int|string|float|null>
@@ -145,6 +166,7 @@ function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?i
         'diskUtil'        => $getAny(['%util']),
         'avgQueueSize'    => $getAny(['aqu-sz', 'avgqu-sz']),
         'psiFullAvg300'   => pmssDiskIostatReadPsiFullAvg300(),
+        'iopingHomeMs'    => pmssDiskIostatReadIopingHomeMs(),
         'diskQuantity'    => $deviceCount,
         'time'            => $timestamp ?? time(),
     ];
