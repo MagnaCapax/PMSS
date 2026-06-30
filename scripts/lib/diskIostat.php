@@ -166,6 +166,8 @@ function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?i
         'diskUtil'        => $getAny(['%util']),
         'avgQueueSize'    => $getAny(['aqu-sz', 'avgqu-sz']),
         'psiFullAvg300'   => pmssDiskIostatReadPsiFullAvg300(),
+        'psiMemFullAvg300'=> pmssDiskIostatReadPsiFullAvg300('/proc/pressure/memory'),
+        'psiCpuFullAvg300'=> pmssDiskIostatReadPsiFullAvg300('/proc/pressure/cpu'),
         'iopingHomeMs'    => pmssDiskIostatReadIopingHomeMs(),
         'diskQuantity'    => $deviceCount,
         'time'            => $timestamp ?? time(),
