@@ -5,7 +5,16 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class MediaStackNginxRedirectTest extends TestCase
 {
-    private const MEDIA_STACK_APPS = ['sabnzbd', 'lidarr', 'radarr', 'prowlarr', 'readarr', 'sonarr', 'jellyfin'];
+    private const PUBLIC_SESSION_COOKIE_APPS = [
+        'sabnzbd',
+        'lidarr',
+        'radarr',
+        'prowlarr',
+        'readarr',
+        'sonarr',
+        'jellyfin',
+        'komga',
+    ];
 
     private function publicProxyBlock(): string
     {
@@ -17,11 +26,11 @@ class MediaStackNginxRedirectTest extends TestCase
         return $matches[0];
     }
 
-    public function testPublicProxyBlockDoesNotCarryMediaStackRedirectRules(): void
+    public function testPublicProxyBlockDoesNotCarryAppSpecificRedirectRules(): void
     {
         $block = $this->publicProxyBlock();
 
-        foreach (self::MEDIA_STACK_APPS as $app) {
+        foreach (self::PUBLIC_SESSION_COOKIE_APPS as $app) {
             $this->assertFalse(
                 strpos($block, 'proxy_redirect ~^(https?://[^/]+)?/'.$app.'(/.*)?$') !== false,
                 'Nginx public block must stay app-agnostic for '.$app.' redirects'
@@ -29,11 +38,11 @@ class MediaStackNginxRedirectTest extends TestCase
         }
     }
 
-    public function testPublicProxyBlockRewritesMediaStackCookiePaths(): void
+    public function testPublicProxyBlockRewritesPublicSessionCookiePaths(): void
     {
         $block = $this->publicProxyBlock();
 
-        foreach (self::MEDIA_STACK_APPS as $app) {
+        foreach (self::PUBLIC_SESSION_COOKIE_APPS as $app) {
             $this->assertTrue(
                 strpos($block, 'proxy_cookie_path /'.$app.' /public-##username/'.$app.';') !== false,
                 'Nginx public block must restore cookie scope for '.$app

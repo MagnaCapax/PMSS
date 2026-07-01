@@ -499,7 +499,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/createNginxConfig.php
   - Behavior: Regenerates nginx global and per-user config from templates; adds per-user subdomain vhosts under `/etc/nginx/conf.d/pmss-user-*.conf` when `/etc/hostname` is a valid FQDN.
-  - Public proxy contract: `/public-<user>/` forwards the original scheme via `X-Forwarded-Proto` and only restores generic lighttpd redirects back under `/public-<user>/`; per-app media-stack redirect and cookie-path rewriting stays in the user's `~/.lighttpd/custom.d/media-stack.conf` fragment.
+  - Public proxy contract: `/public-<user>/` forwards the original scheme via `X-Forwarded-Proto` and only restores generic lighttpd redirects back under `/public-<user>/`; per-app media-stack Location rewriting stays in the user's `~/.lighttpd/custom.d/media-stack.conf` fragment, while Set-Cookie Path rewriting stays in nginx `proxy_cookie_path` rules because lighttpd `map-urlpath` does not rewrite `Set-Cookie`.
   - Subdomains: `USERNAME.<host>` proxies to `/public-<user>/`; SHA256 host (`sha256(username.billingServiceId.hostname).<host>`) proxies to `/user-<user>/` with HTTP→HTTPS redirect; hash vhost reads `.billingServiceId` with `.billingId` legacy fallback and is skipped when neither file has a valid value.
   - 502 pages: private user proxies route upstream failures to `/error-502-<user>.html`, which falls back to the shared `/error-502.html`; the lighttpd watchdog refreshes those per-user files under `/var/www` while the stack is unhealthy.
   - WebDAV: the external URL format is `https://<server-fqdn>/webdav-<user>/`; the path is never bare `/webdav`.

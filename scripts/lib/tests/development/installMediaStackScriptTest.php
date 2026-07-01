@@ -335,8 +335,9 @@ LIGHTTPD;
         $withoutJellyfin = (string) file_get_contents($home.'/.lighttpd/custom.d/media-stack-no-jellyfin.conf');
 
         $this->assertOrderedStrings(array(
-            'Location and Set-Cookie Path rewriting belongs here via',
-            'map-urlpath so nginx stays a minimal per-user front door.',
+            'Location rewriting belongs here via map-urlpath. Set-Cookie',
+            'Path rewriting stays in nginx proxy_cookie_path rules',
+            'map-urlpath does not rewrite Set-Cookie.',
             '"^/radarr$" => "/public-alice/radarr/"',
             '"^/sonarr$" => "/public-alice/sonarr/"',
             '"^/prowlarr$" => "/public-alice/prowlarr/"',

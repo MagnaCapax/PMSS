@@ -676,8 +676,9 @@ lighttpd_media_stack_config_write() {
 # PMSS-managed media stack proxy fragment.
 # Keep ARR base paths canonical so missing-slash requests
 # redirect to proxy-managed app roots.
-# App-specific Location and Set-Cookie Path rewriting belongs here via
-# map-urlpath so nginx stays a minimal per-user front door.
+# App-specific Location rewriting belongs here via map-urlpath. Set-Cookie
+# Path rewriting stays in nginx proxy_cookie_path rules because lighttpd
+# map-urlpath does not rewrite Set-Cookie.
 url.redirect += (
   "^/radarr$" => "/public-${USERNAME}/radarr/",
   "^/sonarr$" => "/public-${USERNAME}/sonarr/",

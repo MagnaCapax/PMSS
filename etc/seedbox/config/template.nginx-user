@@ -27,6 +27,7 @@ location /public-##username/ {
         proxy_cookie_path /readarr /public-##username/readarr;
         proxy_cookie_path /sonarr /public-##username/sonarr;
         proxy_cookie_path /jellyfin /public-##username/jellyfin;
+        proxy_cookie_path /komga /public-##username/komga;
         # Keep redirect rewriting generic so nginx does not need per-app
         # location rules for trailing-slash and similar lighttpd responses.
         proxy_redirect ~^(https?://[^/]+)?/(.+)$ /public-##username/$2;
