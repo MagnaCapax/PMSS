@@ -617,6 +617,16 @@ runStep('Hardening access to session and network binaries', 'chmod o-r /var/log/
 // Cleanup legacy runtime metadata that should never have shipped with snapshots.
 if (is_dir('/etc/seedbox/config/app-versions')) { runStep('Removing legacy app version records', 'rm -rf '.escapeshellarg('/etc/seedbox/config/app-versions')); }
 
+$topLevelOwnershipOk = pmssRunProfiledCallable('Checking top-level root ownership invariant', 'pmssEnsureTopLevelRootOwnership', ['logmsg']);
+if ($topLevelOwnershipOk !== true) {
+    pmssUpdateStep2HandleClassifiedFailure(
+        'Checking top-level root ownership invariant',
+        PMSS_UPDATE_STEP_CLASS_SOFT_FAIL,
+        1,
+        'top_level_ownership_invariant'
+    );
+}
+
 // On tenant-empty fresh installs, capture one idle storage baseline before root
 // cron resumes. Failures stay soft: the benchmark has its own --require-idle
 // gate and must never block normal update convergence.

@@ -159,6 +159,18 @@ class UpdateUserFileSafeWriteTest extends TestCase
         $this->assertEquals('keep-data', file_get_contents($outside));
     }
 
+    public function testSkipsHomeSymlinkEscapingHomeRoot(): void
+    {
+        $outside = $this->pmssMakeTempDir('pmss-home-escape-');
+        $relative = $this->skelRelative('home-escape.txt');
+        $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'escape-data');
+        $this->pmssCreateSymlinkOrSkip($outside, $this->homeRoot.'/'.$this->user);
+
+        \updateUserFile($relative, $this->user);
+
+        $this->assertFalse(is_file($outside.'/'.$relative));
+    }
+
     public function testCopyToUserSpaceReturnsFalseWhenParentDirectoryMissing(): void
     {
         $source = $this->pmssMakeTempFile('pmss-copy-source-');
@@ -168,6 +180,29 @@ class UpdateUserFileSafeWriteTest extends TestCase
 
         $this->assertFalse(\copyToUserSpace($source, $target, $this->user));
         $this->assertFalse(is_file($target));
+    }
+
+    public function testCopyToUserSpaceRejectsRootTarget(): void
+    {
+        $this->ensureUserHome();
+        $source = $this->pmssMakeTempFile('pmss-copy-source-');
+        file_put_contents($source, 'data');
+
+        $this->assertFalse(\copyToUserSpace($source, '/', $this->user));
+    }
+
+    public function testCopyToUserSpaceRejectsSymlinkedParentEscape(): void
+    {
+        $home = $this->ensureUserHome();
+        $outside = $this->pmssMakeTempDir('pmss-copy-escape-');
+        $link = $home.'/linked-parent';
+        $this->pmssCreateSymlinkOrSkip($outside, $link);
+
+        $source = $this->pmssMakeTempFile('pmss-copy-source-');
+        file_put_contents($source, 'data');
+
+        $this->assertFalse(\copyToUserSpace($source, $link.'/copied.txt', $this->user));
+        $this->assertFalse(is_file($outside.'/copied.txt'));
     }
 
     public function testCopyToUserSpaceReturnsTrueWhenCopySucceeds(): void

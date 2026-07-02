@@ -129,7 +129,7 @@ class MdadmCheckarrayTest extends TestCase
     private function writeCheckarrayStub(): string
     {
         $path = $this->fixtureRoot.'/checkarray';
-        $body = "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> \"$PMSS_MDADM_CHECKARRAY_STUB_LOG\"\n";
+        $body = "#!/usr/bin/env bash\nprintf '%s\\n' \"\$*\" >> \"\$PMSS_MDADM_CHECKARRAY_STUB_LOG\"\n";
         file_put_contents($path, $body);
         chmod($path, 0755);
         return $path;

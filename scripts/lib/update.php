@@ -26,6 +26,126 @@ function pmssSkeletonBase(): string
 }
 
 /**
+ * Resolve and validate a tenant home before doing ownership-sensitive writes.
+ */
+function pmssUpdateUserHomeDir(string $user): string
+{
+    $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
+    $homeDir  = $homeRoot.'/'.$user;
+    $realRoot = realpath($homeRoot);
+    $realHome = realpath($homeDir);
+    if ($realRoot === false || $realRoot === '/' || $realHome === false || !is_dir($realHome)) {
+        logMessage("[ERROR] Refusing user file update with invalid home for {$user}: {$homeDir}");
+        return '';
+    }
+
+    $realRoot = rtrim($realRoot, '/');
+    $realHome = rtrim($realHome, '/');
+    if ($realHome === $realRoot || strpos($realHome, $realRoot.'/') !== 0) {
+        logMessage("[ERROR] Refusing user file update outside home root for {$user}: {$homeDir}");
+        return '';
+    }
+
+    return $realHome;
+}
+
+/**
+ * Confirm a target resolves strictly below the already-validated tenant home.
+ */
+function pmssUpdateUserPathIsInsideHome(string $path, string $homeDir): bool
+{
+    if ($path === '' || $path === '/' || $homeDir === '' || $homeDir === '/') {
+        return false;
+    }
+
+    $realPath = realpath($path);
+    if ($realPath === false) {
+        return false;
+    }
+
+    $realPath = rtrim($realPath, '/');
+    $homeDir  = rtrim($homeDir, '/');
+    return $realPath !== $homeDir && strpos($realPath, $homeDir.'/') === 0;
+}
+
+/**
+ * Confirm a not-yet-created target would land strictly below the tenant home.
+ */
+function pmssUpdateUserCandidatePathIsInsideHome(string $path, string $homeDir): bool
+{
+    return $path !== '' && $path !== '/' && $homeDir !== '' && pmssPathWithinResolvedRoot($path, $homeDir);
+}
+
+/**
+ * Apply tenant ownership only after proving the resolved target is in that home.
+ */
+function pmssApplyUserPathPermissions(string $path, string $user, string $homeDir, string $label): bool
+{
+    if (!pmssUpdateUserPathIsInsideHome($path, $homeDir)) {
+        logMessage("[ERROR] Refusing to chown path outside user home for {$user}: {$label}");
+        return false;
+    }
+
+    if (!@chmod($path, 0755)) {
+        logMessage("[WARN] Failed to chmod 0755: {$label}");
+    }
+    if (!@chown($path, (string) $user)) {
+        logMessage("[WARN] Failed to chown {$user}: {$label}");
+    }
+    if (!@chgrp($path, (string) $user)) {
+        logMessage("[WARN] Failed to chgrp {$user}: {$label}");
+    }
+
+    return true;
+}
+
+/**
+ * Restore root:root ownership for critical top-level directories if drift appears.
+ *
+ * @param callable|null $logger Optional logger for tests or callers.
+ * @param string[]|null $paths  Optional path set for hermetic tests.
+ */
+function pmssEnsureTopLevelRootOwnership(?callable $logger = null, ?array $paths = null): bool
+{
+    $log = $logger ?: 'logMessage';
+    $paths = $paths ?: ['/', '/bin', '/boot', '/dev', '/etc', '/home', '/opt', '/root', '/run', '/sbin', '/srv', '/tmp', '/usr', '/var'];
+    $ok = true;
+    foreach ($paths as $path) {
+        if (!is_string($path) || $path === '' || !file_exists($path)) {
+            continue;
+        }
+
+        $stat = @lstat($path);
+        if (!is_array($stat)) {
+            $log("[WARN] Unable to stat top-level ownership invariant path: {$path}");
+            $ok = false;
+            continue;
+        }
+        if ((int) $stat['uid'] === 0 && (int) $stat['gid'] === 0) {
+            continue;
+        }
+
+        $log("[ERROR] Top-level ownership invariant drift: {$path} is uid={$stat['uid']} gid={$stat['gid']}; restoring root:root");
+        pmssLogJson(['event' => 'top_level_ownership_drift', 'path' => $path, 'uid' => (int) $stat['uid'], 'gid' => (int) $stat['gid']]);
+        if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+            $ok = false;
+            $log("[WARN] Dry-run would restore top-level ownership invariant: {$path}");
+            continue;
+        }
+
+        @chown($path, 'root');
+        @chgrp($path, 'root');
+        $after = @lstat($path);
+        if (!is_array($after) || (int) $after['uid'] !== 0 || (int) $after['gid'] !== 0) {
+            $ok = false;
+            $log("[ERROR] Top-level ownership invariant still failing after restore attempt: {$path}");
+        }
+    }
+
+    return $ok;
+}
+
+/**
  * Update a user's file from the skeleton directory.
  *
  * @param string $file The filename relative to the skeleton base and the user's home.
@@ -53,12 +173,9 @@ function updateUserFile($file, $user) {
 
     $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
     $homeDir  = $homeRoot.'/'.$user;
-    if (!file_exists($homeDir)) {
-        logMessage("[user:{$user}] updateUserFile skipped (home missing): {$file}");
-        return;
-    }
-    if (!is_dir($homeDir)) {
-        logMessage("[user:{$user}] updateUserFile skipped (home not a directory): {$file}");
+    $realHomeDir = pmssUpdateUserHomeDir($user);
+    if ($realHomeDir === '') {
+        logMessage("[user:{$user}] updateUserFile skipped (invalid home): {$file}");
         return;
     }
 
@@ -112,9 +229,9 @@ function updateUserFile($file, $user) {
                     logMessage("[user:{$user}] Failed to create directory: {$path}");
                     return;
                 }
-                @chmod($path, 0755);
-                @chown($path, (string) $user);
-                @chgrp($path, (string) $user);
+                if (!pmssApplyUserPathPermissions($path, (string) $user, $realHomeDir, $path)) {
+                    return;
+                }
                 logMessage("[user:{$user}] Created directory: {$path}");
             }
         }
@@ -161,21 +278,19 @@ function updateUserFile($file, $user) {
  */
 function copyToUserSpace($sourceFile, $targetFile, $user) {
     $parent = dirname($targetFile);
+    $homeDir = pmssUpdateUserHomeDir((string) $user);
+    if ($homeDir === '' || !pmssUpdateUserCandidatePathIsInsideHome($targetFile, $homeDir) || is_link($targetFile)) {
+        logMessage("[ERROR] Refusing to copy user file outside home for {$user}: {$targetFile}");
+        return false;
+    }
+
     if (!is_dir($parent)) {
         logMessage("[user:{$user}] Failed to copy; parent directory missing: {$parent}");
         return false;
     }
 
-    $applyPermissions = static function (string $path) use ($targetFile, $user): void {
-        if (!@chmod($path, 0755)) {
-            logMessage("[WARN] Failed to chmod 0755: {$targetFile}");
-        }
-        if (!@chown($path, (string) $user)) {
-            logMessage("[WARN] Failed to chown {$user}: {$targetFile}");
-        }
-        if (!@chgrp($path, (string) $user)) {
-            logMessage("[WARN] Failed to chgrp {$user}: {$targetFile}");
-        }
+    $applyPermissions = static function (string $path) use ($targetFile, $user, $homeDir): bool {
+        return pmssApplyUserPathPermissions($path, (string) $user, $homeDir, $targetFile);
     };
 
     $tempFile = @tempnam($parent, 'pmss-userfile-');
@@ -189,7 +304,10 @@ function copyToUserSpace($sourceFile, $targetFile, $user) {
         return false;
     }
 
-    $applyPermissions($tempFile);
+    if (!$applyPermissions($tempFile)) {
+        @unlink($tempFile);
+        return false;
+    }
 
     if (!@rename($tempFile, $targetFile)) {
         @unlink($tempFile);
@@ -198,6 +316,5 @@ function copyToUserSpace($sourceFile, $targetFile, $user) {
     }
 
     // Avoid shelling out for simple chmod/chown: fork failures are common during updates.
-    $applyPermissions($targetFile);
-    return true;
+    return $applyPermissions($targetFile);
 }

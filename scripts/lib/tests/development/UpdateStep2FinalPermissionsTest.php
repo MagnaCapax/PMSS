@@ -45,4 +45,22 @@ class UpdateStep2FinalPermissionsTest extends TestCase
             ],
         ]);
     }
+
+    public function testTopLevelOwnershipInvariantRunsNearEnd(): void
+    {
+        $this->pmssAssertRepoFileContract('scripts/util/update-step2.php', [
+            'required' => [
+                "\$topLevelOwnershipOk = pmssRunProfiledCallable('Checking top-level root ownership invariant', 'pmssEnsureTopLevelRootOwnership', ['logmsg']);",
+                "'top_level_ownership_invariant'",
+            ],
+            'ordered' => [[
+                'needles' => [
+                    "runStep('Hardening access to session and network binaries'",
+                    "\$topLevelOwnershipOk = pmssRunProfiledCallable('Checking top-level root ownership invariant'",
+                    "'top_level_ownership_invariant'",
+                    "pmssRunProfiledCallable('Running post-install storage benchmark'",
+                ],
+            ]],
+        ]);
+    }
 }
