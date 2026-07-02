@@ -179,7 +179,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                     "runStep('Updating vnstat interface database'",
                     "pmssBuildCommand('vnstat', ['-u', '-i', \$link])",
                     "str_replace('RateUnit 1', 'RateUnit 0'",
-                    'MaxBandwidth 100',
+                    'MaxBandwidth 50000',
                     'Warning: unable to read /etc/vnstat.conf',
                     'Warning: unable to write /etc/vnstat.conf',
                     "runStep('Restarting vnstat'",
