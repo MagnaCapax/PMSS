@@ -169,11 +169,15 @@ if [[ -z "$target_issue" ]]; then
 			continue
 		fi
 
-		title_lc=$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]')
-		if [[ "$title_lc" == *"roadmap"* || "$title_lc" == *"research"* || "$title_lc" == *"investigation"* ]]; then
-			echo "[agentic-issues] SKIP #$num (research/roadmap ticket): $title" >&1
-			continue
-		fi
+		# (Removed 2026-07-02) Title-keyword skip for roadmap/research/investigation deleted:
+		# it was REGEX_FOR_SEMANTICS — a title substring deciding "not buildable" — and redundant
+		# with the label-based exclusion in the jq filter below (needs-investigation/blocked/
+		# should-not-implement/etc.; #351's shipped label-routing). Verified 2026-07-02: zero
+		# currently-open non-excluded issues carry these keywords in title, so removal changes no
+		# current routing; it only stops FUTURE false-skips of a real buildable issue whose title
+		# merely contains one of these words (e.g. "Investigation panel returns 500"). Routing is
+		# now by LABEL (a judgment signal applied by a human/review), not a brittle title keyword.
+		# Ref: PMSS#350 verdict + sysadmin session 5fd7ea81.
 
 		if has_label "$labels_csv" "bug"; then
 			issue_numbers_bug+=("$num")
