@@ -33,7 +33,7 @@ class userConfigCommandContractsTest extends TestCase
                 "pmssBuildUserShellCommand(\$user['name'], \$dockerSetupCmd)",
                 '/usr/bin/dockerd-rootless-setuptool.sh install',
             ], 'forbidden' => [
-                'machinectl shell' => 'rootless-Docker setup must be manager-independent (ADR-0020): no `machinectl shell user@` (needs a working per-user systemd manager, which fails under cgroup v2 + hidepid=2, systemd issue 12955)',
+                'machinectl shell' => 'rootless-Docker setup must be manager-independent (ADR-0027): no `machinectl shell user@` (needs a working per-user systemd manager, which fails under cgroup v2 + hidepid=2, systemd issue 12955)',
             ]],
             'scripts/lib/user/userConfigCli.php' => ['required' => ["'/scripts/util/userConfigCgroup.php'"]],
         ]);
