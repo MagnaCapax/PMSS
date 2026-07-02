@@ -81,4 +81,4 @@ MAILTO=""
 # Replaces Debian default /etc/cron.d/mdadm (monthly, all servers at 00:57 first Sunday)
 # Group: hostname hash % 3 determines which months (Jan/Apr/Jul/Oct OR Feb/May/Aug/Nov OR Mar/Jun/Sep/Dec)
 # Stagger: hostname hash determines sleep offset (0-18000s = 0-5h) for start time spread
-0 0 * * 0   root    if [ -x /usr/share/mdadm/checkarray ] && [ $(date +\%d) -le 7 ]; then H=$(hostname -s | cksum | cut -d' ' -f1); if [ $(($(date +\%-m) \% 3)) -eq $((H \% 3)) ]; then sleep $((H \% 18000)); /usr/share/mdadm/checkarray --cron --all --idle --quiet; fi; fi
+0 0 * * 0   root    if [ -x /usr/share/mdadm/checkarray ] && [ -x /scripts/cron/mdadmCheckarray.php ] && [ $(date +\%d) -le 7 ]; then H=$(hostname -s | cksum | cut -d' ' -f1); if [ $(($(date +\%-m) \% 3)) -eq $((H \% 3)) ]; then sleep $((H \% 18000)); /scripts/cron/mdadmCheckarray.php >> /var/log/pmss/mdadmCheckarray.log 2>&1; fi; fi
