@@ -111,7 +111,7 @@ function pmssEnsureCgroupsConfigured(?callable $logger = null): void
             }
         }
         if ($mode === 'v2' && $hidepid !== '' && (int) $hidepid > 0 && is_file('/usr/bin/dockerd-rootless-setuptool.sh')) {
-            $log('[WARN] cgroup v2 with /proc hidepid>0 detected; rootless Docker may fail. Consider remounting /proc without hidepid or adjusting policy.');
+            $log('[INFO] cgroup v2 with /proc hidepid>0 detected. The per-user systemd manager cannot start here (systemd issue 12955); PMSS provisions rootless Docker manager-independently (su + XDG_RUNTIME_DIR) and runs it via nohup dockerd-rootless.sh, so this is expected and non-fatal. Do NOT remount /proc without hidepid: that removes cross-tenant process isolation (a privacy invariant). See ADR-0027.');
         }
     } catch (\Throwable $e) {
         // Best-effort advisory only.

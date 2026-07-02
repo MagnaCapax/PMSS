@@ -160,5 +160,12 @@ function pmssUserConfigApplyCgroupAndDocker(array $user, $store): void
 
     runStep('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg($user['name'])));
     runStep('Installing systemd-container tools', 'apt-get install -y systemd-container');
-    runStep('Configuring rootless Docker', sprintf('machinectl shell %1$s@ /usr/bin/dockerd-rootless-setuptool.sh install', escapeshellarg($user['name'])));
+    // Manager-independent rootless-Docker setup (ADR-0027): run the setuptool AS the user (su)
+    // with XDG_RUNTIME_DIR set, NOT via the per-user-manager container-shell path which requires
+    // a working per-user systemd manager. That manager fails to start under cgroup v2 + hidepid=2
+    // (systemd issue 12955), so the old path breaks new Docker provisioning on v2 hosts. The setuptool
+    // sets up subuid/subgid + rootlesskit here; the daemon is launched separately via nohup
+    // dockerd-rootless.sh (userDocker.php), so a systemd --user unit is not required.
+    $dockerSetupCmd = 'export XDG_RUNTIME_DIR=/run/user/$(id -u); export PATH="$PATH:/usr/sbin:/sbin"; /usr/bin/dockerd-rootless-setuptool.sh install';
+    runStep('Configuring rootless Docker', pmssBuildUserShellCommand($user['name'], $dockerSetupCmd));
 }

@@ -162,8 +162,14 @@ function pmssEnsureRootlessDockerInstalled(string $user): void
         }
     }
 
-    $installCmd = 'export PATH=$PATH:/usr/sbin:/sbin; curl -fsSL https://get.docker.com/rootless | sh';
-    pmssRunAndLog($user, 'docker.com rootless install script', sprintf('machinectl shell %1$s@ /bin/bash -lc %2$s', escapeshellarg($user), escapeshellarg($installCmd)));
+    // Manager-independent rootless-Docker install (ADR-0027): run the local setuptool AS the
+    // user (pmssRunAndLog $asUser=true wraps via su) with XDG_RUNTIME_DIR set, NOT via the
+    // per-user-manager container-shell path which needs a working per-user systemd manager
+    // (fails under cgroup v2 + hidepid=2, systemd issue 12955). Converged onto the local
+    // setuptool instead of the upstream network installer (reproducible + sovereign; matches
+    // userConfigRuntime). Daemon launched separately via nohup dockerd-rootless.sh.
+    $installCmd = 'export XDG_RUNTIME_DIR=/run/user/$(id -u); export PATH=$PATH:/usr/sbin:/sbin; /usr/bin/dockerd-rootless-setuptool.sh install';
+    pmssRunAndLog($user, 'rootless Docker setuptool install', $installCmd, true);
     clearstatcache();
     pmssUserLog($user, is_file($unit)
         ? '[OK] Rootless Docker unit docker.service created for user'
