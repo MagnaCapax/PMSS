@@ -60,7 +60,7 @@ On PMSS, rootless Docker prefers overlay-style drivers so containers stay fast a
 - Debian 12+: when no driver is configured yet and `fuse-overlayfs` is available, PMSS writes `~/.config/docker/daemon.json` with `"storage-driver": "fuse-overlayfs"`. This is the default and recommended mode for rootless Docker on PMSS.
 - Custom drivers: if `daemon.json` already contains `storage-driver` (for example `overlay2` or `vfs`), PMSS leaves it untouched and logs that it is reusing the existing configuration. `vfs` is supported but slow and space-heavy, and should generally be considered a last resort.
 
-During dist-upgrades, PMSS also attempts to install `fuse-overlayfs` (best-effort) so existing rootless Docker configurations keep working after the reboot.
+`fuse-overlayfs` is in the PMSS dpkg baseline (Debian 11/12/13), so every regular update reinstalls it if it is ever removed — notably by the recurring fuse2/fuse3 apt cascade (`apt-get install fuse …` pulls bare `fuse` v2, which conflicts with and evicts `fuse3` + `fuse-overlayfs`; see GH #464/#643). This makes rootless Docker's storage driver self-heal without manual intervention. Dist-upgrades also install it best-effort. Debian 10 (buster, EOL) is not baselined for it because availability in the archived buster repos is not guaranteed.
 
 If you ever need to change the driver, edit `~/.config/docker/daemon.json` and restart Docker. On PMSS the daemon is normally managed for you; reach out to support if you believe a driver change is required so they can coordinate it with platform tooling.
 

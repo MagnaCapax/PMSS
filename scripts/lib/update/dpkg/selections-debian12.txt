@@ -126,6 +126,7 @@ fonts-liberation	install
 fonts-noto-mono	install
 fonts-urw-base35	install
 fuse3	install
+fuse-overlayfs				install
 g++	install
 g++-12	install
 gawk	install

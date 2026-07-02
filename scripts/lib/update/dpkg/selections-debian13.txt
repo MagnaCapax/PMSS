@@ -103,6 +103,7 @@ fonts-unifont					install
 fonts-wqy-zenhei				install
 freeipmi-common					install
 fuse3						install
+fuse-overlayfs				install
 g++						install
 g++-14						install
 g++-14-x86-64-linux-gnu				install
