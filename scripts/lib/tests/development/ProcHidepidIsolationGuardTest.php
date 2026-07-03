@@ -72,8 +72,12 @@ class ProcHidepidIsolationGuardTest extends TestCase
             if ($src === false) {
                 continue;
             }
-            if (preg_match('/gid=proc\b/', $src) === 1
-                || preg_match('/groupadd\s+(?:-\S+\s+)*proc\b/', $src) === 1
+            // Target the bypass MECHANISM, not any prose mention of it (a comment that
+            // documents the hole is legitimate). The hole needs a 'proc' group (groupadd)
+            // and/or the /proc mount carrying a gid= exemption alongside hidepid=.
+            if (preg_match('/groupadd\s+(?:-\S+\s+)*proc\b/', $src) === 1
+                || preg_match('/\b(?:hidepid=\S*,\S*gid=|gid=\S*,\S*hidepid=)/', $src) === 1
+                || preg_match('#\b(?:mount|remount)\b[^\n\r]*\bgid=proc\b#', $src) === 1
             ) {
                 $offenders[] = substr($path, strlen($root) + 1);
             }

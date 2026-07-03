@@ -58,6 +58,11 @@ function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
             'mode' => ['type' => 'command', 'command' => 'stat -fc %T /sys/fs/cgroup 2>/dev/null', 'format' => 'text', 'fallback' => 'unknown'],
             'hierarchy_cmdline' => ['type' => 'command', 'command' => "grep -o 'systemd.unified_cgroup_hierarchy=[01]' /proc/cmdline 2>/dev/null", 'format' => 'text', 'fallback' => 'unset'],
             'proc_hidepid' => ['type' => 'command', 'command' => 'grep -w hidepid /proc/mounts 2>/dev/null', 'format' => 'lines'],
+            // Functional hidepid=2 tenant-isolation probe (not just the mount option): as a sample user,
+            // confirm /proc PID visibility is restricted to own procs and root PID 1 is hidden. Output
+            // "root_pids=N sample_user=U user_pids=M pid1=hidden|readable"; ENFORCED when M<<N AND pid1=hidden.
+            // pid1=readable (or M~=N) means hidepid is off/bypassed (the gid=proc hole class) — a privacy regression.
+            'hidepid_functional' => ['type' => 'command', 'command' => 'r=$(ls -d /proc/[0-9]* 2>/dev/null | wc -l); u=$(php /scripts/listUsers.php 2>/dev/null | head -1); if [ -n "$u" ]; then up=$(su -s /bin/bash "$u" -c "ls -d /proc/[0-9]* 2>/dev/null | wc -l"); p1=$(su -s /bin/bash "$u" -c "cat /proc/1/comm >/dev/null 2>&1 && echo readable || echo hidden"); echo "root_pids=$r sample_user=$u user_pids=$up pid1=$p1"; else echo no-users; fi', 'format' => 'text', 'fallback' => 'unknown'],
             'user_managers_active' => ['type' => 'command', 'command' => "systemctl list-units 'user@*.service' --state=active --no-legend --no-pager 2>/dev/null | wc -l", 'format' => 'int'],
             'user_managers_failed' => ['type' => 'command', 'command' => "systemctl list-units 'user@*.service' --state=failed --no-legend --no-pager 2>/dev/null | wc -l", 'format' => 'int'],
             'user_io_stat_sample' => ['type' => 'command', 'command' => 'cat /sys/fs/cgroup/user.slice/user-*.slice/io.stat 2>/dev/null | head -2', 'format' => 'lines'],

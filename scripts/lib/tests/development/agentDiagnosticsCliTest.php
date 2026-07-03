@@ -40,7 +40,7 @@ final class agentDiagnosticsCliTest extends TestCase
             array_keys($payload['sections'])
         );
         $this->assertSame(
-            ['mode', 'hierarchy_cmdline', 'proc_hidepid', 'user_managers_active', 'user_managers_failed', 'user_io_stat_sample', 'user_cpu_pressure_sample'],
+            ['mode', 'hierarchy_cmdline', 'proc_hidepid', 'hidepid_functional', 'user_managers_active', 'user_managers_failed', 'user_io_stat_sample', 'user_cpu_pressure_sample'],
             array_keys($payload['sections']['cgroup'])
         );
         $this->assertSame(
