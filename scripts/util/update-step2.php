@@ -50,6 +50,7 @@ require_once __DIR__.'/../lib/update/storageBenchmark.php';
 require_once __DIR__.'/../lib/update/systemPrep.php';
 require_once __DIR__.'/../lib/update/services/systemd.php';
 require_once __DIR__.'/../lib/update/services/logging.php';
+require_once __DIR__.'/../lib/update/services/logrotate.php';
 require_once __DIR__.'/../lib/update/services/mountHardening.php';
 require_once __DIR__.'/../lib/update/userMaintenance.php';
 require_once __DIR__.'/../lib/update/networking.php';
@@ -589,26 +590,7 @@ if ($setupPermissionsRc !== 0) {
 pmssLogJson(['event' => 'phase', 'name' => 'transition', 'status' => 'leaving setupPermissions', 'rc' => $setupPermissionsRc]);
 runStep('Refreshing FTP configuration', '/scripts/util/ftpConfig.php');
 
-$logrotateTemplate = '/etc/seedbox/config/template.logrotate.pmss';
-if (file_exists($logrotateTemplate)) {
-    $logrotateTarget = '/etc/logrotate.d/pmss-update';
-    $logrotateInstallRc = runStep(
-        'Installing logrotate policy for PMSS update logs',
-        sprintf('install -m 0644 -T %s %s', escapeshellarg($logrotateTemplate), escapeshellarg($logrotateTarget))
-    );
-    $logrotateVerifyRc = runStep(
-        'Verifying PMSS logrotate policy matches template',
-        sprintf('cmp -s %s %s', escapeshellarg($logrotateTemplate), escapeshellarg($logrotateTarget))
-    );
-    if ($logrotateInstallRc !== 0 || $logrotateVerifyRc !== 0) {
-        pmssUpdateStep2HandleClassifiedFailure(
-            'Installing logrotate policy for PMSS update logs',
-            PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED,
-            $logrotateInstallRc !== 0 ? $logrotateInstallRc : $logrotateVerifyRc,
-            'logrotate_policy_install_or_verify_failed'
-        );
-    }
-}
+pmssRunProfiledCallable('Installing logrotate policies', 'pmssLogrotatePoliciesInstall', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);
 
 pmssRunProfiledCallable('Ensuring network template baseline', 'pmssEnsureNetworkTemplate', ['logmsg']);
 runStep('Reapplying network configuration', '/scripts/util/setupNetwork.php');

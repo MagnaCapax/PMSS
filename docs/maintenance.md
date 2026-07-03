@@ -45,6 +45,11 @@ file exists and tweak the template under `etc/seedbox/config/template.logrotate.
 if retention needs to change. System stats snapshots append to
 `/var/log/pmss/system-stats.log` and are rotated by the same policy.
 
+`/etc/logrotate.d/rsyslog` is also converged from
+`etc/seedbox/config/template.logrotate.rsyslog`. PMSS keeps the standard Debian
+rsyslog log list but rotates it daily with `maxsize 500M` so OS log storms
+cannot grow until the next weekly rotation window.
+
 ## 5. Confirm Version Metadata
 After a real run, `/etc/seedbox/config/version` contains the canonical spec plus
 timestamp, e.g.
