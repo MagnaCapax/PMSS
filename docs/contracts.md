@@ -363,6 +363,11 @@ iptables helpers:
   - Safety: requires `memory`, `tasks`, and all raw metrics to be present and
     numeric; malformed shapes return `null` so the caller can keep the existing
     fail-soft missing-resource path.
+- pmssStatsStatusModelBuild(?string $uid, ?bool $dockerEnabledPolicy, ?callable $runner=null, array $overrides=[]): array
+  - Builds the customer-panel VPN/app/Docker status model; WireGuard and
+    OpenVPN use customer-readable interface presence (`wg0`, `tun0`) instead of
+    privileged systemd queries. `network_interfaces_root` overrides the sysfs
+    root for hermetic tests.
 
 ---
 

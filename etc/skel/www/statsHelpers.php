@@ -234,21 +234,35 @@ function pmssStatsBaseResourcesBuild(?callable $runner = null, array $overrides 
     return array('uid' => $uid, 'text' => implode("\n", $lines));
 }
 
+/** Return active when any expected customer-readable network interface exists. */
+function pmssStatsNetworkInterfaceStatus(array $interfaceNames, string $interfacesRoot = '/sys/class/net'): string
+{
+    $interfacesRoot = rtrim($interfacesRoot, '/');
+    foreach ($interfaceNames as $interfaceName) {
+        if (!is_string($interfaceName) || $interfaceName === '') {
+            continue;
+        }
+        if (@is_dir($interfacesRoot.'/'.$interfaceName)) {
+            return 'active';
+        }
+    }
+
+    return 'inactive';
+}
+
 /**
  * Read service, app, and Docker states for the compact server-info grid.
  *
  * @return array{wgStatus:string,ovpnStatus:string,apps:array<string,string>,dockerInactiveNote:string}
  */
-function pmssStatsStatusModelBuild(?string $uid, ?bool $dockerEnabledPolicy, ?callable $runner = null): array
+function pmssStatsStatusModelBuild(?string $uid, ?bool $dockerEnabledPolicy, ?callable $runner = null, array $overrides = []): array
 {
     $runner = $runner ?? 'pmssInfoShellExec';
-    $serviceStatus = static function (string $command, string $label) use ($runner): string {
-        $result = $runner($command, $label);
-        if ($result['error'] !== null) {
-            return 'error';
-        }
-        return trim((string) $result['output']) === 'active' ? 'active' : 'inactive';
-    };
+    $interfacesRoot = isset($overrides['network_interfaces_root'])
+        && is_string($overrides['network_interfaces_root'])
+        && $overrides['network_interfaces_root'] !== ''
+            ? $overrides['network_interfaces_root']
+            : '/sys/class/net';
 
     $processNeedles = array('rTorrent' => 'rtorrent', 'qBittorrent' => 'qbittorrent-nox', 'Deluge' => 'deluged', 'rclone' => 'rclone');
     $psResult = $runner('ps aux | grep -E "(rtorrent|qbittorrent-nox|deluged|rclone)" | grep -v grep', 'App status');
@@ -270,8 +284,8 @@ function pmssStatsStatusModelBuild(?string $uid, ?bool $dockerEnabledPolicy, ?ca
     $apps['Docker'] = $dockerStatus;
 
     return array(
-        'wgStatus' => $serviceStatus('systemctl is-active wg-quick@wg0 2>/dev/null', 'WireGuard status'),
-        'ovpnStatus' => $serviceStatus('systemctl is-active openvpn 2>/dev/null', 'OpenVPN status'),
+        'wgStatus' => pmssStatsNetworkInterfaceStatus(array('wg0'), $interfacesRoot),
+        'ovpnStatus' => pmssStatsNetworkInterfaceStatus(array('tun0'), $interfacesRoot),
         'apps' => $apps,
         'dockerInactiveNote' => pmssStatsDockerInactiveNote($dockerStatus, $dockerEnabledPolicy),
     );

@@ -54,6 +54,7 @@ final class CustomerStatsLayoutTest extends TestCase
                 'forbidden' => array('function pmssStatsSerializedStateRead(', 'PMSS_STATS'.'_HELPERS_ONLY'),
             ),
             'etc/skel/www/statsHelpers.php' => array('required' => array(
+                'function pmssStatsNetworkInterfaceStatus(',
                 'function pmssStatsDockerInactiveNote(',
                 'function pmssStatsRenderLineChart(',
                 'function pmssStatsRenderResourceBlocks(',
@@ -135,8 +136,12 @@ final class CustomerStatsLayoutTest extends TestCase
             $this->assertStringNotContainsString('systemctl show', $command);
         }
 
-        $statusRunner = function (string $command, string $label): array {
-            $outputs = array('WireGuard status' => "active\n", 'OpenVPN status' => "inactive\n", 'App status' => "alice rtorrent\nbob deluged\ncarol rclone\n", 'Docker status' => '');
+        $interfacesRoot = $this->pmssMakeTempDir('pmss-stats-net-');
+        mkdir($interfacesRoot.'/wg0');
+        $statusCommands = array();
+        $statusRunner = function (string $command, string $label) use (&$statusCommands): array {
+            $statusCommands[] = $command;
+            $outputs = array('App status' => "alice rtorrent\nbob deluged\ncarol rclone\n", 'Docker status' => '');
             return array('output' => $outputs[$label] ?? '', 'error' => null);
         };
 
@@ -149,7 +154,33 @@ final class CustomerStatsLayoutTest extends TestCase
                 ),
                 'dockerInactiveNote' => '',
             ),
-            \pmssStatsStatusModelBuild('999999', null, $statusRunner)
+            \pmssStatsStatusModelBuild('999999', null, $statusRunner, array('network_interfaces_root' => $interfacesRoot))
         );
+        foreach ($statusCommands as $command) {
+            $this->assertStringNotContainsString('systemctl is-active', $command);
+        }
+    }
+
+    public function testStatsVpnStatusUsesInterfacePresenceInsteadOfSystemctlOutput(): void
+    {
+        $interfacesRoot = $this->pmssMakeTempDir('pmss-stats-vpn-net-');
+        $runner = function (string $command, string $label): array {
+            $outputs = array('App status' => '', 'Docker status' => 'Cannot connect to the Docker daemon');
+            return array('output' => $outputs[$label] ?? "active\n", 'error' => null);
+        };
+        $status = function () use ($runner, $interfacesRoot): array {
+            return \pmssStatsStatusModelBuild('999999', null, $runner, array('network_interfaces_root' => $interfacesRoot));
+        };
+
+        $this->assertSame('inactive', $status()['wgStatus']);
+        $this->assertSame('inactive', $status()['ovpnStatus']);
+
+        mkdir($interfacesRoot.'/wg0');
+        $this->assertSame('active', $status()['wgStatus']);
+        $this->assertSame('inactive', $status()['ovpnStatus']);
+
+        mkdir($interfacesRoot.'/tun0');
+        $this->assertSame('active', $status()['wgStatus']);
+        $this->assertSame('active', $status()['ovpnStatus']);
     }
 }
