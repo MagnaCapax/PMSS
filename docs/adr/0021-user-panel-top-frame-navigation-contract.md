@@ -88,7 +88,7 @@ gone). Enabled-only + welcome-default eliminate the 503-on-first-load class enti
   - Style per-user lighttpd 503 like global 404/403 + JS auto-refresh.
   - Add a pmss-qa render test asserting: no `target=_blank` in frame nav, default tab = welcome,
     no tab present for a disabled feature, CSS assets present.
-  - Ensure new skel assets (e.g. `jquery.tabs-ie.css`) propagate via guiFrames `$fileVersions`
+  - Ensure new skel assets (e.g. `jquery.tabs.css`, `pmssTabs.js`) propagate via guiFrames `$fileVersions`
     and the update-step2 per-user copy loop.
 
 ## References

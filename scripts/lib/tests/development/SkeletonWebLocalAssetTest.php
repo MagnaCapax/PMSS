@@ -214,6 +214,131 @@ class SkeletonWebLocalAssetTest extends TestCase
         $this->assertSame([], $missing, "Customer-panel local asset(s) referenced but not deliverable:\n".implode("\n", $missing));
     }
 
+    /**
+     * Guard the inverse of GH#423: every delivered local .css/.js asset should
+     * have at least one loader in the customer-panel source tree.
+     */
+    public function testManifestLocalAssetsAreReferencedByPanelSources(): void
+    {
+        $referenced = $this->customerPanelReferencedLocalAssets();
+        $unreferenced = [];
+        foreach ($this->customerPanelManifestLocalAssets() as $asset) {
+            if (!isset($referenced[$asset])) {
+                $unreferenced[] = 'www/'.$asset;
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $unreferenced,
+            "Customer-panel .css/.js manifest asset(s) have no local loader:\n".implode("\n", $unreferenced)
+        );
+    }
+
+    /** @return array<int, string> */
+    private function customerPanelManifestLocalAssets(): array
+    {
+        $manifest = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
+        preg_match_all("/'www\\/([^']+\\.(?:css|js))'/", $manifest, $matches);
+        $assets = array_values(array_unique($matches[1]));
+        sort($assets);
+
+        $this->assertTrue($assets !== [], 'Expected customer-panel .css/.js manifest entries');
+        return $assets;
+    }
+
+    /** @return array<string, bool> */
+    private function customerPanelReferencedLocalAssets(): array
+    {
+        $referenced = [];
+        foreach ($this->customerPanelReferenceSourceFiles() as $sourceFile) {
+            $source = @file_get_contents($this->pmssRepoPath($sourceFile));
+            $this->assertTrue(is_string($source), 'Unable to read '.$sourceFile);
+            $baseDir = dirname(substr($sourceFile, strlen('etc/skel/www/')));
+            $baseDir = $baseDir === '.' ? '' : $baseDir;
+
+            foreach ($this->customerPanelExtractLocalAssetReferences($source) as $reference) {
+                $asset = $this->customerPanelNormalizeAssetReference($baseDir, $reference);
+                if ($asset !== null) {
+                    $referenced[$asset] = true;
+                }
+            }
+        }
+
+        ksort($referenced);
+        return $referenced;
+    }
+
+    /** @return array<int, string> */
+    private function customerPanelReferenceSourceFiles(): array
+    {
+        $root = $this->pmssRepoPath('etc/skel/www');
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
+        );
+        $files = [];
+        foreach ($iterator as $file) {
+            if (!$file->isFile() || !preg_match('/\.(?:php|html|css|js)$/i', $file->getFilename())) {
+                continue;
+            }
+            $files[] = 'etc/skel/www/'.str_replace('\\', '/', substr($file->getPathname(), strlen($root) + 1));
+        }
+        sort($files);
+
+        return $files;
+    }
+
+    /** @return array<int, string> */
+    private function customerPanelExtractLocalAssetReferences(string $source): array
+    {
+        $patterns = [
+            '/\b(?:src|href)\s*=\s*["\']([^"\']+\.(?:css|js))(?:\?[^"\']*)?["\']/i',
+            '/@import\s+(?:url\(\s*)?["\']?([^"\'\)\s]+\.css)(?:\?[^"\'\)\s]*)?["\']?\s*\)?/i',
+            '/url\(\s*["\']?([^"\'\)\s]+(?:\.css|\.js))(?:\?[^"\'\)]*)?["\']?\s*\)/i',
+        ];
+
+        $references = [];
+        foreach ($patterns as $pattern) {
+            preg_match_all($pattern, $source, $matches);
+            foreach ($matches[1] as $reference) {
+                $references[] = $reference;
+            }
+        }
+
+        return array_values(array_unique($references));
+    }
+
+    private function customerPanelNormalizeAssetReference(string $baseDir, string $reference): ?string
+    {
+        $reference = html_entity_decode(trim($reference), ENT_QUOTES, 'UTF-8');
+        $withoutQuery = preg_replace('/[?#].*$/', '', $reference);
+        $reference = is_string($withoutQuery) ? $withoutQuery : '';
+        if ($reference === '' || preg_match('/^(?:[a-z][a-z0-9+.-]*:|\/\/|\/)/i', $reference)) {
+            return null;
+        }
+        if (!preg_match('/\.(?:css|js)$/i', $reference)) {
+            return null;
+        }
+
+        $parts = [];
+        $path = ($baseDir !== '' ? $baseDir.'/' : '').str_replace('\\', '/', $reference);
+        foreach (explode('/', $path) as $part) {
+            if ($part === '' || $part === '.') {
+                continue;
+            }
+            if ($part === '..') {
+                if ($parts === []) {
+                    return null;
+                }
+                array_pop($parts);
+                continue;
+            }
+            $parts[] = $part;
+        }
+
+        return $parts === [] ? null : implode('/', $parts);
+    }
+
     private function welcomeStartupPhpBlock(string $welcome): string
     {
         $start = strpos($welcome, "require_once __DIR__.'/scriptsInc.php';");
