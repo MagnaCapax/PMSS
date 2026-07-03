@@ -53,7 +53,9 @@ const SCRIPTS_ONLY_FLAG     = '--scripts-only';
 const PMSS_CORRELATION_ENV  = 'PMSS_CORRELATION_ID';
 define('PMSS_UPDATE_LOCK_FILE', '/var/lib/pmss/update.lock');
 define('PMSS_UPDATE_LOCK_ENV', 'PMSS_UPDATE_LOCK_HELD');
-define('PMSS_UPDATE_LOCK_FDS_ENV', 'PMSS_UPDATE_LOCK_FDS');
+if (!defined('PMSS_UPDATE_LOCK_FDS_ENV')) {
+    define('PMSS_UPDATE_LOCK_FDS_ENV', 'PMSS_UPDATE_LOCK_FDS');
+}
 const PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS = 30;
 const PMSS_UPDATE_LOCK_RETRY_SECONDS = 2;
 
@@ -72,62 +74,66 @@ function pmssEnsureDirectory(string $dir, int $mode = 0755): void
     }
 }
 
-/**
- * Minimal logger – writes both to stdout and a file so rescue scenarios still log.
- */
-function logmsg(string $message): void
-{
-    static $logFiles = null;
-    if ($logFiles === null) {
-        $script = $_SERVER['SCRIPT_NAME'] ?? __FILE__;
-        $base   = basename($script, '.php');
-        $dir    = '/var/log/pmss';
-        pmssEnsureDirectory($dir);
-        $logFiles = [
-            'primary'  => rtrim($dir, '/').'/'.$base.'.log',
-            'fallback' => '/tmp/'.$base.'.log',
-        ];
-    }
+if (!function_exists('logmsg')) {
+    /**
+     * Minimal logger – writes both to stdout and a file so rescue scenarios still log.
+     */
+    function logmsg(string $message): void
+    {
+        static $logFiles = null;
+        if ($logFiles === null) {
+            $script = $_SERVER['SCRIPT_NAME'] ?? __FILE__;
+            $base   = basename($script, '.php');
+            $dir    = '/var/log/pmss';
+            pmssEnsureDirectory($dir);
+            $logFiles = [
+                'primary'  => rtrim($dir, '/').'/'.$base.'.log',
+                'fallback' => '/tmp/'.$base.'.log',
+            ];
+        }
 
-    $timestamp = date('[Y-m-d H:i:s] ');
-    @file_put_contents($logFiles['primary'], $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX)
- || @file_put_contents($logFiles['fallback'], $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
-    fwrite(STDOUT, $message.PHP_EOL);
+        $timestamp = date('[Y-m-d H:i:s] ');
+        @file_put_contents($logFiles['primary'], $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX)
+     || @file_put_contents($logFiles['fallback'], $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
+        fwrite(STDOUT, $message.PHP_EOL);
+    }
 }
 
-/**
- * Read or initialize the cross-process correlation ID for this updater run.
- */
-function pmssCorrelationId(bool $createIfMissing = true): string
-{
-    if (is_string($GLOBALS['PMSS_CORRELATION_ID_CACHE']) && $GLOBALS['PMSS_CORRELATION_ID_CACHE'] !== '') {
-        return $GLOBALS['PMSS_CORRELATION_ID_CACHE'];
+if (!function_exists('pmssCorrelationId')) {
+    /**
+     * Read or initialize the cross-process correlation ID for this updater run.
+     */
+    function pmssCorrelationId(bool $createIfMissing = true): string
+    {
+        if (is_string($GLOBALS['PMSS_CORRELATION_ID_CACHE']) && $GLOBALS['PMSS_CORRELATION_ID_CACHE'] !== '') {
+            return $GLOBALS['PMSS_CORRELATION_ID_CACHE'];
+        }
+
+        $envValue = trim((string) (getenv(PMSS_CORRELATION_ENV) ?: ''));
+        if ($envValue !== '') {
+            $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $envValue;
+            return $envValue;
+        }
+
+        if (!$createIfMissing) {
+            return '';
+        }
+
+        $timestamp = gmdate('Ymd-His');
+        $hostRaw = function_exists('gethostname') ? (string) @gethostname() : (string) php_uname('n');
+        $host = trim(strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $hostRaw)), '-');
+        $host = $host !== '' ? $host : 'host';
+
+        try {
+            $generated = $timestamp.'-'.$host.'-'.bin2hex(random_bytes(3));
+        } catch (\Throwable $throwable) {
+            $generated = $timestamp.'-'.$host.'-'.substr(hash('sha256', $timestamp.$host.microtime(true)), 0, 6);
+        }
+
+        $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $generated;
+        putenv(PMSS_CORRELATION_ENV.'='.$generated);
+        return $generated;
     }
-
-    $envValue = trim((string) (getenv(PMSS_CORRELATION_ENV) ?: ''));
-    if ($envValue !== '') {
-        $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $envValue;
-        return $envValue;
-    }
-
-    if (!$createIfMissing) {
-        return '';
-    }
-
-    $timestamp = gmdate('Ymd-His');
-    $hostRaw = function_exists('gethostname') ? (string) @gethostname() : (string) php_uname('n');
-    $host = trim(strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $hostRaw)), '-');
-    $host = $host !== '' ? $host : 'host';
-
-    try {
-        $generated = $timestamp.'-'.$host.'-'.bin2hex(random_bytes(3));
-    } catch (\Throwable $throwable) {
-        $generated = $timestamp.'-'.$host.'-'.substr(hash('sha256', $timestamp.$host.microtime(true)), 0, 6);
-    }
-
-    $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $generated;
-    putenv(PMSS_CORRELATION_ENV.'='.$generated);
-    return $generated;
 }
 
 function logEvent(string $event, array $payload = []): void
