@@ -6,6 +6,19 @@ require_once dirname(__DIR__, 2).'/update/services/bootstrap.php';
 
 class UpdateServicesRuntimeTest extends TestCase
 {
+    public function testSshdTemplateSetsRecoveryQueueHardeningWithoutBreakingLegacyClients(): void
+    {
+        $config = "\n".$this->pmssReadRepoFile('etc/seedbox/config/template.sshd_config');
+
+        $this->assertStringContainsAllStrings([
+            "\nLoginGraceTime 30s\n",
+            "\nMaxStartups 60:30:200\n",
+            "\nCiphers +aes128-cbc,aes192-cbc,aes256-cbc,chacha20-poly1305@openssh.com\n",
+            "\nKexAlgorithms +diffie-hellman-group-exchange-sha1,diffie-hellman-group14-sha1,diffie-hellman-group1-sha1\n",
+            "\nMACs +hmac-sha1\n",
+        ], $config);
+    }
+
     public function testSshdLegacyParserNormalizationKeepsLegacyFallbackContract(): void
     {
         $normalized = \pmssSshdLegacyParserTemplateNormalize("Port 22\nCiphers +aes128-ctr\nHostKeyAlgorithms ssh-ed25519");

@@ -48,8 +48,11 @@ MACs +hmac-sha1
 SyslogFacility AUTH
 LogLevel INFO
 
-# Authentication settings
-LoginGraceTime 2m
+# Authentication and pre-auth queue settings
+# Drain scanner-held unauthenticated slots quickly, while keeping enough
+# headroom for legitimate and recovery SSH during load spikes.
+LoginGraceTime 30s
+MaxStartups 60:30:200
 PermitRootLogin yes
 StrictModes yes
 MaxAuthTries 6
