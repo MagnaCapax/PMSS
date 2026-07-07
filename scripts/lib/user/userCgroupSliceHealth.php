@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/userConfigCli.php';
 require_once __DIR__.'/userConfigStore.php';
+require_once __DIR__.'/userCgroupSliceDropinRepair.php';
 require_once dirname(__DIR__).'/cgroup/Manager.php';
 
 /**
@@ -75,6 +76,18 @@ function pmssUserCgroupSliceApplyCommand(string $username, array $payload): ?str
 /** Reapply the stored cgroup plan when the live slice memory cap has drifted low. */
 function pmssUserCgroupSliceSelfHeal(string $username, UserConfigStore $store): bool
 {
+    $dropinRepaired = pmssUserCgroupSliceRepairLegacyBareMemoryMaxForUser($username, static function (string $message) use ($username): void {
+        pmssUserLog($username, $message);
+        logMessage($message);
+    });
+    if ($dropinRepaired) {
+        $rc = runUserStep($username, 'Reloading systemd after cgroup slice drop-in repair', 'systemctl daemon-reload');
+        if ($rc !== 0) {
+            pmssUserLog($username, sprintf('[WARN] systemd daemon-reload failed after cgroup slice drop-in repair (rc=%d)', $rc));
+            return false;
+        }
+    }
+
     $payload = $store->applyFallbacks($username, $store->get($username) ?? []);
     $plan = pmssUserCgroupSliceMemoryRefreshPlan($username, $payload);
     if (!$plan['needed']) {

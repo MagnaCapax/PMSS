@@ -246,6 +246,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Enumerates users from `users::listHomeUsers()`, runs per-user maintenance, and returns summary keys: `total`, `processed`, `skipped`.
   - Emits end-of-loop summary log line `Processed N of M users` and JSON event `user_maintenance_summary`.
   - Calls `pmssUpdateUserEnvironment()` first, then applies linger/rootless-Docker wiring and optional post-refresh checks for each valid user.
+  - Before marking a user refreshed, repairs stale per-user systemd drop-ins with bare sub-MiB `MemoryMax=<N>` values and matching suffixed `MemoryLimit=<N>M` siblings by appending the PMSS MiB suffix and reloading systemd.
   - Catches per-user throwables (including permission-step timeouts), logs warning, skips that user, and continues remaining users.
 
 - pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha=''): void

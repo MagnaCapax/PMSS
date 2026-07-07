@@ -55,4 +55,46 @@ class UserCgroupSliceHealthTest extends TestCase
             "'--cpu-quota-percent=infinity'",
         ], $command);
     }
+
+    public function testDropinContentRepairAppendsUnitToBareSubMibMemoryMax(): void
+    {
+        $plan = \pmssUserCgroupSliceDropinContentRepairBareMemoryMax(
+            "[Slice]\nMemoryMax=750\nMemoryLimit=750M\nMemoryHigh=600M\n"
+        );
+
+        $this->assertTrue($plan['changed']);
+        $this->assertSame("[Slice]\nMemoryMax=750M\nMemoryLimit=750M\nMemoryHigh=600M\n", $plan['content']);
+        $this->assertSame(['750'], $plan['values']);
+    }
+
+    public function testDropinContentRepairLeavesSuffixedAndByteSizedValuesAlone(): void
+    {
+        foreach ([
+            "[Slice]\nMemoryMax=750M\n",
+            "[Slice]\nMemoryMax=1048576\n",
+            "[Slice]\nMemoryMax=infinity\n",
+            "[Slice]\nMemoryMax=0\n",
+            "[Slice]\nMemoryMax=750\nMemoryHigh=600M\n",
+        ] as $content) {
+            $plan = \pmssUserCgroupSliceDropinContentRepairBareMemoryMax($content);
+            $this->assertFalse($plan['changed']);
+            $this->assertSame($content, $plan['content']);
+        }
+    }
+
+    public function testDropinFileRepairWritesBackupAndSkipsSymlink(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-user-slice-dropin-');
+        $file = $this->pmssWriteFile($dir.'/90-pmss-user.conf', "[Slice]\nMemoryMax=512\nMemoryLimit=512M\n");
+        $link = $dir.'/91-link.conf';
+        symlink($file, $link);
+        $messages = [];
+        $logger = $this->pmssMakeArrayLogger($messages);
+
+        $this->assertTrue(\pmssUserCgroupSliceDropinFileRepairBareMemoryMax($file, $logger));
+        $this->assertSame("[Slice]\nMemoryMax=512M\nMemoryLimit=512M\n", (string) file_get_contents($file));
+        $this->assertTrue(count(glob($file.'.pmss-backup-*') ?: []) > 0);
+        $this->assertFalse(\pmssUserCgroupSliceDropinFileRepairBareMemoryMax($link, $logger));
+        $this->assertStringContainsString('Skipping unsafe user slice drop-in target', implode("\n", $messages));
+    }
 }

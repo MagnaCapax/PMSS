@@ -149,6 +149,7 @@ Inspect and apply limits per user:
   - `php /scripts/util/userConfigCgroup.php USER --apply --defaults`
   - Policy `mounts` entries are applied as per-device IO limits/weights when their backing devices can be resolved.
 - update-step2 checks the live per-user `MemoryMax` against the stored `ramMiB` plan before marking a user refreshed; if the live cap is lower than the canonical plan, it reruns the same `userConfigCgroup.php --apply` command to restore the slice policy.
+- update-step2 also repairs stale per-user drop-ins that contain bare sub-MiB `MemoryMax=<N>` values with a matching suffixed `MemoryLimit=<N>M` sibling by appending the PMSS MiB suffix before reloading systemd, so older high-priority `90-pmss-user.conf` files cannot override the canonical slice policy on the next daemon reload.
 - Cron refresh reapplies explicit io.latency/io.cost user knobs:
   - `/scripts/cron/cgroupPolicyRefresh.php` runs at boot and every 2 hours from `root.cron`.
 - Cgroup-v1 BFQ hosts get a direct kernel weight refresh:
