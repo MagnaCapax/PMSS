@@ -1,0 +1,7 @@
+# PMSS mcx.fi safety default: only generated customer hostnames should serve.
+server {
+        listen 80;
+        server_name .mcx.fi;
+
+        return 404;
+}

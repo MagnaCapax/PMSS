@@ -9,6 +9,7 @@
  */
 
 require_once __DIR__.'/templates.php';
+require_once __DIR__.'/customerHosts.php';
 require_once __DIR__.'/../configBackups.php';
 require_once __DIR__.'/../runtime.php';
 
@@ -50,6 +51,8 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
 {
     $userTemplate = @file_get_contents("/etc/seedbox/config/template.nginx-user");
     $suspendedTemplate = @file_get_contents("/etc/seedbox/config/template.nginx-user-suspended");
+    $customerHostTemplate = @file_get_contents('/etc/seedbox/config/template.nginx-customer-host');
+    $customerHostSuspendedTemplate = @file_get_contents('/etc/seedbox/config/template.nginx-customer-host-suspended');
     $needsDelugeWebPort = is_string($userTemplate) && strpos($userTemplate, '##delugeWebPort') !== false;
 
     // Ensure nginx directories exist to avoid noisy cp/mkdir errors on fresh hosts.
@@ -83,6 +86,17 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
     $subdomainBase = strtolower($serverHostname);
     $subdomainEnabled = pmssNginxUserHostIsValidFqdn($subdomainBase);
     $subdomainConfigDir = '/etc/nginx/conf.d';
+    pmssDirEnsureExists($subdomainConfigDir, 0755);
+
+    $customerHostMap = pmssNginxCustomerHostMapLoad($serverHostname);
+    $customerHostMapLoaded = !empty($customerHostMap['loaded']);
+    if (!$customerHostMapLoaded && is_string($customerHostMap['message'] ?? null) && $customerHostMap['message'] !== '') {
+        fwrite(STDERR, 'Skipping customer stable-host vhosts: '.$customerHostMap['message'].PHP_EOL);
+        if (function_exists('pmssCreateNginxConfigAppendLog')) {
+            pmssCreateNginxConfigAppendLog('customer stable-host vhosts skipped: '.$customerHostMap['message']);
+        }
+    }
+
     $nginxConfigSiteDefault = @file_get_contents('/etc/seedbox/config/template.nginx-site-default');
     $nginxConfigSiteDefaultSsl = @file_get_contents('/etc/seedbox/config/template.nginx-site-default-ssl');
     $nginxConfigSiteDefaultSslLetsEncrypt = @file_get_contents('/etc/seedbox/config/template.nginx-site-default-ssl-lets-encrypt');
@@ -154,8 +168,12 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
         $cleanupConfigs('/etc/nginx/users/*');
     }
 
+    $mcxUnmatchedTemplate = @file_get_contents('/etc/seedbox/config/template.nginx-mcx-fi-unmatched');
+    if (is_string($mcxUnmatchedTemplate) && trim($mcxUnmatchedTemplate) !== '') {
+        @file_put_contents($subdomainConfigDir.'/pmss-mcx-fi-unmatched.conf', $mcxUnmatchedTemplate);
+    }
+
     if ($subdomainEnabled) {
-        pmssDirEnsureExists($subdomainConfigDir, 0755);
         if (!$singleUser) {
             $cleanupConfigs($subdomainConfigDir.'/pmss-user-*.conf');
         } elseif ($requestedUser !== '') {
@@ -166,10 +184,22 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
         fwrite(STDERR, "Skipping nginx subdomain vhosts (invalid hostname: {$subdomainBase})\n");
     }
 
+    if ($customerHostMapLoaded) {
+        if (!$singleUser) {
+            $cleanupConfigs($subdomainConfigDir.'/pmss-customer-host-*.conf');
+        } elseif ($requestedUser !== '') {
+            @unlink($subdomainConfigDir.'/pmss-customer-host-'.$requestedUser.'.conf');
+        }
+    }
+
     $templates = pmssNginxUserSubdomainTemplates();
     return [
         'userTemplate' => $userTemplate,
         'suspendedTemplate' => $suspendedTemplate,
+        'customerHostTemplate' => $customerHostTemplate,
+        'customerHostSuspendedTemplate' => $customerHostSuspendedTemplate,
+        'customerHostsByUser' => is_array($customerHostMap['hostsByUser'] ?? null) ? $customerHostMap['hostsByUser'] : [],
+        'customerHostMapLoaded' => $customerHostMapLoaded,
         'needsDelugeWebPort' => $needsDelugeWebPort,
         'subdomainEnabled' => $subdomainEnabled,
         'subdomainBase' => $subdomainBase,

@@ -106,7 +106,8 @@ function pmssUserConfigLighttpdConfigureUser(
         ['MemoryHigh', 'MemoryMax', 'CPUQuotaPerSecUSec', 'CPUQuotaPeriodUSec', 'CPUQuota']
     );
     $resources = pmssLighttpdResourcePlan($props, $policyDefaults, pmssLighttpdUserConfigLoad($thisUser));
-    $thisUserConfig = pmssLighttpdRenderUserConfig($template, $thisUser, $serverPort, $rclonePort, $qbittorrentPort, $resources);
+    $customerHostDocrootSubdir = pmssUserCustomerHostDocrootSubdirRead($homeDir);
+    $thisUserConfig = pmssLighttpdRenderUserConfig($template, $thisUser, $serverPort, $rclonePort, $qbittorrentPort, $resources, $customerHostDocrootSubdir);
     if (!pmssWriteUserFile($homeDir.'/.lighttpd.conf', $thisUserConfig, $thisUser, 0741)) {
         fwrite(STDERR, "[user:{$thisUser}] Failed to write .lighttpd.conf; skipping user\n");
         return;
