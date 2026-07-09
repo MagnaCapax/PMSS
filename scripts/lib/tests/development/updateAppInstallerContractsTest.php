@@ -12,6 +12,9 @@ class UpdateAppInstallerContractsTest extends TestCase
                 'required' => [
                     '@google/gemini-cli',
                     '@anthropic-ai/claude-code',
+                    "['Claude Code', '@anthropic-ai/claude-code', '2.1.112', 'claude']",
+                    "\$installTarget = \$toolSpec[1].(\$toolSpec[2] === '' ? '' : '@'.\$toolSpec[2]);",
+                    "lib/node_modules/'.\$toolSpec[1].'/package.json",
                     '/usr/local/bin/codex',
                     'node-v22.22.1-linux-x64.tar.xz',
                     'codex-x86_64-unknown-linux-musl.tar.gz',

@@ -99,23 +99,33 @@ if ($nodeBinary !== '') {
     putenv('PATH='.dirname($nodeBinary).($pathValue === false || $pathValue === '' ? '' : ':'.$pathValue));
 
     foreach ([
-        ['Gemini CLI', '@google/gemini-cli', 'gemini'],
-        ['Claude Code', '@anthropic-ai/claude-code', 'claude'],
+        ['Gemini CLI', '@google/gemini-cli', '', 'gemini'],
+        ['Claude Code', '@anthropic-ai/claude-code', '2.1.112', 'claude'],
     ] as $toolSpec) {
         if ($npmBinary === '') {
             $logger('[WARN] Skipping '.$toolSpec[0].' install: npm not available');
             continue;
         }
 
-        $prefixDir = '/opt/pmss/ai-tools/npm/'.$toolSpec[2];
-        $binaryPath = $prefixDir.'/bin/'.$toolSpec[2];
+        $installTarget = $toolSpec[1].($toolSpec[2] === '' ? '' : '@'.$toolSpec[2]);
+        $prefixDir = '/opt/pmss/ai-tools/npm/'.$toolSpec[3];
+        $binaryPath = $prefixDir.'/bin/'.$toolSpec[3];
         if (is_file($binaryPath) && !$force) {
-            continue;
+            if ($toolSpec[2] === '') {
+                continue;
+            }
+
+            // Versioned npm tools must converge after upstream publishes a bad latest.
+            $packageJsonPath = $prefixDir.'/lib/node_modules/'.$toolSpec[1].'/package.json';
+            $packageJson = @json_decode((string) @file_get_contents($packageJsonPath), true);
+            if (is_array($packageJson) && (string) ($packageJson['version'] ?? '') === $toolSpec[2]) {
+                continue;
+            }
         }
 
         runStep('Ensuring '.$toolSpec[0].' install prefix exists', pmssBuildCommand('mkdir', ['-p', $prefixDir]));
-        runStep('Installing '.$toolSpec[0], pmssBuildCommand($npmBinary, ['install', '--prefix', $prefixDir, '-g', '--no-audit', '--no-fund', $toolSpec[1]]));
-        runStep('Linking '.$toolSpec[0].' command', pmssBuildCommand('ln', ['-sf', $binaryPath, '/usr/local/bin/'.$toolSpec[2]]));
+        runStep('Installing '.$toolSpec[0], pmssBuildCommand($npmBinary, ['install', '--prefix', $prefixDir, '-g', '--no-audit', '--no-fund', $installTarget]));
+        runStep('Linking '.$toolSpec[0].' command', pmssBuildCommand('ln', ['-sf', $binaryPath, '/usr/local/bin/'.$toolSpec[3]]));
     }
 }
 
