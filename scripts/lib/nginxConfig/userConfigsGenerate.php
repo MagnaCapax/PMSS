@@ -69,7 +69,7 @@ function pmssCreateNginxConfigRemoveFile(string $path, string $user, string $lab
 /**
  * Write public/private subdomain vhosts from the shared render context.
  */
-function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, string $subdomainBase, ?string $hashHost, bool $suspended, ?int $serverPort = null): bool
+function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, string $subdomainBase, ?string $hashHost, bool $suspended, ?int $serverPort = null, ?string $mcxHost = null): bool
 {
     $replacements = [
         '##user##' => $user,
@@ -81,7 +81,10 @@ function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, st
 
     $prefix = $suspended ? 'Suspended' : 'Subdomain';
     $label = $suspended ? ' suspended' : '';
-    foreach ([[$user.'.'.$subdomainBase, 'public'.$prefix.'Template', '', 'public'.$label.' subdomain config'], [$hashHost, 'private'.$prefix.'Template', '-hash', 'private'.$label.' subdomain config']] as $target) {
+    // Public vhost also answers the user's stable mcx.fi hostname (which resolves
+    // via the mcx.fi zone builder), serving the same www/public content.
+    $publicHost = $user.'.'.$subdomainBase.($mcxHost !== null && $mcxHost !== '' ? ' '.$mcxHost : '');
+    foreach ([[$publicHost, 'public'.$prefix.'Template', '', 'public'.$label.' subdomain config'], [$hashHost, 'private'.$prefix.'Template', '-hash', 'private'.$label.' subdomain config']] as $target) {
         if ($target[0] === null) {
             continue;
         }
@@ -149,12 +152,14 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     $subdomainEnabled = $ctx['subdomainEnabled'] ?? false;
     $subdomainBase = (string)($ctx['subdomainBase'] ?? '');
     $hashHost = null;
+    $mcxHost = null;
 
     if ($subdomainEnabled) {
         $billingServiceId = pmssNginxUserBillingServiceIdFromHome($homeDir);
-        $hashHost = $billingServiceId !== null
-            ? pmssNginxUserHashHostname($thisUser, $billingServiceId, $subdomainBase)
-            : null;
+        if ($billingServiceId !== null) {
+            $hashHost = pmssNginxUserHashHostname($thisUser, $billingServiceId, $subdomainBase);
+            $mcxHost = pmssNginxUserMcxHostname($billingServiceId);
+        }
     }
 
     // When a user is suspended, nginx should serve a static suspended page
@@ -168,7 +173,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
             }
             return;
         }
-        if ($subdomainEnabled && !pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, true)) return;
+        if ($subdomainEnabled && !pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, true, null, $mcxHost)) return;
         $userConfig = str_replace('##username', $thisUser, $suspendedTemplate);
         if (!pmssCreateNginxConfigWriteFile("/etc/nginx/users/{$thisUser}", $userConfig, $thisUser, 'user suspended config')) return;
         pmssCreateNginxConfigUserLog($thisUser, 'nginx config regenerated (suspended template)');
@@ -191,7 +196,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
         return;
     }
 
-    if ($subdomainEnabled && !pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, false, $serverPort)) return;
+    if ($subdomainEnabled && !pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, false, $serverPort, $mcxHost)) return;
 
     if ($userTemplate === false || $userTemplate === '') return;
 

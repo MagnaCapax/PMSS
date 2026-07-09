@@ -36,3 +36,16 @@ function pmssNginxUserHashHostname(string $username, string $billingServiceId, s
 {
     return hash('sha256', $username.'.'.$billingServiceId.'.'.$hostname).'.'.$hostname;
 }
+
+/**
+ * Stable mcx.fi service hostname for a user's billing service id.
+ *
+ * Mirrors the mcx.fi DNS builder VERBATIM (web4 remote/mcxData-api.php:
+ * substr(sha256("mcx.fi:service:".serviceid),0,16)) so the name this server
+ * serves by Host matches the A record the builder already publishes in the
+ * mcx.fi zone. Public sha256-cut-16, no secret (operator-chosen, customer-computable).
+ */
+function pmssNginxUserMcxHostname(string $billingServiceId): string
+{
+    return substr(hash('sha256', 'mcx.fi:service:'.$billingServiceId), 0, 16).'.mcx.fi';
+}
