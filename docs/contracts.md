@@ -489,7 +489,6 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/configureLighttpd.php [<user>]
   - Behavior: Renders per-user lighttpd vhost/fastcgi config from templates. With a username, targets only that user; otherwise (no args) refreshes all.
-  - Customer stable-host docroot: reads `/home/<user>/www/.mcx-docroot` as one safe subdirectory under `~/www`, defaulting to `public` when absent/invalid/unsafe; renders only that selected directory behind the internal `/_pmss-customer-host-docroot/` lighttpd alias.
   - 503 pages: rendered lighttpd configs use the customer-tree `~/www/error-503.html` static page so app proxies that are enabled but still starting return a styled retry page instead of lighttpd's raw default.
   - PMSS-managed proxy fragments: always refreshes the qBittorrent and rclone proxies; when `/home/<user>/.invidiousPort` contains a valid port, also publishes `/public-<user>/invidious/` and `/user-<user>/apps/invidious/` through the user's lighttpd.
   - PMSS-managed lighttpd proxy fragments enable `proxy.header` upgrade forwarding so WebSocket-capable apps can complete HTTP upgrade handshakes through the per-user proxy.
@@ -506,9 +505,6 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/createNginxConfig.php
   - Behavior: Regenerates nginx global and per-user config from templates; adds per-user subdomain vhosts under `/etc/nginx/conf.d/pmss-user-*.conf` when `/etc/hostname` is a valid FQDN.
-  - Customer stable-host serving: when the pulsedmedia.com remote API exposes a per-server hostname-to-local-user slice, writes HTTP-only vhosts under `/etc/nginx/conf.d/pmss-customer-host-<user>.conf`; each vhost proxies any mapped external hostname to the user's per-user lighttpd `/_pmss-customer-host-docroot/` alias. The consumer is stubbed until that endpoint slice exists and does not delete existing customer-host configs while the map is unavailable.
-  - mcx.fi default: writes `/etc/nginx/conf.d/pmss-mcx-fi-unmatched.conf` so unmatched `*.mcx.fi` HTTP hosts return 404 instead of falling through to `/var/www`.
-  - Phase 1 note: remaining work is the pulsedmedia.com per-server slice contract, Phase 2 per-host TLS issuance (no wildcard certificates), and the separate memorable service hostname form.
   - Public proxy contract: `/public-<user>/` forwards the original scheme via `X-Forwarded-Proto` and only restores generic lighttpd redirects back under `/public-<user>/`; per-app media-stack Location rewriting stays in the user's `~/.lighttpd/custom.d/media-stack.conf` fragment, while Set-Cookie Path rewriting stays in nginx `proxy_cookie_path` rules because lighttpd `map-urlpath` does not rewrite `Set-Cookie`.
   - Subdomains: `USERNAME.<host>` proxies to `/public-<user>/`; SHA256 host (`sha256(username.billingServiceId.hostname).<host>`) proxies to `/user-<user>/` with HTTP→HTTPS redirect; hash vhost reads `.billingServiceId` with `.billingId` legacy fallback and is skipped when neither file has a valid value.
   - 502 pages: private user proxies route upstream failures to `/error-502-<user>.html`, which falls back to the shared `/error-502.html`; the lighttpd watchdog refreshes those per-user files under `/var/www` while the stack is unhealthy.

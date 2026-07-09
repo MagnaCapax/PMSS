@@ -14,7 +14,6 @@ server.modules              = (
 )
 #See https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ConfigurationOptions
 server.port = ##serverPort
-# PMSS customer host docroot: ##customerHostDocrootSubdir
 server.document-root       = "/home/##username/www/public/"
 server.upload-dirs = ( "/home/##username/.lighttpd/upload" )
 server.errorlog            = "/home/##username/.lighttpd/error.log"
@@ -81,8 +80,7 @@ alias.url += (
  "/user-##username/" => "/home/##username/www/",
  "/webdav-##username/" => "/home/##username/",
  "/public-##username/" => "/home/##username/www/public/",
- "/public/" => "/home/##username/www/public/",
- "/_pmss-customer-host-docroot/" => "/home/##username/www/##customerHostDocrootSubdir/"
+ "/public/" => "/home/##username/www/public/"
 )
 
 # PMSS_WEBDAV_BEGIN

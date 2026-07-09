@@ -6,7 +6,6 @@
  */
 
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
-require_once __DIR__.'/customerHostConfigs.php';
 
 /**
  * Write an explicit warning when nginx config generation skips a user.
@@ -150,8 +149,6 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     $subdomainEnabled = $ctx['subdomainEnabled'] ?? false;
     $subdomainBase = (string)($ctx['subdomainBase'] ?? '');
     $hashHost = null;
-    $customerHostsByUser = is_array($ctx['customerHostsByUser'] ?? null) ? $ctx['customerHostsByUser'] : [];
-    $customerHostnames = is_array($customerHostsByUser[$thisUser] ?? null) ? $customerHostsByUser[$thisUser] : [];
 
     if ($subdomainEnabled) {
         $billingServiceId = pmssNginxUserBillingServiceIdFromHome($homeDir);
@@ -172,7 +169,6 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
             return;
         }
         if ($subdomainEnabled && !pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, true)) return;
-        if (!pmssCreateNginxConfigWriteCustomerHostConfig($ctx, $thisUser, $customerHostnames, true)) return;
         $userConfig = str_replace('##username', $thisUser, $suspendedTemplate);
         if (!pmssCreateNginxConfigWriteFile("/etc/nginx/users/{$thisUser}", $userConfig, $thisUser, 'user suspended config')) return;
         pmssCreateNginxConfigUserLog($thisUser, 'nginx config regenerated (suspended template)');
@@ -196,11 +192,6 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     }
 
     if ($subdomainEnabled && !pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, false, $serverPort)) return;
-    if ($customerHostnames !== []) {
-        $docrootSubdir = pmssUserCustomerHostDocrootSubdirRead($homeDir);
-        pmssCreateNginxConfigRefreshLighttpdDocrootIfStale($thisUser, $homeDir, $docrootSubdir);
-        if (!pmssCreateNginxConfigWriteCustomerHostConfig($ctx, $thisUser, $customerHostnames, false, $serverPort, $docrootSubdir)) return;
-    }
 
     if ($userTemplate === false || $userTemplate === '') return;
 

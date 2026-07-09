@@ -6,7 +6,6 @@
  */
 
 require_once __DIR__.'/../user/identity.php';
-require_once __DIR__.'/../user/customerHostDocroot.php';
 require_once __DIR__.'/userFileWrite.php';
 
 function pmssClampLighttpdBandwidthLimits(string $config): string
@@ -60,12 +59,11 @@ function pmssLighttpdRenderUserConfig(
     int $serverPort,
     int $rclonePort,
     int $qbittorrentPort,
-    array $resources,
-    string $customerHostDocrootSubdir = PMSS_CUSTOMER_HOST_DOCROOT_DEFAULT
+    array $resources
 ): string {
     $config = str_replace(
-        ["##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##customerHostDocrootSubdir", "##PMSS_WEBDAV_WWW_POLICY##"],
-        [$user, $serverPort, $rclonePort, $qbittorrentPort, $customerHostDocrootSubdir, pmssWebdavWwwPolicyBlock($user)],
+        ["##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##"],
+        [$user, $serverPort, $rclonePort, $qbittorrentPort, pmssWebdavWwwPolicyBlock($user)],
         (string) $template
     );
     $config = preg_replace(

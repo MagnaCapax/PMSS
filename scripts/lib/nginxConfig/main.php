@@ -77,8 +77,6 @@ function pmssCreateNginxConfigMain(array $argv): int
     // Disallow config reading by anyone else.
     pmssCreateNginxConfigChmodGlob(0640, '/etc/nginx/users/*');
     pmssCreateNginxConfigChmodGlob(0640, $subdomainConfigDir.'/pmss-user-*.conf');
-    pmssCreateNginxConfigChmodGlob(0640, $subdomainConfigDir.'/pmss-customer-host-*.conf');
-    pmssCreateNginxConfigChmodGlob(0640, $subdomainConfigDir.'/pmss-mcx-fi-*.conf');
     pmssCreateNginxConfigChmodGlob(0640, '/etc/nginx/*.conf');
 
     return pmssCreateNginxConfigTestAndMaybeRestart($restartNginx);
