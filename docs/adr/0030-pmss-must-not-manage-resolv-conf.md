@@ -1,4 +1,4 @@
-# ADR 0023: PMSS must not manage /etc/resolv.conf
+# ADR 0030: PMSS must not manage /etc/resolv.conf
 
 Date: 2026-06-26
 Category: architecture

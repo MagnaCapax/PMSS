@@ -24,7 +24,7 @@ check_no_readme_adr_links
 check_adr_metadata() {
 	local adr_dir="$ROOT_DIR/docs/adr"
 	[[ -d "$adr_dir" ]] || return 0
-	local f title rest words chars cat
+	local f title rest words chars cat expected_number title_number
 	while IFS= read -r -d '' f; do
 		# H1 must be first matching line starting with '# ADR NNNN:'
 		title=$(grep -m1 -E '^# ADR [0-9]{4}:' "$f" || true)
@@ -32,6 +32,14 @@ check_adr_metadata() {
 			echo "doctrine lint: ADR missing H1 with number: $f" >&2
 			FAIL=$((FAIL + 1))
 			continue
+		fi
+		# ADR citations use this number as identity; filename and H1 must agree.
+		expected_number=$(basename "$f" | sed -E 's/^([0-9]{4})-.*/\1/')
+		title_number=$(printf '%s\n' "$title" | sed -E 's/^# ADR ([0-9]{4}):.*/\1/')
+		if [[ "$title_number" != "$expected_number" ]]; then
+			echo "doctrine lint: ADR filename/H1 number mismatch: $f" >&2
+			echo "  -> filename $expected_number, H1 $title_number" >&2
+			FAIL=$((FAIL + 1))
 		fi
 		# Extract text after colon and trim
 		rest="${title#*:}"
@@ -68,6 +76,22 @@ check_adr_metadata() {
 }
 
 check_adr_metadata
+
+check_adr_unique_numbers() {
+	local adr_dir="$ROOT_DIR/docs/adr"
+	[[ -d "$adr_dir" ]] || return 0
+	local duplicates number
+	duplicates=$(find "$adr_dir" -maxdepth 1 -type f -name "[0-9][0-9][0-9][0-9]-*.md" -print |
+		sed -E 's#.*/([0-9]{4})-[^/]*$#\1#' | sort | uniq -d)
+	while IFS= read -r number; do
+		[[ -n "$number" ]] || continue
+		echo "doctrine lint: duplicate ADR number $number:" >&2
+		find "$adr_dir" -maxdepth 1 -type f -name "$number-*.md" -print | sort >&2
+		FAIL=$((FAIL + 1))
+	done <<<"$duplicates"
+}
+
+check_adr_unique_numbers
 
 # 3) Guardrail: forbid index docs (directory listings suffice)
 check_no_docs_index_files() {

@@ -4,13 +4,13 @@ Date: 2026-07-09
 Category: architecture
 
 ## Status
-Accepted (2026-07-09). Generalizes ADR 0023 (PMSS must not manage `/etc/resolv.conf`) from
+Accepted (2026-07-09). Generalizes ADR 0030 (PMSS must not manage `/etc/resolv.conf`) from
 the single resolv.conf case to the whole class of server/location/network-specific
-configuration. ADR 0023 remains the canonical worked example of this rule.
+configuration. ADR 0030 remains the canonical worked example of this rule.
 
 ## Context
 PMSS is a **portable Debian overlay** that can run on ANY host, including third-party /
-rented servers that are NOT on Pulsed Media's network. ADR 0023 established, for
+rented servers that are NOT on Pulsed Media's network. ADR 0030 established, for
 `/etc/resolv.conf` specifically, that PMSS must not bake in PM-network resolver IPs: a PMSS
 install on a non-PM host would have its DNS continually rewritten toward unreachable
 resolvers, breaking the box.
@@ -53,9 +53,9 @@ PMSS install on a rented box on a third-party network?"* If yes → wrong layer,
 - Audit for and removal of any existing instances is tracked in GH #703.
 
 ## Origin
-- Generalizes ADR 0023 (2026-06-26, resolv.conf case).
+- Generalizes ADR 0030 (2026-06-26, resolv.conf case).
 - Operator directive 2026-07-09.
 
 ## References
-- ADR 0023: PMSS must not manage /etc/resolv.conf
+- ADR 0030: PMSS must not manage /etc/resolv.conf
 - GH #703
