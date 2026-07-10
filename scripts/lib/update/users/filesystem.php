@@ -8,6 +8,7 @@
  * @author PMSS Team
  */
 require_once dirname(__DIR__, 2).'/pathSafety.php';
+require_once dirname(__DIR__, 2).'/user/trafficLimit.php';
 
 /**
  * Confirm that a user maintenance path resolves beneath the configured home root.
@@ -129,6 +130,14 @@ function pmssUserRefreshPanelIndexForFrameDataCompat(array $ctx): void
 function pmssUserApplySkeletonFiles(array $ctx): void
 {
     $user = $ctx['user'];
+    pmssTrafficLimitHomeArtifactReconcile(
+        $user,
+        dirname(rtrim((string) $ctx['home'], '/')),
+        null,
+        static function (string $message) use ($user): void {
+            logMessage("[user:{$user}] {$message}");
+        }
+    );
     pmssUserRefreshPanelIndexForFrameDataCompat($ctx);
 
     $legacyDownloadHeaderBlock = <<<'PHP'

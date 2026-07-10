@@ -131,6 +131,64 @@ PHP;
         ]);
     }
 
+    public function testHomeArtifactReconcileRestoresMissingTrafficLimitFromRuntime(): void
+    {
+        $homeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-home-');
+        $runtimeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-runtime-');
+        @mkdir($homeRoot.'/alice', 0755, true);
+        @mkdir($runtimeRoot.'/trafficLimits', 0700, true);
+        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/alice', "750GiB\n");
+        $logs = array();
+
+        $this->assertTrue(\pmssTrafficLimitHomeArtifactReconcile(
+            'alice',
+            $homeRoot,
+            $runtimeRoot,
+            static function (string $message) use (&$logs): void {
+                $logs[] = $message;
+            }
+        ));
+
+        $this->assertSame('750', trim((string) @file_get_contents($homeRoot.'/alice/.trafficLimit')));
+        $this->assertSame(0664, @fileperms($homeRoot.'/alice/.trafficLimit') & 0777);
+        $this->assertSame(array('traffic limit home artifact reconciled from runtime limit'), $logs);
+    }
+
+    public function testHomeArtifactReconcileDoesNotOverwriteExistingTrafficLimit(): void
+    {
+        $homeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-home-');
+        $runtimeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-runtime-');
+        @mkdir($homeRoot.'/alice', 0755, true);
+        @mkdir($runtimeRoot.'/trafficLimits', 0700, true);
+        $this->pmssWriteFile($homeRoot.'/alice/.trafficLimit', "25\n");
+        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/alice', "750\n");
+
+        $this->assertTrue(\pmssTrafficLimitHomeArtifactReconcile('alice', $homeRoot, $runtimeRoot));
+        $this->assertSame('25', trim((string) @file_get_contents($homeRoot.'/alice/.trafficLimit')));
+    }
+
+    public function testHomeArtifactReconcileRejectsInvalidRuntimeTrafficLimit(): void
+    {
+        $homeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-home-');
+        $runtimeRoot = $this->pmssMakeTempDir('pmss-traffic-reconcile-runtime-');
+        @mkdir($homeRoot.'/alice', 0755, true);
+        @mkdir($runtimeRoot.'/trafficLimits', 0700, true);
+        $this->pmssWriteFile($runtimeRoot.'/trafficLimits/alice', "-1\n");
+        $logs = array();
+
+        $this->assertFalse(\pmssTrafficLimitHomeArtifactReconcile(
+            'alice',
+            $homeRoot,
+            $runtimeRoot,
+            static function (string $message) use (&$logs): void {
+                $logs[] = $message;
+            }
+        ));
+
+        $this->assertFalse(file_exists($homeRoot.'/alice/.trafficLimit'));
+        $this->assertSame(array('traffic limit home artifact skipped: invalid runtime limit (invalid format)'), $logs);
+    }
+
     /** @return array<string,array<string,string>> */
     private function gibSettingDefinitions(): array
     {

@@ -405,6 +405,52 @@ function pmssTrafficLimitCliPrepareTargetModes(array $targetModes): bool
         && pmssTrafficLimitEnsureStorageDir(dirname($runtimePath));
 }
 
+/**
+ * Recreate the customer-visible home limit file from the root-side runtime file.
+ */
+function pmssTrafficLimitHomeArtifactReconcile(
+    string $userName,
+    ?string $homeDir = null,
+    ?string $runtimeDir = null,
+    ?callable $logger = null
+): bool {
+    $log = $logger ?: function (string $_message): void { };
+    $normalized = pmssTrafficLimitCliUsernameNormalize($userName);
+    if ($normalized === null || $normalized !== $userName) {
+        $log('traffic limit home artifact skipped: invalid username');
+        return false;
+    }
+
+    $homeLimitPath = pmssIntegerSettingUserHomePath($userName, '.trafficLimit', $homeDir);
+    $runtimeLimitPath = pmssIntegerSettingRuntimeUserPath('trafficLimits', $userName, $runtimeDir);
+    if (is_file($homeLimitPath) && !is_link($homeLimitPath)) {
+        return true;
+    }
+    if (file_exists($homeLimitPath) || is_link($homeLimitPath)) {
+        $log('traffic limit home artifact skipped: unsafe existing .trafficLimit target');
+        return false;
+    }
+    if (!pmssRegularFilePathIsReadable($runtimeLimitPath)) {
+        return true;
+    }
+
+    $raw = pmssReadRegularFileTrimmed($runtimeLimitPath);
+    $error = null;
+    $limitGiB = pmssTrafficLimitParseGiB($raw, $error);
+    if ($limitGiB === null) {
+        $log('traffic limit home artifact skipped: invalid runtime limit ('.($error ?: 'invalid').')');
+        return false;
+    }
+    if (!pmssTrafficLimitWriteGiBFile($homeLimitPath, $limitGiB)
+        || !pmssTrafficLimitConvergeFileMode($homeLimitPath, 0664)) {
+        $log('traffic limit home artifact reconciliation failed');
+        return false;
+    }
+
+    $log('traffic limit home artifact reconciled from runtime limit');
+    return true;
+}
+
 function pmssUserTrafficLimitCli(array $argv, ?string $usage = null): int
 {
     if (!is_string($usage) || $usage === '') {

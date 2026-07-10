@@ -383,24 +383,22 @@ if (file_exists('openvpn-config.tgz')) {
                         <?php
                         echo quotaCreateSection($quotaInfo, $bonusQuota);
 
-                        if (@file_exists('../.trafficLimit')) {
-                            $trafficLimit = (int) $trafficLimitState['limitGiB'];
-                            $trafficData = pmssWelcomeSerializedArrayRead('../.trafficData');
-                            if ($trafficData !== null) {
-                                trafficCreateSection($trafficData, $trafficLimit, pmssWelcomeSerializedArrayRead('../.trafficDataIngress'), $bonusTraffic, $trafficBandwidthState, $billingServiceId);
-                            } else {
-                                if ($trafficLimit > 0) {
-                                    $effectiveLimit = (int) $trafficLimitState['effectiveLimitGiB'];
-                                    $trafficLimitText = number_format($effectiveLimit) . ' GiB';
-                                    if ($bonusTraffic > 0) {
-                                        $trafficLimitText .= ' (Bonus traffic: ' . number_format($bonusTraffic) . ' GiB)';
-                                    }
-                                } else {
-                                    $trafficLimitText = 'Unlimited';
+                        $trafficLimit = (int) $trafficLimitState['limitGiB'];
+                        $trafficData = pmssWelcomeSerializedArrayRead('../.trafficData');
+                        if ($trafficData !== null) {
+                            trafficCreateSection($trafficData, $trafficLimit, pmssWelcomeSerializedArrayRead('../.trafficDataIngress'), $bonusTraffic, $trafficBandwidthState, $billingServiceId);
+                        } elseif (@file_exists('../.trafficLimit')) {
+                            if ($trafficLimit > 0) {
+                                $effectiveLimit = (int) $trafficLimitState['effectiveLimitGiB'];
+                                $trafficLimitText = number_format($effectiveLimit) . ' GiB';
+                                if ($bonusTraffic > 0) {
+                                    $trafficLimitText .= ' (Bonus traffic: ' . number_format($bonusTraffic) . ' GiB)';
                                 }
-                                echo "Traffic limit: {$trafficLimitText}<br />";
-                                echo pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId).'<br />';
+                            } else {
+                                $trafficLimitText = 'Unlimited';
                             }
+                            echo "Traffic limit: {$trafficLimitText}<br />";
+                            echo pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId).'<br />';
                         }
 
                         echo pmssWelcomeMemorySectionHtmlBuild();

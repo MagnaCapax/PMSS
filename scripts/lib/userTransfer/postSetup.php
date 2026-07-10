@@ -10,6 +10,7 @@ require_once __DIR__.'/completenessVerify.php';
 require_once __DIR__.'/localUserSafety.php';
 require_once __DIR__.'/qbittorrentCategories.php';
 require_once __DIR__.'/sessionRewrite.php';
+require_once dirname(__DIR__).'/user/trafficLimit.php';
 require_once dirname(__DIR__).'/rtorrent/scgi.php';
 
 function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths): void
@@ -31,6 +32,7 @@ function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths
         $scratchPaths['qbittorrentConfig'],
         $scratchPaths['qbittorrentCategories']
     );
+    pmssTrafficLimitHomeArtifactReconcile($localUser, dirname(rtrim($home, '/')), null, 'logMessage');
 
     runStep(
         'Normalising user permissions',

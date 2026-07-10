@@ -46,6 +46,37 @@ class CustomerPanelRenderHarnessTest extends TestCase
         }
     }
 
+    public function testWelcomeTrafficUsageRendersWhenLimitFileIsMissing(): void
+    {
+        $this->pmssLoadCustomerPanelRenderHarness();
+        $runRoot = \pmssCustomerPanelRenderTempRoot();
+        $homeRoot = $runRoot.'/home';
+        $home = $homeRoot.'/renderuser';
+        $www = $home.'/www';
+        $bootstrap = $runRoot.'/php-cli-bootstrap.php';
+
+        try {
+            $setup = \pmssCustomerPanelRenderPrepare($this->pmssRepoPath('etc/skel/www'), $home, $www, $bootstrap);
+            $this->assertTrue($setup['ok'], $setup['error']);
+            @unlink($home.'/.trafficLimit');
+
+            $result = \pmssCustomerPanelRenderPage(
+                $www,
+                $bootstrap,
+                $homeRoot,
+                $home,
+                'welcome.php',
+                ['minBytes' => 1024, 'markers' => ['Traffic Info']]
+            );
+
+            $this->assertEquals(array(), $result['errors'], implode('; ', $result['errors']));
+            $this->assertStringContainsString('Traffic used (30 days): 15 GiB', $result['stdout']);
+            $this->assertStringContainsString('Traffic limit: Unlimited', $result['stdout']);
+        } finally {
+            \pmssCustomerPanelRenderCleanup($runRoot);
+        }
+    }
+
     public function testReportsUndefinedFunctionFatalFromFixture(): void
     {
         $root = $this->pmssMakeTempDir('pmss-render-fixture-', 0700);
