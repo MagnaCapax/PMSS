@@ -26,8 +26,8 @@ class ErrorPageTemplateTest extends TestCase
     {
         foreach ([
             ['var/www/error-401.html', '/401_images/401-', 3, true],
-            ['var/www/error-403.html', '/404_images/404-', 22, false],
-            ['var/www/error-404.html', '/404_images/404-', 22, true],
+            ['var/www/error-403.html', '/404_images/404-', 32, false],
+            ['var/www/error-404.html', '/404_images/404-', 32, true],
             ['var/www/error-502.html', '/502_images/502-', 13, true],
         ] as [$path, $prefix, $count, $hasHomeLink]) {
             $contents = $this->assertErrorPageImagePool($path, $prefix, $count);
