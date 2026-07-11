@@ -75,8 +75,12 @@ if (!$running) {
         .' -t fontSize=15'
         .' '.$shellCmd;
 
-    // Fully detach so ttyd outlives this php-cgi request.
-    @exec('setsid sh -c '.escapeshellarg($cmd.' </dev/null >/dev/null 2>&1').' >/dev/null 2>&1 &');
+    // Start the shell in the customer's HOME. The per-user lighttpd (and its
+    // php-cgi children) inherit cwd=/root from the root cron that starts them,
+    // so without this cd the console opens in an inaccessible /root. Fully
+    // detach so ttyd outlives this php-cgi request.
+    $spawn = 'cd '.escapeshellarg($home).' 2>/dev/null; '.$cmd.' </dev/null >/dev/null 2>&1';
+    @exec('setsid sh -c '.escapeshellarg($spawn).' >/dev/null 2>&1 &');
 
     // Give ttyd a moment to create the socket before the iframe hits the proxy.
     for ($i = 0; $i < 100 && !file_exists($sock); $i++) {
