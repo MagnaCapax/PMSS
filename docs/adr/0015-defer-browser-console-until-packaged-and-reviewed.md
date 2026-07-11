@@ -4,7 +4,11 @@ Date: 2026-04-02
 Category: architecture
 
 ## Status
-Accepted
+Superseded by ADR 0031 (2026-07-11). The five deferral prerequisites are met by
+ADR 0031: ttyd is provisioned via the pinned-checksum installer path (the
+supported mechanism used by rclone/syncthing/filebot, not an ad-hoc download),
+proxied inside per-user lighttpd over a loopback UNIX socket, security-reviewed,
+and covered by hermetic tests. The original context below is retained as record.
 
 ## Context
 Issue #326 requests an HTML5 browser console so tenants can open an interactive

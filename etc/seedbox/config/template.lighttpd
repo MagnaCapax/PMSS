@@ -112,6 +112,17 @@ $HTTP["url"] =~ "^/user-##username/rutorrent/" {
     )
 }
 
+# GH #326 browser console (ADR 0031). Reverse-proxy /user-<user>/console/ to the
+# on-demand ttyd instance that the per-user www/console.php launcher binds to a
+# private loopback UNIX socket. mod_proxy performs the WebSocket 101 upgrade over
+# the socket (no mod_wstunnel, no new module). This block sits inside the
+# htpasswd-protected /user-##username/ area, so the existing panel login already
+# gates access; ttyd never binds a TCP port and never runs as root.
+$HTTP["url"] =~ "^/user-##username/console/" {
+    proxy.server = ( "" => (( "socket" => "/home/##username/.lighttpd/console.sock" )) )
+    proxy.header = ( "upgrade" => "enable" )
+}
+
 $HTTP["url"] =~ "^/owncloud($|/)" {
         dir-listing.activate = "disable"
 }
