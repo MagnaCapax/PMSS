@@ -80,4 +80,14 @@ class BrowserConsoleArtifactsTest extends TestCase
         // Must not have removed the existing stats include.
         $this->assertStringContainsString('stats.php', $src);
     }
+
+    public function testConsolePhpRegisteredForExistingUserDistribution(): void
+    {
+        // Regression guard (2026-07-11): a NEW skel www file reaches EXISTING users
+        // only if it is listed in pmssUserApplySkeletonFiles()'s distribution
+        // allowlist. Without this, the info.php "Open console" button 404s for every
+        // current customer (caught on first fleet deploy to arkstream).
+        $src = $this->repoFile('scripts/lib/update/users/filesystem.php');
+        $this->assertStringContainsString("'www/console.php'", $src);
+    }
 }

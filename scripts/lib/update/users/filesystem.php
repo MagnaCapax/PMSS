@@ -162,6 +162,7 @@ PHP;
         '.scriptsInc.php',
         '.lighttpd/php.ini',
         'radarr-sonarr.txt',
+        'www/console.php',
         'www/deluge.php',
         'www/error-503.html',
         'www/filemanager.php',
