@@ -93,6 +93,18 @@ class BrowserConsoleArtifactsTest extends TestCase
         );
     }
 
+    public function testConsoleBlockDoesNotReusePortfolioFlexContainer(): void
+    {
+        $src = $this->repoFile('etc/skel/www/info.php');
+        // The info page already has an outer .portfoliobox flex row for stats.
+        // The console block must stay a plain block so its heading/body/buttons stack.
+        $this->assertStringContainsString('id="pmss-console"', $src);
+        $this->assertFalse(
+            (bool) preg_match('/<div\b(?=[^>]*\bid="pmss-console")(?=[^>]*\bclass="[^"]*\bportfoliobox\b[^"]*")/i', $src),
+            'info.php console block must not reuse .portfoliobox flex layout'
+        );
+    }
+
     public function testConsolePhpRegisteredForExistingUserDistribution(): void
     {
         // Regression guard (2026-07-11): a NEW skel www file reaches EXISTING users
