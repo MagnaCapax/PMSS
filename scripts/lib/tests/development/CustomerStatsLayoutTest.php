@@ -47,6 +47,8 @@ final class CustomerStatsLayoutTest extends TestCase
         $this->pmssAssertRepoFileContractCases(array(
             'etc/skel/www/stats.php' => array(
                 'required' => array(
+                    '$pmssStatsRequiredHelpers',
+                    'Stats unavailable: missing local panel helper',
                     "require_once __DIR__.'/scriptsInc.php';",
                     "require_once __DIR__.'/statsHelpers.php';",
                     'pmssStatsRenderResourceBlocks($resourceState);',
@@ -60,6 +62,31 @@ final class CustomerStatsLayoutTest extends TestCase
                 'function pmssStatsRenderResourceBlocks(',
             )),
         ));
+    }
+
+    public function testStatsPageFailsSoftWhenBundledHelperIsMissing(): void
+    {
+        $this->pmssLoadCustomerPanelRenderHarness();
+        $runRoot = \pmssCustomerPanelRenderTempRoot();
+        $homeRoot = $runRoot.'/home';
+        $home = $homeRoot.'/renderuser';
+        $www = $home.'/www';
+        $bootstrap = $runRoot.'/php-cli-bootstrap.php';
+
+        try {
+            $setup = \pmssCustomerPanelRenderPrepare($this->pmssRepoPath('etc/skel/www'), $home, $www, $bootstrap);
+            $this->assertTrue($setup['ok'], $setup['error']);
+            $this->assertTrue(@unlink($www.'/statsHelpers.php'), 'Expected stats helper fixture removal to succeed.');
+
+            foreach (array('stats.php', 'info.php') as $page) {
+                $result = \pmssCustomerPanelRenderPage($www, $bootstrap, $homeRoot, $home, $page, array('minBytes' => 1, 'query' => ''));
+                $this->assertSame(array(), $result['errors'], implode('; ', $result['errors']));
+                $this->assertStringContainsString('Stats unavailable: missing local panel helper statsHelpers.php.', $result['stdout']);
+                $this->assertStringNotContainsString('Fatal error', $result['stdout'].$result['stderr']);
+            }
+        } finally {
+            \pmssCustomerPanelRenderCleanup($runRoot);
+        }
     }
 
     public function testTrafficUsageRendersRawOnlyTrafficSnapshots(): void

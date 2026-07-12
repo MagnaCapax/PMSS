@@ -6,6 +6,20 @@
  * Copyright (C) 2010-2025 Magna Capax Finland Oy
  * TODO: status hover logs and allowed restarts.
  */
+$pmssStatsRequiredHelpers = array('scriptsInc.php', 'statsHelpers.php');
+$pmssStatsMissingHelpers = array();
+foreach ($pmssStatsRequiredHelpers as $pmssStatsHelper) {
+    $pmssStatsHelperPath = __DIR__.'/'.$pmssStatsHelper;
+    if (!is_file($pmssStatsHelperPath) || is_link($pmssStatsHelperPath) || !is_readable($pmssStatsHelperPath)) {
+        $pmssStatsMissingHelpers[] = $pmssStatsHelper;
+    }
+}
+if ($pmssStatsMissingHelpers !== array()) {
+    echo '<pre>Stats unavailable: missing local panel helper '
+        .htmlspecialchars(implode(', ', $pmssStatsMissingHelpers), ENT_QUOTES, 'UTF-8')
+        .'.</pre>';
+    return;
+}
 require_once __DIR__.'/scriptsInc.php';
 require_once __DIR__.'/statsHelpers.php';
 
