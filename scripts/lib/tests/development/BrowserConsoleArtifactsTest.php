@@ -81,6 +81,18 @@ class BrowserConsoleArtifactsTest extends TestCase
         $this->assertStringContainsString('stats.php', $src);
     }
 
+    public function testConsoleButtonRequiresLocalBackendArtifact(): void
+    {
+        $src = $this->repoFile('etc/skel/www/info.php');
+        // guiv may heal info.php before console.php reaches the same user tree;
+        // hide the buttons unless their target exists in this customer directory.
+        $this->assertMatches(
+            '/is_file\(__DIR__\s*\.\s*[\'"]\/console\.php[\'"]\)/',
+            $src,
+            'info.php must hide console buttons when console.php is not deployed locally'
+        );
+    }
+
     public function testConsolePhpRegisteredForExistingUserDistribution(): void
     {
         // Regression guard (2026-07-11): a NEW skel www file reaches EXISTING users

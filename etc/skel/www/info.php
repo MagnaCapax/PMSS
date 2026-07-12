@@ -90,13 +90,15 @@ if (file_exists($pmssStorageHealthNoticeLib)) {
  ?>
 </div>
 
-<!-- GH #326 browser console (ADR 0031): additive; does not replace SSH/ruTorrent/file access. -->
-<div class="portfoliobox" id="pmss-console" style="margin-top:16px">
-  <h2 style="margin:0 0 6px;font-size:1.1em">Shell console</h2>
-  <p style="margin:0 0 10px;color:#555">Open a shell in your browser — no SSH client needed. Runs as your own account.</p>
-  <a href="console.php" target="_blank" rel="noopener" style="display:inline-block;padding:8px 14px;background:#2d6cdf;color:#fff;text-decoration:none;border-radius:4px">Open console</a>
-  <a href="console.php?mode=persist" target="_blank" rel="noopener" style="display:inline-block;padding:8px 14px;margin-left:6px;background:#3a3f4b;color:#fff;text-decoration:none;border-radius:4px">Persistent (tmux)</a>
-</div>
+<?php if (is_file(__DIR__ . '/console.php')): ?>
+	<!-- GH #326 browser console (ADR 0031): additive; does not replace SSH/ruTorrent/file access. -->
+	<div class="portfoliobox" id="pmss-console" style="margin-top:16px">
+	  <h2 style="margin:0 0 6px;font-size:1.1em">Shell console</h2>
+	  <p style="margin:0 0 10px;color:#555">Open a shell in your browser — no SSH client needed. Runs as your own account.</p>
+	  <a href="console.php" target="_blank" rel="noopener" style="display:inline-block;padding:8px 14px;background:#2d6cdf;color:#fff;text-decoration:none;border-radius:4px">Open console</a>
+	  <a href="console.php?mode=persist" target="_blank" rel="noopener" style="display:inline-block;padding:8px 14px;margin-left:6px;background:#3a3f4b;color:#fff;text-decoration:none;border-radius:4px">Persistent (tmux)</a>
+	</div>
+<?php endif; ?>
 
                 
                 
