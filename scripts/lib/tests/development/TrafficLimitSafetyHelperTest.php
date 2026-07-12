@@ -113,6 +113,31 @@ class TrafficLimitSafetyHelperTest extends TestCase
         $this->assertSame(null, $error);
     }
 
+    public function testThrottleOrphanReconcileRemovesHomeThrottleWhenMarkerMissing(): void
+    {
+        $homeRoot = $this->tempDir.'/home';
+        $home = $this->pmssEnsureDir($homeRoot.'/alice');
+        $enabledMarker = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
+        $this->pmssEnsureDir(dirname($enabledMarker), 0700);
+        file_put_contents($home.'/.throttle', '25');
+
+        $this->assertTrue(\pmssTrafficLimitThrottleOrphanReconcile('alice', 100, $enabledMarker, $homeRoot));
+        $this->assertFalse(file_exists($home.'/.throttle'));
+    }
+
+    public function testThrottleOrphanReconcileLeavesActiveThrottleWhenMarkerExists(): void
+    {
+        $homeRoot = $this->tempDir.'/home';
+        $home = $this->pmssEnsureDir($homeRoot.'/alice');
+        $enabledMarker = $this->tempDir.'/runtime/trafficLimits/alice.enabled';
+        $this->pmssEnsureDir(dirname($enabledMarker), 0700);
+        file_put_contents($enabledMarker, '1');
+        file_put_contents($home.'/.throttle', '25');
+
+        $this->assertTrue(\pmssTrafficLimitThrottleOrphanReconcile('alice', 100, $enabledMarker, $homeRoot));
+        $this->assertSame('25', trim((string) file_get_contents($home.'/.throttle')));
+    }
+
     public function testThrottleFileOperationsRejectSymlinkTargets(): void
     {
         foreach ([

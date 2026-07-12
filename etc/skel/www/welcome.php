@@ -510,25 +510,64 @@ function pmssWelcomeBillingServiceIdRead($primaryPath, $legacyPath) {
 /**
  * Resolve baseline and currently effective per-account bandwidth caps.
  *
- * @return array{defaultCapMbit:int,effectiveCapMbit:int,isReduced:bool,throttleFileExists:bool,throttleFileMtime:?int}
+ * @return array{defaultCapMbit:int,effectiveCapMbit:int,isReduced:bool,throttleFileExists:bool,throttleEnforced:bool,throttleFileMtime:?int}
  */
-function pmssWelcomeTrafficBandwidthStateBuild($throttlePath) {
+function pmssWelcomeTrafficBandwidthStateBuild($throttlePath, $enabledMarkerPath = null) {
     $defaultCapMbit = pmssWelcomeTrafficDefaultCapMbitRead();
     $effectiveCapMbit = $defaultCapMbit;
 
     $parsedCap = pmssCustomerPositiveIntegerFileRead($throttlePath);
-    if ($parsedCap !== null) {
+    $throttleEnforced = $parsedCap !== null && pmssWelcomeTrafficThrottleEnforced($throttlePath, $enabledMarkerPath);
+    if ($throttleEnforced) {
         $effectiveCapMbit = $parsedCap;
     }
 
-    $throttleFileMtime = $parsedCap !== null ? pmssWelcomeRegularFileMtimeRead($throttlePath) : null;
+    $throttleFileMtime = $throttleEnforced ? pmssWelcomeRegularFileMtimeRead($throttlePath) : null;
     return array(
         'defaultCapMbit' => $defaultCapMbit,
         'effectiveCapMbit' => $effectiveCapMbit,
         'isReduced' => $effectiveCapMbit < $defaultCapMbit,
         'throttleFileExists' => $parsedCap !== null,
+        'throttleEnforced' => $throttleEnforced,
         'throttleFileMtime' => $throttleFileMtime,
     );
+}
+
+/**
+ * Check the root-side runtime marker before trusting a persistent throttle cap.
+ */
+function pmssWelcomeTrafficThrottleEnforced($throttlePath, $enabledMarkerPath = null) {
+    if (!is_string($enabledMarkerPath) || $enabledMarkerPath === '') {
+        $enabledMarkerPath = pmssWelcomeTrafficThrottleMarkerPath($throttlePath);
+    }
+    if (!is_string($enabledMarkerPath) || $enabledMarkerPath === '') {
+        return false;
+    }
+
+    return is_file($enabledMarkerPath) && !is_link($enabledMarkerPath);
+}
+
+/**
+ * Resolve the traffic-limit runtime marker that FireQOS also treats as active.
+ */
+function pmssWelcomeTrafficThrottleMarkerPath($throttlePath) {
+    $homePath = is_string($throttlePath) && $throttlePath !== '' ? @realpath(dirname($throttlePath)) : false;
+    if (!is_string($homePath) || $homePath === '') {
+        return null;
+    }
+
+    $userName = basename($homePath);
+    if (!is_string($userName) || $userName === '' || !preg_match('/^[A-Za-z0-9._-]{1,64}$/D', $userName)) {
+        return null;
+    }
+
+    $stateDir = getenv('PMSS_TRAFFIC_LIMIT_STATE_DIR');
+    $stateDir = is_string($stateDir) && $stateDir !== '' ? rtrim($stateDir, '/') : '/var/run/pmss/trafficLimits';
+    if ($stateDir === '' || $stateDir[0] !== '/' || strpos($stateDir, "\0") !== false) {
+        $stateDir = '/var/run/pmss/trafficLimits';
+    }
+
+    return $stateDir.'/'.$userName.'.enabled';
 }
 
 /**

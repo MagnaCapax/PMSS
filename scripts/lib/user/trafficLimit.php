@@ -223,6 +223,36 @@ function pmssTrafficLimitThrottleApply(string $user, int $trafficCapMbit, bool $
     return true;
 }
 
+/**
+ * Check whether the per-user throttle cap exists as a safe regular file.
+ */
+function pmssTrafficLimitThrottleFileExists(string $user, string $homeRoot = '/home'): bool
+{
+    $throttleFile = pmssTrafficLimitThrottleFilePath($user, $homeRoot);
+    return $throttleFile !== null && is_file($throttleFile) && !is_link($throttleFile);
+}
+
+/**
+ * Remove stale persistent throttle state when the runtime enforcement marker is gone.
+ */
+function pmssTrafficLimitThrottleOrphanReconcile(
+    string $user,
+    int $trafficCapMbit,
+    string $enabledMarkerPath,
+    string $homeRoot = '/home'
+): bool {
+    if (!pmssTrafficLimitMarkerPathIsSafe($enabledMarkerPath)) {
+        pmssTrafficLimitLog($user, "traffic throttle marker path unsafe ({$enabledMarkerPath})");
+        return false;
+    }
+    if (file_exists($enabledMarkerPath) || is_link($enabledMarkerPath) || !pmssTrafficLimitThrottleFileExists($user, $homeRoot)) {
+        return true;
+    }
+
+    pmssTrafficLimitLog($user, 'orphaned traffic throttle file removed after runtime marker loss');
+    return pmssTrafficLimitThrottleApply($user, $trafficCapMbit, false, $homeRoot);
+}
+
 /** @param array<string,int> $targetModes */
 function pmssTrafficLimitPersistTargetModes(array $targetModes, int $value, ?string &$error = null): bool
 {

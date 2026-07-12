@@ -48,6 +48,10 @@ function pmssCustomerPanelRenderPage(string $www, string $bootstrap, string $hom
         'QUERY_STRING' => $query,
         'SERVER_NAME' => 'render.test',
     ];
+    $trafficLimitStateDir = getenv('PMSS_TRAFFIC_LIMIT_STATE_DIR');
+    if (is_string($trafficLimitStateDir) && $trafficLimitStateDir !== '') {
+        $env['PMSS_TRAFFIC_LIMIT_STATE_DIR'] = $trafficLimitStateDir;
+    }
 
     $command = escapeshellarg(PHP_BINARY)
         .' -d allow_url_fopen=0'

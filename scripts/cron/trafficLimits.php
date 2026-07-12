@@ -97,5 +97,7 @@ foreach($users AS $thisUser) {
 			pmssTrafficLimitThrottleApply($thisUser, $trafficCapMbit, false);
         }
 
+    } else {
+        pmssTrafficLimitThrottleOrphanReconcile($thisUser, $trafficCapMbit, $userTrafficLimitEnabledFile);
     }
 }
