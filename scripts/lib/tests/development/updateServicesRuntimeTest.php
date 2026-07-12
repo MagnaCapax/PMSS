@@ -16,6 +16,7 @@ class UpdateServicesRuntimeTest extends TestCase
             "\nCiphers +aes128-cbc,aes192-cbc,aes256-cbc,chacha20-poly1305@openssh.com\n",
             "\nKexAlgorithms +diffie-hellman-group-exchange-sha1,diffie-hellman-group14-sha1,diffie-hellman-group1-sha1\n",
             "\nMACs +hmac-sha1\n",
+            "\nPrintMotd no\n",
         ], $config);
     }
 

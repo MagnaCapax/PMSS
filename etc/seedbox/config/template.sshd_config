@@ -65,6 +65,7 @@ ChallengeResponseAuthentication no
 
 # PAM authentication support
 UsePAM yes
+PrintMotd no
 
 # X11 forwarding
 X11Forwarding yes
