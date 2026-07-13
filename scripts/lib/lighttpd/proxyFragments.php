@@ -48,6 +48,13 @@ function pmssLighttpdProxyRuleFragment(
     return $fragment.'}';
 }
 
+function pmssLighttpdProxyExactRedirectFragment(string $sourcePath, string $targetPath): string
+{
+    return '$HTTP["url"] == "'.$sourcePath."\" {\n"
+        .'  url.redirect = ( "" => "'.$targetPath."\" )\n"
+        .'}';
+}
+
 function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $port): string
 {
     $pathMap = static function (string $basePath): array {
@@ -62,7 +69,13 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
             ],
         ],
         'rclone' => ["# PMSS-managed: rclone reverse proxy.\n\n", [['^/user-'.$user.'/rclone/', [], true, false, true]]],
-        'qbittorrent' => ["# PMSS-managed: qBittorrent reverse proxy.\n\n", [['^/user-'.$user.'/qbittorrent($|/)', $pathMap('/user-'.$user.'/qbittorrent'), false, true]]],
+        'qbittorrent' => [
+            "# PMSS-managed: qBittorrent reverse proxy.\n\n",
+            [
+                ['redirect', '/user-'.$user.'/qbittorrent', '/user-'.$user.'/qbittorrent/'],
+                ['^/user-'.$user.'/qbittorrent/', ['/user-'.$user.'/qbittorrent/' => '/'], false, true],
+            ],
+        ],
         'invidious' => [
             "# PMSS-managed: Invidious reverse proxy.\n\n",
             [
@@ -77,6 +90,10 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
 
     $fragment = $definitions[$proxyName][0];
     foreach ($definitions[$proxyName][1] as $rule) {
+        if ($rule[0] === 'redirect') {
+            $fragment .= pmssLighttpdProxyExactRedirectFragment($rule[1], $rule[2])."\n\n";
+            continue;
+        }
         $fragment .= pmssLighttpdProxyRuleFragment($rule[0], $port, $rule[1], $rule[2], $rule[3], $rule[4] ?? false)."\n\n";
     }
 

@@ -7,6 +7,7 @@ server.modules              = (
         "mod_setenv",
         "mod_webdav",
         "mod_fastcgi",
+        "mod_redirect",
         "mod_proxy",
         # mod_deflate disabled (2025-11): single-tenant vhosts gain negligible benefit; revisit post-2028 and remove packages/config if still unused.
         #"mod_deflate",

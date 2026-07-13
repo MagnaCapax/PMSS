@@ -27,11 +27,16 @@ class LighttpdProxyFragmentsTest extends TestCase
         }
     }
 
+    public function testTemplateLoadsRedirectModuleForManagedProxyRedirects(): void
+    {
+        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/template.lighttpd', '"mod_redirect",');
+    }
+
     public function testManagedProxyFragmentsMatchCharacterization(): void
     {
         $expectedHashes = [
             'rclone' => '6d265ad8b338c69f39057129c0cd1a9a7bca09b3270ccea555168ceca96104de',
-            'qbittorrent' => 'c038e960403ce4e550e10c891ddac25bc13551113dc8fc182ad67e562523ace3',
+            'qbittorrent' => '21585cc7a5b993589046f2b529ed6e03a41fd70386f9d0512f9d7ed948c9009f',
             'invidious' => '168bb1b5e71c3ea4af59cf176a2181b00f425485dd504cb3ca088a8c73a178b4',
             'deluge' => '485c54359bd2220fe74b10ff06e371d4e5aea69b53130eab71d845cb8968c822',
         ];
@@ -64,11 +69,18 @@ class LighttpdProxyFragmentsTest extends TestCase
         }
     }
 
-    public function testQbittorrentFragmentMatchesBasePathWithoutTrailingSlash(): void
+    public function testQbittorrentFragmentRedirectsBasePathWithoutTrailingSlash(): void
     {
         $fragment = \pmssLighttpdManagedProxyFragment('qbittorrent', 'demo', 4002);
 
-        $this->assertStringContainsAllStrings(['$HTTP["url"] =~ "^/user-demo/qbittorrent($|/)" {', '"/user-demo/qbittorrent" => ""'], $fragment);
+        $this->assertStringContainsAllStrings([
+            '$HTTP["url"] == "/user-demo/qbittorrent" {',
+            'url.redirect = ( "" => "/user-demo/qbittorrent/" )',
+            '$HTTP["url"] =~ "^/user-demo/qbittorrent/" {',
+            '"/user-demo/qbittorrent/"  => "/"',
+        ], $fragment);
+        $this->assertStringNotContainsString('"/user-demo/qbittorrent" => ""', $fragment);
+        $this->assertStringNotContainsString('$HTTP["url"] =~ "^/user-demo/qbittorrent($|/)" {', $fragment);
     }
 
     public function testRcloneFragmentAddsZeroContentLengthOnlyForBodylessPosts(): void
