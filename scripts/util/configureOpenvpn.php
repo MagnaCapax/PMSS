@@ -14,6 +14,7 @@
  */
 
 require_once __DIR__.'/../lib/update/runtime/commands.php';
+require_once __DIR__.'/../lib/openvpn/certificates.php';
 // Shared runtime helpers are loaded directly above; package installation for
 // OpenVPN/EasyRSA remains owned by the central package phase.
 
@@ -38,15 +39,24 @@ $tplClient    = '/etc/seedbox/config/template.openvpn.client.config';
 $clientOvpn   = '/home/openvpn-'.$slug.'.ovpn';
 $clientCrt    = '/home/openvpn-'.$slug.'.crt';
 $bundleTgz    = '/etc/skel/www/openvpn-config.tgz';
+$serverCert   = $easyRsaDir.'/pki/issued/server.crt';
+$serverCertificateRenewalPlan = pmssOpenvpnServerCertificateRenewalPlan($serverCert);
+$serverCertificateRenewalNeeded = (bool) $serverCertificateRenewalPlan['renew'];
 
 // Fast-path using the same binary/config/artifact checks expected by systemTest.
 $alreadyConfigured = pmssCommandPath('openvpn') !== ''
     && is_file($serverConf)
-    && (is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt'))
+    && is_file($serverCert)
+    && !$serverCertificateRenewalNeeded
     && (!$clientArtifactsEnabled || (is_file($clientOvpn) && is_file($clientCrt) && is_file($bundleTgz)));
 if ($alreadyConfigured) {
     pmssLogStatus('SKIP', 'OpenVPN already configured; skipping provisioning', 0);
     return;
+}
+if ($serverCertificateRenewalNeeded) {
+    logmsg('[INFO] OpenVPN server certificate '.$serverCertificateRenewalPlan['reason'].'; renewal required');
+} elseif (in_array($serverCertificateRenewalPlan['reason'], ['invalid', 'unreadable', 'unsupported'], true)) {
+    logmsg('[WARN] OpenVPN server certificate expiry unavailable: '.$serverCertificateRenewalPlan['reason']);
 }
 
 // 1) Package presence (informational)
@@ -105,6 +115,27 @@ if (file_exists($easyRsaDir.'/easyrsa') && !file_exists($easyRsaDir.'/pki/ca.crt
         .'./easyrsa build-server-full server nopass; '
         .'./easyrsa gen-dh');
     runStep('Initializing EasyRSA PKI and server keys', $cmd);
+}
+
+// 5b) Renew the server leaf before OpenVPN restarts when the CA is still present.
+if ($serverCertificateRenewalNeeded && file_exists($easyRsaDir.'/easyrsa') && file_exists($easyRsaDir.'/pki/ca.crt')) {
+    $backupCommand = pmssOpenvpnPkiBackupCommand($easyRsaDir);
+    $renewCommand = pmssOpenvpnServerCertificateRenewCommand($easyRsaDir);
+    if ($backupCommand === '' || $renewCommand === '') {
+        logmsg('[WARN] OpenVPN server certificate renewal skipped because command construction failed');
+    } elseif (runStep('Backing up OpenVPN PKI before server certificate renewal', $backupCommand) === 0) {
+        $renewRc = runStep('Renewing OpenVPN server certificate', $renewCommand);
+        if ($renewRc === 0 && !pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+            $postRenewalPlan = pmssOpenvpnServerCertificateRenewalPlan($serverCert);
+            if ((bool) $postRenewalPlan['renew']) {
+                logmsg('[WARN] OpenVPN server certificate still requires renewal after EasyRSA run');
+            } elseif (is_int($postRenewalPlan['not_after'])) {
+                logmsg('[OK] OpenVPN server certificate renewed until '.gmdate('Y-m-d H:i:s\Z', $postRenewalPlan['not_after']));
+            }
+        }
+    } else {
+        logmsg('[WARN] OpenVPN server certificate renewal skipped because PKI backup failed');
+    }
 }
 
 // 6) Server configuration from template
