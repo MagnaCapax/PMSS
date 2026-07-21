@@ -581,6 +581,15 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Step classes: post-package orchestration can be classified as `must_succeed`, `soft_fail`, or `skip_if_missing`; `must_succeed` failures after package phase completion emit `step_failed` (`severity=error`) and abort phase 2. Unknown class strings fail closed as error-severity failures instead of silently downgrading policy.
   - Logrotate convergence: calls `pmssLogrotatePoliciesInstall()` to install and verify PMSS-managed policies for `/etc/logrotate.d/pmss-update` and `/etc/logrotate.d/rsyslog`; the rsyslog policy keeps OS logs daily with `maxsize 500M`.
 
+## Customer Bonus Display – `etc/skel/www/scriptsInc.php`
+
+- `pmssCustomerBonusDisplayStateRead(string $userBonusPath='../.userBonus', string $bonusQuotaPath='../.bonusQuota'): array`
+  - Output: `['unit'=>'percent|gib', 'value'=>int]` for the customer-facing bonus banner.
+  - Read order: an unsigned integer `.userBonus` value is authoritative and represents a percentage; otherwise a positive `.bonusQuota` value represents GiB.
+  - Missing, zero, malformed, or unsafe values fall back to `['unit'=>'percent', 'value'=>0]`; the helper never derives a percentage from quota bytes.
+- `pmssCustomerBonusDisplayTextBuild(array $state): string`
+  - Formats percent states as `BONUS: N%` and current `.bonusQuota` fallback states as `BONUS: +N GiB` so the two units cannot be confused.
+
 ---
 
 ## User Management (CLI)

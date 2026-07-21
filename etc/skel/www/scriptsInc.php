@@ -145,6 +145,37 @@ if (!function_exists('pmssCustomerPositiveIntegerFileRead')) {
  }
 }
 
+if (!function_exists('pmssCustomerBonusDisplayStateRead')) {
+ /** Read the authoritative percentage, falling back to the current GiB allocation. */
+ function pmssCustomerBonusDisplayStateRead($userBonusPath = '../.userBonus', $bonusQuotaPath = '../.bonusQuota') {
+  $userBonus = pmssCustomerUnsignedIntegerFileRead($userBonusPath);
+  if ($userBonus !== null) {
+   return array('unit' => 'percent', 'value' => $userBonus);
+  }
+
+  $bonusQuota = pmssCustomerPositiveIntegerFileRead($bonusQuotaPath);
+  if ($bonusQuota !== null) {
+   return array('unit' => 'gib', 'value' => $bonusQuota);
+  }
+
+  return array('unit' => 'percent', 'value' => 0);
+ }
+}
+
+if (!function_exists('pmssCustomerBonusDisplayTextBuild')) {
+ /** Format a bonus state without mislabeling GiB as a percentage. */
+ function pmssCustomerBonusDisplayTextBuild($state) {
+  $unit = is_array($state) && isset($state['unit']) && $state['unit'] === 'gib' ? 'gib' : 'percent';
+  $value = is_array($state) && isset($state['value']) && is_numeric($state['value'])
+   ? max(0, (int) $state['value'])
+   : 0;
+
+  return $unit === 'gib'
+   ? 'BONUS: +'.number_format($value).' GiB'
+   : 'BONUS: '.number_format($value).'%';
+ }
+}
+
 if (!function_exists('pmssCustomerKeyValueFileRead')) {
  /** Parse simple whitespace-delimited kernel/config key-value files. */
  function pmssCustomerKeyValueFileRead($path) {

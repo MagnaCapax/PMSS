@@ -32,6 +32,7 @@ foreach ([
 $pageState = pmssWelcomePageStateBuild();
 $quotaInfo = $pageState['quotaInfo'];
 $bonusQuota = $pageState['bonusQuota'];
+$bonusDisplayState = $pageState['bonusDisplayState'];
 $trafficLimitState = $pageState['trafficLimitState'];
 $bonusTraffic = $trafficLimitState['bonusGiB'];
 $vendor = $pageState['vendor'];
@@ -323,6 +324,9 @@ $managedApps = pmssCustomerManagedAppDefinitions();
             <div class="full_top_nohd"><!-- top design --></div>
             <div class="full_body">
                 <div class="portfoliobox">
+                    <div class="pmss-bonus-banner" role="status">
+                        <strong><?php echo pmssCustomerHtmlAttr(pmssCustomerBonusDisplayTextBuild($bonusDisplayState)); ?></strong>
+                    </div>
                     <div class="portfolioimg">
                         <?php
                         echo $welcomeHeadingHtml;
@@ -481,6 +485,7 @@ function pmssWelcomePageStateBuild() {
     return array(
         'quotaInfo' => $quotaInfo,
         'bonusQuota' => (int) (pmssCustomerPositiveIntegerFileRead('../.bonusQuota') ?? 0),
+        'bonusDisplayState' => pmssCustomerBonusDisplayStateRead(),
         'trafficLimitState' => $trafficLimitState,
         'vendor' => pmssWelcomeVendorRead(),
         'contextualWelcomeMessage' => pmssWelcomeContextualMessageBuild($quotaInfo),

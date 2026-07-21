@@ -9,7 +9,21 @@ final class CustomerStatsLayoutTest extends TestCase
 {
     public function testResourceBasicsRenderAsCompactTopSnapshot(): void
     {
+        $welcome = $this->pmssRenderCustomerPanelPage('welcome.php');
         $stats = $this->pmssRenderCustomerPanelPage('stats.php');
+
+        $this->assertOrderedStrings(
+            array('<div class="pmss-bonus-banner" role="status">', 'BONUS: +50 GiB', '<div class="portfolioimg">'),
+            $welcome,
+            'Missing welcome bonus layout marker: ',
+            'Welcome bonus order changed at: '
+        );
+        $this->assertOrderedStrings(
+            array('<div class="stats-block stats-bonus-block" role="status">', 'BONUS: +50 GiB', '<h6>Base Resources (current)</h6>'),
+            $stats,
+            'Missing stats bonus layout marker: ',
+            'Stats bonus order changed at: '
+        );
 
         $this->assertOrderedStrings(
             array('<h6>Resource snapshot</h6>', '<h6>Storage I/O</h6>', '<h6>Memory pressure</h6>'),
@@ -27,6 +41,8 @@ final class CustomerStatsLayoutTest extends TestCase
             )),
             'etc/skel/www/stats.php' => array(
                 'required' => array(
+                    'class="stats-block stats-bonus-block"',
+                    'pmssCustomerBonusDisplayTextBuild($pmssBonusDisplayState)',
                     'class="stats-block stats-block-base-resources"',
                     'class="stats-base-resources-pre"',
                     '.stats-block-base-resources .stats-base-resources-pre',
@@ -39,7 +55,34 @@ final class CustomerStatsLayoutTest extends TestCase
                     '<h6>Process count</h6>',
                 ),
             ),
+            'etc/skel/www/scriptsInc.php' => array('required' => array(
+                'function pmssCustomerBonusDisplayStateRead(',
+                'function pmssCustomerBonusDisplayTextBuild(',
+            )),
         ));
+    }
+
+    public function testBonusDisplayPrefersPercentAndPreservesGiBFallback(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-bonus-display-');
+        $cases = array(
+            array('percent', '47', '1925', array('unit' => 'percent', 'value' => 47), 'BONUS: 47%'),
+            array('zero-percent', '0', '1925', array('unit' => 'percent', 'value' => 0), 'BONUS: 0%'),
+            array('gib-fallback', null, '1925', array('unit' => 'gib', 'value' => 1925), 'BONUS: +1,925 GiB'),
+            array('invalid-percent', '-1', '1925', array('unit' => 'gib', 'value' => 1925), 'BONUS: +1,925 GiB'),
+            array('missing-values', null, null, array('unit' => 'percent', 'value' => 0), 'BONUS: 0%'),
+        );
+
+        foreach ($cases as $case) {
+            $userBonusPath = $root.'/'.$case[0].'.userBonus';
+            $bonusQuotaPath = $root.'/'.$case[0].'.bonusQuota';
+            if ($case[1] !== null) $this->pmssWriteFile($userBonusPath, $case[1]."\n");
+            if ($case[2] !== null) $this->pmssWriteFile($bonusQuotaPath, $case[2]."\n");
+
+            $state = pmssCustomerBonusDisplayStateRead($userBonusPath, $bonusQuotaPath);
+            $this->assertSame($case[3], $state, 'Unexpected bonus state for '.$case[0]);
+            $this->assertSame($case[4], pmssCustomerBonusDisplayTextBuild($state), 'Unexpected bonus text for '.$case[0]);
+        }
     }
 
     public function testStatsPageLoadsBundledHelperLibrary(): void

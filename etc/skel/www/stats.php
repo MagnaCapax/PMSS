@@ -43,6 +43,7 @@ $pmssBaseResources = pmssStatsBaseResourcesBuild();
 $uid = $pmssBaseResources['uid'];
 $pmssStatsStatusModel = pmssStatsStatusModelBuild($uid, $pmssDockerEnabledPolicy);
 $pmssStatsAppToggles = pmssCustomerManagedAppDefinitions();
+$pmssBonusDisplayState = pmssCustomerBonusDisplayStateRead();
 ?>
 
 <style>
@@ -71,6 +72,19 @@ $pmssStatsAppToggles = pmssCustomerManagedAppDefinitions();
     font-weight: 600;
     border-bottom: 1px solid #333;
     padding-bottom: 6px;
+}
+.stats-bonus-block {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, #12334a 0%, #1d3d55 100%);
+    border: 1px solid #4fc3f7;
+    text-align: center;
+}
+.stats-bonus-block .stats-bonus-value {
+    color: #ffffff;
+    font-size: 2.4rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.1;
 }
 
 .info-line {
@@ -275,6 +289,11 @@ function pmssStatsToggleApp(button) {
 </script>
 
 <div class="stats-container">
+
+  <div class="stats-block stats-bonus-block" role="status">
+    <h6>Account bonus</h6>
+    <div class="stats-bonus-value"><?php echo pmssCustomerHtmlAttr(pmssCustomerBonusDisplayTextBuild($pmssBonusDisplayState)); ?></div>
+  </div>
 
   <!-- LEFT: Base resources -->
   <div class="stats-block stats-block-base-resources">
