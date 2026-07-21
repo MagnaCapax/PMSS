@@ -212,7 +212,7 @@ Docker rootless mode allows running containers without root privileges. While th
 
 ### Why Docker Rootless Doesn't Work Well on PMSS
 
-1. **cgroup Delegation Issues**: Proxmox VMs have limited cgroup v2 delegation, causing containers to fail with "Permission denied" errors during startup.
+1. **cgroup Delegation Issues (mitigated for PMSS-managed accounts)**: PMSS production hosts are pinned to cgroup v1, and PMSS seeds the rootless Docker `cgroupfs` driver for new accounts. Existing accounts are reconciled by `userDocker.php` on start/restart when the cgroup-v2 path applies, so the previously reported cgroup-v2 "Permission denied" startup failure is not expected on a converged PMSS host.
 
 2. **Higher Resource Usage**: Docker daemon alone uses ~180 MB. Combined with container isolation overhead, memory usage is 20-30% higher than native installs.
 
@@ -255,7 +255,8 @@ systemctl daemon-reload
 dockerd-rootless-setuptool.sh install
 export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
 
-# For cgroup issues, use cgroupfs driver:
+# PMSS-managed accounts receive this setting automatically; retain this for
+# self-managed dedicated/baremetal servers where PMSS does not manage the account:
 mkdir -p ~/.config/docker
 echo '{"exec-opts":["native.cgroupdriver=cgroupfs"]}' > ~/.config/docker/daemon.json
 systemctl --user restart docker.service
