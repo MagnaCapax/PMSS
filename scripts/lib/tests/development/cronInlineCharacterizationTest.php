@@ -42,6 +42,7 @@ class CronInlineCharacterizationTest extends TestCase
             "pmssLighttpdWatchdogDeleteErrorPage(\$thisUser, \$watchdogWebRoot)",
             'pmssLighttpdWatchdogWriteErrorPage(',
             'pmssLighttpdWatchdogDetectReason(',
+            "'lighttpd watchdog: ' . \$watchdogReason",
             'pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);',
             'pmssUserWatchdogHandleSuspended(',
             "'lighttpd stopped due to suspension'",

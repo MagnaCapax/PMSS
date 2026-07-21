@@ -85,11 +85,9 @@ foreach($users AS $thisUser) {
     }
 
     if ($socketError || !$lighttpdRunningBeforeRestart) {
-        pmssLighttpdWatchdogWriteErrorPage(
-            $thisUser,
-            pmssLighttpdWatchdogDetectReason($thisUser, $homeDir, $configPath, $socketError),
-            $watchdogWebRoot
-        );
+        $watchdogReason = pmssLighttpdWatchdogDetectReason($thisUser, $homeDir, $configPath, $socketError);
+        pmssLighttpdWatchdogWriteErrorPage($thisUser, $watchdogReason, $watchdogWebRoot);
+        pmssUserLog($thisUser, 'lighttpd watchdog: ' . $watchdogReason);
     } else {
         pmssLighttpdWatchdogDeleteErrorPage($thisUser, $watchdogWebRoot);
     }
