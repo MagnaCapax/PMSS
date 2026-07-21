@@ -240,7 +240,7 @@ pmss_normalize_path() {
     IFS=':' read -r -a parts <<< "$path_value"
     for entry in "${parts[@]}"; do
         case "$entry" in
-            ""|"$HOME/.bin"|"$HOME/bin") continue ;;
+            ""|"$HOME/.bin"|"$HOME/bin"|"$HOME/.local/bin") continue ;;
         esac
         case ":$new_path:" in
             *":$entry:"*) ;;
@@ -249,7 +249,7 @@ pmss_normalize_path() {
     done
 
     new_path="${sys_paths}${new_path:+:$new_path}"
-    for entry in "$HOME/.bin" "$HOME/bin"; do
+    for entry in "$HOME/.bin" "$HOME/bin" "$HOME/.local/bin"; do
         if [ -d "$entry" ]; then
             case ":$new_path:" in
                 *":$entry:"*) ;;
