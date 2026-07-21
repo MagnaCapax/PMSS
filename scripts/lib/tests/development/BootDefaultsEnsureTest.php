@@ -81,6 +81,30 @@ class BootDefaultsEnsureTest extends TestCase
         $this->assertStringContainsAndOmitsStrings(['GRUB_CMDLINE_LINUX_DEFAULT="quiet systemd.unified_cgroup_hierarchy=0 console=tty0"', 'GRUB_TERMINAL="console"'], ['BAD-KEY'], $updatedGrub);
     }
 
+    public function testBootDefaultsNormalizesMalformedCmdlineLinesIdempotently(): void
+    {
+        $logger = static function (string $message): void { };
+        $dir = $this->pmssMakeTempDir('pmss-boot-defaults-malformed-', 0700);
+        $fstab = $dir.'/fstab';
+        $grub = $dir.'/grub';
+        $option = 'systemd.unified_cgroup_hierarchy=0';
+        $duplicateQuote = '"'.'"';
+        $malformedLine = 'GRUB_CMDLINE_LINUX="text '.$option.$duplicateQuote;
+        file_put_contents($fstab, "proc /proc proc defaults,hidepid=2 0 0\n");
+        file_put_contents($grub, "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet $option\"\n".$malformedLine."\n");
+
+        \pmssEnsureBootDefaults($logger, $fstab, $grub, $option);
+        $updatedGrub = (string) file_get_contents($grub);
+        $this->assertStringContainsAllStrings([
+            'GRUB_CMDLINE_LINUX_DEFAULT="quiet '.$option.'"',
+            'GRUB_CMDLINE_LINUX="text '.$option.'"',
+        ], $updatedGrub);
+        $this->assertStringNotContainsString($option.$duplicateQuote, $updatedGrub);
+
+        \pmssEnsureBootDefaults($logger, $fstab, $grub, $option);
+        $this->assertSame($updatedGrub, (string) file_get_contents($grub));
+    }
+
     public function testBootDefaultsPlanHelpersStayStable(): void
     {
         $this->assertSame(

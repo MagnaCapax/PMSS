@@ -61,18 +61,28 @@ function pmssBootDefaultsEnsureGrubOptions(array &$lines, array $requiredGrubOpt
     $changed = $found = false;
     foreach ($lines as $idx => $line) {
         if (!preg_match('/^(GRUB_CMDLINE_LINUX_DEFAULT|GRUB_CMDLINE_LINUX)=("|\')([^"\']*)("|\')/', $line, $match)) continue;
-        $found = true;
-        $currentOptions = pmssNonEmptyStrings(preg_split('/\s+/', trim($match[3])) ?: []);
-        foreach ($requiredGrubOptions as $option) {
-            if (!in_array($option, $currentOptions, true)) $currentOptions[] = $option;
+        $lineChanged = false;
+        // Keep option placement backward-compatible while healing every managed line's quoting.
+        if (!$found) {
+            $found = true;
+            $currentOptions = pmssNonEmptyStrings(preg_split('/\s+/', trim($match[3])) ?: []);
+            foreach ($requiredGrubOptions as $option) {
+                if (!in_array($option, $currentOptions, true)) $currentOptions[] = $option;
+            }
+            $updatedValue = implode(' ', $currentOptions);
+            if ($updatedValue !== $match[3]) {
+                $lines[$idx] = $match[1].'='.$match[2].$updatedValue.$match[2];
+                $lineChanged = true;
+                $log('Updated '.$match[1].' options in '.$grubPath);
+            }
         }
-        $updatedValue = implode(' ', $currentOptions);
-        if ($updatedValue !== $match[3]) {
-            $lines[$idx] = $match[1].'='.$match[2].$updatedValue.$match[2];
-            $changed = true;
-            $log('Updated '.$match[1].' options in '.$grubPath);
+        $lineToNormalize = $lines[$idx] ?? $line;
+        if (preg_match('/^(GRUB_CMDLINE_LINUX_DEFAULT|GRUB_CMDLINE_LINUX)=("|\')([^"\']*)\2\2+$/', $lineToNormalize, $malformedMatch) === 1) {
+            $lines[$idx] = $malformedMatch[1].'='.$malformedMatch[2].$malformedMatch[3].$malformedMatch[2];
+            $lineChanged = true;
+            $log('Normalized '.$malformedMatch[1].' quoting in '.$grubPath);
         }
-        break;
+        $changed = $lineChanged || $changed;
     }
     if ($found || $requiredGrubOptions === []) return $changed;
 
