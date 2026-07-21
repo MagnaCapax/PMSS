@@ -102,6 +102,7 @@ fonts-tlwg-loma-otf				install
 fonts-unifont					install
 fonts-wqy-zenhei				install
 freeipmi-common					install
+fuse						deinstall
 fuse3						install
 fuse-overlayfs				install
 g++						install

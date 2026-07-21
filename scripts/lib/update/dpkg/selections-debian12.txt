@@ -125,6 +125,7 @@ fonts-lato	install
 fonts-liberation	install
 fonts-noto-mono	install
 fonts-urw-base35	install
+fuse						deinstall
 fuse3	install
 fuse-overlayfs				install
 g++	install
