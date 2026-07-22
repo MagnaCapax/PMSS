@@ -35,7 +35,7 @@ function pmssUserTransferBuildRsyncCommand(array $cfg, array $sources, array $ex
         $arguments[] = escapeshellarg($prefix.$source);
     }
 
-    return "#!/bin/bash\nset -e\n".'rsync -av -e '
+    return "#!/bin/bash\nset -e\n".'rsync -a --stats -e '
         .escapeshellarg(pmssUserTransferBuildSshCommand($cfg['remoteUser']))
         .' '.implode(' ', $arguments).' '.escapeshellarg('/home/'.$cfg['localUser'].'/')."\n";
 }

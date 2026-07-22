@@ -8,12 +8,29 @@
 require_once __DIR__.'/remoteScripts.php';
 
 /**
- * Build a remote size probe script that returns `du -sb` output over SSH.
+ * Build a privacy-safe shell fragment that prints aggregate home statistics.
+ */
+function pmssUserTransferBuildHomeStatsShell(string $home): string
+{
+    $home = rtrim($home, '/').'/';
+    $lines = [
+        'bytes=$(du -sb -- "$home" 2>/dev/null | awk "NR == 1 {print \$1}")',
+        'files=$(find "$home" -type f -printf . 2>/dev/null | wc -c | tr -d "[:space:]")',
+        'case "$bytes" in ""|*[!0-9]*) exit 1 ;; esac',
+        'case "$files" in ""|*[!0-9]*) exit 1 ;; esac',
+        'printf "bytes=%s files=%s\n" "$bytes" "$files"',
+    ];
+
+    return 'home='.escapeshellarg($home)."\n".implode("\n", $lines)."\n";
+}
+
+/**
+ * Build a remote size/count probe script that emits aggregate values only.
  */
 function pmssUserTransferBuildRemoteSizeProbe(array $cfg): string
 {
     $remoteHome = '/home/'.$cfg['remoteUser'].'/';
-    $remoteCommand = pmssBuildCommand('du', ['-sb', $remoteHome]);
+    $remoteCommand = pmssBuildCommand('bash', ['-c', pmssUserTransferBuildHomeStatsShell($remoteHome)]);
 
     return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshCommand(
         $cfg['remoteUser'],
@@ -22,10 +39,14 @@ function pmssUserTransferBuildRemoteSizeProbe(array $cfg): string
 }
 
 /**
- * Parse the byte count from `du -sb` output.
+ * Parse the byte count from legacy `du -sb` or aggregate stats output.
  */
 function pmssUserTransferParseDuBytes(string $output): ?int
 {
+    if (preg_match('/\bbytes=([0-9]+)\b/', $output, $matches) === 1) {
+        return (int) $matches[1];
+    }
+
     $lines = preg_split('/\r?\n/', trim($output));
     if (!is_array($lines)) {
         return null;
@@ -41,24 +62,44 @@ function pmssUserTransferParseDuBytes(string $output): ?int
 }
 
 /**
- * Run a size probe command and return the measured byte count.
+ * Parse aggregate home statistics from the privacy-safe probe output.
  */
-function pmssUserTransferMeasureBytes(string $description, string $command): ?int
+function pmssUserTransferParseHomeStats(string $output): ?array
+{
+    if (preg_match('/\bbytes=([0-9]+)\s+files=([0-9]+)\b/', trim($output), $matches) !== 1) {
+        return null;
+    }
+
+    return ['bytes' => (int) $matches[1], 'files' => (int) $matches[2]];
+}
+
+/**
+ * Build the local target-side aggregate home statistics command.
+ */
+function pmssUserTransferBuildLocalHomeStatsCommand(string $home): string
+{
+    return pmssBuildCommand('bash', ['-c', pmssUserTransferBuildHomeStatsShell($home)]);
+}
+
+/**
+ * Run an aggregate home statistics probe.
+ */
+function pmssUserTransferMeasureHomeStats(string $description, string $command): ?array
 {
     $rc = runStep($description, $command);
     if ($rc !== 0) {
-        logMessage(sprintf('[WARN] Skipping transfer size verification: %s failed (rc=%d)', strtolower($description), $rc));
+        logMessage(sprintf('[WARN] Skipping transfer home statistics: %s failed (rc=%d)', strtolower($description), $rc));
         return null;
     }
 
     $stdout = (string) ($GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '');
-    $bytes = pmssUserTransferParseDuBytes($stdout);
-    if ($bytes === null) {
-        logMessage(sprintf('[WARN] Skipping transfer size verification: %s returned unreadable output', strtolower($description)));
+    $stats = pmssUserTransferParseHomeStats($stdout);
+    if ($stats === null) {
+        logMessage(sprintf('[WARN] Skipping transfer home statistics: %s returned unreadable output', strtolower($description)));
         return null;
     }
 
-    return $bytes;
+    return $stats;
 }
 
 /**
@@ -84,24 +125,32 @@ function pmssUserTransferEvaluateCompleteness(int $remoteBytes, int $localBytes,
 }
 
 /**
- * Measure remote/local home sizes and emit an advisory warning for partial copies.
+ * Measure remote/local home stats and emit the existing size advisory.
  */
 function pmssUserTransferVerifyCompleteness(array $cfg, string $home, string $expectPath, string $remoteSizeScriptPath): void
 {
-    $remoteBytes = pmssUserTransferMeasureBytes(
+    $remoteStats = pmssUserTransferMeasureHomeStats(
         'Measuring remote home size',
         pmssBuildCommand($expectPath, [$remoteSizeScriptPath])
     );
-    $localBytes = pmssUserTransferMeasureBytes(
+    $localStats = pmssUserTransferMeasureHomeStats(
         'Measuring local home size',
-        pmssBuildCommand('du', ['-sb', rtrim($home, '/').'/'])
+        pmssUserTransferBuildLocalHomeStatsCommand($home)
     );
 
-    if ($remoteBytes === null || $localBytes === null) {
+    if ($remoteStats === null || $localStats === null) {
         return;
     }
 
-    $warning = pmssUserTransferEvaluateCompleteness($remoteBytes, $localBytes, $cfg['verifyThreshold']);
+    logMessage(sprintf(
+        '[INFO] Transfer aggregate summary: source_bytes=%d target_bytes=%d source_files=%d target_files=%d',
+        $remoteStats['bytes'],
+        $localStats['bytes'],
+        $remoteStats['files'],
+        $localStats['files']
+    ));
+
+    $warning = pmssUserTransferEvaluateCompleteness($remoteStats['bytes'], $localStats['bytes'], $cfg['verifyThreshold']);
     if ($warning !== null) {
         logMessage(sprintf(
             '[WARN] Transfer size verification advisory: local=%d bytes remote=%d bytes threshold=%d%% observed=%.2f%%',
@@ -115,8 +164,8 @@ function pmssUserTransferVerifyCompleteness(array $cfg, string $home, string $ex
 
     logMessage(sprintf(
         '[INFO] Transfer size verification ok: local=%d bytes remote=%d bytes threshold=%d%%',
-        $localBytes,
-        $remoteBytes,
+        $localStats['bytes'],
+        $remoteStats['bytes'],
         $cfg['verifyThreshold']
     ));
 }
