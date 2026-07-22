@@ -174,6 +174,19 @@ CONF;
             @unlink($tmpSelection);
         }
 
+        // GH#643: after the baseline install, HOLD fuse3 so an explicit `apt-get install fuse`
+        // (the legacy rootless-docker setuptool vector) ABORTS instead of cascading fuse3 +
+        // fuse-overlayfs out and hard-downing rootless Docker server-wide. apt refuses to remove a
+        // held, non-named package without --allow-change-held-packages (apt-get(8)), and the
+        // aggressor uses plain `-y`. The set-selections baseline above clears any prior hold, so
+        // this re-asserts it every update. Guarded to an installed fuse3 -> no-op on Debian 10 /
+        // non-docker hosts. The reactive heal stays the `fuse deinstall` + `fuse3`/`fuse-overlayfs
+        // install` lines in the selection baseline (mirrors the repo-mediaarea hold above).
+        if (trim((string) @shell_exec("dpkg-query -W -f='\${Status}' fuse3 2>/dev/null")) === 'install ok installed') {
+            runStep('Holding fuse3 to block the fuse2 conflict-removal cascade (GH#643)',
+                pmssAptDpkgEnvPrefix().' apt-mark hold fuse3 || true');
+        }
+
         if ($warnings) {
             pmssLogStatus('WARN', 'Dpkg selection baseline contained ignored entries; proceeding with remaining packages', 0);
         }
