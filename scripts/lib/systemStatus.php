@@ -100,7 +100,7 @@ function pmssStatusProbeSpecs(string $sourcesPath): array
         'paths' => [
             ['systemLabel' => 'Apt sources', 'path' => $sourcesPath], ['systemLabel' => 'ProFTPD configuration', 'componentName' => 'config.proftpd', 'path' => '/etc/proftpd/proftpd.conf'],
             ['systemLabel' => 'OpenVPN directory', 'componentName' => 'config.openvpn', 'path' => '/etc/openvpn'], ['systemLabel' => 'VPN Easy-RSA', 'path' => '/etc/openvpn/easy-rsa'],
-            ['systemLabel' => 'Seedbox localnet', 'componentName' => 'config.seedbox.localnet', 'path' => '/etc/seedbox/localnet'], ['systemLabel' => 'Nginx directory', 'componentName' => 'config.nginx', 'path' => '/etc/nginx'],
+            ['systemLabel' => 'Seedbox localnet', 'componentName' => 'config.seedbox.localnet', 'path' => '/etc/seedbox/config/localnet'], ['systemLabel' => 'Nginx directory', 'componentName' => 'config.nginx', 'path' => '/etc/nginx'],
         ],
     ];
 }

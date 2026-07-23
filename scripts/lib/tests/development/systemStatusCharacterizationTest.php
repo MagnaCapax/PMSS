@@ -58,7 +58,7 @@ final class SystemStatusCharacterizationTest extends TestCase
         return [
             'runCommand' => static function (string $command) use ($commandMap): string { return $commandMap[$command] ?? ''; },
             'pathExists' => static function (string $path) use ($sourcesPath): bool {
-                return in_array($path, [$sourcesPath, '/etc/proftpd/proftpd.conf', '/etc/openvpn', '/etc/openvpn/easy-rsa', '/etc/seedbox/localnet', '/etc/nginx'], true);
+                return in_array($path, [$sourcesPath, '/etc/proftpd/proftpd.conf', '/etc/openvpn', '/etc/openvpn/easy-rsa', '/etc/seedbox/config/localnet', '/etc/nginx'], true);
             },
             'isFile' => static function (string $path) use ($sourcesPath): bool {
                 return in_array($path, [$sourcesPath, '/etc/seedbox/config/localnet', '/home/openvpn-host-pulsedmedia-com.ovpn', '/home/openvpn-host-pulsedmedia-com.crt', '/opt/flexget/bin/flexget', '/opt/pyload/bin/pyload'], true);
@@ -444,7 +444,7 @@ final class SystemStatusCharacterizationTest extends TestCase
                 'ProFTPD configuration|OK|/etc/proftpd/proftpd.conf',
                 'OpenVPN directory|OK|/etc/openvpn',
                 'VPN Easy-RSA|OK|/etc/openvpn/easy-rsa',
-                'Seedbox localnet|OK|/etc/seedbox/localnet',
+                'Seedbox localnet|OK|/etc/seedbox/config/localnet',
                 'Nginx directory|OK|/etc/nginx',
                 'Seedbox localnet (config)|OK|/etc/seedbox/config/localnet readable via 0664 + traversable dirs',
                 'Sources codename match|OK|sources.list references bookworm',
@@ -463,7 +463,7 @@ final class SystemStatusCharacterizationTest extends TestCase
                 'Component: bin.curl|OK|/usr/bin/curl',
                 'Component: config.proftpd|OK|/etc/proftpd/proftpd.conf',
                 'Component: config.openvpn|OK|/etc/openvpn',
-                'Component: config.seedbox.localnet|OK|/etc/seedbox/localnet',
+                'Component: config.seedbox.localnet|OK|/etc/seedbox/config/localnet',
                 'Component: config.nginx|OK|/etc/nginx',
             ],
             array_map(static function (array $check) use ($sourcesPath): string {
