@@ -87,8 +87,6 @@ if ($passwd === null)
     die("User {$userName} does not exist in /etc/passwd - aborting.\n");
 pmssRequireSafeRecreateUserPath($homeDir, 'home');
 pmssRequireSafeRecreateUserPath($backupDir, 'backup');
-if (file_exists($backupDir))
-    die("Backup directory {$backupDir} already exists - remove or rename it first.\n");
 
 $homeExists = is_dir($homeDir);
 if ($homeExists) {
@@ -96,6 +94,29 @@ if ($homeExists) {
     if ($realHome === false || $realHome !== $homeDir) {
         fwrite(STDERR, "Refusing to operate on unexpected home path: {$realHome}\n");
         exit(1);
+    }
+}
+
+// Handle a leftover backup-<user> from a PRIOR rebuild. Policy (2026-07-23): the backup
+// persists until terminateUser reclaims it or the NEXT recreateUser supersedes it - it no
+// longer blocks a rebuild. We NEVER delete it up-front: a failed prior rebuild can leave
+// the customer's ONLY real data here while the current home is an empty skel (which is
+// content-indistinguishable from a legitimately near-empty home). So when we have a real
+// home to back up, set the prior backup aside and reclaim it at the END (section 11), only
+// after the new backup is safely created. When home is missing, leave the prior backup
+// untouched (possible sole copy) - a fresh build creates no backup, so there is no collision.
+$supersededBackup = null;
+if (file_exists($backupDir)) {
+    if ($homeExists) {
+        $supersededBackup = $backupDir . '.superseded';
+        pmssRequireSafeRecreateUserPath($supersededBackup, 'superseded-backup');
+        if (file_exists($supersededBackup)) {
+            pmssRunOrExit('rm -rf ' . escapeshellarg($supersededBackup));
+        }
+        echo "[*] Setting aside prior backup {$backupDir} -> {$supersededBackup}\n";
+        pmssRunOrExit('mv ' . escapeshellarg($backupDir) . ' ' . escapeshellarg($supersededBackup));
+    } else {
+        echo "[i] Home missing but prior backup {$backupDir} present - leaving it untouched (possible sole copy).\n";
     }
 }
 
@@ -184,10 +205,20 @@ if ($password !== null && $password !== '') {
 echo "[*] Setting password\n";
 pmssRunOrExit('php ' . __DIR__ . '/changePw.php ' . $pwArgs);
 
-/* ===== 11. Done ===== */
+/* ===== 11. Reclaim the superseded prior backup (only after the new backup exists) ===== */
+// The current home has now been safely moved into {$backupDir} and the rebuild has passed
+// the ownership-sanity check above, so the prior backup we set aside is truly superseded
+// and can be reclaimed. $supersededBackup is only ever set when $homeExists was true (a
+// fresh backup was created), so this never deletes a possible sole copy.
+if ($supersededBackup !== null && is_dir($supersededBackup)) {
+    echo "[*] Reclaiming superseded prior backup {$supersededBackup}\n";
+    pmssRunOrExit('rm -rf ' . escapeshellarg($supersededBackup));
+}
+
+/* ===== 12. Done ===== */
 echo "[OK] Finished. ";
 if ($homeExists) {
-    echo "Review then remove backup:  rm -rf " . escapeshellarg($backupDir) . "\n";
+    echo "Rebuilt. Backup at {$backupDir} persists (auto-reclaimed by terminateUser or the next rebuild).\n";
 } else {
     echo "Fresh build done (no backup created).\n";
 }
