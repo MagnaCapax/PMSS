@@ -111,7 +111,10 @@ if (file_exists($backupDir)) {
         $supersededBackup = $backupDir . '.superseded';
         pmssRequireSafeRecreateUserPath($supersededBackup, 'superseded-backup');
         if (file_exists($supersededBackup)) {
-            pmssRunOrExit('rm -rf ' . escapeshellarg($supersededBackup));
+            // .trafficData/.trafficDataLocal are immutable (chattr +i, PMSS #161); clear the immutable
+            // attr recursively before rm or it fails "Operation not permitted" (cf. terminateUser #176,
+            // userTransfer #283). GH PMSS#725. Failing here is fail-safe (before rebuild — live account untouched).
+            pmssRunOrExit('chattr -R -i ' . escapeshellarg($supersededBackup) . ' 2>/dev/null; rm -rf ' . escapeshellarg($supersededBackup));
         }
         echo "[*] Setting aside prior backup {$backupDir} -> {$supersededBackup}\n";
         pmssRunOrExit('mv ' . escapeshellarg($backupDir) . ' ' . escapeshellarg($supersededBackup));
@@ -212,7 +215,13 @@ pmssRunOrExit('php ' . __DIR__ . '/changePw.php ' . $pwArgs);
 // fresh backup was created), so this never deletes a possible sole copy.
 if ($supersededBackup !== null && is_dir($supersededBackup)) {
     echo "[*] Reclaiming superseded prior backup {$supersededBackup}\n";
-    pmssRunOrExit('rm -rf ' . escapeshellarg($supersededBackup));
+    // .trafficData/.trafficDataLocal are immutable (chattr +i, PMSS #161); clear before rm (cf. terminateUser #176). GH PMSS#725.
+    // This runs AFTER a successful rebuild — a cleanup failure here must NOT fail the tool (the account is already rebuilt),
+    // so it is non-fatal (exec, not pmssRunOrExit). A lingering .superseded is routine janitorial, not a rebuild failure.
+    exec('chattr -R -i ' . escapeshellarg($supersededBackup) . ' 2>/dev/null; rm -rf ' . escapeshellarg($supersededBackup) . ' 2>&1', $reclaimOut, $reclaimRc);
+    if ($reclaimRc !== 0) {
+        fwrite(STDERR, "[!] Non-fatal: could not fully reclaim {$supersededBackup} (rc={$reclaimRc}); rebuild already succeeded, manual cleanup may be needed.\n");
+    }
 }
 
 /* ===== 12. Done ===== */
