@@ -24,6 +24,24 @@ All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to
 - The wrapper intentionally stops at first-install scope: once `~/.bin` or Jellyfin data already exist, reruns should happen over SSH so operators can review existing state and any Jellyfin data-loss prompt before proceeding.
 - The wrapper does not pre-generate Jellyfin credentials; the admin account is created in Jellyfin’s first-run wizard after the install completes.
 
+## Jellyfin Media Library Path
+
+PMSS keeps `/home` non-listable for tenant privacy. Jellyfin can traverse to
+`/home`, but its first-run folder picker cannot list the user directories below
+it. Clicking `home` can therefore show a blank list, and accepting `/home`
+creates a library that scans nothing.
+
+In the Jellyfin first-run wizard, type the complete media path into the folder
+field instead of selecting `/home`; for the usual layout, use:
+
+```text
+/home/<user>/data
+```
+
+For support checks, a `.mblink` containing exactly `/home` indicates this
+misconfiguration. Jellyfin logs it as `Library folder "/home" is inaccessible
+or empty, skipping`.
+
 ## Compatibility Matrix
 - Debian 12 (bookworm): uses latest Servarr download/update endpoints + .NET 8.
 - Debian 11 (bullseye) and Debian 10 (buster): .NET 8 supported; Radarr GLIBC fallback:

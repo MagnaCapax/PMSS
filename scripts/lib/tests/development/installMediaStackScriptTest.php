@@ -146,6 +146,15 @@ class installMediaStackScriptTest extends TestCase
         ], $this->script);
     }
 
+    public function testJellyfinLibraryPathGuidanceIsPrinted(): void
+    {
+        $this->assertStringContainsAllStrings([
+            'echo "JELLYFIN-MEDIA-PATH = $HOME/data"',
+            'echo "JELLYFIN-LIBRARY-GUIDANCE = Jellyfin cannot list /home on PMSS;',
+            'type the full path above into the folder field instead of selecting /home."',
+        ], $this->script);
+    }
+
     public function testJellyfinSystemXmlTagSetterLocksSnapshot(): void
     {
         $script = implode("\n", array(

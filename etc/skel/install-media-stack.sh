@@ -1618,6 +1618,8 @@ echo "SABNZBD-WIZARD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/wizard
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 	echo "JELLYFIN-URL = https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
 	echo "JELLYFIN-LOCAL-URL = http://127.0.0.1:${JELLYFIN_PORT}"
+	echo "JELLYFIN-MEDIA-PATH = $HOME/data"
+	echo "JELLYFIN-LIBRARY-GUIDANCE = Jellyfin cannot list /home on PMSS; type the full path above into the folder field instead of selecting /home."
 else
 	echo "JELLYFIN-SKIPPED = install FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ under ~/.bin and rerun with --jellyfin-ffmpeg=$HOME/.bin/ffmpeg"
 fi
