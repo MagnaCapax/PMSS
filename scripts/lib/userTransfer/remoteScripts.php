@@ -25,8 +25,16 @@ function pmssUserTransferBuildSshCommand(string $remoteUser, array $extraOptions
     ], $extraOptions, ['-l '.escapeshellarg($remoteUser)]));
 }
 
-function pmssUserTransferBuildRsyncCommand(array $cfg, array $sources, array $excludes = []): string
+function pmssUserTransferBuildRsyncCommand(
+    array $cfg,
+    array $sources,
+    array $excludes = [],
+    array $rsyncOptions = []
+): string
 {
+    $options = implode(' ', array_map(static function (string $option): string {
+        return escapeshellarg($option);
+    }, $rsyncOptions));
     $arguments = array_map(static function (string $item): string {
         return '--exclude='.escapeshellarg($item);
     }, $excludes);
@@ -35,7 +43,7 @@ function pmssUserTransferBuildRsyncCommand(array $cfg, array $sources, array $ex
         $arguments[] = escapeshellarg($prefix.$source);
     }
 
-    return "#!/bin/bash\nset -e\n".'rsync -a --stats -e '
+    return "#!/bin/bash\nset -e\n".'rsync -a --stats'.($options === '' ? '' : ' '.$options).' -e '
         .escapeshellarg(pmssUserTransferBuildSshCommand($cfg['remoteUser']))
         .' '.implode(' ', $arguments).' '.escapeshellarg('/home/'.$cfg['localUser'].'/')."\n";
 }
@@ -57,9 +65,9 @@ function pmssUserTransferBuildRsyncFinal(array $cfg): string
 {
     $remoteHome = '/home/'.$cfg['remoteUser'];
     return pmssUserTransferBuildRsyncCommand($cfg, [
-        $remoteHome.'/session', $remoteHome.'/www/rutorrent/share', $remoteHome.'/.lighttpd/custom',
-        $remoteHome.'/.lighttpd/custom.d', $remoteHome.'/.local', $remoteHome.'/www/public',
-    ]);
+        $remoteHome.'/./session', $remoteHome.'/./www/rutorrent/share', $remoteHome.'/./.lighttpd/custom',
+        $remoteHome.'/./.lighttpd/custom.d', $remoteHome.'/./.local', $remoteHome.'/./www/public',
+    ], [], ['-R']);
 }
 
 function pmssUserTransferBuildAuthProbe(array $cfg): string
