@@ -207,6 +207,7 @@ foreach ($chmodItems as $item) {
 // cost when uid/gid ownership is already correct.
 $excludes = [
     "/home/{$thisUser}/.quota",
+    "/home/{$thisUser}/.resourceData",
     $trafficPaths['normal'],
     $trafficPaths['local'],
     $trafficPaths['ingress'],

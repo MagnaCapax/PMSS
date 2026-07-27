@@ -26,6 +26,7 @@ PHP;
         $this->pmssAssertRepoFileContract('scripts/util/userPermissions.php', [
             'required' => [
                 '["/home/{$thisUser}/data", 0750],',
+                '"/home/{$thisUser}/.resourceData",',
                 $dataPrune,
                 $localPrune,
                 '["/home/{$thisUser}/data", "{$thisUser}:{$thisUser}"],',
