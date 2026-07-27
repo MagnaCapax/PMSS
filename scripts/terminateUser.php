@@ -164,6 +164,9 @@ $trafficFiles = array_values(pmssTrafficDataPaths($username));
 $trafficArgs = array_map('escapeshellarg', $trafficFiles);
 $clearImmutableCmd = 'if command -v chattr >/dev/null 2>&1; then chattr -i '.implode(' ', $trafficArgs).' 2>/dev/null || true; fi';
 $homePath = "/home/{$username}";
+$homeArg = escapeshellarg($homePath);
+$clearHomeImmutableCmd = 'if [ -d '.$homeArg.' ] && command -v chattr >/dev/null 2>&1; then chattr -R -i '.$homeArg.' 2>/dev/null || true; fi';
+$removeHomeLeftoversCmd = 'if [ -d '.$homeArg.' ]; then rm -rf -- '.$homeArg.'; fi';
 pmssUserLifecycleRunSteps('terminate', $username, array(
     array('crontab_remove', 'crontab -r -u '.escapeshellarg($username).' || true'),
     array('crontab_spool_remove', 'rm -f -- '.escapeshellarg($crontabSpoolPaths[0]).' '.escapeshellarg($crontabSpoolPaths[1]).' || true'),
@@ -174,7 +177,12 @@ $homeReclaimPath = pmssTerminateUserMoveHomeForReclaim($username, $homePath, $dr
 if ($homeReclaimPath !== '') {
     pmssUserLifecycleStep('terminate', $username, 'queue_home_reclaim', pmssUserHomeReclaimLaunchCommand($homeReclaimPath), $dryRun);
 } else {
-    pmssUserLifecycleStep('terminate', $username, 'remove_home_fallback', 'cd /home && rm -rf -- '.escapeshellarg($username), $dryRun);
+    pmssUserLifecycleRunSteps('terminate', $username, array(
+        array('remove_home_fallback', 'cd /home && rm -rf -- '.escapeshellarg($username)),
+        // Clear immutable flags only when the first removal left a residue.
+        array('clear_immutable_home_fallback', $clearHomeImmutableCmd),
+        array('remove_home_fallback_leftovers', $removeHomeLeftoversCmd),
+    ), $dryRun);
 }
 $backupPath = "/home/backup-{$username}";
 $backupReclaimPath = pmssTerminateUserMoveBackupForReclaim($username, $backupPath, $dryRun);

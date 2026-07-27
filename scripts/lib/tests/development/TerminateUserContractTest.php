@@ -59,6 +59,18 @@ final class TerminateUserContractTest extends TestCase
         ]);
     }
 
+    public function testTerminateUserFallbackClearsImmutableLeftoversAfterInitialRemoval(): void
+    {
+        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', [
+            'required' => ['chattr -R -i', "'clear_immutable_home_fallback'", "'remove_home_fallback_leftovers'"],
+            'ordered' => [[
+                "'remove_home_fallback'",
+                "'clear_immutable_home_fallback'",
+                "'remove_home_fallback_leftovers'",
+            ]],
+        ]);
+    }
+
     public function testTerminateUserReclaimsExactRecreateBackupDir(): void
     {
         $this->pmssAssertRepoFileContractCases([
