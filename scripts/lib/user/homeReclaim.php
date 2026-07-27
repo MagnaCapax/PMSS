@@ -3,7 +3,7 @@
  * Helpers for reclaiming terminated user homes outside the foreground flow.
  *
  * The terminate script owns account cleanup; this module owns only the
- * rename-aside path contract and the detached low-priority reclaim command.
+ * rename-aside path contract, reclaim lock, and detached reclaim command.
  *
  * @license GPL-3.0-only
  * @author PMSS Team

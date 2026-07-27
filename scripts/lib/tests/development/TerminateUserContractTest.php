@@ -5,6 +5,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/user/homeReclaim.php';
+require_once dirname(__DIR__, 2).'/user/homeReclaimRetry.php';
 require_once dirname(__DIR__, 2).'/user/terminationCleanup.php';
 
 final class TerminateUserContractTest extends TestCase
@@ -97,6 +98,49 @@ final class TerminateUserContractTest extends TestCase
         $command = \pmssUserHomeReclaimLaunchCommand('/home/.terminating-user1234-20260101000000-42');
         $this->assertStringContainsString('/scripts/util/userHomeReclaim.php', $command);
         $this->assertStringContainsString('ionice -c3 nice -n 19', $command);
+    }
+
+    public function testHomeReclaimSweepUsesEncodedAgeAndRejectsUnsafeTargets(): void
+    {
+        $now = 1767225600;
+        $old = \pmssUserHomeReclaimPathBuild('user1234', $now - 3601, 42);
+        $fresh = \pmssUserHomeReclaimPathBuild('user1234', $now - 3599, 42);
+
+        $this->assertTrue(\pmssUserHomeReclaimPathIsDue($old, $now));
+        $this->assertFalse(\pmssUserHomeReclaimPathIsDue($fresh, $now));
+        $this->assertFalse(\pmssUserHomeReclaimPathIsDue('/home/user1234', $now));
+        $this->assertFalse(\pmssUserHomeReclaimPathIsDue('/home/.terminating-user1234-not-a-date-42', $now));
+        $this->assertSame($now - 3601, \pmssUserHomeReclaimPathTimestamp($old));
+    }
+
+    public function testHomeReclaimLockPreventsConcurrentTargetWork(): void
+    {
+        $runtime = $this->pmssMakeNamedTempDir('pmss-home-reclaim-lock-');
+        $target = '/home/.terminating-user1234-20260101000000-42';
+        $this->pmssWithEnv(['PMSS_RUNTIME_DIR' => $runtime], function () use ($target): void {
+            $first = \pmssUserHomeReclaimAcquireLock($target);
+            $second = \pmssUserHomeReclaimAcquireLock($target);
+
+            $this->assertTrue(is_resource($first));
+            $this->assertSame(false, $second);
+            \pmssUserHomeReclaimReleaseLock($first);
+
+            $third = \pmssUserHomeReclaimAcquireLock($target);
+            $this->assertTrue(is_resource($third));
+            \pmssUserHomeReclaimReleaseLock($third);
+        });
+    }
+
+    public function testHomeReclaimSweepModeKeepsWorkerPathContract(): void
+    {
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/util/userHomeReclaim.php' => ['required' => ["'--sweep'", 'homeReclaimWorker.php']],
+            'scripts/lib/user/homeReclaimWorker.php' => ['required' => [
+                'pmssUserHomeReclaimSweepTargets',
+                'pmssUserHomeReclaimRunTarget($targetPath)',
+                'home_reclaim_locked',
+            ]],
+        ]);
     }
 
     public function testTerminateUserHomeInvariantIsExact(): void

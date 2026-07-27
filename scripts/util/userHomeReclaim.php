@@ -11,40 +11,26 @@
  */
 
 require_once __DIR__.'/../lib/userLifecycle.php';
-require_once __DIR__.'/../lib/user/homeReclaim.php';
+require_once __DIR__.'/../lib/user/homeReclaimWorker.php';
 
-/**
- * Refuse reclaim when the target no longer satisfies the terminating-home contract.
- */
-function pmssUserHomeReclaimRefuseUnsafePath(?string $username, string $targetPath, string $phase): int
-{
-    fwrite(STDERR, "Refusing unsafe reclaim path: {$targetPath}\n");
-    if ($username !== null) {
-        pmssUserLifecycleContextLogStatusMessage(
-            'terminate',
-            $phase,
-            $username,
-            'ERR',
-            'Refusing unsafe reclaim path',
-            array('path' => $targetPath)
-        );
-    }
-
-    return 1;
-}
-
-/** Execute the asynchronous home reclaim worker. */
+/** Execute the asynchronous home reclaim worker or its periodic reaper mode. */
 function pmssUserHomeReclaimMain(array $argv): int
 {
     pmssRequireCli();
     requireRoot();
 
-    $usage = "Usage: userHomeReclaim.php --confirm /home/.terminating-USER-YYYYMMDDHHMMSS-PID\n";
+    $usage = "Usage: userHomeReclaim.php --confirm /home/.terminating-USER-YYYYMMDDHHMMSS-PID\n"
+        ."       userHomeReclaim.php --sweep\n";
     $confirm = false;
+    $sweep = false;
     $targetPath = '';
     foreach (array_slice($argv, 1) as $arg) {
         if ($arg === '--confirm') {
             $confirm = true;
+            continue;
+        }
+        if ($arg === '--sweep') {
+            $sweep = true;
             continue;
         }
         if ($targetPath === '') {
@@ -54,59 +40,18 @@ function pmssUserHomeReclaimMain(array $argv): int
         return pmssCliReturnWithStderr($usage, 2);
     }
 
+    if ($sweep) {
+        if ($confirm || $targetPath !== '') {
+            return pmssCliReturnWithStderr($usage, 2);
+        }
+        return pmssUserHomeReclaimSweepMain();
+    }
+
     if (!$confirm || $targetPath === '') {
         return pmssCliReturnWithStderr($usage, 2);
     }
 
-    $username = pmssUserHomeReclaimPathUsername($targetPath);
-    if ($username === null || !pmssUserHomeReclaimPathIsSafe($targetPath)) {
-        return pmssUserHomeReclaimRefuseUnsafePath($username, $targetPath, 'home_reclaim_unsafe');
-    }
-
-    if (!file_exists($targetPath)) {
-        pmssUserLifecycleContextLogStatusMessage('terminate', 'home_reclaim_missing', $username, 'OK', 'Reclaim target already absent', array('path' => $targetPath));
-        return 0;
-    }
-
-    pmssUserLifecycleContextLog('terminate', 'home_reclaim_start', $username, array('status' => 'INFO', 'path' => $targetPath));
-
-    $chattr = pmssCommandPath('chattr');
-    if ($chattr !== '') {
-        pmssUserLifecycleStep(
-            'terminate',
-            $username,
-            'home_reclaim_clear_immutable',
-            pmssBuildCommand('find', array($targetPath, '-xdev', '-exec', $chattr, '-i', '--', '{}', '+')),
-            false
-        );
-    }
-
-    clearstatcache(true, $targetPath);
-    if (!pmssUserHomeReclaimPathIsSafe($targetPath)) {
-        return pmssUserHomeReclaimRefuseUnsafePath(
-            $username,
-            $targetPath,
-            'home_reclaim_unsafe_after_immutable_clear'
-        );
-    }
-
-    $reclaimRc = pmssUserLifecycleRunSteps('terminate', $username, array(
-        array('home_reclaim_delete_contents', pmssBuildCommand('find', array($targetPath, '-xdev', '-depth', '-mindepth', '1', '-delete'))),
-        array('home_reclaim_remove_root', pmssBuildCommand('rmdir', array('--', $targetPath))),
-    ), false);
-
-    $ok = ($reclaimRc['home_reclaim_delete_contents'] ?? 1) === 0
-        && ($reclaimRc['home_reclaim_remove_root'] ?? 1) === 0;
-    pmssUserLifecycleContextLogStatusMessage(
-        'terminate',
-        'home_reclaim_end',
-        $username,
-        $ok ? 'OK' : 'ERR',
-        $ok ? 'Reclaimed terminated home' : 'Terminated home reclaim incomplete',
-        array('path' => $targetPath)
-    );
-
-    return $ok ? 0 : 1;
+    return pmssUserHomeReclaimRunTarget($targetPath);
 }
 
 pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserHomeReclaimMain');

@@ -14,6 +14,7 @@ MAILTO=""
 
 
 1 * * * *   root /scripts/cron/checkDirectories.php >> /var/log/pmss/checkDirectories.log 2>&1
+*/15 * * * * root /scripts/util/userHomeReclaim.php --sweep >> /var/log/pmss/userHomeReclaim.log 2>&1
 */10 * * * *   root /scripts/cron/checkGui.php >> /dev/null 2>&1
 * * * * *   root ps -o pid= -C rtorrent|xargs -I'{1}' ionice -c2 -n3 -p{1}
 * * * * *   root ps -o pid= -C deluged|xargs -I'{1}' ionice -c2 -n3 -p{1}

@@ -21,6 +21,7 @@ are frequently used during day-to-day operations:
 - `scripts/addUser.php` - provision a new user account (creates services/config).
 - `scripts/suspend.php` / `scripts/unsuspend.php` - toggle user suspension state.
 - `scripts/terminateUser.php` - terminate a user account (`--confirm` required for non-interactive runs); homes and matching `backup-<user>` recreate backups are renamed aside and reclaimed asynchronously by `scripts/util/userHomeReclaim.php`.
+- The root cron template retries reclaim targets older than one hour with `scripts/util/userHomeReclaim.php --sweep`; inspect `/var/log/pmss/userHomeReclaim.log` and the diagnostics `terminated_home_reclaim_count` when residue remains.
 
 ## 2. Dry-Run The Updater
 ```
