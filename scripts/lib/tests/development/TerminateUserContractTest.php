@@ -32,64 +32,46 @@ final class TerminateUserContractTest extends TestCase
             ]]]);
     }
 
-    public function testTerminateUserClearsImmutableTrafficBeforeHomeReclaim(): void
+    public function testTerminateUserClearsImmutableTrafficBeforeHomeRemoval(): void
     {
         $this->pmssAssertRepoFileContract('scripts/terminateUser.php', [
                 'required' => ['command -v chattr', 'array_values(pmssTrafficDataPaths($username))'],
                 'ordered' => [[
                     "'clear_immutable_traffic'",
-                    '$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim',
+                    "'remove_home_initial'",
                 ]],
             ]);
     }
 
-    public function testTerminateUserQueuesHomeReclaimAfterTrafficImmutableCleanup(): void
-    {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/terminateUser.php' => ['ordered' => [[
-                "'clear_immutable_traffic'",
-                '$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim',
-                "'queue_home_reclaim'",
-            ]]],
-            'scripts/lib/user/homeReclaim.php' => ['required' => [
-                'PMSS_USER_HOME_RECLAIM_LOG',
-                'ionice -c3 nice -n 19',
-                '/scripts/util/userHomeReclaim.php',
-            ]],
-        ]);
-    }
-
-    public function testTerminateUserFallbackClearsImmutableLeftoversAfterInitialRemoval(): void
+    /**
+     * Home removal is synchronous: rm first, recursive chattr only on the residue,
+     * then rm the leftovers. Refs #729 (revert of the async rename-aside reclaim)
+     * and #606 (ordinary files go first so the recursive walk stays bounded).
+     */
+    public function testTerminateUserRemovesHomeSynchronouslyResidueOnly(): void
     {
         $this->pmssAssertRepoFileContract('scripts/terminateUser.php', [
-            'required' => ['chattr -R -i', "'clear_immutable_home_fallback'", "'remove_home_fallback_leftovers'"],
+            'required' => ['chattr -R -i', "'clear_immutable_home'", "'remove_home_leftovers'"],
+            'forbidden' => ['pmssTerminateUserMoveHomeForReclaim', 'queue_home_reclaim', '.terminating-'],
             'ordered' => [[
-                "'remove_home_fallback'",
-                "'clear_immutable_home_fallback'",
-                "'remove_home_fallback_leftovers'",
+                "'remove_home_initial'",
+                "'clear_immutable_home'",
+                "'remove_home_leftovers'",
             ]],
         ]);
     }
 
-    public function testTerminateUserReclaimsExactRecreateBackupDir(): void
+    public function testTerminateUserRemovesRecreateBackupDirSynchronously(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/user/terminationCleanup.php' => [
-                'required' => [
-                    'function pmssTerminateUserMoveBackupForReclaim',
-                    'is_link($backupPath)',
-                    '$realBackup !== $backupPath',
-                    "'reclaim_user_backup_dir'",
-                ],
-                'forbidden' => ['/home/backup-*', 'glob('],
-            ],
-            'scripts/terminateUser.php' => ['ordered' => [[
-                '$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim',
-                '$backupReclaimPath = pmssTerminateUserMoveBackupForReclaim',
-                "'queue_user_backup_reclaim'",
-                'pmssUserHomeReclaimLaunchCommand($backupReclaimPath)',
+        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', [
+            'required' => ['$backupPath = "/home/backup-{$username}"'],
+            'forbidden' => ['pmssTerminateUserMoveBackupForReclaim', 'queue_user_backup_reclaim', 'glob('],
+            'ordered' => [[
+                "'remove_user_backup_initial'",
+                "'clear_immutable_user_backup'",
+                "'remove_user_backup_leftovers'",
                 'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
-            ]]],
+            ]],
         ]);
     }
 
@@ -157,26 +139,13 @@ final class TerminateUserContractTest extends TestCase
 
     public function testTerminateUserHomeInvariantIsExact(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/terminateUser.php' => ['required' => [
-                '$realHome !== $expectedHome',
-                'Prefix checks are too loose',
-            ]],
-            'scripts/lib/user/terminationCleanup.php' => ['required' => [
-                'function pmssTerminateUserHomePathIsExact',
-                '$realHome !== false && $homePath === $expectedHome && $realHome === $expectedHome',
-                'Refusing unexpected home reclaim source path',
-            ]],
-        ]);
-    }
-
-    public function testTerminateUserHomeReclaimRejectsNonHomeSource(): void
-    {
-        $dir = $this->pmssMakeTempDir('pmss-terminate-home-source-');
-
-        $this->assertFalse(\pmssTerminateUserHomePathIsExact('user1234', $dir));
-        $this->assertSame('', \pmssTerminateUserMoveHomeForReclaim('user1234', $dir, true));
-        $this->assertTrue(is_dir($dir), 'unsafe home reclaim source must not be renamed');
+        // The exact-home invariant lives in terminateUser.php itself; the reclaim-side
+        // duplicate went with the async rename-aside helpers (Refs #729).
+        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', ['required' => [
+            '$realHome !== $expectedHome',
+            'Prefix checks are too loose',
+            'Refusing to operate on unexpected home path',
+        ]]);
     }
 
     public function testTerminateUserHandlesUnreadableRtorrentConfig(): void
@@ -292,10 +261,7 @@ final class TerminateUserContractTest extends TestCase
         $this->assertTrue(is_dir($emptyDir), 'dry-run rmdir must not remove directory');
         $this->assertTrue(\pmssTerminateUserRemoveEmptyDir('user1234', 'remove_dir', $emptyDir, false));
         $this->assertFalse(is_dir($emptyDir), 'non-dry rmdir should remove empty directory');
-
-        $target = \pmssTerminateUserMoveBackupForReclaim('user1234', $backupDir, true);
-        $this->assertStringContainsString('/home/.terminating-user1234-', $target);
-        $this->assertTrue(is_dir($backupDir), 'dry-run backup reclaim must not move source');
+        $this->assertTrue(is_dir($backupDir), 'recreate backup dir is removed by the terminate steps, not a helper');
     }
 
     public function testTerminationCleanupHelpersRejectUnsafePathInputs(): void
@@ -310,33 +276,6 @@ final class TerminateUserContractTest extends TestCase
         $this->assertTrue(is_file($file), 'unsafe unlink input must not affect nearby files');
         $this->assertFalse(\pmssTerminateUserRemoveEmptyDir('user1234', 'remove_dir', "bad\0path", false));
         $this->assertTrue(is_dir($emptyDir), 'unsafe rmdir input must not affect nearby dirs');
-
-        $this->assertSame(
-            '',
-            \pmssTerminateUserMovePathForReclaim(
-                'user1234',
-                'home_reclaim_rename',
-                $dir."\0bad",
-                true,
-                'Dry run; home not renamed',
-                'Failed to rename home for background reclaim',
-                'Renamed home for background reclaim'
-            )
-        );
-        $this->assertSame(
-            '',
-            \pmssTerminateUserMovePathForReclaim(
-                'user1234',
-                'home_reclaim_rename',
-                $dir,
-                true,
-                'Dry run; home not renamed',
-                'Failed to rename home for background reclaim',
-                'Renamed home for background reclaim',
-                array(),
-                true
-            )
-        );
     }
 
     public function testTerminateUserRtorrentPortCleanupPreservesDryRunAndRemovesFiles(): void

@@ -18,7 +18,7 @@
  * @license GPL-3.0-only
  */
 require_once __DIR__.'/lib/userLifecycle.php';
-pmssRequireRelativeFiles(__DIR__, ['lib/users.php', 'lib/homeMount.php', 'lib/traffic/storage.php', 'lib/user/homeReclaim.php', 'lib/user/terminationCleanup.php']);
+pmssRequireRelativeFiles(__DIR__, ['lib/users.php', 'lib/homeMount.php', 'lib/traffic/storage.php', 'lib/user/terminationCleanup.php']);
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Terminating
 // a user when /home is unavailable could lead to incomplete cleanup or acting on
@@ -173,22 +173,20 @@ pmssUserLifecycleRunSteps('terminate', $username, array(
     array('userdel_initial', $userdelCommand),
     array('clear_immutable_traffic', $clearImmutableCmd),
 ), $dryRun);
-$homeReclaimPath = pmssTerminateUserMoveHomeForReclaim($username, $homePath, $dryRun);
-if ($homeReclaimPath !== '') {
-    pmssUserLifecycleStep('terminate', $username, 'queue_home_reclaim', pmssUserHomeReclaimLaunchCommand($homeReclaimPath), $dryRun);
-} else {
-    pmssUserLifecycleRunSteps('terminate', $username, array(
-        array('remove_home_fallback', 'cd /home && rm -rf -- '.escapeshellarg($username)),
-        // Clear immutable flags only when the first removal left a residue.
-        array('clear_immutable_home_fallback', $clearHomeImmutableCmd),
-        array('remove_home_fallback_leftovers', $removeHomeLeftoversCmd),
-    ), $dryRun);
-}
+pmssUserLifecycleRunSteps('terminate', $username, array(
+    array('remove_home_initial', 'cd /home && rm -rf -- '.escapeshellarg($username)),
+    // Remove ordinary files first so recursive chattr only visits leftovers.
+    array('clear_immutable_home', $clearHomeImmutableCmd),
+    array('remove_home_leftovers', $removeHomeLeftoversCmd),
+), $dryRun);
 $backupPath = "/home/backup-{$username}";
-$backupReclaimPath = pmssTerminateUserMoveBackupForReclaim($username, $backupPath, $dryRun);
-if ($backupReclaimPath !== '') {
-    pmssUserLifecycleStep('terminate', $username, 'queue_user_backup_reclaim', pmssUserHomeReclaimLaunchCommand($backupReclaimPath), $dryRun);
-}
+$backupArg = escapeshellarg($backupPath);
+pmssUserLifecycleRunSteps('terminate', $username, array(
+    array('remove_user_backup_initial', 'if [ -d '.$backupArg.' ]; then rm -rf -- '.$backupArg.'; fi'),
+    // Same residue-only ordering as the home above.
+    array('clear_immutable_user_backup', 'if [ -d '.$backupArg.' ] && command -v chattr >/dev/null 2>&1; then chattr -R -i '.$backupArg.' 2>/dev/null || true; fi'),
+    array('remove_user_backup_leftovers', 'if [ -d '.$backupArg.' ]; then rm -rf -- '.$backupArg.'; fi'),
+), $dryRun);
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");
 pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);
 pmssUserLifecycleRefreshNginxConfig(
