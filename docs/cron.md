@@ -36,6 +36,10 @@ healthy between full update runs:
 - **Terminated-home reclaim sweep** – Retries safe `/home/.terminating-*` targets
   older than one hour and records failed attempts in the cron log. A per-target
   lock prevents the sweep from duplicating a reclaim that is still running.
+  Backward-compatibility only: termination removes homes synchronously since
+  2026-07-29 and nothing creates these targets any more. The sweep exists to reap
+  directories left by earlier releases and is retired on the usual multi-year
+  compatibility horizon (ADR 0033, Refs #729).
   `*/15 * * * * root /scripts/util/userHomeReclaim.php --sweep >> /var/log/pmss/userHomeReclaim.log 2>&1`
 
 Audit these lines whenever you review a host. Missing watchdogs usually signal

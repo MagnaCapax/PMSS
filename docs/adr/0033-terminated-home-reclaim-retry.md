@@ -4,11 +4,24 @@ Date: 2026-07-27
 Category: architecture
 
 ## Status
-Accepted
+Accepted 2026-07-27. Superseded as design 2026-07-29 (Refs #729) — **retained as a
+backward-compatibility shim**.
+
+Account termination no longer renames homes aside: `terminateUser.php` removes the
+home synchronously, so nothing creates `/home/.terminating-*` any more. The sweep and
+its worker stay because hosts update on their own schedule and directories created by
+any release between 2026-05-30 and 2026-07-29 may still be sitting on disk consuming a
+full account's capacity. Releases in that window before 2026-07-27 had no retry at all,
+so a worker killed by a reboot stranded its target permanently.
+
+Retire this machinery only once no supported host can still be carrying such a
+directory — on PMSS's usual multi-year compatibility horizon, not on the next cleanup
+pass. Removing it early converts every stranded directory into a silent orphan with no
+reaper and no diagnostics probe reporting it.
 
 ## Context
 
-Account termination renames a home to `/home/.terminating-*` and starts the
+Account termination renamed a home to `/home/.terminating-*` and started the
 existing guarded reclaim worker asynchronously. A worker interrupted by reboot,
 resource pressure, immutable files, or another filesystem error can leave that
 directory consuming capacity after the termination command has returned.

@@ -6,6 +6,14 @@
  * This utility is intentionally narrow: it accepts only PMSS-generated
  * /home/.terminating-* paths and never operates on active /home/<user> names.
  *
+ * BACKWARD-COMPATIBILITY SHIM — do not delete as dead code (Refs #729, ADR 0033).
+ * Termination removes homes synchronously since 2026-07-29, so nothing creates these
+ * targets any more. This reaps directories left behind by releases between 2026-05-30
+ * and 2026-07-29 on hosts that update on their own schedule; releases in that window
+ * before 2026-07-27 had no retry, so an interrupted worker stranded its target for
+ * good. Retire on PMSS's usual multi-year compatibility horizon, not on the next
+ * cleanup pass.
+ *
  * @license GPL-3.0-only
  * @author PMSS Team
  */

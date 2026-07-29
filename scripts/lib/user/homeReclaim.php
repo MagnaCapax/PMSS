@@ -5,6 +5,11 @@
  * The terminate script owns account cleanup; this module owns only the
  * rename-aside path contract, reclaim lock, and detached reclaim command.
  *
+ * BACKWARD-COMPATIBILITY SHIM — do not delete as dead code (Refs #729, ADR 0033).
+ * terminateUser.php stopped renaming homes aside on 2026-07-29; these helpers remain
+ * so the sweep can still recognise and reap /home/.terminating-* directories created
+ * by earlier releases. Retire on PMSS's usual multi-year compatibility horizon.
+ *
  * @license GPL-3.0-only
  * @author PMSS Team
  */
