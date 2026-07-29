@@ -137,6 +137,39 @@ class WebCgroupMemoryStatusTest extends TestCase
         ));
     }
 
+    public function testReadUsesAnonymousMemoryForPressureButReportsInclusiveCurrent(): void
+    {
+        $dir = $this->writeMemoryStatusFixture(
+            '1136082944', '1048576000', '1310720000', "high 0\nmax 0\noom 0\noom_kill 0\n"
+        );
+        $this->pmssWriteFile($dir.'/memory.stat', "total_rss 715689984\ntotal_cache 369463296\n");
+
+        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234]);
+
+        $this->pmssAssertArraySubsetSame([
+            'memory_current' => 1136082944,
+            'usage_percent' => 86.7,
+            'high_percent' => 108.3,
+            'pressure_usage_percent' => 54.6,
+            'pressure_high_percent' => 68.3,
+            'status' => 'LOW',
+        ], $status);
+        $this->assertStringContainsString('1.1 GiB / 1.2 GiB (86.7%; pressure 54.6%)', $status['usage_text']);
+    }
+
+    public function testReadUsesCgroupV1FailcntWhenMemoryEventsAreUnavailable(): void
+    {
+        $dir = $this->writeMemoryStatusFixture(
+            '1073741824', '1073741824', '2147483648', ''
+        );
+        $this->pmssWriteFile($dir.'/memory.failcnt', "3\n");
+        $this->pmssWriteFile($dir.'/memory.stat', "total_rss 1073741824\ntotal_cache 0\n");
+
+        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234]);
+
+        $this->pmssAssertArraySubsetSame(['throttle_events' => 3, 'status' => 'THROTTLED'], $status);
+    }
+
     public function testThrottleMessageUsesReducedSpeedCopyWithoutOomLanguage(): void
     {
         $dir = $this->writeMemoryStatusFixture('2147483648', '1073741824', '3221225472', "high 4\nmax 0\noom 0\noom_kill 0\n");
