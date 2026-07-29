@@ -241,10 +241,39 @@ class ArrUpdateTest extends TestCase
         }
     }
 
-    public function testUpdateUsesSharedBinaryProbeBeforeSkippingMatchingInstall(): void
+    public function testUpdateSkipsMatchingInstallFromVersionFileWithoutRunningTheBinary(): void
     {
-        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-timeout-probe-');
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-metadata-skip-');
         $app = 'PmssArrProbe'.bin2hex(random_bytes(3));
+        $installPath = $baseDir.'/install';
+        $extractDir = 'PackageDir';
+        $archivePath = $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'replacement']);
+        $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
+        $shimDir = $this->writeCurlShim($baseDir);
+        $probeLog = $baseDir.'/probe.log';
+
+        $this->pmssEnsureDir($installPath);
+        @file_put_contents($installPath.'/marker.txt', 'existing');
+        @file_put_contents($installPath.'/version.txt', "1.2.3\n");
+        // Canary: a runnable binary that records any invocation. It must stay silent.
+        $this->writeVersionBinary($installPath.'/'.$app, '1.2.3', $probeLog);
+
+        try {
+            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
+                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
+            });
+
+            $this->assertEquals('existing', (string) @file_get_contents($installPath.'/marker.txt'));
+            $this->assertTrue(!is_file($probeLog), 'the installed binary must never be executed to determine its version');
+        } finally {
+            $this->cleanup($baseDir);
+        }
+    }
+
+    public function testUpdateReinstallsWhenVersionMetadataIsAbsentWithoutRunningTheBinary(): void
+    {
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-metadata-missing-');
+        $app = 'PmssArrTimeout'.bin2hex(random_bytes(3));
         $installPath = $baseDir.'/install';
         $extractDir = 'PackageDir';
         $archivePath = $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'replacement']);
@@ -259,43 +288,13 @@ class ArrUpdateTest extends TestCase
         try {
             $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
-            }, [
-                'PMSS_ARR_TEST_PROBE_LOG' => $probeLog,
-            ]);
+            });
 
-            $this->assertEquals('existing', (string) @file_get_contents($installPath.'/marker.txt'));
-            $probeLines = file($probeLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
-            $this->assertSame(['--version'], $probeLines, 'expected --version probe to satisfy the version check without a fallback probe');
-        } finally {
-            $this->cleanup($baseDir);
-        }
-    }
-
-    public function testUpdateReinstallsWhenSharedVersionProbesReturnNoVersion(): void
-    {
-        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-timeout-fallback-');
-        $app = 'PmssArrTimeout'.bin2hex(random_bytes(3));
-        $installPath = $baseDir.'/install';
-        $extractDir = 'PackageDir';
-        $archivePath = $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'replacement']);
-        $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
-        $shimDir = $this->writeCurlShim($baseDir);
-        $probeLog = $baseDir.'/probe.log';
-
-        $this->pmssEnsureDir($installPath);
-        @file_put_contents($installPath.'/marker.txt', 'existing');
-        $this->writeVersionBinary($installPath.'/'.$app, '', $probeLog);
-
-        try {
-            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
-                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
-            }, [
-                'PMSS_ARR_TEST_PROBE_LOG' => $probeLog,
-            ]);
-
+            // Unknown version reinstalls once, then persists version.txt so the next
+            // run is a cheap metadata read instead of another download.
             $this->assertEquals('replacement', (string) @file_get_contents($installPath.'/marker.txt'));
-            $probeLines = file($probeLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
-            $this->assertSame(['--version', '-v'], $probeLines);
+            $this->assertEquals("1.2.3\n", (string) @file_get_contents($installPath.'/version.txt'));
+            $this->assertTrue(!is_file($probeLog), 'the installed binary must never be executed to determine its version');
         } finally {
             $this->cleanup($baseDir);
         }

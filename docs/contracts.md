@@ -468,6 +468,10 @@ These scripts are primarily imperative; treat them as idempotent installers guar
 
 - servarr.php
   - Provides the shared ARR updater for Lidarr, Prowlarr, Radarr, Readarr, and Sonarr using one canonical app list in `arr.php`; update-step2 excludes this entrypoint from the default app autoloader so system updates do not block on account-scoped media-stack maintenance.
+  - Contract (ADR 0034): install is not execution. `arr.php` downloads, extracts and activates releases and persists `install_path/version.txt`; it MUST NOT execute an installed binary, and unknown-version simply reinstalls. Symlinked version markers are ignored so a foreign-owned install tree cannot redirect root.
+
+- arrRootConfigHardening.php (`scripts/lib/update/`)
+  - `pmssEnsureArrRootConfigHardening()` converges `/root/.config/<App>/config.xml` to `BindAddress=127.0.0.1`, `AuthenticationMethod=Forms`, `AuthenticationRequired=Enabled` and a random `ApiKey`. Seeds where an ARR app is installed, repairs where a past accidental root launch left first-run defaults, never rewrites an unrecognised payload, and refuses symlinked paths. Root has no legitimate ARR instance; this only limits the blast radius of an accidental launch.
 
 - deluge.php
   - Debian 10: installs dependencies via pip and builds Deluge 2.0.5 from source.

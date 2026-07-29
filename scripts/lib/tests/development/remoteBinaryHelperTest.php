@@ -27,6 +27,39 @@ class RemoteBinaryHelperTest extends TestCase
         $this->assertSame('libtorrent.so.21 => not found', \pmssAppVersionProbeOutput($command, 5));
     }
 
+    public function testAppVersionProbeMatchReturnsFirstCapture(): void
+    {
+        $this->assertSame('1.2.3', \pmssAppVersionProbeMatch(['printf %s '.escapeshellarg('tool v1.2.3')], '/v([0-9.]+)/', 1, 5));
+    }
+
+    public function testAppVersionProbeOutputLogsTimeouts(): void
+    {
+        $timeoutLog = $this->pmssMakeTempFile('pmss-app-version-timeout-');
+        $output = 'not-run';
+        $previousCorrelationId = $GLOBALS['PMSS_CORRELATION_ID_CACHE'] ?? null;
+
+        try {
+            $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = null;
+            $this->pmssWithEnv([
+                'PMSS_TIMEOUT_FIRE_LOG' => $timeoutLog,
+                'PMSS_CORRELATION_ID' => 'app-version-probe-test',
+            ], function () use (&$output): void {
+                $output = \pmssAppVersionProbeOutput('php -r '.escapeshellarg('sleep(2);'), 1);
+            });
+        } finally {
+            $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $previousCorrelationId;
+        }
+
+        $this->assertSame('', $output);
+        $data = pmssJsonLineFileLast($timeoutLog);
+        $this->assertTrue(is_array($data), 'expected app probe timeout-fire JSON payload');
+        $this->assertSame('timeout_fired', $data['event'] ?? '');
+        $this->assertSame(1, $data['intended_seconds'] ?? 0);
+        $this->assertSame(124, $data['exit_status'] ?? 0);
+        $this->assertSame('SIGTERM', $data['signal'] ?? '');
+        $this->assertSame('app-version-probe-test', $data['correlation_id'] ?? '');
+    }
+
     private function withFakeDownloadBody(string $body, callable $callback, array $extraEnv = array()): void
     {
         $root = $this->pmssMakeTempDir('pmss-remote-binary-', 0700);

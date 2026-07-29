@@ -6,8 +6,14 @@
  * @author PMSS Team
  */
 
-// Bound ARR binary probes so daemonizing applications cannot wedge updates.
-const PMSS_ARR_VERSION_PROBE_TIMEOUT_SECONDS = 50;
+// INSTALL !== EXECUTION. This module downloads, extracts and activates ARR releases;
+// it MUST NEVER execute an installed binary. Version detection reads metadata only.
+// A *arr binary invoked with an unrecognised argument (Radarr 6.2.0 has no --version)
+// ignores it and performs a full application Bootstrap, then reparents to PID 1 when
+// the updater exits -- a permanent root daemon on a public port with the first-run
+// defaults BindAddress=* / AuthenticationMethod=None. Bounding the probe TIMEOUT bounds
+// the parent's wait, not the child; that "fix" (GH #527) converted a visible update hang
+// into a silent root daemon and produced the 2026-07-03 root compromise of a fleet host.
 const PMSS_ARR_APP_BRANCHES = ['Lidarr' => 'develop|master', 'Prowlarr' => 'develop|master', 'Radarr' => 'develop|master', 'Readarr' => 'develop|master', 'Sonarr' => 'main|develop'];
 
 /**
@@ -82,50 +88,27 @@ function pmssArrVersionExtract(string $payload): ?string
         : null;
 }
 
-/** Build the shell-safe command used by the shared bounded app probe. */
-function pmssArrVersionProbeCommand(string $binary, string $flag): string
-{
-    return function_exists('pmssBuildCommand')
-        ? pmssBuildCommand($binary, [$flag])
-        : escapeshellarg($binary).' '.escapeshellarg($flag);
-}
-
-/** Run an ARR version probe through the shared app probe timeout path. */
-function pmssArrVersionProbeRun(string $binary, string $flag): string
-{
-    require_once __DIR__.'/remoteBinary.php';
-    return trim(pmssAppVersionProbeOutput(pmssArrVersionProbeCommand($binary, $flag), PMSS_ARR_VERSION_PROBE_TIMEOUT_SECONDS));
-}
-
-/** Prefer cheap version files, then bounded binary probes, to detect installed ARR versions. */
+/**
+ * Detect the installed ARR version from on-disk metadata only.
+ *
+ * Metadata reads are the ONLY permitted detection method: the install tree may be a
+ * leftover owned by a departed uid, and is_executable() is a permission test, not a
+ * trust test. Returning null is safe -- pmssArrUpdate() reinstalls on an unknown
+ * version, which is idempotent and self-healing (it also writes version.txt, so a
+ * host pays this at most once).
+ */
 function pmssArrInstalledVersionRead(string $installPath, string $app): ?string
 {
     foreach ([$installPath.'/version.txt', $installPath.'/VERSION'] as $file) {
-        if (!is_file($file)) {
+        // Reject symlinks: root must not be redirected out of the install tree by a
+        // marker planted in a foreign-owned /opt directory.
+        if (!is_file($file) || is_link($file)) {
             continue;
         }
 
         $versionPayload = @file_get_contents($file);
         if (is_string($versionPayload) && $versionPayload !== '') {
             $version = pmssArrVersionExtract($versionPayload);
-            if ($version !== null) {
-                return $version;
-            }
-        }
-    }
-
-    foreach ([$installPath.'/'.$app, $installPath.'/'.strtolower($app), $installPath.'/'.$app.'.exe'] as $binary) {
-        if (!is_executable($binary)) {
-            continue;
-        }
-
-        foreach (['--version', '-v'] as $flag) {
-            $output = pmssArrVersionProbeRun($binary, $flag);
-            if ($output === '') {
-                continue;
-            }
-
-            $version = pmssArrVersionExtract($output);
             if ($version !== null) {
                 return $version;
             }
@@ -158,7 +141,11 @@ function pmssArrReleaseAssetSelect(array $releases, string $assetPattern, string
             }
             $url = (string) ($candidateAsset['browser_download_url'] ?? '');
             if ($url === '') { continue; }
-            $candidate = [$match[1], $url, $name];
+            // Normalize the captured version through the same extractor used to read
+            // version.txt back. The greedy [0-9.]+ capture keeps the separator before
+            // "linux" ("6.2.0.10390."), which would never equal the value read back and
+            // would therefore reinstall every app on every update.
+            $candidate = [pmssArrVersionExtract($match[1]) ?? $match[1], $url, $name];
             $nameLower = strtolower($name);
             if (strpos($nameLower, 'musl') !== false) {
                 continue; // skip musl builds: dynamic loader /lib/ld-musl-* is absent on glibc Debian -> non-executable (#489, libc filter missing post-#447)
