@@ -32,47 +32,53 @@ final class TerminateUserContractTest extends TestCase
             ]]]);
     }
 
-    public function testTerminateUserClearsImmutableTrafficBeforeHomeRemoval(): void
-    {
-        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', [
-                'required' => ['command -v chattr', 'array_values(pmssTrafficDataPaths($username))'],
-                'ordered' => [[
-                    "'clear_immutable_traffic'",
-                    "'remove_home_initial'",
-                ]],
-            ]);
-    }
-
     /**
-     * Home removal is synchronous: rm first, recursive chattr only on the residue,
-     * then rm the leftovers. Refs #729 (revert of the async rename-aside reclaim)
-     * and #606 (ordinary files go first so the recursive walk stays bounded).
+     * Home and the recreate backup are purged synchronously through one shared helper,
+     * after the account is removed and before the nginx routes are cleaned up.
+     * Refs #729 (revert of the async rename-aside reclaim).
      */
-    public function testTerminateUserRemovesHomeSynchronouslyResidueOnly(): void
+    public function testTerminateUserPurgesHomeAndBackupSynchronously(): void
     {
         $this->pmssAssertRepoFileContract('scripts/terminateUser.php', [
-            'required' => ['chattr -R -i', "'clear_immutable_home'", "'remove_home_leftovers'"],
-            'forbidden' => ['pmssTerminateUserMoveHomeForReclaim', 'queue_home_reclaim', '.terminating-'],
+            'forbidden' => [
+                'pmssTerminateUserMoveHomeForReclaim',
+                'pmssTerminateUserMoveBackupForReclaim',
+                'queue_home_reclaim',
+                'queue_user_backup_reclaim',
+                '.terminating-',
+            ],
             'ordered' => [[
-                "'remove_home_initial'",
-                "'clear_immutable_home'",
-                "'remove_home_leftovers'",
-            ]],
-        ]);
-    }
-
-    public function testTerminateUserRemovesRecreateBackupDirSynchronously(): void
-    {
-        $this->pmssAssertRepoFileContract('scripts/terminateUser.php', [
-            'required' => ['$backupPath = "/home/backup-{$username}"'],
-            'forbidden' => ['pmssTerminateUserMoveBackupForReclaim', 'queue_user_backup_reclaim', 'glob('],
-            'ordered' => [[
-                "'remove_user_backup_initial'",
-                "'clear_immutable_user_backup'",
-                "'remove_user_backup_leftovers'",
+                "'userdel_initial'",
+                "pmssTerminateUserPurgeDirectorySteps('home', \"/home/{\$username}\")",
+                "pmssTerminateUserPurgeDirectorySteps('user_backup', \"/home/backup-{\$username}\")",
                 'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
             ]],
         ]);
+    }
+
+    /**
+     * The purge sequence is rm first, recursive chattr on the residue only, then rm
+     * the leftovers (Refs #606 — a full recursive chattr before the removal delays
+     * inode recovery on large accounts). Covering the tree recursively means no named
+     * path list exists to drift from what the writers actually mark immutable.
+     */
+    public function testPurgeDirectoryStepsClearImmutableOnResidueOnly(): void
+    {
+        $steps = \pmssTerminateUserPurgeDirectorySteps('home', '/home/user1234');
+
+        $this->assertSame(
+            ['remove_home_initial', 'clear_immutable_home', 'remove_home_leftovers'],
+            array_column($steps, 0),
+            'purge must be remove -> clear-immutable -> remove-leftovers'
+        );
+        $this->assertStringNotContainsString('chattr', $steps[0][1], 'first removal must not walk the tree');
+        $this->assertStringContainsString('chattr -R -i', $steps[1][1]);
+        $this->assertStringContainsString("'/home/user1234'", $steps[1][1], 'path must be shell-escaped');
+        $this->assertSame($steps[0][1], $steps[2][1], 'leftover removal repeats the initial removal');
+
+        foreach ($steps as $step) {
+            $this->assertSame(0, strpos($step[1], 'if [ -d '), 'every step must no-op when the directory is gone');
+        }
     }
 
     public function testHomeReclaimPathContract(): void

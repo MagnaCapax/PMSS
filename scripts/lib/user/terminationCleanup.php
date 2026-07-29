@@ -72,6 +72,29 @@ function pmssTerminateUserRemoveEmptyDir(string $username, string $phase, string
     return false;
 }
 
+/**
+ * Steps that purge a directory: remove ordinary files, clear immutable flags on
+ * whatever survived, then remove that residue.
+ *
+ * The ordering is deliberate (Refs #606): a full recursive chattr BEFORE the removal
+ * delays inode recovery on large accounts even when nothing is immutable. Running it
+ * only on the residue keeps the walk bounded to the files rm could not delete, and
+ * covers every immutable path in the tree without a list that can drift from what
+ * the writers actually mark.
+ */
+function pmssTerminateUserPurgeDirectorySteps(string $label, string $path): array
+{
+    $arg = escapeshellarg($path);
+    $whenPresent = 'if [ -d '.$arg.' ]; then ';
+    $remove = $whenPresent.'rm -rf -- '.$arg.'; fi';
+
+    return array(
+        array('remove_'.$label.'_initial', $remove),
+        array('clear_immutable_'.$label, $whenPresent.'command -v chattr >/dev/null 2>&1 && chattr -R -i '.$arg.' 2>/dev/null || true; fi'),
+        array('remove_'.$label.'_leftovers', $remove),
+    );
+}
+
 function pmssTerminateUserNginxRouteFileSpecs(string $username): array
 {
     return array(array('phase' => 'remove_nginx_route_file', 'path' => "/etc/nginx/conf.d/pmss-user-{$username}.conf"), array('phase' => 'remove_nginx_route_file_hash', 'path' => "/etc/nginx/conf.d/pmss-user-{$username}-hash.conf"));
