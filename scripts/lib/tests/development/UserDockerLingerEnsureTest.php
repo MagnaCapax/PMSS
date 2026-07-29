@@ -37,4 +37,20 @@ class UserDockerLingerEnsureTest extends TestCase
         $this->assertTrue($ensurePos !== false && $startPos !== false && $ensurePos < $startPos,
             'linger-ensure must run before the rootless dockerd launch');
     }
+
+    public function testUserDockerStopUsesRuntimeDirFallbackAndLivenessGate(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 3).'/util/userDocker.php');
+        $this->assertStringContainsString('XDG_RUNTIME_DIR=%s systemctl --user %s docker.service', $src);
+        $this->assertStringContainsString('$systemdAction = !$dockerEnabled ? \'disable --now\' : \'stop\';', $src);
+        $this->assertStringContainsString('if ($stopRc !== 0) {', $src);
+        $this->assertStringContainsString('userDockerCollectPids($user, $debug, $stopCheckOk)', $src);
+        $this->assertStringContainsString('if (!$stopCheckOk || !empty($remainingPids)) {', $src);
+        $oldTimeoutGuard = 'if ($stopRc === '.(string) 124;
+        $oldTimeoutGuard .= ')';
+        $this->assertTrue(strpos($src, $oldTimeoutGuard) === false,
+            'stop fallback must not be limited to timeout rc 124');
+        $this->assertTrue(strpos($src, 'userDockerCollectPids($user, $debug, $stopCheckOk)') < strpos($src, 'echo "Docker stop requested'),
+            'stop success output must follow liveness verification');
+    }
 }

@@ -332,19 +332,54 @@ if ($action === 'status') {
 
 // STOP
 if ($action === 'stop' || $action === 'restart') {
+    $userDockerStore = new UserConfigStore();
+    $dockerEnabled = pmssUserDockerEnabled($user, $userDockerStore);
     pmssUserLog($user, $serviceExists
         ? 'userDocker: stopping via systemd user service'
         : 'userDocker: stopping rootless daemon via pkill (no systemd user unit)');
+    $fallbackUsed = false;
     if ($serviceExists) {
         $stopRc = 0;
-        userDockerRunAs($user, 'systemctl --user stop docker.service', $userDockerStartTimeoutSec, $stopRc);
-        if ($stopRc === 124) {
-            pmssUserLog($user, 'userDocker: systemctl stop timed out; falling back to pkill');
+        $systemdAction = !$dockerEnabled ? 'disable --now' : 'stop';
+        $systemdStopCmd = sprintf(
+            'XDG_RUNTIME_DIR=%s systemctl --user %s docker.service',
+            escapeshellarg($runtimeDir),
+            $systemdAction
+        );
+        userDockerRunAs($user, $systemdStopCmd, $userDockerStartTimeoutSec, $stopRc);
+        if ($stopRc !== 0) {
+            pmssUserLog($user, sprintf(
+                'userDocker: systemctl %s failed (rc=%d); falling back to pkill',
+                $systemdAction,
+                $stopRc
+            ));
             userDockerRunAs($user, $dockerStopCmd);
+            $fallbackUsed = true;
         }
     } else {
         // Best-effort stop for non-systemd rootless: kill dockerd-rootless.sh/dockerd for this user.
         userDockerRunAs($user, $dockerStopCmd);
+        $fallbackUsed = true;
+    }
+
+    if ($fallbackUsed) {
+        // Allow an upstream user unit's short restart window to settle before checking liveness.
+        usleep(3000000);
+    }
+
+    $stopCheckOk = true;
+    $remainingPids = userDockerCollectPids($user, $debug, $stopCheckOk);
+    if (!empty($remainingPids)) {
+        sort($remainingPids);
+    }
+    if (!$stopCheckOk || !empty($remainingPids)) {
+        $detail = !$stopCheckOk
+            ? 'process verification failed'
+            : 'remaining pid(s): '.implode(', ', $remainingPids);
+        $failure = sprintf('Docker stop failed for %s: %s', $user, $detail);
+        pmssUserLog($user, '[ERR] '.$failure);
+        fwrite(STDERR, $failure."\n");
+        exit(1);
     }
     if ($action === 'stop') {
         echo "Docker stop requested for {$user}\n";

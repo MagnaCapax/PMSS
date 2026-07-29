@@ -76,7 +76,7 @@ For operators, per-user Docker can be controlled via:
 /scripts/userDocker.php USER {start|stop|restart|status}
 ```
 
-This helper **defaults to starting `dockerd-rootless.sh` directly** (non-systemd rootless mode) once it has confirmed no rootless Docker process is running. Systemd user units are treated as advisory: their *presence on disk* is reported by `status` and, when available, used for a polite `stop`, but the helper does not query the user bus (to avoid hangs) or rely on systemd for `start`/`restart` until it has dedicated test coverage on the current distro mix. Actions are logged to `/var/log/pmss/users/<username>.log` (and mirrored into `/var/log/pmss/users.log`/`.jsonl` when available).
+This helper **defaults to starting `dockerd-rootless.sh` directly** (non-systemd rootless mode) once it has confirmed no rootless Docker process is running. Systemd user units are treated as advisory for start, while `stop` and `restart` pass the user's runtime directory to the user bus, fall back to a user-scoped process stop on failure, and verify that Docker is no longer running before reporting success. When `dockerEnabled=false`, the stop path also disables the user unit. Actions are logged to `/var/log/pmss/users/<username>.log` (and mirrored into `/var/log/pmss/users.log`/`.jsonl` when available).
 
 On cgroup v2 hosts, `userDocker.php start` also backfills the same `daemon.json` override for older accounts that were provisioned before the skeleton shipped it.
 
