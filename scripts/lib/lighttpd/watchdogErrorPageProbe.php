@@ -9,12 +9,6 @@ if (!function_exists('pmssCommandPath') && is_file(__DIR__.'/../runtime.php')) {
     require_once __DIR__.'/../runtime.php';
 }
 
-/** Return true when quota output shows either block or inode exhaustion. */
-function pmssLighttpdWatchdogQuotaOutputShowsExhaustion(string $output): bool
-{
-    return preg_match('/^\s*\/\S+.*\*.*$/m', $output) === 1;
-}
-
 /** Parse the reported root inode-use percentage from `df -i` output. */
 function pmssLighttpdWatchdogParseDfInodeUsePercent(string $output): ?int
 {
@@ -45,25 +39,7 @@ function pmssLighttpdWatchdogCommandCapture(string $binary, string $arguments): 
     return array('output' => $lines !== array() ? implode(PHP_EOL, $lines).PHP_EOL : '', 'exitCode' => $exitCode);
 }
 
-/** Inspect quota state live when possible, otherwise fall back to ~/.quota. */
-function pmssLighttpdWatchdogQuotaExceeded(string $username, string $homeDir): bool
-{
-    $output = '';
-    $quotaResult = pmssLighttpdWatchdogCommandCapture('quota', '-u '.escapeshellarg($username).' -s 2>/dev/null');
-    if ($quotaResult !== null && $quotaResult['output'] !== '') {
-        $output = $quotaResult['output'];
-    }
-
-    if ($output === '') {
-        $quotaFile = rtrim($homeDir, '/').'/.quota';
-        $snapshot = pmssReadRegularFileContents($quotaFile);
-        if ($snapshot !== null) {
-            $output = $snapshot;
-        }
-    }
-
-    return pmssLighttpdWatchdogQuotaOutputShowsExhaustion($output);
-}
+require_once __DIR__.'/watchdogQuotaProbe.php';
 
 /** Return true when root inode usage is at or above the watchdog threshold. */
 function pmssLighttpdWatchdogRootInodesExhausted(string $mountPath = '/'): bool
@@ -94,13 +70,28 @@ function pmssLighttpdWatchdogConfigInvalid(string $configPath): bool
 }
 
 /** Diagnose the most helpful 502 status page for an unhealthy user web stack. */
-function pmssLighttpdWatchdogDetectReason(string $username, string $homeDir, string $configPath, bool $socketError): string
+function pmssLighttpdWatchdogDetectReason(
+    string $username,
+    string $homeDir,
+    string $configPath,
+    bool $socketError,
+    string $procRoot = '/proc',
+    ?callable $statReader = null
+): string
 {
     if (is_dir(rtrim($homeDir, '/').'/www-disabled')) {
         return 'suspended';
     }
 
-    if (pmssLighttpdWatchdogQuotaExceeded($username, $homeDir)) {
+    $quotaState = pmssLighttpdWatchdogQuotaStateRead($username, $homeDir);
+    if (is_array($quotaState) && !empty($quotaState['exceeded'])) {
+        $overageBytes = max(0, (int) $quotaState['usedBytes'] - (int) $quotaState['softLimitBytes']);
+        $heldBlocks = $overageBytes > 0
+            ? pmssLighttpdWatchdogQuotaHeldBlocks($username, $homeDir, $procRoot, $statReader)
+            : null;
+        if (pmssLighttpdWatchdogQuotaDescriptorStateMatches($quotaState, $heldBlocks)) {
+            return 'quota_descriptors';
+        }
         return 'quota';
     }
 

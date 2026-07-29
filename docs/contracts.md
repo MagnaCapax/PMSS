@@ -511,6 +511,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - scripts/cron/checkLighttpdInstances.php [<user>]
   - Behavior: Keeps per-user `lighttpd` and `php-cgi` healthy, regenerates missing configs, and refreshes per-user 502 pages while the web stack is unhealthy.
   - Behavior: Restarts the per-user lighttpd/php-cgi stack when the rendered config, `~/.lighttpd/custom`, or `~/.lighttpd/custom.d/*.conf` fragments are newer than the running lighttpd process.
+  - Quota diagnosis: when quota is exceeded, compares the charged-over-soft amount with deleted blocks held by account-owned processes on the home device; an uncertain `/proc` or `stat()` scan keeps the conservative quota reason. The `quota_descriptors` page never exposes descriptor paths and states that further deletion will not release held blocks.
   - Per-user toggle: when user config `lighttpdEnabled` is false, kills any running `lighttpd`/`php-cgi` for that user, removes the watchdog error page, and skips restart. Default remains true.
 
 - scripts/cron/checkRtorrent.php

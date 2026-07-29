@@ -51,7 +51,7 @@ class ErrorPageTemplateTest extends TestCase
                 'The sage guards this path.',
                 '<a href="/">Return to the main page.</a>',
             ]],
-            'var/www/error-502.html' => ['required' => ['Your disk quota is full', 'connect with SFTP and delete files', 'account is suspended', 'server-wide storage pressure']],
+            'var/www/error-502.html' => ['required' => ['Your disk quota is full', 'stop the torrent client before deleting files', 'account is suspended', 'server-wide storage pressure']],
             'etc/seedbox/config/template.lighttpd' => ['required' => ['server.errorfile-prefix    = "/home/##username/www/error-"']],
             'etc/skel/www/error-503.html' => ['required' => [
                 '503 - Service Unavailable',

@@ -12,7 +12,8 @@ function pmssLighttpdWatchdogRenderErrorPage(string $reasonKey): string
 {
     $messages = array(
         'suspended' => array('headline' => 'Your account is suspended.', 'detail' => 'Check your invoices or contact support before retrying.'),
-        'quota' => array('headline' => 'Your disk quota is full.', 'detail' => 'Connect with SFTP and delete files to free space, then retry.'),
+        'quota' => array('headline' => 'Your disk quota is full.', 'detail' => 'Stop the torrent client before deleting files; data held open by a running client can remain charged.'),
+        'quota_descriptors' => array('headline' => 'Deleted files are still counted by your quota.', 'detail' => 'Your account process still has deleted files open, so their blocks remain charged. Stop that client or remove the affected torrents; deleting more files will not release this space.'),
         'inode' => array('headline' => 'Server-wide storage pressure is blocking web access.', 'detail' => 'No action is needed from your side; our team is already on it.'),
         'config' => array('headline' => 'A web configuration error was detected.', 'detail' => 'Please contact support so we can correct the service configuration.'),
         'php' => array('headline' => 'Your PHP backend is not responding.', 'detail' => 'An automatic restart is in progress; retry in 1-2 minutes.'),

@@ -39,6 +39,36 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         $this->assertFalse(pmssLighttpdWatchdogQuotaOutputShowsExhaustion("quota unavailable\ntry again later\n"));
     }
 
+    public function testQuotaStateParsesChargedAndSoftLimitBytes(): void
+    {
+        $state = pmssLighttpdWatchdogQuotaStateParse(
+            "Disk quotas for user demo (uid 1000):\n/dev/sda1 10G* 9G 10G 0 0 0\n"
+        );
+        $this->assertSame(10737418240, $state['usedBytes']);
+        $this->assertSame(9663676416, $state['softLimitBytes']);
+        $this->assertSame(10737418240, $state['hardLimitBytes']);
+        $this->assertTrue($state['exceeded']);
+    }
+
+    public function testQuotaStateReturnsNullForMalformedData(): void
+    {
+        $this->assertSame(null, pmssLighttpdWatchdogQuotaStateParse("/dev/sda1 unknown 9G 10G\n"));
+    }
+
+    public function testQuotaDescriptorMatchUsesDerivedOverageBoundary(): void
+    {
+        $state = ['usedBytes' => 1025, 'softLimitBytes' => 1, 'exceeded' => true];
+        $this->assertTrue(pmssLighttpdWatchdogQuotaDescriptorStateMatches($state, 2));
+        $this->assertFalse(pmssLighttpdWatchdogQuotaDescriptorStateMatches($state, 1));
+    }
+
+    public function testQuotaDescriptorMatchFailsClosedForUncertainOrNonOverQuotaState(): void
+    {
+        $this->assertFalse(pmssLighttpdWatchdogQuotaDescriptorStateMatches(['usedBytes' => 2048, 'softLimitBytes' => 1024, 'exceeded' => false], 2));
+        $this->assertFalse(pmssLighttpdWatchdogQuotaDescriptorStateMatches(['usedBytes' => 1024, 'softLimitBytes' => 1024, 'exceeded' => true], 2));
+        $this->assertFalse(pmssLighttpdWatchdogQuotaDescriptorStateMatches(['usedBytes' => 2048, 'softLimitBytes' => 1024, 'exceeded' => true], null));
+    }
+
     public function testParseDfInodeUsePercentReturnsDetectedValue(): void
     {
         $output = "Filesystem Inodes IUsed IFree IUse% Mounted on\n/dev/sda1 100 96 4 96% /\n";
@@ -95,7 +125,16 @@ SH
     public function testRenderErrorPageIncludesSpecificStatusAndHomeLink(): void
     {
         $contents = pmssLighttpdWatchdogRenderErrorPage('quota');
-        $this->assertStringContainsAllStrings(['Your disk quota is full.', 'Connect with SFTP and delete files to free space, then retry.', '<a href="/">Return to the main page.</a>'], $contents);
+        $this->assertStringContainsAllStrings(['Your disk quota is full.', 'Stop the torrent client before deleting files', '<a href="/">Return to the main page.</a>'], $contents);
+    }
+
+    public function testRenderErrorPageExplainsHeldDeletedFiles(): void
+    {
+        $contents = pmssLighttpdWatchdogRenderErrorPage('quota_descriptors');
+        $this->assertStringContainsAllStrings([
+            'Deleted files are still counted by your quota.',
+            'deleting more files will not release this space.',
+        ], $contents);
     }
 
     public function testRenderErrorPageFallsBackToRestartingMessageForUnknownReason(): void
@@ -132,6 +171,7 @@ SH
     {
         $contents = $this->pmssReadRepoFile('var/www/error-502.html');
         $this->assertStringContainsString('If this continues for more than a few minutes, open a support ticket.', $contents);
+        $this->assertStringContainsString('stop the torrent client before deleting files', $contents);
     }
 
     public function testWriteErrorPageCreatesExpectedPerUserPath(): void
