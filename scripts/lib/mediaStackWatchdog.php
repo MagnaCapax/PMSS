@@ -105,9 +105,9 @@ function pmssMediaStackWatchdogSnapshot(string $username, array $apps, array $pr
 }
 
 /** Atomically publish a customer-readable status artifact. */
-function pmssMediaStackWatchdogStatusWrite(string $path, array $status): bool
+function pmssMediaStackWatchdogStatusWrite(string $home, string $path, array $status): bool
 {
-    if ($path === '' || !pmssPathTargetIsSafe($path, false, true)) {
+    if ($path === '' || !pmssPathTargetIsSafe($path, false, true) || !pmssPathWithinResolvedRoot($path, $home)) {
         return false;
     }
     $encoded = pmssJsonEncodePrettyLine($status);
@@ -152,7 +152,7 @@ function pmssMediaStackWatchdogRunUser(string $username, string $homeRoot = '/ho
 
     $previous = pmssJsonFileReadAssoc($path, true) ?? array();
     $status = pmssMediaStackWatchdogSnapshot($username, $apps, $previous, $probe);
-    if (!pmssMediaStackWatchdogStatusWrite($path, $status)) {
+    if (!pmssMediaStackWatchdogStatusWrite($home, $path, $status)) {
         echo date('Y-m-d H:i:s').' Media stack watchdog: unable to publish status for '.$username.PHP_EOL;
         return $status;
     }

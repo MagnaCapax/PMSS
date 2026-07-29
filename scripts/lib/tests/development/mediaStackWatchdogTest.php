@@ -77,7 +77,7 @@ class MediaStackWatchdogTest extends TestCase
         $path = \pmssMediaStackWatchdogStatusPath($home);
         $status = array('state' => 'healthy', 'apps' => array('sonarr' => array('state' => 'running')));
 
-        $this->assertTrue(\pmssMediaStackWatchdogStatusWrite($path, $status));
+        $this->assertTrue(\pmssMediaStackWatchdogStatusWrite($home, $path, $status));
         $this->assertEquals($status, \pmssJsonFileReadAssoc($path, true));
         $this->assertSame(0644, fileperms($path) & 0777);
     }
@@ -85,6 +85,7 @@ class MediaStackWatchdogTest extends TestCase
     public function testUnsafeStatusPathIsRejected(): void
     {
         $this->assertSame('', \pmssMediaStackWatchdogStatusPath('/tmp/../home/alice'));
-        $this->assertFalse(\pmssMediaStackWatchdogStatusWrite('/tmp/relative-status.json', array()));
+        $home = $this->pmssMakeTempDir('media-stack-watchdog-unsafe-status-');
+        $this->assertFalse(\pmssMediaStackWatchdogStatusWrite($home, '/tmp/relative-status.json', array()));
     }
 }
