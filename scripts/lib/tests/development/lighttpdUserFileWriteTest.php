@@ -145,6 +145,7 @@ class LighttpdUserFileWriteTest extends TestCase
         $movedDir = $this->tempDir.'/user/.lighttpd-real';
         $path = $managedDir.'/.htpasswd';
         @mkdir($managedDir, 0755, true);
+        $this->pmssWriteFile($path, "original:hash\n");
 
         $this->assertFalse(\pmssReplaceUserFile($path, "user:hash\n", static function (string $tmp) use ($managedDir, $movedDir): void {
             rename($managedDir, $movedDir);
@@ -153,8 +154,7 @@ class LighttpdUserFileWriteTest extends TestCase
         }));
 
         $this->assertTrue(is_link($managedDir));
-        $this->assertFalse(file_exists($path));
-        $this->assertFalse(file_exists($movedDir.'/.htpasswd'));
+        $this->assertEquals("original:hash\n", file_get_contents($movedDir.'/.htpasswd'));
         $this->assertEquals(0, count(glob($movedDir.'/.htpasswd.pmss-tmp-*') ?: []));
     }
 

@@ -5,8 +5,8 @@
  *
  * Preconditions:
  *   - User homes live under `/home/<user>` with `www/` mirroring the skeleton.
- *   - A healthy GUI exposes `www/index.php`; missing or zero-byte files are
- *     restored from `/etc/skel/www/index.php`.
+ *   - Healthy managed panel files are present and at least as large as their
+ *     skeleton sources; missing, empty, or undersized files are restored.
  *
  * Future enhancements may add HTTP responsiveness probes; keep the watchdog
  * lightweight and idempotent so it can run every few minutes without churn.
@@ -104,26 +104,28 @@ function pmssCheckGuiEnsureUserDirectory(string $directory, string $user, string
 }
 
 /**
- * Restore the user's GUI entrypoint when it is missing or empty.
+ * Restore a managed user panel file when it is missing, empty, or undersized.
  */
-function pmssCheckGuiRestoreUserIndex(string $targetFile, string $sourceFile, string $user, callable $log, string $homeDir = ''): bool
+function pmssCheckGuiRestoreUserFile(string $targetFile, string $sourceFile, string $user, string $label, callable $log, string $homeDir = ''): bool
 {
     $homeDir = $homeDir === '' ? dirname(dirname($targetFile)) : rtrim($homeDir, '/');
     if (!pmssCheckGuiUserPathIsSafe($targetFile, $homeDir, false)) {
-        $log("Skipping {$user}: unsafe index.php target {$targetFile}");
+        $log("Skipping {$user}: unsafe {$label} target {$targetFile}");
         return false;
     }
 
-    if (is_file($targetFile) && filesize($targetFile) > 0) {
+    $targetSize = @filesize($targetFile);
+    $sourceSize = @filesize($sourceFile);
+    if (is_file($targetFile) && is_int($targetSize) && $targetSize > 0
+        && (!is_int($sourceSize) || $targetSize >= $sourceSize)) {
         return true;
     }
 
     if (file_exists($targetFile) && !is_file($targetFile)) {
-        $log("Skipping {$user}: expected index.php file but found non-file at {$targetFile}");
+        $log("Skipping {$user}: expected {$label} file but found non-file at {$targetFile}");
         return false;
     }
 
-    $sourceSize = @filesize($sourceFile);
     if (
         !pmssPathTargetIsSafe($sourceFile, false, true)
         || !is_file($sourceFile)
@@ -131,17 +133,29 @@ function pmssCheckGuiRestoreUserIndex(string $targetFile, string $sourceFile, st
         || !is_int($sourceSize)
         || $sourceSize <= 0
     ) {
-        $log("Cannot restore index.php for {$user}: missing skeleton source {$sourceFile}");
+        $log("Cannot restore {$label} for {$user}: missing skeleton source {$sourceFile}");
         return false;
     }
 
-    $log("Restoring index.php for user {$user}");
-    if (!@copy($sourceFile, $targetFile)) {
-        $log("Skipping {$user}: unable to copy index.php to {$targetFile}");
+    $content = @file_get_contents($sourceFile);
+    if (!is_string($content) || strlen($content) !== $sourceSize) {
+        $log("Skipping {$user}: unable to read complete {$label} source {$sourceFile}");
+        return false;
+    }
+
+    $log("Restoring {$label} for user {$user}");
+    if (!pmssReplaceUserFilePreservingMetadata($targetFile, $content)) {
+        $log("Skipping {$user}: unable to atomically replace {$label} at {$targetFile}");
         return false;
     }
 
     return pmssCheckGuiApplyOwnership($targetFile, $user, $log);
+}
+
+/** Preserve the existing public helper contract for index.php callers. */
+function pmssCheckGuiRestoreUserIndex(string $targetFile, string $sourceFile, string $user, callable $log, string $homeDir = ''): bool
+{
+    return pmssCheckGuiRestoreUserFile($targetFile, $sourceFile, $user, 'index.php', $log, $homeDir);
 }
 
 /**
@@ -151,7 +165,7 @@ function pmssCheckGuiMain(array $argv): int
 {
     $logger = new Logger(__FILE__);
     $log = [$logger, 'msg'];
-    $skeletonIndex = '/etc/skel/www/index.php';
+    $skeletonWwwDir = '/etc/skel/www';
 
     foreach (pmssManagedHomeUsersList() as $thisUser) {
         $thisUser = pmssCheckGuiManagedUserNameNormalize($thisUser);
@@ -178,8 +192,18 @@ function pmssCheckGuiMain(array $argv): int
         }
         pmssCheckGuiEnsureUserDirectory($dataDir, $thisUser, 'data', $log, $homeDir);
 
-        // Keep a functioning GUI entrypoint for each non-suspended account.
-        pmssCheckGuiRestoreUserIndex($wwwDir.'/index.php', $skeletonIndex, $thisUser, $log, $homeDir);
+        // Keep the panel entrypoint and its load-bearing include recoverable
+        // outside the panel request path after a partial filesystem write.
+        foreach (['index.php', 'scriptsInc.php'] as $guiFile) {
+            pmssCheckGuiRestoreUserFile(
+                $wwwDir.'/'.$guiFile,
+                $skeletonWwwDir.'/'.$guiFile,
+                $thisUser,
+                $guiFile,
+                $log,
+                $homeDir
+            );
+        }
 
         #TODO Check responsiveness etc. other common stuff as well.
     }

@@ -271,6 +271,12 @@ Sub-handlers:
   - Applies per-user timeout via `PMSS_USER_PERMISSIONS_TIMEOUT` (default 900s) by temporarily setting `PMSS_COMMAND_TIMEOUT` for that command only.
   - Throws `RuntimeException` when permission refresh times out so caller can skip that user and continue the queue.
   - Refreshes `~/.rtorrent.rc.custom` from skel if hash matches legacy list.
+- pmssUserPatchWritableFile(string $path, callable $patcher): void
+  - Reads an existing writable tenant file, applies the content transformer, and
+    atomically replaces changed content while preserving existing mode and
+    ownership metadata.
+  - Unsafe, missing, empty, or unchanged files are ignored; failed replacement
+    leaves the previous file in place.
 
 ---
 
@@ -523,6 +529,12 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - scripts/util/setupRootCron.php
   - Behavior: Installs/updates root cron entries from `/etc/seedbox/config/root.cron`.
   - Behavior: Maintains the PMSS-owned `cron.service` drop-in with `Restart=always` and an aggregate `TasksMax=8192` cap so cron-spawned user jobs cannot consume host-wide pid capacity.
+
+- scripts/cron/checkGui.php
+  - Behavior: Runs outside the panel request path and repairs missing, empty, or
+    undersized `www/index.php` and `www/scriptsInc.php` files from the skeleton.
+  - Safety: Revalidates user paths and skeleton sources, and replaces repaired
+    files atomically so a failed write does not truncate the prior copy.
 
 - scripts/util/setupNetwork.php
   - Behavior: Renders and applies FireQOS from `template.fireqos` using `networkLoadConfig()` and `networkLoadLocalnets()`; writes config under `/etc/seedbox/config` and applies rules.

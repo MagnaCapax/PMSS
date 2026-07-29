@@ -8,6 +8,7 @@
  * @author PMSS Team
  */
 require_once dirname(__DIR__, 2).'/pathSafety.php';
+require_once dirname(__DIR__, 2).'/lighttpd/userFileWrite.php';
 require_once dirname(__DIR__, 2).'/user/trafficLimit.php';
 
 /**
@@ -36,7 +37,7 @@ function pmssUserPatchWritableFile(string $path, callable $patcher): void
 
     $updated = $patcher($content);
     if (is_string($updated) && $updated !== $content) {
-        @file_put_contents($path, $updated);
+        pmssReplaceUserFilePreservingMetadata($path, $updated);
     }
 }
 

@@ -24,6 +24,8 @@ class CheckGuiCronTest extends TestCase
                 'pmssCheckGuiEnsureUserDirectory($wwwDir',
                 'pmssCheckGuiEnsureUserDirectory($dataDir',
                 'pmssCheckGuiRestoreUserIndex',
+                'pmssCheckGuiRestoreUserFile',
+                "'scriptsInc.php'",
                 'pmssCheckGuiManagedUserNameNormalize($thisUser)',
             ],
             'checkGui should keep core userspace repair wiring: '
@@ -109,6 +111,50 @@ class CheckGuiCronTest extends TestCase
             $homeDir
         ));
         $this->assertEquals("<?php echo 'ok';\n", file_get_contents($homeDir.'/www/index.php'));
+    }
+
+    public function testRestoreUserFileRepairsNonZeroTruncation(): void
+    {
+        $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
+        $sourceFile = $this->tempDir.'/skel/scriptsInc.php';
+        $targetFile = $homeDir.'/www/scriptsInc.php';
+        $sourceContent = "<?php\nfunction panelHelper(): string { return 'ok'; }\n";
+        $this->pmssWriteFile($sourceFile, $sourceContent);
+        $this->pmssWriteFile($targetFile, substr($sourceContent, 0, -12));
+        $messages = [];
+
+        $this->assertTrue(\pmssCheckGuiRestoreUserFile(
+            $targetFile,
+            $sourceFile,
+            $this->pmssCurrentOwner(),
+            'scriptsInc.php',
+            $this->pmssMakeArrayLogger($messages),
+            $homeDir
+        ));
+        $this->assertEquals($sourceContent, file_get_contents($targetFile));
+    }
+
+    public function testRestoreUserFileKeepsLargerExistingPanelFile(): void
+    {
+        $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
+        $sourceFile = $this->tempDir.'/skel/scriptsInc.php';
+        $targetFile = $homeDir.'/www/scriptsInc.php';
+        $sourceContent = "<?php echo 'source';\n";
+        $targetContent = $sourceContent."// local trailing content\n";
+        $this->pmssWriteFile($sourceFile, $sourceContent);
+        $this->pmssWriteFile($targetFile, $targetContent);
+        $messages = [];
+
+        $this->assertTrue(\pmssCheckGuiRestoreUserFile(
+            $targetFile,
+            $sourceFile,
+            $this->pmssCurrentOwner(),
+            'scriptsInc.php',
+            $this->pmssMakeArrayLogger($messages),
+            $homeDir
+        ));
+        $this->assertEquals($targetContent, file_get_contents($targetFile));
+        $this->assertFalse($this->pmssMessagesContain($messages, 'Restoring scriptsInc.php'));
     }
 
     public function testRestoreUserIndexRejectsSymlinkTarget(): void

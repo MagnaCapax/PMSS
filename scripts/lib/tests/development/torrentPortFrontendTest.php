@@ -251,6 +251,20 @@ class TorrentPortFrontendTest extends TestCase
         $this->assertSame("legacy\n", (string) file_get_contents($outsidePath));
     }
 
+    public function testUserPatchWritableFileUsesAtomicMetadataPreservingReplacement(): void
+    {
+        $path = $this->pmssUserHomePath($this->homeRoot, $this->user, 'www/filemanager.php');
+        $this->pmssWriteFile($path, "legacy\n");
+        chmod($path, 0640);
+
+        \pmssUserPatchWritableFile($path, static function (string $content): string {
+            return str_replace('legacy', 'patched', $content);
+        });
+
+        $this->assertSame("patched\n", file_get_contents($path));
+        $this->assertSame(0640, fileperms($path) & 0777);
+    }
+
     public function testUserDeletePathIfPresentRejectsPathOutsideHomeRoot(): void
     {
         $outsidePath = $this->pmssMakeTempDir('pmss-user-delete-outside-').'/legacy.php';
