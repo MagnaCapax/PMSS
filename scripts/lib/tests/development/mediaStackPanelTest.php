@@ -100,6 +100,24 @@ class MediaStackPanelTest extends TestCase
         $this->assertStringContainsString('/public-alice/jellyfin/web/index.html', $status['urls']['Jellyfin']);
     }
 
+    public function testStatusShowsRuntimeAppsWhenWatchdogSnapshotExists(): void
+    {
+        $home = $this->mediaHomeCreate('pmss-media-runtime-status-');
+        $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
+        $this->pmssWriteRelativeFile($home, '.media-stack-status.json', json_encode(array(
+            'state' => 'degraded',
+            'apps' => array(
+                'sonarr' => array('state' => 'running', 'consecutiveFailures' => 0),
+                'radarr' => array('state' => 'failed', 'consecutiveFailures' => 3),
+            ),
+        )));
+
+        $status = $this->mediaStatusRead($home);
+
+        $this->assertSame('degraded', $status['state']);
+        $this->assertStringContainsString('Radarr: failed repeatedly (3 consecutive failed checks).', implode(' ', $status['details']));
+    }
+
     public function testStatusShowsRunningWhenPidExists(): void
     {
         $status = $this->mediaStatusFixture('pmss-media-running-', '.install-media-stack-web.pid', (string) getmypid());

@@ -207,6 +207,32 @@ function pmssMediaStackPanelLogTailRead(string $home, int $maxBytes = 6000): str
     return is_string($tail) ? ltrim($tail) : '';
 }
 
+/** Read the operator-published runtime snapshot without crossing the customer tree. */
+function pmssMediaStackPanelRuntimeStatusRead(string $home): ?array
+{
+    $path = pmssMediaStackPanelHomePath($home, '.media-stack-status.json');
+    $status = pmssJsonFileReadAssoc($path);
+    return is_array($status) && isset($status['apps']) && is_array($status['apps']) ? $status : null;
+}
+
+/** Convert the watchdog snapshot into bounded customer-facing app details. */
+function pmssMediaStackPanelRuntimeDetailsRead(array $runtime): array
+{
+    $labels = array('sonarr' => 'Sonarr', 'radarr' => 'Radarr', 'prowlarr' => 'Prowlarr', 'sabnzbd' => 'SABnzbd', 'cloudplow' => 'Cloudplow', 'jellyfin' => 'Jellyfin');
+    $details = array();
+    foreach ($labels as $app => $label) {
+        if (!isset($runtime['apps'][$app]) || !is_array($runtime['apps'][$app])) {
+            continue;
+        }
+        $state = (string) ($runtime['apps'][$app]['state'] ?? 'unknown');
+        $text = $state === 'running' ? 'running' : ($state === 'failed' ? 'failed repeatedly' : 'not running');
+        $failures = (int) ($runtime['apps'][$app]['consecutiveFailures'] ?? 0);
+        $suffix = $state === 'failed' ? ' ('.$failures.' consecutive failed checks).' : '.';
+        $details[] = $label.': '.$text.$suffix;
+    }
+    return $details;
+}
+
 /**
  * Build the stable per-user URLs exposed by the installer.
  *
@@ -271,10 +297,30 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
     }
 
     if ($installed) {
+        $runtime = pmssMediaStackPanelRuntimeStatusRead($home);
+        if ($runtime !== null) {
+            $runtimeState = (string) ($runtime['state'] ?? 'healthy');
+            $panelState = $runtimeState === 'failed' ? 'failed' : ($runtimeState === 'degraded' ? 'degraded' : 'installed');
+            $message = $runtimeState === 'failed'
+                ? 'Media stack is installed, but one or more apps failed repeatedly.'
+                : ($runtimeState === 'degraded'
+                    ? 'Media stack is installed, but one or more apps are not running.'
+                    : 'Media stack is installed and all managed apps are running.');
+            return array_merge($status, array(
+                'state' => $panelState,
+                'message' => $message,
+                'details' => array_merge(
+                    pmssMediaStackPanelRuntimeDetailsRead($runtime),
+                    array('Automatic restart is disabled after repeated failures; use the app log or SSH for diagnosis.')
+                ),
+            ));
+        }
+
         return array_merge($status, array(
             'state' => 'installed',
             'message' => 'Media stack is installed for this account.',
             'details' => array(
+                'Runtime status is not available yet; the host watchdog will publish it shortly.',
                 'No password is pre-generated. Create the Jellyfin admin account in the first-run wizard.',
                 'If you need a rerun or cleanup, use SSH because the installer becomes interactive once files already exist.',
             ),

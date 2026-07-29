@@ -52,6 +52,7 @@ class WatchdogCronSmokeTest extends TestCase
             'scripts/cron/checkLighttpdInstances.php',
             'scripts/cron/checkDelugeInstances.php',
             'scripts/cron/checkQbittorrentInstances.php',
+            'scripts/cron/mediaStackInstancesCheck.php',
         ) as $entrypoint) {
             $result = $this->pmssRunRepoPhpScriptCommand($entrypoint, array(), array_merge($this->pmssTestModeEnv(), array(
                 'PATH' => $this->binDir.':'.getenv('PATH'),
