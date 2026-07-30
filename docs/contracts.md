@@ -470,8 +470,11 @@ These scripts are primarily imperative; treat them as idempotent installers guar
   - Provides the shared ARR updater for Lidarr, Prowlarr, Radarr, Readarr, and Sonarr using one canonical app list in `arr.php`; update-step2 excludes this entrypoint from the default app autoloader so system updates do not block on account-scoped media-stack maintenance.
   - Contract (ADR 0034): install is not execution. `arr.php` downloads, extracts and activates releases and persists `install_path/version.txt`; it MUST NOT execute an installed binary, and unknown-version simply reinstalls. Symlinked version markers are ignored so a foreign-owned install tree cannot redirect root.
 
-- arrRootConfigHardening.php (`scripts/lib/update/`)
-  - `pmssEnsureArrRootConfigHardening()` converges `/root/.config/<App>/config.xml` to `BindAddress=127.0.0.1`, `AuthenticationMethod=Forms`, `AuthenticationRequired=Enabled` and a random `ApiKey`. Seeds where an ARR app is installed, repairs where a past accidental root launch left first-run defaults, never rewrites an unrecognised payload, and refuses symlinked paths. Root has no legitimate ARR instance; this only limits the blast radius of an accidental launch.
+- arrRootExecutionBlock.php (`scripts/lib/update/`)
+  - `pmssEnsureArrRootExecutionBlocked()` occupies `/root/.config/<App>` with a mode-0444 regular FILE, which makes the app's data directory un-creatable so a root launch aborts during logger init, before it binds. A leftover config DIRECTORY is moved to `<App>.pmss-disabled-<UTC>` and never deleted (an absent config is the first-run condition that regenerates `AuthenticationMethod=None` / `BindAddress=*`, so deleting it is security-negative). Refuses symlinked paths and never clobbers an existing backup. `/opt` is untouched: customers keep full use of the shared install. Root has no legitimate ARR instance, so this PREVENTS the launch rather than limiting its blast radius.
+
+- arrRootGuard.php (`scripts/lib/`)
+  - `pmssArrRootGuardKillAll()` kills any process whose exe lives under `/opt/<App>/` AND whose real uid is 0, signalling the process group when the pid leads it (ADR 0035). Backstop to the block above for instances started before it existed or with an explicit `--data` elsewhere. Selection is exe-path + uid, never a cmdline match: customers run their own copies from `/home/<user>/.bin/<App>` and a cmdline match would kill them. Called from `scripts/cron/mediaStackInstancesCheck.php` (root, every 2 minutes); silent when there is nothing to kill.
 
 - deluge.php
   - Debian 10: installs dependencies via pip and builds Deluge 2.0.5 from source.

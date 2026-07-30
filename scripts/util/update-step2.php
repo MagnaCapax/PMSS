@@ -45,7 +45,7 @@ require_once __DIR__.'/../lib/update/filesystem.php';
 require_once __DIR__.'/../lib/update/opensslSsh2Compat.php';
 require_once __DIR__.'/../lib/update/distro.php';
 require_once __DIR__.'/../lib/update/kernelHardening.php';
-require_once __DIR__.'/../lib/update/arrRootConfigHardening.php';
+require_once __DIR__.'/../lib/update/arrRootExecutionBlock.php';
 require_once __DIR__.'/../lib/update/repositories.php';
 require_once __DIR__.'/../lib/update/storageBenchmark.php';
 require_once __DIR__.'/../lib/update/systemPrep.php';
@@ -518,7 +518,7 @@ pmssRunProfiledCallable('Applying system service disable/mask policy (post-app)'
 // Root must never run an ARR application; when it happens by accident the app writes
 // unauthenticated wildcard-bound defaults. Converge root-side ARR configs to
 // authenticated loopback defaults so the accident is not rewarded.
-pmssRunProfiledCallable('Hardening root-side ARR application defaults', 'pmssEnsureArrRootConfigHardening', ['logmsg']);
+pmssRunProfiledCallable('Blocking root execution of ARR applications', 'pmssEnsureArrRootExecutionBlocked', ['logmsg']);
 
 runStep('Updating Let\'s Encrypt configuration', '/scripts/util/setupLetsEncrypt.php noreplies@pulsedmedia.com');
 // Drop obsolete global autodl configuration

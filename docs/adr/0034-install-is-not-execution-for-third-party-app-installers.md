@@ -71,11 +71,30 @@ had live root daemons; the rest died at reboot because the orphan has no unit.
    update, which is a bounded cost and strictly better than the previous fallback of
    executing the binary.
 
-3. `scripts/lib/update/arrRootConfigHardening.php` converges root-side Servarr configs to
-   `BindAddress=127.0.0.1`, `AuthenticationMethod=Forms`, `AuthenticationRequired=Enabled`
-   and a random 32-hex `ApiKey`. It seeds hosts where an accidental root launch is possible
-   and repairs configs a past accident already left behind, so the residue heals as hosts
-   update rather than needing a fleet sweep.
+3. `scripts/lib/update/arrRootExecutionBlock.php` makes a root launch impossible rather than
+   making a root instance safer. It occupies `/root/.config/<App>` — the data directory the app
+   derives from `$HOME/.config/<App>` when no `--data` is given — with a mode-0444 regular file.
+   Measured 2026-07-30 as root on `/opt/Radarr/Radarr`: rc=134,
+   `System.IO.DirectoryNotFoundException` during logger init, port never bound, and the file's
+   sha256 unchanged afterwards (the app does not unlink what blocks it, even as root). The
+   positive control — same binary, creatable data directory — starts normally, which is why
+   `/opt` needs no permission change and customers keep full use of the shared install.
+   A leftover config directory is moved to `<App>.pmss-disabled-<UTC>` and never deleted:
+   an absent config IS the first-run condition, so deletion would regenerate
+   `AuthenticationMethod=None` / `BindAddress=*` on the next launch.
+
+   This SUPERSEDES the earlier config-hardening approach (`BindAddress=127.0.0.1`,
+   `AuthenticationMethod=Forms`, random `ApiKey`). That approach was measured to work —
+   unauthenticated API 401, `/` 302, valid key 200 — but it leaves a RUNNING root instance
+   reachable from every local shell on a multi-tenant host, and the two are mutually exclusive
+   because the block file occupies the directory the seeded config lived in. Prevention over
+   mitigation; operator directive 2026-07-30: "it's not ever supposed to run as root, but for
+   customers".
+
+4. `scripts/lib/arrRootGuard.php`, called by `scripts/cron/mediaStackInstancesCheck.php` every
+   two minutes as root, kills any process whose exe is under `/opt/<App>/` with real uid 0 —
+   the backstop for an instance started before the block existed, or with `--data` pointing
+   elsewhere. Never a cmdline match: customers run their own copies from `/home/<user>/.bin/`.
 
 **Generalised rule:** an installer may download, verify, extract and activate an artifact. It
 may not execute it. Identify software from metadata — release data, a version file, a package
@@ -117,6 +136,7 @@ orphan.
 ## References
 - GH #526, #527 — the original hang and the timeout "fix" this ADR reverses in direction.
 - GH #558 — timeout audit; #559 — Servarr removed from the system-wide update path.
-- `scripts/lib/update/apps/arr.php`, `scripts/lib/update/arrRootConfigHardening.php`
+- `scripts/lib/update/apps/arr.php`, `scripts/lib/update/arrRootExecutionBlock.php`,
+  `scripts/lib/arrRootGuard.php`, `scripts/cron/mediaStackInstancesCheck.php`
 - `scripts/lib/tests/development/ArrInstallerNoExecPolicyTest.php`,
-  `scripts/lib/tests/development/ArrRootConfigHardeningTest.php`
+  `scripts/lib/tests/development/ArrRootExecutionBlockTest.php`

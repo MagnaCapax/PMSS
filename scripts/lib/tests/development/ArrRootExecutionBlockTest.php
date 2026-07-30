@@ -1,0 +1,142 @@
+<?php
+namespace PMSS\Tests;
+
+require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/log.php';
+require_once dirname(__DIR__, 2).'/update/arrRootExecutionBlock.php';
+require_once dirname(__DIR__, 2).'/arrRootGuard.php';
+
+/**
+ * Root must not be able to START an *ARR application, and a leftover root config must be kept
+ * rather than deleted (an absent config IS the first-run condition that regenerates
+ * AuthenticationMethod=None / BindAddress=*). Hermetic: every path is a temp directory.
+ */
+class ArrRootExecutionBlockTest extends TestCase
+{
+    /** Collect log lines while applying the block over a temp config root. */
+    private function block(string $configRoot, ?string $timestamp = null): array
+    {
+        $messages = [];
+        \pmssEnsureArrRootExecutionBlocked(static function (string $message) use (&$messages): void {
+            $messages[] = $message;
+        }, $configRoot, $timestamp);
+        return $messages;
+    }
+
+    public function testOccupiesEveryAppDataPathWithARegularFile(): void
+    {
+        $configRoot = $this->pmssMakeTempDir('pmss-arr-cfg-', 0700);
+
+        $this->block($configRoot);
+
+        foreach (array_keys(\PMSS_ARR_APP_BRANCHES) as $app) {
+            $path = $configRoot.'/'.$app;
+            // A DIRECTORY here is what lets the app start; only a plain file blocks it.
+            $this->assertTrue(is_file($path), $app.': data path must be occupied by a regular file');
+            $this->assertFalse(is_dir($path), $app.': data path must not be a directory');
+            $this->assertStringContainsString('root must never run '.$app, (string) @file_get_contents($path));
+            $this->assertSame('0444', substr(sprintf('%o', fileperms($path)), -4));
+        }
+    }
+
+    public function testKeepsALeftoverRootConfigInsteadOfDeletingIt(): void
+    {
+        $configRoot = $this->pmssMakeTempDir('pmss-arr-cfg-', 0700);
+        @mkdir($configRoot.'/Sonarr', 0700, true);
+        @file_put_contents($configRoot.'/Sonarr/config.xml', '<Config><ApiKey>keepme</ApiKey></Config>');
+        @file_put_contents($configRoot.'/Sonarr/sonarr.db', 'database');
+
+        $messages = $this->block($configRoot, '20260730120000');
+
+        $backup = $configRoot.'/Sonarr'.\PMSS_ARR_ROOT_BLOCK_SUFFIX.'20260730120000';
+        $this->assertTrue(is_dir($backup), 'the leftover config directory must be moved aside, not removed');
+        $this->assertSame('<Config><ApiKey>keepme</ApiKey></Config>', (string) @file_get_contents($backup.'/config.xml'));
+        $this->assertSame('database', (string) @file_get_contents($backup.'/sonarr.db'));
+        $this->assertTrue(is_file($configRoot.'/Sonarr'), 'the freed path must then be occupied by the block file');
+        $this->assertStringContainsString('never deleted', implode("\n", $messages));
+    }
+
+    public function testLeavesTheDirectoryAloneRatherThanClobberingAnExistingBackup(): void
+    {
+        $configRoot = $this->pmssMakeTempDir('pmss-arr-cfg-', 0700);
+        @mkdir($configRoot.'/Lidarr', 0700, true);
+        @file_put_contents($configRoot.'/Lidarr/config.xml', 'current');
+        @mkdir($configRoot.'/Lidarr'.\PMSS_ARR_ROOT_BLOCK_SUFFIX.'20260730120000', 0700, true);
+        @file_put_contents($configRoot.'/Lidarr'.\PMSS_ARR_ROOT_BLOCK_SUFFIX.'20260730120000/config.xml', 'earlier');
+
+        $messages = $this->block($configRoot, '20260730120000');
+
+        $this->assertSame('earlier', (string) @file_get_contents($configRoot.'/Lidarr'.\PMSS_ARR_ROOT_BLOCK_SUFFIX.'20260730120000/config.xml'));
+        $this->assertSame('current', (string) @file_get_contents($configRoot.'/Lidarr/config.xml'));
+        $this->assertStringContainsString('already exists', implode("\n", $messages));
+    }
+
+    public function testRefusesToFollowSymlinkedRootConfigPaths(): void
+    {
+        $configRoot = $this->pmssMakeTempDir('pmss-arr-cfg-', 0700);
+        $outside = $this->pmssMakeTempDir('pmss-arr-outside-', 0700);
+        @file_put_contents($outside.'/config.xml', 'original');
+        $this->pmssCreateSymlinkOrSkip($outside, $configRoot.'/Prowlarr');
+
+        $messages = $this->block($configRoot);
+
+        $this->assertSame('original', (string) @file_get_contents($outside.'/config.xml'));
+        $this->assertStringContainsString('symlinked', implode("\n", $messages));
+    }
+
+    public function testIsIdempotentAcrossRepeatedUpdates(): void
+    {
+        $configRoot = $this->pmssMakeTempDir('pmss-arr-cfg-', 0700);
+
+        $this->block($configRoot, '20260730120000');
+        $first = (string) @file_get_contents($configRoot.'/Readarr');
+        $this->block($configRoot, '20260730130000');
+
+        $this->assertSame($first, (string) @file_get_contents($configRoot.'/Readarr'));
+        // A second run must not manufacture a backup directory out of the block file it just wrote.
+        $this->assertSame([], glob($configRoot.'/Readarr'.\PMSS_ARR_ROOT_BLOCK_SUFFIX.'*') ?: []);
+    }
+
+    public function testGuardMatchesInstalledAppPathsAndAnchorsThePrefix(): void
+    {
+        $prefixes = \pmssArrRootGuardInstallPrefixes('/opt');
+
+        $this->assertSame('Radarr', \pmssArrRootGuardAppForExe('/opt/Radarr/Radarr', $prefixes));
+        $this->assertSame('Sonarr', \pmssArrRootGuardAppForExe('/opt/Sonarr/bin/Sonarr', $prefixes));
+        // Anchoring: a look-alike install directory must not resolve to a managed app.
+        $this->assertSame(null, \pmssArrRootGuardAppForExe('/opt/RadarrEvil/Radarr', $prefixes));
+        $this->assertSame(null, \pmssArrRootGuardAppForExe('/opt/Radarr2/Radarr', $prefixes));
+        // A customer's own copy lives under their home and must never be selected.
+        $this->assertSame(null, \pmssArrRootGuardAppForExe('/home/tomate/.bin/Sonarr/Sonarr', $prefixes));
+        $this->assertSame(null, \pmssArrRootGuardAppForExe('/usr/bin/bash', $prefixes));
+    }
+
+    public function testGuardScanSelectsOnlyRootOwnedProcessesOfInstalledApps(): void
+    {
+        $procRoot = $this->pmssMakeTempDir('pmss-arr-proc-', 0700);
+        $installRoot = $this->pmssMakeTempDir('pmss-arr-opt-', 0700);
+        @mkdir($installRoot.'/Radarr', 0755, true);
+        @touch($installRoot.'/Radarr/Radarr');
+
+        // uid 0 running the managed install: must be selected.
+        $this->pmssWriteFakeProcess($procRoot, 101, $installRoot.'/Radarr/Radarr', 0);
+        // Same binary, but a customer uid: must NOT be selected.
+        $this->pmssWriteFakeProcess($procRoot, 102, $installRoot.'/Radarr/Radarr', 1046);
+        // uid 0 running something else entirely: must NOT be selected.
+        $this->pmssWriteFakeProcess($procRoot, 103, '/usr/bin/bash', 0);
+
+        $found = \pmssArrRootGuardScan($procRoot, $installRoot);
+
+        $this->assertSame([101], array_keys($found));
+        $this->assertSame('Radarr', $found[101]['app']);
+    }
+
+    /** Build a /proc-shaped entry: exe symlink plus the Uid line the scanner parses. */
+    private function pmssWriteFakeProcess(string $procRoot, int $pid, string $exeTarget, int $uid): void
+    {
+        $dir = $procRoot.'/'.$pid;
+        @mkdir($dir, 0700, true);
+        @file_put_contents($dir.'/status', "Name:\ttest\nUid:\t".$uid."\t".$uid."\t".$uid."\t".$uid."\n");
+        $this->pmssCreateSymlinkOrSkip($exeTarget, $dir.'/exe');
+    }
+}

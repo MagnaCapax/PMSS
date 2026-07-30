@@ -1,18 +1,28 @@
 #!/usr/bin/env php
 <?php
 /**
- * Observe installed per-user media-stack tmux sessions.
+ * Observe installed per-user media-stack tmux sessions, and kill any *ARR running as root.
  *
  * This task publishes runtime state and stops at reporting repeated failures;
  * it deliberately does not restart an app indefinitely without diagnosis.
+ *
+ * The root-*ARR kill rides here rather than in its own cron because this is already the
+ * root-owned, fleet-wide, every-two-minutes media-stack task -- a second timer for the same
+ * concern would be duplication. It is the backstop to the structural block in
+ * scripts/lib/update/arrRootExecutionBlock.php; see scripts/lib/arrRootGuard.php.
  *
  * @license GPL-3.0-only
  */
 
 require_once __DIR__.'/../lib/mediaStackWatchdog.php';
 require_once __DIR__.'/../lib/user/selection.php';
+require_once __DIR__.'/../lib/arrRootGuard.php';
 
 echo date('Y-m-d H:i:s').": Checking media stack instances\n";
+pmssArrRootGuardKillAll(static function (string $message): void {
+    echo date('Y-m-d H:i:s').': '.$message."\n";
+});
+
 $result = pmssListManagedUsersResult('/scripts/listUsers.php');
 if ((int) $result['exitCode'] !== 0) {
     fwrite(STDERR, 'Error: listUsers.php failed; aborting media-stack check.'.PHP_EOL);
