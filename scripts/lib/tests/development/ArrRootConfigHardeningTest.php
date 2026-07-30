@@ -141,7 +141,7 @@ class ArrRootConfigHardeningTest extends TestCase
         // A self-closing document is normalized so elements can still be applied.
         $this->assertStringContainsString('<BindAddress>127.0.0.1</BindAddress>', (string) \pmssArrRootConfigHarden('<Config />'));
         // Non-config payloads are rejected rather than rewritten.
-        $this->assertNull(\pmssArrRootConfigHarden('<html><body>hello</body></html>'));
+        $this->assertSame(null, \pmssArrRootConfigHarden('<html><body>hello</body></html>'));
     }
 
     public function testSeededCredentialsAreRandomPerConfig(): void

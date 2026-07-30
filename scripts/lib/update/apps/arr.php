@@ -92,8 +92,9 @@ function pmssArrVersionExtract(string $payload): ?string
  * Detect the installed ARR version from on-disk metadata only.
  *
  * Metadata reads are the ONLY permitted detection method: the install tree may be a
- * leftover owned by a departed uid, and is_executable() is a permission test, not a
- * trust test. Returning null is safe -- pmssArrUpdate() reinstalls on an unknown
+ * leftover owned by a departed uid, and an executable-permission check is not a trust
+ * check; see docs/adr/0034-install-is-not-execution-for-third-party-app-installers.md.
+ * Returning null is safe -- pmssArrUpdate() reinstalls on an unknown
  * version, which is idempotent and self-healing (it also writes version.txt, so a
  * host pays this at most once).
  */
