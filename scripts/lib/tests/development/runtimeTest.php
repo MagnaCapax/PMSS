@@ -427,14 +427,10 @@ class RuntimeTest extends TestCase
         $this->assertTrue(array_key_exists('stderr', $output));
     }
 
-    public function testRunCommandAptTimeoutFloorIgnoresLowerEnvTimeout(): void
-    {
-        $rc = null;
-        $this->pmssWithEnv(['PMSS_COMMAND_TIMEOUT' => '1'], function () use (&$rc): void {
-            $rc = \runCommand('echo apt-get; sleep 2', false, function (string $m): void {});
-        });
-        $this->assertEquals(0, $rc);
-    }
+    // The apt/dpkg timeout floor this used to characterize is deleted: it computed
+    // max(1200, 1200) and only acted under an env override that LOWERED the deadline.
+    // Replaced by CommandTimeoutProcessGroupTest::testNoCommandClassCarriesABespokeTimeout,
+    // which asserts the invariant (no class-specific deadline) instead of the carve-out.
 
     public function testRunCommandAptExecHandlesLeadingEnvAssignments(): void
     {

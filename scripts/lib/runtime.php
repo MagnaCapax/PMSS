@@ -17,8 +17,12 @@ const PMSS_RUNTIME_DIR_DEFAULT = '/var/run/pmss';
 const PMSS_STATE_DIR_DEFAULT = '/var/lib/pmss';
 const PMSS_RUNTIME_FALLBACK_LOG = PMSS_LOG_DIR_DEFAULT.'/runtime.log';
 const PMSS_COMMAND_TIMEOUT_DEFAULT = 1200;
-const PMSS_COMMAND_TIMEOUT_APT_DEFAULT = 1200;
 const PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT = 5;
+// Slack between the PHP watchdog's deadline and the coreutils backstop wrapping the same
+// command. PHP must win the race so `timed_out`, the [TIMEOUT] line and the timeout-fire JSONL
+// still fire; the backstop only matters when the PHP parent dies first, so being late costs
+// nothing. It only has to exceed the watchdog's poll interval under load, not be tuned.
+const PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS = 30;
 const PMSS_TIMEOUT_FIRE_LOG_DEFAULT = '/var/log/pmss-timeout-fires.jsonl';
 const PMSS_BLOCK_DATA_DEVICE_NAME_PATTERN = '/^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme\d+n\d+|mmcblk\d+)$/';
 const PMSS_IOPING_PROBE_COUNT = 60;
