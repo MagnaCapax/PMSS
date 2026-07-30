@@ -354,7 +354,16 @@ function pmssCommandBashInvocation(string $cmd): string
 
     $cmdForShell = pmssLockChildClosePrefix().$cmdForShell;
 
-    return '/bin/bash -lc '.escapeshellarg($cmdForShell);
+    // setsid makes the child a process-group leader so a timeout can kill the WHOLE
+    // group, not just the direct child. Without it, proc_terminate() in
+    // pmssCommandTimeoutTerminate() reaches only /bin/bash and any daemonizing
+    // grandchild survives, reparents to PID 1 and runs forever as root -- which is
+    // exactly how an *arr --version probe became a permanent root daemon on a public
+    // port and was exploited to root a shared host (2026-07-03). See
+    // memory/lessons/security/20260729-privileged-probe-by-execution-exploit-class-*.md
+    // --wait is REQUIRED: bare `setsid` forks and returns 0, discarding the child's
+    // exit status (verified: `setsid sh -c 'exit 42'` -> rc 0; with --wait -> rc 42).
+    return 'setsid --wait /bin/bash -lc '.escapeshellarg($cmdForShell);
 }
 
 /**
