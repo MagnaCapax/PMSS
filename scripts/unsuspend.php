@@ -45,6 +45,47 @@ if (!$disabledRootExists) {
     }
 }
 
+// Never replace a valid active root with an empty restore source. This state is
+// produced when suspend.php cannot archive www but still leaves its marker.
+if ($disabledRootExists && !pmssUserLifecycleWebRootContainsUserContent($disabledRoot)) {
+    $activeRootHasContent = $activeRootExists
+        && pmssUserLifecycleWebRootContainsUserContent($activeRoot);
+    if (!$activeRootHasContent) {
+        pmssUserLifecycleContextLogStatusMessage(
+            'unsuspend',
+            'validate_restore_source',
+            $username,
+            'ERR',
+            'Suspended web root contains no recoverable user content',
+            array('disabled_root' => $disabledRoot)
+        );
+        die("Error: suspended web root contains no recoverable user content\n");
+    }
+
+    if (!pmssUserLifecycleClearEmptySuspendedMarker($homeDir, $disabledRoot)) {
+        pmssUserLifecycleContextLogStatusMessage(
+            'unsuspend',
+            'validate_restore_source',
+            $username,
+            'ERR',
+            'Unable to clear empty suspended web root marker',
+            array('disabled_root' => $disabledRoot)
+        );
+        die("Error: unable to clear empty suspended web root marker\n");
+    }
+
+    $disabledRootExists = false;
+    pmssUserLifecycleContextLogStatusMessage(
+        'unsuspend',
+        'validate_restore_source',
+        $username,
+        'WARN',
+        'Ignored empty suspended web root marker and kept active web root',
+        array('disabled_root' => $disabledRoot)
+    );
+    echo "Warning: ignored empty suspended web root marker; kept {$activeRoot}\n";
+}
+
 pmssUserLifecycleContextLogHomeInfo('unsuspend', 'start', $username, $homeDir);
 
 // Unlock and extend expiry before restoring services.
@@ -83,6 +124,20 @@ if ($activeRootExists && !$restoredFromBackup && $disabledRootExists) {
 if ($disabledRootExists && !$activeRootExists && !@rename($disabledRoot, $activeRoot)) {
     echo "Warning: failed to restore {$disabledRoot}\n";
 }
+
+if (!is_file($activeRoot.'/index.php')) {
+    pmssUserLifecycleContextLogStatusMessage(
+        'unsuspend',
+        'validate_restored_web_root',
+        $username,
+        'ERR',
+        'Restored web root is missing index.php',
+        array('active_root' => $activeRoot)
+    );
+    fwrite(STDERR, "Error: restored web root is missing index.php\n");
+    exit(1);
+}
+
 // Best-effort: mirror the state in the user config store (marker is canonical).
 pmssUserLifecycleSyncSuspendedState($username, $disabledRoot);
 pmssUserLifecycleRefreshManagedNginxConfig('unsuspend', $username, false);

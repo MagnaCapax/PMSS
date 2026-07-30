@@ -177,8 +177,19 @@ class userLifecycleLoggingTest extends TestCase
         $this->assertSame(array('activeRootExists' => true, 'disabledRootExists' => false), $active);
         $this->assertSame(array('activeRootExists' => true, 'disabledRootExists' => true), $suspended);
         $this->pmssAssertRepoFileContractCases(array(
-            'scripts/suspend.php' => array('required' => array("pmssUserLifecycleRequireWebRootState('suspend'")),
-            'scripts/unsuspend.php' => array('required' => array("pmssUserLifecycleRequireWebRootState('unsuspend'")),
+            'scripts/suspend.php' => array('required' => array(
+                "pmssUserLifecycleRequireWebRootState('suspend'",
+                "'archive_web_root'",
+                'suspension aborted',
+                'exit(1);',
+            )),
+            'scripts/unsuspend.php' => array('required' => array(
+                "pmssUserLifecycleRequireWebRootState('unsuspend'",
+                'pmssUserLifecycleWebRootContainsUserContent($disabledRoot)',
+                'pmssUserLifecycleClearEmptySuspendedMarker($homeDir, $disabledRoot)',
+                "'validate_restored_web_root'",
+                "is_file(\$activeRoot.'/index.php')",
+            )),
         ));
     }
 
@@ -212,6 +223,28 @@ class userLifecycleLoggingTest extends TestCase
         $this->pmssEnsureDir($emptyHome.'/www-suspended-empty');
 
         $this->assertSame(null, \pmssUserLifecycleFindSuspendedBackup($emptyHome));
+    }
+
+    public function testWebRootContentPredicateAndEmptyMarkerCleanupAreConservative(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-user-lifecycle-content-');
+        $disabledRoot = $home.'/www-disabled';
+        $activeRoot = $home.'/www';
+        $this->pmssEnsureDir($disabledRoot);
+        $this->pmssEnsureDir($activeRoot);
+
+        $this->assertFalse(\pmssUserLifecycleWebRootContainsUserContent($disabledRoot));
+        $this->assertTrue(\pmssUserLifecycleClearEmptySuspendedMarker($home, $disabledRoot));
+        $this->assertFalse(is_dir($disabledRoot));
+
+        $this->pmssWriteFile($activeRoot.'/index.php', 'panel');
+        $this->pmssEnsureDir($disabledRoot);
+        $this->assertTrue(\pmssUserLifecycleWebRootContainsUserContent($activeRoot));
+        $this->assertTrue(\pmssUserLifecycleClearEmptySuspendedMarker($home, $disabledRoot));
+        $this->pmssEnsureDir($disabledRoot);
+        $this->pmssWriteFile($disabledRoot.'/rutorrent/.keep', '');
+        $this->assertTrue(\pmssUserLifecycleWebRootContainsUserContent($disabledRoot));
+        $this->assertFalse(\pmssUserLifecycleClearEmptySuspendedMarker($home, $disabledRoot));
     }
 
     public function testSuspendedBackupCandidateGuardRequiresDirectHomeDirectory(): void

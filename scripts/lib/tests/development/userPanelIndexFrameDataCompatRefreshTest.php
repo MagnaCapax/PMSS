@@ -61,6 +61,19 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
         $this->assertEquals($this->fixedPanelIndexSource(), file_get_contents($this->home.'/www/index.php'));
     }
 
+    public function testSkeletonApplyFlowRestoresDataAndWatchLinks(): void
+    {
+        $this->pmssEnsureDir($this->home.'/data');
+        $this->pmssEnsureDir($this->home.'/watch');
+
+        \pmssUserApplySkeletonFiles($this->context());
+
+        $this->assertTrue(is_link($this->home.'/www/data'));
+        $this->assertSame('../data', readlink($this->home.'/www/data'));
+        $this->assertTrue(is_link($this->home.'/www/watch'));
+        $this->assertSame('../watch', readlink($this->home.'/www/watch'));
+    }
+
     public function testTargetedRefreshLeavesCustomInitializedPanelCopyAloneInIsolation(): void
     {
         $custom = $this->customInitializedPanelSource();

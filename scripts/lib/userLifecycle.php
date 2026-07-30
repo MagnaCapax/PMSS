@@ -296,6 +296,43 @@ function pmssUserLifecycleSuspendedBackupCandidateIsSafe(string $homeDir, string
 }
 
 /**
+ * Return whether a validated web-root candidate contains user web content.
+ */
+function pmssUserLifecycleWebRootContainsUserContent(string $candidate): bool
+{
+    if (is_dir($candidate.'/rutorrent') || is_file($candidate.'/index.php')) {
+        return true;
+    }
+
+    $entries = @scandir($candidate);
+    $entries = is_array($entries) ? array_diff($entries, array('.', '..')) : array();
+    if (empty($entries)) {
+        return false;
+    }
+    foreach ($entries as $entry) {
+        if ($entry !== 'index.html' && $entry !== 'public') {
+            return true;
+        }
+    }
+
+    $publicEntries = @scandir($candidate.'/public');
+    return $publicEntries === false || count(array_diff($publicEntries, array('.', '..', 'index.html'))) > 0;
+}
+
+/**
+ * Remove only an empty, validated suspended marker.
+ */
+function pmssUserLifecycleClearEmptySuspendedMarker(string $homeDir, string $disabledRoot): bool
+{
+    if (!pmssUserLifecycleWebRootPathIsSafe($homeDir, $disabledRoot, 'www-disabled', true)
+        || pmssUserLifecycleWebRootContainsUserContent($disabledRoot)) {
+        return false;
+    }
+
+    return @rmdir($disabledRoot);
+}
+
+/**
  * Find the newest suspended web backup that still contains user content.
  */
 function pmssUserLifecycleFindSuspendedBackup(string $homeDir): ?string
@@ -307,28 +344,9 @@ function pmssUserLifecycleFindSuspendedBackup(string $homeDir): ?string
     }
     $bestPath = null;
     $bestMtime = 0;
-    $hasSuspendedContent = static function (string $candidate) use ($homeDir): bool {
-        if (!pmssUserLifecycleSuspendedBackupCandidateIsSafe($homeDir, $candidate)) {
-            return false;
-        }
-        if (is_dir($candidate.'/rutorrent') || is_file($candidate.'/index.php')) {
-            return true;
-        }
-        $entries = @scandir($candidate);
-        $entries = is_array($entries) ? array_diff($entries, array('.', '..')) : array();
-        if (empty($entries)) {
-            return false;
-        }
-        foreach ($entries as $entry) {
-            if ($entry !== 'index.html' && $entry !== 'public') {
-                return true;
-            }
-        }
-        $publicEntries = @scandir($candidate.'/public');
-        return $publicEntries === false || count(array_diff($publicEntries, array('.', '..', 'index.html'))) > 0;
-    };
     foreach ($candidates as $candidate) {
-        if (!$hasSuspendedContent($candidate)) {
+        if (!pmssUserLifecycleSuspendedBackupCandidateIsSafe($homeDir, $candidate)
+            || !pmssUserLifecycleWebRootContainsUserContent($candidate)) {
             continue;
         }
         $mtime = @filemtime($candidate);

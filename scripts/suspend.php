@@ -43,7 +43,16 @@ pmssUserLifecycleRunSteps('suspend', $username, array(
 // landing page if the original content is safely moved aside.
 if ($activeRootExists) {
     if (!@rename($activeRoot, $disabledRoot)) {
-        echo "Warning: failed to archive {$activeRoot}, attempting to continue\n";
+        pmssUserLifecycleContextLogStatusMessage(
+            'suspend',
+            'archive_web_root',
+            $username,
+            'ERR',
+            'Failed to archive active web root; suspended marker was not created',
+            array('active_root' => $activeRoot, 'disabled_root' => $disabledRoot)
+        );
+        fwrite(STDERR, "Error: failed to archive {$activeRoot}; suspension aborted\n");
+        exit(1);
     }
 }
 

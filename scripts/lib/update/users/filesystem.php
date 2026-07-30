@@ -10,6 +10,7 @@
 require_once dirname(__DIR__, 2).'/pathSafety.php';
 require_once dirname(__DIR__, 2).'/lighttpd/userFileWrite.php';
 require_once dirname(__DIR__, 2).'/user/trafficLimit.php';
+require_once dirname(__DIR__, 2).'/user/directories.php';
 
 /**
  * Confirm that a user maintenance path resolves beneath the configured home root.
@@ -79,6 +80,47 @@ function pmssUserDeletePathIfPresent(string $path): void
 }
 
 /**
+ * Restore the skeleton's data/watch links without replacing user content.
+ */
+function pmssUserEnsureWebRootSymlinks(array $ctx): void
+{
+    $user = (string) ($ctx['user'] ?? '');
+    $home = rtrim((string) ($ctx['home'] ?? ''), '/');
+    $www = $home.'/www';
+    if ($user === '' || $home === '' || !is_dir($www) || is_link($www)) {
+        return;
+    }
+
+    foreach (['data', 'watch'] as $directory) {
+        $source = $home.'/'.$directory;
+        $link = $www.'/'.$directory;
+        $target = '../'.$directory;
+        if (!pmssUserPathWithinHomeRoot($source) || !pmssUserPathWithinHomeRoot($link)) {
+            continue;
+        }
+        if (is_link($link)) {
+            if (readlink($link) !== $target) {
+                logMessage("[user:{$user}] Refusing to replace unexpected www/{$directory} symlink");
+            }
+            continue;
+        }
+        if (file_exists($link)) {
+            logMessage("[user:{$user}] Refusing to replace existing www/{$directory} path");
+            continue;
+        }
+        if (is_link($source) || (!is_dir($source) && !pmssEnsureUserHomeDir($user, $home, $directory, 0750))) {
+            logMessage("[user:{$user}] Unable to prepare home/{$directory} for www/{$directory} symlink");
+            continue;
+        }
+        if (@symlink($target, $link)) {
+            logMessage("[user:{$user}] Restored www/{$directory} symlink");
+        } else {
+            logMessage("[user:{$user}] Unable to restore www/{$directory} symlink");
+        }
+    }
+}
+
+/**
  * Detect legacy panel copies that fatal on PHP 8.2 because frameData is null.
  */
 function pmssUserPanelIndexNeedsFrameDataCompatRefresh(string $content): bool
@@ -140,6 +182,7 @@ function pmssUserApplySkeletonFiles(array $ctx): void
         }
     );
     pmssUserRefreshPanelIndexForFrameDataCompat($ctx);
+    pmssUserEnsureWebRootSymlinks($ctx);
 
     $legacyDownloadHeaderBlock = <<<'PHP'
     if (strstr($_SERVER['HTTP_USER_AGENT'], "MSIE")) {
