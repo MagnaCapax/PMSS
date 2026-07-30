@@ -109,6 +109,15 @@ class ArrRootExecutionBlockTest extends TestCase
         // A customer's own copy lives under their home and must never be selected.
         $this->assertSame(null, \pmssArrRootGuardAppForExe('/home/tomate/.bin/Sonarr/Sonarr', $prefixes));
         $this->assertSame(null, \pmssArrRootGuardAppForExe('/usr/bin/bash', $prefixes));
+
+        $allPrefixes = \pmssRootGuardInstallPrefixes('/opt');
+        $this->assertSame('Whisparr', \pmssRootGuardAppForExe('/opt/Whisparr/Whisparr', $allPrefixes));
+        $this->assertSame('qBittorrent', \pmssRootGuardAppForExe('/usr/bin/qbittorrent-nox', $allPrefixes));
+        $this->assertSame('Deluge', \pmssRootGuardAppForExe('/usr/local/bin/deluge-web', $allPrefixes));
+        $this->assertSame('rTorrent', \pmssRootGuardAppForExe('/usr/local/bin/rtorrent', $allPrefixes));
+        $this->assertSame(null, \pmssRootGuardAppForExe('/usr/bin/qbittorrent-nox-helper', $allPrefixes));
+        $this->assertFalse(\pmssRootGuardExeIsStandardPath('/tmp/root-owned-app'));
+        $this->assertTrue(\pmssRootGuardExeIsStandardPath('/opt/RadarrEvil/Radarr'));
     }
 
     public function testGuardScanSelectsOnlyRootOwnedProcessesOfInstalledApps(): void
@@ -124,11 +133,51 @@ class ArrRootExecutionBlockTest extends TestCase
         $this->pmssWriteFakeProcess($procRoot, 102, $installRoot.'/Radarr/Radarr', 1046);
         // uid 0 running something else entirely: must NOT be selected.
         $this->pmssWriteFakeProcess($procRoot, 103, '/usr/bin/bash', 0);
+        // Unknown root software outside standard paths: alert-only, never killed.
+        $unknownExe = $this->pmssMakeTempPath('pmss-root-unknown-exe-');
+        @file_put_contents($unknownExe, 'binary');
+        $this->pmssWriteFakeProcess($procRoot, 104, $unknownExe, 0);
+        // A look-alike under /opt is neither a known app nor an alert-only unknown path.
+        $this->pmssWriteFakeProcess($procRoot, 105, '/opt/RadarrEvil/Radarr', 0);
 
         $found = \pmssArrRootGuardScan($procRoot, $installRoot);
 
-        $this->assertSame([101], array_keys($found));
+        $this->assertSame([101, 104], array_keys($found));
         $this->assertSame('Radarr', $found[101]['app']);
+        $this->assertSame('kill', $found[101]['action']);
+        $this->assertSame(null, $found[104]['app']);
+        $this->assertSame('alert', $found[104]['action']);
+    }
+
+    public function testAuditAlertsWithoutSendingSignalsInTheTestFixture(): void
+    {
+        $procRoot = $this->pmssMakeTempDir('pmss-arr-proc-', 0700);
+        $installRoot = $this->pmssMakeTempDir('pmss-arr-opt-', 0700);
+        @mkdir($installRoot.'/Radarr', 0755, true);
+        @touch($installRoot.'/Radarr/Radarr');
+        $unknownExe = $this->pmssMakeTempPath('pmss-root-unknown-exe-');
+        @file_put_contents($unknownExe, 'binary');
+        $this->pmssWriteFakeProcess($procRoot, 201, $installRoot.'/Radarr/Radarr', 0);
+        $this->pmssWriteFakeProcess($procRoot, 202, $unknownExe, 0);
+        $this->pmssWriteFakeProcess($procRoot, 203, $installRoot.'/Radarr/Radarr', 0);
+
+        $messages = array();
+        $signals = array();
+        $findings = \pmssArrRootGuardAuditAndKill(
+            static function (string $message) use (&$messages): void { $messages[] = $message; },
+            $procRoot,
+            $installRoot,
+            static function (int $pid, int $signal) use (&$signals): bool {
+                $signals[] = array($pid, $signal);
+                return $pid === 201 && $signal === 9;
+            }
+        );
+
+        $this->assertSame(3, $findings);
+        $this->assertSame([[201, 9], [203, 9]], $signals);
+        $this->assertStringContainsString('action=killed pid=201', implode("\n", $messages));
+        $this->assertStringContainsString('action=observed_unknown_root_process pid=202', implode("\n", $messages));
+        $this->assertStringContainsString('action=kill_failed pid=203', implode("\n", $messages));
     }
 
     /** Build a /proc-shaped entry: exe symlink plus the Uid line the scanner parses. */

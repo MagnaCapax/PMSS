@@ -18,8 +18,7 @@ require_once __DIR__.'/../lib/mediaStackWatchdog.php';
 require_once __DIR__.'/../lib/user/selection.php';
 require_once __DIR__.'/../lib/arrRootGuard.php';
 
-echo date('Y-m-d H:i:s').": Checking media stack instances\n";
-pmssArrRootGuardKillAll(static function (string $message): void {
+$rootGuardFindings = pmssArrRootGuardAuditAndKill(static function (string $message): void {
     echo date('Y-m-d H:i:s').': '.$message."\n";
 });
 
@@ -33,3 +32,5 @@ $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
 foreach ($result['users'] as $username) {
     pmssMediaStackWatchdogRunUser($username, $homeRoot);
 }
+
+exit($rootGuardFindings > 0 ? 1 : 0);
