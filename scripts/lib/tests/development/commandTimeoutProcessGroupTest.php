@@ -136,6 +136,26 @@ class CommandTimeoutProcessGroupTest extends TestCase
         $this->assertSame('err', trim($result['stderr']));
     }
 
+    public function testStatusProbeRunnerEnforcesADeadline(): void
+    {
+        // systemStatus's binary probes execute installed third-party binaries as root to read a
+        // version line. The runner must bound them; an unbounded shell_exec would wedge
+        // systemTest and leave an orphan behind it. Behavioural, because the probe runner and
+        // the probe specs live on different lines and no line-scoped lint can see the pair.
+        require_once dirname(__DIR__, 2).'/systemStatus.php';
+        $runCommand = \pmssStatusContextResolve()['runCommand'];
+
+        $startedAt = microtime(true);
+        $output = $runCommand('sleep 60; echo late');
+        $elapsed = microtime(true) - $startedAt;
+
+        $this->assertTrue(
+            $elapsed < 55,
+            sprintf('status probe runner must enforce a deadline; it ran %.1fs', $elapsed)
+        );
+        $this->assertSame('', trim((string) $output), 'a probe that hit its deadline must yield no version detail');
+    }
+
     public function testNoCommandClassCarriesABespokeTimeout(): void
     {
         // Invariant, not a named-constant check: any future per-class carve-out fails this too.

@@ -8,6 +8,9 @@ declare(strict_types=1);
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/update/osRelease.php';
 
+// Version probes only need to print a line. Anything slower is wedged, not slow.
+const PMSS_STATUS_PROBE_TIMEOUT_SECONDS = 15;
+
 /** Build a normalized status entry for text and JSON outputs. */
 function pmssStatus(string $name, string $status, string $detail = ''): array
 {
@@ -176,7 +179,15 @@ function pmssStatusContextResolve(array $dependencies = []): array
 {
     $sourcesPath = pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
     return [
-        'runCommand' => $dependencies['runCommand'] ?? static function (string $command): string { return trim((string) @shell_exec($command)); },
+        // Bounded capture, not shell_exec: the binary probes below run installed third-party
+        // binaries as root to read a version string. shell_exec has no deadline, so a
+        // daemon-capable binary that ignores its version flag would wedge systemTest and then
+        // outlive it as an orphan -- the ADR 0034 / ADR 0035 failure mode. pmssCommandCapture
+        // bounds the wait AND runs the child in its own process group so the timeout reaches it.
+        'runCommand' => $dependencies['runCommand'] ?? static function (string $command): string {
+            $result = pmssCommandCapture($command, PMSS_STATUS_PROBE_TIMEOUT_SECONDS);
+            return trim((string) ($result['stdout'] ?? ''));
+        },
         'pathExists' => $dependencies['pathExists'] ?? static function (string $path): bool { return is_dir($path) || is_file($path); },
         'readFile' => $dependencies['readFile'] ?? static function (string $path): string { $contents = @file_get_contents($path); return $contents === false ? '' : (string) $contents; },
         'isFile' => $dependencies['isFile'] ?? static function (string $path): bool { return is_file($path); },

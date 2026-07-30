@@ -120,6 +120,13 @@ on existing hosts would trigger a from-source recompile across the fleet on the 
   orphaned by parent death, not by `setsid`, and IS covered.
 - Negative: commands now run one process deeper (`timeout` → `bash` → command) on the piped
   path.
+- Applied to a second surface under the same rule: `systemStatus.php`'s probe runner executed
+  sixteen installed binaries as root (`rtorrent -h`, `openvpn --version`, `flexget --version`,
+  `pyload --version`, …) through an unbounded `shell_exec`, outside the app-installer tree the
+  timeout audit covered. It now goes through `pmssCommandCapture()`, so those probes are both
+  bounded and group-killed. Measured pre-fix: the old closure ran a 20s command to completion.
+  The audit's line-scoped rule could never have caught it — the runner factory and the probe
+  specs are on different lines — so the enforcement is a behavioural test, not a lint.
 - The dev suite did not cover this behaviour: it reported 2577 tests / 0 failures both with and
   without the earlier `setsid` attempt. `commandTimeoutProcessGroupTest.php` reproduces the
   orphan and fails on the pre-fix tree, so the regression is now detectable.

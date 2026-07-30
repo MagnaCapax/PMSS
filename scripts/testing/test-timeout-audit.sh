@@ -47,7 +47,12 @@ while IFS= read -r file; do
 			}
 		' "$file"
 	)
-done < <(git ls-files 'scripts/lib/update/apps/*.php' 2>/dev/null)
+	# Widened past the app installers: the same execute-to-read-a-version pattern appears in
+	# the shared lib and util trees. NOTE this only catches a probe whose shell_exec and
+	# version flag sit on ONE line; a probe split across a runner factory and a spec table
+	# (as systemStatus.php was) is invisible here and needs a behavioural test instead --
+	# see CommandTimeoutProcessGroupTest::testStatusProbeRunnerEnforcesADeadline.
+done < <(git ls-files 'scripts/lib/*.php' 'scripts/util/*.php' 2>/dev/null)
 
 if [[ "$violations" -gt 0 ]]; then
 	printf 'timeout audit: %d offender(s)\n' "$violations" >&2
