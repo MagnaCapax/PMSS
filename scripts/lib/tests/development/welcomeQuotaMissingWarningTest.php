@@ -56,10 +56,12 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $tail = substr($source, $start);
         $tail = preg_replace('/\?>\s*$/', '', $tail);
         $fixture = $this->pmssMakeTempPath('pmss-welcome-usage-', '.php');
+        $scriptsHelper = $this->pmssRepoPath('etc/skel/www/scriptsInc.php');
         $memoryHelper = $this->pmssRepoPath('etc/skel/www/webCgroupMemoryStatus.php');
         return $this->pmssWriteFile(
             $fixture,
             "<?php\n"
+            .'require_once '.var_export($scriptsHelper, true).";\n"
             .'require_once '.var_export($memoryHelper, true).";\n"
             .$tail
         );
@@ -254,6 +256,14 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $this->assertWelcomeUsageScriptContains(
             'echo quotaCreateSection(array("hardLimit" => 100, "totalSpace" => 50));',
             ['Quota info is missing']
+        );
+    }
+
+    public function testWelcomeQuotaSectionExplainsMissingBonusState(): void
+    {
+        $this->assertWelcomeUsageScriptContains(
+            'echo quotaCreateSection(array("hardLimit" => 100, "totalSpace" => 50, "usedBytes" => 10), 0, array("unit" => "percent", "value" => 0, "state" => "absent"));',
+            ['No bonus is applied on this server yet.', 'Earned bonus is added on top of your base resources, never taken from them.']
         );
     }
 

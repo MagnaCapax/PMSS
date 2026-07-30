@@ -33,6 +33,9 @@ $pageState = pmssWelcomePageStateBuild();
 $quotaInfo = $pageState['quotaInfo'];
 $bonusQuota = $pageState['bonusQuota'];
 $bonusDisplayState = $pageState['bonusDisplayState'];
+$bonusDisplayNote = function_exists('pmssCustomerBonusDisplayNoteBuild')
+    ? pmssCustomerBonusDisplayNoteBuild($bonusDisplayState)
+    : '';
 $trafficLimitState = $pageState['trafficLimitState'];
 $bonusTraffic = $trafficLimitState['bonusGiB'];
 $vendor = $pageState['vendor'];
@@ -326,6 +329,7 @@ $managedApps = pmssCustomerManagedAppDefinitions();
                 <div class="portfoliobox">
                     <div class="pmss-bonus-banner" role="status">
                         <strong><?php echo pmssCustomerHtmlAttr(pmssCustomerBonusDisplayTextBuild($bonusDisplayState)); ?></strong>
+                        <?php if ($bonusDisplayNote !== ''): ?><small class="pmss-bonus-note"><?php echo pmssCustomerHtmlAttr($bonusDisplayNote); ?></small><?php endif; ?>
                     </div>
                     <div class="portfolioimg">
                         <?php
@@ -385,7 +389,7 @@ if (file_exists('openvpn-config.tgz')) {
 
                     <div class="portfoliodesc">
                         <?php
-                        echo quotaCreateSection($quotaInfo, $bonusQuota);
+                        echo quotaCreateSection($quotaInfo, $bonusQuota, $bonusDisplayState);
 
                         $trafficLimit = (int) $trafficLimitState['limitGiB'];
                         $trafficData = pmssWelcomeSerializedArrayRead('../.trafficData');
@@ -1040,7 +1044,7 @@ function gaugeColor($percent) {
     return dechex($startColor[0] - round(($startColor[0] - $endColor[0]) * ($percent / 100))).dechex($startColor[1] - round(($startColor[1] - $endColor[1]) * ($percent / 100))).dechex($startColor[2] - round(($startColor[2] - $endColor[2]) * ($percent / 100)));
 }
 
-function quotaCreateSection($quotaInfo, $bonusQuota = 0) {
+function quotaCreateSection($quotaInfo, $bonusQuota = 0, $bonusDisplayState = array()) {
     if (!is_array($quotaInfo) || count($quotaInfo) == 0) return '';
 
     $quotaMissingWarning = '<b>Warning:</b> Quota info is missing. If this persists for more than an hour, contact support.';
@@ -1076,6 +1080,12 @@ function quotaCreateSection($quotaInfo, $bonusQuota = 0) {
     $readableBurst  = pmssFormatBytes($hardLimit, 2, 0, true);
 
     $bonusQuotaLine = ($bonusQuota != 0) ? '<br />Bonus disk space: ' . number_format($bonusQuota) . ' GiB' : '';
+    $bonusDisplayNote = function_exists('pmssCustomerBonusDisplayNoteBuild')
+        ? pmssCustomerBonusDisplayNoteBuild($bonusDisplayState)
+        : '';
+    if ($bonusDisplayNote !== '') {
+        $bonusQuotaLine .= ($bonusQuotaLine !== '' ? '<br />' : '') . pmssCustomerHtmlAttr($bonusDisplayNote);
+    }
 
     if ($percent > 100) {
         $warning = <<<EOF

@@ -150,15 +150,15 @@ if (!function_exists('pmssCustomerBonusDisplayStateRead')) {
  function pmssCustomerBonusDisplayStateRead($userBonusPath = '../.userBonus', $bonusQuotaPath = '../.bonusQuota') {
   $userBonus = pmssCustomerUnsignedIntegerFileRead($userBonusPath);
   if ($userBonus !== null) {
-   return array('unit' => 'percent', 'value' => $userBonus);
+   return array('unit' => 'percent', 'value' => $userBonus, 'state' => $userBonus > 0 ? 'applied' : 'zero');
   }
 
   $bonusQuota = pmssCustomerPositiveIntegerFileRead($bonusQuotaPath);
   if ($bonusQuota !== null) {
-   return array('unit' => 'gib', 'value' => $bonusQuota);
+   return array('unit' => 'gib', 'value' => $bonusQuota, 'state' => 'applied');
   }
 
-  return array('unit' => 'percent', 'value' => 0);
+  return array('unit' => 'percent', 'value' => 0, 'state' => 'absent');
  }
 }
 
@@ -173,6 +173,24 @@ if (!function_exists('pmssCustomerBonusDisplayTextBuild')) {
   return $unit === 'gib'
    ? 'BONUS: +'.number_format($value).' GiB'
    : 'BONUS: '.number_format($value).'%';
+ }
+}
+
+if (!function_exists('pmssCustomerBonusDisplayNoteBuild')) {
+ /** Explain whether the displayed bonus is present on this server. */
+ function pmssCustomerBonusDisplayNoteBuild($state) {
+  if (!is_array($state) || !isset($state['state'])) return '';
+
+  switch ((string) $state['state']) {
+   case 'applied':
+    return 'Bonus is applied on this server.';
+   case 'zero':
+    return 'No bonus is applied on this server.';
+   case 'absent':
+    return 'No bonus is applied on this server yet. Earned bonus is added on top of your base resources, never taken from them.';
+   default:
+    return '';
+  }
  }
 }
 

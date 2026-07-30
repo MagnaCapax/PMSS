@@ -44,6 +44,9 @@ $uid = $pmssBaseResources['uid'];
 $pmssStatsStatusModel = pmssStatsStatusModelBuild($uid, $pmssDockerEnabledPolicy);
 $pmssStatsAppToggles = pmssCustomerManagedAppDefinitions();
 $pmssBonusDisplayState = pmssCustomerBonusDisplayStateRead();
+$pmssBonusDisplayNote = function_exists('pmssCustomerBonusDisplayNoteBuild')
+    ? pmssCustomerBonusDisplayNoteBuild($pmssBonusDisplayState)
+    : '';
 ?>
 
 <style>
@@ -293,6 +296,7 @@ function pmssStatsToggleApp(button) {
   <div class="stats-block stats-bonus-block" role="status">
     <h6>Account bonus</h6>
     <div class="stats-bonus-value"><?php echo pmssCustomerHtmlAttr(pmssCustomerBonusDisplayTextBuild($pmssBonusDisplayState)); ?></div>
+    <?php if ($pmssBonusDisplayNote !== ''): ?><div class="stats-bonus-note"><?php echo pmssCustomerHtmlAttr($pmssBonusDisplayNote); ?></div><?php endif; ?>
   </div>
 
   <!-- LEFT: Base resources -->

@@ -13,13 +13,13 @@ final class CustomerStatsLayoutTest extends TestCase
         $stats = $this->pmssRenderCustomerPanelPage('stats.php');
 
         $this->assertOrderedStrings(
-            array('<div class="pmss-bonus-banner" role="status">', 'BONUS: +50 GiB', '<div class="portfolioimg">'),
+            array('<div class="pmss-bonus-banner" role="status">', 'BONUS: +50 GiB', 'Bonus is applied on this server.', '<div class="portfolioimg">'),
             $welcome,
             'Missing welcome bonus layout marker: ',
             'Welcome bonus order changed at: '
         );
         $this->assertOrderedStrings(
-            array('<div class="stats-block stats-bonus-block" role="status">', 'BONUS: +50 GiB', '<h6>Base Resources (current)</h6>'),
+            array('<div class="stats-block stats-bonus-block" role="status">', 'BONUS: +50 GiB', 'Bonus is applied on this server.', '<h6>Base Resources (current)</h6>'),
             $stats,
             'Missing stats bonus layout marker: ',
             'Stats bonus order changed at: '
@@ -43,6 +43,7 @@ final class CustomerStatsLayoutTest extends TestCase
                 'required' => array(
                     'class="stats-block stats-bonus-block"',
                     'pmssCustomerBonusDisplayTextBuild($pmssBonusDisplayState)',
+                    'pmssCustomerBonusDisplayNoteBuild($pmssBonusDisplayState)',
                     'class="stats-block stats-block-base-resources"',
                     'class="stats-base-resources-pre"',
                     '.stats-block-base-resources .stats-base-resources-pre',
@@ -58,6 +59,7 @@ final class CustomerStatsLayoutTest extends TestCase
             'etc/skel/www/scriptsInc.php' => array('required' => array(
                 'function pmssCustomerBonusDisplayStateRead(',
                 'function pmssCustomerBonusDisplayTextBuild(',
+                'function pmssCustomerBonusDisplayNoteBuild(',
             )),
         ));
     }
@@ -66,11 +68,11 @@ final class CustomerStatsLayoutTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-bonus-display-');
         $cases = array(
-            array('percent', '47', '1925', array('unit' => 'percent', 'value' => 47), 'BONUS: 47%'),
-            array('zero-percent', '0', '1925', array('unit' => 'percent', 'value' => 0), 'BONUS: 0%'),
-            array('gib-fallback', null, '1925', array('unit' => 'gib', 'value' => 1925), 'BONUS: +1,925 GiB'),
-            array('invalid-percent', '-1', '1925', array('unit' => 'gib', 'value' => 1925), 'BONUS: +1,925 GiB'),
-            array('missing-values', null, null, array('unit' => 'percent', 'value' => 0), 'BONUS: 0%'),
+            array('percent', '47', '1925', array('unit' => 'percent', 'value' => 47, 'state' => 'applied'), 'BONUS: 47%', 'Bonus is applied on this server.'),
+            array('zero-percent', '0', '1925', array('unit' => 'percent', 'value' => 0, 'state' => 'zero'), 'BONUS: 0%', 'No bonus is applied on this server.'),
+            array('gib-fallback', null, '1925', array('unit' => 'gib', 'value' => 1925, 'state' => 'applied'), 'BONUS: +1,925 GiB', 'Bonus is applied on this server.'),
+            array('invalid-percent', '-1', '1925', array('unit' => 'gib', 'value' => 1925, 'state' => 'applied'), 'BONUS: +1,925 GiB', 'Bonus is applied on this server.'),
+            array('missing-values', null, null, array('unit' => 'percent', 'value' => 0, 'state' => 'absent'), 'BONUS: 0%', 'No bonus is applied on this server yet. Earned bonus is added on top of your base resources, never taken from them.'),
         );
 
         foreach ($cases as $case) {
@@ -82,6 +84,7 @@ final class CustomerStatsLayoutTest extends TestCase
             $state = pmssCustomerBonusDisplayStateRead($userBonusPath, $bonusQuotaPath);
             $this->assertSame($case[3], $state, 'Unexpected bonus state for '.$case[0]);
             $this->assertSame($case[4], pmssCustomerBonusDisplayTextBuild($state), 'Unexpected bonus text for '.$case[0]);
+            $this->assertSame($case[5], pmssCustomerBonusDisplayNoteBuild($state), 'Unexpected bonus note for '.$case[0]);
         }
     }
 
