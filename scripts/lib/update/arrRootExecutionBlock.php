@@ -17,12 +17,12 @@
  * /root/.config/<App>. A regular file there makes that directory un-creatable, and the app aborts
  * during logger initialisation -- BEFORE it opens a socket.
  *
- * MEASURED 2026-07-30 on /opt/Radarr/Radarr (host 3-173baum), running as ROOT with the file in
- * place: rc=134, "EPIC FAIL: System.IO.DirectoryNotFoundException", the port was never bound, and
- * the file's sha256 was unchanged afterwards -- the application does not unlink what blocks it,
- * even with root privileges. Positive control, same binary with a creatable data directory:
- * starts normally and reaches ApplicationStartedEvent. That control is why customers keep full
- * use of the shared install; the abort is caused by the file, not by uid or /opt permissions.
+ * MEASURED on /opt/Radarr/Radarr, running as ROOT with the file in place: rc=134,
+ * "System.IO.DirectoryNotFoundException", the port was never bound, and the file's sha256 was
+ * unchanged afterwards -- the application does not unlink what blocks it, even with root
+ * privileges. Positive control, same binary with a creatable data directory: starts normally and
+ * reaches ApplicationStartedEvent. That control is why customers keep full use of the shared
+ * install; the abort is caused by the file, not by uid or /opt permissions.
  *
  * WHY NOT seed an authenticated config instead (Forms + AuthenticationRequired=Enabled, which was
  * measured to genuinely deny: unauthenticated API 401, / 302, valid ApiKey 200): that still leaves

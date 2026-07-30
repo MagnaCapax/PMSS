@@ -104,9 +104,9 @@ function pmssArrRootGuardSignal(int $pid, int $signal): bool
 /**
  * Kill every root-owned *ARR process; returns how many were signalled.
  *
- * Silent when there is nothing to kill -- the log stays a signal rather than a heartbeat. Every
- * kill is also recorded in the server's own audit log, because this destroys state that somebody
- * may later ask about.
+ * Silent when there is nothing to kill -- the log stays a signal rather than a heartbeat. The
+ * caller's logger is the single sink; the cron entry already routes it to a persistent file, so a
+ * second hand-rolled append here would only duplicate it.
  */
 function pmssArrRootGuardKillAll(callable $log, string $procRoot = '/proc', string $installRoot = '/opt'): int
 {
@@ -118,9 +118,7 @@ function pmssArrRootGuardKillAll(callable $log, string $procRoot = '/proc', stri
         }
 
         $killed++;
-        $message = 'arr root guard: killed root-owned '.$process['app'].' pid '.$pid.' ('.$process['exe'].')';
-        $log($message);
-        @file_put_contents('/root/sysadmin.agentic.log', gmdate('c').' PMSS '.$message."\n", FILE_APPEND);
+        $log('arr root guard: killed root-owned '.$process['app'].' pid '.$pid.' ('.$process['exe'].')');
     }
 
     return $killed;
