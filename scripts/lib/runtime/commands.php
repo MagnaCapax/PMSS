@@ -148,6 +148,16 @@ function pmssCommandProcessGroupWrap(string $bash, int $timeoutSec): string
 
     $timeoutBinary = pmssCommandTimeoutBinaryPath();
     if ($timeoutBinary === '') {
+        // Fail LOUD, never silently. Without coreutils timeout there is no process group, so a
+        // daemonizing grandchild survives the timeout exactly as it did before ADR 0035 -- and an
+        // unannounced fallback is indistinguishable from the fixed state. Silence is what let the
+        // original orphan run as root for 60 days; do not reproduce that property in the fix.
+        $warning = 'WARNING: coreutils timeout not found -- command runs WITHOUT process-group '
+            .'containment; a daemonizing grandchild can survive its timeout (ADR 0035)';
+        // commands.php has no guaranteed log.php in its include chain, and this branch is only
+        // reachable when coreutils is missing -- i.e. exactly when an undefined-function fatal
+        // would be least welcome. error_log() always exists; logmsg() is used when available.
+        function_exists('logmsg') ? logmsg($warning) : error_log($warning);
         return $bash;
     }
 
