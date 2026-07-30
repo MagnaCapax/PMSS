@@ -69,7 +69,7 @@ function pmssCreateNginxConfigRemoveFile(string $path, string $user, string $lab
 /**
  * Write public/private subdomain vhosts from the shared render context.
  */
-function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, string $subdomainBase, ?string $hashHost, bool $suspended, ?int $serverPort = null, ?string $mcxHost = null): bool
+function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, string $subdomainBase, ?string $hashHost, bool $suspended, ?int $serverPort = null, ?string $mcxHosts = null): bool
 {
     $replacements = [
         '##user##' => $user,
@@ -81,9 +81,11 @@ function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, st
 
     $prefix = $suspended ? 'Suspended' : 'Subdomain';
     $label = $suspended ? ' suspended' : '';
-    // Public vhost also answers the user's stable mcx.fi hostname (which resolves
-    // via the mcx.fi zone builder), serving the same www/public content.
-    $publicHost = $user.'.'.$subdomainBase.($mcxHost !== null && $mcxHost !== '' ? ' '.$mcxHost : '');
+    // Public vhost also answers the user's stable mcx.fi hostnames (which resolve
+    // via the mcx.fi zone builder), serving the same www/public content. This is
+    // the per-service name, plus the customer's cluster name when they have one —
+    // already space-joined by the caller, so it drops straight into server_name.
+    $publicHost = $user.'.'.$subdomainBase.($mcxHosts !== null && $mcxHosts !== '' ? ' '.$mcxHosts : '');
     foreach ([[$publicHost, 'public'.$prefix.'Template', '', 'public'.$label.' subdomain config'], [$hashHost, 'private'.$prefix.'Template', '-hash', 'private'.$label.' subdomain config']] as $target) {
         if ($target[0] === null) {
             continue;
@@ -159,6 +161,14 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
         if ($billingServiceId !== null) {
             $hashHost = pmssNginxUserHashHostname($thisUser, $billingServiceId, $subdomainBase);
             $mcxHost = pmssNginxUserMcxHostname($billingServiceId);
+            // Customers with 2+ services also get a cluster name, round-robined
+            // across their nodes by the zone builder. The client id is already on
+            // this node, so no remote lookup is needed. Single-service users get a
+            // name that never resolves — inert, nginx never sees a request for it.
+            $billingClientId = pmssUserBillingClientIdDigitsRead($homeDir);
+            if ($billingClientId !== null) {
+                $mcxHost .= ' '.pmssNginxUserMcxClusterHostname($billingClientId);
+            }
         }
     }
 

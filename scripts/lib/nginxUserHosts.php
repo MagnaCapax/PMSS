@@ -49,3 +49,24 @@ function pmssNginxUserMcxHostname(string $billingServiceId): string
 {
     return substr(hash('sha256', 'mcx.fi:service:'.$billingServiceId), 0, 16).'.mcx.fi';
 }
+
+/**
+ * Stable mcx.fi CLUSTER hostname for a user's billing client id.
+ *
+ * Mirrors the mcx.fi DNS builder VERBATIM (ns0-build-mcx.php:
+ * substr(sha256("mcx.fi:customer:".clientid),0,16)) — the same relationship the
+ * service hostname above has to its own record. The builder publishes this label
+ * as multi-A round-robin across every node holding one of that customer's
+ * services, so each node must answer for it to serve the customer's content.
+ *
+ * The client id is already on the node (.billingClientId, read via
+ * pmssUserBillingClientIdRead) — no remote lookup is needed to derive this.
+ *
+ * The builder only emits a cluster record for customers with 2+ active
+ * services. A single-service user therefore gets a server_name entry that never
+ * resolves; nginx simply never receives a request for it, so no guard is needed.
+ */
+function pmssNginxUserMcxClusterHostname(string $billingClientId): string
+{
+    return substr(hash('sha256', 'mcx.fi:customer:'.$billingClientId), 0, 16).'.mcx.fi';
+}
