@@ -167,15 +167,6 @@ final class agentDiagnosticsCliTest extends TestCase
         $this->assertSame(['raw' => 'uid=1001(alice)'], $section);
     }
 
-    public function testStorageDiagnosticsReportsTerminatedHomeResidueCount(): void
-    {
-        $storage = \pmssAgentDiagnosticsSectionSpecs()['storage'];
-
-        $this->assertSame('command', $storage['terminated_home_reclaim_count']['type']);
-        $this->assertSame('int', $storage['terminated_home_reclaim_count']['format']);
-        $this->assertStringContainsString("-name '.terminating-*'", $storage['terminated_home_reclaim_count']['command']);
-    }
-
     public function testSpecTimeoutBoundsInvalidAndLargeValues(): void
     {
         $default = (int) constant('PMSS_AGENT_DIAGNOSTICS_COMMAND_TIMEOUT_DEFAULT');

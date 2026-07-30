@@ -640,16 +640,10 @@ Automation often invokes these utilities; below are expected inputs and effects.
     With `--jsonl`, suppresses human status lines and emits one JSON object with the new credential, sync return codes, and `qbittorrent_updated` (`true` when the existing qBittorrent config was updated, `false` when no qBittorrent config was present, `null` before that sync step is reached).
 
 - scripts/terminateUser.php [--dry-run] [--confirm] USERNAME
-  - Behavior: Validates the managed user and exact `/home/<user>` path, removes account-owned runtime/config state, renames `/home/<user>` aside for asynchronous reclaim, and when `/home/backup-<user>` exists from `recreateUser.php`, validates that exact directory before queueing it for the same reclaim worker. It never sweeps `backup-*` prefixes.
-  - Dry-run: Logs planned home and backup reclaim work without renaming or deleting those paths.
-  - Fallback cleanup: If the home cannot be renamed, removes ordinary contents first, clears immutable attributes only from remaining contents, and retries removal.
-  - Safety: Direct cleanup helpers reject NUL-containing paths, refuse symlinked reclaim sources, revalidate the hidden reclaim target after rename, and skip malformed/out-of-range rTorrent port values before unlinking reservation files.
-
-- scripts/util/userHomeReclaim.php --confirm /home/.terminating-USER-YYYYMMDDHHMMSS-PID
-  - Behavior: Clears immutable attributes and deletes one previously renamed reclaim target with the existing `/home/.terminating-*`, realpath, post-clear revalidation, and `-xdev` safeguards.
-  - Locking: Holds a non-blocking per-target lock under `pmssRuntimeDir()` for the full reclaim, so a retry cannot duplicate an in-progress reclaim.
-  - Failure: Returns non-zero and records `home_reclaim_end` with `ERR` when deletion or root removal is incomplete.
-  - scripts/util/userHomeReclaim.php --sweep: Scans only direct `/home` children, retries targets whose encoded rename timestamp is at least one hour old, and prints a cron-visible target/failure summary.
+  - Behavior: Validates the managed user and exact `/home/<user>` path, removes account-owned runtime/config state, then removes `/home/<user>` and any `/home/backup-<user>` left by `recreateUser.php`. It never sweeps `backup-*` prefixes.
+  - Removal: Removes ordinary contents first, clears immutable attributes only from the remaining residue, and retries removal — so the recursive attribute walk never traverses a full account.
+  - Dry-run: Logs planned removal work without deleting those paths.
+  - Safety: Direct cleanup helpers reject NUL-containing paths and skip malformed/out-of-range rTorrent port values before unlinking reservation files.
 
 - scripts/recreateUser.php USERNAME RAM_MiB QUOTA_GiB
   - Behavior: Kills user processes; if `/home/<user>` exists, moves to `/home/backup-<user>`;

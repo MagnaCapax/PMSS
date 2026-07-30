@@ -33,14 +33,6 @@ healthy between full update runs:
   `/etc/seedbox/config/users/*.json` to keep provisioning data accurate. Logs to
   `/var/log/pmss/userDbCleanup.log` when changes are made (or with `--debug`).
   `30 2 * * * root /scripts/cron/cleanupUserDb.php >> /var/log/pmss/userDbCleanup.log 2>&1`
-- **Terminated-home reclaim sweep** – Retries safe `/home/.terminating-*` targets
-  older than one hour and records failed attempts in the cron log. A per-target
-  lock prevents the sweep from duplicating a reclaim that is still running.
-  Backward-compatibility only: termination removes homes synchronously since
-  2026-07-29 and nothing creates these targets any more. The sweep exists to reap
-  directories left by earlier releases and is retired on the usual multi-year
-  compatibility horizon (ADR 0033, Refs #729).
-  `*/15 * * * * root /scripts/util/userHomeReclaim.php --sweep >> /var/log/pmss/userHomeReclaim.log 2>&1`
 
 Audit these lines whenever you review a host. Missing watchdogs usually signal
 manual edits that need to be reconciled.
@@ -59,8 +51,6 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
 - `cgroup.php` – Apply cgroup limits for active users.
 - `checkDelugeInstances.php` – Ensure Deluge daemons stay running when enabled.
 - `checkDirectories.php` – Repair expected directory hierarchy if it drifts.
-- `userHomeReclaim.php --sweep` – Retry old terminated-home reclaim targets using
-  the same path validation and deletion worker as account termination.
 - `checkGui.php` – Restore missing `www/` + `data/` paths and GUI entrypoint.
 - `checkRtorrent.php` – Monitor rTorrent instances, regenerate missing
   `~/.rtorrent.rc` from the canonical templates, and restart as needed. Its

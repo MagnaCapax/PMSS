@@ -42,7 +42,6 @@ function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
         'storage' => [
             'df' => ['type' => 'command', 'command' => 'df -h', 'format' => 'lines'],
             'df_inodes' => ['type' => 'command', 'command' => 'df -i', 'format' => 'lines'],
-            'terminated_home_reclaim_count' => ['type' => 'command', 'command' => "find /home -mindepth 1 -maxdepth 1 -type d -name '.terminating-*' -print 2>/dev/null | wc -l", 'format' => 'int'],
             'mdstat' => ['type' => 'file', 'env' => 'PMSS_AGENT_DIAGNOSTICS_MDSTAT_PATH', 'path' => '/proc/mdstat'],
             'fstab' => ['type' => 'file', 'env' => 'PMSS_AGENT_DIAGNOSTICS_FSTAB_PATH', 'path' => '/etc/fstab'],
         ],

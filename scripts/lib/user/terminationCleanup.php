@@ -7,7 +7,6 @@
  */
 
 require_once dirname(__DIR__).'/userLifecycle.php';
-require_once __DIR__.'/homeReclaim.php';
 require_once __DIR__.'/userConfigStore.php';
 
 function pmssTerminateUserRejectUnsafePath(string $username, string $phase, string $path, string $message, string $contextKey = 'path'): bool
