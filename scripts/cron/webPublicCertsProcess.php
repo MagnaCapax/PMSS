@@ -106,6 +106,12 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
         @unlink($failedMarker);
         $issued++;
         $changed = true;
+        // Regenerate ONLY this user's config so the public vhost picks up the new
+        // cert. Per-user (not the whole fleet) and no restart here — activation is
+        // a single graceful reload after the batch, below.
+        if (is_file('/scripts/util/createNginxConfig.php')) {
+            exec('/scripts/util/createNginxConfig.php --user '.escapeshellarg($user).' 2>&1');
+        }
         logLine('user='.$user.' result=issued names='.implode(',', $names));
     } else {
         @file_put_contents($failedMarker, gmdate('c')." rc=$rc\n");
@@ -116,11 +122,20 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
     $out = [];
 }
 
-// Regenerate configs once so newly-issued certs are picked up, and reload nginx.
-// Canonical entry point — no per-user config hand-editing.
-if ($changed && is_file('/scripts/util/createNginxConfig.php')) {
-    exec('/scripts/util/createNginxConfig.php --restart 2>&1', $regenOut, $regenRc);
-    logLine('result=regenerated rc='.$regenRc);
+// Activate the newly-issued certs with ONE graceful reload for the whole batch —
+// not a full `nginx` restart (which drops every customer's in-flight transfer on
+// the node for a single customer's opt-in), and gated on a config test so a bad
+// config can never take nginx down. Per-user configs were already regenerated
+// above; this only re-reads them.
+if ($changed) {
+    exec('nginx -t 2>&1', $testOut, $testRc);
+    if ($testRc === 0) {
+        exec('nginx -s reload 2>&1', $reloadOut, $reloadRc);
+        logLine('result=reloaded rc='.$reloadRc);
+    } else {
+        logLine('result=reload-skipped reason=nginx-config-test-failed rc='.$testRc
+            .' tail='.substr(str_replace("\n", ' ', implode(' ', array_slice($testOut, -2))), 0, 200));
+    }
 }
 
 logLine('result=done requested='.$requested.' issued='.$issued.' failed='.$failed);
