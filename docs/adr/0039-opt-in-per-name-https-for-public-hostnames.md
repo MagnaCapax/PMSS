@@ -48,10 +48,12 @@ an issuance path:
 4. **Root issuance job** (`scripts/cron/webPublicCertsProcess.php`, scheduled in
    `root.cron` every 5 min, no-op when nothing is pending): for each flagged
    user it runs `certbot certonly --webroot` for `<user>.<server>` and
-   `<sha16>.mcx.fi`, then regenerates configs via the canonical
-   `/scripts/util/createNginxConfig.php --restart`. A failed issuance writes a
-   `.failed` marker and the user is skipped for 6h, so a broken request cannot
-   hammer Let's Encrypt.
+   `<sha16>.mcx.fi`, regenerates only that user's config
+   (`createNginxConfig.php --user <user>`), and activates the batch with a single
+   graceful `nginx -s reload` gated on `nginx -t` — never a full `systemctl
+   restart nginx`, which would drop every customer's in-flight transfer on the
+   node for one customer's opt-in. A failed issuance writes a `.failed` marker and
+   the user is skipped for 6h, so a broken request cannot hammer Let's Encrypt.
 
 ### Deliberate exclusions
 - **Self-signed default: not built.** A self-signed cert produces the same
