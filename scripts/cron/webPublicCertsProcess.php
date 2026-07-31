@@ -130,7 +130,9 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
 if ($changed) {
     exec('nginx -t 2>&1', $testOut, $testRc);
     if ($testRc === 0) {
-        exec('nginx -s reload 2>&1', $reloadOut, $reloadRc);
+        // Graceful reload via the same init-system idiom the rest of PMSS uses
+        // for nginx (systemctl with an init.d fallback) — NOT a full restart.
+        exec('systemctl reload nginx 2>&1 || /etc/init.d/nginx reload 2>&1', $reloadOut, $reloadRc);
         logLine('result=reloaded rc='.$reloadRc);
     } else {
         logLine('result=reload-skipped reason=nginx-config-test-failed rc='.$testRc
