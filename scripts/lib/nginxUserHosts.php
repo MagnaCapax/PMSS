@@ -70,3 +70,36 @@ function pmssNginxUserMcxClusterHostname(string $billingClientId): string
 {
     return substr(hash('sha256', 'mcx.fi:customer:'.$billingClientId), 0, 16).'.mcx.fi';
 }
+
+/**
+ * Choose the SSL block for a user's public subdomain vhost.
+ *
+ * Per-name HTTPS is OPT-IN (see docs/adr/0039): a customer only gets a valid
+ * certificate for their own public names after requesting it, because issuing a
+ * cert per name for the whole fleet would be wasteful and strain the LE
+ * per-registered-domain rate limit. Until then the vhost falls back to the host
+ * certificate (name-mismatch warning) exactly as before — this function changes
+ * nothing for a user who has not opted in.
+ *
+ * The certificate, when it exists, is the standard root-owned certbot output at
+ * /etc/letsencrypt/live/<primaryHost>/ (issued for the user's public names as
+ * SANs). nginx never reads a certificate out of a customer home.
+ *
+ * @param string $primaryHost      The user's own public FQDN (user.server.tld).
+ * @param string $hostFallbackBlock The existing host-wide ssl block.
+ * @param string $liveDir          Certbot live dir (overridable for tests).
+ */
+function pmssNginxUserSslBlock(string $primaryHost, string $hostFallbackBlock, string $liveDir = '/etc/letsencrypt/live'): string
+{
+    if (!pmssNginxUserHostIsValidFqdn($primaryHost)) {
+        return $hostFallbackBlock;
+    }
+    $certDir = $liveDir.'/'.$primaryHost;
+    if (!is_file($certDir.'/fullchain.pem') || !is_file($certDir.'/privkey.pem')) {
+        return $hostFallbackBlock;
+    }
+    return "    ssl_certificate ".$certDir."/fullchain.pem;\n"
+        ."    ssl_certificate_key ".$certDir."/privkey.pem;\n"
+        ."    include /etc/letsencrypt/options-ssl-nginx.conf;\n"
+        ."    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;\n";
+}

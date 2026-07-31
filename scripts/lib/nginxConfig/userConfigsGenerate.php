@@ -71,9 +71,9 @@ function pmssCreateNginxConfigRemoveFile(string $path, string $user, string $lab
  */
 function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, string $subdomainBase, ?string $hashHost, bool $suspended, ?int $serverPort = null, ?string $mcxHosts = null): bool
 {
+    $hostSslBlock = (string) ($ctx['nginxSslBlock'] ?? '');
     $replacements = [
         '##user##' => $user,
-        '##ssl_block##' => (string) ($ctx['nginxSslBlock'] ?? ''),
     ];
     if ($serverPort !== null) {
         $replacements['##port##'] = (string) $serverPort;
@@ -85,12 +85,17 @@ function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, st
     // via the mcx.fi zone builder), serving the same www/public content. This is
     // the per-service name, plus the customer's cluster name when they have one —
     // already space-joined by the caller, so it drops straight into server_name.
-    $publicHost = $user.'.'.$subdomainBase.($mcxHosts !== null && $mcxHosts !== '' ? ' '.$mcxHosts : '');
-    foreach ([[$publicHost, 'public'.$prefix.'Template', '', 'public'.$label.' subdomain config'], [$hashHost, 'private'.$prefix.'Template', '-hash', 'private'.$label.' subdomain config']] as $target) {
+    $ownFqdn = $user.'.'.$subdomainBase;
+    $publicHost = $ownFqdn.($mcxHosts !== null && $mcxHosts !== '' ? ' '.$mcxHosts : '');
+    // The public vhost uses the user's OWN certificate when they have opted into
+    // per-name HTTPS (docs/adr/0039); otherwise the host cert (name-mismatch
+    // warning), unchanged. The private vhost always uses the host cert.
+    $publicSslBlock = pmssNginxUserSslBlock($ownFqdn, $hostSslBlock);
+    foreach ([[$publicHost, 'public'.$prefix.'Template', '', 'public'.$label.' subdomain config', $publicSslBlock], [$hashHost, 'private'.$prefix.'Template', '-hash', 'private'.$label.' subdomain config', $hostSslBlock]] as $target) {
         if ($target[0] === null) {
             continue;
         }
-        $config = strtr((string) ($ctx[$target[1]] ?? ''), $replacements + ['##host##' => $target[0]]);
+        $config = strtr((string) ($ctx[$target[1]] ?? ''), $replacements + ['##host##' => $target[0], '##ssl_block##' => $target[4]]);
         if (!pmssCreateNginxConfigWriteFile((string) ($ctx['subdomainConfigDir'] ?? '/etc/nginx/conf.d').'/pmss-user-'.$user.$target[2].'.conf', $config, $user, $target[3])) {
             return false;
         }

@@ -1,0 +1,55 @@
+#!/usr/bin/env php
+<?php
+/**
+ * createWebPublicCerts — request a real HTTPS certificate for your public web
+ * folder's stable hostnames.
+ *
+ * Runs as the CUSTOMER. It cannot issue the certificate itself — certificate
+ * issuance needs root (it writes under /etc/letsencrypt and answers the ACME
+ * challenge on the server's port 80). So this script records your request; a
+ * root-side job (scripts/cron/webPublicCertsProcess.php) picks it up within a
+ * few minutes, issues the certificate for your public hostnames, and switches
+ * your public site over to it. This is opt-in on purpose — most accounts never
+ * need it, and issuing one per account for the whole fleet would be wasteful.
+ *
+ * Idempotent: running it again just re-affirms the request.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
+
+$home = getenv('HOME');
+if ($home === false || $home === '' || !is_dir($home)) {
+    fwrite(STDERR, "Cannot determine your home directory.\n");
+    exit(1);
+}
+
+$serviceIdRaw = @file_get_contents($home.'/.billingServiceId');
+$serviceId = is_string($serviceIdRaw) ? preg_replace('/\D+/', '', $serviceIdRaw) : '';
+$serverFqdn = trim((string) @shell_exec('hostname -f'));
+$user = basename($home);
+
+echo "Public HTTPS certificate request\n";
+echo "================================\n\n";
+echo "Your public web folder (~/www/public/) is reachable at:\n";
+if ($serverFqdn !== '') {
+    echo "  http://".$user.".".$serverFqdn."/\n";
+}
+if ($serviceId !== '') {
+    $label = substr(hash('sha256', 'mcx.fi:service:'.$serviceId), 0, 16);
+    echo "  http://".$label.".mcx.fi/\n";
+}
+echo "\nThese serve over plain HTTP today; opening them with https:// shows a\n";
+echo "certificate warning. This request gets a real certificate for them so\n";
+echo "https:// works without a warning.\n\n";
+
+if (file_put_contents($home.'/.request-web-certs', gmdate('c')."\n") === false) {
+    fwrite(STDERR, "Could not record the request. Please open a support ticket.\n");
+    exit(1);
+}
+@unlink($home.'/.request-web-certs.failed');
+
+echo "Request recorded. Your certificate will normally be in place within a few\n";
+echo "minutes. Re-run this command any time to check — once https:// loads\n";
+echo "without a warning, you are done. Renewal is automatic afterwards.\n";
+exit(0);

@@ -52,6 +52,16 @@ server {
     listen 80;
     server_name ##host##;
 
+    # ACME HTTP-01 challenge for opt-in per-name certificates (ADR 0039).
+    # Served from a fixed root-owned webroot so certbot runs --webroot and never
+    # parses-and-patches this generated config (ADR 0036). Takes precedence over
+    # the proxy below via ^~.
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/acme-challenge;
+        default_type "text/plain";
+        try_files $uri =404;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:##port##/public-##user##/;
 ##public_proxy_defaults##
