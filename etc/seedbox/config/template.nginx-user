@@ -41,6 +41,32 @@ location /public-##username/ {
         limit_conn addr 8;
 }
 
+# Classic /~##username/ alias for the public web folder (www/public/), the same
+# content /public-##username/ serves. proxy_pass carries a trailing slash so
+# nginx replaces the "/~##username/" prefix before forwarding: lighttpd receives
+# the path WITHOUT the leading "~", so its url.access-deny = ( "~", ... ) rule is
+# never triggered. An alias/root-based implementation would send the literal "~"
+# to lighttpd and 403 every request.
+location /~##username/ {
+        proxy_pass http://127.0.0.1:##serverPort/;
+        proxy_cookie_path /sabnzbd /~##username/sabnzbd;
+        proxy_cookie_path /lidarr /~##username/lidarr;
+        proxy_cookie_path /radarr /~##username/radarr;
+        proxy_cookie_path /prowlarr /~##username/prowlarr;
+        proxy_cookie_path /readarr /~##username/readarr;
+        proxy_cookie_path /sonarr /~##username/sonarr;
+        proxy_cookie_path /jellyfin /~##username/jellyfin;
+        proxy_cookie_path /komga /~##username/komga;
+        proxy_redirect ~^(https?://[^/]+)?/(.+)$ /~##username/$2;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        include /etc/nginx/proxy_params;
+        proxy_http_version 1.1;
+        limit_rate_after 100m;
+        limit_rate 32768k;
+        limit_conn addr 8;
+}
+
 location /webdav-##username/ {
         if ($scheme = http) {
                 return 301 https://$host$request_uri;
