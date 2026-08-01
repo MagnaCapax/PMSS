@@ -460,11 +460,24 @@ EOF
 		sed -i -E "s|<Port>[^<]*</Port>|<Port>${port}</Port>|g" "$datadir/config.xml"
 		sed -i -E "s|<UrlBase>[^<]*</UrlBase>|<UrlBase>/public-${USERNAME}/${app}</UrlBase>|g" "$datadir/config.xml"
 		sed -i -E "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddress>|g" "$datadir/config.xml"
+		servarr_config_xml_tag_converge "$datadir/config.xml" UpdateMechanism External
+		servarr_config_xml_tag_converge "$datadir/config.xml" UpdateAutomatically False
 	else
 		log_info "[dry-run] would configure ${app^^} (port=${port}, url_base=/public-${USERNAME}/${app})"
 	fi
 	echo "${app^^} configured"
 	echo ""
+}
+
+# Keep updates on the supported installer path instead of in-place app updates.
+servarr_config_xml_tag_converge() {
+	local file="$1" tag="$2" value="$3"
+
+	if grep -q "<${tag}>" "$file"; then
+		sed -i -E "s|<${tag}>[^<]*</${tag}>|<${tag}>${value}</${tag}>|g" "$file"
+	else
+		sed -i -E "s|</Config>|  <${tag}>${value}</${tag}>\n</Config>|" "$file"
+	fi
 }
 
 servarr_resolve_download_url() {

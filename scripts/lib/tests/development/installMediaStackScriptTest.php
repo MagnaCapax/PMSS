@@ -53,6 +53,44 @@ class installMediaStackScriptTest extends TestCase
         ], $this->script);
     }
 
+    public function testServarrConfigDisablesInPlaceUpdates(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-update-policy-home-');
+        $existingConfig = $home.'/existing';
+        $this->pmssEnsureDir($existingConfig);
+        $this->pmssWriteFile(
+            $existingConfig.'/config.xml',
+            "<Config>\n  <UpdateMechanism>BuiltIn</UpdateMechanism>\n  <UpdateAutomatically>True</UpdateAutomatically>\n</Config>\n"
+        );
+
+        $functions = $this->pmssExtractShellFunctions($this->script, array(
+            'servarr_config_xml_tag_converge',
+            'servarr_config_xml_converge',
+        ));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'HOME='.escapeshellarg($home),
+            'USERNAME=alice',
+            'DRY_RUN=0',
+            'log_info() { :; }',
+            $functions,
+            'mkdir -p "$HOME/fresh"',
+            'servarr_config_xml_converge radarr "$HOME/fresh" 17878 7878',
+            'servarr_config_xml_converge radarr "$HOME/existing" 17879 7879',
+            'cat "$HOME/fresh/config.xml"',
+            'cat "$HOME/existing/config.xml"',
+            '',
+        ));
+
+        $output = $this->pmssRunShellHarness($script);
+
+        $this->assertSame(2, substr_count($output, '<UpdateMechanism>External</UpdateMechanism>'));
+        $this->assertSame(2, substr_count($output, '<UpdateAutomatically>False</UpdateAutomatically>'));
+        $this->assertStringNotContainsString('<UpdateMechanism>BuiltIn</UpdateMechanism>', $output);
+        $this->assertStringNotContainsString('<UpdateAutomatically>True</UpdateAutomatically>', $output);
+    }
+
     public function testVenvPipBootstrapUsesPython3(): void
     {
         $this->assertStringContainsString('python_venv_install_requirements() {', $this->script);

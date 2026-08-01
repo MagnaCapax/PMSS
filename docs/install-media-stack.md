@@ -17,6 +17,7 @@ All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to
 - Safe defaults: localhost binding; randomized high ports; aliases to launch in `tmux`.
 - Memory pre-flight: accounts below 1024 MiB are warned and must use `--force` from SSH.
 - Uninstall path: `--uninstall` stops media-stack sessions, removes PMSS-managed app/config paths, and backs up/strips managed shell aliases.
+- Servarr update policy: Radarr, Sonarr, and Prowlarr use the external update mechanism and disable automatic in-place updates; rerun this installer to update them safely.
 - Logging: colored console output and log tee to `~/.install-media-stack.log`.
 
 ## Web Panel Wrapper
@@ -147,7 +148,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - Jellyfin (download/extract to `~/.bin/jellyfin`) only when system ffmpeg is 4.4+ or `--jellyfin-ffmpeg=PATH` is supplied
 
 6) Configuration
-- Writes Servarr XML configs in `~/.config/<app>/config.xml` with randomized ports, localhost bind, and URL base `/public-<user>/<app>`.
+- Writes Servarr XML configs in `~/.config/<app>/config.xml` with randomized ports, localhost bind, URL base `/public-<user>/<app>`, and the external update mechanism. The installer disables automatic in-place updates so the shared `.NET` runtime cannot be removed by an app updater; rerun this script for Servarr updates.
 - Jellyfin writes `~/.config/jellyfin/network.xml` likewise.
 - SABnzbd writes `~/.config/sabnzbd/sabnzbd.ini` and adjusts url_base/port/whitelist plus `inet_exposure = 4` so the proxied first-run wizard is reachable.
 
