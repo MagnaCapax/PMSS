@@ -1084,7 +1084,7 @@ function quotaCreateSection($quotaInfo, $bonusQuota = 0, $bonusDisplayState = ar
         ? pmssCustomerBonusDisplayNoteBuild($bonusDisplayState)
         : '';
     if ($bonusDisplayNote !== '') {
-        $bonusQuotaLine .= ($bonusQuotaLine !== '' ? '<br />' : '') . pmssCustomerHtmlAttr($bonusDisplayNote);
+        $bonusQuotaLine .= '<br />' . pmssCustomerHtmlAttr($bonusDisplayNote);
     }
 
     if ($percent > 100) {
