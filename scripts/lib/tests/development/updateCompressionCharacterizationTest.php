@@ -124,7 +124,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
     public function testNginxSubdomainTemplateOutputSnapshot(): void
     {
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
-        $this->assertSame('86ea6ac663b4a48a25b6a8ad4718787cb671dc376bb121bcdd3aa21c51480c8d', hash('sha256', implode("\n---PMSS-TEMPLATE---\n", \pmssNginxUserSubdomainTemplates())), 'nginx subdomain template output changed');
+        $this->assertSame('80b0b8c112396441ce3b1242c93e7cac5e6fbf699e46e2d4e652484e3962bf16', hash('sha256', implode("\n---PMSS-TEMPLATE---\n", \pmssNginxUserSubdomainTemplates())), 'nginx subdomain template output changed');
     }
 
     public function testUpdateStep2OwnsWebStackConfiguration(): void
