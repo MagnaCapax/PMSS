@@ -154,7 +154,7 @@ class ResourceStatisticsTest extends TestCase
         $stats = new \resourceStatistics();
         $timestamp = strtotime('2026-05-16 12:34:56');
         $parts = \pmssResourceLogLineParts(
-            ['io_read' => 1024, 'io_write' => 2048, 'io_read_ops' => 12, 'io_write_ops' => 34],
+            ['io_read' => 1024, 'io_write' => 2048, 'io_read_ops' => 12, 'io_write_ops' => 34, 'cpu_nsec' => 3000],
             ['cpu_nsec' => 3000, 'memory' => 4096, 'tasks' => 7, 'memory_anon' => 512, 'memory_file' => 1024]
         );
 
@@ -172,6 +172,30 @@ class ResourceStatisticsTest extends TestCase
             'memory_anon' => 512.0,
             'memory_file' => 1024.0,
         ], $stats->parseLine($this->resourceLine($timestamp, implode(' ', $parts))));
+    }
+
+    public function testResourceLogCpuWindowUsesCounterDelta(): void
+    {
+        $stats = new \resourceStatistics();
+        $now = strtotime('2026-05-16 12:34:56');
+        $first = \pmssResourceLogLineParts(
+            ['cpu_nsec' => 100],
+            ['cpu_nsec' => 100, 'memory' => 4096, 'tasks' => 1]
+        );
+        $second = \pmssResourceLogLineParts(
+            ['cpu_nsec' => 50],
+            ['cpu_nsec' => 150, 'memory' => 4096, 'tasks' => 1]
+        );
+
+        $results = $stats->collectWindowResultsFromData(
+            implode("\n", [
+                $this->resourceLine($now - 300, implode(' ', $first)),
+                $this->resourceLine($now, implode(' ', $second)),
+            ]),
+            ['month' => $now - 3600]
+        );
+
+        $this->assertEquals(150.0, $results['raw']['cpu']['month']);
     }
 
     public function testParseLineValid(): void

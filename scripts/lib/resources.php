@@ -124,8 +124,8 @@ function pmssResourceResultsWindowMetrics(array $results, string $window): ?arra
 function pmssResourceLogLineParts(array $delta, array $state): array
 {
     $parts = [];
-    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops'] as $field) $parts[] = (string) ($delta[$field] ?? 0);
-    foreach (['cpu_nsec', 'memory', 'tasks'] as $field) $parts[] = (string) ($state[$field] ?? 0);
+    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) $parts[] = (string) ($delta[$field] ?? 0);
+    foreach (['memory', 'tasks'] as $field) $parts[] = (string) ($state[$field] ?? 0);
     if (isset($state['memory_anon'], $state['memory_file'])) array_push($parts, (string) $state['memory_anon'], (string) $state['memory_file']);
     return $parts;
 }
