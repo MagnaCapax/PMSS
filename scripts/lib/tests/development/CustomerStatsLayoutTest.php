@@ -175,6 +175,26 @@ final class CustomerStatsLayoutTest extends TestCase
         $this->assertSame('n/a', \pmssStatsTrafficDisplayValue(array('raw' => array('month' => 'bad')), 'month'));
     }
 
+    public function testResourceSnapshotRendersRawOnlyMemoryAndRamHours(): void
+    {
+        $resourceData = array(
+            'cpu' => array('raw' => array('month' => 0, 'week' => 0, 'day' => 0, 'hour' => 0)),
+            'memory' => array('raw' => array('month' => 3 * 1073741824, 'week' => 2 * 1073741824, 'day' => 1073741824)),
+            'ram_hours' => array('raw' => array('month' => 12.5, 'week' => 6.5, 'day' => 1.25)),
+            'tasks' => array('current' => 1),
+            'daily' => array(),
+        );
+
+        [, $output] = $this->pmssCaptureStdout(function () use ($resourceData): void {
+            \pmssStatsRenderResourceBlocks(array('data' => $resourceData, 'time' => 0, 'error' => null));
+        });
+
+        $this->assertStringContainsString('RAM-hours: 12.5GB-hrs / 6.5GB-hrs / 1.25GB-hrs', $output);
+        $this->assertStringContainsString('Average: 3GiB / 2GiB / 1024MiB', $output);
+        $this->assertStringNotContainsString('RAM-hours: n/a', $output);
+        $this->assertStringNotContainsString('Average: n/a', $output);
+    }
+
     public function testStatsStatusHelpersCharacterizeLocalResourceContracts(): void
     {
         $cgroupDir = $this->pmssMakeTempDir('pmss-stats-cgroup-');

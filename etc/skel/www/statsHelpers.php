@@ -411,6 +411,16 @@ function pmssStatsResourceSnapshotBuild(?array $resourceData): array
     foreach (array('io_read' => 'ioReadDisplay', 'io_write' => 'ioWriteDisplay', 'cpu' => 'cpuDisplay', 'memory' => 'memoryDisplay', 'ram_hours' => 'ramHoursDisplay') as $section => $target) {
         $snapshot[$target] = pmssStatsNestedArrayRead($resourceData, $section, 'display');
     }
+    $memoryRaw = pmssStatsNestedArrayRead($resourceData, 'memory', 'raw');
+    $ramHoursRaw = pmssStatsNestedArrayRead($resourceData, 'ram_hours', 'raw');
+    foreach (array('month', 'week', 'day', 'hour') as $period) {
+        if (!isset($snapshot['memoryDisplay'][$period]) && isset($memoryRaw[$period]) && is_numeric($memoryRaw[$period])) {
+            $snapshot['memoryDisplay'][$period] = pmssFormatBytesShort($memoryRaw[$period]);
+        }
+        if (!isset($snapshot['ramHoursDisplay'][$period]) && isset($ramHoursRaw[$period]) && is_numeric($ramHoursRaw[$period])) {
+            $snapshot['ramHoursDisplay'][$period] = round((float)$ramHoursRaw[$period], 2).'GB-hrs';
+        }
+    }
     $cpuRaw = pmssStatsNestedArrayRead($resourceData, 'cpu', 'raw');
     $ioReadOpsRaw = pmssStatsNestedArrayRead($resourceData, 'io_read_ops', 'raw');
     $ioWriteOpsRaw = pmssStatsNestedArrayRead($resourceData, 'io_write_ops', 'raw');
