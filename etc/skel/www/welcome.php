@@ -1080,12 +1080,6 @@ function quotaCreateSection($quotaInfo, $bonusQuota = 0, $bonusDisplayState = ar
     $readableBurst  = pmssFormatBytes($hardLimit, 2, 0, true);
 
     $bonusQuotaLine = ($bonusQuota != 0) ? '<br />Bonus disk space: ' . number_format($bonusQuota) . ' GiB' : '';
-    $bonusDisplayNote = function_exists('pmssCustomerBonusDisplayNoteBuild')
-        ? pmssCustomerBonusDisplayNoteBuild($bonusDisplayState)
-        : '';
-    if ($bonusDisplayNote !== '') {
-        $bonusQuotaLine .= '<br />' . pmssCustomerHtmlAttr($bonusDisplayNote);
-    }
 
     if ($percent > 100) {
         $warning = <<<EOF

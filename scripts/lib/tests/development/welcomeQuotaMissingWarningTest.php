@@ -259,14 +259,14 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         );
     }
 
-    public function testWelcomeQuotaSectionExplainsMissingBonusState(): void
+    public function testWelcomeQuotaSectionOmitsBonusStateNote(): void
     {
         $output = $this->assertWelcomeUsageScriptContains(
             'echo quotaCreateSection(array("hardLimit" => 100, "totalSpace" => 50, "usedBytes" => 10), 0, array("unit" => "percent", "value" => 0, "state" => "absent"));',
-            ['No bonus is applied on this server yet.', 'Earned bonus is added on top of your base resources, never taken from them.']
+            ['10 B/50 B']
         );
-        $this->assertStringContainsString(
-            '10 B/50 B<br />No bonus is applied on this server yet. Earned bonus is added on top of your base resources, never taken from them.',
+        $this->pmssAssertStringNotContainsString(
+            'No bonus is applied on this server yet. Earned bonus is added on top of your base resources, never taken from them.',
             $output
         );
     }
