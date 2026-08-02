@@ -7,6 +7,15 @@ require_once dirname(__DIR__, 4).'/etc/skel/www/statsHelpers.php';
 
 final class CustomerStatsLayoutTest extends TestCase
 {
+    public function testInfoRaidNoticeOccupiesFullFlexRow(): void
+    {
+        $this->pmssAssertRepoFileContainsString(
+            'etc/skel/www/info.php',
+            ".pmss-raid-notice {\n        flex: 0 0 100%;",
+            'The info-page RAID notice must occupy the full portfolio flex row.'
+        );
+    }
+
     public function testResourceBasicsRenderAsCompactTopSnapshot(): void
     {
         $welcome = $this->pmssRenderCustomerPanelPage('welcome.php');

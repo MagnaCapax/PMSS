@@ -45,6 +45,7 @@ if (file_exists($pmssStorageHealthNoticeLib)) {
         margin-right: 0;
       }
       .pmss-raid-notice {
+        flex: 0 0 100%;
         margin: 14px 0 18px;
         padding: 12px 14px;
         border: 1px solid #d8a55a;
