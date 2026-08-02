@@ -198,12 +198,6 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
     }
 
     $throttleEvents = pmssCustomerUnsignedIntegerValue($events['high'] ?? null);
-    if ($throttleEvents === null && $cgroupAvailable) {
-        $throttleEvents = pmssWebCgroupMemoryStatusCounterRead(
-            pmssWebCgroupMemoryStatusCounterCandidatePaths($uid, $cgroupDir, 'memory.failcnt', 'memory.failcnt')
-        );
-    }
-    $throttleEvents = $throttleEvents ?? 0;
     $maxEvents = pmssCustomerUnsignedIntegerValue($events['max'] ?? null) ?? 0;
     $oomEvents = pmssCustomerUnsignedIntegerValue($events['oom'] ?? null) ?? 0;
     $oomKillEvents = pmssCustomerUnsignedIntegerValue($events['oom_kill'] ?? null) ?? 0;
@@ -414,8 +408,10 @@ function pmssWelcomeMemorySectionHtmlBuild($pressureStatusOverride = null)
     if (is_array($pressureStatus)) {
         $pressureParts = array(
             '<br /><b>Memory pressure:</b> <span style="color: '.$pressureStatus['status_color'].';">&#9679; '.pmssCustomerHtmlAttr($pressureStatus['status']).'</span>',
-            '<br />Throttle events: '.number_format((int) $pressureStatus['throttle_events']),
         );
+        if ($pressureStatus['throttle_events'] !== null) {
+            $pressureParts[] = '<br />Throttle events: '.number_format((int) $pressureStatus['throttle_events']);
+        }
         if ($pressureStatus['message'] !== '') {
             $pressureParts[] = '<br /><b style="color: '.$pressureStatus['status_color'].';">'.pmssCustomerHtmlAttr($pressureStatus['message']).'</b>';
         }

@@ -157,17 +157,31 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->assertStringContainsString('1.1 GiB / 1.2 GiB (86.7%; pressure 54.6%)', $status['usage_text']);
     }
 
-    public function testReadUsesCgroupV1FailcntWhenMemoryEventsAreUnavailable(): void
+    public function testReadDoesNotExposeCgroupV1FailcntAsThrottleEvents(): void
     {
-        $dir = $this->writeMemoryStatusFixture(
-            '1073741824', '1073741824', '2147483648', ''
-        );
-        $this->pmssWriteFile($dir.'/memory.failcnt', "3\n");
+        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-v1-');
+        $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "1073741824\n");
+        $this->pmssWriteFile($dir.'/memory.soft_limit_in_bytes', "1073741824\n");
+        $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "2147483648\n");
+        $this->pmssWriteFile($dir.'/memory.failcnt', "1270090200\n");
+        $this->pmssWriteFile($dir.'/memory.pressure', "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n");
         $this->pmssWriteFile($dir.'/memory.stat', "total_rss 1073741824\ntotal_cache 0\n");
 
         $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234]);
 
-        $this->pmssAssertArraySubsetSame(['throttle_events' => 3, 'status' => 'THROTTLED'], $status);
+        $this->pmssAssertArraySubsetSame(['throttle_events' => null, 'status' => 'HIGH'], $status);
+    }
+
+    public function testCustomerPanelsOmitUnavailableThrottleEventCount(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/www/webCgroupMemoryStatus.php', [
+            "if (\$pressureStatus['throttle_events'] !== null)",
+            "\$pressureParts[] = '<br />Throttle events: '",
+        ]);
+        $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/www/stats.php', [
+            "if (\$pmssMemoryPressure['throttle_events'] !== null):",
+            '<span class="label">Throttle events:</span>',
+        ]);
     }
 
     public function testThrottleMessageUsesReducedSpeedCopyWithoutOomLanguage(): void

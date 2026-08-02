@@ -376,10 +376,12 @@ echo pmssCustomerHtmlAttr($ip !== false ? trim($ip) : 'unknown');
         <span class="label">Memory pressure:</span>
         <span class="value"><span class="status <?php echo strtolower($pmssMemoryPressure['status']); ?>"><?php echo pmssCustomerHtmlAttr($pmssMemoryPressure['status']); ?></span></span>
     </div>
+    <?php if ($pmssMemoryPressure['throttle_events'] !== null): ?>
     <div class="info-line">
         <span class="label">Throttle events:</span>
         <span class="value"><?php echo number_format((int) $pmssMemoryPressure['throttle_events']); ?></span>
     </div>
+    <?php endif; ?>
     <div class="info-line">
         <span class="label">Pressure avg10:</span>
         <span class="value"><?php
