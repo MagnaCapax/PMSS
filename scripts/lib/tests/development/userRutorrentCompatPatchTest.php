@@ -74,6 +74,11 @@ class UserRutorrentCompatPatchTest extends TestCase
                 'path' => 'www/rutorrent/plugins/rss/action.php',
                 'content' => "before\nflush();\nafter\n",
             ],
+            [
+                'dir' => 'www/rutorrent/plugins/throttle',
+                'path' => 'www/rutorrent/plugins/throttle/throttle.php',
+                'content' => "new rXMLRPCCommand( \"set_upload_rate\", 1048576 )\nnew rXMLRPCCommand( \"set_download_rate\", 1048576 )\n",
+            ],
         ] as $case) {
             $this->assertCompatibilityContentUntouched($case, $case['content']);
         }
@@ -85,6 +90,11 @@ class UserRutorrentCompatPatchTest extends TestCase
         $settingsPath = $this->pmssWriteRelativeFile($home, 'www/rutorrent/php/settings.php', "\t\t\$tm = getdate();\n\t\t\$startAt = mktime(\$tm[\"hours\"],\n\t\t\t((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\n");
         $rssPath = $this->pmssWriteRelativeFile($home, 'www/rutorrent/plugins/rss/action.php', "ob_flush();\n");
         $hddquotaPath = $this->pmssWriteRelativeFile($home, 'www/rutorrent/plugins/hddquota/action.php', "return \$field;\n");
+        $throttlePath = $this->pmssWriteRelativeFile(
+            $home,
+            'www/rutorrent/plugins/throttle/throttle.php',
+            "new rXMLRPCCommand( \"set_upload_rate\", MAX_SPEED )\nnew rXMLRPCCommand( \"set_download_rate\", MAX_SPEED )\n"
+        );
 
         \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
 
@@ -92,6 +102,10 @@ class UserRutorrentCompatPatchTest extends TestCase
         $this->assertStringContainsString('((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),', (string) file_get_contents($settingsPath));
         $this->assertStringContainsString('@ob_flush();', (string) file_get_contents($rssPath));
         $this->assertStringContainsString('return (int) $field;', (string) file_get_contents($hddquotaPath));
+        $throttleContent = (string) file_get_contents($throttlePath);
+        $this->assertStringContainsString('new rXMLRPCCommand( "set_upload_rate", 0 )', $throttleContent);
+        $this->assertStringContainsString('new rXMLRPCCommand( "set_download_rate", 0 )', $throttleContent);
+        $this->pmssAssertStringNotContainsString('MAX_SPEED', $throttleContent);
     }
 
     public function testSkeletonHddquotaActionReturnsInt(): void
@@ -137,6 +151,14 @@ class UserRutorrentCompatPatchTest extends TestCase
                 'patched' => "prefix\n        return (int) \$field;\nsuffix\n",
                 'expected' => 'return (int) $field;',
                 'unexpected' => 'return $field;',
+            ],
+            [
+                'dir' => 'www/rutorrent/plugins/throttle',
+                'path' => 'www/rutorrent/plugins/throttle/throttle.php',
+                'legacy' => "prefix\nnew rXMLRPCCommand( \"set_upload_rate\", MAX_SPEED )\nnew rXMLRPCCommand( \"set_download_rate\", MAX_SPEED )\nsuffix\n",
+                'patched' => "prefix\nnew rXMLRPCCommand( \"set_upload_rate\", 0 )\nnew rXMLRPCCommand( \"set_download_rate\", 0 )\nsuffix\n",
+                'expected' => "new rXMLRPCCommand( \"set_upload_rate\", 0 )\nnew rXMLRPCCommand( \"set_download_rate\", 0 )",
+                'unexpected' => "new rXMLRPCCommand( \"set_upload_rate\", MAX_SPEED )\nnew rXMLRPCCommand( \"set_download_rate\", MAX_SPEED )",
             ],
         ];
     }

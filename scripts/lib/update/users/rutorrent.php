@@ -92,6 +92,16 @@ PHP;
             'legacy' => 'return $field;',
             'patched' => 'return (int) $field;',
         ],
+        [
+            'path' => $ctx['home'].'/www/rutorrent/plugins/throttle/throttle.php',
+            'legacy' => 'new rXMLRPCCommand( "set_upload_rate", MAX_SPEED )',
+            'patched' => 'new rXMLRPCCommand( "set_upload_rate", 0 )',
+        ],
+        [
+            'path' => $ctx['home'].'/www/rutorrent/plugins/throttle/throttle.php',
+            'legacy' => 'new rXMLRPCCommand( "set_download_rate", MAX_SPEED )',
+            'patched' => 'new rXMLRPCCommand( "set_download_rate", 0 )',
+        ],
     ] as $patch) {
         pmssUserPatchWritableStrings($patch['path'], [$patch]);
     }

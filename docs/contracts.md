@@ -269,6 +269,7 @@ Sub-handlers:
 - pmssUserApplySkeletonFiles(array $ctx): void → copies fixed list of skel files and quota plugin files into user tree using `updateUserFile()`; force-refreshes legacy `~/www/index.php` copies missing the PHP 8.2 `frameData` initialization; deletes `~/www/phpXplorer`.
 - pmssUserUpdateThemes(array $ctx): void → ensures named themes exist under `rutorrent/plugins/theme/themes/` (copied from skel), fixes ownership.
 - pmssUserUpgradeRutorrent(array $ctx): void → if user’s ruTorrent index.html SHA != skeleton (and no existing backup), backups to `oldRutorrent-3`, copies fresh from skel, restores config/share, updates config via `updateRutorrentConfig()`, fixes ownership and perms.
+- pmssUserMaintainRutorrentPhpCompatibility(array $ctx): void → applies idempotent compatibility patches to writable per-user ruTorrent PHP files, including neutralizing the throttle plugin’s global `MAX_SPEED` re-pin while preserving rTorrent’s unlimited `0` rate.
 - pmssUserEnsurePlugins(array $ctx): void → removes deprecated `cpuload`, ensures `unpack` plugin exists and has proper perms, removes legacy `retrackers.dat`, and creates torrents/RSS settings dirs.
 - pmssUserRefreshPermissions(array $ctx): void
   - Runs `userPermissions.php` with optional `ionice -c3` wrapper when available.
