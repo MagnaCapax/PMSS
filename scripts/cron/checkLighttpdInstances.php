@@ -9,8 +9,15 @@
 require_once __DIR__.'/../lib/lighttpd/userConfigApply.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogErrorPage.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';
+require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
 require_once __DIR__.'/../lib/user/watchdog.php';
+
+$pmssCheckLighttpdLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkLighttpdInstances.lock'), true);
+if ($pmssCheckLighttpdLock === false) {
+    echo date('Y-m-d H:i:s').': checkLighttpdInstances already running; skipping' . "\n";
+    exit(0);
+}
 
 $argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';
 if ($argUserRaw === '') {

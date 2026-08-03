@@ -37,6 +37,9 @@ class CronInlineCharacterizationTest extends TestCase
     public function testLighttpdWatchdogUsesSharedHelpersAndKeepsRestartFlow(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkLighttpdInstances.php', [
+            "require_once __DIR__.'/../lib/runtime.php';",
+            "pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkLighttpdInstances.lock'), true)",
+            'checkLighttpdInstances already running; skipping',
             "require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';",
             "pmssUserLighttpdEnabled(\$thisUser)",
             "pmssLighttpdWatchdogDeleteErrorPage(\$thisUser, \$watchdogWebRoot)",
