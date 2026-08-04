@@ -61,6 +61,19 @@ class CronInlineCharacterizationTest extends TestCase
         ]);
     }
 
+    public function testMediaStackWatchdogKeepsRootGuardAndUserLoopSingleInstance(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/cron/mediaStackInstancesCheck.php');
+
+        $this->assertOrderedStrings([
+            'pmssArrRootGuardAuditAndKill(',
+            "\$pmssMediaStackInstancesLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-mediaStackInstancesCheck.lock'), true);",
+            'if ($pmssMediaStackInstancesLock === false) {',
+            'mediaStackInstancesCheck already running; skipping',
+            "foreach (\$result['users'] as \$username) {",
+        ], $source, 'media-stack watchdog guard contract: ');
+    }
+
     public function testWireguardSyncconfRejectsPartialTempfileWrites(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkWireguard.php', [

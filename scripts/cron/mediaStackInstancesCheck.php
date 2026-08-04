@@ -17,10 +17,18 @@
 require_once __DIR__.'/../lib/mediaStackWatchdog.php';
 require_once __DIR__.'/../lib/user/selection.php';
 require_once __DIR__.'/../lib/arrRootGuard.php';
+require_once __DIR__.'/../lib/runtime.php';
 
 $rootGuardFindings = pmssArrRootGuardAuditAndKill(static function (string $message): void {
     echo date('Y-m-d H:i:s').': '.$message."\n";
 });
+
+// Keep the handle alive while home filesystem probes run so overlapping ticks skip.
+$pmssMediaStackInstancesLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-mediaStackInstancesCheck.lock'), true);
+if ($pmssMediaStackInstancesLock === false) {
+    echo date('Y-m-d H:i:s').': mediaStackInstancesCheck already running; skipping'."\n";
+    exit($rootGuardFindings > 0 ? 1 : 0);
+}
 
 $result = pmssListManagedUsersResult('/scripts/listUsers.php');
 if ((int) $result['exitCode'] !== 0) {
