@@ -8,6 +8,13 @@
  */
 require_once __DIR__.'/../lib/user/watchdog.php';
 require_once __DIR__.'/../lib/user/torrentPort.php';
+
+$pmssCheckQbittorrentLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkQbittorrentInstances.lock'), true);
+if ($pmssCheckQbittorrentLock === false) {
+    echo date('Y-m-d H:i:s').': checkQbittorrentInstances already running; skipping' . "\n";
+    exit(0);
+}
+
 pmssUserWatchdogRunService('qBittorrent', 'qbittorrentEnable', ['qbittorrent-nox'], 'qbittorrent-nox stopped due to suspension', [
     pmssUserWatchdogServiceSpec('qbittorrent-nox', static function (string $thisUser): string {
         return pmssUserWatchdogSuCommand($thisUser, 'cd ~; nohup qbittorrent-nox -d >> /dev/null 2>&1 &');
