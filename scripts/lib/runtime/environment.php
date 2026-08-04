@@ -42,7 +42,22 @@ function pmssIopingProbeOutput(?string $target): ?string
 {
     $bin = pmssCommandPath('ioping');
     if ($bin === '' || $target === null || trim($target) === '') return null;
-    $result = pmssCommandCapture(pmssCommandArgvShellQuote([$bin, '-c', (string) PMSS_IOPING_PROBE_COUNT, '-i', PMSS_IOPING_PROBE_INTERVAL, '-D', $target]), PMSS_IOPING_PROBE_TIMEOUT);
+    $command = pmssCommandArgvShellQuote([$bin, '-c', (string) PMSS_IOPING_PROBE_COUNT, '-i', PMSS_IOPING_PROBE_INTERVAL, '-D', $target]);
+    // Single-instance guard (#751): bind the lock to the ioping process itself, so a
+    // direct-I/O probe orphaned in D-state past the timeout wrapper blocks only its
+    // OWN next tick instead of piling up N-deep and DoSing the host it measures.
+    // A PHP-level flock() would release when the wrapper is proc_terminate'd at the
+    // timeout while the stuck probe still holds the device queue — so keep the lock
+    // on the exec'd command (same idiom as the storage-health probes, Refs #758).
+    $flock = pmssCommandPath('flock');
+    if ($flock !== '') {
+        $lockPath = pmssRuntimeLockPath('pmss-ioping-'.(preg_replace('#[^A-Za-z0-9]+#', '-', trim((string) $target, '/')) ?: 'root').'.lock');
+        $command = escapeshellarg($flock).' -xn -E 75 '.escapeshellarg($lockPath).' '.$command;
+    }
+    // flock -xn exits 75 without launching ioping when a prior probe still holds the
+    // lock; that produces empty output -> null -> callers report the existing 'na'
+    // sentinel for that tick (a skipped probe under contention is correct).
+    $result = pmssCommandCapture($command, PMSS_IOPING_PROBE_TIMEOUT);
     $out = trim($result['stdout'] !== '' ? $result['stdout'] : $result['stderr']);
     return $out === '' ? null : $out;
 }
