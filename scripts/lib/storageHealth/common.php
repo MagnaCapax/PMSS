@@ -111,3 +111,28 @@ function pmssStorageHealthExecCapture(string $cmd, int $timeoutSec = 20): array
 {
     return pmssCommandCapture($cmd, $timeoutSec);
 }
+
+/**
+ * Bind a probe lock to the external storage command, not to the PHP wrapper.
+ *
+ * A probe can outlive the timeout wrapper while blocked in device I/O. Keeping
+ * the lock on the exec'd probe prevents the next snapshot from launching a
+ * competing probe for the same device while allowing other devices through.
+ *
+ * @return array{command:string,lock_exit_code:int}
+ */
+function pmssStorageHealthProbeCommand(string $kind, string $kname, string $command): array
+{
+    if (pmssCommandPath('flock') === ''
+        || preg_match('/^[A-Za-z0-9._!+-]+$/D', $kind) !== 1
+        || preg_match('/^[A-Za-z0-9._!+-]+$/D', $kname) !== 1) {
+        return ['command' => $command, 'lock_exit_code' => 0];
+    }
+
+    $flock = pmssCommandPath('flock');
+    $lockPath = pmssRuntimeLockPath('pmss-storage-'.$kind.'-'.$kname.'.lock');
+    return [
+        'command' => escapeshellarg($flock).' -xn -E 75 '.escapeshellarg($lockPath).' '.$command,
+        'lock_exit_code' => 75,
+    ];
+}

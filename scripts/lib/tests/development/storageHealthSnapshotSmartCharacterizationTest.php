@@ -6,6 +6,28 @@ require_once dirname(__DIR__, 2).'/storageHealth.php';
 
 final class StorageHealthSnapshotSmartCharacterizationTest extends TestCase
 {
+    public function testStorageHealthProbeLocksAreBoundPerDeviceAndKind(): void
+    {
+        $smart = \pmssStorageHealthProbeCommand('smart', 'sda', 'smartctl -H /dev/sda');
+        $nvme = \pmssStorageHealthProbeCommand('nvme', 'sda', 'nvme smart-log /dev/sda');
+
+        $this->assertSame(75, $smart['lock_exit_code']);
+        $this->assertSame(75, $nvme['lock_exit_code']);
+        $this->assertStringContainsString(" -xn -E 75 ", $smart['command']);
+        $this->assertStringContainsString('pmss-storage-smart-sda.lock', $smart['command']);
+        $this->assertStringContainsString('pmss-storage-nvme-sda.lock', $nvme['command']);
+        $this->assertTrue($smart['command'] !== $nvme['command']);
+    }
+
+    public function testStorageHealthProbeFallsBackWithoutFlock(): void
+    {
+        $this->pmssWithEnv(['PATH' => ''], function (): void {
+            $probe = \pmssStorageHealthProbeCommand('smart', 'sda', 'smartctl -H /dev/sda');
+            $this->assertSame('smartctl -H /dev/sda', $probe['command']);
+            $this->assertSame(0, $probe['lock_exit_code']);
+        });
+    }
+
     public function testSnapshotSmartKeepsLegacyUdmaCrcHistoryCompatible(): void
     {
         $device = $this->pmssMakeReadableTempPath('pmss-smart-device-', 'dev-');

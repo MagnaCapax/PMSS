@@ -124,9 +124,13 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
     }
 
     $cmd = 'smartctl -n standby,now -H -A -i '.escapeshellarg($dev);
-    $res = pmssStorageHealthExecCapture($cmd, 25);
+    $probe = pmssStorageHealthProbeCommand('smart', (string) ($disk['kname'] ?? ''), $cmd);
+    $res = pmssStorageHealthExecCapture($probe['command'], 25);
     $out = $res['stdout']."\n".$res['stderr'];
     if (trim($out) === '') {
+        if ($probe['lock_exit_code'] !== 0 && (int) $res['rc'] === $probe['lock_exit_code']) {
+            return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['smartctl_probe_locked'], 'warn', 'smartctl probe already running');
+        }
         return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['smartctl_empty'], 'warn', 'smartctl produced no output');
     }
 

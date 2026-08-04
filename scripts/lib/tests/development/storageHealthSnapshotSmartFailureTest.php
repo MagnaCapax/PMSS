@@ -19,6 +19,18 @@ class StorageHealthSnapshotSmartFailureTest extends TestCase
         });
     }
 
+    public function testSnapshotSmartReportsBusyProbeSeparately(): void
+    {
+        $device = $this->pmssMakeReadableTempPath('pmss-smart-locked-', 'dev-');
+        $flockDir = $this->pmssMakeExecutableStub('flock', "#!/bin/sh\nexit 75\n", 'pmss-smart-flock-');
+        $smartctlDir = $this->pmssMakeLineOutputStub('smartctl', ['SMART overall-health self-assessment test result: PASSED'], 'pmss-smart-locked-bin-');
+
+        $this->pmssWithEnv(['PATH' => $flockDir.':'.$smartctlDir], function () use ($device): void {
+            $entry = \pmssStorageHealthSnapshotSmart(['path' => $device, 'kname' => 'sdz'], [], '2025-01-01T00:00:00+00:00');
+            $this->pmssAssertArraySubsetSame(['error' => 'smartctl probe already running', 'flags' => ['smartctl_probe_locked'], 'severity' => 'warn', 'ok' => false], $entry);
+        });
+    }
+
     private function assertSmartGuardEntry(array $entry, string $device, string $error, string $flag): void
     {
         $this->pmssAssertArraySubsetSame(['kind' => 'smart', 'device' => $device, 'error' => $error, 'flags' => [$flag], 'severity' => 'warn', 'ok' => false], $entry);
