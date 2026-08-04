@@ -19,7 +19,7 @@ require_once __DIR__.'/../lib/user/selection.php';
 require_once __DIR__.'/../lib/arrRootGuard.php';
 require_once __DIR__.'/../lib/runtime.php';
 
-$rootGuardFindings = pmssArrRootGuardAuditAndKill(static function (string $message): void {
+$rootGuardFindings = pmssRootGuardAuditAndKill(static function (string $message): void {
     echo date('Y-m-d H:i:s').': '.$message."\n";
 });
 

@@ -128,7 +128,7 @@ function pmssRootGuardExeIsStandardPath(string $exe): bool
 }
 
 /** Real uid of a /proc entry, or null when it cannot be read. */
-function pmssArrRootGuardProcessUid(string $procDir): ?int
+function pmssRootGuardProcessUid(string $procDir): ?int
 {
     $status = @file_get_contents($procDir.'/status');
     if (!is_string($status) || preg_match('/^Uid:\s+(\d+)/m', $status, $match) !== 1) {
@@ -143,7 +143,7 @@ function pmssArrRootGuardProcessUid(string $procDir): ?int
  *
  * A process that exits mid-scan simply drops out: every read is failure-tolerant.
  */
-function pmssArrRootGuardScan(string $procRoot = '/proc', string $installRoot = '/opt'): array
+function pmssRootGuardScan(string $procRoot = '/proc', string $installRoot = '/opt'): array
 {
     $prefixes = pmssRootGuardInstallPrefixes($installRoot);
     $found = array();
@@ -153,7 +153,7 @@ function pmssArrRootGuardScan(string $procRoot = '/proc', string $installRoot = 
         if (!is_string($exe) || $exe === '') {
             continue;
         }
-        if (pmssArrRootGuardProcessUid($procDir) !== 0) {
+        if (pmssRootGuardProcessUid($procDir) !== 0) {
             continue;
         }
 
@@ -179,7 +179,7 @@ function pmssArrRootGuardScan(string $procRoot = '/proc', string $installRoot = 
  * leave helper children behind (ADR 0035). The gate is that the pid actually LEADS its group --
  * otherwise a negative pid would signal a group we do not own.
  */
-function pmssArrRootGuardSignal(int $pid, int $signal): bool
+function pmssRootGuardSignal(int $pid, int $signal): bool
 {
     if (function_exists('posix_getpgid') && @posix_getpgid($pid) === $pid) {
         return (bool) @posix_kill(-$pid, $signal);
@@ -195,14 +195,14 @@ function pmssArrRootGuardSignal(int $pid, int $signal): bool
  * caller's logger is the single sink; the cron entry already routes it to a persistent file, so a
  * second hand-rolled append here would only duplicate it.
  */
-function pmssArrRootGuardKillAll(callable $log, string $procRoot = '/proc', string $installRoot = '/opt'): int
+function pmssRootGuardKillAll(callable $log, string $procRoot = '/proc', string $installRoot = '/opt'): int
 {
     $killed = 0;
-    foreach (pmssArrRootGuardScan($procRoot, $installRoot) as $pid => $process) {
+    foreach (pmssRootGuardScan($procRoot, $installRoot) as $pid => $process) {
         if (($process['action'] ?? '') !== 'kill') {
             continue;
         }
-        if (!pmssArrRootGuardSignal($pid, defined('SIGKILL') ? SIGKILL : 9)) {
+        if (!pmssRootGuardSignal($pid, defined('SIGKILL') ? SIGKILL : 9)) {
             $log('###PMSS_ROOT_GUARD_ALERT action=kill_failed pid='.$pid.' app='.$process['app'].' exe='.$process['exe']);
             continue;
         }
@@ -215,14 +215,14 @@ function pmssArrRootGuardKillAll(callable $log, string $procRoot = '/proc', stri
 }
 
 /** Alert on every finding and kill only applications with a known install path. */
-function pmssArrRootGuardAuditAndKill(
+function pmssRootGuardAuditAndKill(
     callable $log,
     string $procRoot = '/proc',
     string $installRoot = '/opt',
     ?callable $signal = null
 ): int {
     $findings = 0;
-    foreach (pmssArrRootGuardScan($procRoot, $installRoot) as $pid => $process) {
+    foreach (pmssRootGuardScan($procRoot, $installRoot) as $pid => $process) {
         $findings++;
         if (($process['action'] ?? '') !== 'kill') {
             $log('###PMSS_ROOT_GUARD_ALERT action=observed_unknown_root_process pid='.$pid.' exe='.$process['exe']);
@@ -231,7 +231,7 @@ function pmssArrRootGuardAuditAndKill(
 
         $signalled = $signal !== null
             ? (bool) $signal($pid, defined('SIGKILL') ? SIGKILL : 9)
-            : pmssArrRootGuardSignal($pid, defined('SIGKILL') ? SIGKILL : 9);
+            : pmssRootGuardSignal($pid, defined('SIGKILL') ? SIGKILL : 9);
         $action = $signalled ? 'killed' : 'kill_failed';
         $log('###PMSS_ROOT_GUARD_ALERT action='.$action.' pid='.$pid.' app='.$process['app'].' exe='.$process['exe']);
     }

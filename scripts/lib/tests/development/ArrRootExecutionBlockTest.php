@@ -140,7 +140,7 @@ class ArrRootExecutionBlockTest extends TestCase
         // A look-alike under /opt is neither a known app nor an alert-only unknown path.
         $this->pmssWriteFakeProcess($procRoot, 105, '/opt/RadarrEvil/Radarr', 0);
 
-        $found = \pmssArrRootGuardScan($procRoot, $installRoot);
+        $found = \pmssRootGuardScan($procRoot, $installRoot);
 
         $this->assertSame([101, 104], array_keys($found));
         $this->assertSame('Radarr', $found[101]['app']);
@@ -163,7 +163,7 @@ class ArrRootExecutionBlockTest extends TestCase
 
         $messages = array();
         $signals = array();
-        $findings = \pmssArrRootGuardAuditAndKill(
+        $findings = \pmssRootGuardAuditAndKill(
             static function (string $message) use (&$messages): void { $messages[] = $message; },
             $procRoot,
             $installRoot,

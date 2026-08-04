@@ -66,7 +66,7 @@ class CronInlineCharacterizationTest extends TestCase
         $source = $this->pmssReadRepoFile('scripts/cron/mediaStackInstancesCheck.php');
 
         $this->assertOrderedStrings([
-            'pmssArrRootGuardAuditAndKill(',
+            'pmssRootGuardAuditAndKill(',
             "\$pmssMediaStackInstancesLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-mediaStackInstancesCheck.lock'), true);",
             'if ($pmssMediaStackInstancesLock === false) {',
             'mediaStackInstancesCheck already running; skipping',
