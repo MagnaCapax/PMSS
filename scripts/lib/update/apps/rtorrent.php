@@ -78,10 +78,8 @@ function pmssRtorrentBinaryRuns(): bool
     if (!is_file('/usr/local/bin/rtorrent')) {
         return false;
     }
-    $out = [];
-    $rc = 1;
-    @exec('/usr/local/bin/rtorrent -h >/dev/null 2>&1', $out, $rc);
-    return $rc === 0;
+
+    return pmssAppVersionProbeSucceeded('/usr/local/bin/rtorrent -h >/dev/null 2>&1');
 }
 
 /** Persist a queryable marker so a silent build failure becomes fleet-detectable. */

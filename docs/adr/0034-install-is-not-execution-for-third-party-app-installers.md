@@ -96,6 +96,13 @@ had live root daemons; the rest died at reboot because the orphan has no unit.
    the backstop for an instance started before the block existed, or with `--data` pointing
    elsewhere. Never a cmdline match: customers run their own copies from `/home/<user>/.bin/`.
 
+5. Legacy non-ARR probes with documented version commands remain behind the shared
+   `remoteBinary.php` trust gate. It resolves the leading executable, requires a target and
+   link target owned by root or a system UID, and accepts only non-writable paths under the
+   standard system roots. A failed trust check returns the existing failed-probe result and
+   never launches the command. This is defence in depth for compatibility probes; it does not
+   weaken ARR's metadata-only rule.
+
 **Generalised rule:** an installer may download, verify, extract and activate an artifact. It
 may not execute it. Identify software from metadata — release data, a version file, a package
 database, a checksum — never by running it. If a future probe of a potentially-daemonizing
@@ -136,7 +143,10 @@ orphan.
 ## References
 - GH #526, #527 — the original hang and the timeout "fix" this ADR reverses in direction.
 - GH #558 — timeout audit; #559 — Servarr removed from the system-wide update path.
+- GH #760 — shared app-probe trust gate for legacy non-ARR version commands.
 - `scripts/lib/update/apps/arr.php`, `scripts/lib/update/arrRootExecutionBlock.php`,
+  `scripts/lib/update/apps/remoteBinary.php`, `scripts/lib/update/apps/rtorrent.php`,
   `scripts/lib/arrRootGuard.php`, `scripts/cron/mediaStackInstancesCheck.php`
 - `scripts/lib/tests/development/ArrInstallerNoExecPolicyTest.php`,
-  `scripts/lib/tests/development/ArrRootExecutionBlockTest.php`
+  `scripts/lib/tests/development/ArrRootExecutionBlockTest.php`,
+  `scripts/lib/tests/development/remoteBinaryHelperTest.php`

@@ -8,7 +8,7 @@ class RemoteBinaryHelperTest extends TestCase
 {
     public function testAppVersionProbeOutputReturnsStdoutForSuccessfulProbe(): void
     {
-        $output = \pmssAppVersionProbeOutput('printf %s '.escapeshellarg('tool version 1.2.3'), 5);
+        $output = \pmssAppVersionProbeOutput('/usr/bin/printf %s '.escapeshellarg('tool version 1.2.3'), 5);
 
         $this->assertSame('tool version 1.2.3', $output);
     }
@@ -29,7 +29,25 @@ class RemoteBinaryHelperTest extends TestCase
 
     public function testAppVersionProbeMatchReturnsFirstCapture(): void
     {
-        $this->assertSame('1.2.3', \pmssAppVersionProbeMatch(['printf %s '.escapeshellarg('tool v1.2.3')], '/v([0-9.]+)/', 1, 5));
+        $this->assertSame('1.2.3', \pmssAppVersionProbeMatch(['/usr/bin/printf %s '.escapeshellarg('tool v1.2.3')], '/v([0-9.]+)/', 1, 5));
+    }
+
+    public function testAppVersionProbeRejectsBinaryOutsideSystemPathsBeforeExecution(): void
+    {
+        $invocationLog = $this->pmssMakeTempFile('pmss-app-version-untrusted-');
+        $binDir = $this->pmssMakeInvocationLogStub('pmss-untrusted-probe', $invocationLog, 'pmss-app-version-bin-');
+
+        $this->pmssWithPathPrefix($binDir, function (): void {
+            $this->assertSame('', \pmssAppVersionProbeOutput('pmss-untrusted-probe --version', 5));
+        });
+
+        $this->assertSame('', (string) @file_get_contents($invocationLog));
+    }
+
+    public function testAppVersionProbeSucceededPreservesTrustedProbeExitStatus(): void
+    {
+        $this->assertTrue(\pmssAppVersionProbeSucceeded('/usr/bin/printf %s '.escapeshellarg('probe-ok'), 5));
+        $this->assertFalse(\pmssAppVersionProbeSucceeded('/usr/bin/printf %s '.escapeshellarg('probe-failed').' >&2; exit 7', 5));
     }
 
     public function testAppVersionProbeOutputLogsTimeouts(): void
