@@ -33,6 +33,13 @@ const WEBROOT = '/var/www/acme-challenge';
 const FAILED_BACKOFF_SECONDS = 21600; // 6h — do not retry a failing request sooner
 const LOG_PREFIX = 'webPublicCerts';
 
+// Canonical billing-id reader: reads .billingServiceId with a fallback to the
+// legacy .billingId (the whole fleet is still in the migration window and carries
+// only .billingId). Reading .billingServiceId raw here silently dropped the mcx.fi
+// SAN fleet-wide, so the cert only covered the per-server subdomain (verified
+// 2026-08-04 on le4-0-106-225wardrobe/mcxstati). Same fallback the serving path uses.
+require_once __DIR__.'/../lib/user/billingIds.php';
+
 if (posix_getuid() !== 0) {
     fwrite(STDERR, "Must run as root.\n");
     exit(1);
@@ -85,8 +92,10 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
     $requested++;
 
     $names = [$user.'.'.$serverFqdn];
-    $serviceIdRaw = @file_get_contents($home.'/.billingServiceId');
-    $serviceId = is_string($serviceIdRaw) ? preg_replace('/\D+/', '', $serviceIdRaw) : '';
+    // Service id via the canonical reader (.billingServiceId, falling back to the
+    // legacy .billingId) so the portable per-service mcx.fi permalink is included
+    // as a SAN on the migration-window fleet, not just the per-server subdomain.
+    $serviceId = (string) pmssUserBillingServiceIdDigitsRead($home);
     if ($serviceId !== '') {
         $names[] = substr(hash('sha256', 'mcx.fi:service:'.$serviceId), 0, 16).'.mcx.fi';
     }
