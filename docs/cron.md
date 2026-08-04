@@ -20,7 +20,7 @@ healthy between full update runs:
 
 - **Rootless Docker watchdog** – Restarts per-user Docker daemons when they
   exit unexpectedly. Logs to `/var/log/pmss/rootlessDocker.log`.
-  `*/5 * * * * root /scripts/cron/checkRootlessDocker.php >> /var/log/pmss/rootlessDocker.log 2>&1`
+  `*/5 * * * * root flock -xn -o /run/lock/pmss-checkRootlessDocker.lock /scripts/cron/checkRootlessDocker.php >> /var/log/pmss/rootlessDocker.log 2>&1`
 - **WireGuard health check** – Ensures the WireGuard kernel module is loaded
   and `wg-quick@wg0` stays active. Logs to `/var/log/pmss/checkWireguard.log`
   when taking action (module load/restart) or when `--debug` is passed.

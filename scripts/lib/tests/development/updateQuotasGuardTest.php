@@ -14,6 +14,15 @@ class UpdateQuotasGuardTest extends TestCase
         );
     }
 
+    public function testRootCronGuardsRootlessDockerWithCloseOnExec(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'etc/seedbox/config/root.cron',
+            ['*/5 * * * * root flock -xn -o /run/lock/pmss-checkRootlessDocker.lock /scripts/cron/checkRootlessDocker.php', '/var/log/pmss/rootlessDocker.log'],
+            'root.cron should guard rootless Docker without leaking the lock fd: '
+        );
+    }
+
     public function testUpdateQuotasSkipsEmptyAndInvalidUsers(): void
     {
         $this->pmssAssertRepoFileContainsString('scripts/cron/updateQuotas.php', "pmssListManagedUsers('/scripts/listUsers.php')", 'updateQuotas.php must use the shared listUsers helper');
