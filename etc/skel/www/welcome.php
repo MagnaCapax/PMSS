@@ -61,6 +61,25 @@ $managedApps = pmssCustomerManagedAppDefinitions();
     <!-- Javascript -->
     <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
     <style type="text/css">
+        .pmss-bonus-banner {
+            flex: 0 0 100%;
+            box-sizing: border-box;
+            margin: 0 0 8px;
+            padding: 18px 20px;
+            border: 1px solid #4fc3f7;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #12334a 0%, #1d3d55 100%);
+            color: #ffffff;
+            text-align: center;
+        }
+
+        .pmss-bonus-banner strong {
+            display: block;
+            font-size: 2.4rem;
+            letter-spacing: 0.04em;
+            line-height: 1.1;
+        }
+
         #pmss-action-notice {
             display: none;
             position: fixed;

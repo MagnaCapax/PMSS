@@ -36,6 +36,29 @@ class SkeletonWebLocalAssetTest extends TestCase
         );
     }
 
+    public function testWelcomeBonusBannerStylesStayWithGuivDeliveredPage(): void
+    {
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'etc/skel/www/welcome.php',
+            [
+                '.pmss-bonus-banner {',
+                'flex: 0 0 100%;',
+                '.pmss-bonus-banner strong {',
+                'font-size: 2.4rem;',
+            ],
+            []
+        );
+
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'etc/skel/www/screen.css',
+            [],
+            [
+                '.pmss-bonus-banner {',
+                '.pmss-bonus-banner strong {',
+            ]
+        );
+    }
+
     public function testIndexLocalFallbackUsesBundledTabsAssets(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings(
