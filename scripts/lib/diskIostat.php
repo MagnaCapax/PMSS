@@ -15,6 +15,8 @@ require_once __DIR__.'/systemStats.php';   // for pmssSystemStatsIopingMs() — 
 
 const PMSS_DISK_IOSTAT_HISTORY_LOG = '/var/log/pmss/iostat-history.log';
 const PMSS_DISK_IOSTAT_HISTORY_RAW_LOG = '/var/log/pmss/iostat-history-raw.log';
+// Leave startup and parser time while bounding the 120-second iostat interval.
+const PMSS_DISK_IOSTAT_TIMEOUT_SECONDS = 180;
 
 /** Keep block device names argv-safe before passing them to iostat. */
 function pmssDiskIostatDeviceNameIsSafe(string $device): bool
@@ -214,8 +216,8 @@ function pmssDiskIostatMain(?callable $runner = null): int
     try {
         $command = pmssDiskIostatBuildCommand($devices);
         if ($runner === null) {
-            $rawOutput = @shell_exec($command);
-            $iostatRaw = is_string($rawOutput) ? $rawOutput : '';
+            $result = pmssCommandCapture($command, PMSS_DISK_IOSTAT_TIMEOUT_SECONDS);
+            $iostatRaw = (string) ($result['stdout'] ?? '');
         } else {
             $iostatRaw = (string) $runner($command);
         }

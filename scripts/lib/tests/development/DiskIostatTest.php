@@ -33,6 +33,27 @@ class DiskIostatTest extends TestCase
         }, 'Unsafe block device name for iostat');
     }
 
+    public function testIostatCaptureUsesBoundedSharedCommandWrapper(): void
+    {
+        $this->pmssAssertRepoFileContainsAndOmitsStrings(
+            'scripts/lib/diskIostat.php',
+            [
+                'const PMSS_DISK_IOSTAT_TIMEOUT_SECONDS = 180;',
+                '$result = pmssCommandCapture($command, PMSS_DISK_IOSTAT_TIMEOUT_SECONDS);',
+                '$iostatRaw = (string) ($result[\'stdout\'] ?? \'\');',
+            ],
+            ['@shell'.'_exec($command)']
+        );
+    }
+
+    public function testCronEntryPointUsesNonBlockingSingleInstanceLock(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/diskIostat.php', [
+            "pmssLockFileAcquire(pmssRuntimeLockPath('pmss-diskIostat.lock'), true)",
+            'diskIostat already running; skipping',
+        ]);
+    }
+
     public function testParseLatestSampleUsesHeaderNames(): void
     {
         $raw = "Device r/s rMB/s rrqm/s %rrqm r_await rareq-sz w/s wMB/s wrqm/s %wrqm w_await wareq-sz d/s dMB/s drqm/s %drqm d_await dareq-sz f/s f_await aqu-sz %util\n"
