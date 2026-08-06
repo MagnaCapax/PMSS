@@ -59,6 +59,45 @@ class SkeletonWebLocalAssetTest extends TestCase
         );
     }
 
+    /**
+     * Keep full-row portfoliobox children self-contained in their guiv page.
+     *
+     * The guiv heal delivers PHP files more often than update.php refreshes
+     * screen.css. Discovering direct child classes keeps new panel banners
+     * covered without maintaining a second hardcoded class list.
+     */
+    public function testPortfolioboxDirectChildStylesStayWithGuivPage(): void
+    {
+        $candidates = [];
+        foreach (glob($this->pmssRepoPath('etc/skel/www/*.php')) ?: [] as $path) {
+            $source = $this->pmssReadRepoFile('etc/skel/www/'.basename($path));
+            $classes = $this->customerPanelPortfolioboxDirectChildClasses($source);
+            if ($classes !== []) {
+                $candidates['etc/skel/www/'.basename($path)] = [$source, $classes];
+            }
+        }
+
+        $this->assertTrue($candidates !== [], 'Expected a portfoliobox panel source with a pmss-* child.');
+        $screenCss = $this->pmssReadRepoFile('etc/skel/www/screen.css');
+        foreach ($candidates as $path => [$source, $classes]) {
+            preg_match_all('/<style\b[^>]*>(.*?)<\/style>/is', $source, $styleMatches);
+            $inlineCss = implode("\n", $styleMatches[1]);
+            foreach ($classes as $class) {
+                $rulePattern = '/\.'.preg_quote($class, '/').'\s*\{[^}]*\bflex\s*:\s*0\s+0\s+100%\s*;/s';
+                $this->assertMatches(
+                    $rulePattern,
+                    $inlineCss,
+                    $path.' must keep .'.$class.' full-row styling inline with its guiv-delivered markup.'
+                );
+                $this->assertStringNotContainsString(
+                    '.'.$class,
+                    $screenCss,
+                    '.'.$class.' must not depend on the slower base-delivered screen.css.'
+                );
+            }
+        }
+    }
+
     public function testIndexLocalFallbackUsesBundledTabsAssets(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings(
@@ -375,5 +414,51 @@ class SkeletonWebLocalAssetTest extends TestCase
     {
         preg_match_all('/\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/', $source, $matches);
         return array_unique($matches[1]);
+    }
+
+    /** @return array<int, string> */
+    private function customerPanelPortfolioboxDirectChildClasses(string $source): array
+    {
+        preg_match_all('/<\/?div\b[^>]*>/i', $source, $tagMatches);
+        $depth = 0;
+        $classes = [];
+        foreach ($tagMatches[0] as $tag) {
+            if (preg_match('/^<div\b/i', $tag)) {
+                if ($depth === 0 && $this->customerPanelTagHasClass($tag, 'portfoliobox')) {
+                    $depth = 1;
+                    continue;
+                }
+                if ($depth === 1) {
+                    foreach ($this->customerPanelTagClasses($tag) as $class) {
+                        if (strpos($class, 'pmss-') === 0) {
+                            $classes[] = $class;
+                        }
+                    }
+                }
+                if ($depth > 0) {
+                    $depth++;
+                }
+            } elseif ($depth > 0 && preg_match('/^<\/div\b/i', $tag)) {
+                $depth--;
+            }
+        }
+
+        $classes = array_values(array_unique($classes));
+        sort($classes);
+        return $classes;
+    }
+
+    private function customerPanelTagHasClass(string $tag, string $expected): bool
+    {
+        return in_array($expected, $this->customerPanelTagClasses($tag), true);
+    }
+
+    /** @return array<int, string> */
+    private function customerPanelTagClasses(string $tag): array
+    {
+        if (preg_match('/\bclass\s*=\s*(["\'])(.*?)\1/i', $tag, $matches) !== 1) {
+            return [];
+        }
+        return preg_split('/\s+/', trim($matches[2])) ?: [];
     }
 }
