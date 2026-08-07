@@ -57,4 +57,16 @@ class LighttpdUserDirectoryPrepTest extends TestCase
         $this->assertTrue(is_link($home.'/.lighttpd'));
         $this->assertTrue(!is_dir($elsewhere.'/custom.d'));
     }
+
+    public function testAcceptsExpectedDurablePublicWebRootSymlink(): void
+    {
+        $user = 'testuser';
+        $home = $this->pmssEnsureUserWebHome($this->base, 'home');
+        $target = $home.'/.local/share/pmss/public';
+        $this->pmssEnsureDir($target, 0751);
+        $this->pmssCreateSymlinkOrSkip('../.local/share/pmss/public', $home.'/www/public');
+
+        $this->assertTrue(\pmssPrepareLighttpdUserDirectories($user, $home, false));
+        $this->assertSame('../.local/share/pmss/public', readlink($home.'/www/public'));
+    }
 }

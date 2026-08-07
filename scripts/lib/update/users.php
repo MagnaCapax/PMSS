@@ -9,6 +9,7 @@
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/../user/log.php';
 require_once __DIR__.'/users/filesystem.php';
+require_once __DIR__.'/users/webRoot.php';
 require_once __DIR__.'/users/rutorrent.php';
 require_once __DIR__.'/users/context.php';
 require_once __DIR__.'/users/http.php';

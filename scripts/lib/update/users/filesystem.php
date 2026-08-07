@@ -183,6 +183,7 @@ function pmssUserApplySkeletonFiles(array $ctx): void
     );
     pmssUserRefreshPanelIndexForFrameDataCompat($ctx);
     pmssUserEnsureWebRootSymlinks($ctx);
+    pmssUserMigrateWebRootState($ctx);
 
     $legacyDownloadHeaderBlock = <<<'PHP'
     if (strstr($_SERVER['HTTP_USER_AGENT'], "MSIE")) {

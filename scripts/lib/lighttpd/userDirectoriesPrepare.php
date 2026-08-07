@@ -82,6 +82,15 @@ function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool 
         $directories['.lighttpd/compress'] = 0751;
     }
     foreach ($directories as $directory => $mode) {
+        $path = $homeDir.'/'.$directory;
+        if ($directory === 'www/public' && is_link($path)) {
+            if (readlink($path) === '../.local/share/pmss/public'
+                && is_dir($path)
+                && pmssPathSegmentsAreSafe(dirname($path), false, false)) {
+                continue;
+            }
+            return false;
+        }
         if (!pmssEnsureUserHomeDir($user, $homeDir, $directory, $mode)) {
             return false;
         }
