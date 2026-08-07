@@ -54,11 +54,17 @@ class CronInlineCharacterizationTest extends TestCase
             'pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 15);',
             'pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 9);',
             "pmssUserWatchdogServiceSpec('lighttpd'",
+            'pmssLockHandleExportChildCloseFds($pmssCheckLighttpdLock);',
+            "pmssLockChildClosePrefix().'/scripts/startLighttpd ' . \$thisUser",
             'lighttpd disabled by config; terminating web stack',
             'Killing (if any) lighttpd for user: {$thisUser}',
             "'lighttpd restart requested'",
             "'lighttpd start requested'",
         ]);
+        $this->assertOrderedStrings([
+            'pmssLockHandleExportChildCloseFds($pmssCheckLighttpdLock);',
+            "pmssLockChildClosePrefix().'/scripts/startLighttpd ' . \$thisUser",
+        ], $this->pmssReadRepoFile('scripts/cron/checkLighttpdInstances.php'), 'lighttpd lock-fd close contract: ');
     }
 
     public function testMediaStackWatchdogKeepsRootGuardAndUserLoopSingleInstance(): void
