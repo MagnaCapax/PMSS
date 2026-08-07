@@ -103,10 +103,8 @@ if (file_exists($pmssStorageHealthNoticeLib)) {
 
 	<div id="pmss-referral" style="margin-top:16px">
 	  <h2 style="margin:0 0 6px;font-size:1.1em">Your referral link</h2>
-	  <p style="margin:0 0 10px;color:#555">Every paid account has a referral link, and it can point at almost any page on our website — so someone lands on the plan you recommended instead of the front page. Add <code>?aff=YOURNUMBER</code> to the end of any page address:</p>
-	  <pre style="margin:0 0 10px;background:#f5f5f5;padding:8px;border-radius:4px;overflow:auto">https://pulsedmedia.com/free-seedbox.php?aff=YOURNUMBER
-https://pulsedmedia.com/?aff=YOURNUMBER</pre>
-	  <p style="margin:0 0 10px;color:#555">If the address already contains a <code>?</code>, use <code>&amp;aff=YOURNUMBER</code> instead. The referral is recorded when the page opens and lasts 90 days. Your own number is in your <a href="https://pulsedmedia.com/clients/affiliates.php" target="_blank" rel="noopener">client area under Affiliates</a>; worked examples and order-form shortcuts are on the <a href="https://wiki.pulsedmedia.com/index.php/Pulsed_Media_Affiliate_Program" target="_blank" rel="noopener">Affiliate Program page in our wiki</a>.</p>
+	  <p style="margin:0 0 10px;color:#555">Every paid account has a personal referral link you can share — anyone who signs up through it is credited to you, and the referral lasts 90 days. Your link and number live in your client area; worked examples and order-form shortcuts are on the <a href="https://wiki.pulsedmedia.com/index.php/Pulsed_Media_Affiliate_Program" target="_blank" rel="noopener">Affiliate Program page in our wiki</a>.</p>
+	  <a href="https://pulsedmedia.com/clients/affiliates.php" target="_blank" rel="noopener" style="display:inline-block;padding:8px 14px;background:#2d6cdf;color:#fff;text-decoration:none;border-radius:4px">Get your referral link</a>
 	</div>
 
                 
