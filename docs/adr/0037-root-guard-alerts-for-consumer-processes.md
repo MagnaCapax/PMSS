@@ -13,7 +13,9 @@ ADR 0034 prevents new root-owned ARR launches, but a process started before that
 protection or with an alternate data path can still be present. The existing
 two-minute media-stack cron task killed only known ARR paths and did not make a
 finding visible to machine monitoring. Unknown root software outside normal
-system locations was not reported at all.
+system locations was not reported at all. The ARR backstop also needs to catch a
+known shared-install path that binds an application's default listener under a
+non-root uid.
 
 The guard must not match command lines: customer processes may use the same
 application names, and command-line matching would cross the per-user boundary.
@@ -25,15 +27,19 @@ The existing process-group leadership gate from ADR 0035 remains mandatory.
   command-line matches can kill customer processes.
 - **Kill every root process outside a fixed path list.** Rejected because an
   unknown root process has an unbounded false-positive surface.
-- **Executable-path and real-uid selection with alert-only unknowns.** Chosen:
-  known consumer paths are killed, while unknown executables outside standard
-  system paths are reported for operator investigation.
+- **Executable-path selection with root and default-port predicates.** Chosen:
+  known consumer paths are killed when root; known ARR paths are also killed
+  when they hold a catalogued default listener; unknown executables outside
+  standard system paths are reported for operator investigation.
 
 ## Decision
 
 Keep the existing module and two-minute cron call site. A single named catalog
-contains the known consumer application paths. `/proc/<pid>/status` real uid 0
-and `/proc/<pid>/exe` are the only selection inputs.
+contains the known consumer application paths, and a second named catalog holds
+the supported ARR default listeners. `/proc/<pid>/status` real uid 0 and
+`/proc/<pid>/exe` remain selection inputs for the root guard; ARR default-port
+selection additionally matches `/proc/<pid>/fd` socket inodes to listening rows
+in `/proc/net/tcp` and `/proc/net/tcp6`.
 
 Known applications are signalled with SIGKILL, using the process group when the
 pid leads that group. Signal failure is an alert finding rather than a warning
@@ -41,12 +47,16 @@ that permits a green run. An unknown uid-0 executable outside `/usr/bin`,
 `/usr/sbin`, `/bin`, `/sbin`, `/usr/lib`, `/usr/libexec`, `/usr/local`, and
 `/opt` is alert-only. Every finding emits the greppable
 `###PMSS_ROOT_GUARD_ALERT` marker and makes the cron entrypoint exit non-zero;
-clean runs emit no root-guard heartbeat.
+clean runs emit no root-guard heartbeat. For a known ARR executable path, either
+real uid 0 or its catalogued default listener selects the process. Customer
+copies outside the known install roots remain excluded.
 
 ## Consequences
 
 - Positive: known consumer root processes are removed, and repeated or failed
   action is visible in the cron log and to exit-status monitoring.
+- Positive: a known shared ARR install binding its default listener is removed
+  even when it is not root-owned.
 - Positive: unknown non-standard root processes become investigation findings
   without broad destructive killing.
 - Negative: operators may need to classify legitimate future system software
@@ -56,7 +66,7 @@ clean runs emit no root-guard heartbeat.
 
 ## References
 
-- GH #743
+- GH #740, #743
 - ADR 0025: per-user web hosting is an intentional feature
 - ADR 0034: install is not execution
 - ADR 0035: command timeouts signal the process group

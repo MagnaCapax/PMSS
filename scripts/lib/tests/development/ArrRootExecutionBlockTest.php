@@ -149,6 +149,39 @@ class ArrRootExecutionBlockTest extends TestCase
         $this->assertSame('alert', $found[104]['action']);
     }
 
+    public function testGuardSelectsNonRootArrOnlyOnItsDefaultListeningPort(): void
+    {
+        $procRoot = $this->pmssMakeTempDir('pmss-arr-proc-', 0700);
+        $procNetRoot = $this->pmssMakeTempDir('pmss-arr-net-', 0700);
+        $installRoot = $this->pmssMakeTempDir('pmss-arr-opt-', 0700);
+        @mkdir($installRoot.'/Radarr', 0755, true);
+        @touch($installRoot.'/Radarr/Radarr');
+        $this->pmssWriteFakeTcpTable($procNetRoot, [301 => 7878, 302 => 7879]);
+
+        $this->pmssWriteFakeProcess($procRoot, 301, $installRoot.'/Radarr/Radarr', 1046, [301]);
+        $this->pmssWriteFakeProcess($procRoot, 302, $installRoot.'/Radarr/Radarr', 1046, [302]);
+        $this->pmssWriteFakeProcess($procRoot, 303, '/home/customer/.bin/Radarr/Radarr', 1046, [301]);
+        $this->pmssWriteFakeProcess($procRoot, 304, $installRoot.'/Radarr/Radarr', 0);
+
+        $found = \pmssRootGuardScan($procRoot, $installRoot, $procNetRoot);
+
+        $this->assertSame([301, 304], array_keys($found));
+        $this->assertSame(1046, $found[301]['uid']);
+        $this->assertSame('default_port', $found[301]['predicate']);
+        $this->assertSame('uid0', $found[304]['predicate']);
+    }
+
+    public function testGuardKeepsTheFiveServarrDefaultPortsInOneCatalog(): void
+    {
+        $this->assertSame([
+            'Lidarr' => 8686,
+            'Prowlarr' => 9696,
+            'Radarr' => 7878,
+            'Readarr' => 8787,
+            'Sonarr' => 8989,
+        ], \PMSS_ROOT_GUARD_ARR_DEFAULT_PORTS);
+    }
+
     public function testAuditAlertsWithoutSendingSignalsInTheTestFixture(): void
     {
         $procRoot = $this->pmssMakeTempDir('pmss-arr-proc-', 0700);
@@ -181,11 +214,36 @@ class ArrRootExecutionBlockTest extends TestCase
     }
 
     /** Build a /proc-shaped entry: exe symlink plus the Uid line the scanner parses. */
-    private function pmssWriteFakeProcess(string $procRoot, int $pid, string $exeTarget, int $uid): void
+    private function pmssWriteFakeProcess(
+        string $procRoot,
+        int $pid,
+        string $exeTarget,
+        int $uid,
+        array $socketInodes = []
+    ): void
     {
         $dir = $procRoot.'/'.$pid;
         @mkdir($dir, 0700, true);
         @file_put_contents($dir.'/status', "Name:\ttest\nUid:\t".$uid."\t".$uid."\t".$uid."\t".$uid."\n");
         $this->pmssCreateSymlinkOrSkip($exeTarget, $dir.'/exe');
+        @mkdir($dir.'/fd', 0700, true);
+        foreach ($socketInodes as $inode) {
+            $this->pmssCreateSymlinkOrSkip('socket:['.$inode.']', $dir.'/fd/'.$inode);
+        }
+    }
+
+    /** Write the minimum /proc/net/tcp fixture needed by the inode matcher. */
+    private function pmssWriteFakeTcpTable(string $procNetRoot, array $portsByInode): void
+    {
+        $lines = ["  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode"];
+        foreach ($portsByInode as $inode => $port) {
+            $lines[] = sprintf(
+                '  %d: 0100007F:%04X 00000000:0000 0A 00000000:0000 00:00000000 00000000 0 0 %d 1 0000000000000000 100 0 0 10 0',
+                $inode,
+                $port,
+                $inode
+            );
+        }
+        @file_put_contents($procNetRoot.'/tcp', implode("\n", $lines)."\n");
     }
 }

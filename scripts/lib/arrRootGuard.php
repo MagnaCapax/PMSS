@@ -8,11 +8,11 @@
  * somewhere else. A root-owned process executing a managed consumer install is never
  * legitimate; scripts/lib/update/apps/arr.php installs the ARR subset and must never run it.
  *
- * Selection is exe-path + real uid 0, deliberately NOT a cmdline/pkill match: customers run their
- * OWN *ARR from /home/<user>/.bin/<App> via dotnet, so a cmdline match would kill paying
- * customers' media stacks. uid 0 alone already excludes every customer instance; the exe path is
- * the second axis. Neither can match this scanner: it runs as PHP and its own command line does
- * not contain an install path.
+ * Selection is exe-path + (real uid 0 or the app's default listener), deliberately NOT a
+ * cmdline/pkill match: customers run their OWN *ARR from /home/<user>/.bin/<App> via dotnet, so a
+ * cmdline match would kill paying customers' media stacks. The install path is the first axis;
+ * uid or socket ownership is the second. Neither can match this scanner: it runs as PHP and its
+ * own command line does not contain an install path.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -35,6 +35,15 @@ const PMSS_ROOT_GUARD_APP_INSTALL_ROOTS = array(
     'SABnzbd' => array('/opt/SABnzbd/', '/usr/bin/sabnzbdplus', '/usr/local/bin/sabnzbdplus'),
     'rTorrent' => array('/opt/rTorrent/', '/usr/local/bin/rtorrent', '/usr/bin/rtorrent'),
     'Syncthing' => array('/opt/Syncthing/', '/usr/bin/syncthing', '/usr/local/bin/syncthing'),
+);
+
+/** Default listeners for the supported Servarr applications. */
+const PMSS_ROOT_GUARD_ARR_DEFAULT_PORTS = array(
+    'Lidarr' => 8686,
+    'Prowlarr' => 9696,
+    'Radarr' => 7878,
+    'Readarr' => 8787,
+    'Sonarr' => 8989,
 );
 
 /** Paths treated as standard system locations for the alert-only unknown-process predicate. */
@@ -138,14 +147,62 @@ function pmssRootGuardProcessUid(string $procDir): ?int
     return (int) $match[1];
 }
 
+/** Map listening TCP ports to their kernel socket inodes. */
+function pmssRootGuardListeningSocketInodes(string $procNetRoot): array
+{
+    $inodes = array();
+    foreach (array('tcp', 'tcp6') as $table) {
+        $lines = @file($procNetRoot.'/'.$table, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ((array) $lines as $line) {
+            $fields = preg_split('/\s+/', trim((string) $line));
+            if (!is_array($fields) || count($fields) < 10 || ($fields[3] ?? '') !== '0A') {
+                continue;
+            }
+
+            $local = explode(':', (string) ($fields[1] ?? ''));
+            if (count($local) !== 2 || !ctype_xdigit($local[1]) || !ctype_digit((string) $fields[9])) {
+                continue;
+            }
+
+            $inodes[hexdec($local[1])][] = (string) $fields[9];
+        }
+    }
+
+    return $inodes;
+}
+
+/** Return true when a process owns a listening socket on the selected port. */
+function pmssRootGuardProcessHasListeningPort(string $procDir, int $port, array $socketInodes): bool
+{
+    $wanted = array_fill_keys($socketInodes[$port] ?? array(), true);
+    if ($wanted === array()) {
+        return false;
+    }
+
+    foreach ((array) glob($procDir.'/fd/*') as $fd) {
+        $target = @readlink($fd);
+        if (is_string($target) && preg_match('/^socket:\[(\d+)\]$/', $target, $match) === 1
+            && isset($wanted[$match[1]])) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /**
  * List root-owned known consumer processes and unknown non-standard executables.
  *
  * A process that exits mid-scan simply drops out: every read is failure-tolerant.
  */
-function pmssRootGuardScan(string $procRoot = '/proc', string $installRoot = '/opt'): array
+function pmssRootGuardScan(
+    string $procRoot = '/proc',
+    string $installRoot = '/opt',
+    string $procNetRoot = '/proc/net'
+): array
 {
     $prefixes = pmssRootGuardInstallPrefixes($installRoot);
+    $socketInodes = pmssRootGuardListeningSocketInodes($procNetRoot);
     $found = array();
 
     foreach ((array) glob($procRoot.'/[0-9]*', GLOB_ONLYDIR) as $procDir) {
@@ -153,19 +210,35 @@ function pmssRootGuardScan(string $procRoot = '/proc', string $installRoot = '/o
         if (!is_string($exe) || $exe === '') {
             continue;
         }
-        if (pmssRootGuardProcessUid($procDir) !== 0) {
+        $uid = pmssRootGuardProcessUid($procDir);
+        if ($uid === null) {
             continue;
         }
 
         $app = pmssRootGuardAppForExe($exe, $prefixes);
-        if ($app === null && pmssRootGuardExeIsStandardPath($exe)) {
+        $uidMatch = $uid === 0;
+        $defaultPort = $app !== null ? (PMSS_ROOT_GUARD_ARR_DEFAULT_PORTS[$app] ?? null) : null;
+        $portMatch = $app !== null && $defaultPort !== null
+            && pmssRootGuardProcessHasListeningPort($procDir, $defaultPort, $socketInodes);
+
+        if ($app === null && (!$uidMatch || pmssRootGuardExeIsStandardPath($exe))) {
             continue;
+        }
+        if ($app !== null && !$uidMatch && !$portMatch) {
+            continue;
+        }
+
+        $predicate = $uidMatch ? 'uid0' : '';
+        if ($portMatch) {
+            $predicate .= ($predicate === '' ? '' : ',').'default_port';
         }
 
         $found[(int) basename($procDir)] = array(
             'app' => $app,
+            'uid' => $uid,
             'exe' => $exe,
             'action' => $app === null ? 'alert' : 'kill',
+            'predicate' => $predicate,
         );
     }
 
@@ -189,26 +262,31 @@ function pmssRootGuardSignal(int $pid, int $signal): bool
 }
 
 /**
- * Kill every root-owned *ARR process; returns how many were signalled.
+ * Kill every selected *ARR process; returns how many were signalled.
  *
  * Silent when there is nothing to kill -- the log stays a signal rather than a heartbeat. The
  * caller's logger is the single sink; the cron entry already routes it to a persistent file, so a
  * second hand-rolled append here would only duplicate it.
  */
-function pmssRootGuardKillAll(callable $log, string $procRoot = '/proc', string $installRoot = '/opt'): int
+function pmssRootGuardKillAll(
+    callable $log,
+    string $procRoot = '/proc',
+    string $installRoot = '/opt',
+    string $procNetRoot = '/proc/net'
+): int
 {
     $killed = 0;
-    foreach (pmssRootGuardScan($procRoot, $installRoot) as $pid => $process) {
+    foreach (pmssRootGuardScan($procRoot, $installRoot, $procNetRoot) as $pid => $process) {
         if (($process['action'] ?? '') !== 'kill') {
             continue;
         }
         if (!pmssRootGuardSignal($pid, defined('SIGKILL') ? SIGKILL : 9)) {
-            $log('###PMSS_ROOT_GUARD_ALERT action=kill_failed pid='.$pid.' app='.$process['app'].' exe='.$process['exe']);
+            $log('###PMSS_ROOT_GUARD_ALERT action=kill_failed pid='.$pid.' uid='.$process['uid'].' app='.$process['app'].' exe='.$process['exe'].' predicate='.$process['predicate']);
             continue;
         }
 
         $killed++;
-        $log('###PMSS_ROOT_GUARD_ALERT action=killed pid='.$pid.' app='.$process['app'].' exe='.$process['exe']);
+        $log('###PMSS_ROOT_GUARD_ALERT action=killed pid='.$pid.' uid='.$process['uid'].' app='.$process['app'].' exe='.$process['exe'].' predicate='.$process['predicate']);
     }
 
     return $killed;
@@ -219,13 +297,14 @@ function pmssRootGuardAuditAndKill(
     callable $log,
     string $procRoot = '/proc',
     string $installRoot = '/opt',
-    ?callable $signal = null
+    ?callable $signal = null,
+    string $procNetRoot = '/proc/net'
 ): int {
     $findings = 0;
-    foreach (pmssRootGuardScan($procRoot, $installRoot) as $pid => $process) {
+    foreach (pmssRootGuardScan($procRoot, $installRoot, $procNetRoot) as $pid => $process) {
         $findings++;
         if (($process['action'] ?? '') !== 'kill') {
-            $log('###PMSS_ROOT_GUARD_ALERT action=observed_unknown_root_process pid='.$pid.' exe='.$process['exe']);
+            $log('###PMSS_ROOT_GUARD_ALERT action=observed_unknown_root_process pid='.$pid.' uid='.$process['uid'].' exe='.$process['exe'].' predicate='.$process['predicate']);
             continue;
         }
 
@@ -233,7 +312,7 @@ function pmssRootGuardAuditAndKill(
             ? (bool) $signal($pid, defined('SIGKILL') ? SIGKILL : 9)
             : pmssRootGuardSignal($pid, defined('SIGKILL') ? SIGKILL : 9);
         $action = $signalled ? 'killed' : 'kill_failed';
-        $log('###PMSS_ROOT_GUARD_ALERT action='.$action.' pid='.$pid.' app='.$process['app'].' exe='.$process['exe']);
+        $log('###PMSS_ROOT_GUARD_ALERT action='.$action.' pid='.$pid.' uid='.$process['uid'].' app='.$process['app'].' exe='.$process['exe'].' predicate='.$process['predicate']);
     }
 
     return $findings;
