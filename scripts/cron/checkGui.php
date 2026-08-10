@@ -18,6 +18,9 @@
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 require_once __DIR__.'/../lib/user/selection.php';
+require_once __DIR__.'/../lib/update/users/filesystem.php';
+require_once __DIR__.'/../lib/update/users/context.php';
+require_once __DIR__.'/../lib/update/users/webRootReconcile.php';
 
 /**
  * Normalize and revalidate a managed-user iterator value before composing paths.
@@ -63,6 +66,37 @@ function pmssCheckGuiApplyOwnership(string $path, string $user, callable $log): 
     }
 
     return true;
+}
+
+/** Check the small sentinel set before running the complete web-root reconciler. */
+function pmssCheckGuiWebRootSentinelsHealthy(string $wwwDir, string $homeDir): bool
+{
+    foreach ([$wwwDir.'/index.php', $wwwDir.'/rutorrent/index.html'] as $sentinel) {
+        if (!pmssCheckGuiUserPathIsSafe($sentinel, $homeDir, false)
+            || is_link($sentinel)
+            || !is_file($sentinel)
+            || (int) @filesize($sentinel) <= 0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/** Reconcile only when a critical web-root sentinel is missing or unusable. */
+function pmssCheckGuiWebRootReconcileIfSentinelMissing(string $user, string $homeDir, callable $log): bool
+{
+    if (pmssCheckGuiWebRootSentinelsHealthy($homeDir.'/www', $homeDir)) {
+        return true;
+    }
+
+    $context = pmssBuildUserWebRootContext($user);
+    if ($context === null || rtrim((string) $context['home'], '/') !== rtrim($homeDir, '/')) {
+        $log("Skipping {$user}: unable to build a safe web-root reconciliation context");
+        return false;
+    }
+
+    return pmssUserReconcileWebRoot($context, $log);
 }
 
 /**
@@ -166,6 +200,7 @@ function pmssCheckGuiMain(array $argv): int
     $logger = new Logger(__FILE__);
     $log = [$logger, 'msg'];
     $skeletonWwwDir = '/etc/skel/www';
+    $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
 
     foreach (pmssManagedHomeUsersList() as $thisUser) {
         $thisUser = pmssCheckGuiManagedUserNameNormalize($thisUser);
@@ -175,9 +210,9 @@ function pmssCheckGuiMain(array $argv): int
         }
 
         // User suspended check after the iterator value has been revalidated.
-        if (file_exists("/home/{$thisUser}/www-disabled")) continue;
+        if (file_exists(rtrim($homeRoot, '/')."/{$thisUser}/www-disabled")) continue;
 
-        $homeDir = "/home/{$thisUser}";
+        $homeDir = rtrim($homeRoot, '/')."/{$thisUser}";
         $wwwDir = $homeDir.'/www';
         $dataDir = $homeDir.'/data';
 
@@ -185,6 +220,10 @@ function pmssCheckGuiMain(array $argv): int
             $logger->msg("Skipping {$thisUser}: home directory missing or unsafe at {$homeDir}");
             continue;
         }
+
+        // The shared reconciler is intentionally gated so healthy users keep
+        // the cheap watchdog path while damaged roots converge completely.
+        pmssCheckGuiWebRootReconcileIfSentinelMissing($thisUser, $homeDir, $log);
 
         // Recreate core userspace paths if users accidentally remove them.
         if (!pmssCheckGuiEnsureUserDirectory($wwwDir, $thisUser, 'www', $log, $homeDir)) {

@@ -548,10 +548,13 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Maintains the PMSS-owned `cron.service` drop-in with `Restart=always` and an aggregate `TasksMax=8192` cap so cron-spawned user jobs cannot consume host-wide pid capacity.
 
 - scripts/cron/checkGui.php
-  - Behavior: Runs outside the panel request path and repairs missing, empty, or
-    undersized `www/index.php` and `www/scriptsInc.php` files from the skeleton.
+  - Behavior: Runs outside the panel request path and checks non-empty
+    `www/index.php` and `www/rutorrent/index.html` sentinels. When either
+    sentinel fails, it invokes the shared per-user web-root reconciler before
+    retaining the existing core-file and directory repairs.
   - Safety: Revalidates user paths and skeleton sources, and replaces repaired
-    files atomically so a failed write does not truncate the prior copy.
+    files atomically so a failed write does not truncate the prior copy; the
+    shared reconciler keeps its per-user lock and symlink/path-safety guards.
 
 - scripts/util/setupNetwork.php
   - Behavior: Renders and applies FireQOS from `template.fireqos` using `networkLoadConfig()` and `networkLoadLocalnets()`; writes config under `/etc/seedbox/config` and applies rules.

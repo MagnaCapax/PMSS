@@ -25,6 +25,9 @@ class CheckGuiCronTest extends TestCase
                 'pmssCheckGuiEnsureUserDirectory($dataDir',
                 'pmssCheckGuiRestoreUserIndex',
                 'pmssCheckGuiRestoreUserFile',
+                'pmssCheckGuiWebRootSentinelsHealthy',
+                'pmssCheckGuiWebRootReconcileIfSentinelMissing',
+                'pmssUserReconcileWebRoot',
                 "'scriptsInc.php'",
                 'pmssCheckGuiManagedUserNameNormalize($thisUser)',
             ],
@@ -74,6 +77,59 @@ class CheckGuiCronTest extends TestCase
         ));
         $this->assertFalse(file_exists($outsideDir.'/www'));
         $this->pmssAssertMessagesContain($messages, 'unsafe www directory target');
+    }
+
+    public function testWebRootSentinelsRequireNonEmptyRegularFiles(): void
+    {
+        $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
+        $this->pmssWriteFile($homeDir.'/www/index.php', 'panel');
+        $this->pmssWriteFile($homeDir.'/www/rutorrent/index.html', 'rutorrent');
+
+        $this->assertTrue(\pmssCheckGuiWebRootSentinelsHealthy($homeDir.'/www', $homeDir));
+        $this->pmssWriteFile($homeDir.'/www/rutorrent/index.html', '');
+        $this->assertFalse(\pmssCheckGuiWebRootSentinelsHealthy($homeDir.'/www', $homeDir));
+    }
+
+    public function testMissingSentinelUsesSharedReconciler(): void
+    {
+        $user = 'dummy';
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-check-gui-reconcile-');
+        $homeDir = $this->pmssUserHomePath($homeRoot, $user);
+        $this->pmssEnsureDir($homeDir.'/www');
+        $this->pmssWriteFile($homeDir.'/www/index.php', 'existing panel');
+
+        $skeletonRoot = $this->pmssMakeTempDir('pmss-check-gui-skeleton-');
+        $this->pmssWriteFile($skeletonRoot.'/www/index.php', 'skeleton panel');
+        $this->pmssWriteFile($skeletonRoot.'/www/rutorrent/index.html', 'skeleton rutorrent');
+        $this->pmssTrackEnvOverrides([
+            'PMSS_SKEL_DIR' => $skeletonRoot,
+            'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-check-gui-lock-'),
+        ]);
+        $messages = [];
+
+        $this->assertFalse(\pmssCheckGuiWebRootSentinelsHealthy($homeDir.'/www', $homeDir));
+        $this->assertTrue(\pmssCheckGuiWebRootReconcileIfSentinelMissing(
+            $user,
+            $homeDir,
+            $this->pmssMakeArrayLogger($messages)
+        ));
+        $this->assertEquals('existing panel', file_get_contents($homeDir.'/www/index.php'));
+        $this->assertEquals('skeleton rutorrent', file_get_contents($homeDir.'/www/rutorrent/index.html'));
+    }
+
+    public function testHealthySentinelsDoNotInvokeReconciler(): void
+    {
+        $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
+        $this->pmssWriteFile($homeDir.'/www/index.php', 'panel');
+        $this->pmssWriteFile($homeDir.'/www/rutorrent/index.html', 'rutorrent');
+        $messages = [];
+
+        $this->assertTrue(\pmssCheckGuiWebRootReconcileIfSentinelMissing(
+            'dummy',
+            $homeDir,
+            $this->pmssMakeArrayLogger($messages)
+        ));
+        $this->assertFalse($this->pmssMessagesContain($messages, 'Restored complete web root'));
     }
 
     public function testEnsureUserDirectoryRejectsSymlinkedTarget(): void
