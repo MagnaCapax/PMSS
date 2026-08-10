@@ -1164,7 +1164,7 @@ ntpsec	install
 ntpsec-ntpdate	install
 ntpsec-ntpdig	install
 nvme-cli	install
-nzbdrone	install
+nzbget	install
 ocl-icd-libopencl1:amd64	install
 opensc	install
 opensc-pkcs11:amd64	install

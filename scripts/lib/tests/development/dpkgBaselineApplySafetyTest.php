@@ -16,7 +16,7 @@ class DpkgBaselineApplySafetyTest extends TestCase
             return \pmssDpkgSelectionsSanitise(['alpha', 'held HOLD', 'wireguard-dkms install', 'repo-mediaarea install', 'nzbdrone install', 'linux-image-6.1.0-1-amd64 install', 'php8.2-cli install', 'python3.11-venv install', 'missing-tool install', 'cgroup-bin install', 'bad$name install', 'purged purge'], 12, $available);
         });
 
-        $this->assertSame([["alpha\tinstall", "held\thold", "wireguard-dkms\tdeinstall", "repo-mediaarea\tdeinstall", "purged\tpurge"], true, true, ['missing-tool'], ['wireguard-dkms', 'repo-mediaarea', 'nzbdrone', 'php8.2-cli', 'python3.11-venv'], ['linux-image-6.1.0-1-amd64']], [$plan['sanitised'], $plan['warnings'], $plan['short_form_seen'], $plan['dropped_unavailable'], $plan['dropped_obsolete'], $plan['dropped_kernel']]);
+        $this->assertSame([["alpha\tinstall", "held\thold", "wireguard-dkms\tdeinstall", "repo-mediaarea\tdeinstall", "purged\tpurge"], true, true, ['nzbdrone', 'missing-tool'], ['wireguard-dkms', 'repo-mediaarea', 'php8.2-cli', 'python3.11-venv'], ['linux-image-6.1.0-1-amd64']], [$plan['sanitised'], $plan['warnings'], $plan['short_form_seen'], $plan['dropped_unavailable'], $plan['dropped_obsolete'], $plan['dropped_kernel']]);
         $this->assertStringContainsString('Invalid dpkg selection entry at line 11: bad$name install', $output);
     }
 

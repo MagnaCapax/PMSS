@@ -105,10 +105,6 @@ function pmssDpkgSelectionsSanitise(array $lines, int $runtimeVersion, ?callable
             pmssDpkgSelectionsDrop($result, 'dropped_obsolete', $package);
             continue;
         }
-        if (in_array($lower, ['nzbdrone', 'pyload-cli'], true)) {
-            pmssDpkgSelectionsDrop($result, 'dropped_obsolete', $package);
-            continue;
-        }
         foreach (['/^linux-image-[0-9]/i' => 'dropped_kernel', '/^php[0-9]+\.[0-9]+\-/i' => 'dropped_obsolete', '/^python3\.[0-9]+\-/i' => 'dropped_obsolete'] as $pattern => $bucket) {
             if (preg_match($pattern, $package) === 1) {
                 pmssDpkgSelectionsDrop($result, $bucket, $package);
