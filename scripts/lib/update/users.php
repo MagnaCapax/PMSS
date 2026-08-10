@@ -20,18 +20,23 @@ pmssRequireRelativeFiles(__DIR__, ['../user/directories.php', '../user/delugeMan
 function pmssUserEnvironmentHandlers(): array { return ['pmssUserConfigureHttp', 'pmssUserApplySkeletonFiles', 'pmssUserUpdateThemes', 'pmssUserUpgradeRutorrent', 'pmssUserMaintainRutorrentPhpCompatibility', 'pmssUserEnsurePlugins', 'pmssUserRefreshPermissions']; }
 
 /**
- * Refresh a single user's environment (HTTP, skeleton, ruTorrent, plugins, permissions).
+ * Refresh a single user's web root and environment.
  *
  * The second parameter carries the current ruTorrent index checksum so helpers
  * can detect when per-user assets are stale. Keep this function narrow—if more
  * inputs are ever needed, refactor the per-user flow instead of growing the
  * signature or adding generic option bags.
  */
-function pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha = ''): void
+function pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha = ''): bool
 {
+    $webRootCtx = pmssBuildUserWebRootContext($user, $rutorrentIndexSha);
+    if ($webRootCtx === null || !pmssUserReconcileWebRoot($webRootCtx)) {
+        return false;
+    }
+
     $ctx = pmssBuildUserContext($user, $rutorrentIndexSha);
     if ($ctx === null) {
-        return;
+        return false;
     }
 
     echo "***** Updating user {$user}\n";
@@ -40,4 +45,6 @@ function pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha = '')
     foreach (pmssUserEnvironmentHandlers() as $handler) {
         $handler($ctx);
     }
+
+    return true;
 }

@@ -45,10 +45,20 @@ PHP,
                     "Account '(empty)' skipped during environment refresh: empty username entry",
                     "Account '%s' skipped during environment refresh: invalid username",
                     "Account '%s' skipped during environment refresh: %s",
+                    "if (!pmssUpdateUserEnvironment(\$userTrim, \$rutorrentIndexSha)) {",
+                    "throw new RuntimeException('user environment convergence failed');",
                     "'event'     => 'user_maintenance_summary'",
                     "'processed' => ",
                     "'skipped'   => ",
                 ],
+                'ordered' => [[
+                    'needles' => [
+                        "if (!pmssUpdateUserEnvironment(\$userTrim, \$rutorrentIndexSha)) {",
+                        'pmssUserRefreshMarkDone($userTrim, $refreshSignature);',
+                    ],
+                    'missingPrefix' => 'Missing convergence/marker phase: ',
+                    'orderPrefix' => 'Convergence marker order changed at: ',
+                ]],
             ],
             'scripts/lib/update/users/docker.php' => [
                 'required' => [

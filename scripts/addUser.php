@@ -104,7 +104,13 @@ pmssAddUserFailureRollbackInit($userDb, $user['name'], $homePath);
 
 pmssAddUserSystemUserCreate($user, $homePath);
 pmssAddUserUserConfigApply($userDb, $user, $homePath);
-pmssUpdateUserEnvironment($user['name']);
+if (!pmssUpdateUserEnvironment($user['name'])) {
+    pmssAddUserFatalExit(
+        'FAIL',
+        'User web-root convergence failed; aborting provisioning',
+        'web_root_convergence_failed'
+    );
+}
 
 $userHomedirPath = $homePath;
 // Execute per server additional config for user creation IF there is any

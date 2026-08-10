@@ -249,8 +249,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Before marking a user refreshed, repairs stale per-user systemd drop-ins with bare sub-MiB `MemoryMax=<N>` values and matching suffixed `MemoryLimit=<N>M` siblings by appending the PMSS MiB suffix and reloading systemd.
   - Catches per-user throwables (including permission-step timeouts), logs warning, skips that user, and continues remaining users.
 
-- pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha=''): void
-  - Builds context (`pmssBuildUserContext`), returns early when invalid.
+- pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha=''): bool
+  - Builds the minimal web-root context and reconciles the web root before
+    active-tenant context gating; suspended users remain excluded.
+  - Returns false when the web-root context, reconciliation, or active-tenant
+    context is invalid, and true only after reconciliation and all handlers
+    complete successfully. Callers must not mark refresh success on false.
   - Runs handlers in order: HTTP, skeleton, ruTorrent themes, ruTorrent refresh,
     plugin maintenance, then permissions.
     Each handler consumes `['user','home','user_esc','rutorrent_index_sha']`.

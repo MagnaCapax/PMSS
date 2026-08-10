@@ -23,11 +23,12 @@ putenv('PMSS_HOME_DIR='.$base.'/home');
 putenv('PMSS_SKEL_DIR='.$base.'/skel');
 PHP
             ,
-            "pmssUpdateUserEnvironment('missing-user', 'sha123');",
+            "\$environmentResult = pmssUpdateUserEnvironment('missing-user', 'sha123');",
             <<<'PHP'
 [
     'steps' => $GLOBALS['PMSS_USER_STEP_CALLS'],
     'linger' => $GLOBALS['PMSS_LINGER_USERS'],
+    'converged' => $environmentResult,
     'output' => $output,
 ]
 PHP
@@ -37,7 +38,44 @@ PHP
 
         $this->assertEquals([], $result['steps']);
         $this->assertEquals([], $result['linger']);
+        $this->assertFalse($result['converged']);
         $this->assertEquals('', $result['output']);
+    }
+
+    public function testWebRootReconcilesBeforeActiveContextGating(): void
+    {
+        $repoRoot = $this->pmssRepoRoot();
+        $script = $this->buildUserEnvironmentScript(
+            'web-root-before-context',
+            <<<'PHP'
+$home = $base.'/home/alice';
+$skel = $base.'/skel/www';
+$locks = $base.'/locks';
+@mkdir($home, 0755, true);
+@mkdir($skel, 0755, true);
+@mkdir($locks, 0755, true);
+file_put_contents($skel.'/index.php', 'restored');
+putenv('PMSS_HOME_DIR='.$base.'/home');
+putenv('PMSS_SKEL_DIR='.$base.'/skel');
+putenv('PMSS_USER_WEB_ROOT_LOCK_DIR='.$locks);
+PHP
+            ,
+            <<<'PHP'
+$environmentResult = pmssUpdateUserEnvironment('alice', 'sha123');
+PHP
+            ,
+            <<<'PHP'
+[
+    'converged' => $environmentResult,
+    'restored' => is_file($home.'/www/index.php'),
+]
+PHP
+        );
+
+        $result = $this->pmssRunInlinePhpJson(str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script), $this->pmssTestModeEnv());
+
+        $this->assertFalse($result['converged'], 'active context must still reject missing rtorrent state');
+        $this->assertTrue($result['restored'], 'web-root reconciliation must precede active context gating');
     }
 
     public function testUpdateUserEnvironmentRunsStablePhasesWithoutLingerHook(): void
@@ -63,6 +101,8 @@ $home = $homeRoot.'/'.$user;
 @mkdir($skelRoot.'/.irssi', 0755, true);
 @mkdir($skelRoot.'/www', 0755, true);
 @mkdir($skelRoot.'/www/rutorrent/plugins/hddquota', 0755, true);
+$lockRoot = $base.'/locks';
+@mkdir($lockRoot, 0755, true);
 
 file_put_contents($home.'/.rtorrent.rc', "dummy\n");
 file_put_contents($home.'/.lighttpd/php.ini', "display_errors = On\n");
@@ -78,10 +118,11 @@ file_put_contents($skelRoot.'/www/rutorrent/plugins/hddquota/sample.txt', "quota
 
 putenv('PMSS_HOME_DIR='.$homeRoot);
 putenv('PMSS_SKEL_DIR='.$skelRoot);
+putenv('PMSS_USER_WEB_ROOT_LOCK_DIR='.$lockRoot);
 PHP
             ,
             <<<'PHP'
-pmssUpdateUserEnvironment(
+$environmentResult = pmssUpdateUserEnvironment(
     $user,
     ''
 );
@@ -89,6 +130,7 @@ PHP
             ,
             <<<'PHP'
 [
+    'converged' => $environmentResult,
     'descriptions' => array_values(array_map(static function (array $entry): string {
         return $entry['description'];
     }, $GLOBALS['PMSS_USER_STEP_CALLS'])),
@@ -111,6 +153,7 @@ PHP
         $result = $this->pmssRunInlinePhpJson(str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script), $this->pmssTestModeEnv());
 
         $this->assertStringContainsString('***** Updating user alice', $result['output']);
+        $this->assertTrue($result['converged']);
         $this->assertEquals([], $result['linger']);
         $this->assertTrue($result['tmp_exists']);
         $this->assertTrue($result['irssi_exists']);

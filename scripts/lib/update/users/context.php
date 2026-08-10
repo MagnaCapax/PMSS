@@ -43,3 +43,29 @@ function pmssBuildUserContext(string $user, string $rutorrentIndexSha = ''): ?ar
         'rutorrent_index_sha'=> $rutorrentIndexSha,
     ];
 }
+
+/**
+ * Build the minimal context needed before active-tenant gating.
+ *
+ * Web-root convergence must run even when a damaged account is missing core
+ * rtorrent state, but suspended accounts must remain untouched.
+ */
+function pmssBuildUserWebRootContext(string $user, string $rutorrentIndexSha = ''): ?array
+{
+    $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
+    $home = rtrim($homeRoot, '/')."/{$user}";
+    if (!pmssValidateUsername($user)
+        || !is_dir($home)
+        || is_link($home)
+        || !pmssPathWithinResolvedRoot($home, $homeRoot)
+        || is_dir($home.'/www-disabled')) {
+        return null;
+    }
+
+    return [
+        'user'                => $user,
+        'home'                => $home,
+        'user_esc'            => escapeshellarg($user),
+        'rutorrent_index_sha' => $rutorrentIndexSha,
+    ];
+}

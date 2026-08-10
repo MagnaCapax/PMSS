@@ -355,7 +355,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
                 ], 'userMaintenance.php should not keep dead self-guard wrappers once runtime callers use require_once')),
                 'ordered' => [[
                     'needles' => [
-                        'pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);',
+                        'if (!pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha)) {',
                         'pmssEnsureLingerAndDocker($userTrim);',
                         'foreach ($postChecks as $label => $helperPath)',
                     ],

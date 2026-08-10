@@ -18,6 +18,8 @@ class AddUserProvisioningGuardTest extends TestCase
                     "require_once 'lib/update.php';",
                     "require_once 'lib/update/users.php';",
                     "require_once 'lib/user/trafficLimit.php';",
+                    "if (!pmssUpdateUserEnvironment(\$user['name'])) {",
+                    "'web_root_convergence_failed'",
                     'pmssTrafficLimitCliTargetModes($user[\'name\'], $homePath)',
                     'pmssTrafficLimitPersistTargetModes($targetModes, (int) $user[\'trafficLimit\'], $persistError)',
                 ],
