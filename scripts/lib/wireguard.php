@@ -298,6 +298,23 @@ function wgResolveEndpoint(string $hostname): array
     return ['', 'unknown'];
 }
 
+/** Prefer a resolvable hostname for client profiles, retaining IP fallback. */
+function wgResolveClientEndpoint(string $hostname): array
+{
+    $hostname = trim($hostname);
+    if (pmssHostnameIsValid($hostname, false)) {
+        $dnsOverride = getenv('PMSS_WG_DNS_IP');
+        $resolved = $dnsOverride !== false && trim($dnsOverride) !== ''
+            ? trim($dnsOverride)
+            : gethostbyname($hostname);
+        if ($resolved !== $hostname && wgValidatePublicIp($resolved) !== null) {
+            return [$hostname, 'hostname'];
+        }
+    }
+
+    return wgResolveEndpoint($hostname);
+}
+
 /**
  * Ensure server key material exists, creating it when missing.
  */
@@ -889,7 +906,7 @@ function pmssWireguardConfigure(?callable $logger = null): void
     $listenPort = 51820;
 
     $hostname = pmssHostnameRead();
-    [$endpoint, $endpointSource] = wgResolveEndpoint($hostname);
+    [$endpoint, $endpointSource] = wgResolveClientEndpoint($hostname);
     if ($endpoint === '') {
         $log('[wireguard] Unable to determine public endpoint; falling back to hostname '.$hostname);
         $endpoint = $hostname;

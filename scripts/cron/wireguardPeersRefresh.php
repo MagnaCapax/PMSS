@@ -40,7 +40,7 @@ $configPath = $configDir.'/wg0.conf';
 $current    = is_file($configPath) ? (string) file_get_contents($configPath) : '';
 
 $hostname = pmssHostnameRead();
-[$endpoint, $endpointSource] = wgResolveEndpoint($hostname);
+[$endpoint, $endpointSource] = wgResolveClientEndpoint($hostname);
 if ($endpoint === '') {
     wgLog('wireguardPeersRefresh: unable to determine public endpoint; falling back to hostname '.$hostname);
     $endpoint = $hostname;

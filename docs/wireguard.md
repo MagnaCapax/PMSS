@@ -32,9 +32,10 @@ interface. Logs are written to `/var/log/pmss/checkWireguard.log` when taking
 action (module load/restart/peer sync); use `checkWireguard.php --debug` to also
 log healthy checks.
 
-Endpoint detection prefers resolving the host's FQDN and falls back to a public
-IP lookup plus interface inspection. Make sure the hostname resolves externally
-or update the generated `~/wireguard.txt` with the correct address if needed.
+Endpoint detection prefers a resolvable host FQDN in generated client profiles
+and falls back to a public IP lookup plus interface inspection when the hostname
+cannot resolve. WireGuard re-resolves the hostname when the tunnel starts, so
+restart the tunnel after a server address change.
 
 ## Tenant Quick Start (Step by Step)
 

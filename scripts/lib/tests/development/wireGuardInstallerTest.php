@@ -30,6 +30,36 @@ class WireGuardInstallerTest extends TestCase
         }
     }
 
+    public function testResolveClientEndpointPrefersResolvableHostname(): void
+    {
+        $this->pmssWithEnv([
+            'PMSS_WG_DNS_IP'       => '198.51.100.10',
+            'PMSS_WG_INTERFACE_IP' => '10.0.0.2',
+            'PMSS_WG_EXTERNAL_IP'  => '',
+        ], function (): void {
+            [$endpoint, $source] = \wgResolveClientEndpoint('seed.example.com');
+
+            $this->assertSame('seed.example.com', $endpoint);
+            $this->assertSame('hostname', $source);
+            $guide = \wgBuildClientGuide('server-pub', $endpoint, 51820);
+            $this->assertStringContainsString('Endpoint = seed.example.com:51820', $guide);
+        });
+    }
+
+    public function testResolveClientEndpointFallsBackToIpWhenHostnameCannotResolve(): void
+    {
+        $this->pmssWithEnv([
+            'PMSS_WG_DNS_IP'       => 'seed.example.com',
+            'PMSS_WG_INTERFACE_IP' => '198.51.100.20',
+            'PMSS_WG_EXTERNAL_IP'  => '',
+        ], function (): void {
+            [$endpoint, $source] = \wgResolveClientEndpoint('seed.example.com');
+
+            $this->assertSame('198.51.100.20', $endpoint);
+            $this->assertSame('interface', $source);
+        });
+    }
+
     public function testExternalEndpointUrlCandidatesIncludePrimaryAndBackup(): void
     {
         $urls = \wgExternalEndpointUrlCandidates();
