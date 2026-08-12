@@ -29,6 +29,7 @@ function pmssMediaStackWatchdogAppDefinitions(): array
         'sabnzbd' => array('label' => 'SABnzbd', 'config' => '.config/sabnzbd', 'binary' => '.bin/sabnzbd/sabnzbd/SABnzbd.py'),
         'cloudplow' => array('label' => 'Cloudplow', 'config' => '.config/cloudplow', 'binary' => '.bin/cloudplow/cloudplow/cloudplow.py'),
         'jellyfin' => array('label' => 'Jellyfin', 'config' => '.config/jellyfin', 'binary' => '.bin/jellyfin/jellyfin.dll'),
+        'autobrr' => array('label' => 'Autobrr', 'config' => '.config/autobrr', 'binary' => '.bin/autobrr/autobrr'),
     );
 }
 

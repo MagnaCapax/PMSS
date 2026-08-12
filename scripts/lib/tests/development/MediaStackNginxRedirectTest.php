@@ -14,6 +14,7 @@ class MediaStackNginxRedirectTest extends TestCase
         'sonarr',
         'jellyfin',
         'komga',
+        'autobrr',
     ];
 
     private function publicProxyBlock(): string

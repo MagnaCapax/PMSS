@@ -7,6 +7,7 @@ It installs:
 - Jellyfin (server; .NET)
 - SABnzbd (Python + venv)
 - Cloudplow (Python + venv)
+- Autobrr (release-tracked single binary)
 
 All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to `https://<host>/public-<user>/<app>/`.
 
@@ -62,6 +63,7 @@ Note: Jellyfin requires FFmpeg 4.4+ for startup. The script uses distro ffmpeg w
 - Prowlarr: `https://prowlarr.servarr.com/v1/update/<branch>/updatefile?os=linux&runtime=netcore&arch=<arch>` (default branch: `master`)
 - Jellyfin: `https://repo.jellyfin.org/files/server/linux/latest-stable/<arch>/` (scraped for latest tarball), or explicit override
 - SABnzbd: latest GitHub release `-src` asset
+- Autobrr: latest GitHub release Linux tarball for the detected architecture
 
 Every URL may be overridden via CLI flags (below). The script verifies each URL in dry‑run/verify‑only mode.
 
@@ -99,6 +101,9 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - Prowlarr
   - `--prowlarr-url=URL`   Use exact URL
   - `--prowlarr-branch=BR` Override branch (default: `master`; stable)
+
+- Autobrr
+  - `--autobrr-url=URL`    Use exact URL instead of the latest GitHub release asset
 
 - Jellyfin
   - `--jellyfin-url=URL`   Use exact URL for server tarball
@@ -143,6 +148,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 5) Install steps
 - Cloudplow (venv + pip requirements)
 - SABnzbd (venv + pip requirements)
+- Autobrr (release-tracked binary and per-user config)
 - Radarr, Prowlarr, Sonarr (download and extract into `~/.bin/<Name>`)
 - .NET 8 ASP.NET runtime (download to `~/.bin/dotnet`, exports PATH/DOTNET_ROOT in `~/.bashrc.custom` after system paths)
 - Jellyfin (download/extract to `~/.bin/jellyfin`) only when system ffmpeg is 4.4+ or `--jellyfin-ffmpeg=PATH` is supplied
@@ -151,13 +157,14 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - Writes Servarr XML configs in `~/.config/<app>/config.xml` with randomized ports, localhost bind, URL base `/public-<user>/<app>`, and the external update mechanism. The installer disables automatic in-place updates so the shared `.NET` runtime cannot be removed by an app updater; rerun this script for Servarr updates.
 - Jellyfin writes `~/.config/jellyfin/network.xml` likewise.
 - SABnzbd writes `~/.config/sabnzbd/sabnzbd.ini` and adjusts url_base/port/whitelist plus `inet_exposure = 4` so the proxied first-run wizard is reachable.
+- Autobrr writes `~/.config/autobrr/config.toml`, binds to `127.0.0.1`, and serves its sub-path through the generated per-user proxy fragment.
 
 7) Aliases
 - Appends tmux aliases to `~/.bashrc.custom` that export `DOTNET_ROOT` and execute `<app>.dll` via `dotnet` (or Python venv for SABnzbd/Cloudplow).
 - Sources `~/.bashrc` with `set +u` so `~/.bashrc.custom` takes effect (and to avoid aborts when nounset is active in a user’s shell configs).
 
 8) Reverse proxy
-- Writes the PMSS-managed media-stack proxy fragment to `~/.lighttpd/custom.d/media-stack.conf` with URL rewriting from `/app` to `/public-<user>/<app>`.
+- Writes the PMSS-managed media-stack proxy fragment to `~/.lighttpd/custom.d/media-stack.conf` with URL rewriting from `/app` to `/public-<user>/<app>`; Autobrr uses the documented strip-to-empty map and an exact bare-path trailing-slash redirect.
 - On first rerun after older installer versions, legacy PMSS-managed `~/.lighttpd/custom` content is migrated out of the user-controlled include so custom rules are preserved.
 
 9) Launch
@@ -300,6 +307,7 @@ The `/public-<username>/` path is **intentionally unauthenticated** at the proxy
 | Sonarr | Disabled (`AuthenticationMethod: None`) | Enable Forms/Basic auth in Settings → General → Authentication |
 | Prowlarr | Disabled (`AuthenticationMethod: None`) | Enable Forms/Basic auth in Settings → General → Authentication |
 | SABnzbd | Setup wizard on first access | Complete wizard to set credentials |
+| Autobrr | Built-in login on first access | Complete the setup flow and configure filters/download clients |
 
 **Until users configure authentication, Radarr/Sonarr/Prowlarr are accessible to anyone who knows the URL. SABnzbd's wizard is also reachable so users can set its credentials.**
 

@@ -2,7 +2,7 @@
 #
 # PMSS: User-Local Media Stack Installer for Pulsed Media Seedboxes
 #
-# Installs Radarr, Sonarr, Prowlarr, Jellyfin, SABnzbd, Cloudplow in ~/.bin
+# Installs Autobrr, Radarr, Sonarr, Prowlarr, Jellyfin, SABnzbd, Cloudplow in ~/.bin
 # with tmux management, lighttpd proxy under /public-$USER/<app>,
 # randomized ports, localhost binding for security in shared env.
 #
@@ -95,6 +95,7 @@ OVR_RADARR_BRANCH=""
 OVR_RADARR_VERSION=""
 OVR_PROWLARR_URL=""
 OVR_PROWLARR_BRANCH=""
+OVR_AUTOBRR_URL=""
 OVR_SAB_URL=""
 OVR_SAB_VERSION=""
 OVR_JELLYFIN_URL=""
@@ -117,6 +118,8 @@ Overrides:
 
   --prowlarr-url=URL          Use exact URL for Prowlarr tar.gz
   --prowlarr-branch=BRANCH    Override branch (default: main)
+
+  --autobrr-url=URL           Use exact URL for Autobrr tar.gz
 
   --sab-url=URL               Use exact URL for SABnzbd src archive
   --sab-version=TAG           Override SABnzbd tag (advisory)
@@ -154,6 +157,7 @@ for arg in "$@"; do
 	--radarr-pin=*) OVR_RADARR_VERSION=${arg#*=} ;;
 	--prowlarr-url=*) OVR_PROWLARR_URL=${arg#*=} ;;
 	--prowlarr-branch=*) OVR_PROWLARR_BRANCH=${arg#*=} ;;
+	--autobrr-url=*) OVR_AUTOBRR_URL=${arg#*=} ;;
 	--sab-url=*) OVR_SAB_URL=${arg#*=} ;;
 	--sab-version=*) OVR_SAB_VERSION=${arg#*=} ;;
 	--jellyfin-url=*) OVR_JELLYFIN_URL=${arg#*=} ;;
@@ -336,6 +340,51 @@ fetch_verified_archive() {
 	if ! verify_checksum "$archive" "$checksum_id"; then
 		log_err "${label} download failed integrity check — aborting"
 		exit 1
+	fi
+}
+
+autobrr_resolve_download_url() {
+	local release_json="" asset_marker="linux_${AUTOBRR_ARCH}.tar.gz"
+
+	if [[ -n "$OVR_AUTOBRR_URL" ]]; then
+		AUTOBRR_URL="$OVR_AUTOBRR_URL"
+		AUTOBRR_VERSION="override"
+		return 0
+	fi
+
+	if ! release_json=$(fetch_text "https://api.github.com/repos/autobrr/autobrr/releases/latest"); then
+		log_err "Could not resolve Autobrr release metadata from GitHub"
+		return 1
+	fi
+
+	AUTOBRR_VERSION=$(printf '%s\n' "$release_json" | grep -E '"tag_name"' | cut -d '"' -f 4 | head -n 1 || true)
+	AUTOBRR_URL=$(printf '%s\n' "$release_json" |
+		grep -F '"browser_download_url": "https://github.com/autobrr/autobrr/releases/download/' |
+		grep -F "_${asset_marker}" |
+		sed -E 's/.*"browser_download_url": "([^"]+)".*/\1/' | head -n 1 || true)
+	if [[ -z "$AUTOBRR_URL" ]]; then
+		log_err "Could not resolve Autobrr ${asset_marker} from the latest GitHub release"
+		return 1
+	fi
+}
+
+autobrr_configure() {
+	local config_file="$1" port="$2"
+
+	if [[ ! -f "$config_file" ]]; then
+		cat >"$config_file" <<EOF
+host = "127.0.0.1"
+port = ${port}
+baseUrl = "/autobrr/"
+baseUrlModeLegacy = true
+EOF
+		return
+	fi
+
+	if grep -qE '^[[:space:]]*port[[:space:]]*=' "$config_file"; then
+		sed -i -E "s|^[[:space:]]*port[[:space:]]*=.*$|port = ${port}|" "$config_file"
+	else
+		printf '\nport = %s\n' "$port" >>"$config_file"
 	fi
 }
 
@@ -658,6 +707,7 @@ prepare_lighttpd_media_stack_paths() {
 
 lighttpd_media_stack_proxy_block_write() {
 	local app="$1" port="$2"
+	local map_target="${3-/public-${USERNAME}/${app}}"
 
 	cat <<-EOF
 		\$HTTP["url"] =~ "^/${app}(\\\$|/)" {
@@ -673,7 +723,7 @@ lighttpd_media_stack_proxy_block_write() {
 			  proxy.header = (
 			    "upgrade" => "enable",
 			    "map-urlpath" => (
-			      "/${app}" => "/public-${USERNAME}/${app}"
+			      "/${app}" => "${map_target}"
 			    )
 			  )
 			}
@@ -693,6 +743,7 @@ lighttpd_media_stack_config_write() {
 # Path rewriting stays in nginx proxy_cookie_path rules because lighttpd
 # map-urlpath does not rewrite Set-Cookie.
 url.redirect += (
+  "^/autobrr$" => "/public-${USERNAME}/autobrr/",
   "^/radarr$" => "/public-${USERNAME}/radarr/",
   "^/sonarr$" => "/public-${USERNAME}/sonarr/",
   "^/prowlarr$" => "/public-${USERNAME}/prowlarr/"
@@ -704,6 +755,8 @@ EOF
 			[[ "$app" == "sabnzbd" ]] || echo ""
 			lighttpd_media_stack_proxy_block_write "$app" "$port"
 		done
+		echo ""
+		lighttpd_media_stack_proxy_block_write "autobrr" "$AUTOBRR_PORT" ""
 		if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 			echo ""
 			lighttpd_media_stack_proxy_block_write "jellyfin" "$JELLYFIN_PORT"
@@ -855,7 +908,7 @@ media_stack_memory_preflight_guard() {
 
 media_stack_managed_paths() {
 	printf '%s\n' "$HOME/.bin/cloudplow" "$HOME/.bin/sabnzbd" "$HOME/.bin/Radarr" "$HOME/.bin/Prowlarr" "$HOME/.bin/Sonarr" "$HOME/.bin/dotnet" "$HOME/.bin/jellyfin" \
-		"$HOME/.config/cloudplow" "$HOME/.config/sabnzbd" "$HOME/.config/radarr" "$HOME/.config/prowlarr" "$HOME/.config/sonarr" "$HOME/.config/jellyfin" "$HOME/.lighttpd/custom.d/media-stack.conf"
+		"$HOME/.bin/autobrr" "$HOME/.config/cloudplow" "$HOME/.config/sabnzbd" "$HOME/.config/radarr" "$HOME/.config/prowlarr" "$HOME/.config/sonarr" "$HOME/.config/jellyfin" "$HOME/.config/autobrr" "$HOME/.lighttpd/custom.d/media-stack.conf"
 }
 
 media_stack_managed_path_allowed() {
@@ -967,13 +1020,13 @@ media_stack_uninstall() {
 	username=$(whoami)
 	log_step "Uninstalling PMSS media stack"
 	if [[ $DRY_RUN -eq 0 ]]; then
-		for app in jellyfin sabnzbd radarr prowlarr sonarr cloudplow jellyfin-smoke; do
+		for app in jellyfin sabnzbd radarr prowlarr sonarr cloudplow autobrr jellyfin-smoke; do
 			if command -v tmux >/dev/null 2>&1; then
 				tmux kill-session -t "$app" 2>/dev/null || true
 			fi
 		done
 		if command -v pkill >/dev/null 2>&1; then
-			for app in jellyfin.dll SABnzbd.py Radarr.dll Prowlarr.dll Sonarr.dll cloudplow.py; do
+			for app in jellyfin.dll SABnzbd.py Radarr.dll Prowlarr.dll Sonarr.dll cloudplow.py autobrr; do
 				pkill -9 -f -u "$username" "$app" >/dev/null 2>&1 || true
 			done
 		fi
@@ -1003,8 +1056,8 @@ JELLYFIN_CONFIG_DIR="$HOME/.config/jellyfin/config"
 JELLYFIN_DATA_DIR="$HOME/.config/jellyfin/data"
 JELLYFIN_LOG_DIR="$HOME/.config/jellyfin/log"
 JELLYFIN_MIN_FFMPEG_VERSION="4.4"
-MEDIA_STACK_BASE_SESSIONS=(sonarr radarr prowlarr sabnzbd cloudplow)
-MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow)
+MEDIA_STACK_BASE_SESSIONS=(sonarr radarr prowlarr sabnzbd cloudplow autobrr)
+MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow autobrr)
 # Determine public IP from default route (no external HTTP request needed)
 PUBLIC_IP=$(ip -4 route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "unavailable")
 
@@ -1052,9 +1105,9 @@ fi
 # Detect Architecture
 ARCH=$(dpkg --print-architecture)
 case "$ARCH" in
-"amd64") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH <<<"amd64|x64|x64" ;;
-"arm64") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH <<<"arm64|arm64|arm64" ;;
-"armhf") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH <<<"armhf|arm|arm" ;;
+"amd64") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH AUTOBRR_ARCH <<<"amd64|x64|x64|x86_64" ;;
+"arm64") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH AUTOBRR_ARCH <<<"arm64|arm64|arm64|arm64" ;;
+"armhf") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH AUTOBRR_ARCH <<<"armhf|arm|arm|arm" ;;
 *)
 	log_err "Architecture '$ARCH' not supported."
 	exit 1
@@ -1086,14 +1139,14 @@ elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 0 ]] && [ -d "$HOME/.config/jellyfin" ];
 fi
 
 if [[ $DRY_RUN -eq 0 ]]; then
-	config_dirs=("$HOME"/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow})
+	config_dirs=("$HOME"/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow,autobrr})
 	[[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && config_dirs+=("$HOME/.config/jellyfin")
 	mkdir -p "${config_dirs[@]}"
 	chmod 700 "${config_dirs[@]}"
 	mkdir -p "$HOME/.bin"
 else
-	config_dir_label="radarr,sonarr,prowlarr,sabnzbd,cloudplow"
-	[[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && config_dir_label="radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow"
+	config_dir_label="radarr,sonarr,prowlarr,sabnzbd,cloudplow,autobrr"
+	[[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && config_dir_label="radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow,autobrr"
 	log_info "[dry-run] would create ~/.config/{${config_dir_label}}"
 	log_info "[dry-run] would create ~/.bin"
 fi
@@ -1115,6 +1168,9 @@ else
 		exit 1
 	fi
 fi
+
+# Autobrr (GitHub API, latest release asset for the detected architecture)
+autobrr_resolve_download_url
 
 # Jellyfin (Repo Scraping)
 # Fetches from repo.jellyfin.org structure: files/server/linux/latest-stable/<arch>/
@@ -1143,6 +1199,7 @@ fi
 ASPDOTNET_URL="https://aka.ms/dotnet/8.0/aspnetcore-runtime-linux-${DOTNET_ARCH}.tar.gz"
 
 log_info "SABnzbd: ${SABNZBD_VERSION:-unknown}"
+log_info "Autobrr: ${AUTOBRR_VERSION:-unknown}"
 log_info "Jellyfin: ${JF_FILENAME}"
 log_info "ASP.NET: .NET 8 LTS (${DOTNET_ARCH})"
 
@@ -1150,7 +1207,7 @@ log_info "ASP.NET: .NET 8 LTS (${DOTNET_ARCH})"
 if [[ $VERIFY_ONLY -eq 1 ]]; then
 	log_step "Verifying URLs..."
 	all_ok=true
-	for url in "${SABNZBD_URL:-}" "${JELLYFIN_URL:-}" "${ASPDOTNET_URL:-}"; do
+	for url in "${SABNZBD_URL:-}" "${AUTOBRR_URL:-}" "${JELLYFIN_URL:-}" "${ASPDOTNET_URL:-}"; do
 		[[ -n "$url" ]] || continue
 		if check_url "$url"; then
 			log_ok "URL reachable: $url"
@@ -1254,7 +1311,7 @@ media_stack_sessions_label() {
 media_stack_app_log_path() {
 	case "$1" in
 	jellyfin) printf '%s' "$JELLYFIN_LOG_DIR/jellyfin.log" ;;
-	sonarr | radarr | prowlarr | sabnzbd) printf '%s' "$HOME/.config/${1}/${1}.log" ;;
+	sonarr | radarr | prowlarr | sabnzbd | autobrr) printf '%s' "$HOME/.config/${1}/${1}.log" ;;
 	esac
 }
 
@@ -1287,7 +1344,7 @@ media_stack_start_apps() {
 		exit 1
 	fi
 
-	mkdir -p "$HOME/.config/sonarr" "$HOME/.config/radarr" "$HOME/.config/prowlarr" "$HOME/.config/sabnzbd"
+	mkdir -p "$HOME/.config/sonarr" "$HOME/.config/radarr" "$HOME/.config/prowlarr" "$HOME/.config/sabnzbd" "$HOME/.config/autobrr"
 	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 		mkdir -p "$JELLYFIN_DATA_DIR/log"
 		media_stack_start_tmux_app "jellyfin" "$HOME/.bin/jellyfin/jellyfin.dll" \
@@ -1306,6 +1363,9 @@ media_stack_start_apps() {
 	media_stack_start_tmux_app "cloudplow" "$HOME/.bin/cloudplow/cloudplow/cloudplow.py" \
 		"source $HOME/.bin/cloudplow/bin/activate && python3 $HOME/.bin/cloudplow/cloudplow/cloudplow.py run --config=$HOME/.config/cloudplow/config.json --loglevel=DEBUG --cachefile=$HOME/.config/cloudplow/cache.db --logfile=$HOME/.config/cloudplow/cloudplow.log" \
 		"Cloudplow not found at $HOME/.bin/cloudplow/cloudplow/cloudplow.py"
+	media_stack_start_tmux_app "autobrr" "$HOME/.bin/autobrr/autobrr" \
+		"AUTOBRR__HOST=127.0.0.1 AUTOBRR__PORT=\"$AUTOBRR_PORT\" AUTOBRR__BASE_URL=/autobrr/ AUTOBRR__BASE_URL_MODE_LEGACY=true \"$HOME/.bin/autobrr/autobrr\" --config=\"$HOME/.config/autobrr\" 2>&1 | tee -a \"$HOME/.config/autobrr/autobrr.log\"" \
+		"Autobrr not found at $HOME/.bin/autobrr/autobrr"
 }
 
 media_stack_verify_sessions() {
@@ -1332,6 +1392,7 @@ SABNZBD_PORT=$(pick_existing_or_random_port "$(existing_port_from_ini "$HOME/.co
 RADARR_PORT=$(pick_existing_or_random_port "$(existing_port_from_xml_tag "$HOME/.config/radarr/config.xml" "Port")")
 PROWLARR_PORT=$(pick_existing_or_random_port "$(existing_port_from_xml_tag "$HOME/.config/prowlarr/config.xml" "Port")")
 SONARR_PORT=$(pick_existing_or_random_port "$(existing_port_from_xml_tag "$HOME/.config/sonarr/config.xml" "Port")")
+AUTOBRR_PORT=$(pick_existing_or_random_port "$(existing_port_from_ini "$HOME/.config/autobrr/config.toml" "port")")
 JELLYFIN_PORT="$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_DIR/network.xml" "InternalHttpPort")"
 JELLYFIN_PORT="${JELLYFIN_PORT:-$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_DIR/network.xml" "PublicHttpPort")}"
 JELLYFIN_PORT="$(pick_existing_or_random_port "$JELLYFIN_PORT")"
@@ -1431,6 +1492,33 @@ for servarr_spec in \
 	servarr_resolve_download_url "$app"
 	servarr_install_from_url "$app" "$install_name" "$datadir" "$port" "$default_port" "$SERVARR_DOWNLOAD_URL"
 done
+
+# Install Autobrr as a user-local single binary and keep its proxy settings in
+# the user config while runtime environment variables enforce loopback binding.
+app="autobrr"
+log_step "Installing ${app^^}..."
+installdir="$HOME/.bin/autobrr"
+datadir="$HOME/.config/autobrr"
+mkdir -p "$datadir"
+pkill -9 -f -u "$USERNAME" "$app" >/dev/null 2>&1 || true
+if [[ $DRY_RUN -eq 0 ]]; then
+	managed_install_path_reset "$installdir"
+	mkdir -p "$installdir"
+	cd "$installdir"
+	echo "Downloading...${app^^} (${AUTOBRR_VERSION:-unknown})"
+	if [[ -z "${AUTOBRR_URL:-}" ]]; then
+		log_err "Autobrr URL not resolved"
+		exit 1
+	fi
+	fetch_verified_archive "$AUTOBRR_URL" "autobrr.tar.gz" "Autobrr"
+	extract_tgz "autobrr.tar.gz" "$installdir"
+	autobrr_configure "$datadir/config.toml" "$AUTOBRR_PORT"
+	chmod 700 "$installdir/autobrr" "$installdir/autobrrctl" 2>/dev/null || true
+	echo "${app^^} Installed"
+else
+	log_info "[dry-run] would install Autobrr ${AUTOBRR_VERSION:-unknown} and configure loopback port ${AUTOBRR_PORT}"
+fi
+echo ""
 
 # Install ASP.NET Core (.NET 8)
 app="aspnetcore"
@@ -1587,6 +1675,7 @@ fi
 
 # shellcheck disable=SC2016
 append_to_bashrc_custom_if_missing '# PMSS Media stack aliases (updated Nov 2025)
+alias autobrr='\''tmux new-session -d -s "autobrr" "AUTOBRR__HOST=127.0.0.1 AUTOBRR__BASE_URL=/autobrr/ AUTOBRR__BASE_URL_MODE_LEGACY=true \"$HOME/.bin/autobrr/autobrr\" --config=\"$HOME/.config/autobrr\" 2>&1 | tee -a \"$HOME/.config/autobrr/autobrr.log\""'\''
 alias sonarr='\''tmux new-session -d -s "sonarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Sonarr/Sonarr.dll\" --data=\"$HOME/.config/sonarr\""'\''
 alias radarr='\''tmux new-session -d -s "radarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Radarr/Radarr.dll\" --nobrowser --data=\"$HOME/.config/radarr\""'\''
 alias prowlarr='\''tmux new-session -d -s "prowlarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Prowlarr/Prowlarr.dll\" --nobrowser --data=\"$HOME/.config/prowlarr\""'\''
@@ -1624,7 +1713,7 @@ echo ""
 echo "To start application manually use appname as command"
 echo "e.g for SONARR use 'sonarr'"
 echo ""
-for app in radarr sonarr prowlarr sabnzbd; do
+for app in radarr sonarr prowlarr sabnzbd autobrr; do
 	echo "${app^^}-URL = https://${HOSTNAME}/public-${USERNAME}/${app}/"
 done
 echo "SABNZBD-WIZARD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/wizard/"
@@ -1642,8 +1731,8 @@ echo ""
 summary_jellyfin_port=""
 summary_jellyfin_config=""
 [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && summary_jellyfin_port=", Jellyfin=${JELLYFIN_PORT}" && summary_jellyfin_config=" | Jellyfin=$HOME/.config/jellyfin"
-echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}${summary_jellyfin_port}"
-echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr${summary_jellyfin_config} | Cloudplow=$HOME/.config/cloudplow"
+echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}, Autobrr=${AUTOBRR_PORT}${summary_jellyfin_port}"
+echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr | Autobrr=$HOME/.config/autobrr${summary_jellyfin_config} | Cloudplow=$HOME/.config/cloudplow"
 echo "Tmux sessions running: $(media_stack_sessions_label)"
 
 echo ""

@@ -6,9 +6,9 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class MediaStackWatchdogTest extends TestCase
 {
-    public function testDefinitionsCoverTheFiveManagedPanelApps(): void
+    public function testDefinitionsCoverTheManagedPanelApps(): void
     {
-        $this->assertSame(array('sonarr', 'radarr', 'prowlarr', 'sabnzbd', 'cloudplow', 'jellyfin'), array_keys(\pmssMediaStackWatchdogAppDefinitions()));
+        $this->assertSame(array('sonarr', 'radarr', 'prowlarr', 'sabnzbd', 'cloudplow', 'jellyfin', 'autobrr'), array_keys(\pmssMediaStackWatchdogAppDefinitions()));
     }
 
     public function testExpectedAppsOnlyIncludesPreparedAccountDirectories(): void
@@ -16,10 +16,11 @@ class MediaStackWatchdogTest extends TestCase
         $home = $this->pmssMakeTempDir('media-stack-watchdog-apps-');
         $this->pmssWriteRelativeFile($home, '.config/sonarr/config.xml', '<Config />');
         $this->pmssWriteRelativeFile($home, '.bin/Radarr/Radarr.dll', 'binary');
+        $this->pmssWriteRelativeFile($home, '.bin/autobrr/autobrr', 'binary');
 
         $apps = \pmssMediaStackWatchdogExpectedApps($home);
 
-        $this->assertSame(array('sonarr', 'radarr'), array_keys($apps));
+        $this->assertSame(array('sonarr', 'radarr', 'autobrr'), array_keys($apps));
     }
 
     public function testRepeatedMissingSessionsBecomeFailedAtThirdObservation(): void

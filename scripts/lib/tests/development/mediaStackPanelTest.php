@@ -98,6 +98,7 @@ class MediaStackPanelTest extends TestCase
 
         $this->assertSame('installed', $status['state']);
         $this->assertStringContainsString('/public-alice/jellyfin/web/index.html', $status['urls']['Jellyfin']);
+        $this->assertSame('https://seedbox.example/public-alice/autobrr/', $status['urls']['Autobrr']);
     }
 
     public function testStatusShowsRuntimeAppsWhenWatchdogSnapshotExists(): void

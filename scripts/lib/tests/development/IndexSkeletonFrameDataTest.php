@@ -293,6 +293,8 @@ class IndexSkeletonFrameDataTest extends TestCase
                 '}',
                 '$HTTP["url"] =~ "^/jellyfin($|/)" {',
                 '}',
+                '$HTTP["url"] =~ "^/autobrr($|/)" {',
+                '}',
                 '$HTTP["url"] =~ "^/notebook($|/)" {',
                 '}',
             ))."\n"
@@ -300,7 +302,7 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
 
-        foreach (['sabnzbd', 'radarr', 'prowlarr', 'sonarr', 'lidarr', 'readarr'] as $app) {
+        foreach (['sabnzbd', 'radarr', 'prowlarr', 'sonarr', 'lidarr', 'readarr', 'autobrr'] as $app) {
             $this->assertStringContainsString("loadFrame('".$app."', '/public-alice/".$app."/')", $html);
         }
         $this->assertStringContainsString("loadFrame('jellyfin', '/public-alice/jellyfin/web/index.html')", $html);

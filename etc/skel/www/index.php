@@ -149,6 +149,7 @@ function pmssLocalFrameProxyAppDefinitions($username = '')
         'lidarr' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'lidarr/', 'Lidarr', 'Lidarr - Music manager'),
         'readarr' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'readarr/', 'Readarr', 'Readarr - Book manager'),
         'sabnzbd' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'sabnzbd/', 'SABnzbd', 'SABnzbd - Usenet downloader'),
+        'autobrr' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'autobrr/', 'Autobrr', 'Autobrr - Release automation'),
         'invidious' => pmssLocalFrameDefinition('apps/invidious/', 'Invidious', 'Invidious - Video frontend'),
     );
 }
@@ -250,6 +251,7 @@ function pmssLocalFrameInstalledAppFramesRead($homePath = '..')
         'qbittorrent' => array('signal' => '.config/qBittorrent', 'type' => 'dir'),
         'deluge'      => array('signal' => '.config/deluge',      'type' => 'dir'),
         'rclone'      => array('signal' => '.rclonePort',         'type' => 'file'),
+        'autobrr'     => array('signal' => '.config/autobrr',      'type' => 'dir'),
     );
 
     $home = rtrim($homePath, '/');

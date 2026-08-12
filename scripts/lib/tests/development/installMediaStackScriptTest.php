@@ -128,7 +128,9 @@ class installMediaStackScriptTest extends TestCase
     {
         $this->assertStringContainsAllStrings([
             '$HOME/.bin/cloudplow',
+            '$HOME/.bin/autobrr',
             '$HOME/.config/sabnzbd',
+            '$HOME/.config/autobrr',
             'export DOTNET_ROOT=$HOME/.bin/dotnet',
             'PATH="$PATH:$DOTNET_ROOT"',
             'PATH="$PATH:$HOME/.bin"',
@@ -181,6 +183,16 @@ class installMediaStackScriptTest extends TestCase
             'bash install-media-stack.sh --jellyfin-ffmpeg=$home_ffmpeg',
         ], [
             $staticFfmpegPrefix => 'Installer must not auto-download third-party static FFmpeg builds',
+        ], $this->script);
+    }
+
+    public function testAutobrrRuntimeUsesLoopbackAndSubpathSettings(): void
+    {
+        $this->assertStringContainsAllStrings([
+            'AUTOBRR__HOST=127.0.0.1',
+            'AUTOBRR__BASE_URL=/autobrr/',
+            'AUTOBRR__BASE_URL_MODE_LEGACY=true',
+            '--config=\\"$HOME/.config/autobrr\\"',
         ], $this->script);
     }
 
@@ -368,7 +380,7 @@ LIGHTTPD;
             'set -euo pipefail',
             'HOME='.escapeshellarg($home),
             'USERNAME=alice',
-            'SABNZBD_PORT=18080 RADARR_PORT=17878 PROWLARR_PORT=19696 SONARR_PORT=18989 JELLYFIN_PORT=18096',
+            'SABNZBD_PORT=18080 RADARR_PORT=17878 PROWLARR_PORT=19696 SONARR_PORT=18989 AUTOBRR_PORT=17474 JELLYFIN_PORT=18096',
             'JELLYFIN_INSTALL_ENABLED=1',
             $functions,
             'lighttpd_media_stack_config_write "$HOME/.lighttpd/custom.d/media-stack.conf"',
@@ -385,6 +397,7 @@ LIGHTTPD;
             'Location rewriting belongs here via map-urlpath. Set-Cookie',
             'Path rewriting stays in nginx proxy_cookie_path rules',
             'map-urlpath does not rewrite Set-Cookie.',
+            '"^/autobrr$" => "/public-alice/autobrr/"',
             '"^/radarr$" => "/public-alice/radarr/"',
             '"^/sonarr$" => "/public-alice/sonarr/"',
             '"^/prowlarr$" => "/public-alice/prowlarr/"',
@@ -401,12 +414,15 @@ LIGHTTPD;
             '$HTTP["url"] =~ "^/sonarr(\$|/)" {',
             '"port" => 18989',
             '"/sonarr" => "/public-alice/sonarr"',
+            '$HTTP["url"] =~ "^/autobrr(\$|/)" {',
+            '"port" => 17474',
+            '"/autobrr" => ""',
             '$HTTP["url"] =~ "^/jellyfin(\$|/)" {',
             '"port" => 18096',
             '"/jellyfin" => "/public-alice/jellyfin"',
         ), $withJellyfin);
-        $this->assertSame(5, substr_count($withJellyfin, '"upgrade" => "enable"'));
-        $this->assertSame(4, substr_count($withoutJellyfin, '"upgrade" => "enable"'));
+        $this->assertSame(6, substr_count($withJellyfin, '"upgrade" => "enable"'));
+        $this->assertSame(5, substr_count($withoutJellyfin, '"upgrade" => "enable"'));
         $this->assertStringNotContainsString('jellyfin', $withoutJellyfin);
     }
 
@@ -478,9 +494,69 @@ LIGHTTPD;
             'curl -fsSL --max-time 20 "$url"',
             'wget -q -O - --timeout=20 --tries=1 "$url"',
             'SABNZBD_RELEASE_JSON=$(fetch_text "https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest")',
+            'https://api.github.com/repos/autobrr/autobrr/releases/latest',
+            'autobrr_resolve_download_url',
             'JF_REPO_INDEX=$(fetch_text "$JF_REPO_BASE")',
             'Could not resolve SABnzbd release metadata from GitHub',
         ], $this->script);
+    }
+
+    public function testAutobrrResolverSelectsReleaseAssetForArchitecture(): void
+    {
+        $functions = $this->pmssExtractShellFunctions($this->script, array('autobrr_resolve_download_url'));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'AUTOBRR_ARCH=x86_64',
+            'OVR_AUTOBRR_URL=https://mirror.example/autobrr.tar.gz',
+            'log_err() { echo "ERR:$*"; }',
+            $functions,
+            'autobrr_resolve_download_url',
+            'echo "override=$AUTOBRR_VERSION|$AUTOBRR_URL"',
+            'OVR_AUTOBRR_URL=',
+            'fetch_text() { printf "%s\\n" \'{\' \'  "tag_name": "v1.83.0",\' \'  "browser_download_url": "https://github.com/autobrr/autobrr/releases/download/v1.83.0/autobrr_1.83.0_linux_x86_64.tar.gz"\' \'}\'; }',
+            'autobrr_resolve_download_url',
+            'echo "release=$AUTOBRR_VERSION|$AUTOBRR_URL"',
+            '',
+        ));
+
+        $output = $this->pmssRunShellHarness($script);
+
+        $this->assertStringContainsAllStrings([
+            'override=override|https://mirror.example/autobrr.tar.gz',
+            'release=v1.83.0|https://github.com/autobrr/autobrr/releases/download/v1.83.0/autobrr_1.83.0_linux_x86_64.tar.gz',
+        ], $output);
+    }
+
+    public function testAutobrrConfigPreservesExistingSettingsAndConvergesPort(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-autobrr-config-');
+        $newConfig = $home.'/new/config.toml';
+        $existingConfig = $home.'/existing/config.toml';
+        $this->pmssEnsureDir(dirname($newConfig));
+        $this->pmssWriteFile($existingConfig, "host = \"127.0.0.1\"\nport = 12345\ncustom = true\n");
+        $functions = $this->pmssExtractShellFunctions($this->script, array('autobrr_configure'));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            $functions,
+            'autobrr_configure '.escapeshellarg($newConfig).' 23456',
+            'autobrr_configure '.escapeshellarg($existingConfig).' 34567',
+            'cat '.escapeshellarg($newConfig),
+            'cat '.escapeshellarg($existingConfig),
+            '',
+        ));
+
+        $output = $this->pmssRunShellHarness($script);
+
+        $this->assertStringContainsAllStrings([
+            'host = "127.0.0.1"',
+            'port = 23456',
+            'port = 34567',
+            'custom = true',
+            'baseUrl = "/autobrr/"',
+            'baseUrlModeLegacy = true',
+        ], $output);
     }
 
     public function testLogFilePathSetOnce(): void
@@ -496,7 +572,7 @@ LIGHTTPD;
     public function testTmuxKillIsScopedToNamedSessions(): void
     {
         $this->assertStringContainsAllStrings([
-            'MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow)',
+            'MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow autobrr)',
             'media_stack_sessions "${MEDIA_STACK_STOP_SESSIONS[@]}"',
             'while IFS= read -r app; do',
             'tmux kill-session -t "${app}"',

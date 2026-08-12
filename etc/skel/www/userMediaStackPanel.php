@@ -218,7 +218,7 @@ function pmssMediaStackPanelRuntimeStatusRead(string $home): ?array
 /** Convert the watchdog snapshot into bounded customer-facing app details. */
 function pmssMediaStackPanelRuntimeDetailsRead(array $runtime): array
 {
-    $labels = array('sonarr' => 'Sonarr', 'radarr' => 'Radarr', 'prowlarr' => 'Prowlarr', 'sabnzbd' => 'SABnzbd', 'cloudplow' => 'Cloudplow', 'jellyfin' => 'Jellyfin');
+    $labels = array('sonarr' => 'Sonarr', 'radarr' => 'Radarr', 'prowlarr' => 'Prowlarr', 'sabnzbd' => 'SABnzbd', 'cloudplow' => 'Cloudplow', 'jellyfin' => 'Jellyfin', 'autobrr' => 'Autobrr');
     $details = array();
     foreach ($labels as $app => $label) {
         if (!isset($runtime['apps'][$app]) || !is_array($runtime['apps'][$app])) {
@@ -251,6 +251,7 @@ function pmssMediaStackPanelUrlsBuild(string $username, string $hostname): array
         'Sonarr' => $base.'/sonarr/',
         'Prowlarr' => $base.'/prowlarr/',
         'SABnzbd' => $base.'/sabnzbd/',
+        'Autobrr' => $base.'/autobrr/',
     );
 }
 
