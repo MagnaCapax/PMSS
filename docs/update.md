@@ -113,6 +113,13 @@ run. The sequence is:
 4. `pmssApplyDpkgSelections()` – apply the codename-specific baseline snapshot.
 5. `pmssApplyDpkgSelections()` recovery + post-phase fix-broken/autoremove checks.
 
+After the package phase, update-step2 compares the installed versions of
+`containerd.io`, `docker-ce`, and `docker-ce-rootless-extras` with a snapshot
+taken before package recovery. When any of those daemon packages changed, it
+sets `PMSS_DOCKER_PACKAGES_CHANGED=1`; per-user maintenance then uses
+`userDocker.php restart` (including users that would otherwise resume-skip) so
+rootless daemons do not keep executing pre-upgrade binaries against new shims.
+
 Do not move the dpkg recovery below probes, and do not move apt configuration or
 baseline application later in the flow. The dpkg baseline is now the sole source
 of package state in this phase; when in doubt, update the baseline snapshot

@@ -50,7 +50,7 @@ function pmssRunAndLog(string $user, string $label, string $command, bool $asUse
     return (int) $result['rc'];
 }
 
-/** Enable linger, refresh user@UID, then start and check rootless Docker. */
+/** Enable linger, refresh user@UID, then start or restart and check rootless Docker. */
 function pmssEnsureLingerAndDocker(string $user): void
 {
     if (!pmssUserMaintenanceUsernameAllowed($user, 'pmssEnsureLingerAndDocker')) {
@@ -97,8 +97,9 @@ function pmssEnsureLingerAndDocker(string $user): void
     }
 
     pmssEnsureDockerDependencies($user);
-    foreach (['start', 'status'] as $dockerAction) {
-        pmssRunAndLog($user, 'userDocker '.$dockerAction, sprintf('php /scripts/util/userDocker.php %s %s', escapeshellarg($user), $dockerAction));
+    $dockerAction = getenv('PMSS_DOCKER_PACKAGES_CHANGED') === '1' ? 'restart' : 'start';
+    foreach ([$dockerAction, 'status'] as $action) {
+        pmssRunAndLog($user, 'userDocker '.$action, sprintf('php /scripts/util/userDocker.php %s %s', escapeshellarg($user), $action));
     }
 }
 

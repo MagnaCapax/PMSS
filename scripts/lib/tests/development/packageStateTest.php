@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/update/packageState.php';
 
 class PackageStateTest extends TestCase
 {
@@ -29,6 +30,51 @@ class PackageStateTest extends TestCase
     {
         $this->assertTrue(!is_file($this->pmssRepoPath('scripts/lib/update/apps/packages.php')), 'legacy package app must remain removed');
         $this->assertTrue(!is_file($this->pmssRepoPath('scripts/lib/update/apps/packages/helpers.php')), 'legacy package helpers must remain removed');
+    }
+
+    public function testDockerPackageVersionDeltaTracksRuntimePackagesOnly(): void
+    {
+        $before = [
+            'containerd.io' => '1',
+            'docker-ce' => '1',
+            'docker-ce-rootless-extras' => '1',
+        ];
+        $this->assertFalse(\pmssDockerPackageVersionsChanged($before, $before));
+
+        $containerdChanged = $before;
+        $containerdChanged['containerd.io'] = '2';
+        $this->assertTrue(\pmssDockerPackageVersionsChanged($before, $containerdChanged));
+
+        $dockerChanged = $before;
+        $dockerChanged['docker-ce'] = '2';
+        $this->assertTrue(\pmssDockerPackageVersionsChanged($before, $dockerChanged));
+
+        $extrasChanged = $before;
+        $extrasChanged['docker-ce-rootless-extras'] = '2';
+        $this->assertTrue(\pmssDockerPackageVersionsChanged($before, $extrasChanged));
+
+        $cliOnlyChanged = $before;
+        $cliOnlyChanged['docker-ce-cli'] = '2';
+        $this->assertFalse(\pmssDockerPackageVersionsChanged($before, $cliOnlyChanged));
+    }
+
+    public function testUpdateStep2PublishesDockerPackageChangeSignal(): void
+    {
+        $src = (string) file_get_contents($this->pmssRepoPath('scripts/util/update-step2.php'));
+        $this->assertOrderedStrings([
+            '$pmssDockerPackageVersionsBefore = pmssDockerPackageVersions();',
+            '$pmssDockerPackageVersionsAfter = pmssDockerPackageVersions();',
+            'pmssDockerPackageVersionsChanged(',
+            'PMSS_DOCKER_PACKAGES_CHANGED=',
+        ], $src, 'Missing Docker package change signal step: ', 'Docker package signal order changed at: ');
+    }
+
+    public function testUserMaintenanceUsesRestartWhenDockerPackagesChanged(): void
+    {
+        $dockerSrc = (string) file_get_contents($this->pmssRepoPath('scripts/lib/update/users/docker.php'));
+        $maintenanceSrc = (string) file_get_contents($this->pmssRepoPath('scripts/lib/update/userMaintenance.php'));
+        $this->assertStringContainsString("getenv('PMSS_DOCKER_PACKAGES_CHANGED') === '1' ? 'restart' : 'start'", $dockerSrc);
+        $this->assertStringContainsString("getenv('PMSS_DOCKER_PACKAGES_CHANGED') === '1'", $maintenanceSrc);
     }
 
     public function testUpdateStep2DoesNotCarryPackageQueueSkipPath(): void

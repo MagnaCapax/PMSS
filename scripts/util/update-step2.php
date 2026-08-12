@@ -313,6 +313,10 @@ $GLOBALS['PMSS_PACKAGES_READY'] = false;
 // PMSS_PACKAGE_PHASE exposes coarse progress while packages converge.
 putenv('PMSS_PACKAGE_PHASE=initializing');
 
+// Capture daemon package versions before recovery so any package work in this
+// phase can trigger a rootless-Docker restart before user maintenance starts.
+$pmssDockerPackageVersionsBefore = pmssDockerPackageVersions();
+
 pmssRunProfiledCallable('Completing pending dpkg configurations', 'pmssCompletePendingDpkg');
 pmssRunProfiledCallable('Checking /home inode density', 'pmssHomeInodeDensityCheck', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 
@@ -455,6 +459,22 @@ logmsg('[OK] Package phase relies on dpkg baseline selections only');
 
 runStep('Attempting apt fix-broken install (post-package phase)', aptCmd('--fix-broken install -y'));
 runStep('Removing packages no longer required', aptCmd('autoremove -y'));
+
+$pmssDockerPackageVersionsAfter = pmssDockerPackageVersions();
+$pmssDockerPackagesChanged = pmssDockerPackageVersionsChanged(
+    $pmssDockerPackageVersionsBefore,
+    $pmssDockerPackageVersionsAfter
+);
+putenv('PMSS_DOCKER_PACKAGES_CHANGED='.($pmssDockerPackagesChanged ? '1' : '0'));
+pmssLogJson([
+    'event' => 'docker_package_versions',
+    'changed' => $pmssDockerPackagesChanged,
+    'before' => $pmssDockerPackageVersionsBefore,
+    'after' => $pmssDockerPackageVersionsAfter,
+]);
+if ($pmssDockerPackagesChanged) {
+    logmsg('[INFO] Docker runtime package versions changed; rootless daemons will restart during user maintenance');
+}
 
 $GLOBALS['PMSS_PACKAGES_READY'] = true;
 putenv('PMSS_PACKAGE_PHASE=complete');

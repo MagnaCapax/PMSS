@@ -122,7 +122,14 @@ $home = isset($info['dir']) ? (string) $info['dir'] : '';
 $dockerUnitPath = $home !== '' ? $home.'/.config/systemd/user/docker.service' : '';
 $serviceExists = ($dockerUnitPath !== '' && is_file($dockerUnitPath));
 $userDockerStartTimeoutSec = 300;
-$dockerStopCmd = 'pkill -f dockerd-rootless.sh || pkill -f "dockerd-rootless" || pkill dockerd || true';
+// Each match must run independently: rootlesskit owns the user namespace and
+// survives when an earlier dockerd match would short-circuit an `||` chain.
+$dockerStopCmd = [
+    'pkill -f dockerd-rootless.sh || true',
+    'pkill -f "dockerd-rootless" || true',
+    'pkill -x dockerd || true',
+    'pkill -x rootlesskit || true',
+];
 
 if ($debug) {
     pmssUserLog($user, sprintf('userDocker: action=%s requested', $action));
@@ -353,12 +360,16 @@ if ($action === 'stop' || $action === 'restart') {
                 $systemdAction,
                 $stopRc
             ));
-            userDockerRunAs($user, $dockerStopCmd);
+            foreach ($dockerStopCmd as $dockerStopCommand) {
+                userDockerRunAs($user, $dockerStopCommand);
+            }
             $fallbackUsed = true;
         }
     } else {
         // Best-effort stop for non-systemd rootless: kill dockerd-rootless.sh/dockerd for this user.
-        userDockerRunAs($user, $dockerStopCmd);
+        foreach ($dockerStopCmd as $dockerStopCommand) {
+            userDockerRunAs($user, $dockerStopCommand);
+        }
         $fallbackUsed = true;
     }
 

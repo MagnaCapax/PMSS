@@ -53,4 +53,18 @@ class UserDockerLingerEnsureTest extends TestCase
         $this->assertTrue(strpos($src, 'userDockerCollectPids($user, $debug, $stopCheckOk)') < strpos($src, 'echo "Docker stop requested'),
             'stop success output must follow liveness verification');
     }
+
+    public function testUserDockerStopKillsTheRootlesskitParent(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 3).'/util/userDocker.php');
+        $commandPos = strpos($src, '$dockerStopCmd =');
+        $rootlesskitPos = strpos($src, 'pkill -x rootlesskit');
+        $this->assertTrue($commandPos !== false && $rootlesskitPos !== false && $rootlesskitPos > $commandPos,
+            'rootless stop must target the rootlesskit user-namespace parent');
+        $this->assertStringContainsAllStrings([
+            "'pkill -x dockerd || true'",
+            "'pkill -x rootlesskit || true'",
+            'foreach ($dockerStopCmd as $dockerStopCommand)',
+        ], $src);
+    }
 }

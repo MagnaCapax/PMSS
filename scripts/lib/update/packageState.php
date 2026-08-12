@@ -20,6 +20,43 @@ function pmssPackageStatus(string $package): string
     return $rc === 0 ? trim($output[0] ?? '') : '';
 }
 
+/** Return the installed version for a package, or an empty string when absent. */
+function pmssPackageVersion(string $package): string
+{
+    $cmd = 'dpkg-query -W -f=\'${Version}\' '.escapeshellarg($package).' 2>/dev/null';
+    exec($cmd, $output, $rc);
+    return $rc === 0 ? trim($output[0] ?? '') : '';
+}
+
+/** List packages whose daemon binaries can be skewed by an in-place Docker update. */
+function pmssDockerRuntimePackages(): array
+{
+    return ['containerd.io', 'docker-ce', 'docker-ce-rootless-extras'];
+}
+
+/** Snapshot versions of the Docker runtime packages for an update-phase comparison. */
+function pmssDockerPackageVersions(): array
+{
+    $versions = [];
+    foreach (pmssDockerRuntimePackages() as $package) {
+        $versions[$package] = pmssPackageVersion($package);
+    }
+
+    return $versions;
+}
+
+/** Return whether any tracked Docker runtime package changed between snapshots. */
+function pmssDockerPackageVersionsChanged(array $before, array $after): bool
+{
+    foreach (pmssDockerRuntimePackages() as $package) {
+        if (($before[$package] ?? '') !== ($after[$package] ?? '')) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /**
  * Determine if a package is available in the current apt cache.
  */

@@ -118,6 +118,7 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
     $processedUsers = 0;
     $skippedUsers = 0;
     $refreshSignature = pmssUserRefreshSignature($rutorrentIndexSha);
+    $dockerPackagesChanged = getenv('PMSS_DOCKER_PACKAGES_CHANGED') === '1';
     $skipReasons = [];
     $userConfigStore = new UserConfigStore();
     logMessage(sprintf('Per-user maintenance: %d user(s) to process', $totalUsers));
@@ -148,7 +149,7 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
         }
 
         $resumeAlreadyDone = pmssUserRefreshAlreadyDone($userTrim, $refreshSignature);
-        if ($resumeAlreadyDone && pmssUserCgroupSliceSelfHeal($userTrim, $userConfigStore)) {
+        if (!$dockerPackagesChanged && $resumeAlreadyDone && pmssUserCgroupSliceSelfHeal($userTrim, $userConfigStore)) {
             $processedUsers++;
             logMessage(sprintf('User %s already refreshed this version; skipping (resume)', $userTrim));
             continue;
