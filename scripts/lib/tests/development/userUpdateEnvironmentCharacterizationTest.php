@@ -48,7 +48,12 @@ PHP
         $script = $this->buildUserEnvironmentScript(
             'web-root-before-context',
             <<<'PHP'
-$home = $base.'/home/alice';
+$user = 'alice';
+// Root must chown to a real account; do not create system users in hermetic tests.
+if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
+    $user = 'root';
+}
+$home = $base.'/home/'.$user;
 $skel = $base.'/skel/www';
 $locks = $base.'/locks';
 @mkdir($home, 0755, true);
@@ -61,7 +66,7 @@ putenv('PMSS_USER_WEB_ROOT_LOCK_DIR='.$locks);
 PHP
             ,
             <<<'PHP'
-$environmentResult = pmssUpdateUserEnvironment('alice', 'sha123');
+$environmentResult = pmssUpdateUserEnvironment($user, 'sha123');
 PHP
             ,
             <<<'PHP'

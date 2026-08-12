@@ -14,6 +14,11 @@ class UserWebRootReconcileTest extends TestCase
     private $user = 'reconcileuser';
     protected function setUp(): void
     {
+        // Root must chown to a real account; keep the fixture hermetic by using
+        // the existing root account instead of creating a system user.
+        if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
+            $this->user = 'root';
+        }
         $this->homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-web-reconcile-');
         $this->home = $this->pmssUserHomePath($this->homeRoot, $this->user);
         $this->pmssEnsureDir($this->home.'/data');
