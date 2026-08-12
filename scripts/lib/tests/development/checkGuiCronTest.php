@@ -117,6 +117,125 @@ class CheckGuiCronTest extends TestCase
         $this->assertEquals('skeleton rutorrent', file_get_contents($homeDir.'/www/rutorrent/index.html'));
     }
 
+    public function testSingleWatchdogRecoveryRestoresPanelAndRutorrentAfterWebRootDeletion(): void
+    {
+        $user = 'dummy';
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-check-gui-full-recovery-');
+        $homeDir = $this->pmssUserHomePath($homeRoot, $user);
+        $this->pmssEnsureDir($homeDir);
+        $this->pmssEnsureDir($homeDir.'/www');
+        $this->pmssRemoveTree($homeDir.'/www');
+
+        $skeletonRoot = $this->pmssMakeTempDir('pmss-check-gui-full-skeleton-');
+        $this->pmssWriteFile($skeletonRoot.'/www/index.php', 'panel');
+        $this->pmssWriteFile($skeletonRoot.'/www/rutorrent/index.html', 'rutorrent');
+        $this->pmssTrackEnvOverrides([
+            'PMSS_SKEL_DIR' => $skeletonRoot,
+            'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-check-gui-full-lock-'),
+        ]);
+        $messages = [];
+
+        $this->assertFalse(
+            \pmssCheckGuiWebRootSentinelsHealthy($homeDir.'/www', $homeDir)
+        );
+        $this->assertTrue(
+            \pmssCheckGuiWebRootReconcileIfSentinelMissing(
+                $user,
+                $homeDir,
+                $this->pmssMakeArrayLogger($messages)
+            ),
+            implode('|', $messages)
+        );
+        $this->assertSame('panel', file_get_contents($homeDir.'/www/index.php'));
+        $this->assertSame('rutorrent', file_get_contents($homeDir.'/www/rutorrent/index.html'));
+        $this->assertTrue(
+            \pmssCheckGuiWebRootSentinelsHealthy($homeDir.'/www', $homeDir)
+        );
+    }
+
+    public function testWatchdogRecoveryIsIdempotentAfterTheFirstRun(): void
+    {
+        $user = 'dummy';
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-check-gui-idempotent-');
+        $homeDir = $this->pmssUserHomePath($homeRoot, $user);
+        $this->pmssEnsureDir($homeDir);
+        $skeletonRoot = $this->pmssMakeTempDir('pmss-check-gui-idempotent-skeleton-');
+        $this->pmssWriteFile($skeletonRoot.'/www/index.php', 'panel');
+        $this->pmssWriteFile($skeletonRoot.'/www/rutorrent/index.html', 'rutorrent');
+        $this->pmssTrackEnvOverrides([
+            'PMSS_SKEL_DIR' => $skeletonRoot,
+            'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-check-gui-idempotent-lock-'),
+        ]);
+        $messages = [];
+
+        $this->assertTrue(\pmssCheckGuiWebRootReconcileIfSentinelMissing(
+            $user,
+            $homeDir,
+            $this->pmssMakeArrayLogger($messages)
+        ));
+        $before = $this->pmssTreeSnapshot($homeDir);
+        $messages = [];
+        $this->assertTrue(\pmssCheckGuiWebRootReconcileIfSentinelMissing(
+            $user,
+            $homeDir,
+            $this->pmssMakeArrayLogger($messages)
+        ));
+
+        $this->assertSame($before, $this->pmssTreeSnapshot($homeDir));
+        $this->assertFalse($this->pmssMessagesContain($messages, 'Restored complete web root'));
+    }
+
+    public function testUnsafeWebRootSymlinkIsRefusedWithoutTouchingItsTarget(): void
+    {
+        $user = 'dummy';
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-check-gui-symlink-');
+        $homeDir = $this->pmssUserHomePath($homeRoot, $user);
+        $outsideDir = $this->pmssMakeTempDir('pmss-check-gui-outside-');
+        $this->pmssWriteFile($outsideDir.'/sentinel.txt', 'outside');
+        $this->pmssEnsureDir($homeDir);
+        $this->pmssCreateSymlinkOrSkip($outsideDir, $homeDir.'/www');
+        $skeletonRoot = $this->pmssMakeTempDir('pmss-check-gui-symlink-skeleton-');
+        $this->pmssWriteFile($skeletonRoot.'/www/index.php', 'panel');
+        $this->pmssWriteFile($skeletonRoot.'/www/rutorrent/index.html', 'rutorrent');
+        $this->pmssTrackEnvOverrides([
+            'PMSS_SKEL_DIR' => $skeletonRoot,
+            'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-check-gui-symlink-lock-'),
+        ]);
+        $messages = [];
+
+        $this->assertFalse(\pmssCheckGuiWebRootReconcileIfSentinelMissing(
+            $user,
+            $homeDir,
+            $this->pmssMakeArrayLogger($messages)
+        ));
+        $this->assertSame('outside', file_get_contents($outsideDir.'/sentinel.txt'));
+        $this->assertSame($outsideDir, readlink($homeDir.'/www'));
+    }
+
+    public function testWrongWebRootPathTypeIsRefusedWithoutReplacingIt(): void
+    {
+        $user = 'dummy';
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-check-gui-path-type-');
+        $homeDir = $this->pmssUserHomePath($homeRoot, $user);
+        $this->pmssEnsureDir($homeDir);
+        $this->pmssWriteFile($homeDir.'/www', 'not-a-directory');
+        $skeletonRoot = $this->pmssMakeTempDir('pmss-check-gui-path-type-skeleton-');
+        $this->pmssWriteFile($skeletonRoot.'/www/index.php', 'panel');
+        $this->pmssWriteFile($skeletonRoot.'/www/rutorrent/index.html', 'rutorrent');
+        $this->pmssTrackEnvOverrides([
+            'PMSS_SKEL_DIR' => $skeletonRoot,
+            'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-check-gui-path-type-lock-'),
+        ]);
+        $messages = [];
+
+        $this->assertFalse(\pmssCheckGuiWebRootReconcileIfSentinelMissing(
+            $user,
+            $homeDir,
+            $this->pmssMakeArrayLogger($messages)
+        ));
+        $this->assertSame('not-a-directory', file_get_contents($homeDir.'/www'));
+    }
+
     public function testHealthySentinelsDoNotInvokeReconciler(): void
     {
         $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
@@ -253,5 +372,29 @@ class CheckGuiCronTest extends TestCase
         ));
         $this->assertFalse(file_exists($homeDir.'/www/index.php'));
         $this->pmssAssertMessagesContain($messages, 'missing skeleton source');
+    }
+
+    private function pmssTreeSnapshot(string $path, string $relative = ''): array
+    {
+        if (is_link($path)) {
+            return [$relative => ['type' => 'link', 'target' => (string) readlink($path)]];
+        }
+        if (is_file($path)) {
+            return [$relative => ['type' => 'file', 'content' => (string) file_get_contents($path)]];
+        }
+        if (!is_dir($path)) {
+            return [$relative => ['type' => 'missing']];
+        }
+
+        $snapshot = [$relative => ['type' => 'dir']];
+        foreach (scandir($path) ?: [] as $child) {
+            if ($child === '.' || $child === '..') {
+                continue;
+            }
+            $childRelative = $relative === '' ? $child : $relative.'/'.$child;
+            $snapshot += $this->pmssTreeSnapshot($path.'/'.$child, $childRelative);
+        }
+        ksort($snapshot);
+        return $snapshot;
     }
 }

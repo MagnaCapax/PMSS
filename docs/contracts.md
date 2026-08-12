@@ -258,6 +258,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Runs handlers in order: HTTP, skeleton, ruTorrent themes, ruTorrent refresh,
     plugin maintenance, then permissions.
     Each handler consumes `['user','home','user_esc','rutorrent_index_sha']`.
+- pmssUserReconcileWebRoot(array $ctx, ?callable $logger=null): bool
+  - Converges one user's managed web root under a per-user lock, preserving
+    customer-owned paths and refusing unsafe symlinks or conflicting path types.
+  - Emits one structured summary log line per locked run with `reason`, `mode`,
+    `files_restored`, `duration_ms`, and `preserved_conflict` fields.
 - pmssEnsureLingerAndDocker(string $user): void
   - Enables linger + rootless Docker wiring for the user.
   - Skips and attempts `userDocker.php stop` when user config `dockerEnabled` is false (default true, but defaults false for Storage Box product payloads) or the effective RAM floor for Docker is below 245 MiB.
