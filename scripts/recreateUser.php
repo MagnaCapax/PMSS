@@ -168,6 +168,22 @@ pmssRunOrExit(sprintf(
 ));
 pmssRunOrExit('/scripts/util/setupUserHomePermissions.php ' . escapeshellarg($userName));
 pmssRunOrExit('/scripts/util/userConfigLighttpd.php ' . escapeshellarg($userName));
+
+/* Restore billing identities before nginx derives the user's stable hostnames. */
+if ($homeExists) {
+    echo "[*] Restoring billing identities\n";
+    foreach (['.billingServiceId', '.billingId', '.billingClientId'] as $billingFileName) {
+        $sourcePath = "{$backupDir}/{$billingFileName}";
+        if (!is_file($sourcePath) || is_link($sourcePath)) {
+            continue;
+        }
+
+        $destinationPath = "{$homeDir}/{$billingFileName}";
+        pmssRunOrExit('cp ' . escapeshellarg($sourcePath) . ' ' . escapeshellarg($destinationPath));
+        pmssRunOrExit('chown ' . escapeshellarg($userName) . ':' . escapeshellarg($userName) . ' ' . escapeshellarg($destinationPath));
+    }
+}
+
 pmssRunOrExit('/scripts/util/createNginxConfig.php --user ' . escapeshellarg($userName));
 pmssRunOrExit('/scripts/util/userPermissions.php ' . escapeshellarg($userName));
 

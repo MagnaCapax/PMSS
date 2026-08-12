@@ -665,7 +665,9 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Kills user processes; if `/home/<user>` exists, moves to `/home/backup-<user>`;
     recreates from `/etc/skel`, ensures dirs (`data`, `session`, `.lighttpd`);
     re-applies configs (`userConfig.php`, lighttpd/nginx, permissions);
-    restores `data`, `session`, and `.htpasswd` when available; validates ownership.
+    restores billing identity files (`.billingServiceId`, legacy `.billingId`, and
+    `.billingClientId`) before nginx regeneration, then restores `data`, `session`,
+    and `.htpasswd` when available; validates ownership.
 
 ---
 

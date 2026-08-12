@@ -19,4 +19,21 @@ class RecreateUserSafetyGuardTest extends TestCase
                 'Validation failed: unable to stat homeDir',
             ]]);
     }
+
+    public function testBillingIdentitiesRestoreBeforeNginxRegeneration(): void
+    {
+        $source = (string) file_get_contents($this->pmssRepoPath('scripts/recreateUser.php'));
+        $this->assertStringContainsAllStrings([
+            'Restoring billing identities',
+            "foreach (['.billingServiceId', '.billingId', '.billingClientId'] as \$billingFileName)",
+            'if (!is_file($sourcePath) || is_link($sourcePath))',
+            "pmssRunOrExit('cp ' . escapeshellarg(\$sourcePath)",
+            "pmssRunOrExit('chown ' . escapeshellarg(\$userName)",
+        ], $source);
+        $this->assertOrderedStrings([
+            'Restoring billing identities',
+            "foreach (['.billingServiceId', '.billingId', '.billingClientId'] as \$billingFileName)",
+            'createNginxConfig.php --user',
+        ], $source);
+    }
 }
