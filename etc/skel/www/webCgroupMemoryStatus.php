@@ -27,6 +27,44 @@ function pmssWebCgroupMemoryStatusFormatBytes($bytes, $precision = 1)
     return pmssFormatBytes((float) $bytes, (int) $precision);
 }
 
+/** Return whether a v2 cgroup exposes the memory controller. */
+function pmssWebCgroupMemoryStatusV2MemoryControllerAvailable($cgroupDir)
+{
+    if (!is_string($cgroupDir) || $cgroupDir === '') {
+        return false;
+    }
+
+    $memoryStatPath = rtrim($cgroupDir, '/').'/memory.stat';
+    if (!is_file($memoryStatPath) || @file_get_contents($memoryStatPath) === false) {
+        return false;
+    }
+
+    $controllersPath = rtrim($cgroupDir, '/').'/cgroup.controllers';
+    if (!is_file($controllersPath)) {
+        return false;
+    }
+
+    $controllers = @file_get_contents($controllersPath);
+    return is_string($controllers)
+        && preg_match('/(?:^|\s)memory(?:\s|$)/', trim($controllers)) === 1;
+}
+
+/** Return whether a discovered slice owns a readable memory controller. */
+function pmssWebCgroupMemoryStatusDirOwnsMemoryController($cgroupDir)
+{
+    if (!is_string($cgroupDir) || !is_dir($cgroupDir)) {
+        return false;
+    }
+
+    if (@file_get_contents(rtrim($cgroupDir, '/').'/memory.stat') === false) {
+        return false;
+    }
+
+    $controllersPath = rtrim($cgroupDir, '/').'/cgroup.controllers';
+    return !is_file($controllersPath)
+        || pmssWebCgroupMemoryStatusV2MemoryControllerAvailable($cgroupDir);
+}
+
 /** Detect the readable user.slice directory for the current account. */
 function pmssWebCgroupMemoryStatusDetectDir(array $overrides = [])
 {
@@ -36,8 +74,15 @@ function pmssWebCgroupMemoryStatusDetectDir(array $overrides = [])
 
     $uid = $overrides['uid'] ?? (function_exists('posix_getuid') ? posix_getuid() : null);
     if (is_int($uid) && $uid >= 0) {
-        foreach (['/sys/fs/cgroup/user.slice/user-'.$uid.'.slice', '/sys/fs/cgroup/unified/user.slice/user-'.$uid.'.slice'] as $candidate) {
-            if (is_dir($candidate)) {
+        $candidates = isset($overrides['cgroup_dir_candidates']) && is_array($overrides['cgroup_dir_candidates'])
+            ? $overrides['cgroup_dir_candidates']
+            : [
+                '/sys/fs/cgroup/user.slice/user-'.$uid.'.slice',
+                '/sys/fs/cgroup/memory/user.slice/user-'.$uid.'.slice',
+                '/sys/fs/cgroup/unified/user.slice/user-'.$uid.'.slice',
+            ];
+        foreach ($candidates as $candidate) {
+            if (pmssWebCgroupMemoryStatusDirOwnsMemoryController($candidate)) {
                 return $candidate;
             }
         }
@@ -45,9 +90,9 @@ function pmssWebCgroupMemoryStatusDetectDir(array $overrides = [])
 
     $cgroupFile = (string) ($overrides['self_cgroup_file'] ?? '/proc/self/cgroup');
     foreach (pmssCustomerCgroupSelfEntries($cgroupFile) as $entry) {
-        foreach (['/sys/fs/cgroup', '/sys/fs/cgroup/unified'] as $root) {
+        foreach (['/sys/fs/cgroup', '/sys/fs/cgroup/memory', '/sys/fs/cgroup/unified'] as $root) {
             $candidate = $root.$entry['path'];
-            if (is_dir($candidate)) {
+            if (pmssWebCgroupMemoryStatusDirOwnsMemoryController($candidate)) {
                 return $candidate;
             }
         }
@@ -63,7 +108,7 @@ function pmssWebCgroupMemoryStatusMemoryStatCandidatePaths($uid, $cgroupDir = ''
     $paths = [];
     $cgroupDir = is_string($cgroupDir) ? rtrim($cgroupDir, '/') : '';
     if ($cgroupDir !== '') {
-        return [$cgroupDir.'/memory.stat'];
+        $paths[] = $cgroupDir.'/memory.stat';
     }
     if ($uid >= 0) {
         $paths = array_merge($paths, [
@@ -181,7 +226,9 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
     $memoryHigh = $cgroupAvailable ? pmssWebCgroupMemoryStatusCounterRead(pmssWebCgroupMemoryStatusCounterCandidatePaths($uid, $cgroupDir, 'memory.high', 'memory.soft_limit_in_bytes'), true) : null;
     $memoryMax = $cgroupAvailable ? pmssWebCgroupMemoryStatusCounterRead(pmssWebCgroupMemoryStatusCounterCandidatePaths($uid, $cgroupDir, 'memory.max', 'memory.limit_in_bytes'), true) : null;
     $events = $cgroupAvailable ? pmssCustomerKeyValueFileRead($cgroupDir.'/memory.events') : [];
-    $pressure = $cgroupAvailable ? pmssCustomerKeyValueFileRead($cgroupDir.'/memory.pressure') : [];
+    $pressure = $cgroupAvailable && pmssWebCgroupMemoryStatusV2MemoryControllerAvailable($cgroupDir)
+        ? pmssCustomerKeyValueFileRead($cgroupDir.'/memory.pressure')
+        : [];
     $memoryBreakdown = [];
     if ($cgroupAvailable) {
         foreach (pmssWebCgroupMemoryStatusMemoryStatCandidatePaths($uid, $cgroupDir) as $path) {

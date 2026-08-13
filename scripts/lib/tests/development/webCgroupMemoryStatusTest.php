@@ -19,6 +19,21 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->assertSame($dir, \pmssWebCgroupMemoryStatusDetectDir(['cgroup_dir' => $dir]));
     }
 
+    public function testDetectDirRejectsControllerlessUnifiedSlice(): void
+    {
+        $unifiedDir = $this->pmssMakeTempDir('pmss-web-cgroup-unified-');
+        $v1Dir = $this->pmssMakeTempDir('pmss-web-cgroup-v1-');
+        $this->pmssWriteFile($unifiedDir.'/cgroup.controllers', "\n");
+        $this->pmssWriteFile($unifiedDir.'/memory.stat', "anon 99\n");
+        $this->pmssWriteFile($unifiedDir.'/memory.pressure', "some avg10=2.00\n");
+        $this->pmssWriteFile($v1Dir.'/memory.stat', "total_rss 42\n");
+
+        $this->assertSame($v1Dir, \pmssWebCgroupMemoryStatusDetectDir([
+            'uid' => 1234,
+            'cgroup_dir_candidates' => [$unifiedDir, $v1Dir],
+        ]));
+    }
+
     public function testSharedCustomerFileReadersKeepSymlinkAndMapContracts(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-web-cgroup-');
@@ -172,6 +187,22 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->pmssAssertArraySubsetSame(['throttle_events' => null, 'status' => 'HIGH'], $status);
     }
 
+    public function testReadIgnoresPsiFromCgroupV1MemoryController(): void
+    {
+        $dir = $this->writeMemoryStatusFixture(
+            '1073741824', '4294967296', '8589934592', "high 0\n",
+            "some avg10=2.00 avg60=2.00 avg300=2.00 total=1\nfull avg10=1.00 avg60=1.00 avg300=1.00 total=1\n"
+        );
+        $this->pmssWriteFile($dir.'/memory.stat', "total_rss 1073741824\ntotal_cache 0\n");
+
+        unlink($dir.'/cgroup.controllers');
+        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234]);
+
+        $this->assertSame(null, $status['pressure_some_avg10']);
+        $this->assertSame(null, $status['pressure_full_avg10']);
+        $this->assertSame('LOW', $status['status']);
+    }
+
     public function testCustomerPanelsOmitUnavailableThrottleEventCount(): void
     {
         $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/www/webCgroupMemoryStatus.php', [
@@ -231,6 +262,14 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->assertSame('/sys/fs/cgroup/memory/user.slice/user-1234.slice/memory.stat', $paths[2]);
     }
 
+    public function testMemoryStatCandidatePathsKeepUidFallbackAfterExplicitSlice(): void
+    {
+        $paths = \pmssWebCgroupMemoryStatusMemoryStatCandidatePaths(1234, '/sys/fs/cgroup/unified/user.slice/user-1234.slice');
+
+        $this->assertSame('/sys/fs/cgroup/unified/user.slice/user-1234.slice/memory.stat', $paths[0]);
+        $this->assertTrue(in_array('/sys/fs/cgroup/memory/user.slice/user-1234.slice/memory.stat', $paths, true));
+    }
+
     private function assertClassifiesAs(string $expected, array $overrides): void
     {
         $this->assertSame($expected, \pmssWebCgroupMemoryStatusClassify(array_replace([
@@ -253,6 +292,8 @@ class WebCgroupMemoryStatusTest extends TestCase
     ): string
     {
         $dir = $this->pmssMakeTempDir('pmss-web-cgroup-');
+        $this->pmssWriteFile($dir.'/cgroup.controllers', "memory\n");
+        $this->pmssWriteFile($dir.'/memory.stat', "anon {$current}\nfile 0\n");
         foreach (['current' => $current, 'high' => $high, 'max' => $max, 'events' => $events, 'pressure' => $pressure] as $name => $contents) {
             $this->pmssWriteFile($dir.'/memory.'.$name, rtrim((string) $contents, "\n")."\n");
         }
