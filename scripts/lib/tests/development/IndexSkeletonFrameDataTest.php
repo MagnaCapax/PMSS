@@ -258,6 +258,18 @@ class IndexSkeletonFrameDataTest extends TestCase
         }
     }
 
+    public function testRemoteDisabledRenderSkipsAutobrrConfigDirWithoutProxyFragment(): void
+    {
+        $home = $this->pmssMakeUserWebHome('pmss-index-autobrr-config-root-');
+        $this->pmssEnsureDir($home.'/.config/autobrr');
+
+        $html = $this->pmssRenderUserPanelIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+
+        foreach (['<a href="#autobrr"', "loadFrame('autobrr', '/public-alice/autobrr/')"] as $needle) {
+            $this->assertStringNotContainsString($needle, $html);
+        }
+    }
+
     public function testRemoteDisabledRenderSkipsTorrentFramesFromLocalConfigDirsWithoutEnableFlags(): void
     {
         $home = $this->pmssMakeUserWebHome('pmss-index-disabled-config-root-');

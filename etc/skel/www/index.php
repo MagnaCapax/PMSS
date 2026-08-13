@@ -251,7 +251,6 @@ function pmssLocalFrameInstalledAppFramesRead($homePath = '..')
         'qbittorrent' => array('signal' => '.config/qBittorrent', 'type' => 'dir'),
         'deluge'      => array('signal' => '.config/deluge',      'type' => 'dir'),
         'rclone'      => array('signal' => '.rclonePort',         'type' => 'file'),
-        'autobrr'     => array('signal' => '.config/autobrr',      'type' => 'dir'),
     );
 
     $home = rtrim($homePath, '/');
