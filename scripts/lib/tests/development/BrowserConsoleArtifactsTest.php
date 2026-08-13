@@ -81,15 +81,15 @@ class BrowserConsoleArtifactsTest extends TestCase
         $this->assertStringContainsString('stats.php', $src);
     }
 
-    public function testConsoleButtonRequiresLocalBackendArtifact(): void
+    public function testConsoleButtonRequiresLocalAndBackendArtifacts(): void
     {
         $src = $this->repoFile('etc/skel/www/info.php');
         // guiv may heal info.php before console.php reaches the same user tree;
-        // hide the buttons unless their target exists in this customer directory.
+        // hide the buttons unless both the launcher and system-wide backend exist.
         $this->assertMatches(
-            '/is_file\(__DIR__\s*\.\s*[\'"]\/console\.php[\'"]\)/',
+            '/is_file\(__DIR__\s*\.\s*[\'"]\/console\.php[\'"]\)\s*&&\s*is_file\([\'"]\/usr\/bin\/ttyd[\'"]\)/',
             $src,
-            'info.php must hide console buttons when console.php is not deployed locally'
+            'info.php must hide console buttons when the launcher or ttyd backend is absent'
         );
     }
 

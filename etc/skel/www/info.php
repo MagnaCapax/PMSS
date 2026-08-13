@@ -91,7 +91,7 @@ if (file_exists($pmssStorageHealthNoticeLib)) {
  ?>
 </div>
 
-<?php if (is_file(__DIR__ . '/console.php')): ?>
+<?php if (is_file(__DIR__ . '/console.php') && is_file('/usr/bin/ttyd')): ?>
 	<!-- GH #326 browser console (ADR 0031): additive; does not replace SSH/ruTorrent/file access. -->
 	<div id="pmss-console" style="margin-top:16px">
 	  <h2 style="margin:0 0 6px;font-size:1.1em">Shell console</h2>
