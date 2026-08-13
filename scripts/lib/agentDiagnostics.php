@@ -19,7 +19,10 @@ function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = 
         return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script path unsafe: '.$relativePath];
     }
 
-    $scriptRoot = pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT', dirname(__DIR__, 2));
+    // dirname(__DIR__, 1) = the PMSS script root (/scripts on production, .../PMSS/scripts in a dev checkout).
+    // dirname(__DIR__, 2) resolved to "/" on production (PMSS installs at /scripts), which the path-safety guard
+    // (correctly) rejects — breaking every php sub-script fleet-wide. Section paths below are relative to this root.
+    $scriptRoot = pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT', dirname(__DIR__, 1));
     if (!pmssPathSegmentsAreSafe($scriptRoot, false, false, true, true)) {
         return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script root unsafe: '.$scriptRoot];
     }
@@ -50,8 +53,19 @@ function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
             'proftpd' => ['type' => 'command', 'command' => 'systemctl is-active proftpd 2>/dev/null', 'format' => 'text', 'fallback' => 'unknown'],
             'cron' => ['type' => 'command', 'command' => 'systemctl is-active cron 2>/dev/null', 'format' => 'text', 'fallback' => 'unknown'],
             'ssh' => ['type' => 'command', 'command' => 'systemctl is-active ssh 2>/dev/null', 'format' => 'text', 'fallback' => 'unknown'],
-            'rtorrent_count' => ['type' => 'command', 'command' => 'pgrep -cx rtorrent 2>/dev/null', 'format' => 'int'],
+            // pgrep -cx misses PMSS rtorrent (its comm is "rtorrent main", not exact "rtorrent"), returning 0
+            // on healthy hosts. Count via ps comm-name prefix instead (verified reliable 2026-07-11 + 2026-08-13).
+            'rtorrent_count' => ['type' => 'command', 'command' => 'ps -eo comm= 2>/dev/null | grep -c ^rtorrent', 'format' => 'int'],
             'lighttpd_count' => ['type' => 'command', 'command' => 'pgrep -cx lighttpd 2>/dev/null', 'format' => 'int'],
+        ],
+        'system' => [
+            // Host-level saturation signals. These are plain command reads (NOT the php-script path), so they
+            // survive even when the util sub-scripts fail the script-root guard — the single most important
+            // signal (is the host saturated?) must never depend on systemTest.php succeeding.
+            'loadavg' => ['type' => 'command', 'command' => 'cat /proc/loadavg 2>/dev/null', 'format' => 'text', 'fallback' => 'unknown'],
+            'psi_io' => ['type' => 'command', 'command' => 'cat /proc/pressure/io 2>/dev/null', 'format' => 'lines'],
+            'psi_cpu' => ['type' => 'command', 'command' => 'cat /proc/pressure/cpu 2>/dev/null', 'format' => 'lines'],
+            'stats_log_tail' => ['type' => 'command', 'command' => 'tail -6 /var/log/pmss/system-stats.log 2>/dev/null', 'format' => 'lines'],
         ],
         'cgroup' => [
             // Read-only cgroup-hierarchy + per-user-isolation posture probe (cgroup-v2 viability canary, GH #648).
@@ -73,17 +87,17 @@ function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
             'user_io_stat_sample' => ['type' => 'command', 'command' => 'cat /sys/fs/cgroup/user.slice/user-*.slice/io.stat 2>/dev/null | head -2', 'format' => 'lines'],
             'user_cpu_pressure_sample' => ['type' => 'command', 'command' => 'cat /sys/fs/cgroup/user.slice/user-*.slice/cpu.pressure 2>/dev/null | head -2', 'format' => 'lines'],
         ],
-        'system_test' => ['type' => 'php', 'path' => 'scripts/util/systemTest.php', 'args' => ['--json'], 'format' => 'json'],
+        'system_test' => ['type' => 'php', 'path' => 'util/systemTest.php', 'args' => ['--json'], 'format' => 'json'],
         'users' => [
-            'list' => ['type' => 'php', 'path' => 'scripts/listUsers.php', 'format' => 'lines'],
-            'consistency' => ['type' => 'php', 'path' => 'scripts/util/checkUsers.php', 'args' => ['--json'], 'format' => 'json'],
+            'list' => ['type' => 'php', 'path' => 'listUsers.php', 'format' => 'lines'],
+            'consistency' => ['type' => 'php', 'path' => 'util/checkUsers.php', 'args' => ['--json'], 'format' => 'json'],
         ],
-        'resources' => ['type' => 'php', 'path' => 'scripts/util/userResourcesList.php', 'args' => ['--full', '--json'], 'format' => 'json'],
-        'traffic' => ['type' => 'php', 'path' => 'scripts/showTraffic.php', 'args' => ['--json'], 'format' => 'json'],
+        'resources' => ['type' => 'php', 'path' => 'util/userResourcesList.php', 'args' => ['--full', '--json'], 'format' => 'json'],
+        'traffic' => ['type' => 'php', 'path' => 'showTraffic.php', 'args' => ['--json'], 'format' => 'json'],
     ];
     if ($user !== '') {
         $userArg = escapeshellarg($user);
-        $sections['user_settings'] = ['type' => 'php', 'path' => 'scripts/userSetting.php', 'args' => ['view', $user], 'format' => 'json'];
+        $sections['user_settings'] = ['type' => 'php', 'path' => 'userSetting.php', 'args' => ['view', $user], 'format' => 'json'];
         $sections['user_processes'] = ['type' => 'command', 'command' => 'pgrep -u '.$userArg.' -a 2>/dev/null', 'format' => 'lines'];
         foreach ([
             'user_identity' => 'id '.$userArg,
@@ -210,7 +224,7 @@ function pmssAgentDiagnosticsMain(array $argv): int
     $user = trim((string) pmssCliOption($parsed, 'user', 'u', ''));
     if ($user !== '') {
         $selection = pmssManagedUsersSelectFromCommand(
-            pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT', dirname(__DIR__, 2)).'/scripts/listUsers.php',
+            pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT', dirname(__DIR__, 1)).'/listUsers.php',
             $user,
             ['strictInput' => true]
         );
