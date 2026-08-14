@@ -29,18 +29,35 @@ function pmssSystemdUnitIsEnabled(string $unit): ?bool { return pmssSystemdUnitQ
 function pmssCgroupMode(): string
 {
     if (($override = getenv('PMSS_CGROUP_MODE')) === 'v1' || $override === 'v2') return $override;
-    // The kernel-boot v1 pin is authoritative and MUST be checked first (#707): a host
-    // booted with systemd.unified_cgroup_hierarchy=0 is v1 even though systemd still mounts
-    // a hybrid cgroup2 controller at /sys/fs/cgroup/unified. The previous
-    // "cgroup2 anywhere in mountinfo" probe matched that hybrid mount and misdetected
-    // genuinely-v1 hosts as v2, routing per-user I/O metering to the systemd UINT64_MAX
-    // sentinel path (zero I/O stats fleet-wide).
-    if (strpos(pmssReadRegularFileContents('/proc/cmdline') ?? '', 'systemd.unified_cgroup_hierarchy=0') !== false) return 'v1';
+    // Gather the raw signals here; the decision itself is a pure, testable helper (#707).
+    return pmssCgroupModeFromSignals(
+        pmssReadRegularFileContents('/proc/cmdline'),
+        is_file('/sys/fs/cgroup/cgroup.controllers'),
+        glob('/sys/fs/cgroup/*', GLOB_ONLYDIR) ?: []
+    );
+}
+
+/**
+ * Pure cgroup-mode decision from gathered signals — no filesystem access, so it is unit-testable
+ * (the real detection paths were previously untested; #707).
+ *
+ * @param string|null       $cmdline           contents of /proc/cmdline (null when unreadable)
+ * @param bool              $controllersAtRoot is /sys/fs/cgroup/cgroup.controllers a file?
+ * @param array<int,string> $cgroupDirs        top-level directories under /sys/fs/cgroup
+ */
+function pmssCgroupModeFromSignals(?string $cmdline, bool $controllersAtRoot, array $cgroupDirs): string
+{
+    // The kernel-boot v1 pin is authoritative and MUST be checked FIRST: a host booted with
+    // systemd.unified_cgroup_hierarchy=0 is v1 even though systemd still mounts a hybrid cgroup2
+    // controller at /sys/fs/cgroup/unified. The previous "cgroup2 anywhere in mountinfo" probe
+    // matched that hybrid mount and misdetected genuinely-v1 hosts as v2, routing per-user I/O
+    // metering to the systemd UINT64_MAX sentinel path (zero I/O stats fleet-wide).
+    if (strpos($cmdline ?? '', 'systemd.unified_cgroup_hierarchy=0') !== false) return 'v1';
     // Genuine unified v2 exposes cgroup.controllers at the hierarchy ROOT; a v1-hybrid host
-    // exposes cgroup2 only under /sys/fs/cgroup/unified, never at root. Require it at root
-    // (not "anywhere in mountinfo") so the hybrid /unified mount cannot force a false v2.
-    if (is_file('/sys/fs/cgroup/cgroup.controllers')) return 'v2';
-    foreach (glob('/sys/fs/cgroup/*', GLOB_ONLYDIR) ?: [] as $dir) if (basename($dir) !== 'unified') return 'v1';
+    // exposes cgroup2 only under /sys/fs/cgroup/unified, never at root. Require it at root (not
+    // "anywhere in mountinfo") so the hybrid /unified mount cannot force a false v2.
+    if ($controllersAtRoot) return 'v2';
+    foreach ($cgroupDirs as $dir) if (basename($dir) !== 'unified') return 'v1';
     return 'unknown';
 }
 

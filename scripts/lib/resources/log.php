@@ -185,14 +185,23 @@ function pmssResourceLogReadCountersV1(int $uid, ?string $cgroupRoot = null): ?a
     // from the SAME accounting family the bytes came from, and record io_source so the delta
     // path can reseed the baseline on a source switch, avoiding a phantom first delta (#707).
     $blkioSlice = $root.'/blkio'.$slice;
-    if (($bytes = pmssResourceLogReadBlkioBytesWithSource($blkioSlice, 'blkio.bfq.io_service_bytes', 'blkio.throttle.io_service_bytes')) !== null) {
-        $values['io_read'] = $bytes['read'];
-        $values['io_write'] = $bytes['write'];
-        $values['io_source'] = $bytes['source'];
+    $bytes = pmssResourceLogReadBlkioBytesWithSource($blkioSlice, 'blkio.bfq.io_service_bytes', 'blkio.throttle.io_service_bytes');
+    if ($bytes !== null) {
+        // ATOMIC io group: bytes, ops, AND io_source are recorded together or not at all. If the
+        // ops file is transiently unreadable, omit the WHOLE io sample rather than store a partial
+        // baseline (io_source set + io_*_ops=0). A partial baseline would let the ops cumulative
+        // flow as an unguarded phantom delta on recovery — the source is unchanged, so the §0
+        // reseed guard (keyed on io_source) would NOT fire — risking a spurious IOPS throttle.
+        // Safe: on a BFQ host both bfq.* files are exposed together (CONFIG_BFQ_CGROUP_DEBUG), so
+        // "bytes present, ops absent" is only a transient read failure, never a steady state.
         $opsFile = $bytes['source'] === 'bfq' ? 'blkio.bfq.io_serviced' : 'blkio.throttle.io_serviced';
-        if (($ops = pmssResourceLogReadBlkioReadWrite($blkioSlice.$opsFile)) !== null) {
+        $ops = pmssResourceLogReadBlkioReadWrite($blkioSlice.$opsFile);
+        if ($ops !== null) {
+            $values['io_read'] = $bytes['read'];
+            $values['io_write'] = $bytes['write'];
             $values['io_read_ops'] = $ops['read'];
             $values['io_write_ops'] = $ops['write'];
+            $values['io_source'] = $bytes['source'];
         }
     }
 

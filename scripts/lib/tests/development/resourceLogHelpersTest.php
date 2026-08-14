@@ -123,6 +123,26 @@ class ResourceLogHelpersTest extends TestCase
         });
     }
 
+    public function testReadCountersV1OmitsIoGroupWhenOpsCounterMissing(): void
+    {
+        // #707 §0 completeness: if the bytes file reads but the ops (io_serviced) file is ABSENT,
+        // the whole io group (bytes + ops + io_source) must be OMITTED — never a partial baseline.
+        // A partial baseline (io_source set, io_*_ops=0) would let the ops cumulative phantom-delta
+        // through the source-keyed reseed guard on recovery, risking a spurious IOPS throttle.
+        $slice = 'user.slice/user-1000.slice';
+        $root = $this->makeV1CgroupTree(1000, [
+            'cpuacct/'.$slice.'/cpuacct.usage' => "42\n",
+            'blkio/'.$slice.'/blkio.bfq.io_service_bytes' => "8:0 Read 9000\n8:0 Write 8000\nTotal 17000\n",
+            // NO blkio.bfq.io_serviced -> ops read fails -> whole io group omitted.
+        ]);
+        $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
+            $counters = \pmssResourceLogReadCounters(1000, $root);
+            $this->assertSame(['cpu_nsec' => 42], $counters);
+            $this->assertTrue(!array_key_exists('io_read', $counters));
+            $this->assertTrue(!array_key_exists('io_source', $counters));
+        });
+    }
+
     public function testReadCountersV1OmitsMissingFieldsWithoutGarbage(): void
     {
         $slice = 'user.slice/user-1000.slice';
