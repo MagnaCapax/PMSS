@@ -227,7 +227,7 @@ class CgroupUserConfigTest extends TestCase
 
     public function testApplyWipePropagatesRevertFailure(): void
     {
-        $steps = [];
+        /** @var array<int, array{string, string}> $steps */ $steps = [];
         $this->mgr = new Manager($this->sys, static function (string $description, string $command) use (&$steps): int {
             $steps[] = [$description, $command];
             return $description === 'Reverting user slice' ? 1 : 0;

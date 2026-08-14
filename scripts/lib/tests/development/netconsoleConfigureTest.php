@@ -41,7 +41,7 @@ class NetconsoleConfigureTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-netconsole-reachable-');
         file_put_contents($dir.'/netconsole', '6665@192.0.2.10/eth0,6666@192.0.2.20/aa:bb:cc:dd:ee:ff');
-        $calls = [];
+        /** @var array<int, array{string, string}> $calls */ $calls = [];
 
         $this->pmssWithEnv($this->netconsoleEnv($dir), function () use (&$calls): void {
             \pmssNetconsoleConfigure(function (): void {

@@ -177,7 +177,7 @@ foreach ($users as $user) {
         continue;
     }
 
-    if (!empty($rtorrentPids) && count($rtorrentPids) === 1) {
+    if (count($rtorrentPids) === 1) {
         // Helper owns legacy restart marker: rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);
         pmssCheckRtorrentHandleAliveProcess(
             $user,
