@@ -28,7 +28,19 @@ function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = 
     }
 
     $scriptPath = $scriptRoot.'/'.$relativePath;
-    if (!is_file($scriptPath) || !is_readable($scriptPath)) return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script missing or unreadable: '.$relativePath];
+    $reportedPath = $relativePath;
+    $scriptRootOverride = getenv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT');
+    $hasRepositoryRootOverride = is_string($scriptRootOverride) && $scriptRootOverride !== '';
+    if ($hasRepositoryRootOverride && !is_file($scriptPath) && strpos($relativePath, 'scripts/') !== 0) {
+        $repositoryScriptPath = $scriptRoot.'/scripts/'.$relativePath;
+        if (is_file($repositoryScriptPath)) {
+            $scriptPath = $repositoryScriptPath;
+            $reportedPath = 'scripts/'.$relativePath;
+        } elseif (is_dir($scriptRoot.'/scripts')) {
+            $reportedPath = 'scripts/'.$relativePath;
+        }
+    }
+    if (!is_file($scriptPath) || !is_readable($scriptPath)) return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script missing or unreadable: '.$reportedPath];
     // Use 'php' from $PATH instead of PHP_BINARY — consistent with update.php (GH#589).
     $command = escapeshellarg('php').' '.escapeshellarg($scriptPath);
     foreach ($arguments as $argument) {
@@ -223,11 +235,18 @@ function pmssAgentDiagnosticsMain(array $argv): int
 
     $user = trim((string) pmssCliOption($parsed, 'user', 'u', ''));
     if ($user !== '') {
-        $selection = pmssManagedUsersSelectFromCommand(
-            pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT', dirname(__DIR__, 1)).'/listUsers.php',
-            $user,
-            ['strictInput' => true]
-        );
+        $listUsersResult = pmssAgentDiagnosticsPhpScript('listUsers.php');
+        $listUsersExitCode = (int) ($listUsersResult['rc'] ?? 1);
+        if ($listUsersExitCode !== 0) {
+            fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
+            return $listUsersExitCode;
+        }
+        $listUsersLines = preg_split('/\r?\n/', trim((string) ($listUsersResult['stdout'] ?? '')));
+        if (!is_array($listUsersLines) || pmssManagedUsersOutputHasDiagnostics($listUsersLines)) {
+            fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
+            return 1;
+        }
+        $selection = pmssManagedUsersSelectFromList($listUsersLines, $user, ['strictInput' => true]);
         if ((int) $selection['exitCode'] !== 0) return (int) $selection['exitCode'];
         $user = (string) $selection['username'];
     }

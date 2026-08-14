@@ -36,7 +36,7 @@ final class agentDiagnosticsCliTest extends TestCase
         $payload = $this->pmssDecodeJsonArray($output);
 
         $this->assertSame(
-            ['motd', 'storage', 'services', 'cgroup', 'system_test', 'users', 'resources', 'traffic', 'user_settings', 'user_processes', 'user_identity', 'user_quota', 'user_disk'],
+            ['motd', 'storage', 'services', 'system', 'cgroup', 'system_test', 'users', 'resources', 'traffic', 'user_settings', 'user_processes', 'user_identity', 'user_quota', 'user_disk'],
             array_keys($payload['sections'])
         );
         $this->assertSame(
@@ -225,6 +225,7 @@ final class agentDiagnosticsCliTest extends TestCase
         return $this->pmssWriteExecutableFiles($binDir, [
             'df' => "#!/bin/sh\nprintf 'Filesystem Size Used Avail Use%% Mounted on\\n/dev/md0 100G 10G 90G 10%% /home\\n'\n",
             'systemctl' => "#!/bin/sh\nprintf 'active\\n'\n",
+            'ps' => "#!/bin/sh\nprintf 'rtorrent main\\nrtorrent main\\nrtorrent main\\nrtorrent main\\n'\n",
             'pgrep' => "#!/bin/sh\nif [ \"$1\" = '-cx' ]; then\n  if [ \"$2\" = 'rtorrent' ]; then printf '4\\n'; else printf '2\\n'; fi\n  exit 0\nfi\nprintf 'pid1 rtorrent\\n'\n",
             'id' => "#!/bin/sh\nprintf 'uid=1001(alice) gid=1001(alice) groups=1001(alice)\\n'\n",
             'quota' => "#!/bin/sh\nprintf 'Disk quotas for user alice\\n'\n",
