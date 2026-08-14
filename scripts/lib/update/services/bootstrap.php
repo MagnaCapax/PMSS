@@ -58,6 +58,10 @@ function pmssConfigureQuotaMount(?callable $logger = null): void
 
     $mount = trim(pmssResolvePathFromEnv('PMSS_QUOTA_MOUNT', '/home'));
     pmssEnsureQuotaOptions($mount, null, $log);
+    // Default ext4 journal commit interval (60s vs the 5s ext4 default) — batches jbd2 commits to
+    // ease RAID5 write-convoy contention on shared seedbox hosts. The remount below applies it live
+    // (commit= is remount-able). Skippable via PMSS_SKIP_QUOTA (same gate that guards this whole step).
+    pmssEnsureJournalCommitOption($mount, 60, $log);
     if (!is_dir($mount)) {
         $log('[WARN] Skipping remount for '.$mount.' (mount path not found)');
         return;

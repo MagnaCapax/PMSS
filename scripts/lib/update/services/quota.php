@@ -49,6 +49,44 @@ function pmssEnsureQuotaOptions(string $mountPoint, ?array $requiredOptions = nu
 }
 
 /**
+ * Ensure the given mount point in /etc/fstab carries an ext4 journal commit interval.
+ *
+ * A longer commit interval (default 60s vs the ext4 default 5s) batches journal commits, easing
+ * jbd2 write-convoy contention on shared RAID5 seedbox hosts. `commit=` is remount-able, so
+ * pmssConfigureQuotaMount's remount applies it live — no reboot needed. Uses the same
+ * backup-protected fstab helpers as pmssEnsureQuotaOptions.
+ *
+ * NOTE: `data=writeback` is deliberately NOT set here. It trades crash-consistency for speed and
+ * requires a reboot to take effect — an operator policy decision, not an automatic default.
+ */
+function pmssEnsureJournalCommitOption(string $mountPoint, int $seconds = 60, ?callable $logger = null, ?string $fstabPath = null): void
+{
+    $log = $logger ?: 'logMessage';
+    if ($mountPoint === '' || $seconds < 1) {
+        return;
+    }
+    $fstab = $fstabPath ?? '/etc/fstab';
+    $lines = pmssFstabLinesRead($fstab, $log, 'journal commit configuration.');
+    if ($lines === null) {
+        return;
+    }
+
+    $option = 'commit='.$seconds;
+    $plan = pmssFstabMountOptionsEnsure($lines, $mountPoint, [$option], [], true, null, ['commit=' => $option]);
+    if ($plan === null) {
+        $log('[WARN] Mount point '.$mountPoint.' not found in '.$fstab.'; skipping journal commit update.');
+        return;
+    }
+    if (!$plan['changed']) {
+        $log('[SKIP] Journal commit option already present for '.$mountPoint);
+        return;
+    }
+
+    $log('[WARN] Updated journal commit option for '.$mountPoint.pmssFstabPlanChangeSuffix($plan));
+    pmssWriteManagedPathFileWithBackup($fstab, $lines, 'fstab', $log, true);
+}
+
+/**
  * Warn if quota state files under the mount point have unexpected names.
  *
  * ext4 journaled quotas expect `aquota.user` and `aquota.group`. Garbage
