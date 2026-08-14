@@ -34,9 +34,14 @@
     sharedscripts
 }
 
+# Performance-metric logs: keep ALL history, effectively forever, uncompressed.
+# rotate 9999 = logrotate has no "infinite" keyword; a huge finite count never
+# deletes within any realistic node lifetime (operator directive 2026-08-14:
+# "keep them all on server side", ADR 0044). maxsize is a file-SPLITTER only
+# (forces rotation into a new file) — it never deletes data.
 /var/log/pmss/system-stats.log {
     yearly
-    rotate 100
+    rotate 9999
     maxsize 1G
     missingok
     notifempty
@@ -47,7 +52,7 @@
 
 /var/log/pmss/iostat-history.log {
     yearly
-    rotate 100
+    rotate 9999
     maxsize 1G
     missingok
     notifempty
@@ -57,8 +62,8 @@
 
 /var/log/pmss/iostat-history-raw.log {
     yearly
-    rotate 10
-    maxsize 512M
+    rotate 9999
+    maxsize 1G
     missingok
     notifempty
     nocompress
@@ -78,57 +83,55 @@
     sharedscripts
 }
 
+# Performance/storage-metric logs: keep ALL history forever, uncompressed
+# (operator directive 2026-08-14, ADR 0044). rotate 9999 = effectively unlimited;
+# maxsize (where present) is a non-deleting file-splitter only.
 /var/log/pmss/quota-daily.log {
     monthly
-    rotate 24
+    rotate 9999
     missingok
     notifempty
-    compress
-    delaycompress
+    nocompress
     create 0600 root root
 }
 
 /var/log/pmss/resource-daily.log {
     monthly
-    rotate 24
+    rotate 9999
     missingok
     notifempty
-    compress
-    delaycompress
+    nocompress
     create 0600 root root
 }
 
 /var/log/pmss/metrics/* {
     daily
-    rotate 14
+    rotate 9999
     missingok
     notifempty
-    compress
-    delaycompress
+    nocompress
     nocreate
     maxsize 50M
 }
 
 /var/log/pmss/process-snapshot.log {
     weekly
-    rotate 8
+    rotate 9999
     minsize 1M
     maxsize 128M
     missingok
     notifempty
-    compress
-    delaycompress
+    nocompress
     copytruncate
     create 0600 root root
 }
 
 /var/log/pmss/storage-health.jsonl /var/log/pmss/storageHealthSnapshot.log {
     daily
-    rotate 30
+    rotate 9999
     missingok
     notifempty
-    compress
-    delaycompress
+    nocompress
     create 0600 root root
 }
 

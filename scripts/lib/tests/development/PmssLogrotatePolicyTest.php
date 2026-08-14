@@ -30,35 +30,55 @@ class PmssLogrotatePolicyTest extends TestCase
         );
     }
 
-    public function testSystemStatsLogPersistsUncompressedLongTerm(): void
+    public function testSystemStatsLogPersistsUncompressedForever(): void
     {
         // The richest per-server metric log (full PSI vector + ioping + mem/disk, 5-min
-        // cadence) must be retained long-term and UNCOMPRESSED so trend/forensic history
-        // stays directly greppable. Regression lock against re-introducing a short
-        // retention cap or compression (operator directive 2026-08-14; ADR 0044).
+        // cadence) must be retained AS LONG AS POSSIBLE (rotate 9999 = effectively
+        // unlimited) and UNCOMPRESSED so trend/forensic history stays directly greppable.
+        // Regression lock against re-introducing ANY retention cap or compression
+        // (operator directive 2026-08-14 "keep them all on server side"; ADR 0044).
         $this->pmssAssertRepoFileMatches(
             'etc/seedbox/config/template.logrotate.pmss',
-            '#/var/log/pmss/system-stats\.log\s*\{[^}]*yearly[^}]*rotate 100[^}]*maxsize 1G[^}]*nocompress[^}]*copytruncate#s',
-            'system-stats.log must persist long-term, uncompressed, size-bounded'
+            '#/var/log/pmss/system-stats\.log\s*\{[^}]*rotate 9999[^}]*nocompress[^}]*copytruncate#s',
+            'system-stats.log must persist forever (rotate 9999), uncompressed'
         );
     }
 
-    public function testDiskIostatHistoryLogsPersistUncompressedLongTerm(): void
+    public function testDiskIostatHistoryLogsPersistUncompressedForever(): void
     {
-        // Parsed structured metrics — retained long-term, uncompressed (ADR 0044).
+        // Both parsed metrics and the fat raw forensic dump retained forever, uncompressed
+        // (ADR 0044). maxsize stays as a non-deleting file-splitter, not a retention cap.
         $this->pmssAssertRepoFileMatches(
             'etc/seedbox/config/template.logrotate.pmss',
-            '#/var/log/pmss/iostat-history\.log\s*\{[^}]*yearly[^}]*rotate 100[^}]*maxsize 1G[^}]*nocompress[^}]*create 0644 root root#s',
-            'iostat-history.log must persist long-term, uncompressed, size-bounded'
+            '#/var/log/pmss/iostat-history\.log\s*\{[^}]*rotate 9999[^}]*nocompress[^}]*create 0644 root root#s',
+            'iostat-history.log must persist forever (rotate 9999), uncompressed'
         );
+        $this->pmssAssertRepoFileMatches(
+            'etc/seedbox/config/template.logrotate.pmss',
+            '#/var/log/pmss/iostat-history-raw\.log\s*\{[^}]*rotate 9999[^}]*nocompress[^}]*create 0644 root root#s',
+            'iostat-history-raw.log must persist forever (rotate 9999), uncompressed'
+        );
+    }
 
-        // Fat raw forensic dump — uncompressed but disk-bounded (Munger backstop: a
-        // pathological node must not fill /var/log). ~2GB worst-case (ADR 0044).
-        $this->pmssAssertRepoFileMatches(
-            'etc/seedbox/config/template.logrotate.pmss',
-            '#/var/log/pmss/iostat-history-raw\.log\s*\{[^}]*yearly[^}]*rotate 10[^}]*maxsize 512M[^}]*nocompress[^}]*create 0644 root root#s',
-            'iostat-history-raw.log must persist uncompressed but disk-bounded'
-        );
+    public function testAllPerformanceMetricLogsPersistUncappedUncompressed(): void
+    {
+        // Operator directive 2026-08-14: ALL performance/storage metric logs kept as long
+        // as possible, uncompressed — not just the iostat/system-stats pair (ADR 0044).
+        // Regression lock the rest of the metric set so a short cap cannot creep back in.
+        foreach ([
+            '/var/log/pmss/metrics/*',
+            '/var/log/pmss/storage-health.jsonl /var/log/pmss/storageHealthSnapshot.log',
+            '/var/log/pmss/resource-daily.log',
+            '/var/log/pmss/quota-daily.log',
+            '/var/log/pmss/process-snapshot.log',
+        ] as $stanzaHead) {
+            $pattern = '#'.preg_quote($stanzaHead, '#').'\s*\{[^}]*rotate 9999[^}]*nocompress#s';
+            $this->pmssAssertRepoFileMatches(
+                'etc/seedbox/config/template.logrotate.pmss',
+                $pattern,
+                $stanzaHead.' must persist uncapped (rotate 9999) and uncompressed'
+            );
+        }
     }
 
     public function testUpdateStep2RefreshesAndVerifiesLogrotatePolicy(): void

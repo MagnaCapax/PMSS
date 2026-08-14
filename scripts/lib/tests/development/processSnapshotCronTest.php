@@ -14,7 +14,7 @@ class ProcessSnapshotCronTest extends TestCase
             'scripts/cron/resourceSnapshot.php' => $snapshotHelperCase,
             'etc/seedbox/config/root.cron' => ['required' => ['/scripts/cron/processSnapshot.php']],
             'etc/seedbox/config/template.logrotate.pmss' => [
-                'required' => ['/var/log/pmss/process-snapshot.log', 'weekly', 'rotate 8', 'create 0600 root root'],
+                'required' => ['/var/log/pmss/process-snapshot.log', 'weekly', 'rotate 9999', 'create 0600 root root'],
             ],
         ]);
     }

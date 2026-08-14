@@ -74,11 +74,48 @@ no-compression principle to them is a separate operator decision.
 - Follow-up: none required; deploys fleet-wide via routine `update.php` (verbatim
   `install -m 0644` + `cmp -s` verify).
 
+## Amendment 2026-08-14 — retention is EFFECTIVELY UNLIMITED, and the policy covers ALL metric logs
+
+The first cut of this ADR still capped retention (`rotate 100`, and `rotate 10` on the
+raw log) and only touched three logs. The operator corrected it the same day (verbatim):
+"all the performance metrics should be collected as long as possible, not just 7 days or
+12 months ... we keep them all on server side. this was fully a premature ejaculation once
+fucking again." A `rotate N` count IS a deletion cap; `rotate 100`/`rotate 10` delete data
+the operator wants kept. Corrected decision:
+
+- **Retention = effectively unlimited: `rotate 9999`** on every performance/storage metric
+  log. logrotate has no "infinite" keyword and requires a finite count; 9999 intervals
+  never triggers deletion within any realistic node lifetime. `maxage` is NOT used (it
+  deletes by age — the opposite of "keep all"). `maxsize` (where present) is retained ONLY
+  as a file-SPLITTER (forces rotation into a new file); it never deletes data.
+- **Scope widened to all metric DATA logs:** system-stats.log, iostat-history.log,
+  iostat-history-raw.log, resource-daily.log, quota-daily.log, metrics/* (the graph-ready
+  per-user JSONL — was 14 days), storage-health.jsonl + storageHealthSnapshot.log (drive
+  health — was 30 days), process-snapshot.log. All → `rotate 9999` + `nocompress`.
+- **Explicitly OUT of scope (unchanged, operational not metrics):** pmss-update logs,
+  userDbCleanup.log, users.log/users.jsonl/user-home-reclaim.log, check*.log,
+  user/*.log + users/*.log, and the cron **stdout-capture** `*.log` files (cpuStat.log,
+  systemStatsLog.log, iostatLog.log, metricsLog.log, trafficStats.log, …). Note:
+  `trafficStats.log` is a cron stdout capture, NOT the traffic metric — the canonical
+  per-user traffic metric lives in `~/.trafficData` and hallinta `nodeUserTraffic`, neither
+  in this template — so it is deliberately left in its operational bundle.
+
+### Disk-cost accounting (Munger check — surfaced to operator)
+Uncompressed-forever, per-node /var/log growth is dominated by `metrics/*` (~1.4 GB/yr,
+scales with user count), then `iostat-history-raw.log` (~0.3 GB/yr) and `process-snapshot`
+(~0.1–0.5 GB/yr) → **~1.5–2 GB/yr/node total**. Safe on a normal root partition for well
+over a decade; realistic node lifetimes (3–5 yr) accumulate ~6–10 GB. **If /var/log
+pressure ever materializes on a small-root, very-long-lived node, the remedy is CAPACITY —
+bigger root, archive to the multi-TB /home array, or ship to hallinta — NEVER auto-deletion
+of performance history.** This is the operator's explicit, informed choice.
+
 ## References
 - Operator directive 2026-08-14 (verbatim): "7 day retention is premature ejaculation
   ... should be for ever"; "compression is another premature ejaculation ... no
-  compression initially"
+  compression initially"; "all the performance metrics should be collected as long as
+  possible ... we keep them all on server side. this was fully a premature ejaculation once
+  fucking again"
 - `etc/seedbox/config/template.logrotate.pmss`
 - `scripts/lib/tests/development/PmssLogrotatePolicyTest.php`
-- `scripts/cron/systemStatsLog.php`, `scripts/lib/diskIostat.php`
-- Prior policy commits: a1aa3e19 (Refs #163), 650405b2
+- `scripts/cron/systemStatsLog.php`, `scripts/lib/diskIostat.php`, `scripts/cron/metricsLog.php`
+- Prior policy commits: a1aa3e19 (Refs #163), 650405b2; first-cut capped policy 20b1a86c (this session)
