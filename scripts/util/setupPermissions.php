@@ -150,11 +150,10 @@ if (pmssPermissionTargetFileExists('/etc/seedbox/localnet')) {
 // Normalise permissions inside /etc/seedbox/config so templates stay readable without leaking secrets.
 $configDir = '/etc/seedbox/config';
 if (pmssPermissionTargetDirectoryExists($configDir)) {
-    // Secrets get a tighter mask; everything else falls back to group writable templates.
-    $restrictedFiles = [
-        $configDir . '/api.localKey'  => 0600,
-        $configDir . '/api.remoteKey' => 0600,
-    ];
+    // No committed secrets remain in /etc/seedbox/config: the dead api.* command-and-control
+    // family (config + generator setupApiKey.php + deleted consumer serverApi.php) was removed.
+    // If a live secret is reintroduced, add it here with a 0600 mask.
+    $restrictedFiles = [];
 
     $iterator = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($configDir, FilesystemIterator::SKIP_DOTS),
