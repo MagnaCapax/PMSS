@@ -35,25 +35,33 @@
 }
 
 /var/log/pmss/system-stats.log {
-    daily
-    rotate 7
-    minsize 1M
+    yearly
+    rotate 100
+    maxsize 1G
     missingok
     notifempty
-    compress
-    delaycompress
+    nocompress
     copytruncate
     sharedscripts
 }
 
-/var/log/pmss/iostat-history.log
-/var/log/pmss/iostat-history-raw.log {
-    monthly
-    rotate 12
-    compress
-    delaycompress
+/var/log/pmss/iostat-history.log {
+    yearly
+    rotate 100
+    maxsize 1G
     missingok
     notifempty
+    nocompress
+    create 0644 root root
+}
+
+/var/log/pmss/iostat-history-raw.log {
+    yearly
+    rotate 10
+    maxsize 512M
+    missingok
+    notifempty
+    nocompress
     create 0644 root root
 }
 

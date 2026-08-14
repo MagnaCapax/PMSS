@@ -30,12 +30,34 @@ class PmssLogrotatePolicyTest extends TestCase
         );
     }
 
-    public function testDiskIostatHistoryLogsPersistWithAnnualRetention(): void
+    public function testSystemStatsLogPersistsUncompressedLongTerm(): void
     {
+        // The richest per-server metric log (full PSI vector + ioping + mem/disk, 5-min
+        // cadence) must be retained long-term and UNCOMPRESSED so trend/forensic history
+        // stays directly greppable. Regression lock against re-introducing a short
+        // retention cap or compression (operator directive 2026-08-14; ADR 0044).
         $this->pmssAssertRepoFileMatches(
             'etc/seedbox/config/template.logrotate.pmss',
-            '#/var/log/pmss/iostat-history\.log\s+/var/log/pmss/iostat-history-raw\.log\s*\{[^}]*monthly[^}]*rotate 12[^}]*create 0644 root root#s',
-            'iostat history logs must persist outside tmpfs with annual rotation'
+            '#/var/log/pmss/system-stats\.log\s*\{[^}]*yearly[^}]*rotate 100[^}]*maxsize 1G[^}]*nocompress[^}]*copytruncate#s',
+            'system-stats.log must persist long-term, uncompressed, size-bounded'
+        );
+    }
+
+    public function testDiskIostatHistoryLogsPersistUncompressedLongTerm(): void
+    {
+        // Parsed structured metrics — retained long-term, uncompressed (ADR 0044).
+        $this->pmssAssertRepoFileMatches(
+            'etc/seedbox/config/template.logrotate.pmss',
+            '#/var/log/pmss/iostat-history\.log\s*\{[^}]*yearly[^}]*rotate 100[^}]*maxsize 1G[^}]*nocompress[^}]*create 0644 root root#s',
+            'iostat-history.log must persist long-term, uncompressed, size-bounded'
+        );
+
+        // Fat raw forensic dump — uncompressed but disk-bounded (Munger backstop: a
+        // pathological node must not fill /var/log). ~2GB worst-case (ADR 0044).
+        $this->pmssAssertRepoFileMatches(
+            'etc/seedbox/config/template.logrotate.pmss',
+            '#/var/log/pmss/iostat-history-raw\.log\s*\{[^}]*yearly[^}]*rotate 10[^}]*maxsize 512M[^}]*nocompress[^}]*create 0644 root root#s',
+            'iostat-history-raw.log must persist uncompressed but disk-bounded'
         );
     }
 
