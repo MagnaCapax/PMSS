@@ -121,6 +121,12 @@ pmssRun(sprintf(
     escapeshellarg("/home/{$thisUser}/.local")
 ));
 
+// Existing-home residue of the #781 skel-mode regression: served ~/www content was
+// copied carrying the exec bit. Strip exec from ~/www FILES (dirs are already normalised
+// to 0750 by the walk above). Bounded to ~/www so large payload trees under ~/data are
+// untouched; the explicit chmodItems below re-apply any file that legitimately keeps exec.
+pmssRun(sprintf('find %s -type f -perm /0111 -exec chmod a-x {} +', escapeshellarg("/home/{$thisUser}/www")));
+
 // Ensure ~/.bin and ~/bin exist with safe permissions and ownership.
 foreach ([
     ["/home/{$thisUser}/.bin", 'userPermissions: created ~/.bin with safe ownership'],
@@ -156,7 +162,8 @@ $chmodItems = [
     // The directory walk above already normalises nested data directories.
     // Avoid `chmod -R` on payload files so large homes do not time out here.
     ["/home/{$thisUser}/data", 0750],
-    ["/home/{$thisUser}/www", 0750, true],
+    // ~/www is normalised above (dirs 0750 via the home walk, files exec-stripped);
+    // a recursive 0750 here would re-add the exec bit to served data files (#781).
     ["/home/{$thisUser}/.*.php", 0750],
     ["/home/{$thisUser}/.lighttpd", 0775],
     ["/home/{$thisUser}/.lighttpd/.htpasswd", 0754],
