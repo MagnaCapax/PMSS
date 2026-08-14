@@ -148,6 +148,9 @@ $chmodItems = [
     ["/home/{$thisUser}/bin", 0750, true],
     ["/home/{$thisUser}/.viminfo", 0640],
     ["/home/{$thisUser}/.quota", 0640],
+    ["/home/{$thisUser}/.billingServiceId", 0640],
+    ["/home/{$thisUser}/.billingId", 0640],
+    ["/home/{$thisUser}/.billingClientId", 0640],
     ["/home/{$thisUser}/.profile", 0644],
     ["/home/{$thisUser}/.bash_history", 0640],
     ["/home/{$thisUser}/.bashrc", 0644],
@@ -183,6 +186,14 @@ $chownItems = [
     // NOTE: Avoid blanket chown -R on the whole home; exclude known root-owned files/dirs first.
     // The remaining tree is handled by a targeted find below.
     ["/home/{$thisUser}/.quota", "root:{$thisUser}"],
+    // Billing identity files: root-owned (user reads via group, cannot WRITE) so a user
+    // cannot forge their own service/client id. Mirrors .quota. Writers are root
+    // (recreateUser restore, mgmt-host backfill); order-time provisioning creates the file
+    // before the first permission refresh, and the service id is stable (no user rewrite).
+    // Root ownership closes the forgery at the source (GH #784).
+    ["/home/{$thisUser}/.billingServiceId", "root:{$thisUser}"],
+    ["/home/{$thisUser}/.billingId", "root:{$thisUser}"],
+    ["/home/{$thisUser}/.billingClientId", "root:{$thisUser}"],
     [$trafficPaths['normal'], "root:{$thisUser}"],
     [$trafficPaths['local'], "root:{$thisUser}"],
     [$trafficPaths['ingress'], "root:{$thisUser}"],
@@ -223,6 +234,9 @@ foreach ($chmodItems as $item) {
 $excludes = [
     "/home/{$thisUser}/.quota",
     "/home/{$thisUser}/.resourceData",
+    "/home/{$thisUser}/.billingServiceId",
+    "/home/{$thisUser}/.billingId",
+    "/home/{$thisUser}/.billingClientId",
     $trafficPaths['normal'],
     $trafficPaths['local'],
     $trafficPaths['ingress'],
