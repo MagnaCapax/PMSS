@@ -180,13 +180,20 @@ function pmssResourceLogReadCountersV1(int $uid, ?string $cgroupRoot = null): ?a
     if (($mem = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.usage_in_bytes')) !== null) $values['memory'] = $mem;
     if (($tasks = pmssResourceLogReadSysfsCounter($root.'/pids'.$slice.'pids.current')) !== null) $values['tasks'] = $tasks;
 
-    if (($bytes = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.throttle.io_service_bytes')) !== null) {
+    // Per-cgroup I/O accounting: prefer the BFQ file (real data under the fleet-default BFQ
+    // scheduler on rotational/md hosts), fall back to throttle for non-BFQ hosts. Read ops
+    // from the SAME accounting family the bytes came from, and record io_source so the delta
+    // path can reseed the baseline on a source switch, avoiding a phantom first delta (#707).
+    $blkioSlice = $root.'/blkio'.$slice;
+    if (($bytes = pmssResourceLogReadBlkioBytesWithSource($blkioSlice, 'blkio.bfq.io_service_bytes', 'blkio.throttle.io_service_bytes')) !== null) {
         $values['io_read'] = $bytes['read'];
         $values['io_write'] = $bytes['write'];
-    }
-    if (($ops = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.throttle.io_serviced')) !== null) {
-        $values['io_read_ops'] = $ops['read'];
-        $values['io_write_ops'] = $ops['write'];
+        $values['io_source'] = $bytes['source'];
+        $opsFile = $bytes['source'] === 'bfq' ? 'blkio.bfq.io_serviced' : 'blkio.throttle.io_serviced';
+        if (($ops = pmssResourceLogReadBlkioReadWrite($blkioSlice.$opsFile)) !== null) {
+            $values['io_read_ops'] = $ops['read'];
+            $values['io_write_ops'] = $ops['write'];
+        }
     }
 
     // v1 memory.stat uses rss/cache where v2 uses anon/file; map to the shared output keys.
@@ -223,6 +230,31 @@ function pmssResourceLogReadBlkioReadWrite(string $path): ?array
     }
 
     return $matched ? $totals : null;
+}
+
+/**
+ * Read v1 per-cgroup blkio Read/Write totals, preferring the BFQ accounting file.
+ *
+ * Under the fleet-default BFQ scheduler (rotational/md hosts) the real per-cgroup I/O lands
+ * in blkio.bfq.*; blkio.throttle.* exists but stays all-zero unless an explicit throttle
+ * policy is applied (#467/#707). "Whichever is non-null" is WRONG — the throttle file is
+ * present-but-zero under BFQ and would win, reproducing the zero-metering bug. Prefer bfq
+ * when it carries data; fall back to throttle for non-BFQ hosts (SSD/nvme) where the bfq
+ * file is absent. Returns the read source label so the delta path can guard a source switch.
+ *
+ * @return array{read:int,write:int,source:string}|null
+ */
+function pmssResourceLogReadBlkioBytesWithSource(string $blkioSliceDir, string $bfqFile, string $throttleFile): ?array
+{
+    $bfq = pmssResourceLogReadBlkioReadWrite($blkioSliceDir.$bfqFile);
+    if ($bfq !== null && ($bfq['read'] > 0 || $bfq['write'] > 0)) return $bfq + ['source' => 'bfq'];
+    $throttle = pmssResourceLogReadBlkioReadWrite($blkioSliceDir.$throttleFile);
+    if ($throttle !== null && ($throttle['read'] > 0 || $throttle['write'] > 0)) return $throttle + ['source' => 'throttle'];
+    // Both absent or genuinely zero: keep a stable source label from whichever file exists so
+    // an idle user does not thrash io_source (which would force a spurious reseed each sample).
+    if ($bfq !== null) return $bfq + ['source' => 'bfq'];
+    if ($throttle !== null) return $throttle + ['source' => 'throttle'];
+    return null;
 }
 
 /** Read one named field from a v1 memory.stat file. */
@@ -288,6 +320,9 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
         $state[$field] = array_key_exists($field, $counters) ? (int) $counters[$field] : 0;
     }
     foreach (pmssResourceMemoryBreakdownFieldMap() as $field) { array_key_exists($field, $counters) && $state[$field] = (int) $counters[$field]; }
+    // Persist which blkio accounting source the io_* counters came from (bfq/throttle), so the
+    // next interval can detect a source switch and reseed the baseline (phantom-delta guard).
+    if (array_key_exists('io_source', $counters)) { $state['io_source'] = (string) $counters['io_source']; }
 
     $result = pmssCounterStateUpdate(
         $statePath,
@@ -300,5 +335,18 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
             'io_write_ops' => PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_OPS,
         ]
     );
+
+    // Phantom-delta guard (#707 §0): the io_* counters feed live monthly-IOPS enforcement
+    // (pmssReadUserMonthlyIopsUsage -> io_read_ops/io_write_ops raw.month). When the accounting
+    // SOURCE changes — throttle->bfq on this fix, or a cgroup-mode flip changing systemd<->v1 —
+    // the stored baseline belonged to a different counter, so the raw delta would be the full
+    // cumulative and inflate the month total, risking a spurious /home IOPS throttle. On a
+    // source change, emit zero io_* deltas for this one sample; the new baseline is now stored,
+    // so subsequent intervals delta normally.
+    $previousSource = $result['previous_state']['io_source'] ?? null;
+    if ($previousSource !== ($state['io_source'] ?? null)) {
+        foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops'] as $field) { $result['delta'][$field] = 0; }
+    }
+
     return ['delta' => $result['delta'], 'state' => $state];
 }

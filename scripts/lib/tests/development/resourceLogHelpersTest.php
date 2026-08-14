@@ -90,11 +90,36 @@ class ResourceLogHelpersTest extends TestCase
                 'tasks' => 77,
                 'io_read' => 1500,
                 'io_write' => 2250,
+                'io_source' => 'throttle',
                 'io_read_ops' => 15,
                 'io_write_ops' => 22,
                 'memory_anon' => 3333,
                 'memory_file' => 4444,
             ], $counters);
+        });
+    }
+
+    public function testReadCountersV1PrefersBfqOverZeroThrottle(): void
+    {
+        // #707: under the BFQ scheduler the real per-cgroup I/O is in blkio.bfq.*, while
+        // blkio.throttle.* exists but reads all-zero. The selector MUST take bfq, not the
+        // present-but-zero throttle file (the bug where throttle-zero won).
+        $slice = 'user.slice/user-1000.slice';
+        $root = $this->makeV1CgroupTree(1000, [
+            'cpuacct/'.$slice.'/cpuacct.usage' => "550000\n",
+            'blkio/'.$slice.'/blkio.throttle.io_service_bytes' => "8:0 Read 0\n8:0 Write 0\nTotal 0\n",
+            'blkio/'.$slice.'/blkio.throttle.io_serviced' => "8:0 Read 0\n8:0 Write 0\nTotal 0\n",
+            'blkio/'.$slice.'/blkio.bfq.io_service_bytes' => "8:0 Read 9000\n8:0 Write 8000\nTotal 17000\n",
+            'blkio/'.$slice.'/blkio.bfq.io_serviced' => "8:0 Read 90\n8:0 Write 80\nTotal 170\n",
+        ]);
+
+        $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
+            $counters = \pmssResourceLogReadCounters(1000, $root);
+            $this->assertSame('bfq', $counters['io_source'] ?? null);
+            $this->assertSame(9000, $counters['io_read'] ?? null);
+            $this->assertSame(8000, $counters['io_write'] ?? null);
+            $this->assertSame(90, $counters['io_read_ops'] ?? null);
+            $this->assertSame(80, $counters['io_write_ops'] ?? null);
         });
     }
 

@@ -67,11 +67,17 @@ function pmssUserMetricsCollect(int $uid, ?string $cgroupRoot = null): array
     pmssMetricSet($m, 'pids_events_max', pmssResourceLogReadMemoryStatField($root.'/pids'.$slice.'pids.events', 'max'));
 
     // --- Block IO (blkio controller) ---
-    pmssMetricMergeReadWrite($m, 'io_bytes', pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.throttle.io_service_bytes'));
-    pmssMetricMergeReadWrite($m, 'io_ops', pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.throttle.io_serviced'));
-    pmssMetricMergeReadWrite($m, 'io_service_time_ns', pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.io_service_time'));
-    pmssMetricMergeReadWrite($m, 'io_wait_time_ns', pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.io_wait_time'));
-    pmssMetricMergeReadWrite($m, 'io_queued', pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.io_queued'));
+    // Prefer BFQ per-cgroup accounting (fleet-default scheduler on rotational/md hosts); fall
+    // back to throttle on non-BFQ hosts. Match ops to the same family the bytes came from (#707).
+    // (Raw cumulative telemetry — no delta/enforcement, so no source-reseed guard needed here.)
+    $ioBytes = pmssResourceLogReadBlkioBytesWithSource($root.'/blkio'.$slice, 'blkio.bfq.io_service_bytes', 'blkio.throttle.io_service_bytes');
+    pmssMetricMergeReadWrite($m, 'io_bytes', $ioBytes);
+    if ($ioBytes !== null) {
+        $opsFile = $ioBytes['source'] === 'bfq' ? 'blkio.bfq.io_serviced' : 'blkio.throttle.io_serviced';
+        pmssMetricMergeReadWrite($m, 'io_ops', pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.$opsFile));
+    }
+    // The CFQ-era blkio.io_service_time / io_wait_time / io_queued files do not exist under the
+    // BFQ or throttle policies on any current host (blk-mq); their reads were dead. Removed (#707).
 
     return $m;
 }
