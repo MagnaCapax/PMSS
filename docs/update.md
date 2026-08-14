@@ -214,6 +214,26 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
    iptables owner match; when unavailable `setupNetwork.php` skips those rules
    and logs to `/var/log/pmss/iptables.log`.
 
+### User dotfile hooks (`.bashrc.custom` / `.bashrc.user`)
+
+Step 9's per-user refresh force-syncs a fixed set of skeleton files into each home
+(`pmssUserApplySkeletonFiles()` in `scripts/lib/update/users/filesystem.php`), `.bashrc`
+among them. `updateUserFile()` (`scripts/lib/update.php`) SHA1-compares the tenant copy
+against the skeleton and overwrites it when they differ; a symlinked target is skipped. A
+tenant's hand-edit to `~/.bashrc` therefore does not persist — it is restored on the next run.
+
+Two `[ -f ]`-guarded hooks sourced at the END of `etc/skel/.bashrc` are NOT in the force-sync
+set and survive updates: `~/.bashrc.custom` (installer-managed — `install-media-stack.sh` writes
+its PATH/alias blocks here) and `~/.bashrc.user` (tenant-owned; permissions reserved by
+`scripts/util/userPermissions.php`). Neither exists by default. Both load after
+`pmss_normalize_path`, and only in interactive shells (skel `.bashrc` returns early on
+`[ -z "$PS1" ]`), so a `PATH` line in either runs after the deliberate system-paths-first
+ordering (Refs #153) and does not reach cron / non-interactive contexts.
+
+Editing `etc/skel/.bashrc` is fleet-wide: a syntax error breaks every tenant login. Gate any
+change with `bash -n etc/skel/.bashrc`. Customer-facing version: the wiki page "Shell
+customization on PMSS".
+
 Every shell command flows through `runStep()`, and non-shell module calls are
 wrapped by `pmssRunProfiledStep()`/`pmssRunProfiledCallable()` from
 `scripts/lib/update/runtime/profile.php` (plus classified wrapper helpers where
