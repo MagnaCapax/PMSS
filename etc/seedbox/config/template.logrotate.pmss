@@ -70,15 +70,17 @@
     create 0644 root root
 }
 
+# Service-watchdog / health-check history is observability: keep it forever, uncompressed
+# (operator directive 2026-08-14 "the other observability logs"; ADR 0044). maxsize 64M is a
+# non-deleting file-splitter, not a retention cap.
 /var/log/pmss/check*.log {
     monthly
-    rotate 7
+    rotate 9999
     minsize 1M
     maxsize 64M
     missingok
     notifempty
-    compress
-    delaycompress
+    nocompress
     copytruncate
     sharedscripts
 }

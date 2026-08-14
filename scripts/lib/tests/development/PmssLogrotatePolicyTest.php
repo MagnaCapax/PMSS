@@ -23,10 +23,12 @@ class PmssLogrotatePolicyTest extends TestCase
 
     public function testWatchdogLogsStayCoveredByCheckWildcard(): void
     {
+        // Watchdog/health-check history is observability: kept forever (rotate 9999),
+        // uncompressed, but size-bounded per-file by maxsize (ADR 0044).
         $this->pmssAssertRepoFileMatches(
             'etc/seedbox/config/template.logrotate.pmss',
-            '#/var/log/pmss/check\*\.log\s*\{[^}]*maxsize 64M[^}]*copytruncate#s',
-            'checkInstances and checkLighttpdInstances must stay size-bounded'
+            '#/var/log/pmss/check\*\.log\s*\{[^}]*rotate 9999[^}]*maxsize 64M[^}]*nocompress[^}]*copytruncate#s',
+            'check*.log must persist forever (rotate 9999), uncompressed, size-bounded'
         );
     }
 
