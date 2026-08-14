@@ -107,7 +107,12 @@ function pmssUserConfigLighttpdConfigureUser(
     );
     $resources = pmssLighttpdResourcePlan($props, $policyDefaults, pmssLighttpdUserConfigLoad($thisUser));
     $thisUserConfig = pmssLighttpdRenderUserConfig($template, $thisUser, $serverPort, $rclonePort, $qbittorrentPort, $resources);
-    if (!pmssWriteUserFile($homeDir.'/.lighttpd.conf', $thisUserConfig, $thisUser, 0741)) {
+    // Managed authoritative config (ADR-0032): root-owned + world-readable (0644) so the
+    // per-user lighttpd can read it but the user cannot edit it (edits belong in
+    // ~/.lighttpd/custom.d/). Only root-context callers (addUser, checkLighttpdInstances
+    // cron, userConfigLighttpd) write this — the user-context port-ensure paths write the
+    // client configs (qBittorrent.conf/deluge web.conf), never this file.
+    if (!pmssWriteUserFile($homeDir.'/.lighttpd.conf', $thisUserConfig, 'root', 0644)) {
         fwrite(STDERR, "[user:{$thisUser}] Failed to write .lighttpd.conf; skipping user\n");
         return;
     }

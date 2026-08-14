@@ -165,6 +165,7 @@ $chmodItems = [
     // ~/www is normalised above (dirs 0750 via the home walk, files exec-stripped);
     // a recursive 0750 here would re-add the exec bit to served data files (#781).
     ["/home/{$thisUser}/.*.php", 0750],
+    ["/home/{$thisUser}/.lighttpd.conf", 0644],
     ["/home/{$thisUser}/.lighttpd", 0775],
     ["/home/{$thisUser}/.lighttpd/.htpasswd", 0754],
     ["/home/{$thisUser}/.lighttpd/compress", 0770],
@@ -199,6 +200,7 @@ $chownItems = [
     // user (as "other") and would break login. Mirrors the .rtorrent.rc model.
     ["/home/{$thisUser}/.bashrc", "root:root"],
     ["/home/{$thisUser}/.profile", "root:root"],
+    ["/home/{$thisUser}/.lighttpd.conf", "root:root"],
 ];
 
 $trafficFiles = array_values($trafficPaths);
@@ -229,6 +231,7 @@ $excludes = [
     "/home/{$thisUser}/www/rutorrent/conf/config.php",
     "/home/{$thisUser}/.bashrc",
     "/home/{$thisUser}/.profile",
+    "/home/{$thisUser}/.lighttpd.conf",
 ];
 $findParts = [sprintf('find %s -mindepth 1', escapeshellarg("/home/{$thisUser}"))];
 // Prune ~/.local subtree to avoid noisy chown failures on application-managed trees (e.g. Docker).
