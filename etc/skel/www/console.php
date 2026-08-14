@@ -77,14 +77,39 @@ if (!$running) {
 
     // Start the shell in the customer's HOME. The per-user lighttpd (and its
     // php-cgi children) inherit cwd=/root from the root cron that starts them,
-    // so without this cd the console opens in an inaccessible /root. Fully
-    // detach so ttyd outlives this php-cgi request.
-    $spawn = 'cd '.escapeshellarg($home).' 2>/dev/null; '.$cmd.' </dev/null >/dev/null 2>&1';
-    @exec('setsid sh -c '.escapeshellarg($spawn).' >/dev/null 2>&1 &');
+    // so without this cd the console opens in an inaccessible /root. Keep
+    // ttyd diagnostics in the private lighttpd tree; they are surfaced only
+    // when the socket never appears, not as customer-session output.
+    $spawnLog = $home.'/.lighttpd/console-error.log';
+    $spawn = 'cd '.escapeshellarg($home).' 2>/dev/null || exit 1; '
+        .': > '.escapeshellarg($spawnLog).' 2>/dev/null || exit 1; '
+        .$cmd.' </dev/null >/dev/null 2>>'.escapeshellarg($spawnLog);
+    // Fully detach so ttyd outlives this php-cgi request. Capture outer-shell
+    // failures too: bare setsid does not propagate the child's exit status.
+    @exec('setsid sh -c '.escapeshellarg($spawn)
+        .' >/dev/null 2>>'.escapeshellarg($spawnLog).' &');
 
     // Give ttyd a moment to create the socket before the iframe hits the proxy.
     for ($i = 0; $i < 100 && !file_exists($sock); $i++) {
         usleep(20000); // up to ~2s
+    }
+
+    if (!file_exists($sock)) {
+        $spawnError = @file_get_contents($spawnLog);
+        $spawnError = is_string($spawnError) ? trim($spawnError) : '';
+        $spawnError = preg_replace('/[\r\n]+/', ' | ', $spawnError);
+        $spawnError = is_string($spawnError) ? substr($spawnError, -4096) : '';
+        error_log('[console] ttyd did not create console.sock.'
+            .($spawnError !== '' ? ' stderr: '.$spawnError : ''));
+
+        http_response_code(503);
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!doctype html><meta charset="utf-8"><title>Console unavailable</title>'
+            .'<body style="font-family:sans-serif;padding:2em;max-width:40em">'
+            .'<h2>Console temporarily unavailable</h2>'
+            .'<p>The browser shell could not be started. Please try again.</p>'
+            .'<p><a href="console.php">Try again</a></p></body>';
+        return;
     }
 }
 

@@ -65,6 +65,16 @@ class BrowserConsoleArtifactsTest extends TestCase
         $this->assertStringContainsString('--once', $src);
     }
 
+    public function testLauncherReportsSocketSpawnFailure(): void
+    {
+        $src = $this->repoFile('etc/skel/www/console.php');
+        // A failed detached spawn must not fall through to a guaranteed proxy 503.
+        $this->assertStringContainsString('console-error.log', $src);
+        $this->assertStringContainsString('error_log(', $src);
+        $this->assertStringContainsString('http_response_code(503)', $src);
+        $this->assertStringContainsString('Try again', $src);
+    }
+
     public function testProxyBlockUsesLoopbackSocketUpgrade(): void
     {
         $src = $this->repoFile('etc/seedbox/config/template.lighttpd');

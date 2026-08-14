@@ -65,7 +65,9 @@ Implement GH #326 as an **additive** browser console:
   re-spawned on next open.
 - **Privacy (MISSION #1).** Session I/O is **not** logged. GH #326's "tee output
   to a support log" idea is intentionally dropped — logging a customer's shell
-  is peeking. Only spawn *failures* reach the user's own lighttpd error log.
+  is peeking. Only spawn *failures* reach the user's own lighttpd error log;
+  `console.php` keeps detached ttyd stderr private and emits a generic retry page
+  when the socket is not created.
 
 ## Consequences
 - Positive: mobile-only customers (iPhone/Chromebook) gain shell access with no
