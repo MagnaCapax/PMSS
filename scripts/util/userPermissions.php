@@ -148,9 +148,9 @@ $chmodItems = [
     ["/home/{$thisUser}/bin", 0750, true],
     ["/home/{$thisUser}/.viminfo", 0640],
     ["/home/{$thisUser}/.quota", 0640],
-    ["/home/{$thisUser}/.profile", 0640],
+    ["/home/{$thisUser}/.profile", 0644],
     ["/home/{$thisUser}/.bash_history", 0640],
-    ["/home/{$thisUser}/.bashrc", 0640],
+    ["/home/{$thisUser}/.bashrc", 0644],
     ["/home/{$thisUser}/.bashrc.user", 0640],
     ["/home/{$thisUser}/.tmp", 0770],
     ["/home/{$thisUser}/.config", 0770, true],
@@ -193,6 +193,12 @@ $chownItems = [
     ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}/torrents", "{$thisUser}:{$thisUser}"],
     ["/home/{$thisUser}/.rtorrent.rc", "root:root"],
     ["/home/{$thisUser}/www/rutorrent/conf/config.php", "root:root"],
+    // Managed shell configs: root-owned + world-readable (0644) so the user can still
+    // SOURCE them but cannot edit — edits go in ~/.bashrc.user (sourced by .bashrc).
+    // 0644 (not 0640) is required: a root-owned .bashrc at 0640 is unreadable by the
+    // user (as "other") and would break login. Mirrors the .rtorrent.rc model.
+    ["/home/{$thisUser}/.bashrc", "root:root"],
+    ["/home/{$thisUser}/.profile", "root:root"],
 ];
 
 $trafficFiles = array_values($trafficPaths);
@@ -221,6 +227,8 @@ $excludes = [
     $trafficPaths['ingressLocal'],
     "/home/{$thisUser}/.rtorrent.rc",
     "/home/{$thisUser}/www/rutorrent/conf/config.php",
+    "/home/{$thisUser}/.bashrc",
+    "/home/{$thisUser}/.profile",
 ];
 $findParts = [sprintf('find %s -mindepth 1', escapeshellarg("/home/{$thisUser}"))];
 // Prune ~/.local subtree to avoid noisy chown failures on application-managed trees (e.g. Docker).

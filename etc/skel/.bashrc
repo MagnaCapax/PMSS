@@ -1,3 +1,11 @@
+# ============================================================================
+#  PULSED MEDIA — MANAGED FILE, DO NOT EDIT
+#  This file is owned by root and is REPLACED on every host/service update.
+#  Any change you make here will be silently reverted.
+#  Put your own shell customizations in  ~/.bashrc.user  — it is sourced
+#  automatically at the end of this file and is never overwritten.
+# ============================================================================
+
 # Keep newly-created files private before any early shell return.
 umask 077
 

@@ -1,3 +1,10 @@
+# ============================================================================
+#  PULSED MEDIA — MANAGED FILE, DO NOT EDIT
+#  This file is owned by root and is REPLACED on every host/service update.
+#  Any change here will be silently reverted. Put your customizations in
+#  ~/.bashrc.user  (sourced via ~/.bashrc, which this file sources on login).
+# ============================================================================
+
 # ~/.profile: executed by the command interpreter for login shells.
 # This file is not read by bash(1), if ~/.bash_profile or ~/.bash_login
 # exists.
