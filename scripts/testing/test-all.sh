@@ -24,6 +24,8 @@ echo "cgroup template lint"
 bash scripts/testing/cgroup-template-lint.sh
 runIfEnabled PMSS_LINT_CAMEL "camelCase filename lint" bash scripts/testing/camelcase-lint.sh
 runIfEnabled PMSS_LINT_EXEC "exec-bit lint" bash scripts/testing/exec-bit-lint.sh
+echo "skel committed-mode lint (shebang<->exec bit across etc/skel + etc/seedbox/skel)"
+php scripts/testing/skel-mode-lint.php --report
 echo "static include check"
 scripts/testing/static-include-check.php
 runIfEnabled PMSS_LINT_DOCBLOCK "docblock lint" bash scripts/testing/docblock-lint.sh
