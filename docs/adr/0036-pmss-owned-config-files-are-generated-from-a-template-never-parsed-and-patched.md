@@ -90,13 +90,16 @@ format transformer (regex over XML/INI/JSON/rc).
   not owned and the exception above applies.
 - Negative (accepted): template changes have fleet-wide blast radius on regeneration — the same
   trade-off ADR 0032 accepts, mitigated the same way (hermetic tests assert the rendered shape).
-- Follow-up: PMSS #741 converts `arrRootExecutionBlock.php` to `template.arr.config.xml` plus one
-  `str_replace` and deletes the rewriting functions.
+- Follow-up: PMSS #741 proposed migrating `arrRootExecutionBlock.php`'s config generation to
+  `template.arr.config.xml` plus one `str_replace`. Superseded-by-deletion: that file never held
+  the rewriting functions this ADR describes (they were removed earlier, in 73f8e818), and no
+  root-side Servarr config is generated today — ADR 0034 blocks root execution instead. Closed
+  with no code change.
 
 ## References
 - ADR 0032 — ownership decides placement; this ADR is its production-mechanism counterpart.
 - ADR 0034 — install is not execution; the root-side Servarr config is the case that triggered this.
 - `scripts/util/userConfig.php`, `scripts/lib/rtorrentConfig.php` — the reference implementations.
-- PMSS #741 — first migration.
+- PMSS #741 — proposed first migration; closed superseded-by-deletion (no code change needed).
 - Operator directive, 2026-07-30: all config files idempotently templated on the same minimal pattern
   as the other `template.*` files.
