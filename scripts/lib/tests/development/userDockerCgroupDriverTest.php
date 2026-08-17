@@ -42,7 +42,8 @@ class UserDockerCgroupDriverTest extends TestCase
                     ],
                     [
                         'needles' => [
-                            'function userDockerRunAs(string $user, string $cmd, ?int $timeoutSeconds = null, ?int &$rc = null): string',
+                            'function userDockerRunAs(',
+                            'bool $placeInUserSlice = false',
                             '$target = userDockerAccountInfo($user);',
                             '$wrapper = pmssBuildUserShellCommand($user, $cmd);',
                         ],

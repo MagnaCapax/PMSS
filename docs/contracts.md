@@ -271,6 +271,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Rootless Docker `daemon.json` convergence refuses symlinked or non-regular config targets before writing, then installs changes through a temporary file with mode 0600. On Debian 10/11 with `fuse-overlayfs` available, it also disables Docker's containerd image store so the classic rootless graphdriver honours `storage-driver`.
 - `scripts/util/userDocker.php USER ACTION`
   - `stop` and `restart` pass `XDG_RUNTIME_DIR` when using a user systemd unit; a disabled `dockerEnabled` policy uses `systemctl --user disable --now` so the unit does not remain enabled.
+  - Root-context `start` and `restart` launch the non-systemd rootless daemon through the slice-aware service launcher; same-UID invocations remain direct.
   - Any non-zero systemd stop result falls back to the user-scoped rootless stop command, then waits for the short restart window and verifies Docker process state before reporting success.
   - A failed or unknown process check, or surviving Docker PIDs, returns non-zero; `restart` does not continue into the start path after an unsuccessful stop.
 

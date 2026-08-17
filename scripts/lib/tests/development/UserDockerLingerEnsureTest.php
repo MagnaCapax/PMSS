@@ -38,6 +38,22 @@ class UserDockerLingerEnsureTest extends TestCase
             'linger-ensure must run before the rootless dockerd launch');
     }
 
+    public function testRootDockerStartUsesSliceAwareLauncherButSameUserPathStaysDirect(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 3).'/util/userDocker.php');
+        $this->assertStringContainsAllStrings([
+            "require_once __DIR__.'/../lib/user/serviceLaunch.php';",
+            'bool $placeInUserSlice = false',
+            '$wrapper = pmssBuildUserServiceShellCommand($user, $cmd);',
+            'userDockerRunAs($user, $envCmd, $userDockerStartTimeoutSec, $launchRc, true);',
+        ], $src);
+
+        $directLaunchPos = strpos($src, "if (\$target !== null && \$currentUid > 0 && \$currentUid === (int) \$target['uid']) {");
+        $sliceLaunchPos = strpos($src, 'elseif ($placeInUserSlice && $currentUid === 0)');
+        $this->assertTrue($directLaunchPos !== false && $sliceLaunchPos !== false && $directLaunchPos < $sliceLaunchPos,
+            'same-user invocation must remain direct before the root slice-aware branch');
+    }
+
     public function testUserDockerStopUsesRuntimeDirFallbackAndLivenessGate(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 3).'/util/userDocker.php');

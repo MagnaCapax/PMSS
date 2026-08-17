@@ -47,6 +47,7 @@
 
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/runtime.php';
+require_once __DIR__.'/../lib/user/serviceLaunch.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
 pmssRequireCli();
@@ -136,7 +137,13 @@ if ($debug) {
 }
 
 // Helper to execute a command as the target user via su, with an optional timeout.
-function userDockerRunAs(string $user, string $cmd, ?int $timeoutSeconds = null, ?int &$rc = null): string
+function userDockerRunAs(
+    string $user,
+    string $cmd,
+    ?int $timeoutSeconds = null,
+    ?int &$rc = null,
+    bool $placeInUserSlice = false
+): string
 {
     static $timeoutBinResolved = false;
     static $timeoutBin = null;
@@ -147,12 +154,15 @@ function userDockerRunAs(string $user, string $cmd, ?int $timeoutSeconds = null,
         return '';
     }
 
-    $wrapper = pmssBuildUserShellCommand($user, $cmd);
     $currentUid = function_exists('posix_geteuid') ? (int) posix_geteuid() : -1;
     if ($target !== null && $currentUid > 0 && $currentUid === (int) $target['uid']) {
         // When already running as the target user (e.g. per-user web UI),
         // avoid `su` so interactive password prompts do not block automation.
         $wrapper = sprintf('/bin/bash -lc %s', escapeshellarg($cmd));
+    } elseif ($placeInUserSlice && $currentUid === 0) {
+        $wrapper = pmssBuildUserServiceShellCommand($user, $cmd);
+    } else {
+        $wrapper = pmssBuildUserShellCommand($user, $cmd);
     }
 
     if ($timeoutSeconds !== null && $timeoutSeconds > 0) {
@@ -472,7 +482,8 @@ if ($action === 'start' || $action === 'restart') {
         'XDG_RUNTIME_DIR=%s PATH=$PATH:/usr/sbin:/sbin:$HOME/bin nohup dockerd-rootless.sh >/dev/null 2>&1 &',
         $runtimeDir
     );
-    userDockerRunAs($user, $envCmd, $userDockerStartTimeoutSec);
+    $launchRc = 0;
+    userDockerRunAs($user, $envCmd, $userDockerStartTimeoutSec, $launchRc, true);
     echo "Docker start requested for {$user} via dockerd-rootless.sh\n";
 }
 
