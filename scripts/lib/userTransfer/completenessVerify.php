@@ -5,7 +5,75 @@
  * @license GPL-3.0-only
  */
 
+require_once dirname(__DIR__).'/userLifecycle.php';
+require_once __DIR__.'/localUserSafety.php';
 require_once __DIR__.'/remoteScripts.php';
+
+/** Build a target-side check that rejects any non-symlink payload owner mismatch. */
+function pmssUserTransferBuildPayloadOwnershipCheckCommand(string $dataPath, int $uid, int $gid): string
+{
+    $find = sprintf(
+        'find %s -not -type l \( -not -uid %d -o -not -gid %d \) -print -quit 2>/dev/null',
+        escapeshellarg($dataPath),
+        $uid,
+        $gid
+    );
+    $script = 'mismatch=$('.$find.")\n"
+        .'find_rc=$?' . "\n"
+        .'if [ "$find_rc" -ne 0 ]; then exit "$find_rc"; fi' . "\n"
+        .'test -z "$mismatch"';
+
+    return pmssBuildCommand('bash', ['-c', $script]);
+}
+
+/** Build a target-user check for directory traversal and one readable payload file. */
+function pmssUserTransferBuildPayloadAccessCheckShell(string $dataPath): string
+{
+    $quotedPath = escapeshellarg($dataPath);
+    return 'sample=$(find '.$quotedPath.' -type f -print -quit 2>/dev/null)' . "\n"
+        .'find_rc=$?' . "\n"
+        .'if [ "$find_rc" -ne 0 ]; then exit "$find_rc"; fi' . "\n"
+        .'if [ -n "$sample" ]; then test -r "$sample"; else test -x '.$quotedPath.'; fi' . "\n";
+}
+
+/** Hard-fail a cross-username transfer when its payload is not target-accessible. */
+function pmssUserTransferVerifyPayloadOwnership(string $user, string $home): void
+{
+    $dataPath = rtrim($home, '/').'/data';
+    if (is_link($dataPath)) {
+        throw new RuntimeException('Transferred data path is an unsafe symlink', 1);
+    }
+    if (!is_dir($dataPath)) {
+        logMessage('[INFO] Skipping transferred data ownership verification: data directory is absent');
+        return;
+    }
+    if (!pmssUserTransferIsPathWithinHome($dataPath, $home)) {
+        throw new RuntimeException('Transferred data path escapes the user home', 1);
+    }
+
+    $account = pmssUserAccountLookup($user);
+    if (!is_array($account) || !isset($account['uid'], $account['gid'])) {
+        throw new RuntimeException('Unable to resolve target user ownership metadata', 1);
+    }
+
+    $ownershipRc = runStep(
+        'Verifying transferred data ownership',
+        pmssUserTransferBuildPayloadOwnershipCheckCommand($dataPath, (int) $account['uid'], (int) $account['gid'])
+    );
+    if ($ownershipRc !== 0) {
+        throw new RuntimeException('Transferred data ownership verification failed', 1);
+    }
+
+    $accessRc = runStep(
+        'Verifying transferred data access',
+        pmssBuildUserShellCommand($user, pmssUserTransferBuildPayloadAccessCheckShell($dataPath), '/bin/sh')
+    );
+    if ($accessRc !== 0) {
+        throw new RuntimeException('Transferred data access verification failed', 1);
+    }
+
+    logMessage('[OK] Transferred data ownership and access verified');
+}
 
 /**
  * Build a privacy-safe shell fragment that prints aggregate home statistics.

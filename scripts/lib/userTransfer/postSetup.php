@@ -38,6 +38,9 @@ function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths
         'Normalising user permissions',
         pmssBuildCommand('php', [dirname(__DIR__, 2).'/util/userPermissions.php', $localUser])
     );
+    if ($remoteUser !== $localUser) {
+        pmssUserTransferVerifyPayloadOwnership($localUser, $home);
+    }
     pmssUserTransferRequestRtorrentRestart($home, $localUser);
 
     // Advisory only: keep exit-code semantics while surfacing suspiciously incomplete copies.

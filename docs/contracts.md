@@ -239,6 +239,8 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     `/home/<localUser>/...` when usernames differ.
   - Side-effects: writes the merged JSON with mode `0600` before the existing
     `userPermissions.php` normalization step fixes final ownership.
+  - Cross-username transfers hard-fail after normalization unless the `data`
+    payload is target-owned and readable/traversable by the local account.
   - Errors: fail-soft; invalid/missing category metadata logs a warning or info
     line and does not abort the transfer.
 

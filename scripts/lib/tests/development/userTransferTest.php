@@ -140,6 +140,51 @@ class UserTransferTest extends TestCase
         }
     }
 
+    public function testCrossUsernamePayloadOwnershipCheckUsesTargetIds(): void
+    {
+        $command = \pmssUserTransferBuildPayloadOwnershipCheckCommand('/home/newuser/data', 1201, 1202);
+
+        $this->assertStringContainsAllStrings([
+            'newuser/data',
+            '-not -type l',
+            '-not -uid 1201 -o -not -gid 1202',
+            'mismatch=$(',
+            'find_rc=$?',
+            'test -z "$mismatch"',
+        ], $command);
+        $this->assertStringNotContainsString('chown', $command);
+    }
+
+    public function testCrossUsernamePayloadAccessCheckRunsAsTargetUser(): void
+    {
+        $shell = \pmssUserTransferBuildPayloadAccessCheckShell('/home/newuser/data');
+
+        $this->assertStringContainsAllStrings([
+            "find '/home/newuser/data' -type f -print -quit",
+            'if [ -n "$sample" ]; then test -r "$sample";',
+            "else test -x '/home/newuser/data'; fi",
+        ], $shell);
+        $this->assertStringNotContainsString('sudo', $shell);
+    }
+
+    public function testCrossUsernamePayloadGateStaysAfterPermissionNormalisation(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/lib/userTransfer/postSetup.php',
+            [
+                "'Normalising user permissions'",
+                'pmssUserTransferVerifyPayloadOwnership($localUser, $home);',
+                'pmssUserTransferRequestRtorrentRestart',
+            ],
+            'Cross-username payload gate order is unsafe: '
+        );
+        $this->pmssAssertRepoFileContainsString(
+            'scripts/lib/userTransfer/postSetup.php',
+            'if ($remoteUser !== $localUser) {',
+            'Cross-username payload gate lost its username guard: '
+        );
+    }
+
     public function testGeneratedScriptsKeepSharedSshFlagsAligned(): void
     {
         $cfg = $this->baseConfig();
