@@ -120,4 +120,25 @@ class checkRtorrentContractTest extends TestCase
             ],
         ]);
     }
+
+    public function testRtorrentDisableMarkerSkipsUserAndStaysStopped(): void
+    {
+        // GH#470 per-user opt-out: `.rtorrentDisable` marker => stop and stay stopped.
+        // The disable check must sit AFTER the suspended-user block (a disabled user is not
+        // suspended) and BEFORE the .rtorrent.rc / start logic, and it must `continue`.
+        $this->pmssAssertRepoFileContract('scripts/cron/checkRtorrent.php', [
+            'required' => [
+                "if (is_file(\$home.'/.rtorrentDisable')) {",
+                'rtorrent disabled by user (.rtorrentDisable)',
+            ],
+            'ordered' => [[
+                'needles' => [
+                    'if (pmssUserWebRootUnavailable($user)) {',
+                    "if (is_file(\$home.'/.rtorrentDisable')) {",
+                    "if (!is_file(\$home.'/.rtorrent.rc')) {",
+                ],
+                'missingPrefix' => 'checkRtorrent .rtorrentDisable skip misordered: ',
+            ]],
+        ]);
+    }
 }

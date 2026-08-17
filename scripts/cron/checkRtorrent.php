@@ -124,6 +124,20 @@ foreach ($users as $user) {
         continue;
     }
 
+    // Per-user rtorrent opt-out: the `.rtorrentDisable` marker means "stop and stay stopped"
+    // (GH#470). A disabled user is NOT suspended (web root is fine), so this is a separate
+    // check. Graceful TERM (not -9) lets rtorrent save its session; re-enable = remove the
+    // marker and the watchdog restarts within PMSS_RTORRENT_MISSING_GRACE.
+    if (is_file($home.'/.rtorrentDisable')) {
+        $null = [];
+        $rc = 0;
+        foreach (['rtorrent', '.rtorrentExecute.php'] as $processName) {
+            @exec('killall -u '.escapeshellarg($user).' '.escapeshellarg($processName).' 2>/dev/null', $null, $rc);
+        }
+        pmssCheckRtorrentLogBoth($user, "rtorrent disabled by user (.rtorrentDisable); cleanup (killall rc={$rc})", $debug);
+        continue;
+    }
+
     if (!is_file($home.'/.rtorrent.rc')) {
         if (!pmssCheckRtorrentRecoverMissingConfig($user, $home, $debug)) {
             continue;
