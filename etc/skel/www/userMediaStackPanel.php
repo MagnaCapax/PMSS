@@ -255,6 +255,63 @@ function pmssMediaStackPanelUrlsBuild(string $username, string $hostname): array
     );
 }
 
+/** Return app labels whose installer markers are present in the customer home. */
+function pmssMediaStackPanelExpectedAppLabelsRead(string $home): array
+{
+    // Mirror the watchdog's config-directory and binary-file presence signals.
+    $apps = array(
+        'Jellyfin' => array('.config/jellyfin', '.bin/jellyfin/jellyfin.dll'),
+        'Radarr' => array('.config/radarr', '.bin/Radarr/Radarr.dll'),
+        'Sonarr' => array('.config/sonarr', '.bin/Sonarr/Sonarr.dll'),
+        'Prowlarr' => array('.config/prowlarr', '.bin/Prowlarr/Prowlarr.dll'),
+        'SABnzbd' => array('.config/sabnzbd', '.bin/sabnzbd/sabnzbd/SABnzbd.py'),
+    );
+    $expected = array();
+    foreach ($apps as $label => $markers) {
+        if (is_dir(pmssMediaStackPanelHomePath($home, $markers[0]))
+            || is_file(pmssMediaStackPanelHomePath($home, $markers[1]))) {
+            $expected[$label] = true;
+        }
+    }
+
+    // Autobrr markers may belong to a self-managed proxy at another path (#778).
+    if (pmssMediaStackPanelProxyAppPresent($home, 'autobrr')) {
+        $expected['Autobrr'] = true;
+    }
+    return $expected;
+}
+
+/** Return true when a customer proxy fragment exposes the named app path. */
+function pmssMediaStackPanelProxyFragmentMentionsApp(string $fragment, string $app): bool
+{
+    $appPattern = preg_quote($app, '/');
+    $pathPrefix = '(?:user-[^"\']+\/(?:apps\/)?|public-[^"\']+\/)?';
+    return preg_match('/\^\/'.$pathPrefix.$appPattern.'(?:\(|\/|\$)/i', $fragment) === 1
+        || preg_match('/["\']\/'.$pathPrefix.$appPattern.'(?:\/|["\'])/i', $fragment) === 1;
+}
+
+/** Return true when any readable customer proxy fragment exposes an app. */
+function pmssMediaStackPanelProxyAppPresent(string $home, string $app): bool
+{
+    $files = glob(pmssMediaStackPanelHomePath($home, '.lighttpd/custom.d/*.conf'));
+    foreach (is_array($files) ? $files : array() as $file) {
+        $fragment = pmssCustomerFileRead($file);
+        if (is_string($fragment) && pmssMediaStackPanelProxyFragmentMentionsApp($fragment, $app)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** Build only URLs backed by an app marker or the Autobrr proxy fragment. */
+function pmssMediaStackPanelUrlsRead(string $home, string $username, string $hostname): array
+{
+    return array_intersect_key(
+        pmssMediaStackPanelUrlsBuild($username, $hostname),
+        pmssMediaStackPanelExpectedAppLabelsRead($home)
+    );
+}
+
 /**
  * Build the shell command that launches the installer in the background.
  */
@@ -285,7 +342,7 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
     $running = pmssMediaStackPanelPidRunning($pid);
     $logTail = pmssMediaStackPanelLogTailRead($home);
     $gate = pmssMediaStackPanelStartGateRead($home);
-    $urls = ($installed || $logTail !== '') ? pmssMediaStackPanelUrlsBuild($username, $hostname) : array();
+    $urls = ($installed || $logTail !== '') ? pmssMediaStackPanelUrlsRead($home, $username, $hostname) : array();
     $status = array('tail' => $logTail, 'urls' => $urls, 'canStart' => false, 'poll' => false);
 
     if ($running) {

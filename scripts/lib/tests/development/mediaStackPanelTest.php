@@ -92,12 +92,62 @@ class MediaStackPanelTest extends TestCase
         $this->pmssAssertArraySubsetSame(['ok' => false, 'message' => 'Media stack installer is missing from this account.'], $gate);
     }
 
-    public function testStatusShowsInstalledUrlsWhenJellyfinConfigExists(): void
+    public function testStatusOnlyShowsInstalledUrlsWhenJellyfinConfigExists(): void
     {
         $status = $this->mediaStatusFixture('pmss-media-installed-', '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
 
         $this->assertSame('installed', $status['state']);
         $this->assertStringContainsString('/public-alice/jellyfin/web/index.html', $status['urls']['Jellyfin']);
+        $this->assertSame(array('Jellyfin'), array_keys($status['urls']));
+    }
+
+    public function testStatusShowsUrlsForEachAppMarkerShape(): void
+    {
+        $cases = array(
+            array('Radarr', '.config/radarr', 'dir'),
+            array('Sonarr', '.bin/Sonarr/Sonarr.dll', 'file'),
+            array('Prowlarr', '.config/prowlarr', 'dir'),
+            array('SABnzbd', '.bin/sabnzbd/sabnzbd/SABnzbd.py', 'file'),
+        );
+        foreach ($cases as $index => $case) {
+            [$label, $marker, $type] = $case;
+            $home = $this->mediaHomeCreate('pmss-media-app-marker-'.$index.'-');
+            $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
+            if ($type === 'dir') {
+                $this->pmssEnsureDir($home.'/'.$marker);
+            } else {
+                $this->pmssWriteRelativeFile($home, $marker, 'marker');
+            }
+
+            $status = $this->mediaStatusRead($home);
+
+            $this->assertTrue(isset($status['urls'][$label]), $label.' marker should expose its URL.');
+        }
+    }
+
+    public function testStatusSkipsAutobrrMarkerWithoutProxyFragment(): void
+    {
+        $home = $this->mediaHomeCreate('pmss-media-autobrr-marker-');
+        $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
+        $this->pmssWriteRelativeFile($home, '.bin/autobrr/autobrr', 'marker');
+
+        $status = $this->mediaStatusRead($home);
+
+        $this->assertFalse(isset($status['urls']['Autobrr']));
+    }
+
+    public function testStatusShowsAutobrrUrlFromProxyFragmentWithoutInstallMarkers(): void
+    {
+        $home = $this->mediaHomeCreate('pmss-media-autobrr-proxy-');
+        $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
+        $this->pmssWriteRelativeFile(
+            $home,
+            '.lighttpd/custom.d/autobrr-custom.conf',
+            '$HTTP["url"] =~ "^/autobrr(?:/|$)" { "map-urlpath" => ( "/autobrr" => "" ) }'
+        );
+
+        $status = $this->mediaStatusRead($home);
+
         $this->assertSame('https://seedbox.example/public-alice/autobrr/', $status['urls']['Autobrr']);
     }
 
