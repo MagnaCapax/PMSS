@@ -21,6 +21,8 @@ $action = isset($_GET['action']) ? (string) $_GET['action'] : 'status';
 
 if ($action === 'start') {
     pmssMediaStackPanelStartHandle($home, $username, $hostname);
+} elseif ($action === 'start-stopped') {
+    pmssMediaStackPanelRecoveryHandle($home, $username, $hostname);
 }
 
 pmssMediaStackPanelJsonRespond(pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname));
@@ -37,9 +39,37 @@ function pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname)
         'message' => $status['message'],
         'html' => pmssMediaStackPanelHtmlBuild($status),
         'canStart' => !empty($status['canStart']),
+        'canRestart' => !empty($status['canRestart']),
         'poll' => !empty($status['poll']),
         'state' => $status['state'],
     );
+}
+
+/** Start absent media-stack sessions once, without changing watchdog policy. */
+function pmssMediaStackPanelRecoveryHandle($home, $username, $hostname)
+{
+    if (!pmssMediaStackPanelRecoveryRequestAllowed($_SERVER)) {
+        $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
+        $payload['message'] = 'Starting stopped media-stack apps requires a panel POST request.';
+        pmssMediaStackPanelJsonRespond($payload, (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') ? 403 : 405);
+    }
+
+    $gate = pmssMediaStackPanelRecoveryGateRead($home);
+    if (!$gate['ok']) {
+        $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
+        $payload['message'] = $gate['message'];
+        pmssMediaStackPanelJsonRespond($payload, 409);
+    }
+
+    $result = pmssFrontendShellExec(pmssMediaStackPanelRecoveryCommandBuild($home, $username));
+    $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
+    if (trim((string) $result) !== 'pmss-media-stack-started') {
+        $payload['message'] = 'Stopped media-stack apps could not be started from the panel.';
+        pmssMediaStackPanelJsonRespond($payload, 500);
+    }
+
+    $payload['message'] = 'Start request sent for stopped media-stack apps.';
+    pmssMediaStackPanelJsonRespond($payload, 202);
 }
 
 /**

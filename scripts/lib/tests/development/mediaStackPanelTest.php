@@ -35,6 +35,15 @@ class MediaStackPanelTest extends TestCase
             'function pmssMediaStackPanelShellExec'.'Available',
             'function pmssMediaStackPanel'.'Installed',
         ]);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/mediaStack.php', [
+            "elseif (\$action === 'start-stopped')",
+            'pmssMediaStackPanelRecoveryHandle($home, $username, $hostname);',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/welcome.php', [
+            'pmssMediaStackStartStopped',
+            "headers: {'X-Requested-With': 'XMLHttpRequest'}",
+            'value="Start stopped apps"',
+        ]);
     }
 
     public function testStatusIsReadyForFreshHome(): void
@@ -155,6 +164,7 @@ class MediaStackPanelTest extends TestCase
     {
         $home = $this->mediaHomeCreate('pmss-media-runtime-status-');
         $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
+        $this->pmssWriteRelativeFile($home, '.bashrc.custom', "alias sonarr='true'\n");
         $this->pmssWriteRelativeFile($home, '.media-stack-status.json', json_encode(array(
             'state' => 'degraded',
             'apps' => array(
@@ -166,6 +176,7 @@ class MediaStackPanelTest extends TestCase
         $status = $this->mediaStatusRead($home);
 
         $this->assertSame('degraded', $status['state']);
+        $this->assertTrue($status['canRestart']);
         $this->assertStringContainsString('Radarr: failed repeatedly (3 consecutive failed checks).', implode(' ', $status['details']));
     }
 
@@ -203,6 +214,48 @@ class MediaStackPanelTest extends TestCase
         $command = \pmssMediaStackPanelStartCommandBuild($home, 'alice');
 
         $this->assertStringContainsAllStrings(['.install-media-stack-web.pid', 'install-media-stack.sh', "USER='alice'"], $command);
+    }
+
+    public function testRecoveryCommandUsesFixedInstallerMode(): void
+    {
+        $command = \pmssMediaStackPanelRecoveryCommandBuild('/home/alice', 'alice');
+
+        $this->assertStringContainsAllStrings([
+            "HOME='/home/alice'",
+            "USER='alice'",
+            "'/home/alice/install-media-stack.sh' --start-stopped",
+            'pmss-media-stack-started',
+        ], $command);
+    }
+
+    public function testRecoveryRequestRequiresAjaxPost(): void
+    {
+        $this->assertTrue(\pmssMediaStackPanelRecoveryRequestAllowed(array(
+            'REQUEST_METHOD' => 'POST',
+            'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest',
+        )));
+        foreach (array(
+            array(),
+            array('REQUEST_METHOD' => 'GET', 'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest'),
+            array('REQUEST_METHOD' => 'POST'),
+            array('REQUEST_METHOD' => 'POST', 'HTTP_X_REQUESTED_WITH' => 'cross-site-form'),
+        ) as $server) {
+            $this->assertFalse(\pmssMediaStackPanelRecoveryRequestAllowed($server));
+        }
+    }
+
+    public function testRecoveryGateRejectsMissingAndSymlinkedAliases(): void
+    {
+        $home = $this->mediaHomeCreate('pmss-media-recovery-gate-');
+        $this->assertFalse(\pmssMediaStackPanelRecoveryGateRead($home)['ok']);
+
+        $target = $this->pmssWriteRelativeFile($home, '.bashrc.custom-target', "alias sonarr='true'\n");
+        @symlink($target, $home.'/.bashrc.custom');
+        $this->assertFalse(\pmssMediaStackPanelRecoveryGateRead($home)['ok']);
+
+        @unlink($home.'/.bashrc.custom');
+        $this->pmssWriteRelativeFile($home, '.bashrc.custom', "alias sonarr='true'\n");
+        $this->assertTrue(\pmssMediaStackPanelRecoveryGateRead($home)['ok']);
     }
 
     public function testHomePathBuildsStableInstallerPaths(): void

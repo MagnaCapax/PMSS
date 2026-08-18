@@ -279,6 +279,7 @@ $managedApps = pmssCustomerManagedAppDefinitions();
         function pmssMediaStackApply(payload) {
             var panel = $('#pmss-media-stack-status');
             var button = $('#pmss-media-stack-start');
+            var recoveryButton = $('#pmss-media-stack-recovery');
 
             if (panel.length > 0 && payload && payload.html) {
                 panel.html(payload.html);
@@ -289,6 +290,14 @@ $managedApps = pmssCustomerManagedAppDefinitions();
                     button.removeAttr('disabled');
                 } else {
                     button.attr('disabled', 'disabled');
+                }
+            }
+
+            if (recoveryButton.length > 0 && payload) {
+                if (payload.canRestart) {
+                    recoveryButton.removeAttr('disabled').show();
+                } else {
+                    recoveryButton.attr('disabled', 'disabled').hide();
                 }
             }
 
@@ -311,15 +320,16 @@ $managedApps = pmssCustomerManagedAppDefinitions();
             });
         }
 
-        function pmssMediaStackStart(button) {
+        function pmssMediaStackAction(button, action, pendingMessage, failureMessage) {
             pmssSetActionLoading(button, true);
-            pmssShowActionNotice('Starting media stack install...', false);
+            pmssShowActionNotice(pendingMessage, false);
 
             $.ajax({
-                url: 'mediaStack.php?action=start',
+                url: 'mediaStack.php?action=' + action,
                 type: 'POST',
                 dataType: 'json',
                 cache: false,
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
                 success: function(payload) {
                     pmssSetActionLoading(button, false);
                     pmssMediaStackApply(payload);
@@ -332,9 +342,17 @@ $managedApps = pmssCustomerManagedAppDefinitions();
                     if (xhr && xhr.responseText) {
                         pmssMediaStackStatusRefresh();
                     }
-                    pmssShowActionNotice('Media stack install could not be started from the panel.', true);
+                    pmssShowActionNotice(failureMessage, true);
                 }
             });
+        }
+
+        function pmssMediaStackStart(button) {
+            pmssMediaStackAction(button, 'start', 'Starting media stack install...', 'Media stack install could not be started from the panel.');
+        }
+
+        function pmssMediaStackStartStopped(button) {
+            pmssMediaStackAction(button, 'start-stopped', 'Starting stopped media-stack apps...', 'Stopped media-stack apps could not be started from the panel.');
         }
     </script>
 
@@ -379,6 +397,7 @@ if (file_exists('mediaStack.php') && function_exists('pmssMediaStackPanelHtmlBui
                         <h6>Media Stack</h6>
                         <div id="pmss-media-stack-status"><?php echo pmssMediaStackPanelHtmlBuild($mediaStackStatus); ?></div>
                         <input type="button" id="pmss-media-stack-start" name="mediaStackStart" value="Install Media Stack" onClick="pmssMediaStackStart(this);"<?php if (empty($mediaStackStatus['canStart'])) echo ' disabled="disabled"'; ?> />
+                        <input type="button" id="pmss-media-stack-recovery" name="mediaStackRecovery" value="Start stopped apps" onClick="pmssMediaStackStartStopped(this);"<?php if (empty($mediaStackStatus['canRestart'])) echo ' disabled="disabled" style="display:none"'; ?> />
 <?php
 }
 ?>

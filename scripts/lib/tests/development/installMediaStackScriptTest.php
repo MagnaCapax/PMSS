@@ -477,6 +477,49 @@ LIGHTTPD;
         $this->assertStringContainsString('--verify-only', $this->script);
     }
 
+    public function testStartStoppedModeUsesAliasesAndSkipsLiveSessions(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-start-stopped-');
+        $bin = $this->pmssMakeTempDir('pmss-media-start-stopped-bin-');
+        $this->pmssWriteExecutableFile($bin.'/tmux', <<<'BASH'
+#!/usr/bin/env bash
+if [[ "$1" == "has-session" && "$3" == "radarr" ]]; then
+    exit 0
+fi
+if [[ "$1" == "has-session" ]]; then
+    exit 1
+fi
+printf '%s\n' "$*" >> "$HOME/tmux-actions"
+BASH
+        );
+        $this->pmssWriteFile($home.'/.bashrc.custom', <<<'BASHRC'
+alias sonarr='tmux new-session -d -s sonarr true'
+alias radarr='tmux new-session -d -s radarr true'
+BASHRC
+        );
+        $function = $this->pmssExtractShellFunction($this->script, 'media_stack_start_stopped');
+        $harness = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'HOME='.escapeshellarg($home),
+            'PATH='.escapeshellarg($bin).':$PATH',
+            'MEDIA_STACK_BASE_SESSIONS=(sonarr radarr prowlarr sabnzbd cloudplow autobrr)',
+            'log_ok() { echo "OK:$*"; }',
+            'log_warn() { echo "WARN:$*"; }',
+            'log_err() { echo "ERR:$*"; }',
+            $function,
+            'media_stack_start_stopped',
+            'cat "$HOME/tmux-actions"',
+            '',
+        ));
+
+        $output = $this->pmssRunShellHarness($harness);
+
+        $this->assertStringContainsString('OK:Started sonarr', $output);
+        $this->assertStringContainsString('new-session -d -s sonarr true', $output);
+        $this->assertStringNotContainsString('new-session -d -s radarr true', $output);
+    }
+
     public function testDryRunUrlChecksUseHttpProbeHelpers(): void
     {
         $this->assertStringContainsAllStrings([

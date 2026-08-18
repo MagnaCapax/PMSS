@@ -166,6 +166,30 @@ function pmssMediaStackPanelStartGateRead(string $home): array
     return array('ok' => true, 'message' => 'Ready to start the first-run media stack install.');
 }
 
+/** Gate the one-shot recovery action to the existing installer-owned files. */
+function pmssMediaStackPanelRecoveryGateRead(string $home): array
+{
+    $aliasPath = pmssMediaStackPanelHomePath($home, '.bashrc.custom');
+    foreach (array(
+        array(!is_file(pmssMediaStackPanelHomePath($home, 'install-media-stack.sh')), 'Media stack installer is missing from this account.'),
+        array(!is_file($aliasPath) || is_link($aliasPath) || !is_readable($aliasPath), 'Media stack launch aliases are missing or unsafe.'),
+        array(!pmssFrontendShellExecAvailable(), 'PHP shell execution is unavailable on this host.'),
+    ) as $gate) {
+        if ($gate[0]) {
+            return array('ok' => false, 'message' => $gate[1]);
+        }
+    }
+
+    return array('ok' => true, 'message' => 'Ready to start stopped media-stack apps.');
+}
+
+/** Require same-origin AJAX POST semantics for a state-changing panel action. */
+function pmssMediaStackPanelRecoveryRequestAllowed(array $server): bool
+{
+    return ($server['REQUEST_METHOD'] ?? '') === 'POST'
+        && strcasecmp((string) ($server['HTTP_X_REQUESTED_WITH'] ?? ''), 'XMLHttpRequest') === 0;
+}
+
 /**
  * Read the launcher pid file when present.
  */
@@ -330,6 +354,20 @@ function pmssMediaStackPanelStartCommandBuild(string $home, string $username): s
         .' /bin/bash -lc '.escapeshellarg($innerCommand);
 }
 
+/** Build the fixed one-shot command used to relaunch absent tmux sessions. */
+function pmssMediaStackPanelRecoveryCommandBuild(string $home, string $username): string
+{
+    $scriptPath = pmssMediaStackPanelHomePath($home, 'install-media-stack.sh');
+    $successMarker = 'pmss-media-stack-started';
+
+    return 'cd '.escapeshellarg($home)
+        .' && HOME='.escapeshellarg($home)
+        .' USER='.escapeshellarg($username)
+        .' LOGNAME='.escapeshellarg($username)
+        .' /bin/bash '.escapeshellarg($scriptPath).' --start-stopped >/dev/null 2>&1'
+        .' && printf %s '.escapeshellarg($successMarker);
+}
+
 /**
  * Describe the current web-installer state for rendering and polling.
  *
@@ -343,7 +381,7 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
     $logTail = pmssMediaStackPanelLogTailRead($home);
     $gate = pmssMediaStackPanelStartGateRead($home);
     $urls = ($installed || $logTail !== '') ? pmssMediaStackPanelUrlsRead($home, $username, $hostname) : array();
-    $status = array('tail' => $logTail, 'urls' => $urls, 'canStart' => false, 'poll' => false);
+    $status = array('tail' => $logTail, 'urls' => $urls, 'canStart' => false, 'canRestart' => false, 'poll' => false);
 
     if ($running) {
         return array_merge($status, array(
@@ -355,6 +393,7 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
     }
 
     if ($installed) {
+        $recoveryGate = pmssMediaStackPanelRecoveryGateRead($home);
         $runtime = pmssMediaStackPanelRuntimeStatusRead($home);
         if ($runtime !== null) {
             $runtimeState = (string) ($runtime['state'] ?? 'healthy');
@@ -369,8 +408,11 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
                 'message' => $message,
                 'details' => array_merge(
                     pmssMediaStackPanelRuntimeDetailsRead($runtime),
-                    array('Automatic restart is disabled after repeated failures; use the app log or SSH for diagnosis.')
+                    array($recoveryGate['ok']
+                        ? 'Automatic crash-loop restart remains disabled; review the app log, then use Start stopped apps for one recovery attempt.'
+                        : $recoveryGate['message'])
                 ),
+                'canRestart' => $recoveryGate['ok'],
             ));
         }
 
@@ -381,7 +423,9 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
                 'Runtime status is not available yet; the host watchdog will publish it shortly.',
                 'No password is pre-generated. Create the Jellyfin admin account in the first-run wizard.',
                 'If you need a rerun or cleanup, use SSH because the installer becomes interactive once files already exist.',
+                $recoveryGate['ok'] ? 'Use Start stopped apps for a one-time recovery after a host restart.' : $recoveryGate['message'],
             ),
+            'canRestart' => $recoveryGate['ok'],
         ));
     }
 

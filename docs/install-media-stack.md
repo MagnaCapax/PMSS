@@ -85,6 +85,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
   - `--dry-run`            Verify URLs and show actions; do not change the system
   - `--verify-only`        Only verify URLs (alias to `--dry-run`) and exit early
   - `--force`              Continue below the 1024 MiB account-memory guard
+  - `--start-stopped`      Start installed apps whose tmux sessions are absent, then exit
   - `--uninstall`          Remove the PMSS-managed media stack from this account
 
 - Sonarr
@@ -120,6 +121,8 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 
 - Dry‑run (URL checks only):
   - `bash install-media-stack.sh --verify-only`
+- Start stopped apps without reinstalling:
+  - `bash install-media-stack.sh --start-stopped`
 
 - Pin Radarr on Debian 11 x64:
   - `bash install-media-stack.sh --radarr-pin=v5.10.4.9218`
@@ -169,6 +172,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 
 9) Launch
 - Starts each app under a tmux session (skipped in `--dry-run`).
+- `--start-stopped` is a separate one-shot recovery path: it skips downloads and installation, preserves live sessions, and launches only missing sessions through the installer-managed aliases.
 
 10) Logging
 - All output is colored for terminals and appended to `~/.install-media-stack.log`.
@@ -184,6 +188,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - The script preserves unrelated `~/.bin` contents on reruns and refreshes only PMSS-managed media-stack paths in place.
 - The full stack is not suitable for very small shared-hosting memory budgets. If the detected account cgroup limit is below 1024 MiB, the installer warns and aborts unless run interactively with confirmation or explicitly with `--force`. The welcome-page wrapper surfaces the same warning and does not force installs from the browser.
 - The script still prompts before removing existing Jellyfin state because stale config can hang reruns and the deletion is destructive.
+- The welcome panel exposes the same one-shot `--start-stopped` recovery. It never enables automatic crash-loop restarts; review the app log before retrying a repeatedly failing app.
 - Media-stack ports are still chosen locally from `10000-65000`; they are not yet registered with `scripts/util/portManager.php`.
 - All app binds are `127.0.0.1`. Exposure to the Internet is not supported without proper SSL/reverse proxy hardening.
 - Conflicts with global `/opt` installs may occur; this is a per‑user stack by design.

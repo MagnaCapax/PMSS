@@ -40,7 +40,7 @@
 PMSS_MEDIA_STACK_SELF_UPDATE=1
 for pmss_media_stack_arg in "$@"; do
 	case "$pmss_media_stack_arg" in
-	--skip-update | --uninstall) PMSS_MEDIA_STACK_SELF_UPDATE=0 ;;
+	--skip-update | --uninstall | --start-stopped) PMSS_MEDIA_STACK_SELF_UPDATE=0 ;;
 	esac
 done
 unset pmss_media_stack_arg
@@ -82,9 +82,12 @@ DRY_RUN=0
 VERIFY_ONLY=0
 FORCE_INSTALL=0
 UNINSTALL=0
+START_STOPPED=0
 MEDIA_STACK_MIN_MEMORY_MIB=1024
 MEDIA_STACK_MIN_MEMORY_BYTES=$((MEDIA_STACK_MIN_MEMORY_MIB * 1024 * 1024))
 MEDIA_STACK_UNLIMITED_MEMORY_BYTES=$((1024 * 1024 * 1024 * 1024 * 1024))
+MEDIA_STACK_BASE_SESSIONS=(sonarr radarr prowlarr sabnzbd cloudplow autobrr)
+MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow autobrr)
 
 # Overrides (initialized empty)
 OVR_SONARR_URL=""
@@ -131,6 +134,7 @@ Modes:
   --dry-run                   Verify endpoints and show actions; do not modify system
   --verify-only               Only verify URLs (alias: implies --dry-run) and exit
   --force                     Continue below the ${MEDIA_STACK_MIN_MEMORY_MIB} MiB memory guard
+  --start-stopped             Start installed apps whose tmux sessions are absent
   --uninstall                 Stop media-stack sessions and remove PMSS-managed files
 USAGE
 }
@@ -143,6 +147,7 @@ for arg in "$@"; do
 		;;
 	--dry-run) DRY_RUN=1 ;;
 	--force) FORCE_INSTALL=1 ;;
+	--start-stopped) START_STOPPED=1 ;;
 	--uninstall) UNINSTALL=1 ;;
 	--verify-only)
 		VERIFY_ONLY=1
@@ -209,6 +214,47 @@ log_info() { echo -e "${C_INFO}[INFO]${C_RESET} $*"; }
 log_ok() { echo -e "${C_OK}[ OK ]${C_RESET} $*"; }
 log_warn() { echo -e "${C_WARN}[WARN]${C_RESET} $*"; }
 log_err() { echo -e "${C_ERR}[ERR ]${C_RESET} $*"; }
+
+# Relaunch only absent sessions through the installer-managed aliases. This
+# gives the panel one explicit recovery action without creating a restart loop.
+media_stack_start_stopped() {
+	local alias_file="$HOME/.bashrc.custom"
+	local app app_rc failed=0
+
+	if ! command -v tmux >/dev/null 2>&1; then
+		log_err "tmux is required to start media-stack applications"
+		return 1
+	fi
+	if [[ ! -f "$alias_file" || -L "$alias_file" || ! -r "$alias_file" ]]; then
+		log_err "Media-stack aliases are missing or unsafe: $alias_file"
+		return 1
+	fi
+
+	for app in jellyfin "${MEDIA_STACK_BASE_SESSIONS[@]}"; do
+		if tmux has-session -t "$app" 2>/dev/null; then
+			continue
+		fi
+		if /bin/bash --noprofile --norc -O expand_aliases -c '
+			source "$1"
+			alias "$2" >/dev/null 2>&1 || exit 3
+			eval "$2"
+		' pmss-media-stack "$alias_file" "$app"; then
+			log_ok "Started $app"
+		else
+			app_rc=$?
+			[[ $app_rc -eq 3 ]] && continue
+			log_warn "Failed to start $app"
+			failed=1
+		fi
+	done
+
+	return "$failed"
+}
+
+if [[ $START_STOPPED -eq 1 ]]; then
+	media_stack_start_stopped
+	exit $?
+fi
 
 # Checksums file for download integrity verification
 CHECKSUMS_FILE="$HOME/.install-checksums.sha256"
@@ -1056,8 +1102,6 @@ JELLYFIN_CONFIG_DIR="$HOME/.config/jellyfin/config"
 JELLYFIN_DATA_DIR="$HOME/.config/jellyfin/data"
 JELLYFIN_LOG_DIR="$HOME/.config/jellyfin/log"
 JELLYFIN_MIN_FFMPEG_VERSION="4.4"
-MEDIA_STACK_BASE_SESSIONS=(sonarr radarr prowlarr sabnzbd cloudplow autobrr)
-MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow autobrr)
 # Determine public IP from default route (no external HTTP request needed)
 PUBLIC_IP=$(ip -4 route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "unavailable")
 
