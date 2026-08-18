@@ -141,4 +141,30 @@ class DbusPolicyHardeningTest extends TestCase
         \pmssEnsureRunSystemdUsersTmpfiles($this->pmssMakeArrayLogger($messages2));
         $this->assertTrue($this->pmssMessagesContain($messages2, 'already present and up to date'), 'idempotent skip logged');
     }
+
+    public function testRunSystemdSessionsTmpfilesRenderRestrictsMode(): void
+    {
+        $body = \pmssRunSystemdSessionsTmpfilesRender();
+        // tmpfiles `d` restricts the /run/systemd/sessions DIRECTORY to 0750 (holds REMOTE_HOST/client IP).
+        $this->assertStringContainsString('d /run/systemd/sessions 0750 root root', $body);
+        $this->assertStringNotContainsString('0644', $body);
+        $this->assertStringNotContainsString('0755', $body);
+    }
+
+    public function testSessionsTmpfilesInstallIsIdempotent(): void
+    {
+        $messages = [];
+        $logger = $this->pmssMakeArrayLogger($messages);
+        $dir = $this->pmssMakeTempDir('pmss-tmpfiles-sessions-', 0700);
+        $this->pmssTrackEnvOverrides(['PMSS_TMPFILES_DIR' => $dir], true);
+
+        \pmssEnsureRunSystemdSessionsTmpfiles($logger);
+        $target = $dir.'/'.\pmssRunSystemdSessionsTmpfilesBasename();
+        $this->assertTrue(is_file($target), 'sessions tmpfiles drop-in installed');
+        $this->assertSame(\pmssRunSystemdSessionsTmpfilesRender(), (string) file_get_contents($target), 'content matches render');
+
+        $messages2 = [];
+        \pmssEnsureRunSystemdSessionsTmpfiles($this->pmssMakeArrayLogger($messages2));
+        $this->assertTrue($this->pmssMessagesContain($messages2, 'already present and up to date'), 'idempotent skip logged');
+    }
 }

@@ -306,11 +306,75 @@ function pmssEnsureRunSystemdUsersTmpfiles(?callable $logger = null): void
 }
 
 /* -------------------------------------------------------------------------- *
- *  Orchestrator — all three channels
+ *  Channel D — /run/systemd/sessions/<id> world-readable REMOTE_HOST (client IP)
+ * -------------------------------------------------------------------------- */
+
+/** Canonical basename for the /run/systemd/sessions mode-restriction tmpfiles drop-in. */
+function pmssRunSystemdSessionsTmpfilesBasename(): string
+{
+    return 'pmss-run-systemd-sessions.conf';
+}
+
+/**
+ * Render the tmpfiles.d drop-in restricting the /run/systemd/sessions DIRECTORY to 0750.
+ *
+ * Sibling of the /run/systemd/users hardening, and the MORE sensitive datum: each
+ * per-session file under /run/systemd/sessions carries `REMOTE_HOST=<connecting client
+ * IP>` (systemd writes it world-readable 0644 despite its own "# This is private data"
+ * header), so any unprivileged SSH user can read every other tenant's connecting IP
+ * straight off the filesystem. logind creates the per-session files 0644 and RE-creates
+ * them on every login, so a per-file rule does not hold between tmpfiles runs; restricting
+ * the PARENT DIRECTORY to 0750 is the robust close — a non-root user cannot traverse into
+ * it regardless of the files' own modes. loginctl reaches session data over the login1
+ * D-Bus (restricted separately, Channel B), not the filesystem, so the 0750 dir does not
+ * break it; nothing in PMSS reads /run/systemd/sessions as non-root.
+ */
+function pmssRunSystemdSessionsTmpfilesRender(): string
+{
+    return "# PMSS-managed: restrict the /run/systemd/sessions directory (per-session REMOTE_HOST/client IP) to root.\n"
+        ."# Managed by scripts/lib/update/systemPrep/dbusPolicyHardening.php; edits are overwritten.\n"
+        ."d /run/systemd/sessions 0750 root root -\n";
+}
+
+/**
+ * Ensure the /run/systemd/sessions tmpfiles mode-restriction drop-in is installed (D).
+ *
+ * Mirrors pmssEnsureRunSystemdUsersTmpfiles exactly (PMSS_TMPFILES_DIR override,
+ * PMSS_TEST_MODE guards the systemd-tmpfiles apply).
+ */
+function pmssEnsureRunSystemdSessionsTmpfiles(?callable $logger = null): void
+{
+    $log = $logger ?: 'logMessage';
+    $dir = pmssResolvePathFromEnv('PMSS_TMPFILES_DIR', '/etc/tmpfiles.d');
+    $target = $dir.'/'.pmssRunSystemdSessionsTmpfilesBasename();
+    $content = pmssRunSystemdSessionsTmpfilesRender();
+    $label = '/run/systemd/sessions tmpfiles policy';
+
+    if (!pmssRefreshManagedPathFile($target, $content, $label, $log, pmssManagedPathInstallOptions($target, $label, [
+        'directoryFailureMessage' => '[WARN] Unable to create tmpfiles.d directory: '.$dir,
+    ]))) {
+        return;
+    }
+
+    if (function_exists('pmssTestModeEnabled') && pmssTestModeEnabled()) {
+        pmssLogStatus('SKIP', 'Applying /run/systemd/sessions tmpfiles policy (test mode)');
+        return;
+    }
+
+    // tmpfiles `d` re-asserts the directory mode at boot; also chmod the already-existing
+    // directory now so the restriction takes effect immediately on this update run.
+    runStep(
+        'Restricting /run/systemd/sessions directory mode',
+        'systemd-tmpfiles --create '.escapeshellarg($target).' 2>/dev/null; [ -d /run/systemd/sessions ] && chmod 0750 /run/systemd/sessions 2>/dev/null || true'
+    );
+}
+
+/* -------------------------------------------------------------------------- *
+ *  Orchestrator — all four channels
  * -------------------------------------------------------------------------- */
 
 /**
- * Ensure all three systemd cross-user disclosure channels are hardened.
+ * Ensure all four systemd cross-user disclosure channels are hardened.
  *
  * Single entry point wired from update-step2; each sub-step is independently
  * idempotent and degrades to a [WARN]/[SKIP] without aborting the others.
@@ -319,5 +383,6 @@ function pmssEnsureSystemdDbusDisclosureHardening(?callable $logger = null): voi
 {
     pmssEnsureDbusSystemd1EnumerationPolicy($logger); // A — worst
     pmssEnsureDbusLoginEnumerationPolicy($logger);    // B
-    pmssEnsureRunSystemdUsersTmpfiles($logger);       // C — lowest sensitivity
+    pmssEnsureRunSystemdUsersTmpfiles($logger);       // C — UID->username map
+    pmssEnsureRunSystemdSessionsTmpfiles($logger);    // D — REMOTE_HOST/client IP (most sensitive)
 }
