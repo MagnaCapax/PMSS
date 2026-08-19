@@ -10,7 +10,7 @@ require_once __DIR__.'/../../../util/safeRootCleanup.php';
  * Proves the safety boundary of scripts/util/safeRootCleanup.php: the whitelist gate
  * REFUSES every customer/system/live path and ACCEPTS only regenerable cruft. This
  * tool deletes on production root filesystems, so the boundary is the load-bearing
- * safety property (converged design 20260810, Layer 2: "resolve + TEST before shipping").
+ * safety property and must be verified before it ships.
  */
 class PmssSafeRootCleanupTest extends TestCase
 {
@@ -21,7 +21,7 @@ class PmssSafeRootCleanupTest extends TestCase
             '/home/alice/data/movie.mkv',
             '/home/bob/.rtorrent.rc',
             '/var/www/site/index.php',
-            '/var/www/html/10GiB.dat',       // barbera's tipping file — a SERVED path, human-judgment
+            '/var/www/html/10GiB.dat',       // a large SERVED file — needs human judgment, never auto-rm
             '/etc/passwd',
             '/etc/seedbox/config/version',
             '/root/.ssh/id_rsa',

@@ -3,9 +3,9 @@
 /**
  * Safe root-filesystem cleanup — reclaim REGENERABLE cruft ONLY, when / is near-full.
  *
- * The capability the ticket-runner lacked: on a PMSS host whose ROOT filesystem is
- * near 100% from accumulated cruft (barbera 3-172barbera, root 100% for 6 days while
- * /home had 17T free), free space WITHOUT a blanket rm — which HG-48 rightly blocks.
+ * On a shared PMSS host whose ROOT filesystem approaches 100% from accumulated cruft
+ * (root full for days while /home has ample free space and the arrays are healthy —
+ * an OS-root exhaustion, not a hardware failure), free space WITHOUT a blanket rm.
  *
  * Whitelist-ONLY, hardcoded regenerable classes:
  *   - apt package cache            (apt-get clean)
@@ -15,13 +15,11 @@
  *   - old atop logs                (/var/log/atop/atop_* older than N days)
  *
  * NEVER touches /home, /var/www, customer data, /etc, /root, /boot, live logs, or any
- * unrecognized/served file. The whitelist IS the safety boundary (POLA-correct where a
- * blanket rm under HG-48 is not). Dry-run by DEFAULT; --apply frees and logs every byte.
+ * unrecognized/served file. The hardcoded whitelist + a realpath deny/allow gate IS the
+ * safety boundary (POLA-correct). Dry-run by DEFAULT; --apply frees and logs every byte.
  *
- * Design: memory/deep-memory/20260810-converged-design-ticket-runner-handling-of-pmss-
- * host-root-filesystem-full-prevention-caps-safe-cleanup-executor-sop-branch.md (Layer 2).
- * NOT a live-log-storm tool: a filling live syslog/kern.log is fixed by KILLING THE
- * SOURCE (runner SOP STEP 0 + op-needed-attack Q9), not here.
+ * NOT a live-log-storm tool: a filling LIVE syslog/kern.log (e.g. a runaway process
+ * OOM-looping into the log) is fixed by stopping the source, not by this cleanup.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -154,8 +152,12 @@ function pmssSafeRootCleanupCollectRotatedLogs(int $olderThanDays, int $now): ar
     // SKIP_DOTS only — RecursiveDirectoryIterator does NOT descend into symlinked
     // directories by default, so a /var/log symlink cannot escape the tree; and the
     // per-file realpath+deny-prefix gate is the final backstop regardless.
+    // CATCH_GET_CHILD: a permission-denied subdir (e.g. /var/log/private, 0700) must be
+    // SKIPPED, not throw — otherwise one unreadable dir aborts the whole cleanup.
     $it = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)
+        new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::LEAVES_ONLY,
+        RecursiveIteratorIterator::CATCH_GET_CHILD
     );
     foreach ($it as $fileInfo) {
         if (!$fileInfo->isFile()) {
