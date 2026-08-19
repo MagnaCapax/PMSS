@@ -19,21 +19,22 @@ All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to
 - Memory pre-flight: accounts below 1024 MiB are warned and must use `--force` from SSH.
 - Uninstall path: `--uninstall` stops media-stack sessions, removes PMSS-managed app/config paths, and backs up/strips managed shell aliases.
 - Servarr update policy: Radarr, Sonarr, and Prowlarr use the external update mechanism and disable automatic in-place updates; rerun this installer to update them safely.
+- App-level authentication: the installer generates per-app passwords, configures auth before the public proxy is restarted, and writes credentials to `~/.media-stack-credentials.txt` with mode `600`.
 - Logging: colored console output and log tee to `~/.install-media-stack.log`.
 
 ## Web Panel Wrapper
 - The welcome page can launch the installer without SSH for the first run.
 - The wrapper intentionally stops at first-install scope: once `~/.bin` or Jellyfin data already exist, reruns should happen over SSH so operators can review existing state and any Jellyfin data-loss prompt before proceeding.
-- The wrapper does not pre-generate Jellyfin credentials; the admin account is created in Jellyfin’s first-run wizard after the install completes.
+- The wrapper uses the same installer path: credentials are generated during install and are available in `~/.media-stack-credentials.txt`.
 
 ## Jellyfin Media Library Path
 
 PMSS keeps `/home` non-listable for tenant privacy. Jellyfin can traverse to
-`/home`, but its first-run folder picker cannot list the user directories below
-it. Clicking `home` can therefore show a blank list, and accepting `/home`
-creates a library that scans nothing.
+`/home`, but its folder picker cannot list the user directories below it.
+Clicking `home` can therefore show a blank list, and accepting `/home` creates
+a library that scans nothing.
 
-In the Jellyfin first-run wizard, type the complete media path into the folder
+When adding Jellyfin libraries, type the complete media path into the folder
 field instead of selecting `/home`; for the usual layout, use:
 
 ```text
@@ -159,8 +160,11 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 6) Configuration
 - Writes Servarr XML configs in `~/.config/<app>/config.xml` with randomized ports, localhost bind, URL base `/public-<user>/<app>`, and the external update mechanism. The installer disables automatic in-place updates so the shared `.NET` runtime cannot be removed by an app updater; rerun this script for Servarr updates.
 - Jellyfin writes `~/.config/jellyfin/network.xml` likewise.
-- SABnzbd writes `~/.config/sabnzbd/sabnzbd.ini` and adjusts url_base/port/whitelist plus `inet_exposure = 4` so the proxied first-run wizard is reachable.
-- Autobrr writes `~/.config/autobrr/config.toml`, binds to `127.0.0.1`, and serves its sub-path through the generated per-user proxy fragment.
+- SABnzbd writes `~/.config/sabnzbd/sabnzbd.ini`, sets `[misc]` username/password, and keeps `inet_exposure = 4` so the proxied WebUI remains reachable.
+- Autobrr writes `~/.config/autobrr/config.toml`, binds to `127.0.0.1`, sets a session secret when absent, creates the initial admin user with `autobrrctl`, and serves its sub-path through the generated per-user proxy fragment.
+- Radarr, Sonarr, and Prowlarr are seeded through their local host-config API on temporary loopback ports, then returned to their assigned ports with Forms auth enabled.
+- Jellyfin is started on a temporary loopback port so the startup wizard can create and verify the admin account before the public proxy is restarted.
+- Credentials are written to `~/.media-stack-credentials.txt` with mode `600` and echoed in the final summary.
 
 7) Aliases
 - Appends tmux aliases to `~/.bashrc.custom` that export `DOTNET_ROOT` and execute `<app>.dll` via `dotnet` (or Python venv for SABnzbd/Cloudplow).
@@ -303,18 +307,18 @@ docker compose up -d
 All media stack applications bind to `127.0.0.1` only and are reverse-proxied through the user's lighttpd instance under `/public-<username>/<app>/`.
 Generated lighttpd proxy fragments enable HTTP upgrade forwarding so WebSocket-capable apps can keep live connections through the same per-user proxy path.
 
-The `/public-<username>/` path is **intentionally unauthenticated** at the proxy level — it exists for web hosting, file sharing, and public-facing services. **App-level authentication is the user's responsibility.**
+The `/public-<username>/` path is **intentionally unauthenticated** at the proxy level — it exists for web hosting, file sharing, and public-facing services. App-level authentication is configured by the installer for newly installed media-stack apps.
 
 | Application | Auth on Install | User Action Required |
 |-------------|----------------|---------------------|
-| Jellyfin | First-run wizard forces admin account creation | None — wizard handles it |
-| Radarr | Disabled (`AuthenticationMethod: None`) | Enable Forms/Basic auth in Settings → General → Authentication |
-| Sonarr | Disabled (`AuthenticationMethod: None`) | Enable Forms/Basic auth in Settings → General → Authentication |
-| Prowlarr | Disabled (`AuthenticationMethod: None`) | Enable Forms/Basic auth in Settings → General → Authentication |
-| SABnzbd | Setup wizard on first access | Complete wizard to set credentials |
-| Autobrr | Built-in login on first access | Complete the setup flow and configure filters/download clients |
+| Jellyfin | Admin user created through the startup API | Use credentials from `~/.media-stack-credentials.txt` |
+| Radarr | Forms auth enabled through the local host-config API | Use credentials from `~/.media-stack-credentials.txt` |
+| Sonarr | Forms auth enabled through the local host-config API | Use credentials from `~/.media-stack-credentials.txt` |
+| Prowlarr | Forms auth enabled through the local host-config API | Use credentials from `~/.media-stack-credentials.txt` |
+| SABnzbd | `[misc]` username/password configured; `inet_exposure = 4` preserved | Use credentials from `~/.media-stack-credentials.txt` |
+| Autobrr | Admin user created with `autobrrctl create-user` | Use credentials from `~/.media-stack-credentials.txt` |
 
-**Until users configure authentication, Radarr/Sonarr/Prowlarr are accessible to anyone who knows the URL. SABnzbd's wizard is also reachable so users can set its credentials.**
+If the installer detects existing app auth on a rerun, it preserves it rather than overwriting the password. If the original generated credential file is missing and the existing password cannot be recovered safely, the installer warns instead of claiming a new password was set.
 
 Additional security measures:
 - Randomized ports per user (not security, but obscurity layer)

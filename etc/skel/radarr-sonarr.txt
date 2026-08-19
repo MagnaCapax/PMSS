@@ -7,11 +7,15 @@ the HTTPS URLs proxied through nginx:
 
     arrinfo
 
-Each Arr app has its own authentication, separate from your seedbox panel. Set
-up Forms authentication inside each app before sharing or relying on its URL.
-Until Forms auth is configured, Arr apps may be reachable to anyone who knows
-the proxied URL. Credentials are per-app; setting them in one app does not
-configure the others.
+Each Arr app has its own authentication, separate from your seedbox panel.
+User-local installs from install-media-stack.sh pre-set Forms authentication
+and write the per-app URLs, usernames, and generated passwords to:
+
+    ~/.media-stack-credentials.txt
+
+Credentials are per-app; setting or changing them in one app does not configure
+the others. If you later change a password inside an app, update your own
+records because the installer will preserve existing app auth on reruns.
 
 Restart and update behavior depends on installation type: PMSS maintains the
 system-wide /opt apps during updates, while user-local installs from

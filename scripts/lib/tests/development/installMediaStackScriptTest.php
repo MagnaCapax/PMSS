@@ -87,6 +87,7 @@ class installMediaStackScriptTest extends TestCase
 
         $this->assertSame(2, substr_count($output, '<UpdateMechanism>External</UpdateMechanism>'));
         $this->assertSame(2, substr_count($output, '<UpdateAutomatically>False</UpdateAutomatically>'));
+        $this->assertSame(2, substr_count($output, '<AuthenticationRequired>Enabled</AuthenticationRequired>'));
         $this->assertStringNotContainsString('<UpdateMechanism>BuiltIn</UpdateMechanism>', $output);
         $this->assertStringNotContainsString('<UpdateAutomatically>True</UpdateAutomatically>', $output);
     }
@@ -115,11 +116,13 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringNotContainsString($oldRemoveCommand, $this->script);
     }
 
-    public function testSabnzbdAllowsProxiedWizardAccess(): void
+    public function testSabnzbdConfiguresAuthAndKeepsProxiedWebUiAccess(): void
     {
         $this->assertStringContainsAllStrings([
             'inet_exposure = 4',
             'sabnzbd_misc_value_set() {',
+            'sabnzbd_misc_value_set "$datadir/${app}.ini" username "$SABNZBD_AUTH_USERNAME"',
+            'sabnzbd_misc_value_set "$datadir/${app}.ini" password "$SABNZBD_PASSWORD"',
             'sabnzbd_misc_value_set "$datadir/${app}.ini" inet_exposure "4"',
         ], $this->script);
     }
@@ -193,6 +196,66 @@ class installMediaStackScriptTest extends TestCase
             'AUTOBRR__BASE_URL=/autobrr/',
             'AUTOBRR__BASE_URL_MODE_LEGACY=true',
             '--config=\\"$HOME/.config/autobrr\\"',
+        ], $this->script);
+    }
+
+    public function testMediaStackCredentialsUseDelugeStylePhpCsprngAndOwnerOnlyFile(): void
+    {
+        $this->assertStringContainsAllStrings([
+            'MEDIA_STACK_CREDENTIALS_FILE="$HOME/.media-stack-credentials.txt"',
+            'media_stack_password_generate() {',
+            'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_',
+            'random_int(0, $maxIndex)',
+            'media_stack_credentials_file_write() {',
+            'mktemp "${MEDIA_STACK_CREDENTIALS_FILE}.pmss.XXXXXX"',
+            'chmod 600 "$MEDIA_STACK_CREDENTIALS_FILE"',
+            'media_stack_credentials_summary_print',
+            'SABNZBD_PASSWORD = %s',
+            'RADARR_PASSWORD = %s',
+            'JELLYFIN_PASSWORD = %s',
+        ], $this->script);
+    }
+
+    public function testServarrAuthSeedingUsesLocalApiAndFailsClosed(): void
+    {
+        $this->assertStringContainsAllStrings([
+            'servarr_auth_seed() {',
+            'base_url="http://127.0.0.1:${seed_port}/api/${api_version}/config/host"',
+            '$data["authenticationMethod"] = "forms"',
+            '$data["authenticationRequired"] = "enabled"',
+            'servarr_credentials_mark_existing_unknown() {',
+            'RADARR_PASSWORD="[existing Radarr password preserved; not known to installer]"',
+            'password not changed',
+            'servarr_config_xml_tag_converge "$config_file" AuthenticationMethod Forms',
+            'servarr_config_xml_tag_converge "$config_file" AuthenticationRequired Enabled',
+            'unauthenticated API returned HTTP ${unauth_code}',
+            'Radarr auth seeding failed; not starting media stack',
+            'Prowlarr auth seeding failed; not starting media stack',
+            'Sonarr auth seeding failed; not starting media stack',
+        ], $this->script);
+    }
+
+    public function testAutobrrAuthSeedingUsesCliAndPreservesExistingUsers(): void
+    {
+        $this->assertStringContainsAllStrings([
+            'autobrr_auth_seed() {',
+            'AUTOBRR__PORT=\"$seed_port\"',
+            'autobrrctl" --config "$datadir" create-user "$MEDIA_STACK_AUTH_USERNAME"',
+            'Autobrr user already exists or could not be changed; preserving existing Autobrr credentials',
+            'Autobrr auth seeding failed; not starting media stack',
+        ], $this->script);
+    }
+
+    public function testJellyfinStartupWizardAdminIsSeededAndVerified(): void
+    {
+        $this->assertStringContainsAllStrings([
+            'jellyfin_auth_seed() {',
+            '${base_url}/Startup/User',
+            '${base_url}/Startup/Complete',
+            '${base_url}/Users/AuthenticateByName',
+            'Authorization: MediaBrowser Client="PMSS"',
+            'Jellyfin admin login verification failed',
+            'Jellyfin auth seeding failed; not starting media stack',
         ], $this->script);
     }
 
@@ -577,14 +640,14 @@ BASHRC
         $newConfig = $home.'/new/config.toml';
         $existingConfig = $home.'/existing/config.toml';
         $this->pmssEnsureDir(dirname($newConfig));
-        $this->pmssWriteFile($existingConfig, "host = \"127.0.0.1\"\nport = 12345\ncustom = true\n");
+        $this->pmssWriteFile($existingConfig, "host = \"127.0.0.1\"\nport = 12345\nsessionSecret = \"oldsecret\"\ncustom = true\n");
         $functions = $this->pmssExtractShellFunctions($this->script, array('autobrr_configure'));
         $script = implode("\n", array(
             '#!/usr/bin/env bash',
             'set -euo pipefail',
             $functions,
-            'autobrr_configure '.escapeshellarg($newConfig).' 23456',
-            'autobrr_configure '.escapeshellarg($existingConfig).' 34567',
+            'autobrr_configure '.escapeshellarg($newConfig).' 23456 newsecret',
+            'autobrr_configure '.escapeshellarg($existingConfig).' 34567 newsecret',
             'cat '.escapeshellarg($newConfig),
             'cat '.escapeshellarg($existingConfig),
             '',
@@ -599,6 +662,9 @@ BASHRC
             'custom = true',
             'baseUrl = "/autobrr/"',
             'baseUrlModeLegacy = true',
+            'databaseType = "sqlite"',
+            'sessionSecret = "newsecret"',
+            'sessionSecret = "oldsecret"',
         ], $output);
     }
 

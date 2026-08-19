@@ -14,18 +14,14 @@
 # @author Pulsed Media Dev Team
 #
 # WARNING: PROVIDED AS-IS. NO GUARANTEES, NO MAINTENANCE, NO SUPPORT.
-# USERS MUST CONFIGURE, MAINTAIN, AND SECURE APPS THEMSELVES (e.g., media paths, API keys).
+# USERS MUST CONFIGURE AND MAINTAIN APPS THEMSELVES (e.g., media paths, API keys).
 # DO NOT EXPOSE TO INTERNET WITHOUT PROPER FIREWALL/HTTPS/VPN.
 # MAY CONFLICT WITH GLOBAL /opt INSTALLS—USE AT OWN RISK.
 # RANDOM PORTS USED FOR SHARED ENV; APPS BIND TO LOCALHOST ONLY.
 # SECURITY MODEL
 # All apps are reverse-proxied under /public-<user>/<app> which has NO
-# proxy-level authentication. App-level auth is the USER's responsibility:
-#   - Jellyfin: first-run wizard forces admin account creation
-#   - Radarr/Sonarr/Prowlarr: enable Forms auth in Settings > General > Authentication
-#   - SABnzbd: first-run wizard sets credentials
-# Until users configure auth, Radarr/Sonarr/Prowlarr are accessible to anyone
-# who knows the URL. The installer prints a security warning at completion.
+# proxy-level authentication. The installer configures app-level auth by
+# default and writes generated credentials to ~/.media-stack-credentials.txt.
 #
 # #TODO: Integrate with /opt sonarr/radarr (e.g., symlink or detect)
 # #TODO: Systemd service generation instead of tmux
@@ -88,6 +84,7 @@ MEDIA_STACK_MIN_MEMORY_BYTES=$((MEDIA_STACK_MIN_MEMORY_MIB * 1024 * 1024))
 MEDIA_STACK_UNLIMITED_MEMORY_BYTES=$((1024 * 1024 * 1024 * 1024 * 1024))
 MEDIA_STACK_BASE_SESSIONS=(sonarr radarr prowlarr sabnzbd cloudplow autobrr)
 MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow autobrr)
+MEDIA_STACK_CREDENTIALS_FILE="$HOME/.media-stack-credentials.txt"
 
 # Overrides (initialized empty)
 OVR_SONARR_URL=""
@@ -415,7 +412,7 @@ autobrr_resolve_download_url() {
 }
 
 autobrr_configure() {
-	local config_file="$1" port="$2"
+	local config_file="$1" port="$2" session_secret="${3:-}"
 
 	if [[ ! -f "$config_file" ]]; then
 		cat >"$config_file" <<EOF
@@ -423,7 +420,11 @@ host = "127.0.0.1"
 port = ${port}
 baseUrl = "/autobrr/"
 baseUrlModeLegacy = true
+databaseType = "sqlite"
 EOF
+		if [[ -n "$session_secret" ]]; then
+			printf 'sessionSecret = "%s"\n' "$session_secret" >>"$config_file"
+		fi
 		return
 	fi
 
@@ -431,6 +432,18 @@ EOF
 		sed -i -E "s|^[[:space:]]*port[[:space:]]*=.*$|port = ${port}|" "$config_file"
 	else
 		printf '\nport = %s\n' "$port" >>"$config_file"
+	fi
+	if ! grep -qE '^[[:space:]]*baseUrl[[:space:]]*=' "$config_file"; then
+		printf 'baseUrl = "/autobrr/"\n' >>"$config_file"
+	fi
+	if ! grep -qE '^[[:space:]]*baseUrlModeLegacy[[:space:]]*=' "$config_file"; then
+		printf 'baseUrlModeLegacy = true\n' >>"$config_file"
+	fi
+	if ! grep -qE '^[[:space:]]*databaseType[[:space:]]*=' "$config_file"; then
+		printf 'databaseType = "sqlite"\n' >>"$config_file"
+	fi
+	if [[ -n "$session_secret" ]] && ! grep -qE '^[[:space:]]*sessionSecret[[:space:]]*=' "$config_file"; then
+		printf 'sessionSecret = "%s"\n' "$session_secret" >>"$config_file"
 	fi
 }
 
@@ -555,6 +568,7 @@ EOF
 		sed -i -E "s|<Port>[^<]*</Port>|<Port>${port}</Port>|g" "$datadir/config.xml"
 		sed -i -E "s|<UrlBase>[^<]*</UrlBase>|<UrlBase>/public-${USERNAME}/${app}</UrlBase>|g" "$datadir/config.xml"
 		sed -i -E "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddress>|g" "$datadir/config.xml"
+		servarr_config_xml_tag_converge "$datadir/config.xml" AuthenticationRequired Enabled
 		servarr_config_xml_tag_converge "$datadir/config.xml" UpdateMechanism External
 		servarr_config_xml_tag_converge "$datadir/config.xml" UpdateAutomatically False
 	else
@@ -1310,6 +1324,20 @@ existing_port_from_ini() {
 				print $2;
 				exit
 			}
+			' "$file"
+}
+
+existing_value_from_ini() {
+	local file="$1" key="$2"
+	[[ -f "$file" ]] || return 0
+	awk -F'=' -v k="$key" '
+			$1 ~ "^[[:space:]]*" k "[[:space:]]*$" {
+				value = $0;
+				sub(/^[^=]*=/, "", value);
+				gsub(/^[[:space:]]+|[[:space:]]+$/, "", value);
+				print value;
+				exit
+			}
 		' "$file"
 }
 
@@ -1333,6 +1361,331 @@ pick_existing_or_random_port() {
 		log_warn "Ignoring invalid existing port '${existing}' and selecting a fresh local port"
 	fi
 	random_open_port
+}
+
+media_stack_password_generate() {
+	# shellcheck disable=SC2016
+	php -r '$alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_"; $maxIndex = strlen($alphabet) - 1; for ($position = 0; $position < 24; $position++) { echo $alphabet[random_int(0, $maxIndex)]; } echo PHP_EOL;'
+}
+
+media_stack_app_key() {
+	printf '%s' "$1" | tr '[:lower:]-' '[:upper:]_'
+}
+
+media_stack_credentials_value() {
+	local key="$1"
+	[[ -f "$MEDIA_STACK_CREDENTIALS_FILE" ]] || return 0
+	awk -F' = ' -v k="$key" '$1 == k { print $2; exit }' "$MEDIA_STACK_CREDENTIALS_FILE"
+}
+
+media_stack_credentials_password_for_app() {
+	local app_key existing
+	app_key=$(media_stack_app_key "$1")
+	existing=$(media_stack_credentials_value "${app_key}_PASSWORD")
+	if [[ -n "$existing" && "$existing" != \[* ]]; then
+		printf '%s' "$existing"
+		return
+	fi
+	media_stack_password_generate
+}
+
+media_stack_require_auth_seed_tools() {
+	if ! command -v php >/dev/null 2>&1; then
+		log_err "PHP is required to generate media-stack passwords safely"
+		return 1
+	fi
+	if ! command -v curl >/dev/null 2>&1; then
+		log_err "curl is required to seed media-stack app authentication safely"
+		return 1
+	fi
+}
+
+media_stack_wait_http_ok() {
+	local url="$1" attempts="${2:-45}" attempt
+
+	for ((attempt = 1; attempt <= attempts; attempt++)); do
+		if curl -fsS --max-time 2 "$url" >/dev/null 2>&1; then
+			return 0
+		fi
+		sleep 1
+	done
+	return 1
+}
+
+media_stack_http_code() {
+	local url="$1"
+	shift
+	curl -sS --max-time 10 -o /dev/null -w "%{http_code}" "$@" "$url" 2>/dev/null || printf '000'
+}
+
+media_stack_json_escape() {
+	JSON_VALUE="$1" php -r 'echo json_encode(getenv("JSON_VALUE"), JSON_UNESCAPED_SLASHES);'
+}
+
+media_stack_credentials_file_write() {
+	local tmp_file
+	tmp_file=$(mktemp "${MEDIA_STACK_CREDENTIALS_FILE}.pmss.XXXXXX")
+	chmod 600 "$tmp_file"
+
+	{
+		printf '# PMSS media stack credentials\n'
+		printf '# This file is owner-readable only; app auth is separate from the public proxy.\n'
+		printf 'SABNZBD_URL = https://%s/public-%s/sabnzbd/\n' "$HOSTNAME" "$USERNAME"
+		printf 'SABNZBD_USERNAME = %s\n' "$SABNZBD_AUTH_USERNAME"
+		printf 'SABNZBD_PASSWORD = %s\n' "$SABNZBD_PASSWORD"
+		printf 'RADARR_URL = https://%s/public-%s/radarr/\n' "$HOSTNAME" "$USERNAME"
+		printf 'RADARR_USERNAME = %s\n' "$MEDIA_STACK_AUTH_USERNAME"
+		printf 'RADARR_PASSWORD = %s\n' "$RADARR_PASSWORD"
+		printf 'SONARR_URL = https://%s/public-%s/sonarr/\n' "$HOSTNAME" "$USERNAME"
+		printf 'SONARR_USERNAME = %s\n' "$MEDIA_STACK_AUTH_USERNAME"
+		printf 'SONARR_PASSWORD = %s\n' "$SONARR_PASSWORD"
+		printf 'PROWLARR_URL = https://%s/public-%s/prowlarr/\n' "$HOSTNAME" "$USERNAME"
+		printf 'PROWLARR_USERNAME = %s\n' "$MEDIA_STACK_AUTH_USERNAME"
+		printf 'PROWLARR_PASSWORD = %s\n' "$PROWLARR_PASSWORD"
+		printf 'AUTOBRR_URL = https://%s/public-%s/autobrr/\n' "$HOSTNAME" "$USERNAME"
+		printf 'AUTOBRR_USERNAME = %s\n' "$MEDIA_STACK_AUTH_USERNAME"
+		printf 'AUTOBRR_PASSWORD = %s\n' "$AUTOBRR_PASSWORD"
+		if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+			printf 'JELLYFIN_URL = https://%s/public-%s/jellyfin/web/index.html\n' "$HOSTNAME" "$USERNAME"
+			printf 'JELLYFIN_USERNAME = %s\n' "$MEDIA_STACK_AUTH_USERNAME"
+			printf 'JELLYFIN_PASSWORD = %s\n' "$JELLYFIN_PASSWORD"
+		fi
+	} >"$tmp_file"
+	chmod 600 "$tmp_file"
+	mv "$tmp_file" "$MEDIA_STACK_CREDENTIALS_FILE"
+	chmod 600 "$MEDIA_STACK_CREDENTIALS_FILE"
+}
+
+media_stack_credentials_summary_print() {
+	echo "Media stack credentials: $MEDIA_STACK_CREDENTIALS_FILE"
+	grep -v '^#' "$MEDIA_STACK_CREDENTIALS_FILE"
+}
+
+servarr_config_auth_configured() {
+	local config_file="$1" method
+	method=$(sed -n -E 's|.*<AuthenticationMethod>([^<]*)</AuthenticationMethod>.*|\1|p' "$config_file" | head -n 1 | tr '[:upper:]' '[:lower:]')
+	[[ "$method" == "forms" || "$method" == "basic" || "$method" == "external" ]]
+}
+
+servarr_credentials_mark_existing_unknown() {
+	local app="$1" install_name="$2"
+
+	case "$app" in
+	radarr)
+		RADARR_PASSWORD="[existing Radarr password preserved; not known to installer]"
+		;;
+	sonarr)
+		SONARR_PASSWORD="[existing Sonarr password preserved; not known to installer]"
+		;;
+	prowlarr)
+		PROWLARR_PASSWORD="[existing Prowlarr password preserved; not known to installer]"
+		;;
+	esac
+	log_warn "${install_name} app-level auth already configured; password not changed"
+}
+
+servarr_auth_payload_write() {
+	local source_json="$1" target_json="$2" password="$3"
+	# shellcheck disable=SC2016
+	MEDIA_STACK_AUTH_USERNAME="$MEDIA_STACK_AUTH_USERNAME" MEDIA_STACK_AUTH_PASSWORD="$password" php -r '$input = stream_get_contents(STDIN); $data = json_decode($input, true); if (!is_array($data)) { fwrite(STDERR, "Invalid Servarr host-config JSON\n"); exit(1); } $data["id"] = isset($data["id"]) ? $data["id"] : 1; $data["authenticationMethod"] = "forms"; $data["authenticationRequired"] = "enabled"; $data["username"] = getenv("MEDIA_STACK_AUTH_USERNAME"); $data["password"] = getenv("MEDIA_STACK_AUTH_PASSWORD"); $data["passwordConfirmation"] = getenv("MEDIA_STACK_AUTH_PASSWORD"); echo json_encode($data, JSON_UNESCAPED_SLASHES);' <"$source_json" >"$target_json"
+}
+
+servarr_auth_seed() {
+	local app="$1" install_name="$2" dll="$3" desired_port="$4" api_version="$5" password="$6" extra_args="${7:-}"
+	local datadir="$HOME/.config/${app}"
+	local config_file="$datadir/config.xml"
+	local seed_port session base_url response_json payload_json put_code unauth_code run_args existing_password
+
+	if servarr_config_auth_configured "$config_file"; then
+		existing_password=$(media_stack_credentials_value "$(media_stack_app_key "$app")_PASSWORD")
+		if [[ -n "$existing_password" && "$existing_password" != \[* ]]; then
+			log_info "${install_name} app-level auth already configured; preserving existing credentials file entry"
+		else
+			servarr_credentials_mark_existing_unknown "$app" "$install_name"
+		fi
+		return 0
+	fi
+
+	seed_port=$(random_open_port)
+	session="${app}-auth-seed"
+	base_url="http://127.0.0.1:${seed_port}/api/${api_version}/config/host"
+	response_json=$(mktemp)
+	payload_json=$(mktemp)
+
+	servarr_config_xml_tag_converge "$config_file" Port "$seed_port"
+	servarr_config_xml_tag_converge "$config_file" AuthenticationRequired Enabled
+	run_args="${dll}${extra_args:+ $extra_args} --data=\"$datadir\""
+	tmux kill-session -t "$session" 2>/dev/null || true
+	tmux new-session -d -s "$session" \
+		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/${install_name}\" && \"$DOTNET_ROOT_PATH/dotnet\" ${run_args} 2>&1 | tee -a \"$datadir/${app}-auth-seed.log\"" || {
+		log_err "Failed to start ${install_name} for local auth seeding"
+		rm -f "$response_json" "$payload_json"
+		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+		return 1
+	}
+
+	if ! media_stack_wait_http_ok "$base_url"; then
+		log_err "${install_name} did not expose its local auth configuration API"
+		tmux kill-session -t "$session" 2>/dev/null || true
+		rm -f "$response_json" "$payload_json"
+		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+		return 1
+	fi
+
+	if ! curl -fsS --max-time 10 "$base_url" -o "$response_json"; then
+		log_err "Failed to read ${install_name} local auth configuration"
+		tmux kill-session -t "$session" 2>/dev/null || true
+		rm -f "$response_json" "$payload_json"
+		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+		return 1
+	fi
+	if ! servarr_auth_payload_write "$response_json" "$payload_json" "$password"; then
+		log_err "Failed to build ${install_name} auth payload"
+		tmux kill-session -t "$session" 2>/dev/null || true
+		rm -f "$response_json" "$payload_json"
+		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+		return 1
+	fi
+
+	put_code=$(media_stack_http_code "${base_url}/1" -X PUT -H 'Content-Type: application/json' --data-binary "@${payload_json}")
+	if [[ "$put_code" != "200" && "$put_code" != "202" ]]; then
+		log_err "${install_name} rejected local auth configuration (HTTP ${put_code})"
+		tmux kill-session -t "$session" 2>/dev/null || true
+		rm -f "$response_json" "$payload_json"
+		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+		return 1
+	fi
+
+	sleep 1
+	unauth_code=$(media_stack_http_code "$base_url")
+	if [[ "$unauth_code" != "401" && "$unauth_code" != "403" ]]; then
+		log_err "${install_name} auth verification failed; unauthenticated API returned HTTP ${unauth_code}"
+		tmux kill-session -t "$session" 2>/dev/null || true
+		rm -f "$response_json" "$payload_json"
+		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+		return 1
+	fi
+
+	tmux kill-session -t "$session" 2>/dev/null || true
+	rm -f "$response_json" "$payload_json"
+	servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+	servarr_config_xml_tag_converge "$config_file" AuthenticationMethod Forms
+	servarr_config_xml_tag_converge "$config_file" AuthenticationRequired Enabled
+	log_ok "${install_name} app-level auth configured"
+}
+
+autobrr_auth_seed() {
+	local datadir="$1" password="$2" session="autobrr-auth-seed"
+	local db_file="$datadir/autobrr.db" had_db=0 seed_port
+
+	[[ -s "$db_file" ]] && had_db=1
+	if [[ "$had_db" -eq 0 ]]; then
+		seed_port=$(random_open_port)
+		tmux kill-session -t "$session" 2>/dev/null || true
+		tmux new-session -d -s "$session" \
+			"AUTOBRR__HOST=127.0.0.1 AUTOBRR__PORT=\"$seed_port\" AUTOBRR__BASE_URL=/autobrr/ AUTOBRR__BASE_URL_MODE_LEGACY=true \"$HOME/.bin/autobrr/autobrr\" --config=\"$datadir\" 2>&1 | tee -a \"$datadir/autobrr-auth-seed.log\"" || {
+			log_err "Failed to start Autobrr for local database migration"
+			return 1
+		}
+		if ! media_stack_wait_http_ok "http://127.0.0.1:${seed_port}/autobrr/" 30; then
+			log_err "Autobrr did not start for local auth seeding"
+			tmux kill-session -t "$session" 2>/dev/null || true
+			return 1
+		fi
+		tmux kill-session -t "$session" 2>/dev/null || true
+	fi
+
+	if printf '%s\n' "$password" | "$HOME/.bin/autobrr/autobrrctl" --config "$datadir" create-user "$MEDIA_STACK_AUTH_USERNAME" >/dev/null 2>&1; then
+		log_ok "Autobrr app-level auth configured"
+		return 0
+	fi
+
+	if [[ "$had_db" -eq 1 ]]; then
+		log_warn "Autobrr user already exists or could not be changed; preserving existing Autobrr credentials"
+		AUTOBRR_PASSWORD="[existing Autobrr password preserved; not known to installer]"
+		return 0
+	fi
+
+	log_err "Autobrr admin user could not be created"
+	return 1
+}
+
+jellyfin_auth_payload_write() {
+	local target_json="$1" password="$2"
+	{
+		printf '{"Name":'
+		media_stack_json_escape "$MEDIA_STACK_AUTH_USERNAME"
+		printf ',"Password":'
+		media_stack_json_escape "$password"
+		printf '}'
+	} >"$target_json"
+}
+
+jellyfin_auth_seed() {
+	local password="$1" seed_port session base_url payload_json auth_json code
+	seed_port=$(random_open_port)
+	session="jellyfin-auth-seed"
+	base_url="http://127.0.0.1:${seed_port}"
+	payload_json=$(mktemp)
+	auth_json=$(mktemp)
+
+	tmux kill-session -t "$session" 2>/dev/null || true
+	tmux new-session -d -s "$session" \
+		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${seed_port}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log\"" 2>/dev/null || true
+
+	if ! media_stack_wait_http_ok "${base_url}/Startup/Configuration" 60; then
+		log_err "Jellyfin did not expose the startup API for admin seeding"
+		if media_stack_log_has "$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log" "FfmpegException\|Failed.*ffmpeg"; then
+			log_err "Jellyfin failed FFmpeg validation — pass --jellyfin-ffmpeg=$HOME/.bin/ffmpeg after installing FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
+		fi
+		if media_stack_log_has "$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log" "illegal instruction\|SIGILL\|signal 4"; then
+			log_err "Jellyfin crashed with Illegal Instruction — CPU lacks required instruction sets"
+		fi
+		tmux kill-session -t "$session" 2>/dev/null || true
+		rm -f "$payload_json" "$auth_json"
+		return 1
+	fi
+
+	if ! curl -fsS --max-time 10 "${base_url}/Startup/User" >/dev/null; then
+		log_err "Jellyfin startup user initialization failed"
+		tmux kill-session -t "$session" 2>/dev/null || true
+		rm -f "$payload_json" "$auth_json"
+		return 1
+	fi
+	jellyfin_auth_payload_write "$payload_json" "$password"
+	code=$(media_stack_http_code "${base_url}/Startup/User" -X POST -H 'Content-Type: application/json' --data-binary "@${payload_json}")
+	if [[ "$code" != "204" ]]; then
+		log_err "Jellyfin rejected startup admin creation (HTTP ${code})"
+		tmux kill-session -t "$session" 2>/dev/null || true
+		rm -f "$payload_json" "$auth_json"
+		return 1
+	fi
+	code=$(media_stack_http_code "${base_url}/Startup/Complete" -X POST)
+	if [[ "$code" != "204" ]]; then
+		log_err "Jellyfin rejected startup completion (HTTP ${code})"
+		tmux kill-session -t "$session" 2>/dev/null || true
+		rm -f "$payload_json" "$auth_json"
+		return 1
+	fi
+
+	{
+		printf '{"Username":'
+		media_stack_json_escape "$MEDIA_STACK_AUTH_USERNAME"
+		printf ',"Pw":'
+		media_stack_json_escape "$password"
+		printf '}'
+	} >"$auth_json"
+	code=$(media_stack_http_code "${base_url}/Users/AuthenticateByName" -X POST -H 'Content-Type: application/json' -H 'Authorization: MediaBrowser Client="PMSS", Device="media-stack-installer", DeviceId="pmss-media-stack", Version="1"' --data-binary "@${auth_json}")
+	if [[ "$code" != "200" ]]; then
+		log_err "Jellyfin admin login verification failed (HTTP ${code})"
+		tmux kill-session -t "$session" 2>/dev/null || true
+		rm -f "$payload_json" "$auth_json"
+		return 1
+	fi
+
+	tmux kill-session -t "$session" 2>/dev/null || true
+	rm -f "$payload_json" "$auth_json" "$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log" 2>/dev/null || true
+	log_ok "Jellyfin admin account configured"
 }
 
 jellyfin_system_xml_tag_set() {
@@ -1442,6 +1795,18 @@ JELLYFIN_PORT="${JELLYFIN_PORT:-$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_D
 JELLYFIN_PORT="$(pick_existing_or_random_port "$JELLYFIN_PORT")"
 USERNAME=$(whoami)
 HOSTNAME=$(hostname)
+MEDIA_STACK_AUTH_USERNAME="$USERNAME"
+media_stack_require_auth_seed_tools
+SABNZBD_AUTH_USERNAME=$(existing_value_from_ini "$HOME/.config/sabnzbd/sabnzbd.ini" "username")
+SABNZBD_AUTH_USERNAME="${SABNZBD_AUTH_USERNAME:-$MEDIA_STACK_AUTH_USERNAME}"
+SABNZBD_PASSWORD=$(existing_value_from_ini "$HOME/.config/sabnzbd/sabnzbd.ini" "password")
+SABNZBD_PASSWORD="${SABNZBD_PASSWORD:-$(media_stack_credentials_password_for_app sabnzbd)}"
+RADARR_PASSWORD=$(media_stack_credentials_password_for_app radarr)
+SONARR_PASSWORD=$(media_stack_credentials_password_for_app sonarr)
+PROWLARR_PASSWORD=$(media_stack_credentials_password_for_app prowlarr)
+AUTOBRR_PASSWORD=$(media_stack_credentials_password_for_app autobrr)
+AUTOBRR_SESSION_SECRET=$(media_stack_credentials_password_for_app autobrr_session)
+JELLYFIN_PASSWORD=$(media_stack_credentials_password_for_app jellyfin)
 
 # Guardrail: Check for python3-venv
 if ! python3 -m venv --help >/dev/null 2>&1; then
@@ -1519,8 +1884,16 @@ EOF
 	sabnzbd_misc_value_set "$datadir/${app}.ini" port "$SABNZBD_PORT"
 	sabnzbd_misc_value_set "$datadir/${app}.ini" host "127.0.0.1"
 	sabnzbd_misc_value_set "$datadir/${app}.ini" host_whitelist "$HOSTNAME"
-	# The public lighttpd proxy forwards real client IPs; allow the setup wizard so users can set SABnzbd auth.
+	sabnzbd_misc_value_set "$datadir/${app}.ini" username "$SABNZBD_AUTH_USERNAME"
+	sabnzbd_misc_value_set "$datadir/${app}.ini" password "$SABNZBD_PASSWORD"
+	# The public lighttpd proxy forwards real client IPs; keep the proxied WebUI/wizard reachable.
 	sabnzbd_misc_value_set "$datadir/${app}.ini" inet_exposure "4"
+	if [[ "$(existing_value_from_ini "$datadir/${app}.ini" "username")" != "$SABNZBD_AUTH_USERNAME" ||
+	"$(existing_value_from_ini "$datadir/${app}.ini" "password")" != "$SABNZBD_PASSWORD" ||
+	"$(existing_value_from_ini "$datadir/${app}.ini" "inet_exposure")" != "4" ]]; then
+		log_err "SABnzbd auth configuration verification failed"
+		exit 1
+	fi
 else
 	log_info "[dry-run] would configure ${app^^} (port=${SABNZBD_PORT}, url_base=/public-${USERNAME}/${app})"
 fi
@@ -1556,8 +1929,12 @@ if [[ $DRY_RUN -eq 0 ]]; then
 	fi
 	fetch_verified_archive "$AUTOBRR_URL" "autobrr.tar.gz" "Autobrr"
 	extract_tgz "autobrr.tar.gz" "$installdir"
-	autobrr_configure "$datadir/config.toml" "$AUTOBRR_PORT"
+	autobrr_configure "$datadir/config.toml" "$AUTOBRR_PORT" "$AUTOBRR_SESSION_SECRET"
 	chmod 700 "$installdir/autobrr" "$installdir/autobrrctl" 2>/dev/null || true
+	if ! autobrr_auth_seed "$datadir" "$AUTOBRR_PASSWORD"; then
+		log_err "Autobrr auth seeding failed; not starting media stack"
+		exit 1
+	fi
 	echo "${app^^} Installed"
 else
 	log_info "[dry-run] would install Autobrr ${AUTOBRR_VERSION:-unknown} and configure loopback port ${AUTOBRR_PORT}"
@@ -1594,6 +1971,25 @@ case ":$PATH:" in
 esac
 export PATH' 'PMSS media stack installer'
 chmod 0640 "$HOME/.bashrc.custom" 2>/dev/null || true
+echo ""
+
+log_step "Configuring Servarr authentication..."
+if [[ $DRY_RUN -eq 0 ]]; then
+	servarr_auth_seed "radarr" "Radarr" "Radarr.dll" "$RADARR_PORT" "v3" "$RADARR_PASSWORD" "--nobrowser" || {
+		log_err "Radarr auth seeding failed; not starting media stack"
+		exit 1
+	}
+	servarr_auth_seed "prowlarr" "Prowlarr" "Prowlarr.dll" "$PROWLARR_PORT" "v1" "$PROWLARR_PASSWORD" "--nobrowser" || {
+		log_err "Prowlarr auth seeding failed; not starting media stack"
+		exit 1
+	}
+	servarr_auth_seed "sonarr" "Sonarr" "Sonarr.dll" "$SONARR_PORT" "v3" "$SONARR_PASSWORD" || {
+		log_err "Sonarr auth seeding failed; not starting media stack"
+		exit 1
+	}
+else
+	log_info "[dry-run] would seed Radarr/Sonarr/Prowlarr Forms auth on temporary loopback ports"
+fi
 echo ""
 
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
@@ -1683,26 +2079,11 @@ SYSXML
 	echo "${app^^} configured"
 
 	if [[ $DRY_RUN -eq 0 ]] && [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
-		jellyfin_smoke_log="$JELLYFIN_LOG_DIR/jellyfin-smoke.log"
-		log_info "Running Jellyfin smoke test..."
-		tmux new-session -d -s "jellyfin-smoke" \
-			"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$jellyfin_smoke_log\"" 2>/dev/null || true
-		sleep 4
-		if tmux has-session -t "jellyfin-smoke" 2>/dev/null; then
-			log_ok "Jellyfin smoke test passed (DLL loads, native libs OK)"
-			tmux kill-session -t "jellyfin-smoke" 2>/dev/null || true
-		else
-			log_warn "Jellyfin exited during smoke test — may have crashed"
-			if media_stack_log_has "$jellyfin_smoke_log" "FfmpegException\|Failed.*ffmpeg"; then
-				log_err "Jellyfin failed FFmpeg validation — pass --jellyfin-ffmpeg=$HOME/.bin/ffmpeg after installing FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
-			fi
-			if media_stack_log_has "$jellyfin_smoke_log" "illegal instruction\|SIGILL\|signal 4"; then
-				log_err "Jellyfin crashed with Illegal Instruction — CPU lacks required instruction sets"
-				log_err "SkiaSharp or other native libraries need SSE4.2/AVX which this CPU does not have"
-				log_warn "Jellyfin will be installed but may crash during image processing"
-			fi
+		log_info "Creating Jellyfin admin account locally..."
+		if ! jellyfin_auth_seed "$JELLYFIN_PASSWORD"; then
+			log_err "Jellyfin auth seeding failed; not starting media stack"
+			exit 1
 		fi
-		rm -f "$jellyfin_smoke_log" 2>/dev/null || true
 	fi
 else
 	log_warn "Skipping Jellyfin install; rerun with --jellyfin-ffmpeg=$HOME/.bin/ffmpeg after installing FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
@@ -1743,6 +2124,7 @@ set -u
 echo ""
 log_step "Starting applications"
 if [[ $DRY_RUN -eq 0 ]]; then
+	media_stack_credentials_file_write
 	media_stack_start_apps
 	media_stack_verify_sessions
 else
@@ -1750,6 +2132,10 @@ else
 fi
 
 echo ""
+if [[ $DRY_RUN -eq 0 ]]; then
+	media_stack_credentials_summary_print
+	echo ""
+fi
 echo "Connect to running application use command 'tmux attach -t <app-name>'"
 echo "e.g to attach to radarr 'tmux attach -t radarr'"
 echo "Exit tmux session by pressing 'CTRL+b' then 'd'"
@@ -1760,7 +2146,6 @@ echo ""
 for app in radarr sonarr prowlarr sabnzbd autobrr; do
 	echo "${app^^}-URL = https://${HOSTNAME}/public-${USERNAME}/${app}/"
 done
-echo "SABNZBD-WIZARD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/wizard/"
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 	echo "JELLYFIN-URL = https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
 	echo "JELLYFIN-LOCAL-URL = http://127.0.0.1:${JELLYFIN_PORT}"
@@ -1801,15 +2186,13 @@ fi
 echo ""
 echo "================== SECURITY WARNING =================="
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-	echo "Jellyfin first-run requires creating an admin account."
-	echo "Set a STRONG admin password immediately after opening:"
-	echo "  https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
+	echo "Jellyfin admin auth was configured before the public proxy was restarted."
 else
 	echo "Jellyfin was skipped because FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is not configured."
 	echo "Install user-local FFmpeg and rerun with --jellyfin-ffmpeg=$HOME/.bin/ffmpeg."
 fi
-echo "Services are bound to 127.0.0.1 via per-user lighttpd,"
-echo "but do NOT expose them publicly without authentication."
+echo "The /public-${USERNAME}/ paths are intentionally public at proxy level."
+echo "Use the app-level credentials in $MEDIA_STACK_CREDENTIALS_FILE."
 echo "======================================================="
 echo ""
 echo "=== IMPORTANT WARNINGS ==="
