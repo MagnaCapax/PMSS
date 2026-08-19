@@ -153,17 +153,28 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
 
     echo "**** Remove old rtorrent packages\n";
     //passthru('rm -rf /tmp/rtorrent*; rm -rf /tmp/libtorrent*; rm -rf /tmp/xmlrpc*');
-    runStep('Cleaning previous rtorrent sources', 'rm -rf /tmp/rtorrent* /tmp/libtorrent*');	// Not updating xmlrpc this time
+    // xmlrpc-c uses /root/compile below when needed.
+    runStep('Cleaning previous rtorrent sources', 'rm -rf /tmp/rtorrent* /tmp/libtorrent*');
     
 
     if (!file_exists('/usr/local/lib/libxmlrpc_client.a')) {
         echo "**** Updating xmlrpc-c to rev 3116\n";
-        #passthru('cd /tmp; svn checkout https://svn.code.sf.net/p/xmlrpc-c/code/advanced xmlrpc-c -r 2776');
+        $xmlrpcBuildRoot = '/root/compile';
+        $xmlrpcBuildDir = $xmlrpcBuildRoot.'/xmlrpc-c';
         runStep(
-            "Checking out xmlrpc-c rev {$xmlrpcVersion}",
-            pmssBuildCommand('svn', ['checkout', 'https://svn.code.sf.net/p/xmlrpc-c/code/advanced', 'xmlrpc-c', '-r', $xmlrpcVersion])
+            "Checking out and building xmlrpc-c rev {$xmlrpcVersion}",
+            implode('; ', [
+                'set -e',
+                'mkdir -p '.escapeshellarg($xmlrpcBuildRoot),
+                'rm -rf '.escapeshellarg($xmlrpcBuildDir),
+                pmssBuildCommand('svn', ['checkout', 'https://svn.code.sf.net/p/xmlrpc-c/code/advanced', $xmlrpcBuildDir, '-r', $xmlrpcVersion]),
+                'cd '.escapeshellarg($xmlrpcBuildDir),
+                './configure',
+                'make -j12',
+                'make install',
+                'ldconfig',
+            ])
         );
-        runStep('Building xmlrpc-c', 'cd /tmp/xmlrpc-c; ./configure; make -j12; make install; ldconfig; cd -');
     }
 
     

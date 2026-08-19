@@ -234,6 +234,25 @@ class UpdateAppInstallerContractsTest extends TestCase
         }
     }
 
+    public function testRtorrentXmlrpcBuildUsesRootCompileWorkspace(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/update/apps/rtorrent.php');
+
+        $this->assertStringContainsAllStrings([
+            '$xmlrpcBuildRoot = \'/root/compile\';',
+            '$xmlrpcBuildDir = $xmlrpcBuildRoot.\'/xmlrpc-c\';',
+            '"Checking out and building xmlrpc-c rev {$xmlrpcVersion}"',
+            "'set -e'",
+            "'mkdir -p '.escapeshellarg(\$xmlrpcBuildRoot)",
+            "'rm -rf '.escapeshellarg(\$xmlrpcBuildDir)",
+            "pmssBuildCommand('svn', ['checkout', 'https://svn.code.sf.net/p/xmlrpc-c/code/advanced', \$xmlrpcBuildDir, '-r', \$xmlrpcVersion])",
+            "'cd '.escapeshellarg(\$xmlrpcBuildDir)",
+        ], $source);
+
+        $this->assertStringNotContainsString('cd /tmp/xmlrpc-c', $source);
+        $this->assertStringNotContainsString("pmssBuildCommand('svn', ['checkout', 'https://svn.code.sf.net/p/xmlrpc-c/code/advanced', 'xmlrpc-c'", $source);
+    }
+
     public function testSyncthingPinMatchesCheckedReleaseManifest(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/update/apps/syncthing.php');
