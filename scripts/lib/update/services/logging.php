@@ -1,6 +1,6 @@
 <?php
 /**
- * Best-effort journald and remote logging configuration facade.
+ * Best-effort journald and rsyslog configuration facade.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -28,4 +28,4 @@ function pmssRenderLoggingTemplate(
     }
     return strtr($raw, $replacements);
 }
-pmssRequireRelativeFiles(__DIR__, ['logging/journald.php', 'logging/remote.php']);
+pmssRequireRelativeFiles(__DIR__, ['logging/journald.php', 'logging/rsyslog.php', 'logging/remote.php']);

@@ -483,6 +483,7 @@ pmssLogJson(['event' => 'package_phase', 'status' => 'ok']);
 pmssRunProfiledCallable('Migrating legacy localnet config path', 'pmssMigrateLegacyLocalnet');
 pmssRunProfiledCallable('Applying runtime service templates', 'pmssApplyRuntimeTemplates', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);
 pmssRunProfiledCallable('Applying journald runtime limits', 'pmssApplyJournaldLimits', ['logmsg']);
+pmssRunProfiledCallable('Applying rsyslog kernel input rate limit', 'pmssApplyRsyslogKernelInputRateLimit', ['logmsg']);
 pmssRunProfiledCallable('Applying remote logging configuration', 'pmssApplyRemoteLogging', ['logmsg']);
 pmssRunProfiledCallable('Applying hostname configuration', 'pmssApplyHostnameConfig', ['logmsg']);
 pmssRunProfiledCallable('Configuring quota mounts', 'pmssConfigureQuotaMount', ['logmsg']);

@@ -150,6 +150,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - logMessage(string $message, array $context=[]): void → writes to `PMSS_LOG_FILE` (default `pmssLogDir()/update.log`), mirrors to stdout, and emits a JSON `log` event when JSON logging is configured.
 - logmsg(string $message): void → legacy updater entry point; once `scripts/lib/update.php` bootstraps structured logging it forwards to `logMessage()` so older modules keep the shared logger contract.
 - pmssUserLog(string $user, string $message): void → appends to `/var/log/pmss/users/<user>.log` (migrates legacy `/var/log/pmss/user`), no-ops when not running as root; mirrors to `users.log`/`users.jsonl` when lifecycle helpers are available.
+- pmssApplyRsyslogKernelInputRateLimit(?callable $logger=null, ?callable $runner=null): void
+  - Converges the stock Debian `module(load="imklog")` declaration in `/etc/rsyslog.conf` to a 10-second/2000-message input rate limit, preserving every other distro/operator-owned line (ADR 0047).
+  - Validates a temporary full-config candidate with `rsyslogd -N1`, keeps a timestamped backup, atomically replaces the original while preserving metadata, and restarts rsyslog only after a successful change.
+  - Nonstandard/custom imklog declarations, unreadable or unsafe paths, and validation failures are preserved with a warning. `PMSS_RSYSLOG_CONFIG_PATH` and the runner callback support hermetic tests.
 
 ---
 

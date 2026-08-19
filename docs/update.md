@@ -194,7 +194,8 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
 4. Immediately refresh APT repositories and apply the codename-selected dpkg baseline
    _before_ any other orchestration (this ordering is mandatory for all regressions).
 5. Prepare the host (cgroups, systemd slices, base permissions, MOTD, locales) and
-   reapply installer defaults (hardware-aware late-order sysctl tuning, Debian 13+
+   reapply installer defaults (journald caps, the rsyslog kernel-input rate limit,
+   hardware-aware late-order sysctl tuning, Debian 13+
    `/tmp` disk-backed baseline, root shell config, `/home`
    permissions, hostname/quota overrides exported by `install.sh`).
 6. Apply repository templates, refresh apt indexes, migrate legacy files.
