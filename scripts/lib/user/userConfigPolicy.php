@@ -48,6 +48,13 @@ function pmssUserDockerEnabled(string $username, ?UserConfigStore $store = null)
     return $effectiveRamMiB <= 0 || $effectiveRamMiB >= pmssUserDockerMinRamMiB();
 }
 
+/** Check whether persistent per-user services were explicitly requested. */
+function pmssUserLingerEnabled(string $username, ?UserConfigStore $store = null): bool
+{
+    $payload = pmssUserConfigResolvePayload($username, $store);
+    return $payload !== null && pmssUserConfigNormaliseToggleValue($payload, 'lingerEnabled', false);
+}
+
 /** Check whether the per-user lighttpd/php-cgi web stack should run. */
 function pmssUserLighttpdEnabled(string $username, ?UserConfigStore $store = null): bool
 {

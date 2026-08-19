@@ -153,12 +153,16 @@ function pmssUserConfigApplyCgroupAndDocker(array $user, $store): void
     $cgroupRc = runStep('Configuring cgroups', pmssBuildCommand('php', $args));
     if ($cgroupRc !== 0) pmssUserConfigCgroupApplyFailureLog($user['name'], $cgroupRc);
 
-    if (!pmssUserDockerEnabled($user['name'], $store)) {
+    $dockerEnabled = pmssUserDockerEnabled($user['name'], $store);
+    $lingerEnabled = pmssUserLingerEnabled($user['name'], $store);
+    if ($dockerEnabled || $lingerEnabled) {
+        runStep('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg($user['name'])));
+    }
+    if (!$dockerEnabled) {
         pmssLogStatus('SKIP', 'Rootless Docker disabled by config for '.$user['name']);
         return;
     }
 
-    runStep('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg($user['name'])));
     runStep('Installing systemd-container tools', 'apt-get install -y systemd-container');
     // Manager-independent rootless-Docker setup (ADR-0027): run the setuptool AS the user (su)
     // with XDG_RUNTIME_DIR set, NOT via the per-user-manager container-shell path which requires

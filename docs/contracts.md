@@ -271,7 +271,8 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     `files_restored`, `duration_ms`, and `preserved_conflict` fields.
 - pmssEnsureLingerAndDocker(string $user): void
   - Enables linger + rootless Docker wiring for the user.
-  - Skips and attempts `userDocker.php stop` when user config `dockerEnabled` is false (default true, but defaults false for Storage Box product payloads) or the effective RAM floor for Docker is below 245 MiB.
+  - `lingerEnabled` is an independent, default-off opt-in: when true, maintenance enables linger even if rootless Docker is disabled.
+  - Skips and attempts `userDocker.php stop` when user config `dockerEnabled` is false (default true, but defaults false for Storage Box product payloads) or the effective RAM floor for Docker is below 245 MiB; an active linger opt-in is retained.
   - Rootless Docker `daemon.json` convergence refuses symlinked or non-regular config targets before writing, then installs changes through a temporary file with mode 0600. On Debian 10/11 with `fuse-overlayfs` available, it also disables Docker's containerd image store so the classic rootless graphdriver honours `storage-driver`.
 - `scripts/util/userDocker.php USER ACTION`
   - `stop` and `restart` pass `XDG_RUNTIME_DIR` when using a user systemd unit; a disabled `dockerEnabled` policy uses `systemctl --user disable --now` so the unit does not remain enabled.

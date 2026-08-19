@@ -265,6 +265,29 @@ class UserConfigStoreTest extends TestCase
         $this->assertEquals(false, \pmssUserLighttpdEnabled('../evil'));
     }
 
+    public function testPmssUserLingerEnabledDefaultsOffAndNormalisesStoredValues(): void
+    {
+        $store = $this->newStore();
+        $this->assertEquals(false, \pmssUserLingerEnabled('alice', $store));
+
+        foreach ([
+            ['lingfalse', false, false],
+            ['lingzero', 0, false],
+            ['lingstrfalse', 'false', false],
+            ['lingstroff', 'off', false],
+            ['lingempty', '', false],
+            ['lingtrue', true, true],
+            ['lingone', 1, true],
+            ['lingstrtrue', 'true', true],
+            ['lingstrone', '1', true],
+        ] as $case) {
+            $this->assertTrue($store->set($case[0], $this->basePayload(['lingerEnabled' => $case[1]])));
+            $this->assertEquals($case[2], \pmssUserLingerEnabled($case[0], $store), $case[0]);
+        }
+
+        $this->assertEquals(false, \pmssUserLingerEnabled('../evil', $store));
+    }
+
     public function testResolvePayloadKeepsMissingValidUserAsEmptyArray(): void
     {
         $store = new \UserConfigStore($this->configDirPath());

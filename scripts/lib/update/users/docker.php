@@ -63,10 +63,14 @@ function pmssEnsureLingerAndDocker(string $user): void
 
     static $userConfigStore = null;
     $userConfigStore = $userConfigStore ?: new UserConfigStore();
-    if (!pmssUserDockerEnabled($user, $userConfigStore)) {
+    $dockerEnabled = pmssUserDockerEnabled($user, $userConfigStore);
+    $lingerEnabled = pmssUserLingerEnabled($user, $userConfigStore);
+    if (!$dockerEnabled) {
         pmssUserLog($user, '[SKIP] Docker disabled by config; stopping rootless Docker if running');
         pmssRunAndLog($user, 'userDocker stop (disabled)', sprintf('php /scripts/util/userDocker.php %s stop', escapeshellarg($user)));
-        return;
+        if (!$lingerEnabled) {
+            return;
+        }
     }
     if (!pmssSystemdRuntimeAvailable()) {
         pmssUserLog($user, '[SKIP] systemd not available on this host');
@@ -85,7 +89,13 @@ function pmssEnsureLingerAndDocker(string $user): void
     } else {
         logMessage('[LINGER/DOCKER] '.$user);
     }
-    pmssRunAndLog($user, 'loginctl enable-linger', 'loginctl enable-linger '.escapeshellarg($user));
+    $lingerRc = pmssRunAndLog($user, 'loginctl enable-linger', 'loginctl enable-linger '.escapeshellarg($user));
+    if (!$dockerEnabled) {
+        pmssUserLog($user, $lingerRc === 0
+            ? '[OK] Linger opt-in applied with rootless Docker disabled'
+            : '[WARN] Linger opt-in failed with rootless Docker disabled');
+        return;
+    }
     pmssEnsureRootlessDockerInstalled($user);
 
     foreach ([
