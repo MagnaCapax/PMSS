@@ -9,15 +9,15 @@ require_once dirname(__DIR__, 2).'/update/users.php';
 
 class UserUpdateHttpTest extends TestCase
 {
-    public function testConfigureHttpDisablesQbittorrentReverseProxyChecks(): void
+    public function testConfigureHttpRestoresQbittorrentWebUiProtections(): void
     {
         $home = $this->pmssMakeTempDir('pmss-http-qbittorrent-');
         mkdir($home.'/.config/qBittorrent', 0755, true);
 
         $config = "[Preferences]\n";
-        $config .= "WebUI\\CSRFProtection=true\n";
-        $config .= "WebUI\\ClickjackingProtection=true\n";
-        $config .= "WebUI\\HostHeaderValidation=true\n";
+        $config .= "WebUI\\CSRFProtection=false\n";
+        $config .= "WebUI\\ClickjackingProtection=false\n";
+        $config .= "WebUI\\HostHeaderValidation=false\n";
         $config .= "WebUI\\Port=12345\n";
         file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', $config);
 
@@ -27,10 +27,10 @@ class UserUpdateHttpTest extends TestCase
 
         $updated = file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf');
         $updatedConfig = ($updated === false) ? '' : $updated;
-        $this->assertStringContainsAllStrings(['WebUI\\CSRFProtection=false', 'WebUI\\ClickjackingProtection=false', 'WebUI\\HostHeaderValidation=false'], $updatedConfig);
-        $this->assertTrue(strpos($updatedConfig, 'WebUI\\CSRFProtection=true') === false);
-        $this->assertTrue(strpos($updatedConfig, 'WebUI\\ClickjackingProtection=true') === false);
-        $this->assertTrue(strpos($updatedConfig, 'WebUI\\HostHeaderValidation=true') === false);
+        $this->assertStringContainsAllStrings(['WebUI\\CSRFProtection=true', 'WebUI\\ClickjackingProtection=true', 'WebUI\\HostHeaderValidation=true'], $updatedConfig);
+        $this->assertTrue(strpos($updatedConfig, 'WebUI\\CSRFProtection=false') === false);
+        $this->assertTrue(strpos($updatedConfig, 'WebUI\\ClickjackingProtection=false') === false);
+        $this->assertTrue(strpos($updatedConfig, 'WebUI\\HostHeaderValidation=false') === false);
     }
 
     public function testConfigureHttpCreatesTempDirectory(): void
@@ -81,7 +81,7 @@ class UserUpdateHttpTest extends TestCase
 
         $updated = file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf');
         $updatedConfig = ($updated === false) ? '' : $updated;
-        $this->assertStringContainsAllStrings(['WebUI\\Port=12345', 'WebUI\\Address=*', 'WebUI\\CSRFProtection=false', 'Downloads\\PreAllocation=true', 'Session\\DiskCacheSize=128'], $updatedConfig);
+        $this->assertStringContainsAllStrings(['WebUI\\Port=12345', 'WebUI\\Address=*', 'WebUI\\CSRFProtection=true', 'Downloads\\PreAllocation=true', 'Session\\DiskCacheSize=128'], $updatedConfig);
     }
 
     public function testConfigureHttpRefreshesDelugeManagedKeys(): void

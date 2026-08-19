@@ -40,9 +40,9 @@ function pmssQbittorrentManagedConfigEntries(): array
         ['section' => 'Preferences', 'key' => 'Downloads\\DiskWriteCacheSize', 'value' => '128'],
         ['section' => 'Preferences', 'key' => 'Downloads\\DiskWriteCacheTTL', 'value' => '120'],
         ['section' => 'Preferences', 'key' => 'Downloads\\PreAllocation', 'value' => 'true'],
-        ['section' => 'Preferences', 'key' => 'WebUI\\CSRFProtection', 'value' => 'false'],
-        ['section' => 'Preferences', 'key' => 'WebUI\\ClickjackingProtection', 'value' => 'false'],
-        ['section' => 'Preferences', 'key' => 'WebUI\\HostHeaderValidation', 'value' => 'false'],
+        ['section' => 'Preferences', 'key' => 'WebUI\\CSRFProtection', 'value' => 'true'],
+        ['section' => 'Preferences', 'key' => 'WebUI\\ClickjackingProtection', 'value' => 'true'],
+        ['section' => 'Preferences', 'key' => 'WebUI\\HostHeaderValidation', 'value' => 'true'],
     ];
 }
 

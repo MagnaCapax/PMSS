@@ -42,13 +42,13 @@ class QbittorrentManagedConfigTest extends TestCase
         $configPath = $this->pmssWriteRelativeFile(
             $this->homeRoot,
             'alice/.config/qBittorrent/qBittorrent.conf',
-            "[Preferences]\nWebUI\\CSRFProtection=true\nWebUI\\ClickjackingProtection=true\nWebUI\\HostHeaderValidation=true\n"
+            "[Preferences]\nWebUI\\CSRFProtection=false\nWebUI\\ClickjackingProtection=false\nWebUI\\HostHeaderValidation=false\n"
         );
 
         $this->assertTrue(pmssQbittorrentApplyManagedConfig('alice'));
 
         $updated = (string) file_get_contents($configPath);
-        $this->assertStringContainsAllStrings(["WebUI\\CSRFProtection=false\n", "WebUI\\ClickjackingProtection=false\n", "WebUI\\HostHeaderValidation=false\n"], $updated);
+        $this->assertStringContainsAllStrings(["WebUI\\CSRFProtection=true\n", "WebUI\\ClickjackingProtection=true\n", "WebUI\\HostHeaderValidation=true\n"], $updated);
     }
 
     public function testApplyManagedConfigPreservesUserOwnedSettings(): void
@@ -90,7 +90,7 @@ class QbittorrentManagedConfigTest extends TestCase
         $this->assertTrue(pmssQbittorrentApplyManagedConfig('alice'));
 
         $updated = (string) file_get_contents($configPath);
-        $this->assertStringContainsAllStrings(["[BitTorrent]\n", "Session\\DiskCacheSize=128\n", "[Preferences]\n", "Bittorrent\\MaxConnecs=300\n", "WebUI\\HostHeaderValidation=false\n"], $updated);
+        $this->assertStringContainsAllStrings(["[BitTorrent]\n", "Session\\DiskCacheSize=128\n", "[Preferences]\n", "Bittorrent\\MaxConnecs=300\n", "WebUI\\HostHeaderValidation=true\n"], $updated);
     }
 
     public function testApplyManagedConfigRejectsSymlinkTarget(): void

@@ -14,7 +14,8 @@ function pmssLighttpdProxyRuleFragment(
     array $pathMap = [],
     bool $disableAuth = false,
     bool $forwardForwardedHeaders = false,
-    bool $injectZeroContentLengthOnEmptyPost = false
+    bool $injectZeroContentLengthOnEmptyPost = false,
+    bool $preserveRequestHostHeader = false
 ): string {
     $hasPathMap = count($pathMap) > 0;
     $fragment = '$HTTP["url"] =~ "'.$pattern."\" {\n";
@@ -30,6 +31,10 @@ function pmssLighttpdProxyRuleFragment(
     }
 
     $fragment .= "  proxy.server = ( \"\" => ( (\n    \"host\" => \"127.0.0.1\",\n    \"port\" => {$port}\n  ) ) ),\n";
+    if ($preserveRequestHostHeader) {
+        // qBittorrent validates Host/Origin against the browser-visible origin.
+        $fragment .= "  proxy.replace-http-host = \"disable\"\n";
+    }
     if ($forwardForwardedHeaders) {
         $fragment .= "  proxy.forwarded = ( \"for\" => 1,\n                      \"host\" => 1,\n                      \"by\" => 1\n  )";
         $fragment .= ",\n";
@@ -73,7 +78,7 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
             "# PMSS-managed: qBittorrent reverse proxy.\n\n",
             [
                 ['redirect', '/user-'.$user.'/qbittorrent', '/user-'.$user.'/qbittorrent/'],
-                ['^/user-'.$user.'/qbittorrent/', ['/user-'.$user.'/qbittorrent/' => '/'], false, true],
+                ['^/user-'.$user.'/qbittorrent/', ['/user-'.$user.'/qbittorrent/' => '/'], false, true, false, true],
             ],
         ],
         'invidious' => [
@@ -94,7 +99,7 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
             $fragment .= pmssLighttpdProxyExactRedirectFragment($rule[1], $rule[2])."\n\n";
             continue;
         }
-        $fragment .= pmssLighttpdProxyRuleFragment($rule[0], $port, $rule[1], $rule[2], $rule[3], $rule[4] ?? false)."\n\n";
+        $fragment .= pmssLighttpdProxyRuleFragment($rule[0], $port, $rule[1], $rule[2], $rule[3], $rule[4] ?? false, $rule[5] ?? false)."\n\n";
     }
 
     return $fragment;

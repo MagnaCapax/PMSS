@@ -177,7 +177,7 @@ PHP
         $this->assertStringContainsString('((integer)($tm["minutes"]/((', str_replace('(int)$interval', '((int)$interval)', $result['settings']));
         $this->assertStringContainsString('@ob_flush();', $result['rss']);
         $this->assertStringContainsString('return (int) $field;', $result['hddquota']);
-        $this->assertStringContainsAllStrings(['WebUI\\CSRFProtection=false', 'WebUI\\ClickjackingProtection=false', 'WebUI\\HostHeaderValidation=false', 'Session\\DiskCacheSize=128', 'Session\\MaxConnections=300', 'Downloads\\DiskWriteCacheSize=128', 'Bittorrent\\MaxConnecs=300'], $result['qbittorrent']);
+        $this->assertStringContainsAllStrings(['WebUI\\CSRFProtection=true', 'WebUI\\ClickjackingProtection=true', 'WebUI\\HostHeaderValidation=true', 'Session\\DiskCacheSize=128', 'Session\\MaxConnections=300', 'Downloads\\DiskWriteCacheSize=128', 'Bittorrent\\MaxConnecs=300'], $result['qbittorrent']);
 
         $expectedPhases = [
             'Configuring lighttpd vhost',

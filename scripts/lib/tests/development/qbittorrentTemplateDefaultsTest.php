@@ -34,6 +34,13 @@ class QbittorrentTemplateDefaultsTest extends TestCase
         $this->assertStringContainsAllStrings(["Session\\uTPMixedMode=TCP\n", "Session\\ChokingAlgorithm=FixedSlots\n", "Session\\SeedChokingAlgorithm=FastestUpload\n"], $template);
     }
 
+    public function testTemplateKeepsWebUiProtectionsEnabled(): void
+    {
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.qbittorrent.conf');
+
+        $this->assertStringContainsAllStrings(["WebUI\\CSRFProtection=true\n", "WebUI\\ClickjackingProtection=true\n", "WebUI\\HostHeaderValidation=true\n"], $template);
+    }
+
     public function testTemplatePinsSendBufferDefaults(): void
     {
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.qbittorrent.conf');

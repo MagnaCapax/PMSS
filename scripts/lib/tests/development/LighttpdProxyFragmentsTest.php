@@ -36,7 +36,7 @@ class LighttpdProxyFragmentsTest extends TestCase
     {
         $expectedHashes = [
             'rclone' => '6d265ad8b338c69f39057129c0cd1a9a7bca09b3270ccea555168ceca96104de',
-            'qbittorrent' => '21585cc7a5b993589046f2b529ed6e03a41fd70386f9d0512f9d7ed948c9009f',
+            'qbittorrent' => '3e100e73153d063640ebb7c142e3b4a4d996a8f153245c2907f78bc4b1b9c05b',
             'invidious' => '168bb1b5e71c3ea4af59cf176a2181b00f425485dd504cb3ca088a8c73a178b4',
             'deluge' => '485c54359bd2220fe74b10ff06e371d4e5aea69b53130eab71d845cb8968c822',
         ];
@@ -81,6 +81,19 @@ class LighttpdProxyFragmentsTest extends TestCase
         ], $fragment);
         $this->assertStringNotContainsString('"/user-demo/qbittorrent" => ""', $fragment);
         $this->assertStringNotContainsString('$HTTP["url"] =~ "^/user-demo/qbittorrent($|/)" {', $fragment);
+    }
+
+    public function testQbittorrentFragmentPreservesBrowserVisibleOrigin(): void
+    {
+        $fragment = \pmssLighttpdManagedProxyFragment('qbittorrent', 'demo', 4002);
+
+        $this->assertStringContainsAllStrings([
+            'proxy.replace-http-host = "disable"',
+            'proxy.forwarded = ( "for" => 1,',
+            '"host" => 1',
+        ], $fragment);
+        $this->assertStringNotContainsString('setenv.set-request-header = ( "Origin"', $fragment);
+        $this->assertStringNotContainsString('setenv.set-request-header = ( "Referer"', $fragment);
     }
 
     public function testRcloneFragmentAddsZeroContentLengthOnlyForBodylessPosts(): void
