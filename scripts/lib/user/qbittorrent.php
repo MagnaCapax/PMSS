@@ -42,7 +42,8 @@ function pmssQbittorrentManagedConfigEntries(): array
         ['section' => 'Preferences', 'key' => 'Downloads\\PreAllocation', 'value' => 'true'],
         ['section' => 'Preferences', 'key' => 'WebUI\\CSRFProtection', 'value' => 'true'],
         ['section' => 'Preferences', 'key' => 'WebUI\\ClickjackingProtection', 'value' => 'true'],
-        ['section' => 'Preferences', 'key' => 'WebUI\\HostHeaderValidation', 'value' => 'true'],
+        // Keep off until per-user WebUI\ServerDomains contains customer WebUI hostnames and a live test host verifies WebUI load; blind enabling risks fleet-wide 403s.
+        ['section' => 'Preferences', 'key' => 'WebUI\\HostHeaderValidation', 'value' => 'false'],
     ];
 }
 
