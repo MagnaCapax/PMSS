@@ -87,6 +87,42 @@ function pmssEnsureJournalCommitOption(string $mountPoint, int $seconds = 60, ?c
 }
 
 /**
+ * Ensure the given mount point carries `nofail` so a failed mount at boot does not hang the host.
+ *
+ * PMSS hosts are remote-managed: a `/home` mount failure should leave the host REACHABLE (SSH up)
+ * for recovery, not drop to an interactive emergency prompt that needs console/IPMI. The Phase 5.3
+ * pre-reboot checklist expects `nofail` on `/home` for exactly this reason (a host observed in the
+ * fleet without it stalled the pre-reboot check). `nofail` is a boot-time option (NOT remount-able,
+ * unlike `commit=`), so this only writes fstab — it takes effect on the next boot. Minimal delta:
+ * it adds `nofail` and touches no other option.
+ */
+function pmssEnsureMountNofailOption(string $mountPoint, ?callable $logger = null, ?string $fstabPath = null): void
+{
+    $log = $logger ?: 'logMessage';
+    if ($mountPoint === '') {
+        return;
+    }
+    $fstab = $fstabPath ?? '/etc/fstab';
+    $lines = pmssFstabLinesRead($fstab, $log, 'nofail configuration.');
+    if ($lines === null) {
+        return;
+    }
+
+    $plan = pmssFstabMountOptionsEnsure($lines, $mountPoint, ['nofail']);
+    if ($plan === null) {
+        $log('[WARN] Mount point '.$mountPoint.' not found in '.$fstab.'; skipping nofail update.');
+        return;
+    }
+    if (!$plan['changed']) {
+        $log('[SKIP] nofail option already present for '.$mountPoint);
+        return;
+    }
+
+    $log('[WARN] Added nofail option for '.$mountPoint.pmssFstabPlanChangeSuffix($plan));
+    pmssWriteManagedPathFileWithBackup($fstab, $lines, 'fstab', $log, true);
+}
+
+/**
  * Warn if quota state files under the mount point have unexpected names.
  *
  * ext4 journaled quotas expect `aquota.user` and `aquota.group`. Garbage

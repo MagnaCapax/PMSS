@@ -62,6 +62,10 @@ function pmssConfigureQuotaMount(?callable $logger = null): void
     // ease RAID5 write-convoy contention on shared seedbox hosts. The remount below applies it live
     // (commit= is remount-able). Skippable via PMSS_SKIP_QUOTA (same gate that guards this whole step).
     pmssEnsureJournalCommitOption($mount, 60, $log);
+    // Ensure `nofail` so a boot-time mount failure of this mount leaves the host REACHABLE for
+    // remote recovery instead of hanging at an emergency prompt (Phase 5.3 pre-reboot expectation).
+    // Boot-only option — no live remount needed, so it is applied before the remount below.
+    pmssEnsureMountNofailOption($mount, $log);
     if (!is_dir($mount)) {
         $log('[WARN] Skipping remount for '.$mount.' (mount path not found)');
         return;
