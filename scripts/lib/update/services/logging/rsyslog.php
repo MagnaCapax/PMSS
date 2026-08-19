@@ -9,15 +9,19 @@
  * @author PMSS Team
  */
 
+const PMSS_RSYSLOG_IMKLOG_STOCK = 'module(load="imklog")';
+const PMSS_RSYSLOG_IMKLOG_LIMITED = 'module(load="imklog" RatelimitInterval="10" RatelimitBurst="2000")';
+
 /** Add the PMSS rate limit to one stock Debian imklog declaration. */
 function pmssRsyslogKernelInputRateLimitConfig(string $config): string
 {
-    $plain = 'module(load="imklog")';
-    $limited = 'module(load="imklog" RatelimitInterval="10" RatelimitBurst="2000")';
-    if (strpos($config, $limited) !== false || substr_count($config, $plain) !== 1) {
+    if (
+        strpos($config, PMSS_RSYSLOG_IMKLOG_LIMITED) !== false
+        || substr_count($config, PMSS_RSYSLOG_IMKLOG_STOCK) !== 1
+    ) {
         return $config;
     }
-    return str_replace($plain, $limited, $config);
+    return str_replace(PMSS_RSYSLOG_IMKLOG_STOCK, PMSS_RSYSLOG_IMKLOG_LIMITED, $config);
 }
 
 /** Validate and atomically converge the stock Debian rsyslog configuration. */
@@ -26,8 +30,6 @@ function pmssApplyRsyslogKernelInputRateLimit(?callable $logger = null, ?callabl
     $log = $logger ?: 'logMessage';
     $run = $runner ?: 'runStep';
     $target = pmssResolvePathFromEnv('PMSS_RSYSLOG_CONFIG_PATH', '/etc/rsyslog.conf');
-    $plain = 'module(load="imklog")';
-    $limited = 'module(load="imklog" RatelimitInterval="10" RatelimitBurst="2000")';
     $current = pmssReadRegularFileContents($target);
     if ($current === null) {
         $log('[WARN] Unable to read regular rsyslog configuration: '.$target);
@@ -36,18 +38,24 @@ function pmssApplyRsyslogKernelInputRateLimit(?callable $logger = null, ?callabl
 
     $candidateBody = pmssRsyslogKernelInputRateLimitConfig($current);
     if ($candidateBody === $current) {
-        $log(strpos($current, $limited) !== false
+        $log(strpos($current, PMSS_RSYSLOG_IMKLOG_LIMITED) !== false
             ? '[SKIP] Rsyslog kernel input rate limit already applied'
             : '[WARN] Preserving nonstandard rsyslog imklog configuration; kernel input rate limit not changed');
         return;
     }
-    if (substr_count($current, $plain) !== 1 || !pmssManagedPathIsSafe($target, 'rsyslog configuration', $log)) {
+    if (!pmssManagedPathIsSafe($target, 'rsyslog configuration', $log)) {
         return;
     }
 
     $candidatePath = @tempnam(dirname($target), '.pmss-rsyslog-');
-    if (!is_string($candidatePath) || $candidatePath === '' || @file_put_contents($candidatePath, $candidateBody) === false) {
-        if (is_string($candidatePath)) @unlink($candidatePath);
+    if (
+        !is_string($candidatePath)
+        || $candidatePath === ''
+        || @file_put_contents($candidatePath, $candidateBody) === false
+    ) {
+        if (is_string($candidatePath)) {
+            @unlink($candidatePath);
+        }
         $log('[WARN] Unable to prepare rsyslog configuration candidate');
         return;
     }
@@ -63,7 +71,9 @@ function pmssApplyRsyslogKernelInputRateLimit(?callable $logger = null, ?callabl
     }
 
     $backup = pmssCreateManagedPathBackup($target, 'rsyslog configuration', $log, date('YmdHis'));
-    if ($backup === '') return;
+    if ($backup === '') {
+        return;
+    }
     if (!pmssReplaceUserFilePreservingMetadata($target, $candidateBody)) {
         $log('[WARN] Unable to install validated rsyslog kernel input rate limit');
         return;
