@@ -153,6 +153,32 @@ function pmssPathSegmentsAreSafe(
 }
 
 /**
+ * Return shell-safe existing targets while rejecting symlinked path segments.
+ */
+function pmssPathShellTarget(string $path): ?string
+{
+    $hasGlob = strpbrk($path, '*?[]') !== false;
+
+    if ($hasGlob) {
+        $matches = glob($path);
+        if ($matches === false || $matches === []) {
+            return null;
+        }
+
+        $targets = [];
+        foreach ($matches as $match) {
+            if (file_exists($match) && pmssPathSegmentsAreSafe($match)) {
+                $targets[] = escapeshellarg($match);
+            }
+        }
+
+        return $targets === [] ? null : implode(' ', $targets);
+    }
+
+    return file_exists($path) && pmssPathSegmentsAreSafe($path) ? escapeshellarg($path) : null;
+}
+
+/**
  * Validate a filesystem target and reject symlinked path segments.
  */
 function pmssPathTargetIsSafe(

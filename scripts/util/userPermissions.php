@@ -10,6 +10,7 @@
 
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/shell.php';
+require_once __DIR__.'/../lib/pathSafety.php';
 require_once __DIR__.'/../lib/user/userFilesystem.php';
 require_once __DIR__.'/../lib/traffic/storage.php';
 
@@ -35,21 +36,6 @@ function chmodPath(string $path, int $perm, bool $recursive = false): void
     }
 
     pmssRun(sprintf('chmod %s%o %s', $recursive ? '-R ' : '', $perm, $target));
-}
-
-function pmssPathShellTarget(string $path): ?string
-{
-    $hasGlob = strpbrk($path, '*?[]') !== false;
-
-    if ($hasGlob) {
-        $matches = glob($path);
-        if ($matches === false || $matches === []) {
-            return null;
-        }
-        return $path;
-    }
-
-    return file_exists($path) ? escapeshellarg($path) : null;
 }
 
 function chownPath(string $path, string $owner, bool $recursive = false): void

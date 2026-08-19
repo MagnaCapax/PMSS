@@ -13,6 +13,7 @@
  * @license GPL-3.0-only
  */
 require_once __DIR__.'/../lib/userLifecycle.php';
+require_once __DIR__.'/../lib/pathSafety.php';
 require_once __DIR__.'/../lib/user/userFilesystem.php';
 
 $usage = "Usage: setupUserHomePermissions.php USERNAME\n";
@@ -24,16 +25,26 @@ $rtorrentRc    = $homeDir.'/.rtorrent.rc';
 $rutorrentConf = $homeDir.'/www/rutorrent/conf/*';
 $lighttpdDir   = $homeDir.'/.lighttpd/custom.d';
 
+$steps = array();
+
 // Align with historical behaviour but quote paths defensively.
-if (file_exists($rtorrentRc)) {
-    pmssUserLifecycleRunSteps('permissions', $userName, array(
-        array('chown_rtorrent_rc', 'chown root:root '.escapeshellarg($rtorrentRc)),
-        array('chmod_rtorrent_rc', 'chmod 775 '.escapeshellarg($rtorrentRc)),
-    ), false);
+$rtorrentRcTarget = pmssPathShellTarget($rtorrentRc);
+if ($rtorrentRcTarget !== null) {
+    $steps[] = array('chown_rtorrent_rc', 'chown root:root '.$rtorrentRcTarget);
+    $steps[] = array('chmod_rtorrent_rc', 'chmod 775 '.$rtorrentRcTarget);
 }
 
-pmssUserLifecycleRunSteps('permissions', $userName, array(
-    array('chown_rutorrent_conf', 'chown root:root '.escapeshellarg($rutorrentConf)),
-    array('chmod_rutorrent_conf', 'chmod 775 '.escapeshellarg($rutorrentConf)),
-    array('chmod_lighttpd_custom', 'chmod 750 '.escapeshellarg($lighttpdDir)),
-), false);
+$rutorrentConfTarget = pmssPathShellTarget($rutorrentConf);
+if ($rutorrentConfTarget !== null) {
+    $steps[] = array('chown_rutorrent_conf', 'chown root:root '.$rutorrentConfTarget);
+    $steps[] = array('chmod_rutorrent_conf', 'chmod 775 '.$rutorrentConfTarget);
+}
+
+$lighttpdDirTarget = pmssPathShellTarget($lighttpdDir);
+if ($lighttpdDirTarget !== null) {
+    $steps[] = array('chmod_lighttpd_custom', 'chmod 750 '.$lighttpdDirTarget);
+}
+
+if ($steps !== array()) {
+    pmssUserLifecycleRunSteps('permissions', $userName, $steps, false);
+}
