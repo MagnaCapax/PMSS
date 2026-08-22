@@ -11,6 +11,11 @@
  *
  * Auto-loaded by update-step2.php's apps/*.php glob (no manual registration).
  *
+ * Upstream credit: the browser console is powered by ttyd, created and
+ * maintained by tsl0922 and contributors — https://github.com/tsl0922/ttyd
+ * (MIT). PMSS only pins and deploys the upstream static binary; all credit for
+ * ttyd itself belongs to its original author and the ttyd project.
+ *
  * @license GPL-3.0-only
  * @author PMSS Team
  */
