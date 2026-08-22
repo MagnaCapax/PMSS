@@ -38,7 +38,6 @@ class TrafficStatsProcessor extends PmssUserStatsProcessor
 
         $rawTotals = array_fill_keys(array_keys($compareTimes), 0.0);
         $dailyTotals = [];
-        $firstDay = '';
 
         foreach ($trafficData as $line) {
             $parsed = $this->stats->parseLine($line);
@@ -53,9 +52,8 @@ class TrafficStatsProcessor extends PmssUserStatsProcessor
                 }
             }
 
-            $currentDay = date('Y/m/d', $parsed['timestamp']);
-            $firstDay = ($firstDay === '') ? $currentDay : $firstDay;
-            if ($currentDay !== $firstDay) {
+            if ($parsed['timestamp'] >= $compareTimes['month']) {
+                $currentDay = date('Y/m/d', $parsed['timestamp']);
                 $dailyTotals[$currentDay] = ($dailyTotals[$currentDay] ?? 0) + $parsed['data'];
             }
         }

@@ -40,6 +40,9 @@ How PMSS limits per-user network egress when a customer exceeds their monthly tr
 
 End result: any packet from a UID over the limit hits a kernel HTB class with a rate ceiling, drops/throttles to the configured Mbit/s.
 
+The persisted `raw.month` total and `daily` chart series use the same rolling
+30-day timestamp cutoff. The boundary calendar day remains as a partial bucket.
+
 ## State Files
 
 ### Per-user (in /home and /var/run)

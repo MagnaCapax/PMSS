@@ -49,6 +49,39 @@ class TrafficStatsProcessorTest extends TrafficTestCase
         }
     }
 
+    public function testDailyTotalsMatchMonthlyWindowAcrossTrafficModes(): void
+    {
+        $now = strtotime('2026-08-22 12:00:00');
+        $monthSeconds = 30 * 24 * 60 * 60;
+        $usageLines = $this->makeTrafficUsageLines([
+            $monthSeconds + 1 => 1048576,
+            $monthSeconds => 2 * 1048576,
+            $monthSeconds - 300 => 4 * 1048576,
+            28 * 24 * 60 * 60 => 8 * 1048576,
+            60 => 16 * 1048576,
+        ], $now);
+        $expectedDaily = [
+            date('Y/m/d', $now - $monthSeconds) => 6.0,
+            date('Y/m/d', $now - (28 * 24 * 60 * 60)) => 8.0,
+            date('Y/m/d', $now - 60) => 16.0,
+        ];
+
+        foreach (['egress', 'ingress'] as $mode) {
+            $paths = $this->makeTrafficPaths('pmss-traffic-window-', true, ['traffic_mode' => $mode]);
+            $this->createTrafficUser($paths, 'alice');
+            $this->pmssWriteFile($paths['traffic_dir'].'/alice', $usageLines."\n");
+
+            $processor = new \TrafficStatsProcessor(new \trafficStatistics($paths), $paths);
+            $processor->processUser('alice', \pmssStatsCompareTimesBuild($now));
+
+            $dataPath = \pmssTrafficDataPaths('alice', $paths['home_dir'])[\pmssTrafficDataPathKey(false, $mode)];
+            $payload = unserialize((string) file_get_contents($dataPath));
+            $this->assertEquals(30.0, $payload['raw']['month']);
+            $this->assertEquals($expectedDaily, $payload['daily']);
+            $this->assertEquals($payload['raw']['month'], array_sum($payload['daily']));
+        }
+    }
+
     public function testRunCliProcessesWorkerUser(): void
     {
         [$stub, $paths, $processor] = $this->makeTrafficProcessorStubFixture(true);
