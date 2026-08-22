@@ -24,6 +24,7 @@ if (!is_array($userIds)) die("No such user\n");
 
 function chmodPath(string $path, int $perm, bool $recursive = false): void
 {
+    // Hardening prompted by a security disclosure from Samanta.
     $target = pmssPathShellTarget($path);
     if ($target === null) {
         return;
