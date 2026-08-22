@@ -111,3 +111,29 @@ For a deeper guide to running linuxserver.io application containers on PMSS, see
 VPN service (recommended default), see [`docs/wireguard.md`](./wireguard.md);
 the linuxserver.io WireGuard container is optional and runs under your own
 account with Docker.
+
+## Running your own stack alongside the managed defaults
+
+A shared seedbox gives you an interactive shell as your own user, rootless
+Docker, and your own web space &mdash; but not root. The default services (the
+torrent client, your control panel, the host VPN endpoint) are managed for you
+and kept alive automatically, so they are not yours to switch off system-wide.
+That is by design, and it does not get in the way of a container stack: the
+managed defaults are small and idle when unused, and your containers run
+alongside them.
+
+- **You cannot permanently disable a managed default from your account.** If you
+  stop one, it is brought back automatically. Rather than fight it, just leave
+  an unused default idle &mdash; it costs almost nothing.
+- **Reach your own apps without exposing them.** Bind an app to `127.0.0.1` and
+  reach it over an SSH tunnel or WireGuard; the transport is already encrypted,
+  so the app needs no certificate and there is no port to negotiate with other
+  tenants. See [`Docker on PMSS`](https://wiki.pulsedmedia.com/index.php/Docker_on_PMSS)
+  for the full pattern.
+- **Direct-published ports are not guaranteed reachable from outside.** Whether a
+  `-p`-published port is reachable from the public internet depends on host
+  firewalling &mdash; confirm it from an external network before relying on it.
+- **Clean up your own content freely, leave the plumbing alone.** Your data and
+  anything you create is yours to remove; the account&rsquo;s managed files are
+  restored on the next update if removed, so deleting them is harmless but
+  pointless.
