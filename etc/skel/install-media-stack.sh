@@ -1464,7 +1464,10 @@ media_stack_credentials_summary_print() {
 servarr_config_auth_configured() {
 	local config_file="$1" method
 	method=$(sed -n -E 's|.*<AuthenticationMethod>([^<]*)</AuthenticationMethod>.*|\1|p' "$config_file" | head -n 1 | tr '[:upper:]' '[:lower:]')
-	[[ "$method" == "forms" || "$method" == "basic" || "$method" == "external" ]]
+	if [[ "$method" == "forms" || "$method" == "basic" || "$method" == "external" ]]; then
+		return 0
+	fi
+	return 1
 }
 
 servarr_credentials_mark_existing_unknown() {
