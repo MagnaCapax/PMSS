@@ -644,6 +644,12 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Rejects unsafe or top-level symlinked paths, runs as the customer UID, and does not accept archive paths from request data.
   - The panel warns that the archive may contain private tracker URLs and separate application credentials.
 
+## Customer Whole-Account Service Restart – `etc/skel/www/welcome.php`
+
+- The `Restart all my services` control composes the existing customer-owned restart endpoints for rTorrent, enabled Deluge/qBittorrent/rclone frontends, stopped media-stack tmux apps, and Lighttpd.
+- Requests run sequentially as the authenticated customer; qBittorrent retains its account-password synchronization challenge, media-stack recovery retains its same-origin AJAX POST gate, and failures do not prevent later services from receiving their request.
+- The Lighttpd request is sent last so its graceful restart cannot interrupt earlier panel requests. Media-stack recovery uses the existing `--start-stopped` path and preserves live tmux sessions.
+
 ---
 
 ## User Management (CLI)

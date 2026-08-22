@@ -5,6 +5,21 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class welcomeQuotaMissingWarningTest extends TestCase
 {
+    private function loadWelcomeServiceControlHelpers(): void
+    {
+        if (function_exists('pmssWelcomeActionButtonHtmlBuild')
+            && function_exists('pmssWelcomeManagedAppsHtmlBuild')
+            && function_exists('pmssWelcomeServiceRestartActionsBuild')) return;
+
+        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+        $start = strpos($source, 'function pmssWelcomeHtmlAttr');
+        $end = strpos($source, 'function pmssWelcomeHeadingHtmlBuild');
+        $this->assertTrue($start !== false && $end !== false && $end > $start, 'welcome.php service-control helpers should remain present');
+
+        $fixture = $this->pmssMakeTempPath('pmss-welcome-service-controls-', '.php');
+        require_once $this->pmssWriteFile($fixture, "<?php\nrequire_once ".var_export($this->pmssRepoPath('etc/skel/www/scriptsInc.php'), true).";\n".substr($source, $start, $end - $start));
+    }
+
     private function makeWelcomeSafetyFixture(): string
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
@@ -106,14 +121,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
 
     public function testWelcomeServiceActionButtonSnapshots(): void
     {
-        if (!function_exists('pmssWelcomeActionButtonHtmlBuild') || !function_exists('pmssWelcomeManagedAppsHtmlBuild')) {
-            $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-            $start = strpos($source, 'function pmssWelcomeHtmlAttr'); $end = strpos($source, 'function pmssWelcomeHeadingHtmlBuild');
-            $this->assertTrue($start !== false && $end !== false && $end > $start, 'welcome.php service-control helpers should remain present');
-
-            $fixture = $this->pmssMakeTempPath('pmss-welcome-service-controls-', '.php');
-            require_once $this->pmssWriteFile($fixture, "<?php\nrequire_once ".var_export($this->pmssRepoPath('etc/skel/www/scriptsInc.php'), true).";\n".substr($source, $start, $end - $start));
-        }
+        $this->loadWelcomeServiceControlHelpers();
 
         /** @var callable(mixed,mixed,mixed,mixed,mixed,mixed): string $button */
         $button = 'pmssWelcomeActionButtonHtmlBuild';
@@ -128,6 +136,41 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $cwd = getcwd(); chdir($this->pmssRepoPath('etc/skel/www'));
         try { $managedAppHash = hash('sha256', pmssWelcomeManagedAppsHtmlBuild($apps, true, 'Rotated', 'secret')); } finally { if (is_string($cwd)) chdir($cwd); }
         $this->assertSame('1ef4337fc6833ff55e1c6d947b39d53038ea1e85530cc516ca1d0f0d4e2b4dc9', $managedAppHash);
+    }
+
+    public function testWelcomeWholeAccountRestartComposesExistingEndpoints(): void
+    {
+        $this->loadWelcomeServiceControlHelpers();
+        $root = $this->pmssMakeTempDir('pmss-welcome-restart-all-');
+        $qbittorrentEnable = $this->pmssWriteFile($root.'/qbittorrent.enable', '1');
+        $rcloneEnable = $this->pmssWriteFile($root.'/rclone.enable', '1');
+        $apps = array(
+            'qBittorrent' => array('enable' => $qbittorrentEnable, 'endpoint' => 'qbittorrent.php', 'binaries' => array(PHP_BINARY)),
+            'Deluge' => array('enable' => $root.'/deluge.enable', 'endpoint' => 'deluge.php', 'binaries' => array(PHP_BINARY)),
+            'rclone' => array('enable' => $rcloneEnable, 'endpoint' => 'rclone.php', 'binaries' => array(PHP_BINARY)),
+        );
+
+        $cwd = getcwd();
+        chdir($this->pmssRepoPath('etc/skel/www'));
+        try {
+            $actions = pmssWelcomeServiceRestartActionsBuild($apps, array('canRestart' => true));
+        } finally {
+            if (is_string($cwd)) chdir($cwd);
+        }
+
+        $this->assertSame(array('rTorrent', 'qBittorrent', 'rclone', 'stopped media-stack apps', 'Lighttpd'), array_column($actions, 'label'));
+        $this->assertSame('qbittorrentPassword', $actions[1]['passwordField']);
+        $this->assertSame('POST', $actions[3]['type']);
+        $this->assertSame(array('X-Requested-With' => 'XMLHttpRequest'), $actions[3]['headers']);
+        $this->assertSame('lighttpdRestart.php?action=confirm-restart', $actions[4]['url']);
+
+        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+        $this->assertStringContainsAllStrings([
+            'value="Restart all my services"',
+            'function pmssRestartAllServices(button)',
+            'pmssActionRequest(action).done(runNext)',
+            'Restart requests sent for all available account services.',
+        ], $source);
     }
 
     public function testWelcomeRemoteFetchRejectsUnexpectedEndpoints(): void

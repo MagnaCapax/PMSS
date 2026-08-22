@@ -55,6 +55,9 @@ $welcomeHeadingHtml = pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage);
 $announcementItemsHtml = pmssWelcomeAnnouncementItemsHtmlBuild();
 $homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
 $managedApps = pmssCustomerManagedAppDefinitions();
+$serviceRestartActions = pmssWelcomeServiceRestartActionsBuild($managedApps, $mediaStackStatus);
+$serviceRestartActionsJson = json_encode($serviceRestartActions, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -179,6 +182,7 @@ $managedApps = pmssCustomerManagedAppDefinitions();
     <script type="text/javascript">
         var pmssActionNoticeTimer = null;
         var pmssMediaStackPollTimer = null;
+        var pmssServiceRestartActions = <?php echo $serviceRestartActionsJson; ?>;
 
         function pmssShowActionNotice(message, isError) {
             var notice = $('#pmss-action-notice');
@@ -224,50 +228,88 @@ $managedApps = pmssCustomerManagedAppDefinitions();
             }
         }
 
-        function pmssRunAction(button, url, successMessage, shouldReload, pendingMessage, passwordFieldName, passwordValue) {
-            pmssSetActionLoading(button, true);
-
-            if (pendingMessage) {
-                pmssShowActionNotice(pendingMessage, false);
-            }
-
+        function pmssActionRequest(action, passwordValue) {
+            var deferred = $.Deferred();
             var request = {
-                url: url,
+                url: action.url,
                 cache: false,
                 data: null,
-                type: 'GET',
-                success: function() {
-                    pmssSetActionLoading(button, false);
-
-                    if (successMessage) {
-                        pmssShowActionNotice(successMessage, false);
-                    }
-
-                    if (shouldReload) {
-                        window.setTimeout(function() {
-                            location.reload(true);
-                        }, 900);
-                    }
+                type: action.type || 'GET',
+                success: function(payload) {
+                    deferred.resolve(payload);
                 },
                 error: function(xhr) {
-                    pmssSetActionLoading(button, false);
-                    var retryPasswordField = passwordFieldName || (url.indexOf('qbittorrent.php') === 0 ? 'qbittorrentPassword' : '');
-                    if (xhr.status === 428 && retryPasswordField) {
+                    if (xhr.status === 428 && action.passwordField) {
                         var password = window.prompt('Enter your account password to sync qBittorrent WebUI login.');
                         if (password !== null) {
-                            pmssRunAction(button, url, successMessage, shouldReload, pendingMessage, retryPasswordField, password);
+                            pmssActionRequest(action, password).done(function(payload) {
+                                deferred.resolve(payload);
+                            }).fail(function(retryXhr, cancelled) {
+                                deferred.reject(retryXhr, cancelled);
+                            });
+                        } else {
+                            deferred.reject(xhr, true);
                         }
                         return;
                     }
-                    pmssShowActionNotice('Action failed. Please try again in a moment.', true);
+                    deferred.reject(xhr, false);
                 }
             };
-            if (passwordFieldName && passwordValue !== undefined) {
+            if (action.dataType) request.dataType = action.dataType;
+            if (action.headers) request.headers = action.headers;
+            if (action.passwordField && passwordValue !== undefined) {
                 request.type = 'POST';
                 request.data = {};
-                request.data[passwordFieldName] = passwordValue;
+                request.data[action.passwordField] = passwordValue;
             }
             $.ajax(request);
+            return deferred.promise();
+        }
+
+        function pmssRunAction(button, url, successMessage, shouldReload, pendingMessage, passwordFieldName, passwordValue) {
+            pmssSetActionLoading(button, true);
+            if (pendingMessage) pmssShowActionNotice(pendingMessage, false);
+
+            var action = {
+                url: url,
+                passwordField: passwordFieldName || (url.indexOf('qbittorrent.php') === 0 ? 'qbittorrentPassword' : '')
+            };
+            pmssActionRequest(action, passwordValue).done(function() {
+                pmssSetActionLoading(button, false);
+                if (successMessage) pmssShowActionNotice(successMessage, false);
+                if (shouldReload) window.setTimeout(function() { location.reload(true); }, 900);
+            }).fail(function(xhr, cancelled) {
+                pmssSetActionLoading(button, false);
+                if (!cancelled) pmssShowActionNotice('Action failed. Please try again in a moment.', true);
+            });
+        }
+
+        function pmssRestartAllServices(button) {
+            var actions = pmssServiceRestartActions.slice(0);
+            var failures = [];
+            var actionIndex = 0;
+            pmssSetActionLoading(button, true);
+
+            function runNext() {
+                if (actionIndex >= actions.length) {
+                    pmssSetActionLoading(button, false);
+                    if (failures.length > 0) {
+                        pmssShowActionNotice('Restart requests failed or were cancelled for: ' + failures.join(', ') + '.', true);
+                    } else {
+                        pmssShowActionNotice('Restart requests sent for all available account services.', false);
+                    }
+                    return;
+                }
+
+                var action = actions[actionIndex++];
+                pmssShowActionNotice('Restarting ' + action.label + '...', false);
+                pmssActionRequest(action).done(runNext).fail(function() {
+                    failures.push(action.label);
+                    runNext();
+                });
+            }
+
+            runNext();
         }
 
         function pmssMediaStackPollSchedule(delay) {
@@ -393,6 +435,10 @@ $managedApps = pmssCustomerManagedAppDefinitions();
                         <ul>
                             <li><a href="https://filezilla-project.org/download.php?platform=win64" target="_blank">FileZilla - Popular opensource client</a></li>
                         </ul>
+
+                        <h6>All account services</h6>
+                        <p>Restart every available service for this account. Installed media-stack apps that are stopped are started without disturbing live tmux sessions.</p>
+                        <input type="button" name="servicesRestart" value="Restart all my services" onClick="pmssRestartAllServices(this);" />
 
 <?php echo pmssWelcomeManagedAppsHtmlBuild($managedApps, $delugePasswordCanRotate, $delugePasswordNotice, $delugePassword); ?>
 
@@ -875,6 +921,38 @@ function pmssWelcomeHtmlAttr($value) { return pmssCustomerHtmlAttr($value); }
 function pmssWelcomeJsSingleQuoted($value) { return str_replace(array('\\', "'", "\r", "\n"), array('\\\\', "\\'", '\\r', '\\n'), (string) $value); }
 
 function pmssWelcomeServiceAvailable($scriptPath, array $binaryPaths) { if (!file_exists($scriptPath)) return false; foreach ($binaryPaths as $binaryPath) if (file_exists((string) $binaryPath)) return true; return false; }
+
+/** Build the ordered queue for the whole-account restart control. */
+function pmssWelcomeServiceRestartActionsBuild(array $managedApps, array $mediaStackStatus) {
+    $actions = array();
+    if (file_exists('rtorrentRestart.php')) $actions[] = array('label' => 'rTorrent', 'url' => 'rtorrentRestart.php');
+
+    foreach ($managedApps as $appName => $definition) {
+        if (!is_array($definition)
+            || !isset($definition['endpoint'], $definition['binaries'], $definition['enable'])
+            || !is_array($definition['binaries'])
+            || !file_exists((string) $definition['enable'])
+            || !pmssWelcomeServiceAvailable((string) $definition['endpoint'], $definition['binaries'])) continue;
+
+        $action = array('label' => (string) $appName, 'url' => (string) $definition['endpoint'].'?action=restart');
+        if ($appName === 'qBittorrent') $action['passwordField'] = 'qbittorrentPassword';
+        $actions[] = $action;
+    }
+
+    if (!empty($mediaStackStatus['canRestart']) && file_exists('mediaStack.php')) {
+        $actions[] = array(
+            'label' => 'stopped media-stack apps',
+            'url' => 'mediaStack.php?action=start-stopped',
+            'type' => 'POST',
+            'dataType' => 'json',
+            'headers' => array('X-Requested-With' => 'XMLHttpRequest'),
+        );
+    }
+
+    // A graceful lighttpd restart can interrupt this page, so send it last.
+    if (file_exists('lighttpdRestart.php')) $actions[] = array('label' => 'Lighttpd', 'url' => 'lighttpdRestart.php?action=confirm-restart');
+    return $actions;
+}
 
 function pmssWelcomeActionButtonHtmlBuild($name, $value, $url, $successMessage, $shouldReload, $pendingMessage) {
     return '<input type="button" name="'.pmssWelcomeHtmlAttr($name).'" value="'.pmssWelcomeHtmlAttr($value).'" onClick="pmssRunAction(this, \''

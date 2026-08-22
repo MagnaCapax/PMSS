@@ -71,12 +71,16 @@ class addUserQbittorrentPasswordSyncTest extends TestCase
     public function testWelcomeRetriesQbittorrentStartWithPasswordPost(): void
     {
         $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/www/welcome.php', [
+            'function pmssActionRequest(action, passwordValue)',
+            'if (xhr.status === 428 && action.passwordField)',
+            "window.prompt('Enter your account password to sync qBittorrent WebUI login.')",
+            'pmssActionRequest(action, password).done',
+            'if (action.passwordField && passwordValue !== undefined)',
+            "request.type = 'POST';",
+            'request.data[action.passwordField] = passwordValue;',
             'function pmssRunAction(button, url, successMessage, shouldReload, pendingMessage, passwordFieldName, passwordValue)',
             "url.indexOf('qbittorrent.php') === 0 ? 'qbittorrentPassword' : ''",
-            'if (xhr.status === 428 && retryPasswordField)',
-            "window.prompt('Enter your account password to sync qBittorrent WebUI login.')",
-            "request.type = 'POST';",
-            'request.data[passwordFieldName] = passwordValue;',
+            'pmssActionRequest(action, passwordValue).done',
         ]);
     }
 }
