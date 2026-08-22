@@ -235,6 +235,66 @@ class installMediaStackScriptTest extends TestCase
         ], $this->script);
     }
 
+    public function testMediaStackWaitHttpOkReadyFailFastAndTimeout(): void
+    {
+        // Exercises the live readiness path (previously only string-asserted):
+        //   ready  -> rc 0 once curl answers 2xx
+        //   death  -> rc 2 immediately when the tmux session is gone (fail fast)
+        //   budget -> rc 1 after the attempt budget with no session to watch
+        $function = $this->pmssExtractShellFunction($this->script, 'media_stack_wait_http_ok');
+        $bin = $this->pmssMakeTempDir('pmss-media-wait-bin-');
+
+        // curl mock: fails until it has been called more than $READY_AFTER times.
+        $this->pmssWriteExecutableFile($bin.'/curl', <<<'BASH'
+#!/usr/bin/env bash
+state="${STATE:-/dev/null}"
+ready_after="${READY_AFTER:-999999}"
+count=0
+[[ -f "$state" ]] && count=$(cat "$state")
+count=$((count + 1))
+[[ "$state" != /dev/null ]] && echo "$count" > "$state"
+[[ "$count" -gt "$ready_after" ]] && exit 0
+exit 1
+BASH
+        );
+        // tmux mock: has-session exit is $SESSION_ALIVE (0 alive, 1 gone); all else ok.
+        $this->pmssWriteExecutableFile($bin.'/tmux', <<<'BASH'
+#!/usr/bin/env bash
+[[ "$1" == "has-session" ]] && exit "${SESSION_ALIVE:-0}"
+exit 0
+BASH
+        );
+        // sleep mock: no-op so the budget run does not actually wait.
+        $this->pmssWriteExecutableFile($bin.'/sleep', "#!/usr/bin/env bash\nexit 0\n");
+
+        $run = function (string $body) use ($function, $bin): string {
+            $harness = implode("\n", array(
+                '#!/usr/bin/env bash',
+                'set -euo pipefail',
+                'PATH='.escapeshellarg($bin).':$PATH',
+                $function,
+                $body,
+                '',
+            ));
+            return $this->pmssRunShellHarness($harness);
+        };
+
+        $stateReady = $this->pmssMakeTempDir('pmss-media-wait-s1-').'/s';
+        $this->assertStringContainsString('rc=0', $run(
+            'export STATE='.escapeshellarg($stateReady).' READY_AFTER=2'."\n"
+            .'rc=0; media_stack_wait_http_ok http://x 10 "" || rc=$?; echo "rc=$rc"'
+        ), 'wait must report ready (rc 0) once curl answers 2xx');
+
+        $this->assertStringContainsString('rc=2', $run(
+            'export SESSION_ALIVE=1'."\n"
+            .'rc=0; media_stack_wait_http_ok http://x 999 seed-session || rc=$?; echo "rc=$rc"'
+        ), 'wait must fail fast (rc 2) when the tmux session has exited, not exhaust the budget');
+
+        $this->assertStringContainsString('rc=1', $run(
+            'rc=0; media_stack_wait_http_ok http://x 3 "" || rc=$?; echo "rc=$rc"'
+        ), 'wait must time out (rc 1) after the budget when there is no session to watch');
+    }
+
     public function testAutobrrAuthSeedingUsesCliAndPreservesExistingUsers(): void
     {
         $this->assertStringContainsAllStrings([

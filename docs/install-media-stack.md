@@ -12,7 +12,7 @@ It installs:
 All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to `https://<host>/public-<user>/<app>/`.
 
 ## Key Properties
-- Self‑updating (interactive): when run in a TTY, fetches the latest script from GitHub and re‑execs it; skip with `--skip-update`. Non‑interactive runs (e.g. `wget … | bash`) use the fetched script as‑is.
+- Self‑update is opt‑in via `--self-update` (default off): every invocation path — SSH, the web panel, and a piped one‑liner install — runs the copy it already has, which `update.php` keeps current with the installed PMSS version. Behaviour no longer depends on whether stdin is a TTY, so the web panel and an interactive SSH run behave identically.
 - Monolithic but structured: single file with small helpers for clarity and reuse.
 - Idempotent: re‑runs converge to the same state; dry‑run exists for verification.
 - Safe defaults: localhost binding; randomized high ports; aliases to launch in `tmux`.
@@ -70,19 +70,20 @@ Every URL may be overridden via CLI flags (below). The script verifies each URL 
 
 ## Installing the Installer
 
-- Run locally (self‑updates by default):
+- Run locally (uses the installed copy):
   - `bash install-media-stack.sh`
 - Or run the latest from GitHub (if the file isn’t present yet):
   - `wget -qO - https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/main/etc/skel/install-media-stack.sh | bash`
   
-To skip self‑update (use whatever version you already have locally):
-  - `bash install-media-stack.sh --skip-update`
+To fetch and re‑exec the latest installer from GitHub before installing:
+  - `bash install-media-stack.sh --self-update`
 
 ## CLI
 Run `install-media-stack.sh --help` for the latest usage. Full options:
 
 - Common
-  - `--skip-update`        Skip self‑update from GitHub
+  - `--self-update`        Fetch and re‑exec the latest installer from GitHub first (default off)
+  - `--skip-update`        No‑op kept for compatibility (self‑update is already off by default)
   - `--dry-run`            Verify URLs and show actions; do not change the system
   - `--verify-only`        Only verify URLs (alias to `--dry-run`) and exit early
   - `--force`              Continue below the 1024 MiB account-memory guard
@@ -137,8 +138,8 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
       --sab-url=https://github.com/sabnzbd/sabnzbd/releases/download/X.Y.Z/SABnzbd-X.Y.Z-src.tar.gz`
 
 ## Behavior by Stage
-1) Self‑update
-- Downloads the latest script from GitHub and re‑executes it with `--skip-update` by default. Disable with `--skip-update`.
+1) Self‑update (opt‑in)
+- With `--self-update`, downloads the latest script from GitHub and re‑executes it (passing `--skip-update` to the re‑exec to avoid a loop). Off by default; otherwise the local copy, kept current by `update.php`, is used.
 
 2) Dependency checks
 - Verifies `ss` exists; errors out if missing.
@@ -336,8 +337,8 @@ Additional security measures:
 ## Examples
 - Default install:
   - `bash install-media-stack.sh`
-- Skip self‑update:
-  - `bash install-media-stack.sh --skip-update`
+- Fetch the latest installer from GitHub first:
+  - `bash install-media-stack.sh --self-update`
 - Dry‑run/verify only:
   - `bash install-media-stack.sh --dry-run`
   - `bash install-media-stack.sh --verify-only`

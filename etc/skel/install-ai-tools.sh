@@ -18,8 +18,10 @@
 # PROVIDED AS-IS. NO GUARANTEES, NO MAINTENANCE, NO SUPPORT.
 #
 
-# Self-update from GitHub (same pattern as install-media-stack.sh)
-if [[ "${1:-}" != "--skip-update" ]] && [[ -t 0 ]]; then
+# Self-update is opt-in via --self-update (default off); otherwise the local copy,
+# kept current by update.php, is used. Behaviour no longer depends on whether stdin
+# is a TTY -- same policy as install-media-stack.sh (GH #800, ADR-0007).
+if [[ " $* " == *" --self-update "* && " $* " != *" --skip-update "* ]]; then
 	REMOTE_RAW_URL="https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/main/etc/skel/install-ai-tools.sh"
 	tmp=$(mktemp) || true
 	if [[ -n "$tmp" ]]; then

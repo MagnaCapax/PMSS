@@ -30,18 +30,28 @@
 # #TODO: Click status → attempt restart (if allowed)
 #
 
-# Self-update unless explicitly skipped, but only when running interactively (TTY).
-# Uninstall intentionally uses the local copy so cleanup never turns into install
-# if an older remote copy does not know the new mode yet.
-PMSS_MEDIA_STACK_SELF_UPDATE=1
+# Self-update is OPT-IN via --self-update (default off). Every invocation path
+# (SSH, web panel, wget|bash) then runs the copy it already has; update.php keeps
+# that home copy current with the installed PMSS version. This makes the web panel
+# and an interactive SSH run behave identically (GH #800) instead of SSH self-
+# updating ahead of the installed platform. Precedent ADR-0007: do not gate
+# installer behaviour on whether stdin is a TTY. Uninstall/start-stopped always use
+# the local copy and never self-update.
+PMSS_MEDIA_STACK_SELF_UPDATE=0
+PMSS_MEDIA_STACK_SKIP_UPDATE=0
 for pmss_media_stack_arg in "$@"; do
 	case "$pmss_media_stack_arg" in
-	--skip-update | --uninstall | --start-stopped) PMSS_MEDIA_STACK_SELF_UPDATE=0 ;;
+	--self-update) PMSS_MEDIA_STACK_SELF_UPDATE=1 ;;
+	--skip-update | --uninstall | --start-stopped) PMSS_MEDIA_STACK_SKIP_UPDATE=1 ;;
 	esac
 done
 unset pmss_media_stack_arg
+# --skip-update/--uninstall/--start-stopped always win, regardless of arg order, so
+# the self-update re-exec below (which passes --skip-update alongside the original
+# args — which may include --self-update) can never re-trigger and loop.
+[[ $PMSS_MEDIA_STACK_SKIP_UPDATE -eq 1 ]] && PMSS_MEDIA_STACK_SELF_UPDATE=0
 
-if [[ $PMSS_MEDIA_STACK_SELF_UPDATE -eq 1 && -t 0 ]]; then
+if [[ $PMSS_MEDIA_STACK_SELF_UPDATE -eq 1 ]]; then
 	REMOTE_RAW_URL="https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/main/etc/skel/install-media-stack.sh"
 	tmp=$(mktemp) || true
 	if [[ -n "$tmp" ]]; then
@@ -104,7 +114,7 @@ JELLYFIN_INSTALL_ENABLED=1
 
 print_usage() {
 	cat <<USAGE
-Usage: install-media-stack.sh [--skip-update] [--dry-run] [overrides]
+Usage: install-media-stack.sh [--self-update] [--skip-update] [--dry-run] [overrides]
 
 Overrides:
   --sonarr-url=URL            Use exact URL for Sonarr tar.gz
@@ -133,6 +143,9 @@ Modes:
   --force                     Continue below the ${MEDIA_STACK_MIN_MEMORY_MIB} MiB memory guard
   --start-stopped             Start installed apps whose tmux sessions are absent
   --uninstall                 Stop media-stack sessions and remove PMSS-managed files
+  --self-update               Fetch and re-exec the latest installer from GitHub
+                              before running (default off; the local copy, kept
+                              current by update.php, is used otherwise)
 USAGE
 }
 
@@ -164,6 +177,7 @@ for arg in "$@"; do
 	--sab-version=*) OVR_SAB_VERSION=${arg#*=} ;;
 	--jellyfin-url=*) OVR_JELLYFIN_URL=${arg#*=} ;;
 	--jellyfin-ffmpeg=*) OVR_JELLYFIN_FFMPEG=${arg#*=} ;;
+	--self-update) : ;; # handled above (opt-in self-update)
 	--skip-update) : ;; # handled above
 	*) ;;
 	esac
@@ -1400,12 +1414,20 @@ media_stack_require_auth_seed_tools() {
 	fi
 }
 
+# Wait until $url answers 2xx (curl -f fails on >=400, so 000/503/401 keep waiting —
+# the ready predicate must stay 2xx-only: the follow-up config read/PUT require a
+# migrated instance). Optional $session is a tmux session name: if given and the
+# session has exited, the app process died (e.g. OOM) so we fail fast instead of
+# polling the whole budget. Returns: 0 ready, 1 timeout, 2 process exited.
 media_stack_wait_http_ok() {
-	local url="$1" attempts="${2:-45}" attempt
+	local url="$1" attempts="${2:-45}" session="${3:-}" attempt
 
 	for ((attempt = 1; attempt <= attempts; attempt++)); do
 		if curl -fsS --max-time 2 "$url" >/dev/null 2>&1; then
 			return 0
+		fi
+		if [[ -n "$session" ]] && ! tmux has-session -t "$session" 2>/dev/null; then
+			return 2
 		fi
 		sleep 1
 	done
@@ -1497,7 +1519,7 @@ servarr_auth_seed() {
 	local app="$1" install_name="$2" dll="$3" desired_port="$4" api_version="$5" password="$6" extra_args="${7:-}"
 	local datadir="$HOME/.config/${app}"
 	local config_file="$datadir/config.xml"
-	local seed_port session base_url response_json payload_json put_code unauth_code run_args existing_password
+	local seed_port session base_url response_json payload_json put_code unauth_code run_args existing_password seed_wait_rc
 
 	if servarr_config_auth_configured "$config_file"; then
 		existing_password=$(media_stack_credentials_value "$(media_stack_app_key "$app")_PASSWORD")
@@ -1527,8 +1549,18 @@ servarr_auth_seed() {
 		return 1
 	}
 
-	if ! media_stack_wait_http_ok "$base_url"; then
-		log_err "${install_name} did not expose its local auth configuration API"
+	# Cold .NET first-run (DB migration) on a contended host can take well over the
+	# old 45-attempt (~45s) budget; 180 gives headroom, and the session-aware fail
+	# fast returns early if the app dies, so the larger budget never idles on a
+	# corpse. Keep the abort fail-closed (never start an unauthenticated app).
+	media_stack_wait_http_ok "$base_url" 180 "$session"
+	seed_wait_rc=$?
+	if [[ $seed_wait_rc -ne 0 ]]; then
+		if [[ $seed_wait_rc -eq 2 ]]; then
+			log_err "${install_name} auth-seed process exited before its API came up; see $datadir/${app}-auth-seed.log"
+		else
+			log_err "${install_name} did not expose its local auth configuration API within ~180s; see $datadir/${app}-auth-seed.log"
+		fi
 		tmux kill-session -t "$session" 2>/dev/null || true
 		rm -f "$response_json" "$payload_json"
 		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
@@ -1590,8 +1622,8 @@ autobrr_auth_seed() {
 			log_err "Failed to start Autobrr for local database migration"
 			return 1
 		}
-		if ! media_stack_wait_http_ok "http://127.0.0.1:${seed_port}/autobrr/" 30; then
-			log_err "Autobrr did not start for local auth seeding"
+		if ! media_stack_wait_http_ok "http://127.0.0.1:${seed_port}/autobrr/" 30 "$session"; then
+			log_err "Autobrr did not start for local auth seeding (see $datadir/autobrr-auth-seed.log)"
 			tmux kill-session -t "$session" 2>/dev/null || true
 			return 1
 		fi
@@ -1636,8 +1668,8 @@ jellyfin_auth_seed() {
 	tmux new-session -d -s "$session" \
 		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${seed_port}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log\"" 2>/dev/null || true
 
-	if ! media_stack_wait_http_ok "${base_url}/Startup/Configuration" 60; then
-		log_err "Jellyfin did not expose the startup API for admin seeding"
+	if ! media_stack_wait_http_ok "${base_url}/Startup/Configuration" 120 "$session"; then
+		log_err "Jellyfin did not expose the startup API for admin seeding (see $JELLYFIN_LOG_DIR/jellyfin-auth-seed.log)"
 		if media_stack_log_has "$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log" "FfmpegException\|Failed.*ffmpeg"; then
 			log_err "Jellyfin failed FFmpeg validation — pass --jellyfin-ffmpeg=$HOME/.bin/ffmpeg after installing FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
 		fi
