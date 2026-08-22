@@ -55,11 +55,17 @@ $shellCmd = $persist ? 'tmux new -A -s console' : 'bash';
 // base-path must match the reverse-proxy prefix for asset/WebSocket resolution.
 $basePath = '/user-'.$name.'/console/';
 
-// Reuse a live console if one is already running for this user on this socket.
+// Reuse a live console only if the ttyd process AND its socket are both present.
+// A bare pgrep match is not a liveness signal: a matched-but-dead ttyd whose
+// socket has vanished would be trusted, the spawn block skipped, and the
+// customer served a bare lighttpd mod_proxy 503 with no console-error.log
+// diagnostic (GH #789). Requiring the socket file falls through to the spawn
+// block, which clears the stale socket, respawns ttyd, and restores the
+// diagnostic. Extends ADR-0031 (only spawn failures reach the user's log).
 $running = false;
 $out = [];
 @exec('pgrep -u '.escapeshellarg($name).' -f '.escapeshellarg('ttyd .*'.$sock).' 2>/dev/null', $out, $rc);
-if ($rc === 0 && !empty($out)) {
+if ($rc === 0 && !empty($out) && file_exists($sock)) {
     $running = true;
 }
 
