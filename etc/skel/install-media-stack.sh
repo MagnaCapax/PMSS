@@ -970,12 +970,10 @@ media_stack_memory_preflight_guard() {
 		log_warn "--force supplied; continuing despite the memory warning."
 		return 0
 	fi
-	if [[ -t 0 ]]; then
-		printf "Continue anyway? (y/N): "
-		read -r confirm
-		[[ $confirm == [yY] ]] && return 0
-	fi
-
+	# No interactive prompt: behaviour must not depend on whether stdin is a TTY
+	# (GH #800 "defaults should match"; ADR-0007). Low memory without an explicit
+	# --force aborts identically on every path (SSH, web panel, wget|bash); --force
+	# is the single, deliberate escape hatch the panel already documents.
 	log_err "Aborting. Re-run with --force only if you accept the memory throttling risk."
 	exit 1
 }
