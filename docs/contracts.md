@@ -636,6 +636,14 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - `pmssCustomerBonusDisplayTextBuild(array $state): string`
   - Formats percent states as `BONUS: N%` and current `.bonusQuota` fallback states as `BONUS: +N GiB` so the two units cannot be confused.
 
+## Customer Torrent-State Backup – `etc/skel/www/scriptsInc.php` and `welcome.php`
+
+- `welcome.php?backup=download`
+  - Streams a gzip-compressed tar archive directly to the authenticated customer without retaining a server-side copy.
+  - Includes only the fixed, customer-owned rTorrent, ruTorrent, Deluge, and qBittorrent configuration and session/resume paths returned by `pmssCustomerBackupRelativePaths()`; media and unrelated account paths are excluded.
+  - Rejects unsafe or top-level symlinked paths, runs as the customer UID, and does not accept archive paths from request data.
+  - The panel warns that the archive may contain private tracker URLs and separate application credentials.
+
 ---
 
 ## User Management (CLI)

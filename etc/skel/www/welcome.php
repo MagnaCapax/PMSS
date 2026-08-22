@@ -15,6 +15,11 @@
  */
 require_once __DIR__.'/scriptsInc.php';
 
+if (isset($_GET['backup']) && $_GET['backup'] === 'download') {
+    pmssCustomerBackupDownload(dirname(__DIR__));
+    exit;
+}
+
 // Customer-side helpers MUST live in the customer tree (etc/skel/www/) because
 // per-user lighttpd runs as the customer UID and cannot traverse /scripts/
 // (intentionally 750 root:root — the operator-only security boundary).
@@ -404,6 +409,10 @@ if (file_exists('mediaStack.php') && function_exists('pmssMediaStackPanelHtmlBui
 
                         <h6>rTorrent</h6>
                         <input type="button" name="rtorrentRestart" value="Restart rTorrent" onClick="pmssRunAction(this, 'rtorrentRestart.php', 'rTorrent restart request sent, please allow up to 2 minutes for restart to happen.', false, 'Sending rTorrent restart request...');" />
+                        <h6>Torrent configuration backup</h6>
+                        <p>Download rTorrent, ruTorrent, Deluge, and qBittorrent configuration plus torrent session/resume state. Media files are not included.</p>
+                        <p><b>Keep the archive private:</b> it can contain private tracker URLs and separate application credentials.</p>
+                        <p><a href="welcome.php?backup=download" rel="nofollow">Download torrent configuration backup</a></p>
 <?php
 if (file_exists('lighttpdRestart.php')) {
 ?>

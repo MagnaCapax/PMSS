@@ -20,12 +20,18 @@ function pmssFrontendActionRequest() {
  return (string) $_REQUEST['action'];
 }
 
+/** Check whether a customer-side PHP action may call one runtime function. */
+function pmssFrontendFunctionAvailable($function) {
+ if (!is_string($function) || preg_match('/\A[A-Za-z_][A-Za-z0-9_]*\z/', $function) !== 1) return false;
+ $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+ return function_exists($function) && !in_array($function, $disabled, true);
+}
+
 /**
  * Check whether customer PHP may run shell commands on this host.
  */
 function pmssFrontendShellExecAvailable() {
- $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
- return function_exists('shell_exec') && !in_array('shell_exec', $disabled, true);
+ return pmssFrontendFunctionAvailable('shell_exec');
 }
 
 /**
@@ -256,6 +262,88 @@ if (!function_exists('pmssCustomerPathIsSafe')) {
    $real .= '/'.basename($path);
   }
   return strpos($real, $homeRoot.'/') === 0;
+ }
+}
+
+if (!function_exists('pmssCustomerBackupRelativePaths')) {
+ /** Return the fixed torrent-client config and resume-state backup set. */
+ function pmssCustomerBackupRelativePaths() {
+  return array(
+   '.rtorrent.rc',
+   '.rtorrent.rc.custom',
+   'session',
+   '.config/deluge',
+   '.delugeSession',
+   '.sessionDeluge',
+   '.config/qBittorrent',
+   '.local/share/qBittorrent/BT_backup',
+   '.local/share/data/qBittorrent/BT_backup',
+   '.config/pmss/rutorrent/users',
+   '.local/share/pmss/rutorrent/share',
+  );
+ }
+}
+
+if (!function_exists('pmssCustomerBackupEntriesRead')) {
+ /** Return readable, non-symlinked backup entries below one customer home. */
+ function pmssCustomerBackupEntriesRead($home) {
+  $home = rtrim((string) $home, '/');
+  if (!is_dir($home) || !pmssCustomerPathIsSafe($home)) return array();
+
+  $entries = array();
+  foreach (pmssCustomerBackupRelativePaths() as $relativePath) {
+   $path = $home.'/'.$relativePath;
+   if ((is_file($path) || is_dir($path)) && is_readable($path) && pmssCustomerPathIsSafe($path)) {
+    $entries[] = $relativePath;
+   }
+  }
+  return $entries;
+ }
+}
+
+if (!function_exists('pmssCustomerBackupTarCommandBuild')) {
+ /** Build the fixed GNU tar stream command without accepting request data. */
+ function pmssCustomerBackupTarCommandBuild($home, $entries) {
+  if (!pmssCustomerPathIsSafe($home)) return '';
+  $home = realpath((string) $home);
+  if (!is_string($home) || !is_dir($home) || !pmssCustomerPathIsSafe($home) || !is_array($entries) || count($entries) === 0) return '';
+
+  $allowed = array_fill_keys(pmssCustomerBackupRelativePaths(), true);
+  $arguments = array('/bin/tar', '--create', '--gzip', '--file=-', '--directory', $home, '--');
+  foreach ($entries as $entry) {
+   if (!is_string($entry) || !isset($allowed[$entry])) return '';
+   $arguments[] = $entry;
+  }
+  return implode(' ', array_map('escapeshellarg', $arguments));
+ }
+}
+
+if (!function_exists('pmssCustomerBackupDownload')) {
+ /** Stream a private torrent-state archive without persisting a server copy. */
+ function pmssCustomerBackupDownload($home) {
+  $entries = pmssCustomerBackupEntriesRead($home);
+  $command = pmssCustomerBackupTarCommandBuild($home, $entries);
+  if ($command === '' || !is_executable('/bin/tar') || !pmssFrontendFunctionAvailable('passthru')) {
+   http_response_code($entries === array() ? 404 : 503);
+   header('Content-Type: text/plain; charset=utf-8');
+   header('Cache-Control: private, no-store, max-age=0');
+   echo $entries === array() ? "No torrent configuration or session state was found.\n" : "Backup download is unavailable on this host.\n";
+   return false;
+  }
+
+  while (ob_get_level() > 0) {
+   @ob_end_clean();
+  }
+  header('Content-Type: application/gzip');
+  header('Content-Disposition: attachment; filename="pmss-torrent-config-'.gmdate('Ymd-His').'.tar.gz"');
+  header('Cache-Control: private, no-store, max-age=0');
+  header('Pragma: no-cache');
+  header('X-Content-Type-Options: nosniff');
+
+  $returnCode = 1;
+  passthru($command, $returnCode);
+  if ($returnCode !== 0 && !headers_sent()) http_response_code(500);
+  return $returnCode === 0;
  }
 }
 
