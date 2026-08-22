@@ -150,12 +150,25 @@ function pmssUserUpgradeRutorrent(array $ctx): void
     $expectedSha   = $ctx['rutorrent_index_sha'];
     $rutorrentPath = "{$home}/www/rutorrent";
     $legacyPath    = "{$home}/www/oldRutorrent-3";
+    $sharePath     = $rutorrentPath.'/share';
+    $durableShare  = "{$home}/.local/share/pmss/rutorrent/share";
 
     if ($expectedSha === ''
         || !file_exists($rutorrentPath.'/index.html')
         || file_exists($legacyPath)
         || $expectedSha === sha1(file_get_contents($rutorrentPath.'/index.html'))) {
         return;
+    }
+
+    $shareLink = pmssUserWebRootMigrationRelativeTarget($home, $sharePath, $durableShare);
+    $usesDurableShare = is_link($sharePath)
+        && is_string($shareLink)
+        && @readlink($sharePath) === $shareLink
+        && is_dir($durableShare)
+        && !is_link($durableShare)
+        && pmssPathTargetIsSafe($durableShare, true);
+    if (is_link($sharePath) && !$usesDurableShare) {
+        throw new RuntimeException('Refusing ruTorrent upgrade with an unexpected share symlink');
     }
 
     echo "****** Updating ruTorrent\n";
@@ -176,13 +189,23 @@ function pmssUserUpgradeRutorrent(array $ctx): void
         'Restoring ruTorrent config.php',
         sprintf('cp -p %s %s', escapeshellarg($legacyPath.'/conf/config.php'), escapeshellarg($rutorrentPath.'/conf/'))
     );
-    runUserStep(
-        $user,
-        'Restoring ruTorrent share directory',
-        sprintf('bash -lc %s',
-            escapeshellarg("cp -rp {$legacyPath}/share/* {$rutorrentPath}/share/")
-        )
-    );
+
+    $shareDescription = 'Restoring ruTorrent share directory';
+    $shareCommand = sprintf('cp -rp %s %s', escapeshellarg($legacyPath.'/share/.'), escapeshellarg($sharePath.'/'));
+    if ($usesDurableShare) {
+        // ADR 0041 makes the durable store authoritative; discard only the fresh skeleton placeholder.
+        $shareDescription = 'Restoring durable ruTorrent share link';
+        $shareCommand = sprintf(
+            'rm -rf -- %1$s && ln -s -- %2$s %1$s',
+            escapeshellarg($sharePath),
+            escapeshellarg($shareLink)
+        );
+    }
+    if (runUserStep($user, $shareDescription, $shareCommand) !== 0
+        || ($usesDurableShare && (!is_link($sharePath) || @readlink($sharePath) !== $shareLink))) {
+        throw new RuntimeException('Unable to restore ruTorrent share state');
+    }
+
     updateRutorrentConfig($user, 1);
     runUserStep($user, 'Setting ruTorrent ownership', sprintf('chown -R %1$s:%1$s %2$s', $userEsc, escapeshellarg($rutorrentPath)));
     runUserStep($user, 'Setting ruTorrent permissions', sprintf('chmod -R 751 %s', escapeshellarg($rutorrentPath)));
