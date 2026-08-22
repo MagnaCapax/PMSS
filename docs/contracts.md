@@ -583,6 +583,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/userConfig.php <user> <ramMiB> <quotaGiB>
   - Behavior: Applies quota settings and rTorrent/ruTorrent configs; seeds dotfiles; safe to re-run.
+  - Named mode: `scripts/util/userConfig.php <user> [RESOURCE_OPTIONS]` reuses the stored RAM/quota baseline for configuration but does not apply the stored disk quota to the kernel; only the full positional form invokes `setquota`.
   - qBittorrent bootstrap: seeds `~/.config/qBittorrent/qBittorrent.conf` from `/etc/seedbox/config/template.qbittorrent.conf`, pinning shared-host defaults such as POSIX disk I/O, 128 MiB disk cache, 4 async I/O threads, and moderate connection/upload caps for new accounts; later maintenance refreshes that PMSS-managed subset without replacing user-owned settings.
   - Optional flags: `--upload-throttle-kib=<KiB>` updates torrent upload throttle; `--welcome-message=<HTML>` sets/clears the per-user welcome banner override file at `~/.config/welcome-message.html` (empty value clears).
   - IOPS downgrade semantics: explicit `IOReadIOPS` / `IOWriteIOPS` values of `0` are forwarded to `userConfigCgroup.php` as `/home:max`, which resolves `/home` to a safe block device and applies `IOReadIOPSMax=<device> infinity` / `IOWriteIOPSMax=<device> infinity`.

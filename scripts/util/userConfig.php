@@ -222,7 +222,9 @@ if (!file_exists($qbittorrentConfigFile)) {
     }
 }
 pmssQbittorrentApplyUploadThrottle($user['name'], $throttle);
-userApplyDiskQuota($user);
+if (pmssUserConfigDiskQuotaShouldApply($configMode)) {
+    userApplyDiskQuota($user);
+}
 $lockFile = sprintf('/home/%s/session/rtorrent.lock', $user['name']);
 if (file_exists($lockFile)) {
     $pid = pmssUserConfigRtorrentLockPid($lockFile);

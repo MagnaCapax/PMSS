@@ -104,6 +104,11 @@ function pmssUserConfigInvocationMode(array $args, bool $welcomeMessageProvided,
     if (!empty($args[1]) && $welcomeMessageProvided && empty($args[2]) && empty($args[3])) return 'welcome';
     return '';
 }
+/** Only full mode carries an explicit disk quota that is safe to apply. */
+function pmssUserConfigDiskQuotaShouldApply(string $configMode): bool
+{
+    return $configMode === 'full';
+}
 function pmssUserConfigBaselineError(array $payload, array $requiredKeys): ?string
 {
     foreach ($requiredKeys as $requiredKey) {

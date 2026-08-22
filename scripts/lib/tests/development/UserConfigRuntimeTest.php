@@ -99,4 +99,11 @@ class UserConfigRuntimeTest extends TestCase
             array($payload['ramMiB'], $payload['rtorrentPort'], $payload['quota'], $payload['quotaBurst'], $payload['trafficLimit'], $payload['CPUWeight'], $payload['trafficCapMbit'], $payload['billingServiceId'], $payload['billingClientId'], $payload['dockerEnabled'], $payload['welcomeMessage'])
         );
     }
+
+    public function testDiskQuotaApplyIsReservedForFullMode(): void
+    {
+        foreach (['full' => true, 'named' => false, 'welcome' => false, '' => false, 'invalid' => false] as $mode => $expected) {
+            $this->assertSame($expected, \pmssUserConfigDiskQuotaShouldApply($mode), 'disk quota apply policy for '.$mode);
+        }
+    }
 }

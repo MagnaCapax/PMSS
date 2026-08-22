@@ -16,6 +16,7 @@ class userConfigCommandContractsTest extends TestCase
                     'pmssUserConfigPayloadBuild($store, $existing, $user, $presence, $dockerEnabled)',
                     "pmssPortManagerAssignServicePort(\$user['name'], 'rclone')",
                     '@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false',
+                    "if (pmssUserConfigDiskQuotaShouldApply(\$configMode)) {\n    userApplyDiskQuota(\$user);\n}",
                     'pmssUserConfigApplyCgroupAndDocker($user, $store)',
                 ],
                 'forbidden' => [
