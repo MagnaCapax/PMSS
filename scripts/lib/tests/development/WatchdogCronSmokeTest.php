@@ -28,6 +28,8 @@ class WatchdogCronSmokeTest extends TestCase
         $this->binDir = $this->pmssMakeTempDir('watchdog-cron-bin-');
         $this->commandLog = $this->pmssMakeTempPath('watchdog-cron-command-', '.log');
         $this->listUsersScript = $this->pmssMakeTempDir('watchdog-cron-list-users-').'/listUsers.php';
+        $nginxAccessLog = $this->pmssMakeTempPath('watchdog-cron-nginx-', '.log');
+        $nginxStatePath = $this->pmssMakeTempPath('watchdog-cron-nginx-state-', '.json');
 
         $home = $this->pmssEnsureUserWebHome($this->homeRoot, 'alice');
         $this->pmssWriteFile($home.'/.lighttpd.conf', '"max-procs" => 0'."\n");
@@ -58,6 +60,8 @@ class WatchdogCronSmokeTest extends TestCase
                 'PATH' => $this->binDir.':'.getenv('PATH'),
                 'PMSS_HOME_DIR' => $this->homeRoot,
                 'PMSS_LIGHTTPD_WATCHDOG_WEB_ROOT' => $this->pmssMakeTempDir('watchdog-cron-web-'),
+                'PMSS_LIGHTTPD_WATCHDOG_NGINX_ACCESS_LOG' => $nginxAccessLog,
+                'PMSS_LIGHTTPD_WATCHDOG_NGINX_STATE' => $nginxStatePath,
                 'PMSS_TEST_LIST_USERS_COMMAND' => $this->listUsersScript,
             )));
 

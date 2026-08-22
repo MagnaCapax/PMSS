@@ -8,6 +8,7 @@
  */
 require_once __DIR__.'/../lib/lighttpd/userConfigApply.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogErrorPage.php';
+require_once __DIR__.'/../lib/lighttpd/watchdogNginxLogReader.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
@@ -29,6 +30,26 @@ if ($selection['exitCode'] !== 0) exit($selection['exitCode']);
 $users = $selection['users'];
 $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
 $watchdogWebRoot = pmssResolvePathFromEnv('PMSS_LIGHTTPD_WATCHDOG_WEB_ROOT', '/var/www');
+$nginxRecoveryActions = array();
+if ($argUserRaw === '') {
+    $portDir = rtrim(pmssResolvePathFromEnv('PMSS_PORT_MANAGER_DIR', '/etc/seedbox/runtime/ports'), '/');
+    $nginxUsersByPort = array();
+    foreach ($users as $username) {
+        if (pmssUserWebRootUnavailable($username, $homeRoot) || !pmssUserLighttpdEnabled($username)) {
+            continue;
+        }
+        $port = pmssReadRegularFileNetworkPort($portDir.'/lighttpd-'.$username);
+        if ($port !== null) {
+            $nginxUsersByPort[$port] = isset($nginxUsersByPort[$port]) ? '' : $username;
+        }
+    }
+    $nginxUsersByPort = array_filter($nginxUsersByPort);
+    $nginxRecoveryActions = pmssLighttpdWatchdogNginxActionsRead(
+        pmssResolvePathFromEnv('PMSS_LIGHTTPD_WATCHDOG_NGINX_ACCESS_LOG', '/var/log/nginx/access.log'),
+        pmssResolvePathFromEnv('PMSS_LIGHTTPD_WATCHDOG_NGINX_STATE', pmssRuntimeDir().'/checkLighttpdInstances-nginx.json'),
+        $nginxUsersByPort
+    );
+}
 foreach($users AS $thisUser) {
     $homeDir = rtrim($homeRoot, '/')."/{$thisUser}";
     $configPath = $homeDir.'/.lighttpd.conf';
@@ -48,6 +69,23 @@ foreach($users AS $thisUser) {
         passthru('/scripts/util/userConfigLighttpd.php '.escapeshellarg($thisUser));
         pmssUserLog($thisUser, 'lighttpd config generated (missing config detected)');
     }
+
+    $nginxRecoveryAction = (string) ($nginxRecoveryActions[$thisUser] ?? '');
+    if ($nginxRecoveryAction === 'reconfigure') {
+        echo "Persistent nginx upstream 502s remain for user: {$thisUser}; regenerating lighttpd config before restart.\n";
+        $reconfigureRc = runStep(
+            "Regenerating lighttpd config for {$thisUser}",
+            pmssBuildCommand('/scripts/util/userConfigLighttpd.php', [$thisUser])
+        );
+        pmssUserLog($thisUser, 'lighttpd config regeneration requested (persistent nginx upstream 502)');
+        if ($reconfigureRc !== 0) {
+            echo "Lighttpd config regeneration failed for user: {$thisUser}; continuing with guarded restart.\n";
+        }
+    } elseif ($nginxRecoveryAction === 'restart') {
+        echo "Persistent nginx upstream 502s detected for user: {$thisUser}; restarting lighttpd.\n";
+        pmssUserLog($thisUser, 'lighttpd restart requested (persistent nginx upstream 502)');
+    }
+    $nginxRecoveryRequired = $nginxRecoveryAction === 'restart' || $nginxRecoveryAction === 'reconfigure';
 
     $phpCgiRunning = pmssUserWatchdogProcessRunning($thisUser, 'php-cgi');
     $socketError = false;
@@ -92,7 +130,7 @@ foreach($users AS $thisUser) {
         pmssUserLog($thisUser, 'lighttpd restart requested (config newer than process)');
     }
 
-    if ($socketError || !$lighttpdRunningBeforeRestart) {
+    if ($socketError || !$lighttpdRunningBeforeRestart || $nginxRecoveryRequired) {
         $watchdogReason = pmssLighttpdWatchdogDetectReason($thisUser, $homeDir, $configPath, $socketError);
         pmssLighttpdWatchdogWriteErrorPage($thisUser, $watchdogReason, $watchdogWebRoot);
         pmssUserLog($thisUser, 'lighttpd watchdog: ' . $watchdogReason);
@@ -100,7 +138,7 @@ foreach($users AS $thisUser) {
         pmssLighttpdWatchdogDeleteErrorPage($thisUser, $watchdogWebRoot);
     }
 
-    $restartRequired = $socketError || $configChangedAfterStart;
+    $restartRequired = $socketError || $configChangedAfterStart || $nginxRecoveryRequired;
     $lighttpdRunning = pmssUserWatchdogRestartProcessesIf(
         $thisUser,
         $socketError || $lighttpdRunningBeforeRestart,

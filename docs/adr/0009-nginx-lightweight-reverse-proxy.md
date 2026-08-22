@@ -77,6 +77,24 @@ Guardrail for future changes:
 - Follow-ups: Keep WebDAV-related tests aligned with the centralized proxy
   parameters and re-evaluate defaults if production behavior indicates issues.
 
+## Amendment 2026-08-23 — transport evidence for the lighttpd watchdog
+
+Nginx remains a lightweight proxy, but its combined access log now carries an
+append-only PMSS suffix with the selected upstream address, upstream status, and
+upstream-header time. `checkLighttpdInstances.php` consumes only new lines and
+uses that transport evidence for guarded recovery:
+
+- a numeric upstream-header time proves lighttpd answered, even if an application
+  behind lighttpd returned its own 502;
+- a final/upstream 502 with no response-header time records one failed watchdog
+  cycle for the selected per-user lighttpd port;
+- three failing cycles trigger one restart; three more trigger managed config
+  regeneration followed by one restart; no further destructive action repeats
+  until a healthy upstream response resets the state.
+
+This keeps policy and active health checking out of nginx while closing the blind
+spot where a process can exist but nginx cannot obtain a response from it.
+
 ## References
 - GH issue #7 (Deluge path alignment discussion)
 - GH issue #137 (WebDAV proxy timeout duplication regression)
