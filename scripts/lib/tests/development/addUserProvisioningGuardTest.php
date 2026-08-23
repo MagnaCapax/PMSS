@@ -3,6 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/user/add/provisioningRuntime.php';
+require_once dirname(__DIR__, 2).'/user/identity.php';
 
 class AddUserProvisioningGuardTest extends TestCase
 {
@@ -51,5 +52,23 @@ class AddUserProvisioningGuardTest extends TestCase
         $lines = file($this->pmssRepoPath('scripts/addUser.php'), FILE_IGNORE_NEW_LINES);
         $this->assertTrue(is_array($lines), 'addUser.php must be readable');
         $this->assertTrue(count($lines) <= 200, 'addUser.php must stay under 200 lines');
+    }
+
+    public function testAddUserRejectsReservedRuntimeAndDaemonNames(): void
+    {
+        $reservedNames = [
+            'lxc', 'runc', 'crun', 'podman', 'qemu', 'dockerd', 'virsh', 'xen', 'vagrant',
+            'cron', 'crond', 'anacron', 'systemd', 'journal', 'journald', 'init', 'udev', 'udevd', 'logind',
+            'named', 'nscd', 'sssd', 'nslcd', 'samba', 'smbd', 'nmbd', 'monit', 'snmpd', 'rpcbind', 'fail2ban',
+        ];
+
+        foreach ($reservedNames as $name) {
+            $this->assertTrue(\pmssValidateUsername($name), 'Legacy validation must still accept '.$name);
+            $error = \pmssUsernameCreateValidationError($name);
+            $this->assertTrue(is_array($error), 'Expected create validation error for '.$name);
+            $this->assertEquals('reserved', $error['code'], 'Unexpected create validation code for '.$name);
+        }
+
+        $this->assertEquals(null, \pmssUsernameCreateValidationError('abc123'));
     }
 }
