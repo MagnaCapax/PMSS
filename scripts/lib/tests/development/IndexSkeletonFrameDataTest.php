@@ -73,11 +73,89 @@ class IndexSkeletonFrameDataTest extends TestCase
             [
                 'gui'.'Frames.php?v=2',
                 "getenv('PMSS_DISABLE_REMOTE_FRAMES')",
+                '!pmssGuiFramesLocalOnlyEnabled()',
                 'eval'.'($frames'.'Code)',
                 '$useLocalFrames = true;',
             ],
             ['Build the local tab set from bundled customer-tree definitions.']
         );
+    }
+
+    public function testLocalOnlyFramePreferenceRoundTripsThroughRegularMarker(): void
+    {
+        $this->loadIndexFrameHelpers();
+        $marker = $this->pmssMakeTempPath('pmss-gui-frames-local-only-');
+
+        $this->assertFalse($this->guiFramesLocalOnlyEnabled($marker));
+        $this->assertTrue($this->guiFramesLocalOnlyPreferenceApply('local', $marker));
+        $this->assertTrue($this->guiFramesLocalOnlyEnabled($marker));
+        $this->assertTrue($this->guiFramesLocalOnlyPreferenceApply('local', $marker), 'local mode should be idempotent');
+        $this->assertTrue($this->guiFramesLocalOnlyPreferenceApply('remote', $marker));
+        $this->assertFalse($this->guiFramesLocalOnlyEnabled($marker));
+        $this->assertTrue($this->guiFramesLocalOnlyPreferenceApply('remote', $marker), 'remote mode should be idempotent');
+    }
+
+    public function testLocalOnlyFramePreferenceRejectsInvalidAndUnsafeTargets(): void
+    {
+        $this->loadIndexFrameHelpers();
+        $marker = $this->pmssMakeTempPath('pmss-gui-frames-invalid-');
+        $this->assertFalse($this->guiFramesLocalOnlyPreferenceApply('invalid', $marker));
+        $this->assertFalse(file_exists($marker));
+
+        $directory = $this->pmssMakeTempDir('pmss-gui-frames-directory-');
+        $this->assertFalse($this->guiFramesLocalOnlyPreferenceApply('local', $directory));
+        $this->assertFalse($this->guiFramesLocalOnlyPreferenceApply('remote', $directory));
+
+        $target = $this->pmssMakeTempFile('pmss-gui-frames-target-');
+        $link = $this->pmssMakeTempPath('pmss-gui-frames-link-');
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+        $this->assertFalse($this->guiFramesLocalOnlyPreferenceApply('local', $link));
+        $this->assertFalse($this->guiFramesLocalOnlyPreferenceApply('remote', $link));
+        $this->assertFalse($this->guiFramesLocalOnlyEnabled($link));
+    }
+
+    public function testFramePreferenceWriteRequiresSameOriginAjaxPost(): void
+    {
+        $this->loadIndexFrameHelpers();
+        $this->assertTrue($this->guiFramesPreferenceRequestAllowed(array(
+            'REQUEST_METHOD' => 'POST',
+            'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest',
+        )));
+        $this->assertTrue($this->guiFramesPreferenceRequestAllowed(array(
+            'REQUEST_METHOD' => 'POST',
+            'HTTP_X_REQUESTED_WITH' => 'xmlhttprequest',
+        )));
+        $this->assertFalse($this->guiFramesPreferenceRequestAllowed(array('REQUEST_METHOD' => 'GET')));
+        $this->assertFalse($this->guiFramesPreferenceRequestAllowed(array('REQUEST_METHOD' => 'POST')));
+        $this->assertFalse($this->guiFramesPreferenceRequestAllowed(array(
+            'REQUEST_METHOD' => 'POST',
+            'HTTP_X_REQUESTED_WITH' => 'fetch',
+        )));
+    }
+
+    public function testPerUserLocalOnlyMarkerSelectsBundledFramesWithoutEnvironmentFlag(): void
+    {
+        $home = $this->pmssMakeUserWebHome('pmss-index-local-only-home-');
+        $this->pmssWriteFile($home.'/.guiFramesLocalOnly', '');
+
+        $html = '';
+        $this->pmssWithEnv(array('PMSS_DISABLE_REMOTE_FRAMES' => null), function () use (&$html, $home): void {
+            $html = $this->pmssRenderUserPanelIndexFromHome($home);
+        });
+
+        $this->assertStringContainsString('<a href="#welcome"', $html);
+        $this->assertStringContainsString('<iframe id="welcomeFrame"', $html);
+    }
+
+    public function testWelcomePageOffersScopedFrameSourceControl(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/welcome.php', array(
+            'Panel frame source',
+            'Remote-updated frame definitions are the default.',
+            'Other panel content may still use remote resources.',
+            "headers: {'X-Requested-With': 'XMLHttpRequest'}",
+            "data: {guiFramesMode: mode}",
+        ));
     }
 
     public function testLocalFallbackWelcomeUrlCarriesSerializedQuotaSnapshot(): void
@@ -450,6 +528,30 @@ class IndexSkeletonFrameDataTest extends TestCase
         /** @var callable(string): array<string,array<string,string>> $reader */
         $reader = 'pmssLocalFrameCustomFramesRead';
         return $reader($path);
+    }
+
+    private function guiFramesLocalOnlyEnabled(string $path): bool
+    {
+        $this->loadIndexFrameHelpers();
+        /** @var callable(string): bool $reader */
+        $reader = 'pmssGuiFramesLocalOnlyEnabled';
+        return $reader($path);
+    }
+
+    private function guiFramesLocalOnlyPreferenceApply(string $mode, string $path): bool
+    {
+        $this->loadIndexFrameHelpers();
+        /** @var callable(string,string): bool $writer */
+        $writer = 'pmssGuiFramesLocalOnlyPreferenceApply';
+        return $writer($mode, $path);
+    }
+
+    private function guiFramesPreferenceRequestAllowed(array $server): bool
+    {
+        $this->loadIndexFrameHelpers();
+        /** @var callable(array<string,string>): bool $gate */
+        $gate = 'pmssGuiFramesPreferenceRequestAllowed';
+        return $gate($server);
     }
 
     private function writeQuotaSnapshotContent(string $content): string

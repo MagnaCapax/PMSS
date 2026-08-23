@@ -294,12 +294,62 @@ function pmssLocalFrameCustomFramesRead($path = '../.customFrames')
     return $frameData;
 }
 
+/** Return whether this customer selected bundled frame definitions only. */
+function pmssGuiFramesLocalOnlyEnabled($markerPath = '../.guiFramesLocalOnly')
+{
+    return is_file($markerPath) && !is_link($markerPath);
+}
+
+/** Apply the customer frame-source preference through one guarded marker. */
+function pmssGuiFramesLocalOnlyPreferenceApply($mode, $markerPath = '../.guiFramesLocalOnly')
+{
+    if (!is_string($mode) || is_link($markerPath)) {
+        return false;
+    }
+
+    if ($mode === 'remote') {
+        return !file_exists($markerPath) || (is_file($markerPath) && @unlink($markerPath));
+    }
+    if ($mode !== 'local' || file_exists($markerPath)) {
+        return $mode === 'local' && is_file($markerPath);
+    }
+
+    $marker = @fopen($markerPath, 'x');
+    if (!is_resource($marker)) {
+        return false;
+    }
+    fclose($marker);
+    @chmod($markerPath, 0600);
+    return pmssGuiFramesLocalOnlyEnabled($markerPath);
+}
+
+/** Require the same-origin AJAX request shape used by panel mutations. */
+function pmssGuiFramesPreferenceRequestAllowed($server)
+{
+    return isset($server['REQUEST_METHOD'], $server['HTTP_X_REQUESTED_WITH'])
+        && $server['REQUEST_METHOD'] === 'POST'
+        && strcasecmp((string) $server['HTTP_X_REQUESTED_WITH'], 'XMLHttpRequest') === 0;
+}
+
+if (isset($_POST['guiFramesMode'])) {
+    if (!pmssGuiFramesPreferenceRequestAllowed($_SERVER)) {
+        http_response_code(403);
+        exit;
+    }
+    if (!pmssGuiFramesLocalOnlyPreferenceApply($_POST['guiFramesMode'])) {
+        http_response_code(409);
+        exit;
+    }
+    http_response_code(204);
+    exit;
+}
+
 // Remote frames can be disabled explicitly for debugging or fully offline
 // deployments by exporting PMSS_DISABLE_REMOTE_FRAMES=1. Local frames are the
 // FAILOVER, not a replacement: the remote guiFrames path is the primary on-load
 // GUI auto-update mechanism. Reverted #601 per operator directive 2026-06-03 —
 // removing the primary instead of keeping local as failover was the defect.
-if (!getenv('PMSS_DISABLE_REMOTE_FRAMES')) {
+if (!getenv('PMSS_DISABLE_REMOTE_FRAMES') && !pmssGuiFramesLocalOnlyEnabled()) {
     $framesUrl = 'https://pulsedmedia.com/remote/guiFrames.php?v=2';
     $remoteFrames = function_exists('pmssWelcomeHttpContextCreate')
         ? @file_get_contents($framesUrl, false, pmssWelcomeHttpContextCreate())

@@ -637,6 +637,13 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - `pmssCustomerBonusDisplayTextBuild(array $state): string`
   - Formats percent states as `BONUS: N%` and current `.bonusQuota` fallback states as `BONUS: +N GiB` so the two units cannot be confused.
 
+## Customer Panel Frame Source – `etc/skel/www/index.php` and `welcome.php`
+
+- Remote `guiFrames` remains the default and primary on-load frame-definition source; bundled definitions remain its failover.
+- The customer may select bundled definitions through the welcome-page control. The preference is represented only by the customer-owned `~/.guiFramesLocalOnly` marker; an absent marker restores remote-primary behavior.
+- The write accepts the fixed `local` and `remote` values through a same-origin AJAX POST, refuses symlinked or conflicting marker paths, and remains reversible and idempotent.
+- Local frame definitions suppress only the remote frame-definition request. They do not promise a fully network-free panel, and receive navigation changes through server PMSS updates rather than the remote on-load update path.
+
 ## Customer Torrent-State Backup – `etc/skel/www/scriptsInc.php` and `welcome.php`
 
 - `welcome.php?backup=download`
