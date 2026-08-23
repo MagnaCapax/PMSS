@@ -152,7 +152,7 @@ if (!function_exists('pmssCustomerPositiveIntegerFileRead')) {
 }
 
 if (!function_exists('pmssCustomerBonusDisplayStateRead')) {
- /** Read the authoritative percentage, falling back to the current GiB allocation. */
+ /** Read the loyalty percentage, falling back to the aggregate additional GiB allocation. */
  function pmssCustomerBonusDisplayStateRead($userBonusPath = '../.userBonus', $bonusQuotaPath = '../.bonusQuota') {
   $userBonus = pmssCustomerUnsignedIntegerFileRead($userBonusPath);
   if ($userBonus !== null) {
@@ -169,7 +169,7 @@ if (!function_exists('pmssCustomerBonusDisplayStateRead')) {
 }
 
 if (!function_exists('pmssCustomerBonusDisplayTextBuild')) {
- /** Format a bonus state without mislabeling GiB as a percentage. */
+ /** Keep loyalty percentages distinct from aggregate additional disk space. */
  function pmssCustomerBonusDisplayTextBuild($state) {
   $unit = is_array($state) && isset($state['unit']) && $state['unit'] === 'gib' ? 'gib' : 'percent';
   $value = is_array($state) && isset($state['value']) && is_numeric($state['value'])
@@ -177,7 +177,7 @@ if (!function_exists('pmssCustomerBonusDisplayTextBuild')) {
    : 0;
 
   return $unit === 'gib'
-   ? 'BONUS: +'.number_format($value).' GiB'
+   ? 'ADDITIONAL DISK SPACE: '.number_format($value).' GiB'
    : 'BONUS: '.number_format($value).'%';
  }
 }
@@ -189,7 +189,9 @@ if (!function_exists('pmssCustomerBonusDisplayNoteBuild')) {
 
   switch ((string) $state['state']) {
    case 'applied':
-    return 'Bonus is applied on this server.';
+    return isset($state['unit']) && $state['unit'] === 'gib'
+     ? 'Additional disk space is included in your quota on this server.'
+     : 'Bonus is applied on this server.';
    case 'zero':
     return 'No bonus is applied on this server.';
    case 'absent':

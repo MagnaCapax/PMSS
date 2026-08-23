@@ -294,7 +294,7 @@ function pmssStatsToggleApp(button) {
 <div class="stats-container">
 
   <div class="stats-block stats-bonus-block" role="status">
-    <h6>Account bonus</h6>
+    <h6>Additional resources</h6>
     <div class="stats-bonus-value"><?php echo pmssCustomerHtmlAttr(pmssCustomerBonusDisplayTextBuild($pmssBonusDisplayState)); ?></div>
     <?php if ($pmssBonusDisplayNote !== ''): ?><div class="stats-bonus-note"><?php echo pmssCustomerHtmlAttr($pmssBonusDisplayNote); ?></div><?php endif; ?>
   </div>

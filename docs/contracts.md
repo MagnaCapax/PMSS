@@ -631,11 +631,14 @@ Automation often invokes these utilities; below are expected inputs and effects.
 ## Customer Bonus Display – `etc/skel/www/scriptsInc.php`
 
 - `pmssCustomerBonusDisplayStateRead(string $userBonusPath='../.userBonus', string $bonusQuotaPath='../.bonusQuota'): array`
-  - Output: `['unit'=>'percent|gib', 'value'=>int]` for the customer-facing bonus banner.
+  - Output: `['unit'=>'percent|gib', 'value'=>int]` for the customer-facing additional-resource banner.
   - Read order: an unsigned integer `.userBonus` value is authoritative and represents a percentage; otherwise a positive `.bonusQuota` value represents GiB.
+  - The GiB fallback is aggregate additional quota and may combine earned bonus with paid addon disk; the customer tree has no source that can split those components.
   - Missing, zero, malformed, or unsafe values fall back to `['unit'=>'percent', 'value'=>0]`; the helper never derives a percentage from quota bytes.
 - `pmssCustomerBonusDisplayTextBuild(array $state): string`
-  - Formats percent states as `BONUS: N%` and current `.bonusQuota` fallback states as `BONUS: +N GiB` so the two units cannot be confused.
+  - Formats loyalty percent states as `BONUS: N%` and aggregate `.bonusQuota` fallback states as `ADDITIONAL DISK SPACE: N GiB` so paid space is not presented as a gift.
+- `pmssCustomerBonusDisplayNoteBuild(array $state): string`
+  - Describes an applied GiB fallback as additional disk already included in the displayed quota; percentage states retain the loyalty-bonus wording.
 
 ## Customer Panel Frame Source – `etc/skel/www/index.php` and `welcome.php`
 

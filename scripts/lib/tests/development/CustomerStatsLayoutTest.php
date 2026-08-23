@@ -22,13 +22,13 @@ final class CustomerStatsLayoutTest extends TestCase
         $stats = $this->pmssRenderCustomerPanelPage('stats.php');
 
         $this->assertOrderedStrings(
-            array('<div class="pmss-bonus-banner" role="status">', 'BONUS: +50 GiB', 'Bonus is applied on this server.', '<div class="portfolioimg">'),
+            array('<div class="pmss-bonus-banner" role="status">', 'ADDITIONAL DISK SPACE: 50 GiB', 'Additional disk space is included in your quota on this server.', '<div class="portfolioimg">'),
             $welcome,
             'Missing welcome bonus layout marker: ',
             'Welcome bonus order changed at: '
         );
         $this->assertOrderedStrings(
-            array('<div class="stats-block stats-bonus-block" role="status">', 'BONUS: +50 GiB', 'Bonus is applied on this server.', '<h6>Base Resources (current)</h6>'),
+            array('<div class="stats-block stats-bonus-block" role="status">', '<h6>Additional resources</h6>', 'ADDITIONAL DISK SPACE: 50 GiB', 'Additional disk space is included in your quota on this server.', '<h6>Base Resources (current)</h6>'),
             $stats,
             'Missing stats bonus layout marker: ',
             'Stats bonus order changed at: '
@@ -79,8 +79,8 @@ final class CustomerStatsLayoutTest extends TestCase
         $cases = array(
             array('percent', '47', '1925', array('unit' => 'percent', 'value' => 47, 'state' => 'applied'), 'BONUS: 47%', 'Bonus is applied on this server.'),
             array('zero-percent', '0', '1925', array('unit' => 'percent', 'value' => 0, 'state' => 'zero'), 'BONUS: 0%', 'No bonus is applied on this server.'),
-            array('gib-fallback', null, '1925', array('unit' => 'gib', 'value' => 1925, 'state' => 'applied'), 'BONUS: +1,925 GiB', 'Bonus is applied on this server.'),
-            array('invalid-percent', '-1', '1925', array('unit' => 'gib', 'value' => 1925, 'state' => 'applied'), 'BONUS: +1,925 GiB', 'Bonus is applied on this server.'),
+            array('gib-fallback', null, '1925', array('unit' => 'gib', 'value' => 1925, 'state' => 'applied'), 'ADDITIONAL DISK SPACE: 1,925 GiB', 'Additional disk space is included in your quota on this server.'),
+            array('invalid-percent', '-1', '1925', array('unit' => 'gib', 'value' => 1925, 'state' => 'applied'), 'ADDITIONAL DISK SPACE: 1,925 GiB', 'Additional disk space is included in your quota on this server.'),
             array('missing-values', null, null, array('unit' => 'percent', 'value' => 0, 'state' => 'absent'), 'BONUS: 0%', 'No bonus is applied on this server yet. Earned bonus is added on top of your base resources, never taken from them.'),
         );
 
