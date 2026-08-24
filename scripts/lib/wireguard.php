@@ -825,7 +825,7 @@ function wgBootstrapUserGuides(string $clientGuide): void
 }
 
 /**
- * Update each per-user guide to show the assigned client IP for the first valid key.
+ * Update each per-user guide with the IP assigned to its embedded private key.
  *
  * @param array<int,array{user:string,key:string,ip:string}> $assigned
  */
@@ -841,7 +841,6 @@ function wgSyncUserGuideAddresses(array $assigned, string $fallbackGuide = ''): 
         if (isset($seenUsers[$entry['user']])) {
             continue;
         }
-        $seenUsers[$entry['user']] = true;
 
         $target       = wgUserGuidePath($entry['user']);
         $targetExists = is_file($target);
@@ -852,6 +851,11 @@ function wgSyncUserGuideAddresses(array $assigned, string $fallbackGuide = ''): 
             }
             $guide = $fallbackGuide;
         }
+        $privateKey = wgGuidePrivateKey($guide);
+        if ($privateKey === '' || wgDerivePublicKey($privateKey) !== $entry['key']) {
+            continue;
+        }
+        $seenUsers[$entry['user']] = true;
 
         $updated = wgApplyAssignedIpToGuide($guide, $entry['ip']);
         if ($targetExists && $updated === $guide) {

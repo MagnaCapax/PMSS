@@ -25,6 +25,9 @@ Typical workflow:
 If a PMSS-generated single-device `~/wireguard.txt` already exists but its
 matching `~/.wireguard-public-key` entry goes missing, the periodic refresh can
 re-register that first profile automatically from the managed guide.
+Periodic address reconciliation likewise updates that profile only when its
+embedded private key derives to the registered public key receiving the address;
+additional device keys cannot retarget the shared bootstrap profile.
 
 A cron watchdog (`checkWireguard.php`) ensures the kernel module stays loaded,
 `wg-quick@wg0` remains active, and configured peers are loaded into the running

@@ -474,6 +474,8 @@ Environment overrides: `PMSS_WG_CONFIG_DIR`, `PMSS_WG_HOME_BASE`, `PMSS_WG_USER_
 
 Safety: per-user public-key reads revalidate the username and ignore missing,
 non-regular, symlinked, unreadable, or invalid-key registry files.
+Per-user guide address reconciliation derives the embedded private key's public
+key and updates only the matching assigned peer; unmatched guides remain unchanged.
 
 ---
 
