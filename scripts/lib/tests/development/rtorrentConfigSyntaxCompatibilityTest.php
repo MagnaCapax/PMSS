@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/portManager.php';
 
 class rtorrentConfigSyntaxCompatibilityTest extends TestCase
 {
@@ -44,6 +45,26 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
         $skeletonContent = $this->pmssReadRepoFile('etc/skel/.rtorrent.rc');
         $this->assertStringContainsString('schedule2 = watch_directory,1,1,"load.start_verbose=~/watch/*.torrent"', $skeletonContent);
         $this->assertStringContainsString($expectedRssHook, $skeletonContent);
+    }
+
+    /**
+     * rTorrent listen ranges must not overlap the managed-service namespace.
+     */
+    public function testPmssRtorrentListenRangesExcludeManagedServicePorts(): void
+    {
+        foreach (['etc/seedbox/config/template.rtorrent.rc', 'etc/skel/.rtorrent.rc'] as $relativePath) {
+            $content = $this->pmssReadRepoFile($relativePath);
+            $matches = [];
+            $this->assertSame(
+                1,
+                preg_match('/^network\.port_range\.set\s*=\s*(\d+)-(\d+)$/m', $content, $matches),
+                $relativePath.' should define one rTorrent listen-port range'
+            );
+            $this->assertTrue(
+                (int) $matches[1] > \PMSS_PORT_MANAGER_MAX_PORT,
+                $relativePath.' rTorrent listen ports should start above the managed-service namespace'
+            );
+        }
     }
 
     /**

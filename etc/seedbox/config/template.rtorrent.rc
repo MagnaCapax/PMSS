@@ -33,7 +33,7 @@ network.http.max_open.set = 16
 network.max_open_files.set = 5000
 network.http.dns_cache_timeout.set = 6
 network.xmlrpc.size_limit.set = 4M
-network.port_range.set = 20000-60000
+network.port_range.set = 50000-60000
 network.port_random.set = yes
 
 #trackers.use_udp.set = yes
