@@ -397,3 +397,51 @@ function pmssUserLifecycleRefreshManagedNginxConfig(string $action, string $user
         $stepRunner
     );
 }
+
+/**
+ * Start the per-user web stack and require both daemon layers to remain up.
+ */
+function pmssUserLifecycleWebStackStartAndVerify(string $action, string $username, bool $dryRun, ?callable $stepRunner = null, ?callable $processChecker = null): int
+{
+    $runner = $stepRunner ?? 'pmssUserLifecycleStep';
+    $startRc = (int) $runner(
+        $action,
+        $username,
+        'start_lighttpd',
+        '/scripts/startLighttpd '.escapeshellarg($username),
+        $dryRun
+    );
+    if ($dryRun) {
+        return $startRc;
+    }
+
+    // Observed state wins over the launcher rc when the watchdog won the race.
+    $checker = $processChecker ?? 'pmssUserWatchdogProcessRunning';
+    $missingProcesses = array();
+    foreach (array('lighttpd', 'php-cgi') as $processName) {
+        if (!(bool) $checker($username, $processName)) {
+            $missingProcesses[] = $processName;
+        }
+    }
+    if ($missingProcesses !== array()) {
+        pmssUserLifecycleContextLogStatusMessage(
+            $action,
+            'verify_web_stack',
+            $username,
+            'ERR',
+            'Per-user web stack failed to start',
+            array('start_rc' => $startRc, 'missing_processes' => $missingProcesses)
+        );
+        return $startRc !== 0 ? $startRc : 1;
+    }
+
+    pmssUserLifecycleContextLogStatusMessage(
+        $action,
+        'verify_web_stack',
+        $username,
+        'OK',
+        'Per-user lighttpd and php-cgi are running',
+        array('start_rc' => $startRc)
+    );
+    return 0;
+}

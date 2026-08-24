@@ -95,6 +95,40 @@ class userLifecycleLoggingTest extends TestCase
         $this->assertTrue($calls[0]['dryRun']);
     }
 
+    public function testWebStackStartRequiresBothProcesses(): void
+    {
+        $cases = array(
+            array('dry-run', 0, true, array(), 0, array()),
+            array('launcher failure', 7, false, array('lighttpd' => false, 'php-cgi' => false), 7, array('lighttpd', 'php-cgi')),
+            array('lighttpd missing', 0, false, array('lighttpd' => false, 'php-cgi' => true), 1, array('lighttpd', 'php-cgi')),
+            array('php-cgi missing', 0, false, array('lighttpd' => true, 'php-cgi' => false), 1, array('lighttpd', 'php-cgi')),
+            array('both running', 0, false, array('lighttpd' => true, 'php-cgi' => true), 0, array('lighttpd', 'php-cgi')),
+            array('watchdog won race', 7, false, array('lighttpd' => true, 'php-cgi' => true), 0, array('lighttpd', 'php-cgi')),
+        );
+
+        foreach ($cases as $case) {
+            $stepCalls = array();
+            $processCalls = array();
+            $result = \pmssUserLifecycleWebStackStartAndVerify(
+                'unsuspend',
+                'alice',
+                $case[2],
+                static function (string $action, string $username, string $step, string $command, bool $dryRun) use (&$stepCalls, $case): int {
+                    $stepCalls[] = array($action, $username, $step, $command, $dryRun);
+                    return $case[1];
+                },
+                static function (string $username, string $processName) use (&$processCalls, $case): bool {
+                    $processCalls[] = $processName;
+                    return (bool) ($case[3][$processName] ?? false);
+                }
+            );
+
+            $this->assertSame($case[4], $result, $case[0]);
+            $this->assertSame(array('unsuspend', 'alice', 'start_lighttpd', "/scripts/startLighttpd 'alice'", $case[2]), $stepCalls[0], $case[0]);
+            $this->assertSame($case[5], $processCalls, $case[0]);
+        }
+    }
+
     public function testSyncSuspendedStateMirrorsDisabledRootMarker(): void
     {
         $base = $this->pmssMakeTempDir('pmss-user-lifecycle-sync-');
@@ -189,6 +223,8 @@ class userLifecycleLoggingTest extends TestCase
                 'pmssUserLifecycleClearEmptySuspendedMarker($homeDir, $disabledRoot)',
                 "'validate_restored_web_root'",
                 "is_file(\$activeRoot.'/index.php')",
+                "pmssUserLifecycleWebStackStartAndVerify('unsuspend'",
+                'if ($webStackRc !== 0)',
             )),
         ));
     }

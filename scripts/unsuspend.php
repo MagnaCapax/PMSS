@@ -5,7 +5,7 @@
  *
  * Re-enables the Unix account, restores the original web root from
  * /home/<user>/www-disabled when present, refreshes nginx user config, and
- * restarts rTorrent for the user.
+ * restarts and verifies the per-user web stack before completing.
  *
  * @author    Aleksi Ursin <aleksi@magnacapax.fi>
  * @copyright 2010-2025 Magna Capax Finland Oy
@@ -141,6 +141,11 @@ if (!is_file($activeRoot.'/index.php')) {
 // Best-effort: mirror the state in the user config store (marker is canonical).
 pmssUserLifecycleSyncSuspendedState($username, $disabledRoot);
 pmssUserLifecycleRefreshManagedNginxConfig('unsuspend', $username, false);
+$webStackRc = pmssUserLifecycleWebStackStartAndVerify('unsuspend', $username, false);
 
 pmssUserLifecycleContextLogHomeInfo('unsuspend', 'start_rtorrent', $username, $homeDir);
 pmssUserLifecycleStep('unsuspend', $username, 'start_rtorrent', '/scripts/startRtorrent '.escapeshellarg($username), false);
+if ($webStackRc !== 0) {
+    fwrite(STDERR, "Error: per-user web stack failed to start\n");
+    exit(1);
+}
