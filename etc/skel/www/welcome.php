@@ -527,6 +527,7 @@ if (file_exists('openvpn-config.tgz')) {
                         }
 
                         echo pmssWelcomeMemorySectionHtmlBuild();
+                        echo pmssWelcomeServerInfoHtmlBuild();
 
                         if ($billingServiceId > 0) {
                             echo <<<EOF
@@ -832,6 +833,64 @@ function pmssWelcomeDurationCompact($seconds) {
 
 function pmssWelcomeMetricSectionHtmlBuild($title, $bodyHtml) {
     return '<h6>'.pmssWelcomeHtmlAttr($title).'</h6>'.(string) $bodyHtml.'<hr />';
+}
+
+/** Format server uptime without rounding it beyond the observed duration. */
+function pmssWelcomeServerUptimeTextBuild($seconds) {
+    if (!is_numeric($seconds) || !is_finite((float) $seconds) || (float) $seconds < 0) {
+        return null;
+    }
+
+    $seconds = (int) floor((float) $seconds);
+    if ($seconds < 60) return 'under 1 minute';
+
+    $values = array(
+        'day' => (int) floor($seconds / 86400),
+        'hour' => (int) floor(($seconds % 86400) / 3600),
+        'minute' => (int) floor(($seconds % 3600) / 60),
+    );
+    $parts = array();
+    foreach ($values as $unit => $value) {
+        if ($value <= 0) continue;
+        $parts[] = $value.' '.$unit.($value === 1 ? '' : 's');
+        if (count($parts) === 2) break;
+    }
+
+    return implode(' ', $parts);
+}
+
+/** Render fail-soft host uptime and shared load averages on the welcome page. */
+function pmssWelcomeServerInfoHtmlBuild($uptimePath = '/proc/uptime', $loadAveragePath = '/proc/loadavg') {
+    $uptimeText = 'unavailable';
+    $uptimeRaw = pmssCustomerTrimmedFileRead($uptimePath);
+    $uptimeFields = is_string($uptimeRaw) && $uptimeRaw !== '' ? preg_split('/\s+/', $uptimeRaw) : array();
+    if (is_array($uptimeFields) && isset($uptimeFields[0])) {
+        $formattedUptime = pmssWelcomeServerUptimeTextBuild($uptimeFields[0]);
+        if (is_string($formattedUptime) && $formattedUptime !== '') $uptimeText = $formattedUptime;
+    }
+
+    $loadText = 'unavailable';
+    $loadRaw = pmssCustomerTrimmedFileRead($loadAveragePath);
+    $loadFields = is_string($loadRaw) && $loadRaw !== '' ? preg_split('/\s+/', $loadRaw) : array();
+    $loadAverages = array();
+    for ($index = 0; $index < 3; $index++) {
+        if (!is_array($loadFields) || !isset($loadFields[$index]) || !is_numeric($loadFields[$index])) {
+            $loadAverages = array();
+            break;
+        }
+        $loadAverage = (float) $loadFields[$index];
+        if (!is_finite($loadAverage) || $loadAverage < 0) {
+            $loadAverages = array();
+            break;
+        }
+        $loadAverages[] = number_format($loadAverage, 2, '.', '');
+    }
+    if (count($loadAverages) === 3) $loadText = implode(' / ', $loadAverages);
+
+    return pmssWelcomeMetricSectionHtmlBuild(
+        'Server Info',
+        "\nServer uptime: {$uptimeText}<br />\nServer load average (1 / 5 / 15 min, shared server): {$loadText}\n"
+    );
 }
 
 /**

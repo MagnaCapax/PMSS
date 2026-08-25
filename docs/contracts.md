@@ -660,6 +660,12 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - The write accepts the fixed `local` and `remote` values through a same-origin AJAX POST, refuses symlinked or conflicting marker paths, and remains reversible and idempotent.
 - Local frame definitions suppress only the remote frame-definition request. They do not promise a fully network-free panel, and receive navigation changes through server PMSS updates rather than the remote on-load update path.
 
+## Customer Server Status – `etc/skel/www/welcome.php`
+
+- `pmssWelcomeServerInfoHtmlBuild()` renders host uptime plus the 1/5/15-minute load averages after the per-account RAM section.
+- Load is explicitly labeled as shared-server data rather than a per-account metric.
+- `/proc/uptime` and `/proc/loadavg` are read directly from the customer tree without shelling; each unavailable or malformed metric fails soft to `unavailable` without hiding the other metric.
+
 ## Customer Torrent-State Backup – `etc/skel/www/scriptsInc.php` and `welcome.php`
 
 - `welcome.php?backup=download`
