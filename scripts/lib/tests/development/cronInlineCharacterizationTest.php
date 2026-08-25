@@ -47,6 +47,8 @@ class CronInlineCharacterizationTest extends TestCase
             'pmssLighttpdWatchdogDetectReason(',
             "'lighttpd watchdog: ' . \$watchdogReason",
             'pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);',
+            'pmssLighttpdWatchdogListeningSocketPaths($homeDir)',
+            'pmssLighttpdWatchdogSocketFailureIsStaleIndex(',
             'pmssUserWatchdogHandleSuspended(',
             "'lighttpd stopped due to suspension'",
             'pmssUserWatchdogProcessRunning($thisUser, \'php-cgi\')',

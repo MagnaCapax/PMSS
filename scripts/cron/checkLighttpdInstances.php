@@ -102,6 +102,18 @@ foreach($users AS $thisUser) {
         foreach ($socketPaths as $socketPath) {
             $probeResult = pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);
             if (!$probeResult['ok']) {
+                $listeningSocketPaths = (int) $probeResult['errno'] === PMSS_LIGHTTPD_WATCHDOG_SOCKET_ECONNREFUSED
+                    ? pmssLighttpdWatchdogListeningSocketPaths($homeDir)
+                    : array();
+                if (pmssLighttpdWatchdogSocketFailureIsStaleIndex(
+                    (int) $probeResult['errno'],
+                    $socketPaths,
+                    $listeningSocketPaths
+                )) {
+                    echo "Configured php-cgi socket {$socketPath} refused the probe, but live listener coverage is healthy for user: {$thisUser}; skipping restart.\n";
+                    pmssLighttpdWatchdogClearSocketFailure($thisUser);
+                    break;
+                }
                 $socketProbeFailed = true;
                 $failureState = pmssLighttpdWatchdogRecordSocketFailure($thisUser);
                 echo "Error when attempting to connect to socket {$socketPath}: {$probeResult['errno']}, {$probeResult['errstr']} (after {$probeResult['attempts']} attempts)\n";

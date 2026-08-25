@@ -11,6 +11,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         $this->assertSame(4, \PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_ATTEMPTS);
         $this->assertSame(3, \PMSS_LIGHTTPD_WATCHDOG_SOCKET_FAILURE_CYCLES);
         $this->assertSame(2, \PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_RETRY_DELAY_SECONDS);
+        $this->assertSame(111, \PMSS_LIGHTTPD_WATCHDOG_SOCKET_ECONNREFUSED);
     }
 
     /**
@@ -132,6 +133,85 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         $this->assertEquals(1, $result['attempts']);
         $this->assertEquals(0, $probeCalls);
         $this->assertEquals('socket path missing', $result['errstr']);
+    }
+
+    public function testListeningSocketParserAcceptsCurrentNumberedAndLegacyPaths(): void
+    {
+        $home = '/home/alice';
+        $this->assertSame(
+            array($home.'/.lighttpd/php.socket-1', $home.'/.lighttpd/php.socket'),
+            \pmssLighttpdWatchdogListeningSocketPathsFromLines(array(
+                'u_str LISTEN 0 1024 '.$home.'/.lighttpd/php.socket-1 12345 * 0',
+                'u_str LISTEN 0 1024 '.$home.'/.lighttpd/php.socket 12346 * 0',
+            ), $home)
+        );
+    }
+
+    public function testListeningSocketParserRejectsUntrustedRowsAndPaths(): void
+    {
+        $home = '/home/alice';
+        $this->assertSame(array(), \pmssLighttpdWatchdogListeningSocketPathsFromLines(array(
+            'u_str ESTAB 0 1024 '.$home.'/.lighttpd/php.socket-1 12345 * 0',
+            'u_str LISTEN nope 1024 '.$home.'/.lighttpd/php.socket-2 12346 * 0',
+            'u_str LISTEN 0 nope '.$home.'/.lighttpd/php.socket-3 12347 * 0',
+            'u_str LISTEN 0 1024 /home/bob/.lighttpd/php.socket-1 12348 * 0',
+            'u_str LISTEN 0 1024 '.$home.'/.lighttpd/php.socket-old 12349 * 0',
+            'malformed',
+        ), $home));
+        $this->assertSame(array(), \pmssLighttpdWatchdogListeningSocketPathsFromLines(array(), 'relative/home'));
+    }
+
+    public function testListeningSocketParserDeduplicatesListenerRows(): void
+    {
+        $path = '/home/alice/.lighttpd/php.socket-2';
+        $line = 'u_str LISTEN 0 1024 '.$path.' 12345 * 0';
+
+        $this->assertSame(
+            array($path),
+            \pmssLighttpdWatchdogListeningSocketPathsFromLines(array($line, $line), '/home/alice')
+        );
+    }
+
+    public function testListeningSocketReaderRejectsFailedAndMalformedResults(): void
+    {
+        foreach (array(
+            static function (): array { return array('lines' => array(), 'rc' => 1); },
+            static function (): array { return array('lines' => 'not-an-array', 'rc' => 0); },
+            static function () { return 'not-an-array'; },
+        ) as $reader) {
+            $this->assertSame(
+                array(),
+                \pmssLighttpdWatchdogListeningSocketPaths('/home/alice', array('reader' => $reader))
+            );
+        }
+    }
+
+    public function testListeningSocketReaderReturnsStrictlyParsedPaths(): void
+    {
+        $path = '/home/alice/.lighttpd/php.socket-4';
+        $reader = static function () use ($path): array {
+            return array('lines' => array('u_str LISTEN 0 1024 '.$path.' 12345 * 0'), 'rc' => 0);
+        };
+
+        $this->assertSame(
+            array($path),
+            \pmssLighttpdWatchdogListeningSocketPaths('/home/alice', array('reader' => $reader))
+        );
+    }
+
+    public function testStaleIndexDecisionRequiresRefusalAndConfiguredWorkerCount(): void
+    {
+        $expected = array('/socket-0', '/socket-1');
+        $this->assertFalse(\pmssLighttpdWatchdogSocketFailureIsStaleIndex(111, array(), array('/socket-2')));
+        $this->assertFalse(\pmssLighttpdWatchdogSocketFailureIsStaleIndex(111, $expected, array()));
+        $this->assertFalse(\pmssLighttpdWatchdogSocketFailureIsStaleIndex(111, $expected, array('/socket-2')));
+        $this->assertFalse(\pmssLighttpdWatchdogSocketFailureIsStaleIndex(110, $expected, array('/socket-2', '/socket-3')));
+        $this->assertTrue(\pmssLighttpdWatchdogSocketFailureIsStaleIndex(111, $expected, array('/socket-2', '/socket-3')));
+        $this->assertTrue(\pmssLighttpdWatchdogSocketFailureIsStaleIndex(
+            111,
+            array('/socket-0', '/socket-0'),
+            array('/socket-2', '/socket-2')
+        ));
     }
 
     public function testSocketFailureStateWaitsUntilThreshold(): void

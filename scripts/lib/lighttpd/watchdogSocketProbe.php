@@ -24,6 +24,10 @@ if (!defined('PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_TIMEOUT_SECONDS')) {
     define('PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_TIMEOUT_SECONDS', 5);
 }
 
+if (!defined('PMSS_LIGHTTPD_WATCHDOG_SOCKET_ECONNREFUSED')) {
+    define('PMSS_LIGHTTPD_WATCHDOG_SOCKET_ECONNREFUSED', 111);
+}
+
 /** Retry a php-cgi Unix socket probe before treating the worker pool as dead. */
 function pmssLighttpdWatchdogSocketProbeWithRetry(string $socketPath, array $options = array()): array
 {
@@ -73,6 +77,81 @@ function pmssLighttpdWatchdogSocketProbeWithRetry(string $socketPath, array $opt
     }
 
     return $result;
+}
+
+/**
+ * Parse strict `ss -xln` LISTEN rows for one account's php-cgi sockets.
+ *
+ * @param string[] $lines
+ * @return string[]
+ */
+function pmssLighttpdWatchdogListeningSocketPathsFromLines(array $lines, string $homeDir): array
+{
+    $homeDir = rtrim($homeDir, '/');
+    if ($homeDir === '' || !pmssPathAbsoluteStringIsSafe($homeDir)) {
+        return array();
+    }
+
+    $baseSocketPath = $homeDir.'/.lighttpd/php.socket';
+    $pathPattern = '~^'.preg_quote($baseSocketPath, '~').'(?:-[0-9]+)?$~D';
+    $listeningPaths = array();
+    foreach ($lines as $line) {
+        $columns = preg_split('/\s+/', trim((string) $line));
+        if (!is_array($columns)
+            || count($columns) < 5
+            || ($columns[1] ?? '') !== 'LISTEN'
+            || !ctype_digit((string) ($columns[2] ?? ''))
+            || !ctype_digit((string) ($columns[3] ?? ''))
+        ) {
+            continue;
+        }
+        foreach ($columns as $column) {
+            if (preg_match($pathPattern, (string) $column) === 1) {
+                $listeningPaths[(string) $column] = (string) $column;
+            }
+        }
+    }
+
+    return array_values($listeningPaths);
+}
+
+/** Read live php-cgi listener paths without trusting socket files on disk. */
+function pmssLighttpdWatchdogListeningSocketPaths(string $homeDir, array $options = array()): array
+{
+    $reader = isset($options['reader']) && is_callable($options['reader']) ? $options['reader'] : null;
+    if ($reader === null) {
+        $reader = static function (): array {
+            $lines = array();
+            $rc = 1;
+            @exec('ss -xln 2>/dev/null', $lines, $rc);
+
+            return array('lines' => $lines, 'rc' => $rc);
+        };
+    }
+    $result = $reader();
+    if (!is_array($result)
+        || (int) ($result['rc'] ?? 1) !== 0
+        || !isset($result['lines'])
+        || !is_array($result['lines'])
+    ) {
+        return array();
+    }
+
+    return pmssLighttpdWatchdogListeningSocketPathsFromLines($result['lines'], $homeDir);
+}
+
+/** Identify refused stale-index probes only when all configured worker slots remain represented. */
+function pmssLighttpdWatchdogSocketFailureIsStaleIndex(
+    int $errno,
+    array $expectedPaths,
+    array $listeningPaths
+): bool
+{
+    $expectedCount = count(array_unique($expectedPaths));
+
+    return $errno === PMSS_LIGHTTPD_WATCHDOG_SOCKET_ECONNREFUSED
+        && $expectedCount > 0
+        && count(array_unique($listeningPaths)) >= $expectedCount;
 }
 
 /** Return the per-user marker path for consecutive php-cgi socket failures. */
