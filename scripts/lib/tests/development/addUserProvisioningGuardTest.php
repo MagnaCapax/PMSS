@@ -60,6 +60,9 @@ class AddUserProvisioningGuardTest extends TestCase
             'lxc', 'runc', 'crun', 'podman', 'qemu', 'dockerd', 'virsh', 'xen', 'vagrant',
             'cron', 'crond', 'anacron', 'systemd', 'journal', 'journald', 'init', 'udev', 'udevd', 'logind',
             'named', 'nscd', 'sssd', 'nslcd', 'samba', 'smbd', 'nmbd', 'monit', 'snmpd', 'rpcbind', 'fail2ban',
+            // pmseedbox signup-layer baseline reconcile (2026-08-25). 'su' is also reserved-listed
+            // but the min-length (>=3) check precedes the reserved check, so it returns too_short.
+            'mrfarmer', 'wheel', 'slice', 'cgroup', 'user',
         ];
 
         foreach ($reservedNames as $name) {
