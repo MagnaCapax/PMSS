@@ -230,6 +230,23 @@ if (!function_exists('pmssCustomerCgroupSelfEntries')) {
 }
 
 if (!function_exists('pmssCustomerHtmlAttr')) { /** Escape customer GUI text and attributes with the shared PMSS flags. */ function pmssCustomerHtmlAttr($value) { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); } }
+
+if (!function_exists('pmssCustomerContextualHelpLinkBuild')) {
+ /** Render help only for panel items with a known published wiki page. */
+ function pmssCustomerContextualHelpLinkBuild($item) {
+  $targets = array(
+   'panelFrameSource' => array(
+    'url' => 'https://wiki.pulsedmedia.com/index.php/Panel_Frame_Source',
+    'title' => 'Read about panel frame sources in the Pulsed Media Wiki',
+   ),
+  );
+  if (!is_string($item) || !isset($targets[$item])) return '';
+
+  $target = $targets[$item];
+  return ' <a class="pmss-contextual-help" href="'.pmssCustomerHtmlAttr($target['url']).'" target="_blank" rel="noopener noreferrer" title="'.pmssCustomerHtmlAttr($target['title']).'" aria-label="'.pmssCustomerHtmlAttr($target['title']).'">(?)</a>';
+ }
+}
+
 if (!function_exists('pmssJsonFileReadAssoc')) {
  /** Read a JSON object file as an associative array, optionally requiring a customer-safe path. */
  function pmssJsonFileReadAssoc($path, $safePathRequired = false) {

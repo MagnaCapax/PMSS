@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 4).'/etc/skel/www/scriptsInc.php';
 
 class IndexSkeletonFrameDataTest extends TestCase
 {
@@ -151,11 +152,31 @@ class IndexSkeletonFrameDataTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/welcome.php', array(
             'Panel frame source',
+            "pmssCustomerContextualHelpLinkBuild('panelFrameSource')",
             'Remote-updated frame definitions are the default.',
             'Other panel content may still use remote resources.',
             "headers: {'X-Requested-With': 'XMLHttpRequest'}",
             "data: {guiFramesMode: mode}",
         ));
+    }
+
+    public function testContextualHelpLinkRequiresPublishedWikiTarget(): void
+    {
+        $html = \pmssCustomerContextualHelpLinkBuild('panelFrameSource');
+
+        $this->assertStringContainsString('class="pmss-contextual-help"', $html);
+        $this->assertStringContainsString('href="https://wiki.pulsedmedia.com/index.php/Panel_Frame_Source"', $html);
+        $this->assertStringContainsString('title="Read about panel frame sources in the Pulsed Media Wiki"', $html);
+        $this->assertStringContainsString('aria-label="Read about panel frame sources in the Pulsed Media Wiki"', $html);
+        $this->assertStringContainsString('target="_blank" rel="noopener noreferrer"', $html);
+        $this->assertStringContainsString('>(?)</a>', $html);
+
+        $this->assertSame('', \pmssCustomerContextualHelpLinkBuild(null));
+        $this->assertSame('', \pmssCustomerContextualHelpLinkBuild(''));
+        $this->assertSame('', \pmssCustomerContextualHelpLinkBuild('panel-frame-source'));
+        $this->assertSame('', \pmssCustomerContextualHelpLinkBuild('PanelFrameSource'));
+        $this->assertSame('', \pmssCustomerContextualHelpLinkBuild('panelFrameSource '));
+        $this->assertSame('', \pmssCustomerContextualHelpLinkBuild(array('panelFrameSource')));
     }
 
     public function testLocalFallbackWelcomeUrlCarriesSerializedQuotaSnapshot(): void

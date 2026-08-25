@@ -456,7 +456,7 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
                             <li><a href="https://filezilla-project.org/download.php?platform=win64" target="_blank">FileZilla - Popular opensource client</a></li>
                         </ul>
 
-                        <h6>Panel frame source</h6>
+                        <h6>Panel frame source<?php echo pmssCustomerContextualHelpLinkBuild('panelFrameSource'); ?></h6>
                         <p>Remote-updated frame definitions are the default. Local definitions avoid that frame-definition request, but receive navigation changes only with server PMSS updates. Other panel content may still use remote resources.</p>
                         <input type="button" name="guiFramesMode" value="<?php echo $guiFramesLocalOnly ? 'Use remote-updated frames' : 'Use local frame definitions'; ?>" onClick="pmssGuiFramesModeApply(this, '<?php echo $guiFramesLocalOnly ? 'remote' : 'local'; ?>');" />
 

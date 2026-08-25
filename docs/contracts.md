@@ -659,6 +659,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - The customer may select bundled definitions through the welcome-page control. The preference is represented only by the customer-owned `~/.guiFramesLocalOnly` marker; an absent marker restores remote-primary behavior.
 - The write accepts the fixed `local` and `remote` values through a same-origin AJAX POST, refuses symlinked or conflicting marker paths, and remains reversible and idempotent.
 - Local frame definitions suppress only the remote frame-definition request. They do not promise a fully network-free panel, and receive navigation changes through server PMSS updates rather than the remote on-load update path.
+- `pmssCustomerContextualHelpLinkBuild()` renders the panel's `(?)` wiki link only for items registered with a published wiki page; an absent or unknown item renders no link.
 
 ## Customer Server Status – `etc/skel/www/welcome.php`
 
