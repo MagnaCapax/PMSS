@@ -68,8 +68,33 @@ function pmssCreateNginxConfigMain(array $argv): int
     $singleUser = ($requestedUser !== '');
 
     $ctx = pmssCreateNginxConfigSetup($requestedUser, $singleUser);
+    $writeFailureUsers = [];
+    $unserviceableUsers = [];
     foreach ($users as $thisUser) {
-        pmssCreateNginxConfigGenerateUser($thisUser, $ctx, $singleUser);
+        $outcome = pmssCreateNginxConfigGenerateUser($thisUser, $ctx, $singleUser);
+        if ($outcome !== PMSS_NGINX_USER_CONFIG_WRITE_FAILED) {
+            continue;
+        }
+        $writeFailureUsers[] = $thisUser;
+        if (!pmssCreateNginxConfigUserRouteIsServiceable($thisUser, $ctx)) {
+            $unserviceableUsers[] = $thisUser;
+        }
+    }
+
+    if (!$singleUser && $writeFailureUsers === []) {
+        if (!pmssCreateNginxConfigPruneOrphans($users, $ctx)) {
+            fwrite(STDERR, "[WARN] nginx managed config orphan pruning was incomplete\n");
+        }
+    }
+    if ($writeFailureUsers !== []) {
+        $message = sprintf('WARN: nginx config writes failed for %d user(s); prior routes were preserved where safe', count($writeFailureUsers));
+        fwrite(STDERR, $message.PHP_EOL);
+        pmssCreateNginxConfigAppendLog($message);
+    }
+    if ($unserviceableUsers !== []) {
+        $message = sprintf('CRITICAL: nginx config generation left %d user(s) without a serviceable primary route', count($unserviceableUsers));
+        fwrite(STDERR, $message.PHP_EOL);
+        pmssCreateNginxConfigAppendLog($message);
     }
 
     $subdomainConfigDir = (string)($ctx['subdomainConfigDir'] ?? '/etc/nginx/conf.d');
@@ -79,5 +104,9 @@ function pmssCreateNginxConfigMain(array $argv): int
     pmssCreateNginxConfigChmodGlob(0640, $subdomainConfigDir.'/pmss-user-*.conf');
     pmssCreateNginxConfigChmodGlob(0640, '/etc/nginx/*.conf');
 
-    return pmssCreateNginxConfigTestAndMaybeRestart($restartNginx);
+    $configTestRc = pmssCreateNginxConfigTestAndMaybeRestart($restartNginx);
+    if ($configTestRc !== 0) {
+        return $configTestRc;
+    }
+    return $unserviceableUsers === [] ? 0 : 1;
 }

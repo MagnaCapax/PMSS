@@ -57,16 +57,6 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
         pmssDirEnsureExists($path, 0755);
     }
 
-    $cleanupConfigs = static function (string $pattern): void {
-        $existingConfigs = glob($pattern);
-        if ($existingConfigs === false) {
-            return;
-        }
-        foreach ($existingConfigs as $oldConfig) {
-            @unlink($oldConfig);
-        }
-    };
-
     foreach ([
         '/etc/seedbox/config/template.nginx-conf' => '/etc/nginx/nginx.conf',
         '/etc/seedbox/config/template.nginx-proxy_params' => '/etc/nginx/proxy_params',
@@ -150,18 +140,10 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
         @passthru('openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj "/C=FI/ST=none/L=none/O=PulsedMedia/CN=' . $hostname . '" -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt');
     }
 
-    if (pmssDirEnsureExists('/etc/nginx/users', 0751) && !$singleUser) {
-        $cleanupConfigs('/etc/nginx/users/*');
-    }
+    pmssDirEnsureExists('/etc/nginx/users', 0751);
 
     if ($subdomainEnabled) {
         pmssDirEnsureExists($subdomainConfigDir, 0755);
-        if (!$singleUser) {
-            $cleanupConfigs($subdomainConfigDir.'/pmss-user-*.conf');
-        } elseif ($requestedUser !== '') {
-            @unlink($subdomainConfigDir.'/pmss-user-'.$requestedUser.'.conf');
-            @unlink($subdomainConfigDir.'/pmss-user-'.$requestedUser.'-hash.conf');
-        }
     } elseif ($subdomainBase !== '') {
         fwrite(STDERR, "Skipping nginx subdomain vhosts (invalid hostname: {$subdomainBase})\n");
     }
@@ -174,6 +156,9 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
         'subdomainEnabled' => $subdomainEnabled,
         'subdomainBase' => $subdomainBase,
         'subdomainConfigDir' => $subdomainConfigDir,
+        'nginxUsersDir' => '/etc/nginx/users',
+        'homeBase' => '/home',
+        'runtimePortDir' => '/etc/seedbox/runtime/ports',
         'nginxSslBlock' => $nginxSslBlock,
         'publicSubdomainTemplate' => $templates['public'],
         'privateSubdomainTemplate' => $templates['private'],

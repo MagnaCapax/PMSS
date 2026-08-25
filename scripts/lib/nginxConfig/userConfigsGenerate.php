@@ -5,7 +5,11 @@
  * @license GPL-3.0-only
  */
 
-require_once __DIR__.'/../lighttpd/userFileWrite.php';
+require_once __DIR__.'/userConfigsReconcile.php';
+
+const PMSS_NGINX_USER_CONFIG_GENERATED = 'generated';
+const PMSS_NGINX_USER_CONFIG_SKIPPED = 'skipped';
+const PMSS_NGINX_USER_CONFIG_WRITE_FAILED = 'write_failed';
 
 /**
  * Write an explicit warning when nginx config generation skips a user.
@@ -37,31 +41,6 @@ function pmssCreateNginxConfigWriteFile(string $path, string $content, string $u
     }
 
     pmssCreateNginxConfigLogSkippedUser($user, 'failed to write '.$label.' ('.$path.')');
-
-    return false;
-}
-
-/**
- * Remove a stale managed nginx config without following unsafe filesystem edges.
- */
-function pmssCreateNginxConfigRemoveFile(string $path, string $user, string $label): bool
-{
-    if (!pmssUserFilePathIsSafe($path)) {
-        pmssCreateNginxConfigLogSkippedUser($user, 'unsafe '.$label.' path ('.$path.')');
-        return false;
-    }
-    if (!file_exists($path)) {
-        return true;
-    }
-    if (is_link($path) || !is_file($path)) {
-        pmssCreateNginxConfigLogSkippedUser($user, 'refusing to remove non-regular '.$label.' ('.$path.')');
-        return false;
-    }
-    if (@unlink($path)) {
-        return true;
-    }
-
-    pmssCreateNginxConfigLogSkippedUser($user, 'failed to remove '.$label.' ('.$path.')');
 
     return false;
 }
@@ -141,17 +120,23 @@ function pmssCreateNginxConfigLegacyDelugeWebPort(string $homeDir, string $user)
 }
 
 /**
- * Generate per-user configs under /etc/nginx/users and optional subdomain vhosts.
+ * Reconcile one user's configs without deleting a working route before replacement.
  */
-function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $singleUser): void
+function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $singleUser): string
 {
     $thisUser = trim($thisUser);
-    if ($thisUser === '' || !pmssValidateUsername($thisUser)) return;
+    if ($thisUser === '' || !pmssValidateUsername($thisUser)) return PMSS_NGINX_USER_CONFIG_SKIPPED;
 
-    $homeDir = "/home/{$thisUser}";
-    if (!is_dir($homeDir)) return;
+    $managedPaths = pmssCreateNginxConfigManagedUserPaths($thisUser, $ctx);
+    $homeBase = pmssCreateNginxConfigContextDir($ctx, 'homeBase', '/home');
+    $runtimePortDir = pmssCreateNginxConfigContextDir($ctx, 'runtimePortDir', '/etc/seedbox/runtime/ports');
+    $homeDir = $homeBase.'/'.$thisUser;
+    if (!is_dir($homeDir)) {
+        pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $singleUser ? [$managedPaths['user']] : []);
+        return PMSS_NGINX_USER_CONFIG_SKIPPED;
+    }
 
-    $portFile = "/etc/seedbox/runtime/ports/lighttpd-{$thisUser}";
+    $portFile = $runtimePortDir.'/lighttpd-'.$thisUser;
     $isSuspended = is_dir($homeDir.'/www-disabled');
 
     $suspendedTemplate = $ctx['suspendedTemplate'] ?? false;
@@ -183,21 +168,27 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
         if ($suspendedTemplate === false || $suspendedTemplate === '') {
             // No dedicated suspended template found; skip generating a per-user
             // config so nginx falls back to generic defaults.
-            if ($singleUser) {
-                pmssCreateNginxConfigRemoveFile("/etc/nginx/users/{$thisUser}", $thisUser, 'stale user config');
-            }
-            return;
+            pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, []);
+            return PMSS_NGINX_USER_CONFIG_SKIPPED;
         }
-        if ($subdomainEnabled && !pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, true, null, $mcxHost)) return;
+        $writtenPaths = [];
+        if ($subdomainEnabled) {
+            if (!pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, true, null, $mcxHost)) return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
+            $writtenPaths[] = $managedPaths['public'];
+            if ($hashHost !== null) $writtenPaths[] = $managedPaths['private'];
+        }
         $userConfig = str_replace('##username', $thisUser, $suspendedTemplate);
-        if (!pmssCreateNginxConfigWriteFile("/etc/nginx/users/{$thisUser}", $userConfig, $thisUser, 'user suspended config')) return;
+        if (!pmssCreateNginxConfigWriteFile($managedPaths['user'], $userConfig, $thisUser, 'user suspended config')) return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
+        $writtenPaths[] = $managedPaths['user'];
+        pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $writtenPaths);
         pmssCreateNginxConfigUserLog($thisUser, 'nginx config regenerated (suspended template)');
-        return;
+        return PMSS_NGINX_USER_CONFIG_GENERATED;
     }
 
     if (!file_exists($homeDir.'/.rtorrent.rc')) {
         pmssCreateNginxConfigLogSkippedUser($thisUser, 'missing .rtorrent.rc prerequisite');
-        return;
+        pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $singleUser ? [$managedPaths['user']] : []);
+        return PMSS_NGINX_USER_CONFIG_SKIPPED;
     }
 
     $serverPort = pmssReadRegularFileInt($portFile);
@@ -208,12 +199,22 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     }
     if (!pmssNetworkPortInRange($serverPort, 1024)) {
         pmssCreateNginxConfigLogSkippedUser($thisUser, 'lighttpd port missing or invalid after refresh attempt ('.$portFile.')');
-        return;
+        pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $singleUser ? [$managedPaths['user']] : []);
+        return PMSS_NGINX_USER_CONFIG_SKIPPED;
     }
 
-    if ($subdomainEnabled && !pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, false, $serverPort, $mcxHost)) return;
+    $writtenPaths = [];
+    if ($subdomainEnabled) {
+        if (!pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, false, $serverPort, $mcxHost)) return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
+        $writtenPaths[] = $managedPaths['public'];
+        if ($hashHost !== null) $writtenPaths[] = $managedPaths['private'];
+    }
 
-    if ($userTemplate === false || $userTemplate === '') return;
+    if ($userTemplate === false || $userTemplate === '') {
+        if ($singleUser) $writtenPaths[] = $managedPaths['user'];
+        pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $writtenPaths);
+        return PMSS_NGINX_USER_CONFIG_SKIPPED;
+    }
 
     $placeholders = array("##username", "##serverPort");
     $replacements = array($thisUser, $serverPort);
@@ -225,6 +226,9 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
 
     $userConfig = str_replace($placeholders, $replacements, $userTemplate);
 
-    if (!pmssCreateNginxConfigWriteFile("/etc/nginx/users/{$thisUser}", $userConfig, $thisUser, 'user config')) return;
+    if (!pmssCreateNginxConfigWriteFile($managedPaths['user'], $userConfig, $thisUser, 'user config')) return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
+    $writtenPaths[] = $managedPaths['user'];
+    pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $writtenPaths);
     pmssCreateNginxConfigUserLog($thisUser, 'nginx config regenerated');
+    return PMSS_NGINX_USER_CONFIG_GENERATED;
 }
