@@ -62,7 +62,7 @@ class AddUserProvisioningGuardTest extends TestCase
             'named', 'nscd', 'sssd', 'nslcd', 'samba', 'smbd', 'nmbd', 'monit', 'snmpd', 'rpcbind', 'fail2ban',
             // pmseedbox signup-layer baseline reconcile (2026-08-25). 'su' is also reserved-listed
             // but the min-length (>=3) check precedes the reserved check, so it returns too_short.
-            'mrfarmer', 'wheel', 'slice', 'cgroup', 'user',
+            'mrfarmer', 'wheel', 'slice', 'cgroup', 'user', 'exim',
         ];
 
         foreach ($reservedNames as $name) {

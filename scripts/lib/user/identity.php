@@ -69,7 +69,7 @@ function pmssReservedUsernames(): array
         'lighttpd', 'rutorrent', 'srvadmin', 'srvapi', 'pmcseed',
         'pmcdn', 'srvmgmt',
         // pmseedbox signup-layer baseline reconcile — single source of truth (2026-08-25)
-        'mrfarmer', 'wheel', 'su', 'slice', 'cgroup', 'user',
+        'mrfarmer', 'wheel', 'su', 'slice', 'cgroup', 'user', 'exim',
     );
 
     return $reserved;
