@@ -429,6 +429,14 @@ read-only probes used by baseline sanitization and source-build guards.
 
 ---
 
+## Per-user Notification Recipient - `scripts/lib/user/notificationEmail.php`
+
+- `pmssUserNotificationEmailRead()` reads `.notifyEmail` only from a root-owned `0600`/`0640` regular file in the expected account group, rejects symlinks, and returns a single syntactically valid email address or `null`.
+- `UserConfigStore::readNotificationEmail()` accepts only a valid managed username and requires the artifact to be root-owned and non-writable by group/other. `PMSS_HOME_DIR` overrides `/home` for hermetic callers.
+- `scripts/util/userPermissions.php` converges the authoritative artifact to `root:<user> 0640`; `scripts/recreateUser.php` preserves it across account reconstruction.
+
+---
+
 ## rTorrent Configuration – `scripts/lib/rtorrentConfig.php`
 
 Class `rtorrentConfig`
@@ -585,6 +593,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/userPermissions.php <user>
   - Behavior: Fixes ownership/permissions under `/home/<user>` according to policy (chmod/chown); safe to re-run.
+  - Provisioned recipient: Converges `.notifyEmail` to `root:<user> 0640`, preserving customer read access while preventing local redirection of future notifications.
 
 - scripts/util/userConfig.php <user> <ramMiB> <quotaGiB>
   - Behavior: Applies quota settings and rTorrent/ruTorrent configs; seeds dotfiles; safe to re-run.
@@ -710,8 +719,9 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Kills user processes; if `/home/<user>` exists, moves to `/home/backup-<user>`;
     recreates from `/etc/skel`, ensures dirs (`data`, `session`, `.lighttpd`);
     re-applies configs (`userConfig.php`, lighttpd/nginx, permissions);
-    restores billing identity files (`.billingServiceId`, legacy `.billingId`, and
-    `.billingClientId`) before nginx regeneration, then restores `data`, `session`,
+    restores authoritative billing/contact files (`.billingServiceId`, legacy
+    `.billingId`, `.billingClientId`, and `.notifyEmail`) before nginx regeneration,
+    immediately reapplies `root:<user> 0640`, then restores `data`, `session`,
     and `.htpasswd` when available; validates ownership.
 
 ---

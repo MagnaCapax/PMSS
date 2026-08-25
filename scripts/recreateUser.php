@@ -169,10 +169,10 @@ pmssRunOrExit(sprintf(
 pmssRunOrExit('/scripts/util/setupUserHomePermissions.php ' . escapeshellarg($userName));
 pmssRunOrExit('/scripts/util/userConfigLighttpd.php ' . escapeshellarg($userName));
 
-/* Restore billing identities before nginx derives the user's stable hostnames. */
+/* Restore authoritative provisioning artifacts before dependent config is rendered. */
 if ($homeExists) {
     echo "[*] Restoring billing identities\n";
-    foreach (['.billingServiceId', '.billingId', '.billingClientId'] as $billingFileName) {
+    foreach (['.billingServiceId', '.billingId', '.billingClientId', '.notifyEmail'] as $billingFileName) {
         $sourcePath = "{$backupDir}/{$billingFileName}";
         if (!is_file($sourcePath) || is_link($sourcePath)) {
             continue;
@@ -180,7 +180,8 @@ if ($homeExists) {
 
         $destinationPath = "{$homeDir}/{$billingFileName}";
         pmssRunOrExit('cp ' . escapeshellarg($sourcePath) . ' ' . escapeshellarg($destinationPath));
-        pmssRunOrExit('chown ' . escapeshellarg($userName) . ':' . escapeshellarg($userName) . ' ' . escapeshellarg($destinationPath));
+        pmssRunOrExit('chown ' . escapeshellarg('root:'.$userName) . ' ' . escapeshellarg($destinationPath));
+        pmssRunOrExit('chmod 0640 ' . escapeshellarg($destinationPath));
     }
 }
 

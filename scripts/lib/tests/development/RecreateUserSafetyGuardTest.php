@@ -25,14 +25,15 @@ class RecreateUserSafetyGuardTest extends TestCase
         $source = (string) file_get_contents($this->pmssRepoPath('scripts/recreateUser.php'));
         $this->assertStringContainsAllStrings([
             'Restoring billing identities',
-            "foreach (['.billingServiceId', '.billingId', '.billingClientId'] as \$billingFileName)",
+            "foreach (['.billingServiceId', '.billingId', '.billingClientId', '.notifyEmail'] as \$billingFileName)",
             'if (!is_file($sourcePath) || is_link($sourcePath))',
             "pmssRunOrExit('cp ' . escapeshellarg(\$sourcePath)",
-            "pmssRunOrExit('chown ' . escapeshellarg(\$userName)",
+            "pmssRunOrExit('chown ' . escapeshellarg('root:'.\$userName)",
+            "pmssRunOrExit('chmod 0640 ' . escapeshellarg(\$destinationPath))",
         ], $source);
         $this->assertOrderedStrings([
             'Restoring billing identities',
-            "foreach (['.billingServiceId', '.billingId', '.billingClientId'] as \$billingFileName)",
+            "foreach (['.billingServiceId', '.billingId', '.billingClientId', '.notifyEmail'] as \$billingFileName)",
             'createNginxConfig.php --user',
         ], $source);
     }

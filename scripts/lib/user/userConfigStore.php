@@ -23,6 +23,7 @@ require_once __DIR__.'/../runtime.php';
 
 require_once __DIR__.'/UserValidator.php';
 require_once __DIR__.'/billingIds.php';
+require_once __DIR__.'/notificationEmail.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
 
@@ -158,6 +159,22 @@ class UserConfigStore
         $limits = pmssReadUserSlicePropertiesByUsername($username, ['MemoryHigh', 'MemoryMax']);
         $bytes = (int) (pmssSystemdPropertyTrailingInt($limits['MemoryMax']) ?: pmssSystemdPropertyTrailingInt($limits['MemoryHigh']) ?: 0);
         return $bytes > 0 ? max(0, (int) floor($bytes / 1048576)) : 0;
+    }
+
+    /** Read the billing-provisioned notification recipient for one user. */
+    public function readNotificationEmail(string $username): ?string
+    {
+        if (($username = $this->validatedUsername($username)) === null) {
+            return null;
+        }
+
+        $account = pmssUserAccountLookup($username);
+        if (!is_array($account) || !isset($account['gid']) || !is_numeric($account['gid'])) {
+            return null;
+        }
+
+        $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
+        return pmssUserNotificationEmailRead($homeRoot.'/'.$username, (int) $account['gid']);
     }
 
     private function validatedUsername(string $username): ?string
