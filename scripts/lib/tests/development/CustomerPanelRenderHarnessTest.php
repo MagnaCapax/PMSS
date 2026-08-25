@@ -151,6 +151,49 @@ class CustomerPanelRenderHarnessTest extends TestCase
         }
     }
 
+    public function testWelcomeShowsReducedThrottleAtDefaultCapWhenEnabledMarkerExists(): void
+    {
+        $this->pmssLoadCustomerPanelRenderHarness();
+        $runRoot = \pmssCustomerPanelRenderTempRoot();
+        $homeRoot = $runRoot.'/home';
+        $home = $homeRoot.'/renderuser';
+        $www = $home.'/www';
+        $bootstrap = $runRoot.'/php-cli-bootstrap.php';
+        $stateDir = $this->pmssEnsureDir($runRoot.'/runtime/trafficLimits', 0700);
+
+        try {
+            $setup = \pmssCustomerPanelRenderPrepare($this->pmssRepoPath('etc/skel/www'), $home, $www, $bootstrap);
+            $this->assertTrue($setup['ok'], $setup['error']);
+            $trafficData = array('raw' => array('month' => 125 * 1024, 'week' => 0, 'day' => 0), 'daily' => array());
+            $this->pmssWriteSerializedFixture($home.'/.trafficData', $trafficData);
+            $this->pmssWriteFile($home.'/.trafficLimit', "100\n");
+            $this->pmssWriteFile($home.'/.bonusTraffic', "0\n");
+            $this->pmssWriteFile($home.'/.throttle', "100\n");
+            $this->pmssWriteFile($stateDir.'/renderuser.enabled', "1\n");
+
+            $result = [];
+            $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir], function () use (&$result, $www, $bootstrap, $homeRoot, $home): void {
+                $result = \pmssCustomerPanelRenderPage(
+                    $www,
+                    $bootstrap,
+                    $homeRoot,
+                    $home,
+                    'welcome.php',
+                    ['minBytes' => 1024, 'markers' => ['Traffic Info']]
+                );
+            });
+
+            $this->assertEquals(array(), $result['errors'], implode('; ', $result['errors']));
+            $this->assertStringContainsString('OVER TRAFFIC LIMIT WARNING - REDUCED BANDWIDTH', $result['stdout']);
+            $this->assertStringContainsString('Current effective: 100 Mbps (reduced)', $result['stdout']);
+            $this->assertStringContainsString('Throttled to 100 Mbps', $result['stdout']);
+            $this->assertStringNotContainsString('Current effective: full plan port speed', $result['stdout']);
+            $this->assertStringNotContainsString('Approaching monthly traffic cap', $result['stdout']);
+        } finally {
+            \pmssCustomerPanelRenderCleanup($runRoot);
+        }
+    }
+
     public function testReportsUndefinedFunctionFatalFromFixture(): void
     {
         $root = $this->pmssMakeTempDir('pmss-render-fixture-', 0700);

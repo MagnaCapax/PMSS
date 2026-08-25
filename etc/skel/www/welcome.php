@@ -652,7 +652,7 @@ function pmssWelcomeTrafficBandwidthStateBuild($throttlePath, $enabledMarkerPath
     return array(
         'defaultCapMbit' => $defaultCapMbit,
         'effectiveCapMbit' => $effectiveCapMbit,
-        'isReduced' => $effectiveCapMbit < $defaultCapMbit,
+        'isReduced' => $throttleEnforced,
         'throttleFileExists' => $parsedCap !== null,
         'throttleEnforced' => $throttleEnforced,
         'throttleFileMtime' => $throttleFileMtime,
