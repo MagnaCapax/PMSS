@@ -88,6 +88,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
   - `--verify-only`        Only verify URLs (alias to `--dry-run`) and exit early
   - `--force`              Continue below the 1024 MiB account-memory guard
   - `--start-stopped`      Start installed apps whose tmux sessions are absent, then exit
+  - `--secure-app=APP`     Apply PMSS default auth to one installed app, then exit
   - `--uninstall`          Remove the PMSS-managed media stack from this account
 
 - Sonarr
@@ -125,6 +126,8 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
   - `bash install-media-stack.sh --verify-only`
 - Start stopped apps without reinstalling:
   - `bash install-media-stack.sh --start-stopped`
+- Secure one installed app without reinstalling:
+  - `bash install-media-stack.sh --secure-app=radarr`
 
 - Pin Radarr on Debian 11 x64:
   - `bash install-media-stack.sh --radarr-pin=v5.10.4.9218`
@@ -320,6 +323,8 @@ The `/public-<username>/` path is **intentionally unauthenticated** at the proxy
 | Autobrr | Admin user created with `autobrrctl create-user` | Use credentials from `~/.media-stack-credentials.txt` |
 
 If the installer detects existing app auth on a rerun, it preserves it rather than overwriting the password. If the original generated credential file is missing and the existing password cannot be recovered safely, the installer warns instead of claiming a new password was set.
+
+The welcome-page media stack panel also reads each installed app's local auth config and shows it as **Protected** or **Exposed**. For exposed PMSS-managed apps, the panel's **Secure this app** action delegates to `install-media-stack.sh --secure-app=<app>` as the customer user and writes any generated app credential to `~/.media-stack-credentials.txt`.
 
 Additional security measures:
 - Randomized ports per user (not security, but obscurity layer)

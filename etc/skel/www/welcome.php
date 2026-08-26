@@ -136,6 +136,38 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
         .pmss-media-stack-box ul {
             margin: 8px 0 0 18px;
         }
+        .pmss-media-stack-apps {
+            margin-left: 0 !important;
+            padding-left: 0;
+            list-style: none;
+        }
+        .pmss-media-stack-apps li {
+            margin-top: 6px;
+        }
+        .pmss-media-stack-auth-badge {
+            display: inline-block;
+            min-width: 64px;
+            margin: 0 6px;
+            padding: 2px 6px;
+            border: 1px solid #999;
+            border-radius: 4px;
+            background: #fff;
+            font-weight: bold;
+            text-align: center;
+        }
+        .pmss-media-stack-auth-badge-protected {
+            border-color: #3f8f48;
+            background: #dff3e2;
+            color: #234f27;
+        }
+        .pmss-media-stack-auth-badge-exposed {
+            border-color: #b66a6a;
+            background: #ffe8e8;
+            color: #7a1a1a;
+        }
+        .pmss-media-stack-secure {
+            margin-left: 6px;
+        }
         .pmss-media-stack-box pre {
             margin-top: 10px;
             max-height: 220px;
@@ -442,6 +474,36 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
 
         function pmssMediaStackStartStopped(button) {
             pmssMediaStackAction(button, 'start-stopped', 'Starting stopped media-stack apps...', 'Stopped media-stack apps could not be started from the panel.');
+        }
+
+        function pmssMediaStackSecureApp(button, app) {
+            if (!/^[a-z0-9-]+$/.test(app)) {
+                pmssShowActionNotice('Unknown media-stack app.', true);
+                return;
+            }
+
+            pmssSetActionLoading(button, true);
+            pmssShowActionNotice('Securing media-stack app...', false);
+            $.ajax({
+                url: 'mediaStack.php',
+                type: 'POST',
+                dataType: 'json',
+                cache: false,
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                data: {action: 'confirm-secure-' + app},
+                success: function(payload) {
+                    pmssSetActionLoading(button, false);
+                    pmssMediaStackApply(payload);
+                    if (payload && payload.message) {
+                        pmssShowActionNotice(payload.message, false);
+                    }
+                },
+                error: function() {
+                    pmssSetActionLoading(button, false);
+                    pmssMediaStackStatusRefresh();
+                    pmssShowActionNotice('Media-stack app auth could not be configured from the panel.', true);
+                }
+            });
         }
     </script>
 

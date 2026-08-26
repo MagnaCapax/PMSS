@@ -42,13 +42,13 @@ PMSS_MEDIA_STACK_SKIP_UPDATE=0
 for pmss_media_stack_arg in "$@"; do
 	case "$pmss_media_stack_arg" in
 	--self-update) PMSS_MEDIA_STACK_SELF_UPDATE=1 ;;
-	--skip-update | --uninstall | --start-stopped) PMSS_MEDIA_STACK_SKIP_UPDATE=1 ;;
+	--skip-update | --uninstall | --start-stopped | --secure-app=*) PMSS_MEDIA_STACK_SKIP_UPDATE=1 ;;
 	esac
 done
 unset pmss_media_stack_arg
-# --skip-update/--uninstall/--start-stopped always win, regardless of arg order, so
-# the self-update re-exec below (which passes --skip-update alongside the original
-# args — which may include --self-update) can never re-trigger and loop.
+# --skip-update/--uninstall/--start-stopped/--secure-app always win, regardless of
+# arg order, so the self-update re-exec below (which passes --skip-update alongside
+# the original args — which may include --self-update) can never re-trigger and loop.
 [[ $PMSS_MEDIA_STACK_SKIP_UPDATE -eq 1 ]] && PMSS_MEDIA_STACK_SELF_UPDATE=0
 
 if [[ $PMSS_MEDIA_STACK_SELF_UPDATE -eq 1 ]]; then
@@ -89,6 +89,7 @@ VERIFY_ONLY=0
 FORCE_INSTALL=0
 UNINSTALL=0
 START_STOPPED=0
+SECURE_APP=""
 MEDIA_STACK_MIN_MEMORY_MIB=1024
 MEDIA_STACK_MIN_MEMORY_BYTES=$((MEDIA_STACK_MIN_MEMORY_MIB * 1024 * 1024))
 MEDIA_STACK_UNLIMITED_MEMORY_BYTES=$((1024 * 1024 * 1024 * 1024 * 1024))
@@ -142,6 +143,7 @@ Modes:
   --verify-only               Only verify URLs (alias: implies --dry-run) and exit
   --force                     Continue below the ${MEDIA_STACK_MIN_MEMORY_MIB} MiB memory guard
   --start-stopped             Start installed apps whose tmux sessions are absent
+  --secure-app=APP            Apply PMSS default auth to one installed app
   --uninstall                 Stop media-stack sessions and remove PMSS-managed files
   --self-update               Fetch and re-exec the latest installer from GitHub
                               before running (default off; the local copy, kept
@@ -158,6 +160,7 @@ for arg in "$@"; do
 	--dry-run) DRY_RUN=1 ;;
 	--force) FORCE_INSTALL=1 ;;
 	--start-stopped) START_STOPPED=1 ;;
+	--secure-app=*) SECURE_APP=${arg#*=} ;;
 	--uninstall) UNINSTALL=1 ;;
 	--verify-only)
 		VERIFY_ONLY=1
@@ -1136,162 +1139,164 @@ if [[ $UNINSTALL -eq 1 ]]; then
 	exit 0
 fi
 
-# Check required dependencies early
-log_step "Checking dependencies..."
-MISSING_CMDS=()
+if [[ -z "$SECURE_APP" ]]; then
+	# Check required dependencies early
+	log_step "Checking dependencies..."
+	MISSING_CMDS=()
 
-for cmd in ss tmux git python3 tar dpkg getconf; do
-	if ! command -v "$cmd" >/dev/null 2>&1; then
-		MISSING_CMDS+=("$cmd")
-	fi
-done
-
-if [[ ${#MISSING_CMDS[@]} -gt 0 ]]; then
-	log_err "Missing required commands: ${MISSING_CMDS[*]}"
-	log_err "Please install missing dependencies and retry."
-	exit 1
-fi
-
-# Check for curl or wget (at least one needed)
-if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
-	log_err "Neither 'curl' nor 'wget' found. At least one is required."
-	exit 1
-fi
-
-log_ok "All required dependencies found"
-media_stack_memory_preflight_guard
-
-# Fetch latest checksums for download verification
-[[ $DRY_RUN -eq 0 ]] && fetch_checksums_file
-
-# CPU feature detection for compatibility warnings
-if ! grep -q ' avx ' /proc/cpuinfo 2>/dev/null; then
-	log_warn "CPU lacks AVX instructions — some native libraries may not work"
-	log_warn "Jellyfin image processing (SkiaSharp) may crash on very old CPUs"
-	log_warn "If any app crashes with 'Illegal instruction', your CPU is too old for that component"
-	echo ""
-fi
-
-# Detect Architecture
-ARCH=$(dpkg --print-architecture)
-case "$ARCH" in
-"amd64") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH AUTOBRR_ARCH <<<"amd64|x64|x64|x86_64" ;;
-"arm64") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH AUTOBRR_ARCH <<<"arm64|arm64|arm64|arm64" ;;
-"armhf") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH AUTOBRR_ARCH <<<"armhf|arm|arm|arm" ;;
-*)
-	log_err "Architecture '$ARCH' not supported."
-	exit 1
-	;;
-esac
-
-jellyfin_ffmpeg_configure_fallback
-
-# Preserve unrelated ~/.bin contents on reruns; only managed media-stack paths are refreshed.
-if [ -d "$HOME/.bin" ] && [ "$(ls -A "$HOME/.bin" 2>/dev/null)" ]; then
-	log_info "Keeping existing ~/.bin contents outside PMSS-managed app paths."
-	log_info "Managed media-stack binaries will be refreshed in place."
-fi
-
-# Safety check for existing Jellyfin config/data (can cause DB migration hang on rerun).
-if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && [ -d "$HOME/.config/jellyfin" ] && [ "$(ls -A "$HOME/.config/jellyfin" 2>/dev/null)" ]; then
-	if [[ $DRY_RUN -eq 1 ]]; then
-		log_warn "$HOME/.config/jellyfin exists and would be removed (dry-run); Jellyfin users, metadata, and watch state would be lost."
-	else
-		printf "WARNING: %s exists and will be removed. Jellyfin users, metadata, and watch state will be lost. Continue? (y/N): " "$HOME/.config/jellyfin"
-		read -r confirm
-		[[ $confirm == [yY] ]] || exit 1
-		jellyfin_config_dir_reset
-	fi
-elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && [ -d "$HOME/.config/jellyfin" ]; then
-	[[ $DRY_RUN -eq 1 ]] || jellyfin_config_dir_reset
-elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 0 ]] && [ -d "$HOME/.config/jellyfin" ]; then
-	log_warn "Leaving existing Jellyfin config untouched because this run will skip Jellyfin."
-fi
-
-if [[ $DRY_RUN -eq 0 ]]; then
-	config_dirs=("$HOME"/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow,autobrr})
-	[[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && config_dirs+=("$HOME/.config/jellyfin")
-	mkdir -p "${config_dirs[@]}"
-	chmod 700 "${config_dirs[@]}"
-	mkdir -p "$HOME/.bin"
-else
-	config_dir_label="radarr,sonarr,prowlarr,sabnzbd,cloudplow,autobrr"
-	[[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && config_dir_label="radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow,autobrr"
-	log_info "[dry-run] would create ~/.config/{${config_dir_label}}"
-	log_info "[dry-run] would create ~/.bin"
-fi
-
-log_step "Resolving latest versions..."
-
-# SABnzbd (GitHub API)
-if [[ -n "$OVR_SAB_URL" ]]; then
-	SABNZBD_URL="$OVR_SAB_URL"
-	SABNZBD_VERSION="override"
-else
-	if ! SABNZBD_RELEASE_JSON=$(fetch_text "https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest"); then
-		SABNZBD_RELEASE_JSON=""
-	fi
-	SABNZBD_VERSION=$(printf '%s\n' "$SABNZBD_RELEASE_JSON" | grep -E 'tag_name' | cut -d '"' -f 4 || true)
-	SABNZBD_URL=$(printf '%s\n' "$SABNZBD_RELEASE_JSON" | grep -E 'browser_download_url' | grep -- '-src' | cut -d '"' -f 4 || true)
-	if [[ -z "$SABNZBD_URL" ]]; then
-		log_err "Could not resolve SABnzbd release metadata from GitHub"
-		exit 1
-	fi
-fi
-
-# Autobrr (GitHub API, latest release asset for the detected architecture)
-autobrr_resolve_download_url
-
-# Jellyfin (Repo Scraping)
-# Fetches from repo.jellyfin.org structure: files/server/linux/latest-stable/<arch>/
-JF_REPO_BASE="https://repo.jellyfin.org/files/server/linux/latest-stable/${JF_ARCH}/"
-# Find filename like jellyfin_10.X.Y-amd64.tar.gz
-if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 0 ]]; then
-	JELLYFIN_URL=""
-	JF_FILENAME="skipped"
-elif [[ -n "$OVR_JELLYFIN_URL" ]]; then
-	JELLYFIN_URL="$OVR_JELLYFIN_URL"
-	JF_FILENAME="override"
-else
-	if ! JF_REPO_INDEX=$(fetch_text "$JF_REPO_BASE"); then
-		JF_REPO_INDEX=""
-	fi
-	JF_FILENAME=$(printf '%s\n' "$JF_REPO_INDEX" | grep -oE "jellyfin_[0-9]+\\.[0-9]+\\.[0-9]+-${JF_ARCH}\\.tar\\.gz" | head -n 1)
-	if [[ -z "$JF_FILENAME" ]]; then
-		log_err "Could not resolve latest Jellyfin tarball from $JF_REPO_BASE"
-		exit 1
-	fi
-	JELLYFIN_URL="${JF_REPO_BASE}${JF_FILENAME}"
-fi
-
-# ASP.NET Core Runtime (Microsoft aka.ms Links)
-# These redirect to the latest patch version of .NET 8 (LTS)
-ASPDOTNET_URL="https://aka.ms/dotnet/8.0/aspnetcore-runtime-linux-${DOTNET_ARCH}.tar.gz"
-
-log_info "SABnzbd: ${SABNZBD_VERSION:-unknown}"
-log_info "Autobrr: ${AUTOBRR_VERSION:-unknown}"
-log_info "Jellyfin: ${JF_FILENAME}"
-log_info "ASP.NET: .NET 8 LTS (${DOTNET_ARCH})"
-
-# If verify-only, check URLs and exit
-if [[ $VERIFY_ONLY -eq 1 ]]; then
-	log_step "Verifying URLs..."
-	all_ok=true
-	for url in "${SABNZBD_URL:-}" "${AUTOBRR_URL:-}" "${JELLYFIN_URL:-}" "${ASPDOTNET_URL:-}"; do
-		[[ -n "$url" ]] || continue
-		if check_url "$url"; then
-			log_ok "URL reachable: $url"
-			continue
+	for cmd in ss tmux git python3 tar dpkg getconf; do
+		if ! command -v "$cmd" >/dev/null 2>&1; then
+			MISSING_CMDS+=("$cmd")
 		fi
-		log_err "URL not reachable: $url"
-		all_ok=false
 	done
-	if [[ "$all_ok" == true ]]; then
-		log_ok "All URLs verified successfully"
-		exit 0
-	else
-		log_err "Some URLs failed verification"
+
+	if [[ ${#MISSING_CMDS[@]} -gt 0 ]]; then
+		log_err "Missing required commands: ${MISSING_CMDS[*]}"
+		log_err "Please install missing dependencies and retry."
 		exit 1
+	fi
+
+	# Check for curl or wget (at least one needed)
+	if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+		log_err "Neither 'curl' nor 'wget' found. At least one is required."
+		exit 1
+	fi
+
+	log_ok "All required dependencies found"
+	media_stack_memory_preflight_guard
+
+	# Fetch latest checksums for download verification
+	[[ $DRY_RUN -eq 0 ]] && fetch_checksums_file
+
+	# CPU feature detection for compatibility warnings
+	if ! grep -q ' avx ' /proc/cpuinfo 2>/dev/null; then
+		log_warn "CPU lacks AVX instructions — some native libraries may not work"
+		log_warn "Jellyfin image processing (SkiaSharp) may crash on very old CPUs"
+		log_warn "If any app crashes with 'Illegal instruction', your CPU is too old for that component"
+		echo ""
+	fi
+
+	# Detect Architecture
+	ARCH=$(dpkg --print-architecture)
+	case "$ARCH" in
+	"amd64") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH AUTOBRR_ARCH <<<"amd64|x64|x64|x86_64" ;;
+	"arm64") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH AUTOBRR_ARCH <<<"arm64|arm64|arm64|arm64" ;;
+	"armhf") IFS='|' read -r JF_ARCH DOTNET_ARCH SERVARR_ARCH AUTOBRR_ARCH <<<"armhf|arm|arm|arm" ;;
+	*)
+		log_err "Architecture '$ARCH' not supported."
+		exit 1
+		;;
+	esac
+
+	jellyfin_ffmpeg_configure_fallback
+
+	# Preserve unrelated ~/.bin contents on reruns; only managed media-stack paths are refreshed.
+	if [ -d "$HOME/.bin" ] && [ "$(ls -A "$HOME/.bin" 2>/dev/null)" ]; then
+		log_info "Keeping existing ~/.bin contents outside PMSS-managed app paths."
+		log_info "Managed media-stack binaries will be refreshed in place."
+	fi
+
+	# Safety check for existing Jellyfin config/data (can cause DB migration hang on rerun).
+	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && [ -d "$HOME/.config/jellyfin" ] && [ "$(ls -A "$HOME/.config/jellyfin" 2>/dev/null)" ]; then
+		if [[ $DRY_RUN -eq 1 ]]; then
+			log_warn "$HOME/.config/jellyfin exists and would be removed (dry-run); Jellyfin users, metadata, and watch state would be lost."
+		else
+			printf "WARNING: %s exists and will be removed. Jellyfin users, metadata, and watch state will be lost. Continue? (y/N): " "$HOME/.config/jellyfin"
+			read -r confirm
+			[[ $confirm == [yY] ]] || exit 1
+			jellyfin_config_dir_reset
+		fi
+	elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && [ -d "$HOME/.config/jellyfin" ]; then
+		[[ $DRY_RUN -eq 1 ]] || jellyfin_config_dir_reset
+	elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 0 ]] && [ -d "$HOME/.config/jellyfin" ]; then
+		log_warn "Leaving existing Jellyfin config untouched because this run will skip Jellyfin."
+	fi
+
+	if [[ $DRY_RUN -eq 0 ]]; then
+		config_dirs=("$HOME"/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow,autobrr})
+		[[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && config_dirs+=("$HOME/.config/jellyfin")
+		mkdir -p "${config_dirs[@]}"
+		chmod 700 "${config_dirs[@]}"
+		mkdir -p "$HOME/.bin"
+	else
+		config_dir_label="radarr,sonarr,prowlarr,sabnzbd,cloudplow,autobrr"
+		[[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && config_dir_label="radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow,autobrr"
+		log_info "[dry-run] would create ~/.config/{${config_dir_label}}"
+		log_info "[dry-run] would create ~/.bin"
+	fi
+
+	log_step "Resolving latest versions..."
+
+	# SABnzbd (GitHub API)
+	if [[ -n "$OVR_SAB_URL" ]]; then
+		SABNZBD_URL="$OVR_SAB_URL"
+		SABNZBD_VERSION="override"
+	else
+		if ! SABNZBD_RELEASE_JSON=$(fetch_text "https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest"); then
+			SABNZBD_RELEASE_JSON=""
+		fi
+		SABNZBD_VERSION=$(printf '%s\n' "$SABNZBD_RELEASE_JSON" | grep -E 'tag_name' | cut -d '"' -f 4 || true)
+		SABNZBD_URL=$(printf '%s\n' "$SABNZBD_RELEASE_JSON" | grep -E 'browser_download_url' | grep -- '-src' | cut -d '"' -f 4 || true)
+		if [[ -z "$SABNZBD_URL" ]]; then
+			log_err "Could not resolve SABnzbd release metadata from GitHub"
+			exit 1
+		fi
+	fi
+
+	# Autobrr (GitHub API, latest release asset for the detected architecture)
+	autobrr_resolve_download_url
+
+	# Jellyfin (Repo Scraping)
+	# Fetches from repo.jellyfin.org structure: files/server/linux/latest-stable/<arch>/
+	JF_REPO_BASE="https://repo.jellyfin.org/files/server/linux/latest-stable/${JF_ARCH}/"
+	# Find filename like jellyfin_10.X.Y-amd64.tar.gz
+	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 0 ]]; then
+		JELLYFIN_URL=""
+		JF_FILENAME="skipped"
+	elif [[ -n "$OVR_JELLYFIN_URL" ]]; then
+		JELLYFIN_URL="$OVR_JELLYFIN_URL"
+		JF_FILENAME="override"
+	else
+		if ! JF_REPO_INDEX=$(fetch_text "$JF_REPO_BASE"); then
+			JF_REPO_INDEX=""
+		fi
+		JF_FILENAME=$(printf '%s\n' "$JF_REPO_INDEX" | grep -oE "jellyfin_[0-9]+\\.[0-9]+\\.[0-9]+-${JF_ARCH}\\.tar\\.gz" | head -n 1)
+		if [[ -z "$JF_FILENAME" ]]; then
+			log_err "Could not resolve latest Jellyfin tarball from $JF_REPO_BASE"
+			exit 1
+		fi
+		JELLYFIN_URL="${JF_REPO_BASE}${JF_FILENAME}"
+	fi
+
+	# ASP.NET Core Runtime (Microsoft aka.ms Links)
+	# These redirect to the latest patch version of .NET 8 (LTS)
+	ASPDOTNET_URL="https://aka.ms/dotnet/8.0/aspnetcore-runtime-linux-${DOTNET_ARCH}.tar.gz"
+
+	log_info "SABnzbd: ${SABNZBD_VERSION:-unknown}"
+	log_info "Autobrr: ${AUTOBRR_VERSION:-unknown}"
+	log_info "Jellyfin: ${JF_FILENAME}"
+	log_info "ASP.NET: .NET 8 LTS (${DOTNET_ARCH})"
+
+	# If verify-only, check URLs and exit
+	if [[ $VERIFY_ONLY -eq 1 ]]; then
+		log_step "Verifying URLs..."
+		all_ok=true
+		for url in "${SABNZBD_URL:-}" "${AUTOBRR_URL:-}" "${JELLYFIN_URL:-}" "${ASPDOTNET_URL:-}"; do
+			[[ -n "$url" ]] || continue
+			if check_url "$url"; then
+				log_ok "URL reachable: $url"
+				continue
+			fi
+			log_err "URL not reachable: $url"
+			all_ok=false
+		done
+		if [[ "$all_ok" == true ]]; then
+			log_ok "All URLs verified successfully"
+			exit 0
+		else
+			log_err "Some URLs failed verification"
+			exit 1
+		fi
 	fi
 fi
 
@@ -1799,6 +1804,245 @@ media_stack_verify_sessions() {
 		log_info "To diagnose: tmux new-session -s ${app}-debug 'cd ~/.bin/${app}* && ...'"
 	done < <(media_stack_sessions "${MEDIA_STACK_BASE_SESSIONS[@]}")
 }
+
+media_stack_secure_app_id_valid() {
+	case "$1" in
+	jellyfin | radarr | sonarr | prowlarr | sabnzbd | autobrr) return 0 ;;
+	esac
+	return 1
+}
+
+media_stack_credentials_key_set() {
+	local key="$1" value="$2" tmp_file
+
+	if [[ ! "$key" =~ ^[A-Z0-9_]+$ ]]; then
+		log_err "Refusing unsafe credentials key: $key"
+		return 1
+	fi
+	if [[ -e "$MEDIA_STACK_CREDENTIALS_FILE" && (! -f "$MEDIA_STACK_CREDENTIALS_FILE" || -L "$MEDIA_STACK_CREDENTIALS_FILE") ]]; then
+		log_err "Refusing unsafe media-stack credentials file: $MEDIA_STACK_CREDENTIALS_FILE"
+		return 1
+	fi
+
+	tmp_file=$(mktemp "${MEDIA_STACK_CREDENTIALS_FILE}.pmss.XXXXXX")
+	chmod 600 "$tmp_file"
+	if [[ -f "$MEDIA_STACK_CREDENTIALS_FILE" ]]; then
+		awk -F' = ' -v k="$key" -v v="$value" '
+			BEGIN { found = 0 }
+			$1 == k { print k " = " v; found = 1; next }
+			{ print }
+			END { if (found == 0) print k " = " v }
+		' "$MEDIA_STACK_CREDENTIALS_FILE" >"$tmp_file"
+	else
+		{
+			printf '# PMSS media stack credentials\n'
+			printf '# This file is owner-readable only; app auth is separate from the public proxy.\n'
+			printf '%s = %s\n' "$key" "$value"
+		} >"$tmp_file"
+	fi
+	chmod 600 "$tmp_file"
+	mv "$tmp_file" "$MEDIA_STACK_CREDENTIALS_FILE"
+	chmod 600 "$MEDIA_STACK_CREDENTIALS_FILE"
+}
+
+media_stack_credentials_app_write() {
+	local app="$1" username="$2" password="$3" app_key url_path
+
+	app_key=$(media_stack_app_key "$app")
+	case "$app" in
+	jellyfin) url_path="jellyfin/web/index.html" ;;
+	radarr | sonarr | prowlarr | sabnzbd | autobrr) url_path="${app}/" ;;
+	*)
+		log_err "Unknown media-stack app for credentials write: $app"
+		return 1
+		;;
+	esac
+
+	media_stack_credentials_key_set "${app_key}_URL" "https://${HOSTNAME}/public-${USERNAME}/${url_path}"
+	media_stack_credentials_key_set "${app_key}_USERNAME" "$username"
+	media_stack_credentials_key_set "${app_key}_PASSWORD" "$password"
+}
+
+media_stack_secure_marker_print() {
+	printf 'pmss-media-stack-secured:%s\n' "$1"
+}
+
+media_stack_stop_app_for_auth() {
+	local session="$1" process_pattern="$2"
+
+	tmux kill-session -t "$session" 2>/dev/null || true
+	if command -v pkill >/dev/null 2>&1; then
+		pkill -9 -f -u "$USERNAME" "$process_pattern" >/dev/null 2>&1 || true
+	fi
+}
+
+media_stack_secure_sabnzbd() {
+	local app="sabnzbd" datadir="$HOME/.config/sabnzbd"
+	local config_file="$datadir/sabnzbd.ini"
+	local existing_username existing_password
+
+	if [[ ! -f "$config_file" || ! -f "$HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py" ]]; then
+		log_err "SABnzbd install is incomplete; use SSH for repair"
+		return 1
+	fi
+
+	existing_username=$(existing_value_from_ini "$config_file" "username")
+	existing_password=$(existing_value_from_ini "$config_file" "password")
+	if [[ -n "$existing_username" && -n "$existing_password" ]]; then
+		log_info "SABnzbd is already protected"
+		media_stack_secure_marker_print "$app"
+		return 0
+	fi
+
+	SABNZBD_AUTH_USERNAME="${existing_username:-$MEDIA_STACK_AUTH_USERNAME}"
+	SABNZBD_PASSWORD="${existing_password:-$(media_stack_credentials_password_for_app "$app")}"
+	sabnzbd_misc_value_set "$config_file" username "$SABNZBD_AUTH_USERNAME"
+	sabnzbd_misc_value_set "$config_file" password "$SABNZBD_PASSWORD"
+	sabnzbd_misc_value_set "$config_file" inet_exposure "4"
+	if [[ "$(existing_value_from_ini "$config_file" "username")" != "$SABNZBD_AUTH_USERNAME" ||
+	"$(existing_value_from_ini "$config_file" "password")" != "$SABNZBD_PASSWORD" ||
+	"$(existing_value_from_ini "$config_file" "inet_exposure")" != "4" ]]; then
+		log_err "SABnzbd auth configuration verification failed"
+		return 1
+	fi
+
+	media_stack_credentials_app_write "$app" "$SABNZBD_AUTH_USERNAME" "$SABNZBD_PASSWORD"
+	media_stack_stop_app_for_auth "$app" "SABnzbd.py"
+	media_stack_start_tmux_app "$app" "$HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py" \
+		"source $HOME/.bin/sabnzbd/bin/activate && cd \"$HOME/.bin/sabnzbd/sabnzbd\" && nice -n 19 python3 SABnzbd.py -b 0 -f $config_file 2>&1 | tee -a \"$datadir/sabnzbd.log\"" \
+		"SABnzbd not found at $HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py"
+	media_stack_secure_marker_print "$app"
+}
+
+media_stack_secure_servarr() {
+	local app="$1" install_name="$2" dll="$3" api_version="$4" extra_args="${5:-}"
+	local datadir="$HOME/.config/${app}"
+	local config_file="$datadir/config.xml" port password
+
+	if [[ ! -x "$DOTNET_ROOT_PATH/dotnet" || ! -f "$HOME/.bin/${install_name}/${dll}" || ! -f "$config_file" ]]; then
+		log_err "${install_name} install is incomplete; use SSH for repair"
+		return 1
+	fi
+	if servarr_config_auth_configured "$config_file"; then
+		log_info "${install_name} is already protected"
+		media_stack_secure_marker_print "$app"
+		return 0
+	fi
+
+	port=$(pick_existing_or_reserved_port "$(existing_port_from_xml_tag "$config_file" "Port")" "$app")
+	password=$(media_stack_credentials_password_for_app "$app")
+	media_stack_stop_app_for_auth "$app" "$dll"
+	if ! servarr_auth_seed "$app" "$install_name" "$dll" "$port" "$api_version" "$password" "$extra_args"; then
+		log_err "${install_name} auth seeding failed"
+		return 1
+	fi
+	media_stack_credentials_app_write "$app" "$MEDIA_STACK_AUTH_USERNAME" "$password"
+	media_stack_start_servarr_app "$app" "$install_name" "$dll" "$extra_args"
+	media_stack_secure_marker_print "$app"
+}
+
+media_stack_secure_autobrr() {
+	local app="autobrr" datadir="$HOME/.config/autobrr" port
+
+	if [[ ! -d "$datadir" || ! -x "$HOME/.bin/autobrr/autobrr" || ! -x "$HOME/.bin/autobrr/autobrrctl" ]]; then
+		log_err "Autobrr install is incomplete; use SSH for repair"
+		return 1
+	fi
+
+	port=$(pick_existing_or_reserved_port "$(existing_port_from_ini "$datadir/config.toml" "port")" "$app")
+	AUTOBRR_PASSWORD=$(media_stack_credentials_password_for_app "$app")
+	AUTOBRR_SESSION_SECRET=$(media_stack_credentials_password_for_app autobrr_session)
+	autobrr_configure "$datadir/config.toml" "$port" "$AUTOBRR_SESSION_SECRET"
+	media_stack_stop_app_for_auth "$app" "$HOME/.bin/autobrr/autobrr"
+	if ! autobrr_auth_seed "$datadir" "$AUTOBRR_PASSWORD" "$port"; then
+		log_err "Autobrr auth seeding failed"
+		return 1
+	fi
+	media_stack_credentials_app_write "$app" "$MEDIA_STACK_AUTH_USERNAME" "$AUTOBRR_PASSWORD"
+	media_stack_start_tmux_app "$app" "$HOME/.bin/autobrr/autobrr" \
+		"AUTOBRR__HOST=127.0.0.1 AUTOBRR__PORT=\"$port\" AUTOBRR__BASE_URL=/autobrr/ AUTOBRR__BASE_URL_MODE_LEGACY=true \"$HOME/.bin/autobrr/autobrr\" --config=\"$datadir\" 2>&1 | tee -a \"$datadir/autobrr.log\"" \
+		"Autobrr not found at $HOME/.bin/autobrr/autobrr"
+	media_stack_secure_marker_print "$app"
+}
+
+media_stack_secure_jellyfin() {
+	local app="jellyfin" syscfg="$JELLYFIN_CONFIG_DIR/system.xml"
+	local jellyfin_port
+
+	if [[ ! -x "$DOTNET_ROOT_PATH/dotnet" || ! -f "$HOME/.bin/jellyfin/jellyfin.dll" || ! -f "$JELLYFIN_CONFIG_DIR/network.xml" ]]; then
+		log_err "Jellyfin install is incomplete; use SSH for repair"
+		return 1
+	fi
+	if grep -qi '<IsStartupWizardCompleted>true</IsStartupWizardCompleted>' "$syscfg" 2>/dev/null; then
+		log_info "Jellyfin is already protected"
+		media_stack_secure_marker_print "$app"
+		return 0
+	fi
+
+	jellyfin_port="$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_DIR/network.xml" "InternalHttpPort")"
+	jellyfin_port="${jellyfin_port:-$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_DIR/network.xml" "PublicHttpPort")}"
+	jellyfin_port="$(pick_existing_or_reserved_port "$jellyfin_port" "$app")"
+	JELLYFIN_PASSWORD=$(media_stack_credentials_password_for_app "$app")
+	mkdir -p "$JELLYFIN_DATA_DIR" "$JELLYFIN_LOG_DIR" "$JELLYFIN_CONFIG_DIR"
+	if [[ ! -f "$syscfg" ]]; then
+		printf '%s\n%s\n' '<ServerConfiguration>' '</ServerConfiguration>' >"$syscfg"
+	fi
+	jellyfin_system_xml_tag_set "$syscfg" "BaseUrl" "/public-${USERNAME}/${app}"
+	if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
+		jellyfin_system_xml_tag_set "$syscfg" "FFmpegPath" "$OVR_JELLYFIN_FFMPEG"
+	fi
+
+	media_stack_stop_app_for_auth "$app" "jellyfin.dll"
+	if ! jellyfin_auth_seed "$JELLYFIN_PASSWORD" "$jellyfin_port"; then
+		log_err "Jellyfin auth seeding failed"
+		return 1
+	fi
+	media_stack_credentials_app_write "$app" "$MEDIA_STACK_AUTH_USERNAME" "$JELLYFIN_PASSWORD"
+	media_stack_start_tmux_app "$app" "$HOME/.bin/jellyfin/jellyfin.dll" \
+		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${jellyfin_port}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" \
+		"Jellyfin DLL not found at $HOME/.bin/jellyfin/jellyfin.dll"
+	media_stack_secure_marker_print "$app"
+}
+
+media_stack_secure_app() {
+	local app="$1"
+
+	if ! media_stack_secure_app_id_valid "$app"; then
+		log_err "Unknown media-stack app: $app"
+		return 1
+	fi
+	USERNAME=$(whoami)
+	HOSTNAME=$(hostname)
+	MEDIA_STACK_AUTH_USERNAME="$USERNAME"
+
+	if ! command -v php >/dev/null 2>&1; then
+		log_err "PHP is required to generate media-stack passwords safely"
+		return 1
+	fi
+	if [[ "$app" != "sabnzbd" ]] && ! command -v curl >/dev/null 2>&1; then
+		log_err "curl is required to seed media-stack app authentication safely"
+		return 1
+	fi
+	if ! command -v tmux >/dev/null 2>&1; then
+		log_err "tmux is required to restart the secured media-stack app"
+		return 1
+	fi
+
+	case "$app" in
+	jellyfin) media_stack_secure_jellyfin ;;
+	radarr) media_stack_secure_servarr "$app" "Radarr" "Radarr.dll" "v3" "--nobrowser" ;;
+	sonarr) media_stack_secure_servarr "$app" "Sonarr" "Sonarr.dll" "v3" ;;
+	prowlarr) media_stack_secure_servarr "$app" "Prowlarr" "Prowlarr.dll" "v1" "--nobrowser" ;;
+	sabnzbd) media_stack_secure_sabnzbd ;;
+	autobrr) media_stack_secure_autobrr ;;
+	esac
+}
+
+if [[ -n "$SECURE_APP" ]]; then
+	secure_rc=0
+	media_stack_secure_app "$SECURE_APP" || secure_rc=$?
+	exit "$secure_rc"
+fi
 
 SABNZBD_PORT=$(pick_existing_or_reserved_port "$(existing_port_from_ini "$HOME/.config/sabnzbd/sabnzbd.ini" "port")" sabnzbd)
 RADARR_PORT=$(pick_existing_or_reserved_port "$(existing_port_from_xml_tag "$HOME/.config/radarr/config.xml" "Port")" radarr)

@@ -19,7 +19,9 @@ $hostname = function_exists('gethostname') ? (string) gethostname() : '';
 $hostname = $hostname !== '' ? $hostname : (string) php_uname('n');
 $action = isset($_GET['action']) ? (string) $_GET['action'] : 'status';
 
-if ($action === 'start') {
+if (isset($_POST['action']) && strpos((string) $_POST['action'], 'confirm-secure-') === 0) {
+    pmssMediaStackPanelSecureHandle($home, $username, $hostname);
+} elseif ($action === 'start') {
     pmssMediaStackPanelStartHandle($home, $username, $hostname);
 } elseif ($action === 'start-stopped') {
     pmssMediaStackPanelRecoveryHandle($home, $username, $hostname);
@@ -69,6 +71,60 @@ function pmssMediaStackPanelRecoveryHandle($home, $username, $hostname)
     }
 
     $payload['message'] = 'Start request sent for stopped media-stack apps.';
+    pmssMediaStackPanelJsonRespond($payload, 202);
+}
+
+/** Apply one app's default auth through the guarded customer-side installer. */
+function pmssMediaStackPanelSecureHandle($home, $username, $hostname)
+{
+    if (!pmssMediaStackPanelRecoveryRequestAllowed($_SERVER)) {
+        $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
+        $payload['message'] = 'Securing a media-stack app requires a panel POST request.';
+        pmssMediaStackPanelJsonRespond($payload, (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') ? 403 : 405);
+    }
+
+    $action = pmssFrontendActionRequest();
+    $app = pmssMediaStackPanelSecureActionAppIdRead($action);
+    if ($app === null) {
+        $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
+        $payload['message'] = 'Unknown media-stack app.';
+        pmssMediaStackPanelJsonRespond($payload, 400);
+    }
+
+    $label = pmssMediaStackPanelAppLabelRead($app);
+    if (pmssMediaStackPanelAppAuthConfigured($home, $app)) {
+        $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
+        $payload['message'] = $label.' is already protected.';
+        pmssMediaStackPanelJsonRespond($payload);
+    }
+
+    $gate = pmssMediaStackPanelSecureGateRead($home, $app);
+    if (!$gate['ok']) {
+        $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
+        $payload['message'] = $gate['message'];
+        pmssMediaStackPanelJsonRespond($payload, 409);
+    }
+
+    $command = pmssMediaStackPanelSecureCommandBuild($home, $username, $app);
+    if ($command === '') {
+        $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
+        $payload['message'] = 'Unknown media-stack app.';
+        pmssMediaStackPanelJsonRespond($payload, 400);
+    }
+
+    if (function_exists('set_time_limit')) {
+        @set_time_limit(240);
+    }
+
+    $result = pmssFrontendShellExec($command);
+    $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
+    if (strpos((string) $result, 'pmss-media-stack-secured:'.$app) === false
+        && !pmssMediaStackPanelAppAuthConfigured($home, $app)) {
+        $payload['message'] = $label.' could not be secured from the panel.';
+        pmssMediaStackPanelJsonRespond($payload, 500);
+    }
+
+    $payload['message'] = $label.' auth was configured. Use ~/.media-stack-credentials.txt for login.';
     pmssMediaStackPanelJsonRespond($payload, 202);
 }
 

@@ -341,7 +341,7 @@ BASH
 
     public function testJellyfinFfmpegPreflightRunsBeforeDataLossPrompt(): void
     {
-        $preflight = strpos($this->script, "esac\n\njellyfin_ffmpeg_configure_fallback");
+        $preflight = strpos($this->script, "\n\tjellyfin_ffmpeg_configure_fallback\n");
         $prompt = strpos($this->script, 'WARNING: %s exists and will be removed');
 
         $this->assertTrue($preflight !== false, 'Jellyfin FFmpeg pre-flight call missing');
@@ -641,6 +641,34 @@ BASHRC
         $this->assertStringContainsString('OK:Started sonarr', $output);
         $this->assertStringContainsString('new-session -d -s sonarr true', $output);
         $this->assertStringNotContainsString('new-session -d -s radarr true', $output);
+    }
+
+    public function testSecureAppModeIsScopedAndSkipsFullInstallResolution(): void
+    {
+        $this->assertStringContainsAllStrings([
+            '--secure-app=APP',
+            '--skip-update | --uninstall | --start-stopped | --secure-app=*)',
+            '--secure-app=*) SECURE_APP=${arg#*=} ;;',
+            'media_stack_secure_app_id_valid() {',
+            'jellyfin | radarr | sonarr | prowlarr | sabnzbd | autobrr)',
+            'media_stack_secure_app() {',
+            'media_stack_credentials_app_write() {',
+            'media_stack_stop_app_for_auth() {',
+            "printf 'pmss-media-stack-secured:%s\\n' \"\$1\"",
+            'if [[ -n "$SECURE_APP" ]]; then',
+        ], $this->script);
+
+        $secureSkip = strpos($this->script, 'if [[ -z "$SECURE_APP" ]]; then');
+        $dependencyCheck = strpos($this->script, 'log_step "Checking dependencies..."');
+        $secureDispatch = strpos($this->script, 'if [[ -n "$SECURE_APP" ]]; then');
+        $fullInstallPorts = strrpos($this->script, 'SABNZBD_PORT=$(pick_existing_or_reserved_port');
+
+        $this->assertTrue($secureSkip !== false, 'Secure mode skip guard missing');
+        $this->assertTrue($dependencyCheck !== false, 'Dependency check missing');
+        $this->assertTrue($secureDispatch !== false, 'Secure mode dispatch missing');
+        $this->assertTrue($fullInstallPorts !== false, 'Full install port selection missing');
+        $this->assertTrue($secureSkip < $dependencyCheck, 'Secure mode must skip release/dependency resolution');
+        $this->assertTrue($secureDispatch < $fullInstallPorts, 'Secure mode must exit before full install port selection');
     }
 
     public function testDryRunUrlChecksUseHttpProbeHelpers(): void

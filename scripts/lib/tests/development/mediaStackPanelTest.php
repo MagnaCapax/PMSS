@@ -36,11 +36,15 @@ class MediaStackPanelTest extends TestCase
             'function pmssMediaStackPanel'.'Installed',
         ]);
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/mediaStack.php', [
+            "strpos((string) \$_POST['action'], 'confirm-secure-') === 0",
+            'pmssMediaStackPanelSecureHandle($home, $username, $hostname);',
             "elseif (\$action === 'start-stopped')",
             'pmssMediaStackPanelRecoveryHandle($home, $username, $hostname);',
         ]);
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/welcome.php', [
             'pmssMediaStackStartStopped',
+            'pmssMediaStackSecureApp',
+            "data: {action: 'confirm-secure-' + app}",
             "headers: {'X-Requested-With': 'XMLHttpRequest'}",
             'value="Start stopped apps"',
         ]);
@@ -160,6 +164,64 @@ class MediaStackPanelTest extends TestCase
         $this->assertSame('https://seedbox.example/public-alice/autobrr/', $status['urls']['Autobrr']);
     }
 
+    public function testSecurityStatusDetectsConfiguredAuthPerApp(): void
+    {
+        $home = $this->mediaHomeCreate('pmss-media-auth-protected-');
+        $this->pmssWriteRelativeFile($home, '.config/radarr/config.xml', "<Config>\n<AuthenticationMethod>Forms</AuthenticationMethod>\n<AuthenticationRequired>Enabled</AuthenticationRequired>\n</Config>\n");
+        $this->pmssWriteRelativeFile($home, '.bin/Radarr/Radarr.dll', 'marker');
+        $this->pmssWriteRelativeFile($home, '.config/sabnzbd/sabnzbd.ini', "[misc]\nusername = alice\npassword = secret\n");
+        $this->pmssWriteRelativeFile($home, '.bin/sabnzbd/sabnzbd/SABnzbd.py', 'marker');
+        $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
+        $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/system.xml', '<IsStartupWizardCompleted>true</IsStartupWizardCompleted>');
+        $this->pmssWriteRelativeFile($home, '.bin/jellyfin/jellyfin.dll', 'marker');
+
+        $status = $this->mediaStatusRead($home);
+
+        $this->assertTrue($status['security']['radarr']['protected']);
+        $this->assertTrue($status['security']['sabnzbd']['protected']);
+        $this->assertTrue($status['security']['jellyfin']['protected']);
+        $this->assertSame('Protected', $status['security']['radarr']['status']);
+    }
+
+    public function testSecurityStatusShowsExposedActionForUnprotectedApp(): void
+    {
+        $home = $this->mediaHomeCreate('pmss-media-auth-exposed-');
+        $this->pmssWriteRelativeFile($home, '.config/sonarr/config.xml', "<Config>\n<AuthenticationMethod>None</AuthenticationMethod>\n<AuthenticationRequired>Disabled</AuthenticationRequired>\n</Config>\n");
+        $this->pmssWriteRelativeFile($home, '.bin/Sonarr/Sonarr.dll', 'marker');
+
+        $status = $this->mediaStatusRead($home);
+        $html = \pmssMediaStackPanelHtmlBuild($status);
+
+        $this->assertFalse($status['security']['sonarr']['protected']);
+        $this->assertSame('confirm-secure-sonarr', $status['security']['sonarr']['action']);
+        $this->assertStringContainsAllStrings(['Exposed', 'Secure this app', "pmssMediaStackSecureApp(this, 'sonarr')"], $html);
+    }
+
+    public function testSecurityStatusDetectsAutobrrSqliteUser(): void
+    {
+        if (!class_exists('SQLite3')) {
+            throw new SkipTest('SQLite3 helper not present in this PHP runtime');
+        }
+
+        $home = $this->mediaHomeCreate('pmss-media-auth-autobrr-');
+        $this->pmssWriteRelativeFile(
+            $home,
+            '.lighttpd/custom.d/autobrr-custom.conf',
+            '$HTTP["url"] =~ "^/autobrr(?:/|$)" { "map-urlpath" => ( "/autobrr" => "" ) }'
+        );
+        $this->pmssWriteRelativeFile($home, '.bin/autobrr/autobrr', 'marker');
+        $this->pmssWriteRelativeFile($home, '.bin/autobrr/autobrrctl', 'marker');
+        $this->pmssEnsureDir($home.'/.config/autobrr');
+        $db = new \SQLite3($home.'/.config/autobrr/autobrr.db');
+        $db->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT)');
+        $db->exec("INSERT INTO users (username) VALUES ('alice')");
+        $db->close();
+
+        $status = $this->mediaStatusRead($home);
+
+        $this->assertTrue($status['security']['autobrr']['protected']);
+    }
+
     public function testStatusShowsRuntimeAppsWhenWatchdogSnapshotExists(): void
     {
         $home = $this->mediaHomeCreate('pmss-media-runtime-status-');
@@ -195,17 +257,17 @@ class MediaStackPanelTest extends TestCase
         $this->assertStringContainsString('Download failed', $status['tail']);
     }
 
-    public function testHtmlIncludesWizardPasswordNotice(): void
+    public function testHtmlIncludesMediaStackCredentialsNotice(): void
     {
         $html = \pmssMediaStackPanelHtmlBuild(array(
             'state' => 'installed',
             'message' => 'Media stack is installed for this account.',
-            'details' => array('No password is pre-generated. Create the Jellyfin admin account in the first-run wizard.'),
+            'details' => array('Use the app-level credentials in ~/.media-stack-credentials.txt; exposed apps can be secured from this panel.'),
             'tail' => '',
             'urls' => array('Jellyfin' => 'https://seedbox.example/public-alice/jellyfin/web/index.html'),
         ));
 
-        $this->assertStringContainsAllStrings(['first-run wizard', 'public-alice/jellyfin'], $html);
+        $this->assertStringContainsAllStrings(['.media-stack-credentials.txt', 'public-alice/jellyfin'], $html);
     }
 
     public function testStartCommandIncludesPidFileAndScriptPath(): void
@@ -226,6 +288,22 @@ class MediaStackPanelTest extends TestCase
             "'/home/alice/install-media-stack.sh' --start-stopped",
             'pmss-media-stack-started',
         ], $command);
+    }
+
+    public function testSecureActionAndCommandUseHardcodedAppAllowlist(): void
+    {
+        $this->assertSame('radarr', \pmssMediaStackPanelSecureActionAppIdRead('confirm-secure-radarr'));
+        $this->assertSame(null, \pmssMediaStackPanelSecureActionAppIdRead('confirm-secure-../../evil'));
+
+        $command = \pmssMediaStackPanelSecureCommandBuild('/home/alice', 'alice', 'radarr');
+        $this->assertStringContainsAllStrings([
+            "HOME='/home/alice'",
+            "USER='alice'",
+            "'/home/alice/install-media-stack.sh'",
+            "'--secure-app=radarr'",
+        ], $command);
+        $this->assertStringContainsAndOmitsStrings([], array('&&' => $command, ';' => $command, '||' => $command), $command);
+        $this->assertSame('', \pmssMediaStackPanelSecureCommandBuild('/home/alice', 'alice', '../../evil'));
     }
 
     public function testRecoveryRequestRequiresAjaxPost(): void
