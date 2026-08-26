@@ -1295,37 +1295,6 @@ if [[ $VERIFY_ONLY -eq 1 ]]; then
 	fi
 fi
 
-# Enhanced port randomizer with bind test (for shared env security)
-random_open_port() {
-	local LOW_BOUND=10000
-	local UPPER_BOUND=65000
-	local candidate
-	local attempts=0
-	local max_attempts=100
-
-	# Check required commands
-	if ! command -v comm >/dev/null 2>&1 || ! command -v shuf >/dev/null 2>&1 || ! command -v seq >/dev/null 2>&1; then
-		log_err "Required commands (comm, shuf, seq) not found for port randomization"
-		exit 1
-	fi
-
-	while [ $attempts -lt $max_attempts ]; do
-		candidate=$(comm -23 <(seq "${LOW_BOUND}" "${UPPER_BOUND}" | sort -u) <(ss -Htan | awk '{print $4}' | rev | cut -d':' -f1 | rev | sort -u) | shuf | head -n 1)
-		if [[ -z "$candidate" ]]; then
-			# Fallback: random port in range
-			candidate=$((LOW_BOUND + RANDOM % (UPPER_BOUND - LOW_BOUND)))
-		fi
-		# Test bind with Python (available on Debian 10+)
-		if python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.bind(('127.0.0.1', $candidate)); s.close(); exit(0)" 2>/dev/null; then
-			echo "$candidate"
-			return
-		fi
-		attempts=$((attempts + 1))
-	done
-	log_err "Failed to find available port after $max_attempts attempts"
-	exit 1
-}
-
 # Preserve existing ports on reruns so proxy configs stay stable.
 existing_port_from_ini() {
 	local file="$1" key="$2"
@@ -1363,16 +1332,31 @@ media_stack_port_is_valid() {
 	[[ "$1" =~ ^[0-9]{1,5}$ ]] && ((10#$1 >= 1 && 10#$1 <= 65535))
 }
 
-pick_existing_or_random_port() {
-	local existing="$1"
+media_stack_reserved_port_read() {
+	local app="$1" marker port
+	marker="$HOME/.media-stack-port-${app}"
+	[[ -f "$marker" && ! -L "$marker" ]] || return 1
+	IFS= read -r port <"$marker"
+	media_stack_port_is_valid "$port" || return 1
+	printf '%s' "$port"
+}
+
+pick_existing_or_reserved_port() {
+	local existing="$1" app="$2" reserved=""
+	if reserved=$(media_stack_reserved_port_read "$app"); then
+		printf '%s' "$reserved"
+		return
+	fi
 	if [[ -n "$existing" ]]; then
 		if media_stack_port_is_valid "$existing"; then
+			log_warn "No PMSS reservation for ${app}; preserving its existing port"
 			printf '%s' "$existing"
 			return
 		fi
-		log_warn "Ignoring invalid existing port '${existing}' and selecting a fresh local port"
+		log_warn "Ignoring invalid existing port '${existing}'"
 	fi
-	random_open_port
+	log_err "No PMSS-reserved port is available for ${app}; run a full PMSS update first"
+	exit 1
 }
 
 media_stack_password_generate() {
@@ -1529,7 +1513,7 @@ servarr_auth_seed() {
 		return 0
 	fi
 
-	seed_port=$(random_open_port)
+	seed_port="$desired_port"
 	session="${app}-auth-seed"
 	base_url="http://127.0.0.1:${seed_port}/api/${api_version}/config/host"
 	response_json=$(mktemp)
@@ -1608,12 +1592,11 @@ servarr_auth_seed() {
 }
 
 autobrr_auth_seed() {
-	local datadir="$1" password="$2" session="autobrr-auth-seed"
-	local db_file="$datadir/autobrr.db" had_db=0 seed_port
+	local datadir="$1" password="$2" seed_port="$3" session="autobrr-auth-seed"
+	local db_file="$datadir/autobrr.db" had_db=0
 
 	[[ -s "$db_file" ]] && had_db=1
 	if [[ "$had_db" -eq 0 ]]; then
-		seed_port=$(random_open_port)
 		tmux kill-session -t "$session" 2>/dev/null || true
 		tmux new-session -d -s "$session" \
 			"AUTOBRR__HOST=127.0.0.1 AUTOBRR__PORT=\"$seed_port\" AUTOBRR__BASE_URL=/autobrr/ AUTOBRR__BASE_URL_MODE_LEGACY=true \"$HOME/.bin/autobrr/autobrr\" --config=\"$datadir\" 2>&1 | tee -a \"$datadir/autobrr-auth-seed.log\"" || {
@@ -1655,8 +1638,7 @@ jellyfin_auth_payload_write() {
 }
 
 jellyfin_auth_seed() {
-	local password="$1" seed_port session base_url payload_json auth_json code
-	seed_port=$(random_open_port)
+	local password="$1" seed_port="$2" session base_url payload_json auth_json code
 	session="jellyfin-auth-seed"
 	base_url="http://127.0.0.1:${seed_port}"
 	payload_json=$(mktemp)
@@ -1818,14 +1800,14 @@ media_stack_verify_sessions() {
 	done < <(media_stack_sessions "${MEDIA_STACK_BASE_SESSIONS[@]}")
 }
 
-SABNZBD_PORT=$(pick_existing_or_random_port "$(existing_port_from_ini "$HOME/.config/sabnzbd/sabnzbd.ini" "port")")
-RADARR_PORT=$(pick_existing_or_random_port "$(existing_port_from_xml_tag "$HOME/.config/radarr/config.xml" "Port")")
-PROWLARR_PORT=$(pick_existing_or_random_port "$(existing_port_from_xml_tag "$HOME/.config/prowlarr/config.xml" "Port")")
-SONARR_PORT=$(pick_existing_or_random_port "$(existing_port_from_xml_tag "$HOME/.config/sonarr/config.xml" "Port")")
-AUTOBRR_PORT=$(pick_existing_or_random_port "$(existing_port_from_ini "$HOME/.config/autobrr/config.toml" "port")")
+SABNZBD_PORT=$(pick_existing_or_reserved_port "$(existing_port_from_ini "$HOME/.config/sabnzbd/sabnzbd.ini" "port")" sabnzbd)
+RADARR_PORT=$(pick_existing_or_reserved_port "$(existing_port_from_xml_tag "$HOME/.config/radarr/config.xml" "Port")" radarr)
+PROWLARR_PORT=$(pick_existing_or_reserved_port "$(existing_port_from_xml_tag "$HOME/.config/prowlarr/config.xml" "Port")" prowlarr)
+SONARR_PORT=$(pick_existing_or_reserved_port "$(existing_port_from_xml_tag "$HOME/.config/sonarr/config.xml" "Port")" sonarr)
+AUTOBRR_PORT=$(pick_existing_or_reserved_port "$(existing_port_from_ini "$HOME/.config/autobrr/config.toml" "port")" autobrr)
 JELLYFIN_PORT="$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_DIR/network.xml" "InternalHttpPort")"
 JELLYFIN_PORT="${JELLYFIN_PORT:-$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_DIR/network.xml" "PublicHttpPort")}"
-JELLYFIN_PORT="$(pick_existing_or_random_port "$JELLYFIN_PORT")"
+JELLYFIN_PORT="$(pick_existing_or_reserved_port "$JELLYFIN_PORT" jellyfin)"
 USERNAME=$(whoami)
 HOSTNAME=$(hostname)
 MEDIA_STACK_AUTH_USERNAME="$USERNAME"
@@ -1964,7 +1946,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
 	extract_tgz "autobrr.tar.gz" "$installdir"
 	autobrr_configure "$datadir/config.toml" "$AUTOBRR_PORT" "$AUTOBRR_SESSION_SECRET"
 	chmod 700 "$installdir/autobrr" "$installdir/autobrrctl" 2>/dev/null || true
-	if ! autobrr_auth_seed "$datadir" "$AUTOBRR_PASSWORD"; then
+	if ! autobrr_auth_seed "$datadir" "$AUTOBRR_PASSWORD" "$AUTOBRR_PORT"; then
 		log_err "Autobrr auth seeding failed; not starting media stack"
 		exit 1
 	fi
@@ -2113,7 +2095,7 @@ SYSXML
 
 	if [[ $DRY_RUN -eq 0 ]] && [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
 		log_info "Creating Jellyfin admin account locally..."
-		if ! jellyfin_auth_seed "$JELLYFIN_PASSWORD"; then
+		if ! jellyfin_auth_seed "$JELLYFIN_PASSWORD" "$JELLYFIN_PORT"; then
 			log_err "Jellyfin auth seeding failed; not starting media stack"
 			exit 1
 		fi

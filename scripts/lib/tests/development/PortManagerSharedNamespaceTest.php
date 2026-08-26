@@ -6,6 +6,26 @@ require_once dirname(__DIR__, 2).'/portManager.php';
 
 final class PortManagerSharedNamespaceTest extends TestCase
 {
+    /** Open a deterministic in-range listener for bind-conflict tests. */
+    private function openListener(string $address): array
+    {
+        for ($port = 22000; $port <= 22100; $port++) {
+            $errno = 0;
+            $error = '';
+            $server = @stream_socket_server(
+                sprintf('tcp://%s:%d', $address, $port),
+                $errno,
+                $error,
+                STREAM_SERVER_BIND | STREAM_SERVER_LISTEN
+            );
+            if ($server !== false) {
+                return [$server, $port];
+            }
+        }
+
+        throw new SkipTest('No free in-range listener port available');
+    }
+
     private function runPortManagerMain(array $arguments): array
     {
         [$rc, $output] = $this->pmssCaptureStdout(static function () use ($arguments): int {
@@ -98,5 +118,16 @@ final class PortManagerSharedNamespaceTest extends TestCase
         $this->assertSame('25000', $cli['output']);
         $this->assertSame(25000, $again);
         $this->assertSame('already_assigned', $existing);
+    }
+
+    public function testAvailabilityRejectsLoopbackAndWildcardListeners(): void
+    {
+        foreach (array('127.0.0.1', '0.0.0.0') as $address) {
+            [$server, $port] = $this->openListener($address);
+
+            $this->assertFalse(\pmssPortManagerPortIsAvailable($port), $address.' listener must be rejected');
+            fclose($server);
+            $this->assertTrue(\pmssPortManagerPortIsAvailable($port), $address.' port should recover after close');
+        }
     }
 }

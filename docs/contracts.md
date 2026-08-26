@@ -282,7 +282,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 Sub-handlers:
 - pmssBuildUserContext(string $user, string $rutorrentIndexSha=''): ?array → validates `/home/<user>` with `.rtorrent.rc`, `data`, and no `www-disabled`; returns context.
-- pmssUserConfigureHttp(array $ctx): void → configure lighttpd per-user, refresh the PMSS-managed qBittorrent safety defaults and Deluge fleet safety limits, ensure php.ini `error_log`, create `.tmp` and `.irssi` (from skel), and `www/recycle` with perms/ownership.
+- pmssUserConfigureHttp(array $ctx): void → configure lighttpd per-user, reserve/adopt native media-stack ports through the shared port manager, refresh the PMSS-managed qBittorrent safety defaults and Deluge fleet safety limits, ensure php.ini `error_log`, create `.tmp` and `.irssi` (from skel), and `www/recycle` with perms/ownership.
 - pmssUserApplySkeletonFiles(array $ctx): void → copies fixed list of skel files and quota plugin files into user tree using `updateUserFile()`; force-refreshes legacy `~/www/index.php` copies missing the PHP 8.2 `frameData` initialization; deletes `~/www/phpXplorer`.
 - pmssUserUpdateThemes(array $ctx): void → ensures named themes exist under `rutorrent/plugins/theme/themes/` (copied from skel), fixes ownership.
 - pmssUserUpgradeRutorrent(array $ctx): void → if user’s ruTorrent index.html SHA != skeleton (and no existing backup), backups to `oldRutorrent-3`, copies fresh from skel, restores config, and either re-links the ADR-0041 durable share store or copies an unmigrated real share directory forward. Preservation failures abort that user’s maintenance before it can be marked refreshed; successful runs regenerate config and normalize ownership/modes.
@@ -633,9 +633,12 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - scripts/productConfig.php <product> --welcome-message=<HTML>
   - Behavior: Sets/clears product-level welcome banner templates in `/etc/seedbox/config/welcomeMessages.json`.
 
-- scripts/util/portManager.php assign <user> lighttpd
-  - Behavior: Assigns a unique port for the user’s lighttpd; persists reservation.
+- scripts/util/portManager.php assign <user> [service]
+  - Behavior: Assigns a unique port from the shared managed-service namespace and persists the reservation; fresh candidates must be bindable on both loopback and the IPv4 wildcard address.
   - Safety: rejects invalid usernames/service names before building reservation paths; `PMSS_PORT_MANAGER_DIR` may override the reservation directory for hermetic tests.
+
+- etc/skel/install-media-stack.sh
+  - Port allocation: consumes root-provisioned `~/.media-stack-port-APP` markers for SABnzbd, Radarr, Prowlarr, Sonarr, Autobrr, and Jellyfin. A legacy configured port is preserved only when no marker exists; a fresh install without a valid marker fails closed and requests a full PMSS update.
 
 - scripts/util/systemTest.php
   - Behavior: Read-only probe of system readiness (binary versions, config presence);

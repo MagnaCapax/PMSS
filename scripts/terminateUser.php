@@ -191,6 +191,12 @@ pmssUserLifecycleRunSteps('terminate', $username, array(
     array('release_rclone_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' rclone'),
     array('release_qbittorrent_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' qbittorrent'),
     array('release_deluge_web_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' deluge-web'),
+    array('release_media_sabnzbd_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-sabnzbd'),
+    array('release_media_radarr_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-radarr'),
+    array('release_media_prowlarr_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-prowlarr'),
+    array('release_media_sonarr_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-sonarr'),
+    array('release_media_autobrr_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-autobrr'),
+    array('release_media_jellyfin_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-jellyfin'),
 ), $dryRun);
 pmssTerminateUserUnlinkPath($username, 'remove_nginx_user_file', "/etc/nginx/users/{$username}", $dryRun);
 

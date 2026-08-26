@@ -753,36 +753,44 @@ BASHRC
         $this->assertStringContainsString('source "$HOME/.bashrc" || true', $this->script);
     }
 
-    public function testExistingPortSelectionRejectsInvalidValues(): void
+    public function testPortSelectionPrefersReservationAndPreservesLegacyExistingPort(): void
     {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-port-selection-');
+        $this->pmssWriteFile($home.'/.media-stack-port-sabnzbd', "21000\n");
+        $this->pmssWriteFile($home.'/.media-stack-port-sonarr', "22000\n");
         $functions = $this->pmssExtractShellFunctions($this->script, array(
             'media_stack_port_is_valid',
-            'pick_existing_or_random_port',
+            'media_stack_reserved_port_read',
+            'pick_existing_or_reserved_port',
         ));
         $script = implode("\n", array(
             '#!/usr/bin/env bash',
             'set -euo pipefail',
+            'HOME='.escapeshellarg($home),
             'log_warn() { echo "WARN:$*" >&2; }',
-            'random_open_port() { echo 23456; }',
+            'log_err() { echo "ERR:$*" >&2; }',
             $functions,
-            'echo "valid=$(pick_existing_or_random_port 8080)"',
-            'echo "zero=$(pick_existing_or_random_port 0)"',
-            'echo "text=$(pick_existing_or_random_port abc)"',
-            'echo "high=$(pick_existing_or_random_port 70000)"',
+            'echo "reserved=$(pick_existing_or_reserved_port 8080 sabnzbd)"',
+            'echo "legacy=$(pick_existing_or_reserved_port 8081 radarr)"',
+            'echo "invalid=$(pick_existing_or_reserved_port abc sonarr)"',
+            'set +e',
+            '(pick_existing_or_reserved_port abc prowlarr >/dev/null)',
+            'echo "missing_rc=$?"',
             '',
         ));
 
         $output = $this->pmssRunShellHarness($script);
 
         $this->assertStringContainsAllStrings([
-            'valid=8080',
-            'zero=23456',
-            'text=23456',
-            'high=23456',
-            "WARN:Ignoring invalid existing port '0'",
+            'reserved=21000',
+            'legacy=8081',
+            'invalid=22000',
+            'missing_rc=1',
+            'WARN:No PMSS reservation for radarr; preserving its existing port',
             "WARN:Ignoring invalid existing port 'abc'",
-            "WARN:Ignoring invalid existing port '70000'",
+            'ERR:No PMSS-reserved port is available for prowlarr; run a full PMSS update first',
         ], $output);
+        $this->assertStringNotContainsString('random_'.'open_port', $this->script);
     }
 
     public function testJellyfinSedDoesNotUseSlashDelimitersWithClosingTags(): void

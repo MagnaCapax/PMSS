@@ -49,6 +49,11 @@ work that confines all PMSS and media-stack bind ports to a single namespace can
 replace this with a narrower or more complete end-state, but that belongs with
 the allocator unification work.
 
+Issue #826 extends that managed namespace to the native per-user media-stack
+ports. Root-side user convergence reserves those ports before the customer-run
+installer reads its per-app marker, so they now inherit this ADR's kernel
+reservation without widening the band.
+
 ## Consequences
 - Positive: kernel ephemeral source-port selection no longer steals the
   watchdog-managed service ports in the PMSS port-manager band.

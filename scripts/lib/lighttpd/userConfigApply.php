@@ -16,6 +16,7 @@ require_once __DIR__.'/proxyFragments.php';
 require_once __DIR__.'/resourcePlan.php';
 require_once __DIR__.'/userDirectoriesPrepare.php';
 require_once __DIR__.'/../user/userConfigStore.php';
+require_once __DIR__.'/../mediaStackPorts.php';
 
 function pmssLighttpdUserConfigLoad(string $thisUser, ?UserConfigStore $store = null): array
 {
@@ -64,6 +65,12 @@ function pmssUserConfigLighttpdConfigureUser(
     }
     pmssEnsureWebdavLockDatabase($thisUser, $homeDir);
     $customDir = $homeDir.'/.lighttpd/custom.d';
+
+    foreach (pmssMediaStackPortsEnsure($thisUser, $homeDir) as $app => $mediaStackPort) {
+        if ($mediaStackPort === 0) {
+            fwrite(STDERR, "[user:{$thisUser}] Failed to reserve {$app} media-stack port\n");
+        }
+    }
 
     $proxyPorts = pmssLighttpdProxyPortsEnsure([
         'rclone' => $homeDir.'/.rclonePort',

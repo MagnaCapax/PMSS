@@ -141,6 +141,31 @@ function pmssPortManagerUsedPorts(string $portDir, string $legacyPortsBase = '/v
     return $used;
 }
 
+/** Confirm that a candidate can bind on loopback and every IPv4 interface. */
+function pmssPortManagerPortIsAvailable(int $port): bool
+{
+    if (!pmssNetworkPortInRange($port, PMSS_PORT_MANAGER_MIN_PORT, PMSS_PORT_MANAGER_MAX_PORT)) {
+        return false;
+    }
+
+    foreach (array('127.0.0.1', '0.0.0.0') as $address) {
+        $errno = 0;
+        $error = '';
+        $server = @stream_socket_server(
+            sprintf('tcp://%s:%d', $address, $port),
+            $errno,
+            $error,
+            STREAM_SERVER_BIND | STREAM_SERVER_LISTEN
+        );
+        if ($server === false) {
+            return false;
+        }
+        fclose($server);
+    }
+
+    return true;
+}
+
 /**
  * Pick one free service port without risking an unbounded collision loop.
  *
@@ -154,7 +179,14 @@ function pmssPortManagerSelectAvailablePort(array $used): ?int
             $available[] = $port;
         }
     }
-    return $available === [] ? null : $available[rand(0, count($available) - 1)];
+    shuffle($available);
+    foreach ($available as $port) {
+        if (pmssPortManagerPortIsAvailable($port)) {
+            return $port;
+        }
+    }
+
+    return null;
 }
 
 /**
@@ -186,7 +218,8 @@ function pmssPortManagerAssignServicePort(string $user, string $service, ?int $p
         $used = pmssPortManagerUsedPorts($context['dir'], pmssPortManagerLegacyReservationDir());
         $port = ($preferredPort !== null
             && pmssNetworkPortInRange($preferredPort, PMSS_PORT_MANAGER_MIN_PORT, PMSS_PORT_MANAGER_MAX_PORT)
-            && !isset($used[$preferredPort]))
+            && !isset($used[$preferredPort])
+            && pmssPortManagerPortIsAvailable($preferredPort))
             ? $preferredPort
             : pmssPortManagerSelectAvailablePort($used);
         if ($port === null) { $status = 'port_range_exhausted'; return null; }
