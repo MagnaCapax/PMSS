@@ -287,6 +287,31 @@ class RtorrentProcessTest extends TestCase
         $this->assertEquals(9, SIGKILL);
     }
 
+    public function testProcessKillManagedPidsRejectsInvalidUsername(): void
+    {
+        $this->assertSame(0, rtorrentProcessKillManagedPids('bad;name', SIGTERM));
+    }
+
+    public function testWatchdogCleanupUsesManagedPidsAndPreservesSignals(): void
+    {
+        $processSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/process.php');
+        $watchdogSource = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
+
+        $this->assertStringContainsAllStrings([
+            'function rtorrentProcessKillManagedPids(',
+            "pmssUserWatchdogProcessPids(\$user, '^rtorrent')",
+            "rtorrentProcessExecutorPids(\$user)['all']",
+            'rtorrentProcessKillPids($managedPids, $signal);',
+        ], $processSource);
+        $this->assertStringContainsAllStrings([
+            'rtorrentProcessKillManagedPids($user, SIGKILL)',
+            'rtorrentProcessKillManagedPids($user, SIGTERM)',
+            'cleanup signal requested (signal=KILL',
+            'cleanup signal requested (signal=TERM',
+        ], $watchdogSource);
+        $this->pmssAssertStringNotContainsString('killall', $watchdogSource);
+    }
+
     public function testProcessStartOwnsLaunchCommandAndRestartMarkers(): void
     {
         $processSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/process.php');

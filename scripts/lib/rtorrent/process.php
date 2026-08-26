@@ -331,6 +331,28 @@ function rtorrentProcessKillPids(array $pids, int $signal): void
 }
 
 /**
+ * Resolve and signal the rTorrent processes managed for one user.
+ *
+ * @param string $user   System username.
+ * @param int    $signal Signal number (SIGTERM=15, SIGKILL=9).
+ *
+ * @return int Number of unique process IDs targeted.
+ */
+function rtorrentProcessKillManagedPids(string $user, int $signal): int
+{
+    if (!pmssValidateUsername($user)) {
+        return 0;
+    }
+
+    $rtorrentPids = pmssUserWatchdogProcessPids($user, '^rtorrent');
+    $executorPids = rtorrentProcessExecutorPids($user)['all'];
+    $managedPids = rtorrentProcessNormalizePids(array_merge($rtorrentPids, $executorPids));
+    rtorrentProcessKillPids($managedPids, $signal);
+
+    return count($managedPids);
+}
+
+/**
  * Check if system was recently rebooted.
  *
  * Reads /proc/uptime to determine seconds since boot. Used to detect

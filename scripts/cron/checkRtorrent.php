@@ -115,12 +115,8 @@ foreach ($users as $user) {
 
     // Suspended users: kill only rtorrent and executor — not all user processes (see GH#210).
     if (pmssUserWebRootUnavailable($user)) {
-        $null = [];
-        $rc = 0;
-        foreach (['rtorrent', '.rtorrentExecute.php'] as $processName) {
-            @exec('killall -9 -u '.escapeshellarg($user).' '.escapeshellarg($processName).' 2>/dev/null', $null, $rc);
-        }
-        pmssCheckRtorrentLogBoth($user, "suspended; cleanup (killall rc={$rc})", $debug);
+        $targets = rtorrentProcessKillManagedPids($user, SIGKILL);
+        pmssCheckRtorrentLogBoth($user, "suspended; cleanup signal requested (signal=KILL targets={$targets})", $debug);
         continue;
     }
 
@@ -129,12 +125,8 @@ foreach ($users as $user) {
     // check. Graceful TERM (not -9) lets rtorrent save its session; re-enable = remove the
     // marker and the watchdog restarts within PMSS_RTORRENT_MISSING_GRACE.
     if (is_file($home.'/.rtorrentDisable')) {
-        $null = [];
-        $rc = 0;
-        foreach (['rtorrent', '.rtorrentExecute.php'] as $processName) {
-            @exec('killall -u '.escapeshellarg($user).' '.escapeshellarg($processName).' 2>/dev/null', $null, $rc);
-        }
-        pmssCheckRtorrentLogBoth($user, "rtorrent disabled by user (.rtorrentDisable); cleanup (killall rc={$rc})", $debug);
+        $targets = rtorrentProcessKillManagedPids($user, SIGTERM);
+        pmssCheckRtorrentLogBoth($user, "rtorrent disabled by user (.rtorrentDisable); cleanup signal requested (signal=TERM targets={$targets})", $debug);
         continue;
     }
 
