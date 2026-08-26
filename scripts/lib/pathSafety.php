@@ -17,6 +17,12 @@ function pmssResolvePathFromEnv(string $envKey, string $default): string
     return $value !== '' ? $value : rtrim($default, '/');
 }
 
+/** Locate the base directory for skeleton files. */
+function pmssSkeletonBase(): string
+{
+    return pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel');
+}
+
 /** Normalize directory paths while preserving `/` and intentional empty overrides. */
 function pmssDirPathNormalize(string $path): string { $trimmed = rtrim($path, '/'); return $trimmed !== '' ? $trimmed : ($path !== '' ? '/' : ''); }
 /** Resolve a directory path from an explicit override or env-backed default. */

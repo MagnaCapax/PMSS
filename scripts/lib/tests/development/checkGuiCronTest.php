@@ -16,6 +16,30 @@ class CheckGuiCronTest extends TestCase
         $this->pmssAssertRepoFileContainsString('etc/seedbox/config/root.cron', '/scripts/cron/checkGui.php', 'root.cron should schedule checkGui.php');
     }
 
+    public function testStandaloneWatchdogLoadsRequiredSymbols(): void
+    {
+        $script = <<<'PHP'
+$requiredSymbols = ['Logger' => 'class', 'pmssSkeletonBase' => 'function'];
+foreach ($requiredSymbols as $symbol => $type) {
+    $loaded = $type === 'class' ? class_exists($symbol, false) : function_exists($symbol);
+    if (!$loaded) {
+        fwrite(STDERR, 'missing '.$symbol);
+        exit(1);
+    }
+}
+echo 'ok';
+PHP;
+
+        $output = $this->pmssRunRepoInlinePhpRequire(
+            'scripts/cron/checkGui.php',
+            $script,
+            $this->pmssTestModeEnv(),
+            '2>&1',
+            true
+        );
+        $this->assertEquals('ok', trim($output));
+    }
+
     public function testCheckGuiRepairsCoreUserspacePaths(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings(

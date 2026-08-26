@@ -417,9 +417,11 @@ read-only probes used by baseline sanitization and source-build guards.
 
 ---
 
-## OS-Release & Skeleton Utilities - `scripts/lib/update.php`
+## OS-Release & Skeleton Utilities
 
-- pmssSkeletonBase(): string → `PMSS_SKEL_DIR` or `/etc/skel`.
+- pmssSkeletonBase(): string → `PMSS_SKEL_DIR` or `/etc/skel`; defined in
+  `scripts/lib/pathSafety.php` so standalone skeleton consumers inherit it with
+  the shared path-resolution helpers.
 - updateUserFile(string $file, string $user): void → copies a skeleton file into `PMSS_HOME_DIR` (default `/home`) under `/<user>/<file>` when missing or checksum differs; ensures parent directories exist, writes via temp-file + rename, sets mode 755 and `chown user:user`.
 - copyToUserSpace(string $sourceFile, string $targetFile, string $user): void → atomic copy via temp + rename, chmod 755, chown/chgrp user.
 - updateRutorrentConfig(string $username, int $scgiPort): void → renders ruTorrent templates with user paths and writes `conf/{config.php,access.ini}`.

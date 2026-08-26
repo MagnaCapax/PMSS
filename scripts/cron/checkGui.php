@@ -16,6 +16,7 @@
  */
 
 require_once __DIR__.'/../lib/runtime.php';
+require_once __DIR__.'/../lib/logger.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 require_once __DIR__.'/../lib/user/selection.php';
 require_once __DIR__.'/../lib/update/users/filesystem.php';

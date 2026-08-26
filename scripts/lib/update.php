@@ -18,14 +18,6 @@ require_once __DIR__.'/runtime.php';
 pmssRequireRelativeFiles(__DIR__, ['version.php', 'update/apt.php', 'update/osRelease.php']);
 
 /**
- * Locate the base directory for skeleton files.
- */
-function pmssSkeletonBase(): string
-{
-    return pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel');
-}
-
-/**
  * Resolve and validate a tenant home before doing ownership-sensitive writes.
  */
 function pmssUpdateUserHomeDir(string $user): string
