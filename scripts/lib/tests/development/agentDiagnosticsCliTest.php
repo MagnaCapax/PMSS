@@ -36,7 +36,7 @@ final class agentDiagnosticsCliTest extends TestCase
         $payload = $this->pmssDecodeJsonArray($output);
 
         $this->assertSame(
-            ['motd', 'storage', 'services', 'system', 'cgroup', 'system_test', 'users', 'resources', 'traffic', 'user_settings', 'user_processes', 'user_identity', 'user_quota', 'user_disk'],
+            ['motd', 'storage', 'services', 'system', 'cgroup', 'system_test', 'users', 'resources', 'traffic', 'user_settings', 'user_processes', 'user_metrics_latest', 'user_identity', 'user_quota', 'user_disk'],
             array_keys($payload['sections'])
         );
         $this->assertSame(
@@ -53,6 +53,10 @@ final class agentDiagnosticsCliTest extends TestCase
         $this->assertSame(['alice', 'bob'], $payload['sections']['users']['list']);
         $this->assertSame(4, $payload['sections']['services']['rtorrent_count']);
         $this->assertSame(['pid1 rtorrent'], $payload['sections']['user_processes']);
+        $this->assertSame(
+            ['ts' => 1756200000, 'uid' => 1001, 'mem_failcnt' => 126389728, 'mem_current' => 327155712, 'mem_peak' => 327155712, 'mem_limit' => 327155712, 'mem_oom_kill' => 0],
+            $payload['sections']['user_metrics_latest']
+        );
         $this->assertSame(['raw' => 'uid=1001(alice) gid=1001(alice) groups=1001(alice)'], $payload['sections']['user_identity']);
         $this->assertSame(['raw' => 'Disk quotas for user alice'], $payload['sections']['user_quota']);
         $this->assertSame(['raw' => '12G /home/alice'], $payload['sections']['user_disk']);
@@ -230,6 +234,7 @@ final class agentDiagnosticsCliTest extends TestCase
             'id' => "#!/bin/sh\nprintf 'uid=1001(alice) gid=1001(alice) groups=1001(alice)\\n'\n",
             'quota' => "#!/bin/sh\nprintf 'Disk quotas for user alice\\n'\n",
             'du' => "#!/bin/sh\nprintf '12G /home/alice\\n'\n",
+            'tail' => "#!/bin/sh\nprintf '{\"ts\":1756200000,\"uid\":1001,\"mem_failcnt\":126389728,\"mem_current\":327155712,\"mem_peak\":327155712,\"mem_limit\":327155712,\"mem_oom_kill\":0}\\n'\n",
         ]);
     }
 }

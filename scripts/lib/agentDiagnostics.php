@@ -111,6 +111,14 @@ function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
         $userArg = escapeshellarg($user);
         $sections['user_settings'] = ['type' => 'php', 'path' => 'userSetting.php', 'args' => ['view', $user], 'format' => 'json'];
         $sections['user_processes'] = ['type' => 'command', 'command' => 'pgrep -u '.$userArg.' -a 2>/dev/null', 'format' => 'lines'];
+        // Latest per-user resource-metrics snapshot (cpu-throttle / blkio / pids / memory-pressure).
+        // metricsLog.php (root.cron, */5) persists pmssUserMetricsCollect() output as JSONL here; the
+        // last line surfaces this account's resource envelope — including memory.failcnt, max_usage vs
+        // limit, and oom_kill — which is the per-account memory-exhaustion signal the host-level probes
+        // above miss (GH #114824 misdiagnosis). A plain `tail` (not a util sub-script) so it survives the
+        // production script-root guard failure (GH #722) that breaks the php-type sections. Absent file
+        // (new user / no cycle yet) => tail rc!=0 => a benign error stub, not a crash.
+        $sections['user_metrics_latest'] = ['type' => 'command', 'command' => 'tail -1 '.escapeshellarg('/var/log/pmss/metrics/'.$user).' 2>/dev/null', 'format' => 'json'];
         foreach ([
             'user_identity' => 'id '.$userArg,
             'user_quota' => 'quota -u '.$userArg.' 2>/dev/null',
