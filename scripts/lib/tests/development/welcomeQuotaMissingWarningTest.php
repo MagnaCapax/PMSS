@@ -5,19 +5,26 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class welcomeQuotaMissingWarningTest extends TestCase
 {
-    private function loadWelcomeServiceControlHelpers(): void
+    private function makeWelcomeServiceControlFixture(): string
     {
-        if (function_exists('pmssWelcomeActionButtonHtmlBuild')
-            && function_exists('pmssWelcomeManagedAppsHtmlBuild')
-            && function_exists('pmssWelcomeServiceRestartActionsBuild')) return;
-
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
         $start = strpos($source, 'function pmssWelcomeHtmlAttr');
         $end = strpos($source, 'function pmssWelcomeHeadingHtmlBuild');
         $this->assertTrue($start !== false && $end !== false && $end > $start, 'welcome.php service-control helpers should remain present');
 
         $fixture = $this->pmssMakeTempPath('pmss-welcome-service-controls-', '.php');
-        require_once $this->pmssWriteFile($fixture, "<?php\nrequire_once ".var_export($this->pmssRepoPath('etc/skel/www/scriptsInc.php'), true).";\n".substr($source, $start, $end - $start));
+        return $this->pmssWriteFile($fixture, "<?php\nrequire_once ".var_export($this->pmssRepoPath('etc/skel/www/scriptsInc.php'), true).";\n".substr($source, $start, $end - $start));
+    }
+
+    private function loadWelcomeServiceControlHelpers(): void
+    {
+        if (function_exists('pmssWelcomeActionButtonHtmlBuild')
+            && function_exists('pmssWelcomeManagedAppsHtmlBuild')
+            && function_exists('pmssWelcomeServiceRestartActionsBuild')
+            && function_exists('pmssWelcomeCoreServiceStatusesRead')
+            && function_exists('pmssWelcomeCoreServiceStatusBadgeHtmlBuild')) return;
+
+        require_once $this->makeWelcomeServiceControlFixture();
     }
 
     private function makeWelcomeSafetyFixture(): string
@@ -50,6 +57,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
             'if (!function_exists("pmssWelcomeVendorRead")) { function pmssWelcomeVendorRead() { return array("name" => "Pulsed Media"); } }'
             .'if (!function_exists("pmssWelcomeContextualMessageBuild")) { function pmssWelcomeContextualMessageBuild($quotaInfo) { return ""; } }'
             .'if (!function_exists("pmssWelcomeDelugeStateBuild")) { function pmssWelcomeDelugeStateBuild($username, $path) { return array("canRotate" => false, "passwordNotice" => "", "password" => ""); } }'
+            .'if (!function_exists("pmssWelcomeCoreServiceStatusesRead")) { function pmssWelcomeCoreServiceStatusesRead() { return array("rtorrent" => "unknown", "lighttpd" => "unknown"); } }'
             .'if (!function_exists("pmssWelcomeUserConfigNumber")) { function pmssWelcomeUserConfigNumber($key, $allowSymlink = false) { return null; } }'
             .'chdir('.var_export($home, true).');'
             .'$state = pmssWelcomePageStateBuild();'
@@ -136,6 +144,67 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $cwd = getcwd(); chdir($this->pmssRepoPath('etc/skel/www'));
         try { $managedAppHash = hash('sha256', pmssWelcomeManagedAppsHtmlBuild($apps, true, 'Rotated', 'secret')); } finally { if (is_string($cwd)) chdir($cwd); }
         $this->assertSame('1ef4337fc6833ff55e1c6d947b39d53038ea1e85530cc516ca1d0f0d4e2b4dc9', $managedAppHash);
+    }
+
+    public function testWelcomeCoreServiceStatusBadgesUseMediaStackBadgeStyle(): void
+    {
+        $this->loadWelcomeServiceControlHelpers();
+
+        $running = pmssWelcomeCoreServiceStatusBadgeHtmlBuild('rTorrent', 'running');
+        $stopped = pmssWelcomeCoreServiceStatusBadgeHtmlBuild('Lighttpd', 'stopped');
+        $unknown = pmssWelcomeCoreServiceStatusBadgeHtmlBuild('Lighttpd', 'paused');
+
+        $this->assertStringContainsAllStrings(array('<b>rTorrent:</b>', 'pmss-media-stack-auth-badge-protected', '>running</span>'), $running);
+        $this->assertStringContainsAllStrings(array('<b>Lighttpd:</b>', 'pmss-media-stack-auth-badge-exposed', '>stopped</span>'), $stopped);
+        $this->assertStringContainsAllStrings(array('pmss-core-service-status', 'pmss-media-stack-auth-badge', '>unknown</span>'), $unknown);
+        $this->assertStringNotContainsString('pmss-media-stack-auth-badge-protected', $unknown);
+        $this->assertStringNotContainsString('pmss-media-stack-auth-badge-exposed', $unknown);
+    }
+
+    public function testWelcomeCoreServiceStatusUsesFixedCustomerPgrepChecks(): void
+    {
+        $this->loadWelcomeServiceControlHelpers();
+        $bin = $this->pmssMakeTempDir('pmss-welcome-pgrep-bin-');
+        $log = $this->pmssMakeTempPath('pmss-welcome-pgrep-', '.log');
+        $stub = "#!/bin/sh\n"
+            ."printf '%s|%s|%s|%s\\n' \"\$1\" \"\$2\" \"\$3\" \"\$4\" >> ".escapeshellarg($log)."\n"
+            ."if [ \"\$4\" = '^rtorrent' ]; then\n"
+            ."    printf '123\\n'\n"
+            ."    exit 0\n"
+            ."fi\n"
+            ."exit 1\n";
+        $this->pmssWriteExecutableFile($bin.'/pgrep', $stub);
+
+        $oldPath = getenv('PATH');
+        putenv('PATH='.$bin.':'.(is_string($oldPath) ? $oldPath : ''));
+        try {
+            $statuses = pmssWelcomeCoreServiceStatusesRead();
+        } finally {
+            if (is_string($oldPath)) putenv('PATH='.$oldPath);
+            else putenv('PATH');
+        }
+
+        $this->assertSame(array('rtorrent' => 'running', 'lighttpd' => 'stopped'), $statuses);
+        $logLines = file($log, FILE_IGNORE_NEW_LINES);
+        $this->assertTrue(is_array($logLines), 'expected pgrep stub log to be readable');
+        $this->assertSame(2, count($logLines));
+        $rtorrentArgs = explode('|', (string) $logLines[0]);
+        $lighttpdArgs = explode('|', (string) $logLines[1]);
+        $this->assertSame('-u', $rtorrentArgs[0]);
+        $this->assertSame('-u', $lighttpdArgs[0]);
+        $this->assertTrue(ctype_digit($rtorrentArgs[1]));
+        $this->assertTrue(ctype_digit($lighttpdArgs[1]));
+        $this->assertSame(array('-f', '^rtorrent'), array_slice($rtorrentArgs, 2));
+        $this->assertSame(array('-x', 'lighttpd'), array_slice($lighttpdArgs, 2));
+    }
+
+    public function testWelcomeCoreServiceStatusUnknownWhenShellExecDisabled(): void
+    {
+        $fixture = $this->makeWelcomeServiceControlFixture();
+        $script = 'require '.var_export($fixture, true).'; echo json_encode(pmssWelcomeCoreServiceStatusesRead());';
+        $output = $this->pmssRunShellCommand(escapeshellarg(PHP_BINARY).' -d disable_functions=shell_exec -r '.escapeshellarg($script), [], '2>&1');
+
+        $this->assertSame(array('rtorrent' => 'unknown', 'lighttpd' => 'unknown'), $this->pmssDecodeJsonArray($output));
     }
 
     public function testWelcomeWholeAccountRestartComposesExistingEndpoints(): void

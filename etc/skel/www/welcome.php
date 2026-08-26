@@ -49,6 +49,7 @@ $delugePasswordCanRotate = $pageState['delugePasswordCanRotate'];
 $delugePasswordNotice = $pageState['delugePasswordNotice'];
 $delugePassword = $pageState['delugePassword'];
 $mediaStackStatus = $pageState['mediaStackStatus'];
+$coreServiceStatuses = $pageState['coreServiceStatuses'];
 $billingServiceId = $pageState['billingServiceId'];
 $trafficBandwidthState = $pageState['trafficBandwidthState'];
 $welcomeHeadingHtml = pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage);
@@ -167,6 +168,11 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
         }
         .pmss-media-stack-secure {
             margin-left: 6px;
+        }
+        .pmss-core-service-status {
+            display: inline-block;
+            margin-left: 6px;
+            vertical-align: middle;
         }
         .pmss-media-stack-box pre {
             margin-top: 10px;
@@ -567,6 +573,7 @@ if (file_exists('mediaStack.php') && function_exists('pmssMediaStackPanelHtmlBui
 
                         <h6>rTorrent</h6>
                         <input type="button" name="rtorrentRestart" value="Restart rTorrent" onClick="pmssRunAction(this, 'rtorrentRestart.php', 'rTorrent restart request sent, please allow up to 2 minutes for restart to happen.', false, 'Sending rTorrent restart request...');" />
+                        <?php echo pmssWelcomeCoreServiceStatusBadgeHtmlBuild('rTorrent', $coreServiceStatuses['rtorrent'] ?? 'unknown'); ?>
                         <h6>Torrent configuration backup</h6>
                         <p>Download rTorrent, ruTorrent, Deluge, and qBittorrent configuration plus torrent session/resume state. Media files are not included.</p>
                         <p><b>Keep the archive private:</b> it can contain private tracker URLs and separate application credentials.</p>
@@ -581,6 +588,7 @@ if (file_exists('lighttpdRestart.php')) {
 ?>
                         <h6>Lighttpd</h6>
                         <input type="button" name="lighttpdRestart" value="Restart Lighttpd" onClick="pmssRunAction(this, 'lighttpdRestart.php?action=confirm-restart', 'Lighttpd restart request sent. It might take a couple of minutes.', false, 'Lighttpd restart may take a couple of minutes...');" />
+                        <?php echo pmssWelcomeCoreServiceStatusBadgeHtmlBuild('Lighttpd', $coreServiceStatuses['lighttpd'] ?? 'unknown'); ?>
 <?php
 }
 
@@ -708,6 +716,7 @@ function pmssWelcomePageStateBuild() {
         'delugePasswordNotice' => $delugeState['passwordNotice'],
         'delugePassword' => $delugeState['password'],
         'mediaStackStatus' => $mediaStackStatus,
+        'coreServiceStatuses' => pmssWelcomeCoreServiceStatusesRead(),
         'billingServiceId' => $billingServiceId,
         'trafficBandwidthState' => $trafficBandwidthState,
     );
@@ -1095,6 +1104,38 @@ function pmssWelcomeDelugeStateBuild($username, $delugeAuthPath) {
 function pmssWelcomeHtmlAttr($value) { return pmssCustomerHtmlAttr($value); }
 
 function pmssWelcomeJsSingleQuoted($value) { return str_replace(array('\\', "'", "\r", "\n"), array('\\\\', "\\'", '\\r', '\\n'), (string) $value); }
+
+/** Read passive up/down state for the two core customer-owned services. */
+function pmssWelcomeCoreServiceStatusesRead() {
+    $unknown = array('rtorrent' => 'unknown', 'lighttpd' => 'unknown');
+    if (!pmssFrontendShellExecAvailable()) return $unknown;
+
+    $uid = function_exists('posix_getuid') ? (int) posix_getuid() : (int) getmyuid();
+    return array(
+        'rtorrent' => pmssWelcomeCoreServicePgrepStatusRead($uid, '-f', '^rtorrent'),
+        'lighttpd' => pmssWelcomeCoreServicePgrepStatusRead($uid, '-x', 'lighttpd'),
+    );
+}
+
+/** Run one fixed pgrep liveness probe and map output to a customer badge state. */
+function pmssWelcomeCoreServicePgrepStatusRead($uid, $mode, $pattern) {
+    $mode = $mode === '-f' ? '-f' : '-x';
+    $command = 'pgrep -u '.(int) $uid.' '.(string) $mode.' '.escapeshellarg((string) $pattern).' 2>/dev/null';
+    $output = pmssFrontendShellExec($command);
+    return is_string($output) && trim($output) !== '' ? 'running' : 'stopped';
+}
+
+/** Render a compact status badge using the media-stack badge visual language. */
+function pmssWelcomeCoreServiceStatusBadgeHtmlBuild($label, $status) {
+    $status = in_array($status, array('running', 'stopped'), true) ? $status : 'unknown';
+    $classes = array('pmss-media-stack-auth-badge');
+    if ($status === 'running') $classes[] = 'pmss-media-stack-auth-badge-protected';
+    if ($status === 'stopped') $classes[] = 'pmss-media-stack-auth-badge-exposed';
+
+    return '<span class="pmss-core-service-status"><b>'.pmssWelcomeHtmlAttr($label).':</b> '
+        .'<span class="'.pmssWelcomeHtmlAttr(implode(' ', $classes)).'">'
+        .pmssWelcomeHtmlAttr($status).'</span></span>';
+}
 
 function pmssWelcomeServiceAvailable($scriptPath, array $binaryPaths) { if (!file_exists($scriptPath)) return false; foreach ($binaryPaths as $binaryPath) if (file_exists((string) $binaryPath)) return true; return false; }
 
