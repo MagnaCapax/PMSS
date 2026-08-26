@@ -66,4 +66,23 @@ class changePwPasswdFailureGuardTest extends TestCase
             'changePw htpasswd guard order changed near: '
         );
     }
+
+    public function testQbittorrentHashWritePrecedesNonGracefulRestart(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/changePw.php',
+            [
+                '$qbittorrentUpdated = pmssUpdateQbittorrentPassword($username, $password);',
+                'if ($qbittorrentUpdated) {',
+                'killall -u %s -KILL %s 2>/dev/null',
+            ],
+            'changePw qBittorrent restart guard missing substring: ',
+            'changePw qBittorrent restart order changed near: '
+        );
+        $this->pmssAssertRepoFileNotContainsString(
+            'scripts/changePw.php',
+            'killall -u %s -TERM %s 2>/dev/null',
+            'qBittorrent must not gracefully overwrite the newly written password hash'
+        );
+    }
 }

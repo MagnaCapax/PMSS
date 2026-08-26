@@ -27,6 +27,13 @@ final class QbittorrentConfigCharacterizationTest extends TestCase
         $this->assertMatches('/^WebUI\\\\Password_PBKDF2=@ByteArray\([A-Za-z0-9+\/=]+:[A-Za-z0-9+\/=]+\)$/', $lines[1]);
         $this->assertSame('Locale=en', $lines[2]);
         $this->assertSame(1, preg_match_all('/^WebUI\\\\Password_PBKDF2=/m', implode("\n", $lines)));
+
+        $matches = [];
+        $this->assertSame(1, preg_match('/@ByteArray\(([^:]+):([^\)]+)\)/', $lines[1], $matches));
+        $salt = base64_decode($matches[1], true);
+        $storedHash = base64_decode($matches[2], true);
+        $this->assertTrue(is_string($salt) && is_string($storedHash));
+        $this->assertTrue(hash_equals($storedHash, hash_pbkdf2('sha512', 'secret', $salt, 100000, 64, true)));
     }
 
     public function testPasswordSyncAddsPasswordLineInsidePreferencesSection(): void

@@ -137,9 +137,11 @@ if ($chownReturnCode !== 0) {
 // making account password sync a security risk (see GH#211).
 $qbittorrentUpdated = pmssUpdateQbittorrentPassword($username, $password);
 
-// Kill updated torrent daemons gracefully; watchdog cron will restart them.
+// qBittorrent writes its in-memory config during graceful shutdown. Kill it
+// after the hash write so stale settings cannot restore the previous password;
+// watchdog cron will restart it.
 if ($qbittorrentUpdated) {
-    shell_exec(sprintf('killall -u %s -TERM %s 2>/dev/null', escapeshellarg($username), 'qbittorrent-nox'));
+    shell_exec(sprintf('killall -u %s -KILL %s 2>/dev/null', escapeshellarg($username), 'qbittorrent-nox'));
 }
 
 if ($qbittorrentUpdated && !$jsonlOutput) {
