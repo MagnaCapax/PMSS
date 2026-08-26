@@ -152,6 +152,42 @@ class WebCgroupMemoryStatusTest extends TestCase
         ));
     }
 
+    public function testReadSurfacesV1OomKillFromMemoryOomControlWithUpgradeCta(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-v1-oom-');
+        $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "104857600\n");
+        $this->pmssWriteFile($dir.'/memory.soft_limit_in_bytes', "327155712\n");
+        $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "327155712\n");
+        $this->pmssWriteFile($dir.'/memory.events', "high 0\n");
+        // Real OOM kills on the account's own slice — the ONLY sound v1 pressure signal.
+        $this->pmssWriteFile($dir.'/memory.oom_control', "oom_kill_disable 0\nunder_oom 0\noom_kill 4\n");
+
+        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234]);
+
+        $this->assertSame(4, $status['oom_kill_events']);
+        $this->assertSame('HIGH', $status['status']);
+        $this->assertStringContainsString('out-of-memory', $status['message']);
+        $this->assertStringContainsString('Extra RAM', $status['message']);
+    }
+
+    public function testReadReadsChildServiceSliceOomKillWhenParentSliceIsZero(): void
+    {
+        // systemd can record the memcg OOM kills on the child user@<uid>.service slice while the
+        // parent user-<uid>.slice reads 0 — the reader must check both and take the max.
+        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-v1-oomchild-');
+        $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "104857600\n");
+        $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "327155712\n");
+        $this->pmssWriteFile($dir.'/memory.oom_control', "oom_kill_disable 0\nunder_oom 0\noom_kill 0\n");
+        $childDir = $dir.'/user@1234.service';
+        @mkdir($childDir, 0777, true);
+        $this->pmssWriteFile($childDir.'/memory.oom_control', "oom_kill_disable 0\nunder_oom 0\noom_kill 3\n");
+
+        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234]);
+
+        $this->assertSame(3, $status['oom_kill_events']);
+        $this->assertSame('HIGH', $status['status']);
+    }
+
     public function testReadUsesAnonymousMemoryForPressureButReportsInclusiveCurrent(): void
     {
         $dir = $this->writeMemoryStatusFixture(

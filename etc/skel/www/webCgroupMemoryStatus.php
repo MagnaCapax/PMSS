@@ -178,9 +178,42 @@ function pmssWebCgroupMemoryStatusMemoryStatBreakdownParse($raw)
     return $breakdown;
 }
 
+/**
+ * cgroup-v1 fallback: read the real OOM-kill count from memory.oom_control on the account's
+ * own slice AND its child user@<uid>.service slice. systemd can place the memcg limit (and
+ * therefore the kills) on the child, so the parent slice can read oom_kill 0 while the child
+ * recorded the kills — read both, take the max. Both files are world-readable (root:root 0644),
+ * so this customer-tree helper reads them directly, no /scripts traversal (ADR-0016/0017).
+ * memory.events (the v2 oom_kill source used in the reader above) does not exist on the
+ * v1-pinned fleet; a REAL OOM kill is the ONLY sound per-account memory-pressure signal there
+ * (failcnt false-HIGHs on page-cache reclaim and is deliberately NOT read). Returns 0 on v2.
+ */
+function pmssWebCgroupMemoryStatusV1OomKillRead($cgroupDir, $uid)
+{
+    if (!is_string($cgroupDir) || $cgroupDir === '') {
+        return 0;
+    }
+    $cgroupDir = rtrim($cgroupDir, '/');
+    $paths = array($cgroupDir.'/memory.oom_control');
+    if (is_int($uid) && $uid >= 0) {
+        $paths[] = $cgroupDir.'/user@'.$uid.'.service/memory.oom_control';
+    }
+    $max = 0;
+    foreach ($paths as $path) {
+        $value = pmssCustomerUnsignedIntegerValue((pmssCustomerKeyValueFileRead($path))['oom_kill'] ?? null);
+        if ($value !== null && $value > $max) {
+            $max = $value;
+        }
+    }
+    return $max;
+}
+
 /** Classify current cgroup memory pressure into a user-facing level. */
 function pmssWebCgroupMemoryStatusClassify(array $stats)
 {
+    if ((int) ($stats['oom_kill_events'] ?? 0) > 0) {
+        return 'HIGH';
+    }
     $usagePercent = $stats['usage_percent'];
     $highPercent = $stats['high_percent'];
     $pressureSome = $stats['pressure_some_avg10'];
@@ -248,6 +281,11 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
     $maxEvents = pmssCustomerUnsignedIntegerValue($events['max'] ?? null) ?? 0;
     $oomEvents = pmssCustomerUnsignedIntegerValue($events['oom'] ?? null) ?? 0;
     $oomKillEvents = pmssCustomerUnsignedIntegerValue($events['oom_kill'] ?? null) ?? 0;
+    // cgroup-v1 fleet (ADR-0019): memory.events is absent, so the v2 oom_kill above is 0.
+    // Fall back to the real OOM-kill count from memory.oom_control (the only sound v1 signal).
+    if ($oomKillEvents === 0 && !pmssWebCgroupMemoryStatusV2MemoryControllerAvailable($cgroupDir)) {
+        $oomKillEvents = pmssWebCgroupMemoryStatusV1OomKillRead($cgroupDir, $uid);
+    }
     $limitBytes = $memoryMax !== null ? $memoryMax : $memoryHigh;
     $memoryPressureCurrent = isset($memoryBreakdown['anon'])
         ? (float) $memoryBreakdown['anon']
@@ -274,6 +312,7 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
         'pressure_some_avg10' => $pressureSomeAvg10,
         'pressure_full_avg10' => $pressureFullAvg10,
         'throttle_events' => $throttleEvents,
+        'oom_kill_events' => $oomKillEvents,
     ]);
 
     return [
@@ -296,9 +335,11 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
         'oom_kill_events' => $oomKillEvents,
         'status' => $status,
         'status_color' => ['LOW' => '#81c784', 'MEDIUM' => '#ffb74d', 'HIGH' => '#ef5350', 'THROTTLED' => '#d2691e'][$status] ?? '#b0bec5',
-        'message' => $status === 'THROTTLED'
-            ? 'Your service is running at reduced speed due to memory pressure. Reducing active tasks or upgrading your plan will restore full speed.'
-            : ($status === 'HIGH' ? 'Memory usage is close to the account limit.' : ''),
+        'message' => $oomKillEvents > 0
+            ? 'Your account reached its memory limit and had processes stopped (out-of-memory) '.number_format($oomKillEvents).' time(s). If transfers or apps keep getting interrupted, adding Extra RAM from your Upgrade Options raises the limit for this service.'
+            : ($status === 'THROTTLED'
+                ? 'Your service is running at reduced speed due to memory pressure. Reducing active tasks or upgrading your plan will restore full speed.'
+                : ($status === 'HIGH' ? 'Memory usage is close to the account limit.' : '')),
         'usage_text' => ($memoryCurrent !== null ? pmssWebCgroupMemoryStatusFormatBytes($memoryCurrent) : 'n/a')
             .' / '.($limitBytes !== null ? pmssWebCgroupMemoryStatusFormatBytes($limitBytes) : 'n/a')
             .($usagePercent !== null ? ' ('.number_format($usagePercent, 1, '.', '').'%' : '')
