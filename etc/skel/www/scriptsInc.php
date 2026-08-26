@@ -177,7 +177,7 @@ if (!function_exists('pmssCustomerBonusDisplayTextBuild')) {
    : 0;
 
   return $unit === 'gib'
-   ? 'ADDITIONAL DISK SPACE: '.number_format($value).' GiB'
+   ? 'ADDITIONAL DISK SPACE: '.number_format($value, 0, '.', '').' GiB'
    : 'BONUS: '.number_format($value).'%';
  }
 }

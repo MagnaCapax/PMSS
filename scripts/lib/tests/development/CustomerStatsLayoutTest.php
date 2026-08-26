@@ -79,8 +79,8 @@ final class CustomerStatsLayoutTest extends TestCase
         $cases = array(
             array('percent', '47', '1925', array('unit' => 'percent', 'value' => 47, 'state' => 'applied'), 'BONUS: 47%', 'Bonus is applied on this server.'),
             array('zero-percent', '0', '1925', array('unit' => 'percent', 'value' => 0, 'state' => 'zero'), 'BONUS: 0%', 'No bonus is applied on this server.'),
-            array('gib-fallback', null, '1925', array('unit' => 'gib', 'value' => 1925, 'state' => 'applied'), 'ADDITIONAL DISK SPACE: 1,925 GiB', 'Additional disk space is included in your quota on this server.'),
-            array('invalid-percent', '-1', '1925', array('unit' => 'gib', 'value' => 1925, 'state' => 'applied'), 'ADDITIONAL DISK SPACE: 1,925 GiB', 'Additional disk space is included in your quota on this server.'),
+            array('gib-fallback', null, '1925', array('unit' => 'gib', 'value' => 1925, 'state' => 'applied'), 'ADDITIONAL DISK SPACE: 1925 GiB', 'Additional disk space is included in your quota on this server.'),
+            array('invalid-percent', '-1', '1925', array('unit' => 'gib', 'value' => 1925, 'state' => 'applied'), 'ADDITIONAL DISK SPACE: 1925 GiB', 'Additional disk space is included in your quota on this server.'),
             array('missing-values', null, null, array('unit' => 'percent', 'value' => 0, 'state' => 'absent'), 'BONUS: 0%', 'No bonus is applied on this server yet. Earned bonus is added on top of your base resources, never taken from them.'),
         );
 

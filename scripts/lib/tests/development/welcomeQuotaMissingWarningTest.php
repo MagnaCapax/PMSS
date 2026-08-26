@@ -386,8 +386,8 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     public function testWelcomeQuotaSectionLabelsAggregateQuotaAsAdditionalDiskSpace(): void
     {
         $output = $this->assertWelcomeUsageScriptContains(
-            'echo quotaCreateSection(array("hardLimit" => 100, "totalSpace" => 50, "usedBytes" => 10), 25);',
-            ['Additional disk space: 25 GiB']
+            'echo quotaCreateSection(array("hardLimit" => 100, "totalSpace" => 50, "usedBytes" => 10), 1925);',
+            ['Additional disk space: 1925 GiB']
         );
         $this->pmssAssertStringNotContainsString('Bonus disk space:', $output);
     }
