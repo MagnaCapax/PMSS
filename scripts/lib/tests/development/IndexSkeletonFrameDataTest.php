@@ -160,6 +160,49 @@ class IndexSkeletonFrameDataTest extends TestCase
         ));
     }
 
+    public function testUsageAlertPreferenceRoundTripsThroughRegularMarker(): void
+    {
+        $this->loadIndexFrameHelpers();
+        $marker = $this->pmssMakeTempPath('pmss-usage-alerts-enabled-');
+
+        $this->assertFalse($this->usageAlertsEnabled($marker));
+        $this->assertTrue($this->usageAlertsPreferenceApply('enabled', $marker));
+        $this->assertTrue($this->usageAlertsEnabled($marker));
+        $this->assertSame(0600, fileperms($marker) & 0777);
+        $this->assertTrue($this->usageAlertsPreferenceApply('enabled', $marker));
+        chmod($marker, 0644);
+        $this->assertFalse($this->usageAlertsEnabled($marker));
+        $this->assertTrue($this->usageAlertsPreferenceApply('enabled', $marker));
+        $this->assertSame(0600, fileperms($marker) & 0777);
+        $this->assertTrue($this->usageAlertsPreferenceApply('disabled', $marker));
+        $this->assertFalse($this->usageAlertsEnabled($marker));
+    }
+
+    public function testUsageAlertPreferenceRejectsInvalidAndUnsafeTargets(): void
+    {
+        $this->loadIndexFrameHelpers();
+        $marker = $this->pmssMakeTempPath('pmss-usage-alerts-invalid-');
+        $this->assertFalse($this->usageAlertsPreferenceApply('invalid', $marker));
+
+        $directory = $this->pmssMakeTempDir('pmss-usage-alerts-directory-');
+        $this->assertFalse($this->usageAlertsPreferenceApply('enabled', $directory));
+        $target = $this->pmssMakeTempFile('pmss-usage-alerts-target-');
+        $link = $this->pmssMakeTempPath('pmss-usage-alerts-link-');
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+        $this->assertFalse($this->usageAlertsPreferenceApply('enabled', $link));
+        $this->assertFalse($this->usageAlertsPreferenceApply('disabled', $link));
+    }
+
+    public function testWelcomePageOffersUsageAlertControl(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/welcome.php', array(
+            'Usage alert email',
+            'traffic reaches 80%',
+            'disk usage reaches 90%',
+            "data: {usageAlertsMode: mode}",
+        ));
+    }
+
     public function testContextualHelpLinkRequiresPublishedWikiTarget(): void
     {
         $html = \pmssCustomerContextualHelpLinkBuild('panelFrameSource');
@@ -573,6 +616,22 @@ class IndexSkeletonFrameDataTest extends TestCase
         /** @var callable(array<string,string>): bool $gate */
         $gate = 'pmssGuiFramesPreferenceRequestAllowed';
         return $gate($server);
+    }
+
+    private function usageAlertsEnabled(string $path): bool
+    {
+        $this->loadIndexFrameHelpers();
+        /** @var callable(string): bool $reader */
+        $reader = 'pmssUsageAlertsEnabled';
+        return $reader($path);
+    }
+
+    private function usageAlertsPreferenceApply(string $mode, string $path): bool
+    {
+        $this->loadIndexFrameHelpers();
+        /** @var callable(string,string): bool $writer */
+        $writer = 'pmssUsageAlertsPreferenceApply';
+        return $writer($mode, $path);
     }
 
     private function writeQuotaSnapshotContent(string $content): string

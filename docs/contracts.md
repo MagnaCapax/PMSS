@@ -437,6 +437,21 @@ read-only probes used by baseline sanitization and source-build guards.
 
 ---
 
+## Per-user Usage Alerts - `scripts/cron/usageAlertsNotify.php`
+
+- Alerts are off by default. The customer panel writes the customer-owned
+  `~/.usageAlertsEnabled` marker as mode `0600`; root rejects symlinks, wrong
+  ownership, and any other mode before treating the account as opted in.
+- The hourly root cron reads the existing root-produced traffic, quota, and
+  media-stack status artifacts. It alerts at 80% traffic, 90% disk, and the
+  watchdog's `failed` service state, using the verified `.notifyEmail` recipient.
+- Root-owned markers under `/var/lib/pmss/usageAlerts` suppress repeat mail while
+  a condition remains active. A marker is written only after delivery succeeds
+  and is removed when the condition clears or the customer opts out.
+- Delivery reuses `pmssSupportMailSend()` and never logs the recipient address.
+
+---
+
 ## rTorrent Configuration – `scripts/lib/rtorrentConfig.php`
 
 Class `rtorrentConfig`

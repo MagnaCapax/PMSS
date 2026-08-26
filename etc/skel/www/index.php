@@ -331,12 +331,65 @@ function pmssGuiFramesPreferenceRequestAllowed($server)
         && strcasecmp((string) $server['HTTP_X_REQUESTED_WITH'], 'XMLHttpRequest') === 0;
 }
 
+/** Return whether this customer opted into proactive usage-alert email. */
+function pmssUsageAlertsEnabled($markerPath = '../.usageAlertsEnabled')
+{
+    $permissions = @fileperms($markerPath);
+    return is_file($markerPath) && !is_link($markerPath)
+        && is_int($permissions) && ($permissions & 0777) === 0600;
+}
+
+/** Apply the customer usage-alert preference through one guarded marker. */
+function pmssUsageAlertsPreferenceApply($mode, $markerPath = '../.usageAlertsEnabled')
+{
+    if (!is_string($mode) || is_link($markerPath)) {
+        return false;
+    }
+    if ($mode === 'disabled') {
+        return !file_exists($markerPath) || (is_file($markerPath) && @unlink($markerPath));
+    }
+    if ($mode !== 'enabled') {
+        return false;
+    }
+    if (file_exists($markerPath)) {
+        @chmod($markerPath, 0600);
+        clearstatcache(true, $markerPath);
+        return pmssUsageAlertsEnabled($markerPath);
+    }
+
+    $marker = @fopen($markerPath, 'x');
+    if (!is_resource($marker)) {
+        return false;
+    }
+    $written = fwrite($marker, "enabled\n") !== false;
+    fclose($marker);
+    if (!$written || !@chmod($markerPath, 0600)) {
+        @unlink($markerPath);
+        return false;
+    }
+    clearstatcache(true, $markerPath);
+    return pmssUsageAlertsEnabled($markerPath);
+}
+
 if (isset($_POST['guiFramesMode'])) {
     if (!pmssGuiFramesPreferenceRequestAllowed($_SERVER)) {
         http_response_code(403);
         exit;
     }
     if (!pmssGuiFramesLocalOnlyPreferenceApply($_POST['guiFramesMode'])) {
+        http_response_code(409);
+        exit;
+    }
+    http_response_code(204);
+    exit;
+}
+
+if (isset($_POST['usageAlertsMode'])) {
+    if (!pmssGuiFramesPreferenceRequestAllowed($_SERVER)) {
+        http_response_code(403);
+        exit;
+    }
+    if (!pmssUsageAlertsPreferenceApply($_POST['usageAlertsMode'])) {
         http_response_code(409);
         exit;
     }

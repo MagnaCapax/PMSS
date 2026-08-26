@@ -56,6 +56,9 @@ $announcementItemsHtml = pmssWelcomeAnnouncementItemsHtmlBuild();
 $homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
 $managedApps = pmssCustomerManagedAppDefinitions();
 $guiFramesLocalOnly = is_file('../.guiFramesLocalOnly') && !is_link('../.guiFramesLocalOnly');
+$usageAlertsPermissions = @fileperms('../.usageAlertsEnabled');
+$usageAlertsEnabled = is_file('../.usageAlertsEnabled') && !is_link('../.usageAlertsEnabled')
+    && is_int($usageAlertsPermissions) && ($usageAlertsPermissions & 0777) === 0600;
 $serviceRestartActions = pmssWelcomeServiceRestartActionsBuild($managedApps, $mediaStackStatus);
 $serviceRestartActionsJson = json_encode($serviceRestartActions, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
@@ -304,6 +307,25 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
             });
         }
 
+        function pmssUsageAlertsModeApply(button, mode) {
+            pmssSetActionLoading(button, true);
+            pmssShowActionNotice('Saving usage alert preference...', false);
+            $.ajax({
+                url: 'index.php',
+                type: 'POST',
+                cache: false,
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                data: {usageAlertsMode: mode},
+                success: function() {
+                    window.setTimeout(function() { location.reload(true); }, 500);
+                },
+                error: function() {
+                    pmssSetActionLoading(button, false);
+                    pmssShowActionNotice('Usage alert preference could not be saved.', true);
+                }
+            });
+        }
+
         function pmssRestartAllServices(button) {
             var actions = pmssServiceRestartActions.slice(0);
             var failures = [];
@@ -459,6 +481,10 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
                         <h6>Panel frame source<?php echo pmssCustomerContextualHelpLinkBuild('panelFrameSource'); ?></h6>
                         <p>Remote-updated frame definitions are the default. Local definitions avoid that frame-definition request, but receive navigation changes only with server PMSS updates. Other panel content may still use remote resources.</p>
                         <input type="button" name="guiFramesMode" value="<?php echo $guiFramesLocalOnly ? 'Use remote-updated frames' : 'Use local frame definitions'; ?>" onClick="pmssGuiFramesModeApply(this, '<?php echo $guiFramesLocalOnly ? 'remote' : 'local'; ?>');" />
+
+                        <h6>Usage alert email</h6>
+                        <p>Opt in to email when traffic reaches 80% of the monthly allowance, disk usage reaches 90% of quota, or a monitored media-stack service is reported down. Alerts reset after the condition clears.</p>
+                        <input type="button" name="usageAlertsMode" value="<?php echo $usageAlertsEnabled ? 'Disable usage alert email' : 'Enable usage alert email'; ?>" onClick="pmssUsageAlertsModeApply(this, '<?php echo $usageAlertsEnabled ? 'disabled' : 'enabled'; ?>');" />
 
                         <h6>All account services</h6>
                         <p>Restart every available service for this account. Installed media-stack apps that are stopped are started without disturbing live tmux sessions.</p>
