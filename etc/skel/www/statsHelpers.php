@@ -112,8 +112,12 @@ function pmssStatsCgroupDirDetect(string $uid, array $overrides = []): string
         return rtrim($overrides['cgroup_dir'], '/');
     }
 
-    foreach (array('/sys/fs/cgroup/user.slice/user-'.$uid.'.slice', '/sys/fs/cgroup/unified/user.slice/user-'.$uid.'.slice', '/sys/fs/cgroup/memory/user.slice/user-'.$uid.'.slice') as $candidate) {
-        if (is_dir($candidate)) {
+    $candidates = isset($overrides['cgroup_dir_candidates']) && is_array($overrides['cgroup_dir_candidates'])
+        ? $overrides['cgroup_dir_candidates']
+        : array('/sys/fs/cgroup/user.slice/user-'.$uid.'.slice', '/sys/fs/cgroup/unified/user.slice/user-'.$uid.'.slice', '/sys/fs/cgroup/memory/user.slice/user-'.$uid.'.slice');
+    foreach ($candidates as $candidate) {
+        if (function_exists('pmssCustomerCgroupDirOwnsMemoryController')
+            && pmssCustomerCgroupDirOwnsMemoryController($candidate)) {
             return $candidate;
         }
     }
@@ -127,7 +131,8 @@ function pmssStatsCgroupDirDetect(string $uid, array $overrides = []): string
             : array('/sys/fs/cgroup', '/sys/fs/cgroup/unified');
         foreach ($roots as $root) {
             $candidate = $root.(string) ($entry['path'] ?? '');
-            if (is_dir($candidate)) {
+            if (function_exists('pmssCustomerCgroupDirOwnsMemoryController')
+                && pmssCustomerCgroupDirOwnsMemoryController($candidate)) {
                 return $candidate;
             }
         }

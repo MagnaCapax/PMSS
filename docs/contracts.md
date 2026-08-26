@@ -381,6 +381,15 @@ iptables helpers:
 
 ## Resource Statistics
 
+- pmssCustomerCgroupDirOwnsMemoryController($cgroupDir): bool
+  - Accepts cgroup v1 directories only when `memory.stat` is readable; when
+    `cgroup.controllers` exists, it must list the `memory` controller.
+- pmssStatsCgroupDirDetect(string $uid, array $overrides=[]): string
+  - Returns the first memory-controller-backed user slice, rejecting
+    controllerless hybrid `unified` directories before falling through to the
+    production cgroup v1 memory hierarchy. Tests may inject candidates through
+    `cgroup_dir_candidates`.
+
 - resourceStatistics::getData($user, $timePeriod=10080): string
   - Inputs: managed username and requested resource-log tail line count.
   - Safety: validates username/resource path before shelling, clamps line count

@@ -34,35 +34,9 @@ function pmssWebCgroupMemoryStatusV2MemoryControllerAvailable($cgroupDir)
         return false;
     }
 
-    $memoryStatPath = rtrim($cgroupDir, '/').'/memory.stat';
-    if (!is_file($memoryStatPath) || @file_get_contents($memoryStatPath) === false) {
-        return false;
-    }
-
     $controllersPath = rtrim($cgroupDir, '/').'/cgroup.controllers';
-    if (!is_file($controllersPath)) {
-        return false;
-    }
-
-    $controllers = @file_get_contents($controllersPath);
-    return is_string($controllers)
-        && preg_match('/(?:^|\s)memory(?:\s|$)/', trim($controllers)) === 1;
-}
-
-/** Return whether a discovered slice owns a readable memory controller. */
-function pmssWebCgroupMemoryStatusDirOwnsMemoryController($cgroupDir)
-{
-    if (!is_string($cgroupDir) || !is_dir($cgroupDir)) {
-        return false;
-    }
-
-    if (@file_get_contents(rtrim($cgroupDir, '/').'/memory.stat') === false) {
-        return false;
-    }
-
-    $controllersPath = rtrim($cgroupDir, '/').'/cgroup.controllers';
-    return !is_file($controllersPath)
-        || pmssWebCgroupMemoryStatusV2MemoryControllerAvailable($cgroupDir);
+    return is_file($controllersPath)
+        && pmssCustomerCgroupDirOwnsMemoryController($cgroupDir);
 }
 
 /** Detect the readable user.slice directory for the current account. */
@@ -82,7 +56,7 @@ function pmssWebCgroupMemoryStatusDetectDir(array $overrides = [])
                 '/sys/fs/cgroup/unified/user.slice/user-'.$uid.'.slice',
             ];
         foreach ($candidates as $candidate) {
-            if (pmssWebCgroupMemoryStatusDirOwnsMemoryController($candidate)) {
+            if (pmssCustomerCgroupDirOwnsMemoryController($candidate)) {
                 return $candidate;
             }
         }
@@ -92,7 +66,7 @@ function pmssWebCgroupMemoryStatusDetectDir(array $overrides = [])
     foreach (pmssCustomerCgroupSelfEntries($cgroupFile) as $entry) {
         foreach (['/sys/fs/cgroup', '/sys/fs/cgroup/memory', '/sys/fs/cgroup/unified'] as $root) {
             $candidate = $root.$entry['path'];
-            if (pmssWebCgroupMemoryStatusDirOwnsMemoryController($candidate)) {
+            if (pmssCustomerCgroupDirOwnsMemoryController($candidate)) {
                 return $candidate;
             }
         }

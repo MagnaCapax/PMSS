@@ -263,6 +263,45 @@ final class CustomerStatsLayoutTest extends TestCase
         }
     }
 
+    public function testCustomerCgroupDirOwnershipRequiresReadableMemoryController(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-stats-cgroup-owner-');
+        $emptyDir = $root.'/empty';
+        $v1Dir = $root.'/v1';
+        $controllerlessDir = $root.'/controllerless';
+        $cpuOnlyDir = $root.'/cpu-only';
+        $v2Dir = $root.'/v2';
+        foreach (array($emptyDir, $v1Dir, $controllerlessDir, $cpuOnlyDir, $v2Dir) as $dir) {
+            mkdir($dir);
+        }
+        foreach (array($v1Dir, $controllerlessDir, $cpuOnlyDir, $v2Dir) as $dir) {
+            $this->pmssWriteFile($dir.'/memory.stat', "anon 42\n");
+        }
+        $this->pmssWriteFile($controllerlessDir.'/cgroup.controllers', "\n");
+        $this->pmssWriteFile($cpuOnlyDir.'/cgroup.controllers', "cpu io\n");
+        $this->pmssWriteFile($v2Dir.'/cgroup.controllers', "cpu memory io\n");
+
+        $this->assertFalse(\pmssCustomerCgroupDirOwnsMemoryController($root.'/missing'));
+        $this->assertFalse(\pmssCustomerCgroupDirOwnsMemoryController($emptyDir));
+        $this->assertTrue(\pmssCustomerCgroupDirOwnsMemoryController($v1Dir));
+        $this->assertFalse(\pmssCustomerCgroupDirOwnsMemoryController($controllerlessDir));
+        $this->assertFalse(\pmssCustomerCgroupDirOwnsMemoryController($cpuOnlyDir));
+        $this->assertTrue(\pmssCustomerCgroupDirOwnsMemoryController($v2Dir));
+    }
+
+    public function testStatsCgroupDirDetectionSkipsControllerlessHybridSlice(): void
+    {
+        $unifiedDir = $this->pmssMakeTempDir('pmss-stats-cgroup-unified-');
+        $v1Dir = $this->pmssMakeTempDir('pmss-stats-cgroup-v1-');
+        $this->pmssWriteFile($unifiedDir.'/memory.stat', "anon 99\n");
+        $this->pmssWriteFile($unifiedDir.'/cgroup.controllers', "\n");
+        $this->pmssWriteFile($v1Dir.'/memory.stat', "total_rss 42\n");
+
+        $this->assertSame($v1Dir, \pmssStatsCgroupDirDetect('1234', array(
+            'cgroup_dir_candidates' => array($unifiedDir, $v1Dir),
+        )));
+    }
+
     public function testStatsVpnStatusUsesInterfacePresenceInsteadOfSystemctlOutput(): void
     {
         $interfacesRoot = $this->pmssMakeTempDir('pmss-stats-vpn-net-');

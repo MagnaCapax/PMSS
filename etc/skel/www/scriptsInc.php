@@ -229,6 +229,24 @@ if (!function_exists('pmssCustomerCgroupSelfEntries')) {
  }
 }
 
+if (!function_exists('pmssCustomerCgroupDirOwnsMemoryController')) {
+ /** Return whether a cgroup directory exposes readable memory-controller data. */
+ function pmssCustomerCgroupDirOwnsMemoryController($cgroupDir) {
+  if (!is_string($cgroupDir) || !is_dir($cgroupDir)) return false;
+
+  $cgroupDir = rtrim($cgroupDir, '/');
+  $memoryStatPath = $cgroupDir.'/memory.stat';
+  if (!is_file($memoryStatPath) || @file_get_contents($memoryStatPath) === false) return false;
+
+  $controllersPath = $cgroupDir.'/cgroup.controllers';
+  if (!is_file($controllersPath)) return true;
+
+  $controllers = @file_get_contents($controllersPath);
+  return is_string($controllers)
+   && preg_match('/(?:^|\s)memory(?:\s|$)/', trim($controllers)) === 1;
+ }
+}
+
 if (!function_exists('pmssCustomerHtmlAttr')) { /** Escape customer GUI text and attributes with the shared PMSS flags. */ function pmssCustomerHtmlAttr($value) { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); } }
 
 if (!function_exists('pmssCustomerContextualHelpLinkBuild')) {
