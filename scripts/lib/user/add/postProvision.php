@@ -9,6 +9,32 @@
 require_once __DIR__.'/../../traffic/storage.php';
 require_once __DIR__.'/../../user/trafficLimit.php';
 require_once __DIR__.'/../../user/iopsLimit.php';
+require_once __DIR__.'/../../lighttpd/userFileWrite.php';
+require_once __DIR__.'/../../userLifecycle.php';
+
+/** Persist creation-time additional quota for immediate panel visibility. */
+function pmssAddUserBonusQuotaPersist(array $user, string $homePath): bool
+{
+    if (!array_key_exists('bonusQuotaGiB', $user)) {
+        return true;
+    }
+    if (!is_int($user['bonusQuotaGiB']) || $user['bonusQuotaGiB'] < 0) {
+        return false;
+    }
+    if ($user['bonusQuotaGiB'] === 0) {
+        return true;
+    }
+    if (!isset($user['name']) || !is_string($user['name']) || !pmssValidateUsername($user['name'])) {
+        return false;
+    }
+
+    return pmssWriteUserFile(
+        rtrim($homePath, '/').'/.bonusQuota',
+        (string) $user['bonusQuotaGiB'],
+        $user['name'],
+        0640
+    );
+}
 
 /**
  * Run post-provision steps that should not block account creation.
@@ -49,5 +75,11 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
     if (empty($user['iopsLimit'])) {
         $iopsLimitPath = pmssIopsLimitPath($user['name'], dirname($homePath));
         pmssIntegerSettingFileWrite($iopsLimitPath, 0) && pmssIntegerSettingPathModeConverge($iopsLimitPath, 0664);
+    }
+
+    if (!pmssAddUserBonusQuotaPersist($user, $homePath)) {
+        logProvisionMessage('Bonus quota persistence failed');
+    } elseif (!empty($user['bonusQuotaGiB'])) {
+        logProvisionMessage('Bonus quota recorded: '.$user['bonusQuotaGiB'].' GiB');
     }
 }

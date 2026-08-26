@@ -25,6 +25,7 @@ Usage
 - `--password=PASSWORD` — same as the second positional password.
 - `--ram-mib=RAM_MiB` — same as the RAM positional argument.
 - `--disk-quota-gib=DISK_QUOTA_GiB` — same as the disk quota positional argument.
+- `--bonus-quota-gib=BONUS_QUOTA_GiB` — optional additional disk quota already included in the total disk quota; positive values are recorded in `.bonusQuota` for immediate panel display.
 - `--traffic-limit-gb=GIB` — monthly traffic quota in GiB.
 - `--iops-limit=OPS` — monthly combined read+write I/O operations budget.
 - `--traffic-cap-mbit=MBIT` — traffic shaper ceiling in Mbit/s; `0` disables shaping.
@@ -48,12 +49,13 @@ Usage
 - The first positional `USERNAME` can be mixed with named options for the remaining values.
 - `RAM_MiB` is applied through `userConfig.php` and then `userConfigCgroup.php`; PMSS clamps the effective `MemoryHigh` floor to 250 MiB and derives `MemoryMax` at roughly 1.25x with at most 2048 MiB of headroom.
 - If `RAM_MiB` is below `245`, PMSS persists `dockerEnabled=false` for safety.
-- Invalid CLI input exits non-zero. Username validation failures also emit an `ERROR:` line and `###ADDUSER_JSON` with `success=false` for automation.
+- Invalid CLI input exits non-zero. `--bonus-quota-gib` accepts only a non-negative integer and writes only positive values. Username validation failures also emit an `ERROR:` line and `###ADDUSER_JSON` with `success=false` for automation.
 
 ## Examples
 
 ```bash
 /scripts/addUser.php alice rand 1024 200
+/scripts/addUser.php alice rand 1024 250 --bonus-quota-gib=50
 /scripts/addUser.php alice --password=rand --ram-mib=1024 --disk-quota-gib=200 --io-weight=320
 /scripts/addUser.php --user=alice --password=rand --ram-mib=1024 --disk-quota-gib=200 --traffic-limit-gb=500 --cpu-weight=320 --io-weight=320 --cpu-quota-percent=150 --io-latency-ms=50 --io-cost-qos='enable=1 ctrl=user rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.00' --upload-throttle-kib=2048 --docker-enabled=true
 ```

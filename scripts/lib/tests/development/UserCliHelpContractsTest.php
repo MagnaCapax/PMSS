@@ -28,6 +28,7 @@ final class UserCliHelpContractsTest extends TestCase
         $this->pmssAssertRepoFileContractCases([
             'docs/addUser.md' => ['required' => [
                 'addUser.php USERNAME PASSWORD RAM_MiB DISK_QUOTA_GiB',
+                '--bonus-quota-gib=BONUS_QUOTA_GiB',
                 '--cpu-weight=WEIGHT',
                 '--io-latency-ms=MS',
                 '--io-cost-qos=SETTING',

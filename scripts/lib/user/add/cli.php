@@ -39,6 +39,7 @@ function pmssAddUserCliUsage(): string
             pmssCliHelpLine('--password=PASSWORD', 'Same as the second positional password.'),
             pmssCliHelpLine('--ram-mib=RAM_MiB', 'Same as the RAM positional argument.'),
             pmssCliHelpLine('--disk-quota-gib=DISK_QUOTA_GiB', 'Same as the disk quota positional argument.'),
+            pmssCliHelpLine('--bonus-quota-gib=BONUS_QUOTA_GiB', 'Additional disk quota already included in the total disk quota.'),
         ], pmssUserConfigCliResourceHelpLines('addUserPrimaryOptions', 'usage'), [
             pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
         ], pmssUserConfigCliResourceHelpLines('addUserAdvancedOptions', 'usage', ['CPUWeight' => $derivedDefault, 'IOWeight' => $derivedDefault]), [
@@ -58,6 +59,23 @@ function pmssAddUserCliUsage(): string
     ], $useColor);
 }
 
+/** Parse the optional creation-time additional disk quota. */
+function pmssAddUserBonusQuotaGiBParse($raw): ?int
+{
+    if ($raw === null) {
+        return null;
+    }
+    if (!is_string($raw) || preg_match('/^(0|[1-9][0-9]*)$/D', $raw) !== 1) {
+        throw new InvalidArgumentException('Invalid --bonus-quota-gib value');
+    }
+
+    $value = filter_var($raw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+    if ($value === false) {
+        throw new InvalidArgumentException('Invalid --bonus-quota-gib value');
+    }
+    return (int) $value;
+}
+
 /**
  * Parse addUser CLI arguments into the canonical user payload.
  *
@@ -65,7 +83,7 @@ function pmssAddUserCliUsage(): string
  */
 function pmssAddUserParseCli(array $argv): array
 {
-    $longOptions = array_merge(['user', 'password', 'ram-mib', 'disk-quota-gib', 'upload-throttle-kib', 'docker-enabled'], pmssUserConfigCliResourceOptionNames('addUserOption'));
+    $longOptions = array_merge(['user', 'password', 'ram-mib', 'disk-quota-gib', 'bonus-quota-gib', 'upload-throttle-kib', 'docker-enabled'], pmssUserConfigCliResourceOptionNames('addUserOption'));
     $parsed = pmssParseCliTokens($argv, $longOptions);
     if (pmssCliHelpRequested($parsed)) return ['help' => true, 'usage' => pmssAddUserCliUsage()];
 
@@ -79,6 +97,11 @@ function pmssAddUserParseCli(array $argv): array
 
     if ($user['name'] === '' || $user['password'] === '' || $user['memory'] === '' || $user['quota'] === '') {
         throw new InvalidArgumentException(pmssAddUserCliUsage());
+    }
+
+    $bonusQuotaGiB = pmssAddUserBonusQuotaGiBParse(pmssCliOption($parsed, 'bonus-quota-gib', null, null));
+    if ($bonusQuotaGiB !== null) {
+        $user['bonusQuotaGiB'] = $bonusQuotaGiB;
     }
 
     foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {

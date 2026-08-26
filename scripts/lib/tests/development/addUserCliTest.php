@@ -11,7 +11,7 @@ class addUserCliTest extends TestCase
     {
         $usage = \pmssAddUserCliUsage();
 
-        $this->assertStringContainsAllStrings(['addUser.php USERNAME --password=PASSWORD', '--cpu-weight=WEIGHT', '--io-read-bw=/dev/DEVICE:RATE', '--cpu-quota-percent=PERCENT|infinity', '--iops-limit=OPS', '--io-latency-ms=MS', '--io-cost-qos=SETTING', '--io-cost-model=SETTING', '--docker-enabled=true|false', '--help'], $usage);
+        $this->assertStringContainsAllStrings(['addUser.php USERNAME --password=PASSWORD', '--bonus-quota-gib=BONUS_QUOTA_GiB', '--cpu-weight=WEIGHT', '--io-read-bw=/dev/DEVICE:RATE', '--cpu-quota-percent=PERCENT|infinity', '--iops-limit=OPS', '--io-latency-ms=MS', '--io-cost-qos=SETTING', '--io-cost-model=SETTING', '--docker-enabled=true|false', '--help'], $usage);
     }
 
     public function testHelpFlagReturnsUsageWithoutUserPayload(): void
@@ -90,6 +90,27 @@ class addUserCliTest extends TestCase
             '--disk-quota-gib=100',
             '--docker-enabled',
         ], '--docker-enabled requires true or false');
+    }
+
+    public function testBonusQuotaRequiresANonNegativeInteger(): void
+    {
+        $cli = $this->parseAddUserCli([
+            '--user=alice', '--password=secret', '--ram-mib=512', '--disk-quota-gib=100',
+            '--bonus-quota-gib=25',
+        ]);
+        $this->assertSame(25, $cli['user']['bonusQuotaGiB']);
+
+        $zero = $this->parseAddUserCli([
+            '--user=alice', '--password=secret', '--ram-mib=512', '--disk-quota-gib=100',
+            '--bonus-quota-gib=0',
+        ]);
+        $this->assertSame(0, $zero['user']['bonusQuotaGiB']);
+
+        foreach (['--bonus-quota-gib', '--bonus-quota-gib=-1', '--bonus-quota-gib=1.5', '--bonus-quota-gib= 1', '--bonus-quota-gib=999999999999999999999999'] as $invalid) {
+            $this->assertAddUserParseFails([
+                '--user=alice', '--password=secret', '--ram-mib=512', '--disk-quota-gib=100', $invalid,
+            ], 'Invalid --bonus-quota-gib value');
+        }
     }
 
     public function testLongOptionsOverrideLegacyPositionals(): void
