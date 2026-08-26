@@ -508,6 +508,11 @@ if (file_exists('mediaStack.php') && function_exists('pmssMediaStackPanelHtmlBui
                         <h6>Torrent configuration backup</h6>
                         <p>Download rTorrent, ruTorrent, Deluge, and qBittorrent configuration plus torrent session/resume state. Media files are not included.</p>
                         <p><b>Keep the archive private:</b> it can contain private tracker URLs and separate application credentials.</p>
+                        <form method="post" action="backup.php">
+                            <input type="hidden" name="action" value="confirm-backup" />
+                            <input type="submit" name="configBackup" value="Backup my config" />
+                        </form>
+                        <p>Download <b>backup-config.tar.gz</b> from your home directory with <a href="filemanager.php" rel="nofollow">file manager</a>.</p>
                         <p><a href="welcome.php?backup=download" rel="nofollow">Download torrent configuration backup</a></p>
 <?php
 if (file_exists('lighttpdRestart.php')) {
