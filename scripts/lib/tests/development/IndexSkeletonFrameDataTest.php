@@ -171,6 +171,7 @@ class IndexSkeletonFrameDataTest extends TestCase
         $this->assertSame(0600, fileperms($marker) & 0777);
         $this->assertTrue($this->usageAlertsPreferenceApply('enabled', $marker));
         chmod($marker, 0644);
+        clearstatcache(true, $marker);
         $this->assertFalse($this->usageAlertsEnabled($marker));
         $this->assertTrue($this->usageAlertsPreferenceApply('enabled', $marker));
         $this->assertSame(0600, fileperms($marker) & 0777);
