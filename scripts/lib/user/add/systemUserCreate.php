@@ -7,6 +7,7 @@
  */
 
 require_once dirname(__DIR__, 2).'/userLifecycle.php';
+require_once dirname(__DIR__).'/directories.php';
 
 /**
  * Create the underlying Unix account and validate that `/home/<user>` is sane.
@@ -38,6 +39,13 @@ function pmssAddUserSystemUserCreate(array $user, string $homePath): void
         if ($homeOwner !== false && (int) $homeOwner !== (int) $pwEntry['uid']) {
             pmssAddUserFatalExit('FAIL', 'Home directory owner mismatch after useradd; aborting provisioning', 'home_owner_mismatch');
         }
+    }
+    if (!pmssEnsureUserHomeDir($user['name'], $homePath, '.lighttpd', 0751, 'logProvisionMessage')) {
+        pmssAddUserFatalExit(
+            'FAIL',
+            'Lighttpd credential directory unavailable after useradd; aborting provisioning',
+            'lighttpd_directory_failed'
+        );
     }
 
     $safeChangePw = sprintf('/scripts/changePw.php %s [redacted]', escapeshellarg($user['name']));

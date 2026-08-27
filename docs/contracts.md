@@ -727,6 +727,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Help: `-h` / `--help` prints structured usage and exits successfully.
   - Parse failures: missing or invalid CLI arguments print usage/error text to stderr and exit non-zero.
   - Guardrails: Per-user lock file prevents concurrent addUser runs for the same username.
+  - Guardrails: After `useradd`, addUser converges the symlink-safe per-user `.lighttpd` directory before initial credential sync; an unsafe or uncreatable path fails provisioning and retains early rollback.
   - Guardrails: Rejects reserved system/service usernames to avoid future account collisions.
   - Recovery gate: When `/etc/passwd` already contains the username, addUser may self-heal only if the latest `###ADDUSER_JSON` summary for that user is a recent internal `FAIL` and both per-user `rtorrent` and `lighttpd` are inactive; the stale account is cleaned before retry. All other existing-user cases still abort.
   - Recovery gate: When the current run fails after `useradd` but before `userConfig.php` completes, addUser reuses the stale-account cleanup path on shutdown so `/etc/passwd`, `/home/<user>`, ports, lock files, and the per-user config store do not linger half-created.

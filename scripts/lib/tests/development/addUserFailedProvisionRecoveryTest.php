@@ -150,4 +150,17 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
         $this->assertStringContainsString('pmssAddUserFailureRollbackMarkSystemUserCreated();', $systemUserCreate);
         $this->assertStringContainsString('pmssAddUserFailureRollbackMarkUserConfigApplied();', $userConfigApply);
     }
+
+    public function testSystemUserCreateConvergesCredentialDirectoryBeforePasswordSync(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/lib/user/add/systemUserCreate.php',
+            array(
+                "pmssEnsureUserHomeDir(\$user['name'], \$homePath, '.lighttpd', 0751, 'logProvisionMessage')",
+                "'lighttpd_directory_failed'",
+                '$safeChangePw = sprintf(',
+                "'Set initial password'",
+            )
+        );
+    }
 }
