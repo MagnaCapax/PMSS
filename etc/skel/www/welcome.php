@@ -546,10 +546,6 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
                             <li><a href="https://filezilla-project.org/download.php?platform=win64" target="_blank">FileZilla - Popular opensource client</a></li>
                         </ul>
 
-                        <h6>Panel frame source<?php echo pmssCustomerContextualHelpLinkBuild('panelFrameSource'); ?></h6>
-                        <p>Remote-updated frame definitions are the default. Local definitions avoid that frame-definition request, but receive navigation changes only with server PMSS updates. Other panel content may still use remote resources.</p>
-                        <input type="button" name="guiFramesMode" value="<?php echo $guiFramesLocalOnly ? 'Use remote-updated frames' : 'Use local frame definitions'; ?>" onClick="pmssGuiFramesModeApply(this, '<?php echo $guiFramesLocalOnly ? 'remote' : 'local'; ?>');" />
-
                         <h6>Usage alert email</h6>
                         <p>Opt in to email when traffic reaches 80% of the monthly allowance, disk usage reaches 90% of quota, or a monitored media-stack service is reported down. Alerts reset after the condition clears.</p>
                         <input type="button" name="usageAlertsMode" value="<?php echo $usageAlertsEnabled ? 'Disable usage alert email' : 'Enable usage alert email'; ?>" onClick="pmssUsageAlertsModeApply(this, '<?php echo $usageAlertsEnabled ? 'disabled' : 'enabled'; ?>');" />
@@ -602,6 +598,10 @@ if (file_exists('openvpn-config.tgz')) {
 <?php
 }
 ?>
+
+                        <h6>Panel frame source<?php echo pmssCustomerContextualHelpLinkBuild('panelFrameSource'); ?></h6>
+                        <p>Remote-updated frame definitions are the default. Local definitions avoid that frame-definition request, but receive navigation changes only with server PMSS updates. Other panel content may still use remote resources.</p>
+                        <input type="button" name="guiFramesMode" value="<?php echo $guiFramesLocalOnly ? 'Use remote-updated frames' : 'Use local frame definitions'; ?>" onClick="pmssGuiFramesModeApply(this, '<?php echo $guiFramesLocalOnly ? 'remote' : 'local'; ?>');" />
 
                     </div>
 
