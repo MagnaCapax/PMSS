@@ -98,7 +98,9 @@ class CustomerBackupTest extends TestCase
 
         $this->assertTrue($route !== false && $pageState !== false && $route < $pageState, 'Backup response must run before welcome HTML rendering.');
         $this->assertStringContainsAllStrings(array(
-            'Download torrent configuration backup',
+            '<form method="get" action="welcome.php">',
+            '<input type="hidden" name="backup" value="download" />',
+            '<input type="submit" name="configBackupDownload" value="Download torrent configuration backup" />',
             'Media files are not included.',
             'private tracker URLs and separate application credentials',
         ), $welcome);
