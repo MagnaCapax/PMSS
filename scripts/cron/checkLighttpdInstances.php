@@ -14,13 +14,11 @@ require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
 require_once __DIR__.'/../lib/user/watchdog.php';
 
-$pmssCheckLighttpdLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkLighttpdInstances.lock'), true);
+$pmssCheckLighttpdLock = pmssUserWatchdogLockAcquire(pmssRuntimeLockPath('pmss-checkLighttpdInstances.lock'));
 if ($pmssCheckLighttpdLock === false) {
     echo date('Y-m-d H:i:s').': checkLighttpdInstances already running; skipping' . "\n";
     exit(0);
 }
-pmssLockHandleExportChildCloseFds($pmssCheckLighttpdLock);
-
 $argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';
 if ($argUserRaw === '') {
     echo date('Y-m-d H:i:s') . ': Checking Lighttpd instances' . "\n";
@@ -168,5 +166,5 @@ foreach($users AS $thisUser) {
             usleep(50000);
         }
     );
-    pmssUserWatchdogEnsureServices($thisUser, [pmssUserWatchdogServiceSpec('lighttpd', pmssLockChildClosePrefix().'/scripts/startLighttpd ' . $thisUser, 'lighttpd start requested')], ['lighttpd' => $lighttpdRunning]);
+    pmssUserWatchdogEnsureServices($thisUser, [pmssUserWatchdogServiceSpec('lighttpd', '/scripts/startLighttpd ' . $thisUser, 'lighttpd start requested')], ['lighttpd' => $lighttpdRunning]);
 }

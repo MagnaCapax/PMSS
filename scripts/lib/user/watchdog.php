@@ -74,6 +74,16 @@ function pmssUserWatchdogProcessRunning(string $username, string $processName): 
 
 function pmssUserWatchdogSuCommand(string $username, string $innerCommand): string { return pmssBuildUserServiceShellCommand($username, $innerCommand); }
 
+/** Acquire a watchdog lock without leaking its descriptor into service daemons. */
+function pmssUserWatchdogLockAcquire(string $path)
+{
+    $handle = pmssLockFileAcquire($path, true);
+    if ($handle !== false) {
+        pmssLockHandleExportChildCloseFds($handle);
+    }
+    return $handle;
+}
+
 /** Read a watchdog-owned local TCP port, failing closed on malformed files. */
 function pmssUserWatchdogLocalPortRead(string $path): ?int
 {
@@ -143,7 +153,7 @@ function pmssUserWatchdogEnsureServices(string $username, array $serviceSpecs, a
         $running = isset($runningStates[$processName]) ? (bool) $runningStates[$processName] : pmssUserWatchdogProcessRunning($username, $processName);
         if (!$running && (string) $command !== '') {
             echo 'Start '.(string) ($serviceSpec['serviceLabel'] ?? $processName).' for user: '.$username."\n";
-            passthru((string) $command);
+            passthru(pmssLockChildClosePrefix().(string) $command);
             pmssUserLog($username, (string) ($serviceSpec['userLogMessage'] ?? ($processName.' start requested')));
         }
         $runningStates[$processName] = $running;

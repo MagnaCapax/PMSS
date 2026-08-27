@@ -264,6 +264,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Runs handlers in order: HTTP, skeleton, ruTorrent themes, ruTorrent refresh,
     plugin maintenance, then permissions.
     Each handler consumes `['user','home','user_esc','rutorrent_index_sha']`.
+- pmssUserWatchdogLockAcquire(string $path)
+  - Acquires one non-blocking watchdog lock and exports its descriptor list so
+    the shared service launcher closes those descriptors before child exec.
+- pmssUserWatchdogEnsureServices(string $username, array $serviceSpecs, array $runningStates=[]): array
+  - Starts missing service specs after applying the exported lock-fd close prefix;
+    the watchdog parent retains its lock while long-lived daemons cannot inherit it.
 - pmssUserReconcileWebRoot(array $ctx, ?callable $logger=null): bool
   - Converges one user's managed web root under a per-user lock, preserving
     customer-owned paths and refusing unsafe symlinks or conflicting path types.

@@ -9,7 +9,7 @@
 require_once __DIR__.'/../lib/user/watchdog.php';
 require_once __DIR__.'/../lib/user/torrentPort.php';
 
-$pmssCheckQbittorrentLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkQbittorrentInstances.lock'), true);
+$pmssCheckQbittorrentLock = pmssUserWatchdogLockAcquire(pmssRuntimeLockPath('pmss-checkQbittorrentInstances.lock'));
 if ($pmssCheckQbittorrentLock === false) {
     echo date('Y-m-d H:i:s').': checkQbittorrentInstances already running; skipping' . "\n";
     exit(0);

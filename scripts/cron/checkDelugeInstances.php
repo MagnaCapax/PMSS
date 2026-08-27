@@ -13,7 +13,7 @@
 require_once __DIR__.'/../lib/user/watchdog.php';
 require_once __DIR__.'/../lib/user/delugeManagedConfig.php';
 
-$pmssCheckDelugeLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkDelugeInstances.lock'), true);
+$pmssCheckDelugeLock = pmssUserWatchdogLockAcquire(pmssRuntimeLockPath('pmss-checkDelugeInstances.lock'));
 if ($pmssCheckDelugeLock === false) {
     echo date('Y-m-d H:i:s').': checkDelugeInstances already running; skipping' . "\n";
     exit(0);
