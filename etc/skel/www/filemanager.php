@@ -226,6 +226,11 @@ if (isset($_SESSION[FM_SESSION_ID]['logged']) && !empty($directories_users[$_SES
     $wd = fm_clean_path(dirname($_SERVER['PHP_SELF']));
     $root_url =  $root_url.$wd.DIRECTORY_SEPARATOR.$directories_users[$_SESSION[FM_SESSION_ID]['logged']];
 }
+// PMSS serves filemanager.php below a per-user request prefix. Preserve that
+// directory unless tinyfilemanager already selected a mapped user root.
+if ($root_url === '') {
+    $root_url = ltrim((string) dirname($_SERVER['SCRIPT_NAME']), '/');
+}
 // clean $root_url
 $root_url = fm_clean_path($root_url);
 

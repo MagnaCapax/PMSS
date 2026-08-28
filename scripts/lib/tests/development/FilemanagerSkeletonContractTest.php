@@ -38,4 +38,19 @@ class FilemanagerSkeletonContractTest extends TestCase
             ['strstr($_SERVER[\'HTTP_USER_AGENT\'], "MSIE")', "\n        ob_flush();\n"]
         );
     }
+
+    public function testSkeletonPreservesPerUserUrlBaseAfterMappedRootSelection(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'etc/skel/www/filemanager.php',
+            [
+                "if (isset(\$_SESSION[FM_SESSION_ID]['logged']) && !empty(\$directories_users[\$_SESSION[FM_SESSION_ID]['logged']])) {",
+                "if (\$root_url === '') {\n    \$root_url = ltrim((string) dirname(\$_SERVER['SCRIPT_NAME']), '/');\n}",
+                '$root_url = fm_clean_path($root_url);',
+                "defined('FM_ROOT_URL') || define('FM_ROOT_URL'",
+            ],
+            'Missing filemanager URL-base fragment: ',
+            'Filemanager URL-base ordering changed at: '
+        );
+    }
 }

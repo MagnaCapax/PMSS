@@ -697,6 +697,11 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - Local frame definitions suppress only the remote frame-definition request. They do not promise a fully network-free panel, and receive navigation changes through server PMSS updates rather than the remote on-load update path.
 - `pmssCustomerContextualHelpLinkBuild()` renders the panel's `(?)` wiki link only for items registered with a published wiki page; an absent or unknown item renders no link.
 
+## Customer File Manager URLs – `etc/skel/www/filemanager.php`
+
+- Preview, Open, and DirectLink URLs retain the request script's directory (such as `/user-<username>/`) when tinyfilemanager has not selected a mapped multi-user root.
+- The fallback runs after mapped-root selection so enabling tinyfilemanager's multi-user mode cannot double the request prefix.
+
 ## Customer Server Status – `etc/skel/www/welcome.php`
 
 - `pmssWelcomeServerInfoHtmlBuild()` renders host uptime plus the 1/5/15-minute load averages after the per-account RAM section.
