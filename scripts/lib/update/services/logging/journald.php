@@ -33,7 +33,11 @@ function pmssJournaldTemplateSize(int $bytes): string
     return $bytes > 0 && ($bytes % $gib) === 0 ? (string) ($bytes / $gib).'G' : (string) max(1, (int) floor($bytes / (1024 * 1024))).'M';
 }
 
-/** Render and install journald limits template, then restart journald. */
+/**
+ * Render and install journald limits template, then restart journald.
+ *
+ * @throws RuntimeException When the managed target cannot be prepared or written.
+ */
 function pmssApplyJournaldLimits(?callable $logger = null): void
 {
     $log = $logger ?: 'logMessage';
@@ -69,9 +73,11 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
     $targetDir = pmssResolvePathFromEnv('PMSS_JOURNALD_CONF_DIR', '/etc/systemd/journald.conf.d');
     if ((!is_dir($targetDir) || is_link($targetDir)) && !pmssEnsureSafeDir($targetDir, 0755)) {
         $log('[WARN] Unable to prepare journald config directory: '.$targetDir);
-        return;
+        throw new RuntimeException('journald_config_directory_prepare_failed');
     }
-    if (!pmssWriteManagedPathFile($targetDir.'/pmss-limits.conf', $rendered, 'journald limits', $log)) return;
+    if (!pmssWriteManagedPathFile($targetDir.'/pmss-limits.conf', $rendered, 'journald limits', $log)) {
+        throw new RuntimeException('journald_limits_write_failed');
+    }
     $log(sprintf('Applied journald limits: SystemMaxUse=%s RuntimeMaxUse=%s RateLimit=%ss/%d',
         $repl['%%PMSS_JOURNALD_SYSTEM_MAX_USE%%'],
         $repl['%%PMSS_JOURNALD_RUNTIME_MAX_USE%%'],

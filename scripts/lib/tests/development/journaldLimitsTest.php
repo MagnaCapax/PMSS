@@ -130,10 +130,34 @@ class JournaldLimitsTest extends TestCase
             'PMSS_JOURNALD_CONF_DIR' => $linkTargetDir,
             'PMSS_ROOT_FS_BYTES' => (string) $this->gib(10),
         ], function () use (&$messages): void {
-            \pmssApplyJournaldLimits($this->pmssMakeArrayLogger($messages));
+            $this->assertThrowsRuntime(function () use (&$messages): void {
+                \pmssApplyJournaldLimits($this->pmssMakeArrayLogger($messages));
+            }, 'journald_config_directory_prepare_failed');
         });
 
         $this->assertTrue(!file_exists($realTargetDir.'/pmss-limits.conf'), 'must not write through symlinked journald dir');
         $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to prepare journald config directory'), 'expected safe-directory warning');
+    }
+
+    public function testJournaldLimitsRejectsSymlinkedTargetFile(): void
+    {
+        $cfgDir = $this->pmssMakeTempDir('pmss-journald-cfg-');
+        $targetDir = $this->pmssMakeTempDir('pmss-journald-journald-');
+        $foreign = $this->pmssMakeTempFile('pmss-journald-foreign-');
+        file_put_contents($foreign, 'foreign');
+        file_put_contents($cfgDir.'/template.journald.conf.d-pmss-limits.conf', "[Journal]\nSystemMaxUse=%%PMSS_JOURNALD_SYSTEM_MAX_USE%%\n");
+        $this->pmssCreateSymlinkOrSkip($foreign, $targetDir.'/pmss-limits.conf');
+
+        $this->pmssWithEnv([
+            'PMSS_CONFIG_DIR' => $cfgDir,
+            'PMSS_JOURNALD_CONF_DIR' => $targetDir,
+            'PMSS_ROOT_FS_BYTES' => (string) $this->gib(10),
+        ], function (): void {
+            $this->assertThrowsRuntime(static function (): void {
+                \pmssApplyJournaldLimits();
+            }, 'journald_limits_write_failed');
+        });
+
+        $this->assertSame('foreign', file_get_contents($foreign), 'must not write through symlinked journald target');
     }
 }

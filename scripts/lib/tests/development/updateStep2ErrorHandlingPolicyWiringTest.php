@@ -10,7 +10,7 @@ class UpdateStep2ErrorHandlingPolicyWiringTest extends TestCase
     {
         $this->pmssAssertRepoFileContractCases([
             'scripts/lib/update/runtime/stepPolicy.php' => ['required' => ['PMSS_UPDATE_STEP_CLASS_SOFT_FAIL', 'PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED', 'PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING', 'pmssUpdateStep2ClassificationIsKnown', 'unknown_classification', 'pmssUpdateStep2HandleClassifiedFailure']],
-            'scripts/util/update-step2.php' => ['required' => ["require_once __DIR__.'/../lib/update/runtime/stepPolicy.php';", "pmssRunProfiledCallable('Applying runtime service templates', 'pmssApplyRuntimeTemplates', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);", "pmssRunProfiledCallable('Configuring web stack', 'pmssConfigureWebStack', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);"]],
+            'scripts/util/update-step2.php' => ['required' => ["require_once __DIR__.'/../lib/update/runtime/stepPolicy.php';", "pmssRunProfiledCallable('Applying runtime service templates', 'pmssApplyRuntimeTemplates', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);", "pmssRunProfiledCallable('Applying journald runtime limits', 'pmssApplyJournaldLimits', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);", "pmssRunProfiledCallable('Configuring web stack', 'pmssConfigureWebStack', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);"]],
         ]);
         $this->pmssAssertRepoFileSubstringCountAtLeast(
             'scripts/util/update-step2.php',
