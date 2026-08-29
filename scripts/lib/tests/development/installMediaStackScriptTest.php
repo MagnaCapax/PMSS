@@ -473,6 +473,34 @@ LIGHTTPD;
         ], $output);
     }
 
+    public function testUninstallRemovesRuntimeArtifactsAndPreservesCredentials(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-uninstall-home-');
+        $bin = $this->pmssMakeTempDir('pmss-media-stack-uninstall-bin-');
+        $this->pmssWriteFile($home.'/.install-media-stack.log', "old installer output\n");
+        $this->pmssWriteFile($home.'/.media-stack-status.json', "{\"state\":\"failed\"}\n");
+        $this->pmssWriteFile($home.'/.media-stack-credentials.txt', "preserve\n");
+        foreach (array('tmux', 'pkill') as $command) {
+            $this->pmssWriteExecutableFile($bin.'/'.$command, "#!/usr/bin/env bash\nexit 0\n");
+        }
+
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'export HOME='.escapeshellarg($home),
+            'export PATH='.escapeshellarg($bin).':/usr/bin:/bin',
+            '/bin/bash '.escapeshellarg($this->pmssRepoPath('etc/skel/install-media-stack.sh')).' --uninstall',
+            '',
+        ));
+
+        $output = $this->pmssRunShellHarness($script);
+
+        $this->assertStringContainsString('PMSS media stack uninstall complete.', $output);
+        $this->assertFalse(file_exists($home.'/.install-media-stack.log'));
+        $this->assertFalse(file_exists($home.'/.media-stack-status.json'));
+        $this->assertSame("preserve\n", (string) file_get_contents($home.'/.media-stack-credentials.txt'));
+    }
+
     public function testJellyfinConfigResetUsesExactPathGuard(): void
     {
         $removedHelper = 'jellyfin_config_dir_reset_target'.'_is_safe';

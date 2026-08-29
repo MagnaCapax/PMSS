@@ -983,7 +983,8 @@ media_stack_memory_preflight_guard() {
 
 media_stack_managed_paths() {
 	printf '%s\n' "$HOME/.bin/cloudplow" "$HOME/.bin/sabnzbd" "$HOME/.bin/Radarr" "$HOME/.bin/Prowlarr" "$HOME/.bin/Sonarr" "$HOME/.bin/dotnet" "$HOME/.bin/jellyfin" \
-		"$HOME/.bin/autobrr" "$HOME/.config/cloudplow" "$HOME/.config/sabnzbd" "$HOME/.config/radarr" "$HOME/.config/prowlarr" "$HOME/.config/sonarr" "$HOME/.config/jellyfin" "$HOME/.config/autobrr" "$HOME/.lighttpd/custom.d/media-stack.conf"
+		"$HOME/.bin/autobrr" "$HOME/.config/cloudplow" "$HOME/.config/sabnzbd" "$HOME/.config/radarr" "$HOME/.config/prowlarr" "$HOME/.config/sonarr" "$HOME/.config/jellyfin" "$HOME/.config/autobrr" "$HOME/.lighttpd/custom.d/media-stack.conf" \
+		"$HOME/.install-media-stack.log" "$HOME/.media-stack-status.json"
 }
 
 media_stack_managed_path_allowed() {

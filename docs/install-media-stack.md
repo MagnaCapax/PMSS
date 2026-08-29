@@ -17,7 +17,7 @@ All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to
 - Idempotent: re‑runs converge to the same state; dry‑run exists for verification.
 - Safe defaults: localhost binding; randomized high ports; aliases to launch in `tmux`.
 - Memory pre-flight: accounts below 1024 MiB are warned and must use `--force` from SSH.
-- Uninstall path: `--uninstall` stops media-stack sessions, removes PMSS-managed app/config paths, and backs up/strips managed shell aliases.
+- Uninstall path: `--uninstall` stops media-stack sessions, removes PMSS-managed app/config and runtime-status paths, and backs up/strips managed shell aliases.
 - Servarr update policy: Radarr, Sonarr, and Prowlarr use the external update mechanism and disable automatic in-place updates; rerun this installer to update them safely.
 - App-level authentication: the installer generates per-app passwords, configures auth before the public proxy is restarted, and writes credentials to `~/.media-stack-credentials.txt` with mode `600`.
 - Logging: colored console output and log tee to `~/.install-media-stack.log`.
@@ -207,10 +207,10 @@ Run from SSH:
 - `bash install-media-stack.sh --uninstall`
 - Add `--dry-run` to preview the cleanup without removing files.
 
-The uninstall mode stops the media-stack `tmux` sessions, removes only the PMSS-managed app directories under `~/.bin`, removes the matching config directories under `~/.config`, removes `~/.lighttpd/custom.d/media-stack.conf`, and backs up `~/.bashrc.custom` before stripping the installer-managed alias/PATH blocks. It does not remove unrelated files from `~/.bin`, `~/.config`, or user-owned lighttpd custom fragments.
+The uninstall mode stops the media-stack `tmux` sessions, removes only the PMSS-managed app directories under `~/.bin`, removes the matching config directories under `~/.config`, removes `~/.lighttpd/custom.d/media-stack.conf`, clears the installer log and watchdog status snapshot, and backs up `~/.bashrc.custom` before stripping the installer-managed alias/PATH blocks. It does not remove credentials, unrelated files from `~/.bin` or `~/.config`, or user-owned lighttpd custom fragments.
 
 ## Troubleshooting
-- Check `~/.install-media-stack.log` for a full run transcript.
+- Before uninstalling, check `~/.install-media-stack.log` for a full run transcript.
 - Use `--dry-run` to verify endpoint reachability and planned actions.
 - If the installer reports a low memory limit, use a larger plan for the full stack. `--force` is available for deliberate SSH-only installs, but throttling can make rtorrent and the panel unresponsive on small accounts.
 - Use `--uninstall` to remove a user-local media stack that was installed on an unsuitable account.
