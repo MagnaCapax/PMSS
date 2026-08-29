@@ -97,6 +97,7 @@ class CustomerBackupTest extends TestCase
         $pageState = strpos($welcome, '$pageState = pmssWelcomePageStateBuild();');
 
         $this->assertTrue($route !== false && $pageState !== false && $route < $pageState, 'Backup response must run before welcome HTML rendering.');
+        $this->assertSame(1, substr_count($welcome, 'name="configBackup'), 'Welcome must expose only the streamed backup control.');
         $this->assertStringContainsAllStrings(array(
             '<form method="get" action="welcome.php">',
             '<input type="hidden" name="backup" value="download" />',
