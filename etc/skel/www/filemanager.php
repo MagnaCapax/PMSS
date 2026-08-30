@@ -540,7 +540,6 @@ if (isset($_POST['ajax']) && !FM_READONLY) {
         }
 
         $url = !empty($_REQUEST["uploadurl"]) && preg_match("|^http(s)?://.+$|", stripslashes($_REQUEST["uploadurl"])) ? stripslashes($_REQUEST["uploadurl"]) : null;
-        $use_curl = false;
         $temp_file = tempnam(sys_get_temp_dir(), "upload-");
         $fileinfo = new stdClass();
         $fileinfo->name = trim(basename($url), ".\x00..\x20");
@@ -567,30 +566,7 @@ if (isset($_POST['ajax']) && !FM_READONLY) {
             exit();
         }
 
-        if (!$url) {
-            $success = false;
-        } else if ($use_curl) {
-            @$fp = fopen($temp_file, "w");
-            @$ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_NOPROGRESS, false );
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_FILE, $fp);
-            @$success = curl_exec($ch);
-            $curl_info = curl_getinfo($ch);
-            if (!$success) {
-                $err = array("message" => curl_error($ch));
-            }
-            @curl_close($ch);
-            fclose($fp);
-            $fileinfo->size = $curl_info["size_download"];
-            $fileinfo->type = $curl_info["content_type"];
-        } else {
-            $ctx = stream_context_create();
-            @$success = copy($url, $temp_file, $ctx);
-            if (!$success) {
-                $err = error_get_last();
-            }
-        }
+        $success = $url ? fm_remote_url_download($url, $temp_file, $fileinfo, $err) : false;
 
         if ($success) {
             $success = rename($temp_file, get_file_path());
@@ -2098,6 +2074,228 @@ fm_show_footer();
 //--- END
 
 // Functions
+
+/**
+ * Return whether a packed address belongs to the given CIDR range.
+ *
+ * @param string $address Packed address from inet_pton().
+ * @param string $network Network address in text form.
+ * @param int $prefix Prefix length in bits.
+ * @return bool
+ */
+function fm_remote_url_address_in_range($address, $network, $prefix)
+{
+    $networkAddress = inet_pton($network);
+    if ($networkAddress === false || strlen($address) !== strlen($networkAddress)) {
+        return false;
+    }
+
+    $length = strlen($address);
+    if ($prefix < 0 || $prefix > $length * 8) {
+        return false;
+    }
+
+    $wholeBytes = (int) floor($prefix / 8);
+    if ($wholeBytes > 0 && substr($address, 0, $wholeBytes) !== substr($networkAddress, 0, $wholeBytes)) {
+        return false;
+    }
+
+    $remainingBits = $prefix % 8;
+    if ($remainingBits === 0) {
+        return true;
+    }
+
+    $mask = (0xff << (8 - $remainingBits)) & 0xff;
+    return (ord($address[$wholeBytes]) & $mask) === (ord($networkAddress[$wholeBytes]) & $mask);
+}
+
+/**
+ * Accept only globally-routable IPv4 and IPv6 destination addresses.
+ *
+ * @param string $address Address in text form.
+ * @return bool
+ */
+function fm_remote_url_address_is_public($address)
+{
+    $packed = inet_pton($address);
+    if ($packed === false) {
+        return false;
+    }
+
+    if (strlen($packed) === 4) {
+        $blocked = array(
+            '0.0.0.0/8', '10.0.0.0/8', '100.64.0.0/10', '127.0.0.0/8',
+            '169.254.0.0/16', '172.16.0.0/12', '192.0.0.0/24', '192.0.2.0/24',
+            '192.168.0.0/16', '198.18.0.0/15', '198.51.100.0/24',
+            '203.0.113.0/24', '224.0.0.0/3',
+        );
+    } else {
+        // Global unicast is 2000::/3; exclude special-purpose ranges inside it.
+        if (!fm_remote_url_address_in_range($packed, '2000::', 3)) {
+            return false;
+        }
+        $blocked = array('2001::/23', '2001:db8::/32', '2002::/16', '3fff::/20');
+    }
+
+    foreach ($blocked as $range) {
+        list($network, $prefix) = explode('/', $range, 2);
+        if (fm_remote_url_address_in_range($packed, $network, (int) $prefix)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Parse and resolve a remote URL into public addresses suitable for pinning.
+ *
+ * @param string $url User-supplied URL.
+ * @return array|false
+ */
+function fm_remote_url_target($url)
+{
+    if (!is_string($url) || $url === '' || preg_match('/[\x00-\x20\x7f\\\\]/', $url)) {
+        return false;
+    }
+
+    $parts = parse_url($url);
+    if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+        return false;
+    }
+
+    $scheme = strtolower($parts['scheme']);
+    if ($scheme !== 'http' && $scheme !== 'https') {
+        return false;
+    }
+
+    $host = strtolower(trim($parts['host'], '[]'));
+    $port = isset($parts['port']) ? (int) $parts['port'] : ($scheme === 'https' ? 443 : 80);
+    if ($host === '' || $port < 1 || $port > 65535) {
+        return false;
+    }
+
+    $literal = filter_var($host, FILTER_VALIDATE_IP) !== false;
+    if ($literal) {
+        $addresses = array($host);
+    } else {
+        $dnsHost = rtrim($host, '.');
+        if (filter_var($dnsHost, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) === false) {
+            return false;
+        }
+        $records = dns_get_record($dnsHost.'.', DNS_A | DNS_AAAA);
+        if (!is_array($records)) {
+            return false;
+        }
+        $addresses = array();
+        foreach ($records as $record) {
+            $address = isset($record['ip']) ? $record['ip'] : (isset($record['ipv6']) ? $record['ipv6'] : null);
+            if ($address !== null) {
+                $addresses[] = $address;
+            }
+        }
+    }
+
+    $addresses = array_values(array_unique($addresses));
+    if (empty($addresses)) {
+        return false;
+    }
+    foreach ($addresses as $address) {
+        if (!fm_remote_url_address_is_public($address)) {
+            return false;
+        }
+    }
+
+    return array('host' => $host, 'port' => $port, 'addresses' => $addresses, 'literal' => $literal);
+}
+
+/**
+ * Download a URL while pinning each validated hop and rejecting unsafe redirects.
+ *
+ * @param string $url User-supplied URL.
+ * @param string $tempFile Destination temporary file.
+ * @param stdClass $fileinfo Download metadata updated on success.
+ * @param mixed $err Error payload updated on failure.
+ * @return bool
+ */
+function fm_remote_url_download($url, $tempFile, $fileinfo, &$err)
+{
+    if (!function_exists('curl_init')) {
+        $err = array('message' => 'Remote URL downloads are unavailable');
+        return false;
+    }
+
+    for ($redirects = 0; $redirects <= 5; $redirects++) {
+        $target = fm_remote_url_target($url);
+        if ($target === false) {
+            $err = array('message' => 'Remote URL is not allowed');
+            return false;
+        }
+
+        $fp = fopen($tempFile, 'wb');
+        $ch = $fp !== false ? curl_init($url) : false;
+        if ($fp === false || $ch === false) {
+            if (is_resource($fp)) {
+                fclose($fp);
+            }
+            $err = array('message' => 'Remote download could not be started');
+            return false;
+        }
+
+        $options = array(
+            CURLOPT_FILE => $fp,
+            CURLOPT_FAILONERROR => true,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+            CURLOPT_PROXY => '',
+        );
+        if (!$target['literal']) {
+            $pinned = array_map(static function ($address) {
+                return strpos($address, ':') !== false ? '['.$address.']' : $address;
+            }, $target['addresses']);
+            $options[CURLOPT_RESOLVE] = array(
+                $target['host'].':'.$target['port'].':'.implode(',', $pinned),
+            );
+        }
+
+        $configured = curl_setopt_array($ch, $options);
+        $success = $configured ? curl_exec($ch) : false;
+        $curlInfo = curl_getinfo($ch);
+        curl_close($ch);
+        fclose($fp);
+
+        $primaryIp = isset($curlInfo['primary_ip']) ? $curlInfo['primary_ip'] : '';
+        $primaryPacked = inet_pton($primaryIp);
+        $addressMatch = false;
+        foreach ($target['addresses'] as $address) {
+            if ($primaryPacked !== false && $primaryPacked === inet_pton($address)) {
+                $addressMatch = true;
+                break;
+            }
+        }
+        if (!$success || !$addressMatch) {
+            $err = array('message' => 'Remote download failed');
+            return false;
+        }
+
+        $status = isset($curlInfo['http_code']) ? (int) $curlInfo['http_code'] : 0;
+        $redirectUrl = isset($curlInfo['redirect_url']) ? $curlInfo['redirect_url'] : '';
+        if ($status >= 300 && $status < 400 && $redirectUrl !== '') {
+            if ($redirects === 5) {
+                $err = array('message' => 'Remote URL redirected too many times');
+                return false;
+            }
+            $url = $redirectUrl;
+            continue;
+        }
+
+        $fileinfo->size = isset($curlInfo['size_download']) ? $curlInfo['size_download'] : filesize($tempFile);
+        $fileinfo->type = isset($curlInfo['content_type']) ? $curlInfo['content_type'] : null;
+        return true;
+    }
+
+    return false;
+}
 
 /**
  * Check if the filename is allowed.
