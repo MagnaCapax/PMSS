@@ -132,6 +132,7 @@ issue_numbers_bug=()
 issue_numbers_security=()
 issue_numbers_stability=()
 issue_numbers_other=()
+declare -A issue_build_ready=()
 raw_candidate_count=0
 
 has_label() {
@@ -171,6 +172,13 @@ if [[ -z "$target_issue" ]]; then
 		# merely contains one of these words (e.g. "Investigation panel returns 500"). Routing is
 		# now by LABEL (a judgment signal applied by a human/review), not a brittle title keyword.
 		# Ref: PMSS#350 verdict + sysadmin session 5fd7ea81.
+
+		# Track `build-ready` (converged, adversarial-review PROCEED) so the
+		# selection below can build these BEFORE unconverged issues instead of
+		# leaving them to compete at random and languish (GH #807 class).
+		if has_label "$labels_csv" "build-ready"; then
+			issue_build_ready["$num"]=1
+		fi
 
 		if has_label "$labels_csv" "bug"; then
 			issue_numbers_bug+=("$num")
@@ -280,10 +288,31 @@ if [[ -z "$target_issue" ]]; then
 		exit 0
 	fi
 
-	# Randomize within the selected priority tier, then cap actual work.
-	if [[ ${#approved_issues[@]} -gt 1 ]] && command -v shuf >/dev/null 2>&1; then
-		mapfile -t approved_issues < <(printf '%s\n' "${approved_issues[@]}" | shuf)
+	# Prioritise converged `build-ready` issues: build them BEFORE unconverged
+	# ones instead of letting them compete at random and languish (GH #807 sat
+	# build-ready+unbuilt for a week). Partition the approved tier build-ready-first,
+	# randomize WITHIN each partition to keep anti-starvation fairness among equals,
+	# then cap. An unbuildable build-ready issue is self-limited by the existing
+	# needs-investigation/blocked relabel (jq-excluded above) — no cooldown needed.
+	ready_issues=()
+	rest_issues=()
+	for num in "${approved_issues[@]}"; do
+		if [[ -n "${issue_build_ready[$num]:-}" ]]; then
+			ready_issues+=("$num")
+		else
+			rest_issues+=("$num")
+		fi
+	done
+	if command -v shuf >/dev/null 2>&1; then
+		if [[ ${#ready_issues[@]} -gt 1 ]]; then
+			mapfile -t ready_issues < <(printf '%s\n' "${ready_issues[@]}" | shuf)
+		fi
+		if [[ ${#rest_issues[@]} -gt 1 ]]; then
+			mapfile -t rest_issues < <(printf '%s\n' "${rest_issues[@]}" | shuf)
+		fi
 	fi
+	approved_issues=("${ready_issues[@]}" "${rest_issues[@]}")
+	echo "[agentic-issues] build-ready prioritised: ${#ready_issues[@]} ready, ${#rest_issues[@]} other" >&1
 	if [[ ${#approved_issues[@]} -gt "$max_issues" ]]; then
 		approved_issues=("${approved_issues[@]:0:max_issues}")
 	fi
