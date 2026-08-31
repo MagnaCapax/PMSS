@@ -196,6 +196,7 @@ PHP;
     $files = [
         '.rtorrentExecute.php',
         '.rtorrentRestart.php',
+        '.rtorrentThrottleInit.php',
         '.bashrc',
         'install-media-stack.sh',
         'install-ai-tools.sh',

@@ -11,3 +11,5 @@ log.open_file = "rtorrent.log", (cat,~/.logs/rtorrent.log.,(system.time))
 log.add_output = "storage_critical", "rtorrent.log"
 log.add_output = "socket_critical", "rtorrent.log"
 
+# Restore cached ruTorrent channel rates once its SCGI socket is ready.
+schedule2 = throttle_init,5,0,"execute.nothrow=sh,-c,php ~/.rtorrentThrottleInit.php& exit 0"

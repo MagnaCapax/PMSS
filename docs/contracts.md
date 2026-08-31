@@ -471,6 +471,13 @@ read-only probes used by baseline sanitization and source-build guards.
 
 ## rTorrent Configuration – `scripts/lib/rtorrentConfig.php`
 
+- `etc/skel/.rtorrentThrottleInit.php`
+  - Runs once in the background from the skeleton `.rtorrent.rc.custom` five seconds after rTorrent starts, so rTorrent remains free to serve the helper's SCGI request.
+  - Derives the customer name from the executing UID, loads the customer's existing ruTorrent throttle plugin, and re-applies its cached named channel rates through `rThrottle::obtain()`.
+  - Direct customer-defined `throttle.up`, `throttle.down`, `throttle_up`, or `throttle_down` entries in `.rtorrent.rc.custom` suppress the cached plugin restore so supported customer overrides remain authoritative.
+  - Missing plugin files, invalid account names, and plugin failures exit non-zero without loading operator-only `/scripts` code or preventing rTorrent startup.
+  - Ongoing user maintenance distributes the helper and refreshes only known unmodified legacy `.rtorrent.rc.custom` defaults; customer-edited overrides remain untouched.
+
 Class `rtorrentConfig`
 - __construct(array $resourceConfig=[], ?string $template=null)
   - Loads default resource JSON (`/etc/seedbox/config/rtorrent.resources.json`) and template (`/etc/seedbox/config/template.rtorrent.rc`) when not provided; validates and fills defaults via `_checkResourceConfig()`.

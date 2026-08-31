@@ -50,16 +50,31 @@ class UserUpdatePermissionsTest extends TestCase
         }
     }
 
-    public function testRefreshPermissionsUpdatesLegacyFile(): void
+    public function testRefreshPermissionsPlansCurrentSkeletonMigration(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-perm-');
-        file_put_contents($home.'/.rtorrent.rc.custom', "legacy");
-        $this->pmssWithEnv(['PMSS_SKEL_DIR' => $home], function () use ($home): void {
-            file_put_contents($home.'/.rtorrent.rc.custom', 'legacy');
-            $ctx = $this->pmssUserUpdateContext($home);
-            \pmssUserRefreshPermissions($ctx);
-        });
-        $this->assertTrue(true);
+        $skeleton = $this->pmssReadRepoFile('etc/skel/.rtorrent.rc.custom');
+        $hookBlock = <<<'RC'
+
+# Restore cached ruTorrent channel rates once its SCGI socket is ready.
+schedule2 = throttle_init,5,0,"execute.nothrow=sh,-c,php ~/.rtorrentThrottleInit.php& exit 0"
+RC;
+        $legacy = str_replace($hookBlock, '', $skeleton, $replacements);
+
+        $this->assertSame(1, $replacements, 'Expected one throttle startup hook in the skeleton');
+        $this->assertSame('81d37b0b09345e3bfa5c2e79e66a3ef055f65905', sha1($legacy));
+        $result = $this->runRefreshPermissionsWithStepRc(0, $legacy);
+
+        $this->assertEquals(
+            ['Refreshing user permissions', 'Updating .rtorrent.rc.custom from skeleton'],
+            $result['descriptions']
+        );
+    }
+
+    public function testRefreshPermissionsPreservesCustomizedRtorrentConfig(): void
+    {
+        $result = $this->runRefreshPermissionsWithStepRc(0, "# customer override\n");
+
+        $this->assertEquals(['Refreshing user permissions'], $result['descriptions']);
     }
 
     public function testRefreshPermissionsKeepsNonTimeoutFailureSoft(): void
@@ -108,13 +123,17 @@ class UserUpdatePermissionsTest extends TestCase
     /**
      * Run the permission helper in a subprocess so the runUserStep shim is deterministic.
      */
-    private function runRefreshPermissionsWithStepRc(int $rc): array
+    private function runRefreshPermissionsWithStepRc(int $rc, ?string $rcCustomContent = null): array
     {
         $repoRoot = $this->pmssRepoRoot();
         $script = <<<'PHP'
 $repoRoot = __REPO_ROOT__;
 $home = sys_get_temp_dir().'/pmss-perm-rc-'.bin2hex(random_bytes(4));
 @mkdir($home, 0755, true);
+$rcCustomContent = __RC_CUSTOM_CONTENT__;
+if ($rcCustomContent !== null) {
+    file_put_contents($home.'/.rtorrent.rc.custom', $rcCustomContent);
+}
 $GLOBALS['PMSS_STEPS'] = [];
 function runUserStep(string $user, string $description, string $command): int
 {
@@ -137,8 +156,8 @@ PHP;
 
         return $this->pmssRunInlinePhpJson(
             str_replace(
-                ['__REPO_ROOT__', '__STEP_RC__'],
-                [var_export($repoRoot, true), (string) $rc],
+                ['__REPO_ROOT__', '__STEP_RC__', '__RC_CUSTOM_CONTENT__'],
+                [var_export($repoRoot, true), (string) $rc, var_export($rcCustomContent, true)],
                 $script
             ),
             $this->pmssTestModeEnv()
