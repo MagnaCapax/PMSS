@@ -123,6 +123,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Uses the same direct-I/O probe, parses per-request latency samples, and
     returns their median in milliseconds. Falls back to the summary average
     when older/stubbed output lacks individual sample lines.
+- pmssSystemStatsHostPressureSnapshotWrite(string $path, array $stats, ?int $timestamp=null): bool
+  - Atomically writes a mode-0644 customer-readable JSON snapshot containing
+    only timestamp, five-minute full I/O PSI, and `/home` ioping latency.
+  - Rejects unsafe/symlinked targets through the shared managed-file writer.
 
 - pmssRecordProfile(array $entry): void → lazily initializes `$GLOBALS['PMSS_PROFILE']`, appends the entry, and emits JSON `step` event.
 - pmssProfileSummary(): void → logs status counts and top 5 durations; writes full JSON to `PMSS_PROFILE_OUTPUT` or `(<PMSS_JSON_LOG>.profile.json)`.
@@ -714,6 +718,12 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - `pmssWelcomeServerInfoHtmlBuild()` renders host uptime plus the 1/5/15-minute load averages after the per-account RAM section.
 - Load is explicitly labeled as shared-server data rather than a per-account metric.
 - `/proc/uptime` and `/proc/loadavg` are read directly from the customer tree without shelling; each unavailable or malformed metric fails soft to `unavailable` without hiding the other metric.
+- `pmssStorageHealthNoticeHtmlRead()` renders the existing `/home` RAID
+  degradation/resync notice first, otherwise a host-pressure notice when the
+  fresh root-produced snapshot reports five-minute full I/O PSI of at least
+  20% or `/home` median ioping latency above 100 ms.
+- Host-pressure snapshots older than 15 minutes, future-dated, malformed, or
+  symlinked fail soft to no notice; customer PHP never loads operator `/scripts`.
 
 ## Customer Torrent-State Backup – `etc/skel/www/scriptsInc.php` and `welcome.php`
 

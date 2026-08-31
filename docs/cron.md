@@ -75,6 +75,10 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   cron template runs it twice daily (06:00 and 18:00), and the PMSS logrotate
   policy retains the JSONL plus the cron wrapper log.
 - `processSnapshot.php` – Append process tree snapshots for postmortem analysis (root-only log at `/var/log/pmss/process-snapshot.log`).
+- `systemStatsLog.php` – Record host PSI, ioping, load, memory, and disk-busy
+  metrics every five minutes. It also atomically refreshes the narrow mode-0644
+  `/var/log/pmss/host-pressure.json` snapshot consumed by customer-panel
+  storage-pressure notices.
 - `quotaSnapshot.php` – Append daily quota usage snapshots (machine-parseable; root-only log at `/var/log/pmss/quota-daily.log`).
 - `resourceLog.php` – Capture per-user CPU, memory, and I/O samples every five minutes into the resource metering pipeline.
 - `resourceStats.php` – Fold raw resource samples into per-user aggregates twice per hour.

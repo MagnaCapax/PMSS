@@ -1,11 +1,12 @@
 <?php
 /**
- * Customer-side storage-health notice for the /home RAID array.
+ * Customer-side storage-health notices for the /home RAID array and host I/O.
  *
  * Reads /proc/mounts and /proc/mdstat (both world-readable kernel paths)
  * to detect whether the customer's /home is on an md array that's
- * currently degraded, resyncing, rebuilding, or reshaping. Returns
- * rendered HTML for info.php / welcome.php to embed in the panel.
+ * currently degraded, resyncing, rebuilding, or reshaping. It also reads the
+ * narrow host-pressure snapshot written by root cron. Returns rendered HTML
+ * for info.php / welcome.php to embed in the panel.
  *
  * Lives in etc/skel/www/ because customer PHP runs as the customer UID
  * and cannot traverse /scripts/ (operator-only). The chained operator-side
@@ -185,5 +186,96 @@ HTML;
     <p>If possible, avoid heavy disk activity until the array work completes. Lighter use helps the maintenance finish sooner.</p>
 </div>
 HTML;
+    }
+}
+
+if (!function_exists('pmssStorageHealthHostPressureMetricFloat')) {
+    /** Normalize one customer-readable pressure metric at the trust boundary. */
+    function pmssStorageHealthHostPressureMetricFloat($value): ?float
+    {
+        if (!is_scalar($value) || !is_numeric((string) $value)) {
+            return null;
+        }
+        $number = (float) $value;
+        return is_finite($number) && $number >= 0 ? $number : null;
+    }
+}
+
+if (!function_exists('pmssStorageHealthHostPressureStateRead')) {
+    /**
+     * Read a fresh host-pressure snapshot and return only alerting signals.
+     *
+     * Latency above the storage benchmark's 100ms idle gate alerts here. A
+     * 20% full PSI average means all non-idle tasks stalled for at least one
+     * minute of the five-minute window, avoiding transient warning churn.
+     */
+    function pmssStorageHealthHostPressureStateRead(
+        string $path = '/var/log/pmss/host-pressure.json',
+        ?int $now = null
+    ): ?array {
+        $raw = pmssCustomerFileRead($path);
+        if (!is_string($raw) || $raw === '' || strlen($raw) > 4096) {
+            return null;
+        }
+        $payload = pmssJsonDecodeAssoc($raw);
+        $timestamp = is_array($payload)
+            ? pmssCustomerUnsignedIntegerValue($payload['timestamp'] ?? null)
+            : null;
+        $now = $now ?? time();
+        if ($timestamp === null || $now <= 0 || $timestamp > $now || ($now - $timestamp) > 900) {
+            return null;
+        }
+
+        $psi = pmssStorageHealthHostPressureMetricFloat($payload['psi_io_full_avg300'] ?? null);
+        $latency = pmssStorageHealthHostPressureMetricFloat($payload['ioping_home_ms'] ?? null);
+        $state = ['timestamp' => $timestamp];
+        if ($psi !== null && $psi >= 20.0) $state['psi_io_full_avg300'] = $psi;
+        if ($latency !== null && $latency > 100.0) $state['ioping_home_ms'] = $latency;
+        return count($state) > 1 ? $state : null;
+    }
+}
+
+if (!function_exists('pmssStorageHealthHostPressureNoticeHtmlBuild')) {
+    /** Build a shared-server I/O pressure notice from validated alert state. */
+    function pmssStorageHealthHostPressureNoticeHtmlBuild($state): string
+    {
+        if (!is_array($state)) return '';
+
+        $details = [];
+        if (isset($state['psi_io_full_avg300'])) {
+            $details[] = 'I/O wait: '.number_format((float) $state['psi_io_full_avg300'], 1, '.', '').'% of the last 5 minutes';
+        }
+        if (isset($state['ioping_home_ms'])) {
+            $details[] = 'Storage response: '.number_format((float) $state['ioping_home_ms'], 1, '.', '').' ms';
+        }
+        if (empty($details)) return '';
+
+        $detailHtml = pmssCustomerHtmlAttr(implode(' | ', $details));
+        return <<<HTML
+<div class="pmss-raid-notice pmss-host-pressure-notice" role="status" aria-live="polite">
+    <strong><span class="pmss-raid-icon" aria-hidden="true">&#10071;</span> Shared storage is under heavy load</strong>
+    <p>Disk-backed services may respond more slowly while the server-wide I/O queue clears. Repeated service restarts will not make this condition clear faster.</p>
+    <div class="pmss-raid-meta">{$detailHtml}</div>
+</div>
+HTML;
+    }
+}
+
+if (!function_exists('pmssStorageHealthNoticeHtmlRead')) {
+    /** Prefer the specific /home RAID explanation over a generic pressure alert. */
+    function pmssStorageHealthNoticeHtmlRead(
+        ?string $mountsPath = null,
+        ?array $raidEntries = null,
+        string $hostPressurePath = '/var/log/pmss/host-pressure.json',
+        ?int $now = null
+    ): string {
+        $raidHtml = pmssStorageHealthHomeRaidNoticeHtmlBuild(
+            pmssStorageHealthHomeRaidActivity($mountsPath, $raidEntries)
+        );
+        if ($raidHtml !== '') return $raidHtml;
+
+        return pmssStorageHealthHostPressureNoticeHtmlBuild(
+            pmssStorageHealthHostPressureStateRead($hostPressurePath, $now)
+        );
     }
 }

@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once dirname(__DIR__, 2).'/systemStats.php';
+require_once dirname(__DIR__, 2).'/systemStats/hostPressure.php';
 
 class SystemStatsCollectTest extends TestCase
 {
@@ -199,5 +200,56 @@ class SystemStatsCollectTest extends TestCase
         $this->assertFalse(\pmssSystemStatsAppendLogLine($dir, 'blocked'));
         $this->assertFalse(\pmssSystemStatsAppendLogLine('relative.log', 'blocked'));
         $this->assertFalse(\pmssSystemStatsAppendLogLine($dir."/bad\0path", 'blocked'));
+    }
+
+    public function testHostPressurePayloadKeepsOnlyCustomerSafeMetrics(): void
+    {
+        $payload = \pmssSystemStatsHostPressurePayloadBuild([
+            'psiIo' => '1.0/2.0/3.0/4.0/5.0/6.5/7/8',
+            'iopingHome' => '123.4ms',
+            'topMem' => 'private-process:1.0G',
+        ], 1234567890);
+
+        $this->assertSame([
+            'timestamp' => 1234567890,
+            'psi_io_full_avg300' => 6.5,
+            'ioping_home_ms' => 123.4,
+        ], $payload);
+    }
+
+    public function testHostPressurePayloadRejectsMalformedMetrics(): void
+    {
+        foreach ([
+            ['psiIo' => 'na', 'iopingHome' => 'na'],
+            ['psiIo' => '1/2/3/4/5/not-a-number/7/8', 'iopingHome' => '-1ms'],
+            ['psiIo' => '1/2/3/4/5/INF/7/8', 'iopingHome' => '10'],
+        ] as $stats) {
+            $payload = \pmssSystemStatsHostPressurePayloadBuild($stats, 1);
+            $this->assertSame(null, $payload['psi_io_full_avg300']);
+            $this->assertSame(null, $payload['ioping_home_ms']);
+        }
+    }
+
+    public function testHostPressureSnapshotUsesSafeWorldReadableFile(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-host-pressure-');
+        $path = $dir.'/host-pressure.json';
+        $stats = ['psiIo' => '1/2/3/4/5/6/7/8', 'iopingHome' => '100.0ms'];
+
+        $this->assertTrue(\pmssSystemStatsHostPressureSnapshotWrite($path, $stats, 100));
+        $this->pmssAssertArraySubsetSame([
+            'timestamp' => 100,
+            'psi_io_full_avg300' => 6,
+            'ioping_home_ms' => 100,
+        ], $this->pmssReadJsonArrayFile($path));
+        clearstatcache(true, $path);
+        $this->assertSame(0644, fileperms($path) & 0777);
+
+        $target = $dir.'/target';
+        $link = $dir.'/link';
+        $this->pmssWriteFile($target, "unchanged\n");
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+        $this->assertFalse(\pmssSystemStatsHostPressureSnapshotWrite($link, $stats, 101));
+        $this->assertSame("unchanged\n", file_get_contents($target));
     }
 }

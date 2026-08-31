@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once dirname(__DIR__, 2).'/storageHealth.php';
+require_once dirname(__DIR__, 4).'/etc/skel/www/storageHealthNotice.php';
 
 class StorageHealthHomeRaidActivityTest extends TestCase
 {
@@ -125,6 +126,89 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         ] as [$payload, $required, $forbidden]) {
             $this->assertStringContainsAndOmitsStrings($required, $forbidden, \pmssStorageHealthHomeRaidNoticeHtmlBuild($payload));
         }
+    }
+
+    private function hostPressurePath(array $payload): string
+    {
+        return $this->pmssWriteFile(
+            $this->tmpDir.'/host-pressure-'.bin2hex(random_bytes(3)).'.json',
+            json_encode($payload)."\n"
+        );
+    }
+
+    public function testHostPressureStateUsesConservativeThresholds(): void
+    {
+        $now = 2000;
+        $healthy = $this->hostPressurePath([
+            'timestamp' => $now,
+            'psi_io_full_avg300' => 19.9,
+            'ioping_home_ms' => 100.0,
+        ]);
+        $this->assertSame(null, \pmssStorageHealthHostPressureStateRead($healthy, $now));
+
+        foreach ([
+            ['field' => 'psi_io_full_avg300', 'value' => 20.0],
+            ['field' => 'ioping_home_ms', 'value' => 100.1],
+        ] as $case) {
+            $path = $this->hostPressurePath(['timestamp' => $now, $case['field'] => $case['value']]);
+            $state = \pmssStorageHealthHostPressureStateRead($path, $now);
+            $this->assertTrue(is_array($state), 'Expected threshold boundary to alert');
+            $this->assertTrue(isset($state[$case['field']]), 'Expected matching pressure signal');
+        }
+    }
+
+    public function testHostPressureStateRejectsStaleMalformedAndUnsafeSnapshots(): void
+    {
+        $now = 5000;
+        foreach ([
+            $this->hostPressurePath(['timestamp' => $now - 901, 'ioping_home_ms' => 500]),
+            $this->hostPressurePath(['timestamp' => $now + 1, 'ioping_home_ms' => 500]),
+            $this->pmssWriteFile($this->tmpDir.'/malformed.json', '{broken'),
+        ] as $path) {
+            $this->assertSame(null, \pmssStorageHealthHostPressureStateRead($path, $now));
+        }
+
+        $target = $this->hostPressurePath(['timestamp' => $now, 'ioping_home_ms' => 500]);
+        $link = $this->tmpDir.'/host-pressure-link.json';
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+        $this->assertSame(null, \pmssStorageHealthHostPressureStateRead($link, $now));
+    }
+
+    public function testHostPressureNoticeExplainsSharedServerCondition(): void
+    {
+        $html = \pmssStorageHealthHostPressureNoticeHtmlBuild([
+            'psi_io_full_avg300' => 25.25,
+            'ioping_home_ms' => 125.75,
+        ]);
+        $this->assertStringContainsAllStrings([
+            'Shared storage is under heavy load',
+            'server-wide I/O queue',
+            'I/O wait: 25.3% of the last 5 minutes',
+            'Storage response: 125.8 ms',
+        ], $html);
+        $this->assertSame('', \pmssStorageHealthHostPressureNoticeHtmlBuild([]));
+    }
+
+    public function testCombinedNoticePrefersSpecificRaidActivity(): void
+    {
+        $now = 9000;
+        $pressurePath = $this->hostPressurePath(['timestamp' => $now, 'ioping_home_ms' => 500]);
+        $raidHtml = \pmssStorageHealthNoticeHtmlRead(
+            $this->homeMountsPath('/dev/md1'),
+            [['array' => 'md1', 'resync' => 'resync = 50.0% finish=10min speed=1000K/sec']],
+            $pressurePath,
+            $now
+        );
+        $this->assertStringContainsString('Home storage maintenance in progress', $raidHtml);
+        $this->assertStringNotContainsString('Shared storage is under heavy load', $raidHtml);
+
+        $pressureHtml = \pmssStorageHealthNoticeHtmlRead(
+            $this->homeMountsPath('/dev/vda1'),
+            [],
+            $pressurePath,
+            $now
+        );
+        $this->assertStringContainsString('Shared storage is under heavy load', $pressureHtml);
     }
 
 }

@@ -54,7 +54,7 @@ $billingServiceId = $pageState['billingServiceId'];
 $trafficBandwidthState = $pageState['trafficBandwidthState'];
 $welcomeHeadingHtml = pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage);
 $announcementItemsHtml = pmssWelcomeAnnouncementItemsHtmlBuild();
-$homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
+$storageHealthNoticeHtml = pmssWelcomeStorageHealthNoticeHtmlRead();
 $managedApps = pmssCustomerManagedAppDefinitions();
 $guiFramesLocalOnly = is_file('../.guiFramesLocalOnly') && !is_link('../.guiFramesLocalOnly');
 $usageAlertsPermissions = @fileperms('../.usageAlertsEnabled');
@@ -528,7 +528,7 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
                     <div class="portfolioimg">
                         <?php
                         echo $welcomeHeadingHtml;
-                        echo $homeRaidNoticeHtml;
+                        echo $storageHealthNoticeHtml;
                         ?>
                         <h6>Basic Usage</h6>
                         <p><b>watch directory</b><br />
@@ -1052,12 +1052,17 @@ function pmssWelcomeContextualMessageBuild($quotaInfo) {
     return pmssWelcomeMessageForUser($quotaInfo, $userHome, $username);
 }
 
-function pmssWelcomeHomeRaidNoticeHtmlRead() {
+function pmssWelcomeStorageHealthNoticeHtmlRead() {
     // Customer-side storage-health notice (see storageHealthNotice.php).
     if (!pmssWelcomeRequireLocalHelper('storageHealthNotice.php')) {
         return '';
     }
 
+    if (function_exists('pmssStorageHealthNoticeHtmlRead')) {
+        return pmssStorageHealthNoticeHtmlRead();
+    }
+
+    // Preserve the RAID notice during staggered guiv delivery of the helper.
     if (!function_exists('pmssStorageHealthHomeRaidActivity')) {
         return '';
     }

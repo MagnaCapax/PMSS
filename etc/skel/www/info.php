@@ -11,18 +11,21 @@
  * Copyright (C) 2010-2025 Magna Capax Finland Oy
  */
 
-$pmssHomeRaidActivity = null;
-$pmssHomeRaidNoticeHtml = '';
+$pmssStorageHealthNoticeHtml = '';
 // Customer-side storage-health notice: see storageHealthNotice.php for rationale.
 // The full /scripts/lib/storageHealth.php (with SMART/NVMe paths) remains
-// operator-side; customer only needs the /proc/mdstat reader subset which
-// has been inlined.
+// operator-side; customer PHP reads only world-readable kernel state and the
+// narrow host-pressure artifact produced by root cron.
 $pmssStorageHealthNoticeLib = __DIR__.'/storageHealthNotice.php';
 if (file_exists($pmssStorageHealthNoticeLib)) {
     require_once $pmssStorageHealthNoticeLib;
-    if (function_exists('pmssStorageHealthHomeRaidActivity')) {
-        $pmssHomeRaidActivity = pmssStorageHealthHomeRaidActivity();
-        $pmssHomeRaidNoticeHtml = pmssStorageHealthHomeRaidNoticeHtmlBuild($pmssHomeRaidActivity);
+    if (function_exists('pmssStorageHealthNoticeHtmlRead')) {
+        $pmssStorageHealthNoticeHtml = pmssStorageHealthNoticeHtmlRead();
+    } elseif (function_exists('pmssStorageHealthHomeRaidActivity')) {
+        // Preserve the RAID notice during staggered guiv delivery of the helper.
+        $pmssStorageHealthNoticeHtml = pmssStorageHealthHomeRaidNoticeHtmlBuild(
+            pmssStorageHealthHomeRaidActivity()
+        );
     }
 }
 ?>
@@ -77,7 +80,7 @@ if (file_exists($pmssStorageHealthNoticeLib)) {
           <div class="full_body">
 <h1>Seedbox information</h1>
             <div class="portfoliobox">
-<?php if ($pmssHomeRaidNoticeHtml !== '') echo $pmssHomeRaidNoticeHtml; ?>
+<?php if ($pmssStorageHealthNoticeHtml !== '') echo $pmssStorageHealthNoticeHtml; ?>
 
 <div id="stats">
  <?php
