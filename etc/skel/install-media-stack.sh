@@ -1406,12 +1406,16 @@ media_stack_require_auth_seed_tools() {
 # the ready predicate must stay 2xx-only: the follow-up config read/PUT require a
 # migrated instance). Optional $session is a tmux session name: if given and the
 # session has exited, the app process died (e.g. OOM) so we fail fast instead of
-# polling the whole budget. Returns: 0 ready, 1 timeout, 2 process exited.
+# polling the whole budget. Optional $curl_config supplies owner-only request
+# headers without exposing credentials in process arguments. Returns: 0 ready,
+# 1 timeout, 2 process exited.
 media_stack_wait_http_ok() {
-	local url="$1" attempts="${2:-45}" session="${3:-}" attempt
+	local url="$1" attempts="${2:-45}" session="${3:-}" curl_config="${4:-}" attempt
+	local -a curl_options=()
+	[[ -n "$curl_config" ]] && curl_options=(--config "$curl_config")
 
 	for ((attempt = 1; attempt <= attempts; attempt++)); do
-		if curl -fsS --max-time 2 "$url" >/dev/null 2>&1; then
+		if curl -fsS --max-time 2 "${curl_options[@]}" "$url" >/dev/null 2>&1; then
 			return 0
 		fi
 		if [[ -n "$session" ]] && ! tmux has-session -t "$session" 2>/dev/null; then
@@ -1480,6 +1484,32 @@ servarr_config_auth_configured() {
 	return 1
 }
 
+servarr_api_key_curl_config_write() {
+	local config_file="$1" curl_config="$2" api_key
+	api_key=$(sed -n -E 's|.*<ApiKey>([^<]*)</ApiKey>.*|\1|p' "$config_file" 2>/dev/null | head -n 1)
+	[[ "$api_key" =~ ^[[:xdigit:]]{32}$ ]] || return 1
+
+	# Radarr, Sonarr and Prowlarr generate 32-character hexadecimal API keys.
+	# Keep the key in an owner-only curl config so it never appears in argv/logs.
+	(umask 077 && printf 'header = "X-Api-Key: %s"\n' "$api_key" >"$curl_config") || return 1
+	chmod 600 "$curl_config"
+}
+
+servarr_api_key_curl_config_wait() {
+	local config_file="$1" curl_config="$2" attempts="${3:-180}" session="${4:-}" attempt
+
+	for ((attempt = 1; attempt <= attempts; attempt++)); do
+		if servarr_api_key_curl_config_write "$config_file" "$curl_config"; then
+			return 0
+		fi
+		if [[ -n "$session" ]] && ! tmux has-session -t "$session" 2>/dev/null; then
+			return 2
+		fi
+		sleep 1
+	done
+	return 1
+}
+
 servarr_credentials_mark_existing_unknown() {
 	local app="$1" install_name="$2"
 
@@ -1507,7 +1537,7 @@ servarr_auth_seed() {
 	local app="$1" install_name="$2" dll="$3" desired_port="$4" api_version="$5" password="$6" extra_args="${7:-}"
 	local datadir="$HOME/.config/${app}"
 	local config_file="$datadir/config.xml"
-	local seed_port session base_url response_json payload_json put_code unauth_code run_args existing_password seed_wait_rc
+	local seed_port session base_url response_json payload_json curl_config put_code unauth_code run_args existing_password key_wait_rc seed_wait_rc
 
 	if servarr_config_auth_configured "$config_file"; then
 		existing_password=$(media_stack_credentials_value "$(media_stack_app_key "$app")_PASSWORD")
@@ -1524,6 +1554,8 @@ servarr_auth_seed() {
 	base_url="http://127.0.0.1:${seed_port}/api/${api_version}/config/host"
 	response_json=$(mktemp)
 	payload_json=$(mktemp)
+	curl_config=$(mktemp)
+	chmod 600 "$curl_config"
 
 	servarr_config_xml_tag_converge "$config_file" Port "$seed_port"
 	servarr_config_xml_tag_converge "$config_file" AuthenticationRequired Enabled
@@ -1532,16 +1564,30 @@ servarr_auth_seed() {
 	tmux new-session -d -s "$session" \
 		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/${install_name}\" && \"$DOTNET_ROOT_PATH/dotnet\" ${run_args} 2>&1 | tee -a \"$datadir/${app}-auth-seed.log\"" || {
 		log_err "Failed to start ${install_name} for local auth seeding"
-		rm -f "$response_json" "$payload_json"
+		rm -f "$response_json" "$payload_json" "$curl_config"
 		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 		return 1
 	}
+
+	servarr_api_key_curl_config_wait "$config_file" "$curl_config" 180 "$session"
+	key_wait_rc=$?
+	if [[ $key_wait_rc -ne 0 ]]; then
+		if [[ $key_wait_rc -eq 2 ]]; then
+			log_err "${install_name} auth-seed process exited before writing its API key; see $datadir/${app}-auth-seed.log"
+		else
+			log_err "${install_name} did not write a valid local API key within ~180s; see $datadir/${app}-auth-seed.log"
+		fi
+		tmux kill-session -t "$session" 2>/dev/null || true
+		rm -f "$response_json" "$payload_json" "$curl_config"
+		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
+		return 1
+	fi
 
 	# Cold .NET first-run (DB migration) on a contended host can take well over the
 	# old 45-attempt (~45s) budget; 180 gives headroom, and the session-aware fail
 	# fast returns early if the app dies, so the larger budget never idles on a
 	# corpse. Keep the abort fail-closed (never start an unauthenticated app).
-	media_stack_wait_http_ok "$base_url" 180 "$session"
+	media_stack_wait_http_ok "$base_url" 180 "$session" "$curl_config"
 	seed_wait_rc=$?
 	if [[ $seed_wait_rc -ne 0 ]]; then
 		if [[ $seed_wait_rc -eq 2 ]]; then
@@ -1550,31 +1596,31 @@ servarr_auth_seed() {
 			log_err "${install_name} did not expose its local auth configuration API within ~180s; see $datadir/${app}-auth-seed.log"
 		fi
 		tmux kill-session -t "$session" 2>/dev/null || true
-		rm -f "$response_json" "$payload_json"
+		rm -f "$response_json" "$payload_json" "$curl_config"
 		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 		return 1
 	fi
 
-	if ! curl -fsS --max-time 10 "$base_url" -o "$response_json"; then
+	if ! curl -fsS --max-time 10 --config "$curl_config" "$base_url" -o "$response_json"; then
 		log_err "Failed to read ${install_name} local auth configuration"
 		tmux kill-session -t "$session" 2>/dev/null || true
-		rm -f "$response_json" "$payload_json"
+		rm -f "$response_json" "$payload_json" "$curl_config"
 		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 		return 1
 	fi
 	if ! servarr_auth_payload_write "$response_json" "$payload_json" "$password"; then
 		log_err "Failed to build ${install_name} auth payload"
 		tmux kill-session -t "$session" 2>/dev/null || true
-		rm -f "$response_json" "$payload_json"
+		rm -f "$response_json" "$payload_json" "$curl_config"
 		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 		return 1
 	fi
 
-	put_code=$(media_stack_http_code "${base_url}/1" -X PUT -H 'Content-Type: application/json' --data-binary "@${payload_json}")
+	put_code=$(media_stack_http_code "${base_url}/1" --config "$curl_config" -X PUT -H 'Content-Type: application/json' --data-binary "@${payload_json}")
 	if [[ "$put_code" != "200" && "$put_code" != "202" ]]; then
 		log_err "${install_name} rejected local auth configuration (HTTP ${put_code})"
 		tmux kill-session -t "$session" 2>/dev/null || true
-		rm -f "$response_json" "$payload_json"
+		rm -f "$response_json" "$payload_json" "$curl_config"
 		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 		return 1
 	fi
@@ -1584,13 +1630,13 @@ servarr_auth_seed() {
 	if [[ "$unauth_code" != "401" && "$unauth_code" != "403" ]]; then
 		log_err "${install_name} auth verification failed; unauthenticated API returned HTTP ${unauth_code}"
 		tmux kill-session -t "$session" 2>/dev/null || true
-		rm -f "$response_json" "$payload_json"
+		rm -f "$response_json" "$payload_json" "$curl_config"
 		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 		return 1
 	fi
 
 	tmux kill-session -t "$session" 2>/dev/null || true
-	rm -f "$response_json" "$payload_json"
+	rm -f "$response_json" "$payload_json" "$curl_config"
 	servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 	servarr_config_xml_tag_converge "$config_file" AuthenticationMethod Forms
 	servarr_config_xml_tag_converge "$config_file" AuthenticationRequired Enabled

@@ -228,6 +228,10 @@ class installMediaStackScriptTest extends TestCase
             'password not changed',
             'servarr_config_xml_tag_converge "$config_file" AuthenticationMethod Forms',
             'servarr_config_xml_tag_converge "$config_file" AuthenticationRequired Enabled',
+            'servarr_api_key_curl_config_wait "$config_file" "$curl_config" 180 "$session"',
+            'media_stack_wait_http_ok "$base_url" 180 "$session" "$curl_config"',
+            'curl -fsS --max-time 10 --config "$curl_config" "$base_url" -o "$response_json"',
+            'media_stack_http_code "${base_url}/1" --config "$curl_config"',
             'unauthenticated API returned HTTP ${unauth_code}',
             'Radarr auth seeding failed; not starting media stack',
             'Prowlarr auth seeding failed; not starting media stack',
@@ -293,6 +297,114 @@ BASH
         $this->assertStringContainsString('rc=1', $run(
             'rc=0; media_stack_wait_http_ok http://x 3 "" || rc=$?; echo "rc=$rc"'
         ), 'wait must time out (rc 1) after the budget when there is no session to watch');
+    }
+
+    public function testServarrAuthSeedAuthenticatesProbeReadAndWrite(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-auth-seed-home-');
+        $bin = $this->pmssMakeTempDir('pmss-media-auth-seed-bin-');
+        $trace = $home.'/curl-trace';
+        $apiKey = '0123456789abcdef0123456789abcdef';
+        $this->pmssEnsureDir($home.'/.config/radarr');
+        $this->pmssEnsureDir($home.'/tmp');
+        $this->pmssWriteFile($home.'/.config/radarr/config.xml', "<Config></Config>\n");
+
+        $this->pmssWriteExecutableFile($bin.'/tmux', <<<'BASH'
+#!/usr/bin/env bash
+[[ "$1" == "has-session" ]] && exit 0
+exit 0
+BASH
+        );
+        $this->pmssWriteExecutableFile($bin.'/curl', <<<'BASH'
+#!/usr/bin/env bash
+curl_config="" output="" write_format="" method="GET"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --config) curl_config="${2:-}"; shift 2 ;;
+        -o) output="${2:-}"; shift 2 ;;
+        -w) write_format="${2:-}"; shift 2 ;;
+        -X) method="${2:-}"; shift 2 ;;
+        --max-time|-H|--data-binary) shift 2 ;;
+        *) shift ;;
+    esac
+done
+authenticated=0
+if [[ -n "$curl_config" && -f "$curl_config" && "$(cat "$curl_config")" == "$EXPECTED_HEADER" ]]; then
+    [[ "$(stat -c '%a' "$curl_config")" == "600" ]] || exit 23
+    authenticated=1
+fi
+if [[ "$method" == "PUT" ]]; then
+    [[ "$authenticated" -eq 1 ]] || { printf '401'; exit 0; }
+    printf 'write:authenticated\n' >> "$TRACE"
+    printf '200'
+    exit 0
+fi
+if [[ -n "$write_format" ]]; then
+    [[ "$authenticated" -eq 0 ]] || { printf '200'; exit 0; }
+    printf 'verify:unauthenticated\n' >> "$TRACE"
+    printf '401'
+    exit 0
+fi
+if [[ -n "$output" && "$output" != "/dev/null" ]]; then
+    [[ "$authenticated" -eq 1 ]] || exit 22
+    printf '{}\n' > "$output"
+    printf 'read:authenticated\n' >> "$TRACE"
+    exit 0
+fi
+[[ "$authenticated" -eq 1 ]] || exit 22
+printf 'probe:authenticated\n' >> "$TRACE"
+BASH
+        );
+
+        $functions = $this->pmssExtractShellFunctions($this->script, array(
+            'media_stack_wait_http_ok',
+            'media_stack_http_code',
+            'servarr_api_key_curl_config_write',
+            'servarr_api_key_curl_config_wait',
+            'servarr_auth_payload_write',
+            'servarr_auth_seed',
+        ));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'export HOME='.escapeshellarg($home),
+            'export TMPDIR='.escapeshellarg($home.'/tmp'),
+            'export PATH='.escapeshellarg($bin).':$PATH',
+            'export TRACE='.escapeshellarg($trace),
+            'export EXPECTED_HEADER='.escapeshellarg('header = "X-Api-Key: '.$apiKey.'"'),
+            'DOTNET_ROOT_PATH=/opt/dotnet',
+            'MEDIA_STACK_AUTH_USERNAME=pmss',
+            'servarr_config_auth_configured() { return 1; }',
+            'servarr_config_xml_tag_converge() { :; }',
+            'media_stack_credentials_value() { :; }',
+            'media_stack_app_key() { printf "%s" "$1"; }',
+            'log_info() { :; }',
+            'log_warn() { :; }',
+            'log_err() { :; }',
+            'log_ok() { :; }',
+            'sleep() { if ! grep -q "<ApiKey>" "$HOME/.config/radarr/config.xml"; then printf '.escapeshellarg("<Config><ApiKey>{$apiKey}</ApiKey></Config>\n").' > "$HOME/.config/radarr/config.xml"; fi; }',
+            $functions,
+            'servarr_auth_seed radarr Radarr Radarr.dll 17878 v3 test-password --nobrowser',
+            'for invalid_key in "" short 0123456789abcdef0123456789abcde 0123456789abcdef0123456789abcde!; do',
+            '  printf "<Config><ApiKey>%s</ApiKey></Config>\n" "$invalid_key" > "$HOME/.config/radarr/config.xml"',
+            '  invalid_config=$(mktemp); if servarr_api_key_curl_config_write "$HOME/.config/radarr/config.xml" "$invalid_config"; then exit 91; fi; rm -f "$invalid_config"',
+            'done',
+            'echo invalid_keys_rejected',
+            'shopt -s nullglob; leftovers=("$TMPDIR"/*); echo "leftovers=${#leftovers[@]}"',
+            '',
+        ));
+
+        $output = $this->pmssRunShellHarness($script);
+        $traceOutput = (string) file_get_contents($trace);
+
+        $this->assertOrderedStrings(array(
+            'probe:authenticated',
+            'read:authenticated',
+            'write:authenticated',
+            'verify:unauthenticated',
+        ), $traceOutput);
+        $this->assertStringContainsString('invalid_keys_rejected', $output);
+        $this->assertStringContainsString('leftovers=0', $output, 'seed must remove temporary files containing credentials');
     }
 
     public function testAutobrrAuthSeedingUsesCliAndPreservesExistingUsers(): void
