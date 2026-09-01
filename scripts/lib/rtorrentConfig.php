@@ -15,6 +15,7 @@
  */
 require_once __DIR__.'/log.php';
 require_once __DIR__.'/runtime/filesystem.php';
+require_once __DIR__.'/rtorrentPortReservations.php';
 
 class rtorrentConfig
 {
@@ -180,6 +181,12 @@ class rtorrentConfig
         return '/var/lib/pmss/ports';
     }
 
+    /** Return the shared lock guarding reservation creation and cleanup. */
+    protected function portReservationLockPath(): string
+    {
+        return pmssRtorrentPortReservationLockPath();
+    }
+
     /** Validate the reservation namespace before deriving filesystem paths. */
     private function normalizePortReservationType($type): string
     {
@@ -229,16 +236,43 @@ class rtorrentConfig
     }
     private function configWithPortDefaults(array $config): array
     {
-        if (!isset($config['scgiPort'])) {
-            $config['scgiPort'] = $this->_configPortPrivate('scgi', 4000, 24000);
+        $reserve = array(
+            'scgi' => !isset($config['scgiPort']),
+            'dht' => !isset($config['dhtPort']) || empty($config['dhtPort']),
+            'listen' => !isset($config['listenPort']) || empty($config['listenPort']),
+        );
+        if (!in_array(true, $reserve, true)) {
+            return $config;
         }
-        if (!isset($config['dhtPort']) || empty($config['dhtPort'])) {
-            $config['dhtPort'] = $this->_configPortPrivate('dht', 24001, 44000);
+
+        $lock = pmssLockFileAcquire($this->portReservationLockPath(), false, 'c', true);
+        if ($lock === false) {
+            throw new RuntimeException('Unable to acquire rTorrent port reservation lock');
         }
-        if (!isset($config['listenPort']) || empty($config['listenPort'])) {
-            $config['listenPort'] = $this->_configPortPrivate('listen', 44001, 64000);
+
+        $reserved = array();
+        try {
+            try {
+                foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
+                    if (!$reserve[$type]) {
+                        continue;
+                    }
+                    $port = $this->_configPortPrivate($type, $spec['min'], $spec['max']);
+                    $config[$type.'Port'] = $port;
+                    $reserved[] = array($type, $port);
+                }
+                return $config;
+            } catch (Throwable $exception) {
+                foreach (array_reverse($reserved) as $reservation) {
+                    if (!pmssRtorrentPortReservationMarkerRemove($this->portReservationBaseDir(), $reservation[0], $reservation[1])) {
+                        logmsg('[WARN] Failed to roll back rTorrent '.$reservation[0].' port reservation');
+                    }
+                }
+                throw $exception;
+            }
+        } finally {
+            pmssLockHandleRelease($lock);
         }
-        return $config;
     }
 
     private function renderConfigFile(array $config): string

@@ -502,6 +502,11 @@ Class `rtorrentConfig`
 - readConfig(string $file): array|false → parses key=value pairs from `~/.rtorrent.rc` file (skipping comments and blanks).
 - _configPortPrivate(string $type, int $rangeStart=2000, int $rangeEnd=65000): int
   - Reserves a random port using files under `/var/lib/pmss/ports/<type>/<port>`; idempotent by presence.
+  - Default scgi/dht/listen acquisition is transactional: if a later type cannot be reserved, markers created earlier in the same call are removed before the exception is re-thrown.
+
+- `scripts/cron/rtorrentPortReservationsReconcile.php`
+  - Runs hourly under a single shared reservation lock and removes only old marker files absent from the union of every live user's stored rTorrent ports and readable `.rtorrent.rc` references.
+  - Keeps recent markers for a one-hour publication grace and skips the whole pass whenever a live user's ownership cannot be determined from the available sources.
 - loadDefaultResourceConfig(): array → reads and JSON-decodes resources file; throws on failure.
 - loadDefaultTemplate(): string → reads template; throws on failure.
 - _checkResourceConfig(): void → fills defaults for missing fields (ramBlock, peers, uploadSlots).

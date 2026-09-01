@@ -64,6 +64,7 @@ MAILTO=""
 */5 * * * *   root    /scripts/cron/checkWireguard.php >> /var/log/pmss/checkWireguard.log 2>&1
 */6 * * * *   root    /scripts/cron/wireguardPeersRefresh.php >> /var/log/pmss/wireguardPeersRefresh.log 2>&1
 30 2 * * *   root    /scripts/cron/cleanupUserDb.php >> /var/log/pmss/userDbCleanup.log 2>&1
+37 * * * *   root    /scripts/cron/rtorrentPortReservationsReconcile.php >> /var/log/pmss/rtorrentPortReservationsReconcile.log 2>&1
 0 3 1,15 * *   root    /scripts/cron/backupEtc.sh >> /var/log/pmss/backupEtc.log 2>&1
 
 @reboot root    /scripts/cron/checkDirectories.php >> /dev/null 2>&1
