@@ -87,7 +87,7 @@ class NetconsoleConfigureTest extends TestCase
         file_put_contents($dir.'/netconsole', $spec);
         file_put_contents($dir.'/modprobe.d/netconsole.conf', "options netconsole netconsole={$spec}\n");
         file_put_contents($dir.'/modules-load.d/pmss-netconsole.conf', "netconsole\n");
-        $calls = [];
+        /** @var array<int, array{string, string}> $calls */ $calls = [];
 
         $env = $this->netconsoleEnv($dir);
         $env['PMSS_NETCONSOLE_MODULE_LOADED'] = '1';

@@ -42,7 +42,7 @@ class RsyslogRateLimitTest extends TestCase
         $this->pmssWithEnv([
             'PMSS_RSYSLOG_CONFIG_PATH' => $target,
             'PMSS_TEST_MODE' => '1',
-        ], function () use ($target, &$messages, &$commands): void {
+        ], function () use (&$messages, &$commands): void {
             \pmssApplyRsyslogKernelInputRateLimit(
                 $this->pmssMakeArrayLogger($messages),
                 static function (string $description, string $command) use (&$commands): int {

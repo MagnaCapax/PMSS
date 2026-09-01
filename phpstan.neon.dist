@@ -2,6 +2,7 @@ parameters:
     scanFiles:
         - etc/skel/www/scriptsInc.php
         - etc/skel/www/statsHelpers.php
+        - etc/skel/www/storageHealthNotice.php
         - etc/skel/www/userTrafficLimit.php
         - etc/skel/www/welcome.php
         - etc/skel/www/welcomeAnnouncements.php
