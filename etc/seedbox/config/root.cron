@@ -44,8 +44,8 @@ MAILTO=""
 * * * * *   root flock -xn /tmp/pmss-updateQuotas.lock /scripts/cron/updateQuotas.php >> /var/log/pmss/updateQuotas.log 2>&1
 */5 * * * * root flock -xn -o /run/lock/pmss-checkRootlessDocker.lock /scripts/cron/checkRootlessDocker.php >> /var/log/pmss/rootlessDocker.log 2>&1
 */15 * * * *   root    /scripts/cron/processWatchdog.sh >> /var/log/pmss/checkProcessWatchdog.log 2>&1
-*/5 * * * *   root    /scripts/cron/trafficLog.php >> /var/log/pmss/trafficLog.log 2>&1
-*/5 * * * *   root    /scripts/cron/trafficIngressLog.php >> /var/log/pmss/trafficIngressLog.log 2>&1
+*/5 * * * *   root    flock -xn -o /run/lock/pmss-trafficLog.lock /scripts/cron/trafficLog.php >> /var/log/pmss/trafficLog.log 2>&1
+*/5 * * * *   root    flock -xn -o /run/lock/pmss-trafficIngressLog.lock /scripts/cron/trafficIngressLog.php >> /var/log/pmss/trafficIngressLog.log 2>&1
 */5 * * * *   root    /scripts/cron/resourceLog.php >> /var/log/pmss/resourceLog.log 2>&1
 */5 * * * *   root    /scripts/cron/metricsLog.php >> /var/log/pmss/metricsLog.log 2>&1
 */5 * * * *    root    /scripts/cron/diskIostat.php >> /var/log/pmss/iostatLog.log 2>&1
@@ -55,11 +55,11 @@ MAILTO=""
 0 0 * * *   root    /scripts/cron/resourceSnapshot.php >/dev/null 2>&1
 */30 * * * *   root    /scripts/cron/processSnapshot.php >/dev/null 2>&1
 0 6,18 * * *   root    /scripts/cron/storageHealthSnapshot.php >> /var/log/pmss/storageHealthSnapshot.log 2>&1
-7 * * * *   root    sleep 45; /scripts/cron/trafficLimits.php >> /var/log/pmss/trafficLimits.log 2>&1
+7 * * * *   root    sleep 45; flock -xn -o /run/lock/pmss-trafficLimits.lock /scripts/cron/trafficLimits.php >> /var/log/pmss/trafficLimits.log 2>&1
 14 * * * *   root    /scripts/cron/usageAlertsNotify.php >> /var/log/pmss/usageAlerts.log 2>&1
 7 * * * *   root    sleep 55; /scripts/cron/iopsLimits.php >> /var/log/pmss/iopsLimits.log 2>&1
-25,55 * * * *   root    /bin/sleep 20; /scripts/cron/trafficStats.php >> /var/log/pmss/trafficStats.log 2>&1
-25,55 * * * *   root    /bin/sleep 25; /scripts/cron/trafficIngressStats.php >> /var/log/pmss/trafficIngressStats.log 2>&1
+25,55 * * * *   root    /bin/sleep 20; flock -xn -o /run/lock/pmss-trafficStats.lock /scripts/cron/trafficStats.php >> /var/log/pmss/trafficStats.log 2>&1
+25,55 * * * *   root    /bin/sleep 25; flock -xn -o /run/lock/pmss-trafficIngressStats.lock /scripts/cron/trafficIngressStats.php >> /var/log/pmss/trafficIngressStats.log 2>&1
 25,55 * * * *   root    /bin/sleep 30; /scripts/cron/resourceStats.php >> /var/log/pmss/resourceStats.log 2>&1
 */5 * * * *   root    /scripts/cron/checkWireguard.php >> /var/log/pmss/checkWireguard.log 2>&1
 */6 * * * *   root    /scripts/cron/wireguardPeersRefresh.php >> /var/log/pmss/wireguardPeersRefresh.log 2>&1
