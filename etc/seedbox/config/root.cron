@@ -44,7 +44,7 @@ MAILTO=""
 * * * * *   root flock -xn /tmp/pmss-updateQuotas.lock /scripts/cron/updateQuotas.php >> /var/log/pmss/updateQuotas.log 2>&1
 */5 * * * * root flock -xn -o /run/lock/pmss-checkRootlessDocker.lock /scripts/cron/checkRootlessDocker.php >> /var/log/pmss/rootlessDocker.log 2>&1
 */15 * * * *   root    /scripts/cron/processWatchdog.sh >> /var/log/pmss/checkProcessWatchdog.log 2>&1
-*/5 * * * *   root    flock -xn -o /run/lock/pmss-trafficLog.lock /scripts/cron/trafficLog.php >> /var/log/pmss/trafficLog.log 2>&1
+*/5 * * * *   root    /scripts/cron/trafficLog.php >> /var/log/pmss/trafficLog.log 2>&1
 */5 * * * *   root    flock -xn -o /run/lock/pmss-trafficIngressLog.lock /scripts/cron/trafficIngressLog.php >> /var/log/pmss/trafficIngressLog.log 2>&1
 */5 * * * *   root    /scripts/cron/resourceLog.php >> /var/log/pmss/resourceLog.log 2>&1
 */5 * * * *   root    /scripts/cron/metricsLog.php >> /var/log/pmss/metricsLog.log 2>&1
