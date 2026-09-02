@@ -60,3 +60,10 @@ function pmssUserLighttpdEnabled(string $username, ?UserConfigStore $store = nul
 {
     return pmssUserConfigFeatureEnabled($username, 'lighttpdEnabled', $store);
 }
+
+/** Check whether the user opted into scheduled config backups. */
+function pmssUserScheduledConfigBackupEnabled(string $username, ?UserConfigStore $store = null): bool
+{
+    $payload = pmssUserConfigResolvePayload($username, $store);
+    return $payload !== null && pmssUserConfigNormaliseToggleValue($payload, 'scheduledConfigBackup', false);
+}

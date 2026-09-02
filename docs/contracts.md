@@ -746,6 +746,10 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Includes only the fixed, customer-owned rTorrent, ruTorrent, Deluge, and qBittorrent configuration and session/resume paths returned by `pmssCustomerBackupRelativePaths()`; media and unrelated account paths are excluded.
   - Rejects unsafe or top-level symlinked paths, runs as the customer UID, and does not accept archive paths from request data.
   - The panel warns that the archive may contain private tracker URLs and separate application credentials.
+- `scheduledConfigBackup`
+  - Per-user config-store toggle, default off. When true, the daily root cron runs the same allowlist tar primitive as the manual backup under the customer UID.
+  - Archives are written as `~/.pmss-backups/config-YYYYMMDD-HHMMSS.tar.gz` with a private `0700` directory and `0600` files.
+  - Retention keeps the newest 7 scheduled archives and prunes older files only after a newly written archive is verified as an existing non-empty file inside the same home.
 
 ## Customer Whole-Account Service Restart – `etc/skel/www/welcome.php`
 

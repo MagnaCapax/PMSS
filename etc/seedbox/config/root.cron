@@ -55,6 +55,7 @@ MAILTO=""
 0 0 * * *   root    /scripts/cron/resourceSnapshot.php >/dev/null 2>&1
 */30 * * * *   root    /scripts/cron/processSnapshot.php >/dev/null 2>&1
 0 6,18 * * *   root    /scripts/cron/storageHealthSnapshot.php >> /var/log/pmss/storageHealthSnapshot.log 2>&1
+43 3 * * *   root    /scripts/cron/scheduledConfigBackup.php >> /var/log/pmss/scheduledConfigBackup.log 2>&1
 7 * * * *   root    sleep 45; flock -xn -o /run/lock/pmss-trafficLimits.lock /scripts/cron/trafficLimits.php >> /var/log/pmss/trafficLimits.log 2>&1
 14 * * * *   root    /scripts/cron/usageAlertsNotify.php >> /var/log/pmss/usageAlerts.log 2>&1
 7 * * * *   root    sleep 55; /scripts/cron/iopsLimits.php >> /var/log/pmss/iopsLimits.log 2>&1

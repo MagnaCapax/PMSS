@@ -384,6 +384,179 @@ if (!function_exists('pmssCustomerBackupDownload')) {
  }
 }
 
+if (!function_exists('pmssCustomerBackupFileResult')) {
+ /** Build the stable scheduled-backup result shape consumed by cron/tests. */
+ function pmssCustomerBackupFileResult($ok, $message, $bytes = 0, $path = '', $keptCount = 0, $deletedCount = 0) {
+  return array(
+   'ok' => (bool) $ok,
+   'message' => (string) $message,
+   'bytes' => max(0, (int) $bytes),
+   'path' => (string) $path,
+   'keptCount' => max(0, (int) $keptCount),
+   'deletedCount' => max(0, (int) $deletedCount),
+  );
+ }
+}
+
+if (!function_exists('pmssCustomerBackupFileDirectoryEnsure')) {
+ /** Prepare the private per-user scheduled backup directory. */
+ function pmssCustomerBackupFileDirectoryEnsure($home, &$error) {
+  $error = '';
+  $home = rtrim((string) $home, '/');
+  $dir = $home.'/.pmss-backups';
+
+  if (!pmssCustomerBackupRestoreTargetPathIsSafe($home, '.pmss-backups')) {
+   $error = 'Backup directory path is not safe.';
+   return '';
+  }
+  if (is_link($dir) || (file_exists($dir) && !is_dir($dir))) {
+   $error = 'Backup directory is not a private directory.';
+   return '';
+  }
+  if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
+   $error = 'Could not create backup directory.';
+   return '';
+  }
+  if (!pmssCustomerPathIsInsideHome($home, $dir)) {
+   $error = 'Backup directory is outside the customer home.';
+   return '';
+  }
+  if (((@fileperms($dir) & 0777) !== 0700) && !@chmod($dir, 0700)) {
+   $error = 'Could not restrict backup directory permissions.';
+   return '';
+  }
+  if (function_exists('posix_geteuid')) {
+   $owner = @fileowner($dir);
+   if ($owner === false || (int) $owner !== (int) posix_geteuid()) {
+    $error = 'Backup directory is not owned by the customer user.';
+    return '';
+   }
+  }
+
+  if (!is_writable($dir)) {
+   $error = 'Backup directory is not writable.';
+   return '';
+  }
+  return $dir;
+ }
+}
+
+if (!function_exists('pmssCustomerBackupFilePathBuild')) {
+ /** Reserve a scheduled backup archive name without overwriting older runs. */
+ function pmssCustomerBackupFilePathBuild($home) {
+  $home = rtrim((string) $home, '/');
+  $base = $home.'/.pmss-backups/config-'.gmdate('Ymd-His');
+  for ($i = 0; $i < 100; $i++) {
+   $path = $base.($i === 0 ? '' : '-'.str_pad((string) $i, 2, '0', STR_PAD_LEFT)).'.tar.gz';
+   if (!file_exists($path)
+       && !file_exists($path.'.part')
+       && !is_link($path)
+       && pmssCustomerBackupRestoreTargetPathIsSafe($home, '.pmss-backups/'.basename($path))) {
+    return $path;
+   }
+  }
+  return '';
+ }
+}
+
+if (!function_exists('pmssCustomerBackupFileCreate')) {
+ /** Persist the fixed allowlist tar stream as a private scheduled archive. */
+ function pmssCustomerBackupFileCreate($home) {
+  $home = rtrim((string) $home, '/');
+  if (!is_dir($home) || !pmssCustomerPathIsSafe($home)) {
+   return pmssCustomerBackupFileResult(false, 'Customer home directory is not available.');
+  }
+
+  $entries = pmssCustomerBackupEntriesRead($home);
+  if ($entries === array()) return pmssCustomerBackupFileResult(true, 'nothing to back up');
+
+  $command = pmssCustomerBackupTarCommandBuild($home, $entries);
+  if ($command === '' || !is_executable('/bin/tar') || !pmssFrontendFunctionAvailable('popen')) {
+   return pmssCustomerBackupFileResult(false, 'Backup is unavailable on this host.');
+  }
+
+  $error = '';
+  $dir = pmssCustomerBackupFileDirectoryEnsure($home, $error);
+  if ($dir === '') return pmssCustomerBackupFileResult(false, $error);
+
+  $archivePath = pmssCustomerBackupFilePathBuild($home);
+  if ($archivePath === '') return pmssCustomerBackupFileResult(false, 'Could not reserve a backup archive path.');
+
+  $tmpPath = $archivePath.'.part';
+  $out = @fopen($tmpPath, 'xb');
+  if (!is_resource($out)) return pmssCustomerBackupFileResult(false, 'Could not create the backup archive file.');
+  @chmod($tmpPath, 0600);
+
+  $pipe = @popen($command, 'r');
+  if (!is_resource($pipe)) {
+   fclose($out);
+   @unlink($tmpPath);
+   return pmssCustomerBackupFileResult(false, 'Could not start the backup archive process.');
+  }
+
+  $bytes = @stream_copy_to_stream($pipe, $out);
+  $closeOk = @fclose($out);
+  $returnCode = @pclose($pipe);
+  if ($bytes === false || (int) $bytes <= 0 || !$closeOk || $returnCode !== 0 || file_exists($archivePath) || !@rename($tmpPath, $archivePath)) {
+   @unlink($tmpPath);
+   return pmssCustomerBackupFileResult(false, 'Backup archive creation failed.');
+  }
+
+  @chmod($archivePath, 0600);
+  clearstatcache(true, $archivePath);
+  $size = @filesize($archivePath);
+  if (!is_file($archivePath) || is_link($archivePath) || !is_numeric($size) || (int) $size <= 0) {
+   @unlink($archivePath);
+   return pmssCustomerBackupFileResult(false, 'Backup archive verification failed.');
+  }
+
+  return pmssCustomerBackupFileResult(true, 'created config backup', (int) $size, $archivePath);
+ }
+}
+
+if (!function_exists('pmssCustomerBackupArchivesRead')) {
+ /** Return private scheduled backup archives newest first. */
+ function pmssCustomerBackupArchivesRead($home) {
+  $home = rtrim((string) $home, '/');
+  $dir = $home.'/.pmss-backups';
+  if (!is_dir($dir) || is_link($dir) || !pmssCustomerPathIsInsideHome($home, $dir)) return array();
+
+  $archives = array();
+  foreach (glob($dir.'/config-*.tar.gz') ?: array() as $path) {
+   $name = basename($path);
+   if (preg_match('/\Aconfig-[0-9]{8}-[0-9]{6}(?:-[0-9]{2})?\.tar\.gz\z/', $name) !== 1) continue;
+   if (!is_file($path) || is_link($path) || !pmssCustomerPathIsInsideHome($home, $path)) continue;
+   $mtime = @filemtime($path);
+   $archives[] = array('path' => $path, 'name' => $name, 'mtime' => is_numeric($mtime) ? (int) $mtime : 0);
+  }
+
+  usort($archives, function ($a, $b) {
+   if ($a['mtime'] === $b['mtime']) return strcmp($b['name'], $a['name']);
+   return $b['mtime'] <=> $a['mtime'];
+  });
+  return $archives;
+ }
+}
+
+if (!function_exists('pmssCustomerBackupRetentionPrune')) {
+ /** Keep only the newest scheduled config backup archives. */
+ function pmssCustomerBackupRetentionPrune($home, $keep = 7) {
+  $keep = max(1, (int) $keep);
+  $archives = pmssCustomerBackupArchivesRead($home);
+  $delete = array_slice($archives, $keep);
+  $deleted = 0;
+
+  foreach ($delete as $archive) {
+   if (!@unlink($archive['path'])) {
+    return pmssCustomerBackupFileResult(false, 'Could not prune old backup archive.', 0, '', count($archives) - $deleted, $deleted);
+   }
+   $deleted++;
+  }
+
+  return pmssCustomerBackupFileResult(true, $deleted > 0 ? 'pruned old backup archives' : 'nothing to prune', 0, '', count($archives) - $deleted, $deleted);
+ }
+}
+
 if (!function_exists('pmssCustomerPathIsInsideHome')) {
  /** Require a resolved path to stay inside one customer's home directory. */
  function pmssCustomerPathIsInsideHome($home, $path) {

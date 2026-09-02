@@ -23,6 +23,9 @@ Usage:
   userSetting.php set USER KEY VALUE
   userSetting.php unset USER KEY
 
+Known toggle keys:
+  scheduledConfigBackup  bool, default off; enables daily private config backup archives
+
 USAGE;
 
 $action = $argv[1] ?? '';
