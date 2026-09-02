@@ -1019,8 +1019,8 @@ if (isset($_GET['unzip']) && !FM_READONLY) {
                     $res = false;
                 }
             } catch (Exception $e) {
-                //TODO:: need to handle the error
-                $res = true;
+                error_log('filemanager unzip: archive extraction failed: ' . $e->getMessage());
+                $res = false;
             }
         }
 
