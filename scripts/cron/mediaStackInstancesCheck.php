@@ -15,6 +15,7 @@
  */
 
 require_once __DIR__.'/../lib/mediaStackWatchdog.php';
+require_once __DIR__.'/../lib/userSystemdWatchdog.php';
 require_once __DIR__.'/../lib/user/selection.php';
 require_once __DIR__.'/../lib/arrRootGuard.php';
 require_once __DIR__.'/../lib/runtime.php';
@@ -39,6 +40,7 @@ if ((int) $result['exitCode'] !== 0) {
 $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
 foreach ($result['users'] as $username) {
     pmssMediaStackWatchdogRunUser($username, $homeRoot);
+    pmssUserSystemdWatchdogRunUser($username, $homeRoot);
 }
 
 exit($rootGuardFindings > 0 ? 1 : 0);

@@ -274,6 +274,15 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - pmssUserWatchdogEnsureServices(string $username, array $serviceSpecs, array $runningStates=[]): array
   - Starts missing service specs after applying the exported lock-fd close prefix;
     the watchdog parent retains its lock while long-lived daemons cannot inherit it.
+- pmssUserSystemdWatchdogRunUser(string $username, string $homeRoot='/home', string $lingerRoot='/var/lib/systemd/linger', ?callable $probe=null, ?callable $accountLookup=null): ?array
+  - Runs from the existing two-minute all-users cron and observes only accounts with
+    linger, an account-authored `~/.config/systemd/user/*.service`, and cgroup v1.
+    The PMSS-managed `docker.service` does not establish customer-unit intent.
+  - Publishes `~/.systemd-user-status.json` atomically with mode 0644. A second
+    consecutive inactive manager probe changes `pending` to `degraded`; probe
+    failures publish `unknown`. It never starts, restarts, enables, or disables a unit.
+  - New homes contain `~/.config/systemd/user/` from the skeleton as a safe default;
+    this does not make parent-directory unit misplacement impossible.
 - pmssUserReconcileWebRoot(array $ctx, ?callable $logger=null): bool
   - Converges one user's managed web root under a per-user lock, preserving
     customer-owned paths and refusing unsafe symlinks or conflicting path types.
