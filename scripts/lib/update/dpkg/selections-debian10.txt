@@ -949,6 +949,7 @@ libzstd1:amd64					install
 libzvbi-common					install
 libzvbi0:amd64					install
 lighttpd					install
+lighttpd-mod-magnet				install
 lighttpd-mod-webdav				install
 lighttpd-modules-ldap				install
 lighttpd-modules-mysql				install
