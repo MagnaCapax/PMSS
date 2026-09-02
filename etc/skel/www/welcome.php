@@ -20,6 +20,13 @@ if (isset($_GET['backup']) && $_GET['backup'] === 'download') {
     exit;
 }
 
+$configRestoreResult = null;
+if (isset($_GET['restore']) && $_GET['restore'] === 'config') {
+    $configRestoreResult = $_SERVER['REQUEST_METHOD'] === 'POST'
+        ? pmssCustomerBackupRestore(dirname(__DIR__), isset($_POST['archivePath']) ? (string) $_POST['archivePath'] : '')
+        : pmssCustomerBackupRestoreResult(false, 'Use the restore form to choose an uploaded backup archive.');
+}
+
 // Customer-side helpers MUST live in the customer tree (etc/skel/www/) because
 // per-user lighttpd runs as the customer UID and cannot traverse /scripts/
 // (intentionally 750 root:root — the operator-only security boundary).
@@ -577,6 +584,20 @@ if (file_exists('mediaStack.php') && function_exists('pmssMediaStackPanelHtmlBui
                             <input type="hidden" name="backup" value="download" />
                             <input type="submit" name="configBackupDownload" value="Download torrent configuration backup" />
                         </form>
+                        <h6>Torrent configuration restore</h6>
+                        <p>Upload the backup with File Manager, stop your torrent client, then restore the uploaded archive path here.</p>
+                        <form method="post" action="welcome.php?restore=config">
+                            <input type="text" name="archivePath" value="" placeholder="pmss-torrent-config-YYYYMMDD-HHMMSS.tar.gz" style="width: 360px; max-width: 100%;" />
+                            <input type="submit" name="torrentConfigRestore" value="Restore torrent configuration" />
+                        </form>
+<?php
+if (is_array($configRestoreResult)) {
+    $restoreColor = !empty($configRestoreResult['ok']) ? '#2e7d32' : '#b71c1c';
+?>
+                        <p style="color: <?php echo $restoreColor; ?>;"><b><?php echo !empty($configRestoreResult['ok']) ? 'Restore complete:' : 'Restore not run:'; ?></b> <?php echo pmssCustomerHtmlAttr($configRestoreResult['message']); ?></p>
+<?php
+}
+?>
 <?php
 if (file_exists('lighttpdRestart.php')) {
 ?>
