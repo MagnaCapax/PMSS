@@ -1,7 +1,7 @@
 # ADR 0050: update.php falls back to the codeload branch tarball when git clone is blocked
 
 Date: 2026-09-02
-Category: infrastructure
+Category: architecture
 
 ## Status
 Accepted
