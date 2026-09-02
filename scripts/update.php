@@ -660,12 +660,57 @@ function fetchSnapshot(array $spec, string $tmp): void
         escapeshellarg($spec['repo']),
         escapeshellarg($tmp)
     );
-    pmssRunBootstrapCommand($clone, EXIT_FETCH);
+    if (pmssRunBootstrapCommand($clone) !== 0) {
+        // git-upload-pack can be network/edge-blocked (e.g. GitHub challenging a
+        // reputation-flagged source prefix with HTTP 401) while the codeload tarball
+        // CDN still serves the same branch. For a branch tip (no pin) fall back to the
+        // branch tarball over a plain HTTPS GET. A pinned spec needs git history, so
+        // it cannot use the (history-less) tarball and stays fatal.
+        if ($spec['pin'] !== '') {
+            fatal('git clone failed and a pinned spec requires git history: '.$spec['branch'].'@{'.$spec['pin'].'}', EXIT_FETCH);
+        }
+        logmsg('[WARN] git clone failed; falling back to codeload branch tarball');
+        pmssFetchBranchTarball($spec['repo'], $spec['branch'], $tmp);
+        return;
+    }
 
     if ($spec['pin'] !== '') {
         $rev = escapeshellarg($spec['branch'].'@{'.$spec['pin'].'}');
         pmssRunBootstrapCommand('cd '.escapeshellarg($tmp).' && git fetch --quiet && git checkout '.$rev, EXIT_FETCH);
     }
+}
+
+/**
+ * Fetch a branch tip as a tarball from GitHub's codeload CDN and extract it into
+ * `$tmp`. Fallback for fetchSnapshot() when `git clone` fails (e.g. GitHub blocking
+ * git-protocol from a flagged source prefix) — codeload is a separate endpoint not
+ * subject to that git-upload-pack block. Derives the codeload URL from an
+ * `https://github.com/<owner>/<repo>[.git]` repo URL. Fatal on failure.
+ */
+function pmssCodeloadTarballUrl(string $repo, string $branch): ?string
+{
+    if (!preg_match('#github\.com/([^/]+/[^/]+?)(?:\.git)?/?$#', $repo, $m)) {
+        return null;
+    }
+    return 'https://codeload.github.com/'.$m[1].'/tar.gz/refs/heads/'.rawurlencode($branch);
+}
+
+function pmssFetchBranchTarball(string $repo, string $branch, string $tmp): void
+{
+    $url = pmssCodeloadTarballUrl($repo, $branch);
+    if ($url === null) {
+        fatal('Cannot derive codeload tarball URL from repo: '.$repo, EXIT_FETCH);
+    }
+    $tar = $tmp.'/source.tgz';
+    // --http1.1: codeload has a known intermittent HTTP/2 400 in some CI environments.
+    $cmd = sprintf(
+        'curl -sfL --http1.1 -A %s %s -o %s',
+        escapeshellarg(CURL_UA),
+        escapeshellarg($url),
+        escapeshellarg($tar)
+    );
+    pmssRunBootstrapCommand($cmd, EXIT_FETCH);
+    pmssRunBootstrapCommand('tar -xzf '.escapeshellarg($tar).' -C '.escapeshellarg($tmp).' --strip-components=1', EXIT_FETCH);
 }
 
 function pmssRunBootstrapCommand(string $command, ?int $fatalCode = null): int
