@@ -44,10 +44,27 @@ Signature: refer to file for full source; highlights below.
 - resolveLatestRelease(): string
   - Fetches GitHub latest release tag; `fatal(EXIT_FETCH)` on HTTP/parse failure.
 
-- fetchSnapshot(array $spec, string $tmp): void
+- fetchSnapshot(array $spec, string $tmp): string
   - For `release`: `curl` tarball and `tar -xzf` into `$tmp`.
   - For `git`: shallow clone with branch; optional `git checkout <branch>@{<pin>}`.
+  - Output: fetched version label for guard/log visibility (e.g., resolved `release:<tag>`).
   - Errors: `runFatal(EXIT_FETCH)` on failure.
+
+- pmssBuildVersionSpec(array $spec): string
+  - Builds the canonical recorded spec (`release[:tag]`, `git/<branch>[:pin]`, or custom repo form).
+
+- pmssFetchedVersionLine(array $spec, string $fetchedVersion, string $tmp): string
+  - Adds the cloned git commit timestamp to unpinned git fetched-version labels when `.git` metadata is present.
+  - Leaves release labels and pinned git labels unchanged.
+
+- pmssVersionMoveDecision(string $installedVersion, string $fetchedVersion, bool $explicitTarget): array
+  - Parses orderable dates from release tags, git pins, or recorded unpinned git timestamps.
+  - Output: `allowed`, `ordering` (`backward|forward|same|indeterminate`), and parsed order dates.
+  - Fail-open contract: indeterminate ordering returns `allowed=true`.
+
+- pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarget): void
+  - Reads `/etc/seedbox/config/version`, logs the installed-version → fetched-version transition, and emits `snapshot_version_transition`.
+  - Fatal `EXIT_FETCH` only when an unpinned target is proven older than the installed marker.
 
 - stageSnapshot(string $tmp, bool $dryRun): void
   - Copies `scripts/`, `etc/`, `var/` from `$tmp` into live FS.

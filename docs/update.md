@@ -10,6 +10,10 @@ Responsibilities:
 - Parse the requested source (`git/<branch>`, `release[:tag]`, or a custom repo)
   and optional flags.
 - Fetch the snapshot (shallow git clone or release tarball).
+- Compare the installed version marker with the fetched snapshot before staging:
+  proven backwards moves are refused for unpinned specs (`release`,
+  `git/<branch>`) and allowed for pinned specs (`release:<tag>`,
+  `git/<branch>:YYYY-MM-DD`).
 - Stage the snapshot by replacing `/scripts` and refreshing `/etc` and `/var`
   trees. `/scripts` and `/etc/skel` are wiped before copying so stale files do
   not survive.
@@ -58,6 +62,14 @@ falling back to `git/main`.
 Every run emits structured events to `/var/log/pmss-update.jsonl`, making it easy
 to audit which spec was applied, whether the run was dry, and if phase 2 was
 invoked.
+
+Before staging, `update.php` logs the installed-version → fetched-version
+transition. When both sides expose an orderable date and an unpinned target would
+move backwards, the run exits with a clear refusal. If either side is
+unparseable, the guard logs `indeterminate` and proceeds so a malformed or
+legacy version marker cannot brick the update path. To perform an intentional
+rollback, pin the target explicitly, e.g. `release:2026-01-21` or
+`git/main:2026-01-21`.
 
 ## Phase 2 – `scripts/util/update-step2.php`
 
@@ -294,7 +306,7 @@ Phase 1 logs to `/var/log/pmss/update.log` and emits JSON to `/var/log/pmss-upda
 - Rolling updates by default: the fleet intentionally runs a mix of versions across hosts; updates roll forward progressively and can be paused.
 - Coexistence across distros: Debian 10 and 11 hosts are operated side‑by‑side; update logic must remain compatible with both baselines.
 - Debian 13 (trixie) is experimental; do not assume full support until the dpkg baseline is captured and validated.
-- Script rollbacks: scripts and configs can be reverted independently of package state; keep pre‑change backups and version metadata for quick rollback.
+- Script rollbacks: scripts and configs can be reverted independently of package state; keep pre‑change backups and version metadata for quick rollback. Rollbacks must name a pinned target explicitly; unpinned `release` and `git/<branch>` requests refuse only proven backwards movement, while indeterminate ordering logs and proceeds.
 
 Keeping the bootstrap minimal and the second phase modular allows PMSS to update
 safely even on partially broken systems while keeping the complex logic in files

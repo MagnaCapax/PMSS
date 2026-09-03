@@ -635,9 +635,10 @@ function resolveLatestRelease(): string
  * For 'release': downloads the GitHub tarball for the tag (or latest) and
  * extracts into `$tmp`. For 'git': shallow clones the branch into `$tmp` and
  * optionally checks out `<branch>@{<pin>}` if a date pin is provided.
+ * Returns the fetched version label used for downgrade/rollback visibility.
  * Fatal on failure.
  */
-function fetchSnapshot(array $spec, string $tmp): void
+function fetchSnapshot(array $spec, string $tmp): string
 {
     if ($spec['type'] === 'release') {
         $tag = $spec['pin'] !== '' ? $spec['pin'] : resolveLatestRelease();
@@ -651,7 +652,7 @@ function fetchSnapshot(array $spec, string $tmp): void
         );
         pmssRunBootstrapCommand($cmd, EXIT_FETCH);
         pmssRunBootstrapCommand('tar -xzf '.escapeshellarg($tar).' -C '.escapeshellarg($tmp).' --strip-components=1', EXIT_FETCH);
-        return;
+        return 'release:'.$tag;
     }
 
     $clone = sprintf(
@@ -671,13 +672,15 @@ function fetchSnapshot(array $spec, string $tmp): void
         }
         logmsg('[WARN] git clone failed; falling back to codeload branch tarball');
         pmssFetchBranchTarball($spec['repo'], $spec['branch'], $tmp);
-        return;
+        return pmssBuildVersionSpec($spec);
     }
 
     if ($spec['pin'] !== '') {
         $rev = escapeshellarg($spec['branch'].'@{'.$spec['pin'].'}');
         pmssRunBootstrapCommand('cd '.escapeshellarg($tmp).' && git fetch --quiet && git checkout '.$rev, EXIT_FETCH);
     }
+
+    return pmssBuildVersionSpec($spec);
 }
 
 /**
@@ -1583,6 +1586,158 @@ function collectCommitHash(string $tmp): string
     return trim((string)$rev);
 }
 
+function collectCommitTimestamp(string $tmp): string
+{
+    $date = @shell_exec(pmssShellCommandWithoutInheritedUpdateLock('cd '.escapeshellarg($tmp).' && git log -1 --format=%cI 2>/dev/null'));
+    if (preg_match('/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/', trim((string) $date), $m) === 1) {
+        return $m[1].' '.$m[2];
+    }
+
+    return '';
+}
+
+function pmssBuildVersionSpec(array $spec): string
+{
+    if (($spec['type'] ?? '') === 'release') {
+        $pin = (string) ($spec['pin'] ?? '');
+        return 'release'.($pin !== '' ? ':'.$pin : '');
+    }
+
+    $repo = (string) ($spec['repo'] ?? DEFAULT_REPO);
+    $branch = (string) ($spec['branch'] ?? 'main');
+    $pin = (string) ($spec['pin'] ?? '');
+    $version = $repo === DEFAULT_REPO ? 'git/'.$branch : 'git/'.$repo.':'.$branch;
+
+    return $version.($pin !== '' ? ':'.$pin : '');
+}
+
+function pmssSpecHasExplicitVersionPin(array $spec): bool
+{
+    return trim((string) ($spec['pin'] ?? '')) !== '';
+}
+
+function pmssFetchedVersionLine(array $spec, string $fetchedVersion, string $tmp): string
+{
+    if (($spec['type'] ?? '') !== 'git' || pmssSpecHasExplicitVersionPin($spec)) {
+        return $fetchedVersion;
+    }
+
+    $timestamp = collectCommitTimestamp($tmp);
+    return $timestamp !== '' ? $fetchedVersion.'@'.$timestamp : $fetchedVersion;
+}
+
+function pmssVersionOrderingDate(string $version): string
+{
+    $version = trim($version);
+    if ($version === '') {
+        return '';
+    }
+
+    $spec = $version;
+    $recorded = '';
+    if (preg_match('/^(.*)@(\d{4}-\d{2}-\d{2})(?:[ T]\d{2}:\d{2})?$/', $version, $m) === 1) {
+        $spec = trim($m[1]);
+        $recorded = $m[2];
+    }
+
+    if (preg_match('/^release[:\/].*?(\d{4}-\d{2}-\d{2})/i', $spec, $m) === 1) {
+        return pmssValidatedVersionDate($m[1]);
+    }
+    if (preg_match('/^git\/.+:(\d{4}-\d{2}-\d{2})(?:[ T]\d{2}:\d{2})?$/i', $spec, $m) === 1) {
+        return pmssValidatedVersionDate($m[1]);
+    }
+    if (preg_match('/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?$/', $spec, $m) === 1) {
+        return pmssValidatedVersionDate(substr($spec, 0, 10));
+    }
+    if ($recorded !== '' && preg_match('/^(git\/.+|release)$/i', $spec) === 1) {
+        return pmssValidatedVersionDate($recorded);
+    }
+
+    return '';
+}
+
+function pmssValidatedVersionDate(string $date): string
+{
+    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m) !== 1) {
+        return '';
+    }
+
+    if (!checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
+        return '';
+    }
+
+    return $m[1].'-'.$m[2].'-'.$m[3];
+}
+
+function pmssVersionMoveDecision(string $installedVersion, string $fetchedVersion, bool $explicitTarget): array
+{
+    $installedDate = pmssVersionOrderingDate($installedVersion);
+    $fetchedDate = pmssVersionOrderingDate($fetchedVersion);
+    if ($installedDate === '' || $fetchedDate === '') {
+        return ['allowed' => true, 'ordering' => 'indeterminate', 'installed_order' => $installedDate, 'fetched_order' => $fetchedDate];
+    }
+
+    $comparison = strcmp($fetchedDate, $installedDate);
+    $ordering = $comparison < 0 ? 'backward' : ($comparison > 0 ? 'forward' : 'same');
+
+    return [
+        'allowed' => $ordering !== 'backward' || $explicitTarget,
+        'ordering' => $ordering,
+        'installed_order' => $installedDate,
+        'fetched_order' => $fetchedDate,
+    ];
+}
+
+function pmssInstalledVersionLine(): string
+{
+    if (!is_readable(VERSION_FILE)) {
+        return '';
+    }
+
+    return trim((string) @file_get_contents(VERSION_FILE));
+}
+
+function pmssVersionLogLabel(string $version): string
+{
+    $version = trim($version);
+    return $version !== '' ? $version : '(none)';
+}
+
+function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarget): void
+{
+    $installedVersion = pmssInstalledVersionLine();
+    $decision = pmssVersionMoveDecision($installedVersion, $fetchedVersion, $explicitTarget);
+    $mode = $explicitTarget ? 'explicit target' : 'unpinned target';
+    $message = '[INFO] Snapshot version transition: '
+        .pmssVersionLogLabel($installedVersion).' -> '.pmssVersionLogLabel($fetchedVersion)
+        .' ('.$decision['ordering'].', '.$mode.')';
+
+    if ($decision['ordering'] === 'indeterminate') {
+        $message .= '; ordering indeterminate, proceeding';
+    } elseif ($decision['ordering'] === 'backward' && $explicitTarget) {
+        $message .= '; explicit rollback allowed';
+    }
+
+    logmsg($message);
+    logEvent('snapshot_version_transition', [
+        'installed_version' => $installedVersion,
+        'fetched_version' => $fetchedVersion,
+        'ordering' => $decision['ordering'],
+        'explicit_target' => $explicitTarget,
+        'allowed' => $decision['allowed'],
+    ]);
+
+    if (!$decision['allowed']) {
+        fatal(
+            'Refusing unpinned backwards PMSS version move: installed '
+            .pmssVersionLogLabel($installedVersion).' is newer than fetched '
+            .pmssVersionLogLabel($fetchedVersion)
+            .'. Pin the target explicitly (release:<tag> or git/<branch>:YYYY-MM-DD) if this rollback is intended.',
+            EXIT_FETCH
+        );
+    }
+}
+
 /**
  * Record the applied version for auditability.
  *
@@ -1849,6 +2004,7 @@ function bootstrapMain(array $argv): void
         fatal("Invalid source spec '{$options['spec']}'", EXIT_PARSE);
     }
     $spec = parseSpec($specRaw);
+    $explicitVersionTarget = pmssSpecHasExplicitVersionPin($spec);
 
     logmsg('Source spec → '.json_encode($spec));
     logEvent('update_start', [
@@ -1881,14 +2037,12 @@ function bootstrapMain(array $argv): void
         $workdir = createWorkdir();
 
         try {
-            fetchSnapshot($spec, $workdir);
+            $fetchedVersion = fetchSnapshot($spec, $workdir);
             $spec['commit'] = $spec['type'] === 'git' ? collectCommitHash($workdir) : '';
+            $fetchedVersion = pmssFetchedVersionLine($spec, $fetchedVersion, $workdir);
+            $versionSpec = pmssBuildVersionSpec($spec);
+            pmssGuardSnapshotVersionMove($fetchedVersion, $explicitVersionTarget);
             stageSnapshot($workdir, $options['dry_run']);
-
-            $versionSpec = $spec['type'] === 'release'
-                ? 'release'.($spec['pin'] !== '' ? ':'.$spec['pin'] : '')
-                : (($spec['repo'] === DEFAULT_REPO ? 'git/'.$spec['branch'] : 'git/'.$spec['repo'].':'.$spec['branch'])
-                    .($spec['pin'] !== '' ? ':'.$spec['pin'] : ''));
 
             recordVersion($versionSpec, [
                 'spec_input'      => $options['spec'],
@@ -1898,10 +2052,12 @@ function bootstrapMain(array $argv): void
                 'branch'          => $spec['branch'],
                 'pin'             => $spec['pin'],
                 'commit'          => $spec['commit'] ?? '',
+                'fetched_version' => $fetchedVersion,
             ], $options['dry_run']);
 
             logEvent('snapshot_applied', [
                 'version_spec' => $versionSpec,
+                'fetched_version' => $fetchedVersion,
                 'commit'       => $spec['commit'] ?? '',
                 'dry_run'      => $options['dry_run'],
             ]);
