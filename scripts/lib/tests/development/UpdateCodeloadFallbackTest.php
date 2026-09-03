@@ -47,4 +47,23 @@ class UpdateCodeloadFallbackTest extends TestCase
             'a pinned spec must stay fatal on clone failure (tarball has no git history)'
         );
     }
+
+    public function testGitCloneAndPinFetchForceHttp11ToAvoidGitHubHttp2Challenge(): void
+    {
+        // GitHub's edge 401s the anonymous git-upload-pack POST over HTTP/2 from some
+        // source networks (a known curl-HTTP/2 <-> GitHub failure class); HTTP/1.1 is
+        // served normally. update.php must force HTTP/1.1 on BOTH the clone and the
+        // pin-path fetch (both hit git-upload-pack). Harmless where HTTP/2 would work.
+        // See docs/adr/0052.
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/update.php',
+            [
+                "const GIT_HTTP_VERSION_FLAG = '-c http.version=HTTP/1.1';",
+                "'git %s clone --quiet",
+                'GIT_HTTP_VERSION_FLAG,',
+                "git '.GIT_HTTP_VERSION_FLAG.' fetch",
+            ],
+            'update.php must force HTTP/1.1 on the git clone and the pin-path fetch (git-upload-pack over HTTP/2 is challenged): '
+        );
+    }
 }

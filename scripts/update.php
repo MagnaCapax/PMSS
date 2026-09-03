@@ -43,6 +43,7 @@ declare(strict_types=1);
 
 const DEFAULT_REPO          = 'https://github.com/MagnaCapax/PMSS';
 const CURL_UA               = 'PMSS-Updater (+https://pulsedmedia.com)';
+const GIT_HTTP_VERSION_FLAG = '-c http.version=HTTP/1.1';
 const VERSION_DIR           = '/etc/seedbox/config';
 const VERSION_FILE          = VERSION_DIR.'/version';
 const VERSION_META          = VERSION_DIR.'/version.meta';
@@ -655,8 +656,12 @@ function fetchSnapshot(array $spec, string $tmp): string
         return 'release:'.$tag;
     }
 
+    // Force HTTP/1.1 for the fetch: GitHub's edge 401s the anonymous git-upload-pack POST
+    // over HTTP/2 from some source networks (a known curl-HTTP/2 <-> GitHub failure class),
+    // while HTTP/1.1 is served normally. Harmless where HTTP/2 would have worked. See ADR-0052.
     $clone = sprintf(
-        'git clone --quiet --depth=1 --branch %s %s %s',
+        'git %s clone --quiet --depth=1 --branch %s %s %s',
+        GIT_HTTP_VERSION_FLAG,
         escapeshellarg($spec['branch']),
         escapeshellarg($spec['repo']),
         escapeshellarg($tmp)
@@ -677,7 +682,7 @@ function fetchSnapshot(array $spec, string $tmp): string
 
     if ($spec['pin'] !== '') {
         $rev = escapeshellarg($spec['branch'].'@{'.$spec['pin'].'}');
-        pmssRunBootstrapCommand('cd '.escapeshellarg($tmp).' && git fetch --quiet && git checkout '.$rev, EXIT_FETCH);
+        pmssRunBootstrapCommand('cd '.escapeshellarg($tmp).' && git '.GIT_HTTP_VERSION_FLAG.' fetch --quiet && git checkout '.$rev, EXIT_FETCH);
     }
 
     return pmssBuildVersionSpec($spec);
