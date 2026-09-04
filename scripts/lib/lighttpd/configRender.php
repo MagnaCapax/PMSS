@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__.'/../user/identity.php';
+require_once __DIR__.'/panelSessionLogin.php';
 require_once __DIR__.'/userFileWrite.php';
 
 function pmssClampLighttpdBandwidthLimits(string $config): string
@@ -59,7 +60,8 @@ function pmssLighttpdRenderUserConfig(
     int $serverPort,
     int $rclonePort,
     int $qbittorrentPort,
-    array $resources
+    array $resources,
+    array $panelSessionLogin = []
 ): string {
     $config = str_replace(
         ["##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##"],
@@ -73,7 +75,8 @@ function pmssLighttpdRenderUserConfig(
         1
     );
 
-    return pmssClampLighttpdBandwidthLimits(is_string($config) ? $config : (string) $template);
+    $config = pmssClampLighttpdBandwidthLimits(is_string($config) ? $config : (string) $template);
+    return pmssLighttpdPanelSessionConfigApply($config, $user, $panelSessionLogin);
 }
 
 function pmssLighttpdApplyPhpIniContent(string $content, string $user, int $memoryLimitMiB): string

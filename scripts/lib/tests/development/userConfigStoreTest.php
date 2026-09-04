@@ -157,6 +157,9 @@ class UserConfigStoreTest extends TestCase
             ['lighton', ['ramMiB' => 512, 'rtorrentPort' => 5012], ['lighttpdEnabled' => true]],
             ['dckprod', ['ramMiB' => 512, 'rtorrentPort' => 5007, 'productType' => 'storage-box'], ['dockerEnabled' => true]],
             ['dckex', ['ramMiB' => 512, 'rtorrentPort' => 5008, 'product' => 'Storage Box 100', 'dockerEnabled' => true], ['dockerEnabled' => true]],
+            ['paneldef', ['ramMiB' => 512, 'rtorrentPort' => 5014], ['panelSessionLogin' => false]],
+            ['panelon', ['ramMiB' => 512, 'rtorrentPort' => 5015, 'panelSessionLogin' => 'true'], ['panelSessionLogin' => true]],
+            ['paneloff', ['ramMiB' => 512, 'rtorrentPort' => 5016, 'panelSessionLogin' => 'off'], ['panelSessionLogin' => false]],
             ['dckzero', ['rtorrentPort' => 5003, 'dockerEnabled' => 0], ['dockerEnabled' => false]],
             ['dckstr', ['rtorrentPort' => 5004, 'dockerEnabled' => 'false'], ['dockerEnabled' => false]],
             ['dcktrue', ['ramMiB' => 512, 'rtorrentPort' => 5005, 'dockerEnabled' => 'true'], ['dockerEnabled' => true]],
@@ -288,6 +291,29 @@ class UserConfigStoreTest extends TestCase
         $this->assertEquals(false, \pmssUserLingerEnabled('../evil', $store));
     }
 
+    public function testPmssUserPanelSessionLoginEnabledDefaultsOffAndNormalisesStoredValues(): void
+    {
+        $store = $this->newStore();
+        $this->assertEquals(false, \pmssUserPanelSessionLoginEnabled('alice', $store));
+
+        foreach ([
+            ['panelfalse', false, false],
+            ['panelzero', 0, false],
+            ['panelstrfalse', 'false', false],
+            ['panelstroff', 'off', false],
+            ['panelempty', '', false],
+            ['paneltrue', true, true],
+            ['panelone', 1, true],
+            ['panelstrtrue', 'true', true],
+            ['panelstrone', '1', true],
+        ] as $case) {
+            $this->assertTrue($store->set($case[0], $this->basePayload(['panelSessionLogin' => $case[1]])));
+            $this->assertEquals($case[2], \pmssUserPanelSessionLoginEnabled($case[0], $store), $case[0]);
+        }
+
+        $this->assertEquals(false, \pmssUserPanelSessionLoginEnabled('../evil', $store));
+    }
+
     public function testResolvePayloadKeepsMissingValidUserAsEmptyArray(): void
     {
         $store = new \UserConfigStore($this->configDirPath());
@@ -301,6 +327,7 @@ class UserConfigStoreTest extends TestCase
     {
         $store = $this->newStore();
         $this->assertTrue(function_exists('pmssUserConfigFeatureEnabled'));
+        $this->assertTrue(function_exists('pmssUserPanelSessionLoginEnabled'));
         $this->assertEquals(true, \pmssUserConfigFeatureEnabled('alice', 'dockerEnabled', $store));
 
         $payload = $this->basePayload(['lighttpdEnabled' => false]);

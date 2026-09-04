@@ -275,6 +275,7 @@ LIGHTTPD;
         $this->assertStringContainsAllStrings([
             "require_once __DIR__.'/configRender.php';",
             "require_once __DIR__.'/delugeWebConf.php';",
+            "require_once __DIR__.'/panelSessionLogin.php';",
             "require_once __DIR__.'/proxyFragments.php';",
             "require_once __DIR__.'/resourcePlan.php';",
             "require_once __DIR__.'/userDirectoriesPrepare.php';",
@@ -293,6 +294,8 @@ LIGHTTPD;
             'pmssDelugeReadWebConf',
             'pmssDelugeWriteWebConf',
             'pmssLighttpdManagedProxyFragment',
+            'pmssLighttpdPanelSessionConfigApply',
+            'pmssLighttpdPanelSessionGateDeploy',
         ] as $functionName) {
             $this->assertTrue(function_exists($functionName), $functionName.' should be loaded through the facade');
         }

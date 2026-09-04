@@ -239,6 +239,7 @@ class UserConfigStore
 
         $payload['dockerEnabled'] = pmssUserConfigNormaliseToggleValue($payload, 'dockerEnabled');
         $payload['lighttpdEnabled'] = pmssUserConfigNormaliseToggleValue($payload, 'lighttpdEnabled');
+        $payload['panelSessionLogin'] = pmssUserConfigNormaliseToggleValue($payload, 'panelSessionLogin', false);
         $payload['scheduledConfigBackup'] = pmssUserConfigNormaliseToggleValue($payload, 'scheduledConfigBackup', false);
 
         // Safety gate: keep rootless Docker disabled for low-memory accounts.

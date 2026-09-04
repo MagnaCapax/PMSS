@@ -12,6 +12,7 @@ require_once __DIR__.'/../systemdSliceProperties.php';
 require_once __DIR__.'/userFileWrite.php';
 require_once __DIR__.'/configRender.php';
 require_once __DIR__.'/delugeWebConf.php';
+require_once __DIR__.'/panelSessionLogin.php';
 require_once __DIR__.'/proxyFragments.php';
 require_once __DIR__.'/resourcePlan.php';
 require_once __DIR__.'/userDirectoriesPrepare.php';
@@ -112,8 +113,26 @@ function pmssUserConfigLighttpdConfigureUser(
         $thisUser,
         ['MemoryHigh', 'MemoryMax', 'CPUQuotaPerSecUSec', 'CPUQuotaPeriodUSec', 'CPUQuota']
     );
-    $resources = pmssLighttpdResourcePlan($props, $policyDefaults, pmssLighttpdUserConfigLoad($thisUser));
-    $thisUserConfig = pmssLighttpdRenderUserConfig($template, $thisUser, $serverPort, $rclonePort, $qbittorrentPort, $resources);
+    $userConfig = pmssLighttpdUserConfigLoad($thisUser);
+    $resources = pmssLighttpdResourcePlan($props, $policyDefaults, $userConfig);
+    $panelSessionLoginEnabled = pmssUserPanelSessionLoginEnabledFromPayload($userConfig);
+    if ($panelSessionLoginEnabled && !pmssLighttpdPanelSessionGateDeploy($thisUser, $homeDir)) {
+        fwrite(STDERR, "[user:{$thisUser}] panelSessionLogin enabled but Lua gate deployment failed; using Basic-only config\n");
+    }
+    $panelSessionLogin = pmssLighttpdPanelSessionLoginOptions($thisUser, $homeDir, $panelSessionLoginEnabled);
+    $panelSessionFallbackReason = pmssLighttpdPanelSessionLoginFallbackReason($panelSessionLogin);
+    if ($panelSessionFallbackReason !== '') {
+        fwrite(STDERR, "[user:{$thisUser}] panelSessionLogin enabled but {$panelSessionFallbackReason}; using Basic-only config\n");
+    }
+    $thisUserConfig = pmssLighttpdRenderUserConfig(
+        $template,
+        $thisUser,
+        $serverPort,
+        $rclonePort,
+        $qbittorrentPort,
+        $resources,
+        $panelSessionLogin
+    );
     // Managed authoritative config (ADR-0032): root-owned + world-readable (0644) so the
     // per-user lighttpd can read it but the user cannot edit it (edits belong in
     // ~/.lighttpd/custom.d/). Only root-context callers (addUser, checkLighttpdInstances

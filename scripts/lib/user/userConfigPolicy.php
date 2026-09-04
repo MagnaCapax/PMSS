@@ -67,3 +67,16 @@ function pmssUserScheduledConfigBackupEnabled(string $username, ?UserConfigStore
     $payload = pmssUserConfigResolvePayload($username, $store);
     return $payload !== null && pmssUserConfigNormaliseToggleValue($payload, 'scheduledConfigBackup', false);
 }
+
+/** Read the opt-in panel session-cookie login flag from a normalized payload. */
+function pmssUserPanelSessionLoginEnabledFromPayload(array $payload): bool
+{
+    return pmssUserConfigNormaliseToggleValue($payload, 'panelSessionLogin', false);
+}
+
+/** Check whether the user opted into panel session-cookie login. */
+function pmssUserPanelSessionLoginEnabled(string $username, ?UserConfigStore $store = null): bool
+{
+    $payload = pmssUserConfigResolvePayload($username, $store);
+    return $payload !== null && pmssUserPanelSessionLoginEnabledFromPayload($payload);
+}
