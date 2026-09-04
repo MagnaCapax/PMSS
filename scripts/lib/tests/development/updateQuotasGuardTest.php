@@ -7,10 +7,12 @@ class UpdateQuotasGuardTest extends TestCase
 {
     public function testRootCronGuardsUpdateQuotasAgainstOverlap(): void
     {
+        // Migrated to the canonical in-script lock (ADR-0049 / #853): the former
+        // root.cron `flock -xn` is retired; updateQuotas.php now self-locks.
         $this->pmssAssertRepoFileContainsAllStrings(
-            'etc/seedbox/config/root.cron',
-            ['* * * * *', 'flock -xn /tmp/pmss-updateQuotas.lock', '/scripts/cron/updateQuotas.php'],
-            'root.cron should guard updateQuotas with flock: '
+            'scripts/cron/updateQuotas.php',
+            ["pmssLockFileAcquire(pmssRuntimeLockPath('pmss-updateQuotas.lock')", '=== false'],
+            'updateQuotas must self-lock against overlap (ADR-0049 in-script lock): '
         );
     }
 

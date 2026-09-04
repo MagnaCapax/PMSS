@@ -18,7 +18,15 @@ require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/userLifecycle.php';
 require_once __DIR__.'/../lib/quotaSnapshot.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
+require_once '/scripts/lib/runtime.php';
 $logger = new Logger(__FILE__);
+
+// Serialize runs with the canonical in-script lock (ADR-0049), replacing the
+// former root.cron `flock -xn`. Overlapping runs would race per-user quota
+// snapshot writes and stack on a hung mount (GH #850/#853). Non-blocking: skip
+// if another run holds the lock. Hold the handle until exit.
+$updateQuotasLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-updateQuotas.lock'), true);
+if ($updateQuotasLock === false) { fwrite(STDERR, "updateQuotas already running; skipping\n"); exit(0); }
 
 /**
  * Atomically replace a quota snapshot without exposing a missing-file window.
