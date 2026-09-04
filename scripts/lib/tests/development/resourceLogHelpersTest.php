@@ -79,7 +79,8 @@ class ResourceLogHelpersTest extends TestCase
                 "8:0 Read 1000\n8:0 Write 2000\n8:16 Read 500\n8:16 Write 250\nTotal 3750\n",
             'blkio/'.$slice.'/blkio.throttle.io_serviced' =>
                 "8:0 Read 10\n8:0 Write 20\n8:16 Read 5\n8:16 Write 2\nTotal 37\n",
-            'memory/'.$slice.'/memory.stat' => "cache 4444\nrss 3333\nrss_huge 0\n",
+            // User processes live below user-<uid>.slice; local counters may therefore be zero.
+            'memory/'.$slice.'/memory.stat' => "cache 0\nrss 0\ntotal_cache 4444\ntotal_rss 3333\nrss_huge 0\n",
         ]);
 
         $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
@@ -96,6 +97,21 @@ class ResourceLogHelpersTest extends TestCase
                 'memory_anon' => 3333,
                 'memory_file' => 4444,
             ], $counters);
+        });
+    }
+
+    public function testReadCountersV1FallsBackToLocalMemoryStatFields(): void
+    {
+        $slice = 'user.slice/user-1000.slice';
+        $root = $this->makeV1CgroupTree(1000, [
+            'memory/'.$slice.'/memory.stat' => "cache 4444\nrss 3333\n",
+        ]);
+
+        $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
+            $this->assertSame([
+                'memory_anon' => 3333,
+                'memory_file' => 4444,
+            ], \pmssResourceLogReadCounters(1000, $root));
         });
     }
 

@@ -205,9 +205,14 @@ function pmssResourceLogReadCountersV1(int $uid, ?string $cgroupRoot = null): ?a
         }
     }
 
-    // v1 memory.stat uses rss/cache where v2 uses anon/file; map to the shared output keys.
-    foreach (['rss' => 'memory_anon', 'cache' => 'memory_file'] as $field => $key) {
-        if (($value = pmssResourceLogReadMemoryStatField($root.'/memory'.$slice.'memory.stat', $field)) !== null) $values[$key] = $value;
+    // The user slice owns child cgroups, so prefer hierarchical totals over its often-zero local fields.
+    foreach (['memory_anon' => ['total_rss', 'rss'], 'memory_file' => ['total_cache', 'cache']] as $key => $fields) {
+        foreach ($fields as $field) {
+            $value = pmssResourceLogReadMemoryStatField($root.'/memory'.$slice.'memory.stat', $field);
+            if ($value === null) continue;
+            $values[$key] = $value;
+            break;
+        }
     }
 
     return $values === [] ? null : $values;
