@@ -14,6 +14,13 @@ require_once '/scripts/lib/user/log.php';
 require_once '/scripts/lib/user/userConfigStore.php';
 require_once '/scripts/lib/user/watchdog.php';
 
+// Serialize runs with the canonical in-script lock (ADR-0049), replacing the
+// former root.cron `flock -xn`. Overlapping runs would race per-user rootless
+// Docker (re)starts and stack on a hung mount (GH #850/#853). Non-blocking:
+// skip if another run holds the lock. Hold the handle until exit.
+$checkRootlessDockerLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkRootlessDocker.lock'), true);
+if ($checkRootlessDockerLock === false) { fwrite(STDERR, "checkRootlessDocker already running; skipping\n"); exit(0); }
+
 $logger = new Logger(__FILE__);
 // Mirror messages to the legacy logfile when stdout is interactive.
 $mirrorLegacy = pmssStreamIsTty(STDOUT, true);

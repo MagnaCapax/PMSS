@@ -42,7 +42,7 @@ MAILTO=""
 # Opt-in per-name HTTPS: issue certs for users who ran ~/bin/createWebPublicCerts (ADR 0039). No-op when none pending.
 */5 * * * *   root    sleep 33; /scripts/cron/webPublicCertsProcess.php >> /var/log/pmss/webPublicCertsProcess.log 2>&1
 * * * * *   root /scripts/cron/updateQuotas.php >> /var/log/pmss/updateQuotas.log 2>&1
-*/5 * * * * root flock -xn -o /run/lock/pmss-checkRootlessDocker.lock /scripts/cron/checkRootlessDocker.php >> /var/log/pmss/rootlessDocker.log 2>&1
+*/5 * * * * root /scripts/cron/checkRootlessDocker.php >> /var/log/pmss/rootlessDocker.log 2>&1
 */15 * * * *   root    /scripts/cron/processWatchdog.sh >> /var/log/pmss/checkProcessWatchdog.log 2>&1
 */5 * * * *   root    /scripts/cron/trafficLog.php >> /var/log/pmss/trafficLog.log 2>&1
 */5 * * * *   root    flock -xn -o /run/lock/pmss-trafficIngressLog.lock /scripts/cron/trafficIngressLog.php >> /var/log/pmss/trafficIngressLog.log 2>&1

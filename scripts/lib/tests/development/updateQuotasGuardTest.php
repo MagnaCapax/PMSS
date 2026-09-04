@@ -18,10 +18,11 @@ class UpdateQuotasGuardTest extends TestCase
 
     public function testRootCronGuardsRootlessDockerWithCloseOnExec(): void
     {
+        // Migrated to the canonical in-script lock (ADR-0049 / #853): checkRootlessDocker.php self-locks.
         $this->pmssAssertRepoFileContainsAllStrings(
-            'etc/seedbox/config/root.cron',
-            ['*/5 * * * * root flock -xn -o /run/lock/pmss-checkRootlessDocker.lock /scripts/cron/checkRootlessDocker.php', '/var/log/pmss/rootlessDocker.log'],
-            'root.cron should guard rootless Docker without leaking the lock fd: '
+            'scripts/cron/checkRootlessDocker.php',
+            ["pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkRootlessDocker.lock')", '=== false'],
+            'checkRootlessDocker must self-lock against overlap (ADR-0049 in-script lock): '
         );
     }
 
