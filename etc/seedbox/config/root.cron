@@ -60,7 +60,7 @@ MAILTO=""
 14 * * * *   root    /scripts/cron/usageAlertsNotify.php >> /var/log/pmss/usageAlerts.log 2>&1
 7 * * * *   root    sleep 55; /scripts/cron/iopsLimits.php >> /var/log/pmss/iopsLimits.log 2>&1
 25,55 * * * *   root    /bin/sleep 20; /scripts/cron/trafficStats.php >> /var/log/pmss/trafficStats.log 2>&1
-25,55 * * * *   root    /bin/sleep 25; flock -xn -o /run/lock/pmss-trafficIngressStats.lock /scripts/cron/trafficIngressStats.php >> /var/log/pmss/trafficIngressStats.log 2>&1
+25,55 * * * *   root    /bin/sleep 25; /scripts/cron/trafficIngressStats.php >> /var/log/pmss/trafficIngressStats.log 2>&1
 25,55 * * * *   root    /bin/sleep 30; /scripts/cron/resourceStats.php >> /var/log/pmss/resourceStats.log 2>&1
 */5 * * * *   root    /scripts/cron/checkWireguard.php >> /var/log/pmss/checkWireguard.log 2>&1
 */6 * * * *   root    /scripts/cron/wireguardPeersRefresh.php >> /var/log/pmss/wireguardPeersRefresh.log 2>&1
