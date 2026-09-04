@@ -1,7 +1,7 @@
 # ADR 0052: update.php forces HTTP/1.1 on its git operations to avoid the GitHub HTTP/2 upload-pack challenge
 
 Date: 2026-09-03
-Category: infrastructure
+Category: architecture
 
 ## Status
 Accepted
