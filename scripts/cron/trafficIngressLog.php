@@ -10,6 +10,14 @@
 require_once '/scripts/lib/traffic.php';
 require_once '/scripts/lib/traffic/ingress.php';
 require_once '/scripts/lib/networkInfo.php';
+require_once '/scripts/lib/runtime.php';
+
+// Serialize runs with the canonical in-script lock (ADR-0049), replacing the
+// former root.cron `flock -xn`. Each run does a read-modify-write of a per-user
+// delta-state file (pmssTrafficIngressUpdateState) — overlapping runs would
+// double-count or lose ingress deltas (billing). Non-blocking: skip if busy.
+$trafficIngressLogLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-trafficIngressLog.lock'), true);
+if ($trafficIngressLogLock === false) { fwrite(STDERR, "trafficIngressLog already running; skipping\n"); exit(0); }
 
 $logDir = '/var/log/pmss/traffic-ingress';
 $stateDir = '/var/run/pmss/trafficIngress';
