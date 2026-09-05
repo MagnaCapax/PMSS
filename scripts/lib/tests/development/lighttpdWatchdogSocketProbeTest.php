@@ -199,6 +199,77 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         );
     }
 
+    public function testListeningSocketSnapshotPreservesProbeStatus(): void
+    {
+        $path = '/home/alice/.lighttpd/php.socket-1';
+        $healthyReader = static function () use ($path): array {
+            return array('lines' => array('u_str LISTEN 0 1024 '.$path.' 12345 * 0'), 'rc' => 0);
+        };
+        $failedReader = static function (): array {
+            return array('lines' => array(), 'rc' => 124);
+        };
+
+        $this->assertSame(
+            array('ok' => true, 'paths' => array($path)),
+            \pmssLighttpdWatchdogListeningSocketSnapshot('/home/alice', array('reader' => $healthyReader))
+        );
+        $this->assertSame(
+            array('ok' => false, 'paths' => array()),
+            \pmssLighttpdWatchdogListeningSocketSnapshot('/home/alice', array('reader' => $failedReader))
+        );
+    }
+
+    public function testListenerCoverageRequiresConfiguredCount(): void
+    {
+        $this->assertFalse(\pmssLighttpdWatchdogListenerCoverageIsHealthy(array(), array('/socket-1')));
+        $this->assertFalse(\pmssLighttpdWatchdogListenerCoverageIsHealthy(array('/socket-0'), array()));
+        $this->assertFalse(\pmssLighttpdWatchdogListenerCoverageIsHealthy(array('/socket-0', '/socket-1'), array('/socket-2')));
+        $this->assertTrue(\pmssLighttpdWatchdogListenerCoverageIsHealthy(array('/socket-0'), array('/socket-2')));
+        $this->assertTrue(\pmssLighttpdWatchdogListenerCoverageIsHealthy(array('/socket-0', '/socket-1'), array('/socket-2', '/socket-3')));
+        $this->assertFalse(\pmssLighttpdWatchdogListenerCoverageIsHealthy(array('/socket-0', '/socket-1'), array('/socket-2', '/socket-2')));
+    }
+
+    public function testRestartVerificationRetriesAndReportsOutcome(): void
+    {
+        $calls = 0;
+        $sleeps = array();
+        $reader = static function () use (&$calls): array {
+            $calls++;
+            $lines = $calls < 2 ? array() : array('u_str LISTEN 0 1024 /home/alice/.lighttpd/php.socket-4 12345 * 0');
+            return array('lines' => $lines, 'rc' => 0);
+        };
+        $sleep = static function (int $seconds) use (&$sleeps): void {
+            $sleeps[] = $seconds;
+        };
+
+        $this->assertSame(
+            array('status' => 'healthy', 'attempts' => 2, 'expected' => 1, 'observed' => 1),
+            \pmssLighttpdWatchdogRestartVerify('/home/alice', array('/socket-0'), array(
+                'attemptCount' => 3,
+                'retryDelaySeconds' => 1,
+                'reader' => $reader,
+                'sleep' => $sleep,
+            ))
+        );
+        $this->assertSame(array(1), $sleeps);
+    }
+
+    public function testRestartVerificationDistinguishesDownFromUnverified(): void
+    {
+        $noListeners = static function (): array { return array('lines' => array(), 'rc' => 0); };
+        $probeFailure = static function (): array { return array('lines' => array(), 'rc' => 124); };
+        $options = array('attemptCount' => 1, 'retryDelaySeconds' => 0);
+
+        $this->assertSame(
+            array('status' => 'restart_attempted_still_down', 'attempts' => 1, 'expected' => 1, 'observed' => 0),
+            \pmssLighttpdWatchdogRestartVerify('/home/alice', array('/socket-0'), $options + array('reader' => $noListeners))
+        );
+        $this->assertSame(
+            array('status' => 'restart_attempted_unverified', 'attempts' => 1, 'expected' => 1, 'observed' => 0),
+            \pmssLighttpdWatchdogRestartVerify('/home/alice', array('/socket-0'), $options + array('reader' => $probeFailure))
+        );
+    }
+
     public function testStaleIndexDecisionRequiresRefusalAndConfiguredWorkerCount(): void
     {
         $expected = array('/socket-0', '/socket-1');

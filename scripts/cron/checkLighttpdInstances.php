@@ -167,4 +167,14 @@ foreach($users AS $thisUser) {
         }
     );
     pmssUserWatchdogEnsureServices($thisUser, [pmssUserWatchdogServiceSpec('lighttpd', '/scripts/startLighttpd ' . $thisUser, 'lighttpd start requested')], ['lighttpd' => $lighttpdRunning]);
+    if ($restartRequired) {
+        $restartVerification = pmssLighttpdWatchdogRestartVerify($homeDir, $socketPaths);
+        if ($restartVerification['status'] !== 'healthy') {
+            $restartFailure = 'checkLighttpdInstances: '.$restartVerification['status'].' user='.$thisUser
+                .' expected_listeners='.$restartVerification['expected'].' observed_listeners='.$restartVerification['observed']
+                .' attempts='.$restartVerification['attempts'];
+            echo $restartFailure."\n";
+            pmssUserLog($thisUser, $restartFailure);
+        }
+    }
 }

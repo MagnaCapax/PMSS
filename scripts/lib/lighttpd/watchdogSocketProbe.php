@@ -6,6 +6,7 @@
  */
 
 require_once dirname(__DIR__).'/pathSafety.php';
+require_once dirname(__DIR__).'/runtime.php';
 require_once dirname(__DIR__).'/user/identity.php';
 
 if (!defined('PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_ATTEMPTS')) {
@@ -115,17 +116,20 @@ function pmssLighttpdWatchdogListeningSocketPathsFromLines(array $lines, string 
     return array_values($listeningPaths);
 }
 
-/** Read live php-cgi listener paths without trusting socket files on disk. */
-function pmssLighttpdWatchdogListeningSocketPaths(string $homeDir, array $options = array()): array
+/** Read one bounded live-listener snapshot without trusting socket files on disk. */
+function pmssLighttpdWatchdogListeningSocketSnapshot(string $homeDir, array $options = array()): array
 {
     $reader = isset($options['reader']) && is_callable($options['reader']) ? $options['reader'] : null;
     if ($reader === null) {
-        $reader = static function (): array {
-            $lines = array();
-            $rc = 1;
-            @exec('ss -xln 2>/dev/null', $lines, $rc);
+        $timeoutSeconds = max(1, (int) ($options['timeoutSeconds'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_TIMEOUT_SECONDS));
+        $reader = static function () use ($timeoutSeconds): array {
+            $result = pmssCommandCapture(pmssBuildCommand('ss', array('-xln')), $timeoutSeconds);
+            $stdout = trim((string) ($result['stdout'] ?? ''));
 
-            return array('lines' => $lines, 'rc' => $rc);
+            return array(
+                'lines' => $stdout === '' ? array() : preg_split('/\r?\n/', $stdout),
+                'rc' => (int) ($result['rc'] ?? 1),
+            );
         };
     }
     $result = $reader();
@@ -134,10 +138,51 @@ function pmssLighttpdWatchdogListeningSocketPaths(string $homeDir, array $option
         || !isset($result['lines'])
         || !is_array($result['lines'])
     ) {
-        return array();
+        return array('ok' => false, 'paths' => array());
     }
 
-    return pmssLighttpdWatchdogListeningSocketPathsFromLines($result['lines'], $homeDir);
+    return array('ok' => true, 'paths' => pmssLighttpdWatchdogListeningSocketPathsFromLines($result['lines'], $homeDir));
+}
+
+/** Read live php-cgi listener paths without trusting socket files on disk. */
+function pmssLighttpdWatchdogListeningSocketPaths(string $homeDir, array $options = array()): array
+{
+    return pmssLighttpdWatchdogListeningSocketSnapshot($homeDir, $options)['paths'];
+}
+
+/** Return true when the account has at least its configured listener count. */
+function pmssLighttpdWatchdogListenerCoverageIsHealthy(array $expectedPaths, array $listeningPaths): bool
+{
+    $expectedCount = count(array_unique($expectedPaths));
+
+    return $expectedCount > 0 && count(array_unique($listeningPaths)) >= $expectedCount;
+}
+
+/** Verify a restart restored listener coverage, allowing a brief bounded startup window. */
+function pmssLighttpdWatchdogRestartVerify(string $homeDir, array $expectedPaths, array $options = array()): array
+{
+    $attemptCount = max(1, (int) ($options['attemptCount'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_ATTEMPTS));
+    $retryDelaySeconds = max(0, (int) ($options['retryDelaySeconds'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_RETRY_DELAY_SECONDS));
+    $sleep = isset($options['sleep']) && is_callable($options['sleep']) ? $options['sleep'] : 'sleep';
+    unset($options['attemptCount'], $options['retryDelaySeconds'], $options['sleep']);
+
+    $snapshot = array('ok' => false, 'paths' => array());
+    for ($attempt = 1; $attempt <= $attemptCount; $attempt++) {
+        $snapshot = pmssLighttpdWatchdogListeningSocketSnapshot($homeDir, $options);
+        if ($snapshot['ok'] && pmssLighttpdWatchdogListenerCoverageIsHealthy($expectedPaths, $snapshot['paths'])) {
+            return array('status' => 'healthy', 'attempts' => $attempt, 'expected' => count(array_unique($expectedPaths)), 'observed' => count(array_unique($snapshot['paths'])));
+        }
+        if ($attempt < $attemptCount && $retryDelaySeconds > 0) {
+            $sleep($retryDelaySeconds);
+        }
+    }
+
+    return array(
+        'status' => $snapshot['ok'] ? 'restart_attempted_still_down' : 'restart_attempted_unverified',
+        'attempts' => $attemptCount,
+        'expected' => count(array_unique($expectedPaths)),
+        'observed' => count(array_unique($snapshot['paths'])),
+    );
 }
 
 /** Identify refused stale-index probes only when all configured worker slots remain represented. */
@@ -147,11 +192,8 @@ function pmssLighttpdWatchdogSocketFailureIsStaleIndex(
     array $listeningPaths
 ): bool
 {
-    $expectedCount = count(array_unique($expectedPaths));
-
     return $errno === PMSS_LIGHTTPD_WATCHDOG_SOCKET_ECONNREFUSED
-        && $expectedCount > 0
-        && count(array_unique($listeningPaths)) >= $expectedCount;
+        && pmssLighttpdWatchdogListenerCoverageIsHealthy($expectedPaths, $listeningPaths);
 }
 
 /** Return the per-user marker path for consecutive php-cgi socket failures. */

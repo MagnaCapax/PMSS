@@ -49,6 +49,8 @@ class CronInlineCharacterizationTest extends TestCase
             "'lighttpd watchdog: ' . \$watchdogReason",
             'pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);',
             'pmssLighttpdWatchdogListeningSocketPaths($homeDir)',
+            'pmssLighttpdWatchdogRestartVerify($homeDir, $socketPaths)',
+            '$restartVerification[\'status\'] !== \'healthy\'',
             'pmssLighttpdWatchdogSocketFailureIsStaleIndex(',
             'pmssUserWatchdogHandleSuspended(',
             "'lighttpd stopped due to suspension'",
