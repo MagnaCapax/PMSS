@@ -63,7 +63,7 @@ class QuotaSnapshotTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAllStrings(
             'etc/seedbox/config/template.logrotate.pmss',
-            ['/var/log/pmss/quota-daily.log', 'rotate 9999', 'create 0600 root root'],
+            ['/var/log/pmss/quota-daily.log', 'rotate 120', 'compress', 'delaycompress', 'create 0600 root root'],
             'logrotate policy is missing: '
         );
     }

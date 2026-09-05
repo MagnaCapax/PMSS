@@ -109,12 +109,59 @@ pressure ever materializes on a small-root, very-long-lived node, the remedy is 
 bigger root, archive to the multi-TB /home array, or ship to hallinta — NEVER auto-deletion
 of performance history.** This is the operator's explicit, informed choice.
 
+## Amendment 2026-09-05 — compression and bounded retention supersede keep-forever
+
+Live incident evidence from baum on 2026-09-05 reversed the August policy. The
+`/var/log/pmss/metrics/*` stanza recursively matched its own rotated output:
+`alistair` rotated to `alistair.1`, then the wildcard later matched
+`alistair.1`, producing chains such as `alistair.1.1.1...`. Because the policy
+also used `rotate 9999` and `nocompress`, those chains remained fat. When a
+terminated user's metrics file disappeared mid-chain, logrotate hit `getfacl`
+errors on missing rotated names, exited non-zero, and stopped all host log
+rotation. `/var/log` then grew unbounded and filled root, contributing to the
+OOM/502/500 ticket cohort.
+
+Operator directive, 2026-09-05 (verbatim):
+
+- "gzipped is insane compression ratio on these"
+- "we want to retain them as long as possible, have log rotate etc. but oldest have to go if they fill up"
+- "does not mean you let servers fail because we want to retain those long time"
+
+The new policy:
+
+- Applies to system-stats, iostat-history, iostat-history-raw, per-user
+  `metrics/*`, storage-health, resource-daily, quota-daily, process-snapshot,
+  and `check*.log`. This explicitly supersedes the 2026-08-14 out-of-scope
+  carve-out for `check*.log`.
+- Enables `compress` + `delaycompress` on observability metric stanzas that were
+  previously `nocompress`. Gzip is lossless, so this keeps more history per GB
+  while leaving the active file and newest rotation directly greppable.
+- Replaces `rotate 9999` with large finite retention: yearly logs keep 10
+  rotations, monthly logs keep 120, weekly logs keep 520, and daily logs keep
+  3650. This is ten-year-equivalent retention by cadence, exceeding normal host
+  lifetime while ensuring the oldest data ages out before root fills.
+- Moves per-user metrics rotations into `/var/log/pmss/metrics/archive` via
+  `olddir` + `createolddir`, stopping the recursive self-glob that created
+  `.1.1.1...` chains.
+- Keeps `maxsize` as the per-file splitter. It still limits individual file
+  growth between cadence rotations; finite `rotate` counts provide the deletion
+  boundary that the prior policy deliberately lacked.
+
+This amendment supersedes the no-compression / never-delete language above for
+PMSS observability metric logrotate policy. Retention remains long, but the
+safety invariant is stronger: drop the oldest compressed history before a server
+fails.
+
 ## References
 - Operator directive 2026-08-14 (verbatim): "7 day retention is premature ejaculation
   ... should be for ever"; "compression is another premature ejaculation ... no
   compression initially"; "all the performance metrics should be collected as long as
   possible ... we keep them all on server side. this was fully a premature ejaculation once
   fucking again"
+- Operator directive 2026-09-05 (verbatim): "gzipped is insane compression ratio on
+  these"; "we want to retain them as long as possible, have log rotate etc. but oldest
+  have to go if they fill up"; "does not mean you let servers fail because we want to
+  retain those long time"
 - `etc/seedbox/config/template.logrotate.pmss`
 - `scripts/lib/tests/development/PmssLogrotatePolicyTest.php`
 - `scripts/cron/systemStatsLog.php`, `scripts/lib/diskIostat.php`, `scripts/cron/metricsLog.php`

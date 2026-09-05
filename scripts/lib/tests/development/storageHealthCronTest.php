@@ -16,7 +16,9 @@ class StorageHealthCronTest extends TestCase
             [
                 '/var/log/pmss/storage-health.jsonl /var/log/pmss/storageHealthSnapshot.log',
                 'daily',
-                'rotate 9999',
+                'rotate 3650',
+                'compress',
+                'delaycompress',
                 'create 0600 root root',
             ],
             'logrotate policy is missing: '

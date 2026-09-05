@@ -5,6 +5,21 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class PmssLogrotatePolicyTest extends TestCase
 {
+    private function assertPmssLogrotateStanza(string $stanzaHead, array $required, string $messagePrefix): void
+    {
+        $source = $this->pmssReadRepoFile('etc/seedbox/config/template.logrotate.pmss');
+        $pattern = '#'.preg_quote($stanzaHead, '#').'\s*\{(?P<body>[^}]*)\}#s';
+        $this->assertTrue((bool) preg_match($pattern, $source, $matches), $messagePrefix.'missing stanza');
+
+        $body = (string) $matches['body'];
+        foreach ($required as $needle) {
+            $this->assertStringContainsString((string) $needle, $body, $messagePrefix.$needle);
+        }
+
+        $this->pmssAssertStringNotContainsString('nocompress', $body, $messagePrefix.'nocompress');
+        $this->assertMatches('#\n\s+compress\n\s+delaycompress\n#', $body, $messagePrefix.'compress + delaycompress');
+    }
+
     public function testHighVolumeSharedPmssLogsRotateBySize(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings(
@@ -23,64 +38,57 @@ class PmssLogrotatePolicyTest extends TestCase
 
     public function testWatchdogLogsStayCoveredByCheckWildcard(): void
     {
-        // Watchdog/health-check history is observability: kept forever (rotate 9999),
-        // uncompressed, but size-bounded per-file by maxsize (ADR 0044).
-        $this->pmssAssertRepoFileMatches(
-            'etc/seedbox/config/template.logrotate.pmss',
-            '#/var/log/pmss/check\*\.log\s*\{[^}]*rotate 9999[^}]*maxsize 64M[^}]*nocompress[^}]*copytruncate#s',
-            'check*.log must persist forever (rotate 9999), uncompressed, size-bounded'
-        );
+        $this->assertPmssLogrotateStanza('/var/log/pmss/check*.log', [
+            'monthly',
+            'rotate 120',
+            'maxsize 64M',
+            'copytruncate',
+        ], 'check*.log must be compressed and ten-year bounded: ');
     }
 
-    public function testSystemStatsLogPersistsUncompressedForever(): void
+    public function testSystemStatsLogPersistsCompressedWithBoundedRetention(): void
     {
-        // The richest per-server metric log (full PSI vector + ioping + mem/disk, 5-min
-        // cadence) must be retained AS LONG AS POSSIBLE (rotate 9999 = effectively
-        // unlimited) and UNCOMPRESSED so trend/forensic history stays directly greppable.
-        // Regression lock against re-introducing ANY retention cap or compression
-        // (operator directive 2026-08-14 "keep them all on server side"; ADR 0044).
-        $this->pmssAssertRepoFileMatches(
-            'etc/seedbox/config/template.logrotate.pmss',
-            '#/var/log/pmss/system-stats\.log\s*\{[^}]*rotate 9999[^}]*nocompress[^}]*copytruncate#s',
-            'system-stats.log must persist forever (rotate 9999), uncompressed'
-        );
+        $this->assertPmssLogrotateStanza('/var/log/pmss/system-stats.log', [
+            'yearly',
+            'rotate 10',
+            'maxsize 1G',
+            'copytruncate',
+        ], 'system-stats.log must be compressed and bounded: ');
     }
 
-    public function testDiskIostatHistoryLogsPersistUncompressedForever(): void
+    public function testDiskIostatHistoryLogsPersistCompressedWithBoundedRetention(): void
     {
-        // Both parsed metrics and the fat raw forensic dump retained forever, uncompressed
-        // (ADR 0044). maxsize stays as a non-deleting file-splitter, not a retention cap.
-        $this->pmssAssertRepoFileMatches(
-            'etc/seedbox/config/template.logrotate.pmss',
-            '#/var/log/pmss/iostat-history\.log\s*\{[^}]*rotate 9999[^}]*nocompress[^}]*create 0644 root root#s',
-            'iostat-history.log must persist forever (rotate 9999), uncompressed'
-        );
-        $this->pmssAssertRepoFileMatches(
-            'etc/seedbox/config/template.logrotate.pmss',
-            '#/var/log/pmss/iostat-history-raw\.log\s*\{[^}]*rotate 9999[^}]*nocompress[^}]*create 0644 root root#s',
-            'iostat-history-raw.log must persist forever (rotate 9999), uncompressed'
-        );
-    }
-
-    public function testAllPerformanceMetricLogsPersistUncappedUncompressed(): void
-    {
-        // Operator directive 2026-08-14: ALL performance/storage metric logs kept as long
-        // as possible, uncompressed — not just the iostat/system-stats pair (ADR 0044).
-        // Regression lock the rest of the metric set so a short cap cannot creep back in.
-        foreach ([
-            '/var/log/pmss/metrics/*',
-            '/var/log/pmss/storage-health.jsonl /var/log/pmss/storageHealthSnapshot.log',
-            '/var/log/pmss/resource-daily.log',
-            '/var/log/pmss/quota-daily.log',
-            '/var/log/pmss/process-snapshot.log',
-        ] as $stanzaHead) {
-            $pattern = '#'.preg_quote($stanzaHead, '#').'\s*\{[^}]*rotate 9999[^}]*nocompress#s';
-            $this->pmssAssertRepoFileMatches(
-                'etc/seedbox/config/template.logrotate.pmss',
-                $pattern,
-                $stanzaHead.' must persist uncapped (rotate 9999) and uncompressed'
-            );
+        foreach (['/var/log/pmss/iostat-history.log', '/var/log/pmss/iostat-history-raw.log'] as $stanzaHead) {
+            $this->assertPmssLogrotateStanza($stanzaHead, [
+                'yearly',
+                'rotate 10',
+                'maxsize 1G',
+                'create 0644 root root',
+            ], $stanzaHead.' must be compressed and bounded: ');
         }
+    }
+
+    public function testAllPerformanceMetricLogsUseCompressedBoundedRetention(): void
+    {
+        $stanzas = [
+            '/var/log/pmss/metrics/*' => ['daily', 'rotate 3650', 'maxsize 50M', 'nocreate'],
+            '/var/log/pmss/storage-health.jsonl /var/log/pmss/storageHealthSnapshot.log' => ['daily', 'rotate 3650', 'create 0600 root root'],
+            '/var/log/pmss/resource-daily.log' => ['monthly', 'rotate 120', 'create 0600 root root'],
+            '/var/log/pmss/quota-daily.log' => ['monthly', 'rotate 120', 'create 0600 root root'],
+            '/var/log/pmss/process-snapshot.log' => ['weekly', 'rotate 520', 'maxsize 128M', 'copytruncate', 'create 0600 root root'],
+        ];
+
+        foreach ($stanzas as $stanzaHead => $required) {
+            $this->assertPmssLogrotateStanza($stanzaHead, $required, $stanzaHead.' must be compressed and bounded: ');
+        }
+    }
+
+    public function testMetricsWildcardRotatesIntoArchiveDirectory(): void
+    {
+        $this->assertPmssLogrotateStanza('/var/log/pmss/metrics/*', [
+            'olddir /var/log/pmss/metrics/archive',
+            'createolddir 0755 root root',
+        ], 'metrics wildcard must rotate outside the live glob path: ');
     }
 
     public function testUpdateStep2RefreshesAndVerifiesLogrotatePolicy(): void

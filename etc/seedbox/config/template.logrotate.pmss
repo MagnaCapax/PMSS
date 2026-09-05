@@ -34,106 +34,114 @@
     sharedscripts
 }
 
-# Performance-metric logs: keep ALL history, effectively forever, uncompressed.
-# rotate 9999 = logrotate has no "infinite" keyword; a huge finite count never
-# deletes within any realistic node lifetime (operator directive 2026-08-14:
-# "keep them all on server side", ADR 0044). maxsize is a file-SPLITTER only
-# (forces rotation into a new file) — it never deletes data.
+# Performance-metric logs: keep long history, compress old generations, and
+# delete the oldest rotations before /var/log can fill root (ADR 0044 amendment
+# 2026-09-05). delaycompress keeps the newest rotation directly greppable.
 /var/log/pmss/system-stats.log {
     yearly
-    rotate 9999
+    rotate 10
     maxsize 1G
     missingok
     notifempty
-    nocompress
+    compress
+    delaycompress
     copytruncate
     sharedscripts
 }
 
 /var/log/pmss/iostat-history.log {
     yearly
-    rotate 9999
+    rotate 10
     maxsize 1G
     missingok
     notifempty
-    nocompress
+    compress
+    delaycompress
     create 0644 root root
 }
 
 /var/log/pmss/iostat-history-raw.log {
     yearly
-    rotate 9999
+    rotate 10
     maxsize 1G
     missingok
     notifempty
-    nocompress
+    compress
+    delaycompress
     create 0644 root root
 }
 
-# Service-watchdog / health-check history is observability: keep it forever, uncompressed
-# (operator directive 2026-08-14 "the other observability logs"; ADR 0044). maxsize 64M is a
-# non-deleting file-splitter, not a retention cap.
+# Service-watchdog / health-check history is observability; keep ten years of
+# monthly rotations, gzip older generations, and retain maxsize as a splitter.
 /var/log/pmss/check*.log {
     monthly
-    rotate 9999
+    rotate 120
     minsize 1M
     maxsize 64M
     missingok
     notifempty
-    nocompress
+    compress
+    delaycompress
     copytruncate
     sharedscripts
 }
 
-# Performance/storage-metric logs: keep ALL history forever, uncompressed
-# (operator directive 2026-08-14, ADR 0044). rotate 9999 = effectively unlimited;
-# maxsize (where present) is a non-deleting file-splitter only.
+# Performance/storage-metric logs use ten-year-equivalent retention by cadence.
+# Rotated per-user metric files leave the live metrics directory so the wildcard
+# cannot recursively rotate its own output.
 /var/log/pmss/quota-daily.log {
     monthly
-    rotate 9999
+    rotate 120
     missingok
     notifempty
-    nocompress
+    compress
+    delaycompress
     create 0600 root root
 }
 
 /var/log/pmss/resource-daily.log {
     monthly
-    rotate 9999
+    rotate 120
     missingok
     notifempty
-    nocompress
+    compress
+    delaycompress
     create 0600 root root
 }
 
 /var/log/pmss/metrics/* {
     daily
-    rotate 9999
+    rotate 3650
     missingok
     notifempty
-    nocompress
+    compress
+    delaycompress
     nocreate
+    olddir /var/log/pmss/metrics/archive
+    createolddir 0755 root root
     maxsize 50M
 }
 
 /var/log/pmss/process-snapshot.log {
     weekly
-    rotate 9999
+    rotate 520
     minsize 1M
     maxsize 128M
     missingok
     notifempty
-    nocompress
+    compress
+    delaycompress
     copytruncate
     create 0600 root root
 }
 
 /var/log/pmss/storage-health.jsonl /var/log/pmss/storageHealthSnapshot.log {
     daily
-    rotate 9999
+    rotate 3650
     missingok
     notifempty
-    nocompress
+    compress
+    delaycompress
     create 0600 root root
 }
 

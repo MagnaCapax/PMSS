@@ -56,7 +56,7 @@ class PmssSafeRootCleanupTest extends TestCase
             '/var/log/nginx/access.log',     // live app log (non-rotated)
             '/var/log/nginx/error.log',
             '/var/log/some-unrecognized-file',
-            '/var/log/pmss/system-stats.log', // observability log, kept forever — not cruft
+            '/var/log/pmss/system-stats.log', // live observability log, never cruft
         ];
         foreach ($liveLogs as $path) {
             $this->assertFalse(
