@@ -71,6 +71,22 @@ function pmssConfigureQuotaMount(?callable $logger = null): void
         return;
     }
 
+    // Journaled quota (jqfmt=vfsv1 + usrjquota/grpjquota) cannot be applied or refreshed via
+    // `mount -o remount` — the kernel rejects re-applying the quota options on a live mount, so the
+    // remount fails rc=32 even though commit= and the quota options are already active from the fstab
+    // mount. Skip the doomed, redundant remount on such mounts (it would only log a spurious ERR that
+    // masks real failures in update logs); commit=/quota take effect at mount/boot time regardless.
+    $mountsPath  = pmssResolvePathFromEnv('PMSS_PROC_MOUNTS_PATH', '/proc/mounts');
+    $liveOptions = pmssMountHardeningReadMounts($mountsPath)[$mount]['options'] ?? [];
+    $hasJournaledQuota = (bool) array_filter($liveOptions, static function (string $opt): bool {
+        return strpos($opt, 'jqfmt=') === 0 || strpos($opt, 'usrjquota=') === 0 || strpos($opt, 'grpjquota=') === 0;
+    });
+    if ($hasJournaledQuota) {
+        $log('[INFO] Skipping remount for '.$mount.' (journaled quota cannot be remounted; commit/quota options apply at mount time)');
+        pmssWarnUnexpectedQuotaFiles($mount, $log);
+        return;
+    }
+
     runStep('Remounting '.$mount.' to refresh quota options', sprintf('mount -o remount %s', escapeshellarg($mount)));
     pmssWarnUnexpectedQuotaFiles($mount, $log);
 }
