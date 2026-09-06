@@ -5,6 +5,16 @@ require_once dirname(__DIR__, 3).'/util/userConfigLighttpd.php';
 
 class LighttpdProxyFragmentsTest extends TestCase
 {
+    private function proxyFragmentFixture(): array
+    {
+        $directory = $this->pmssMakeTempDir('pmss-lighttpd-proxy-');
+        return [
+            $directory,
+            $directory.'/pmss-rclone.conf',
+            \pmssLighttpdManagedProxyFragment('rclone', 'demo', 4001),
+        ];
+    }
+
     private function managedProxyFragments(): array
     {
         return [
@@ -115,5 +125,98 @@ class LighttpdProxyFragmentsTest extends TestCase
                 $proxyName.' proxy should not rewrite request bodies'
             );
         }
+    }
+
+    public function testProxyFragmentUrlConditionPatternsNormalizeLayout(): void
+    {
+        $fragment = "  \$HTTP[\"url\"]\t=~  \"^/user-demo/rclone/\"   {\n"
+            ."    auth.require = ()\n"
+            ."  }\n"
+            ."\$HTTP[\"url\"] == \"/user-demo/rclone\" {\n  }\n";
+
+        $this->assertSame(
+            ['^/user-demo/rclone/'],
+            \pmssLighttpdProxyFragmentUrlConditionPatterns($fragment)
+        );
+    }
+
+    public function testProxyFragmentSiblingConflictMatchesExactConditional(): void
+    {
+        [$directory, $managedPath, $managedFragment] = $this->proxyFragmentFixture();
+        file_put_contents(
+            $directory.'/legacy.conf',
+            "  \$HTTP[\"url\"]\t=~  \"^/user-demo/rclone/\" {\n  auth.require = ()\n}\n"
+        );
+
+        $this->assertSame(true, \pmssLighttpdProxyFragmentSiblingConflict($managedPath, $managedFragment));
+    }
+
+    public function testProxyFragmentSiblingConflictIgnoresMentionsAndDifferentPaths(): void
+    {
+        [$directory, $managedPath, $managedFragment] = $this->proxyFragmentFixture();
+        file_put_contents(
+            $directory.'/legacy.conf',
+            "# \$HTTP[\"url\"] =~ \"^/user-demo/rclone/\" {\n"
+            ."\$HTTP[\"url\"] =~ \"^/user-demo/other/\" {\n  auth.require = ()\n}\n"
+        );
+
+        $this->assertSame(false, \pmssLighttpdProxyFragmentSiblingConflict($managedPath, $managedFragment));
+    }
+
+    public function testProxyFragmentSiblingConflictExcludesManagedTarget(): void
+    {
+        [, $managedPath, $managedFragment] = $this->proxyFragmentFixture();
+        file_put_contents($managedPath, $managedFragment);
+
+        $this->assertSame(false, \pmssLighttpdProxyFragmentSiblingConflict($managedPath, $managedFragment));
+    }
+
+    public function testProxyFragmentSiblingConflictFailsClosedForSymlink(): void
+    {
+        [$directory, $managedPath, $managedFragment] = $this->proxyFragmentFixture();
+        $outsidePath = $directory.'/outside-fragment';
+        file_put_contents($outsidePath, $managedFragment);
+        $this->assertTrue(symlink($outsidePath, $directory.'/legacy.conf'));
+
+        $this->assertSame(null, \pmssLighttpdProxyFragmentSiblingConflict($managedPath, $managedFragment));
+    }
+
+    public function testManagedProxyFragmentYieldsWithoutMutatingSibling(): void
+    {
+        [$directory, $managedPath, $managedFragment] = $this->proxyFragmentFixture();
+        $legacyPath = $directory.'/legacy.conf';
+        $legacyFragment = "# customer rule\n".$managedFragment;
+        file_put_contents($legacyPath, $legacyFragment);
+
+        $this->assertTrue(\pmssLighttpdWriteManagedProxyFragment('rclone', 'demo', 4001, $managedPath));
+        $this->assertFalse(file_exists($managedPath));
+        $this->assertSame($legacyFragment, file_get_contents($legacyPath));
+
+        unlink($legacyPath);
+        $this->assertTrue(\pmssLighttpdWriteManagedProxyFragment('rclone', 'demo', 4001, $managedPath));
+        $this->assertSame($managedFragment, file_get_contents($managedPath));
+    }
+
+    public function testManagedProxyFragmentRemovesOwnedCollisionSide(): void
+    {
+        [$directory, $managedPath, $managedFragment] = $this->proxyFragmentFixture();
+        file_put_contents($managedPath, $managedFragment);
+        file_put_contents($directory.'/legacy.conf', $managedFragment);
+
+        $this->assertTrue(\pmssLighttpdWriteManagedProxyFragment('rclone', 'demo', 4001, $managedPath));
+        $this->assertFalse(file_exists($managedPath));
+        $this->assertTrue(file_exists($directory.'/legacy.conf'));
+    }
+
+    public function testManagedProxyFragmentPreservesOwnedFileWhenScanIsUnsafe(): void
+    {
+        [$directory, $managedPath, $managedFragment] = $this->proxyFragmentFixture();
+        file_put_contents($managedPath, 'existing managed fragment');
+        $outsidePath = $directory.'/outside-fragment';
+        file_put_contents($outsidePath, $managedFragment);
+        $this->assertTrue(symlink($outsidePath, $directory.'/legacy.conf'));
+
+        $this->assertFalse(\pmssLighttpdWriteManagedProxyFragment('rclone', 'demo', 4001, $managedPath));
+        $this->assertSame('existing managed fragment', file_get_contents($managedPath));
     }
 }
