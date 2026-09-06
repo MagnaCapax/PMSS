@@ -746,8 +746,9 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - Preview, Open, and DirectLink URLs retain the request script's directory (such as `/user-<username>/`) when tinyfilemanager has not selected a mapped multi-user root.
 - The fallback runs after mapped-root selection so enabling tinyfilemanager's multi-user mode cannot double the request prefix.
 
-## Customer Server Status – `etc/skel/www/welcome.php`
+## Customer Server Status – `etc/skel/www/welcome.php` and `stats.php`
 
+- `pmssStatsChartOptions()` caps the shared Traffic, CPU, Storage I/O, and IOPS chart x-axis at six visible date ticks so month-long daily histories remain readable.
 - `pmssWelcomeServerInfoHtmlBuild()` renders host uptime plus the 1/5/15-minute load averages after the per-account RAM section.
 - Load is explicitly labeled as shared-server data rather than a per-account metric.
 - `/proc/uptime` and `/proc/loadavg` are read directly from the customer tree without shelling; each unavailable or malformed metric fails soft to `unavailable` without hiding the other metric.

@@ -250,6 +250,7 @@ function pmssStatsChartOptions() {
             tooltip: { mode: 'index', intersect: false }
         },
         scales: {
+            x: { ticks: { maxTicksLimit: 6 } },
             y: { beginAtZero: true }
         }
     };

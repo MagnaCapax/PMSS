@@ -7,6 +7,15 @@ require_once dirname(__DIR__, 4).'/etc/skel/www/statsHelpers.php';
 
 final class CustomerStatsLayoutTest extends TestCase
 {
+    public function testChartOptionsLimitXAxisDateTicks(): void
+    {
+        $this->pmssAssertRepoFileContainsString(
+            'etc/skel/www/stats.php',
+            "scales: {\n            x: { ticks: { maxTicksLimit: 6 } },\n            y: { beginAtZero: true }\n        }",
+            'The shared chart options must cap x-axis date ticks.'
+        );
+    }
+
     public function testInfoRaidNoticeOccupiesFullFlexRow(): void
     {
         $this->pmssAssertRepoFileContainsString(
