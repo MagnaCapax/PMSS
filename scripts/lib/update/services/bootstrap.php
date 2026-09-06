@@ -71,18 +71,20 @@ function pmssConfigureQuotaMount(?callable $logger = null): void
         return;
     }
 
-    // Journaled quota (jqfmt=vfsv1 + usrjquota/grpjquota) cannot be applied or refreshed via
-    // `mount -o remount` — the kernel rejects re-applying the quota options on a live mount, so the
-    // remount fails rc=32 even though commit= and the quota options are already active from the fstab
-    // mount. Skip the doomed, redundant remount on such mounts (it would only log a spurious ERR that
-    // masks real failures in update logs); commit=/quota take effect at mount/boot time regardless.
-    $mountsPath  = pmssResolvePathFromEnv('PMSS_PROC_MOUNTS_PATH', '/proc/mounts');
-    $liveOptions = pmssMountHardeningReadMounts($mountsPath)[$mount]['options'] ?? [];
-    $hasJournaledQuota = (bool) array_filter($liveOptions, static function (string $opt): bool {
-        return strpos($opt, 'jqfmt=') === 0 || strpos($opt, 'usrjquota=') === 0 || strpos($opt, 'grpjquota=') === 0;
-    });
-    if ($hasJournaledQuota) {
-        $log('[INFO] Skipping remount for '.$mount.' (journaled quota cannot be remounted; commit/quota options apply at mount time)');
+    // The remount below applies commit= live. But when the fstab entry carries journaled-quota
+    // options (jqfmt=/usrjquota=/grpjquota=) and quota is turned on, the kernel refuses the remount —
+    // `mount -o remount` re-reads fstab and tries to re-apply the quota options, and ext4 rejects it:
+    //   "EXT4-fs: Cannot change journaled quota options when quota turned on"
+    // so the step fails rc=32 on every run and logs a spurious ERR that masks real failures in the
+    // update log. commit= and the quota options already take effect at mount/boot time, so skip the
+    // doomed, redundant remount when the fstab entry declares journaled quota. (The options live in
+    // fstab, not /proc/mounts — ext4 does not echo the journaled-quota options in the live mount
+    // string — so detection reads the fstab entry.) Non-journaled-quota mounts remount as before.
+    $fstabLines = pmssFstabLinesRead('/etc/fstab', $log, 'quota remount journaled-quota check');
+    $fstabEntry = $fstabLines !== null ? pmssFstabMountEntryRead($fstabLines, $mount) : null;
+    $fstabOptions = $fstabEntry['columns'][3] ?? '';
+    if (preg_match('/(?:^|,)(?:jqfmt=|usrjquota=|grpjquota=)/', $fstabOptions) === 1) {
+        $log('[INFO] Skipping remount for '.$mount.' (journaled quota in fstab cannot be re-applied while quota is on; commit/quota options take effect at mount time)');
         pmssWarnUnexpectedQuotaFiles($mount, $log);
         return;
     }
