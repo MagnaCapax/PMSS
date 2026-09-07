@@ -63,4 +63,28 @@ class UpdateBackwardsVersionGuardTest extends TestCase
             'update.php should contain ordered guard step: '
         );
     }
+
+    public function testRecordedMarkerUsesContentDateNotInstallTime(): void
+    {
+        // Fetched HEAD content dated 2026-09-06 15:06; install wall-clock 2026-09-07 09:08.
+        // The marker MUST carry the CONTENT date, so a follow-up fetch of the same HEAD
+        // orders as "same", not a phantom backwards move (a back-to-back
+        // update.php git/main then --dist-upgrade on one host tripped the guard).
+        $installTs = \mktime(9, 8, 0, 9, 7, 2026);
+        $line = \pmssRecordedVersionLine('git/main', 'git/main@2026-09-06 15:06', $installTs);
+        $this->assertSame('git/main@2026-09-06 15:06', $line, 'marker must carry the content commit date');
+
+        $decision = \pmssVersionMoveDecision($line, 'git/main@2026-09-06 15:06', false);
+        $this->assertTrue($decision['allowed'], 're-fetching the same HEAD must not be a backwards move');
+        $this->assertSame('same', $decision['ordering']);
+    }
+
+    public function testRecordedMarkerFallsBackToInstallTimeWhenLabelIsDateless(): void
+    {
+        // Dateless fetched label (e.g. codeload tarball fallback with no commit metadata)
+        // preserves ADR 0051's fail-open contract by falling back to install time.
+        $installTs = \mktime(9, 8, 0, 9, 7, 2026);
+        $line = \pmssRecordedVersionLine('git/main', 'git/main', $installTs);
+        $this->assertSame('git/main@2026-09-07 09:08', $line, 'dateless fetched label falls back to install time');
+    }
 }

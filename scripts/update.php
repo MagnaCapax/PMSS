@@ -1744,6 +1744,40 @@ function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarg
 }
 
 /**
+ * Build the version-marker line written to VERSION_FILE.
+ *
+ * The marker date MUST reflect the CONTENT's commit date (carried in the
+ * fetched-version label, derived from `git log -1 --format=%cI`), NOT install
+ * wall-clock time. ADR 0051's ordering guard compares this marker against the
+ * next fetch's commit date; stamping install time made a freshly-installed build
+ * outrank the real repo HEAD, so a follow-up update to the actual newest snapshot
+ * was wrongly refused as "backward" (observed when a back-to-back
+ * `update.php git/main` then `update.php --dist-upgrade` ran on one host: the
+ * first run stamped the marker with wall-clock "now", which outranks the fetched
+ * HEAD's earlier commit date, so the second run refused the current HEAD).
+ * Falls back to install time only when the fetched label carries no orderable
+ * date, preserving ADR 0051's fail-open contract for dateless codeload fallbacks.
+ *
+ * @param string $spec           Canonical version spec (e.g. git/main).
+ * @param string $fetchedVersion Fetched label; may embed @YYYY-MM-DD HH:MM.
+ * @param int    $timestamp      Install time, used only as the dateless fallback.
+ */
+function pmssRecordedVersionLine(string $spec, string $fetchedVersion, int $timestamp): string
+{
+    $contentDate = '';
+    if (preg_match('/@(\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?)$/', trim($fetchedVersion), $matches) === 1) {
+        $contentDate = str_replace('T', ' ', $matches[1]);
+        if (strlen($contentDate) === 10) {
+            $contentDate .= ' 00:00';
+        }
+    }
+
+    $stamp = $contentDate !== '' ? $contentDate : date('Y-m-d H:i', $timestamp);
+
+    return $spec.'@'.$stamp;
+}
+
+/**
  * Record the applied version for auditability.
  *
  * Writes a one-line spec with timestamp to VERSION_FILE and a JSON metadata
@@ -1759,7 +1793,11 @@ function recordVersion(string $spec, array $details, bool $dryRun): void
     pmssEnsureDirectory(VERSION_DIR);
 
     $timestamp = time();
-    $line      = $spec.'@'.date('Y-m-d H:i', $timestamp);
+    // Marker date = CONTENT commit date (from fetched_version), never install
+    // wall-clock — otherwise a just-installed build outranks the real HEAD and a
+    // follow-up update to the actual newest snapshot is refused as "backward"
+    // (see pmssRecordedVersionLine + ADR 0051/0054).
+    $line      = pmssRecordedVersionLine($spec, (string) ($details['fetched_version'] ?? ''), $timestamp);
     $details['recorded_spec'] = $spec;
     $details['timestamp']     = date('c', $timestamp);
 
