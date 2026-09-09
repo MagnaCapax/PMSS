@@ -26,15 +26,22 @@ function pmssUserEnvironmentHandlers(): array { return ['pmssUserConfigureHttp',
  * can detect when per-user assets are stale. Keep this function narrow—if more
  * inputs are ever needed, refactor the per-user flow instead of growing the
  * signature or adding generic option bags.
+ *
+ * @param string|null $reason Short predicate slug explaining a false result.
  */
-function pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha = ''): bool
+function pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha = '', ?string &$reason = null): bool
 {
-    $webRootCtx = pmssBuildUserWebRootContext($user, $rutorrentIndexSha);
-    if ($webRootCtx === null || !pmssUserReconcileWebRoot($webRootCtx)) {
+    $reason = null;
+    $webRootCtx = pmssBuildUserWebRootContext($user, $rutorrentIndexSha, $reason);
+    if ($webRootCtx === null) {
+        return false;
+    }
+    if (!pmssUserReconcileWebRoot($webRootCtx)) {
+        $reason = 'web-root-reconcile-failed';
         return false;
     }
 
-    $ctx = pmssBuildUserContext($user, $rutorrentIndexSha);
+    $ctx = pmssBuildUserContext($user, $rutorrentIndexSha, $reason);
     if ($ctx === null) {
         return false;
     }

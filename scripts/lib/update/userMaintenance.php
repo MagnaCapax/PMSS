@@ -172,8 +172,13 @@ function pmssUpdateAllUsers(string $rutorrentIndexSha): array
             }
 
             pmssUserMaintenanceRepairLegacyCpuQuota($userTrim);
-            if (!pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha)) {
-                throw new RuntimeException('user environment convergence failed');
+            $environmentReason = null;
+            if (!pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha, $environmentReason)) {
+                $environmentMessage = 'user environment convergence failed';
+                if (is_string($environmentReason) && trim($environmentReason) !== '') {
+                    $environmentMessage .= ': '.$environmentReason;
+                }
+                throw new RuntimeException($environmentMessage);
             }
             pmssEnsureLingerAndDocker($userTrim);
 

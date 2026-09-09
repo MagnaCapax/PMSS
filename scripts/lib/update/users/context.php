@@ -18,19 +18,31 @@
  *
  * @param string $user             Username (validated by callers).
  * @param string $rutorrentIndexSha Current ruTorrent index.html checksum.
+ * @param string|null $reason       Short predicate slug explaining a null result.
  */
-function pmssBuildUserContext(string $user, string $rutorrentIndexSha = ''): ?array
+function pmssBuildUserContext(string $user, string $rutorrentIndexSha = '', ?string &$reason = null): ?array
 {
+    $reason = null;
     // Allow tests and development tooling to override the home root while
     // keeping the default `/home` behaviour for production.
     $home = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home')."/{$user}";
     // The shared context only exists for active PMSS tenants; suspended users
     // are intentionally skipped to avoid recreating web roots or restarting
     // services mid-suspension.
-    if (!is_dir($home)
-        || !file_exists($home.'/.rtorrent.rc')
-        || !file_exists($home.'/data')
-        || is_dir("{$home}/www-disabled")) {
+    if (!is_dir($home)) {
+        $reason = 'home-missing';
+        return null;
+    }
+    if (!file_exists($home.'/.rtorrent.rc')) {
+        $reason = 'rtorrent-rc-missing';
+        return null;
+    }
+    if (!file_exists($home.'/data')) {
+        $reason = 'data-dir-missing';
+        return null;
+    }
+    if (is_dir("{$home}/www-disabled")) {
+        $reason = 'suspended';
         return null;
     }
 
@@ -49,16 +61,32 @@ function pmssBuildUserContext(string $user, string $rutorrentIndexSha = ''): ?ar
  *
  * Web-root convergence must run even when a damaged account is missing core
  * rtorrent state, but suspended accounts must remain untouched.
+ *
+ * @param string|null $reason Short predicate slug explaining a null result.
  */
-function pmssBuildUserWebRootContext(string $user, string $rutorrentIndexSha = ''): ?array
+function pmssBuildUserWebRootContext(string $user, string $rutorrentIndexSha = '', ?string &$reason = null): ?array
 {
+    $reason = null;
     $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
     $home = rtrim($homeRoot, '/')."/{$user}";
-    if (!pmssValidateUsername($user)
-        || !is_dir($home)
-        || is_link($home)
-        || !pmssPathWithinResolvedRoot($home, $homeRoot)
-        || is_dir($home.'/www-disabled')) {
+    if (!pmssValidateUsername($user)) {
+        $reason = 'invalid-username';
+        return null;
+    }
+    if (is_link($home)) {
+        $reason = 'home-symlink';
+        return null;
+    }
+    if (!is_dir($home)) {
+        $reason = 'home-missing';
+        return null;
+    }
+    if (!pmssPathWithinResolvedRoot($home, $homeRoot)) {
+        $reason = 'home-outside-root';
+        return null;
+    }
+    if (is_dir($home.'/www-disabled')) {
+        $reason = 'suspended';
         return null;
     }
 

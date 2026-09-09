@@ -83,6 +83,53 @@ PHP
         $this->assertTrue($result['restored'], 'web-root reconciliation must precede active context gating');
     }
 
+    public function testUpdateUserEnvironmentReportsDistinctRejectReasons(): void
+    {
+        $repoRoot = $this->pmssRepoRoot();
+        $script = $this->buildUserEnvironmentScript(
+            'reason-slugs',
+            <<<'PHP'
+$homeRoot = $base.'/home';
+$suspendedUser = 'sususer';
+$missingUser = 'missuser';
+$suspendedHome = $homeRoot.'/'.$suspendedUser;
+
+@mkdir($suspendedHome.'/data', 0755, true);
+@mkdir($suspendedHome.'/www-disabled', 0755, true);
+file_put_contents($suspendedHome.'/.rtorrent.rc', "dummy\n");
+
+putenv('PMSS_HOME_DIR='.$homeRoot);
+putenv('PMSS_SKEL_DIR='.$base.'/skel');
+PHP
+            ,
+            <<<'PHP'
+$suspendedReason = null;
+$missingReason = null;
+$suspendedResult = pmssUpdateUserEnvironment($suspendedUser, 'sha123', $suspendedReason);
+$missingResult = pmssUpdateUserEnvironment($missingUser, 'sha123', $missingReason);
+PHP
+            ,
+            <<<'PHP'
+[
+    'suspended_converged' => $suspendedResult,
+    'missing_converged' => $missingResult,
+    'suspended_reason' => $suspendedReason,
+    'missing_reason' => $missingReason,
+    'output' => $output,
+]
+PHP
+        );
+
+        $result = $this->pmssRunInlinePhpJson(str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script), $this->pmssTestModeEnv());
+
+        $this->assertFalse($result['suspended_converged']);
+        $this->assertFalse($result['missing_converged']);
+        $this->assertEquals('suspended', $result['suspended_reason']);
+        $this->assertEquals('home-missing', $result['missing_reason']);
+        $this->assertFalse($result['suspended_reason'] === $result['missing_reason']);
+        $this->assertEquals('', $result['output']);
+    }
+
     public function testUpdateUserEnvironmentRunsStablePhasesWithoutLingerHook(): void
     {
         $repoRoot = $this->pmssRepoRoot();

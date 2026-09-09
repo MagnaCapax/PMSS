@@ -276,12 +276,13 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Before marking a user refreshed, repairs stale per-user systemd drop-ins with bare sub-MiB `MemoryMax=<N>` values and matching suffixed `MemoryLimit=<N>M` siblings by appending the PMSS MiB suffix and reloading systemd.
   - Catches per-user throwables (including permission-step timeouts), logs warning, skips that user, and continues remaining users.
 
-- pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha=''): bool
+- pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha='', ?string &$reason=null): bool
   - Builds the minimal web-root context and reconciles the web root before
     active-tenant context gating; suspended users remain excluded.
   - Returns false when the web-root context, reconciliation, or active-tenant
     context is invalid, and true only after reconciliation and all handlers
     complete successfully. Callers must not mark refresh success on false.
+  - When provided, `$reason` receives a stable predicate slug for false results such as `invalid-username`, `home-missing`, `home-symlink`, `home-outside-root`, `suspended`, `rtorrent-rc-missing`, `data-dir-missing`, or `web-root-reconcile-failed`.
   - Runs handlers in order: HTTP, skeleton, ruTorrent themes, ruTorrent refresh,
     plugin maintenance, then permissions.
     Each handler consumes `['user','home','user_esc','rutorrent_index_sha']`.
@@ -317,7 +318,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - A failed or unknown process check, or surviving Docker PIDs, returns non-zero; `restart` does not continue into the start path after an unsuccessful stop.
 
 Sub-handlers:
-- pmssBuildUserContext(string $user, string $rutorrentIndexSha=''): ?array → validates `/home/<user>` with `.rtorrent.rc`, `data`, and no `www-disabled`; returns context.
+- pmssBuildUserContext(string $user, string $rutorrentIndexSha='', ?string &$reason=null): ?array → validates `/home/<user>` with `.rtorrent.rc`, `data`, and no `www-disabled`; returns context or null with an optional reject-reason slug.
 - pmssUserConfigureHttp(array $ctx): void → configure lighttpd per-user, reserve/adopt native media-stack ports through the shared port manager, refresh the PMSS-managed qBittorrent safety defaults and Deluge fleet safety limits, ensure php.ini `error_log`, create `.tmp` and `.irssi` (from skel), and `www/recycle` with perms/ownership.
 - pmssUserApplySkeletonFiles(array $ctx): void → copies fixed list of skel files and quota plugin files into user tree using `updateUserFile()`; force-refreshes legacy `~/www/index.php` copies missing the PHP 8.2 `frameData` initialization; deletes `~/www/phpXplorer`.
 - pmssUserUpdateThemes(array $ctx): void → ensures named themes exist under `rutorrent/plugins/theme/themes/` (copied from skel), fixes ownership.
