@@ -193,6 +193,38 @@ function pmssQuotaCommandRun(string $command, ?callable $runner = null): array
 }
 
 /**
+ * Run a quotaFix maintenance command while preserving legacy command output.
+ *
+ * `quotaon -p` returns the count of enabled quota types, so verification queries
+ * can return non-zero for a healthy state and must not be logged as failures.
+ *
+ * @param callable|null $runner Test seam; receives the shell command and returns
+ *                              rc/stdout/stderr keys like pmssCommandCapture().
+ * @param callable|null $logger Test seam for logMessage().
+ *
+ * @return array{ok:bool,rc:int,output:string}
+ */
+function pmssQuotaFixRunCommand(string $description, string $command, bool $critical, int &$exitCode, bool $isQuery = false, ?callable $runner = null, ?callable $logger = null): array
+{
+    $log = $logger ?: 'logMessage';
+    $log($description);
+    $result = pmssQuotaCommandRun($command, $runner);
+    if ($result['output'] !== '') {
+        echo $result['output'];
+    }
+    if (!$result['ok']) {
+        if (!$isQuery) {
+            $log('[quotaFix] WARNING: command failed (rc='.$result['rc'].'): '.$command);
+        }
+        if ($critical) {
+            $exitCode = 1;
+        }
+    }
+
+    return $result;
+}
+
+/**
  * Remove stale quota check files after validating the mount point boundary.
  *
  * quotacheck may leave temporary `aquota*new` files behind after an interrupted

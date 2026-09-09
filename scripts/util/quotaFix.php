@@ -39,28 +39,6 @@ requireRoot();
 
 $exitCode = 0;
 
-/**
- * Run a quota maintenance command while preserving legacy command output.
- *
- * @return array{ok:bool,rc:int,output:string}
- */
-function pmssQuotaFixRunCommand(string $description, string $command, bool $critical, int &$exitCode): array
-{
-    logMessage($description);
-    $result = pmssQuotaCommandRun($command);
-    if ($result['output'] !== '') {
-        echo $result['output'];
-    }
-    if (!$result['ok']) {
-        logMessage('[quotaFix] WARNING: command failed (rc='.$result['rc'].'): '.$command);
-        if ($critical) {
-            $exitCode = 1;
-        }
-    }
-
-    return $result;
-}
-
 logMessage('[quotaFix] Starting quota integrity check');
 
 // 1. Report current status before any changes
@@ -103,7 +81,7 @@ pmssQuotaFixRunCommand('[quotaFix] Re-enabling quotas', 'quotaon -av', true, $ex
 // failure leaves quotas off and the next investigator cannot tell from the log
 // whether enforcement is on or off. quotaon -ap reads the kernel's actual
 // state, not just our intent.
-pmssQuotaFixRunCommand('[quotaFix] Verifying quota enforcement state:', 'quotaon -ap', false, $exitCode);
+pmssQuotaFixRunCommand('[quotaFix] Verifying quota enforcement state:', 'quotaon -ap', false, $exitCode, true);
 
 // 7. Report final status for visual comparison
 pmssQuotaFixRunCommand('[quotaFix] Final quota state:', 'repquota -as', false, $exitCode);

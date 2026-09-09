@@ -35,8 +35,53 @@ class QuotaFixGuardTest extends TestCase
             "pmssQuotaFixRunCommand('[quotaFix] Disabling quotas for recalculation', 'quotaoff -av', true, \$exitCode);",
             "'quotacheck -avugmn'",
             "pmssQuotaFixRunCommand('[quotaFix] Re-enabling quotas', 'quotaon -av', true, \$exitCode);",
+            "pmssQuotaFixRunCommand('[quotaFix] Verifying quota enforcement state:', 'quotaon -ap', false, \$exitCode, true);",
         ]);
         $this->pmssAssertRepoFileNotContainsString('scripts/util/quotaFix.php', 'shell_exec(');
+    }
+
+    public function testQuotaFixQueryExitCodeDoesNotWarnButCriticalFailureStillDoes(): void
+    {
+        $logs = [];
+        $exitCode = 0;
+
+        ob_start();
+        $queryResult = \pmssQuotaFixRunCommand(
+            '[quotaFix] Verifying quota enforcement state:',
+            'quotaon -ap',
+            false,
+            $exitCode,
+            true,
+            static function (string $command): array {
+                return ['rc' => 2, 'stdout' => "quota state\n", 'stderr' => ''];
+            },
+            static function (string $message) use (&$logs): void {
+                $logs[] = $message;
+            }
+        );
+        $criticalResult = \pmssQuotaFixRunCommand(
+            '[quotaFix] Re-enabling quotas',
+            'quotaon -av',
+            true,
+            $exitCode,
+            false,
+            static function (string $command): array {
+                return ['rc' => 5, 'stdout' => '', 'stderr' => "quotaon failed\n"];
+            },
+            static function (string $message) use (&$logs): void {
+                $logs[] = $message;
+            }
+        );
+        $output = ob_get_clean();
+
+        $this->assertSame(2, $queryResult['rc']);
+        $this->assertSame(5, $criticalResult['rc']);
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString("quota state\nquotaon failed\n", $output);
+
+        $logText = implode("\n", $logs);
+        $this->assertStringContainsString('[quotaFix] WARNING: command failed (rc=5): quotaon -av', $logText);
+        $this->assertStringNotContainsString('[quotaFix] WARNING: command failed (rc=2): quotaon -ap', $logText);
     }
 
     public function testQuotaFixSkipsQuotacheckWhenQuotaoffFails(): void
