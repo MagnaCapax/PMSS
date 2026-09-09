@@ -324,6 +324,16 @@ if ($action === 'status') {
         ? "docker process: running (pid(s): ".implode(', ', $dockerPids).")\n"
         : ($processCheckOk ? "docker process: not running\n" : "docker process: unknown (process check failed)\n");
     echo $serviceExists ? "systemd user service unit: present at {$dockerUnitPath}\n" : "systemd user service unit: missing\n";
+    if ($serviceExists) {
+        // #873: PMSS manages rootless Docker via the checkRootlessDocker watchdog and
+        // dockerd-rootless.sh (ADR-0027), NOT this shipped unit. Running
+        // `systemctl --user start/restart docker` launches a second daemon that
+        // collides with the watchdog on the same rootless socket. Surface the
+        // guidance where a troubleshooting user actually looks.
+        echo "note: PMSS manages rootless Docker via its watchdog; do NOT run 'systemctl --user start/restart/stop docker'. "
+            . "Use '/scripts/util/userDocker.php {$user} restart' (or stop/status) instead.\n";
+    }
+
     echo $socketPresent ? "docker socket: present at {$dockerSock}\n" : "docker socket: not found at {$dockerSock}\n";
     if ($debug) {
         echo "debug: home={$home}\n";
