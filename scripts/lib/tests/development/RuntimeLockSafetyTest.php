@@ -5,6 +5,91 @@ require_once dirname(__DIR__, 2).'/runtime.php';
 
 class RuntimeLockSafetyTest extends TestCase
 {
+    public function testLockAcquireRejectsUnsafeModesBeforeFilesystemChanges(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-runtime-lock-modes-');
+        $path = $this->pmssWriteFile($root.'/lock', 'retained lock state');
+        $missing = $root.'/missing/lock';
+        $owner = \pmssLockFileAcquire($path, true, 'c+');
+        $this->assertTrue(is_resource($owner));
+
+        try {
+            // Both busy-handle policies must reject before opening or creating paths.
+            foreach (['', 'w', 'w+', 'wb', 'wb+', 'w+b', 'wt', 'w+t', 'we', 'w+e', "w\0+", "c\0+", "\0"] as $mode) {
+                foreach ([true, false] as $closeOnBusy) {
+                    foreach ([$path, $root.'/new-lock', $missing] as $target) {
+                        $this->pmssAssertNoPhpWarnings(function () use ($target, $mode, $closeOnBusy): void {
+                            $busy = true;
+                            $handle = \pmssLockFileAcquire($target, true, $mode, true, $closeOnBusy, $busy);
+                            \pmssLockHandleRelease($handle);
+                            $this->assertFalse($handle);
+                            $this->assertFalse($busy, 'Rejected modes are not lock contention');
+                        });
+                    }
+                    $this->assertSame('retained lock state', file_get_contents($path));
+                    $this->assertFalse(file_exists($root.'/new-lock'));
+                    $this->assertFalse(file_exists(dirname($missing)));
+                }
+            }
+
+            $busy = null;
+            $competing = \pmssLockFileAcquire($path, true, 'c+', false, true, $busy);
+            \pmssLockHandleRelease($competing);
+            $this->assertFalse($competing);
+            $this->assertTrue($busy, 'Rejected opens must leave the owner lock held');
+        } finally {
+            \pmssLockHandleRelease($owner);
+        }
+    }
+
+    public function testLockAcquirePreservesNonTruncatingModesAndBusyHandles(): void
+    {
+        $path = $this->pmssMakeTempFile('pmss-runtime-lock-modes-');
+        foreach (['c', 'c+', 'cb', 'c+b', 'r', 'r+', 'rb', 'r+b', 'a', 'a+', 'ab', 'a+b'] as $mode) {
+            $this->pmssWriteFile($path, 'retained lock state');
+            $busy = true;
+            $owner = \pmssLockFileAcquire($path, true, $mode, false, true, $busy);
+            try {
+                $this->assertTrue(is_resource($owner));
+                $this->assertFalse($busy);
+                // Legacy callers can retain an open, unlocked stream on contention.
+                foreach ([true, false] as $closeOnBusy) {
+                    $competing = \pmssLockFileAcquire($path, true, $mode, false, $closeOnBusy, $busy);
+                    try {
+                        $this->assertTrue($busy);
+                        $this->assertSame(!$closeOnBusy, is_resource($competing));
+                        $this->assertSame('retained lock state', file_get_contents($path));
+                    } finally {
+                        \pmssLockHandleRelease($competing, false);
+                    }
+                }
+            } finally {
+                \pmssLockHandleRelease($owner);
+            }
+        }
+    }
+
+    public function testLockAcquirePreservesNonTruncatingFileCreation(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-runtime-lock-create-');
+        foreach (['c', 'c+', 'a', 'a+', 'x', 'x+', 'xb', 'x+b'] as $index => $mode) {
+            $path = $root.'/'.$index.'/lock';
+            $busy = true;
+            $handle = \pmssLockFileAcquire($path, true, $mode, true, true, $busy);
+            try {
+                $this->assertTrue(is_resource($handle));
+                $this->assertFalse($busy);
+                $this->assertTrue(\pmssLockFileHandleMatchesPath($handle, $path));
+                $this->assertSame('', file_get_contents($path));
+                $this->assertSame(5, fwrite($handle, 'state'));
+                $this->assertTrue(fflush($handle));
+                $this->assertSame('state', file_get_contents($path));
+            } finally {
+                \pmssLockHandleRelease($handle);
+            }
+        }
+    }
+
     public function testLockHandleOperationsRejectInvalidResourcesWithoutWarnings(): void
     {
         $path = $this->pmssMakeTempFile('pmss-runtime-lock-');

@@ -54,6 +54,15 @@ primitive; callers retain the returned stream for their entire run. Callbacks
 preserve legacy logging and exit statuses, and watchdogs retain their existing
 `pmssUserWatchdogLockAcquire()` descriptor-export step for child services.
 
+Lock acquisition rejects empty modes, modes containing NUL bytes, and all
+`w`-prefixed modes before opening the target or creating its parent directory.
+Opening with `w` would truncate stored state before `flock()` could reject a
+competing acquisition. Rejection returns `false` with `busy=false`, following
+the existing invalid-input failure path. Non-truncating modes, including the
+default `c` and counter-state `c+`, retain their creation and contention behavior.
+`RuntimeLockSafetyTest` covers preserved contents, untouched missing paths,
+busy-handle policies, and ordinary lock creation and release.
+
 `scripts/lib/tests/development/CronDoubleLockGuardTest.php` (commit `ad6e852a`) enforces the
 load-bearing invariant deterministically in CI: no `root.cron` cron script is BOTH
 outer-`flock`-wrapped AND self-locking on the same lock path. That test makes the #850
