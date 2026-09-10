@@ -45,23 +45,17 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
     $entry = pmssStorageHealthDeviceEntryBuild('nvme', $disk, $timestamp, 0);
     $entry['metrics'] = $metrics;
     $flags = [];
-    $severity = 'ok';
     if (($metrics['critical_warnings'] ?? 0) > 0) {
-        $severity = 'fail';
         $flags[] = 'nvme_critical_warning';
     }
     if (($metrics['temperature'] ?? 0) >= 70) {
-        $severity = pmssStorageHealthWarnSeverity($severity);
         $flags[] = 'hot_nvme';
     }
     if (($percentageUsed = (int) ($metrics['percentage_used'] ?? 0)) >= 80) {
-        $severity = pmssStorageHealthWarnSeverity($severity);
         $flags[] = $percentageUsed >= 95 ? 'wearout_critical' : 'wearout_high';
     }
 
     $previous = $last['nvme::'.$dev]['metrics'] ?? null;
-    if (is_array($previous)) {
-        $severity = pmssStorageHealthAppendMetricIncreaseFlags($metrics, $previous, ['media_errors' => 'media_errors_increase', 'num_err_log_entries' => 'err_log_increase'], ['media_errors'], $flags, $severity);
-    }
-    return pmssStorageHealthEntryFinalize($entry, $flags, $severity);
+    $flags = array_merge($flags, pmssStorageHealthMetricIncreaseFlags($metrics, is_array($previous) ? $previous : null, ['media_errors' => 'media_errors_increase', 'num_err_log_entries' => 'err_log_increase']));
+    return pmssStorageHealthEntryFinalize($entry, $flags);
 }

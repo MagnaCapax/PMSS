@@ -22,7 +22,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
     if (stripos($out, 'Device is in STANDBY') !== false || stripos($out, 'Device is in SLEEP') !== false) {
         $entry['metrics'] = $defaultMetrics;
         $entry['metrics']['health'] = 'STANDBY';
-        return pmssStorageHealthEntryFinalize($entry, ['standby'], 'ok');
+        return pmssStorageHealthEntryFinalize($entry, ['standby']);
     }
 
     $metrics = $defaultMetrics;
@@ -66,7 +66,6 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
 
     $entry['metrics'] = $metrics;
     $flags = [];
-    $sev = 'ok';
 
     $health = $metrics['health'];
     $healthUpper = is_string($health) ? strtoupper($health) : '';
@@ -75,19 +74,14 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         && strpos($healthUpper, 'FAIL') === false
         && strpos($healthUpper, 'BAD') === false;
 
-    if (!$healthExplicit) {
-        $sev = pmssStorageHealthWarnSeverity($sev);
-        $flags[] = 'health_unknown';
-    } elseif (!$healthOk) {
-        $sev = 'fail';
-        $flags[] = 'health_not_ok';
+    if (!$healthExplicit || !$healthOk) {
+        $flags[] = $healthExplicit ? 'health_not_ok' : 'health_unknown';
     }
 
     foreach (['pending' => 'pending_sectors', 'reallocated' => 'reallocated_sectors'] as $metric => $flag) {
         if (($metrics[$metric] ?? 0) <= 0) {
             continue;
         }
-        $sev = pmssStorageHealthWarnSeverity($sev);
         $flags[] = $flag;
     }
 
@@ -96,16 +90,12 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         $rota = (int) ($disk['rota'] ?? 1);
         $threshold = ($rota === 1) ? 50 : 70;
         if ($temp >= $threshold) {
-            $sev = pmssStorageHealthWarnSeverity($sev);
             $flags[] = ($rota === 1) ? 'hot_hdd' : 'hot_ssd';
         }
     }
 
-    if (is_array($prevMetrics)) {
-        $sev = pmssStorageHealthAppendMetricIncreaseFlags($metrics, $prevMetrics, ['reallocated' => 'reallocated_increase', 'pending' => 'pending_increase', 'link_errors' => 'link_errors_increase'], ['pending'], $flags, $sev);
-    }
-
-    return pmssStorageHealthEntryFinalize($entry, $flags, $sev);
+    $flags = array_merge($flags, pmssStorageHealthMetricIncreaseFlags($metrics, $prevMetrics, ['reallocated' => 'reallocated_increase', 'pending' => 'pending_increase', 'link_errors' => 'link_errors_increase']));
+    return pmssStorageHealthEntryFinalize($entry, $flags);
 }
 
 /**
@@ -117,10 +107,10 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
 {
     $dev = (string) $disk['path'];
     if (!is_readable($dev)) {
-        return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['device_unreadable'], 'warn', 'device unreadable');
+        return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['device_unreadable'], 'device unreadable');
     }
     if (pmssCommandPath('smartctl') === '') {
-        return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['smartctl_missing'], 'warn', 'smartctl missing');
+        return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['smartctl_missing'], 'smartctl missing');
     }
 
     $cmd = 'smartctl -n standby,now -H -A -i '.escapeshellarg($dev);
@@ -129,9 +119,9 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
     $out = $res['stdout']."\n".$res['stderr'];
     if (trim($out) === '') {
         if ($probe['lock_exit_code'] !== 0 && (int) $res['rc'] === $probe['lock_exit_code']) {
-            return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['smartctl_probe_locked'], 'warn', 'smartctl probe already running');
+            return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['smartctl_probe_locked'], 'smartctl probe already running');
         }
-        return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['smartctl_empty'], 'warn', 'smartctl produced no output');
+        return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['smartctl_empty'], 'smartctl produced no output');
     }
 
     $prevMetrics = $last['smart::'.$dev]['metrics'] ?? null;
@@ -141,8 +131,7 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
 
     $entry = pmssStorageHealthParseSmartctlOutput($out, $disk, $prevMetrics, $timestamp);
     if ($res['rc'] === 124) {
-        $severity = pmssStorageHealthWarnSeverity((string) ($entry['severity'] ?? 'ok'));
-        return pmssStorageHealthEntryFinalize($entry, array_merge((array) ($entry['flags'] ?? []), ['smartctl_timeout']), $severity);
+        return pmssStorageHealthEntryFinalize($entry, array_merge((array) ($entry['flags'] ?? []), ['smartctl_timeout']));
     }
     return $entry;
 }

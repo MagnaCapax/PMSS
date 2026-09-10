@@ -53,14 +53,21 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
         ], 'pmss-nvme-bin-');
 
         $this->pmssWithPathPrefix($stubDir, function () use ($device): void {
-            $entry = \pmssStorageHealthSnapshotNvme(
-                ['path' => $device],
-                ['nvme::'.$device => ['metrics' => ['media_errors' => 2, 'num_err_log_entries' => 4]]],
-                '2025-01-01T00:00:00+00:00'
-            );
+            foreach ([
+                [['media_errors' => 2, 'num_err_log_entries' => 4], 'warn', ['media_errors_increase', 'err_log_increase']],
+                [['media_errors' => 5, 'num_err_log_entries' => 4], 'ok', ['err_log_increase']],
+                [['media_errors' => '2', 'num_err_log_entries' => '4'], 'ok', []],
+                [['media_errors' => 6, 'num_err_log_entries' => 8], 'ok', []],
+            ] as [$previous, $severity, $flags]) {
+                $entry = \pmssStorageHealthSnapshotNvme(
+                    ['path' => $device],
+                    ['nvme::'.$device => ['metrics' => $previous]],
+                    '2025-01-01T00:00:00+00:00'
+                );
 
-            $this->assertTrue(is_array($entry));
-            $this->pmssAssertArraySubsetSame(['severity' => 'warn', 'flags' => ['media_errors_increase', 'err_log_increase']], $entry);
+                $this->assertTrue(is_array($entry));
+                $this->pmssAssertArraySubsetSame(['severity' => $severity, 'ok' => $severity === 'ok', 'flags' => $flags], $entry);
+            }
         });
     }
 

@@ -43,20 +43,19 @@ function pmssStorageHealthRaidEntriesParse(string $mdstat, string $timestamp): a
             ];
             $last = count($entries) - 1;
             if (preg_match('/\\[(\\d+)\\/(\\d+)\\]\\s*\\[([U_]+)\\]/', $entries[$last]['detail'], $detail) && (strpos($detail[3], '_') !== false || (int) $detail[1] !== (int) $detail[2])) {
-                $entries[$last]['severity'] = 'fail';
-                $entries[$last]['ok'] = false;
                 $entries[$last]['flags'][] = 'degraded';
             }
         } elseif (!empty($entries) && preg_match('/\b(check|resync|recovery|reshape)\b/', $line, $operation) === 1) {
             $last = count($entries) - 1;
-            if ((string) $entries[$last]['severity'] === 'ok') {
-                $entries[$last]['severity'] = 'warn';
-            }
-            $entries[$last]['ok'] = false;
             $entries[$last]['flags'][] = 'rebuild_in_progress';
             $entries[$last]['operation'] = $operation[1];
             $entries[$last]['resync'] = $trimmed;
         }
+    }
+    // Keep RAID's field order and repeated activity flags in the persisted payload.
+    foreach ($entries as &$entry) {
+        $entry['severity'] = pmssStorageHealthFlagsSeverity($entry['flags']);
+        $entry['ok'] = $entry['severity'] === 'ok';
     }
     return $entries;
 }

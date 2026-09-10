@@ -1,10 +1,35 @@
 <?php
 namespace PMSS\Tests;
 
-require_once dirname(__DIR__, 2).'/storageHealth/common.php';
+require_once dirname(__DIR__, 2).'/storageHealth.php';
 
 final class StorageHealthFacadeCharacterizationTest extends TestCase
 {
+    public function testSmartAndRaidPayloadSnapshot(): void
+    {
+        // Freeze complete payloads, including key/flag order, temperature boundaries,
+        // informational counter growth, failed health, and repeated RAID activity.
+        $entries = [];
+        foreach (['', 'OK', 'PASSED', 'FAILED', 'OK FAIL', 'BAD', 'STANDBY'] as $health) {
+            foreach ([0, 49, 50, 69, 70] as $temperature) {
+                foreach ([0, 1] as $rota) {
+                    foreach ([null, -1, 0, '0', 2] as $previous) {
+                        $out = $health === 'STANDBY' ? 'Device is in STANDBY' : ($health === '' ? '' : 'SMART Health Status: '.$health);
+                        $out .= "\nCurrent Drive Temperature: {$temperature} C\nElements in grown defect list: 0\nNon-medium error count: 1\n";
+                        $entries[] = \pmssStorageHealthParseSmartctlOutput($out, ['path' => '/dev/sda', 'rota' => $rota], ['reallocated' => $previous, 'pending' => $previous, 'link_errors' => $previous], '2025-01-01T00:00:00+00:00');
+                    }
+                }
+            }
+        }
+        foreach (['[2/2] [UU]', '[2/1] [U_]', '[2/1] [UU]'] as $detail) {
+            foreach (['', 'check', 'resync', 'recovery', 'reshape'] as $operation) {
+                $activity = $operation === '' ? '' : "\n {$operation} = 10.0% finish=2min speed=100K/sec";
+                $entries[] = \pmssStorageHealthRaidEntriesParse("md0 : active raid1 {$detail}".$activity.$activity, '2025-01-01T00:00:00+00:00');
+            }
+        }
+        $this->assertSame('4399d9d1f6cef768172bdf798502eb63a330341cfa2724975846053a1badf348', hash('sha256', json_encode($entries)));
+    }
+
     public function testDiskInventoryParserMatchesSharedLsblkShape(): void
     {
         $lsblk = "sda disk 0 Samsung SSD SN123 1.8T\n"

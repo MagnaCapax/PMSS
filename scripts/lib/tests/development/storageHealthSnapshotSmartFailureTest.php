@@ -6,6 +6,23 @@ require_once dirname(__DIR__, 2).'/storageHealth.php';
 
 class StorageHealthSnapshotSmartFailureTest extends TestCase
 {
+    public function testTimeoutFindingsPreserveFailedAndStandbyHealth(): void
+    {
+        $device = $this->pmssMakeReadableTempPath('pmss-smart-timeout-', 'dev-');
+        foreach ([
+            ['SMART Health Status: PASSED', 'warn', ['smartctl_timeout']],
+            ['SMART Health Status: FAILED', 'fail', ['health_not_ok', 'smartctl_timeout']],
+            ['Device is in STANDBY', 'warn', ['standby', 'smartctl_timeout']],
+            ['', 'warn', ['smartctl_empty']],
+        ] as [$output, $severity, $flags]) {
+            $stub = $this->pmssMakeExecutableStub('smartctl', "#!/bin/sh\nprintf '%s' ".escapeshellarg($output)."\nexit 124\n", 'pmss-smart-timeout-bin-');
+            $this->pmssWithEnv(['PATH' => $stub], function () use ($device, $severity, $flags): void {
+                $entry = \pmssStorageHealthSnapshotSmart(['path' => $device], [], '2025-01-01T00:00:00+00:00');
+                $this->pmssAssertArraySubsetSame(['severity' => $severity, 'ok' => false, 'flags' => $flags], $entry);
+            });
+        }
+    }
+
     public function testSnapshotSmartGuardFailures(): void
     {
         $disk = ['path' => sys_get_temp_dir().'/pmss-smart-missing-'.bin2hex(random_bytes(4)), 'kname' => 'sdx'];

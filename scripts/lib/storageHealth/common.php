@@ -72,34 +72,37 @@ function pmssStorageHealthDeviceEntryBuild(string $kind, array $disk, string $ti
 }
 
 /** @param array<string, mixed> $entry @param array<int, string> $flags @return array<string, mixed> */
-function pmssStorageHealthEntryFinalize(array $entry, array $flags, string $severity, ?string $error = null): array
+function pmssStorageHealthEntryFinalize(array $entry, array $flags, ?string $error = null): array
 {
     if ($error !== null) {
         $entry['error'] = $error;
     }
     $entry['flags'] = array_values(array_unique($flags));
-    $entry['severity'] = $severity;
-    $entry['ok'] = ($severity === 'ok');
+    $entry['severity'] = pmssStorageHealthFlagsSeverity($flags);
+    $entry['ok'] = ($entry['severity'] === 'ok');
     return $entry;
 }
 
-/** Promote OK storage-health severity to WARN without downgrading failures. */
-function pmssStorageHealthWarnSeverity(string $severity): string
+/** Derive status from findings: failures win; informational flags remain OK. */
+function pmssStorageHealthFlagsSeverity(array $flags): string
 {
-    return $severity === 'ok' ? 'warn' : $severity;
+    if (array_intersect($flags, ['health_not_ok', 'nvme_critical_warning', 'degraded']) !== []) {
+        return 'fail';
+    }
+    return array_diff($flags, ['standby', 'reallocated_increase', 'link_errors_increase', 'err_log_increase']) === [] ? 'ok' : 'warn';
 }
 
-/** Append flags when current metrics exceed the previous snapshot. */
-function pmssStorageHealthAppendMetricIncreaseFlags(array $metrics, array $previous, array $metricFlags, array $warningMetrics, array &$flags, string $severity): string
+/** Return findings only for integer counters that grew since the last snapshot. */
+function pmssStorageHealthMetricIncreaseFlags(array $metrics, ?array $previous, array $metricFlags): array
 {
+    $flags = [];
     foreach ($metricFlags as $metric => $flag) {
         $current = $metrics[$metric] ?? null;
         $old = $previous[$metric] ?? null;
         if (!is_int($current) || !is_int($old) || $current <= $old) continue;
-        if (in_array($metric, $warningMetrics, true)) $severity = pmssStorageHealthWarnSeverity($severity);
         $flags[] = $flag;
     }
-    return $severity;
+    return $flags;
 }
 
 /**
