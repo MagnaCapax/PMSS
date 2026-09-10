@@ -48,6 +48,12 @@ that can overlap harmfully self-locks internally; the outer cron `flock` wrapper
 A script whose work is genuinely idempotent (e.g. systemd IPAccounting cumulative+delta
 counters) needs no lock at all and carries neither.
 
+Cron entrypoints share `pmssCronLockAcquire()` in `runtime/locks.php` for this
+acquire-or-skip sequence. It retains the `pmss-<name>.lock` path and non-blocking
+primitive; callers retain the returned stream for their entire run. Callbacks
+preserve legacy logging and exit statuses, and watchdogs retain their existing
+`pmssUserWatchdogLockAcquire()` descriptor-export step for child services.
+
 `scripts/lib/tests/development/CronDoubleLockGuardTest.php` (commit `ad6e852a`) enforces the
 load-bearing invariant deterministically in CI: no `root.cron` cron script is BOTH
 outer-`flock`-wrapped AND self-locking on the same lock path. That test makes the #850

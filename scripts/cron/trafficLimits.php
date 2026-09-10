@@ -24,8 +24,7 @@ require_once '/scripts/lib/runtime.php';
 // former root.cron `flock -xn`. Overlapping runs would race per-user throttle
 // applies (pmssTrafficLimitThrottleApply) and stack on a hung mount (GH #850/#853).
 // Non-blocking: skip if another run holds the lock. Hold the handle until exit.
-$trafficLimitsLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-trafficLimits.lock'), true);
-if ($trafficLimitsLock === false) { fwrite(STDERR, "trafficLimits already running; skipping\n"); exit(0); }
+$trafficLimitsLock = pmssCronLockAcquire('trafficLimits');
 
 if (!pmssDirEnsureExists('/var/run/pmss/trafficLimits', 0755)) {
     fwrite(STDERR, "Unable to prepare traffic limit runtime directory\n");

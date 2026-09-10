@@ -48,6 +48,22 @@ function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mo
     return $handle;
 }
 
+/** Acquire a cron lock; callers must retain the stream until their work ends. */
+function pmssCronLockAcquire(string $name, ?callable $onBusy = null, ?callable $acquire = null)
+{
+    $path = pmssRuntimeLockPath('pmss-'.$name.'.lock');
+    $handle = $acquire === null ? pmssLockFileAcquire($path, true) : $acquire($path);
+    if ($handle !== false) return $handle;
+    // Preserve legacy skip output and status, including silent and alerting jobs.
+    $message = $name.' already running; skipping';
+    if ($onBusy !== null) exit((int) $onBusy($message));
+    fwrite(STDERR, $message."\n");
+    exit(0);
+}
+
+/** Legacy watchdogs send timestamped skip notices to stdout. */
+function pmssCronLockSkipLog(string $message): void { echo date('Y-m-d H:i:s').': '.$message."\n"; }
+
 /**
  * Resolve numeric fd entries that reference an acquired lock handle.
  *

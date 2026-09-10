@@ -17,9 +17,9 @@ class CronInlineCharacterizationTest extends TestCase
     public function testServiceWatchdogsUseSharedHelpersAndKeepCommands(): void
     {
         $this->pmssAssertRepoFileContractCases([
-            'scripts/cron/checkQbittorrentInstances.php' => ['required' => ['$pmssCheckQbittorrentLock = pmssUserWatchdogLockAcquire(pmssRuntimeLockPath(\'pmss-checkQbittorrentInstances.lock\'))', 'if ($pmssCheckQbittorrentLock === false) {', 'checkQbittorrentInstances already running; skipping', 'pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssQbittorrentApplyManagedConfig'", 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox stopped due to suspension'", "'qbittorrent-nox start requested'", 'pmssUserWatchdogSuCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'qBittorrent watchdog must quote su shell boundaries through the shared helper']],
-            'scripts/cron/checkRcloneInstances.php' => ['required' => ['$pmssCheckRcloneLock = pmssUserWatchdogLockAcquire(pmssRuntimeLockPath(\'pmss-checkRcloneInstances.lock\'))', 'if ($pmssCheckRcloneLock === false) {', 'checkRcloneInstances already running; skipping', 'pmssUserWatchdogRunService(', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone stopped due to suspension'", "'rclone start requested'", 'pmssUserWatchdogSuCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'rclone watchdog must quote su shell boundaries through the shared helper']],
-            'scripts/cron/checkDelugeInstances.php' => ['required' => ['$pmssCheckDelugeLock = pmssUserWatchdogLockAcquire(pmssRuntimeLockPath(\'pmss-checkDelugeInstances.lock\'))', 'if ($pmssCheckDelugeLock === false) {', 'checkDelugeInstances already running; skipping', 'pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssDelugeApplyManagedConfig'", "'deluge stopped due to suspension'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'", 'pmssUserWatchdogSuCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'deluge watchdog must quote su shell boundaries through the shared helper']],
+            'scripts/cron/checkQbittorrentInstances.php' => ['required' => ['$pmssCheckQbittorrentLock = pmssCronLockAcquire(\'checkQbittorrentInstances\', \'pmssCronLockSkipLog\', \'pmssUserWatchdogLockAcquire\')', 'pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssQbittorrentApplyManagedConfig'", 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox stopped due to suspension'", "'qbittorrent-nox start requested'", 'pmssUserWatchdogSuCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'qBittorrent watchdog must quote su shell boundaries through the shared helper']],
+            'scripts/cron/checkRcloneInstances.php' => ['required' => ['$pmssCheckRcloneLock = pmssCronLockAcquire(\'checkRcloneInstances\', \'pmssCronLockSkipLog\', \'pmssUserWatchdogLockAcquire\')', 'pmssUserWatchdogRunService(', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone stopped due to suspension'", "'rclone start requested'", 'pmssUserWatchdogSuCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'rclone watchdog must quote su shell boundaries through the shared helper']],
+            'scripts/cron/checkDelugeInstances.php' => ['required' => ['$pmssCheckDelugeLock = pmssCronLockAcquire(\'checkDelugeInstances\', \'pmssCronLockSkipLog\', \'pmssUserWatchdogLockAcquire\')', 'pmssUserWatchdogRunService(', 'pmssUserWatchdogApplyManagedConfigWhenStopped(', 'pmssUserWatchdogRestartProcessesIf(', "'pmssDelugeApplyManagedConfig'", "'deluge stopped due to suspension'", "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'", 'pmssUserWatchdogSuCommand($thisUser,'], 'forbidden' => ['su '.'{$thisUser}' => 'deluge watchdog must quote su shell boundaries through the shared helper']],
             'scripts/lib/runtime/environment.php' => ['required' => ['function pmssBuildUserShellCommand(', 'escapeshellarg($username)', 'escapeshellarg($command)']],
             'scripts/lib/user/serviceLaunch.php' => ['required' => ['function pmssBuildUserServiceShellCommand(', "'--scope'", "'--slice='.\$slice", "pmssBuildCommand('systemd-run'", "pmssBuildCommand('systemctl', ['start', \$slice])"]],
             'scripts/lib/user/watchdog.php' => ['required' => [
@@ -39,8 +39,7 @@ class CronInlineCharacterizationTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkLighttpdInstances.php', [
             "require_once __DIR__.'/../lib/runtime.php';",
-            "pmssUserWatchdogLockAcquire(pmssRuntimeLockPath('pmss-checkLighttpdInstances.lock'))",
-            'checkLighttpdInstances already running; skipping',
+            "pmssCronLockAcquire('checkLighttpdInstances', 'pmssCronLockSkipLog', 'pmssUserWatchdogLockAcquire')",
             "require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';",
             "pmssUserLighttpdEnabled(\$thisUser)",
             "pmssLighttpdWatchdogDeleteErrorPage(\$thisUser, \$watchdogWebRoot)",
@@ -65,7 +64,7 @@ class CronInlineCharacterizationTest extends TestCase
             "'lighttpd start requested'",
         ]);
         $this->assertOrderedStrings([
-            "pmssUserWatchdogLockAcquire(pmssRuntimeLockPath('pmss-checkLighttpdInstances.lock'))",
+            "pmssCronLockAcquire('checkLighttpdInstances', 'pmssCronLockSkipLog', 'pmssUserWatchdogLockAcquire')",
             "pmssUserWatchdogServiceSpec('lighttpd'",
         ], $this->pmssReadRepoFile('scripts/cron/checkLighttpdInstances.php'), 'lighttpd shared lock-fd close contract: ');
     }
@@ -76,9 +75,8 @@ class CronInlineCharacterizationTest extends TestCase
 
         $this->assertOrderedStrings([
             'pmssRootGuardAuditAndKill(',
-            "\$pmssMediaStackInstancesLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-mediaStackInstancesCheck.lock'), true);",
-            'if ($pmssMediaStackInstancesLock === false) {',
-            'mediaStackInstancesCheck already running; skipping',
+            "\$pmssMediaStackInstancesLock = pmssCronLockAcquire('mediaStackInstancesCheck'",
+            'return $rootGuardFindings > 0 ? 1 : 0;',
             "foreach (\$result['users'] as \$username) {",
         ], $source, 'media-stack watchdog guard contract: ');
     }

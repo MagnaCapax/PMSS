@@ -5,25 +5,12 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateQuotasGuardTest extends TestCase
 {
-    public function testRootCronGuardsUpdateQuotasAgainstOverlap(): void
+    public function testCronJobsRetainSharedNonBlockingLocks(): void
     {
-        // Migrated to the canonical in-script lock (ADR-0049 / #853): the former
-        // root.cron `flock -xn` is retired; updateQuotas.php now self-locks.
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/cron/updateQuotas.php',
-            ["pmssLockFileAcquire(pmssRuntimeLockPath('pmss-updateQuotas.lock')", '=== false'],
-            'updateQuotas must self-lock against overlap (ADR-0049 in-script lock): '
-        );
-    }
-
-    public function testRootCronGuardsRootlessDockerWithCloseOnExec(): void
-    {
-        // Migrated to the canonical in-script lock (ADR-0049 / #853): checkRootlessDocker.php self-locks.
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/cron/checkRootlessDocker.php',
-            ["pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkRootlessDocker.lock')", '=== false'],
-            'checkRootlessDocker must self-lock against overlap (ADR-0049 in-script lock): '
-        );
+        // All six migrated jobs keep their original names and stderr skip policy (ADR 0049).
+        foreach (['updateQuotas', 'checkRootlessDocker', 'trafficIngressLog', 'trafficIngressStats', 'trafficLimits', 'trafficStats'] as $name) {
+            $this->pmssAssertRepoFileContainsString('scripts/cron/'.$name.'.php', '$'.$name.'Lock = pmssCronLockAcquire(\''.$name.'\');');
+        }
     }
 
     public function testUpdateQuotasSkipsEmptyAndInvalidUsers(): void

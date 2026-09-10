@@ -29,11 +29,9 @@ define('PMSS_RTORRENT_START_FAILURE_ESCALATE', 6);
 
 // Keep the handle for the whole run — an unassigned handle is closed at end
 // of statement, which releases the flock and voids the guard.
-$pmssCheckRtorrentLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkRtorrent.lock'), true);
-if ($pmssCheckRtorrentLock === false) {
-    pmssCheckRtorrentLog('checkRtorrent already running; skipping', false, $debug);
-    exit(0);
-}
+$pmssCheckRtorrentLock = pmssCronLockAcquire('checkRtorrent', static function (string $message) use ($debug): void {
+    pmssCheckRtorrentLog($message, false, $debug);
+});
 
 pmssCheckRtorrentLog('Checking rTorrent instances', false, $debug);
 

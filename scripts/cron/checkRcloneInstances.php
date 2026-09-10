@@ -8,11 +8,7 @@
  */
 require_once __DIR__.'/../lib/user/watchdog.php';
 
-$pmssCheckRcloneLock = pmssUserWatchdogLockAcquire(pmssRuntimeLockPath('pmss-checkRcloneInstances.lock'));
-if ($pmssCheckRcloneLock === false) {
-    echo date('Y-m-d H:i:s').': checkRcloneInstances already running; skipping' . "\n";
-    exit(0);
-}
+$pmssCheckRcloneLock = pmssCronLockAcquire('checkRcloneInstances', 'pmssCronLockSkipLog', 'pmssUserWatchdogLockAcquire');
 
 pmssUserWatchdogRunService('Rclone', 'rcloneEnable', ['rclone'], 'rclone stopped due to suspension', [
     pmssUserWatchdogServiceSpec('rclone', static function (string $thisUser): string {

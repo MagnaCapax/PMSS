@@ -49,8 +49,7 @@ class DiskIostatTest extends TestCase
     public function testCronEntryPointUsesNonBlockingSingleInstanceLock(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/diskIostat.php', [
-            "pmssLockFileAcquire(pmssRuntimeLockPath('pmss-diskIostat.lock'), true)",
-            'diskIostat already running; skipping',
+            "\$pmssDiskIostatLock = pmssCronLockAcquire('diskIostat', 'pmssCronLockSkipLog')",
         ]);
     }
 

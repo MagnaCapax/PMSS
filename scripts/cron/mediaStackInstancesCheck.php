@@ -25,11 +25,10 @@ $rootGuardFindings = pmssRootGuardAuditAndKill(static function (string $message)
 });
 
 // Keep the handle alive while home filesystem probes run so overlapping ticks skip.
-$pmssMediaStackInstancesLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-mediaStackInstancesCheck.lock'), true);
-if ($pmssMediaStackInstancesLock === false) {
-    echo date('Y-m-d H:i:s').': mediaStackInstancesCheck already running; skipping'."\n";
-    exit($rootGuardFindings > 0 ? 1 : 0);
-}
+$pmssMediaStackInstancesLock = pmssCronLockAcquire('mediaStackInstancesCheck', static function (string $message) use ($rootGuardFindings): int {
+    pmssCronLockSkipLog($message);
+    return $rootGuardFindings > 0 ? 1 : 0;
+});
 
 $result = pmssListManagedUsersResult('/scripts/listUsers.php');
 if ((int) $result['exitCode'] !== 0) {

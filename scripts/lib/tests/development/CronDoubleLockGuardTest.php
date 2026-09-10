@@ -41,8 +41,10 @@ class CronDoubleLockGuardTest extends TestCase
             $script   = $row[2];   // e.g. trafficLog  (from /scripts/cron/trafficLog.php)
             $src = $this->pmssReadRepoFile('scripts/cron/'.$script.'.php');
 
-            $referencesSameLock = strpos($src, 'pmss-'.$lockName.'.lock') !== false;
+            $referencesSameLock = strpos($src, 'pmss-'.$lockName.'.lock') !== false
+                || strpos($src, "pmssCronLockAcquire('".$lockName."'") !== false;
             $selfLocks = strpos($src, 'pmssLockFileAcquire') !== false
+                || strpos($src, 'pmssCronLockAcquire') !== false
                 || strpos($src, 'pmssRuntimeLockPath') !== false
                 || strpos($src, 'flock(') !== false;
 

@@ -12,8 +12,7 @@ require_once __DIR__.'/../lib/user/selection.php';
 require_once __DIR__.'/../lib/user/usageAlertDelivery.php';
 
 requireRoot();
-$lock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-usageAlertsNotify.lock'), true);
-if ($lock === false) exit(0);
+$lock = pmssCronLockAcquire('usageAlertsNotify', static function (): void { });
 
 $result = pmssListManagedUsersResult('/scripts/listUsers.php');
 if ((int) $result['exitCode'] !== 0) {

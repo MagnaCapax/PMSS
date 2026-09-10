@@ -15,8 +15,8 @@ class checkRtorrentRestartGraceContractTest extends TestCase
         // wrapper, so this in-script lock is the only concurrency guard).
         $this->pmssAssertRepoFileContract('scripts/cron/checkRtorrent.php', [
             'required' => [
-                '$pmssCheckRtorrentLock = pmssLockFileAcquire(',
-                'if ($pmssCheckRtorrentLock === false) {',
+                "\$pmssCheckRtorrentLock = pmssCronLockAcquire('checkRtorrent'",
+                'pmssCheckRtorrentLog($message, false, $debug);',
             ],
         ]);
     }

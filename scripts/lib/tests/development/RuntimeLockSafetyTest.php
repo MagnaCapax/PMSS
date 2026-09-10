@@ -31,9 +31,13 @@ class RuntimeLockSafetyTest extends TestCase
     public function testLockHandleLifecyclePreservesPidAndReleaseBehavior(): void
     {
         $path = $this->pmssMakeTempFile('pmss-runtime-lock-');
-        foreach ([true, false] as $unlock) {
+        foreach ([[true, false], [false, false], [true, true], [false, true]] as [$unlock, $cron]) {
             $this->pmssWriteFile($path, str_repeat('old pid ', 8));
-            $handle = \pmssLockFileAcquire($path, true, 'c+');
+            $acquire = function (string $resolved) use ($path) {
+                $this->assertSame(\pmssRuntimeLockPath('pmss-test.lock'), $resolved);
+                return \pmssLockFileAcquire($path, true, 'c+');
+            };
+            $handle = $cron ? \pmssCronLockAcquire('test', null, $acquire) : \pmssLockFileAcquire($path, true, 'c+');
             $this->assertTrue(is_resource($handle));
 
             try {
@@ -58,6 +62,24 @@ class RuntimeLockSafetyTest extends TestCase
             } finally {
                 \pmssLockHandleRelease($reacquired);
             }
+        }
+    }
+
+    public function testCronLockSkipPreservesOutputAndExitPolicy(): void
+    {
+        foreach ([
+            ['null', 0, '', "test already running; skipping\n"],
+            ["'pmssCronLockSkipLog'", 0, 'TIMESTAMP: test already running; skipping', ''],
+            ['static function (): void {}', 0, '', ''],
+            ['static function ($message): void { echo "log:".$message; }', 0, 'log:test already running; skipping', ''],
+            ['static function (): int { return 1; }', 1, '', ''],
+        ] as [$callback, $rc, $stdout, $stderr]) {
+            $code = 'require '.var_export($this->pmssRepoPath('scripts/lib/runtime.php'), true).'; '
+                .'pmssCronLockAcquire("test", '.$callback.', static function ($path) { return false; }); exit(99);';
+            ['result' => $result, 'stderrPath' => $stderrPath] = $this->pmssExecShellCommandWithTempStderr(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code));
+            $this->assertSame($rc, $result['rc']);
+            $this->assertSame($stdout, preg_replace('/\d{4}-\d\d-\d\d \d\d:\d\d:\d\d/', 'TIMESTAMP', $result['output']));
+            $this->assertSame($stderr, file_get_contents($stderrPath));
         }
     }
 

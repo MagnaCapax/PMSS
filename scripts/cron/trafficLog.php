@@ -21,11 +21,7 @@ $logger = new Logger(__FILE__);
 // Counters are listed then flushed below; an overlapping run would read the
 // same counters twice and double-bill traffic. Hold the handle until exit —
 // an unassigned handle is closed immediately, which releases the flock.
-$pmssTrafficLogLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-trafficLog.lock'), true);
-if ($pmssTrafficLogLock === false) {
-    $logger->msg('trafficLog already running; skipping');
-    exit(0);
-}
+$pmssTrafficLogLock = pmssCronLockAcquire('trafficLog', [$logger, 'msg']);
 $logdir = '/var/log/pmss/traffic/';
 $userUids = pmssResourceLogManagedUserUids();
 if (count($userUids) == 0) exit;    // Nothing to collect
