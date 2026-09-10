@@ -16,8 +16,8 @@ Usage:
 
 Purpose:
   Fetch open GitHub issues (excluding complete-verify, wontfix,
-  needs-investigation, blocked, should-not-implement) and launch
-  the assistant to implement tractable ones.
+  needs-investigation, blocked, should-not-implement, human-in-the-loop)
+  and launch the assistant to implement tractable ones.
 
 Options:
   --max-issues N  Maximum issues to fetch (default: ${max_issues})
@@ -191,7 +191,7 @@ if [[ -z "$target_issue" ]]; then
 		fi
 	done < <(gh issue list --state open --limit "$candidate_pool" \
 		--json number,title,labels \
-		--jq '.[] | select((.labels | map(.name) | any(. == "complete-verify" or . == "wontfix" or . == "needs-investigation" or . == "blocked" or . == "should-not-implement")) | not) | [(.number|tostring), .title, ([.labels[].name] | join(","))] | @tsv' 2>/dev/null || true)
+		--jq '.[] | select((.labels | map(.name) | any(. == "complete-verify" or . == "wontfix" or . == "needs-investigation" or . == "blocked" or . == "should-not-implement" or . == "human-in-the-loop")) | not) | [(.number|tostring), .title, ([.labels[].name] | join(","))] | @tsv' 2>/dev/null || true)
 
 	issue_numbers=("${issue_numbers_bug[@]}" "${issue_numbers_security[@]}" "${issue_numbers_stability[@]}" "${issue_numbers_other[@]}")
 fi
@@ -200,7 +200,7 @@ if [[ ${#issue_numbers[@]} -eq 0 ]]; then
 	if [[ -n "$target_issue" ]]; then
 		echo "[agentic-issues] No selectable target issue. Skipping." >&1
 	else
-		echo "[agentic-issues] No tractable issues (all labeled complete-verify, wontfix, needs-investigation, blocked, or should-not-implement). Skipping." >&1
+		echo "[agentic-issues] No tractable issues (all labeled complete-verify, wontfix, needs-investigation, blocked, should-not-implement, or human-in-the-loop). Skipping." >&1
 	fi
 	exit 0
 fi
