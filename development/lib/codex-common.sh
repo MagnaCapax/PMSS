@@ -644,8 +644,12 @@ EOF
 }
 
 # Post-run enforcement: revert any modifications to frozen pipeline paths.
-# The codex sandbox (workspace-write) allows writes to ALL files in the repo.
-# This function detects and reverts changes to paths that agents must NEVER modify.
+# The codex sandbox (danger-full-access) allows writes to ALL files in the repo AND lets the
+# agent commit and push in-session, so this scan checks two ranges:
+#   - the working tree (staged, unstaged, untracked): reverted/removed here;
+#   - the commits made since run start (base_ref..HEAD, optional 2nd arg): already in history
+#     (and pushed under autocommit) — reported loudly, never rewritten here.
+# This function detects changes to paths that agents must NEVER modify.
 #
 # FROZEN PATHS (security-critical):
 #   .github/           — CI/CD workflows (sandbox escape vector)
@@ -655,9 +659,11 @@ EOF
 #   .codex-prompt      — operator notes (persistent prompt injection)
 #   .gitignore         — could hide malicious files
 #
-# Returns 0 if clean, 1 if frozen paths were touched (and reverted).
+# Usage: codex_scan_frozen_paths <repo_root> [<base_ref>]
+# Returns 0 if clean, 1 if frozen paths were touched (working tree reverted; commits reported).
 codex_scan_frozen_paths() {
 	local repo_root="$1"
+	local base_ref="${2:-}"
 	command -v git >/dev/null 2>&1 || return 0
 	git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
 
@@ -695,35 +701,58 @@ codex_scan_frozen_paths() {
 		fi
 	done < <(git -C "$repo_root" ls-files --others --exclude-standard 2>/dev/null)
 
-	if [[ ${#touched_files[@]} -eq 0 ]]; then
+	# Commits made since run start: the agent may have committed (and pushed) a frozen path
+	# change already, which leaves the working tree clean. Report — do not rewrite history.
+	local committed_files=()
+	local head_now
+	head_now=$(git -C "$repo_root" rev-parse HEAD 2>/dev/null || true)
+	if [[ -n "$base_ref" && -n "$head_now" && "$base_ref" != "$head_now" ]]; then
+		while IFS= read -r f; do
+			[[ -n "$f" ]] || continue
+			if echo "$f" | grep -qE "$pattern"; then
+				committed_files+=("$f")
+			fi
+		done < <(git -C "$repo_root" diff --name-only "$base_ref" "$head_now" 2>/dev/null || true)
+	fi
+
+	if [[ ${#touched_files[@]} -eq 0 && ${#committed_files[@]} -eq 0 ]]; then
 		return 0
 	fi
 
-	echo "[codex-run] FROZEN PATH VIOLATION: agent modified protected paths:" >&2
 	local file
-	for file in "${touched_files[@]}"; do
-		echo "[codex-run]   - $file" >&2
-	done
+	if [[ ${#committed_files[@]} -gt 0 ]]; then
+		echo "[codex-run] FROZEN PATH VIOLATION: protected paths changed in commits ${base_ref:0:12}..${head_now:0:12} (already in history; pushed under autocommit) — review and revert by hand:" >&2
+		for file in "${committed_files[@]}"; do
+			echo "[codex-run]   - $file (committed)" >&2
+		done
+	fi
 
-	# Revert: restore frozen files from HEAD, remove untracked frozen files
-	for file in "${touched_files[@]}"; do
-		if git -C "$repo_root" ls-files --error-unmatch "$file" >/dev/null 2>&1; then
-			# Tracked file — restore from HEAD
-			git -C "$repo_root" checkout HEAD -- "$file" 2>/dev/null || true
-			echo "[codex-run]   REVERTED: $file (restored from HEAD)" >&2
-		else
-			# Untracked file in frozen dir — remove it
-			rm -f "$repo_root/$file" 2>/dev/null || true
-			echo "[codex-run]   REMOVED: $file (untracked in frozen path)" >&2
-		fi
-	done
+	if [[ ${#touched_files[@]} -gt 0 ]]; then
+		echo "[codex-run] FROZEN PATH VIOLATION: agent modified protected paths:" >&2
+		for file in "${touched_files[@]}"; do
+			echo "[codex-run]   - $file" >&2
+		done
 
-	# Unstage any frozen files that were staged
-	for file in "${touched_files[@]}"; do
-		git -C "$repo_root" reset HEAD -- "$file" 2>/dev/null || true
-	done
+		# Revert: restore frozen files from HEAD, remove untracked frozen files
+		for file in "${touched_files[@]}"; do
+			if git -C "$repo_root" ls-files --error-unmatch "$file" >/dev/null 2>&1; then
+				# Tracked file — restore from HEAD
+				git -C "$repo_root" checkout HEAD -- "$file" 2>/dev/null || true
+				echo "[codex-run]   REVERTED: $file (restored from HEAD)" >&2
+			else
+				# Untracked file in frozen dir — remove it
+				rm -f "$repo_root/$file" 2>/dev/null || true
+				echo "[codex-run]   REMOVED: $file (untracked in frozen path)" >&2
+			fi
+		done
 
-	echo "[codex-run] FROZEN PATH VIOLATION: all frozen paths reverted/removed" >&2
+		# Unstage any frozen files that were staged
+		for file in "${touched_files[@]}"; do
+			git -C "$repo_root" reset HEAD -- "$file" 2>/dev/null || true
+		done
+
+		echo "[codex-run] FROZEN PATH VIOLATION: all frozen paths reverted/removed" >&2
+	fi
 	return 1
 }
 

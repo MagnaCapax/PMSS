@@ -382,6 +382,9 @@ invoke_start_ms="$(codex_now_ms)"
 codex_emit_event_jsonl "$event_log" "assistant_invoke_start" "info" "invoke" "$run_id" "" "" \
 	"exec=${exec_cmd%% *}"
 
+# HEAD at run start: the post-run guards inspect the commits the agent makes (and pushes) itself.
+pre_head="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
+
 set +e
 codex_invoke "$exec_cmd" "$prompt_out"
 invoke_rc=$?
@@ -396,23 +399,25 @@ if [[ "$invoke_rc" -ne 0 ]]; then
 	exit "$invoke_rc"
 fi
 
-# Security: revert any modifications to frozen pipeline paths (CRITICAL)
+# Security: detect modifications to frozen pipeline paths (CRITICAL) — working tree (reverted)
+# and commits made since run start (reported; the agent commits and pushes in-session).
 # This catches sandbox escape via .github/, development/, AGENTS.md, .codex-prompt, .gitignore
-if ! codex_scan_frozen_paths "$ROOT"; then
-	echo "[codex-run] WARNING: frozen path violation detected and reverted" >&2
+if ! codex_scan_frozen_paths "$ROOT" "$pre_head"; then
+	echo "[codex-run] WARNING: frozen path violation detected (working tree reverted; committed changes reported above)" >&2
 	codex_emit_event_jsonl "$event_log" "frozen_path_violation" "warn" "scan_frozen_paths" "$run_id" "0" "" \
-		"frozen path modifications were detected and reverted"
+		"frozen path modifications were detected (working tree reverted; committed changes reported)"
 fi
 
 codex_scan_git_diff_for_dangers "$ROOT"
 codex_emit_event_jsonl "$event_log" "danger_scan_complete" "info" "scan_diff" "$run_id" "0" "" \
 	"danger scan completed"
 
-# Security: scan commit messages for PII before they get pushed to public repo
-if ! codex_scan_commit_messages_for_pii "$ROOT"; then
-	echo "[codex-run] WARNING: unpushed commits contain PII — wrapper should block push" >&2
+# Security: scan the commit messages made since run start for PII (public repo). The agent
+# pushes in-session, so origin/main already equals HEAD here — the run-start HEAD is the base.
+if ! codex_scan_commit_messages_for_pii "$ROOT" "${pre_head:-origin/main}"; then
+	echo "[codex-run] WARNING: commits made since run start contain PII-like data (already pushed under autocommit) — review and rewrite immediately" >&2
 	codex_emit_event_jsonl "$event_log" "commit_pii_warning" "warn" "scan_commit_messages" "$run_id" "0" "" \
-		"PII-like data detected in unpushed commit messages"
+		"PII-like data detected in commit messages made since run start"
 fi
 
 # NOTE: The parent-shell "git add -A" commit fallback that used to live here was REMOVED
