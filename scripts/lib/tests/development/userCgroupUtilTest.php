@@ -10,6 +10,38 @@ use PMSS\Cgroup\SystemInterface;
 
 class UserCgroupUtilTest extends TestCase
 {
+    /** Lock profile precedence, repeated flags, output order, and return codes. */
+    public function testCliPipelineSnapshot(): void
+    {
+        $configDir = $this->pmssMakeCgroupPolicyConfigDir([
+            'memoryHighMiB' => 600, 'cpuWeight' => 180,
+            'mounts' => ['/home' => ['ioWeight' => 75, 'readBw' => '12M']],
+            'profiles' => ['cpu' => ['LOW' => 80], 'io' => [
+                'HDD' => ['cpuWeight' => 225, 'readIops' => 0, 'writeBw' => '7M'],
+                'archive' => ['tasksMax' => 9000, 'readBw' => '9M'],
+            ]],
+        ]);
+        $cases = [
+            ['--cpu-weight=50', '--cpu-weight=75'],
+            ['--cpu-profile=LOW', '--mem-profile=heavy', '--tasks-profile=high'],
+            ['--cpu-profile=unknown'], ['--device=/home', '--io-profile=HDD'],
+            ['--device=/home', '--io-profile=nvme'], ['--device=/home', '--io-profile=bulk'],
+            ['--device=/home', '--io-profile=archive'], ['--device=/home', '--io-profile=unknown'],
+            ['--defaults', '--device=/home', '--io-profile=hdd', '--io-weight=777'],
+            ['--io-write-iops=/home:max', '--io-read-iops=/home:0', '--io-read-bw=/dev/sdb:3M', '--io-read-bw=/dev/sdc:4M'],
+            ['--io-latency-ms=50'], ['--cpu-quota-percent=infinity'],
+        ];
+        $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $configDir], function () use ($cases): void {
+            $snapshot = [];
+            $manager = new Manager($this->makeSystemStub('/dev/sdb'), static function (): int { return 0; });
+            foreach ($cases as $flags) {
+                $snapshot[] = $this->pmssCaptureStdout(static function () use ($manager, $flags): int {
+                    return $manager->run(array_merge(['userConfigCgroup.php', 'testuser', '--apply'], $flags));
+                });
+            }
+            $this->assertSame('2043e5da85f94201d8ee42562f1d08dc7d293f9fd42b6715663bc499b00c7abc', hash('sha256', serialize($snapshot)));
+        });
+    }
     /**
      * Create a manager instance backed by a no-op system implementation.
      *

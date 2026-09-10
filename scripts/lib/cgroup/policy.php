@@ -53,9 +53,6 @@ function pmssCgroupPolicyDeviceMajorMinorResolve(string $devicePath, ?callable $
     return pmssCgroupPolicyMajorMinorIsValid($majorMinor) ? $majorMinor : null;
 }
 
-/** Map IO profile default policy keys to userConfigCgroup option keys. */
-function pmssCgroupPolicyIoDefaultMap(): array { return ['ioWeight' => 'io-weight', 'cpuWeight' => 'cpu-weight', 'tasksMax' => 'tasks-max']; }
-
 /** Map policy IO limit keys to systemd property names and value validation mode. */
 function pmssCgroupPolicyIoPairSpecs(bool $includeWeight = true): array
 {
@@ -120,55 +117,6 @@ function pmssBfqKernelWeightParse($raw): ?int
 
     $weight = (int) $value;
     return $weight >= 1 && $weight <= PMSS_BFQ_KERNEL_MAX ? $weight : null;
-}
-
-/** Resolve one numeric profile value from policy overrides plus built-in defaults. */
-function pmssCgroupPolicyNumericProfileValue(array $policy, string $family, string $profileName, array $defaults, string $fallback): string
-{
-    $profileName = strtolower($profileName);
-    $profiles = isset($policy['profiles'][$family]) && is_array($policy['profiles'][$family]) ? $policy['profiles'][$family] : [];
-    foreach ($profiles as $name => $value) {
-        if (!is_string($name) || $name === '' || !is_numeric($value) || (int) $value <= 0) {
-            continue;
-        }
-        $defaults[strtolower($name)] = (string) (int) $value;
-    }
-
-    return $defaults[$profileName] ?? $fallback;
-}
-
-/** Merge policy-defined IO profiles into the built-in shorthand profiles. */
-function pmssCgroupPolicyIoProfiles(array $policy, array $builtIns): array
-{
-    if (!isset($policy['profiles']['io']) || !is_array($policy['profiles']['io'])) {
-        return $builtIns;
-    }
-
-    foreach ($policy['profiles']['io'] as $name => $config) {
-        if (!is_string($name) || $name === '' || !is_array($config)) {
-            continue;
-        }
-
-        $key = strtolower($name);
-        $entry = isset($builtIns[$key]) && is_array($builtIns[$key]) ? $builtIns[$key] : ['defaults' => [], 'limits' => []];
-        $changed = false;
-
-        foreach (pmssCgroupPolicyIoDefaultMap() as $policyKey => $targetKey) {
-            $value = pmssCgroupPolicyPositiveValue($config, $policyKey, true);
-            if ($value === null) continue;
-            $entry['defaults'][$targetKey] = $value;
-            $changed = true;
-        }
-        foreach (pmssCgroupPolicyIoPairSpecs(false) as $limitKey => $mapping) {
-            $value = pmssCgroupPolicyPositiveValue($config, $limitKey, (bool) $mapping[1]);
-            if ($value === null) continue;
-            $entry['limits'][$limitKey] = $value;
-            $changed = true;
-        }
-        if ($changed) $builtIns[$key] = $entry;
-    }
-
-    return $builtIns;
 }
 
 /**
