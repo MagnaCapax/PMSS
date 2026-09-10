@@ -247,6 +247,44 @@ if (!function_exists('pmssCustomerCgroupDirOwnsMemoryController')) {
  }
 }
 
+if (!function_exists('pmssCustomerCgroupCounterPaths')) {
+ /** Build ordered counter candidates; null UID suppresses the user-slice fallback. */
+ function pmssCustomerCgroupCounterPaths($uid, $cgroupDir, $v2File, $v1Controller, $v1File) {
+  $paths = $cgroupDir !== '' ? array($cgroupDir.'/'.$v2File, $cgroupDir.'/'.$v1File) : array();
+  if ($uid !== null) {
+   $slice = 'user.slice/user-'.$uid.'.slice';
+   $paths[] = '/sys/fs/cgroup/'.$slice.'/'.$v2File;
+   $paths[] = '/sys/fs/cgroup/unified/'.$slice.'/'.$v2File;
+   $paths[] = '/sys/fs/cgroup/'.$v1Controller.'/'.$slice.'/'.$v1File;
+  }
+  return array_values(array_unique($paths));
+ }
+}
+
+if (!function_exists('pmssCustomerCgroupCounterRead')) {
+ /** Read the first unsigned counter, excluding v1 unlimited sentinels only for limits. */
+ function pmssCustomerCgroupCounterRead(array $paths, $limit = false) {
+  foreach ($paths as $path) {
+   $value = pmssCustomerUnsignedIntegerFileRead($path);
+   if ($value !== null && (!$limit || $value < 1125899906842624)) return $value;
+  }
+  return null;
+ }
+}
+
+if (!function_exists('pmssCustomerCgroupMemoryRead')) {
+ /** Share the memory counter schema; unavailable slices retain null fields without probes. */
+ function pmssCustomerCgroupMemoryRead($uid, $cgroupDir, $available = true) {
+  $memory = array();
+  foreach (array('current' => 'usage_in_bytes', 'high' => 'soft_limit_in_bytes', 'max' => 'limit_in_bytes') as $key => $v1File) {
+   $memory['memory_'.$key] = $available ? pmssCustomerCgroupCounterRead(
+    pmssCustomerCgroupCounterPaths($uid, $cgroupDir, 'memory.'.$key, 'memory', 'memory.'.$v1File), $key !== 'current'
+   ) : null;
+  }
+  return $memory;
+ }
+}
+
 if (!function_exists('pmssCustomerHtmlAttr')) { /** Escape customer GUI text and attributes with the shared PMSS flags. */ function pmssCustomerHtmlAttr($value) { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); } }
 
 if (!function_exists('pmssCustomerContextualHelpLinkBuild')) {

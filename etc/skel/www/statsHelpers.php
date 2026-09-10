@@ -141,40 +141,6 @@ function pmssStatsCgroupDirDetect(string $uid, array $overrides = []): string
     return '';
 }
 
-/** Build cgroup v2 and v1 candidate paths for one counter. */
-function pmssStatsCgroupCounterCandidatePaths(string $uid, string $cgroupDir, string $v2File, string $v1Controller, string $v1File): array
-{
-    $paths = array();
-    if ($cgroupDir !== '') {
-        $paths[] = $cgroupDir.'/'.$v2File;
-        $paths[] = $cgroupDir.'/'.$v1File;
-    }
-
-    $slice = 'user.slice/user-'.$uid.'.slice';
-    $paths[] = '/sys/fs/cgroup/'.$slice.'/'.$v2File;
-    $paths[] = '/sys/fs/cgroup/unified/'.$slice.'/'.$v2File;
-    $paths[] = '/sys/fs/cgroup/'.$v1Controller.'/'.$slice.'/'.$v1File;
-
-    return array_values(array_unique($paths));
-}
-
-/** Read the first valid unsigned cgroup counter, ignoring v1 unlimited sentinels for limits. */
-function pmssStatsCgroupUnsignedIntegerRead(array $paths, bool $limit = false)
-{
-    foreach ($paths as $path) {
-        $value = function_exists('pmssCustomerUnsignedIntegerFileRead')
-            ? pmssCustomerUnsignedIntegerFileRead($path)
-            : null;
-        if ($value === null || ($limit && $value >= 1125899906842624)) {
-            continue;
-        }
-
-        return $value;
-    }
-
-    return null;
-}
-
 /**
  * Read user-slice counters directly from cgroupfs.
  *
@@ -182,11 +148,11 @@ function pmssStatsCgroupUnsignedIntegerRead(array $paths, bool $limit = false)
  */
 function pmssStatsCgroupCountersRead(string $uid, string $cgroupDir): array
 {
-    return array(
-        'memory_current' => pmssStatsCgroupUnsignedIntegerRead(pmssStatsCgroupCounterCandidatePaths($uid, $cgroupDir, 'memory.current', 'memory', 'memory.usage_in_bytes')),
-        'memory_high' => pmssStatsCgroupUnsignedIntegerRead(pmssStatsCgroupCounterCandidatePaths($uid, $cgroupDir, 'memory.high', 'memory', 'memory.soft_limit_in_bytes'), true),
-        'memory_max' => pmssStatsCgroupUnsignedIntegerRead(pmssStatsCgroupCounterCandidatePaths($uid, $cgroupDir, 'memory.max', 'memory', 'memory.limit_in_bytes'), true),
-        'tasks_current' => pmssStatsCgroupUnsignedIntegerRead(pmssStatsCgroupCounterCandidatePaths($uid, $cgroupDir, 'pids.current', 'pids', 'pids.current')),
+    if (!function_exists('pmssCustomerCgroupMemoryRead')) {
+        return array_fill_keys(array('memory_current', 'memory_high', 'memory_max', 'tasks_current'), null);
+    }
+    return pmssCustomerCgroupMemoryRead($uid, $cgroupDir) + array(
+        'tasks_current' => pmssCustomerCgroupCounterRead(pmssCustomerCgroupCounterPaths($uid, $cgroupDir, 'pids.current', 'pids', 'pids.current')),
     );
 }
 

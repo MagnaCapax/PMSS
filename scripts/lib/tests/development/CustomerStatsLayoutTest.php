@@ -311,6 +311,26 @@ final class CustomerStatsLayoutTest extends TestCase
         )));
     }
 
+    public function testCgroupCountersPreserveFallbacksAndLimitSentinels(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-stats-cgroup-counters-');
+        foreach (['memory.usage_in_bytes' => '42', 'memory.soft_limit_in_bytes' => '200', 'memory.limit_in_bytes' => '400', 'pids.current' => '0'] as $file => $value) {
+            $this->pmssWriteFile($dir.'/'.$file, $value."\n");
+        }
+        foreach ([
+            ['0', 0, 0, 0], ['001', 1, 1, 1], ['-1', 42, 200, 400],
+            ['1.5', 42, 200, 400], ['max', 42, 200, 400],
+            ['1125899906842623', 1125899906842623, 1125899906842623, 1125899906842623],
+            ['1125899906842624', 1125899906842624, 200, 400],
+        ] as [$raw, $current, $high, $max]) {
+            foreach (['current', 'high', 'max'] as $key) $this->pmssWriteFile($dir.'/memory.'.$key, $raw."\n");
+            $this->assertSame(['memory_current' => $current, 'memory_high' => $high, 'memory_max' => $max, 'tasks_current' => 0], \pmssStatsCgroupCountersRead('-1', $dir));
+        }
+        unlink($dir.'/memory.current');
+        $this->pmssCreateSymlinkOrSkip($dir.'/pids.current', $dir.'/memory.current');
+        $this->assertSame(42, \pmssStatsCgroupCountersRead('-1', $dir)['memory_current']);
+    }
+
     public function testStatsVpnStatusUsesInterfacePresenceInsteadOfSystemctlOutput(): void
     {
         $interfacesRoot = $this->pmssMakeTempDir('pmss-stats-vpn-net-');

@@ -418,6 +418,10 @@ iptables helpers:
 
 ## Resource Statistics
 
+- Customer cgroup readers share ordered counter paths, unsigned/limit parsing,
+  and memory fields in `etc/skel/www/scriptsInc.php` (ADR 0059). Page-specific
+  directory precedence, missing-data behavior, and pressure classification stay unchanged.
+
 - pmssCustomerCgroupDirOwnsMemoryController($cgroupDir): bool
   - Accepts cgroup v1 directories only when `memory.stat` is readable; when
     `cgroup.controllers` exists, it must list the `memory` controller.

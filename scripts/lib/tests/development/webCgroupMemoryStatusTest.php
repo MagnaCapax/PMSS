@@ -6,6 +6,28 @@ require_once dirname(__DIR__, 4).'/etc/skel/www/webCgroupMemoryStatus.php';
 
 class WebCgroupMemoryStatusTest extends TestCase
 {
+    /** Lock the complete pre-refactor payload, including types, key order, and display text. */
+    public function testMemoryReaderPayloadSnapshots(): void
+    {
+        $cases = [
+            'v1' => [['memory.usage_in_bytes' => '100', 'memory.soft_limit_in_bytes' => '200', 'memory.limit_in_bytes' => '400'], '244f327bb546cd77b01992a321152286034264d531ffa9e5b7746c79dfbeac0c'],
+            'unlimited' => [['memory.usage_in_bytes' => '100', 'memory.soft_limit_in_bytes' => '200', 'memory.limit_in_bytes' => '1125899906842624'], 'b13f997189cf41dc30eeac3d348dc7a24e82ce0c5f940f4dcc6692679deec1df'],
+            'mixed' => [['memory.current' => '0', 'memory.usage_in_bytes' => '100', 'memory.high' => 'max', 'memory.soft_limit_in_bytes' => '200', 'memory.max' => '-1', 'memory.limit_in_bytes' => '400'], 'e0d31abe844743a809c096f2277697e801847a2db87190b226e6880d2b2bc0e4'],
+            'pressure' => [['memory.current' => '195', 'memory.high' => '200', 'memory.max' => '400', 'memory.stat' => "anon 160\nfile 35", 'cgroup.controllers' => 'cpu memory io', 'memory.pressure' => "some avg10=0.50 total=1\nfull avg10=0.10 total=2", 'memory.events' => "high 1001\nmax 2\noom 0\noom_kill 0"], '83d6b1884a8fc2cbbdd4c0d1afc0e7f5a016d375707fbab640301a9e10836201'],
+            'oom' => [['memory.usage_in_bytes' => '100', 'memory.limit_in_bytes' => '400', 'memory.oom_control' => 'oom_kill 4'], '9b86c22953066fb6084cf2c605989188340dde98d0bce43a9fae8e5ea1585298'],
+            'invalid' => [['memory.current' => '-1', 'memory.usage_in_bytes' => '1.2', 'memory.high' => '', 'memory.max' => 'max'], '7f43320f26a6efcabc24f23aa74a5ae1e927c6bc45ff9f68f9e9302bbb28b977'],
+        ];
+        foreach ($cases as $name => [$files, $hash]) {
+            $dir = $this->pmssMakeTempDir('pmss-web-cgroup-snapshot-');
+            foreach ($files as $file => $value) $this->pmssWriteFile($dir.'/'.$file, $value."\n");
+            // Isolate customer formatting from the operator formatter loaded by the full suite.
+            $actual = $this->pmssRunRepoInlinePhpRequire('etc/skel/www/webCgroupMemoryStatus.php',
+                '$status = pmssWebCgroupMemoryStatusRead(["uid" => -1, "cgroup_dir" => '.var_export($dir, true).']);'
+                .'$status["cgroup_dir"] = "<slice>"; echo hash("sha256", serialize($status));', [], '2>&1');
+            $this->assertSame($hash, $actual, $name);
+        }
+    }
+
     public function testFormatBytesCoversInvalidAndGiBValues(): void
     {
         foreach ([[null, 'n/a'], [-1, 'n/a'], [5 * 1024 * 1024 * 1024, '5.0 GiB']] as [$value, $expected]) {
@@ -291,7 +313,7 @@ class WebCgroupMemoryStatusTest extends TestCase
 
     public function testMemoryStatCandidatePathsPreferV2BeforeV1(): void
     {
-        $paths = \pmssWebCgroupMemoryStatusMemoryStatCandidatePaths(1234);
+        $paths = \pmssCustomerCgroupCounterPaths(1234, '', 'memory.stat', 'memory', 'memory.stat');
 
         $this->assertSame('/sys/fs/cgroup/user.slice/user-1234.slice/memory.stat', $paths[0]);
         $this->assertSame('/sys/fs/cgroup/unified/user.slice/user-1234.slice/memory.stat', $paths[1]);
@@ -300,7 +322,7 @@ class WebCgroupMemoryStatusTest extends TestCase
 
     public function testMemoryStatCandidatePathsKeepUidFallbackAfterExplicitSlice(): void
     {
-        $paths = \pmssWebCgroupMemoryStatusMemoryStatCandidatePaths(1234, '/sys/fs/cgroup/unified/user.slice/user-1234.slice');
+        $paths = \pmssCustomerCgroupCounterPaths(1234, '/sys/fs/cgroup/unified/user.slice/user-1234.slice', 'memory.stat', 'memory', 'memory.stat');
 
         $this->assertSame('/sys/fs/cgroup/unified/user.slice/user-1234.slice/memory.stat', $paths[0]);
         $this->assertTrue(in_array('/sys/fs/cgroup/memory/user.slice/user-1234.slice/memory.stat', $paths, true));

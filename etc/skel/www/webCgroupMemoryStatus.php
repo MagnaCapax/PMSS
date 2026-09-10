@@ -75,61 +75,6 @@ function pmssWebCgroupMemoryStatusDetectDir(array $overrides = [])
     return '';
 }
 
-/** Return candidate memory.stat paths for the current account slice. */
-function pmssWebCgroupMemoryStatusMemoryStatCandidatePaths($uid, $cgroupDir = '')
-{
-    $uid = (int) $uid;
-    $paths = [];
-    $cgroupDir = is_string($cgroupDir) ? rtrim($cgroupDir, '/') : '';
-    if ($cgroupDir !== '') {
-        $paths[] = $cgroupDir.'/memory.stat';
-    }
-    if ($uid >= 0) {
-        $paths = array_merge($paths, [
-            '/sys/fs/cgroup/user.slice/user-'.$uid.'.slice/memory.stat',
-            '/sys/fs/cgroup/unified/user.slice/user-'.$uid.'.slice/memory.stat',
-            '/sys/fs/cgroup/memory/user.slice/user-'.$uid.'.slice/memory.stat',
-        ]);
-    }
-
-    return array_values(array_unique($paths));
-}
-
-/** Return candidate cgroup counter paths for v2 and production v1 hosts. */
-function pmssWebCgroupMemoryStatusCounterCandidatePaths($uid, $cgroupDir, $v2File, $v1File)
-{
-    $uid = (int) $uid;
-    $paths = array();
-    $cgroupDir = is_string($cgroupDir) ? rtrim($cgroupDir, '/') : '';
-    if ($cgroupDir !== '') {
-        $paths[] = $cgroupDir.'/'.$v2File;
-        $paths[] = $cgroupDir.'/'.$v1File;
-    }
-    if ($uid >= 0) {
-        $slice = 'user.slice/user-'.$uid.'.slice';
-        $paths[] = '/sys/fs/cgroup/'.$slice.'/'.$v2File;
-        $paths[] = '/sys/fs/cgroup/unified/'.$slice.'/'.$v2File;
-        $paths[] = '/sys/fs/cgroup/memory/'.$slice.'/'.$v1File;
-    }
-
-    return array_values(array_unique($paths));
-}
-
-/** Read the first numeric memory counter, skipping unlimited v1 limit sentinels. */
-function pmssWebCgroupMemoryStatusCounterRead(array $paths, $limit = false)
-{
-    foreach ($paths as $path) {
-        $value = pmssCustomerUnsignedIntegerFileRead($path);
-        if ($value === null || ($limit && $value >= 1125899906842624)) {
-            continue;
-        }
-
-        return $value;
-    }
-
-    return null;
-}
-
 /** Parse cgroup v1/v2 memory.stat anon+file counters into byte values. */
 function pmssWebCgroupMemoryStatusMemoryStatBreakdownParse($raw)
 {
@@ -228,17 +173,15 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
     $cgroupDir = pmssWebCgroupMemoryStatusDetectDir($overrides);
     $cgroupAvailable = is_dir($cgroupDir);
     $uid = $overrides['uid'] ?? (function_exists('posix_getuid') ? posix_getuid() : null);
-    $uid = is_int($uid) && $uid >= 0 ? $uid : -1;
-    $memoryCurrent = $cgroupAvailable ? pmssWebCgroupMemoryStatusCounterRead(pmssWebCgroupMemoryStatusCounterCandidatePaths($uid, $cgroupDir, 'memory.current', 'memory.usage_in_bytes')) : null;
-    $memoryHigh = $cgroupAvailable ? pmssWebCgroupMemoryStatusCounterRead(pmssWebCgroupMemoryStatusCounterCandidatePaths($uid, $cgroupDir, 'memory.high', 'memory.soft_limit_in_bytes'), true) : null;
-    $memoryMax = $cgroupAvailable ? pmssWebCgroupMemoryStatusCounterRead(pmssWebCgroupMemoryStatusCounterCandidatePaths($uid, $cgroupDir, 'memory.max', 'memory.limit_in_bytes'), true) : null;
+    $uid = is_int($uid) && $uid >= 0 ? $uid : null;
+    $memory = pmssCustomerCgroupMemoryRead($uid, rtrim($cgroupDir, '/'), $cgroupAvailable);
     $events = $cgroupAvailable ? pmssCustomerKeyValueFileRead($cgroupDir.'/memory.events') : [];
     $pressure = $cgroupAvailable && pmssWebCgroupMemoryStatusV2MemoryControllerAvailable($cgroupDir)
         ? pmssCustomerKeyValueFileRead($cgroupDir.'/memory.pressure')
         : [];
     $memoryBreakdown = [];
     if ($cgroupAvailable) {
-        foreach (pmssWebCgroupMemoryStatusMemoryStatCandidatePaths($uid, $cgroupDir) as $path) {
+        foreach (pmssCustomerCgroupCounterPaths($uid, rtrim($cgroupDir, '/'), 'memory.stat', 'memory', 'memory.stat') as $path) {
             $raw = @file_get_contents($path);
             if (!is_string($raw) || trim($raw) === '') {
                 continue;
@@ -251,76 +194,51 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
         }
     }
 
-    $throttleEvents = pmssCustomerUnsignedIntegerValue($events['high'] ?? null);
-    $maxEvents = pmssCustomerUnsignedIntegerValue($events['max'] ?? null) ?? 0;
-    $oomEvents = pmssCustomerUnsignedIntegerValue($events['oom'] ?? null) ?? 0;
-    $oomKillEvents = pmssCustomerUnsignedIntegerValue($events['oom_kill'] ?? null) ?? 0;
+    // Build the returned fields once; classification substitutes only its anon-based inputs.
+    $stats = ['available' => $cgroupDir !== '' && $memory['memory_current'] !== null, 'cgroup_dir' => $cgroupDir] + $memory;
+    $stats['limit_bytes'] = $memory['memory_max'] ?? $memory['memory_high'];
+    $stats['limit_source'] = $memory['memory_max'] !== null ? 'memory.max' : ($memory['memory_high'] !== null ? 'memory.high' : '');
+    $memoryPressureCurrent = isset($memoryBreakdown['anon']) ? (float) $memoryBreakdown['anon'] : $memory['memory_current'];
+    foreach ([
+        'usage_percent' => [$memory['memory_current'], $stats['limit_bytes']],
+        'high_percent' => [$memory['memory_current'], $memory['memory_high']],
+        'pressure_usage_percent' => [$memoryPressureCurrent, $stats['limit_bytes']],
+        'pressure_high_percent' => [$memoryPressureCurrent, $memory['memory_high']],
+    ] as $key => [$current, $limit]) {
+        $stats[$key] = $current !== null && $limit !== null && $limit > 0 ? round(($current / $limit) * 100, 1) : null;
+    }
+    foreach (['some', 'full'] as $key) {
+        $stats['pressure_'.$key.'_avg10'] = isset($pressure[$key]) && preg_match('/avg10=([0-9.]+)/', $pressure[$key], $matches) === 1 ? (float) $matches[1] : null;
+    }
+    foreach (['throttle' => 'high', 'max' => 'max', 'oom' => 'oom', 'oom_kill' => 'oom_kill'] as $key => $event) {
+        $stats[$key.'_events'] = pmssCustomerUnsignedIntegerValue($events[$event] ?? null) ?? ($key === 'throttle' ? null : 0);
+    }
     // cgroup-v1 fleet (ADR-0019): memory.events is absent, so the v2 oom_kill above is 0.
     // Fall back to the real OOM-kill count from memory.oom_control (the only sound v1 signal).
-    if ($oomKillEvents === 0 && !pmssWebCgroupMemoryStatusV2MemoryControllerAvailable($cgroupDir)) {
-        $oomKillEvents = pmssWebCgroupMemoryStatusV1OomKillRead($cgroupDir, $uid);
+    if ($stats['oom_kill_events'] === 0 && !pmssWebCgroupMemoryStatusV2MemoryControllerAvailable($cgroupDir)) {
+        $stats['oom_kill_events'] = pmssWebCgroupMemoryStatusV1OomKillRead($cgroupDir, $uid);
     }
-    $limitBytes = $memoryMax !== null ? $memoryMax : $memoryHigh;
-    $memoryPressureCurrent = isset($memoryBreakdown['anon'])
-        ? (float) $memoryBreakdown['anon']
-        : $memoryCurrent;
-    $usagePercent = ($memoryCurrent !== null && $limitBytes !== null && $limitBytes > 0)
-        ? round(($memoryCurrent / $limitBytes) * 100, 1)
-        : null;
-    $highPercent = ($memoryCurrent !== null && $memoryHigh !== null && $memoryHigh > 0)
-        ? round(($memoryCurrent / $memoryHigh) * 100, 1)
-        : null;
-    $pressureUsagePercent = ($memoryPressureCurrent !== null && $limitBytes !== null && $limitBytes > 0)
-        ? round(($memoryPressureCurrent / $limitBytes) * 100, 1)
-        : null;
-    $pressureHighPercent = ($memoryPressureCurrent !== null && $memoryHigh !== null && $memoryHigh > 0)
-        ? round(($memoryPressureCurrent / $memoryHigh) * 100, 1)
-        : null;
-    $pressureSomeAvg10 = isset($pressure['some']) && preg_match('/avg10=([0-9.]+)/', $pressure['some'], $matches) === 1 ? (float) $matches[1] : null;
-    $pressureFullAvg10 = isset($pressure['full']) && preg_match('/avg10=([0-9.]+)/', $pressure['full'], $matches) === 1 ? (float) $matches[1] : null;
-    $status = pmssWebCgroupMemoryStatusClassify([
+    $status = pmssWebCgroupMemoryStatusClassify(array_replace($stats, [
         'memory_current' => $memoryPressureCurrent,
-        'memory_high' => $memoryHigh,
-        'usage_percent' => $pressureUsagePercent,
-        'high_percent' => $pressureHighPercent,
-        'pressure_some_avg10' => $pressureSomeAvg10,
-        'pressure_full_avg10' => $pressureFullAvg10,
-        'throttle_events' => $throttleEvents,
-        'oom_kill_events' => $oomKillEvents,
-    ]);
+        'usage_percent' => $stats['pressure_usage_percent'],
+        'high_percent' => $stats['pressure_high_percent'],
+    ]));
 
-    return [
-        'available' => $cgroupDir !== '' && $memoryCurrent !== null,
-        'cgroup_dir' => $cgroupDir,
-        'memory_current' => $memoryCurrent,
-        'memory_high' => $memoryHigh,
-        'memory_max' => $memoryMax,
-        'limit_bytes' => $limitBytes,
-        'limit_source' => $memoryMax !== null ? 'memory.max' : ($memoryHigh !== null ? 'memory.high' : ''),
-        'usage_percent' => $usagePercent,
-        'high_percent' => $highPercent,
-        'pressure_usage_percent' => $pressureUsagePercent,
-        'pressure_high_percent' => $pressureHighPercent,
-        'pressure_some_avg10' => $pressureSomeAvg10,
-        'pressure_full_avg10' => $pressureFullAvg10,
-        'throttle_events' => $throttleEvents,
-        'max_events' => $maxEvents,
-        'oom_events' => $oomEvents,
-        'oom_kill_events' => $oomKillEvents,
+    return $stats + [
         'status' => $status,
         'status_color' => ['LOW' => '#81c784', 'MEDIUM' => '#ffb74d', 'HIGH' => '#ef5350', 'THROTTLED' => '#d2691e'][$status] ?? '#b0bec5',
-        'message' => $oomKillEvents > 0
-            ? 'Your account reached its memory limit and had processes stopped (out-of-memory) '.number_format($oomKillEvents).' time(s). If transfers or apps keep getting interrupted, adding Extra RAM from your Upgrade Options raises the limit for this service.'
+        'message' => $stats['oom_kill_events'] > 0
+            ? 'Your account reached its memory limit and had processes stopped (out-of-memory) '.number_format($stats['oom_kill_events']).' time(s). If transfers or apps keep getting interrupted, adding Extra RAM from your Upgrade Options raises the limit for this service.'
             : ($status === 'THROTTLED'
                 ? 'Your service is running at reduced speed due to memory pressure. Reducing active tasks or upgrading your plan will restore full speed.'
                 : ($status === 'HIGH' ? 'Memory usage is close to the account limit.' : '')),
-        'usage_text' => ($memoryCurrent !== null ? pmssWebCgroupMemoryStatusFormatBytes($memoryCurrent) : 'n/a')
-            .' / '.($limitBytes !== null ? pmssWebCgroupMemoryStatusFormatBytes($limitBytes) : 'n/a')
-            .($usagePercent !== null ? ' ('.number_format($usagePercent, 1, '.', '').'%' : '')
-            .($pressureUsagePercent !== null && $pressureUsagePercent !== $usagePercent
-                ? '; pressure '.number_format($pressureUsagePercent, 1, '.', '').'%'
+        'usage_text' => ($stats['memory_current'] !== null ? pmssWebCgroupMemoryStatusFormatBytes($stats['memory_current']) : 'n/a')
+            .' / '.($stats['limit_bytes'] !== null ? pmssWebCgroupMemoryStatusFormatBytes($stats['limit_bytes']) : 'n/a')
+            .($stats['usage_percent'] !== null ? ' ('.number_format($stats['usage_percent'], 1, '.', '').'%' : '')
+            .($stats['pressure_usage_percent'] !== null && $stats['pressure_usage_percent'] !== $stats['usage_percent']
+                ? '; pressure '.number_format($stats['pressure_usage_percent'], 1, '.', '').'%'
                 : '')
-            .($usagePercent !== null ? ')' : ''),
+            .($stats['usage_percent'] !== null ? ')' : ''),
     ];
 }
 
@@ -365,7 +283,7 @@ function pmssWelcomeMemoryStateBuild($pressureStatusOverride = null)
     }
 
     if (!isset($breakdown['anon'], $breakdown['file']) && $uid !== null) {
-        foreach (pmssWebCgroupMemoryStatusMemoryStatCandidatePaths($uid) as $path) {
+        foreach (pmssCustomerCgroupCounterPaths($uid, '', 'memory.stat', 'memory', 'memory.stat') as $path) {
             $raw = @file_get_contents($path);
             if (!is_string($raw) || trim($raw) === '') {
                 continue;
