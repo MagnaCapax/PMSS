@@ -86,7 +86,7 @@ function pmssLighttpdWatchdogSocketProbeWithRetry(string $socketPath, array $opt
  * @param string[] $lines
  * @return string[]
  */
-function pmssLighttpdWatchdogListeningSocketPathsFromLines(array $lines, string $homeDir): array
+function pmssLighttpdWatchdogSocketPathsFromLines(array $lines, string $homeDir): array
 {
     $homeDir = rtrim($homeDir, '/');
     if ($homeDir === '' || !pmssPathAbsoluteStringIsSafe($homeDir)) {
@@ -141,13 +141,7 @@ function pmssLighttpdWatchdogListeningSocketSnapshot(string $homeDir, array $opt
         return array('ok' => false, 'paths' => array());
     }
 
-    return array('ok' => true, 'paths' => pmssLighttpdWatchdogListeningSocketPathsFromLines($result['lines'], $homeDir));
-}
-
-/** Read live php-cgi listener paths without trusting socket files on disk. */
-function pmssLighttpdWatchdogListeningSocketPaths(string $homeDir, array $options = array()): array
-{
-    return pmssLighttpdWatchdogListeningSocketSnapshot($homeDir, $options)['paths'];
+    return array('ok' => true, 'paths' => pmssLighttpdWatchdogSocketPathsFromLines($result['lines'], $homeDir));
 }
 
 /** Return true when the account has at least its configured listener count. */

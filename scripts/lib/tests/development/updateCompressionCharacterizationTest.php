@@ -70,6 +70,22 @@ class UpdateCompressionCharacterizationTest extends TestCase
                     'Failed to write'.' temp' => 'systemd drop-in callers should log the single managed-write failure path',
                 ],
             ],
+            'scripts/lib/update/services/bootstrap.php' => [
+                'required' => ["pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/template.ssh.service.pmss-starvation.conf'"],
+                'forbidden' => ['function pmssSshdStarvation'.'DropinTemplatePath(' => 'the sole drop-in caller should resolve its template directly'],
+            ],
+            'scripts/lib/lighttpd/proxyFragments.php' => [
+                'required' => ["\$fragment .= '\$HTTP[\"url\"] == \"'.\$rule[1]"],
+                'forbidden' => ['function pmssLighttpdProxyExact'.'RedirectFragment(' => 'the sole redirect renderer should stay in the rule branch'],
+            ],
+            'scripts/lib/lighttpd/watchdogSocketProbe.php' => [
+                'required' => ['function pmssLighttpdWatchdogListeningSocketSnapshot(', 'function pmssLighttpdWatchdogSocketPathsFromLines('],
+                'forbidden' => ['function pmssLighttpdWatchdogListeningSocketPath'.'s(' => 'callers should consume paths from the status-preserving snapshot', 'pmssLighttpdWatchdogListeningSocketPath'.'sFromLines(' => 'the parser name should not retain the removed pass-through prefix'],
+            ],
+            'scripts/lib/user/userConfigPolicy.php' => [
+                'required' => ['function pmssUserConfigNormaliseToggleValue('],
+                'forbidden' => ['function pmssUserScheduledConfigBackup'.'Enabled(' => 'scheduled backup policy is consumed from its normalized payload'],
+            ],
             'scripts/lib/update/logging.php' => [
                 'required' => [
                     "gmdate('Ymd-His')",
@@ -84,9 +100,11 @@ class UpdateCompressionCharacterizationTest extends TestCase
                 'required' => [
                     "bin2hex(random_bytes(3))",
                     "PMSS_CORRELATION_ENV.'='.\$generated",
+                    'is_readable(VERSION_FILE)',
                 ],
                 'forbidden' => [
                     'function pmssBuild'.'CorrelationId(' => 'update.php should keep correlation ID generation inside pmssCorrelationId()',
+                    'function pmssInstalledVersion'.'Line(' => 'the snapshot guard should read its sole version marker directly',
                 ],
             ],
             'scripts/lib/quotaSnapshot.php' => [

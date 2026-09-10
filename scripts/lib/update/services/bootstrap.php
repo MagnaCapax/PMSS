@@ -163,12 +163,6 @@ function pmssSshdValidationCommand(string $sshdPath = '/usr/sbin/sshd'): string
         : ($sshdPath === '/usr/sbin/sshd' ? '/usr/sbin/sshd -t' : pmssBuildCommand($sshdPath, ['-t']));
 }
 
-/** Return the PMSS ssh.service starvation-resistance drop-in template path. */
-function pmssSshdStarvationDropinTemplatePath(): string
-{
-    return pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/template.ssh.service.pmss-starvation.conf';
-}
-
 /**
  * Install ssh.service resource-priority drop-in for recovery access.
  *
@@ -183,7 +177,7 @@ function pmssEnsureSshdStarvationDropin(
 ): bool {
     $dropinDir = rtrim($dropinDir, '/');
     $dropinFile = $dropinFile !== '' ? $dropinFile : $dropinDir.'/10-pmss-starvation-resistance.conf';
-    $template = pmssSshdStarvationDropinTemplatePath();
+    $template = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/template.ssh.service.pmss-starvation.conf';
 
     if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
         runStep('Ensuring ssh.service starvation-resistance drop-in directory', 'install -d -m 0755 '.escapeshellarg($dropinDir));

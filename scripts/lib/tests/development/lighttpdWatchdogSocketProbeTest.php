@@ -140,7 +140,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         $home = '/home/alice';
         $this->assertSame(
             array($home.'/.lighttpd/php.socket-1', $home.'/.lighttpd/php.socket'),
-            \pmssLighttpdWatchdogListeningSocketPathsFromLines(array(
+            \pmssLighttpdWatchdogSocketPathsFromLines(array(
                 'u_str LISTEN 0 1024 '.$home.'/.lighttpd/php.socket-1 12345 * 0',
                 'u_str LISTEN 0 1024 '.$home.'/.lighttpd/php.socket 12346 * 0',
             ), $home)
@@ -150,7 +150,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
     public function testListeningSocketParserRejectsUntrustedRowsAndPaths(): void
     {
         $home = '/home/alice';
-        $this->assertSame(array(), \pmssLighttpdWatchdogListeningSocketPathsFromLines(array(
+        $this->assertSame(array(), \pmssLighttpdWatchdogSocketPathsFromLines(array(
             'u_str ESTAB 0 1024 '.$home.'/.lighttpd/php.socket-1 12345 * 0',
             'u_str LISTEN nope 1024 '.$home.'/.lighttpd/php.socket-2 12346 * 0',
             'u_str LISTEN 0 nope '.$home.'/.lighttpd/php.socket-3 12347 * 0',
@@ -158,7 +158,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
             'u_str LISTEN 0 1024 '.$home.'/.lighttpd/php.socket-old 12349 * 0',
             'malformed',
         ), $home));
-        $this->assertSame(array(), \pmssLighttpdWatchdogListeningSocketPathsFromLines(array(), 'relative/home'));
+        $this->assertSame(array(), \pmssLighttpdWatchdogSocketPathsFromLines(array(), 'relative/home'));
     }
 
     public function testListeningSocketParserDeduplicatesListenerRows(): void
@@ -168,7 +168,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
         $this->assertSame(
             array($path),
-            \pmssLighttpdWatchdogListeningSocketPathsFromLines(array($line, $line), '/home/alice')
+            \pmssLighttpdWatchdogSocketPathsFromLines(array($line, $line), '/home/alice')
         );
     }
 
@@ -180,8 +180,8 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
             static function () { return 'not-an-array'; },
         ) as $reader) {
             $this->assertSame(
-                array(),
-                \pmssLighttpdWatchdogListeningSocketPaths('/home/alice', array('reader' => $reader))
+                array('ok' => false, 'paths' => array()),
+                \pmssLighttpdWatchdogListeningSocketSnapshot('/home/alice', array('reader' => $reader))
             );
         }
     }
@@ -194,8 +194,8 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         };
 
         $this->assertSame(
-            array($path),
-            \pmssLighttpdWatchdogListeningSocketPaths('/home/alice', array('reader' => $reader))
+            array('ok' => true, 'paths' => array($path)),
+            \pmssLighttpdWatchdogListeningSocketSnapshot('/home/alice', array('reader' => $reader))
         );
     }
 

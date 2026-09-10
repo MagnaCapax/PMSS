@@ -101,7 +101,7 @@ foreach($users AS $thisUser) {
             $probeResult = pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);
             if (!$probeResult['ok']) {
                 $listeningSocketPaths = (int) $probeResult['errno'] === PMSS_LIGHTTPD_WATCHDOG_SOCKET_ECONNREFUSED
-                    ? pmssLighttpdWatchdogListeningSocketPaths($homeDir)
+                    ? pmssLighttpdWatchdogListeningSocketSnapshot($homeDir)['paths']
                     : array();
                 if (pmssLighttpdWatchdogSocketFailureIsStaleIndex(
                     (int) $probeResult['errno'],

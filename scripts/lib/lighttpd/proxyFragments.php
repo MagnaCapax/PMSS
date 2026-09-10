@@ -53,13 +53,6 @@ function pmssLighttpdProxyRuleFragment(
     return $fragment.'}';
 }
 
-function pmssLighttpdProxyExactRedirectFragment(string $sourcePath, string $targetPath): string
-{
-    return '$HTTP["url"] == "'.$sourcePath."\" {\n"
-        .'  url.redirect = ( "" => "'.$targetPath."\" )\n"
-        .'}';
-}
-
 function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $port): string
 {
     $pathMap = static function (string $basePath): array {
@@ -96,7 +89,8 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
     $fragment = $definitions[$proxyName][0];
     foreach ($definitions[$proxyName][1] as $rule) {
         if ($rule[0] === 'redirect') {
-            $fragment .= pmssLighttpdProxyExactRedirectFragment($rule[1], $rule[2])."\n\n";
+            $fragment .= '$HTTP["url"] == "'.$rule[1]."\" {\n"
+                .'  url.redirect = ( "" => "'.$rule[2]."\" )\n}\n\n";
             continue;
         }
         $fragment .= pmssLighttpdProxyRuleFragment($rule[0], $port, $rule[1], $rule[2], $rule[3], $rule[4] ?? false, $rule[5] ?? false)."\n\n";

@@ -1693,15 +1693,6 @@ function pmssVersionMoveDecision(string $installedVersion, string $fetchedVersio
     ];
 }
 
-function pmssInstalledVersionLine(): string
-{
-    if (!is_readable(VERSION_FILE)) {
-        return '';
-    }
-
-    return trim((string) @file_get_contents(VERSION_FILE));
-}
-
 function pmssVersionLogLabel(string $version): string
 {
     $version = trim($version);
@@ -1710,7 +1701,9 @@ function pmssVersionLogLabel(string $version): string
 
 function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarget): void
 {
-    $installedVersion = pmssInstalledVersionLine();
+    $installedVersion = is_readable(VERSION_FILE)
+        ? trim((string) @file_get_contents(VERSION_FILE))
+        : '';
     $decision = pmssVersionMoveDecision($installedVersion, $fetchedVersion, $explicitTarget);
     $mode = $explicitTarget ? 'explicit target' : 'unpinned target';
     $message = '[INFO] Snapshot version transition: '
