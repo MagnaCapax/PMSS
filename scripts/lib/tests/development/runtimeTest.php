@@ -318,6 +318,71 @@ class RuntimeTest extends TestCase
         $this->assertEquals("CAPTURE_ERR\n", $result['stderr']);
     }
 
+    public function testCommandCaptureRejectsNulBeforeShellQuoting(): void
+    {
+        foreach ($this->commandNulInputs() as $command) {
+            foreach ([false, true] as $loginShell) {
+                $this->assertSame(
+                    ['rc' => 23, 'stdout' => '', 'stderr' => 'unsafe proc_open command'],
+                    \pmssCommandCapture($command, 0, $loginShell, 'custom launch error', 23)
+                );
+            }
+        }
+    }
+
+    public function testPipedCaptureRejectsNulBeforeLaunchingCommandPrefix(): void
+    {
+        foreach ($this->commandNulInputs() as $command) {
+            foreach ([0, 2] as $timeout) {
+                $result = \pmssCommandPipedCapture($command, 'nul-input-test', $timeout, 0, false, 'custom launch error', 17, true);
+                $this->assertPipedCaptureLaunchFailure($result, 17, 'unsafe proc_open command');
+            }
+        }
+    }
+
+    public function testInheritedTtyCaptureRejectsNulBeforeLaunch(): void
+    {
+        foreach ($this->commandNulInputs() as $command) {
+            $result = \pmssCommandInheritedTtyCapture($command, 'nul-input-test', 0);
+            $this->assertPipedCaptureLaunchFailure($result, 1, 'unsafe proc_open command');
+        }
+    }
+
+    public function testRunCommandRejectsNulBeforeLoggingCommandOrLaunching(): void
+    {
+        foreach ($this->commandNulInputs() as $command) {
+            foreach ([[false, false], [true, false], [false, true], [true, true]] as $options) {
+                $logs = [];
+                $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => 'stale', 'stderr' => 'stale'];
+                ob_start();
+                try {
+                    $rc = \runCommand($command, $options[0], function (string $message) use (&$logs): void { $logs[] = $message; }, $options[1]);
+                } finally {
+                    $stdout = ob_get_clean();
+                }
+                $this->assertSame(1, $rc);
+                $this->assertSame('', $stdout);
+                $this->assertSame(['[WARN] unsafe proc_open command'], $logs);
+                $this->assertSame(['stdout' => '', 'stderr' => 'unsafe proc_open command'], $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']);
+            }
+        }
+    }
+
+    /** NUL command bytes are invalid; empty commands and binary output remain valid. */
+    public function testCommandCapturePreservesValidBoundaryInputs(): void
+    {
+        foreach ([
+            ['', 0, '', ''],
+            [' ', 0, '', ''],
+            [':', 0, '', ''],
+            ['printf out; printf err >&2; exit 7', 7, 'out', 'err'],
+            ['printf "\\0"; printf "\\0" >&2', 0, "\0", "\0"],
+            ['exit 127', 127, '', ''],
+        ] as [$command, $rc, $stdout, $stderr]) {
+            $this->assertSame(['rc' => $rc, 'stdout' => $stdout, 'stderr' => $stderr], \pmssCommandCapture($command));
+        }
+    }
+
     public function testPipedCaptureKeepsStdoutStderrRcShape(): void
     {
         $bash = '/bin/bash -lc '.escapeshellarg('printf PIPE_OUT; printf PIPE_ERR >&2; exit 6');
@@ -637,6 +702,12 @@ class RuntimeTest extends TestCase
     }
 
     // Note: logMessage() in lib/update.php targets a fixed log location; avoid writing system logs here.
+
+    /** Cover leading, trailing, repeated, and embedded NULs with harmless command prefixes. */
+    private function commandNulInputs(): array
+    {
+        return ["\0", "\0printf SHOULD_NOT_RUN", "printf SHOULD_NOT_RUN\0", "printf SHOULD_NOT_RUN\0; exit 9", "printf 'SHOULD\0NOT_RUN'", "printf SHOULD_NOT_RUN\0\0"];
+    }
 
     /** Assert the common launch-failure shape for piped command capture. */
     private function assertPipedCaptureLaunchFailure(array $result, int $rc, string $stderr, string $label = ''): void

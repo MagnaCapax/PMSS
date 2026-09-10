@@ -21,6 +21,10 @@ require_once __DIR__.'/commandProcess.php';
  */
 function pmssCommandCapture(string $cmd, int $timeoutSec = 0, bool $loginShell = false, string $launchError = 'proc_open failed', int $launchRc = 1): array
 {
+    // Reject before escapeshellarg() can throw; retain the caller's launch-failure code.
+    if (strpos($cmd, "\0") !== false) {
+        return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'unsafe proc_open command'];
+    }
     $bash = '/bin/bash '.($loginShell ? '-lc ' : '-c ').escapeshellarg($cmd);
     $result = pmssCommandPipedCapture($bash, $cmd, $timeoutSec, 0, false, $launchError, $launchRc);
     return ['rc' => $result['rc'], 'stdout' => $result['stdout'], 'stderr' => $result['stderr']];
@@ -29,6 +33,12 @@ function pmssCommandCapture(string $cmd, int $timeoutSec = 0, bool $loginShell =
 function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null, bool $inheritTty = false): int
 {
     $log = $logger ?? 'logMessage';
+    // Malformed commands must neither launch a truncated prefix nor enter command logs.
+    if (strpos($cmd, "\0") !== false) {
+        $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => 'unsafe proc_open command'];
+        $log('[WARN] unsafe proc_open command');
+        return 1;
+    }
     $failPipeCapture = static function (string $message) use ($log): int {
         $log('[WARN] '.$message);
         fwrite(STDERR, '[PIPE] '.$message.PHP_EOL);

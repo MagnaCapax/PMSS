@@ -26,6 +26,10 @@ function pmssCommandPipedCapture(string $bash, string $timeoutCommand, int $time
 /** Launch, collect, and reap both I/O modes through one lifecycle; public wrappers keep their defaults. */
 function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $timeoutSec, int $maxBuffer, bool $mirrorOutput, string $launchError, int $launchRc, bool $retryLaunch, string $streamSelectError, ?string $cwd, ?array $env, bool $inheritTty = false): array
 {
+    // Direct capture callers bypass shell quoting; proc_open() can truncate at a NUL.
+    if (strpos($bash, "\0") !== false) {
+        return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'unsafe proc_open command', 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];
+    }
     if ($cwd !== null && ($cwd === '' || pmssFilesystemPathHasNulByte($cwd) || !is_dir($cwd))) {
         return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'unsafe proc_open cwd', 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];
     }

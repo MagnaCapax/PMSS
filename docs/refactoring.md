@@ -51,6 +51,13 @@ Reject the refactor if any of these are true:
 - Machine payload channel (stdout) now includes diagnostics/noise.
 - No compatibility test proves legacy default behavior still works.
 
+Command launch safety belongs before shell quoting and before `proc_open()`:
+`pmssCommandCapture()`, `runCommand()`, and the shared process launcher reject
+literal NUL bytes with the existing failure result shapes. They must never
+execute the prefix before a NUL or log the malformed command. Empty shell
+commands, shell syntax, and binary stdout/stderr retain their existing behavior;
+`RuntimeTest` covers these boundaries for piped and inherited-terminal callers.
+
 ## Helper Extraction Rules
 
 Whitespace column parsing belongs in `pmssConfigLineColumns()` from the runtime
