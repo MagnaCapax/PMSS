@@ -36,7 +36,7 @@ final class agentDiagnosticsCliTest extends TestCase
         $payload = $this->pmssDecodeJsonArray($output);
 
         $this->assertSame(
-            ['motd', 'storage', 'services', 'system', 'cgroup', 'system_test', 'users', 'resources', 'traffic', 'user_settings', 'user_processes', 'user_metrics_latest', 'user_identity', 'user_quota', 'user_disk'],
+            ['motd', 'storage', 'services', 'system', 'cgroup', 'system_test', 'users', 'resources', 'traffic', 'user_settings', 'user_processes', 'user_metrics_latest', 'user_identity', 'user_quota', 'user_disk', 'user_http_responsiveness'],
             array_keys($payload['sections'])
         );
         $this->assertSame(
@@ -60,6 +60,7 @@ final class agentDiagnosticsCliTest extends TestCase
         $this->assertSame(['raw' => 'uid=1001(alice) gid=1001(alice) groups=1001(alice)'], $payload['sections']['user_identity']);
         $this->assertSame(['raw' => 'Disk quotas for user alice'], $payload['sections']['user_quota']);
         $this->assertSame(['raw' => '12G /home/alice'], $payload['sections']['user_disk']);
+        $this->assertSame(['raw' => '401 0.012s'], $payload['sections']['user_http_responsiveness']);
         $this->assertSame('Alice Setting', $payload['sections']['user_settings']['label']);
     }
 
@@ -235,6 +236,7 @@ final class agentDiagnosticsCliTest extends TestCase
             'quota' => "#!/bin/sh\nprintf 'Disk quotas for user alice\\n'\n",
             'du' => "#!/bin/sh\nprintf '12G /home/alice\\n'\n",
             'tail' => "#!/bin/sh\nprintf '{\"ts\":1756200000,\"uid\":1001,\"mem_failcnt\":126389728,\"mem_current\":327155712,\"mem_peak\":327155712,\"mem_limit\":327155712,\"mem_oom_kill\":0}\\n'\n",
+            'curl' => "#!/bin/sh\nprintf '401 0.012s'\n",
         ]);
     }
 }

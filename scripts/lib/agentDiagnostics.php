@@ -119,10 +119,17 @@ function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
         // production script-root guard failure (GH #722) that breaks the php-type sections. Absent file
         // (new user / no cycle yet) => tail rc!=0 => a benign error stub, not a crash.
         $sections['user_metrics_latest'] = ['type' => 'command', 'command' => 'tail -1 '.escapeshellarg('/var/log/pmss/metrics/'.$user).' 2>/dev/null', 'format' => 'json'];
+        // End-to-end per-user responsiveness: a timed local HTTP GET to the user's panel path
+        // (nginx -> per-user lighttpd). A healthy account answers fast with 401/200; under I/O
+        // saturation the listener still reads `systemctl is-active` while the actual request hangs
+        // — this probe captures that (listener-liveness != responds-under-load), the signal the
+        // host-level service/process/PSI probes above cannot show. Bounded -m 10, read-only GET,
+        // fail-benign (timeout => "timeout-or-unreachable", never a crash).
         foreach ([
             'user_identity' => 'id '.$userArg,
             'user_quota' => 'quota -u '.$userArg.' 2>/dev/null',
             'user_disk' => 'du -sBG '.escapeshellarg('/home/'.$user).' 2>/dev/null',
+            'user_http_responsiveness' => 'curl -sS -m 10 -o /dev/null -w "%{http_code} %{time_total}s" '.escapeshellarg('http://localhost/user-'.$user.'/').' 2>/dev/null || echo timeout-or-unreachable',
         ] as $name => $command) {
             $sections[$name] = ['type' => 'command', 'command' => $command, 'wrap' => 'raw'];
         }
