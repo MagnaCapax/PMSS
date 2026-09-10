@@ -428,7 +428,8 @@ codex_prepare_agent_exec_command() {
 	codex_prepare_agent_exec "$assist_dir" "$default_agent" "$agent_name" "$exec_name" || return $?
 	[[ -n "$extra_args_name" ]] || return 0
 	local -n extra_args_ref="$extra_args_name"
-	[[ "${#extra_args_ref[@]}" -gt 0 ]] && codex_append_exec_extra_args "$exec_name" "$agent_final_ref" "${extra_args_ref[@]}"
+	# Unguarded on purpose: the helper handles an empty list; a `[[ -gt 0 ]] &&` guard here returned 1 on no args (silent launcher exit 1).
+	codex_append_exec_extra_args "$exec_name" "$agent_final_ref" "${extra_args_ref[@]}"
 }
 
 codex_make_temp_workspace() {

@@ -77,6 +77,31 @@ class AgenticRefactorScopeClaimTest extends TestCase
         $this->assertStringContainsAllStrings(["stale=removed\n", 'fresh=kept'], $output);
     }
 
+    public function testPrepareAgentExecCommandSucceedsWithEmptyPassthroughArgs(): void
+    {
+        $root = $this->pmssRepoPath('');
+        $assistDir = $root.'/development/assistants';
+
+        $output = $this->pmssRunShellHarness(
+            "#!/usr/bin/env bash\n"
+            ."set -euo pipefail\n"
+            ."source ".escapeshellarg($root.'/development/lib/codex-common.sh')."\n"
+            ."agent=''\n"
+            ."exec_cmd='codex exec'\n"
+            ."declare -a passthrough=()\n"
+            ."if codex_prepare_agent_exec_command ".escapeshellarg($assistDir)." codex agent exec_cmd passthrough; then rc=0; else rc=\$?; fi\n"
+            ."printf 'empty: rc=%s exec=[%s]\\n' \"\$rc\" \"\$exec_cmd\"\n"
+            ."exec_cmd='codex exec'\n"
+            ."declare -a passthrough2=(--yolo)\n"
+            ."if codex_prepare_agent_exec_command ".escapeshellarg($assistDir)." codex agent exec_cmd passthrough2; then rc=0; else rc=\$?; fi\n"
+            ."printf 'yolo: rc=%s exec=[%s]\\n' \"\$rc\" \"\$exec_cmd\"\n"
+        );
+
+        // An empty passthrough list must not fail the launcher (the refactor lane exited 1 on
+        // every cron run for this reason); a non-empty list must still be appended, normalized.
+        $this->assertStringContainsAllStrings(["empty: rc=0 exec=[codex exec]\n", "yolo: rc=0 exec=[codex exec --ask-for-approval never]"], $output);
+    }
+
     public function testLauncherUsesSharedScopeClaimHelperOnly(): void
     {
         $launcher = $this->pmssReadRepoFile('development/agentic-refactor.sh');
