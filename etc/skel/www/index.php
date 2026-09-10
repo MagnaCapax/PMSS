@@ -451,7 +451,6 @@ if ($useLocalFrames) {
     // This keeps the familiar tabbed GUI layout even when pulsedmedia.com
     // is unreachable or remote frames are explicitly disabled.
     $htmlHead = <<<EOF
-<title>PM Seedbox</title>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
         <script src="pmssTabs.js"></script>
         <link rel="stylesheet" href="jquery.tabs.css" type="text/css" media="print, projection, screen">
@@ -470,11 +469,21 @@ EOF;
         'wiki' => pmssLocalFrameDefinition('https://wiki.pulsedmedia.com', 'wiki', 'Pulsed Media Wiki'),
     );
 }
+
+// Own the browser title on both frame paths, with the short hostname first.
+$panelHostname = function_exists('gethostname') ? (string) gethostname() : '';
+$panelHostname = explode('.', $panelHostname !== '' ? $panelHostname : (string) php_uname('n'), 2)[0];
+$panelVendor = function_exists('pmssCustomerSerializedArrayFileRead')
+    ? pmssCustomerSerializedArrayFileRead('/etc/seedbox/config/vendor', 4096) : null;
+$panelVendorName = isset($panelVendor['name']) && is_string($panelVendor['name']) && trim($panelVendor['name']) !== ''
+    ? trim($panelVendor['name']) : 'Pulsed Media';
+$panelTitle = trim($panelHostname.' '.$panelVendorName.' Dashboard');
 ?>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
 <head>
-<?=$htmlHead;?>
+<title><?=htmlspecialchars($panelTitle, ENT_QUOTES, 'UTF-8');?></title>
+<?=preg_replace('/<title\b[^>]*>.*?<\/title\s*>/is', '', $htmlHead);?>
 <style>
 html, body {
  margin: 0;

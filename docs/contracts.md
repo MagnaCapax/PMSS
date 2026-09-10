@@ -737,6 +737,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ## Customer Panel Frame Source – `etc/skel/www/index.php` and `welcome.php`
 
+- The outer panel owns the browser title on both frame paths: `<short hostname> <vendor name> Dashboard`. It reads the system hostname without shelling, falls back to `php_uname('n')`, escapes the title as HTML, and defaults missing or invalid vendor names to `Pulsed Media`. Frame-source title elements are omitted so only the outer title remains.
 - Remote `guiFrames` remains the default and primary on-load frame-definition source; bundled definitions remain its failover.
 - The customer may select bundled definitions through the welcome-page control. The preference is represented only by the customer-owned `~/.guiFramesLocalOnly` marker; an absent marker restores remote-primary behavior.
 - The write accepts the fixed `local` and `remote` values through a same-origin AJAX POST, refuses symlinked or conflicting marker paths, and remains reversible and idempotent.
