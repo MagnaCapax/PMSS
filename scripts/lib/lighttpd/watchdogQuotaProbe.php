@@ -13,26 +13,6 @@ function pmssLighttpdWatchdogQuotaOutputShowsExhaustion(string $output): bool
     return preg_match('/^\s*\/\S+.*\*.*$/m', $output) === 1;
 }
 
-/** Read quota state live when possible, otherwise fall back to ~/.quota. */
-function pmssLighttpdWatchdogQuotaOutputRead(string $username, string $homeDir): ?string
-{
-    $output = '';
-    $quotaResult = pmssLighttpdWatchdogCommandCapture('quota', '-u '.escapeshellarg($username).' -s 2>/dev/null');
-    if ($quotaResult !== null && $quotaResult['output'] !== '') {
-        $output = $quotaResult['output'];
-    }
-
-    if ($output === '') {
-        $quotaFile = rtrim($homeDir, '/').'/.quota';
-        $snapshot = pmssReadRegularFileContents($quotaFile);
-        if ($snapshot !== null) {
-            $output = $snapshot;
-        }
-    }
-
-    return $output !== '' ? $output : null;
-}
-
 /** Parse the charged, soft-limit, and exhaustion state from quota output. */
 function pmssLighttpdWatchdogQuotaStateParse(string $output): ?array
 {
@@ -43,23 +23,18 @@ function pmssLighttpdWatchdogQuotaStateParse(string $output): ?array
             continue;
         }
 
-        $sizes = array();
-        foreach (array_slice($tokens, 1, 3) as $token) {
-            $bytes = pmssParseSizeToBytes(rtrim((string) $token, '*'));
+        $state = [];
+        foreach ([1 => 'usedBytes', 2 => 'softLimitBytes', 3 => 'hardLimitBytes'] as $index => $field) {
+            $bytes = pmssParseSizeToBytes(rtrim((string) $tokens[$index], '*'));
             if ($bytes === null) {
                 continue 2;
             }
-            $sizes[] = (int) $bytes;
+            $state[$field] = (int) $bytes;
         }
 
-        $state = array(
-            'usedBytes' => $sizes[0],
-            'softLimitBytes' => $sizes[1],
-            'hardLimitBytes' => $sizes[2],
-            'exceeded' => false,
-        );
-        if (strpos($tokens[1], '*') !== false || strpos($tokens[4] ?? '', '*') !== false) {
-            $state['exceeded'] = true;
+        // Prefer the first exhausted row; otherwise retain the last valid row.
+        $state['exceeded'] = strpos($tokens[1], '*') !== false || strpos($tokens[4] ?? '', '*') !== false;
+        if ($state['exceeded']) {
             return $state;
         }
         $fallback = $state;
@@ -68,11 +43,15 @@ function pmssLighttpdWatchdogQuotaStateParse(string $output): ?array
     return $fallback;
 }
 
-/** Read numeric quota state for the current unhealthy-user diagnosis. */
+/** Read live quota state, falling back to ~/.quota only when output is empty. */
 function pmssLighttpdWatchdogQuotaStateRead(string $username, string $homeDir): ?array
 {
-    $output = pmssLighttpdWatchdogQuotaOutputRead($username, $homeDir);
-    if ($output === null) {
+    $quotaResult = pmssLighttpdWatchdogCommandCapture('quota', '-u '.escapeshellarg($username).' -s 2>/dev/null');
+    $output = $quotaResult['output'] ?? '';
+    if ($output === '') {
+        $output = pmssReadRegularFileContents(rtrim($homeDir, '/').'/.quota');
+    }
+    if ($output === null || $output === '') {
         return null;
     }
 
@@ -83,13 +62,6 @@ function pmssLighttpdWatchdogQuotaStateRead(string $username, string $homeDir): 
 
     $state['exceeded'] = pmssLighttpdWatchdogQuotaOutputShowsExhaustion($output);
     return $state;
-}
-
-/** Inspect quota state live when possible, otherwise fall back to ~/.quota. */
-function pmssLighttpdWatchdogQuotaExceeded(string $username, string $homeDir): bool
-{
-    $state = pmssLighttpdWatchdogQuotaStateRead($username, $homeDir);
-    return is_array($state) && !empty($state['exceeded']);
 }
 
 /** Aggregate deleted blocks for the account on its home filesystem. */

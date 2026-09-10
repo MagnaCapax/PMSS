@@ -55,6 +55,37 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         $this->assertSame(null, pmssLighttpdWatchdogQuotaStateParse("/dev/sda1 unknown 9G 10G\n"));
     }
 
+    public function testQuotaStateReaderPreservesLiveOutputAndSnapshotPrecedence(): void
+    {
+        $homeDir = $this->pmssMakeTempDir('pmss-watchdog-quota-');
+        $healthy = "/dev/sda1 1G 9G 10G 0 0 0\n";
+        $exhausted = "/dev/sda1 10G* 9G 10G 0 0 0\n";
+        // Nonempty live output wins even on failure; only empty output uses the snapshot.
+        foreach ([[$healthy, 0, $exhausted, false], [$exhausted, 1, $healthy, true],
+            ['', 1, $exhausted, true], ['', 0, $healthy, false],
+            ['unavailable', 1, $exhausted, null], ['', 1, '', null]] as [$output, $rc, $snapshot, $expected]) {
+            file_put_contents($homeDir.'/.quota', $snapshot);
+            $this->pmssWriteExecutableFiles($homeDir, ['quota' => "#!/bin/sh\nprintf '%s' ".escapeshellarg($output)."\nexit {$rc}\n"]);
+            $this->pmssWithPathPrefix($homeDir, function () use ($homeDir, $expected): void {
+                $state = pmssLighttpdWatchdogQuotaStateRead('alice', $homeDir);
+                $this->assertSame($expected, $state['exceeded'] ?? null);
+            });
+        }
+    }
+
+    public function testQuotaStateParserPreservesRowSelectionAndFieldOrder(): void
+    {
+        $healthy = "/dev/sda1 1G 9G 10G 0 0 0\n";
+        $exhausted = "/dev/sdb1 2G 9G 10G 5000* 4000 5000\n";
+        $expected = ['usedBytes' => 2147483648, 'softLimitBytes' => 9663676416, 'hardLimitBytes' => 10737418240, 'exceeded' => true];
+        $this->assertSame($expected, pmssLighttpdWatchdogQuotaStateParse($healthy.$exhausted.$healthy));
+        $expected['exceeded'] = false;
+        $this->assertSame($expected, pmssLighttpdWatchdogQuotaStateParse($healthy.str_replace('5000*', '5000', $exhausted)));
+        foreach (['bad 9G 10G', '1G bad 10G', '1G 9G bad'] as $sizes) {
+            $this->assertSame(pmssLighttpdWatchdogQuotaStateParse($healthy), pmssLighttpdWatchdogQuotaStateParse($healthy.'/dev/sdb1 '.$sizes."\n"));
+        }
+    }
+
     public function testQuotaDescriptorMatchUsesDerivedOverageBoundary(): void
     {
         $state = ['usedBytes' => 1025, 'softLimitBytes' => 1, 'exceeded' => true];

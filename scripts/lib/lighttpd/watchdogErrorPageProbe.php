@@ -45,13 +45,9 @@ require_once __DIR__.'/watchdogQuotaProbe.php';
 function pmssLighttpdWatchdogRootInodesExhausted(string $mountPath = '/'): bool
 {
     $dfResult = pmssLighttpdWatchdogCommandCapture('df', '-i '.escapeshellarg($mountPath).' 2>/dev/null');
-    if ($dfResult === null) {
-        return false;
-    }
-
-    $usagePercent = pmssLighttpdWatchdogParseDfInodeUsePercent($dfResult['output']);
-
-    return $usagePercent !== null && $usagePercent >= 95;
+    return $dfResult !== null
+        && ($usagePercent = pmssLighttpdWatchdogParseDfInodeUsePercent($dfResult['output'])) !== null
+        && $usagePercent >= 95;
 }
 
 /** Return true when `lighttpd -t -f` reports a config problem. */
@@ -62,11 +58,7 @@ function pmssLighttpdWatchdogConfigInvalid(string $configPath): bool
     }
 
     $lighttpdResult = pmssLighttpdWatchdogCommandCapture('lighttpd', '-t -f '.escapeshellarg($configPath).' 2>&1');
-    if ($lighttpdResult === null) {
-        return false;
-    }
-
-    return $lighttpdResult['exitCode'] !== 0;
+    return $lighttpdResult !== null && $lighttpdResult['exitCode'] !== 0;
 }
 
 /** Diagnose the most helpful 502 status page for an unhealthy user web stack. */
