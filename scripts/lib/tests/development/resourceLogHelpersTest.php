@@ -198,6 +198,75 @@ class ResourceLogHelpersTest extends TestCase
         });
     }
 
+    public function testReadBlkioReadWritePreservesValidTotalsAndIgnoredRows(): void
+    {
+        $path = $this->makeRoot().'/blkio';
+        $max = PHP_INT_MAX - 1;
+        foreach ([
+            ['', null],
+            ["Total 100\n8:0 Sync 10\n", null],
+            ["8:0 Read 0\n8:0 Write 0\n", ['read' => 0, 'write' => 0]],
+            ["8:0 Read 10\r\n8:16 Read 20\r\n8:0 Write 7\r\nTotal 37\r\n", ['read' => 30, 'write' => 7]],
+            ["8:0 Read -1\n8:0 Write invalid\n8:16 Read 2\n", ['read' => 2, 'write' => 0]],
+            ["8:0 Read ".PHP_INT_MAX."\n8:16 Write 3\n", ['read' => 0, 'write' => 3]],
+            ["8:0 Read ".($max - 1)."\n8:16 Read 1\n", ['read' => $max, 'write' => 0]],
+            ["8:0 Read {$max}\n8:0 Write {$max}\n", ['read' => $max, 'write' => $max]],
+        ] as [$contents, $expected]) {
+            $this->pmssWriteFile($path, $contents);
+            $this->assertSame($expected, \pmssResourceLogReadBlkioReadWrite($path));
+        }
+    }
+
+    public function testReadBlkioReadWriteRejectsSentinelAndOverflowingTotals(): void
+    {
+        $path = $this->makeRoot().'/blkio';
+        $max = PHP_INT_MAX - 1;
+        foreach (['Read', 'Write'] as $direction) {
+            // Cover the sentinel, overflow, order reversal, and a multi-row boundary crossing.
+            foreach ([[$max, 1], [1, $max], [$max, 2], [$max, $max], [$max - 1, 1, 1]] as $values) {
+                $rows = [];
+                foreach ($values as $device => $value) {
+                    $rows[] = "8:{$device} {$direction} {$value}";
+                }
+                $this->pmssWriteFile($path, implode("\n", $rows));
+                $this->pmssAssertNoPhpWarnings(function () use ($path): void {
+                    $this->assertSame(null, \pmssResourceLogReadBlkioReadWrite($path));
+                });
+            }
+        }
+    }
+
+    public function testReadCountersV1OmitsIoGroupWithUnrepresentableTotals(): void
+    {
+        $slice = 'user.slice/user-1000.slice';
+        foreach (['bfq', 'throttle'] as $source) {
+            foreach (['io_service_bytes', 'io_serviced'] as $counter) {
+                $files = [
+                    'cpuacct/'.$slice.'/cpuacct.usage' => "42\n",
+                    'blkio/'.$slice.'/blkio.'.$source.'.io_service_bytes' => "8:0 Read 100\n8:0 Write 200\n",
+                    'blkio/'.$slice.'/blkio.'.$source.'.io_serviced' => "8:0 Read 10\n8:0 Write 20\n",
+                ];
+                $files['blkio/'.$slice.'/blkio.'.$source.'.'.$counter] = "8:0 Read ".(PHP_INT_MAX - 1)."\n8:16 Read 2\n";
+                $root = $this->makeV1CgroupTree(1000, $files);
+                $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
+                    $this->assertSame(['cpu_nsec' => 42], \pmssResourceLogReadCounters(1000, $root));
+                });
+            }
+        }
+    }
+
+    public function testReadBlkioBytesFallsBackWhenBfqTotalIsUnrepresentable(): void
+    {
+        $root = $this->makeRoot().'/';
+        $this->pmssWriteFile($root.'blkio.bfq.io_service_bytes', "8:0 Read ".(PHP_INT_MAX - 1)."\n8:16 Read 2\n");
+        $this->pmssWriteFile($root.'blkio.throttle.io_service_bytes', "8:0 Read 12\n8:0 Write 34\n");
+
+        $this->assertSame(
+            ['read' => 12, 'write' => 34, 'source' => 'throttle'],
+            \pmssResourceLogReadBlkioBytesWithSource($root, 'blkio.bfq.io_service_bytes', 'blkio.throttle.io_service_bytes')
+        );
+    }
+
     private function makeStatePath($previousPayload = null): string
     {
         $statePath = $this->makeRoot().'/state.json';

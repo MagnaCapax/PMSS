@@ -81,6 +81,9 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   storage-pressure notices.
 - `quotaSnapshot.php` – Append daily quota usage snapshots (machine-parseable; root-only log at `/var/log/pmss/quota-daily.log`).
 - `resourceLog.php` – Capture per-user CPU, memory, and I/O samples every five minutes into the resource metering pipeline.
+  The shared cgroup-v1 blkio reader rejects a Read or Write total that reaches
+  the existing counter sentinel (`PHP_INT_MAX`) before addition can overflow.
+  That file follows the existing unavailable-counter fallback and sample guards.
 - `resourceStats.php` – Fold raw resource samples into per-user aggregates twice per hour.
 - `resourceSnapshot.php` – Append a daily root-only snapshot of resource usage for long-term review.
 - `trafficLimits.php` – Refresh per-user traffic throttling configuration (supports staged overage caps via `overageStages` and progressive post-cap reduction via `progressiveThrottleEnabled`, `progressiveThrottleFloorPercent`, and `progressiveThrottleGracePercent` in `/etc/seedbox/config/network`).

@@ -227,7 +227,10 @@ function pmssResourceLogReadSysfsCounter(string $path): ?int
     return ($value < 0 || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) ? null : $value;
 }
 
-/** Sum the Read/Write rows of a v1 blkio per-device file (blkio.throttle.io_service_bytes / io_serviced). */
+/**
+ * Sum the Read/Write rows of a v1 blkio per-device file.
+ * Totals must stay below the counter sentinel; an unrepresentable sum is absent.
+ */
 function pmssResourceLogReadBlkioReadWrite(string $path): ?array
 {
     $raw = pmssReadRegularFileContents($path);
@@ -239,7 +242,10 @@ function pmssResourceLogReadBlkioReadWrite(string $path): ?array
         if (preg_match('/^\S+\s+(Read|Write)\s+([0-9]+)$/', trim((string) $line), $m) !== 1) continue;
         $value = (int) $m[2];
         if ($value < 0 || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) continue;
-        $totals[$m[1] === 'Read' ? 'read' : 'write'] += $value;
+        $direction = $m[1] === 'Read' ? 'read' : 'write';
+        // Check before addition: integer overflow becomes a float and can later cast negative.
+        if ($value >= PMSS_RESOURCE_COUNTER_SENTINEL - $totals[$direction]) return null;
+        $totals[$direction] += $value;
         $matched = true;
     }
 
