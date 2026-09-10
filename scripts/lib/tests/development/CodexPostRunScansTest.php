@@ -69,7 +69,8 @@ class CodexPostRunScansTest extends TestCase
 
     public function testRunnerPassesRunStartHeadToBothScans(): void
     {
-        $runner = $this->pmssReadRepoFile('development/codex-run.sh');
+        $runner = $this->pmssReadRepoFile('development/codex-run.sh')
+            .$this->pmssReadRepoFile('development/lib/codex-run-lifecycle.sh');
 
         $this->assertStringContainsAllStrings([
             'pre_head="$(git -C "$ROOT" rev-parse HEAD',

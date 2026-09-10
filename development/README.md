@@ -57,6 +57,53 @@ These wrappers exist because assistants do not reliably auto-discover PMSS guard
 
 - `development/lib/codex-common.sh`
   - Shared, dependency-free helpers sourced by the wrapper scripts.
+  - Command transport lives in `lib/codex-exec.sh`; runner options, prompts,
+    and lifecycle checks have separate `lib/codex-run-*.sh` modules.
+  - Refactor options and context collection live in `lib/refactor-*.sh`.
+
+## Codex defaults and launcher inventory
+
+Every Codex invocation defaults to `gpt-6-astra` with `xhigh` reasoning.
+The shared invocation helper sets these through CLI configuration, including
+bare `--exec "codex exec"` overrides. Explicit model or reasoning arguments
+remain effective because they follow the default configuration values.
+Non-Codex profiles retain their existing commands.
+Sandbox and approval defaults also use configuration keys, preserving explicit
+`-s`, `--sandbox`, configuration overrides, and bypass options without appending
+conflicting flags. The existing interactive/headless sandbox choices remain.
+
+The complete development launcher/proxy set is `agentic.sh`,
+`agentic-refactor.sh`, `agentic-ci.sh`, `agentic-issues.sh`, `agentic-qa.sh`,
+`codex.sh`, `codex-headless.sh`, `codex-refactor.sh`, `codex-ci.sh`, `ci.sh`,
+`ci-logs.sh codex`, and the shared `codex-run.sh run` entrypoint.
+`codex.sh` remains interactive; automated profiles use `codex exec`.
+Convenience approval flags use the shared `approval_policy` configuration key,
+which works in both modes. Custom autocommit prompts may omit the optional
+`COMMIT PREFIX OVERRIDE` directive and retain their normal prefix.
+
+## Runner event logs
+
+Each shared runner invocation writes a separate JSONL shard at
+`log/codex-run/YYYY-MM-DD/<run-id>.jsonl` beneath the checkout. These local
+artifacts are already ignored by Git. Timestamps are UTC strings formatted
+`YYYY-MM-DD HH:mm:ss`, with an explicit `timezone: "UTC"` field. The terminal output reports the shard path.
+`--event-log PATH` takes precedence over `PMSS_CODEX_RUN_EVENT_LOG`; either
+can retain an existing collector's exact destination. Explicit shared files
+use locked appends to prevent interleaved records.
+
+Events cover runner start/end, assistant start/end, and post-run guard results.
+Missing prompts, missing executables, and assistant failures retain their
+nonzero status in terminal events. A failed log write reports an error and
+fails the run; a failed initial write prevents assistant launch. SIGINT and
+SIGTERM record their exit status when the shell can handle the signal;
+SIGKILL cannot produce a terminal event. A successful exit means the invocation
+and checks completed; inspect the diff or commit to establish what work changed.
+
+The protected-path scan reports staged, unstaged, untracked, and committed
+changes. It preserves all files and staging for review and returns status 3
+from the runner when a protected path changed. A shared checkout's existing
+operator work must never be automatically restored, removed, or unstaged.
+See ADRs 0055 and 0056 for the event and preservation contracts.
 
 ## How prompts are assembled
 

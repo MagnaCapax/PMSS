@@ -99,12 +99,13 @@ class AgenticRefactorScopeClaimTest extends TestCase
 
         // An empty passthrough list must not fail the launcher (the refactor lane exited 1 on
         // every cron run for this reason); a non-empty list must still be appended, normalized.
-        $this->assertStringContainsAllStrings(["empty: rc=0 exec=[codex exec]\n", "yolo: rc=0 exec=[codex exec --ask-for-approval never]"], $output);
+        $this->assertStringContainsAllStrings(["empty: rc=0 exec=[codex exec]\n", 'yolo: rc=0 exec=[codex exec -c approval_policy=\"never\"]'], $output);
     }
 
     public function testLauncherUsesSharedScopeClaimHelperOnly(): void
     {
-        $launcher = $this->pmssReadRepoFile('development/agentic-refactor.sh');
+        $launcher = $this->pmssReadRepoFile('development/agentic-refactor.sh')
+            .$this->pmssReadRepoFile('development/lib/refactor-context.sh');
         $library = $this->pmssReadRepoFile('development/lib/codex-common.sh');
 
         $this->assertStringContainsAndOmitsStrings(['codex_scope_claim_filter_candidates'], ['candidate-files.filtered.txt', 'pmss_refactor'.'_key='], $launcher);

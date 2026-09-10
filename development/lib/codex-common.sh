@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Shared helpers for Codex-oriented CLI wrappers.
 # Keep lightweight and dependency-free so scripts can source this safely.
+# Nameref outputs are consumed by the sourcing launchers; their types vary by caller.
+# shellcheck disable=SC2034,SC2178,SC2179
 
 # Initialize ROOT from a launcher path and optionally chdir.
 codex_init_root() {
 	ROOT="$(cd "$1/.." && pwd)"
-	[[ "${2:-0}" == "1" ]] && cd "$ROOT"
+	if [[ "${2:-0}" == "1" ]]; then cd "$ROOT" || return $?; fi
 	return 0
 }
 
@@ -79,17 +81,6 @@ codex_now_ms() {
 	printf '%s000\n' "$now"
 }
 
-# Minimal JSON string escaping for log/event payloads.
-codex_json_escape() {
-	local value="${1:-}"
-	value="${value//\\/\\\\}"
-	value="${value//\"/\\\"}"
-	value="${value//$'\n'/\\n}"
-	value="${value//$'\r'/\\r}"
-	value="${value//$'\t'/\\t}"
-	printf '%s' "$value"
-}
-
 # Run a static PHP JSON filter against stdin, with decoded payload in $j.
 # shellcheck disable=SC2016
 codex_json_filter_stdin() {
@@ -110,38 +101,9 @@ codex_detect_distro_label() {
 	printf '%s\n' "$label"
 }
 
-# Emit a single structured JSONL event for wrapper observability.
-# Fields align with repo observability baseline when feasible.
+# JSON encoding and locked appends use PHP so control bytes cannot corrupt a shard.
 codex_emit_event_jsonl() {
-	local log_file="$1" event="$2" level="$3" step="$4" correlation_id="$5"
-	local rc="${6:-}" duration_ms="${7:-}" detail="${8:-}"
-	local log_dir ts host distro rc_json duration_json
-	log_dir="$(dirname "$log_file")"
-	mkdir -p "$log_dir" 2>/dev/null || return 0
-
-	ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-	host="$(hostname -s 2>/dev/null || hostname 2>/dev/null || echo unknown)"
-	distro="$(codex_detect_distro_label)"
-	rc_json="null"
-	duration_json="null"
-	if [[ -n "$rc" ]]; then
-		rc_json="$rc"
-	fi
-	if [[ -n "$duration_ms" ]]; then
-		duration_json="$duration_ms"
-	fi
-
-	printf '{"timestamp":"%s","event":"%s","level":"%s","step":"%s","rc":%s,"duration_ms":%s,"host":"%s","distro":"%s","correlationId":"%s","detail":"%s"}\n' \
-		"$(codex_json_escape "$ts")" \
-		"$(codex_json_escape "$event")" \
-		"$(codex_json_escape "$level")" \
-		"$(codex_json_escape "$step")" \
-		"$rc_json" \
-		"$duration_json" \
-		"$(codex_json_escape "$host")" \
-		"$(codex_json_escape "$distro")" \
-		"$(codex_json_escape "$correlation_id")" \
-		"$(codex_json_escape "$detail")" >>"$log_file" 2>/dev/null || true
+	php "$(dirname "${BASH_SOURCE[0]}")/codex-events.php" "$@" "$(codex_detect_distro_label)"
 }
 
 # List available assistant profiles under the given directory.
@@ -310,6 +272,7 @@ codex_parse_option() {
 	CODEX_PARSE_VALUE=""
 
 	if [[ "$arg" == "$option_name" ]]; then
+		[[ -n "$next_value" ]] || codex_cli_error_exit codex "$option_name requires a value"
 		CODEX_PARSE_VALUE="$next_value"
 		CODEX_PARSE_SHIFT=2
 		return 0
@@ -381,6 +344,7 @@ codex_parse_exec_extra_option() {
 		return 0
 		;;
 	--approval-mode | --ask-for-approval | -a | --allowed-tools | --permission-mode)
+		[[ -n "$next_value" ]] || codex_cli_error_exit codex "$arg requires a value"
 		target_ref+=("$arg" "$next_value")
 		CODEX_PARSE_SHIFT=2
 		return 0
@@ -512,10 +476,10 @@ codex_normalize_exec_extra_args() {
 			elif [[ "$agent" == "codex" ]]; then
 				mode="${args[$((i + 1))]:-}"
 				[[ "$mode" == "yolo" ]] && mode="never"
-				normalized+=(--ask-for-approval)
+				normalized+=(-c)
 				codex_has_approval=1
 				if [[ -n "$mode" ]]; then
-					normalized+=("$mode")
+					normalized+=("approval_policy=\"$mode\"")
 					i=$((i + 1))
 				fi
 			else
@@ -526,13 +490,26 @@ codex_normalize_exec_extra_args() {
 				fi
 			fi
 			;;
-		--ask-for-approval)
-			normalized+=("${args[$i]}")
+		--ask-for-approval | -a)
+			if [[ "$agent" == "codex" ]]; then
+				normalized+=(-c)
+			else
+				normalized+=("${args[$i]}")
+			fi
 			codex_has_approval=1
 			if [[ -n "${args[$((i + 1))]:-}" ]]; then
-				normalized+=("${args[$((i + 1))]}")
+				if [[ "$agent" == "codex" ]]; then
+					normalized+=("approval_policy=\"${args[$((i + 1))]}\"")
+				else
+					normalized+=("${args[$((i + 1))]}")
+				fi
 				i=$((i + 1))
 			fi
+			;;
+		approval_policy=* | --config=approval_policy=* | -capproval_policy=*)
+			# Explicit config has the same precedence as the explicit approval flag.
+			codex_has_approval=1
+			normalized+=("${args[$i]}")
 			;;
 		*)
 			normalized+=("${args[$i]}")
@@ -544,7 +521,8 @@ codex_normalize_exec_extra_args() {
 		normalized+=(--dangerously-skip-permissions)
 	fi
 	if [[ "$agent" == "codex" && -n "$codex_force_approval" && "$codex_has_approval" == "0" ]]; then
-		normalized+=(--ask-for-approval "$codex_force_approval")
+		# exec accepts the shared config key, but not the interactive approval flag.
+		normalized+=(-c "approval_policy=\"$codex_force_approval\"")
 	fi
 
 	printf '%s\n' "${normalized[@]}"
@@ -643,10 +621,10 @@ EOF
 	codex_append_local_notes "$notes_file" "$prompt_file"
 }
 
-# Post-run enforcement: revert any modifications to frozen pipeline paths.
+# Post-run enforcement: report modifications to frozen pipeline paths without discarding work.
 # The codex sandbox (danger-full-access) allows writes to ALL files in the repo AND lets the
 # agent commit and push in-session, so this scan checks two ranges:
-#   - the working tree (staged, unstaged, untracked): reverted/removed here;
+#   - the working tree (staged, unstaged, untracked): reported and preserved;
 #   - the commits made since run start (base_ref..HEAD, optional 2nd arg): already in history
 #     (and pushed under autocommit) — reported loudly, never rewritten here.
 # This function detects changes to paths that agents must NEVER modify.
@@ -660,7 +638,7 @@ EOF
 #   .gitignore         — could hide malicious files
 #
 # Usage: codex_scan_frozen_paths <repo_root> [<base_ref>]
-# Returns 0 if clean, 1 if frozen paths were touched (working tree reverted; commits reported).
+# Returns 0 if clean, 1 if frozen paths were touched (all files/history preserved).
 codex_scan_frozen_paths() {
 	local repo_root="$1"
 	local base_ref="${2:-}"
@@ -728,30 +706,14 @@ codex_scan_frozen_paths() {
 	fi
 
 	if [[ ${#touched_files[@]} -gt 0 ]]; then
-		echo "[codex-run] FROZEN PATH VIOLATION: agent modified protected paths:" >&2
+		echo "[codex-run] FROZEN PATH VIOLATION: protected paths have uncommitted changes:" >&2
 		for file in "${touched_files[@]}"; do
 			echo "[codex-run]   - $file" >&2
 		done
 
-		# Revert: restore frozen files from HEAD, remove untracked frozen files
-		for file in "${touched_files[@]}"; do
-			if git -C "$repo_root" ls-files --error-unmatch "$file" >/dev/null 2>&1; then
-				# Tracked file — restore from HEAD
-				git -C "$repo_root" checkout HEAD -- "$file" 2>/dev/null || true
-				echo "[codex-run]   REVERTED: $file (restored from HEAD)" >&2
-			else
-				# Untracked file in frozen dir — remove it
-				rm -f "$repo_root/$file" 2>/dev/null || true
-				echo "[codex-run]   REMOVED: $file (untracked in frozen path)" >&2
-			fi
-		done
-
-		# Unstage any frozen files that were staged
-		for file in "${touched_files[@]}"; do
-			git -C "$repo_root" reset HEAD -- "$file" 2>/dev/null || true
-		done
-
-		echo "[codex-run] FROZEN PATH VIOLATION: all frozen paths reverted/removed" >&2
+		# A shared checkout contains operator/parallel edits. Ownership cannot be inferred
+		# from a post-run diff, so preserve the working tree and index for review.
+		echo "[codex-run] FROZEN PATH VIOLATION: working tree and staging preserved for review" >&2
 	fi
 	return 1
 }
@@ -927,57 +889,6 @@ codex_scan_commit_messages_for_pii() {
 	return 0
 }
 
-# Expand prompt placeholders for both real invocation and dry-run previews.
-codex_expand_prompt_placeholders() {
-	local exec_cmd="$1" prompt_file="$2" prompt_replacement="$3" output_name="$4" mode_name="$5"
-	local -n output_ref="$output_name"
-	local -n mode_ref="$mode_name"
-	local prompt_file_q
-	printf -v prompt_file_q '%q' "$prompt_file"
-	output_ref="$exec_cmd"
-	mode_ref="prompt-string"
-	if [[ "$output_ref" == *"##PROMPT_FILE##"* ]]; then
-		output_ref="${output_ref//##PROMPT_FILE##/$prompt_file_q}"
-		mode_ref="prompt-inline"
-	fi
-	if [[ "$output_ref" == *"##PROMPT##"* ]]; then
-		output_ref="${output_ref//##PROMPT##/$prompt_replacement}"
-		mode_ref="prompt-inline"
-	fi
-	if [[ "$output_ref" == *"##PROMPT_STDIN##"* ]]; then
-		output_ref="${output_ref//##PROMPT_STDIN##/}"
-		mode_ref="prompt-stdin"
-	fi
-}
-
-# Invoke the assistant executable with the prompt file contents.
-codex_invoke() {
-	local exec_cmd="$1" prompt_file="$2"
-	local exec_bin="${exec_cmd%% *}"
-	if [[ -z "$exec_bin" ]] || ! command -v "$exec_bin" >/dev/null 2>&1; then
-		echo "[codex] assistant executable not found: $exec_bin" >&2
-		echo "[codex] run manually with codex installed, for example:" >&2
-		echo "  codex \"\$(cat '$prompt_file')\"" >&2
-		exit 127
-	fi
-
-	local prompt prompt_q exec_cmd_final prompt_mode
-	prompt="$(cat "$prompt_file")"
-	printf -v prompt_q '%q' "$prompt"
-	codex_expand_prompt_placeholders "$exec_cmd" "$prompt_file" "$prompt_q" exec_cmd_final prompt_mode
-
-	if [[ "$prompt_mode" == "prompt-stdin" ]]; then
-		echo "[codex] invoking: $exec_cmd_final [prompt-stdin]" >&1
-		eval "$exec_cmd_final < $prompt_file"
-		return
-	fi
-
-	if [[ "$prompt_mode" == "prompt-inline" ]]; then
-		echo "[codex] invoking: $exec_cmd_final [prompt-inline]" >&1
-		eval "$exec_cmd_final"
-		return
-	fi
-
-	echo "[codex] invoking: $exec_cmd_final [prompt-string]" >&1
-	eval "$exec_cmd_final $prompt_q"
-}
+# The invocation domain is shared with direct runner callers and launcher tests.
+# shellcheck source=development/lib/codex-exec.sh
+source "$(dirname "${BASH_SOURCE[0]}")/codex-exec.sh"
