@@ -86,24 +86,23 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
         }
         $dataLines = $loadedData['data_lines'];
 
-        $results = $this->stats->collectWindowResultsFromData(
+        $data = $this->stats->collectWindowResultsFromData(
             $dataLines,
             $compareTimes,
             function (string $line) use ($logPrefix, $user): void {
                 $this->log($logPrefix."Parsing line failed for {$user}, line: {$line}");
             }
         );
-        if ($results === null) {
+        if ($data === null) {
             $this->log($logPrefix."No valid samples for {$user}");
             return;
         }
 
-        $data = pmssResourceStoredPayloadFromResults($results);
         $this->ensureRuntime();
         if (!$this->save($user, $data, $logPrefix)) {
             return;
         }
-        $this->log($logPrefix."Resource stats for {$user} saved, month read bytes: {$results['raw']['io_read']['month']}");
+        $this->log($logPrefix."Resource stats for {$user} saved, month read bytes: {$data['io_read']['raw']['month']}");
     }
 
     /** Persist user resource data to home directory and runtime cache. */

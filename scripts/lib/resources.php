@@ -8,7 +8,7 @@
 
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/lighttpd/userFileWrite.php';
-require_once __DIR__.'/resources/accumulator.php';
+require_once __DIR__.'/resources/payload.php';
 
 const PMSS_RESOURCE_LOG_TAIL_LINES_MAX = 10080;
 const PMSS_RESOURCE_LOG_TAIL_TIMEOUT_SECONDS = 5;
@@ -47,77 +47,6 @@ function pmssResourceTailLogContents(string $path, int $lines): string
     if ($tail === '') return '';
     $result = pmssCommandCapture(pmssCommandArgvShellQuote([$tail, '-n', (string) $lines, $path]), PMSS_RESOURCE_LOG_TAIL_TIMEOUT_SECONDS);
     return $result['rc'] === 0 ? trim($result['stdout']) : '';
-}
-
-/** Return the shared schema used by resource rows and totals. */
-function pmssResourceReportTemplate(): array
-{
-    $windows = array_fill_keys(['month', 'week', 'day', 'hour'], 0.0);
-    return array_fill_keys(ResourceStatsAccumulator::RAW_METRICS, $windows) + ['memory' => ['current' => 0.0, 'avg_month' => 0.0], 'tasks' => ['current' => 0.0]];
-}
-
-/** Normalize scalar metric values while rejecting malformed persisted/fallback data. */
-function pmssResourceMetricValueNormalize($value): ?float { return is_numeric($value) ? (float) $value : null; }
-
-/** Return metrics shared by resource snapshot rows and fallback calculations. */
-function pmssResourceSnapshotMetricKeys(): array { return array_merge(ResourceStatsAccumulator::RAW_METRICS, ResourceStatsAccumulator::AVERAGE_METRICS); }
-
-/** Read a stored payload metric window, defaulting missing ops windows to zero. */
-function pmssResourceStoredPayloadWindowValue(array $data, string $metric, string $window): ?float
-{
-    $value = $data[$metric]['raw'][$window] ?? (substr($metric, -4) === '_ops' ? 0.0 : null);
-    return $value !== null ? pmssResourceMetricValueNormalize($value) : null;
-}
-
-/** Read all metrics for a stored payload window. */
-function pmssResourceStoredPayloadWindowMetrics(array $data, string $window): ?array
-{
-    $metrics = [];
-    foreach (pmssResourceSnapshotMetricKeys() as $key) {
-        if (($metrics[$key] = pmssResourceStoredPayloadWindowValue($data, $key, $window)) === null) return null;
-    }
-    return $metrics;
-}
-
-/** Normalize persisted resource stats into the row shape used by reports. */
-function pmssResourceStoredPayloadReportRow(array $data): ?array
-{
-    $row = pmssResourceReportTemplate();
-    foreach (ResourceStatsAccumulator::RAW_METRICS as $metric) {
-        foreach (array_keys($row[$metric]) as $label) {
-            if (($row[$metric][$label] = pmssResourceStoredPayloadWindowValue($data, $metric, $label)) === null) return null;
-        }
-    }
-
-    $row['memory'] = ['current' => (float) ($data['memory']['current'] ?? 0.0), 'avg_month' => (float) ($data['memory']['raw']['month'] ?? 0.0)];
-    $row['tasks'] = ['current' => (float) ($data['tasks']['current'] ?? 0.0)];
-    return $row;
-}
-
-/** Build the persisted per-user resource payload from accumulator results. */
-function pmssResourceStoredPayloadFromResults(array $results): array
-{
-    $data = ['daily' => $results['daily']];
-    foreach ($results['raw'] + ['memory' => $results['memory'], 'tasks' => $results['tasks']] as $metric => $values) {
-        $data[$metric] = ['raw' => $values];
-    }
-    $data['memory']['current'] = $results['current_memory'];
-    foreach (pmssResourceMemoryBreakdownFieldMap('current_memory_') as $field => $resultKey) {
-        if (isset($results[$resultKey]) && is_numeric($results[$resultKey])) $data['memory'][$field] = (float) $results[$resultKey];
-    }
-    $data['tasks']['current'] = $results['current_tasks'];
-    return $data;
-}
-
-/** Extract one accumulator window into the resource-snapshot metric shape. */
-function pmssResourceResultsWindowMetrics(array $results, string $window): ?array
-{
-    $metrics = [];
-    foreach (pmssResourceSnapshotMetricKeys() as $metric) {
-        $source = in_array($metric, ResourceStatsAccumulator::AVERAGE_METRICS, true) ? ($results[$metric] ?? null) : ($results['raw'][$metric] ?? null);
-        if (!is_array($source) || !array_key_exists($window, $source) || ($metrics[$metric] = pmssResourceMetricValueNormalize($source[$window])) === null) return null;
-    }
-    return $metrics;
 }
 
 /** Compose the stable resource cron text-record payload after the timestamp. */
@@ -190,7 +119,7 @@ class resourceStatistics
     }
 
     /**
-     * Accumulate parsed resource log lines across the requested windows.
+     * Accumulate parsed log lines into the persisted resource payload schema.
      *
      * @param string $dataLines Newline-delimited resource log payload.
      * @param array<string, int> $compareTimes Window thresholds keyed by label.

@@ -97,16 +97,14 @@ class ResourceStatisticsTest extends TestCase
     public function testResourceResultsWindowMetricsValidatesSnapshotFallbackShape(): void
     {
         $results = [
-            'memory' => ['day' => '1024'],
-            'tasks' => ['day' => '3'],
-            'raw' => [
-                'io_read' => ['day' => '1'],
-                'io_write' => ['day' => '2'],
-                'io_read_ops' => ['day' => '3'],
-                'io_write_ops' => ['day' => '4'],
-                'cpu' => ['day' => '5'],
-                'ram_hours' => ['day' => '6.5'],
-            ],
+            'memory' => ['raw' => ['day' => '1024']],
+            'tasks' => ['raw' => ['day' => '3']],
+            'io_read' => ['raw' => ['day' => '1']],
+            'io_write' => ['raw' => ['day' => '2']],
+            'io_read_ops' => ['raw' => ['day' => '3']],
+            'io_write_ops' => ['raw' => ['day' => '4']],
+            'cpu' => ['raw' => ['day' => '5']],
+            'ram_hours' => ['raw' => ['day' => '6.5']],
         ];
 
         $this->assertEquals([
@@ -118,15 +116,15 @@ class ResourceStatisticsTest extends TestCase
             'io_write_ops' => 4.0,
             'cpu' => 5.0,
             'ram_hours' => 6.5,
-        ], \pmssResourceResultsWindowMetrics($results, 'day'));
+        ], \pmssResourceStoredPayloadWindowMetrics($results, 'day'));
 
         $badCpu = $results;
-        $badCpu['raw']['cpu']['day'] = 'bad';
-        $this->assertSame(null, \pmssResourceResultsWindowMetrics($badCpu, 'day'));
+        $badCpu['cpu']['raw']['day'] = 'bad';
+        $this->assertSame(null, \pmssResourceStoredPayloadWindowMetrics($badCpu, 'day'));
 
         $missingRamHours = $results;
-        unset($missingRamHours['raw']['ram_hours']['day']);
-        $this->assertSame(null, \pmssResourceResultsWindowMetrics($missingRamHours, 'day'));
+        unset($missingRamHours['ram_hours']['raw']['day']);
+        $this->assertSame(null, \pmssResourceStoredPayloadWindowMetrics($missingRamHours, 'day'));
     }
 
     public function testCollectWindowResultsFromDataKeepsSnapshotFallbackInDayWindow(): void
@@ -140,13 +138,13 @@ class ResourceStatisticsTest extends TestCase
         ]), ['day' => $now - 86400]);
 
         $this->assertTrue(is_array($results));
-        $this->assertEquals(500.0, $results['raw']['io_read']['day']);
-        $this->assertEquals(700.0, $results['raw']['io_write']['day']);
-        $this->assertEquals(5.0, $results['raw']['io_read_ops']['day']);
-        $this->assertEquals(7.0, $results['raw']['io_write_ops']['day']);
-        $this->assertEquals(900.0, $results['raw']['cpu']['day']);
-        $this->assertEquals(1536.0, $results['memory']['day']);
-        $this->assertEquals(5.0, $results['tasks']['day']);
+        $this->assertEquals(500.0, $results['io_read']['raw']['day']);
+        $this->assertEquals(700.0, $results['io_write']['raw']['day']);
+        $this->assertEquals(5.0, $results['io_read_ops']['raw']['day']);
+        $this->assertEquals(7.0, $results['io_write_ops']['raw']['day']);
+        $this->assertEquals(900.0, $results['cpu']['raw']['day']);
+        $this->assertEquals(1536.0, $results['memory']['raw']['day']);
+        $this->assertEquals(5.0, $results['tasks']['raw']['day']);
     }
 
     public function testResourceLogLineCodecMatchesStableSnapshot(): void
@@ -195,7 +193,7 @@ class ResourceStatisticsTest extends TestCase
             ['month' => $now - 3600]
         );
 
-        $this->assertEquals(150.0, $results['raw']['cpu']['month']);
+        $this->assertEquals(150.0, $results['cpu']['raw']['month']);
     }
 
     public function testParseLineValid(): void

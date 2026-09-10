@@ -10,12 +10,8 @@ class ResourceStatsAccumulator
 {
     public const RAW_METRICS = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'];
     public const AVERAGE_METRICS = ['memory', 'tasks'];
-    private const CURRENT_RESULT_KEYS = ['memory' => 'current_memory', 'tasks' => 'current_tasks', 'memory_anon' => 'current_memory_anon', 'memory_file' => 'current_memory_file'];
-
     private $compareTimes;
-    private $rawTotals;
-    private $averageSums;
-    private $averageCounts;
+    private $windowTotals;
     private $dailyTotals = [];
     private $firstDay = '';
     private $currentValues = ['memory' => 0.0, 'tasks' => 0.0, 'memory_anon' => null, 'memory_file' => null];
@@ -24,14 +20,7 @@ class ResourceStatsAccumulator
     public function __construct(array $compareTimes)
     {
         $this->compareTimes = $compareTimes;
-        $labels = array_keys($compareTimes);
-        $windowZeros = array_fill_keys($labels, 0.0);
-        $windowCounts = array_fill_keys($labels, 0);
-        $this->rawTotals = array_fill_keys(self::RAW_METRICS, $windowZeros);
-        foreach (self::AVERAGE_METRICS as $metric) {
-            $this->averageSums[$metric] = $windowZeros;
-            $this->averageCounts[$metric] = $windowCounts;
-        }
+        $this->windowTotals = array_fill_keys(array_keys($compareTimes), []);
     }
 
     /**
@@ -60,30 +49,31 @@ class ResourceStatsAccumulator
             if ($timestamp < $threshold) {
                 continue;
             }
-            foreach ($sampleMetrics as $metric => $value) {
-                $this->rawTotals[$metric][$label] += $value;
-            }
-            foreach ($sampleAverages as $metric => $value) {
-                $this->averageSums[$metric][$label] += $value;
-                $this->averageCounts[$metric][$label] += 1;
-            }
+            $this->addTotals($this->windowTotals[$label], $sampleMetrics + $sampleAverages);
         }
 
         $currentDay = date('Y/m/d', $timestamp);
         $this->firstDay = ($this->firstDay === '') ? $currentDay : $this->firstDay;
         if ($currentDay === $this->firstDay) return;
-        $this->dailyTotals[$currentDay] = $this->dailyTotals[$currentDay] ?? array_fill_keys(self::RAW_METRICS, 0.0)
-            + array_fill_keys(['memory_sum', 'tasks_sum'], 0.0)
-            + array_fill_keys(['memory_count', 'tasks_count'], 0);
+        $this->dailyTotals[$currentDay] = $this->dailyTotals[$currentDay] ?? [];
+        $this->addTotals($this->dailyTotals[$currentDay], $sampleMetrics + $sampleAverages);
+    }
 
-        $dayTotals = &$this->dailyTotals[$currentDay];
-        foreach ($sampleMetrics as $metric => $value) {
-            $dayTotals[$metric] += $value;
+    /** Every accepted sample contributes both averages, so one count serves the whole bucket. */
+    private function addTotals(array &$totals, array $metrics): void
+    {
+        foreach ($metrics as $metric => $value) $totals[$metric] = ($totals[$metric] ?? 0.0) + $value;
+        $totals['samples'] = ($totals['samples'] ?? 0) + 1;
+    }
+
+    /** Use the same sum/average calculation for rolling windows and complete days. */
+    private function totalsResult(array $totals): array
+    {
+        $values = array_intersect_key($totals, array_flip(self::RAW_METRICS)) + array_fill_keys(self::RAW_METRICS, 0.0);
+        foreach (self::AVERAGE_METRICS as $metric) {
+            $values[$metric] = ($totals['samples'] ?? 0) > 0 ? $totals[$metric] / $totals['samples'] : 0.0;
         }
-        foreach ($sampleAverages as $metric => $value) {
-            $dayTotals[$metric.'_sum'] += $value;
-            $dayTotals[$metric.'_count'] += 1;
-        }
+        return $values;
     }
 
     /**
@@ -92,34 +82,21 @@ class ResourceStatsAccumulator
     public function hasSamples(): bool { return $this->prevTimestamp !== null; }
 
     /**
-     * Return computed totals and averages.
+     * Return the persisted payload consumed by resource reports and daily snapshots.
      */
     public function results(): array
     {
-        $daily = [];
-        $metricKeys = array_flip(self::RAW_METRICS);
-        foreach ($this->dailyTotals as $day => $totals) {
-            $daily[$day] = array_intersect_key($totals, $metricKeys);
-            foreach (self::AVERAGE_METRICS as $metric) {
-                $count = (int) ($totals[$metric.'_count'] ?? 0);
-                $daily[$day][$metric] = $count > 0 ? ($totals[$metric.'_sum'] / $count) : 0.0;
-            }
+        $data = ['daily' => array_map([$this, 'totalsResult'], $this->dailyTotals)]
+            + array_fill_keys(array_merge(self::RAW_METRICS, self::AVERAGE_METRICS), ['raw' => []]);
+        foreach ($this->windowTotals as $label => $totals) {
+            foreach ($this->totalsResult($totals) as $metric => $value) $data[$metric]['raw'][$label] = $value;
         }
-
-        $result = [
-            'raw' => $this->rawTotals,
-            'memory' => $this->computeAverages($this->averageSums['memory'], $this->averageCounts['memory']),
-            'tasks' => $this->computeAverages($this->averageSums['tasks'], $this->averageCounts['tasks']),
-            'daily' => $daily,
-        ];
-        foreach (self::CURRENT_RESULT_KEYS as $field => $key) $result[$key] = $this->currentValues[$field];
-        return $result;
-    }
-
-    private function computeAverages(array $sums, array $counts): array
-    {
-        $averages = [];
-        foreach ($sums as $label => $sum) { $count = (int) ($counts[$label] ?? 0); $averages[$label] = $count > 0 ? ($sum / $count) : 0.0; }
-        return $averages;
+        $data['memory']['current'] = $this->currentValues['memory'];
+        // Missing breakdown samples retain the last valid values; never serialize null placeholders.
+        foreach (['anon', 'file'] as $field) {
+            if ($this->currentValues['memory_'.$field] !== null) $data['memory'][$field] = $this->currentValues['memory_'.$field];
+        }
+        $data['tasks']['current'] = $this->currentValues['tasks'];
+        return $data;
     }
 }

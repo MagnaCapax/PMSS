@@ -2,10 +2,34 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/resources/accumulator.php';
+require_once dirname(__DIR__, 2).'/resources.php';
 
 class ResourceStatsAccumulatorTest extends TestCase
 {
+    /** Freeze serialized consumer payloads before changing the accumulator's internal shape. */
+    public function testPersistedPayloadByteSnapshots(): void
+    {
+        $start = strtotime('2026-01-02 00:00:00');
+        $cases = [
+            [[], '3f69ff09f52338c2bf98de47b20e7a43120d32e27542a7ebce5719bb004cd2b2'],
+            [[0], '779c9f4df7c33af7867c148ff6bec4cb440c40a01f34dc31d787e8a81f0ab06a'],
+            [[0, 300], '67c86e25556c2379898245ca1a6bd7798c7ded6fbcb61f0f63d97627d987a40d'],
+            [[0, 86400, 86400, 86000, 90001, 90002], '37d1add21fa04ed449629308d04cc9a08a4f30f6432e50a2c09cd4740fce388b'],
+            [[-1, 0, 300, 3600, 86400], '125b213c0d3fc8a9aea0f9ffdbcc44550ea25000d8bf96c63b1d2a5be35183f0'],
+        ];
+        foreach ($cases as [$offsets, $expected]) {
+            $acc = new \ResourceStatsAccumulator(['month' => $start, 'day' => $start + 86400, 'empty' => $start + 200000]);
+            foreach ($offsets as $index => $offset) {
+                $sample = ['timestamp' => $start + $offset, 'io_read' => $index + 1, 'io_write' => 2,
+                    'cpu' => 3, 'memory' => ($index + 1) * 1073741824, 'tasks' => $index];
+                if ($index === 1) $sample += ['memory_anon' => 123, 'memory_file' => 456, 'io_read_ops' => 7];
+                $acc->addSample($sample);
+            }
+            $payload = $acc->results();
+            $this->assertSame($expected, hash('sha256', serialize($payload)), json_encode($offsets));
+        }
+    }
+
     private function sample(int $timestamp, array $overrides = []): array
     {
         return array_merge([
@@ -57,11 +81,11 @@ class ResourceStatsAccumulatorTest extends TestCase
 
         $results = $acc->results();
         $this->assertTrue($acc->hasSamples());
-        $this->assertEquals(150.0, $results['raw']['io_read']['day']);
-        $this->assertEquals(15.0, $results['raw']['io_read_ops']['day']);
-        $this->assertEquals(27.0, $results['raw']['io_write_ops']['day']);
-        $this->assertEquals(['day' => 3.0], $results['tasks']);
-        $this->assertEquals(['day' => 1024 * 1024 * 1024], $results['memory']);
+        $this->assertEquals(150.0, $results['io_read']['raw']['day']);
+        $this->assertEquals(15.0, $results['io_read_ops']['raw']['day']);
+        $this->assertEquals(27.0, $results['io_write_ops']['raw']['day']);
+        $this->assertEquals(['day' => 3.0], $results['tasks']['raw']);
+        $this->assertEquals(['day' => 1024 * 1024 * 1024], $results['memory']['raw']);
     }
 
     public function testRamHoursUsesSampleIntervals(): void
@@ -74,7 +98,7 @@ class ResourceStatsAccumulatorTest extends TestCase
         $acc->addSample($this->sample($now));
 
         $results = $acc->results();
-        $ramHours = $results['raw']['ram_hours']['day'];
+        $ramHours = $results['ram_hours']['raw']['day'];
         $this->assertTrue(abs($ramHours - 0.25) < 0.01);
     }
 
@@ -87,7 +111,7 @@ class ResourceStatsAccumulatorTest extends TestCase
         $acc->addSample($this->sample($now - (2 * 3600)));
         $acc->addSample($this->sample($now));
 
-        $ramHours = $acc->results()['raw']['ram_hours']['day'];
+        $ramHours = $acc->results()['ram_hours']['raw']['day'];
         $this->assertTrue(abs($ramHours - (10 / 60)) < 0.01);
     }
 

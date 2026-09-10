@@ -29,8 +29,8 @@ function pmssResourceSnapshotRun(): int
 
             if ($metrics === null && ($dataLines = $stats->getData($user, 350)) !== '') {
                 $threshold = time() - (24 * 60 * 60);
-                if (($results = $stats->collectWindowResultsFromData($dataLines, ['day' => $threshold])) !== null) {
-                    $metrics = pmssResourceResultsWindowMetrics($results, 'day');
+                if (($data = $stats->collectWindowResultsFromData($dataLines, ['day' => $threshold])) !== null) {
+                    $metrics = pmssResourceStoredPayloadWindowMetrics($data, 'day');
                 }
             }
 
