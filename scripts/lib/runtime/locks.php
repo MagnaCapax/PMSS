@@ -2,6 +2,9 @@
 /**
  * Runtime lock helpers shared by CLI tools and cron entrypoints.
  *
+ * Handle operations accept open streams only. Other resources (including
+ * stream contexts) follow the existing false/empty/no-op failure paths.
+ *
  * @license GPL-3.0-only
  * @author PMSS Team
  */
@@ -20,7 +23,7 @@ function pmssLockFilePathIsSafe(string $path): bool
 /** Confirm an opened lock handle still points at the guarded lock path. */
 function pmssLockFileHandleMatchesPath($handle, string $path): bool
 {
-    if (!is_resource($handle) || !pmssLockFilePathIsSafe($path)) return false;
+    if (!is_resource($handle) || get_resource_type($handle) !== 'stream' || !pmssLockFilePathIsSafe($path)) return false;
 
     $handleStat = @fstat($handle);
     $pathStat = @stat($path);
@@ -52,7 +55,7 @@ function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mo
  */
 function pmssLockHandleFdList($handle, string $fdRoot = '/proc/self/fd'): array
 {
-    if (!is_resource($handle) || $fdRoot === '' || pmssFilesystemPathHasNulByte($fdRoot) || !is_dir($fdRoot)) return [];
+    if (!is_resource($handle) || get_resource_type($handle) !== 'stream' || $fdRoot === '' || pmssFilesystemPathHasNulByte($fdRoot) || !is_dir($fdRoot)) return [];
     $handleStat = @fstat($handle);
     if (!is_array($handleStat) || !isset($handleStat['dev'], $handleStat['ino'])) return [];
 
@@ -100,7 +103,7 @@ function pmssLockChildClosePrefix(): string
 /** Record the current process id in an acquired lock handle. */
 function pmssLockHandleWritePid($handle): bool
 {
-    if (!is_resource($handle)) return false;
+    if (!is_resource($handle) || get_resource_type($handle) !== 'stream') return false;
     $pid = (string) getmypid();
     if (!@ftruncate($handle, 0) || !@rewind($handle)) return false;
     return @fwrite($handle, $pid) === strlen($pid) && @fflush($handle);
@@ -116,4 +119,4 @@ function pmssRuntimeLockBasename(string $basename): string
 }
 
 function pmssRuntimeLockPath(string $basename): string { return (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/'.pmssRuntimeLockBasename($basename); }
-function pmssLockHandleRelease($handle, bool $unlock = true): void { if (!is_resource($handle)) return; $unlock && @flock($handle, LOCK_UN); @fclose($handle); }
+function pmssLockHandleRelease($handle, bool $unlock = true): void { if (!is_resource($handle) || get_resource_type($handle) !== 'stream') return; $unlock && @flock($handle, LOCK_UN); @fclose($handle); }
