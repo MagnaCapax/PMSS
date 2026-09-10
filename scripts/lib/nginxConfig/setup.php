@@ -68,8 +68,7 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
 
     $serverHostname = pmssHostnameRead();
     // /etc/hostname should be a single token; trim defensively to avoid whitespace surprises.
-    $serverHostnameParts = preg_split('/\\s+/', $serverHostname);
-    $serverHostname = is_array($serverHostnameParts) && isset($serverHostnameParts[0]) ? (string)$serverHostnameParts[0] : $serverHostname;
+    $serverHostname = (string) (pmssConfigLineColumns($serverHostname, 0, [])[0] ?? $serverHostname);
     $subdomainBase = strtolower($serverHostname);
     $subdomainEnabled = pmssNginxUserHostIsValidFqdn($subdomainBase);
     $subdomainConfigDir = '/etc/nginx/conf.d';

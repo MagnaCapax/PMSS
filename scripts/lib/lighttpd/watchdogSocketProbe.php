@@ -97,9 +97,7 @@ function pmssLighttpdWatchdogSocketPathsFromLines(array $lines, string $homeDir)
     $pathPattern = '~^'.preg_quote($baseSocketPath, '~').'(?:-[0-9]+)?$~D';
     $listeningPaths = array();
     foreach ($lines as $line) {
-        $columns = preg_split('/\s+/', trim((string) $line));
-        if (!is_array($columns)
-            || count($columns) < 5
+        if (($columns = pmssConfigLineColumns((string) $line, 5, [])) === []
             || ($columns[1] ?? '') !== 'LISTEN'
             || !ctype_digit((string) ($columns[2] ?? ''))
             || !ctype_digit((string) ($columns[3] ?? ''))

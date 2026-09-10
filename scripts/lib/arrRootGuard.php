@@ -19,6 +19,7 @@
  */
 
 require_once __DIR__.'/update/apps/arr.php';
+require_once __DIR__.'/runtime.php';
 
 /** Known system installation paths for consumer applications that must not run as root. */
 const PMSS_ROOT_GUARD_APP_INSTALL_ROOTS = array(
@@ -154,8 +155,7 @@ function pmssRootGuardListeningSocketInodes(string $procNetRoot): array
     foreach (array('tcp', 'tcp6') as $table) {
         $lines = @file($procNetRoot.'/'.$table, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ((array) $lines as $line) {
-            $fields = preg_split('/\s+/', trim((string) $line));
-            if (!is_array($fields) || count($fields) < 10 || ($fields[3] ?? '') !== '0A') {
+            if (($fields = pmssConfigLineColumns((string) $line, 10, [])) === [] || ($fields[3] ?? '') !== '0A') {
                 continue;
             }
 

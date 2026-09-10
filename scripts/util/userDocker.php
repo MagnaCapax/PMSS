@@ -281,16 +281,11 @@ function userDockerCollectPids(string $user, bool $debug = false, ?bool &$checkO
         if ($rc === 0) {
             $checkOkLocal = true;
             foreach ($out as $line) {
-                $line = trim((string) $line);
-                if ($line === '') {
+                $parts = pmssConfigLineColumns((string) $line, 2, [], 2);
+                if ($parts === []) {
                     continue;
                 }
-                $parts = preg_split('/\s+/', $line, 2);
-                if (!is_array($parts) || count($parts) < 2) {
-                    continue;
-                }
-                $pid = $parts[0];
-                $cmdline = $parts[1];
+                [$pid, $cmdline] = $parts;
                 if (!ctype_digit($pid)) {
                     continue;
                 }

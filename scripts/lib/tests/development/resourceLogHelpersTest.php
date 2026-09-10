@@ -104,7 +104,7 @@ class ResourceLogHelpersTest extends TestCase
     {
         $slice = 'user.slice/user-1000.slice';
         $root = $this->makeV1CgroupTree(1000, [
-            'memory/'.$slice.'/memory.stat' => "cache 4444\nrss 3333\n",
+            'memory/'.$slice.'/memory.stat' => "cache\ncache 999 extra\ncache\t4444\nrss 888\t999\nrss 3333\n",
         ]);
 
         $this->pmssWithEnv(['PMSS_CGROUP_MODE' => 'v1'], function () use ($root): void {
@@ -525,7 +525,7 @@ class ResourceLogHelpersTest extends TestCase
         $root = $this->makeRoot();
         $path = $root.'/user.slice/user-1000.slice';
         @mkdir($path, 0755, true);
-        file_put_contents($path.'/memory.stat', "anon 123\nslab 999\nfile 456\n");
+        file_put_contents($path.'/memory.stat', "anon\t123\nslab 999\nfile 456\nanon 777 extra\nfile 888\t999\nfile\n");
 
         $breakdown = \pmssResourceLogReadMemoryBreakdown(1000, $root);
 

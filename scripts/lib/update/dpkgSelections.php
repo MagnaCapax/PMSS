@@ -94,8 +94,7 @@ function pmssDpkgSelectionsSanitise(array $lines, int $runtimeVersion, ?callable
     foreach ($lines as $idx => $line) {
         $trimmed = trim((string) $line);
         if ($trimmed === '') continue;
-        $parts = preg_split('/\s+/', $trimmed);
-        if (!is_array($parts) || $parts === []) { pmssLogStatus('WARN', sprintf('Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed), 0); $result['warnings'] = true; continue; }
+        if (($parts = pmssConfigLineColumns($trimmed, 0, [])) === []) { pmssLogStatus('WARN', sprintf('Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed), 0); $result['warnings'] = true; continue; }
         $package = (string) $parts[0];
         $state = isset($parts[1]) ? (string) $parts[1] : 'install';
         count($parts) === 1 && $result['short_form_seen'] = true;

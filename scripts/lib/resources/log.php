@@ -284,7 +284,7 @@ function pmssResourceLogReadMemoryStatField(string $path, string $field): ?int
     if ($raw === null || trim($raw) === '') return null;
 
     foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
-        [$name, $value] = array_pad(preg_split('/\s+/', trim((string) $line), 2), 2, null);
+        [$name, $value] = array_pad(pmssConfigLineColumns((string) $line, 0, [], 2), 2, null);
         if ($name !== $field || !ctype_digit((string) $value)) continue;
         $parsed = (int) $value;
         return ($parsed < 0 || $parsed >= PMSS_RESOURCE_COUNTER_SENTINEL) ? null : $parsed;
@@ -312,7 +312,7 @@ function pmssResourceLogReadMemoryBreakdown(int $uid, ?string $cgroupRoot = null
 
         $breakdown = [];
         foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
-            [$field, $value] = array_pad(preg_split('/\s+/', trim($line), 2), 2, null);
+            [$field, $value] = array_pad(pmssConfigLineColumns($line, 0, [], 2), 2, null);
             if (!isset($memoryFields[$field]) || !ctype_digit((string) $value)) {
                 continue;
             }

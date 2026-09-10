@@ -131,11 +131,12 @@ function pmssConfigLineTrimmed(string $line, array $commentPrefixes = ['#']): st
     return $trimmed;
 }
 
-function pmssConfigLineColumns(string $line, int $minColumns = 0, array $commentPrefixes = ['#']): array
+/** A positive split limit preserves the remaining text in the final column. */
+function pmssConfigLineColumns(string $line, int $minColumns = 0, array $commentPrefixes = ['#'], int $limit = -1): array
 {
     $trimmed = pmssConfigLineTrimmed($line, $commentPrefixes);
     if ($trimmed === '') return [];
-    $columns = preg_split('/\s+/', $trimmed);
+    $columns = preg_split('/\s+/', $trimmed, $limit);
     return is_array($columns) && count($columns) >= $minColumns ? $columns : [];
 }
 
