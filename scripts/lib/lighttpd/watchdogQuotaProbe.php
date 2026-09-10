@@ -38,8 +38,8 @@ function pmssLighttpdWatchdogQuotaStateParse(string $output): ?array
 {
     $fallback = null;
     foreach (preg_split('/\r?\n/', $output) as $line) {
-        $tokens = preg_split('/\s+/', trim($line));
-        if (!is_array($tokens) || count($tokens) < 4 || strpos($tokens[0], '/') !== 0) {
+        $tokens = pmssConfigLineColumns($line, 4, []);
+        if ($tokens === [] || strpos($tokens[0], '/') !== 0) {
             continue;
         }
 

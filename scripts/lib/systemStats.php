@@ -26,8 +26,7 @@ function pmssSystemStatsTopMemoryFromPsRows(array $rows): string
 {
     $items = [];
     foreach ($rows as $line) {
-        $parts = preg_split('/\s+/', trim((string) $line));
-        if (!is_array($parts) || count($parts) < 2) {
+        if (($parts = pmssConfigLineColumns((string) $line, 2, [])) === []) {
             continue;
         }
 
@@ -69,8 +68,7 @@ function pmssSystemStatsLoadAverageFromRaw(?string $raw): string
 {
     if ($raw === null) return 'na,na,na';
 
-    $parts = preg_split('/\s+/', trim($raw));
-    if (!is_array($parts) || count($parts) < 3) return 'na,na,na';
+    if (($parts = pmssConfigLineColumns($raw, 3, [])) === []) return 'na,na,na';
 
     $load = array_slice($parts, 0, 3);
     foreach ($load as $value) {
@@ -89,8 +87,8 @@ function pmssSystemStatsCpuCountersFromRaw(?string $raw): array
     if ($raw === null) return [];
 
     $lines = preg_split('/\r?\n/', $raw);
-    $parts = is_array($lines) && isset($lines[0]) ? preg_split('/\s+/', trim((string) $lines[0])) : false;
-    if (!is_array($parts) || count($parts) < 6 || array_shift($parts) !== 'cpu') return [];
+    $parts = pmssConfigLineColumns((string) ($lines[0] ?? ''), 6, []);
+    if ($parts === [] || array_shift($parts) !== 'cpu') return [];
 
     foreach ($parts as $value) {
         if (!is_string($value) || $value === '' || !ctype_digit($value)) return [];
@@ -121,8 +119,7 @@ function pmssSystemStatsDiskIoTimeFromRaw(?string $raw): array
     if ($raw === null) return $stats;
 
     foreach (preg_split('/\r?\n/', $raw) ?: [] as $line) {
-        $parts = preg_split('/\s+/', trim($line));
-        if (!is_array($parts) || count($parts) < 13) continue;
+        if (($parts = pmssConfigLineColumns($line, 13, [])) === []) continue;
         $name = $parts[2] ?? '';
         $ioTime = (string) ($parts[12] ?? '');
         if (pmssBlockDeviceNameIsDataDevice($name) && ctype_digit($ioTime)) {

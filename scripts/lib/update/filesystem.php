@@ -65,8 +65,7 @@ function pmssUpdateStep2PreflightChecks(?callable $logger = null, ?array $diskPa
  */
 function pmssFilesystemStatLineParse(string $line): ?array
 {
-    $parts = preg_split('/\s+/', trim($line));
-    if (!is_array($parts) || count($parts) < 3) {
+    if (($parts = pmssConfigLineColumns($line, 3, [])) === []) {
         return null;
     }
 

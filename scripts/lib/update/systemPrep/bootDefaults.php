@@ -65,7 +65,7 @@ function pmssBootDefaultsEnsureGrubOptions(array &$lines, array $requiredGrubOpt
         // Keep option placement backward-compatible while healing every managed line's quoting.
         if (!$found) {
             $found = true;
-            $currentOptions = pmssNonEmptyStrings(preg_split('/\s+/', trim($match[3])) ?: []);
+            $currentOptions = pmssConfigLineColumns($match[3], 0, []);
             foreach ($requiredGrubOptions as $option) {
                 if (!in_array($option, $currentOptions, true)) $currentOptions[] = $option;
             }

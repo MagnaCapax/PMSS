@@ -131,7 +131,7 @@ function pmssUserDockerUnitExecBinary(string $unit): ?string
         if ($command !== '' && $command[0] === '-') {
             $command = ltrim(substr($command, 1));
         }
-        $parts = $command === '' ? [] : preg_split('/\s+/', $command);
+        $parts = pmssConfigLineColumns($command, 1, []);
         return $parts && $parts[0] !== '' ? trim($parts[0], "\"'") : null;
     }
 

@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/runtime.php';
+
 /**
  * Normalize `quota -s` output so UI consumers always receive unit-suffixed
  * size fields in the quota data row.
@@ -28,13 +30,8 @@ function pmssQuotaSnapshotNormalizeHumanReadableOutput(string $content): string
  */
 function pmssQuotaSnapshotNormalizeHumanReadableLine(string $line): string
 {
-    $trimmed = trim($line);
-    if ($trimmed === '') {
-        return $line;
-    }
-
-    $tokens = preg_split('/\s+/', $trimmed);
-    if (!is_array($tokens) || count($tokens) < 4 || strpos($tokens[0], '/') !== 0) {
+    $tokens = pmssConfigLineColumns($line, 4, []);
+    if ($tokens === [] || strpos($tokens[0], '/') !== 0) {
         return $line;
     }
 

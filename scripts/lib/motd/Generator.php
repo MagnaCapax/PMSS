@@ -185,8 +185,8 @@ class Motd
         $iface = '';
         // Discover the primary interface via routing table, preferring route-get.
         foreach (['ip -o route get 1 2>/dev/null', 'ip route show default 2>/dev/null'] as $routeCommand) {
-            $route = preg_split('/\s+/', trim((string) shell_exec($routeCommand)));
-            $ifaceIndex = is_array($route) ? array_search('dev', $route, true) : false;
+            $route = pmssConfigLineColumns((string) shell_exec($routeCommand), 0, []);
+            $ifaceIndex = array_search('dev', $route, true);
             $iface = ($ifaceIndex !== false && isset($route[$ifaceIndex + 1])) ? $route[$ifaceIndex + 1] : '';
             if ($iface !== '') {
                 break;

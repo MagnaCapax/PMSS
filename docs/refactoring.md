@@ -53,6 +53,10 @@ Reject the refactor if any of these are true:
 
 ## Helper Extraction Rules
 
+Whitespace column parsing belongs in `pmssConfigLineColumns()` from the runtime
+library. Pass the existing minimum column count and `[]` for command output
+whose `#` tokens are data; keep field validation and failure reporting in callers.
+
 When a helper pattern reaches three similar implementations, extract the shared
 shape before shipping the third clone. The third implementation is the refactor
 trigger, not proof that a duplicated pattern should persist.

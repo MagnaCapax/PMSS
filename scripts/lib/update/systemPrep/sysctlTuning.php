@@ -131,8 +131,7 @@ function pmssSysctlSwapIsFast(): bool
             continue;
         }
 
-        $columns = preg_split('/\s+/', trim($line));
-        if (!is_array($columns) || !isset($columns[0]) || $columns[0] === '') {
+        if (($columns = pmssConfigLineColumns($line, 1, [])) === []) {
             continue;
         }
 
@@ -162,8 +161,8 @@ function pmssSysctlNicSpeedMbps(): int
             continue;
         }
 
-        $columns = preg_split('/\s+/', trim($line));
-        if (is_array($columns) && isset($columns[0], $columns[1]) && $columns[1] === '00000000') {
+        $columns = pmssConfigLineColumns($line, 2, []);
+        if ($columns !== [] && $columns[1] === '00000000') {
             $iface = pmssNetworkInterfaceNameNormalize((string) $columns[0], 15);
             if ($iface === '') {
                 continue;

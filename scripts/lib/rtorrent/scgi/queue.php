@@ -3,6 +3,8 @@
  * rTorrent Unix socket listen-queue helpers.
  */
 
+require_once dirname(__DIR__, 2).'/runtime.php';
+
 /**
  * Parse `ss -xln` output and return the queue depth for one Unix socket.
  *
@@ -16,8 +18,8 @@ function rtorrentScgiSocketQueueSnapshotFromLines(array $lines, string $socketPa
     }
 
     foreach ($lines as $line) {
-        $columns = preg_split('/\s+/', trim((string) $line));
-        if (!is_array($columns) || count($columns) < 5 || ($columns[1] ?? '') !== 'LISTEN') {
+        $columns = pmssConfigLineColumns((string) $line, 5, []);
+        if ($columns === [] || ($columns[1] ?? '') !== 'LISTEN') {
             continue;
         }
 
