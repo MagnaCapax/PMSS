@@ -76,7 +76,15 @@ function pmssShowResourcesMain(array $argv): int
         return pmssJsonEmitPayload(['users' => $rows, 'totals' => $totals, 'missing' => $missingStats], 'Failed to encode resource report JSON.');
     }
 
-    pmssShowResourcesPrintTextReport($rows, $totals, $missingStats, pmssCliOptionPresent($parsed, 'show-missing'));
+    $rowFormat = "%-14s %-12s %-12s %-11s %-14s %-9s %-6s %-10s %-8s\n";
+    printf($rowFormat, 'Username', 'IO Read/mo', 'IO Write/mo', 'CPU hrs/mo', 'RAM GB-hrs/mo', 'Mem Now', 'Procs', 'IO Ops/mo', 'IOPS/s');
+    foreach ($rows as $username => $row) { pmssShowResourcesPrintUsageRow($username, $row, $rowFormat); }
+    printf($rowFormat, '---', '---', '---', '---', '---', '---', '---', '---', '---');
+    pmssShowResourcesPrintUsageRow('Total', $totals, $rowFormat);
+    if (!empty($missingStats)) {
+        echo "* Missing resource stats for ".count($missingStats)." users (run resourceStats to rebuild).\n";
+        if (pmssCliOptionPresent($parsed, 'show-missing')) { echo "* Missing: ".implode(' ', $missingStats)."\n"; }
+    }
 
     return 0;
 }
@@ -109,17 +117,4 @@ function pmssShowResourcesPrintUsageRow(string $label, array $data, string $rowF
         pmssShowResourcesFormatIoOperations($monthOps),
         number_format($hourOps / 3600, 2)
     );
-}
-
-function pmssShowResourcesPrintTextReport(array $rows, array $totals, array $missingStats, bool $showMissing): void
-{
-    $rowFormat = "%-14s %-12s %-12s %-11s %-14s %-9s %-6s %-10s %-8s\n";
-    printf($rowFormat, 'Username', 'IO Read/mo', 'IO Write/mo', 'CPU hrs/mo', 'RAM GB-hrs/mo', 'Mem Now', 'Procs', 'IO Ops/mo', 'IOPS/s');
-    foreach ($rows as $username => $row) { pmssShowResourcesPrintUsageRow($username, $row, $rowFormat); }
-    printf($rowFormat, '---', '---', '---', '---', '---', '---', '---', '---', '---');
-    pmssShowResourcesPrintUsageRow('Total', $totals, $rowFormat);
-    if (!empty($missingStats)) {
-        echo "* Missing resource stats for ".count($missingStats)." users (run resourceStats to rebuild).\n";
-        if ($showMissing) { echo "* Missing: ".implode(' ', $missingStats)."\n"; }
-    }
 }

@@ -5,6 +5,24 @@ require_once dirname(__DIR__, 3).'/showTraffic.php';
 
 class ShowTrafficFormatTest extends TestCase
 {
+    public function testSortErrorsAndHelpPrecedenceKeepCliContract(): void
+    {
+        $help = $this->pmssRunRepoPhpScriptCommand('scripts/showTraffic.php', ['--help'])['output'];
+        foreach ([
+            [['--sort'], 2, 'Error: --sort expects a value.'],
+            [['--sort='], 2, 'Error: --sort expects a value.'],
+            [['--sort=bad'], 2, "Error: invalid --sort value: bad\n".$help],
+            [['--help', '--sort'], 0, $help],
+            [['--help', '--sort=bad'], 0, $help],
+            [['--help', '--color', '--no-color'], 0, $help],
+            [['--color', '--no-color'], 2, 'Error: --color and --no-color are mutually exclusive.'],
+        ] as [$args, $rc, $output]) {
+            $result = $this->pmssRunRepoPhpScriptCommand('scripts/showTraffic.php', $args);
+            $this->assertSame($rc, $result['rc']);
+            $this->assertSame($output, $result['output']);
+        }
+    }
+
     public function testFormatTrafficAmountCharacterizationAcrossUnits(): void
     {
         $twoTiBInMiB = 2 * 1024 * 1024;

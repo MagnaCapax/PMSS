@@ -16,9 +16,15 @@ function pmssShowTrafficMain(array $argv): int
     $asJson = pmssCliOptionPresent($parsed, 'json');
     $showMissing = pmssCliOptionPresent($parsed, 'show-missing');
     $extended = pmssCliOptionPresent($parsed, 'extended');
-    $sort = pmssShowTrafficSortOption($parsed, $helpExitCode);
-    if ($sort === null) {
+    $sortOption = pmssCliOption($parsed, 'sort', null, null);
+    if ($helpExitCode === null && $sortOption !== null && (!is_string($sortOption) || trim($sortOption) === '')) {
+        fwrite(STDERR, "Error: --sort expects a value.\n");
         return 2;
+    }
+    $sort = is_string($sortOption) ? strtolower(trim($sortOption)) : 'name';
+    if ($helpExitCode === null && !in_array($sort, ['name', 'month', 'pct', 'rate'], true)) {
+        fwrite(STDERR, "Error: invalid --sort value: {$sort}\n");
+        $helpExitCode = 2;
     }
     if ($helpExitCode !== null) {
         echo pmssCliHelpUsageOptions('showTraffic.php [--json] [--show-missing] [--extended] [--sort=<mode>]', [
@@ -30,7 +36,12 @@ function pmssShowTrafficMain(array $argv): int
     }
 
     if (pmssCliRejectMutuallyExclusiveOptions($parsed, ['color', 'no-color'], "Error: --color and --no-color are mutually exclusive.\n")) return 2;
-    $useColor = (!$asJson && $extended) ? pmssShowTrafficUseColor($parsed) : false;
+    $useColor = false;
+    if (!$asJson && $extended) {
+        $term = getenv('TERM'); $noColorEnv = getenv('NO_COLOR');
+        $useColor = pmssCliOptionPresent($parsed, 'color') || (!pmssCliOptionPresent($parsed, 'no-color')
+            && pmssStreamIsTty(STDOUT) && !in_array($term, [false, '', 'dumb'], true) && ($noColorEnv === false || $noColorEnv === ''));
+    }
 
     $statsDir = pmssRuntimeDir().'/trafficStats';
     $users = pmssShowTrafficUsersLoad(dirname(__DIR__, 2).'/listUsers.php', $statsDir);
@@ -43,7 +54,7 @@ function pmssShowTrafficMain(array $argv): int
     }
 
     if (!$asJson) {
-        pmssShowTrafficPrintLegend($extended);
+        echo $extended ? "Legend:\n\t USER: Traffic: Data Month / Limit  %  Stat  Bar        IN: Month  Ratio  DATARATES: Week MiB/s / Day MiB/s / Hour MiB/s / 15min MiB/s\n" : "Legend:\n\t USER: Traffic: Data Month / Week / Day  IN: Month  Ratio  DATARATES: Rate Week / Rate Day / Rate Hour / Rate 15min\n";
     }
 
     $report = pmssShowTrafficReportBuild($users, $statsDir);
@@ -55,37 +66,6 @@ function pmssShowTrafficMain(array $argv): int
     foreach ($report['rows'] as $row) { pmssShowTrafficPrintRow($row, $extended, $useColor); }
     pmssShowTrafficPrintSummary($extended, $showMissing, $report['missingStats'], count($report['baseUsers']), $report['overLimitCount'], $report['nearLimitCount'], $report['dataMonthTotal'], $report['dataMonthTotalLocal']);
     return 0;
-}
-
-function pmssShowTrafficSortOption(array $parsed, ?int &$helpExitCode): ?string
-{
-    $sortOption = pmssCliOption($parsed, 'sort', null, null);
-    if ($helpExitCode === null && $sortOption !== null) {
-        if (!is_string($sortOption) || trim($sortOption) === '') {
-            fwrite(STDERR, "Error: --sort expects a value.\n");
-            return null;
-        }
-    }
-    $sort = is_string($sortOption) ? strtolower(trim($sortOption)) : 'name';
-    if ($helpExitCode === null && !in_array($sort, ['name', 'month', 'pct', 'rate'], true)) {
-        fwrite(STDERR, "Error: invalid --sort value: {$sort}\n");
-        $helpExitCode = 2;
-    }
-    return $sort;
-}
-
-function pmssShowTrafficUseColor(array $parsed): bool
-{
-    if (pmssCliOptionPresent($parsed, 'color') || pmssCliOptionPresent($parsed, 'no-color')) {
-        return pmssCliOptionPresent($parsed, 'color');
-    }
-    $term = getenv('TERM'); $noColorEnv = getenv('NO_COLOR');
-    return pmssStreamIsTty(STDOUT) && !in_array($term, [false, '', 'dumb'], true) && ($noColorEnv === false || $noColorEnv === '');
-}
-
-function pmssShowTrafficPrintLegend(bool $extended): void
-{
-    echo $extended ? "Legend:\n\t USER: Traffic: Data Month / Limit  %  Stat  Bar        IN: Month  Ratio  DATARATES: Week MiB/s / Day MiB/s / Hour MiB/s / 15min MiB/s\n" : "Legend:\n\t USER: Traffic: Data Month / Week / Day  IN: Month  Ratio  DATARATES: Rate Week / Rate Day / Rate Hour / Rate 15min\n";
 }
 
 /** @return array<int,string>|null */
@@ -175,16 +155,13 @@ function pmssShowTrafficRowsSort(array &$rows, string $sort): void
 function pmssShowTrafficJsonPayload(array $rows, float $dataMonthTotal, float $dataMonthTotalLocal, array $baseUsers, array $baseUsersWithStats, int $overLimitCount, int $nearLimitCount, array $missingStats): array
 {
     return [
-        'users' => array_map('pmssShowTrafficJsonRow', $rows),
+        'users' => array_map(static function (array $row): array {
+            return ['user' => $row['user'], 'display' => pmssShowTrafficDisplayAmounts($row['rawMiB']), 'rates' => $row['rates'], 'inboundMonthMiB' => $row['inboundMonthMiB'], 'inboundOutboundRatio' => $row['inboundRatio'], 'limitMiB' => $row['limitMiB'], 'pctUsed' => ($row['pctUsed'] !== null) ? round($row['pctUsed'], 2) : null, 'overLimit' => $row['overLimit'], 'nearLimit' => $row['nearLimit'], 'rawMiB' => $row['rawMiB']];
+        }, $rows),
         'totals' => ['monthMiB' => round($dataMonthTotal, 2), 'monthLocalMiB' => round($dataMonthTotalLocal, 2), 'monthTiB' => round(($dataMonthTotal / 1024 / 1024), 2), 'monthLocalTiB' => round(($dataMonthTotalLocal / 1024 / 1024), 2)],
         'summary' => ['totalUsers' => count($baseUsers), 'usersWithStats' => count($baseUsersWithStats), 'overLimit' => $overLimitCount, 'nearLimit' => $nearLimitCount, 'missingStats' => count($missingStats)],
         'missingStatsUsers' => $missingStats,
     ];
-}
-
-function pmssShowTrafficJsonRow(array $row): array
-{
-    return ['user' => $row['user'], 'display' => pmssShowTrafficDisplayAmounts($row['rawMiB']), 'rates' => $row['rates'], 'inboundMonthMiB' => $row['inboundMonthMiB'], 'inboundOutboundRatio' => $row['inboundRatio'], 'limitMiB' => $row['limitMiB'], 'pctUsed' => ($row['pctUsed'] !== null) ? round($row['pctUsed'], 2) : null, 'overLimit' => $row['overLimit'], 'nearLimit' => $row['nearLimit'], 'rawMiB' => $row['rawMiB']];
 }
 
 function pmssShowTrafficPrintRow(array $row, bool $extended, bool $useColor): void
