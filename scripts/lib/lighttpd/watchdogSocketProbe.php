@@ -205,7 +205,9 @@ function pmssLighttpdWatchdogSocketFailureStatePath(string $username, string $ru
         return '';
     }
 
-    return $runtimeDir.'/checkLighttpdInstances-socket-'.$username.'.count';
+    $statePath = $runtimeDir.'/checkLighttpdInstances-socket-'.$username.'.count';
+    // Validate the marker itself before either recording or clearing failures.
+    return pmssPathTargetIsSafe($statePath, false) ? $statePath : '';
 }
 
 /**
@@ -224,7 +226,9 @@ function pmssLighttpdWatchdogRecordSocketFailure(string $username, array $option
     }
 
     $count = max(0, pmssReadRegularFileInt($statePath)) + 1;
-    if (@file_put_contents($statePath, (string) $count, LOCK_EX) === false) {
+    $encodedCount = (string) $count;
+    // A partial write must not authorize a destructive restart.
+    if (@file_put_contents($statePath, $encodedCount, LOCK_EX) !== strlen($encodedCount)) {
         return array('action' => 'wait', 'count' => 0, 'threshold' => $threshold);
     }
 

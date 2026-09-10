@@ -314,6 +314,89 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         );
     }
 
+    public function testSocketFailureStatePreservesRegularMarkerContract(): void
+    {
+        $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-regular-');
+        $statePath = \pmssLighttpdWatchdogSocketFailureStatePath('alice', $runtimeDir);
+        file_put_contents($statePath, '8');
+        chmod($statePath, 0640);
+
+        $this->assertSame(
+            array('action' => 'wait', 'count' => 9, 'threshold' => 10),
+            $this->recordSocketFailure($runtimeDir, 10)
+        );
+        $this->assertSame('9', file_get_contents($statePath));
+        $this->assertSame(
+            array('action' => 'restart', 'count' => 10, 'threshold' => 10),
+            $this->recordSocketFailure($runtimeDir, 10)
+        );
+        $this->assertSame('10', file_get_contents($statePath));
+        clearstatcache(true, $statePath);
+        $this->assertSame(0640, fileperms($statePath) & 0777);
+    }
+
+    public function testSocketFailureStateRejectsSymlinkMarkersWithoutChangingTargets(): void
+    {
+        // Cover both an existing foreign file and a dangling link's absent target.
+        foreach (array(false, true) as $targetExists) {
+            $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-symlink-');
+            $statePath = \pmssLighttpdWatchdogSocketFailureStatePath('alice', $runtimeDir);
+            $target = $runtimeDir.'/foreign';
+            if ($targetExists) {
+                file_put_contents($target, 'sentinel');
+            }
+            $this->assertTrue(symlink($target, $statePath));
+
+            $this->assertSame('', \pmssLighttpdWatchdogSocketFailureStatePath('alice', $runtimeDir));
+            $this->assertSame(
+                array('action' => 'wait', 'count' => 0, 'threshold' => 1),
+                $this->recordSocketFailure($runtimeDir, 1)
+            );
+            \pmssLighttpdWatchdogClearSocketFailure('alice', $this->socketFailureOptions($runtimeDir, 1));
+            $this->assertSame($target, readlink($statePath));
+            $this->assertSame($targetExists, file_exists($target));
+            if ($targetExists) {
+                $this->assertSame('sentinel', file_get_contents($target));
+            }
+        }
+    }
+
+    public function testSocketFailureStateRejectsNonRegularMarkers(): void
+    {
+        foreach (array('directory', 'fifo') as $type) {
+            $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-type-');
+            $statePath = \pmssLighttpdWatchdogSocketFailureStatePath('alice', $runtimeDir);
+            if ($type === 'directory') {
+                $this->assertTrue(mkdir($statePath));
+            } else {
+                if (!function_exists('posix_mkfifo')) {
+                    continue;
+                }
+                $this->assertTrue(posix_mkfifo($statePath, 0600));
+            }
+
+            // Reject the FIFO before file_put_contents can block waiting for a reader.
+            $this->assertSame('', \pmssLighttpdWatchdogSocketFailureStatePath('alice', $runtimeDir));
+            $this->assertSame(
+                array('action' => 'wait', 'count' => 0, 'threshold' => 1),
+                $this->recordSocketFailure($runtimeDir, 1)
+            );
+            \pmssLighttpdWatchdogClearSocketFailure('alice', $this->socketFailureOptions($runtimeDir, 1));
+            $this->assertSame($type === 'directory' ? 'dir' : 'fifo', filetype($statePath));
+        }
+    }
+
+    public function testSocketFailureStateCreatesMissingRuntimeDirectory(): void
+    {
+        $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-missing-').'/runtime';
+        $this->assertSame(
+            array('action' => 'wait', 'count' => 1, 'threshold' => 3),
+            $this->recordSocketFailure($runtimeDir, 3)
+        );
+        $statePath = \pmssLighttpdWatchdogSocketFailureStatePath('alice', $runtimeDir);
+        $this->assertSame('1', file_get_contents($statePath));
+    }
+
     public function testSocketFailureStateRejectsInvalidUsername(): void
     {
         $runtimeDir = $this->pmssMakeTempDir('lighttpd-socket-invalid-');

@@ -617,6 +617,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/cron/checkLighttpdInstances.php [<user>]
   - Behavior: Keeps per-user `lighttpd` and `php-cgi` healthy, regenerates missing configs, and refreshes per-user 502 pages while the web stack is unhealthy. A non-blocking runtime lock makes overlapping invocations skip cleanly.
+  - Socket failure markers: validates both the runtime directory and marker path before recording or clearing consecutive failures. Symlinks and non-regular markers remain untouched; an unsafe path or incomplete counter write retains the existing `wait` action with count zero and cannot authorize a socket-failure restart.
   - Socket health: An `ECONNREFUSED` result for a configured `php.socket-N` path is treated as stale-index drift when strict `ss -xln` parsing finds at least the configured number of live listeners under the same account's `.lighttpd` directory. Missing, malformed, or incomplete listener evidence retains the consecutive-failure restart gate.
   - Restart verification: after issuing a restart, retries the bounded `ss -xln` listener-coverage read through the shared command runner. Missing listeners emit `restart_attempted_still_down`; a failed probe emits `restart_attempted_unverified`. Both outcomes are log-only and never trigger another restart.
   - Behavior: Restarts the per-user lighttpd/php-cgi stack when the rendered config, `~/.lighttpd/custom`, or `~/.lighttpd/custom.d/*.conf` fragments are newer than the running lighttpd process.
