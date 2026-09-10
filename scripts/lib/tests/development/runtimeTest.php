@@ -384,9 +384,27 @@ class RuntimeTest extends TestCase
 
     public function testInheritedTtyCaptureKeepsResultShape(): void
     {
-        $result = \pmssCommandInheritedTtyCapture('/bin/bash -lc '.escapeshellarg('exit 5'), 'tty-shape-test', 0);
+        foreach ([0, 5, 42, 124, 137, 255] as $rc) {
+            $result = \pmssCommandInheritedTtyCapture('/bin/bash -c '.escapeshellarg('exit '.$rc), 'tty-shape-test', 2);
+            $this->assertSame(['rc' => $rc, 'stdout' => '', 'stderr' => '', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => false], $result);
+        }
+    }
 
-        $this->assertSame(['rc' => 5, 'stdout' => '', 'stderr' => '', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => false], $result);
+    /** Freeze independent channel tails, EOF handling, and ordinary timeout-shaped exit codes. */
+    public function testCommandCaptureChannelCharacterization(): void
+    {
+        foreach ([0, 1, 4, 8192, 20000] as $limit) {
+            $stdout = str_repeat('0123456789', 2000)."\0out\n";
+            $stderr = str_repeat('abcdefghij', 2000)."\0err\n";
+            $code = 'if (fread(STDIN, 1) !== "") exit(1); fwrite(STDOUT, '.var_export($stdout, true).'); fwrite(STDERR, '.var_export($stderr, true).'); exit(124);';
+            $command = escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code);
+            $result = \pmssCommandPipedCapture($command, 'channel-characterization', 2, $limit);
+            $this->assertSame([
+                'rc' => 124, 'stdout' => $limit > 0 ? substr($stdout, -$limit) : $stdout,
+                'stderr' => $limit > 0 ? substr($stderr, -$limit) : $stderr,
+                'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => false,
+            ], $result);
+        }
     }
 
     public function testProcessCloseExitCodeUsesObservedStatusAfterPolling(): void

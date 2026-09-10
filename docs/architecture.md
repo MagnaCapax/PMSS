@@ -26,6 +26,12 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/runtime/commands.php** – Stable command facade. `commandProcess.php`
+  owns launch/retry/reaping for both I/O modes; `commandPipes.php` drains output,
+  `commandTimeout.php` retains ADR 0035 deadlines and group signals,
+  `commandEnvironment.php` builds shell environments, and `commandDiagnostics.php`
+  reports fork exhaustion. Only piped commands receive process-group wrapping;
+  inherited terminals keep their foreground group and empty capture buffers.
 - **scripts/lib/update/environment.php** – dpkg/apt guards plus helper to apply release-specific package selections.
 - **scripts/lib/update/filesystem.php** – warning-only filesystem preflights, including `/home` inode density detection for media-stack-heavy hosts.
 - **scripts/lib/update/arrRootExecutionBlock.php** – occupies `/root/.config/<App>` with a regular file so a root launch cannot create its data directory and aborts before binding; leftover config directories are moved aside, never deleted. Root has no legitimate Servarr instance, and `/opt` stays fully usable by customers (ADR 0034). Backstopped by **scripts/lib/arrRootGuard.php**, which the every-2-minute media-stack cron uses to kill root-owned `/opt/<App>/` processes and any known ARR process holding its default listener.
