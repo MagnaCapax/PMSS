@@ -18,7 +18,7 @@ class CodexLaunchersTest extends CodexLauncherTestCase
             $args[] = '--dry-run';
             $result = $this->launch($entry, $args);
             $this->assertSame(0, $result['rc'], $entry.': '.$result['output']);
-            $this->assertStringContainsAllStrings(['model="gpt-6-astra"', 'model_reasoning_effort="xhigh"'], $result['output']);
+            $this->assertStringContainsAllStrings(['model="gpt-6-astra"', 'model_reasoning_effort="medium"'], $result['output']);
         }
         $this->assertFalse(file_exists($this->tempDir.'/assistant.json'));
         $this->assertSame(12, count(glob($this->launcherRoot.'/log/codex-run/*/*.jsonl')));

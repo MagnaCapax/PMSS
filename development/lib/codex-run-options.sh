@@ -19,7 +19,7 @@ Options:
   --prompt TEXT       Inline prompt text instead of a file
   --context PATH      Append extra context files (repeatable)
   --exec CMD          Assistant command line (default: codex exec ##PROMPT_STDIN##)
-                      Codex defaults: gpt-6-astra, xhigh reasoning
+                      Codex defaults: gpt-6-astra, medium reasoning
   --event-log PATH    JSONL event log output path (default: log/codex-run/DATE/RUN.jsonl)
   --outdir DIR        Output directory for prompt + artifacts (default: temp dir)
   --dry-run           Build prompt and show the command without invoking

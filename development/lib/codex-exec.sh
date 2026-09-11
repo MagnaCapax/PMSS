@@ -8,7 +8,7 @@ codex_prepare_invocation() {
 	[[ "${exec_bin##*/}" == "codex" ]] || return 0
 	# Repeated config keys are evaluated in order; explicit CLI options/configs win.
 	# Config defaults avoid duplicate --sandbox/-s options or bypass-flag conflicts.
-	defaults="$exec_bin -c 'model=\"gpt-6-astra\"' -c 'model_reasoning_effort=\"xhigh\"'"
+	defaults="$exec_bin -c 'model=\"gpt-6-astra\"' -c 'model_reasoning_effort=\"medium\"'"
 	if [[ "${PMSS_CODEX_NO_SANDBOX:-0}" != "1" ]]; then
 		if [[ "$exec_cmd" == "$exec_bin" ]]; then
 			sandbox_mode=workspace-write
