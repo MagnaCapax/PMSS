@@ -80,6 +80,12 @@ Workflow (Do This Now):
     less restrictive (removing it, lowering a threshold, widening allowed values, making
     an exception into a warning, or making a guard optional) — the root fix belongs in
     the component that produces the non-conforming input, not in the downstream validator
+  NOT a skip reason: an open design choice (a percentile, window, threshold, default value,
+  config placement, refresh cadence) when the issue thread already carries a documented
+  default or a converged investigation/review answer. Implement the documented default
+  behind config, name the choice in the commit message, and let review adjust the number.
+  A design knob is neither "external access" nor an "operator decision" — five build
+  sessions on one issue posted BLOCKED on knobs its thread had already resolved.
   Note why you skipped it.
 - BLOCKED ISSUE FEEDBACK (important — enables autonomous cycle health):
   When you skip an issue, FIRST check its existing comments — if a previous
