@@ -1111,7 +1111,7 @@ if (!function_exists('pmssWelcomeHttpContextCreate')) {
   * Build the standard remote-request context used by PMSS GUI pages.
   */
  function pmssWelcomeHttpContextCreate() {
-  return stream_context_create(array('http' => array('timeout' => 5, 'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)')));
+  return stream_context_create(array('http' => array('timeout' => 5, 'follow_location' => 0, 'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)')));
  }
 }
 

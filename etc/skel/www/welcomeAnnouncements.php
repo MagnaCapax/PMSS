@@ -59,7 +59,14 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
             continue;
         }
 
-        $itemsHtml .= '<li>('.date('d/m', strtotime((string) $thisItem->pubDate)).') <a href="'.(string) $thisItem->link.'" target="_blank">'
+        // Third-party feed items can carry a hostile link. Restrict the scheme to http(s) and
+        // escape the href exactly as the title already is (CWE-79).
+        $itemLink = (string) $thisItem->link;
+        if (!preg_match('#^https?://#i', $itemLink)) {
+            continue;
+        }
+
+        $itemsHtml .= '<li>('.date('d/m', strtotime((string) $thisItem->pubDate)).') <a href="'.pmssCustomerHtmlAttr($itemLink).'" target="_blank">'
             .pmssCustomerHtmlAttr($thisItem->title)."</a></li>\n";
         if (++$renderedItems === 4) {
             break;
