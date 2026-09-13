@@ -72,8 +72,6 @@ function pmssUserWatchdogProcessRunning(string $username, string $processName): 
     return $exitCode === 0 && $pids !== array();
 }
 
-function pmssUserWatchdogSuCommand(string $username, string $innerCommand): string { return pmssBuildUserServiceShellCommand($username, $innerCommand); }
-
 /** Acquire a watchdog lock without leaking its descriptor into service daemons. */
 function pmssUserWatchdogLockAcquire(string $path)
 {
@@ -82,12 +80,6 @@ function pmssUserWatchdogLockAcquire(string $path)
         pmssLockHandleExportChildCloseFds($handle);
     }
     return $handle;
-}
-
-/** Read a watchdog-owned local TCP port, failing closed on malformed files. */
-function pmssUserWatchdogLocalPortRead(string $path): ?int
-{
-    return pmssReadRegularFileNetworkPort($path);
 }
 
 /** Return the oldest /proc start marker for exact process-name matches. */

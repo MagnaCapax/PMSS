@@ -88,7 +88,7 @@ function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null
     $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => $stdout, 'stderr' => $stderr];
     if ($exitCode !== 0) {
         $excerpt = trim($stderr);
-        $excerpt = $excerpt !== '' ? ' :: '.preg_replace('/\s+/', ' ', substr($excerpt, 0, 300)) : '';
+        $excerpt = $excerpt !== '' ? ' :: '.pmssLogWhitespaceCollapse(substr($excerpt, 0, 300)) : '';
         if ($timedOut) {
             $msg = ($isInteractive ? "\033[1;31m[TIMEOUT]\033[0m " : '[TIMEOUT] ')
                 .'Command timed out after '.$timeoutSec.'s: '.$cmd;

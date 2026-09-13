@@ -11,27 +11,6 @@ require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../storageHealth.php';
 require_once __DIR__.'/reportTable.php';
 
-/** @return array{0:array<int,array<string,mixed>>,1:array<int,array<string,mixed>>,2:string} */
-function pmssStorageHealthReportEntries(string $jsonPath): array
-{
-    $disks = [];
-    $raid = [];
-    $latestTs = '';
-    foreach (pmssStorageHealthReadLastEntries($jsonPath) as $entry) {
-        $ts = (string) ($entry['timestamp'] ?? '');
-        $kind = (string) ($entry['kind'] ?? '');
-        if ($ts !== '' && ($latestTs === '' || strcmp($ts, $latestTs) > 0)) {
-            $latestTs = $ts;
-        }
-        if ($kind === 'raid') {
-            $raid[] = $entry;
-        } elseif ($kind === 'smart' || $kind === 'nvme') {
-            $disks[] = $entry;
-        }
-    }
-    return [$disks, $raid, $latestTs];
-}
-
 /** @param array<int,array<string,mixed>> $entries @return array<int,array<string,mixed>> */
 function pmssStorageHealthReportFilter(array $entries, ?string $deviceFilter, bool $onlyProblems): array
 {
@@ -99,7 +78,22 @@ function pmssStorageHealthReportMain(array $argv): int
         return pmssCliReturnWithStderr("No snapshot file found at {$jsonPath}\n");
     }
 
-    [$disks, $raid, $latestTs] = pmssStorageHealthReportEntries($jsonPath);
+    // Retain encounter order per kind and include unknown kinds in the latest timestamp.
+    $disks = [];
+    $raid = [];
+    $latestTs = '';
+    foreach (pmssStorageHealthReadLastEntries($jsonPath) as $entry) {
+        $ts = (string) ($entry['timestamp'] ?? '');
+        $kind = (string) ($entry['kind'] ?? '');
+        if ($ts !== '' && ($latestTs === '' || strcmp($ts, $latestTs) > 0)) {
+            $latestTs = $ts;
+        }
+        if ($kind === 'raid') {
+            $raid[] = $entry;
+        } elseif ($kind === 'smart' || $kind === 'nvme') {
+            $disks[] = $entry;
+        }
+    }
     $onlyProblems = pmssCliOptionPresent($parsed, 'only-problems');
     $disks = pmssStorageHealthReportFilter($disks, pmssCliOptionString($parsed, 'device', null, null), $onlyProblems);
     $raid = pmssStorageHealthReportFilter($raid, null, $onlyProblems);

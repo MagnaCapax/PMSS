@@ -70,7 +70,10 @@ function pmssFilesystemStatLineParse(string $line): ?array
     }
 
     foreach ([$parts[0], $parts[1], $parts[2]] as $value) {
-        if (!ctype_digit((string) $value) || (int) $value <= 0) {
+        // Integer casts saturate on overflow; preserve leading-zero support.
+        if (!ctype_digit((string) $value) || (int) $value <= 0
+            || (string) (int) $value !== ltrim($value, '0')
+        ) {
             return null;
         }
     }
@@ -86,12 +89,16 @@ function pmssFilesystemStatLineParse(string $line): ?array
 function pmssFilesystemBytesPerInode(array $stats): ?float
 {
     foreach (['block_size', 'blocks', 'inodes'] as $key) {
-        if (!isset($stats[$key]) || !is_numeric($stats[$key]) || (float) $stats[$key] <= 0.0) {
+        if (!isset($stats[$key]) || !is_numeric($stats[$key])
+            || !is_finite((float) $stats[$key]) || (float) $stats[$key] <= 0.0
+        ) {
             return null;
         }
     }
 
-    return ((float) $stats['block_size'] * (float) $stats['blocks']) / (float) $stats['inodes'];
+    $density = ((float) $stats['block_size'] * (float) $stats['blocks']) / (float) $stats['inodes'];
+    // Finite operands can still overflow or underflow during arithmetic.
+    return is_finite($density) && $density > 0.0 ? $density : null;
 }
 
 /** Format a bytes-per-inode value for concise operator logs. */
@@ -128,13 +135,15 @@ function pmssHomeInodeDensityCheck(
     $line = strtok($stdout, "\r\n");
     $stats = pmssFilesystemStatLineParse(is_string($line) ? $line : '');
     $bytesPerInode = $stats !== null ? pmssFilesystemBytesPerInode($stats) : null;
-    if ($stats === null || $bytesPerInode === null) {
+    $roundedBytesPerInode = $bytesPerInode !== null ? round($bytesPerInode) : null;
+    // Use the exactly representable exclusive integer bound before casting.
+    if ($stats === null || $bytesPerInode === null || $roundedBytesPerInode >= -(float) PHP_INT_MIN) {
         $log('[WARN] Unable to parse home inode density from stat output for '.$path);
         pmssLogJson(['event' => 'home_inode_density', 'status' => 'warn', 'path' => $path, 'reason' => 'parse_failed']);
         return;
     }
 
-    $roundedBytesPerInode = (int) round($bytesPerInode);
+    $roundedBytesPerInode = (int) $roundedBytesPerInode;
     $status = $roundedBytesPerInode > $warnThresholdBytes ? 'warn' : 'ok';
     pmssLogJson([
         'event'           => 'home_inode_density',

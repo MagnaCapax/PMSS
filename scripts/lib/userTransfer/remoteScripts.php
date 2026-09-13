@@ -25,6 +25,13 @@ function pmssUserTransferBuildSshCommand(string $remoteUser, array $extraOptions
     ], $extraOptions, ['-l '.escapeshellarg($remoteUser)]));
 }
 
+/** Build a probe command for validated transfer config; callers own script headers and redirection. */
+function pmssUserTransferBuildSshProbeCommand(array $cfg, string $remoteCommand): string
+{
+    return pmssUserTransferBuildSshCommand($cfg['remoteUser'], ['-o ConnectTimeout=20', '-o NumberOfPasswordPrompts=1'])
+        .' '.escapeshellarg($cfg['hostname']).' '.escapeshellarg($remoteCommand);
+}
+
 function pmssUserTransferBuildRsyncCommand(
     array $cfg,
     array $sources,
@@ -72,10 +79,7 @@ function pmssUserTransferBuildRsyncFinal(array $cfg): string
 
 function pmssUserTransferBuildAuthProbe(array $cfg): string
 {
-    return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshCommand(
-        $cfg['remoteUser'],
-        ['-o ConnectTimeout=20', '-o NumberOfPasswordPrompts=1']
-    ).' '.escapeshellarg($cfg['hostname']).' '.escapeshellarg('/bin/true')."\n";
+    return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshProbeCommand($cfg, '/bin/true')."\n";
 }
 
 function pmssUserTransferBuildExpectWrapper(): string

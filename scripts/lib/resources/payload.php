@@ -9,24 +9,18 @@ function pmssResourceReportTemplate(): array
     return array_fill_keys(ResourceStatsAccumulator::RAW_METRICS, $windows) + ['memory' => ['current' => 0.0, 'avg_month' => 0.0], 'tasks' => ['current' => 0.0]];
 }
 
-/** Normalize scalar metric values while rejecting malformed persisted/fallback data. */
-function pmssResourceMetricValueNormalize($value): ?float { return is_numeric($value) ? (float) $value : null; }
-
-/** Return metrics shared by resource snapshot rows and fallback calculations. */
-function pmssResourceSnapshotMetricKeys(): array { return array_merge(ResourceStatsAccumulator::RAW_METRICS, ResourceStatsAccumulator::AVERAGE_METRICS); }
-
-/** Read a stored payload metric window, defaulting missing ops windows to zero. */
+/** Normalize a stored metric window, rejecting malformed values and defaulting missing ops to zero. */
 function pmssResourceStoredPayloadWindowValue(array $data, string $metric, string $window): ?float
 {
     $value = $data[$metric]['raw'][$window] ?? (substr($metric, -4) === '_ops' ? 0.0 : null);
-    return $value !== null ? pmssResourceMetricValueNormalize($value) : null;
+    return $value !== null && is_numeric($value) ? (float) $value : null;
 }
 
 /** Read all metrics for a stored payload window. */
 function pmssResourceStoredPayloadWindowMetrics(array $data, string $window): ?array
 {
     $metrics = [];
-    foreach (pmssResourceSnapshotMetricKeys() as $key) {
+    foreach (array_merge(ResourceStatsAccumulator::RAW_METRICS, ResourceStatsAccumulator::AVERAGE_METRICS) as $key) {
         if (($metrics[$key] = pmssResourceStoredPayloadWindowValue($data, $key, $window)) === null) return null;
     }
     return $metrics;

@@ -68,6 +68,9 @@ class ShowResourcesFormatTest extends TestCase
     public function testUserFilteredOutputFormatsLargeByteAndIoOperationSuffixes(): void
     {
         foreach ([
+            [['io_read_ops' => $this->pmssBuildWindowValues(960)], '1.00 K ops'],
+            [['io_read_ops' => $this->pmssBuildWindowValues(9960)], '10.0 K ops'],
+            [['io_read_ops' => $this->pmssBuildWindowValues(999999960)], '1.00 B ops'],
             [
                 ['io_read' => $this->pmssBuildWindowValues(2 * 1024 * 1024 * 1024 * 1024, 1, 1, 1)],
                 '2.00 TiB',

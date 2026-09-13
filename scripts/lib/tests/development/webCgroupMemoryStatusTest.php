@@ -41,6 +41,51 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->assertSame($dir, \pmssWebCgroupMemoryStatusDetectDir(['cgroup_dir' => $dir]));
     }
 
+    public function testFormatBytesRejectsNonFiniteValues(): void
+    {
+        foreach ([INF, -INF, NAN, '1e999', str_repeat('9', 400), [], new \stdClass()] as $value) {
+            $this->assertSame('n/a', \pmssWebCgroupMemoryStatusFormatBytes($value));
+        }
+        foreach ([['0001024', '1.0 KiB'], [1024.5, '1.0 KiB']] as [$value, $expected]) {
+            $this->assertSame($expected, \pmssWebCgroupMemoryStatusFormatBytes($value));
+        }
+    }
+
+    public function testMemoryStatParserSkipsInvalidCountersWithoutLosingValidFields(): void
+    {
+        foreach (['total_rss', 'total_cache', 'anon', 'file'] as $field) {
+            $key = in_array($field, ['total_rss', 'anon'], true) ? 'anon' : 'file';
+            foreach (['', '-1', '1.5', '1e999', 'INF', "1\0x", str_repeat('9', 400)] as $value) {
+                $this->assertSame([], \pmssWebCgroupMemoryStatusMemoryStatBreakdownParse($field.' '.$value));
+                $this->assertSame([$key => 42.0], \pmssWebCgroupMemoryStatusMemoryStatBreakdownParse(
+                    $field." 42\n".$field.' '.$value
+                ));
+            }
+            foreach (['0', '00042', '18446744073709551615'] as $value) {
+                $this->assertSame([$key => (float) $value], \pmssWebCgroupMemoryStatusMemoryStatBreakdownParse($field.' '.$value));
+            }
+        }
+        foreach ([null, [], 42, ''] as $raw) {
+            $this->assertSame([], \pmssWebCgroupMemoryStatusMemoryStatBreakdownParse($raw));
+        }
+    }
+
+    public function testReadFallsBackToCurrentWhenV1AnonymousCounterOverflows(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-overflow-');
+        $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "100\n");
+        $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "400\n");
+        $this->pmssWriteFile($dir.'/memory.stat', 'total_rss '.str_repeat('9', 400)."\ntotal_cache 50\n");
+
+        // Disable UID fallback so the fixture never reads the host's account counters.
+        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => -1]);
+        $this->pmssAssertArraySubsetSame([
+            'pressure_usage_percent' => 25.0,
+            'status' => 'LOW',
+        ], $status);
+        $this->assertTrue(is_string(json_encode($status)));
+    }
+
     public function testDetectDirRejectsControllerlessUnifiedSlice(): void
     {
         $unifiedDir = $this->pmssMakeTempDir('pmss-web-cgroup-unified-');

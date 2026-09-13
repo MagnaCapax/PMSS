@@ -54,6 +54,66 @@ class HomeInodeDensityTest extends TestCase
         }
     }
 
+    public function testPreservesPaddedCountersAndIntegerBoundary(): void
+    {
+        foreach (['1', '0001', '4096', (string) PHP_INT_MAX, '000'.PHP_INT_MAX] as $value) {
+            $expected = array_fill_keys(['block_size', 'blocks', 'inodes'], (int) $value);
+            $this->assertSame($expected, \pmssFilesystemStatLineParse("\t$value  $value\t$value extra\r\n"));
+        }
+    }
+
+    public function testRejectsOverflowInEveryStatCounter(): void
+    {
+        $tooLarge = substr((string) PHP_INT_MAX, 0, -1).'8';
+        foreach ([$tooLarge, '000'.$tooLarge, PHP_INT_MAX.'0', str_repeat('9', 400)] as $value) {
+            foreach ([0, 1, 2] as $index) {
+                $parts = ['4096', '1024', '128'];
+                $parts[$index] = $value;
+                $this->assertSame(null, \pmssFilesystemStatLineParse(implode(' ', $parts)));
+            }
+        }
+    }
+
+    public function testRejectsInvalidAndNonFiniteDensityOperands(): void
+    {
+        $valid = ['block_size' => 4096, 'blocks' => 1024, 'inodes' => 128];
+        foreach (array_keys($valid) as $key) {
+            $missing = $valid;
+            unset($missing[$key]);
+            $this->assertSame(null, \pmssFilesystemBytesPerInode($missing));
+            foreach ([null, '', 'bad', [], true, 0, -1, NAN, INF, -INF, '1e309', '1e-999'] as $value) {
+                $this->assertSame(null, \pmssFilesystemBytesPerInode([$key => $value] + $valid));
+            }
+        }
+    }
+
+    public function testDensityArithmeticRejectsOverflowAndUnderflow(): void
+    {
+        foreach ([[PHP_FLOAT_MAX, 2, 1], [1, 1, 1e-309], [1e-300, 1e-300, 1], [1e-300, 1, 1e300]] as $values) {
+            $stats = array_combine(['block_size', 'blocks', 'inodes'], $values);
+            $this->assertSame(null, \pmssFilesystemBytesPerInode($stats));
+        }
+    }
+
+    public function testPreservesFiniteDensityCalculations(): void
+    {
+        foreach ([1, '1', '001', 1.5, '1e3', 1e-100, (float) PHP_INT_MAX / 2] as $value) {
+            $stats = ['block_size' => $value, 'blocks' => 1, 'inodes' => 1];
+            $this->assertSame((float) $value, \pmssFilesystemBytesPerInode($stats));
+        }
+    }
+
+    public function testUnrepresentableStatOutputRetainsParseWarning(): void
+    {
+        // A wrapped integer must never turn an extreme density into an OK result.
+        $overflow = PHP_INT_MAX.'0';
+        foreach (["$overflow 1 1", "1 $overflow 1", "1 1 $overflow", PHP_INT_MAX.' 2 1', PHP_INT_MAX.' '.PHP_INT_MAX.' 1'] as $line) {
+            $messages = $this->runHomeInodeDensityCheckWithStat([$line], 'pmss-inode-overflow-');
+            $this->assertSame(1, count($messages));
+            $this->pmssAssertMessagesContain($messages, '[WARN] Unable to parse home inode density from stat output');
+        }
+    }
+
     public function testLogsOkWhenInodeDensityIsBelowThreshold(): void
     {
         $messages = $this->runHomeInodeDensityCheckWithStat(['4096 1024 128'], 'pmss-inode-ok-');

@@ -6,6 +6,20 @@ require_once dirname(__DIR__, 3).'/motd/Generator.php';
 
 class MotdRenderTest extends TestCase
 {
+    public function testNetworkFallbackAndWarningBytes(): void
+    {
+        foreach (['', 'unknown', ' N/A ', ' 1000Mb/s ', '0'] as $speed) {
+            $model = ['netSpeed' => $speed, 'storageWarn' => 'disk warning'];
+            $template = "%NETWORK_SPEED%\nRuntime Version: old\n%UNRECOGNIZED%";
+            foreach ([false, true] as $color) {
+                $net = in_array(strtolower(trim($speed)), ['', 'unknown', 'n/a'], true)
+                    ? "\e[33mUnknown\e[0m" : "\e[32m".trim($speed)."\e[0m";
+                $this->assertSame(($color ? $net : $speed).($color || $speed !== '' ? "\n" : '')."\n%UNRECOGNIZED%\n\e[33mStorage WARN:\e[0m disk warning\n",
+                    \Motd::renderMotdTemplate($template, $model, $color));
+            }
+        }
+    }
+
     private function motdModel(array $overrides = []): array
     {
         return array_merge([

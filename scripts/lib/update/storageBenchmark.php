@@ -54,8 +54,7 @@ function pmssStorageBenchmarkPostInstallCommand(): string
 /** Sanitize one benchmark output line before mirroring it into the update log. */
 function pmssStorageBenchmarkPostInstallLogLine(string $line): string
 {
-    $line = preg_replace('/[[:cntrl:]]+/', ' ', $line);
-    $line = trim(is_string($line) ? $line : '');
+    $line = trim(pmssLogControlCharactersReplace($line));
     return strlen($line) > 1000 ? substr($line, 0, 1000).' ...' : $line;
 }
 

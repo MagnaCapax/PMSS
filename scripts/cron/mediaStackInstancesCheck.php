@@ -32,8 +32,7 @@ $pmssMediaStackInstancesLock = pmssCronLockAcquire('mediaStackInstancesCheck', s
 
 $result = pmssListManagedUsersResult('/scripts/listUsers.php');
 if ((int) $result['exitCode'] !== 0) {
-    fwrite(STDERR, 'Error: listUsers.php failed; aborting media-stack check.'.PHP_EOL);
-    exit((int) $result['exitCode']);
+    exit(pmssCliReturnWithStderr('Error: listUsers.php failed; aborting media-stack check.'.PHP_EOL, (int) $result['exitCode']));
 }
 
 $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');

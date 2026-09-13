@@ -3,6 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../../cgroup/directApply.php';
+require_once __DIR__.'/../../cgroup/policy.php';
 
 /**
  * Source-level guards for the direct cgroup-v1 IOPS writer.
@@ -15,6 +16,30 @@ require_once __DIR__.'/../../cgroup/directApply.php';
  */
 final class CgroupIopsLimitApplySafetyTest extends TestCase
 {
+    public function testMajorMinorGuardConsumesTheEntireWriteToken(): void
+    {
+        foreach (['0:0', '8:0', '259:65535', '008:000', '4294967295:4294967295'] as $token) {
+            $this->assertTrue(\pmssCgroupPolicyMajorMinorIsValid($token));
+        }
+        foreach (["8:0\n", "8:0\r\n", "8:0\r", "8:0\0", "\n8:0", '8:0 ',
+            "8:0\n8:1", '8:0 100', '', '8:', ':0', '-8:0', '8:0.5'] as $token) {
+            $this->assertFalse(\pmssCgroupPolicyMajorMinorIsValid($token), json_encode($token));
+        }
+    }
+
+    public function testMajorMinorResolverPreservesSysfsLineNormalization(): void
+    {
+        // Sysfs returns a newline-terminated record; normalization belongs at the read boundary.
+        foreach (['8:0', "8:0\n", "8:0\r\n", " 8:0\n", "\t8:0\n"] as $raw) {
+            $this->assertSame('8:0', \pmssCgroupPolicyDeviceMajorMinorResolve('/dev/sda',
+                static function (string $path) use ($raw): string { return $raw; }));
+        }
+        foreach (['', 'error', "8:0\n8:1", '8:', '8:0 100'] as $raw) {
+            $this->assertSame(null, \pmssCgroupPolicyDeviceMajorMinorResolve('/dev/sda',
+                static function (string $path) use ($raw): string { return $raw; }));
+        }
+    }
+
     public function testCronSourceSafetyContracts(): void
     {
         $this->pmssAssertRepoFileContract('scripts/cron/cgroupIopsLimitApply.php', [

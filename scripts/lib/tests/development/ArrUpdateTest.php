@@ -129,13 +129,10 @@ class ArrUpdateTest extends TestCase
     public function testUpdateRejectsUnsafeExtractDirectoryBeforeFetchingMetadata(): void
     {
         $baseDir = $this->pmssMakeTempDir('pmss-arr-update-unsafe-extract-');
-        $output = '';
 
         try {
-            $this->pmssWithEnv([], function () use ($baseDir, &$output): void {
-                list(, $output) = $this->pmssCaptureStdout(function () use ($baseDir): void {
-                    $this->runArrUpdate('PmssArrUnsafeExtract', $baseDir.'/install', $baseDir.'/missing-releases.json', '../PackageDir');
-                });
+            list(, $output) = $this->pmssCaptureStdout(function () use ($baseDir): void {
+                $this->runArrUpdate('PmssArrUnsafeExtract', $baseDir.'/install', $baseDir.'/missing-releases.json', '../PackageDir');
             });
 
             $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: extract_dir'], ['Unable to fetch release metadata'], $output);
@@ -147,13 +144,10 @@ class ArrUpdateTest extends TestCase
     public function testUpdateRejectsUnsafeInstallPathBeforeFetchingMetadata(): void
     {
         $baseDir = $this->pmssMakeTempDir('pmss-arr-update-unsafe-install-');
-        $output = '';
 
         try {
-            $this->pmssWithEnv([], function () use ($baseDir, &$output): void {
-                list(, $output) = $this->pmssCaptureStdout(function () use ($baseDir): void {
-                    $this->runArrUpdate('PmssArrUnsafeInstall', $baseDir.'/../install', $baseDir.'/missing-releases.json', 'PackageDir');
-                });
+            list(, $output) = $this->pmssCaptureStdout(function () use ($baseDir): void {
+                $this->runArrUpdate('PmssArrUnsafeInstall', $baseDir.'/../install', $baseDir.'/missing-releases.json', 'PackageDir');
             });
 
             $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: install_path'], ['Unable to fetch release metadata'], $output);
@@ -164,12 +158,8 @@ class ArrUpdateTest extends TestCase
 
     public function testUpdateRejectsTopLevelInstallPathBeforeFetchingMetadata(): void
     {
-        $output = '';
-
-        $this->pmssWithEnv([], function () use (&$output): void {
-            list(, $output) = $this->pmssCaptureStdout(function (): void {
-                $this->runArrUpdate('PmssArrUnsafeTopLevel', '/opt', '/tmp/pmss-arr-missing-releases.json', 'PackageDir');
-            });
+        list(, $output) = $this->pmssCaptureStdout(function (): void {
+            $this->runArrUpdate('PmssArrUnsafeTopLevel', '/opt', '/tmp/pmss-arr-missing-releases.json', 'PackageDir');
         });
 
         $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: install_path'], ['Unable to fetch release metadata'], $output);
@@ -179,14 +169,11 @@ class ArrUpdateTest extends TestCase
     {
         $baseDir = $this->pmssMakeTempDir('pmss-arr-update-symlink-install-');
         $link = sys_get_temp_dir().'/pmss-arr-update-link-'.bin2hex(random_bytes(3));
-        $output = '';
 
         try {
             $this->pmssCreateSymlinkOrSkip($baseDir, $link);
-            $this->pmssWithEnv([], function () use ($link, &$output): void {
-                list(, $output) = $this->pmssCaptureStdout(function () use ($link): void {
-                    $this->runArrUpdate('PmssArrUnsafeSymlink', $link.'/install', $link.'/missing-releases.json', 'PackageDir');
-                });
+            list(, $output) = $this->pmssCaptureStdout(function () use ($link): void {
+                $this->runArrUpdate('PmssArrUnsafeSymlink', $link.'/install', $link.'/missing-releases.json', 'PackageDir');
             });
 
             $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: install_path'], ['Unable to fetch release metadata'], $output);
@@ -200,14 +187,11 @@ class ArrUpdateTest extends TestCase
     {
         $baseDir = $this->pmssMakeTempDir('pmss-arr-update-file-install-');
         $installPath = $baseDir.'/install';
-        $output = '';
 
         try {
             @file_put_contents($installPath, 'not a directory');
-            $this->pmssWithEnv([], function () use ($installPath, $baseDir, &$output): void {
-                list(, $output) = $this->pmssCaptureStdout(function () use ($installPath, $baseDir): void {
-                    $this->runArrUpdate('PmssArrUnsafeFile', $installPath, $baseDir.'/missing-releases.json', 'PackageDir');
-                });
+            list(, $output) = $this->pmssCaptureStdout(function () use ($installPath, $baseDir): void {
+                $this->runArrUpdate('PmssArrUnsafeFile', $installPath, $baseDir.'/missing-releases.json', 'PackageDir');
             });
 
             $this->assertStringContainsAndOmitsStrings(['Invalid updater configuration: install_path'], ['Unable to fetch release metadata'], $output);
@@ -225,14 +209,11 @@ class ArrUpdateTest extends TestCase
         $archivePath = $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'new']);
         $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
         $shimDir = $this->writeCurlShim($baseDir);
-        $output = '';
 
         try {
-            $this->pmssWithPathPrefix($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir, &$output): void {
-                list(, $output) = $this->pmssCaptureStdout(function () use ($app, $installPath, $metadataPath, $extractDir): void {
-                    $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
-                });
-            });
+            list(, $output) = $this->pmssCaptureStdout(function () use ($app, $installPath, $metadataPath, $extractDir): void {
+                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
+            }, $this->pmssPathPrefixedEnvironment($shimDir));
 
             $this->assertFalse(is_dir($installPath), 'install path should stay absent when its parent directory is missing');
             $this->assertStringContainsAndOmitsStrings(['Install parent directory missing; refusing to replace application'], ['Installed version 1.2.3'], $output);

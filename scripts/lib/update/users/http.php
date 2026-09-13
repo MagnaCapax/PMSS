@@ -46,7 +46,7 @@ function pmssUserConfigureHttp(array $ctx): void
         foreach ($phpIni as $key => $value) {
             $newContent .= sprintf('%s = "%s"\n', $key, $value);
         }
-        if (pmssWriteUserFile($phpIniPath, $newContent, $user, 0751)) {
+        if (pmssWriteUserFile($phpIniPath, $newContent, $user, 0640)) {
             echo "Updated php.ini for user {$user}\n";
         } else {
             $userLog('[WARN] Failed to update php.ini during HTTP maintenance');

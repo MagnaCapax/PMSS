@@ -80,15 +80,7 @@ BASH;
 
         $entryScript = $entry === 'legacy' ? $this->legacyInstallerPath : $this->installerPath;
         $runner = $entry === 'legacy' ? $this->bashBin : $this->phpBin;
-        $command = 'env';
-        foreach ($envPairs as $pair) {
-            $command .= ' '.escapeshellarg($pair);
-        }
-        $command .= ' '.escapeshellarg($runner).' '.escapeshellarg($entryScript);
-        foreach ($args as $arg) {
-            $command .= ' '.escapeshellarg($arg);
-        }
-        $command .= ' 2>&1';
+        $command = 'env '.\pmssCommandArgvShellQuote(array_merge($envPairs, [$runner, $entryScript], $args)).' 2>&1';
 
         $output = [];
         $rc = 0;

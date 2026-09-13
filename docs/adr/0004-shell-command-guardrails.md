@@ -114,6 +114,14 @@ We adopt **Option C**.
 
 ## Consequences
 
+Private temporary file/directory creation and directory cleanup share
+`pmssPrivateTempPrefixIsSafe()`. Its alphanumeric-first allowlist must match
+the entire prefix, including rejecting a final newline, before creation or
+recursive cleanup is attempted. Invalid prefixes keep the existing null/failed
+results and cleanup warning; valid prefixes retain the same scoped command.
+`RuntimeTempPrefixSafetyTest` covers these boundaries with temporary fixtures
+and a recording cleanup runner that never executes the deletion command.
+
 - **Positive:**
   - Reduces the blast radius of any future `listUsers.php` or filesystem
     issues; even if upstream emits garbage, invariants and single-command

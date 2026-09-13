@@ -18,25 +18,26 @@ require_once __DIR__.'/../runtime.php';
  * Older hosts may still carry stale site templates without default_server, which
  * causes nginx to treat the first loaded vhost as the implicit default (conf.d
  * loads before sites-enabled by default).
+ * Regex failures retain the last intact config/line rather than emptying it.
  */
 function pmssNginxConfigEnsureSiteDefaultDefinesDefaultServer(string $config): string
 {
     $config = preg_replace_callback('/^(\\s*listen\\s+80\\b)([^;]*)(;.*)$/m', static function (array $match) {
-        if (preg_match('/\\bdefault_server\\b/', $match[2])) {
+        if (preg_match('/\\bdefault_server\\b/', $match[2]) !== 0) {
             return $match[0];
         }
         return $match[1].rtrim($match[2]).' default_server'.$match[3];
-    }, $config);
+    }, $config) ?? $config;
 
     $config = preg_replace_callback('/^(\\s*listen\\s+443\\b)([^;]*)(;.*)$/m', static function (array $match) {
-        if (!preg_match('/\\bssl\\b/', $match[2])) {
+        if (preg_match('/\\bssl\\b/', $match[2]) !== 1) {
             return $match[0];
         }
-        if (preg_match('/\\bdefault_server\\b/', $match[2])) {
+        if (preg_match('/\\bdefault_server\\b/', $match[2]) !== 0) {
             return $match[0];
         }
         return $match[1].rtrim($match[2]).' default_server'.$match[3];
-    }, $config);
+    }, $config) ?? $config;
 
     return $config;
 }

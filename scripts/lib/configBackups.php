@@ -182,10 +182,14 @@ function pmssConfigBackupsPathKey(string $path): string
 
 /**
  * Normalize a service key used as the backup directory name.
+ * Reject dot-directory components before backup or prune can select an ancestor.
  */
 function pmssConfigBackupsNormalizeService(string $service): string
 {
     $service = trim($service);
+    if ($service === '.' || $service === '..') {
+        return '';
+    }
     return preg_match('/^[A-Za-z0-9._-]+$/', $service) === 1 ? $service : '';
 }
 

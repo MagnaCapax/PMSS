@@ -62,6 +62,89 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
         });
     }
 
+    public function testMarkerRejectsSymlinkLeavesWithoutChangingTheirTargets(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-urefresh-links-', 0700);
+        $stateDir = $root.'/state';
+        mkdir($stateDir, 0700);
+        file_put_contents($root.'/target', "old-signature\n");
+        mkdir($root.'/directory', 0700);
+
+        foreach (['target', 'missing', 'directory'] as $target) {
+            $marker = $stateDir.'/alice';
+            $this->assertTrue(symlink($root.'/'.$target, $marker));
+            $this->assertUnsafeMarkerRejected($stateDir);
+            $this->assertTrue(is_link($marker));
+            $this->assertSame($root.'/'.$target, readlink($marker));
+            $this->assertSame("old-signature\n", file_get_contents($root.'/target'));
+            $this->assertFalse(file_exists($root.'/missing'));
+            $this->assertSame(['.', '..'], scandir($root.'/directory'));
+            unlink($marker);
+        }
+    }
+
+    public function testMarkerRejectsDirectoryLeafWithoutRemovingContents(): void
+    {
+        $stateDir = $this->pmssMakeTempDir('pmss-urefresh-directory-', 0700);
+        mkdir($stateDir.'/alice', 0700);
+        file_put_contents($stateDir.'/alice/sentinel', 'keep');
+
+        $this->assertUnsafeMarkerRejected($stateDir);
+        $this->assertSame('keep', file_get_contents($stateDir.'/alice/sentinel'));
+    }
+
+    public function testMarkerRejectsFifoLeafBeforeOpeningIt(): void
+    {
+        if (!function_exists('posix_mkfifo')) {
+            throw new SkipTest('posix_mkfifo unavailable');
+        }
+        $stateDir = $this->pmssMakeTempDir('pmss-urefresh-fifo-', 0700);
+        $this->assertTrue(posix_mkfifo($stateDir.'/alice', 0600));
+
+        // The path assertion runs first so a regression fails before a FIFO open can block.
+        $this->assertUnsafeMarkerRejected($stateDir);
+        $this->assertSame('fifo', filetype($stateDir.'/alice'));
+    }
+
+    public function testMarkerCreatesMissingStateDirectoryAndReplacesRegularFileSilently(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-urefresh-create-', 0700);
+        $stateDir = $root.'/state';
+        $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $stateDir], function () use ($stateDir): void {
+            ob_start();
+            try {
+                pmssUserRefreshMarkDone('alice', 'old-signature');
+                pmssUserRefreshMarkDone('alice', 'new-signature');
+            } finally {
+                $output = (string) ob_get_clean();
+            }
+
+            $this->assertSame('', $output);
+            $this->assertSame($stateDir.'/alice', pmssUserRefreshMarkerPath('alice'));
+            $this->assertSame("new-signature\n", file_get_contents($stateDir.'/alice'));
+            $this->assertTrue(pmssUserRefreshAlreadyDone('alice', 'new-signature'));
+            $this->assertFalse(pmssUserRefreshAlreadyDone('alice', 'old-signature'));
+        });
+    }
+
+    private function assertUnsafeMarkerRejected(string $stateDir): void
+    {
+        $this->pmssWithEnv([
+            'PMSS_USER_REFRESH_STATE_DIR' => $stateDir,
+            'PMSS_LOG_FILE' => $stateDir.'/test.log',
+        ], function (): void {
+            $this->assertSame('', pmssUserRefreshMarkerPath('alice'));
+            $this->assertFalse(pmssUserRefreshAlreadyDone('alice', 'old-signature'));
+            ob_start();
+            try {
+                pmssUserRefreshMarkDone('alice', 'new-signature');
+            } finally {
+                $output = (string) ob_get_clean();
+            }
+            $this->assertStringContainsString('Refusing to write unsafe user refresh marker', $output);
+        });
+    }
+
     public function testHandlerCatalogAndLegacyCpuQuotaHelperPreserveContracts(): void
     {
         $this->assertSame(['pmssUserConfigureHttp', 'pmssUserApplySkeletonFiles', 'pmssUserUpdateThemes', 'pmssUserUpgradeRutorrent', 'pmssUserMaintainRutorrentPhpCompatibility', 'pmssUserEnsurePlugins', 'pmssUserRefreshPermissions'], pmssUserEnvironmentHandlers());

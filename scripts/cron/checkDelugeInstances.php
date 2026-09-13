@@ -17,10 +17,10 @@ $pmssCheckDelugeLock = pmssCronLockAcquire('checkDelugeInstances', 'pmssCronLock
 
 pmssUserWatchdogRunService('Deluge', 'delugeEnable', ['deluged', 'deluge-web'], 'deluge stopped due to suspension', [
     pmssUserWatchdogServiceSpec('deluged', static function (string $thisUser): string {
-        return pmssUserWatchdogSuCommand($thisUser, "cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info");
+        return pmssBuildUserServiceShellCommand($thisUser, "cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info");
     }, 'deluged start requested'),
     pmssUserWatchdogServiceSpec('deluge-web', static function (string $thisUser): string {
-        return pmssUserWatchdogSuCommand($thisUser, "cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info");
+        return pmssBuildUserServiceShellCommand($thisUser, "cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info");
     }, 'deluge-web start requested'),
 ], function (string $thisUser): array {
     $running = pmssUserWatchdogProcessRunning($thisUser, 'deluged');

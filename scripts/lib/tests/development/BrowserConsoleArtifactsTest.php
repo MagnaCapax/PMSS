@@ -25,7 +25,7 @@ class BrowserConsoleArtifactsTest extends TestCase
         $this->assertStringContainsString('1.7.7', $src);
         $this->assertMatches('/[a-f0-9]{64}/', $src, 'ttyd installer must pin a SHA256');
         $this->assertStringContainsString('pmssPinnedRemoteAmd64ArtifactsSupported', $src);
-        $this->assertStringContainsString('pmssFetchPinnedRemoteFile', $src);
+        $this->assertStringContainsString('pmssPinnedRemoteArtifactTempFileUse', $src);
         $this->assertStringContainsString('/usr/bin/ttyd', $src);
     }
 

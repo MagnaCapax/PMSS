@@ -104,7 +104,10 @@ class CgroupUserConfigTest extends TestCase
 
     public function testValidUserStatus()
     {
-        $this->assertRunOutput(array('testuser'), array('slice=user-1000.slice', '[Config]', '[Status]'));
+        foreach ([[], ['--apply'], ['--dry-run'], ['--io-profile=0'], ['--device=0']] as $flags) {
+            $this->assertRunOutput(array_merge(['testuser'], $flags),
+                ['slice=user-1000.slice', '[Config]', '[Status]'], ['(dry-run or no --apply']);
+        }
     }
 
     // -- Memory Calculation & Clamping Tests --
@@ -444,12 +447,16 @@ class CgroupUserConfigTest extends TestCase
     public function testIoCostQosDefaultsToHomeDeviceMajorMinor()
     {
         $this->sys->findmnt['/home'] = '/dev/md0';
-        $this->sys->commands['lsblk -dn -o MAJ:MIN'] = "9:0\n";
-
-        $this->assertRunOutput(
-            array('testuser', '--io-cost-qos=enable=1 ctrl=user'),
-            array('[Planned io.cost writes]', '/sys/fs/cgroup/io.cost.qos <= 9:0 enable=1 ctrl=user')
-        );
+        // Prefer lsblk, fall back to sysfs, and never plan writes from malformed tokens.
+        foreach ([["9:0\n", "8:1\n", '9:0'], ['bad', "8:1\n", '8:1'], ['', "8:1\n", '8:1'],
+            [null, null, ''], ['bad', 'bad', ''], ["8:1\n8:2\n", '8:3 extra', '']] as [$lsblk, $sysfs, $expected]) {
+            $this->sys->commands['lsblk -dn -o MAJ:MIN'] = $lsblk;
+            $this->sys->files['/sys/class/block/md0/dev'] = $sysfs;
+            $this->assertRunOutput(['testuser', '--io-cost-qos=enable=1 ctrl=user'],
+                [$expected === '' ? 'io.cost skipped: unable to resolve major:minor'
+                    : '/sys/fs/cgroup/io.cost.qos <= '.$expected.' enable=1 ctrl=user'],
+                $expected === '' ? ['[Planned io.cost writes]'] : []);
+        }
     }
 
     public function testIoCostAcceptsMatchingExplicitMajorMinor()

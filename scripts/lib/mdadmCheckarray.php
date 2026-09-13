@@ -35,44 +35,24 @@ function pmssMdadmCheckarrayArrayNameIsSafe(string $array): bool
     return preg_match('/^md\d+$/', $array) === 1;
 }
 
-/** Detect whether raw mdstat contains md array records at all. */
-function pmssMdadmCheckarrayMdstatHasArrayLines(string $mdstat): bool
+/** Prefer valid sysfs state; missing or malformed data falls back to mdstat. */
+function pmssMdadmCheckarrayEntryDegradedState(array $entry, string $sysBlockRoot): ?bool
 {
-    return preg_match('/^md\d+\s*:/m', $mdstat) === 1;
-}
+    $array = (string) ($entry['array'] ?? '');
+    if (pmssMdadmCheckarrayArrayNameIsSafe($array)) {
+        $raw = @file_get_contents(rtrim($sysBlockRoot, '/').'/'.$array.'/md/degraded');
+        if (is_string($raw) && ctype_digit(trim($raw))) {
+            return (int) trim($raw) > 0;
+        }
+    }
 
-/** Resolve degraded state from the existing mdstat map parser shape. */
-function pmssMdadmCheckarrayMdstatEntryDegradedState(array $entry): ?bool
-{
+    // Preserve unknown state when neither source can decide.
     $detail = (string) ($entry['detail'] ?? '');
     if (preg_match('/\[(\d+)\/(\d+)\]\s*\[([U_]+)\]/', $detail, $matches) !== 1) {
         return null;
     }
 
     return strpos($matches[3], '_') !== false || (int) $matches[1] !== (int) $matches[2];
-}
-
-/** Read `/sys/block/mdX/md/degraded`; null means this path cannot decide. */
-function pmssMdadmCheckarraySysfsDegradedState(string $array, string $sysBlockRoot): ?bool
-{
-    if (!pmssMdadmCheckarrayArrayNameIsSafe($array)) {
-        return null;
-    }
-
-    $raw = @file_get_contents(rtrim($sysBlockRoot, '/').'/'.$array.'/md/degraded');
-    if (!is_string($raw) || !ctype_digit(trim($raw))) {
-        return null;
-    }
-
-    return (int) trim($raw) > 0;
-}
-
-/** Prefer sysfs state, then fall back to the shared mdstat parser result. */
-function pmssMdadmCheckarrayEntryDegradedState(array $entry, string $sysBlockRoot): ?bool
-{
-    $array = (string) ($entry['array'] ?? '');
-    $sysfs = pmssMdadmCheckarraySysfsDegradedState($array, $sysBlockRoot);
-    return $sysfs !== null ? $sysfs : pmssMdadmCheckarrayMdstatEntryDegradedState($entry);
 }
 
 /**
@@ -91,7 +71,8 @@ function pmssMdadmCheckarrayPlan(string $mdstatPath, string $sysBlockRoot): arra
     }
 
     $entries = pmssStorageHealthRaidEntriesParse($mdstat, date('c'));
-    if (empty($entries) && pmssMdadmCheckarrayMdstatHasArrayLines($mdstat)) {
+    // Distinguish an empty host from array records the parser cannot enumerate.
+    if (empty($entries) && preg_match('/^md\d+\s*:/m', $mdstat) === 1) {
         $plan['fallback_all'] = true;
         $plan['reason'] = 'mdstat_parse_empty';
         return $plan;

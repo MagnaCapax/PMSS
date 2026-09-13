@@ -6,6 +6,22 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 final class SysctlProfileSnapshotTest extends TestCase
 {
+    public function testMemorySettingsKeepBoundaryAndPrecedenceSnapshots(): void
+    {
+        // Captured before compression; serialization also locks key order and string types.
+        $cases = [
+            [[], '9a9cf3d8ec6c62d0ddc54d049630476a9059f40efb93370462ce30099e4e5d9b'],
+            [['ram_gb' => 0, 'has_swap' => true], '866e770540212567d4448541772eb034eae7da6289037007b5958feb9afd8c92'],
+            [['ram_gb' => 10000, 'has_swap' => true], '8fe0ca406295d602ddda344e2ff97918ba28330e1c33e68f19f7f9b2438abc72'],
+            [['ram_gb' => 10000, 'has_swap' => true, 'swap_is_fast' => true], '5be9627ba9712e927104c5ade94ecf7f2324a426b3f02cc4591c4f26ebe0437a'],
+            [['has_swap' => false, 'is_vm' => true, 'swap_is_fast' => true], '9a9cf3d8ec6c62d0ddc54d049630476a9059f40efb93370462ce30099e4e5d9b'],
+            [['has_swap' => true, 'is_vm' => true, 'swap_is_fast' => false], '866e770540212567d4448541772eb034eae7da6289037007b5958feb9afd8c92'],
+        ];
+        foreach ($cases as [$profile, $hash]) {
+            $this->assertSame($hash, hash('sha256', serialize(\pmssSysctlMemorySettingsBuild($profile))));
+        }
+    }
+
     public function testSettingsBuildKeepsProfileSnapshotHashes(): void
     {
         $procSysRoot = $this->pmssMakeTempDir('pmss-sysctl-profile-proc-', 0700);

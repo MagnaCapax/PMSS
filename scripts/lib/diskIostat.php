@@ -68,7 +68,7 @@ function pmssDiskIostatBuildCommand(array $devices, string $iostatBinary = ''): 
         $iostatBinary = $resolved !== '' ? $resolved : 'iostat';
     }
 
-    $deviceArgs = $devices ? ' '.implode(' ', array_map('escapeshellarg', $devices)) : '';
+    $deviceArgs = $devices ? ' '.pmssCommandArgvShellQuote($devices) : '';
     return escapeshellarg($iostatBinary).' -xm 120 2 -g grp1'.$deviceArgs.' 2>&1';
 }
 

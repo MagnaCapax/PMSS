@@ -79,12 +79,19 @@ class UpdateBackwardsVersionGuardTest extends TestCase
         $this->assertSame('same', $decision['ordering']);
     }
 
-    public function testRecordedMarkerFallsBackToInstallTimeWhenLabelIsDateless(): void
+    public function testRecordedMarkerKeepsDatelessLabelsIndeterminate(): void
     {
-        // Dateless fetched label (e.g. codeload tarball fallback with no commit metadata)
-        // preserves ADR 0051's fail-open contract by falling back to install time.
+        // A codeload fallback must not fabricate an orderable date for the next run.
         $installTs = \mktime(9, 8, 0, 9, 7, 2026);
-        $line = \pmssRecordedVersionLine('git/main', 'git/main', $installTs);
-        $this->assertSame('git/main@2026-09-07 09:08', $line, 'dateless fetched label falls back to install time');
+        foreach (['git/main', '', 'git/main@not-a-date', 'release', 'release:stable'] as $fetched) {
+            $spec = strpos($fetched, 'release') === 0 ? $fetched : 'git/main';
+            $line = \pmssRecordedVersionLine($spec, $fetched, $installTs);
+            $this->assertSame($spec, $line);
+            foreach (['git/main@2026-09-06 15:06', 'release:2026-01-21', 'git/main'] as $next) {
+                $decision = \pmssVersionMoveDecision($line, $next, false);
+                $this->assertTrue($decision['allowed']);
+                $this->assertSame('indeterminate', $decision['ordering']);
+            }
+        }
     }
 }

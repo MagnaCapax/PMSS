@@ -7,6 +7,25 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class CliWrapperCharacterizationTest extends TestCase
 {
+    public function testDelegationPreservesArgumentsStreamsAndNonzeroExit(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-cli-wrapper-');
+        $runtime = var_export($this->pmssRepoPath('scripts/lib/runtime.php'), true);
+        $args = ['', 'plain', 'two words', "quote'\"", '$(false); *', "line\nbreak"];
+        foreach (['', "#!/usr/bin/env php\n"] as $shebang) {
+            // Both include and subprocess delegation must preserve the CLI contract.
+            $this->pmssWriteFile($root."/target ' quoted.php", $shebang."<?php declare(strict_types=1);\n"
+                .'echo json_encode(array_slice($_SERVER["argv"], 1)); fwrite(STDERR, "child stderr\n"); exit(23);');
+            $wrapper = $this->pmssWriteFile($root.'/wrapper.php', "<?php require_once {$runtime};\n"
+                .'pmssRequireCliEntrypointScript(__DIR__, '.var_export("target ' quoted.php", true).', false, ["--appended"]); echo "unexpected return";');
+            $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($wrapper).' '.implode(' ', array_map('escapeshellarg', $args));
+            ['result' => $result, 'stderrPath' => $stderrPath] = $this->pmssExecShellCommandWithTempStderr($command);
+            $this->assertSame(23, $result['rc']);
+            $this->assertSame(array_merge($args, ['--appended']), $this->pmssDecodeJsonArray($result['output']));
+            $this->assertSame("child stderr\n", file_get_contents($stderrPath));
+        }
+    }
+
     public function testThinWrappersDelegateDirectlyToUtilScripts(): void
     {
         $this->pmssAssertRepoFileContractCases([

@@ -179,19 +179,30 @@ SH
         );
     }
 
-    public function testFetchPinnedRemoteFileReturnsTempPathForMatchingChecksum(): void
+    public function testArtifactCallbackPreservesResultsAndOwnsTempLifetime(): void
     {
         $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
-            $path = \pmssFetchPinnedRemoteFile('demo archive', 'https://example.invalid/archive', $expectedSha256);
-
-            $this->assertTrue(is_string($path) && $path !== '', 'Expected matching download to return a temp path');
-            $this->assertEquals($body, (string) file_get_contents($path));
+            foreach ([null, false, true, 0, 'installed', new \RuntimeException('callback failed')] as $expected) {
+                $path = null;
+                try {
+                    $actual = \pmssPinnedRemoteArtifactTempFileUse('demo archive', 'https://example.invalid/archive', $expectedSha256, function (string $tmp) use (&$path, $body, $expected) {
+                        $path = $tmp;
+                        $this->assertSame($body, file_get_contents($tmp));
+                        $this->assertSame(0600, fileperms($tmp) & 0777);
+                        if ($expected instanceof \RuntimeException) throw $expected;
+                        return $expected;
+                    });
+                } catch (\RuntimeException $error) {
+                    $actual = $error;
+                }
+                $this->assertSame($expected, $actual);
+                $this->assertTrue(is_string($path) && !file_exists($path), 'Callback temp must be removed');
+            }
             $this->assertStringContainsString('wget ', $this->pmssReadFileOrEmpty($commandLog));
-            @unlink($path);
         });
     }
 
-    public function testFetchPinnedRemoteFileRejectsInvalidInputsBeforeDownload(): void
+    public function testArtifactCallbackRejectsInvalidInputsBeforeDownload(): void
     {
         foreach ([
             'http url' => ['http://example.invalid/archive', null],
@@ -201,7 +212,7 @@ SH
             'bad checksum' => ['https://example.invalid/archive', 'not-a-sha256'],
         ] as $label => [$url, $checksum]) {
             $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256) use ($label, $url, $checksum): void {
-                $path = \pmssFetchPinnedRemoteFile('demo archive', $url, $checksum ?? $expectedSha256);
+                $path = \pmssPinnedRemoteArtifactTempFileUse('demo archive', $url, $checksum ?? $expectedSha256, static function () { throw new \RuntimeException('Rejected artifact reached callback'); });
 
                 $this->assertTrue($path === null, 'Expected '.$label.' to be rejected');
                 $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog), $label);
@@ -209,15 +220,27 @@ SH
         }
     }
 
-    public function testFetchPinnedRemoteFileCleansChecksumMismatchTemps(): void
+    public function testArtifactCallbackCleansChecksumMismatchTemps(): void
     {
         $this->pmssAssertNoNewGlobMatches(sys_get_temp_dir().'/pmss-remote-bin-*', function (): void {
             $this->withFakeDownloadBody('payload', function (): void {
-                $path = \pmssFetchPinnedRemoteFile('demo archive', 'https://example.invalid/archive', str_repeat('a', 64));
+                $path = \pmssPinnedRemoteArtifactTempFileUse('demo archive', 'https://example.invalid/archive', str_repeat('a', 64), static function () { throw new \RuntimeException('Unverified artifact reached callback'); });
 
                 $this->assertTrue($path === null, 'Expected checksum mismatch to reject the download');
             });
         }, 'Checksum mismatch should not leave temp files behind');
+    }
+
+    public function testArtifactCallbackDryRunPolicyAndCleanup(): void
+    {
+        $this->withFakeDownloadBody('payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
+            foreach ([false, true] as $runInDryRun) {
+                $result = \pmssPinnedRemoteArtifactTempFileUse('demo archive', 'https://example.invalid/archive', $expectedSha256, static function (string $tmp): string { return $tmp; }, $runInDryRun);
+                $this->assertSame($runInDryRun, is_string($result));
+                if ($runInDryRun) $this->assertFalse(file_exists($result));
+            }
+            $this->assertSame('', $this->pmssReadFileOrEmpty($commandLog));
+        }, ['PMSS_DRY_RUN' => '1']);
     }
 
     public function testRunPinnedRemoteArchiveStepRejectsUnsafeExtractionInputsBeforeDownload(): void

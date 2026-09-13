@@ -19,12 +19,7 @@ function pmssInfoShellExec($command, $label): array
         return array('output' => null, 'error' => $label.' unavailable: shell_exec disabled');
     }
 
-    $output = pmssFrontendShellExec($command);
-    if ($output === null) {
-        return array('output' => '', 'error' => null);
-    }
-
-    return array('output' => $output, 'error' => null);
+    return array('output' => pmssFrontendShellExec($command) ?? '', 'error' => null);
 }
 
 /**
@@ -54,11 +49,10 @@ function pmssStatsSerializedStateRead(string $path, string $invalidMessage): arr
 function pmssStatsTrafficAmountFormat($valueMiB): string
 {
     $valueMiB = max(0.0, (float) $valueMiB);
-    if ($valueMiB > (1024 * 1024)) {
-        return round($valueMiB / 1024 / 1024, 2).'TiB';
-    }
-    if ($valueMiB > 1024) {
-        return round($valueMiB / 1024, 2).'GiB';
+    foreach (array(1048576 => 'TiB', 1024 => 'GiB') as $divisor => $unit) {
+        if ($valueMiB > $divisor) {
+            return round($valueMiB / $divisor, 2).$unit;
+        }
     }
 
     return round($valueMiB, 2).'MiB';
@@ -91,8 +85,7 @@ function pmssStatsCurrentUidResolve(?callable $runner = null): array
         return array('uid' => (string) posix_getuid(), 'error' => null);
     }
 
-    $runner = $runner ?? 'pmssInfoShellExec';
-    $uidResult = $runner('/usr/bin/id -u', 'User ID');
+    $uidResult = ($runner ?? 'pmssInfoShellExec')('/usr/bin/id -u', 'User ID');
     if ($uidResult['error'] !== null) {
         return array('uid' => null, 'error' => $uidResult['error']);
     }
@@ -396,7 +389,8 @@ function pmssStatsResourceSnapshotBuild(?array $resourceData): array
     $ioReadOpsRaw = pmssStatsNestedArrayRead($resourceData, 'io_read_ops', 'raw');
     $ioWriteOpsRaw = pmssStatsNestedArrayRead($resourceData, 'io_write_ops', 'raw');
     $snapshot['ioOperationsMonth'] = (float)($ioReadOpsRaw['month'] ?? 0.0) + (float)($ioWriteOpsRaw['month'] ?? 0.0);
-    if (isset($cpuRaw['month'])) { $snapshot['cpuDisplay']['month'] = pmssFormatCpuHours($cpuRaw['month']); }
+    // Monthly CPU nanoseconds are always displayed as CPU-hours.
+    if (isset($cpuRaw['month'])) { $snapshot['cpuDisplay']['month'] = round(((float) $cpuRaw['month'] / 1000000000) / 3600, 2).' CPU-hours'; }
     foreach (array('week', 'day', 'hour') as $period) {
         if (!isset($snapshot['cpuDisplay'][$period]) && isset($cpuRaw[$period])) {
             $snapshot['cpuDisplay'][$period] = pmssFormatDurationSeconds($cpuRaw[$period] / 1000000000);
@@ -433,7 +427,6 @@ function pmssStatsRenderResourceBlocks(array $resourceState): void
         return;
     }
 
-    $resourceTime = $resourceState['time'];
     $snapshot = pmssStatsResourceSnapshotBuild($resourceData);
     ?>
 <div class="stats-block resource-summary-block">
@@ -473,7 +466,7 @@ function pmssStatsRenderResourceBlocks(array $resourceState): void
 <div class="stats-block">
     <h6>Storage I/O</h6>
     <pre style="margin-bottom:12px;">
-Resource usage at <?php echo date('Y-m-d H:i:s', (int)$resourceTime); ?>:
+Resource usage at <?php echo date('Y-m-d H:i:s', (int)$resourceState['time']); ?>:
 I/O Read (month/week/day/hour): <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['month'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['week'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['day'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['hour'] ?? 'n/a'); ?>
 I/O Write (month/week/day/hour): <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['month'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['week'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['day'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['hour'] ?? 'n/a'); ?>
 Past 30 days total I/O operations: <?php echo pmssCustomerHtmlAttr(pmssFormatIoOperationsShort($snapshot['ioOperationsMonth'])); ?>
@@ -661,13 +654,6 @@ function pmssFormatDurationSeconds($seconds): string
         return round($seconds / 60, 2).'m';
     }
     return round($seconds, 2).'s';
-}
-
-/** Format monthly CPU nanoseconds as CPU-hours. */
-function pmssFormatCpuHours($nanoseconds): string
-{
-    $hours = ((float) $nanoseconds / 1000000000) / 3600;
-    return round($hours, 2).' CPU-hours';
 }
 
 /** Format an I/O operation count for compact display. */

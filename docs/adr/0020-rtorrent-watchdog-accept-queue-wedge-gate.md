@@ -44,6 +44,13 @@ restart path when process state is unavailable or `STAT` contains `D`. It reads
 `Recv-Q` and `Send-Q` as valid input. Restart occurs only after the queue has
 reached the listen backlog for consecutive checks.
 
+Queue counters must also fit PHP's integer range before conversion. Oversized
+decimal values are ignored as malformed rows, since integer clamping can make
+different queue depths compare equal and falsely authorize wedge recovery.
+Leading zeros, zero counters, and representable values retain their existing
+interpretation. `RtorrentScgiTest` covers these bounds and continued scanning
+after a rejected row without invoking recovery commands.
+
 This extends ADR-0004's shell guardrails by keeping probes single-purpose and
 ADR-0005's trust boundary policy by validating internal command output before
 acting on it.

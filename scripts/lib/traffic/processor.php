@@ -34,12 +34,10 @@ class TrafficStatsProcessor extends PmssUserStatsProcessor
         if ($loadedData === null) {
             return;
         }
-        $trafficData = $loadedData['records'];
-
         $rawTotals = array_fill_keys(array_keys($compareTimes), 0.0);
         $dailyTotals = [];
 
-        foreach ($trafficData as $line) {
+        foreach ($loadedData['records'] as $line) {
             $parsed = $this->stats->parseLine($line);
             if ($parsed === false) {
                 logMessage($logPrefix."Parsing line failed for {$user}, line: {$line}");

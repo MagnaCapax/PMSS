@@ -29,6 +29,9 @@ PMSS updates cannot add a usable inode budget after the filesystem is full.
 `update-step2.php` warns when `/home` exceeds 256 KiB per inode so operators can
 plan user migration or host evacuation/reformat before customer writes hit
 `ENOSPC`.
+Unrepresentable `stat` counters or density results use the existing parse-failure
+warning instead of reporting a wrapped value as healthy. This check remains
+diagnostic only; valid counters retain the same threshold and output format.
 
 ## Development capture (interactive TTY)
 

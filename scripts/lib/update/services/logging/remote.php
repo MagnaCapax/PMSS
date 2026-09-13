@@ -84,10 +84,7 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
     }
     if (!pmssWriteManagedPathFile($target, $rendered, 'remote logging config', $log)) return;
     $log(sprintf('Applied remote logging: %s:%d (%s)', $config['host'], $config['port'], $config['protocol']));
-    if ($skipRestartReason !== '') {
-        pmssLogStatus('SKIP', 'Restarting rsyslog to apply remote forwarding ('.$skipRestartReason.')');
-        return;
-    }
+    if (pmssSystemdActionSkip($skipRestartReason, 'Restarting rsyslog to apply remote forwarding')) return;
     if (!@file_exists('/lib/systemd/system/rsyslog.service') && !@file_exists('/etc/init.d/rsyslog')) {
         $log('[SKIP] rsyslog service not found; config deployed but service not restarted');
         return;

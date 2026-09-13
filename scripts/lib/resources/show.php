@@ -89,21 +89,18 @@ function pmssShowResourcesMain(array $argv): int
     return 0;
 }
 
-function pmssShowResourcesFormatIoOperations(float $operations): string
-{
-    foreach ([1000000000.0 => 'B ops', 1000000.0 => 'M ops', 1000.0 => 'K ops'] as $divisor => $unit) {
-        if ($operations >= $divisor) {
-            $value = $operations / $divisor;
-            return number_format($value, $value >= 100 ? 0 : ($value >= 10 ? 1 : 2)).' '.$unit;
-        }
-    }
-    return number_format($operations, 0).' ops';
-}
-
 function pmssShowResourcesPrintUsageRow(string $label, array $data, string $rowFormat): void
 {
     $hourOps = (float) (($data['io_read_ops']['hour'] ?? 0) + ($data['io_write_ops']['hour'] ?? 0));
     $monthOps = (float) (($data['io_read_ops']['month'] ?? 0) + ($data['io_write_ops']['month'] ?? 0));
+    $monthOpsText = number_format($monthOps, 0).' ops';
+    foreach ([1000000000.0 => 'B ops', 1000000.0 => 'M ops', 1000.0 => 'K ops'] as $divisor => $unit) {
+        if ($monthOps >= $divisor) {
+            $value = $monthOps / $divisor;
+            $monthOpsText = number_format($value, $value >= 100 ? 0 : ($value >= 10 ? 1 : 2)).' '.$unit;
+            break;
+        }
+    }
     $ramHours = (float) $data['ram_hours']['month'];
     printf(
         $rowFormat,
@@ -114,7 +111,7 @@ function pmssShowResourcesPrintUsageRow(string $label, array $data, string $rowF
         number_format($ramHours, $ramHours >= 100 ? 0 : ($ramHours >= 10 ? 1 : 2)).' GB-hrs',
         pmssFormatBytes((float) $data['memory']['current'], 2, 1),
         (string) round($data['tasks']['current']),
-        pmssShowResourcesFormatIoOperations($monthOps),
+        $monthOpsText,
         number_format($hourOps / 3600, 2)
     );
 }

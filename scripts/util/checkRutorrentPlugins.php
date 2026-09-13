@@ -15,8 +15,7 @@ function pmssCheckRutorrentPluginsMain(array $argv): int
 
     $accessIni = @file_get_contents('/etc/seedbox/config/template.rutorrent.access');
     if ($accessIni === false) {
-        fwrite(STDERR, "Unable to read /etc/seedbox/config/template.rutorrent.access\n");
-        return 1;
+        return pmssCliReturnWithStderr("Unable to read /etc/seedbox/config/template.rutorrent.access\n");
     }
 
     $users = pmssListManagedUsers('/scripts/listUsers.php');

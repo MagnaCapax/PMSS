@@ -21,8 +21,7 @@ require_once '/scripts/lib/resources/metrics.php';
 // /home/<user>/.resourceData, never this operator-side log.
 $logDir = '/var/log/pmss/metrics';
 if (!pmssEnsureSafeDir($logDir, 0700)) {
-    fwrite(STDERR, "Failed to prepare metrics log directory.\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr("Failed to prepare metrics log directory.\n"));
 }
 @chmod($logDir, 0700);
 

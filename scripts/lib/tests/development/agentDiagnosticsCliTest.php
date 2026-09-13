@@ -8,6 +8,20 @@ use PMSS\Tests\TestCase;
 
 final class agentDiagnosticsCliTest extends TestCase
 {
+    public function testPhpScriptPreservesArgumentsAndExitStatus(): void
+    {
+        $root = $this->pmssMakeNamedTempDir('pmss-agent-argv-');
+        $this->pmssWriteExecutablePhpFile($root.'/echo args.php', 'echo json_encode(array_slice($argv, 1)); fwrite(STDERR, "fixture stderr"); exit(7);');
+        $this->pmssWithEnv(['PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $root], function (): void {
+            foreach ([[], ['', 'two words', "a'b", '$(printf injected)', "line\nbreak", '--flag=-1']] as $args) {
+                $result = \pmssAgentDiagnosticsPhpScript('echo args.php', $args);
+                $this->assertSame(7, $result['rc']);
+                $this->assertSame($args, json_decode($result['stdout'], true));
+                $this->assertSame('fixture stderr', $result['stderr']);
+            }
+        });
+    }
+
     public function testHelpShowsUsage(): void
     {
         $this->pmssAssertRepoPhpScriptOutputContains('scripts/util/agentDiagnostics.php', ['--help'], ['agentDiagnostics.php [--json] [--pretty] [--user USERNAME]']);

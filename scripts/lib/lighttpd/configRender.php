@@ -104,7 +104,7 @@ function pmssLighttpdSyncPhpIni(string $phpIniPath, string $user, int $memoryLim
     }
     if (!file_exists($phpIniPath)) {
         $skelPhpIni = @file_get_contents('/etc/skel/.lighttpd/php.ini');
-        if (!is_string($skelPhpIni) || !pmssWriteUserFile($phpIniPath, $skelPhpIni, $user, 0751)) {
+        if (!is_string($skelPhpIni) || !pmssWriteUserFile($phpIniPath, $skelPhpIni, $user, 0640)) {
             $failureReason = 'seed';
             return false;
         }
@@ -115,7 +115,7 @@ function pmssLighttpdSyncPhpIni(string $phpIniPath, string $user, int $memoryLim
         return false;
     }
 
-    pmssUserFileApplyMetadata($phpIniPath, $user, 0751);
+    pmssUserFileApplyMetadata($phpIniPath, $user, 0640);
 
     return true;
 }

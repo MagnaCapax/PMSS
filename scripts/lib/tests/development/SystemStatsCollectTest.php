@@ -6,6 +6,39 @@ require_once dirname(__DIR__, 2).'/systemStats/hostPressure.php';
 
 class SystemStatsCollectTest extends TestCase
 {
+    public function testCounterValidationPreservesExactIntegerBoundaries(): void
+    {
+        foreach (['0', '000', '00123', (string) PHP_INT_MAX, '000'.PHP_INT_MAX] as $value) {
+            $this->assertTrue(\pmssSystemStatsCounterIsValid($value), $value);
+        }
+        foreach (['', '-1', '+1', '1.0', '1e3', "1\0", ' 1', PHP_INT_MAX.'0', str_repeat('9', 100)] as $value) {
+            $this->assertFalse(\pmssSystemStatsCounterIsValid($value), $value);
+        }
+    }
+
+    public function testCounterParsersPreserveRepresentableValuesAndRejectOverflow(): void
+    {
+        foreach (['0', '000', '00123', (string) PHP_INT_MAX, '000'.PHP_INT_MAX] as $value) {
+            $this->assertSame([(int) $value, 2, 3, 4, 5], \pmssSystemStatsCpuCountersFromRaw('cpu '.$value.' 2 3 4 5'));
+            $this->assertSame(['sda' => (int) $value], \pmssSystemStatsDiskIoTimeFromRaw('8 0 sda 0 0 0 0 0 0 0 0 0 '.$value));
+            $this->assertSame('cron:'.\pmssSystemStatsKbToHuman((int) $value), \pmssSystemStatsTopMemoryFromPsRows(['cron '.$value]));
+        }
+
+        foreach ([PHP_INT_MAX.'0', '000'.PHP_INT_MAX.'0', str_repeat('9', 100)] as $value) {
+            // A CPU sample is indivisible; row-based summaries retain their valid siblings.
+            foreach (range(0, 4) as $index) {
+                $counters = ['1', '2', '3', '4', '5'];
+                $counters[$index] = $value;
+                $this->assertSame([], \pmssSystemStatsCpuCountersFromRaw('cpu '.implode(' ', $counters)));
+            }
+            $this->assertSame(['sdb' => 123], \pmssSystemStatsDiskIoTimeFromRaw(
+                '8 0 sda 0 0 0 0 0 0 0 0 0 '.$value."\n8 16 sdb 0 0 0 0 0 0 0 0 0 123\n"
+            ));
+            $this->assertSame('cron:123K', \pmssSystemStatsTopMemoryFromPsRows(['oversized '.$value, 'cron 123']));
+            $this->assertSame('na', \pmssSystemStatsTopMemoryFromPsRows(['oversized '.$value]));
+        }
+    }
+
     public function testCollectReturnsExpectedMetricKeys(): void
     {
         $stats = \pmssSystemStatsCollect();

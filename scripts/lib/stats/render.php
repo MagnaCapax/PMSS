@@ -6,14 +6,6 @@
  * @author PMSS Team
  */
 
-function pmssStatsRenderBar(?float $percent, int $width): string
-{
-    if ($percent === null) return '['.str_repeat('·', $width).']';
-    $clamped = max(0.0, min(100.0, $percent));
-    $filled = (int) round(($clamped / 100.0) * $width);
-    return '['.str_repeat('█', $filled).str_repeat('░', max(0, $width - $filled)).']';
-}
-
 function pmssStatsFormatBytesOrFallback($bytes, string $fallback = 'n/a'): string
 {
     return $bytes !== null ? pmssFormatBytes((float) $bytes) : $fallback;
@@ -21,7 +13,11 @@ function pmssStatsFormatBytesOrFallback($bytes, string $fallback = 'n/a'): strin
 
 function pmssStatsRenderPercentSuffix(?float $percent, int $width): string
 {
-    return pmssStatsRenderBar($percent, $width).' '.($percent !== null ? sprintf('%d%%', round($percent)) : 'n/a');
+    if ($percent === null) return '['.str_repeat('·', $width).'] n/a';
+    // Clamp only the bar; the printed percentage still exposes usage beyond the limit.
+    $clamped = max(0.0, min(100.0, $percent));
+    $filled = (int) round(($clamped / 100.0) * $width);
+    return '['.str_repeat('█', $filled).str_repeat('░', max(0, $width - $filled)).'] '.sprintf('%d%%', round($percent));
 }
 
 function pmssStatsRenderLine(string $label, string $value, string $suffix = ''): string
@@ -97,12 +93,8 @@ function pmssStatsRenderText(array $stats, array $options = []): string
     return implode(PHP_EOL, $lines).PHP_EOL;
 }
 
-/**
- * Parse CLI options for the stats command.
- *
- * @return array<string, bool>|false
- */
-function pmssStatsParseOptions(array $argv)
+/** Parse options and emit the per-account stats report, returning early for help. */
+function pmssStatsMain(array $argv): int
 {
     $self = basename($argv[0] ?? 'pmss-stats.php');
     $usage = pmssCliHelpUsageOptions($self.' [--full] [--json] [--mini] [--no-header]', [
@@ -111,20 +103,14 @@ function pmssStatsParseOptions(array $argv)
         ['--mini', 'Show a compact four-line summary.'],
         ['--no-header', 'Skip the title box.'],
     ], 13);
-    if (($parsed = pmssParseCliTokensOrHelp($argv, $usage)) === null) return false;
+    if (($parsed = pmssParseCliTokensOrHelp($argv, $usage)) === null) return 0;
 
-    return [
+    $options = [
         'full' => pmssCliOptionPresent($parsed, 'full'),
         'json' => pmssCliOptionPresent($parsed, 'json'),
         'mini' => pmssCliOptionPresent($parsed, 'mini'),
         'no_header' => pmssCliOptionPresent($parsed, 'no-header'),
     ];
-}
-
-function pmssStatsMain(array $argv): int
-{
-    $options = pmssStatsParseOptions($argv);
-    if ($options === false) return 0;
     $stats = pmssStatsCollect();
     if ($options['json']) return pmssJsonEmitPayload($stats, 'Failed to encode PMSS stats JSON.', JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     echo pmssStatsRenderText($stats, $options);

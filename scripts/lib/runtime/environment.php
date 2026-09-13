@@ -16,6 +16,8 @@ function pmssBlockDeviceNameIsDataDevice(string $device): bool { return preg_mat
 
 function pmssCommandPath(string $binary): string
 {
+    // trim() removes edge NULs; reject them before they can name another binary.
+    if (pmssFilesystemPathHasNulByte($binary)) return '';
     $binary = trim($binary);
     if ($binary === '' || !pmssCommandBinaryNameIsSafe($binary)) return '';
     $resolved = @shell_exec('command -v '.escapeshellarg($binary).' 2>/dev/null');
@@ -40,6 +42,8 @@ function pmssBuildUserShellCommand(string $username, string $command, string $sh
 /** Run the canonical direct-I/O 4 KiB latency probe and return raw output. */
 function pmssIopingProbeOutput(?string $target): ?string
 {
+    // Keep malformed paths on the null-result path before shell quoting can throw.
+    if ($target !== null && pmssFilesystemPathHasNulByte($target)) return null;
     $bin = pmssCommandPath('ioping');
     if ($bin === '' || $target === null || trim($target) === '') return null;
     $command = pmssCommandArgvShellQuote([$bin, '-c', (string) PMSS_IOPING_PROBE_COUNT, '-i', PMSS_IOPING_PROBE_INTERVAL, '-D', $target]);

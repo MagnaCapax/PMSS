@@ -337,7 +337,7 @@ class UserLifecycleWatchdogTest extends TestCase
         $path = $this->pmssMakeTempFile('watchdog-port-');
         file_put_contents($path, "1500\n");
 
-        $this->assertSame(1500, pmssUserWatchdogLocalPortRead($path));
+        $this->assertSame(1500, pmssReadRegularFileNetworkPort($path));
     }
 
     public function testLocalPortReadRejectsUnsafeInputs(): void
@@ -353,7 +353,7 @@ class UserLifecycleWatchdogTest extends TestCase
         symlink($target, $link);
 
         foreach ([$missing, $path, $outOfRange, $link] as $candidate) {
-            $this->assertSame(null, pmssUserWatchdogLocalPortRead($candidate));
+            $this->assertSame(null, pmssReadRegularFileNetworkPort($candidate));
         }
     }
 }

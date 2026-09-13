@@ -442,6 +442,10 @@ iptables helpers:
   `raw` windows, current values, and `daily` rows. `resources/payload.php` projects
   both stored and freshly accumulated data for reports and snapshots; missing
   legacy operation counters default to zero, other malformed metrics return `null`.
+- Usage reporting keeps scalar conversion and formatting inside their consumers.
+  Terminal stats retain their help exit status and text layouts, including raw
+  percentages beside clamped bars. Traffic columns retain unitless default rates
+  and the extended display's 1000 MiB/s scaling threshold.
 - pmssStatsStatusModelBuild(?string $uid, ?bool $dockerEnabledPolicy, ?callable $runner=null, array $overrides=[]): array
   - Builds the customer-panel VPN/app/Docker status model; WireGuard and
     OpenVPN use customer-readable interface presence (`wg0`, `tun0`) instead of

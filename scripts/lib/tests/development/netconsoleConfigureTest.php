@@ -31,7 +31,7 @@ class NetconsoleConfigureTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-netconsole-missing-');
         $logs = [];
         $this->pmssWithEnv($this->netconsoleEnv($dir), function () use (&$logs): void {
-            \pmssNetconsoleConfigure(function (string $message) use (&$logs): void { $logs[] = $message; });
+            \pmssNetconsoleConfigure($this->pmssMakeArrayLogger($logs));
         });
 
         $this->assertTrue($this->pmssMessagesContain($logs, 'No netconsole configuration'), 'expected missing-config skip log');

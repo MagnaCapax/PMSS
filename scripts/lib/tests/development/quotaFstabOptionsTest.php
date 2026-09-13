@@ -5,6 +5,30 @@ require_once dirname(__DIR__, 2).'/update/services/quota.php';
 
 class QuotaFstabOptionsTest extends TestCase
 {
+    public function testMountPoliciesPreserveMessagesDefaultsAndReruns(): void
+    {
+        foreach (['quota' => 'usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1', 'journal' => 'commit=60', 'nofail' => 'defaults,nofail'] as $policy => $options) {
+            $fstab = $this->makeQuotaFstab("UUID=abc /home ext4 defaults 0 0\n");
+            $apply = function (callable $logger) use ($policy, $fstab): void {
+                if ($policy === 'quota') \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
+                elseif ($policy === 'journal') \pmssEnsureJournalCommitOption('/home', 60, $logger, $fstab);
+                else \pmssEnsureMountNofailOption('/home', $logger, $fstab);
+            };
+            $messages = $this->pmssArrayLoggerMessages($apply);
+            $expected = "UUID=abc\t/home\text4\t{$options}\t0\t0\n";
+            $this->assertSame($expected, file_get_contents($fstab));
+            $labels = ['quota' => ['Updated quota options', 'Quota options'], 'journal' => ['Updated journal commit option', 'Journal commit option'], 'nofail' => ['Added nofail option', 'nofail option']][$policy];
+            $added = $policy === 'nofail' ? 'nofail' : $options;
+            $this->assertSame('[WARN] '.$labels[0].' for /home (added '.str_replace(',', ', ', $added).')', $messages[0]);
+            $this->assertSame(['[SKIP] '.$labels[1].' already present for /home'], $this->pmssArrayLoggerMessages($apply));
+            $this->assertSame($expected, file_get_contents($fstab));
+            $this->assertSame(1, count(glob($fstab.'.pmss-backup-*') ?: []));
+            file_put_contents($fstab, "UUID=abc /srv ext4 defaults 0 0\n");
+            $missing = ['quota' => 'quota updates', 'journal' => 'journal commit update', 'nofail' => 'nofail update'][$policy];
+            $this->assertSame(['[WARN] Mount point /home not found in '.$fstab.'; skipping '.$missing.'.'], $this->pmssArrayLoggerMessages($apply));
+        }
+    }
+
     private function makeQuotaFstab(string $content): string
     {
         ['fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-quota-', $content);

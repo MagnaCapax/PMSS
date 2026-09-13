@@ -46,7 +46,9 @@ function pmssLighttpdWatchdogQuotaStateParse(string $output): ?array
 /** Read live quota state, falling back to ~/.quota only when output is empty. */
 function pmssLighttpdWatchdogQuotaStateRead(string $username, string $homeDir): ?array
 {
-    $quotaResult = pmssLighttpdWatchdogCommandCapture('quota', '-u '.escapeshellarg($username).' -s 2>/dev/null');
+    // An unquotable account name leaves the existing snapshot fallback available.
+    $quotaResult = strpos($username, "\0") !== false ? null
+        : pmssLighttpdWatchdogCommandCapture('quota', '-u '.escapeshellarg($username).' -s 2>/dev/null');
     $output = $quotaResult['output'] ?? '';
     if ($output === '') {
         $output = pmssReadRegularFileContents(rtrim($homeDir, '/').'/.quota');

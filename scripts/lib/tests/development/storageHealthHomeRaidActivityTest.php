@@ -51,6 +51,38 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $this->assertEquals('md0', $homeArray);
     }
 
+    public function testRaidSnapshotPathFailuresStayEmpty(): void
+    {
+        $path = $this->pmssWriteRelativeFile($this->tmpDir, 'mdstat', "md1 : active raid1 sda1[0]\n", 0700);
+        foreach (['', "\0", $path."\0suffix", "\0".$path, $this->tmpDir.'/missing'] as $invalid) {
+            $this->assertSame([], \pmssStorageHealthSnapshotRaid('fixture', $invalid));
+        }
+        $this->assertSame(
+            \pmssStorageHealthRaidEntriesParse("md1 : active raid1 sda1[0]\n", 'fixture'),
+            \pmssStorageHealthSnapshotRaid('fixture', $path)
+        );
+        $this->assertSame([], \pmssStorageHealthSnapshotRaid('fixture', $this->pmssWriteFile($path, '')));
+    }
+
+    public function testHomeArrayPathFailuresStayNull(): void
+    {
+        $path = $this->homeMountsPath('/dev/md1');
+        foreach (["\0", $path."\0suffix", "\0".$path, $this->tmpDir.'/missing'] as $invalid) {
+            $this->assertSame(null, \pmssStorageHealthHomeArrayResolve($invalid));
+        }
+        $this->assertSame('md1', \pmssStorageHealthHomeArrayResolve($path));
+        $this->assertSame(null, \pmssStorageHealthHomeArrayResolve($this->pmssWriteFile($path, '')));
+    }
+
+    public function testHomeArrayRejectsNulInsideMountSource(): void
+    {
+        foreach (["/dev/\0md1", "/dev/md1\0suffix", "/dev/md\0/../md1"] as $source) {
+            $path = $this->homeMountsPath($source);
+            $this->assertSame(null, \pmssStorageHealthHomeArrayResolve($path));
+            $this->assertSame(null, \pmssStorageHealthHomeRaidActivity($path, []));
+        }
+    }
+
     public function testResolvesHomeArrayFromNamedMdDevice(): void
     {
         @mkdir($this->tmpDir.'/dev/md', 0700, true);

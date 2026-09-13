@@ -98,13 +98,9 @@ function pmssSupportMessageNormalize(string $message): string
 function pmssSupportDiagnosticsBuild(string $message, ?callable $runner = null): array
 {
     $runner = $runner ?: function (array $argv): array {
-        $parts = [];
-        foreach ($argv as $part) {
-            $parts[] = escapeshellarg($part);
-        }
         $output = [];
         $rc = 0;
-        exec(implode(' ', $parts).' 2>&1', $output, $rc);
+        exec(pmssCommandArgvShellQuote($argv).' 2>&1', $output, $rc);
         return ['rc' => $rc, 'output' => implode("\n", $output)];
     };
 

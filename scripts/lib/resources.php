@@ -83,7 +83,9 @@ function pmssResourceLogLineParse($line)
     foreach ($fields as $offset => $field) {
         $value = $tokens[$offset + 2] ?? '';
         if (!ctype_digit($value)) return false;
+        // Digit-only input can still overflow a float; use the existing parse-failure path.
         $parsed[$field] = (float) $value;
+        if (!is_finite($parsed[$field])) return false;
     }
     return $parsed;
 }

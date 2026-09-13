@@ -15,6 +15,10 @@ require_once __DIR__.'/common.php';
  */
 function pmssStorageHealthSnapshotRaid(string $timestamp, string $mdstatPath = '/proc/mdstat'): array
 {
+    // Invalid paths must use the same empty snapshot as an unavailable proc file.
+    if ($mdstatPath === '' || pmssFilesystemPathHasNulByte($mdstatPath)) {
+        return [];
+    }
     $mdstat = @file_get_contents($mdstatPath);
     return $mdstat === false ? [] : pmssStorageHealthRaidEntriesParse($mdstat, $timestamp);
 }
@@ -64,6 +68,9 @@ function pmssStorageHealthRaidEntriesParse(string $mdstat, string $timestamp): a
 function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
 {
     $mountsPath = ($mountsPath !== null && $mountsPath !== '') ? $mountsPath : '/proc/mounts';
+    if (pmssFilesystemPathHasNulByte($mountsPath)) {
+        return null;
+    }
     if (!is_array($mounts = @file($mountsPath, FILE_IGNORE_NEW_LINES))) {
         return null;
     }
@@ -73,6 +80,10 @@ function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
             continue;
         }
         $source = str_replace('\\040', ' ', (string) $fields[0]);
+        // A malformed mount source cannot be passed safely to realpath().
+        if (pmssFilesystemPathHasNulByte($source)) {
+            return null;
+        }
         return preg_match('#/(md\d+)$#', @realpath($source) ?: $source, $matches) === 1 ? $matches[1] : null;
     }
     return null;

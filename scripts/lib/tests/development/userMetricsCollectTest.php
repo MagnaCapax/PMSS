@@ -36,34 +36,30 @@ class UserMetricsCollectTest extends TestCase
         ]);
 
         $m = \pmssUserMetricsCollect(1000, $root);
-        $this->assertEquals(900, $m['cpu_usage_nsec']);
-        $this->assertEquals(12, $m['cpu_user_ticks']);
-        $this->assertEquals(7, $m['cpu_nr_throttled']);
-        $this->assertEquals(4200, $m['cpu_throttled_nsec']);
-        $this->assertEquals(5000, $m['mem_current']);
-        $this->assertEquals(9000, $m['mem_peak']);
-        $this->assertEquals(2, $m['mem_oom_kill']);
-        $this->assertEquals(3333, $m['mem_rss']);
-        $this->assertEquals(4444, $m['mem_cache']);
-        $this->assertEquals(11, $m['mem_pgmajfault']);
-        $this->assertEquals(21, $m['pids_current']);
-        $this->assertEquals(5, $m['pids_events_max']);
-        $this->assertEquals(1000, $m['io_bytes_read']);
-        $this->assertEquals(2000, $m['io_bytes_write']);
-        $this->assertEquals(10, $m['io_ops_read']);
-        $this->assertEquals(20, $m['io_ops_write']);
+        // Freeze values, integer types, zero retention, and JSON field order together.
+        $this->assertSame([
+            'cpu_usage_nsec' => 900, 'cpu_user_ticks' => 12, 'cpu_system_ticks' => 8,
+            'cpu_nr_periods' => 100, 'cpu_nr_throttled' => 7, 'cpu_throttled_nsec' => 4200,
+            'mem_current' => 5000, 'mem_peak' => 9000, 'mem_failcnt' => 3, 'mem_oom_kill' => 2,
+            'mem_rss' => 3333, 'mem_cache' => 4444, 'mem_swap' => 0, 'mem_pgmajfault' => 11,
+            'pids_current' => 21, 'pids_events_max' => 5,
+            'io_bytes_read' => 1000, 'io_bytes_write' => 2000, 'io_ops_read' => 10, 'io_ops_write' => 20,
+        ], $m);
     }
 
     public function testOmitsAbsentSourcesAndReturnsEmptyWhenNothingReadable(): void
     {
         $this->assertEquals([], \pmssUserMetricsCollect(1000, $this->tree([])));
 
-        // Partial tree: only pids present -> only pids key emitted, no garbage.
-        $root2 = $this->tree(['pids/user.slice/user-1000.slice/pids.current' => "4\n"]);
+        // Invalid counters stay absent; a valid zero must survive omission filtering.
+        $slice = 'user.slice/user-1000.slice/';
+        $root2 = $this->tree([
+            'cpuacct/'.$slice.'cpuacct.usage' => "-1\n", 'cpu/'.$slice.'cpu.stat' => "nr_periods nope\n",
+            'memory/'.$slice.'memory.limit_in_bytes' => "18446744073709551615\n",
+            'pids/'.$slice.'pids.current' => "0\n",
+        ]);
         $m = \pmssUserMetricsCollect(1000, $root2);
-        $this->assertEquals(['pids_current' => 4], $m);
-        $this->assertTrue(!array_key_exists('mem_current', $m));
-        $this->assertTrue(!array_key_exists('io_bytes_read', $m));
+        $this->assertSame(['pids_current' => 0], $m);
     }
 
     public function testBlkioSumsAcrossDevicesAndIgnoresTotalRows(): void

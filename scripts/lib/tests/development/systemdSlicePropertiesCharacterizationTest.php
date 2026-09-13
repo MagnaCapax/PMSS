@@ -41,6 +41,42 @@ class SystemdSlicePropertiesCharacterizationTest extends TestCase
         $this->assertEquals('printf %s ""', \pmssBuildSystemdShowCommand('user-1000.slice', []));
     }
 
+    public function testBuildSystemdShowCommandRejectsNulAtEitherArgumentBoundary(): void
+    {
+        foreach (["\0value", "val\0ue", "value\0", "\0", "\0\0"] as $invalid) {
+            $this->assertEquals('printf %s ""', \pmssBuildSystemdShowCommand($invalid, ['MemoryCurrent']));
+            foreach ([[$invalid], ['MemoryCurrent', $invalid], [$invalid, 'MemoryCurrent']] as $properties) {
+                $this->assertEquals('printf %s ""', \pmssBuildSystemdShowCommand('user-1000.slice', $properties));
+            }
+        }
+    }
+
+    public function testBuildSystemdShowCommandPreservesValidAndSkippedArguments(): void
+    {
+        $this->assertEquals(
+            "systemctl show 'user-1000.slice' -p 'MemoryCurrent' -p 'TasksCurrent' 2>/dev/null",
+            \pmssBuildSystemdShowCommand('user-1000.slice', ['', null, false, 42, [], 'MemoryCurrent', 'TasksCurrent'])
+        );
+        $this->assertEquals('printf %s ""', \pmssBuildSystemdShowCommand('user-1000.slice', ['', null, false, 42, []]));
+        $this->assertEquals(
+            "systemctl show '' -p 'MemoryCurrent' 2>/dev/null",
+            \pmssBuildSystemdShowCommand('', ['MemoryCurrent'])
+        );
+    }
+
+    public function testReadSystemdPropertiesKeepsEmptyResultShapeForNulArguments(): void
+    {
+        // These calls execute only the empty printf fallback, never systemctl.
+        $this->assertEquals(
+            ['MemoryCurrent' => '', 'TasksCurrent' => ''],
+            \pmssReadSystemdProperties("user-1000.slice\0", ['MemoryCurrent', 'TasksCurrent'])
+        );
+        $this->assertEquals(
+            ['MemoryCurrent' => '', "Tasks\0Current" => ''],
+            \pmssReadSystemdProperties('user-1000.slice', ['MemoryCurrent', "Tasks\0Current"])
+        );
+    }
+
     public function testTrailingIntParsesPlainNumericValues(): void
     {
         $this->assertEquals(4096, \pmssSystemdPropertyTrailingInt('4096'));

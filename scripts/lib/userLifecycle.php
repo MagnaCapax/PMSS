@@ -79,32 +79,6 @@ function pmssUserLifecycleContextLogHomeInfo(string $action, string $phase, stri
 }
 
 /**
- * Convert arbitrary log fields into a single-line text-safe representation.
- */
-function pmssUserLifecycleFormatTextField($value): string
-{
-    if ($value === null) {
-        return '';
-    }
-
-    if (is_bool($value)) {
-        $text = $value ? 'true' : 'false';
-    } elseif (is_scalar($value)) {
-        $text = (string) $value;
-    } elseif (is_object($value) && method_exists($value, '__toString')) {
-        $text = (string) $value;
-    } else {
-        $text = gettype($value);
-    }
-
-    $normalized = str_replace(array("\r", "\n", "\t", "\0"), ' ', $text);
-    $normalized = preg_replace('/[[:cntrl:]]+/', ' ', $normalized);
-    $normalized = preg_replace('/\s+/', ' ', trim((string) $normalized));
-
-    return is_string($normalized) ? $normalized : '';
-}
-
-/**
  * Write a user lifecycle audit record to both JSON and human-readable logs.
  */
 function pmssUserWriteLogs(array $payload): void
@@ -120,12 +94,12 @@ function pmssUserWriteLogs(array $payload): void
     pmssJsonLineAppend(PMSS_USER_LOG_JSON, $payload);
 
     // Text line for operators
-    $status  = pmssUserLifecycleFormatTextField($payload['status'] ?? 'INFO');
-    $action  = pmssUserLifecycleFormatTextField($payload['action'] ?? 'unknown');
-    $phase   = pmssUserLifecycleFormatTextField($payload['phase'] ?? 'unknown');
-    $user    = pmssUserLifecycleFormatTextField($payload['username'] ?? '');
-    $message = isset($payload['message']) ? ' msg='.pmssUserLifecycleFormatTextField($payload['message']) : '';
-    $step    = isset($payload['step']) ? ' step='.pmssUserLifecycleFormatTextField($payload['step']) : '';
+    $status  = pmssLogScalarText($payload['status'] ?? 'INFO');
+    $action  = pmssLogScalarText($payload['action'] ?? 'unknown');
+    $phase   = pmssLogScalarText($payload['phase'] ?? 'unknown');
+    $user    = pmssLogScalarText($payload['username'] ?? '');
+    $message = isset($payload['message']) ? ' msg='.pmssLogScalarText($payload['message']) : '';
+    $step    = isset($payload['step']) ? ' step='.pmssLogScalarText($payload['step']) : '';
 
     $text = 'user='.$user.' action='.$action.' phase='.$phase.' status='.$status.$step.$message;
     pmssLogAppendTimestampedLine(PMSS_USER_LOG_TEXT, $text);

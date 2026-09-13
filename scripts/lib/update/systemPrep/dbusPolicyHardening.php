@@ -208,11 +208,7 @@ function pmssEnsureDbusManagedPolicy(string $basename, string $content, string $
         return;
     }
 
-    if (($skipReason = pmssSystemdActionSkipReason('dbus.service', true, true)) !== '') {
-        pmssLogStatus('SKIP', 'Reloading dbus for '.$label.' ('.$skipReason.')');
-        return;
-    }
-
+    if (pmssSystemdActionSkip(pmssSystemdActionSkipReason('dbus.service', true, true), 'Reloading dbus for '.$label)) return;
     runStep('Reloading dbus to apply '.$label, 'systemctl reload dbus');
 }
 

@@ -39,6 +39,25 @@ class MdadmCheckarrayTest extends TestCase
         $this->assertSame('mdstat_unreadable', $plan['reason']);
     }
 
+    public function testDegradedStatePreservesSourcePrecedenceAndUnknowns(): void
+    {
+        foreach ([
+            [null, '[2/2] [UU]', false], [null, '[2/1] [U_]', true],
+            ['', '[2/2] [UU]', false], ['invalid', '[2/1] [U_]', true],
+            ['-1', '[2/2] [UU]', false], ['0', '[2/1] [U_]', false],
+            ['1', '[2/2] [UU]', true], [' 0 ', '', false],
+            [null, '', null], ['invalid', 'unsupported', null],
+            [null, '[2/1] [UU]', true],
+        ] as $index => [$sysfs, $detail, $expected]) {
+            $array = 'md'.$index;
+            if ($sysfs !== null) $this->writeSysfsState($array, $sysfs);
+            $this->assertSame($expected, \pmssMdadmCheckarrayEntryDegradedState(
+                ['array' => $array, 'detail' => $detail], $this->fixtureRoot.'/sys/block/'
+            ));
+        }
+        $this->assertSame(null, \pmssMdadmCheckarrayEntryDegradedState([], $this->fixtureRoot));
+    }
+
     public function testPlanFallsBackWhenMdstatLooksUnsupported(): void
     {
         $mdstat = $this->writeMdstat("md0 : unexpected format without raid level\n");

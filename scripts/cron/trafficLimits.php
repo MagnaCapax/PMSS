@@ -27,8 +27,7 @@ require_once '/scripts/lib/runtime.php';
 $trafficLimitsLock = pmssCronLockAcquire('trafficLimits');
 
 if (!pmssDirEnsureExists('/var/run/pmss/trafficLimits', 0755)) {
-    fwrite(STDERR, "Unable to prepare traffic limit runtime directory\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr("Unable to prepare traffic limit runtime directory\n"));
 }
 
 $trafficLimitPeriod = 3 * 24 * 60 * 60;     // 3 days limiting period

@@ -105,14 +105,12 @@ class CheckWireguardSafetyTest extends TestCase
         $configPath = $this->pmssMakeNamedTempDir('pmss-check-wireguard-', 0700).'/wg0.conf';
         mkdir($configPath);
 
-        $this->pmssWithEnv(['PMSS_WIREGUARD_CONFIG_PATH' => $configPath], function (): void {
-            list($rc, $output) = $this->pmssCaptureStdout(function (): int {
-                return \pmssWireguardCheckMain(['checkWireguard.php']);
-            });
+        list($rc, $output) = $this->pmssCaptureStdout(function (): int {
+            return \pmssWireguardCheckMain(['checkWireguard.php']);
+        }, ['PMSS_WIREGUARD_CONFIG_PATH' => $configPath]);
 
-            $this->assertSame(0, $rc);
-            $this->assertStringContainsString('wireguard config not_regular; skipping check', $output);
-        });
+        $this->assertSame(0, $rc);
+        $this->assertStringContainsString('wireguard config not_regular; skipping check', $output);
     }
 
     public function testMainHandlesPeerReconcileStates(): void
@@ -167,18 +165,16 @@ class CheckWireguardSafetyTest extends TestCase
         $logPath = $this->pmssMakeTempPath('pmss-check-wireguard-', '.log');
         $binDir = $this->writeWireguardCommandStubs($configPath, $logPath, $runningPeers, $syncSucceeds);
 
-        $this->pmssWithPathPrefixedEnv($binDir, [
+        list($rc, $output) = $this->pmssCaptureStdout(function (): int {
+            return \pmssWireguardCheckMain(['checkWireguard.php', '--debug']);
+        }, $this->pmssPathPrefixedEnvironment($binDir, [
             'PMSS_TEST_MODE' => '1',
             'PMSS_WIREGUARD_CONFIG_PATH' => $configPath,
-        ], function () use ($logPath, $outputNeedles, $logRequired, $logForbidden): void {
-            list($rc, $output) = $this->pmssCaptureStdout(function (): int {
-                return \pmssWireguardCheckMain(['checkWireguard.php', '--debug']);
-            });
+        ]));
 
-            $this->assertSame(0, $rc);
-            $this->assertStringContainsAllStrings($outputNeedles, $output);
-            $this->assertStringContainsAndOmitsStrings($logRequired, $logForbidden, (string) file_get_contents($logPath));
-        });
+        $this->assertSame(0, $rc);
+        $this->assertStringContainsAllStrings($outputNeedles, $output);
+        $this->assertStringContainsAndOmitsStrings($logRequired, $logForbidden, (string) file_get_contents($logPath));
     }
 
     /** @param array<int,string> $runningPeers */

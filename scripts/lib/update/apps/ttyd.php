@@ -37,12 +37,8 @@ if (file_exists('/usr/bin/ttyd') || is_link('/usr/bin/ttyd')) {
     @unlink('/usr/bin/ttyd');
 }
 
-$tmp = pmssFetchPinnedRemoteFile('ttyd '.$ttydVersion, $ttydUrl, $ttydSha256);
-if ($tmp === null) {
-    return; // download/checksum failure already logged; dry-run returns null too
-}
-
-echo "*** ttyd not present (or stale), installing {$ttydVersion}!\n";
-runStep('Installing ttyd '.$ttydVersion.' binary',
-    pmssBuildCommand('install', ['-m', '0755', '-o', 'root', '-g', 'root', $tmp, '/usr/bin/ttyd']));
-@unlink($tmp);
+pmssPinnedRemoteArtifactTempFileUse('ttyd '.$ttydVersion, $ttydUrl, $ttydSha256, static function (string $tmp) use ($ttydVersion): void {
+    echo "*** ttyd not present (or stale), installing {$ttydVersion}!\n";
+    runStep('Installing ttyd '.$ttydVersion.' binary',
+        pmssBuildCommand('install', ['-m', '0755', '-o', 'root', '-g', 'root', $tmp, '/usr/bin/ttyd']));
+});

@@ -283,14 +283,20 @@ abstract class TestCase
 
     /**
      * Capture stdout emitted by a callback and return its result alongside the buffer.
+     * Optional environment overrides are restored even when the callback throws.
      *
+     * @param array<string, string|null> $environment
      * @return array{0:mixed,1:string}
      */
-    protected function pmssCaptureStdout(callable $callback): array
+    protected function pmssCaptureStdout(callable $callback, array $environment = []): array
     {
         ob_start();
         try {
-            return [$callback(), (string) ob_get_clean()];
+            $result = null;
+            $this->pmssWithEnv($environment, static function () use ($callback, &$result): void {
+                $result = $callback();
+            });
+            return [$result, (string) ob_get_clean()];
         } catch (\Throwable $e) {
             ob_end_clean();
             throw $e;

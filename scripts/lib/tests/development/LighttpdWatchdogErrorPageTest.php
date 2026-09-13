@@ -6,6 +6,45 @@ require_once dirname(__DIR__, 2).'/lighttpd/watchdogErrorPage.php';
 
 class LighttpdWatchdogErrorPageTest extends TestCase
 {
+    public function testProbeCommandsRejectNulWithoutLaunching(): void
+    {
+        $binDir = $this->pmssMakeTempDir('pmss-watchdog-nul-');
+        $marker = $binDir.'/launched';
+        $stub = "#!/bin/sh\nprintf launched > ".escapeshellarg($marker)."\n";
+        $this->pmssWriteExecutableFiles($binDir, ['df' => $stub, 'quota' => $stub, 'lighttpd' => $stub]);
+        file_put_contents($binDir.'/config', 'fixture');
+        $this->pmssWithPathPrefix($binDir, function () use ($binDir, $marker): void {
+            foreach (["\0", "\0suffix", "prefix\0suffix", "prefix\0", "\0\0"] as $invalid) {
+                $this->assertSame(null, pmssLighttpdWatchdogCommandCapture('df', $invalid));
+                $this->assertSame(null, pmssLighttpdWatchdogCommandCapture('df'.$invalid, ''));
+                $this->assertFalse(pmssLighttpdWatchdogRootInodesExhausted($invalid));
+                $this->assertTrue(pmssLighttpdWatchdogConfigInvalid($binDir.'/config'.$invalid));
+                $this->assertSame(null, pmssLighttpdWatchdogQuotaStateRead($invalid, $binDir));
+            }
+            // A rejected live probe must still use a valid saved quota snapshot.
+            file_put_contents($binDir.'/.quota', "/dev/sda1 10G* 9G 10G 0 0 0\n");
+            $state = pmssLighttpdWatchdogQuotaStateRead("alice\0", $binDir);
+            $this->assertTrue($state['exceeded']);
+            $this->assertFalse(file_exists($marker));
+        });
+    }
+
+    public function testProbeCapturePreservesOutputAndExitCode(): void
+    {
+        $binDir = $this->pmssMakeTempDir('pmss-watchdog-capture-');
+        $this->pmssWriteExecutableFiles($binDir, [
+            'df' => "#!/bin/sh\nprintf '%s\\n' \"\$1\"\nexit \"\$2\"\n",
+        ]);
+        $this->pmssWithPathPrefix($binDir, function (): void {
+            foreach ([['', 0], ['two words', 0], ['quoted\'value', 1], ['line one'.PHP_EOL.'line two', 2], ['0', 7]] as [$value, $rc]) {
+                $this->assertSame(
+                    ['output' => $value.PHP_EOL, 'exitCode' => $rc],
+                    pmssLighttpdWatchdogCommandCapture('df', escapeshellarg($value).' '.$rc)
+                );
+            }
+        });
+    }
+
     private function watchdogErrorPagePath(string $webRoot, string $username = 'alice'): string
     {
         return $webRoot.'/error-502-'.$username.'.html';

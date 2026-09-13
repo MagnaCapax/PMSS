@@ -99,6 +99,8 @@ extension TODO markers for these pending items.
 `cliInput.php` parses options once; `profiles.php` applies selected profiles using
 the policy file's flat fields. `ioPlan.php` resolves devices and plans guarded IO
 writes, while `cliDisplay.php` renders help, configuration, counters, and plans.
+Action checks and latency pairs stay inline in the CLI lifecycle; io.cost
+major:minor lookup stays with its write planner and uses the shared policy validator.
 There is no translated profile catalog or diagnostic-result envelope between
 these modules. The CLI output, return codes, validation, and production v1 pin
 (ADR 0019) remain unchanged; `UserCgroupUtilTest` locks profile/option output.

@@ -116,18 +116,13 @@ class NginxConfigTestTest extends TestCase
     /** @return array{0:int,1:string} */
     private function runConfigTestWithCommands(string $testCommand, ?string $restartCommand, bool $restart): array
     {
-        $captured = [1, ''];
-        $this->pmssWithEnv([
+        return $this->pmssCaptureStdout(function () use ($restart): int {
+            return \pmssCreateNginxConfigTestAndMaybeRestart($restart);
+        }, [
             'PMSS_LOG_DIR' => $this->tempDir.'/logs',
             'PMSS_NGINX_CONFIG_TEST_COMMAND' => $testCommand,
             'PMSS_NGINX_RESTART_COMMAND' => $restartCommand,
-        ], function () use (&$captured, $restart): void {
-            $captured = $this->pmssCaptureStdout(function () use ($restart): int {
-                return \pmssCreateNginxConfigTestAndMaybeRestart($restart);
-            });
-        });
-
-        return $captured;
+        ]);
     }
 
     private function assertCommandEnvFallsBack(string $envKey, string $envValue, string $default): void

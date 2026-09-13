@@ -103,6 +103,11 @@ had live root daemons; the rest died at reboot because the orphan has no unit.
    never launches the command. This is defence in depth for compatibility probes; it does not
    weaken ARR's metadata-only rule.
 
+Implementation: `remoteBinary.php` retains the installer facade and loads
+`remoteBinary/versionProbe.php` for these trust checks. Verified artifacts use
+`remoteBinary/artifact.php`: one callback flow owns downloads through cleanup,
+including failures and dry runs. Installers no longer own temporary download paths.
+
 **Generalised rule:** an installer may download, verify, extract and activate an artifact. It
 may not execute it. Identify software from metadata — release data, a version file, a package
 database, a checksum — never by running it. If a future probe of a potentially-daemonizing

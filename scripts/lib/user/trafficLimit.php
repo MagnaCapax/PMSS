@@ -394,21 +394,18 @@ function pmssUserGiBSettingCli(array $argv, array $spec): int
     $error = null;
     $value = pmssTrafficLimitParseGiB($valueRaw, $error);
     if ($value === null) {
-        fwrite(STDERR, sprintf("Error: invalid %s value (expected integer GiB): %s\n", $spec['invalidOptionLabel'], $error ?: 'invalid'));
-        return 2;
+        return pmssCliReturnWithStderr(sprintf("Error: invalid %s value (expected integer GiB): %s\n", $spec['invalidOptionLabel'], $error ?: 'invalid'), 2);
     }
 
     $prepareTargetModes = $spec['prepareTargetModes'] ?? null;
     if ($prepareTargetModes !== null && !call_user_func($prepareTargetModes, $targetModes)) {
-        fwrite(STDERR, (string) ($spec['prepareError'] ?? 'Error: failed to prepare persisted targets')."\n");
-        return 4;
+        return pmssCliReturnWithStderr((string) ($spec['prepareError'] ?? 'Error: failed to prepare persisted targets')."\n", 4);
     }
 
     $removingValue = ($value === 0);
     $persistError = null;
     if (!pmssTrafficLimitPersistTargetModes($targetModes, $value, $persistError)) {
-        fwrite(STDERR, 'Error: '.($persistError ?: 'failed to persist targets')."\n");
-        return 4;
+        return pmssCliReturnWithStderr('Error: '.($persistError ?: 'failed to persist targets')."\n", 4);
     }
 
     if (function_exists('pmssUserLog')) {

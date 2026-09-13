@@ -227,6 +227,13 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
    iptables owner match; when unavailable `setupNetwork.php` skips those rules
    and logs to `/var/log/pmss/iptables.log`.
 
+Same-version resume markers under `/var/lib/pmss/user-refresh` are checked
+through the shared path-safety predicate before reads or writes, including the
+marker leaf. Symlinks and non-regular markers cannot authorize a resume skip;
+completion writes leave them untouched and use the existing unsafe-marker
+warning. Missing state directories and ordinary marker files retain the usual
+create, update, and signature-matching behavior.
+
 ### User dotfile hooks (`.bashrc.custom` / `.bashrc.user`)
 
 Step 9's per-user refresh force-syncs a fixed set of skeleton files into each home

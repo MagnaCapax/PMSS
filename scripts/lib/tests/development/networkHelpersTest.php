@@ -100,7 +100,7 @@ class NetworkHelpersTest extends TestCase
             ],
         ] as [$runner, $expectedLogs]) {
             $logs = [];
-            $result = \networkLoadMonitoringCommands($runner, static function (string $message) use (&$logs): void { $logs[] = $message; });
+            $result = \networkLoadMonitoringCommands($runner, $this->pmssMakeArrayLogger($logs));
 
             $this->assertEquals([], $result);
             $this->assertSame($expectedLogs, $logs);

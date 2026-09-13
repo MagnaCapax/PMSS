@@ -85,6 +85,9 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   the existing counter sentinel (`PHP_INT_MAX`) before addition can overflow.
   That file follows the existing unavailable-counter fallback and sample guards.
 - `resourceStats.php` – Fold raw resource samples into per-user aggregates twice per hour.
+  Raw-log numbers that overflow a float follow the existing parse-error path.
+  Finite values, historical line formats, and stored-report error handling
+  remain unchanged.
 - `resourceSnapshot.php` – Append a daily root-only snapshot of resource usage for long-term review.
 - `trafficLimits.php` – Refresh per-user traffic throttling configuration (supports staged overage caps via `overageStages` and progressive post-cap reduction via `progressiveThrottleEnabled`, `progressiveThrottleFloorPercent`, and `progressiveThrottleGracePercent` in `/etc/seedbox/config/network`).
 - `iopsLimits.php` – Refresh per-user monthly IOPS throttling by comparing `resourceStats` month totals against `/etc/seedbox/runtime/iopsLimits/<user>` and temporarily capping `/home` read/write IOPS via `userConfigCgroup.php`.

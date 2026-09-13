@@ -12,6 +12,33 @@
 
 require_once __DIR__.'/pathSafety.php';
 
+/** Collapse whitespace without changing caller-owned trimming or byte limits. */
+function pmssLogWhitespaceCollapse(string $text): string { return (string) preg_replace('/\s+/', ' ', $text); }
+
+/** Replace control-character runs while retaining printable column spacing. */
+function pmssLogControlCharactersReplace(string $text): string { return (string) preg_replace('/[[:cntrl:]]+/', ' ', $text); }
+
+/** Convert arbitrary log fields to single-line text, defaulting only when empty. */
+function pmssLogScalarText($value, string $default = ''): string
+{
+    if ($value === null) {
+        return $default;
+    }
+    if (is_bool($value)) {
+        $text = $value ? 'true' : 'false';
+    } elseif (is_scalar($value)) {
+        $text = (string) $value;
+    } elseif (is_object($value) && method_exists($value, '__toString')) {
+        $text = (string) $value;
+    } else {
+        $text = gettype($value);
+    }
+
+    $text = str_replace(array("\r", "\n", "\t", "\0"), ' ', $text);
+    $text = pmssLogWhitespaceCollapse(trim(pmssLogControlCharactersReplace($text)));
+    return $text !== '' ? $text : $default;
+}
+
 if (!function_exists('logmsg')) {
     /** Historical logging function retained for backwards compatibility. */
     function logmsg(string $message): void

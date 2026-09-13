@@ -35,9 +35,7 @@ class PythonVenvHelperTest extends TestCase
             $result = \pmssPythonVenvEnsure(
                 '/tmp/pmss-python-venv-test-missing',
                 'FlexGet',
-                static function (string $message) use (&$messages): void {
-                    $messages[] = $message;
-                },
+                $this->pmssMakeArrayLogger($messages),
                 '[WARN] Skipping FlexGet install: python3 missing from PATH'
             );
 
@@ -55,9 +53,7 @@ class PythonVenvHelperTest extends TestCase
             $result = \pmssPythonVenvEnsure(
                 '/tmp/pmss-python-venv-test-default',
                 'pyLoad',
-                static function (string $message) use (&$messages): void {
-                    $messages[] = $message;
-                }
+                $this->pmssMakeArrayLogger($messages)
             );
 
             $this->assertEquals('', $result);
@@ -83,9 +79,7 @@ class PythonVenvHelperTest extends TestCase
                 $linkPath,
                 '[WARN] Skipping FlexGet install: python3 missing from PATH',
                 '[WARN] FlexGet binary missing after install',
-                static function (string $message) use (&$messages): void {
-                    $messages[] = $message;
-                }
+                $this->pmssMakeArrayLogger($messages)
             );
         });
 
@@ -111,9 +105,7 @@ class PythonVenvHelperTest extends TestCase
                 $linkPath,
                 '[WARN] Skipping pyLoad setup: python3 missing from PATH',
                 '[WARN] pyLoad binary missing after install',
-                static function (string $message) use (&$messages): void {
-                    $messages[] = $message;
-                }
+                $this->pmssMakeArrayLogger($messages)
             );
         });
 
@@ -143,9 +135,7 @@ class PythonVenvHelperTest extends TestCase
                 '/tmp/pmss-python-venv-invalid-link',
                 '[WARN] Skipping FlexGet install: python3 missing from PATH',
                 '[WARN] FlexGet binary missing after install',
-                static function (string $message) use (&$messages): void {
-                    $messages[] = $message;
-                }
+                $this->pmssMakeArrayLogger($messages)
             );
 
             $this->assertEquals(['[WARN] Skipping FlexGet install: unsafe install step'], $messages);
@@ -174,9 +164,7 @@ class PythonVenvHelperTest extends TestCase
                 $case[3],
                 '[WARN] Skipping FlexGet install: python3 missing from PATH',
                 '[WARN] FlexGet binary missing after install',
-                static function (string $message) use (&$messages): void {
-                    $messages[] = $message;
-                }
+                $this->pmssMakeArrayLogger($messages)
             );
 
             $this->assertEquals([$case[4]], $messages);

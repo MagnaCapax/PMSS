@@ -17,9 +17,7 @@ class ArrRootExecutionBlockTest extends TestCase
     private function block(string $configRoot, ?string $timestamp = null): array
     {
         $messages = [];
-        \pmssEnsureArrRootExecutionBlocked(static function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        }, $configRoot, $timestamp);
+        \pmssEnsureArrRootExecutionBlocked($this->pmssMakeArrayLogger($messages), $configRoot, $timestamp);
         return $messages;
     }
 
@@ -197,7 +195,7 @@ class ArrRootExecutionBlockTest extends TestCase
         $messages = array();
         $signals = array();
         $findings = \pmssRootGuardAuditAndKill(
-            static function (string $message) use (&$messages): void { $messages[] = $message; },
+            $this->pmssMakeArrayLogger($messages),
             $procRoot,
             $installRoot,
             static function (int $pid, int $signal) use (&$signals): bool {

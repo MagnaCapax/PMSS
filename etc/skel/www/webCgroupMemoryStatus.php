@@ -20,7 +20,7 @@ require_once __DIR__.'/scriptsInc.php';
 /** Format bytes into a compact human-readable string. */
 function pmssWebCgroupMemoryStatusFormatBytes($bytes, $precision = 1)
 {
-    if (!is_numeric($bytes) || (float) $bytes < 0) {
+    if (!is_numeric($bytes) || !is_finite((float) $bytes) || (float) $bytes < 0) {
         return 'n/a';
     }
 
@@ -85,6 +85,10 @@ function pmssWebCgroupMemoryStatusMemoryStatBreakdownParse($raw)
 
     foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
         if (count($parts = preg_split('/\s+/', trim($line), 2)) !== 2 || !ctype_digit($parts[1])) {
+            continue;
+        }
+        // Digit-only input can still overflow; keep it out of pressure arithmetic.
+        if (!is_finite((float) $parts[1])) {
             continue;
         }
         if ($parts[0] === 'anon' || $parts[0] === 'total_rss') {

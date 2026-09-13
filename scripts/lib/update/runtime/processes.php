@@ -8,6 +8,15 @@
 
 require_once __DIR__.'/commands.php';
 
+/** Report a nonempty skip reason, preserving each caller's profiling contract. */
+function pmssSystemdActionSkip(string $reason, string $description, bool $profile = true): bool
+{
+    if ($reason === '') return false;
+    $message = $description.' ('.$reason.')';
+    $profile ? pmssLogStatus('SKIP', $message) : logmsg('[SKIP] '.$message);
+    return true;
+}
+
 function pmssSystemdActionSkipReason(?string $unit = null, bool $skipInDryRun = false, bool $skipInStrictTestMode = false): string
 {
     if (($skipInDryRun && pmssEnvFlagEnabled('PMSS_DRY_RUN')) || ($skipInStrictTestMode && pmssTestModeEnabled())) return 'test/dry-run';
@@ -52,8 +61,8 @@ function pmssSystemdUnitExists(string $unit): bool
 function pmssSystemdUnitActionIfPresent(string $unit, string $description, string $action, bool $allowFailure = false): void
 {
     $action = trim($action);
-    if (!pmssSystemdUnitActionNameIsSafe($action)) { logmsg("[SKIP] {$description} (invalid systemd action)"); return; }
-    if (($skipReason = pmssSystemdActionSkipReason($unit)) !== '') { logmsg("[SKIP] {$description} ({$skipReason})"); return; }
+    if (!pmssSystemdUnitActionNameIsSafe($action)) { pmssSystemdActionSkip('invalid systemd action', $description, false); return; }
+    if (pmssSystemdActionSkip(pmssSystemdActionSkipReason($unit), $description, false)) return;
     $target = $action === 'enable' ? pmssSystemdUnitDefaultServiceName($unit) : $unit;
     $command = 'systemctl '.$action.' '.escapeshellarg($target);
     runStep($description, $allowFailure ? $command.' || true' : $command);

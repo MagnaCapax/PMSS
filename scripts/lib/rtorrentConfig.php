@@ -3,8 +3,8 @@
  * rTorrent configuration generator and idempotency helper.
  *
  * The legacy class name is a compatibility contract for provisioning scripts.
- * Internally the render path is split into normalization, sizing, and IO
- * helpers so callers keep the same API without carrying one large method.
+ * The class owns defaults, the reservation transaction, and configuration IO;
+ * template rendering and exclusive port allocation live in focused modules.
  *
  * @author Aleksi Ursin
  * @copyright NuCode 2010-2014 - All Rights reserved.
@@ -16,6 +16,8 @@
 require_once __DIR__.'/log.php';
 require_once __DIR__.'/runtime/filesystem.php';
 require_once __DIR__.'/rtorrentPortReservations.php';
+require_once __DIR__.'/rtorrent/configRender.php';
+require_once __DIR__.'/rtorrent/portReservation.php';
 
 class rtorrentConfig
 {
@@ -57,7 +59,13 @@ class rtorrentConfig
         }
 
         $config = $this->configWithPortDefaults($config);
-        return array('configFile' => $this->renderConfigFile($config), 'config' => $config);
+        $configFile = pmssRtorrentConfigRender($this->_template, $config, $this->_resourceConfig);
+        // Localnet publication remains host IO, outside the pure token renderer.
+        if (is_readable('/etc/seedbox/config/localnet')) {
+            @chmod('/etc/seedbox/config/localnet', 0664);
+            $configFile .= "\nipv4_filter.load = /etc/seedbox/config/localnet, preferred";
+        }
+        return array('configFile' => $configFile, 'config' => $config);
     }
     /**
      * Persist rendered configuration text to the user's `.rtorrent.rc` file.
@@ -104,7 +112,7 @@ class rtorrentConfig
      */
     public function readUserConfig($user)
     {
-        if (!$this->userConfigUsernameIsSafe($user)) {
+        if (!pmssRtorrentPortReservationUsernameIsValid($user)) {
             return false;
         }
         $file = $this->userConfigFilePath($user);
@@ -138,41 +146,10 @@ class rtorrentConfig
         }
         return $config;
     }
+    /** Preserve the subclass allocation hook while sharing one exclusive writer. */
     protected function _configPortPrivate($type, $rangeStart = 2000, $rangeEnd = 65000)
     {
-        $type = $this->normalizePortReservationType($type);
-        [$rangeStart, $rangeEnd] = $this->normalizePortReservationRange($rangeStart, $rangeEnd);
-
-        $directoryBase = $this->portReservationBaseDir();
-        $directoryType = $directoryBase.'/'.$type;
-
-        $this->ensureDirectory($directoryBase, 'Unable to create port reservation base directory: ');
-        $this->ensureDirectory($directoryType, 'Unable to create port reservation directory: ');
-
-        $rangeSize = $rangeEnd - $rangeStart + 1;
-        $attempts = min(max($rangeSize * 2, 16), 4096);
-        for ($attempt = 0; $attempt < $attempts; $attempt++) {
-            $port = rand($rangeStart, $rangeEnd);
-            $reserved = $this->tryReservePortFile($directoryType, $port);
-            if ($reserved === true) {
-                return $port;
-            }
-            if ($reserved === null) {
-                throw new RuntimeException('Unable to reserve port file: '.$directoryType.'/'.$port);
-            }
-        }
-
-        for ($port = $rangeStart; $port <= $rangeEnd; $port++) {
-            $reserved = $this->tryReservePortFile($directoryType, $port);
-            if ($reserved === true) {
-                return $port;
-            }
-            if ($reserved === null) {
-                throw new RuntimeException('Unable to reserve port file: '.$directoryType.'/'.$port);
-            }
-        }
-
-        throw new RuntimeException('No available rTorrent '.$type.' port reservation slots');
+        return pmssRtorrentPortReserve($this->portReservationBaseDir(), $type, $rangeStart, $rangeEnd);
     }
 
     /** Return the root directory used for legacy rTorrent port reservations. */
@@ -187,53 +164,7 @@ class rtorrentConfig
         return pmssRtorrentPortReservationLockPath();
     }
 
-    /** Validate the reservation namespace before deriving filesystem paths. */
-    private function normalizePortReservationType($type): string
-    {
-        $type = (string) $type;
-        if (preg_match('/^[a-z][a-z0-9_-]{0,31}$/D', $type) !== 1) {
-            throw new InvalidArgumentException('Invalid rTorrent port reservation type');
-        }
-        return $type;
-    }
-
-    /** Normalize and bound the port range before any reservation attempts. */
-    private function normalizePortReservationRange($rangeStart, $rangeEnd): array
-    {
-        $rangeStart = filter_var($rangeStart, FILTER_VALIDATE_INT);
-        $rangeEnd = filter_var($rangeEnd, FILTER_VALIDATE_INT);
-        if ($rangeStart === false || $rangeEnd === false || $rangeStart < 1 || $rangeEnd > 65535 || $rangeStart > $rangeEnd) {
-            throw new InvalidArgumentException('Invalid rTorrent port reservation range');
-        }
-
-        return [(int) $rangeStart, (int) $rangeEnd];
-    }
-
-    /**
-     * Create one reservation file without following pre-existing paths.
-     *
-     * Returns true when reserved, false when occupied, and null on write error.
-     */
-    private function tryReservePortFile(string $directoryType, int $port): ?bool
-    {
-        $path = $directoryType.'/'.$port;
-        if (is_link($path)) {
-            return false;
-        }
-
-        $handle = @fopen($path, 'x');
-        if ($handle === false) {
-            return (file_exists($path) || is_link($path)) ? false : null;
-        }
-
-        @fclose($handle);
-        if (!is_file($path) || is_link($path)) {
-            @unlink($path);
-            return null;
-        }
-
-        return true;
-    }
+    /** Acquire missing ports as one transaction and unwind only its own markers. */
     private function configWithPortDefaults(array $config): array
     {
         $reserve = array(
@@ -252,90 +183,27 @@ class rtorrentConfig
 
         $reserved = array();
         try {
-            try {
-                foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
-                    if (!$reserve[$type]) {
-                        continue;
-                    }
-                    $port = $this->_configPortPrivate($type, $spec['min'], $spec['max']);
-                    $config[$type.'Port'] = $port;
-                    $reserved[] = array($type, $port);
+            foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
+                if (!$reserve[$type]) {
+                    continue;
                 }
-                return $config;
-            } catch (Throwable $exception) {
-                foreach (array_reverse($reserved) as $reservation) {
-                    if (!pmssRtorrentPortReservationMarkerRemove($this->portReservationBaseDir(), $reservation[0], $reservation[1])) {
-                        logmsg('[WARN] Failed to roll back rTorrent '.$reservation[0].' port reservation');
-                    }
-                }
-                throw $exception;
+                $port = $this->_configPortPrivate($type, $spec['min'], $spec['max']);
+                $config[$type.'Port'] = $port;
+                $reserved[] = array($type, $port);
             }
+            return $config;
+        } catch (Throwable $exception) {
+            foreach (array_reverse($reserved) as $reservation) {
+                if (!pmssRtorrentPortReservationMarkerRemove($this->portReservationBaseDir(), $reservation[0], $reservation[1])) {
+                    logmsg('[WARN] Failed to roll back rTorrent '.$reservation[0].' port reservation');
+                }
+            }
+            throw $exception;
         } finally {
             pmssLockHandleRelease($lock);
         }
     }
 
-    private function renderConfigFile(array $config): string
-    {
-        $sizing = $this->resourceSizing($config);
-        $uploadThrottleLine = '';
-        if (isset($config['uploadThrottle']) && is_numeric($config['uploadThrottle'])) {
-            $uploadThrottle = (int) $config['uploadThrottle'];
-            $uploadThrottleLine = $uploadThrottle > 0 ? 'throttle.global_up.max_rate.set = '.$uploadThrottle : '';
-        }
-        $replacements = [
-            '##minimumPeers' => $sizing['minimumPeers'],
-            '##maximumPeers' => $sizing['maximumPeers'],
-            '##uploadSlotsGlobal' => $sizing['uploadSlots'] * 6,
-            '##uploadSlots' => $sizing['uploadSlots'],
-            '##uploadThrottleLine' => $uploadThrottleLine,
-            '##scgiPort' => $config['scgiPort'],
-            '##dhtPort' => $config['dhtPort'],
-            '##listenPort' => $config['listenPort'],
-            '##pex' => $config['pex'],
-            '##dht' => $config['dht'],
-            '##memoryMax' => $sizing['piecesMemoryMiB'].'M',
-        ];
-        $configFile = str_replace(array_keys($replacements), array_values($replacements), $this->_template);
-        return $this->appendLocalnetFilter($configFile);
-    }
-
-    private function resourceSizing(array $config): array
-    {
-        $resourceConfig = $this->_resourceConfig;
-        $blocks = round(($config['ram'] / $resourceConfig['ramBlock']), 2);
-        $uploadSlots = floor($resourceConfig['uploadSlots'] * $blocks);
-
-        return [
-            'minimumPeers' => ceil($resourceConfig['peers']['minimum'] * $blocks),
-            'maximumPeers' => floor($resourceConfig['peers']['maximum'] * $blocks),
-            'uploadSlots' => $uploadSlots,
-            'piecesMemoryMiB' => $this->piecesMemoryMiB((int) $config['ram']),
-        ];
-    }
-
-    private function piecesMemoryMiB(int $ramMiB): int
-    {
-        $ramMiB = max(0, $ramMiB);
-        $gapMiB = max(250, min(1000, (int) floor($ramMiB * 0.25)));
-        return max(170, $ramMiB - $gapMiB);
-    }
-
-    private function appendLocalnetFilter(string $configFile): string
-    {
-        if (!is_readable('/etc/seedbox/config/localnet')) {
-            return $configFile;
-        }
-        @chmod('/etc/seedbox/config/localnet', 0664);
-        return $configFile."\nipv4_filter.load = /etc/seedbox/config/localnet, preferred";
-    }
-
-    private function ensureDirectory(string $directory, string $errorPrefix): void
-    {
-        if (!pmssDirEnsureExists($directory, 0755)) {
-            throw new RuntimeException($errorPrefix.$directory);
-        }
-    }
     private function loadDefaultResourceConfig(): array
     {
         $path = self::RESOURCE_CONFIG_PATH;
@@ -365,7 +233,7 @@ class rtorrentConfig
 
     private function userConfigFilePath($user): string
     {
-        if (!$this->userConfigUsernameIsSafe($user)) {
+        if (!pmssRtorrentPortReservationUsernameIsValid($user)) {
             throw new InvalidArgumentException('rtorrentConfig requires a valid PMSS username');
         }
 
@@ -387,20 +255,4 @@ class rtorrentConfig
             && pmssPathTargetIsSafe($file, false, true);
     }
 
-    private function userConfigUsernameIsSafe($user): bool
-    {
-        if (!is_string($user)) {
-            return false;
-        }
-        if (function_exists('pmssValidateUsername')) {
-            return pmssValidateUsername($user);
-        }
-
-        // Keep this leaf writer independent of the full user lifecycle
-        // bootstrap; the fallback mirrors pmssUsernameIsValid().
-        $normalized = strtolower(trim($user));
-        return $user !== ''
-            && $normalized === $user
-            && preg_match('/^[a-z][a-z0-9]{0,7}$/D', $normalized) === 1;
-    }
 }

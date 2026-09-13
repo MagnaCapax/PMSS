@@ -72,7 +72,7 @@ class CodexRunnerEventsTest extends CodexLauncherTestCase
         $detail = "tab\t newline\n control\x01 backslash\\ quote\"";
         $args = [$log, 'fixture', 'info', 'check', 'fixture-id', '0', '0', $detail, 'fixture'];
         $result = $this->pmssExecShellCommand('php '.escapeshellarg($this->launcherRoot.'/development/lib/codex-events.php').' '
-            .implode(' ', array_map('escapeshellarg', $args)));
+            .\pmssCommandArgvShellQuote($args));
         $this->assertSame(0, $result['rc'], $result['output']);
         $rows = file($log, FILE_IGNORE_NEW_LINES);
         $this->assertSame(3, count($rows));
@@ -104,7 +104,7 @@ class CodexRunnerEventsTest extends CodexLauncherTestCase
         foreach (['failed', '-1', '0,null'] as $invalid) {
             $args = [$log, 'fixture', 'info', 'check', 'fixture-id', $invalid, '0', 'fixture', 'fixture'];
             $result = $this->pmssExecShellCommand('php '.escapeshellarg($this->launcherRoot.'/development/lib/codex-events.php').' '
-                .implode(' ', array_map('escapeshellarg', $args)));
+                .\pmssCommandArgvShellQuote($args));
             $this->assertSame(2, $result['rc'], $result['output']);
         }
         $this->assertFalse(file_exists($log));

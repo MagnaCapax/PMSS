@@ -8,6 +8,13 @@
 
 require_once __DIR__.'/runtime.php';
 
+/** Accept digit counters only when PHP can represent their exact value. */
+function pmssSystemStatsCounterIsValid(string $value): bool
+{
+    // Normalize padding before comparing; a cast alone silently saturates on overflow.
+    return ctype_digit($value) && (string) (int) $value === (ltrim($value, '0') ?: '0');
+}
+
 /** Convert KiB counters to the compact legacy units used by stats logs. */
 function pmssSystemStatsKbToHuman(int $kb): string
 {
@@ -32,7 +39,7 @@ function pmssSystemStatsTopMemoryFromPsRows(array $rows): string
 
         $command = (string) $parts[0];
         $rssKiB = (string) $parts[1];
-        if ($command === '' || preg_match('/[\s,:[:cntrl:]]/', $command) === 1 || !ctype_digit($rssKiB)) {
+        if ($command === '' || preg_match('/[\s,:[:cntrl:]]/', $command) === 1 || !pmssSystemStatsCounterIsValid($rssKiB)) {
             continue;
         }
 
@@ -91,7 +98,7 @@ function pmssSystemStatsCpuCountersFromRaw(?string $raw): array
     if ($parts === [] || array_shift($parts) !== 'cpu') return [];
 
     foreach ($parts as $value) {
-        if (!is_string($value) || $value === '' || !ctype_digit($value)) return [];
+        if (!is_string($value) || !pmssSystemStatsCounterIsValid($value)) return [];
     }
 
     return array_map('intval', $parts);
@@ -122,7 +129,7 @@ function pmssSystemStatsDiskIoTimeFromRaw(?string $raw): array
         if (($parts = pmssConfigLineColumns($line, 13, [])) === []) continue;
         $name = $parts[2] ?? '';
         $ioTime = (string) ($parts[12] ?? '');
-        if (pmssBlockDeviceNameIsDataDevice($name) && ctype_digit($ioTime)) {
+        if (pmssBlockDeviceNameIsDataDevice($name) && pmssSystemStatsCounterIsValid($ioTime)) {
             $stats[$name] = (int) $ioTime;
         }
     }

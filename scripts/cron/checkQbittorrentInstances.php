@@ -13,7 +13,7 @@ $pmssCheckQbittorrentLock = pmssCronLockAcquire('checkQbittorrentInstances', 'pm
 
 pmssUserWatchdogRunService('qBittorrent', 'qbittorrentEnable', ['qbittorrent-nox'], 'qbittorrent-nox stopped due to suspension', [
     pmssUserWatchdogServiceSpec('qbittorrent-nox', static function (string $thisUser): string {
-        return pmssUserWatchdogSuCommand($thisUser, 'cd ~; nohup qbittorrent-nox -d >> /dev/null 2>&1 &');
+        return pmssBuildUserServiceShellCommand($thisUser, 'cd ~; nohup qbittorrent-nox -d >> /dev/null 2>&1 &');
     }, 'qbittorrent-nox start requested', 'qBittorrent'),
 ], function (string $thisUser): array {
     $running = pmssUserWatchdogProcessRunning($thisUser, 'qbittorrent-nox');

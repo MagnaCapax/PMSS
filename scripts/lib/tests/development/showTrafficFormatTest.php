@@ -98,7 +98,9 @@ class ShowTrafficFormatTest extends TestCase
             [1024.0, '1.00GiB/s'],
             [2048.0, '2.00GiB/s'],
         ] as $case) {
-            $this->assertEquals($case[1], \pmssShowTrafficFormatRateDisplay($case[0]));
+            $rates = array_fill_keys(['week', 'day', 'hour', '15min'], $case[0]);
+            $this->assertSame(array_fill(0, 4, $case[1]), \pmssShowTrafficRateColumns($rates, true));
+            $this->assertSame(array_fill(0, 4, sprintf('%.2f', $case[0])), \pmssShowTrafficRateColumns($rates, false));
         }
     }
 

@@ -18,11 +18,9 @@ function pmssUserTransferBuildQbittorrentCategoryProbe(array $cfg, string $local
     };
 
     return "#!/bin/bash\nset -e\numask 077\n"
-        .pmssUserTransferBuildSshCommand($cfg['remoteUser'], ['-o ConnectTimeout=20', '-o NumberOfPasswordPrompts=1'])
-        .' '.escapeshellarg($cfg['hostname']).' '.escapeshellarg($readRemote($remoteConfig))
+        .pmssUserTransferBuildSshProbeCommand($cfg, $readRemote($remoteConfig))
         .' > '.escapeshellarg($localConfigPath)."\n"
-        .pmssUserTransferBuildSshCommand($cfg['remoteUser'], ['-o ConnectTimeout=20', '-o NumberOfPasswordPrompts=1'])
-        .' '.escapeshellarg($cfg['hostname']).' '.escapeshellarg($readRemote($remoteCategories))
+        .pmssUserTransferBuildSshProbeCommand($cfg, $readRemote($remoteCategories))
         .' > '.escapeshellarg($localCategoriesPath)."\n";
 }
 

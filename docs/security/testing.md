@@ -6,6 +6,10 @@ Security for PMSS emphasizes defense-in-depth on a shared host.
 - Invalid/edge inputs for parsers (spec parsing, config readers) must return safe defaults or explicit errors.
 - File writes must fail safely (temp files, backups, atomic replace) and restore on error.
 - Network-affecting helpers (iptables rendering, FireQOS config) must degrade to no-op rather than partial application.
+- Boot-default activation follows successful managed writes: failed fstab writes
+  must not trigger a `/proc` remount, and failed GRUB defaults writes must not
+  trigger `update-grub`. `BootDefaultsEnsureTest` covers refused targets, missing
+  files, unchanged files, and successful updates with dry-run command profiles.
 
 ## Hermeticity
 - Development tests MUST NOT mutate the real filesystem or network. Use temp dirs and environment overrides (e.g., `PMSS_OS_RELEASE_PATH`, `PMSS_APT_SOURCES_PATH`).

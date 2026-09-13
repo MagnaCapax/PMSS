@@ -10,6 +10,54 @@ use PMSS\Cgroup\SystemInterface;
 
 class UserCgroupUtilTest extends TestCase
 {
+    public function testIntegerFlagsRejectIncompleteMatches(): void
+    {
+        $keys = array_merge(\PMSS\Cgroup\PMSS_CGROUP_INTEGER_OPTIONS, ['cpu-quota-percent']);
+        foreach ($keys as $key) {
+            foreach (["50\n", "-50\n", "50\r\n", "50\0", "\n50", '50 ', '', '5.0', '+50'] as $value) {
+                $suffix = $key === 'cpu-quota-percent' ? ' or infinity' : '';
+                $this->assertSame(
+                    'Invalid --'.$key.' value: expected integer'.$suffix,
+                    \PMSS\Cgroup\pmssCgroupCliValidateFlagOptions([$key => $value], '', '')
+                );
+            }
+        }
+    }
+
+    public function testIntegerFlagsPreserveAcceptedValues(): void
+    {
+        $keys = array_merge(\PMSS\Cgroup\PMSS_CGROUP_INTEGER_OPTIONS, ['cpu-quota-percent']);
+        foreach ($keys as $key) {
+            // Range policy stays downstream; latency alone already requires a positive value.
+            $values = $key === 'io-latency-ms' ? ['1', '050', 50] : ['0', '-1', '050', 50, (string) PHP_INT_MAX];
+            foreach ($values as $value) {
+                $this->assertSame(null, \PMSS\Cgroup\pmssCgroupCliValidateFlagOptions([$key => $value], '', ''));
+            }
+        }
+        foreach (['infinity', 'INFINITY', 'Infinity'] as $value) {
+            $this->assertSame(null, \PMSS\Cgroup\pmssCgroupCliValidateFlagOptions(['cpu-quota-percent' => $value], '', ''));
+        }
+    }
+
+    public function testNewlineIntegerFlagsStopBeforeApply(): void
+    {
+        $stub = $this->makeSystemStub('/dev/sdb');
+        $steps = [];
+        $manager = new Manager($stub, static function (string $description, string $command) use (&$steps): int {
+            $steps[] = $command;
+            return 0;
+        });
+        foreach (array_merge(\PMSS\Cgroup\PMSS_CGROUP_INTEGER_OPTIONS, ['cpu-quota-percent']) as $key) {
+            list($rc, $out) = $this->pmssCaptureStdout(static function () use ($manager, $key): int {
+                return $manager->run(['userConfigCgroup.php', 'testuser', '--apply', '--'.$key."=50\n"]);
+            });
+            $this->assertSame(2, $rc);
+            $this->assertSame("user=testuser uid=1000 slice=user-1000.slice mode=v2\n", $out);
+        }
+        $this->assertSame([], $steps);
+        $this->assertFalse($stub->resolved, 'invalid integers must stop before device resolution');
+    }
+
     /** Lock profile precedence, repeated flags, output order, and return codes. */
     public function testCliPipelineSnapshot(): void
     {

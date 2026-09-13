@@ -53,8 +53,8 @@ function runStep(string $description, string $command): int
     $lastOutput  = $dryRun ? [] : ($GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] ?? []);
     $stdout      = $lastOutput['stdout'] ?? '';
     $stderr      = $lastOutput['stderr'] ?? '';
-    $stderrShort = $stderr !== '' ? preg_replace('/\s+/', ' ', trim(substr($stderr, 0, 300))) : '';
-    $stdoutShort = $stdout !== '' ? preg_replace('/\s+/', ' ', trim(substr($stdout, 0, 300))) : '';
+    $stderrShort = $stderr !== '' ? pmssLogWhitespaceCollapse(trim(substr($stderr, 0, 300))) : '';
+    $stdoutShort = $stdout !== '' ? pmssLogWhitespaceCollapse(trim(substr($stdout, 0, 300))) : '';
 
     // Fork failures may occur inside nested scripts (e.g. find/chown) while the
     // wrapper command itself still exits rc=0. Detect known strings and emit a

@@ -64,6 +64,10 @@ Whitespace column parsing belongs in `pmssConfigLineColumns()` from the runtime
 library. Pass the existing minimum column count and `[]` for command output
 whose `#` tokens are data; keep field validation and failure reporting in callers.
 
+Systemd skip reporting belongs in `pmssSystemdActionSkip()`: pass the existing
+reason and description, with `false` for legacy callers that do not record a
+profile entry. Keep reason evaluation at its original point in each flow.
+
 When a helper pattern reaches three similar implementations, extract the shared
 shape before shipping the third clone. The third implementation is the refactor
 trigger, not proof that a duplicated pattern should persist.

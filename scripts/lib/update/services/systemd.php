@@ -39,11 +39,7 @@ function pmssStopDisableMaskSystemdUnit(string $unit, string $label, bool $mask)
  */
 function pmssEnsureSystemdServicesGuardBootUnit(): void
 {
-    if (($skipReason = pmssSystemdActionSkipReason()) !== '') {
-        pmssLogStatus('SKIP', 'Installing PMSS boot-time systemd services guard unit (systemd unavailable)');
-        return;
-    }
-
+    if (pmssSystemdActionSkip(pmssSystemdActionSkipReason(), 'Installing PMSS boot-time systemd services guard unit')) return;
     $template = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/template.systemd.pmss-systemd-services-guard.service';
     if (!is_file($template)) {
         pmssLogStatus('SKIP', 'Installing PMSS boot-time systemd services guard unit (template missing: '.$template.')');
@@ -60,11 +56,7 @@ function pmssEnsureSystemdServicesGuardBootUnit(): void
  */
 function pmssEnsureCronServiceActive(string $context = 'update'): void
 {
-    if (($skipReason = pmssSystemdActionSkipReason('cron.service')) !== '') {
-        logmsg('[SKIP] Ensuring cron service is active ('.$skipReason.')');
-        return;
-    }
-
+    if (pmssSystemdActionSkip(pmssSystemdActionSkipReason('cron.service'), 'Ensuring cron service is active', false)) return;
     if (pmssSystemdUnitState('is-enabled', 'cron.service') === 'masked') {
         logmsg('[WARN] cron.service is masked during '.$context.'; unmasking immediately');
         runStep('Unmasking cron service ('.$context.')', 'systemctl unmask cron.service || true');
@@ -352,11 +344,7 @@ function pmssStopDisableMaskSeedboxSystemServices(): void
 function pmssPurgeFailedUnbound(): void
 {
     // Skip if systemd is not available (containers, very old systems)
-    if (($skipReason = pmssSystemdActionSkipReason()) !== '') {
-        pmssLogStatus('SKIP', 'Checking unbound service status (systemd unavailable)');
-        return;
-    }
-
+    if (pmssSystemdActionSkip(pmssSystemdActionSkipReason(), 'Checking unbound service status')) return;
     if (pmssSystemdUnitState('is-active', 'unbound') !== 'failed') {
         return;
     }

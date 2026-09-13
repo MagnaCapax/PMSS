@@ -91,44 +91,19 @@ function pmssRunProfiledCallableBatch(array $steps): void
 }
 
 /**
- * Convert profile fields to log-safe scalar text.
- */
-function pmssProfileScalarText($value, string $default = ''): string
-{
-    if ($value === null) {
-        return $default;
-    }
-    if (is_bool($value)) {
-        $text = $value ? 'true' : 'false';
-    } elseif (is_scalar($value)) {
-        $text = (string) $value;
-    } elseif (is_object($value) && method_exists($value, '__toString')) {
-        $text = (string) $value;
-    } else {
-        $text = gettype($value);
-    }
-
-    $text = str_replace(array("\r", "\n", "\t", "\0"), ' ', $text);
-    $text = preg_replace('/[[:cntrl:]]+/', ' ', $text);
-    $text = preg_replace('/\s+/', ' ', trim((string) $text));
-
-    return is_string($text) && $text !== '' ? $text : $default;
-}
-
-/**
  * Normalize one profile row before summary sorting and JSON persistence.
  */
 function pmssProfileSummaryEntry(array $entry): array
 {
     return array(
-        'description'    => pmssProfileScalarText($entry['description'] ?? null, 'unknown'),
-        'command'        => pmssProfileScalarText($entry['command'] ?? null),
-        'status'         => strtoupper(pmssProfileScalarText($entry['status'] ?? null, 'OTHER')),
+        'description'    => pmssLogScalarText($entry['description'] ?? null, 'unknown'),
+        'command'        => pmssLogScalarText($entry['command'] ?? null),
+        'status'         => strtoupper(pmssLogScalarText($entry['status'] ?? null, 'OTHER')),
         'rc'             => is_numeric($entry['rc'] ?? null) ? (int) $entry['rc'] : 0,
         'duration'       => is_numeric($entry['duration'] ?? null) ? round(max(0.0, (float) $entry['duration']), 4) : 0.0,
         'dry_run'        => (bool) ($entry['dry_run'] ?? false),
-        'stdout_excerpt' => pmssProfileScalarText($entry['stdout_excerpt'] ?? null),
-        'stderr_excerpt' => pmssProfileScalarText($entry['stderr_excerpt'] ?? null),
+        'stdout_excerpt' => pmssLogScalarText($entry['stdout_excerpt'] ?? null),
+        'stderr_excerpt' => pmssLogScalarText($entry['stderr_excerpt'] ?? null),
     );
 }
 

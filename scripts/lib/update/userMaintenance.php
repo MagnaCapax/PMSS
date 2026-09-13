@@ -31,7 +31,10 @@ function pmssUserRefreshMarkerPath(string $user): string
         return '';
     }
 
-    return $dir.'/'.$user;
+    // Check the marker leaf too: a symlink must neither authorize a resume
+    // skip nor redirect the completion write outside the state directory.
+    $path = $dir.'/'.$user;
+    return pmssPathTargetIsSafe($path, false, false, false) ? $path : '';
 }
 
 /** True when the user was already fully refreshed against this signature. */

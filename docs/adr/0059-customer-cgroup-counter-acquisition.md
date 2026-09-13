@@ -27,3 +27,10 @@ Three path builders become one; two counter readers and two memory schemas each
 become one. Classification consumes the output fields instead of a second map.
 Pre-refactor payload snapshots and counter fixtures lock behavior. No new
 customer delivery file, operator-tree dependency, or cgroup-v2 feature is added.
+
+The memory-stat breakdown parser skips digit-only values that overflow to a
+non-finite float, just as it skips malformed counters. An unavailable anonymous
+counter retains the existing current-memory fallback. The memory-status byte
+formatter returns `n/a` for non-finite input. Finite counters, field precedence,
+and valid status payloads remain unchanged; overflow fixtures and the existing
+payload snapshots cover these boundaries.

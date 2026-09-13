@@ -191,10 +191,17 @@ final class CustomerStatsLayoutTest extends TestCase
         $this->assertSame('1024MiB', \pmssStatsTrafficDisplayValue(array('raw' => array('month' => 1024.0)), 'month'));
         $this->assertSame('1TiB', \pmssStatsTrafficDisplayValue(array('raw' => array('month' => 1048577.0)), 'month'));
         $this->assertSame('n/a', \pmssStatsTrafficDisplayValue(array('raw' => array('month' => 'bad')), 'month'));
+        foreach (array(-1 => '0MiB', 0 => '0MiB', 1023 => '1023MiB', 1048576 => '1024GiB') as $value => $expected) {
+            $this->assertSame($expected, \pmssStatsTrafficAmountFormat($value));
+        }
     }
 
     public function testResourceSnapshotRendersRawOnlyMemoryAndRamHours(): void
     {
+        foreach (array(0 => '0 CPU-hours', -3600000000000 => '-1 CPU-hours', 1800000000000 => '0.5 CPU-hours', 7200000000000 => '2 CPU-hours') as $value => $expected) {
+            $snapshot = \pmssStatsResourceSnapshotBuild(array('cpu' => array('raw' => array('month' => (string) $value))));
+            $this->assertSame($expected, $snapshot['cpuDisplay']['month']);
+        }
         $resourceData = array(
             'cpu' => array('raw' => array('month' => 0, 'week' => 0, 'day' => 0, 'hour' => 0)),
             'memory' => array('raw' => array('month' => 3 * 1073741824, 'week' => 2 * 1073741824, 'day' => 1073741824)),

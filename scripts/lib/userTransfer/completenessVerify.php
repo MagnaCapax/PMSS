@@ -100,10 +100,7 @@ function pmssUserTransferBuildRemoteSizeProbe(array $cfg): string
     $remoteHome = '/home/'.$cfg['remoteUser'].'/';
     $remoteCommand = pmssBuildCommand('bash', ['-c', pmssUserTransferBuildHomeStatsShell($remoteHome)]);
 
-    return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshCommand(
-        $cfg['remoteUser'],
-        ['-o ConnectTimeout=20', '-o NumberOfPasswordPrompts=1']
-    ).' '.escapeshellarg($cfg['hostname']).' '.escapeshellarg($remoteCommand)."\n";
+    return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshProbeCommand($cfg, $remoteCommand)."\n";
 }
 
 /**

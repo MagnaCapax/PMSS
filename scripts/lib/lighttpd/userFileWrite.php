@@ -82,6 +82,7 @@ function pmssUserFileApplyMetadata(string $path, string $owner, int $mode, ?stri
 
 /**
  * Atomically replace a regular file, with optional temp-file preparation.
+ * Incomplete writes leave the destination untouched and remove the temp file.
  */
 function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTemp = null): bool
 {
@@ -90,7 +91,7 @@ function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTe
     }
 
     $tmp = @tempnam(dirname($path), basename($path).'.pmss-tmp-');
-    if ($tmp === false || $tmp === '' || is_link($tmp) || !is_file($tmp) || @file_put_contents($tmp, $content) === false) {
+    if ($tmp === false || $tmp === '' || is_link($tmp) || !is_file($tmp) || @file_put_contents($tmp, $content) !== strlen($content)) {
         if (is_string($tmp)) {
             @unlink($tmp);
         }
@@ -266,6 +267,7 @@ function pmssManagedSerializedTargetsWrite(string $serialized, array $targets, c
  *
  * This keeps legacy append workflows on the same path validation rules as the
  * atomic writer so symlinks and non-regular targets are rejected consistently.
+ * A short append reports failure; bytes already appended cannot be rolled back.
  */
 function pmssAppendUserFile(string $path, string $content, string $owner, int $mode): bool
 {
@@ -273,7 +275,7 @@ function pmssAppendUserFile(string $path, string $content, string $owner, int $m
         return false;
     }
 
-    if (@file_put_contents($path, $content, FILE_APPEND | LOCK_EX) === false) {
+    if (@file_put_contents($path, $content, FILE_APPEND | LOCK_EX) !== strlen($content)) {
         return false;
     }
 

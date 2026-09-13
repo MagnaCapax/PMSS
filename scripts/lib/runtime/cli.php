@@ -47,9 +47,25 @@ function pmssRequireCliEntrypointScript(string $baseDir, string $relativePath, b
 {
     pmssPrepareCliEntrypoint($rootRequired, $argvAppend);
     $scriptPath = pmssCliEntrypointScriptResolve($baseDir, $relativePath);
-    if (pmssCliEntrypointScriptStartsWithShebang($scriptPath)) {
-        pmssRunCliEntrypointScriptProcess($scriptPath);
+    // A shebang cannot be included before strict_types; execute that target as a script.
+    $prefix = false;
+    $handle = @fopen($scriptPath, 'rb');
+    if (is_resource($handle)) {
+        $prefix = @fread($handle, 2);
+        @fclose($handle);
     }
+    if ($prefix === '#!') {
+        $argv = $_SERVER['argv'] ?? ($GLOBALS['argv'] ?? []);
+        $argv = is_array($argv) ? $argv : [];
+        $command = escapeshellarg('php').' '.escapeshellarg($scriptPath);
+        for ($i = 1, $argc = count($argv); $i < $argc; $i++) {
+            $command .= ' '.escapeshellarg((string) $argv[$i]);
+        }
+        $rc = 1;
+        passthru($command, $rc);
+        exit((int) $rc);
+    }
+    unset($prefix, $handle);
 
     require_once $scriptPath;
 }
@@ -81,40 +97,6 @@ function pmssCliEntrypointScriptResolve(string $baseDir, string $relativePath): 
     }
 
     return $scriptReal;
-}
-
-/** Detect executable PHP scripts that cannot be safely included before strict_types. */
-function pmssCliEntrypointScriptStartsWithShebang(string $scriptPath): bool
-{
-    $handle = @fopen($scriptPath, 'rb');
-    if (!is_resource($handle)) {
-        return false;
-    }
-
-    $prefix = @fread($handle, 2);
-    @fclose($handle);
-
-    return $prefix === '#!';
-}
-
-/** @param array<int, string> $argv */
-function pmssCliEntrypointScriptCommand(string $scriptPath, array $argv): string
-{
-    $command = escapeshellarg('php').' '.escapeshellarg($scriptPath);
-    for ($i = 1, $argc = count($argv); $i < $argc; $i++) {
-        $command .= ' '.escapeshellarg((string) $argv[$i]);
-    }
-
-    return $command;
-}
-
-function pmssRunCliEntrypointScriptProcess(string $scriptPath): void
-{
-    $argv = $_SERVER['argv'] ?? ($GLOBALS['argv'] ?? []);
-    $command = pmssCliEntrypointScriptCommand($scriptPath, is_array($argv) ? $argv : []);
-    $rc = 1;
-    passthru($command, $rc);
-    exit((int) $rc);
 }
 
 function pmssRunCliEntrypoint(string $scriptPath, callable $main): void

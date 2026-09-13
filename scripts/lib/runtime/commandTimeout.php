@@ -22,23 +22,6 @@ function pmssTimeoutFireLog(string $command, int $intendedSeconds, float $actual
 }
 
 /**
- * Locate coreutils timeout without trusting a PATH lookup inside the generated command.
- *
- * An unresolvable name would make every wrapped command fail as "exec: not found", so the
- * caller degrades to the unwrapped invocation instead when this returns an empty string.
- */
-function pmssCommandTimeoutBinaryPath(): string
-{
-    foreach (['/usr/bin/timeout', '/bin/timeout'] as $candidate) {
-        if (is_executable($candidate)) {
-            return $candidate;
-        }
-    }
-
-    return '';
-}
-
-/**
  * Run the child in its own process group so a timeout can reach daemonizing grandchildren.
  *
  * `proc_terminate()` signals only the DIRECT child. A grandchild that daemonizes survives,
@@ -66,25 +49,27 @@ function pmssCommandProcessGroupWrap(string $bash, int $timeoutSec): string
         return $bash;
     }
 
-    $timeoutBinary = pmssCommandTimeoutBinaryPath();
-    if ($timeoutBinary === '') {
-        // Fail LOUD, never silently. Without coreutils timeout there is no process group, so a
-        // daemonizing grandchild survives the timeout exactly as it did before ADR 0035 -- and an
-        // unannounced fallback is indistinguishable from the fixed state. Silence is what let the
-        // original orphan run as root for 60 days; do not reproduce that property in the fix.
-        $warning = 'WARNING: coreutils timeout not found -- command runs WITHOUT process-group '
-            .'containment; a daemonizing grandchild can survive its timeout (ADR 0035)';
-        // commands.php has no guaranteed log.php in its include chain, and this branch is only
-        // reachable when coreutils is missing -- i.e. exactly when an undefined-function fatal
-        // would be least welcome. error_log() always exists; logmsg() is used when available.
-        function_exists('logmsg') ? logmsg($warning) : error_log($warning);
-        return $bash;
+    // Resolve a fixed executable path: a bare name could fail as "exec: not found".
+    foreach (['/usr/bin/timeout', '/bin/timeout'] as $candidate) {
+        if (is_executable($candidate)) {
+            return 'exec '.$candidate
+                .' --kill-after='.PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT.'s '
+                .($timeoutSec + PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS).'s '
+                .$bash;
+        }
     }
 
-    return 'exec '.$timeoutBinary
-        .' --kill-after='.PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT.'s '
-        .($timeoutSec + PMSS_COMMAND_TIMEOUT_BACKSTOP_GRACE_SECONDS).'s '
-        .$bash;
+    // Fail LOUD, never silently. Without coreutils timeout there is no process group, so a
+    // daemonizing grandchild survives the timeout exactly as it did before ADR 0035 -- and an
+    // unannounced fallback is indistinguishable from the fixed state. Silence is what let the
+    // original orphan run as root for 60 days; do not reproduce that property in the fix.
+    $warning = 'WARNING: coreutils timeout not found -- command runs WITHOUT process-group '
+        .'containment; a daemonizing grandchild can survive its timeout (ADR 0035)';
+    // commands.php has no guaranteed log.php in its include chain, and this branch is only
+    // reachable when coreutils is missing -- i.e. exactly when an undefined-function fatal
+    // would be least welcome. error_log() always exists; logmsg() is used when available.
+    function_exists('logmsg') ? logmsg($warning) : error_log($warning);
+    return $bash;
 }
 
 /**

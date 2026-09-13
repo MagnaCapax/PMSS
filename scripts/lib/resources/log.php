@@ -70,6 +70,24 @@ function pmssCounterStateLockAcquire(string $statePath)
     }
 }
 
+/**
+ * Replace a counter payload on a stream whose lock remains owned by the caller.
+ * A failed seek must not truncate the previous state; failed I/O stops the write.
+ *
+ * @param resource $handle Locked counter-state stream.
+ */
+function pmssCounterStateWritePayload($handle, string $payload): bool
+{
+    if (!is_resource($handle) || get_resource_type($handle) !== 'stream') {
+        return false;
+    }
+    if (!@rewind($handle) || !@ftruncate($handle, 0)) {
+        return false;
+    }
+
+    return @fwrite($handle, $payload) === strlen($payload) && @fflush($handle);
+}
+
 /** Persist counter state under lock and return deltas for the selected fields.
  *
  * @param array<string, int> $deltaCeilings
@@ -96,14 +114,17 @@ function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFie
             : $candidateDelta;
     }
 
-    if ($handle !== false && is_string($payload = pmssJsonEncodeSafe($state))) {
-        @ftruncate($handle, 0);
-        @rewind($handle);
-        @fwrite($handle, $payload);
-        @fflush($handle);
-        chmod($statePath, 0600);
+    try {
+        if ($handle !== false && is_string($payload = pmssJsonEncodeSafe($state))) {
+            $written = pmssCounterStateWritePayload($handle, $payload);
+            $modeSet = @chmod($statePath, 0600);
+            if (!$written || !$modeSet) {
+                error_log('[WARN] Unable to persist counter state: '.json_encode($statePath));
+            }
+        }
+    } finally {
+        if ($handle !== false) { pmssLockHandleRelease($handle); }
     }
-    if ($handle !== false) { pmssLockHandleRelease($handle); }
     return ['delta' => $delta, 'previous_state' => $previousState, 'state' => $state];
 }
 

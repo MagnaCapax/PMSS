@@ -22,6 +22,11 @@ Utility scripts under `scripts/testing/` orchestrate common checks:
 
 These utilities augment existing runners. They do not replace the canonical test entry points.
 
+For in-process tests, `TestCase::pmssCaptureStdout($callback, $environment)`
+returns `[result, output]` and restores temporary environment overrides on success
+or exception. Pass `pmssPathPrefixedEnvironment()` for command stubs; keep
+assertions outside the capture so only the operation's output is collected.
+
 ### Lint Opt-ins (safe defaults)
 - To run all lints locally without impacting dev hosts:
   - `PMSS_LINT_CAMEL=1 scripts/testing/test-all.sh`

@@ -41,8 +41,9 @@ function pmssAptDpkgEnvAssignments(array $overrides = []): array
 /** Keep generated shell prefixes to simple KEY=value environment assignments. */
 function pmssAptDpkgEnvAssignmentIsSafe(string $key, string $value): bool
 {
-    return preg_match('/^[A-Z_][A-Z0-9_]*$/', $key) === 1
-        && preg_match('/^[A-Za-z0-9_@%+=:,.\/-]*$/', $value) === 1;
+    // Unlike $, \z cannot admit a trailing newline into an unquoted assignment.
+    return preg_match('/^[A-Z_][A-Z0-9_]*\z/', $key) === 1
+        && preg_match('/^[A-Za-z0-9_@%+=:,.\/-]*\z/', $value) === 1;
 }
 
 function pmssAptDpkgEnvPrefix(array $overrides = []): string

@@ -73,11 +73,12 @@ function pmssCgroupCliParseFlagInputs(SystemInterface $sys, array $flags, ?strin
 
 /**
  * Reject malformed CLI values before they reach systemctl.
+ * Integer matches consume the entire value, including a final newline.
  */
 function pmssCgroupCliValidateFlagOptions(array $opt, string $ioCostQos, string $ioCostModel): ?string
 {
     foreach (PMSS_CGROUP_INTEGER_OPTIONS as $key) {
-        if (isset($opt[$key]) && preg_match('/^-?[0-9]+$/', (string)$opt[$key]) !== 1) {
+        if (isset($opt[$key]) && preg_match('/^-?[0-9]+$/D', (string)$opt[$key]) !== 1) {
             return 'Invalid --'.$key.' value: expected integer';
         }
     }
@@ -97,7 +98,7 @@ function pmssCgroupCliValidateFlagOptions(array $opt, string $ioCostQos, string 
     }
 
     $quota = (string)$opt['cpu-quota-percent'];
-    if (strtolower($quota) === 'infinity' || preg_match('/^-?[0-9]+$/', $quota) === 1) {
+    if (strtolower($quota) === 'infinity' || preg_match('/^-?[0-9]+$/D', $quota) === 1) {
         return null;
     }
 

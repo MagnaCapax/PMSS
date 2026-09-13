@@ -22,16 +22,6 @@ function pmssCgroupCliDeviceResolve(SystemInterface $sys, string $device, bool $
     return '';
 }
 
-function pmssCgroupCliAppendIoLatencyPair(string $mode, string $devResolved, array $opt, array &$ioPairs): void
-{
-    if (!isset($opt['io-latency-ms']) || (int)$opt['io-latency-ms'] <= 0) return;
-    if ($mode === 'v2' && $devResolved !== '') {
-        $ioPairs[] = 'IODeviceLatencyTargetSec='.$devResolved.' '.(int)$opt['io-latency-ms'].'ms';
-    } elseif ($mode !== 'v2') {
-        echo "[SKIP] IODeviceLatencyTargetSec requires cgroup v2\n";
-    }
-}
-
 /**
  * Build io.cost write operations for qos/model with scheduler safeguards.
  *
@@ -60,8 +50,14 @@ function pmssCgroupCliIoCostWrites(SystemInterface $sys, string $slice, string $
         return [];
     }
 
-    $majorMinor = pmssCgroupCliResolveIoCostMajorMinor($sys, $resolvedDevice);
-    if ($majorMinor === '') {
+    // Resolve decimal major:minor via lsblk, then the existing sysfs fallback.
+    $majorMinor = trim((string) $sys->execute('lsblk -dn -o MAJ:MIN '.escapeshellarg($resolvedDevice).' 2>/dev/null'));
+    if (!\pmssCgroupPolicyMajorMinorIsValid($majorMinor)) {
+        $blockName = basename($resolvedDevice);
+        $majorMinor = strpos($resolvedDevice, '/dev/') === 0 && $blockName !== ''
+            ? trim((string) $sys->readFile('/sys/class/block/'.$blockName.'/dev')) : '';
+    }
+    if (!\pmssCgroupPolicyMajorMinorIsValid($majorMinor)) {
         echo '[WARN] io.cost skipped: unable to resolve major:minor for '.$resolvedDevice."\n";
         return [];
     }
@@ -97,25 +93,4 @@ function pmssCgroupCliIoCostWrites(SystemInterface $sys, string $slice, string $
     }
 
     return $writes;
-}
-
-/** Resolve device major:minor in decimal form for io.cost lines. */
-function pmssCgroupCliResolveIoCostMajorMinor(SystemInterface $sys, string $devicePath): string
-{
-    $majorMinor = trim((string) $sys->execute('lsblk -dn -o MAJ:MIN '.escapeshellarg($devicePath).' 2>/dev/null'));
-    if (preg_match('/^[0-9]+:[0-9]+$/', $majorMinor) === 1) {
-        return $majorMinor;
-    }
-
-    if (strpos($devicePath, '/dev/') === 0) {
-        $blockName = basename($devicePath);
-        if ($blockName !== '') {
-            $devValue = trim((string) $sys->readFile('/sys/class/block/'.$blockName.'/dev'));
-            if (preg_match('/^[0-9]+:[0-9]+$/', $devValue) === 1) {
-                return $devValue;
-            }
-        }
-    }
-
-    return '';
 }

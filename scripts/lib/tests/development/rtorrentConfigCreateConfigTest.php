@@ -6,18 +6,6 @@ require_once dirname(__DIR__, 2).'/rtorrentPortReservationsReconcile.php';
 
 class rtorrentConfigCreateConfigTest extends TestCase
 {
-    private function calculatePiecesMemory(int $ramMiB): int
-    {
-        $ramMiB = max(0, (int)$ramMiB);
-        $gapMiB = (int) floor($ramMiB * 0.25);
-        $gapMiB = max(250, min(1000, $gapMiB));
-        $piecesMemoryMiB = $ramMiB - $gapMiB;
-        if ($piecesMemoryMiB < 170) {
-            $piecesMemoryMiB = 170;
-        }
-        return $piecesMemoryMiB;
-    }
-
     private function skipIfLocalnetPresent(string $label): void
     {
         if (is_readable('/etc/seedbox/config/localnet')) {
@@ -70,25 +58,9 @@ class rtorrentConfigCreateConfigTest extends TestCase
         $this->assertTrue(isset($result['configFile']));
         $this->assertTrue(isset($result['config']));
 
-        $blocks = round(($input['ram'] / $resourceConfig['ramBlock']), 2);
-        $minimumPeers = ceil($resourceConfig['peers']['minimum'] * $blocks);
-        $maximumPeers = floor($resourceConfig['peers']['maximum'] * $blocks);
-        $uploadSlots = floor($resourceConfig['uploadSlots'] * $blocks);
-
-        $expected = implode("\n", [
-            'min='.$minimumPeers,
-            'max='.$maximumPeers,
-            'usg='.($uploadSlots * 6),
-            'us='.$uploadSlots,
-            'throttle.global_up.max_rate.set = '.$input['uploadThrottle'],
-            'scgi='.$input['scgiPort'],
-            'dht='.$input['dhtPort'],
-            'listen='.$input['listenPort'],
-            'pex='.$input['pex'],
-            'dhtmode='.$input['dht'],
-            'mem='.$this->calculatePiecesMemory((int)$input['ram']).'M',
-            '',
-        ]);
+        // Freeze the public render result instead of repeating its sizing formula.
+        $expected = "min=24\nmax=128\nusg=168\nus=28\nthrottle.global_up.max_rate.set = 1234\n"
+            ."scgi=5000\ndht=5001\nlisten=5002\npex=auto\ndhtmode=yes\nmem=750M\n";
 
         $this->assertEquals($expected, (string) $result['configFile']);
         $this->assertEquals($input, $result['config']);
@@ -122,10 +94,17 @@ class rtorrentConfigCreateConfigTest extends TestCase
         ];
 
         $cases = [
+            ['ram' => -1,   'expected' => 170],
+            ['ram' => 0,    'expected' => 170],
             ['ram' => 250,  'expected' => 170],
+            ['ram' => 420,  'expected' => 170],
+            ['ram' => 421,  'expected' => 171],
             ['ram' => 500,  'expected' => 250],
             ['ram' => 1000, 'expected' => 750],
             ['ram' => 2000, 'expected' => 1500],
+            ['ram' => 3999, 'expected' => 3000],
+            ['ram' => 4000, 'expected' => 3000],
+            ['ram' => 4001, 'expected' => 3001],
             ['ram' => 8000, 'expected' => 7000],
         ];
 
@@ -283,6 +262,8 @@ class rtorrentConfigCreateConfigTest extends TestCase
         file_put_contents($portRoot.'/scgi/4000', '');
         $cfg = $this->rtorrentPortReservationFixture($portRoot);
 
+        // This seed draws the occupied slot for all 16 random attempts, exercising fallback.
+        srand(21860);
         $port = $cfg->reservePrivatePort('scgi', 4000, 4001);
 
         $this->assertEquals(4001, $port);

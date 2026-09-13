@@ -41,6 +41,10 @@ function pmssLighttpdWatchdogSocketProbeWithRetry(string $socketPath, array $opt
     if ($socketPath === '') {
         return array('ok' => false, 'errno' => 0, 'errstr' => 'socket path missing', 'attempts' => 1);
     }
+    // Reject embedded terminators before a socket API or injected probe sees the path.
+    if (strpos($socketPath, "\0") !== false) {
+        return array('ok' => false, 'errno' => 0, 'errstr' => 'socket path invalid', 'attempts' => 1);
+    }
 
     $result = array('ok' => false, 'errno' => 0, 'errstr' => '', 'attempts' => 0);
     for ($attempt = 1; $attempt <= $attemptCount; $attempt++) {

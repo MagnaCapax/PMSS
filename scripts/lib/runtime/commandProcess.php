@@ -36,8 +36,9 @@ function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $ti
     if ($env !== null) {
         $normalizedEnv = [];
         foreach ($env as $key => $value) {
+            // Consume the entire variable name; $ also matches before a final newline.
             if (!is_string($key)
-                || preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key) !== 1
+                || preg_match('/^[A-Za-z_][A-Za-z0-9_]*\z/', $key) !== 1
                 || (!is_string($value) && !is_int($value) && !is_float($value) && !is_bool($value))
             ) {
                 return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'unsafe proc_open environment', 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];

@@ -117,6 +117,59 @@ class BootDefaultsEnsureTest extends TestCase
         );
     }
 
+    public function testBootDefaultsOnlyActivatesPersistedChanges(): void
+    {
+        $option = 'systemd.unified_cgroup_hierarchy=0';
+        $binDir = $this->pmssMakeExecutableStub('update-grub', "#!/bin/sh\nexit 99\n", 'pmss-boot-bin-');
+        $cases = [
+            // Expected remount/update-grub calls distinguish failure from no change.
+            ['changed', true, true],
+            ['append', true, true],
+            ['unchanged', false, false],
+            ['parent-link', false, false],
+            ['grub-link', true, false],
+            ['missing', false, false],
+        ];
+        foreach ($cases as [$kind, $expectMount, $expectGrub]) {
+            $dir = $this->pmssMakeTempDir('pmss-boot-activation-', 0700);
+            $real = $dir.'/real';
+            mkdir($real, 0700);
+            $fstabBody = $kind === 'append' ? "# no proc entry\n"
+                : 'proc /proc proc defaults'.($kind === 'unchanged' ? ',hidepid=2' : '')." 0 0\n";
+            $grubBody = $kind === 'append' ? "# no cmdline entry\n"
+                : 'GRUB_CMDLINE_LINUX_DEFAULT="quiet'.($kind === 'unchanged' ? ' '.$option : '')."\"\n";
+            if ($kind !== 'missing') {
+                file_put_contents($real.'/fstab', $fstabBody);
+                file_put_contents($real.'/grub', $grubBody);
+            }
+            $fstab = $real.'/fstab';
+            $grub = $real.'/grub';
+            if ($kind === 'parent-link') {
+                symlink($real, $dir.'/linked');
+                $fstab = $dir.'/linked/fstab';
+                $grub = $dir.'/linked/grub';
+            } elseif ($kind === 'grub-link') {
+                symlink($grub, $dir.'/grub');
+                $grub = $dir.'/grub';
+            }
+            $messages = [];
+            $logger = $this->pmssMakeArrayLogger($messages);
+            $this->pmssResetRuntimeProfile();
+            $this->pmssWithPathPrefixedEnv($binDir, ['PMSS_DRY_RUN' => '1'], function () use ($logger, $fstab, $grub, $option): void {
+                \pmssEnsureBootDefaults($logger, $fstab, $grub, $option);
+            });
+            $this->assertSame($expectMount, $this->pmssFindProfileCommand('Remounting /proc') !== null, $kind.' remount');
+            $this->assertSame($expectGrub, $this->pmssFindProfileCommand('Updating GRUB') !== null, $kind.' update-grub');
+            if ($kind === 'parent-link' || $kind === 'grub-link') {
+                $this->assertSame($grubBody, file_get_contents($real.'/grub'), $kind.' preserves grub');
+                $this->assertTrue($this->pmssMessagesContain($messages, '[WARN] Unsafe'), $kind.' warning');
+            }
+            if ($kind === 'parent-link') {
+                $this->assertSame($fstabBody, file_get_contents($real.'/fstab'), 'preserves fstab');
+            }
+        }
+    }
+
     public function testFstabMutationCharacterizationMatrix(): void
     {
         $cases = [
@@ -149,6 +202,7 @@ class BootDefaultsEnsureTest extends TestCase
             }],
             ['label' => 'boot-defaults', 'expect' => "proc\t/proc\tproc\tdefaults,hidepid=2\t0\t0\n", 'log' => 'Updated /proc mount options', 'runner' => function (string $dir, callable $logger): string {
                 $fstab = $dir.'/fstab'; $grub = $dir.'/grub'; file_put_contents($fstab, "proc /proc proc defaults,hidepid=1 0 0\n"); file_put_contents($grub, "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet systemd.unified_cgroup_hierarchy=0\"\n");
+                putenv('PMSS_DRY_RUN=1'); // The preceding matrix case clears this flag.
                 \pmssEnsureBootDefaults($logger, $fstab, $grub, 'systemd.unified_cgroup_hierarchy=0');
                 return (string) file_get_contents($fstab);
             }],

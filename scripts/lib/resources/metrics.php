@@ -37,34 +37,34 @@ function pmssUserMetricsCollect(int $uid, ?string $cgroupRoot = null): array
     $m = [];
 
     // --- CPU (cpuacct + cpu controllers) ---
-    pmssMetricSet($m, 'cpu_usage_nsec', pmssResourceLogReadSysfsCounter($root.'/cpuacct'.$slice.'cpuacct.usage'));
+    $m['cpu_usage_nsec'] = pmssResourceLogReadSysfsCounter($root.'/cpuacct'.$slice.'cpuacct.usage');
     // cpuacct.stat reports user/system in USER_HZ ticks (not ns) — recorded raw.
-    pmssMetricSet($m, 'cpu_user_ticks', pmssResourceLogReadMemoryStatField($root.'/cpuacct'.$slice.'cpuacct.stat', 'user'));
-    pmssMetricSet($m, 'cpu_system_ticks', pmssResourceLogReadMemoryStatField($root.'/cpuacct'.$slice.'cpuacct.stat', 'system'));
+    $m['cpu_user_ticks'] = pmssResourceLogReadMemoryStatField($root.'/cpuacct'.$slice.'cpuacct.stat', 'user');
+    $m['cpu_system_ticks'] = pmssResourceLogReadMemoryStatField($root.'/cpuacct'.$slice.'cpuacct.stat', 'system');
     // CFS throttling (only populated when a CPU quota is set on the slice).
-    pmssMetricSet($m, 'cpu_nr_periods', pmssResourceLogReadMemoryStatField($root.'/cpu'.$slice.'cpu.stat', 'nr_periods'));
-    pmssMetricSet($m, 'cpu_nr_throttled', pmssResourceLogReadMemoryStatField($root.'/cpu'.$slice.'cpu.stat', 'nr_throttled'));
-    pmssMetricSet($m, 'cpu_throttled_nsec', pmssResourceLogReadMemoryStatField($root.'/cpu'.$slice.'cpu.stat', 'throttled_time'));
+    $m['cpu_nr_periods'] = pmssResourceLogReadMemoryStatField($root.'/cpu'.$slice.'cpu.stat', 'nr_periods');
+    $m['cpu_nr_throttled'] = pmssResourceLogReadMemoryStatField($root.'/cpu'.$slice.'cpu.stat', 'nr_throttled');
+    $m['cpu_throttled_nsec'] = pmssResourceLogReadMemoryStatField($root.'/cpu'.$slice.'cpu.stat', 'throttled_time');
 
     // --- Memory (memory controller) ---
-    pmssMetricSet($m, 'mem_current', pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.usage_in_bytes'));
-    pmssMetricSet($m, 'mem_peak', pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.max_usage_in_bytes'));
-    pmssMetricSet($m, 'mem_limit', pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.limit_in_bytes'));
-    pmssMetricSet($m, 'mem_failcnt', pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.failcnt'));
-    pmssMetricSet($m, 'memsw_current', pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.memsw.usage_in_bytes'));
-    pmssMetricSet($m, 'mem_oom_kill', pmssResourceLogReadMemoryStatField($root.'/memory'.$slice.'memory.oom_control', 'oom_kill'));
+    $m['mem_current'] = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.usage_in_bytes');
+    $m['mem_peak'] = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.max_usage_in_bytes');
+    $m['mem_limit'] = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.limit_in_bytes');
+    $m['mem_failcnt'] = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.failcnt');
+    $m['memsw_current'] = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.memsw.usage_in_bytes');
+    $m['mem_oom_kill'] = pmssResourceLogReadMemoryStatField($root.'/memory'.$slice.'memory.oom_control', 'oom_kill');
     // Full memory.stat field set (v1 names).
     foreach ([
         'rss', 'cache', 'rss_huge', 'mapped_file', 'swap', 'shmem', 'dirty', 'writeback',
         'pgfault', 'pgmajfault', 'pgpgin', 'pgpgout',
         'inactive_anon', 'active_anon', 'inactive_file', 'active_file', 'unevictable',
     ] as $field) {
-        pmssMetricSet($m, 'mem_'.$field, pmssResourceLogReadMemoryStatField($root.'/memory'.$slice.'memory.stat', $field));
+        $m['mem_'.$field] = pmssResourceLogReadMemoryStatField($root.'/memory'.$slice.'memory.stat', $field);
     }
 
     // --- PIDs ---
-    pmssMetricSet($m, 'pids_current', pmssResourceLogReadSysfsCounter($root.'/pids'.$slice.'pids.current'));
-    pmssMetricSet($m, 'pids_events_max', pmssResourceLogReadMemoryStatField($root.'/pids'.$slice.'pids.events', 'max'));
+    $m['pids_current'] = pmssResourceLogReadSysfsCounter($root.'/pids'.$slice.'pids.current');
+    $m['pids_events_max'] = pmssResourceLogReadMemoryStatField($root.'/pids'.$slice.'pids.events', 'max');
 
     // --- Block IO (blkio controller) ---
     // Prefer BFQ per-cgroup accounting (fleet-default scheduler on rotational/md hosts); fall
@@ -79,13 +79,8 @@ function pmssUserMetricsCollect(int $uid, ?string $cgroupRoot = null): array
     // The CFQ-era blkio.io_service_time / io_wait_time / io_queued files do not exist under the
     // BFQ or throttle policies on any current host (blk-mq); their reads were dead. Removed (#707).
 
-    return $m;
-}
-
-/** Set a metric only when the value is a usable non-negative integer. */
-function pmssMetricSet(array &$metrics, string $key, ?int $value): void
-{
-    if ($value !== null) $metrics[$key] = $value;
+    // Omit unavailable readings once, retaining zero counters and insertion order.
+    return array_filter($m, static function (?int $value): bool { return $value !== null; });
 }
 
 /** Merge a {read,write} pair into <prefix>_read / <prefix>_write when present. */

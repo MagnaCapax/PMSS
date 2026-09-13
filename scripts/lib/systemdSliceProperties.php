@@ -25,13 +25,25 @@ function pmssParseSystemdPropertyOutput(array $propertyNames, string $output): a
     return $properties;
 }
 
-/** @param array<int, string> $propertyNames */
+/**
+ * Build a read-only property query; NUL arguments use the empty-query fallback
+ * before shell quoting, so malformed input cannot abort a caller's collection.
+ *
+ * @param array<int, string> $propertyNames
+ */
 function pmssBuildSystemdShowCommand(string $unit, array $propertyNames): string
 {
+    if (strpos($unit, "\0") !== false) {
+        return 'printf %s ""';
+    }
     $propertyArgs = [];
     foreach ($propertyNames as $propertyName) {
         if (!is_string($propertyName) || $propertyName === '') {
             continue;
+        }
+        // Reject the whole query instead of collecting a misleading partial set.
+        if (strpos($propertyName, "\0") !== false) {
+            return 'printf %s ""';
         }
         $propertyArgs[] = '-p '.escapeshellarg($propertyName);
     }

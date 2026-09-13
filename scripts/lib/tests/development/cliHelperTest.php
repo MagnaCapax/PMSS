@@ -39,7 +39,11 @@ class CliHelperTest extends TestCase
         foreach ([['runtime', 60, 60], ['idle-util', 85, 70], ['empty', 85, 0]] as $case) {
             $this->assertEquals($case[2], \pmssCliOptionInt($parsed, $case[0], null, $case[1]));
         }
-        $this->assertEquals([true, ['script.php', 'alice']], \pmssCliArgvDebugSplit(['script.php', '--debug', 'alice']));
+        foreach ([[['script.php', '--debug', 'alice'], true, ['script.php', 'alice']], [[], false, []], [['--debug', '--debug', '--debug=1', '-debug'], true, ['--debug=1', '-debug']]] as [$argv, $debug, $remaining]) {
+            $this->assertSame([$debug, $remaining], \pmssCliArgvDebugSplit($argv));
+        }
+        $this->assertSame('', \pmssCliHelpSectionText([], false));
+        $this->assertSame("\033[1mFirst\033[0m\nline\n\n\033[1mEmpty\033[0m", \pmssCliHelpSectionText(['First' => ['line'], 'Empty' => []], true));
     }
 
     public function testSupportsLongAndShortOptionValues(): void

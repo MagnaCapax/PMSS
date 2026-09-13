@@ -45,7 +45,8 @@ function pmssBootDefaultsEnsureProcHidepid(string $fstabPath, callable $log): vo
     }
     if (!$fstabChanged) return;
 
-    pmssWriteManagedPathFileWithBackup($fstabPath, $lines, 'fstab', $log);
+    // Do not activate a mount configuration that could not be persisted.
+    if (!pmssWriteManagedPathFileWithBackup($fstabPath, $lines, 'fstab', $log)) return;
     runStep('Remounting /proc with hidepid=2', pmssBuildCommand('mount', ['-o', 'remount,hidepid=2', '/proc']));
 }
 
@@ -148,7 +149,8 @@ function pmssEnsureBootDefaults(
     if (is_readable($grubPath) && ($lines = file($grubPath, FILE_IGNORE_NEW_LINES)) !== false) {
         $grubChanged = pmssBootDefaultsEnsureGrubOptions($lines, pmssBootDefaultsRequiredGrubOptions($grubOption, $extraGrubOptions), $grubPath, $log);
         $grubChanged = pmssBootDefaultsEnsureGrubSettings($lines, pmssBootDefaultsRequiredGrubSettings($extraGrubSettings), $grubPath, $log) || $grubChanged;
-        if ($grubChanged) pmssWriteManagedPathFileWithBackup($grubPath, $lines, 'grub', $log);
+        // Only regenerate boot configuration after the managed write succeeds.
+        if ($grubChanged) $grubChanged = pmssWriteManagedPathFileWithBackup($grubPath, $lines, 'grub', $log);
     } else {
         $log('[WARN] '.$grubPath.' not readable; skipping grub cmdline update');
     }

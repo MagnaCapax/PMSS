@@ -51,7 +51,7 @@ function pmssSnapshotWarnToken(string $value, string $fallback = 'field'): strin
 function pmssSnapshotWriteWarn($handle, string $timestamp, string $code, array $fields = [], array $output = []): void
 {
     if ($output !== []) {
-        $excerpt = trim((string) preg_replace('/\s+/', ' ', implode(' ', array_slice($output, 0, 5))));
+        $excerpt = trim(pmssLogWhitespaceCollapse(implode(' ', array_slice($output, 0, 5))));
         if ($excerpt !== '') {
             $fields['msg'] = substr($excerpt, 0, 300);
         }

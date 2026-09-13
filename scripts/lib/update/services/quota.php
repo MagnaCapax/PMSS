@@ -15,17 +15,27 @@ pmssRequireRelativeFiles(__DIR__, ['../fstab.php', '../managedPath.php']);
  */
 function pmssEnsureQuotaOptions(string $mountPoint, ?array $requiredOptions = null, ?callable $logger = null, ?string $fstabPath = null): void
 {
+    pmssQuotaFstabOptionsApply($mountPoint, $requiredOptions ?? ['usrjquota=aquota.user', 'grpjquota=aquota.group', 'jqfmt=vfsv1'], 'quota', $logger, $fstabPath);
+}
+
+/** Apply the quota mount policies through one read/plan/backup flow, retaining their log text. */
+function pmssQuotaFstabOptionsApply(string $mountPoint, array $requiredOptions, string $policy, ?callable $logger, ?string $fstabPath): void
+{
     $log = $logger ?: 'logMessage';
     if ($mountPoint === '') {
         return;
     }
     $fstab = $fstabPath ?? '/etc/fstab';
-    $lines = pmssFstabLinesRead($fstab, $log, 'quota configuration.');
+    [$context, $missing, $unchanged, $changed] = [
+        'quota' => ['quota', 'quota updates', 'Quota options', 'Updated quota options'],
+        'journal' => ['journal commit', 'journal commit update', 'Journal commit option', 'Updated journal commit option'],
+        'nofail' => ['nofail', 'nofail update', 'nofail option', 'Added nofail option'],
+    ][$policy];
+    $lines = pmssFstabLinesRead($fstab, $log, $context.' configuration.');
     if ($lines === null) {
         return;
     }
 
-    $requiredOptions = $requiredOptions ?? ['usrjquota=aquota.user', 'grpjquota=aquota.group', 'jqfmt=vfsv1'];
     $replacePrefixedOptions = [];
     foreach ($requiredOptions as $requiredOption) {
         $equalsPosition = strpos($requiredOption, '=');
@@ -33,18 +43,19 @@ function pmssEnsureQuotaOptions(string $mountPoint, ?array $requiredOptions = nu
             $replacePrefixedOptions[substr($requiredOption, 0, $equalsPosition + 1)] = $requiredOption;
         }
     }
-    $plan = pmssFstabMountOptionsEnsure($lines, $mountPoint, $requiredOptions, [], true, null, $replacePrefixedOptions);
+    // nofail adds only its flag; quota and journal updates also drop a lone defaults token.
+    $plan = pmssFstabMountOptionsEnsure($lines, $mountPoint, $requiredOptions, [], $policy !== 'nofail', null, $replacePrefixedOptions);
     if ($plan === null) {
-        $log('[WARN] Mount point '.$mountPoint.' not found in '.$fstab.'; skipping quota updates.');
+        $log('[WARN] Mount point '.$mountPoint.' not found in '.$fstab.'; skipping '.$missing.'.');
         return;
     }
 
     if (!$plan['changed']) {
-        $log('[SKIP] Quota options already present for '.$mountPoint);
+        $log('[SKIP] '.$unchanged.' already present for '.$mountPoint);
         return;
     }
 
-    $log('[WARN] Updated quota options for '.$mountPoint.pmssFstabPlanChangeSuffix($plan));
+    $log('[WARN] '.$changed.' for '.$mountPoint.pmssFstabPlanChangeSuffix($plan));
     pmssWriteManagedPathFileWithBackup($fstab, $lines, 'fstab', $log, true);
 }
 
@@ -61,29 +72,10 @@ function pmssEnsureQuotaOptions(string $mountPoint, ?array $requiredOptions = nu
  */
 function pmssEnsureJournalCommitOption(string $mountPoint, int $seconds = 60, ?callable $logger = null, ?string $fstabPath = null): void
 {
-    $log = $logger ?: 'logMessage';
     if ($mountPoint === '' || $seconds < 1) {
         return;
     }
-    $fstab = $fstabPath ?? '/etc/fstab';
-    $lines = pmssFstabLinesRead($fstab, $log, 'journal commit configuration.');
-    if ($lines === null) {
-        return;
-    }
-
-    $option = 'commit='.$seconds;
-    $plan = pmssFstabMountOptionsEnsure($lines, $mountPoint, [$option], [], true, null, ['commit=' => $option]);
-    if ($plan === null) {
-        $log('[WARN] Mount point '.$mountPoint.' not found in '.$fstab.'; skipping journal commit update.');
-        return;
-    }
-    if (!$plan['changed']) {
-        $log('[SKIP] Journal commit option already present for '.$mountPoint);
-        return;
-    }
-
-    $log('[WARN] Updated journal commit option for '.$mountPoint.pmssFstabPlanChangeSuffix($plan));
-    pmssWriteManagedPathFileWithBackup($fstab, $lines, 'fstab', $log, true);
+    pmssQuotaFstabOptionsApply($mountPoint, ['commit='.$seconds], 'journal', $logger, $fstabPath);
 }
 
 /**
@@ -98,28 +90,7 @@ function pmssEnsureJournalCommitOption(string $mountPoint, int $seconds = 60, ?c
  */
 function pmssEnsureMountNofailOption(string $mountPoint, ?callable $logger = null, ?string $fstabPath = null): void
 {
-    $log = $logger ?: 'logMessage';
-    if ($mountPoint === '') {
-        return;
-    }
-    $fstab = $fstabPath ?? '/etc/fstab';
-    $lines = pmssFstabLinesRead($fstab, $log, 'nofail configuration.');
-    if ($lines === null) {
-        return;
-    }
-
-    $plan = pmssFstabMountOptionsEnsure($lines, $mountPoint, ['nofail']);
-    if ($plan === null) {
-        $log('[WARN] Mount point '.$mountPoint.' not found in '.$fstab.'; skipping nofail update.');
-        return;
-    }
-    if (!$plan['changed']) {
-        $log('[SKIP] nofail option already present for '.$mountPoint);
-        return;
-    }
-
-    $log('[WARN] Added nofail option for '.$mountPoint.pmssFstabPlanChangeSuffix($plan));
-    pmssWriteManagedPathFileWithBackup($fstab, $lines, 'fstab', $log, true);
+    pmssQuotaFstabOptionsApply($mountPoint, ['nofail'], 'nofail', $logger, $fstabPath);
 }
 
 /**
@@ -141,7 +112,7 @@ function pmssWarnUnexpectedQuotaFiles(string $mountPoint, ?callable $logger = nu
         if (strpos($entry, 'aquota.') !== 0 || $entry === 'aquota.user' || $entry === 'aquota.group') {
             continue;
         }
-        $unexpected[] = addcslashes($entry, "\0..\37\177..\377");
+        $unexpected[] = pmssQuotaEscapePathForLog($entry);
     }
 
     if ($unexpected === []) {
@@ -173,13 +144,7 @@ function pmssQuotaCommandRun(string $command, ?callable $runner = null): array
         return ['ok' => false, 'rc' => 1, 'output' => ''];
     }
 
-    if ($runner === null) {
-        $runner = function (string $cmd): array {
-            return pmssCommandCapture($cmd);
-        };
-    }
-
-    $result = $runner($command);
+    $result = ($runner ?? 'pmssCommandCapture')($command);
     if (!is_array($result)) {
         return ['ok' => false, 'rc' => 1, 'output' => ''];
     }

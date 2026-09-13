@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/CounterStateStream.php';
 require_once dirname(__DIR__, 2).'/resources/log.php';
 require_once dirname(__DIR__, 2).'/traffic/ingress.php';
 
@@ -10,6 +11,82 @@ class CounterStateCharacterizationTest extends TestCase
     private function makeRoot(): string
     {
         return $this->pmssMakeTempDir('pmss-counter-state-', 0700);
+    }
+
+    public function testPayloadWriterReplacesLongerStateAndRetainsCallerLock(): void
+    {
+        $path = $this->makeRoot().'/state.json';
+        $this->pmssWriteFile($path, '{"ingress":123456789}');
+        $handle = \pmssCounterStateLockAcquire($path);
+        try {
+            $this->assertTrue(is_resource($handle));
+            stream_get_contents($handle); // Match the caller's EOF position after reading state.
+            $this->assertTrue(\pmssCounterStateWritePayload($handle, '{"ingress":1}'));
+            $this->assertSame('{"ingress":1}', file_get_contents($path));
+            $busy = false;
+            $contender = \pmssLockFileAcquire($path, true, 'c+', false, true, $busy);
+            if ($contender !== false) { \pmssLockHandleRelease($contender); }
+            $this->assertSame(false, $contender);
+            $this->assertTrue($busy);
+        } finally {
+            \pmssLockHandleRelease($handle);
+        }
+    }
+
+    public function testPayloadWriterRejectsInvalidAndClosedHandles(): void
+    {
+        $closed = fopen('php://memory', 'w+');
+        fclose($closed);
+        foreach ([false, null, 0, '', [], new \stdClass(), stream_context_create(), $closed] as $handle) {
+            $this->pmssAssertNoPhpWarnings(function () use ($handle): void {
+                $this->assertFalse(\pmssCounterStateWritePayload($handle, '{}'));
+            });
+        }
+    }
+
+    public function testPayloadWriterStopsAtFailedIoBoundary(): void
+    {
+        $this->assertTrue(stream_wrapper_register('pmsscounterstate', CounterStateStream::class));
+        try {
+            foreach (['seek', 'truncate', 'write', 'short', 'flush', 'success'] as $failure) {
+                $handle = fopen('pmsscounterstate://'.$failure, 'w+');
+                $stream = stream_get_meta_data($handle)['wrapper_data'];
+                try {
+                    $this->assertSame($failure === 'success', \pmssCounterStateWritePayload($handle, '{"ingress":1}'));
+                    $this->assertSame(in_array($failure, ['flush', 'success'], true), in_array('flush', $stream->events, true));
+                    if (in_array($failure, ['seek', 'truncate'], true)) {
+                        $this->assertSame('previous state', $stream->contents);
+                        $this->assertFalse(in_array('write', $stream->events, true));
+                    }
+                    if ($failure === 'seek') {
+                        $this->assertFalse(in_array('truncate', $stream->events, true));
+                    }
+                    if ($failure === 'success') {
+                        $this->assertSame('{"ingress":1}', $stream->contents);
+                    }
+                } finally {
+                    fclose($handle);
+                }
+            }
+        } finally {
+            stream_wrapper_unregister('pmsscounterstate');
+        }
+    }
+
+    public function testUnencodableStatePreservesBaselineAndReleasesLock(): void
+    {
+        $path = $this->makeRoot().'/state.json';
+        $this->pmssWriteFile($path, '{"ingress":100}');
+        $result = \pmssCounterStateUpdate($path, ['ingress' => 160, 'invalid' => NAN], ['ingress']);
+        $this->assertSame(['ingress' => 60], $result['delta']);
+        $this->assertSame(['ingress' => 100], $result['previous_state']);
+        $this->assertSame('{"ingress":100}', file_get_contents($path));
+        $handle = \pmssLockFileAcquire($path, true, 'c+');
+        try {
+            $this->assertTrue(is_resource($handle));
+        } finally {
+            \pmssLockHandleRelease($handle);
+        }
     }
 
     public function testSharedStateCreatesMissingFileWithSelectedDeltaFields(): void

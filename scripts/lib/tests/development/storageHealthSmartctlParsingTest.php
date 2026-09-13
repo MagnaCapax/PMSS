@@ -31,6 +31,11 @@ class StorageHealthSmartctlParsingTest extends TestCase
             ["SMART Health Status: FAILED\n", [], null, 'fail', ['health_not_ok'], []],
             ["SMART Health Status: OK FAIL\n", [], null, 'fail', ['health_not_ok'], []],
             ["Device is in STANDBY mode\n", [], null, 'ok', ['standby'], ['health' => 'STANDBY']],
+            [["SMART Health Status: OK", '190 Temperature 42'], [], null, 'ok', [], ['temp_c' => 42]],
+            [["SMART Health Status: OK", '194 Temperature_Celsius 0'], [], null, 'ok', [], ['temp_c' => 0]],
+            [["SMART Health Status: OK", '194 Temperature_Celsius invalid'], [], null, 'ok', [], ['temp_c' => null]],
+            [["SMART Health Status: OK", '190 Temperature 41', '194 Temperature_Celsius 43'], [], null, 'ok', [], ['temp_c' => 43]],
+            [["SMART Health Status: OK", 'Accumulated power on time, hours:minutes 123:45:06'], [], null, 'ok', [], ['power_on_hours' => 123]],
             [[
                 'SMART Health Status: FAILED',
                 '197 Current_Pending_Sector  0x0012   100   100   000    Old_age   Always       -       1',

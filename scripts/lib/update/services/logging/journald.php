@@ -84,9 +84,6 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
         $policy['rate_limit_interval_sec'],
         $policy['rate_limit_burst']
     ));
-    if (($skipReason = pmssSystemdActionSkipReason(null, true, true)) !== '') {
-        pmssLogStatus('SKIP', 'Restarting systemd-journald to apply log caps ('.$skipReason.')');
-        return;
-    }
+    if (pmssSystemdActionSkip(pmssSystemdActionSkipReason(null, true, true), 'Restarting systemd-journald to apply log caps')) return;
     runStep('Restarting systemd-journald to apply log caps', 'systemctl restart systemd-journald');
 }

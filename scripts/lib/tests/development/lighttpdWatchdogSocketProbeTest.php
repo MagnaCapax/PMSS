@@ -135,6 +135,38 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         $this->assertEquals('socket path missing', $result['errstr']);
     }
 
+    public function testProbeRejectsNulPathsBeforeConnectingOrSleeping(): void
+    {
+        foreach (array("\0", "\0/tmp/php.socket", "/tmp/php\0.socket", "/tmp/php.socket\0", "/tmp/php.socket\0ignored") as $path) {
+            [$result, $probeCalls, $sleepCalls] = $this->runSocketProbeFixture([
+                array('ok' => true, 'errno' => 0, 'errstr' => ''),
+            ], array('socketPath' => $path));
+
+            $expected = array('ok' => false, 'errno' => 0, 'errstr' => 'socket path invalid', 'attempts' => 1);
+            $this->assertSame($expected, $result);
+            $this->assertSame(0, $probeCalls);
+            $this->assertSame(array(), $sleepCalls);
+            // The default transport must take the same guard without opening a socket.
+            $this->assertSame($expected, \pmssLighttpdWatchdogSocketProbeWithRetry($path));
+        }
+    }
+
+    public function testProbePreservesValidPathBytesAndTimeout(): void
+    {
+        foreach (array('/tmp/php.socket', '/tmp/php.socket-0', '/tmp/socket with spaces', 'relative.socket', '/tmp/zero0') as $path) {
+            $seen = array();
+            $result = \pmssLighttpdWatchdogSocketProbeWithRetry($path, array(
+                'timeoutSeconds' => 7,
+                'probe' => static function (string $socketPath, int $timeout) use (&$seen): array {
+                    $seen = array($socketPath, $timeout);
+                    return array('ok' => true, 'errno' => 0, 'errstr' => '');
+                },
+            ));
+            $this->assertSame(array($path, 7), $seen);
+            $this->assertSame(array('ok' => true, 'errno' => 0, 'errstr' => '', 'attempts' => 1), $result);
+        }
+    }
+
     public function testListeningSocketParserAcceptsCurrentNumberedAndLegacyPaths(): void
     {
         $home = '/home/alice';

@@ -67,7 +67,7 @@ function pmssDumpForkDiagnostics(string $context, ?callable $logger = null): voi
         foreach (preg_split('/\r?\n/', $limitsRaw) ?: [] as $limitLine) {
             foreach ($limits as $label => $value) {
                 if ($value === null && strpos($limitLine, $label) === 0) {
-                    $limits[$label] = preg_replace('/\s+/', ' ', trim($limitLine));
+                    $limits[$label] = pmssLogWhitespaceCollapse(trim($limitLine));
                 }
             }
         }

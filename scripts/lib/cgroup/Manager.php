@@ -65,14 +65,15 @@ class Manager
         $mode  = $this->sys->getCgroupMode();
         echo "user=$user uid=$uid slice=$slice mode=$mode\n";
 
-        $actions = $this->actionFlags($flags);
+        // Resolve top-level CLI booleans once, preserving exact flag matching.
+        $actions = [];
+        foreach (self::ACTION_FLAG_MAP as $key => $flag) $actions[$key] = in_array($flag, $flags, true);
         $device = (string) ($inlineOptions['device'] ?? '');
         $ioProfile = strtolower((string) ($inlineOptions['io-profile'] ?? ''));
         $ioCostQos = (string) ($inlineOptions['io-cost-qos'] ?? '');
         $ioCostModel = (string) ($inlineOptions['io-cost-model'] ?? '');
         $ioPairs = $parsedOptions['io'];
         $policyIoPairs = [];
-        $ioCostWrites = [];
         $opt = array_intersect_key($inlineOptions, PMSS_CGROUP_POLICY_OPTIONS + PMSS_CGROUP_NUMERIC_PROFILES);
 
         if ($parseError !== null) {
@@ -85,7 +86,8 @@ class Manager
             return 2;
         }
 
-        if ($actions['wipe'] && $this->wipeHasConflictingInput($opt, $ioPairs, $actions, $device, $ioProfile, $ioCostQos, $ioCostModel)) {
+        if ($actions['wipe'] && (!empty($opt) || !empty($ioPairs) || $actions['defaults'] || $actions['respectExisting']
+            || $device !== '' || $ioProfile !== '' || $ioCostQos !== '' || $ioCostModel !== '')) {
             fwrite(STDERR, "Invalid --wipe combination: remove resource, IO, defaults, and respect-existing options before wiping\n");
             return 2;
         }
@@ -111,14 +113,21 @@ class Manager
             pmssCgroupCliApplyIoProfile($ioProfile, $devResolved, $opt, $ioPairs);
         }
 
-        pmssCgroupCliAppendIoLatencyPair($mode, $devResolved, $opt, $ioPairs);
+        if (isset($opt['io-latency-ms']) && (int)$opt['io-latency-ms'] > 0) {
+            if ($mode === 'v2' && $devResolved !== '') {
+                $ioPairs[] = 'IODeviceLatencyTargetSec='.$devResolved.' '.(int)$opt['io-latency-ms'].'ms';
+            } elseif ($mode !== 'v2') {
+                echo "[SKIP] IODeviceLatencyTargetSec requires cgroup v2\n";
+            }
+        }
         $ioCostWrites = pmssCgroupCliIoCostWrites($this->sys, $slice, $mode, $devResolved, $ioCostQos, $ioCostModel);
 
         if (!empty($policyIoPairs) && empty($ioPairs) && $ioProfile === '' && $device === '') {
-            $ioPairs = array_merge($ioPairs, $policyIoPairs);
+            $ioPairs = $policyIoPairs;
         }
 
-        if (!$actions['status'] && !$actions['config'] && !$this->planHasWork([$opt, $ioPairs, $ioCostWrites, $device, $ioProfile], $actions['wipe'])) {
+        if (!$actions['status'] && !$actions['config'] && !$actions['wipe']
+            && empty($opt) && empty($ioPairs) && empty($ioCostWrites) && empty($device) && empty($ioProfile)) {
             pmssCgroupCliShowConfig($this->sys, $slice);
             pmssCgroupCliShowStatus($this->sys, $slice, $uid);
         }
@@ -178,15 +187,6 @@ class Manager
         return $props;
     }
 
-    /** Resolve top-level CLI booleans once so the run path carries one action shape. */
-    private function actionFlags(array $flags): array { $actions = []; foreach (self::ACTION_FLAG_MAP as $key => $flag) $actions[$key] = in_array($flag, $flags, true); return $actions; }
-
-    private function wipeHasConflictingInput(array $opt, array $ioPairs, array $actions, string $device, string $ioProfile, string $ioCostQos, string $ioCostModel): bool
-    { return !empty($opt) || !empty($ioPairs) || $actions['defaults'] || $actions['respectExisting'] || $device !== '' || $ioProfile !== '' || $ioCostQos !== '' || $ioCostModel !== ''; }
-
-    private function planHasWork(array $items, bool $wipe = false): bool
-    { if ($wipe) return true; foreach ($items as $item) if (!empty($item)) return true; return false; }
-
     private function filterExistingProps(string $slice, bool $enabled, array &$props): void
     {
         if (!$enabled || empty($props)) return;
@@ -202,7 +202,7 @@ class Manager
 
     private function finishPlan(string $slice, int $uid, array $actions, array $props, array $ioPairs, array $ioCostWrites): int
     {
-        if (!$this->planHasWork([$props, $ioPairs, $ioCostWrites], $actions['wipe'])) return 0;
+        if (!$actions['wipe'] && empty($props) && empty($ioPairs) && empty($ioCostWrites)) return 0;
         if (!$actions['apply'] || $actions['dryRun']) {
             echo "(dry-run or no --apply; not changing system)\n";
             return 0;

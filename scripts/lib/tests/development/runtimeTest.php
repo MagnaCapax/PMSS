@@ -438,6 +438,11 @@ class RuntimeTest extends TestCase
             ['' => 'empty-key'],
             ['BAD=KEY' => 'value'],
             ["BAD\nKEY" => 'value'],
+            ["PMSS_PIPE_ENV\n" => 'value'],
+            ["PMSS_PIPE_ENV\r\n" => 'value'],
+            ["PMSS_PIPE_ENV\r" => 'value'],
+            ["PMSS_PIPE_ENV\t" => 'value'],
+            ["PMSS_PIPE_ENV\0" => 'value'],
             ['PMSS_PIPE_ENV' => "bad\0value"],
             ['PMSS_PIPE_ENV' => ['not' => 'scalar']],
         ] as $env) {
@@ -445,6 +450,33 @@ class RuntimeTest extends TestCase
 
             $this->assertPipedCaptureLaunchFailure($result, 19, 'unsafe proc_open environment');
         }
+    }
+
+    public function testPipedCapturePreservesLiteralEnvironmentValues(): void
+    {
+        $env = [
+            'pmss_test_env' => "\nline one\nline two\n",
+            '_PMSS_EMPTY' => '',
+            'PMSS_NUMBER' => 42,
+            'PMSS_FLOAT' => 1.25,
+            'PMSS_TRUE' => true,
+            'PMSS_FALSE' => false,
+        ];
+        // Native process launch may omit empty entries; their effective string value stays empty.
+        $code = 'echo json_encode(array_map(static function ($key) { return (string) getenv($key); }, '
+            .var_export(array_keys($env), true).'));';
+        $command = escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code);
+        $result = \pmssCommandPipedCapture($command, 'pipe-env-literal-test', 2, 0, false, 'proc_open failed', 1, false, 'stream_select failed', null, $env);
+
+        // Direct process values stay literal; only variable names use the identifier grammar.
+        $this->assertSame([
+            'rc' => 0,
+            'stdout' => json_encode(["\nline one\nline two\n", '', '42', '1.25', '1', '']),
+            'stderr' => '',
+            'timed_out' => false,
+            'launch_failed' => false,
+            'pipe_failed' => false,
+        ], $result);
     }
 
     public function testInheritedTtyCaptureKeepsResultShape(): void
@@ -558,6 +590,44 @@ class RuntimeTest extends TestCase
         ]);
         $this->assertStringContainsString('DEBIAN_FRONTEND=readline', $prefix);
         $this->assertStringNotContainsString('$(reboot)', $prefix);
+    }
+
+    public function testAptDpkgEnvAssignmentsRejectControlCharacterBoundaries(): void
+    {
+        $defaultPrefix = 'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none '
+            .'UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
+        $this->assertSame($defaultPrefix, \pmssAptDpkgEnvPrefix());
+
+        foreach (["\n", "\r\n", "\r", "\t", "\0"] as $control) {
+            foreach ([
+                ['DEBIAN_FRONTEND'.$control, 'readline'],
+                [$control.'DEBIAN_FRONTEND', 'readline'],
+                ['DEBIAN_FRONTEND', 'readline'.$control],
+                ['DEBIAN_FRONTEND', $control.'readline'],
+                ['DEBIAN_FRONTEND', $control],
+            ] as [$key, $value]) {
+                $this->assertFalse(\pmssAptDpkgEnvAssignmentIsSafe($key, $value));
+                // Rejected overrides must preserve the default and never enter the shell prefix.
+                $this->assertSame($defaultPrefix, \pmssAptDpkgEnvPrefix([$key => $value]));
+            }
+        }
+    }
+
+    public function testAptDpkgEnvAssignmentsPreserveValidScalarOverrides(): void
+    {
+        $overrides = [
+            'DEBIAN_FRONTEND' => 'readline',
+            '_PMSS_EMPTY' => '',
+            'PMSS_NUMBER' => 42,
+            'PMSS_FLOAT' => 1.25,
+            'PMSS_PUNCTUATION' => 'AZaz09_@%+=:,./-',
+        ];
+        $this->assertSame(
+            'DEBIAN_FRONTEND=readline APT_LISTCHANGES_FRONTEND=none '
+                .'UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a '
+                .'_PMSS_EMPTY= PMSS_NUMBER=42 PMSS_FLOAT=1.25 PMSS_PUNCTUATION=AZaz09_@%+=:,./-',
+            \pmssAptDpkgEnvPrefix($overrides)
+        );
     }
 
     public function testCommandBashInvocationExportsEnvForBareDpkgRecovery(): void

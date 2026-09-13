@@ -39,8 +39,8 @@ function pmssCgroupPolicyMountSourceResolve(string $mountPath, ?callable $runner
     return trim((string) $runner('findmnt -no SOURCE '.$target.' 2>/dev/null'));
 }
 
-/** Accept only kernel major:minor tokens before composing cgroup writes. */
-function pmssCgroupPolicyMajorMinorIsValid(string $majorMinor): bool { return preg_match('/^[0-9]+:[0-9]+$/', $majorMinor) === 1; }
+/** Accept only complete kernel major:minor tokens, without trailing line breaks, before writes. */
+function pmssCgroupPolicyMajorMinorIsValid(string $majorMinor): bool { return preg_match('/^[0-9]+:[0-9]+\z/', $majorMinor) === 1; }
 
 /** Resolve a block device's kernel major:minor token from /sys/block. */
 function pmssCgroupPolicyDeviceMajorMinorResolve(string $devicePath, ?callable $reader = null): ?string

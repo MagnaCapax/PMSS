@@ -5,6 +5,19 @@ require_once dirname(__DIR__, 2).'/runtime.php';
 
 class RuntimeLockSafetyTest extends TestCase
 {
+    public function testRuntimeLockPathPreservesNormalizationAndRejections(): void
+    {
+        $root = is_dir('/run/lock') ? '/run/lock' : '/tmp';
+        foreach (['job.lock', '/job.lock', '///job.lock', ' spaced.lock ', '.hidden'] as $name) {
+            $this->assertSame($root.'/'.ltrim($name, '/'), \pmssRuntimeLockPath($name));
+        }
+        foreach (['', '/', '.', '..', '/..', 'a/b', "bad\nlock", "bad\rlock", "bad\0lock"] as $name) {
+            $this->assertThrowsRuntime(static function () use ($name): void {
+                \pmssRuntimeLockPath($name);
+            }, 'Unsafe runtime lock basename');
+        }
+    }
+
     public function testLockAcquireRejectsUnsafeModesBeforeFilesystemChanges(): void
     {
         $root = $this->pmssMakeTempDir('pmss-runtime-lock-modes-');

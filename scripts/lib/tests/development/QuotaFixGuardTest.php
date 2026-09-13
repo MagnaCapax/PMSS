@@ -55,9 +55,7 @@ class QuotaFixGuardTest extends TestCase
             static function (string $command): array {
                 return ['rc' => 2, 'stdout' => "quota state\n", 'stderr' => ''];
             },
-            static function (string $message) use (&$logs): void {
-                $logs[] = $message;
-            }
+            $this->pmssMakeArrayLogger($logs)
         );
         $criticalResult = \pmssQuotaFixRunCommand(
             '[quotaFix] Re-enabling quotas',
@@ -68,9 +66,7 @@ class QuotaFixGuardTest extends TestCase
             static function (string $command): array {
                 return ['rc' => 5, 'stdout' => '', 'stderr' => "quotaon failed\n"];
             },
-            static function (string $message) use (&$logs): void {
-                $logs[] = $message;
-            }
+            $this->pmssMakeArrayLogger($logs)
         );
         $output = ob_get_clean();
 

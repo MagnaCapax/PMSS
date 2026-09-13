@@ -41,12 +41,6 @@ function pmssCliHelpStyle(string $text, string $code, bool $useColor): string
     return "\033[{$code}m{$text}\033[0m";
 }
 
-/** Render a section title. */
-function pmssCliHelpHeading(string $title, bool $useColor): string
-{
-    return pmssCliHelpStyle($title, '1', $useColor);
-}
-
 /** Render lower-priority default or hint text. */
 function pmssCliHelpDim(string $text, bool $useColor): string
 {
@@ -62,9 +56,10 @@ function pmssCliHelpLine(string $label, string $description, int $width = 40): s
 /** @param array<string,array<int,string>> $sections */
 function pmssCliHelpSectionText(array $sections, bool $useColor): string
 {
-    $lines = [];
-    foreach ($sections as $title => $sectionLines) $lines = array_merge($lines, $lines === [] ? [] : [''], [pmssCliHelpHeading((string) $title, $useColor)], $sectionLines);
-    return implode("\n", $lines);
+    // Flatten once instead of copying all preceding sections on each iteration.
+    $chunks = [];
+    foreach ($sections as $title => $sectionLines) $chunks[] = array_merge($chunks === [] ? [] : [''], [pmssCliHelpStyle((string) $title, '1', $useColor)], $sectionLines);
+    return implode("\n", array_merge([], ...$chunks));
 }
 
 /**

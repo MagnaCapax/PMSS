@@ -45,6 +45,12 @@ file exists and tweak the template under `etc/seedbox/config/template.logrotate.
 if retention needs to change. System stats snapshots append to
 `/var/log/pmss/system-stats.log` and are rotated by the same policy.
 
+System stats reject CPU tick, disk busy-time, and process RSS counters larger
+than PHP's integer range instead of silently saturating them. They use the
+existing malformed-input fallbacks: discard the CPU sample or skip the affected
+disk/process row. Valid counters, including zero-padded values, retain the
+existing log format.
+
 `/etc/logrotate.d/rsyslog` is also converged from
 `etc/seedbox/config/template.logrotate.rsyslog`. PMSS keeps the standard Debian
 rsyslog log list but rotates it daily with `maxsize 500M` so OS log storms

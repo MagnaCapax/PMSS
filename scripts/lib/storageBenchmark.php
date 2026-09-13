@@ -12,7 +12,7 @@ require_once __DIR__.'/storageBenchmark/report.php';
 require_once __DIR__.'/storageHealth/common.php';
 
 /** Emit a legacy CLI fatal error and preserve the historical exit code. */
-function storageBenchmarkFail(string $message): void { fwrite(STDERR, $message); exit(1); }
+function storageBenchmarkFail(string $message): void { exit(pmssCliReturnWithStderr($message)); }
 function storageBenchmarkRequireSizeBytes(string $optionName, string $value, int $minimumBytes = 1, string $minimumLabel = 'positive size'): int { $bytes = preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i', trim($value)) === 1 ? pmssParseSizeToBytes($value, true, true) : null; if ($bytes === null || $bytes <= 0.0) storageBenchmarkFail("Error: {$optionName} must be a positive size (examples: 1G, 512M, 1048576).\n"); if ($bytes < $minimumBytes) storageBenchmarkFail("Error: {$optionName} must be at least {$minimumLabel}.\n"); return (int) $bytes; }
 function storageBenchmarkRequireIntOption(array $parsed, string $optionName, int $default, int $minimum, string $minimumLabel): int { $value = pmssCliOption($parsed, $optionName, null, null); if ($value === null || $value === true) return $default; if (!is_string($value) || !ctype_digit($value) || (int) $value < $minimum) storageBenchmarkFail("Error: --{$optionName} must be a {$minimumLabel} integer.\n"); return (int) $value; }
 function storageBenchmarkRequireJsonLogPath(string $jsonLog): void { $jsonDir = dirname($jsonLog); $jsonDirError = null; if (!pmssLogWriteDirectoryPrepare($jsonDir, 0755, $jsonDirError, true)) storageBenchmarkFail($jsonDirError === 'create' ? "Error: failed to create JSON log directory: {$jsonDir}\n" : "Error: unsafe JSON log path: {$jsonLog}\n"); if (!pmssLogWritePathIsSafe($jsonLog)) storageBenchmarkFail("Error: unsafe JSON log path: {$jsonLog}\n"); }
@@ -44,7 +44,7 @@ function storageBenchmarkMain(array $argv): int
     $idleLatencyMs = storageBenchmarkRequireIntOption($parsed, 'idle-latency-ms', 100, 0, 'non-negative'); $idleUtilPct = storageBenchmarkRequireIntOption($parsed, 'idle-util', 85, 0, 'non-negative');
     $requested = storageBenchmarkRequireSizeBytes('--size', $fileSize); $ddSizeBytes = $testDevices ? storageBenchmarkRequireSizeBytes('--dd-size', $ddSize, 1024 * 1024, '1 MiB') : 0;
     storageBenchmarkRequireJsonLogPath($jsonLog); $targetDir = storageBenchmarkRequireTargetDir($targetDir);
-    if (pmssCommandPath('fio') === '') { fwrite(STDERR, "Error: 'fio' not found.\n"); return 1; }
+    if (pmssCommandPath('fio') === '') return pmssCliReturnWithStderr("Error: 'fio' not found.\n");
 
     $runId = date('YmdHis').'-'.bin2hex(random_bytes(3)); $runTs = date('c');
     $fs = storageBenchmarkRequireCommandField('stat -f -c %T '.escapeshellarg($targetDir), 'filesystem type'); $mntDev = storageBenchmarkRequireCommandField('df -P '.escapeshellarg($targetDir).' | awk '.escapeshellarg('NR==2 {print $1}'), 'mount device');
@@ -54,7 +54,7 @@ function storageBenchmarkMain(array $argv): int
     $iostatUtilPct = storageBenchmarkIostatUtilPctRead('/var/run/pmss/iostat');
     if ($iostatUtilPct !== null) { $pre['iostat_util_pct'] = $iostatUtilPct; if ($pre['iostat_util_pct'] > $idleUtilPct) { $pre['ok'] = false; $pre['warn_util'] = 'iostat util high'; } }
     storageBenchmarkAppendJsonLine($jsonLog, $pre);
-    if ($requireIdle && !$pre['ok']) { fwrite(STDERR, "Busy system (--require-idle): aborting.\n"); return 2; }
+    if ($requireIdle && !$pre['ok']) return pmssCliReturnWithStderr("Busy system (--require-idle): aborting.\n", 2);
 
     $summary = storageBenchmarkRunFileTests($targetDir, $jsonLog, $runTs, $label, $runId, $mntDev, $fs, $requested, $runtime);
     storageBenchmarkPrintFileSummary($targetDir, $jsonLog, $label, $summary);

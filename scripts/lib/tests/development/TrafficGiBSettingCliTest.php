@@ -144,9 +144,7 @@ PHP;
             'alice',
             $homeRoot,
             $runtimeRoot,
-            static function (string $message) use (&$logs): void {
-                $logs[] = $message;
-            }
+            $this->pmssMakeArrayLogger($logs)
         ));
 
         $this->assertSame('750', trim((string) @file_get_contents($homeRoot.'/alice/.trafficLimit')));
@@ -180,9 +178,7 @@ PHP;
             'alice',
             $homeRoot,
             $runtimeRoot,
-            static function (string $message) use (&$logs): void {
-                $logs[] = $message;
-            }
+            $this->pmssMakeArrayLogger($logs)
         ));
 
         $this->assertFalse(file_exists($homeRoot.'/alice/.trafficLimit'));

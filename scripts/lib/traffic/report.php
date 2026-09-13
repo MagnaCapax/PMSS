@@ -187,7 +187,12 @@ function pmssShowTrafficDisplayAmounts(array $rawMiB): array { return array_map(
 
 function pmssShowTrafficRateColumns(array $rates, bool $withUnits): array
 {
-    return array_map(static function (string $key) use ($rates, $withUnits): string { $rate = (float) $rates[$key]; return $withUnits ? pmssShowTrafficFormatRateDisplay($rate) : sprintf('%.2f', $rate); }, ['week', 'day', 'hour', '15min']);
+    return array_map(static function (string $key) use ($rates, $withUnits): string {
+        $rate = (float) $rates[$key];
+        if (!$withUnits) return sprintf('%.2f', $rate);
+        // Extended columns auto-scale from MiB/s to GiB/s at the legacy threshold.
+        return sprintf('%.2f%s', $rate >= 1000 ? $rate / 1024 : $rate, $rate >= 1000 ? 'GiB/s' : 'MiB/s');
+    }, ['week', 'day', 'hour', '15min']);
 }
 
 function pmssShowTrafficLimitDisplays(array $row, bool $useColor): array
@@ -247,6 +252,3 @@ function pmssShowTrafficRawCounters(array $payload): ?array
 
     return $counters;
 }
-
-/** Format a data rate in MiB/s, auto-scaling to GiB/s. */
-function pmssShowTrafficFormatRateDisplay(float $rateMiB): string { return sprintf('%.2f%s', $rateMiB >= 1000 ? $rateMiB / 1024 : $rateMiB, $rateMiB >= 1000 ? 'GiB/s' : 'MiB/s'); }

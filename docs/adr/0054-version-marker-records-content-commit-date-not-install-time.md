@@ -71,6 +71,14 @@ audit; only the ordering-significant marker line changes.
   `pmssGuardSnapshotVersionMove()`, `pmssVersionMoveDecision()`
 - `scripts/lib/tests/development/UpdateBackwardsVersionGuardTest.php`
   (`testRecordedMarkerUsesContentDateNotInstallTime`,
-  `testRecordedMarkerFallsBackToInstallTimeWhenLabelIsDateless`)
+  `testRecordedMarkerKeepsDatelessLabelsIndeterminate`)
 - ADR 0051 (the ordering guard whose premise this restores)
 - ADR 0050 (codeload tarball fallback that can produce dateless labels)
+
+## Correction — 2026-09-12 (Refs #882)
+The install-time fallback above does not preserve indeterminate ordering on the
+next fetch: it fabricates an authoritative date. The writer now returns the bare
+spec when no content-date suffix exists; dated pins and tags retain their ordering.
+This supersedes only the dateless fallback decision. The alternative of relaxing
+the backward-move guard is rejected; its checks remain unchanged. Install time
+stays in metadata, and existing install-time markers are not retroactively repaired.

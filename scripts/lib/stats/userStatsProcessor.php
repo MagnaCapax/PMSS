@@ -25,10 +25,20 @@ abstract class PmssUserStatsProcessor
 
     public function discoverUsers(): array { $items = array_map('basename', array_filter(glob($this->statsDataDir.'/*') ?: [], 'is_file')); sort($items, SORT_NATURAL | SORT_FLAG_CASE); return $items; }
 
+    /** Reject NUL-bearing command arguments before quoting; retain valid detached worker commands. */
     public function spawnWorkers(string $scriptPath, array $users): void
     {
+        if (strpos($scriptPath, "\0") !== false || strpos($this->workerLogPath, "\0") !== false) {
+            logMessage(date('c').': Failed to start stats workers: NUL byte in script or log path');
+            return;
+        }
         $script = escapeshellarg($scriptPath);
         foreach ($users as $user) {
+            // One malformed account must not prevent the remaining workers from starting.
+            if (strpos($user, "\0") !== false) {
+                logMessage(date('c').': Failed to start stats worker: NUL byte in user argument');
+                continue;
+            }
             $command = "nohup {$script} ".escapeshellarg($user)." >> ".escapeshellarg($this->workerLogPath)." 2>&1 &";
             $rc = $this->runSpawnCommand($command);
             if ($rc !== 0) {

@@ -121,8 +121,9 @@ class PmssStatsCliTest extends TestCase
         $this->assertSame(null, \pmssStatsPercent(null, 100.0));
         $this->assertSame(null, \pmssStatsPercent(10.0, 0.0));
         $this->assertEquals(25.0, \pmssStatsPercent(2.0, 8.0));
-        $this->assertSame('[····] n/a', \pmssStatsRenderPercentSuffix(null, 4));
-        $this->assertSame('[████] 150%', \pmssStatsRenderPercentSuffix(150.0, 4));
+        foreach ([[null, '[····] n/a'], [-10.0, '[░░░░] -10%'], [0.0, '[░░░░] 0%'], [12.5, '[█░░░] 13%'], [100.0, '[████] 100%'], [150.0, '[████] 150%']] as [$percent, $expected]) {
+            $this->assertSame($expected, \pmssStatsRenderPercentSuffix($percent, 4));
+        }
     }
 
     public function testRenderTextSnapshotLocksStatsLayouts(): void
@@ -161,7 +162,7 @@ class PmssStatsCliTest extends TestCase
     public function testHelpTextSnapshotLocksCliContract(): void
     {
         list($result, $help) = $this->pmssCaptureStdout(function () {
-            return \pmssStatsParseOptions(['scripts/pmss-stats.php', '--help']);
+            return \pmssStatsMain(['scripts/pmss-stats.php', '--help']);
         });
 
         $expected = "Usage: pmss-stats.php [--full] [--json] [--mini] [--no-header]\n\n";
@@ -172,7 +173,7 @@ class PmssStatsCliTest extends TestCase
         $expected .= "  --no-header  Skip the title box.\n";
         $expected .= "  --help       Show this help.\n\n";
 
-        $this->assertSame(false, $result);
+        $this->assertSame(0, $result);
         $this->assertSame($expected, $help);
     }
 

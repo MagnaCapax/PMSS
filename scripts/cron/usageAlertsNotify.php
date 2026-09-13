@@ -16,8 +16,7 @@ $lock = pmssCronLockAcquire('usageAlertsNotify', static function (): void { });
 
 $result = pmssListManagedUsersResult('/scripts/listUsers.php');
 if ((int) $result['exitCode'] !== 0) {
-    fwrite(STDERR, "event=usage_alerts result=user_list_failed\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr("event=usage_alerts result=user_list_failed\n"));
 }
 
 $failures = 0;

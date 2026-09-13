@@ -4,6 +4,11 @@ PMSS supports optional forwarding of system logs to a central syslog server.
 This feature is **disabled by default** and must be explicitly enabled through
 configuration.
 
+Text formatting lives in `scripts/lib/log.php`: `pmssLogScalarText()` handles
+lifecycle/profile fields, while `pmssLogWhitespaceCollapse()` and
+`pmssLogControlCharactersReplace()` preserve the distinct spacing policies of
+command excerpts and benchmark output. Callers retain trimming and byte limits.
+
 ## Overview
 
 The log shipping infrastructure uses rsyslog with the `imjournal` module to

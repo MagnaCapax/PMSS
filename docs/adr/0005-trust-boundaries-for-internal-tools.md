@@ -113,6 +113,17 @@ We adopt **Option B** and formalise the following trust boundary rules:
      `listUsers.php` (and similar helpers) call `pmssValidateUsername()` or the
      appropriate validator.
 
+## Implementation
+
+Command environment validation consumes the entire variable name. The APT/dpkg
+shell-prefix builder also consumes the entire unquoted value; a final newline
+must not pass either allowlist. Invalid overrides retain the existing skip
+behavior, while invalid direct-process names retain the launch-failure result
+without executing the command or echoing the malformed environment.
+Direct-process values remain literal, including newlines, and keep their existing
+scalar conversion rules. `RuntimeTest` covers control characters at both ends,
+unchanged default/valid prefixes, rejected launches, and literal value capture.
+
 ## Consequences
 
 - **Positive:**

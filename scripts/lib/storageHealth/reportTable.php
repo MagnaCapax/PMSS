@@ -66,11 +66,12 @@ function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestam
         foreach ($rows as $r) {
             $modelWidth = max($modelWidth, min(34, strlen($r['model'])));
         }
-        $fmtHeader = sprintf("%-4s %-4s %-5s %-5s %-".$modelWidth."s %-10s %-5s %-7s %-6s %-6s %s\n", 'MARK', 'SEV', 'DEV', 'SIZE', 'MODEL', 'HEALTH', 'TEMP', 'REALLOC', 'PEND', 'LINK', 'FLAGS');
+        $format = "%-4s %-4s %-5s %-5s %-".$modelWidth."s %-10s %-5s %-7s %-6s %-6s %s\n";
+        $fmtHeader = sprintf($format, 'MARK', 'SEV', 'DEV', 'SIZE', 'MODEL', 'HEALTH', 'TEMP', 'REALLOC', 'PEND', 'LINK', 'FLAGS');
         echo $fmtHeader;
         echo str_repeat('-', max(20, strlen(rtrim($fmtHeader)))).PHP_EOL;
         foreach ($rows as $r) {
-            printf("%-4s %-4s %-5s %-5s %-".$modelWidth."s %-10s %-5s %-7s %-6s %-6s %s\n", pmssStorageHealthColor($r['sev'], PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$r['sev']]['mark'] ?? '?'), strtoupper($r['sev']), $r['dev'], $r['size'], substr($r['model'], 0, $modelWidth), substr($r['health'], 0, 10), $r['temp'], $r['realloc'], $r['pend'], $r['link'], $r['flags']);
+            printf($format, pmssStorageHealthColor($r['sev'], PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$r['sev']]['mark'] ?? '?'), strtoupper($r['sev']), $r['dev'], $r['size'], substr($r['model'], 0, $modelWidth), substr($r['health'], 0, 10), $r['temp'], $r['realloc'], $r['pend'], $r['link'], $r['flags']);
         }
         echo PHP_EOL;
     }

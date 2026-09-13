@@ -15,7 +15,8 @@ function pmssPrivateTempBaseDirRealpath(?string $path = null): ?string
     if ($real === false || $real === DIRECTORY_SEPARATOR || !is_dir($real) || !is_writable($real)) return null;
     return rtrim($real, DIRECTORY_SEPARATOR);
 }
-function pmssPrivateTempPrefixIsSafe(string $prefix): bool { return preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $prefix) === 1; }
+// Match the entire prefix: $ also accepts a position before a final newline.
+function pmssPrivateTempPrefixIsSafe(string $prefix): bool { return preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]*\z/', $prefix) === 1; }
 function pmssCreatePrivateTempFile(string $prefix): ?string
 {
     if (!pmssPrivateTempPrefixIsSafe($prefix) || ($base = pmssPrivateTempBaseDirRealpath()) === null) return null;

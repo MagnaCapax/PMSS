@@ -144,17 +144,21 @@ class UpdateAppInstallerContractsTest extends TestCase
                 'required' => [
                     'function pmssRunPinnedRemoteArchiveStep(',
                     'function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expectedSha256, string $archiveName, string $sourceDir, string $description, array $postExtractCommands, string $workDir = \'/root/compile\'): bool',
-                    'function pmssPinnedRemoteTempFileUse(',
-                    'function pmssPinnedRemoteArtifactTempFileUse(',
                     "substr(\$archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf'",
                     "'tar '.\$tarMode",
                     'function pmssInstallPinnedRemoteDebPackage',
-                    'function pmssDownloadPinnedRemoteTempFile',
                     "dpkgCmd('-i '",
-                    'checksum mismatch; refusing install',
-                    'pmssDownloadPinnedRemoteTempFile(',
-                    "'pmss-remote-bin-'",
                     "'pmss-remote-deb-'",
+                    "require_once __DIR__.'/remoteBinary/versionProbe.php';",
+                    "require_once __DIR__.'/remoteBinary/artifact.php';",
+                ],
+            ],
+            'remoteBinary/artifact.php' => [
+                'required' => [
+                    'function pmssPinnedRemoteTempFileUse(',
+                    'function pmssPinnedRemoteArtifactTempFileUse(',
+                    'checksum mismatch; refusing install',
+                    "'pmss-remote-bin-'",
                     'try {',
                     '} finally {',
                 ],
@@ -217,7 +221,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                 "@hash_file('sha256'" => $installer.' should delegate checksum verification to remoteBinary.php',
             ]);
 
-            $this->assertTrue(preg_match('/pmss(?:DownloadPinnedRemoteTempFile|FetchPinnedRemoteFile|RunPinnedRemoteArchiveStep|PinnedRemote(?:TempFile|ArtifactTempFile)Use)\(/', $contents) === 1, $installer.' should call a remoteBinary.php pinned download helper');
+            $this->assertTrue(preg_match('/pmss(?:RunPinnedRemoteArchiveStep|PinnedRemote(?:TempFile|ArtifactTempFile)Use)\(/', $contents) === 1, $installer.' should call a remoteBinary.php pinned download helper');
         }
     }
 

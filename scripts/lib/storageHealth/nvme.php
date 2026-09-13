@@ -22,7 +22,7 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
 
     $cmd = 'nvme smart-log '.escapeshellarg($dev).' 2>/dev/null';
     $probe = pmssStorageHealthProbeCommand('nvme', (string) ($disk['kname'] ?? ''), $cmd);
-    $out = pmssStorageHealthExecCapture($probe['command'], 20)['stdout'];
+    $out = pmssCommandCapture($probe['command'], 20)['stdout'];
     if ($out === '') {
         return null;
     }

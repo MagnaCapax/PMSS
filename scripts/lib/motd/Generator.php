@@ -8,10 +8,9 @@
 
 /** MOTD generator (class-based). */
 
-require_once __DIR__.'/../update/distro.php';
+require_once __DIR__.'/model.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../runtime.php';
-require_once __DIR__.'/../version.php';
 
 class Motd
 {
@@ -27,7 +26,7 @@ class Motd
      * Controller: generate + write MOTD from the template.
      *
      * MVC split:
-     * - Model: motdCollectModel() gathers system inputs (shell-outs, files).
+     * - Model: pmssMotdModelCollect() gathers system inputs (shell-outs, files).
      * - View:  renderMotdTemplate() formats + substitutes placeholders (pure).
      * - Ctrl:  motdGenerate() orchestrates IO + writes output.
      */
@@ -40,7 +39,7 @@ class Motd
             return;
         }
 
-        $model = self::motdCollectModel();
+        $model = pmssMotdModelCollect();
         $colorEnabled = getenv('PMSS_MOTD_COLOR');
         $rendered = self::renderMotdTemplate(
             $tpl,
@@ -53,42 +52,6 @@ class Motd
         if ($outPath === '/etc/motd') {
             self::motdSyncPamDynamic($rendered);
         }
-    }
-
-    /**
-     * Model: gather system inputs.
-     *
-     * @return array<string, string>
-     */
-    private static function motdCollectModel(): array
-    {
-        [$host, $ip, $cpu, $ram, $storage] = self::sysBasics();
-        [$pmssVersion, $updateDate] = self::versionInfo();
-        [$uptime, $kernel, $netSpeed] = self::runtimeInfo();
-        $distro = self::distroInfo();
-        [$wg, $ovpn] = self::serviceStatuses();
-        $storageWarn = self::storageWarnings();
-        $aptUpdateStamp = @filemtime('/var/lib/apt/periodic/update-success-stamp');
-
-        return [
-            'host'          => (string) $host,
-            'ip'            => (string) $ip,
-            'cpu'           => (string) $cpu,
-            'ram'           => (string) $ram,
-            'storage'       => (string) $storage,
-            'pmssVersion'   => (string) $pmssVersion,
-            'updateDate'    => (string) $updateDate,
-            'aptLastUpdate' => ($aptUpdateStamp === false || $aptUpdateStamp <= 0)
-                ? 'Not available'
-                : date('Y-m-d', $aptUpdateStamp),
-            'uptime'        => (string) $uptime,
-            'kernel'        => (string) $kernel,
-            'netSpeed'      => (string) $netSpeed,
-            'wgStatus'      => (string) $wg,
-            'ovpnStatus'    => (string) $ovpn,
-            'distro'        => (string) $distro,
-            'storageWarn'   => (string) $storageWarn,
-        ];
     }
 
     /**
@@ -154,125 +117,8 @@ class Motd
         }
     }
 
-    private static function sysBasics(): array
-    {
-        $host = pmssHostnameRead();
-        $ip   = gethostbyname($host);
-        $cpu  = trim((string) shell_exec("lscpu | grep 'Model name:' | sed 's/Model name:\\s*//'"));
-        $ram  = trim((string) shell_exec("free -h | awk '/^Mem:/ { print \$2 }'"));
-        $stor = trim((string) shell_exec("df -h /home | awk 'NR==2 {print \$2}'"));
-        return [$host,$ip,$cpu,$ram,$stor];
-    }
-
-    private static function versionInfo(): array
-    {
-        $pmssVersion = getPmssVersion();
-        
-        // Append short commit hash if available
-        $meta = pmssJsonFileReadAssoc('/etc/seedbox/config/version.meta');
-        if (is_array($meta) && isset($meta['commit']) && strlen($meta['commit']) >= 7) {
-            $pmssVersion .= ' ('.substr($meta['commit'], 0, 7).')';
-        }
-
-        $updateDate = pmssReadRegularFileTrimmed('/var/run/pmss/updated') ?? 'not set';
-        return [$pmssVersion,$updateDate];
-    }
-
-    private static function runtimeInfo(): array
-    {
-        $uptime  = trim((string) shell_exec('uptime -p'));
-        $kernel  = trim((string) shell_exec('uname -r'));
-        $iface = '';
-        // Discover the primary interface via routing table, preferring route-get.
-        foreach (['ip -o route get 1 2>/dev/null', 'ip route show default 2>/dev/null'] as $routeCommand) {
-            $route = pmssConfigLineColumns((string) shell_exec($routeCommand), 0, []);
-            $ifaceIndex = array_search('dev', $route, true);
-            $iface = ($ifaceIndex !== false && isset($route[$ifaceIndex + 1])) ? $route[$ifaceIndex + 1] : '';
-            if ($iface !== '') {
-                break;
-            }
-        }
-        $net = 'Unknown';
-        if ($iface !== '') {
-            // Prefer sysfs when available
-            $sysSpeed = "/sys/class/net/".$iface."/speed";
-            if (@is_file($sysSpeed)) {
-                $val = trim((string) @file_get_contents($sysSpeed));
-                if ($val !== '' && ctype_digit(str_replace(['-','+'], '', $val))) {
-                    $intVal = (int) $val;
-                    if ($intVal > 0) {
-                        $net = $intVal.'Mb/s';
-                    }
-                }
-            }
-            // Fallback to ethtool on detected interface
-            if ($net === 'Unknown') {
-                $nsRaw = shell_exec('ethtool '.escapeshellarg($iface)." 2>/dev/null | grep 'Speed:'");
-                if ($nsRaw && preg_match('/Speed:\\s+(\\S+)/', $nsRaw, $m)) {
-                    $net = $m[1];
-                }
-            }
-        }
-        return [$uptime,$kernel,$net];
-    }
-
     private static function c(string $text, string $code): string
     {
         return "\e[{$code}m{$text}\e[0m";
     }
-
-    private static function distroInfo(): string
-    {
-        $info = \pmssDetectDistro();
-        $name = (string) ($info['name'] ?? '');
-        $ver  = (int) ($info['version'] ?? 0);
-        $code = (string) ($info['codename'] ?? '');
-        if ($name === '') $name = 'debian';
-        $name = ucfirst(strtolower($name));
-        return $name.($ver > 0 ? ' '.$ver : '').($code !== '' ? ' ('.$code.')' : '');
-    }
-
-    private static function serviceStatuses(): array
-    {
-        $svc = static function (string $service, ?string $configPath): string {
-            if ($configPath !== null && !file_exists($configPath)) {
-                return self::c('not configured', '33');
-            }
-            $active = \pmssSystemdUnitIsActive($service);
-            if ($active === null) return self::c('unknown', '33');
-            if ($active) return self::c('active', '32');
-            return \pmssSystemdUnitIsEnabled($service) === false ? self::c('disabled', '33') : self::c('inactive', '31');
-        };
-        return [
-            $svc('wg-quick@wg0', '/etc/wireguard/wg0.conf'),
-            $svc('openvpn@openvpn', '/etc/openvpn/openvpn.conf'),
-        ];
-    }
-
-    private static function storageWarnings(): string
-    {
-        $path = pmssResolvePathFromEnv('PMSS_HEALTH_LOG_PATH', '/var/log/pmss/storage-health.jsonl');
-        if (!is_file($path)) return '';
-        $raidWarnLine = ''; $raidPerfLine = ''; $nvmeCrit = []; $lastSmart = [];
-        pmssJsonLineFileEach($path, static function (array $j) use (&$raidWarnLine, &$raidPerfLine, &$nvmeCrit, &$lastSmart): void {
-            $k = $j['kind'] ?? '';
-            if ($k==='smart') { $lastSmart[$j['device'] ?? '']=$j; }
-            elseif ($k==='raid') {
-                if (($j['severity'] ?? 'ok')!=='ok') {
-                    $flags = implode(',', (array) ($j['flags'] ?? []));
-                    $raidWarnLine = 'RAID '.($j['array'] ?? 'md').': '.($flags !== '' ? $flags : ($j['state'] ?? 'warn'));
-                }
-                if (in_array('rebuild_in_progress', (array)($j['flags'] ?? []), true)) {
-                    $raidPerfLine = 'Performance limited: RAID '.($j['array'] ?? 'md').' resync in progress';
-                }
-            }
-            elseif ($k==='nvme') { if ((int)($j['metrics']['critical_warnings'] ?? 0) > 0) $nvmeCrit[] = $j['device'] ?? 'nvme'; }
-        });
-        $lines = pmssNonEmptyStrings([$raidWarnLine, $raidPerfLine, empty($nvmeCrit) ? '' : 'NVMe critical warning: '.implode(', ', array_unique($nvmeCrit))]);
-        foreach ($lastSmart as $dev=>$s) {
-            if (in_array('udma_crc_increase',(array)($s['flags']??[]),true)) $lines[] = 'SATA UDMA CRC increased: '.$dev;
-        }
-        return implode(' | ', $lines);
-    }
-
 }

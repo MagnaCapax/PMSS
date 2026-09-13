@@ -14,7 +14,7 @@ class ResourceStatsAccumulator
     private $windowTotals;
     private $dailyTotals = [];
     private $firstDay = '';
-    private $currentValues = ['memory' => 0.0, 'tasks' => 0.0, 'memory_anon' => null, 'memory_file' => null];
+    private $currentValues = ['memory' => ['current' => 0.0, 'anon' => null, 'file' => null], 'tasks' => ['current' => 0.0]];
     private $prevTimestamp = null;
 
     public function __construct(array $compareTimes)
@@ -30,8 +30,8 @@ class ResourceStatsAccumulator
     {
         $timestamp = (int) $sample['timestamp'];
         $sampleAverages = ['memory' => (float) $sample['memory'], 'tasks' => (float) $sample['tasks']];
-        foreach ($sampleAverages as $metric => $value) $this->currentValues[$metric] = $value;
-        foreach (['memory_anon', 'memory_file'] as $metric) if (isset($sample[$metric]) && is_numeric($sample[$metric])) $this->currentValues[$metric] = (float) $sample[$metric];
+        foreach ($sampleAverages as $metric => $value) $this->currentValues[$metric]['current'] = $value;
+        foreach (['anon', 'file'] as $field) if (isset($sample['memory_'.$field]) && is_numeric($sample['memory_'.$field])) $this->currentValues['memory'][$field] = (float) $sample['memory_'.$field];
 
         $delta = ($this->prevTimestamp === null) ? 300 : ($timestamp - $this->prevTimestamp);
         $intervalHours = (($delta > 0 && $delta <= 3600) ? $delta : 300) / 3600;
@@ -43,20 +43,20 @@ class ResourceStatsAccumulator
             'io_write_ops' => (float) ($sample['io_write_ops'] ?? 0.0),
             'cpu' => (float) $sample['cpu'],
             'ram_hours' => ($sampleAverages['memory'] / 1024 / 1024 / 1024) * $intervalHours,
-        ];
+        ] + $sampleAverages;
 
         foreach ($this->compareTimes as $label => $threshold) {
             if ($timestamp < $threshold) {
                 continue;
             }
-            $this->addTotals($this->windowTotals[$label], $sampleMetrics + $sampleAverages);
+            $this->addTotals($this->windowTotals[$label], $sampleMetrics);
         }
 
         $currentDay = date('Y/m/d', $timestamp);
         $this->firstDay = ($this->firstDay === '') ? $currentDay : $this->firstDay;
         if ($currentDay === $this->firstDay) return;
         $this->dailyTotals[$currentDay] = $this->dailyTotals[$currentDay] ?? [];
-        $this->addTotals($this->dailyTotals[$currentDay], $sampleMetrics + $sampleAverages);
+        $this->addTotals($this->dailyTotals[$currentDay], $sampleMetrics);
     }
 
     /** Every accepted sample contributes both averages, so one count serves the whole bucket. */
@@ -91,12 +91,10 @@ class ResourceStatsAccumulator
         foreach ($this->windowTotals as $label => $totals) {
             foreach ($this->totalsResult($totals) as $metric => $value) $data[$metric]['raw'][$label] = $value;
         }
-        $data['memory']['current'] = $this->currentValues['memory'];
         // Missing breakdown samples retain the last valid values; never serialize null placeholders.
-        foreach (['anon', 'file'] as $field) {
-            if ($this->currentValues['memory_'.$field] !== null) $data['memory'][$field] = $this->currentValues['memory_'.$field];
+        foreach ($this->currentValues as $metric => $fields) {
+            $data[$metric] += array_filter($fields, static function ($value): bool { return $value !== null; });
         }
-        $data['tasks']['current'] = $this->currentValues['tasks'];
         return $data;
     }
 }

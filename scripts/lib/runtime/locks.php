@@ -128,14 +128,14 @@ function pmssLockHandleWritePid($handle): bool
     return @fwrite($handle, $pid) === strlen($pid) && @fflush($handle);
 }
 
-function pmssRuntimeLockBasename(string $basename): string
+/** Normalize and validate the basename before resolving its runtime lock path. */
+function pmssRuntimeLockPath(string $basename): string
 {
     $basename = ltrim($basename, '/');
     if ($basename === '' || $basename === '.' || $basename === '..' || strpos($basename, '/') !== false || preg_match('/[\r\n\0]/', $basename) === 1) {
         throw new RuntimeException('Unsafe runtime lock basename');
     }
-    return $basename;
+    return (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/'.$basename;
 }
 
-function pmssRuntimeLockPath(string $basename): string { return (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/'.pmssRuntimeLockBasename($basename); }
 function pmssLockHandleRelease($handle, bool $unlock = true): void { if (!is_resource($handle) || get_resource_type($handle) !== 'stream') return; $unlock && @flock($handle, LOCK_UN); @fclose($handle); }

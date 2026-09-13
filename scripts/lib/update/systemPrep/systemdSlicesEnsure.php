@@ -224,8 +224,10 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         // Use a suffix that sorts after legacy 99-pmss.conf drop-ins so root
         // remains unlimited even when a stale vendor file exists.
         $rootDrop = $rootDir.'/99-zz-pmss-unlimited.conf';
-        pmssWriteManagedPathFile($rootDrop, "[Slice]\nMemoryHigh=infinity\nMemoryMax=infinity\nTasksMax=infinity\n", 'systemd root slice drop-in', $log, null, null, 0644, '[WARN] Failed to install root slice drop-in '.$rootDrop);
-        @unlink($rootDir.'/99-pmss-unlimited.conf');
+        // Keep the legacy protection if its replacement cannot be installed.
+        if (pmssWriteManagedPathFile($rootDrop, "[Slice]\nMemoryHigh=infinity\nMemoryMax=infinity\nTasksMax=infinity\n", 'systemd root slice drop-in', $log, null, null, 0644, '[WARN] Failed to install root slice drop-in '.$rootDrop)) {
+            @unlink($rootDir.'/99-pmss-unlimited.conf');
+        }
         if ($skipSystemctl) {
             pmssLogStatus('SKIP', 'Reloading systemd manager configuration (root slice, test mode)', 0);
             return;

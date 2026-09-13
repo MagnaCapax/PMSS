@@ -10,7 +10,6 @@
 require_once '/scripts/lib/traffic.php';
 require_once '/scripts/lib/traffic/ingress.php';
 require_once '/scripts/lib/networkInfo.php';
-require_once '/scripts/lib/runtime.php';
 
 // Serialize runs with the canonical in-script lock (ADR-0049), replacing the
 // former root.cron `flock -xn`. Each run does a read-modify-write of a per-user

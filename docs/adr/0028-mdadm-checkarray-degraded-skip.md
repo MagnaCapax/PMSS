@@ -37,6 +37,10 @@ enumerate arrays from mdstat content that clearly contains md records, the
 wrapper preserves the previous `checkarray --all` behavior and logs the fallback
 so a parser failure does not silently disable scrubs fleet-wide.
 
+The planner resolves each array's state in one helper: valid numeric sysfs data
+takes precedence, then mdstat supplies the fallback, otherwise state is unknown.
+Missing or malformed sysfs data must not mask usable mdstat evidence.
+
 ## Consequences
 - Positive: degraded arrays no longer receive a scheduled data-check that cannot
   restore redundancy and may worsen storage pressure.

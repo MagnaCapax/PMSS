@@ -35,9 +35,9 @@ final class ResourceStatsSpawnHarness extends \PmssUserStatsProcessor
     /** @var array<int,int> */
     private $returnCodes;
 
-    public function __construct(array $returnCodes = [])
+    public function __construct(array $returnCodes = [], string $workerLogPath = '/tmp/pmss stats.log')
     {
-        parent::__construct(['resource_dir' => sys_get_temp_dir(), 'home_dir' => sys_get_temp_dir(), 'passwd_file' => '/dev/null'], 'resource_dir', 'PMSS_RESOURCE_DIR', sys_get_temp_dir(), '/tmp/pmss stats.log');
+        parent::__construct(['resource_dir' => sys_get_temp_dir(), 'home_dir' => sys_get_temp_dir(), 'passwd_file' => '/dev/null'], 'resource_dir', 'PMSS_RESOURCE_DIR', sys_get_temp_dir(), $workerLogPath);
         $this->returnCodes = $returnCodes;
     }
 
@@ -124,5 +124,49 @@ final class resourceStatsCliCharacterizationTest extends TestCase
 
         $this->assertStringContainsString('Failed to start stats worker, rc=7', $output);
         $this->assertEquals(1, count($processor->commands));
+    }
+
+    public function testStatsProcessorSpawnRejectsNulPathsBeforeQuoting(): void
+    {
+        foreach (["\0secret", "prefix\0secret", "suffix\0"] as $path) {
+            foreach ([[$path, '/tmp/stats.log'], ['/tmp/worker.php', $path]] as $paths) {
+                $processor = new ResourceStatsSpawnHarness([], $paths[1]);
+                list(, $output) = $this->pmssCaptureStdout(function () use ($processor, $paths): void {
+                    $processor->spawnWorkers($paths[0], ['alice']);
+                });
+                $this->assertSame([], $processor->commands);
+                $this->assertStringContainsString('NUL byte in script or log path', $output);
+                $this->assertFalse(strpos($output, 'secret') !== false);
+                $this->assertFalse(strpos($output, "\0") !== false);
+            }
+        }
+    }
+
+    public function testStatsProcessorSpawnSkipsNulUsersAndContinues(): void
+    {
+        $processor = new ResourceStatsSpawnHarness();
+        list(, $output) = $this->pmssCaptureStdout(function () use ($processor): void {
+            $processor->spawnWorkers('/tmp/worker.php', ['alice', "\0secret", "prefix\0secret", "suffix\0", 'bob-localnet']);
+        });
+        $this->assertSame([
+            "nohup '/tmp/worker.php' 'alice' >> '/tmp/pmss stats.log' 2>&1 &",
+            "nohup '/tmp/worker.php' 'bob-localnet' >> '/tmp/pmss stats.log' 2>&1 &",
+        ], $processor->commands);
+        $this->assertSame(3, substr_count($output, 'NUL byte in user argument'));
+        $this->assertFalse(strpos($output, 'secret') !== false);
+        $this->assertFalse(strpos($output, "\0") !== false);
+    }
+
+    public function testStatsProcessorSpawnPreservesNonNulShellArguments(): void
+    {
+        $processor = new ResourceStatsSpawnHarness();
+        $script = "/tmp/worker's script.php";
+        $users = ['', 'www-data', 'alice-localnet', "quoted'user", '$(false)', "line\nbreak"];
+        $processor->spawnWorkers($script, $users);
+        $expected = [];
+        foreach ($users as $user) {
+            $expected[] = 'nohup '.escapeshellarg($script).' '.escapeshellarg($user)." >> '/tmp/pmss stats.log' 2>&1 &";
+        }
+        $this->assertSame($expected, $processor->commands);
     }
 }

@@ -80,9 +80,6 @@ function pmssApplyRsyslogKernelInputRateLimit(?callable $logger = null, ?callabl
     }
     $log('Applied rsyslog kernel input rate limit (10s/2000 messages; backup '.$backup.')');
 
-    if (($skipReason = pmssSystemdActionSkipReason(null, true, true)) !== '') {
-        pmssLogStatus('SKIP', 'Restarting rsyslog to apply kernel input rate limit ('.$skipReason.')');
-        return;
-    }
+    if (pmssSystemdActionSkip(pmssSystemdActionSkipReason(null, true, true), 'Restarting rsyslog to apply kernel input rate limit')) return;
     runStep('Restarting rsyslog to apply kernel input rate limit', 'systemctl restart rsyslog');
 }

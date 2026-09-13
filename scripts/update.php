@@ -1739,21 +1739,13 @@ function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarg
 /**
  * Build the version-marker line written to VERSION_FILE.
  *
- * The marker date MUST reflect the CONTENT's commit date (carried in the
- * fetched-version label, derived from `git log -1 --format=%cI`), NOT install
- * wall-clock time. ADR 0051's ordering guard compares this marker against the
- * next fetch's commit date; stamping install time made a freshly-installed build
- * outrank the real repo HEAD, so a follow-up update to the actual newest snapshot
- * was wrongly refused as "backward" (observed when a back-to-back
- * `update.php git/main` then `update.php --dist-upgrade` ran on one host: the
- * first run stamped the marker with wall-clock "now", which outranks the fetched
- * HEAD's earlier commit date, so the second run refused the current HEAD).
- * Falls back to install time only when the fetched label carries no orderable
- * date, preserving ADR 0051's fail-open contract for dateless codeload fallbacks.
+ * Only content dates belong in the marker: install time can outrank the next
+ * fetched HEAD. Dateless labels stay dateless so ADR 0051's indeterminate
+ * ordering survives the next update (ADR 0054 correction, Refs #882).
  *
  * @param string $spec           Canonical version spec (e.g. git/main).
  * @param string $fetchedVersion Fetched label; may embed @YYYY-MM-DD HH:MM.
- * @param int    $timestamp      Install time, used only as the dateless fallback.
+ * @param int    $timestamp      Legacy argument retained for caller compatibility.
  */
 function pmssRecordedVersionLine(string $spec, string $fetchedVersion, int $timestamp): string
 {
@@ -1765,15 +1757,13 @@ function pmssRecordedVersionLine(string $spec, string $fetchedVersion, int $time
         }
     }
 
-    $stamp = $contentDate !== '' ? $contentDate : date('Y-m-d H:i', $timestamp);
-
-    return $spec.'@'.$stamp;
+    return $spec.($contentDate !== '' ? '@'.$contentDate : '');
 }
 
 /**
  * Record the applied version for auditability.
  *
- * Writes a one-line spec with timestamp to VERSION_FILE and a JSON metadata
+ * Writes a spec with any content date to VERSION_FILE and a JSON metadata
  * object to VERSION_META. Skips writes when dry-run is enabled.
  */
 function recordVersion(string $spec, array $details, bool $dryRun): void
@@ -1786,10 +1776,7 @@ function recordVersion(string $spec, array $details, bool $dryRun): void
     pmssEnsureDirectory(VERSION_DIR);
 
     $timestamp = time();
-    // Marker date = CONTENT commit date (from fetched_version), never install
-    // wall-clock — otherwise a just-installed build outranks the real HEAD and a
-    // follow-up update to the actual newest snapshot is refused as "backward"
-    // (see pmssRecordedVersionLine + ADR 0051/0054).
+    // Keep install time in audit metadata, separate from the content-age marker.
     $line      = pmssRecordedVersionLine($spec, (string) ($details['fetched_version'] ?? ''), $timestamp);
     $details['recorded_spec'] = $spec;
     $details['timestamp']     = date('c', $timestamp);

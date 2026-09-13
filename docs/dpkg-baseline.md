@@ -83,6 +83,9 @@ are true:
 
 ## Operational Expectations
 
+- Sanitized baseline staging must write the complete payload before returning
+  a path to dpkg. Failed or short writes remove the temporary file and use the
+  existing staging failure path; package application does not proceed.
 - Treat `install.sh` as immutable bootstrap glue. Any behavioural change must
   follow the guardrails documented in [`docs/install.md`](./install.md) so fresh
   hosts still mirror the environments used to capture the baseline.

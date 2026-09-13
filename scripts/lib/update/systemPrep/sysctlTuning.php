@@ -250,36 +250,20 @@ function pmssSysctlMemorySettingsBuild(array $profile): array
 {
     $hasSwap = !empty($profile['has_swap']);
     $isVm = !empty($profile['is_vm']);
-    $fastSwap = !empty($profile['swap_is_fast']);
+    // No-swap and VM policies take precedence over fast storage.
+    $fastSwap = $hasSwap && !$isVm && !empty($profile['swap_is_fast']);
     $ramGb = max(1, (int) ($profile['ram_gb'] ?? 1));
-    $memoryProfile = !$hasSwap ? 'no_swap' : ($isVm ? 'vm' : ($fastSwap ? 'fast_swap' : ''));
 
-    return array_merge([
-        'vm.swappiness' => '10',
-        'vm.vfs_cache_pressure' => '50',
-        'vm.min_free_kbytes' => (string) min(2097152, max(131072, $ramGb * 5120)),
-        'vm.dirty_ratio' => '20',
-        'vm.dirty_background_ratio' => '5',
-    ], [
-        'no_swap' => ['vm.swappiness' => '60'],
-        'vm' => ['vm.min_free_kbytes' => '131072'],
-        'fast_swap' => [
-            'vm.swappiness' => '100',
-            'vm.vfs_cache_pressure' => '2',
-            'vm.min_free_kbytes' => (string) min(4194304, max(131072, $ramGb * 10240)),
-            'vm.dirty_ratio' => '40',
-            'vm.dirty_background_ratio' => '10',
-        ],
-    ][$memoryProfile] ?? [], [
+    return [
+        'vm.swappiness' => !$hasSwap ? '60' : ($fastSwap ? '100' : '10'),
+        'vm.vfs_cache_pressure' => $fastSwap ? '2' : '50',
+        'vm.min_free_kbytes' => $hasSwap && $isVm ? '131072'
+            : (string) min($fastSwap ? 4194304 : 2097152, max(131072, $ramGb * ($fastSwap ? 10240 : 5120))),
+        'vm.dirty_ratio' => $fastSwap ? '40' : '20',
+        'vm.dirty_background_ratio' => $fastSwap ? '10' : '5',
         'vm.dirty_expire_centisecs' => '1500',
         'vm.dirty_writeback_centisecs' => '500',
-    ]);
-}
-
-/** Return the managed service-port band reserved from kernel ephemeral picks. */
-function pmssSysctlReservedServicePortRange(): string
-{
-    return PMSS_PORT_MANAGER_MIN_PORT.'-'.PMSS_PORT_MANAGER_MAX_PORT;
+    ];
 }
 
 /** Build network sysctl settings for the detected host profile. */
@@ -304,7 +288,8 @@ function pmssSysctlNetworkSettingsBuild(array $profile): array
         'net.ipv4.tcp_max_tw_buckets' => '1440000',
         'net.ipv4.tcp_tw_reuse' => '1',
         'net.ipv4.ip_local_port_range' => '1024 65535',
-        'net.ipv4.ip_local_reserved_ports' => pmssSysctlReservedServicePortRange(),
+        // Keep the kernel reservation tied to the allocator band (ADR 0026).
+        'net.ipv4.ip_local_reserved_ports' => PMSS_PORT_MANAGER_MIN_PORT.'-'.PMSS_PORT_MANAGER_MAX_PORT,
         'net.ipv4.tcp_mem' => '3086631 4115510 6173262',
         'net.ipv4.ip_forward' => '1',
     ];
@@ -446,14 +431,11 @@ function pmssSysctlGroupedSettingsRows(array $groupedSettings): array
 function pmssSysctlChangesDescribe(array $existingSettings, array $groupedSettings): array
 {
     $changes = [];
-    foreach (pmssSysctlGroupedSettingsRows($groupedSettings) as $row) {
-        [$key, $value] = $row;
+    foreach (pmssSysctlGroupedSettingsRows($groupedSettings) as [$key, $value]) {
         $previousValue = array_key_exists($key, $existingSettings) ? (string) $existingSettings[$key] : null;
         if ($previousValue === $value) continue;
 
-        $changes[] = $previousValue === null
-            ? $key.': <unset> -> '.$value
-            : $key.': '.$previousValue.' -> '.$value;
+        $changes[] = $key.': '.($previousValue ?? '<unset>').' -> '.$value;
     }
 
     return $changes;
@@ -473,10 +455,7 @@ function pmssSysctlSummaryWrite(?callable $logger, array $profile, array $groupe
     $existing = @file_get_contents($target);
     $payload = is_string($existing) ? (pmssJsonDecodeAssoc($existing) ?? []) : [];
 
-    $applied = [];
-    foreach (pmssSysctlGroupedSettingsRows($groupedSettings) as $row) {
-        $applied[$row[0]] = $row[1];
-    }
+    $applied = array_column(pmssSysctlGroupedSettingsRows($groupedSettings), 1, 0);
     ksort($applied);
 
     $payload['timestamp'] = gmdate('Y-m-d\TH:i:s\Z');

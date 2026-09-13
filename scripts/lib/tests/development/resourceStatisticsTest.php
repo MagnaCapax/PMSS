@@ -237,4 +237,37 @@ class ResourceStatisticsTest extends TestCase
             $this->assertTrue($stats->parseLine($line) === false, $line);
         }
     }
+
+    public function testParseLineRejectsOverflowInEveryHistoricalMetricPosition(): void
+    {
+        $timestamp = strtotime('2026-05-16 12:34:56');
+        foreach ([5, 7, 9] as $count) {
+            for ($offset = 0; $offset < $count; $offset++) {
+                $parts = array_fill(0, $count, '1');
+                // Large finite digit strings still obey the original parser contract.
+                $parts[$offset] = str_repeat('9', 308);
+                $parsed = \pmssResourceLogLineParse($this->resourceLine($timestamp, implode(' ', $parts)));
+                $this->assertTrue(is_array($parsed));
+                $this->assertSame((float) $parts[$offset], $parsed[\pmssResourceLogPayloadFields($count)[$offset]]);
+                $parts[$offset] = str_repeat('9', 400);
+                $this->assertSame(false, \pmssResourceLogLineParse($this->resourceLine($timestamp, implode(' ', $parts))));
+            }
+        }
+    }
+
+    public function testCollectWindowResultsSkipsOverflowThroughParseErrorCallback(): void
+    {
+        $stats = new \resourceStatistics();
+        $timestamp = strtotime('2026-05-16 12:34:56');
+        $valid = $this->resourceLine($timestamp, '1 2 3 4 5');
+        $invalid = $this->resourceLine($timestamp, str_repeat('9', 400).' 2 3 4 5');
+        $errors = [];
+        $result = $stats->collectWindowResultsFromData($invalid."\n".$valid, ['day' => $timestamp - 300], function (string $line) use (&$errors): void {
+            $errors[] = $line;
+        });
+        $this->assertSame([$invalid], $errors);
+        $this->assertSame(1.0, $result['io_read']['raw']['day']);
+        $this->assertTrue(is_string(json_encode($result)));
+        $this->assertSame(null, $stats->collectWindowResultsFromData($invalid."\n".$invalid, ['day' => $timestamp - 300]));
+    }
 }

@@ -140,6 +140,36 @@ class RtorrentScgiTest extends TestCase
         }
     }
 
+    public function testSocketQueueSnapshotRejectsUnrepresentableCounters(): void
+    {
+        $max = (string) PHP_INT_MAX;
+        // Decimal strings avoid overflowing the fixture while constructing max + 1.
+        $overflow = substr($max, 0, -1).((int) substr($max, -1) + 1);
+        foreach ([
+            'zero counters' => ['0', '0', ['recvQ' => 0, 'sendQ' => 0]],
+            'leading zeros' => ['0001', '0002', ['recvQ' => 1, 'sendQ' => 2]],
+            'all zeros' => ['000', '000', ['recvQ' => 0, 'sendQ' => 0]],
+            'maximum counters' => [$max, $max, ['recvQ' => PHP_INT_MAX, 'sendQ' => PHP_INT_MAX]],
+            'padded maximum' => ['00'.$max, '00'.$max, ['recvQ' => PHP_INT_MAX, 'sendQ' => PHP_INT_MAX]],
+            'receive overflow' => [$overflow, '1', null],
+            'backlog overflow' => ['1', $overflow, null],
+            'false saturation' => [$max.'0', $max.'1', null],
+            'padded overflow' => ['00'.$overflow, '1', null],
+            'very long counter' => [str_repeat('9', 200), '1', null],
+            'negative counter' => ['-1', '1', null],
+            'fractional counter' => ['1', '1.5', null],
+        ] as $label => $case) {
+            $lines = ['u_str LISTEN '.$case[0].' '.$case[1].' /tmp/example.socket 12345 * 0'];
+            $this->assertSame($case[2], rtorrentScgiSocketQueueSnapshotFromLines($lines, '/tmp/example.socket'), $label);
+        }
+
+        // An invalid row must not hide a later valid matching socket row.
+        $this->assertSame(['recvQ' => 1, 'sendQ' => 2], rtorrentScgiSocketQueueSnapshotFromLines([
+            'u_str LISTEN '.$overflow.' 1 /tmp/example.socket 12345 * 0',
+            'u_str LISTEN 1 2 /tmp/example.socket 12345 * 0',
+        ], '/tmp/example.socket'));
+    }
+
     public function testSocketQueueSaturatedRequiresRecvQAtBacklog(): void
     {
         foreach ([

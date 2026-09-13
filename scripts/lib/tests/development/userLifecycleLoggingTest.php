@@ -22,22 +22,27 @@ class userLifecycleLoggingTest extends TestCase
             array(true, 'true'),
             array(false, 'false'),
             array(null, ''),
+            array('', ''),
+            array(" \0\t", ''),
+            array('0', '0'),
+            array(new \stdClass(), 'object'),
             array(array('nested' => 'value'), 'array'),
             array($stringable, 'hello world'),
         ) as $case) {
-            $this->assertEquals($case[1], \pmssUserLifecycleFormatTextField($case[0]));
+            $this->assertEquals($case[1], \pmssLogScalarText($case[0]));
+            $this->assertSame($case[1] === '' ? 'fallback' : $case[1], \pmssLogScalarText($case[0], 'fallback'));
         }
     }
 
     public function testUserLifecycleSourceContractsUseSharedHelpers(): void
     {
         $this->pmssAssertRepoFileContract('scripts/lib/userLifecycle.php', ['required' => [
-                "pmssUserLifecycleFormatTextField(\$payload['status'] ?? 'INFO')",
-                "pmssUserLifecycleFormatTextField(\$payload['action'] ?? 'unknown')",
-                "pmssUserLifecycleFormatTextField(\$payload['phase'] ?? 'unknown')",
-                "pmssUserLifecycleFormatTextField(\$payload['username'] ?? '')",
-                "pmssUserLifecycleFormatTextField(\$payload['message'])",
-                "pmssUserLifecycleFormatTextField(\$payload['step'])",
+                "pmssLogScalarText(\$payload['status'] ?? 'INFO')",
+                "pmssLogScalarText(\$payload['action'] ?? 'unknown')",
+                "pmssLogScalarText(\$payload['phase'] ?? 'unknown')",
+                "pmssLogScalarText(\$payload['username'] ?? '')",
+                "pmssLogScalarText(\$payload['message'])",
+                "pmssLogScalarText(\$payload['step'])",
                 'function pmssUserLifecycleContextLog(',
                 'pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));',
                 'function pmssUserLifecycleContextLogStatusMessage(',

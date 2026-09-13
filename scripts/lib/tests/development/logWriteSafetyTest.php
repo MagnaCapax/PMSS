@@ -6,6 +6,18 @@ require_once dirname(__DIR__, 2).'/log.php';
 
 final class LogWriteSafetyTest extends TestCase
 {
+    public function testLogTextPrimitivesPreserveDistinctSpacingPolicies(): void
+    {
+        foreach ([
+            ['', '', ''], ['  x  ', ' x ', '  x  '],
+            ["a\r\n\t b", 'a b', 'a  b'], ["a\0\x1bb", "a\0\x1bb", 'a b'],
+            ["a\v\fb", 'a b', 'a b'], ["ä\xc2\xa0b", "ä\xc2\xa0b", "ä\xc2\xa0b"],
+        ] as [$input, $whitespace, $controls]) {
+            $this->assertSame($whitespace, \pmssLogWhitespaceCollapse($input));
+            $this->assertSame($controls, \pmssLogControlCharactersReplace($input));
+        }
+    }
+
     public function testLogWritePathIsSafeAcceptsRegularFileTarget(): void
     {
         $path = $this->pmssMakeTempDir('pmss-log-dir-').'/events.log';

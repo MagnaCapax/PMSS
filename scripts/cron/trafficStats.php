@@ -10,7 +10,6 @@
  */
 
 require_once '/scripts/lib/traffic/processor.php';
-require_once '/scripts/lib/runtime.php';
 
 // Serialize runs with the canonical in-script lock (ADR-0049), replacing the
 // former root.cron `flock -xn`. Preserves the prior serialization of the stats

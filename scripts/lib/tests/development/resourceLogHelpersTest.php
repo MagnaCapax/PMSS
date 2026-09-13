@@ -418,9 +418,7 @@ class ResourceLogHelpersTest extends TestCase
                 $output = [];
                 $rc = 4;
             },
-            static function (string $message) use (&$warnings): void {
-                $warnings[] = $message;
-            }
+            $this->pmssMakeArrayLogger($warnings)
         );
 
         $this->assertSame(null, $usage);
@@ -438,9 +436,7 @@ class ResourceLogHelpersTest extends TestCase
                 $output = ['  ', '1 111 MARK all -- * * 0.0.0.0/0 0.0.0.0/0 MARK set 0x1'];
                 $rc = 0;
             },
-            static function (string $message) use (&$warnings): void {
-                $warnings[] = $message;
-            }
+            $this->pmssMakeArrayLogger($warnings)
         );
 
         $this->assertSame(null, $usage);
@@ -462,9 +458,7 @@ class ResourceLogHelpersTest extends TestCase
                 $output = [];
                 $rc = 7;
             },
-            static function (string $message) use (&$warnings): void {
-                $warnings[] = $message;
-            }
+            $this->pmssMakeArrayLogger($warnings)
         );
 
         $this->assertSame('Chain OUTPUT (policy ACCEPT 1 packets, 222 bytes)', $usage);

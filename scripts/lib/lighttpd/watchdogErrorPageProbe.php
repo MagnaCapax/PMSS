@@ -28,6 +28,10 @@ function pmssLighttpdWatchdogParseDfInodeUsePercent(string $output): ?int
 /** Execute a watchdog probe command and capture its combined output and rc. */
 function pmssLighttpdWatchdogCommandCapture(string $binary, string $arguments): ?array
 {
+    // Reject malformed commands before lookup or exec can truncate or throw.
+    if (strpos($binary, "\0") !== false || strpos($arguments, "\0") !== false) {
+        return null;
+    }
     $path = function_exists('pmssCommandPath') ? pmssCommandPath($binary) : '';
     if ($path === '') {
         return null;
@@ -44,6 +48,10 @@ require_once __DIR__.'/watchdogQuotaProbe.php';
 /** Return true when root inode usage is at or above the watchdog threshold. */
 function pmssLighttpdWatchdogRootInodesExhausted(string $mountPath = '/'): bool
 {
+    // Shell quoting also rejects NUL bytes; retain the unavailable-probe result.
+    if (strpos($mountPath, "\0") !== false) {
+        return false;
+    }
     $dfResult = pmssLighttpdWatchdogCommandCapture('df', '-i '.escapeshellarg($mountPath).' 2>/dev/null');
     return $dfResult !== null
         && ($usagePercent = pmssLighttpdWatchdogParseDfInodeUsePercent($dfResult['output'])) !== null
@@ -53,7 +61,7 @@ function pmssLighttpdWatchdogRootInodesExhausted(string $mountPath = '/'): bool
 /** Return true when `lighttpd -t -f` reports a config problem. */
 function pmssLighttpdWatchdogConfigInvalid(string $configPath): bool
 {
-    if (!file_exists($configPath)) {
+    if (strpos($configPath, "\0") !== false || !file_exists($configPath)) {
         return true;
     }
 

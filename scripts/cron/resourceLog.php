@@ -11,8 +11,7 @@ $logDir = '/var/log/pmss/resources';
 $stateDir = '/var/run/pmss/resources';
 
 if (!pmssEnsureSafeDir($logDir, 0755) || !pmssEnsureSafeDir($stateDir, 0700)) {
-    fwrite(STDERR, "Failed to prepare resource log directories.\n");
-    exit(1);
+    exit(pmssCliReturnWithStderr("Failed to prepare resource log directories.\n"));
 }
 
 $userUids = pmssResourceLogManagedUserUids();

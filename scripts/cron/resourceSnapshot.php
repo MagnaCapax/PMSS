@@ -8,8 +8,6 @@
  */
 
 require_once __DIR__.'/../lib/resources/log.php';
-require_once __DIR__.'/../lib/resources.php';
-require_once __DIR__.'/../lib/runtime.php';
 
 const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/resource-daily.log';
 

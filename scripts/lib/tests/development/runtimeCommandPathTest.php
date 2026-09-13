@@ -89,6 +89,64 @@ class RuntimeCommandPathTest extends TestCase
         }
     }
 
+    public function testCommandPathRejectsNulBeforeTrimmingBinaryName(): void
+    {
+        $binary = 'pmss-safe-binary';
+        $binDir = $this->pmssMakeExecutableStub($binary, "#!/bin/sh\nexit 0\n", 'pmss-command-path-nul-');
+        $this->pmssWithPathPrefix($binDir, function () use ($binary, $binDir): void {
+            $this->pmssAssertNoPhpWarnings(function () use ($binary, $binDir): void {
+                foreach (["\0", "\0".$binary, $binary."\0", $binary."\0suffix", " \0".$binary."\0 \n"] as $input) {
+                    $this->assertSame('', pmssCommandPath($input));
+                }
+                // Ordinary surrounding whitespace remains supported.
+                foreach ([$binary, ' '.$binary.' ', "\t".$binary."\r\n"] as $input) {
+                    $this->assertSame($binDir.'/'.$binary, pmssCommandPath($input));
+                }
+            });
+        });
+    }
+
+    public function testIopingRejectsNulTargetsBeforeLaunchingProbeOrLock(): void
+    {
+        $binDir = $this->pmssMakeTempDir('pmss-ioping-nul-');
+        $marker = $binDir.'/invoked';
+        $stub = "#!/bin/sh\n: > ".escapeshellarg($marker)."\nexit 99\n";
+        $this->pmssWriteExecutableFiles($binDir, ['ioping' => $stub, 'flock' => $stub]);
+
+        $this->pmssWithPathPrefix($binDir, function () use ($marker): void {
+            $this->pmssAssertNoPhpWarnings(function () use ($marker): void {
+                foreach (['pmssIopingProbeOutput', 'pmssIopingAverageMs', 'pmssIopingMedianMs'] as $probe) {
+                    foreach ([null, '', '  ', "\0", "\0/tmp", "/tmp\0", "/tmp\0suffix", " \0/tmp\0 "] as $target) {
+                        $this->assertSame(null, $probe($target));
+                    }
+                }
+                $this->assertFalse(file_exists($marker), 'Invalid targets must not launch ioping or flock');
+            });
+        });
+    }
+
+    public function testIopingPreservesValidTargetBytesAndResultShapes(): void
+    {
+        $binDir = $this->pmssMakeTempDir('pmss-ioping-target-');
+        $argsLog = $binDir.'/args';
+        $output = 'min/avg/max/mdev = 1.0 / 2.0 ms / 3.0 / 0.1';
+        $this->pmssWriteExecutableFiles($binDir, [
+            'ioping' => "#!/bin/sh\nprintf '%s\\000' \"\$@\" > ".escapeshellarg($argsLog)
+                ."\nprintf '%s\\n' ".escapeshellarg($output)."\n",
+            // Exercise the lock wrapper without opening a real runtime lock.
+            'flock' => "#!/bin/sh\nshift 4\nexec \"\$@\"\n",
+        ]);
+
+        $this->pmssWithPathPrefix($binDir, function () use ($argsLog, $output): void {
+            foreach (['/tmp', '/', 'relative', '/tmp/space name', "/tmp/quote'path", "/tmp/line\npath"] as $target) {
+                foreach (['pmssIopingProbeOutput' => $output, 'pmssIopingAverageMs' => 2.0, 'pmssIopingMedianMs' => 2.0] as $probe => $expected) {
+                    $this->assertSame($expected, $probe($target));
+                    $this->assertSame(implode("\0", ['-c', '60', '-i', '0.1', '-D', $target, '']), file_get_contents($argsLog));
+                }
+            }
+        });
+    }
+
     public function testIopingAverageMsParsesReportedUnits(): void
     {
         foreach ([['1500 us', 1.5], ['2.75 ms', 2.75], ['0.25 s', 250.0]] as $case) {

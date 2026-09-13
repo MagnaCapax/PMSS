@@ -106,16 +106,6 @@ function pmssStorageHealthMetricIncreaseFlags(array $metrics, ?array $previous, 
 }
 
 /**
- * Execute a shell command with captured output (no streaming).
- *
- * @return array{rc:int,stdout:string,stderr:string}
- */
-function pmssStorageHealthExecCapture(string $cmd, int $timeoutSec = 20): array
-{
-    return pmssCommandCapture($cmd, $timeoutSec);
-}
-
-/**
  * Bind a probe lock to the external storage command, not to the PHP wrapper.
  *
  * A probe can outlive the timeout wrapper while blocked in device I/O. Keeping

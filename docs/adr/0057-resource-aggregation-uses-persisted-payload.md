@@ -16,6 +16,8 @@ Use one sum/count bucket for windows and days. The accumulator returns the
 existing persisted payload directly; both snapshot paths use its shared reader.
 Keep payload projections in `scripts/lib/resources/payload.php`. Remove the
 intermediate result converters and migrate their internal callers together.
+Current readings retain the payload's metric/field layout and field order;
+serialization omits null breakdown placeholders while preserving zero readings.
 
 ## Consequences
 Serialized customer/runtime artifacts, CLI output, window boundaries, first-day

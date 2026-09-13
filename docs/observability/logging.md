@@ -26,3 +26,13 @@ Long-running PMSS operations should emit structured logs for traceability.
 
 ## Runbooks
 See `docs/runbooks/update-failures.md` for quick diagnosis steps.
+
+## Counter-state persistence
+Resource and ingress accounting share `pmssCounterStateUpdate()`. Its writer
+checks rewind before truncating, stops on truncate or write failure, and verifies
+the full payload and flush result. Persistence or mode-setting failures emit a
+PHP error-log warning with the JSON-quoted state path, without the counter payload.
+The caller's lock is released even when persistence raises an exception.
+Normal JSON storage, mode 0600, delta calculations, and return keys stay unchanged.
+This remains an in-place write: a short write or failed flush can leave incomplete
+state; the warning reports that failure without changing accounting policy.

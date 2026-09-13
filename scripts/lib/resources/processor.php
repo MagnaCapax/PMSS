@@ -66,7 +66,6 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
             pmssLockHandleRelease($this->lockHandle);
             $this->lockHandle = false;
             $this->log(date('c').": Unable to record lock pid in {$lockFile} for resourceStats; continuing without spawn lock");
-            return true;
         }
         return true;
     }
@@ -84,10 +83,8 @@ class ResourceStatsProcessor extends PmssUserStatsProcessor
         if ($loadedData === null) {
             return;
         }
-        $dataLines = $loadedData['data_lines'];
-
         $data = $this->stats->collectWindowResultsFromData(
-            $dataLines,
+            $loadedData['data_lines'],
             $compareTimes,
             function (string $line) use ($logPrefix, $user): void {
                 $this->log($logPrefix."Parsing line failed for {$user}, line: {$line}");

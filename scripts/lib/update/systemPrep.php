@@ -89,11 +89,7 @@ function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = 
         pmssRefreshManagedPathFile($path, $content, $label, $log, pmssManagedPathInstallOptions($path, $label, ['mode' => $mode]));
     }
 
-    if (($skipReason = pmssSystemdActionSkipReason(null, true, true)) !== '') {
-        pmssLogStatus('SKIP', 'Enabling PMSS boot tuning service ('.$skipReason.')');
-        return;
-    }
-
+    if (pmssSystemdActionSkip(pmssSystemdActionSkipReason(null, true, true), 'Enabling PMSS boot tuning service')) return;
     runStep('Reloading systemd unit files (PMSS boot tuning)', 'systemctl daemon-reload || true');
     runStep('Enabling PMSS boot tuning service', 'systemctl enable pmss-boot-tuning.service || true');
     runStep('Starting PMSS boot tuning service', 'systemctl start pmss-boot-tuning.service || true');

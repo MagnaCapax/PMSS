@@ -17,15 +17,13 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
 {
     $entry = pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1);
 
-    $defaultMetrics = ['health' => 'UNKNOWN'] + array_fill_keys(['reallocated', 'pending', 'udma_crc', 'temp_c', 'power_on_hours', 'link_errors'], null);
+    $metrics = ['health' => 'UNKNOWN'] + array_fill_keys(['reallocated', 'pending', 'udma_crc', 'temp_c', 'power_on_hours', 'link_errors'], null);
 
     if (stripos($out, 'Device is in STANDBY') !== false || stripos($out, 'Device is in SLEEP') !== false) {
-        $entry['metrics'] = $defaultMetrics;
+        $entry['metrics'] = $metrics;
         $entry['metrics']['health'] = 'STANDBY';
         return pmssStorageHealthEntryFinalize($entry, ['standby']);
     }
-
-    $metrics = $defaultMetrics;
 
     $healthExplicit = false;
     foreach ([
@@ -40,26 +38,26 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         break;
     }
 
+    // The first capture is always the counter; keep parser order for overlapping lines.
     $lineParsers = [
-        ['pattern' => '/\\bReallocated_Sector_Ct\\b.*?\\s(\\d+)\\s*$/', 'group' => 1, 'targets' => ['reallocated']],
-        ['pattern' => '/\\bCurrent_Pending_Sector\\b.*?\\s(\\d+)\\s*$/', 'group' => 1, 'targets' => ['pending']],
-        ['pattern' => '/\\bUDMA_CRC_Error_Count\\b.*?\\s(\\d+)\\s*$/', 'group' => 1, 'targets' => ['udma_crc', 'link_errors']],
-        ['pattern' => '/\\bTemperature(_Celsius)?\\b.*?\\s(\\d+)\\s*$/', 'group' => 2, 'targets' => ['temp_c']],
-        ['pattern' => '/^194\\s+Temperature_Celsius.*?\\s(\\d+)\\s*$/', 'group' => 1, 'targets' => ['temp_c']],
-        ['pattern' => '/Current\\s+Drive\\s+Temperature:\\s*([0-9]+)\\s*C/i', 'group' => 1, 'targets' => ['temp_c']],
-        ['pattern' => '/Elements\\s+in\\s+grown\\s+defect\\s+list:\\s*([0-9]+)/i', 'group' => 1, 'targets' => ['reallocated']],
-        ['pattern' => '/Non-medium\\s+error\\s+count:\\s*([0-9]+)/i', 'group' => 1, 'targets' => ['link_errors']],
-        ['pattern' => '/\\bPower_On_Hours\\b.*?\\s(\\d+)\\s*$/', 'group' => 1, 'targets' => ['power_on_hours']],
-        ['pattern' => '/Accumulated\\s+power\\s+on\\s+time.*?([0-9]+):([0-9]+):([0-9]+)/i', 'group' => 1, 'targets' => ['power_on_hours']],
+        '/\\bReallocated_Sector_Ct\\b.*?\\s(\\d+)\\s*$/' => ['reallocated'],
+        '/\\bCurrent_Pending_Sector\\b.*?\\s(\\d+)\\s*$/' => ['pending'],
+        '/\\bUDMA_CRC_Error_Count\\b.*?\\s(\\d+)\\s*$/' => ['udma_crc', 'link_errors'],
+        '/\\bTemperature(?:_Celsius)?\\b.*?\\s(\\d+)\\s*$/' => ['temp_c'],
+        '/^194\\s+Temperature_Celsius.*?\\s(\\d+)\\s*$/' => ['temp_c'],
+        '/Current\\s+Drive\\s+Temperature:\\s*([0-9]+)\\s*C/i' => ['temp_c'],
+        '/Elements\\s+in\\s+grown\\s+defect\\s+list:\\s*([0-9]+)/i' => ['reallocated'],
+        '/Non-medium\\s+error\\s+count:\\s*([0-9]+)/i' => ['link_errors'],
+        '/\\bPower_On_Hours\\b.*?\\s(\\d+)\\s*$/' => ['power_on_hours'],
+        '/Accumulated\\s+power\\s+on\\s+time.*?([0-9]+):([0-9]+):([0-9]+)/i' => ['power_on_hours'],
     ];
     foreach (preg_split('/\r?\n/', $out) as $line) {
-        foreach ($lineParsers as $parser) {
-            if (preg_match($parser['pattern'], $line, $matches) !== 1) {
+        foreach ($lineParsers as $pattern => $targets) {
+            if (preg_match($pattern, $line, $matches) !== 1) {
                 continue;
             }
-            $value = (int) $matches[$parser['group']];
-            foreach ($parser['targets'] as $target) {
-                $metrics[$target] = $value;
+            foreach ($targets as $target) {
+                $metrics[$target] = (int) $matches[1];
             }
         }
     }
@@ -115,7 +113,7 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
 
     $cmd = 'smartctl -n standby,now -H -A -i '.escapeshellarg($dev);
     $probe = pmssStorageHealthProbeCommand('smart', (string) ($disk['kname'] ?? ''), $cmd);
-    $res = pmssStorageHealthExecCapture($probe['command'], 25);
+    $res = pmssCommandCapture($probe['command'], 25);
     $out = $res['stdout']."\n".$res['stderr'];
     if (trim($out) === '') {
         if ($probe['lock_exit_code'] !== 0 && (int) $res['rc'] === $probe['lock_exit_code']) {

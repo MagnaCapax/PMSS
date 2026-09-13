@@ -12,7 +12,6 @@ require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/network/iptables.php';
 require_once '/scripts/lib/resources/log.php';
-require_once '/scripts/lib/runtime.php';
 require_once '/scripts/lib/traffic.php';
 require_once '/scripts/lib/user/log.php';
 

@@ -25,17 +25,12 @@ class DpkgBaselineApplySafetyTest extends TestCase
         $this->pmssSkipUnlessFunctionExists('pmssWriteSanitisedDpkgSelectionsTempFile');
 
         $tmpDir = $this->pmssMakeTempDir('pmss-dpkg-stage-', 0700);
-        $path = null;
-        $output = '';
-
-        $this->pmssWithEnv(['TMPDIR' => $tmpDir], function () use (&$path, &$output): void {
-            [$path, $output] = $this->pmssCaptureStdout(function (): ?string {
-                return \pmssWriteSanitisedDpkgSelectionsTempFile([
-                    "alpha\tinstall",
-                    "beta\thold",
-                ]);
-            });
-        });
+        [$path, $output] = $this->pmssCaptureStdout(function (): ?string {
+            return \pmssWriteSanitisedDpkgSelectionsTempFile([
+                "alpha\tinstall",
+                "beta\thold",
+            ]);
+        }, ['TMPDIR' => $tmpDir]);
 
         $this->assertTrue(is_string($path) && $path !== '', 'Expected a staged dpkg baseline temp file');
         $this->assertTrue(file_exists((string) $path), 'Expected staged temp file to exist');
@@ -48,13 +43,9 @@ class DpkgBaselineApplySafetyTest extends TestCase
         $this->pmssSkipUnlessFunctionExists('pmssWriteSanitisedDpkgSelectionsTempFile');
 
         $tmpDir = $this->pmssMakeTempDir('pmss-dpkg-newline-', 0700);
-        $path = null;
-
-        $this->pmssWithEnv(['TMPDIR' => $tmpDir], function () use (&$path): void {
-            [$path] = $this->pmssCaptureStdout(function (): ?string {
-                return \pmssWriteSanitisedDpkgSelectionsTempFile(["gamma\tdeinstall"]);
-            });
-        });
+        [$path] = $this->pmssCaptureStdout(function (): ?string {
+            return \pmssWriteSanitisedDpkgSelectionsTempFile(["gamma\tdeinstall"]);
+        }, ['TMPDIR' => $tmpDir]);
 
         $payload = (string) file_get_contents((string) $path);
         $this->assertSame("\n", substr($payload, -1), 'Expected staged baseline payload to end with one newline');
@@ -112,14 +103,9 @@ class DpkgBaselineApplySafetyTest extends TestCase
         $tmpDir = $this->pmssMakeTempDir('pmss-private-realpath-root-', 0700);
         $ownedDir = $tmpDir.'/pmss-libssl-owned';
         @mkdir($ownedDir, 0700);
-        $resolved = null;
-        $output = '';
-
-        $this->pmssWithEnv(['TMPDIR' => $tmpDir], function () use ($ownedDir, &$resolved, &$output): void {
-            [$resolved, $output] = $this->pmssCaptureStdout(function () use ($ownedDir): ?string {
-                return \pmssPrivateTempDirRealpath($ownedDir, 'pmss-libssl-');
-            });
-        });
+        [$resolved, $output] = $this->pmssCaptureStdout(function () use ($ownedDir): ?string {
+            return \pmssPrivateTempDirRealpath($ownedDir, 'pmss-libssl-');
+        }, ['TMPDIR' => $tmpDir]);
 
         $this->assertSame(realpath($ownedDir), $resolved);
         $this->assertEquals('', $output, 'Expected accepted private temp directory to stay quiet');
@@ -132,14 +118,9 @@ class DpkgBaselineApplySafetyTest extends TestCase
         $tmpDir = $this->pmssMakeTempDir('pmss-private-reject-root-', 0700);
         $wrongDir = $tmpDir.'/other-cache';
         @mkdir($wrongDir, 0700);
-        $resolved = 'sentinel';
-        $output = '';
-
-        $this->pmssWithEnv(['TMPDIR' => $tmpDir], function () use ($wrongDir, &$resolved, &$output): void {
-            [$resolved, $output] = $this->pmssCaptureStdout(function () use ($wrongDir): ?string {
-                return \pmssPrivateTempDirRealpath($wrongDir, 'pmss-libssl-');
-            });
-        });
+        [$resolved, $output] = $this->pmssCaptureStdout(function () use ($wrongDir): ?string {
+            return \pmssPrivateTempDirRealpath($wrongDir, 'pmss-libssl-');
+        }, ['TMPDIR' => $tmpDir]);
 
         $this->assertSame(null, $resolved);
         $this->assertStringContainsString('Refusing temporary directory cleanup outside PMSS temp scope', $output);
@@ -152,14 +133,9 @@ class DpkgBaselineApplySafetyTest extends TestCase
         $tmpDir = $this->pmssMakeTempDir('pmss-private-prefix-root-', 0700);
         $ownedDir = $tmpDir.'/pmss-libssl-owned';
         @mkdir($ownedDir, 0700);
-        $resolved = 'sentinel';
-        $output = '';
-
-        $this->pmssWithEnv(['TMPDIR' => $tmpDir], function () use ($ownedDir, &$resolved, &$output): void {
-            [$resolved, $output] = $this->pmssCaptureStdout(function () use ($ownedDir): ?string {
-                return \pmssPrivateTempDirRealpath($ownedDir, '../pmss-libssl-');
-            });
-        });
+        [$resolved, $output] = $this->pmssCaptureStdout(function () use ($ownedDir): ?string {
+            return \pmssPrivateTempDirRealpath($ownedDir, '../pmss-libssl-');
+        }, ['TMPDIR' => $tmpDir]);
 
         $this->assertSame(null, $resolved);
         $this->assertStringContainsString('Refusing temporary directory cleanup for unsafe prefix', $output);
@@ -172,15 +148,10 @@ class DpkgBaselineApplySafetyTest extends TestCase
         $tmpDir = $this->pmssMakeTempDir('pmss-private-cleanup-root-', 0700);
         $wrongDir = $tmpDir.'/other-cache';
         @mkdir($wrongDir, 0700);
-        $result = 0;
-        $output = '';
-
-        $this->pmssWithEnv(['TMPDIR' => $tmpDir, 'PMSS_DRY_RUN' => '1'], function () use ($wrongDir, &$result, &$output): void {
-            $this->pmssResetRuntimeProfile();
-            [$result, $output] = $this->pmssCaptureStdout(function () use ($wrongDir): int {
-                return \pmssRemovePrivateTempDir($wrongDir, 'pmss-libssl-', 'Cleaning unit-test temp dir');
-            });
-        });
+        $this->pmssResetRuntimeProfile();
+        [$result, $output] = $this->pmssCaptureStdout(function () use ($wrongDir): int {
+            return \pmssRemovePrivateTempDir($wrongDir, 'pmss-libssl-', 'Cleaning unit-test temp dir');
+        }, ['TMPDIR' => $tmpDir, 'PMSS_DRY_RUN' => '1']);
 
         $this->assertSame(1, $result);
         $this->assertStringContainsString('Refusing temporary directory cleanup outside PMSS temp scope', $output);
@@ -192,14 +163,9 @@ class DpkgBaselineApplySafetyTest extends TestCase
         $this->pmssSkipUnlessFunctionExists('pmssWriteSanitisedDpkgSelectionsTempFile');
 
         $blockedPath = $this->pmssMakeReadableTempPath('pmss-dpkg-blocked-', 'tmpdir');
-        $path = 'sentinel';
-        $output = '';
-
-        $this->pmssWithEnv(['TMPDIR' => $blockedPath], function () use (&$path, &$output): void {
-            [$path, $output] = $this->pmssCaptureStdout(function (): ?string {
-                return \pmssWriteSanitisedDpkgSelectionsTempFile(["delta\tinstall"]);
-            });
-        });
+        [$path, $output] = $this->pmssCaptureStdout(function (): ?string {
+            return \pmssWriteSanitisedDpkgSelectionsTempFile(["delta\tinstall"]);
+        }, ['TMPDIR' => $blockedPath]);
 
         if ($path === null) {
             $this->assertStringContainsString(
@@ -216,19 +182,12 @@ class DpkgBaselineApplySafetyTest extends TestCase
     public function testApplyDpkgSelectionsBlockedTmpdirBehaviorMatchesCurrentBaseline(): void
     {
         $blockedPath = $this->pmssMakeReadableTempPath('pmss-dpkg-apply-fail-', 'tmpdir');
-        $result = false;
-        $output = '';
-        $applyCommand = 'unexpected';
-        $installCommand = 'unexpected';
-
-        $this->pmssWithEnv(['TMPDIR' => $blockedPath, 'PMSS_DRY_RUN' => '1'], function () use (&$result, &$output, &$applyCommand, &$installCommand): void {
-            $this->pmssResetRuntimeProfile();
-            [$result, $output] = $this->pmssCaptureStdout(function (): bool {
-                return \pmssApplyDpkgSelections(12, true);
-            });
-            $applyCommand = $this->pmssFindProfileCommand('Applying dpkg selection baseline');
-            $installCommand = $this->pmssFindProfileCommand('Installing packages from selection baseline');
-        });
+        $this->pmssResetRuntimeProfile();
+        [$result, $output] = $this->pmssCaptureStdout(function (): bool {
+            return \pmssApplyDpkgSelections(12, true);
+        }, ['TMPDIR' => $blockedPath, 'PMSS_DRY_RUN' => '1']);
+        $applyCommand = $this->pmssFindProfileCommand('Applying dpkg selection baseline');
+        $installCommand = $this->pmssFindProfileCommand('Installing packages from selection baseline');
 
         if ($result === false) {
             $this->assertStringContainsString(
@@ -248,18 +207,12 @@ class DpkgBaselineApplySafetyTest extends TestCase
     public function testApplyDpkgSelectionsDryRunProfilesCommandsAndCleansTempFile(): void
     {
         $tmpDir = $this->pmssMakeTempDir('pmss-dpkg-apply-ok-', 0700);
-        $result = false;
-        $applyCommand = null;
-        $installCommand = null;
-
-        $this->pmssWithEnv(['TMPDIR' => $tmpDir, 'PMSS_DRY_RUN' => '1'], function () use (&$result, &$applyCommand, &$installCommand): void {
-            $this->pmssResetRuntimeProfile();
-            [$result] = $this->pmssCaptureStdout(function (): bool {
-                return \pmssApplyDpkgSelections(12, true);
-            });
-            $applyCommand = $this->pmssFindProfileCommand('Applying dpkg selection baseline');
-            $installCommand = $this->pmssFindProfileCommand('Installing packages from selection baseline');
-        });
+        $this->pmssResetRuntimeProfile();
+        [$result] = $this->pmssCaptureStdout(function (): bool {
+            return \pmssApplyDpkgSelections(12, true);
+        }, ['TMPDIR' => $tmpDir, 'PMSS_DRY_RUN' => '1']);
+        $applyCommand = $this->pmssFindProfileCommand('Applying dpkg selection baseline');
+        $installCommand = $this->pmssFindProfileCommand('Installing packages from selection baseline');
 
         $matches = [];
         $this->assertTrue($result, 'Expected dry-run dpkg baseline application to succeed when staging works');

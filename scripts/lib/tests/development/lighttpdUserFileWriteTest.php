@@ -166,4 +166,73 @@ class LighttpdUserFileWriteTest extends TestCase
             ['file_put_contents($userHtpasswd']
         );
     }
+
+    public function testReplaceRejectsShortWritesBeforePreparingOrPublishing(): void
+    {
+        foreach ([null, 'original'] as $existing) {
+            foreach ([0, 1, 7] as $limit) {
+                $result = $this->writeWithFileSizeLimit(false, $existing, 'complete', $limit);
+                $this->assertFalse($result['ok']);
+                $this->assertSame($existing, $result['content']);
+                $this->assertFalse($result['prepared']);
+                $this->assertSame([], $result['temporary']);
+                $this->assertSame($existing === null ? null : 0600, $result['mode']);
+            }
+        }
+    }
+
+    public function testAppendReportsShortWritesWithoutChangingMetadata(): void
+    {
+        foreach ([0, 1, 7] as $bytes) {
+            $result = $this->writeWithFileSizeLimit(true, 'original', 'complete', 8 + $bytes);
+            $this->assertFalse($result['ok']);
+            $this->assertSame('original'.substr('complete', 0, $bytes), $result['content']);
+            $this->assertSame(0600, $result['mode']);
+            $this->assertSame([], $result['temporary']);
+        }
+    }
+
+    public function testCompleteWritesRetainEmptyAndBinaryPayloadContracts(): void
+    {
+        foreach ([false, true] as $append) {
+            foreach ([null, 'original'] as $existing) {
+                foreach (['', 'complete', "binary\0\xff\n"] as $payload) {
+                    $expected = ($append ? (string) $existing : '').$payload;
+                    $result = $this->writeWithFileSizeLimit($append, $existing, $payload, strlen($expected));
+                    $this->assertTrue($result['ok']);
+                    $this->assertSame(base64_encode($expected), $result['encoded']);
+                    $this->assertSame(!$append, $result['prepared']);
+                    $this->assertSame(0640, $result['mode']);
+                    $this->assertSame([], $result['temporary']);
+                }
+            }
+        }
+    }
+
+    /** Limit writes only in a child process; all files remain in test fixtures. */
+    private function writeWithFileSizeLimit(bool $append, ?string $existing, string $payload, int $limit): array
+    {
+        if (!function_exists('posix_setrlimit') || !function_exists('pcntl_signal')) {
+            throw new SkipTest('File-size fault injection requires POSIX and PCNTL');
+        }
+        $directory = $this->pmssMakeTempDir('pmss-user-write-limit-', 0700);
+        $path = $directory.'/snapshot';
+        if ($existing !== null) {
+            $this->pmssWriteFile($path, $existing);
+            chmod($path, 0600);
+        }
+        $script = 'require '.var_export(dirname(__DIR__, 2).'/lighttpd/userFileWrite.php', true).';'
+            .'$path = '.var_export($path, true).'; $payload = '.var_export($payload, true).'; $prepared = false;'
+            .'if (!pcntl_signal(SIGXFSZ, SIG_IGN) || !posix_setrlimit(POSIX_RLIMIT_FSIZE, '.$limit.', '.$limit.')) { exit(2); }'
+            .'$ok = '.($append
+                ? 'pmssAppendUserFile($path, $payload, '.var_export($this->pmssCurrentOwner(), true).', 0640);'
+                : 'pmssReplaceUserFile($path, $payload, static function ($tmp) use (&$prepared): void { $prepared = true; chmod($tmp, 0640); });')
+            .'clearstatcache(); $content = is_file($path) ? file_get_contents($path) : null;'
+            .'echo json_encode(["ok" => $ok, "encoded" => $content === null ? null : base64_encode($content),'
+            .'"mode" => is_file($path) ? fileperms($path) & 0777 : null, "prepared" => $prepared,'
+            .'"temporary" => glob(dirname($path)."/snapshot.pmss-tmp-*")]);';
+        $result = $this->pmssRunInlinePhpJson($script);
+        $result['content'] = $result['encoded'] === null ? null : base64_decode($result['encoded']);
+        return $result;
+    }
 }

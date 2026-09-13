@@ -14,6 +14,14 @@ function pmssCommandOutputPipesDrain(array $pipes, int $timeoutSec, float $start
     $output = ['stdout' => '', 'stderr' => ''];
     $timedOut = false;
 
+    // Validate both channels before consuming either; invalid handles must not
+    // turn a partial launch/cleanup failure into a PHP stream-operation fatal.
+    foreach ([1, 2] as $index) {
+        if (!isset($pipes[$index]) || !is_resource($pipes[$index]) || get_resource_type($pipes[$index]) !== 'stream') {
+            return ['stdout' => '', 'stderr' => $streamSelectError, 'timed_out' => false];
+        }
+    }
+
     while (!feof($pipes[1]) || !feof($pipes[2])) {
         $read = [];
         foreach ([1, 2] as $index) {

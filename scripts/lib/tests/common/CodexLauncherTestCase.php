@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/TestCase.php';
+require_once __DIR__.'/../../runtime.php';
 
 /** Synthetic launcher checkout and fake assistant; never runs the installed assistant. */
 abstract class CodexLauncherTestCase extends TestCase
@@ -60,7 +61,7 @@ PHP;
     {
         return $this->pmssExecShellCommand(
             'timeout --kill-after=5s 20s bash '.escapeshellarg($this->launcherRoot.'/development/'.$entry).' '
-            .implode(' ', array_map('escapeshellarg', $args)).' < /dev/null',
+            .\pmssCommandArgvShellQuote($args).' < /dev/null',
             array_replace($this->launcherEnv, $env)
         );
     }
