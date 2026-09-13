@@ -61,6 +61,8 @@ $billingServiceId = $pageState['billingServiceId'];
 $trafficBandwidthState = $pageState['trafficBandwidthState'];
 $welcomeHeadingHtml = pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage);
 $announcementItemsHtml = pmssWelcomeAnnouncementItemsHtmlBuild();
+$articleItemsHtml      = pmssWelcomePanelFeedItemsHtmlBuild('article', 4);
+$wikiItemsHtml         = pmssWelcomePanelFeedItemsHtmlBuild('wiki', 5);
 $storageHealthNoticeHtml = pmssWelcomeStorageHealthNoticeHtmlRead();
 $managedApps = pmssCustomerManagedAppDefinitions();
 $guiFramesLocalOnly = is_file('../.guiFramesLocalOnly') && !is_link('../.guiFramesLocalOnly');
@@ -221,6 +223,15 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
             background: #fff6e5;
             color: #5f3b00;
             line-height: 1.45;
+        }
+        /* Feed rows are one line at every width: the right column measures 451px at 1280 and
+           277px at 768, so truncation must be CSS, not a PHP character budget. */
+        .pmss-feed-list { margin: 0 0 6px 0; padding-left: 1.1em; }
+        .pmss-feed-row {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
         }
         .pmss-traffic-disclosure-active {
             border-color: #cc8f8f;
@@ -674,7 +685,21 @@ echo $announcementItemsHtml;
                             <li>Billing: <a href="mailto:billing@pulsedmedia.com" title="E-Mail Billing">billing@pulsedmedia.com</a></li>
                         </ul>
 
-                        <br /><br /><br /><br /><br /><br /><br /><br />
+<?php
+// Two dense, title-only blocks in what was eight <br/> of dead space (~144px). Each renders only
+// if its source produced rows, so a failed fetch leaves no empty heading behind.
+if ($articleItemsHtml !== '') {
+    echo "                        <h6>Latest Writing</h6>\n                        <ul class=\"pmss-feed-list\">\n"
+       . $articleItemsHtml
+       . "                        </ul>\n";
+}
+if ($wikiItemsHtml !== '') {
+    echo "                        <h6>Wiki Updates</h6>\n                        <ul class=\"pmss-feed-list\">\n"
+       . $wikiItemsHtml
+       . "                        </ul>\n";
+}
+?>
+                        <br /><br />
                     </div>
                 </div>
             </div>
@@ -1254,6 +1279,15 @@ function pmssWelcomeAnnouncementItemsHtmlBuild() {
     return pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rssRaw);
 }
 
+function pmssWelcomePanelFeedItemsHtmlBuild($category, $limit) {
+    $raw = pmssWelcomeRemoteFetch('https://pulsedmedia.com/data/v1/panel-feed.xml');
+    if ($raw === false || !function_exists('pmssWelcomeAnnouncementItemsHtmlBuildFromRaw')) {
+        return '';
+    }
+
+    return pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($raw, $category, $limit);
+}
+
 function pmssWelcomeRemoteFetch($url) {
     if (!is_string($url) || $url === '' || strlen($url) > 2048 || preg_match('/[\x00-\x1F\x7F]/', $url)) {
         return false;
@@ -1267,6 +1301,7 @@ function pmssWelcomeRemoteFetch($url) {
     $allowedPaths = array(
         '/clients/announcementsrss.php',
         '/remote/welcomeHeadingText.php',
+        '/data/v1/panel-feed.xml',
     );
 
     // Customer-panel remote fetches are pinned to expected PMSS HTTPS endpoints.

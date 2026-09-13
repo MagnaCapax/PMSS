@@ -19,7 +19,7 @@ require_once __DIR__.'/scriptsInc.php';
  * @param string $rssRaw Raw XML fetched from the announcement feed.
  * @return string
  */
-function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
+function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw, string $category = '', int $limit = 4): string
 {
     if ($rssRaw === '') {
         return '';
@@ -54,6 +54,11 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
 
     $itemsHtml = '';
     $renderedItems = 0;
+ $limit = ($limit > 0 && $limit <= 20) ? $limit : 4;
+ // Dates earn their ~8 characters only on time-sensitive notices. Evergreen article and wiki
+ // rows are title-only: at 768px the column holds ~51 characters, so a (dd/mm) prefix costs
+ // 10-16%% of the scan line and manufactures a staleness impression on content that has none.
+ $showDate = ($category === '' || $category === 'announcement');
     foreach ($rssXml->channel->item as $thisItem) {
         if (!isset($thisItem->pubDate, $thisItem->link, $thisItem->title)) {
             continue;
@@ -61,14 +66,20 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
 
         // Third-party feed items can carry a hostile link. Restrict the scheme to http(s) and
         // escape the href exactly as the title already is (CWE-79).
+        // One merged feed carries every category; a block renders only its own.
+        if ($category !== '' && strtolower(trim((string) $thisItem->category)) !== $category) {
+            continue;
+        }
+
         $itemLink = (string) $thisItem->link;
         if (!preg_match('#^https?://#i', $itemLink)) {
             continue;
         }
 
-        $itemsHtml .= '<li>('.date('d/m', strtotime((string) $thisItem->pubDate)).') <a href="'.pmssCustomerHtmlAttr($itemLink).'" target="_blank">'
+        $datePrefix = $showDate ? '('.date('d/m', strtotime((string) $thisItem->pubDate)).') ' : '';
+        $itemsHtml .= '<li class="pmss-feed-row">'.$datePrefix.'<a href="'.pmssCustomerHtmlAttr($itemLink).'" target="_blank">'
             .pmssCustomerHtmlAttr($thisItem->title)."</a></li>\n";
-        if (++$renderedItems === 4) {
+        if (++$renderedItems === $limit) {
             break;
         }
     }
