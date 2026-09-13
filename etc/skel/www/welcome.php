@@ -228,6 +228,9 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
            277px at 768, so truncation must be CSS, not a PHP character budget. */
         .pmss-feed-list { margin: 0 0 6px 0; padding-left: 1.1em; }
         .pmss-feed-row {
+            /* markers INSIDE: overflow:hidden clips an outside marker, which would silently
+               strip the bullets the Announcements list already had. */
+            list-style-position: inside;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
