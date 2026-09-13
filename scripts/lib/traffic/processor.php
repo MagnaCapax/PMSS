@@ -20,7 +20,25 @@ class TrafficStatsProcessor extends PmssUserStatsProcessor
         $this->stats = $stats;
     }
 
-    /** Validate that a user has traffic data and a home directory. */
+    /** Aggregate in the cron's locked process so detached workers cannot contend with it. */
+    public function runCli(array $argv, string $scriptPath): int
+    {
+        if (isset($argv[1])) {
+            return parent::runCli($argv, $scriptPath);
+        }
+        $users = array_filter($this->discoverUsers(), [$this, 'validateUser']);
+        if (empty($users)) {
+            echo "No users in this system!\n";
+            return 0;
+        }
+        $compareTimes = pmssStatsCompareTimesBuild();
+        foreach ($users as $user) {
+            $this->processUser($user, $compareTimes);
+        }
+        return 0;
+    }
+
+    /** Validate that a user has traffic data, a home directory, and a passwd record. */
     public function validateUser(string $username): bool
     {
         return $this->statsUserHasDataHomeAndPasswd($username, pmssTrafficUserKeyBaseUser($username));

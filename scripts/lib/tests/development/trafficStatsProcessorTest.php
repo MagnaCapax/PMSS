@@ -121,12 +121,50 @@ class TrafficStatsProcessorTest extends TrafficTestCase
         $this->assertEquals([], $processor->spawnCalls);
     }
 
-    public function testRunCliSpawnsWorkersForDiscoveredUsers(): void
+    public function testRunCliAggregatesValidAccountsUnderParentLockWithoutSpawning(): void
     {
-        [, , $processor] = $this->makeTrafficProcessorStubFixture(true);
-        $processor->usersToDiscover = ['alice', 'bob'];
-
-        $this->assertEquals(0, $processor->runCli(['/scripts/cron/trafficStats.php'], '/scripts/cron/trafficStats.php'));
-        $this->assertEquals([['/scripts/cron/trafficStats.php', ['alice', 'bob']]], $processor->spawnCalls);
+        foreach (['egress', 'ingress'] as $mode) {
+            $paths = $this->makeTrafficPaths('pmss-traffic-cli-', true, ['traffic_mode' => $mode]);
+            $script = $mode === 'ingress' ? 'trafficIngressStats.php' : 'trafficStats.php';
+            $processor = new class(new \trafficStatistics($paths), $paths) extends \TrafficStatsProcessor {
+                protected function runSpawnCommand(string $command): int
+                {
+                    throw new \RuntimeException('Traffic aggregation must not spawn workers');
+                }
+            };
+            // Valid base/localnet series, plus ghosts missing either or both account prerequisites.
+            foreach (['alice', 'user2', 'user10', 'no-passwd', 'no-data'] as $user) {
+                $this->createTrafficUser($paths, $user, $user !== 'no-data');
+            }
+            foreach (['user2', 'user10', 'no-home', 'no-data', 'www-data', 'directory'] as $user) {
+                file_put_contents($paths['passwd_file'], "{$user}:x:1001:1001::/nonexistent:/bin/false\n", FILE_APPEND);
+            }
+            $expectedUsers = ['alice', 'alice-localnet', 'user2', 'user10'];
+            foreach (array_merge($expectedUsers, ['ghost', 'ghost-localnet', 'no-home', 'no-passwd', 'www-data']) as $user) {
+                file_put_contents($paths['traffic_dir'].'/'.$user, $this->makeTrafficUsageLines([
+                    60 => 1048576, 120 => 2097152,
+                ])."\n");
+            }
+            mkdir($paths['traffic_dir'].'/directory');
+            mkdir($paths['home_dir'].'/directory');
+            $lock = \pmssLockFileAcquire($paths['runtime_dir'].'/aggregation.lock', true);
+            $this->assertTrue(is_resource($lock));
+            try {
+                $this->assertEquals(0, $processor->runCli([$script], $script));
+                foreach ($expectedUsers as $user) {
+                    $baseUser = \pmssTrafficUserKeyBaseUser($user);
+                    $key = \pmssTrafficDataPathKey(\pmssTrafficUserKeyIsLocalnet($user), $mode);
+                    $payload = unserialize(file_get_contents(\pmssTrafficDataPaths($baseUser, $paths['home_dir'])[$key]));
+                    $this->assertEquals(3.0, $payload['raw']['month']);
+                }
+                $this->assertTrue(!is_file($paths['home_dir'].'/no-passwd/.trafficData'));
+                $this->assertTrue(!is_file($paths['home_dir'].'/no-data/.trafficData'));
+                $busy = false;
+                $this->assertEquals(false, \pmssLockFileAcquire($paths['runtime_dir'].'/aggregation.lock', true, 'c', false, true, $busy));
+                $this->assertTrue($busy);
+            } finally {
+                fclose($lock);
+            }
+        }
     }
 }

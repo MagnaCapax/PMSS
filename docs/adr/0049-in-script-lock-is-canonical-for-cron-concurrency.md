@@ -73,6 +73,12 @@ lock where a lock is needed, drop the outer `flock`, one script per commit, veri
 script's idempotency and updating the existing flock-asserting tests) is tracked in issue #853.
 
 ## Consequences
+- Traffic aggregation runs its no-argument account loop inside the locked cron
+  process (Refs #890). Detached traffic workers would re-enter the same lock and
+  skip aggregation. Both ingress and egress use `TrafficStatsProcessor`, which
+  filters discovered entries through its existing validator, including base-user
+  mapping for localnet series. Explicit single-account invocations retain their
+  validation and processing path; resource-stat worker dispatch is unchanged.
 - Positive: one lock mechanism, protecting every invocation path (cron, manual, test), not
   only the cron path.
 - Positive: the #850 double-lock collision class is eliminated structurally (guard test) and
