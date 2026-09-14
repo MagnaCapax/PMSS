@@ -34,10 +34,10 @@ function pmssSystemdUnitExists(string $unit): bool
     if (!pmssSystemdRuntimeAvailable()) {
         return false;
     }
-    $unit = trim($unit);
     if (!pmssSystemdUnitNameIsSafe($unit)) {
         return false;
     }
+    $unit = trim($unit);
     $candidate = pmssSystemdUnitDefaultServiceName($unit);
     exec('systemctl list-unit-files '.escapeshellarg($candidate).' 2>/dev/null', $output, $status);
     if ($status === 0) {
@@ -60,8 +60,8 @@ function pmssSystemdUnitExists(string $unit): bool
  */
 function pmssSystemdUnitActionIfPresent(string $unit, string $description, string $action, bool $allowFailure = false): void
 {
-    $action = trim($action);
     if (!pmssSystemdUnitActionNameIsSafe($action)) { pmssSystemdActionSkip('invalid systemd action', $description, false); return; }
+    $action = trim($action);
     if (pmssSystemdActionSkip(pmssSystemdActionSkipReason($unit), $description, false)) return;
     $target = $action === 'enable' ? pmssSystemdUnitDefaultServiceName($unit) : $unit;
     $command = 'systemctl '.$action.' '.escapeshellarg($target);

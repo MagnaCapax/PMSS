@@ -47,6 +47,52 @@ class SystemdRuntimeProcessesTest extends TestCase
         $this->assertSame(null, \pmssSystemdUnitState('is-active', '-cron.service'));
     }
 
+    public function testSystemdValidatorsRejectNulBeforeTrimming(): void
+    {
+        foreach (["\0%s", "%s\0", " \0%s\t", "\n%s\0 ", "%s\0suffix", "\0"] as $format) {
+            $unit = sprintf($format, 'demo.service');
+            $action = sprintf($format, 'restart');
+            $this->assertFalse(\pmssSystemdUnitNameIsSafe($unit));
+            $this->assertFalse(\pmssSystemdUnitActionNameIsSafe($action));
+            $this->assertSame(null, \pmssSystemdUnitState('is-active', $unit));
+            $this->assertSame(null, \pmssSystemdUnitQuietStatus('is-enabled', $unit));
+            $this->assertFalse(\pmssSystemdUnitExists($unit));
+        }
+    }
+
+    public function testSystemdMalformedArgumentsKeepSkipPathsInDryRun(): void
+    {
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function (): void {
+            foreach (["\0%s", "%s\0", " \0%s\t", "\n%s\0 ", "%s\0suffix"] as $format) {
+                $unit = sprintf($format, 'demo.service');
+                $this->pmssResetRuntimeProfile();
+                $this->assertSame('invalid unit name', \pmssSystemdActionSkipReason($unit));
+                // Dry-run profiles expose command construction without invoking systemctl.
+                \pmssSystemdUnitActionIfPresent($unit, 'Starting demo', 'start');
+                \pmssStopDisableMaskSystemdUnit($unit, 'Demo', true);
+                \pmssSystemdUnitActionIfPresent('demo.service', 'Restarting demo', sprintf($format, 'restart'));
+                $this->assertSame([], $this->pmssProfileCommands());
+            }
+        });
+    }
+
+    public function testSystemdValidActionsPreserveWhitespaceAndCommands(): void
+    {
+        $actions = ['disable', 'enable', 'mask', 'reload', 'restart', 'start', 'stop', 'try-reload-or-restart', 'try-restart', 'unmask'];
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use ($actions): void {
+            foreach ($actions as $action) {
+                foreach (['%s', " \t%s\r\n"] as $format) {
+                    $this->assertTrue(\pmssSystemdUnitNameIsSafe(sprintf($format, 'demo.service')));
+                    $this->assertTrue(\pmssSystemdUnitActionNameIsSafe(sprintf($format, $action)));
+                    $this->pmssResetRuntimeProfile();
+                    \pmssSystemdUnitActionIfPresent('demo', 'Updating demo', sprintf($format, $action));
+                    $target = $action === 'enable' ? 'demo.service' : 'demo';
+                    $this->assertSame(["systemctl ".$action." '".$target."'"], $this->pmssProfileCommands());
+                }
+            }
+        });
+    }
+
     public function testStopDisableMaskSystemdUnitSkipsInvalidUnitNameDuringDryRun(): void
     {
         $this->pmssResetRuntimeProfile();

@@ -58,6 +58,12 @@ execute the prefix before a NUL or log the malformed command. Empty shell
 commands, shell syntax, and binary stdout/stderr retain their existing behavior;
 `RuntimeTest` covers these boundaries for piped and inherited-terminal callers.
 
+Systemd unit and action validators likewise reject NUL bytes before whitespace
+normalization. Updater callers must validate the original argument before
+trimming it, retaining existing invalid-unit/action skip paths. Valid names,
+allowed actions, whitespace normalization, and generated commands are unchanged;
+`SystemdRuntimeProcessesTest` exercises these contracts without service operations.
+
 ## Helper Extraction Rules
 
 Whitespace column parsing belongs in `pmssConfigLineColumns()` from the runtime
