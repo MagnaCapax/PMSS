@@ -109,8 +109,7 @@ function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPat
 {
     $log = $logger ?: 'logMessage';
     if (!pmssMountHardeningFlagEnabled('PMSS_HARDEN_TMP_TMPFS', '[SKIP] /tmp tmpfs hardening disabled (PMSS_HARDEN_TMP_TMPFS not set)', '[SKIP] /tmp tmpfs hardening disabled via PMSS_HARDEN_TMP_TMPFS', $log)) return;
-    $size = trim((string) getenv('PMSS_TMPFS_TMP_SIZE'));
-    $size === '' && $size = '2G';
+    $size = pmssEnvTrimmed('PMSS_TMPFS_TMP_SIZE', '2G');
     if (!preg_match('/^[0-9]+[KMGTP]?$/i', $size)) { $log('[WARN] Invalid PMSS_TMPFS_TMP_SIZE value; defaulting to 2G'); $size = '2G'; }
     $ctx = pmssMountHardeningContext('/tmp tmpfs configuration', '[WARN] '.($mountsPath ?? pmssResolvePathFromEnv('PMSS_PROC_MOUNTS_PATH', '/proc/mounts')).' not readable; skipping /proc/mounts checks', $log, $fstabPath, $mountsPath);
     $fstabPath = $ctx['fstab_path']; $mounts = $ctx['mounts']; $lines = $ctx['lines']; $required = $ctx['required']; $conflicts = $ctx['conflicts'];

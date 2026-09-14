@@ -21,7 +21,7 @@ function pmssApplyHostnameConfig(?callable $logger = null): void
         return;
     }
 
-    if (($hostname = trim((string) getenv('PMSS_HOSTNAME'))) === '') {
+    if (($hostname = pmssEnvTrimmed('PMSS_HOSTNAME')) === '') {
         $log('[SKIP] No hostname override provided');
         return;
     }

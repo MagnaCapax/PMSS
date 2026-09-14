@@ -101,6 +101,13 @@ function pmssIopingMedianMs(?string $target): ?float
     return $median !== null ? $median : pmssIopingAverageMsFromOutput($out);
 }
 
+/** Read a trimmed override; blank values use the default verbatim, while zero is retained. */
+function pmssEnvTrimmed(string $envKey, string $default = ''): string
+{
+    $value = trim((string) getenv($envKey));
+    return $value === '' ? $default : $value;
+}
+
 function pmssEnvValueNormalized($value): string { return strtolower(trim((string) $value)); }
 function pmssValueMatchesNormalized($value, array $tokens): bool { return in_array(pmssEnvValueNormalized($value), $tokens, true); }
 function pmssEnvValueIsFalsey($value): bool { return pmssValueMatchesNormalized($value, ['', '0', 'false', 'no']); }

@@ -22,13 +22,6 @@ function pmssMdadmCheckarrayLog(string $message): void
     echo date('c').' pmss-mdadm-checkarray: '.$message."\n";
 }
 
-/** Return a non-empty environment override or the caller supplied default. */
-function pmssMdadmCheckarrayEnvPath(string $key, string $default): string
-{
-    $value = getenv($key);
-    return is_string($value) && trim($value) !== '' ? trim($value) : $default;
-}
-
 /** Keep array names constrained before composing sysfs paths or shell args. */
 function pmssMdadmCheckarrayArrayNameIsSafe(string $array): bool
 {
@@ -132,15 +125,15 @@ function pmssMdadmCheckarrayMain(array $argv): int
         return 0;
     }
 
-    $binary = pmssMdadmCheckarrayEnvPath('PMSS_MDADM_CHECKARRAY_BIN', PMSS_MDADM_CHECKARRAY_BIN_DEFAULT);
+    $binary = pmssEnvTrimmed('PMSS_MDADM_CHECKARRAY_BIN', PMSS_MDADM_CHECKARRAY_BIN_DEFAULT);
     if (!is_executable($binary)) {
         pmssMdadmCheckarrayLog('checkarray helper missing; skipping');
         return 0;
     }
 
-    $sysBlockRoot = pmssMdadmCheckarrayEnvPath('PMSS_MDADM_CHECKARRAY_SYS_BLOCK_ROOT', PMSS_MDADM_CHECKARRAY_SYS_BLOCK_DEFAULT);
+    $sysBlockRoot = pmssEnvTrimmed('PMSS_MDADM_CHECKARRAY_SYS_BLOCK_ROOT', PMSS_MDADM_CHECKARRAY_SYS_BLOCK_DEFAULT);
     $plan = pmssMdadmCheckarrayPlan(
-        pmssMdadmCheckarrayEnvPath('PMSS_MDADM_CHECKARRAY_MDSTAT_PATH', PMSS_MDADM_CHECKARRAY_MDSTAT_DEFAULT),
+        pmssEnvTrimmed('PMSS_MDADM_CHECKARRAY_MDSTAT_PATH', PMSS_MDADM_CHECKARRAY_MDSTAT_DEFAULT),
         $sysBlockRoot
     );
 

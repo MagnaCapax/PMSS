@@ -6,6 +6,13 @@ require_once dirname(__DIR__, 2).'/runtime.php';
 
 class RuntimeEnvValueTest extends TestCase
 {
+    public function testTrimmedOverridesPreserveZeroAndDefaultWhitespace(): void
+    {
+        foreach ([[null, ' default '], ['', ' default '], [" \t\r\n", ' default '], ['0', '0'], [' /path/ ', '/path/'], ["a\nb", "a\nb"]] as [$value, $expected]) {
+            $this->pmssAssertEnvResolvedPath('PMSS_TEST_TRIMMED_ENV', $value, $expected, static function (): string { return \pmssEnvTrimmed('PMSS_TEST_TRIMMED_ENV', ' default '); });
+        }
+    }
+
     public function testConfigColumnsPreserveBoundedRemainders(): void
     {
         $this->assertSame(['42', 'dockerd --label a  b'], \pmssConfigLineColumns(" \t42\tdockerd --label a  b\n", 2, [], 2));

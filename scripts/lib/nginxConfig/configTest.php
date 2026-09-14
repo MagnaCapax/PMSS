@@ -12,12 +12,7 @@ require_once __DIR__.'/../runtime.php';
  */
 function pmssCreateNginxConfigCommandFromEnv(string $envKey, string $default): string
 {
-    $command = getenv($envKey);
-    if (!is_string($command)) {
-        return $default;
-    }
-
-    $command = trim($command);
+    $command = pmssEnvTrimmed($envKey);
     if ($command === '' || strpos($command, "\0") !== false || strpos($command, "\n") !== false || strpos($command, "\r") !== false) {
         return $default;
     }

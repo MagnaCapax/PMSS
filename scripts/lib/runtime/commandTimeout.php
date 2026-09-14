@@ -3,8 +3,7 @@
 
 function pmssTimeoutFireLog(string $command, int $intendedSeconds, float $actualSeconds, string $signal, int $exitStatus): void
 {
-    $logPath = getenv('PMSS_TIMEOUT_FIRE_LOG');
-    $logPath = is_string($logPath) && trim($logPath) !== '' ? trim($logPath) : PMSS_TIMEOUT_FIRE_LOG_DEFAULT;
+    $logPath = pmssEnvTrimmed('PMSS_TIMEOUT_FIRE_LOG', PMSS_TIMEOUT_FIRE_LOG_DEFAULT);
     $command = trim((string) preg_replace('/[\r\n\0\t ]+/', ' ', $command));
     $payload = [
         'timestamp'        => date('c'),
