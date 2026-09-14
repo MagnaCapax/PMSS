@@ -1310,8 +1310,8 @@ PHP
         require_once dirname(__DIR__, 2).'/testing/customerPanelRenderProcess.php';
     }
 
-    /** Render a customer-panel page in the shared synthetic customer tree. */
-    protected function pmssRenderCustomerPanelPage(string $page, array $homeFlags = [], array $expectation = []): string
+    /** Prepare a customer tree, check each render, and always clean up after the callback. */
+    protected function pmssWithCustomerPanelRender(callable $callback)
     {
         $this->pmssLoadCustomerPanelRenderHarness();
         $runRoot = \pmssCustomerPanelRenderTempRoot();
@@ -1323,23 +1323,26 @@ PHP
         try {
             $setup = \pmssCustomerPanelRenderPrepare($this->pmssRepoPath('etc/skel/www'), $home, $www, $bootstrap);
             $this->assertTrue($setup['ok'], $setup['error']);
-            foreach ($homeFlags as $flag) {
-                @touch($home.'/'.ltrim((string) $flag, '/'));
-            }
-
-            $result = \pmssCustomerPanelRenderPage(
-                $www,
-                $bootstrap,
-                $homeRoot,
-                $home,
-                $page,
-                array_merge(['minBytes' => 5000, 'query' => ''], $expectation)
-            );
-            $this->assertEquals([], $result['errors'], implode('; ', $result['errors']));
-            return $result['stdout'];
+            $render = function (string $page, array $expectation) use ($www, $bootstrap, $homeRoot, $home): array {
+                $result = \pmssCustomerPanelRenderPage($www, $bootstrap, $homeRoot, $home, $page, $expectation);
+                $this->assertEquals([], $result['errors'], implode('; ', $result['errors']));
+                return $result;
+            };
+            return $callback($home, $render, $runRoot);
         } finally {
             \pmssCustomerPanelRenderCleanup($runRoot);
         }
+    }
+
+    /** Render a customer-panel page in the shared synthetic customer tree. */
+    protected function pmssRenderCustomerPanelPage(string $page, array $homeFlags = [], array $expectation = []): string
+    {
+        return $this->pmssWithCustomerPanelRender(function (string $home, callable $render) use ($page, $homeFlags, $expectation): string {
+            foreach ($homeFlags as $flag) {
+                @touch($home.'/'.ltrim((string) $flag, '/'));
+            }
+            return $render($page, array_merge(['minBytes' => 5000, 'query' => ''], $expectation))['stdout'];
+        });
     }
 
     /** Render a copied user-panel index fixture from its customer www directory. */

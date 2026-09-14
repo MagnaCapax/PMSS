@@ -19,16 +19,7 @@ class CustomerPanelRenderHarnessTest extends TestCase
 
     public function testWelcomeTrafficGaugeOmitsDuplicateUsedLimitFooter(): void
     {
-        $this->pmssLoadCustomerPanelRenderHarness();
-        $runRoot = \pmssCustomerPanelRenderTempRoot();
-        $homeRoot = $runRoot.'/home';
-        $home = $homeRoot.'/renderuser';
-        $www = $home.'/www';
-        $bootstrap = $runRoot.'/php-cli-bootstrap.php';
-
-        try {
-            $setup = \pmssCustomerPanelRenderPrepare($this->pmssRepoPath('etc/skel/www'), $home, $www, $bootstrap);
-            $this->assertTrue($setup['ok'], $setup['error']);
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
 
             $trafficData = array('raw' => array('month' => 35240 * 1024, 'week' => 0, 'day' => 0), 'daily' => array());
             $this->pmssWriteSerializedFixture($home.'/.trafficData', $trafficData);
@@ -37,133 +28,71 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $this->pmssWriteFile($home.'/.bonusTraffic', "0\n");
 
             $expectations = \pmssCustomerPanelRenderExpectations();
-            $result = \pmssCustomerPanelRenderPage($www, $bootstrap, $homeRoot, $home, 'welcome.php', $expectations['welcome.php']);
-            $this->assertEquals(array(), $result['errors'], implode('; ', $result['errors']));
+            $result = $render('welcome.php', $expectations['welcome.php']);
+
             $this->assertStringContainsString('Used: 35240 GiB / Limit: 100,000 GiB (30-day window)', $result['stdout']);
             $this->assertStringNotContainsString('>35240 GiB / 100000 GiB</span>', $result['stdout']);
-        } finally {
-            \pmssCustomerPanelRenderCleanup($runRoot);
-        }
+        });
     }
 
     public function testWelcomeTrafficUsageRendersWhenLimitFileIsMissing(): void
     {
-        $this->pmssLoadCustomerPanelRenderHarness();
-        $runRoot = \pmssCustomerPanelRenderTempRoot();
-        $homeRoot = $runRoot.'/home';
-        $home = $homeRoot.'/renderuser';
-        $www = $home.'/www';
-        $bootstrap = $runRoot.'/php-cli-bootstrap.php';
-
-        try {
-            $setup = \pmssCustomerPanelRenderPrepare($this->pmssRepoPath('etc/skel/www'), $home, $www, $bootstrap);
-            $this->assertTrue($setup['ok'], $setup['error']);
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
             @unlink($home.'/.trafficLimit');
 
-            $result = \pmssCustomerPanelRenderPage(
-                $www,
-                $bootstrap,
-                $homeRoot,
-                $home,
-                'welcome.php',
+            $result = $render('welcome.php',
                 ['minBytes' => 1024, 'markers' => ['Traffic Info']]
             );
 
-            $this->assertEquals(array(), $result['errors'], implode('; ', $result['errors']));
             $this->assertStringContainsString('Traffic used (30 days): 15 GiB', $result['stdout']);
             $this->assertStringContainsString('Traffic limit: Unlimited', $result['stdout']);
-        } finally {
-            \pmssCustomerPanelRenderCleanup($runRoot);
-        }
+        });
     }
 
     public function testWelcomeIgnoresOrphanedThrottleWithoutEnabledMarker(): void
     {
-        $this->pmssLoadCustomerPanelRenderHarness();
-        $runRoot = \pmssCustomerPanelRenderTempRoot();
-        $homeRoot = $runRoot.'/home';
-        $home = $homeRoot.'/renderuser';
-        $www = $home.'/www';
-        $bootstrap = $runRoot.'/php-cli-bootstrap.php';
-        $stateDir = $this->pmssEnsureDir($runRoot.'/runtime/trafficLimits', 0700);
-
-        try {
-            $setup = \pmssCustomerPanelRenderPrepare($this->pmssRepoPath('etc/skel/www'), $home, $www, $bootstrap);
-            $this->assertTrue($setup['ok'], $setup['error']);
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render, string $runRoot): void {
+            $stateDir = $this->pmssEnsureDir($runRoot.'/runtime/trafficLimits', 0700);
             $this->pmssWriteFile($home.'/.throttle', "25\n");
             $this->pmssWriteFile($home.'/.trafficLimit', "100000\n");
 
             $result = [];
-            $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir], function () use (&$result, $www, $bootstrap, $homeRoot, $home): void {
-                $result = \pmssCustomerPanelRenderPage(
-                    $www,
-                    $bootstrap,
-                    $homeRoot,
-                    $home,
-                    'welcome.php',
+            $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir], function () use (&$result, $render): void {
+                $result = $render('welcome.php',
                     ['minBytes' => 1024, 'markers' => ['Traffic Info']]
                 );
             });
 
-            $this->assertEquals(array(), $result['errors'], implode('; ', $result['errors']));
             $this->assertStringContainsString('Current effective: full plan port speed', $result['stdout']);
             $this->assertStringNotContainsString('Current effective: 25 Mbps (reduced)', $result['stdout']);
             $this->assertStringNotContainsString('Throttle cooldown active', $result['stdout']);
-        } finally {
-            \pmssCustomerPanelRenderCleanup($runRoot);
-        }
+        });
     }
 
     public function testWelcomeShowsReducedThrottleWhenEnabledMarkerExists(): void
     {
-        $this->pmssLoadCustomerPanelRenderHarness();
-        $runRoot = \pmssCustomerPanelRenderTempRoot();
-        $homeRoot = $runRoot.'/home';
-        $home = $homeRoot.'/renderuser';
-        $www = $home.'/www';
-        $bootstrap = $runRoot.'/php-cli-bootstrap.php';
-        $stateDir = $this->pmssEnsureDir($runRoot.'/runtime/trafficLimits', 0700);
-
-        try {
-            $setup = \pmssCustomerPanelRenderPrepare($this->pmssRepoPath('etc/skel/www'), $home, $www, $bootstrap);
-            $this->assertTrue($setup['ok'], $setup['error']);
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render, string $runRoot): void {
+            $stateDir = $this->pmssEnsureDir($runRoot.'/runtime/trafficLimits', 0700);
             $this->pmssWriteFile($home.'/.throttle', "25\n");
             $this->pmssWriteFile($home.'/.trafficLimit', "100000\n");
             $this->pmssWriteFile($stateDir.'/renderuser.enabled', "1\n");
 
             $result = [];
-            $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir], function () use (&$result, $www, $bootstrap, $homeRoot, $home): void {
-                $result = \pmssCustomerPanelRenderPage(
-                    $www,
-                    $bootstrap,
-                    $homeRoot,
-                    $home,
-                    'welcome.php',
+            $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir], function () use (&$result, $render): void {
+                $result = $render('welcome.php',
                     ['minBytes' => 1024, 'markers' => ['Traffic Info']]
                 );
             });
 
-            $this->assertEquals(array(), $result['errors'], implode('; ', $result['errors']));
             $this->assertStringContainsString('Current effective: 25 Mbps (reduced)', $result['stdout']);
             $this->assertStringContainsString('Throttle cooldown active', $result['stdout']);
-        } finally {
-            \pmssCustomerPanelRenderCleanup($runRoot);
-        }
+        });
     }
 
     public function testWelcomeShowsReducedThrottleAtDefaultCapWhenEnabledMarkerExists(): void
     {
-        $this->pmssLoadCustomerPanelRenderHarness();
-        $runRoot = \pmssCustomerPanelRenderTempRoot();
-        $homeRoot = $runRoot.'/home';
-        $home = $homeRoot.'/renderuser';
-        $www = $home.'/www';
-        $bootstrap = $runRoot.'/php-cli-bootstrap.php';
-        $stateDir = $this->pmssEnsureDir($runRoot.'/runtime/trafficLimits', 0700);
-
-        try {
-            $setup = \pmssCustomerPanelRenderPrepare($this->pmssRepoPath('etc/skel/www'), $home, $www, $bootstrap);
-            $this->assertTrue($setup['ok'], $setup['error']);
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render, string $runRoot): void {
+            $stateDir = $this->pmssEnsureDir($runRoot.'/runtime/trafficLimits', 0700);
             $trafficData = array('raw' => array('month' => 125 * 1024, 'week' => 0, 'day' => 0), 'daily' => array());
             $this->pmssWriteSerializedFixture($home.'/.trafficData', $trafficData);
             $this->pmssWriteFile($home.'/.trafficLimit', "100\n");
@@ -172,26 +101,18 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $this->pmssWriteFile($stateDir.'/renderuser.enabled', "1\n");
 
             $result = [];
-            $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir], function () use (&$result, $www, $bootstrap, $homeRoot, $home): void {
-                $result = \pmssCustomerPanelRenderPage(
-                    $www,
-                    $bootstrap,
-                    $homeRoot,
-                    $home,
-                    'welcome.php',
+            $this->pmssWithEnv(['PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir], function () use (&$result, $render): void {
+                $result = $render('welcome.php',
                     ['minBytes' => 1024, 'markers' => ['Traffic Info']]
                 );
             });
 
-            $this->assertEquals(array(), $result['errors'], implode('; ', $result['errors']));
             $this->assertStringContainsString('OVER TRAFFIC LIMIT WARNING - REDUCED BANDWIDTH', $result['stdout']);
             $this->assertStringContainsString('Current effective: 100 Mbps (reduced)', $result['stdout']);
             $this->assertStringContainsString('Throttled to 100 Mbps', $result['stdout']);
             $this->assertStringNotContainsString('Current effective: full plan port speed', $result['stdout']);
             $this->assertStringNotContainsString('Approaching monthly traffic cap', $result['stdout']);
-        } finally {
-            \pmssCustomerPanelRenderCleanup($runRoot);
-        }
+        });
     }
 
     public function testReportsUndefinedFunctionFatalFromFixture(): void

@@ -130,27 +130,16 @@ final class CustomerStatsLayoutTest extends TestCase
 
     public function testStatsPageFailsSoftWhenBundledHelperIsMissing(): void
     {
-        $this->pmssLoadCustomerPanelRenderHarness();
-        $runRoot = \pmssCustomerPanelRenderTempRoot();
-        $homeRoot = $runRoot.'/home';
-        $home = $homeRoot.'/renderuser';
-        $www = $home.'/www';
-        $bootstrap = $runRoot.'/php-cli-bootstrap.php';
-
-        try {
-            $setup = \pmssCustomerPanelRenderPrepare($this->pmssRepoPath('etc/skel/www'), $home, $www, $bootstrap);
-            $this->assertTrue($setup['ok'], $setup['error']);
-            $this->assertTrue(@unlink($www.'/statsHelpers.php'), 'Expected stats helper fixture removal to succeed.');
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            $this->assertTrue(@unlink($home.'/www/statsHelpers.php'), 'Expected stats helper fixture removal to succeed.');
 
             foreach (array('stats.php', 'info.php') as $page) {
-                $result = \pmssCustomerPanelRenderPage($www, $bootstrap, $homeRoot, $home, $page, array('minBytes' => 1, 'query' => ''));
-                $this->assertSame(array(), $result['errors'], implode('; ', $result['errors']));
+                $result = $render($page, array('minBytes' => 1, 'query' => ''));
+
                 $this->assertStringContainsString('Stats unavailable: missing local panel helper statsHelpers.php.', $result['stdout']);
                 $this->assertStringNotContainsString('Fatal error', $result['stdout'].$result['stderr']);
             }
-        } finally {
-            \pmssCustomerPanelRenderCleanup($runRoot);
-        }
+        });
     }
 
     public function testTrafficUsageRendersRawOnlyTrafficSnapshots(): void
