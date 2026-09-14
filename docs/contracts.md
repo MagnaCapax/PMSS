@@ -152,6 +152,14 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Logging & JSON Events
 
+- pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defaultLogPath, callable $callback): int
+  - Opens the snapshot log for append and runs the callback under an exclusive
+    lock when `flock` is available. A failed lock returns 1 without collecting
+    or writing a snapshot, matching directory/open failures.
+  - Successful runs retain the callback return code and log format; the stream
+    closes and the previous umask is restored even when the callback throws.
+    Environments without `flock` retain the legacy unlocked fallback.
+
 ## Agent Diagnostics – `scripts/util/agentDiagnostics.php`
 
 - pmssAgentDiagnosticsMain(array $argv): int

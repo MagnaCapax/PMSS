@@ -19,8 +19,9 @@ function pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defa
             return 1;
         }
         @chmod($logPath, 0600);
-        if (function_exists('flock')) {
-            @flock($handle, LOCK_EX);
+        // Never collect or append a snapshot after its serialization lock failed.
+        if (function_exists('flock') && !@flock($handle, LOCK_EX)) {
+            return 1;
         }
         return (int) $callback($handle, $timestamp);
     } finally {

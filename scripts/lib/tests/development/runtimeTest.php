@@ -750,6 +750,66 @@ class RuntimeTest extends TestCase
         $this->assertStringContainsAllStrings([' SNAPSHOT_BEGIN', ' WARN sample_warn rc=2 msg=alpha beta'], $result['body']);
     }
 
+    public function testSnapshotLockFailureSkipsCallbackAndRestoresLifecycle(): void
+    {
+        // Isolate native-call stubs in a child namespace; use real temporary files
+        // and locks on success, without requiring the development suite to be root.
+        $runtime = var_export(dirname(__DIR__, 2).'/runtime.php', true);
+        $snapshot = var_export(dirname(__DIR__, 2).'/runtime/snapshot.php', true);
+        $script = <<<'PHP'
+namespace SnapshotFixture;
+function posix_geteuid() { return 0; }
+function function_exists($name) {
+    return $name === 'flock' && getenv('PMSS_TEST_SNAPSHOT_CASE') === 'unavailable'
+        ? false : \function_exists($name);
+}
+function fopen($path, $mode) {
+    return $GLOBALS['snapshotHandle'] = \fopen($path, $mode);
+}
+function flock($handle, $operation) {
+    $GLOBALS['snapshotLockOperation'] = $operation;
+    return getenv('PMSS_TEST_SNAPSHOT_CASE') === 'failed' ? false : \flock($handle, $operation);
+}
+PHP;
+        $script .= "require {$runtime}; eval('namespace SnapshotFixture;'.substr(file_get_contents({$snapshot}), 5));";
+        $script .= <<<'PHP'
+$case = getenv('PMSS_TEST_SNAPSHOT_CASE');
+$path = getenv('PMSS_TEST_SNAPSHOT_LOG');
+$before = umask(0027);
+$called = false;
+$result = null;
+$exception = '';
+try {
+    $result = pmssRunSnapshotLogTask('snapshot-test.php', 'PMSS_TEST_SNAPSHOT_LOG', $path,
+        static function ($handle, string $timestamp) use (&$called, $case): int {
+            $called = true;
+            if ($case === 'throw') throw new \RuntimeException('snapshot callback failed');
+            pmssSnapshotWriteLine($handle, 'snapshot payload');
+            return $case === 'nonzero' ? 7 : 0;
+        });
+} catch (\RuntimeException $error) {
+    $exception = $error->getMessage();
+}
+echo json_encode([$result, $called, is_resource($GLOBALS['snapshotHandle']), umask(),
+    file_get_contents($path), $exception, $GLOBALS['snapshotLockOperation'] ?? null]);
+umask($before);
+PHP;
+        foreach (['failed', 'success', 'nonzero', 'throw', 'unavailable'] as $case) {
+            $path = $this->pmssMakeTempFile('pmss-snapshot-lock-');
+            file_put_contents($path, "previous snapshot\n");
+            $expectedBody = "previous snapshot\n";
+            if (!in_array($case, ['failed', 'throw'], true)) $expectedBody .= "snapshot payload\n";
+            $this->assertSame([
+                $case === 'throw' ? null : ($case === 'failed' ? 1 : ($case === 'nonzero' ? 7 : 0)),
+                $case !== 'failed', false, 0027, $expectedBody,
+                $case === 'throw' ? 'snapshot callback failed' : '',
+                $case === 'unavailable' ? null : LOCK_EX,
+            ], $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_SNAPSHOT_CASE' => $case, 'PMSS_TEST_SNAPSHOT_LOG' => $path,
+            ]), $case);
+        }
+    }
+
     public function testSnapshotWarnNormalizesControlCharacters(): void
     {
         $handle = fopen('php://temp', 'w+');
