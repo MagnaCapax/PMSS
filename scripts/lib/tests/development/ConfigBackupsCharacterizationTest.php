@@ -6,6 +6,58 @@ require_once dirname(__DIR__, 2).'/configBackups.php';
 
 class ConfigBackupsCharacterizationTest extends TestCase
 {
+    public function testNulInputsCannotOverwriteOrPruneExistingBackups(): void
+    {
+        [$sourceRoot, $backupRoot] = $this->pmssConfigBackupsFixtureRoots();
+        $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "new config\n");
+        $serviceDir = $backupRoot.'/nginx';
+        mkdir($serviceDir, 0700);
+        $backupPath = $serviceDir.'/20000101000000__'.\pmssConfigBackupsPathKey($source).'.bak';
+        file_put_contents($backupPath, 'keep');
+
+        // Include edge bytes that trim() used to erase and embedded bytes it retained.
+        foreach (["\0%s", "%s\0", " \0%s\t", "\t%s\0\n", "%s\0suffix"] as $format) {
+            foreach (['service', 'source'] as $field) {
+                $serviceArg = $field === 'service' ? sprintf($format, 'nginx') : 'nginx';
+                $sourceArg = $field === 'source' ? sprintf($format, $source) : $source;
+                [$backup, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($serviceArg, $sourceArg, $backupRoot) {
+                    $options = [
+                        'backupRoot' => $backupRoot, 'logger' => $logger, 'logSuccess' => false,
+                        'timestamp' => '20000101000000', 'pmssVersion' => '', 'correlationId' => '',
+                        'ttlSeconds' => 1, 'nowTs' => 1800000000,
+                    ];
+                    $backup = \pmssBackupCriticalConfig($serviceArg, $sourceArg, $options);
+                    \pmssPruneCriticalConfigBackups($serviceArg, $sourceArg, $options);
+                    return $backup;
+                });
+
+                $this->assertSame(null, $backup);
+                $this->assertSame(2, count($messages));
+                $this->assertSame(false, strpos(implode('', $messages), "\0"));
+                $this->assertSame([$backupPath], glob($serviceDir.'/*.bak'));
+                $this->assertSame('keep', file_get_contents($backupPath));
+                $this->assertSame("new config\n", file_get_contents($source));
+            }
+        }
+    }
+
+    public function testWhitespaceNormalizedBackupAndPruneRemainCompatible(): void
+    {
+        [$sourceRoot, $backupRoot] = $this->pmssConfigBackupsFixtureRoots();
+        $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "config\n");
+        $options = [
+            'backupRoot' => $backupRoot, 'logSuccess' => false, 'ttlSeconds' => 0,
+            'timestamp' => '20000101000000', 'pmssVersion' => '', 'correlationId' => '',
+        ];
+        $backup = \pmssBackupCriticalConfig(" \tnginx\n", " \t".$source."\n", $options);
+        $this->assertSame($backupRoot.'/nginx/20000101000000__'.\pmssConfigBackupsPathKey($source).'.bak', $backup);
+        $this->assertSame("config\n", file_get_contents($backup));
+        $options['ttlSeconds'] = 1;
+        $options['nowTs'] = 1800000000;
+        \pmssPruneCriticalConfigBackups(" \tnginx\n", " \t".$source."\n", $options);
+        $this->assertSame(false, file_exists($backup));
+    }
+
     public function testBackupFilenameFormatRemainsStable(): void
     {
         [$sourceRoot, $backupRoot] = $this->pmssConfigBackupsFixtureRoots();

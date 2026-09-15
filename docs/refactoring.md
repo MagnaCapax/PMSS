@@ -64,6 +64,13 @@ trimming it, retaining existing invalid-unit/action skip paths. Valid names,
 allowed actions, whitespace normalization, and generated commands are unchanged;
 `SystemdRuntimeProcessesTest` exercises these contracts without service operations.
 
+Config backup and prune helpers reject NUL bytes in source paths and service
+keys before trimming, so malformed inputs cannot select an existing backup for
+replacement or deletion. Rejections retain the null/no-op failure paths and
+do not echo malformed bytes. Ordinary whitespace normalization, filenames, and
+retention rules remain unchanged; `ConfigBackupsCharacterizationTest` verifies
+both rejection and compatibility using temporary fixtures.
+
 ## Helper Extraction Rules
 
 Whitespace column parsing belongs in `pmssConfigLineColumns()` from the runtime

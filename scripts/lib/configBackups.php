@@ -122,6 +122,11 @@ function pmssConfigBackupsPrepareContext(string $service, string $sourcePath, ar
     $log = $options['logger'] ?? (function_exists('logMessage')
         ? 'logMessage'
         : $GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER']);
+    // Reject malformed paths before trim() can select a different backup/prune target.
+    if (pmssFilesystemPathHasNulByte($sourcePath)) {
+        $log('[WARN] Refusing config backup for unsafe source path');
+        return null;
+    }
     $service = pmssConfigBackupsNormalizeService($service);
     $sourcePath = trim($sourcePath);
     if ($service === '' || $sourcePath === '' || pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
@@ -134,7 +139,7 @@ function pmssConfigBackupsPrepareContext(string $service, string $sourcePath, ar
         $log('[WARN] Refusing config backup for non-absolute source path: '.$sourcePath);
         return null;
     }
-    if (strpos($sourcePath, "\0") !== false || is_link($sourcePath)) {
+    if (is_link($sourcePath)) {
         $log('[WARN] Refusing config backup for unsafe source path: '.$sourcePath);
         return null;
     }
@@ -186,6 +191,10 @@ function pmssConfigBackupsPathKey(string $path): string
  */
 function pmssConfigBackupsNormalizeService(string $service): string
 {
+    // NUL is not whitespace, even when it appears at either end of the key.
+    if (pmssFilesystemPathHasNulByte($service)) {
+        return '';
+    }
     $service = trim($service);
     if ($service === '.' || $service === '..') {
         return '';
