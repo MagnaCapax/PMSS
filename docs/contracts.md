@@ -115,6 +115,14 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `pmssNetworkPortParseDigits($value, int $min=1, int $max=65535): ?int`
+  - Accepts integers or whitespace-trimmed decimal strings within the requested
+    port range; malformed inputs return `null` without output.
+  - Rejects NUL bytes before trimming. `pmssReadRegularFileNetworkPort()` passes
+    raw file contents through this same guard, retaining regular-file and
+    symlink checks. Valid ports, leading zeroes, whitespace, and bounds retain
+    their existing behavior.
+
 - runCommand(string $cmd, bool $verbose=false, ?callable $logger=null, bool $inheritTty=false): int
   - Spawns `/bin/bash -lc <cmd>` via `proc_open`, streams stdout/stderr, returns rc.
   - Exposes `$GLOBALS['PMSS_LAST_COMMAND_OUTPUT']` with `stdout`/`stderr`.

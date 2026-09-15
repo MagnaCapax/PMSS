@@ -356,4 +356,38 @@ class UserLifecycleWatchdogTest extends TestCase
             $this->assertSame(null, pmssReadRegularFileNetworkPort($candidate));
         }
     }
+
+    public function testPortParsingRejectsNulBeforeNormalization(): void
+    {
+        $path = $this->pmssMakeTempFile('watchdog-port-nul-');
+        foreach (["\0".'1500', "1500\0", "15\0".'00', " \0"."1500\n", "1500\0\r\n", "\0"] as $raw) {
+            file_put_contents($path, $raw);
+            $this->assertSame(null, pmssNetworkPortParseDigits($raw));
+            $this->assertSame(null, pmssReadRegularFileNetworkPort($path));
+        }
+    }
+
+    public function testPortParsingPreservesValidInputsAndBounds(): void
+    {
+        $path = $this->pmssMakeTempFile('watchdog-port-valid-');
+        foreach ([1, 65535, '001500', " \t1500\r\n", "\v1500\v"] as $raw) {
+            file_put_contents($path, (string) $raw);
+            $this->assertSame((int) trim((string) $raw), pmssNetworkPortParseDigits($raw));
+            $this->assertSame((int) trim((string) $raw), pmssReadRegularFileNetworkPort($path));
+        }
+        foreach ([[1500, 1500, 1500], [1500, 1501, 65535], [1500, 1, 1499], [1500, 0, 65535], [1500, 1, 65536], [1500, 2000, 1000]] as $case) {
+            list($raw, $min, $max) = $case;
+            file_put_contents($path, (string) $raw);
+            $expected = $min === 1500 && $max === 1500 ? 1500 : null;
+            $this->assertSame($expected, pmssNetworkPortParseDigits($raw, $min, $max));
+            $this->assertSame($expected, pmssReadRegularFileNetworkPort($path, $min, $max));
+        }
+    }
+
+    public function testPortParsingPreservesInvalidInputRejection(): void
+    {
+        foreach ([null, false, true, [], new \stdClass(), 1500.0, '', ' ', '0', '-1', '+1500', '1.5', '15 00', '65536', str_repeat('9', 40)] as $raw) {
+            $this->assertSame(null, pmssNetworkPortParseDigits($raw));
+        }
+    }
 }
