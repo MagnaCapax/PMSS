@@ -76,9 +76,20 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw, string $ca
             continue;
         }
 
+        // Users take in about the first two words of a list entry before deciding whether to read
+        // on (Nielsen Norman Group, "First 2 Words: A Signal for the Scanning Eye"). Inside our own
+        // panel a leading "Pulsed Media " spends exactly those two words on the one thing the
+        // reader already knows, and three of ten wiki rows opened with it. Strip it so each row
+        // front-loads what actually distinguishes it. Never strip a title down to nothing.
+        $itemTitle = (string) $thisItem->title;
+        $trimmedTitle = preg_replace('/^Pulsed Media\s+/i', '', $itemTitle);
+        if (is_string($trimmedTitle) && trim($trimmedTitle) !== '') {
+            $itemTitle = $trimmedTitle;
+        }
+
         $datePrefix = $showDate ? '('.date('d/m', strtotime((string) $thisItem->pubDate)).') ' : '';
         $itemsHtml .= '<li class="pmss-feed-row">'.$datePrefix.'<a href="'.pmssCustomerHtmlAttr($itemLink).'" target="_blank">'
-            .pmssCustomerHtmlAttr($thisItem->title)."</a></li>\n";
+            .pmssCustomerHtmlAttr($itemTitle)."</a></li>\n";
         if (++$renderedItems === $limit) {
             break;
         }
