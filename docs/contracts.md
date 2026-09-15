@@ -115,6 +115,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `pmssProcessCloseExitCode($process, $lastStatus=null): int`
+  - Closes only process resources; invalid, closed, and other resource types
+    use the existing `-1` fallback without consuming or closing unrelated streams.
+  - A non-negative integer `exitcode` from the last observed status replaces
+    only a `-1` close result. Native process exit codes retain precedence.
+
 - `pmssNetworkPortParseDigits($value, int $min=1, int $max=65535): ?int`
   - Accepts integers or whitespace-trimmed decimal strings within the requested
     port range; malformed inputs return `null` without output.

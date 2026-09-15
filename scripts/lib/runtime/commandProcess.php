@@ -5,7 +5,8 @@ function pmssProcessCloseExitCode($process, $lastStatus = null): int
 {
     $observedExitCode = is_array($lastStatus) ? ($lastStatus['exitcode'] ?? null) : null;
     $fallbackExitCode = is_int($observedExitCode) && $observedExitCode >= 0 ? $observedExitCode : null;
-    $rc = is_resource($process) ? @proc_close($process) : -1;
+    // Other resource types must retain the missing-process fallback, not reach proc_close().
+    $rc = is_resource($process) && get_resource_type($process) === 'process' ? @proc_close($process) : -1;
     return ($rc === -1 && $fallbackExitCode !== null) ? $fallbackExitCode : (int) $rc;
 }
 
