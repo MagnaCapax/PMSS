@@ -679,18 +679,10 @@ echo $announcementItemsHtml;
 ?>
                         </ul>
 
-                        <h6>Need support?</h6>
-                        <ul>
-                            <li><a href="https://pulsedmedia.com/clients/knowledgebase.php" title="Browse Pulsed Media Knowledgebase">Browse Knowledgebase</a></li>
-                            <li><a href="https://wiki.pulsedmedia.com" title="Pulsed Media Wiki">Browse Wiki</a></li>
-                            <li><a href="https://discord.gg/cGBz52HJtx" target="_blank" title="Join Pulsed Media on Discord">Discord</a></li>
-                            <li>Technical: <a href="mailto:support@pulsedmedia.com" title="E-Mail Support">support@pulsedmedia.com</a></li>
-                            <li>Billing: <a href="mailto:billing@pulsedmedia.com" title="E-Mail Billing">billing@pulsedmedia.com</a></li>
-                        </ul>
-
 <?php
-// Two dense, title-only blocks in what was eight <br/> of dead space (~144px). Each renders only
-// if its source produced rows, so a failed fetch leaves no empty heading behind.
+// Two dense, title-only blocks, placed directly beneath Announcements so the three feed blocks
+// read as one group. Each renders only if its source produced rows, so a failed fetch leaves no
+// empty heading behind. They occupy what was eight <br/> of dead space (~144px) further down.
 if ($articleItemsHtml !== '') {
     echo "                        <h6>Latest Writing</h6>\n                        <ul class=\"pmss-feed-list\">\n"
        . $articleItemsHtml
@@ -702,6 +694,15 @@ if ($wikiItemsHtml !== '') {
        . "                        </ul>\n";
 }
 ?>
+
+                        <h6>Need support?</h6>
+                        <ul>
+                            <li><a href="https://pulsedmedia.com/clients/knowledgebase.php" title="Browse Pulsed Media Knowledgebase">Browse Knowledgebase</a></li>
+                            <li><a href="https://wiki.pulsedmedia.com" title="Pulsed Media Wiki">Browse Wiki</a></li>
+                            <li><a href="https://discord.gg/cGBz52HJtx" target="_blank" title="Join Pulsed Media on Discord">Discord</a></li>
+                            <li>Technical: <a href="mailto:support@pulsedmedia.com" title="E-Mail Support">support@pulsedmedia.com</a></li>
+                            <li>Billing: <a href="mailto:billing@pulsedmedia.com" title="E-Mail Billing">billing@pulsedmedia.com</a></li>
+                        </ul>
                         <br /><br />
                     </div>
                 </div>
