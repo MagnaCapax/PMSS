@@ -13,7 +13,8 @@ function pmssResourceReportTemplate(): array
 function pmssResourceStoredPayloadWindowValue(array $data, string $metric, string $window): ?float
 {
     $value = $data[$metric]['raw'][$window] ?? (substr($metric, -4) === '_ops' ? 0.0 : null);
-    return $value !== null && is_numeric($value) ? (float) $value : null;
+    // Numeric strings can overflow on conversion; serialized floats can be INF/NAN.
+    return $value !== null && is_numeric($value) && is_finite((float) $value) ? (float) $value : null;
 }
 
 /** Read all metrics for a stored payload window. */

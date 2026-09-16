@@ -464,6 +464,9 @@ iptables helpers:
   `raw` windows, current values, and `daily` rows. `resources/payload.php` projects
   both stored and freshly accumulated data for reports and snapshots; missing
   legacy operation counters default to zero, other malformed metrics return `null`.
+  Window values must remain finite after numeric conversion: infinity, NaN,
+  and overflowing numeric strings use that same `null` failure path. Finite
+  values and legacy missing-operation defaults retain their existing conversion.
 - Usage reporting keeps scalar conversion and formatting inside their consumers.
   Terminal stats retain their help exit status and text layouts, including raw
   percentages beside clamped bars. Traffic columns retain unitless default rates

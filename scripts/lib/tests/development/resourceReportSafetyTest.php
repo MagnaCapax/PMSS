@@ -50,6 +50,44 @@ class resourceReportSafetyTest extends TestCase
         $this->assertTrue(!file_exists($this->markerPath));
     }
 
+    public function testStoredWindowRejectsNonFiniteValuesAcrossConsumers(): void
+    {
+        $metrics = array_merge(\ResourceStatsAccumulator::RAW_METRICS, \ResourceStatsAccumulator::AVERAGE_METRICS);
+        $payload = array_fill_keys($metrics, ['raw' => $this->pmssBuildWindowValues(1)]);
+        foreach ($metrics as $metric) {
+            foreach ([INF, -INF, NAN, '1e9999', '-1e9999'] as $invalid) {
+                $data = $payload;
+                $data[$metric]['raw']['day'] = $invalid;
+                $this->assertSame(null, \pmssResourceStoredPayloadWindowValue($data, $metric, 'day'));
+                $this->assertSame(null, \pmssResourceStoredPayloadWindowMetrics($data, 'day'));
+                if (!in_array($metric, \ResourceStatsAccumulator::RAW_METRICS, true)) continue;
+                $this->pmssWriteSerializedFixture($this->statsDir.'/alice', $data);
+                $report = \pmssResourceBuildReport($this->statsDir, ['alice']);
+                $this->assertSame(['alice'], $report['missing']);
+                $this->assertSame([], $report['rows']);
+                $this->assertSame(\pmssResourceReportTemplate(), $report['totals']);
+                $this->assertTrue(is_string(json_encode($report)));
+            }
+        }
+    }
+
+    public function testStoredWindowPreservesFiniteValuesAndMissingDefaults(): void
+    {
+        foreach ([0, -1, 1.5, '00012', '2.5e2', PHP_FLOAT_MAX, -PHP_FLOAT_MAX] as $value) {
+            $data = ['cpu' => ['raw' => ['day' => $value]]];
+            $this->assertSame((float) $value, \pmssResourceStoredPayloadWindowValue($data, 'cpu', 'day'));
+        }
+        foreach ([null, '', 'bad', [], false] as $value) {
+            $data = ['cpu' => ['raw' => ['day' => $value]]];
+            $this->assertSame(null, \pmssResourceStoredPayloadWindowValue($data, 'cpu', 'day'));
+        }
+        $this->assertSame(null, \pmssResourceStoredPayloadWindowValue([], 'cpu', 'day'));
+        foreach (['io_read_ops', 'io_write_ops'] as $metric) {
+            $this->assertSame(0.0, \pmssResourceStoredPayloadWindowValue([], $metric, 'day'));
+            $this->assertSame(0.0, \pmssResourceStoredPayloadWindowValue([$metric => ['raw' => ['day' => null]]], $metric, 'day'));
+        }
+    }
+
     public function testBuildReportSkipsInvalidUserTraversalKeys(): void
     {
         $this->pmssWriteSerializedFixture($this->runtimeDir.'/outside-stats', $this->pmssBuildResourceStatsPayloadFromValues([
