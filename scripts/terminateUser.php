@@ -165,10 +165,6 @@ pmssUserLifecycleRunSteps('terminate', $username, array(
     array('crontab_spool_remove', 'rm -f -- '.escapeshellarg($crontabSpoolPaths[0]).' '.escapeshellarg($crontabSpoolPaths[1]).' || true'),
     array('userdel_initial', $userdelCommand),
 ), $dryRun);
-// Home and the recreate backup are purged the same way; the recursive chattr runs on
-// the residue only, so every immutable path is covered without naming any of them.
-pmssUserLifecycleRunSteps('terminate', $username, pmssTerminateUserPurgeDirectorySteps('home', "/home/{$username}"), $dryRun);
-pmssUserLifecycleRunSteps('terminate', $username, pmssTerminateUserPurgeDirectorySteps('user_backup', "/home/backup-{$username}"), $dryRun);
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");
 pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);
 pmssUserLifecycleRefreshNginxConfig(
@@ -199,6 +195,29 @@ pmssUserLifecycleRunSteps('terminate', $username, array(
     array('release_media_jellyfin_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-jellyfin'),
 ), $dryRun);
 pmssTerminateUserUnlinkPath($username, 'remove_nginx_user_file', "/etc/nginx/users/{$username}", $dryRun);
+
+// Home and the recreate backup are purged the same way; the recursive chattr runs on
+// the residue only, so every immutable path is covered without naming any of them.
+//
+// The purge runs LAST because it is the only unbounded step here. Every step above is
+// cheap and bounded, and on an account large enough for the purge to exceed the caller's
+// timeout, anything sequenced after it never runs at all -- which stranded a live nginx
+// route and 12 port reservations. Ports are the durable loss: they leave the pool until
+// something reconciles them. Ordering the bounded work first means a timeout costs only
+// the purge, which is resumable, instead of the whole cleanup tail.
+//
+// This stays SYNCHRONOUS and un-renamed, which is the property #729 protects (revert of
+// the async rename-aside reclaim, 4d3548d2): backgrounding the purge would let this script
+// return while the home still exists, and addUser.php has no existence guard, so a
+// re-provisioned username could race the deletion. Running the purge later in the SAME
+// blocking run reintroduces none of that -- see the forbidden list in
+// TerminateUserContractTest, which is what actually holds #729.
+//
+// Route-retire -> nginx reload -> port release must also stay in that order: portManager
+// shuffles the free list, so releasing a port before its route is gone lets a new account
+// draw a port a stale route still proxies to.
+pmssUserLifecycleRunSteps('terminate', $username, pmssTerminateUserPurgeDirectorySteps('home', "/home/{$username}"), $dryRun);
+pmssUserLifecycleRunSteps('terminate', $username, pmssTerminateUserPurgeDirectorySteps('user_backup', "/home/backup-{$username}"), $dryRun);
 
 $db = new users();
 if (pmssUserAccountLookup($username) !== null) {

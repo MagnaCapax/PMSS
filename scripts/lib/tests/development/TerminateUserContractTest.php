@@ -32,8 +32,19 @@ final class TerminateUserContractTest extends TestCase
 
     /**
      * Home and the recreate backup are purged synchronously through one shared helper,
-     * after the account is removed and before the nginx routes are cleaned up.
-     * Refs #729 (revert of the async rename-aside reclaim).
+     * after the account is removed and after every bounded cleanup step has run.
+     * Refs #729 (revert of the async rename-aside reclaim), #908 (purge ordering).
+     *
+     * The protected property is SYNCHRONOUS-NOT-QUEUED, held by the forbidden list below:
+     * backgrounding or renaming the home aside would let terminateUser.php return while
+     * the directory still exists, and addUser.php has no existence guard, so a
+     * re-provisioned username could race the deletion.
+     *
+     * The purge's POSITION is a separate concern and deliberately moved (#908). It is the
+     * only unbounded step; when it overran the caller's timeout it took the entire cleanup
+     * tail with it, stranding a live nginx route and 12 port reservations. Sequencing the
+     * bounded work first means a timeout costs only the resumable purge. Running it later
+     * in the same blocking run reintroduces none of #729 -- nothing is queued or renamed.
      */
     public function testTerminateUserPurgesHomeAndBackupSynchronously(): void
     {
@@ -47,9 +58,11 @@ final class TerminateUserContractTest extends TestCase
             ],
             'ordered' => [[
                 "'userdel_initial'",
+                'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
+                "'release_lighttpd_port'",
+                "'remove_nginx_user_file'",
                 "pmssTerminateUserPurgeDirectorySteps('home', \"/home/{\$username}\")",
                 "pmssTerminateUserPurgeDirectorySteps('user_backup', \"/home/backup-{\$username}\")",
-                'pmssTerminateUserRemoveNginxRouteFiles($username, $dryRun);',
             ]],
         ]);
     }
