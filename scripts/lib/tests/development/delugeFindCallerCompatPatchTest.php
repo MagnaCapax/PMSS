@@ -12,11 +12,7 @@ class DelugeFindCallerCompatPatchTest extends DelugeAppTestCase
 
     public function testPatchAddsStacklevelToLegacySignature(): void
     {
-        $path = $this->tempDir.'/log.py';
-        file_put_contents($path, "class Logging:\n    def findCaller(self, stack_info=False):  # NOQA: N802\n        return ('x', 1, 'y', None)\n");
-
-        $result = \pmssPatchDelugeFindCallerSignature($path, false, $this->logger);
-        $content = (string) file_get_contents($path);
+        [$result, $content] = $this->pmssDelugePatchFixtureApply('log.py', "class Logging:\n    def findCaller(self, stack_info=False):  # NOQA: N802\n        return ('x', 1, 'y', None)\n", 'pmssPatchDelugeFindCallerSignature');
 
         $this->assertTrue($result, 'Expected legacy signature to be patched');
         $this->assertEquals("class Logging:\n    def findCaller(self, stack_info=False, stacklevel=1):  # NOQA: N802\n        return ('x', 1, 'y', None)\n", $content);
@@ -24,12 +20,8 @@ class DelugeFindCallerCompatPatchTest extends DelugeAppTestCase
 
     public function testPatchReturnsTrueForAlreadyPatchedSignature(): void
     {
-        $path = $this->tempDir.'/log.py';
         $original = "class Logging:\n    def findCaller(self, stack_info=False, stacklevel=1):\n        return ('x', 1, 'y', None)\n";
-        file_put_contents($path, $original);
-
-        $result = \pmssPatchDelugeFindCallerSignature($path, false, $this->logger);
-        $content = (string) file_get_contents($path);
+        [$result, $content] = $this->pmssDelugePatchFixtureApply('log.py', $original, 'pmssPatchDelugeFindCallerSignature');
 
         $this->assertTrue($result, 'Expected patched signature to be accepted');
         $this->assertEquals($original, $content, 'Already patched file should remain unchanged');
@@ -37,22 +29,15 @@ class DelugeFindCallerCompatPatchTest extends DelugeAppTestCase
 
     public function testPatchReturnsFalseWhenSignatureMissing(): void
     {
-        $path = $this->tempDir.'/log.py';
-        file_put_contents($path, "class Logging:\n    def not_find_caller(self):\n        return None\n");
-
-        $result = \pmssPatchDelugeFindCallerSignature($path, false, $this->logger);
+        [$result] = $this->pmssDelugePatchFixtureApply('log.py', "class Logging:\n    def not_find_caller(self):\n        return None\n", 'pmssPatchDelugeFindCallerSignature');
 
         $this->assertTrue($result === false, 'Expected no-op when signature is absent');
     }
 
     public function testPatchDryRunDoesNotModifyFile(): void
     {
-        $path = $this->tempDir.'/log.py';
         $original = "class Logging:\n    def findCaller(self, stack_info=False):\n        return ('x', 1, 'y', None)\n";
-        file_put_contents($path, $original);
-
-        $result = \pmssPatchDelugeFindCallerSignature($path, true, $this->logger);
-        $content = (string) file_get_contents($path);
+        [$result, $content] = $this->pmssDelugePatchFixtureApply('log.py', $original, 'pmssPatchDelugeFindCallerSignature', true);
 
         $this->assertTrue($result, 'Expected dry-run patch to report success');
         $this->assertEquals($original, $content, 'Dry-run must not modify file content');
@@ -61,17 +46,7 @@ class DelugeFindCallerCompatPatchTest extends DelugeAppTestCase
 
     public function testPatchRejectsSymlinkPath(): void
     {
-        $realPath = $this->tempDir.'/log-real.py';
-        $linkPath = $this->tempDir.'/log.py';
-        $original = "class Logging:\n    def findCaller(self, stack_info=False):\n        return ('x', 1, 'y', None)\n";
-        file_put_contents($realPath, $original);
-        @symlink($realPath, $linkPath);
-
-        $result = \pmssPatchDelugeFindCallerSignature($linkPath, false, $this->logger);
-        $content = (string) file_get_contents($realPath);
-
-        $this->assertTrue($result === false, 'Expected symlink path to be refused');
-        $this->assertEquals($original, $content, 'Symlink target must remain unchanged');
+        $this->pmssAssertDelugePatchSymlinkRefused('log.py', "class Logging:\n    def findCaller(self, stack_info=False):\n        return ('x', 1, 'y', None)\n", 'pmssPatchDelugeFindCallerSignature');
     }
 
 }

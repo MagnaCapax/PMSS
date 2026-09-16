@@ -27,6 +27,11 @@ returns `[result, output]` and restores temporary environment overrides on succe
 or exception. Pass `pmssPathPrefixedEnvironment()` for command stubs; keep
 assertions outside the capture so only the operation's output is collected.
 
+Deluge compatibility-patch tests share fixture execution and symlink-refusal
+checks in `DelugeAppTestCase`. Keep patch-specific source, expected bytes,
+return-value assertions, and log expectations in each named test; the shared
+harness only owns temporary file setup, patch invocation, and content reads.
+
 ### Lint Opt-ins (safe defaults)
 - To run all lints locally without impacting dev hosts:
   - `PMSS_LINT_CAMEL=1 scripts/testing/test-all.sh`

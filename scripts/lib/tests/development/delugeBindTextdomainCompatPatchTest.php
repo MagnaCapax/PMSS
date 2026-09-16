@@ -12,11 +12,7 @@ class DelugeBindTextdomainCompatPatchTest extends DelugeAppTestCase
 
     public function testPatchGuardsLegacyCodesetCall(): void
     {
-        $path = $this->tempDir.'/util.py';
-        file_put_contents($path, $this->legacyUtilSource());
-
-        $result = \pmssPatchDelugeBindTextdomainCodeset($path, false, $this->logger);
-        $content = (string) file_get_contents($path);
+        [$result, $content] = $this->pmssDelugePatchFixtureApply('util.py', $this->legacyUtilSource(), 'pmssPatchDelugeBindTextdomainCodeset');
 
         $this->assertTrue($result, 'Expected legacy gettext codeset call to be patched');
         $this->assertEquals($this->patchedUtilSource(), $content);
@@ -24,12 +20,8 @@ class DelugeBindTextdomainCompatPatchTest extends DelugeAppTestCase
 
     public function testPatchReturnsTrueWhenCodesetCallAlreadyGuarded(): void
     {
-        $path = $this->tempDir.'/util.py';
         $original = $this->patchedUtilSource();
-        file_put_contents($path, $original);
-
-        $result = \pmssPatchDelugeBindTextdomainCodeset($path, false, $this->logger);
-        $content = (string) file_get_contents($path);
+        [$result, $content] = $this->pmssDelugePatchFixtureApply('util.py', $original, 'pmssPatchDelugeBindTextdomainCodeset');
 
         $this->assertTrue($result, 'Expected already guarded gettext codeset call to be accepted');
         $this->assertEquals($original, $content, 'Already guarded util.py should remain unchanged');
@@ -37,22 +29,15 @@ class DelugeBindTextdomainCompatPatchTest extends DelugeAppTestCase
 
     public function testPatchReturnsFalseWhenCodesetCallMissing(): void
     {
-        $path = $this->tempDir.'/util.py';
-        file_put_contents($path, "import gettext\n\ndef setup_translations():\n    gettext.textdomain('deluge')\n");
-
-        $result = \pmssPatchDelugeBindTextdomainCodeset($path, false, $this->logger);
+        [$result] = $this->pmssDelugePatchFixtureApply('util.py', "import gettext\n\ndef setup_translations():\n    gettext.textdomain('deluge')\n", 'pmssPatchDelugeBindTextdomainCodeset');
 
         $this->assertTrue($result === false, 'Expected no-op when codeset call is absent');
     }
 
     public function testPatchDryRunDoesNotModifyFile(): void
     {
-        $path = $this->tempDir.'/util.py';
         $original = $this->legacyUtilSource();
-        file_put_contents($path, $original);
-
-        $result = \pmssPatchDelugeBindTextdomainCodeset($path, true, $this->logger);
-        $content = (string) file_get_contents($path);
+        [$result, $content] = $this->pmssDelugePatchFixtureApply('util.py', $original, 'pmssPatchDelugeBindTextdomainCodeset', true);
 
         $this->assertTrue($result, 'Expected dry-run patch to report success');
         $this->assertEquals($original, $content, 'Dry-run must not modify file content');
@@ -61,17 +46,7 @@ class DelugeBindTextdomainCompatPatchTest extends DelugeAppTestCase
 
     public function testPatchRejectsSymlinkPath(): void
     {
-        $realPath = $this->tempDir.'/util-real.py';
-        $linkPath = $this->tempDir.'/util.py';
-        $original = $this->legacyUtilSource();
-        file_put_contents($realPath, $original);
-        @symlink($realPath, $linkPath);
-
-        $result = \pmssPatchDelugeBindTextdomainCodeset($linkPath, false, $this->logger);
-        $content = (string) file_get_contents($realPath);
-
-        $this->assertTrue($result === false, 'Expected symlink path to be refused');
-        $this->assertEquals($original, $content, 'Symlink target must remain unchanged');
+        $this->pmssAssertDelugePatchSymlinkRefused('util.py', $this->legacyUtilSource(), 'pmssPatchDelugeBindTextdomainCodeset');
     }
 
     private function legacyUtilSource(): string
