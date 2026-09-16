@@ -37,14 +37,17 @@ class UserUpdateHttpTest extends TestCase
     {
         $tempHome = $this->pmssMakeTempDir('pmss-http-');
         mkdir($tempHome.'/.lighttpd', 0755, true);
-        file_put_contents($tempHome.'/.lighttpd/php.ini', "display_errors = On\n");
+        $original = $this->pmssReadRepoFile('etc/skel/.lighttpd/php.ini');
+        file_put_contents($tempHome.'/.lighttpd/php.ini', $original);
 
         $ctx = $this->pmssUserUpdateContext($tempHome);
 
         \pmssUserConfigureHttp($ctx);
 
         $ini = file_get_contents($tempHome.'/.lighttpd/php.ini');
-        $this->assertTrue(strpos($ini, 'error_log') !== false);
+        $this->assertSame($original, $ini);
+        $this->assertSame(parse_ini_string($original), parse_ini_file($tempHome.'/.lighttpd/php.ini'));
+        $this->assertTrue(is_dir($tempHome.'/.tmp'));
     }
 
     public function testConfigureHttpRefusesSymlinkedPhpIni(): void

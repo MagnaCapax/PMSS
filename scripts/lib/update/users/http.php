@@ -40,17 +40,6 @@ function pmssUserConfigureHttp(array $ctx): void
     $phpIniPath = "{$home}/.lighttpd/php.ini";
     if (file_exists($phpIniPath) && !pmssUserFilePathIsSafe($phpIniPath)) {
         $userLog('[WARN] Refusing unsafe php.ini path during HTTP maintenance');
-    } elseif (($phpIni = @parse_ini_file($phpIniPath)) !== false && !isset($phpIni['error_log'])) {
-        $phpIni['error_log'] = "{$home}/.lighttpd/error.log";
-        $newContent = '';
-        foreach ($phpIni as $key => $value) {
-            $newContent .= sprintf('%s = "%s"\n', $key, $value);
-        }
-        if (pmssWriteUserFile($phpIniPath, $newContent, $user, 0640)) {
-            echo "Updated php.ini for user {$user}\n";
-        } else {
-            $userLog('[WARN] Failed to update php.ini during HTTP maintenance');
-        }
     }
 
     if (!is_dir("{$home}/.tmp")) {

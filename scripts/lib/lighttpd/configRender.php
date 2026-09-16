@@ -85,6 +85,7 @@ function pmssLighttpdApplyPhpIniContent(string $content, string $user, int $memo
     foreach ([
         '/^memory_limit\s*=.*$/m' => 'memory_limit = '.$memoryLimitMiB.'M',
         '/^\s*;?\s*upload_tmp_dir\s*=.*$/m' => 'upload_tmp_dir = /home/'.$user.'/.lighttpd/upload',
+        '/^\s*;?\s*error_log\s*=.*$/m' => 'error_log = /home/'.$user.'/.lighttpd/error.log',
     ] as $pattern => $line) {
         $updated = preg_match($pattern, $content)
             ? preg_replace($pattern, $line, $content, 1)

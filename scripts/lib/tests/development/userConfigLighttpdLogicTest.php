@@ -228,13 +228,13 @@ LIGHTTPD;
     public function testPhpIniContentRendererKeepsExistingDirectivesStable(): void
     {
         $updated = \pmssLighttpdApplyPhpIniContent(
-            "engine = On\nmemory_limit = 64M\n; upload_tmp_dir = /tmp\n",
+            "; Keep this comment\n[PHP]\nengine = On\nmemory_limit = 64M\n; upload_tmp_dir = /tmp\n; error_log = php_errors.log\n",
             'alice',
             512
         );
 
         $this->assertSame(
-            "engine = On\nmemory_limit = 512M\nupload_tmp_dir = /home/alice/.lighttpd/upload\n",
+            "; Keep this comment\n[PHP]\nengine = On\nmemory_limit = 512M\nupload_tmp_dir = /home/alice/.lighttpd/upload\nerror_log = /home/alice/.lighttpd/error.log\n",
             $updated
         );
     }
@@ -263,9 +263,17 @@ LIGHTTPD;
         $updated = \pmssLighttpdApplyPhpIniContent("engine = On\n", 'bob', 256);
 
         $this->assertSame(
-            "engine = On\nmemory_limit = 256M\nupload_tmp_dir = /home/bob/.lighttpd/upload\n",
+            "engine = On\nmemory_limit = 256M\nupload_tmp_dir = /home/bob/.lighttpd/upload\nerror_log = /home/bob/.lighttpd/error.log\n",
             $updated
         );
+        foreach (['', '; error_log = php_errors.log', 'error_log = syslog', 'error_log =', '  ; error_log = /tmp/errors'] as $line) {
+            $rendered = \pmssLighttpdApplyPhpIniContent("engine = On\n".$line."\n", 'bob', 256);
+            $this->assertSame(4, substr_count($rendered, "\n"));
+            $path = $this->pmssMakeTempFile('pmss-http-phpini-');
+            file_put_contents($path, $rendered);
+            $this->assertSame('/home/bob/.lighttpd/error.log', parse_ini_file($path)['error_log']);
+            $this->assertSame($rendered, \pmssLighttpdApplyPhpIniContent($rendered, 'bob', 256));
+        }
     }
 
     public function testUserConfigApplyFacadeLoadsFocusedHelpers(): void
