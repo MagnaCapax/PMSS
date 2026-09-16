@@ -124,7 +124,8 @@ function pmssLockHandleWritePid($handle): bool
 {
     if (!is_resource($handle) || get_resource_type($handle) !== 'stream') return false;
     $pid = (string) getmypid();
-    if (!@ftruncate($handle, 0) || !@rewind($handle)) return false;
+    // Preserve the previous PID when the stream cannot seek to its beginning.
+    if (!@rewind($handle) || !@ftruncate($handle, 0)) return false;
     return @fwrite($handle, $pid) === strlen($pid) && @fflush($handle);
 }
 

@@ -2,9 +2,41 @@
 namespace PMSS\Tests;
 
 require_once dirname(__DIR__, 2).'/runtime.php';
+require_once __DIR__.'/../common/CounterStateStream.php';
 
 class RuntimeLockSafetyTest extends TestCase
 {
+    public function testPidWriterStopsAtFailedIoBoundary(): void
+    {
+        $this->assertTrue(stream_wrapper_register('pmsslockpid', CounterStateStream::class));
+        try {
+            foreach (['seek', 'truncate', 'write', 'short', 'flush', 'success'] as $failure) {
+                $handle = fopen('pmsslockpid://'.$failure, 'w+');
+                $stream = stream_get_meta_data($handle)['wrapper_data'];
+                try {
+                    $this->assertSame($failure === 'success', \pmssLockHandleWritePid($handle));
+                    $this->assertTrue(is_resource($handle), 'The caller retains the stream on every result');
+                    $this->assertSame('seek', $stream->events[0]);
+                    $this->assertSame(in_array($failure, ['flush', 'success'], true), in_array('flush', $stream->events, true));
+                    if (in_array($failure, ['seek', 'truncate'], true)) {
+                        $this->assertSame('previous state', $stream->contents);
+                        $this->assertFalse(in_array('write', $stream->events, true));
+                    }
+                    if ($failure === 'seek') {
+                        $this->assertSame(['seek'], $stream->events);
+                    }
+                    if ($failure === 'success') {
+                        $this->assertSame((string) getmypid(), $stream->contents);
+                    }
+                } finally {
+                    fclose($handle);
+                }
+            }
+        } finally {
+            stream_wrapper_unregister('pmsslockpid');
+        }
+    }
+
     public function testRuntimeLockPathPreservesNormalizationAndRejections(): void
     {
         $root = is_dir('/run/lock') ? '/run/lock' : '/tmp';
@@ -140,6 +172,7 @@ class RuntimeLockSafetyTest extends TestCase
 
             try {
                 $this->assertTrue(\pmssLockFileHandleMatchesPath($handle, $path));
+                stream_get_contents($handle); // Existing contents can leave the caller at EOF.
                 $this->assertTrue(\pmssLockHandleWritePid($handle));
                 $this->assertSame((string) getmypid(), file_get_contents($path));
 

@@ -115,6 +115,14 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `pmssLockHandleWritePid($handle): bool`
+  - Rewinds before truncating, preserving the previous PID if seeking fails.
+  - Stops on failed seek, truncation, incomplete write, or flush and returns
+    `false`; successful writes retain the decimal PID without a newline.
+  - The caller retains ownership of the stream and its lock on every result.
+    Writes are in-place: a write/flush failure after truncation cannot restore
+    the previous contents. `RuntimeLockSafetyTest` injects each I/O failure.
+
 - `pmssProcessCloseExitCode($process, $lastStatus=null): int`
   - Closes only process resources; invalid, closed, and other resource types
     use the existing `-1` fallback without consuming or closing unrelated streams.
