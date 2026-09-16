@@ -134,11 +134,10 @@ class NetworkFireqosTest extends TestCase
             ['10.0.0.0/8'],
             $this->pmssReadRepoFile('etc/seedbox/config/template.fireqos')
         );
-        $interfacePos = strpos($config, 'interface $DEVICE outbound output rate $INTERFACE_SPEED');
-        $localPos = strpos($config, 'class local commit 10%');
-        $this->assertTrue($interfacePos !== false);
-        $this->assertTrue($localPos !== false);
-        $this->assertTrue($localPos > $interfacePos);
+        $this->assertOrderedStrings([
+            'interface $DEVICE outbound output rate $INTERFACE_SPEED',
+            'class local commit 10%',
+        ], $config);
         $this->assertEquals(1, substr_count($config, 'class local commit 10%'));
         $this->assertStringContainsAllStrings(['class root ceil 25Mbit', 'match dst 10.0.0.0/8'], $config);
     }

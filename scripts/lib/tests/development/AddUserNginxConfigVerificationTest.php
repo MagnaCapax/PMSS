@@ -34,13 +34,9 @@ class AddUserNginxConfigVerificationTest extends TestCase
 
     public function testAddUserVerifiesArtifactsBeforeReportingSuccess(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/addUser.php');
-
-        $verifyPos = strpos($source, "pmssAddUserVerifyArtifactsOrFail(\$user['name'], \$homePath);");
-        $successPos = strpos($source, "finalizeProvision('SUCCESS', 'completed', 0);");
-
-        $this->assertTrue($verifyPos !== false, 'addUser.php must verify required artifacts');
-        $this->assertTrue($successPos !== false, 'addUser.php must still report success when complete');
-        $this->assertTrue($verifyPos < $successPos, 'artifact verification must happen before SUCCESS is reported');
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/addUser.php', [
+            "pmssAddUserVerifyArtifactsOrFail(\$user['name'], \$homePath);",
+            "finalizeProvision('SUCCESS', 'completed', 0);",
+        ], '', 'artifact verification must happen before SUCCESS is reported: ');
     }
 }

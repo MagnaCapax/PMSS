@@ -30,12 +30,11 @@ class UserDockerLingerEnsureTest extends TestCase
     public function testUserDockerStartPathWiresLingerEnsureBeforeDaemonStart(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 3).'/util/userDocker.php');
-        $this->assertStringContainsString('pmssUserDockerLingerEnsureCommands($user, $uid)', $src);
         $this->assertStringContainsString('if (!is_dir($runtimeDir)) {', $src);
-        $ensurePos = strpos($src, 'pmssUserDockerLingerEnsureCommands($user, $uid)');
-        $startPos = strpos($src, 'nohup dockerd-rootless.sh');
-        $this->assertTrue($ensurePos !== false && $startPos !== false && $ensurePos < $startPos,
-            'linger-ensure must run before the rootless dockerd launch');
+        $this->assertOrderedStrings([
+            'pmssUserDockerLingerEnsureCommands($user, $uid)',
+            'nohup dockerd-rootless.sh',
+        ], $src, '', 'linger-ensure must run before the rootless dockerd launch: ');
     }
 
     public function testRootDockerStartUsesSliceAwareLauncherButSameUserPathStaysDirect(): void
@@ -48,10 +47,10 @@ class UserDockerLingerEnsureTest extends TestCase
             'userDockerRunAs($user, $envCmd, $userDockerStartTimeoutSec, $launchRc, true);',
         ], $src);
 
-        $directLaunchPos = strpos($src, "if (\$target !== null && \$currentUid > 0 && \$currentUid === (int) \$target['uid']) {");
-        $sliceLaunchPos = strpos($src, 'elseif ($placeInUserSlice && $currentUid === 0)');
-        $this->assertTrue($directLaunchPos !== false && $sliceLaunchPos !== false && $directLaunchPos < $sliceLaunchPos,
-            'same-user invocation must remain direct before the root slice-aware branch');
+        $this->assertOrderedStrings([
+            "if (\$target !== null && \$currentUid > 0 && \$currentUid === (int) \$target['uid']) {",
+            'elseif ($placeInUserSlice && $currentUid === 0)',
+        ], $src, '', 'same-user invocation must remain direct before the root slice-aware branch: ');
     }
 
     public function testUserDockerStopUsesRuntimeDirFallbackAndLivenessGate(): void
@@ -66,17 +65,17 @@ class UserDockerLingerEnsureTest extends TestCase
         $oldTimeoutGuard .= ')';
         $this->assertTrue(strpos($src, $oldTimeoutGuard) === false,
             'stop fallback must not be limited to timeout rc 124');
-        $this->assertTrue(strpos($src, 'userDockerCollectPids($user, $debug, $stopCheckOk)') < strpos($src, 'echo "Docker stop requested'),
-            'stop success output must follow liveness verification');
+        $this->assertOrderedStrings([
+            'userDockerCollectPids($user, $debug, $stopCheckOk)',
+            'echo "Docker stop requested',
+        ], $src, '', 'stop success output must follow liveness verification: ');
     }
 
     public function testUserDockerStopKillsTheRootlesskitParent(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 3).'/util/userDocker.php');
-        $commandPos = strpos($src, '$dockerStopCmd =');
-        $rootlesskitPos = strpos($src, 'pkill -x rootlesskit');
-        $this->assertTrue($commandPos !== false && $rootlesskitPos !== false && $rootlesskitPos > $commandPos,
-            'rootless stop must target the rootlesskit user-namespace parent');
+        $this->assertOrderedStrings(['$dockerStopCmd =', 'pkill -x rootlesskit'], $src,
+            '', 'rootless stop must target the rootlesskit user-namespace parent: ');
         $this->assertStringContainsAllStrings([
             "'pkill -x dockerd || true'",
             "'pkill -x rootlesskit || true'",

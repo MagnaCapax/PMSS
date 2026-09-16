@@ -404,13 +404,8 @@ LIGHTTPD;
         $user = 'testuser';
         $policy = pmssWebdavWwwPolicyBlock($user);
 
-        $wwwPos = strpos($policy, '/www($|/)');
-        $publicPos = strpos($policy, '/www/public($|/)');
-
-        $this->assertTrue($wwwPos !== false, 'www block must exist');
-        $this->assertTrue($publicPos !== false, 'www/public block must exist');
-        $this->assertTrue($publicPos > $wwwPos,
-            'www/public block must come after www block for lighttpd precedence');
+        $this->assertOrderedStrings(['/www($|/)', '/www/public($|/)'], $policy,
+            '', 'www/public block must come after www block for lighttpd precedence: ');
     }
 
     // =========================================================================

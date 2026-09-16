@@ -45,11 +45,10 @@ class UpdateBootstrapDistUpgradeTest extends TestCase
 
         $runUpdateStep2 = substr($data, $runStep2Start, $runStep2End - $runStep2Start);
         $bootstrapMain = substr($data, $bootstrapStart);
-        $disableIdx = strpos($runUpdateStep2, 'pmssDisableRootCronForUpdateStep2();');
-        $handoffIdx = strpos($runUpdateStep2, "logEvent('update_step2_start')");
-        $this->assertTrue($disableIdx !== false, 'update.php should disable root cron at phase-2 handoff');
-        $this->assertTrue($handoffIdx !== false, 'update.php should log update_step2_start');
-        $this->assertTrue($handoffIdx < $disableIdx, 'root cron disable should be coupled to update-step2 handoff');
+        $this->assertOrderedStrings([
+            "logEvent('update_step2_start')",
+            'pmssDisableRootCronForUpdateStep2();',
+        ], $runUpdateStep2, '', 'root cron disable should be coupled to update-step2 handoff: ');
         $this->pmssAssertStringNotContainsString("pmssRemoveFileFatal(\$rootCron", $bootstrapMain, 'bootstrapMain must not remove root cron during phase-1 staging');
         $this->pmssAssertStringNotContainsString('Disabled /etc/cron.d/pmss during update', $bootstrapMain, 'root cron should stay live through snapshot staging');
     }
