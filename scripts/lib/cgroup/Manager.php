@@ -45,8 +45,7 @@ class Manager
             return 0;
         }
         if (count($args) === 0) {
-            fwrite(STDERR, pmssCgroupCliUsageText()."\n");
-            return 2;
+            return pmssCliReturnWithStderr(pmssCgroupCliUsageText()."\n", 2);
         }
 
         $user  = $args[0];
@@ -57,8 +56,7 @@ class Manager
         $uid   = $this->sys->getUid($user);
 
         if ($uid < 0) {
-            fwrite(STDERR, "Unknown user: $user\n");
-            return 1;
+            return pmssCliReturnWithStderr("Unknown user: $user\n", 1);
         }
 
         $slice = "user-".$uid.".slice";
@@ -77,19 +75,16 @@ class Manager
         $opt = array_intersect_key($inlineOptions, PMSS_CGROUP_POLICY_OPTIONS + PMSS_CGROUP_NUMERIC_PROFILES);
 
         if ($parseError !== null) {
-            fwrite(STDERR, $parseError."\n");
-            return 2;
+            return pmssCliReturnWithStderr($parseError."\n", 2);
         }
 
         if (($invalidMessage = pmssCgroupCliValidateFlagOptions($opt, $ioCostQos, $ioCostModel)) !== null) {
-            fwrite(STDERR, $invalidMessage."\n");
-            return 2;
+            return pmssCliReturnWithStderr($invalidMessage."\n", 2);
         }
 
         if ($actions['wipe'] && (!empty($opt) || !empty($ioPairs) || $actions['defaults'] || $actions['respectExisting']
             || $device !== '' || $ioProfile !== '' || $ioCostQos !== '' || $ioCostModel !== '')) {
-            fwrite(STDERR, "Invalid --wipe combination: remove resource, IO, defaults, and respect-existing options before wiping\n");
-            return 2;
+            return pmssCliReturnWithStderr("Invalid --wipe combination: remove resource, IO, defaults, and respect-existing options before wiping\n", 2);
         }
 
         if ($actions['defaults']) {
@@ -102,8 +97,7 @@ class Manager
         pmssCgroupCliExpandProfiles($opt);
 
         if (($invalidDeviceMessage = pmssCgroupCliValidateDeviceSelector($device)) !== null) {
-            fwrite(STDERR, $invalidDeviceMessage."\n");
-            return 2;
+            return pmssCliReturnWithStderr($invalidDeviceMessage."\n", 2);
         }
 
         $devResolved = pmssCgroupCliDeviceResolve($this->sys, $device, isset($opt['io-latency-ms']));
@@ -208,8 +202,7 @@ class Manager
             return 0;
         }
         if ($uid === 0) {
-            fwrite(STDERR, "Refusing to apply cgroup changes to root slice; use cgroupRootCheck.php for root guard repair.\n");
-            return 1;
+            return pmssCliReturnWithStderr("Refusing to apply cgroup changes to root slice; use cgroupRootCheck.php for root guard repair.\n", 1);
         }
 
         $this->sys->requireRoot();
@@ -218,8 +211,7 @@ class Manager
             $applyFailed = (int) call_user_func($this->stepRunner, $step[0], $step[1]) !== 0 || $applyFailed;
         }
         if ($applyFailed) {
-            fwrite(STDERR, "One or more cgroup apply operations failed; inspect the logged command output above.\n");
-            return 1;
+            return pmssCliReturnWithStderr("One or more cgroup apply operations failed; inspect the logged command output above.\n", 1);
         }
 
         return 0;

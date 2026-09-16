@@ -18,8 +18,7 @@ function pmssShowTrafficMain(array $argv): int
     $extended = pmssCliOptionPresent($parsed, 'extended');
     $sortOption = pmssCliOption($parsed, 'sort', null, null);
     if ($helpExitCode === null && $sortOption !== null && (!is_string($sortOption) || trim($sortOption) === '')) {
-        fwrite(STDERR, "Error: --sort expects a value.\n");
-        return 2;
+        return pmssCliReturnWithStderr("Error: --sort expects a value.\n", 2);
     }
     $sort = is_string($sortOption) ? strtolower(trim($sortOption)) : 'name';
     if ($helpExitCode === null && !in_array($sort, ['name', 'month', 'pct', 'rate'], true)) {

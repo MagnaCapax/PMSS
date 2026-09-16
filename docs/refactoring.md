@@ -79,6 +79,9 @@ payload bytes, and successful log formats remain unchanged.
 
 ## Helper Extraction Rules
 
+CLI diagnostic-and-return paths use `pmssCliReturnWithStderr()`, passing the
+complete message and status unchanged; the helper does not exit or add a newline.
+
 Whitespace column parsing belongs in `pmssConfigLineColumns()` from the runtime
 library. Pass the existing minimum column count and `[]` for command output
 whose `#` tokens are data; keep field validation and failure reporting in callers.

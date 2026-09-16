@@ -262,27 +262,23 @@ function pmssDockerInstallLsioMain(array $argv): int
     }
 
     if (count($positionals) < 1 || count($positionals) > 2) {
-        fwrite(STDERR, pmssDockerInstallLsioUsage($scriptName));
-        return 1;
+        return pmssCliReturnWithStderr(pmssDockerInstallLsioUsage($scriptName), 1);
     }
 
     $app = (string) $positionals[0];
     $homeDir = (string) getenv('HOME');
     if ($homeDir === '') {
-        fwrite(STDERR, "HOME is not set.\n");
-        return 1;
+        return pmssCliReturnWithStderr("HOME is not set.\n", 1);
     }
 
     $spec = pmssDockerInstallLsioAppSpec($app, $homeDir, $dryRun);
     if ($spec === null) {
-        fwrite(STDERR, pmssDockerInstallLsioUsage($scriptName));
-        return 1;
+        return pmssCliReturnWithStderr(pmssDockerInstallLsioUsage($scriptName), 1);
     }
 
     $hostPort = pmssDockerInstallLsioHostPort(isset($positionals[1]) ? (string) $positionals[1] : null, (string) $spec['defaultPort']);
     if ($hostPort === null) {
-        fwrite(STDERR, "Invalid host port; expected an integer between 1 and 65535.\n");
-        return 1;
+        return pmssCliReturnWithStderr("Invalid host port; expected an integer between 1 and 65535.\n", 1);
     }
 
     $dockerRun = pmssDockerInstallLsioDockerRunCommand($app, $hostPort, pmssDockerInstallLsioTimezone(), $spec);
@@ -294,18 +290,15 @@ function pmssDockerInstallLsioMain(array $argv): int
     }
 
     if (pmssCommandPath('docker') === '') {
-        fwrite(STDERR, "docker command not found in PATH\n");
-        return 1;
+        return pmssCliReturnWithStderr("docker command not found in PATH\n", 1);
     }
 
     if (pmssCommandCapture(pmssCommandArgvShellQuote(['docker', 'info']))['rc'] !== 0) {
-        fwrite(STDERR, "Docker daemon unavailable; wait for the PMSS rootless Docker watchdog and retry.\n");
-        return 1;
+        return pmssCliReturnWithStderr("Docker daemon unavailable; wait for the PMSS rootless Docker watchdog and retry.\n", 1);
     }
 
     if (pmssCommandCapture(pmssCommandArgvShellQuote(['docker', 'container', 'inspect', $app]))['rc'] === 0) {
-        fwrite(STDERR, "Container {$app} already exists; remove it manually if you want to recreate it.\n");
-        return 1;
+        return pmssCliReturnWithStderr("Container {$app} already exists; remove it manually if you want to recreate it.\n", 1);
     }
 
     if (pmssCommandCapture(pmssCommandArgvShellQuote(['docker', 'network', 'inspect', 'pmss-media']))['rc'] !== 0) {

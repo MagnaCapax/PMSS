@@ -8,6 +8,18 @@ require_once dirname(__DIR__, 2).'/log.php';
 
 class RuntimeTest extends TestCase
 {
+    public function testCliDiagnosticReturnPreservesBytesAndContinues(): void
+    {
+        foreach (['', "failure\n", "  failure  ", "first\nsecond\n", "binary\0payload"] as $message) {
+            $code = 'require '.var_export(dirname(__DIR__, 2).'/runtime/cli.php', true).'; '
+                .'echo pmssCliReturnWithStderr('.var_export($message, true).', 7); echo " continued";';
+            $capture = $this->pmssExecShellCommandWithTempStderr(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($code));
+            $this->assertSame(0, $capture['result']['rc']);
+            $this->assertSame('7 continued', $capture['result']['output']);
+            $this->assertSame($message, file_get_contents($capture['stderrPath']));
+        }
+    }
+
     public function testRuntimeRequireOnceOwnsDefinitionContract(): void
     {
         $runtime = var_export(dirname(__DIR__, 3).'/lib/runtime.php', true);

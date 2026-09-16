@@ -159,8 +159,7 @@ function pmssUserResourcesListMain(array $argv): int
     ], $useColor)."\n";
     if (($parsed = pmssParseCliTokensOrHelp($argv, $usage)) === null) return 0;
     if (posix_getuid() !== 0) {
-        fwrite(STDERR, "Error: This script must be run as root to query systemd slices.\n");
-        return 1;
+        return pmssCliReturnWithStderr("Error: This script must be run as root to query systemd slices.\n", 1);
     }
     $outputJsonl = (bool) pmssCliOption($parsed, 'jsonl');
     $outputJson = !$outputJsonl && (bool) pmssCliOption($parsed, 'json');

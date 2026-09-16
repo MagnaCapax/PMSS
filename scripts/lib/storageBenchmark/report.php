@@ -10,6 +10,7 @@
  */
 
 require_once dirname(__DIR__).'/log.php';
+require_once dirname(__DIR__).'/runtime/cli.php';
 
 /** Convert untrusted JSONL display values to printable scalar text. */
 function storageBenchmarkScalarDisplay($value): string
@@ -118,8 +119,7 @@ function storageBenchmarkReportPrintDeviceEntry(array $entry): void
 function storageBenchmarkShowLast(string $jsonLog): int
 {
     if (!is_file($jsonLog)) {
-        fwrite(STDERR, "No log at {$jsonLog}\n");
-        return 1;
+        return pmssCliReturnWithStderr("No log at {$jsonLog}\n", 1);
     }
 
     [$lastId, $run] = storageBenchmarkLastRunRead($jsonLog);
