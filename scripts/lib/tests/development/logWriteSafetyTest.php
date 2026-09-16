@@ -30,6 +30,52 @@ final class LogWriteSafetyTest extends TestCase
         $this->assertFalse(\pmssLogWritePathIsSafe("/tmp/pmss-log\nunsafe.log"));
     }
 
+    public function testLogBoundariesRejectRawControlBytesWithoutIo(): void
+    {
+        $directory = $this->pmssMakeTempDir('pmss-log-boundary-');
+        $path = $directory.'/events.jsonl';
+        $original = "{\"event\":\"original\"}\n";
+        file_put_contents($path, $original);
+        $handled = false;
+        $handler = static function () use (&$handled): void { $handled = true; };
+
+        foreach (["\0", "\r", "\n", "\r\n"] as $bytes) {
+            foreach ([$bytes.$path, $path.$bytes, $directory.'/events'.$bytes.'.jsonl', " \t".$path.$bytes."\t "] as $unsafe) {
+                $this->assertFalse(\pmssLogWritePathIsSafe($unsafe));
+                $this->assertFalse(\pmssJsonLineAppend($unsafe, ['event' => 'blocked']));
+                $this->assertFalse(\pmssLogAppendTimestampedLine($unsafe, 'blocked'));
+                $this->assertFalse(\pmssJsonLineFileEach($unsafe, $handler));
+                $this->assertSame([], \pmssJsonLineFileRead($unsafe));
+                $this->assertSame(null, \pmssJsonLineFileLast($unsafe));
+            }
+        }
+
+        $this->assertFalse($handled);
+        $this->assertSame($original, file_get_contents($path));
+        $this->assertSame(['.', '..', 'events.jsonl'], scandir($directory));
+    }
+
+    public function testLogBoundaryPreservesOrdinaryPathsAndPayloadBytes(): void
+    {
+        $path = $this->pmssMakeTempDir('pmss-log-compatible-').'/events with spaces.jsonl';
+        // Preserve the predicate's existing whitespace normalization policy.
+        foreach ([$path, ' '.$path.' ', "\t".$path."\t"] as $candidate) {
+            $this->assertTrue(\pmssLogWritePathIsSafe($candidate));
+        }
+        foreach (['', ' ', "\t"] as $empty) {
+            $this->assertFalse(\pmssLogWritePathIsSafe($empty));
+        }
+
+        $payload = ['event' => "ready\0\r\n", 'path' => '/data/test'];
+        $this->assertTrue(\pmssJsonLineAppend($path, $payload));
+        $this->assertSame("{\"event\":\"ready\\u0000\\r\\n\",\"path\":\"/data/test\"}".PHP_EOL, file_get_contents($path));
+        $this->assertSame([$payload], \pmssJsonLineFileRead($path));
+
+        $linePath = dirname($path).'/events.log';
+        $this->assertTrue(\pmssLogAppendTimestampedLine($linePath, "ready\0", '', '[INFO] '));
+        $this->assertSame("[INFO] ready\0".PHP_EOL, file_get_contents($linePath));
+    }
+
     public function testJsonLineAppendRejectsSymlinkTarget(): void
     {
         $target = $this->pmssMakeTempFile('pmss-log-target-');

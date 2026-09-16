@@ -90,8 +90,12 @@ function pmssJsonFileReadAssoc(string $path, bool $safePathRequired = false): ?a
 /** Validate a log write target before appending data. */
 function pmssLogWritePathIsSafe(string $path): bool
 {
+    // Check raw bytes before trim() can hide a malformed filesystem target.
+    if (preg_match('/[\r\n\0]/', $path) === 1) {
+        return false;
+    }
     $path = trim($path);
-    if ($path === '' || preg_match('/[\r\n\0]/', $path) === 1) {
+    if ($path === '') {
         return false;
     }
 

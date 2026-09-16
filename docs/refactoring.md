@@ -71,6 +71,12 @@ do not echo malformed bytes. Ordinary whitespace normalization, filenames, and
 retention rules remain unchanged; `ConfigBackupsCharacterizationTest` verifies
 both rejection and compatibility using temporary fixtures.
 
+The shared log-path guard checks NUL, CR, and LF bytes before trimming, so
+malformed paths stay on the existing false/empty read and append failure paths.
+`LogWriteSafetyTest` covers leading, embedded, and trailing control bytes across
+JSONL readers and both append helpers. Ordinary path whitespace normalization,
+payload bytes, and successful log formats remain unchanged.
+
 ## Helper Extraction Rules
 
 Whitespace column parsing belongs in `pmssConfigLineColumns()` from the runtime
