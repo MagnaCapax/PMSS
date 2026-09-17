@@ -795,6 +795,11 @@ try {
     $result = pmssRunSnapshotLogTask('snapshot-test.php', 'PMSS_TEST_SNAPSHOT_LOG', $path,
         static function ($handle, string $timestamp) use (&$called, $case): int {
             $called = true;
+            if ($case === 'closed' || $case === 'closed_throw') {
+                fclose($handle);
+                if ($case === 'closed_throw') throw new \RuntimeException('snapshot callback failed');
+                return 7;
+            }
             if ($case === 'throw') throw new \RuntimeException('snapshot callback failed');
             pmssSnapshotWriteLine($handle, 'snapshot payload');
             return $case === 'nonzero' ? 7 : 0;
@@ -806,15 +811,16 @@ echo json_encode([$result, $called, is_resource($GLOBALS['snapshotHandle']), uma
     file_get_contents($path), $exception, $GLOBALS['snapshotLockOperation'] ?? null]);
 umask($before);
 PHP;
-        foreach (['failed', 'success', 'nonzero', 'throw', 'unavailable'] as $case) {
+        foreach (['failed', 'success', 'nonzero', 'throw', 'unavailable', 'closed', 'closed_throw'] as $case) {
             $path = $this->pmssMakeTempFile('pmss-snapshot-lock-');
             file_put_contents($path, "previous snapshot\n");
             $expectedBody = "previous snapshot\n";
-            if (!in_array($case, ['failed', 'throw'], true)) $expectedBody .= "snapshot payload\n";
+            $throws = in_array($case, ['throw', 'closed_throw'], true);
+            if (!in_array($case, ['failed', 'throw', 'closed', 'closed_throw'], true)) $expectedBody .= "snapshot payload\n";
             $this->assertSame([
-                $case === 'throw' ? null : ($case === 'failed' ? 1 : ($case === 'nonzero' ? 7 : 0)),
+                $throws ? null : ($case === 'failed' ? 1 : (in_array($case, ['nonzero', 'closed'], true) ? 7 : 0)),
                 $case !== 'failed', false, 0027, $expectedBody,
-                $case === 'throw' ? 'snapshot callback failed' : '',
+                $throws ? 'snapshot callback failed' : '',
                 $case === 'unavailable' ? null : LOCK_EX,
             ], $this->pmssRunInlinePhpJson($script, [
                 'PMSS_TEST_SNAPSHOT_CASE' => $case, 'PMSS_TEST_SNAPSHOT_LOG' => $path,

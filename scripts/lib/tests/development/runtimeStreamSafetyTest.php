@@ -4,9 +4,49 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/runtime/system.php';
 require_once dirname(__DIR__, 2).'/runtime/commandProcess.php';
+require_once dirname(__DIR__, 2).'/runtime.php';
 
 class RuntimeStreamSafetyTest extends TestCase
 {
+    public function testSnapshotWritersIgnoreInvalidAndClosedHandles(): void
+    {
+        $closed = fopen('php://memory', 'w+');
+        fclose($closed);
+        $context = stream_context_create();
+        $process = proc_open('exit 7', [], $pipes);
+        $this->assertTrue(is_resource($process));
+        try {
+            foreach ([null, false, 0, '', [], new \stdClass(), $closed, $context, $process] as $handle) {
+                $this->pmssAssertNoPhpWarnings(function () use ($handle): void {
+                    $this->assertSame(null, \pmssSnapshotWriteLine($handle, 'payload'));
+                    $this->assertSame(null, \pmssSnapshotWriteWarn($handle, 'timestamp', 'warning'));
+                });
+            }
+            $this->assertSame('stream-context', get_resource_type($context));
+            $this->assertSame('process', get_resource_type($process));
+        } finally {
+            $exitCode = proc_close($process);
+        }
+        $this->assertSame(7, $exitCode);
+    }
+
+    public function testSnapshotWritersPreserveBytesAndLeaveStreamsOpen(): void
+    {
+        foreach (['php://memory', 'php://temp'] as $path) {
+            $handle = fopen($path, 'w+');
+            try {
+                foreach (['', 'payload', "binary\0bytes", "two\nlines", "already terminated\n"] as $line) {
+                    $this->assertSame(null, \pmssSnapshotWriteLine($handle, $line));
+                }
+                \pmssSnapshotWriteWarn($handle, 'timestamp', "bad\ncode", ['rc' => 7]);
+                rewind($handle);
+                $this->assertSame("\npayload\nbinary\0bytes\ntwo\nlines\nalready terminated\n\ntimestamp WARN bad_code rc=7\n", stream_get_contents($handle));
+            } finally {
+                fclose($handle);
+            }
+        }
+    }
+
     public function testProcessCloseRejectsOtherHandlesWithoutConsumingThem(): void
     {
         $stream = fopen('php://memory', 'w+');

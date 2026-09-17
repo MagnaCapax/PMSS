@@ -25,7 +25,8 @@ function pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defa
         }
         return (int) $callback($handle, $timestamp);
     } finally {
-        if ($handle !== false) @fclose($handle);
+        // A callback may already have closed the stream, including before throwing.
+        if (is_resource($handle) && get_resource_type($handle) === 'stream') @fclose($handle);
         if ($oldUmask !== null) umask($oldUmask);
     }
 }
@@ -33,6 +34,8 @@ function pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defa
 // Append one newline-terminated line to a snapshot log.
 function pmssSnapshotWriteLine($handle, string $line): void
 {
+    // Keep invalid or closed handles on the legacy best-effort no-op path.
+    if (!is_resource($handle) || get_resource_type($handle) !== 'stream') return;
     @fwrite($handle, $line.PHP_EOL);
 }
 
