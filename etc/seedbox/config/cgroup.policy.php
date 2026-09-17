@@ -4,6 +4,9 @@
 // Values here may be overridden per host/SKU as needed.
 // Guardrails still apply in code: MemoryHigh >= 250MiB; MemoryMax <= 95% of system RAM.
 return [
+    // Passive estimate only: maximum daily P95 over completed UTC days.
+    'ioCeiling' => ['percentile' => 95, 'windowDays' => 7, 'minSamplesPerDay' => 144, 'minDays' => 3],
+
     // CPU/IO weights (1..10000). Lower = lower priority vs others. Default systemd is ~100.
     'cpuWeight'        => 100,
     'ioWeight'         => 100,

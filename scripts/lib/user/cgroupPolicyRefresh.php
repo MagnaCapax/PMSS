@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/../update/runtime/commands.php';
 pmssRequireRelativeFiles(__DIR__, ['../runtime.php', '../userLifecycle.php', 'userConfigCli.php', 'userConfigStore.php']);
+require_once __DIR__.'/../cgroup/ioCeilingHistory.php';
 
 /** Return true when the payload includes explicit io.latency/io.cost knobs. */
 function pmssCgroupRefreshHasExplicitIoPolicy(array $payload): bool
@@ -34,6 +35,10 @@ function pmssCgroupRefreshBuildCommand(string $username, array $payload): ?strin
 /** Reapply explicit io.latency/io.cost settings for every matching managed user. */
 function pmssCgroupPolicyRefreshRun(): int
 {
+    // Passive host measurement is independent of the existing per-user applies.
+    if (!pmssIoCeilingRefresh(pmssCgroupPolicyLoad())) {
+        logmsg('[WARN] Host I/O ceiling cache refresh failed');
+    }
     $store = new UserConfigStore();
     foreach (pmssListManagedUsers('/scripts/listUsers.php') as $user) {
         $payload = $store->applyFallbacks($user, $store->get($user) ?? []);

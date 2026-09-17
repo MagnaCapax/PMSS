@@ -742,6 +742,17 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Safety: `--wipe` must be isolated from resource/IO/default modifiers, and
     explicit io.cost major:minor tokens must match the resolved target device.
 
+- scripts/cron/cgroupPolicyRefresh.php
+  - Existing user-policy applies also refresh a passive host estimate in
+    `/var/run/pmss/io-ceiling.json`; the estimate never applies user limits.
+  - `cgroup.policy.php`'s `ioCeiling` defaults: percentile 95, windowDays 7,
+    minSamplesPerDay 144, minDays 3. Only completed UTC days qualify.
+  - JSON includes settings, computed_at, excluded_current_day, aggregation_frame,
+    qualifying days and published per-dimension maxima with a from_day map.
+    Missing/thin history removes stale publication; consumers check freshness.
+  - Reads the last 16 MiB of the active iostat history and `.1`; older compressed
+    rotations are excluded. See ADR 0063 for the publication and retention contract.
+
 - scripts/productConfig.php <product> --welcome-message=<HTML>
   - Behavior: Sets/clears product-level welcome banner templates in `/etc/seedbox/config/welcomeMessages.json`.
 
