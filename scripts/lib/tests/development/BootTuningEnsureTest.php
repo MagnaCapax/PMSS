@@ -23,6 +23,19 @@ class BootTuningEnsureTest extends TestCase
         $this->assertTrue(file_exists($service), 'expected boot tuning service to be written');
     }
 
+    public function testTunesVirtioBlkDataDisks(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-boot-tuning-virtio-', 0700);
+        [$script] = $this->runBootTuning($dir);
+
+        $this->pmssAssertFileContainsAllStrings($script, [
+            '/sys/block/vd*',
+            '/sys/block/xvd*',
+        ], 'expected boot tuning to cover virtio-blk disks: /home is on /dev/vda on every PMSS KVM guest, '
+            .'so an sd*-only selector leaves all customer I/O unscheduled and makes the per-user '
+            .'blkio.bfq.weight tiers set by cron/cgroupBfqWeightApply.php inert');
+    }
+
     public function testWritesBootTuningService(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-boot-tuning-service-', 0700);
