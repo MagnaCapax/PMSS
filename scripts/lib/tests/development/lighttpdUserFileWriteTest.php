@@ -209,7 +209,15 @@ class LighttpdUserFileWriteTest extends TestCase
         }
     }
 
-    /** Limit writes only in a child process; all files remain in test fixtures. */
+    /**
+     * Limit writes only in a child process; all files remain in test fixtures.
+     *
+     * The payload crosses into the child base64-encoded on purpose. pmssRunInlinePhp()
+     * ships the script through escapeshellarg(), and PHP strips bytes that are invalid
+     * in the current LC_CTYPE encoding -- under C.UTF-8 escapeshellarg("\xff") is "''".
+     * A var_export()ed raw binary payload therefore arrives truncated and the binary
+     * contract below silently tests nothing.
+     */
     private function writeWithFileSizeLimit(bool $append, ?string $existing, string $payload, int $limit): array
     {
         if (!function_exists('posix_setrlimit') || !function_exists('pcntl_signal')) {
@@ -222,7 +230,7 @@ class LighttpdUserFileWriteTest extends TestCase
             chmod($path, 0600);
         }
         $script = 'require '.var_export(dirname(__DIR__, 2).'/lighttpd/userFileWrite.php', true).';'
-            .'$path = '.var_export($path, true).'; $payload = '.var_export($payload, true).'; $prepared = false;'
+            .'$path = '.var_export($path, true).'; $payload = base64_decode('.var_export(base64_encode($payload), true).'); $prepared = false;'
             .'if (!pcntl_signal(SIGXFSZ, SIG_IGN) || !posix_setrlimit(POSIX_RLIMIT_FSIZE, '.$limit.', '.$limit.')) { exit(2); }'
             .'$ok = '.($append
                 ? 'pmssAppendUserFile($path, $payload, '.var_export($this->pmssCurrentOwner(), true).', 0640);'

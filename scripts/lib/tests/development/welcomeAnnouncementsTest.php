@@ -54,7 +54,7 @@ class WelcomeAnnouncementsTest extends TestCase
 
         $html = \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss);
 
-        $this->assertEquals(1, substr_count($html, '<li>'));
+        $this->assertEquals(1, substr_count($html, '<li'));
         $this->assertStringContainsString('Only', $html);
     }
 
@@ -70,7 +70,7 @@ class WelcomeAnnouncementsTest extends TestCase
 
         $html = \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss);
 
-        $this->assertEquals(4, substr_count($html, '<li>'));
+        $this->assertEquals(4, substr_count($html, '<li'));
         $this->assertStringContainsString('One', $html);
         $this->assertTrue(strpos($html, 'Five') === false, 'Fifth item must be omitted');
     }
@@ -84,7 +84,7 @@ class WelcomeAnnouncementsTest extends TestCase
 
         $html = \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss);
 
-        $this->assertEquals(1, substr_count($html, '<li>'));
+        $this->assertEquals(1, substr_count($html, '<li'));
         $this->assertStringContainsString('Ready', $html);
         $this->assertTrue(strpos($html, 'Missing Link') === false, 'Incomplete items must be skipped');
     }

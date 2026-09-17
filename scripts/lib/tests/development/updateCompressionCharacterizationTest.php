@@ -445,10 +445,12 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
         $this->assertTrue(!is_file($this->pmssRepoPath('scripts/lib/storageHealth/exec.php')), 'Expected one-call storageHealth/exec.php helper file to be removed');
         $this->pmssAssertRepoFileNotContainsString('scripts/lib/storageHealth.php', "'exec'", 'storageHealth.php should stop requiring the removed exec.php module');
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/storageHealth/common.php', [
-            'function '.$symbol.'(',
-            'return pmssCommandCapture($cmd, $timeoutSec);',
-        ]);
+        // The intermediate one-call wrapper was folded away too: probes now call the shared
+        // pmssCommandCapture() directly. Pin that end state, not the retired wrapper name.
+        foreach (['common.php', 'nvme.php', 'smart.php'] as $probeFile) {
+            $this->pmssAssertRepoFileNotContainsString('scripts/lib/storageHealth/'.$probeFile, $symbol.'(', 'storageHealth/'.$probeFile.' should call pmssCommandCapture() directly, not the retired '.$symbol.'() wrapper');
+        }
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/storageHealth/common.php', ['pmssCommandCapture(']);
     }
 
     public function testResourceSnapshotCronOwnsSnapshotLoop(): void

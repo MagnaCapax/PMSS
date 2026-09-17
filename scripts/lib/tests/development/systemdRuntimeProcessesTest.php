@@ -10,13 +10,28 @@ class SystemdRuntimeProcessesTest extends TestCase
     {
         $forwarding = $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'];
         $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] = true;
+        // Which global logmsg() won the load race decides whether the plain (non-profile)
+        // [SKIP] line is visible to ob_start(). scripts/lib/log.php forwards to logMessage(),
+        // which echoes -> buffered and capturable. The update.php rescue logger writes with
+        // fwrite(STDOUT, ...) on purpose (unbuffered survives a fatal) -> invisible to
+        // ob_get_clean(). The Runner loads the update bootstrap shim first, so the rescue
+        // logger normally wins here while an isolated run gets log.php. Assert the contract
+        // that holds either way instead of pinning one load order.
+        $logger = new \ReflectionFunction('logmsg');
+        $plainLineIsBuffered = realpath((string) $logger->getFileName()) === realpath(dirname(__DIR__, 2).'/log.php');
         try {
             foreach ([true, false] as $profile) foreach (['', '0', 'test/dry-run', 'systemd unavailable', 'invalid unit name', 'unit demo.service missing'] as $reason) {
                 $this->pmssResetRuntimeProfile();
                 [$skipped, $output] = $this->pmssCaptureStdout(static function () use ($reason, $profile): bool { return \pmssSystemdActionSkip($reason, 'Starting demo service', $profile); });
                 $description = 'Starting demo service ('.$reason.')';
                 $this->assertSame($reason !== '', $skipped);
-                $this->assertSame($skipped ? ($profile ? '[SKIP 0.000s rc=0] ' : '[SKIP] ').$description.PHP_EOL : '', $output);
+                $expectedOutput = '';
+                if ($skipped && $profile) {
+                    $expectedOutput = '[SKIP 0.000s rc=0] '.$description.PHP_EOL;
+                } elseif ($skipped && $plainLineIsBuffered) {
+                    $expectedOutput = '[SKIP] '.$description.PHP_EOL;
+                }
+                $this->assertSame($expectedOutput, $output);
                 $this->assertSame($skipped && $profile ? [$description] : [], array_column($GLOBALS['PMSS_PROFILE'] ?? [], 'description'));
             }
         } finally { $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] = $forwarding; }
