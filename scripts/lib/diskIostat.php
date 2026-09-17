@@ -21,7 +21,7 @@ const PMSS_DISK_IOSTAT_TIMEOUT_SECONDS = 180;
 /** Keep block device names argv-safe before passing them to iostat. */
 function pmssDiskIostatDeviceNameIsSafe(string $device): bool
 {
-    return $device !== '' && preg_match('/^[A-Za-z0-9._+-]+$/', $device) === 1;
+    return $device !== '' && preg_match('/\A[A-Za-z0-9._+-]+\z/', $device) === 1;
 }
 
 /**
@@ -31,6 +31,10 @@ function pmssDiskIostatDeviceNameIsSafe(string $device): bool
  */
 function pmssDiskIostatDiscoverDevices(string $sysBlockDir = '/sys/block'): array
 {
+    // Match the existing discovery-failure result before PHP rejects the path.
+    if ($sysBlockDir === '' || pmssFilesystemPathHasNulByte($sysBlockDir)) {
+        return [];
+    }
     $entries = @scandir($sysBlockDir);
     if (!is_array($entries)) {
         return [];
@@ -57,6 +61,10 @@ function pmssDiskIostatDiscoverDevices(string $sysBlockDir = '/sys/block'): arra
  */
 function pmssDiskIostatBuildCommand(array $devices, string $iostatBinary = ''): string
 {
+    // Reject malformed executable paths before shell quoting can throw.
+    if (pmssFilesystemPathHasNulByte($iostatBinary)) {
+        throw new RuntimeException('Unsafe iostat binary path');
+    }
     foreach ($devices as $device) {
         if (!is_string($device) || !pmssDiskIostatDeviceNameIsSafe($device)) {
             throw new RuntimeException('Unsafe block device name for iostat');

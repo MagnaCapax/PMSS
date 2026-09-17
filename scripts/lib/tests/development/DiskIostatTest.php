@@ -115,4 +115,40 @@ class DiskIostatTest extends TestCase
 
         $this->assertFalse(\pmssDiskIostatWriteSnapshotFiles($root.'/missing/iostat', $payload, 'raw'));
     }
+
+    public function testDiscoveryRejectsMalformedPathsWithoutPhpWarnings(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-iostat-path-');
+        $this->pmssEnsureDir($root.'/sda', 0755);
+        foreach (['', "\0", "\0".$root, $root."\0", $root."\0/child"] as $path) {
+            $this->pmssAssertNoPhpWarnings(function () use ($path): void {
+                $this->assertSame([], \pmssDiskIostatDiscoverDevices($path));
+            });
+        }
+        $this->assertSame(['sda'], \pmssDiskIostatDiscoverDevices($root));
+    }
+
+    public function testDeviceValidationRejectsTrailingAndEmbeddedControlBytes(): void
+    {
+        foreach (["sda\n", "\nsda", "sd\na", "sda\r", "sda\0", "sda\t", ''] as $device) {
+            $this->assertFalse(\pmssDiskIostatDeviceNameIsSafe($device));
+            $this->assertThrowsRuntime(static function () use ($device): void {
+                \pmssDiskIostatBuildCommand([$device], '/usr/bin/iostat');
+            }, 'Unsafe block device name for iostat');
+        }
+        foreach (['sda', 'nvme0n1', 'dm-0', 'disk.name', 'disk_name', 'disk+name'] as $device) {
+            $this->assertTrue(\pmssDiskIostatDeviceNameIsSafe($device));
+        }
+    }
+
+    public function testCommandRejectsNulExecutablePathsBeforeShellQuoting(): void
+    {
+        foreach (["\0", "\0iostat", "io\0stat", "iostat\0", "/usr/bin/iostat\0ignored"] as $binary) {
+            $this->assertThrowsRuntime(static function () use ($binary): void {
+                \pmssDiskIostatBuildCommand(['sda'], $binary);
+            }, 'Unsafe iostat binary path');
+        }
+        // Quoting remains byte-compatible even for paths with shell punctuation.
+        $this->assertSame("'/tmp/io stat' -xm 120 2 -g grp1 'sda' 2>&1", \pmssDiskIostatBuildCommand(['sda'], '/tmp/io stat'));
+    }
 }
