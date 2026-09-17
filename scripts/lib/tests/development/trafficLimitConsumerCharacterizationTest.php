@@ -69,8 +69,8 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
             '"/home/{$user}/.trafficData"',
             "require_once __DIR__.'/traffic.php';",
             "require_once __DIR__.'/trafficLimit.php';",
-            'pmssTrafficLimitReadGiBFile($trafficLimitPath)',
-            'pmssReadUserTrafficMonth($trafficDataPath)',
+            'pmssTrafficLimitReadGiBFile("/home/{$user}/.trafficLimit")',
+            'pmssReadUserTrafficMonth("/home/{$user}/.trafficData")',
             'max($diskQuotaGiB * 500, 15000)',
         ], ['unserialize(']);
     }

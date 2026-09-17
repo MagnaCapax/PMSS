@@ -44,34 +44,19 @@ function pmssUserResourcesListGiBFormat($value): string
  */
 function pmssUserResourcesListQuotaState(?array $userConfig, bool $suspended): array
 {
-    $diskQuotaGiB = null;
-    $diskBurstGiB = null;
-    $inodeQuota = null;
-    $inodeBurst = null;
-    if (is_array($userConfig)) {
-        if (isset($userConfig['quota']) && is_numeric($userConfig['quota'])) {
-            $diskQuotaGiB = (int) $userConfig['quota'];
-        }
-        if (isset($userConfig['quotaBurst']) && is_numeric($userConfig['quotaBurst'])) {
-            $diskBurstGiB = (int) $userConfig['quotaBurst'];
-        }
-        if ($diskBurstGiB === null && $diskQuotaGiB !== null) {
-            $diskBurstGiB = (int) round($diskQuotaGiB * 1.25);
-        }
-        if ($diskQuotaGiB !== null && $diskQuotaGiB > 0) {
-            $inodeQuota = max($diskQuotaGiB * 500, 15000);
-            $inodeBurst = (int) floor($inodeQuota * 1.25);
-        }
-        if (!$suspended && isset($userConfig['suspended'])) {
-            $suspended = (bool) $userConfig['suspended'];
-        }
+    $diskQuotaGiB = is_numeric($userConfig['quota'] ?? null) ? (int) $userConfig['quota'] : null;
+    $diskBurstGiB = is_numeric($userConfig['quotaBurst'] ?? null) ? (int) $userConfig['quotaBurst'] : null;
+    // Explicit zero bursts survive; only missing/invalid values derive from the quota.
+    if ($diskBurstGiB === null && $diskQuotaGiB !== null) {
+        $diskBurstGiB = (int) round($diskQuotaGiB * 1.25);
     }
+    $inodeQuota = $diskQuotaGiB !== null && $diskQuotaGiB > 0 ? max($diskQuotaGiB * 500, 15000) : null;
     return [
         'disk_quota_gib' => $diskQuotaGiB,
         'disk_burst_gib' => $diskBurstGiB,
         'inode_quota' => $inodeQuota,
-        'inode_burst' => $inodeBurst,
-        'suspended' => $suspended,
+        'inode_burst' => $inodeQuota === null ? null : (int) floor($inodeQuota * 1.25),
+        'suspended' => $suspended || (bool) ($userConfig['suspended'] ?? false),
     ];
 }
 
@@ -79,8 +64,6 @@ function pmssUserResourcesListQuotaState(?array $userConfig, bool $suspended): a
 function pmssUserResourcesListEntryBuild(string $user, array $info, array $props, ?array $userConfig): array
 {
     $quotaState = pmssUserResourcesListQuotaState($userConfig, is_dir("/home/{$user}/www-disabled"));
-    $trafficLimitPath = "/home/{$user}/.trafficLimit";
-    $trafficDataPath = "/home/{$user}/.trafficData";
     return [
         'user' => $user,
         'uid' => $info['uid'],
@@ -97,8 +80,8 @@ function pmssUserResourcesListEntryBuild(string $user, array $info, array $props
         'disk_burst_gib' => $quotaState['disk_burst_gib'],
         'inode_quota' => $quotaState['inode_quota'],
         'inode_burst' => $quotaState['inode_burst'],
-        'network_limit_gib' => (($trafficLimitGiB = pmssTrafficLimitReadGiBFile($trafficLimitPath)) > 0) ? $trafficLimitGiB : null,
-        'network_used_gib' => round(pmssReadUserTrafficMonth($trafficDataPath) / 1024, 1),
+        'network_limit_gib' => (($trafficLimitGiB = pmssTrafficLimitReadGiBFile("/home/{$user}/.trafficLimit")) > 0) ? $trafficLimitGiB : null,
+        'network_used_gib' => round(pmssReadUserTrafficMonth("/home/{$user}/.trafficData") / 1024, 1),
         'process_max' => pmssSystemdPropertyTrailingInt($props['TasksMax']),
         'suspended' => $quotaState['suspended'],
     ];
@@ -124,8 +107,8 @@ function pmssUserResourcesListRowBuild(array $resourceData, string $displayMode)
         return $row;
     }
     return array_merge($row, [
-        $resourceData['disk_quota_gib'] === null ? '-' : pmssUserResourcesListGiBFormat($resourceData['disk_quota_gib']),
-        $resourceData['disk_burst_gib'] === null ? '-' : pmssUserResourcesListGiBFormat($resourceData['disk_burst_gib']),
+        pmssUserResourcesListGiBFormat($resourceData['disk_quota_gib']),
+        pmssUserResourcesListGiBFormat($resourceData['disk_burst_gib']),
         $resourceData['inode_quota'] === null ? '-' : (string) $resourceData['inode_quota'],
         $resourceData['inode_burst'] === null ? '-' : (string) $resourceData['inode_burst'],
         $resourceData['network_limit_gib'] === null ? 'inf' : pmssUserResourcesListGiBFormat($resourceData['network_limit_gib']),
@@ -165,13 +148,14 @@ function pmssUserResourcesListMain(array $argv): int
     $outputJson = !$outputJsonl && (bool) pmssCliOption($parsed, 'json');
     $fullMode = (bool) pmssCliOption($parsed, 'full');
     if (pmssCliRejectMutuallyExclusiveOptions($parsed, ['brief', 'full'], "Error: choose either --brief or --full (not both).\n", 'truthy')) return 1;
-    $format = $fullMode
-        ? "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s %-6s %-6s %-7s %-7s %-7s %-7s %-8s %-9s\n"
-        : "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s\n";
-    $headers = $fullMode
-        ? ["User", "UID", "MemHigh", "MemMax", "CPUWt", "CPUQt", "BlkWt", "RdBW", "WrBW", "RdIOPS", "WrIOPS", "DskQ", "DskB", "InoQ", "InoB", "NetLim", "NetUsed", "ProcMax", "Suspended"]
-        : ["User", "UID", "MemHigh", "MemMax", "CPUWt", "CPUQt", "BlkWt", "RdBW", "WrBW", "RdIOPS", "WrIOPS"];
-    $separator = $fullMode ? 180 : 120;
+    // Full mode extends the same eleven-column prefix used by brief rows.
+    $format = "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s";
+    $headers = ["User", "UID", "MemHigh", "MemMax", "CPUWt", "CPUQt", "BlkWt", "RdBW", "WrBW", "RdIOPS", "WrIOPS"];
+    if ($fullMode) {
+        $format .= " %-6s %-6s %-7s %-7s %-7s %-7s %-8s %-9s";
+        array_push($headers, "DskQ", "DskB", "InoQ", "InoB", "NetLim", "NetUsed", "ProcMax", "Suspended");
+    }
+    $format .= "\n";
     $users = pmssListManagedUsers('/scripts/listUsers.php');
     if ($users === []) {
         echo $outputJson ? "[]\n" : ($outputJsonl ? '' : "No users found.\n");
@@ -179,7 +163,7 @@ function pmssUserResourcesListMain(array $argv): int
     }
     if (!$outputJson && !$outputJsonl) {
         printf($format, ...$headers);
-        echo str_repeat('-', $separator)."\n";
+        echo str_repeat('-', $fullMode ? 180 : 120)."\n";
     }
     $allData = [];
     $sliceKeys = ['MemoryHigh', 'MemoryMax', 'CPUWeight', 'IOWeight', 'CPUQuotaPerSecUSec', 'CPUQuotaPeriodUSec', 'CPUQuota', 'IOReadBandwidthMax', 'IOWriteBandwidthMax', 'IOReadIOPSMax', 'IOWriteIOPSMax', 'TasksMax'];

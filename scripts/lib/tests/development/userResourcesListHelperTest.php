@@ -6,6 +6,22 @@ require_once dirname(__DIR__, 2).'/user/resourcesList.php';
 
 class UserResourcesListHelperTest extends TestCase
 {
+    public function testQuotaStatePreservesMissingInvalidAndZeroValues(): void
+    {
+        foreach ([
+            [null, false, [null, null, null, null, false]],
+            [[], true, [null, null, null, null, true]],
+            [['quota' => 'bad', 'quotaBurst' => [], 'suspended' => null], false, [null, null, null, null, false]],
+            [['quota' => '0', 'quotaBurst' => 0], false, [0, 0, null, null, false]],
+            [['quota' => -4], false, [-4, -5, null, null, false]],
+            [['quota' => '30.9', 'quotaBurst' => 'bad', 'suspended' => '0'], true, [30, 38, 15000, 18750, true]],
+        ] as [$config, $suspended, $expected]) {
+            $this->assertSame($expected, array_values(\pmssUserResourcesListQuotaState($config, $suspended)));
+        }
+        $this->assertSame('-', \pmssUserResourcesListGiBFormat(null));
+        $this->assertSame('0G', \pmssUserResourcesListGiBFormat(0));
+    }
+
     public function testQuotaStateDerivesBurstAndInodes(): void
     {
         $state = \pmssUserResourcesListQuotaState(['quota' => 20], false);
