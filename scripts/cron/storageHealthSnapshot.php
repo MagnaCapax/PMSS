@@ -14,3 +14,5 @@ require_once __DIR__.'/../lib/runtime.php';
 pmssPrepareCliEntrypoint(true, ['--quiet']);
 
 require_once __DIR__.'/../util/storageHealthSnapshot.php';
+
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssStorageHealthSnapshotMain');

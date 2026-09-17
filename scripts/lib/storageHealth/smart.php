@@ -111,7 +111,7 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
         return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['smartctl_missing'], 'smartctl missing');
     }
 
-    $cmd = 'smartctl -n standby,now -H -A -i '.escapeshellarg($dev);
+    $cmd = 'smartctl -n standby -H -A -i '.escapeshellarg($dev);
     $probe = pmssStorageHealthProbeCommand('smart', (string) ($disk['kname'] ?? ''), $cmd);
     $res = pmssCommandCapture($probe['command'], 25);
     $out = $res['stdout']."\n".$res['stderr'];
