@@ -217,7 +217,7 @@ class CgroupBfqWeightApplyTest extends TestCase
                         'needles' => [
                             "require_once __DIR__.'/../lib/cgroup/directApply.php';",
                             "pmssCgroupDirectRequireRuntime('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); script does not apply here');",
-                            '// BFQ scheduler must be the active elevator on at least one block device.',
+                            '// BFQ must be the active elevator on the device backing /home',
                         ],
                         'missingPrefix' => 'missing BFQ POSIX extension guard: ',
                         'orderPrefix' => 'BFQ POSIX guard must run before root preflight: ',

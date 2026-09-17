@@ -42,6 +42,40 @@ function pmssCgroupPolicyMountSourceResolve(string $mountPath, ?callable $runner
 /** Accept only complete kernel major:minor tokens, without trailing line breaks, before writes. */
 function pmssCgroupPolicyMajorMinorIsValid(string $majorMinor): bool { return preg_match('/^[0-9]+:[0-9]+\z/', $majorMinor) === 1; }
 
+/**
+ * Is BFQ the active elevator governing the I/O of the device backing $mountPath?
+ *
+ * Per-user blkio.bfq.weight values only take effect when BFQ is the scheduler on
+ * the device the I/O actually goes to, so "BFQ is active somewhere" is not the
+ * question worth asking — a boot disk running BFQ says nothing about /home.
+ *
+ * md and dm devices report scheduler "none" by design (a stacking driver has no
+ * elevator of its own), so for a stacked device the MEMBERS carry the scheduler
+ * and are checked instead.
+ *
+ * @return bool|null true/false when determinable, null when the topology cannot be
+ *                   read — callers fall back rather than treat unknown as failure.
+ */
+function pmssCgroupPolicyMountBfqActive(string $mountPath = '/home', ?string $source = null, string $sysBlock = '/sys/block'): ?bool
+{
+    $device = basename(trim($source ?? pmssCgroupPolicyMountSourceResolve($mountPath)));
+    if ($device === '' || preg_match('/^[A-Za-z0-9_-]+$/', $device) !== 1) return null;
+    if (!is_dir($sysBlock.'/'.$device)) return null;
+
+    $slaves  = glob($sysBlock.'/'.$device.'/slaves/*') ?: [];
+    $targets = $slaves !== [] ? array_map('basename', $slaves) : [$device];
+
+    $readable = false;
+    foreach ($targets as $target) {
+        $schedFile = $sysBlock.'/'.$target.'/queue/scheduler';
+        if (!is_readable($schedFile)) continue;
+        $readable = true;
+        if (preg_match('/\[bfq\]/', (string) @file_get_contents($schedFile)) === 1) return true;
+    }
+
+    return $readable ? false : null;
+}
+
 /** Resolve a block device's kernel major:minor token from /sys/block. */
 function pmssCgroupPolicyDeviceMajorMinorResolve(string $devicePath, ?callable $reader = null): ?string
 {

@@ -41,16 +41,24 @@ $DRY_RUN    = in_array('--dry-run', $argv ?? [], true);
 // Pre-flight — fail loud rather than silent no-op on misconfig.
 pmssCgroupDirectRequireRuntime('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); script does not apply here');
 
-// BFQ scheduler must be the active elevator on at least one block device.
-$bfqActive = false;
-foreach (glob('/sys/block/sd*/queue/scheduler') ?: [] as $schedFile) {
-    if (preg_match('/\[bfq\]/', (string) @file_get_contents($schedFile))) {
-        $bfqActive = true;
-        break;
+// BFQ must be the active elevator on the device backing /home — that is the I/O the
+// per-user weights govern. Globbing sd* asked the wrong question: on a virtio-blk
+// guest it passes on the 35 GB boot disk while /home on vda runs unscheduled, so the
+// weights written below are inert and this pre-flight reported green anyway.
+$bfqActive = pmssCgroupPolicyMountBfqActive('/home');
+if ($bfqActive === null) {
+    // Topology unreadable (no findmnt, exotic stacking). Fall back to the legacy
+    // any-block-device probe rather than turn an unknown layout into a new FATAL.
+    $bfqActive = false;
+    foreach (glob('/sys/block/*/queue/scheduler') ?: [] as $schedFile) {
+        if (preg_match('/\[bfq\]/', (string) @file_get_contents($schedFile))) {
+            $bfqActive = true;
+            break;
+        }
     }
 }
 if (!$bfqActive) {
-    fwrite(STDERR, "FATAL: BFQ scheduler not active on any sd* device; no work to do\n");
+    fwrite(STDERR, "FATAL: BFQ is not the active elevator on the device backing /home; per-user weights would be inert\n");
     exit(2);
 }
 
