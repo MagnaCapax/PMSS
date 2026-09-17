@@ -103,6 +103,10 @@ class StorageBenchmarkShowLastTest extends TestCase
             $this->pmssStorageBenchmarkEntry($runId, $runTs, 'device-ioping', ['timestamp' => $runTs, 'label' => 'array-a', 'device' => '/dev/sda', 'metrics' => ['ioping_avg_ms' => 1.23]]),
             $this->pmssStorageBenchmarkEntry($runId, $runTs, 'dev-randread-4k', ['timestamp' => $runTs, 'label' => 'array-a', 'device' => '/dev/sda', 'metrics' => ['read_bw_MBps' => 12.34, 'read_iops' => 567.8, 'read_p95_ms' => 0.91]]),
             $this->pmssStorageBenchmarkEntry($runId, $runTs, 'dev-randread-1M', ['timestamp' => $runTs, 'label' => 'array-a', 'device' => '/dev/sda', 'metrics' => ['read_bw_MBps' => 345.67, 'read_iops' => 89.1, 'read_p95_ms' => 4.56]]),
+            // Later preflights and malformed file rows must not interrupt rendering.
+            $this->pmssStorageBenchmarkPreflightEntry($runId, $runTs, ['ioping_avg_ms' => 999]),
+            $this->pmssStorageBenchmarkEntry($runId, $runTs, 'invalid-file', ['params' => 'read']),
+            $this->pmssStorageBenchmarkEntry($runId, $runTs, 'unknown-device-test', ['device' => '/dev/sdb']),
         ], ['timestamp' => $runTs, 'label' => 'array-a', 'ioping_avg_ms' => 1.5, 'iostat_util_pct' => 2]);
 
         $expected = "\n== Storage benchmark (last run) ==\nRun ID: {$runId}  Time: {$runTs}  Label: array-a\n\n";
@@ -115,6 +119,7 @@ class StorageBenchmarkShowLastTest extends TestCase
         $expected .= sprintf("  %-18s avg_ms=%.2f\n", 'device-ioping', 1.23);
         $expected .= sprintf("  %-18s read_MB/s=%.2f IOPS=%.1f p95=%.2fms\n", 'dev-randread-4k', 12.34, 567.8, 0.91);
         $expected .= sprintf("  %-18s read_MB/s=%.2f IOPS=%.1f p95=%.2fms\n", 'dev-randread-1M', 345.67, 89.1, 4.56);
+        $expected .= "/dev/sdb\n";
 
         $this->assertSame($expected, $this->pmssRunRepoPhpScript('scripts/util/storageBenchmark.php', ['--show-last', '--json', $log]));
     }
