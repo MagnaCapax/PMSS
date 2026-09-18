@@ -36,6 +36,21 @@ class BootTuningEnsureTest extends TestCase
             .'blkio.bfq.weight tiers set by cron/cgroupBfqWeightApply.php inert');
     }
 
+    public function testVirtioReadAheadMatchesRcLocal(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-boot-tuning-ra-', 0700);
+        [$script] = $this->runBootTuning($dir);
+
+        // Two shipped paths write this same knob on a virtio-blk guest: this service and
+        // template.rc.local. Whichever runs last wins, so a mismatch makes the effective
+        // read_ahead_kb non-deterministic. Measured live 2026-09-18: a node verified at
+        // 4096 held 2048 twenty-eight minutes later. Pin them equal so the drift cannot
+        // return silently.
+        $this->pmssAssertFileContainsAllStrings($script, [
+            'read_ahead_kb" 4096',
+        ], 'virtio-blk read_ahead_kb must match template.rc.local (4096); a divergent value '
+            .'makes the effective setting depend on which writer ran last');
+    }
     public function testWritesBootTuningService(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-boot-tuning-service-', 0700);
