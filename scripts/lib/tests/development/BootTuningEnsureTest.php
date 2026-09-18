@@ -80,6 +80,43 @@ class BootTuningEnsureTest extends TestCase
         );
     }
 
+    public function testBcacheBranchCoversRcLocalQueueKnobsAndNotCacheMode(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-boot-tuning-bcache-', 0700);
+        [$script] = $this->runBootTuning($dir);
+        $body = (string)file_get_contents($script);
+
+        // ADR 0064 step 1. template.rc.local's blanket per-disk loop
+        // (ls /sys/block|grep -v nvme|grep -v md|grep -v loop) INCLUDES bcache*, so until this
+        // branch existed rc.local was the only queue-knob writer for those devices. Step 2 gates
+        // that loop off on updated hosts; without this branch the gating would silently drop
+        // bcache tuning fleet-wide. Assert the branch is here so the ordering cannot be inverted.
+        $this->pmssAssertFileContainsAllStrings($script, [
+            '/sys/block/bcache*',
+            '"bcache_read_ahead_kb": 4096',
+            '"bcache_scheduler": "bfq"',
+        ], 'bcache* needs a queue-knob branch here plus a matching hardware.json declaration '
+            .'before rc.local\'s per-disk loop can be gated off (ADR 0064 step 1); a missing '
+            .'declaration also makes the audit surface lie about the host');
+
+        // Scope fence, asserted rather than merely commented: the cache MODE knobs come from a
+        // SEPARATE rc.local loop, not the blanket per-disk one, so they are outside step 1 and
+        // survive step 2 untouched. Hosts are actively being moved off writeback, so adopting
+        // that mode here would freeze a live policy decision into this unit as a side effect.
+        // Assert the sysfs PATH form, not the bare word: the mode knobs live under
+        // /sys/block/bcacheN/bcache/ while the queue knobs this unit owns live under
+        // /sys/block/bcacheN/queue/. Matching the bare word would fire on the comment above
+        // that explains the fence - a substring standing in for a shape (catalog #1).
+        foreach (['bcache/cache_mode', 'bcache/writeback_percent', 'bcache/writeback_delay'] as $modeKnob) {
+            $this->pmssAssertStringNotContainsString(
+                $modeKnob,
+                $body,
+                'this unit tunes bcache QUEUE knobs only; '.$modeKnob.' belongs to template.rc.local\'s '
+                .'separate bcache loop and must not be adopted here (ADR 0064 step 1 scope fence)'
+            );
+        }
+    }
+
     public function testVirtioReadAheadMatchesRcLocal(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-boot-tuning-ra-', 0700);

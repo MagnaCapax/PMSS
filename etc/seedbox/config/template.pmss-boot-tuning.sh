@@ -72,7 +72,9 @@ write_hardware_summary() {
     "nonrotational_scheduler": "mq-deadline",
     "nonrotational_read_ahead_kb": 4096,
     "nvme_scheduler": "none",
-    "nvme_read_ahead_kb": 128
+    "nvme_read_ahead_kb": 128,
+    "bcache_scheduler": "bfq",
+    "bcache_read_ahead_kb": 4096
   }
 }
 EOF
@@ -164,6 +166,24 @@ done
 # original 2048 here matched the value observed in the FIELD, which was a stale
 # 2022-vintage rc.local pushed by an external actor - not the specification.
 for disk in /sys/block/vd* /sys/block/xvd*; do
+	[ -d "$disk/queue" ] || continue
+	write_sys "$disk/queue/scheduler" bfq
+	write_sys "$disk/queue/read_ahead_kb" 4096
+done
+
+# bcache devices (legacy caching layer; several hosts run MD ON TOP of bcache). Until now this
+# unit had NO bcache branch, so template.rc.local was their ONLY queue-knob writer: its blanket
+# loop is `ls /sys/block|grep -v nvme|grep -v md|grep -v loop`, which INCLUDES bcache*, and it
+# writes 4096 + bfq there. Removing that loop without this branch would lose the tuning entirely,
+# which is why ADR 0064 orders this branch FIRST. Values match rc.local for the same reason every
+# other class here does: both writers touch these knobs, so a mismatch makes the effective value
+# depend on which unit ran last.
+# SCOPE FENCE - queue knobs ONLY. cache_mode / writeback_percent / writeback_delay are written by
+# a SEPARATE rc.local loop, not the blanket per-disk one, and are deliberately NOT adopted here:
+# ADR 0064 step 2 gates only the per-disk loop, so that block survives and loses no coverage, and
+# the cache MODE is a live policy question (hosts are being moved off writeback) that must not be
+# frozen into this unit as a side effect of a read_ahead consolidation.
+for disk in /sys/block/bcache*; do
 	[ -d "$disk/queue" ] || continue
 	write_sys "$disk/queue/scheduler" bfq
 	write_sys "$disk/queue/read_ahead_kb" 4096

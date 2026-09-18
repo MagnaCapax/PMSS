@@ -72,6 +72,19 @@ overrides `mq-deadline` on non-rotational `sd*`. That override is recorded here 
 than silently adopted; whether SSDs should run `bfq` or `mq-deadline` is a separate
 decision needing measurement, not a side effect of a read_ahead ruling.
 
+## Implementation status
+
+- **Step 1: DONE (2026-09-18).** `template.pmss-boot-tuning.sh` now carries a `bcache*` branch
+  writing the queue knobs rc.local's blanket loop gives those devices (`read_ahead_kb` 4096,
+  `scheduler` bfq), with matching `bcache_scheduler` / `bcache_read_ahead_kb` entries in the
+  `hardware.json` summary. `BootTuningEnsureTest::testBcacheBranchCoversRcLocalQueueKnobsAndNotCacheMode`
+  pins both, and additionally asserts this unit writes nothing under `/sys/block/bcacheN/bcache/` —
+  the cache MODE knobs stay with rc.local's separate bcache loop, which step 2 does not gate and
+  which must not be frozen here while hosts are being moved off `writeback`.
+- **Step 2: not started.** Gating rc.local's per-disk loop on `pmss-boot-tuning.sh` being absent.
+  The prerequisite above is now satisfied, so this is unblocked.
+- **Step 3: blocked on fleet minimum PMSS version**, as designed.
+
 ## Consequences
 - Until the consolidation completes, every shared knob must be changed in BOTH files in
   the same commit. `BootTuningEnsureTest` asserts the read_ahead values so a one-sided
