@@ -36,6 +36,28 @@ class BootTuningEnsureTest extends TestCase
             .'blkio.bfq.weight tiers set by cron/cgroupBfqWeightApply.php inert');
     }
 
+    public function testMdReadAheadMatchesRcLocal(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-boot-tuning-md-ra-', 0700);
+        [$script] = $this->runBootTuning($dir);
+
+        // Same two-writer shape as the virtio case below, on the md branch: this service
+        // and template.rc.local both write /sys/block/<md>/queue/read_ahead_kb, so a
+        // divergent value makes the effective setting depend on boot order. rc.local
+        // writes 4096 (operator ruling 2026-09-18: "4096 is more authoritative"), so the
+        // md branch and the hardware.json md_read_ahead_kb it advertises must both be 4096.
+        $this->pmssAssertFileContainsAllStrings($script, [
+            '"md_read_ahead_kb": 4096',
+        ], 'hardware.json must advertise the md read_ahead_kb this script actually writes; '
+            .'a stale declaration makes the audit surface lie about the host');
+
+        $this->pmssAssertStringNotContainsString(
+            'read_ahead_kb" 2048',
+            (string)file_get_contents($script),
+            'no writer may diverge from template.rc.local 4096 on a knob rc.local also writes'
+        );
+    }
+
     public function testVirtioReadAheadMatchesRcLocal(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-boot-tuning-ra-', 0700);

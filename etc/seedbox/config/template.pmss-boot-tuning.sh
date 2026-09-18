@@ -66,7 +66,7 @@ write_hardware_summary() {
     "mglru_requested": $(json_bool "$has_mglru"),
     "zswap_requested": $(json_bool "$zswap_requested"),
     "md_scheduler": "bfq",
-    "md_read_ahead_kb": 2048,
+    "md_read_ahead_kb": 4096,
     "rotational_scheduler": "bfq",
     "rotational_read_ahead_kb": 1024,
     "nonrotational_scheduler": "mq-deadline",
@@ -124,7 +124,7 @@ for md in /sys/block/md[0-9]*; do
 	write_sys "$md/md/stripe_cache_size" 32768
 	write_sys "$md/md/sync_speed_min" 25000
 	write_sys "$md/md/sync_speed_max" 750000
-	write_sys "$md/queue/read_ahead_kb" 2048
+	write_sys "$md/queue/read_ahead_kb" 4096
 	write_sys "$md/queue/scheduler" bfq
 done
 
