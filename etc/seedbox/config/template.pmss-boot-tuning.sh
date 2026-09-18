@@ -150,12 +150,14 @@ done
 # skipping them leaves all customer I/O unscheduled and makes the per-user
 # blkio.bfq.weight tiers set by cron/cgroupBfqWeightApply.php inert.
 # virtio-blk cannot advertise non-rotational, so rotational always reads 1 here
-# and BFQ is always the correct choice; read_ahead_kb 2048 matches the value the
-# fleet already runs and the md_read_ahead_kb of the arrays backing these disks.
+# and BFQ is always the correct choice. read_ahead_kb MUST match template.rc.local's 4096:
+# both write this knob, so a mismatch makes the value depend on which ran last. The
+# original 2048 here matched the value observed in the FIELD, which was a stale
+# 2022-vintage rc.local pushed by an external actor - not the specification.
 for disk in /sys/block/vd* /sys/block/xvd*; do
 	[ -d "$disk/queue" ] || continue
 	write_sys "$disk/queue/scheduler" bfq
-	write_sys "$disk/queue/read_ahead_kb" 2048
+	write_sys "$disk/queue/read_ahead_kb" 4096
 done
 
 # Record the detected host profile and the boot-time tuning targets for audits.
