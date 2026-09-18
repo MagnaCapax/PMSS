@@ -68,9 +68,9 @@ write_hardware_summary() {
     "md_scheduler": "bfq",
     "md_read_ahead_kb": 4096,
     "rotational_scheduler": "bfq",
-    "rotational_read_ahead_kb": 1024,
+    "rotational_read_ahead_kb": 4096,
     "nonrotational_scheduler": "mq-deadline",
-    "nonrotational_read_ahead_kb": 512,
+    "nonrotational_read_ahead_kb": 4096,
     "nvme_scheduler": "none",
     "nvme_read_ahead_kb": 128
   }
@@ -132,12 +132,21 @@ done
 for disk in /sys/block/sd*; do
 	[ -d "$disk/queue" ] || continue
 	rot=$(cat "$disk/queue/rotational" 2>/dev/null || echo "")
+	# read_ahead_kb is 4096 for BOTH classes because template.rc.local writes a blanket 4096
+	# to every non-nvme non-md device (sd* included) and runs LATER than this unit
+	# (rc-local is After=network-online.target; this unit is After=local-fs.target), so
+	# rc.local wins on every overlapping device. Operator ruling 2026-09-18: "4096 is more
+	# authoritative". A differing value here is not a policy, it is a value that gets
+	# overwritten one second later - stating 4096 makes the code say what actually happens.
+	# The SCHEDULER split below is deliberately UNCHANGED: it is the documented intent, the
+	# operator has ruled only on read_ahead, and rc.local's blanket bfq currently overrides
+	# mq-deadline on SSDs. That override is tracked in ADR 0064, not silently blessed here.
 	if [ "$rot" = "0" ]; then
 		write_sys "$disk/queue/scheduler" mq-deadline
-		write_sys "$disk/queue/read_ahead_kb" 512
+		write_sys "$disk/queue/read_ahead_kb" 4096
 	else
 		write_sys "$disk/queue/scheduler" bfq
-		write_sys "$disk/queue/read_ahead_kb" 1024
+		write_sys "$disk/queue/read_ahead_kb" 4096
 	fi
 done
 for disk in /sys/block/nvme*; do

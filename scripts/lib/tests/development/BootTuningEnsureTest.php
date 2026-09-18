@@ -36,6 +36,28 @@ class BootTuningEnsureTest extends TestCase
             .'blkio.bfq.weight tiers set by cron/cgroupBfqWeightApply.php inert');
     }
 
+    public function testNoWriterDivergesFromRcLocalReadAhead(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-boot-tuning-ra-all-', 0700);
+        [$script] = $this->runBootTuning($dir);
+
+        // template.rc.local writes a blanket 4096 to every non-nvme non-md device (sd*, vd*,
+        // xvd*, bcache*) and runs LATER than this unit (rc-local is After=network-online.target,
+        // this unit is After=local-fs.target), so it wins on every overlapping device. Any other
+        // value written here is not a policy - it is a value overwritten a second later. nvme is
+        // the one legitimate exception: rc.local's loop excludes it, so 128 is uncontested.
+        // See ADR 0064.
+        $body = (string)file_get_contents($script);
+        foreach (['2048', '1024', '512'] as $stale) {
+            $this->pmssAssertStringNotContainsString(
+                'read_ahead_kb" '.$stale,
+                $body,
+                'read_ahead_kb '.$stale.' diverges from template.rc.local 4096 on a device class '
+                .'rc.local also writes; rc.local runs later and wins (ADR 0064)'
+            );
+        }
+    }
+
     public function testMdReadAheadMatchesRcLocal(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-boot-tuning-md-ra-', 0700);
