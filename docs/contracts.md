@@ -370,7 +370,7 @@ Sub-handlers:
   - Runs `userPermissions.php` with optional `ionice -c3` wrapper when available.
   - Applies per-user timeout via `PMSS_USER_PERMISSIONS_TIMEOUT` (default 900s) by temporarily setting `PMSS_COMMAND_TIMEOUT` for that command only.
   - Throws `RuntimeException` when permission refresh times out so caller can skip that user and continue the queue.
-  - Refreshes `~/.rtorrent.rc.custom` from skel if hash matches legacy list.
+  - Seeds absent `~/.rtorrent.rc.custom` files and refreshes known legacy hashes from skel through the atomic user-file writer (customer ownership, mode `0640`). Preserves customized files, symlinks and non-regular targets; dry runs leave files untouched.
 - pmssUserPatchWritableFile(string $path, callable $patcher): void
   - Reads an existing writable tenant file, applies the content transformer, and
     atomically replaces changed content while preserving existing mode and
@@ -559,7 +559,7 @@ read-only probes used by baseline sanitization and source-build guards.
   - Derives the customer name from the executing UID, loads the customer's existing ruTorrent throttle plugin, and re-applies its cached named channel rates through `rThrottle::obtain()`.
   - Direct customer-defined `throttle.up`, `throttle.down`, `throttle_up`, or `throttle_down` entries in `.rtorrent.rc.custom` suppress the cached plugin restore so supported customer overrides remain authoritative.
   - Missing plugin files, invalid account names, and plugin failures exit non-zero without loading operator-only `/scripts` code or preventing rTorrent startup.
-  - Ongoing user maintenance distributes the helper and refreshes only known unmodified legacy `.rtorrent.rc.custom` defaults; customer-edited overrides remain untouched.
+  - Ongoing user maintenance distributes the helper, seeds absent `.rtorrent.rc.custom` files and refreshes only known unmodified legacy defaults; customer-edited overrides remain untouched.
 
 Class `rtorrentConfig`
 - __construct(array $resourceConfig=[], ?string $template=null)
