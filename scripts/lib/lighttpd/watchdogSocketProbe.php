@@ -46,7 +46,6 @@ function pmssLighttpdWatchdogSocketProbeWithRetry(string $socketPath, array $opt
         return array('ok' => false, 'errno' => 0, 'errstr' => 'socket path invalid', 'attempts' => 1);
     }
 
-    $result = array('ok' => false, 'errno' => 0, 'errstr' => '', 'attempts' => 0);
     for ($attempt = 1; $attempt <= $attemptCount; $attempt++) {
         if ($probe !== null) {
             $probeResult = $probe($socketPath, $timeoutSeconds);
@@ -162,11 +161,11 @@ function pmssLighttpdWatchdogRestartVerify(string $homeDir, array $expectedPaths
     $sleep = isset($options['sleep']) && is_callable($options['sleep']) ? $options['sleep'] : 'sleep';
     unset($options['attemptCount'], $options['retryDelaySeconds'], $options['sleep']);
 
-    $snapshot = array('ok' => false, 'paths' => array());
     for ($attempt = 1; $attempt <= $attemptCount; $attempt++) {
         $snapshot = pmssLighttpdWatchdogListeningSocketSnapshot($homeDir, $options);
-        if ($snapshot['ok'] && pmssLighttpdWatchdogListenerCoverageIsHealthy($expectedPaths, $snapshot['paths'])) {
-            return array('status' => 'healthy', 'attempts' => $attempt, 'expected' => count(array_unique($expectedPaths)), 'observed' => count(array_unique($snapshot['paths'])));
+        $healthy = $snapshot['ok'] && pmssLighttpdWatchdogListenerCoverageIsHealthy($expectedPaths, $snapshot['paths']);
+        if ($healthy) {
+            break;
         }
         if ($attempt < $attemptCount && $retryDelaySeconds > 0) {
             $sleep($retryDelaySeconds);
@@ -174,10 +173,10 @@ function pmssLighttpdWatchdogRestartVerify(string $homeDir, array $expectedPaths
     }
 
     return array(
-        'status' => $snapshot['ok'] ? 'restart_attempted_still_down' : 'restart_attempted_unverified',
-        'attempts' => $attemptCount,
+        'status' => $healthy ? 'healthy' : ($snapshot['ok'] ? 'restart_attempted_still_down' : 'restart_attempted_unverified'),
+        'attempts' => min($attempt, $attemptCount),
         'expected' => count(array_unique($expectedPaths)),
-        'observed' => count(array_unique($snapshot['paths'])),
+        'observed' => count($snapshot['paths']), // The snapshot parser already keys paths uniquely.
     );
 }
 

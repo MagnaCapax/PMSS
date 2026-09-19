@@ -267,7 +267,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         $sleeps = array();
         $reader = static function () use (&$calls): array {
             $calls++;
-            $lines = $calls < 2 ? array() : array('u_str LISTEN 0 1024 /home/alice/.lighttpd/php.socket-4 12345 * 0');
+            $lines = $calls < 2 ? array() : array_fill(0, 2, 'u_str LISTEN 0 1024 /home/alice/.lighttpd/php.socket-4 12345 * 0');
             return array('lines' => $lines, 'rc' => 0);
         };
         $sleep = static function (int $seconds) use (&$sleeps): void {
@@ -276,7 +276,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
 
         $this->assertSame(
             array('status' => 'healthy', 'attempts' => 2, 'expected' => 1, 'observed' => 1),
-            \pmssLighttpdWatchdogRestartVerify('/home/alice', array('/socket-0'), array(
+            \pmssLighttpdWatchdogRestartVerify('/home/alice', array('/socket-0', '/socket-0'), array(
                 'attemptCount' => 3,
                 'retryDelaySeconds' => 1,
                 'reader' => $reader,
@@ -290,7 +290,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
     {
         $noListeners = static function (): array { return array('lines' => array(), 'rc' => 0); };
         $probeFailure = static function (): array { return array('lines' => array(), 'rc' => 124); };
-        $options = array('attemptCount' => 1, 'retryDelaySeconds' => 0);
+        $options = array('attemptCount' => 0, 'retryDelaySeconds' => 0);
 
         $this->assertSame(
             array('status' => 'restart_attempted_still_down', 'attempts' => 1, 'expected' => 1, 'observed' => 0),

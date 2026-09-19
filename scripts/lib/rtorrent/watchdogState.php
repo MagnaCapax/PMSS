@@ -78,10 +78,8 @@ function rtorrentProcessCheckFailureCountState(string $stateFile, int $failureTh
  */
 function rtorrentProcessWriteEscalationState(string $stateFile, string $user, int $failureCount, ?int $now = null): bool
 {
-    $now = $now ?? time();
-
     return rtorrentProcessWriteStateFile($stateFile, (string) json_encode([
-        'timestamp' => $now,
+        'timestamp' => $now ?? time(),
         'user' => $user,
         'count' => $failureCount,
     ]));
@@ -97,7 +95,8 @@ function rtorrentProcessEscalationTimestamp(string $stateFile): int
     }
 
     $payload = @file_get_contents($stateFile);
-    if (!is_string($payload) || trim($payload) === '') {
+    $trimmed = is_string($payload) ? trim($payload) : '';
+    if ($trimmed === '') {
         return 0;
     }
 
@@ -106,7 +105,6 @@ function rtorrentProcessEscalationTimestamp(string $stateFile): int
         return max(0, (int) $decoded['timestamp']);
     }
 
-    $trimmed = trim($payload);
     return is_numeric($trimmed) ? max(0, (int) $trimmed) : 0;
 }
 
@@ -126,8 +124,7 @@ function rtorrentProcessEscalationRetryState(string $stateFile, int $retryInterv
         return ['action' => 'record', 'age' => 0];
     }
 
-    $now = $now ?? time();
-    $age = max(0, $now - $timestamp);
+    $age = max(0, ($now ?? time()) - $timestamp);
 
     return ['action' => $age < max(1, $retryInterval) ? 'wait' : 'retry', 'age' => $age];
 }
@@ -165,7 +162,7 @@ function rtorrentProcessClearResolvedWatchdogState(array $state, bool $rtorrentP
         $clear = array_merge($clear, ['startMarker', 'startFailure', 'sessionReset', 'escalation']);
     }
 
-    foreach (array_unique($clear) as $key) {
+    foreach ($clear as $key) {
         if (isset($state[$key])) {
             rtorrentProcessClearStaleState((string) $state[$key]);
         }
