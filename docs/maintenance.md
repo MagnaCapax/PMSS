@@ -22,6 +22,11 @@ are frequently used during day-to-day operations:
 - `scripts/suspend.php` / `scripts/unsuspend.php` - toggle user suspension state.
 - `scripts/terminateUser.php` - terminate a user account (`--confirm` required for non-interactive runs); the home and any matching `backup-<user>` recreate backup are removed synchronously.
 
+Storage benchmark `fioRun()` releases its private JSON output file in `finally`,
+including when command construction, execution, or output reading throws. The
+original throwable propagates; normal metrics and failure results are unchanged.
+`StorageBenchSecurityTest` injects these failures without executing storage probes.
+
 ## 2. Dry-Run The Updater
 ```
 /scripts/update.php --dry-run --scriptonly --verbose

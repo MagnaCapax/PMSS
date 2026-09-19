@@ -5,6 +5,71 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class StorageBenchSecurityTest extends TestCase
 {
+    public function testFioTemporaryOutputCleanupPreservesResultsAndThrowables(): void
+    {
+        // Namespace shims inject failures without running fio or touching a device.
+        $source = $this->pmssRepoPath('scripts/lib/storageBenchmark.php');
+        $script = <<<'PHP'
+namespace FioCleanupFixture;
+function pmssCreatePrivateTempFile($prefix) {
+    if ($GLOBALS['case'] === 'allocate') return null;
+    \file_put_contents($GLOBALS['path'], 'allocated');
+    return $GLOBALS['path'];
+}
+function runCommand($command, $verbose) {
+    $GLOBALS['ran'] = true;
+    if ($GLOBALS['case'] === 'execute') throw $GLOBALS['failure'];
+    return $GLOBALS['case'] === 'rc' ? 7 : 0;
+}
+function file_get_contents($path) {
+    if ($GLOBALS['case'] === 'read') throw $GLOBALS['failure'];
+    return $GLOBALS['payload'];
+}
+PHP;
+        $script .= 'eval("namespace FioCleanupFixture;".substr(str_replace("__DIR__", '.
+            var_export(var_export(dirname($source), true), true).', \file_get_contents('.
+            var_export($source, true).')), 5));';
+        $script .= <<<'PHP'
+[$GLOBALS['case'], $kind, $GLOBALS['payload']] = json_decode(getenv('PMSS_TEST_FIO_CASE'), true);
+$GLOBALS['path'] = getenv('PMSS_TEST_FIO_PATH');
+$GLOBALS['failure'] = $kind === 'error' ? new \Error('original') : new \RuntimeException('original');
+$GLOBALS['ran'] = false;
+$job = ['name' => 'fixture', 'rw' => 'read', 'iodepth' => 1, 'numjobs' => 1, 'direct' => 1];
+if ($GLOBALS['case'] === 'quote') {
+    $job['name'] = new class {
+        public function __toString(): string { throw $GLOBALS['failure']; }
+    };
+}
+try {
+    $result = fioRun('/unused', 4096, 1, $job);
+} catch (\Throwable $failure) {
+    $result = ['sameThrowable' => $failure === $GLOBALS['failure']];
+}
+echo json_encode([$result, file_exists($GLOBALS['path']), $GLOBALS['ran']]);
+PHP;
+        $raw = ['jobs' => [['read' => ['bw_bytes' => 1048576, 'iops' => 2]]]];
+        $success = ['ok' => true, 'result' => ['read_bw_MBps' => 1, 'write_bw_MBps' => 0,
+            'read_iops' => 2, 'write_iops' => 0, 'read_p95_ms' => 0, 'write_p95_ms' => 0, 'raw' => $raw]];
+        foreach ([
+            ['allocate', 'exception', '', ['ok' => false, 'error' => 'unable to allocate fio JSON temp file'], false],
+            ['quote', 'exception', '', ['sameThrowable' => true], false],
+            ['execute', 'exception', '', ['sameThrowable' => true], true],
+            ['execute', 'error', '', ['sameThrowable' => true], true],
+            ['read', 'exception', '', ['sameThrowable' => true], true],
+            ['read', 'error', '', ['sameThrowable' => true], true],
+            ['rc', 'exception', '{}', ['ok' => false, 'error' => 'fio failed'], true],
+            ['normal', 'exception', false, ['ok' => false, 'error' => 'fio failed'], true],
+            ['normal', 'exception', '', ['ok' => false, 'error' => 'fio failed'], true],
+            ['normal', 'exception', '{', ['ok' => false, 'error' => 'invalid fio JSON'], true],
+            ['normal', 'exception', json_encode($raw), $success, true],
+        ] as [$case, $kind, $payload, $expected, $ran]) {
+            $this->assertSame([$expected, false, $ran], $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_FIO_CASE' => json_encode([$case, $kind, $payload]),
+                'PMSS_TEST_FIO_PATH' => $this->pmssMakeTempPath('pmss-fio-cleanup-'),
+            ]), $case.'/'.$kind);
+        }
+    }
+
     private function runShow(string $path): string
     {
         if ($this->isSandbox()) {
