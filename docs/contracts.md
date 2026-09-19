@@ -458,6 +458,12 @@ iptables helpers:
 - iptablesRun(string $rule): void → run single rule; logs error to `/var/log/pmss/iptables.log` on failure.
 - iptablesParseMonitoring(string $raw): array → returns list of rule strings, stripping `/sbin/iptables` prefixes and ignoring flushes.
 - iptablesApplyAtomically(array $filterCommands, array $natCommands): bool → builds an `iptables-restore` script and applies in one shot.
+  - Its canonical `networkApplyIptablesAtomically()` helper requires a complete
+    temporary-file write before invoking restore; failed or short writes return
+    `false` through the existing write-error log path. Best-effort removal of the
+    private temporary file runs in `finally`, including when writing, logging, or command execution
+    throws. Exceptions propagate unchanged; successful rule bytes and command
+    results retain their existing contract.
 - iptablesApplyFallback(array $filterCommands, array $natCommands, array $replacements): void → applies rules one-by-one as a fallback.
 
 ---

@@ -161,15 +161,18 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
         networkIptablesLog('ERROR', 'unable to allocate iptables-restore temp file');
         return false;
     }
-    if (@file_put_contents($tmp, $data) === false) {
+    try {
+        // Never restore an incomplete ruleset, even when the write made progress.
+        if (@file_put_contents($tmp, $data) !== strlen($data)) {
+            networkIptablesLog('ERROR', 'unable to write iptables-restore temp file');
+            return false;
+        }
+        $command = sprintf('sh -c %s', escapeshellarg('iptables-restore < '.escapeshellarg($tmp)));
+        return runCommand($command, false, 'logMessage') === 0;
+    } finally {
+        // Command execution or logging may throw; the private file is still ours.
         @unlink($tmp);
-        networkIptablesLog('ERROR', 'unable to write iptables-restore temp file');
-        return false;
     }
-    $command = sprintf('sh -c %s', escapeshellarg('iptables-restore < '.escapeshellarg($tmp)));
-    $result = runCommand($command, false, 'logMessage');
-    @unlink($tmp);
-    return $result === 0;
 }
 
 function networkApplyIptablesFallback(array $filterCommands, array $natCommands, array $replacements): void
