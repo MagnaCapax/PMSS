@@ -95,25 +95,22 @@ function pmssUserResourcesListRowBuild(array $resourceData, string $displayMode)
         (string) $resourceData['uid'],
         pmssUserResourcesListBinaryFormat($resourceData['memory_high']),
         pmssUserResourcesListBinaryFormat($resourceData['memory_max']),
-        $resourceData['cpu_weight'] === null ? '-' : (string) $resourceData['cpu_weight'],
+        (string) ($resourceData['cpu_weight'] ?? '-'),
         $resourceData['cpu_quota_percent'] === null ? '-' : $resourceData['cpu_quota_percent'].'%',
-        $resourceData['io_weight'] === null ? '-' : (string) $resourceData['io_weight'],
+        (string) ($resourceData['io_weight'] ?? '-'),
         pmssUserResourcesListBinaryFormat($resourceData['io_read_bandwidth']),
         pmssUserResourcesListBinaryFormat($resourceData['io_write_bandwidth']),
-        $resourceData['io_read_iops'] === null ? '-' : (string) $resourceData['io_read_iops'],
-        $resourceData['io_write_iops'] === null ? '-' : (string) $resourceData['io_write_iops'],
+        (string) ($resourceData['io_read_iops'] ?? '-'),
+        (string) ($resourceData['io_write_iops'] ?? '-'),
     ];
-    if ($displayMode !== 'full') {
-        return $row;
-    }
-    return array_merge($row, [
+    return array_merge($row, $displayMode !== 'full' ? [] : [
         pmssUserResourcesListGiBFormat($resourceData['disk_quota_gib']),
         pmssUserResourcesListGiBFormat($resourceData['disk_burst_gib']),
-        $resourceData['inode_quota'] === null ? '-' : (string) $resourceData['inode_quota'],
-        $resourceData['inode_burst'] === null ? '-' : (string) $resourceData['inode_burst'],
+        (string) ($resourceData['inode_quota'] ?? '-'),
+        (string) ($resourceData['inode_burst'] ?? '-'),
         $resourceData['network_limit_gib'] === null ? 'inf' : pmssUserResourcesListGiBFormat($resourceData['network_limit_gib']),
         pmssUserResourcesListGiBFormat($resourceData['network_used_gib']),
-        $resourceData['process_max'] === null ? 'inf' : (string) $resourceData['process_max'],
+        (string) ($resourceData['process_max'] ?? 'inf'),
         $resourceData['suspended'] ? 'yes' : 'no',
     ]);
 }

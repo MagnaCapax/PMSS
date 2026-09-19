@@ -74,8 +74,8 @@ class UserResourcesListHelperTest extends TestCase
             'suspended' => true,
         ], 'full');
 
-        foreach ([0 => 'alice', 2 => '1G', 3 => '2G', 7 => '1M', 11 => '50G', 15 => 'inf', 16 => '12.5G', 17 => 'inf', 18 => 'yes'] as $index => $expected) {
-            $this->assertEquals($expected, $row[$index], 'column '.$index);
+        foreach (['alice', '1001', '1G', '2G', '200', '150%', '300', '1M', '2M', '1000', '2000', '50G', '75G', '25000', '31250', 'inf', '12.5G', 'inf', 'yes'] as $index => $expected) {
+            $this->assertSame($expected, $row[$index], 'column '.$index);
         }
     }
 
