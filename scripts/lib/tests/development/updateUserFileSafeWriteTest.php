@@ -205,6 +205,31 @@ class UpdateUserFileSafeWriteTest extends TestCase
         $this->assertFalse(is_file($outside.'/copied.txt'));
     }
 
+    public function testCopyToUserSpaceReplacesLeafSymlinkWithoutFollowingTarget(): void
+    {
+        $owner = $this->pmssCurrentOwner();
+        if ($owner === '') {
+            throw new SkipTest('current owner unavailable');
+        }
+
+        $home = $this->homeRoot.'/'.$owner;
+        $this->pmssEnsureDir($home);
+        $source = $this->pmssMakeTempFile('pmss-copy-source-');
+        $outside = $this->pmssMakeTempFile('pmss-copy-link-target-');
+        $target = $home.'/linked-replace.txt';
+        file_put_contents($source, 'payload');
+        file_put_contents($outside, 'keep-data');
+        $this->pmssCreateSymlinkOrSkip($outside, $target);
+
+        $this->assertTrue(\copyToUserSpace($source, $target, $owner));
+
+        $this->assertFalse(is_link($target));
+        $this->assertEquals('payload', file_get_contents($target));
+        $this->assertEquals('keep-data', file_get_contents($outside));
+        $this->assertSame(@fileowner($home), @fileowner($target), 'copied file owner should match home owner');
+        $this->assertSame(@filegroup($home), @filegroup($target), 'copied file group should match home group');
+    }
+
     public function testCopyToUserSpaceReturnsTrueWhenCopySucceeds(): void
     {
         $home = $this->ensureUserHome();

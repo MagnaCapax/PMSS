@@ -271,7 +271,7 @@ function updateUserFile($file, $user) {
 function copyToUserSpace($sourceFile, $targetFile, $user) {
     $parent = dirname($targetFile);
     $homeDir = pmssUpdateUserHomeDir((string) $user);
-    if ($homeDir === '' || !pmssUpdateUserCandidatePathIsInsideHome($targetFile, $homeDir) || is_link($targetFile)) {
+    if ($homeDir === '' || !pmssUpdateUserCandidatePathIsInsideHome($targetFile, $homeDir)) {
         logMessage("[ERROR] Refusing to copy user file outside home for {$user}: {$targetFile}");
         return false;
     }
