@@ -83,6 +83,12 @@ stream, so its return value or original exception survives and the prior umask
 is restored. Valid streams retain the same newline-terminated bytes and warning
 normalization; `RuntimeStreamSafetyTest` and `RuntimeTest` cover these boundaries.
 
+JSON Lines readers close their stream in `finally`, including when the handler
+throws an exception or error. The original throwable propagates unchanged;
+valid entries keep their ordering, invalid/scalar JSON is skipped, and the
+success/failure return values remain unchanged. `LogWriteSafetyTest` verifies
+cleanup on successful reads and failures at the first and last valid entries.
+
 ## Helper Extraction Rules
 
 CLI diagnostic-and-return paths use `pmssCliReturnWithStderr()`, passing the

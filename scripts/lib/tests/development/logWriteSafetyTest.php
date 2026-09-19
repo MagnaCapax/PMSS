@@ -118,6 +118,50 @@ final class LogWriteSafetyTest extends TestCase
         $this->assertEquals(['event' => 'done'], \pmssJsonLineFileLast($path));
     }
 
+    public function testJsonLineReaderClosesStreamAndPreservesCallbackOutcome(): void
+    {
+        $path = $this->pmssMakeTempFile('pmss-log-jsonl-cleanup-');
+        $contents = "invalid\nnull\n{\"event\":\"first\"}\n{\"event\":\"last\"}";
+        file_put_contents($path, $contents);
+
+        foreach ([null, new \RuntimeException('first'), new \Error('first'),
+            new \RuntimeException('last'), new \Error('last')] as $failure) {
+            $reader = null;
+            $seen = [];
+            $caught = null;
+            try {
+                $this->assertTrue(\pmssJsonLineFileEach($path, static function (array $entry) use (
+                    $path, $failure, &$reader, &$seen
+                ): void {
+                    // Retain the actual reader to verify explicit close, not GC cleanup.
+                    foreach (get_resources('stream') as $stream) {
+                        if ((stream_get_meta_data($stream)['uri'] ?? null) === $path) {
+                            $reader = $stream;
+                        }
+                    }
+                    $seen[] = $entry['event'];
+                    if ($failure !== null && $entry['event'] === $failure->getMessage()) {
+                        throw $failure;
+                    }
+                }));
+            } catch (\Throwable $error) {
+                $caught = $error;
+            }
+            try {
+                $this->assertSame($failure, $caught);
+                $this->assertSame($failure !== null && $failure->getMessage() === 'first'
+                    ? ['first'] : ['first', 'last'], $seen);
+                $this->assertSame('resource (closed)', gettype($reader));
+                $this->assertSame($contents, file_get_contents($path));
+            } finally {
+                // Keep a failing regression test from leaking its retained stream.
+                if (is_resource($reader)) {
+                    fclose($reader);
+                }
+            }
+        }
+    }
+
     public function testLogAppendTimestampedLineRejectsSymlinkedParentDirectory(): void
     {
         $targetDir = $this->pmssMakeTempDir('pmss-log-parent-real-');

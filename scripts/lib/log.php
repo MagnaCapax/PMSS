@@ -154,12 +154,16 @@ function pmssJsonLineFileEach(string $path, callable $handler): bool
     if ($handle === false) {
         return false;
     }
-    while (($line = fgets($handle)) !== false) {
-        if (($decoded = pmssJsonDecodeAssoc($line)) !== null) {
-            $handler($decoded);
+    try {
+        while (($line = fgets($handle)) !== false) {
+            if (($decoded = pmssJsonDecodeAssoc($line)) !== null) {
+                $handler($decoded);
+            }
         }
+    } finally {
+        // Release the reader even when a handler throws; preserve its exception.
+        fclose($handle);
     }
-    fclose($handle);
     return true;
 }
 
