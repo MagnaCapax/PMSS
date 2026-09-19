@@ -156,7 +156,7 @@ function pmssUpdateStep2HandleUserMaintenanceSummary($summary): void
         return;
     }
 
-    $skipReasons = isset($summary['skip_reasons']) && is_array($summary['skip_reasons']) ? $summary['skip_reasons'] : [];
+    $skipReasons = is_array($summary['skip_reasons'] ?? null) ? $summary['skip_reasons'] : [];
     pmssUpdateRecordIncompleteUserMaintenance($processed, $total, $skipReasons);
     pmssUpdateStep2HandleClassifiedFailure(
         'Updating all user environments',

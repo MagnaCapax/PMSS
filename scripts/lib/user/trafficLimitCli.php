@@ -111,7 +111,7 @@ TEXT
 function pmssUserGiBSettingCli(array $argv, array $spec): int
 {
     if (!pmssUserTrafficCliBootstrap()) return 1;
-    $usage = isset($spec['usage']) && is_string($spec['usage']) ? $spec['usage'] : '';
+    $usage = is_string($spec['usage'] ?? null) ? $spec['usage'] : '';
     if (($parsed = pmssParseCliTokensOrHelp($argv, $usage."\n")) === null) return 0;
 
     $userName = (string) pmssCliOption($parsed, 'user', 'u', $parsed['arguments'][0] ?? '');

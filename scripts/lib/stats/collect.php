@@ -131,11 +131,11 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
 
     $rtorrent = pmssStatsReadRtorrentStats($rtorrentCaller ?: 'rtorrentScgiCall', $context['socket_path']);
     $diskLimitBytes = $quota['soft_bytes'];
-    if ($diskLimitBytes === null && isset($config['quota']) && is_numeric($config['quota'])) $diskLimitBytes = ((float) $config['quota']) * 1024 * 1024 * 1024;
-    $memoryCurrentBytes = isset($resource['memory']['current']) && is_numeric($resource['memory']['current']) ? (float) $resource['memory']['current'] : (is_int($cgroup['memory_current'] ?? null) ? (float) $cgroup['memory_current'] : null);
-    $memoryLimitBytes = isset($config['ramMiB']) && is_numeric($config['ramMiB']) ? ((float) $config['ramMiB']) * 1024 * 1024 : (is_int($cgroup['memory_limit'] ?? null) ? (float) $cgroup['memory_limit'] : null);
+    if ($diskLimitBytes === null && is_numeric($config['quota'] ?? null)) $diskLimitBytes = ((float) $config['quota']) * 1024 * 1024 * 1024;
+    $memoryCurrentBytes = is_numeric($resource['memory']['current'] ?? null) ? (float) $resource['memory']['current'] : (is_int($cgroup['memory_current'] ?? null) ? (float) $cgroup['memory_current'] : null);
+    $memoryLimitBytes = is_numeric($config['ramMiB'] ?? null) ? ((float) $config['ramMiB']) * 1024 * 1024 : (is_int($cgroup['memory_limit'] ?? null) ? (float) $cgroup['memory_limit'] : null);
     $trafficLimitMiB = $trafficLimitState['effectiveLimitGiB'] > 0 ? $trafficLimitState['effectiveLimitGiB'] * 1024.0 : null;
-    $trafficUsedMiB = isset($traffic['raw']['month']) && is_numeric($traffic['raw']['month']) ? (float) $traffic['raw']['month'] : null;
+    $trafficUsedMiB = is_numeric($traffic['raw']['month'] ?? null) ? (float) $traffic['raw']['month'] : null;
 
     return [
         'context' => $context,
@@ -152,7 +152,7 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
         'memory' => ['current_bytes' => $memoryCurrentBytes, 'limit_bytes' => $memoryLimitBytes, 'percent' => pmssStatsPercent($memoryCurrentBytes, $memoryLimitBytes)],
         'traffic' => [
             'upload_month_mib' => $trafficUsedMiB,
-            'download_month_mib' => isset($trafficIngress['raw']['month']) && is_numeric($trafficIngress['raw']['month']) ? (float) $trafficIngress['raw']['month'] : null,
+            'download_month_mib' => is_numeric($trafficIngress['raw']['month'] ?? null) ? (float) $trafficIngress['raw']['month'] : null,
             'limit_mib' => $trafficLimitMiB,
             'bonus_gib' => $trafficLimitState['bonusGiB'],
             'percent' => pmssStatsPercent($trafficUsedMiB, $trafficLimitMiB),

@@ -28,7 +28,7 @@ function storageBenchmarkMetricFloat(array $metrics, string $key): float
 }
 
 /** Return the metrics object only when the decoded JSONL shape is valid. */
-function storageBenchmarkEntryMetrics(array $entry): array { return (isset($entry['metrics']) && is_array($entry['metrics'])) ? $entry['metrics'] : []; }
+function storageBenchmarkEntryMetrics(array $entry): array { return is_array($entry['metrics'] ?? null) ? $entry['metrics'] : []; }
 
 /** Return a printable metric for the preflight summary, defaulting when malformed. */
 function storageBenchmarkPreflightDisplay(array $entry, string $key): string
@@ -51,10 +51,10 @@ function storageBenchmarkLastRunRead(string $jsonLog): array
     $lastId = '';
     $lastTs = '';
     foreach (pmssJsonLineFileRead($jsonLog) as $entry) {
-        if (!isset($entry['run_id']) || !is_string($entry['run_id']) || $entry['run_id'] === '') continue;
+        if (!is_string($entry['run_id'] ?? null) || $entry['run_id'] === '') continue;
         $runId = $entry['run_id'];
         $runs[$runId][] = $entry;
-        $runTs = (isset($entry['run_ts']) && is_string($entry['run_ts'])) ? $entry['run_ts'] : '';
+        $runTs = is_string($entry['run_ts'] ?? null) ? $entry['run_ts'] : '';
         if ($runTs > $lastTs) {
             $lastTs = $runTs;
             $lastId = $runId;
@@ -95,7 +95,7 @@ function storageBenchmarkShowLast(string $jsonLog): int
     foreach ($run as $entry) {
         $test = storageBenchmarkScalarDisplay($entry['test'] ?? '');
         if ($test === '' || storageBenchmarkEntryDeviceName($entry) !== null
-            || !isset($entry['params']) || !is_array($entry['params'])
+            || !is_array($entry['params'] ?? null)
             || storageBenchmarkScalarDisplay($entry['params']['rw'] ?? '') === '') continue;
         $metrics = storageBenchmarkEntryMetrics($entry);
         printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n", $test, storageBenchmarkMetricFloat($metrics, 'read_bw_MBps'), storageBenchmarkMetricFloat($metrics, 'write_bw_MBps'), storageBenchmarkMetricFloat($metrics, 'read_iops'), storageBenchmarkMetricFloat($metrics, 'write_iops'), storageBenchmarkMetricFloat($metrics, 'read_p95_ms'), storageBenchmarkMetricFloat($metrics, 'write_p95_ms'));
