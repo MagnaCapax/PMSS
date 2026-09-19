@@ -92,6 +92,39 @@ class rtorrentWatchdogDecisionTest extends TestCase
         }
     }
 
+    public function testEscalationEncodingFailurePreservesExistingAndAbsentMarkers(): void
+    {
+        $path = $this->escalatedStatePaths()['escalation'];
+        $original = '{"timestamp":900,"user":"alice","count":6}';
+        // Invalid UTF-8 at each position and truncated/overlong sequences fail encoding.
+        foreach (["\xffalice", "ali\xffce", "alice\xff", "\xc3", "\xc0\xaf"] as $user) {
+            file_put_contents($path, $original);
+            $this->assertFalse(\rtorrentProcessWriteEscalationState($path, $user, 7, 1000));
+            $this->assertSame($original, file_get_contents($path));
+            $this->assertSame(['action' => 'wait', 'age' => 100], \rtorrentProcessEscalationRetryState($path, 180, 1000));
+
+            unlink($path);
+            $this->assertFalse(\rtorrentProcessWriteEscalationState($path, $user, 7, 1000));
+            $this->assertFalse(file_exists($path));
+        }
+    }
+
+    public function testEscalationEncodingPreservesLegacyBytes(): void
+    {
+        $path = $this->escalatedStatePaths()['escalation'];
+        foreach ([
+            ['alice', 'alice'],
+            ['', ''],
+            ['a/b', 'a\\/b'],
+            ["a\n", 'a\\n'],
+            ["\xc3\xa4", '\\u00e4'],
+        ] as $case) {
+            $this->assertTrue(\rtorrentProcessWriteEscalationState($path, $case[0], 6, 900));
+            $this->assertSame('{"timestamp":900,"user":"'.$case[1].'","count":6}', file_get_contents($path));
+        }
+        $this->assertFalse(\rtorrentProcessWriteEscalationState($this->tempDir.'/missing/marker', 'alice', 6, 900));
+    }
+
     public function testEscalationRetryStateUsesMarkerTimestamp(): void
     {
         $state = $this->escalatedStatePaths();

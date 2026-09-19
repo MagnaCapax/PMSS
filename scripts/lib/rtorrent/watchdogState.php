@@ -78,11 +78,13 @@ function rtorrentProcessCheckFailureCountState(string $stateFile, int $failureTh
  */
 function rtorrentProcessWriteEscalationState(string $stateFile, string $user, int $failureCount, ?int $now = null): bool
 {
-    return rtorrentProcessWriteStateFile($stateFile, (string) json_encode([
+    $payload = json_encode([
         'timestamp' => $now ?? time(),
         'user' => $user,
         'count' => $failureCount,
-    ]));
+    ]);
+    // Encoding failure must not truncate an existing escalation marker.
+    return $payload !== false && rtorrentProcessWriteStateFile($stateFile, $payload);
 }
 
 /**

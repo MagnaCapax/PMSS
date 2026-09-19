@@ -91,6 +91,11 @@ cleanup on successful reads and failures at the first and last valid entries.
 
 ## Helper Extraction Rules
 
+rTorrent escalation markers are encoded before opening the destination. Failed
+JSON encoding returns `false` without creating or truncating a marker; valid
+payload bytes and retry timing remain unchanged. `rtorrentWatchdogDecisionTest`
+covers malformed UTF-8, existing and absent markers, and legacy JSON escaping.
+
 JSONL and timestamped log append helpers require the complete byte count,
 including the newline, before reporting success. Short or zero writes return
 `false` like other write failures; timestamped logging can use its existing
