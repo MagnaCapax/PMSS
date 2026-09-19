@@ -91,6 +91,13 @@ cleanup on successful reads and failures at the first and last valid entries.
 
 ## Helper Extraction Rules
 
+JSONL and timestamped log append helpers require the complete byte count,
+including the newline, before reporting success. Short or zero writes return
+`false` like other write failures; timestamped logging can use its existing
+fallback and applies the optional mode only after a complete write. Partial
+bytes remain in place: no truncation or retry risks overwriting concurrent logs.
+`LogWriteSafetyTest` injects incomplete writes and checks successful byte output.
+
 CLI diagnostic-and-return paths use `pmssCliReturnWithStderr()`, passing the
 complete message and status unchanged; the helper does not exit or add a newline.
 

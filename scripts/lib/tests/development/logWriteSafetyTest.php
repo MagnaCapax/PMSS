@@ -6,6 +6,71 @@ require_once dirname(__DIR__, 2).'/log.php';
 
 final class LogWriteSafetyTest extends TestCase
 {
+    public function testAppendResultsRequireCompleteRecordsAndPreserveFallback(): void
+    {
+        // Replace only the write boundary in an isolated child; use real temp files.
+        $library = var_export(dirname(__DIR__, 2).'/log.php', true);
+        $script = <<<'PHP'
+namespace LogAppendFixture;
+function file_put_contents($path, $data, $flags) {
+    $GLOBALS['requests'][] = [$path, $data, $flags];
+    $limit = $path === ($GLOBALS['fallback'] ?? null) ? null : $GLOBALS['limit'];
+    if ($limit === false) return false;
+    if ($limit !== null) $data = substr($data, 0, $limit);
+    return \file_put_contents($path, $data, $flags);
+}
+PHP;
+        $script .= '$library = '.$library.';';
+        $script .= <<<'PHP'
+$source = str_replace('__DIR__', var_export(dirname($library), true), file_get_contents($library));
+eval('namespace LogAppendFixture;'.substr($source, 5));
+[$path, $kind, $GLOBALS['limit']] = json_decode(getenv('PMSS_TEST_LOG_APPEND'), true);
+$GLOBALS['requests'] = [];
+if ($kind === 'mirror') {
+    $GLOBALS['fallback'] = $path.'.fallback';
+    ob_start();
+    pmssLogWriteMessage($path, $GLOBALS['fallback'], 'ready');
+    $output = ob_get_clean();
+    echo json_encode([$output, file_get_contents($GLOBALS['fallback']), $GLOBALS['requests']]);
+    return;
+}
+if ($kind === 'json') {
+    $result = pmssJsonLineAppend($path, ['event' => "ready\0", 'path' => '/data/test']);
+} else {
+    $result = pmssLogAppendTimestampedLine($path, "ready\0", '', '[INFO] ', 0644);
+}
+clearstatcache(true, $path);
+echo json_encode([$result, file_get_contents($path), fileperms($path) & 0777, $GLOBALS['requests']]);
+PHP;
+        $path = $this->pmssMakeTempDir('pmss-log-short-write-').'/events.log';
+        foreach (['json' => '{"event":"ready\\u0000","path":"/data/test"}'.PHP_EOL,
+            'text' => "[INFO] ready\0".PHP_EOL] as $kind => $line) {
+            foreach ([false, 0, 1, strlen($line) - 1, strlen($line), null] as $limit) {
+                file_put_contents($path, 'previous'.PHP_EOL);
+                chmod($path, 0600);
+                $complete = $limit === null || $limit === strlen($line);
+                $bytes = $limit === false ? '' : ($limit === null ? $line : substr($line, 0, $limit));
+                $this->assertSame([$complete, 'previous'.PHP_EOL.$bytes,
+                    $kind === 'text' && $complete ? 0644 : 0600,
+                    [[$path, $line, FILE_APPEND | LOCK_EX]]], $this->pmssRunInlinePhpJson($script, [
+                        'PMSS_TEST_LOG_APPEND' => json_encode([$path, $kind, $limit]),
+                    ]));
+            }
+        }
+        foreach ([false, 0, 1] as $limit) {
+            file_put_contents($path, 'previous'.PHP_EOL);
+            file_put_contents($path.'.fallback', '');
+            [$output, $fallback, $requests] = $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_LOG_APPEND' => json_encode([$path, 'mirror', $limit]),
+            ]);
+            $this->assertSame('ready'.PHP_EOL, $output);
+            $this->assertSame(2, count($requests));
+            $this->assertSame($path, $requests[0][0]);
+            $this->assertSame([$path.'.fallback', $fallback, FILE_APPEND | LOCK_EX], $requests[1]);
+            $this->assertTrue((bool) preg_match('/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] ready\n$/D', $fallback));
+        }
+    }
+
     public function testLogTextPrimitivesPreserveDistinctSpacingPolicies(): void
     {
         foreach ([
