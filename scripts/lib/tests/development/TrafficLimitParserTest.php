@@ -36,7 +36,7 @@ echo json_encode([
     'targetModes' => pmssTrafficLimitCliTargetModes('alice', '/tmp/home'),
     'parsed' => pmssTrafficLimitParseGiB('42GiB', $error),
     'error' => $error,
-    'operatorWriterLoaded' => function_exists('pmssTrafficLimitWriteGiBFile'),
+    'operatorWriterLoaded' => function_exists('pmssIntegerSettingFileWrite'),
 ]);
 PHP,
             var_export($this->pmssRepoPath('scripts/lib/user/trafficLimit.php'), true)

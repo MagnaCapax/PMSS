@@ -70,7 +70,7 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
     // Ensure .trafficLimit exists even when no limit is configured at creation time.
     if (empty($user['trafficLimit'])) {
         $trafficLimitPath = pmssTrafficLimitPath($user['name'], dirname($homePath));
-        pmssTrafficLimitWriteGiBFile($trafficLimitPath, 0) && pmssTrafficLimitConvergeFileMode($trafficLimitPath, 0664);
+        pmssIntegerSettingFileWrite($trafficLimitPath, 0) && pmssIntegerSettingPathModeConverge($trafficLimitPath, 0664);
     }
     if (empty($user['iopsLimit'])) {
         $iopsLimitPath = pmssIopsLimitPath($user['name'], dirname($homePath));

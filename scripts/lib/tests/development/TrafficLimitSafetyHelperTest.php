@@ -23,7 +23,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
             'existing file' => $filePath,
             'symlink' => $linkDir,
         ] as $label => $path) {
-            $this->assertTrue(\pmssTrafficLimitEnsureStorageDir($path) === false, $label);
+            $this->assertTrue(\pmssIntegerSettingStorageDirEnsure($path) === false, $label);
         }
     }
 
@@ -31,7 +31,7 @@ class TrafficLimitSafetyHelperTest extends TestCase
     {
         $path = $this->tempDir.'/runtime/trafficLimits';
 
-        $this->assertTrue(\pmssTrafficLimitEnsureStorageDir($path));
+        $this->assertTrue(\pmssIntegerSettingStorageDirEnsure($path));
         $this->assertTrue(is_dir($path));
         $this->assertEquals(0700, fileperms($path) & 0777);
     }
@@ -41,26 +41,26 @@ class TrafficLimitSafetyHelperTest extends TestCase
         $path = $this->pmssEnsureDir($this->tempDir.'/existing');
         chmod($path, 0755);
 
-        $this->assertTrue(\pmssTrafficLimitEnsureStorageDir($path));
+        $this->assertTrue(\pmssIntegerSettingStorageDirEnsure($path));
         $this->assertEquals(0700, fileperms($path) & 0777);
     }
 
     public function testRemoveGiBFileHandlesFilesystemCases(): void
     {
-        $this->assertTrue(\pmssTrafficLimitRemoveGiBFile($this->tempDir.'/missing'));
+        $this->assertTrue(\pmssIntegerSettingFileRemove($this->tempDir.'/missing'));
 
         $path = $this->tempDir.'/quota';
         file_put_contents($path, '12');
 
-        $this->assertTrue(\pmssTrafficLimitRemoveGiBFile($path));
+        $this->assertTrue(\pmssIntegerSettingFileRemove($path));
         $this->assertTrue(!file_exists($path));
 
         [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real', $this->tempDir.'/link', '12');
-        $this->assertTrue(\pmssTrafficLimitRemoveGiBFile($linkPath) === false);
+        $this->assertTrue(\pmssIntegerSettingFileRemove($linkPath) === false);
         $this->assertTrue(file_exists($realPath));
 
         $dirPath = $this->pmssEnsureDir($this->tempDir.'/dir');
-        $this->assertTrue(\pmssTrafficLimitRemoveGiBFile($dirPath) === false);
+        $this->assertTrue(\pmssIntegerSettingFileRemove($dirPath) === false);
         $this->assertTrue(is_dir($dirPath));
     }
 
@@ -70,14 +70,14 @@ class TrafficLimitSafetyHelperTest extends TestCase
         file_put_contents($path, '12');
         chmod($path, 0644);
 
-        $this->assertTrue(\pmssTrafficLimitConvergeFileMode($path, 0600));
+        $this->assertTrue(\pmssIntegerSettingPathModeConverge($path, 0600));
         $this->assertEquals(0600, fileperms($path) & 0777);
 
         $dirPath = $this->pmssEnsureDir($this->tempDir.'/dir', 0700);
-        $this->assertTrue(\pmssTrafficLimitConvergeFileMode($dirPath, 0700));
+        $this->assertTrue(\pmssIntegerSettingPathModeConverge($dirPath, 0700));
 
         [, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip($this->tempDir.'/real', $this->tempDir.'/link', '12');
-        $this->assertTrue(\pmssTrafficLimitConvergeFileMode($linkPath, 0600) === false);
+        $this->assertTrue(\pmssIntegerSettingPathModeConverge($linkPath, 0600) === false);
     }
 
     public function testThrottleFileWritePersistsCapWithReadableMode(): void

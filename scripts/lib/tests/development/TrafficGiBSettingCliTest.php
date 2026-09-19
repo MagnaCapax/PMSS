@@ -79,7 +79,7 @@ PHP;
                 ],
                 'forbidden' => [
                     'pmssParseCliTokens($argv',
-                    'pmssTrafficLimitWriteGiBFile($target, $trafficLimit)',
+                    'pmssIntegerSettingFileWrite($target, $trafficLimit)',
                     '  ./userTrafficLimit.php --user=<username> --limit=<GiB>',
                 ],
             ],
@@ -99,20 +99,17 @@ PHP;
 
     public function testLibraryOwnsTheGiBSettingCliImplementations(): void
     {
+        foreach ([
+            'trafficLimit.php' => ['pmssTrafficLimitPersistTargetModes'],
+            'trafficLimitCli.php' => ['pmssUserGiBSettingCli', 'pmssUserGiBSettingUsageText', 'pmssUserTrafficCliBootstrap'],
+            'trafficLimitCommands.php' => ['pmssTrafficLimitCliTargetModes', 'pmssUserTrafficLimitCli', 'pmssUserBonusTrafficCli'],
+        ] as $file => $functions) {
+            foreach ($functions as $function) {
+                $this->assertSame($this->pmssRepoPath('scripts/lib/user/'.$file), (new \ReflectionFunction($function))->getFileName());
+            }
+        }
         $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/user/trafficLimit.php' => ['required' => [
-                'function pmssUserGiBSettingCli(array $argv, array $spec): int',
-                'function pmssUserGiBSettingUsageText(',
-                'function pmssTrafficLimitCliTargetModes(string $userName, string $homeDir): array',
-                'function pmssTrafficLimitPersistTargetModes(array $targetModes, int $value, ?string &$error = null): bool',
-                'function pmssUserTrafficCliBootstrap(): bool',
-                'function pmssUserTrafficLimitCli(array $argv, ?string $usage = null): int',
-                'function pmssUserBonusTrafficCli(array $argv): int',
-                "'targetModesResolver' => 'pmssTrafficLimitCliTargetModes'",
-                "'targetModesResolver' => static function",
-                'traffic limit set to %d GiB (monthly quota)',
-                'bonus traffic set to %d GiB (monthly add-on)',
-            ], 'forbidden' => [
+            'scripts/lib/user/trafficLimit.php' => ['forbidden' => [
                 'function '.'pmssBonusTraffic'.'ReadGiB(',
                 'function '.'pmssBonusTraffic'.'WriteGiB(',
                 'function '.'pmssBonusTraffic'.'Remove(',
@@ -125,7 +122,7 @@ PHP;
                 'forbidden' => [
                     'function pmssUserBonusTrafficCli(array $argv): int',
                     'pmssParseCliTokens($argv)',
-                    'pmssTrafficLimitWriteGiBFile($bonusFile',
+                    'pmssIntegerSettingFileWrite($bonusFile',
                 ],
             ],
         ]);
@@ -246,6 +243,7 @@ PHP;
             'traffic-limit help' => $this->gibSettingCliCase('traffic', $definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null, 'runtime' => null]),
             'traffic-limit set' => $this->gibSettingCliCase('traffic', $definition, ['--limit=20'], "Traffic limit for alice set at 20 GiB\n", [], ['home' => '20', 'runtime' => '20'], ['home' => 0664, 'runtime' => 0600], [['alice', 'traffic limit set to 20 GiB (monthly quota)']]),
             'traffic-limit unset' => $this->gibSettingCliCase('traffic', $definition, ['--unset'], "Traffic limit for alice set at 0 GiB\n", ['runtime' => "8\n", 'home' => "8\n"], ['home' => null, 'runtime' => null], [], [['alice', 'traffic limit unset (GiB quota removed)']]),
+            'traffic-limit zero' => $this->gibSettingCliCase('traffic', $definition, ['--limit=0'], "Traffic limit for alice set at 0 GiB\n", ['runtime' => "8\n", 'home' => "8\n"], ['home' => null, 'runtime' => null], [], [['alice', 'traffic limit unset (GiB quota removed)']]),
         ];
     }
 
@@ -257,6 +255,7 @@ PHP;
             'bonus help' => $this->gibSettingCliCase('bonus', $definition, ['--help'], $this->gibSettingUsageText($definition), [], ['home' => null]),
             'bonus set' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=20'], "Bonus traffic for alice set to 20 GiB\n", [], ['home' => '20'], [], [['alice', 'bonus traffic set to 20 GiB (monthly add-on)']]),
             'bonus unset' => $this->gibSettingCliCase('bonus', $definition, ['--unset'], "Bonus traffic for alice set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['alice', 'bonus traffic unset (GiB add-on removed)']]),
+            'bonus zero' => $this->gibSettingCliCase('bonus', $definition, ['--bonus=0'], "Bonus traffic for alice set to 0 GiB\n", ['home' => "9\n"], ['home' => null], [], [['alice', 'bonus traffic unset (GiB add-on removed)']]),
         ];
     }
 

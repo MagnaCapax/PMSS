@@ -29,7 +29,7 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
     public function testTrafficLimitCronUsesSharedSafeHelpers(): void
     {
         $this->pmssAssertRepoFileContractCases([
-            'scripts/lib/user/trafficLimit.php' => ['required' => [
+            'scripts/lib/user/trafficLimitThrottle.php' => ['required' => [
                 'pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)',
                 'traffic throttle file write failed',
                 'pmssTrafficLimitThrottleFileRemove($throttleFile, $error)',
