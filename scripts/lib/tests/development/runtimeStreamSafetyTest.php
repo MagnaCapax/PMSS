@@ -103,6 +103,51 @@ PHP;
         }
     }
 
+    public function testSnapshotShortWritesFinishOrStopWithoutRetryingFailures(): void
+    {
+        // Inject fwrite results in a child namespace; accepted bytes use a real memory stream.
+        $snapshot = var_export(dirname(__DIR__, 2).'/runtime/snapshot.php', true);
+        $script = <<<'PHP'
+namespace SnapshotWriteFixture;
+function fwrite($handle, $bytes) {
+    $GLOBALS['requests'][] = $bytes;
+    if ($GLOBALS['limits'] === []) {
+        throw new \RuntimeException('Unexpected write retry');
+    }
+    $limit = array_shift($GLOBALS['limits']);
+    return $limit === false ? false : \fwrite($handle, substr($bytes, 0, $limit));
+}
+PHP;
+        $script .= "eval('namespace SnapshotWriteFixture;'.substr(file_get_contents({$snapshot}), 5));";
+        $script .= <<<'PHP'
+[$line, $GLOBALS['limits']] = json_decode(getenv('PMSS_TEST_SNAPSHOT_WRITE'), true);
+$GLOBALS['requests'] = [];
+$handle = fopen('php://memory', 'w+');
+try {
+    $result = pmssSnapshotWriteLine($handle, $line);
+    rewind($handle);
+    echo json_encode([$result, stream_get_contents($handle), $GLOBALS['requests'], is_resource($handle)]);
+} finally {
+    fclose($handle);
+}
+PHP;
+        foreach ([
+            ['abc', [4], "abc\n", ["abc\n"]],
+            ['abc', [1, 2, 1], "abc\n", ["abc\n", "bc\n", "\n"]],
+            ['', [1], "\n", ["\n"]],
+            ["a\0b", [2, 2], "a\0b\n", ["a\0b\n", "b\n"]],
+            ["a\n", [1, 1, 1], "a\n\n", ["a\n\n", "\n\n", "\n"]],
+            ['abc', [0], '', ["abc\n"]],
+            ['abc', [false], '', ["abc\n"]],
+            ['abc', [2, 0], 'ab', ["abc\n", "c\n"]],
+            ['abc', [2, false], 'ab', ["abc\n", "c\n"]],
+        ] as [$line, $limits, $expected, $requests]) {
+            $this->assertSame([null, $expected, $requests, true], $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_SNAPSHOT_WRITE' => json_encode([$line, $limits]),
+            ]));
+        }
+    }
+
     public function testProcessCloseRejectsOtherHandlesWithoutConsumingThem(): void
     {
         $stream = fopen('php://memory', 'w+');

@@ -45,6 +45,12 @@ file exists and tweak the template under `etc/seedbox/config/template.logrotate.
 if retention needs to change. System stats snapshots append to
 `/var/log/pmss/system-stats.log` and are rotated by the same policy.
 
+Snapshot line writers finish short writes while the stream makes progress and
+stop immediately on a failed or zero-byte write. Logging remains best-effort:
+a failure can leave a partial line, and the caller still owns the open stream.
+Successful line bytes, warning formatting, and callback return codes are unchanged.
+`RuntimeStreamSafetyTest` exercises these cases with injected write results.
+
 System stats reject CPU tick, disk busy-time, and process RSS counters larger
 than PHP's integer range instead of silently saturating them. They use the
 existing malformed-input fallbacks: discard the CPU sample or skip the affected
