@@ -223,11 +223,19 @@ else
 	C_STEP=""
 fi
 
-log_step() { echo -e "${C_STEP}==> $*${C_RESET}"; }
-log_info() { echo -e "${C_INFO}[INFO]${C_RESET} $*"; }
-log_ok() { echo -e "${C_OK}[ OK ]${C_RESET} $*"; }
-log_warn() { echo -e "${C_WARN}[WARN]${C_RESET} $*"; }
-log_err() { echo -e "${C_ERR}[ERR ]${C_RESET} $*"; }
+# Diagnostics go to stderr, never stdout. Several helpers return DATA on stdout and
+# are called inside $( ), so a diagnostic on stdout is captured into the caller's
+# variable instead of reaching the user: pick_existing_or_reserved_port() logged a
+# fatal "no reserved port" line that vanished into the assignment, leaving set -e to
+# kill the script with no message, and its two warn paths prepended their own text to
+# the port value they returned. The visible output and ~/.install-media-stack.log are
+# unchanged, because the exec redirect above already merges stderr into the same tee.
+# (Refs #857)
+log_step() { echo -e "${C_STEP}==> $*${C_RESET}" >&2; }
+log_info() { echo -e "${C_INFO}[INFO]${C_RESET} $*" >&2; }
+log_ok() { echo -e "${C_OK}[ OK ]${C_RESET} $*" >&2; }
+log_warn() { echo -e "${C_WARN}[WARN]${C_RESET} $*" >&2; }
+log_err() { echo -e "${C_ERR}[ERR ]${C_RESET} $*" >&2; }
 
 # Relaunch only absent sessions through the installer-managed aliases. This
 # gives the panel one explicit recovery action without creating a restart loop.
