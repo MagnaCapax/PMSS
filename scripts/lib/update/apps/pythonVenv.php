@@ -131,8 +131,8 @@ function pmssPythonVenvInstallCli(
         return;
     }
     $pipInstallPrefix = pmssBuildCommand($venvPython, ['-m', 'pip', 'install', '--upgrade']);
-    foreach ($normalizedInstallSteps as $installStep) {
-        runStep($installStep[0], $pipInstallPrefix.' '.$installStep[1]);
+    foreach ($normalizedInstallSteps as [$description, $args]) {
+        runStep($description, $pipInstallPrefix.' '.$args);
     }
     if (!is_file($cliBin)) {
         if (!pmssEnvFlagEnabled('PMSS_DRY_RUN')) $log($missingCliMessage);

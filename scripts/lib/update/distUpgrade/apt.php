@@ -113,8 +113,8 @@ function pmssExecuteUpgrade(): bool
         $hasTty
     );
 
-    foreach ([["$env apt-get autoremove -y", '[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt autoremove'], ["$env dpkg --configure -a", '[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg --configure -a']] as $lockedStep) {
-        if (pmssDistUpgradeRunLockedCommand($lockedStep[0], $lockedStep[1], $hasTty) === null) {
+    foreach ([["$env apt-get autoremove -y", '[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt autoremove'], ["$env dpkg --configure -a", '[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg --configure -a']] as [$command, $lockMessage]) {
+        if (pmssDistUpgradeRunLockedCommand($command, $lockMessage, $hasTty) === null) {
             return false;
         }
     }
@@ -133,8 +133,8 @@ function pmssRunUpgradeWithRecovery(string $command, string $env, string $recove
         ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt recovery', "$env apt-get -f install -y"],
         ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt update', "$env apt-get update"],
         ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt retry', $command],
-    ] as $recoveryStep) {
-        if (pmssDistUpgradeRunLockedCommand($recoveryStep[1], $recoveryStep[0], $inheritTty) === null) {
+    ] as [$lockMessage, $recoveryCommand]) {
+        if (pmssDistUpgradeRunLockedCommand($recoveryCommand, $lockMessage, $inheritTty) === null) {
             return;
         }
     }

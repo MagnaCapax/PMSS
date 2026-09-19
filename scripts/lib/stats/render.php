@@ -66,8 +66,8 @@ function pmssStatsRenderText(array $stats, array $options = []): string
         $torrentSummary = 'rTorrent unavailable';
     }
     $lines[] = pmssStatsRenderLine('Torrents', $torrentSummary);
-    foreach ([['Upload', '▲', 'upload'], ['Download', '▼', 'download']] as $transferLine) {
-        $lines[] = pmssStatsRenderLine($transferLine[0], $transferLine[1].' '.pmssFormatBytes((float) ($stats['rtorrent'][$transferLine[2].'_rate'] ?? 0.0)).'/s', 'Total: '.pmssStatsFormatBytesOrFallback($stats['rtorrent'][$transferLine[2].'_total']));
+    foreach ([['Upload', '▲', 'upload'], ['Download', '▼', 'download']] as [$label, $arrow, $direction]) {
+        $lines[] = pmssStatsRenderLine($label, $arrow.' '.pmssFormatBytes((float) ($stats['rtorrent'][$direction.'_rate'] ?? 0.0)).'/s', 'Total: '.pmssStatsFormatBytesOrFallback($stats['rtorrent'][$direction.'_total']));
     }
     $lines[] = pmssStatsRenderLine('Ratio', $stats['rtorrent']['ratio'] !== null ? number_format((float) $stats['rtorrent']['ratio'], 2) : 'n/a');
     $lines[] = '';

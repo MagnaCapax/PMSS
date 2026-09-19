@@ -278,8 +278,7 @@ function pmssSystemStatusChecks(array $dependencies = []): array
     foreach ([
         'CLI symlink: flexget' => ['/usr/local/bin/flexget', '/opt/flexget/bin/flexget'],
         'CLI symlink: pyLoad' => ['/usr/local/bin/pyload', '/opt/pyload/bin/pyload'],
-    ] as $label => $target) {
-        [$link, $expected] = $target;
+    ] as $label => [$link, $expected]) {
         if (!$isLink($link)) {
             $checks[] = pmssStatus($label, 'WARN', $isFile($link) ? sprintf('%s present but not a symlink', $link) : sprintf('%s missing', $link));
             continue;
