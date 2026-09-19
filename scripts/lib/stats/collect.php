@@ -139,7 +139,7 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
 
     return [
         'context' => $context,
-        'product' => isset($config['product']) ? (string) $config['product'] : 'PMSS',
+        'product' => (string) ($config['product'] ?? 'PMSS'),
         'pmss_version' => getPmssVersion($context['version_file']),
         'uptime_seconds' => $uptimeSeconds,
         'quota' => $quota,

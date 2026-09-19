@@ -108,7 +108,7 @@ function pmssUserCgroupSliceSelfHeal(string $username, UserConfigStore $store): 
 
     pmssUserLog($username, sprintf(
         'cgroup slice memory policy refreshed (current=%s expected=%d)',
-        $plan['currentMemoryMaxBytes'] === null ? 'unknown' : (string) $plan['currentMemoryMaxBytes'],
+        (string) ($plan['currentMemoryMaxBytes'] ?? 'unknown'),
         $plan['expectedMemoryMaxBytes']
     ));
     return true;

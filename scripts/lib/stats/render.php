@@ -83,7 +83,7 @@ function pmssStatsRenderText(array $stats, array $options = []): string
 
     if (!empty($options['full'])) {
         $lines[] = '';
-        $lines[] = pmssStatsRenderLine('PIDs', ($stats['cgroup']['pids_current'] !== null) ? (string) $stats['cgroup']['pids_current'] : 'n/a');
+        $lines[] = pmssStatsRenderLine('PIDs', (string) ($stats['cgroup']['pids_current'] ?? 'n/a'));
         $lines[] = pmssStatsRenderLine('CPU', ($stats['cgroup']['cpu_usage_usec'] !== null) ? number_format(((float) $stats['cgroup']['cpu_usage_usec']) / 1000000, 1, '.', '').'s' : 'n/a');
         $lines[] = pmssStatsRenderLine('I/O Read', pmssFormatBytes((float) ($stats['cgroup']['io_read_bytes'] ?? 0)));
         $lines[] = pmssStatsRenderLine('I/O Write', pmssFormatBytes((float) ($stats['cgroup']['io_write_bytes'] ?? 0)));

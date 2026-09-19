@@ -160,5 +160,5 @@ function pmssUserTransferVerifyRtorrentRestart(string $home, string $localUser, 
         return;
     }
 
-    logMessage('[WARN] rTorrent restart verification could not confirm migrated session reload for '.$localUser.' (session files='.$sessionCount.', loaded='.($loadedCount === null ? 'unknown' : (string) $loadedCount).')');
+    logMessage('[WARN] rTorrent restart verification could not confirm migrated session reload for '.$localUser.' (session files='.$sessionCount.', loaded='.(string) ($loadedCount ?? 'unknown').')');
 }

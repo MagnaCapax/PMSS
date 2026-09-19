@@ -25,7 +25,7 @@ function pmssDumpForkDiagnostics(string $context, ?callable $logger = null): voi
         $line .= ' pid='.$pid;
     }
     if ($euid !== null || $uid !== null) {
-        $line .= sprintf(' uid=%s euid=%s', $uid !== null ? (string) $uid : 'n/a', $euid !== null ? (string) $euid : 'n/a');
+        $line .= sprintf(' uid=%s euid=%s', (string) ($uid ?? 'n/a'), (string) ($euid ?? 'n/a'));
     }
     $log($line);
 
@@ -55,7 +55,7 @@ function pmssDumpForkDiagnostics(string $context, ?callable $logger = null): voi
     }
     $log($prefix.sprintf(
         'kernel procs=%s pid_max=%s threads_max=%s loadavg=%s',
-        $procCount !== null ? (string) $procCount : 'n/a',
+        (string) ($procCount ?? 'n/a'),
         $readTrim('/proc/sys/kernel/pid_max') ?? 'n/a',
         $readTrim('/proc/sys/kernel/threads-max') ?? 'n/a',
         $readTrim('/proc/loadavg') ?? 'n/a'
