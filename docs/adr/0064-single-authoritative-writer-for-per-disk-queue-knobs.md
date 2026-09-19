@@ -81,8 +81,16 @@ decision needing measurement, not a side effect of a read_ahead ruling.
   pins both, and additionally asserts this unit writes nothing under `/sys/block/bcacheN/bcache/` —
   the cache MODE knobs stay with rc.local's separate bcache loop, which step 2 does not gate and
   which must not be frozen here while hosts are being moved off `writeback`.
-- **Step 2: not started.** Gating rc.local's per-disk loop on `pmss-boot-tuning.sh` being absent.
-  The prerequisite above is now satisfied, so this is unblocked.
+- **Step 2: DONE (2026-09-19).** `template.rc.local`'s per-disk loop is now wrapped in
+  `if [ ! -e /usr/local/sbin/pmss-boot-tuning.sh ]; then ... fi`, so on a host carrying the unit
+  boot-tuning is the SOLE writer of `sd*`/`vd*`/`bcache*` queue knobs, while a host too old to
+  carry it keeps rc.local as its tuner. The md loop and the bcache `cache_mode` loop are NOT
+  gated (boot-tuning does not own those). Accepted residual: the gate keys on script PRESENCE,
+  not on the service having RUN this boot — if the unit is installed but its service failed,
+  loop 1 is skipped and the per-disk knobs stay at kernel defaults for that boot (a perf
+  regression, not a data risk). A run-marker gate (`/run/pmss-boot-tuning.applied`) would close
+  this; deferred as a refinement since systemPrep installs+enables+starts the unit together, so
+  presence≈ran in the normal case.
 - **Step 3: blocked on fleet minimum PMSS version**, as designed.
 
 ## Consequences

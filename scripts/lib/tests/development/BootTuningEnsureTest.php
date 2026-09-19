@@ -80,6 +80,28 @@ class BootTuningEnsureTest extends TestCase
         );
     }
 
+    public function testRcLocalPerDiskLoopGatedOnBootTuningPresence(): void
+    {
+        // ADR 0064 step 2. On a host carrying pmss-boot-tuning.service, boot-tuning is the sole
+        // writer of sd*/vd*/bcache* queue knobs; template.rc.local's per-disk loop must be gated
+        // on the unit's ABSENCE (one writer on updated hosts, still-tuned on un-updated hosts).
+        // The gate must PRECEDE the per-disk (DISK) loop.
+        $rel = 'etc/seedbox/config/template.rc.local';
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            $rel,
+            ['if [ ! -e /usr/local/sbin/pmss-boot-tuning.sh ]; then', 'for DISK in'],
+            'rc.local must gate the per-disk loop on boot-tuning presence (ADR 0064 step 2)',
+            'the boot-tuning presence gate must appear before the per-disk (DISK) loop'
+        );
+        // The md stripe_cache loop and the bcache cache_mode loop are NOT gated - boot-tuning does
+        // not own those - so they must remain present in rc.local.
+        $this->pmssAssertRepoFileContainsAllStrings(
+            $rel,
+            ['stripe_cache_size', 'bcache/cache_mode'],
+            'md loop and bcache cache_mode loop must remain in rc.local (step 2 gates only per-disk)'
+        );
+    }
+
     public function testBcacheBranchCoversRcLocalQueueKnobsAndNotCacheMode(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-boot-tuning-bcache-', 0700);

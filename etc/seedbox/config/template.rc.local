@@ -2,12 +2,19 @@
 
 modprobe bfq;
 
+# ADR 0064 step 2: this per-disk loop and pmss-boot-tuning.service (After=local-fs.target) both
+# tuned sd*/vd*/bcache* queue knobs; boot-tuning now owns them (incl the bcache* branch from step 1).
+# Run rc.local's per-disk loop ONLY when boot-tuning is not installed, so a host too old to carry the
+# unit still gets tuned while an updated host has exactly ONE writer for these knobs. The md loop and
+# the bcache cache_mode loop below are NOT gated - boot-tuning does not own those.
+if [ ! -e /usr/local/sbin/pmss-boot-tuning.sh ]; then
 for DISK in `ls /sys/block|grep -v nvme|grep -v md|grep -v loop`
 do
     echo 4096 > /sys/block/${DISK}/queue/read_ahead_kb  &
     echo "bfq" > /sys/block/${DISK}/queue/scheduler  &
 
 done
+fi
 
 for MD in `ls /sys/block|grep md|grep -v nvme|grep -v loop|grep -v bcache`
 do
