@@ -368,9 +368,7 @@ class SkeletonWebLocalAssetTest extends TestCase
         $references = [];
         foreach ($patterns as $pattern) {
             preg_match_all($pattern, $source, $matches);
-            foreach ($matches[1] as $reference) {
-                $references[] = $reference;
-            }
+            $references = array_merge($references, $matches[1]);
         }
 
         return array_values(array_unique($references));

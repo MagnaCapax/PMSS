@@ -236,7 +236,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
             "require_once __DIR__.'/../lib/log.php';",
             '$snapshotEntries[] = pmssStorageHealthSnapshotSmart($disk, $last, $timestamp);',
             '$snapshotEntries[] = $nvme;',
-            '$snapshotEntries[] = $raid;',
+            '$snapshotEntries = array_merge($snapshotEntries, pmssStorageHealthSnapshotRaid($timestamp));',
             'foreach ($snapshotEntries as $entry)',
             'pmssJsonLineAppend($logPath, $entry)',
         ], [$wrapperNeedle => 'storageHealthSnapshot.php should rely on the shared JSONL append helper instead of a local wrapper']);

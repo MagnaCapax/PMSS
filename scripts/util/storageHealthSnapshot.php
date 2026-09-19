@@ -43,9 +43,7 @@ function pmssStorageHealthSnapshotMain(array $argv): int
             $snapshotEntries[] = $nvme;
         }
     }
-    foreach (pmssStorageHealthSnapshotRaid($timestamp) as $raid) {
-        $snapshotEntries[] = $raid;
-    }
+    $snapshotEntries = array_merge($snapshotEntries, pmssStorageHealthSnapshotRaid($timestamp));
     foreach ($snapshotEntries as $entry) {
         if (!pmssJsonLineAppend($logPath, $entry)) {
             return pmssCliReturnWithStderr("Failed to write storage health snapshot to {$logPath}\n");

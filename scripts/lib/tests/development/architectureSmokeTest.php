@@ -43,9 +43,7 @@ class ArchitectureSmokeTest extends TestCase
 
             $source = (string) file_get_contents($file->getPathname());
             $relativePath = substr($file->getPathname(), strlen($repoRoot) + 1);
-            foreach ($this->extractNamedFunctions($source, $relativePath) as $function) {
-                $functions[] = $function;
-            }
+            $functions = array_merge($functions, $this->extractNamedFunctions($source, $relativePath));
         }
 
         return $functions;

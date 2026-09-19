@@ -148,11 +148,7 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
         if (!$commands) {
             continue;
         }
-        foreach ($commands as $cmd) {
-            $section[] = $cmd;
-        }
-        $section[] = 'COMMIT';
-        $sections[] = implode("\n", $section);
+        $sections[] = implode("\n", array_merge($section, array_values($commands), ['COMMIT']));
     }
 
     if (!$sections) {

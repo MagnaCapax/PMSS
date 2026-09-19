@@ -39,9 +39,7 @@ function pmssLighttpdWatchdogSocketPaths(string $homeDir, string $configPath): a
 function pmssLighttpdWatchedConfigPaths(string $homeDir, string $configPath): array
 {
     $paths = [$configPath, rtrim($homeDir, '/').'/.lighttpd/custom'];
-    foreach (glob(rtrim($homeDir, '/').'/.lighttpd/custom.d/*.conf') ?: [] as $path) {
-        $paths[] = $path;
-    }
+    $paths = array_merge($paths, glob(rtrim($homeDir, '/').'/.lighttpd/custom.d/*.conf') ?: []);
 
     return array_values(array_filter($paths, static function (string $path): bool {
         return is_file($path) && !is_link($path);
