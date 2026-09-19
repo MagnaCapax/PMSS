@@ -8,6 +8,62 @@ require_once dirname(__DIR__, 2).'/runtime.php';
 
 class RuntimeStreamSafetyTest extends TestCase
 {
+    public function testSnapshotLogPathsFailSoftBeforeFilesystemChanges(): void
+    {
+        // Stub only the root check in a child process; all file operations are real.
+        $runtime = var_export(dirname(__DIR__, 2).'/runtime.php', true);
+        $snapshot = var_export(dirname(__DIR__, 2).'/runtime/snapshot.php', true);
+        $script = 'namespace SnapshotPathFixture; function posix_geteuid() { return 0; }';
+        $script .= "require {$runtime}; eval('namespace SnapshotPathFixture;'.substr(file_get_contents({$snapshot}), 5));";
+        $script .= <<<'PHP'
+$root = getenv('PMSS_TEST_SNAPSHOT_ROOT');
+$path = base64_decode(getenv('PMSS_TEST_SNAPSHOT_PATH'));
+putenv('PMSS_TEST_SNAPSHOT_OVERRIDE');
+if (getenv('PMSS_TEST_SNAPSHOT_USE_OVERRIDE') === '1') {
+    putenv('PMSS_TEST_SNAPSHOT_OVERRIDE='.$path);
+    $path = $root.'/unused.log';
+}
+$before = umask(0027);
+$called = false;
+try {
+    $rc = pmssRunSnapshotLogTask('snapshot-test.php', 'PMSS_TEST_SNAPSHOT_OVERRIDE', $path,
+        static function ($handle) use (&$called): int {
+            $called = true;
+            pmssSnapshotWriteLine($handle, 'new snapshot');
+            return 7;
+        });
+    echo json_encode([$rc, $called, umask(), file_get_contents($root.'/snapshot.log'),
+        file_exists($root.'/missing'), file_exists($root.'/unused.log')]);
+} finally {
+    umask($before);
+}
+PHP;
+        $root = $this->pmssMakeTempDir('pmss-snapshot-path-');
+        $path = $root.'/snapshot.log';
+        foreach (['', "\0", "\0".$path, $path."\0", $path."\0suffix",
+            $root."/missing/snapshot\0.log", $root."/missing\0/snapshot.log"] as $invalid) {
+            file_put_contents($path, "previous snapshot\n");
+            $this->assertSame([1, false, 0027, "previous snapshot\n", false, false],
+                $this->pmssRunInlinePhpJson($script, [
+                    'PMSS_TEST_SNAPSHOT_ROOT' => $root,
+                    'PMSS_TEST_SNAPSHOT_PATH' => base64_encode($invalid),
+                    'PMSS_TEST_SNAPSHOT_USE_OVERRIDE' => '0',
+                ]));
+        }
+        // Defaults and env overrides keep append bytes, callback status, and slash normalization.
+        foreach (['0', '1'] as $override) {
+            foreach ([$path, $path.'/'] as $valid) {
+                file_put_contents($path, "previous snapshot\n");
+                $this->assertSame([7, true, 0027, "previous snapshot\nnew snapshot\n", false, false],
+                    $this->pmssRunInlinePhpJson($script, [
+                        'PMSS_TEST_SNAPSHOT_ROOT' => $root,
+                        'PMSS_TEST_SNAPSHOT_PATH' => base64_encode($valid),
+                        'PMSS_TEST_SNAPSHOT_USE_OVERRIDE' => $override,
+                    ]));
+            }
+        }
+    }
+
     public function testSnapshotWritersIgnoreInvalidAndClosedHandles(): void
     {
         $closed = fopen('php://memory', 'w+');

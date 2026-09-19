@@ -11,6 +11,10 @@ function pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defa
         }
         $oldUmask = umask(0077);
         $logPath = pmssResolvePathFromEnv($envKey, $defaultLogPath);
+        // Reject malformed filenames before creating parents or reaching fopen().
+        if ($logPath === '' || pmssFilesystemPathHasNulByte($logPath)) {
+            return 1;
+        }
         if (!pmssDirEnsureExists(dirname($logPath), 0755)) {
             return 1;
         }

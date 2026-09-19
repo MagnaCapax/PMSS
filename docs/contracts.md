@@ -183,6 +183,9 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     remain unchanged.
 
 - pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defaultLogPath, callable $callback): int
+  - Empty or NUL-containing resolved log paths return 1 before creating parent
+    directories or opening a file; the callback is skipped and the prior umask
+    is restored. Valid defaults and environment overrides retain append behavior.
   - Opens the snapshot log for append and runs the callback under an exclusive
     lock when `flock` is available. A failed lock returns 1 without collecting
     or writing a snapshot, matching directory/open failures.
