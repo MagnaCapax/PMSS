@@ -3,9 +3,44 @@ namespace PMSS\Tests;
 
 require_once dirname(__DIR__, 2).'/runtime.php';
 require_once __DIR__.'/../common/CounterStateStream.php';
+require_once __DIR__.'/../common/LockLifecycleStream.php';
 
 class RuntimeLockSafetyTest extends TestCase
 {
+    public function testLockLifecycleClosesStreamsWhenBoundariesThrow(): void
+    {
+        $this->assertTrue(stream_wrapper_register('pmsslocklifecycle', LockLifecycleStream::class));
+        try {
+            foreach (['stat', 'lock', 'unlock'] as $phase) {
+                foreach ([new \RuntimeException('lock failure'), new \Error('lock failure')] as $expected) {
+                    foreach ([true, false] as $closeOnBusy) {
+                        LockLifecycleStream::$failure = $phase;
+                        LockLifecycleStream::$throwable = $expected;
+                        $handle = false;
+                        $caught = null;
+                        try {
+                            $handle = \pmssLockFileAcquire('pmsslocklifecycle://lock', true, 'c', false, $closeOnBusy);
+                            \pmssLockHandleRelease($handle);
+                        } catch (\Throwable $error) {
+                            $caught = $error;
+                        } finally {
+                            // Check before fixture cleanup so leaked handles cannot pass.
+                            $closed = LockLifecycleStream::$last->closed;
+                            if (is_resource($handle)) fclose($handle);
+                        }
+                        $this->assertSame($expected, $caught, 'The original throwable must propagate');
+                        $this->assertTrue($closed, 'Stream must close after '.$phase.' throws');
+                    }
+                }
+            }
+        } finally {
+            LockLifecycleStream::$failure = null;
+            LockLifecycleStream::$throwable = null;
+            LockLifecycleStream::$last = null;
+            stream_wrapper_unregister('pmsslocklifecycle');
+        }
+    }
+
     public function testPidWriterStopsAtFailedIoBoundary(): void
     {
         $this->assertTrue(stream_wrapper_register('pmsslockpid', CounterStateStream::class));

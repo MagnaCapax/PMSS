@@ -117,6 +117,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- Lock lifecycle helpers close streams when handle validation, lock acquisition,
+  or explicit unlocking throws. The original throwable propagates; successful
+  acquisition still transfers ownership to the caller, including the legacy
+  open-but-busy result when `closeOnBusy=false`. `RuntimeLockSafetyTest` covers
+  exception cleanup and ordinary creation, contention, and release behavior.
+
 - `pmssLockHandleWritePid($handle): bool`
   - Rewinds before truncating, preserving the previous PID if seeking fails.
   - Stops on failed seek, truncation, incomplete write, or flush and returns

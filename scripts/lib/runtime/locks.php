@@ -43,12 +43,19 @@ function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mo
     if (!pmssLockFilePathIsSafe($path)) return false;
     if ($createParentDir && !pmssDirEnsureExists(dirname($path), 0755)) return false;
     if (($handle = @fopen($path, $mode)) === false) return false;
-    if (!pmssLockFileHandleMatchesPath($handle, $path)) { @fclose($handle); return false; }
-    if (!@flock($handle, LOCK_EX | ($nonBlocking ? LOCK_NB : 0))) {
-        $busy = true;
-        if ($closeOnBusy) { @fclose($handle); return false; }
+    $retained = false;
+    try {
+        if (!pmssLockFileHandleMatchesPath($handle, $path)) return false;
+        if (!@flock($handle, LOCK_EX | ($nonBlocking ? LOCK_NB : 0))) {
+            $busy = true;
+            if ($closeOnBusy) return false;
+        }
+        $retained = true;
+        return $handle;
+    } finally {
+        // Ownership transfers only on return; failures must not retain a descriptor.
+        if (!$retained) @fclose($handle);
     }
-    return $handle;
 }
 
 /** Acquire a cron lock; callers must retain the stream until their work ends. */
@@ -139,4 +146,13 @@ function pmssRuntimeLockPath(string $basename): string
     return (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/'.$basename;
 }
 
-function pmssLockHandleRelease($handle, bool $unlock = true): void { if (!is_resource($handle) || get_resource_type($handle) !== 'stream') return; $unlock && @flock($handle, LOCK_UN); @fclose($handle); }
+function pmssLockHandleRelease($handle, bool $unlock = true): void
+{
+    if (!is_resource($handle) || get_resource_type($handle) !== 'stream') return;
+    try {
+        $unlock && @flock($handle, LOCK_UN);
+    } finally {
+        // Closing also releases the lock when an explicit unlock throws.
+        @fclose($handle);
+    }
+}
