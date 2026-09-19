@@ -635,7 +635,7 @@ function resolveLatestRelease(): string
  *
  * For 'release': downloads the GitHub tarball for the tag (or latest) and
  * extracts into `$tmp`. For 'git': shallow clones the branch into `$tmp` and
- * optionally checks out `<branch>@{<pin>}` if a date pin is provided.
+ * resolves date pins against complete commit history rather than the local reflog.
  * Returns the fetched version label used for downgrade/rollback visibility.
  * Fatal on failure.
  */
@@ -681,8 +681,25 @@ function fetchSnapshot(array $spec, string $tmp): string
     }
 
     if ($spec['pin'] !== '') {
-        $rev = escapeshellarg($spec['branch'].'@{'.$spec['pin'].'}');
-        pmssRunBootstrapCommand('cd '.escapeshellarg($tmp).' && git '.GIT_HTTP_VERSION_FLAG.' fetch --quiet && git checkout '.$rev, EXIT_FETCH);
+        $git = 'git -C '.escapeshellarg($tmp).' ';
+        // A local-path clone may already be complete; a shallow remote may never be.
+        if (is_file($tmp.'/.git/shallow')) {
+            pmssRunBootstrapCommand($git.GIT_HTTP_VERSION_FLAG.' fetch --quiet --unshallow', EXIT_FETCH);
+            clearstatcache(true, $tmp.'/.git/shallow');
+            if (is_file($tmp.'/.git/shallow')) {
+                fatal('Cannot resolve dated pin from incomplete git history.', EXIT_FETCH);
+            }
+        }
+        // Fix omitted time fields at midnight/minute start, not the current clock.
+        $cutoff = $spec['pin'].(strlen($spec['pin']) === 10 ? ' 00:00:00' : ':00');
+        $revisionFile = $tmp.'/.git/pmss-pinned-revision';
+        pmssRunBootstrapCommand($git.'rev-list -n1 --before='.escapeshellarg($cutoff)
+            .' HEAD -- > '.escapeshellarg($revisionFile), EXIT_FETCH);
+        $revision = trim((string) file_get_contents($revisionFile));
+        if (!preg_match('/^[a-f0-9]{40}$/D', $revision)) {
+            fatal('No git commit at or before requested pin '.$spec['pin'].'.', EXIT_FETCH);
+        }
+        pmssRunBootstrapCommand($git.'checkout --quiet --detach '.escapeshellarg($revision), EXIT_FETCH);
     }
 
     return pmssBuildVersionSpec($spec);

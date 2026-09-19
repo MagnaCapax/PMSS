@@ -46,7 +46,9 @@ Signature: refer to file for full source; highlights below.
 
 - fetchSnapshot(array $spec, string $tmp): string
   - For `release`: `curl` tarball and `tar -xzf` into `$tmp`.
-  - For `git`: shallow clone with branch; optional `git checkout <branch>@{<pin>}`.
+  - For `git`: shallow clone with branch; dated pins fetch complete history and
+    detach at the first commit selected by `rev-list --before` from the cloned HEAD.
+    Incomplete history or no matching commit is fatal before staging.
   - Output: fetched version label for guard/log visibility (e.g., resolved `release:<tag>`).
   - Errors: `runFatal(EXIT_FETCH)` on failure.
 

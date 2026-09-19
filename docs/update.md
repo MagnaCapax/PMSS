@@ -59,6 +59,13 @@ Version specs normalise user input so `main`, `git main`, and `git/main` produce
 identical results. If no spec is supplied the previously recorded one is reused,
 falling back to `git/main`.
 
+Dated git pins resolve against commit history, not the clone's local reflog.
+They fetch the missing history and detach at the commit selected at or before
+the cutoff; an incomplete history or a date preceding every commit fails before
+staging. Date-only pins mean midnight in the host timezone; minute pins use
+`:00` seconds. Pinned runs require more transfer and temporary disk space than
+ordinary shallow updates. A stored dated spec follows the same rules on reruns.
+
 Every run emits structured events to `/var/log/pmss-update.jsonl`, making it easy
 to audit which spec was applied, whether the run was dry, and if phase 2 was
 invoked.
