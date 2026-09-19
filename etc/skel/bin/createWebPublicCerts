@@ -24,8 +24,31 @@ if ($home === false || $home === '' || !is_dir($home)) {
     exit(1);
 }
 
-$serviceIdRaw = @file_get_contents($home.'/.billingServiceId');
-$serviceId = is_string($serviceIdRaw) ? preg_replace('/\D+/', '', $serviceIdRaw) : '';
+// Same two-file order, and the same strictness, as pmssUserBillingServiceIdDigitsRead():
+// .billingServiceId first, then the legacy .billingId. That canonical reader lives
+// under the root-owned /scripts tree, which the customer UID cannot read (ADR 0016),
+// so it is re-implemented inline here the way the rest of this script avoids
+// operator-tree code. Without the fallback, an account still on .billingId -- the
+// whole migration window -- is told about one hostname while webPublicCertsProcess.php
+// issues a certificate covering two.
+$billingDigitsRead = static function (string $path): string {
+    if (!is_file($path) || is_link($path)) {
+        return '';
+    }
+    $raw = @file_get_contents($path, false, null, 0, 64);
+    if (!is_string($raw)) {
+        return '';
+    }
+    // Reject rather than salvage: a file that is not purely digits yields no service
+    // id in the root-side reader either, and the two must not disagree.
+    $raw = trim($raw);
+    return ($raw !== '' && ctype_digit($raw) && (int) $raw > 0) ? $raw : '';
+};
+
+$serviceId = $billingDigitsRead($home.'/.billingServiceId');
+if ($serviceId === '') {
+    $serviceId = $billingDigitsRead($home.'/.billingId');
+}
 $serverFqdn = trim((string) @shell_exec('hostname -f'));
 $user = basename($home);
 
