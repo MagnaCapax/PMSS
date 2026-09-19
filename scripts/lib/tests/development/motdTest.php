@@ -113,4 +113,54 @@ class MotdTest extends TestCase
             '/scripts/util/motdGenerate.php',
         ]);
     }
+
+    public function testLinkSpeedLabelRendersMbitAsHumanRate(): void
+    {
+        $this->assertSame('', \pmssMotdLinkSpeedLabel(0));
+        $this->assertSame('', \pmssMotdLinkSpeedLabel(-1));
+        $this->assertSame('100Mb/s', \pmssMotdLinkSpeedLabel(100));
+        $this->assertSame('1Gb/s', \pmssMotdLinkSpeedLabel(1000));
+        $this->assertSame('2.5Gb/s', \pmssMotdLinkSpeedLabel(2500));
+        $this->assertSame('20Gb/s', \pmssMotdLinkSpeedLabel(20000));
+    }
+
+    public function testNetworkSpeedIsResolvedOnlyForNumericProbeResults(): void
+    {
+        // ethtool prints a literal "Unknown!" on a virtio NIC; sysfs gives -1.
+        $this->assertTrue(\pmssMotdNetworkSpeedIsResolved('10000Mb/s'));
+        $this->assertFalse(\pmssMotdNetworkSpeedIsResolved('Unknown!'));
+        $this->assertFalse(\pmssMotdNetworkSpeedIsResolved('Unknown'));
+        $this->assertFalse(\pmssMotdNetworkSpeedIsResolved('n/a'));
+        $this->assertFalse(\pmssMotdNetworkSpeedIsResolved(''));
+        $this->assertFalse(\pmssMotdNetworkSpeedIsResolved('-1'));
+    }
+
+    public function testConfiguredLinkSpeedLabelReadsTheNetworkConfig(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-motd-net-', 0700);
+        $config = $dir.'/network';
+        file_put_contents($config, "<?php return array('speed' => '20000');");
+
+        $label = '';
+        $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $config], function () use (&$label): void {
+            $label = \pmssMotdConfiguredLinkSpeedLabel();
+        });
+
+        $this->assertSame('20Gb/s', $label);
+    }
+
+    public function testConfiguredLinkSpeedLabelEmptyWhenUnset(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-motd-net-', 0700);
+        $config = $dir.'/network';
+        file_put_contents($config, "<?php return array();");
+
+        $label = '';
+        $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $config], function () use (&$label): void {
+            $label = \pmssMotdConfiguredLinkSpeedLabel();
+        });
+
+        $this->assertSame('', $label);
+    }
+
 }

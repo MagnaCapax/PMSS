@@ -71,9 +71,12 @@ class Motd
 
         if ($colorEnabled) {
             $netSpeed = trim($repl['%NETWORK_SPEED%']);
-            $repl['%NETWORK_SPEED%'] = ($netSpeed !== '' && !in_array(strtolower($netSpeed), ['unknown', 'n/a'], true))
-                ? self::c($netSpeed, '32') // green when detected
-                : self::c('Unknown', '33'); // yellow when unknown
+            // Resolved means "starts with a digit". The old allow-list compared against
+            // 'unknown' and 'n/a' only, so ethtool's literal "Unknown!" on a virtio NIC
+            // slipped through and was rendered green, as if it were a detected speed.
+            $repl['%NETWORK_SPEED%'] = pmssMotdNetworkSpeedIsResolved($netSpeed)
+                ? self::c($netSpeed, '32') // green when detected or provisioned
+                : self::c('Unknown', '33'); // yellow when neither probe nor config answers
         }
 
         $rendered = strtr($template, $repl);
