@@ -129,7 +129,7 @@ function pmssUserGiBSettingCli(array $argv, array $spec): int
     $targetModes = call_user_func($spec['targetModesResolver'], $userName, $homeDir);
 
     if ($show) {
-        echo sprintf("%s for %s: %d GiB\n", $spec['subjectLabel'], $userName, pmssTrafficLimitReadGiBFile((string) array_key_first($targetModes)));
+        printf("%s for %s: %d GiB\n", $spec['subjectLabel'], $userName, pmssTrafficLimitReadGiBFile((string) array_key_first($targetModes)));
         return 0;
     }
 
@@ -156,6 +156,6 @@ function pmssUserGiBSettingCli(array $argv, array $spec): int
         pmssUserLog($userName, $removingValue ? (string) $spec['unsetLogMessage'] : sprintf((string) $spec['setLogTemplate'], $value));
     }
 
-    echo sprintf("%s for %s set %s %d GiB\n", $spec['subjectLabel'], $userName, $spec['setPreposition'], $value);
+    printf("%s for %s set %s %d GiB\n", $spec['subjectLabel'], $userName, $spec['setPreposition'], $value);
     return 0;
 }

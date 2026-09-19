@@ -133,7 +133,7 @@ foreach (pmssCgroupDirectPlannedUsers(PMSS_IOPS_USERS_DIR, $total, $errors, func
             $written++;
             syslog(LOG_INFO, "$dir-iops $user uid=$uid: $majMin $iops");
         } elseif ($res['reason'] === 'dry-run' && $DRY_RUN) {
-            echo sprintf("[DRY-RUN] %-20s uid=%d %s: %s %d\n", $user, $uid, $dir, $majMin, $iops);
+            printf("[DRY-RUN] %-20s uid=%d %s: %s %d\n", $user, $uid, $dir, $majMin, $iops);
         }
     }
 }

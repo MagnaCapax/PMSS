@@ -77,7 +77,7 @@ function pmssStatusEmit(
     }
 
     echo str_repeat('-', 60)."\n";
-    echo sprintf(
+    printf(
         "Summary: %d OK, %d WARN, %d ERR\n",
         (int) ($summary['ok'] ?? 0),
         (int) ($summary['warn'] ?? 0),

@@ -52,7 +52,7 @@ function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestam
         $severity = (string) ($entry['severity'] ?? 'warn');
         $counts[isset($counts[$severity]) ? $severity : 'warn']++;
     }
-    echo sprintf("Summary: %s ok, %s warn, %s fail\n\n", (string) $counts['ok'], (string) $counts['warn'], (string) $counts['fail']);
+    printf("Summary: %s ok, %s warn, %s fail\n\n", (string) $counts['ok'], (string) $counts['warn'], (string) $counts['fail']);
 
     if (!empty($disks)) {
         echo "Disks\n-----\n";

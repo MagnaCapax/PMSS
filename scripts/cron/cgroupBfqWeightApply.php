@@ -132,7 +132,7 @@ foreach (pmssCgroupDirectPlannedUsers($USERS_DIR, $total, $errors, function (str
     }
 
     if ($DRY_RUN) {
-        echo sprintf("[DRY-RUN] %-20s uid=%d %d -> %d\n", $user, $uid, $cur, $w);
+        printf("[DRY-RUN] %-20s uid=%d %d -> %d\n", $user, $uid, $cur, $w);
         $written++;
         continue;
     }
