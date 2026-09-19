@@ -139,6 +139,54 @@ class RuntimeProfileTest extends TestCase
         }
     }
 
+    public function testProfileSummaryEncodingFailuresPreserveReports(): void
+    {
+        // Each text field can contain raw command bytes that are not valid UTF-8.
+        foreach (['description', 'command', 'status', 'stdout_excerpt', 'stderr_excerpt', 'duration'] as $field) {
+            foreach ([true, false] as $existing) {
+                $this->resetState();
+                $root = $this->pmssMakeTempDir('pmss-profile-encoding-');
+                $path = $existing ? $root.'/report.json' : $root.'/missing/report.json';
+                if ($existing) {
+                    file_put_contents($path, "prior report\n");
+                }
+                $this->pmssTrackEnvOverrides(['PMSS_PROFILE_OUTPUT' => $path]);
+                $GLOBALS['PMSS_PROFILE'] = [[$field => $field === 'duration' ? INF : "invalid\xFF"]];
+
+                pmssProfileSummary();
+
+                if ($existing) {
+                    $this->assertSame("prior report\n", file_get_contents($path), $field);
+                } else {
+                    $this->assertFalse(file_exists(dirname($path)), $field);
+                }
+            }
+        }
+    }
+
+    public function testProfileSummaryPreservesSuccessfulReportBytes(): void
+    {
+        foreach ([false, true] as $fallback) {
+            $this->resetState();
+            $root = $this->pmssMakeTempDir('pmss-profile-bytes-');
+            $jsonPath = $root.'/events.jsonl';
+            $path = $fallback ? $jsonPath.'.profile.json' : $root.'/nested/report.json';
+            $this->pmssTrackEnvOverrides([
+                'PMSS_JSON_LOG' => $fallback ? $jsonPath : null,
+                'PMSS_PROFILE_OUTPUT' => $fallback ? null : $path,
+            ]);
+            $GLOBALS['PMSS_PROFILE'] = [
+                ['description' => 'fast / step', 'duration' => 0.1],
+                ['description' => 'slow step', 'duration' => 0.2],
+            ];
+            $expected = array_map('pmssProfileSummaryEntry', array_reverse($GLOBALS['PMSS_PROFILE']));
+
+            pmssProfileSummary();
+
+            $this->assertSame(json_encode($expected, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), file_get_contents($path));
+        }
+    }
+
     private function recordProfileEntry(array $overrides = []): void
     {
         pmssRecordProfile(array_replace([

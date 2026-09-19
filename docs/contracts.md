@@ -171,6 +171,9 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 - pmssRecordProfile(array $entry): void → lazily initializes `$GLOBALS['PMSS_PROFILE']`, appends the entry, and emits JSON `step` event.
 - pmssProfileSummary(): void → logs status counts and top 5 durations; writes full JSON to `PMSS_PROFILE_OUTPUT` or `(<PMSS_JSON_LOG>.profile.json)`.
+  - If JSON encoding fails, leaves any existing report untouched and creates no
+    report directories. Directory preparation failures skip the write. These
+    failures remain best-effort; valid report bytes and summary logs are unchanged.
 
 ---
 

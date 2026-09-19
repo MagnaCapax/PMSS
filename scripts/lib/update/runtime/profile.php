@@ -173,6 +173,10 @@ function pmssProfileSummary(): void
     if ($profileOutput === '') {
         return;
     }
-    pmssDirEnsureExists(dirname($profileOutput), 0755);
-    @file_put_contents($profileOutput, pmssJsonEncodePretty($profile) ?? '');
+    // Encoding must succeed before opening the report: an empty fallback erases prior evidence.
+    $encoded = pmssJsonEncodePretty($profile);
+    if ($encoded === null || !pmssDirEnsureExists(dirname($profileOutput), 0755)) {
+        return;
+    }
+    @file_put_contents($profileOutput, $encoded);
 }
