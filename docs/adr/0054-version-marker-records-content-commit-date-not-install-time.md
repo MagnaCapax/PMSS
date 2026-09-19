@@ -35,11 +35,12 @@ older was ever being installed; the marker simply recorded the wrong kind of dat
 
 ## Decision
 `recordVersion()` builds the marker line via a new pure helper
-`pmssRecordedVersionLine($spec, $fetchedVersion, $timestamp)` that stamps the
+`pmssRecordedVersionLine($spec, $fetchedVersion)` that stamps the
 marker with the **content commit date** extracted from the fetched-version label
-(`@YYYY-MM-DD HH:MM`). It falls back to install wall-clock time only when the
-fetched label carries no orderable date (e.g. codeload tarball fallbacks with no
-`.git` metadata), preserving ADR 0051's fail-open contract.
+(`@YYYY-MM-DD HH:MM`). The accepted decision originally fell back to install
+wall-clock time when the fetched label carried no orderable date (e.g. codeload
+tarball fallbacks with no `.git` metadata); the correction below supersedes that
+dateless fallback because it did not preserve ADR 0051's fail-open contract.
 
 The metadata object (`VERSION_META`) keeps `timestamp` = actual install time for
 audit; only the ordering-significant marker line changes.
@@ -79,6 +80,8 @@ audit; only the ordering-significant marker line changes.
 The install-time fallback above does not preserve indeterminate ordering on the
 next fetch: it fabricates an authoritative date. The writer now returns the bare
 spec when no content-date suffix exists; dated pins and tags retain their ordering.
-This supersedes only the dateless fallback decision. The alternative of relaxing
-the backward-move guard is rejected; its checks remain unchanged. Install time
-stays in metadata, and existing install-time markers are not retroactively repaired.
+The helper no longer accepts install time for marker construction. This supersedes
+only the dateless fallback decision. The alternative of relaxing the backward-move
+guard is rejected; its checks remain unchanged. Install time stays in metadata,
+and existing install-time markers are normalized only when metadata proves they
+came from the dateless fallback.

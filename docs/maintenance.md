@@ -64,10 +64,12 @@ cannot grow until the next weekly rotation window.
 
 ## 5. Confirm Version Metadata
 After a real run, `/etc/seedbox/config/version` contains the canonical spec plus
-timestamp, e.g.
+the fetched content timestamp when one is known, e.g.
 ```
 git/main:2025-01-01@2025-01-02 03:04
 ```
+Dateless fetches keep the marker dateless so update ordering remains
+indeterminate rather than trusting an install-time surrogate.
 `version.meta` records the resolved branch, commit, and log destinations in a
 human-readable JSON structure for audits.
 

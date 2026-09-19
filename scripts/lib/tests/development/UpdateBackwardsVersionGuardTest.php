@@ -23,18 +23,21 @@ class UpdateBackwardsVersionGuardTest extends TestCase
         $metadata = $this->pmssWriteTempFile('version-meta', json_encode([
             'recorded_spec' => 'git/main',
         ]));
-        $this->assertTrue(\pmssInstalledMarkerDateIsFallback($metadata), 'missing fetched_version marks stored date as fallback');
+        $installedVersion = 'git/main@2026-09-10 03:04';
+        $this->assertTrue(
+            \pmssMetadataProvesInstalledFallbackDate($installedVersion, $metadata),
+            'missing fetched_version marks stored date as fallback'
+        );
+        $installedVersion = \pmssInstalledVersionForOrdering($installedVersion, $metadata);
 
         $decision = \pmssVersionMoveDecision(
-            'git/main@2026-09-10 03:04',
+            $installedVersion,
             'git/main@2026-09-09 06:33',
-            false,
-            \pmssInstalledMarkerDateIsFallback($metadata)
+            false
         );
 
         $this->assertTrue($decision['allowed'], 'fallback marker date should not brick the unpinned update path');
         $this->assertSame('indeterminate', $decision['ordering']);
-        $this->assertSame('installed_fallback_marker', $decision['reason']);
     }
 
     public function testRealContentDateInstalledMarkerStillRefusesBackwardFetch(): void
@@ -43,13 +46,17 @@ class UpdateBackwardsVersionGuardTest extends TestCase
             'fetched_version' => 'git/main@2026-09-10 03:04',
             'recorded_spec' => 'git/main',
         ]));
-        $this->assertFalse(\pmssInstalledMarkerDateIsFallback($metadata), 'content-dated fetched_version remains authoritative');
+        $installedVersion = 'git/main@2026-09-10 03:04';
+        $this->assertFalse(
+            \pmssMetadataProvesInstalledFallbackDate($installedVersion, $metadata),
+            'content-dated fetched_version remains authoritative'
+        );
+        $installedVersion = \pmssInstalledVersionForOrdering($installedVersion, $metadata);
 
         $decision = \pmssVersionMoveDecision(
-            'git/main@2026-09-10 03:04',
+            $installedVersion,
             'git/main@2026-09-09 06:33',
-            false,
-            \pmssInstalledMarkerDateIsFallback($metadata)
+            false
         );
 
         $this->assertFalse($decision['allowed'], 'real content-date marker must still refuse a genuine backward move');
@@ -108,8 +115,7 @@ class UpdateBackwardsVersionGuardTest extends TestCase
         // The marker MUST carry the CONTENT date, so a follow-up fetch of the same HEAD
         // orders as "same", not a phantom backwards move (a back-to-back
         // update.php git/main then --dist-upgrade on one host tripped the guard).
-        $installTs = \mktime(9, 8, 0, 9, 7, 2026);
-        $line = \pmssRecordedVersionLine('git/main', 'git/main@2026-09-06 15:06', $installTs);
+        $line = \pmssRecordedVersionLine('git/main', 'git/main@2026-09-06 15:06');
         $this->assertSame('git/main@2026-09-06 15:06', $line, 'marker must carry the content commit date');
 
         $decision = \pmssVersionMoveDecision($line, 'git/main@2026-09-06 15:06', false);
@@ -117,21 +123,29 @@ class UpdateBackwardsVersionGuardTest extends TestCase
         $this->assertSame('same', $decision['ordering']);
     }
 
-    public function testRecordedMarkerFallsBackToCappedInstallTimeWhenLabelIsDateless(): void
+    public function testRecordedMarkerKeepsDatelessLabelsIndeterminate(): void
     {
-        $installTs = \mktime(9, 8, 0, 9, 7, 2026);
         foreach (['git/main', '', 'git/main@not-a-date', 'release', 'release:stable'] as $fetched) {
             $spec = strpos($fetched, 'release') === 0 ? $fetched : 'git/main';
-            $line = \pmssRecordedVersionLine($spec, $fetched, $installTs);
-            $this->assertSame($spec.'@2026-09-07 09:08', $line);
+            $line = \pmssRecordedVersionLine($spec, $fetched);
+            $this->assertSame($spec, $line);
+
+            $decision = \pmssVersionMoveDecision($line, 'git/main@2026-09-09 06:33', false);
+            $this->assertTrue($decision['allowed'], 'dateless marker should keep the next guard fail-open');
+            $this->assertSame('indeterminate', $decision['ordering']);
         }
     }
 
-    public function testRecordedMarkerFallbackDateDoesNotExceedSystemClock(): void
+    public function testRecordedMarkerUsesOrderableFetchedSpecDate(): void
     {
-        $line = \pmssRecordedVersionLine('git/main', 'git/main', time() + 3600);
-        $recorded = \pmssVersionOrderingDate($line);
+        $this->assertSame(
+            'release@2026-01-21 00:00',
+            \pmssRecordedVersionLine('release', 'release:2026-01-21')
+        );
 
-        $this->assertTrue($recorded <= date('Y-m-d'), 'fallback date must not be future-relative to the system clock');
+        $this->assertSame(
+            'git/main:2026-01-21@2026-01-21 00:00',
+            \pmssRecordedVersionLine('git/main:2026-01-21', 'git/main:2026-01-21')
+        );
     }
 }

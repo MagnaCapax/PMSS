@@ -1694,8 +1694,7 @@ function pmssValidatedVersionDate(string $date): string
 function pmssVersionMoveDecision(
     string $installedVersion,
     string $fetchedVersion,
-    bool $explicitTarget,
-    bool $installedMarkerDateIsFallback = false
+    bool $explicitTarget
 ): array
 {
     $installedDate = pmssVersionOrderingDate($installedVersion);
@@ -1706,16 +1705,6 @@ function pmssVersionMoveDecision(
 
     $comparison = strcmp($fetchedDate, $installedDate);
     $ordering = $comparison < 0 ? 'backward' : ($comparison > 0 ? 'forward' : 'same');
-    if ($ordering === 'backward' && !$explicitTarget && $installedMarkerDateIsFallback) {
-        return [
-            'allowed' => true,
-            'ordering' => 'indeterminate',
-            'installed_order' => '',
-            'fetched_order' => $fetchedDate,
-            'ignored_installed_order' => $installedDate,
-            'reason' => 'installed_fallback_marker',
-        ];
-    }
 
     return [
         'allowed' => $ordering !== 'backward' || $explicitTarget,
@@ -1725,20 +1714,32 @@ function pmssVersionMoveDecision(
     ];
 }
 
-function pmssVersionLabelHasContentDate(string $version): bool
+function pmssVersionSpecWithoutRecordedDate(string $version): string
 {
-    return pmssVersionOrderingDate($version) !== '';
+    $version = trim($version);
+    if (preg_match('/^(.*)@\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?$/', $version, $m) === 1) {
+        return trim($m[1]);
+    }
+
+    return $version;
 }
 
-function pmssInstalledMarkerDateIsFallback(string $metadataPath): bool
+function pmssMetadataProvesInstalledFallbackDate(string $installedVersion, string $metadataPath): bool
 {
+    $spec = pmssVersionSpecWithoutRecordedDate($installedVersion);
+    if ($spec === '' || $spec === trim($installedVersion)) {
+        return false;
+    }
+    if (preg_match('/^(git\/.+|release)$/i', $spec) !== 1) {
+        return false;
+    }
     if (!is_readable($metadataPath)) {
-        return true;
+        return false;
     }
 
     $raw = @file_get_contents($metadataPath);
     if (!is_string($raw) || trim($raw) === '') {
-        return true;
+        return false;
     }
 
     $metadata = json_decode($raw, true);
@@ -1746,11 +1747,25 @@ function pmssInstalledMarkerDateIsFallback(string $metadataPath): bool
         return false;
     }
 
+    $recordedSpec = trim((string) ($metadata['recorded_spec'] ?? ''));
+    if ($recordedSpec !== '' && $recordedSpec !== $spec) {
+        return false;
+    }
+
     $fetchedVersion = array_key_exists('fetched_version', $metadata)
         ? trim((string) $metadata['fetched_version'])
         : '';
 
-    return $fetchedVersion === '' || !pmssVersionLabelHasContentDate($fetchedVersion);
+    return $fetchedVersion === '' || pmssVersionOrderingDate($fetchedVersion) === '';
+}
+
+function pmssInstalledVersionForOrdering(string $installedVersion, string $metadataPath): string
+{
+    if (!pmssMetadataProvesInstalledFallbackDate($installedVersion, $metadataPath)) {
+        return $installedVersion;
+    }
+
+    return pmssVersionSpecWithoutRecordedDate($installedVersion);
 }
 
 function pmssVersionLogLabel(string $version): string
@@ -1764,8 +1779,8 @@ function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarg
     $installedVersion = is_readable(VERSION_FILE)
         ? trim((string) @file_get_contents(VERSION_FILE))
         : '';
-    $installedMarkerDateIsFallback = pmssInstalledMarkerDateIsFallback(VERSION_META);
-    $decision = pmssVersionMoveDecision($installedVersion, $fetchedVersion, $explicitTarget, $installedMarkerDateIsFallback);
+    $installedVersionForOrdering = pmssInstalledVersionForOrdering($installedVersion, VERSION_META);
+    $decision = pmssVersionMoveDecision($installedVersionForOrdering, $fetchedVersion, $explicitTarget);
     $mode = $explicitTarget ? 'explicit target' : 'unpinned target';
     $message = '[INFO] Snapshot version transition: '
         .pmssVersionLogLabel($installedVersion).' -> '.pmssVersionLogLabel($fetchedVersion)
@@ -1773,8 +1788,8 @@ function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarg
 
     if ($decision['ordering'] === 'indeterminate') {
         $message .= '; ordering indeterminate, proceeding';
-        if (($decision['reason'] ?? '') === 'installed_fallback_marker') {
-            $message .= ' (installed marker lacks content-date metadata)';
+        if ($installedVersionForOrdering !== $installedVersion) {
+            $message .= ' (installed marker date came from dateless metadata)';
         }
     } elseif ($decision['ordering'] === 'backward' && $explicitTarget) {
         $message .= '; explicit rollback allowed';
@@ -1787,11 +1802,9 @@ function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarg
         'explicit_target' => $explicitTarget,
         'allowed' => $decision['allowed'],
     ];
-    if (($decision['reason'] ?? '') !== '') {
-        $event['reason'] = (string) $decision['reason'];
-    }
-    if (($decision['ignored_installed_order'] ?? '') !== '') {
-        $event['ignored_installed_order'] = (string) $decision['ignored_installed_order'];
+    if ($installedVersionForOrdering !== $installedVersion) {
+        $event['installed_version_for_ordering'] = $installedVersionForOrdering;
+        $event['reason'] = 'installed_fallback_marker';
     }
 
     logmsg($message);
@@ -1811,15 +1824,13 @@ function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarg
 /**
  * Build the version-marker line written to VERSION_FILE.
  *
- * Content dates win. Dateless labels fall back to a wall-clock marker capped at
- * the current system clock, and the ordering guard treats those fallback markers
- * as indeterminate on the next run unless metadata proves a real content date.
+ * Content dates win. Dateless labels stay dateless so the next ordering check
+ * remains indeterminate instead of trusting an install-wall-clock surrogate.
  *
  * @param string $spec           Canonical version spec (e.g. git/main).
  * @param string $fetchedVersion Fetched label; may embed @YYYY-MM-DD HH:MM.
- * @param int    $timestamp      Install time used only as a capped fallback.
  */
-function pmssRecordedVersionLine(string $spec, string $fetchedVersion, int $timestamp): string
+function pmssRecordedVersionLine(string $spec, string $fetchedVersion): string
 {
     $contentDate = '';
     if (preg_match('/@(\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?)$/', trim($fetchedVersion), $matches) === 1) {
@@ -1829,9 +1840,14 @@ function pmssRecordedVersionLine(string $spec, string $fetchedVersion, int $time
         }
     }
 
-    $stamp = $contentDate !== '' ? $contentDate : date('Y-m-d H:i', min($timestamp, time()));
+    if ($contentDate === '') {
+        $orderingDate = pmssVersionOrderingDate($fetchedVersion);
+        if ($orderingDate !== '') {
+            $contentDate = $orderingDate.' 00:00';
+        }
+    }
 
-    return $spec.'@'.$stamp;
+    return $contentDate !== '' ? $spec.'@'.$contentDate : $spec;
 }
 
 /**
@@ -1851,7 +1867,7 @@ function recordVersion(string $spec, array $details, bool $dryRun): void
 
     $timestamp = time();
     // Content time belongs in the marker; install time remains explicit metadata.
-    $line      = pmssRecordedVersionLine($spec, (string) ($details['fetched_version'] ?? ''), $timestamp);
+    $line      = pmssRecordedVersionLine($spec, (string) ($details['fetched_version'] ?? ''));
     $details['recorded_spec'] = $spec;
     $details['timestamp']     = date('c', $timestamp);
 
