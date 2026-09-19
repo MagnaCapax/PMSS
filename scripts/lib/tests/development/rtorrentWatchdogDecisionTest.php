@@ -37,6 +37,11 @@ class rtorrentWatchdogDecisionTest extends TestCase
         }
     }
 
+    private function escalatedStatePaths(): array
+    {
+        return \rtorrentProcessWatchdogStatePaths($this->tempDir, 'alice');
+    }
+
     public function testCronLogHonorsForceAndDebugFlags(): void
     {
         $this->assertSame('', $this->pmssCaptureStdout(static function (): void {
@@ -85,6 +90,110 @@ class rtorrentWatchdogDecisionTest extends TestCase
         foreach (['startMarker', 'startFailure', 'sessionReset', 'escalation'] as $key) {
             $this->assertTrue(file_exists($state[$key]), $key.' remains until a process or executor appears');
         }
+    }
+
+    public function testEscalationRetryStateUsesMarkerTimestamp(): void
+    {
+        $state = $this->escalatedStatePaths();
+
+        $this->assertSame(['action' => 'record', 'age' => 0], \rtorrentProcessEscalationRetryState($state['escalation'], 180, 1000));
+
+        \rtorrentProcessWriteEscalationState($state['escalation'], 'alice', 6, 900);
+        $this->assertSame(['action' => 'wait', 'age' => 99], \rtorrentProcessEscalationRetryState($state['escalation'], 180, 999));
+        $this->assertSame(['action' => 'retry', 'age' => 180], \rtorrentProcessEscalationRetryState($state['escalation'], 180, 1080));
+
+        file_put_contents($state['escalation'], '500');
+        $this->assertSame(['action' => 'retry', 'age' => 500], \rtorrentProcessEscalationRetryState($state['escalation'], 180, 1000));
+
+        file_put_contents($state['escalation'], 'not-json');
+        $this->assertSame(['action' => 'record', 'age' => 0], \rtorrentProcessEscalationRetryState($state['escalation'], 180, 1000));
+    }
+
+    public function testEscalatedStartFailureRetriesOnceAfterBoundedIntervalAndClearsOnSuccess(): void
+    {
+        $state = $this->escalatedStatePaths();
+        \rtorrentProcessWriteEscalationState($state['escalation'], 'alice', 6, time() - 3600);
+        $attempts = 0;
+        $logger = static function (string $message, bool $force = false): void {};
+
+        $this->pmssCaptureStdout(static function () use ($state, $logger, &$attempts): void {
+            \pmssCheckRtorrentHandleEscalatedStartFailure(
+                'alice',
+                $state,
+                6,
+                180,
+                $logger,
+                false,
+                static function (string $user, callable $logCallback, string $startMarker) use (&$attempts): int {
+                    $attempts++;
+                    file_put_contents($startMarker, 'started');
+                    return 0;
+                }
+            );
+        });
+
+        $this->assertSame(1, $attempts, 'elapsed escalation interval should permit exactly one start attempt');
+        $this->assertFalse(file_exists($state['escalation']), 'successful bounded retry clears escalation flag');
+        $this->assertSame('started', (string) file_get_contents($state['startMarker']));
+    }
+
+    public function testEscalatedStartFailureWaitsBeforeBoundedInterval(): void
+    {
+        $state = $this->escalatedStatePaths();
+        \rtorrentProcessWriteEscalationState($state['escalation'], 'alice', 6, time());
+        $before = (string) file_get_contents($state['escalation']);
+        $attempts = 0;
+        $logger = static function (string $message, bool $force = false): void {};
+
+        $this->pmssCaptureStdout(static function () use ($state, $logger, &$attempts): void {
+            \pmssCheckRtorrentHandleEscalatedStartFailure(
+                'alice',
+                $state,
+                6,
+                3600,
+                $logger,
+                false,
+                static function (string $user, callable $logCallback, string $startMarker) use (&$attempts): int {
+                    $attempts++;
+                    return 0;
+                }
+            );
+        });
+
+        $this->assertSame(0, $attempts, 'fresh escalation interval must not attempt a start');
+        $this->assertSame($before, (string) file_get_contents($state['escalation']), 'waiting must not re-arm the interval');
+        $this->assertFalse(file_exists($state['startMarker']), 'waiting must not touch the start marker');
+    }
+
+    public function testEscalatedStartFailureRearmsAfterFailedOneShot(): void
+    {
+        $state = $this->escalatedStatePaths();
+        \rtorrentProcessWriteEscalationState($state['escalation'], 'alice', 6, time() - 3600);
+        $before = time();
+        $attempts = 0;
+        $logger = static function (string $message, bool $force = false): void {};
+
+        $this->pmssCaptureStdout(static function () use ($state, $logger, &$attempts): void {
+            \pmssCheckRtorrentHandleEscalatedStartFailure(
+                'alice',
+                $state,
+                7,
+                180,
+                $logger,
+                false,
+                static function (string $user, callable $logCallback, string $startMarker) use (&$attempts): int {
+                    $attempts++;
+                    return 1;
+                }
+            );
+        });
+
+        $payload = json_decode((string) file_get_contents($state['escalation']), true);
+        $this->assertSame(1, $attempts, 'failed one-shot still attempts only once');
+        $this->assertTrue(is_array($payload), 'failed one-shot should leave a JSON escalation marker');
+        $this->assertSame('alice', $payload['user']);
+        $this->assertSame(7, $payload['count']);
+        $this->assertTrue((int) $payload['timestamp'] >= $before, 'failed one-shot should re-arm the interval from now');
     }
 
     public function testGraceStateUsesBaseAndExtendsAfterRecentRestartMarkers(): void

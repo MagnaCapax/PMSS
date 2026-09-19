@@ -74,6 +74,65 @@ function rtorrentProcessCheckFailureCountState(string $stateFile, int $failureTh
 }
 
 /**
+ * Write the persistent-start-failure escalation marker.
+ */
+function rtorrentProcessWriteEscalationState(string $stateFile, string $user, int $failureCount, ?int $now = null): bool
+{
+    $now = $now ?? time();
+
+    return rtorrentProcessWriteStateFile($stateFile, (string) json_encode([
+        'timestamp' => $now,
+        'user' => $user,
+        'count' => $failureCount,
+    ]));
+}
+
+/**
+ * Read the escalation timestamp from either the JSON marker or a legacy scalar.
+ */
+function rtorrentProcessEscalationTimestamp(string $stateFile): int
+{
+    if (!rtorrentProcessStateFilePathIsSafe($stateFile) || !is_file($stateFile)) {
+        return 0;
+    }
+
+    $payload = @file_get_contents($stateFile);
+    if (!is_string($payload) || trim($payload) === '') {
+        return 0;
+    }
+
+    $decoded = json_decode($payload, true);
+    if (is_array($decoded) && isset($decoded['timestamp']) && is_numeric($decoded['timestamp'])) {
+        return max(0, (int) $decoded['timestamp']);
+    }
+
+    $trimmed = trim($payload);
+    return is_numeric($trimmed) ? max(0, (int) $trimmed) : 0;
+}
+
+/**
+ * Decide whether an escalated account is due for one bounded recovery start.
+ *
+ * @return array{action:string,age:int}
+ */
+function rtorrentProcessEscalationRetryState(string $stateFile, int $retryInterval, ?int $now = null): array
+{
+    if (!rtorrentProcessStateFilePathIsSafe($stateFile)) {
+        return ['action' => 'wait', 'age' => 0];
+    }
+
+    $timestamp = rtorrentProcessEscalationTimestamp($stateFile);
+    if ($timestamp <= 0) {
+        return ['action' => 'record', 'age' => 0];
+    }
+
+    $now = $now ?? time();
+    $age = max(0, $now - $timestamp);
+
+    return ['action' => $age < max(1, $retryInterval) ? 'wait' : 'retry', 'age' => $age];
+}
+
+/**
  * Return all checkRtorrent marker paths for one user.
  */
 function rtorrentProcessWatchdogStatePaths(string $stateDir, string $user): array

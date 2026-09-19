@@ -11,6 +11,52 @@
  */
 
 /**
+ * Handle an escalated persistent-start failure without retry storms.
+ *
+ * @param array<string,string> $state
+ */
+function pmssCheckRtorrentHandleEscalatedStartFailure(
+    string $user,
+    array $state,
+    int $persistentFailureCount,
+    int $retryInterval,
+    callable $logCallback,
+    bool $debug,
+    callable $startCallback
+): void {
+    $retryState = rtorrentProcessEscalationRetryState($state['escalation'], $retryInterval);
+    if ($retryState['action'] !== 'retry') {
+        if ($retryState['action'] === 'record') {
+            rtorrentProcessWriteEscalationState($state['escalation'], $user, $persistentFailureCount);
+        }
+
+        pmssCheckRtorrentLogBoth(
+            $user,
+            'persistent start failure escalated; leaving retry disabled for external monitoring '
+                .'until bounded auto-recovery interval elapses '
+                .'(age='.(int) $retryState['age'].'s interval='.max(1, $retryInterval).'s)',
+            $debug
+        );
+        return;
+    }
+
+    pmssCheckRtorrentLogBoth(
+        $user,
+        'persistent start failure escalated for '.(int) $retryState['age'].'s; attempting bounded auto-recovery start',
+        $debug
+    );
+    $rc = (int) $startCallback($user, $logCallback, $state['startMarker']);
+    if ($rc === 0) {
+        rtorrentProcessClearStaleState($state['escalation']);
+        pmssCheckRtorrentLogBoth($user, 'bounded auto-recovery start succeeded; clearing escalation', $debug);
+        return;
+    }
+
+    rtorrentProcessWriteEscalationState($state['escalation'], $user, $persistentFailureCount);
+    pmssCheckRtorrentLogBoth($user, "bounded auto-recovery start failed (rc={$rc}); remaining escalated", $debug);
+}
+
+/**
  * Handle absent rTorrent processes while preserving executor-specific grace.
  *
  * @param int[] $executorAllPids
@@ -45,8 +91,17 @@ function pmssCheckRtorrentHandleMissingProcess(
             }
 
             if ($persistentFailureCount >= $startFailureEscalate) {
-                rtorrentProcessWriteStateFile($state['escalation'], (string) json_encode(['timestamp' => time(), 'user' => $user, 'count' => $persistentFailureCount]));
-                pmssCheckRtorrentLogBoth($user, 'persistent start failure escalated; leaving retry disabled for external monitoring', $debug);
+                pmssCheckRtorrentHandleEscalatedStartFailure(
+                    $user,
+                    $state,
+                    $persistentFailureCount,
+                    $missingGrace,
+                    $logCallback,
+                    $debug,
+                    static function (string $startUser, callable $startLogCallback, string $startMarker): int {
+                        return rtorrentProcessStart($startUser, $startLogCallback, $startMarker);
+                    }
+                );
                 return;
             }
         }
