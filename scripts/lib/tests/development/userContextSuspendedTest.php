@@ -38,14 +38,19 @@ class UserContextSuspendedTest extends TestCase
         $this->assertEquals(null, \pmssBuildUserContext($user));
     }
 
-    public function testBuildUserContextReturnsNullWhenDataDirMissing(): void
+    public function testBuildUserContextReturnsWhenDataDirMissing(): void
     {
         $user = 'testuser';
+        $sha = 'sha123';
 
         $home = $this->pmssMakeTrackedUserHomeTree('pmss-user-context-missing-data-', $user);
         $this->pmssWriteFile($home.'/.rtorrent.rc', "dummy");
 
-        $this->assertEquals(null, \pmssBuildUserContext($user));
+        $ctx = \pmssBuildUserContext($user, $sha);
+        $this->assertTrue(is_array($ctx));
+        $this->assertEquals($user, $ctx['user']);
+        $this->assertEquals($home, $ctx['home']);
+        $this->assertEquals($sha, $ctx['rutorrent_index_sha']);
     }
 
     public function testBuildUserContextReturnsWhenMarkerMissing(): void

@@ -37,10 +37,6 @@ function pmssBuildUserContext(string $user, string $rutorrentIndexSha = '', ?str
         $reason = 'rtorrent-rc-missing';
         return null;
     }
-    if (!file_exists($home.'/data')) {
-        $reason = 'data-dir-missing';
-        return null;
-    }
     if (is_dir("{$home}/www-disabled")) {
         $reason = 'suspended';
         return null;
