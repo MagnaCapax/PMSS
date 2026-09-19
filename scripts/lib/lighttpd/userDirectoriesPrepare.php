@@ -101,7 +101,13 @@ function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool 
         return false;
     }
 
-    return file_exists($customFile) || pmssWriteUserFile($customFile, '', $user, 0640);
+    if (!file_exists($customFile)) {
+        return pmssWriteUserFile($customFile, '', $user, 0640);
+    }
+
+    // Converge legacy file modes without rewriting customer configuration.
+    pmssUserFileApplyMetadata($customFile, $user, 0640);
+    return true;
 }
 
 function pmssEnsureWebdavLockDatabase(string $user, string $homeDir): void
