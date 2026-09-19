@@ -88,6 +88,7 @@ class UserRutorrentCompatPatchTest extends TestCase
     {
         $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', 'www/rutorrent/php');
         $settingsPath = $this->pmssWriteRelativeFile($home, 'www/rutorrent/php/settings.php', "\t\t\$tm = getdate();\n\t\t\$startAt = mktime(\$tm[\"hours\"],\n\t\t\t((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\n");
+        $snoopyPath = $this->pmssWriteRelativeFile($home, 'www/rutorrent/php/Snoopy.class.inc', "\tvar \$accept\t\t\t=\t\"image/gif, image/x-xbitmap, image/jpeg, image/pjpeg, */*\";\n");
         $rssPath = $this->pmssWriteRelativeFile($home, 'www/rutorrent/plugins/rss/action.php', "ob_flush();\n");
         $hddquotaPath = $this->pmssWriteRelativeFile($home, 'www/rutorrent/plugins/hddquota/action.php', "return \$field;\n");
         $throttlePath = $this->pmssWriteRelativeFile(
@@ -100,6 +101,8 @@ class UserRutorrentCompatPatchTest extends TestCase
 
         $this->assertStringContainsString("\$interval = (int)\$interval;\n\t\tif(\$interval<1)\n\t\t\t\$interval = 30;", (string) file_get_contents($settingsPath));
         $this->assertStringContainsString('((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),', (string) file_get_contents($settingsPath));
+        $this->assertStringContainsString('text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8', (string) file_get_contents($snoopyPath));
+        $this->pmssAssertStringNotContainsString('image/x-xbitmap', (string) file_get_contents($snoopyPath));
         $this->assertStringContainsString('@ob_flush();', (string) file_get_contents($rssPath));
         $this->assertStringContainsString('return (int) $field;', (string) file_get_contents($hddquotaPath));
         $throttleContent = (string) file_get_contents($throttlePath);
@@ -143,6 +146,14 @@ class UserRutorrentCompatPatchTest extends TestCase
                 'patched' => "before\n@ob_flush();\nafter\n",
                 'expected' => '@ob_flush();',
                 'unexpected' => "\nob_flush();\n",
+            ],
+            [
+                'dir' => 'www/rutorrent/php',
+                'path' => 'www/rutorrent/php/Snoopy.class.inc',
+                'legacy' => "prefix\n\tvar \$accept\t\t\t=\t\"image/gif, image/x-xbitmap, image/jpeg, image/pjpeg, */*\";\nsuffix\n",
+                'patched' => "prefix\n\tvar \$accept\t\t\t=\t\"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\";\nsuffix\n",
+                'expected' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'unexpected' => 'image/x-xbitmap',
             ],
             [
                 'dir' => 'www/rutorrent/plugins/hddquota',

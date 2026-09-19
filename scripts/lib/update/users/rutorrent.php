@@ -69,6 +69,8 @@ PHP;
 			$interval = 30;
 		$startAt = mktime($tm["hours"],
 PHP;
+    $snoopyAcceptLegacy = "\tvar \$accept\t\t\t=\t\"image/gif, image/x-xbitmap, image/jpeg, image/pjpeg, */*\";";
+    $snoopyAcceptPatched = "\tvar \$accept\t\t\t=\t\"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\";";
 
     // Keep these compatibility shims in one literal patch table.
     foreach ([
@@ -81,6 +83,11 @@ PHP;
             'path' => $ctx['home'].'/www/rutorrent/php/settings.php',
             'legacy' => '((integer)($tm["minutes"]/$interval))*$interval+$interval,',
             'patched' => '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),',
+        ],
+        [
+            'path' => $ctx['home'].'/www/rutorrent/php/Snoopy.class.inc',
+            'legacy' => $snoopyAcceptLegacy,
+            'patched' => $snoopyAcceptPatched,
         ],
         [
             'path' => $ctx['home'].'/www/rutorrent/plugins/rss/action.php',
