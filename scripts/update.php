@@ -1691,7 +1691,12 @@ function pmssValidatedVersionDate(string $date): string
     return $m[1].'-'.$m[2].'-'.$m[3];
 }
 
-function pmssVersionMoveDecision(string $installedVersion, string $fetchedVersion, bool $explicitTarget): array
+function pmssVersionMoveDecision(
+    string $installedVersion,
+    string $fetchedVersion,
+    bool $explicitTarget,
+    bool $installedMarkerDateIsFallback = false
+): array
 {
     $installedDate = pmssVersionOrderingDate($installedVersion);
     $fetchedDate = pmssVersionOrderingDate($fetchedVersion);
@@ -1701,6 +1706,16 @@ function pmssVersionMoveDecision(string $installedVersion, string $fetchedVersio
 
     $comparison = strcmp($fetchedDate, $installedDate);
     $ordering = $comparison < 0 ? 'backward' : ($comparison > 0 ? 'forward' : 'same');
+    if ($ordering === 'backward' && !$explicitTarget && $installedMarkerDateIsFallback) {
+        return [
+            'allowed' => true,
+            'ordering' => 'indeterminate',
+            'installed_order' => '',
+            'fetched_order' => $fetchedDate,
+            'ignored_installed_order' => $installedDate,
+            'reason' => 'installed_fallback_marker',
+        ];
+    }
 
     return [
         'allowed' => $ordering !== 'backward' || $explicitTarget,
@@ -1708,6 +1723,34 @@ function pmssVersionMoveDecision(string $installedVersion, string $fetchedVersio
         'installed_order' => $installedDate,
         'fetched_order' => $fetchedDate,
     ];
+}
+
+function pmssVersionLabelHasContentDate(string $version): bool
+{
+    return pmssVersionOrderingDate($version) !== '';
+}
+
+function pmssInstalledMarkerDateIsFallback(string $metadataPath): bool
+{
+    if (!is_readable($metadataPath)) {
+        return true;
+    }
+
+    $raw = @file_get_contents($metadataPath);
+    if (!is_string($raw) || trim($raw) === '') {
+        return true;
+    }
+
+    $metadata = json_decode($raw, true);
+    if (!is_array($metadata)) {
+        return false;
+    }
+
+    $fetchedVersion = array_key_exists('fetched_version', $metadata)
+        ? trim((string) $metadata['fetched_version'])
+        : '';
+
+    return $fetchedVersion === '' || !pmssVersionLabelHasContentDate($fetchedVersion);
 }
 
 function pmssVersionLogLabel(string $version): string
@@ -1721,7 +1764,8 @@ function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarg
     $installedVersion = is_readable(VERSION_FILE)
         ? trim((string) @file_get_contents(VERSION_FILE))
         : '';
-    $decision = pmssVersionMoveDecision($installedVersion, $fetchedVersion, $explicitTarget);
+    $installedMarkerDateIsFallback = pmssInstalledMarkerDateIsFallback(VERSION_META);
+    $decision = pmssVersionMoveDecision($installedVersion, $fetchedVersion, $explicitTarget, $installedMarkerDateIsFallback);
     $mode = $explicitTarget ? 'explicit target' : 'unpinned target';
     $message = '[INFO] Snapshot version transition: '
         .pmssVersionLogLabel($installedVersion).' -> '.pmssVersionLogLabel($fetchedVersion)
@@ -1729,18 +1773,29 @@ function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarg
 
     if ($decision['ordering'] === 'indeterminate') {
         $message .= '; ordering indeterminate, proceeding';
+        if (($decision['reason'] ?? '') === 'installed_fallback_marker') {
+            $message .= ' (installed marker lacks content-date metadata)';
+        }
     } elseif ($decision['ordering'] === 'backward' && $explicitTarget) {
         $message .= '; explicit rollback allowed';
     }
 
-    logmsg($message);
-    logEvent('snapshot_version_transition', [
+    $event = [
         'installed_version' => $installedVersion,
         'fetched_version' => $fetchedVersion,
         'ordering' => $decision['ordering'],
         'explicit_target' => $explicitTarget,
         'allowed' => $decision['allowed'],
-    ]);
+    ];
+    if (($decision['reason'] ?? '') !== '') {
+        $event['reason'] = (string) $decision['reason'];
+    }
+    if (($decision['ignored_installed_order'] ?? '') !== '') {
+        $event['ignored_installed_order'] = (string) $decision['ignored_installed_order'];
+    }
+
+    logmsg($message);
+    logEvent('snapshot_version_transition', $event);
 
     if (!$decision['allowed']) {
         fatal(
@@ -1756,13 +1811,13 @@ function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarg
 /**
  * Build the version-marker line written to VERSION_FILE.
  *
- * Only content dates belong in the marker: install time can outrank the next
- * fetched HEAD. Dateless labels stay dateless so ADR 0051's indeterminate
- * ordering survives the next update (ADR 0054 correction, Refs #882).
+ * Content dates win. Dateless labels fall back to a wall-clock marker capped at
+ * the current system clock, and the ordering guard treats those fallback markers
+ * as indeterminate on the next run unless metadata proves a real content date.
  *
  * @param string $spec           Canonical version spec (e.g. git/main).
  * @param string $fetchedVersion Fetched label; may embed @YYYY-MM-DD HH:MM.
- * @param int    $timestamp      Legacy argument retained for caller compatibility.
+ * @param int    $timestamp      Install time used only as a capped fallback.
  */
 function pmssRecordedVersionLine(string $spec, string $fetchedVersion, int $timestamp): string
 {
@@ -1774,7 +1829,9 @@ function pmssRecordedVersionLine(string $spec, string $fetchedVersion, int $time
         }
     }
 
-    return $spec.($contentDate !== '' ? '@'.$contentDate : '');
+    $stamp = $contentDate !== '' ? $contentDate : date('Y-m-d H:i', min($timestamp, time()));
+
+    return $spec.'@'.$stamp;
 }
 
 /**
@@ -1793,7 +1850,7 @@ function recordVersion(string $spec, array $details, bool $dryRun): void
     pmssEnsureDirectory(VERSION_DIR);
 
     $timestamp = time();
-    // Keep install time in audit metadata, separate from the content-age marker.
+    // Content time belongs in the marker; install time remains explicit metadata.
     $line      = pmssRecordedVersionLine($spec, (string) ($details['fetched_version'] ?? ''), $timestamp);
     $details['recorded_spec'] = $spec;
     $details['timestamp']     = date('c', $timestamp);
