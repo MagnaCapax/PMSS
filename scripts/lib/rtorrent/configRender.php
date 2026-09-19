@@ -32,5 +32,5 @@ function pmssRtorrentConfigRender(string $template, array $config, array $resour
         '##dht' => $config['dht'],
         '##memoryMax' => max(170, $ramMiB - $gapMiB).'M',
     ];
-    return str_replace(array_keys($replacements), array_values($replacements), $template);
+    return str_replace(array_keys($replacements), $replacements, $template);
 }

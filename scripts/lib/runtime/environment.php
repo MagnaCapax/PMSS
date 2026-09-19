@@ -162,7 +162,6 @@ function pmssConfigOptionsUpdatePlan(string $optionList, array $requiredOptions 
         unset($options[$index]);
         $removed[] = $removeOption;
     }
-    $options = array_values($options);
     $added = array_values(array_diff($requiredOptions, $options));
     return ['options' => array_merge($options, $added), 'added' => $added, 'removed' => $removed];
 }

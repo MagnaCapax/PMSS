@@ -61,7 +61,7 @@ function pmssRtorrentNormalizeLegacyTemplate(string $template): string
     }
 
     $normalizeInlineAliases = static function (string $line) use ($inline): string {
-        return $inline === [] ? $line : (string) preg_replace(array_keys($inline), array_values($inline), $line);
+        return $inline === [] ? $line : (string) preg_replace(array_keys($inline), $inline, $line);
     };
 
     $normalizedLines = [];

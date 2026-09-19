@@ -79,7 +79,7 @@ function pmssTrafficParseOutputUsage(string $usage, array $localnets): array
 {
     $traffic = $local = [];
     $unmatched = 0;
-    $localnetLookup = array_fill_keys(array_values(array_filter($localnets, 'is_string')), true);
+    $localnetLookup = array_fill_keys(array_filter($localnets, 'is_string'), true);
     foreach (preg_split('/\r?\n/', trim($usage)) as $line) {
         $trimmed = trim($line);
         if ($trimmed === '') continue;
