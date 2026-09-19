@@ -119,6 +119,15 @@ class UserRutorrentCompatPatchTest extends TestCase
         $this->assertStringContainsString('return (int) $field;', $content);
     }
 
+    public function testSkeletonSnoopyAcceptDefaultIsModern(): void
+    {
+        $path = $this->pmssRepoPath('etc/skel/www/rutorrent/php/Snoopy.class.inc');
+        $content = (string) file_get_contents($path);
+
+        $this->assertStringContainsString('var $accept			=	"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";', $content);
+        $this->pmssAssertStringNotContainsString('image/x-xbitmap', $content);
+    }
+
     private function assertCompatibilityContentUntouched(array $case, string $content): void
     {
         $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', $case['dir']);

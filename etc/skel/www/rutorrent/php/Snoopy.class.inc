@@ -64,7 +64,7 @@ class Snoopy
 	var $pass		=	"";			// password for http authentication
 	
 	// http accept types
-	var $accept			=	"image/gif, image/x-xbitmap, image/jpeg, image/pjpeg, */*";
+	var $accept			=	"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
 	
 	var $results		=	"";			// where the content is put
 		
