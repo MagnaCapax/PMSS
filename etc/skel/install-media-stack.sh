@@ -586,7 +586,7 @@ EOF
 		sed -i -E "s|<UrlBase>[^<]*</UrlBase>|<UrlBase>/public-${USERNAME}/${app}</UrlBase>|g" "$datadir/config.xml"
 		sed -i -E "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddress>|g" "$datadir/config.xml"
 		servarr_config_xml_tag_converge "$datadir/config.xml" AuthenticationRequired Enabled
-		servarr_config_xml_tag_converge "$datadir/config.xml" UpdateMechanism External
+		servarr_config_xml_tag_converge "$datadir/config.xml" UpdateMechanism Script
 		servarr_config_xml_tag_converge "$datadir/config.xml" UpdateAutomatically False
 	else
 		log_info "[dry-run] would configure ${app^^} (port=${port}, url_base=/public-${USERNAME}/${app})"
@@ -595,7 +595,7 @@ EOF
 	echo ""
 }
 
-# Keep updates on the supported installer path instead of in-place app updates.
+# Script with no UpdateScriptPath blocks the built-in updater; External is reset on startup.
 servarr_config_xml_tag_converge() {
 	local file="$1" tag="$2" value="$3"
 

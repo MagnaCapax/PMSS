@@ -53,14 +53,14 @@ class installMediaStackScriptTest extends TestCase
         ], $this->script);
     }
 
-    public function testServarrConfigDisablesInPlaceUpdates(): void
+    public function testServarrConfigSelectsScriptUpdatesWithoutScript(): void
     {
         $home = $this->pmssMakeTempDir('pmss-media-stack-update-policy-home-');
         $existingConfig = $home.'/existing';
         $this->pmssEnsureDir($existingConfig);
         $this->pmssWriteFile(
             $existingConfig.'/config.xml',
-            "<Config>\n  <UpdateMechanism>BuiltIn</UpdateMechanism>\n  <UpdateAutomatically>True</UpdateAutomatically>\n</Config>\n"
+            "<Config>\n  <UpdateMechanism>External</UpdateMechanism>\n  <UpdateAutomatically>True</UpdateAutomatically>\n</Config>\n"
         );
 
         $functions = $this->pmssExtractShellFunctions($this->script, array(
@@ -85,10 +85,10 @@ class installMediaStackScriptTest extends TestCase
 
         $output = $this->pmssRunShellHarness($script);
 
-        $this->assertSame(2, substr_count($output, '<UpdateMechanism>External</UpdateMechanism>'));
+        $this->assertSame(2, substr_count($output, '<UpdateMechanism>Script</UpdateMechanism>'));
         $this->assertSame(2, substr_count($output, '<UpdateAutomatically>False</UpdateAutomatically>'));
         $this->assertSame(2, substr_count($output, '<AuthenticationRequired>Enabled</AuthenticationRequired>'));
-        $this->assertStringNotContainsString('<UpdateMechanism>BuiltIn</UpdateMechanism>', $output);
+        $this->assertStringContainsAndOmitsStrings([], ['<UpdateMechanism>BuiltIn</UpdateMechanism>', '<UpdateMechanism>External</UpdateMechanism>', '<UpdateScriptPath>'], $output);
         $this->assertStringNotContainsString('<UpdateAutomatically>True</UpdateAutomatically>', $output);
     }
 

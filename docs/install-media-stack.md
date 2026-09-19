@@ -18,7 +18,7 @@ All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to
 - Safe defaults: localhost binding; randomized high ports; aliases to launch in `tmux`.
 - Memory pre-flight: accounts below 1024 MiB are warned and must use `--force` from SSH.
 - Uninstall path: `--uninstall` stops media-stack sessions, removes PMSS-managed app/config and runtime-status paths, and backs up/strips managed shell aliases.
-- Servarr update policy: Radarr, Sonarr, and Prowlarr use the external update mechanism and disable automatic in-place updates; rerun this installer to update them safely.
+- Servarr update policy: Radarr, Sonarr, and Prowlarr select `Script` updates without supplying an update script and disable automatic updates. Manual updates report an undefined-script error before launching the built-in updater; rerun this installer to update safely.
 - App-level authentication: the installer generates per-app passwords, configures auth before the public proxy is restarted, and writes credentials to `~/.media-stack-credentials.txt` with mode `600`.
 - Logging: colored console output and log tee to `~/.install-media-stack.log`.
 
@@ -162,7 +162,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - Jellyfin (download/extract to `~/.bin/jellyfin`) only when system ffmpeg is 4.4+ or `--jellyfin-ffmpeg=PATH` is supplied
 
 6) Configuration
-- Writes Servarr XML configs in `~/.config/<app>/config.xml` with randomized ports, localhost bind, URL base `/public-<user>/<app>`, and the external update mechanism. The installer disables automatic in-place updates so the shared `.NET` runtime cannot be removed by an app updater; rerun this script for Servarr updates.
+- Writes Servarr XML configs in `~/.config/<app>/config.xml` with randomized ports, localhost bind, URL base `/public-<user>/<app>`, `UpdateMechanism=Script`, and `UpdateAutomatically=False` (Refs #920). With no `UpdateScriptPath` configured, manual updates can download, extract into a temporary sandbox, and back up app data, but stop before launching the updater that can remove the shared `.NET` host. `External` is reset by unpackaged apps on startup. This policy takes effect on install/reinstall, is customer-editable, and does not replace a customer-supplied update script; rerun this installer for Servarr updates.
 - Jellyfin writes `~/.config/jellyfin/network.xml` likewise.
 - SABnzbd writes `~/.config/sabnzbd/sabnzbd.ini`, sets `[misc]` username/password, and keeps `inet_exposure = 4` so the proxied WebUI remains reachable.
 - Autobrr writes `~/.config/autobrr/config.toml`, binds to `127.0.0.1`, sets a session secret when absent, creates the initial admin user with `autobrrctl`, and serves its sub-path through the generated per-user proxy fragment.
