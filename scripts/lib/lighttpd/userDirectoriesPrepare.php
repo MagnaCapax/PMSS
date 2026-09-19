@@ -45,6 +45,16 @@ function pmssLighttpdNewestConfigMtime(string $homeDir, string $configPath): ?in
         }
     }
 
+    // Removing a fragment cannot raise the surviving files' maximum mtime.
+    // Watch the directory itself so the watchdog sees deletions too. (Refs #874)
+    $customDir = $lighttpdDir.'/custom.d';
+    if (is_dir($customDir) && !is_link($customDir)) {
+        $mtime = @filemtime($customDir);
+        if (is_int($mtime)) {
+            $newest = $newest === null ? $mtime : max($newest, $mtime);
+        }
+    }
+
     return $newest;
 }
 
