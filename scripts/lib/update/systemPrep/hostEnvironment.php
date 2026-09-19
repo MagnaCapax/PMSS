@@ -20,11 +20,7 @@ function pmssSystemPrepReadDigitEnv(string $key): ?int
  */
 function pmssTotalMemMiB(): int
 {
-    if (($override = pmssSystemPrepReadDigitEnv('PMSS_TOTAL_MEM_MIB')) !== null) {
-        return (int) $override;
-    }
-
-    return pmssProcMeminfoTotalMiBRead();
+    return pmssSystemPrepReadDigitEnv('PMSS_TOTAL_MEM_MIB') ?? pmssProcMeminfoTotalMiBRead();
 }
 
 /**

@@ -46,7 +46,7 @@ function pmssPythonVenvEnsure(
 
     $python = pmssCommandPath('python3');
     if ($python === '') {
-        $log($missingPythonMessage !== null ? $missingPythonMessage : '[WARN] Skipping '.$label.' setup: python3 missing');
+        $log($missingPythonMessage ?? '[WARN] Skipping '.$label.' setup: python3 missing');
         return '';
     }
     if (!is_dir($venvDir)) {

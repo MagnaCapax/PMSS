@@ -15,6 +15,8 @@ class hostResourcesDetectTest extends TestCase
     {
         foreach ([
             ['PMSS_TOTAL_MEM_MIB', '16384', '\pmssTotalMemMiB', 16384],
+            ['PMSS_TOTAL_MEM_MIB', '0', '\pmssTotalMemMiB', 0],
+            ['PMSS_TOTAL_MEM_MIB', '', '\pmssTotalMemMiB', null],
             ['PMSS_TOTAL_MEM_MIB', 'invalid', '\pmssTotalMemMiB', null],
             ['PMSS_TOTAL_CPU_THREADS', '24', '\pmssTotalCpuThreads', 24],
             ['PMSS_TOTAL_CPU_THREADS', '0', '\pmssTotalCpuThreads', 0],

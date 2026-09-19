@@ -98,7 +98,7 @@ function pmssIopingMedianMs(?string $target): ?float
     $out = pmssIopingProbeOutput($target);
     if ($out === null) return null;
     $median = pmssIopingMedianMsFromSamples(pmssIopingSamplesMsFromOutput($out));
-    return $median !== null ? $median : pmssIopingAverageMsFromOutput($out);
+    return $median ?? pmssIopingAverageMsFromOutput($out);
 }
 
 /** Read a trimmed override; blank values use the default verbatim, while zero is retained. */

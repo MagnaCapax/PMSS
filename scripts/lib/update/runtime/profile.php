@@ -85,7 +85,7 @@ function pmssRunProfiledCallableBatch(array $steps): void
     foreach ($steps as $step) {
         $description = (string) $step[0];
         $arguments = isset($step[2]) && is_array($step[2]) ? $step[2] : [];
-        $classification = isset($step[3]) ? (string) $step[3] : '';
+        $classification = (string) ($step[3] ?? '');
         pmssRunProfiledCallable($description, $step[1], $arguments, $classification);
     }
 }

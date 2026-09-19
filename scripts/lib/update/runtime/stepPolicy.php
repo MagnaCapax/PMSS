@@ -149,8 +149,8 @@ function pmssUpdateStep2HandleUserMaintenanceSummary($summary): void
 {
     if (!is_array($summary)) return;
 
-    $total = isset($summary['total']) ? (int) $summary['total'] : 0;
-    $processed = isset($summary['processed']) ? (int) $summary['processed'] : 0;
+    $total = (int) ($summary['total'] ?? 0);
+    $processed = (int) ($summary['processed'] ?? 0);
     if ($processed >= $total) {
         pmssUpdateClearIncompleteUserMaintenance();
         return;
