@@ -102,6 +102,30 @@ class BootTuningEnsureTest extends TestCase
         );
     }
 
+    public function testSdSchedulerStaysBfqNotMqDeadline(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-boot-tuning-sd-sched-', 0700);
+        [$script] = $this->runBootTuning($dir);
+        $body = (string)file_get_contents($script);
+
+        // ADR 0064 step 2. Gating rc.local's per-disk loop makes THIS unit the sole writer of sd*
+        // queue knobs on updated hosts. rc.local's blanket loop wrote bfq to every sd*, so this
+        // unit must write bfq too - otherwise gating the loop silently flips non-rotational sd* to
+        // mq-deadline fleet-wide: an un-measured change the ADR defers, and one that breaks the
+        // per-user blkio.bfq.weight fairness (mq-deadline cannot honor those weights;
+        // cgroupBfqWeightApply.php / CgroupPolicyHomeBfqTest depend on bfq being active on /home).
+        $this->pmssAssertStringNotContainsString(
+            'scheduler" mq-deadline',
+            $body,
+            'this unit must not write mq-deadline for sd*: rc.local wrote bfq, so gating rc.local\'s '
+            .'per-disk loop (step 2) would flip SSDs to mq-deadline and break blkio.bfq.weight fairness. '
+            .'The mq-deadline-on-SSD question is a separate measured decision (ADR 0064), not a consolidation side effect'
+        );
+        $this->pmssAssertFileContainsAllStrings($script, [
+            '"nonrotational_scheduler": "bfq"',
+        ], 'hardware.json must advertise the behavior-preserving bfq this unit writes for non-rotational sd*');
+    }
+
     public function testBcacheBranchCoversRcLocalQueueKnobsAndNotCacheMode(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-boot-tuning-bcache-', 0700);

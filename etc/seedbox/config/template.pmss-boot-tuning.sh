@@ -69,7 +69,7 @@ write_hardware_summary() {
     "md_read_ahead_kb": 4096,
     "rotational_scheduler": "bfq",
     "rotational_read_ahead_kb": 4096,
-    "nonrotational_scheduler": "mq-deadline",
+    "nonrotational_scheduler": "bfq",
     "nonrotational_read_ahead_kb": 4096,
     "nvme_scheduler": "none",
     "nvme_read_ahead_kb": 128,
@@ -130,26 +130,21 @@ for md in /sys/block/md[0-9]*; do
 	write_sys "$md/queue/scheduler" bfq
 done
 
-# Set per-disk scheduler and read-ahead values.
+# Set per-disk scheduler and read-ahead values. ADR 0064 step 2 makes this unit the SOLE writer
+# of sd* queue knobs on updated hosts (template.rc.local's per-disk loop is gated off when this
+# unit is present). Both knobs are written BEHAVIOR-PRESERVING against what rc.local's blanket
+# loop produced, so gating that loop changes nothing on the wire:
+#   - read_ahead_kb 4096 (operator ruling 2026-09-18: "4096 is more authoritative").
+#   - scheduler bfq for ALL sd* (rotational AND non-rotational). rc.local's blanket loop wrote bfq
+#     to every sd*, so bfq is what the fleet actually runs; and bfq is REQUIRED for the per-user
+#     blkio.bfq.weight tiers (cgroupBfqWeightApply.php / CgroupPolicyHomeBfqTest) - mq-deadline
+#     cannot honor them, so an SSD /home would silently lose I/O fairness. Whether SSDs should
+#     instead run mq-deadline is a SEPARATE measured decision (ADR 0064), NOT a side effect of
+#     gating rc.local: do not reinstate a per-rotational scheduler branch here without that measurement.
 for disk in /sys/block/sd*; do
 	[ -d "$disk/queue" ] || continue
-	rot=$(cat "$disk/queue/rotational" 2>/dev/null || echo "")
-	# read_ahead_kb is 4096 for BOTH classes because template.rc.local writes a blanket 4096
-	# to every non-nvme non-md device (sd* included) and runs LATER than this unit
-	# (rc-local is After=network-online.target; this unit is After=local-fs.target), so
-	# rc.local wins on every overlapping device. Operator ruling 2026-09-18: "4096 is more
-	# authoritative". A differing value here is not a policy, it is a value that gets
-	# overwritten one second later - stating 4096 makes the code say what actually happens.
-	# The SCHEDULER split below is deliberately UNCHANGED: it is the documented intent, the
-	# operator has ruled only on read_ahead, and rc.local's blanket bfq currently overrides
-	# mq-deadline on SSDs. That override is tracked in ADR 0064, not silently blessed here.
-	if [ "$rot" = "0" ]; then
-		write_sys "$disk/queue/scheduler" mq-deadline
-		write_sys "$disk/queue/read_ahead_kb" 4096
-	else
-		write_sys "$disk/queue/scheduler" bfq
-		write_sys "$disk/queue/read_ahead_kb" 4096
-	fi
+	write_sys "$disk/queue/scheduler" bfq
+	write_sys "$disk/queue/read_ahead_kb" 4096
 done
 for disk in /sys/block/nvme*; do
 	[ -d "$disk/queue" ] || continue

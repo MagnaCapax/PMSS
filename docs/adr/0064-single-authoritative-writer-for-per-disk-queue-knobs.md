@@ -66,11 +66,12 @@ Until step 1 lands, the interim position is the harmonised-values one: both writ
 and any knob both of them write carries the SAME value in both files, with the reason
 stated inline at each site. `hardware.json` advertises the values actually written.
 
-The scheduler split is deliberately not harmonised. It is this unit's documented intent,
-the operator has ruled only on read_ahead, and rc.local's blanket `bfq` currently
-overrides `mq-deadline` on non-rotational `sd*`. That override is recorded here rather
-than silently adopted; whether SSDs should run `bfq` or `mq-deadline` is a separate
-decision needing measurement, not a side effect of a read_ahead ruling.
+The scheduler is harmonised to `bfq` for all `sd*` — behavior-preserving against rc.local's
+blanket `bfq`, so gating rc.local's loop (step 2) does not silently flip non-rotational `sd*`
+to `mq-deadline`. `bfq` is also what the per-user `blkio.bfq.weight` tiers require (mq-deadline
+cannot honor them), so it is the value the fleet already runs, not a new choice. Whether SSDs
+should instead run `mq-deadline` remains a separate decision needing measurement, recorded here
+as deferred — not adopted as a side effect of consolidating the writers.
 
 ## Implementation status
 
@@ -84,7 +85,12 @@ decision needing measurement, not a side effect of a read_ahead ruling.
 - **Step 2: DONE (2026-09-19).** `template.rc.local`'s per-disk loop is now wrapped in
   `if [ ! -e /usr/local/sbin/pmss-boot-tuning.sh ]; then ... fi`, so on a host carrying the unit
   boot-tuning is the SOLE writer of `sd*`/`vd*`/`bcache*` queue knobs, while a host too old to
-  carry it keeps rc.local as its tuner. The md loop and the bcache `cache_mode` loop are NOT
+  carry it keeps rc.local as its tuner. Because gating the loop makes boot-tuning authoritative
+  for the `sd*` scheduler too, this unit's `sd*` scheduler was harmonised to `bfq` (the value
+  rc.local's blanket loop produced) so the gate changes nothing on the wire and does not silently
+  flip non-rotational `sd*` to `mq-deadline`; `hardware.json`'s `nonrotational_scheduler` follows,
+  and `BootTuningEnsureTest::testSdSchedulerStaysBfqNotMqDeadline` pins it. The `mq-deadline`-on-SSD
+  question stays deferred per the Decision above. The md loop and the bcache `cache_mode` loop are NOT
   gated (boot-tuning does not own those). Accepted residual: the gate keys on script PRESENCE,
   not on the service having RUN this boot — if the unit is installed but its service failed,
   loop 1 is skipped and the per-disk knobs stay at kernel defaults for that boot (a perf
