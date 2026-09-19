@@ -1115,4 +1115,39 @@ BASHRC
         ), $traceOutput);
     }
 
+
+    public function testPortPickerKeepsDiagnosticsOutOfItsCapturedValue(): void
+    {
+        // pick_existing_or_reserved_port() returns DATA on stdout and is called inside
+        // $( ). While the log helpers wrote to stdout, its warning was captured into the
+        // port value and its fatal error vanished into the assignment entirely, leaving
+        // set -e to kill the installer with nothing printed. (Refs #857)
+        $functions = $this->pmssExtractShellFunctions(
+            $this->script,
+            array('log_warn', 'log_err', 'pick_existing_or_reserved_port')
+        );
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'C_WARN=""; C_ERR=""; C_RESET=""',
+            'media_stack_reserved_port_read() { return 1; }',
+            'media_stack_port_is_valid() { [[ "$1" =~ ^[0-9]+$ ]]; }',
+            $functions,
+            'port=$(pick_existing_or_reserved_port 8080 radarr)',
+            'echo "captured:[${port}]"',
+            'fatal=$(pick_existing_or_reserved_port "" sonarr) || fatal="<aborted>"',
+            'echo "fatal:[${fatal}]"',
+            '',
+        ));
+
+        $output = $this->pmssRunShellHarness($script);
+
+        // The value carries the port and nothing else...
+        $this->assertStringContainsString('captured:[8080]', $output);
+        $this->assertStringContainsString('fatal:[<aborted>]', $output);
+        // ...while both diagnostics still reach the operator on stderr.
+        $this->assertStringContainsString('preserving its existing port', $output);
+        $this->assertStringContainsString('No PMSS-reserved port is available for sonarr', $output);
+    }
+
 }
