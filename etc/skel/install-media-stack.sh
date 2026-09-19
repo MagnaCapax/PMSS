@@ -1114,7 +1114,37 @@ media_stack_uninstall() {
 		media_stack_managed_path_remove "$managed_path"
 	done < <(media_stack_managed_paths)
 	bashrc_custom_media_stack_blocks_strip
+	# An uninstall removes ~/.lighttpd/custom.d/media-stack.conf, but the running
+	# per-user lighttpd still holds the proxy routes it parsed at start, so every
+	# uninstalled app keeps answering 503 against a backend that is gone. The
+	# compensating watchdog cannot cover this either: it compares the NEWEST watched
+	# config mtime against the process start, and a deletion cannot raise a maximum.
+	# Restart here, the same way the install path does. (Refs #874)
+	lighttpd_user_restart
 	log_ok "PMSS media stack uninstall complete."
+}
+
+# Restart the per-user lighttpd and its php-cgi workers so config changes made by
+# this script take effect now. Shared by the install tail and the uninstall path --
+# a removed proxy fragment needs the reload just as much as an added one.
+# USERNAME is only assigned on the install path, so resolve it defensively: this
+# runs under `set -u`. (Refs #874)
+lighttpd_user_restart() {
+	local user="${USERNAME:-$(whoami)}"
+	log_step "Restarting lighttpd"
+	if [[ $DRY_RUN -eq 1 ]]; then
+		log_info "[dry-run] would restart lighttpd/php-cgi"
+		return 0
+	fi
+	pkill -9 -u "$user" lighttpd >/dev/null 2>&1 || true
+	pkill -9 -u "$user" php-cgi >/dev/null 2>&1 || true
+	if command -v lighttpd >/dev/null 2>&1 && [[ -f "$HOME/.lighttpd.conf" ]]; then
+		if ! lighttpd -f "$HOME/.lighttpd.conf" >/dev/null 2>&1; then
+			log_warn "Direct lighttpd restart failed; watchdog may retry."
+		fi
+	else
+		echo "It may take 1-2 minutes to restart lighttpd"
+	fi
 }
 
 # Central configuration (keep multi-use constants here)
@@ -2474,20 +2504,7 @@ echo ""
 echo "To kill all applications use 'tmux kill-server'"
 
 echo ""
-log_step "Restarting lighttpd"
-if [[ $DRY_RUN -eq 0 ]]; then
-	pkill -9 -u "$USERNAME" lighttpd >/dev/null 2>&1 || true
-	pkill -9 -u "$USERNAME" php-cgi >/dev/null 2>&1 || true
-	if command -v lighttpd >/dev/null 2>&1 && [[ -f "$HOME/.lighttpd.conf" ]]; then
-		if ! lighttpd -f "$HOME/.lighttpd.conf" >/dev/null 2>&1; then
-			log_warn "Direct lighttpd restart failed; watchdog may retry."
-		fi
-	else
-		echo "It may take 1-2 minutes to restart lighttpd"
-	fi
-else
-	log_info "[dry-run] would restart lighttpd/php-cgi"
-fi
+lighttpd_user_restart
 
 echo ""
 echo "================== SECURITY WARNING =================="

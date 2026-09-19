@@ -38,11 +38,18 @@ function pmssLighttpdWatchdogSocketPaths(string $homeDir, string $configPath): a
 
 function pmssLighttpdWatchedConfigPaths(string $homeDir, string $configPath): array
 {
-    $paths = [$configPath, rtrim($homeDir, '/').'/.lighttpd/custom'];
-    $paths = array_merge($paths, glob(rtrim($homeDir, '/').'/.lighttpd/custom.d/*.conf') ?: []);
+    // The custom.d DIRECTORY is watched alongside its fragments. Removing a fragment
+    // cannot raise the maximum mtime of the files that survive, so a pure deletion
+    // (install-media-stack.sh --uninstall) was invisible here and the stale proxy
+    // routes stayed live until something unrelated restarted that user's lighttpd.
+    // Unlinking does move the parent directory's mtime, which makes a removal as
+    // visible as an edit. (Refs #874)
+    $customDir = rtrim($homeDir, '/').'/.lighttpd/custom.d';
+    $paths = [$configPath, rtrim($homeDir, '/').'/.lighttpd/custom', $customDir];
+    $paths = array_merge($paths, glob($customDir.'/*.conf') ?: []);
 
     return array_values(array_filter($paths, static function (string $path): bool {
-        return is_file($path) && !is_link($path);
+        return !is_link($path) && (is_file($path) || is_dir($path));
     }));
 }
 
