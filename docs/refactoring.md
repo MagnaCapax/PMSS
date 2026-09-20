@@ -100,6 +100,11 @@ rTorrent escalation markers are encoded before opening the destination. Failed
 JSON encoding returns `false` without creating or truncating a marker; valid
 payload bytes and retry timing remain unchanged. `rtorrentWatchdogDecisionTest`
 covers malformed UTF-8, existing and absent markers, and legacy JSON escaping.
+The shared marker writer reports success only for a complete payload write;
+short writes return `false` like other write failures. It retains the existing
+locking, empty-payload behavior, and marker bytes without retrying or deleting
+partial state. The same test class injects failed, zero, short, and full writes
+for scalar and escalation markers.
 
 JSONL and timestamped log append helpers require the complete byte count,
 including the newline, before reporting success. Short or zero writes return

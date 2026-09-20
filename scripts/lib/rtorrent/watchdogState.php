@@ -27,7 +27,8 @@ function rtorrentProcessStateFilePathIsSafe(string $stateFile): bool
 function rtorrentProcessWriteStateFile(string $stateFile, string $payload): bool
 {
     return rtorrentProcessStateFilePathIsSafe($stateFile)
-        && @file_put_contents($stateFile, $payload, LOCK_EX) !== false;
+        // A truncated timestamp or JSON marker is not a successful state write.
+        && @file_put_contents($stateFile, $payload, LOCK_EX) === strlen($payload);
 }
 
 /**

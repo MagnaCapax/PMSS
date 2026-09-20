@@ -92,6 +92,45 @@ class rtorrentWatchdogDecisionTest extends TestCase
         }
     }
 
+    public function testStateWritesRequireCompletePayloads(): void
+    {
+        // Inject write results in a child process without touching live marker files.
+        $library = var_export(dirname(__DIR__, 2).'/rtorrent/watchdogState.php', true);
+        $script = <<<'PHP'
+namespace WatchdogStateWriteFixture;
+function file_put_contents($path, $data, $flags) {
+    $GLOBALS['requests'][] = [$path, $data, $flags];
+    $limit = $GLOBALS['limit'];
+    if ($limit === false) return false;
+    return \file_put_contents($path, $limit === null ? $data : substr($data, 0, $limit), $flags);
+}
+PHP;
+        $script .= '$library = '.$library.';';
+        $script .= <<<'PHP'
+$source = str_replace('__DIR__', var_export(dirname($library), true), file_get_contents($library));
+eval('namespace WatchdogStateWriteFixture;'.substr($source, 5));
+[$path, $payload, $GLOBALS['limit'], $escalation] = json_decode(getenv('PMSS_TEST_STATE_WRITE'), true);
+$GLOBALS['requests'] = [];
+$result = $escalation
+    ? rtorrentProcessWriteEscalationState($path, 'alice', 6, 900)
+    : rtorrentProcessWriteStateFile($path, $payload);
+echo json_encode([$result, file_get_contents($path), $GLOBALS['requests']]);
+PHP;
+        $path = $this->tempDir.'/write-marker';
+        foreach (['', '0', '1700000000', "binary\0payload", '{"timestamp":900,"user":"alice","count":6}'] as $payload) {
+            $escalation = substr($payload, 0, 1) === '{';
+            foreach ([false, 0, 1, max(0, strlen($payload) - 1), strlen($payload), null] as $limit) {
+                file_put_contents($path, 'prior marker');
+                $bytes = $limit === false ? 'prior marker' : ($limit === null ? $payload : substr($payload, 0, $limit));
+                $complete = $limit !== false && ($limit === null || $limit >= strlen($payload));
+                $this->assertSame([$complete, $bytes, [[$path, $payload, LOCK_EX]]],
+                    $this->pmssRunInlinePhpJson($script, [
+                        'PMSS_TEST_STATE_WRITE' => json_encode([$path, $payload, $limit, $escalation]),
+                    ]));
+            }
+        }
+    }
+
     public function testEscalationEncodingFailurePreservesExistingAndAbsentMarkers(): void
     {
         $path = $this->escalatedStatePaths()['escalation'];
