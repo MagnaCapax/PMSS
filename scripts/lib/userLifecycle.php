@@ -47,7 +47,7 @@ function pmssUserBaseContext(string $action, string $phase, string $username, ar
         'ssh_client'         => getenv('SSH_CLIENT') ?: null,
         'sudo_user'          => getenv('SUDO_USER') ?: null,
         'pmss_correlation_id'=> getenv('PMSS_CORRELATION_ID') ?: null,
-        'argv'               => isset($GLOBALS['argv']) ? $GLOBALS['argv'] : array(),
+        'argv'               => $GLOBALS['argv'] ?? array(),
     );
 
     return array_merge($base, $extra);

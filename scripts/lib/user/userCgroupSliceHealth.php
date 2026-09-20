@@ -24,7 +24,7 @@ function pmssUserCgroupSliceExpectedMemoryMaxBytes(array $payload, ?int $totalMe
     $memory = \PMSS\Cgroup\Manager::computeMemoryProperties(
         $memoryHighMiB,
         null,
-        $totalMemMiB !== null ? $totalMemMiB : pmssProcMeminfoTotalMiBRead()
+        $totalMemMiB ?? pmssProcMeminfoTotalMiBRead()
     );
 
     return (int) $memory['memoryMaxMiB'] * 1048576;

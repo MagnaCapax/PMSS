@@ -40,7 +40,7 @@ foreach ($userUids as $user => $uid) {
     ['delta' => $delta, 'previous_ingress' => $previousIngress] = pmssTrafficIngressUpdateState($statePath, $counters);
 
     if ($delta > 0) {
-        $previousDisplay = $previousIngress !== null ? $previousIngress : 'n/a';
+        $previousDisplay = $previousIngress ?? 'n/a';
         if (pmssTrafficBudgetExceeded($logDir.'/error.log', $user, 'ingress', $delta, $linkSpeed, "DEBUG COUNTERS: ingress={$counters['ingress']} previous={$previousDisplay}", 'ingress anomaly: usage exceeds 90%% link max (%d bytes)')) {
             continue;
         }

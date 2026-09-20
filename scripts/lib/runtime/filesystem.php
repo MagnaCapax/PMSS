@@ -24,7 +24,7 @@ function pmssDirectoryEntriesRead(string $path)
 
 function pmssPrivateTempBaseDirRealpath(?string $path = null): ?string
 {
-    $path = $path === null ? sys_get_temp_dir() : $path;
+    $path = $path ?? sys_get_temp_dir();
     if ($path === '' || pmssFilesystemPathHasNulByte($path)) return null;
     $real = realpath($path);
     if ($real === false || $real === DIRECTORY_SEPARATOR || !is_dir($real) || !is_writable($real)) return null;

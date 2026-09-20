@@ -32,9 +32,9 @@ function pmssScheduledConfigBackupCustomerPhpCode(): string
 {
     return <<<'PHP'
 require_once $argv[1];
-$home = isset($argv[2]) ? $argv[2] : '';
-$action = isset($argv[3]) ? $argv[3] : '';
-$keep = isset($argv[4]) ? (int) $argv[4] : 7;
+$home = $argv[2] ?? '';
+$action = $argv[3] ?? '';
+$keep = (int) ($argv[4] ?? 7);
 $result = array('ok' => false, 'message' => 'Unknown scheduled backup action.', 'bytes' => 0, 'path' => '');
 if ($action === 'create') {
     $result = pmssCustomerBackupFileCreate($home);
