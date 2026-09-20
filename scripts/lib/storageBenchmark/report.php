@@ -15,8 +15,7 @@ require_once dirname(__DIR__).'/runtime/cli.php';
 /** Convert untrusted JSONL display values to printable scalar text. */
 function storageBenchmarkScalarDisplay($value): string
 {
-    if (is_string($value) || is_int($value) || is_float($value)) return (string) $value;
-    return is_bool($value) ? ($value ? '1' : '') : '';
+    return is_scalar($value) ? (string) $value : '';
 }
 
 /** Read a numeric metric from untrusted JSONL entries without PHP coercion warnings. */

@@ -137,7 +137,7 @@ function pmssProfileSummary(): void
     // occurred without scanning the entire log.
     $counts = array_fill_keys(['OK', 'ERR', 'SKIP', 'OTHER'], 0);
     foreach ($profile as $entry) {
-        $status = strtoupper((string) ($entry['status'] ?? ''));
+        $status = $entry['status'];
         ++$counts[isset($counts[$status]) ? $status : 'OTHER'];
     }
     logmsg(sprintf(

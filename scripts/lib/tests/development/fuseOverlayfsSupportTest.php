@@ -2,11 +2,13 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/update/distUpgrade.php';
 
 class FuseOverlayfsSupportTest extends TestCase
 {
     public function testFuseOverlayfsContractsStayCentralized(): void
     {
+        $this->assertSame('apt-get install -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold fuse-overlayfs', \pmssDistUpgradeAptCommand('', 'install', 'fuse-overlayfs'));
         $this->pmssAssertRepoFileContractCases([
             'scripts/lib/update/distUpgrade/docker.php' => ['required' => [
                 'pmssEnsureFuseOverlayfsAfterDistUpgrade',
@@ -14,7 +16,6 @@ class FuseOverlayfsSupportTest extends TestCase
                 "pmssDistUpgradeAptCommand(\$env, 'install', 'fuse-overlayfs')",
                 'fuse-overlayfs',
             ]],
-            'scripts/lib/update/distUpgrade/apt.php' => ['required' => ['apt-get install']],
             'scripts/lib/update/userMaintenance.php' => ['required' => ["'users/docker.php'"]],
             'scripts/lib/update/users/docker.php' => [
                 'required' => ['fuse-overlayfs', 'disable_containerd_snapshotter'],

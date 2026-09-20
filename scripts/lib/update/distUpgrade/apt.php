@@ -33,9 +33,8 @@ function pmssDistUpgradeAptCommand(string $env, string $action, string $argument
         }
     }
 
-    $aptAction = $action === 'install' ? 'apt-get install' : 'apt-get '.$action;
     $opts = ' -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
-    return trim($env.' '.$aptAction.$opts.($suffix !== '' ? ' '.$suffix : ''));
+    return trim($env.' apt-get '.$action.$opts.($suffix !== '' ? ' '.$suffix : ''));
 }
 
 function pmssWaitForDpkgLocks(int $timeoutSeconds = 1800, int $sleepSeconds = 5): bool

@@ -121,7 +121,7 @@ function pmssDumpForkDiagnostics(string $context, ?callable $logger = null): voi
         $procsRaw = $readTrim($pickedDir.'/cgroup.procs', 262144);
         if ($procsRaw !== null) {
             $trimmed = trim($procsRaw);
-            $procsInCgroup = $trimmed === '' ? 0 : (substr_count($trimmed, "\n") + 1);
+            $procsInCgroup = substr_count($trimmed, "\n") + 1;
         }
         $fmtBytes = static function (?string $val): string {
             if ($val === null || $val === 'max' || !ctype_digit($val)) {
