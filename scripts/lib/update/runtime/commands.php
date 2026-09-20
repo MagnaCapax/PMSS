@@ -93,8 +93,7 @@ if (!function_exists('runUserStep')) {
             ? count($GLOBALS['PMSS_PROFILE'])
             : 0;
         $rc = runStep("[user:$user] {$description}", $command);
-        if (isset($GLOBALS['PMSS_PROFILE'][$profileCountBefore])
-            && is_array($GLOBALS['PMSS_PROFILE'][$profileCountBefore])) {
+        if (is_array($GLOBALS['PMSS_PROFILE'][$profileCountBefore] ?? null)) {
             $GLOBALS['PMSS_PROFILE'][$profileCountBefore]['description'] = $description;
         }
 

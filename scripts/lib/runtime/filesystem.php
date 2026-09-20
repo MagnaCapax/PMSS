@@ -105,7 +105,7 @@ function pmssProcMeminfoFieldsRead(string $path = '/proc/meminfo'): array
     return $fields;
 }
 
-function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fields = pmssProcMeminfoFieldsRead($path); return isset($fields['MemTotal']) ? (int) round($fields['MemTotal'] / 1024) : 0; }
+function pmssProcMeminfoTotalMiBRead(string $path = '/proc/meminfo'): int { $fields = pmssProcMeminfoFieldsRead($path); return (int) round(($fields['MemTotal'] ?? 0) / 1024); }
 
 function pmssReadSerializedArrayFile(string $path): ?array
 {

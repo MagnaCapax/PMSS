@@ -65,7 +65,7 @@ function storageBenchmarkMain(array $argv): int
 function storageBenchmarkAppendJsonLine(string $jsonLog, array $entry): void { if (!pmssJsonLineAppend($jsonLog, $entry)) storageBenchmarkFail("Error: failed to append JSON log entry: {$jsonLog}\n"); }
 function storageBenchmarkEntryBase(string $runTs, string $label, string $runId): array { return ['timestamp' => $runTs, 'label' => $label ?: null, 'run_id' => $runId, 'run_ts' => $runTs]; }
 function storageBenchmarkApplyRunResult(array $entry, array $res, string $fallbackError = 'unknown'): array { if ($res['ok']) $entry['metrics'] = $res['result']; else $entry['error'] = $res['error'] ?? $fallbackError; return $entry; }
-function storageBenchmarkIostatUtilPctRead(string $path): ?float { $payload = pmssReadSerializedArrayFile($path); if ($payload === null || !array_key_exists('diskUtil', $payload)) return null; $util = $payload['diskUtil']; return (is_int($util) || is_float($util) || (is_string($util) && is_numeric(trim($util)))) ? (float) trim((string) $util) : null; }
+function storageBenchmarkIostatUtilPctRead(string $path): ?float { $payload = pmssReadSerializedArrayFile($path); $util = $payload['diskUtil'] ?? null; return (is_int($util) || is_float($util) || (is_string($util) && is_numeric(trim($util)))) ? (float) trim((string) $util) : null; }
 /** Validate raw command bytes before whitespace normalization can erase NULs. */
 function storageBenchmarkRequireCommandField(string $command, string $label, bool $positiveInt = false): string
 {
@@ -150,7 +150,7 @@ function storageBenchmarkPeerMedian(array $peer, string $key): float { return st
 function storageBenchmarkPrintPeerWarnings(array $peer): void
 {
     $medDd = storageBenchmarkPeerMedian($peer, 'dd_mb'); $medIop = storageBenchmarkPeerMedian($peer, 'iop_ms'); $med4k = storageBenchmarkPeerMedian($peer, 'fio4k_mb');
-    foreach ($peer as $p => $r) { if ($medDd > 0 && isset($r['dd_mb']) && $r['dd_mb'] !== null && $r['dd_mb'] < 0.6 * $medDd) echo "WARN: {$p} seqread < 60% median\n"; if ($medIop > 0 && isset($r['iop_ms']) && $r['iop_ms'] !== null && $r['iop_ms'] > max(50, 2 * $medIop)) echo "WARN: {$p} ioping > 2x median\n"; if ($med4k > 0 && isset($r['fio4k_mb']) && $r['fio4k_mb'] !== null && $r['fio4k_mb'] < 0.5 * $med4k) echo "WARN: {$p} 4k randread < 50% median\n"; }
+    foreach ($peer as $p => $r) { if ($medDd > 0 && isset($r['dd_mb']) && $r['dd_mb'] < 0.6 * $medDd) echo "WARN: {$p} seqread < 60% median\n"; if ($medIop > 0 && isset($r['iop_ms']) && $r['iop_ms'] > max(50, 2 * $medIop)) echo "WARN: {$p} ioping > 2x median\n"; if ($med4k > 0 && isset($r['fio4k_mb']) && $r['fio4k_mb'] < 0.5 * $med4k) echo "WARN: {$p} 4k randread < 50% median\n"; }
 }
 
 function storageBenchmarkRunDeviceTests(string $jsonLog, string $runTs, string $label, string $runId, int $ddSizeBytes, int $devRuntime): void

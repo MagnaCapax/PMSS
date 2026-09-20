@@ -64,7 +64,7 @@ function pmssStatusEmit(
 
     $isTty = $useColour && pmssStreamIsTty(STDOUT, true);
     $textValue = static function ($value): string {
-        return is_scalar($value) || $value === null ? (string) $value : '';
+        return is_scalar($value) ? (string) $value : '';
     };
     foreach ($checks as $result) {
         $status = strtoupper($textValue($result['status'] ?? ''));
