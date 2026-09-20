@@ -9,7 +9,6 @@ final class LogWriteSafetyTest extends TestCase
     public function testJsonLineReaderDistinguishesReadFailureFromEof(): void
     {
         // Inject only the read failure; real files retain native EOF and close behavior.
-        $library = var_export(dirname(__DIR__, 2).'/log.php', true);
         $script = <<<'PHP'
 namespace LogReadFixture;
 function fgets($handle) {
@@ -18,10 +17,8 @@ function fgets($handle) {
     return \fgets($handle);
 }
 PHP;
-        $script .= '$library = '.$library.';';
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/log.php', 'LogReadFixture');
         $script .= <<<'PHP'
-$source = str_replace('__DIR__', var_export(dirname($library), true), file_get_contents($library));
-eval('namespace LogReadFixture;'.substr($source, 5));
 [$path, $GLOBALS['failAt']] = json_decode(getenv('PMSS_TEST_LOG_READ'), true);
 $GLOBALS['reads'] = 0;
 $seen = [];
@@ -63,7 +60,6 @@ PHP;
     public function testAppendResultsRequireCompleteRecordsAndPreserveFallback(): void
     {
         // Replace only the write boundary in an isolated child; use real temp files.
-        $library = var_export(dirname(__DIR__, 2).'/log.php', true);
         $script = <<<'PHP'
 namespace LogAppendFixture;
 function file_put_contents($path, $data, $flags) {
@@ -74,10 +70,8 @@ function file_put_contents($path, $data, $flags) {
     return \file_put_contents($path, $data, $flags);
 }
 PHP;
-        $script .= '$library = '.$library.';';
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/log.php', 'LogAppendFixture');
         $script .= <<<'PHP'
-$source = str_replace('__DIR__', var_export(dirname($library), true), file_get_contents($library));
-eval('namespace LogAppendFixture;'.substr($source, 5));
 [$path, $kind, $GLOBALS['limit']] = json_decode(getenv('PMSS_TEST_LOG_APPEND'), true);
 $GLOBALS['requests'] = [];
 if ($kind === 'mirror') {

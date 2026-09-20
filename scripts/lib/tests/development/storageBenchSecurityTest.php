@@ -8,16 +8,13 @@ class StorageBenchSecurityTest extends TestCase
     public function testCommandFieldsAndDeviceSizesValidateRawOutput(): void
     {
         // Inject capture results; no command, allocation, or block-device read runs.
-        $source = $this->pmssRepoPath('scripts/lib/storageBenchmark.php');
         $script = <<<'PHP'
 namespace BenchmarkOutputFixture;
 function pmssCommandCapture($command, $timeout) {
     return json_decode(getenv('PMSS_TEST_BENCH_CAPTURE'), true);
 }
 PHP;
-        $script .= 'eval("namespace BenchmarkOutputFixture;".substr(str_replace("__DIR__", '.
-            var_export(var_export(dirname($source), true), true).', \file_get_contents('.
-            var_export($source, true).')), 5));';
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php', 'BenchmarkOutputFixture');
         $script .= <<<'PHP'
 $kind = getenv('PMSS_TEST_BENCH_KIND');
 $result = $kind === 'device' ? storageBenchmarkDeviceSizeBytesRead('/dev/pmss-test')
@@ -54,7 +51,6 @@ PHP;
     public function testFioTemporaryOutputCleanupPreservesResultsAndThrowables(): void
     {
         // Namespace shims inject failures without running fio or touching a device.
-        $source = $this->pmssRepoPath('scripts/lib/storageBenchmark.php');
         $script = <<<'PHP'
 namespace FioCleanupFixture;
 function pmssCreatePrivateTempFile($prefix) {
@@ -72,9 +68,7 @@ function file_get_contents($path) {
     return $GLOBALS['payload'];
 }
 PHP;
-        $script .= 'eval("namespace FioCleanupFixture;".substr(str_replace("__DIR__", '.
-            var_export(var_export(dirname($source), true), true).', \file_get_contents('.
-            var_export($source, true).')), 5));';
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark.php', 'FioCleanupFixture');
         $script .= <<<'PHP'
 [$GLOBALS['case'], $kind, $GLOBALS['payload']] = json_decode(getenv('PMSS_TEST_FIO_CASE'), true);
 $GLOBALS['path'] = getenv('PMSS_TEST_FIO_PATH');

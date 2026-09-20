@@ -50,7 +50,6 @@ class NetworkIptablesWriteSafetyTest extends TestCase
     private function applyFixture(string $mode): array
     {
         // Namespace stubs isolate the system boundary; temporary files and cleanup are real.
-        $source = dirname(__DIR__, 2).'/network/iptables.php';
         $script = <<<'PHP'
 namespace IptablesWriteFixture;
 function pmssCreatePrivateTempFile($prefix) {
@@ -78,8 +77,7 @@ function runCommand($command, $verbose, $logger) {
     return $GLOBALS['mode'] === 'commandFail' ? 7 : 0;
 }
 PHP;
-        $script .= 'eval("namespace IptablesWriteFixture;".substr(str_replace("__DIR__", '.
-            var_export(var_export(dirname($source), true), true).', file_get_contents('.var_export($source, true).')), 5));';
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/network/iptables.php', 'IptablesWriteFixture');
         $script .= <<<'PHP'
 $GLOBALS['mode'] = getenv('PMSS_TEST_IPTABLES_WRITE');
 $GLOBALS['throwable'] = $GLOBALS['mode'] === 'commandError'

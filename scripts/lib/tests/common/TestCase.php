@@ -1079,6 +1079,16 @@ abstract class TestCase
         return $result['output'];
     }
 
+    /** Load a repository PHP library into a fixture namespace for child-process fault injection. */
+    protected function pmssInlinePhpLibraryInNamespace(string $relativePath, string $namespace): string
+    {
+        $path = $this->pmssRepoPath($relativePath);
+        // Read through the native function even when the fixture intercepts file reads.
+        // Preserve library-relative includes after eval changes the source location.
+        return 'eval('.var_export('namespace '.$namespace.';', true).'.substr(str_replace("__DIR__", '.
+            var_export(var_export(dirname($path), true), true).', \\file_get_contents('.var_export($path, true).')), 5));';
+    }
+
     protected function pmssRunInlinePhp(string $script, array $environment = [], string $stderrRedirect = '2>/dev/null'): string
     {
         return $this->pmssRunShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script), $environment, $stderrRedirect);

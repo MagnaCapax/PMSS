@@ -47,7 +47,6 @@ class RuntimeCommandPathTest extends TestCase
     {
         // Inject only command lookup; real executable checks keep the boundary realistic.
         $runtime = var_export(dirname(__DIR__, 2).'/runtime.php', true);
-        $environment = var_export(dirname(__DIR__, 2).'/runtime/environment.php', true);
         $script = <<<'PHP'
 namespace CommandPathOutputFixture;
 function shell_exec($command) {
@@ -55,7 +54,7 @@ function shell_exec($command) {
     return $GLOBALS['lookupOutput'];
 }
 PHP;
-        $script .= "require {$runtime}; eval('namespace CommandPathOutputFixture;'.substr(file_get_contents({$environment}), 5));";
+        $script .= "require {$runtime};".$this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/environment.php', 'CommandPathOutputFixture');
         $script .= <<<'PHP'
 $path = PHP_BINARY;
 $cases = [

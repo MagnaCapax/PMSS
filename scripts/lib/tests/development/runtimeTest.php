@@ -767,7 +767,6 @@ class RuntimeTest extends TestCase
         // Isolate native-call stubs in a child namespace; use real temporary files
         // and locks on success, without requiring the development suite to be root.
         $runtime = var_export(dirname(__DIR__, 2).'/runtime.php', true);
-        $snapshot = var_export(dirname(__DIR__, 2).'/runtime/snapshot.php', true);
         $script = <<<'PHP'
 namespace SnapshotFixture;
 function posix_geteuid() { return 0; }
@@ -783,7 +782,7 @@ function flock($handle, $operation) {
     return getenv('PMSS_TEST_SNAPSHOT_CASE') === 'failed' ? false : \flock($handle, $operation);
 }
 PHP;
-        $script .= "require {$runtime}; eval('namespace SnapshotFixture;'.substr(file_get_contents({$snapshot}), 5));";
+        $script .= "require {$runtime};".$this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/snapshot.php', 'SnapshotFixture');
         $script .= <<<'PHP'
 $case = getenv('PMSS_TEST_SNAPSHOT_CASE');
 $path = getenv('PMSS_TEST_SNAPSHOT_LOG');

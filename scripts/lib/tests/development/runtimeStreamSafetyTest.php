@@ -12,7 +12,6 @@ class RuntimeStreamSafetyTest extends TestCase
     {
         // Isolate injected close failures and the process-wide umask from the runner.
         $runtime = var_export(dirname(__DIR__, 2).'/runtime.php', true);
-        $snapshot = var_export(dirname(__DIR__, 2).'/runtime/snapshot.php', true);
         $script = <<<'PHP'
 namespace SnapshotCloseFixture;
 function posix_geteuid() { return 0; }
@@ -25,7 +24,7 @@ function fclose($handle) {
     return true;
 }
 PHP;
-        $script .= "require {$runtime}; eval('namespace SnapshotCloseFixture;'.substr(file_get_contents({$snapshot}), 5));";
+        $script .= "require {$runtime};".$this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/snapshot.php', 'SnapshotCloseFixture');
         $script .= <<<'PHP'
 [$closeType, $callbackType, $mask] = json_decode(getenv('PMSS_TEST_SNAPSHOT_CLOSE'), true);
 $GLOBALS['closeFailure'] = $closeType === '' ? null : new $closeType('close failure');
@@ -79,9 +78,8 @@ PHP;
     {
         // Stub only the root check in a child process; all file operations are real.
         $runtime = var_export(dirname(__DIR__, 2).'/runtime.php', true);
-        $snapshot = var_export(dirname(__DIR__, 2).'/runtime/snapshot.php', true);
         $script = 'namespace SnapshotPathFixture; function posix_geteuid() { return 0; }';
-        $script .= "require {$runtime}; eval('namespace SnapshotPathFixture;'.substr(file_get_contents({$snapshot}), 5));";
+        $script .= "require {$runtime};".$this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/snapshot.php', 'SnapshotPathFixture');
         $script .= <<<'PHP'
 $root = getenv('PMSS_TEST_SNAPSHOT_ROOT');
 $path = base64_decode(getenv('PMSS_TEST_SNAPSHOT_PATH'));
@@ -173,7 +171,6 @@ PHP;
     public function testSnapshotShortWritesFinishOrStopWithoutRetryingFailures(): void
     {
         // Inject fwrite results in a child namespace; accepted bytes use a real memory stream.
-        $snapshot = var_export(dirname(__DIR__, 2).'/runtime/snapshot.php', true);
         $script = <<<'PHP'
 namespace SnapshotWriteFixture;
 function fwrite($handle, $bytes) {
@@ -185,7 +182,7 @@ function fwrite($handle, $bytes) {
     return $limit === false ? false : \fwrite($handle, substr($bytes, 0, $limit));
 }
 PHP;
-        $script .= "eval('namespace SnapshotWriteFixture;'.substr(file_get_contents({$snapshot}), 5));";
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/snapshot.php', 'SnapshotWriteFixture');
         $script .= <<<'PHP'
 [$line, $GLOBALS['limits']] = json_decode(getenv('PMSS_TEST_SNAPSHOT_WRITE'), true);
 $GLOBALS['requests'] = [];
