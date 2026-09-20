@@ -99,7 +99,7 @@ function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFie
     $previousState = $handle !== false ? (pmssJsonDecodeAssoc((string) @stream_get_contents($handle)) ?? []) : [];
     $delta = [];
     foreach ($deltaFields as $field) {
-        $currentValue = array_key_exists($field, $state) ? (int) $state[$field] : 0;
+        $currentValue = (int) ($state[$field] ?? 0);
         $previous = $previousState[$field] ?? null;
         $previousValue = is_int($previous) && $previous >= 0 ? $previous : null;
         if (is_string($previous) && ctype_digit($previous)) {
@@ -353,12 +353,12 @@ function pmssResourceLogReadMemoryBreakdown(int $uid, ?string $cgroupRoot = null
 function pmssResourceLogUpdateState(string $statePath, array $counters): array
 {
     $state = [
-        'memory' => array_key_exists('memory', $counters) ? (int) $counters['memory'] : 0,
-        'tasks' => array_key_exists('tasks', $counters) ? (int) $counters['tasks'] : 0,
+        'memory' => (int) ($counters['memory'] ?? 0),
+        'tasks' => (int) ($counters['tasks'] ?? 0),
         'ts' => time(),
     ];
     foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) {
-        $state[$field] = array_key_exists($field, $counters) ? (int) $counters[$field] : 0;
+        $state[$field] = (int) ($counters[$field] ?? 0);
     }
     foreach (pmssResourceMemoryBreakdownFieldMap() as $field) { array_key_exists($field, $counters) && $state[$field] = (int) $counters[$field]; }
     // Persist which blkio accounting source the io_* counters came from (bfq/throttle), so the

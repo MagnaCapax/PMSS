@@ -32,14 +32,14 @@ function storageBenchmarkEntryMetrics(array $entry): array { return is_array($en
 /** Return a printable metric for the preflight summary, defaulting when malformed. */
 function storageBenchmarkPreflightDisplay(array $entry, string $key): string
 {
-    $value = array_key_exists($key, $entry) ? storageBenchmarkScalarDisplay($entry[$key]) : '';
+    $value = storageBenchmarkScalarDisplay($entry[$key] ?? null);
     return $value !== '' ? $value : 'n/a';
 }
 
 /** Return a safe device grouping key from an untrusted benchmark entry. */
 function storageBenchmarkEntryDeviceName(array $entry): ?string
 {
-    $device = array_key_exists('device', $entry) ? storageBenchmarkScalarDisplay($entry['device']) : '';
+    $device = storageBenchmarkScalarDisplay($entry['device'] ?? null);
     return ($device !== '' && $device !== '0') ? $device : null;
 }
 
