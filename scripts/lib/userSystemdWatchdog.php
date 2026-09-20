@@ -83,13 +83,19 @@ function pmssUserSystemdWatchdogStatusWrite(string $home, string $path, array $s
 {
     if ($path === '' || !pmssPathTargetIsSafe($path, false, true) || !pmssPathWithinResolvedRoot($path, $home)) return false;
     $encoded = pmssJsonEncodePrettyLine($status);
+    // Failed encoding must not allocate a temporary file or disturb the last snapshot.
+    if (!is_string($encoded)) return false;
     $temporary = @tempnam(dirname($path), '.systemd-user-status.');
-    if (!is_string($encoded) || $temporary === false) return false;
-    if (@file_put_contents($temporary, $encoded, LOCK_EX) === false || !@chmod($temporary, 0644) || !@rename($temporary, $path)) {
-        @unlink($temporary);
-        return false;
+    if ($temporary === false) return false;
+    $published = false;
+    try {
+        // Publish only complete JSON; failed writes leave the previous snapshot intact.
+        if (@file_put_contents($temporary, $encoded, LOCK_EX) !== strlen($encoded) || !@chmod($temporary, 0644)) return false;
+        return $published = @rename($temporary, $path);
+    } finally {
+        // Exceptions retain their propagation while unpublished files are cleaned up.
+        if (!$published) @unlink($temporary);
     }
-    return true;
 }
 
 /** Emit only actionable failures and recovery transitions. */

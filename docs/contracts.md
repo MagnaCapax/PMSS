@@ -357,6 +357,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Publishes `~/.systemd-user-status.json` atomically with mode 0644. A second
     consecutive inactive manager probe changes `pending` to `degraded`; probe
     failures publish `unknown`. It never starts, restarts, enables, or disables a unit.
+  - Publication rejects failed encoding before allocating a temporary file and
+    requires a complete write before rename. Failed writes, chmod, or rename
+    preserve the previous snapshot and clean up the unpublished temporary file,
+    including when those operations throw; the original throwable propagates.
   - New homes contain `~/.config/systemd/user/` from the skeleton as a safe default;
     this does not make parent-directory unit misplacement impossible.
 - pmssUserReconcileWebRoot(array $ctx, ?callable $logger=null): bool

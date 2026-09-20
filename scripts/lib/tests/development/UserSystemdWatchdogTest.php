@@ -117,6 +117,93 @@ class UserSystemdWatchdogTest extends TestCase
         $this->assertSame(null, \pmssUserSystemdWatchdogRunUser('bad-name', $homeRoot, $lingerRoot, $probe, $lookup));
     }
 
+    public function testStatusPublicationFailuresPreservePreviousSnapshot(): void
+    {
+        foreach (['encoding', 'temp', 'false', 'zero', 'short', 'chmod', 'rename'] as $mode) {
+            $result = $this->statusWriteFixture($mode);
+            $this->assertSame(false, $result['result'], $mode);
+            $this->assertSame('previous snapshot', $result['bytes'], $mode);
+            $this->assertSame([], $result['temporaryFiles'], $mode);
+            $this->assertSame(null, $result['exception'], $mode);
+            $this->assertSame($mode === 'encoding' ? 0 : 1, $result['tempCalls'], $mode);
+        }
+    }
+
+    public function testStatusPublicationExceptionsCleanTemporaryFiles(): void
+    {
+        foreach (['writeThrow', 'chmodThrow', 'renameThrow', 'writeError'] as $mode) {
+            $result = $this->statusWriteFixture($mode);
+            $this->assertSame(null, $result['result'], $mode);
+            $this->assertSame(true, $result['sameThrowable'], $mode);
+            $this->assertSame($mode, $result['exception'], $mode);
+            $this->assertSame('previous snapshot', $result['bytes'], $mode);
+            $this->assertSame([], $result['temporaryFiles'], $mode);
+        }
+    }
+
+    public function testStatusPublicationPreservesSuccessfulBytesAndMode(): void
+    {
+        $result = $this->statusWriteFixture('success');
+        $this->assertSame(true, $result['result']);
+        $this->assertSame(\pmssJsonEncodePrettyLine(['state' => 'healthy']), $result['bytes']);
+        $this->assertSame(0644, $result['permissions']);
+        $this->assertSame([], $result['temporaryFiles']);
+        $this->assertSame(null, $result['exception']);
+    }
+
+    private function statusWriteFixture(string $mode): array
+    {
+        // Keep native file publication and path guards; inject only failing I/O boundaries.
+        $home = $this->pmssMakeTempDir('systemd-status-write-');
+        $script = <<<'PHP'
+namespace SystemdStatusWriteFixture;
+function tempnam($directory, $prefix) {
+    ++$GLOBALS['tempCalls'];
+    return $GLOBALS['mode'] === 'temp' ? false : \tempnam($directory, $prefix);
+}
+function file_put_contents($path, $bytes, $flags = 0) {
+    $mode = $GLOBALS['mode'];
+    if ($mode === 'writeThrow' || $mode === 'writeError') throw $GLOBALS['throwable'];
+    if ($mode === 'false') return false;
+    if ($mode === 'zero') return 0;
+    return \file_put_contents($path, $mode === 'short' ? substr($bytes, 0, -1) : $bytes, $flags);
+}
+function chmod($path, $permissions) {
+    if ($GLOBALS['mode'] === 'chmodThrow') throw $GLOBALS['throwable'];
+    return $GLOBALS['mode'] === 'chmod' ? false : \chmod($path, $permissions);
+}
+function rename($from, $to) {
+    if ($GLOBALS['mode'] === 'renameThrow') throw $GLOBALS['throwable'];
+    return $GLOBALS['mode'] === 'rename' ? false : \rename($from, $to);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/userSystemdWatchdog.php', 'SystemdStatusWriteFixture');
+        $script .= <<<'PHP'
+$GLOBALS['mode'] = getenv('PMSS_TEST_STATUS_MODE');
+$GLOBALS['tempCalls'] = 0;
+$GLOBALS['throwable'] = $GLOBALS['mode'] === 'writeError'
+    ? new \Error($GLOBALS['mode']) : new \RuntimeException($GLOBALS['mode']);
+$home = getenv('PMSS_TEST_STATUS_HOME');
+$path = pmssUserSystemdWatchdogStatusPath($home);
+\file_put_contents($path, 'previous snapshot');
+$status = ['state' => $GLOBALS['mode'] === 'encoding' ? "\xff" : 'healthy'];
+$result = $exception = null;
+$sameThrowable = false;
+try {
+    $result = pmssUserSystemdWatchdogStatusWrite($home, $path, $status);
+} catch (\Throwable $caught) {
+    $exception = $caught->getMessage();
+    $sameThrowable = $caught === $GLOBALS['throwable'];
+}
+clearstatcache();
+echo json_encode(['result' => $result, 'exception' => $exception, 'sameThrowable' => $sameThrowable,
+    'bytes' => \file_get_contents($path), 'permissions' => fileperms($path) & 0777,
+    'temporaryFiles' => array_values(array_diff(glob($home.'/.systemd-user-status.*'), [$path])),
+    'tempCalls' => $GLOBALS['tempCalls']]);
+PHP;
+        return $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_STATUS_MODE' => $mode, 'PMSS_TEST_STATUS_HOME' => $home]);
+    }
+
     public function testRunUserSkipsAccountsWithoutIntentAndCgroupV2(): void
     {
         $homeRoot = $this->pmssMakeTempDir('user-systemd-watchdog-skip-homes-');
