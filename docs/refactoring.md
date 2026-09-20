@@ -96,6 +96,12 @@ verifies these results and cleanup on read failures and handler exceptions.
 
 ## Helper Extraction Rules
 
+The lighttpd watchdog's incremental nginx reader closes its log stream in
+`finally`, including when metadata checks, state loading, seeking, or parsing
+throws. Exceptions continue to propagate without publishing a new cursor.
+Normal cursor bytes, partial-line retries, and recovery decisions are unchanged;
+`LighttpdWatchdogNginxLogTest` covers exceptional cleanup and legacy behavior.
+
 Counter-state updates release their lock even when reading prior state or
 calculating deltas throws, as well as when persistence throws. The original
 throwable propagates; normal deltas, payload bytes, and failed-open behavior

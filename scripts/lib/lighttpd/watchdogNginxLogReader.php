@@ -16,58 +16,60 @@ function pmssLighttpdWatchdogNginxActionsRead(string $logPath, string $statePath
     }
 
     $handle = @fopen($logPath, 'rb');
-    $logStat = is_resource($handle) ? @fstat($handle) : false;
-    $pathStat = @lstat($logPath);
-    if (!is_resource($handle) || !is_array($logStat) || !is_array($pathStat)
-        || ($logStat['dev'] ?? null) !== ($pathStat['dev'] ?? null)
-        || ($logStat['ino'] ?? null) !== ($pathStat['ino'] ?? null)
-    ) {
+    try {
+        $logStat = is_resource($handle) ? @fstat($handle) : false;
+        $pathStat = @lstat($logPath);
+        if (!is_resource($handle) || !is_array($logStat) || !is_array($pathStat)
+            || ($logStat['dev'] ?? null) !== ($pathStat['dev'] ?? null)
+            || ($logStat['ino'] ?? null) !== ($pathStat['ino'] ?? null)
+        ) {
+            return array();
+        }
+
+        $state = pmssJsonFileReadAssoc($statePath, true);
+        $firstRun = !is_array($state) || !isset($state['offset'], $state['device'], $state['inode']);
+        $sameFile = !$firstRun
+            && (int) $state['device'] === (int) $logStat['dev']
+            && (int) $state['inode'] === (int) $logStat['ino'];
+        $offset = $sameFile ? max(0, (int) $state['offset']) : 0;
+        if ($firstRun) {
+            $offset = (int) ($logStat['size'] ?? 0);
+            $state = array('users' => array());
+        } elseif ($offset > (int) ($logStat['size'] ?? 0)) {
+            $offset = 0;
+        }
+        if (@fseek($handle, $offset) !== 0) {
+            return array();
+        }
+
+        // Retain at most a reset plus the final failure per port. This preserves
+        // relevant event order without holding an unbounded log backlog.
+        $eventsByPort = array();
+        while (($line = @fgets($handle)) !== false) {
+            if (substr($line, -1) !== "\n") {
+                @fseek($handle, -strlen($line), SEEK_CUR);
+                break;
+            }
+            $event = pmssLighttpdWatchdogNginxEventParse($line);
+            if ($event === null) {
+                continue;
+            }
+            $port = $event['port'];
+            if ($event['outcome'] === 'healthy') {
+                $eventsByPort[$port] = array($event);
+            } elseif (isset($eventsByPort[$port][0]) && $eventsByPort[$port][0]['outcome'] === 'healthy') {
+                $eventsByPort[$port] = array($eventsByPort[$port][0], $event);
+            } else {
+                $eventsByPort[$port] = array($event);
+            }
+        }
+        $newOffset = @ftell($handle);
+    } finally {
+        // Cover metadata, state loading, and parsing failures as well as early returns.
         if (is_resource($handle)) {
             @fclose($handle);
         }
-        return array();
     }
-
-    $state = pmssJsonFileReadAssoc($statePath, true);
-    $firstRun = !is_array($state) || !isset($state['offset'], $state['device'], $state['inode']);
-    $sameFile = !$firstRun
-        && (int) $state['device'] === (int) $logStat['dev']
-        && (int) $state['inode'] === (int) $logStat['ino'];
-    $offset = $sameFile ? max(0, (int) $state['offset']) : 0;
-    if ($firstRun) {
-        $offset = (int) ($logStat['size'] ?? 0);
-        $state = array('users' => array());
-    } elseif ($offset > (int) ($logStat['size'] ?? 0)) {
-        $offset = 0;
-    }
-    if (@fseek($handle, $offset) !== 0) {
-        @fclose($handle);
-        return array();
-    }
-
-    // Retain at most a reset plus the final failure per port. This preserves
-    // relevant event order without holding an unbounded log backlog.
-    $eventsByPort = array();
-    while (($line = @fgets($handle)) !== false) {
-        if (substr($line, -1) !== "\n") {
-            @fseek($handle, -strlen($line), SEEK_CUR);
-            break;
-        }
-        $event = pmssLighttpdWatchdogNginxEventParse($line);
-        if ($event === null) {
-            continue;
-        }
-        $port = $event['port'];
-        if ($event['outcome'] === 'healthy') {
-            $eventsByPort[$port] = array($event);
-        } elseif (isset($eventsByPort[$port][0]) && $eventsByPort[$port][0]['outcome'] === 'healthy') {
-            $eventsByPort[$port] = array($eventsByPort[$port][0], $event);
-        } else {
-            $eventsByPort[$port] = array($event);
-        }
-    }
-    $newOffset = @ftell($handle);
-    @fclose($handle);
 
     $events = array();
     foreach ($eventsByPort as $portEvents) {

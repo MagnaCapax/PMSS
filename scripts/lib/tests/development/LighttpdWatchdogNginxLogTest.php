@@ -6,6 +6,74 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class LighttpdWatchdogNginxLogTest extends TestCase
 {
+    public function testReaderClosesStreamOnExceptionalAndEarlyExits(): void
+    {
+        $logPath = $this->pmssMakeTempFile('lighttpd-nginx-close-log-');
+        $statePath = $this->pmssMakeTempFile('lighttpd-nginx-close-state-');
+        file_put_contents($logPath, $this->nginxLine(25000));
+        $stat = stat($logPath);
+        $state = json_encode(['device' => $stat['dev'], 'inode' => $stat['ino'], 'offset' => 0, 'users' => []]);
+        file_put_contents($statePath, $state);
+        // Namespace interception keeps fault injection away from global runtime helpers.
+        $script = <<<'PHP'
+namespace NginxReadFixture;
+function fault($stage) {
+    if ($GLOBALS['stage'] === $stage && $GLOBALS['failure'] !== null) throw $GLOBALS['failure'];
+}
+function fopen($path, $mode) {
+    return $GLOBALS['handle'] = $GLOBALS['stage'] === 'open-false' ? false : \fopen($path, $mode);
+}
+function fstat($handle) {
+    fault('stat');
+    return $GLOBALS['stage'] === 'stat-false' ? false : \fstat($handle);
+}
+function lstat($path) { fault('path-stat'); return \lstat($path); }
+function pmssJsonFileReadAssoc($path, $safe) { fault('state'); return \pmssJsonFileReadAssoc($path, $safe); }
+function fseek($handle, $offset, $whence = SEEK_SET) {
+    fault('seek');
+    return $GLOBALS['stage'] === 'seek-false' ? -1 : \fseek($handle, $offset, $whence);
+}
+function fgets($handle) { fault('read'); return \fgets($handle); }
+function pmssLighttpdWatchdogNginxEventParse($line) { fault('parse'); return \pmssLighttpdWatchdogNginxEventParse($line); }
+function ftell($handle) { fault('tell'); return \ftell($handle); }
+function fclose($handle) { $GLOBALS['closes']++; return \fclose($handle); }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/watchdogNginxLogReader.php', 'NginxReadFixture');
+        $script .= <<<'PHP'
+[$logPath, $statePath] = json_decode(getenv('PMSS_TEST_NGINX_READ'), true);
+$original = file_get_contents($statePath);
+$results = [];
+foreach (['stat', 'path-stat', 'state', 'seek', 'read', 'parse', 'tell', 'open-false', 'stat-false', 'seek-false'] as $stage) {
+    foreach (['exception', 'error'] as $kind) {
+        $GLOBALS['stage'] = $stage;
+        $GLOBALS['failure'] = substr($stage, -6) === '-false' ? null
+            : ($kind === 'exception' ? new \RuntimeException('read failed') : new \Error('read failed'));
+        $GLOBALS['closes'] = 0;
+        $caught = null;
+        $actions = [];
+        try {
+            $actions = pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'alice']);
+        } catch (\Throwable $error) {
+            $caught = $error;
+        }
+        $results[$stage.'-'.$kind] = [
+            $caught === $GLOBALS['failure'], !is_resource($GLOBALS['handle']),
+            $GLOBALS['closes'], $actions, file_get_contents($statePath) === $original,
+        ];
+    }
+}
+echo json_encode($results);
+PHP;
+        $results = $this->pmssRunInlinePhpJson($script, [
+            'PMSS_TEST_NGINX_READ' => json_encode([$logPath, $statePath]),
+        ]);
+        $this->assertSame(20, count($results));
+        foreach ($results as $case => $result) {
+            $this->assertSame([true, true, strpos($case, 'open-false-') === 0 ? 0 : 1, [], true], $result, $case);
+        }
+        $this->assertSame($this->nginxLine(25000), file_get_contents($logPath));
+    }
+
     private function nginxLine(int $port, int $status = 502, string $upstreamStatus = '502', string $headerTime = '-'): string
     {
         return '127.0.0.1 - - [23/Aug/2026:12:00:00 +0200] "GET /user-alice/ HTTP/1.1" '
