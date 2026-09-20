@@ -161,11 +161,12 @@ function pmssJsonLineFileEach(string $path, callable $handler): bool
                 $handler($decoded);
             }
         }
+        // A failed read before EOF must not report a complete scan.
+        return feof($handle);
     } finally {
         // Release the reader even when a handler throws; preserve its exception.
         fclose($handle);
     }
-    return true;
 }
 
 /** Read decodable JSON Lines entries from a file. */

@@ -6,6 +6,60 @@ require_once dirname(__DIR__, 2).'/log.php';
 
 final class LogWriteSafetyTest extends TestCase
 {
+    public function testJsonLineReaderDistinguishesReadFailureFromEof(): void
+    {
+        // Inject only the read failure; real files retain native EOF and close behavior.
+        $library = var_export(dirname(__DIR__, 2).'/log.php', true);
+        $script = <<<'PHP'
+namespace LogReadFixture;
+function fgets($handle) {
+    $GLOBALS['reader'] = $handle;
+    if ($GLOBALS['reads']++ === $GLOBALS['failAt']) return false;
+    return \fgets($handle);
+}
+PHP;
+        $script .= '$library = '.$library.';';
+        $script .= <<<'PHP'
+$source = str_replace('__DIR__', var_export(dirname($library), true), file_get_contents($library));
+eval('namespace LogReadFixture;'.substr($source, 5));
+[$path, $GLOBALS['failAt']] = json_decode(getenv('PMSS_TEST_LOG_READ'), true);
+$GLOBALS['reads'] = 0;
+$seen = [];
+$result = pmssJsonLineFileEach($path, static function (array $entry) use (&$seen): void {
+    $seen[] = $entry;
+});
+$closed = !is_resource($GLOBALS['reader']);
+$GLOBALS['reads'] = 0;
+$entries = pmssJsonLineFileRead($path);
+$closed = $closed && !is_resource($GLOBALS['reader']);
+$GLOBALS['reads'] = 0;
+$last = pmssJsonLineFileLast($path);
+echo json_encode([$result, $seen, $entries, $last, $closed && !is_resource($GLOBALS['reader'])]);
+PHP;
+        $path = $this->pmssMakeTempFile('pmss-log-read-failure-');
+        $first = ['event' => 'first'];
+        $last = ['event' => 'last'];
+        $lines = "{\"event\":\"first\"}\ninvalid\nnull\n{\"event\":\"last\"}\n";
+        foreach ([
+            [$lines, 0, false, []],
+            [$lines, 1, false, [$first]],
+            [$lines, 2, false, [$first]],
+            [$lines, 3, false, [$first]],
+            [$lines, null, true, [$first, $last]],
+            [rtrim($lines, "\n"), null, true, [$first, $last]],
+            ['', null, true, []],
+            ["invalid\nnull\n", null, true, []],
+        ] as [$contents, $failAt, $success, $entries]) {
+            file_put_contents($path, $contents);
+            $this->assertSame([$success, $entries, $entries,
+                $entries === [] ? null : $entries[count($entries) - 1], true],
+                $this->pmssRunInlinePhpJson($script, [
+                    'PMSS_TEST_LOG_READ' => json_encode([$path, $failAt]),
+                ]));
+            $this->assertSame($contents, file_get_contents($path));
+        }
+    }
+
     public function testAppendResultsRequireCompleteRecordsAndPreserveFallback(): void
     {
         // Replace only the write boundary in an isolated child; use real temp files.

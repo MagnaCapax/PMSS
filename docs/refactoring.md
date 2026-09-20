@@ -88,9 +88,11 @@ over callback exceptions; normal callback results and append bytes are unchanged
 
 JSON Lines readers close their stream in `finally`, including when the handler
 throws an exception or error. The original throwable propagates unchanged;
-valid entries keep their ordering, invalid/scalar JSON is skipped, and the
-success/failure return values remain unchanged. `LogWriteSafetyTest` verifies
-cleanup on successful reads and failures at the first and last valid entries.
+valid entries keep their ordering and invalid/scalar JSON is skipped. A read
+failure before EOF returns `false`; normal EOF still returns `true`, including
+empty files and a final line without a newline. Already delivered entries remain
+available to handlers and the read/last convenience helpers. `LogWriteSafetyTest`
+verifies these results and cleanup on read failures and handler exceptions.
 
 ## Helper Extraction Rules
 
