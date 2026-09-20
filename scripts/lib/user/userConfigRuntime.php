@@ -134,7 +134,7 @@ function pmssUserConfigNamedModeUser(array $user, array $existing, array $explic
 }
 function pmssUserConfigPayloadBuild($store, array $existing, array $user, array $presence, ?bool $dockerEnabled): array
 {
-    $payload = array_merge($existing, ['ramMiB' => $user['memory'], 'rtorrentPort' => isset($existing['rtorrentPort']) ? (int) $existing['rtorrentPort'] : 0, 'quota' => $user['quota'], 'quotaBurst' => (int) round(((float) $user['quota']) * 1.25), 'trafficLimit' => 0]);
+    $payload = array_merge($existing, ['ramMiB' => $user['memory'], 'rtorrentPort' => (int) ($existing['rtorrentPort'] ?? 0), 'quota' => $user['quota'], 'quotaBurst' => (int) round(((float) $user['quota']) * 1.25), 'trafficLimit' => 0]);
     $payload = pmssUserConfigCliApplyPersistedResources($payload, $user, $presence);
     $payload['billingServiceId'] = $payload['billingServiceId'] ?? 0;
     $payload['billingClientId'] = $payload['billingClientId'] ?? 0;

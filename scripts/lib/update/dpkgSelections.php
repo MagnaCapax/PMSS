@@ -98,7 +98,7 @@ function pmssDpkgSelectionsSanitise(array $lines, int $runtimeVersion, ?callable
         if ($trimmed === '') continue;
         if (($parts = pmssConfigLineColumns($trimmed, 0, [])) === []) { pmssLogStatus('WARN', sprintf('Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed), 0); $result['warnings'] = true; continue; }
         $package = (string) $parts[0];
-        $state = isset($parts[1]) ? (string) $parts[1] : 'install';
+        $state = (string) ($parts[1] ?? 'install');
         count($parts) === 1 && $result['short_form_seen'] = true;
         $lower = strtolower($package);
         if (($runtimeVersion >= 12 && $lower === 'wireguard-dkms') || $lower === 'repo-mediaarea') {

@@ -25,7 +25,7 @@ function pmssConfigureTempDiskBackedMount(?callable $logger = null, ?int $distro
     $log = $logger ?: 'logMessage';
     if ($distroVersion === null && function_exists('pmssDetectDistro')) {
         $detected = pmssDetectDistro();
-        $distroVersion = isset($detected['version']) ? (int) $detected['version'] : 0;
+        $distroVersion = (int) ($detected['version'] ?? 0);
     }
 
     if ((int) $distroVersion < 13) {

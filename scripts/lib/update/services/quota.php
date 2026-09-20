@@ -151,8 +151,8 @@ function pmssQuotaCommandRun(string $command, ?callable $runner = null): array
 
     $rcRaw = $result['rc'] ?? 1;
     $rc = is_int($rcRaw) ? $rcRaw : (is_numeric($rcRaw) ? (int) $rcRaw : 1);
-    $stdout = isset($result['stdout']) && is_string($result['stdout']) ? $result['stdout'] : '';
-    $stderr = isset($result['stderr']) && is_string($result['stderr']) ? $result['stderr'] : '';
+    $stdout = is_string($result['stdout'] ?? null) ? $result['stdout'] : '';
+    $stderr = is_string($result['stderr'] ?? null) ? $result['stderr'] : '';
 
     return ['ok' => $rc === 0, 'rc' => $rc, 'output' => $stdout.$stderr];
 }

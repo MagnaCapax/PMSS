@@ -61,7 +61,7 @@ function pmssUserConfigCliResolvedResources(array $parsed, array $args, string $
 {
     $values = [];
     foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        $legacyIndex = isset($spec[$indexKey]) ? (int) $spec[$indexKey] : -1;
+        $legacyIndex = (int) ($spec[$indexKey] ?? -1);
         $value = pmssUserConfigCliLegacyValue($parsed, $spec[$optionKey], $args, $legacyIndex, $spec['default']);
         $values[$key] = ($spec['parse'] === 'int' && $value !== null) ? (int) $value : $value;
     }
@@ -200,7 +200,7 @@ function pmssUserConfigCliCgroupIoClearRequested(array $user, string $key): bool
 /** @return array<int,string>|null Build cgroup apply args from a stored payload. */
 function pmssUserConfigCliBuildStoredCgroupApplyArgs(string $username, array $payload): ?array
 {
-    $memory = isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) ? (int) $payload['ramMiB'] : 0;
+    $memory = is_numeric($payload['ramMiB'] ?? null) ? (int) $payload['ramMiB'] : 0;
     if ($memory <= 0) {
         return null;
     }
