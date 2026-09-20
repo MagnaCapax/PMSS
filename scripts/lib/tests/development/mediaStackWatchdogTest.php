@@ -89,4 +89,77 @@ class MediaStackWatchdogTest extends TestCase
         $home = $this->pmssMakeTempDir('media-stack-watchdog-unsafe-status-');
         $this->assertFalse(\pmssMediaStackWatchdogStatusWrite($home, '/tmp/relative-status.json', array()));
     }
+
+    public function testInvalidStatusEncodingLeavesNoTemporaryFiles(): void
+    {
+        $home = $this->pmssMakeTempDir('media-stack-encoding-');
+        $path = $home.'/.media-stack-status.json';
+        foreach ([false, true] as $existing) {
+            if ($existing) file_put_contents($path, 'previous status');
+            foreach ([['invalid' => "\xff"], ['invalid' => INF], ['invalid' => NAN]] as $status) {
+                $this->assertFalse(\pmssMediaStackWatchdogStatusWrite($home, $path, $status));
+                $this->assertSame([], array_values(array_diff(glob($home.'/.media-stack-status.*'), [$path])));
+                $this->assertSame($existing, file_exists($path));
+                if ($existing) $this->assertSame('previous status', file_get_contents($path));
+            }
+        }
+    }
+
+    public function testStatusPublicationFailuresPreservePreviousBytesAndCleanStaging(): void
+    {
+        foreach (['open', 'false', 'zero', 'short', 'chmod', 'rename', 'writeThrow', 'chmodThrow', 'renameThrow', 'writeError', 'success'] as $mode) {
+            $home = $this->pmssMakeTempDir('media-stack-publication-');
+            $path = $home.'/.media-stack-status.json';
+            file_put_contents($path, 'previous status');
+            $result = $this->statusWriteFixture($home, $mode);
+            $throws = strpos($mode, 'Throw') !== false || $mode === 'writeError';
+            $this->assertSame($throws ? null : $mode === 'success', $result['result'], $mode);
+            $this->assertSame($throws, $result['sameThrowable'], $mode);
+            $this->assertSame([], array_values(array_diff(glob($home.'/.media-stack-status.*'), [$path])), $mode);
+            $expected = $mode === 'success' ? \pmssJsonEncodePrettyLine(['state' => 'healthy']) : 'previous status';
+            $this->assertSame($expected, file_get_contents($path), $mode);
+            if ($mode === 'success') $this->assertSame(0644, fileperms($path) & 0777);
+        }
+    }
+
+    private function statusWriteFixture(string $home, string $mode): array
+    {
+        // Intercept only publication operations; path validation and fixture I/O stay real.
+        $script = <<<'PHP'
+namespace MediaStackStatusFixture;
+function tempnam($directory, $prefix) {
+    return $GLOBALS['mode'] === 'open' ? false : \tempnam($directory, $prefix);
+}
+function file_put_contents($path, $data, $flags) {
+    $mode = $GLOBALS['mode'];
+    if ($mode === 'writeThrow' || $mode === 'writeError') throw $GLOBALS['throwable'];
+    if ($mode === 'false') return false;
+    if ($mode === 'zero') return 0;
+    return \file_put_contents($path, $mode === 'short' ? substr($data, 0, -1) : $data, $flags);
+}
+function chmod($path, $permissions) {
+    if ($GLOBALS['mode'] === 'chmodThrow') throw $GLOBALS['throwable'];
+    return $GLOBALS['mode'] === 'chmod' ? false : \chmod($path, $permissions);
+}
+function rename($source, $target) {
+    if ($GLOBALS['mode'] === 'renameThrow') throw $GLOBALS['throwable'];
+    return $GLOBALS['mode'] === 'rename' ? false : \rename($source, $target);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/mediaStackWatchdog.php', 'MediaStackStatusFixture');
+        $script .= <<<'PHP'
+$GLOBALS['mode'] = getenv('PMSS_TEST_STATUS_MODE');
+$GLOBALS['throwable'] = $GLOBALS['mode'] === 'writeError' ? new \Error('write') : new \RuntimeException('publication');
+$home = getenv('PMSS_TEST_STATUS_HOME');
+$result = null;
+$sameThrowable = false;
+try {
+    $result = pmssMediaStackWatchdogStatusWrite($home, $home.'/.media-stack-status.json', ['state' => 'healthy']);
+} catch (\Throwable $caught) {
+    $sameThrowable = $caught === $GLOBALS['throwable'];
+}
+echo json_encode(['result' => $result, 'sameThrowable' => $sameThrowable]);
+PHP;
+        return $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_STATUS_MODE' => $mode, 'PMSS_TEST_STATUS_HOME' => $home]);
+    }
 }

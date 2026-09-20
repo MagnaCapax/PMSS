@@ -191,6 +191,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Logging & JSON Events
 
+- `pmssMediaStackWatchdogStatusWrite()` encodes before allocating a temporary
+  file and publishes only a complete write. Encoding, write, mode, or rename
+  failures leave the previous status untouched; unpublished files are removed
+  even when filesystem operations throw. Successful JSON bytes and mode 0644
+  remain unchanged, and exceptions continue to propagate.
+
 - Iostat input boundaries (`scripts/lib/diskIostat.php`):
   - Device-name validation matches the entire input, rejecting final newlines.
     Empty or NUL-containing discovery paths return the existing empty list.
