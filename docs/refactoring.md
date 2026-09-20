@@ -82,6 +82,9 @@ consuming unrelated resources. Task cleanup tolerates a callback closing its
 stream, so its return value or original exception survives and the prior umask
 is restored. Valid streams retain the same newline-terminated bytes and warning
 normalization; `RuntimeStreamSafetyTest` and `RuntimeTest` cover these boundaries.
+The task restores the prior umask in a nested `finally` even if closing the
+stream throws. Close exceptions retain their existing propagation and precedence
+over callback exceptions; normal callback results and append bytes are unchanged.
 
 JSON Lines readers close their stream in `finally`, including when the handler
 throws an exception or error. The original throwable propagates unchanged;

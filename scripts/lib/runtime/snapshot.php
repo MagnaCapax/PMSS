@@ -29,9 +29,13 @@ function pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defa
         }
         return (int) $callback($handle, $timestamp);
     } finally {
-        // A callback may already have closed the stream, including before throwing.
-        if (is_resource($handle) && get_resource_type($handle) === 'stream') @fclose($handle);
-        if ($oldUmask !== null) umask($oldUmask);
+        try {
+            // A callback may already have closed the stream, including before throwing.
+            if (is_resource($handle) && get_resource_type($handle) === 'stream') @fclose($handle);
+        } finally {
+            // Stream cleanup can throw too; always restore the caller's creation mask.
+            if ($oldUmask !== null) umask($oldUmask);
+        }
     }
 }
 

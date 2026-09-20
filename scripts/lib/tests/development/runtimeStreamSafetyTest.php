@@ -8,6 +8,73 @@ require_once dirname(__DIR__, 2).'/runtime.php';
 
 class RuntimeStreamSafetyTest extends TestCase
 {
+    public function testSnapshotRestoresUmaskWhenClosingThrows(): void
+    {
+        // Isolate injected close failures and the process-wide umask from the runner.
+        $runtime = var_export(dirname(__DIR__, 2).'/runtime.php', true);
+        $snapshot = var_export(dirname(__DIR__, 2).'/runtime/snapshot.php', true);
+        $script = <<<'PHP'
+namespace SnapshotCloseFixture;
+function posix_geteuid() { return 0; }
+function fclose($handle) {
+    ++$GLOBALS['closeCalls'];
+    \fclose($handle);
+    if ($GLOBALS['closeFailure'] !== null) {
+        throw $GLOBALS['closeFailure'];
+    }
+    return true;
+}
+PHP;
+        $script .= "require {$runtime}; eval('namespace SnapshotCloseFixture;'.substr(file_get_contents({$snapshot}), 5));";
+        $script .= <<<'PHP'
+[$closeType, $callbackType, $mask] = json_decode(getenv('PMSS_TEST_SNAPSHOT_CLOSE'), true);
+$GLOBALS['closeFailure'] = $closeType === '' ? null : new $closeType('close failure');
+$callbackFailure = $callbackType === '' ? null : new $callbackType('callback failure');
+$GLOBALS['closeCalls'] = 0;
+$originalMask = umask($mask);
+$result = null;
+$caught = null;
+$stream = null;
+try {
+    try {
+        $result = pmssRunSnapshotLogTask('snapshot-test.php', 'PMSS_TEST_SNAPSHOT_UNUSED',
+            getenv('PMSS_TEST_SNAPSHOT_LOG'), static function ($handle) use (&$stream, $callbackFailure): int {
+                $stream = $handle;
+                pmssSnapshotWriteLine($handle, 'snapshot');
+                if ($callbackFailure !== null) {
+                    throw $callbackFailure;
+                }
+                return 7;
+            });
+    } catch (\Throwable $error) {
+        $caught = $error;
+    }
+    echo json_encode([$result, $caught === ($GLOBALS['closeFailure'] ?? $callbackFailure),
+        umask(), $GLOBALS['closeCalls'], is_resource($stream),
+        file_get_contents(getenv('PMSS_TEST_SNAPSHOT_LOG'))]);
+} finally {
+    umask($originalMask);
+}
+PHP;
+        $root = $this->pmssMakeTempDir('pmss-snapshot-close-');
+        foreach (['', 'RuntimeException', 'Error'] as $closeType) {
+            foreach (['', 'RuntimeException', 'Error'] as $callbackType) {
+                foreach ([0, 0027, 0077] as $mask) {
+                    $path = $root.'/snapshot.log';
+                    file_put_contents($path, '');
+                    $this->assertSame([
+                        $closeType === '' && $callbackType === '' ? 7 : null,
+                        true, $mask, 1, false, "snapshot\n",
+                    ], $this->pmssRunInlinePhpJson($script, [
+                        'PMSS_TEST_SNAPSHOT_CLOSE' => json_encode([$closeType, $callbackType, $mask]),
+                        'PMSS_TEST_SNAPSHOT_LOG' => $path,
+                        'PMSS_TEST_SNAPSHOT_UNUSED' => '',
+                    ]));
+                }
+            }
+        }
+    }
+
     public function testSnapshotLogPathsFailSoftBeforeFilesystemChanges(): void
     {
         // Stub only the root check in a child process; all file operations are real.
