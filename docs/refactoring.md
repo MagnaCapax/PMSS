@@ -96,6 +96,12 @@ verifies these results and cleanup on read failures and handler exceptions.
 
 ## Helper Extraction Rules
 
+Counter-state updates release their lock even when reading prior state or
+calculating deltas throws, as well as when persistence throws. The original
+throwable propagates; normal deltas, payload bytes, and failed-open behavior
+remain unchanged. `ResourceLogHelpersTest` injects read, decode, encode, and
+write exceptions and errors, and verifies stream closure and lock reacquisition.
+
 The shared directory reader rejects empty and NUL-containing paths before
 calling `scandir()`, retaining `false` for scan failures across PHP versions.
 Valid scans preserve ordering, numeric keys, literal names, and caller-owned

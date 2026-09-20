@@ -96,25 +96,26 @@ function pmssCounterStateWritePayload($handle, string $payload): bool
 function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFields, array $deltaCeilings = []): array
 {
     $handle = pmssCounterStateLockAcquire($statePath);
-    $previousState = $handle !== false ? (pmssJsonDecodeAssoc((string) @stream_get_contents($handle)) ?? []) : [];
-    $delta = [];
-    foreach ($deltaFields as $field) {
-        $currentValue = (int) ($state[$field] ?? 0);
-        $previous = $previousState[$field] ?? null;
-        $previousValue = is_int($previous) && $previous >= 0 ? $previous : null;
-        if (is_string($previous) && ctype_digit($previous)) {
-            $previousValue = (int) $previous;
-        }
-        $candidateDelta = $previousValue !== null && $currentValue >= $previousValue
-            ? $currentValue - $previousValue
-            : $currentValue;
-        $deltaLimit = $deltaCeilings[$field] ?? null;
-        $delta[$field] = is_int($deltaLimit) && $deltaLimit >= 0 && $candidateDelta > $deltaLimit
-            ? 0
-            : $candidateDelta;
-    }
-
+    // The lock covers reads and delta calculation as well as persistence.
     try {
+        $previousState = $handle !== false ? (pmssJsonDecodeAssoc((string) @stream_get_contents($handle)) ?? []) : [];
+        $delta = [];
+        foreach ($deltaFields as $field) {
+            $currentValue = (int) ($state[$field] ?? 0);
+            $previous = $previousState[$field] ?? null;
+            $previousValue = is_int($previous) && $previous >= 0 ? $previous : null;
+            if (is_string($previous) && ctype_digit($previous)) {
+                $previousValue = (int) $previous;
+            }
+            $candidateDelta = $previousValue !== null && $currentValue >= $previousValue
+                ? $currentValue - $previousValue
+                : $currentValue;
+            $deltaLimit = $deltaCeilings[$field] ?? null;
+            $delta[$field] = is_int($deltaLimit) && $deltaLimit >= 0 && $candidateDelta > $deltaLimit
+                ? 0
+                : $candidateDelta;
+        }
+
         if ($handle !== false && is_string($payload = pmssJsonEncodeSafe($state))) {
             $written = pmssCounterStateWritePayload($handle, $payload);
             $modeSet = @chmod($statePath, 0600);

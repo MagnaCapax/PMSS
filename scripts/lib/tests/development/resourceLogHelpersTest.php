@@ -8,6 +8,72 @@ require_once dirname(__DIR__, 2).'/userLifecycle.php';
 
 class ResourceLogHelpersTest extends TestCase
 {
+    public function testCounterStateReleasesLockWhenReadOrPersistenceThrows(): void
+    {
+        $path = $this->makeStatePath(['io_read' => 4]);
+        $load = $this->pmssInlinePhpLibraryInNamespace('scripts/lib/resources/log.php', 'CounterLifecycleFixture');
+        $results = $this->pmssRunInlinePhpJson(<<<'PHP'
+namespace CounterLifecycleFixture;
+function pmssLockFileAcquire($path, $nonBlocking, $mode) {
+    return $GLOBALS['counterHandle'] = \pmssLockFileAcquire($path, $nonBlocking, $mode);
+}
+function stream_get_contents($handle) {
+    if ($GLOBALS['counterPhase'] === 'read') throw $GLOBALS['counterFailure'];
+    return \stream_get_contents($handle);
+}
+function pmssJsonDecodeAssoc($raw) {
+    if ($GLOBALS['counterPhase'] === 'decode') throw $GLOBALS['counterFailure'];
+    return \pmssJsonDecodeAssoc($raw);
+}
+function pmssJsonEncodeSafe($state) {
+    if ($GLOBALS['counterPhase'] === 'encode') throw $GLOBALS['counterFailure'];
+    return \pmssJsonEncodeSafe($state);
+}
+function fwrite($handle, $payload) {
+    if ($GLOBALS['counterPhase'] === 'write') throw $GLOBALS['counterFailure'];
+    return \fwrite($handle, $payload);
+}
+PHP
+            .$load.'$path = '.var_export($path, true).';'.<<<'PHP'
+$results = [];
+foreach (['read', 'decode', 'encode', 'write', 'success'] as $phase) {
+    foreach ([new \RuntimeException('counter failure'), new \Error('counter failure')] as $failure) {
+        \file_put_contents($path, '{"io_read":4}');
+        $GLOBALS['counterPhase'] = $phase;
+        $GLOBALS['counterFailure'] = $failure;
+        $caught = $result = null;
+        try {
+            $result = pmssCounterStateUpdate($path, ['io_read' => 9], ['io_read']);
+        } catch (\Throwable $error) {
+            $caught = $error;
+        }
+        // Inspect before fixture cleanup; retaining the handle exposes leaks.
+        $closed = !is_resource($GLOBALS['counterHandle']);
+        $probe = \pmssLockFileAcquire($path, true, 'c+');
+        $available = is_resource($probe);
+        \pmssLockHandleRelease($probe);
+        $results[] = [$phase, $closed, $available, $caught === ($phase === 'success' ? null : $failure),
+            $result, \file_get_contents($path)];
+        \pmssLockHandleRelease($GLOBALS['counterHandle']);
+    }
+}
+echo json_encode($results);
+PHP
+        );
+        $this->assertSame(10, count($results));
+        foreach ($results as [$phase, $closed, $available, $sameThrowable, $result, $contents]) {
+            $this->assertTrue($closed, $phase.' must close the stream');
+            $this->assertTrue($available, $phase.' must release the lock');
+            $this->assertTrue($sameThrowable, $phase.' must preserve the original throwable');
+            if ($phase === 'success') {
+                $this->assertSame(['delta' => ['io_read' => 5], 'previous_state' => ['io_read' => 4], 'state' => ['io_read' => 9]], $result);
+                $this->assertSame('{"io_read":9}', $contents);
+            } elseif ($phase !== 'write') {
+                $this->assertSame('{"io_read":4}', $contents);
+            }
+        }
+    }
+
     private function makeRoot(): string
     {
         return $this->pmssMakeTempDir('pmss-resource-', 0700);
