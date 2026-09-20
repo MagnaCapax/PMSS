@@ -52,8 +52,8 @@ function pmssLighttpdWatchdogSocketProbeWithRetry(string $socketPath, array $opt
             $result = is_array($probeResult)
                 ? array(
                     'ok' => !empty($probeResult['ok']),
-                    'errno' => isset($probeResult['errno']) ? (int) $probeResult['errno'] : 0,
-                    'errstr' => isset($probeResult['errstr']) ? (string) $probeResult['errstr'] : '',
+                    'errno' => (int) ($probeResult['errno'] ?? 0),
+                    'errstr' => (string) ($probeResult['errstr'] ?? ''),
                 )
                 : array('ok' => false, 'errno' => 0, 'errstr' => 'probe callback returned invalid result');
         } else {

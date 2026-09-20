@@ -45,7 +45,7 @@ function pmssUserSystemdWatchdogManagerState(int $uid, ?callable $probe = null):
     if (!is_array($result)) return 'unknown';
 
     $output = strtolower(trim((string) ($result['stdout'] ?? '')));
-    $rc = isset($result['rc']) ? (int) $result['rc'] : -1;
+    $rc = (int) ($result['rc'] ?? -1);
     if ($rc === 0 && $output === 'active') return 'active';
     return $rc === 3 && in_array($output, ['inactive', 'failed'], true) ? 'inactive' : 'unknown';
 }

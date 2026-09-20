@@ -83,7 +83,7 @@ function pmssMediaStackWatchdogSnapshot(string $username, array $apps, array $pr
 
     foreach ($apps as $app => $definition) {
         $running = pmssMediaStackWatchdogSessionRunning($username, $app, $probe);
-        $oldFailures = isset($previousApps[$app]['consecutiveFailures']) ? (int) $previousApps[$app]['consecutiveFailures'] : 0;
+        $oldFailures = (int) ($previousApps[$app]['consecutiveFailures'] ?? 0);
         $failures = $running ? 0 : max(0, $oldFailures) + 1;
         $state = $running ? 'running' : ($failures >= PMSS_MEDIA_STACK_WATCHDOG_FAILURE_CYCLES ? 'failed' : 'stopped');
         $hasStopped = $hasStopped || $state === 'stopped';
@@ -161,7 +161,7 @@ function pmssMediaStackWatchdogRunUser(string $username, string $homeRoot = '/ho
     $previousApps = isset($previous['apps']) && is_array($previous['apps']) ? $previous['apps'] : array();
     foreach ($status['apps'] as $app => $appStatus) {
         $state = (string) $appStatus['state'];
-        $oldState = isset($previousApps[$app]['state']) ? (string) $previousApps[$app]['state'] : '';
+        $oldState = (string) ($previousApps[$app]['state'] ?? '');
         if ($state !== 'running' && $state !== $oldState) {
             pmssMediaStackWatchdogLogTransition($username, $app, $state, (int) $appStatus['consecutiveFailures']);
         } elseif ($state === 'running' && $oldState !== '' && $oldState !== 'running') {

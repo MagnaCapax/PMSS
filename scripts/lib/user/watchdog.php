@@ -136,13 +136,13 @@ function pmssUserWatchdogEnsureServices(string $username, array $serviceSpecs, a
     }
 
     foreach ($serviceSpecs as $serviceSpec) {
-        $processName = isset($serviceSpec['processName']) ? (string) $serviceSpec['processName'] : '';
+        $processName = (string) ($serviceSpec['processName'] ?? '');
         if ($processName === '') {
             continue;
         }
         $command = $serviceSpec['command'] ?? '';
         is_callable($command) && $command = (string) $command($username);
-        $running = isset($runningStates[$processName]) ? (bool) $runningStates[$processName] : pmssUserWatchdogProcessRunning($username, $processName);
+        $running = (bool) ($runningStates[$processName] ?? pmssUserWatchdogProcessRunning($username, $processName));
         if (!$running && (string) $command !== '') {
             echo 'Start '.(string) ($serviceSpec['serviceLabel'] ?? $processName).' for user: '.$username."\n";
             passthru(pmssLockChildClosePrefix().(string) $command);
