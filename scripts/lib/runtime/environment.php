@@ -21,7 +21,8 @@ function pmssCommandPath(string $binary): string
     $binary = trim($binary);
     if ($binary === '' || !pmssCommandBinaryNameIsSafe($binary)) return '';
     $resolved = @shell_exec('command -v '.escapeshellarg($binary).' 2>/dev/null');
-    if (!is_string($resolved)) return '';
+    // Reject raw NUL bytes before trim() can turn malformed output into a valid path.
+    if (!is_string($resolved) || pmssFilesystemPathHasNulByte($resolved)) return '';
     $path = trim($resolved);
     return pmssCommandPathCandidateIsSafe($path) && is_executable($path) ? $path : '';
 }

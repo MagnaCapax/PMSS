@@ -43,6 +43,41 @@ class RuntimeCommandPathTest extends TestCase
         }
     }
 
+    public function testCommandPathValidatesRawLookupOutputBeforeTrimming(): void
+    {
+        // Inject only command lookup; real executable checks keep the boundary realistic.
+        $runtime = var_export(dirname(__DIR__, 2).'/runtime.php', true);
+        $environment = var_export(dirname(__DIR__, 2).'/runtime/environment.php', true);
+        $script = <<<'PHP'
+namespace CommandPathOutputFixture;
+function shell_exec($command) {
+    $GLOBALS['lookupCommands'][] = $command;
+    return $GLOBALS['lookupOutput'];
+}
+PHP;
+        $script .= "require {$runtime}; eval('namespace CommandPathOutputFixture;'.substr(file_get_contents({$environment}), 5));";
+        $script .= <<<'PHP'
+$path = PHP_BINARY;
+$cases = [
+    [null, ''], [false, ''], ['', ''], [" \t\n", ''],
+    ["\0", ''], ["\0".$path, ''], [$path."\0", ''],
+    [$path."\0\n", ''], [" \0".$path."\0 \n", ''],
+    [$path."\0suffix", ''], ["/\0".ltrim($path, '/'), ''],
+    [$path, $path], [$path."\n", $path], [" \t".$path."\r\n", $path],
+    ['relative/path', ''], [$path."\nwarning", ''],
+];
+$results = [];
+foreach ($cases as [$output, $expected]) {
+    $GLOBALS['lookupOutput'] = $output;
+    $GLOBALS['lookupCommands'] = [];
+    $results[] = [pmssCommandPath(' php ') === $expected,
+        $GLOBALS['lookupCommands'] === ["command -v 'php' 2>/dev/null"]];
+}
+echo json_encode($results);
+PHP;
+        $this->assertSame(array_fill(0, 16, [true, true]), $this->pmssRunInlinePhpJson($script));
+    }
+
     public function testCommandPathRejectsResolvedPathsWithLineBreaks(): void
     {
         $binDir = $this->pmssMakeTempDir("pmss-command-path-newline-\n");

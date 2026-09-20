@@ -33,7 +33,7 @@ Keep the canonical installer/update details under `docs/install.md` and
   reports fork exhaustion. Only piped commands receive process-group wrapping;
   inherited terminals keep their foreground group and empty capture buffers.
 - **scripts/lib/runtime/environment.php** – Command lookup rejects NUL bytes before
-  trimming binary names; ioping probes reject NUL targets before shell quoting.
+  trimming binary names or raw lookup output; ioping probes reject NUL targets before shell quoting.
   These boundaries retain their empty-string/null failure results and preserve
   ordinary whitespace normalization and valid probe arguments.
 - **scripts/lib/update/environment.php** – dpkg/apt guards plus helper to apply release-specific package selections.
