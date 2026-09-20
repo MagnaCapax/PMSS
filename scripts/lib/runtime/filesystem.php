@@ -16,6 +16,8 @@ function pmssDirEnsureExists(string $path, int $mode = 0755): bool { return $pat
  */
 function pmssDirectoryEntriesRead(string $path)
 {
+    // Invalid paths must keep the scan-failure result across PHP versions.
+    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return false;
     $entries = @scandir($path);
     return is_array($entries) ? array_diff($entries, ['.', '..']) : false;
 }
