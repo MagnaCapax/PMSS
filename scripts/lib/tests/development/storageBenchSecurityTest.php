@@ -5,6 +5,52 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class StorageBenchSecurityTest extends TestCase
 {
+    public function testCommandFieldsAndDeviceSizesValidateRawOutput(): void
+    {
+        // Inject capture results; no command, allocation, or block-device read runs.
+        $source = $this->pmssRepoPath('scripts/lib/storageBenchmark.php');
+        $script = <<<'PHP'
+namespace BenchmarkOutputFixture;
+function pmssCommandCapture($command, $timeout) {
+    return json_decode(getenv('PMSS_TEST_BENCH_CAPTURE'), true);
+}
+PHP;
+        $script .= 'eval("namespace BenchmarkOutputFixture;".substr(str_replace("__DIR__", '.
+            var_export(var_export(dirname($source), true), true).', \file_get_contents('.
+            var_export($source, true).')), 5));';
+        $script .= <<<'PHP'
+$kind = getenv('PMSS_TEST_BENCH_KIND');
+$result = $kind === 'device' ? storageBenchmarkDeviceSizeBytesRead('/dev/pmss-test')
+    : storageBenchmarkRequireCommandField('unused', 'fixture field', $kind === 'integer');
+echo json_encode([$result]);
+PHP;
+        foreach (['field', 'integer', 'device'] as $kind) {
+            foreach ([
+                ["\0"], ["\0".'1048576'], ["1048576\0"], ["1048\0".'576'],
+                [" \t\0"."1048576\0\r\n"], [''], [" \t\r\n"],
+                ["1048\n576"], ["1048\r576"], ['1048576', 7],
+                ['1048576', 0, '1048576'], [" \t001048576\r\n", 0, '001048576'],
+                ['ext4', 0, $kind === 'field' ? 'ext4' : null],
+                ['/dev/example', 0, $kind === 'field' ? '/dev/example' : null],
+                ['0', 0, $kind === 'field' ? '0' : null],
+                ['-1', 0, $kind === 'field' ? '-1' : null],
+            ] as $case) {
+                $expected = $case[2] ?? null;
+                $run = $this->pmssExecShellCommandWithTempStderr(
+                    escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
+                    ['PMSS_TEST_BENCH_KIND' => $kind,
+                        'PMSS_TEST_BENCH_CAPTURE' => json_encode(['stdout' => $case[0], 'rc' => $case[1] ?? 0])]
+                );
+                if ($expected === null && $kind !== 'device') {
+                    $this->pmssAssertCommandFailsToStderr($run['result'], $run['stderrPath'], "Error: failed to read fixture field.\n");
+                } else {
+                    $this->pmssAssertCommandSucceedsWithoutStderr($run['result'], $run['stderrPath']);
+                    $this->assertSame(json_encode([$kind === 'device' && $expected !== null ? (int) $expected : $expected]), $run['result']['output']);
+                }
+            }
+        }
+    }
+
     public function testFioTemporaryOutputCleanupPreservesResultsAndThrowables(): void
     {
         // Namespace shims inject failures without running fio or touching a device.

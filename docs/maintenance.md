@@ -27,6 +27,13 @@ including when command construction, execution, or output reading throws. The
 original throwable propagates; normal metrics and failure results are unchanged.
 `StorageBenchSecurityTest` injects these failures without executing storage probes.
 
+Storage benchmark preflight fields and block-device sizes reject NUL bytes in
+raw command output before whitespace normalization. Invalid fields retain the
+existing stderr message and exit code; invalid device sizes return `null` so
+the device is skipped. Ordinary whitespace, valid values, and existing failure
+results are unchanged. `StorageBenchSecurityTest` covers both boundaries with
+injected output, without running storage commands.
+
 ## 2. Dry-Run The Updater
 ```
 /scripts/update.php --dry-run --scriptonly --verbose

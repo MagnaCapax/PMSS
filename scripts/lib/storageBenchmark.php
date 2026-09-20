@@ -66,7 +66,19 @@ function storageBenchmarkAppendJsonLine(string $jsonLog, array $entry): void { i
 function storageBenchmarkEntryBase(string $runTs, string $label, string $runId): array { return ['timestamp' => $runTs, 'label' => $label ?: null, 'run_id' => $runId, 'run_ts' => $runTs]; }
 function storageBenchmarkApplyRunResult(array $entry, array $res, string $fallbackError = 'unknown'): array { if ($res['ok']) $entry['metrics'] = $res['result']; else $entry['error'] = $res['error'] ?? $fallbackError; return $entry; }
 function storageBenchmarkIostatUtilPctRead(string $path): ?float { $payload = pmssReadSerializedArrayFile($path); if ($payload === null || !array_key_exists('diskUtil', $payload)) return null; $util = $payload['diskUtil']; return (is_int($util) || is_float($util) || (is_string($util) && is_numeric(trim($util)))) ? (float) trim((string) $util) : null; }
-function storageBenchmarkRequireCommandField(string $command, string $label, bool $positiveInt = false): string { $result = pmssCommandCapture($command, 30); $value = trim((string) ($result['stdout'] ?? '')); if ((int) ($result['rc'] ?? 1) !== 0 || $value === '' || preg_match('/[\r\n\0]/', $value) === 1 || ($positiveInt && (!ctype_digit($value) || (int) $value <= 0))) storageBenchmarkFail("Error: failed to read {$label}.\n"); return $value; }
+/** Validate raw command bytes before whitespace normalization can erase NULs. */
+function storageBenchmarkRequireCommandField(string $command, string $label, bool $positiveInt = false): string
+{
+    $result = pmssCommandCapture($command, 30);
+    $raw = (string) ($result['stdout'] ?? '');
+    $value = trim($raw);
+    if ((int) ($result['rc'] ?? 1) !== 0 || pmssFilesystemPathHasNulByte($raw)
+        || $value === '' || preg_match('/[\r\n\0]/', $value) === 1
+        || ($positiveInt && (!ctype_digit($value) || (int) $value <= 0))) {
+        storageBenchmarkFail("Error: failed to read {$label}.\n");
+    }
+    return $value;
+}
 /** Return true only for raw block-device paths safe to pass to read-only probes. */
 function storageBenchmarkDevicePathIsSafe(string $path): bool
 {
@@ -85,8 +97,11 @@ function storageBenchmarkDeviceSizeBytesRead(string $path): ?int
     }
 
     $result = pmssCommandCapture('blockdev --getsize64 '.escapeshellarg($path), 30);
-    $value = trim((string) ($result['stdout'] ?? ''));
-    if ((int) ($result['rc'] ?? 1) !== 0 || $value === '' || preg_match('/[\r\n\0]/', $value) === 1 || !ctype_digit($value) || (int) $value <= 0) {
+    // Inspect the original bytes so a NUL-padded size cannot authorize raw reads.
+    $raw = (string) ($result['stdout'] ?? '');
+    $value = trim($raw);
+    if ((int) ($result['rc'] ?? 1) !== 0 || pmssFilesystemPathHasNulByte($raw)
+        || $value === '' || preg_match('/[\r\n\0]/', $value) === 1 || !ctype_digit($value) || (int) $value <= 0) {
         return null;
     }
 
