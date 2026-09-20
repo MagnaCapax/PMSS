@@ -45,12 +45,16 @@ function pmssDumpForkDiagnostics(string $context, ?callable $logger = null): voi
     $dir = @opendir('/proc');
     if ($dir !== false) {
         $count = 0;
-        while (false !== ($entry = readdir($dir))) {
-            if ($entry !== '.' && $entry !== '..' && ctype_digit($entry)) {
-                $count++;
+        try {
+            while (false !== ($entry = readdir($dir))) {
+                if ($entry !== '.' && $entry !== '..' && ctype_digit($entry)) {
+                    $count++;
+                }
             }
+        } finally {
+            // Diagnostics run under resource pressure; release the handle even on read errors.
+            closedir($dir);
         }
-        closedir($dir);
         $procCount = $count;
     }
     $log($prefix.sprintf(
