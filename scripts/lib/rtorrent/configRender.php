@@ -13,7 +13,7 @@ function pmssRtorrentConfigRender(string $template, array $config, array $resour
     $ramMiB = max(0, (int) $config['ram']);
     $gapMiB = max(250, min(1000, (int) floor($ramMiB * 0.25)));
     $uploadThrottleLine = '';
-    if (isset($config['uploadThrottle']) && is_numeric($config['uploadThrottle'])) {
+    if (is_numeric($config['uploadThrottle'] ?? null)) {
         $uploadThrottle = (int) $config['uploadThrottle'];
         $uploadThrottleLine = $uploadThrottle > 0 ? 'throttle.global_up.max_rate.set = '.$uploadThrottle : '';
     }

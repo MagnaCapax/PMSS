@@ -62,7 +62,7 @@ function pmssCgroupCliDefaultsApply(SystemInterface $sys, array &$opt): array
     $policy = \pmssCgroupPolicyLoad();
 
     foreach (PMSS_CGROUP_POLICY_OPTIONS as $optionKey => $policyKey) {
-        if (!isset($opt[$optionKey]) && isset($policy[$policyKey]) && is_numeric($policy[$policyKey])) {
+        if (!isset($opt[$optionKey]) && is_numeric($policy[$policyKey] ?? null)) {
             $opt[$optionKey] = (string)$policy[$policyKey];
         }
     }

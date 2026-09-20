@@ -19,7 +19,7 @@ function pmssExtractCpuQuotaPercent(array $props, array $policyDefaults): int
         return $quota;
     }
 
-    $policyQuota = (isset($policyDefaults['cpuQuotaPercent']) && is_numeric($policyDefaults['cpuQuotaPercent']))
+    $policyQuota = is_numeric($policyDefaults['cpuQuotaPercent'] ?? null)
         ? (int) $policyDefaults['cpuQuotaPercent']
         : 0;
     if ($policyQuota > 0 && $policyQuota !== 85) {
@@ -49,7 +49,7 @@ function pmssComputePhpProcessPlan(float $cpuQuotaPercent, int $minThreads = 0):
 
 function pmssLighttpdMinThreadsFromUserConfig(array $userConfig): int
 {
-    if (!isset($userConfig['lighttpdMinThreads']) || !is_numeric($userConfig['lighttpdMinThreads'])) {
+    if (!is_numeric($userConfig['lighttpdMinThreads'] ?? null)) {
         return 0;
     }
 

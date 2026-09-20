@@ -25,8 +25,8 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         return;
     }
 
-    $soft = (isset($policy['limitNoFileSoft']) && is_numeric($policy['limitNoFileSoft'])) ? max(0, (int)$policy['limitNoFileSoft']) : 0;
-    $hard = (isset($policy['limitNoFileHard']) && is_numeric($policy['limitNoFileHard'])) ? max(0, (int)$policy['limitNoFileHard']) : 0;
+    $soft = is_numeric($policy['limitNoFileSoft'] ?? null) ? max(0, (int)$policy['limitNoFileSoft']) : 0;
+    $hard = is_numeric($policy['limitNoFileHard'] ?? null) ? max(0, (int)$policy['limitNoFileHard']) : 0;
     if ($soft === 0 && $hard === 0) {
         $log('[SKIP] No LimitNOFILE values found in cgroup policy');
         return;
@@ -96,12 +96,12 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
 
         $defaultHigh  = max($minHighMiB, (int)floor($totalMiB * 0.10)); // default ~10% of RAM
         $maxCapMiB    = (int)floor($totalMiB * 0.95); // MemoryMax never above 95% of total
-        $policyHigh   = isset($policy['memoryHighMiB']) && is_numeric($policy['memoryHighMiB']) ? (int)$policy['memoryHighMiB'] : $defaultHigh;
+        $policyHigh   = is_numeric($policy['memoryHighMiB'] ?? null) ? (int)$policy['memoryHighMiB'] : $defaultHigh;
         $policyHigh   = max($minHighMiB, $policyHigh);
-        $calcMax      = isset($policy['memoryMaxMiB']) && is_numeric($policy['memoryMaxMiB']) ? (int)$policy['memoryMaxMiB'] : (int)floor($policyHigh * 1.25);
+        $calcMax      = is_numeric($policy['memoryMaxMiB'] ?? null) ? (int)$policy['memoryMaxMiB'] : (int)floor($policyHigh * 1.25);
         $calcMax      = min($calcMax, $maxCapMiB);
-        $cpuWeight    = isset($policy['cpuWeight']) && is_numeric($policy['cpuWeight']) ? (int)$policy['cpuWeight'] : 200;
-        $ioWeight     = isset($policy['ioWeight']) && is_numeric($policy['ioWeight']) ? (int)$policy['ioWeight'] : 200;
+        $cpuWeight    = is_numeric($policy['cpuWeight'] ?? null) ? (int)$policy['cpuWeight'] : 200;
+        $ioWeight     = is_numeric($policy['ioWeight'] ?? null) ? (int)$policy['ioWeight'] : 200;
 
         // Derive a reasonable default per-user TasksMax based on host capacity.
         // systemd TasksMax counts tasks (threads), not just processes.
@@ -109,7 +109,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         $memGiB = $totalMiB > 0 ? (int)ceil($totalMiB / 1024) : 0;
         $scaleBase = max($cpuThreads, $memGiB);
         $defaultTasksMax = max(2048, min(16384, 512 * $scaleBase));
-        $tasksMax = (isset($policy['tasksMax']) && is_numeric($policy['tasksMax'])) ? (int) $policy['tasksMax'] : $defaultTasksMax;
+        $tasksMax = is_numeric($policy['tasksMax'] ?? null) ? (int) $policy['tasksMax'] : $defaultTasksMax;
 
         // Calculate default CPUQuota: 85% of total logical cores (threads).
         // Fallback to 600% (6 cores) if detection fails.
@@ -132,7 +132,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
             '%%USER_CGROUP_CPU_QUOTA%%'   => ($cpuQuotaVal === 'infinity') ? 'infinity' : $cpuQuotaVal.'%',
             '%%USER_CGROUP_IO_DEVICE_LATENCY%%' => '',
         ];
-        if ($mode === 'v2' && isset($policy['ioLatencyMs']) && is_numeric($policy['ioLatencyMs']) && (int) $policy['ioLatencyMs'] > 0) {
+        if ($mode === 'v2' && is_numeric($policy['ioLatencyMs'] ?? null) && (int) $policy['ioLatencyMs'] > 0) {
             $homeDevice = pmssCgroupPolicyMountSourceResolve('/home');
             if ($homeDevice !== '' && pmssCgroupPolicyDeviceTargetIsSafe($homeDevice)) {
                 $repl['%%USER_CGROUP_IO_DEVICE_LATENCY%%'] = 'IODeviceLatencyTargetSec='.$homeDevice.' '.(int) $policy['ioLatencyMs'].'ms';
@@ -141,7 +141,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
             } else {
                 $log('[WARN] Unable to resolve /home backing device for IODeviceLatencyTargetSec');
             }
-        } elseif ($mode !== 'v2' && isset($policy['ioLatencyMs']) && is_numeric($policy['ioLatencyMs']) && (int) $policy['ioLatencyMs'] > 0) {
+        } elseif ($mode !== 'v2' && is_numeric($policy['ioLatencyMs'] ?? null) && (int) $policy['ioLatencyMs'] > 0) {
             $log('[SKIP] IODeviceLatencyTargetSec skipped on cgroup v1');
         }
         $raw = strtr((string)@file_get_contents($tpl), $repl);
@@ -157,7 +157,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
                     $log('[WARN] Unsafe backing device for cgroup policy mount '.pmssSystemdLogValue($mount).': '.pmssSystemdLogValue($src));
                     continue;
                 }
-                if (isset($def['ioWeight']) && is_numeric($def['ioWeight'])) {
+                if (is_numeric($def['ioWeight'] ?? null)) {
                     $skippedDeviceWeights = $skippedDeviceWeights || $mode !== 'v2';
                 }
                 $unsafeKeys = [];

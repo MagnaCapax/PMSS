@@ -71,7 +71,7 @@ function pmssTrafficLimitLegacyOverageStages(): array
 function pmssTrafficLimitThrottlePolicyFromNetworkConfig(array $networkConfig): array
 {
     $throttle = is_array($networkConfig['throttle'] ?? null) ? $networkConfig['throttle'] : [];
-    $capMbit = (isset($throttle['max']) && is_numeric($throttle['max'])) ? (int) $throttle['max'] : 100;
+    $capMbit = is_numeric($throttle['max'] ?? null) ? (int) $throttle['max'] : 100;
     $progressiveRaw = $throttle['progressiveThrottleEnabled'] ?? true;
     $overageStages = (is_array($throttle['overageStages'] ?? null) &&
         !pmssTrafficLimitOverageStagesMatchLegacyDefault($throttle['overageStages']))
@@ -83,11 +83,11 @@ function pmssTrafficLimitThrottlePolicyFromNetworkConfig(array $networkConfig): 
         'progressiveThrottleEnabled' => is_bool($progressiveRaw) ? $progressiveRaw : !in_array(pmssEnvValueNormalized($progressiveRaw), ['0', 'false', 'no', 'off'], true),
         'progressiveThrottleFloorPercent' => max(0.0, min(
             100.0,
-            (isset($throttle['progressiveThrottleFloorPercent']) && is_numeric($throttle['progressiveThrottleFloorPercent'])) ? (float) $throttle['progressiveThrottleFloorPercent'] : 2.5
+            is_numeric($throttle['progressiveThrottleFloorPercent'] ?? null) ? (float) $throttle['progressiveThrottleFloorPercent'] : 2.5
         )),
         'progressiveThrottleGracePercent' => max(
             0.0,
-            (isset($throttle['progressiveThrottleGracePercent']) && is_numeric($throttle['progressiveThrottleGracePercent'])) ? (float) $throttle['progressiveThrottleGracePercent'] : 0.0
+            is_numeric($throttle['progressiveThrottleGracePercent'] ?? null) ? (float) $throttle['progressiveThrottleGracePercent'] : 0.0
         ),
         'overageThrottleStages' => $overageStages,
     ];
@@ -106,7 +106,7 @@ function pmssTrafficLimitNormalizeOverageStages(array $rawStages): array
 {
     $normalizedStages = [];
     foreach ($rawStages as $index => $stage) {
-        if (!is_array($stage) || !isset($stage['overagePercent']) || !is_numeric($stage['overagePercent']) || !isset($stage['capMbit']) || !is_numeric($stage['capMbit'])) {
+        if (!is_array($stage) || !is_numeric($stage['overagePercent'] ?? null) || !is_numeric($stage['capMbit'] ?? null)) {
             continue;
         }
 
@@ -115,7 +115,7 @@ function pmssTrafficLimitNormalizeOverageStages(array $rawStages): array
             continue;
         }
 
-        $stageMinOverageGiB = (isset($stage['minOverageGiB']) && is_numeric($stage['minOverageGiB']))
+        $stageMinOverageGiB = is_numeric($stage['minOverageGiB'] ?? null)
             ? max(0.0, (float) $stage['minOverageGiB'])
             : 0.0;
 
