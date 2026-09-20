@@ -103,7 +103,7 @@ function rtorrentProcessEscalationTimestamp(string $stateFile): int
     }
 
     $decoded = json_decode($payload, true);
-    if (is_array($decoded) && isset($decoded['timestamp']) && is_numeric($decoded['timestamp'])) {
+    if (is_array($decoded) && is_numeric($decoded['timestamp'] ?? null)) {
         return max(0, (int) $decoded['timestamp']);
     }
 

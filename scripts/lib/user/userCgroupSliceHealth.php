@@ -16,7 +16,7 @@ require_once dirname(__DIR__).'/cgroup/Manager.php';
  */
 function pmssUserCgroupSliceExpectedMemoryMaxBytes(array $payload, ?int $totalMemMiB = null): int
 {
-    $memoryHighMiB = isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) ? (int) $payload['ramMiB'] : 0;
+    $memoryHighMiB = is_numeric($payload['ramMiB'] ?? null) ? (int) $payload['ramMiB'] : 0;
     if ($memoryHighMiB <= 0) {
         return 0;
     }

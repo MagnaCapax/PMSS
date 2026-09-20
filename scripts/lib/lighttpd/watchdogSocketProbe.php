@@ -35,8 +35,8 @@ function pmssLighttpdWatchdogSocketProbeWithRetry(string $socketPath, array $opt
     $attemptCount = max(1, (int) ($options['attemptCount'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_ATTEMPTS));
     $retryDelaySeconds = max(0, (int) ($options['retryDelaySeconds'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_RETRY_DELAY_SECONDS));
     $timeoutSeconds = max(1, (int) ($options['timeoutSeconds'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_TIMEOUT_SECONDS));
-    $probe = isset($options['probe']) && is_callable($options['probe']) ? $options['probe'] : null;
-    $sleep = isset($options['sleep']) && is_callable($options['sleep']) ? $options['sleep'] : 'sleep';
+    $probe = is_callable($options['probe'] ?? null) ? $options['probe'] : null;
+    $sleep = is_callable($options['sleep'] ?? null) ? $options['sleep'] : 'sleep';
 
     if ($socketPath === '') {
         return array('ok' => false, 'errno' => 0, 'errstr' => 'socket path missing', 'attempts' => 1);
@@ -120,7 +120,7 @@ function pmssLighttpdWatchdogSocketPathsFromLines(array $lines, string $homeDir)
 /** Read one bounded live-listener snapshot without trusting socket files on disk. */
 function pmssLighttpdWatchdogListeningSocketSnapshot(string $homeDir, array $options = array()): array
 {
-    $reader = isset($options['reader']) && is_callable($options['reader']) ? $options['reader'] : null;
+    $reader = is_callable($options['reader'] ?? null) ? $options['reader'] : null;
     if ($reader === null) {
         $timeoutSeconds = max(1, (int) ($options['timeoutSeconds'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_TIMEOUT_SECONDS));
         $reader = static function () use ($timeoutSeconds): array {
@@ -136,8 +136,7 @@ function pmssLighttpdWatchdogListeningSocketSnapshot(string $homeDir, array $opt
     $result = $reader();
     if (!is_array($result)
         || (int) ($result['rc'] ?? 1) !== 0
-        || !isset($result['lines'])
-        || !is_array($result['lines'])
+        || !is_array($result['lines'] ?? null)
     ) {
         return array('ok' => false, 'paths' => array());
     }
@@ -158,7 +157,7 @@ function pmssLighttpdWatchdogRestartVerify(string $homeDir, array $expectedPaths
 {
     $attemptCount = max(1, (int) ($options['attemptCount'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_ATTEMPTS));
     $retryDelaySeconds = max(0, (int) ($options['retryDelaySeconds'] ?? PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_RETRY_DELAY_SECONDS));
-    $sleep = isset($options['sleep']) && is_callable($options['sleep']) ? $options['sleep'] : 'sleep';
+    $sleep = is_callable($options['sleep'] ?? null) ? $options['sleep'] : 'sleep';
     unset($options['attemptCount'], $options['retryDelaySeconds'], $options['sleep']);
 
     for ($attempt = 1; $attempt <= $attemptCount; $attempt++) {

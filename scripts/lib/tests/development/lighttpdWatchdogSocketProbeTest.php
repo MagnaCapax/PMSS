@@ -207,6 +207,8 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
     public function testListeningSocketReaderRejectsFailedAndMalformedResults(): void
     {
         foreach (array(
+            static function (): array { return array('rc' => 0); },
+            static function (): array { return array('lines' => null, 'rc' => 0); },
             static function (): array { return array('lines' => array(), 'rc' => 1); },
             static function (): array { return array('lines' => 'not-an-array', 'rc' => 0); },
             static function () { return 'not-an-array'; },

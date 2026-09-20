@@ -8,6 +8,9 @@ class UserCgroupSliceHealthTest extends TestCase
 {
     public function testExpectedMemoryMaxUsesCanonicalCgroupClamp(): void
     {
+        foreach ([[], ['ramMiB' => null], ['ramMiB' => false], ['ramMiB' => []], ['ramMiB' => 'bad'], ['ramMiB' => 0]] as $payload) {
+            $this->assertSame(0, \pmssUserCgroupSliceExpectedMemoryMaxBytes($payload, 16384));
+        }
         $this->assertSame(1280 * 1048576, \pmssUserCgroupSliceExpectedMemoryMaxBytes(['ramMiB' => 1024], 16384));
         $this->assertSame(972 * 1048576, \pmssUserCgroupSliceExpectedMemoryMaxBytes(['ramMiB' => 900], 1024));
     }

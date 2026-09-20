@@ -48,15 +48,13 @@ function pmssLighttpdWatchdogNginxStateAdvance(
     int $threshold = PMSS_LIGHTTPD_WATCHDOG_NGINX_FAILURE_CYCLES
 ): array {
     $threshold = max(1, $threshold);
-    $previousUsers = isset($state['users']) && is_array($state['users']) ? $state['users'] : array();
+    $previousUsers = is_array($state['users'] ?? null) ? $state['users'] : array();
     $users = array();
     foreach ($usersByPort as $port => $username) {
         if (!pmssNetworkPortInRange((int) $port) || !is_string($username) || !pmssValidateUsername($username)) {
             continue;
         }
-        $previous = isset($previousUsers[$username]) && is_array($previousUsers[$username])
-            ? $previousUsers[$username]
-            : array();
+        $previous = is_array($previousUsers[$username] ?? null) ? $previousUsers[$username] : array();
         $users[$username] = array(
             'failureCycles' => max(0, (int) ($previous['failureCycles'] ?? 0)),
             'recoveryStage' => min(2, max(0, (int) ($previous['recoveryStage'] ?? 0))),
