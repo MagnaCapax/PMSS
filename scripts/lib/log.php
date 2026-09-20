@@ -48,7 +48,7 @@ if (!function_exists('logmsg')) {
             return;
         }
 
-        $defaults = isset($GLOBALS['PMSS_LOGMSG_DEFAULTS']) && is_array($GLOBALS['PMSS_LOGMSG_DEFAULTS']) ? $GLOBALS['PMSS_LOGMSG_DEFAULTS'] : [];
+        $defaults = is_array($GLOBALS['PMSS_LOGMSG_DEFAULTS'] ?? null) ? $GLOBALS['PMSS_LOGMSG_DEFAULTS'] : [];
         $script = trim((string) ($defaults['script'] ?? '')) ?: ($_SERVER['SCRIPT_NAME'] ?? __FILE__);
         $baseName = trim((string) ($defaults['base_name'] ?? '')) ?: basename($script, '.php');
         $primary = rtrim(trim((string) ($defaults['dir'] ?? '')) !== '' ? (string) $defaults['dir'] : '/var/log/pmss', '/').'/'.$baseName.'.log';

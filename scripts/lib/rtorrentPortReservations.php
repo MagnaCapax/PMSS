@@ -93,7 +93,7 @@ function pmssRtorrentPortReservationStoredSource(string $user, string $configRoo
     if (!is_array($payload)) {
         return pmssRtorrentPortReservationSourceEmpty(true);
     }
-    $users = isset($payload['users']) && is_array($payload['users']) ? $payload['users'] : $payload;
+    $users = is_array($payload['users'] ?? null) ? $payload['users'] : $payload;
     if (!array_key_exists($user, $users)) {
         return pmssRtorrentPortReservationSourceEmpty();
     }

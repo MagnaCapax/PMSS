@@ -70,10 +70,10 @@ function pmssTrafficLimitLegacyOverageStages(): array
  */
 function pmssTrafficLimitThrottlePolicyFromNetworkConfig(array $networkConfig): array
 {
-    $throttle = isset($networkConfig['throttle']) && is_array($networkConfig['throttle']) ? $networkConfig['throttle'] : [];
+    $throttle = is_array($networkConfig['throttle'] ?? null) ? $networkConfig['throttle'] : [];
     $capMbit = (isset($throttle['max']) && is_numeric($throttle['max'])) ? (int) $throttle['max'] : 100;
     $progressiveRaw = $throttle['progressiveThrottleEnabled'] ?? true;
-    $overageStages = (isset($throttle['overageStages']) && is_array($throttle['overageStages']) &&
+    $overageStages = (is_array($throttle['overageStages'] ?? null) &&
         !pmssTrafficLimitOverageStagesMatchLegacyDefault($throttle['overageStages']))
         ? $throttle['overageStages']
         : pmssTrafficLimitDefaultOverageStages();

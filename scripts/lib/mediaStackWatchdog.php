@@ -79,7 +79,7 @@ function pmssMediaStackWatchdogSnapshot(string $username, array $apps, array $pr
     $states = array();
     $hasStopped = false;
     $hasFailed = false;
-    $previousApps = isset($previous['apps']) && is_array($previous['apps']) ? $previous['apps'] : array();
+    $previousApps = is_array($previous['apps'] ?? null) ? $previous['apps'] : array();
 
     foreach ($apps as $app => $definition) {
         $running = pmssMediaStackWatchdogSessionRunning($username, $app, $probe);
@@ -158,7 +158,7 @@ function pmssMediaStackWatchdogRunUser(string $username, string $homeRoot = '/ho
         return $status;
     }
 
-    $previousApps = isset($previous['apps']) && is_array($previous['apps']) ? $previous['apps'] : array();
+    $previousApps = is_array($previous['apps'] ?? null) ? $previous['apps'] : array();
     foreach ($status['apps'] as $app => $appStatus) {
         $state = (string) $appStatus['state'];
         $oldState = (string) ($previousApps[$app]['state'] ?? '');

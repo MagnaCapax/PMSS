@@ -146,7 +146,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         }
         $raw = strtr((string)@file_get_contents($tpl), $repl);
         // Append per-mount device throttles and weights from policy
-        if (isset($policy['mounts']) && is_array($policy['mounts'])) {
+        if (is_array($policy['mounts'] ?? null)) {
             $append = [];
             $skippedDeviceWeights = false;
             foreach ($policy['mounts'] as $mount => $def) {
