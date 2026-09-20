@@ -6,6 +6,15 @@ require_once dirname(__DIR__, 2).'/runtime.php';
 
 class RuntimeEnvValueTest extends TestCase
 {
+    public function testDigitOverridesPreserveRawValidationAndIntegerCast(): void
+    {
+        foreach ([[null, null], ['', null], ['0', 0], ['0012', 12], [' 12', null], ['12 ', null], ['-1', null], ['+1', null], ['1.5', null], ['1e3', null], ["12\n", null], [str_repeat('9', 30), PHP_INT_MAX]] as [$value, $expected]) {
+            $this->pmssWithEnv(['PMSS_COMMAND_TIMEOUT' => $value], function () use ($expected): void {
+                $this->assertSame($expected, \pmssEnvReadDigits('PMSS_COMMAND_TIMEOUT'));
+                $this->assertSame($expected ?? PMSS_COMMAND_TIMEOUT_DEFAULT, \pmssCommandTimeoutSeconds('true'));
+            });
+        }
+    }
     public function testTrimmedOverridesPreserveZeroAndDefaultWhitespace(): void
     {
         foreach ([[null, ' default '], ['', ' default '], [" \t\r\n", ' default '], ['0', '0'], [' /path/ ', '/path/'], ["a\nb", "a\nb"]] as [$value, $expected]) {

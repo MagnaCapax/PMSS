@@ -109,6 +109,9 @@ function pmssEnvTrimmed(string $envKey, string $default = ''): string
     return $value === '' ? $default : $value;
 }
 
+/** Read unsigned decimal overrides without trimming; callers own defaults and zero policy. */
+function pmssEnvReadDigits(string $envKey): ?int { return (($value = getenv($envKey)) !== false && ctype_digit($value)) ? (int) $value : null; }
+
 function pmssEnvValueNormalized($value): string { return strtolower(trim((string) $value)); }
 function pmssValueMatchesNormalized($value, array $tokens): bool { return in_array(pmssEnvValueNormalized($value), $tokens, true); }
 function pmssEnvValueIsFalsey($value): bool { return pmssValueMatchesNormalized($value, ['', '0', 'false', 'no']); }

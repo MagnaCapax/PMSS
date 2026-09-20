@@ -117,6 +117,8 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `pmssEnvReadDigits(string $envKey): ?int` accepts only raw unsigned decimal environment values, retaining zero, leading zeroes, and PHP integer-cast saturation. Unset, empty, signed, fractional, or whitespace-containing values return `null`; callers retain their existing defaults and zero policy.
+
 - `pmssDirectoryEntriesRead(string $path): array|false` removes only `.` and `..`
   from a suppressed `scandir()`, preserving keys, order, and `false` on failure.
   Callers own path/symlink validation and whether scan failures may be ignored.

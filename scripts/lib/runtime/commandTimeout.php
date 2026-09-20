@@ -150,9 +150,5 @@ function pmssCommandTimeoutClose($process, string $cmd, int $timeoutSec, float $
 function pmssCommandTimeoutSeconds(string $cmd): int
 {
     unset($cmd);
-    $timeoutEnv = getenv('PMSS_COMMAND_TIMEOUT');
-
-    return ($timeoutEnv !== false && $timeoutEnv !== '' && ctype_digit($timeoutEnv))
-        ? (int) $timeoutEnv
-        : PMSS_COMMAND_TIMEOUT_DEFAULT;
+    return pmssEnvReadDigits('PMSS_COMMAND_TIMEOUT') ?? PMSS_COMMAND_TIMEOUT_DEFAULT;
 }

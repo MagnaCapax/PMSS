@@ -9,18 +9,12 @@ require_once dirname(__DIR__, 2).'/runtime.php';
 require_once dirname(__DIR__).'/fstab.php';
 require_once dirname(__DIR__).'/managedPath.php';
 
-/** Read a non-negative integer override from the environment. */
-function pmssSystemPrepReadDigitEnv(string $key): ?int
-{
-    return (($override = getenv($key)) !== false && ctype_digit($override)) ? (int) $override : null;
-}
-
 /**
  * Return total system memory in MiB (rounded).
  */
 function pmssTotalMemMiB(): int
 {
-    return pmssSystemPrepReadDigitEnv('PMSS_TOTAL_MEM_MIB') ?? pmssProcMeminfoTotalMiBRead();
+    return pmssEnvReadDigits('PMSS_TOTAL_MEM_MIB') ?? pmssProcMeminfoTotalMiBRead();
 }
 
 /**
@@ -28,7 +22,7 @@ function pmssTotalMemMiB(): int
  */
 function pmssTotalCpuThreads(): int
 {
-    if (($override = pmssSystemPrepReadDigitEnv('PMSS_TOTAL_CPU_THREADS')) !== null) {
+    if (($override = pmssEnvReadDigits('PMSS_TOTAL_CPU_THREADS')) !== null) {
         return (int) $override;
     }
 

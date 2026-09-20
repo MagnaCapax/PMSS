@@ -150,7 +150,7 @@ function pmssSysctlSwapIsFast(): bool
 /** Detect the default-route interface speed in Mbps. */
 function pmssSysctlNicSpeedMbps(): int
 {
-    if (($override = pmssSystemPrepReadDigitEnv('PMSS_SYSCTL_NIC_SPEED_MBPS')) !== null) {
+    if (($override = pmssEnvReadDigits('PMSS_SYSCTL_NIC_SPEED_MBPS')) !== null) {
         return $override;
     }
 

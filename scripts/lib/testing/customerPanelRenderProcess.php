@@ -16,8 +16,7 @@ function pmssCustomerPanelRenderExpectations(): array
         'usedBytes' => 21474836480,
     ]));
 
-    $minBytesOverride = getenv('PMSS_CUSTOMER_PANEL_RENDER_MIN_BYTES');
-    $minBytes = is_string($minBytesOverride) && ctype_digit($minBytesOverride) ? (int) $minBytesOverride : null;
+    $minBytes = pmssEnvReadDigits('PMSS_CUSTOMER_PANEL_RENDER_MIN_BYTES');
 
     return [
         'welcome.php' => ['minBytes' => $minBytes ?? 10000, 'query' => 'quota='.$quota],

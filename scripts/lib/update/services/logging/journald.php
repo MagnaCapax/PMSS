@@ -42,9 +42,8 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
 {
     $log = $logger ?: 'logMessage';
     $cfgDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
-    $rootBytes = (($override = getenv('PMSS_ROOT_FS_BYTES')) !== false && $override !== '' && ctype_digit($override))
-        ? (int) $override
-        : (((($bytes = @disk_total_space('/')) !== false) && is_numeric($bytes) && $bytes > 0) ? (int) $bytes : 0);
+    $rootBytes = pmssEnvReadDigits('PMSS_ROOT_FS_BYTES')
+        ?? (((($bytes = @disk_total_space('/')) !== false) && is_numeric($bytes) && $bytes > 0) ? (int) $bytes : 0);
     if ($rootBytes <= 0) {
         $log('[WARN] Unable to determine root filesystem size; skipping journald limits');
         return;
