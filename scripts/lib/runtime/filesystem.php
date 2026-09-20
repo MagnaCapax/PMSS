@@ -7,6 +7,19 @@
  */
 
 function pmssDirEnsureExists(string $path, int $mode = 0755): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && (is_dir($path) || @mkdir($path, $mode, true) || is_dir($path)); }
+
+/**
+ * Read directory children, preserving scandir ordering, keys, and failure state.
+ *
+ * Only dot entries are removed; callers retain path and symlink policy.
+ * @return array<int, string>|false
+ */
+function pmssDirectoryEntriesRead(string $path)
+{
+    $entries = @scandir($path);
+    return is_array($entries) ? array_diff($entries, ['.', '..']) : false;
+}
+
 function pmssPrivateTempBaseDirRealpath(?string $path = null): ?string
 {
     $path = $path === null ? sys_get_temp_dir() : $path;

@@ -117,6 +117,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `pmssDirectoryEntriesRead(string $path): array|false` removes only `.` and `..`
+  from a suppressed `scandir()`, preserving keys, order, and `false` on failure.
+  Callers own path/symlink validation and whether scan failures may be ignored.
+
 - Lock lifecycle helpers close streams when handle validation, lock acquisition,
   or explicit unlocking throws. The original throwable propagates; successful
   acquisition still transfers ownership to the caller, including the legacy

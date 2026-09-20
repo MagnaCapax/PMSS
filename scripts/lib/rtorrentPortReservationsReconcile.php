@@ -48,11 +48,11 @@ function pmssRtorrentPortReservationsMarkerEntries(string $base): ?array
         if (!is_dir($directory) || is_link($directory) || !pmssPathTargetIsSafe($directory, true)) {
             return null;
         }
-        $listed = @scandir($directory);
+        $listed = pmssDirectoryEntriesRead($directory);
         if (!is_array($listed)) {
             return null;
         }
-        $entries[$type] = array_values(array_diff($listed, array('.', '..')));
+        $entries[$type] = array_values($listed);
     }
     return $entries;
 }

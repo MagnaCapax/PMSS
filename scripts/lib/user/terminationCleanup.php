@@ -54,8 +54,8 @@ function pmssTerminateUserRemoveEmptyDir(string $username, string $phase, string
         return true;
     }
 
-    $entries = @scandir($path);
-    if (!is_array($entries) || array_diff($entries, array('.', '..')) !== array()) {
+    $entries = pmssDirectoryEntriesRead($path);
+    if ($entries !== array()) {
         return true;
     }
     if ($dryRun) {

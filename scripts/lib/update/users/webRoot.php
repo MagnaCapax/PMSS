@@ -10,6 +10,7 @@
  */
 
 require_once dirname(__DIR__, 2).'/pathSafety.php';
+require_once dirname(__DIR__, 2).'/runtime/filesystem.php';
 require_once dirname(__DIR__, 2).'/user/directories.php';
 
 /** Emit one migration message through the normal updater logger or a test logger. */
@@ -68,14 +69,11 @@ function pmssUserWebRootMigrationSnapshotWalk(string $path, string $relative, ar
         return true;
     }
 
-    $children = @scandir($path);
+    $children = pmssDirectoryEntriesRead($path);
     if (!is_array($children)) {
         return false;
     }
     foreach ($children as $child) {
-        if ($child === '.' || $child === '..') {
-            continue;
-        }
         $childRelative = $relative === '' ? $child : $relative.'/'.$child;
         if (!pmssUserWebRootMigrationSnapshotWalk($path.'/'.$child, $childRelative, $snapshot)) {
             return false;

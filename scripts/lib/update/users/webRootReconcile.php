@@ -80,10 +80,7 @@ function pmssUserWebRootReconcileTreeIsSafe(string $path, string $home, bool $pl
         return true;
     }
 
-    foreach (@scandir($path) ?: [] as $child) {
-        if ($child === '.' || $child === '..') {
-            continue;
-        }
+    foreach (pmssDirectoryEntriesRead($path) ?: [] as $child) {
         $childRelative = $relative === '' ? $child : $relative.'/'.$child;
         if (!pmssPathRelativeStringIsSafe($childRelative)
             || !pmssUserWebRootReconcileTreeIsSafe($path.'/'.$child, $home, $placed, $childRelative)) {
@@ -112,9 +109,8 @@ function pmssUserWebRootReconcileApplyOwnership(string $path, string $user): boo
         return true;
     }
 
-    foreach (@scandir($path) ?: [] as $child) {
-        if ($child !== '.' && $child !== '..'
-        && !pmssUserWebRootReconcileApplyOwnership($path.'/'.$child, $user)) {
+    foreach (pmssDirectoryEntriesRead($path) ?: [] as $child) {
+        if (!pmssUserWebRootReconcileApplyOwnership($path.'/'.$child, $user)) {
             return false;
         }
     }
@@ -174,10 +170,7 @@ function pmssUserWebRootReconcileCopyEntry(
             return false;
         }
         @chmod($target, $stat['mode'] & 07777);
-        foreach (@scandir($source) ?: [] as $child) {
-            if ($child === '.' || $child === '..') {
-                continue;
-            }
+        foreach (pmssDirectoryEntriesRead($source) ?: [] as $child) {
             $childRelative = $relative === '' ? $child : $relative.'/'.$child;
             $baselineShare = strpos($childRelative, 'rutorrent/share') === 0
                 && !file_exists(rtrim($home, '/').'/.local/share/pmss/rutorrent/share')
@@ -208,10 +201,8 @@ function pmssUserWebRootReconcileRemoveTree(string $path): void
     if (!is_dir($path)) {
         return;
     }
-    foreach (@scandir($path) ?: [] as $child) {
-        if ($child !== '.' && $child !== '..') {
-            pmssUserWebRootReconcileRemoveTree($path.'/'.$child);
-        }
+    foreach (pmssDirectoryEntriesRead($path) ?: [] as $child) {
+        pmssUserWebRootReconcileRemoveTree($path.'/'.$child);
     }
     @rmdir($path);
 }
@@ -235,10 +226,7 @@ function pmssUserWebRootReconcileMergeEntry(
             pmssUserWebRootMigrationLog($user, $logger, 'Refusing symlinked web-root directory: '.$relative);
             return;
         }
-        foreach (@scandir($source) ?: [] as $child) {
-            if ($child === '.' || $child === '..') {
-                continue;
-            }
+        foreach (pmssDirectoryEntriesRead($source) ?: [] as $child) {
             $childRelative = $relative === '' ? $child : $relative.'/'.$child;
             if (!pmssUserWebRootReconcileMergeExcluded($childRelative)) {
                 pmssUserWebRootReconcileMergeEntry($source.'/'.$child, $target.'/'.$child, $home, $user, $logger, $childRelative, $stats);
@@ -284,12 +272,10 @@ function pmssUserWebRootReconcileMergeEntry(
                 @chown($target, $user);
                 @chgrp($target, $user);
             }
-            foreach (@scandir($source) ?: [] as $child) {
-                if ($child !== '.' && $child !== '..') {
-                    $childRelative = $relative.'/'.$child;
-                    if (!pmssUserWebRootReconcileMergeExcluded($childRelative)) {
-                        pmssUserWebRootReconcileMergeEntry($source.'/'.$child, $target.'/'.$child, $home, $user, $logger, $childRelative, $stats);
-                    }
+            foreach (pmssDirectoryEntriesRead($source) ?: [] as $child) {
+                $childRelative = $relative.'/'.$child;
+                if (!pmssUserWebRootReconcileMergeExcluded($childRelative)) {
+                    pmssUserWebRootReconcileMergeEntry($source.'/'.$child, $target.'/'.$child, $home, $user, $logger, $childRelative, $stats);
                 }
             }
         }
@@ -339,8 +325,8 @@ function pmssUserWebRootReconcileFull(
         && pmssUserWebRootReconcileTreeIsSafe($stage, $home)
         && pmssUserWebRootReconcileApplyOwnership($stage, $user);
     if ($success) {
-        $entries = @scandir($www);
-        $currentRootIsSafe = !is_link($www) && (!$entries || count(array_diff($entries, ['.', '..'])) === 0);
+        $entries = pmssDirectoryEntriesRead($www);
+        $currentRootIsSafe = !is_link($www) && !$entries;
         $success = $currentRootIsSafe && @rename($stage, $www);
     }
     if (!$success) {
@@ -425,16 +411,16 @@ function pmssUserReconcileWebRoot(array $ctx, ?callable $logger = null): bool
             return false;
         }
 
-        $entries = is_dir($www) ? (@scandir($www) ?: []) : [];
-        $fullRestore = !is_dir($www) || count(array_diff($entries, ['.', '..'])) === 0;
+        $entries = is_dir($www) ? (pmssDirectoryEntriesRead($www) ?: []) : [];
+        $fullRestore = !is_dir($www) || $entries === [];
         $mode = $fullRestore ? 'full-restore' : 'partial-merge';
         $reason = $fullRestore ? 'missing-or-empty-web-root' : 'managed-entry-check';
         $result = $fullRestore
             ? pmssUserWebRootReconcileFull($www, $skeleton, $home, $user, $runLogger, $stats)
             : true;
         if (!$fullRestore) {
-            foreach (@scandir($skeleton) ?: [] as $child) {
-                if ($child !== '.' && $child !== '..' && !pmssUserWebRootReconcileMergeExcluded($child)) {
+            foreach (pmssDirectoryEntriesRead($skeleton) ?: [] as $child) {
+                if (!pmssUserWebRootReconcileMergeExcluded($child)) {
                     pmssUserWebRootReconcileMergeEntry($skeleton.'/'.$child, $www.'/'.$child, $home, $user, $runLogger, $child, $stats);
                 }
             }

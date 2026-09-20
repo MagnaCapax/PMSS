@@ -278,8 +278,7 @@ function pmssUserLifecycleWebRootContainsUserContent(string $candidate): bool
         return true;
     }
 
-    $entries = @scandir($candidate);
-    $entries = is_array($entries) ? array_diff($entries, array('.', '..')) : array();
+    $entries = pmssDirectoryEntriesRead($candidate);
     if (empty($entries)) {
         return false;
     }
@@ -289,8 +288,8 @@ function pmssUserLifecycleWebRootContainsUserContent(string $candidate): bool
         }
     }
 
-    $publicEntries = @scandir($candidate.'/public');
-    return $publicEntries === false || count(array_diff($publicEntries, array('.', '..', 'index.html'))) > 0;
+    $publicEntries = pmssDirectoryEntriesRead($candidate.'/public');
+    return $publicEntries === false || count(array_diff($publicEntries, array('index.html'))) > 0;
 }
 
 /**
