@@ -95,12 +95,13 @@ class PythonVenvHelperTest extends TestCase
         $cliBin = $venvDir.'/bin/pyload';
         $linkPath = $this->pmssMakeTempDir('pmss-python-link-dir-').'/pyload';
         $this->pmssWriteExecutableFile($cliBin, "#!/bin/sh\nexit 0\n");
+        $this->pmssResetRuntimeProfile();
 
         $this->pmssWithEnv(['PATH' => $pythonPath], function () use (&$messages, $venvDir, $cliBin, $linkPath): void {
             \pmssPythonVenvInstallCli(
                 $venvDir,
                 'pyLoad',
-                [['Installing pyLoad (pyload-ng)', 'pyload-ng']],
+                [['  Installing pyLoad (pyload-ng)  ', '  pyload-ng  ']],
                 $cliBin,
                 $linkPath,
                 '[WARN] Skipping pyLoad setup: python3 missing from PATH',
@@ -112,18 +113,33 @@ class PythonVenvHelperTest extends TestCase
         $this->assertEquals([], $messages);
         $this->assertTrue(is_link($linkPath), 'Expected installer to create a CLI symlink');
         $this->assertEquals($cliBin, readlink($linkPath));
+        $this->assertSame(
+            \pmssBuildCommand($venvDir.'/bin/python', ['-m', 'pip', 'install', '--upgrade']).' pyload-ng',
+            $this->pmssFindProfileCommand('Installing pyLoad (pyload-ng)')
+        );
     }
 
     public function testInstallerRejectsUnsafeInstallStepsBeforeRunningCommands(): void
     {
-        foreach ([
-            [[['Installing bad package', 'package; rm -rf /']]],
-            [[['Installing bad package', "package\nother"]]],
-            [[['Installing bad package']]],
-            [[[[], 'package']]],
-            [[['Installing bad package', ['package']]]],
-            [[['', 'package']]],
-        ] as $installSteps) {
+        $cases = [
+            [['Installing bad package', 'package; rm -rf /']],
+            [['Installing bad package', "package\nother"]],
+            [['Installing bad package']],
+            [[[], 'package']],
+            [['Installing bad package', ['package']]],
+            [['', 'package']],
+        ];
+        // Exercise both fields before, inside, and after text, including bytes trim removes.
+        foreach (["\0", "\t", "\n", "\r", "\x0B", "\x1F", "\x7F"] as $byte) {
+            foreach ([0, 1] as $field) {
+                foreach ([$byte.'package', 'pack'.$byte.'age', 'package'.$byte] as $value) {
+                    $step = ['Installing package', 'package'];
+                    $step[$field] = $value;
+                    $cases[] = [['Installing valid package', 'package'], $step];
+                }
+            }
+        }
+        foreach ($cases as $installSteps) {
             $messages = [];
             $this->pmssResetRuntimeProfile();
 

@@ -203,6 +203,12 @@ table only tracks external/non-Debian sources.
 
 Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely on the system interpreter; track them for future virtualenv migrations so pip activity stays isolated per app.
 
+The shared virtualenv CLI installer validates the original install-step bytes
+before running any commands. Control characters in descriptions or package
+arguments use the existing unsafe-step warning and skip path, including when
+leading or trailing bytes would disappear during trimming. Ordinary surrounding
+spaces still normalize to the same descriptions and pip arguments.
+
 ### Execution Outline
 
 1. Acquire the phase-2 lock, run fatal preflight checks, finish pending dpkg

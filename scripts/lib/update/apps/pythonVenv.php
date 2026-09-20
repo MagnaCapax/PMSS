@@ -116,7 +116,8 @@ function pmssPythonVenvInstallCli(
         $args = trim((string) $installStep[1]);
         if ($description === ''
             || $args === ''
-            || preg_match('/[\x00-\x1F\x7F]/', $description.$args) === 1
+            // Validate original bytes: trim() must not hide control characters.
+            || preg_match('/[\x00-\x1F\x7F]/', (string) $installStep[0].(string) $installStep[1]) === 1
             || preg_match('/[;&|`$<>\\\\]/', $args) === 1
         ) {
             $log('[WARN] Skipping '.$label.' install: unsafe install step');
