@@ -42,7 +42,7 @@ function pmssUserDockerEnabled(string $username, ?UserConfigStore $store = null)
 {
     if (!pmssUserConfigFeatureEnabled($username, 'dockerEnabled', $store)) return false;
     $payload = pmssUserConfigResolvePayload($username, $store);
-    $configuredRamMiB = isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) ? (int) $payload['ramMiB'] : 0;
+    $configuredRamMiB = is_numeric($payload['ramMiB'] ?? null) ? (int) $payload['ramMiB'] : 0;
     $runtimeRamMiB = $store->resolveRamMiB(pmssNormalizeUsername($username));
     $effectiveRamMiB = ($runtimeRamMiB > 0 && ($configuredRamMiB <= 0 || $runtimeRamMiB < $configuredRamMiB)) ? $runtimeRamMiB : $configuredRamMiB;
     return $effectiveRamMiB <= 0 || $effectiveRamMiB >= pmssUserDockerMinRamMiB();

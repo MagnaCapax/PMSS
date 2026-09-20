@@ -65,7 +65,7 @@ class Motd
     {
         $repl = [];
         foreach (self::MOTD_FIELDS as $placeholder => $field) {
-            $value = isset($model[$field[0]]) ? (string) $model[$field[0]] : '';
+            $value = (string) ($model[$field[0]] ?? '');
             $repl[$placeholder] = $colorEnabled && isset($field[1]) ? self::c($value, $field[1]) : $value;
         }
 
@@ -80,7 +80,7 @@ class Motd
         $patched = preg_replace('/^\s*Runtime Version:.*$/m', '', $rendered);
         $rendered = is_string($patched) ? $patched : $rendered;
 
-        $storageWarn = isset($model['storageWarn']) ? (string) $model['storageWarn'] : '';
+        $storageWarn = (string) ($model['storageWarn'] ?? '');
         if ($storageWarn !== '') {
             $rendered .= "\n\e[33mStorage WARN:\e[0m ".$storageWarn."\n";
         }

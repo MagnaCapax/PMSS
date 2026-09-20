@@ -9,7 +9,7 @@
 require_once '/scripts/lib/networkInfo.php';
 
 $link = isset($link) ? networkInterfaceNameNormalized((string) $link) : '';
-$linkSpeed = isset($linkSpeed) && is_numeric($linkSpeed) ? (int) $linkSpeed : 0;
+$linkSpeed = is_numeric($linkSpeed ?? null) ? (int) $linkSpeed : 0;
 
 #TODO This should be in the install script
 #TODO Use an actual config template

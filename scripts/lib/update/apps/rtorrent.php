@@ -34,7 +34,7 @@ require_once dirname(__DIR__, 2).'/rtorrent/legacyDirectives.php';
  */
 function pmssRtorrentResolveTargetVersions(array $distroInfo, string $legacyDebianVersion = ''): array
 {
-    $majorVersion = isset($distroInfo['version']) ? (int) $distroInfo['version'] : 0;
+    $majorVersion = (int) ($distroInfo['version'] ?? 0);
     if ($majorVersion <= 0 && preg_match('/^\s*([0-9]+)/', $legacyDebianVersion, $matches)) {
         $majorVersion = (int) $matches[1];
     }

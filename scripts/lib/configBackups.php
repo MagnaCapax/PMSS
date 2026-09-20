@@ -70,7 +70,7 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
         return null;
     }
     @chmod($backupPath, 0600);
-    if (isset($options['logSuccess']) ? (bool) $options['logSuccess'] : function_exists('logMessage')) {
+    if ((bool) ($options['logSuccess'] ?? function_exists('logMessage'))) {
         $context['log']('Backup written: '.$backupPath);
     }
     pmssPruneCriticalConfigBackups($context['service'], $context['sourcePath'], $options);
@@ -93,9 +93,9 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
     if (!is_dir($context['serviceDir']) || empty($files = glob($context['serviceDir'].'/*__'.$context['key'].'*.bak'))) {
         return;
     }
-    $maxCount = isset($options['maxCount']) ? (int) $options['maxCount'] : 10;
-    $ttlSeconds = isset($options['ttlSeconds']) ? (int) $options['ttlSeconds'] : (90 * 86400);
-    $nowTs = isset($options['nowTs']) ? (int) $options['nowTs'] : time();
+    $maxCount = (int) ($options['maxCount'] ?? 10);
+    $ttlSeconds = (int) ($options['ttlSeconds'] ?? (90 * 86400));
+    $nowTs = (int) ($options['nowTs'] ?? time());
     // Sort by filename (timestamp prefix) descending so we keep the newest ones.
     rsort($files, SORT_STRING);
     $keptMap = array_fill_keys($maxCount > 0 ? array_slice($files, 0, $maxCount) : $files, true);
