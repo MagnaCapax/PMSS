@@ -1250,7 +1250,7 @@ if [[ -z "$SECURE_APP" ]]; then
 	# Jellyfin (Repo Scraping)
 	# Fetches from repo.jellyfin.org structure: files/server/linux/latest-stable/<arch>/
 	JF_REPO_BASE="https://repo.jellyfin.org/files/server/linux/latest-stable/${JF_ARCH}/"
-	# Find filename like jellyfin_10.X.Y-amd64.tar.gz
+	# Find filename like jellyfin_12.1-amd64.tar.gz (Jellyfin ships 2- or 3-segment versions)
 	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 0 ]]; then
 		JELLYFIN_URL=""
 		JF_FILENAME="skipped"
@@ -1261,7 +1261,7 @@ if [[ -z "$SECURE_APP" ]]; then
 		if ! JF_REPO_INDEX=$(fetch_text "$JF_REPO_BASE"); then
 			JF_REPO_INDEX=""
 		fi
-		JF_FILENAME=$(printf '%s\n' "$JF_REPO_INDEX" | grep -oE "jellyfin_[0-9]+\\.[0-9]+\\.[0-9]+-${JF_ARCH}\\.tar\\.gz" | head -n 1)
+		JF_FILENAME=$(printf '%s\n' "$JF_REPO_INDEX" | grep -oE "jellyfin_[0-9]+(\\.[0-9]+){1,2}-${JF_ARCH}\\.tar\\.gz" | head -n 1 || true)
 		if [[ -z "$JF_FILENAME" ]]; then
 			log_err "Could not resolve latest Jellyfin tarball from $JF_REPO_BASE"
 			exit 1

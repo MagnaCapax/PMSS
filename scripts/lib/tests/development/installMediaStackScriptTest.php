@@ -34,6 +34,15 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('v5.10.4.9218', $this->script);
     }
 
+    public function testJellyfinVersionRegexAcceptsTwoOrThreeSegments(): void
+    {
+        // Jellyfin's stable tarball switched from a 3-segment version (10.9.11)
+        // to 2-segment (12.1); a X.Y.Z-only regex leaves JF_FILENAME empty and
+        // aborts the whole installer. The resolver must accept 2- or 3-segment
+        // versions.
+        $this->assertStringContainsString('[0-9]+){1,2}-${JF_ARCH}', $this->script);
+    }
+
     public function testProwlarrRuntimeNetcorePresent(): void
     {
         $this->assertStringContainsAllStrings([
