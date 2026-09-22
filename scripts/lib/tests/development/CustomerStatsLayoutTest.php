@@ -94,12 +94,12 @@ final class CustomerStatsLayoutTest extends TestCase
         );
 
         foreach ($cases as $case) {
-            $userBonusPath = $root.'/'.$case[0].'.userBonus';
+            $bonusPercentPath = $root.'/'.$case[0].'.bonus';
             $bonusQuotaPath = $root.'/'.$case[0].'.bonusQuota';
-            if ($case[1] !== null) $this->pmssWriteFile($userBonusPath, $case[1]."\n");
+            if ($case[1] !== null) $this->pmssWriteFile($bonusPercentPath, $case[1]."\n");
             if ($case[2] !== null) $this->pmssWriteFile($bonusQuotaPath, $case[2]."\n");
 
-            $state = pmssCustomerBonusDisplayStateRead($userBonusPath, $bonusQuotaPath);
+            $state = pmssCustomerBonusDisplayStateRead($bonusPercentPath, $bonusQuotaPath);
             $this->assertSame($case[3], $state, 'Unexpected bonus state for '.$case[0]);
             $this->assertSame($case[4], pmssCustomerBonusDisplayTextBuild($state), 'Unexpected bonus text for '.$case[0]);
             $this->assertSame($case[5], pmssCustomerBonusDisplayNoteBuild($state), 'Unexpected bonus note for '.$case[0]);

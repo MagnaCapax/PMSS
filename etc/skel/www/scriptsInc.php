@@ -152,11 +152,12 @@ if (!function_exists('pmssCustomerPositiveIntegerFileRead')) {
 }
 
 if (!function_exists('pmssCustomerBonusDisplayStateRead')) {
- /** Read the loyalty percentage, falling back to the aggregate additional GiB allocation. */
- function pmssCustomerBonusDisplayStateRead($userBonusPath = '../.userBonus', $bonusQuotaPath = '../.bonusQuota') {
-  $userBonus = pmssCustomerUnsignedIntegerFileRead($userBonusPath);
-  if ($userBonus !== null) {
-   return array('unit' => 'percent', 'value' => $userBonus, 'state' => $userBonus > 0 ? 'applied' : 'zero');
+ /** Read the loyalty percentage from .bonus (the canonical per-user bonus percent, also the
+  *  source for BFQ I/O weight), falling back to the aggregate additional GiB allocation. */
+ function pmssCustomerBonusDisplayStateRead($bonusPercentPath = '../.bonus', $bonusQuotaPath = '../.bonusQuota') {
+  $bonusPercent = pmssCustomerUnsignedIntegerFileRead($bonusPercentPath);
+  if ($bonusPercent !== null) {
+   return array('unit' => 'percent', 'value' => $bonusPercent, 'state' => $bonusPercent > 0 ? 'applied' : 'zero');
   }
 
   $bonusQuota = pmssCustomerPositiveIntegerFileRead($bonusQuotaPath);
