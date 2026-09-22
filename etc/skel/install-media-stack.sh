@@ -295,17 +295,26 @@ fetch_checksums_file() {
 # - artifact_id not found in checksums file: warn, return 0 (allow new versions)
 # - artifact_id found but hash mismatches: error, return 1 (corruption/compromise)
 verify_checksum() {
-	local file="$1" artifact_id="$2"
+	local file="$1" artifact_id="$2" require="${3:-0}"
 	if [[ ! -f "$file" ]]; then
 		return 0 # File not present (e.g., dry-run mode) — skip
 	fi
 	if [[ ! -f "$CHECKSUMS_FILE" ]]; then
+		if [[ "$require" -eq 1 ]]; then
+			log_err "No checksums file, but '${artifact_id}' requires a verified pin — aborting"
+			return 1
+		fi
 		log_warn "No checksums file — skipping verification for $(basename "$file")"
 		return 0
 	fi
 	local expected_hash
 	expected_hash=$(grep -F "  ${artifact_id}" "$CHECKSUMS_FILE" 2>/dev/null | grep -v '^#' | awk '{print $1}' | head -1)
 	if [[ -z "$expected_hash" ]]; then
+		if [[ "$require" -eq 1 ]]; then
+			log_err "No checksum pinned for '${artifact_id}', which requires verification."
+			log_err "  Add its sha256 to etc/skel/.install-checksums.sha256 and retry."
+			return 1
+		fi
 		log_warn "No checksum on file for '${artifact_id}' — skipping verification"
 		return 0
 	fi
@@ -390,14 +399,14 @@ fetch() {
 }
 
 fetch_verified_archive() {
-	local url="$1" archive="$2" label="$3" checksum_id="${4:-}"
+	local url="$1" archive="$2" label="$3" checksum_id="${4:-}" require_checksum="${5:-0}"
 	[[ -n "$checksum_id" ]] || checksum_id=$(basename "${url%%\?*}")
 
 	if ! fetch "$url" "$archive"; then
 		log_err "Failed to download ${label}"
 		exit 1
 	fi
-	if ! verify_checksum "$archive" "$checksum_id"; then
+	if ! verify_checksum "$archive" "$checksum_id" "$require_checksum"; then
 		log_err "${label} download failed integrity check — aborting"
 		exit 1
 	fi
@@ -1251,6 +1260,9 @@ if [[ -z "$SECURE_APP" ]]; then
 	# Fetches from repo.jellyfin.org structure: files/server/linux/latest-stable/<arch>/
 	JF_REPO_BASE="https://repo.jellyfin.org/files/server/linux/latest-stable/${JF_ARCH}/"
 	# Find filename like jellyfin_10.X.Y-amd64.tar.gz
+	# Only the auto-resolved path enforces a mandatory pin (see below); an explicit
+	# --jellyfin-url override and the skip case cannot be pinned by filename.
+	JF_STRICT_CHECKSUM=0
 	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 0 ]]; then
 		JELLYFIN_URL=""
 		JF_FILENAME="skipped"
@@ -1261,12 +1273,17 @@ if [[ -z "$SECURE_APP" ]]; then
 		if ! JF_REPO_INDEX=$(fetch_text "$JF_REPO_BASE"); then
 			JF_REPO_INDEX=""
 		fi
-		JF_FILENAME=$(printf '%s\n' "$JF_REPO_INDEX" | grep -oE "jellyfin_[0-9]+\\.[0-9]+\\.[0-9]+-${JF_ARCH}\\.tar\\.gz" | head -n 1)
+		JF_FILENAME=$(printf '%s\n' "$JF_REPO_INDEX" | grep -oE "jellyfin_[0-9]+\\.[0-9]+(\\.[0-9]+)?-${JF_ARCH}\\.tar\\.gz" | head -n 1)
 		if [[ -z "$JF_FILENAME" ]]; then
 			log_err "Could not resolve latest Jellyfin tarball from $JF_REPO_BASE"
 			exit 1
 		fi
 		JELLYFIN_URL="${JF_REPO_BASE}${JF_FILENAME}"
+		# Auto-resolved "latest" tarball: a pin MUST exist for whatever version we
+		# just resolved. Without this, a new upstream release the pin list has not
+		# caught up to (e.g. a two-segment 12.0) would install with no hash check
+		# at all — verify_checksum skips unknown artifact_ids. Fail closed instead.
+		JF_STRICT_CHECKSUM=1
 	fi
 
 	# ASP.NET Core Runtime (Microsoft aka.ms Links)
@@ -2310,7 +2327,7 @@ if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 	managed_install_path_reset "$installdir/${app}"
 	cd "$installdir"
 	echo "Downloading...${app^^}"
-	fetch_verified_archive "$JELLYFIN_URL" "${app}.tar.gz" "Jellyfin" "${JF_FILENAME:-override}"
+	fetch_verified_archive "$JELLYFIN_URL" "${app}.tar.gz" "Jellyfin" "${JF_FILENAME:-override}" "${JF_STRICT_CHECKSUM:-0}"
 	mkdir -p "${app}"
 	extract_tgz "${app}.tar.gz" "${app}" 1
 	[[ $DRY_RUN -eq 1 ]] || echo "${app^^} Installed"
