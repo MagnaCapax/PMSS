@@ -154,27 +154,30 @@ function pmssEnsureRootlessDockerInstalled(string $user): void
     $home = $uinfo['dir'];
     $unit = $home.'/.config/systemd/user/docker.service';
 
-    // A masked unit (symlink -> /dev/null) is our neutralised install-marker: the
-    // footgun `systemctl --user restart docker` is disabled and the daemon still
-    // runs via the watchdog's nohup dockerd-rootless.sh (ADR-0027, GH#873). Treat
-    // it as installed so the setuptool is never re-run — a re-run would recreate
-    // the footgun unit and loop on every maintenance cycle.
-    if (pmssUserDockerServiceUnitIsNeutralised($unit)) {
-        pmssUserLog($user, '[SKIP] Rootless Docker unit neutralised (masked); install-marker present');
-        return;
+    // The docker.service unit is a REAL, customer-usable unit: customers start rootless
+    // Docker with `systemctl --user start docker.service` (the Rootless Docker KB article;
+    // GH#794, closed/complete-verify, treats a broken `systemctl --user` as a FAULT TO FIX,
+    // not an unsupported path). PMSS's watchdog uses `nohup dockerd-rootless.sh` (ADR-0027)
+    // for its OWN liveness path, but the unit stays the customer path and MUST remain
+    // functional. Do NOT mask it (GH#873 correction — masking the unit broke the documented
+    // customer start path). The `systemctl --user restart` collision with the watchdog daemon
+    // is a documented UX nuance (docs steer to pkill recovery), not grounds to disable the unit.
+
+    // Restore any unit a prior release masked (symlink -> /dev/null) so the customer-usable
+    // unit comes back; the guarded reinstall below recreates the real unit.
+    if (is_link($unit) && @readlink($unit) === '/dev/null') {
+        $realHome = realpath($home);
+        $unitDir = realpath(dirname($unit));
+        if ($realHome !== false && $unitDir !== false && strpos($unitDir.'/', $realHome.'/') === 0) {
+            @unlink($unit);
+            clearstatcache();
+        }
     }
 
     if (is_file($unit)) {
         $execBinary = pmssUserDockerUnitExecBinary($unit);
         if ($execBinary !== null && is_file($execBinary)) {
-            // Present + valid: neutralise the footgun in place, then skip. Masking
-            // converges existing users off the shipped unit with NO setuptool
-            // re-run, so there is no fleet-wide reinstall wave (GH#873).
-            if (pmssNeutralizeUserDockerServiceUnit($unit, $home)) {
-                pmssUserLog($user, '[OK] Rootless Docker unit neutralised (masked) in place');
-            } else {
-                pmssUserLog($user, '[WARN] Failed to neutralise docker.service unit; left in place');
-            }
+            pmssUserLog($user, '[SKIP] Rootless Docker unit present and valid; install-marker present');
             return;
         }
 
@@ -200,14 +203,8 @@ function pmssEnsureRootlessDockerInstalled(string $user): void
     $installCmd = 'export XDG_RUNTIME_DIR=/run/user/$(id -u); export PATH=$PATH:/usr/sbin:/sbin; /usr/bin/dockerd-rootless-setuptool.sh install';
     pmssRunAndLog($user, 'rootless Docker setuptool install', $installCmd, true);
     clearstatcache();
-    // Neutralise (mask) the freshly-created unit so the footgun never goes live;
-    // the masked symlink is what the install-marker recognises next cycle (GH#873).
-    if (is_file($unit)) {
-        pmssNeutralizeUserDockerServiceUnit($unit, $home);
-        clearstatcache();
-    }
-    pmssUserLog($user, pmssUserDockerServiceUnitIsNeutralised($unit)
-        ? '[OK] Rootless Docker installed and unit neutralised (masked) for user'
+    pmssUserLog($user, is_file($unit)
+        ? '[OK] Rootless Docker installed for user'
         : '[WARN] Rootless Docker install script completed but docker.service is still missing');
 }
 

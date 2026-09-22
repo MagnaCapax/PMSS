@@ -36,29 +36,22 @@ class UserMaintenanceDockerModuleTest extends TestCase
         ]);
     }
 
-    public function testNeutraliseMasksUnitAndMarkerRecognisesIt(): void
+    public function testDockerUnitKeptFunctionalAndPriorMaskReverted(): void
     {
-        $home = $this->pmssMakeTempPath('pmss-docker-home-');
-        $unitDir = $home.'/.config/systemd/user';
-        $this->assertTrue(@mkdir($unitDir, 0755, true), 'temp home unit dir created');
-        $unit = $unitDir.'/docker.service';
-
-        // (a) a real unit reads as NOT neutralised, then masks cleanly.
-        file_put_contents($unit, "[Service]\nExecStart=/usr/bin/dockerd-rootless.sh\n");
-        $this->assertFalse(\pmssUserDockerServiceUnitIsNeutralised($unit), 'real unit is not neutralised');
-        $this->assertTrue(\pmssNeutralizeUserDockerServiceUnit($unit, $home), 'mask succeeds');
-        $this->assertTrue(is_link($unit) && readlink($unit) === '/dev/null', 'unit becomes a /dev/null symlink');
-        $this->assertTrue(\pmssUserDockerServiceUnitIsNeutralised($unit), 'masked unit reads as neutralised (install-marker)');
-        $this->assertFalse(is_file($unit), 'masked unit is not a regular file, so is_file() would loop — marker must use is_link');
-
-        // (b) masking is idempotent on an already-masked unit.
-        $this->assertTrue(\pmssNeutralizeUserDockerServiceUnit($unit, $home), 'mask is idempotent');
-        $this->assertTrue(\pmssUserDockerServiceUnitIsNeutralised($unit), 'still neutralised after idempotent call');
-
-        // (c) refuses to touch a path whose parent is outside the user's home.
-        $outside = $this->pmssMakeTempPath('pmss-docker-outside-');
-        file_put_contents($outside, 'keep');
-        $this->assertFalse(\pmssNeutralizeUserDockerServiceUnit($outside, $home), 'refuses outside home');
-        $this->assertSame('keep', file_get_contents($outside), 'outside path left untouched');
+        // GH#873 correction: the per-user docker.service unit is the customer-usable start
+        // path (`systemctl --user start docker.service`, the Rootless Docker KB article; GH#794
+        // treats broken `systemctl --user` as a fault to FIX). It MUST stay functional — it is
+        // NOT masked. A unit a prior release masked (symlink -> /dev/null) is un-masked so the
+        // real customer-usable unit is restored.
+        $this->pmssAssertRepoFileContractCases([
+            'scripts/lib/update/users/docker.php' => [
+                'required' => ["=== '/dev/null'", 'unit present and valid'],
+                'forbidden' => ['pmssNeutralizeUserDockerServiceUnit', 'neutralised (masked)'],
+            ],
+            'scripts/lib/user/rootlessDockerConfig.php' => [
+                'required' => ['pmssUserRootlessDockerConfigConverge'],
+                'forbidden' => ['pmssNeutralizeUserDockerServiceUnit'],
+            ],
+        ]);
     }
 }

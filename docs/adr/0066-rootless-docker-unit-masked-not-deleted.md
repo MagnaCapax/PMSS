@@ -4,7 +4,36 @@ Date: 2026-09-22
 Category: architecture
 
 ## Status
-Accepted. Companion to ADR-0027 (rootless Docker decoupled from the per-user systemd manager).
+**SUPERSEDED 2026-09-22 (same day) — the mask was REVERTED.** The Decision below (mask the unit)
+was wrong: it broke the documented, KB-published customer start path.
+
+## Supersession (2026-09-22)
+This ADR's premise — "PMSS never uses the unit, so it is only a footgun" — is FALSE for the party
+that matters: **customers use it.** The Rootless Docker KB article tells customers to start rootless
+Docker with `systemctl --user start docker.service`; and GH#794 (closed/complete-verify) treated a
+broken `systemctl --user` as a FAULT TO FIX (dead per-user manager, missing
+`~/.config/systemd/user/`), NOT an unsupported path — the original claim here that
+"rootless-via-systemctl is unsupported" mis-cited #794. The watchdog uses `nohup dockerd-rootless.sh`
+for its OWN liveness path (ADR-0027), but the unit remains the **customer** path and must stay
+functional. Masking it (`/dev/null` symlink) makes `systemctl --user start docker.service` fail with
+"Unit is masked" — a regression against the documented customer behaviour.
+
+**Reverted:** `pmssEnsureRootlessDockerInstalled()` no longer masks the unit; it keeps a valid unit
+functional (install-marker = `is_file`), UN-MASKS any unit a prior release masked (removes the
+`/dev/null` symlink so the real unit is recreated by the guarded setuptool reinstall), and retains
+the stale-real-unit reinstall path. The `pmssNeutralizeUserDockerServiceUnit()` /
+`pmssUserDockerServiceUnitIsNeutralised()` helpers are removed. The `systemctl --user restart`
+collision (the real #873 footgun) is handled by DOCUMENTATION (`docs/docker-help.md`,
+`docs/linuxserver.io.md` steer to `pkill` recovery), not by disabling the unit — the "or document
+that it must not be used" alternative in #873's own title. The higher-leverage root cause (why users
+reach for `systemctl` — the watchdog process-existence-not-serving liveness gap) remains tracked in
+#718/#872/#913/#875.
+
+The original (now-reverted) decision is retained below as the historical record.
+
+---
+
+Original status: Accepted. Companion to ADR-0027 (rootless Docker decoupled from the per-user systemd manager).
 
 ## Context
 `dockerd-rootless-setuptool.sh install` creates a per-user `~/.config/systemd/user/docker.service`
