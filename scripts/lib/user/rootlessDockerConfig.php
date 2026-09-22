@@ -169,3 +169,41 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
     $result['created'] = !$hasConfigFile;
     return $result;
 }
+
+/**
+ * Neutralise a per-user rootless docker.service unit by masking it (replacing it
+ * with a symlink to /dev/null). PMSS never launches the daemon from this unit —
+ * the watchdog runs `nohup dockerd-rootless.sh` (ADR-0027) — so the shipped unit
+ * is only a footgun: `systemctl --user start|restart docker` collides with the
+ * watchdog's daemon in the wedged case (GH#873). Masking turns that into a clear
+ * "Unit docker.service is masked" error while leaving a filesystem entry that
+ * pmssEnsureRootlessDockerInstalled() still recognises as installed (via is_link),
+ * so the install-marker does not regress into a per-cycle reinstall loop.
+ *
+ * The path is only ever touched when its parent directory resolves under $home.
+ * A DIY-customised unit is not preserved (rootless-via-systemctl is unsupported).
+ *
+ * @return bool true when the unit is masked (or was already masked).
+ */
+function pmssNeutralizeUserDockerServiceUnit(string $unitPath, string $home): bool
+{
+    if (is_link($unitPath) && @readlink($unitPath) === '/dev/null') {
+        return true; // already masked
+    }
+    $realHome = realpath($home);
+    $unitDir = realpath(dirname($unitPath));
+    if ($realHome === false || $unitDir === false
+        || strpos($unitDir.'/', $realHome.'/') !== 0) {
+        return false; // refuse to touch anything outside the user's home
+    }
+    if ((is_file($unitPath) || is_link($unitPath)) && !@unlink($unitPath)) {
+        return false;
+    }
+    return @symlink('/dev/null', $unitPath);
+}
+
+/** True when a docker.service unit path is our neutralised (masked) marker. */
+function pmssUserDockerServiceUnitIsNeutralised(string $unitPath): bool
+{
+    return is_link($unitPath) && @readlink($unitPath) === '/dev/null';
+}
