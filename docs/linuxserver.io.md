@@ -22,13 +22,27 @@ hosts are described in [`docs/security/operational-safety.md`](./security/operat
   home directory; you cannot (and should not) write to system paths from
   rootless Docker.
 
-You manage your daemon with:
+On a PMSS-managed account the rootless daemon is started and kept alive
+automatically by a platform watchdog — you do not start it yourself. Inspect it
+with:
 
 ```bash
 systemctl --user status docker
-systemctl --user start docker
-systemctl --user restart docker
 ```
+
+Do **not** use `systemctl --user restart docker` on a PMSS-managed account: when
+the daemon is wedged the watchdog is already holding the socket, so a restart
+collides with it. To recover a stuck daemon, terminate your own docker processes
+and let the watchdog start a fresh one, then bring your containers back:
+
+```bash
+pkill -x -u $(id -u) rootlesskit    # clear the wedged daemon
+# the 5-minute watchdog starts a fresh daemon within a few minutes; then:
+docker compose up -d
+```
+
+(On a self-managed dedicated/baremetal server where PMSS does not manage the
+account, you own the daemon and manage it with `systemctl --user` yourself.)
 
 PMSS updates (see [`docs/update.md`](./update.md)) replace `/scripts`, `/etc`,
 and parts of `/var` but do not touch your home directory. That means containers
@@ -923,13 +937,20 @@ support before running it.
     ls -ld ~/docker/* ~/downloads ~/media 2>/dev/null
     ```
 
-- **Daemon not running**
-  - Inspect status and logs:
+- **Daemon not running** (PMSS-managed account)
+  - Inspect status:
 
     ```bash
     systemctl --user status docker
-    journalctl --user -u docker
-    systemctl --user restart docker
+    ```
+
+  - The daemon is watchdog-managed — do **not** `systemctl --user restart` it (a
+    restart collides with the watchdog's running daemon). If it is wedged, clear
+    your own docker processes and let the watchdog start a fresh one:
+
+    ```bash
+    pkill -x -u $(id -u) rootlesskit
+    docker compose up -d
     ```
 
 - **Container exits immediately**

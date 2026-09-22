@@ -104,6 +104,17 @@ ps -u USER -o pid,cmd | grep dockerd
 
 If `systemctl --user` complains about missing `$DBUS_SESSION_BUS_ADDRESS` or `$XDG_RUNTIME_DIR`, you are not in a real user session. Log in directly as the user (for example `ssh user@host`) and re-run the commands, or contact support so the host-level rootless Docker configuration can be checked.
 
+If the daemon's processes are alive but `docker ps` still cannot connect to the
+socket (a "wedged" daemon), do **not** `systemctl --user restart docker` — that
+collides with the watchdog's running daemon. Instead clear your own docker
+processes and let the platform watchdog start a fresh one within a few minutes,
+then bring your containers back:
+
+```bash
+pkill -x -u $(id -u) rootlesskit
+docker compose up -d
+```
+
 See the [rootless Docker limitations](https://docs.docker.com/engine/security/rootless/#known-limitations) for details.
 
 For a deeper guide to running linuxserver.io application containers on PMSS, see
