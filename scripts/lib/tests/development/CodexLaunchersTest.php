@@ -18,7 +18,7 @@ class CodexLaunchersTest extends CodexLauncherTestCase
             $args[] = '--dry-run';
             $result = $this->launch($entry, $args);
             $this->assertSame(0, $result['rc'], $entry.': '.$result['output']);
-            $this->assertStringContainsAllStrings(['model="gpt-6-astra"', 'model_reasoning_effort="medium"'], $result['output']);
+            $this->assertStringContainsAllStrings(['model="gpt-5.6-sol"', 'model_reasoning_effort="high"'], $result['output']);
         }
         $this->assertFalse(file_exists($this->tempDir.'/assistant.json'));
         $this->assertSame(12, count(glob($this->launcherRoot.'/log/codex-run/*/*.jsonl')));
@@ -34,7 +34,7 @@ class CodexLaunchersTest extends CodexLauncherTestCase
             $this->assertSame(0, $result['rc'], $result['output']);
             $capture = $this->pmssReadJsonArrayFile($this->tempDir.'/assistant.json');
             $this->assertSame($this->launcherRoot, $capture['cwd']);
-            $this->assertStringContainsString('model="gpt-6-astra"', implode(' ', $capture['args']));
+            $this->assertStringContainsString('model="gpt-5.6-sol"', implode(' ', $capture['args']));
             $payload = $placeholder === ' ##PROMPT_STDIN##' ? $capture['stdin'] : implode(' ', $capture['args']);
             if ($placeholder === ' ##PROMPT_FILE##') {
                 $payload = file_get_contents($this->tempDir.'/output with spaces/prompt.txt');
@@ -50,7 +50,7 @@ class CodexLaunchersTest extends CodexLauncherTestCase
             'codex exec --model chosen-model -c \'model_reasoning_effort="low"\'']);
         $this->assertSame(0, $result['rc'], $result['output']);
         $args = $this->pmssReadJsonArrayFile($this->tempDir.'/assistant.json')['args'];
-        $this->assertOrderedStrings(['model="gpt-6-astra"', 'chosen-model', 'model_reasoning_effort="low"'], implode(' ', $args));
+        $this->assertOrderedStrings(['model="gpt-5.6-sol"', 'chosen-model', 'model_reasoning_effort="low"'], implode(' ', $args));
     }
 
     public function testCustomAutocommitPromptUsesDefaultOrExplicitPrefix(): void
