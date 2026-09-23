@@ -13,20 +13,12 @@ require_once __DIR__.'/../../userLifecycle.php';
  */
 function pmssAddUserCleanupFailedProvisionTargetValid(string $userName, string $homePath, ?callable $pathSafetyChecker = null): bool
 {
-    if (!pmssValidateUsername($userName)) {
-        return false;
-    }
-
-    if ($homePath === '' || strpos($homePath, "\0") !== false) {
-        return false;
-    }
-
-    if ($homePath !== '/home/'.$userName) {
-        return false;
-    }
-
     $pathSafetyChecker = $pathSafetyChecker ?? 'pmssPathTargetIsSafe';
-    return (bool) $pathSafetyChecker($homePath, true, false, false);
+    return pmssValidateUsername($userName)
+        && $homePath !== ''
+        && strpos($homePath, "\0") === false
+        && $homePath === '/home/'.$userName
+        && (bool) $pathSafetyChecker($homePath, true, false, false);
 }
 
 /**
@@ -74,12 +66,8 @@ function pmssAddUserLatestProvisionSummary(string $userName): ?array
  */
 function pmssAddUserProvisionSummaryRecoverable(?array $summary, ?int $now = null): bool
 {
-    if (!is_array($summary) || ($summary['status'] ?? '') !== 'FAIL') {
-        return false;
-    }
-
     $timestamp = (int) ($summary['timestamp'] ?? 0);
-    if ($timestamp <= 0) {
+    if (!is_array($summary) || ($summary['status'] ?? '') !== 'FAIL' || $timestamp <= 0) {
         return false;
     }
 

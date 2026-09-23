@@ -211,11 +211,8 @@ function pmssUserLifecycleWebRootPathIsSafe(string $homeDir, string $path, strin
     }
 
     $realHome = realpath($homeDir);
-    if ($realHome === false || $realHome !== $homeDir || dirname($path) !== $homeDir || basename($path) !== $expectedBasename) {
-        return false;
-    }
-
-    if (is_link($path)) {
+    if ($realHome === false || $realHome !== $homeDir || dirname($path) !== $homeDir
+        || basename($path) !== $expectedBasename || is_link($path)) {
         return false;
     }
     if (!file_exists($path)) {
@@ -259,14 +256,11 @@ function pmssUserLifecycleSyncSuspendedState(string $username, string $disabledR
 function pmssUserLifecycleSuspendedBackupCandidateIsSafe(string $homeDir, string $candidate): bool
 {
     $homeDir = rtrim($homeDir, '/');
-    if ($homeDir === '' || is_link($candidate) || !is_dir($candidate)) {
-        return false;
-    }
-    if (dirname($candidate) !== $homeDir) {
-        return false;
-    }
-
-    return strpos(basename($candidate), 'www-suspended-') === 0;
+    return $homeDir !== ''
+        && !is_link($candidate)
+        && is_dir($candidate)
+        && dirname($candidate) === $homeDir
+        && strpos(basename($candidate), 'www-suspended-') === 0;
 }
 
 /**

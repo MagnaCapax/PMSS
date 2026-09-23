@@ -37,10 +37,8 @@ function rtorrentProcessUserTargetPathIsSafe(
         return false;
     }
 
-    if (!$testMode && $home !== '/home/'.$user) {
-        return false;
-    }
-    if ($testMode && $requireUserTailInTest && substr($home, -strlen('/'.$user)) !== '/'.$user) {
+    if ((!$testMode && $home !== '/home/'.$user)
+        || ($testMode && $requireUserTailInTest && substr($home, -strlen('/'.$user)) !== '/'.$user)) {
         return false;
     }
 
