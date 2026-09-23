@@ -173,7 +173,7 @@ if (!function_exists('pmssCustomerBonusDisplayTextBuild')) {
  /** Keep loyalty percentages distinct from aggregate additional disk space. */
  function pmssCustomerBonusDisplayTextBuild($state) {
   $unit = is_array($state) && isset($state['unit']) && $state['unit'] === 'gib' ? 'gib' : 'percent';
-  $value = is_array($state) && isset($state['value']) && is_numeric($state['value'])
+  $value = is_array($state) && is_numeric($state['value'] ?? null)
    ? max(0, (int) $state['value'])
    : 0;
 
@@ -913,7 +913,7 @@ if (!function_exists('pmssCustomerBackupRestoreEntriesSelect')) {
   $entries = array();
   foreach ($iterator as $entry) {
    $member = pmssCustomerBackupRestoreMemberNormalize(pmssCustomerBackupRestoreMemberNameFromPhar($archivePath, $entry));
-   $type = isset($types[$member]) ? $types[$member] : null;
+   $type = $types[$member] ?? null;
    if ($member === ''
        || !pmssCustomerBackupRestoreMemberAllowed($member)
        || !pmssCustomerBackupRestoreMemberTypeAllowed($type)

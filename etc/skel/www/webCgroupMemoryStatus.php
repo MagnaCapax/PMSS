@@ -42,13 +42,13 @@ function pmssWebCgroupMemoryStatusV2MemoryControllerAvailable($cgroupDir)
 /** Detect the readable user.slice directory for the current account. */
 function pmssWebCgroupMemoryStatusDetectDir(array $overrides = [])
 {
-    if (isset($overrides['cgroup_dir']) && is_string($overrides['cgroup_dir']) && $overrides['cgroup_dir'] !== '') {
+    if (is_string($overrides['cgroup_dir'] ?? null) && $overrides['cgroup_dir'] !== '') {
         return $overrides['cgroup_dir'];
     }
 
     $uid = $overrides['uid'] ?? (function_exists('posix_getuid') ? posix_getuid() : null);
     if (is_int($uid) && $uid >= 0) {
-        $candidates = isset($overrides['cgroup_dir_candidates']) && is_array($overrides['cgroup_dir_candidates'])
+        $candidates = is_array($overrides['cgroup_dir_candidates'] ?? null)
             ? $overrides['cgroup_dir_candidates']
             : [
                 '/sys/fs/cgroup/user.slice/user-'.$uid.'.slice',
@@ -254,15 +254,15 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
 function pmssWelcomeMemoryStateBuild($pressureStatusOverride = null)
 {
     $memory = pmssCustomerSerializedArrayFileRead('../.resourceData', 1048576);
-    $memory = is_array($memory) && isset($memory['memory']) && is_array($memory['memory'])
+    $memory = is_array($memory) && is_array($memory['memory'] ?? null)
         ? $memory['memory']
         : array();
-    $currentBytes = isset($memory['current']) && is_numeric($memory['current'])
+    $currentBytes = is_numeric($memory['current'] ?? null)
         ? (float) $memory['current']
         : null;
     $breakdown = array();
     foreach (array('anon', 'file') as $key) {
-        if (isset($memory[$key]) && is_numeric($memory[$key])) {
+        if (is_numeric($memory[$key] ?? null)) {
             $breakdown[$key] = (float) $memory[$key];
         }
     }

@@ -77,7 +77,7 @@ function pmssLighttpdPanelSessionLoginOptions(string $user, string $homeDir, boo
 
 function pmssLighttpdPanelSessionLoginShouldEmit(array $options): bool
 {
-    $gatePath = isset($options['gatePath']) && is_string($options['gatePath']) ? $options['gatePath'] : '';
+    $gatePath = is_string($options['gatePath'] ?? null) ? $options['gatePath'] : '';
     $gateExists = array_key_exists('gateExists', $options)
         ? (bool) $options['gateExists']
         : pmssLighttpdPanelSessionGateFileUsable($gatePath);

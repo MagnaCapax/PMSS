@@ -23,7 +23,7 @@ if (isset($_GET['backup']) && $_GET['backup'] === 'download') {
 $configRestoreResult = null;
 if (isset($_GET['restore']) && $_GET['restore'] === 'config') {
     $configRestoreResult = $_SERVER['REQUEST_METHOD'] === 'POST'
-        ? pmssCustomerBackupRestore(dirname(__DIR__), isset($_POST['archivePath']) ? (string) $_POST['archivePath'] : '')
+        ? pmssCustomerBackupRestore(dirname(__DIR__), (string) ($_POST['archivePath'] ?? ''))
         : pmssCustomerBackupRestoreResult(false, 'Use the restore form to choose an uploaded backup archive.');
 }
 
@@ -893,10 +893,10 @@ function pmssWelcomeTrafficDefaultCapMbitRead() {
  * Build tiny traffic-cap disclosure text shown near usage gauge.
  */
 function pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingServiceId) {
-    $effectiveCapMbit = isset($trafficBandwidthState['effectiveCapMbit']) && is_numeric($trafficBandwidthState['effectiveCapMbit'])
+    $effectiveCapMbit = is_numeric($trafficBandwidthState['effectiveCapMbit'] ?? null)
         ? (int) $trafficBandwidthState['effectiveCapMbit']
         : 0;
-    $isReduced = isset($trafficBandwidthState['isReduced']) && $trafficBandwidthState['isReduced'] === true;
+    $isReduced = ($trafficBandwidthState['isReduced'] ?? null) === true;
     if (!$isReduced) {
         return '<span style="font-size: 0.82em; color: #666;">Current effective: full plan port speed</span>';
     }
@@ -923,10 +923,10 @@ function pmssWelcomeTrafficDisclosureHtmlBuild($trafficPercent, $trafficBandwidt
     );
 
     $isReduced = !empty($trafficBandwidthState['isReduced']);
-    $effectiveCapMbit = isset($trafficBandwidthState['effectiveCapMbit']) && is_numeric($trafficBandwidthState['effectiveCapMbit'])
+    $effectiveCapMbit = is_numeric($trafficBandwidthState['effectiveCapMbit'] ?? null)
         ? max(0, (int) $trafficBandwidthState['effectiveCapMbit'])
         : 0;
-    $throttleFileMtime = isset($trafficBandwidthState['throttleFileMtime']) && is_numeric($trafficBandwidthState['throttleFileMtime'])
+    $throttleFileMtime = is_numeric($trafficBandwidthState['throttleFileMtime'] ?? null)
         ? (int) $trafficBandwidthState['throttleFileMtime']
         : null;
     $capText = number_format($effectiveCapMbit).' Mbps';
@@ -1246,7 +1246,7 @@ function pmssWelcomeManagedAppsHtmlBuild(array $managedApps, $delugePasswordCanR
 
     $html = '';
     foreach ($specs as list($appName, $prefix, $heading, $body, $startLabel, $startSuccess, $startPending, $disableLabel, $disableSuccess, $disablePending, $restartLabel, $restartSuccess, $restartPending)) {
-        $definition = isset($managedApps[$appName]) && is_array($managedApps[$appName]) ? $managedApps[$appName] : array();
+        $definition = is_array($managedApps[$appName] ?? null) ? $managedApps[$appName] : array();
         if (!isset($definition['endpoint'], $definition['binaries'], $definition['enable']) || !is_array($definition['binaries']) || !pmssWelcomeServiceAvailable($definition['endpoint'], $definition['binaries'])) continue;
         $endpoint = (string) $definition['endpoint'];
         $html .= '<h6>'.pmssWelcomeHtmlAttr($heading).'</h6>'.$body;
@@ -1324,7 +1324,7 @@ function pmssWelcomeUserConfigNumber($key, $allowSymlink = false) {
     $configPath = '../.config/pmss-user.json';
     $raw = pmssCustomerFileRead($configPath, $allowSymlink);
     $userConfig = is_string($raw) ? pmssJsonDecodeAssoc($raw) : null;
-    return is_array($userConfig) && isset($userConfig[$key]) && is_numeric($userConfig[$key])
+    return is_array($userConfig) && is_numeric($userConfig[$key] ?? null)
         ? (float) $userConfig[$key]
         : null;
 }
@@ -1335,10 +1335,8 @@ function pmssWelcomeSerializedArrayRead($path) {
 
 function pmssWelcomeTrafficMonthValueRead($trafficState) {
     if (!is_array($trafficState)
-        || !isset($trafficState['raw'])
-        || !is_array($trafficState['raw'])
-        || !isset($trafficState['raw']['month'])
-        || !is_numeric($trafficState['raw']['month'])) {
+        || !is_array($trafficState['raw'] ?? null)
+        || !is_numeric($trafficState['raw']['month'] ?? null)) {
         return null;
     }
 
@@ -1396,7 +1394,7 @@ function createStackedGauge($titleText, $footerText, $percent, $segments) {
     $barHtml = '';
     $filledPercent = 0;
     foreach ($segments as $segment) {
-        $width = isset($segment['width']) && is_numeric($segment['width']) ? (float) $segment['width'] : 0;
+        $width = is_numeric($segment['width'] ?? null) ? (float) $segment['width'] : 0;
         if (empty($segment['raw'])) {
             $width = max(0, min(100 - $filledPercent, $width));
             if ($width <= 0) {
@@ -1404,7 +1402,7 @@ function createStackedGauge($titleText, $footerText, $percent, $segments) {
             }
             $filledPercent += $width;
         }
-        $color = isset($segment['color']) ? (string) $segment['color'] : 'transparent';
+        $color = (string) ($segment['color'] ?? 'transparent');
         $id = isset($segment['id']) ? ' id="'.(string) $segment['id'].'"' : '';
         $barHtml .= '<div'.$id.' style="float: left; width: '.$width.'%; background-color: '.$color.'; visibility: visible;">&nbsp;</div>';
     }

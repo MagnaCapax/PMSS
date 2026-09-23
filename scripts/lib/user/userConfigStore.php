@@ -203,7 +203,7 @@ class UserConfigStore
     private function normalise(array $payload): array
     {
         // Additive back-compat: map legacy rtorrentRam -> ramMiB but keep rtorrentRam if present.
-        if (!isset($payload['ramMiB']) && isset($payload['rtorrentRam']) && is_numeric($payload['rtorrentRam'])) {
+        if (!isset($payload['ramMiB']) && is_numeric($payload['rtorrentRam'] ?? null)) {
             $payload['ramMiB'] = (int)$payload['rtorrentRam'];
         }
 
@@ -242,7 +242,7 @@ class UserConfigStore
         $payload['scheduledConfigBackup'] = pmssUserConfigNormaliseToggleValue($payload, 'scheduledConfigBackup', false);
 
         // Safety gate: keep rootless Docker disabled for low-memory accounts.
-        if (isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) && (int)$payload['ramMiB'] > 0
+        if (is_numeric($payload['ramMiB'] ?? null) && (int)$payload['ramMiB'] > 0
             && (int)$payload['ramMiB'] < pmssUserDockerMinRamMiB()) {
             $payload['dockerEnabled'] = false;
         }
@@ -262,7 +262,7 @@ class UserConfigStore
         }
 
         return $this->normaliseUserMap(
-            isset($data['users']) && is_array($data['users']) ? $data['users'] : $data
+            is_array($data['users'] ?? null) ? $data['users'] : $data
         );
     }
 
