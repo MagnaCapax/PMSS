@@ -23,11 +23,7 @@ function pmssWelcomeUserMessagePath(string $userHome): string
 function pmssWelcomeUserMessageRead(string $userHome): string
 {
     $path = pmssWelcomeUserMessagePath($userHome);
-    if (!pmssCustomerPathIsSafe($path) || !is_file($path) || is_link($path)) {
-        return '';
-    }
-
-    $content = @file_get_contents($path);
+    $content = pmssCustomerPathIsSafe($path) ? pmssCustomerFileRead($path) : null;
     return (is_string($content) && trim($content) !== '') ? $content : '';
 }
 
@@ -48,8 +44,8 @@ function pmssWelcomeMessageForUser(
             break;
         }
     }
-    if ($productKey === '' && is_file($productFile = pmssCustomerHomePath($userHome, '.product')) && !is_link($productFile) && pmssCustomerPathIsSafe($productFile)) {
-        $productKey = trim((string) @file_get_contents($productFile));
+    if ($productKey === '' && pmssCustomerPathIsSafe($productFile = pmssCustomerHomePath($userHome, '.product'))) {
+        $productKey = (string) (pmssCustomerTrimmedFileRead($productFile) ?? '');
     }
 
     $template = pmssWelcomeUserMessageRead($userHome);

@@ -195,8 +195,7 @@ function pmssMediaStackPanelRecoveryRequestAllowed(array $server): bool
  */
 function pmssMediaStackPanelPidRead(string $home): int
 {
-    $raw = @file_get_contents(pmssMediaStackPanelHomePath($home, '.install-media-stack-web.pid'));
-    return is_string($raw) ? (int) trim($raw) : 0;
+    return (int) (pmssCustomerTrimmedFileRead(pmssMediaStackPanelHomePath($home, '.install-media-stack-web.pid'), true) ?? '');
 }
 
 /**

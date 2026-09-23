@@ -405,8 +405,7 @@ echo pmssCustomerHtmlAttr($ip !== false ? trim($ip) : 'unknown');
 <div class="stats-block">
     <h6>Disk usage / Quota</h6>
     <pre><?php
-    if (file_exists('../.quota')) {
-        $content = file_get_contents('../.quota');
+    if (is_string($content = pmssCustomerFileRead('../.quota', true))) {
         echo $content;
         $mtime = filemtime('../.quota');
         echo "\nUpdated: " . date('Y-m-d H:i:s', $mtime) . "\n";

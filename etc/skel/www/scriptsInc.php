@@ -237,12 +237,12 @@ if (!function_exists('pmssCustomerCgroupDirOwnsMemoryController')) {
 
   $cgroupDir = rtrim($cgroupDir, '/');
   $memoryStatPath = $cgroupDir.'/memory.stat';
-  if (!is_file($memoryStatPath) || @file_get_contents($memoryStatPath) === false) return false;
+  if (pmssCustomerFileRead($memoryStatPath, true) === null) return false;
 
   $controllersPath = $cgroupDir.'/cgroup.controllers';
   if (!is_file($controllersPath)) return true;
 
-  $controllers = @file_get_contents($controllersPath);
+  $controllers = pmssCustomerFileRead($controllersPath, true);
   return is_string($controllers)
    && preg_match('/(?:^|\s)memory(?:\s|$)/', trim($controllers)) === 1;
  }
@@ -948,8 +948,8 @@ if (!function_exists('pmssCustomerBackupRestoreRtorrentProcRunning')) {
 
   while (($entry = readdir($dir)) !== false) {
    if (!ctype_digit($entry)) continue;
-   $status = @file_get_contents(rtrim($procRoot, '/').'/'.$entry.'/status');
-   $comm = @file_get_contents(rtrim($procRoot, '/').'/'.$entry.'/comm');
+   $status = pmssCustomerFileRead(rtrim($procRoot, '/').'/'.$entry.'/status', true);
+   $comm = pmssCustomerFileRead(rtrim($procRoot, '/').'/'.$entry.'/comm', true);
    if (is_string($status)
        && is_string($comm)
        && preg_match('/^Uid:\s+'.preg_quote((string) $uid, '/').'\s/m', $status) === 1

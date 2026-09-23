@@ -68,8 +68,8 @@ if (!function_exists('pmssStorageHealthSnapshotRaid')) {
     /** Read mdadm array status from /proc/mdstat (world-readable). */
     function pmssStorageHealthSnapshotRaid(string $timestamp): array
     {
-        $mdstat = @file_get_contents('/proc/mdstat');
-        if ($mdstat === false) {
+        $mdstat = pmssCustomerFileRead('/proc/mdstat', true);
+        if (!is_string($mdstat)) {
             return [];
         }
         $entries = [];

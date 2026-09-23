@@ -186,7 +186,7 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
     $memoryBreakdown = [];
     if ($cgroupAvailable) {
         foreach (pmssCustomerCgroupCounterPaths($uid, rtrim($cgroupDir, '/'), 'memory.stat', 'memory', 'memory.stat') as $path) {
-            $raw = @file_get_contents($path);
+            $raw = pmssCustomerFileRead($path, true);
             if (!is_string($raw) || trim($raw) === '') {
                 continue;
             }
@@ -288,7 +288,7 @@ function pmssWelcomeMemoryStateBuild($pressureStatusOverride = null)
 
     if (!isset($breakdown['anon'], $breakdown['file']) && $uid !== null) {
         foreach (pmssCustomerCgroupCounterPaths($uid, '', 'memory.stat', 'memory', 'memory.stat') as $path) {
-            $raw = @file_get_contents($path);
+            $raw = pmssCustomerFileRead($path, true);
             if (!is_string($raw) || trim($raw) === '') {
                 continue;
             }

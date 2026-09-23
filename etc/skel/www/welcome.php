@@ -1263,8 +1263,8 @@ function pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage) {
         $html .= $welcomeHeading;
     }
 
-    if (file_exists('/etc/seedbox/config/vendorWelcome')) {
-        $html .= (string) @file_get_contents('/etc/seedbox/config/vendorWelcome');
+    if (is_string($vendorWelcome = pmssCustomerFileRead('/etc/seedbox/config/vendorWelcome', true))) {
+        $html .= $vendorWelcome;
     }
 
     if (!empty($contextualWelcomeMessage)) {

@@ -7,6 +7,7 @@
  *
  * @license GPL-3.0-only
  */
+require_once __DIR__.'/scriptsInc.php';
 
 /**
  * Run a fail-soft shell command for the stats page.
@@ -264,7 +265,7 @@ function pmssStatsServerResourceTextBuild(): string
         : trim((string) $uptimeResult['output'])."\n\n";
     $text .= "Memory usage:\n";
 
-    $meminfo = @file_get_contents('/proc/meminfo');
+    $meminfo = pmssCustomerFileRead('/proc/meminfo', true);
     if (!$meminfo || preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m) < 1) {
         return $text."Failed to read /proc/meminfo\n";
     }
@@ -276,7 +277,7 @@ function pmssStatsServerResourceTextBuild(): string
     $text .= sprintf("Swap total:       %6s MiB\n", round($fmt('SwapTotal') / 1024, 0));
     $text .= sprintf("Swap free:        %6s MiB\n", round($fmt('SwapFree') / 1024, 0));
 
-    $psi = @file_get_contents('/proc/pressure/memory');
+    $psi = pmssCustomerFileRead('/proc/pressure/memory', true);
     if ($psi && preg_match('/some avg10=([0-9.]+) avg60=([0-9.]+) avg300=([0-9.]+)/', $psi, $m) === 1) {
         $text .= sprintf("Memory pressure (some):  %s / %s / %s\n", $m[1], $m[2], $m[3]);
         if (preg_match('/full avg10=([0-9.]+) avg60=([0-9.]+) avg300=([0-9.]+)/', $psi, $f) === 1) {
@@ -503,7 +504,7 @@ function pmssStatsDockerInactiveNote(
         return '';
     }
 
-    $cmdline = (string) @file_get_contents($cmdlinePath);
+    $cmdline = (string) (pmssCustomerFileRead($cmdlinePath, true) ?? '');
     if (strpos($cmdline, 'unified_cgroup_hierarchy=0') !== false) {
         if ($dockerEnabledPolicy === false) {
             return ' (Docker is available but currently disabled by policy. Contact support if it should be enabled.)';
@@ -525,7 +526,7 @@ function pmssStatsDockerInactiveNote(
         }
     }
     if ($debianLabel === 'Debian') {
-        $debianVersion = trim((string) @file_get_contents($debianVersionPath));
+        $debianVersion = (string) (pmssCustomerTrimmedFileRead($debianVersionPath, true) ?? '');
         if (preg_match('/^([0-9]+)/', $debianVersion, $matches) === 1) {
             $debianLabel = 'Debian '.$matches[1];
         }
