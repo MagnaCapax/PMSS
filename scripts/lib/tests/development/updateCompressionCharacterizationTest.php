@@ -118,7 +118,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
             ],
             'scripts/lib/user/torrentPort.php' => [
                 'required' => [
-                    "require_once __DIR__.'/qbittorrent.php';",
+                    "pmssRequireRelativeFiles(__DIR__, ['../lighttpd/userConfigApply.php', 'qbittorrent.php', 'identity.php']);",
                     'pmssQbittorrentConfigMutate(',
                 ],
                 'forbidden' => [

@@ -23,7 +23,7 @@ class CronInlineCharacterizationTest extends TestCase
             'scripts/lib/runtime/environment.php' => ['required' => ['function pmssBuildUserShellCommand(', 'escapeshellarg($username)', 'escapeshellarg($command)']],
             'scripts/lib/user/serviceLaunch.php' => ['required' => ['function pmssBuildUserServiceShellCommand(', "'--scope'", "'--slice='.\$slice", "pmssBuildCommand('systemd-run'", "pmssBuildCommand('systemctl', ['start', \$slice])"]],
             'scripts/lib/user/watchdog.php' => ['required' => [
-                "require_once __DIR__.'/serviceLaunch.php';",
+                "pmssRequireRelativeFiles(__DIR__, ['log.php', 'selection.php', 'serviceLaunch.php']);",
                 'function pmssUserWatchdogLockAcquire(',
                 'function pmssUserWatchdogRestartProcessesIf(',
                 'function pmssUserWatchdogApplyManagedConfigWhenStopped(',

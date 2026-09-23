@@ -13,8 +13,7 @@
  */
 
 require_once __DIR__.'/../lib/runtime.php';
-require_once __DIR__.'/../lib/update/distro.php';
-require_once __DIR__.'/../lib/certbotSetup.php';
+pmssRequireRelativeFiles(__DIR__.'/../lib', ['update/distro.php', 'certbotSetup.php']);
 
 function pmssSetupLetsEncryptMain(array $argv): int
 {

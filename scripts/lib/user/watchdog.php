@@ -7,9 +7,7 @@
  */
 
 require_once dirname(__DIR__).'/runtime.php';
-require_once __DIR__.'/log.php';
-require_once __DIR__.'/selection.php';
-require_once __DIR__.'/serviceLaunch.php';
+pmssRequireRelativeFiles(__DIR__, ['log.php', 'selection.php', 'serviceLaunch.php']);
 
 /** Return true when watchdogs must avoid web-facing services for the user. */
 function pmssUserWebRootUnavailable(string $username, string $homeRoot = '/home'): bool

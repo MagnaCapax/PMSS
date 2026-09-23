@@ -11,8 +11,7 @@ require_once __DIR__.'/../lib/lighttpd/watchdogErrorPage.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogNginxLogReader.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';
 require_once __DIR__.'/../lib/runtime.php';
-require_once __DIR__.'/../lib/user/userConfigStore.php';
-require_once __DIR__.'/../lib/user/watchdog.php';
+pmssRequireRelativeFiles(__DIR__.'/../lib', ['user/userConfigStore.php', 'user/watchdog.php']);
 
 $pmssCheckLighttpdLock = pmssCronLockAcquire('checkLighttpdInstances', 'pmssCronLockSkipLog', 'pmssUserWatchdogLockAcquire');
 $argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';

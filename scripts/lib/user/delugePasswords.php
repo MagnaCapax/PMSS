@@ -1,8 +1,6 @@
 <?php
 require_once __DIR__.'/../runtime.php';
-require_once __DIR__.'/delugeManagedConfig.php';
-require_once __DIR__.'/../lighttpd/userConfigApply.php';
-require_once __DIR__.'/../lighttpd/userFileWrite.php';
+pmssRequireRelativeFiles(__DIR__, ['delugeManagedConfig.php', '../lighttpd/userConfigApply.php', '../lighttpd/userFileWrite.php']);
 
 /**
  * Password synchronization helpers for torrent clients.

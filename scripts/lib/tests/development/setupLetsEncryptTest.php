@@ -56,7 +56,7 @@ class SetupLetsEncryptTest extends TestCase
     public function testCliDelegatesToSharedSetupLibraryWithoutShellExec(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupLetsEncrypt.php', [
-            "require_once __DIR__.'/../lib/certbotSetup.php';",
+            "pmssRequireRelativeFiles(__DIR__.'/../lib', ['update/distro.php', 'certbotSetup.php']);",
             'pmssSetupLetsEncryptRun($domain, $email, $codename);',
         ]);
         $this->pmssAssertRepoFileNotContainsString('scripts/util/setupLetsEncrypt.php', 'shell_exec(');

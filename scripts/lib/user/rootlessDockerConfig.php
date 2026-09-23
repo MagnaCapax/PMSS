@@ -2,8 +2,7 @@
 /** Rootless Docker daemon.json convergence helper. */
 
 require_once __DIR__.'/../runtime.php';
-require_once __DIR__.'/directories.php';
-require_once __DIR__.'/log.php';
+pmssRequireRelativeFiles(__DIR__, ['directories.php', 'log.php']);
 
 /** Return true when daemon.json can be read or replaced safely. */
 function pmssUserRootlessDockerConfigTargetIsSafe(string $configFile): bool

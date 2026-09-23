@@ -10,9 +10,7 @@
 
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/runtime.php';
-require_once '/scripts/lib/user/log.php';
-require_once '/scripts/lib/user/userConfigStore.php';
-require_once '/scripts/lib/user/watchdog.php';
+pmssRequireRelativeFiles('/scripts/lib', ['user/log.php', 'user/userConfigStore.php', 'user/watchdog.php']);
 
 // Serialize runs with the canonical in-script lock (ADR-0049), replacing the
 // former root.cron `flock -xn`. Overlapping runs would race per-user rootless

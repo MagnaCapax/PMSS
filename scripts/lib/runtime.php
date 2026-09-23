@@ -74,10 +74,7 @@ if (!$pmssLogmsgUsesLogMessageInitialized) {
     $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] = false;
 }
 
-require_once __DIR__.'/runtime/filesystem.php';
-require_once __DIR__.'/runtime/locks.php';
-require_once __DIR__.'/runtime/system.php';
-require_once __DIR__.'/runtime/commands.php';
+pmssRequireRelativeFiles(__DIR__.'/runtime', ['filesystem.php', 'locks.php', 'system.php', 'commands.php']);
 
 if (!function_exists('pmssRequireCli')) {
     /**
@@ -98,5 +95,4 @@ if (!function_exists('pmssRequireCli')) {
     }
 }
 
-require_once __DIR__.'/runtime/cli.php';
-require_once __DIR__.'/runtime/snapshot.php';
+pmssRequireRelativeFiles(__DIR__.'/runtime', ['cli.php', 'snapshot.php']);

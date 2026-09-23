@@ -18,8 +18,7 @@
  */
 
 require_once __DIR__.'/lib/runtime.php';
-require_once __DIR__.'/lib/cli/optionParser.php';
-require_once __DIR__.'/lib/userLifecycle.php';
+pmssRequireRelativeFiles(__DIR__.'/lib', ['cli/optionParser.php', 'userLifecycle.php']);
 
 pmssRequireCli();
 

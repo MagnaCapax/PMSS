@@ -7,9 +7,7 @@
  */
 
 require_once __DIR__.'/../runtime.php';
-require_once __DIR__.'/../lighttpd/userConfigApply.php';
-require_once __DIR__.'/qbittorrent.php';
-require_once __DIR__.'/identity.php';
+pmssRequireRelativeFiles(__DIR__, ['../lighttpd/userConfigApply.php', 'qbittorrent.php', 'identity.php']);
 
 /**
  * Validate the user/home pair before crossing process or filesystem boundaries.

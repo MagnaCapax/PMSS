@@ -21,11 +21,10 @@
 
 require_once __DIR__.'/../runtime.php';
 
-require_once __DIR__.'/UserValidator.php';
-require_once __DIR__.'/billingIds.php';
-require_once __DIR__.'/notificationEmail.php';
-require_once __DIR__.'/../lighttpd/userFileWrite.php';
-require_once __DIR__.'/../systemdSliceProperties.php';
+pmssRequireRelativeFiles(__DIR__, [
+    'UserValidator.php', 'billingIds.php', 'notificationEmail.php',
+    '../lighttpd/userFileWrite.php', '../systemdSliceProperties.php',
+]);
 
 class UserConfigStore
 {
