@@ -244,56 +244,77 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertSame([], $commands);
     }
 
-    public function testSharedBinaryProbeRendererKeepsSystemAndComponentViewsStable(): void
+    public function testSharedBinaryProbeViewsKeepSystemAndComponentResultsStable(): void
     {
         $dependencies = $this->buildComponentStatusDependencies();
-        $runCommand = $dependencies['runCommand'];
-        $isExecutable = $dependencies['isExecutable'];
-        $binarySpec = [
-            'infoCommand' => 'nginx -v 2>&1',
-            'componentName' => 'bin.nginx',
-        ];
+        $views = pmssStatusProbeViews([
+            'binaries' => [
+                'nginx' => ['infoCommand' => 'nginx -v 2>&1', 'componentName' => 'bin.nginx'],
+                'wget' => ['infoCommand' => 'wget --version 2>&1 | head -n 1'],
+            ],
+            'paths' => [],
+        ], $dependencies['runCommand'], $dependencies['isExecutable'], $dependencies['pathExists'], true);
 
-        $this->assertSame(
+        $this->assertSame([
             ['name' => 'Binary: nginx', 'status' => 'OK', 'detail' => 'nginx version: nginx/1.22.0'],
-            pmssStatusBinaryProbeCheck('nginx', $binarySpec, $runCommand, $isExecutable)
-        );
-        $this->assertSame(
+            ['name' => 'Binary: wget', 'status' => 'OK', 'detail' => 'GNU Wget 1.21.3'],
+        ], $views['system']);
+        $this->assertSame([
             ['name' => 'bin.nginx', 'status' => 'OK', 'detail' => '/usr/sbin/nginx'],
-            pmssStatusBinaryProbeCheck('nginx', $binarySpec, $runCommand, $isExecutable, true)
-        );
-        $this->assertTrue(pmssStatusBinaryProbeCheck('wget', ['infoCommand' => 'wget --version 2>&1 | head -n 1'], $runCommand, $isExecutable, true) === null);
+        ], $views['component']);
     }
 
-    public function testSharedBinaryProbeRendererDefaultsMissingInfoCommandToPresentWithoutWarnings(): void
+    public function testComponentOnlyProbeViewsDoNotExecuteVersionCommands(): void
     {
         $commands = [];
-        $runCommand = static function (string $command) use (&$commands): string {
+        $views = pmssStatusProbeViews([
+            'binaries' => [
+                'nginx' => ['infoCommand' => 'nginx -v 2>&1', 'componentName' => 'bin.nginx'],
+                'wget' => ['infoCommand' => 'wget --version 2>&1 | head -n 1'],
+            ],
+            'paths' => [],
+        ], static function (string $command) use (&$commands): string {
             $commands[] = $command;
+            return '/usr/sbin/nginx';
+        }, static function (string $path): bool {
+            return $path === '/usr/sbin/nginx';
+        }, static function (): bool {
+            return false;
+        }, false);
 
-            return $command === "command -v 'nginx'" ? '/usr/sbin/nginx' : '';
-        };
-        $result = null;
-
-        $this->pmssAssertNoPhpWarnings(function () use (&$result, $runCommand): void {
-            $result = pmssStatusBinaryProbeCheck(
-                'nginx',
-                ['componentName' => 'bin.nginx'],
-                $runCommand,
-                static function (string $path): bool {
-                    return $path === '/usr/sbin/nginx';
-                }
-            );
-        });
-
-        $this->assertSame(
-            ['name' => 'Binary: nginx', 'status' => 'OK', 'detail' => 'present'],
-            $result
-        );
+        $this->assertSame([], $views['system']);
+        $this->assertSame([
+            ['name' => 'bin.nginx', 'status' => 'OK', 'detail' => '/usr/sbin/nginx'],
+        ], $views['component']);
         $this->assertSame(["command -v 'nginx'"], $commands);
     }
 
-    public function testSharedProbeRendererPreservesCatalogOrderAndViewFiltering(): void
+    public function testSharedProbeViewsDefaultMissingInfoCommandToPresentWithoutWarnings(): void
+    {
+        $commands = [];
+        $views = null;
+
+        $this->pmssAssertNoPhpWarnings(function () use (&$views, &$commands): void {
+            $views = pmssStatusProbeViews([
+                'binaries' => ['nginx' => ['componentName' => 'bin.nginx']],
+                'paths' => [],
+            ], static function (string $command) use (&$commands): string {
+                $commands[] = $command;
+                return $command === "command -v 'nginx'" ? '/usr/sbin/nginx' : '';
+            }, static function (string $path): bool {
+                return $path === '/usr/sbin/nginx';
+            }, static function (): bool {
+                return false;
+            }, true);
+        });
+
+        $this->assertSame([
+            ['name' => 'Binary: nginx', 'status' => 'OK', 'detail' => 'present'],
+        ], $views['system']);
+        $this->assertSame(["command -v 'nginx'"], $commands);
+    }
+
+    public function testSharedProbeViewsPreserveCatalogOrderAndFiltering(): void
     {
         $specs = [
             'binaries' => [
@@ -306,10 +327,7 @@ final class SystemStatusCharacterizationTest extends TestCase
             ],
         ];
         $runCommand = static function (string $command): string {
-            return [
-                "command -v 'alpha'" => '/usr/bin/alpha',
-                'alpha --version' => 'alpha 1.0',
-            ][$command] ?? '';
+            return ["command -v 'alpha'" => '/usr/bin/alpha', 'alpha --version' => 'alpha 1.0'][$command] ?? '';
         };
         $isExecutable = static function (string $path): bool {
             return $path === '/usr/bin/alpha';
@@ -319,7 +337,8 @@ final class SystemStatusCharacterizationTest extends TestCase
         };
 
         $this->pmssAssertNoPhpWarnings(function () use ($specs, $runCommand, $isExecutable, $pathExists): void {
-            $this->assertSame([], pmssStatusProbeChecks([], $runCommand, $isExecutable, $pathExists));
+            $this->assertSame(['system' => [], 'component' => []], pmssStatusProbeViews([], $runCommand, $isExecutable, $pathExists, true));
+            $views = pmssStatusProbeViews($specs, $runCommand, $isExecutable, $pathExists, true);
             $this->assertSame(
                 [
                     ['name' => 'Binary: alpha', 'status' => 'OK', 'detail' => 'alpha 1.0'],
@@ -327,14 +346,14 @@ final class SystemStatusCharacterizationTest extends TestCase
                     ['name' => 'Alpha config', 'status' => 'OK', 'detail' => '/alpha'],
                     ['name' => 'Beta config', 'status' => 'WARN', 'detail' => '/beta missing'],
                 ],
-                pmssStatusProbeChecks($specs, $runCommand, $isExecutable, $pathExists)
+                $views['system']
             );
             $this->assertSame(
                 [
                     ['name' => 'bin.alpha', 'status' => 'OK', 'detail' => '/usr/bin/alpha'],
                     ['name' => 'config.alpha', 'status' => 'OK', 'detail' => '/alpha'],
                 ],
-                pmssStatusProbeChecks($specs, $runCommand, $isExecutable, $pathExists, true)
+                $views['component']
             );
         });
     }
@@ -471,6 +490,33 @@ final class SystemStatusCharacterizationTest extends TestCase
                 return $check['name'].'|'.$check['status'].'|'.$detail;
             }, $checks)
         );
+    }
+
+    public function testSystemStatusEvaluatesSharedCatalogOnce(): void
+    {
+        $dependencies = $this->buildSystemStatusDependencies();
+        $runCommand = $dependencies['runCommand'];
+        $pathExists = $dependencies['pathExists'];
+        $commandCounts = [];
+        $pathCounts = [];
+        $dependencies['runCommand'] = static function (string $command) use ($runCommand, &$commandCounts): string {
+            $commandCounts[$command] = ($commandCounts[$command] ?? 0) + 1;
+            return $runCommand($command);
+        };
+        $dependencies['pathExists'] = static function (string $path) use ($pathExists, &$pathCounts): bool {
+            $pathCounts[$path] = ($pathCounts[$path] ?? 0) + 1;
+            return $pathExists($path);
+        };
+
+        pmssSystemStatusChecks($dependencies);
+
+        foreach (pmssStatusProbeSpecs($this->sourcesPath)['binaries'] as $binary => $spec) {
+            $this->assertSame(1, $commandCounts["command -v '".$binary."'"] ?? 0, 'binary lookup repeated: '.$binary);
+        }
+        foreach (pmssStatusProbeSpecs($this->sourcesPath)['paths'] as $spec) {
+            $path = (string) $spec['path'];
+            $this->assertSame(1, $pathCounts[$path] ?? 0, 'path probe repeated: '.$path);
+        }
     }
 
     public function testSystemStatusRejectsInvalidOpenvpnHostnameBeforeArtifactProbe(): void

@@ -108,65 +108,48 @@ function pmssStatusProbeSpecs(string $sourcesPath): array
     ];
 }
 
-/** @return array<int, array<string, string>> Render shared binary/path probes for one status view. */
-function pmssStatusProbeChecks(array $probeSpecs, callable $runCommand, callable $isExecutable, callable $pathExists, bool $componentView = false): array
+/**
+ * Evaluate the shared catalog once and render its system and component views.
+ * Component-only callers skip version commands while systemTest reuses the
+ * same path observations for its trailing component projection.
+ *
+ * @return array{system:array<int,array<string,string>>,component:array<int,array<string,string>>}
+ */
+function pmssStatusProbeViews(array $probeSpecs, callable $runCommand, callable $isExecutable, callable $pathExists, bool $includeSystem): array
 {
-    $checks = [];
-    $binarySpecs = is_array($probeSpecs['binaries'] ?? null) ? $probeSpecs['binaries'] : [];
-    foreach ($binarySpecs as $binary => $binarySpec) {
-        if (!is_array($binarySpec)) {
-            $binarySpec = [];
+    $views = ['system' => [], 'component' => []];
+    foreach (is_array($probeSpecs['binaries'] ?? null) ? $probeSpecs['binaries'] : [] as $binary => $spec) {
+        $spec = is_array($spec) ? $spec : [];
+        if (!$includeSystem && !isset($spec['componentName'])) continue;
+        $binary = (string) $binary;
+        $path = pmssStatusBinaryPathResolve($binary, $runCommand, $isExecutable);
+        if ($includeSystem) {
+            $detail = 'Not found in PATH';
+            if ($path !== '') {
+                $infoCommand = is_string($spec['infoCommand'] ?? null) ? trim($spec['infoCommand']) : '';
+                $info = $infoCommand === '' ? '' : trim((string) $runCommand($infoCommand));
+                $detail = $info !== '' ? $info : 'present';
+            }
+            $views['system'][] = pmssStatus('Binary: '.$binary, $path !== '' ? 'OK' : 'WARN', $detail);
         }
-        ($check = pmssStatusBinaryProbeCheck((string) $binary, $binarySpec, $runCommand, $isExecutable, $componentView)) !== null && $checks[] = $check;
+        if (isset($spec['componentName'])) {
+            $views['component'][] = pmssStatus((string) $spec['componentName'], $path !== '' ? 'OK' : 'WARN', $path);
+        }
     }
-    $pathSpecs = is_array($probeSpecs['paths'] ?? null) ? $probeSpecs['paths'] : [];
-    foreach ($pathSpecs as $pathSpec) {
-        if (!is_array($pathSpec) || ($componentView && !isset($pathSpec['componentName']))) {
-            continue;
-        }
-        $path = (string) ($pathSpec['path'] ?? '');
+
+    foreach (is_array($probeSpecs['paths'] ?? null) ? $probeSpecs['paths'] : [] as $spec) {
+        if (!is_array($spec) || (!$includeSystem && !isset($spec['componentName']))) continue;
+        $path = (string) ($spec['path'] ?? '');
         $exists = $pathExists($path);
-        $checks[] = $componentView
-            ? pmssStatus((string) $pathSpec['componentName'], $exists ? 'OK' : 'WARN', $exists ? $path : 'missing')
-            : pmssStatus((string) ($pathSpec['systemLabel'] ?? $path), $exists ? 'OK' : 'WARN', $exists ? $path : $path.' missing');
-    }
-    return $checks;
-}
-
-/** Render a shared binary probe in either system or component view. */
-function pmssStatusBinaryProbeCheck(string $binary, array $binarySpec, callable $runCommand, callable $isExecutable, bool $componentView = false): ?array
-{
-    if ($componentView && !isset($binarySpec['componentName'])) return null;
-    $path = pmssStatusBinaryPathResolve($binary, $runCommand, $isExecutable);
-    if ($componentView) return pmssStatus((string) $binarySpec['componentName'], $path !== '' ? 'OK' : 'WARN', $path);
-    if ($path === '') return pmssStatus('Binary: '.$binary, 'WARN', 'Not found in PATH');
-    $infoCommand = is_string($binarySpec['infoCommand'] ?? null) ? trim($binarySpec['infoCommand']) : '';
-    if ($infoCommand === '') {
-        return pmssStatus('Binary: '.$binary, 'OK', 'present');
+        if ($includeSystem) {
+            $views['system'][] = pmssStatus((string) ($spec['systemLabel'] ?? $path), $exists ? 'OK' : 'WARN', $exists ? $path : $path.' missing');
+        }
+        if (isset($spec['componentName'])) {
+            $views['component'][] = pmssStatus((string) $spec['componentName'], $exists ? 'OK' : 'WARN', $exists ? $path : 'missing');
+        }
     }
 
-    $detail = trim((string) $runCommand($infoCommand));
-    return pmssStatus('Binary: '.$binary, 'OK', $detail !== '' ? $detail : 'present');
-}
-
-/** Return the codename check for either system-test or component-status output. */
-function pmssStatusCodenameCheck(string $codename, bool $componentView = false): array
-{
-    $name = $componentView ? 'os.codename' : 'OS codename';
-    return $codename === '' ? pmssStatus($name, 'WARN', 'VERSION_CODENAME missing') : pmssStatus($name, 'OK', $codename);
-}
-
-/** Return the apt-sources/codename check while preserving each caller's label contract. */
-function pmssStatusSourcesCodenameCheck(string $codename, string $sourcesPath, callable $isFile, callable $readFile, bool $componentView = false): ?array
-{
-    if (!$isFile($sourcesPath)) return $componentView ? pmssStatus('apt.sources', 'WARN', 'missing sources.list') : null;
-    if (!$componentView && $codename === '') return null;
-    $sources = $readFile($sourcesPath);
-    $matches = $componentView
-        ? ($codename === '' || stripos($sources, $codename) !== false)
-        : ($sources !== '' && stripos($sources, $codename) !== false);
-    if ($componentView) return pmssStatus('apt.sources', $matches ? 'OK' : 'WARN', $matches ? 'contains '.$codename : 'codename mismatch');
-    return pmssStatus('Sources codename match', $matches ? 'OK' : 'WARN', $matches ? 'sources.list references '.$codename : sprintf('%s not present in sources.list', $codename));
+    return $views;
 }
 
 function pmssStatusContextResolve(array $dependencies = []): array
@@ -195,16 +178,37 @@ function pmssStatusContextResolve(array $dependencies = []): array
         'probeSpecs' => pmssStatusProbeSpecs($sourcesPath),
     ];
 }
+
+/** Build both public report views from one set of shared filesystem observations. */
+function pmssStatusSharedViews(array $context, bool $includeSystem): array
+{
+    $readFile = $context['readFile'];
+    $isFile = $context['isFile'] ?? 'is_file';
+    $codename = (string) $context['codename']; $sourcesPath = (string) $context['sourcesPath'];
+    $probeViews = pmssStatusProbeViews($context['probeSpecs'], $context['runCommand'], $context['isExecutable'], $context['pathExists'], $includeSystem);
+    $codenameStatus = $codename === '' ? 'WARN' : 'OK';
+    $codenameDetail = $codename === '' ? 'VERSION_CODENAME missing' : $codename;
+    $sourcesExist = $isFile($sourcesPath);
+    $sources = $sourcesExist ? $readFile($sourcesPath) : '';
+    $componentSourcesMatch = $sourcesExist && ($codename === '' || stripos($sources, $codename) !== false);
+
+    $probeViews['component'] = array_merge([
+        pmssStatus('os.codename', $codenameStatus, $codenameDetail),
+        pmssStatus('apt.sources', $componentSourcesMatch ? 'OK' : 'WARN', !$sourcesExist ? 'missing sources.list' : ($componentSourcesMatch ? 'contains '.$codename : 'codename mismatch')),
+    ], $probeViews['component']);
+    $probeViews['system'] = $includeSystem
+        ? array_merge([pmssStatus('OS codename', $codenameStatus, $codenameDetail)], $probeViews['system'])
+        : [];
+    $systemSourcesMatch = $sources !== '' && stripos($sources, $codename) !== false;
+    $probeViews['systemSources'] = !$includeSystem || !$sourcesExist || $codename === '' ? null
+        : pmssStatus('Sources codename match', $systemSourcesMatch ? 'OK' : 'WARN', $systemSourcesMatch ? 'sources.list references '.$codename : sprintf('%s not present in sources.list', $codename));
+    return $probeViews;
+}
+
 function pmssComponentStatusChecks(array $dependencies = []): array
 {
     $context = isset($dependencies['probeSpecs']) ? $dependencies : pmssStatusContextResolve($dependencies);
-    $runCommand = $context['runCommand']; $pathExists = $context['pathExists']; $readFile = $context['readFile']; $isExecutable = $context['isExecutable'];
-    $isFile = $context['isFile'] ?? 'is_file';
-    $codename = (string) $context['codename']; $sourcesPath = (string) $context['sourcesPath'];
-    $results[] = pmssStatusCodenameCheck($codename, true);
-    $results[] = pmssStatusSourcesCodenameCheck($codename, $sourcesPath, $isFile, $readFile, true);
-
-    return array_merge($results, pmssStatusProbeChecks($context['probeSpecs'], $runCommand, $isExecutable, $pathExists, true));
+    return pmssStatusSharedViews($context, false)['component'];
 }
 
 /** Check localnet readability and parent traversal as one system-test result. */
@@ -249,18 +253,13 @@ function pmssSystemStatusOpenvpnClientArtifactCheck(callable $isFile, string $ho
 function pmssSystemStatusChecks(array $dependencies = []): array
 {
     $context = pmssStatusContextResolve($dependencies);
-    $runCommand = $context['runCommand']; $pathExists = $context['pathExists'];
     $isFile = $context['isFile']; $isDir = $context['isDir']; $isExecutable = $context['isExecutable'];
     $isLink = $context['isLink']; $readLink = $context['readLink']; $readFile = $context['readFile']; $filePerms = $context['filePerms'];
-    $checks = [];
-    $codename = (string) $context['codename'];
-    $sourcesPath = (string) $context['sourcesPath'];
-    $checks[] = pmssStatusCodenameCheck($codename);
-    $checks = array_merge($checks, pmssStatusProbeChecks($context['probeSpecs'], $runCommand, $isExecutable, $pathExists));
+    $statusViews = pmssStatusSharedViews($context, true);
+    $checks = $statusViews['system'];
 
-    $sourcesCheck = pmssStatusSourcesCodenameCheck($codename, $sourcesPath, $isFile, $readFile);
     $checks[] = pmssSystemStatusLocalnetConfigCheck($isFile, $isDir, $filePerms);
-    $sourcesCheck !== null && $checks[] = $sourcesCheck;
+    $statusViews['systemSources'] !== null && $checks[] = $statusViews['systemSources'];
     $checks[] = pmssSystemStatusOpenvpnClientArtifactCheck($isFile, (string) $readFile('/etc/hostname'));
 
     foreach ([
@@ -283,7 +282,7 @@ function pmssSystemStatusChecks(array $dependencies = []): array
             : pmssStatus($label, $actual === $expected ? 'OK' : 'WARN', $actual === $expected ? sprintf('%s -> %s', $link, $actual) : sprintf('%s -> %s (expected %s)', $link, $actual, $expected));
     }
 
-    foreach (pmssComponentStatusChecks($context) as $entry) $checks[] = pmssStatus('Component: '.(string) $entry['name'], (string) $entry['status'], (string) ($entry['detail'] ?? ''));
+    foreach ($statusViews['component'] as $entry) $checks[] = pmssStatus('Component: '.(string) $entry['name'], (string) $entry['status'], (string) ($entry['detail'] ?? ''));
 
     return $checks;
 }
