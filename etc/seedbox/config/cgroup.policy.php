@@ -4,6 +4,23 @@
 // Values here may be overridden per host/SKU as needed.
 // Guardrails still apply in code: MemoryHigh >= 250MiB; MemoryMax <= 95% of system RAM.
 return [
+    'cgroup' => [
+        // Per-user derived read-IOPS caps may oversell the measured host ceiling.
+        // 2.0 means PMSS assigns up to 200% of the passive host read-IOPS estimate.
+        'assignMax' => ['iops' => 2.0],
+
+        // Read-dimension safety floors for derived per-user caps. NVMe is not
+        // represented in the current fleet sample; keep this placeholder
+        // review-adjustable while ensuring it is at least the SSD floor.
+        'readIopsClassFloors' => [
+            'default' => 200,
+            'storage' => 200,
+            'hdd' => 200,
+            'ssd' => 500,
+            'nvme' => 750,
+        ],
+    ],
+
     // Passive estimate only: maximum daily P95 over completed UTC days.
     'ioCeiling' => ['percentile' => 95, 'windowDays' => 7, 'minSamplesPerDay' => 144, 'minDays' => 3],
 

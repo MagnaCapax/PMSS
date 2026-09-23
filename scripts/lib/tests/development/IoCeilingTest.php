@@ -122,6 +122,7 @@ class IoCeilingTest extends TestCase
         $this->assertTrue(\pmssIoCeilingRefresh($this->policy(), $history, $state, self::NOW));
         $result = json_decode(file_get_contents($state), true);
         $this->assertEquals(19, $result['published']['read_iops']);
+        $this->assertSame(19.0, \pmssIoCeilingPublishedReadIops($state));
         $this->assertSame(20, $result['days']['2024-01-09']['samples']);
         unlink($history.'.1');
         // A compressed-only remainder fails the sample gate; stale values disappear.

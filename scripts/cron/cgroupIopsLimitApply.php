@@ -30,6 +30,7 @@ declare(strict_types=1);
 
 require_once __DIR__.'/../lib/cgroup/directApply.php';
 require_once __DIR__.'/../lib/cgroup/policy.php';
+require_once __DIR__.'/../lib/cgroup/ioCeilingHistory.php';
 
 const PMSS_IOPS_USERS_DIR = '/etc/seedbox/config/users';
 
@@ -100,14 +101,47 @@ if ($majMin === null) {
 openlog('pmss-iops', LOG_PID, LOG_DAEMON);
 
 $total = 0; $written = 0; $skippedNoSlice = 0; $errors = 0;
+$policy = pmssCgroupPolicyLoad();
+$userConfigs = [];
+foreach (pmssCgroupDirectUserConfigs(PMSS_IOPS_USERS_DIR, $errors) as $configEntry) {
+    list($configUser, $configPayload) = $configEntry;
+    $userConfigs[$configUser] = $configPayload;
+}
 
-foreach (pmssCgroupDirectPlannedUsers(PMSS_IOPS_USERS_DIR, $total, $errors, function (string $user, array $json): ?array {
+$hostReadIops = pmssIoCeilingPublishedReadIops(pmssResolvePathFromEnv('PMSS_IO_CEILING_STATE_PATH', PMSS_IO_CEILING_STATE_PATH_DEFAULT));
+$homeMdBacked = $homeDevice !== '' && pmssCgroupPolicyHomeDeviceIsMdBacked($homeDevice);
+$homeClass = $homeMdBacked ? null : pmssCgroupPolicyHomeStorageClassResolve($homeDevice);
+$classFloor = pmssCgroupPolicyReadIopsClassFloor($homeClass, $policy);
+$weightSum = pmssCgroupPolicyUserIoWeightSum($userConfigs, $policy);
+$derivationAllowed = !$homeMdBacked && pmssCgroupPolicyReadIopsDerivationAllowed(
+    $hostReadIops,
+    $classFloor,
+    count($userConfigs),
+    static function (string $message): void { syslog(LOG_WARNING, $message); }
+);
+
+foreach ($userConfigs as $user => $json) {
     $readIops  = pmssIopsParseSpec($json['IOReadIOPS']  ?? null);
     $writeIops = pmssIopsParseSpec($json['IOWriteIOPS'] ?? null);
-    if ($readIops === null && $writeIops === null) return null; // no caps configured for this user
-    return [$readIops, $writeIops];
-}) as $entry) {
-    list($user, $uid, $limits) = $entry;
+    if ($readIops === null) {
+        $readIops = pmssCgroupPolicyDerivedReadIopsCap(
+            $json,
+            $policy,
+            $hostReadIops,
+            $weightSum,
+            count($userConfigs),
+            $homeClass,
+            $derivationAllowed
+        );
+    }
+    if ($readIops === null && $writeIops === null) {
+        continue; // no caps configured or derived for this user
+    }
+    $total++;
+    if (($uid = pmssCgroupDirectUserUidOrError($user, $errors)) === null) {
+        continue;
+    }
+    $limits = [$readIops, $writeIops];
 
     $sliceDir = pmssCgroupDirectUserSliceDir($uid);
     if (!is_dir($sliceDir)) {

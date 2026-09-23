@@ -46,8 +46,9 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
                 'ordered' => [
                     [
                         'needles' => [
-                            'foreach (pmssCgroupDirectPlannedUsers(PMSS_IOPS_USERS_DIR, $total, $errors',
-                            'list($user, $uid, $limits) = $entry;',
+                            'foreach ($userConfigs as $user => $json) {',
+                            'if (($uid = pmssCgroupDirectUserUidOrError($user, $errors)) === null) {',
+                            '$limits = [$readIops, $writeIops];',
                             '$sliceDir = pmssCgroupDirectUserSliceDir($uid);',
                         ],
                         'missingPrefix' => 'missing IOPS passwd UID guard: ',
@@ -92,6 +93,15 @@ final class CgroupIopsLimitApplySafetyTest extends TestCase
         ] as [$path, $expected]) {
             $this->assertSame($expected, \pmssCgroupDirectUserBlkioPathAllowed($path, $allowed));
         }
+    }
+
+    public function testAbsentBlkioHierarchyIsCleanNoopForRootRuntime(): void
+    {
+        $missingRoot = $this->pmssMakeTempPath('pmss-missing-blkio-');
+        $check = \pmssCgroupDirectRuntimeCheck('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); not applicable here', 0, $missingRoot);
+
+        $this->assertSame(0, $check['exitCode']);
+        $this->assertSame('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); not applicable here', $check['message']);
     }
 
     public function testPlannedUsersPreserveCycleAccountingAndResolverFailures(): void

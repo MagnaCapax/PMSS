@@ -10,20 +10,29 @@ require_once dirname(__DIR__).'/user/identity.php';
 
 const PMSS_CGROUP_DIRECT_BLKIO_ROOT = '/sys/fs/cgroup/blkio';
 
+/** Inspect the runtime boundary in a form unit tests can exercise. */
+function pmssCgroupDirectRuntimeCheck(string $skipMessage, ?int $euid = null, string $blkioRoot = PMSS_CGROUP_DIRECT_BLKIO_ROOT): array
+{
+    if (!function_exists('posix_geteuid') || !function_exists('posix_getpwnam')) {
+        return ['exitCode' => 2, 'message' => "FATAL: POSIX extension required to resolve managed user UIDs"];
+    }
+    if (($euid ?? posix_geteuid()) !== 0) {
+        return ['exitCode' => 2, 'message' => "FATAL: must run as root (writes to /sys/fs/cgroup/blkio/)"];
+    }
+    if (!is_dir($blkioRoot)) {
+        return ['exitCode' => 0, 'message' => rtrim($skipMessage, "\n")];
+    }
+
+    return ['exitCode' => null, 'message' => ''];
+}
+
 /** Require the common runtime boundary before any managed-account sysfs writes. */
 function pmssCgroupDirectRequireRuntime(string $skipMessage): void
 {
-    if (!function_exists('posix_geteuid') || !function_exists('posix_getpwnam')) {
-        fwrite(STDERR, "FATAL: POSIX extension required to resolve managed user UIDs\n");
-        exit(2);
-    }
-    if (posix_geteuid() !== 0) {
-        fwrite(STDERR, "FATAL: must run as root (writes to /sys/fs/cgroup/blkio/)\n");
-        exit(2);
-    }
-    if (!is_dir(PMSS_CGROUP_DIRECT_BLKIO_ROOT)) {
-        fwrite(STDERR, rtrim($skipMessage, "\n")."\n");
-        exit(0);
+    $check = pmssCgroupDirectRuntimeCheck($skipMessage);
+    if ($check['exitCode'] !== null) {
+        fwrite(STDERR, $check['message']."\n");
+        exit((int) $check['exitCode']);
     }
 }
 

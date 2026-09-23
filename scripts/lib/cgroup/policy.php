@@ -173,3 +173,5 @@ function pmssCgroupPolicyIoPairs(array $source, string $devicePath, bool $includ
     }
     return $pairs;
 }
+
+require_once __DIR__.'/readIopsPolicy.php';
