@@ -30,6 +30,4 @@ function pmssRtorrentPortReservationsReconcileMain(): int
     return $result['status'] === 'error' ? 1 : 0;
 }
 
-if (PHP_SAPI === 'cli' && realpath((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === __FILE__) {
-    exit(pmssRtorrentPortReservationsReconcileMain());
-}
+pmssRunCliEntrypoint(__FILE__, 'pmssRtorrentPortReservationsReconcileMain');

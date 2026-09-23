@@ -9,6 +9,4 @@
 
 require_once __DIR__.'/../lib/user/scheduledConfigBackup.php';
 
-if (PHP_SAPI === 'cli' && realpath((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === __FILE__) {
-    exit(pmssScheduledConfigBackupMain($argv ?? []));
-}
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssScheduledConfigBackupMain');

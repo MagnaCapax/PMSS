@@ -56,19 +56,23 @@ final class CliWrapperCharacterizationTest extends TestCase
         ]);
     }
 
-    public function testArgvCliEntrypointsUseSharedRuntimeHelper(): void
+    public function testCliEntrypointsUseSharedRuntimeHelpers(): void
     {
-        $this->pmssAssertRepoFileContractCases(array_fill_keys(
+        $this->pmssAssertRepoFileContractCases(array_merge(array_fill_keys(
             [
                 'scripts/showResources.php',
                 'scripts/showTraffic.php',
+                'scripts/cron/scheduledConfigBackup.php',
                 'scripts/util/dockerInstallLsio.php',
                 'scripts/util/portManager.php',
                 'scripts/util/userConfigCgroup.php',
                 'scripts/util/userConfigLighttpd.php',
             ],
-            ['required' => ['pmssRunCliEntrypointWithArgv(__FILE__,']]
-        ));
+            ['required' => ['pmssRunCliEntrypointWithArgv(__FILE__,'], 'forbidden' => ["PHP_SAPI === 'cli'"]]
+        ), array_fill_keys(
+            ['scripts/cron/checkDirectories.php', 'scripts/cron/rtorrentPortReservationsReconcile.php'],
+            ['required' => ['pmssRunCliEntrypoint(__FILE__,'], 'forbidden' => ["PHP_SAPI === 'cli'"]]
+        )));
     }
 
     public function testLegacyCheckInstancesWrapperDelegatesInProcess(): void
