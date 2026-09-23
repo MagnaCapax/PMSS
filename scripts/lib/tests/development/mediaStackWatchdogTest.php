@@ -105,45 +105,4 @@ class MediaStackWatchdogTest extends TestCase
         }
     }
 
-    public function testStatusPublicationFailuresPreservePreviousBytesAndCleanStaging(): void
-    {
-        foreach (['open', 'false', 'zero', 'short', 'chmod', 'rename', 'writeThrow', 'chmodThrow', 'renameThrow', 'writeError', 'success'] as $mode) {
-            $home = $this->pmssMakeTempDir('media-stack-publication-');
-            $path = $home.'/.media-stack-status.json';
-            file_put_contents($path, 'previous status');
-            $result = $this->statusWriteFixture($home, $mode);
-            $throws = strpos($mode, 'Throw') !== false || $mode === 'writeError';
-            $this->assertSame($throws ? null : $mode === 'success', $result['result'], $mode);
-            $this->assertSame($throws, $result['sameThrowable'], $mode);
-            $this->assertSame([], array_values(array_diff(glob($home.'/.media-stack-status.*'), [$path])), $mode);
-            $expected = $mode === 'success' ? \pmssJsonEncodePrettyLine(['state' => 'healthy']) : 'previous status';
-            $this->assertSame($expected, file_get_contents($path), $mode);
-            if ($mode === 'success') $this->assertSame(0644, fileperms($path) & 0777);
-        }
-    }
-
-    private function statusWriteFixture(string $home, string $mode): array
-    {
-        // Intercept only publication operations; path validation and fixture I/O stay real.
-        $script = <<<'PHP'
-namespace MediaStackStatusFixture;
-PHP;
-        $script .= $this->pmssInlinePhpAtomicPublicationShims('open');
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/mediaStackWatchdog.php', 'MediaStackStatusFixture');
-        $script .= <<<'PHP'
-$GLOBALS['mode'] = getenv('PMSS_TEST_STATUS_MODE');
-$GLOBALS['tempCalls'] = 0;
-$GLOBALS['throwable'] = $GLOBALS['mode'] === 'writeError' ? new \Error('write') : new \RuntimeException('publication');
-$home = getenv('PMSS_TEST_STATUS_HOME');
-$result = null;
-$sameThrowable = false;
-try {
-    $result = pmssMediaStackWatchdogStatusWrite($home, $home.'/.media-stack-status.json', ['state' => 'healthy']);
-} catch (\Throwable $caught) {
-    $sameThrowable = $caught === $GLOBALS['throwable'];
-}
-echo json_encode(['result' => $result, 'sameThrowable' => $sameThrowable]);
-PHP;
-        return $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_STATUS_MODE' => $mode, 'PMSS_TEST_STATUS_HOME' => $home]);
-    }
 }

@@ -11,7 +11,7 @@
  */
 
 require_once __DIR__.'/runtime.php';
-pmssRequireRelativeFiles(__DIR__, ['pathSafety.php', 'user/identity.php', 'user/log.php']);
+pmssRequireRelativeFiles(__DIR__, ['lighttpd/userFileWrite.php', 'user/identity.php', 'user/log.php']);
 
 if (!defined('PMSS_MEDIA_STACK_WATCHDOG_FAILURE_CYCLES')) {
     define('PMSS_MEDIA_STACK_WATCHDOG_FAILURE_CYCLES', 3);
@@ -109,28 +109,7 @@ function pmssMediaStackWatchdogStatusWrite(string $home, string $path, array $st
     if ($path === '' || !pmssPathTargetIsSafe($path, false, true) || !pmssPathWithinResolvedRoot($path, $home)) {
         return false;
     }
-    $encoded = pmssJsonEncodePrettyLine($status);
-    // Failed encoding must not allocate an unpublished status file.
-    if (!is_string($encoded)) {
-        return false;
-    }
-    $temporary = @tempnam(dirname($path), '.media-stack-status.');
-    if ($temporary === false) {
-        return false;
-    }
-    try {
-        // Publish only complete snapshots; preserve the previous artifact on failure.
-        if (@file_put_contents($temporary, $encoded, LOCK_EX) !== strlen($encoded) || !@chmod($temporary, 0644) || !@rename($temporary, $path)) {
-            return false;
-        }
-        $temporary = null;
-        return true;
-    } finally {
-        // Also remove staging files when a filesystem operation throws.
-        if ($temporary !== null) {
-            @unlink($temporary);
-        }
-    }
+    return pmssAtomicJsonFileWrite($path, $status, 0644);
 }
 
 /** Log state transitions to both the host cron stream and the per-user log. */

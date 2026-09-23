@@ -91,38 +91,28 @@ function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTe
     }
 
     $tmp = @tempnam(dirname($path), basename($path).'.pmss-tmp-');
-    if ($tmp === false || $tmp === '' || is_link($tmp) || !is_file($tmp) || @file_put_contents($tmp, $content) !== strlen($content)) {
-        if (is_string($tmp)) {
-            @unlink($tmp);
+    if ($tmp === false || $tmp === '' || is_link($tmp) || !is_file($tmp)) {
+        if (is_string($tmp)) @unlink($tmp);
+        return false;
+    }
+
+    try {
+        if (@file_put_contents($tmp, $content) !== strlen($content)) {
+            return false;
         }
-        return false;
-    }
-
-    if ($prepareTemp !== null) {
-        try {
-            $prepareTemp($tmp);
-        } catch (\Throwable $exception) {
-            @unlink($tmp);
-            throw $exception;
+        if ($prepareTemp !== null && $prepareTemp($tmp) === false) {
+            return false;
         }
-    }
+        if (is_link($tmp) || !is_file($tmp) || !pmssUserFilePathIsSafe($path) || !@rename($tmp, $path)) {
+            return false;
+        }
 
-    if (is_link($tmp) || !is_file($tmp)) {
-        @unlink($tmp);
-        return false;
+        $tmp = null;
+        return true;
+    } finally {
+        // Failed operations and thrown I/O errors must not strand staging files.
+        if (is_string($tmp)) @unlink($tmp);
     }
-
-    if (!pmssUserFilePathIsSafe($path)) {
-        @unlink($tmp);
-        return false;
-    }
-
-    if (!@rename($tmp, $path)) {
-        @unlink($tmp);
-        return false;
-    }
-
-    return true;
 }
 
 function pmssReplaceUserFileWithMetadata(string $path, string $content, int $mode, ?string $owner = null, ?string $group = null): bool
@@ -170,6 +160,19 @@ function pmssNetworkPortFileWrite(string $path, int $port, int $min = 1, int $ma
 function pmssAtomicWriteFile(string $path, string $content, ?int $mode = null): bool
 {
     return $mode === null ? pmssReplaceUserFile($path, $content) : pmssReplaceUserFileWithMetadata($path, $content, $mode);
+}
+
+/** Encode and atomically publish one newline-terminated pretty JSON document. */
+function pmssAtomicJsonFileWrite(string $path, array $payload, int $mode): bool
+{
+    $encoded = pmssJsonEncodePrettyLine($payload);
+    return is_string($encoded) && pmssReplaceUserFile(
+        $path,
+        $encoded,
+        static function (string $temporaryPath) use ($mode): bool {
+            return @chmod($temporaryPath, $mode);
+        }
+    );
 }
 
 function pmssWriteManagedFile(string $path, string $content, string $owner, ?string $group, int $mode): bool

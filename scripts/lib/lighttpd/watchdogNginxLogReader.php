@@ -81,8 +81,7 @@ function pmssLighttpdWatchdogNginxActionsRead(string $logPath, string $statePath
         'offset' => is_int($newOffset) ? $newOffset : (int) ($logStat['size'] ?? 0),
         'users' => $advanced['users'],
     );
-    $encoded = pmssJsonEncodePrettyLine($newState);
-    if (!is_string($encoded) || !pmssAtomicWriteFile($statePath, $encoded, 0600)) {
+    if (!pmssAtomicJsonFileWrite($statePath, $newState, 0600)) {
         return array();
     }
 

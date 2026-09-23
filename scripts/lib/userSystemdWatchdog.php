@@ -9,7 +9,7 @@
  */
 
 require_once __DIR__.'/runtime.php';
-pmssRequireRelativeFiles(__DIR__, ['user/identity.php', 'user/log.php']);
+pmssRequireRelativeFiles(__DIR__, ['lighttpd/userFileWrite.php', 'user/identity.php', 'user/log.php']);
 
 /** Return account-authored user services, excluding PMSS's Docker unit. */
 function pmssUserSystemdWatchdogUnitNames(string $home): array
@@ -81,20 +81,7 @@ function pmssUserSystemdWatchdogStatusPath(string $home): string
 function pmssUserSystemdWatchdogStatusWrite(string $home, string $path, array $status): bool
 {
     if ($path === '' || !pmssPathTargetIsSafe($path, false, true) || !pmssPathWithinResolvedRoot($path, $home)) return false;
-    $encoded = pmssJsonEncodePrettyLine($status);
-    // Failed encoding must not allocate a temporary file or disturb the last snapshot.
-    if (!is_string($encoded)) return false;
-    $temporary = @tempnam(dirname($path), '.systemd-user-status.');
-    if ($temporary === false) return false;
-    $published = false;
-    try {
-        // Publish only complete JSON; failed writes leave the previous snapshot intact.
-        if (@file_put_contents($temporary, $encoded, LOCK_EX) !== strlen($encoded) || !@chmod($temporary, 0644)) return false;
-        return $published = @rename($temporary, $path);
-    } finally {
-        // Exceptions retain their propagation while unpublished files are cleaned up.
-        if (!$published) @unlink($temporary);
-    }
+    return pmssAtomicJsonFileWrite($path, $status, 0644);
 }
 
 /** Emit only actionable failures and recovery transitions. */

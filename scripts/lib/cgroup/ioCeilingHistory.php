@@ -76,9 +76,8 @@ function pmssIoCeilingRefresh(
     if ($result === null) {
         return !file_exists($statePath) || @unlink($statePath);
     }
-    $json = pmssJsonEncodePrettyLine($result);
-    return $json !== null && pmssEnsureSafeDir(dirname($statePath), 0755)
-        && pmssAtomicWriteFile($statePath, $json, 0644);
+    return pmssEnsureSafeDir(dirname($statePath), 0755)
+        && pmssAtomicJsonFileWrite($statePath, $result, 0644);
 }
 
 /** Return true only when a published cache still satisfies its own sample gates. */
