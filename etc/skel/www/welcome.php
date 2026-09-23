@@ -987,11 +987,9 @@ function pmssWelcomeMetricSectionHtmlBuild($title, $bodyHtml) {
 
 /** Format server uptime without rounding it beyond the observed duration. */
 function pmssWelcomeServerUptimeTextBuild($seconds) {
-    if (!is_numeric($seconds) || !is_finite((float) $seconds) || (float) $seconds < 0) {
-        return null;
-    }
-
-    $seconds = (int) floor((float) $seconds);
+    $seconds = pmssCustomerNonnegativeFloat($seconds);
+    if ($seconds === null) return null;
+    $seconds = (int) floor($seconds);
     if ($seconds < 60) return 'under 1 minute';
 
     $values = array(
@@ -1024,12 +1022,10 @@ function pmssWelcomeServerInfoHtmlBuild($uptimePath = '/proc/uptime', $loadAvera
     $loadFields = is_string($loadRaw) && $loadRaw !== '' ? preg_split('/\s+/', $loadRaw) : array();
     $loadAverages = array();
     for ($index = 0; $index < 3; $index++) {
-        if (!is_array($loadFields) || !isset($loadFields[$index]) || !is_numeric($loadFields[$index])) {
-            $loadAverages = array();
-            break;
-        }
-        $loadAverage = (float) $loadFields[$index];
-        if (!is_finite($loadAverage) || $loadAverage < 0) {
+        $loadAverage = is_array($loadFields) && isset($loadFields[$index])
+            ? pmssCustomerNonnegativeFloat($loadFields[$index])
+            : null;
+        if ($loadAverage === null) {
             $loadAverages = array();
             break;
         }
@@ -1334,14 +1330,9 @@ function pmssWelcomeSerializedArrayRead($path) {
 }
 
 function pmssWelcomeTrafficMonthValueRead($trafficState) {
-    if (!is_array($trafficState)
-        || !is_array($trafficState['raw'] ?? null)
-        || !is_numeric($trafficState['raw']['month'] ?? null)) {
-        return null;
-    }
-
-    $month = (float) $trafficState['raw']['month'];
-    return is_finite($month) && $month >= 0 ? $month : null;
+    return is_array($trafficState) && is_array($trafficState['raw'] ?? null)
+        ? pmssCustomerNonnegativeFloat($trafficState['raw']['month'] ?? null)
+        : null;
 }
 
 function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null, $bonusTraffic = 0, $trafficBandwidthState = array(), $billingServiceId = 0) {
@@ -1453,14 +1444,8 @@ function quotaCreateSection($quotaInfo, $bonusQuota = 0, $bonusDisplayState = ar
     $quotaMissingWarning = '<b>Warning:</b> Quota info is missing. If this persists for more than an hour, contact support.';
     $quotaFields = array();
     foreach (array('hardLimit', 'totalSpace', 'usedBytes') as $field) {
-        if (!isset($quotaInfo[$field]) || !is_numeric($quotaInfo[$field])) {
-            return $quotaMissingWarning;
-        }
-
-        $value = (float) $quotaInfo[$field];
-        if (!is_finite($value) || $value < 0) {
-            return $quotaMissingWarning;
-        }
+        $value = isset($quotaInfo[$field]) ? pmssCustomerNonnegativeFloat($quotaInfo[$field]) : null;
+        if ($value === null) return $quotaMissingWarning;
         $quotaFields[$field] = $value;
     }
 

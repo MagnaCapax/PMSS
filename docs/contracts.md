@@ -499,6 +499,8 @@ iptables helpers:
 - Customer cgroup readers share ordered counter paths, unsigned/limit parsing,
   and memory fields in `etc/skel/www/scriptsInc.php` (ADR 0059). Page-specific
   directory precedence, missing-data behavior, and pressure classification stay unchanged.
+- `pmssCustomerNonnegativeFloat($value): ?float` is the customer-tree metric
+  normalizer; it rejects non-numeric, non-finite, and negative values.
 
 - pmssCustomerCgroupDirOwnsMemoryController($cgroupDir): bool
   - Accepts cgroup v1 directories only when `memory.stat` is readable; when

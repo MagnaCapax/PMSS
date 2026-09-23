@@ -193,11 +193,7 @@ if (!function_exists('pmssStorageHealthHostPressureMetricFloat')) {
     /** Normalize one customer-readable pressure metric at the trust boundary. */
     function pmssStorageHealthHostPressureMetricFloat($value): ?float
     {
-        if (!is_scalar($value) || !is_numeric((string) $value)) {
-            return null;
-        }
-        $number = (float) $value;
-        return is_finite($number) && $number >= 0 ? $number : null;
+        return $value === true ? 1.0 : pmssCustomerNonnegativeFloat($value);
     }
 }
 

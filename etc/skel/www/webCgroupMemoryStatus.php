@@ -20,11 +20,8 @@ require_once __DIR__.'/scriptsInc.php';
 /** Format bytes into a compact human-readable string. */
 function pmssWebCgroupMemoryStatusFormatBytes($bytes, $precision = 1)
 {
-    if (!is_numeric($bytes) || !is_finite((float) $bytes) || (float) $bytes < 0) {
-        return 'n/a';
-    }
-
-    return pmssFormatBytes((float) $bytes, (int) $precision);
+    $bytes = pmssCustomerNonnegativeFloat($bytes);
+    return $bytes === null ? 'n/a' : pmssFormatBytes($bytes, (int) $precision);
 }
 
 /** Return whether a v2 cgroup exposes the memory controller. */

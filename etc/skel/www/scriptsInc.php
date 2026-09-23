@@ -135,6 +135,15 @@ if (!function_exists('pmssCustomerUnsignedIntegerValue')) {
  }
 }
 
+if (!function_exists('pmssCustomerNonnegativeFloat')) {
+ /** Normalize customer-visible metrics without admitting overflow or negatives. */
+ function pmssCustomerNonnegativeFloat($value) {
+  if (!is_numeric($value)) return null;
+  $number = (float) $value;
+  return is_finite($number) && $number >= 0 ? $number : null;
+ }
+}
+
 if (!function_exists('pmssCustomerUnsignedIntegerFileRead')) {
  /** Read an unsigned integer from a customer-visible file. */
  function pmssCustomerUnsignedIntegerFileRead($path, $allowSymlink = false) {

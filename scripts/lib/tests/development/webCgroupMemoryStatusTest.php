@@ -43,7 +43,7 @@ class WebCgroupMemoryStatusTest extends TestCase
 
     public function testFormatBytesRejectsNonFiniteValues(): void
     {
-        foreach ([INF, -INF, NAN, '1e999', str_repeat('9', 400), [], new \stdClass()] as $value) {
+        foreach ([INF, -INF, NAN, '1e999', str_repeat('9', 400), true, false, [], new \stdClass()] as $value) {
             $this->assertSame('n/a', \pmssWebCgroupMemoryStatusFormatBytes($value));
         }
         foreach ([['0001024', '1.0 KiB'], [1024.5, '1.0 KiB']] as [$value, $expected]) {
