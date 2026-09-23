@@ -10,10 +10,9 @@
  */
 
 require_once dirname(__DIR__).'/runtime.php';
-require_once dirname(__DIR__).'/lighttpd/userFileWrite.php';
-require_once dirname(__DIR__).'/stats/collect.php';
-require_once dirname(__DIR__).'/traffic/storage.php';
-require_once __DIR__.'/trafficLimit.php';
+pmssRequireRelativeFiles(dirname(__DIR__), [
+    'lighttpd/userFileWrite.php', 'stats/collect.php', 'traffic/storage.php', 'user/trafficLimit.php',
+]);
 
 const PMSS_USAGE_ALERTS_TRAFFIC_PERCENT = 80.0;
 const PMSS_USAGE_ALERTS_DISK_PERCENT = 90.0;

@@ -8,8 +8,7 @@
  */
 
 require_once __DIR__.'/../lib/runtime.php';
-require_once __DIR__.'/../lib/user/selection.php';
-require_once __DIR__.'/../lib/user/usageAlertDelivery.php';
+pmssRequireRelativeFiles(__DIR__.'/../lib', ['user/selection.php', 'user/usageAlertDelivery.php']);
 
 requireRoot();
 $lock = pmssCronLockAcquire('usageAlertsNotify', static function (): void { });

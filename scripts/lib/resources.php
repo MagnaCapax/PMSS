@@ -7,8 +7,7 @@
  */
 
 require_once __DIR__.'/runtime.php';
-require_once __DIR__.'/lighttpd/userFileWrite.php';
-require_once __DIR__.'/resources/payload.php';
+pmssRequireRelativeFiles(__DIR__, ['lighttpd/userFileWrite.php', 'resources/payload.php']);
 
 const PMSS_RESOURCE_LOG_TAIL_LINES_MAX = 10080;
 const PMSS_RESOURCE_LOG_TAIL_TIMEOUT_SECONDS = 5;

@@ -11,9 +11,7 @@
  */
 
 require_once __DIR__.'/runtime.php';
-require_once __DIR__.'/pathSafety.php';
-require_once __DIR__.'/user/identity.php';
-require_once __DIR__.'/user/log.php';
+pmssRequireRelativeFiles(__DIR__, ['pathSafety.php', 'user/identity.php', 'user/log.php']);
 
 if (!defined('PMSS_MEDIA_STACK_WATCHDOG_FAILURE_CYCLES')) {
     define('PMSS_MEDIA_STACK_WATCHDOG_FAILURE_CYCLES', 3);

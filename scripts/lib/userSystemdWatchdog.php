@@ -9,8 +9,7 @@
  */
 
 require_once __DIR__.'/runtime.php';
-require_once __DIR__.'/user/identity.php';
-require_once __DIR__.'/user/log.php';
+pmssRequireRelativeFiles(__DIR__, ['user/identity.php', 'user/log.php']);
 
 /** Return account-authored user services, excluding PMSS's Docker unit. */
 function pmssUserSystemdWatchdogUnitNames(string $home): array

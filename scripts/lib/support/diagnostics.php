@@ -11,9 +11,7 @@
  */
 
 require_once dirname(__DIR__).'/runtime.php';
-require_once __DIR__.'/stream.php';
-require_once __DIR__.'/../lighttpd/userFileWrite.php';
-require_once __DIR__.'/../user/billingIds.php';
+pmssRequireRelativeFiles(__DIR__, ['stream.php', '../lighttpd/userFileWrite.php', '../user/billingIds.php']);
 
 /**
  * Resolve the current caller identity from trusted process state.

@@ -6,8 +6,7 @@
  */
 
 require_once dirname(__DIR__, 2).'/runtime.php';
-require_once dirname(__DIR__).'/fstab.php';
-require_once dirname(__DIR__).'/managedPath.php';
+pmssRequireRelativeFiles(dirname(__DIR__), ['fstab.php', 'managedPath.php']);
 
 /**
  * Return total system memory in MiB (rounded).

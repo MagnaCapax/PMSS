@@ -10,8 +10,7 @@
  */
 
 require_once __DIR__.'/../runtime.php';
-require_once __DIR__.'/managedPath.php';
-require_once __DIR__.'/../user/selection.php';
+pmssRequireRelativeFiles(__DIR__, ['managedPath.php', '../user/selection.php']);
 
 /** Return the durable success marker path for the post-install benchmark. */
 function pmssStorageBenchmarkPostInstallMarkerPath(): string

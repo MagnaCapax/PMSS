@@ -7,9 +7,7 @@
  */
 
 require_once __DIR__.'/runtime.php';
-require_once __DIR__.'/cli/optionParser.php';
-require_once __DIR__.'/storageBenchmark/report.php';
-require_once __DIR__.'/storageHealth/common.php';
+pmssRequireRelativeFiles(__DIR__, ['cli/optionParser.php', 'storageBenchmark/report.php', 'storageHealth/common.php']);
 
 /** Emit a legacy CLI fatal error and preserve the historical exit code. */
 function storageBenchmarkFail(string $message): void { exit(pmssCliReturnWithStderr($message)); }
