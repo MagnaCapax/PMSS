@@ -6,10 +6,7 @@ require_once dirname(__DIR__, 2).'/user/add/postProvision.php';
 
 final class AddUserPostProvisionTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-add-user-bonus-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-add-user-bonus-']; }
 
     public function testTrafficSeedingDelegatesToSharedStorageHelper(): void
     {

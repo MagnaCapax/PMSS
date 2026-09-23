@@ -7,11 +7,7 @@ require_once dirname(__DIR__, 2).'/lighttpd/htpasswd.php';
 
 class userPasswordShadowSyncTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-user-password-shadow-sync-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-user-password-shadow-sync-']; }
 
     public function testReadShadowPasswordHashReturnsEntryForManagedUser(): void
     {

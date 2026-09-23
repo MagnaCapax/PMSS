@@ -8,10 +8,7 @@ class MdadmCheckarrayTest extends TestCase
     /** @var string */
     private $fixtureRoot;
 
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('fixtureRoot', 'pmss-mdadm-checkarray-', 0700);
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['fixtureRoot', 'pmss-mdadm-checkarray-', 0700]; }
 
     public function testPlanKeepsOnlyHealthyArrays(): void
     {

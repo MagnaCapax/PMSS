@@ -8,10 +8,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
     /** @var string */
     private $tempHome = '';
 
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempHome', 'home', 0755, sys_get_temp_dir().'/pmss-rtorrent-customrc-tests');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempHome', 'home', 0755, sys_get_temp_dir().'/pmss-rtorrent-customrc-tests']; }
 
     private function resolveTestUser(): string
     {

@@ -5,11 +5,7 @@ require_once dirname(__DIR__, 2).'/welcomeMessage.php';
 
 class WelcomeMessageTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-welcome-message-', 0755);
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-welcome-message-', 0755]; }
 
     private function makeUserHome(): string
     {

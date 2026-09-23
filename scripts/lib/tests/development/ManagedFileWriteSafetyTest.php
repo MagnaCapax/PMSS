@@ -6,10 +6,7 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class ManagedFileWriteSafetyTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-managed-file-write-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-managed-file-write-']; }
 
     public function testImmutableToggleRejectsNulPathBeforeFilesystemProbe(): void
     {

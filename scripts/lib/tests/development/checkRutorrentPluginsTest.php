@@ -6,10 +6,7 @@ require_once dirname(__DIR__, 4).'/scripts/lib/rutorrentPlugins.php';
 
 class CheckRutorrentPluginsTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-rutorrent-plugins-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-rutorrent-plugins-']; }
 
     public function testSyncUserRejectsInvalidUsername(): void
     {

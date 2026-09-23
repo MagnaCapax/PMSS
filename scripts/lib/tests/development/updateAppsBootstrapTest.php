@@ -5,10 +5,7 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateAppsBootstrapTest extends TestCase
 {
-    public function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-update-app-bootstrap', 0700);
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-update-app-bootstrap', 0700]; }
 
     public function testServarrInstallerWarnsForEveryAppWhenRuntimeHelperMissing(): void
     {

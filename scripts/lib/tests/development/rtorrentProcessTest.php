@@ -12,10 +12,7 @@ require_once dirname(__DIR__, 2).'/rtorrent/process.php';
 
 class RtorrentProcessTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-rtorrent-process-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-rtorrent-process-']; }
 
     /**
      * Test stale state: first detection records timestamp.

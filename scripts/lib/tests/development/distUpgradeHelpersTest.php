@@ -8,10 +8,7 @@ class DistUpgradeHelpersTest extends TestCase
     /** @var string */
     private $tmpDir;
 
-    public function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tmpDir', 'pmss-dist-upgrade-helpers-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tmpDir', 'pmss-dist-upgrade-helpers-']; }
 
     public function testDistUpgradeFacadeLoadsDecomposedHelperSurface(): void
     {

@@ -5,10 +5,7 @@ require_once dirname(__DIR__, 2).'/lighttpd/accessLog.php';
 
 class LighttpdAccessLogTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-lighttpd-access-log-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-lighttpd-access-log-']; }
 
     public function testThresholdMatchesOneHundredMiB(): void
     {

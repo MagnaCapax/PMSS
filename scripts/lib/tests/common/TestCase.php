@@ -48,9 +48,19 @@ abstract class TestCase
      */
     private $trackedEnvOverrides = [];
 
-    /** Provide a shared no-op setup hook for inheriting tests. */
+    /** Return arguments for the standard tracked temporary-directory fixture. */
+    protected function pmssTempDirFixtureArguments(): array
+    {
+        return [];
+    }
+
+    /** Prepare the standard temporary-directory fixture when a test declares one. */
     protected function setUp(): void
     {
+        $arguments = $this->pmssTempDirFixtureArguments();
+        if ($arguments !== []) {
+            $this->pmssAssignTempDirProperty(...$arguments);
+        }
     }
 
     /** Provide a shared no-op teardown hook for inheriting tests. */

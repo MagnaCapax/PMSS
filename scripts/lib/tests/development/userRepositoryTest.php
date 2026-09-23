@@ -10,11 +10,7 @@ class UserRepositoryTest extends TestCase
         return $this->tempDir.'/seedbox/config';
     }
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->pmssAssignTempDirProperty('tempDir', 'repo', 0755, sys_get_temp_dir().'/pmss-userrepo-tests');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'repo', 0755, sys_get_temp_dir().'/pmss-userrepo-tests']; }
 
     public function testPersistAndReload(): void
     {

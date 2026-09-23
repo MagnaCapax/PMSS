@@ -12,10 +12,7 @@ class CreateNginxConfigPermissionHardeningTest extends TestCase
     /** @var string */
     private $root;
 
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('root', 'pmss-nginx-chmod-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['root', 'pmss-nginx-chmod-']; }
 
     public function testChmodGlobAppliesModeToMatchedFiles(): void
     {

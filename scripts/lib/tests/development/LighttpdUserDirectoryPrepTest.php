@@ -8,10 +8,7 @@ class LighttpdUserDirectoryPrepTest extends TestCase
 {
     private $base;
 
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('base', 'pmss-lighttpd-dirprep-', 0700);
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['base', 'pmss-lighttpd-dirprep-', 0700]; }
 
     public function testCreatesDirectoriesAndCustomFile(): void
     {

@@ -6,10 +6,7 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class LighttpdUserFileWriteTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-lighttpd-user-write-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-lighttpd-user-write-']; }
 
     public function testAppendUserFileWritesNewFile(): void
     {

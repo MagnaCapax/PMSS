@@ -23,10 +23,7 @@ if (!function_exists('pmssDelugeReadWebConf')) {
 
 class DelugeReverseProxyHardeningTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-proxy-test', 0700);
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-deluge-proxy-test', 0700]; }
 
     // =========================================================================
     // SECTION 1: nginx legacy Deluge URL routing (slash redirect + proxy)

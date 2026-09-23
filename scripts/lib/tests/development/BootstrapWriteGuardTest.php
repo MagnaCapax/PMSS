@@ -10,10 +10,7 @@ require_once dirname(__DIR__, 2).'/update/services/bootstrap.php';
  */
 class BootstrapWriteGuardTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-bootstrap-write-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-bootstrap-write-']; }
 
     public function testManagedPathWriterStoresContentWithRootMetadata(): void
     {

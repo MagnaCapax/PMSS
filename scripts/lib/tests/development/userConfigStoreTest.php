@@ -22,11 +22,7 @@ class UserConfigStoreRuntimeStub extends \UserConfigStore
 
 class UserConfigStoreTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->pmssAssignTempDirProperty('tempDir', 'store', 0755, sys_get_temp_dir().'/pmss-userconfigstore-tests');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'store', 0755, sys_get_temp_dir().'/pmss-userconfigstore-tests']; }
 
     private function configDirPath(): string
     {

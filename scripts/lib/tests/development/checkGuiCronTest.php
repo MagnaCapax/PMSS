@@ -6,10 +6,7 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class CheckGuiCronTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-check-gui-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-check-gui-']; }
 
     public function testRootCronSchedulesCheckGui(): void
     {

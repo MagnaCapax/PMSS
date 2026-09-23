@@ -7,10 +7,7 @@ require_once __DIR__.'/../../user/trafficLimit.php';
 
 class UserTrafficStateHelpersTest extends TestCase
 {
-    public function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-traffic-state-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-traffic-state-']; }
 
     public function testSharedTrafficPayloadReaderReturnsSerializedArrays(): void
     {

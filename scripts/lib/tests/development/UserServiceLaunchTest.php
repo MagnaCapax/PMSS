@@ -6,10 +6,7 @@ require_once dirname(__DIR__, 2).'/user/serviceLaunch.php';
 
 class UserServiceLaunchTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-user-service-launch-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-user-service-launch-']; }
 
     public function testScopedLaunchContainsProcessStormAtUserSliceTasksMax(): void
     {

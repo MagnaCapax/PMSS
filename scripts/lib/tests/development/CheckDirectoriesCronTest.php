@@ -6,10 +6,7 @@ require_once dirname(__DIR__, 3).'/cron/checkDirectories.php';
 
 class CheckDirectoriesCronTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-check-dirs-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-check-dirs-']; }
 
     public function testRequiredDirectoriesKeepParentsBeforeChildren(): void
     {

@@ -6,10 +6,7 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class PathShellTargetSafetyTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-path-shell-target-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-path-shell-target-']; }
 
     public function testShellTargetAcceptsExistingRegularFile(): void
     {

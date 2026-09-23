@@ -7,10 +7,7 @@ require_once dirname(__DIR__, 4).'/scripts/lib/user/trafficLimit.php';
 
 class TrafficLimitSafetyHelperTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-traffic-limit-safety-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-traffic-limit-safety-']; }
 
     public function testEnsureStorageDirRejectsUnsafeTargets(): void
     {
