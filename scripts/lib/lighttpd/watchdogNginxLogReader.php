@@ -17,11 +17,10 @@ function pmssLighttpdWatchdogNginxActionsRead(string $logPath, string $statePath
 
     $handle = @fopen($logPath, 'rb');
     try {
-        $logStat = is_resource($handle) ? @fstat($handle) : false;
+        $logStat = null;
         $pathStat = @lstat($logPath);
-        if (!is_resource($handle) || !is_array($logStat) || !is_array($pathStat)
-            || ($logStat['dev'] ?? null) !== ($pathStat['dev'] ?? null)
-            || ($logStat['ino'] ?? null) !== ($pathStat['ino'] ?? null)
+        if (!is_resource($handle) || !is_array($pathStat)
+            || !pmssLockFileHandleMatchesPath($handle, $logPath, $pathStat, $logStat)
         ) {
             return array();
         }

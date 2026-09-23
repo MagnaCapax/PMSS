@@ -31,12 +31,8 @@ function pmssLighttpdAccessLogTrimFile(string $path, int $thresholdBytes): array
     if (!is_resource($handle)) return ['status' => 'error', 'reason' => 'open_failed'];
     if (!@flock($handle, LOCK_EX | LOCK_NB)) { @fclose($handle); return ['status' => 'skip', 'reason' => 'lock_busy']; }
 
-    $handleStat = @fstat($handle);
-    if (
-        !is_array($handleStat)
-        || ($pathStat['dev'] ?? null) !== ($handleStat['dev'] ?? null)
-        || ($pathStat['ino'] ?? null) !== ($handleStat['ino'] ?? null)
-    ) { @fclose($handle); return ['status' => 'skip', 'reason' => 'path_changed']; }
+    $handleStat = null;
+    if (!pmssLockFileHandleMatchesPath($handle, $path, $pathStat, $handleStat)) { @fclose($handle); return ['status' => 'skip', 'reason' => 'path_changed']; }
 
     if (($handleStat['nlink'] ?? 1) !== 1) { @fclose($handle); return ['status' => 'skip', 'reason' => 'multiple_links']; }
 

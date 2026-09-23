@@ -42,14 +42,12 @@ function pmssUserNotificationEmailRead(string $home, int $expectedGroup): ?strin
     }
 
     $handle = @fopen($path, 'rb');
-    $handleStat = is_resource($handle) ? @fstat($handle) : false;
+    $handleStat = null;
+    $openedPathMatches = pmssLockFileHandleMatchesPath($handle, $path, $pathStat, $handleStat);
     $pathAfterOpen = @lstat($path);
     $permissions = is_array($handleStat) ? ($handleStat['mode'] ?? 0) & 0777 : -1;
-    if (!is_resource($handle)
-        || !is_array($handleStat)
+    if (!$openedPathMatches
         || !is_array($pathAfterOpen)
-        || ($pathStat['dev'] ?? null) !== ($handleStat['dev'] ?? null)
-        || ($pathStat['ino'] ?? null) !== ($handleStat['ino'] ?? null)
         || ($pathAfterOpen['dev'] ?? null) !== ($handleStat['dev'] ?? null)
         || ($pathAfterOpen['ino'] ?? null) !== ($handleStat['ino'] ?? null)
         || ($handleStat['uid'] ?? -1) !== 0

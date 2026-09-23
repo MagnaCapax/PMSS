@@ -94,6 +94,24 @@ function pmssRemovePrivateTempDir(string $path, string $prefix, string $descript
 // runtime boundary and keep callers on the existing fail-soft path.
 function pmssFilesystemPathHasNulByte(string $path): bool { return strpos($path, "\0") !== false; }
 function pmssRegularFilePathIsReadable(string $path): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && is_file($path) && !is_link($path); }
+
+/** Lock files must be plain files; refuse symlinks and device paths. */
+function pmssLockFilePathIsSafe(string $path): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && !is_link($path) && (!file_exists($path) || is_file($path)); }
+
+/** Confirm an opened stream still points at a path or supplied path snapshot. */
+function pmssLockFileHandleMatchesPath($handle, string $path, ?array $pathStat = null, ?array &$handleStat = null): bool
+{
+    $handleStat = null; $validateLockPath = $pathStat === null;
+    if (!is_resource($handle) || get_resource_type($handle) !== 'stream' || ($validateLockPath && !pmssLockFilePathIsSafe($path))) return false;
+    $observedHandleStat = @fstat($handle); $pathStat = $validateLockPath ? @stat($path) : $pathStat;
+    $handleStat = is_array($observedHandleStat) ? $observedHandleStat : null;
+    if ($handleStat === null || !is_array($pathStat)) return false;
+    if (!$validateLockPath) return ($handleStat['dev'] ?? null) === ($pathStat['dev'] ?? null)
+        && ($handleStat['ino'] ?? null) === ($pathStat['ino'] ?? null);
+    return isset($handleStat['dev'], $handleStat['ino'], $pathStat['dev'], $pathStat['ino'])
+        && (int) $handleStat['dev'] === (int) $pathStat['dev'] && (int) $handleStat['ino'] === (int) $pathStat['ino'];
+}
+
 function pmssReadRegularFileContents(string $path): ?string { return (!pmssRegularFilePathIsReadable($path) || !is_string($contents = @file_get_contents($path))) ? null : $contents; }
 function pmssReadRegularFileTrimmed(string $path): ?string { return (($contents = pmssReadRegularFileContents($path)) === null) ? null : trim($contents); }
 function pmssReadRegularFileNonEmptyLines(string $path): array { $lines = preg_split('/\r?\n/', pmssReadRegularFileContents($path) ?? ''); return array_values(array_filter(is_array($lines) ? $lines : [], 'strlen')); }

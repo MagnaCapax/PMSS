@@ -275,6 +275,10 @@ class RuntimeLockSafetyTest extends TestCase
 
         try {
             $this->assertTrue(\pmssLockFileHandleMatchesPath($handle, $path));
+            $pathStat = lstat($path);
+            $handleStat = null;
+            $this->assertTrue(\pmssLockFileHandleMatchesPath($handle, $path, $pathStat, $handleStat));
+            $this->assertSame([$pathStat['dev'], $pathStat['ino']], [$handleStat['dev'], $handleStat['ino']]);
         } finally {
             if (is_resource($handle)) {
                 @fclose($handle);

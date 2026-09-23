@@ -23,9 +23,11 @@ function fault($stage) {
 function fopen($path, $mode) {
     return $GLOBALS['handle'] = $GLOBALS['stage'] === 'open-false' ? false : \fopen($path, $mode);
 }
-function fstat($handle) {
+function pmssLockFileHandleMatchesPath($handle, $path, $pathStat = null, &$handleStat = null) {
     fault('stat');
-    return $GLOBALS['stage'] === 'stat-false' ? false : \fstat($handle);
+    return $GLOBALS['stage'] === 'stat-false'
+        ? false
+        : \pmssLockFileHandleMatchesPath($handle, $path, $pathStat, $handleStat);
 }
 function lstat($path) { fault('path-stat'); return \lstat($path); }
 function pmssJsonFileReadAssoc($path, $safe) { fault('state'); return \pmssJsonFileReadAssoc($path, $safe); }
