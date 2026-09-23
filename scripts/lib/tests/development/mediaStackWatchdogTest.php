@@ -127,28 +127,12 @@ class MediaStackWatchdogTest extends TestCase
         // Intercept only publication operations; path validation and fixture I/O stay real.
         $script = <<<'PHP'
 namespace MediaStackStatusFixture;
-function tempnam($directory, $prefix) {
-    return $GLOBALS['mode'] === 'open' ? false : \tempnam($directory, $prefix);
-}
-function file_put_contents($path, $data, $flags) {
-    $mode = $GLOBALS['mode'];
-    if ($mode === 'writeThrow' || $mode === 'writeError') throw $GLOBALS['throwable'];
-    if ($mode === 'false') return false;
-    if ($mode === 'zero') return 0;
-    return \file_put_contents($path, $mode === 'short' ? substr($data, 0, -1) : $data, $flags);
-}
-function chmod($path, $permissions) {
-    if ($GLOBALS['mode'] === 'chmodThrow') throw $GLOBALS['throwable'];
-    return $GLOBALS['mode'] === 'chmod' ? false : \chmod($path, $permissions);
-}
-function rename($source, $target) {
-    if ($GLOBALS['mode'] === 'renameThrow') throw $GLOBALS['throwable'];
-    return $GLOBALS['mode'] === 'rename' ? false : \rename($source, $target);
-}
 PHP;
+        $script .= $this->pmssInlinePhpAtomicPublicationShims('open');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/mediaStackWatchdog.php', 'MediaStackStatusFixture');
         $script .= <<<'PHP'
 $GLOBALS['mode'] = getenv('PMSS_TEST_STATUS_MODE');
+$GLOBALS['tempCalls'] = 0;
 $GLOBALS['throwable'] = $GLOBALS['mode'] === 'writeError' ? new \Error('write') : new \RuntimeException('publication');
 $home = getenv('PMSS_TEST_STATUS_HOME');
 $result = null;

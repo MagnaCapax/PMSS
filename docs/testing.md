@@ -30,6 +30,8 @@ assertions outside the capture so only the operation's output is collected.
 Child-process fault-injection tests use `pmssInlinePhpLibraryInNamespace()` to
 load a library behind namespace-local shims, preserving its `__DIR__` includes.
 Define shims before loading; keep prerequisite imports and assertions in callers.
+Atomic-publication fixtures share `pmssInlinePhpAtomicPublicationShims()` and
+parameterize only the existing temporary-file failure label.
 
 Deluge compatibility-patch tests share fixture execution and symlink-refusal
 checks in `DelugeAppTestCase`. Keep patch-specific source, expected bytes,

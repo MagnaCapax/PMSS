@@ -157,26 +157,8 @@ class UserSystemdWatchdogTest extends TestCase
         $home = $this->pmssMakeTempDir('systemd-status-write-');
         $script = <<<'PHP'
 namespace SystemdStatusWriteFixture;
-function tempnam($directory, $prefix) {
-    ++$GLOBALS['tempCalls'];
-    return $GLOBALS['mode'] === 'temp' ? false : \tempnam($directory, $prefix);
-}
-function file_put_contents($path, $bytes, $flags = 0) {
-    $mode = $GLOBALS['mode'];
-    if ($mode === 'writeThrow' || $mode === 'writeError') throw $GLOBALS['throwable'];
-    if ($mode === 'false') return false;
-    if ($mode === 'zero') return 0;
-    return \file_put_contents($path, $mode === 'short' ? substr($bytes, 0, -1) : $bytes, $flags);
-}
-function chmod($path, $permissions) {
-    if ($GLOBALS['mode'] === 'chmodThrow') throw $GLOBALS['throwable'];
-    return $GLOBALS['mode'] === 'chmod' ? false : \chmod($path, $permissions);
-}
-function rename($from, $to) {
-    if ($GLOBALS['mode'] === 'renameThrow') throw $GLOBALS['throwable'];
-    return $GLOBALS['mode'] === 'rename' ? false : \rename($from, $to);
-}
 PHP;
+        $script .= $this->pmssInlinePhpAtomicPublicationShims('temp');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/userSystemdWatchdog.php', 'SystemdStatusWriteFixture');
         $script .= <<<'PHP'
 $GLOBALS['mode'] = getenv('PMSS_TEST_STATUS_MODE');

@@ -1089,6 +1089,34 @@ abstract class TestCase
             var_export(var_export(dirname($path), true), true).', \\file_get_contents('.var_export($path, true).')), 5));';
     }
 
+    /** Return filesystem shims shared by atomic-publication fault fixtures. */
+    protected function pmssInlinePhpAtomicPublicationShims(string $tempFailureMode): string
+    {
+        $this->assertMatches('/^[A-Za-z]+$/', $tempFailureMode, 'Invalid temporary-file failure mode');
+        $shims = <<<'PHP'
+function tempnam($directory, $prefix) {
+    ++$GLOBALS['tempCalls'];
+    return $GLOBALS['mode'] === %s ? false : \tempnam($directory, $prefix);
+}
+function file_put_contents($path, $bytes, $flags = 0) {
+    $mode = $GLOBALS['mode'];
+    if ($mode === 'writeThrow' || $mode === 'writeError') throw $GLOBALS['throwable'];
+    if ($mode === 'false') return false;
+    if ($mode === 'zero') return 0;
+    return \file_put_contents($path, $mode === 'short' ? substr($bytes, 0, -1) : $bytes, $flags);
+}
+function chmod($path, $permissions) {
+    if ($GLOBALS['mode'] === 'chmodThrow') throw $GLOBALS['throwable'];
+    return $GLOBALS['mode'] === 'chmod' ? false : \chmod($path, $permissions);
+}
+function rename($from, $to) {
+    if ($GLOBALS['mode'] === 'renameThrow') throw $GLOBALS['throwable'];
+    return $GLOBALS['mode'] === 'rename' ? false : \rename($from, $to);
+}
+PHP;
+        return sprintf($shims, var_export($tempFailureMode, true));
+    }
+
     protected function pmssRunInlinePhp(string $script, array $environment = [], string $stderrRedirect = '2>/dev/null'): string
     {
         return $this->pmssRunShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script), $environment, $stderrRedirect);
