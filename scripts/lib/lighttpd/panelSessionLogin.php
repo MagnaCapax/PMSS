@@ -23,7 +23,7 @@ function pmssLighttpdPanelSessionGatePath(string $homeDir): string
 
 function pmssLighttpdPanelSessionGateFileUsable(string $path): bool
 {
-    return $path !== '' && is_file($path) && !is_link($path);
+    return pmssRegularFilePathIsReadable($path);
 }
 
 function pmssLighttpdPanelSessionGateDeploy(string $user, string $homeDir): bool
@@ -33,11 +33,8 @@ function pmssLighttpdPanelSessionGateDeploy(string $user, string $homeDir): bool
     }
 
     $source = PMSS_LIGHTTPD_PANEL_SESSION_GATE_SOURCE;
-    if (!is_file($source) || is_link($source)) {
-        return false;
-    }
-    $content = @file_get_contents($source);
-    if (!is_string($content) || $content === '') {
+    $content = pmssReadRegularFileContents($source);
+    if ($content === null || $content === '') {
         return false;
     }
 
@@ -58,7 +55,7 @@ function pmssLighttpdPanelSessionMagnetModuleLoadable(?array $modulePaths = null
     }
 
     foreach (array_unique($modulePaths) as $path) {
-        if (is_string($path) && is_file($path) && !is_link($path)) {
+        if (is_string($path) && pmssRegularFilePathIsReadable($path)) {
             return true;
         }
     }

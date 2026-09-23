@@ -43,14 +43,13 @@ function pmssMediaStackConfiguredPortRead(string $home, array $definition): ?int
     $size = @filesize($path);
     if (!is_string($homeReal) || !is_string($pathReal)
         || strpos($pathReal, $homeReal.'/') !== 0
-        || !is_file($path) || is_link($path)
         || !is_int($size) || $size < 1 || $size > 1048576
     ) {
         return null;
     }
 
-    $content = @file_get_contents($path);
-    if (!is_string($content)) {
+    $content = pmssReadRegularFileContents($path);
+    if ($content === null) {
         return null;
     }
     foreach (($definition['patterns'] ?? array()) as $pattern) {

@@ -102,7 +102,7 @@ class rtorrentConfig
     public function idempotentConfig($user, $config)
     {
         $file = $this->userConfigFilePath($user);
-        $data = (is_file($file) && !is_link($file)) ? @file_get_contents($file) : false;
+        $data = pmssReadRegularFileContents($file);
         return $data !== $config ? $this->writeConfig($user, $config) : null;
     }
     /**
@@ -115,8 +115,7 @@ class rtorrentConfig
         if (!pmssRtorrentPortReservationUsernameIsValid($user)) {
             return false;
         }
-        $file = $this->userConfigFilePath($user);
-        return (!is_file($file) || is_link($file)) ? false : $this->readConfig($file);
+        return $this->readConfig($this->userConfigFilePath($user));
     }
     /**
      * Parse simple `key = value` lines from an rTorrent config file.
@@ -125,11 +124,8 @@ class rtorrentConfig
      */
     public function readConfig($file)
     {
-        if (!is_file($file) || is_link($file)) {
-            return false;
-        }
-        $configRaw = @file_get_contents($file);
-        if (!is_string($configRaw) || $configRaw === '') {
+        $configRaw = pmssReadRegularFileContents($file);
+        if ($configRaw === null || $configRaw === '') {
             return false;
         }
         $config = array();

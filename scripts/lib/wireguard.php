@@ -60,7 +60,7 @@ function pmssWireguardConfigLines(string $configPath): array
     if (!file_exists($configPath)) {
         return ['status' => 'missing', 'lines' => []];
     }
-    if (!is_file($configPath) || is_link($configPath)) {
+    if (!pmssRegularFilePathIsReadable($configPath)) {
         return ['status' => 'not_regular', 'lines' => []];
     }
 
@@ -560,7 +560,7 @@ function wgReadUserPublicKeys(string $user): array
     if (!file_exists($path)) {
         return [];
     }
-    if (!is_file($path) || is_link($path)) {
+    if (!pmssRegularFilePathIsReadable($path)) {
         wgLog('Ignoring unsafe WireGuard public key path for user '.$user.': '.$path);
         return [];
     }

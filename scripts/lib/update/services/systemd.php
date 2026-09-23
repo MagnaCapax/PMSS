@@ -156,8 +156,8 @@ function pmssEnsureCronRestartDropin(
 
     $content = pmssCronRestartDropinContent();
     if (is_file($dropinFile)) {
-        $existing = @file_get_contents($dropinFile);
-        if (!is_string($existing)) {
+        $existing = pmssReadRegularFileContents($dropinFile);
+        if ($existing === null) {
             logMessage('[ERR] Failed to read cron systemd drop-in target: '.$dropinFile);
             return false;
         }
@@ -211,12 +211,12 @@ function pmssEnsureCronPamSystemdSession(string $pamCronPath = '/etc/pam.d/cron'
     if (!file_exists($pamCronPath)) {
         return true; // no cron PAM file -> nothing to contain
     }
-    if (is_link($pamCronPath) || !is_file($pamCronPath)) {
+    if (!pmssRegularFilePathIsReadable($pamCronPath)) {
         logMessage('[ERR] Refusing non-regular cron PAM target: '.$pamCronPath);
         return false;
     }
-    $content = @file_get_contents($pamCronPath);
-    if (!is_string($content)) {
+    $content = pmssReadRegularFileContents($pamCronPath);
+    if ($content === null) {
         logMessage('[ERR] Failed to read cron PAM file: '.$pamCronPath);
         return false;
     }

@@ -65,13 +65,13 @@ function pmssUserCgroupSliceDropinContentRepairBareMemoryMax(string $content): a
 /** Repair one drop-in file when it contains stale bare MemoryMax values. */
 function pmssUserCgroupSliceDropinFileRepairBareMemoryMax(string $file, callable $logger): bool
 {
-    if (is_link($file) || !is_file($file)) {
+    if (!pmssRegularFilePathIsReadable($file)) {
         $logger('[WARN] Skipping unsafe user slice drop-in target: '.$file);
         return false;
     }
 
-    $content = @file_get_contents($file);
-    if (!is_string($content)) {
+    $content = pmssReadRegularFileContents($file);
+    if ($content === null) {
         $logger('[WARN] Unable to read user slice drop-in: '.$file);
         return false;
     }

@@ -100,15 +100,14 @@ function pmssArrVersionExtract(string $payload): ?string
  */
 function pmssArrInstalledVersionRead(string $installPath, string $app): ?string
 {
+    if (!function_exists('pmssReadRegularFileContents')) {
+        require_once dirname(__DIR__, 2).'/runtime/filesystem.php';
+    }
     foreach ([$installPath.'/version.txt', $installPath.'/VERSION'] as $file) {
         // Reject symlinks: root must not be redirected out of the install tree by a
         // marker planted in a foreign-owned /opt directory.
-        if (!is_file($file) || is_link($file)) {
-            continue;
-        }
-
-        $versionPayload = @file_get_contents($file);
-        if (is_string($versionPayload) && $versionPayload !== '') {
+        $versionPayload = pmssReadRegularFileContents($file);
+        if ($versionPayload !== null && $versionPayload !== '') {
             $version = pmssArrVersionExtract($versionPayload);
             if ($version !== null) {
                 return $version;

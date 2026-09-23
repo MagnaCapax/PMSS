@@ -163,8 +163,7 @@ function pmssCheckGuiRestoreUserFile(string $targetFile, string $sourceFile, str
 
     if (
         !pmssPathTargetIsSafe($sourceFile, false, true)
-        || !is_file($sourceFile)
-        || is_link($sourceFile)
+        || !pmssRegularFilePathIsReadable($sourceFile)
         || !is_int($sourceSize)
         || $sourceSize <= 0
     ) {
@@ -172,8 +171,8 @@ function pmssCheckGuiRestoreUserFile(string $targetFile, string $sourceFile, str
         return false;
     }
 
-    $content = @file_get_contents($sourceFile);
-    if (!is_string($content) || strlen($content) !== $sourceSize) {
+    $content = pmssReadRegularFileContents($sourceFile);
+    if ($content === null || strlen($content) !== $sourceSize) {
         $log("Skipping {$user}: unable to read complete {$label} source {$sourceFile}");
         return false;
     }

@@ -140,12 +140,8 @@ function pmssQbittorrentConfigMutate(string $username, callable $mutator, ?strin
     if ($configFile === null) {
         $configFile = pmssQbittorrentConfigPath($username);
     }
-    if (!is_file($configFile) || is_link($configFile)) {
-        return false;
-    }
-
-    $config = @file_get_contents($configFile);
-    if (!is_string($config)) {
+    $config = pmssReadRegularFileContents($configFile);
+    if ($config === null) {
         return false;
     }
 

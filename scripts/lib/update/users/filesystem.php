@@ -29,9 +29,7 @@ function pmssUserPathWithinHomeRoot(string $path): bool
 function pmssUserPatchWritableFile(string $path, callable $patcher): void
 {
     if (!pmssUserPathWithinHomeRoot($path)
-        || !is_file($path)
-        || is_link($path)
-        || !is_string($content = @file_get_contents($path))
+        || ($content = pmssReadRegularFileContents($path)) === null
         || $content === '') {
         return;
     }
@@ -154,8 +152,8 @@ function pmssUserRefreshPanelIndexForFrameDataCompat(array $ctx): void
     }
 
     $sourceContent = @file_get_contents($sourceFile);
-    $targetContent = @file_get_contents($targetFile);
-    if (!is_string($sourceContent) || !is_string($targetContent)) {
+    $targetContent = pmssReadRegularFileContents($targetFile);
+    if (!is_string($sourceContent) || $targetContent === null) {
         return;
     }
 

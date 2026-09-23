@@ -131,7 +131,7 @@ function rtorrentCustomConfigQuarantine(string $home, string $user, callable $lo
         $logFn("Refusing to quarantine unsafe custom rTorrent config: {$src}", true);
         return null;
     }
-    if (!is_file($src) || is_link($src)) {
+    if (!pmssRegularFilePathIsReadable($src)) {
         return null;
     }
 
@@ -146,8 +146,8 @@ function rtorrentCustomConfigQuarantine(string $home, string $user, callable $lo
         }
     }
 
-    $content = @file_get_contents($src);
-    if (is_string($content)) {
+    $content = pmssReadRegularFileContents($src);
+    if ($content !== null) {
         $legacyDirectives = rtorrentCustomConfigFindLegacyDirectives($content);
         if ($legacyDirectives !== []) {
             $logFn('Custom rTorrent config still uses legacy PMSS-migrated directives: '.implode(', ', $legacyDirectives), true);
