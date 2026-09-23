@@ -11,6 +11,20 @@ require_once dirname(__DIR__, 2).'/update/users.php';
  */
 class UserContextSuspendedTest extends TestCase
 {
+    public function testUserContextIdentityNormalizesBoundaryInputs(): void
+    {
+        $cases = [
+            [['user' => 'testuser', 'home' => '/home/testuser'], ['testuser', '/home/testuser']],
+            [['user' => 'testuser', 'home' => '/home/testuser/'], ['testuser', '/home/testuser']],
+            [['user' => 123, 'home' => 456], ['123', '456']],
+            [['user' => null, 'home' => null], ['', '']],
+            [[], ['', '']],
+        ];
+        foreach ($cases as $case) {
+            $this->assertEquals($case[1], \pmssUserContextIdentity($case[0]));
+        }
+    }
+
     public function testBuildUserContextSkipsSuspendedUsers(): void
     {
         $user = 'testuser';

@@ -13,8 +13,7 @@
  */
 function pmssUserRefreshPermissions(array $ctx): void
 {
-    $user = $ctx['user'];
-    $home = $ctx['home'];
+    [$user, $home] = pmssUserContextIdentity($ctx);
 
     $timeoutSeconds = pmssEnvReadDigits('PMSS_USER_PERMISSIONS_TIMEOUT') ?: 900;
     $previousTimeout = getenv('PMSS_COMMAND_TIMEOUT');

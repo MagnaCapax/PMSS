@@ -363,8 +363,7 @@ function pmssUserWebRootReconcileLogSummary(
 function pmssUserReconcileWebRoot(array $ctx, ?callable $logger = null): bool
 {
     $startedAt = microtime(true);
-    $user = (string) ($ctx['user'] ?? '');
-    $home = rtrim((string) ($ctx['home'] ?? ''), '/');
+    [$user, $home] = pmssUserContextIdentity($ctx);
     $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
     if ($user === '' || !preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $user)
         || $home === '' || !pmssPathTargetIsSafe($home, true) || is_link($home)

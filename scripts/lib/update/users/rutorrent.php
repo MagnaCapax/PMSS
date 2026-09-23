@@ -13,8 +13,7 @@
  */
 function pmssUserEnsurePlugins(array $ctx): void
 {
-    $user    = $ctx['user'];
-    $home    = $ctx['home'];
+    [$user, $home] = pmssUserContextIdentity($ctx);
     $userEsc = $ctx['user_esc'];
 
     if (file_exists("{$home}/www/rutorrent/plugins/cpuload")) {
@@ -121,8 +120,7 @@ PHP;
  */
 function pmssUserUpdateThemes(array $ctx): void
 {
-    $user    = $ctx['user'];
-    $home    = $ctx['home'];
+    [$user, $home] = pmssUserContextIdentity($ctx);
     $userEsc = $ctx['user_esc'];
 
     $themesPath = "{$home}/www/rutorrent/plugins/theme/themes/";
@@ -151,8 +149,7 @@ function pmssUserUpdateThemes(array $ctx): void
  */
 function pmssUserUpgradeRutorrent(array $ctx): void
 {
-    $user          = $ctx['user'];
-    $home          = $ctx['home'];
+    [$user, $home] = pmssUserContextIdentity($ctx);
     $userEsc       = $ctx['user_esc'];
     $expectedSha   = $ctx['rutorrent_index_sha'];
     $rutorrentPath = "{$home}/www/rutorrent";

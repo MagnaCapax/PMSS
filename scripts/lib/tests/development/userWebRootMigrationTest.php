@@ -3,6 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/update.php';
+require_once dirname(__DIR__, 2).'/update/users/context.php';
 require_once dirname(__DIR__, 2).'/update/users/filesystem.php';
 require_once dirname(__DIR__, 2).'/update/users/webRoot.php';
 

@@ -82,8 +82,7 @@ function pmssUserDeletePathIfPresent(string $path): void
  */
 function pmssUserEnsureWebRootSymlinks(array $ctx): void
 {
-    $user = (string) ($ctx['user'] ?? '');
-    $home = rtrim((string) ($ctx['home'] ?? ''), '/');
+    [$user, $home] = pmssUserContextIdentity($ctx);
     $www = $home.'/www';
     if ($user === '' || $home === '' || !is_dir($www) || is_link($www)) {
         return;
@@ -135,8 +134,7 @@ function pmssUserPanelIndexNeedsFrameDataCompatRefresh(string $content): bool
  */
 function pmssUserRefreshPanelIndexForFrameDataCompat(array $ctx): void
 {
-    $user = (string) ($ctx['user'] ?? '');
-    $home = rtrim((string) ($ctx['home'] ?? ''), '/');
+    [$user, $home] = pmssUserContextIdentity($ctx);
     if ($user === '' || $home === '') {
         return;
     }
@@ -170,10 +168,10 @@ function pmssUserRefreshPanelIndexForFrameDataCompat(array $ctx): void
 
 function pmssUserApplySkeletonFiles(array $ctx): void
 {
-    $user = $ctx['user'];
+    [$user, $home] = pmssUserContextIdentity($ctx);
     pmssTrafficLimitHomeArtifactReconcile(
         $user,
-        dirname(rtrim((string) $ctx['home'], '/')),
+        dirname($home),
         null,
         static function (string $message) use ($user): void {
             logMessage("[user:{$user}] {$message}");
@@ -243,14 +241,14 @@ PHP;
         updateUserFile($file, $user);
     }
 
-    pmssUserDeletePathIfPresent($ctx['home'].'/www/phpXplorer');
+    pmssUserDeletePathIfPresent($home.'/www/phpXplorer');
 
     // Remove dead extsearch engines from tenant copies until the frozen
     // skeleton ruTorrent tree can be curated directly.
     foreach ([
-        $ctx['home'].'/www/rutorrent/plugins/extsearch/engines/RARbgTorrentAPI.php',
-        $ctx['home'].'/www/rutorrent/plugins/extsearch/engines/Demonoid.php',
-        $ctx['home'].'/www/rutorrent/plugins/extsearch/engines/KAT.php',
+        $home.'/www/rutorrent/plugins/extsearch/engines/RARbgTorrentAPI.php',
+        $home.'/www/rutorrent/plugins/extsearch/engines/Demonoid.php',
+        $home.'/www/rutorrent/plugins/extsearch/engines/KAT.php',
     ] as $path) {
         pmssUserDeletePathIfPresent($path);
     }
@@ -258,7 +256,7 @@ PHP;
     // Patch tenant copies until the frozen skeleton filemanager source can be
     // updated upstream without touching the locked tree.
     pmssUserPatchWritableStrings(
-        $ctx['home'].'/www/filemanager.php',
+        $home.'/www/filemanager.php',
         [
             ['legacy' => '        ob_flush();', 'patched' => '        @ob_flush();'],
             ['legacy' => 'https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.slim.min.js', 'patched' => 'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.slim.min.js'],

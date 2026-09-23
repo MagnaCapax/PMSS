@@ -8,6 +8,12 @@
  * @author PMSS Team
  */
 
+/** @return array{0:string,1:string} Normalized username and home path. */
+function pmssUserContextIdentity(array $ctx): array
+{
+    return [(string) ($ctx['user'] ?? ''), rtrim((string) ($ctx['home'] ?? ''), '/')];
+}
+
 /**
  * Build the shared per-user context array used by update-step2 user helpers.
  *

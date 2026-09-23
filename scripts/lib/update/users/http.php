@@ -18,8 +18,7 @@
  */
 function pmssUserConfigureHttp(array $ctx): void
 {
-    $user    = $ctx['user'];
-    $home    = $ctx['home'];
+    [$user, $home] = pmssUserContextIdentity($ctx);
     $userEsc = $ctx['user_esc'];
     $userLog = static function (string $message) use ($user): void { pmssUserLog($user, $message); };
 

@@ -457,8 +457,7 @@ function pmssUserMigrateWebRootPath(
 /** Migrate the customer-owned web paths whose durable targets are ADR-defined. */
 function pmssUserMigrateWebRootState(array $ctx, ?callable $logger = null): void
 {
-    $user = (string) ($ctx['user'] ?? '');
-    $home = rtrim((string) ($ctx['home'] ?? ''), '/');
+    [$user, $home] = pmssUserContextIdentity($ctx);
     if ($user === '' || $home === '') {
         return;
     }
