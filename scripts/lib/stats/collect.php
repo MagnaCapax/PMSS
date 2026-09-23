@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../quotaSnapshot.php';
+
 /**
  * Read the quota snapshot written into the user home directory.
  *
@@ -19,9 +21,7 @@ function pmssStatsReadQuotaSnapshot(string $home): array
     if ($raw === null || trim($raw) === '') return $result;
     $result['raw'] = $raw;
 
-    foreach (preg_split('/\r?\n/', trim($raw)) ?: [] as $line) {
-        $columns = pmssConfigLineColumns($line, 4, []);
-        if ($columns === [] || strpos($columns[0], '/dev/') !== 0) continue;
+    foreach (pmssQuotaSnapshotDataRows($raw, '/dev/') as $columns) {
         foreach (['used' => 1, 'soft' => 2, 'hard' => 3] as $key => $column) {
             $result[$key.'_text'] = $columns[$column];
             $result[$key.'_bytes'] = pmssParseSizeToBytes($columns[$column]);

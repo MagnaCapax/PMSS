@@ -8,6 +8,13 @@
 
 require_once __DIR__.'/runtime.php';
 
+/** @return array<int,array<int,string>> Parse quota data rows for one filesystem prefix. */
+function pmssQuotaSnapshotDataRows(string $content, string $pathPrefix = '/'): array
+{
+    $rows = []; foreach (preg_split('/\r?\n/', $content) ?: [] as $line) if (($columns = pmssConfigLineColumns($line, 4, [])) !== [] && strpos($columns[0], $pathPrefix) === 0) $rows[] = $columns;
+    return $rows;
+}
+
 /**
  * Normalize `quota -s` output so UI consumers always receive unit-suffixed
  * size fields in the quota data row.
@@ -30,10 +37,8 @@ function pmssQuotaSnapshotNormalizeHumanReadableOutput(string $content): string
  */
 function pmssQuotaSnapshotNormalizeHumanReadableLine(string $line): string
 {
-    $tokens = pmssConfigLineColumns($line, 4, []);
-    if ($tokens === [] || strpos($tokens[0], '/') !== 0) {
-        return $line;
-    }
+    $tokens = pmssQuotaSnapshotDataRows($line)[0] ?? [];
+    if ($tokens === []) return $line;
 
     $changed = false;
     for ($index = 1; $index <= 3; $index++) {

@@ -5,7 +5,7 @@
  * @license GPL-3.0-only
  */
 
-require_once __DIR__.'/../user/userProcHeldBlocks.php';
+pmssRequireRelativeFiles(dirname(__DIR__), ['quotaSnapshot.php', 'user/userProcHeldBlocks.php']);
 
 /** Return true when quota output shows either block or inode exhaustion. */
 function pmssLighttpdWatchdogQuotaOutputShowsExhaustion(string $output): bool
@@ -17,12 +17,7 @@ function pmssLighttpdWatchdogQuotaOutputShowsExhaustion(string $output): bool
 function pmssLighttpdWatchdogQuotaStateParse(string $output): ?array
 {
     $fallback = null;
-    foreach (preg_split('/\r?\n/', $output) as $line) {
-        $tokens = pmssConfigLineColumns($line, 4, []);
-        if ($tokens === [] || strpos($tokens[0], '/') !== 0) {
-            continue;
-        }
-
+    foreach (pmssQuotaSnapshotDataRows($output) as $tokens) {
         $state = [];
         foreach ([1 => 'usedBytes', 2 => 'softLimitBytes', 3 => 'hardLimitBytes'] as $index => $field) {
             $bytes = pmssParseSizeToBytes(rtrim((string) $tokens[$index], '*'));
