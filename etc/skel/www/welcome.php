@@ -1073,7 +1073,7 @@ function pmssWelcomeVendorRead() {
     );
 
     $vendor = pmssCustomerSerializedArrayFileRead('/etc/seedbox/config/vendor', 4096);
-    if (!is_array($vendor) || count($vendor) == 0 || !isset($vendor['name']) || empty($vendor['name'])) {
+    if (!is_array($vendor) || empty($vendor) || empty($vendor['name'])) {
         return $vendorDefault;
     }
 
@@ -1347,7 +1347,7 @@ function pmssWelcomeTrafficMonthValueRead($trafficState) {
 }
 
 function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null, $bonusTraffic = 0, $trafficBandwidthState = array(), $billingServiceId = 0) {
-    if (!is_array($trafficData) || count($trafficData) == 0) {
+    if (!is_array($trafficData) || empty($trafficData)) {
         return;
     }
 
@@ -1450,7 +1450,7 @@ function gaugeColor($percent) {
 }
 
 function quotaCreateSection($quotaInfo, $bonusQuota = 0, $bonusDisplayState = array()) {
-    if (!is_array($quotaInfo) || count($quotaInfo) == 0) return '';
+    if (!is_array($quotaInfo) || empty($quotaInfo)) return '';
 
     $quotaMissingWarning = '<b>Warning:</b> Quota info is missing. If this persists for more than an hour, contact support.';
     $quotaFields = array();

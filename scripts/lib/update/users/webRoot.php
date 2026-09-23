@@ -143,7 +143,7 @@ function pmssUserWebRootMigrationPrepareParent(string $user, string $home, strin
 function pmssUserWebRootMigrationDirectoryIsEmpty(string $path): bool
 {
     $entries = pmssDirectoryEntriesRead($path);
-    return is_array($entries) && count($entries) === 0;
+    return is_array($entries) && empty($entries);
 }
 
 /** Apply metadata captured from lstat() without treating failures as fatal. */

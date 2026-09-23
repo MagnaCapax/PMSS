@@ -51,7 +51,7 @@ class rtorrentConfig
      */
     public function createConfig($config = array())
     {
-        if (!is_array($config) || count($config) == 0) {
+        if (!is_array($config) || empty($config)) {
             throw new Exception('createConfig requires an array with atleast RAM defined', 100);
         }
         if (!isset($config['ram'])) {
@@ -165,8 +165,8 @@ class rtorrentConfig
     {
         $reserve = array(
             'scgi' => !isset($config['scgiPort']),
-            'dht' => !isset($config['dhtPort']) || empty($config['dhtPort']),
-            'listen' => !isset($config['listenPort']) || empty($config['listenPort']),
+            'dht' => empty($config['dhtPort']),
+            'listen' => empty($config['listenPort']),
         );
         if (!in_array(true, $reserve, true)) {
             return $config;

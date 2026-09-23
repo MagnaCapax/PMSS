@@ -382,7 +382,7 @@ if (!function_exists('pmssCustomerBackupTarCommandBuild')) {
  function pmssCustomerBackupTarCommandBuild($home, $entries) {
   if (!pmssCustomerPathIsSafe($home)) return '';
   $home = realpath((string) $home);
-  if (!is_string($home) || !is_dir($home) || !pmssCustomerPathIsSafe($home) || !is_array($entries) || count($entries) === 0) return '';
+  if (!is_string($home) || !is_dir($home) || !pmssCustomerPathIsSafe($home) || !is_array($entries) || empty($entries)) return '';
 
   $allowed = array_fill_keys(pmssCustomerBackupRelativePaths(), true);
   $arguments = array('/bin/tar', '--create', '--gzip', '--file=-', '--directory', $home, '--');

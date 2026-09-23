@@ -312,7 +312,7 @@ function pmssUserLifecycleFindSuspendedBackup(string $homeDir): ?string
 {
     $homeDir = rtrim($homeDir, '/');
     $candidates = glob($homeDir.'/www-suspended-*', GLOB_NOSORT);
-    if (!is_array($candidates) || empty($candidates)) {
+    if (empty($candidates)) {
         return null;
     }
     $bestPath = null;
