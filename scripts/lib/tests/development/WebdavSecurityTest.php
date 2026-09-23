@@ -494,7 +494,7 @@ LIGHTTPD;
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
 
         preg_match('/# PMSS_WEBDAV_BEGIN.*?# PMSS_WEBDAV_END/s', $template, $matches);
-        $webdavBlock = isset($matches[0]) ? $matches[0] : '';
+        $webdavBlock = $matches[0] ?? '';
 
         $this->assertStringContainsString('dir-listing.activate = "disable"', $webdavBlock);
     }
@@ -930,8 +930,8 @@ LIGHTTPD;
         $webdavProxyHeaders = array();
         preg_match_all('/^proxy_set_header\\s+[^;]+;$/m', $proxyParams, $proxyHeaders);
         preg_match_all('/^proxy_set_header\\s+[^;]+;$/m', $webdavProxyParams, $webdavProxyHeaders);
-        $proxyHeaderLines = isset($proxyHeaders[0]) ? $proxyHeaders[0] : array();
-        $webdavProxyHeaderLines = isset($webdavProxyHeaders[0]) ? $webdavProxyHeaders[0] : array();
+        $proxyHeaderLines = $proxyHeaders[0] ?? array();
+        $webdavProxyHeaderLines = $webdavProxyHeaders[0] ?? array();
         sort($proxyHeaderLines);
         sort($webdavProxyHeaderLines);
 

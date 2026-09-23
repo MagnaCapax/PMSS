@@ -14,7 +14,7 @@ require_once __DIR__.'/../lib/runtime.php';
 pmssRequireRelativeFiles(__DIR__.'/../lib', ['user/userConfigStore.php', 'user/watchdog.php']);
 
 $pmssCheckLighttpdLock = pmssCronLockAcquire('checkLighttpdInstances', 'pmssCronLockSkipLog', 'pmssUserWatchdogLockAcquire');
-$argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';
+$argUserRaw = trim((string) ($argv[1] ?? ''));
 if ($argUserRaw === '') {
     echo date('Y-m-d H:i:s') . ': Checking Lighttpd instances' . "\n";
 }

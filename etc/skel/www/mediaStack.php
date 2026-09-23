@@ -17,7 +17,7 @@ $home = dirname(__DIR__);
 $username = basename(rtrim($home, '/'));
 $hostname = function_exists('gethostname') ? (string) gethostname() : '';
 $hostname = $hostname !== '' ? $hostname : (string) php_uname('n');
-$action = isset($_GET['action']) ? (string) $_GET['action'] : 'status';
+$action = (string) ($_GET['action'] ?? 'status');
 
 if (isset($_POST['action']) && strpos((string) $_POST['action'], 'confirm-secure-') === 0) {
     pmssMediaStackPanelSecureHandle($home, $username, $hostname);

@@ -620,7 +620,7 @@ function wgDeriveClientIp(string $key, array $usedIps): string
 {
     $hash = hash('sha256', $key, true);
     $num  = unpack('N', substr($hash, 0, 4));
-    $base = isset($num[1]) ? (int) $num[1] : 1;
+    $base = (int) ($num[1] ?? 1);
     if ($base === 0) {
         $base = 1;
     }
