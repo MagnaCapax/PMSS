@@ -152,12 +152,12 @@ function pmssMediaStackPanelStartHandle($home, $username, $hostname)
         pmssMediaStackPanelJsonRespond(pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname), 409);
     }
 
-    $logPath = pmssMediaStackPanelHomePath($home, '.install-media-stack.log');
+    $logPath = pmssCustomerHomePath($home, '.install-media-stack.log');
     if (is_file($logPath)) {
         @rename($logPath, $logPath.'.previous');
     }
 
-    @unlink(pmssMediaStackPanelHomePath($home, '.install-media-stack-web.pid'));
+    @unlink(pmssCustomerHomePath($home, '.install-media-stack-web.pid'));
     @pmssFrontendShellExec(pmssMediaStackPanelStartCommandBuild($home, $username));
 
     $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);

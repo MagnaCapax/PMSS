@@ -9,13 +9,8 @@
  */
 require_once __DIR__.'/scriptsInc.php';
 
-/**
- * Resolve a media-stack helper path relative to the tenant home.
- */
-function pmssMediaStackPanelHomePath(string $home, string $suffix): string
-{
-    return pmssCustomerHomePath($home, $suffix);
-}
+const PMSS_MEDIA_STACK_MEMORY_MINIMUM_BYTES = 1024 * 1024 * 1024;
+const PMSS_MEDIA_STACK_MEMORY_UNLIMITED_BYTES = 1024 * 1024 * 1024 * 1024 * 1024;
 
 /**
  * Return true when a directory exists and contains non-dot entries.
@@ -27,28 +22,12 @@ function pmssMediaStackPanelDirectoryPopulated(string $path): bool
 }
 
 /**
- * Return the installer memory floor used by both panel messaging and shell.
- */
-function pmssMediaStackPanelMemoryMinimumBytes(): int
-{
-    return 1024 * 1024 * 1024;
-}
-
-/**
- * Treat kernel sentinel values above this as unlimited for pre-flight checks.
- */
-function pmssMediaStackPanelMemoryUnlimitedBytes(): int
-{
-    return 1024 * 1024 * 1024 * 1024 * 1024;
-}
-
-/**
  * Read one cgroup memory limit file and ignore unlimited/sentinel values.
  */
 function pmssMediaStackPanelMemoryLimitFileRead(string $path): ?int
 {
     $bytes = pmssCustomerPositiveIntegerFileRead($path);
-    return $bytes !== null && $bytes < pmssMediaStackPanelMemoryUnlimitedBytes() ? $bytes : null;
+    return $bytes !== null && $bytes < PMSS_MEDIA_STACK_MEMORY_UNLIMITED_BYTES ? $bytes : null;
 }
 
 /**
@@ -115,7 +94,7 @@ function pmssMediaStackPanelMemoryLimitBytesRead(): ?int
  */
 function pmssMediaStackPanelMemoryPreflightRead(): array
 {
-    $minimum = pmssMediaStackPanelMemoryMinimumBytes();
+    $minimum = PMSS_MEDIA_STACK_MEMORY_MINIMUM_BYTES;
     $limit = pmssMediaStackPanelMemoryLimitBytesRead();
     if ($limit === null) {
         return array(
@@ -152,11 +131,11 @@ function pmssMediaStackPanelStartGateRead(string $home): array
 {
     $memory = pmssMediaStackPanelMemoryPreflightRead();
     foreach (array(
-        array(!is_file(pmssMediaStackPanelHomePath($home, 'install-media-stack.sh')), 'Media stack installer is missing from this account.'),
+        array(!is_file(pmssCustomerHomePath($home, 'install-media-stack.sh')), 'Media stack installer is missing from this account.'),
         array(!pmssFrontendShellExecAvailable(), 'PHP shell execution is unavailable on this host.'),
         array(!$memory['ok'], $memory['message']),
-        array(pmssMediaStackPanelDirectoryPopulated(pmssMediaStackPanelHomePath($home, '.bin')), 'Web install is limited to the first run because existing ~/.bin content triggers interactive prompts.'),
-        array(pmssMediaStackPanelDirectoryPopulated(pmssMediaStackPanelHomePath($home, '.config/jellyfin')), 'Web install is limited to the first run because existing Jellyfin data must be reviewed over SSH.'),
+        array(pmssMediaStackPanelDirectoryPopulated(pmssCustomerHomePath($home, '.bin')), 'Web install is limited to the first run because existing ~/.bin content triggers interactive prompts.'),
+        array(pmssMediaStackPanelDirectoryPopulated(pmssCustomerHomePath($home, '.config/jellyfin')), 'Web install is limited to the first run because existing Jellyfin data must be reviewed over SSH.'),
     ) as $gate) {
         if ($gate[0]) {
             return array('ok' => false, 'message' => $gate[1]);
@@ -169,9 +148,9 @@ function pmssMediaStackPanelStartGateRead(string $home): array
 /** Gate the one-shot recovery action to the existing installer-owned files. */
 function pmssMediaStackPanelRecoveryGateRead(string $home): array
 {
-    $aliasPath = pmssMediaStackPanelHomePath($home, '.bashrc.custom');
+    $aliasPath = pmssCustomerHomePath($home, '.bashrc.custom');
     foreach (array(
-        array(!is_file(pmssMediaStackPanelHomePath($home, 'install-media-stack.sh')), 'Media stack installer is missing from this account.'),
+        array(!is_file(pmssCustomerHomePath($home, 'install-media-stack.sh')), 'Media stack installer is missing from this account.'),
         array(!is_file($aliasPath) || is_link($aliasPath) || !is_readable($aliasPath), 'Media stack launch aliases are missing or unsafe.'),
         array(!pmssFrontendShellExecAvailable(), 'PHP shell execution is unavailable on this host.'),
     ) as $gate) {
@@ -195,7 +174,7 @@ function pmssMediaStackPanelRecoveryRequestAllowed(array $server): bool
  */
 function pmssMediaStackPanelPidRead(string $home): int
 {
-    return (int) (pmssCustomerTrimmedFileRead(pmssMediaStackPanelHomePath($home, '.install-media-stack-web.pid'), true) ?? '');
+    return (int) (pmssCustomerTrimmedFileRead(pmssCustomerHomePath($home, '.install-media-stack-web.pid'), true) ?? '');
 }
 
 /**
@@ -211,7 +190,7 @@ function pmssMediaStackPanelPidRunning(int $pid): bool
  */
 function pmssMediaStackPanelLogTailRead(string $home, int $maxBytes = 6000): string
 {
-    $path = pmssMediaStackPanelHomePath($home, '.install-media-stack.log');
+    $path = pmssCustomerHomePath($home, '.install-media-stack.log');
     if (!is_file($path) || ($size = @filesize($path)) === false) {
         return '';
     }
@@ -233,9 +212,9 @@ function pmssMediaStackPanelLogTailRead(string $home, int $maxBytes = 6000): str
 /** Read the operator-published runtime snapshot without crossing the customer tree. */
 function pmssMediaStackPanelRuntimeStatusRead(string $home): ?array
 {
-    $path = pmssMediaStackPanelHomePath($home, '.media-stack-status.json');
+    $path = pmssCustomerHomePath($home, '.media-stack-status.json');
     $status = pmssJsonFileReadAssoc($path);
-    return is_array($status) && isset($status['apps']) && is_array($status['apps']) ? $status : null;
+    return is_array($status) && is_array($status['apps'] ?? null) ? $status : null;
 }
 
 /** Convert the watchdog snapshot into bounded customer-facing app details. */
@@ -313,20 +292,6 @@ function pmssMediaStackPanelAppDefinitionsRead(): array
 }
 
 /**
- * Build the stable per-user URLs exposed by the installer.
- *
- * @return array<string,string>
- */
-function pmssMediaStackPanelUrlsBuild(string $username, string $hostname): array
-{
-    $urls = array();
-    foreach (pmssMediaStackPanelUrlsByAppIdBuild($username, $hostname) as $app => $url) {
-        $urls[pmssMediaStackPanelAppLabelRead($app)] = $url;
-    }
-    return $urls;
-}
-
-/**
  * Build URLs keyed by the internal app id used by action validation.
  *
  * @return array<string,string>
@@ -349,7 +314,7 @@ function pmssMediaStackPanelUrlsByAppIdBuild(string $username, string $hostname)
 function pmssMediaStackPanelAppLabelRead(string $app): string
 {
     $definitions = pmssMediaStackPanelAppDefinitionsRead();
-    return isset($definitions[$app]) ? $definitions[$app]['label'] : $app;
+    return $definitions[$app]['label'] ?? $app;
 }
 
 /** Return true when the app id is one of the hardcoded panel-action targets. */
@@ -368,7 +333,7 @@ function pmssMediaStackPanelExpectedAppIdsRead(string $home): array
     $expected = array();
     foreach (pmssMediaStackPanelAppDefinitionsRead() as $app => $definition) {
         foreach ($definition['markers'] as $marker) {
-            $path = pmssMediaStackPanelHomePath($home, $marker['path']);
+            $path = pmssCustomerHomePath($home, $marker['path']);
             if (($marker['type'] === 'dir' && is_dir($path))
                 || ($marker['type'] === 'file' && is_file($path))) {
                 $expected[$app] = true;
@@ -380,16 +345,6 @@ function pmssMediaStackPanelExpectedAppIdsRead(string $home): array
     // Autobrr markers may belong to a self-managed proxy at another path (#778).
     if (pmssMediaStackPanelProxyAppPresent($home, 'autobrr')) {
         $expected['autobrr'] = true;
-    }
-    return $expected;
-}
-
-/** Return app labels whose installer markers are present in the customer home. */
-function pmssMediaStackPanelExpectedAppLabelsRead(string $home): array
-{
-    $expected = array();
-    foreach (pmssMediaStackPanelExpectedAppIdsRead($home) as $app => $_present) {
-        $expected[pmssMediaStackPanelAppLabelRead($app)] = true;
     }
     return $expected;
 }
@@ -406,7 +361,7 @@ function pmssMediaStackPanelProxyFragmentMentionsApp(string $fragment, string $a
 /** Return true when any readable customer proxy fragment exposes an app. */
 function pmssMediaStackPanelProxyAppPresent(string $home, string $app): bool
 {
-    $files = glob(pmssMediaStackPanelHomePath($home, '.lighttpd/custom.d/*.conf'));
+    $files = glob(pmssCustomerHomePath($home, '.lighttpd/custom.d/*.conf'));
     foreach (is_array($files) ? $files : array() as $file) {
         $fragment = pmssCustomerFileRead($file);
         if (is_string($fragment) && pmssMediaStackPanelProxyFragmentMentionsApp($fragment, $app)) {
@@ -419,10 +374,15 @@ function pmssMediaStackPanelProxyAppPresent(string $home, string $app): bool
 /** Build only URLs backed by an app marker or the Autobrr proxy fragment. */
 function pmssMediaStackPanelUrlsRead(string $home, string $username, string $hostname): array
 {
-    return array_intersect_key(
-        pmssMediaStackPanelUrlsBuild($username, $hostname),
-        pmssMediaStackPanelExpectedAppLabelsRead($home)
+    $urls = array();
+    $installed = array_intersect_key(
+        pmssMediaStackPanelUrlsByAppIdBuild($username, $hostname),
+        pmssMediaStackPanelExpectedAppIdsRead($home)
     );
+    foreach ($installed as $app => $url) {
+        $urls[pmssMediaStackPanelAppLabelRead($app)] = $url;
+    }
+    return $urls;
 }
 
 /** Read one XML tag value from a local customer app config file. */
@@ -478,7 +438,7 @@ function pmssMediaStackPanelSqliteCountRead(string $path, string $query): ?int
 /** Return true when a Servarr config has the secure-by-default auth values. */
 function pmssMediaStackPanelServarrAuthConfigured(string $home, string $app): bool
 {
-    $configPath = pmssMediaStackPanelHomePath($home, '.config/'.$app.'/config.xml');
+    $configPath = pmssCustomerHomePath($home, '.config/'.$app.'/config.xml');
     $method = strtolower((string) pmssMediaStackPanelXmlTagValueRead($configPath, 'AuthenticationMethod'));
     $required = strtolower((string) pmssMediaStackPanelXmlTagValueRead($configPath, 'AuthenticationRequired'));
     return in_array($method, array('forms', 'basic', 'external'), true) && $required === 'enabled';
@@ -487,7 +447,7 @@ function pmssMediaStackPanelServarrAuthConfigured(string $home, string $app): bo
 /** Return true when the installed SABnzbd config contains app-level credentials. */
 function pmssMediaStackPanelSabnzbdAuthConfigured(string $home): bool
 {
-    $configPath = pmssMediaStackPanelHomePath($home, '.config/sabnzbd/sabnzbd.ini');
+    $configPath = pmssCustomerHomePath($home, '.config/sabnzbd/sabnzbd.ini');
     $username = pmssMediaStackPanelIniValueRead($configPath, 'username');
     $password = pmssMediaStackPanelIniValueRead($configPath, 'password');
     return is_string($username) && $username !== '' && is_string($password) && $password !== '';
@@ -497,7 +457,7 @@ function pmssMediaStackPanelSabnzbdAuthConfigured(string $home): bool
 function pmssMediaStackPanelAutobrrAuthConfigured(string $home): bool
 {
     $count = pmssMediaStackPanelSqliteCountRead(
-        pmssMediaStackPanelHomePath($home, '.config/autobrr/autobrr.db'),
+        pmssCustomerHomePath($home, '.config/autobrr/autobrr.db'),
         'SELECT COUNT(*) FROM users'
     );
     return $count !== null && $count > 0;
@@ -507,7 +467,7 @@ function pmssMediaStackPanelAutobrrAuthConfigured(string $home): bool
 function pmssMediaStackPanelJellyfinAuthConfigured(string $home): bool
 {
     $value = strtolower((string) pmssMediaStackPanelXmlTagValueRead(
-        pmssMediaStackPanelHomePath($home, '.config/jellyfin/config/system.xml'),
+        pmssCustomerHomePath($home, '.config/jellyfin/config/system.xml'),
         'IsStartupWizardCompleted'
     ));
     return in_array($value, array('true', '1'), true);
@@ -540,24 +500,24 @@ function pmssMediaStackPanelAppSecurePrerequisitesRead(string $home, string $app
 {
     switch ($app) {
         case 'jellyfin':
-            return is_file(pmssMediaStackPanelHomePath($home, '.config/jellyfin/config/network.xml'))
-                && is_file(pmssMediaStackPanelHomePath($home, '.bin/jellyfin/jellyfin.dll'));
+            return is_file(pmssCustomerHomePath($home, '.config/jellyfin/config/network.xml'))
+                && is_file(pmssCustomerHomePath($home, '.bin/jellyfin/jellyfin.dll'));
         case 'radarr':
-            return is_file(pmssMediaStackPanelHomePath($home, '.config/radarr/config.xml'))
-                && is_file(pmssMediaStackPanelHomePath($home, '.bin/Radarr/Radarr.dll'));
+            return is_file(pmssCustomerHomePath($home, '.config/radarr/config.xml'))
+                && is_file(pmssCustomerHomePath($home, '.bin/Radarr/Radarr.dll'));
         case 'sonarr':
-            return is_file(pmssMediaStackPanelHomePath($home, '.config/sonarr/config.xml'))
-                && is_file(pmssMediaStackPanelHomePath($home, '.bin/Sonarr/Sonarr.dll'));
+            return is_file(pmssCustomerHomePath($home, '.config/sonarr/config.xml'))
+                && is_file(pmssCustomerHomePath($home, '.bin/Sonarr/Sonarr.dll'));
         case 'prowlarr':
-            return is_file(pmssMediaStackPanelHomePath($home, '.config/prowlarr/config.xml'))
-                && is_file(pmssMediaStackPanelHomePath($home, '.bin/Prowlarr/Prowlarr.dll'));
+            return is_file(pmssCustomerHomePath($home, '.config/prowlarr/config.xml'))
+                && is_file(pmssCustomerHomePath($home, '.bin/Prowlarr/Prowlarr.dll'));
         case 'sabnzbd':
-            return is_file(pmssMediaStackPanelHomePath($home, '.config/sabnzbd/sabnzbd.ini'))
-                && is_file(pmssMediaStackPanelHomePath($home, '.bin/sabnzbd/sabnzbd/SABnzbd.py'));
+            return is_file(pmssCustomerHomePath($home, '.config/sabnzbd/sabnzbd.ini'))
+                && is_file(pmssCustomerHomePath($home, '.bin/sabnzbd/sabnzbd/SABnzbd.py'));
         case 'autobrr':
-            return is_dir(pmssMediaStackPanelHomePath($home, '.config/autobrr'))
-                && is_file(pmssMediaStackPanelHomePath($home, '.bin/autobrr/autobrr'))
-                && is_file(pmssMediaStackPanelHomePath($home, '.bin/autobrr/autobrrctl'));
+            return is_dir(pmssCustomerHomePath($home, '.config/autobrr'))
+                && is_file(pmssCustomerHomePath($home, '.bin/autobrr/autobrr'))
+                && is_file(pmssCustomerHomePath($home, '.bin/autobrr/autobrrctl'));
     }
     return false;
 }
@@ -565,7 +525,7 @@ function pmssMediaStackPanelAppSecurePrerequisitesRead(string $home, string $app
 /** Validate a secure-app action string against literal hardcoded actions. */
 function pmssMediaStackPanelSecureActionAppIdRead(string $action): ?string
 {
-    foreach (pmssMediaStackPanelAppDefinitionsRead() as $app => $_definition) {
+    foreach (array_keys(pmssMediaStackPanelAppDefinitionsRead()) as $app) {
         if ($action === 'confirm-secure-'.$app) {
             return $app;
         }
@@ -576,7 +536,7 @@ function pmssMediaStackPanelSecureActionAppIdRead(string $action): ?string
 /** Gate one app-scoped auth action to customer-owned media-stack files. */
 function pmssMediaStackPanelSecureGateRead(string $home, string $app): array
 {
-    $scriptPath = pmssMediaStackPanelHomePath($home, 'install-media-stack.sh');
+    $scriptPath = pmssCustomerHomePath($home, 'install-media-stack.sh');
     $installedApps = pmssMediaStackPanelExpectedAppIdsRead($home);
     foreach (array(
         array(!pmssMediaStackPanelAppIdAllowed($app), 'Unknown media-stack app.'),
@@ -604,7 +564,7 @@ function pmssMediaStackPanelSecureCommandBuild(string $home, string $username, s
     return 'HOME='.escapeshellarg($home)
         .' USER='.escapeshellarg($username)
         .' LOGNAME='.escapeshellarg($username)
-        .' /bin/bash '.escapeshellarg(pmssMediaStackPanelHomePath($home, 'install-media-stack.sh'))
+        .' /bin/bash '.escapeshellarg(pmssCustomerHomePath($home, 'install-media-stack.sh'))
         .' '.escapeshellarg('--secure-app='.$app);
 }
 
@@ -617,13 +577,13 @@ function pmssMediaStackPanelSecurityStatusesRead(string $home, string $username,
 {
     $statuses = array();
     $urls = pmssMediaStackPanelUrlsByAppIdBuild($username, $hostname);
-    foreach (pmssMediaStackPanelExpectedAppIdsRead($home) as $app => $_present) {
+    foreach (array_keys(pmssMediaStackPanelExpectedAppIdsRead($home)) as $app) {
         $protected = pmssMediaStackPanelAppAuthConfigured($home, $app);
         $gate = pmssMediaStackPanelSecureGateRead($home, $app);
         $statuses[$app] = array(
             'id' => $app,
             'label' => pmssMediaStackPanelAppLabelRead($app),
-            'url' => isset($urls[$app]) ? $urls[$app] : '',
+            'url' => $urls[$app] ?? '',
             'status' => $protected ? 'Protected' : 'Exposed',
             'protected' => $protected,
             'canSecure' => !$protected && $gate['ok'],
@@ -639,8 +599,8 @@ function pmssMediaStackPanelSecurityStatusesRead(string $home, string $username,
  */
 function pmssMediaStackPanelStartCommandBuild(string $home, string $username): string
 {
-    $scriptPath = pmssMediaStackPanelHomePath($home, 'install-media-stack.sh');
-    $pidPath = pmssMediaStackPanelHomePath($home, '.install-media-stack-web.pid');
+    $scriptPath = pmssCustomerHomePath($home, 'install-media-stack.sh');
+    $pidPath = pmssCustomerHomePath($home, '.install-media-stack-web.pid');
 
     $innerCommand = 'cd '.escapeshellarg($home)
         .' && rm -f -- '.escapeshellarg($pidPath)
@@ -655,7 +615,7 @@ function pmssMediaStackPanelStartCommandBuild(string $home, string $username): s
 /** Build the fixed one-shot command used to relaunch absent tmux sessions. */
 function pmssMediaStackPanelRecoveryCommandBuild(string $home, string $username): string
 {
-    $scriptPath = pmssMediaStackPanelHomePath($home, 'install-media-stack.sh');
+    $scriptPath = pmssCustomerHomePath($home, 'install-media-stack.sh');
     $successMarker = 'pmss-media-stack-started';
 
     return 'cd '.escapeshellarg($home)
@@ -675,7 +635,7 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
 {
     $installedApps = pmssMediaStackPanelExpectedAppIdsRead($home);
     $installed = $installedApps !== array()
-        || is_file(pmssMediaStackPanelHomePath($home, '.config/jellyfin/config/network.xml'));
+        || is_file(pmssCustomerHomePath($home, '.config/jellyfin/config/network.xml'));
     $pid = pmssMediaStackPanelPidRead($home);
     $running = pmssMediaStackPanelPidRunning($pid);
     $logTail = pmssMediaStackPanelLogTailRead($home);

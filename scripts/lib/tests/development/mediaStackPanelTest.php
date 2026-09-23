@@ -336,13 +336,13 @@ class MediaStackPanelTest extends TestCase
         $this->assertTrue(\pmssMediaStackPanelRecoveryGateRead($home)['ok']);
     }
 
-    public function testHomePathBuildsStableInstallerPaths(): void
+    public function testCustomerHomePathBuildsStableInstallerPaths(): void
     {
         $home = '/home/alice/';
 
-        $this->assertSame('/home/alice/install-media-stack.sh', \pmssMediaStackPanelHomePath($home, 'install-media-stack.sh'));
-        $this->assertSame('/home/alice/.install-media-stack.log', \pmssMediaStackPanelHomePath($home, '.install-media-stack.log'));
-        $this->assertSame('/home/alice/.install-media-stack-web.pid', \pmssMediaStackPanelHomePath($home, '.install-media-stack-web.pid'));
+        $this->assertSame('/home/alice/install-media-stack.sh', \pmssCustomerHomePath($home, 'install-media-stack.sh'));
+        $this->assertSame('/home/alice/.install-media-stack.log', \pmssCustomerHomePath($home, '.install-media-stack.log'));
+        $this->assertSame('/home/alice/.install-media-stack-web.pid', \pmssCustomerHomePath($home, '.install-media-stack-web.pid'));
     }
 
     private function mediaStatusFixture(string $prefix, string $relativePath, string $content): array
