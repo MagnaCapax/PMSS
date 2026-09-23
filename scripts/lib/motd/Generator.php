@@ -99,10 +99,8 @@ class Motd
         if (is_string($data)) {
             foreach (preg_split('/\r?\n/', $data) as $line) {
                 $line = trim($line);
-                if ($line === '' || $line[0] === '#') {
-                    continue;
-                }
-                if (strpos($line, 'pam_motd.so') === false) {
+                if ($line === '' || $line[0] === '#'
+                    || strpos($line, 'pam_motd.so') === false) {
                     continue;
                 }
                 if (strpos($line, 'motd=/run/motd.dynamic') !== false) {

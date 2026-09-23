@@ -30,7 +30,7 @@ function pmssUserBaseContext(string $action, string $phase, string $username, ar
     $operatorName = getenv('SUDO_USER') ?: getenv('USER') ?: null;
     if ($operatorUid !== null && function_exists('posix_getpwuid')) {
         $pw = @posix_getpwuid($operatorUid);
-        if (is_array($pw) && isset($pw['name']) && $pw['name'] !== '') {
+        if (($pw['name'] ?? '') !== '') {
             $operatorName = $operatorName ?: $pw['name'];
         }
     }

@@ -8,7 +8,8 @@
 // Vnstat config + install
 require_once '/scripts/lib/networkInfo.php';
 
-$link = isset($link) ? networkInterfaceNameNormalized((string) $link) : '';
+$link = $link ?? '';
+$link = networkInterfaceNameNormalized((string) $link);
 
 #TODO This should be in the install script
 #TODO Use an actual config template

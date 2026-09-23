@@ -175,11 +175,7 @@ function pmssUserWebRootMigrationCopyTree(string $source, string $target): bool
         pmssUserWebRootMigrationApplyMetadata($target, $stat);
         return true;
     }
-    if (!is_dir($source)) {
-        return false;
-    }
-
-    if (!@mkdir($target, ((int) $stat['mode']) & 07777)) {
+    if (!is_dir($source) || !@mkdir($target, ((int) $stat['mode']) & 07777)) {
         return false;
     }
     $children = pmssDirectoryEntriesRead($source);
@@ -235,10 +231,8 @@ function pmssUserWebRootMigrationChownTreeToUser(string $path, string $user): bo
 /** Chown a tree by numeric ids after the symlink-refusing snapshot has passed. */
 function pmssUserWebRootMigrationChownTreeToIds(string $path, int $uid, int $gid): bool
 {
-    if (is_link($path) || !is_array(@lstat($path))) {
-        return false;
-    }
-    if (!@chown($path, $uid) || !@chgrp($path, $gid)) {
+    if (is_link($path) || !is_array(@lstat($path))
+        || !@chown($path, $uid) || !@chgrp($path, $gid)) {
         return false;
     }
     if (!is_dir($path)) {

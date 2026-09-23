@@ -22,10 +22,8 @@ function pmssSupportIdentityRead(): array
 {
     $isSafeUsername = static function (string $username): bool {
         $username = trim($username);
-        if ($username === '' || strpos($username, "\0") !== false) {
-            return false;
-        }
-        if (strpos($username, '/') !== false || strpos($username, '\\') !== false || strpos($username, '..') !== false) {
+        if ($username === '' || strpos($username, "\0") !== false || strpos($username, '/') !== false
+            || strpos($username, '\\') !== false || strpos($username, '..') !== false) {
             return false;
         }
         return preg_match('/[[:space:][:cntrl:]]/', $username) !== 1;
