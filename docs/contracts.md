@@ -448,7 +448,7 @@ Sub-handlers:
 - pmssEnsureBootDefaults(?callable $logger=null, ?string $fstabPath=null, ?string $grubPath=null, ?string $grubOption=null, ?array $extraGrubOptions=null, ?array $extraGrubSettings=null): void → enforces `/proc` `hidepid=2`, ensures required grub cmdline options, and optionally pins explicit grub settings such as serial-console directives.
 - pmssVerifyDistUpgradeBootReadiness(?string $mdstatPath=null, ?string $grubConfigPath=null, ?string $mdadmConfigPath=null, ?string $initramfsMdadmPath=null): void → non-fatal post-upgrade boot checks (RAID degradation markers, grub config presence/size, mdadm ARRAY entries, BOOT_DEGRADED flag) with warning logs for operator follow-up before reboot.
 
-- pmssConfigureRootShellDefaults(?callable $logger=null): void → ensures `/root/.bashrc` contains `alias ls=...` and `PATH=$PATH:/scripts`.
+- pmssConfigureRootShellDefaults(?callable $logger=null, ?string $bashrc=null): void → ensures `/root/.bashrc` (or an explicit test target) contains `alias ls=...` and `PATH=$PATH:/scripts`; rejects symlink/non-regular targets, preserves existing metadata, and warns without reporting success when reading or atomic replacement fails.
 
 - pmssStopDisableMaskSeedboxSystemServices(): void → stops/disables/masks system-wide daemons that must never run on seedbox hosts (e.g. lighttpd, deluged/deluge-web, transmission-daemon, redis-server, memcached, rpcbind/nfs-kernel-server, smbd, exim4, docker.service), then purges exim4 packages and stale exim spool files. Fail-soft; safe when units are missing.
 - pmssEnsureSystemdServicesGuardBootUnit(): void → installs/enables `pmss-systemd-services-guard.service` so the systemd hardening guard runs early at boot (before basic.target).

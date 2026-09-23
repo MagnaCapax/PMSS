@@ -206,11 +206,22 @@ function pmssEnsureLocaleBaseline(): void
 /**
  * Ensure root shell defaults mirror the historical installer behaviour.
  */
-function pmssConfigureRootShellDefaults(?callable $logger = null): void
+function pmssConfigureRootShellDefaults(?callable $logger = null, ?string $bashrc = null): void
 {
     $log    = $logger ?: 'logMessage';
-    $bashrc = '/root/.bashrc';
-    $lines = file_exists($bashrc) ? (file($bashrc, FILE_IGNORE_NEW_LINES) ?: []) : [];
+    $bashrc = $bashrc ?? '/root/.bashrc';
+    if (!pmssManagedPathIsSafe($bashrc, 'root shell defaults', $log)) {
+        return;
+    }
+
+    $lines = [];
+    if (file_exists($bashrc)) {
+        $lines = @file($bashrc, FILE_IGNORE_NEW_LINES);
+        if (!is_array($lines)) {
+            $log('[WARN] Unable to read root shell defaults at '.$bashrc);
+            return;
+        }
+    }
 
     $defaults = [
         "alias ls='ls --color=auto'",
@@ -221,6 +232,11 @@ function pmssConfigureRootShellDefaults(?callable $logger = null): void
         return;
     }
 
-    @file_put_contents($bashrc, implode(PHP_EOL, array_merge($lines, $missing)).PHP_EOL);
+    $contents = implode(PHP_EOL, array_merge($lines, $missing)).PHP_EOL;
+    // Keep existing metadata and never report success after a short or failed write.
+    if (!pmssReplaceUserFilePreservingMetadata($bashrc, $contents)) {
+        $log('[WARN] Unable to write root shell defaults at '.$bashrc);
+        return;
+    }
     $log('Appended root shell defaults: '.implode(', ', $missing));
 }

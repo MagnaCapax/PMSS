@@ -77,6 +77,12 @@ malformed paths stay on the existing false/empty read and append failure paths.
 JSONL readers and both append helpers. Ordinary path whitespace normalization,
 payload bytes, and successful log formats remain unchanged.
 
+Root shell defaults validate their managed target before reading or replacing
+it. Symlink and non-regular targets are left untouched, unreadable files are not
+treated as empty, and atomic replacement preserves existing metadata. Success is
+logged only after a complete write; `RootShellDefaultsSafetyTest` preserves the
+historical content and skip behavior while covering rejected targets.
+
 Snapshot log writers ignore invalid, closed, and non-stream handles without
 consuming unrelated resources. Task cleanup tolerates a callback closing its
 stream, so its return value or original exception survives and the prior umask
