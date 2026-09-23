@@ -29,21 +29,39 @@ function pmssLighttpdAccessLogTrimFile(string $path, int $thresholdBytes): array
 
     $handle = @fopen($path, 'c+');
     if (!is_resource($handle)) return ['status' => 'error', 'reason' => 'open_failed'];
-    if (!@flock($handle, LOCK_EX | LOCK_NB)) { @fclose($handle); return ['status' => 'skip', 'reason' => 'lock_busy']; }
+    $result = null;
+    $sizeBefore = null;
+    try {
+        if (!@flock($handle, LOCK_EX | LOCK_NB)) {
+            $result = ['status' => 'skip', 'reason' => 'lock_busy'];
+        } else {
+            $handleStat = null;
+            if (!pmssLockFileHandleMatchesPath($handle, $path, $pathStat, $handleStat)) {
+                $result = ['status' => 'skip', 'reason' => 'path_changed'];
+            } elseif (($handleStat['nlink'] ?? 1) !== 1) {
+                $result = ['status' => 'skip', 'reason' => 'multiple_links'];
+            } elseif (($sizeBefore = (int) ($handleStat['size'] ?? 0)) <= $thresholdBytes) {
+                $result = ['status' => 'skip', 'reason' => 'below_threshold', 'sizeBefore' => $sizeBefore];
+            } elseif (!@ftruncate($handle, 0)) {
+                $result = ['status' => 'error', 'reason' => 'truncate_failed', 'sizeBefore' => $sizeBefore];
+            } elseif (!@fflush($handle)) {
+                $result = ['status' => 'error', 'reason' => 'flush_failed', 'sizeBefore' => $sizeBefore];
+            } else {
+                $result = ['status' => 'trimmed', 'sizeBefore' => $sizeBefore];
+            }
+        }
+    } finally {
+        // The lock belongs to this handle; every return and throwable must release it.
+        $closed = @fclose($handle);
+    }
 
-    $handleStat = null;
-    if (!pmssLockFileHandleMatchesPath($handle, $path, $pathStat, $handleStat)) { @fclose($handle); return ['status' => 'skip', 'reason' => 'path_changed']; }
+    if (!$closed) {
+        $result = ['status' => 'error', 'reason' => 'close_failed']
+            + ($sizeBefore === null ? [] : ['sizeBefore' => $sizeBefore]);
+    }
+    if (($result['status'] ?? '') !== 'trimmed') return $result;
 
-    if (($handleStat['nlink'] ?? 1) !== 1) { @fclose($handle); return ['status' => 'skip', 'reason' => 'multiple_links']; }
-
-    $sizeBefore = (int) ($handleStat['size'] ?? 0);
-    if ($sizeBefore <= $thresholdBytes) { @fclose($handle); return ['status' => 'skip', 'reason' => 'below_threshold', 'sizeBefore' => $sizeBefore]; }
-
-    if (!@ftruncate($handle, 0)) { @fclose($handle); return ['status' => 'error', 'reason' => 'truncate_failed', 'sizeBefore' => $sizeBefore]; }
-
-    @fflush($handle);
-    @fclose($handle);
     clearstatcache(true, $path);
-
-    return ['status' => 'trimmed', 'sizeBefore' => $sizeBefore, 'sizeAfter' => (int) @filesize($path)];
+    $result['sizeAfter'] = (int) @filesize($path);
+    return $result;
 }
