@@ -157,7 +157,7 @@ function pmssUserWebRootMigrationApplyMetadata(string $path, array $stat): void
     }
     @chmod($path, ((int) $stat['mode']) & 07777);
     if (isset($stat['mtime'])) {
-        @touch($path, (int) $stat['mtime'], isset($stat['atime']) ? (int) $stat['atime'] : (int) $stat['mtime']);
+        @touch($path, (int) $stat['mtime'], (int) ($stat['atime'] ?? $stat['mtime']));
     }
 }
 

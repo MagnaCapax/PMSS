@@ -704,10 +704,8 @@ abstract class TestCase
      */
     protected function pmssSystemdSliceFixturePrepare(array $options = []): array
     {
-        $cfgDir = $this->pmssMakeTempDir(isset($options['cfgPrefix']) ? (string) $options['cfgPrefix'] : 'pmss-cg-cfg-');
-        $dropDir = isset($options['dropDir'])
-            ? (string) $options['dropDir']
-            : $this->pmssMakeTempDir(isset($options['dropPrefix']) ? (string) $options['dropPrefix'] : 'pmss-cg-drop-');
+        $cfgDir = $this->pmssMakeTempDir((string) ($options['cfgPrefix'] ?? 'pmss-cg-cfg-'));
+        $dropDir = (string) ($options['dropDir'] ?? $this->pmssMakeTempDir((string) ($options['dropPrefix'] ?? 'pmss-cg-drop-')));
 
         $v1Template = array_key_exists('v1Template', $options) ? $options['v1Template'] : 'ignored';
         $v2Template = array_key_exists('v2Template', $options) ? $options['v2Template'] : 'ignored';
@@ -726,10 +724,10 @@ abstract class TestCase
         }
 
         $env = [
-            'PMSS_CGROUP_MODE' => isset($options['mode']) ? (string) $options['mode'] : 'v2',
+            'PMSS_CGROUP_MODE' => (string) ($options['mode'] ?? 'v2'),
             'PMSS_CONFIG_DIR' => $cfgDir,
             'PMSS_SYSTEMD_USER_SLICE_DIR' => $dropDir,
-            'PMSS_TOTAL_MEM_MIB' => (string) (isset($options['totalMemMiB']) ? $options['totalMemMiB'] : 2048),
+            'PMSS_TOTAL_MEM_MIB' => (string) ($options['totalMemMiB'] ?? 2048),
         ];
         if (isset($options['totalCpuThreads'])) {
             $env['PMSS_TOTAL_CPU_THREADS'] = (string) $options['totalCpuThreads'];

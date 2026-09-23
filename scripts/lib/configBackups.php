@@ -41,7 +41,7 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
     if ($context === null) {
         return null;
     }
-    $timestamp = isset($options['timestamp']) && preg_match('/^[0-9]{14}$/', (string) $options['timestamp'])
+    $timestamp = preg_match('/^[0-9]{14}$/', (string) ($options['timestamp'] ?? '')) === 1
         ? (string) $options['timestamp']
         : date('YmdHis');
     $pmssVersion = array_key_exists('pmssVersion', $options)

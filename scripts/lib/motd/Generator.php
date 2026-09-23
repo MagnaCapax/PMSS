@@ -66,7 +66,7 @@ class Motd
         $repl = [];
         foreach (self::MOTD_FIELDS as $placeholder => $field) {
             $value = (string) ($model[$field[0]] ?? '');
-            $repl[$placeholder] = $colorEnabled && isset($field[1]) ? self::c($value, $field[1]) : $value;
+            $repl[$placeholder] = $colorEnabled && ($field[1] ?? null) !== null ? self::c($value, $field[1]) : $value;
         }
 
         if ($colorEnabled) {
