@@ -74,17 +74,13 @@ function pmssResourceLogLineParse($line)
 {
     $tokens = preg_split('/\s+/', trim((string) $line)) ?: [];
     $fields = pmssResourceLogPayloadFields(count($tokens) - 2);
-    if ($fields === null) return false;
-    $timestamp = strtotime($tokens[0].' '.$tokens[1]);
-    if ($timestamp === false) return false;
+    if ($fields === null || ($timestamp = strtotime($tokens[0].' '.$tokens[1])) === false) return false;
 
     $parsed = ['timestamp' => (int) $timestamp] + array_fill_keys(['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks'], 0.0);
     foreach ($fields as $offset => $field) {
         $value = $tokens[$offset + 2] ?? '';
-        if (!ctype_digit($value)) return false;
         // Digit-only input can still overflow a float; use the existing parse-failure path.
-        $parsed[$field] = (float) $value;
-        if (!is_finite($parsed[$field])) return false;
+        if (!ctype_digit($value) || !is_finite($parsed[$field] = (float) $value)) return false;
     }
     return $parsed;
 }

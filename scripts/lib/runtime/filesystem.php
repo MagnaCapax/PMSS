@@ -135,8 +135,7 @@ function pmssReadSerializedArrayFile(string $path): ?array
 
 function pmssReadOptionalSerializedArrayFile(string $path, string $label = 'serialized array file'): array
 {
-    if (pmssFilesystemPathHasNulByte($path)) return [];
-    if (!file_exists($path)) return [];
+    if (pmssFilesystemPathHasNulByte($path) || !file_exists($path)) return [];
     $payload = pmssReadSerializedArrayFile($path);
     if ($payload === null) throw new RuntimeException('Invalid '.$label.': '.$path);
     return $payload;
@@ -155,9 +154,8 @@ function pmssNetworkPortInRange(int $port, int $min = 1, int $max = 65535): bool
 
 function pmssNetworkPortParseDigits($value, int $min = 1, int $max = 65535): ?int
 {
-    if (!is_int($value) && !is_string($value)) return null;
     // Reject NUL before trim() can turn malformed port data into valid digits.
-    if (is_string($value) && strpos($value, "\0") !== false) return null;
+    if ((!is_int($value) && !is_string($value)) || (is_string($value) && strpos($value, "\0") !== false)) return null;
     $raw = trim((string) $value);
     if ($raw === '' || !ctype_digit($raw)) return null;
     $port = (int) $raw;

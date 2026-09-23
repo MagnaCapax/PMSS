@@ -18,10 +18,10 @@ function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mo
     $busy = false;
     // A truncating open destroys state before flock can report contention.
     // Reject empty/NUL modes too, before either fopen or parent creation.
-    if ($mode === '' || strpos($mode, "\0") !== false || $mode[0] === 'w') return false;
-    if (!pmssLockFilePathIsSafe($path)) return false;
-    if ($createParentDir && !pmssDirEnsureExists(dirname($path), 0755)) return false;
-    if (($handle = @fopen($path, $mode)) === false) return false;
+    if ($mode === '' || strpos($mode, "\0") !== false || $mode[0] === 'w'
+        || !pmssLockFilePathIsSafe($path)
+        || ($createParentDir && !pmssDirEnsureExists(dirname($path), 0755))
+        || ($handle = @fopen($path, $mode)) === false) return false;
     $retained = false;
     try {
         if (!pmssLockFileHandleMatchesPath($handle, $path)) return false;

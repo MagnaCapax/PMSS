@@ -139,8 +139,8 @@ class CgroupBfqWeightApplyTest extends TestCase
         $this->pmssAssertRepoFileContract('scripts/lib/cgroup/directApply.php', [
                 'required' => [
                     'function pmssCgroupDirectIntegerFileWrite(string $path, int $value, int $minimum, int $maximum): bool',
-                    'if ($minimum > $maximum || $value < $minimum || $value > $maximum) {',
-                    'if (!pmssCgroupDirectWritableFileTarget($path)) {',
+                    'if ($minimum > $maximum || $value < $minimum || $value > $maximum',
+                    '|| !pmssCgroupDirectWritableFileTarget($path)) {',
                     '$payload = (string) $value;',
                     '$bytes = @file_put_contents($path, $payload);',
                     'return is_int($bytes) && $bytes === strlen($payload);',
@@ -148,8 +148,8 @@ class CgroupBfqWeightApplyTest extends TestCase
                 'ordered' => [
                     [
                         'needles' => [
-                            'if ($minimum > $maximum || $value < $minimum || $value > $maximum) {',
-                            'if (!pmssCgroupDirectWritableFileTarget($path)) {',
+                            'if ($minimum > $maximum || $value < $minimum || $value > $maximum',
+                            '|| !pmssCgroupDirectWritableFileTarget($path)) {',
                             '$bytes = @file_put_contents($path, $payload);',
                             'return is_int($bytes) && $bytes === strlen($payload);',
                         ],

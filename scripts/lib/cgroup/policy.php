@@ -59,8 +59,7 @@ function pmssCgroupPolicyMajorMinorIsValid(string $majorMinor): bool { return pr
 function pmssCgroupPolicyMountBfqActive(string $mountPath = '/home', ?string $source = null, string $sysBlock = '/sys/block'): ?bool
 {
     $device = basename(trim($source ?? pmssCgroupPolicyMountSourceResolve($mountPath)));
-    if ($device === '' || preg_match('/^[A-Za-z0-9_-]+$/', $device) !== 1) return null;
-    if (!is_dir($sysBlock.'/'.$device)) return null;
+    if ($device === '' || preg_match('/^[A-Za-z0-9_-]+$/', $device) !== 1 || !is_dir($sysBlock.'/'.$device)) return null;
 
     $slaves  = glob($sysBlock.'/'.$device.'/slaves/*') ?: [];
     $targets = $slaves !== [] ? array_map('basename', $slaves) : [$device];
@@ -139,12 +138,7 @@ function pmssBfqApplyBonusWeight(int $baseWeight, int $bonusPct, int $kernelMax 
 /** Parse one kernel bfq.weight sysfs payload without silently coercing errors. */
 function pmssBfqKernelWeightParse($raw): ?int
 {
-    if (!is_string($raw)) {
-        return null;
-    }
-
-    $value = trim($raw);
-    if ($value === '' || preg_match('/^\d+$/', $value) !== 1) {
+    if (!is_string($raw) || ($value = trim($raw)) === '' || preg_match('/^\d+$/', $value) !== 1) {
         return null;
     }
 
