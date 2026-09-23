@@ -15,6 +15,11 @@ class UserWebRootMigrationTest extends TestCase
 
     protected function setUp(): void
     {
+        // Root can chown fixture copies; use a real account so ownership
+        // assertions exercise the same path production takes.
+        if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
+            $this->user = 'root';
+        }
         $this->homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-web-root-');
         $this->home = $this->pmssEnsureUserWebHome($this->homeRoot, $this->user);
         $this->pmssEnsureDir($this->home.'/www/rutorrent');
@@ -109,6 +114,117 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertSame('../../.local/share/pmss/rutorrent/share', readlink($this->home.'/www/rutorrent/share'));
         $this->assertEquals('durable-share', file_get_contents($target.'/users/'.$this->user.'/settings.ini'));
         $this->assertTrue($this->pmssMessagesContain($messages, 'Restored symlink for www/rutorrent/share'));
+    }
+
+    public function testCopiesMisfiledBasenameTreesIntoAbsentDurableTargets(): void
+    {
+        $shareSource = $this->home.'/share';
+        $shareFile = $shareSource.'/users/'.$this->user.'/settings/profile.ini';
+        $publicSource = $this->home.'/public';
+        $publicFile = $publicSource.'/index.html';
+        $this->pmssWriteFile($shareFile, 'legacy-rtorrent-profile');
+        $this->pmssWriteFile($publicFile, 'legacy-public');
+        chmod($shareSource, 0701);
+        chmod($shareFile, 0640);
+        chmod($publicSource, 0711);
+        $shareMtime = time() - 3600;
+        touch($shareFile, $shareMtime);
+        $shareOwner = fileowner($shareFile);
+        $shareGroup = filegroup($shareFile);
+
+        $messages = [];
+        \pmssUserMigrateWebRootState($this->context(), $this->logger($messages));
+
+        $durableShare = $this->home.'/.local/share/pmss/rutorrent/share';
+        $durablePublic = $this->home.'/.local/share/pmss/public';
+        $durableShareFile = $durableShare.'/users/'.$this->user.'/settings/profile.ini';
+        $this->assertEquals('legacy-rtorrent-profile', file_get_contents($durableShareFile));
+        $this->assertEquals('legacy-public', file_get_contents($durablePublic.'/index.html'));
+        $this->assertEquals('legacy-rtorrent-profile', file_get_contents($shareFile));
+        $this->assertEquals('legacy-public', file_get_contents($publicFile));
+        $this->assertSame(0701, fileperms($durableShare) & 07777);
+        $this->assertSame(0640, fileperms($durableShareFile) & 07777);
+        $this->assertSame($shareMtime, filemtime($durableShareFile));
+        $this->assertSame($shareOwner, fileowner($durableShareFile));
+        $this->assertSame($shareGroup, filegroup($durableShareFile));
+        $this->assertTrue(is_link($this->home.'/www/rutorrent/share'));
+        $this->assertSame('../../.local/share/pmss/rutorrent/share', readlink($this->home.'/www/rutorrent/share'));
+        $this->assertTrue(is_link($this->home.'/www/public'));
+        $this->assertSame('../.local/share/pmss/public', readlink($this->home.'/www/public'));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Copied misfiled share'));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Copied misfiled public'));
+    }
+
+    public function testMisfiledShareDoesNotClobberPopulatedDurableTarget(): void
+    {
+        $misfile = $this->home.'/share/users/'.$this->user.'/settings/profile.ini';
+        $target = $this->home.'/.local/share/pmss/rutorrent/share/users/'.$this->user.'/settings/profile.ini';
+        $this->pmssWriteFile($misfile, 'misfiled-profile');
+        $this->pmssWriteFile($target, 'durable-profile');
+
+        $messages = [];
+        \pmssUserMigrateWebRootState($this->context(), $this->logger($messages));
+
+        $this->assertEquals('misfiled-profile', file_get_contents($misfile));
+        $this->assertEquals('durable-profile', file_get_contents($target));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Preserving destination conflict for www/rutorrent/share'));
+    }
+
+    public function testMissingBasenameMisfileLeavesNormalMigrationUnchanged(): void
+    {
+        $source = $this->home.'/www/rutorrent/share/users/'.$this->user.'/settings/profile.ini';
+        $this->pmssWriteFile($source, 'ordinary-profile');
+
+        $messages = [];
+        \pmssUserMigrateWebRootState($this->context(), $this->logger($messages));
+
+        $target = $this->home.'/.local/share/pmss/rutorrent/share/users/'.$this->user.'/settings/profile.ini';
+        $this->assertFalse(file_exists($this->home.'/share'));
+        $this->assertEquals('ordinary-profile', file_get_contents($target));
+        $this->assertTrue(is_link($this->home.'/www/rutorrent/share'));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Migrated www/rutorrent/share'));
+        $this->assertFalse($this->pmssMessagesContain($messages, 'Copied misfiled share'));
+    }
+
+    public function testUnsafeMisfiledShareSymlinkIsRefused(): void
+    {
+        $outside = $this->homeRoot.'/outside-share';
+        $this->pmssWriteFile($outside.'/users/'.$this->user.'/settings/profile.ini', 'outside-profile');
+        $this->pmssCreateSymlinkOrSkip($outside, $this->home.'/share');
+
+        $messages = [];
+        \pmssUserMigrateWebRootState($this->context(), $this->logger($messages));
+
+        $this->assertTrue(is_link($this->home.'/share'));
+        $this->assertSame($outside, readlink($this->home.'/share'));
+        $this->assertEquals('outside-profile', file_get_contents($outside.'/users/'.$this->user.'/settings/profile.ini'));
+        $this->assertFalse(file_exists($this->home.'/.local/share/pmss/rutorrent/share'));
+        $this->assertFalse(file_exists($this->home.'/www/rutorrent/share'));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Refusing unsafe symlink or unreadable tree at share'));
+    }
+
+    public function testMisfiledShareRepairIsIdempotent(): void
+    {
+        $misfile = $this->home.'/share/users/'.$this->user.'/settings/profile.ini';
+        $this->pmssWriteFile($misfile, 'legacy-profile');
+
+        $firstMessages = [];
+        \pmssUserMigrateWebRootState($this->context(), $this->logger($firstMessages));
+        $target = $this->home.'/.local/share/pmss/rutorrent/share';
+        $beforeTarget = \pmssUserWebRootMigrationSnapshot($target);
+        $beforeMisfile = \pmssUserWebRootMigrationSnapshot($this->home.'/share');
+
+        $secondMessages = [];
+        \pmssUserMigrateWebRootState($this->context(), $this->logger($secondMessages));
+
+        $this->assertEquals($beforeTarget, \pmssUserWebRootMigrationSnapshot($target));
+        $this->assertEquals($beforeMisfile, \pmssUserWebRootMigrationSnapshot($this->home.'/share'));
+        $this->assertEquals('legacy-profile', file_get_contents($target.'/users/'.$this->user.'/settings/profile.ini'));
+        $this->assertEquals('legacy-profile', file_get_contents($misfile));
+        $this->assertTrue(is_link($this->home.'/www/rutorrent/share'));
+        $this->assertTrue($this->pmssMessagesContain($firstMessages, 'Copied misfiled share'));
+        $this->assertTrue($this->pmssMessagesContain($secondMessages, 'Preserving destination conflict for www/rutorrent/share'));
+        $this->assertFalse($this->pmssMessagesContain($secondMessages, 'Copied misfiled share'));
     }
 
     private function context(): array
