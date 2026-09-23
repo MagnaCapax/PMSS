@@ -11,6 +11,7 @@
  */
 
 require_once __DIR__.'/../runtime/commands.php';
+require_once __DIR__.'/../managedPath.php';
 require_once __DIR__.'/../runtime/processes.php';
 
 /**
@@ -133,50 +134,24 @@ function pmssEnsureCronRestartDropin(
         logMessage('[ERR] Refusing unsafe cron systemd drop-in directory path: '.$dropinDir);
         return false;
     }
-    if (!is_dir($dropinDir)) {
-        $rc = runStep('Ensuring cron systemd drop-in directory', 'install -d -m 0755 '.escapeshellarg($dropinDir));
-        if ($rc !== 0 || !is_dir($dropinDir)) {
-            logMessage('[ERR] Failed to create cron systemd drop-in directory: '.$dropinDir);
-            return false;
-        }
-    }
-    if (is_link($dropinDir)) {
-        logMessage('[ERR] Refusing symlinked cron systemd drop-in directory: '.$dropinDir);
-        return false;
-    }
 
-    if (!pmssPathTargetIsSafe($dropinFile, false, true, false)) {
-        logMessage('[ERR] Refusing unsafe cron systemd drop-in target path: '.$dropinFile);
-        return false;
-    }
-    if (is_link($dropinFile) || (file_exists($dropinFile) && !is_file($dropinFile))) {
-        logMessage('[ERR] Refusing unsafe cron systemd drop-in target: '.$dropinFile);
-        return false;
-    }
-
-    $content = pmssCronRestartDropinContent();
-    if (is_file($dropinFile)) {
-        $existing = pmssReadRegularFileContents($dropinFile);
-        if ($existing === null) {
-            logMessage('[ERR] Failed to read cron systemd drop-in target: '.$dropinFile);
-            return false;
-        }
-        if ($existing === $content) {
-            return true;
-        }
-    }
-
-    if (@file_put_contents($dropinFile, $content, LOCK_EX) === false) {
-        logMessage('[ERR] Failed to write cron systemd drop-in target: '.$dropinFile);
-        return false;
-    }
-    if (!@chmod($dropinFile, 0644)) {
+    $changed = pmssRefreshManagedPathFile(
+        $dropinFile,
+        pmssCronRestartDropinContent(),
+        'cron systemd drop-in',
+        'logMessage',
+        [
+            'directoryFailureMessage' => '[ERR] Failed to create cron systemd drop-in directory: '.$dropinDir,
+            'writeFailureMessage' => '[ERR] Failed to write cron systemd drop-in target: '.$dropinFile,
+        ],
+        $succeeded
+    );
+    if ($changed && ((int) @fileperms($dropinFile) & 0777) !== 0644) {
         logMessage('[ERR] Failed to set cron systemd drop-in mode: '.$dropinFile);
+        $changed = false;
         return false;
     }
-
-    $changed = true;
-    return true;
+    return $succeeded;
 }
 
 /** PAM session line that places cron-spawned user jobs into user-UID.slice. */

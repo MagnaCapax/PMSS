@@ -35,14 +35,13 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
     $soft = $soft ?: $hard;
     $hard = max($soft, $hard);
     $dropDir = pmssResolvePathFromEnv('PMSS_SYSTEMD_USER_AT_SERVICE_DIR', '/etc/systemd/system/user@.service.d');
-    if (!pmssDirEnsureExists($dropDir, 0755)) {
-        $log('[WARN] Failed to create user@.service drop-in dir '.$dropDir);
-        return;
-    }
-
     $target = $dropDir.'/20-pmss-limits.conf';
     $body = "# PMSS: per-user manager descriptor limits from cgroup.policy.php\n[Service]\nLimitNOFILE={$soft}:{$hard}\n";
-    if (pmssWriteManagedPathFile($target, $body, 'systemd drop-in', $log, null, null, 0644, '[WARN] Failed to install user@.service drop-in '.$target)) { $log(sprintf('Installed %s with LimitNOFILE=%d:%d', $target, $soft, $hard)); }
+    pmssRefreshManagedPathFile($target, $body, 'systemd drop-in', $log, [
+        'directoryFailureMessage' => '[WARN] Failed to create user@.service drop-in dir '.$dropDir,
+        'writeFailureMessage' => '[WARN] Failed to install user@.service drop-in '.$target,
+        'successMessage' => sprintf('Installed %s with LimitNOFILE=%d:%d', $target, $soft, $hard),
+    ]);
 }
 
     /**
@@ -77,7 +76,6 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         $mode = pmssCgroupMode();
         $dropDir = pmssResolvePathFromEnv('PMSS_SYSTEMD_USER_SLICE_DIR', '/etc/systemd/system/user-.slice.d');
         $target  = $dropDir.'/15-pmss.conf';
-        is_dir($dropDir) || runStep('Creating user-.slice drop-in directory', 'install -d -m 0755 '.escapeshellarg($dropDir));
 
         // Render template based on cgroup mode
         $cfgDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
@@ -174,8 +172,10 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
             }
         }
 
-        // Atomic write to avoid race conditions where the file is briefly missing
-        if (!pmssWriteManagedPathFile($target, $raw, 'systemd drop-in', $log, null, null, 0644, '[WARN] Failed to atomically replace user-.slice drop-in '.$target)) {
+        pmssRefreshManagedPathFile($target, $raw, 'systemd drop-in', $log, [
+            'writeFailureMessage' => '[WARN] Failed to atomically replace user-.slice drop-in '.$target,
+        ], $sliceReady);
+        if (!$sliceReady) {
             return;
         }
 
@@ -189,7 +189,9 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
             $existing = @file_get_contents($shadowPath);
             if (
                 ($existing === false || trim((string) $existing) !== trim($shadow))
-                && pmssWriteManagedPathFile($shadowPath, $shadow, 'systemd drop-in', $log, null, null, 0644, '[WARN] Failed to write '.$shadowPath.' TasksMax override (legacy shadow)')
+                && pmssRefreshManagedPathFile($shadowPath, $shadow, 'systemd drop-in', $log, [
+                    'writeFailureMessage' => '[WARN] Failed to write '.$shadowPath.' TasksMax override (legacy shadow)',
+                ])
             ) {
                 $log('Installed '.$shadowPath.' TasksMax override (legacy shadow)');
             }
@@ -202,13 +204,13 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         // Keep user manager logs isolated by namespace to reduce
         // cross-tenant journald mixing on shared hosts.
         $userAtDropDir = pmssResolvePathFromEnv('PMSS_SYSTEMD_USER_AT_SERVICE_DIR', '/etc/systemd/system/user@.service.d');
-        if (!pmssDirEnsureExists($userAtDropDir, 0755)) {
-            $log('[WARN] Failed to create user@.service drop-in dir '.$userAtDropDir);
-        } else {
-            $userAtTarget = $userAtDropDir.'/30-pmss-log-namespace.conf';
-            $userAtBody = "# PMSS: isolate per-user manager logs in dedicated namespaces\n[Service]\nLogNamespace=user-%i\n";
-            if (pmssWriteManagedPathFile($userAtTarget, $userAtBody, 'systemd drop-in', $log, null, null, 0644, '[WARN] Failed to install user@.service log namespace drop-in '.$userAtTarget)) { $log('Installed '.$userAtTarget.' with LogNamespace=user-%i'); }
-        }
+        $userAtTarget = $userAtDropDir.'/30-pmss-log-namespace.conf';
+        $userAtBody = "# PMSS: isolate per-user manager logs in dedicated namespaces\n[Service]\nLogNamespace=user-%i\n";
+        pmssRefreshManagedPathFile($userAtTarget, $userAtBody, 'systemd drop-in', $log, [
+            'directoryFailureMessage' => '[WARN] Failed to create user@.service drop-in dir '.$userAtDropDir,
+            'writeFailureMessage' => '[WARN] Failed to install user@.service log namespace drop-in '.$userAtTarget,
+            'successMessage' => 'Installed '.$userAtTarget.' with LogNamespace=user-%i',
+        ]);
 
         if ($skipSystemctl) {
             pmssLogStatus('SKIP', 'Reloading systemd manager configuration (test mode)', 0);
@@ -220,12 +222,19 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         // Ensure root (uid 0) slice is not limited: create user-0 specific
         // override setting infinity/large limits.
         $rootDir = dirname($dropDir).'/user-0.slice.d';
-        pmssDirEnsureExists($rootDir, 0755);
         // Use a suffix that sorts after legacy 99-pmss.conf drop-ins so root
         // remains unlimited even when a stale vendor file exists.
         $rootDrop = $rootDir.'/99-zz-pmss-unlimited.conf';
         // Keep the legacy protection if its replacement cannot be installed.
-        if (pmssWriteManagedPathFile($rootDrop, "[Slice]\nMemoryHigh=infinity\nMemoryMax=infinity\nTasksMax=infinity\n", 'systemd root slice drop-in', $log, null, null, 0644, '[WARN] Failed to install root slice drop-in '.$rootDrop)) {
+        pmssRefreshManagedPathFile(
+            $rootDrop,
+            "[Slice]\nMemoryHigh=infinity\nMemoryMax=infinity\nTasksMax=infinity\n",
+            'systemd root slice drop-in',
+            $log,
+            ['writeFailureMessage' => '[WARN] Failed to install root slice drop-in '.$rootDrop],
+            $rootDropReady
+        );
+        if ($rootDropReady) {
             @unlink($rootDir.'/99-pmss-unlimited.conf');
         }
         if ($skipSystemctl) {

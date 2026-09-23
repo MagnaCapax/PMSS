@@ -53,15 +53,21 @@ function pmssWriteManagedPathFile(
  * Refresh managed file content only when it changed.
  *
  * Returns true only when a write was completed; unchanged or failed writes
- * return false so callers can gate reload work on real mutations.
+ * return false so callers can gate reload work on real mutations. The optional
+ * outcome distinguishes successful convergence from a failed refresh.
  */
-function pmssRefreshManagedPathFile(string $path, string $contents, string $label, callable $logger, array $options = []): bool
+function pmssRefreshManagedPathFile(string $path, string $contents, string $label, callable $logger, array $options = [], ?bool &$succeeded = null): bool
 {
-    $existing = @file_get_contents($path);
-    if ($existing !== false && $existing === $contents) {
+    $succeeded = false;
+    $existing = pmssReadRegularFileContents($path);
+    if ($existing !== null && $existing === $contents) {
+        if (!pmssManagedPathIsSafe($path, $label, $logger)) {
+            return false;
+        }
         if (($options['skipMessage'] ?? '') !== '') {
             $logger((string) $options['skipMessage']);
         }
+        $succeeded = true;
         return false;
     }
 
@@ -83,6 +89,7 @@ function pmssRefreshManagedPathFile(string $path, string $contents, string $labe
     if (($options['successMessage'] ?? '') !== '') {
         $logger((string) $options['successMessage']);
     }
+    $succeeded = true;
     return true;
 }
 

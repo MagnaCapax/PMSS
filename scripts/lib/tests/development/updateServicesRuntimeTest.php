@@ -113,6 +113,7 @@ class UpdateServicesRuntimeTest extends TestCase
 
         $this->assertTrue(strpos($content, "[Service]\n") === 0);
         $this->assertStringContainsAllStrings(["TasksAccounting=yes\n", "TasksMax=8192\n", "Restart=always\n"], $content);
+        $this->assertSame('654e9acdf7d6b95aa03214b2f74e4355c84437ce0f4ffb9f8c67d7733f43eeb4', hash('sha256', \pmssCronRestartDropinContent(4)));
     }
 
     public function testCronRestartDropinReservesCpuHeadroomForSystemSlice(): void

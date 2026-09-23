@@ -199,11 +199,6 @@ function pmssEnsureSshdStarvationDropin(
         return false;
     }
 
-    // NOTE: pass no custom message options here. pmssManagedPathInstallOptions()
-    // lives in an unrelated in-flight managedPath.php change that is NOT on main;
-    // depending on it broke update-step2 fleet-wide (undefined function, Refs #579).
-    // pmssRefreshManagedPathFile null-coalesces every option, so [] installs the
-    // drop-in identically (mode 0644) minus the cosmetic skip/success log strings.
     $changed = pmssRefreshManagedPathFile(
         $dropinFile,
         $content,
