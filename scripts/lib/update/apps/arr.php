@@ -49,7 +49,7 @@ function pmssArrInstallPathIsSafe(string $path): bool
 function pmssArrNormalizeConfig(array $config, callable $log): ?array
 {
     foreach (['app', 'install_path', 'releases_url', 'asset_pattern', 'extract_dir'] as $key) {
-        if (!isset($config[$key]) || !is_string($config[$key]) || !pmssArrIsSafeConfigValue($config[$key])) {
+        if (!is_string($config[$key] ?? null) || !pmssArrIsSafeConfigValue($config[$key])) {
             $log('Invalid updater configuration: '.$key);
             return null;
         }
@@ -71,8 +71,7 @@ function pmssArrNormalizeConfig(array $config, callable $log): ?array
         return null;
     }
 
-    $config['user_agent'] = isset($config['user_agent'])
-        && is_string($config['user_agent'])
+    $config['user_agent'] = is_string($config['user_agent'] ?? null)
         && pmssArrIsSafeConfigValue($config['user_agent'])
         ? $config['user_agent']
         : 'PMSS-ARR';
@@ -210,7 +209,7 @@ function pmssArrReleaseActivate(array $config, string $app, string $downloadUrl,
 
 function pmssArrUpdate(array $config): void
 {
-    $app = isset($config['app']) && is_string($config['app']) && $config['app'] !== ''
+    $app = is_string($config['app'] ?? null) && $config['app'] !== ''
         ? $config['app']
         : 'ARR';
     $runtimePath = dirname(__DIR__, 2).'/runtime.php';

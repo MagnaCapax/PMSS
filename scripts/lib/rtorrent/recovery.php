@@ -91,7 +91,7 @@ function rtorrentProcessResetSessionDirectory(string $home, string $user, callab
     @chown($sessionDir, $user);
     if (function_exists('posix_getpwnam')) {
         $pw = @posix_getpwnam($user);
-        if (is_array($pw) && isset($pw['gid'])) {
+        if (isset($pw['gid'])) {
             @chgrp($sessionDir, (int) $pw['gid']);
         }
     }
@@ -138,7 +138,7 @@ function rtorrentCustomConfigQuarantine(string $home, string $user, callable $lo
     // Best-effort ownership guard: only allow root-owned or user-owned files.
     if (function_exists('posix_getpwnam')) {
         $pw = @posix_getpwnam($user);
-        $uid = (is_array($pw) && isset($pw['uid'])) ? (int) $pw['uid'] : null;
+        $uid = isset($pw['uid']) ? (int) $pw['uid'] : null;
         $owner = @fileowner($src);
         if ($owner !== false && $uid !== null && (int) $owner !== 0 && (int) $owner !== $uid) {
             $logFn("Refusing to quarantine {$src}: unexpected owner uid={$owner}", true);

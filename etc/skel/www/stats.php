@@ -308,7 +308,7 @@ function pmssStatsToggleApp(button) {
 
   <!-- RIGHT: Server info -->
   <div class="stats-block">
-    <h6><?php echo pmssCustomerHtmlAttr(isset($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : 'server'); ?> info</h6>
+    <h6><?php echo pmssCustomerHtmlAttr($_SERVER['SERVER_NAME'] ?? 'server'); ?> info</h6>
 
     <div class="info-line">
         <span class="label">IP:</span>

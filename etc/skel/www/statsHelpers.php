@@ -62,13 +62,12 @@ function pmssStatsTrafficAmountFormat($valueMiB): string
 /** Return a display value from persisted traffic state, deriving it from raw MiB when absent. */
 function pmssStatsTrafficDisplayValue(array $trafficData, string $period): string
 {
-    if (isset($trafficData['display']) && is_array($trafficData['display'])
+    if (is_array($trafficData['display'] ?? null)
         && isset($trafficData['display'][$period]) && trim((string) $trafficData['display'][$period]) !== '') {
         return (string) $trafficData['display'][$period];
     }
 
-    if (isset($trafficData['raw']) && is_array($trafficData['raw'])
-        && isset($trafficData['raw'][$period]) && is_numeric($trafficData['raw'][$period])) {
+    if (is_array($trafficData['raw'] ?? null) && is_numeric($trafficData['raw'][$period] ?? null)) {
         return pmssStatsTrafficAmountFormat($trafficData['raw'][$period]);
     }
 
@@ -102,11 +101,11 @@ function pmssStatsCurrentUidResolve(?callable $runner = null): array
 /** Detect a readable cgroup directory for display purposes. */
 function pmssStatsCgroupDirDetect(string $uid, array $overrides = []): string
 {
-    if (isset($overrides['cgroup_dir']) && is_string($overrides['cgroup_dir']) && $overrides['cgroup_dir'] !== '') {
+    if (is_string($overrides['cgroup_dir'] ?? null) && $overrides['cgroup_dir'] !== '') {
         return rtrim($overrides['cgroup_dir'], '/');
     }
 
-    $candidates = isset($overrides['cgroup_dir_candidates']) && is_array($overrides['cgroup_dir_candidates'])
+    $candidates = is_array($overrides['cgroup_dir_candidates'] ?? null)
         ? $overrides['cgroup_dir_candidates']
         : array('/sys/fs/cgroup/user.slice/user-'.$uid.'.slice', '/sys/fs/cgroup/unified/user.slice/user-'.$uid.'.slice', '/sys/fs/cgroup/memory/user.slice/user-'.$uid.'.slice');
     foreach ($candidates as $candidate) {
@@ -119,7 +118,7 @@ function pmssStatsCgroupDirDetect(string $uid, array $overrides = []): string
     $cgroupFile = (string) ($overrides['self_cgroup_file'] ?? '/proc/self/cgroup');
     $entries = function_exists('pmssCustomerCgroupSelfEntries') ? pmssCustomerCgroupSelfEntries($cgroupFile) : array();
     foreach ($entries as $entry) {
-        $controllers = isset($entry['controllers']) && is_array($entry['controllers']) ? $entry['controllers'] : array();
+        $controllers = is_array($entry['controllers'] ?? null) ? $entry['controllers'] : array();
         $roots = in_array('memory', $controllers, true)
             ? array('/sys/fs/cgroup/memory', '/sys/fs/cgroup', '/sys/fs/cgroup/unified')
             : array('/sys/fs/cgroup', '/sys/fs/cgroup/unified');
@@ -223,8 +222,7 @@ function pmssStatsNetworkInterfaceStatus(array $interfaceNames, string $interfac
 function pmssStatsStatusModelBuild(?string $uid, ?bool $dockerEnabledPolicy, ?callable $runner = null, array $overrides = []): array
 {
     $runner = $runner ?? 'pmssInfoShellExec';
-    $interfacesRoot = isset($overrides['network_interfaces_root'])
-        && is_string($overrides['network_interfaces_root'])
+    $interfacesRoot = is_string($overrides['network_interfaces_root'] ?? null)
         && $overrides['network_interfaces_root'] !== ''
             ? $overrides['network_interfaces_root']
             : '/sys/class/net';
@@ -271,7 +269,7 @@ function pmssStatsServerResourceTextBuild(): string
     }
 
     $info = array_combine($m[1], $m[2]);
-    $fmt = static function (string $key) use ($info) { return isset($info[$key]) ? $info[$key] : 0; };
+    $fmt = static function (string $key) use ($info) { return $info[$key] ?? 0; };
     $text .= sprintf("Memory total:     %6s MiB\n", round($fmt('MemTotal') / 1024, 0));
     $text .= sprintf("Memory available: %6s MiB\n", round($fmt('MemAvailable') / 1024, 0));
     $text .= sprintf("Swap total:       %6s MiB\n", round($fmt('SwapTotal') / 1024, 0));
@@ -300,8 +298,8 @@ function pmssStatsRenderTrafficUsageBlock(): void
     $trafficLimitState = function_exists('pmssTrafficLimitStateRead')
         ? pmssTrafficLimitStateRead('../.trafficLimit', '../.bonusTraffic')
         : array('limitGiB' => 0, 'bonusGiB' => 0, 'effectiveLimitGiB' => 0);
-    $trafficOutboundMonth = ($trafficData !== null && isset($trafficData['raw']['month']) && is_numeric($trafficData['raw']['month'])) ? (float) $trafficData['raw']['month'] : null;
-    $trafficInboundMonth = ($trafficIngressData !== null && isset($trafficIngressData['raw']['month']) && is_numeric($trafficIngressData['raw']['month'])) ? (float) $trafficIngressData['raw']['month'] : null;
+    $trafficOutboundMonth = is_numeric($trafficData['raw']['month'] ?? null) ? (float) $trafficData['raw']['month'] : null;
+    $trafficInboundMonth = is_numeric($trafficIngressData['raw']['month'] ?? null) ? (float) $trafficIngressData['raw']['month'] : null;
     $trafficRatioState = function_exists('pmssTrafficRatioStateBuild') ? pmssTrafficRatioStateBuild($trafficOutboundMonth, $trafficInboundMonth) : array('available' => false);
 
     if ($trafficData === null && $trafficIngressData === null) {
@@ -379,10 +377,10 @@ function pmssStatsResourceSnapshotBuild(?array $resourceData): array
     $memoryRaw = pmssStatsNestedArrayRead($resourceData, 'memory', 'raw');
     $ramHoursRaw = pmssStatsNestedArrayRead($resourceData, 'ram_hours', 'raw');
     foreach (array('month', 'week', 'day', 'hour') as $period) {
-        if (!isset($snapshot['memoryDisplay'][$period]) && isset($memoryRaw[$period]) && is_numeric($memoryRaw[$period])) {
+        if (!isset($snapshot['memoryDisplay'][$period]) && is_numeric($memoryRaw[$period] ?? null)) {
             $snapshot['memoryDisplay'][$period] = pmssFormatBytesShort($memoryRaw[$period]);
         }
-        if (!isset($snapshot['ramHoursDisplay'][$period]) && isset($ramHoursRaw[$period]) && is_numeric($ramHoursRaw[$period])) {
+        if (!isset($snapshot['ramHoursDisplay'][$period]) && is_numeric($ramHoursRaw[$period] ?? null)) {
             $snapshot['ramHoursDisplay'][$period] = round((float)$ramHoursRaw[$period], 2).'GB-hrs';
         }
     }
@@ -404,7 +402,7 @@ function pmssStatsResourceSnapshotBuild(?array $resourceData): array
     }
     if (isset($resourceData['tasks']['current'])) { $snapshot['tasksCurrent'] = (string) round((float)$resourceData['tasks']['current'], 2); }
 
-    if (isset($resourceData['daily']) && is_array($resourceData['daily'])) {
+    if (is_array($resourceData['daily'] ?? null)) {
         $dailySeries = array('ioDailyRead' => array('io_read', 1048576, 2), 'ioDailyWrite' => array('io_write', 1048576, 2), 'cpuDailyHours' => array('cpu', 3600000000000, 4));
         foreach ($resourceData['daily'] as $day => $totals) {
             $snapshot['ioDailyLabels'][] = $day;
@@ -421,7 +419,7 @@ function pmssStatsResourceSnapshotBuild(?array $resourceData): array
 /** Render the resource snapshot and storage I/O blocks. */
 function pmssStatsRenderResourceBlocks(array $resourceState): void
 {
-    $resourceData = isset($resourceState['data']) && is_array($resourceState['data']) ? $resourceState['data'] : null;
+    $resourceData = is_array($resourceState['data'] ?? null) ? $resourceState['data'] : null;
     if ($resourceData === null) {
         $message = $resourceState['error'] !== null ? $resourceState['error'] : 'Resource data not available.';
         echo '<div class="stats-block resource-summary-block"><h6>Resource snapshot</h6><pre>'.pmssCustomerHtmlAttr($message).'</pre></div>';
@@ -543,13 +541,13 @@ function pmssStatsDockerInactiveNote(
  */
 function pmssStatsAppToggleButtonHtmlBuild(string $appName, array $definitions): string
 {
-    if (!isset($definitions[$appName]) || !is_array($definitions[$appName])) {
+    if (!is_array($definitions[$appName] ?? null)) {
         return '';
     }
 
     $definition = $definitions[$appName];
-    $endpoint = isset($definition['endpoint']) ? (string) $definition['endpoint'] : '';
-    $enableFile = isset($definition['enable']) ? (string) $definition['enable'] : '';
+    $endpoint = (string) ($definition['endpoint'] ?? '');
+    $enableFile = (string) ($definition['enable'] ?? '');
     $endpointPath = __DIR__.'/'.$endpoint;
     if ($endpoint === '' || $enableFile === '' || !is_file($endpointPath) || is_link($endpointPath)) {
         return '';
@@ -626,9 +624,7 @@ function pmssStatsRenderLineChart($canvasId, array $labels, array $datasets): vo
 /** Return a nested array section or an empty fallback. */
 function pmssStatsNestedArrayRead(array $source, string $section, string $key): array
 {
-    return isset($source[$section][$key]) && is_array($source[$section][$key])
-        ? $source[$section][$key]
-        : array();
+    return is_array($source[$section][$key] ?? null) ? $source[$section][$key] : array();
 }
 
 /** Format a byte count for compact customer stats labels. */

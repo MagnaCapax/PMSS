@@ -154,7 +154,7 @@ function pmssUserConfigCliBuildUserConfigPositionals(array $user): array
             continue;
         }
         $index = $spec['userConfigIndex'];
-        $optionalArgs[$index] = array_key_exists($key, $user) ? (string) $user[$key] : '';
+        $optionalArgs[$index] = (string) ($user[$key] ?? '');
         if ($optionalArgs[$index] !== '') {
             $lastOptionalIndex = $index;
         }
