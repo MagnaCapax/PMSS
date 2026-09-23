@@ -97,7 +97,7 @@ the codebase, one concept being extracted from multiple call sites). Do NOT spli
 across multiple commits, and do NOT shrink the arc to a single source file just to keep the diff small.
 
 Per-mode per-commit scope (the SINGLE commit can be this large):
-  - refactor(compression):  up to  10 files, up to  500 lines  (compression is local by nature)
+  - refactor(compression):  up to  500 lines  (compression is local by nature)
   - refactor(decompose):    up to  30 files, up to 5000 lines  (architectural — bundle the arc)
   - refactor(dry):          up to  30 files, up to 5000 lines  (DRY across files — bundle the arc)
   - refactor(safety):       up to   5 files, up to  300 lines  (cautious, narrow additions)
