@@ -183,8 +183,8 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
     // Source tarballs stay pinned to HTTPS URLs with SHA256 verification.
     $rtorrentTarball = "rtorrent-{$rtorrentVersionTarget}.tar.gz";
     $libtorrentTarball = "libtorrent-{$rtorrentVersionTargetLib}.tar.gz";
-    $rtorrentSha = isset($checksums[$rtorrentTarball]) ? $checksums[$rtorrentTarball] : '';
-    $libtorrentSha = isset($checksums[$libtorrentTarball]) ? $checksums[$libtorrentTarball] : '';
+    $rtorrentSha = $checksums[$rtorrentTarball] ?? '';
+    $libtorrentSha = $checksums[$libtorrentTarball] ?? '';
 
     if ($rtorrentSha === '' || $libtorrentSha === '') {
         $log('[WARN] Missing checksum for rtorrent/libtorrent tarballs; aborting');

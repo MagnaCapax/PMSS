@@ -43,7 +43,7 @@ function pmssIoCeilingHistorySamples(string $path): iterable
                     continue;
                 }
                 $sample = @unserialize(substr($line, 23), ['allowed_classes' => false]);
-                if (!is_array($sample) || !isset($sample['time']) || !is_int($sample['time'])) {
+                if (!is_array($sample) || !is_int($sample['time'] ?? null)) {
                     continue;
                 }
                 // Never compute a percentile from a day cut by the byte budget.
@@ -84,8 +84,8 @@ function pmssIoCeilingRefresh(
 /** Return true only when a published cache still satisfies its own sample gates. */
 function pmssIoCeilingPublishedStateSatisfiesGuards(array $state): bool
 {
-    $minDays = isset($state['min_days']) && is_int($state['min_days']) ? $state['min_days'] : 0;
-    $minSamples = isset($state['min_samples_per_day']) && is_int($state['min_samples_per_day']) ? $state['min_samples_per_day'] : 0;
+    $minDays = is_int($state['min_days'] ?? null) ? $state['min_days'] : 0;
+    $minSamples = is_int($state['min_samples_per_day'] ?? null) ? $state['min_samples_per_day'] : 0;
     $days = $state['days'] ?? null;
     if ($minDays <= 0 || $minSamples <= 0 || !is_array($days)) {
         return false;
@@ -93,7 +93,7 @@ function pmssIoCeilingPublishedStateSatisfiesGuards(array $state): bool
 
     $qualified = 0;
     foreach ($days as $day) {
-        if (is_array($day) && isset($day['samples']) && is_int($day['samples']) && $day['samples'] >= $minSamples) {
+        if (is_array($day) && is_int($day['samples'] ?? null) && $day['samples'] >= $minSamples) {
             $qualified++;
         }
     }

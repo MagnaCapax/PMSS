@@ -19,7 +19,7 @@ $trafficIngressLogLock = pmssCronLockAcquire('trafficIngressLog');
 
 $logDir = '/var/log/pmss/traffic-ingress';
 $stateDir = '/var/run/pmss/trafficIngress';
-$linkSpeed = isset($linkSpeed) && is_numeric($linkSpeed) ? (float) $linkSpeed : null;
+$linkSpeed = is_numeric($linkSpeed ?? null) ? (float) $linkSpeed : null;
 
 if (!pmssEnsureSafeDir($logDir, 0755) || !pmssEnsureSafeDir($stateDir, 0700)) {
     fwrite(STDERR, "Failed to prepare ingress traffic directories.\n");

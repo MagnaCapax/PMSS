@@ -23,9 +23,7 @@ function pmssCgroupPolicyPositiveIntSetting($value): ?int
 /** Return true when the user payload carries an operator-set read-IOPS value. */
 function pmssCgroupPolicyUserHasExplicitReadIops(array $source): bool
 {
-    return array_key_exists('IOReadIOPS', $source)
-        && $source['IOReadIOPS'] !== null
-        && is_scalar($source['IOReadIOPS']);
+    return isset($source['IOReadIOPS']) && is_scalar($source['IOReadIOPS']);
 }
 
 /** Read the review-adjustable host oversell multiplier. */
@@ -70,11 +68,7 @@ function pmssCgroupPolicyReadIopsClassFloor(?string $storageClass, array $policy
 {
     $floors = pmssCgroupPolicyReadIopsClassFloors($policy);
     $class = is_string($storageClass) ? strtolower($storageClass) : '';
-    if ($class !== '' && isset($floors[$class])) {
-        return $floors[$class];
-    }
-
-    return $floors['default'] ?? ($floors['storage'] ?? 200);
+    return $floors[$class] ?? $floors['default'] ?? $floors['storage'] ?? 200;
 }
 
 /** Prefer explicit user IOWeight, then the policy default, then systemd's default-ish 100. */

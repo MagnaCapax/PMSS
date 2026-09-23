@@ -94,7 +94,7 @@ function pmssScheduledConfigBackupCommandRun(string $command): array
 
 function pmssScheduledConfigBackupCustomerResult(array $process): array
 {
-    $rc = isset($process['rc']) && is_numeric($process['rc']) ? (int) $process['rc'] : 1;
+    $rc = is_numeric($process['rc'] ?? null) ? (int) $process['rc'] : 1;
     $stdout = trim((string) ($process['stdout'] ?? ''));
     $jsonLine = '';
     foreach (preg_split('/\r?\n/', $stdout) ?: [] as $line) {
@@ -139,8 +139,8 @@ function pmssScheduledConfigBackupArchiveVerified(string $home, string $path): i
 function pmssScheduledConfigBackupRunUser(string $user, array $payload, array $options = []): array
 {
     $homeRoot = rtrim((string) ($options['homeRoot'] ?? pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home')), '/');
-    $runner = isset($options['runner']) && is_callable($options['runner']) ? $options['runner'] : null;
-    $userLogger = isset($options['userLogger']) && is_callable($options['userLogger']) ? $options['userLogger'] : 'pmssUserLog';
+    $runner = is_callable($options['runner'] ?? null) ? $options['runner'] : null;
+    $userLogger = is_callable($options['userLogger'] ?? null) ? $options['userLogger'] : 'pmssUserLog';
     $retention = max(1, (int) ($options['retention'] ?? PMSS_SCHEDULED_CONFIG_BACKUP_RETENTION_DEFAULT));
 
     if (!pmssUserConfigNormaliseToggleValue($payload, PMSS_SCHEDULED_CONFIG_BACKUP_KEY, false)) return pmssScheduledConfigBackupOutcome('skipped', 'toggle off', ['enabled' => false]);
@@ -182,8 +182,8 @@ function pmssScheduledConfigBackupRunUser(string $user, array $payload, array $o
 
 function pmssScheduledConfigBackupRun(UserConfigStore $store, array $options = []): array
 {
-    $logger = isset($options['logger']) && is_callable($options['logger']) ? $options['logger'] : null;
-    $userLogger = isset($options['userLogger']) && is_callable($options['userLogger']) ? $options['userLogger'] : 'pmssUserLog';
+    $logger = is_callable($options['logger'] ?? null) ? $options['logger'] : null;
+    $userLogger = is_callable($options['userLogger'] ?? null) ? $options['userLogger'] : 'pmssUserLog';
     $summary = ['timestamp' => date('c'), 'event' => 'scheduled_config_backup', 'processed' => 0, 'succeeded' => 0, 'failed' => 0, 'skipped' => 0];
 
     foreach ($store->loadAll() as $user => $payload) {

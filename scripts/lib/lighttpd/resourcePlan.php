@@ -68,7 +68,7 @@ function pmssLighttpdResourcePlan(array $props, array $policyDefaults, array $us
 
     $cpuQuotaPercent = pmssExtractCpuQuotaPercent($props, $policyDefaults);
     $processPlan = pmssComputePhpProcessPlan($cpuQuotaPercent, pmssLighttpdMinThreadsFromUserConfig($userConfig));
-    $memoryDefault = isset($policyDefaults['memoryHighMiB']) ? (int) $policyDefaults['memoryHighMiB'] : 512;
+    $memoryDefault = (int) ($policyDefaults['memoryHighMiB'] ?? 512);
 
     return [
         'memoryLimit' => pmssClampMemoryLimit((int) ($memoryHigh ?? $memoryDefault)),

@@ -109,7 +109,7 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
     }
 
     $changed = false;
-    $desiredDriver = isset($policy['storage_driver']) && is_string($policy['storage_driver']) ? $policy['storage_driver'] : null;
+    $desiredDriver = is_string($policy['storage_driver'] ?? null) ? $policy['storage_driver'] : null;
     $preserveCustomDriver = array_key_exists('preserve_custom_storage_driver', $policy) ? (bool) $policy['preserve_custom_storage_driver'] : true;
 
     if (!empty($policy['remove_pmss_storage_driver']) && ($data['storage-driver'] ?? null) === 'fuse-overlayfs') {
@@ -130,7 +130,7 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
     if (!empty($policy['disable_containerd_snapshotter'])) {
         // Docker reads storage backend features only at daemon startup. This
         // preserves existing feature keys while forcing the classic graphdriver.
-        $features = isset($data['features']) && is_array($data['features']) ? $data['features'] : [];
+        $features = is_array($data['features'] ?? null) ? $data['features'] : [];
         if (!array_key_exists('containerd-snapshotter', $features) || $features['containerd-snapshotter'] !== false) {
             $features['containerd-snapshotter'] = false;
             $data['features'] = $features;
@@ -141,7 +141,7 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
 
     $createWhenMissing = !empty($policy['create_when_missing']);
     if ($hasConfigFile || $createWhenMissing || $changed) {
-        $execOpts = isset($data['exec-opts']) && is_array($data['exec-opts']) ? $data['exec-opts'] : [];
+        $execOpts = is_array($data['exec-opts'] ?? null) ? $data['exec-opts'] : [];
         if (!in_array('native.cgroupdriver=cgroupfs', $execOpts, true)) {
             $execOpts[] = 'native.cgroupdriver=cgroupfs';
             $data['exec-opts'] = array_values(array_unique($execOpts));

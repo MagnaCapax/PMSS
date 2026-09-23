@@ -337,10 +337,10 @@ function pmssUserLifecycleFindSuspendedBackup(string $homeDir): ?string
 function pmssUserLifecycleRefreshNginxConfig(string $action, string $username, bool $dryRun, string $configStep, string $configCommand, array $restartOptions = array(), ?callable $stepRunner = null): int
 {
     $runner = $stepRunner ?? 'pmssUserLifecycleStep';
-    $systemctlStep = isset($restartOptions['systemctlStep']) ? (string) $restartOptions['systemctlStep'] : 'restart_nginx_systemctl';
-    $systemctlCommand = isset($restartOptions['systemctlCommand']) ? (string) $restartOptions['systemctlCommand'] : 'systemctl restart nginx';
-    $initStep = isset($restartOptions['initStep']) ? (string) $restartOptions['initStep'] : 'restart_nginx_init';
-    $initCommand = isset($restartOptions['initCommand']) ? (string) $restartOptions['initCommand'] : '/etc/init.d/nginx restart';
+    $systemctlStep = (string) ($restartOptions['systemctlStep'] ?? 'restart_nginx_systemctl');
+    $systemctlCommand = (string) ($restartOptions['systemctlCommand'] ?? 'systemctl restart nginx');
+    $initStep = (string) ($restartOptions['initStep'] ?? 'restart_nginx_init');
+    $initCommand = (string) ($restartOptions['initCommand'] ?? '/etc/init.d/nginx restart');
 
     $configRc = (int) $runner($action, $username, $configStep, $configCommand, $dryRun);
     if ($configRc !== 0) {

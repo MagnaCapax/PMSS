@@ -97,8 +97,7 @@ function pmssCgroupPolicyIoPairSpecs(bool $includeWeight = true): array
 /** Read one positive policy value, preserving skip-on-invalid behavior. */
 function pmssCgroupPolicyPositiveValue(array $source, string $key, bool $numeric): ?string
 {
-    if (!isset($source[$key])) return null;
-    if (!is_scalar($source[$key])) return null;
+    if (!is_scalar($source[$key] ?? null)) return null;
     if ($numeric) return is_numeric($source[$key]) && (int) $source[$key] > 0 ? (string) (int) $source[$key] : null;
     $value = trim((string) $source[$key]);
     return $value === '' ? null : $value;
