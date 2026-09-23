@@ -91,7 +91,7 @@ class rtorrentConfig
             }
             @chmod($file, 0644);
         }
-        return is_writable($file) && @file_put_contents($file, $config) !== false;
+        return is_writable($file) && @file_put_contents($file, $config) === strlen($config);
     }
     /**
      * Rewrite a user's configuration only when the contents differ.

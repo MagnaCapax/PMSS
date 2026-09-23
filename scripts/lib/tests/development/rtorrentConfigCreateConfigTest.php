@@ -220,6 +220,23 @@ class rtorrentConfigCreateConfigTest extends TestCase
         $this->assertFalse(file_exists($target.'/.rtorrent.rc'));
     }
 
+    public function testWriteConfigReportsOnlyCompleteWritesAsSuccess(): void
+    {
+        $expected = [
+            'false' => [false, "prior\n"],
+            'zero' => [false, "prior\n"],
+            'short' => [false, "complete"],
+            'over' => [false, "complete\n"],
+            'complete' => [true, "complete\n"],
+        ];
+
+        foreach ($expected as $mode => $case) {
+            $result = $this->writeConfigWithResultMode($mode);
+            $this->assertSame($case[0], $result['result']);
+            $this->assertSame(base64_encode($case[1]), $result['content']);
+        }
+    }
+
     public function testPortReservationRejectsUnsafeTypeBeforeFilesystemTouch(): void
     {
         $portRoot = $this->pmssMakeTempPath('pmss-rtorrent-ports-');
@@ -232,6 +249,38 @@ class rtorrentConfigCreateConfigTest extends TestCase
         }
 
         $this->assertFalse(file_exists($portRoot), 'unsafe types must not create reservation directories');
+    }
+
+    /** Run writeConfig() behind a namespaced file_put_contents() fault shim. */
+    private function writeConfigWithResultMode(string $mode): array
+    {
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-rtorrent-write-');
+        $home = $this->pmssUserHomePath($homeRoot, 'dummy');
+        $this->pmssEnsureDir($home);
+        $path = $home.'/.rtorrent.rc';
+        $this->pmssWriteFile($path, "prior\n");
+
+        $script = <<<'PHP'
+namespace RtorrentConfigWriteFixture;
+function file_put_contents($path, $data, $flags = 0) {
+    $mode = getenv('PMSS_TEST_WRITE_MODE');
+    if ($mode === 'false') return false;
+    if ($mode === 'zero') return 0;
+    $written = \file_put_contents($path, $mode === 'short' ? substr($data, 0, -1) : $data, $flags);
+    return $mode === 'over' ? strlen($data) + 1 : $written;
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrentConfig.php', 'RtorrentConfigWriteFixture');
+        $script .= <<<'PHP'
+$config = new rtorrentConfig(['ramBlock' => 250], 'template');
+$result = $config->writeConfig('dummy', "complete\n");
+$path = rtrim(getenv('PMSS_HOME_DIR'), '/').'/dummy/.rtorrent.rc';
+echo json_encode(['result' => $result, 'content' => base64_encode((string) \file_get_contents($path))]);
+PHP;
+        return $this->pmssRunInlinePhpJson($script, [
+            'PMSS_HOME_DIR' => $homeRoot,
+            'PMSS_TEST_WRITE_MODE' => $mode,
+        ]);
     }
 
     public function testPortReservationRejectsInvalidRangesBeforeFilesystemTouch(): void

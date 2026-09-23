@@ -609,7 +609,7 @@ Class `rtorrentConfig`
   - Errors: throws on missing `'ram'` or invalid input.
 
 - writeConfig(string $user, string $config): bool
-  - Writes `/home/<user>/.rtorrent.rc` (touches 0644 when missing); returns true on success.
+  - Writes `/home/<user>/.rtorrent.rc` (touches 0644 when missing); returns true only when the complete configuration payload is written.
 
 - idempotentConfig(string $user, string $config): ?bool
   - Reads current file and compares; writes only when content differs; returns write result or null when identical.
