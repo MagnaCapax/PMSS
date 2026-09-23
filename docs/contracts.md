@@ -719,6 +719,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/cron/checkRtorrent.php
   - Behavior: Keeps per-user rTorrent/executor processes healthy and recovers missing `.rtorrent.rc` files from canonical templates when enough user config data exists.
+  - Session recovery reports success only after the recreated `~/session` directory has customer ownership and, when POSIX account lookup is available, the customer's primary group. Ownership failures are logged and leave the directory for a later repair attempt without writing the session-reset marker.
   - Side-effects: Publishes `/root/changedConfigs` when a user's `.rtorrent.rc` is not owned by root; clears the stale report when no drift remains; write/remove failures are logged instead of hidden.
 
 - scripts/util/createNginxConfig.php

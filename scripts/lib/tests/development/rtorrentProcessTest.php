@@ -14,6 +14,13 @@ class RtorrentProcessTest extends TestCase
 {
     protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-rtorrent-process-']; }
 
+    private function sessionResetTestUser(): string
+    {
+        $user = $this->pmssCurrentOwner();
+        if ($user === '') throw new SkipTest('POSIX account lookup unavailable');
+        return $user;
+    }
+
     /**
      * Test stale state: first detection records timestamp.
      */
@@ -360,11 +367,12 @@ class RtorrentProcessTest extends TestCase
 
     public function testResetSessionDirectoryQuarantinesAndRecreatesDirectory(): void
     {
-        $home = $this->tempDir.'/alice';
+        $user = $this->sessionResetTestUser();
+        $home = $this->tempDir.'/'.$user;
         $sessionDir = $this->pmssEnsureDir($home.'/session');
         file_put_contents($sessionDir.'/resume.dat', 'state');
-        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home): bool {
-            return rtorrentProcessResetSessionDirectory($home, 'alice', $logger);
+        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home, $user): bool {
+            return rtorrentProcessResetSessionDirectory($home, $user, $logger);
         });
 
         $this->assertTrue($result, 'Session reset should succeed for a normal directory');
@@ -376,9 +384,10 @@ class RtorrentProcessTest extends TestCase
 
     public function testResetSessionDirectoryCreatesMissingDirectory(): void
     {
-        $home = $this->pmssEnsureDir($this->tempDir.'/alice');
+        $user = $this->sessionResetTestUser();
+        $home = $this->pmssEnsureDir($this->tempDir.'/'.$user);
 
-        $result = rtorrentProcessResetSessionDirectory($home, 'alice', function (): void {
+        $result = rtorrentProcessResetSessionDirectory($home, $user, function (): void {
         });
 
         $this->assertTrue($result, 'Missing session directory should be created');
@@ -401,12 +410,13 @@ class RtorrentProcessTest extends TestCase
             throw new SkipTest('symlink unavailable');
         }
 
-        $home = $this->tempDir.'/alice';
+        $user = $this->sessionResetTestUser();
+        $home = $this->tempDir.'/'.$user;
         $this->pmssEnsureDir($home);
         $this->pmssEnsureDir($this->tempDir.'/target');
         @symlink($this->tempDir.'/target', $home.'/session');
-        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home): bool {
-            return rtorrentProcessResetSessionDirectory($home, 'alice', $logger);
+        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home, $user): bool {
+            return rtorrentProcessResetSessionDirectory($home, $user, $logger);
         });
 
         $this->assertTrue(!$result, 'Symlinked session directory should be rejected');
@@ -419,15 +429,16 @@ class RtorrentProcessTest extends TestCase
             throw new SkipTest('symlink unavailable');
         }
 
-        $home = $this->tempDir.'/alice';
+        $user = $this->sessionResetTestUser();
+        $home = $this->tempDir.'/'.$user;
         $targetHome = dirname($this->pmssEnsureDir($this->tempDir.'/target-home/session'));
         file_put_contents($targetHome.'/session/resume.dat', 'state');
         if (@symlink($targetHome, $home) === false) {
             throw new SkipTest('symlink() failed');
         }
 
-        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home): bool {
-            return rtorrentProcessResetSessionDirectory($home, 'alice', $logger);
+        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home, $user): bool {
+            return rtorrentProcessResetSessionDirectory($home, $user, $logger);
         });
 
         $this->assertTrue(!$result, 'Symlinked user home should be rejected');
@@ -438,17 +449,32 @@ class RtorrentProcessTest extends TestCase
 
     public function testResetSessionDirectoryCanRunTwice(): void
     {
-        $home = $this->tempDir.'/alice';
+        $user = $this->sessionResetTestUser();
+        $home = $this->tempDir.'/'.$user;
         $sessionDir = $this->pmssEnsureDir($home.'/session');
 
-        $first = rtorrentProcessResetSessionDirectory($home, 'alice', function (): void {
+        $first = rtorrentProcessResetSessionDirectory($home, $user, function (): void {
         });
-        $second = rtorrentProcessResetSessionDirectory($home, 'alice', function (): void {
+        $second = rtorrentProcessResetSessionDirectory($home, $user, function (): void {
         });
 
         $this->assertTrue($first);
         $this->assertTrue($second);
         $this->assertTrue(is_dir($sessionDir));
         $this->assertTrue(count(glob($home.'/session.broken-*')) >= 1, 'At least one quarantine directory should exist');
+    }
+
+    public function testResetSessionDirectoryReportsOwnershipFailure(): void
+    {
+        $user = 'pmss-missing-account-'.getmypid();
+        $home = $this->pmssEnsureDir($this->tempDir.'/'.$user);
+
+        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home, $user): bool {
+            return rtorrentProcessResetSessionDirectory($home, $user, $logger);
+        });
+
+        $this->assertFalse($result, 'Ownership failure must not report a completed reset');
+        $this->assertTrue(is_dir($home.'/session'), 'The recreated directory remains available for later repair');
+        $this->pmssAssertMessagesContain($messages, 'Failed to restore session directory owner');
     }
 }
