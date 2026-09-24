@@ -80,31 +80,28 @@ function pmssIoCeilingRefresh(
         && pmssAtomicJsonFileWrite($statePath, $result, 0644);
 }
 
-/** Return true only when a published cache still satisfies its own sample gates. */
-function pmssIoCeilingPublishedStateSatisfiesGuards(array $state): bool
+/** Read the persisted published host read-IOPS ceiling, failing closed on thin caches. */
+function pmssIoCeilingPublishedReadIops(string $statePath = PMSS_IO_CEILING_STATE_PATH_DEFAULT): ?float
 {
+    $state = pmssJsonFileReadAssoc($statePath, true);
+    if (!is_array($state)) {
+        return null;
+    }
+
+    // A consumer must re-apply the sample gates stored with the publication.
     $minDays = is_int($state['min_days'] ?? null) ? $state['min_days'] : 0;
     $minSamples = is_int($state['min_samples_per_day'] ?? null) ? $state['min_samples_per_day'] : 0;
     $days = $state['days'] ?? null;
     if ($minDays <= 0 || $minSamples <= 0 || !is_array($days)) {
-        return false;
+        return null;
     }
-
     $qualified = 0;
     foreach ($days as $day) {
         if (is_array($day) && is_int($day['samples'] ?? null) && $day['samples'] >= $minSamples) {
             $qualified++;
         }
     }
-
-    return $qualified >= $minDays;
-}
-
-/** Read the persisted published host read-IOPS ceiling, failing closed on thin caches. */
-function pmssIoCeilingPublishedReadIops(string $statePath = PMSS_IO_CEILING_STATE_PATH_DEFAULT): ?float
-{
-    $state = pmssJsonFileReadAssoc($statePath, true);
-    if (!is_array($state) || !pmssIoCeilingPublishedStateSatisfiesGuards($state)) {
+    if ($qualified < $minDays) {
         return null;
     }
 

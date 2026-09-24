@@ -89,29 +89,6 @@ function rtorrentProcessWriteEscalationState(string $stateFile, string $user, in
 }
 
 /**
- * Read the escalation timestamp from either the JSON marker or a legacy scalar.
- */
-function rtorrentProcessEscalationTimestamp(string $stateFile): int
-{
-    if (!rtorrentProcessStateFilePathIsSafe($stateFile) || !is_file($stateFile)) {
-        return 0;
-    }
-
-    $payload = @file_get_contents($stateFile);
-    $trimmed = is_string($payload) ? trim($payload) : '';
-    if ($trimmed === '') {
-        return 0;
-    }
-
-    $decoded = json_decode($payload, true);
-    if (is_array($decoded) && is_numeric($decoded['timestamp'] ?? null)) {
-        return max(0, (int) $decoded['timestamp']);
-    }
-
-    return is_numeric($trimmed) ? max(0, (int) $trimmed) : 0;
-}
-
-/**
  * Decide whether an escalated account is due for one bounded recovery start.
  *
  * @return array{action:string,age:int}
@@ -122,7 +99,17 @@ function rtorrentProcessEscalationRetryState(string $stateFile, int $retryInterv
         return ['action' => 'wait', 'age' => 0];
     }
 
-    $timestamp = rtorrentProcessEscalationTimestamp($stateFile);
+    // Accept the current JSON marker and the legacy scalar timestamp format.
+    $payload = rtorrentProcessStateFilePathIsSafe($stateFile) && is_file($stateFile)
+        ? @file_get_contents($stateFile)
+        : false;
+    $trimmed = is_string($payload) ? trim($payload) : '';
+    $decoded = $trimmed !== '' ? json_decode($payload, true) : null;
+    if (is_array($decoded) && is_numeric($decoded['timestamp'] ?? null)) {
+        $timestamp = max(0, (int) $decoded['timestamp']);
+    } else {
+        $timestamp = is_numeric($trimmed) ? max(0, (int) $trimmed) : 0;
+    }
     if ($timestamp <= 0) {
         return ['action' => 'record', 'age' => 0];
     }

@@ -139,16 +139,10 @@ function pmssJsonLineAppend(string $path, array $payload): bool
         && @file_put_contents($path, $encoded.PHP_EOL, FILE_APPEND | LOCK_EX) === strlen($encoded.PHP_EOL);
 }
 
-/** Validate a JSON Lines read target before streaming structured log data. */
-function pmssJsonLineReadPathIsSafe(string $path): bool
-{
-    return pmssLogWritePathIsSafe($path) && pmssRegularFilePathIsReadable($path);
-}
-
 /** Stream decodable JSON Lines entries to a caller-owned handler. */
 function pmssJsonLineFileEach(string $path, callable $handler): bool
 {
-    if (!pmssJsonLineReadPathIsSafe($path)) {
+    if (!pmssLogWritePathIsSafe($path) || !pmssRegularFilePathIsReadable($path)) {
         return false;
     }
 

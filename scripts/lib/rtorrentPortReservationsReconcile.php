@@ -20,43 +20,6 @@ function pmssRtorrentPortReservationsReferenceMerge(array &$references, array $s
     }
 }
 
-/** Return the first type whose ownership cannot be determined safely. */
-function pmssRtorrentPortReservationsUncertainType(array $stored, array $configured): string
-{
-    foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
-        if (!empty($stored['uncertain'][$type])) {
-            return $type;
-        }
-        $known = isset($stored['ports'][$type]);
-        if (!$known && !empty($configured['uncertain'][$type])) {
-            return $type;
-        }
-    }
-    return '';
-}
-
-/** Validate expected directories and collect their entries before deleting. */
-function pmssRtorrentPortReservationsMarkerEntries(string $base): ?array
-{
-    $entries = array();
-    foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
-        $directory = $base.'/'.$type;
-        if (!file_exists($directory) && !is_link($directory)) {
-            $entries[$type] = array();
-            continue;
-        }
-        if (!is_dir($directory) || is_link($directory) || !pmssPathTargetIsSafe($directory, true)) {
-            return null;
-        }
-        $listed = pmssDirectoryEntriesRead($directory);
-        if (!is_array($listed)) {
-            return null;
-        }
-        $entries[$type] = array_values($listed);
-    }
-    return $entries;
-}
-
 /**
  * Remove old markers absent from every readable live-user ownership source.
  *
@@ -94,16 +57,37 @@ function pmssRtorrentPortReservationsReconcile(
             }
             $stored = pmssRtorrentPortReservationStoredSource($user, $configRoot);
             $configured = pmssRtorrentPortReservationConfigSource(rtrim($homeRoot, '/').'/'.$user.'/.rtorrent.rc');
-            if (($uncertainType = pmssRtorrentPortReservationsUncertainType($stored, $configured)) !== '') {
+            $uncertainType = '';
+            foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
+                if (!empty($stored['uncertain'][$type])
+                    || (!isset($stored['ports'][$type]) && !empty($configured['uncertain'][$type]))) {
+                    $uncertainType = $type;
+                    break;
+                }
+            }
+            if ($uncertainType !== '') {
                 return array_replace($result, array('status' => 'skipped', 'reason' => 'uncertain_'.$uncertainType.'_ownership'));
             }
             pmssRtorrentPortReservationsReferenceMerge($references, $stored);
             pmssRtorrentPortReservationsReferenceMerge($references, $configured);
         }
 
-        $entries = pmssRtorrentPortReservationsMarkerEntries($portsBase);
-        if ($entries === null) {
-            return array_replace($result, array('status' => 'skipped', 'reason' => 'unsafe_marker_directory'));
+        // Validate every marker directory before removing from any of them.
+        $entries = array();
+        foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
+            $directory = $portsBase.'/'.$type;
+            if (!file_exists($directory) && !is_link($directory)) {
+                $entries[$type] = array();
+                continue;
+            }
+            if (!is_dir($directory) || is_link($directory) || !pmssPathTargetIsSafe($directory, true)) {
+                return array_replace($result, array('status' => 'skipped', 'reason' => 'unsafe_marker_directory'));
+            }
+            $listed = pmssDirectoryEntriesRead($directory);
+            if (!is_array($listed)) {
+                return array_replace($result, array('status' => 'skipped', 'reason' => 'unsafe_marker_directory'));
+            }
+            $entries[$type] = array_values($listed);
         }
         $now = $now ?? time();
         $graceSeconds = max(0, $graceSeconds);
