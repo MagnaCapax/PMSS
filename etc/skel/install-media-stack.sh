@@ -1538,7 +1538,7 @@ servarr_credentials_mark_existing_unknown() {
 servarr_auth_payload_write() {
 	local source_json="$1" target_json="$2" password="$3"
 	# shellcheck disable=SC2016
-	MEDIA_STACK_AUTH_USERNAME="$MEDIA_STACK_AUTH_USERNAME" MEDIA_STACK_AUTH_PASSWORD="$password" php -r '$input = stream_get_contents(STDIN); $data = json_decode($input, true); if (!is_array($data)) { fwrite(STDERR, "Invalid Servarr host-config JSON\n"); exit(1); } $data["id"] = isset($data["id"]) ? $data["id"] : 1; $data["authenticationMethod"] = "forms"; $data["authenticationRequired"] = "enabled"; $data["username"] = getenv("MEDIA_STACK_AUTH_USERNAME"); $data["password"] = getenv("MEDIA_STACK_AUTH_PASSWORD"); $data["passwordConfirmation"] = getenv("MEDIA_STACK_AUTH_PASSWORD"); echo json_encode($data, JSON_UNESCAPED_SLASHES);' <"$source_json" >"$target_json"
+	MEDIA_STACK_AUTH_USERNAME="$MEDIA_STACK_AUTH_USERNAME" MEDIA_STACK_AUTH_PASSWORD="$password" php -r '$input = stream_get_contents(STDIN); $data = json_decode($input, true); if (!is_array($data)) { fwrite(STDERR, "Invalid Servarr host-config JSON\n"); exit(1); } $data["id"] = isset($data["id"]) ? $data["id"] : 1; $data["authenticationMethod"] = "forms"; $data["authenticationRequired"] = "enabled"; $data["username"] = getenv("MEDIA_STACK_AUTH_USERNAME"); $data["password"] = getenv("MEDIA_STACK_AUTH_PASSWORD"); $data["passwordConfirmation"] = getenv("MEDIA_STACK_AUTH_PASSWORD"); if (isset($data["updateMechanism"]) && $data["updateMechanism"] === "script" && (!isset($data["updateScriptPath"]) || $data["updateScriptPath"] === "")) { $data["updateMechanism"] = "builtIn"; } echo json_encode($data, JSON_UNESCAPED_SLASHES);' <"$source_json" >"$target_json"
 }
 
 servarr_auth_seed() {
