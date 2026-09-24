@@ -452,11 +452,33 @@ if ($action === 'start' || $action === 'restart') {
     $dockerPids = userDockerCollectPids($user, $debug, $startCheckOk);
     if (!empty($dockerPids)) {
         sort($dockerPids);
-        if ($debug) {
-            pmssUserLog($user, 'userDocker: dockerd already running; skipping start (pids: '.implode(', ', $dockerPids).')');
+        // #872: a daemon left running across a docker/containerd package upgrade
+        // keeps executing the old binary; process existence alone reports it
+        // "healthy" while every container operation fails (unsupported protocol,
+        // TTRPC errors). When the running server version provably differs from
+        // the installed dockerd binary, restart to clear the drift; otherwise
+        // keep the existing skip. The probe fails safe and is timeout-guarded.
+        if (userDockerServerBinaryVersionDrift($user, $runtimeDir, $userDockerStartTimeoutSec, $debug)) {
+            foreach ($dockerStopCmd as $dockerStopCommand) {
+                userDockerRunAs($user, $dockerStopCommand);
+            }
+            usleep(3000000);
+            $driftResidualOk = true;
+            $residualPids = userDockerCollectPids($user, $debug, $driftResidualOk);
+            if (!$driftResidualOk || !empty($residualPids)) {
+                pmssUserLog($user, 'userDocker: daemon still present after version-drift stop; skipping start to avoid dual managers');
+                echo "Docker version-drift stop incomplete for {$user}; skipping start\n";
+                exit(0);
+            }
+            pmssUserLog($user, 'userDocker: stopped stale daemon; starting current dockerd to clear version drift');
+            // fall through to the start path below.
+        } else {
+            if ($debug) {
+                pmssUserLog($user, 'userDocker: dockerd already running; skipping start (pids: '.implode(', ', $dockerPids).')');
+            }
+            echo "Docker already running for {$user} (pid(s): ".implode(', ', $dockerPids)."); skipping start\n";
+            exit(0);
         }
-        echo "Docker already running for {$user} (pid(s): ".implode(', ', $dockerPids)."); skipping start\n";
-        exit(0);
     }
     $socketPresent = file_exists($dockerSock);
     if (!$startCheckOk && $socketPresent) {
@@ -483,3 +505,49 @@ if ($action === 'start' || $action === 'restart') {
 }
 
 // Should not be reached.
+
+
+/**
+ * Extract the first dotted semver (X.Y.Z) from a version string, or '' if none.
+ */
+function userDockerParseVersion(string $raw): string
+{
+    return preg_match('/[0-9]+[.][0-9]+[.][0-9]+/', $raw, $m) === 1 ? $m[0] : '';
+}
+
+/**
+ * True when the running rootless daemon's server version provably differs from
+ * the installed dockerd binary - i.e. the daemon is running a stale binary
+ * after a package upgrade (GH #872). Fails safe: any inconclusive probe returns
+ * false so a healthy daemon is never needlessly restarted, and the watchdog
+ * never hangs (the server probe runs as the user under a hard timeout).
+ */
+function userDockerServerBinaryVersionDrift(string $user, string $runtimeDir, ?int $timeoutSeconds, bool $debug = false): bool
+{
+    $binaryVersion = userDockerParseVersion((string) @shell_exec('dockerd --version 2>/dev/null'));
+    if ($binaryVersion === '') {
+        return false; // cannot read installed binary version; do not restart
+    }
+
+    $probeTimeout = ($timeoutSeconds !== null && $timeoutSeconds > 0) ? min(15, $timeoutSeconds) : 15;
+    $rc = 0;
+    $serverRaw = userDockerRunAs(
+        $user,
+        sprintf('XDG_RUNTIME_DIR=%s docker version --format "{{.Server.Version}}" 2>/dev/null', escapeshellarg($runtimeDir)),
+        $probeTimeout,
+        $rc
+    );
+    $serverVersion = userDockerParseVersion($serverRaw);
+    if ($rc !== 0 || $serverVersion === '') {
+        if ($debug) {
+            pmssUserLog($user, sprintf('userDocker: version-drift probe inconclusive (binary=%s server=%s rc=%d); not restarting', $binaryVersion, $serverVersion !== '' ? $serverVersion : '?', $rc));
+        }
+        return false;
+    }
+
+    if ($serverVersion !== $binaryVersion) {
+        pmssUserLog($user, sprintf('userDocker: version drift detected - running server %s, installed dockerd %s; will restart', $serverVersion, $binaryVersion));
+        return true;
+    }
+    return false;
+}
