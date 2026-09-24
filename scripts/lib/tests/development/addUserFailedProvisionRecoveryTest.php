@@ -41,6 +41,12 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
         });
     }
 
+    public function testProvisionSummaryRecoverableRejectsFutureFailures(): void
+    {
+        $summary = array('status' => 'FAIL', 'timestamp' => 501);
+        $this->assertFalse(pmssAddUserProvisionSummaryRecoverable($summary, 500));
+    }
+
     public function testFailedProvisionCanRecoverRequiresInactiveServices(): void
     {
         $summary = array('status' => 'FAIL', 'timestamp' => 1000);
@@ -106,6 +112,26 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
             $source
         );
         $this->assertStringContainsAllStrings(['/scripts/util/portManager.php release', 'userdel -r', "'/etc/seedbox/runtime/trafficLimits/'.\$userName", 'pmssAddUserCleanupFailedProvisionTargetValid($userName, $homePath)', "'pmssPathTargetIsSafe'"], $source);
+    }
+
+    public function testCleanupStepFailureRunsRemainingStepsAndFailsClosed(): void
+    {
+        $calls = array();
+        $steps = array(
+            array('first', 'command-one'),
+            array('second', 'command-two'),
+            array('third', 'command-three'),
+        );
+        $runner = static function (string $description, string $command) use (&$calls): int {
+            $calls[] = array($description, $command);
+            return $description === 'second' ? 9 : 0;
+        };
+
+        $this->assertFalse(pmssAddUserCleanupStepsRun($steps, $runner));
+        $this->assertSame($steps, $calls);
+        $this->assertTrue(pmssAddUserCleanupStepsRun($steps, static function (): int {
+            return 0;
+        }));
     }
 
     public function testFailureRollbackRunsOnlyForEarlyFailAfterUserCreation(): void

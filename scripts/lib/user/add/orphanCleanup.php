@@ -67,11 +67,11 @@ function pmssAddUserLatestProvisionSummary(string $userName): ?array
 function pmssAddUserProvisionSummaryRecoverable(?array $summary, ?int $now = null): bool
 {
     $timestamp = (int) ($summary['timestamp'] ?? 0);
-    if (!is_array($summary) || ($summary['status'] ?? '') !== 'FAIL' || $timestamp <= 0) {
+    $now = $now ?? time();
+    if (!is_array($summary) || ($summary['status'] ?? '') !== 'FAIL' || $timestamp <= 0 || $timestamp > $now) {
         return false;
     }
 
-    $now = $now ?? time();
     $window = (int) (getenv('PMSS_ADDUSER_RECOVERY_WINDOW_SECONDS') ?: 3600);
     if ($window < 60) {
         $window = 60;
@@ -104,6 +104,24 @@ function pmssAddUserFailedProvisionCanRecover(string $userName, ?array $summary 
 }
 
 /**
+ * Run every cleanup step while retaining whether any command failed.
+ *
+ * @param array<int,array{0:string,1:string}> $cleanupSteps
+ */
+function pmssAddUserCleanupStepsRun(array $cleanupSteps, ?callable $runner = null): bool
+{
+    $runner = $runner ?? 'runProvisionStep';
+    $succeeded = true;
+    foreach ($cleanupSteps as $step) {
+        if ($runner($step[0], $step[1]) !== 0) {
+            $succeeded = false;
+        }
+    }
+
+    return $succeeded;
+}
+
+/**
  * Remove stale resources from a known failed provisioning run.
  */
 function pmssAddUserCleanupFailedProvision(users $userDb, string $userName, string $homePath): bool
@@ -126,11 +144,9 @@ function pmssAddUserCleanupFailedProvision(users $userDb, string $userName, stri
         array('Cleanup addUser lock files', 'rm -f -- '.escapeshellarg('/run/lock/pmss-addUser-'.$userName.'.lock').' '.escapeshellarg('/tmp/pmss-addUser-'.$userName.'.lock')),
     );
 
-    foreach ($cleanupSteps as $step) {
-        runProvisionStep($step[0], $step[1]);
-    }
+    $stepsSucceeded = pmssAddUserCleanupStepsRun($cleanupSteps);
 
-    if (pmssUserAccountLookup($userName) !== null || is_dir($homePath)) {
+    if (!$stepsSucceeded || pmssUserAccountLookup($userName) !== null || is_dir($homePath)) {
         return false;
     }
 
