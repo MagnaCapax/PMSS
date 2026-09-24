@@ -88,12 +88,10 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
     public function testCleanupTargetValidationRejectsUnsafePathState(): void
     {
         $checkedPath = null;
-        $checker = static function (string $homePath, bool $directoryTarget, bool $requireParentDirectory, bool $allowEmptySegments) use (&$checkedPath): bool {
+        $this->assertFalse(pmssAddUserCleanupFailedProvisionTargetValid('alice', '/home/alice', static function (string $homePath, bool $directoryTarget, bool $requireParentDirectory, bool $allowEmptySegments) use (&$checkedPath): bool {
             $checkedPath = array($homePath, $directoryTarget, $requireParentDirectory, $allowEmptySegments);
             return false;
-        };
-
-        $this->assertFalse(pmssAddUserCleanupFailedProvisionTargetValid('alice', '/home/alice', $checker));
+        }));
         $this->assertSame(array('/home/alice', true, false, false), $checkedPath);
     }
 
@@ -122,12 +120,10 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
             array('second', 'command-two'),
             array('third', 'command-three'),
         );
-        $runner = static function (string $description, string $command) use (&$calls): int {
+        $this->assertFalse(pmssAddUserCleanupStepsRun($steps, static function (string $description, string $command) use (&$calls): int {
             $calls[] = array($description, $command);
             return $description === 'second' ? 9 : 0;
-        };
-
-        $this->assertFalse(pmssAddUserCleanupStepsRun($steps, $runner));
+        }));
         $this->assertSame($steps, $calls);
         $this->assertTrue(pmssAddUserCleanupStepsRun($steps, static function (): int {
             return 0;
@@ -170,11 +166,8 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
 
     public function testProvisioningPhasesMarkRollbackBoundaries(): void
     {
-        $systemUserCreate = $this->pmssReadRepoFile('scripts/lib/user/add/systemUserCreate.php');
-        $userConfigApply = $this->pmssReadRepoFile('scripts/lib/user/add/userConfigApply.php');
-
-        $this->assertStringContainsString('pmssAddUserFailureRollbackMarkSystemUserCreated();', $systemUserCreate);
-        $this->assertStringContainsString('pmssAddUserFailureRollbackMarkUserConfigApplied();', $userConfigApply);
+        $this->assertStringContainsString('pmssAddUserFailureRollbackMarkSystemUserCreated();', $this->pmssReadRepoFile('scripts/lib/user/add/systemUserCreate.php'));
+        $this->assertStringContainsString('pmssAddUserFailureRollbackMarkUserConfigApplied();', $this->pmssReadRepoFile('scripts/lib/user/add/userConfigApply.php'));
     }
 
     public function testSystemUserCreateConvergesCredentialDirectoryBeforePasswordSync(): void

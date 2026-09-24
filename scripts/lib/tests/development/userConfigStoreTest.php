@@ -49,11 +49,6 @@ class UserConfigStoreTest extends TestCase
         ];
     }
 
-    private function reloadBasePayload(string $username, array $overrides = []): array
-    {
-        return $this->persistAndReload($username, $this->basePayload($overrides));
-    }
-
     private function persistAndReload(string $username, array $payload): array
     {
         $store = $this->newStore();
@@ -162,7 +157,7 @@ class UserConfigStoreTest extends TestCase
             ['ltpoff', ['ramMiB' => 512, 'rtorrentPort' => 5013, 'lighttpdEnabled' => 'false'], ['lighttpdEnabled' => false]],
             ['dcklow', ['ramMiB' => 244, 'rtorrentPort' => 5006, 'dockerEnabled' => true], ['dockerEnabled' => false]],
         ] as $case) {
-            $reloaded = $this->reloadBasePayload($case[0], $case[1]);
+            $reloaded = $this->persistAndReload($case[0], $this->basePayload($case[1]));
             foreach ($case[2] as $key => $expected) {
                 $this->assertEquals($expected, $reloaded[$key], $case[0].' '.$key);
             }

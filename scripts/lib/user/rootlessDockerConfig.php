@@ -83,10 +83,9 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
         'reason' => '', 'path' => $configFile,
     ];
 
-    $logger = static function (string $message) use ($user): void {
+    if (!pmssEnsureUserHomeDir($user, $home, '.config/docker', 0700, static function (string $message) use ($user): void {
         pmssUserLog($user, $message);
-    };
-    if (!pmssEnsureUserHomeDir($user, $home, '.config/docker', 0700, $logger, 0700)) {
+    }, 0700)) {
         $result['reason'] = 'ensure_dir_failed';
         return $result;
     }
