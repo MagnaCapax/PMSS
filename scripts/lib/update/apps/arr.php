@@ -30,13 +30,10 @@ function pmssArrIsSafeConfigValue(string $value): bool
 function pmssArrInstallPathIsSafe(string $path): bool
 {
     require_once dirname(__DIR__, 2).'/pathSafety.php';
-    if (!pmssPathAbsoluteStringIsSafe($path)) {
-        return false;
-    }
-
     // The updater replaces this directory with rm+mv; never allow top-level
     // targets such as /opt, /home, or /tmp to pass config validation.
-    if (count(explode('/', trim($path, '/'))) < 2) {
+    if (!pmssPathAbsoluteStringIsSafe($path)
+        || count(explode('/', trim($path, '/'))) < 2) {
         return false;
     }
 
@@ -97,7 +94,7 @@ function pmssArrVersionExtract(string $payload): ?string
  * version, which is idempotent and self-healing (it also writes version.txt, so a
  * host pays this at most once).
  */
-function pmssArrInstalledVersionRead(string $installPath, string $app): ?string
+function pmssArrInstalledVersionRead(string $installPath): ?string
 {
     if (!function_exists('pmssReadRegularFileContents')) {
         require_once dirname(__DIR__, 2).'/runtime/filesystem.php';
@@ -250,7 +247,7 @@ function pmssArrUpdate(array $config): void
 
     $installPath = $config['install_path'];
 
-    $currentVersion = pmssArrInstalledVersionRead($installPath, $app);
+    $currentVersion = pmssArrInstalledVersionRead($installPath);
     if ($currentVersion === $latestVersion && is_dir($installPath)) {
         $log("Already at {$latestVersion}, skipping update");
         return;

@@ -319,8 +319,8 @@ function pmssStopDisableMaskSeedboxSystemServices(): void
 function pmssPurgeFailedUnbound(): void
 {
     // Skip if systemd is not available (containers, very old systems)
-    if (pmssSystemdActionSkip(pmssSystemdActionSkipReason(), 'Checking unbound service status')) return;
-    if (pmssSystemdUnitState('is-active', 'unbound') !== 'failed') {
+    if (pmssSystemdActionSkip(pmssSystemdActionSkipReason(), 'Checking unbound service status')
+        || pmssSystemdUnitState('is-active', 'unbound') !== 'failed') {
         return;
     }
 

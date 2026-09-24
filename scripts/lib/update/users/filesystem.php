@@ -151,11 +151,9 @@ function pmssUserRefreshPanelIndexForFrameDataCompat(array $ctx): void
 
     $sourceContent = @file_get_contents($sourceFile);
     $targetContent = pmssReadRegularFileContents($targetFile);
-    if (!is_string($sourceContent) || $targetContent === null) {
-        return;
-    }
-
-    if (!pmssUserPanelIndexNeedsFrameDataCompatRefresh($targetContent)
+    if (!is_string($sourceContent)
+        || $targetContent === null
+        || !pmssUserPanelIndexNeedsFrameDataCompatRefresh($targetContent)
         || strpos($sourceContent, '$frameData = array();') === false
         || strpos($sourceContent, 'function pmssFrameOpensInNewWindow(array $frame)') === false) {
         return;

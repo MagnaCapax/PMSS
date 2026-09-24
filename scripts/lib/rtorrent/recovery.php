@@ -33,11 +33,7 @@ function rtorrentProcessUserTargetPathIsSafe(
         || !is_dir($home)
         || is_link($home)
         || !pmssPathRelativeStringIsSafe($relativePath, ['allowControlChars' => true])
-    ) {
-        return false;
-    }
-
-    if ((!$testMode && $home !== '/home/'.$user)
+        || (!$testMode && $home !== '/home/'.$user)
         || ($testMode && $requireUserTailInTest && substr($home, -strlen('/'.$user)) !== '/'.$user)) {
         return false;
     }

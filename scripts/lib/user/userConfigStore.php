@@ -87,10 +87,8 @@ class UserConfigStore
 
     public function setSuspended(string $username, bool $suspended): bool
     {
-        if (($username = $this->validatedUsername($username)) === null) {
-            return false;
-        }
-        if (!is_array($payload = $this->get($username))) {
+        if (($username = $this->validatedUsername($username)) === null
+            || !is_array($payload = $this->get($username))) {
             return false;
         }
         $payload['suspended'] = $suspended;

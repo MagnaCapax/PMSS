@@ -87,10 +87,10 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
 function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, array $options = array()): void
 {
     $context = pmssConfigBackupsPrepareContext($service, $sourcePath, $options, false, '[WARN] Refusing config backup prune with invalid service name');
-    if ($context === null) {
-        return;
-    }
-    if (!is_dir($context['serviceDir']) || empty($files = glob($context['serviceDir'].'/*__'.$context['key'].'*.bak'))) {
+    if ($context === null
+        || !is_dir($context['serviceDir'])
+        || empty($files = glob($context['serviceDir'].'/*__'.$context['key'].'*.bak'))
+    ) {
         return;
     }
     $maxCount = (int) ($options['maxCount'] ?? 10);

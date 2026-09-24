@@ -53,12 +53,12 @@ class ArrInstallerNoExecPolicyTest extends TestCase
         // An executable that would daemonize if run must never be consulted.
         $binary = $installPath.'/Radarr';
         $this->pmssWriteExecutableFile($binary, "#!/usr/bin/env bash\ntouch ".escapeshellarg($installPath.'/EXECUTED')."\nprintf '9.9.9\\n'\n");
-        $this->assertTrue(\pmssArrInstalledVersionRead($installPath, 'Radarr') === null, 'no metadata means no version');
+        $this->assertTrue(\pmssArrInstalledVersionRead($installPath) === null, 'no metadata means no version');
         $this->assertFalse(is_file($installPath.'/EXECUTED'), 'version detection must not execute the installed binary');
 
         // Metadata is the only accepted source.
         @file_put_contents($installPath.'/version.txt', "6.2.0.10390\n");
-        $this->assertSame('6.2.0.10390', \pmssArrInstalledVersionRead($installPath, 'Radarr'));
+        $this->assertSame('6.2.0.10390', \pmssArrInstalledVersionRead($installPath));
     }
 
     public function testInstalledVersionReadRejectsSymlinkedVersionMarkers(): void
@@ -69,7 +69,7 @@ class ArrInstallerNoExecPolicyTest extends TestCase
         $this->pmssCreateSymlinkOrSkip($outside, $installPath.'/version.txt');
 
         $this->assertTrue(
-            \pmssArrInstalledVersionRead($installPath, 'Radarr') === null,
+            \pmssArrInstalledVersionRead($installPath) === null,
             'root must not follow a version marker symlink planted in a foreign-owned install tree'
         );
     }
@@ -129,7 +129,7 @@ class ArrInstallerNoExecPolicyTest extends TestCase
 
         $this->assertSame(
             $asset[0],
-            \pmssArrInstalledVersionRead($installPath, 'Radarr'),
+            \pmssArrInstalledVersionRead($installPath),
             'the persisted version must round-trip, otherwise every update reinstalls every app'
         );
     }
