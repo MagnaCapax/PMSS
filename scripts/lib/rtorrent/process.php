@@ -413,7 +413,7 @@ function rtorrentProcessStart(string $user, callable $logFn, ?string $startMarke
     $logFn("startRtorrent {$user} completed (rc={$rc})", true);
 
     $now = (string) time();
-    rtorrentProcessWriteStateFile('/tmp/.pmss-rtorrent-restart-'.$user, $now);
+    rtorrentProcessWriteStateFile(rtorrentProcessRestartMarkerPath($user), $now);
     if ($startMarkerState !== null && $startMarkerState !== '') rtorrentProcessWriteStateFile($startMarkerState, $now);
 
     return $rc;

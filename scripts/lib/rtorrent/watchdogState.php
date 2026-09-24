@@ -150,6 +150,17 @@ function rtorrentProcessWatchdogStatePaths(string $stateDir, string $user): arra
 }
 
 /**
+ * Recent-restart marker read by the unresponsive-grace logic.
+ *
+ * Kept with the other root-owned watchdog state (checkRtorrent ensures /run/pmss) rather
+ * than in a shared world-writable directory where any account could create it.
+ */
+function rtorrentProcessRestartMarkerPath(string $user): string
+{
+    return '/run/pmss/checkRtorrent-restart-'.$user.'.ts';
+}
+
+/**
  * Clear marker files whose underlying condition has resolved.
  */
 function rtorrentProcessClearResolvedWatchdogState(array $state, bool $rtorrentPresent, bool $executorPresent): void

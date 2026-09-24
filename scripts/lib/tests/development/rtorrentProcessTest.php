@@ -316,6 +316,13 @@ class RtorrentProcessTest extends TestCase
         $this->pmssAssertStringNotContainsString('killall', $watchdogSource);
     }
 
+    public function testRestartMarkerLivesWithRootOwnedWatchdogState(): void
+    {
+        $path = \rtorrentProcessRestartMarkerPath('alice');
+        $this->assertSame('/run/pmss/checkRtorrent-restart-alice.ts', $path);
+        $this->pmssAssertStringNotContainsString('/tmp/', $path);
+    }
+
     public function testProcessStartOwnsLaunchCommandAndRestartMarkers(): void
     {
         $processSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/process.php');
@@ -326,7 +333,7 @@ class RtorrentProcessTest extends TestCase
             'function rtorrentProcessStart(',
             'Refusing to start rTorrent for invalid username',
             'Refusing to restart rTorrent for invalid username',
-            "'/tmp/.pmss-rtorrent-restart-'.\$user",
+            'rtorrentProcessWriteStateFile(rtorrentProcessRestartMarkerPath($user), $now);',
             'rtorrentProcessWriteStateFile($startMarkerState, $now)',
             '$rc = rtorrentProcessStart($user, $logFn);',
         ], $processSource);

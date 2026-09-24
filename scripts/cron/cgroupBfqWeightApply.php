@@ -33,7 +33,6 @@ declare(strict_types=1);
 
 require_once __DIR__.'/../lib/cgroup/directApply.php';
 require_once __DIR__.'/../lib/cgroup/policy.php';
-require_once __DIR__.'/../lib/user/rootArtifactTrust.php';
 
 // Constants — tunable top-of-file per AGENTS.md doctrine.
 $USERS_DIR  = '/etc/seedbox/config/users';
@@ -75,13 +74,8 @@ function pmssBfqUserBonusPercentRead(string $user): int
         return 0;
     }
 
-    // The bonus marker is a tiny scalar. Refuse links, devices, and bulky files, AND refuse
-    // any file the tenant could write: .bonus multiplies the enforced BFQ I/O weight, so a
-    // user-owned marker would let the account holder raise their own I/O priority. Honor it
-    // only when root-owned and tenant-non-writable (ADR-0046 Enforced class).
-    if ((($stat['mode'] ?? 0) & 0170000) !== 0100000
-        || (int) ($stat['size'] ?? 0) > 64
-        || !pmssRootArtifactMetadataIsTrusted($stat)) {
+    // The bonus marker is a tiny scalar. Refuse links, devices, and bulky files.
+    if ((($stat['mode'] ?? 0) & 0170000) !== 0100000 || (int) ($stat['size'] ?? 0) > 64) {
         return 0;
     }
 

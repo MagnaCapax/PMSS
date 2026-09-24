@@ -164,7 +164,7 @@ function pmssCheckRtorrentHandleAliveProcess(
         return;
     }
 
-    $restartMarker = '/tmp/.pmss-rtorrent-restart-'.$user;
+    $restartMarker = rtorrentProcessRestartMarkerPath($user);
     $graceState = rtorrentProcessUnresponsiveGraceState($restartMarker, $unresponsiveGrace);
     $restartAge = $graceState['restartAge'];
     $effectiveGrace = $graceState['grace'];
