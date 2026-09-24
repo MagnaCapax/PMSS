@@ -305,6 +305,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Respects operator-owned keys from `/etc/sysctl.d/90-pmss-overrides.conf` and records the applied profile under the `sysctl` section in `/etc/seedbox/config/hardware.json`.
   - When `$reload=true`, runs `sysctl --system` to apply the baseline.
 
+- pmssEnsureSystemdDbusDisclosureHardening(?callable $logger=null): void
+  - Converges four ordered PMSS-owned artifacts from one registry: systemd1 and login1 D-Bus restrictions plus tmpfiles policies for `/run/systemd/users` and `/run/systemd/sessions`.
+  - Preserves the method-level systemd1 deny-list, destination-wide login1 deny with self-PID exceptions, and mode `0750` runtime-directory policies.
+  - Each artifact remains independently fail-soft; changed D-Bus policy reloads `dbus`, while changed tmpfiles policy is applied immediately outside test mode.
+
 ---
 
 ## Distro Detection
