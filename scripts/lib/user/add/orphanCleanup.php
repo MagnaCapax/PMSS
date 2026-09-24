@@ -141,7 +141,7 @@ function pmssAddUserCleanupFailedProvision(users $userDb, string $userName, stri
         array('Delete leftover home directory', 'rm -rf -- '.escapeshellarg($homePath)),
         array('Delete user group', 'groupdel '.escapeshellarg($userName).' || true'),
         array('Remove screen socket', 'rm -rf -- '.escapeshellarg('/var/run/screen/S-'.$userName)),
-        array('Cleanup addUser lock files', 'rm -f -- '.escapeshellarg('/run/lock/pmss-addUser-'.$userName.'.lock').' '.escapeshellarg('/tmp/pmss-addUser-'.$userName.'.lock')),
+        array('Cleanup addUser lock files', 'rm -f -- '.escapeshellarg(pmssRuntimeLockPath('pmss-addUser-'.$userName.'.lock')).' '.escapeshellarg('/run/lock/pmss-addUser-'.$userName.'.lock').' '.escapeshellarg('/tmp/pmss-addUser-'.$userName.'.lock')),
     );
 
     $stepsSucceeded = pmssAddUserCleanupStepsRun($cleanupSteps);

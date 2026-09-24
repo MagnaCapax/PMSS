@@ -242,7 +242,7 @@ pmssUserLifecycleRunSteps('terminate', $username, array(
     array('kill_processes_final', $killUserCommand),
     array('userdel_groupdel_final', $userdelCommand),
     array('groupdel_final', $groupdelCommand),
-    array('cleanup_lock_files', 'rm -f -- /run/lock/pmss-*-'.$username.'.lock /tmp/pmss-*-'.$username.'.lock'),
+    array('cleanup_lock_files', 'rm -f -- '.pmssRuntimeLockDir().'/pmss-*-'.$username.'.lock /run/lock/pmss-*-'.$username.'.lock /tmp/pmss-*-'.$username.'.lock'),
 ), $dryRun);
 
 // We don't need setup network here because ... well that chain is not going to get any additional data anymore

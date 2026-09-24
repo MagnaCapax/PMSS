@@ -74,7 +74,7 @@ class RuntimeLockSafetyTest extends TestCase
 
     public function testRuntimeLockPathPreservesNormalizationAndRejections(): void
     {
-        $root = is_dir('/run/lock') ? '/run/lock' : '/tmp';
+        $root = \pmssRuntimeLockDir();
         foreach (['job.lock', '/job.lock', '///job.lock', ' spaced.lock ', '.hidden'] as $name) {
             $this->assertSame($root.'/'.ltrim($name, '/'), \pmssRuntimeLockPath($name));
         }

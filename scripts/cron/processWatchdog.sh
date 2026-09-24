@@ -10,7 +10,7 @@ set -u -o pipefail
 
 WATCHDOG_TAG="pmss-process-watchdog"
 STATE_DIR="${PMSS_PROCESS_WATCHDOG_STATE_DIR:-/var/run/pmss/process-watchdog}"
-LOCK_PATH="${PMSS_PROCESS_WATCHDOG_LOCK_PATH:-/run/lock/pmss-process-watchdog.lock}"
+LOCK_PATH="${PMSS_PROCESS_WATCHDOG_LOCK_PATH:-/run/pmss/locks/pmss-process-watchdog.lock}"
 PROCESS_SOURCE="${PMSS_PROCESS_WATCHDOG_PS_SOURCE:-}"
 
 read_numeric_env() {
@@ -51,7 +51,7 @@ list_processes() {
 }
 
 if command -v flock >/dev/null 2>&1; then
-	mkdir -p "$(dirname "$LOCK_PATH")" 2>/dev/null || true
+	mkdir -p -m 0700 "$(dirname "$LOCK_PATH")" 2>/dev/null || true
 	exec 9>"$LOCK_PATH" || exit 0
 	flock -n 9 || exit 0
 fi

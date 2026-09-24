@@ -8,7 +8,7 @@ include '/scripts/lib/devristo/File.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/trackerCleaner.php';
 
-$lockPath = '/run/lock/pmss-userTrackerCleaner.lock';
+$lockPath = pmssRuntimeLockPath('pmss-userTrackerCleaner.lock');
 $lockBusy = false;
 $lockHandle = pmssLockFileAcquire($lockPath, true, 'c', false, false, $lockBusy);
 if ($lockHandle === false) {

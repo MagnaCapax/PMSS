@@ -693,7 +693,40 @@ class RuntimeTest extends TestCase
     public function testRuntimeLockPathKeepsValidBasename(): void
     {
         $path = \pmssRuntimeLockPath('pmss-runtime-test.lock');
-        $this->assertTrue($path === '/run/lock/pmss-runtime-test.lock' || $path === '/tmp/pmss-runtime-test.lock');
+        $this->assertSame(\pmssRuntimeLockDir().'/pmss-runtime-test.lock', $path);
+    }
+
+    public function testRuntimeLockDirIsPrivateToItsOwner(): void
+    {
+        $saved = getenv('PMSS_RUNTIME_LOCK_DIR');
+        $base = $this->pmssMakeTempDir('pmss-runtime-lockdir-');
+        try {
+            putenv('PMSS_RUNTIME_LOCK_DIR='.$base.'/fresh/locks');
+            $this->assertSame($base.'/fresh/locks', \pmssRuntimeLockDir());
+            clearstatcache();
+            $this->assertSame(0700, fileperms($base.'/fresh/locks') & 0777, 'new lock dir must be 0700');
+            $this->assertSame(0755 & ~umask(), fileperms($base.'/fresh') & 0777, 'parent is created with the traversable 0755 mode');
+
+            mkdir($base.'/loose', 0755);
+            chmod($base.'/loose', 0755);
+            putenv('PMSS_RUNTIME_LOCK_DIR='.$base.'/loose');
+            \pmssRuntimeLockDir();
+            clearstatcache();
+            $this->assertSame(0700, fileperms($base.'/loose') & 0777, 'an existing looser lock dir is tightened to 0700');
+        } finally {
+            putenv($saved === false ? 'PMSS_RUNTIME_LOCK_DIR' : 'PMSS_RUNTIME_LOCK_DIR='.$saved);
+        }
+    }
+
+    public function testRuntimeLockDirDefaultsToRootOwnedRunTree(): void
+    {
+        $saved = getenv('PMSS_RUNTIME_LOCK_DIR');
+        putenv('PMSS_RUNTIME_LOCK_DIR');
+        try {
+            $this->assertSame('/run/pmss/locks', \pmssRuntimeLockDir());
+        } finally {
+            putenv($saved === false ? 'PMSS_RUNTIME_LOCK_DIR' : 'PMSS_RUNTIME_LOCK_DIR='.$saved);
+        }
     }
 
     public function testRuntimeLockAcquireRejectsNulBytePathFailSoft(): void

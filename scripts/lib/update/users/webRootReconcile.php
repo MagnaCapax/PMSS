@@ -371,7 +371,7 @@ function pmssUserReconcileWebRoot(array $ctx, ?callable $logger = null): bool
         return false;
     }
 
-    $lockDir = pmssResolvePathFromEnv('PMSS_USER_WEB_ROOT_LOCK_DIR', is_dir('/run/lock') ? '/run/lock' : '/tmp');
+    $lockDir = pmssResolvePathFromEnv('PMSS_USER_WEB_ROOT_LOCK_DIR', pmssRuntimeLockDir());
     $lockPath = pmssPathAbsoluteStringIsSafe($lockDir, ['allowRoot' => false])
         && is_dir($lockDir) && !is_link($lockDir)
         ? $lockDir.'/pmss-user-web-root-'.$user.'.lock' : '';

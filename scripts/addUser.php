@@ -89,7 +89,7 @@ if ($usernameValidationError !== null) {
     );
 }
 
-$lockPath = (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-addUser-'.$user['name'].'.lock';
+$lockPath = pmssRuntimeLockPath('pmss-addUser-'.$user['name'].'.lock');
 $lockBusy = false;
 $lockHandle = pmssLockFileAcquire($lockPath, true, 'c', false, true, $lockBusy);
 if ($lockHandle === false) {

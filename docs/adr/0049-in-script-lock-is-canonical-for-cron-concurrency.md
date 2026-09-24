@@ -99,3 +99,17 @@ script's idempotency and updating the existing flock-asserting tests) is tracked
 - Commits: `cff1c67a` (introduced the collision), `261bd3e9` (reverted trafficLog's), `ad6e852a` (guard test)
 - `scripts/lib/runtime/locks.php` (`pmssLockFileAcquire`), `scripts/cron/trafficLog.php` (the model idiom)
 - Prior cron-guard precedents: commits Refs #456 (updateQuotas), #756 (checkRootlessDocker)
+
+## Amendment 2026-09-24: lock location
+
+Runtime locks resolve through `pmssRuntimeLockPath()` / `pmssRuntimeLockDir()` to the
+root-owned `/run/pmss/locks` directory (0700, created or tightened on use; `flock()` needs
+no write access, so other accounts must not be able to open the lock files at all; the
+`/run/pmss` parent stays 0755 because customer-side code reads other state there), not to the shared
+`/run/lock` or `/tmp`. Every caller of these helpers runs as root (`/scripts` is 0750 root),
+so their lock entries belong in a directory only root controls.
+Bespoke lock paths (addUser, userTrackerCleaner, the web-root reconcile lock default,
+processWatchdog.sh) now use the same directory. Cleanup steps also remove legacy entries in
+`/run/lock` and `/tmp`. `PMSS_RUNTIME_LOCK_DIR` overrides the directory for hermetic tests.
+During the update that ships this change, a process still holding a lock at the old path does
+not exclude one run of the new code; that overlap is one run long.

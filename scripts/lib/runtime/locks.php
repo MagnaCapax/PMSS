@@ -122,7 +122,35 @@ function pmssRuntimeLockPath(string $basename): string
     if ($basename === '' || $basename === '.' || $basename === '..' || strpos($basename, '/') !== false || preg_match('/[\r\n\0]/', $basename) === 1) {
         throw new RuntimeException('Unsafe runtime lock basename');
     }
-    return (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/'.$basename;
+    return pmssRuntimeLockDir().'/'.$basename;
+}
+
+/**
+ * Directory for runtime locks: root-owned, never a world-writable shared directory.
+ *
+ * Every caller of the runtime lock helpers runs as root (/scripts is 0750 root). A lock
+ * in a shared world-writable directory is not under root's control, so the
+ * lock lives under the root-owned /run/pmss tree instead. The directory is 0700: flock()
+ * does not need write access, so lock files must not even be openable by other accounts.
+ * The parent stays 0755 because customer-side code reads other /run/pmss state.
+ * PMSS_RUNTIME_LOCK_DIR overrides the location for hermetic tests.
+ */
+function pmssRuntimeLockDir(): string
+{
+    $override = getenv('PMSS_RUNTIME_LOCK_DIR');
+    $dir = is_string($override) && $override !== '' ? rtrim($override, '/') : '/run/pmss/locks';
+    if (!is_dir($dir)) {
+        if (!is_dir(dirname($dir))) {
+            @mkdir(dirname($dir), 0755, true);
+        }
+        @mkdir($dir, 0700);
+    }
+    $perms = @fileperms($dir);
+    // Never re-mode a shared sticky directory (e.g. a mistaken override pointing at /tmp).
+    if (is_int($perms) && !is_link($dir) && ($perms & 01000) === 0 && ($perms & 0077) !== 0) {
+        @chmod($dir, 0700);
+    }
+    return $dir;
 }
 
 function pmssLockHandleRelease($handle, bool $unlock = true): void

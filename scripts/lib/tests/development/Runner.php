@@ -69,6 +69,7 @@ foreach ([
     'PMSS_LOCALNET_FILE' => $localnetCfg,
     'PMSS_FIREQOS_TEMPLATE' => $fireqosTpl,
     'PMSS_APT_KEYRING_DIR' => $aptKeyring,
+    'PMSS_RUNTIME_LOCK_DIR' => $suiteRoot.'/locks',
 ] as $key => $value) {
     putenv($key.'='.$value);
 }
