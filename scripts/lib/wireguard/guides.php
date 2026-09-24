@@ -133,6 +133,43 @@ function wgApplyAssignedIpToGuide(string $content, string $ip): string
     );
 }
 
+/** Replace the server identity and endpoint in a managed guide's peer section. */
+function wgApplyPeerToGuide(string $content, string $publicKey, string $endpoint, int $listenPort): string
+{
+    if ($publicKey !== '') {
+        $content = wgGuideReplaceFirst($content, '/^PublicKey = .*$/m', 'PublicKey = '.$publicKey);
+    }
+    if ($endpoint === '' || $listenPort <= 0) {
+        return $content;
+    }
+
+    return wgGuideReplaceFirst($content, '/^Endpoint = .*$/m', 'Endpoint = '.$endpoint.':'.$listenPort);
+}
+
+/** Prefer the stable service hostname only when it resolves to this host. */
+function wgUserGuideEndpoint(string $home, string $endpoint): string
+{
+    $serviceId = pmssUserBillingServiceIdDigitsRead($home);
+    if ($serviceId === null) {
+        return $endpoint;
+    }
+
+    $endpointIp = wgResolveClientEndpointIp($endpoint);
+    if ($endpointIp === null) {
+        wgLog('Failed to resolve current WireGuard endpoint '.$endpoint.'; keeping host endpoint');
+        return $endpoint;
+    }
+
+    $serviceEndpoint = pmssNginxUserMcxHostname($serviceId);
+    $serviceIp = wgResolveClientEndpointIp($serviceEndpoint);
+    if ($serviceIp === null) {
+        wgLog('Failed to resolve WireGuard service endpoint '.$serviceEndpoint.'; keeping host endpoint');
+        return $endpoint;
+    }
+
+    return $serviceIp === $endpointIp ? $serviceEndpoint : $endpoint;
+}
+
 /**
  * Ensure a default single-device client profile exists for users without keys.
  */
@@ -209,8 +246,18 @@ function wgBootstrapUserGuide(string $user, string $clientGuide): void
  * Update each per-user guide with the IP assigned to its embedded private key.
  *
  * @param array<int,array{user:string,key:string,ip:string}> $assigned
+ * @param string $fallbackGuide Guide used when the user's guide is absent.
+ * @param string $serverPublicKey Current host's WireGuard public key.
+ * @param string $endpoint Current host endpoint advertised to clients.
+ * @param int $listenPort Current host's WireGuard listen port.
  */
-function wgSyncUserGuideAddresses(array $assigned, string $fallbackGuide = ''): void
+function wgSyncUserGuideAddresses(
+    array $assigned,
+    string $fallbackGuide = '',
+    string $serverPublicKey = '',
+    string $endpoint = '',
+    int $listenPort = 0
+): void
 {
     if (empty($assigned)) {
         return;
@@ -239,6 +286,15 @@ function wgSyncUserGuideAddresses(array $assigned, string $fallbackGuide = ''): 
         $seenUsers[$entry['user']] = true;
 
         $updated = wgApplyAssignedIpToGuide($guide, $entry['ip']);
+        // Interface-only/manual guides keep the legacy address sync without gaining peer lines.
+        if (preg_match('/^\[Peer\]\r?$/m', $guide) === 1) {
+            if (preg_match('/^Endpoint = .*$/m', $guide) === 1) {
+                $guideEndpoint = wgUserGuideEndpoint(dirname($target), $endpoint);
+                $updated = wgApplyPeerToGuide($updated, $serverPublicKey, $guideEndpoint, $listenPort);
+            } else {
+                $updated = wgApplyPeerToGuide($updated, $serverPublicKey, $endpoint, $listenPort);
+            }
+        }
         if ($targetExists && $updated === $guide) {
             continue;
         }
@@ -264,7 +320,7 @@ function wgClientStateReconcile(string $publicKey, string $endpoint, int $listen
     }
 
     $peerState = wgPeerState();
-    wgSyncUserGuideAddresses($peerState['assigned'], $guide);
+    wgSyncUserGuideAddresses($peerState['assigned'], $guide, $publicKey, $endpoint, $listenPort);
 
     return $peerState;
 }

@@ -11,6 +11,7 @@ require_once __DIR__.'/networkInfo.php';
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/log.php';
 require_once __DIR__.'/lighttpd/userFileWrite.php';
+require_once __DIR__.'/nginxUserHosts.php';
 require_once __DIR__.'/update/runtime/commands.php';
 require_once __DIR__.'/wireguard/state.php';
 require_once __DIR__.'/wireguard/endpoint.php';

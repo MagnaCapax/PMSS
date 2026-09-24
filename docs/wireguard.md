@@ -27,7 +27,10 @@ matching `~/.wireguard-public-key` entry goes missing, the periodic refresh can
 re-register that first profile automatically from the managed guide.
 Periodic address reconciliation likewise updates that profile only when its
 embedded private key derives to the registered public key receiving the address;
-additional device keys cannot retarget the shared bootstrap profile.
+additional device keys cannot retarget the shared bootstrap profile. The same
+pass repairs a migrated profile's server public key and endpoint. When the
+user's stable `mcx.fi` service hostname resolves to the current host, profiles
+use that name; otherwise they retain the host endpoint.
 
 A cron watchdog (`checkWireguard.php`) ensures the kernel module stays loaded,
 `wg-quick@wg0` remains active, and configured peers are loaded into the running

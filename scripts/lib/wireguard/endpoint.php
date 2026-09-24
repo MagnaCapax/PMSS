@@ -117,18 +117,32 @@ function wgResolveEndpoint(string $hostname): array
     return ['', 'unknown'];
 }
 
+/** Resolve a client endpoint host through the same testable DNS seam. */
+function wgResolveClientEndpointIp(string $endpoint): ?string
+{
+    $endpoint = trim($endpoint);
+    $publicIp = wgValidatePublicIp($endpoint);
+    if ($publicIp !== null) {
+        return $publicIp;
+    }
+    if (!pmssHostnameIsValid($endpoint, false)) {
+        return null;
+    }
+
+    $dnsOverride = getenv('PMSS_WG_DNS_IP');
+    $resolved = $dnsOverride !== false && trim($dnsOverride) !== ''
+        ? trim($dnsOverride)
+        : gethostbyname($endpoint);
+
+    return $resolved === $endpoint ? null : wgValidatePublicIp($resolved);
+}
+
 /** Prefer a resolvable hostname for client profiles, retaining IP fallback. */
 function wgResolveClientEndpoint(string $hostname): array
 {
     $hostname = trim($hostname);
-    if (pmssHostnameIsValid($hostname, false)) {
-        $dnsOverride = getenv('PMSS_WG_DNS_IP');
-        $resolved = $dnsOverride !== false && trim($dnsOverride) !== ''
-            ? trim($dnsOverride)
-            : gethostbyname($hostname);
-        if ($resolved !== $hostname && wgValidatePublicIp($resolved) !== null) {
-            return [$hostname, 'hostname'];
-        }
+    if (pmssHostnameIsValid($hostname, false) && wgResolveClientEndpointIp($hostname) !== null) {
+        return [$hostname, 'hostname'];
     }
 
     return wgResolveEndpoint($hostname);

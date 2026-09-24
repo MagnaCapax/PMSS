@@ -429,7 +429,8 @@ class WireGuardInstallerTest extends TestCase
         $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
         $matchingKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
         $otherKey = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=';
-        $guide = "[Interface]\nPrivateKey = client-private\nAddress = 10.90.90.X/32\n";
+        $guide = "[Interface]\nPrivateKey = client-private\nAddress = 10.90.90.X/32\n"
+            ."[Peer]\nAllowedIPs = 10.90.90.X/32\n";
         $this->pmssWriteFile($homeBase.'/alice/wireguard.txt', $guide);
 
         $this->pmssWithEnv([
@@ -465,6 +466,163 @@ class WireGuardInstallerTest extends TestCase
         });
 
         $this->assertSame($guide, (string) file_get_contents($homeBase.'/alice/wireguard.txt'));
+    }
+
+    public function testSyncUserGuideAddressesReconcilesMigratedPeer(): void
+    {
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
+        $clientPublicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+        $guide = \wgApplyPrivateKeyToGuide(
+            \wgBuildClientGuide('old-server-public', 'old.example.com', 12345),
+            'client-private'
+        );
+        $this->pmssWriteFile($homeBase.'/alice/.wireguard-public-key', $clientPublicKey."\n");
+        $this->pmssWriteFile($homeBase.'/alice/wireguard.txt', $guide);
+
+        $this->pmssWithEnv([
+            'PMSS_WG_HOME_BASE'         => $homeBase,
+            'PMSS_WG_CLIENT_PUBLIC_KEY' => $clientPublicKey,
+        ], function () use ($clientPublicKey): void {
+            \wgSyncUserGuideAddresses(
+                [['user' => 'alice', 'key' => $clientPublicKey, 'ip' => '10.90.90.42']],
+                '',
+                'current-server-public',
+                '198.51.100.10',
+                51820
+            );
+        });
+
+        $updated = (string) file_get_contents($homeBase.'/alice/wireguard.txt');
+        $this->assertStringContainsAllStrings([
+            "PrivateKey = client-private\n",
+            "PublicKey = current-server-public\n",
+            "Endpoint = 198.51.100.10:51820\n",
+        ], $updated);
+        $this->assertStringNotContainsString('old-server-public', $updated);
+        $this->assertStringNotContainsString('old.example.com:12345', $updated);
+    }
+
+    public function testSyncUserGuideAddressesUsesMatchingMcxServiceEndpoint(): void
+    {
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
+        $clientPublicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+        $guide = \wgApplyPrivateKeyToGuide(
+            \wgBuildClientGuide('old-server-public', 'old.example.com', 12345),
+            'client-private'
+        );
+        $this->pmssWriteFile($homeBase.'/alice/.billingId', "696\n");
+        $this->pmssWriteFile($homeBase.'/alice/wireguard.txt', $guide);
+
+        $this->pmssWithEnv([
+            'PMSS_WG_HOME_BASE'         => $homeBase,
+            'PMSS_WG_CLIENT_PUBLIC_KEY' => $clientPublicKey,
+            'PMSS_WG_DNS_IP'            => '198.51.100.10',
+        ], function () use ($clientPublicKey): void {
+            \wgSyncUserGuideAddresses(
+                [['user' => 'alice', 'key' => $clientPublicKey, 'ip' => '10.90.90.42']],
+                '',
+                'current-server-public',
+                '198.51.100.10',
+                51820
+            );
+        });
+
+        $serviceEndpoint = \pmssNginxUserMcxHostname('696');
+        $this->assertStringContainsString(
+            'Endpoint = '.$serviceEndpoint.":51820\n",
+            (string) file_get_contents($homeBase.'/alice/wireguard.txt')
+        );
+    }
+
+    public function testSyncUserGuideAddressesKeepsHostEndpointWithoutMatchingServiceDns(): void
+    {
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
+        $clientPublicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+        $guide = \wgApplyPrivateKeyToGuide(
+            \wgBuildClientGuide('old-server-public', 'old.example.com', 12345),
+            'client-private'
+        );
+        foreach (['alice', 'bob'] as $user) {
+            $this->pmssWriteFile($homeBase.'/'.$user.'/wireguard.txt', $guide);
+        }
+        $this->pmssWriteFile($homeBase.'/alice/.billingId', "696\n");
+
+        $this->pmssWithEnv([
+            'PMSS_WG_HOME_BASE'         => $homeBase,
+            'PMSS_WG_CLIENT_PUBLIC_KEY' => $clientPublicKey,
+            'PMSS_WG_DNS_IP'            => '203.0.113.20',
+        ], function () use ($clientPublicKey): void {
+            \wgSyncUserGuideAddresses([
+                ['user' => 'alice', 'key' => $clientPublicKey, 'ip' => '10.90.90.42'],
+                ['user' => 'bob', 'key' => $clientPublicKey, 'ip' => '10.90.90.43'],
+            ], '', 'current-server-public', '198.51.100.10', 51820);
+        });
+
+        foreach (['alice', 'bob'] as $user) {
+            $this->assertStringContainsString(
+                "Endpoint = 198.51.100.10:51820\n",
+                (string) file_get_contents($homeBase.'/'.$user.'/wireguard.txt')
+            );
+        }
+    }
+
+    public function testSyncUserGuideAddressesUpdatesInterfaceOnlyAddressWithoutAddingPeer(): void
+    {
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
+        $clientPublicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+        $guide = "[Interface]\nPrivateKey = client-private\nAddress = 10.90.90.X/32\n";
+        $this->pmssWriteFile($homeBase.'/alice/wireguard.txt', $guide);
+
+        $this->pmssWithEnv([
+            'PMSS_WG_HOME_BASE'         => $homeBase,
+            'PMSS_WG_CLIENT_PUBLIC_KEY' => $clientPublicKey,
+        ], function () use ($clientPublicKey): void {
+            \wgSyncUserGuideAddresses(
+                [['user' => 'alice', 'key' => $clientPublicKey, 'ip' => '10.90.90.42']],
+                '',
+                'current-server-public',
+                '198.51.100.10',
+                51820
+            );
+        });
+
+        $updated = (string) file_get_contents($homeBase.'/alice/wireguard.txt');
+        $this->assertSame(
+            "[Interface]\nPrivateKey = client-private\nAddress = 10.90.90.42/32\n",
+            $updated
+        );
+        $this->assertStringNotContainsString('[Peer]', $updated);
+        $this->assertStringNotContainsString('PublicKey =', $updated);
+        $this->assertStringNotContainsString('Endpoint =', $updated);
+    }
+
+    public function testSyncUserGuideAddressesSecondRunDoesNotWrite(): void
+    {
+        $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
+        $clientPublicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+        $guide = \wgApplyPrivateKeyToGuide(
+            \wgBuildClientGuide('old-server-public', 'old.example.com', 12345),
+            'client-private'
+        );
+        $file = $homeBase.'/alice/wireguard.txt';
+        $this->pmssWriteFile($file, $guide);
+        $assigned = [['user' => 'alice', 'key' => $clientPublicKey, 'ip' => '10.90.90.42']];
+
+        $this->pmssWithEnv([
+            'PMSS_WG_HOME_BASE'         => $homeBase,
+            'PMSS_WG_CLIENT_PUBLIC_KEY' => $clientPublicKey,
+        ], function () use ($assigned, $file): void {
+            \wgSyncUserGuideAddresses($assigned, '', 'current-server-public', '198.51.100.10', 51820);
+            $first = (string) file_get_contents($file);
+            $this->assertTrue(touch($file, 946684800), 'Failed to set idempotence sentinel timestamp');
+            clearstatcache(true, $file);
+
+            \wgSyncUserGuideAddresses($assigned, '', 'current-server-public', '198.51.100.10', 51820);
+            clearstatcache(true, $file);
+
+            $this->assertSame($first, (string) file_get_contents($file));
+            $this->assertSame(946684800, filemtime($file), 'Second reconciliation rewrote an unchanged guide');
+        });
     }
 
     public function testSyncUserGuideAddressesLeavesGuideWithoutPrivateKey(): void
