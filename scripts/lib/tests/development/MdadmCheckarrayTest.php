@@ -85,7 +85,9 @@ class MdadmCheckarrayTest extends TestCase
         );
         $this->writeSysfsState('md0', '0');
         $this->writeSysfsState('md1', '1');
-        $this->writeSyncAction('md1', 'check');
+        $syncTarget = $this->fixtureRoot.'/sys/block/md1/md/sync_action';
+        $this->pmssEnsureDir(dirname($syncTarget), 0700);
+        file_put_contents($syncTarget, "check\n");
         $stub = $this->writeCheckarrayStub();
 
         $result = $this->runCommand($mdstat, $stub);
@@ -94,7 +96,7 @@ class MdadmCheckarrayTest extends TestCase
         $this->assertStringContainsString('skipping md1 (degraded); requested sync_action=idle', $result['output']);
         $this->assertStringContainsString('checking non-degraded arrays: md0', $result['output']);
         $this->assertStringContainsString('--cron --idle --quiet md0', $this->readStubLog());
-        $this->assertSame("idle\n", (string) file_get_contents($this->syncActionPath('md1')));
+        $this->assertSame("idle\n", (string) file_get_contents($syncTarget));
     }
 
     public function testMainFallsBackToAllOnTotalEnumerationFailure(): void
@@ -128,18 +130,6 @@ class MdadmCheckarrayTest extends TestCase
         $dir = $this->fixtureRoot.'/sys/block/'.$array.'/md';
         $this->pmssEnsureDir($dir, 0700);
         file_put_contents($dir.'/degraded', $degraded."\n");
-    }
-
-    private function syncActionPath(string $array): string
-    {
-        return $this->fixtureRoot.'/sys/block/'.$array.'/md/sync_action';
-    }
-
-    private function writeSyncAction(string $array, string $value): void
-    {
-        $dir = dirname($this->syncActionPath($array));
-        $this->pmssEnsureDir($dir, 0700);
-        file_put_contents($this->syncActionPath($array), $value."\n");
     }
 
     private function writeCheckarrayStub(): string

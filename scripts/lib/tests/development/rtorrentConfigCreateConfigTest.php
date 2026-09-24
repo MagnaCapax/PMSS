@@ -541,16 +541,12 @@ PHP;
                 if ($type === $this->failType) {
                     throw new \RuntimeException('forced '.$type.' reservation failure');
                 }
-                $this->pmssEnsureMarkerDirectory($type);
-                file_put_contents($this->portRoot.'/'.$type.'/'.$rangeStart, '');
-                return $rangeStart;
-            }
-
-            private function pmssEnsureMarkerDirectory(string $type): void
-            {
-                if (!is_dir($this->portRoot.'/'.$type)) {
-                    mkdir($this->portRoot.'/'.$type, 0755, true);
+                $directory = $this->portRoot.'/'.$type;
+                if (!is_dir($directory)) {
+                    mkdir($directory, 0755, true);
                 }
+                file_put_contents($directory.'/'.$rangeStart, '');
+                return $rangeStart;
             }
         };
     }

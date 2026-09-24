@@ -137,6 +137,11 @@ class DistUpgradeHelpersTest extends TestCase
 
     public function testVerifyDistUpgradeBootReadinessReportsConfigStates(): void
     {
+        $mdstatPath = $this->tmpDir.'/mdstat';
+        $grubPath = $this->tmpDir.'/grub.cfg';
+        $mdadmConfigPath = $this->tmpDir.'/mdadm.conf';
+        $initramfsMdadmPath = $this->tmpDir.'/initramfs-mdadm';
+
         foreach ([
             [
                 "md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/2] [UU]\n",
@@ -162,31 +167,15 @@ class DistUpgradeHelpersTest extends TestCase
                 ],
             ],
         ] as [$mdstat, $grub, $mdadmConfig, $initramfsMdadm, $needles]) {
-            $this->assertStringContainsAllStrings($needles, $this->captureBootReadinessOutput($mdstat, $grub, $mdadmConfig, $initramfsMdadm));
+            file_put_contents($mdstatPath, $mdstat);
+            file_put_contents($grubPath, $grub);
+            file_put_contents($mdadmConfigPath, $mdadmConfig);
+            file_put_contents($initramfsMdadmPath, $initramfsMdadm);
+
+            list(, $output) = $this->pmssCaptureStdout(function () use ($mdstatPath, $grubPath, $mdadmConfigPath, $initramfsMdadmPath): void {
+                \pmssVerifyDistUpgradeBootReadiness($mdstatPath, $grubPath, $mdadmConfigPath, $initramfsMdadmPath);
+            });
+            $this->assertStringContainsAllStrings($needles, $output);
         }
     }
-
-    private function captureBootReadinessOutput(
-        string $mdstat,
-        string $grub,
-        string $mdadmConfig,
-        string $initramfsMdadm
-    ): string {
-        $mdstatPath = $this->tmpDir.'/mdstat';
-        $grubPath = $this->tmpDir.'/grub.cfg';
-        $mdadmConfigPath = $this->tmpDir.'/mdadm.conf';
-        $initramfsMdadmPath = $this->tmpDir.'/initramfs-mdadm';
-
-        file_put_contents($mdstatPath, $mdstat);
-        file_put_contents($grubPath, $grub);
-        file_put_contents($mdadmConfigPath, $mdadmConfig);
-        file_put_contents($initramfsMdadmPath, $initramfsMdadm);
-
-        list(, $output) = $this->pmssCaptureStdout(function () use ($mdstatPath, $grubPath, $mdadmConfigPath, $initramfsMdadmPath): void {
-            \pmssVerifyDistUpgradeBootReadiness($mdstatPath, $grubPath, $mdadmConfigPath, $initramfsMdadmPath);
-        });
-
-        return $output;
-    }
-
 }

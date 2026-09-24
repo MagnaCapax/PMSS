@@ -76,7 +76,15 @@ class MediaStackPanelTest extends TestCase
             [512 * 1024 * 1024, 'blocked', false, 'install-media-stack.sh --force'],
             [2 * 1024 * 1024 * 1024, 'ready', true, ''],
         ] as [$limitBytes, $expectedState, $expectedCanStart, $messageNeedle]) {
-            $this->assertMediaStatusForMemoryLimit($limitBytes, $expectedState, $expectedCanStart, $messageNeedle);
+            $home = $this->mediaHomeCreate('pmss-media-memory-');
+            $this->pmssWithEnv($this->mediaStackCgroupV2Fixture($limitBytes), function () use ($home, $expectedState, $expectedCanStart, $messageNeedle): void {
+                $status = $this->mediaStatusRead($home);
+
+                $this->pmssAssertArraySubsetSame(['state' => $expectedState, 'canStart' => $expectedCanStart], $status);
+                if ($messageNeedle !== '') {
+                    $this->assertStringContainsString($messageNeedle, $status['message']);
+                }
+            });
         }
     }
 
@@ -366,21 +374,4 @@ class MediaStackPanelTest extends TestCase
         );
     }
 
-    private function assertMediaStatusForMemoryLimit(
-        int $limitBytes,
-        string $expectedState,
-        bool $expectedCanStart,
-        string $messageNeedle = ''
-    ): void {
-        $home = $this->mediaHomeCreate('pmss-media-memory-');
-
-        $this->pmssWithEnv($this->mediaStackCgroupV2Fixture($limitBytes), function () use ($home, $expectedState, $expectedCanStart, $messageNeedle): void {
-            $status = $this->mediaStatusRead($home);
-
-            $this->pmssAssertArraySubsetSame(['state' => $expectedState, 'canStart' => $expectedCanStart], $status);
-            if ($messageNeedle !== '') {
-                $this->assertStringContainsString($messageNeedle, $status['message']);
-            }
-        });
-    }
 }
