@@ -150,6 +150,17 @@ if (pmssPermissionTargetFileExists('/etc/seedbox/localnet')) {
 // Normalise permissions inside /etc/seedbox/config so templates stay readable without leaking secrets.
 $configDir = '/etc/seedbox/config';
 if (pmssPermissionTargetDirectoryExists($configDir)) {
+    // Finish the GH#782 dead-api.* removal for hosts provisioned before that cleanup:
+    // update.php's /etc/seedbox staging is an additive overlay, so files removed from source
+    // persist on already-deployed hosts, where the blanket 0664 sweep below re-exposes them.
+    // Unlink the known-dead legacy artifacts if still present (idempotent; refuses symlinks).
+    foreach (['api.server', 'api.debug', 'api.localKey', 'api.remoteKey'] as $deadFile) {
+        $deadPath = $configDir.'/'.$deadFile;
+        if (is_file($deadPath) && !is_link($deadPath)) {
+            @unlink($deadPath);
+        }
+    }
+
     // No committed secrets remain in /etc/seedbox/config: the dead api.* command-and-control
     // family (config + generator setupApiKey.php + deleted consumer serverApi.php) was removed.
     // If a live secret is reintroduced, add it here with a 0600 mask.
@@ -182,6 +193,22 @@ if (pmssPermissionTargetDirectoryExists($configDir)) {
 
     // Ensure the root directory keeps execute permission for traversal.
     @chmod($configDir, 0775);
+
+    // config/users/<user>.json are the canonical per-user records (billingClientId/ServiceId,
+    // quota, resource limits). The writer (UserConfigStore) creates them 0640 root-owned, but
+    // the blanket 0664 sweep above widens them to world-readable, leaking non-public billing
+    // identifiers to every co-tenant on a shared host. Re-restrict them to 0640 (root-owned
+    // already; chmod-only is sufficient). This is targeted rather than a blanket sweep-default
+    // flip, because other config files (network, vendor, vendorWelcome, welcomeMessages.json)
+    // are legitimately world-read by the per-user panel and must stay 0664.
+    $usersDir = $configDir.'/users';
+    if (is_dir($usersDir) && !is_link($usersDir)) {
+        foreach (glob($usersDir.'/*.json') ?: [] as $userRecord) {
+            if (is_file($userRecord) && !is_link($userRecord)) {
+                @chmod($userRecord, 0640);
+            }
+        }
+    }
 }
 
 // Minimal secrets audit: tighten common private key locations (best-effort).

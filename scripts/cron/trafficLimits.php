@@ -18,6 +18,7 @@ require_once '/scripts/lib/user/selection.php';
 require_once '/scripts/lib/user/log.php';
 require_once '/scripts/lib/user/userConfigStore.php';
 require_once __DIR__.'/../lib/user/trafficLimit.php';
+require_once '/scripts/lib/user/rootArtifactTrust.php';
 require_once '/scripts/lib/runtime.php';
 
 // Serialize runs with the canonical in-script lock (ADR-0049), replacing the
@@ -53,7 +54,13 @@ foreach($users AS $thisUser) {
         echo date('Y-m-d H:i:s') . ": Skipping {$thisUser}, invalid traffic data file\n";
         continue;
     }
-    $trafficLimitState = pmssTrafficLimitStateRead($userTrafficLimitFile, "/home/{$thisUser}/.bonusTraffic");
+    // .bonusTraffic lives in the tenant's own (0770) home, so honor it only when it is a
+    // root-owned, tenant-non-writable file; otherwise the account holder could raise their own
+    // enforced traffic cap. Empty path = no bonus (same contract usageAlerts.php uses).
+    $bonusTrafficPath = pmssRootArtifactIsTrusted("/home/{$thisUser}/.bonusTraffic")
+        ? "/home/{$thisUser}/.bonusTraffic"
+        : '';
+    $trafficLimitState = pmssTrafficLimitStateRead($userTrafficLimitFile, $bonusTrafficPath);
     if ($trafficLimitState['effectiveLimitGiB'] <= 0) {
         continue;
     }
