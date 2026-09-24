@@ -35,6 +35,24 @@ if (!is_file($configTemplate) || !is_file($scriptTemplate)) {
     return;
 }
 
+// Detect the hardware watchdog device BEFORE writing any reboot-capable config.
+// /dev/watchdog[0] are CHARACTER devices, so is_file() is always false for them
+// (it matches regular files only); detect via existence + char-device filetype.
+// Order matters: /etc/watchdog.conf carries load-reboot thresholds, so a
+// deviceless guest must never be left holding that file next to a distro-enabled
+// watchdog daemon — it would reboot the guest under load with no device backing
+// it. With no usable device we disable the service instead of installing config.
+$pmssWatchdogDeviceUsable = static function (string $path): bool {
+    return @file_exists($path) && @filetype($path) === 'char';
+};
+$device = $pmssWatchdogDeviceUsable('/dev/watchdog') ? '/dev/watchdog'
+        : ($pmssWatchdogDeviceUsable('/dev/watchdog0') ? '/dev/watchdog0' : '');
+if ($device === '') {
+    logMessage('[WARN] No watchdog character device present; disabling watchdog service.');
+    runStep('Disabling watchdog service (no device)', 'systemctl disable --now watchdog || true');
+    return;
+}
+
 if (!pmssWatchdogRunRequiredStep('Ensuring watchdog script directory exists', pmssBuildCommand('mkdir', ['-p', $scriptDir]))) {
     return;
 }
@@ -42,12 +60,6 @@ if (!pmssWatchdogRunRequiredStep('Installing watchdog configuration', pmssBuildC
     return;
 }
 if (!pmssWatchdogRunRequiredStep('Installing watchdog network check', pmssBuildCommand('install', ['-m', '0755', $scriptTemplate, $scriptTarget]))) {
-    return;
-}
-
-$device = is_file('/dev/watchdog') ? '/dev/watchdog' : (is_file('/dev/watchdog0') ? '/dev/watchdog0' : '');
-if ($device === '') {
-    logMessage('[WARN] Watchdog device missing; leaving service disabled.');
     return;
 }
 
