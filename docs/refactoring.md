@@ -137,6 +137,11 @@ fallback and applies the optional mode only after a complete write. Partial
 bytes remain in place: no truncation or retry risks overwriting concurrent logs.
 `LogWriteSafetyTest` injects incomplete writes and checks successful byte output.
 
+Rootless Docker config publication rejects empty or NUL-containing targets and
+requires a complete temporary-file write before metadata changes or rename.
+Failed or short writes keep the prior `daemon.json` and remove the partial temp file.
+`UserDockerCgroupDriverTest` covers both rejected targets and short writes.
+
 CLI diagnostic-and-return paths use `pmssCliReturnWithStderr()`, passing the
 complete message and status unchanged; the helper does not exit or add a newline.
 

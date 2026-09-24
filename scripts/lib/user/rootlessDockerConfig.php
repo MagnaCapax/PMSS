@@ -7,7 +7,9 @@ pmssRequireRelativeFiles(__DIR__, ['directories.php', 'log.php']);
 /** Return true when daemon.json can be read or replaced safely. */
 function pmssUserRootlessDockerConfigTargetIsSafe(string $configFile): bool
 {
-    return !is_link($configFile)
+    return $configFile !== ''
+        && strpos($configFile, "\0") === false
+        && !is_link($configFile)
         && (!file_exists($configFile) || is_file($configFile));
 }
 
@@ -47,7 +49,7 @@ function pmssUserRootlessDockerConfigWrite(string $configFile, string $json, int
 
     $ok = false;
     $isRoot = function_exists('posix_geteuid') && (int) @posix_geteuid() === 0;
-    if (@file_put_contents($tempFile, $json) === false) {
+    if (@file_put_contents($tempFile, $json) !== strlen($json)) {
         $reason = 'write_failed';
     } elseif ($isRoot && !@chown($tempFile, $uid)) {
         $reason = 'chown_failed';

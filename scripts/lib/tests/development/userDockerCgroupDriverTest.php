@@ -171,6 +171,39 @@ class UserDockerCgroupDriverTest extends TestCase
         $this->pmssAssertArraySubsetSame(['ok' => false, 'reason' => 'unsafe_config_file'], $result);
     }
 
+    public function testRootlessDockerConfigWriteRejectsNulPath(): void
+    {
+        $reason = null;
+        $this->assertFalse(\pmssUserRootlessDockerConfigWrite("/tmp/daemon\0.json", '{}', 0, 0, $reason));
+        $this->assertSame('unsafe_config_file', $reason);
+    }
+
+    public function testRootlessDockerConfigShortWritePreservesExistingFile(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-rootless-docker-short-write-');
+        $script = <<<'PHP'
+namespace RootlessDockerConfigWriteFixture;
+PHP;
+        $script .= $this->pmssInlinePhpAtomicPublicationShims('temp');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/rootlessDockerConfig.php', 'RootlessDockerConfigWriteFixture');
+        $script .= <<<'PHP'
+$GLOBALS['mode'] = 'short';
+$GLOBALS['tempCalls'] = 0;
+$path = getenv('PMSS_TEST_DOCKER_CONFIG_ROOT').'/daemon.json';
+\file_put_contents($path, '{"keep":true}');
+$reason = null;
+$result = pmssUserRootlessDockerConfigWrite($path, '{"exec-opts":[]}', 0, 0, $reason);
+echo json_encode(['result' => $result, 'reason' => $reason, 'bytes' => \file_get_contents($path),
+    'temporaryFiles' => glob(dirname($path).'/.daemon.json.*')]);
+PHP;
+        $result = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_DOCKER_CONFIG_ROOT' => $root]);
+
+        $this->assertFalse($result['result']);
+        $this->assertSame('write_failed', $result['reason']);
+        $this->assertSame('{"keep":true}', $result['bytes']);
+        $this->assertSame([], $result['temporaryFiles']);
+    }
+
     private function assertDaemonConfigContainsCgroupfs(string $home): array
     {
         $payload = $this->readDaemonConfig($home);
