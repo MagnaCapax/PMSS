@@ -86,11 +86,11 @@ class installBootstrapSafetyTest extends TestCase
         $this->assertTrue($updateStep2 !== false, 'Failed to read update-step2.php');
 
         $this->assertStringContainsAllStrings([
-            "pmssRunProfiledCallable('Applying hostname configuration', 'pmssApplyHostnameConfig'",
-            "pmssRunProfiledCallable('Configuring quota mounts', 'pmssConfigureQuotaMount'",
-            "pmssRunProfiledCallable('Applying boot defaults', 'pmssEnsureBootDefaults'",
-            "pmssRunProfiledCallable('Applying legacy sysctl baseline', 'pmssEnsureLegacySysctlBaseline'",
-            "pmssRunProfiledCallable('Configuring root shell defaults', 'pmssConfigureRootShellDefaults'",
+            "['Applying hostname configuration', 'pmssApplyHostnameConfig'",
+            "['Configuring quota mounts', 'pmssConfigureQuotaMount'",
+            "['Applying boot defaults', 'pmssEnsureBootDefaults'",
+            "['Applying legacy sysctl baseline', 'pmssEnsureLegacySysctlBaseline'",
+            "['Configuring root shell defaults', 'pmssConfigureRootShellDefaults'",
         ], $updateStep2);
     }
 }

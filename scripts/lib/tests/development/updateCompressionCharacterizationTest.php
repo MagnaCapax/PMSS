@@ -29,6 +29,10 @@ class UpdateCompressionCharacterizationTest extends TestCase
                 'forbidden' => [
                     'pmssAdjust'.'LighttpdSecurity' => 'update-step2.php should own the lighttpd hardening block directly',
                     'pmssCleanup'.'MediaareaBootstrapPackage' => 'update-step2.php should own the mediaarea bootstrap cleanup directly',
+                    'pmssUpdateStep2Register'.'WebRefreshShutdownGuard' => 'phase-2 should keep one shutdown rescue lifecycle',
+                    'pmssUpdateStep2Register'.'PermissionShutdownGuard' => 'phase-2 should keep one shutdown rescue lifecycle',
+                    'pmssUpdateStep2Mark'.'WebRefreshRequired' => 'the pending refresh state should not need setter wrappers',
+                    'pmssUpdateStep2Mark'.'WebRefreshCompleted' => 'the pending refresh state should not need setter wrappers',
                 ],
             ],
             'scripts/lib/update/apt.php' => [

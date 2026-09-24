@@ -80,20 +80,20 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
     public function testUpdateStep2RegistersPermissionShutdownRescueBeforeWork(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
-            'function pmssUpdateStep2RegisterPermissionShutdownGuard(): void',
+            'function pmssUpdateStep2RegisterShutdownGuard(): void',
             'update-step2 exited before final permission refresh',
             'function pmssUpdateStep2ShutdownReason(): string',
             "pmssUpdateStep2RunRescueAction('permission_refresh_rescue', ['reason' => \$reason], static function () use (\$helper): int {",
             "pmssUpdateStep2LogRescueEvent(\$event, \$rc === 0 ? 'ok' : 'error', ['rc' => \$rc]);",
             "return runStep('Restoring system permissions (shutdown)', \$helper);",
-            'pmssUpdateStep2RegisterPermissionShutdownGuard();',
+            'pmssUpdateStep2RegisterShutdownGuard();',
         ]);
         $this->pmssAssertRepoFileContainsOrderedStrings(
             'scripts/util/update-step2.php',
             [
-                'pmssUpdateStep2RegisterPermissionShutdownGuard();',
+                'pmssUpdateStep2RegisterShutdownGuard();',
                 "pmssRunProfiledCallable('Acquiring update-step2 lock'",
-                "pmssRunProfiledCallable('Applying runtime service templates'",
+                "['Applying runtime service templates', 'pmssApplyRuntimeTemplates'",
                 "pmssLogJson(['event' => 'phase', 'name' => 'setupPermissions', 'status' => 'start']);",
                 "\$GLOBALS['PMSS_UPDATE_STEP2_COMPLETED'] = true;",
             ],

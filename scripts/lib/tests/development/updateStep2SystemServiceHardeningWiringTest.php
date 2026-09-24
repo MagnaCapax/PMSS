@@ -7,7 +7,7 @@ class UpdateStep2SystemServiceHardeningWiringTest extends TestCase
 {
     public function testUpdateStep2WiresSystemdHardeningHelpers(): void
     {
-        $this->pmssAssertRepoFileContainsString('scripts/util/update-step2.php', "require_once __DIR__.'/../lib/update/services/systemd.php';");
+        $this->pmssAssertRepoFileContainsString('scripts/util/update-step2.php', "'update/services/systemd.php'");
         $this->pmssAssertRepoFileSubstringCountAtLeast(
             'scripts/util/update-step2.php',
             'pmssStopDisableMaskSeedboxSystemServices',

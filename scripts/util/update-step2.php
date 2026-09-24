@@ -36,27 +36,15 @@ $GLOBALS['PMSS_LOGMSG_DEFAULTS'] = array_replace([
 // and document its failure behaviour so future maintainers know whether errors
 // should halt the run or log-and-continue.
 require_once __DIR__.'/../lib/update.php';
-require_once __DIR__.'/../lib/update/runtime/profile.php';
-require_once __DIR__.'/../lib/update/runtime/commands.php';
-require_once __DIR__.'/../lib/update/runtime/stepPolicy.php';
-require_once __DIR__.'/../lib/update/runtime/processes.php';
-require_once __DIR__.'/../lib/update/environment.php';
-require_once __DIR__.'/../lib/update/filesystem.php';
-require_once __DIR__.'/../lib/update/opensslSsh2Compat.php';
-require_once __DIR__.'/../lib/update/distro.php';
-require_once __DIR__.'/../lib/update/kernelHardening.php';
-require_once __DIR__.'/../lib/update/arrRootExecutionBlock.php';
-require_once __DIR__.'/../lib/update/repositories.php';
-require_once __DIR__.'/../lib/update/storageBenchmark.php';
-require_once __DIR__.'/../lib/update/systemPrep.php';
-require_once __DIR__.'/../lib/update/services/systemd.php';
-require_once __DIR__.'/../lib/update/services/logging.php';
-require_once __DIR__.'/../lib/update/services/logrotate.php';
-require_once __DIR__.'/../lib/update/services/mountHardening.php';
-require_once __DIR__.'/../lib/update/userMaintenance.php';
-require_once __DIR__.'/../lib/update/networking.php';
-require_once __DIR__.'/../lib/update/services/bootstrap.php';
-require_once __DIR__.'/../lib/motd/Generator.php';
+pmssRequireRelativeFiles(__DIR__.'/../lib', [
+    'update/runtime/profile.php', 'update/runtime/commands.php', 'update/runtime/stepPolicy.php',
+    'update/runtime/processes.php', 'update/environment.php', 'update/filesystem.php',
+    'update/opensslSsh2Compat.php', 'update/distro.php', 'update/kernelHardening.php',
+    'update/arrRootExecutionBlock.php', 'update/repositories.php', 'update/storageBenchmark.php',
+    'update/systemPrep.php', 'update/services/systemd.php', 'update/services/logging.php',
+    'update/services/logrotate.php', 'update/services/mountHardening.php', 'update/userMaintenance.php',
+    'update/networking.php', 'update/services/bootstrap.php', 'motd/Generator.php',
+]);
 
 requireRoot();
 
@@ -130,7 +118,7 @@ function pmssUpdateStep2AcquireUpdateLock(): void
  */
 function pmssConfigureWebStack(): void
 {
-    pmssUpdateStep2MarkWebRefreshRequired();
+    $GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_PENDING'] = true;
 
     // Stop nginx first so package upgrades and template refreshes never race against an active daemon.
     runStep('Stopping nginx prior to configuration refresh', 'systemctl stop nginx || /etc/init.d/nginx stop || true');
@@ -163,22 +151,6 @@ function pmssConfigureWebStack(): void
             sprintf('find /home -mindepth 1 -maxdepth 1 %s -prune -o -type %s -not -perm %s -exec chmod %s {} +', $prune, $hardeningStep[1], $hardeningStep[2], $hardeningStep[3])
         );
     }
-}
-
-/**
- * Mark that nginx has been stopped and needs a final refresh before exit.
- */
-function pmssUpdateStep2MarkWebRefreshRequired(): void
-{
-    $GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_REQUIRED'] = true;
-}
-
-/**
- * Mark that the final nginx refresh has completed successfully.
- */
-function pmssUpdateStep2MarkWebRefreshCompleted(): void
-{
-    $GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_COMPLETED'] = true;
 }
 
 /**
@@ -226,51 +198,40 @@ function pmssUpdateStep2StartNginxShutdownFallback(string $reason): void
     logmsg(sprintf('[WARN] Direct nginx start fallback completed with rc=%d', $rc));
 }
 
-/**
- * Attempt a best-effort nginx config regeneration if update-step2 exits early.
- */
-function pmssUpdateStep2RegisterWebRefreshShutdownGuard(): void
+/** Restore the web stack and tenant-visible permissions after an early exit. */
+function pmssUpdateStep2RegisterShutdownGuard(): void
 {
     register_shutdown_function(static function (): void {
-        $refreshRequired = !empty($GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_REQUIRED']);
-        $refreshCompleted = !empty($GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_COMPLETED']);
         $scriptCompleted = !empty($GLOBALS['PMSS_UPDATE_STEP2_COMPLETED']);
-        if (!$refreshRequired || $refreshCompleted || $scriptCompleted) {
+        if ($scriptCompleted) {
             return;
         }
 
-        if (!file_exists('/scripts/util/createNginxConfig.php')) {
-            logmsg('[WARN] update-step2 exited before final nginx refresh; createNginxConfig.php missing');
-            pmssUpdateStep2StartNginxShutdownFallback('create_nginx_config_missing');
+        $refreshPending = !empty($GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_PENDING']);
+        $permissionPending = !pmssEnvFlagEnabled('PMSS_DRY_RUN');
+        if (!$refreshPending && !$permissionPending) {
             return;
         }
-
         $reason = pmssUpdateStep2ShutdownReason();
-
-        logmsg('[WARN] update-step2 exited before final nginx refresh; attempting rescue run (reason: '.$reason.')');
-
-        $rc = pmssUpdateStep2RunRescueAction('post_update_web_refresh_rescue', ['reason' => $reason], static function (): int {
-            $rc = 0;
-            passthru(pmssLockChildClosePrefix().'/scripts/util/createNginxConfig.php --restart', $rc);
-            return $rc;
-        });
-        logmsg(sprintf('[WARN] Rescue nginx refresh completed with rc=%d', $rc));
-        if ($rc === 0) {
-            pmssUpdateStep2MarkWebRefreshCompleted();
-            return;
+        if ($refreshPending) {
+            if (!file_exists('/scripts/util/createNginxConfig.php')) {
+                logmsg('[WARN] update-step2 exited before final nginx refresh; createNginxConfig.php missing');
+                pmssUpdateStep2StartNginxShutdownFallback('create_nginx_config_missing');
+            } else {
+                logmsg('[WARN] update-step2 exited before final nginx refresh; attempting rescue run (reason: '.$reason.')');
+                $rc = pmssUpdateStep2RunRescueAction('post_update_web_refresh_rescue', ['reason' => $reason], static function (): int {
+                    $rc = 0;
+                    passthru(pmssLockChildClosePrefix().'/scripts/util/createNginxConfig.php --restart', $rc);
+                    return $rc;
+                });
+                logmsg(sprintf('[WARN] Rescue nginx refresh completed with rc=%d', $rc));
+                if ($rc !== 0) {
+                    pmssUpdateStep2StartNginxShutdownFallback('web_refresh_rescue_failed');
+                }
+            }
         }
 
-        pmssUpdateStep2StartNginxShutdownFallback('web_refresh_rescue_failed');
-    });
-}
-
-/**
- * Restore tenant-visible config traversal if phase 2 exits before final perms.
- */
-function pmssUpdateStep2RegisterPermissionShutdownGuard(): void
-{
-    register_shutdown_function(static function (): void {
-        if (!empty($GLOBALS['PMSS_UPDATE_STEP2_COMPLETED']) || pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+        if (!$permissionPending) {
             return;
         }
 
@@ -289,8 +250,7 @@ function pmssUpdateStep2RegisterPermissionShutdownGuard(): void
     });
 }
 
-pmssUpdateStep2RegisterWebRefreshShutdownGuard();
-pmssUpdateStep2RegisterPermissionShutdownGuard();
+pmssUpdateStep2RegisterShutdownGuard();
 
 pmssRunProfiledCallable('Acquiring update-step2 lock', static function (): void {
     pmssUpdateStep2AcquireUpdateLock();
@@ -420,12 +380,12 @@ $dpkgBaselineOk = pmssRunProfiledCallable('Applying distro dpkg baseline selecti
 
 // System-wide services must not run on seedbox hosts. Stop/disable early so
 // package installs cannot leave attack surface exposed for the rest of the run.
-pmssRunProfiledCallable('Applying system service disable/mask policy (pre-app)', 'pmssStopDisableMaskSeedboxSystemServices');
-// Purge unbound DNS resolver if it is in failed state (external nameservers used)
-pmssRunProfiledCallable('Purging failed unbound daemon if present', 'pmssPurgeFailedUnbound');
-// Ensure the boot-time guard is installed/enabled so masked services cannot
-// start during the next reboot even if systemd enablement drifts.
-pmssRunProfiledCallable('Ensuring systemd service guard boot unit', 'pmssEnsureSystemdServicesGuardBootUnit');
+pmssRunProfiledCallableBatch([
+    ['Applying system service disable/mask policy (pre-app)', 'pmssStopDisableMaskSeedboxSystemServices'],
+    // Purge failed unbound and keep disabled services from returning at boot.
+    ['Purging failed unbound daemon if present', 'pmssPurgeFailedUnbound'],
+    ['Ensuring systemd service guard boot unit', 'pmssEnsureSystemdServicesGuardBootUnit'],
+]);
 // Remove legacy Apache packages; keep apache2-utils. It provides htpasswd (used by
 // lighttpd basic auth) and ab; removing it breaks auth setup and other scripts.
 runStep('Removing residual Apache packages', aptCmd('purge -y apache2 apache2-bin apache2-data libapache2-mod-php7.4 || true'));
@@ -480,25 +440,31 @@ $GLOBALS['PMSS_PACKAGES_READY'] = true;
 putenv('PMSS_PACKAGE_PHASE=complete');
 pmssLogJson(['event' => 'package_phase', 'status' => 'ok']);
 
-pmssRunProfiledCallable('Migrating legacy localnet config path', 'pmssMigrateLegacyLocalnet');
-pmssRunProfiledCallable('Applying runtime service templates', 'pmssApplyRuntimeTemplates', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);
-pmssRunProfiledCallable('Applying journald runtime limits', 'pmssApplyJournaldLimits', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
-pmssRunProfiledCallable('Applying rsyslog kernel input rate limit', 'pmssApplyRsyslogKernelInputRateLimit', ['logmsg']);
-pmssRunProfiledCallable('Applying remote logging configuration', 'pmssApplyRemoteLogging', ['logmsg']);
-pmssRunProfiledCallable('Applying hostname configuration', 'pmssApplyHostnameConfig', ['logmsg']);
-pmssRunProfiledCallable('Configuring quota mounts', 'pmssConfigureQuotaMount', ['logmsg']);
+pmssRunProfiledCallableBatch([
+    ['Migrating legacy localnet config path', 'pmssMigrateLegacyLocalnet'],
+    ['Applying runtime service templates', 'pmssApplyRuntimeTemplates', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED],
+    ['Applying journald runtime limits', 'pmssApplyJournaldLimits', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL],
+    ['Applying rsyslog kernel input rate limit', 'pmssApplyRsyslogKernelInputRateLimit', ['logmsg']],
+    ['Applying remote logging configuration', 'pmssApplyRemoteLogging', ['logmsg']],
+    ['Applying hostname configuration', 'pmssApplyHostnameConfig', ['logmsg']],
+    ['Configuring quota mounts', 'pmssConfigureQuotaMount', ['logmsg']],
+]);
 runStep('Recalculating quota integrity', 'php /scripts/util/quotaFix.php');
-pmssRunProfiledCallable('Applying boot defaults', 'pmssEnsureBootDefaults', ['logmsg']);
-pmssRunProfiledCallable('Applying legacy sysctl baseline', 'pmssEnsureLegacySysctlBaseline', ['logmsg']);
-pmssRunProfiledCallable('Applying kernel module hardening', 'pmssApplyKernelHardening', ['logmsg']);
-pmssRunProfiledCallable('Stripping ssh-keysign SUID', 'pmssEnsureSshKeysignSuidStrip', ['logmsg']);
-pmssRunProfiledCallable('Applying boot-time tuning', 'pmssEnsureBootTuning', ['logmsg']);
-pmssRunProfiledCallable('Configuring root shell defaults', 'pmssConfigureRootShellDefaults', ['logmsg']);
+pmssRunProfiledCallableBatch([
+    ['Applying boot defaults', 'pmssEnsureBootDefaults', ['logmsg']],
+    ['Applying legacy sysctl baseline', 'pmssEnsureLegacySysctlBaseline', ['logmsg']],
+    ['Applying kernel module hardening', 'pmssApplyKernelHardening', ['logmsg']],
+    ['Stripping ssh-keysign SUID', 'pmssEnsureSshKeysignSuidStrip', ['logmsg']],
+    ['Applying boot-time tuning', 'pmssEnsureBootTuning', ['logmsg']],
+    ['Configuring root shell defaults', 'pmssConfigureRootShellDefaults', ['logmsg']],
+]);
 runStep('Restricting world access to /home', 'chmod o-rw /home');
 
-pmssRunProfiledCallable('Ensuring cgroup configuration', 'pmssEnsureCgroupsConfigured', ['logmsg']);
-pmssRunProfiledCallable('Ensuring systemd slices', 'pmssEnsureSystemdSlices', ['logmsg']);
-pmssRunProfiledCallable('Hardening systemd D-Bus cross-user disclosure', 'pmssEnsureSystemdDbusDisclosureHardening', ['logmsg']);
+pmssRunProfiledCallableBatch([
+    ['Ensuring cgroup configuration', 'pmssEnsureCgroupsConfigured', ['logmsg']],
+    ['Ensuring systemd slices', 'pmssEnsureSystemdSlices', ['logmsg']],
+    ['Hardening systemd D-Bus cross-user disclosure', 'pmssEnsureSystemdDbusDisclosureHardening', ['logmsg']],
+]);
 // Directories get traversal; files are only ever tightened here, never widened. A blanket
 // file chmod 0755 made root-only files (per-user records, private keys) world-readable
 // until setupPermissions re-restricted them later in this same pass.
@@ -599,13 +565,15 @@ runStep('Restricting atop binary permissions', 'chmod 750 /usr/bin/atop');
 pmssRunProfiledStep('Running post-update web refresh', static function (): void {
     $refreshRc = runStep('Post-update nginx configuration refresh', '/scripts/util/createNginxConfig.php --restart');
     if ($refreshRc === 0) {
-        pmssUpdateStep2MarkWebRefreshCompleted();
+        $GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_PENDING'] = false;
     }
 });
 
-pmssRunProfiledCallable('Configuring /tmp disk-backed baseline', 'pmssConfigureTempDiskBackedMount', ['logmsg', $distroVersion]);
-pmssRunProfiledCallable('Configuring /tmp tmpfs mount policy', 'pmssConfigureTempTmpfsMount', ['logmsg']);
-pmssRunProfiledCallable('Configuring /tmp noexec hardening', 'pmssConfigureTempMountNoexec', ['logmsg']);
+pmssRunProfiledCallableBatch([
+    ['Configuring /tmp disk-backed baseline', 'pmssConfigureTempDiskBackedMount', ['logmsg', $distroVersion]],
+    ['Configuring /tmp tmpfs mount policy', 'pmssConfigureTempTmpfsMount', ['logmsg']],
+    ['Configuring /tmp noexec hardening', 'pmssConfigureTempMountNoexec', ['logmsg']],
+]);
 
 pmssLogJson(['event' => 'phase', 'name' => 'setupPermissions', 'status' => 'start']);
 $setupPermissionsRc = runStep('Refreshing system permissions', '/scripts/util/setupPermissions.php');

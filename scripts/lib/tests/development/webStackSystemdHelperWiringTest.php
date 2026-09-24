@@ -16,7 +16,7 @@ class WebStackSystemdHelperWiringTest extends TestCase
         $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'scripts/util/update-step2.php',
             [
-                "require_once __DIR__.'/../lib/update/runtime/processes.php';",
+                "'update/runtime/processes.php'",
                 'function pmssConfigureWebStack(): void',
                 "pmssSystemdUnitActionIfPresent('lighttpd', 'Disabling lighttpd systemd service', 'disable');",
                 "pmssSystemdUnitActionIfPresent('nginx', 'Enabling nginx systemd service', 'enable');",

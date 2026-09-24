@@ -5,6 +5,19 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateStep2ProfilingCoverageTest extends TestCase
 {
+    /** Lock the externally visible phase order while orchestration stays table-driven. */
+    public function testUpdateStep2ProfiledPhaseOrderSnapshot(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/util/update-step2.php');
+        preg_match_all("/^\\s+\\['([^']+)', '(pmss[^']+)'(?:,|\\])/m", $source, $matches, PREG_SET_ORDER);
+        $steps = [];
+        foreach ($matches as $match) {
+            $steps[] = $match[1].'|'.$match[2];
+        }
+        $this->assertSame(25, count($steps), 'Profiled batch step count changed');
+        $this->assertSame('b6cb367121af2552c0c81f4a05d906936a4412c38396f39a4fa889d8e55e793b', hash('sha256', implode("\n", $steps)), 'Profiled batch order or callable changed');
+    }
+
     public function testUpdateStep2UsesProfiledWrappersForModuleCalls(): void
     {
         $this->pmssAssertRepoFileContractCases([

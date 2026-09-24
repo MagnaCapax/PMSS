@@ -11,13 +11,19 @@ class UpdateStep2WebRefreshGuardTest extends TestCase
     public function testUpdateStep2RegistersShutdownGuardForWebRefresh(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
-            'function pmssUpdateStep2RegisterWebRefreshShutdownGuard(): void',
-            'pmssUpdateStep2RegisterWebRefreshShutdownGuard();',
-            'pmssUpdateStep2MarkWebRefreshRequired();',
-            'pmssUpdateStep2MarkWebRefreshCompleted();',
+            'function pmssUpdateStep2RegisterShutdownGuard(): void',
+            'pmssUpdateStep2RegisterShutdownGuard();',
+            "\$GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_PENDING'] = true;",
+            "\$GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_PENDING'] = false;",
             "/scripts/util/createNginxConfig.php --restart",
             "'PMSS_UPDATE_STEP2_COMPLETED'",
         ]);
+        $this->pmssAssertRepoFileSubstringCountAtLeast(
+            'scripts/util/update-step2.php',
+            'register_shutdown_function(',
+            3,
+            'The unified phase-2 rescue guard must coexist with lock and cron cleanup guards'
+        );
     }
 
     public function testWebStackRegeneratesAllNginxConfigsFromStagedTemplate(): void

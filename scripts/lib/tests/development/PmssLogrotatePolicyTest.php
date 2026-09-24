@@ -94,7 +94,7 @@ class PmssLogrotatePolicyTest extends TestCase
     public function testUpdateStep2RefreshesAndVerifiesLogrotatePolicy(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
-            "require_once __DIR__.'/../lib/update/services/logrotate.php';",
+            "'update/services/logrotate.php'",
             "pmssRunProfiledCallable('Installing logrotate policies', 'pmssLogrotatePoliciesInstall', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);",
         ]);
 
