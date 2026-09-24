@@ -3,10 +3,6 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 
-if (!defined('PMSS_WIREGUARD_NO_ENTRYPOINT')) {
-    define('PMSS_WIREGUARD_NO_ENTRYPOINT', true);
-}
-
 require_once dirname(__DIR__, 2).'/wireguard.php';
 
 class WireGuardInstallerTest extends TestCase

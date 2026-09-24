@@ -48,11 +48,11 @@ function wgListHomeUsers(): array
 
 function wgSupports(): bool
 {
-    $supported = pmssCommandPath('wg') !== '';
-    if (!$supported) {
-        wgLog('wg binary not available on PATH');
+    if (pmssCommandPath('wg') !== '') {
+        return true;
     }
-    return $supported;
+    wgLog('wg binary not available on PATH');
+    return false;
 }
 
 /**
@@ -203,10 +203,8 @@ function pmssWireguardConfigure(?callable $logger = null): void
             '%LISTEN_PORT%' => (string) $listenPort,
         ]
     );
-    if ($guide === null) {
-        $guide = '';
-    } elseif (!wgWriteManagedFile($configDir.'/README', $guide, 0644, 'WireGuard README')) {
-        // wgWriteManagedFile() logs the failed path; keep service configuration fail-soft.
+    if ($guide !== null) {
+        wgWriteManagedFile($configDir.'/README', $guide, 0644, 'WireGuard README');
     }
 
     $peerState = wgClientStateReconcile($pubKey, $endpoint, $listenPort);

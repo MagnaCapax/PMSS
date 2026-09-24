@@ -18,7 +18,7 @@ function pmssWireguardCheckConfigPath(): string
 {
     if (function_exists('pmssTestModeEnabled') && pmssTestModeEnabled()) {
         $override = getenv('PMSS_WIREGUARD_CONFIG_PATH');
-        if (is_string($override) && trim($override) !== '') {
+        if ($override !== false && trim($override) !== '') {
             return trim($override);
         }
     }
@@ -36,8 +36,7 @@ function pmssWireguardConfigLines(string $configPath): array
         return ['status' => 'not_regular', 'lines' => []];
     }
 
-    $lines = @file($configPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (!is_array($lines)) {
+    if (!is_array($lines = @file($configPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES))) {
         return ['status' => 'unreadable', 'lines' => []];
     }
 

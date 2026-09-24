@@ -9,11 +9,7 @@
 /** Confirm that the supplied address is a routable public IPv4 endpoint. */
 function wgValidatePublicIp(string $candidate): ?string
 {
-    if (($candidate = trim($candidate)) === '') {
-        return null;
-    }
-
-    $ip = filter_var($candidate, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+    $ip = filter_var(trim($candidate), FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
     return $ip === false ? null : $ip;
 }
 
@@ -39,11 +35,7 @@ function wgResolveEndpoint(string $hostname): array
     $hostnamePrivate = '';
     if ($hostname !== '') {
         $dnsOverride = getenv('PMSS_WG_DNS_IP');
-        if ($dnsOverride !== false && $dnsOverride !== '') {
-            $resolved = $dnsOverride;
-        } else {
-            $resolved = gethostbyname($hostname);
-        }
+        $resolved = $dnsOverride !== false && $dnsOverride !== '' ? $dnsOverride : gethostbyname($hostname);
         if ($resolved !== $hostname) {
             $hostnamePrivate = $resolved;
             $public     = wgValidatePublicIp($resolved);
@@ -57,9 +49,7 @@ function wgResolveEndpoint(string $hostname): array
     $interfaceOverride = getenv('PMSS_WG_INTERFACE_IP');
     if ($interfaceOverride !== false) {
         $interfaceIp = trim($interfaceOverride);
-        if ($interfaceIp === '') {
-            $interfaceIp = null;
-        }
+        $interfaceIp = $interfaceIp === '' ? null : $interfaceIp;
     } else {
         $interface = detectPrimaryInterface();
         if ($interface === '') {

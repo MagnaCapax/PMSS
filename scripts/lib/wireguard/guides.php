@@ -55,11 +55,7 @@ function wgGuidePrivateKey(string $content): string
     }
 
     $privateKey = trim($matches[1]);
-    if ($privateKey === '' || $privateKey === '<client private key>') {
-        return '';
-    }
-
-    return $privateKey;
+    return $privateKey === '' || $privateKey === '<client private key>' ? '' : $privateKey;
 }
 
 /**
@@ -98,11 +94,7 @@ function wgGenerateClientKeypair(): array
     }
 
     $publicKey = wgDerivePublicKey($privateKey);
-    if ($publicKey === '') {
-        return ['', ''];
-    }
-
-    return [$privateKey, $publicKey];
+    return $publicKey === '' ? ['', ''] : [$privateKey, $publicKey];
 }
 
 /**
@@ -115,15 +107,14 @@ function wgDerivePublicKey(string $privateKey): string
         'printf %s '.escapeshellarg($privateKey).' | wg pubkey',
         'Failed to derive WireGuard client public key'
     );
-    if ($publicKey === '' || !wgValidatePublicKey($publicKey)) {
-        if ($publicKey === '') {
-            return '';
-        }
+    if ($publicKey !== '' && wgValidatePublicKey($publicKey)) {
+        return $publicKey;
+    }
+    if ($publicKey !== '') {
         wgLog('Failed to derive WireGuard client public key');
-        return '';
     }
 
-    return $publicKey;
+    return '';
 }
 
 /** Replace the placeholder client address with the assigned IP. */

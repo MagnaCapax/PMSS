@@ -10,8 +10,6 @@
  * @author PMSS Team
  */
 
-define('PMSS_WIREGUARD_NO_ENTRYPOINT', true);
-
 require_once __DIR__.'/lib/wireguard.php';
 
 $configPath = wgConfigDir().'/wg0.conf';

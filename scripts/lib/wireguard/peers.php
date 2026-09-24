@@ -12,9 +12,6 @@
 function wgValidatePublicKey(string $key): bool
 {
     $key = trim($key);
-    if ($key === '') {
-        return false;
-    }
     if (!preg_match('/^[A-Za-z0-9+\/=]+$/', $key)) {
         return false;
     }
