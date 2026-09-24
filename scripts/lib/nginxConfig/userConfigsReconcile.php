@@ -39,7 +39,7 @@ function pmssCreateNginxConfigRemoveFile(string $path, string $user, string $lab
     if (!file_exists($path)) {
         return true;
     }
-    if (is_link($path) || !is_file($path)) {
+    if (!pmssRegularFilePathIsReadable($path)) {
         pmssCreateNginxConfigLogSkippedUser($user, 'refusing to remove non-regular '.$label.' ('.$path.')');
         return false;
     }
@@ -109,5 +109,5 @@ function pmssCreateNginxConfigPruneOrphans(array $users, array $ctx): bool
 function pmssCreateNginxConfigUserRouteIsServiceable(string $user, array $ctx): bool
 {
     $path = pmssCreateNginxConfigManagedUserPaths($user, $ctx)['user'];
-    return pmssUserFilePathIsSafe($path) && !is_link($path) && is_file($path) && is_readable($path);
+    return pmssUserFilePathIsSafe($path) && pmssRegularFilePathIsReadable($path) && is_readable($path);
 }

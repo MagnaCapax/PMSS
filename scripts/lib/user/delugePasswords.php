@@ -109,7 +109,7 @@ function pmssDelugeTemplateLocalclientPassword(): string
  */
 function pmssDelugeWebPasswordWrite(string $webConfPath, string $password, string $owner): bool
 {
-    if ($password === '' || !pmssUserFilePathIsSafe($webConfPath) || !is_file($webConfPath) || is_link($webConfPath)) {
+    if ($password === '' || !pmssUserFilePathIsSafe($webConfPath) || !pmssRegularFilePathIsReadable($webConfPath)) {
         return false;
     }
 

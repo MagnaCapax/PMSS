@@ -140,7 +140,7 @@ function pmssUserRefreshPanelIndexForFrameDataCompat(array $ctx): void
     }
 
     $targetFile = $home.'/www/index.php';
-    if (!pmssUserPathWithinHomeRoot($targetFile) || !is_file($targetFile) || is_link($targetFile)) {
+    if (!pmssUserPathWithinHomeRoot($targetFile) || !pmssRegularFilePathIsReadable($targetFile)) {
         return;
     }
 

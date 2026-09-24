@@ -11,7 +11,7 @@ require_once __DIR__.'/watchdogNginxLog.php';
 /** Read only newly appended nginx lines and persist the recovery cursor/state. */
 function pmssLighttpdWatchdogNginxActionsRead(string $logPath, string $statePath, array $usersByPort): array
 {
-    if (!is_file($logPath) || is_link($logPath) || !pmssPathTargetIsSafe($statePath, false, true)) {
+    if (!pmssRegularFilePathIsReadable($logPath) || !pmssPathTargetIsSafe($statePath, false, true)) {
         return array();
     }
 

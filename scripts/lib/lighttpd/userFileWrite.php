@@ -91,7 +91,7 @@ function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTe
     }
 
     $tmp = @tempnam(dirname($path), basename($path).'.pmss-tmp-');
-    if ($tmp === false || $tmp === '' || is_link($tmp) || !is_file($tmp)) {
+    if (!is_string($tmp) || !pmssRegularFilePathIsReadable($tmp)) {
         if (is_string($tmp)) @unlink($tmp);
         return false;
     }
@@ -103,7 +103,7 @@ function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTe
         if ($prepareTemp !== null && $prepareTemp($tmp) === false) {
             return false;
         }
-        if (is_link($tmp) || !is_file($tmp) || !pmssUserFilePathIsSafe($path) || !@rename($tmp, $path)) {
+        if (!pmssRegularFilePathIsReadable($tmp) || !pmssUserFilePathIsSafe($path) || !@rename($tmp, $path)) {
             return false;
         }
 
@@ -188,7 +188,7 @@ function pmssWriteUserFile(string $path, string $content, string $owner, int $mo
 /** Best-effort immutable toggle for managed root-owned files. */
 function pmssManagedFileImmutableSet(string $path, bool $enable): void
 {
-    if (!pmssUserFilePathIsSafe($path) || !is_file($path) || is_link($path)) {
+    if (!pmssUserFilePathIsSafe($path) || !pmssRegularFilePathIsReadable($path)) {
         return;
     }
 

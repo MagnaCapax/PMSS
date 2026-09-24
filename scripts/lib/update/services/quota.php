@@ -227,7 +227,7 @@ function pmssRemoveStaleQuotaCheckFiles(string $mountPoint = '/home', ?callable 
 
     $removed = 0;
     foreach ($staleFiles as $stale) {
-        if (dirname($stale) !== $mountPoint || is_link($stale) || !is_file($stale)) {
+        if (dirname($stale) !== $mountPoint || !pmssRegularFilePathIsReadable($stale)) {
             $log('[quotaFix] WARNING: skipped unsafe stale quota path: '.pmssQuotaEscapePathForLog($stale));
             continue;
         }

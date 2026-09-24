@@ -11,6 +11,7 @@
  */
 
 require_once __DIR__.'/pathSafety.php';
+require_once __DIR__.'/runtime/filesystem.php';
 
 /** Collapse whitespace without changing caller-owned trimming or byte limits. */
 function pmssLogWhitespaceCollapse(string $text): string { return (string) preg_replace('/\s+/', ' ', $text); }
@@ -77,7 +78,7 @@ function pmssJsonEncodePrettyLine($payload, int $extraFlags = 0): ?string { $enc
 /** Read a JSON object file as an associative array, rejecting unsafe paths when requested. */
 function pmssJsonFileReadAssoc(string $path, bool $safePathRequired = false): ?array
 {
-    if ($path === '' || ($safePathRequired && !pmssPathTargetIsSafe($path, false, true)) || !is_file($path) || is_link($path)) {
+    if (!pmssRegularFilePathIsReadable($path) || ($safePathRequired && !pmssPathTargetIsSafe($path, false, true))) {
         return null;
     }
     $raw = @file_get_contents($path);
@@ -141,7 +142,7 @@ function pmssJsonLineAppend(string $path, array $payload): bool
 /** Validate a JSON Lines read target before streaming structured log data. */
 function pmssJsonLineReadPathIsSafe(string $path): bool
 {
-    return pmssLogWritePathIsSafe($path) && is_file($path) && !is_link($path);
+    return pmssLogWritePathIsSafe($path) && pmssRegularFilePathIsReadable($path);
 }
 
 /** Stream decodable JSON Lines entries to a caller-owned handler. */

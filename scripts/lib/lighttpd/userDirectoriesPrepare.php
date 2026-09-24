@@ -41,9 +41,7 @@ function pmssLighttpdWatchedConfigPaths(string $homeDir, string $configPath): ar
     $paths = [$configPath, rtrim($homeDir, '/').'/.lighttpd/custom'];
     $paths = array_merge($paths, glob(rtrim($homeDir, '/').'/.lighttpd/custom.d/*.conf') ?: []);
 
-    return array_values(array_filter($paths, static function (string $path): bool {
-        return is_file($path) && !is_link($path);
-    }));
+    return array_values(array_filter($paths, 'pmssRegularFilePathIsReadable'));
 }
 
 function pmssLighttpdNewestConfigMtime(string $homeDir, string $configPath): ?int

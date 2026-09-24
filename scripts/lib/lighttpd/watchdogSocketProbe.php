@@ -244,7 +244,7 @@ function pmssLighttpdWatchdogClearSocketFailure(string $username, array $options
 {
     $runtimeDir = (string) ($options['runtimeDir'] ?? '');
     $statePath = pmssLighttpdWatchdogSocketFailureStatePath($username, $runtimeDir);
-    if ($statePath !== '' && is_file($statePath) && !is_link($statePath)) {
+    if (pmssRegularFilePathIsReadable($statePath)) {
         @unlink($statePath);
     }
 }

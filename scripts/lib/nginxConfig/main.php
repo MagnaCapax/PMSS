@@ -24,7 +24,7 @@ function pmssCreateNginxConfigChmodGlob(int $mode, string $pattern): void
 
     sort($matches, SORT_STRING);
     foreach ($matches as $path) {
-        if (is_link($path) || !is_file($path)) {
+        if (!pmssRegularFilePathIsReadable($path)) {
             fwrite(STDERR, '[WARN] Skipping unsafe nginx chmod target: '.$path.PHP_EOL);
             continue;
         }

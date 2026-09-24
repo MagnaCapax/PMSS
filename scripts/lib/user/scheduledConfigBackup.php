@@ -56,7 +56,7 @@ function pmssScheduledConfigBackupPhpBinary(): string
 function pmssScheduledConfigBackupCustomerIncludePath(string $home): string
 {
     $path = rtrim($home, '/').'/www/scriptsInc.php';
-    return is_file($path) && !is_link($path) && pmssPathWithinResolvedRoot($path, $home) ? $path : '';
+    return pmssRegularFilePathIsReadable($path) && pmssPathWithinResolvedRoot($path, $home) ? $path : '';
 }
 
 function pmssScheduledConfigBackupCommandBuild(string $user, string $home, string $action, int $retention): string
@@ -130,7 +130,7 @@ function pmssScheduledConfigBackupCustomerAction(string $user, string $home, str
 
 function pmssScheduledConfigBackupArchiveVerified(string $home, string $path): int
 {
-    if ($path === '' || $path[0] !== '/' || !is_file($path) || is_link($path) || !pmssPathWithinResolvedRoot($path, $home)) return 0;
+    if ($path === '' || $path[0] !== '/' || !pmssRegularFilePathIsReadable($path) || !pmssPathWithinResolvedRoot($path, $home)) return 0;
     if (preg_match('#/\.pmss-backups/config-[0-9]{8}-[0-9]{6}(?:-[0-9]{2})?\.tar\.gz\z#', $path) !== 1) return 0;
     $size = @filesize($path);
     return is_numeric($size) && (int) $size > 0 ? (int) $size : 0;

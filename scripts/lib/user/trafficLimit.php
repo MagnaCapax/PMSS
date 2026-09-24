@@ -90,7 +90,7 @@ function pmssTrafficLimitHomeArtifactReconcile(
 
     $homeLimitPath = pmssIntegerSettingUserHomePath($userName, '.trafficLimit', $homeDir);
     $runtimeLimitPath = pmssIntegerSettingRuntimeUserPath('trafficLimits', $userName, $runtimeDir);
-    if (is_file($homeLimitPath) && !is_link($homeLimitPath)) {
+    if (pmssRegularFilePathIsReadable($homeLimitPath)) {
         return true;
     }
     if (file_exists($homeLimitPath) || is_link($homeLimitPath)) {

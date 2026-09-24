@@ -40,7 +40,7 @@ function pmssCreatePrivateTempFile(string $prefix): ?string
     $real = realpath($path);
     $basePrefix = $base.DIRECTORY_SEPARATOR;
     if ($real === false || !is_file($real) || strpos($real, $basePrefix) !== 0 || strpos(basename($real), $prefix) !== 0) {
-        if (is_file($path) && !is_link($path)) @unlink($path);
+        if (pmssRegularFilePathIsReadable($path)) @unlink($path);
         return null;
     }
     return $path;
@@ -52,7 +52,7 @@ function pmssCreatePrivateTempDir(string $prefix): ?string
     $path = pmssCreatePrivateTempFile($prefix);
     if ($path === null) return null;
     if (!@unlink($path) || !@mkdir($path, 0700)) {
-        if (is_file($path) && !is_link($path)) @unlink($path);
+        if (pmssRegularFilePathIsReadable($path)) @unlink($path);
         return null;
     }
     @chmod($path, 0700);

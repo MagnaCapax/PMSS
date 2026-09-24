@@ -134,7 +134,7 @@ function pmssTrafficLimitThrottleApply(string $user, int $trafficCapMbit, bool $
 function pmssTrafficLimitThrottleFileExists(string $user, string $homeRoot = '/home'): bool
 {
     $throttleFile = pmssTrafficLimitThrottleFilePath($user, $homeRoot);
-    return $throttleFile !== null && is_file($throttleFile) && !is_link($throttleFile);
+    return $throttleFile !== null && pmssRegularFilePathIsReadable($throttleFile);
 }
 
 /**

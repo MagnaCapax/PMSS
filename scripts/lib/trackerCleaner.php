@@ -155,7 +155,7 @@ function pmssTrackerCleanerRunUser(
         if ($stopReason !== '') { $userVerboseLog .= pmssTrackerCleanerTimestamp()." run_stop reason={$stopReason}\n"; break; }
 
         $torrentPath = trim($torrentPath);
-        if ($torrentPath === '' || !is_file($torrentPath) || is_link($torrentPath) || !pmssPathWithinRootIsSafe($torrentPath, $sessionDir)) {
+        if (!pmssRegularFilePathIsReadable($torrentPath) || !pmssPathWithinRootIsSafe($torrentPath, $sessionDir)) {
             continue;
         }
         try {
@@ -236,8 +236,7 @@ function pmssTrackerCleanerBackupTorrentSourceIsSafe(string $torrentPath): bool
     $fileName = basename($torrentPath);
     return $fileName !== ''
         && substr($fileName, -8) === '.torrent'
-        && is_file($torrentPath)
-        && !is_link($torrentPath)
+        && pmssRegularFilePathIsReadable($torrentPath)
         && pmssPathTargetIsSafe($torrentPath, false);
 }
 
@@ -292,7 +291,7 @@ function pmssTrackerCleanerBackupTorrent(string $username, string $torrentPath, 
     $backupSize = @filesize($backupTarget);
     $backupSizeText = $backupSize === false ? 'unknown' : (string) $backupSize;
     $backupOk = $backupRc === 0 && $sourceSize !== false && $backupSize !== false && $backupSize === $sourceSize
-        && is_file($backupTarget) && !is_link($backupTarget) && pmssPathWithinRootIsSafe($backupTarget, $backupsRoot);
+        && pmssRegularFilePathIsReadable($backupTarget) && pmssPathWithinRootIsSafe($backupTarget, $backupsRoot);
     $verbose = pmssTrackerCleanerTimestamp()." torrent_backup rc={$backupRc} src={$torrentPath} dst={$backupTarget}\n";
     if (!$backupOk) {
         pmssTrackerCleanerLog("ERR: Backup verification failed for user {$username} (file=".basename($torrentPath).", rc={$backupRc}, src_bytes={$sourceSizeText}, dst_bytes={$backupSizeText}).");
@@ -309,7 +308,7 @@ function pmssTrackerCleanerBackupTorrent(string $username, string $torrentPath, 
  */
 function pmssTrackerCleanerWriteCleanedTorrent(string $torrentPath, string $payload, string $sessionDir)
 {
-    if (!is_file($torrentPath) || is_link($torrentPath) || !pmssPathWithinRootIsSafe($torrentPath, $sessionDir)) {
+    if (!pmssRegularFilePathIsReadable($torrentPath) || !pmssPathWithinRootIsSafe($torrentPath, $sessionDir)) {
         return false;
     }
 

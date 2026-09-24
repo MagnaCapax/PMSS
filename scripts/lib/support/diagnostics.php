@@ -203,7 +203,7 @@ function pmssSupportSnapshotWrite(array $diagnostics, array $config): string
         }
     }
 
-    if (!is_file($path) || is_link($path) || (function_exists('posix_geteuid') && @fileowner($path) !== posix_geteuid())) {
+    if (!pmssRegularFilePathIsReadable($path) || (function_exists('posix_geteuid') && @fileowner($path) !== posix_geteuid())) {
         @unlink($path);
         throw new RuntimeException('Support snapshot file ownership check failed.');
     }

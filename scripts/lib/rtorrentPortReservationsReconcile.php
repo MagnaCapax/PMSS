@@ -113,7 +113,7 @@ function pmssRtorrentPortReservationsReconcile(
                 $path = $portsBase.'/'.$type.'/'.$name;
                 $port = pmssNetworkPortParseDigits($name, $spec['min'], $spec['max']);
                 $mtime = @filemtime($path);
-                if ($port === null || !is_int($mtime) || !is_file($path) || is_link($path)
+                if ($port === null || !is_int($mtime) || !pmssRegularFilePathIsReadable($path)
                     || isset($references[$type][$port]) || ($now - $mtime) < $graceSeconds) {
                     $result['kept']++;
                     continue;

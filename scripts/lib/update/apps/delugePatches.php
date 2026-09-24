@@ -9,10 +9,12 @@
  * @author PMSS Team
  */
 
+require_once dirname(__DIR__, 2).'/runtime/filesystem.php';
+
 /** Read a candidate patch target while refusing symlinked or unreadable paths. */
 function pmssDelugeReadPatchLines(string $path, callable $log, string $readWarning): ?array
 {
-    if (!is_file($path) || is_link($path) || !is_readable($path)) return null;
+    if (!pmssRegularFilePathIsReadable($path) || !is_readable($path)) return null;
     $lines = @file($path, FILE_IGNORE_NEW_LINES);
     if (!is_array($lines)) { $log($readWarning.$path); return null; }
     return $lines;

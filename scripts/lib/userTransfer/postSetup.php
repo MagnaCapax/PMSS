@@ -85,7 +85,7 @@ function pmssUserTransferRequestRtorrentRestart(string $home, string $localUser)
 function pmssUserTransferRunRtorrentRestart(string $home, string $localUser): void
 {
     $restartScript = $home.'/.rtorrentRestart.php';
-    if (!is_file($restartScript) || is_link($restartScript) || !pmssUserTransferIsPathWithinHome($restartScript, $home)) {
+    if (!pmssRegularFilePathIsReadable($restartScript) || !pmssUserTransferIsPathWithinHome($restartScript, $home)) {
         logMessage('[WARN] Skipping rTorrent restart execution (restart script missing or unsafe)');
         return;
     }
