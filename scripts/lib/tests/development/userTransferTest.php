@@ -446,6 +446,46 @@ SNAP;
         ], 'Restart script must not blindly kill the lock PID: ');
     }
 
+    public function testRestartMarkerNeverFollowsATenantPlantedSymlink(): void
+    {
+        $base = $this->pmssMakeTempDir('pmss-userTransfer-marker-');
+        $logDir = $base.'/logs';
+        $this->pmssEnsureDir($base.'/www');
+        $this->pmssEnsureDir($logDir);
+        $user = (string) (posix_getpwuid(posix_geteuid())['name'] ?? '');
+        $marker = $base.'/www/.rtorrentRestart';
+        $create = function () use ($marker, $user, $logDir): bool {
+            $created = false;
+            $this->pmssCaptureStdout(function () use ($marker, $user, &$created): void {
+                $created = \pmssUserTransferCreateRestartMarker($marker, $user);
+            }, ['PMSS_LOG_DIR' => $logDir]);
+            clearstatcache();
+            return $created;
+        };
+
+        // A plain path: the marker is created as an empty regular file.
+        $this->assertTrue($create(), 'marker must be created on a clean path');
+        $this->assertTrue(is_file($marker) && !is_link($marker), 'marker must be a regular file');
+        $this->assertSame(0, filesize($marker), 'marker must be empty');
+        unlink($marker);
+
+        // A symlink to an existing file: refused, and the target is never touched.
+        $target = $base.'/root-owned-target';
+        file_put_contents($target, 'secret');
+        $targetMtime = filemtime($target);
+        symlink($target, $marker);
+        $this->assertFalse($create(), 'a planted symlink must be refused');
+        $this->assertSame('secret', file_get_contents($target), 'symlink target must be untouched');
+        $this->assertSame($targetMtime, filemtime($target), 'symlink target mtime must be untouched');
+
+        // A dangling symlink: refused, and the target is never created.
+        unlink($marker);
+        $absent = $base.'/should-not-exist';
+        symlink($absent, $marker);
+        $this->assertFalse($create(), 'a dangling symlink must be refused');
+        $this->assertFalse(file_exists($absent), 'dangling symlink target must not be created');
+    }
+
     public function testUserTransferRtorrentRestartVerificationHelpers(): void
     {
         $home = $this->pmssMakeTempDir('pmss-userTransfer-rtorrent-verify-');

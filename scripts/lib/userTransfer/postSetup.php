@@ -74,9 +74,31 @@ function pmssUserTransferRequestRtorrentRestart(string $home, string $localUser)
     }
 
     $marker = $wwwDir.'/.rtorrentRestart';
-    runStep('Requesting rTorrent restart marker', pmssBuildCommand('touch', [$marker]));
-    runStep('Setting rTorrent restart marker owner', pmssBuildCommand('chown', [$localUser.':'.$localUser, $marker]));
+    if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+        logMessage('[SKIP] Requesting rTorrent restart marker (dry run)');
+    } elseif (!pmssUserTransferCreateRestartMarker($marker, $localUser)) {
+        logMessage('[WARN] Skipping rTorrent restart marker (could not create it safely)');
+        return;
+    }
     pmssUserTransferRunRtorrentRestart($home, $localUser);
+}
+
+/**
+ * Create the restart marker without ever following a symlink.
+ *
+ * This runs as root inside the tenant-owned ~/www, so it must never dereference whatever is
+ * at that path (ADR-0041: unsafe symlinks are refused). The consumer (~/.rtorrentRestart.php)
+ * only checks that the marker exists and then unlinks it, so an empty file written through the
+ * shared symlink-safe writer (same-dir temp file + atomic rename, symlinked parents refused)
+ * is all that is needed.
+ */
+function pmssUserTransferCreateRestartMarker(string $marker, string $localUser): bool
+{
+    if (!pmssWriteUserFile($marker, '', $localUser, 0644)) {
+        return false;
+    }
+    logMessage('[OK] Requested rTorrent restart marker');
+    return true;
 }
 
 /**
