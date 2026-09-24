@@ -24,10 +24,6 @@ class UpdateBackwardsVersionGuardTest extends TestCase
             'recorded_spec' => 'git/main',
         ]));
         $installedVersion = 'git/main@2026-09-10 03:04';
-        $this->assertTrue(
-            \pmssMetadataProvesInstalledFallbackDate($installedVersion, $metadata),
-            'missing fetched_version marks stored date as fallback'
-        );
         $installedVersion = \pmssInstalledVersionForOrdering($installedVersion, $metadata);
 
         $decision = \pmssVersionMoveDecision(
@@ -47,10 +43,6 @@ class UpdateBackwardsVersionGuardTest extends TestCase
             'recorded_spec' => 'git/main',
         ]));
         $installedVersion = 'git/main@2026-09-10 03:04';
-        $this->assertFalse(
-            \pmssMetadataProvesInstalledFallbackDate($installedVersion, $metadata),
-            'content-dated fetched_version remains authoritative'
-        );
         $installedVersion = \pmssInstalledVersionForOrdering($installedVersion, $metadata);
 
         $decision = \pmssVersionMoveDecision(
@@ -93,6 +85,25 @@ class UpdateBackwardsVersionGuardTest extends TestCase
 
         $this->assertTrue($decision['allowed'], 'same-day movement is not a proven backwards move');
         $this->assertSame('same', $decision['ordering']);
+    }
+
+    public function testVersionFactSnapshotLocksAcceptedLabelShapes(): void
+    {
+        $labels = [
+            ' git/main@2026-07-19T12:34 ',
+            'release:2026-01-21',
+            'git/main:2025-12-31 09:00',
+            '2024-02-29 23:59',
+            'release:2026-02-31@2026-03-01 08:00',
+            '',
+        ];
+        $facts = array_map('pmssVersionFacts', $labels);
+
+        $this->assertSame(
+            '8aaeccfe579b235861e9373bafa5d780444b5a68ce49b0c07f1da784e9ff1c71',
+            hash('sha256', serialize($facts)),
+            'version label parsing is the behavior lock for the consolidated fact model'
+        );
     }
 
     public function testGuardRunsAfterFetchAndBeforeStaging(): void

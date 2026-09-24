@@ -1633,14 +1633,9 @@ function pmssBuildVersionSpec(array $spec): string
     return $version.($pin !== '' ? ':'.$pin : '');
 }
 
-function pmssSpecHasExplicitVersionPin(array $spec): bool
-{
-    return trim((string) ($spec['pin'] ?? '')) !== '';
-}
-
 function pmssFetchedVersionLine(array $spec, string $fetchedVersion, string $tmp): string
 {
-    if (($spec['type'] ?? '') !== 'git' || pmssSpecHasExplicitVersionPin($spec)) {
+    if (($spec['type'] ?? '') !== 'git' || trim((string) ($spec['pin'] ?? '')) !== '') {
         return $fetchedVersion;
     }
 
@@ -1648,47 +1643,44 @@ function pmssFetchedVersionLine(array $spec, string $fetchedVersion, string $tmp
     return $timestamp !== '' ? $fetchedVersion.'@'.$timestamp : $fetchedVersion;
 }
 
-function pmssVersionOrderingDate(string $version): string
+/**
+ * Parse the reusable facts carried by a fetched or recorded version label.
+ *
+ * @return array{spec:string,recorded_timestamp:string,order_date:string}
+ */
+function pmssVersionFacts(string $version): array
 {
     $version = trim($version);
-    if ($version === '') {
-        return '';
-    }
-
     $spec = $version;
-    $recorded = '';
+    $recordedTimestamp = '';
     if (preg_match('/^(.*)@(\d{4}-\d{2}-\d{2})(?:[ T]\d{2}:\d{2})?$/', $version, $m) === 1) {
         $spec = trim($m[1]);
-        $recorded = $m[2];
+        $recordedTimestamp = str_replace('T', ' ', substr($version, strlen($m[1]) + 1));
     }
 
+    $candidate = '';
     if (preg_match('/^release[:\/].*?(\d{4}-\d{2}-\d{2})/i', $spec, $m) === 1) {
-        return pmssValidatedVersionDate($m[1]);
-    }
-    if (preg_match('/^git\/.+:(\d{4}-\d{2}-\d{2})(?:[ T]\d{2}:\d{2})?$/i', $spec, $m) === 1) {
-        return pmssValidatedVersionDate($m[1]);
-    }
-    if (preg_match('/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?$/', $spec, $m) === 1) {
-        return pmssValidatedVersionDate(substr($spec, 0, 10));
-    }
-    if ($recorded !== '' && preg_match('/^(git\/.+|release)$/i', $spec) === 1) {
-        return pmssValidatedVersionDate($recorded);
+        $candidate = $m[1];
+    } elseif (preg_match('/^git\/.+:(\d{4}-\d{2}-\d{2})(?:[ T]\d{2}:\d{2})?$/i', $spec, $m) === 1) {
+        $candidate = $m[1];
+    } elseif (preg_match('/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?$/', $spec) === 1) {
+        $candidate = substr($spec, 0, 10);
+    } elseif ($recordedTimestamp !== '' && preg_match('/^(git\/.+|release)$/i', $spec) === 1) {
+        $candidate = substr($recordedTimestamp, 0, 10);
     }
 
-    return '';
+    $orderDate = '';
+    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $candidate, $m) === 1
+        && checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
+        $orderDate = $candidate;
+    }
+
+    return ['spec' => $spec, 'recorded_timestamp' => $recordedTimestamp, 'order_date' => $orderDate];
 }
 
-function pmssValidatedVersionDate(string $date): string
+function pmssVersionOrderingDate(string $version): string
 {
-    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m) !== 1) {
-        return '';
-    }
-
-    if (!checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
-        return '';
-    }
-
-    return $m[1].'-'.$m[2].'-'.$m[3];
+    return pmssVersionFacts($version)['order_date'];
 }
 
 function pmssVersionMoveDecision(
@@ -1697,8 +1689,8 @@ function pmssVersionMoveDecision(
     bool $explicitTarget
 ): array
 {
-    $installedDate = pmssVersionOrderingDate($installedVersion);
-    $fetchedDate = pmssVersionOrderingDate($fetchedVersion);
+    $installedDate = pmssVersionFacts($installedVersion)['order_date'];
+    $fetchedDate = pmssVersionFacts($fetchedVersion)['order_date'];
     if ($installedDate === '' || $fetchedDate === '') {
         return ['allowed' => true, 'ordering' => 'indeterminate', 'installed_order' => $installedDate, 'fetched_order' => $fetchedDate];
     }
@@ -1714,64 +1706,42 @@ function pmssVersionMoveDecision(
     ];
 }
 
-function pmssVersionSpecWithoutRecordedDate(string $version): string
+function pmssInstalledVersionForOrdering(string $installedVersion, string $metadataPath): string
 {
-    $version = trim($version);
-    if (preg_match('/^(.*)@\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?$/', $version, $m) === 1) {
-        return trim($m[1]);
-    }
-
-    return $version;
-}
-
-function pmssMetadataProvesInstalledFallbackDate(string $installedVersion, string $metadataPath): bool
-{
-    $spec = pmssVersionSpecWithoutRecordedDate($installedVersion);
+    $facts = pmssVersionFacts($installedVersion);
+    $spec = $facts['spec'];
     if ($spec === '' || $spec === trim($installedVersion)) {
-        return false;
+        return $installedVersion;
     }
     if (preg_match('/^(git\/.+|release)$/i', $spec) !== 1) {
-        return false;
+        return $installedVersion;
     }
     if (!is_readable($metadataPath)) {
-        return false;
+        return $installedVersion;
     }
 
     $raw = @file_get_contents($metadataPath);
     if (!is_string($raw) || trim($raw) === '') {
-        return false;
+        return $installedVersion;
     }
 
     $metadata = json_decode($raw, true);
     if (!is_array($metadata)) {
-        return false;
+        return $installedVersion;
     }
 
     $recordedSpec = trim((string) ($metadata['recorded_spec'] ?? ''));
     if ($recordedSpec !== '' && $recordedSpec !== $spec) {
-        return false;
+        return $installedVersion;
     }
 
     $fetchedVersion = array_key_exists('fetched_version', $metadata)
         ? trim((string) $metadata['fetched_version'])
         : '';
 
-    return $fetchedVersion === '' || pmssVersionOrderingDate($fetchedVersion) === '';
-}
-
-function pmssInstalledVersionForOrdering(string $installedVersion, string $metadataPath): string
-{
-    if (!pmssMetadataProvesInstalledFallbackDate($installedVersion, $metadataPath)) {
-        return $installedVersion;
-    }
-
-    return pmssVersionSpecWithoutRecordedDate($installedVersion);
-}
-
-function pmssVersionLogLabel(string $version): string
-{
-    $version = trim($version);
-    return $version !== '' ? $version : '(none)';
+    return $fetchedVersion === '' || pmssVersionFacts($fetchedVersion)['order_date'] === ''
+        ? $spec
+        : $installedVersion;
 }
 
 function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarget): void
@@ -1782,8 +1752,10 @@ function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarg
     $installedVersionForOrdering = pmssInstalledVersionForOrdering($installedVersion, VERSION_META);
     $decision = pmssVersionMoveDecision($installedVersionForOrdering, $fetchedVersion, $explicitTarget);
     $mode = $explicitTarget ? 'explicit target' : 'unpinned target';
+    $installedLabel = $installedVersion !== '' ? $installedVersion : '(none)';
+    $fetchedLabel = trim($fetchedVersion) !== '' ? trim($fetchedVersion) : '(none)';
     $message = '[INFO] Snapshot version transition: '
-        .pmssVersionLogLabel($installedVersion).' -> '.pmssVersionLogLabel($fetchedVersion)
+        .$installedLabel.' -> '.$fetchedLabel
         .' ('.$decision['ordering'].', '.$mode.')';
 
     if ($decision['ordering'] === 'indeterminate') {
@@ -1813,8 +1785,7 @@ function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarg
     if (!$decision['allowed']) {
         fatal(
             'Refusing unpinned backwards PMSS version move: installed '
-            .pmssVersionLogLabel($installedVersion).' is newer than fetched '
-            .pmssVersionLogLabel($fetchedVersion)
+            .$installedLabel.' is newer than fetched '.$fetchedLabel
             .'. Pin the target explicitly (release:<tag> or git/<branch>:YYYY-MM-DD) if this rollback is intended.',
             EXIT_FETCH
         );
@@ -1832,19 +1803,13 @@ function pmssGuardSnapshotVersionMove(string $fetchedVersion, bool $explicitTarg
  */
 function pmssRecordedVersionLine(string $spec, string $fetchedVersion): string
 {
-    $contentDate = '';
-    if (preg_match('/@(\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?)$/', trim($fetchedVersion), $matches) === 1) {
-        $contentDate = str_replace('T', ' ', $matches[1]);
-        if (strlen($contentDate) === 10) {
-            $contentDate .= ' 00:00';
-        }
-    }
+    $facts = pmssVersionFacts($fetchedVersion);
+    $contentDate = $facts['recorded_timestamp'];
 
     if ($contentDate === '') {
-        $orderingDate = pmssVersionOrderingDate($fetchedVersion);
-        if ($orderingDate !== '') {
-            $contentDate = $orderingDate.' 00:00';
-        }
+        $contentDate = $facts['order_date'] !== '' ? $facts['order_date'].' 00:00' : '';
+    } elseif (strlen($contentDate) === 10) {
+        $contentDate .= ' 00:00';
     }
 
     return $contentDate !== '' ? $spec.'@'.$contentDate : $spec;
@@ -2117,7 +2082,7 @@ function bootstrapMain(array $argv): void
         fatal("Invalid source spec '{$options['spec']}'", EXIT_PARSE);
     }
     $spec = parseSpec($specRaw);
-    $explicitVersionTarget = pmssSpecHasExplicitVersionPin($spec);
+    $explicitVersionTarget = trim((string) ($spec['pin'] ?? '')) !== '';
 
     logmsg('Source spec → '.json_encode($spec));
     logEvent('update_start', [
