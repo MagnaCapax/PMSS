@@ -326,14 +326,15 @@ BASH
         );
         $this->pmssWriteExecutableFile($bin.'/curl', <<<'BASH'
 #!/usr/bin/env bash
-curl_config="" output="" write_format="" method="GET"
+curl_config="" output="" write_format="" method="GET" data_binary=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --config) curl_config="${2:-}"; shift 2 ;;
         -o) output="${2:-}"; shift 2 ;;
         -w) write_format="${2:-}"; shift 2 ;;
         -X) method="${2:-}"; shift 2 ;;
-        --max-time|-H|--data-binary) shift 2 ;;
+        --data-binary) data_binary="${2:-}"; shift 2 ;;
+        --max-time|-H) shift 2 ;;
         *) shift ;;
     esac
 done
@@ -344,6 +345,8 @@ if [[ -n "$curl_config" && -f "$curl_config" && "$(cat "$curl_config")" == "$EXP
 fi
 if [[ "$method" == "PUT" ]]; then
     [[ "$authenticated" -eq 1 ]] || { printf '401'; exit 0; }
+    payload_file="${data_binary#@}"
+    grep -q '"updateMechanism":"builtIn"' "$payload_file" || exit 24
     printf 'write:authenticated\n' >> "$TRACE"
     printf '200'
     exit 0
@@ -356,7 +359,7 @@ if [[ -n "$write_format" ]]; then
 fi
 if [[ -n "$output" && "$output" != "/dev/null" ]]; then
     [[ "$authenticated" -eq 1 ]] || exit 22
-    printf '{}\n' > "$output"
+    printf '{"updateMechanism":"script","updateScriptPath":""}\n' > "$output"
     printf 'read:authenticated\n' >> "$TRACE"
     exit 0
 fi
@@ -384,7 +387,7 @@ BASH
             'DOTNET_ROOT_PATH=/opt/dotnet',
             'MEDIA_STACK_AUTH_USERNAME=pmss',
             'servarr_config_auth_configured() { return 1; }',
-            'servarr_config_xml_tag_converge() { :; }',
+            'servarr_config_xml_tag_converge() { printf "tag:%s=%s\\n" "$2" "$3" >> "$TRACE"; }',
             'media_stack_credentials_value() { :; }',
             'media_stack_app_key() { printf "%s" "$1"; }',
             'log_info() { :; }',
@@ -411,6 +414,7 @@ BASH
             'read:authenticated',
             'write:authenticated',
             'verify:unauthenticated',
+            'tag:UpdateMechanism=Script',
         ), $traceOutput);
         $this->assertStringContainsString('invalid_keys_rejected', $output);
         $this->assertStringContainsString('leftovers=0', $output, 'seed must remove temporary files containing credentials');

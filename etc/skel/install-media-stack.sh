@@ -1648,6 +1648,7 @@ servarr_auth_seed() {
 	servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 	servarr_config_xml_tag_converge "$config_file" AuthenticationMethod Forms
 	servarr_config_xml_tag_converge "$config_file" AuthenticationRequired Enabled
+	servarr_config_xml_tag_converge "$config_file" UpdateMechanism Script
 	log_ok "${install_name} app-level auth configured"
 }
 
