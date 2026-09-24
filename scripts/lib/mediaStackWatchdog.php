@@ -44,12 +44,6 @@ function pmssMediaStackWatchdogExpectedApps(string $home): array
     return $apps;
 }
 
-/** Return the existing panel install marker. */
-function pmssMediaStackWatchdogInstalled(string $home): bool
-{
-    return is_file($home.'/.config/jellyfin/config/network.xml');
-}
-
 /** Resolve the published status path without following an unsafe home target. */
 function pmssMediaStackWatchdogStatusPath(string $home): string
 {
@@ -130,7 +124,7 @@ function pmssMediaStackWatchdogRunUser(string $username, string $homeRoot = '/ho
         return null;
     }
     $home = rtrim($homeRoot, '/').'/'.$username;
-    if (!is_dir($home) || !pmssMediaStackWatchdogInstalled($home)) {
+    if (!is_dir($home) || !is_file($home.'/.config/jellyfin/config/network.xml')) {
         return null;
     }
     $apps = pmssMediaStackWatchdogExpectedApps($home);

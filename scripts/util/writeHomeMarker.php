@@ -31,19 +31,6 @@ require_once __DIR__.'/../lib/user/identity.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 require_once __DIR__.'/../lib/user/homeMarkerRegistry.php';
 
-/**
- * Resolve a tenant home that is safe to write into: it must be a real directory whose
- * own path is not a symlink (a symlinked home would let the tenant redirect the parent).
- */
-function pmssHomeMarkerResolveHome(string $user): ?string
-{
-    $home = '/home/'.$user;
-    if (!is_dir($home) || is_link($home) || @realpath($home) !== $home) {
-        return null;
-    }
-    return $home;
-}
-
 function pmssWriteHomeMarkerCli(array $argv): int
 {
     $usage = "Usage: writeHomeMarker.php <user> <marker> <intValue>\n";
@@ -77,8 +64,9 @@ function pmssWriteHomeMarkerCli(array $argv): int
     }
     $value = (int) $raw;
 
-    $home = pmssHomeMarkerResolveHome($user);
-    if ($home === null) {
+    // The home must be a real directory whose path cannot redirect the root write.
+    $home = '/home/'.$user;
+    if (!is_dir($home) || is_link($home) || @realpath($home) !== $home) {
         fwrite(STDERR, "Error: home for '{$user}' is missing or unsafe.\n");
         return 5;
     }

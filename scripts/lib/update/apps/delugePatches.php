@@ -154,10 +154,10 @@ function pmssDelugePatchEnsure(array $patterns, callable $patch, bool $dryRun, c
     return $patched;
 }
 
-/** @return array<int,array{patterns:array<int,string>,patch:callable,message:string}> */
-function pmssDelugePatchSpecs(): array
+/** Run every known Deluge compatibility patch and emit legacy status lines. */
+function pmssDelugePatchAll(bool $dryRun, callable $log): void
 {
-    return [
+    $specs = [
         [
             'patterns' => ['/usr/lib/python3/dist-packages/deluge/core/core.py', '/usr/lib/python3*/dist-packages/deluge/core/core.py', '/usr/local/lib/python3*/dist-packages/deluge/core/core.py'],
             'patch' => 'pmssPatchDelugeCacheHitRatio',
@@ -174,12 +174,7 @@ function pmssDelugePatchSpecs(): array
             'message' => "\t*** Deluge gettext Python 3.11 compatibility ensured\n",
         ],
     ];
-}
-
-/** Run every known Deluge compatibility patch and emit legacy status lines. */
-function pmssDelugePatchAll(bool $dryRun, callable $log): void
-{
-    foreach (pmssDelugePatchSpecs() as $spec) {
+    foreach ($specs as $spec) {
         if (pmssDelugePatchEnsure($spec['patterns'], $spec['patch'], $dryRun, $log)) echo $spec['message'];
     }
 }

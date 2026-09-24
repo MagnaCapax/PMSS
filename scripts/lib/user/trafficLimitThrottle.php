@@ -129,15 +129,6 @@ function pmssTrafficLimitThrottleApply(string $user, int $trafficCapMbit, bool $
 }
 
 /**
- * Check whether the per-user throttle cap exists as a safe regular file.
- */
-function pmssTrafficLimitThrottleFileExists(string $user, string $homeRoot = '/home'): bool
-{
-    $throttleFile = pmssTrafficLimitThrottleFilePath($user, $homeRoot);
-    return $throttleFile !== null && pmssRegularFilePathIsReadable($throttleFile);
-}
-
-/**
  * Remove stale persistent throttle state when the runtime enforcement marker is gone.
  */
 function pmssTrafficLimitThrottleOrphanReconcile(
@@ -150,7 +141,9 @@ function pmssTrafficLimitThrottleOrphanReconcile(
         pmssTrafficLimitLog($user, "traffic throttle marker path unsafe ({$enabledMarkerPath})");
         return false;
     }
-    if (file_exists($enabledMarkerPath) || is_link($enabledMarkerPath) || !pmssTrafficLimitThrottleFileExists($user, $homeRoot)) {
+    $throttleFile = pmssTrafficLimitThrottleFilePath($user, $homeRoot);
+    if (file_exists($enabledMarkerPath) || is_link($enabledMarkerPath)
+        || $throttleFile === null || !pmssRegularFilePathIsReadable($throttleFile)) {
         return true;
     }
 

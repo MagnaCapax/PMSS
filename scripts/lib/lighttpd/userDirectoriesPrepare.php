@@ -36,18 +36,12 @@ function pmssLighttpdWatchdogSocketPaths(string $homeDir, string $configPath): a
     }, range(0, min($maxProcs, $minProcs > 0 ? $minProcs : $maxProcs) - 1));
 }
 
-function pmssLighttpdWatchedConfigPaths(string $homeDir, string $configPath): array
-{
-    $paths = [$configPath, rtrim($homeDir, '/').'/.lighttpd/custom'];
-    $paths = array_merge($paths, glob(rtrim($homeDir, '/').'/.lighttpd/custom.d/*.conf') ?: []);
-
-    return array_values(array_filter($paths, 'pmssRegularFilePathIsReadable'));
-}
-
 function pmssLighttpdNewestConfigMtime(string $homeDir, string $configPath): ?int
 {
     $newest = null;
-    foreach (pmssLighttpdWatchedConfigPaths($homeDir, $configPath) as $path) {
+    $lighttpdDir = rtrim($homeDir, '/').'/.lighttpd';
+    $paths = array_merge([$configPath, $lighttpdDir.'/custom'], glob($lighttpdDir.'/custom.d/*.conf') ?: []);
+    foreach (array_filter($paths, 'pmssRegularFilePathIsReadable') as $path) {
         $mtime = @filemtime($path);
         if (is_int($mtime)) {
             $newest = $newest === null ? $mtime : max($newest, $mtime);
