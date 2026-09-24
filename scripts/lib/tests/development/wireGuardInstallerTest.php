@@ -133,6 +133,11 @@ class WireGuardInstallerTest extends TestCase
                 'PublicKey = '.$aliceKey,
                 'PublicKey = '.$bobKey,
             ]);
+            $this->assertSame(
+                'b946445515861e459499723c0c9456e0b85c37e19f5af3728a32d6bf4637addf',
+                hash('sha256', $contents),
+                'WireGuard config bytes changed'
+            );
             $this->assertMatches('/AllowedIPs = 10\\.90\\.90\\.[0-9]+\\/32/', $contents);
         });
     }

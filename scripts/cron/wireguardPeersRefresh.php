@@ -46,12 +46,8 @@ if ($endpoint === '') {
     $endpoint = $hostname;
 }
 
-$guideTemplate = wgBuildClientGuide($pubKey, $endpoint, $listenPort);
-wgBootstrapUserGuides($guideTemplate);
-$assignedPeers = wgAssignClientIps(wgCollectUserPublicKeys());
-wgSyncUserGuideAddresses($assignedPeers, $guideTemplate);
-
-$newConfig = wireguardBuildConfig($privKey, $listenPort);
+$peerState = wgClientStateReconcile($pubKey, $endpoint, $listenPort);
+$newConfig = wireguardBuildConfig($privKey, $listenPort, $peerState);
 
 if ($newConfig === $current) {
     // No change in peers or base config; avoid unnecessary restarts.
