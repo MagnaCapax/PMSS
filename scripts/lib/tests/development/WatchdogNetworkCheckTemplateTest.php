@@ -19,6 +19,34 @@ class WatchdogNetworkCheckTemplateTest extends TestCase
         ], $template);
     }
 
+    public function testNetworkCheckPreservesFailureEvidence(): void
+    {
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.network-check.sh');
+
+        // The check can end in a reboot and /run is tmpfs, so the evidence has to reach
+        // syslog to survive the decision it makes. (Refs #916, Refs #669)
+        $this->assertStringContainsAllStrings([
+            'logger -t "$LOG_TAG"',
+            'failure window opened',
+            'SUSTAINED FAILURE',
+            'recovered on ${ip}',
+            'ping-binary-missing',
+        ], $template);
+    }
+
+    public function testNetworkCheckRateLimitsItsOwnLogging(): void
+    {
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.network-check.sh');
+
+        // The daemon runs this every 10s against an 1800s window: without a rate limit
+        // a single window would write 180 lines into syslog.
+        $this->assertStringContainsAllStrings([
+            'LOG_INTERVAL=60',
+            'log_due() {',
+            'if log_due "$now"; then',
+        ], $template);
+    }
+
     public function testNetworkCheckKeepsTransientExitUntilThreshold(): void
     {
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.network-check.sh');
