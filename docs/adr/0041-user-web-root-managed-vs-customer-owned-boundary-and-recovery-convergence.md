@@ -70,6 +70,10 @@ target paths (final decision recorded here):
   implementation audit confirms it holds mutable user overrides.
 Migration MUST preserve bytes, ownership, and modes, and MUST never overwrite or
 delete a conflicting destination — preserve the conflict and log it.
+Rename-path verification compares each entry's device, inode, type, mode,
+ownership, and (for files) size and modification time; copy-path verification
+retains full content hashing. This keeps atomic moves free of whole-tree reads
+without weakening copied-data verification (Refs #768).
 
 ## Consequences
 - Positive: `rm -rf ~/www` recovers a usable panel + ruTorrent in one watchdog

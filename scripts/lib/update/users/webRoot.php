@@ -37,12 +37,17 @@ function pmssUserWebRootMigrationParentSafe(string $home, string $path): bool
 }
 
 /**
- * Collect file metadata and hashes without traversing symlinks.
+ * Collect file metadata with content or inode identity without traversing symlinks.
  *
  * A symlink anywhere in a moved tree is refused because relocating it could
  * change the meaning of a relative target even though rename() itself is safe.
  */
-function pmssUserWebRootMigrationSnapshotWalk(string $path, string $relative, array &$snapshot): bool
+function pmssUserWebRootMigrationSnapshotWalk(
+    string $path,
+    string $relative,
+    array &$snapshot,
+    bool $identity
+): bool
 {
     if (is_link($path) || !is_array($stat = @lstat($path))) {
         return false;
@@ -57,7 +62,20 @@ function pmssUserWebRootMigrationSnapshotWalk(string $path, string $relative, ar
     if ($entry['type'] === 'other') {
         return false;
     }
-    if ($entry['type'] === 'file') {
+    if ($identity) {
+        if (!isset($stat['dev'], $stat['ino'])) {
+            return false;
+        }
+        $entry['dev'] = (int) $stat['dev'];
+        $entry['ino'] = (int) $stat['ino'];
+        if ($entry['type'] === 'file') {
+            if (!isset($stat['size'], $stat['mtime'])) {
+                return false;
+            }
+            $entry['size'] = (int) $stat['size'];
+            $entry['mtime'] = (int) $stat['mtime'];
+        }
+    } elseif ($entry['type'] === 'file') {
         $entry['sha256'] = @hash_file('sha256', $path);
         if (!is_string($entry['sha256'])) {
             return false;
@@ -75,7 +93,7 @@ function pmssUserWebRootMigrationSnapshotWalk(string $path, string $relative, ar
     }
     foreach ($children as $child) {
         $childRelative = $relative === '' ? $child : $relative.'/'.$child;
-        if (!pmssUserWebRootMigrationSnapshotWalk($path.'/'.$child, $childRelative, $snapshot)) {
+        if (!pmssUserWebRootMigrationSnapshotWalk($path.'/'.$child, $childRelative, $snapshot, $identity)) {
             return false;
         }
     }
@@ -83,15 +101,15 @@ function pmssUserWebRootMigrationSnapshotWalk(string $path, string $relative, ar
     return true;
 }
 
-/** Return a verified snapshot, or null when the tree is unsafe to move. */
-function pmssUserWebRootMigrationSnapshot(string $path): ?array
+/** Return a content snapshot by default, or an inode-identity snapshot for rename verification. */
+function pmssUserWebRootMigrationSnapshot(string $path, bool $identity = false): ?array
 {
     if (!is_dir($path) || is_link($path)) {
         return null;
     }
 
     $snapshot = [];
-    if (!pmssUserWebRootMigrationSnapshotWalk($path, '', $snapshot)) {
+    if (!pmssUserWebRootMigrationSnapshotWalk($path, '', $snapshot, $identity)) {
         return null;
     }
     ksort($snapshot);
@@ -416,7 +434,7 @@ function pmssUserMigrateWebRootPath(
         return;
     }
 
-    $before = pmssUserWebRootMigrationSnapshot($source);
+    $before = pmssUserWebRootMigrationSnapshot($source, true);
     if ($before === null) {
         pmssUserWebRootMigrationLog($user, $logger, 'Refusing unsafe symlink or unreadable tree at '.$sourceRelative);
         return;
@@ -428,7 +446,7 @@ function pmssUserMigrateWebRootPath(
         return;
     }
 
-    $after = pmssUserWebRootMigrationSnapshot($target);
+    $after = pmssUserWebRootMigrationSnapshot($target, true);
     if ($after === null || $before !== $after) {
         $restored = !file_exists($source) && !is_link($source) && @rename($target, $source);
         pmssUserWebRootMigrationLog($user, $logger, $restored

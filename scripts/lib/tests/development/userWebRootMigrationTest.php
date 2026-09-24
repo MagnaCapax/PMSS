@@ -103,6 +103,68 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertTrue($this->pmssMessagesContain($messages, 'Refusing unexpected symlink at www/public'));
     }
 
+    public function testIdentitySnapshotMatchesNestedTreeAfterRename(): void
+    {
+        $source = $this->home.'/www/public';
+        $target = $this->home.'/.local/share/pmss/public';
+        $file = $source.'/nested/deeper/index.html';
+        $this->pmssWriteFile($file, 'identity-payload');
+
+        $before = \pmssUserWebRootMigrationSnapshot($source, true);
+        $this->pmssEnsureDir(dirname($target));
+        $this->assertTrue(rename($source, $target));
+        $after = \pmssUserWebRootMigrationSnapshot($target, true);
+
+        $this->assertTrue(is_array($before));
+        $this->assertSame($before, $after);
+        $this->assertFalse(array_key_exists('ctime', $before['']));
+        $this->assertFalse(array_key_exists('sha256', $before['nested/deeper/index.html']));
+    }
+
+    public function testIdentitySnapshotDetectsFileMetadataChange(): void
+    {
+        $target = $this->home.'/www/public';
+        $file = $target.'/index.html';
+        $this->pmssWriteFile($file, 'before');
+        $before = \pmssUserWebRootMigrationSnapshot($target, true);
+
+        $this->pmssWriteFile($file, 'after-with-a-different-size');
+        touch($file, time() + 5);
+        clearstatcache(true, $file);
+        $after = \pmssUserWebRootMigrationSnapshot($target, true);
+
+        $this->assertFalse($before === $after);
+    }
+
+    public function testIdentitySnapshotDetectsSameContentReplacement(): void
+    {
+        $target = $this->home.'/www/public';
+        $file = $target.'/index.html';
+        $replacement = $target.'/replacement';
+        $this->pmssWriteFile($file, 'same-payload');
+        $before = \pmssUserWebRootMigrationSnapshot($target, true);
+
+        $this->pmssWriteFile($replacement, 'same-payload');
+        $this->assertTrue(rename($replacement, $file));
+        clearstatcache(true, $file);
+        $after = \pmssUserWebRootMigrationSnapshot($target, true);
+
+        $this->assertEquals('same-payload', file_get_contents($file));
+        $this->assertFalse($before === $after);
+    }
+
+    public function testNestedSymlinkIsRefusedByBothSnapshotModes(): void
+    {
+        $target = $this->home.'/www/public';
+        $outside = $this->homeRoot.'/outside-snapshot';
+        $this->pmssWriteFile($outside.'/index.html', 'outside');
+        $this->pmssEnsureDir($target.'/nested');
+        $this->pmssCreateSymlinkOrSkip($outside, $target.'/nested/link');
+
+        $this->assertSame(null, \pmssUserWebRootMigrationSnapshot($target));
+        $this->assertSame(null, \pmssUserWebRootMigrationSnapshot($target, true));
+    }
+
     public function testExistingDurableTreeGetsLinkBackWhenSourceIsMissing(): void
     {
         $target = $this->home.'/.local/share/pmss/rutorrent/share';
