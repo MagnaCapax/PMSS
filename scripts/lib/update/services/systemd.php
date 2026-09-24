@@ -198,13 +198,11 @@ function pmssEnsureCronPamSystemdSession(string $pamCronPath = '/etc/pam.d/cron'
     if (preg_match('/^[^#\n]*\bpam_systemd\.so\b/m', $content) === 1) {
         return true; // already present
     }
-    $perms = (fileperms($pamCronPath) & 0777) ?: 0644;
     $new = rtrim($content, "\n")."\n".pmssCronPamSystemdLine();
-    if (@file_put_contents($pamCronPath, $new, LOCK_EX) === false) {
+    if (!pmssReplaceUserFilePreservingMetadata($pamCronPath, $new)) {
         logMessage('[ERR] Failed to append pam_systemd to cron PAM file: '.$pamCronPath);
         return false;
     }
-    @chmod($pamCronPath, $perms);
     return true;
 }
 

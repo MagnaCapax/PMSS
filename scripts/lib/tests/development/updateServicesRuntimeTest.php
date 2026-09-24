@@ -137,13 +137,16 @@ class UpdateServicesRuntimeTest extends TestCase
 
         $f = tempnam(sys_get_temp_dir(), 'pmss-cron-pam-');
         try {
-            file_put_contents($f, "@include common-auth\nsession    required     pam_loginuid.so\n");
+            $original = "@include common-auth\nsession    required     pam_loginuid.so\n";
+            file_put_contents($f, $original);
+            chmod($f, 0640);
+            $owner = fileowner($f);
 
             // Appends pam_systemd to an existing regular cron PAM file.
             $this->assertTrue(\pmssEnsureCronPamSystemdSession($f));
-            $this->assertTrue(strpos(file_get_contents($f), 'pam_systemd.so') !== false);
-            // Original lines preserved.
-            $this->assertTrue(strpos(file_get_contents($f), 'pam_loginuid.so') !== false);
+            $this->assertSame($original.\pmssCronPamSystemdLine(), file_get_contents($f));
+            $this->assertSame(0640, fileperms($f) & 0777);
+            $this->assertSame($owner, fileowner($f));
 
             // Idempotent: a second call does not duplicate the line.
             $this->assertTrue(\pmssEnsureCronPamSystemdSession($f));
@@ -167,6 +170,17 @@ class UpdateServicesRuntimeTest extends TestCase
         @unlink($absent);
         $this->assertTrue(\pmssEnsureCronPamSystemdSession($absent));
         $this->assertFalse(file_exists($absent));
+    }
+
+    public function testCronPamSystemdSessionUsesAtomicMetadataPreservingWrite(): void
+    {
+        $this->pmssAssertRepoFileContract('scripts/lib/update/services/systemd.php', [
+            'required' => ['pmssReplaceUserFilePreservingMetadata($pamCronPath, $new)'],
+            'forbidden' => [
+                '@file_put_contents($pamCron'.'Path' => 'cron PAM updates must not truncate the live file in place',
+                '@chmod($pamCron'.'Path' => 'cron PAM metadata must be applied before atomic replacement',
+            ],
+        ]);
     }
 
     public function testSshdStarvationDropinTemplateDocumentsDefenseInDepth(): void
