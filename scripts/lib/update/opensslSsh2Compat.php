@@ -89,17 +89,6 @@ function pmssOpenSslSsh2CompatDebsByPrefix(array $debs, string $prefix): array
     }));
 }
 
-function pmssOpenSslSsh2CompatFirstDebByPrefix(array $debs, string $prefix): string
-{
-    foreach ($debs as $deb) {
-        if (strpos(basename($deb), $prefix) === 0) {
-            return $deb;
-        }
-    }
-
-    return '';
-}
-
 function pmssOpenSslSsh2CompatDpkgInstallCommand(array $debs): string
 {
     return dpkgCmd('--force-confdef --force-confold -i '.implode(' ', array_map('escapeshellarg', $debs)));
@@ -301,45 +290,43 @@ function pmssOpenSslSsh2CompatRestartSshAndVerify(
             throw new RuntimeException('pmssHealOpensshServerIfMissing: temp dir creation failed');
         }
 
-        $downloadRc = runStep(
-            'Downloading openssh-server/client/sftp + runit-helper for dpkg-direct heal',
-            'cd '.escapeshellarg($tmpDir).' && '
-            .pmssAptDpkgEnvPrefix().' apt-get download openssh-server openssh-client openssh-sftp-server runit-helper 2>&1'
-        );
-        if ($downloadRc !== 0) {
+        try {
+            $downloadRc = runStep(
+                'Downloading openssh-server/client/sftp + runit-helper for dpkg-direct heal',
+                'cd '.escapeshellarg($tmpDir).' && '
+                .pmssAptDpkgEnvPrefix().' apt-get download openssh-server openssh-client openssh-sftp-server runit-helper 2>&1'
+            );
+            if ($downloadRc !== 0) {
+                logMessage('[ERROR] pmssHealOpensshServerIfMissing: apt-get download failed; refusing unsafe fallback');
+                throw new RuntimeException('pmssHealOpensshServerIfMissing: download failed');
+            }
+
+            $debs = pmssOpenSslSsh2CompatDownloadedDebs($tmpDir);
+            if (count($debs) < 3) {
+                logMessage('[ERROR] pmssHealOpensshServerIfMissing: expected openssh-* .deb files were not downloaded (got '.count($debs).')');
+                throw new RuntimeException('pmssHealOpensshServerIfMissing: incomplete deb set');
+            }
+
+            // Install runit-helper FIRST (openssh-server postinst depends on it on recent bookworm).
+            $runitDebs = pmssOpenSslSsh2CompatDebsByPrefix($debs, 'runit-helper');
+            if ($runitDebs !== []) {
+                runStep('Installing runit-helper via dpkg-direct (openssh-server dep)',
+                    dpkgCmd('--force-confdef --force-confold -i '.escapeshellarg($runitDebs[0])));
+            }
+
+            // dpkg-direct avoids apt resolver removal; conf flags preserve PMSS sshd_config.
+            $opensshDebs = pmssOpenSslSsh2CompatDebsByPrefix($debs, 'openssh');
+            $installRc = runStep(
+                'Installing openssh-server/client/sftp via dpkg-direct (cascade-heal, conf-preserve)',
+                pmssOpenSslSsh2CompatDpkgInstallCommand($opensshDebs)
+            );
+            if ($installRc !== 0) {
+                // A dependency mismatch may still leave usable binaries unpacked.
+                logMessage('[WARN] pmssHealOpensshServerIfMissing: dpkg -i exited non-zero (likely libssl3 ABI mismatch with held 3.0.17); binary placed on disk — continuing to hold + verify');
+            }
+        } finally {
             pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-', 'Cleaning openssh-direct download cache');
-            logMessage('[ERROR] pmssHealOpensshServerIfMissing: apt-get download failed; refusing unsafe fallback');
-            throw new RuntimeException('pmssHealOpensshServerIfMissing: download failed');
         }
-
-        $debs = pmssOpenSslSsh2CompatDownloadedDebs($tmpDir);
-        if (count($debs) < 3) {
-            pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-', 'Cleaning openssh-direct download cache');
-            logMessage('[ERROR] pmssHealOpensshServerIfMissing: expected openssh-* .deb files were not downloaded (got '.count($debs).')');
-            throw new RuntimeException('pmssHealOpensshServerIfMissing: incomplete deb set');
-        }
-
-        // Install runit-helper FIRST (openssh-server postinst depends on it on recent bookworm).
-        $runitDeb = pmssOpenSslSsh2CompatFirstDebByPrefix($debs, 'runit-helper');
-        if ($runitDeb !== '') {
-            runStep('Installing runit-helper via dpkg-direct (openssh-server dep)',
-                dpkgCmd('--force-confdef --force-confold -i '.escapeshellarg($runitDeb)));
-        }
-
-        // dpkg-direct avoids apt resolver removal; conf flags preserve PMSS sshd_config.
-        $opensshDebs = pmssOpenSslSsh2CompatDebsByPrefix($debs, 'openssh');
-        $installRc = runStep(
-            'Installing openssh-server/client/sftp via dpkg-direct (cascade-heal, conf-preserve)',
-            pmssOpenSslSsh2CompatDpkgInstallCommand($opensshDebs)
-        );
-        if ($installRc !== 0) {
-            // dpkg -i may exit non-zero when libssl3 ABI is older than openssh-server
-            // expects; the binaries are still unpacked onto disk and load the held
-            // libssl3 at runtime. We continue to the hold + verify step below.
-            logMessage('[WARN] pmssHealOpensshServerIfMissing: dpkg -i exited non-zero (likely libssl3 ABI mismatch with held 3.0.17); binary placed on disk — continuing to hold + verify');
-        }
-
-        pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-', 'Cleaning openssh-direct download cache');
 
         pmssOpenSslSsh2CompatRedeploySshdConfigTemplate(
             'cascade-heal',
@@ -444,36 +431,36 @@ function pmssOpenSslSsh2CompatRestartSshAndVerify(
         runStep('Unholding openssh-* for downgrade (if held)',
             pmssAptDpkgEnvPrefix().' apt-mark unhold '.pmssOpenSslSsh2CompatOpenSshPackages().' 2>/dev/null || true');
 
-        // Download the target version trio.
-        $downloadRc = runStep(
-            'Downloading openssh-server/client/sftp at '.$targetOpenssh.' for libssl3-3.0.17-compat downgrade',
-            'cd '.escapeshellarg($tmpDir).' && '
-            .pmssAptDpkgEnvPrefix().' apt-get download '
-            .pmssOpenSslSsh2CompatOpenSshPackages($targetOpenssh, true).' 2>&1'
-        );
-        if ($downloadRc !== 0) {
-            pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-downgrade-', 'Cleaning openssh-downgrade download cache');
-            logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: apt-get download failed — target version may have aged out of the repo');
-            throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: download failed');
-        }
+        try {
+            // Download the target version trio.
+            $downloadRc = runStep(
+                'Downloading openssh-server/client/sftp at '.$targetOpenssh.' for libssl3-3.0.17-compat downgrade',
+                'cd '.escapeshellarg($tmpDir).' && '
+                .pmssAptDpkgEnvPrefix().' apt-get download '
+                .pmssOpenSslSsh2CompatOpenSshPackages($targetOpenssh, true).' 2>&1'
+            );
+            if ($downloadRc !== 0) {
+                logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: apt-get download failed — target version may have aged out of the repo');
+                throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: download failed');
+            }
 
-        $debs = pmssOpenSslSsh2CompatDownloadedDebs($tmpDir);
-        if (count($debs) < 3) {
-            pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-downgrade-', 'Cleaning openssh-downgrade download cache');
-            logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: incomplete deb set (got '.count($debs).')');
-            throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: incomplete debs');
-        }
+            $debs = pmssOpenSslSsh2CompatDownloadedDebs($tmpDir);
+            if (count($debs) < 3) {
+                logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: incomplete deb set (got '.count($debs).')');
+                throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: incomplete debs');
+            }
 
-        // Install via dpkg-direct with conf-preserve (same conf-handling posture
-        // as pmssHealOpensshServerIfMissing — never replace site sshd_config).
-        $installRc = runStep(
-            'Installing openssh-server/client/sftp '.$targetOpenssh.' via dpkg-direct (conf-preserve, libssl3-3.0.17-compat downgrade)',
-            pmssOpenSslSsh2CompatDpkgInstallCommand($debs)
-        );
-        pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-downgrade-', 'Cleaning openssh-downgrade download cache');
-        if ($installRc !== 0) {
-            logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: dpkg -i failed during downgrade');
-            throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: dpkg -i failed');
+            // Install via dpkg-direct while preserving the managed sshd_config.
+            $installRc = runStep(
+                'Installing openssh-server/client/sftp '.$targetOpenssh.' via dpkg-direct (conf-preserve, libssl3-3.0.17-compat downgrade)',
+                pmssOpenSslSsh2CompatDpkgInstallCommand($debs)
+            );
+            if ($installRc !== 0) {
+                logMessage('[ERROR] pmssEnsureOpensshCompatibleWithHeldLibssl3: dpkg -i failed during downgrade');
+                throw new RuntimeException('pmssEnsureOpensshCompatibleWithHeldLibssl3: dpkg -i failed');
+            }
+        } finally {
+            pmssRemovePrivateTempDir($tmpDir, 'pmss-openssh-downgrade-', 'Cleaning openssh-downgrade download cache');
         }
 
         pmssOpenSslSsh2CompatRedeploySshdConfigTemplate('post-downgrade', 'pre-downgrade', 'post-downgrade');
@@ -492,68 +479,3 @@ function pmssOpenSslSsh2CompatRestartSshAndVerify(
         $newVer = trim((string) @shell_exec('dpkg-query -W -f=\'${Version}\' openssh-server 2>/dev/null'));
         logMessage('[OK] pmssEnsureOpensshCompatibleWithHeldLibssl3: openssh-server downgraded from '.$opensshVer.' to '.$newVer.' (libssl3-3.0.17-compatible canonical state)');
     }
-
-/**
- * Build the APT preferences (Pin-Priority) body that pins libssl3/openssl and the
- * OpenSSH trio to the PECL-ssh2-compatible set.
- *
- * Pin-Priority 1001 forces these exact versions even when a downgrade is required,
- * while keeping dependents satisfiable — so apt's resolver DOWNGRADES OpenSSH to the
- * libssl3-3.0.17-compatible deb12u7 instead of REMOVING it. apt-mark hold only blocks
- * automatic upgrades; it does NOT prevent removal during dependency resolution, which
- * is what produced the OpenSSH-removal cascade (openssh deb12u9/u10 Depends
- * libssl3>=3.0.19 vs the held 3.0.17). Pure builder — no side effects. Refs #436/#585.
- */
-function pmssOpenSslSsh2CompatAptPinContents(): string
-{
-    return "# Managed by PMSS update-step2 (opensslSsh2Compat). Do not edit by hand.\n"
-        ."# Pins libssl3/openssl + OpenSSH to the PECL-ssh2-compatible set (Debian 12)\n"
-        ."# so apt downgrades OpenSSH instead of triggering the libssl3>=3.0.19 removal\n"
-        ."# cascade. apt-mark hold is insufficient (blocks upgrades, not removals during\n"
-        ."# dependency resolution). Refs #436/#585.\n"
-        ."\n"
-        ."Package: libssl3 openssl\n"
-        ."Pin: version ".PMSS_OPENSSL_SSH2_LIBSSL_TARGET."\n"
-        ."Pin-Priority: 1001\n"
-        ."\n"
-        ."Package: ".pmssOpenSslSsh2CompatOpenSshPackages()."\n"
-        ."Pin: version ".PMSS_OPENSSL_SSH2_OPENSSH_TARGET."\n"
-        ."Pin-Priority: 1001\n";
-}
-
-/**
- * Write the libssl3/openssh APT pin (Debian 12 only).
- *
- * This is the declarative, durable counterpart to the imperative convergence/heal
- * functions above. The pin is enforced by apt's own resolver and lives on disk, so
- * it (a) survives the package removal/reinstall that clobbers apt-mark hold, and
- * (b) is in place BEFORE the early fix-broken / dpkg-selection phases that otherwise
- * resolve the held-libssl3-vs-newer-openssh conflict by REMOVING OpenSSH. It pins to
- * the same versions the convergence functions already force fleet-wide, so it is
- * behaviour-consistent — declarative prevention layered ahead of the imperative heal,
- * which is retained as recovery for already-damaged hosts. Idempotent (rewrites only
- * on content drift). Refs #436/#585.
- */
-function pmssWriteLibssl3OpensshAptPin(?int $distroVersion = null): void
-{
-    if (!pmssOpenSslSsh2CompatCanMutate(__FUNCTION__, $distroVersion)) {
-        return;
-    }
-
-    $pinPath  = '/etc/apt/preferences.d/pmss-libssl3-openssh.pref';
-    $contents = pmssOpenSslSsh2CompatAptPinContents();
-
-    if (is_file($pinPath) && (string) @file_get_contents($pinPath) === $contents) {
-        logMessage('[SKIP] pmssWriteLibssl3OpensshAptPin: pin already current at '.$pinPath);
-        return;
-    }
-
-    $tmpPath = $pinPath.'.pmss-tmp';
-    if (@file_put_contents($tmpPath, $contents) === false || !@rename($tmpPath, $pinPath)) {
-        @unlink($tmpPath);
-        logMessage('[ERROR] pmssWriteLibssl3OpensshAptPin: failed to write '.$pinPath);
-        throw new RuntimeException('pmssWriteLibssl3OpensshAptPin: unable to write APT pin');
-    }
-    @chmod($pinPath, 0644);
-    logMessage('[OK] pmssWriteLibssl3OpensshAptPin: wrote APT Pin-Priority 1001 for libssl3/openssl + OpenSSH at '.$pinPath);
-}

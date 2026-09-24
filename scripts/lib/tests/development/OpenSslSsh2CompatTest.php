@@ -32,8 +32,10 @@ class OpenSslSsh2CompatTest extends TestCase
             '/tmp/other_1.0_amd64.deb',
         ];
 
-        $this->assertSame('/tmp/runit-helper_2.16.2_all.deb', \pmssOpenSslSsh2CompatFirstDebByPrefix($debs, 'runit-helper'));
-        $this->assertSame('', \pmssOpenSslSsh2CompatFirstDebByPrefix($debs, 'missing'));
+        $this->assertSame([
+            '/tmp/runit-helper_2.16.2_all.deb',
+        ], \pmssOpenSslSsh2CompatDebsByPrefix($debs, 'runit-helper'));
+        $this->assertSame([], \pmssOpenSslSsh2CompatDebsByPrefix($debs, 'missing'));
         $this->assertSame([
             '/tmp/openssh-client_1%3a9.2p1-2+deb12u7_amd64.deb',
             '/tmp/openssh-server_1%3a9.2p1-2+deb12u7_amd64.deb',
@@ -56,16 +58,15 @@ class OpenSslSsh2CompatTest extends TestCase
         $this->assertSame("dpkg-query -W -f='\${Version}' 'libssl3' 2>/dev/null", \pmssOpenSslSsh2CompatVersionQueryCommand('libssl3'));
     }
 
-    public function testAptPinContentsPinCompatibleSetAtPriority1001(): void
+    public function testDpkgBaselineIsTheOnlyDeclarativeCompatibilityAuthority(): void
     {
-        $contents = \pmssOpenSslSsh2CompatAptPinContents();
+        $baseline = $this->pmssReadRepoFile('scripts/lib/update/dpkg/selections-debian12.txt');
+        foreach (['libssl3:amd64', 'openssl', 'openssh-client', 'openssh-server', 'openssh-sftp-server'] as $package) {
+            $this->assertStringContainsString($package."\thold\n", $baseline);
+        }
 
-        // libssl3/openssl pinned to the held target, OpenSSH trio to deb12u7, both at 1001.
-        $this->assertStringContainsString("Package: libssl3 openssl\nPin: version ".PMSS_OPENSSL_SSH2_LIBSSL_TARGET."\nPin-Priority: 1001", $contents);
-        $this->assertStringContainsString("Package: ".\pmssOpenSslSsh2CompatOpenSshPackages()."\nPin: version ".PMSS_OPENSSL_SSH2_OPENSSH_TARGET."\nPin-Priority: 1001", $contents);
-        // Pin-Priority must be >1000 to force downgrade-not-remove; 1001 appears for both stanzas.
-        $this->assertSame(2, substr_count($contents, 'Pin-Priority: 1001'));
-        // Derived from shared constants (DRY) — no hardcoded version drift.
-        $this->assertStringContainsString(PMSS_OPENSSL_SSH2_OPENSSH_TARGET, $contents);
+        $source = $this->pmssReadRepoFile('scripts/lib/update/opensslSsh2Compat.php');
+        $this->assertStringNotContainsString('Pin-Priority', $source);
+        $this->assertStringNotContainsString('preferences.d/pmss-libssl3-openssh.pref', $source);
     }
 }
