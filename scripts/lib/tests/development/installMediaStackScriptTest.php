@@ -444,6 +444,41 @@ BASH
         ], $this->script);
     }
 
+    public function testJellyfinStartupBaseUrlWaitsForHttp200WithOrWithoutPrefix(): void
+    {
+        // Jellyfin 12 answers 302 unprefixed and 503 prefixed while booting; 10.11 answers unprefixed only.
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash', 'set -euo pipefail',
+            $this->pmssExtractShellFunctions($this->script, array('media_stack_http_code', 'jellyfin_startup_base_url')),
+            'sleep() { :; }',
+            'curl() { local url="${*: -1}" n; n=$(($(cat "$calls") + 1)); echo "$n" >"$calls"',
+            '  case "$mode" in',
+            '  jf12) if [[ $url == */public-bob/jellyfin/* ]]; then if ((n > 6)); then printf 200; else printf 503; fi; else printf 302; fi ;;',
+            '  jf1011) if [[ $url == */public-bob/jellyfin/* ]]; then printf 404; elif ((n > 3)); then printf 200; else printf 000; fi ;;',
+            '  *) printf 302 ;;',
+            '  esac; }',
+            'probe() { mode="$1"; calls=$(mktemp); echo 0 >"$calls"; dir=$(mktemp -d)',
+            '  [[ -n "$2" ]] && printf "<X>\n  <BaseUrl>%s</BaseUrl>\n</X>\n" "$2" >"$dir/$3"',
+            '  jellyfin_startup_base_url http://127.0.0.1:8096 "$dir" 5 || printf "fail"; printf "\n"; rm -rf "$dir" "$calls"; }',
+            'probe jf12 /public-bob/jellyfin network.xml',
+            'probe jf12 /public-bob/jellyfin/ system.xml',
+            'probe jf1011 /public-bob/jellyfin network.xml',
+            'probe jf1011 "" ""',
+            'probe never /public-bob/jellyfin network.xml', '',
+        ));
+        $this->assertSame(implode("\n", array(
+            'http://127.0.0.1:8096/public-bob/jellyfin',
+            'http://127.0.0.1:8096/public-bob/jellyfin',
+            'http://127.0.0.1:8096',
+            'http://127.0.0.1:8096',
+            'fail',
+        ))."\n", $this->pmssRunShellHarness($script));
+        $this->assertStringContainsAllStrings([
+            'if ! base_url=$(jellyfin_startup_base_url "$base_url" "$JELLYFIN_CONFIG_DIR" 120); then',
+            'Jellyfin startup API never answered HTTP 200, with or without BaseUrl',
+        ], $this->script);
+    }
+
     public function testJellyfinLibraryPathGuidanceIsPrinted(): void
     {
         $this->assertStringContainsAllStrings([
