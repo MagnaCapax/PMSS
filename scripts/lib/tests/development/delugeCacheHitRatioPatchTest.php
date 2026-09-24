@@ -58,6 +58,45 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
         $this->assertEquals(null, \pmssDelugeLineSearch($lines, 'alpha', 0, null, 0));
     }
 
+    public function testPatchWriterRejectsIncompleteWrites(): void
+    {
+        $lines = ['alpha', 'beta'];
+        $payloadLength = strlen("alpha\nbeta\n");
+        foreach ([false, 0, $payloadLength - 1] as $writeResult) {
+            $this->logs = [];
+            $writer = static function () use ($writeResult) { return $writeResult; };
+            $result = \pmssDelugeWritePatchedLines(
+                $this->tempDir.'/core.py',
+                $lines,
+                false,
+                $this->logger,
+                'dry: ',
+                'write failed: ',
+                $writer
+            );
+
+            $this->assertFalse($result, 'Incomplete writes must use the existing failure path');
+            $this->pmssAssertMessagesContain($this->logs, 'write failed:', 'Expected write warning');
+        }
+    }
+
+    public function testPatchWriterAcceptsCompleteWrite(): void
+    {
+        $writer = static function (string $path, string $payload): int { return strlen($payload); };
+        $result = \pmssDelugeWritePatchedLines(
+            $this->tempDir.'/core.py',
+            ['alpha', 'beta'],
+            false,
+            $this->logger,
+            'dry: ',
+            'write failed: ',
+            $writer
+        );
+
+        $this->assertTrue($result, 'Complete writes must retain the success result');
+        $this->assertEquals([], $this->logs, 'Complete writes must not emit a warning');
+    }
+
     public function testPatchReturnsTrueWhenGuardAlreadyPresent(): void
     {
         $original = "class Core:\n    def update_stats(self):\n        if blocks_read:\n            try:\n                self.session_status['read_hit_ratio'] = (\n                    self.session_status['disk.num_blocks_cache_hits'] / blocks_read\n                )\n            except KeyError:\n                self.session_status['read_hit_ratio'] = 0.0\n        else:\n            self.session_status['read_hit_ratio'] = 0.0\n";

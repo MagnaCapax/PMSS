@@ -273,6 +273,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Environment & Dpkg Baselines
 
+- Deluge compatibility patch publication (`scripts/lib/update/apps/delugePatches.php`)
+  requires `file_put_contents()` to report the complete payload length. Failed,
+  zero, or short writes use the existing warning and `false` result; complete
+  writes retain the existing bytes and success result.
+
 - pmssConfigureAptNonInteractive(?callable $logger=null): void
   - Ensures `/etc/apt/apt.conf.d/90pmss-noninteractive` matches known content; logs SKIP/Updated; 0644.
 

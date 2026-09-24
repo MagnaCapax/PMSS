@@ -36,12 +36,13 @@ function pmssDelugeLineSearch(array $lines, string $needle, int $start = 0, ?int
 }
 
 /** Persist patched lines with the same newline and dry-run contract. */
-function pmssDelugeWritePatchedLines(string $path, array $lines, bool $dryRun, callable $log, string $dryRunMessage, string $writeWarning): bool
+function pmssDelugeWritePatchedLines(string $path, array $lines, bool $dryRun, callable $log, string $dryRunMessage, string $writeWarning, ?callable $writer = null): bool
 {
     $newContent = implode("\n", $lines);
     if ($newContent !== '' && substr($newContent, -1) !== "\n") $newContent .= "\n";
     if ($dryRun) { $log($dryRunMessage.$path); return true; }
-    if (@file_put_contents($path, $newContent) === false) { $log($writeWarning.$path); return false; }
+    $written = $writer ? $writer($path, $newContent) : @file_put_contents($path, $newContent);
+    if ($written !== strlen($newContent)) { $log($writeWarning.$path); return false; }
     return true;
 }
 
