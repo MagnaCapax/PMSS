@@ -184,5 +184,14 @@ for disk in /sys/block/bcache*; do
 	write_sys "$disk/queue/read_ahead_kb" 4096
 done
 
+# Opt-in socket-table privacy (managed by scripts/lib/update/systemPrep/socketTablePrivacy.php).
+# The /proc/net table modes are per-network-namespace kernel state that resets on reboot, so
+# reapply the root-only mode here when the operator marker is present. No marker = untouched.
+if [ -f /etc/seedbox/config/socket-table-privacy.enabled ]; then
+	for t in tcp tcp6 udp udp6 udplite udplite6 raw raw6 icmp icmp6; do
+		[ -e "/proc/net/$t" ] && chmod 0440 "/proc/net/$t" 2>/dev/null || true
+	done
+fi
+
 # Record the detected host profile and the boot-time tuning targets for audits.
 write_hardware_summary

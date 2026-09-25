@@ -594,6 +594,9 @@ pmssRunProfiledCallable('Installing logrotate policies', 'pmssLogrotatePoliciesI
 pmssRunProfiledCallable('Ensuring network template baseline', 'pmssEnsureNetworkTemplate', ['logmsg']);
 runStep('Reapplying network configuration', '/scripts/util/setupNetwork.php');
 runStep('Hardening access to session and network binaries', 'chmod o-r /var/log/wtmp /var/run/utmp /var/log/lastlog /var/log/faillog /usr/bin/netstat /usr/bin/who /usr/bin/w');
+// Opt-in only (marker /etc/seedbox/config/socket-table-privacy.enabled). With no marker this
+// restores stock /proc/net modes and is a no-op — inert until the operator enables it per host.
+pmssRunProfiledCallable('Applying socket-table privacy (opt-in)', 'pmssSocketTablePrivacyApply', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 
 // Cleanup legacy runtime metadata that should never have shipped with snapshots.
 if (is_dir('/etc/seedbox/config/app-versions')) { runStep('Removing legacy app version records', 'rm -rf '.escapeshellarg('/etc/seedbox/config/app-versions')); }
