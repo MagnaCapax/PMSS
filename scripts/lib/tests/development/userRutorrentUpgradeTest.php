@@ -75,6 +75,35 @@ class UserRutorrentUpgradeTest extends TestCase
         $this->assertSame('outside-state', file_get_contents($outside.'/rss.dat'));
     }
 
+    public function testUpgradeStopsWhenSkeletonCopyFails(): void
+    {
+        $this->seedUpgradeTrees();
+        $this->pmssRemoveTree($this->skeleton.'/www/rutorrent');
+
+        $this->assertThrowsRuntime(function (): void {
+            pmssUserUpgradeRutorrent($this->context());
+        }, 'Unable to copy ruTorrent skeleton');
+
+        $this->assertSame('old-rutorrent', file_get_contents($this->home.'/www/oldRutorrent-3/index.html'));
+        $this->assertFalse(file_exists($this->home.'/www/rutorrent'));
+    }
+
+    public function testUpgradeStopsWhenConfigRestoreFails(): void
+    {
+        $this->seedUpgradeTrees();
+        $this->pmssWriteFile($this->home.'/www/rutorrent/share/settings/rss.dat', 'rss-feeds');
+        unlink($this->home.'/www/rutorrent/conf/config.php');
+
+        $this->assertThrowsRuntime(function (): void {
+            pmssUserUpgradeRutorrent($this->context());
+        }, 'Unable to restore ruTorrent configuration');
+
+        $this->assertSame('old-rutorrent', file_get_contents($this->home.'/www/oldRutorrent-3/index.html'));
+        $this->assertSame('rss-feeds', file_get_contents($this->home.'/www/oldRutorrent-3/share/settings/rss.dat'));
+        $this->assertSame('new-rutorrent', file_get_contents($this->home.'/www/rutorrent/index.html'));
+        $this->assertFalse(file_exists($this->home.'/www/rutorrent/share/settings/rss.dat'));
+    }
+
     public function testUpgradeAbortsWhenLegacyShareCannotBeRestored(): void
     {
         $this->seedUpgradeTrees(true);

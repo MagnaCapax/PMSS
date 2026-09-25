@@ -149,22 +149,28 @@ function pmssUserUpgradeRutorrent(array $ctx): void
 
     echo "****** Updating ruTorrent\n";
     echo "******* Backing up old as 'oldRutorrent-3'\n";
-    runUserStep($user, 'Backing up existing ruTorrent', sprintf('mv %s %s', escapeshellarg($rutorrentPath), escapeshellarg($legacyPath)));
+    if (runUserStep($user, 'Backing up existing ruTorrent', sprintf('mv %s %s', escapeshellarg($rutorrentPath), escapeshellarg($legacyPath))) !== 0) {
+        throw new RuntimeException('Unable to back up ruTorrent before upgrade');
+    }
     echo "******* Copying new ruTorrent from skel\n";
-    runUserStep(
+    if (runUserStep(
         $user,
         'Copying new ruTorrent from skel',
         sprintf('cp -Rp %s %s',
             escapeshellarg(pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/www/rutorrent'),
             escapeshellarg("{$home}/www/")
         )
-    );
+    ) !== 0) {
+        throw new RuntimeException('Unable to copy ruTorrent skeleton during upgrade');
+    }
     echo "******* Configuring\n";
-    runUserStep(
+    if (runUserStep(
         $user,
         'Restoring ruTorrent config.php',
         sprintf('cp -p %s %s', escapeshellarg($legacyPath.'/conf/config.php'), escapeshellarg($rutorrentPath.'/conf/'))
-    );
+    ) !== 0) {
+        throw new RuntimeException('Unable to restore ruTorrent configuration');
+    }
 
     $shareDescription = 'Restoring ruTorrent share directory';
     $shareCommand = sprintf('cp -rp %s %s', escapeshellarg($legacyPath.'/share/.'), escapeshellarg($sharePath.'/'));
