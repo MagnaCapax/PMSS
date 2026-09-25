@@ -230,6 +230,79 @@ class MediaStackPanelTest extends TestCase
         $this->assertTrue($status['security']['autobrr']['protected']);
     }
 
+    public function testAppPolicyBehaviorSnapshot(): void
+    {
+        $home = $this->mediaHomeCreate('pmss-media-app-policy-');
+        foreach (array(
+            '.config/jellyfin' => 'dir',
+            '.bin/jellyfin/jellyfin.dll' => 'file',
+            '.config/jellyfin/config/network.xml' => 'file',
+            '.config/radarr' => 'dir',
+            '.bin/Radarr/Radarr.dll' => 'file',
+            '.config/radarr/config.xml' => 'file',
+            '.config/sonarr' => 'dir',
+            '.bin/Sonarr/Sonarr.dll' => 'file',
+            '.config/sonarr/config.xml' => 'file',
+            '.config/prowlarr' => 'dir',
+            '.bin/Prowlarr/Prowlarr.dll' => 'file',
+            '.config/prowlarr/config.xml' => 'file',
+            '.config/sabnzbd' => 'dir',
+            '.bin/sabnzbd/sabnzbd/SABnzbd.py' => 'file',
+            '.config/sabnzbd/sabnzbd.ini' => 'file',
+            '.config/autobrr' => 'dir',
+            '.bin/autobrr/autobrr' => 'file',
+            '.bin/autobrr/autobrrctl' => 'file',
+        ) as $path => $type) {
+            $type === 'dir'
+                ? $this->pmssEnsureDir($home.'/'.$path)
+                : $this->pmssWriteRelativeFile($home, $path, 'fixture');
+        }
+        $this->pmssWriteRelativeFile(
+            $home,
+            '.lighttpd/custom.d/autobrr-custom.conf',
+            '$HTTP["url"] =~ "^/autobrr(?:/|$)" { "map-urlpath" => ( "/autobrr" => "" ) }'
+        );
+
+        $apps = array('jellyfin', 'radarr', 'sonarr', 'prowlarr', 'sabnzbd', 'autobrr');
+        $labels = array();
+        $prerequisites = array();
+        $actions = array();
+        foreach ($apps as $app) {
+            $labels[$app] = \pmssMediaStackPanelAppLabelRead($app);
+            $prerequisites[$app] = \pmssMediaStackPanelAppSecurePrerequisitesRead($home, $app);
+            $actions[] = \pmssMediaStackPanelSecureActionAppIdRead('confirm-secure-'.$app);
+        }
+
+        $this->assertSame(array_fill_keys($apps, true), \pmssMediaStackPanelExpectedAppIdsRead($home));
+        $this->assertSame(array(
+            'jellyfin' => 'Jellyfin',
+            'radarr' => 'Radarr',
+            'sonarr' => 'Sonarr',
+            'prowlarr' => 'Prowlarr',
+            'sabnzbd' => 'SABnzbd',
+            'autobrr' => 'Autobrr',
+        ), $labels);
+        $this->assertSame(array_fill_keys($apps, true), $prerequisites);
+        $this->assertSame($apps, $actions);
+        $this->assertSame(array(
+            'Jellyfin' => 'https://seedbox.example/public-alice/jellyfin/web/index.html',
+            'Radarr' => 'https://seedbox.example/public-alice/radarr/',
+            'Sonarr' => 'https://seedbox.example/public-alice/sonarr/',
+            'Prowlarr' => 'https://seedbox.example/public-alice/prowlarr/',
+            'SABnzbd' => 'https://seedbox.example/public-alice/sabnzbd/',
+            'Autobrr' => 'https://seedbox.example/public-alice/autobrr/',
+        ), \pmssMediaStackPanelUrlsRead($home, 'alice', 'seedbox.example'));
+        $this->assertSame(array(
+            'Sonarr: running.',
+            'Radarr: failed repeatedly (3 consecutive failed checks).',
+            'Autobrr: not running.',
+        ), \pmssMediaStackPanelRuntimeDetailsRead(array('apps' => array(
+            'sonarr' => array('state' => 'running'),
+            'radarr' => array('state' => 'failed', 'consecutiveFailures' => 3),
+            'autobrr' => array('state' => 'pending'),
+        ))));
+    }
+
     public function testStatusShowsRuntimeAppsWhenWatchdogSnapshotExists(): void
     {
         $home = $this->mediaHomeCreate('pmss-media-runtime-status-');

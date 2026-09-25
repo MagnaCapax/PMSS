@@ -220,12 +220,12 @@ function pmssMediaStackPanelRuntimeStatusRead(string $home): ?array
 /** Convert the watchdog snapshot into bounded customer-facing app details. */
 function pmssMediaStackPanelRuntimeDetailsRead(array $runtime): array
 {
-    $labels = array('sonarr' => 'Sonarr', 'radarr' => 'Radarr', 'prowlarr' => 'Prowlarr', 'sabnzbd' => 'SABnzbd', 'cloudplow' => 'Cloudplow', 'jellyfin' => 'Jellyfin', 'autobrr' => 'Autobrr');
     $details = array();
-    foreach ($labels as $app => $label) {
+    foreach (array('sonarr', 'radarr', 'prowlarr', 'sabnzbd', 'cloudplow', 'jellyfin', 'autobrr') as $app) {
         if (!isset($runtime['apps'][$app]) || !is_array($runtime['apps'][$app])) {
             continue;
         }
+        $label = $app === 'cloudplow' ? 'Cloudplow' : pmssMediaStackPanelAppLabelRead($app);
         $state = (string) ($runtime['apps'][$app]['state'] ?? 'unknown');
         $text = $state === 'running' ? 'running' : ($state === 'failed' ? 'failed repeatedly' : 'not running');
         $failures = (int) ($runtime['apps'][$app]['consecutiveFailures'] ?? 0);
@@ -238,7 +238,10 @@ function pmssMediaStackPanelRuntimeDetailsRead(array $runtime): array
 /**
  * Return the web-exposed media-stack apps with their stable markers and URLs.
  *
- * @return array<string,array{label:string,urlPath:string,markers:array<int,array{type:string,path:string}>}>
+ * Each entry owns every app-specific panel rule so adding an app cannot leave
+ * a sibling label, auth check, or prerequisite branch behind.
+ *
+ * @return array<string,array<string,mixed>>
  */
 function pmssMediaStackPanelAppDefinitionsRead(): array
 {
@@ -246,47 +249,44 @@ function pmssMediaStackPanelAppDefinitionsRead(): array
         'jellyfin' => array(
             'label' => 'Jellyfin',
             'urlPath' => 'jellyfin/web/index.html',
-            'markers' => array(
-                array('type' => 'dir', 'path' => '.config/jellyfin'),
-                array('type' => 'file', 'path' => '.bin/jellyfin/jellyfin.dll'),
-            ),
+            'markers' => array('dir' => array('.config/jellyfin'), 'file' => array('.bin/jellyfin/jellyfin.dll')),
+            'secureMarkers' => array('file' => array('.config/jellyfin/config/network.xml', '.bin/jellyfin/jellyfin.dll')),
+            'auth' => array('type' => 'xml-allowed', 'path' => '.config/jellyfin/config/system.xml', 'tag' => 'IsStartupWizardCompleted', 'allowed' => array('true', '1')),
         ),
         'radarr' => array(
             'label' => 'Radarr',
             'urlPath' => 'radarr/',
-            'markers' => array(
-                array('type' => 'dir', 'path' => '.config/radarr'),
-                array('type' => 'file', 'path' => '.bin/Radarr/Radarr.dll'),
-            ),
+            'markers' => array('dir' => array('.config/radarr'), 'file' => array('.bin/Radarr/Radarr.dll')),
+            'secureMarkers' => array('file' => array('.config/radarr/config.xml', '.bin/Radarr/Radarr.dll')),
+            'auth' => array('type' => 'servarr', 'path' => '.config/radarr/config.xml'),
         ),
         'sonarr' => array(
             'label' => 'Sonarr',
             'urlPath' => 'sonarr/',
-            'markers' => array(
-                array('type' => 'dir', 'path' => '.config/sonarr'),
-                array('type' => 'file', 'path' => '.bin/Sonarr/Sonarr.dll'),
-            ),
+            'markers' => array('dir' => array('.config/sonarr'), 'file' => array('.bin/Sonarr/Sonarr.dll')),
+            'secureMarkers' => array('file' => array('.config/sonarr/config.xml', '.bin/Sonarr/Sonarr.dll')),
+            'auth' => array('type' => 'servarr', 'path' => '.config/sonarr/config.xml'),
         ),
         'prowlarr' => array(
             'label' => 'Prowlarr',
             'urlPath' => 'prowlarr/',
-            'markers' => array(
-                array('type' => 'dir', 'path' => '.config/prowlarr'),
-                array('type' => 'file', 'path' => '.bin/Prowlarr/Prowlarr.dll'),
-            ),
+            'markers' => array('dir' => array('.config/prowlarr'), 'file' => array('.bin/Prowlarr/Prowlarr.dll')),
+            'secureMarkers' => array('file' => array('.config/prowlarr/config.xml', '.bin/Prowlarr/Prowlarr.dll')),
+            'auth' => array('type' => 'servarr', 'path' => '.config/prowlarr/config.xml'),
         ),
         'sabnzbd' => array(
             'label' => 'SABnzbd',
             'urlPath' => 'sabnzbd/',
-            'markers' => array(
-                array('type' => 'dir', 'path' => '.config/sabnzbd'),
-                array('type' => 'file', 'path' => '.bin/sabnzbd/sabnzbd/SABnzbd.py'),
-            ),
+            'markers' => array('dir' => array('.config/sabnzbd'), 'file' => array('.bin/sabnzbd/sabnzbd/SABnzbd.py')),
+            'secureMarkers' => array('file' => array('.config/sabnzbd/sabnzbd.ini', '.bin/sabnzbd/sabnzbd/SABnzbd.py')),
+            'auth' => array('type' => 'ini-nonempty', 'path' => '.config/sabnzbd/sabnzbd.ini', 'keys' => array('username', 'password')),
         ),
         'autobrr' => array(
             'label' => 'Autobrr',
             'urlPath' => 'autobrr/',
             'markers' => array(),
+            'secureMarkers' => array('dir' => array('.config/autobrr'), 'file' => array('.bin/autobrr/autobrr', '.bin/autobrr/autobrrctl')),
+            'auth' => array('type' => 'sqlite-user', 'path' => '.config/autobrr/autobrr.db'),
         ),
     );
 }
@@ -332,12 +332,13 @@ function pmssMediaStackPanelExpectedAppIdsRead(string $home): array
 {
     $expected = array();
     foreach (pmssMediaStackPanelAppDefinitionsRead() as $app => $definition) {
-        foreach ($definition['markers'] as $marker) {
-            $path = pmssCustomerHomePath($home, $marker['path']);
-            if (($marker['type'] === 'dir' && is_dir($path))
-                || ($marker['type'] === 'file' && is_file($path))) {
-                $expected[$app] = true;
-                break;
+        foreach ($definition['markers'] as $type => $paths) {
+            foreach ($paths as $relativePath) {
+                $path = pmssCustomerHomePath($home, $relativePath);
+                if ($type === 'dir' ? is_dir($path) : is_file($path)) {
+                    $expected[$app] = true;
+                    break 2;
+                }
             }
         }
     }
@@ -435,62 +436,37 @@ function pmssMediaStackPanelSqliteCountRead(string $path, string $query): ?int
     return is_numeric($count) ? (int) $count : null;
 }
 
-/** Return true when a Servarr config has the secure-by-default auth values. */
-function pmssMediaStackPanelServarrAuthConfigured(string $home, string $app): bool
-{
-    $configPath = pmssCustomerHomePath($home, '.config/'.$app.'/config.xml');
-    $method = strtolower((string) pmssMediaStackPanelXmlTagValueRead($configPath, 'AuthenticationMethod'));
-    $required = strtolower((string) pmssMediaStackPanelXmlTagValueRead($configPath, 'AuthenticationRequired'));
-    return in_array($method, array('forms', 'basic', 'external'), true) && $required === 'enabled';
-}
-
-/** Return true when the installed SABnzbd config contains app-level credentials. */
-function pmssMediaStackPanelSabnzbdAuthConfigured(string $home): bool
-{
-    $configPath = pmssCustomerHomePath($home, '.config/sabnzbd/sabnzbd.ini');
-    $username = pmssMediaStackPanelIniValueRead($configPath, 'username');
-    $password = pmssMediaStackPanelIniValueRead($configPath, 'password');
-    return is_string($username) && $username !== '' && is_string($password) && $password !== '';
-}
-
-/** Return true when Autobrr has completed onboarding with at least one user. */
-function pmssMediaStackPanelAutobrrAuthConfigured(string $home): bool
-{
-    $count = pmssMediaStackPanelSqliteCountRead(
-        pmssCustomerHomePath($home, '.config/autobrr/autobrr.db'),
-        'SELECT COUNT(*) FROM users'
-    );
-    return $count !== null && $count > 0;
-}
-
-/** Return true when Jellyfin's first-run wizard has already created an admin. */
-function pmssMediaStackPanelJellyfinAuthConfigured(string $home): bool
-{
-    $value = strtolower((string) pmssMediaStackPanelXmlTagValueRead(
-        pmssCustomerHomePath($home, '.config/jellyfin/config/system.xml'),
-        'IsStartupWizardCompleted'
-    ));
-    return in_array($value, array('true', '1'), true);
-}
-
 /** Detect app auth status from app-owned config files only. */
 function pmssMediaStackPanelAppAuthConfigured(string $home, string $app): bool
 {
-    if (!pmssMediaStackPanelAppIdAllowed($app)) {
+    $definition = pmssMediaStackPanelAppDefinitionsRead()[$app] ?? null;
+    $auth = is_array($definition) && is_array($definition['auth'] ?? null) ? $definition['auth'] : array();
+    $path = is_string($auth['path'] ?? null) ? pmssCustomerHomePath($home, $auth['path']) : '';
+    if ($path === '') {
         return false;
     }
 
-    if (in_array($app, array('radarr', 'sonarr', 'prowlarr'), true)) {
-        return pmssMediaStackPanelServarrAuthConfigured($home, $app);
+    if (($auth['type'] ?? '') === 'servarr') {
+        $method = strtolower((string) pmssMediaStackPanelXmlTagValueRead($path, 'AuthenticationMethod'));
+        $required = strtolower((string) pmssMediaStackPanelXmlTagValueRead($path, 'AuthenticationRequired'));
+        return in_array($method, array('forms', 'basic', 'external'), true) && $required === 'enabled';
     }
-    if ($app === 'sabnzbd') {
-        return pmssMediaStackPanelSabnzbdAuthConfigured($home);
+    if (($auth['type'] ?? '') === 'ini-nonempty') {
+        foreach (is_array($auth['keys'] ?? null) ? $auth['keys'] : array() as $key) {
+            $value = pmssMediaStackPanelIniValueRead($path, (string) $key);
+            if (!is_string($value) || $value === '') {
+                return false;
+            }
+        }
+        return !empty($auth['keys']);
     }
-    if ($app === 'autobrr') {
-        return pmssMediaStackPanelAutobrrAuthConfigured($home);
+    if (($auth['type'] ?? '') === 'sqlite-user') {
+        $count = pmssMediaStackPanelSqliteCountRead($path, 'SELECT COUNT(*) FROM users');
+        return $count !== null && $count > 0;
     }
-    if ($app === 'jellyfin') {
-        return pmssMediaStackPanelJellyfinAuthConfigured($home);
+    if (($auth['type'] ?? '') === 'xml-allowed') {
+        $value = strtolower((string) pmssMediaStackPanelXmlTagValueRead($path, (string) ($auth['tag'] ?? '')));
+        return in_array($value, is_array($auth['allowed'] ?? null) ? $auth['allowed'] : array(), true);
     }
     return false;
 }
@@ -498,28 +474,22 @@ function pmssMediaStackPanelAppAuthConfigured(string $home, string $app): bool
 /** Return whether the local app files are complete enough to apply default auth. */
 function pmssMediaStackPanelAppSecurePrerequisitesRead(string $home, string $app): bool
 {
-    switch ($app) {
-        case 'jellyfin':
-            return is_file(pmssCustomerHomePath($home, '.config/jellyfin/config/network.xml'))
-                && is_file(pmssCustomerHomePath($home, '.bin/jellyfin/jellyfin.dll'));
-        case 'radarr':
-            return is_file(pmssCustomerHomePath($home, '.config/radarr/config.xml'))
-                && is_file(pmssCustomerHomePath($home, '.bin/Radarr/Radarr.dll'));
-        case 'sonarr':
-            return is_file(pmssCustomerHomePath($home, '.config/sonarr/config.xml'))
-                && is_file(pmssCustomerHomePath($home, '.bin/Sonarr/Sonarr.dll'));
-        case 'prowlarr':
-            return is_file(pmssCustomerHomePath($home, '.config/prowlarr/config.xml'))
-                && is_file(pmssCustomerHomePath($home, '.bin/Prowlarr/Prowlarr.dll'));
-        case 'sabnzbd':
-            return is_file(pmssCustomerHomePath($home, '.config/sabnzbd/sabnzbd.ini'))
-                && is_file(pmssCustomerHomePath($home, '.bin/sabnzbd/sabnzbd/SABnzbd.py'));
-        case 'autobrr':
-            return is_dir(pmssCustomerHomePath($home, '.config/autobrr'))
-                && is_file(pmssCustomerHomePath($home, '.bin/autobrr/autobrr'))
-                && is_file(pmssCustomerHomePath($home, '.bin/autobrr/autobrrctl'));
+    $definition = pmssMediaStackPanelAppDefinitionsRead()[$app] ?? null;
+    $markers = is_array($definition) && is_array($definition['secureMarkers'] ?? null)
+        ? $definition['secureMarkers']
+        : array();
+    if ($markers === array()) {
+        return false;
     }
-    return false;
+    foreach ($markers as $type => $paths) {
+        foreach ($paths as $relativePath) {
+            $path = pmssCustomerHomePath($home, (string) $relativePath);
+            if ($type === 'dir' ? !is_dir($path) : !is_file($path)) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 /** Validate a secure-app action string against literal hardcoded actions. */
