@@ -30,52 +30,46 @@
 require_once __DIR__.'/../lib/user/identity.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 require_once __DIR__.'/../lib/user/homeMarkerRegistry.php';
+require_once __DIR__.'/../lib/runtime/cli.php';
 
 function pmssWriteHomeMarkerCli(array $argv): int
 {
     $usage = "Usage: writeHomeMarker.php <user> <marker> <intValue>\n";
     if (count($argv) !== 4) {
-        fwrite(STDERR, $usage);
-        return 1;
+        return pmssCliReturnWithStderr($usage, 1);
     }
 
     if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
-        fwrite(STDERR, "Error: writeHomeMarker.php must run as root.\n");
-        return 6;
+        return pmssCliReturnWithStderr("Error: writeHomeMarker.php must run as root.\n", 6);
     }
 
     $user = pmssUsernameNormalizeIfValid((string) $argv[1]);
     if ($user === null) {
-        fwrite(STDERR, "Error: invalid username.\n");
-        return 2;
+        return pmssCliReturnWithStderr("Error: invalid username.\n", 2);
     }
 
     $marker = (string) $argv[2];
     if (!pmssHomeMarkerIsKnown($marker)) {
-        fwrite(STDERR, "Error: unknown marker '{$marker}'.\n");
-        return 3;
+        return pmssCliReturnWithStderr("Error: unknown marker '{$marker}'.\n", 3);
     }
     $mode = pmssHomeMarkerMode($marker);
 
     $raw = (string) $argv[3];
     if ($raw === '' || preg_match('/^\d+$/', $raw) !== 1) {
-        fwrite(STDERR, "Error: value must be a non-negative integer.\n");
-        return 4;
+        return pmssCliReturnWithStderr("Error: value must be a non-negative integer.\n", 4);
     }
     $value = (int) $raw;
 
     // The home must be a real directory whose path cannot redirect the root write.
     $home = '/home/'.$user;
     if (!is_dir($home) || is_link($home) || @realpath($home) !== $home) {
-        fwrite(STDERR, "Error: home for '{$user}' is missing or unsafe.\n");
-        return 5;
+        return pmssCliReturnWithStderr("Error: home for '{$user}' is missing or unsafe.\n", 5);
     }
 
     // Symlink-safe atomic write with root:user ownership and the ADR-0046 mode.
     $path = $home.'/'.$marker;
     if (!pmssWriteManagedFile($path, (string) $value, 'root', $user, $mode)) {
-        fwrite(STDERR, "Error: failed to write {$path}.\n");
-        return 7;
+        return pmssCliReturnWithStderr("Error: failed to write {$path}.\n", 7);
     }
 
     if (function_exists('pmssUserLog')) {

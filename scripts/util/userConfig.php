@@ -88,8 +88,7 @@ $existing = $store->get($user['name']) ?? [];
 if ($configMode === 'welcome') {
     $error = pmssUserConfigWelcomeOnlyPersist($store, $user['name'], $expectedHome, $welcomeMessage, $existing);
     if ($error !== null) {
-        fwrite(STDERR, $error."\n");
-        exit(1);
+        pmssCliExitWithStderr($error."\n", 1);
     }
     exit(0);
 }
@@ -97,8 +96,7 @@ if ($configMode === 'welcome') {
 if ($configMode === 'named') {
     $error = pmssUserConfigBaselineError($existing, ['ramMiB', 'quota']);
     if ($error !== null) {
-        fwrite(STDERR, $error."\n");
-        exit(1);
+        pmssCliExitWithStderr($error."\n", 1);
     }
 
     $user = pmssUserConfigNamedModeUser($user, $existing, $explicitResourceOverrides);
@@ -155,8 +153,7 @@ try {
         'uploadThrottle' => $throttle === null ? 0 : $throttle,
     ]);
 } catch (RuntimeException $exception) {
-    fwrite(STDERR, 'Error: '.$exception->getMessage()."\n");
-    exit(1);
+    pmssCliExitWithStderr('Error: '.$exception->getMessage()."\n", 1);
 }
 $rtorrentConfig->writeConfig($user['name'], $configuration['configFile']);
 
@@ -201,8 +198,7 @@ if (!file_exists($qbittorrentConfigFile)) {
         try {
             $qbittorrentTemplate = pmssReadRequiredRegularFile('/etc/seedbox/config/template.qbittorrent.conf', 'qBittorrent template');
         } catch (RuntimeException $exception) {
-            fwrite(STDERR, 'Error: '.$exception->getMessage()."\n");
-            exit(1);
+            pmssCliExitWithStderr('Error: '.$exception->getMessage()."\n", 1);
         }
 
         $qbittorrentConfig = str_replace(

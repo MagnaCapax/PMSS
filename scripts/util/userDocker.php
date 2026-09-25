@@ -59,17 +59,14 @@ require_once __DIR__.'/../lib/user/userConfigStore.php';
 [$debug, $args] = pmssCliArgvDebugSplit($argv ?? null);
 
 if (count($args) < 3) {
-    fwrite(STDERR, "Usage: /scripts/util/userDocker.php USER {start|stop|restart|status} [--debug]\n");
-    exit(1);
+    pmssCliExitWithStderr("Usage: /scripts/util/userDocker.php USER {start|stop|restart|status} [--debug]\n", 1);
 }
 
 $user = $args[1];
 $action = strtolower($args[2]);
 $valid = ['start', 'stop', 'restart', 'status'];
 if (!in_array($action, $valid, true)) {
-    fwrite(STDERR, "Invalid action: {$action}\n");
-    fwrite(STDERR, "Supported actions: start, stop, restart, status\n");
-    exit(1);
+    pmssCliExitWithStderr("Invalid action: {$action}\nSupported actions: start, stop, restart, status\n", 1);
 }
 
 /** Return a single-line value safe for stderr and log context. */
@@ -394,8 +391,7 @@ if ($action === 'stop' || $action === 'restart') {
             : 'remaining pid(s): '.implode(', ', $remainingPids);
         $failure = sprintf('Docker stop failed for %s: %s', $user, $detail);
         pmssUserLog($user, '[ERR] '.$failure);
-        fwrite(STDERR, $failure."\n");
-        exit(1);
+        pmssCliExitWithStderr($failure."\n", 1);
     }
     if ($action === 'stop') {
         echo "Docker stop requested for {$user}\n";
