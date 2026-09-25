@@ -47,6 +47,8 @@ bpftool prog loadall sockdiag_filter.bpf.o /sys/fs/bpf/pmss-test autoattach && r
 
 ## Toolchain
 
-`bpftool` is added to the Debian 12/13 dpkg selection baselines so the loader can run.
-Debian 11 ships `bpftool` 5.10 (no `autoattach`), so the feature runs **stage 1 only**
-there; the loader fails open and the program is simply not loaded.
+An autoattach-capable `bpftool` (>= 7.5) is required to attach the program. It is installed
+on demand (only when the feature is enabled) by `pmssSocketTablePrivacyEnsureBpftool()` in
+`../socketTablePrivacy.php`: from **bookworm-backports** on Debian 12 (main ships 7.1.0,
+which lacks `autoattach` and cannot attach LSM programs), from the main archive elsewhere.
+Debian 11 (`bpftool` 5.10, no `autoattach`) runs **stage 1 only**; the loader fails open.

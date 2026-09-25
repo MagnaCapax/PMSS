@@ -88,8 +88,11 @@ The loader (`bpf/socket-privacy-load.sh`) runs from update-step2 and from the
 boot-tuning unit (BPF state is not reboot-persistent) and **fails open**: it verifies
 the object against its sidecar and checks for the marker, `bpftool`, kernel BTF, and
 a `bpf` LSM, and on any miss it unloads and exits 0 — it can never block an update or
-boot. `bpftool` is added to the Debian 12/13 dpkg selection baselines; Debian 11
-(bpftool 5.10, no autoattach) receives **stage 1 only** (the loader fails open there).
+boot. An autoattach-capable `bpftool` (>= 7.5) is installed on demand when the feature is
+enabled — from **bookworm-backports** on Debian 12 (main ships 7.1.0, which cannot attach
+LSM programs) and from the main archive elsewhere; Debian 11 (bpftool 5.10, no autoattach)
+receives **stage 1 only** (the loader fails open there). Verified on a Debian-12/6.1 pilot
+(le4-0-104): stage 1 active, and stage 2 loads once backports bpftool 7.5 is present.
 The mechanism is load-verified in an isolated namespace on a development host
 (Debian 13 / kernel 6.12): `ss -tlnp` returns listeners, `ss -tn` returns nothing, a
 subordinate-uid process is denied, root is unaffected, tamper-refusal and clean unload

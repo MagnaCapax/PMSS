@@ -52,6 +52,60 @@ function pmssSocketTablePrivacySysctlDropinPath(): string
 }
 
 /**
+ * Does the installed bpftool support `prog loadall ... autoattach` (needed to attach
+ * the LSM program)? Debian 12 main ships bpftool 7.1.0, which lacks it entirely (no
+ * autoattach keyword, no `link create`, no `lsm` in `prog attach`); bpftool >= 7.5
+ * (bookworm-backports, Debian 13 main) has it. Detected from `prog help`, not a
+ * version string, so the check tracks the actual capability.
+ */
+function pmssSocketTablePrivacyBpftoolHasAutoattach(): bool
+{
+    if (trim((string) @shell_exec('command -v bpftool 2>/dev/null')) === '') {
+        return false;
+    }
+    $help = (string) @shell_exec('bpftool prog help 2>&1');
+    return strpos($help, 'autoattach') !== false;
+}
+
+/**
+ * Ensure an autoattach-capable bpftool is present when the feature is enabled.
+ *
+ * Stage 2 (the sock_diag BPF-LSM filter) can only be attached by bpftool >= 7.5.
+ * On Debian 12 that means bookworm-backports; elsewhere the main archive already
+ * carries a new enough build. Runs at update time only (never at boot — apt must
+ * not run from the boot loader) and only when the operator marker is present, so
+ * non-enabled hosts install nothing. Fail-soft: if a capable bpftool cannot be
+ * installed the loader fails open and the host runs stage 1 only.
+ *
+ * Returns true when an autoattach-capable bpftool is present after this call.
+ */
+function pmssSocketTablePrivacyEnsureBpftool(?callable $logger = null, ?int $distroVersion = null): bool
+{
+    $log = $logger ?: 'logMessage';
+    if (!pmssSocketTablePrivacyEnabled()) {
+        return false;
+    }
+    if (pmssSocketTablePrivacyBpftoolHasAutoattach()) {
+        return true;
+    }
+    if ($distroVersion === null && function_exists('pmssDetectDistro')) {
+        $distroVersion = (int) (pmssDetectDistro()['version'] ?? 0);
+    }
+    if (function_exists('runStep')) {
+        if ((int) $distroVersion === 12) {
+            runStep('Installing autoattach-capable bpftool (bookworm-backports)', 'apt-get -o Dpkg::Use-Pty=0 -y -t bookworm-backports install bpftool >/dev/null 2>&1 || true');
+        } else {
+            runStep('Installing bpftool for socket-table privacy', 'apt-get -o Dpkg::Use-Pty=0 -y install bpftool >/dev/null 2>&1 || true');
+        }
+    }
+    $ok = pmssSocketTablePrivacyBpftoolHasAutoattach();
+    $log($ok
+        ? 'Socket-table privacy: autoattach-capable bpftool present'
+        : '[WARN] Socket-table privacy: no autoattach-capable bpftool available; stage-2 filter will fail open (stage 1 still applied)');
+    return $ok;
+}
+
+/**
  * Set every existing address-bearing /proc/net table to $mode.
  * 0440 hides remote addresses from non-root; 0444 is the kernel's stock mode.
  * Returns the count of tables actually changed.

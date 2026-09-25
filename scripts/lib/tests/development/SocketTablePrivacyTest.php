@@ -123,6 +123,15 @@ class SocketTablePrivacyTest extends TestCase
         $this->assertSame(hash_file('sha256', $obj), $recorded, 'BPF object hash must match the sidecar (rebuild regenerates both)');
     }
 
+    /** The bpftool ensure-helper must be a no-op (no apt) when the feature is disabled. */
+    public function testEnsureBpftoolIsNoOpWhenDisabled(): void
+    {
+        $marker = $this->pmssMakeTempDir('pmss-marker-', 0700).'/socket-table-privacy.enabled'; // absent
+        $this->pmssTrackEnvOverrides(['PMSS_SOCKET_TABLE_PRIVACY_MARKER' => $marker], true);
+        // Disabled => returns false without attempting any install (distroVersion passed to avoid detection).
+        $this->assertFalse(pmssSocketTablePrivacyEnsureBpftool(static function (): void {}, 12));
+    }
+
     /** The fail-open loader must be present and syntactically valid sh. */
     public function testStage2LoaderIsPresentAndValidSh(): void
     {
