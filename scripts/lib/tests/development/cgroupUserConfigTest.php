@@ -628,6 +628,30 @@ class CgroupUserConfigTest extends TestCase
         $this->assertRunOutput(array('testuser', '--defaults', '--respect-existing'), array(), array('CPUWeight=500'));
     }
 
+    public function testRespectExistingCpuQuotaOnlyWhenFinite(): void
+    {
+        $this->pmssWriteCgroupPolicyFixture($this->configDir, ['cpuQuotaPercent' => 200], 0700);
+        foreach (['infinity', 'INFINITY', '[not set]', ''] as $unsetValue) {
+            $this->sys->commands['systemctl show'] = "CPUQuotaPerSecUSec={$unsetValue}\n";
+            $this->assertRunOutput(['testuser', '--defaults', '--respect-existing'], ['CPUQuota=200%']);
+        }
+
+        $this->sys->commands['systemctl show'] = "CPUQuotaPerSecUSec=2s\n";
+        $this->assertRunOutput(['testuser', '--defaults', '--respect-existing'], [], ['CPUQuota=200%']);
+    }
+
+    public function testRespectExistingUnsetResourceSentinels(): void
+    {
+        $this->pmssWriteCgroupPolicyFixture($this->configDir, [
+            'cpuWeight' => 500, 'ioWeight' => 200, 'memoryHighMiB' => 1024,
+            'memoryMaxMiB' => 1280, 'tasksMax' => 2048,
+        ], 0700);
+        $this->sys->commands['systemctl show'] = "CPUWeight=[not set]\nIOWeight=[NOT SET]\n"
+            ."MemoryHigh=infinity\nMemoryMax=INFINITY\nTasksMax=infinity\n";
+        $this->assertRunOutput(['testuser', '--defaults', '--respect-existing'],
+            ['CPUWeight=500', 'IOWeight=200', 'MemoryHigh=1024M', 'MemoryMax=1280M', 'TasksMax=2048']);
+    }
+
     // -- Execution & Command Generation --
 
     public function testApplyGeneratesCommand()

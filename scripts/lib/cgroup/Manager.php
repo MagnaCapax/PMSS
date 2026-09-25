@@ -190,7 +190,12 @@ class Manager
         foreach (array_keys($props) as $key) {
             // Read the native systemd key without building a renamed property map.
             $nativeKey = $key === 'CPUQuota' ? 'CPUQuotaPerSecUSec' : $key;
-            if (isset($current[$nativeKey]) && trim((string)$current[$nativeKey]) !== '') unset($props[$key]);
+            $liveValue = trim((string)($current[$nativeKey] ?? ''));
+            // systemctl show uses these sentinels for unset resource controls.
+            $isSet = $nativeKey === 'CPUQuotaPerSecUSec'
+                ? \pmssSystemdTimeSpanUsec($liveValue) !== null
+                : $liveValue !== '' && strcasecmp($liveValue, 'infinity') !== 0 && strcasecmp($liveValue, '[not set]') !== 0;
+            if ($isSet) unset($props[$key]);
         }
     }
 
