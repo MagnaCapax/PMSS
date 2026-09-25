@@ -63,7 +63,7 @@ These wrappers exist because assistants do not reliably auto-discover PMSS guard
 
 ## Codex defaults and launcher inventory
 
-Every Codex invocation defaults to `gpt-5.6-sol` with `medium` reasoning.
+Every Codex invocation defaults to `gpt-6-sol` with `medium` reasoning.
 The shared invocation helper sets these through CLI configuration, including
 bare `--exec "codex exec"` overrides. Explicit model or reasoning arguments
 remain effective because they follow the default configuration values.
