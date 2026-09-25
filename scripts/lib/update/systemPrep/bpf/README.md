@@ -1,6 +1,6 @@
 # Socket-table privacy BPF-LSM filter
 
-Part of the opt-in per-host socket-table privacy feature — see `docs/adr/0067`.
+Part of the opt-in per-host socket-table privacy feature — see `docs/adr/0068`.
 
 ## What it is
 

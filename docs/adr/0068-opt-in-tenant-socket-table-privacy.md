@@ -1,4 +1,4 @@
-# ADR 0067: Opt-in per-tenant socket-table privacy
+# ADR 0068: Opt-in per-tenant socket-table privacy
 
 Date: 2026-09-25
 Category: security

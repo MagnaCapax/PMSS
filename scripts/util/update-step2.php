@@ -599,7 +599,7 @@ runStep('Hardening access to session and network binaries', 'chmod o-r /var/log/
 pmssRunProfiledCallable('Applying socket-table privacy (opt-in)', 'pmssSocketTablePrivacyApply', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 // Stage 2: the sock_diag BPF-LSM filter. The loader self-gates on the same marker and FAILS OPEN
 // (exit 0) on any host lacking the marker, bpftool, kernel BTF, or a bpf LSM — so it can never
-// block the update; it unloads when the feature is disabled. See docs/adr/0067.
+// block the update; it unloads when the feature is disabled. See docs/adr/0068.
 runStep('Loading socket-table privacy filter (opt-in)', 'sh /scripts/lib/update/systemPrep/bpf/socket-privacy-load.sh');
 
 // Cleanup legacy runtime metadata that should never have shipped with snapshots.

@@ -2,7 +2,7 @@
 /*
  * PMSS opt-in socket-table privacy: BPF-LSM filter for NETLINK_SOCK_DIAG.
  *
- * Part of the opt-in per-host socket-table privacy feature (docs/adr/0067). Loaded
+ * Part of the opt-in per-host socket-table privacy feature (docs/adr/0068). Loaded
  * only when /etc/seedbox/config/socket-table-privacy.enabled is present and the host
  * carries a BPF-capable LSM stack + kernel BTF; the loader fails open otherwise.
  *

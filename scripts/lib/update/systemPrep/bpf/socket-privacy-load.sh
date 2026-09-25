@@ -1,5 +1,5 @@
 #!/bin/sh
-# Load/unload the opt-in socket-table-privacy BPF-LSM sock_diag filter (docs/adr/0067).
+# Load/unload the opt-in socket-table-privacy BPF-LSM sock_diag filter (docs/adr/0068).
 # Pure command orchestration. FAILS OPEN: any unmet precondition -> unload + exit 0
 # (never blocks update or boot). Reloaded at boot (BPF state is not reboot-persistent).
 set -u
