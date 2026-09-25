@@ -192,8 +192,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     }
 
     $serverPort = pmssReadRegularFileInt($portFile);
-    $needsLighttpdRefresh = !pmssNetworkPortInRange($serverPort, 1024) || !is_file($homeDir.'/.lighttpd.conf');
-    if ($needsLighttpdRefresh) {
+    if (!pmssNetworkPortInRange($serverPort, 1024) || !is_file($homeDir.'/.lighttpd.conf')) {
         passthru('/scripts/util/userConfigLighttpd.php '.escapeshellarg($thisUser));
         $serverPort = pmssReadRegularFileInt($portFile);
     }

@@ -102,7 +102,7 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
         // Ensure requests to the base hostname (FQDN) land on the main vhost where
         // user location blocks (including legacy Deluge redirects) are included.
         // This prevents unexpected fallback to user subdomain vhosts on some hosts.
-        if ($subdomainEnabled && $subdomainBase !== '' && $subdomainBase !== 'localhost') {
+        if ($subdomainEnabled) {
             $nginxConfigSiteDefault = str_replace(
                 'server_name localhost;',
                 'server_name localhost '.$subdomainBase.';',

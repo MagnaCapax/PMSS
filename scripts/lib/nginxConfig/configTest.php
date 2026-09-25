@@ -35,7 +35,6 @@ function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int
     $configTestRc = 0;
     exec(pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_CONFIG_TEST_COMMAND', 'nginx -t 2>&1'), $configTestOutput, $configTestRc);
     $configTestResult = implode("\n", $configTestOutput);
-    $configTestPassed = ($configTestRc === 0);
 
     $isTty = pmssStreamIsTty(STDOUT);
     $cReset  = $isTty ? "\033[0m"  : '';
@@ -43,7 +42,7 @@ function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int
     $cGreen  = $isTty ? "\033[32m" : '';
     $cYellow = $isTty ? "\033[33m" : '';
 
-    if ($configTestPassed) {
+    if ($configTestRc === 0) {
         echo "{$cGreen}[OK]{$cReset} nginx configuration test passed\n";
         pmssCreateNginxConfigAppendLog('nginx -t passed (rc=0)');
     } else {

@@ -8,14 +8,9 @@
  * @license GPL-3.0-only
  */
 
-function pmssNginxSuspendedLocationBlock(): string
-{
-    return "    location = /error-suspended.html {\n        root /var/www;\n    }\n    location / {\n        return 302 /error-suspended.html;\n    }";
-}
-
 function pmssNginxUserSubdomainTemplates(): array
 {
-    $suspendedLocations = pmssNginxSuspendedLocationBlock();
+    $suspendedLocations = "    location = /error-suspended.html {\n        root /var/www;\n    }\n    location / {\n        return 302 /error-suspended.html;\n    }";
     $publicProxyDefaults = <<<'NGINX'
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
