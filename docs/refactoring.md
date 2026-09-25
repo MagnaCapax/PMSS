@@ -148,6 +148,12 @@ below the representable integer limit. Oversized values retain the existing
 input/command failure paths; ordinary decimal values keep their output shape.
 `StorageBenchSecurityTest` covers the boundary and oversized inputs.
 
+Systemd integer counter mapping rejects unsigned decimal values above
+`PHP_INT_MAX` before casting, including values with leading zeros. Oversized
+samples return the existing missing-sample result instead of a saturated counter;
+representable values retain their integer mapping. The systemd slice property
+characterization test covers both boundaries.
+
 CLI diagnostic-and-return paths use `pmssCliReturnWithStderr()`, passing the
 complete message and status unchanged; the helper does not exit or add a newline.
 

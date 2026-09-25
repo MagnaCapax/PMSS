@@ -186,4 +186,16 @@ class SystemdSlicePropertiesCharacterizationTest extends TestCase
 
         $this->assertEquals(null, $mapped);
     }
+
+    public function testMapSystemdIntPropertiesRejectsOversizedCounters(): void
+    {
+        $map = ['IPIngressBytes' => 'ingress'];
+        foreach (['0' => 0, '00012' => 12, (string) PHP_INT_MAX => PHP_INT_MAX] as $raw => $expected) {
+            $this->assertSame(['ingress' => $expected], \pmssMapSystemdIntProperties(['IPIngressBytes' => (string) $raw], $map));
+        }
+        foreach ([PHP_INT_MAX.'0', '000'.PHP_INT_MAX.'0'] as $raw) {
+            $this->assertSame(null, \pmssMapSystemdIntProperties(['IPIngressBytes' => $raw], $map));
+            $this->assertSame(null, \pmssMapSystemdIntProperties(['IPIngressBytes' => $raw], $map, ['IPIngressBytes' => 0]));
+        }
+    }
 }
