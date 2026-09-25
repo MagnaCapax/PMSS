@@ -75,6 +75,30 @@ function pmssRtorrentPortReservationPayloadSource(array $payload): array
     return $source;
 }
 
+/**
+ * Return the stored ports a reconfigure may keep, as createConfig() input keys.
+ *
+ * A stored port is kept only while its reservation marker still exists, so a
+ * reconfigure (plan change) keeps the account's ports instead of reserving three
+ * new ones and leaving the old markers for the reconciler. A missing, malformed,
+ * out-of-range or symlinked entry is left out and createConfig() reserves fresh.
+ */
+function pmssRtorrentPortReservationReusable(array $payload, string $base = '/var/lib/pmss/ports'): array
+{
+    $reusable = array();
+    foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
+        $port = pmssNetworkPortParseDigits($payload[$spec['key']] ?? null, $spec['min'], $spec['max']);
+        if ($port === null) {
+            continue;
+        }
+        $marker = rtrim($base, '/').'/'.$type.'/'.$port;
+        if (is_file($marker) && !is_link($marker)) {
+            $reusable[$type.'Port'] = $port;
+        }
+    }
+    return $reusable;
+}
+
 /** Read canonical or legacy stored ownership without hiding malformed files. */
 function pmssRtorrentPortReservationStoredSource(string $user, string $configRoot): array
 {

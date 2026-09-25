@@ -373,6 +373,58 @@ PHP;
         $this->assertTrue(is_file($portRoot.'/listen/44001'));
     }
 
+    public function testReservationReusableKeepsOnlyStoredPortsWithLiveMarkers(): void
+    {
+        $portRoot = $this->pmssMakeTempDir('pmss-rtorrent-reuse-');
+        foreach (['scgi/4100', 'dht/24100', 'listen/44100'] as $relative) {
+            $this->pmssWriteFile($portRoot.'/'.$relative, '');
+        }
+        $stored = ['rtorrentPort' => 4100, 'rtorrentDhtPort' => '24100', 'rtorrentListenPort' => 44100];
+
+        // All three stored and reserved: all three kept (numeric strings too).
+        $this->assertEquals(['scgiPort' => 4100, 'dhtPort' => 24100, 'listenPort' => 44100], \pmssRtorrentPortReservationReusable($stored, $portRoot));
+
+        // Marker gone: that type is left for a fresh reservation, the others are kept.
+        @unlink($portRoot.'/dht/24100');
+        $this->assertEquals(['scgiPort' => 4100, 'listenPort' => 44100], \pmssRtorrentPortReservationReusable($stored, $portRoot));
+
+        // New account (payload default rtorrentPort 0), missing keys, malformed and out-of-range values: nothing kept.
+        $this->assertEquals([], \pmssRtorrentPortReservationReusable(['rtorrentPort' => 0], $portRoot));
+        $this->assertEquals([], \pmssRtorrentPortReservationReusable([], $portRoot));
+        $this->assertEquals([], \pmssRtorrentPortReservationReusable(['rtorrentPort' => '41x0', 'rtorrentListenPort' => [44100]], $portRoot));
+        $this->pmssWriteFile($portRoot.'/scgi/24100', '');
+        $this->assertEquals([], \pmssRtorrentPortReservationReusable(['rtorrentPort' => 24100, 'rtorrentListenPort' => 4100], $portRoot));
+
+        // A directory or symlink in the marker slot is not a reservation.
+        @mkdir($portRoot.'/scgi/4200', 0755, true);
+        $this->assertEquals([], \pmssRtorrentPortReservationReusable(['rtorrentPort' => 4200], $portRoot));
+        if (@symlink($portRoot.'/listen/44100', $portRoot.'/listen/44200')) {
+            $this->assertEquals([], \pmssRtorrentPortReservationReusable(['rtorrentListenPort' => 44200], $portRoot));
+        }
+    }
+
+    public function testCreateConfigReconfigureKeepsReservedPortsWithoutNewMarkers(): void
+    {
+        $this->skipIfLocalnetPresent('reconfigure port reuse');
+        $portRoot = $this->pmssMakeTempDir('pmss-rtorrent-reconfigure-');
+        $cfg = $this->rtorrentTransactionalFixture($portRoot, null);
+        $first = $cfg->createConfig(['ram' => 500, 'pex' => 'auto', 'dht' => 'auto']);
+        $stored = [
+            'rtorrentPort' => $first['config']['scgiPort'],
+            'rtorrentDhtPort' => $first['config']['dhtPort'],
+            'rtorrentListenPort' => $first['config']['listenPort'],
+        ];
+
+        $again = $cfg->createConfig(\pmssRtorrentPortReservationReusable($stored, $portRoot) + ['ram' => 1000, 'pex' => 'auto', 'dht' => 'auto']);
+
+        $this->assertEquals($first['config']['scgiPort'], $again['config']['scgiPort']);
+        $this->assertEquals($first['config']['dhtPort'], $again['config']['dhtPort']);
+        $this->assertEquals($first['config']['listenPort'], $again['config']['listenPort']);
+        foreach (['scgi', 'dht', 'listen'] as $type) {
+            $this->assertEquals(1, count(glob($portRoot.'/'.$type.'/*')), $type.' reconfigure must not reserve a second marker');
+        }
+    }
+
     public function testReservationReconcilerKeepsReferencesRecentAndUnsafeMarkers(): void
     {
         $fixture = $this->rtorrentReconcileFixture();

@@ -147,7 +147,8 @@ try {
     $resources = pmssReadOptionalSerializedArrayFile('/etc/seedbox/config/system.rtorrent.resources', 'rTorrent resource configuration');
     $rtorrentConfig = new rtorrentConfig($resources);
     $throttle = pmssReadTorrentThrottle($user['name']);
-    $configuration = $rtorrentConfig->createConfig([
+    // Keep the account's reserved ports across a reconfigure; only missing ones are reserved anew.
+    $configuration = $rtorrentConfig->createConfig(pmssRtorrentPortReservationReusable($payload) + [
         'ram' => $user['memory'],
         'dht' => pmssReadRequiredRegularFile('/etc/seedbox/config/user.rtorrent.defaults.dht', 'rTorrent DHT defaults'),
         'pex' => pmssReadRequiredRegularFile('/etc/seedbox/config/user.rtorrent.defaults.pex', 'rTorrent PEX defaults'),

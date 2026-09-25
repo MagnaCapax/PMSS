@@ -18,6 +18,7 @@ class userConfigCommandContractsTest extends TestCase
                     '@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false',
                     "if (pmssUserConfigDiskQuotaShouldApply(\$configMode)) {\n    userApplyDiskQuota(\$user);\n}",
                     'pmssUserConfigApplyCgroupAndDocker($user, $store)',
+                    '$rtorrentConfig->createConfig(pmssRtorrentPortReservationReusable($payload) + [',
                 ],
                 'forbidden' => [
                     '(int) $pid'.'Chunk',
