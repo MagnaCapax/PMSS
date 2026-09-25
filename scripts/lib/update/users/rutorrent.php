@@ -71,45 +71,17 @@ PHP;
     $snoopyAcceptLegacy = "\tvar \$accept\t\t\t=\t\"image/gif, image/x-xbitmap, image/jpeg, image/pjpeg, */*\";";
     $snoopyAcceptPatched = "\tvar \$accept\t\t\t=\t\"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\";";
 
-    // Keep these compatibility shims in one literal patch table.
+    // Apply each legacy replacement in order, preserving per-patch writes.
     foreach ([
-        [
-            'path' => $ctx['home'].'/www/rutorrent/php/settings.php',
-            'legacy' => $settingsIntervalGuardLegacy,
-            'patched' => $settingsIntervalGuardPatched,
-        ],
-        [
-            'path' => $ctx['home'].'/www/rutorrent/php/settings.php',
-            'legacy' => '((integer)($tm["minutes"]/$interval))*$interval+$interval,',
-            'patched' => '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),',
-        ],
-        [
-            'path' => $ctx['home'].'/www/rutorrent/php/Snoopy.class.inc',
-            'legacy' => $snoopyAcceptLegacy,
-            'patched' => $snoopyAcceptPatched,
-        ],
-        [
-            'path' => $ctx['home'].'/www/rutorrent/plugins/rss/action.php',
-            'legacy' => 'ob_flush();',
-            'patched' => '@ob_flush();',
-        ],
-        [
-            'path' => $ctx['home'].'/www/rutorrent/plugins/hddquota/action.php',
-            'legacy' => 'return $field;',
-            'patched' => 'return (int) $field;',
-        ],
-        [
-            'path' => $ctx['home'].'/www/rutorrent/plugins/throttle/throttle.php',
-            'legacy' => 'new rXMLRPCCommand( "set_upload_rate", MAX_SPEED )',
-            'patched' => 'new rXMLRPCCommand( "set_upload_rate", 0 )',
-        ],
-        [
-            'path' => $ctx['home'].'/www/rutorrent/plugins/throttle/throttle.php',
-            'legacy' => 'new rXMLRPCCommand( "set_download_rate", MAX_SPEED )',
-            'patched' => 'new rXMLRPCCommand( "set_download_rate", 0 )',
-        ],
-    ] as $patch) {
-        pmssUserPatchWritableStrings($patch['path'], [$patch]);
+        ['php/settings.php', $settingsIntervalGuardLegacy, $settingsIntervalGuardPatched],
+        ['php/settings.php', '((integer)($tm["minutes"]/$interval))*$interval+$interval,', '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),'],
+        ['php/Snoopy.class.inc', $snoopyAcceptLegacy, $snoopyAcceptPatched],
+        ['plugins/rss/action.php', 'ob_flush();', '@ob_flush();'],
+        ['plugins/hddquota/action.php', 'return $field;', 'return (int) $field;'],
+        ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_upload_rate", MAX_SPEED )', 'new rXMLRPCCommand( "set_upload_rate", 0 )'],
+        ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_download_rate", MAX_SPEED )', 'new rXMLRPCCommand( "set_download_rate", 0 )'],
+    ] as [$path, $legacy, $patched]) {
+        pmssUserPatchWritableStrings($ctx['home'].'/www/rutorrent/'.$path, [['legacy' => $legacy, 'patched' => $patched]]);
     }
 }
 
