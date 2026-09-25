@@ -100,9 +100,9 @@ function pmssCreateNginxConfigMain(array $argv): int
     $subdomainConfigDir = (string)($ctx['subdomainConfigDir'] ?? '/etc/nginx/conf.d');
     // Permission hardening for generated nginx configs.
     // Disallow config reading by anyone else.
-    pmssCreateNginxConfigChmodGlob(0640, '/etc/nginx/users/*');
-    pmssCreateNginxConfigChmodGlob(0640, $subdomainConfigDir.'/pmss-user-*.conf');
-    pmssCreateNginxConfigChmodGlob(0640, '/etc/nginx/*.conf');
+    foreach (['/etc/nginx/users/*', $subdomainConfigDir.'/pmss-user-*.conf', '/etc/nginx/*.conf'] as $pattern) {
+        pmssCreateNginxConfigChmodGlob(0640, $pattern);
+    }
 
     $configTestRc = pmssCreateNginxConfigTestAndMaybeRestart($restartNginx);
     if ($configTestRc !== 0) {

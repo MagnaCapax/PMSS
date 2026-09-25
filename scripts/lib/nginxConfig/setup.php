@@ -22,21 +22,14 @@ require_once __DIR__.'/../runtime.php';
  */
 function pmssNginxConfigEnsureSiteDefaultDefinesDefaultServer(string $config): string
 {
-    $config = preg_replace_callback('/^(\\s*listen\\s+80\\b)([^;]*)(;.*)$/m', static function (array $match) {
-        if (preg_match('/\\bdefault_server\\b/', $match[2]) !== 0) {
+    $config = preg_replace_callback('/^(\\s*listen\\s+(80|443)\\b)([^;]*)(;.*)$/m', static function (array $match) {
+        if ($match[2] === '443' && preg_match('/\\bssl\\b/', $match[3]) !== 1) {
             return $match[0];
         }
-        return $match[1].rtrim($match[2]).' default_server'.$match[3];
-    }, $config) ?? $config;
-
-    $config = preg_replace_callback('/^(\\s*listen\\s+443\\b)([^;]*)(;.*)$/m', static function (array $match) {
-        if (preg_match('/\\bssl\\b/', $match[2]) !== 1) {
+        if (preg_match('/\\bdefault_server\\b/', $match[3]) !== 0) {
             return $match[0];
         }
-        if (preg_match('/\\bdefault_server\\b/', $match[2]) !== 0) {
-            return $match[0];
-        }
-        return $match[1].rtrim($match[2]).' default_server'.$match[3];
+        return $match[1].rtrim($match[3]).' default_server'.$match[4];
     }, $config) ?? $config;
 
     return $config;
