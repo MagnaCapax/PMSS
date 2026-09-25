@@ -87,6 +87,21 @@ class SocketTablePrivacyTest extends TestCase
         $this->assertFalse(is_file($dropin));
     }
 
+    public function testDisabledNeverWidensAMoreRestrictiveTable(): void
+    {
+        // A table the kernel or another layer left more restrictive than stock (0400)
+        // must NOT be loosened back to 0444 by the disabled restore path.
+        $procNet = $this->fakeProcNet(0444);
+        chmod($procNet.'/tcp', 0400);
+        $marker = $this->pmssMakeTempDir('pmss-marker-', 0700).'/socket-table-privacy.enabled'; // absent
+        $dropin = $this->pmssMakeTempDir('pmss-sysctl-', 0700).'/91-pmss-socket-table-privacy.conf';
+
+        pmssSocketTablePrivacyApply(static function (): void {}, $marker, $procNet, $dropin);
+
+        $this->assertSame(0400, $this->modeOf($procNet.'/tcp'), 'disable must not widen a 0400 table to 0444');
+        $this->assertSame(0444, $this->modeOf($procNet.'/udp'), 'a stock 0444 table stays 0444');
+    }
+
     public function testEnabledDetectionFollowsTheMarker(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-marker-detect-', 0700);

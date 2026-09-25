@@ -55,6 +55,12 @@ function pmssSocketTablePrivacySysctlDropinPath(): string
  * Set every existing address-bearing /proc/net table to $mode.
  * 0440 hides remote addresses from non-root; 0444 is the kernel's stock mode.
  * Returns the count of tables actually changed.
+ *
+ * The restore direction (0444) is deliberately NON-WIDENING: it only touches a
+ * table currently at exactly 0440 (this feature's own signature mode). A table
+ * left at any other mode by the kernel or a future hardening layer is not
+ * loosened back to 0444 — so disabling this feature can never widen access
+ * beyond what it originally restricted.
  */
 function pmssSocketTablePrivacyChmodProcNet(int $mode, ?string $procNetRoot = null): int
 {
@@ -66,7 +72,16 @@ function pmssSocketTablePrivacyChmodProcNet(int $mode, ?string $procNetRoot = nu
             continue;
         }
         $current = @fileperms($path);
-        if (is_int($current) && ($current & 0777) === $mode) {
+        if (!is_int($current)) {
+            continue;
+        }
+        $current &= 0777;
+        if ($current === $mode) {
+            continue;
+        }
+        // Restore (widen to 0444) ONLY our own 0440 mark; never loosen a table
+        // the kernel or another layer set more restrictively.
+        if ($mode === 0444 && $current !== 0440) {
             continue;
         }
         if (@chmod($path, $mode)) {
