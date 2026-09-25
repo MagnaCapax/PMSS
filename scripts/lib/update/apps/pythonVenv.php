@@ -61,16 +61,14 @@ function pmssPythonVenvEnsure(
 
     // Determine if pip is actually importable, not just if a script exists.
     exec(pmssBuildCommand($pythonBin, ['-m', 'pip', '--version']).' 1>/dev/null 2>&1', $out, $rc);
-    $hasPip = $rc === 0;
-    if (!$hasPip) {
+    if ($rc !== 0) {
         runStep('Bootstrapping pip in '.$label.' virtualenv', pmssBuildCommand($pythonBin, ['-m', 'ensurepip', '--upgrade', '--default-pip']));
         // Emit minimal debug context to help diagnose odd hosts.
         runStep('Debug '.$label.' ensurepip context', pmssBuildCommand($pythonBin, ['-c', 'import sys,ensurepip; print(sys.version); print(getattr(ensurepip,"__file__","n/a"))']));
         exec(pmssBuildCommand($pythonBin, ['-m', 'pip', '--version']).' 1>/dev/null 2>&1', $out, $rc);
-        $hasPip = $rc === 0;
     }
 
-    if (!$hasPip) {
+    if ($rc !== 0) {
         $log('[ERR] '.$label.' virtualenv missing pip after ensurepip; ensure python3-venv is installed and rerun update');
         // List venv bin dir to aid debugging.
         @runStep('Debug '.$label.' venv bin listing', pmssBuildCommand('ls', ['-la', dirname($pythonBin)]).' || true');

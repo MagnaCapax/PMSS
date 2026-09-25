@@ -39,7 +39,7 @@ function pmssPinnedRemoteTempFileUse(string $label, string $url, string $expecte
         }
         if (!pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
             $actualSha = pmssPinnedRemoteChecksum($tmp);
-            if ($actualSha === '' || $actualSha !== $expectedSha256) {
+            if ($actualSha !== $expectedSha256) {
                 logmsg("[WARN] {$label}{$artifactLabel} checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
                 return null;
             }

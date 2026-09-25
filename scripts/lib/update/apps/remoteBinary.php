@@ -24,13 +24,6 @@ function pmssPinnedRemoteArchiveComponentIsSafe(string $component): bool
         && strpos($component, "\0") === false;
 }
 
-/** Reject archive names outside the tar formats this helper knows how to unpack. */
-function pmssPinnedRemoteArchiveNameIsSafe(string $archiveName): bool
-{
-    return pmssPinnedRemoteArchiveComponentIsSafe($archiveName)
-        && (substr($archiveName, -7) === '.tar.gz' || substr($archiveName, -7) === '.tar.xz');
-}
-
 /** Reject post-extract shell fragments that would break the generated command chain. */
 function pmssPinnedRemoteArchivePostCommandIsSafe(string $command): bool
 {
@@ -47,7 +40,8 @@ function pmssPinnedRemoteArchivePostCommandIsSafe(string $command): bool
 function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expectedSha256, string $archiveName, string $sourceDir, string $description, array $postExtractCommands, string $workDir = '/root/compile'): bool
 {
     $trimmedWorkDir = rtrim($workDir, '/');
-    if (!pmssPinnedRemoteArchiveNameIsSafe($archiveName)
+    if (!pmssPinnedRemoteArchiveComponentIsSafe($archiveName)
+        || (substr($archiveName, -7) !== '.tar.gz' && substr($archiveName, -7) !== '.tar.xz')
         || !pmssPinnedRemoteArchiveComponentIsSafe($sourceDir)) {
         logmsg("[WARN] Refusing unsafe archive extraction path for {$label}");
         return false;
@@ -72,7 +66,7 @@ function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expe
             'rm -rf '.escapeshellarg($sourceDir).' '.escapeshellarg($archiveName),
             'cp '.escapeshellarg($archivePath).' '.escapeshellarg($archiveName), 'tar '.$tarMode.' '.escapeshellarg($archiveName)];
         foreach ($postExtractCommands as $command) {
-            $commands[] = (string) $command;
+            $commands[] = $command;
         }
         return runStep($description, implode(' && ', $commands)) === 0;
     });
@@ -120,7 +114,7 @@ function pmssInstallPinnedRemoteBinary(
 /** Install a verified Debian package; dry-run still reports success. */
 function pmssInstallPinnedRemoteDebPackage(string $label, string $url, string $expectedSha256): bool
 {
-    $result = pmssPinnedRemoteTempFileUse(
+    return pmssPinnedRemoteTempFileUse(
         $label,
         $url,
         $expectedSha256,
@@ -131,6 +125,5 @@ function pmssInstallPinnedRemoteDebPackage(string $label, string $url, string $e
                 || runStep("Installing {$label}", dpkgCmd('-i '.escapeshellarg($tmp))) === 0;
         },
         ' package'
-    );
-    return $result === true;
+    ) === true;
 }

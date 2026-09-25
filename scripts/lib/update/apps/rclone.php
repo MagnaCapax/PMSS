@@ -10,11 +10,6 @@
 
 require_once __DIR__.'/remoteBinary.php';
 
-function pmssRcloneVersionIsSafe(string $version): bool
-{
-    return preg_match('/\A\d+\.\d+\.\d+\z/', $version) === 1;
-}
-
 function pmssRcloneLatestVersionFetch(array $urls): ?string
 {
     foreach ($urls as $url) {
@@ -49,7 +44,7 @@ function pmssRcloneInstallCommand(string $version, string $workDir): string
 
 function pmssRcloneInstallFromZip(string $version): void
 {
-    if (!pmssRcloneVersionIsSafe($version)) {
+    if (preg_match('/\A\d+\.\d+\.\d+\z/', $version) !== 1) {
         logmsg("[WARN] Refusing unsafe rclone version: {$version}");
         return;
     }
