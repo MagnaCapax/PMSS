@@ -101,14 +101,25 @@ class SystemdSlicePropertiesCharacterizationTest extends TestCase
         $this->assertEquals(250, \pmssSystemdCpuQuotaPercent(['CPUQuota' => '250%']));
     }
 
-    public function testCpuQuotaPercentFallsBackToPeriodRatio(): void
+    public function testCpuQuotaPercentParsesShowTimeSpans(): void
     {
-        $quota = \pmssSystemdCpuQuotaPercent([
-            'CPUQuotaPerSecUSec' => '50000',
-            'CPUQuotaPeriodUSec' => '100000',
-        ]);
+        foreach (['2s' => 200, '13.600000s' => 1360, '500ms' => 50, '1min' => 6000,
+            '1min 30s' => 9000, '1h 2min 3s 4ms 5us' => 372300, '500000' => 50] as $span => $expected) {
+            $this->assertSame($expected, \pmssSystemdCpuQuotaPercent([
+                'CPUQuotaPerSecUSec' => $span,
+                'CPUQuotaPeriodUSec' => 'infinity',
+            ]));
+        }
+    }
 
-        $this->assertEquals(50, $quota);
+    public function testCpuQuotaPercentRejectsUnsetAndInvalidShowValues(): void
+    {
+        foreach (['infinity', '[not set]', '', '0', '0s', '2bogus', '1s garbage'] as $span) {
+            $this->assertSame(null, \pmssSystemdCpuQuotaPercent([
+                'CPUQuotaPerSecUSec' => $span,
+                'CPUQuotaPeriodUSec' => 'infinity',
+            ]));
+        }
     }
 
     public function testCpuQuotaPercentTreatsInfinityAsMissing(): void

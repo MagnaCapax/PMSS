@@ -114,9 +114,30 @@ function pmssSystemdPropertyTrailingInt($value): ?int
     return ($parsed > 0 && $parsed <= 999999999999999) ? $parsed : null;
 }
 
-/**
- * Extract CPU quota percentage from `systemctl show` properties.
- */
+/** Parse a systemd time span into microseconds; unset or malformed values have no duration. */
+function pmssSystemdTimeSpanUsec(string $value): ?float
+{
+    $value = trim($value);
+    if ($value === '' || $value === '[not set]' || strcasecmp($value, 'infinity') === 0) {
+        return null;
+    }
+    if (ctype_digit($value)) {
+        return (float) $value;
+    }
+    if (preg_match('/\A\d+(?:\.\d+)?(?:us|ms|min|s|h)(?:\s+\d+(?:\.\d+)?(?:us|ms|min|s|h))*\z/i', $value) !== 1) {
+        return null;
+    }
+
+    preg_match_all('/(\d+(?:\.\d+)?)(us|ms|min|s|h)/i', $value, $parts, PREG_SET_ORDER);
+    $multipliers = ['us' => 1, 'ms' => 1000, 's' => 1000000, 'min' => 60000000, 'h' => 3600000000];
+    $usec = 0.0;
+    foreach ($parts as $part) {
+        $usec += (float) $part[1] * $multipliers[strtolower($part[2])];
+    }
+    return is_finite($usec) ? $usec : null;
+}
+
+/** Extract CPU quota percentage from `systemctl show` properties. */
 function pmssSystemdCpuQuotaPercent(array $properties): ?int
 {
     $rawQuota = trim((string) ($properties['CPUQuota'] ?? ''));
@@ -124,13 +145,11 @@ function pmssSystemdCpuQuotaPercent(array $properties): ?int
         $quota = (int) round((float) $rawQuota);
         return $quota > 0 ? $quota : null;
     }
-    if (!is_numeric($properties['CPUQuotaPerSecUSec'] ?? null) || !is_numeric($properties['CPUQuotaPeriodUSec'] ?? null)) {
+    $perSecUsec = pmssSystemdTimeSpanUsec((string) ($properties['CPUQuotaPerSecUSec'] ?? ''));
+    if ($perSecUsec === null || $perSecUsec <= 0 || $perSecUsec / 10000 > PHP_INT_MAX) {
         return null;
     }
-    $quotaPeriod = (float) $properties['CPUQuotaPeriodUSec'];
-    if ($quotaPeriod <= 0.0) {
-        return null;
-    }
-    $quota = (int) round((((float) $properties['CPUQuotaPerSecUSec']) / $quotaPeriod) * 100);
+    // PerSecUSec is allowed CPU time per wall-clock second; the scheduling period is unrelated.
+    $quota = (int) round($perSecUsec / 10000);
     return $quota > 0 ? $quota : null;
 }

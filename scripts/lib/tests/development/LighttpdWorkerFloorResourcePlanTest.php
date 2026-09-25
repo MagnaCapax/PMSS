@@ -15,6 +15,20 @@ class LighttpdWorkerFloorResourcePlanTest extends TestCase
         $this->assertSame(6, $resources['totalThreads']);
     }
 
+    public function testSystemdShowQuotaSetsPhpPoolSize(): void
+    {
+        $props = \pmssParseSystemdPropertyOutput(
+            ['CPUQuotaPerSecUSec', 'CPUQuotaPeriodUSec'],
+            "CPUQuotaPerSecUSec=2s\nCPUQuotaPeriodUSec=infinity\n"
+        );
+        $resources = \pmssLighttpdResourcePlan($props, ['cpuQuotaPercent' => 85]);
+
+        $this->assertSame(200, $resources['cpuQuotaPercent']);
+        $this->assertSame(2, $resources['maxProcs']);
+        $this->assertSame(6, $resources['children']);
+        $this->assertSame(12, $resources['totalThreads']);
+    }
+
     public function testWorkerFloorRaisesPlanToProcessGroupBoundary(): void
     {
         $resources = \pmssLighttpdResourcePlan(
