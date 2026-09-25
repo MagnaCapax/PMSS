@@ -54,11 +54,10 @@ function pmssWriteHomeMarkerCli(array $argv): int
     }
     $mode = pmssHomeMarkerMode($marker);
 
-    $raw = (string) $argv[3];
-    if ($raw === '' || preg_match('/^\d+$/', $raw) !== 1) {
+    $value = pmssHomeMarkerValueParse((string) $argv[3]);
+    if ($value === null) {
         return pmssCliReturnWithStderr("Error: value must be a non-negative integer.\n", 4);
     }
-    $value = (int) $raw;
 
     // The home must be a real directory whose path cannot redirect the root write.
     $home = '/home/'.$user;

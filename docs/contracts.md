@@ -899,6 +899,11 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ## User Management (CLI)
 
+- `scripts/util/writeHomeMarker.php <user> <marker> <intValue>` accepts unsigned
+  decimal marker values, including zero and leading zeroes, only when they fit
+  a PHP integer. Invalid or oversized values retain exit code 4 and the
+  existing stderr error before any home-file write.
+
 - scripts/addUser.php USERNAME PASSWORD RAM_MiB QUOTA_GiB [trafficLimitGB]
   - Alternate form: `scripts/addUser.php --user=USERNAME --password=PASSWORD --ram-mib=RAM_MiB --disk-quota-gib=QUOTA_GiB [resource options]`
   - Behavior: Creates Unix user with `/etc/skel`, sets password or generates one,

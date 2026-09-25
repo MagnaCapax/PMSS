@@ -64,3 +64,20 @@ if (!function_exists('pmssHomeMarkerClass')) {
         return array_key_exists($marker, $reg) ? (string) $reg[$marker]['class'] : null;
     }
 }
+
+if (!function_exists('pmssHomeMarkerValueParse')) {
+    /** Accept only a non-negative decimal integer representable by this PHP runtime. */
+    function pmssHomeMarkerValueParse(string $raw): ?int
+    {
+        if ($raw === '' || preg_match('/^\d+$/D', $raw) !== 1) {
+            return null;
+        }
+        $digits = ltrim($raw, '0');
+        $limit = (string) PHP_INT_MAX;
+        if (strlen($digits) > strlen($limit)
+            || (strlen($digits) === strlen($limit) && strcmp($digits, $limit) > 0)) {
+            return null;
+        }
+        return (int) $raw;
+    }
+}
