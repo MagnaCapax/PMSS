@@ -225,11 +225,34 @@ class installMediaStackScriptTest extends TestCase
         ], $this->script);
     }
 
+    public function testServarrHostConfigUrlUsesUrlBase(): void
+    {
+        // Servarr answers unprefixed API paths with an empty 307 once UrlBase is set (Refs #858).
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash', 'set -euo pipefail', 'dir=$(mktemp -d)',
+            $this->pmssExtractShellFunctions($this->script, array('servarr_host_config_url')),
+            'probe() { printf "%s\n" "<Config>" "$1" "</Config>" >"$dir/config.xml"; servarr_host_config_url "$dir/config.xml" 17878 "$2"; printf "\n"; }',
+            'probe "  <UrlBase>/public-bob/radarr</UrlBase>" v3',
+            'probe "  <UrlBase>/public-bob/prowlarr/</UrlBase>" v1',
+            'probe "  <UrlBase></UrlBase>" v3',
+            'probe "  <UrlBase />" v3',
+            'servarr_host_config_url "$dir/missing.xml" 17878 v3; printf "\n"',
+            'rm -rf "$dir"', '',
+        ));
+        $this->assertSame(implode("\n", array(
+            'http://127.0.0.1:17878/public-bob/radarr/api/v3/config/host',
+            'http://127.0.0.1:17878/public-bob/prowlarr/api/v1/config/host',
+            'http://127.0.0.1:17878/api/v3/config/host',
+            'http://127.0.0.1:17878/api/v3/config/host',
+            'http://127.0.0.1:17878/api/v3/config/host',
+        )), $this->pmssRunShellHarness($script));
+    }
+
     public function testServarrAuthSeedingUsesLocalApiAndFailsClosed(): void
     {
         $this->assertStringContainsAllStrings([
             'servarr_auth_seed() {',
-            'base_url="http://127.0.0.1:${seed_port}/api/${api_version}/config/host"',
+            'base_url=$(servarr_host_config_url "$config_file" "$seed_port" "$api_version")',
             '$data["authenticationMethod"] = "forms"',
             '$data["authenticationRequired"] = "enabled"',
             'servarr_credentials_mark_existing_unknown() {',
@@ -374,6 +397,7 @@ BASH
             'servarr_api_key_curl_config_write',
             'servarr_api_key_curl_config_wait',
             'servarr_auth_payload_write',
+            'servarr_host_config_url',
             'servarr_auth_seed',
         ));
         $script = implode("\n", array(
