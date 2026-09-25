@@ -11,8 +11,16 @@ pmssRequireRelativeFiles(__DIR__, ['cli/optionParser.php', 'storageBenchmark/rep
 
 /** Emit a legacy CLI fatal error and preserve the historical exit code. */
 function storageBenchmarkFail(string $message): void { exit(pmssCliReturnWithStderr($message)); }
-function storageBenchmarkRequireSizeBytes(string $optionName, string $value, int $minimumBytes = 1, string $minimumLabel = 'positive size'): int { $bytes = preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i', trim($value)) === 1 ? pmssParseSizeToBytes($value, true, true) : null; if ($bytes === null || $bytes <= 0.0) storageBenchmarkFail("Error: {$optionName} must be a positive size (examples: 1G, 512M, 1048576).\n"); if ($bytes < $minimumBytes) storageBenchmarkFail("Error: {$optionName} must be at least {$minimumLabel}.\n"); return (int) $bytes; }
-function storageBenchmarkRequireIntOption(array $parsed, string $optionName, int $default, int $minimum, string $minimumLabel): int { $value = pmssCliOption($parsed, $optionName, null, null); if ($value === null || $value === true) return $default; if (!is_string($value) || !ctype_digit($value) || (int) $value < $minimum) storageBenchmarkFail("Error: --{$optionName} must be a {$minimumLabel} integer.\n"); return (int) $value; }
+/** Compare decimal input before casting so oversized values cannot saturate to PHP_INT_MAX. */
+function storageBenchmarkUnsignedIntFits(string $value): bool
+{
+    if ($value === '' || !ctype_digit($value)) return false;
+    $digits = ltrim($value, '0');
+    $limit = (string) PHP_INT_MAX;
+    return strlen($digits) < strlen($limit) || (strlen($digits) === strlen($limit) && strcmp($digits, $limit) <= 0);
+}
+function storageBenchmarkRequireSizeBytes(string $optionName, string $value, int $minimumBytes = 1, string $minimumLabel = 'positive size'): int { $bytes = preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i', trim($value)) === 1 ? pmssParseSizeToBytes($value, true, true) : null; if ($bytes === null || $bytes <= 0.0 || !is_finite($bytes) || $bytes >= (float) PHP_INT_MAX) storageBenchmarkFail("Error: {$optionName} must be a positive size (examples: 1G, 512M, 1048576).\n"); if ($bytes < $minimumBytes) storageBenchmarkFail("Error: {$optionName} must be at least {$minimumLabel}.\n"); return (int) $bytes; }
+function storageBenchmarkRequireIntOption(array $parsed, string $optionName, int $default, int $minimum, string $minimumLabel): int { $value = pmssCliOption($parsed, $optionName, null, null); if ($value === null || $value === true) return $default; if (!is_string($value) || !storageBenchmarkUnsignedIntFits($value) || (int) $value < $minimum) storageBenchmarkFail("Error: --{$optionName} must be a {$minimumLabel} integer.\n"); return (int) $value; }
 function storageBenchmarkRequireJsonLogPath(string $jsonLog): void { $jsonDir = dirname($jsonLog); $jsonDirError = null; if (!pmssLogWriteDirectoryPrepare($jsonDir, 0755, $jsonDirError, true)) storageBenchmarkFail($jsonDirError === 'create' ? "Error: failed to create JSON log directory: {$jsonDir}\n" : "Error: unsafe JSON log path: {$jsonLog}\n"); if (!pmssLogWritePathIsSafe($jsonLog)) storageBenchmarkFail("Error: unsafe JSON log path: {$jsonLog}\n"); }
 function storageBenchmarkRequireTargetDir(string $targetDir): string { $path = rtrim($targetDir, '/'); if ($path === '' || preg_match('/[\r\n\0]/', $path) === 1 || !pmssPathSegmentsAreSafe($path, true, true, true, true)) storageBenchmarkFail("Error: unsafe target directory: {$targetDir}\n"); if (!is_dir($path) || !is_writable($path)) storageBenchmarkFail("Error: target not writable: {$targetDir}\n"); return $path; }
 
@@ -72,7 +80,7 @@ function storageBenchmarkRequireCommandField(string $command, string $label, boo
     $value = trim($raw);
     if ((int) ($result['rc'] ?? 1) !== 0 || pmssFilesystemPathHasNulByte($raw)
         || $value === '' || preg_match('/[\r\n\0]/', $value) === 1
-        || ($positiveInt && (!ctype_digit($value) || (int) $value <= 0))) {
+        || ($positiveInt && (!storageBenchmarkUnsignedIntFits($value) || (int) $value <= 0))) {
         storageBenchmarkFail("Error: failed to read {$label}.\n");
     }
     return $value;
@@ -99,7 +107,7 @@ function storageBenchmarkDeviceSizeBytesRead(string $path): ?int
     $raw = (string) ($result['stdout'] ?? '');
     $value = trim($raw);
     if ((int) ($result['rc'] ?? 1) !== 0 || pmssFilesystemPathHasNulByte($raw)
-        || $value === '' || preg_match('/[\r\n\0]/', $value) === 1 || !ctype_digit($value) || (int) $value <= 0) {
+        || $value === '' || preg_match('/[\r\n\0]/', $value) === 1 || !storageBenchmarkUnsignedIntFits($value) || (int) $value <= 0) {
         return null;
     }
 

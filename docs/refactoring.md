@@ -142,6 +142,12 @@ requires a complete temporary-file write before metadata changes or rename.
 Failed or short writes keep the prior `daemon.json` and remove the partial temp file.
 `UserDockerCgroupDriverTest` covers both rejected targets and short writes.
 
+Storage benchmark integer options and block-device/free-space command output
+must fit a PHP integer before casting. Size options must also be finite and
+below the representable integer limit. Oversized values retain the existing
+input/command failure paths; ordinary decimal values keep their output shape.
+`StorageBenchSecurityTest` covers the boundary and oversized inputs.
+
 CLI diagnostic-and-return paths use `pmssCliReturnWithStderr()`, passing the
 complete message and status unchanged; the helper does not exit or add a newline.
 
