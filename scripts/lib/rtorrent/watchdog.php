@@ -145,9 +145,7 @@ function pmssCheckRtorrentRecoverMissingConfig(string $user, string $home, bool 
         return false;
     }
 
-    $resources = is_file('/etc/seedbox/config/system.rtorrent.resources')
-        ? (pmssReadSerializedArrayFile('/etc/seedbox/config/system.rtorrent.resources') ?? [])
-        : [];
+    $resources = pmssReadSerializedArrayFile('/etc/seedbox/config/system.rtorrent.resources') ?? [];
     $configInput = ['ram' => $ramMiB, 'dht' => $dhtDefault, 'pex' => $pexDefault, 'uploadThrottle' => (($throttle = pmssReadTorrentThrottle($user)) === null) ? 0 : $throttle];
     if (isset($payload['rtorrentPort']) && is_numeric($payload['rtorrentPort']) && (int) $payload['rtorrentPort'] > 0) {
         $configInput['scgiPort'] = (int) $payload['rtorrentPort'];

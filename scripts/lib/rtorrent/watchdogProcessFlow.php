@@ -34,7 +34,7 @@ function pmssCheckRtorrentHandleEscalatedStartFailure(
             $user,
             'persistent start failure escalated; leaving retry disabled for external monitoring '
                 .'until bounded auto-recovery interval elapses '
-                .'(age='.(int) $retryState['age'].'s interval='.max(1, $retryInterval).'s)',
+                .'(age='.$retryState['age'].'s interval='.max(1, $retryInterval).'s)',
             $debug
         );
         return;
@@ -42,7 +42,7 @@ function pmssCheckRtorrentHandleEscalatedStartFailure(
 
     pmssCheckRtorrentLogBoth(
         $user,
-        'persistent start failure escalated for '.(int) $retryState['age'].'s; attempting bounded auto-recovery start',
+        'persistent start failure escalated for '.$retryState['age'].'s; attempting bounded auto-recovery start',
         $debug
     );
     $rc = (int) $startCallback($user, $logCallback, $state['startMarker']);
@@ -98,9 +98,7 @@ function pmssCheckRtorrentHandleMissingProcess(
                     $missingGrace,
                     $logCallback,
                     $debug,
-                    static function (string $startUser, callable $startLogCallback, string $startMarker): int {
-                        return rtorrentProcessStart($startUser, $startLogCallback, $startMarker);
-                    }
+                    'rtorrentProcessStart'
                 );
                 return;
             }

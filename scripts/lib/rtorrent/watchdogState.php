@@ -60,7 +60,6 @@ function rtorrentProcessCheckStaleState(string $stateFile, int $gracePeriod): ar
  */
 function rtorrentProcessCheckFailureCountState(string $stateFile, int $failureThreshold): array
 {
-    $failureThreshold = max(1, $failureThreshold);
     if (!rtorrentProcessStateFilePathIsSafe($stateFile)) {
         return ['action' => 'record', 'count' => 1];
     }
@@ -69,7 +68,7 @@ function rtorrentProcessCheckFailureCountState(string $stateFile, int $failureTh
     rtorrentProcessWriteStateFile($stateFile, (string) $count);
 
     return [
-        'action' => $count >= $failureThreshold ? 'stale' : ($count === 1 ? 'record' : 'wait'),
+        'action' => $count >= max(1, $failureThreshold) ? 'stale' : ($count === 1 ? 'record' : 'wait'),
         'count' => $count,
     ];
 }
@@ -100,9 +99,7 @@ function rtorrentProcessEscalationRetryState(string $stateFile, int $retryInterv
     }
 
     // Accept the current JSON marker and the legacy scalar timestamp format.
-    $payload = rtorrentProcessStateFilePathIsSafe($stateFile) && is_file($stateFile)
-        ? @file_get_contents($stateFile)
-        : false;
+    $payload = is_file($stateFile) ? @file_get_contents($stateFile) : false;
     $trimmed = is_string($payload) ? trim($payload) : '';
     $decoded = $trimmed !== '' ? json_decode($payload, true) : null;
     if (is_array($decoded) && is_numeric($decoded['timestamp'] ?? null)) {
