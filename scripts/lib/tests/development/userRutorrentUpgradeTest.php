@@ -14,9 +14,7 @@ class UserRutorrentUpgradeTest extends TestCase
 
     protected function setUp(): void
     {
-        if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-            $this->user = 'root';
-        }
+        $this->user = $this->pmssFixtureUserForCurrentUid($this->user);
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-rutorrent-upgrade-');
         $this->home = $this->pmssUserHomePath($homeRoot, $this->user);
         $this->skeleton = $this->pmssMakeTempDir('pmss-rutorrent-upgrade-skel-');
@@ -92,12 +90,9 @@ class UserRutorrentUpgradeTest extends TestCase
 
     private function context(): array
     {
-        return [
-            'user' => $this->user,
-            'home' => $this->home,
-            'user_esc' => escapeshellarg($this->user),
+        return $this->pmssUserUpdateContext($this->home, $this->user, [
             'rutorrent_index_sha' => sha1('new-rutorrent'),
-        ];
+        ]);
     }
 
     /** Seed old and skeleton ruTorrent trees; optionally make new share invalid. */

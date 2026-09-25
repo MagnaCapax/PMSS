@@ -16,9 +16,7 @@ class UserWebRootReconcileTest extends TestCase
     {
         // Root must chown to a real account; keep the fixture hermetic by using
         // the existing root account instead of creating a system user.
-        if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-            $this->user = 'root';
-        }
+        $this->user = $this->pmssFixtureUserForCurrentUid($this->user);
         $this->homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-web-reconcile-');
         $this->home = $this->pmssUserHomePath($this->homeRoot, $this->user);
         $this->pmssEnsureDir($this->home.'/data');
@@ -151,8 +149,8 @@ class UserWebRootReconcileTest extends TestCase
             pmssLockHandleRelease($handle);
         }
     }
-    private function context(): array { return ['user' => $this->user, 'home' => $this->home]; }
-    private function logger(array &$messages): callable { return static function (string $message) use (&$messages): void { $messages[] = $message; }; }
+    private function context(): array { return $this->pmssUserHomeContext($this->homeRoot, $this->user); }
+    private function logger(array &$messages): callable { return $this->pmssMakeArrayLogger($messages); }
 
     private function pmssReconcileSummary(array $messages): string
     {

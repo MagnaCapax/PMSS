@@ -111,10 +111,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
 
     private function context(): array
     {
-        return [
-            'user' => $this->user,
-            'home' => $this->home,
-        ];
+        return $this->pmssUserHomeContext($this->homeRoot, $this->user);
     }
 
     private function writeUserPanelIndex(string $content): void

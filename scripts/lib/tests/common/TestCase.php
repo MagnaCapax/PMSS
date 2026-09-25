@@ -445,6 +445,12 @@ abstract class TestCase
         return ['user' => $user, 'home' => $this->pmssUserHomePath($homeRoot, $user)];
     }
 
+    /** Use a real account for ownership fixtures when the test runner is root. */
+    protected function pmssFixtureUserForCurrentUid(string $user): string
+    {
+        return function_exists('posix_geteuid') && @posix_geteuid() === 0 ? 'root' : $user;
+    }
+
     /** Build the updater user-context shape shared by user maintenance handlers. */
     protected function pmssUserUpdateContext(string $home, string $user = 'dummy', array $extra = []): array
     {

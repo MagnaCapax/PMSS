@@ -18,9 +18,7 @@ class UserWebRootMigrationTest extends TestCase
     {
         // Root can chown fixture copies; use a real account so ownership
         // assertions exercise the same path production takes.
-        if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-            $this->user = 'root';
-        }
+        $this->user = $this->pmssFixtureUserForCurrentUid($this->user);
         $this->homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-web-root-');
         $this->home = $this->pmssEnsureUserWebHome($this->homeRoot, $this->user);
         $this->pmssEnsureDir($this->home.'/www/rutorrent');
@@ -292,13 +290,11 @@ class UserWebRootMigrationTest extends TestCase
 
     private function context(): array
     {
-        return ['user' => $this->user, 'home' => $this->home];
+        return $this->pmssUserHomeContext($this->homeRoot, $this->user);
     }
 
     private function logger(array &$messages): callable
     {
-        return static function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        return $this->pmssMakeArrayLogger($messages);
     }
 }
