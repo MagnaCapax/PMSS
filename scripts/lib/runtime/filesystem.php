@@ -183,7 +183,16 @@ function pmssColonRecordFieldsLookup(string $path, string $recordName, int $minF
     return null;
 }
 
-function pmssReadRegularFileInt(string $path, int $default = 0): int { $raw = pmssReadRegularFileDigits($path); return $raw === null ? $default : (int) $raw; }
+function pmssReadRegularFileInt(string $path, int $default = 0): int
+{
+    $raw = pmssReadRegularFileDigits($path);
+    if ($raw === null) return $default;
+    // Compare before casting: PHP saturates oversized decimal strings to PHP_INT_MAX.
+    $digits = ltrim($raw, '0');
+    $limit = (string) PHP_INT_MAX;
+    if (strlen($digits) > strlen($limit) || (strlen($digits) === strlen($limit) && strcmp($digits, $limit) > 0)) return $default;
+    return (int) $raw;
+}
 function pmssHostnameRead(string $default = '', string $path = '/etc/hostname'): string { return !pmssFilesystemPathHasNulByte($path) && is_string($hostname = @file_get_contents($path)) ? trim($hostname) : $default; }
 
 function pmssHostnameIsValid(string $hostname, bool $allowIpv4 = true): bool

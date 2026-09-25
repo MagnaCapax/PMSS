@@ -148,6 +148,11 @@ below the representable integer limit. Oversized values retain the existing
 input/command failure paths; ordinary decimal values keep their output shape.
 `StorageBenchSecurityTest` covers the boundary and oversized inputs.
 
+Regular-file integer reads reject decimal values above `PHP_INT_MAX` before
+casting, returning the caller's default instead of a saturated integer.
+Representable values, zero, and leading zeroes keep their previous results;
+`RuntimeTest` covers these file-boundary cases.
+
 Systemd integer counter mapping rejects unsigned decimal values above
 `PHP_INT_MAX` before casting, including values with leading zeros. Oversized
 samples return the existing missing-sample result instead of a saturated counter;

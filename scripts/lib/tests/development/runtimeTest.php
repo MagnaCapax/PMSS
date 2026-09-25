@@ -774,6 +774,10 @@ class RuntimeTest extends TestCase
 
         foreach ([
             'digits' => [$this->pmssWriteFile($this->pmssMakeTempDir('pmss-runtime-int-').'/port', "123\n"), 123],
+            'maximum integer' => [$this->pmssWriteFile($this->pmssMakeTempDir('pmss-runtime-int-').'/port', (string) PHP_INT_MAX), PHP_INT_MAX],
+            'oversized integer' => [$this->pmssWriteFile($this->pmssMakeTempDir('pmss-runtime-int-').'/port', (string) PHP_INT_MAX.'0'), 99],
+            'leading zeroes' => [$this->pmssWriteFile($this->pmssMakeTempDir('pmss-runtime-int-').'/port', str_repeat('0', 32).'123'), 123],
+            'zero' => [$this->pmssWriteFile($this->pmssMakeTempDir('pmss-runtime-int-').'/port', '0000'), 0],
             'non-digit content' => [$this->pmssWriteFile($this->pmssMakeTempDir('pmss-runtime-int-').'/port', "123oops\n"), 99],
             'symlinked file' => [$symlinkPath, 99],
         ] as $label => [$path, $expected]) {
