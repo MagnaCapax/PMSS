@@ -1541,6 +1541,15 @@ servarr_auth_payload_write() {
 	MEDIA_STACK_AUTH_USERNAME="$MEDIA_STACK_AUTH_USERNAME" MEDIA_STACK_AUTH_PASSWORD="$password" php -r '$input = stream_get_contents(STDIN); $data = json_decode($input, true); if (!is_array($data)) { fwrite(STDERR, "Invalid Servarr host-config JSON\n"); exit(1); } $data["id"] = isset($data["id"]) ? $data["id"] : 1; $data["authenticationMethod"] = "forms"; $data["authenticationRequired"] = "enabled"; $data["username"] = getenv("MEDIA_STACK_AUTH_USERNAME"); $data["password"] = getenv("MEDIA_STACK_AUTH_PASSWORD"); $data["passwordConfirmation"] = getenv("MEDIA_STACK_AUTH_PASSWORD"); if (isset($data["updateMechanism"]) && $data["updateMechanism"] === "script" && (!isset($data["updateScriptPath"]) || $data["updateScriptPath"] === "")) { $data["updateMechanism"] = "builtIn"; } echo json_encode($data, JSON_UNESCAPED_SLASHES);' <"$source_json" >"$target_json"
 }
 
+# The configure step writes UrlBase before seeding, so it is live on the seed start:
+# unprefixed API paths answer an empty 307, which curl -f accepts. Build the host-config
+# URL under the UrlBase so the JSON fetch and the PUT reach the API.
+servarr_host_config_url() {
+	local config_file="$1" seed_port="$2" api_version="$3" url_base
+	url_base=$(sed -n -E 's|.*<UrlBase>([^<]*)</UrlBase>.*|\1|p' "$config_file" 2>/dev/null | head -n 1 || true)
+	printf 'http://127.0.0.1:%s%s/api/%s/config/host' "$seed_port" "${url_base%/}" "$api_version"
+}
+
 servarr_auth_seed() {
 	local app="$1" install_name="$2" dll="$3" desired_port="$4" api_version="$5" password="$6" extra_args="${7:-}"
 	local datadir="$HOME/.config/${app}"
@@ -1559,7 +1568,7 @@ servarr_auth_seed() {
 
 	seed_port="$desired_port"
 	session="${app}-auth-seed"
-	base_url="http://127.0.0.1:${seed_port}/api/${api_version}/config/host"
+	base_url=$(servarr_host_config_url "$config_file" "$seed_port" "$api_version")
 	response_json=$(mktemp)
 	payload_json=$(mktemp)
 	curl_config=$(mktemp)
