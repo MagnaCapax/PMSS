@@ -34,6 +34,7 @@ binutils-x86-64-linux-gnu	install
 borgbackup	install
 borgbackup-doc	install
 borgmatic	install
+bpftool	install
 bsdextrautils	install
 bsdutils	install
 build-essential	install

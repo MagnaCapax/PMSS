@@ -192,6 +192,9 @@ if [ -f /etc/seedbox/config/socket-table-privacy.enabled ]; then
 		[ -e "/proc/net/$t" ] && chmod 0440 "/proc/net/$t" 2>/dev/null || true
 	done
 fi
+# Stage 2: reload the sock_diag BPF-LSM filter (BPF state does not survive a reboot).
+# The loader self-gates on the marker and fails open, so this is safe to call unconditionally.
+[ -x /bin/sh ] && sh /scripts/lib/update/systemPrep/bpf/socket-privacy-load.sh 2>/dev/null || true
 
 # Record the detected host profile and the boot-time tuning targets for audits.
 write_hardware_summary

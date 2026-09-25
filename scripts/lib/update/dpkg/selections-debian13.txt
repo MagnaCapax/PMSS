@@ -24,6 +24,7 @@ bind9-libs:amd64				install
 binutils					install
 binutils-common:amd64				install
 binutils-x86-64-linux-gnu			install
+bpftool						install
 bsdextrautils					install
 bsdutils					install
 btrfs-progs					install

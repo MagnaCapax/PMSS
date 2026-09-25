@@ -597,6 +597,10 @@ runStep('Hardening access to session and network binaries', 'chmod o-r /var/log/
 // Opt-in only (marker /etc/seedbox/config/socket-table-privacy.enabled). With no marker this
 // restores stock /proc/net modes and is a no-op — inert until the operator enables it per host.
 pmssRunProfiledCallable('Applying socket-table privacy (opt-in)', 'pmssSocketTablePrivacyApply', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
+// Stage 2: the sock_diag BPF-LSM filter. The loader self-gates on the same marker and FAILS OPEN
+// (exit 0) on any host lacking the marker, bpftool, kernel BTF, or a bpf LSM — so it can never
+// block the update; it unloads when the feature is disabled. See docs/adr/0067.
+runStep('Loading socket-table privacy filter (opt-in)', 'sh /scripts/lib/update/systemPrep/bpf/socket-privacy-load.sh');
 
 // Cleanup legacy runtime metadata that should never have shipped with snapshots.
 if (is_dir('/etc/seedbox/config/app-versions')) { runStep('Removing legacy app version records', 'rm -rf '.escapeshellarg('/etc/seedbox/config/app-versions')); }

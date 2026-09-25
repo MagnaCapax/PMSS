@@ -110,4 +110,25 @@ class SocketTablePrivacyTest extends TestCase
         file_put_contents($marker, "");
         $this->assertTrue(pmssSocketTablePrivacyEnabled($marker), 'present marker => enabled');
     }
+
+    /** The prebuilt BPF object must match its integrity sidecar, or the loader refuses it. */
+    public function testStage2BpfObjectMatchesItsSidecar(): void
+    {
+        $dir = dirname(__DIR__, 2).'/update/systemPrep/bpf';
+        $obj = $dir.'/sockdiag_filter.bpf.o';
+        $sidecar = $dir.'/sockdiag_filter.bpf.o.sha256';
+        $this->assertTrue(is_file($obj), 'prebuilt BPF object must be committed');
+        $this->assertTrue(is_file($sidecar), 'BPF integrity sidecar must be committed');
+        $recorded = strtok(trim((string) file_get_contents($sidecar)), " \t");
+        $this->assertSame(hash_file('sha256', $obj), $recorded, 'BPF object hash must match the sidecar (rebuild regenerates both)');
+    }
+
+    /** The fail-open loader must be present and syntactically valid sh. */
+    public function testStage2LoaderIsPresentAndValidSh(): void
+    {
+        $loader = dirname(__DIR__, 2).'/update/systemPrep/bpf/socket-privacy-load.sh';
+        $this->assertTrue(is_file($loader), 'BPF loader script must be committed');
+        exec('sh -n '.escapeshellarg($loader).' 2>&1', $out, $rc);
+        $this->assertSame(0, $rc, 'loader must be valid sh: '.implode("\n", $out));
+    }
 }

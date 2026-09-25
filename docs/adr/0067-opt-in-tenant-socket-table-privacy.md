@@ -5,7 +5,7 @@ Category: security
 
 ## Status
 
-Accepted (stage 1 implemented; stage 2 designed, gated on a toolchain decision)
+Accepted (stage 1 + stage 2 implemented, default-OFF; not yet enabled on any host)
 
 ## Context
 
@@ -76,22 +76,26 @@ mode and removes the drop-in — inert until enabled. The applier runs from
 `template.pmss-boot-tuning.sh` reapplies the root-only mode at boot when the
 marker is present. This closes the `/proc/net` and `tcp_metrics` channels.
 
-**Stage 2 (designed, not yet implemented).** A BPF-LSM program on `netlink_send`
-denies `NETLINK_SOCK_DIAG` dumps of connected socket states for **any uid ≥ 1000**
-(covers tenants, their `/etc/subuid` ranges, and `nobody`; keying on a narrower
-"tenant range" is bypassable because a tenant can act under a subordinate uid via
-rootless-Docker `uidmap`). It **allows** the `CLOSE`/`LISTEN`-state dumps that
-`ss -tln`/`-tlnp` send, so the documented workflow keeps working, and leaves root
-and system accounts (uid < 1000) unfiltered. The mechanism is prototyped and
-load-verified in an isolated namespace on a development host (Debian 13 / kernel
-6.12): `ss -tlnp` returns listeners, `ss -tn` returns nothing, a subordinate-uid
-process is denied, root is unaffected, clean unload. Stage 2 requires a loader
-toolchain that PMSS hosts do not currently carry (`libbpf1` is present but
-`bpftool`/`clang` are not), so it is gated on a follow-up decision: add `bpftool`
-to the dpkg selection baselines, or ship a minimal loader. It also runs behind
-the same marker and reports "unsupported" (fail-open) where the active LSM set,
-kernel BTF, or loader are unavailable — Debian 11 (bpftool 5.10, no autoattach)
-receives stage 1 only.
+**Stage 2 (implemented).** A BPF-LSM program on `netlink_send`
+(`scripts/lib/update/systemPrep/bpf/sockdiag_filter.bpf.c`, shipped as a prebuilt
+CO-RE object with a sha256 integrity sidecar) denies `NETLINK_SOCK_DIAG` dumps of
+connected socket states for **any uid ≥ 1000** (covers tenants, their `/etc/subuid`
+ranges, and `nobody`; keying on a narrower "tenant range" is bypassable because a
+tenant can act under a subordinate uid via rootless-Docker `uidmap`). It **allows**
+the `CLOSE`/`LISTEN`-state dumps that `ss -tln`/`-tlnp` send, so the documented
+workflow keeps working, and leaves root and system accounts (uid < 1000) unfiltered.
+The loader (`bpf/socket-privacy-load.sh`) runs from update-step2 and from the
+boot-tuning unit (BPF state is not reboot-persistent) and **fails open**: it verifies
+the object against its sidecar and checks for the marker, `bpftool`, kernel BTF, and
+a `bpf` LSM, and on any miss it unloads and exits 0 — it can never block an update or
+boot. `bpftool` is added to the Debian 12/13 dpkg selection baselines; Debian 11
+(bpftool 5.10, no autoattach) receives **stage 1 only** (the loader fails open there).
+The mechanism is load-verified in an isolated namespace on a development host
+(Debian 13 / kernel 6.12): `ss -tlnp` returns listeners, `ss -tn` returns nothing, a
+subordinate-uid process is denied, root is unaffected, tamper-refusal and clean unload
+both hold. Load on the Debian 12 / kernel 6.1 fleet is verified at pilot time (the
+CO-RE object relocates against each host's BTF; fail-open covers any host where it
+does not load).
 
 **Rollout.** Enable on one pilot host, verify (counts and exit codes only — never
 print a customer's remote address), then expand in batches within the fleet
@@ -107,14 +111,15 @@ next boot restore stock state.
   posture intact; the marker gives per-host rollback.
 - **Negative:** when enabled, an account also loses the view of its **own**
   established connections via `/proc/net`/`ss -tn` (it retains `ss -tlnp`).
-  Stage-1-only hosts still leak the connected rows through `ss` until stage 2
-  ships. Stage 1's `/proc/net` `chmod` also affects any non-root system daemon
+  Debian 11 hosts (no BPF-LSM autoattach in bpftool 5.10) run stage 1 only, so a
+  co-tenant there can still read connected rows through `ss` until they move to
+  Debian 12+. Stage 1's `/proc/net` `chmod` also affects any non-root system daemon
   (uid < 1000) reading those tables; the pilot censuses such readers before
-  enabling.
-- **Follow-ups:** the stage-2 toolchain decision (add `bpftool` vs ship a loader)
-  and its BPF loader + systemd unit + tests; verification of the CO-RE object
-  loading on the Debian 12 / kernel 6.1 fleet at pilot time; a later amendment if
-  the default is ever changed.
+  enabling. `bpftool` is now installed fleet-wide (Debian 12/13 baselines) but sits
+  unused until a host sets the marker.
+- **Follow-ups:** verification of the CO-RE object loading on the Debian 12 / kernel
+  6.1 fleet at pilot time (fail-open covers a non-load); a uid<1000 reader census on
+  the first pilot host; a later amendment if the default is ever changed.
 
 ## References
 
