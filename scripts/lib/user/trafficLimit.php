@@ -51,6 +51,18 @@ if (!function_exists('pmssTrafficLimitStateRead')) {
         $limitGiB = pmssTrafficLimitReadGiBFile($limitPath);
         $bonusGiB = ($bonusPath !== '') ? pmssTrafficLimitReadGiBFile($bonusPath) : 0;
 
+        // #945 fairness clamp: the bonus path (~/.bonusTraffic) sits in the tenant's own
+        // 0770 home, so a tenant can delete the root-written file and recreate an inflated
+        // copy, lifting their effective monthly cap arbitrarily. The limit path is the
+        // root-owned sanctioned base. Bound the self-service bonus to that base so a tenant
+        // cannot inflate their effective cap beyond 2x their sanctioned limit; a legit
+        // grant within base is unchanged. Value-clamp against the co-present root-owned
+        // value — no ownership migration, no ordering dependency (same shape and blast
+        // radius as the .bonus BFQ-weight clamp in cgroupBfqWeightApply.php).
+        if ($limitGiB > 0 && $bonusGiB > $limitGiB) {
+            $bonusGiB = $limitGiB;
+        }
+
         return ['limitGiB' => $limitGiB, 'bonusGiB' => $bonusGiB, 'effectiveLimitGiB' => ($limitGiB > 0) ? ($limitGiB + $bonusGiB) : 0];
     }
 }

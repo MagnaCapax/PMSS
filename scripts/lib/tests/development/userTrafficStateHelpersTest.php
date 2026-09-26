@@ -308,6 +308,11 @@ class UserTrafficStateHelpersTest extends TestCase
         foreach ([
             ['combined', "5\n", "2GiB\n", ['limitGiB' => 5, 'bonusGiB' => 2, 'effectiveLimitGiB' => 7]],
             ['bonus-only', null, "9\n", ['limitGiB' => 0, 'bonusGiB' => 9, 'effectiveLimitGiB' => 0]],
+            // #945 fairness clamp: tenant-inflated bonus above the root-owned base is
+            // bounded to the base (effective cannot exceed 2x sanctioned limit).
+            ['bonus-clamped-to-base', "5\n", "20\n", ['limitGiB' => 5, 'bonusGiB' => 5, 'effectiveLimitGiB' => 10]],
+            // At-base bonus is honored unchanged (clamp is > not >=).
+            ['bonus-at-base', "5\n", "5\n", ['limitGiB' => 5, 'bonusGiB' => 5, 'effectiveLimitGiB' => 10]],
         ] as [$name, $limitPayload, $bonusPayload, $expected]) {
             $limitPath = $this->tempDir.'/traffic-limit-'.$name;
             $bonusPath = $this->tempDir.'/bonus-traffic-'.$name;

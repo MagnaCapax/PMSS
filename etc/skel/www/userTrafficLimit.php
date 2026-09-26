@@ -87,6 +87,15 @@ if (!function_exists('pmssTrafficLimitStateRead')) {
     {
         $limitGiB = pmssTrafficLimitReadGiBFile($limitPath);
         $bonusGiB = ($bonusPath !== '') ? pmssTrafficLimitReadGiBFile($bonusPath) : 0;
+        // #945 fairness clamp: keep the customer-facing display in lockstep with the
+        // enforcement copy (scripts/lib/user/trafficLimit.php). ~/.bonusTraffic is
+        // tenant-writable; bound the self-service bonus to the root-owned base so display
+        // and enforcement agree and a tenant cannot show/claim an inflated cap. This is a
+        // duplicated definition (customer web context has restricted includes) — both
+        // copies MUST carry the identical clamp.
+        if ($limitGiB > 0 && $bonusGiB > $limitGiB) {
+            $bonusGiB = $limitGiB;
+        }
         return [
             'limitGiB'          => $limitGiB,
             'bonusGiB'          => $bonusGiB,
