@@ -7,10 +7,9 @@
  */
 
 require_once __DIR__.'/../userLifecycle.php';
-require_once __DIR__.'/../systemdSliceProperties.php';
-require_once __DIR__.'/../lighttpd/userFileWrite.php';
-require_once __DIR__.'/../resources.php';
-require_once __DIR__.'/../user/userFilesystem.php';
+pmssRequireRelativeFiles(dirname(__DIR__), [
+    'systemdSliceProperties.php', 'lighttpd/userFileWrite.php', 'resources.php', 'user/userFilesystem.php',
+]);
 
 const PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_BYTES = 1125899906842624; // 1 PiB per sample.
 const PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_OPS = 1000000000; // 3.3M IOPS over the normal 5m cadence.

@@ -10,13 +10,10 @@ require_once __DIR__.'/user/selection.php';
 require_once __DIR__.'/networkInfo.php';
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/log.php';
-require_once __DIR__.'/lighttpd/userFileWrite.php';
-require_once __DIR__.'/nginxUserHosts.php';
-require_once __DIR__.'/update/runtime/commands.php';
-require_once __DIR__.'/wireguard/state.php';
-require_once __DIR__.'/wireguard/endpoint.php';
-require_once __DIR__.'/wireguard/peers.php';
-require_once __DIR__.'/wireguard/guides.php';
+pmssRequireRelativeFiles(__DIR__, [
+    'lighttpd/userFileWrite.php', 'nginxUserHosts.php', 'update/runtime/commands.php',
+    'wireguard/state.php', 'wireguard/endpoint.php', 'wireguard/peers.php', 'wireguard/guides.php',
+]);
 
 function wgLog(string $message): void
 {

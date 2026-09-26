@@ -8,14 +8,11 @@
 
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/../user/log.php';
-require_once __DIR__.'/users/filesystem.php';
-require_once __DIR__.'/users/webRoot.php';
-require_once __DIR__.'/users/webRootReconcile.php';
-require_once __DIR__.'/users/rutorrent.php';
-require_once __DIR__.'/users/context.php';
-require_once __DIR__.'/users/http.php';
-require_once __DIR__.'/users/permissions.php';
-pmssRequireRelativeFiles(__DIR__, ['../user/directories.php', '../user/delugeManagedConfig.php', '../user/qbittorrent.php']);
+pmssRequireRelativeFiles(__DIR__, [
+    'users/filesystem.php', 'users/webRoot.php', 'users/webRootReconcile.php',
+    'users/rutorrent.php', 'users/context.php', 'users/http.php', 'users/permissions.php',
+    '../user/directories.php', '../user/delugeManagedConfig.php', '../user/qbittorrent.php',
+]);
 
 function pmssUserEnvironmentHandlers(): array { return ['pmssUserConfigureHttp', 'pmssUserApplySkeletonFiles', 'pmssUserUpdateThemes', 'pmssUserUpgradeRutorrent', 'pmssUserMaintainRutorrentPhpCompatibility', 'pmssUserEnsurePlugins', 'pmssUserRefreshPermissions']; }
 

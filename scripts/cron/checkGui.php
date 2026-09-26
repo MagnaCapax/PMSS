@@ -16,12 +16,10 @@
  */
 
 require_once __DIR__.'/../lib/runtime.php';
-require_once __DIR__.'/../lib/logger.php';
-require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
-require_once __DIR__.'/../lib/user/selection.php';
-require_once __DIR__.'/../lib/update/users/filesystem.php';
-require_once __DIR__.'/../lib/update/users/context.php';
-require_once __DIR__.'/../lib/update/users/webRootReconcile.php';
+pmssRequireRelativeFiles(__DIR__.'/../lib', [
+    'logger.php', 'lighttpd/userFileWrite.php', 'user/selection.php',
+    'update/users/filesystem.php', 'update/users/context.php', 'update/users/webRootReconcile.php',
+]);
 
 /**
  * Normalize and revalidate a managed-user iterator value before composing paths.
