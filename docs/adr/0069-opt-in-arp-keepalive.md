@@ -1,7 +1,7 @@
 # ADR 0069: Opt-in ARP keepalive
 
 Date: 2026-09-26
-Category: networking
+Category: architecture
 
 ## Status
 
