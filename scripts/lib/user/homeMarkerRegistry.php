@@ -24,6 +24,8 @@
  * @author PMSS Team
  */
 
+require_once dirname(__DIR__).'/runtime.php';
+
 if (!function_exists('pmssHomeMarkerRegistry')) {
     /**
      * @return array<string,array{class:string,mode:int}> keyed by bare marker filename
@@ -69,15 +71,6 @@ if (!function_exists('pmssHomeMarkerValueParse')) {
     /** Accept only a non-negative decimal integer representable by this PHP runtime. */
     function pmssHomeMarkerValueParse(string $raw): ?int
     {
-        if ($raw === '' || preg_match('/^\d+$/D', $raw) !== 1) {
-            return null;
-        }
-        $digits = ltrim($raw, '0');
-        $limit = (string) PHP_INT_MAX;
-        if (strlen($digits) > strlen($limit)
-            || (strlen($digits) === strlen($limit) && strcmp($digits, $limit) > 0)) {
-            return null;
-        }
-        return (int) $raw;
+        return pmssUnsignedDecimalIntParse($raw);
     }
 }

@@ -11,8 +11,7 @@ require_once __DIR__.'/runtime.php';
 /** Accept digit counters only when PHP can represent their exact value. */
 function pmssSystemStatsCounterIsValid(string $value): bool
 {
-    // Normalize padding before comparing; a cast alone silently saturates on overflow.
-    return ctype_digit($value) && (string) (int) $value === (ltrim($value, '0') ?: '0');
+    return pmssUnsignedDecimalIntParse($value) !== null;
 }
 
 /** Convert KiB counters to the compact legacy units used by stats logs. */

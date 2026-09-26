@@ -112,6 +112,17 @@ function pmssEnvTrimmed(string $envKey, string $default = ''): string
 /** Read unsigned decimal overrides without trimming; callers own defaults and zero policy. */
 function pmssEnvReadDigits(string $envKey): ?int { return (($value = getenv($envKey)) !== false && ctype_digit($value)) ? (int) $value : null; }
 
+/** Parse an untrimmed unsigned decimal only when PHP can represent it exactly. */
+function pmssUnsignedDecimalIntParse(string $raw): ?int
+{
+    if ($raw === '' || !ctype_digit($raw)) return null;
+    $digits = ltrim($raw, '0');
+    $limit = (string) PHP_INT_MAX;
+    if (strlen($digits) > strlen($limit)
+        || (strlen($digits) === strlen($limit) && strcmp($digits, $limit) > 0)) return null;
+    return (int) $raw;
+}
+
 function pmssEnvValueNormalized($value): string { return strtolower(trim((string) $value)); }
 function pmssValueMatchesNormalized($value, array $tokens): bool { return in_array(pmssEnvValueNormalized($value), $tokens, true); }
 function pmssEnvValueIsFalsey($value): bool { return pmssValueMatchesNormalized($value, ['', '0', 'false', 'no']); }

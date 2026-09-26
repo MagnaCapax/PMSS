@@ -174,6 +174,12 @@ When a helper pattern reaches three similar implementations, extract the shared
 shape before shipping the third clone. The third implementation is the refactor
 trigger, not proof that a duplicated pattern should persist.
 
+Unsigned decimal values that must fit a PHP integer use
+`pmssUnsignedDecimalIntParse()` from the runtime value module. It rejects raw
+whitespace, signs, non-digits, and overflow before casting, while accepting zero
+and leading zeroes. Callers retain their own defaults, minimums, and error text.
+`pmssEnvReadDigits()` keeps its documented saturating cast contract.
+
 ### Third-Instance Refactor Trigger
 
 When code review identifies that a proposed function has the same API shape as

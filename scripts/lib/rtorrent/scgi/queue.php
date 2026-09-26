@@ -25,20 +25,19 @@ function rtorrentScgiSocketQueueSnapshotFromLines(array $lines, string $socketPa
 
         $recvQ = (string) ($columns[2] ?? '');
         $sendQ = (string) ($columns[3] ?? '');
-        if (!in_array($socketPath, $columns, true) || !ctype_digit($recvQ) || !ctype_digit($sendQ)) {
+        if (!in_array($socketPath, $columns, true)) {
             continue;
         }
 
-        // Overflow clamps distinct counters to PHP_INT_MAX and can invent saturation.
-        $recvQ = ltrim($recvQ, '0') ?: '0';
-        $sendQ = ltrim($sendQ, '0') ?: '0';
-        if ((string) (int) $recvQ !== $recvQ || (string) (int) $sendQ !== $sendQ) {
+        $recvQ = pmssUnsignedDecimalIntParse($recvQ);
+        $sendQ = pmssUnsignedDecimalIntParse($sendQ);
+        if ($recvQ === null || $sendQ === null) {
             continue;
         }
 
         return [
-            'recvQ' => (int) $recvQ,
-            'sendQ' => (int) $sendQ,
+            'recvQ' => $recvQ,
+            'sendQ' => $sendQ,
         ];
     }
 

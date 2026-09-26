@@ -6,6 +6,16 @@ require_once dirname(__DIR__, 2).'/runtime.php';
 
 class RuntimeEnvValueTest extends TestCase
 {
+    public function testUnsignedDecimalIntParserKeepsExactBoundaries(): void
+    {
+        foreach (['0' => 0, '000' => 0, '0012' => 12, (string) PHP_INT_MAX => PHP_INT_MAX, '000'.PHP_INT_MAX => PHP_INT_MAX] as $raw => $expected) {
+            $this->assertSame($expected, \pmssUnsignedDecimalIntParse((string) $raw));
+        }
+        foreach (['', ' ', ' 12', '12 ', '-1', '+1', '1.0', '1e3', "1\0", "1\n", PHP_INT_MAX.'0', '000'.PHP_INT_MAX.'0'] as $raw) {
+            $this->assertSame(null, \pmssUnsignedDecimalIntParse($raw));
+        }
+    }
+
     public function testDigitOverridesPreserveRawValidationAndIntegerCast(): void
     {
         foreach ([[null, null], ['', null], ['0', 0], ['0012', 12], [' 12', null], ['12 ', null], ['-1', null], ['+1', null], ['1.5', null], ['1e3', null], ["12\n", null], [str_repeat('9', 30), PHP_INT_MAX]] as [$value, $expected]) {

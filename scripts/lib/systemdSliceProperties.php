@@ -75,14 +75,9 @@ function pmssMapSystemdIntProperties(array $properties, array $fieldMap, array $
             $values[$outputField] = (int) $defaults[$propertyName];
             continue;
         }
-        // systemd emits unsigned counters; PHP saturates oversized casts at PHP_INT_MAX.
-        $digits = ltrim($raw, '0');
-        $max = (string) PHP_INT_MAX;
-        if (strlen($digits) > strlen($max)
-            || (strlen($digits) === strlen($max) && strcmp($digits, $max) > 0)) {
-            return null;
-        }
-        $values[$outputField] = (int) $raw;
+        $value = pmssUnsignedDecimalIntParse($raw);
+        if ($value === null) return null;
+        $values[$outputField] = $value;
     }
     return $values;
 }

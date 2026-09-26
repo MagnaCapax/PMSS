@@ -117,6 +117,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `pmssUnsignedDecimalIntParse(string $raw): ?int` accepts only untrimmed unsigned
+  decimal strings whose value fits `PHP_INT_MAX`. Zero and leading zeroes are
+  valid; malformed or oversized values return `null`. Callers own their
+  default, minimum, and error behavior.
+
 - `pmssEnvReadDigits(string $envKey): ?int` accepts only raw unsigned decimal environment values, retaining zero, leading zeroes, and PHP integer-cast saturation. Unset, empty, signed, fractional, or whitespace-containing values return `null`; callers retain their existing defaults and zero policy.
 
 - `pmssDirectoryEntriesRead(string $path): array|false` removes only `.` and `..`
