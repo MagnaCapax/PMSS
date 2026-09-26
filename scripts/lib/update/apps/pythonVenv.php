@@ -75,7 +75,10 @@ function pmssPythonVenvEnsure(
         return '';
     }
 
-    runStep('Upgrading '.$label.' virtualenv tooling', pmssBuildCommand($pythonBin, ['-m', 'pip', 'install', '--upgrade', 'pip', 'setuptools', 'wheel']));
+    if (runStep('Upgrading '.$label.' virtualenv tooling', pmssBuildCommand($pythonBin, ['-m', 'pip', 'install', '--upgrade', 'pip', 'setuptools', 'wheel'])) !== 0) {
+        $log('[WARN] '.$label.' virtualenv tooling upgrade failed; skipping package install');
+        return '';
+    }
     return $pythonBin;
 }
 

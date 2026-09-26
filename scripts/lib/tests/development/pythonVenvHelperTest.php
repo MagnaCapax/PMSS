@@ -124,7 +124,7 @@ class PythonVenvHelperTest extends TestCase
         $messages = [];
         $venvDir = $this->pmssMakeTempDir('pmss-python-venv-failed-install-');
         $this->pmssWriteExecutableFiles($venvDir.'/bin', [
-            'python' => "#!/bin/sh\nif [ \"\$3\" = install ]; then exit 23; fi\nexit 0\n",
+            'python' => "#!/bin/sh\nif [ \"\$5\" = bad-package ]; then exit 23; fi\nexit 0\n",
             'pyload' => "#!/bin/sh\nexit 0\n",
         ]);
         $linkPath = $this->pmssMakeTempDir('pmss-python-failed-link-').'/pyload';
@@ -148,6 +148,37 @@ class PythonVenvHelperTest extends TestCase
         $this->assertTrue(!file_exists($linkPath) && !is_link($linkPath));
         $this->assertTrue($this->pmssFindProfileCommand('Installing first package') !== null);
         $this->assertEquals(null, $this->pmssFindProfileCommand('Installing second package'));
+    }
+
+    public function testFailedToolingUpgradeDoesNotPublishExistingCli(): void
+    {
+        $messages = [];
+        $venvDir = $this->pmssMakeTempDir('pmss-python-venv-failed-tooling-');
+        $this->pmssWriteExecutableFiles($venvDir.'/bin', [
+            'python' => "#!/bin/sh\nif [ \"\$5\" = pip ]; then exit 23; fi\nexit 0\n",
+            'pyload' => "#!/bin/sh\nexit 0\n",
+        ]);
+        $linkPath = $this->pmssMakeTempDir('pmss-python-tooling-link-').'/pyload';
+        $pythonPath = $this->makePythonPath();
+        $this->pmssResetRuntimeProfile();
+
+        $this->pmssWithEnv(['PATH' => $pythonPath], function () use (&$messages, $venvDir, $linkPath): void {
+            \pmssPythonVenvInstallCli(
+                $venvDir,
+                'pyLoad',
+                [['Installing pyLoad', 'pyload-ng']],
+                $venvDir.'/bin/pyload',
+                $linkPath,
+                '[WARN] pyLoad setup: python3 missing',
+                '[WARN] pyLoad binary missing after install',
+                $this->pmssMakeArrayLogger($messages)
+            );
+        });
+
+        $this->assertEquals(['[WARN] pyLoad virtualenv tooling upgrade failed; skipping package install'], $messages);
+        $this->assertTrue(!file_exists($linkPath) && !is_link($linkPath));
+        $this->assertTrue($this->pmssFindProfileCommand('Upgrading pyLoad virtualenv tooling') !== null);
+        $this->assertEquals(null, $this->pmssFindProfileCommand('Installing pyLoad'));
     }
 
     public function testInstallerRejectsUnsafeInstallStepsBeforeRunningCommands(): void

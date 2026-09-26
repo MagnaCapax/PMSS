@@ -210,6 +210,8 @@ leading or trailing bytes would disappear during trimming. Ordinary surrounding
 spaces still normalize to the same descriptions and pip arguments.
 If a package install fails, it logs a warning and stops before publishing a
 possibly stale CLI link. Successful install steps retain their usual order.
+If the virtualenv tooling upgrade fails, it likewise stops before package
+installation and CLI publication; a later update can retry the upgrade.
 
 ### Execution Outline
 
