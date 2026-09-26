@@ -166,14 +166,20 @@ function pmssDiskIostatHomeDevices(array $sampled, string $sysClassBlock = '/sys
     return array_keys($leaves);
 }
 
+/** Use /home leaves when resolvable; otherwise retain the discovered list. */
+function pmssDiskIostatSampleDevices(array $devices, string $sysClassBlock = '/sys/class/block', ?callable $mountRunner = null, string $devRoot = '/dev'): array
+{
+    return pmssDiskIostatHomeDevices($devices, $sysClassBlock, $mountRunner, $devRoot) ?: $devices;
+}
+
 /**
  * Parse the second-sample iostat group row by column name.
- * diskAwait is group r_await; diskServiceTime is group w_await only.
- * homeDisk* describes only leaf disks behind /home; null means not resolvable.
+ * diskAwait is r_await and diskServiceTime is w_await over /home leaf disks.
+ * When /home cannot be resolved, the group row covers all discovered devices.
  *
  * @return array<string, int|string|float|null>
  */
-function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?int $timestamp = null, ?array $homeDevices = null): array
+function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?int $timestamp = null): array
 {
     $lines = explode("\n", $iostatRaw);
     $lastHeaderIdx = -1;
@@ -189,59 +195,25 @@ function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?i
     $header = pmssConfigLineColumns($lines[$lastHeaderIdx], 1, []);
     $colMap = array_flip($header);
     $grp1Line = null;
-    $deviceRows = [];
     for ($i = $lastHeaderIdx + 1; $i < count($lines); $i++) {
-        $row = pmssConfigLineColumns($lines[$i], 1, []);
-        if (!$row) continue;
-        $name = $row[0];
         if (preg_match('/^\s*grp1\s/', $lines[$i])) {
             $grp1Line = $lines[$i];
             break;
         }
-        $deviceRows[$name] = $row;
     }
     if ($grp1Line === null) {
         throw new RuntimeException('No grp1 line after iostat header');
     }
 
     $values = pmssConfigLineColumns($grp1Line, 1, []);
-    $getAny = static function (array $colNames, ?array $row = null) use ($colMap, $values): string {
-        $row = $row ?? $values;
+    $getAny = static function (array $colNames) use ($colMap, $values): string {
         foreach ($colNames as $name) {
             if (isset($colMap[$name])) {
-                return $row[$colMap[$name]] ?? '0';
+                return $values[$colMap[$name]] ?? '0';
             }
         }
         return '0';
     };
-
-    $home = ['homeDiskAwait' => null, 'homeDiskServiceTime' => null, 'homeDiskQuantity' => null];
-    if ($homeDevices && isset($colMap['r/s'], $colMap['w/s'], $colMap['r_await'], $colMap['w_await'])) {
-        $readRate = $writeRate = $readWeighted = $writeWeighted = $readPlain = $writePlain = 0.0;
-        $complete = true;
-        foreach ($homeDevices as $device) {
-            if (!isset($deviceRows[$device])) { $complete = false; break; }
-            $row = $deviceRows[$device];
-            foreach (['r/s', 'w/s', 'r_await', 'w_await'] as $column) {
-                if (!isset($row[$colMap[$column]]) || !is_numeric($row[$colMap[$column]])) { $complete = false; break 2; }
-            }
-            $reads = (float) $getAny(['r/s'], $row);
-            $writes = (float) $getAny(['w/s'], $row);
-            $readAwait = (float) $getAny(['r_await'], $row);
-            $writeAwait = (float) $getAny(['w_await'], $row);
-            $readRate += $reads; $writeRate += $writes;
-            $readWeighted += $reads * $readAwait; $writeWeighted += $writes * $writeAwait;
-            $readPlain += $readAwait; $writePlain += $writeAwait;
-        }
-        if ($complete) {
-            $quantity = count($homeDevices);
-            $home = [
-                'homeDiskAwait' => $readRate > 0 ? $readWeighted / $readRate : $readPlain / $quantity,
-                'homeDiskServiceTime' => $writeRate > 0 ? $writeWeighted / $writeRate : $writePlain / $quantity,
-                'homeDiskQuantity' => $quantity,
-            ];
-        }
-    }
 
     // Column-name lookup keeps sysstat 12+ additions from shifting meanings;
     // legacy await/svctm names remain fallbacks for older hosts.
@@ -260,7 +232,7 @@ function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?i
         'iopingHomeMs'    => pmssDiskIostatReadIopingHomeMs(),
         'diskQuantity'    => $deviceCount,
         'time'            => $timestamp ?? time(),
-    ] + $home;
+    ];
 }
 
 /**
@@ -301,6 +273,7 @@ function pmssDiskIostatMain(?callable $runner = null): int
     $devices = pmssDiskIostatDiscoverDevices();
 
     try {
+        $devices = pmssDiskIostatSampleDevices($devices);
         $command = pmssDiskIostatBuildCommand($devices);
         if ($runner === null) {
             $result = pmssCommandCapture($command, PMSS_DISK_IOSTAT_TIMEOUT_SECONDS);
@@ -308,8 +281,7 @@ function pmssDiskIostatMain(?callable $runner = null): int
         } else {
             $iostatRaw = (string) $runner($command);
         }
-        $homeDevices = pmssDiskIostatHomeDevices($devices);
-        $iostat = pmssDiskIostatParseLatestSample($iostatRaw, max(1, count($devices)), null, $homeDevices);
+        $iostat = pmssDiskIostatParseLatestSample($iostatRaw, max(1, count($devices)));
     } catch (RuntimeException $exception) {
         echo $exception->getMessage()."\n";
         return 0;

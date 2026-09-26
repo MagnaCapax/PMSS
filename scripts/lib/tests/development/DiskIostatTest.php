@@ -25,45 +25,44 @@ class DiskIostatTest extends TestCase
         return [$root, $class, $devices];
     }
 
-    /** Compact last-sample fixture; old group fields deliberately differ from leaves. */
-    private function homeSample(array $rows): string
-    {
-        $header = "Device r/s w/s r_await w_await %util\n";
-        $raw = $header."grp1 1 2 90 80 70\n".$header;
-        foreach ($rows as $device => $values) $raw .= $device.' '.implode(' ', $values)."\n";
-        return $raw."grp1 1 2 90 80 70\n";
-    }
-
     /** Resolve a fake /home source without invoking findmnt. */
     private function homeDevices(array $sampled, string $source, string $class, string $devRoot): ?array
     {
         return \pmssDiskIostatHomeDevices($sampled, $class, static function () use ($source): string { return $source; }, $devRoot);
     }
 
-    public function testGuestHomeFieldsKeepGroupFieldsAndSerializedLegacyValues(): void
+    /** Select the same devices used by the cron command, with a fake mount. */
+    private function sampleDevices(array $discovered, string $source, string $class, string $devRoot): array
+    {
+        return \pmssDiskIostatSampleDevices($discovered, $class, static function () use ($source): string { return $source; }, $devRoot);
+    }
+
+    public function testGuestSamplesOnlyHomeDiskAndKeepsLegacySnapshotKeys(): void
     {
         list($root, $class) = $this->homeTree(['vda' => [], 'vdb' => []]);
-        $leaves = $this->homeDevices(['vda', 'vdb'], $root.'/dev/vda', $class, $root.'/dev');
-        $parsed = \pmssDiskIostatParseLatestSample($this->homeSample([
-            'vda' => [4, 5, 12, 34, 99], 'vdb' => [100, 100, 1, 2, 3],
-        ]), 2, 123, $leaves);
-        $this->assertSame(['homeDiskAwait' => 12.0, 'homeDiskServiceTime' => 34.0, 'homeDiskQuantity' => 1], array_intersect_key($parsed, array_flip(['homeDiskAwait', 'homeDiskServiceTime', 'homeDiskQuantity'])));
+        $devices = $this->sampleDevices(['vda', 'vdb'], $root.'/dev/vda', $class, $root.'/dev');
+        $this->assertSame(['vda'], $devices);
+        $this->assertSame("'/usr/bin/iostat' -xm 120 2 -g grp1 'vda' 2>&1", \pmssDiskIostatBuildCommand($devices, '/usr/bin/iostat'));
+        $raw = "Device r/s w/s r_await w_await %util\n"
+            ."vda 4 5 12 34 99\n"
+            ."grp1 4 5 12 34 99\n";
+        $parsed = \pmssDiskIostatParseLatestSample($raw, count($devices), 123);
         $stored = unserialize(serialize($parsed));
-        $this->assertSame(['iopsRead' => '1', 'iopsWrite' => '2', 'throughputRead' => '0', 'throughputWrite' => '0',
-            'diskAwait' => '90', 'diskServiceTime' => '80', 'diskUtil' => '70', 'avgQueueSize' => '0',
-            'diskQuantity' => 2, 'time' => 123], array_intersect_key($stored, array_flip([
+        $this->assertSame(['iopsRead' => '4', 'iopsWrite' => '5', 'throughputRead' => '0', 'throughputWrite' => '0',
+            'diskAwait' => '12', 'diskServiceTime' => '34', 'diskUtil' => '99', 'avgQueueSize' => '0',
+            'diskQuantity' => 1, 'time' => 123], array_intersect_key($stored, array_flip([
             'iopsRead', 'iopsWrite', 'throughputRead', 'throughputWrite', 'diskAwait', 'diskServiceTime',
             'diskUtil', 'avgQueueSize', 'diskQuantity', 'time',
         ])));
         foreach (['psiFullAvg300', 'psiMemFullAvg300', 'psiCpuFullAvg300', 'iopingHomeMs'] as $key) $this->assertTrue(array_key_exists($key, $stored));
+        $this->assertSame(14, count($stored));
     }
 
-    public function testMdRaidWeightsOnlySixMemberDisks(): void
+    public function testMdRaidSamplesOnlySixMemberDisks(): void
     {
         list($root, $class, $devices) = $this->homeTree(['md0' => []]);
-        $rows = [];
         $sampled = [];
-        foreach (range('a', 'f') as $index => $letter) {
+        foreach (range('a', 'f') as $letter) {
             $disk = 'sd'.$letter;
             $part = $disk.'1';
             $this->pmssEnsureDir($devices.'/'.$disk.'/'.$part, 0755);
@@ -72,17 +71,13 @@ class DiskIostatTest extends TestCase
             @symlink($devices.'/'.$disk.'/'.$part, $class.'/'.$part);
             @symlink($devices.'/'.$disk.'/'.$part, $devices.'/md0/slaves/'.$part);
             $sampled[] = $disk;
-            $rows[$disk] = [$index + 1, 6 - $index, 10 * ($index + 1), 10 * ($index + 1), 50];
         }
         $sampled[] = 'nvme0n1';
-        $rows['nvme0n1'] = [1000, 1000, 1, 1, 1];
-        $leaves = $this->homeDevices($sampled, $root.'/dev/md0', $class, $root.'/dev');
-        $this->assertSame($sampled === [] ? [] : array_slice($sampled, 0, 6), $leaves);
-        $parsed = \pmssDiskIostatParseLatestSample($this->homeSample($rows), 7, 123, $leaves);
-        $this->assertSame(6, $parsed['homeDiskQuantity']);
-        $this->assertSame(910 / 21, $parsed['homeDiskAwait']);
-        $this->assertSame(560 / 21, $parsed['homeDiskServiceTime']);
-        $this->assertSame(7, $parsed['diskQuantity']);
+        $devices = $this->sampleDevices($sampled, $root.'/dev/md0', $class, $root.'/dev');
+        $this->assertSame(array_slice($sampled, 0, 6), $devices);
+        $this->assertSame("'/usr/bin/iostat' -xm 120 2 -g grp1 'sda' 'sdb' 'sdc' 'sdd' 'sde' 'sdf' 2>&1", \pmssDiskIostatBuildCommand($devices, '/usr/bin/iostat'));
+        $parsed = \pmssDiskIostatParseLatestSample("Device r_await w_await\ngrp1 43 27\n", count($devices), 123);
+        $this->assertSame(6, $parsed['diskQuantity']);
     }
 
     public function testBcacheThroughMdAndMapperResolveLeaves(): void
@@ -108,28 +103,21 @@ class DiskIostatTest extends TestCase
         $this->assertSame(['sdb'], $this->homeDevices(['sdb'], $root.'/dev/mapper/vg-home', $class, $root.'/dev'));
     }
 
-    public function testUnknownHomeAndMissingRowsStayNull(): void
+    public function testUnknownHomeFallsBackToDiscoveredDevices(): void
     {
         list($root, $class) = $this->homeTree(['vda' => []]);
-        $raw = $this->homeSample(['vda' => [1, 1, 5, 6, 7]]);
-        foreach ([null, $this->homeDevices(['vdb'], $root.'/dev/vda', $class, $root.'/dev'), ['sda']] as $leaves) {
-            $parsed = \pmssDiskIostatParseLatestSample($raw, 2, 123, $leaves);
-            $this->assertSame(null, $parsed['homeDiskAwait']);
-            $this->assertSame(null, $parsed['homeDiskServiceTime']);
-            $this->assertSame(null, $parsed['homeDiskQuantity']);
-            $this->assertSame('90', $parsed['diskAwait']);
+        foreach (['', $root.'/dev/vdb'] as $source) {
+            $devices = $this->sampleDevices(['vda', 'vdb'], $source, $class, $root.'/dev');
+            $this->assertSame(['vda', 'vdb'], $devices);
+            $this->assertSame("'/usr/bin/iostat' -xm 120 2 -g grp1 'vda' 'vdb' 2>&1", \pmssDiskIostatBuildCommand($devices, '/usr/bin/iostat'));
+            $parsed = \pmssDiskIostatParseLatestSample("Device r_await w_await\ngrp1 90 80\n", count($devices), 123);
             $this->assertSame(2, $parsed['diskQuantity']);
         }
+        $this->assertSame(['vdb'], $this->sampleDevices(['vdb'], $root.'/dev/vda', $class, $root.'/dev'));
+        $this->assertSame(null, $this->homeDevices(['vdb'], $root.'/dev/vda', $class, $root.'/dev'));
         $this->assertSame(null, $this->homeDevices(['vda'], '', $class, $root.'/dev'));
     }
 
-    public function testZeroTrafficUsesPlainMean(): void
-    {
-        $raw = $this->homeSample(['sda' => [0, 0, 10, 20, 1], 'sdb' => [0, 0, 30, 40, 1]]);
-        $parsed = \pmssDiskIostatParseLatestSample($raw, 2, 123, ['sda', 'sdb']);
-        $this->assertSame(20.0, $parsed['homeDiskAwait']);
-        $this->assertSame(30.0, $parsed['homeDiskServiceTime']);
-    }
     public function testDiscoverDevicesMatchesSharedDataDeviceFilter(): void
     {
         $sysBlock = $this->pmssMakeTempDir('pmss-sys-block-');
