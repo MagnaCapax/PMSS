@@ -201,7 +201,9 @@ function pmssSystemStatsAppendLogLine(string $path, string $line): bool
     if (!pmssDirEnsureExists(dirname($path), 0755)) return false;
     if (is_link($path) || (file_exists($path) && !is_file($path))) return false;
 
-    return @file_put_contents($path, rtrim($line, "\r\n")."\n", FILE_APPEND | LOCK_EX) !== false;
+    $record = rtrim($line, "\r\n")."\n";
+    // A partial record must reach the cron caller's existing failure warning.
+    return @file_put_contents($path, $record, FILE_APPEND | LOCK_EX) === strlen($record);
 }
 
 /**

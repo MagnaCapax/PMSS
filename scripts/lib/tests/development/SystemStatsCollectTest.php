@@ -235,6 +235,32 @@ class SystemStatsCollectTest extends TestCase
         $this->assertFalse(\pmssSystemStatsAppendLogLine($dir."/bad\0path", 'blocked'));
     }
 
+    public function testAppendLogLineReportsIncompleteWrites(): void
+    {
+        // Inject only the write result; keep path checks and append bytes real.
+        $script = <<<'PHP'
+namespace SystemStatsAppendFixture;
+function file_put_contents($path, $data, $flags) {
+    $limit = $GLOBALS['limit'];
+    if ($limit === false) return false;
+    return \file_put_contents($path, $limit === null ? $data : substr($data, 0, $limit), $flags);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/systemStats.php', 'SystemStatsAppendFixture');
+        $script .= <<<'PHP'
+[$path, $GLOBALS['limit']] = json_decode(getenv('PMSS_TEST_STATS_APPEND'), true);
+$result = pmssSystemStatsAppendLogLine($path, "ready\r\n");
+echo json_encode([$result, file_get_contents($path)]);
+PHP;
+        $path = $this->pmssMakeTempDir('pmss-stats-short-write-').'/stats.log';
+        foreach ([false, 0, 1, 5, 6, null] as $limit) {
+            file_put_contents($path, "prior\n");
+            $record = $limit === false ? '' : substr("ready\n", 0, $limit === null ? 6 : $limit);
+            $this->assertSame([$limit === null || $limit === 6, "prior\n".$record],
+                $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_STATS_APPEND' => json_encode([$path, $limit])]));
+        }
+    }
+
     public function testHostPressurePayloadKeepsOnlyCustomerSafeMetrics(): void
     {
         $payload = \pmssSystemStatsHostPressurePayloadBuild([

@@ -117,6 +117,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `pmssSystemStatsAppendLogLine(string $path, string $line): bool` appends one
+  newline-terminated system stats record. It returns `true` only when the full
+  record was written; failed and short writes return `false` for the cron warning.
+
 - `pmssUnsignedDecimalIntParse(string $raw): ?int` accepts only untrimmed unsigned
   decimal strings whose value fits `PHP_INT_MAX`. Zero and leading zeroes are
   valid; malformed or oversized values return `null`. Callers own their
