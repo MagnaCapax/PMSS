@@ -430,6 +430,35 @@ SNAP;
         $this->assertStringContainsString('[INFO] rTorrent session rewrite found no /home path references to update', $output);
     }
 
+    public function testRequestRtorrentRestartSkipsWhenUserOptedOut(): void
+    {
+        $home = $this->pmssMakeUserWebHome('pmss-userTransfer-rtorrent-optout-', 'newuser');
+        $this->pmssWriteFile($home.'/.rtorrentDisable', '');
+        $logDir = $this->pmssEnsureDir($this->pmssMakeTempDir('pmss-userTransfer-optout-logs-'));
+
+        list(, $output) = $this->pmssCaptureStdout(function () use ($home): void {
+            \pmssUserTransferRequestRtorrentRestart($home, 'newuser');
+        }, ['PMSS_DRY_RUN' => '1', 'PMSS_LOG_DIR' => $logDir]);
+
+        // The opt-out is honoured: the skip is logged and no restart marker is requested.
+        $this->assertStringContainsString('[INFO] Skipping rTorrent restart: user opted out via .rtorrentDisable', $output);
+        $this->assertStringNotContainsString('Requesting rTorrent restart marker', $output);
+    }
+
+    public function testRequestRtorrentRestartRequestsMarkerWithoutOptOut(): void
+    {
+        $home = $this->pmssMakeUserWebHome('pmss-userTransfer-rtorrent-restart-', 'newuser');
+        $logDir = $this->pmssEnsureDir($this->pmssMakeTempDir('pmss-userTransfer-restart-logs-'));
+
+        list(, $output) = $this->pmssCaptureStdout(function () use ($home): void {
+            \pmssUserTransferRequestRtorrentRestart($home, 'newuser');
+        }, ['PMSS_DRY_RUN' => '1', 'PMSS_LOG_DIR' => $logDir]);
+
+        // Control: without the marker the restart is requested as before.
+        $this->assertStringContainsString('Requesting rTorrent restart marker', $output);
+        $this->assertStringNotContainsString('user opted out via .rtorrentDisable', $output);
+    }
+
     public function testRtorrentRestartScriptUsesLiveUserProcessFallback(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/.rtorrentRestart.php', [

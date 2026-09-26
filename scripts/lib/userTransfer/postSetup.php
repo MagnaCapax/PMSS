@@ -67,6 +67,15 @@ function pmssUserTransferRenameRutorrentShare(string $home, string $remoteUser, 
 
 function pmssUserTransferRequestRtorrentRestart(string $home, string $localUser): void
 {
+    // Respect the per-user rTorrent opt-out (GH#470, GH#869): `.rtorrentDisable`
+    // means "stop and stay stopped". checkRtorrent honours it on every cron
+    // cycle, so restarting here would only be undone within a few minutes while
+    // needlessly reloading the migrated session against the user's wishes. Skip.
+    if (is_file(rtrim($home, '/').'/.rtorrentDisable')) {
+        logMessage('[INFO] Skipping rTorrent restart: user opted out via .rtorrentDisable');
+        return;
+    }
+
     $wwwDir = $home.'/www';
     if (!is_dir($wwwDir) || is_link($wwwDir) || !pmssUserTransferIsPathWithinHome($wwwDir, $home)) {
         logMessage('[WARN] Skipping rTorrent restart marker (www dir missing or unsafe)');
