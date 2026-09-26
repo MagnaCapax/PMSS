@@ -80,7 +80,16 @@ function pmssBfqUserBonusPercentRead(string $user): int
     }
 
     $raw = @file_get_contents($path, false, null, 0, 64);
-    return is_string($raw) ? max(0, (int) trim($raw)) : 0;
+    // #945 fairness clamp: ~/.bonus is tenant-writable, so a tenant can pad the percent
+    // to self-grant maximum I/O weight (observed live: a marker holding 999999). The
+    // applied weight is already kernel-clamped, but an inflated percent still lifts a
+    // small base to the ceiling. Bound the READ to the sanctioned policy max: a legit
+    // grant (<= PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT) is unchanged; an inflated marker is
+    // clamped down. Value-clamp against a constant — no root-owned source file, no
+    // ownership migration, no ordering dependency.
+    return is_string($raw)
+        ? min(PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT, max(0, (int) trim($raw)))
+        : 0;
 }
 
 openlog('pmss-bfq', LOG_PID, LOG_DAEMON);

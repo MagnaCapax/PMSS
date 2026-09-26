@@ -209,6 +209,7 @@ class CgroupBfqWeightApplyTest extends TestCase
                     "((\$stat['mode'] ?? 0) & 0170000) !== 0100000",
                     "(int) (\$stat['size'] ?? 0) > 64",
                     '@file_get_contents($path, false, null, 0, 64)',
+                    'min(PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT, max(0, (int) trim($raw)))',
                     'pmssCgroupDirectWritableFileTarget($cgPath)',
                     'pmssCgroupDirectIntegerFileWrite($cgPath, $w, 1, PMSS_BFQ_KERNEL_MAX)',
                 ],
