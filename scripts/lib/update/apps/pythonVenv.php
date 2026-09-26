@@ -131,7 +131,11 @@ function pmssPythonVenvInstallCli(
     }
     $pipInstallPrefix = pmssBuildCommand($venvPython, ['-m', 'pip', 'install', '--upgrade']);
     foreach ($normalizedInstallSteps as [$description, $args]) {
-        runStep($description, $pipInstallPrefix.' '.$args);
+        if (runStep($description, $pipInstallPrefix.' '.$args) !== 0) {
+            // A stale CLI may exist from a prior run; do not publish it after a failed install.
+            $log('[WARN] '.$label.' package install failed; leaving CLI link unchanged');
+            return;
+        }
     }
     if (!is_file($cliBin)) {
         if (!pmssEnvFlagEnabled('PMSS_DRY_RUN')) $log($missingCliMessage);

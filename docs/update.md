@@ -208,6 +208,8 @@ before running any commands. Control characters in descriptions or package
 arguments use the existing unsafe-step warning and skip path, including when
 leading or trailing bytes would disappear during trimming. Ordinary surrounding
 spaces still normalize to the same descriptions and pip arguments.
+If a package install fails, it logs a warning and stops before publishing a
+possibly stale CLI link. Successful install steps retain their usual order.
 
 ### Execution Outline
 

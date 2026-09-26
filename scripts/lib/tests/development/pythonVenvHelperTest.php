@@ -119,6 +119,37 @@ class PythonVenvHelperTest extends TestCase
         );
     }
 
+    public function testFailedPackageInstallDoesNotPublishExistingCli(): void
+    {
+        $messages = [];
+        $venvDir = $this->pmssMakeTempDir('pmss-python-venv-failed-install-');
+        $this->pmssWriteExecutableFiles($venvDir.'/bin', [
+            'python' => "#!/bin/sh\nif [ \"\$3\" = install ]; then exit 23; fi\nexit 0\n",
+            'pyload' => "#!/bin/sh\nexit 0\n",
+        ]);
+        $linkPath = $this->pmssMakeTempDir('pmss-python-failed-link-').'/pyload';
+        $pythonPath = $this->makePythonPath();
+        $this->pmssResetRuntimeProfile();
+
+        $this->pmssWithEnv(['PATH' => $pythonPath], function () use (&$messages, $venvDir, $linkPath): void {
+            \pmssPythonVenvInstallCli(
+                $venvDir,
+                'pyLoad',
+                [['Installing first package', 'bad-package'], ['Installing second package', 'other-package']],
+                $venvDir.'/bin/pyload',
+                $linkPath,
+                '[WARN] pyLoad setup: python3 missing',
+                '[WARN] pyLoad binary missing after install',
+                $this->pmssMakeArrayLogger($messages)
+            );
+        });
+
+        $this->assertEquals(['[WARN] pyLoad package install failed; leaving CLI link unchanged'], $messages);
+        $this->assertTrue(!file_exists($linkPath) && !is_link($linkPath));
+        $this->assertTrue($this->pmssFindProfileCommand('Installing first package') !== null);
+        $this->assertEquals(null, $this->pmssFindProfileCommand('Installing second package'));
+    }
+
     public function testInstallerRejectsUnsafeInstallStepsBeforeRunningCommands(): void
     {
         $cases = [
