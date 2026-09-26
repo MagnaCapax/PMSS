@@ -83,9 +83,15 @@ done
 
 codex_prepare_agent_exec_command "$ASSIST_DIR" "$default_agent" agent exec_cmd || exit $?
 
+ci_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+ci_run_args=()
+if [[ -n "$ci_branch" && "$ci_branch" != "HEAD" ]]; then
+	ci_run_args=(--branch "$ci_branch" --event push)
+fi
+
 # Pre-flight: skip session entirely if CI is already green (saves tokens on no-op runs)
 if [[ "$autocommit" == "1" && "$dry_run" == "0" ]]; then
-	latest_conclusion=$(gh run list --limit 1 --json conclusion --jq '.[0].conclusion' 2>/dev/null || true)
+	latest_conclusion=$(gh run list --limit 1 "${ci_run_args[@]}" --json conclusion --jq '.[0].conclusion' 2>/dev/null || true)
 	if [[ "$latest_conclusion" == "success" ]]; then
 		echo "[codex-ci] CI is green. Nothing to fix. Skipping." >&1
 		exit 0
@@ -238,7 +244,7 @@ ci_api_download_zip() {
 ci_unzip_to_file() {
 	local zip="$1" out="$2"
 	local tmp_extract
-	tmp_extract="$(mktemp -d "${TMP%/}/pmss-ci-zip-XXXXXXXX")"
+	tmp_extract="$(mktemp -d "${TMPDIR:-/tmp}/pmss-ci-zip-XXXXXXXX")" || return 1
 	if unzip -qq "$zip" -d "$tmp_extract" >/dev/null 2>&1; then
 		find "$tmp_extract" -type f 2>/dev/null | sort | while read -r f; do
 			printf '\n=== %s ===\n' "$(basename "$f")"
@@ -287,7 +293,7 @@ if [[ "$fetch_mode" == "gh" ]]; then
 	fi
 
 	echo "[codex-ci] discovering latest run..." >&1
-	run_id=$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
+	run_id=$(gh run list --limit 1 "${ci_run_args[@]}" --json databaseId --jq '.[0].databaseId')
 else
 	origin_url="$(git config --get remote.origin.url 2>/dev/null || true)"
 	repo_full="$(ci_parse_github_repo "$origin_url" 2>/dev/null || true)"
@@ -298,7 +304,11 @@ else
 	fi
 
 	echo "[codex-ci] discovering latest run via API for $repo_full..." >&1
-	runs_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs?per_page=1" 2>/dev/null || true)"
+	ci_runs_query="per_page=1"
+	if [[ -n "$ci_branch" && "$ci_branch" != "HEAD" ]]; then
+		ci_runs_query="${ci_runs_query}&branch=$(php -r 'echo rawurlencode($argv[1]);' "$ci_branch")&event=push"
+	fi
+	runs_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs?$ci_runs_query" 2>/dev/null || true)"
 	run_id="$(printf '%s' "$runs_json" | codex_json_filter_stdin 'echo $j["workflow_runs"][0]["id"] ?? "";')"
 fi
 
@@ -411,7 +421,7 @@ ci_job_id_from_jobs_json() {
 fetch_job_log() {
 	local name="$1" out="$2"
 	if [[ "$fetch_mode" == "gh" ]]; then
-		local id jobs_json job_id zip_path token
+		local id jobs_json job_id
 
 		# Newer gh versions expose a jobs field directly; older ones do not.
 		id="$(gh run view "$run_id" --json jobs --jq ".jobs[] | select(.name == \"$name\").databaseId" 2>/dev/null || true)"
@@ -448,41 +458,18 @@ fetch_job_log() {
 			gh run view --job "$id" --log >"$out" 2>/dev/null || true
 		fi
 
-		# If gh cannot emit job logs, fall back to downloading the zipped REST logs.
+		# Older gh versions can return success with an empty log; REST returns plain text.
 		if [[ -n "$id" && ! -s "$out" && -n "$repo_full" ]]; then
-			zip_path="$OUTDIR/job-${id}.zip"
-			token="${GITHUB_TOKEN:-}"
-			if [[ -z "$token" ]]; then
-				ci_shell_disable_xtrace
-				# gh 2.4.x lacks `gh auth token`; fall back to parsing `gh auth status --show-token`.
-				token="$(gh auth token 2>/dev/null || true)"
-				if [[ -z "$token" ]]; then
-					# gh auth status prints to stderr and prefixes status lines with symbols (✓),
-					# so match any line containing "Token:" and grab the last field.
-					token="$(gh auth status --show-token 2>&1 |
-						awk 'BEGIN{IGNORECASE=1} /token:[[:space:]]/ {print $NF; exit}' || true)"
-				fi
-				ci_shell_restore_xtrace
-			fi
-			if [[ -n "$token" ]]; then
-				ci_shell_disable_xtrace
-				if GITHUB_TOKEN="$token" ci_api_download_zip "$api_base/repos/$repo_full/actions/jobs/$id/logs" "$zip_path" >/dev/null 2>&1; then
-					ci_unzip_to_file "$zip_path" "$out" >/dev/null 2>&1 || true
-				fi
-				ci_shell_restore_xtrace
-			fi
+			gh api "repos/$repo_full/actions/jobs/$id/logs" >"$out" 2>/dev/null || true
 		fi
 		return 0
 	fi
 
-	local jobs_json job_id zip_path
+	local jobs_json job_id
 	jobs_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id/jobs?per_page=100" 2>/dev/null || true)"
 	job_id="$(ci_job_id_from_jobs_json "$jobs_json" "$name" || true)"
 	[[ -n "$job_id" ]] || return 0
-	zip_path="$OUTDIR/job-${job_id}.zip"
-	if ci_api_download_zip "$api_base/repos/$repo_full/actions/jobs/$job_id/logs" "$zip_path" >/dev/null 2>&1; then
-		ci_unzip_to_file "$zip_path" "$out" >/dev/null 2>&1 || true
-	fi
+	ci_api_get_json "$api_base/repos/$repo_full/actions/jobs/$job_id/logs" >"$out" 2>/dev/null || true
 }
 
 fetch_run_log() {
