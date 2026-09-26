@@ -605,9 +605,9 @@ LIGHTTPD;
         $this->pmssWriteFile($home.'/.install-media-stack.log', "old installer output\n");
         $this->pmssWriteFile($home.'/.media-stack-status.json', "{\"state\":\"failed\"}\n");
         $this->pmssWriteFile($home.'/.media-stack-credentials.txt', "preserve\n");
-        foreach (array('tmux', 'pkill') as $command) {
-            $this->pmssWriteExecutableFile($bin.'/'.$command, "#!/usr/bin/env bash\nexit 0\n");
-        }
+        $this->pmssWriteExecutableFile($bin.'/tmux', "#!/usr/bin/env bash\nexit 0\n");
+        $this->pmssWriteExecutableFile($bin.'/pgrep', "#!/usr/bin/env bash\nexit 1\n");
+        $this->pmssWriteExecutableFile($bin.'/ps', "#!/usr/bin/env bash\nexit 1\n");
 
         $script = implode("\n", array(
             '#!/usr/bin/env bash',
@@ -1087,6 +1087,42 @@ BASHRC
         ], $output);
     }
 
+    public function testAppProcessKillPreservesTmuxShellAndDryRun(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-process-kill-');
+        $trace = $home.'/trace.log';
+        $functions = $this->pmssExtractShellFunctions($this->script, array('media_stack_app_processes_kill'));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'USERNAME=alice DRY_RUN=0 NO_MATCH=0',
+            'TRACE='.escapeshellarg($trace),
+            'log_info() { echo "log:$*" >> "$TRACE"; }',
+            'pgrep() {',
+            '  [[ "$*" == "-f -u alice -- jellyfin.dll" ]] || return 2',
+            '  [[ "$NO_MATCH" == 0 ]] || return 1',
+            '  printf "41001\\n%s\\n41002\\n41003\\n" "$$"',
+            '}',
+            'ps() {',
+            '  case "$4" in 41001) echo "tmux: server" ;; *) echo "dotnet" ;; esac',
+            '}',
+            'kill() { echo "kill:$*" >> "$TRACE"; }',
+            $functions,
+            'media_stack_app_processes_kill jellyfin.dll',
+            'DRY_RUN=1; media_stack_app_processes_kill jellyfin.dll',
+            'DRY_RUN=0 NO_MATCH=1; media_stack_app_processes_kill jellyfin.dll',
+            'echo completed',
+            '',
+        ));
+
+        $output = $this->pmssRunShellHarness($script);
+        $this->assertStringContainsString('completed', $output);
+        $this->assertSame(
+            "kill:-9 41002\nkill:-9 41003\nlog:[dry-run] would stop processes matching jellyfin.dll\n",
+            (string) file_get_contents($trace)
+        );
+    }
+
     public function testServarrInstallHelperRunsSharedDownloadAndConfigSequence(): void
     {
         $home = $this->pmssMakeTempDir('pmss-media-stack-servarr-home-');
@@ -1104,7 +1140,7 @@ BASHRC
             'log_info() { echo "info:$*" >> "$TRACE"; }',
             'log_err() { echo "err:$*" >> "$TRACE"; }',
             'managed_install_path_reset() { echo "reset:$1" >> "$TRACE"; }',
-            'pkill() { echo "pkill:$*" >> "$TRACE"; }',
+            'media_stack_app_processes_kill() { echo "kill-app:$1" >> "$TRACE"; }',
             'fetch() { echo "fetch:$1|$2" >> "$TRACE"; return 0; }',
             'verify_checksum() { echo "verify:$1|$2" >> "$TRACE"; return 0; }',
             'extract_tgz() { echo "extract:$*" >> "$TRACE"; }',
@@ -1119,7 +1155,7 @@ BASHRC
 
         $this->assertOrderedStrings(array(
             'reset:'.$home.'/.bin/Radarr',
-            'pkill:-9 -f -u alice Radarr',
+            'kill-app:Radarr',
             'info:Radarr URL: https://example.invalid/updatefile?os=linux',
             'fetch:https://example.invalid/updatefile?os=linux|Radarr.tar.gz',
             'verify:Radarr.tar.gz|updatefile',

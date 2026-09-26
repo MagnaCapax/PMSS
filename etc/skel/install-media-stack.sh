@@ -664,7 +664,7 @@ servarr_install_from_url() {
 
 	mkdir -p "$data_dir"
 	managed_install_path_reset "$install_dir/$install_name"
-	pkill -9 -f -u "$USERNAME" "$install_name" >/dev/null 2>&1 || true
+	media_stack_app_processes_kill "$install_name"
 	log_info "${install_name} URL: $download_url"
 
 	echo "Downloading...${app^^}"
@@ -1098,6 +1098,24 @@ bashrc_custom_media_stack_blocks_strip() {
 	log_info "Backed up ~/.bashrc.custom to $(basename "$backup")"
 }
 
+media_stack_app_processes_kill() {
+	local pattern="$1" username="${2:-$USERNAME}" pid comm
+
+	if [[ $DRY_RUN -eq 1 ]]; then
+		log_info "[dry-run] would stop processes matching $pattern"
+		return 0
+	fi
+	command -v pgrep >/dev/null 2>&1 || return 0
+	# Match app command lines, but preserve the shell and the shared tmux server.
+	for pid in $(pgrep -f -u "$username" -- "$pattern" 2>/dev/null); do
+		[[ "$pid" == "$$" || "$pid" == "$BASHPID" ]] && continue
+		comm=$(ps -o comm= -p "$pid" 2>/dev/null) || continue
+		[[ "$comm" == tmux* ]] && continue
+		kill -9 "$pid" 2>/dev/null || true
+	done
+	return 0
+}
+
 media_stack_uninstall() {
 	local app username managed_path
 
@@ -1109,9 +1127,9 @@ media_stack_uninstall() {
 				tmux kill-session -t "$app" 2>/dev/null || true
 			fi
 		done
-		if command -v pkill >/dev/null 2>&1; then
+		if command -v pgrep >/dev/null 2>&1; then
 			for app in jellyfin.dll SABnzbd.py Radarr.dll Prowlarr.dll Sonarr.dll cloudplow.py autobrr; do
-				pkill -9 -f -u "$username" "$app" >/dev/null 2>&1 || true
+				media_stack_app_processes_kill "$app" "$username"
 			done
 		fi
 	else
@@ -1927,9 +1945,7 @@ media_stack_stop_app_for_auth() {
 	local session="$1" process_pattern="$2"
 
 	tmux kill-session -t "$session" 2>/dev/null || true
-	if command -v pkill >/dev/null 2>&1; then
-		pkill -9 -f -u "$USERNAME" "$process_pattern" >/dev/null 2>&1 || true
-	fi
+	media_stack_app_processes_kill "$process_pattern"
 }
 
 media_stack_secure_sabnzbd() {
@@ -2165,7 +2181,7 @@ log_step "Installing ${app^^}..."
 installdir="$HOME/.bin/sabnzbd"
 datadir="$HOME/.config/sabnzbd"
 mkdir -p "$datadir"
-pkill -9 -f -u "$USERNAME" "${app}" >/dev/null 2>&1 || true
+media_stack_app_processes_kill "${app}"
 if [[ $DRY_RUN -eq 0 ]]; then
 	managed_install_path_reset "$installdir"
 	python3 -m venv "$installdir"
@@ -2232,7 +2248,7 @@ log_step "Installing ${app^^}..."
 installdir="$HOME/.bin/autobrr"
 datadir="$HOME/.config/autobrr"
 mkdir -p "$datadir"
-pkill -9 -f -u "$USERNAME" "$app" >/dev/null 2>&1 || true
+media_stack_app_processes_kill "$app"
 if [[ $DRY_RUN -eq 0 ]]; then
 	managed_install_path_reset "$installdir"
 	mkdir -p "$installdir"
