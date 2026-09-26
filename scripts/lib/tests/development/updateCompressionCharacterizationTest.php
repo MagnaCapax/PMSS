@@ -308,11 +308,12 @@ class UpdateCompressionCharacterizationTest extends TestCase
             'scripts/lib/update/users.php' => [
                 'required' => [
                     "require_once __DIR__.'/../user/log.php';",
-                    "require_once __DIR__.'/users/filesystem.php';",
-                    "require_once __DIR__.'/users/rutorrent.php';",
-                    "require_once __DIR__.'/users/context.php';",
-                    "require_once __DIR__.'/users/http.php';",
-                    "require_once __DIR__.'/users/permissions.php';",
+                    "pmssRequireRelativeFiles(__DIR__, [",
+                    "'users/filesystem.php'",
+                    "'users/rutorrent.php'",
+                    "'users/context.php'",
+                    "'users/http.php'",
+                    "'users/permissions.php'",
                     "'pmssUserConfigureHttp'",
                     "'pmssUserApplySkeletonFiles'",
                     "'pmssUserUpgradeRutorrent'",

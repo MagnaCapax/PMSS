@@ -664,7 +664,7 @@ class WireGuardInstallerTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/lib/wireguard.php');
 
-        $this->assertStringContainsAllStrings(["require_once __DIR__.'/log.php';", "require_once __DIR__.'/update/runtime/commands.php';"], $source);
+        $this->assertStringContainsAllStrings(["require_once __DIR__.'/log.php';", "pmssRequireRelativeFiles(__DIR__, [", "'update/runtime/commands.php'"], $source);
         $this->assertTrue(strpos($source, "require_once __DIR__.'/update.php';") === false, 'wireguard.php should not pull update.php just to get logmsg()');
         $this->assertTrue(strpos($source, "if (!function_exists('logmsg')) {") === false, 'wireguard.php should rely on require_once instead of logmsg guards');
         $this->assertTrue(strpos($source, "if (!function_exists('runStep')) {") === false, 'wireguard.php should rely on require_once instead of runStep guards');
