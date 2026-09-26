@@ -12,6 +12,7 @@
 
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/systemStats.php';   // for pmssSystemStatsIopingMs() — reused, not re-implemented (DRY)
+require_once __DIR__.'/cgroup/policy.php';
 
 const PMSS_DISK_IOSTAT_HISTORY_LOG = '/var/log/pmss/iostat-history.log';
 const PMSS_DISK_IOSTAT_HISTORY_RAW_LOG = '/var/log/pmss/iostat-history-raw.log';
@@ -123,12 +124,56 @@ function pmssDiskIostatReadIopingHomeMs(): ?float
     return (float) $matches[1];
 }
 
+/** Resolve only sampled leaf disks behind /home; unknown topology stays unknown. */
+function pmssDiskIostatHomeDevices(array $sampled, string $sysClassBlock = '/sys/class/block', ?callable $mountRunner = null, string $devRoot = '/dev'): ?array
+{
+    $source = pmssCgroupPolicyMountSourceResolve('/home', $mountRunner);
+    $devRoot = rtrim($devRoot, '/');
+    if ($source === '' || pmssFilesystemPathHasNulByte($source) || $devRoot === ''
+        || strpos($source, $devRoot.'/') !== 0 || pmssFilesystemPathHasNulByte($sysClassBlock)) return null;
+    if (strpos($source, $devRoot.'/mapper/') === 0) {
+        $source = (string) realpath($source);
+    }
+    $root = rtrim($sysClassBlock, '/');
+    $leaves = [];
+    $seen = [];
+    $walk = static function (string $device, int $depth) use (&$walk, &$leaves, &$seen, $root): bool {
+        if ($depth > 8 || !pmssDiskIostatDeviceNameIsSafe($device)) return false;
+        if (isset($seen[$device])) return true; // Shared leaves are counted once.
+        $seen[$device] = true;
+        $path = $root.'/'.$device;
+        if (!is_dir($path)) return false;
+        $slaves = glob($path.'/slaves/*') ?: [];
+        if ($slaves) {
+            foreach ($slaves as $slave) {
+                if (!$walk(basename($slave), $depth + 1)) return false;
+            }
+            return true;
+        }
+        if (is_file($path.'/partition')) {
+            $real = realpath($path);
+            if ($real === false) return false;
+            $device = basename(dirname($real));
+        }
+        if (!pmssDiskIostatDeviceNameIsSafe($device) || !is_dir($root.'/'.$device)) return false;
+        $leaves[$device] = true;
+        return true;
+    };
+    if (!$walk(basename($source), 0) || !$leaves) return null;
+    foreach ($leaves as $device => $_) {
+        if (!in_array($device, $sampled, true)) return null;
+    }
+    return array_keys($leaves);
+}
+
 /**
  * Parse the second-sample iostat group row by column name.
+ * diskAwait is group r_await; diskServiceTime is group w_await only.
+ * homeDisk* describes only leaf disks behind /home; null means not resolvable.
  *
  * @return array<string, int|string|float|null>
  */
-function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?int $timestamp = null): array
+function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?int $timestamp = null, ?array $homeDevices = null): array
 {
     $lines = explode("\n", $iostatRaw);
     $lastHeaderIdx = -1;
@@ -144,25 +189,59 @@ function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?i
     $header = pmssConfigLineColumns($lines[$lastHeaderIdx], 1, []);
     $colMap = array_flip($header);
     $grp1Line = null;
+    $deviceRows = [];
     for ($i = $lastHeaderIdx + 1; $i < count($lines); $i++) {
+        $row = pmssConfigLineColumns($lines[$i], 1, []);
+        if (!$row) continue;
+        $name = $row[0];
         if (preg_match('/^\s*grp1\s/', $lines[$i])) {
             $grp1Line = $lines[$i];
             break;
         }
+        $deviceRows[$name] = $row;
     }
     if ($grp1Line === null) {
         throw new RuntimeException('No grp1 line after iostat header');
     }
 
     $values = pmssConfigLineColumns($grp1Line, 1, []);
-    $getAny = static function (array $colNames) use ($colMap, $values): string {
+    $getAny = static function (array $colNames, ?array $row = null) use ($colMap, $values): string {
+        $row = $row ?? $values;
         foreach ($colNames as $name) {
             if (isset($colMap[$name])) {
-                return $values[$colMap[$name]] ?? '0';
+                return $row[$colMap[$name]] ?? '0';
             }
         }
         return '0';
     };
+
+    $home = ['homeDiskAwait' => null, 'homeDiskServiceTime' => null, 'homeDiskQuantity' => null];
+    if ($homeDevices && isset($colMap['r/s'], $colMap['w/s'], $colMap['r_await'], $colMap['w_await'])) {
+        $readRate = $writeRate = $readWeighted = $writeWeighted = $readPlain = $writePlain = 0.0;
+        $complete = true;
+        foreach ($homeDevices as $device) {
+            if (!isset($deviceRows[$device])) { $complete = false; break; }
+            $row = $deviceRows[$device];
+            foreach (['r/s', 'w/s', 'r_await', 'w_await'] as $column) {
+                if (!isset($row[$colMap[$column]]) || !is_numeric($row[$colMap[$column]])) { $complete = false; break 2; }
+            }
+            $reads = (float) $getAny(['r/s'], $row);
+            $writes = (float) $getAny(['w/s'], $row);
+            $readAwait = (float) $getAny(['r_await'], $row);
+            $writeAwait = (float) $getAny(['w_await'], $row);
+            $readRate += $reads; $writeRate += $writes;
+            $readWeighted += $reads * $readAwait; $writeWeighted += $writes * $writeAwait;
+            $readPlain += $readAwait; $writePlain += $writeAwait;
+        }
+        if ($complete) {
+            $quantity = count($homeDevices);
+            $home = [
+                'homeDiskAwait' => $readRate > 0 ? $readWeighted / $readRate : $readPlain / $quantity,
+                'homeDiskServiceTime' => $writeRate > 0 ? $writeWeighted / $writeRate : $writePlain / $quantity,
+                'homeDiskQuantity' => $quantity,
+            ];
+        }
+    }
 
     // Column-name lookup keeps sysstat 12+ additions from shifting meanings;
     // legacy await/svctm names remain fallbacks for older hosts.
@@ -181,7 +260,7 @@ function pmssDiskIostatParseLatestSample(string $iostatRaw, int $deviceCount, ?i
         'iopingHomeMs'    => pmssDiskIostatReadIopingHomeMs(),
         'diskQuantity'    => $deviceCount,
         'time'            => $timestamp ?? time(),
-    ];
+    ] + $home;
 }
 
 /**
@@ -229,7 +308,8 @@ function pmssDiskIostatMain(?callable $runner = null): int
         } else {
             $iostatRaw = (string) $runner($command);
         }
-        $iostat = pmssDiskIostatParseLatestSample($iostatRaw, max(1, count($devices)));
+        $homeDevices = pmssDiskIostatHomeDevices($devices);
+        $iostat = pmssDiskIostatParseLatestSample($iostatRaw, max(1, count($devices)), null, $homeDevices);
     } catch (RuntimeException $exception) {
         echo $exception->getMessage()."\n";
         return 0;

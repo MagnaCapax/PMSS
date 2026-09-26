@@ -7,6 +7,7 @@
  */
 
 require_once dirname(__DIR__).'/pathSafety.php';
+require_once dirname(__DIR__).'/runtime.php';
 
 const PMSS_BFQ_KERNEL_MAX = 1000;
 const PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT = 300;
@@ -32,11 +33,14 @@ function pmssCgroupPolicyMountSourceResolve(string $mountPath, ?callable $runner
 {
     $mountPath = trim($mountPath);
     if ($mountPath === '' || preg_match('/[\r\n\0]/', $mountPath) === 1) return '';
+    $findmnt = 'findmnt';
     if ($runner === null) {
         $runner = function (string $command): string { return trim((string) @shell_exec($command)); };
+        $findmnt = pmssCommandPath('findmnt');
+        if ($findmnt === '') return '';
     }
     $target = $mountPath === '/home' ? '/home' : escapeshellarg($mountPath);
-    return trim((string) $runner('findmnt -no SOURCE '.$target.' 2>/dev/null'));
+    return trim((string) $runner(($findmnt === 'findmnt' ? $findmnt : escapeshellarg($findmnt)).' -no SOURCE '.$target.' 2>/dev/null'));
 }
 
 /** Accept only complete kernel major:minor tokens, without trailing line breaks, before writes. */

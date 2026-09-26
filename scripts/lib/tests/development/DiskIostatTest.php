@@ -6,6 +6,130 @@ require_once dirname(__DIR__, 2).'/diskIostat.php';
 
 class DiskIostatTest extends TestCase
 {
+    /** Build a fake class/block tree with kernel-style partition links. */
+    private function homeTree(array $chains): array
+    {
+        $root = $this->pmssMakeTempDir('pmss-iostat-home-');
+        $class = $root.'/class/block';
+        $devices = $root.'/devices';
+        $this->pmssEnsureDir($class, 0755);
+        foreach ($chains as $parent => $children) {
+            $this->pmssEnsureDir($devices.'/'.$parent.'/slaves', 0755);
+            @symlink($devices.'/'.$parent, $class.'/'.$parent);
+            foreach ($children as $child) {
+                $this->pmssEnsureDir($devices.'/'.$child, 0755);
+                @symlink($devices.'/'.$child, $class.'/'.$child);
+                @symlink($devices.'/'.$child, $devices.'/'.$parent.'/slaves/'.$child);
+            }
+        }
+        return [$root, $class, $devices];
+    }
+
+    /** Compact last-sample fixture; old group fields deliberately differ from leaves. */
+    private function homeSample(array $rows): string
+    {
+        $header = "Device r/s w/s r_await w_await %util\n";
+        $raw = $header."grp1 1 2 90 80 70\n".$header;
+        foreach ($rows as $device => $values) $raw .= $device.' '.implode(' ', $values)."\n";
+        return $raw."grp1 1 2 90 80 70\n";
+    }
+
+    /** Resolve a fake /home source without invoking findmnt. */
+    private function homeDevices(array $sampled, string $source, string $class, string $devRoot): ?array
+    {
+        return \pmssDiskIostatHomeDevices($sampled, $class, static function () use ($source): string { return $source; }, $devRoot);
+    }
+
+    public function testGuestHomeFieldsKeepGroupFieldsAndSerializedLegacyValues(): void
+    {
+        list($root, $class) = $this->homeTree(['vda' => [], 'vdb' => []]);
+        $leaves = $this->homeDevices(['vda', 'vdb'], $root.'/dev/vda', $class, $root.'/dev');
+        $parsed = \pmssDiskIostatParseLatestSample($this->homeSample([
+            'vda' => [4, 5, 12, 34, 99], 'vdb' => [100, 100, 1, 2, 3],
+        ]), 2, 123, $leaves);
+        $this->assertSame(['homeDiskAwait' => 12.0, 'homeDiskServiceTime' => 34.0, 'homeDiskQuantity' => 1], array_intersect_key($parsed, array_flip(['homeDiskAwait', 'homeDiskServiceTime', 'homeDiskQuantity'])));
+        $stored = unserialize(serialize($parsed));
+        $this->assertSame(['iopsRead' => '1', 'iopsWrite' => '2', 'throughputRead' => '0', 'throughputWrite' => '0',
+            'diskAwait' => '90', 'diskServiceTime' => '80', 'diskUtil' => '70', 'avgQueueSize' => '0',
+            'diskQuantity' => 2, 'time' => 123], array_intersect_key($stored, array_flip([
+            'iopsRead', 'iopsWrite', 'throughputRead', 'throughputWrite', 'diskAwait', 'diskServiceTime',
+            'diskUtil', 'avgQueueSize', 'diskQuantity', 'time',
+        ])));
+        foreach (['psiFullAvg300', 'psiMemFullAvg300', 'psiCpuFullAvg300', 'iopingHomeMs'] as $key) $this->assertTrue(array_key_exists($key, $stored));
+    }
+
+    public function testMdRaidWeightsOnlySixMemberDisks(): void
+    {
+        list($root, $class, $devices) = $this->homeTree(['md0' => []]);
+        $rows = [];
+        $sampled = [];
+        foreach (range('a', 'f') as $index => $letter) {
+            $disk = 'sd'.$letter;
+            $part = $disk.'1';
+            $this->pmssEnsureDir($devices.'/'.$disk.'/'.$part, 0755);
+            file_put_contents($devices.'/'.$disk.'/'.$part.'/partition', '1');
+            @symlink($devices.'/'.$disk, $class.'/'.$disk);
+            @symlink($devices.'/'.$disk.'/'.$part, $class.'/'.$part);
+            @symlink($devices.'/'.$disk.'/'.$part, $devices.'/md0/slaves/'.$part);
+            $sampled[] = $disk;
+            $rows[$disk] = [$index + 1, 6 - $index, 10 * ($index + 1), 10 * ($index + 1), 50];
+        }
+        $sampled[] = 'nvme0n1';
+        $rows['nvme0n1'] = [1000, 1000, 1, 1, 1];
+        $leaves = $this->homeDevices($sampled, $root.'/dev/md0', $class, $root.'/dev');
+        $this->assertSame($sampled === [] ? [] : array_slice($sampled, 0, 6), $leaves);
+        $parsed = \pmssDiskIostatParseLatestSample($this->homeSample($rows), 7, 123, $leaves);
+        $this->assertSame(6, $parsed['homeDiskQuantity']);
+        $this->assertSame(910 / 21, $parsed['homeDiskAwait']);
+        $this->assertSame(560 / 21, $parsed['homeDiskServiceTime']);
+        $this->assertSame(7, $parsed['diskQuantity']);
+    }
+
+    public function testBcacheThroughMdAndMapperResolveLeaves(): void
+    {
+        list($root, $class, $devices) = $this->homeTree(['bcache0' => ['md1'], 'md1' => []]);
+        $this->pmssEnsureDir($devices.'/sda/sda1', 0755);
+        file_put_contents($devices.'/sda/sda1/partition', '1');
+        @symlink($devices.'/sda', $class.'/sda');
+        @symlink($devices.'/sda/sda1', $class.'/sda1');
+        @symlink($devices.'/sda/sda1', $devices.'/md1/slaves/sda1');
+        $this->assertSame(['sda'], $this->homeDevices(['sda'], $root.'/dev/bcache0', $class, $root.'/dev'));
+
+        $this->pmssEnsureDir($devices.'/dm-0/slaves', 0755);
+        $this->pmssEnsureDir($devices.'/sdb/sdb2', 0755);
+        file_put_contents($devices.'/sdb/sdb2/partition', '2');
+        @symlink($devices.'/dm-0', $class.'/dm-0');
+        @symlink($devices.'/sdb', $class.'/sdb');
+        @symlink($devices.'/sdb/sdb2', $class.'/sdb2');
+        @symlink($devices.'/sdb/sdb2', $devices.'/dm-0/slaves/sdb2');
+        $this->pmssEnsureDir($root.'/dev/mapper', 0755);
+        @symlink($root.'/dev/dm-0', $root.'/dev/mapper/vg-home');
+        file_put_contents($root.'/dev/dm-0', '');
+        $this->assertSame(['sdb'], $this->homeDevices(['sdb'], $root.'/dev/mapper/vg-home', $class, $root.'/dev'));
+    }
+
+    public function testUnknownHomeAndMissingRowsStayNull(): void
+    {
+        list($root, $class) = $this->homeTree(['vda' => []]);
+        $raw = $this->homeSample(['vda' => [1, 1, 5, 6, 7]]);
+        foreach ([null, $this->homeDevices(['vdb'], $root.'/dev/vda', $class, $root.'/dev'), ['sda']] as $leaves) {
+            $parsed = \pmssDiskIostatParseLatestSample($raw, 2, 123, $leaves);
+            $this->assertSame(null, $parsed['homeDiskAwait']);
+            $this->assertSame(null, $parsed['homeDiskServiceTime']);
+            $this->assertSame(null, $parsed['homeDiskQuantity']);
+            $this->assertSame('90', $parsed['diskAwait']);
+            $this->assertSame(2, $parsed['diskQuantity']);
+        }
+        $this->assertSame(null, $this->homeDevices(['vda'], '', $class, $root.'/dev'));
+    }
+
+    public function testZeroTrafficUsesPlainMean(): void
+    {
+        $raw = $this->homeSample(['sda' => [0, 0, 10, 20, 1], 'sdb' => [0, 0, 30, 40, 1]]);
+        $parsed = \pmssDiskIostatParseLatestSample($raw, 2, 123, ['sda', 'sdb']);
+        $this->assertSame(20.0, $parsed['homeDiskAwait']);
+        $this->assertSame(30.0, $parsed['homeDiskServiceTime']);
+    }
     public function testDiscoverDevicesMatchesSharedDataDeviceFilter(): void
     {
         $sysBlock = $this->pmssMakeTempDir('pmss-sys-block-');
