@@ -156,3 +156,16 @@
     copytruncate
     sharedscripts
 }
+
+/var/log/pmss/arpKeepalive.log {
+    weekly
+    rotate 52
+    minsize 1M
+    maxsize 16M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    create 0600 root root
+}
