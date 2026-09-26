@@ -32,6 +32,7 @@
  *   /scripts/util/userDocker.php USER stop
  *   /scripts/util/userDocker.php USER restart
  *   /scripts/util/userDocker.php USER status
+ *   /scripts/util/userDocker.php USER start-containers ID [ID ...]
  *
  * The script:
  *   - Reports process/socket state and whether the systemd user unit exists
@@ -55,18 +56,22 @@ pmssRequireCli();
 require_once __DIR__.'/../lib/user/log.php';
 require_once __DIR__.'/../lib/user/rootlessDockerConfig.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
+require_once __DIR__.'/../lib/user/dockerContainerIds.php';
 
 [$debug, $args] = pmssCliArgvDebugSplit($argv ?? null);
 
 if (count($args) < 3) {
-    pmssCliExitWithStderr("Usage: /scripts/util/userDocker.php USER {start|stop|restart|status} [--debug]\n", 1);
+    pmssCliExitWithStderr("Usage: /scripts/util/userDocker.php USER {start|stop|restart|status|start-containers} [ID ...] [--debug]\n", 1);
 }
 
 $user = $args[1];
 $action = strtolower($args[2]);
-$valid = ['start', 'stop', 'restart', 'status'];
+$valid = ['start', 'stop', 'restart', 'status', 'start-containers'];
 if (!in_array($action, $valid, true)) {
-    pmssCliExitWithStderr("Invalid action: {$action}\nSupported actions: start, stop, restart, status\n", 1);
+    pmssCliExitWithStderr("Invalid action: {$action}\nSupported actions: start, stop, restart, status, start-containers\n", 1);
+}
+if ($action === 'start-containers' && !pmssUserDockerContainerIdsValid(array_slice($args, 3))) {
+    pmssCliExitWithStderr("Invalid container ID list for start-containers\n", 1);
 }
 
 /** Return a single-line value safe for stderr and log context. */
@@ -305,6 +310,55 @@ function userDockerCollectPids(string $user, bool $debug = false, ?bool &$checkO
 
     $checkOk = $checkOkLocal;
     return array_keys($pids);
+}
+
+// Start an explicit transferred set after the asynchronous daemon launch.
+$containerIds = $action === 'start-containers' ? array_slice($args, 3) : [];
+if ($action === 'start-containers') {
+    $userConfigStore = new UserConfigStore();
+    if (!pmssUserDockerEnabled($user, $userConfigStore)) {
+        pmssUserLog($user, sprintf('userDocker: start-containers blocked; Docker disabled by config or RAM floor (%d MiB)', pmssUserDockerMinRamMiB()));
+        echo "Docker start blocked for {$user}: Docker is disabled or RAM is below ".pmssUserDockerMinRamMiB()." MiB\n";
+        exit(0);
+    }
+
+    $dockerEnv = 'XDG_RUNTIME_DIR='.escapeshellarg($runtimeDir)
+        .' DOCKER_HOST='.escapeshellarg('unix://'.$dockerSock).' docker ';
+    $deadline = time() + 60;
+    do {
+        $infoRc = 0;
+        userDockerRunAs($user, $dockerEnv.'info >/dev/null 2>&1', 5, $infoRc);
+        if ($infoRc === 0) {
+            break;
+        }
+        if (time() >= $deadline) {
+            pmssUserLog($user, '[WARN] userDocker: Docker not ready for container start');
+            pmssCliExitWithStderr("Docker not ready for {$user}; containers not started\n", 1);
+        }
+        sleep(min(2, max(1, $deadline - time())));
+    } while (true);
+
+    $startRc = 0;
+    $output = userDockerRunAs($user, $dockerEnv.'start '.implode(' ', array_map('escapeshellarg', $containerIds)).' 2>/dev/null', 120, $startRc);
+    $started = $output === '' ? 0 : min(count($containerIds), count(explode("\n", $output)));
+    $statesRc = 0;
+    $states = userDockerRunAs($user, $dockerEnv."ps -a --format '{{.State}}'", 30, $statesRc);
+    if ($statesRc === 0) {
+        $counts = [];
+        foreach (explode("\n", $states) as $state) {
+            if (preg_match('/^[a-z]+$/D', $state) === 1) {
+                $counts[$state] = ($counts[$state] ?? 0) + 1;
+            }
+        }
+        ksort($counts);
+        $parts = [];
+        foreach ($counts as $state => $count) {
+            $parts[] = $state.'='.$count;
+        }
+        pmssUserLog($user, 'userDocker: containers by state: '.implode(' ', $parts));
+    }
+    echo sprintf("Started %d of %d container(s) for %s\n", $started, count($containerIds), $user);
+    exit($startRc === 0 ? 0 : 1);
 }
 
 // Detect running rootless Docker processes and unit presence.

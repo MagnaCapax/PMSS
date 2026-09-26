@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once dirname(__DIR__, 3).'/lib/userTransfer.php';
+require_once dirname(__DIR__, 3).'/lib/user/dockerContainerIds.php';
 
 /**
  * Hermetic tests for user transfer helpers.
@@ -246,8 +247,8 @@ class UserTransferTest extends TestCase
     public function testGeneratedTransferScriptsMatchSnapshot(): void
     {
         $cfg = $this->baseConfig();
-        $expectedScratchPaths = ['expect' => '/root/pmss-userTransfer-<generated>/transfer.expect', 'authProbe' => '/root/pmss-userTransfer-<generated>/auth-probe.sh', 'mainScript' => '/root/pmss-userTransfer-<generated>/rsync-main.sh', 'finalScript' => '/root/pmss-userTransfer-<generated>/rsync-final.sh', 'remoteSizeScript' => '/root/pmss-userTransfer-<generated>/remote-size.sh', 'qbittorrentProbeScript' => '/root/pmss-userTransfer-<generated>/qbittorrent-categories.sh', 'qbittorrentConfig' => '/root/pmss-userTransfer-<generated>/qBittorrent.conf', 'qbittorrentCategories' => '/root/pmss-userTransfer-<generated>/categories.json'];
-        $expectedPayloadKeys = ['expect', 'authProbe', 'mainScript', 'finalScript', 'remoteSizeScript', 'qbittorrentProbeScript'];
+        $expectedScratchPaths = ['expect' => '/root/pmss-userTransfer-<generated>/transfer.expect', 'authProbe' => '/root/pmss-userTransfer-<generated>/auth-probe.sh', 'mainScript' => '/root/pmss-userTransfer-<generated>/rsync-main.sh', 'finalScript' => '/root/pmss-userTransfer-<generated>/rsync-final.sh', 'remoteSizeScript' => '/root/pmss-userTransfer-<generated>/remote-size.sh', 'qbittorrentProbeScript' => '/root/pmss-userTransfer-<generated>/qbittorrent-categories.sh', 'dockerQuiesceScript' => '/root/pmss-userTransfer-<generated>/docker-quiesce.sh', 'dockerIds' => '/root/pmss-userTransfer-<generated>/docker-ids', 'dockerStartScript' => '/root/pmss-userTransfer-<generated>/docker-start.sh', 'qbittorrentConfig' => '/root/pmss-userTransfer-<generated>/qBittorrent.conf', 'qbittorrentCategories' => '/root/pmss-userTransfer-<generated>/categories.json'];
+        $expectedPayloadKeys = ['expect', 'authProbe', 'mainScript', 'finalScript', 'remoteSizeScript', 'qbittorrentProbeScript', 'dockerQuiesceScript'];
         $expectedMain = <<<'SNAP'
 #!/bin/bash
 set -e
@@ -269,7 +270,67 @@ SNAP;
         $this->assertEquals($expectedAuth."\n", \pmssUserTransferBuildAuthProbe($cfg));
         $this->assertSame($expectedScratchPaths, \pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>/'));
         $this->assertSame($expectedPayloadKeys, array_keys(\pmssUserTransferScratchPayloads($cfg)));
-        $this->assertSame('49ba48a86676a28b69161f1d4024040f316d43b035e9394f5c83e1717d36be71', hash('sha256', json_encode(\pmssUserTransferScratchPayloads($cfg))));
+        $this->assertSame('27a5c229df1afe3aebf5b903cddd085410c1b0ecdeb7183dca903aa0ac2c69eb', hash('sha256', json_encode(\pmssUserTransferScratchPayloads($cfg))));
+    }
+
+    public function testDockerQuiesceProbeBoundsAndStopsSourceSet(): void
+    {
+        $script = \pmssUserTransferBuildDockerQuiesce($this->baseConfig(), '/root/scratch/docker-ids');
+        $this->assertStringContainsAllStrings([
+            "#!/bin/bash\nset -e\numask 077\n", '[ -S "$S" ]', 'command -v docker',
+            'docker ps -q --no-trunc | head -n 500', 'docker stop -t 30 $ids',
+            'printf "%s\n" "$ids"', "| head -c 65536 > '/root/scratch/docker-ids'",
+        ], $script);
+        $this->assertStringNotContainsString('pipefail', $script);
+    }
+
+    public function testDockerStartProbeQuotesValidatedIds(): void
+    {
+        $id = str_repeat('a', 64);
+        $script = \pmssUserTransferBuildDockerStartScript($this->baseConfig(), [$id]);
+        $this->assertStringContainsString('docker start', $script);
+        $this->assertStringContainsString("'{$id}'", $script);
+        foreach ([';id', '$(id)', '`id`', strtoupper($id)] as $invalid) {
+            $this->assertThrowsRuntime(static function () use ($invalid): void {
+                \pmssUserTransferBuildDockerStartScript(['remoteUser' => 'user', 'hostname' => 'example.com'], [$invalid]);
+            }, 'Invalid Docker container ID');
+        }
+    }
+
+    public function testDockerIdParsingKeepsUniqueBoundedExactIds(): void
+    {
+        $a = str_repeat('a', 64);
+        $b = str_repeat('b', 64);
+        $raw = implode("\n", [$a, strtoupper($a), str_repeat('a', 63), str_repeat('a', 65), $a,
+            ';id', '$(id)', '`id`', ' a ', "x\n y", $b]);
+        $this->assertSame([$a, $b], \pmssUserTransferValidDockerIds($raw));
+        $this->assertSame([$a], \pmssUserTransferValidDockerIds($raw, 1));
+        $this->assertSame([], \pmssUserTransferValidDockerIds($raw, 0));
+        $many = [];
+        for ($i = 0; $i < 501; $i++) {
+            $many[] = str_pad(dechex($i), 64, '0', STR_PAD_LEFT);
+        }
+        $this->assertSame(array_slice($many, 0, 500), \pmssUserTransferValidDockerIds(implode("\n", $many)));
+    }
+
+    public function testDockerFinalPassReturnCodes(): void
+    {
+        foreach ([0, 23, 24] as $rc) {
+            $this->assertTrue(\pmssUserTransferDockerRcTransferred($rc));
+        }
+        foreach ([12, 255] as $rc) {
+            $this->assertFalse(\pmssUserTransferDockerRcTransferred($rc));
+        }
+    }
+
+    public function testDockerContainerStartArgumentsRejectInvalidOrOversizedSets(): void
+    {
+        $id = str_repeat('c', 64);
+        $this->assertTrue(\pmssUserDockerContainerIdsValid([$id]));
+        $this->assertTrue(\pmssUserDockerContainerIdsValid(array_fill(0, 500, $id)));
+        foreach ([[], [$id, ';id'], [strtoupper($id)], array_fill(0, 501, $id)] as $invalid) {
+            $this->assertFalse(\pmssUserDockerContainerIdsValid($invalid));
+        }
     }
 
     public function testBuildQbittorrentCategoryProbeWritesRemoteMetadataToScratchFiles(): void

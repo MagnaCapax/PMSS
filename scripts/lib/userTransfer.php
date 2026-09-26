@@ -22,7 +22,19 @@ require_once __DIR__.'/userLifecycle.php';
 pmssRequireRelativeFiles(__DIR__, ['update/runtime/commands.php', 'userTransfer/cliParse.php', 'userTransfer/postSetup.php', 'userTransfer/transferRuntime.php']);
 
 /** Build scratch script payloads keyed to pmssUserTransferScratchPaths(). */
-function pmssUserTransferScratchPayloads(array $cfg, array $paths = []): array { $paths = $paths ?: pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>'); return ['expect' => pmssUserTransferBuildExpectWrapper()."\n", 'authProbe' => pmssUserTransferBuildAuthProbe($cfg), 'mainScript' => pmssUserTransferBuildRsyncMain($cfg), 'finalScript' => pmssUserTransferBuildRsyncFinal($cfg), 'remoteSizeScript' => pmssUserTransferBuildRemoteSizeProbe($cfg), 'qbittorrentProbeScript' => pmssUserTransferBuildQbittorrentCategoryProbe($cfg, $paths['qbittorrentConfig'], $paths['qbittorrentCategories'])]; }
+function pmssUserTransferScratchPayloads(array $cfg, array $paths = []): array
+{
+    $paths = $paths ?: pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>');
+    return [
+        'expect' => pmssUserTransferBuildExpectWrapper()."\n",
+        'authProbe' => pmssUserTransferBuildAuthProbe($cfg),
+        'mainScript' => pmssUserTransferBuildRsyncMain($cfg),
+        'finalScript' => pmssUserTransferBuildRsyncFinal($cfg),
+        'remoteSizeScript' => pmssUserTransferBuildRemoteSizeProbe($cfg),
+        'qbittorrentProbeScript' => pmssUserTransferBuildQbittorrentCategoryProbe($cfg, $paths['qbittorrentConfig'], $paths['qbittorrentCategories']),
+        'dockerQuiesceScript' => pmssUserTransferBuildDockerQuiesce($cfg, $paths['dockerIds']),
+    ];
+}
 
 /**
  * Entry point used by scripts/util/userTransfer.php.
@@ -95,7 +107,34 @@ function pmssUserTransferMain(array $argv): int
             $lastMainRc = pmssUserTransferRunPasses('Pulling home data', $scratchPaths['expect'], $scratchPaths['mainScript'], $cfg['mainPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
             $lastFinalRc = pmssUserTransferRunPasses('Pulling volatile data', $scratchPaths['expect'], $scratchPaths['finalScript'], $cfg['finalPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
 
+            $dockerQuiesceRc = runStep('Quiescing source rootless Docker containers', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['dockerQuiesceScript']]));
+            if ($dockerQuiesceRc !== 0) {
+                logMessage(sprintf('[WARN] Docker quiesce probe returned rc=%d', $dockerQuiesceRc));
+            }
+            $dockerIds = pmssUserTransferValidDockerIds((string) @file_get_contents($scratchPaths['dockerIds']));
+            $dockerCount = count($dockerIds);
+            logMessage(sprintf('[INFO] Docker hand-over: %d running container(s) stopped on source', $dockerCount));
+            $dockerFinalRc = 0;
+            if ($dockerCount > 0) {
+                $dockerFinalRc = pmssUserTransferRunPasses('Pulling volatile data (containers stopped)', $scratchPaths['expect'], $scratchPaths['finalScript'], 1, 0, 0);
+            }
+
             pmssUserTransferPostSetup($cfg, $home, $scratchPaths);
+
+            if ($dockerCount > 0) {
+                if (pmssUserTransferDockerRcTransferred($dockerFinalRc)) {
+                    $dockerUtility = dirname(__DIR__).'/util/userDocker.php';
+                    runStep('Starting rootless Docker for '.$cfg['localUser'], pmssBuildCommand('php', [$dockerUtility, $cfg['localUser'], 'start']));
+                    // runStep records its command; keep container IDs in private scratch.
+                    $dockerStartCommand = pmssBuildCommand('php', array_merge([$dockerUtility, $cfg['localUser'], 'start-containers'], $dockerIds));
+                    pmssUserTransferWriteFile($scratchPaths['dockerStartScript'], "#!/bin/bash\nset -e\n".$dockerStartCommand."\n", 0700);
+                    runStep('Starting transferred containers', pmssBuildCommand($scratchPaths['dockerStartScript']));
+                } else {
+                    pmssUserTransferWriteFile($scratchPaths['dockerStartScript'], pmssUserTransferBuildDockerStartScript($cfg, $dockerIds), 0700);
+                    runStep('Restarting source rootless Docker containers', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['dockerStartScript']]));
+                    logMessage(sprintf('[WARN] Docker hand-over: final pass failed (rc=%d); restarted %d container(s) on source; target containers not started', $dockerFinalRc, $dockerCount));
+                }
+            }
 
             if ($cfg['printPassword']) {
                 logMessage('[WARN] Remote password: '.$password);
@@ -103,6 +142,10 @@ function pmssUserTransferMain(array $argv): int
 
             if ($lastMainRc !== 0 || $lastFinalRc !== 0) {
                 logMessage(sprintf('[WARN] User transfer finished with errors (main rc=%d, final rc=%d)', $lastMainRc, $lastFinalRc));
+                return 1;
+            }
+
+            if ($dockerCount > 0 && !pmssUserTransferDockerRcTransferred($dockerFinalRc)) {
                 return 1;
             }
 

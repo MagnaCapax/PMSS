@@ -13,6 +13,8 @@ function pmssUserTransferScratchPaths(string $scratchRoot): array
         'expect' => $scratchRoot.'/transfer.expect', 'authProbe' => $scratchRoot.'/auth-probe.sh',
         'mainScript' => $scratchRoot.'/rsync-main.sh', 'finalScript' => $scratchRoot.'/rsync-final.sh',
         'remoteSizeScript' => $scratchRoot.'/remote-size.sh', 'qbittorrentProbeScript' => $scratchRoot.'/qbittorrent-categories.sh',
+        'dockerQuiesceScript' => $scratchRoot.'/docker-quiesce.sh', 'dockerIds' => $scratchRoot.'/docker-ids',
+        'dockerStartScript' => $scratchRoot.'/docker-start.sh',
         'qbittorrentConfig' => $scratchRoot.'/qBittorrent.conf',
         'qbittorrentCategories' => $scratchRoot.'/categories.json',
     ];
@@ -80,6 +82,61 @@ function pmssUserTransferBuildRsyncFinal(array $cfg): string
 function pmssUserTransferBuildAuthProbe(array $cfg): string
 {
     return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshProbeCommand($cfg, '/bin/true')."\n";
+}
+
+/** Capture the same bounded container set that is stopped on the source. */
+function pmssUserTransferBuildDockerQuiesce(array $cfg, string $localIdsPath): string
+{
+    $remote = 'R=/run/user/$(id -u); S=$R/docker.sock; '
+        .'[ -S "$S" ] && command -v docker >/dev/null 2>&1 || exit 0; '
+        .'ids=$(DOCKER_HOST=unix://$S docker ps -q --no-trunc | head -n 500) || exit 0; '
+        .'[ -n "$ids" ] || exit 0; printf "\n"; printf "%s\n" "$ids"; '
+        .'DOCKER_HOST=unix://$S docker stop -t 30 $ids >/dev/null';
+
+    return "#!/bin/bash\nset -e\numask 077\n"
+        .pmssUserTransferBuildSshProbeCommand($cfg, $remote)
+        .' | head -c 65536 > '.escapeshellarg($localIdsPath)."\n";
+}
+
+/** Restart only a caller-validated set on the source account's daemon. */
+function pmssUserTransferBuildDockerStartScript(array $cfg, array $ids): string
+{
+    if ($ids === [] || count($ids) > 500) {
+        throw new RuntimeException('Invalid Docker container ID set');
+    }
+    foreach ($ids as $id) {
+        if (!is_string($id) || preg_match('/^[0-9a-f]{64}$/D', $id) !== 1) {
+            throw new RuntimeException('Invalid Docker container ID');
+        }
+    }
+    $remote = 'DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock docker start '
+        .implode(' ', array_map('escapeshellarg', $ids)).' >/dev/null 2>&1';
+    return "#!/bin/bash\nset -e\numask 077\n".pmssUserTransferBuildSshProbeCommand($cfg, $remote)."\n";
+}
+
+/** Keep unique, exact Docker IDs in source order and within the source cap. */
+function pmssUserTransferValidDockerIds(string $raw, int $max = 500): array
+{
+    if ($max < 1) {
+        return [];
+    }
+    $ids = [];
+    foreach (explode("\n", $raw) as $line) {
+        if (preg_match('/^[0-9a-f]{64}$/D', $line) !== 1 || isset($ids[$line])) {
+            continue;
+        }
+        $ids[$line] = true;
+        if (count($ids) >= $max) {
+            break;
+        }
+    }
+    return array_keys($ids);
+}
+
+/** Rsync's routine live-source partial results can still contain the store. */
+function pmssUserTransferDockerRcTransferred(int $rc): bool
+{
+    return in_array($rc, [0, 23, 24], true);
 }
 
 function pmssUserTransferBuildExpectWrapper(): string
