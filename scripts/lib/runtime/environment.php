@@ -11,7 +11,7 @@
 
 function pmssStatsCompareTimesBuild(?int $now = null): array { $now = $now ?? time(); return ['month' => $now - (30 * 24 * 60 * 60), 'week' => $now - (7 * 24 * 60 * 60), 'day' => $now - (24 * 60 * 60), 'hour' => $now - (60 * 60), '15min' => $now - (15 * 60)]; }
 function pmssCommandBinaryNameIsSafe(string $binary): bool { return preg_match('/^[A-Za-z0-9._+-]+$/', $binary) === 1; }
-function pmssCommandPathCandidateIsSafe(string $path): bool { return $path !== '' && strpos($path, '/') === 0 && strpbrk($path, "\0\r\n") === false; }
+function pmssCommandPathCandidateIsSafe(string $path): bool { return strpos($path, '/') === 0 && strpbrk($path, "\0\r\n") === false; }
 function pmssBlockDeviceNameIsDataDevice(string $device): bool { return preg_match(PMSS_BLOCK_DATA_DEVICE_NAME_PATTERN, $device) === 1; }
 
 function pmssCommandPath(string $binary): string
@@ -19,7 +19,7 @@ function pmssCommandPath(string $binary): string
     // trim() removes edge NULs; reject them before they can name another binary.
     if (pmssFilesystemPathHasNulByte($binary)) return '';
     $binary = trim($binary);
-    if ($binary === '' || !pmssCommandBinaryNameIsSafe($binary)) return '';
+    if (!pmssCommandBinaryNameIsSafe($binary)) return '';
     $resolved = @shell_exec('command -v '.escapeshellarg($binary).' 2>/dev/null');
     // Reject raw NUL bytes before trim() can turn malformed output into a valid path.
     if (!is_string($resolved) || pmssFilesystemPathHasNulByte($resolved)) return '';
@@ -115,7 +115,7 @@ function pmssEnvReadDigits(string $envKey): ?int { return (($value = getenv($env
 /** Parse an untrimmed unsigned decimal only when PHP can represent it exactly. */
 function pmssUnsignedDecimalIntParse(string $raw): ?int
 {
-    if ($raw === '' || !ctype_digit($raw)) return null;
+    if (!ctype_digit($raw)) return null;
     $digits = ltrim($raw, '0');
     $limit = (string) PHP_INT_MAX;
     if (strlen($digits) > strlen($limit)
@@ -136,7 +136,7 @@ function pmssParseSizeToBytes(string $value, bool $wholeNumberOnly = false, bool
     $value = trim($value);
     $numberPattern = $wholeNumberOnly ? '[0-9]+' : '[0-9]+(?:\.[0-9]+)?';
     $suffixPattern = $allowBareBinarySuffix ? '(?:i?B?)?' : '(?:i?B)?';
-    if ($value === '' || preg_match('/^('.$numberPattern.')\s*([KMGTPE]?)'.$suffixPattern.'$/i', $value, $matches) !== 1) return null;
+    if (preg_match('/^('.$numberPattern.')\s*([KMGTPE]?)'.$suffixPattern.'$/i', $value, $matches) !== 1) return null;
     $powers = ['' => 0, 'K' => 1, 'M' => 2, 'G' => 3, 'T' => 4, 'P' => 5, 'E' => 6];
     return (float) $matches[1] * pow(1024, $powers[strtoupper($matches[2])]);
 }
@@ -153,7 +153,7 @@ function pmssParseSizeToMiB($value): ?int
 function pmssConfigLineTrimmed(string $line, array $commentPrefixes = ['#']): string
 {
     $trimmed = trim($line);
-    foreach ($commentPrefixes as $prefix) if ($trimmed !== '' && $prefix !== '' && strpos($trimmed, $prefix) === 0) return '';
+    foreach ($commentPrefixes as $prefix) if ($prefix !== '' && strpos($trimmed, $prefix) === 0) return '';
     return $trimmed;
 }
 

@@ -22,7 +22,7 @@ function pmssSystemdUnitNameIsSafe(string $unit): bool
     // trim() must not turn a NUL-containing command argument into a valid unit.
     if (strpos($unit, "\0") !== false) return false;
     $unit = trim($unit);
-    return $unit !== '' && strpos($unit, '-') !== 0 && preg_match('/^[A-Za-z0-9:_.@\\-]+$/', $unit) === 1;
+    return strpos($unit, '-') !== 0 && preg_match('/^[A-Za-z0-9:_.@\\-]+$/', $unit) === 1;
 }
 function pmssSystemdUnitDefaultServiceName(string $unit): string { return preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $unit) ? $unit : $unit.'.service'; }
 function pmssSystemdUnitActionNameIsSafe(string $action): bool

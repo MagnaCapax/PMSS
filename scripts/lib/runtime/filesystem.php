@@ -149,7 +149,7 @@ function pmssReadRequiredRegularFile(string $path, string $label = 'required fil
     return $contents;
 }
 
-function pmssReadRegularFileDigits(string $path): ?string { return (($raw = pmssReadRegularFileTrimmed($path)) !== null && $raw !== '' && ctype_digit($raw)) ? $raw : null; }
+function pmssReadRegularFileDigits(string $path): ?string { return (($raw = pmssReadRegularFileTrimmed($path)) !== null && ctype_digit($raw)) ? $raw : null; }
 function pmssNetworkPortInRange(int $port, int $min = 1, int $max = 65535): bool { return $min >= 1 && $max <= 65535 && $min <= $max && $port >= $min && $port <= $max; }
 
 function pmssNetworkPortParseDigits($value, int $min = 1, int $max = 65535): ?int
@@ -157,7 +157,7 @@ function pmssNetworkPortParseDigits($value, int $min = 1, int $max = 65535): ?in
     // Reject NUL before trim() can turn malformed port data into valid digits.
     if ((!is_int($value) && !is_string($value)) || (is_string($value) && strpos($value, "\0") !== false)) return null;
     $raw = trim((string) $value);
-    if ($raw === '' || !ctype_digit($raw)) return null;
+    if (!ctype_digit($raw)) return null;
     $port = (int) $raw;
     return pmssNetworkPortInRange($port, $min, $max) ? $port : null;
 }
