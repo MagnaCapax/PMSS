@@ -14,10 +14,10 @@ PHP;
 escapeshellarg("/home/{$thisUser}/.local").' -prune -o';
 PHP;
         $uidFilter = <<<'PHP'
--not -uid '.(string) $userIds['uid']
+-not '.pmssOwnerIdSetFindPredicate('-uid', (int) $userIds['uid'], $uidRanges)
 PHP;
         $gidFilter = <<<'PHP'
--not -gid '.(string) $userIds['gid']
+-not '.pmssOwnerIdSetFindPredicate('-gid', (int) $userIds['gid'], $gidRanges)
 PHP;
         $ownerSpec = <<<'PHP'
 escapeshellarg($userIds['uid'].':'.$userIds['gid'])
@@ -35,6 +35,8 @@ PHP;
                 $uidFilter,
                 $gidFilter,
                 $ownerSpec,
+                "require_once __DIR__.'/../lib/user/subordinateIds.php';",
+                "\$findParts[] = '-execdir chown -h';",
                 '$mode = sprintf(\'%04o\', $perm);',
                 'find %s -not -type l -not -perm %s -exec chmod %s {} +',
                 'find %s -path %s -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',

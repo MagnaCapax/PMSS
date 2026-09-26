@@ -12,6 +12,7 @@ require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/shell.php';
 require_once __DIR__.'/../lib/pathSafety.php';
 require_once __DIR__.'/../lib/user/userFilesystem.php';
+require_once __DIR__.'/../lib/user/subordinateIds.php';
 require_once __DIR__.'/../lib/traffic/storage.php';
 
 $usage = 'Usage: ./userPermissions.php USERNAME';
@@ -249,12 +250,21 @@ foreach ($excludes as $ex) {
 // Skip symbolic links so broken symlinks (e.g. ~/www/watch) do not cause chown
 // dereference errors or non-zero rc noise in logs.
 $findParts[] = '-not -type l';
+$uidRanges = pmssSubordinateIdRanges($thisUser, (int) $userIds['uid'], 'uid');
+$gidRanges = pmssSubordinateIdRanges($thisUser, (int) $userIds['gid'], 'gid');
+if ($uidRanges !== [] || $gidRanges !== []) {
+    pmssUserLog($thisUser, sprintf(
+        'userPermissions: honoured %d subordinate uid ranges and %d subordinate gid ranges',
+        count($uidRanges),
+        count($gidRanges)
+    ));
+}
 $findParts[] = '\\(';
-$findParts[] = '-not -uid '.(string) $userIds['uid'];
+$findParts[] = '-not '.pmssOwnerIdSetFindPredicate('-uid', (int) $userIds['uid'], $uidRanges);
 $findParts[] = '-o';
-$findParts[] = '-not -gid '.(string) $userIds['gid'];
+$findParts[] = '-not '.pmssOwnerIdSetFindPredicate('-gid', (int) $userIds['gid'], $gidRanges);
 $findParts[] = '\\)';
-$findParts[] = '-exec chown';
+$findParts[] = '-execdir chown -h';
 $findParts[] = escapeshellarg($userIds['uid'].':'.$userIds['gid']);
 $findParts[] = '{}';
 $findParts[] = '+';
