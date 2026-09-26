@@ -18,7 +18,7 @@ pmssRequireRelativeFiles(__DIR__, ['../cli/optionParser.php', '../nginxUserHosts
 function pmssCreateNginxConfigChmodGlob(int $mode, string $pattern): void
 {
     $matches = glob($pattern);
-    if (!is_array($matches) || $matches === array()) {
+    if (!is_array($matches)) {
         return;
     }
 

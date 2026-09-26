@@ -32,7 +32,6 @@ function pmssCreateNginxConfigAppendLog(string $message): void
 function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int
 {
     $configTestOutput = [];
-    $configTestRc = 0;
     exec(pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_CONFIG_TEST_COMMAND', 'nginx -t 2>&1'), $configTestOutput, $configTestRc);
     $configTestResult = implode("\n", $configTestOutput);
 

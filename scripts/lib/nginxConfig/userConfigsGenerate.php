@@ -128,11 +128,12 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     if ($thisUser === '' || !pmssValidateUsername($thisUser)) return PMSS_NGINX_USER_CONFIG_SKIPPED;
 
     $managedPaths = pmssCreateNginxConfigManagedUserPaths($thisUser, $ctx);
+    $skipKeepPaths = $singleUser ? [$managedPaths['user']] : [];
     $homeBase = pmssCreateNginxConfigContextDir($ctx, 'homeBase', '/home');
     $runtimePortDir = pmssCreateNginxConfigContextDir($ctx, 'runtimePortDir', '/etc/seedbox/runtime/ports');
     $homeDir = $homeBase.'/'.$thisUser;
     if (!is_dir($homeDir)) {
-        pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $singleUser ? [$managedPaths['user']] : []);
+        pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $skipKeepPaths);
         return PMSS_NGINX_USER_CONFIG_SKIPPED;
     }
 
@@ -187,7 +188,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
 
     if (!file_exists($homeDir.'/.rtorrent.rc')) {
         pmssCreateNginxConfigLogSkippedUser($thisUser, 'missing .rtorrent.rc prerequisite');
-        pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $singleUser ? [$managedPaths['user']] : []);
+        pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $skipKeepPaths);
         return PMSS_NGINX_USER_CONFIG_SKIPPED;
     }
 
@@ -198,7 +199,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     }
     if (!pmssNetworkPortInRange($serverPort, 1024)) {
         pmssCreateNginxConfigLogSkippedUser($thisUser, 'lighttpd port missing or invalid after refresh attempt ('.$portFile.')');
-        pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $singleUser ? [$managedPaths['user']] : []);
+        pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $skipKeepPaths);
         return PMSS_NGINX_USER_CONFIG_SKIPPED;
     }
 

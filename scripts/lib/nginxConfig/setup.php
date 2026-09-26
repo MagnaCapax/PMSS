@@ -128,9 +128,8 @@ function pmssCreateNginxConfigSetup(): array
     pmssDirEnsureExists('/etc/nginx/ssl', 0755);
 
     if (!file_exists("/etc/nginx/ssl/nginx.crt")) {
-        $hostname = $serverHostname;
         // Generate a self-signed cert if Let's Encrypt not present yet (ignore errors on systems without openssl)
-        @passthru('openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj "/C=FI/ST=none/L=none/O=PulsedMedia/CN=' . $hostname . '" -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt');
+        @passthru('openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj "/C=FI/ST=none/L=none/O=PulsedMedia/CN=' . $serverHostname . '" -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt');
     }
 
     pmssDirEnsureExists('/etc/nginx/users', 0751);
