@@ -62,7 +62,7 @@ function pmssUserTransferBuildRsyncMain(array $cfg): string
         '.config/deluge/web.conf', '.cache', 'www', 'session', 'www/rutorrent/share',
         '.lighttpd', '.logs', '.local', '.lighttpd.conf', '.quota', '.rtorrentExecuteRun', '.trafficData',
         '.trafficDataLocal', '.trafficDataIngress', '.trafficDataIngressLocal', 'rTorrentLog', '.bonusQuota',
-        '.bonusTraffic', '.trafficLimit',
+        '.bonusTraffic', '.trafficLimit', '.resourceData', '*.pmss-tmp-*',
     ];
 
     return pmssUserTransferBuildRsyncCommand($cfg, ['/home/'.$cfg['remoteUser'].'/'], $excludes);

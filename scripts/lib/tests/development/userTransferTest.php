@@ -131,7 +131,7 @@ class UserTransferTest extends TestCase
         $cfg = $this->baseConfig();
 
         foreach ([
-            [\pmssUserTransferBuildRsyncMain($cfg), ['rsync -a --stats', ':/home/deefbox/', '/home/deefbox/', "--exclude='.rtorrent.rc'", "--exclude='.qbittorrentPort'", "--exclude='.config/pmss-user.json'", "--exclude='.trafficDataIngress'", "--exclude='.trafficDataIngressLocal'"], ['rsync -av' => 'expected no verbose per-file rsync logging', '--exclude={' => 'expected no brace-expanded excludes']],
+            [\pmssUserTransferBuildRsyncMain($cfg), ['rsync -a --stats', ':/home/deefbox/', '/home/deefbox/', "--exclude='.rtorrent.rc'", "--exclude='.qbittorrentPort'", "--exclude='.config/pmss-user.json'", "--exclude='.trafficDataIngress'", "--exclude='.trafficDataIngressLocal'", "--exclude='.resourceData'", "--exclude='*.pmss-tmp-*'"], ['rsync -av' => 'expected no verbose per-file rsync logging', '--exclude={' => 'expected no brace-expanded excludes']],
             [\pmssUserTransferBuildRsyncFinal($cfg), ["rsync -a --stats '-R'", ':/home/deefbox/./session', ':/home/deefbox/./www/public'], ['rsync -av' => 'expected no verbose per-file rsync logging', '{session' => 'expected no brace-expanded sources']],
             [\pmssUserTransferBuildAuthProbe($cfg), ['ssh -o Compression=no', '-o NumberOfPasswordPrompts=1', "-l 'deefbox'", "'example.com'", "'/bin/true'"], []],
             [\pmssUserTransferBuildRemoteSizeProbe($this->baseConfig(['remoteUser' => 'remote01', 'verifyThreshold' => 90])), ['-o NumberOfPasswordPrompts=1', "'example.com'", '/home/remote01/', 'du -sb -- "$home"', 'find "$home" -type f -printf .', 'printf "bytes=%s files=%s\\n"'], ['%p' => 'expected no path-printing stat probe output']],
@@ -251,7 +251,7 @@ class UserTransferTest extends TestCase
         $expectedMain = <<<'SNAP'
 #!/bin/bash
 set -e
-rsync -a --stats -e 'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l '\''deefbox'\''' --exclude='.rtorrent.rc' --exclude='.config/qBittorrent/qBittorrent.conf' --exclude='.qbittorrentPort' --exclude='.config/pmss-user.json' --exclude='.config/deluge/core.conf' --exclude='.config/deluge/web.conf' --exclude='.cache' --exclude='www' --exclude='session' --exclude='www/rutorrent/share' --exclude='.lighttpd' --exclude='.logs' --exclude='.local' --exclude='.lighttpd.conf' --exclude='.quota' --exclude='.rtorrentExecuteRun' --exclude='.trafficData' --exclude='.trafficDataLocal' --exclude='.trafficDataIngress' --exclude='.trafficDataIngressLocal' --exclude='rTorrentLog' --exclude='.bonusQuota' --exclude='.bonusTraffic' --exclude='.trafficLimit' 'deefbox@example.com:/home/deefbox/' '/home/deefbox/'
+rsync -a --stats -e 'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l '\''deefbox'\''' --exclude='.rtorrent.rc' --exclude='.config/qBittorrent/qBittorrent.conf' --exclude='.qbittorrentPort' --exclude='.config/pmss-user.json' --exclude='.config/deluge/core.conf' --exclude='.config/deluge/web.conf' --exclude='.cache' --exclude='www' --exclude='session' --exclude='www/rutorrent/share' --exclude='.lighttpd' --exclude='.logs' --exclude='.local' --exclude='.lighttpd.conf' --exclude='.quota' --exclude='.rtorrentExecuteRun' --exclude='.trafficData' --exclude='.trafficDataLocal' --exclude='.trafficDataIngress' --exclude='.trafficDataIngressLocal' --exclude='rTorrentLog' --exclude='.bonusQuota' --exclude='.bonusTraffic' --exclude='.trafficLimit' --exclude='.resourceData' --exclude='*.pmss-tmp-*' 'deefbox@example.com:/home/deefbox/' '/home/deefbox/'
 SNAP;
         $expectedFinal = <<<'SNAP'
 #!/bin/bash
@@ -269,7 +269,7 @@ SNAP;
         $this->assertEquals($expectedAuth."\n", \pmssUserTransferBuildAuthProbe($cfg));
         $this->assertSame($expectedScratchPaths, \pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>/'));
         $this->assertSame($expectedPayloadKeys, array_keys(\pmssUserTransferScratchPayloads($cfg)));
-        $this->assertSame('9bc8306dbf5dd4d169f766ede41f35302df6e9fa4d1fac5565775b2699fdba68', hash('sha256', json_encode(\pmssUserTransferScratchPayloads($cfg))));
+        $this->assertSame('49ba48a86676a28b69161f1d4024040f316d43b035e9394f5c83e1717d36be71', hash('sha256', json_encode(\pmssUserTransferScratchPayloads($cfg))));
     }
 
     public function testBuildQbittorrentCategoryProbeWritesRemoteMetadataToScratchFiles(): void
