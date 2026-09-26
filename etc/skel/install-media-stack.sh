@@ -1716,6 +1716,30 @@ jellyfin_auth_payload_write() {
 	} >"$target_json"
 }
 
+# Jellyfin 12+ applies the preconfigured BaseUrl on its first start: unprefixed paths then
+# answer 302 (which curl -f treats as ready) while the prefixed API answers 503 until startup
+# finishes. 10.11 keeps answering unprefixed. Print whichever base answers 200.
+jellyfin_startup_base_url() {
+	local base_url="$1" config_dir="$2" attempts="${3:-120}" prefix="" xml attempt
+	for xml in "$config_dir/network.xml" "$config_dir/system.xml"; do
+		prefix=$(sed -n -E 's|.*<BaseUrl>([^<]*)</BaseUrl>.*|\1|p' "$xml" 2>/dev/null | head -n 1)
+		[[ -n "$prefix" ]] && break
+	done
+	prefix="${prefix%/}"
+	for ((attempt = 1; attempt <= attempts; attempt++)); do
+		if [[ -n "$prefix" && "$(media_stack_http_code "${base_url}${prefix}/Startup/Configuration")" == "200" ]]; then
+			printf '%s' "${base_url}${prefix}"
+			return 0
+		fi
+		if [[ "$(media_stack_http_code "${base_url}/Startup/Configuration")" == "200" ]]; then
+			printf '%s' "$base_url"
+			return 0
+		fi
+		sleep 1
+	done
+	return 1
+}
+
 jellyfin_auth_seed() {
 	local password="$1" seed_port="$2" session base_url payload_json auth_json code
 	session="jellyfin-auth-seed"
@@ -1735,6 +1759,12 @@ jellyfin_auth_seed() {
 		if media_stack_log_has "$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log" "illegal instruction\|SIGILL\|signal 4"; then
 			log_err "Jellyfin crashed with Illegal Instruction — CPU lacks required instruction sets"
 		fi
+		tmux kill-session -t "$session" 2>/dev/null || true
+		rm -f "$payload_json" "$auth_json"
+		return 1
+	fi
+	if ! base_url=$(jellyfin_startup_base_url "$base_url" "$JELLYFIN_CONFIG_DIR" 120); then
+		log_err "Jellyfin startup API never answered HTTP 200, with or without BaseUrl (see $JELLYFIN_LOG_DIR/jellyfin-auth-seed.log)"
 		tmux kill-session -t "$session" 2>/dev/null || true
 		rm -f "$payload_json" "$auth_json"
 		return 1
