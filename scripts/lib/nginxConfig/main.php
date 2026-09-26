@@ -67,32 +67,32 @@ function pmssCreateNginxConfigMain(array $argv): int
 
     $singleUser = ($requestedUser !== '');
 
-    $ctx = pmssCreateNginxConfigSetup($requestedUser, $singleUser);
-    $writeFailureUsers = [];
-    $unserviceableUsers = [];
+    $ctx = pmssCreateNginxConfigSetup();
+    $writeFailureCount = 0;
+    $unserviceableCount = 0;
     foreach ($users as $thisUser) {
         $outcome = pmssCreateNginxConfigGenerateUser($thisUser, $ctx, $singleUser);
         if ($outcome !== PMSS_NGINX_USER_CONFIG_WRITE_FAILED) {
             continue;
         }
-        $writeFailureUsers[] = $thisUser;
+        ++$writeFailureCount;
         if (!pmssCreateNginxConfigUserRouteIsServiceable($thisUser, $ctx)) {
-            $unserviceableUsers[] = $thisUser;
+            ++$unserviceableCount;
         }
     }
 
-    if (!$singleUser && $writeFailureUsers === []) {
+    if (!$singleUser && $writeFailureCount === 0) {
         if (!pmssCreateNginxConfigPruneOrphans($users, $ctx)) {
             fwrite(STDERR, "[WARN] nginx managed config orphan pruning was incomplete\n");
         }
     }
-    if ($writeFailureUsers !== []) {
-        $message = sprintf('WARN: nginx config writes failed for %d user(s); prior routes were preserved where safe', count($writeFailureUsers));
+    if ($writeFailureCount > 0) {
+        $message = sprintf('WARN: nginx config writes failed for %d user(s); prior routes were preserved where safe', $writeFailureCount);
         fwrite(STDERR, $message.PHP_EOL);
         pmssCreateNginxConfigAppendLog($message);
     }
-    if ($unserviceableUsers !== []) {
-        $message = sprintf('CRITICAL: nginx config generation left %d user(s) without a serviceable primary route', count($unserviceableUsers));
+    if ($unserviceableCount > 0) {
+        $message = sprintf('CRITICAL: nginx config generation left %d user(s) without a serviceable primary route', $unserviceableCount);
         fwrite(STDERR, $message.PHP_EOL);
         pmssCreateNginxConfigAppendLog($message);
     }
@@ -108,5 +108,5 @@ function pmssCreateNginxConfigMain(array $argv): int
     if ($configTestRc !== 0) {
         return $configTestRc;
     }
-    return $unserviceableUsers === [] ? 0 : 1;
+    return $unserviceableCount === 0 ? 0 : 1;
 }

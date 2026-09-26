@@ -40,7 +40,7 @@ function pmssNginxConfigEnsureSiteDefaultDefinesDefaultServer(string $config): s
  *
  * @return array<string,mixed>
  */
-function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): array
+function pmssCreateNginxConfigSetup(): array
 {
     $userTemplate = @file_get_contents("/etc/seedbox/config/template.nginx-user");
     $suspendedTemplate = @file_get_contents("/etc/seedbox/config/template.nginx-user-suspended");
