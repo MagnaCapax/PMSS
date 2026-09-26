@@ -303,17 +303,12 @@ PHP;
         $states = [44 => ['pid' => 44, 'stat' => 'Sl', 'wchan' => 'poll_schedule_timeout']];
         $queue = ['recvQ' => 100, 'sendQ' => 100];
 
-        $first = \rtorrentProcessScgiUnresponsiveDecision([44], $states, $queue, $this->wedgeStatePath(), 3);
-        $second = \rtorrentProcessScgiUnresponsiveDecision([44], $states, $queue, $this->wedgeStatePath(), 3);
-        $third = \rtorrentProcessScgiUnresponsiveDecision([44], $states, $queue, $this->wedgeStatePath(), 3);
-
-        foreach ([
-            [$first, 'observe_wedge', 'count=1/3'],
-            [$second, 'observe_wedge', 'count=2/3'],
-            [$third, 'restart', 'consecutive checks'],
-        ] as $case) {
-            $this->assertSame($case[1], $case[0]['action']);
-            $this->assertStringContainsString($case[2], $case[0]['message']);
+        // Freeze both the decision sequence and its persisted counter bytes.
+        foreach (['observe_wedge', 'observe_wedge', 'restart'] as $index => $action) {
+            $decision = \rtorrentProcessScgiUnresponsiveDecision([44], $states, $queue, $this->wedgeStatePath(), 3);
+            $this->assertSame($action, $decision['action']);
+            $this->assertStringContainsString($index === 2 ? 'consecutive checks' : 'count='.($index + 1).'/3', $decision['message']);
+            $this->assertSame((string) ($index + 1), (string) file_get_contents($this->wedgeStatePath()));
         }
     }
 

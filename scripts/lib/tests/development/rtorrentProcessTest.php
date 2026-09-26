@@ -327,6 +327,7 @@ class RtorrentProcessTest extends TestCase
     {
         $processSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/process.php');
         $watchdogSource = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
+        $flowSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/watchdogProcessFlow.php');
 
         $this->assertSame(1, substr_count($processSource, "@passthru('/scripts/startRtorrent "));
         $this->assertStringContainsAllStrings([
@@ -340,7 +341,7 @@ class RtorrentProcessTest extends TestCase
         $this->assertStringContainsAllStrings([
             "rtorrentProcessStart(\$user, \$logCallback, \$state['startMarker'])",
             'rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);',
-        ], $watchdogSource);
+        ], $flowSource);
         $this->pmssAssertStringNotContainsString("@passthru('/scripts/startRtorrent ", $watchdogSource);
     }
 

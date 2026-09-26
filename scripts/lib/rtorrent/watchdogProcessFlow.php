@@ -131,13 +131,11 @@ function pmssCheckRtorrentHandleMissingProcess(
 /**
  * Handle the SCGI health path once exactly one rTorrent process is present.
  *
- * @param int[] $rtorrentPids
  * @param int[] $executorAllPids
  * @param array<string,string> $state
  */
 function pmssCheckRtorrentHandleAliveProcess(
     string $user,
-    array $rtorrentPids,
     array $executorAllPids,
     array $state,
     callable $logCallback,
@@ -191,7 +189,9 @@ function pmssCheckRtorrentHandleAliveProcess(
             $acceptQueueWedgeCycles
         );
         if ($decision['action'] === 'extend_grace') {
-            pmssCheckRtorrentExtendUnresponsiveGrace($user, $decision['message'], $state['unresponsive'], $state['acceptQueueWedge'], $debug);
+            rtorrentProcessWriteStateFile($state['unresponsive'], (string) time());
+            rtorrentProcessClearStaleState($state['acceptQueueWedge']);
+            pmssCheckRtorrentLogBoth($user, $decision['message'], $debug);
             return;
         }
         if ($decision['action'] === 'observe_wedge') {

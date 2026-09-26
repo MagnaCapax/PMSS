@@ -50,19 +50,6 @@ function pmssCheckRtorrentStaggerAfterRecentReboot(string $user, string $message
     return true;
 }
 
-/** Keep alive-but-unresponsive rTorrent handling in one conservative path. */
-function pmssCheckRtorrentExtendUnresponsiveGrace(
-    string $user,
-    string $message,
-    string $unresponsiveState,
-    string $acceptQueueWedgeState,
-    bool $debug
-): void {
-    rtorrentProcessWriteStateFile($unresponsiveState, (string) time());
-    rtorrentProcessClearStaleState($acceptQueueWedgeState);
-    pmssCheckRtorrentLogBoth($user, $message, $debug);
-}
-
 /** Refresh an out-of-date executor wrapper from the skeleton copy. */
 function pmssCheckRtorrentRefreshExecutorFromSkel(string $user, string $home, bool $debug): void
 {

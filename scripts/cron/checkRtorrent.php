@@ -54,55 +54,6 @@ $logCallback = function (string $msg, bool $force) use ($debug): void {
     pmssCheckRtorrentLog($msg, $force, $debug);
 };
 
-/*
- * Source-contract map for delegated watchdog process flow.
- *
- * Runtime execution lives in scripts/lib/rtorrent/watchdogProcessFlow.php so
- * this cron entrypoint stays focused on user iteration. Keep these mirrored
- * branch calls current with the helper; CI uses them to verify the same cleanup,
- * queue-wedge, and throttle contracts remain wired.
- *
- * if (!$executorPresent && empty($rtorrentPids)) {
- *     $socketPath = rtorrentScgiSocketPath($user);
- *     pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $state['unresponsive'], $debug);
- *     rtorrentProcessStart($user, $logCallback, $state['startMarker']);
- * }
- * if ($executorPresent && empty($rtorrentPids)) {
- *     $socketPath = rtorrentScgiSocketPath($user);
- *     pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $state['unresponsive'], $debug);
- *     rtorrentProcessCheckStaleState($state['missing'], PMSS_RTORRENT_MISSING_GRACE);
- * }
- * $responsive = rtorrentScgiCall($socketPath, 'system.api_version', [], 5) !== false;
- * $rtorrentPids = pmssUserWatchdogProcessPids($user, '^rtorrent');
- * if (empty($rtorrentPids)) {
- *     pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $state['unresponsive'], $debug);
- *     rTorrent missing after SCGI probe; starting
- *     rtorrentProcessStart($user, $logCallback, $state['startMarker']);
- * }
- * rtorrentProcessScgiUnresponsiveDecision(
- *     $rtorrentPids,
- *     rtorrentProcessStatesForPids($rtorrentPids),
- *     rtorrentScgiSocketQueueSnapshot($socketPath),
- *     $state['acceptQueueWedge'],
- *     PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES
- * );
- * if ($decision['action'] === 'observe_wedge') {
- *     rtorrentProcessWriteStateFile($state['unresponsive'], (string) time());
- * }
-if ($decision['action'] === 'extend_grace') {
-    pmssCheckRtorrentExtendUnresponsiveGrace(
-        $user,
-        $decision['message'],
-        $state['unresponsive'],
-        $state['acceptQueueWedge'],
-        $debug
-    );
-}
- * rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);
-pmssCheckRtorrentApplyThrottle($user, $socketPath, $debug);
-pmssCheckRtorrentLog("rTorrent healthy for {$user}", false, $debug);
- */
-
 foreach ($users as $user) {
 
     $home = '/home/'.$user;
@@ -165,7 +116,6 @@ foreach ($users as $user) {
     }
 
     if (empty($rtorrentPids)) {
-        // Helper owns legacy launch marker: rtorrentProcessStart($user, $logCallback, $state['startMarker'])
         pmssCheckRtorrentHandleMissingProcess(
             $user,
             $home,
@@ -181,21 +131,15 @@ foreach ($users as $user) {
         continue;
     }
 
-    if (count($rtorrentPids) === 1) {
-        // Helper owns legacy restart marker: rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);
-        pmssCheckRtorrentHandleAliveProcess(
-            $user,
-            $rtorrentPids,
-            $executorAllPids,
-            $state,
-            $logCallback,
-            $debug,
-            PMSS_RTORRENT_UNRESPONSIVE_GRACE,
-            PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES
-        );
-        continue;
-    }
-
+    pmssCheckRtorrentHandleAliveProcess(
+        $user,
+        $executorAllPids,
+        $state,
+        $logCallback,
+        $debug,
+        PMSS_RTORRENT_UNRESPONSIVE_GRACE,
+        PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES
+    );
 }
 
 pmssCheckRtorrentPublishChangedConfigReport($changedConfig, '/root/changedConfigs', $debug);
