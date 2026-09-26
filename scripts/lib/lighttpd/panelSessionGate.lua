@@ -22,7 +22,10 @@ local function request_path()
 end
 
 local function panel_user(path)
-    local user = path:match("^/user%-([a-z][a-z0-9]*)($|/)")
+    -- Lua patterns have no alternation and $ anchors only as the final character, so the
+    -- old "($|/)" group matched the literal text "$|/" and never a real path. Match the
+    -- two real shapes explicitly: a trailing-slash prefix, or the bare "/user-<name>".
+    local user = path:match("^/user%-([a-z][a-z0-9]*)/") or path:match("^/user%-([a-z][a-z0-9]*)$")
     if not user or #user > 8 then
         return nil
     end
