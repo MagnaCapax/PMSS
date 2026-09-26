@@ -102,6 +102,11 @@ verifies these results and cleanup on read failures and handler exceptions.
 
 ## Helper Extraction Rules
 
+Pinned remote archive steps reject control bytes in archive names, source
+directory names, and workspace paths before downloading or constructing the
+destructive cleanup command. Valid names keep the existing extraction flow;
+`RemoteBinaryHelperTest` covers rejected inputs without network access.
+
 The lighttpd watchdog's incremental nginx reader closes its log stream in
 `finally`, including when metadata checks, state loading, seeking, or parsing
 throws. Exceptions continue to propagate without publishing a new cursor.

@@ -12,7 +12,7 @@ function pmssPinnedRemoteAmd64ArtifactsSupported(?string $architecture = null): 
     return in_array($architecture ?? php_uname('m'), ['x86_64', 'amd64'], true);
 }
 
-/** Reject archive basenames that could become shell options or path escapes. */
+/** Reject archive basenames that could become shell options, path escapes, or log controls. */
 function pmssPinnedRemoteArchiveComponentIsSafe(string $component): bool
 {
     return $component !== ''
@@ -21,7 +21,7 @@ function pmssPinnedRemoteArchiveComponentIsSafe(string $component): bool
         && substr($component, 0, 1) !== '-'
         && strpos($component, '/') === false
         && strpos($component, '\\') === false
-        && strpos($component, "\0") === false;
+        && preg_match('/[\x00-\x1F\x7F]/', $component) !== 1;
 }
 
 /** Reject post-extract shell fragments that would break the generated command chain. */
@@ -48,6 +48,7 @@ function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expe
     }
     if ($workDir === ''
         || $trimmedWorkDir === ''
+        || preg_match('/[\x00-\x1F\x7F]/', $workDir) === 1
         || !pmssPathTargetIsSafe($trimmedWorkDir, true, false, false)
     ) {
         logmsg("[WARN] Refusing unsafe archive extraction path for {$label}");
