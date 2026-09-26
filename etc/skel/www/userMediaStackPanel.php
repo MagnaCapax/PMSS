@@ -572,9 +572,12 @@ function pmssMediaStackPanelStartCommandBuild(string $home, string $username): s
     $scriptPath = pmssCustomerHomePath($home, 'install-media-stack.sh');
     $pidPath = pmssCustomerHomePath($home, '.install-media-stack-web.pid');
 
+    // Background only the installer: a trailing `&` over the whole && list would also
+    // background `rm` (racing away the pid file) and keep shell_exec's pipe open until
+    // the install ends, so the request dies with the installer's lighttpd restart.
     $innerCommand = 'cd '.escapeshellarg($home)
         .' && rm -f -- '.escapeshellarg($pidPath)
-        .' && nohup /bin/bash '.escapeshellarg($scriptPath).' >/dev/null 2>&1 & echo $! > '.escapeshellarg($pidPath);
+        .' && { nohup /bin/bash '.escapeshellarg($scriptPath).' </dev/null >/dev/null 2>&1 & echo $! > '.escapeshellarg($pidPath).'; }';
 
     return 'HOME='.escapeshellarg($home)
         .' USER='.escapeshellarg($username)
