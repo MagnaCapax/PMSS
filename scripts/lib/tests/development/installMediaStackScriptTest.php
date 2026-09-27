@@ -496,7 +496,7 @@ BASH
             'http://127.0.0.1:8096',
             'http://127.0.0.1:8096',
             'fail',
-        ))."\n", $this->pmssRunShellHarness($script));
+        )), $this->pmssRunShellHarness($script));
         $this->assertStringContainsAllStrings([
             'if ! base_url=$(jellyfin_startup_base_url "$base_url" "$JELLYFIN_CONFIG_DIR" 120); then',
             'Jellyfin startup API never answered HTTP 200, with or without BaseUrl',
