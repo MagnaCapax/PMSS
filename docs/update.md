@@ -91,6 +91,7 @@ scripts/lib/update/environment.php     # dpkg/apt environment guards
 scripts/lib/update/filesystem.php      # warning-only filesystem preflights
 scripts/lib/update/repositories.php    # sources.list templates and apt refresh
 scripts/lib/update/systemPrep.php      # cgroups, slices, base locale and perms
+scripts/lib/update/systemPrep/sysctl*   # host profile, settings, baseline write
 scripts/lib/update/services/*          # runtime templates, legacy daemons,
                                        # mediainfo installer, security tweaks
 scripts/lib/update/userMaintenance.php # per-user refresh and skeleton/cron sync

@@ -195,7 +195,7 @@ class SysctlBaselineTest extends TestCase
 
     public function testVmDetectionAvoidsShellStatusPipeline(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/update/systemPrep/sysctlTuning.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/update/systemPrep/sysctlProfile.php');
 
         $this->pmssAssertStringNotContainsString('; echo '.'$?', $source);
         $this->pmssAssertStringNotContainsString('shell_exec'.'(', $source);
@@ -260,7 +260,7 @@ class SysctlBaselineTest extends TestCase
         );
     }
 
-    public function testSysctlGroupedSettingsRowsLockChangeOrder(): void
+    public function testSysctlChangesKeepGroupOrderAndStringValues(): void
     {
         $grouped = [
             'vm' => ['vm.swappiness' => '10'],
@@ -268,13 +268,6 @@ class SysctlBaselineTest extends TestCase
             'net' => ['net.core.somaxconn' => 2000],
         ];
 
-        $this->assertSame(
-            [
-                ['vm.swappiness', '10'],
-                ['net.core.somaxconn', '2000'],
-            ],
-            \pmssSysctlGroupedSettingsRows($grouped)
-        );
         $this->assertSame(
             [
                 'vm.swappiness: 60 -> 10',
@@ -299,6 +292,26 @@ class SysctlBaselineTest extends TestCase
         $this->assertEquals(64, $summary['sysctl']['detection']['ram_gb'], 'expected RAM detection in summary');
         $this->assertFalse($summary['sysctl']['detection']['swap_is_fast'], 'expected slow swap summary');
         $this->assertEquals('10', $summary['sysctl']['applied']['vm.swappiness'], 'expected applied swappiness in summary');
+    }
+
+    public function testHardwareSummaryKeepsSortedAppliedValuesAndPeerFields(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-summary-map-', 0700);
+        $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir]);
+        file_put_contents($dir.'/hardware.json', "{\"peer\":\"kept\"}\n");
+        $messages = [];
+
+        \pmssSysctlSummaryWrite($this->pmssMakeArrayLogger($messages), [], [
+            'net' => ['net.core.somaxconn' => 2000],
+            'ignored' => 'not-array',
+            'vm' => ['vm.swappiness' => '10'],
+        ], ['vm.dirty_ratio'], ['vm.swappiness: 60 -> 10']);
+
+        $summary = $this->pmssReadJsonArrayFile($dir.'/hardware.json');
+        $this->assertSame('kept', $summary['peer']);
+        $this->assertSame(['net.core.somaxconn' => '2000', 'vm.swappiness' => '10'], $summary['sysctl']['applied']);
+        $this->assertSame(['vm.dirty_ratio'], $summary['sysctl']['overrides_respected']);
+        $this->assertSame(['vm.swappiness: 60 -> 10'], $summary['sysctl']['changes_made']);
     }
 
     /**
