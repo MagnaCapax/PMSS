@@ -144,7 +144,7 @@ function pmssUserWebRootMigrationPrepareParent(string $user, string $home, strin
     if (is_dir($path) && !is_link($path)) {
         return true;
     }
-    if (is_link($path) || file_exists($path)) {
+    if (pmssPathExistsOrLink($path)) {
         pmssUserWebRootMigrationLog($user, $logger, 'Refusing conflicting web-root migration parent: '.$path);
         return false;
     }
@@ -182,7 +182,7 @@ function pmssUserWebRootMigrationApplyMetadata(string $path, array $stat): void
 /** Copy a tree without following symlinks, preserving bytes and basic metadata. */
 function pmssUserWebRootMigrationCopyTree(string $source, string $target): bool
 {
-    if (is_link($source) || is_link($target) || file_exists($target) || !is_array($stat = @lstat($source))) {
+    if (is_link($source) || pmssPathExistsOrLink($target) || !is_array($stat = @lstat($source))) {
         return false;
     }
 
@@ -283,7 +283,7 @@ function pmssUserMigrateWebRootBasenameCollapsePath(
     $source = $home.'/'.$sourceRelative;
     $target = $home.'/'.$targetRelative;
     $misfile = $home.'/'.$misfileRelative;
-    if (!file_exists($misfile) && !is_link($misfile)) {
+    if (!pmssPathExistsOrLink($misfile)) {
         return;
     }
 
@@ -425,7 +425,7 @@ function pmssUserMigrateWebRootPath(
 
     if (!$sourceExists) {
         if (!pmssUserWebRootMigrationPrepareParent($user, $home, $sourceParent, $logger)
-            || is_link($source) || file_exists($source)
+            || pmssPathExistsOrLink($source)
             || !@symlink($linkTarget, $source)) {
             pmssUserWebRootMigrationLog($user, $logger, 'Unable to restore symlink for '.$sourceRelative);
             return;
@@ -440,7 +440,7 @@ function pmssUserMigrateWebRootPath(
         return;
     }
     if (!pmssUserWebRootMigrationPrepareParent($user, $home, $targetParent, $logger)
-        || is_link($target) || file_exists($target)
+        || pmssPathExistsOrLink($target)
         || !@rename($source, $target)) {
         pmssUserWebRootMigrationLog($user, $logger, 'Unable to move '.$sourceRelative.' to durable storage');
         return;
@@ -448,15 +448,15 @@ function pmssUserMigrateWebRootPath(
 
     $after = pmssUserWebRootMigrationSnapshot($target, true);
     if ($after === null || $before !== $after) {
-        $restored = !file_exists($source) && !is_link($source) && @rename($target, $source);
+        $restored = !pmssPathExistsOrLink($source) && @rename($target, $source);
         pmssUserWebRootMigrationLog($user, $logger, $restored
             ? 'Verification failed; restored '.$sourceRelative
             : 'Verification failed; durable copy preserved at '.$targetRelative);
         return;
     }
 
-    if (is_link($source) || file_exists($source) || !@symlink($linkTarget, $source)) {
-        $restored = !file_exists($source) && !is_link($source) && @rename($target, $source);
+    if (pmssPathExistsOrLink($source) || !@symlink($linkTarget, $source)) {
+        $restored = !pmssPathExistsOrLink($source) && @rename($target, $source);
         pmssUserWebRootMigrationLog($user, $logger, $restored
             ? 'Unable to link '.$sourceRelative.'; restored original path'
             : 'Unable to link '.$sourceRelative.'; durable copy preserved at '.$targetRelative);

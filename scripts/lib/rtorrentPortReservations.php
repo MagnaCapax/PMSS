@@ -104,13 +104,13 @@ function pmssRtorrentPortReservationStoredSource(string $user, string $configRoo
 {
     $configRoot = rtrim($configRoot, '/');
     $canonical = $configRoot.'/users/'.$user.'.json';
-    if (file_exists($canonical) || is_link($canonical)) {
+    if (pmssPathExistsOrLink($canonical)) {
         $payload = pmssJsonFileReadAssoc($canonical, true);
         return is_array($payload) ? pmssRtorrentPortReservationPayloadSource($payload) : pmssRtorrentPortReservationSourceEmpty(true);
     }
 
     $legacy = dirname($configRoot).'/runtime/users.json';
-    if (!file_exists($legacy) && !is_link($legacy)) {
+    if (!pmssPathExistsOrLink($legacy)) {
         return pmssRtorrentPortReservationSourceEmpty();
     }
     $payload = pmssJsonFileReadAssoc($legacy, true);

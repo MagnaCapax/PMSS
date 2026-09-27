@@ -156,7 +156,7 @@ function pmssLighttpdWriteManagedProxyFragment(string $proxyName, string $user, 
             fwrite(STDERR, "[user:{$user}] Skipping {$proxyName} lighttpd fragment; sibling fragments could not be scanned safely\n");
             return false;
         }
-        if ((file_exists($path) || is_link($path))
+        if (pmssPathExistsOrLink($path)
             && (!pmssUserFilePathIsSafe($path) || !is_file($path) || !@unlink($path))
         ) {
             fwrite(STDERR, "[user:{$user}] Failed to yield {$proxyName} lighttpd fragment to an existing URL conditional\n");

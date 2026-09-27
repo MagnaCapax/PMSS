@@ -36,7 +36,7 @@ function pmssRtorrentPortReservationsReconcile(
 ): array {
     $result = array('status' => 'ok', 'reason' => '', 'removed' => 0, 'kept' => 0, 'errors' => 0);
     $portsBase = rtrim($portsBase, '/');
-    if (!file_exists($portsBase) && !is_link($portsBase)) {
+    if (!pmssPathExistsOrLink($portsBase)) {
         return $result;
     }
     if (!is_dir($portsBase) || is_link($portsBase) || !pmssPathTargetIsSafe($portsBase, true)) {
@@ -76,7 +76,7 @@ function pmssRtorrentPortReservationsReconcile(
         $entries = array();
         foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
             $directory = $portsBase.'/'.$type;
-            if (!file_exists($directory) && !is_link($directory)) {
+            if (!pmssPathExistsOrLink($directory)) {
                 $entries[$type] = array();
                 continue;
             }

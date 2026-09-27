@@ -109,7 +109,7 @@ function pmssIntegerSettingFileRemove(string $path): bool
 
     file_exists($path) && @unlink($path);
     clearstatcache(true, $path);
-    return !file_exists($path) && !is_link($path);
+    return !pmssPathExistsOrLink($path);
 }
 
 function pmssIntegerSettingStorageDirEnsure(

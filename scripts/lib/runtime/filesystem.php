@@ -93,6 +93,8 @@ function pmssRemovePrivateTempDir(string $path, string $prefix, string $descript
 // NUL bytes make PHP filesystem calls version-dependent; reject them at the
 // runtime boundary and keep callers on the existing fail-soft path.
 function pmssFilesystemPathHasNulByte(string $path): bool { return strpos($path, "\0") !== false; }
+/** Treat a dangling symlink as an occupied path, unlike file_exists(). */
+function pmssPathExistsOrLink(string $path): bool { return file_exists($path) || is_link($path); }
 function pmssRegularFilePathIsReadable(string $path): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && is_file($path) && !is_link($path); }
 
 /** Lock and other write targets must be plain files; refuse symlinks and device paths. */

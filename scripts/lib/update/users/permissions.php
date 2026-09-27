@@ -41,7 +41,7 @@ function pmssUserRefreshPermissions(array $ctx): void
     $rcCustomPath = "{$home}/.rtorrent.rc.custom";
     $rcCustomContent = pmssReadRegularFileContents($rcCustomPath);
     // Seed only genuinely absent paths; retain every existing-file migration guard.
-    if ((!file_exists($rcCustomPath) && !is_link($rcCustomPath)) || (is_string($rcCustomContent)
+    if (!pmssPathExistsOrLink($rcCustomPath) || (is_string($rcCustomContent)
         && in_array(sha1($rcCustomContent), [
             '81d37b0b09345e3bfa5c2e79e66a3ef055f65905',
             'dcf21704d49910d1670b3fdd04b37e640b755889',

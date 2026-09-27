@@ -20,7 +20,7 @@ if (pmssAppVersionInstalledMatches('/usr/bin/syncthing', ['/usr/bin/syncthing ve
     return;
 }
 
-if (file_exists('/usr/bin/syncthing') || is_link('/usr/bin/syncthing')) {
+if (pmssPathExistsOrLink('/usr/bin/syncthing')) {
     if (!pmssPinnedRemoteStaleBinaryRemove('/usr/bin/syncthing', 'Syncthing')) {
         return;
     }

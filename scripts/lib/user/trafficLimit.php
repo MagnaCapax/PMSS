@@ -105,7 +105,7 @@ function pmssTrafficLimitHomeArtifactReconcile(
     if (pmssRegularFilePathIsReadable($homeLimitPath)) {
         return true;
     }
-    if (file_exists($homeLimitPath) || is_link($homeLimitPath)) {
+    if (pmssPathExistsOrLink($homeLimitPath)) {
         $log('traffic limit home artifact skipped: unsafe existing .trafficLimit target');
         return false;
     }

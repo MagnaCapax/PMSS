@@ -42,7 +42,7 @@ function pmssRtorrentPortReserve(string $directoryBase, $type, $rangeStart = 200
         }
         $handle = @fopen($path, 'x');
         if ($handle === false) {
-            if (file_exists($path) || is_link($path)) {
+            if (pmssPathExistsOrLink($path)) {
                 continue;
             }
             throw new RuntimeException('Unable to reserve port file: '.$path);

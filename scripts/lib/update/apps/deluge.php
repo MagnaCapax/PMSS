@@ -61,7 +61,7 @@ function pmssEnsureDelugeCommandSymlink(string $command, string $systemPath, str
         return false;
     }
 
-    if (file_exists($localPath) || is_link($localPath)) {
+    if (pmssPathExistsOrLink($localPath)) {
         if ($dryRun) {
             $log('[DRYRUN] Would replace legacy Deluge command path: '.$localPath);
             return true;

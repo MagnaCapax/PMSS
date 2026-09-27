@@ -173,8 +173,7 @@ function pmssUserWebRootReconcileCopyEntry(
         foreach (pmssDirectoryEntriesRead($source) ?: [] as $child) {
             $childRelative = $relative === '' ? $child : $relative.'/'.$child;
             $baselineShare = strpos($childRelative, 'rutorrent/share') === 0
-                && !file_exists(rtrim($home, '/').'/.local/share/pmss/rutorrent/share')
-                && !is_link(rtrim($home, '/').'/.local/share/pmss/rutorrent/share');
+                && !pmssPathExistsOrLink(rtrim($home, '/').'/.local/share/pmss/rutorrent/share');
             if (pmssUserWebRootReconcileMergeExcluded($childRelative) && !$baselineShare) {
                 continue;
             }
@@ -184,7 +183,7 @@ function pmssUserWebRootReconcileCopyEntry(
         }
         return true;
     }
-    if (!is_file($source) || file_exists($target) || is_link($target)) {
+    if (!is_file($source) || pmssPathExistsOrLink($target)) {
         return false;
     }
 

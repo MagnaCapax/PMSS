@@ -21,7 +21,7 @@ function pmssAiToolsCodexFallbackConfigEnsure(bool $dryRun, ?callable $logger = 
     if ($dryRun || is_file($path)) {
         return;
     }
-    if (is_link($path) || file_exists($path)) {
+    if (pmssPathExistsOrLink($path)) {
         $log('[WARN] Refusing to write Codex fallback config: unsafe target exists.');
         return;
     }

@@ -84,7 +84,7 @@ function pmssPortManagerAssignmentContext(string $user, string $service, ?string
         return null;
     }
     $portFile = $portDir.'/'.$service.'-'.$user;
-    $present = file_exists($portFile) || is_link($portFile);
+    $present = pmssPathExistsOrLink($portFile);
     if ($present && !pmssPortManagerAssignmentPathIsSafe($portDir, $portFile)) {
         $status = 'unsafe_existing_assignment';
         return null;

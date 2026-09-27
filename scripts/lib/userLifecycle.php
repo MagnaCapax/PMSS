@@ -177,8 +177,8 @@ function pmssUserLifecycleRequireUserRoots(array $argv, string $scriptName, stri
 /** Validate active/suspended web roots and return their marker state. */
 function pmssUserLifecycleRequireWebRootState(string $action, string $username, string $homeDir, string $activeRoot, string $disabledRoot): array
 {
-    $activeRootExists = file_exists($activeRoot) || is_link($activeRoot);
-    $disabledRootExists = file_exists($disabledRoot) || is_link($disabledRoot);
+    $activeRootExists = pmssPathExistsOrLink($activeRoot);
+    $disabledRootExists = pmssPathExistsOrLink($disabledRoot);
     $rootSpecs = array(
         array('exists' => $activeRootExists, 'path' => $activeRoot, 'basename' => 'www', 'message' => 'Refusing unsafe active web root'),
         array('exists' => $disabledRootExists, 'path' => $disabledRoot, 'basename' => 'www-disabled', 'message' => 'Refusing unsafe suspended web root'),

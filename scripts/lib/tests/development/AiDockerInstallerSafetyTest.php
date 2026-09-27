@@ -9,7 +9,7 @@ class AiDockerInstallerSafetyTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/aiToolsInstall.php', [
             'function pmssAiToolsCodexFallbackConfigEnsure(bool $dryRun, ?callable $logger = null): void',
-            "is_link(\$path) || file_exists(\$path)",
+            "pmssPathExistsOrLink(\$path)",
             'Refusing to write Codex fallback config: unsafe target exists.',
             '@file_put_contents($path, $content) === false',
             'Unable to write Codex fallback config.',

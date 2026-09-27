@@ -79,7 +79,7 @@ function pmssTrafficLimitMarkerTouch(string $user, string $path): bool
 
 function pmssTrafficLimitMarkerRemove(string $user, string $path): bool
 {
-    if (!file_exists($path) && !is_link($path)) {
+    if (!pmssPathExistsOrLink($path)) {
         return true;
     }
     if (!pmssTrafficLimitMarkerPathIsSafe($path)) {
@@ -142,7 +142,7 @@ function pmssTrafficLimitThrottleOrphanReconcile(
         return false;
     }
     $throttleFile = pmssTrafficLimitThrottleFilePath($user, $homeRoot);
-    if (file_exists($enabledMarkerPath) || is_link($enabledMarkerPath)
+    if (pmssPathExistsOrLink($enabledMarkerPath)
         || $throttleFile === null || !pmssRegularFilePathIsReadable($throttleFile)) {
         return true;
     }

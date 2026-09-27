@@ -115,7 +115,7 @@ function pmssCreateManagedPathBackup(string $path, string $label, callable $logg
 {
     for ($attempt = 0; $attempt < 10; $attempt++) {
         $backup = pmssManagedPathBackupCandidate($path, $timestamp, $attempt);
-        if (file_exists($backup) || is_link($backup)) {
+        if (pmssPathExistsOrLink($backup)) {
             continue;
         }
         if (!pmssManagedPathIsSafe($backup, $label.' backup', $logger)) {
@@ -131,7 +131,7 @@ function pmssCreateManagedPathBackup(string $path, string $label, callable $logg
         $target = @fopen($backup, 'xb');
         if (!is_resource($target)) {
             @fclose($source);
-            if (file_exists($backup) || is_link($backup)) {
+            if (pmssPathExistsOrLink($backup)) {
                 continue;
             }
             $logger('[WARN] Unable to create '.$label.' backup at '.$backup);

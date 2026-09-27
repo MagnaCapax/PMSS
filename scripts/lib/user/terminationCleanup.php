@@ -19,17 +19,12 @@ function pmssTerminateUserRejectUnsafePath(string $username, string $phase, stri
     return true;
 }
 
-function pmssTerminateUserPathExistsOrLink(string $path): bool
-{
-    return file_exists($path) || is_link($path);
-}
-
 function pmssTerminateUserUnlinkPath(string $username, string $phase, string $path, bool $dryRun): bool
 {
     if (pmssTerminateUserRejectUnsafePath($username, $phase, $path, 'Refusing unsafe file path')) {
         return false;
     }
-    if (!pmssTerminateUserPathExistsOrLink($path)) {
+    if (!pmssPathExistsOrLink($path)) {
         return true;
     }
     if ($dryRun) {
@@ -198,7 +193,7 @@ function pmssTerminateUserReleaseRtorrentPortReservations(string $username, stri
     $ok = true;
     foreach ($ports as $type => $port) {
         $filePath = $portsBase.'/'.$type.'/'.$port;
-        if (!pmssTerminateUserPathExistsOrLink($filePath)) {
+        if (!pmssPathExistsOrLink($filePath)) {
             continue;
         }
         $ok = pmssTerminateUserUnlinkPath($username, 'release_rtorrent_'.$type.'_port', $filePath, $dryRun) && $ok;
