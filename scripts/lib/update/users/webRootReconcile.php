@@ -220,20 +220,7 @@ function pmssUserWebRootReconcileMergeEntry(
         pmssUserWebRootMigrationLog($user, $logger, 'Refusing conflicting web-root path: '.$relative);
         return;
     }
-    if (is_dir($target)) {
-        if (is_link($target)) {
-            pmssUserWebRootMigrationLog($user, $logger, 'Refusing symlinked web-root directory: '.$relative);
-            return;
-        }
-        foreach (pmssDirectoryEntriesRead($source) ?: [] as $child) {
-            $childRelative = $relative === '' ? $child : $relative.'/'.$child;
-            if (!pmssUserWebRootReconcileMergeExcluded($childRelative)) {
-                pmssUserWebRootReconcileMergeEntry($source.'/'.$child, $target.'/'.$child, $home, $user, $logger, $childRelative, $stats);
-            }
-        }
-        return;
-    }
-    if (file_exists($target)) {
+    if (!is_dir($target) && file_exists($target)) {
         $conflict = is_link($source) || is_dir($source) || !is_file($source);
         if (!$conflict) {
             $sourceHash = @hash_file('sha256', $source);
@@ -245,46 +232,47 @@ function pmssUserWebRootReconcileMergeEntry(
             : 'Preserving existing web-root path: ').$relative);
         return;
     }
-    if (!pmssPathSegmentsAreSafe(dirname($target), false, false)) {
-        pmssUserWebRootMigrationLog($user, $logger, 'Refusing unsafe web-root parent: '.dirname($target));
-        return;
-    }
-
-    $stat = @lstat($source);
-    if (!is_array($stat)) {
-        return;
-    }
-    if (is_link($source)) {
-        $linkTarget = @readlink($source);
-        if (is_string($linkTarget)
-            && pmssUserWebRootReconcileLinkTargetIsSafe($target, $linkTarget, $home)
-            && @symlink($linkTarget, $target)) {
+    if (!is_dir($target)) {
+        if (!pmssPathSegmentsAreSafe(dirname($target), false, false)) {
+            pmssUserWebRootMigrationLog($user, $logger, 'Refusing unsafe web-root parent: '.dirname($target));
             return;
         }
-        pmssUserWebRootMigrationLog($user, $logger, 'Refusing unsafe skeleton symlink: '.$relative);
-        return;
-    }
-    if (is_dir($source)) {
-        if (@mkdir($target, $stat['mode'] & 07777)) {
-            @chmod($target, $stat['mode'] & 07777);
-            if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-                @chown($target, $user);
-                @chgrp($target, $user);
-            }
-            foreach (pmssDirectoryEntriesRead($source) ?: [] as $child) {
-                $childRelative = $relative.'/'.$child;
-                if (!pmssUserWebRootReconcileMergeExcluded($childRelative)) {
-                    pmssUserWebRootReconcileMergeEntry($source.'/'.$child, $target.'/'.$child, $home, $user, $logger, $childRelative, $stats);
-                }
-            }
+        $stat = @lstat($source);
+        if (!is_array($stat)) {
+            return;
         }
-        return;
+        if (is_link($source)) {
+            $linkTarget = @readlink($source);
+            if (is_string($linkTarget)
+                && pmssUserWebRootReconcileLinkTargetIsSafe($target, $linkTarget, $home)
+                && @symlink($linkTarget, $target)) {
+                return;
+            }
+            pmssUserWebRootMigrationLog($user, $logger, 'Refusing unsafe skeleton symlink: '.$relative);
+            return;
+        }
+        if (!is_dir($source)) {
+            if (is_file($source)) {
+                pmssUserWebRootReconcileInstallFile($source, $target, $stat['mode'] & 07777, true, $stats);
+            }
+            return;
+        }
+        if (!@mkdir($target, $stat['mode'] & 07777)) {
+            return;
+        }
+        // Existing and newly created directories now share the same child walk.
+        @chmod($target, $stat['mode'] & 07777);
+        if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
+            @chown($target, $user);
+            @chgrp($target, $user);
+        }
     }
-    if (!is_file($source)) {
-        return;
+    foreach (pmssDirectoryEntriesRead($source) ?: [] as $child) {
+        $childRelative = $relative === '' ? $child : $relative.'/'.$child;
+        if (!pmssUserWebRootReconcileMergeExcluded($childRelative)) {
+            pmssUserWebRootReconcileMergeEntry($source.'/'.$child, $target.'/'.$child, $home, $user, $logger, $childRelative, $stats);
+        }
     }
-
-    pmssUserWebRootReconcileInstallFile($source, $target, $stat['mode'] & 07777, true, $stats);
 }
 
 /** Customer-owned paths are restored by the migration/link helper, never skel-merged. */
@@ -417,11 +405,7 @@ function pmssUserReconcileWebRoot(array $ctx, ?callable $logger = null): bool
             ? pmssUserWebRootReconcileFull($www, $skeleton, $home, $user, $runLogger, $stats)
             : true;
         if (!$fullRestore) {
-            foreach (pmssDirectoryEntriesRead($skeleton) ?: [] as $child) {
-                if (!pmssUserWebRootReconcileMergeExcluded($child)) {
-                    pmssUserWebRootReconcileMergeEntry($skeleton.'/'.$child, $www.'/'.$child, $home, $user, $runLogger, $child, $stats);
-                }
-            }
+            pmssUserWebRootReconcileMergeEntry($skeleton, $www, $home, $user, $runLogger, '', $stats);
         }
         if (!$result) {
             $reason = 'restore-failed';

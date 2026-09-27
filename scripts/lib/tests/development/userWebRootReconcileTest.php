@@ -133,6 +133,26 @@ class UserWebRootReconcileTest extends TestCase
             $this->pmssReconcileSummary($messages)
         );
     }
+    public function testPartialMergeUsesOneTraversalForExistingAndNewDirectories(): void
+    {
+        $this->pmssWriteFile($this->skeleton.'/existing/new/managed.php', 'managed-existing');
+        $this->pmssWriteFile($this->skeleton.'/fresh/nested/managed.php', 'managed-fresh');
+        $this->pmssWriteFile($this->skeleton.'/fresh/nested/second.php', 'second');
+        $this->pmssWriteFile($this->home.'/www/existing/customer.php', 'customer');
+        $this->pmssWriteFile($this->home.'/www/index.php', 'customer-panel');
+
+        $messages = [];
+        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+        $this->assertSame('customer', file_get_contents($this->home.'/www/existing/customer.php'));
+        $this->assertSame('customer-panel', file_get_contents($this->home.'/www/index.php'));
+        $this->assertSame('managed-existing', file_get_contents($this->home.'/www/existing/new/managed.php'));
+        $this->assertSame('managed-fresh', file_get_contents($this->home.'/www/fresh/nested/managed.php'));
+        $this->assertSame('second', file_get_contents($this->home.'/www/fresh/nested/second.php'));
+        $this->assertMatches(
+            '/web_root_reconcile reason=managed-entry-check mode=partial-merge files_restored=5 duration_ms=[0-9]+ preserved_conflict=1/',
+            $this->pmssReconcileSummary($messages)
+        );
+    }
     public function testPerUserLockSkipsWithoutChangingRoot(): void
     {
         $lockDir = getenv('PMSS_USER_WEB_ROOT_LOCK_DIR');
