@@ -179,6 +179,29 @@ class UserDockerCgroupDriverTest extends TestCase
         $this->assertTrue(\pmssUserRootlessDockerStoreExists($home.'/linked-store/'));
     }
 
+    public function testSymlinkedStoreEntryCountsAsExistingStore(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+        $store = $home.'/store';
+        mkdir($store);
+        symlink($home.'/missing-target', $store.'/containerd');
+
+        $this->assertTrue(\pmssUserRootlessDockerStoreExists($store));
+    }
+
+    public function testConfiguredDataRootOutsideHomeIsNotScanned(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+        $outside = $this->pmssMakeTempDir('pmss-other-store-');
+        symlink($outside, $home.'/linked-store');
+
+        foreach ([$outside, $home.'/linked-store', $outside.'/missing-store'] as $configured) {
+            $dataRoot = \pmssUserRootlessDockerDataRoot($home, ['data-root' => $configured]);
+            $this->assertSame('', $dataRoot);
+            $this->assertTrue($dataRoot === '' || \pmssUserRootlessDockerStoreExists($dataRoot));
+        }
+    }
+
     public function testEmptyAndMissingDataRootsUseInitialDriverPolicy(): void
     {
         foreach (['missing', 'empty'] as $state) {

@@ -13,12 +13,16 @@ function pmssUserRootlessDockerConfigTargetIsSafe(string $configFile): bool
         && (!file_exists($configFile) || is_file($configFile));
 }
 
-/** Resolve Docker's data-root from a decoded daemon config or its default. */
+/** Resolve Docker's data-root; an unsafe configured root returns an empty path. */
 function pmssUserRootlessDockerDataRoot(string $home, array $config): string
 {
     $configured = $config['data-root'] ?? null;
     if (is_string($configured) && $configured !== '' && $configured[0] === '/' && strpos($configured, "\0") === false) {
-        return $configured;
+        $realHome = realpath($home);
+        $realRoot = realpath($configured);
+        // Resolve the final component too: a data-root symlink may leave the home.
+        return $realHome !== false && $realRoot !== false
+            && strpos($realRoot, rtrim($realHome, '/').'/') === 0 ? $configured : '';
     }
     return rtrim($home, '/').'/.local/share/docker';
 }
@@ -35,7 +39,10 @@ function pmssUserRootlessDockerStoreExists(string $dataRoot): bool
     }
     foreach (['containerd', 'image', 'overlay2', 'fuse-overlayfs', 'vfs', 'containers'] as $entry) {
         $path = $dataRoot.'/'.$entry;
-        if (!is_link($path) && is_dir($path)) {
+        if (is_link($path)) {
+            return true;
+        }
+        if (is_dir($path)) {
             $contents = @scandir($path);
             if (is_array($contents) && count($contents) > 2) {
                 return true;

@@ -262,7 +262,7 @@ function pmssEnsureDockerDependencies(string $user): void
     $hasConfigFile = is_file($configFile);
     $config = !$hasConfigFile || is_link($configFile) ? null : pmssJsonDecodeAssoc((string) @file_get_contents($configFile));
     $dataRoot = pmssUserRootlessDockerDataRoot($home, $config ?? []);
-    $storeExists = pmssUserRootlessDockerStoreExists($dataRoot);
+    $storeExists = $dataRoot === '' || pmssUserRootlessDockerStoreExists($dataRoot);
     if ($storeExists) {
         pmssUserLog($user, '[INFO] Existing Docker store found; storage backend left unchanged');
     }
