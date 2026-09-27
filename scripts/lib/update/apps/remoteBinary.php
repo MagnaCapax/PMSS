@@ -12,6 +12,25 @@ function pmssPinnedRemoteAmd64ArtifactsSupported(?string $architecture = null): 
     return in_array($architecture ?? php_uname('m'), ['x86_64', 'amd64'], true);
 }
 
+/** Remove a stale managed binary only when its path is safe and removal succeeds. */
+function pmssPinnedRemoteStaleBinaryRemove(string $path, string $label): bool
+{
+    if (!pmssPathTargetIsSafe($path, false, true)) {
+        logmsg("[WARN] Refusing unsafe {$label} binary path");
+        return false;
+    }
+
+    if (!file_exists($path) && !is_link($path)) {
+        return true;
+    }
+    if (!@unlink($path)) {
+        logmsg("[WARN] Unable to remove stale {$label} binary; leaving existing install in place");
+        return false;
+    }
+
+    return true;
+}
+
 /** Reject archive basenames that could become shell options, path escapes, or log controls. */
 function pmssPinnedRemoteArchiveComponentIsSafe(string $component): bool
 {

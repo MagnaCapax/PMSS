@@ -21,7 +21,9 @@ if (pmssAppVersionInstalledMatches('/usr/bin/syncthing', ['/usr/bin/syncthing ve
 }
 
 if (file_exists('/usr/bin/syncthing') || is_link('/usr/bin/syncthing')) {
-    @unlink('/usr/bin/syncthing');
+    if (!pmssPinnedRemoteStaleBinaryRemove('/usr/bin/syncthing', 'Syncthing')) {
+        return;
+    }
 }
 echo "*** Syncthing not present, downloading and adding!\n";
 

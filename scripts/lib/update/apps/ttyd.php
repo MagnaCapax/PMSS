@@ -33,7 +33,9 @@ if (pmssAppVersionInstalledMatches('/usr/bin/ttyd', ['/usr/bin/ttyd --version 2>
 
 // Replace any stale/older copy before installing the pinned version.
 if (file_exists('/usr/bin/ttyd') || is_link('/usr/bin/ttyd')) {
-    @unlink('/usr/bin/ttyd');
+    if (!pmssPinnedRemoteStaleBinaryRemove('/usr/bin/ttyd', 'ttyd')) {
+        return;
+    }
 }
 
 pmssPinnedRemoteArtifactTempFileUse('ttyd '.$ttydVersion, $ttydUrl, $ttydSha256, static function (string $tmp) use ($ttydVersion): void {

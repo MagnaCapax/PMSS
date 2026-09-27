@@ -6,6 +6,26 @@ require_once dirname(__DIR__, 2).'/update/apps/remoteBinary.php';
 
 class RemoteBinaryHelperTest extends TestCase
 {
+    public function testStaleBinaryRemovalGuardsUnsafeAndFailedTargets(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-stale-binary-');
+        $target = $root.'/binary';
+        $link = $root.'/link';
+        $directory = $root.'/directory';
+        file_put_contents($target, 'old binary');
+        symlink($target, $link);
+        mkdir($directory);
+
+        $this->assertFalse(\pmssPinnedRemoteStaleBinaryRemove($link, 'test'));
+        $this->assertTrue(is_link($link));
+        $this->assertFalse(\pmssPinnedRemoteStaleBinaryRemove($directory, 'test'));
+        $this->assertTrue(is_dir($directory));
+        $this->assertFalse(\pmssPinnedRemoteStaleBinaryRemove($root.'/../escape', 'test'));
+        $this->assertTrue(\pmssPinnedRemoteStaleBinaryRemove($target, 'test'));
+        $this->assertFalse(file_exists($target));
+        $this->assertTrue(\pmssPinnedRemoteStaleBinaryRemove($target, 'test'));
+    }
+
     public function testAppVersionProbeOutputReturnsStdoutForSuccessfulProbe(): void
     {
         $output = \pmssAppVersionProbeOutput('/usr/bin/printf %s '.escapeshellarg('tool version 1.2.3'), 5);
