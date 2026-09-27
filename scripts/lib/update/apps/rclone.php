@@ -49,12 +49,8 @@ function pmssRcloneInstallFromZip(string $version): void
         return;
     }
 
-    if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
-        runStep('Installing rclone '.$version, pmssRcloneInstallCommand($version, '/tmp/pmss-rclone-dry-run'));
-        return;
-    }
-
-    $workDir = pmssCreatePrivateTempDir('pmss-rclone-');
+    $dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
+    $workDir = $dryRun ? '/tmp/pmss-rclone-dry-run' : pmssCreatePrivateTempDir('pmss-rclone-');
     if ($workDir === null) {
         logmsg('[WARN] Unable to create private rclone installer workspace');
         return;
@@ -63,27 +59,22 @@ function pmssRcloneInstallFromZip(string $version): void
     try {
         runStep('Installing rclone '.$version, pmssRcloneInstallCommand($version, $workDir));
     } finally {
-        pmssRemovePrivateTempDir($workDir, 'pmss-rclone-', 'Cleaning rclone installer workspace', 'logmsg');
+        if (!$dryRun) {
+            pmssRemovePrivateTempDir($workDir, 'pmss-rclone-', 'Cleaning rclone installer workspace', 'logmsg');
+        }
     }
 }
 
 // Version pinning keeps deployments reproducible; opt-in fetch updates on demand.
 $rcloneVersion = '1.69.1';
-$fetchedLatest = false;
 if (pmssEnvFlagEnabled('PMSS_RCLONE_FETCH_LATEST')) {
     $latestVersion = pmssRcloneLatestVersionFetch(['https://downloads.rclone.org/version.txt', 'https://rclone.org/downloads/']);
-    if ($latestVersion !== null) {
-        $rcloneVersion = $latestVersion;
-        $fetchedLatest = true;
-    }
-    if (!$fetchedLatest) {
+    if ($latestVersion === null) {
         echo "Warning: Unable to determine latest rclone version, falling back to pinned release.\n";
+    } else {
+        $rcloneVersion = $latestVersion;
+        echo "Requested latest rclone release: {$rcloneVersion}\n";
     }
-}
-
-# Optional info when a newer version is requested
-if ($fetchedLatest) {
-    echo "Requested latest rclone release: {$rcloneVersion}\n";
 }
 $currentRclone = file_exists('/usr/bin/rclone')
     ? pmssAppVersionProbeMatch(['/usr/bin/rclone version 2>/dev/null', '/usr/bin/rclone -V 2>/dev/null'], '/rclone v?(\d+\.\d+\.\d+)/i', 1)

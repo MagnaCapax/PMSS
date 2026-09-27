@@ -27,8 +27,7 @@ function pmssPinnedRemoteArchiveComponentIsSafe(string $component): bool
 /** Reject post-extract shell fragments that would break the generated command chain. */
 function pmssPinnedRemoteArchivePostCommandIsSafe(string $command): bool
 {
-    $trimmed = trim($command);
-    return $trimmed !== ''
+    return trim($command) !== ''
         && strpos($command, "\0") === false
         && preg_match('/[\r\n]/', $command) !== 1
         && strpos($command, ';') === false
@@ -61,7 +60,7 @@ function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expe
         }
     }
 
-    $result = pmssPinnedRemoteArtifactTempFileUse($label, $url, $expectedSha256, static function (string $archivePath) use ($archiveName, $sourceDir, $description, $postExtractCommands, $workDir): bool {
+    return pmssPinnedRemoteArtifactTempFileUse($label, $url, $expectedSha256, static function (string $archivePath) use ($archiveName, $sourceDir, $description, $postExtractCommands, $workDir): bool {
         $tarMode = substr($archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf';
         $commands = ['set -e', 'mkdir -p '.escapeshellarg($workDir), 'cd '.escapeshellarg($workDir),
             'rm -rf '.escapeshellarg($sourceDir).' '.escapeshellarg($archiveName),
@@ -70,8 +69,7 @@ function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expe
             $commands[] = $command;
         }
         return runStep($description, implode(' && ', $commands)) === 0;
-    });
-    return $result === true;
+    }) === true;
 }
 
 /** Install a verified remote binary, refreshing only when needed. */
@@ -106,7 +104,7 @@ function pmssInstallPinnedRemoteBinary(
         }
 
         $actualSha = pmssPinnedRemoteChecksum($destination);
-        if ($actualSha === '' || $actualSha !== $expectedSha256) {
+        if ($actualSha !== $expectedSha256) {
             logMessage("[WARN] {$label} installed checksum mismatch; expected {$expectedSha256}, got ".($actualSha ?: 'unknown'));
         }
     });
