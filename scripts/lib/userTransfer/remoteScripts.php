@@ -6,6 +6,8 @@
  * @license GPL-3.0-only
  */
 
+require_once __DIR__.'/../user/dockerContainerIds.php';
+
 function pmssUserTransferScratchPaths(string $scratchRoot): array
 {
     $scratchRoot = rtrim($scratchRoot, '/');
@@ -104,11 +106,7 @@ function pmssUserTransferBuildDockerStartScript(array $cfg, array $ids): string
     if ($ids === [] || count($ids) > 500) {
         throw new RuntimeException('Invalid Docker container ID set');
     }
-    foreach ($ids as $id) {
-        if (!is_string($id) || preg_match('/^[0-9a-f]{64}$/D', $id) !== 1) {
-            throw new RuntimeException('Invalid Docker container ID');
-        }
-    }
+    if (!pmssUserDockerContainerIdsValid($ids)) throw new RuntimeException('Invalid Docker container ID');
     $remote = 'DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock docker start '
         .implode(' ', array_map('escapeshellarg', $ids)).' >/dev/null 2>&1';
     return "#!/bin/bash\nset -e\numask 077\n".pmssUserTransferBuildSshProbeCommand($cfg, $remote)."\n";
@@ -117,12 +115,10 @@ function pmssUserTransferBuildDockerStartScript(array $cfg, array $ids): string
 /** Keep unique, exact Docker IDs in source order and within the source cap. */
 function pmssUserTransferValidDockerIds(string $raw, int $max = 500): array
 {
-    if ($max < 1) {
-        return [];
-    }
+    if ($max < 1) return [];
     $ids = [];
     foreach (explode("\n", $raw) as $line) {
-        if (preg_match('/^[0-9a-f]{64}$/D', $line) !== 1 || isset($ids[$line])) {
+        if (!pmssUserDockerContainerIdValid($line) || isset($ids[$line])) {
             continue;
         }
         $ids[$line] = true;
