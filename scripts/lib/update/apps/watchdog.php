@@ -35,14 +35,13 @@ if (!is_file($configTemplate) || !is_file($scriptTemplate)) {
     return;
 }
 
-if (!pmssWatchdogRunRequiredStep('Ensuring watchdog script directory exists', pmssBuildCommand('mkdir', ['-p', $scriptDir]))) {
-    return;
-}
-if (!pmssWatchdogRunRequiredStep('Installing watchdog configuration', pmssBuildCommand('install', ['-m', '0644', $configTemplate, '/etc/watchdog.conf']))) {
-    return;
-}
-if (!pmssWatchdogRunRequiredStep('Installing watchdog network check', pmssBuildCommand('install', ['-m', '0755', $scriptTemplate, $scriptTarget]))) {
-    return;
+// Keep preparation ordered and stop before activation if any required step fails.
+foreach ([
+    ['Ensuring watchdog script directory exists', pmssBuildCommand('mkdir', ['-p', $scriptDir])],
+    ['Installing watchdog configuration', pmssBuildCommand('install', ['-m', '0644', $configTemplate, '/etc/watchdog.conf'])],
+    ['Installing watchdog network check', pmssBuildCommand('install', ['-m', '0755', $scriptTemplate, $scriptTarget])],
+] as [$description, $command]) {
+    if (!pmssWatchdogRunRequiredStep($description, $command)) return;
 }
 
 $device = is_file('/dev/watchdog') ? '/dev/watchdog' : (is_file('/dev/watchdog0') ? '/dev/watchdog0' : '');

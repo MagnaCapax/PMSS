@@ -199,7 +199,7 @@ table only tracks external/non-Debian sources.
 | `rtorrent.php` | Rebuilds rTorrent/libtorrent (plus xmlrpc-c), refreshes templates, restarts daemons. | Fetches pinned tarballs from `https://pulsedmedia.com/remote/pkg/` with SHA256 verification, checks out xmlrpc-c via SourceForge SVN; needs build toolchain. |
 | `syncthing.php` | Ensures syncthing binary matches the pinned amd64 release. | Fetches the pinned upstream tarball from GitHub over HTTPS, verifies SHA256, and installs `syncthing` into `/usr/bin`. |
 | `vnstat.php` | Installs/configures vnStat for the detected uplink. | Uses Debian APT; depends on `scripts/lib/networkInfo.php` for interface info. |
-| `watchdog.php` | Disables and removes the distro watchdog daemon. | APT operations only; no external downloads. |
+| `watchdog.php` | Installs the managed watchdog configuration and network check, then enables the service when a device exists. | Uses local templates and systemd; no external downloads. |
 | `wireguard.php` | Generates WireGuard keys/configs, publishes README, distributes to user homes. | Requires `wg` binaries (from package phase), templates `template.wireguard.*`, and queries `https://pulsedmedia.com/remote/myip.php` for endpoint detection. |
 
 Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely on the system interpreter; track them for future virtualenv migrations so pip activity stays isolated per app.

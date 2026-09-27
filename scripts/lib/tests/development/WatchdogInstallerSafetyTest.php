@@ -11,9 +11,10 @@ class WatchdogInstallerSafetyTest extends TestCase
             'function pmssWatchdogRunRequiredStep(string $description, string $command): bool',
             'runStep($description, $command) === 0',
             "logMessage('[WARN] '.\$description.' failed; leaving watchdog service disabled.');",
-            "if (!pmssWatchdogRunRequiredStep('Ensuring watchdog script directory exists'",
-            "if (!pmssWatchdogRunRequiredStep('Installing watchdog configuration'",
-            "if (!pmssWatchdogRunRequiredStep('Installing watchdog network check'",
+            "['Ensuring watchdog script directory exists'",
+            "['Installing watchdog configuration'",
+            "['Installing watchdog network check'",
+            'if (!pmssWatchdogRunRequiredStep($description, $command)) return;',
         ]);
     }
 
