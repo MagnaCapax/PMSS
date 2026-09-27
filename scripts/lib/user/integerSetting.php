@@ -103,7 +103,7 @@ function pmssIntegerSettingPathModeConverge(string $path, int $mode): bool
 
 function pmssIntegerSettingFileRemove(string $path): bool
 {
-    if (is_link($path) || (file_exists($path) && !is_file($path))) {
+    if (!pmssLockFilePathIsSafe($path)) {
         return false;
     }
 

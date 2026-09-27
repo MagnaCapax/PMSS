@@ -100,9 +100,7 @@ function pmssLogWritePathIsSafe(string $path): bool
         return false;
     }
 
-    if (!pmssPathSegmentsAreSafe($path, true)
-        || is_link($path)
-        || (file_exists($path) && !is_file($path))) {
+    if (!pmssPathSegmentsAreSafe($path, true) || !pmssLockFilePathIsSafe($path)) {
         return false;
     }
 

@@ -87,7 +87,7 @@ function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool 
     }
 
     $customFile = $homeDir.'/.lighttpd/custom';
-    if (is_link($customFile) || (file_exists($customFile) && !is_file($customFile))) {
+    if (!pmssLockFilePathIsSafe($customFile)) {
         return false;
     }
 

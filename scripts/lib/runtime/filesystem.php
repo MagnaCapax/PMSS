@@ -95,7 +95,7 @@ function pmssRemovePrivateTempDir(string $path, string $prefix, string $descript
 function pmssFilesystemPathHasNulByte(string $path): bool { return strpos($path, "\0") !== false; }
 function pmssRegularFilePathIsReadable(string $path): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && is_file($path) && !is_link($path); }
 
-/** Lock files must be plain files; refuse symlinks and device paths. */
+/** Lock and other write targets must be plain files; refuse symlinks and device paths. */
 function pmssLockFilePathIsSafe(string $path): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && !is_link($path) && (!file_exists($path) || is_file($path)); }
 
 /** Confirm an opened stream still points at a path or supplied path snapshot. */

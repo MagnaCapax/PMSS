@@ -67,7 +67,7 @@ function pmssPortManagerAssignmentPathIsSafe(string $portDir, string $portFile):
     if ($portDir === '' || dirname($portFile) !== $portDir) {
         return false;
     }
-    return is_dir($portDir) && !is_link($portDir) && !is_link($portFile) && (!file_exists($portFile) || is_file($portFile));
+    return is_dir($portDir) && !is_link($portDir) && pmssLockFilePathIsSafe($portFile);
 }
 
 /**

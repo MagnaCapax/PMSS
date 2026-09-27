@@ -99,7 +99,7 @@ function pmssLighttpdApplyPhpIniContent(string $content, string $user, int $memo
 function pmssLighttpdSyncPhpIni(string $phpIniPath, string $user, int $memoryLimitMiB, &$failureReason = null): bool
 {
     $failureReason = '';
-    if (is_link($phpIniPath) || (file_exists($phpIniPath) && !is_file($phpIniPath))) {
+    if (!pmssLockFilePathIsSafe($phpIniPath)) {
         $failureReason = 'unsafe';
         return false;
     }

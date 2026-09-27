@@ -199,7 +199,7 @@ function pmssSystemStatsAppendLogLine(string $path, string $line): bool
     if ($path === '' || pmssFilesystemPathHasNulByte($path)) return false;
     if ($path[0] !== '/') return false;
     if (!pmssDirEnsureExists(dirname($path), 0755)) return false;
-    if (is_link($path) || (file_exists($path) && !is_file($path))) return false;
+    if (!pmssLockFilePathIsSafe($path)) return false;
 
     $record = rtrim($line, "\r\n")."\n";
     // A partial record must reach the cron caller's existing failure warning.

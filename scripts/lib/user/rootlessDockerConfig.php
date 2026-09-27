@@ -7,10 +7,7 @@ pmssRequireRelativeFiles(__DIR__, ['directories.php', 'log.php']);
 /** Return true when daemon.json can be read or replaced safely. */
 function pmssUserRootlessDockerConfigTargetIsSafe(string $configFile): bool
 {
-    return $configFile !== ''
-        && strpos($configFile, "\0") === false
-        && !is_link($configFile)
-        && (!file_exists($configFile) || is_file($configFile));
+    return pmssLockFilePathIsSafe($configFile);
 }
 
 /** Resolve Docker's data-root; an unsafe configured root returns an empty path. */

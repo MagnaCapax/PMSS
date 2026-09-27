@@ -194,7 +194,7 @@ function pmssWriteTorrentThrottle(string $username, int $value): bool
         return pmssIntegerSettingFileRemove($path);
     }
 
-    if (is_link($path) || (file_exists($path) && !is_file($path))) {
+    if (!pmssLockFilePathIsSafe($path)) {
         return false;
     }
 
