@@ -51,7 +51,7 @@ function pmssApplyRsyslogKernelInputRateLimit(?callable $logger = null, ?callabl
     if (
         !is_string($candidatePath)
         || $candidatePath === ''
-        || @file_put_contents($candidatePath, $candidateBody) === false
+        || @file_put_contents($candidatePath, $candidateBody) !== strlen($candidateBody)
     ) {
         if (is_string($candidatePath)) {
             @unlink($candidatePath);
@@ -60,11 +60,15 @@ function pmssApplyRsyslogKernelInputRateLimit(?callable $logger = null, ?callabl
         return;
     }
     @chmod($candidatePath, 0600);
-    $validationRc = $run(
-        'Validating rsyslog kernel input rate limit',
-        sprintf('rsyslogd -N1 -f %s', escapeshellarg($candidatePath))
-    );
-    @unlink($candidatePath);
+    try {
+        $validationRc = $run(
+            'Validating rsyslog kernel input rate limit',
+            sprintf('rsyslogd -N1 -f %s', escapeshellarg($candidatePath))
+        );
+    } finally {
+        // Validation failures must not leave a copy of the full configuration behind.
+        @unlink($candidatePath);
+    }
     if ($validationRc !== 0) {
         $log('[WARN] Rsyslog kernel input rate limit candidate failed validation; existing configuration preserved');
         return;

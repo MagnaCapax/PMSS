@@ -87,6 +87,35 @@ class RsyslogRateLimitTest extends TestCase
         $this->pmssAssertMessagesContain($messages, 'candidate failed validation', 'expected validation warning');
     }
 
+    public function testValidationExceptionRemovesCandidateAndPreservesOriginal(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-rsyslog-exception-');
+        $target = $root.'/rsyslog.conf';
+        $original = $this->stockConfig();
+        file_put_contents($target, $original);
+
+        try {
+            $this->pmssWithEnv([
+                'PMSS_RSYSLOG_CONFIG_PATH' => $target,
+                'PMSS_TEST_MODE' => '1',
+            ], function (): void {
+                \pmssApplyRsyslogKernelInputRateLimit(
+                    static function (string $message): void {},
+                    static function (string $description, string $command): int {
+                        throw new \RuntimeException('validation unavailable');
+                    }
+                );
+            });
+            $this->assertTrue(false, 'validation exception was swallowed');
+        } catch (\RuntimeException $exception) {
+            $this->assertEquals('validation unavailable', $exception->getMessage());
+        }
+
+        $this->assertEquals($original, file_get_contents($target));
+        $this->assertEquals([], glob($root.'/.pmss-rsyslog-*') ?: []);
+        $this->assertEquals([], glob($target.'.pmss-backup-*') ?: []);
+    }
+
     public function testNonstandardConfigWarnsWithoutMutation(): void
     {
         $root = $this->pmssMakeTempDir('pmss-rsyslog-custom-');
