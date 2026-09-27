@@ -38,7 +38,7 @@ function pmssSystemStatsTopMemoryFromPsRows(array $rows): string
 
         $command = (string) $parts[0];
         $rssKiB = (string) $parts[1];
-        if ($command === '' || preg_match('/[\s,:[:cntrl:]]/', $command) === 1 || !pmssSystemStatsCounterIsValid($rssKiB)) {
+        if (preg_match('/[\s,:[:cntrl:]]/', $command) === 1 || !pmssSystemStatsCounterIsValid($rssKiB)) {
             continue;
         }
 
@@ -72,9 +72,7 @@ function pmssSystemStatsTopMemoryProcesses(?callable $runner = null): string
  */
 function pmssSystemStatsLoadAverageFromRaw(?string $raw): string
 {
-    if ($raw === null) return 'na,na,na';
-
-    if (($parts = pmssConfigLineColumns($raw, 3, [])) === []) return 'na,na,na';
+    if (($parts = pmssConfigLineColumns($raw ?? '', 3, [])) === []) return 'na,na,na';
 
     $load = array_slice($parts, 0, 3);
     foreach ($load as $value) {
@@ -97,14 +95,11 @@ function pmssSystemStatsCpuCountersFromRaw(?string $raw): array
     if ($parts === [] || array_shift($parts) !== 'cpu') return [];
 
     foreach ($parts as $value) {
-        if (!is_string($value) || !pmssSystemStatsCounterIsValid($value)) return [];
+        if (!pmssSystemStatsCounterIsValid($value)) return [];
     }
 
     return array_map('intval', $parts);
 }
-
-/** Read the raw CPU tick counters from /proc/stat. */
-function pmssSystemStatsCpuCountersRead(): array { return pmssSystemStatsCpuCountersFromRaw(pmssReadRegularFileContents('/proc/stat')); }
 
 /** Format CPU iowait percentage from two /proc/stat samples. */
 function pmssSystemStatsCpuIowaitPercent(array $before, array $after): string
@@ -126,17 +121,14 @@ function pmssSystemStatsDiskIoTimeFromRaw(?string $raw): array
 
     foreach (preg_split('/\r?\n/', $raw) ?: [] as $line) {
         if (($parts = pmssConfigLineColumns($line, 13, [])) === []) continue;
-        $name = $parts[2] ?? '';
-        $ioTime = (string) ($parts[12] ?? '');
+        $name = $parts[2];
+        $ioTime = $parts[12];
         if (pmssBlockDeviceNameIsDataDevice($name) && pmssSystemStatsCounterIsValid($ioTime)) {
             $stats[$name] = (int) $ioTime;
         }
     }
     return $stats;
 }
-
-/** Read per-device busy-time counters from /proc/diskstats. */
-function pmssSystemStatsDiskIoTimeRead(): array { return pmssSystemStatsDiskIoTimeFromRaw(pmssReadRegularFileContents('/proc/diskstats')); }
 
 /** Format the busiest data-device percentage from two diskstats samples. */
 function pmssSystemStatsDiskBusyPercent(array $before, array $after, float $sampleSeconds): string
@@ -196,8 +188,7 @@ function pmssSystemStatsLogLine(array $stats, ?string $timestamp = null): string
 /** Append one system-stats log line after checking the target path shape. */
 function pmssSystemStatsAppendLogLine(string $path, string $line): bool
 {
-    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return false;
-    if ($path[0] !== '/') return false;
+    if ($path === '' || pmssFilesystemPathHasNulByte($path) || $path[0] !== '/') return false;
     if (!pmssDirEnsureExists(dirname($path), 0755)) return false;
     if (!pmssLockFilePathIsSafe($path)) return false;
 
@@ -216,11 +207,11 @@ function pmssSystemStatsCollect(): array
     // Keep this low in test mode so hermetic tests don't waste time sleeping.
     $sampleUsec = pmssTestModeEnabled() ? 50000 : 1000000;
 
-    $cpu1 = pmssSystemStatsCpuCountersRead();
-    $disk1 = pmssSystemStatsDiskIoTimeRead();
+    $cpu1 = pmssSystemStatsCpuCountersFromRaw(pmssReadRegularFileContents('/proc/stat'));
+    $disk1 = pmssSystemStatsDiskIoTimeFromRaw(pmssReadRegularFileContents('/proc/diskstats'));
     usleep($sampleUsec);
-    $cpu2 = pmssSystemStatsCpuCountersRead();
-    $disk2 = pmssSystemStatsDiskIoTimeRead();
+    $cpu2 = pmssSystemStatsCpuCountersFromRaw(pmssReadRegularFileContents('/proc/stat'));
+    $disk2 = pmssSystemStatsDiskIoTimeFromRaw(pmssReadRegularFileContents('/proc/diskstats'));
 
     $meminfo = pmssProcMeminfoFieldsRead();
 
