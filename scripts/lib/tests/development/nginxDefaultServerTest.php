@@ -3,6 +3,25 @@ namespace PMSS\Tests;
 
 class NginxDefaultServerTest extends TestCase
 {
+    public function testGlobalConfigWritesReportFailureAndPreserveSuccessfulBytes(): void
+    {
+        require_once dirname(__DIR__, 2).'/nginxConfig/setup.php';
+        $root = $this->pmssMakeTempDir('pmss-nginx-global-write-', 0700);
+        $source = $root.'/template';
+        $target = $root.'/target';
+        $this->pmssWriteFile($source, "template\n");
+
+        $this->assertTrue(\pmssCreateNginxConfigSetupCopy($source, $target));
+        $this->assertSame("template\n", file_get_contents($target));
+        $this->assertTrue(\pmssCreateNginxConfigSetupWrite($target, "rendered\n"));
+        $this->assertSame("rendered\n", file_get_contents($target));
+
+        $this->assertFalse(\pmssCreateNginxConfigSetupCopy($root.'/missing', $target));
+        $this->assertSame("rendered\n", file_get_contents($target));
+        $this->assertFalse(\pmssCreateNginxConfigSetupWrite($root.'/missing/target', 'config'));
+        $this->assertFalse(\pmssCreateNginxConfigSetupWrite($root, 'config'));
+    }
+
     public function testRegexExhaustionPreservesTemplateBytes(): void
     {
         require_once dirname(__DIR__, 2).'/nginxConfig/setup.php';

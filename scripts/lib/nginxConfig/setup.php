@@ -12,6 +12,29 @@ require_once __DIR__.'/templates.php';
 require_once __DIR__.'/../configBackups.php';
 require_once __DIR__.'/../runtime.php';
 
+/** Report failed global config writes without changing the setup flow. */
+function pmssCreateNginxConfigSetupWarn(string $operation, string $path): void
+{
+    $message = '[WARN] Failed to '.$operation.' nginx config: '.$path;
+    fwrite(STDERR, $message.PHP_EOL);
+}
+
+/** Copy a global template and report failed attempts. */
+function pmssCreateNginxConfigSetupCopy(string $source, string $target): bool
+{
+    if (@copy($source, $target)) return true;
+    pmssCreateNginxConfigSetupWarn('copy template to', $target);
+    return false;
+}
+
+/** Check the complete byte count so a short global config write is visible. */
+function pmssCreateNginxConfigSetupWrite(string $path, string $content): bool
+{
+    if (@file_put_contents($path, $content) === strlen($content)) return true;
+    pmssCreateNginxConfigSetupWarn('write', $path);
+    return false;
+}
+
 /**
  * Ensure the default nginx site defines default_server on its listen directives.
  *
@@ -57,7 +80,7 @@ function pmssCreateNginxConfigSetup(): array
         '/etc/seedbox/config/template.nginx-webdav_proxy_params' => '/etc/nginx/webdav_proxy_params',
     ] as $templatePath => $targetPath) {
         pmssBackupCriticalConfig('nginx', $targetPath);
-        @copy($templatePath, $targetPath);
+        pmssCreateNginxConfigSetupCopy($templatePath, $targetPath);
     }
 
     $serverHostname = pmssHostnameRead();
@@ -112,16 +135,16 @@ function pmssCreateNginxConfigSetup(): array
 
         $nginxConfigSiteDefault = str_replace('||SSL_SETTINGS_CONFIGURED_HERE||', (string)$nginxConfigSiteDefaultSsl, $nginxConfigSiteDefault);
         pmssBackupCriticalConfig('nginx', '/etc/nginx/sites-available/default');
-        @file_put_contents('/etc/nginx/sites-available/default', $nginxConfigSiteDefault);
+        pmssCreateNginxConfigSetupWrite('/etc/nginx/sites-available/default', $nginxConfigSiteDefault);
         $enabledDefault = '/etc/nginx/sites-enabled/default';
         if (!file_exists($enabledDefault)) {
             if (@symlink('/etc/nginx/sites-available/default', $enabledDefault) === false) {
-                @file_put_contents($enabledDefault, $nginxConfigSiteDefault);
+                pmssCreateNginxConfigSetupWrite($enabledDefault, $nginxConfigSiteDefault);
             }
         } elseif (!is_link($enabledDefault)) {
             // Keep the enabled copy in sync on hosts where default is not a symlink.
             pmssBackupCriticalConfig('nginx', $enabledDefault);
-            @file_put_contents($enabledDefault, $nginxConfigSiteDefault);
+            pmssCreateNginxConfigSetupWrite($enabledDefault, $nginxConfigSiteDefault);
         }
     }
     // Create SSL config if required!

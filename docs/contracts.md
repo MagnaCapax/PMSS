@@ -743,6 +743,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/createNginxConfig.php
   - Behavior: Regenerates nginx global and per-user config from templates; adds per-user subdomain vhosts under `/etc/nginx/conf.d/pmss-user-*.conf` when `/etc/hostname` is a valid FQDN.
+  - Global template copy and default-site write failures emit stderr warnings; setup still reaches the existing nginx config test and restart decision.
   - Reconciliation: Replaces current per-user routes atomically without deleting them first. A full run prunes genuine orphan routes only after every selected user completes without a write failure; single-user runs never prune other accounts.
   - Write failures: Keeps the previous route where it is still a safe regular file, emits a prominent warning summary, and returns non-zero only when the affected user has no serviceable primary `/etc/nginx/users/<user>` route. Intentional prerequisite skips retain their historical full-run versus single-user cleanup behavior.
   - Public proxy contract: `/public-<user>/` forwards the original scheme via `X-Forwarded-Proto` and only restores generic lighttpd redirects back under `/public-<user>/`; per-app media-stack Location rewriting stays in the user's `~/.lighttpd/custom.d/media-stack.conf` fragment, while Set-Cookie Path rewriting stays in nginx `proxy_cookie_path` rules because lighttpd `map-urlpath` does not rewrite `Set-Cookie`.
