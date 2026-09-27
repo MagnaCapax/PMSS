@@ -13,6 +13,38 @@ function pmssUserRootlessDockerConfigTargetIsSafe(string $configFile): bool
         && (!file_exists($configFile) || is_file($configFile));
 }
 
+/** Resolve Docker's data-root from a decoded daemon config or its default. */
+function pmssUserRootlessDockerDataRoot(string $home, array $config): string
+{
+    $configured = $config['data-root'] ?? null;
+    if (is_string($configured) && $configured !== '' && $configured[0] === '/' && strpos($configured, "\0") === false) {
+        return $configured;
+    }
+    return rtrim($home, '/').'/.local/share/docker';
+}
+
+/** Detect a populated Docker store without traversing a symlinked data-root. */
+function pmssUserRootlessDockerStoreExists(string $dataRoot): bool
+{
+    $dataRoot = rtrim($dataRoot, '/') ?: '/';
+    if (is_link($dataRoot)) {
+        return true;
+    }
+    if (!is_dir($dataRoot)) {
+        return false;
+    }
+    foreach (['containerd', 'image', 'overlay2', 'fuse-overlayfs', 'vfs', 'containers'] as $entry) {
+        $path = $dataRoot.'/'.$entry;
+        if (!is_link($path) && is_dir($path)) {
+            $contents = @scandir($path);
+            if (is_array($contents) && count($contents) > 2) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 /**
  * Commands that establish a persistent user runtime dir (/run/user/UID) by enabling
  * linger, so rootless dockerd can bind its API socket there. Pure builder for test coverage.

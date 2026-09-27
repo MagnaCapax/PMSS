@@ -258,14 +258,21 @@ function pmssEnsureDockerDependencies(string $user): void
 
     $fuse = pmssUserDockerFuseOverlayfsState();
     $home = $uinfo['dir'];
-    $hasConfigFile = is_file($home.'/.config/docker/daemon.json');
+    $configFile = $home.'/.config/docker/daemon.json';
+    $hasConfigFile = is_file($configFile);
+    $config = !$hasConfigFile || is_link($configFile) ? null : pmssJsonDecodeAssoc((string) @file_get_contents($configFile));
+    $dataRoot = pmssUserRootlessDockerDataRoot($home, $config ?? []);
+    $storeExists = pmssUserRootlessDockerStoreExists($dataRoot);
+    if ($storeExists) {
+        pmssUserLog($user, '[INFO] Existing Docker store found; storage backend left unchanged');
+    }
     $result = pmssUserRootlessDockerConfigConverge($user, $home, (int) $uinfo['uid'], (int) $uinfo['gid'], [
-        'storage_driver' => $fuse['available'] ? 'fuse-overlayfs' : null,
-        'remove_pmss_storage_driver' => !$fuse['available'],
-        'create_when_missing' => $fuse['available'],
+        'storage_driver' => !$storeExists && $fuse['available'] ? 'fuse-overlayfs' : null,
+        'remove_pmss_storage_driver' => !$storeExists && !$fuse['available'],
+        'create_when_missing' => !$storeExists && $fuse['available'],
         'invalid_json_as_empty' => true,
         'preserve_custom_storage_driver' => true,
-        'disable_containerd_snapshotter' => $fuse['available'] && $distroVersion <= 11,
+        'disable_containerd_snapshotter' => !$storeExists && $fuse['available'] && $distroVersion <= 11,
     ]);
     if (!$result['ok']) {
         $messages = ['ensure_dir_failed' => '[WARN] Failed to ensure ~/.config/docker', 'encode_failed' => '[WARN] Failed to encode daemon.json', 'write_failed' => '[WARN] Failed to write daemon.json'];

@@ -130,6 +130,90 @@ class UserDockerCgroupDriverTest extends TestCase
         $this->assertTrue(!array_key_exists('storage-driver', $payload));
     }
 
+    public function testPopulatedContainerdStorePreservesDaemonBackendConfig(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+        @mkdir($home.'/.local/share/docker/containerd', 0755, true);
+        file_put_contents($home.'/.local/share/docker/containerd/metadata.db', 'data');
+        $this->writeDaemonConfig($home, ['exec-opts' => ['native.cgroupdriver=cgroupfs']]);
+        $configFile = $home.'/.config/docker/daemon.json';
+        $before = file_get_contents($configFile);
+
+        $this->assertTrue(\pmssUserRootlessDockerStoreExists(\pmssUserRootlessDockerDataRoot($home, $this->readDaemonConfig($home))));
+        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+            'storage_driver' => null,
+            'remove_pmss_storage_driver' => false,
+            'disable_containerd_snapshotter' => false,
+            'create_when_missing' => false,
+        ]);
+
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'changed' => false], $result);
+        $this->assertSame($before, file_get_contents($configFile));
+    }
+
+    public function testPopulatedGraphStoreKeepsUnavailableFuseDriver(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+        @mkdir($home.'/.local/share/docker/overlay2', 0755, true);
+        file_put_contents($home.'/.local/share/docker/overlay2/layer', 'data');
+        $this->writeDaemonConfig($home, ['storage-driver' => 'fuse-overlayfs']);
+
+        $this->assertTrue(\pmssUserRootlessDockerStoreExists(\pmssUserRootlessDockerDataRoot($home, $this->readDaemonConfig($home))));
+        $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+            'storage_driver' => null,
+            'remove_pmss_storage_driver' => false,
+            'disable_containerd_snapshotter' => false,
+            'create_when_missing' => false,
+        ]);
+
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'removed_storage_driver' => false], $result);
+        $this->assertSame('fuse-overlayfs', $this->readDaemonConfig($home)['storage-driver']);
+    }
+
+    public function testSymlinkedDataRootCountsAsExistingStore(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+        symlink($home.'/missing-target', $home.'/linked-store');
+
+        $this->assertTrue(\pmssUserRootlessDockerStoreExists($home.'/linked-store'));
+        $this->assertTrue(\pmssUserRootlessDockerStoreExists($home.'/linked-store/'));
+    }
+
+    public function testEmptyAndMissingDataRootsUseInitialDriverPolicy(): void
+    {
+        foreach (['missing', 'empty'] as $state) {
+            $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+            $dataRoot = \pmssUserRootlessDockerDataRoot($home, []);
+            if ($state === 'empty') {
+                @mkdir($dataRoot.'/containerd', 0755, true);
+            }
+            $this->assertFalse(\pmssUserRootlessDockerStoreExists($dataRoot));
+            $result = \pmssUserRootlessDockerConfigConverge('alice', $home, 0, 0, [
+                'storage_driver' => 'fuse-overlayfs',
+                'create_when_missing' => true,
+                'disable_containerd_snapshotter' => true,
+            ]);
+            $this->pmssAssertArraySubsetSame(['ok' => true, 'configured_storage_driver' => true], $result);
+            $this->assertSame('fuse-overlayfs', $this->readDaemonConfig($home)['storage-driver']);
+        }
+    }
+
+    public function testDataRootResolvesFromDaemonConfig(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
+        $custom = $home.'/custom-store';
+        @mkdir($custom.'/image', 0755, true);
+        file_put_contents($custom.'/image/index', 'data');
+        $this->writeDaemonConfig($home, ['data-root' => $custom]);
+
+        $resolved = \pmssUserRootlessDockerDataRoot($home, $this->readDaemonConfig($home));
+        $this->assertSame($custom, $resolved);
+        $this->assertTrue(\pmssUserRootlessDockerStoreExists($resolved));
+        foreach (['', 'relative/path', 42] as $invalid) {
+            $this->assertSame($home.'/.local/share/docker', \pmssUserRootlessDockerDataRoot($home, ['data-root' => $invalid]));
+        }
+    }
+
     public function testSharedRootlessDockerConfigCanAbortOnInvalidJson(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
