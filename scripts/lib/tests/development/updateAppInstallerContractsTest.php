@@ -60,7 +60,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                     '/usr/bin/filebot',
                     'pmssAppVersionInstalledMatches',
                     ' -version 2>/dev/null',
-                    '@unlink($filebotPath)',
+                    "pmssPinnedRemoteStaleBinaryRemove(\$filebotPath, 'FileBot')",
                 ],
                 'forbidden' => [
                     "require_once __DIR__.'/../runtime/commands.php';" => 'FileBot installer should rely on remoteBinary.php for runtime helper bootstrap',
@@ -68,6 +68,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                     'http://pulsedmedia.com/remote/pkg/' => 'Found insecure FileBot URL',
                     "pmssBuildCommand('dpkg'" => 'FileBot installer should delegate dpkg invocation to remoteBinary helper',
                     "runStep(\"Downloading" => 'FileBot installer should delegate download step to remoteBinary helper',
+                    '@unlink($filebotPath)' => 'FileBot installer must guard stale binary removal',
                 ],
                 'matches' => ['/\\x27[0-9a-f]{64}\\x27/'],
             ],

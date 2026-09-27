@@ -14,7 +14,9 @@ if (pmssAppVersionInstalledMatches($filebotPath, [escapeshellarg($filebotPath).'
     return;
 }
 
-@unlink($filebotPath);
+if (!pmssPinnedRemoteStaleBinaryRemove($filebotPath, 'FileBot')) {
+    return;
+}
 pmssInstallPinnedRemoteDebPackage(
     'FileBot 4.9.4',
     'https://pulsedmedia.com/remote/pkg/FileBot_4.9.4_amd64.deb',

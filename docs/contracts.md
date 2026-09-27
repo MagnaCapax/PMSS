@@ -698,6 +698,7 @@ These scripts are primarily imperative; treat them as idempotent installers guar
 
 - filebot.php
   - Ensures `/usr/bin/filebot` at pinned version; downloads and installs deb when missing.
+  - Refuses unsafe stale binary paths and stops before package installation if removal fails.
 
 - openvpn.php
   - Seeds EasyRSA into `/etc/openvpn/easy-rsa`, writes vars, builds server certs/DH, renews an expired or soon-expiring server leaf under the existing CA after a PKI backup, renders server config from template, restarts service; writes client `.ovpn` and `ca.crt` to `/home`, packs `openvpn-config.tgz` into skeleton and updates user homes.
