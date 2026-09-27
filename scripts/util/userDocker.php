@@ -125,14 +125,8 @@ $home = isset($info['dir']) ? (string) $info['dir'] : '';
 $dockerUnitPath = $home !== '' ? $home.'/.config/systemd/user/docker.service' : '';
 $serviceExists = ($dockerUnitPath !== '' && is_file($dockerUnitPath));
 $userDockerStartTimeoutSec = 300;
-// Each match must run independently: rootlesskit owns the user namespace and
-// survives when an earlier dockerd match would short-circuit an `||` chain.
-$dockerStopCmd = [
-    'pkill -f dockerd-rootless.sh || true',
-    'pkill -f "dockerd-rootless" || true',
-    'pkill -x dockerd || true',
-    'pkill -x rootlesskit || true',
-];
+const USER_DOCKER_DAEMON_WAIT_SECONDS = 20;
+const USER_DOCKER_STOP_DEADLINE_SECONDS = 30;
 
 if ($debug) {
     pmssUserLog($user, sprintf('userDocker: action=%s requested', $action));
@@ -312,6 +306,35 @@ function userDockerCollectPids(string $user, bool $debug = false, ?bool &$checkO
     return array_keys($pids);
 }
 
+/** Select only this account's named daemon, namespace owner, and wrapper PIDs. */
+function userDockerStopPids(int $uid, ?int &$rc = null): array
+{
+    $lines = [];
+    exec('ps -u '.escapeshellarg((string) $uid).' -o pid=,comm=,args= 2>/dev/null', $lines, $rc);
+    $pids = ['dockerd' => [], 'rootlesskit' => [], 'wrapper' => []];
+    if ($rc !== 0) return $pids;
+    foreach ($lines as $line) {
+        if (!preg_match('/^\s*(\d+)\s+(\S+)\s+(.*)$/D', $line, $parts)) continue;
+        $name = $parts[2];
+        if ($name === 'dockerd' || $name === 'rootlesskit') {
+            $pids[$name][] = (int) $parts[1];
+        } elseif (preg_match('~^(?:(?:\S*/)?(?:bash|sh)\s+)?(?:\S*/)?dockerd-rootless\.sh(?:\s|$)~', $parts[3])) {
+            $pids['wrapper'][] = (int) $parts[1];
+        }
+    }
+    return $pids;
+}
+
+/** Signal resolved PIDs only while their proc entry still belongs to the account. */
+function userDockerStopSignal(string $user, int $uid, array $pids, int $signal, string $step): void
+{
+    $failed = 0;
+    foreach (array_unique($pids) as $pid) {
+        if (@fileowner('/proc/'.$pid) !== $uid || !@posix_kill($pid, $signal)) $failed++;
+    }
+    pmssUserLog($user, sprintf('userDocker: step=%s rc=%d count=%d', $step, $failed === 0 ? 0 : 1, count($pids)));
+}
+
 // Start an explicit transferred set after the asynchronous daemon launch.
 $containerIds = $action === 'start-containers' ? array_slice($args, 3) : [];
 if ($action === 'start-containers') {
@@ -397,10 +420,22 @@ if ($action === 'status') {
 if ($action === 'stop' || $action === 'restart') {
     $userDockerStore = new UserConfigStore();
     $dockerEnabled = pmssUserDockerEnabled($user, $userDockerStore);
-    pmssUserLog($user, $serviceExists
-        ? 'userDocker: stopping via systemd user service'
-        : 'userDocker: stopping rootless daemon via pkill (no systemd user unit)');
-    $fallbackUsed = false;
+    $stopStarted = microtime(true);
+    $scanRc = 0;
+    $stopPids = userDockerStopPids($uid, $scanRc);
+    pmssUserLog($user, sprintf('userDocker: step=scan rc=%d count=%d', $scanRc, count($stopPids['dockerd'])));
+    if ($scanRc !== 0) pmssCliExitWithStderr("Docker stop failed for {$user}: process check failed\n", 1);
+    userDockerStopSignal($user, $uid, $stopPids['dockerd'], 15, 'dockerd-term');
+
+    // Give dockerd longer than its default shutdown timeout to stop containers.
+    while ($stopPids['dockerd'] !== [] && microtime(true) - $stopStarted < USER_DOCKER_DAEMON_WAIT_SECONDS) {
+        usleep(200000);
+        $stopPids = userDockerStopPids($uid, $scanRc);
+        if ($scanRc !== 0) pmssCliExitWithStderr("Docker stop failed for {$user}: process check failed\n", 1);
+    }
+    pmssUserLog($user, sprintf('userDocker: step=dockerd-wait rc=%d count=%d',
+        $stopPids['dockerd'] === [] ? 0 : 1, count($stopPids['dockerd'])));
+
     if ($serviceExists) {
         $stopRc = 0;
         $systemdAction = !$dockerEnabled ? 'disable --now' : 'stop';
@@ -409,40 +444,30 @@ if ($action === 'stop' || $action === 'restart') {
             escapeshellarg($runtimeDir),
             $systemdAction
         );
-        userDockerRunAs($user, $systemdStopCmd, $userDockerStartTimeoutSec, $stopRc);
-        if ($stopRc !== 0) {
-            pmssUserLog($user, sprintf(
-                'userDocker: systemctl %s failed (rc=%d); falling back to pkill',
-                $systemdAction,
-                $stopRc
-            ));
-            foreach ($dockerStopCmd as $dockerStopCommand) {
-                userDockerRunAs($user, $dockerStopCommand);
-            }
-            $fallbackUsed = true;
-        }
-    } else {
-        // Best-effort stop for non-systemd rootless: kill dockerd-rootless.sh/dockerd for this user.
-        foreach ($dockerStopCmd as $dockerStopCommand) {
-            userDockerRunAs($user, $dockerStopCommand);
-        }
-        $fallbackUsed = true;
+        userDockerRunAs($user, $systemdStopCmd, 5, $stopRc);
+        pmssUserLog($user, sprintf('userDocker: step=systemctl-stop rc=%d count=1', $stopRc));
     }
+    $stopPids = userDockerStopPids($uid, $scanRc);
+    if ($scanRc !== 0) pmssCliExitWithStderr("Docker stop failed for {$user}: process check failed\n", 1);
+    userDockerStopSignal($user, $uid, array_merge($stopPids['rootlesskit'], $stopPids['wrapper']), 15, 'namespace-term');
 
-    if ($fallbackUsed) {
-        // Allow an upstream user unit's short restart window to settle before checking liveness.
-        usleep(3000000);
+    while (microtime(true) - $stopStarted < USER_DOCKER_STOP_DEADLINE_SECONDS) {
+        $stopPids = userDockerStopPids($uid, $scanRc);
+        if ($scanRc !== 0) pmssCliExitWithStderr("Docker stop failed for {$user}: process check failed\n", 1);
+        if (array_merge($stopPids['dockerd'], $stopPids['rootlesskit'], $stopPids['wrapper']) === []) break;
+        usleep(200000);
     }
-
-    $stopCheckOk = true;
-    $remainingPids = userDockerCollectPids($user, $debug, $stopCheckOk);
-    if (!empty($remainingPids)) {
-        sort($remainingPids);
+    $remainingPids = array_merge($stopPids['dockerd'], $stopPids['rootlesskit'], $stopPids['wrapper']);
+    if ($remainingPids !== []) {
+        userDockerStopSignal($user, $uid, $remainingPids, 9, 'remaining-kill');
+        usleep(200000);
+        $stopPids = userDockerStopPids($uid, $scanRc);
+        if ($scanRc !== 0) pmssCliExitWithStderr("Docker stop failed for {$user}: process check failed\n", 1);
+        $remainingPids = array_merge($stopPids['dockerd'], $stopPids['rootlesskit'], $stopPids['wrapper']);
     }
-    if (!$stopCheckOk || !empty($remainingPids)) {
-        $detail = !$stopCheckOk
-            ? 'process verification failed'
-            : 'remaining pid(s): '.implode(', ', $remainingPids);
+    pmssUserLog($user, sprintf('userDocker: step=verify rc=%d count=%d', $remainingPids === [] ? 0 : 1, count($remainingPids)));
+    if ($remainingPids !== []) {
+        $detail = 'remaining pid(s): '.implode(', ', $remainingPids);
         $failure = sprintf('Docker stop failed for %s: %s', $user, $detail);
         pmssUserLog($user, '[ERR] '.$failure);
         pmssCliExitWithStderr($failure."\n", 1);

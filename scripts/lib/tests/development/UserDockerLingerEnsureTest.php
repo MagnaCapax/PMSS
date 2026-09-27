@@ -58,28 +58,32 @@ class UserDockerLingerEnsureTest extends TestCase
         $src = (string) file_get_contents(dirname(__DIR__, 3).'/util/userDocker.php');
         $this->assertStringContainsString('XDG_RUNTIME_DIR=%s systemctl --user %s docker.service', $src);
         $this->assertStringContainsString('$systemdAction = !$dockerEnabled ? \'disable --now\' : \'stop\';', $src);
-        $this->assertStringContainsString('if ($stopRc !== 0) {', $src);
-        $this->assertStringContainsString('userDockerCollectPids($user, $debug, $stopCheckOk)', $src);
-        $this->assertStringContainsString('if (!$stopCheckOk || !empty($remainingPids)) {', $src);
-        $oldTimeoutGuard = 'if ($stopRc === '.(string) 124;
-        $oldTimeoutGuard .= ')';
-        $this->assertTrue(strpos($src, $oldTimeoutGuard) === false,
-            'stop fallback must not be limited to timeout rc 124');
+        $this->assertStringContainsString('step=systemctl-stop rc=%d count=1', $src);
+        $this->assertStringContainsString('if ($remainingPids !== []) {', $src);
         $this->assertOrderedStrings([
-            'userDockerCollectPids($user, $debug, $stopCheckOk)',
+            'step=verify rc=%d count=%d',
             'echo "Docker stop requested',
         ], $src, '', 'stop success output must follow liveness verification: ');
     }
 
-    public function testUserDockerStopKillsTheRootlesskitParent(): void
+    public function testUserDockerStopSignalsDaemonBeforeNamespaceAndUsesLongerDeadlines(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 3).'/util/userDocker.php');
-        $this->assertOrderedStrings(['$dockerStopCmd =', 'pkill -x rootlesskit'], $src,
-            '', 'rootless stop must target the rootlesskit user-namespace parent: ');
+        $this->assertOrderedStrings([
+            "userDockerStopSignal(\$user, \$uid, \$stopPids['dockerd'], 15, 'dockerd-term')",
+            'USER_DOCKER_DAEMON_WAIT_SECONDS',
+            "userDockerStopSignal(\$user, \$uid, array_merge(\$stopPids['rootlesskit'], \$stopPids['wrapper']), 15, 'namespace-term')",
+            'USER_DOCKER_STOP_DEADLINE_SECONDS',
+            "userDockerStopSignal(\$user, \$uid, \$remainingPids, 9, 'remaining-kill')",
+        ], substr($src, strpos($src, '// STOP')), '', 'stop order: ');
         $this->assertStringContainsAllStrings([
-            "'pkill -x dockerd || true'",
-            "'pkill -x rootlesskit || true'",
-            'foreach ($dockerStopCmd as $dockerStopCommand)',
+            'USER_DOCKER_DAEMON_WAIT_SECONDS = 20',
+            'USER_DOCKER_STOP_DEADLINE_SECONDS = 30',
+            "'dockerd' => []",
+            "'rootlesskit' => []",
+            "'wrapper' => []",
+            "ps -u '.escapeshellarg((string) \$uid)",
         ], $src);
+        $this->assertTrue(strpos($src, 'pkill -f') === false);
     }
 }

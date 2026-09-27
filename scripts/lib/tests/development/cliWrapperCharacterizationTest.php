@@ -48,7 +48,7 @@ final class CliWrapperCharacterizationTest extends TestCase
     {
         $this->pmssAssertRepoFileContractCases([
             'scripts/util/userDocker.php' => ['required' => [
-                '$dockerStopCmd =',
+                'userDockerStopPids($uid, $scanRc)',
                 '$socketPresent = file_exists($dockerSock);',
                 'Docker socket present for {$user}, but process check failed; skipping start',
                 'Docker start requested for {$user} via dockerd-rootless.sh',
