@@ -43,7 +43,9 @@ function pmssDelugeLegacyPipDependencyPackages(): array
  */
 function pmssEnsureDelugeCommandSymlink(string $command, string $systemPath, string $localPath, bool $dryRun, callable $log): bool
 {
-    if ($command === '' || $systemPath === '' || $localPath === '') {
+    // Never unlink the package binary when a caller supplies it as the local target.
+    if ($command === '' || $systemPath === '' || $localPath === '' || $systemPath === $localPath
+        || strpos($systemPath, "\0") !== false || strpos($localPath, "\0") !== false) {
         return false;
     }
 

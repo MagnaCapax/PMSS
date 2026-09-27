@@ -108,6 +108,11 @@ verifies these results and cleanup on read failures and handler exceptions.
 
 ## Helper Extraction Rules
 
+The Deluge command-link helper rejects a destination identical to its package
+binary source before unlinking anything. NUL-containing paths also fail before
+filesystem access. Normal `/usr/bin` to `/usr/local/bin` links and dry runs keep
+their existing results; `DelugeCommandSymlinkTest` covers the rejected inputs.
+
 Per-user nginx generation shares one guarded subdomain write and one final
 primary-route write for active and suspended accounts. Their prerequisite
 checks remain distinct: suspended users need a static template, while active

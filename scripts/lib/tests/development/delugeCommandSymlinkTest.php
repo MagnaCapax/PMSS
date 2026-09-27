@@ -78,6 +78,28 @@ class DelugeCommandSymlinkTest extends DelugeAppTestCase
         $this->pmssAssertMessagesContain($this->logs, 'missing system binary', 'Expected missing binary warning log');
     }
 
+    public function testRejectsSystemBinaryAsLocalTarget(): void
+    {
+        $systemPath = $this->makeExecutable('usr/bin/deluged');
+        $original = (string) file_get_contents($systemPath);
+
+        $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $systemPath, false, $this->logger);
+
+        $this->assertTrue($result === false, 'Expected identical source and target paths to be rejected');
+        $this->assertTrue(is_file($systemPath) && !is_link($systemPath), 'Expected package binary to remain a regular file');
+        $this->assertEquals($original, (string) file_get_contents($systemPath));
+    }
+
+    public function testRejectsNulPathBeforeFilesystemAccess(): void
+    {
+        $systemPath = $this->makeExecutable('usr/bin/deluged');
+
+        $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $systemPath."\0suffix", false, $this->logger);
+
+        $this->assertTrue($result === false, 'Expected a NUL-containing target to be rejected');
+        $this->assertTrue(is_file($systemPath) && !is_link($systemPath), 'Expected package binary to remain untouched');
+    }
+
     public function testRejectsDirectoryAtLocalCommandPath(): void
     {
         $systemPath = $this->makeExecutable('usr/bin/deluge-web');
