@@ -213,6 +213,8 @@ If a package install fails, it logs a warning and stops before publishing a
 possibly stale CLI link. Successful install steps retain their usual order.
 If the virtualenv tooling upgrade fails, it likewise stops before package
 installation and CLI publication; a later update can retry the upgrade.
+Failed virtualenv creation also stops setup before probing a partial environment.
+Failed CLI link publication emits a warning; a later update can retry the link.
 
 ### Execution Outline
 

@@ -50,7 +50,10 @@ function pmssPythonVenvEnsure(
         return '';
     }
     if (!is_dir($venvDir)) {
-        runStep('Creating '.$label.' virtualenv', pmssBuildCommand($python, ['-m', 'venv', $venvDir]));
+        if (runStep('Creating '.$label.' virtualenv', pmssBuildCommand($python, ['-m', 'venv', $venvDir])) !== 0) {
+            $log('[WARN] '.$label.' virtualenv creation failed; skipping setup');
+            return '';
+        }
     }
 
     $pythonBin = rtrim($venvDir, '/').'/bin/python';
@@ -145,6 +148,8 @@ function pmssPythonVenvInstallCli(
         return;
     }
     if (!is_link($linkPath) || readlink($linkPath) !== $cliBin) {
-        runStep('Linking '.$label.' CLI', pmssBuildCommand('ln', ['-sf', $cliBin, $linkPath]));
+        if (runStep('Linking '.$label.' CLI', pmssBuildCommand('ln', ['-sf', $cliBin, $linkPath])) !== 0) {
+            $log('[WARN] '.$label.' CLI link publication failed');
+        }
     }
 }

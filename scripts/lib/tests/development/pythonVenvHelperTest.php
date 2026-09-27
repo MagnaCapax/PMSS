@@ -62,6 +62,23 @@ class PythonVenvHelperTest extends TestCase
         $this->assertEquals(['[WARN] Skipping pyLoad setup: python3 missing'], $messages);
     }
 
+    public function testFailedVenvCreationStopsBeforeProbingPartialEnvironment(): void
+    {
+        $messages = [];
+        $root = $this->pmssMakeTempDir('pmss-python-venv-create-fail-');
+        $venvDir = $root.'/venv';
+        $pythonPath = $this->pmssMakeExecutableStub('python3', "#!/bin/sh\nexit 23\n", 'pmss-python-create-fail-');
+        $this->pmssResetRuntimeProfile();
+
+        $this->pmssWithEnv(['PATH' => $pythonPath], function () use (&$messages, $venvDir): void {
+            $this->assertSame('', \pmssPythonVenvEnsure($venvDir, 'pyLoad', $this->pmssMakeArrayLogger($messages)));
+        });
+
+        $this->assertEquals(['[WARN] pyLoad virtualenv creation failed; skipping setup'], $messages);
+        $this->assertTrue($this->pmssFindProfileCommand('Creating pyLoad virtualenv') !== null);
+        $this->assertEquals(null, $this->pmssFindProfileCommand('Upgrading pyLoad virtualenv tooling'));
+    }
+
     public function testInstallerLogsMissingCliWhenPackagesFinishWithoutBinary(): void
     {
         $messages = [];
@@ -117,6 +134,28 @@ class PythonVenvHelperTest extends TestCase
             \pmssBuildCommand($venvDir.'/bin/python', ['-m', 'pip', 'install', '--upgrade']).' pyload-ng',
             $this->pmssFindProfileCommand('Installing pyLoad (pyload-ng)')
         );
+    }
+
+    public function testFailedCliLinkPublicationReportsFailure(): void
+    {
+        $messages = [];
+        $venvDir = $this->pmssMakeTempDir('pmss-python-venv-link-fail-');
+        $this->makeVenvPython($venvDir);
+        $cliBin = $venvDir.'/bin/pyload';
+        $this->pmssWriteExecutableFile($cliBin, "#!/bin/sh\nexit 0\n");
+        $linkPath = $venvDir.'/missing-parent/pyload';
+        $pythonPath = $this->makePythonPath();
+
+        $this->pmssWithEnv(['PATH' => $pythonPath], function () use (&$messages, $venvDir, $cliBin, $linkPath): void {
+            \pmssPythonVenvInstallCli(
+                $venvDir, 'pyLoad', [['Installing pyLoad', 'pyload-ng']], $cliBin, $linkPath,
+                '[WARN] pyLoad setup: python3 missing', '[WARN] pyLoad binary missing after install',
+                $this->pmssMakeArrayLogger($messages)
+            );
+        });
+
+        $this->assertEquals(['[WARN] pyLoad CLI link publication failed'], $messages);
+        $this->assertTrue(!is_link($linkPath));
     }
 
     public function testFailedPackageInstallDoesNotPublishExistingCli(): void
