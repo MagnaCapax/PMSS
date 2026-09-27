@@ -58,7 +58,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                     'pmssInstallPinnedRemoteDebPackage',
                     'https://pulsedmedia.com/remote/pkg/FileBot_4.9.4_amd64.deb',
                     '/usr/bin/filebot',
-                    'pmssAppVersionProbeMatch',
+                    'pmssAppVersionInstalledMatches',
                     ' -version 2>/dev/null',
                     '@unlink($filebotPath)',
                 ],

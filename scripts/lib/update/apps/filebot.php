@@ -10,8 +10,7 @@
 require_once __DIR__.'/remoteBinary.php';
 
 $filebotPath = '/usr/bin/filebot';
-if (file_exists($filebotPath)
-    && pmssAppVersionProbeMatch([escapeshellarg($filebotPath).' -version 2>/dev/null'], '/4\.9\.4 \(r8736\)/') !== null) {
+if (pmssAppVersionInstalledMatches($filebotPath, [escapeshellarg($filebotPath).' -version 2>/dev/null'], '/4\.9\.4 \(r8736\)/')) {
     return;
 }
 

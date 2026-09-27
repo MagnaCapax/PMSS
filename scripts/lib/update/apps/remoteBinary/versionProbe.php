@@ -125,3 +125,6 @@ function pmssAppVersionProbeMatch(array $commands, string $pattern, int $capture
     }
     return null;
 }
+
+/** Check a present installed path against its bounded version probe. */
+function pmssAppVersionInstalledMatches(string $path, array $commands, string $pattern): bool { return file_exists($path) && pmssAppVersionProbeMatch($commands, $pattern) !== null; }

@@ -27,8 +27,7 @@ if (!pmssPinnedRemoteAmd64ArtifactsSupported()) {
 }
 
 // Idempotent: nothing to do when the pinned version is already in place.
-if (file_exists('/usr/bin/ttyd')
-    && pmssAppVersionProbeMatch(['/usr/bin/ttyd --version 2>/dev/null'], '/'.preg_quote($ttydVersion, '/').'/') !== null) {
+if (pmssAppVersionInstalledMatches('/usr/bin/ttyd', ['/usr/bin/ttyd --version 2>/dev/null'], '/'.preg_quote($ttydVersion, '/').'/')) {
     return;
 }
 
