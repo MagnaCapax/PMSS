@@ -42,7 +42,7 @@ function pmssTrafficUserKeyIsValid(string $user): bool
 /** Resolve the per-user persisted traffic limit path. */
 function pmssTrafficLimitPath(string $username, ?string $homeDir = null): string
 {
-    return pmssIntegerSettingUserHomePath($username, '.trafficLimit', $homeDir);
+    return pmssUserHomeFilePath($username, '.trafficLimit', $homeDir);
 }
 
 /** Resolve the runtime traffic statistics cache path for a user key. */

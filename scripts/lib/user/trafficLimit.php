@@ -100,7 +100,7 @@ function pmssTrafficLimitHomeArtifactReconcile(
         return false;
     }
 
-    $homeLimitPath = pmssIntegerSettingUserHomePath($userName, '.trafficLimit', $homeDir);
+    $homeLimitPath = pmssUserHomeFilePath($userName, '.trafficLimit', $homeDir);
     $runtimeLimitPath = pmssIntegerSettingRuntimeUserPath('trafficLimits', $userName, $runtimeDir);
     if (pmssRegularFilePathIsReadable($homeLimitPath)) {
         return true;

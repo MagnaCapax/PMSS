@@ -7,7 +7,7 @@ if (!function_exists('pmssTrafficLimitCliTargetModes')) {
     /** @return array<string,int> */
     function pmssTrafficLimitCliTargetModes(string $userName, string $homeDir): array
     {
-        return [pmssIntegerSettingRuntimeUserPath('trafficLimits', $userName) => 0600, pmssIntegerSettingUserHomePath($userName, '.trafficLimit', $homeDir) => 0664];
+        return [pmssIntegerSettingRuntimeUserPath('trafficLimits', $userName) => 0600, pmssUserHomeFilePath($userName, '.trafficLimit', $homeDir) => 0664];
     }
 }
 

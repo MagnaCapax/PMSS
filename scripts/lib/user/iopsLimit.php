@@ -31,7 +31,7 @@ function pmssIopsLimitRuntimePath(string $username, ?string $runtimeDir = null):
 
 function pmssIopsLimitPath(string $username, ?string $homeDir = null): string
 {
-    return pmssIntegerSettingUserHomePath($username, '.iopsLimit', $homeDir);
+    return pmssUserHomeFilePath($username, '.iopsLimit', $homeDir);
 }
 
 /** @return array<string,int> */

@@ -82,9 +82,6 @@ function pmssIntegerSettingRuntimeUserPath(string $bucket, string $username, ?st
 /** Resolve a managed file path under one user home. */
 function pmssUserHomeFilePath(string $username, string $filename, ?string $homeDir = null): string { return rtrim(pmssDirPathResolve($homeDir, 'PMSS_HOME_DIR', '/home'), '/').'/'.$username.'/'.ltrim($filename, '/'); }
 
-/** Resolve an integer-setting file path under one user home. */
-function pmssIntegerSettingUserHomePath(string $username, string $filename, ?string $homeDir = null): string { return pmssUserHomeFilePath($username, $filename, $homeDir); }
-
 function pmssIntegerSettingPathModeConverge(string $path, int $mode): bool
 {
     if ((!is_file($path) && !is_dir($path)) || is_link($path)) {
