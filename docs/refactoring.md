@@ -108,6 +108,13 @@ verifies these results and cleanup on read failures and handler exceptions.
 
 ## Helper Extraction Rules
 
+Per-user nginx generation shares one guarded subdomain write and one final
+primary-route write for active and suspended accounts. Their prerequisite
+checks remain distinct: suspended users need a static template, while active
+users need the torrent marker and a usable lighttpd port. An absent active
+primary template still leaves the generated subdomain route in place.
+`NginxConfigWriteGuardTest` locks the rendered routes and cleanup decisions.
+
 Pinned remote archive steps reject control bytes in archive names, source
 directory names, and workspace paths before downloading or constructing the
 destructive cleanup command. Valid names keep the existing extraction flow;

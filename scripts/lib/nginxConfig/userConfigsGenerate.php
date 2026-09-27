@@ -163,8 +163,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
         }
     }
 
-    // When a user is suspended, nginx should serve a static suspended page
-    // instead of proxying to their per-user lighttpd instance.
+    // Suspended users serve a static page and never need a lighttpd port.
     if ($isSuspended) {
         if ($suspendedTemplate === false || $suspendedTemplate === '') {
             // No dedicated suspended template found; skip generating a per-user
@@ -172,63 +171,54 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
             pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, []);
             return PMSS_NGINX_USER_CONFIG_SKIPPED;
         }
-        $writtenPaths = [];
-        if ($subdomainEnabled) {
-            if (!pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, true, null, $mcxHost)) return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
-            $writtenPaths[] = $managedPaths['public'];
-            if ($hashHost !== null) $writtenPaths[] = $managedPaths['private'];
+    } else {
+        if (!file_exists($homeDir.'/.rtorrent.rc')) {
+            pmssCreateNginxConfigLogSkippedUser($thisUser, 'missing .rtorrent.rc prerequisite');
+            pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $skipKeepPaths);
+            return PMSS_NGINX_USER_CONFIG_SKIPPED;
         }
-        $userConfig = str_replace('##username', $thisUser, $suspendedTemplate);
-        if (!pmssCreateNginxConfigWriteFile($managedPaths['user'], $userConfig, $thisUser, 'user suspended config')) return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
-        $writtenPaths[] = $managedPaths['user'];
-        pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $writtenPaths);
-        pmssCreateNginxConfigUserLog($thisUser, 'nginx config regenerated (suspended template)');
-        return PMSS_NGINX_USER_CONFIG_GENERATED;
-    }
 
-    if (!file_exists($homeDir.'/.rtorrent.rc')) {
-        pmssCreateNginxConfigLogSkippedUser($thisUser, 'missing .rtorrent.rc prerequisite');
-        pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $skipKeepPaths);
-        return PMSS_NGINX_USER_CONFIG_SKIPPED;
-    }
-
-    $serverPort = pmssReadRegularFileInt($portFile);
-    if (!pmssNetworkPortInRange($serverPort, 1024) || !is_file($homeDir.'/.lighttpd.conf')) {
-        passthru('/scripts/util/userConfigLighttpd.php '.escapeshellarg($thisUser));
         $serverPort = pmssReadRegularFileInt($portFile);
-    }
-    if (!pmssNetworkPortInRange($serverPort, 1024)) {
-        pmssCreateNginxConfigLogSkippedUser($thisUser, 'lighttpd port missing or invalid after refresh attempt ('.$portFile.')');
-        pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $skipKeepPaths);
-        return PMSS_NGINX_USER_CONFIG_SKIPPED;
+        if (!pmssNetworkPortInRange($serverPort, 1024) || !is_file($homeDir.'/.lighttpd.conf')) {
+            passthru('/scripts/util/userConfigLighttpd.php '.escapeshellarg($thisUser));
+            $serverPort = pmssReadRegularFileInt($portFile);
+        }
+        if (!pmssNetworkPortInRange($serverPort, 1024)) {
+            pmssCreateNginxConfigLogSkippedUser($thisUser, 'lighttpd port missing or invalid after refresh attempt ('.$portFile.')');
+            pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $skipKeepPaths);
+            return PMSS_NGINX_USER_CONFIG_SKIPPED;
+        }
     }
 
     $writtenPaths = [];
     if ($subdomainEnabled) {
-        if (!pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, false, $serverPort, $mcxHost)) return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
+        if (!pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, $isSuspended, $serverPort ?? null, $mcxHost)) return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
         $writtenPaths[] = $managedPaths['public'];
         if ($hashHost !== null) $writtenPaths[] = $managedPaths['private'];
     }
 
-    if ($userTemplate === false || $userTemplate === '') {
+    if (!$isSuspended && ($userTemplate === false || $userTemplate === '')) {
         if ($singleUser) $writtenPaths[] = $managedPaths['user'];
         pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $writtenPaths);
         return PMSS_NGINX_USER_CONFIG_SKIPPED;
     }
 
-    $placeholders = array("##username", "##serverPort");
-    $replacements = array($thisUser, $serverPort);
-    if ($ctx['needsDelugeWebPort'] ?? false) {
-        // Backward compatibility: older templates may still use ##delugeWebPort.
-        $placeholders[] = "##delugeWebPort";
-        $replacements[] = pmssCreateNginxConfigLegacyDelugeWebPort($homeDir, $thisUser);
+    if ($isSuspended) {
+        $userConfig = str_replace('##username', $thisUser, $suspendedTemplate);
+    } else {
+        $placeholders = array("##username", "##serverPort");
+        $replacements = array($thisUser, $serverPort);
+        if ($ctx['needsDelugeWebPort'] ?? false) {
+            // Backward compatibility: older templates may still use ##delugeWebPort.
+            $placeholders[] = "##delugeWebPort";
+            $replacements[] = pmssCreateNginxConfigLegacyDelugeWebPort($homeDir, $thisUser);
+        }
+        $userConfig = str_replace($placeholders, $replacements, $userTemplate);
     }
 
-    $userConfig = str_replace($placeholders, $replacements, $userTemplate);
-
-    if (!pmssCreateNginxConfigWriteFile($managedPaths['user'], $userConfig, $thisUser, 'user config')) return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
+    if (!pmssCreateNginxConfigWriteFile($managedPaths['user'], $userConfig, $thisUser, $isSuspended ? 'user suspended config' : 'user config')) return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
     $writtenPaths[] = $managedPaths['user'];
     pmssCreateNginxConfigReconcileStaleUserFiles($thisUser, $ctx, $writtenPaths);
-    pmssCreateNginxConfigUserLog($thisUser, 'nginx config regenerated');
+    pmssCreateNginxConfigUserLog($thisUser, $isSuspended ? 'nginx config regenerated (suspended template)' : 'nginx config regenerated');
     return PMSS_NGINX_USER_CONFIG_GENERATED;
 }

@@ -125,6 +125,53 @@ class NginxConfigWriteGuardTest extends TestCase
         $this->assertTrue(is_link($nginxUsersDir.'/alice'));
     }
 
+    public function testActiveAndSuspendedGenerationKeepsRenderedRoutesAndCleanup(): void
+    {
+        $home = $this->tempDir.'/home/alice';
+        $users = $this->tempDir.'/users';
+        $conf = $this->tempDir.'/conf.d';
+        $ports = $this->tempDir.'/ports';
+        $this->pmssWriteFile($home.'/.rtorrent.rc', "schedule = test\n");
+        $this->pmssWriteFile($home.'/.lighttpd.conf', "server.port = 12345\n");
+        $this->pmssWriteFile($ports.'/lighttpd-alice', "12345\n");
+        @mkdir($users, 0755, true);
+        @mkdir($conf, 0755, true);
+        $ctx = [
+            'homeBase' => $this->tempDir.'/home', 'runtimePortDir' => $ports,
+            'nginxUsersDir' => $users, 'subdomainConfigDir' => $conf,
+            'subdomainEnabled' => true, 'subdomainBase' => 'example.test',
+            'userTemplate' => 'active ##username ##serverPort',
+            'suspendedTemplate' => 'suspended ##username',
+            'publicSubdomainTemplate' => 'public ##host## ##port##',
+            'privateSubdomainTemplate' => 'private ##host## ##port##',
+            'publicSuspendedTemplate' => 'suspended public ##host##',
+            'privateSuspendedTemplate' => 'suspended private ##host##',
+        ];
+        $public = $conf.'/pmss-user-alice.conf';
+        $private = $conf.'/pmss-user-alice-hash.conf';
+
+        $this->assertSame(PMSS_NGINX_USER_CONFIG_GENERATED, \pmssCreateNginxConfigGenerateUser('alice', $ctx, false));
+        $this->assertSame('active alice 12345', file_get_contents($users.'/alice'));
+        $this->assertSame('public alice.example.test 12345', file_get_contents($public));
+        $this->assertFalse(file_exists($private));
+
+        $ctx['userTemplate'] = false;
+        $this->assertSame(PMSS_NGINX_USER_CONFIG_SKIPPED, \pmssCreateNginxConfigGenerateUser('alice', $ctx, false));
+        $this->assertFalse(file_exists($users.'/alice'));
+        $this->assertSame('public alice.example.test 12345', file_get_contents($public));
+
+        @mkdir($home.'/www-disabled', 0755);
+        $this->assertSame(PMSS_NGINX_USER_CONFIG_GENERATED, \pmssCreateNginxConfigGenerateUser('alice', $ctx, false));
+        $this->assertSame('suspended alice', file_get_contents($users.'/alice'));
+        $this->assertSame('suspended public alice.example.test', file_get_contents($public));
+        $this->assertFalse(file_exists($private));
+
+        $ctx['suspendedTemplate'] = false;
+        $this->assertSame(PMSS_NGINX_USER_CONFIG_SKIPPED, \pmssCreateNginxConfigGenerateUser('alice', $ctx, false));
+        $this->assertFalse(file_exists($users.'/alice'));
+        $this->assertFalse(file_exists($public));
+    }
+
     public function testIntentionalSkipKeepsSingleUserRouteButFullRunRemovesIt(): void
     {
         $ctx = ['nginxUsersDir' => $this->tempDir.'/users', 'homeBase' => $this->tempDir.'/home',
