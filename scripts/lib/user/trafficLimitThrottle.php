@@ -13,7 +13,7 @@ function pmssTrafficLimitThrottleFileWrite(string $path, int $capMbit, ?string &
         $error = 'invalid throttle cap';
         return false;
     }
-    if (!function_exists('pmssUserFilePathIsSafe') || !pmssUserFilePathIsSafe($path)) {
+    if (!pmssTrafficLimitMarkerPathIsSafe($path)) {
         $error = 'unsafe throttle path';
         return false;
     }
@@ -35,7 +35,7 @@ function pmssTrafficLimitThrottleFileWrite(string $path, int $capMbit, ?string &
 function pmssTrafficLimitThrottleFileRemove(string $path, ?string &$error = null): bool
 {
     $error = null;
-    if (!function_exists('pmssUserFilePathIsSafe') || !pmssUserFilePathIsSafe($path)) {
+    if (!pmssTrafficLimitMarkerPathIsSafe($path)) {
         $error = 'unsafe throttle path';
         return false;
     }
@@ -114,18 +114,14 @@ function pmssTrafficLimitThrottleApply(string $user, int $trafficCapMbit, bool $
         return false;
     }
     $error = null;
-    if (!$enable) {
-        if (!pmssTrafficLimitThrottleFileRemove($throttleFile, $error)) {
-            pmssTrafficLimitLog($user, 'traffic throttle file removal failed ('.($error ?: $throttleFile).')');
-            return false;
-        }
-        return true;
+    $ok = $enable
+        ? pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)
+        : pmssTrafficLimitThrottleFileRemove($throttleFile, $error);
+    if (!$ok) {
+        $failure = $enable ? 'traffic throttle file write failed (' : 'traffic throttle file removal failed (';
+        pmssTrafficLimitLog($user, $failure.($error ?: $throttleFile).')');
     }
-    if (!pmssTrafficLimitThrottleFileWrite($throttleFile, (int) $trafficCapMbit, $error)) {
-        pmssTrafficLimitLog($user, 'traffic throttle file write failed ('.($error ?: $throttleFile).')');
-        return false;
-    }
-    return true;
+    return $ok;
 }
 
 /**

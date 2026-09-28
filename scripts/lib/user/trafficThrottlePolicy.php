@@ -38,8 +38,7 @@ function pmssTrafficLimitComputeProgressiveCapMbit(int $postCapMbit, float $over
     $floorMbit = (int) ceil($postCapMbit * ($floorPercent / 100));
     $floorMbit = min($postCapMbit, max($floorMbit, $minMbit));
 
-    $effective = (int) floor($rawEffective);
-    $effective = min($postCapMbit, max($effective, $floorMbit));
+    $effective = min($postCapMbit, max((int) floor($rawEffective), $floorMbit));
 
     return ['effective' => $effective, 'adjustedOverage' => $adjustedOverage, 'floorMbit' => $floorMbit];
 }
@@ -174,7 +173,7 @@ function pmssTrafficLimitThrottlePlan(float $trafficLimitGiB, float $trafficUsag
 
     if (!$progressiveThrottleEnabled) {
         return [
-            'effectiveCapMbit' => (int) $trafficCapMbit,
+            'effectiveCapMbit' => $trafficCapMbit,
             'logMessage' => sprintf('traffic throttle enabled (limit=%.2f GiB usage=%.2f GiB)', $trafficLimitGiB, $trafficUsageGiB),
         ];
     }
@@ -212,14 +211,12 @@ function pmssTrafficLimitSelectTieredCapMbit(float $overagePercent, float $overa
     $overagePercent = max(0.0, $overagePercent);
     $overageGiB = max(0.0, $overageGiB);
 
-    $normalizedStages = pmssTrafficLimitNormalizeOverageStages($rawStages);
-    foreach ($normalizedStages as $stage) {
+    foreach (pmssTrafficLimitNormalizeOverageStages($rawStages) as $stage) {
         if ($overagePercent < $stage['overagePercent'] || $overageGiB < $stage['minOverageGiB']) continue;
 
-        $effectiveCapMbit = min($postCapMbit, (int) $stage['capMbit']);
         unset($stage['index']);
 
-        return ['effective' => $effectiveCapMbit, 'matched' => $stage];
+        return ['effective' => min($postCapMbit, $stage['capMbit']), 'matched' => $stage];
     }
 
     return ['effective' => $postCapMbit, 'matched' => null];
