@@ -120,6 +120,8 @@ function pmssCheckDirectoriesEnsureDirectory(string $thisDir, callable $log, str
         $log("WARN: failed to set mode 0700 on $thisDir");
         $ok = false;
     }
+    // lstat() above may leave the pre-chmod mode cached for callers.
+    clearstatcache(true, $thisDir);
 
     return $ok;
 }
