@@ -143,4 +143,36 @@ class TrackerCleanerLibraryTest extends TestCase
         $this->assertFalse(pmssTrackerCleanerBackupDestinationIsSafe($root.'-sibling/2026-06-09', $root));
         $this->assertFalse(pmssTrackerCleanerBackupDestinationIsSafe($root.'/../escape', $root));
     }
+
+    public function testBackupTorrentRejectsUnsafeExistingTargetsWithoutShelling(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-tracker-cleaner-backups-');
+        $backupDir = $root.'/2026-09-28';
+        mkdir($backupDir);
+        $torrentPath = $this->pmssMakeTempDir('pmss-tracker-cleaner-session-').'/sample.torrent';
+        file_put_contents($torrentPath, 'torrent payload');
+        $target = $backupDir.'/sample.torrent';
+        $outside = $this->pmssMakeTempFile('pmss-tracker-cleaner-outside-');
+        file_put_contents($outside, 'outside');
+
+        foreach (['symlink' => $outside, 'dangling_symlink' => $root.'/missing'] as $label => $linkTarget) {
+            symlink($linkTarget, $target);
+            [$result, $output] = $this->pmssCaptureStdout(static function () use ($torrentPath, $backupDir, $root): array {
+                return pmssTrackerCleanerBackupTorrent('validusr', $torrentPath, $backupDir, $root, 'tracker');
+            });
+            $this->assertFalse($result['ok'], $label);
+            $this->assertStringContainsString('reason=backup_path_unsafe', $result['verbose_log'], $label);
+            $this->assertStringContainsString('ERR:', $output, $label);
+            $this->assertSame('outside', (string) file_get_contents($outside), $label);
+            unlink($target);
+        }
+
+        mkdir($target);
+        [$result] = $this->pmssCaptureStdout(static function () use ($torrentPath, $backupDir, $root): array {
+            return pmssTrackerCleanerBackupTorrent('validusr', $torrentPath, $backupDir, $root, 'tracker');
+        });
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('reason=backup_path_unsafe', $result['verbose_log']);
+        rmdir($target);
+    }
 }

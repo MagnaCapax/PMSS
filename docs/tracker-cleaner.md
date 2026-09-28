@@ -11,6 +11,7 @@ This document explains the rTorrent tracker cleaner used on PMSS hosts: what it 
 - Only non‑private torrents are processed. Torrents with the BitTorrent `private` flag present are skipped entirely.
 - A timestamped backup of every original `.torrent` is written before any change.
 - If backup verification fails (permissions, full disk, or path safety), the cleaner stops for that user without modifying torrents.
+- An existing backup target must be a regular file; symlinks and non-file targets stop the cleaner before its copy step.
 - A per‑user log lists which torrents were modified.
 - You can disable the cleaner per user with a simple opt‑out file.
 

@@ -59,6 +59,11 @@ function pmssTrackerCleanerBackupTorrent(string $username, string $torrentPath, 
     }
 
     $backupTarget = $backupDir.'/'.basename($torrentPath);
+    // Refuse occupied non-files and symlinks before cp can follow the target.
+    if (!pmssPathTargetIsSafe($backupTarget, false, true)) {
+        pmssTrackerCleanerLog("ERR: Backup target unsafe for user {$username} ({$backupTarget}).");
+        return pmssTrackerCleanerBackupFailedResult('backup_path_unsafe', 'backup_target='.pmssTrackerCleanerLogValue($backupTarget));
+    }
     $backupRc = pmssUserLifecycleStep('trackerCleaner', $username, 'backup_torrent', pmssBuildUserShellCommand($username, 'cp -p '.escapeshellarg($torrentPath).' '.escapeshellarg($backupTarget).' && chmod '.$sourceModeText.' '.escapeshellarg($backupTarget), '/bin/bash'), false);
     $backupSize = @filesize($backupTarget);
     $backupSizeText = $backupSize === false ? 'unknown' : (string) $backupSize;
