@@ -5,6 +5,16 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class WatchdogNetworkCheckTemplateTest extends TestCase
 {
+    public function testWatchdogLoadThresholdsAreExplicit(): void
+    {
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.conf');
+        $this->assertStringContainsAllStrings([
+            'max-load-1 = 300',
+            'max-load-5 = 225',
+            'max-load-15 = 150',
+        ], $template);
+    }
+
     public function testNetworkCheckRequiresAllTargetsToFail(): void
     {
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.watchdog.network-check.sh');

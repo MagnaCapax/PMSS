@@ -23,6 +23,30 @@ function pmssWatchdogRunRequiredStep(string $description, string $command): bool
     return false;
 }
 
+/** Return the first usable character device; candidates can be supplied by hermetic tests. */
+function pmssWatchdogDevice(array $candidates = ['/dev/watchdog', '/dev/watchdog0']): string
+{
+    foreach ($candidates as $candidate) {
+        if (file_exists($candidate) && filetype($candidate) === 'char') return $candidate;
+    }
+    return '';
+}
+
+// An operator mask takes precedence over package and PMSS service policy.
+if (pmssSystemdUnitState('is-enabled', 'watchdog.service') === 'masked') {
+    logMessage('[INFO] Watchdog service masked by operator; leaving it unchanged.');
+    return;
+}
+
+$device = pmssWatchdogDevice();
+if ($device === '') {
+    if (pmssSystemdUnitState('is-enabled', 'watchdog.service') === 'enabled') {
+        runStep('Disabling watchdog service without a device', 'systemctl disable --now watchdog.service');
+    }
+    logMessage('[WARN] Watchdog device missing; service left disabled.');
+    return;
+}
+
 // Template sources live under /etc/seedbox/config by convention.
 $configDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
 $configTemplate = $configDir.'/template.watchdog.conf';
@@ -44,12 +68,6 @@ foreach ([
     if (!pmssWatchdogRunRequiredStep($description, $command)) return;
 }
 
-$device = is_file('/dev/watchdog') ? '/dev/watchdog' : (is_file('/dev/watchdog0') ? '/dev/watchdog0' : '');
-if ($device === '') {
-    logMessage('[WARN] Watchdog device missing; leaving service disabled.');
-    return;
-}
-
 if ($device !== '/dev/watchdog' && is_string($config = @file_get_contents('/etc/watchdog.conf'))) {
     $updated = preg_replace('/^watchdog-device\\s*=\\s*\\/dev\\/watchdog\\b/m', 'watchdog-device = '.$device, $config);
     if ($updated !== null && $updated !== $config) {
@@ -60,5 +78,4 @@ if ($device !== '/dev/watchdog' && is_string($config = @file_get_contents('/etc/
     }
 }
 
-runStep('Unmasking watchdog service', 'systemctl unmask watchdog || true');
-runStep('Enabling watchdog service', 'systemctl enable --now watchdog');
+runStep('Enabling watchdog service', 'systemctl enable --now watchdog.service');

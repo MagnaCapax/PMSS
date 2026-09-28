@@ -1,7 +1,7 @@
 # ADR 0074: Weekly TRIM via the distro timer
 
 Date: 2026-09-28
-Category: operations
+Category: architecture
 Status: Accepted
 
 ## Context

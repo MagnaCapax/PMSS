@@ -205,8 +205,8 @@ class UpdateAppInstallerContractsTest extends TestCase
                     'template.watchdog.network-check.sh',
                     '/etc/watchdog.d',
                     '/dev/watchdog0',
-                    'systemctl unmask watchdog || true',
-                    'systemctl enable --now watchdog',
+                    'systemctl disable --now watchdog.service',
+                    'systemctl enable --now watchdog.service',
                 ],
             ],
         ], 'scripts/lib/update/apps/');
