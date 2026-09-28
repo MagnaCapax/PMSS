@@ -150,6 +150,23 @@ class ManagedPathTest extends TestCase
         $this->assertTrue($this->pmssMessagesContain($messages, 'timestamped backup paths already exist for '.$path));
     }
 
+    public function testManagedWritePreservesOriginalWhenBackupCandidatesAreFull(): void
+    {
+        [, $path] = $this->managedPathFixture('pmss-env-write-backup-full-');
+        file_put_contents($path, "before\n");
+        $timestamp = date('YmdHis');
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            file_put_contents(\pmssManagedPathBackupCandidate($path, $timestamp, $attempt), "occupied\n");
+        }
+        $messages = [];
+
+        $this->assertFalse(\pmssWriteManagedPathFileWithBackup(
+            $path, ['after'], 'test target', $this->pmssMakeArrayLogger($messages)
+        ));
+        $this->assertEquals("before\n", file_get_contents($path));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'timestamped backup paths already exist for '.$path));
+    }
+
     public function testManagedWriteWithBackupRejectsSymlinkTarget(): void
     {
         [$root] = $this->managedPathFixture('pmss-env-write-backup-link-');

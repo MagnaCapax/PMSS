@@ -138,10 +138,12 @@ function pmssCreateManagedPathBackup(string $path, string $label, callable $logg
             return '';
         }
 
+        $sourceStat = @fstat($source);
         $copied = @stream_copy_to_stream($source, $target);
         $targetClosed = @fclose($target);
         @fclose($source);
-        if (is_int($copied) && $targetClosed) {
+        // A short copy must not be published as a usable backup.
+        if (is_array($sourceStat) && isset($sourceStat['size']) && $copied === $sourceStat['size'] && $targetClosed) {
             $sourceMode = @fileperms($path);
             if (is_int($sourceMode)) {
                 @chmod($backup, $sourceMode & 0777);
@@ -168,6 +170,11 @@ function pmssWriteManagedPathFileWithBackup(
     $backup = '';
     if (file_exists($path)) {
         $backup = pmssCreateManagedPathBackup($path, $label, $logger, date('YmdHis'));
+        // Preserve the current config when its recovery copy could not be made.
+        if ($backup === '') {
+            $logger('[WARN] Failed writing updated '.$path);
+            return false;
+        }
     }
     $contents = implode(PHP_EOL, $contentLines).PHP_EOL;
     if (!pmssWriteManagedPathFile($path, $contents, $label, $logger, $owner, $group, $mode, '[WARN] Failed writing updated '.$path)) return false;

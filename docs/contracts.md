@@ -136,6 +136,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   confirms matching device/inode metadata; supplied path snapshots can reuse
   returned handle metadata. Invalid/closed handles and unreadable metadata return false.
 
+- `pmssWriteManagedPathFileWithBackup()` leaves an existing managed file intact
+  when its timestamped backup cannot be created. The backup helper accepts a
+  copy only when it contains the full source file; incomplete copies are removed.
+
 - Lock lifecycle helpers close streams when handle validation, lock acquisition,
   or explicit unlocking throws. The original throwable propagates; successful
   acquisition still transfers ownership to the caller, including the legacy
