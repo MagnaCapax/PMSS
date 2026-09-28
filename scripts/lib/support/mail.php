@@ -127,11 +127,7 @@ function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): 
         || !is_resource($pipes[0])
         || !is_resource($pipes[1])
         || !is_resource($pipes[2])) {
-        foreach ($pipes as $pipe) {
-            if (is_resource($pipe)) {
-                fclose($pipe);
-            }
-        }
+        pmssProcessPipesClose($pipes);
         proc_close($process);
         throw new RuntimeException('Sendmail transport did not provide usable pipes.');
     }
@@ -154,11 +150,7 @@ function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): 
         $rc = proc_close($process);
         $process = null;
     } finally {
-        foreach ($pipes as $pipe) {
-            if (is_resource($pipe)) {
-                fclose($pipe);
-            }
-        }
+        pmssProcessPipesClose($pipes);
         if (is_resource($process)) {
             proc_close($process);
         }

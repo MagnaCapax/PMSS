@@ -6,6 +6,16 @@ function pmssProcessPipeDescriptorSpec(string $stdinMode = 'r', string $stdoutMo
     return [0 => ['pipe', $stdinMode], 1 => ['pipe', $stdoutMode], 2 => ['pipe', $stderrMode]];
 }
 
+/** Close only live process pipes; cleanup may run after individual pipes were closed. */
+function pmssProcessPipesClose(array $pipes): void
+{
+    foreach ($pipes as $pipe) {
+        if (is_resource($pipe)) {
+            fclose($pipe);
+        }
+    }
+}
+
 /**
  * @return array{stdout:string,stderr:string,timed_out:bool}
  */

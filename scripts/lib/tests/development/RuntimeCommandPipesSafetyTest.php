@@ -5,6 +5,18 @@ require_once dirname(__DIR__, 2).'/runtime/commandPipes.php';
 
 class RuntimeCommandPipesSafetyTest extends TestCase
 {
+    public function testPipeCleanupSkipsAlreadyClosedAndInvalidHandles(): void
+    {
+        $live = tmpfile();
+        $closed = tmpfile();
+        fclose($closed);
+        $this->pmssAssertNoPhpWarnings(function () use ($live, $closed): void {
+            \pmssProcessPipesClose([$live, $closed, null]);
+            \pmssProcessPipesClose([$live]);
+        });
+        $this->assertFalse(is_resource($live));
+    }
+
     public function testInvalidChannelsLeaveTheOtherStreamUnreadAndOpen(): void
     {
         $valid = tmpfile();

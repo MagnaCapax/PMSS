@@ -81,11 +81,7 @@ function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $ti
         }
     }
     if ($pipeFailed) {
-        foreach ($pipes as $pipe) {
-            if (is_resource($pipe)) {
-                fclose($pipe);
-            }
-        }
+        pmssProcessPipesClose($pipes);
         if (is_resource($process)) {
             if (function_exists('proc_terminate')) {
                 @proc_terminate($process);
