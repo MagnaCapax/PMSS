@@ -59,6 +59,9 @@ class checkRtorrentRestartGraceContractTest extends TestCase
             ],
             'scripts/lib/rtorrent/process.php' => ['required' => [
                 "require_once __DIR__.'/watchdogState.php';",
+                "require_once __DIR__.'/processLifecycle.php';",
+            ]],
+            'scripts/lib/rtorrent/processLifecycle.php' => ['required' => [
                 'function rtorrentProcessStart(',
                 'rtorrentProcessWriteStateFile(rtorrentProcessRestartMarkerPath($user), $now);',
             ]],

@@ -60,7 +60,7 @@ class checkRtorrentContractTest extends TestCase
                     'function pmssCheckRtorrentCleanupStaleSocket(',
                 ],
             ],
-            'scripts/lib/rtorrent/process.php' => [
+            'scripts/lib/rtorrent/processLifecycle.php' => [
                 'required' => [
                     'SCGI unresponsive but rtorrent still alive (pids=',
                     'rtorrentScgiSocketQueueSaturated($queueSnapshot)',

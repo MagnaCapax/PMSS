@@ -244,6 +244,19 @@ class RtorrentProcessTest extends TestCase
         $this->assertTrue(is_array($result));
     }
 
+    public function testProcessSnapshotLogPreservesHeadingAndRowCallbacks(): void
+    {
+        $user = 'nonexistent_user_12345';
+        $expected = [['Process snapshot BEFORE ('.$user.')', true]];
+        foreach (rtorrentProcessSnapshot($user) as $row) $expected[] = [$row, true];
+
+        $messages = [];
+        rtorrentProcessLogSnapshot($user, 'BEFORE', static function (string $message, bool $force) use (&$messages): void {
+            $messages[] = [$message, $force];
+        });
+        $this->assertSame($expected, $messages);
+    }
+
     public function testProcessStateParserCapturesPidStatAndOptionalWchan(): void
     {
         foreach ([
@@ -298,7 +311,7 @@ class RtorrentProcessTest extends TestCase
 
     public function testWatchdogCleanupUsesManagedPidsAndPreservesSignals(): void
     {
-        $processSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/process.php');
+        $processSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/processLifecycle.php');
         $watchdogSource = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
 
         $this->assertStringContainsAllStrings([
@@ -325,7 +338,7 @@ class RtorrentProcessTest extends TestCase
 
     public function testProcessStartOwnsLaunchCommandAndRestartMarkers(): void
     {
-        $processSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/process.php');
+        $processSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/processLifecycle.php');
         $watchdogSource = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
         $flowSource = $this->pmssReadRepoFile('scripts/lib/rtorrent/watchdogProcessFlow.php');
 
