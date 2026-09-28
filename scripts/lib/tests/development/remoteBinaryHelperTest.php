@@ -24,6 +24,12 @@ class RemoteBinaryHelperTest extends TestCase
         $this->assertTrue(\pmssPinnedRemoteStaleBinaryRemove($target, 'test'));
         $this->assertFalse(file_exists($target));
         $this->assertTrue(\pmssPinnedRemoteStaleBinaryRemove($target, 'test'));
+        file_put_contents($target, 'old binary');
+        $this->assertFalse(\pmssPinnedRemoteBinaryPrepareInstall($target, ['/usr/bin/printf %s current'], '/current/', 'test'));
+        $this->assertTrue(file_exists($target));
+        $this->assertTrue(\pmssPinnedRemoteBinaryPrepareInstall($target, ['/usr/bin/printf %s old'], '/current/', 'test'));
+        $this->assertFalse(file_exists($target));
+        $this->assertFalse(\pmssPinnedRemoteBinaryPrepareInstall($link, [], '/current/', 'test'));
     }
 
     public function testAppVersionProbeOutputReturnsStdoutForSuccessfulProbe(): void

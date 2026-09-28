@@ -108,9 +108,9 @@ verifies these results and cleanup on read failures and handler exceptions.
 
 ## Helper Extraction Rules
 
-The pinned remote stale-binary helper handles absent paths as success. App
-installers call it directly after a version mismatch so its path-safety and
-failed-removal checks stay in one place.
+Pinned remote installers share the version-match and guarded stale-binary
+decision. The stale-binary helper handles absent paths as success; its path
+safety and failed-removal checks remain in one place.
 
 The Deluge command-link helper rejects a destination identical to its package
 binary source before unlinking anything. NUL-containing paths also fail before

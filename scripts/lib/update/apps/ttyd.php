@@ -26,13 +26,8 @@ if (!pmssPinnedRemoteAmd64ArtifactsSupported()) {
     return;
 }
 
-// Idempotent: nothing to do when the pinned version is already in place.
-if (pmssAppVersionInstalledMatches('/usr/bin/ttyd', ['/usr/bin/ttyd --version 2>/dev/null'], '/'.preg_quote($ttydVersion, '/').'/')) {
-    return;
-}
-
-// Replace any stale/older copy before installing the pinned version.
-if (!pmssPinnedRemoteStaleBinaryRemove('/usr/bin/ttyd', 'ttyd')) {
+// Keep the matching version; guard removal before replacing a stale copy.
+if (!pmssPinnedRemoteBinaryPrepareInstall('/usr/bin/ttyd', ['/usr/bin/ttyd --version 2>/dev/null'], '/'.preg_quote($ttydVersion, '/').'/', 'ttyd')) {
     return;
 }
 

@@ -28,6 +28,13 @@ function pmssPinnedRemoteStaleBinaryRemove(string $path, string $label): bool
     return true;
 }
 
+/** Prepare a pinned binary only when its installed version does not match. */
+function pmssPinnedRemoteBinaryPrepareInstall(string $path, array $commands, string $pattern, string $label): bool
+{
+    return !pmssAppVersionInstalledMatches($path, $commands, $pattern)
+        && pmssPinnedRemoteStaleBinaryRemove($path, $label);
+}
+
 /** Reject archive basenames that could become shell options, path escapes, or log controls. */
 function pmssPinnedRemoteArchiveComponentIsSafe(string $component): bool
 {

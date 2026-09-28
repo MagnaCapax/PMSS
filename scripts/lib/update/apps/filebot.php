@@ -10,11 +10,7 @@
 require_once __DIR__.'/remoteBinary.php';
 
 $filebotPath = '/usr/bin/filebot';
-if (pmssAppVersionInstalledMatches($filebotPath, [escapeshellarg($filebotPath).' -version 2>/dev/null'], '/4\.9\.4 \(r8736\)/')) {
-    return;
-}
-
-if (!pmssPinnedRemoteStaleBinaryRemove($filebotPath, 'FileBot')) {
+if (!pmssPinnedRemoteBinaryPrepareInstall($filebotPath, [escapeshellarg($filebotPath).' -version 2>/dev/null'], '/4\.9\.4 \(r8736\)/', 'FileBot')) {
     return;
 }
 pmssInstallPinnedRemoteDebPackage(

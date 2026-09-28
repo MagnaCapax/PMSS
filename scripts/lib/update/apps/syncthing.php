@@ -16,11 +16,7 @@ if (!pmssPinnedRemoteAmd64ArtifactsSupported()) {
     return;
 }
 
-if (pmssAppVersionInstalledMatches('/usr/bin/syncthing', ['/usr/bin/syncthing version 2>/dev/null'], '/'.preg_quote($syncthingVersion, '/').'/')) {
-    return;
-}
-
-if (!pmssPinnedRemoteStaleBinaryRemove('/usr/bin/syncthing', 'Syncthing')) {
+if (!pmssPinnedRemoteBinaryPrepareInstall('/usr/bin/syncthing', ['/usr/bin/syncthing version 2>/dev/null'], '/'.preg_quote($syncthingVersion, '/').'/', 'Syncthing')) {
     return;
 }
 echo "*** Syncthing not present, downloading and adding!\n";
