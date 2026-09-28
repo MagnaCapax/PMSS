@@ -169,7 +169,6 @@ class UpdateAppInstallerContractsTest extends TestCase
                     "require_once __DIR__.'/remoteBinary.php';",
                     'syncthing version 2>/dev/null',
                     'pmssPinnedRemoteAmd64ArtifactsSupported()',
-                    "pmssPathExistsOrLink('/usr/bin/syncthing')",
                     "pmssPinnedRemoteStaleBinaryRemove('/usr/bin/syncthing', 'Syncthing')",
                     'https://github.com/syncthing/syncthing/releases/download/',
                     'syncthing-linux-amd64-',
@@ -177,6 +176,7 @@ class UpdateAppInstallerContractsTest extends TestCase
                     "'Installing Syncthing binary'",
                     'install -m 0755',
                 ],
+                'forbidden' => ["pmssPathExistsOrLink('/usr/bin/syncthing')" => 'The stale-binary helper handles absent paths'],
             ],
             'vnstat.php' => [
                 'required' => [

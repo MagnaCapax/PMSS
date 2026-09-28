@@ -20,10 +20,7 @@ function pmssPinnedRemoteStaleBinaryRemove(string $path, string $label): bool
         return false;
     }
 
-    if (!pmssPathExistsOrLink($path)) {
-        return true;
-    }
-    if (!@unlink($path)) {
+    if (pmssPathExistsOrLink($path) && !@unlink($path)) {
         logmsg("[WARN] Unable to remove stale {$label} binary; leaving existing install in place");
         return false;
     }

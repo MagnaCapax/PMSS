@@ -20,10 +20,8 @@ if (pmssAppVersionInstalledMatches('/usr/bin/syncthing', ['/usr/bin/syncthing ve
     return;
 }
 
-if (pmssPathExistsOrLink('/usr/bin/syncthing')) {
-    if (!pmssPinnedRemoteStaleBinaryRemove('/usr/bin/syncthing', 'Syncthing')) {
-        return;
-    }
+if (!pmssPinnedRemoteStaleBinaryRemove('/usr/bin/syncthing', 'Syncthing')) {
+    return;
 }
 echo "*** Syncthing not present, downloading and adding!\n";
 
