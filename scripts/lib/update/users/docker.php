@@ -21,8 +21,7 @@ function pmssUserMaintenanceUsernameAllowed(string $user, string $context): bool
         return true;
     }
 
-    $safeUser = preg_replace('/[\r\n\0]+/', '?', $user);
-    $safeUser = is_string($safeUser) && $safeUser !== '' ? $safeUser : '(empty)';
+    $safeUser = pmssLogSafeLabel($user);
     logMessage(sprintf('[WARN] %s refused invalid username: %s', $context, $safeUser));
     return false;
 }

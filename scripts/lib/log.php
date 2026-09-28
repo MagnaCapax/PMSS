@@ -19,6 +19,9 @@ function pmssLogWhitespaceCollapse(string $text): string { return (string) preg_
 /** Replace control-character runs while retaining printable column spacing. */
 function pmssLogControlCharactersReplace(string $text): string { return (string) preg_replace('/[[:cntrl:]]+/', ' ', $text); }
 
+/** Keep account labels on one line while preserving printable characters. */
+function pmssLogSafeLabel(string $value): string { $label = preg_replace('/[\r\n\0]+/', '?', $value); return is_string($label) && $label !== '' ? $label : '(empty)'; }
+
 /** Convert arbitrary log fields to single-line text, defaulting only when empty. */
 function pmssLogScalarText($value, string $default = ''): string
 {

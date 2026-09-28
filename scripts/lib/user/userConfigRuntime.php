@@ -66,8 +66,7 @@ function pmssUserConfigRtorrentProcessOwnedBy(int $pid, int $uid, string $procRo
  */
 function pmssUserConfigCgroupApplyFailureMessage(string $username, int $rc): string
 {
-    $safeUser = preg_replace('/[\r\n\0]+/', '?', $username);
-    $safeUser = is_string($safeUser) && $safeUser !== '' ? $safeUser : '(empty)';
+    $safeUser = pmssLogSafeLabel($username);
     return sprintf(
         'Warning: cgroup configuration failed for %s (rc=%d); update-step2 will check and retry slice policy drift',
         $safeUser,
@@ -81,8 +80,7 @@ function pmssUserConfigCgroupApplyFailureMessage(string $username, int $rc): str
 function pmssUserConfigCgroupApplyFailureLog(string $username, int $rc): void
 {
     $message = pmssUserConfigCgroupApplyFailureMessage($username, $rc);
-    $safeUser = preg_replace('/[\r\n\0]+/', '?', $username);
-    $safeUser = is_string($safeUser) && $safeUser !== '' ? $safeUser : '(empty)';
+    $safeUser = pmssLogSafeLabel($username);
     fwrite(STDERR, $message."\n");
     if (function_exists('logMessage')) {
         logMessage($message);

@@ -49,8 +49,7 @@ function pmssUserRefreshMarkDone(string $user, string $signature): void
 {
     $path = pmssUserRefreshMarkerPath($user);
     if ($path === '') {
-        $safeUser = (string) preg_replace('/[\r\n\0]+/', '?', $user);
-        logMessage('[WARN] Refusing to write unsafe user refresh marker for '.($safeUser === '' ? '(empty)' : $safeUser));
+        logMessage('[WARN] Refusing to write unsafe user refresh marker for '.pmssLogSafeLabel($user));
         return;
     }
 

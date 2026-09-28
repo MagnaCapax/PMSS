@@ -77,8 +77,7 @@ if ($action === 'start-containers' && !pmssUserDockerContainerIdsValid(array_sli
 /** Return a single-line value safe for stderr and log context. */
 function userDockerSafeLabel(string $value): string
 {
-    $label = preg_replace('/[\r\n\0]+/', '?', $value);
-    return is_string($label) && $label !== '' ? $label : '(empty)';
+    return pmssLogSafeLabel($value);
 }
 
 /** Resolve only managed account names with a positive UID before shelling out. */
