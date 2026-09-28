@@ -925,6 +925,10 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ## User Management (CLI)
 
+- Shared traffic and IOPS integer setting parsing accepts non-negative values
+  only when PHP can represent them as an integer. Oversized decimal strings and
+  floating values take the existing parse-failure path before persistence.
+
 - `scripts/util/writeHomeMarker.php <user> <marker> <intValue>` accepts unsigned
   decimal marker values, including zero and leading zeroes, only when they fit
   a PHP integer. Invalid or oversized values retain exit code 4 and the

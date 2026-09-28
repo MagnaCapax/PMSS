@@ -37,10 +37,20 @@ function pmssIntegerSettingParseNonNegative($raw, string $suffix = '', ?string &
             $error = 'invalid format';
             return null;
         }
-        $value = (int) $matches[1];
+        // Do not turn an oversized quota into PHP_INT_MAX before persisting it.
+        $value = pmssUnsignedDecimalIntParse($matches[1]);
+        if ($value === null) {
+            $error = 'out of range';
+            return null;
+        }
     } elseif (is_float($raw)) {
         if (floor($raw) != $raw) {
             $error = 'must be an integer';
+            return null;
+        }
+        // PHP floats cannot represent PHP_INT_MAX exactly on 64-bit hosts.
+        if (!is_finite($raw) || $raw >= (float) PHP_INT_MAX) {
+            $error = 'out of range';
             return null;
         }
         $value = (int) $raw;

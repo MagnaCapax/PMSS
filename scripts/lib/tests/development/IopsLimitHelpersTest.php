@@ -27,6 +27,20 @@ class IopsLimitHelpersTest extends TestCase
         }
     }
 
+    public function testIntegerSettingsRejectUnrepresentableValues(): void
+    {
+        $over = '9223372036854775808';
+        foreach ([$over, '000'.$over, $over.' ops', 1.0E20, INF] as $raw) {
+            $error = null;
+            $this->assertSame(null, \pmssIopsLimitParseMonthlyOperations($raw, $error));
+            $this->assertSame('out of range', $error);
+        }
+
+        $error = null;
+        $this->assertSame(PHP_INT_MAX, \pmssIopsLimitParseMonthlyOperations((string) PHP_INT_MAX, $error));
+        $this->assertSame(null, $error);
+    }
+
     public function testReadsMonthlyIopsUsageFromSerializedResourcePayload(): void
     {
         $path = $this->pmssWriteTempFile('iops-resource-', serialize([
