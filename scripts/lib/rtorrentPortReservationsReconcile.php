@@ -51,22 +51,18 @@ function pmssRtorrentPortReservationsReconcile(
 
     try {
         $references = array();
+        $specs = pmssRtorrentPortReservationSpecs();
         foreach ($users as $user) {
             if (!pmssRtorrentPortReservationUsernameIsValid($user)) {
                 return array_replace($result, array('status' => 'skipped', 'reason' => 'invalid_user_list'));
             }
             $stored = pmssRtorrentPortReservationStoredSource($user, $configRoot);
             $configured = pmssRtorrentPortReservationConfigSource(rtrim($homeRoot, '/').'/'.$user.'/.rtorrent.rc');
-            $uncertainType = '';
-            foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
+            foreach ($specs as $type => $spec) {
                 if (!empty($stored['uncertain'][$type])
                     || (!isset($stored['ports'][$type]) && !empty($configured['uncertain'][$type]))) {
-                    $uncertainType = $type;
-                    break;
+                    return array_replace($result, array('status' => 'skipped', 'reason' => 'uncertain_'.$type.'_ownership'));
                 }
-            }
-            if ($uncertainType !== '') {
-                return array_replace($result, array('status' => 'skipped', 'reason' => 'uncertain_'.$uncertainType.'_ownership'));
             }
             pmssRtorrentPortReservationsReferenceMerge($references, $stored);
             pmssRtorrentPortReservationsReferenceMerge($references, $configured);
@@ -74,25 +70,24 @@ function pmssRtorrentPortReservationsReconcile(
 
         // Validate every marker directory before removing from any of them.
         $entries = array();
-        foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
+        foreach ($specs as $type => $spec) {
             $directory = $portsBase.'/'.$type;
             if (!pmssPathExistsOrLink($directory)) {
                 $entries[$type] = array();
                 continue;
             }
-            if (!is_dir($directory) || is_link($directory) || !pmssPathTargetIsSafe($directory, true)) {
-                return array_replace($result, array('status' => 'skipped', 'reason' => 'unsafe_marker_directory'));
-            }
-            $listed = pmssDirectoryEntriesRead($directory);
+            $listed = is_dir($directory) && !is_link($directory) && pmssPathTargetIsSafe($directory, true)
+                ? pmssDirectoryEntriesRead($directory)
+                : false;
             if (!is_array($listed)) {
                 return array_replace($result, array('status' => 'skipped', 'reason' => 'unsafe_marker_directory'));
             }
-            $entries[$type] = array_values($listed);
+            $entries[$type] = $listed;
         }
         $now = $now ?? time();
         $graceSeconds = max(0, $graceSeconds);
         foreach ($entries as $type => $names) {
-            $spec = pmssRtorrentPortReservationSpecs()[$type];
+            $spec = $specs[$type];
             foreach ($names as $name) {
                 $path = $portsBase.'/'.$type.'/'.$name;
                 $port = pmssNetworkPortParseDigits($name, $spec['min'], $spec['max']);
