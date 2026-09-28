@@ -15,6 +15,31 @@ class CheckDirectoriesCronTest extends TestCase
         $this->assertTrue(array_search('/var/run/pmss', $dirs, true) < array_search('/var/run/pmss/api', $dirs, true));
     }
 
+    public function testPublicDirectoryIsSeparateAndRejectsSymlink(): void
+    {
+        $this->assertSame(['/var/lib/pmss/public'], \pmssCheckDirectoriesPublicDirectories());
+        $messages = [];
+        $target = $this->tempDir.'/target';
+        $this->pmssEnsureDir($target, 0700);
+        $link = $this->tempDir.'/public';
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+        $this->assertFalse(\pmssCheckDirectoriesEnsurePublicDirectory($link, $this->pmssMakeArrayLogger($messages), posix_geteuid(), posix_getegid()));
+        $this->assertSame(0700, fileperms($target) & 0777);
+        $this->pmssAssertMessagesContain($messages, 'not a root-owned real directory');
+    }
+
+    public function testPublicDirectoryCreatesWithTraversalAndRefusesFile(): void
+    {
+        $messages = [];
+        $path = $this->tempDir.'/public';
+        $this->assertTrue(\pmssCheckDirectoriesEnsurePublicDirectory($path, $this->pmssMakeArrayLogger($messages), posix_geteuid(), posix_getegid()));
+        $this->assertSame(0755, fileperms($path) & 0777);
+        $file = $this->pmssWriteFile($this->tempDir.'/occupied', 'x');
+        $this->assertFalse(\pmssCheckDirectoriesEnsurePublicDirectory($file, $this->pmssMakeArrayLogger($messages), posix_geteuid(), posix_getegid()));
+        $this->assertFalse(\pmssCheckDirectoriesEnsurePublicDirectory($path, $this->pmssMakeArrayLogger($messages), posix_geteuid() + 1, posix_getegid()));
+        $this->assertSame(0755, fileperms($path) & 0777);
+    }
+
     public function testEnsureDirectoryCreatesAndNormalizesDirectory(): void
     {
         $messages = [];

@@ -7,6 +7,7 @@
  */
 
 require_once dirname(__DIR__).'/lighttpd/userFileWrite.php';
+require_once dirname(__DIR__).'/runtime/directories.php';
 
 /** Parse one finite, non-negative metric with an optional unit suffix. */
 function pmssSystemStatsHostPressureMetricParse($value, string $suffix = ''): ?float
@@ -39,8 +40,11 @@ function pmssSystemStatsHostPressurePayloadBuild(array $stats, ?int $timestamp =
 }
 
 /** Atomically publish the latest host-pressure snapshot as root:root 0644. */
-function pmssSystemStatsHostPressureSnapshotWrite(string $path, array $stats, ?int $timestamp = null): bool
+function pmssSystemStatsHostPressureSnapshotWrite(string $path, array $stats, ?int $timestamp = null, int $ownerUid = 0, int $ownerGid = 0): bool
 {
+    if (!pmssCheckDirectoriesEnsurePublicDirectory(dirname($path), static function (string $message): void {
+        fwrite(STDERR, $message.PHP_EOL);
+    }, $ownerUid, $ownerGid)) return false;
     $payload = pmssSystemStatsHostPressurePayloadBuild($stats, $timestamp);
     $json = pmssJsonEncodeSafe($payload, JSON_UNESCAPED_SLASHES);
     return is_string($json) && pmssAtomicWriteFile($path, $json.PHP_EOL, 0644);

@@ -12,7 +12,7 @@ require_once __DIR__.'/../lib/systemStats/hostPressure.php';
 // Periodic stats snapshot for postmortem analysis.
 $logDir = '/var/log/pmss';
 $logFile = $logDir.'/system-stats.log';
-$hostPressureFile = $logDir.'/host-pressure.json';
+$hostPressureFile = '/var/lib/pmss/public/host-pressure.json';
 pmssDirEnsureExists($logDir, 0755);
 
 // Gather metrics from procfs + optional ioping/ps.

@@ -42,6 +42,43 @@ function pmssCheckDirectoriesRequiredDirectories(): array
     );
 }
 
+/** Return the one directory intended for customer-readable projections. */
+function pmssCheckDirectoriesPublicDirectories(): array
+{
+    return ['/var/lib/pmss/public'];
+}
+
+/** Ensure a public projection directory without following or taking over an unsafe path. */
+function pmssCheckDirectoriesEnsurePublicDirectory(string $path, callable $log, int $ownerUid = 0, int $ownerGid = 0): bool
+{
+    if ($path === '') {
+        $log("WARN: invalid public directory or owner: $path");
+        return false;
+    }
+    clearstatcache(true, $path);
+    $stat = @lstat($path);
+    if ($stat !== false && (($stat['mode'] & 0170000) !== 0040000 || $stat['uid'] !== $ownerUid || $stat['gid'] !== $ownerGid)) {
+        $log("WARN: public directory is not a root-owned real directory: $path");
+        return false;
+    }
+    if ($stat === false && !@mkdir($path, 0755)) {
+        $log("WARN: failed to create public directory: $path");
+        return false;
+    }
+    // Recheck after creation, including a concurrent replacement of the path.
+    clearstatcache(true, $path);
+    $stat = @lstat($path);
+    if ($stat === false || ($stat['mode'] & 0170000) !== 0040000 || $stat['uid'] !== $ownerUid || $stat['gid'] !== $ownerGid) {
+        $log("WARN: public directory is not a root-owned real directory: $path");
+        return false;
+    }
+    if (!@chmod($path, 0755)) {
+        $log("WARN: failed to set mode 0755 on $path");
+        return false;
+    }
+    return true;
+}
+
 /** Ensure one runtime/log directory exists with root-only traversal permissions. */
 function pmssCheckDirectoriesEnsureDirectory(string $thisDir, callable $log, string $owner = 'root'): bool
 {
@@ -92,6 +129,12 @@ function pmssCheckDirectoriesMain(?Logger $logger = null, ?array $requiredDirect
 
     foreach (($requiredDirectories ?? pmssCheckDirectoriesRequiredDirectories()) as $thisDir) {
         pmssCheckDirectoriesEnsureDirectory((string) $thisDir, $log);
+    }
+
+    if ($requiredDirectories === null) {
+        foreach (pmssCheckDirectoriesPublicDirectories() as $publicDir) {
+            pmssCheckDirectoriesEnsurePublicDirectory($publicDir, $log);
+        }
     }
 
     return 0;

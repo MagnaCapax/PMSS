@@ -209,6 +209,14 @@ final class CustomerStatsLayoutTest extends TestCase
         $this->assertStringNotContainsString('Average: n/a', $output);
     }
 
+    public function testStorageIoRenderKeepsSeparatePreformattedLines(): void
+    {
+        [, $output] = $this->pmssCaptureStdout(function (): void {
+            \pmssStatsRenderResourceBlocks(['data' => [], 'time' => 0, 'error' => null]);
+        });
+        $this->assertTrue(preg_match('/<pre[^>]*>\s*Resource usage at [^\n]*\nI\/O Read [^\n]*\nI\/O Write [^\n]*\nPast 30 days total I\/O operations:/', $output) === 1);
+    }
+
     public function testStatsStatusHelpersCharacterizeLocalResourceContracts(): void
     {
         $cgroupDir = $this->pmssMakeTempDir('pmss-stats-cgroup-');

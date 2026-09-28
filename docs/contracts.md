@@ -882,16 +882,21 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ## Customer Server Status – `etc/skel/www/welcome.php` and `stats.php`
 
-- `pmssStatsChartOptions()` caps the shared Traffic, CPU, Storage I/O, and IOPS chart x-axis at six visible date ticks so month-long daily histories remain readable.
+- `pmssStatsChartOptions()` caps the shared Traffic, CPU, Storage I/O, and IOPS chart x-axis at six visible date ticks and gives legends explicit point markers, width, and spacing.
+- The Storage I/O text block emits explicit newlines between read, write, and
+  operations values; PHP template close tags otherwise consume source newlines.
 - `pmssWelcomeServerInfoHtmlBuild()` renders host uptime plus the 1/5/15-minute load averages after the per-account RAM section.
 - Load is explicitly labeled as shared-server data rather than a per-account metric.
 - `/proc/uptime` and `/proc/loadavg` are read directly from the customer tree without shelling; each unavailable or malformed metric fails soft to `unavailable` without hiding the other metric.
-- `pmssStorageHealthNoticeHtmlRead()` renders the existing `/home` RAID
-  degradation/resync notice first, otherwise a host-pressure notice when the
-  fresh root-produced snapshot reports five-minute full I/O PSI of at least
-  20% or `/home` median ioping latency above 100 ms.
-- Host-pressure snapshots older than 15 minutes, future-dated, malformed, or
-  symlinked fail soft to no notice; customer PHP never loads operator `/scripts`.
+- `info.php` renders the `/home` RAID notice first, then a full-width standing
+  Server storage row. The row is absent when `/proc/pressure/io` is missing,
+  unavailable when it cannot be read or parsed, and heavy when live five-minute
+  full I/O PSI reaches 20% or fresh `/home` ioping exceeds 100 ms.
+- `welcome.php` retains an alert-only notice, with RAID taking precedence over
+  heavy host pressure. Root cron publishes the optional ioping measurement to
+  `/var/lib/pmss/public/host-pressure.json` at mode 0644. Snapshots older than
+  15 minutes, future-dated, malformed, oversized, or symlinked are ignored;
+  customer PHP never loads operator `/scripts`.
 
 ## Customer Torrent-State Backup – `etc/skel/www/scriptsInc.php` and `welcome.php`
 

@@ -246,7 +246,7 @@ function pmssStatsChartOptions() {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-            legend: { position: 'top' },
+            legend: { position: 'top', labels: { boxWidth: 12, padding: 12, usePointStyle: true, pointStyle: 'circle' } },
             tooltip: { mode: 'index', intersect: false }
         },
         scales: {

@@ -295,7 +295,7 @@ PHP;
         $path = $dir.'/host-pressure.json';
         $stats = ['psiIo' => '1/2/3/4/5/6/7/8', 'iopingHome' => '100.0ms'];
 
-        $this->assertTrue(\pmssSystemStatsHostPressureSnapshotWrite($path, $stats, 100));
+        $this->assertTrue(\pmssSystemStatsHostPressureSnapshotWrite($path, $stats, 100, posix_geteuid(), posix_getegid()));
         $this->pmssAssertArraySubsetSame([
             'timestamp' => 100,
             'psi_io_full_avg300' => 6,
@@ -308,7 +308,7 @@ PHP;
         $link = $dir.'/link';
         $this->pmssWriteFile($target, "unchanged\n");
         $this->pmssCreateSymlinkOrSkip($target, $link);
-        $this->assertFalse(\pmssSystemStatsHostPressureSnapshotWrite($link, $stats, 101));
+        $this->assertFalse(\pmssSystemStatsHostPressureSnapshotWrite($link, $stats, 101, posix_geteuid(), posix_getegid()));
         $this->assertSame("unchanged\n", file_get_contents($target));
     }
 }

@@ -466,8 +466,8 @@ function pmssStatsRenderResourceBlocks(array $resourceState): void
     <h6>Storage I/O</h6>
     <pre style="margin-bottom:12px;">
 Resource usage at <?php echo date('Y-m-d H:i:s', (int)$resourceState['time']); ?>:
-I/O Read (month/week/day/hour): <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['month'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['week'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['day'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['hour'] ?? 'n/a'); ?>
-I/O Write (month/week/day/hour): <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['month'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['week'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['day'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['hour'] ?? 'n/a'); ?>
+I/O Read (month/week/day/hour): <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['month'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['week'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['day'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioReadDisplay']['hour'] ?? 'n/a')."\n"; ?>
+I/O Write (month/week/day/hour): <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['month'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['week'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['day'] ?? 'n/a'); ?> / <?php echo pmssCustomerHtmlAttr($snapshot['ioWriteDisplay']['hour'] ?? 'n/a')."\n"; ?>
 Past 30 days total I/O operations: <?php echo pmssCustomerHtmlAttr(pmssFormatIoOperationsShort($snapshot['ioOperationsMonth'])); ?>
     </pre>
 

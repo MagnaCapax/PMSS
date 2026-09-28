@@ -25,6 +25,11 @@
  */
 require_once __DIR__.'/scriptsInc.php';
 
+const PMSS_STORAGE_PSI_HEAVY = 20.0;
+const PMSS_STORAGE_IOPING_SLOW = 100.0;
+const PMSS_STORAGE_HEAVY_TITLE = 'Shared storage is under heavy load';
+const PMSS_STORAGE_HEAVY_MESSAGE = 'Disk-backed services may respond more slowly while the server-wide I/O queue clears. Repeated service restarts will not make this condition clear faster.';
+
 if (!function_exists('pmssStorageHealthHomeArrayResolve')) {
     /** Resolve which md array backs /home via /proc/mounts. Returns 'mdN' or null. */
     function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
@@ -189,45 +194,70 @@ HTML;
     }
 }
 
-if (!function_exists('pmssStorageHealthHostPressureMetricFloat')) {
-    /** Normalize one customer-readable pressure metric at the trust boundary. */
-    function pmssStorageHealthHostPressureMetricFloat($value): ?float
-    {
-        return $value === true ? 1.0 : pmssCustomerNonnegativeFloat($value);
+if (!function_exists('pmssStorageHealthHostPressureStateRead')) {
+    /**
+     * Read live full I/O PSI and an optional fresh ioping measurement.
+     */
+    function pmssStorageHealthHostPressureStateRead(
+        string $path = '/var/lib/pmss/public/host-pressure.json',
+        ?int $now = null,
+        string $psiPath = '/proc/pressure/io'
+    ): array {
+        if (!file_exists($psiPath)) return ['status' => 'absent'];
+        $psiRaw = pmssCustomerFileRead($psiPath, true);
+        if (!is_string($psiRaw) || !preg_match('/^full\s+[^\r\n]*\bavg300=([0-9]+(?:\.[0-9]+)?)(?:\s|$)/m', $psiRaw, $match)) {
+            return ['status' => 'unavailable'];
+        }
+        $psi = pmssCustomerNonnegativeFloat($match[1]);
+        if ($psi === null) return ['status' => 'unavailable'];
+
+        $now = $now ?? time();
+        $state = ['status' => 'normal', 'psi_io_full_avg300' => $psi];
+        $raw = pmssCustomerFileRead($path);
+        if (is_string($raw) && $raw !== '' && strlen($raw) <= 4096) {
+            $payload = pmssJsonDecodeAssoc($raw);
+            $timestamp = is_array($payload) ? pmssCustomerUnsignedIntegerValue($payload['timestamp'] ?? null) : null;
+            if ($timestamp !== null && $now > 0 && $timestamp <= $now && $now - $timestamp <= 900) {
+                $latency = pmssCustomerNonnegativeFloat($payload['ioping_home_ms'] ?? null);
+                if ($latency !== null) {
+                    $state['ioping_home_ms'] = $latency;
+                    $state['ioping_age_min'] = (int) floor(($now - $timestamp) / 60);
+                }
+            }
+        }
+        if ($psi >= PMSS_STORAGE_PSI_HEAVY || (isset($state['ioping_home_ms']) && $state['ioping_home_ms'] > PMSS_STORAGE_IOPING_SLOW)) {
+            $state['status'] = 'heavy';
+        }
+        return $state;
     }
 }
 
-if (!function_exists('pmssStorageHealthHostPressureStateRead')) {
-    /**
-     * Read a fresh host-pressure snapshot and return only alerting signals.
-     *
-     * Latency above the storage benchmark's 100ms idle gate alerts here. A
-     * 20% full PSI average means all non-idle tasks stalled for at least one
-     * minute of the five-minute window, avoiding transient warning churn.
-     */
-    function pmssStorageHealthHostPressureStateRead(
-        string $path = '/var/log/pmss/host-pressure.json',
-        ?int $now = null
-    ): ?array {
-        $raw = pmssCustomerFileRead($path);
-        if (!is_string($raw) || $raw === '' || strlen($raw) > 4096) {
-            return null;
+if (!function_exists('pmssStorageHealthStatusRowHtmlBuild')) {
+    /** Render the standing status row, omitting it on kernels without PSI. */
+    function pmssStorageHealthStatusRowHtmlBuild(array $state): string
+    {
+        $status = $state['status'] ?? 'unavailable';
+        if ($status === 'absent') return '';
+        $message = $status === 'heavy' ? PMSS_STORAGE_HEAVY_TITLE.' — '.PMSS_STORAGE_HEAVY_MESSAGE
+            : ($status === 'normal' ? 'No shared-storage congestion in the last 5 minutes.' : 'Status unavailable right now.');
+        $values = '';
+        if ($status !== 'unavailable') {
+            $psi = pmssCustomerNonnegativeFloat($state['psi_io_full_avg300'] ?? null);
+            if ($psi !== null) {
+                $values = 'I/O wait: '.number_format($psi, 1, '.', '').'% of the last 5 minutes (congested above 20%)';
+            }
+            $latency = pmssCustomerNonnegativeFloat($state['ioping_home_ms'] ?? null);
+            $age = pmssCustomerUnsignedIntegerValue($state['ioping_age_min'] ?? null);
+            if ($latency !== null && $age !== null) {
+                $values .= ' | Storage response: '.number_format($latency, 1, '.', '').' ms (slow above 100 ms), measured '.$age.' min ago';
+            }
         }
-        $payload = pmssJsonDecodeAssoc($raw);
-        $timestamp = is_array($payload)
-            ? pmssCustomerUnsignedIntegerValue($payload['timestamp'] ?? null)
-            : null;
-        $now = $now ?? time();
-        if ($timestamp === null || $now <= 0 || $timestamp > $now || ($now - $timestamp) > 900) {
-            return null;
-        }
-
-        $psi = pmssStorageHealthHostPressureMetricFloat($payload['psi_io_full_avg300'] ?? null);
-        $latency = pmssStorageHealthHostPressureMetricFloat($payload['ioping_home_ms'] ?? null);
-        $state = ['timestamp' => $timestamp];
-        if ($psi !== null && $psi >= 20.0) $state['psi_io_full_avg300'] = $psi;
-        if ($latency !== null && $latency > 100.0) $state['ioping_home_ms'] = $latency;
-        return count($state) > 1 ? $state : null;
+        $class = $status === 'heavy' ? '' : ' pmss-storage-status-neutral';
+        $message = pmssCustomerHtmlAttr($message);
+        $valuesHtml = $values === '' ? '' : '<div class="pmss-raid-meta">'.pmssCustomerHtmlAttr($values).'</div>';
+        return '<div class="pmss-raid-notice pmss-storage-status'.$class.'" role="status" aria-live="polite">'
+            .'<strong>Server storage</strong><p>'.$message.'</p>'.$valuesHtml
+            .'<p><a href="https://pulsedmedia.com/clients/index.php/knowledgebase/118/How-Much-Speed-Does-My-Plan-Include-And-How-to-Get-More.html" target="_blank" rel="noopener">How speed works on a shared server</a></p></div>';
     }
 }
 
@@ -235,22 +265,24 @@ if (!function_exists('pmssStorageHealthHostPressureNoticeHtmlBuild')) {
     /** Build a shared-server I/O pressure notice from validated alert state. */
     function pmssStorageHealthHostPressureNoticeHtmlBuild($state): string
     {
-        if (!is_array($state)) return '';
+        if (!is_array($state) || ($state['status'] ?? null) !== 'heavy') return '';
 
         $details = [];
-        if (isset($state['psi_io_full_avg300'])) {
+        if (isset($state['psi_io_full_avg300']) && $state['psi_io_full_avg300'] >= PMSS_STORAGE_PSI_HEAVY) {
             $details[] = 'I/O wait: '.number_format((float) $state['psi_io_full_avg300'], 1, '.', '').'% of the last 5 minutes';
         }
-        if (isset($state['ioping_home_ms'])) {
+        if (isset($state['ioping_home_ms']) && $state['ioping_home_ms'] > PMSS_STORAGE_IOPING_SLOW) {
             $details[] = 'Storage response: '.number_format((float) $state['ioping_home_ms'], 1, '.', '').' ms';
         }
         if (empty($details)) return '';
 
         $detailHtml = pmssCustomerHtmlAttr(implode(' | ', $details));
+        $title = pmssCustomerHtmlAttr(PMSS_STORAGE_HEAVY_TITLE);
+        $message = pmssCustomerHtmlAttr(PMSS_STORAGE_HEAVY_MESSAGE);
         return <<<HTML
 <div class="pmss-raid-notice pmss-host-pressure-notice" role="status" aria-live="polite">
-    <strong><span class="pmss-raid-icon" aria-hidden="true">&#10071;</span> Shared storage is under heavy load</strong>
-    <p>Disk-backed services may respond more slowly while the server-wide I/O queue clears. Repeated service restarts will not make this condition clear faster.</p>
+    <strong><span class="pmss-raid-icon" aria-hidden="true">&#10071;</span> {$title}</strong>
+    <p>{$message}</p>
     <div class="pmss-raid-meta">{$detailHtml}</div>
 </div>
 HTML;
@@ -262,8 +294,9 @@ if (!function_exists('pmssStorageHealthNoticeHtmlRead')) {
     function pmssStorageHealthNoticeHtmlRead(
         ?string $mountsPath = null,
         ?array $raidEntries = null,
-        string $hostPressurePath = '/var/log/pmss/host-pressure.json',
-        ?int $now = null
+        string $hostPressurePath = '/var/lib/pmss/public/host-pressure.json',
+        ?int $now = null,
+        string $psiPath = '/proc/pressure/io'
     ): string {
         $raidHtml = pmssStorageHealthHomeRaidNoticeHtmlBuild(
             pmssStorageHealthHomeRaidActivity($mountsPath, $raidEntries)
@@ -271,7 +304,7 @@ if (!function_exists('pmssStorageHealthNoticeHtmlRead')) {
         if ($raidHtml !== '') return $raidHtml;
 
         return pmssStorageHealthHostPressureNoticeHtmlBuild(
-            pmssStorageHealthHostPressureStateRead($hostPressurePath, $now)
+            pmssStorageHealthHostPressureStateRead($hostPressurePath, $now, $psiPath)
         );
     }
 }

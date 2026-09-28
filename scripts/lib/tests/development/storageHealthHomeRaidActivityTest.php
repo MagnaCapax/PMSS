@@ -168,25 +168,25 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         );
     }
 
+    private function psiPath(string $full = '4.25'): string
+    {
+        return $this->pmssWriteRelativeFile($this->tmpDir, 'pressure-'.bin2hex(random_bytes(3)),
+            "some avg10=1.00 avg60=2.00 avg300=3.00 total=12\nfull avg10=1.25 avg60=2.50 avg300={$full} total=34\n", 0700);
+    }
+
     public function testHostPressureStateUsesConservativeThresholds(): void
     {
         $now = 2000;
-        $healthy = $this->hostPressurePath([
-            'timestamp' => $now,
-            'psi_io_full_avg300' => 19.9,
-            'ioping_home_ms' => 100.0,
-        ]);
-        $this->assertSame(null, \pmssStorageHealthHostPressureStateRead($healthy, $now));
-
-        foreach ([
-            ['field' => 'psi_io_full_avg300', 'value' => 20.0],
-            ['field' => 'ioping_home_ms', 'value' => 100.1],
-        ] as $case) {
-            $path = $this->hostPressurePath(['timestamp' => $now, $case['field'] => $case['value']]);
-            $state = \pmssStorageHealthHostPressureStateRead($path, $now);
-            $this->assertTrue(is_array($state), 'Expected threshold boundary to alert');
-            $this->assertTrue(isset($state[$case['field']]), 'Expected matching pressure signal');
-        }
+        $healthy = $this->hostPressurePath(['timestamp' => $now, 'ioping_home_ms' => 100.0]);
+        $this->assertSame('normal', \pmssStorageHealthHostPressureStateRead($healthy, $now, $this->psiPath('19.9'))['status']);
+        $this->assertSame('heavy', \pmssStorageHealthHostPressureStateRead($healthy, $now, $this->psiPath('20.0'))['status']);
+        $slow = $this->hostPressurePath(['timestamp' => $now, 'ioping_home_ms' => 100.1]);
+        $this->assertSame('heavy', \pmssStorageHealthHostPressureStateRead($slow, $now, $this->psiPath())['status']);
+        $this->assertSame(4.25, \pmssStorageHealthHostPressureStateRead($slow, $now, $this->psiPath())['psi_io_full_avg300']);
+        $this->assertSame('absent', \pmssStorageHealthHostPressureStateRead($slow, $now, $this->tmpDir.'/missing')['status']);
+        $this->assertSame('', \pmssStorageHealthStatusRowHtmlBuild(['status' => 'absent']));
+        $this->assertSame('unavailable', \pmssStorageHealthHostPressureStateRead($slow, $now, $this->tmpDir)['status']);
+        $this->assertSame('unavailable', \pmssStorageHealthHostPressureStateRead($slow, $now, $this->psiPath('broken'))['status']);
     }
 
     public function testHostPressureStateRejectsStaleMalformedAndUnsafeSnapshots(): void
@@ -197,18 +197,23 @@ class StorageHealthHomeRaidActivityTest extends TestCase
             $this->hostPressurePath(['timestamp' => $now + 1, 'ioping_home_ms' => 500]),
             $this->pmssWriteFile($this->tmpDir.'/malformed.json', '{broken'),
         ] as $path) {
-            $this->assertSame(null, \pmssStorageHealthHostPressureStateRead($path, $now));
+            $state = \pmssStorageHealthHostPressureStateRead($path, $now, $this->psiPath());
+            $this->assertSame('normal', $state['status']);
+            $this->assertFalse(isset($state['ioping_home_ms']));
         }
 
         $target = $this->hostPressurePath(['timestamp' => $now, 'ioping_home_ms' => 500]);
         $link = $this->tmpDir.'/host-pressure-link.json';
         $this->pmssCreateSymlinkOrSkip($target, $link);
-        $this->assertSame(null, \pmssStorageHealthHostPressureStateRead($link, $now));
+        $this->assertSame('normal', \pmssStorageHealthHostPressureStateRead($link, $now, $this->psiPath())['status']);
+        $oversized = $this->pmssWriteFile($this->tmpDir.'/oversized.json', str_repeat(' ', 4097));
+        $this->assertSame('normal', \pmssStorageHealthHostPressureStateRead($oversized, $now, $this->psiPath())['status']);
     }
 
     public function testHostPressureNoticeExplainsSharedServerCondition(): void
     {
         $html = \pmssStorageHealthHostPressureNoticeHtmlBuild([
+            'status' => 'heavy',
             'psi_io_full_avg300' => 25.25,
             'ioping_home_ms' => 125.75,
         ]);
@@ -219,6 +224,14 @@ class StorageHealthHomeRaidActivityTest extends TestCase
             'Storage response: 125.8 ms',
         ], $html);
         $this->assertSame('', \pmssStorageHealthHostPressureNoticeHtmlBuild([]));
+        $row = \pmssStorageHealthStatusRowHtmlBuild([
+            'status' => 'heavy', 'psi_io_full_avg300' => 25.25,
+            'ioping_home_ms' => 125.75, 'ioping_age_min' => 2,
+        ]);
+        $this->assertStringContainsAllStrings(['Server storage', 'I/O wait: 25.3%', 'Storage response: 125.8 ms', 'measured 2 min ago'], $row);
+        $this->assertStringNotContainsString('<script>', \pmssStorageHealthStatusRowHtmlBuild([
+            'status' => 'normal', 'psi_io_full_avg300' => '<script>', 'ioping_home_ms' => '<script>',
+        ]));
     }
 
     public function testCombinedNoticePrefersSpecificRaidActivity(): void
@@ -229,7 +242,8 @@ class StorageHealthHomeRaidActivityTest extends TestCase
             $this->homeMountsPath('/dev/md1'),
             [['array' => 'md1', 'resync' => 'resync = 50.0% finish=10min speed=1000K/sec']],
             $pressurePath,
-            $now
+            $now,
+            $this->psiPath()
         );
         $this->assertStringContainsString('Home storage maintenance in progress', $raidHtml);
         $this->assertStringNotContainsString('Shared storage is under heavy load', $raidHtml);
@@ -238,9 +252,16 @@ class StorageHealthHomeRaidActivityTest extends TestCase
             $this->homeMountsPath('/dev/vda1'),
             [],
             $pressurePath,
-            $now
+            $now,
+            $this->psiPath()
         );
         $this->assertStringContainsString('Shared storage is under heavy load', $pressureHtml);
+    }
+
+    public function testInfoRendersRaidNoticeBeforeStandingStatus(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/info.php');
+        $this->assertTrue(strpos($source, 'echo $pmssStorageHealthNoticeHtml') < strpos($source, 'echo $pmssStorageStatusHtml'));
     }
 
 }

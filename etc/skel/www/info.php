@@ -12,6 +12,7 @@
  */
 
 $pmssStorageHealthNoticeHtml = '';
+$pmssStorageStatusHtml = '';
 // Customer-side storage-health notice: see storageHealthNotice.php for rationale.
 // The full /scripts/lib/storageHealth.php (with SMART/NVMe paths) remains
 // operator-side; customer PHP reads only world-readable kernel state and the
@@ -19,12 +20,14 @@ $pmssStorageHealthNoticeHtml = '';
 $pmssStorageHealthNoticeLib = __DIR__.'/storageHealthNotice.php';
 if (file_exists($pmssStorageHealthNoticeLib)) {
     require_once $pmssStorageHealthNoticeLib;
-    if (function_exists('pmssStorageHealthNoticeHtmlRead')) {
-        $pmssStorageHealthNoticeHtml = pmssStorageHealthNoticeHtmlRead();
-    } elseif (function_exists('pmssStorageHealthHomeRaidActivity')) {
-        // Preserve the RAID notice during staggered guiv delivery of the helper.
+    if (function_exists('pmssStorageHealthHomeRaidActivity')) {
         $pmssStorageHealthNoticeHtml = pmssStorageHealthHomeRaidNoticeHtmlBuild(
             pmssStorageHealthHomeRaidActivity()
+        );
+    }
+    if (function_exists('pmssStorageHealthStatusRowHtmlBuild')) {
+        $pmssStorageStatusHtml = pmssStorageHealthStatusRowHtmlBuild(
+            pmssStorageHealthHostPressureStateRead()
         );
     }
 }
@@ -60,6 +63,14 @@ if (file_exists($pmssStorageHealthNoticeLib)) {
         background: #fff1f1;
         color: #7a1a1a;
       }
+      .pmss-storage-status-neutral {
+        border-color: #b9c8cf;
+        background: #f3f7f8;
+        color: #263d46;
+      }
+      .pmss-storage-status {
+        overflow-wrap: anywhere;
+      }
       .pmss-raid-notice p {
         margin: 8px 0 0;
       }
@@ -81,6 +92,7 @@ if (file_exists($pmssStorageHealthNoticeLib)) {
 <h1>Seedbox information</h1>
             <div class="portfoliobox">
 <?php if ($pmssStorageHealthNoticeHtml !== '') echo $pmssStorageHealthNoticeHtml; ?>
+<?php if ($pmssStorageStatusHtml !== '') echo $pmssStorageStatusHtml; ?>
 
 <div id="stats">
  <?php

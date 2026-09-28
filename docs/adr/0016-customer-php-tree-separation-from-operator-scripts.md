@@ -50,7 +50,7 @@ Customer-facing helpers live in `etc/skel/www/` (bundled per-user, distributed b
 
 If a helper needs operator-collected data (e.g., SMART/NVMe status that requires root to gather):
 
-- Operator-side: `/scripts/cron/<helper>.php` (or similar) writes a **customer-readable artifact** to `/var/log/pmss/<artifact>.jsonl` (mode 644) or similar.
+- Operator-side: `/scripts/cron/<helper>.php` (or similar) writes a **customer-readable artifact** to `/var/lib/pmss/public/<artifact>.json` (mode 644) or similar.
 - Customer-side: `etc/skel/www/<helper>.php` reads the artifact, parses it, and renders the customer-visible output.
 - The two sides communicate via a shared data file. Customer PHP never executes operator-side code.
 
