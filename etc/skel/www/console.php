@@ -83,11 +83,14 @@ if (!$running) {
 
     // Start the shell in the customer's HOME. The per-user lighttpd (and its
     // php-cgi children) inherit cwd=/root from the root cron that starts them,
-    // so without this cd the console opens in an inaccessible /root. Keep
+    // so without this cd the console opens in an inaccessible /root. php-cgi
+    // carries no HOME either, so export the passwd home with the cd: scripts that
+    // read $HOME (install-media-stack.sh) otherwise refuse to run (GH #968). Keep
     // ttyd diagnostics in the private lighttpd tree; they are surfaced only
     // when the socket never appears, not as customer-session output.
     $spawnLog = $home.'/.lighttpd/console-error.log';
     $spawn = 'cd '.escapeshellarg($home).' 2>/dev/null || exit 1; '
+        .'export HOME='.escapeshellarg($home).'; '
         .': > '.escapeshellarg($spawnLog).' 2>/dev/null || exit 1; '
         .$cmd.' </dev/null >/dev/null 2>>'.escapeshellarg($spawnLog);
     // Fully detach so ttyd outlives this php-cgi request. Capture outer-shell

@@ -75,6 +75,17 @@ class BrowserConsoleArtifactsTest extends TestCase
         $this->assertStringContainsString('Try again', $src);
     }
 
+    public function testLauncherExportsPasswdHomeWithTheCd(): void
+    {
+        $src = $this->repoFile('etc/skel/www/console.php');
+        // php-cgi has no HOME; the spawned shell must get the passwd home it cd's into (GH #968).
+        $this->assertOrderedStrings(array(
+            '\'cd \'.escapeshellarg($home).\' 2>/dev/null || exit 1; \'',
+            '\'export HOME=\'.escapeshellarg($home).\'; \'',
+            '.$cmd.\' </dev/null',
+        ), $src);
+    }
+
     public function testProxyBlockUsesLoopbackSocketUpgrade(): void
     {
         $src = $this->repoFile('etc/seedbox/config/template.lighttpd');
