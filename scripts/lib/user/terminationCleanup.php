@@ -78,6 +78,12 @@ function pmssTerminateUserRemoveEmptyDir(string $username, string $phase, string
  */
 function pmssTerminateUserPurgeDirectorySteps(string $label, string $path): array
 {
+    // Keep recursive deletion limited to the two account paths this helper owns.
+    $prefix = $label === 'home' ? '/home/' : ($label === 'user_backup' ? '/home/backup-' : '');
+    if ($prefix === '' || strpos($path, $prefix) !== 0 || !pmssUsernameIsValid(substr($path, strlen($prefix)))) {
+        throw new InvalidArgumentException('Refusing unsafe user purge path');
+    }
+
     $arg = escapeshellarg($path);
     $whenPresent = 'if [ -d '.$arg.' ]; then ';
     $remove = $whenPresent.'rm -rf -- '.$arg.'; fi';

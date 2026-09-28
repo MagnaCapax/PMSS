@@ -92,6 +92,31 @@ final class TerminateUserContractTest extends TestCase
         }
     }
 
+    public function testPurgeDirectoryStepsRejectPathsOutsideManagedHomes(): void
+    {
+        $backup = \pmssTerminateUserPurgeDirectorySteps('user_backup', '/home/backup-user1234');
+        $this->assertSame('remove_user_backup_initial', $backup[0][0]);
+
+        foreach ([
+            ['home', ''],
+            ['home', '/home/'],
+            ['home', '/'],
+            ['home', '/home/../etc'],
+            ['home', '/home/user1234/other'],
+            ['home', "/home/user1234\0other"],
+            ['home', '/home/backup-user1234'],
+            ['user_backup', '/home/user1234'],
+            ['unexpected', '/home/user1234'],
+        ] as $case) {
+            try {
+                \pmssTerminateUserPurgeDirectorySteps($case[0], $case[1]);
+                $this->assertTrue(false, 'unsafe purge path should be refused');
+            } catch (\InvalidArgumentException $e) {
+                $this->assertSame('Refusing unsafe user purge path', $e->getMessage());
+            }
+        }
+    }
+
     public function testTerminateUserHomeInvariantIsExact(): void
     {
         // The exact-home invariant lives in terminateUser.php itself; the reclaim-side
