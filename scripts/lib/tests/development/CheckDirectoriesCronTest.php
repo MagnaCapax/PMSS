@@ -62,6 +62,20 @@ class CheckDirectoriesCronTest extends TestCase
         $this->pmssAssertMessagesContain($messages, 'exists but is not a directory');
     }
 
+    public function testEnsureDirectoryRejectsSymlinkWithoutChangingTarget(): void
+    {
+        $messages = [];
+        $target = $this->tempDir.'/target';
+        $this->pmssEnsureDir($target, 0755);
+        $link = $this->tempDir.'/runtime-link';
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+
+        $this->assertFalse(\pmssCheckDirectoriesEnsureDirectory($link, $this->pmssMakeArrayLogger($messages), $this->pmssCurrentOwner()));
+        clearstatcache(true, $target);
+        $this->assertSame(0755, fileperms($target) & 0777);
+        $this->pmssAssertMessagesContain($messages, 'exists but is not a directory');
+    }
+
     public function testEnsureDirectoryRejectsEmptyPath(): void
     {
         $messages = [];

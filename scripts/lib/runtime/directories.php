@@ -87,15 +87,26 @@ function pmssCheckDirectoriesEnsureDirectory(string $thisDir, callable $log, str
         return false;
     }
 
-    if (!file_exists($thisDir)) {
+    // Inspect the path itself: is_dir() follows symlinks into unrelated trees.
+    clearstatcache(true, $thisDir);
+    $stat = @lstat($thisDir);
+    if ($stat === false) {
         if (!@mkdir($thisDir)) {
             $log("WARN: failed to create $thisDir");
             return false;
         }
         $log("Created $thisDir");
-    } elseif (!is_dir($thisDir)) {
+    } elseif (($stat['mode'] & 0170000) !== 0040000) {
         // A stale plain file squatting the path would otherwise keep blocking
         // the runtime directory forever.
+        $log("WARN: $thisDir exists but is not a directory; skipping");
+        return false;
+    }
+
+    // Check again before chown/chmod in case creation or another process changed it.
+    clearstatcache(true, $thisDir);
+    $stat = @lstat($thisDir);
+    if ($stat === false || ($stat['mode'] & 0170000) !== 0040000) {
         $log("WARN: $thisDir exists but is not a directory; skipping");
         return false;
     }

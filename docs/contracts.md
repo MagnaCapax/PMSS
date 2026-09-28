@@ -117,6 +117,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `pmssCheckDirectoriesEnsureDirectory()` requires the managed path itself to
+  be a real directory before changing ownership or mode. A symlink or other
+  occupied path logs a warning and returns `false` without changing its target.
+
 - `pmssSystemStatsAppendLogLine(string $path, string $line): bool` appends one
   newline-terminated system stats record. It returns `true` only when the full
   record was written; failed and short writes return `false` for the cron warning.
