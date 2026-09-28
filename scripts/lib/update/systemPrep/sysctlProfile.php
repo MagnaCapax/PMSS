@@ -8,8 +8,9 @@ function pmssSystemPrepReadBoolEnv(string $key): ?bool
 {
     $override = getenv($key);
     if ($override === false) return null;
-    if (pmssValueMatchesNormalized($override, ['1', 'true', 'yes'])) return true;
-    return pmssValueMatchesNormalized($override, ['0', 'false', 'no']) ? false : null;
+    $normalized = pmssEnvValueNormalized($override);
+    if (in_array($normalized, ['1', 'true', 'yes'], true)) return true;
+    return in_array($normalized, ['0', 'false', 'no'], true) ? false : null;
 }
 
 /** Detect whether any swap device is configured. */
@@ -29,12 +30,13 @@ function pmssSysctlBlockDeviceIsFast(string $deviceName, string $sysClassBlockRo
     }
 
     $seen[$deviceName] = true;
-    $queuePath = rtrim($sysClassBlockRoot, '/').'/'.$deviceName.'/queue/rotational';
+    $devicePath = rtrim($sysClassBlockRoot, '/').'/'.$deviceName;
+    $queuePath = $devicePath.'/queue/rotational';
     if (is_file($queuePath)) {
         return (pmssReadRegularFileTrimmed($queuePath) ?? '') === '0';
     }
 
-    foreach (glob(rtrim($sysClassBlockRoot, '/').'/'.$deviceName.'/slaves/*') ?: [] as $slavePath) {
+    foreach (glob($devicePath.'/slaves/*') ?: [] as $slavePath) {
         if (pmssSysctlBlockDeviceIsFast((string) basename($slavePath), $sysClassBlockRoot, $seen)) {
             return true;
         }
@@ -53,11 +55,7 @@ function pmssSysctlSwapIsFast(): bool
     }
 
     $sysClassBlockRoot = pmssResolvePathFromEnv('PMSS_SYSCTL_SYS_CLASS_BLOCK_PATH', '/sys/class/block');
-    foreach (pmssReadRegularFileNonEmptyLines('/proc/swaps') as $index => $line) {
-        if ($index === 0) {
-            continue;
-        }
-
+    foreach (array_slice(pmssReadRegularFileNonEmptyLines('/proc/swaps'), 1) as $line) {
         if (($columns = pmssConfigLineColumns($line, 1, [])) === []) {
             continue;
         }
@@ -83,11 +81,7 @@ function pmssSysctlNicSpeedMbps(): int
 
     $routePath = pmssResolvePathFromEnv('PMSS_SYSCTL_PROC_NET_ROUTE_PATH', '/proc/net/route');
     $iface = '';
-    foreach (pmssReadRegularFileNonEmptyLines($routePath) as $index => $line) {
-        if ($index === 0) {
-            continue;
-        }
-
+    foreach (array_slice(pmssReadRegularFileNonEmptyLines($routePath), 1) as $line) {
         $columns = pmssConfigLineColumns($line, 2, []);
         if ($columns !== [] && $columns[1] === '00000000') {
             $iface = pmssNetworkInterfaceNameNormalize((string) $columns[0], 15);
@@ -107,29 +101,16 @@ function pmssSysctlNicSpeedMbps(): int
     return ctype_digit($speed) ? (int) $speed : 1000;
 }
 
-/** Run one quiet probe command and return only its exit-status meaning. */
-function pmssSysctlCommandQuietSucceeds(string $binaryPath, array $args = []): ?bool
-{
-    if ($binaryPath === '' || strpos($binaryPath, "\0") !== false || !is_executable($binaryPath) || !function_exists('exec')) {
-        return null;
-    }
-
-    $status = 1;
-    $output = [];
-    @exec(pmssCommandArgvShellQuote(array_merge([$binaryPath], $args)).' >/dev/null 2>&1', $output, $status);
-    return $status === 0;
-}
-
 /** Detect whether the current host is a virtual machine. */
 function pmssSysctlIsVm(): bool
 {
     if (($override = pmssSystemPrepReadBoolEnv('PMSS_SYSCTL_IS_VM')) !== null) return $override;
 
-    if (($systemdDetectVirt = pmssCommandPath('systemd-detect-virt')) !== '') {
-        $virtualized = pmssSysctlCommandQuietSucceeds($systemdDetectVirt, ['--quiet']);
-        if ($virtualized !== null) {
-            return $virtualized;
-        }
+    if (($systemdDetectVirt = pmssCommandPath('systemd-detect-virt')) !== '' && function_exists('exec')) {
+        $status = 1;
+        $output = [];
+        @exec(pmssCommandArgvShellQuote([$systemdDetectVirt, '--quiet']).' >/dev/null 2>&1', $output, $status);
+        return $status === 0;
     }
 
     foreach (['/sys/class/dmi/id/product_name', '/sys/class/dmi/id/sys_vendor'] as $path) {
