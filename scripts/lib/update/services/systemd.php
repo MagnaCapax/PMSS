@@ -67,6 +67,34 @@ function pmssEnsureCronServiceActive(string $context = 'update'): void
 }
 
 /**
+ * Start the first TRIM inside the batched update so hosts do not all issue their
+ * first large discard in the same weekly window. This is hygiene, not a performance claim.
+ */
+function pmssEnsureFstrimTimer(string $context = 'update'): void
+{
+    if (pmssSystemdActionSkip(pmssSystemdActionSkipReason('fstrim.timer'), 'Ensuring weekly TRIM timer', false)) return;
+    pmssEnsureFstrimTimerForState(pmssSystemdUnitState('is-enabled', 'fstrim.timer'), $context);
+}
+
+/** Apply the timer state decision after the systemd probe; kept separate for hermetic tests. */
+function pmssEnsureFstrimTimerForState(?string $state, string $context): void
+{
+    if ($state === null) return;
+    if ($state === '' || $state === 'not-found') {
+        logmsg('[INFO] fstrim.timer is not shipped on this release; weekly TRIM skipped');
+        return;
+    }
+    if ($state === 'masked') {
+        logmsg('[INFO] fstrim.timer is masked by the operator; left as is');
+        return;
+    }
+    if ($state === 'enabled') return;
+
+    runStep('Enabling weekly TRIM timer ('.$context.')', 'systemctl enable --now fstrim.timer || true');
+    runStep('Starting first TRIM run in the background ('.$context.')', 'systemctl start --no-block fstrim.service || true');
+}
+
+/**
  * Return the PMSS-owned cron.service drop-in payload.
  *
  * @param int|null $cpuThreads Logical CPU thread count; resolved from the host when null.

@@ -634,6 +634,7 @@ if ((int) $storageBenchmarkRc !== 0) {
 // Restore root cron at the very end. update.php only disables it for the
 // phase-2 handoff window; we want it back for normal operations.
 pmssRunProfiledCallable('Ensuring cron service is active before root cron restore', 'pmssEnsureCronServiceActive', ['update-step2 root cron restore']);
+pmssRunProfiledCallable('Ensuring weekly TRIM timer', 'pmssEnsureFstrimTimer');
 runStep('Refreshing root cron configuration', '/scripts/util/setupRootCron.php');
 $pmssRootCronRestored = true;
 
