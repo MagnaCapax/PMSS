@@ -54,12 +54,6 @@ function pmssPortManagerServiceNameIsValid(string $service): bool
     return preg_match('/^[a-z][a-z0-9-]{0,31}$/', $service) === 1;
 }
 
-/** Resolve the legacy rTorrent reservation root used for collision avoidance. */
-function pmssPortManagerLegacyReservationDir(): string
-{
-    return rtrim(pmssResolvePathFromEnv('PMSS_PORT_MANAGER_LEGACY_DIR', pmssPortManagerDefaultPath('legacy-rtorrent-ports', '/var/lib/pmss/ports')), '/');
-}
-
 /** Guard assignment file reads/writes/removals against symlink and type tricks. */
 function pmssPortManagerAssignmentPathIsSafe(string $portDir, string $portFile): bool
 {
@@ -215,7 +209,8 @@ function pmssPortManagerAssignServicePort(string $user, string $service, ?int $p
             return $port;
         }
 
-        $used = pmssPortManagerUsedPorts($context['dir'], pmssPortManagerLegacyReservationDir());
+        $legacyDir = rtrim(pmssResolvePathFromEnv('PMSS_PORT_MANAGER_LEGACY_DIR', pmssPortManagerDefaultPath('legacy-rtorrent-ports', '/var/lib/pmss/ports')), '/');
+        $used = pmssPortManagerUsedPorts($context['dir'], $legacyDir);
         $port = ($preferredPort !== null
             && pmssNetworkPortInRange($preferredPort, PMSS_PORT_MANAGER_MIN_PORT, PMSS_PORT_MANAGER_MAX_PORT)
             && !isset($used[$preferredPort])
@@ -235,10 +230,10 @@ function pmssPortManagerAssignServicePort(string $user, string $service, ?int $p
 }
 
 /** Emit the public error text and optionally mirror it to user logs. */
-function pmssPortManagerFail(string $message, string $user = '', string $action = '', string $service = '', ?int $port = null, string $status = 'ERR', string $logMessage = ''): int
+function pmssPortManagerFail(string $message, string $user = '', string $action = '', string $service = '', ?int $port = null, string $logMessage = ''): int
 {
     fwrite(STDERR, $message);
-    if ($logMessage !== '' && $user !== '' && $action !== '' && $service !== '') pmssPortManagerLog($user, $action, $service, $port, $status, $logMessage);
+    if ($logMessage !== '' && $user !== '' && $action !== '' && $service !== '') pmssPortManagerLog($user, $action, $service, $port, 'ERR', $logMessage);
     return 1;
 }
 
@@ -270,23 +265,21 @@ function pmssPortManagerMain(array $argv): int
     if ($action === 'assign') {
         $assignStatus = '';
         $port = pmssPortManagerAssignServicePort($user, $service, null, $assignStatus);
-        $assignStatus = $assignStatus !== '' ? $assignStatus : 'write_failed';
         if ($port !== null) {
             echo $port;
             pmssPortManagerLog($user, $action, $service, $port, $assignStatus === 'already_assigned' ? 'SKIP' : 'OK', $assignStatus);
             return 0;
         }
         if ($assignStatus === 'port_dir_unavailable') return pmssPortManagerFail("Error: unable to initialize port directory\n");
-        if ($assignStatus === 'port_range_exhausted') return pmssPortManagerFail("Error: no free port available\n", $user, $action, $service, null, 'ERR', 'port_range_exhausted');
-        if ($assignStatus === 'unsafe_assignment_path') return pmssPortManagerFail("Error: invalid port assignment path\n", $user, $action, $service, null, 'ERR', 'unsafe_assignment_path');
-        if ($assignStatus === 'write_failed') return pmssPortManagerFail("Error: failed to persist port assignment\n", $user, $action, $service, null, 'ERR', 'write_failed');
-        return pmssPortManagerFail("Error: invalid stored port assignment\n", $user, $action, $service, null, 'ERR', $assignStatus === 'invalid_existing_assignment' ? 'invalid_existing_assignment' : 'unsafe_assignment_path');
+        if ($assignStatus === 'port_range_exhausted') return pmssPortManagerFail("Error: no free port available\n", $user, $action, $service, null, 'port_range_exhausted');
+        if ($assignStatus === 'write_failed') return pmssPortManagerFail("Error: failed to persist port assignment\n", $user, $action, $service, null, 'write_failed');
+        return pmssPortManagerFail("Error: invalid stored port assignment\n", $user, $action, $service, null, $assignStatus === 'invalid_existing_assignment' ? 'invalid_existing_assignment' : 'unsafe_assignment_path');
     }
 
     $context = pmssPortManagerAssignmentContext($user, $service, $contextStatus);
     if ($context === null) {
         if ($contextStatus === 'port_dir_unavailable') return pmssPortManagerFail("Error: unable to initialize port directory\n");
-        return pmssPortManagerFail("Error: invalid stored port assignment\n", $user, $action, $service, null, 'ERR', 'unsafe_assignment_path');
+        return pmssPortManagerFail("Error: invalid stored port assignment\n", $user, $action, $service, null, 'unsafe_assignment_path');
     }
 
     if ($action === 'view') {
@@ -307,8 +300,8 @@ function pmssPortManagerMain(array $argv): int
             echo 'No port assigned';
             return 0;
         }
-        if (!pmssPortManagerAssignmentPathIsSafe($context['dir'], $context['file'])) return pmssPortManagerFail("Error: invalid stored port assignment\n", $user, $action, $service, null, 'ERR', 'unsafe_assignment_path');
-        if (!@unlink($context['file'])) return pmssPortManagerFail("Error: failed to release port\n", $user, $action, $service, null, 'ERR', 'release_failed');
+        if (!pmssPortManagerAssignmentPathIsSafe($context['dir'], $context['file'])) return pmssPortManagerFail("Error: invalid stored port assignment\n", $user, $action, $service, null, 'unsafe_assignment_path');
+        if (!@unlink($context['file'])) return pmssPortManagerFail("Error: failed to release port\n", $user, $action, $service, null, 'release_failed');
         echo 'Port released';
         pmssPortManagerLog($user, $action, $service, null, 'OK', 'released');
         return 0;
