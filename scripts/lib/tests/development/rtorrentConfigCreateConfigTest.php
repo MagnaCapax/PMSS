@@ -304,6 +304,25 @@ PHP;
         $this->assertFalse(file_exists($portRoot), 'invalid ranges must not create reservation directories');
     }
 
+    public function testPortReservationRejectsUnsafeDirectoryBeforeFilesystemTouch(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-rtorrent-paths-');
+        $target = $this->pmssEnsureDir($root.'/target', 0700);
+        $link = $root.'/linked';
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+        file_put_contents($root.'/occupied', 'preserved');
+
+        foreach (['relative', $root.'/../other', $root."/nul\0byte", $link, $root.'/occupied'] as $base) {
+            $this->assertThrows(\InvalidArgumentException::class, static function () use ($base): void {
+                \pmssRtorrentPortReserve($base, 'scgi', 4000, 4000);
+            }, 'reservation directory');
+        }
+
+        $this->assertFalse(file_exists($target.'/scgi'));
+        $this->assertFalse(file_exists($root.'/other'));
+        $this->assertSame('preserved', file_get_contents($root.'/occupied'));
+    }
+
     public function testPortReservationSkipsOccupiedFilesAndCreatesExclusiveReservation(): void
     {
         $portRoot = $this->pmssMakeTempDir('pmss-rtorrent-ports-');

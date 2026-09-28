@@ -6,6 +6,7 @@
  */
 
 require_once dirname(__DIR__).'/runtime/filesystem.php';
+require_once dirname(__DIR__).'/pathSafety.php';
 
 /** Reserve one port or throw; the caller owns the transaction lock and rollback. */
 function pmssRtorrentPortReserve(string $directoryBase, $type, $rangeStart = 2000, $rangeEnd = 65000): int
@@ -22,6 +23,10 @@ function pmssRtorrentPortReserve(string $directoryBase, $type, $rangeStart = 200
     }
 
     $directoryType = $directoryBase.'/'.$type;
+    // Refuse symlinked or relative namespaces before mkdir can escape the managed tree.
+    if (!pmssPathTargetIsSafe($directoryType, true)) {
+        throw new InvalidArgumentException('Invalid rTorrent port reservation directory');
+    }
     foreach ([
         [$directoryBase, 'Unable to create port reservation base directory: '],
         [$directoryType, 'Unable to create port reservation directory: '],

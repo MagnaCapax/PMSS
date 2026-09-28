@@ -639,6 +639,7 @@ Class `rtorrentConfig`
 - readConfig(string $file): array|false → parses key=value pairs from `~/.rtorrent.rc` file (skipping comments and blanks).
 - _configPortPrivate(string $type, int $rangeStart=2000, int $rangeEnd=65000): int
   - Reserves a random port using files under `/var/lib/pmss/ports/<type>/<port>`; idempotent by presence.
+  - Rejects relative, dot-segment, NUL-containing, symlinked, or non-directory reservation paths before creating directories; valid reservations retain the existing range and exception behavior.
   - Default scgi/dht/listen acquisition is transactional: if a later type cannot be reserved, markers created earlier in the same call are removed before the exception is re-thrown.
 
 - `scripts/cron/rtorrentPortReservationsReconcile.php`
