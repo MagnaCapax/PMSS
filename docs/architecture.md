@@ -49,6 +49,7 @@ Keep the canonical installer/update details under `docs/install.md` and
 - **scripts/lib/update/services/** – Runtime templates (rc.local, systemd, sshd), legacy service disablement, mediainfo installer, security tweaks.
 - **scripts/lib/update/users/** – User maintenance (context, HTTP, home maintenance, ruTorrent refresh).
 - **scripts/lib/update/apps/** – Application installers (rtorrent, deluge, docker, etc.) called during phase 2. These modules perform one-time bootstrap tasks only; ongoing configuration and scheduling belong under `scripts/util` and `scripts/cron`.
+- **scripts/lib/trackerCleaner.php** – Cron-facing facade for the tracker cleaner. The `trackerCleaner/` modules own selection policy, logs, guarded backups, and the bounded run separately (ADR 0076).
 
 ## Package Strategy
 - Per-release bootstrap baselines live under `scripts/lib/update/dpkg/`; the installer only ensures core tools. System-level apps are built via update-step2 modules, while per-account media-stack apps stay in the skeleton/user maintenance tooling.

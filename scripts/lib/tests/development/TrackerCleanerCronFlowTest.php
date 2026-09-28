@@ -11,8 +11,12 @@ final class TrackerCleanerCronFlowTest extends TestCase
                 'required' => ['pmssTrackerCleanerStopReason($runDeadline, $modifiedCount, $maxModifiedTorrents)', 'pmssTrackerCleanerRunUser(', 'pmssTrackerCleanerRunOutcomeLogLine($stopReason, $anyWork, $anyChanges)'],
                 'forbidden' => ['Torrent::fromFile', '$userVerboseLog .= pmssTrackerCleanerTimestamp()." torrent_check public=1'],
             ],
-            'scripts/lib/trackerCleaner.php' => [
+            'scripts/lib/trackerCleaner/run.php' => [
                 'required' => ['function pmssTrackerCleanerRunUser(', '\\Devristo\\Torrent\\Torrent::fromFile($torrentPath)', 'torrent_skip reason=parse_error', 'run_end user={$username} processed={$processed} private={$private} changed={$changed}{$runSuffix}'],
+            ],
+            'scripts/lib/trackerCleaner.php' => [
+                'required' => ["'trackerCleaner/policy.php'", "'trackerCleaner/log.php'", "'trackerCleaner/backup.php'", "'trackerCleaner/run.php'"],
+                'forbidden' => ['function pmssTrackerCleanerRunUser('],
             ],
         ]);
     }

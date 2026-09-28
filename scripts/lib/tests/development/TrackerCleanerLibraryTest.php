@@ -58,6 +58,23 @@ class TrackerCleanerLibraryTest extends TestCase
         $this->assertSame($marked, pmssTrackerCleanerCommentWithMarker($marked));
     }
 
+    public function testScrubTorrentKeepsOrderedResultAndMutationSnapshot(): void
+    {
+        $blocked = 'udp://tracker.publicbt.com';
+        $good = 'https://good.test/announce';
+        $torrent = new TrackerCleanerFakeTorrent([[$blocked, $good, $good], ['https://other.test/announce']], $blocked);
+
+        $this->assertSame([
+            'changed' => true,
+            'would_trackerless' => false,
+            'removed_trackers' => [$blocked],
+            'remaining_trackers' => [$good, 'https://other.test/announce'],
+            'events' => ['announce_replaced from='.$blocked.' to='.$good],
+        ], pmssTrackerCleanerScrubTorrent($torrent, pmssTrackerCleanerBlockRules()));
+        $this->assertSame([[$good, $good], ['https://other.test/announce']], $torrent->getAnnounceList());
+        $this->assertSame($good, $torrent->getAnnounce());
+    }
+
     public function testRunnerLogHelpersKeepCronOutputStable(): void
     {
         $changes = ['abc123' => 'Public Torrent', 'def456' => 'Second Torrent'];
