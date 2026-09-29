@@ -93,11 +93,9 @@ function pmssResourceLogReadCountersV1(int $uid, ?string $cgroupRoot = null): ?a
     }
 
     // The user slice owns child cgroups, so prefer hierarchical totals over its often-zero local fields.
-    $memoryStat = $root.'/memory'.$slice.'memory.stat';
+    $memoryValues = pmssResourceLogReadMemoryStatFields($root.'/memory'.$slice.'memory.stat', ['total_rss', 'rss', 'total_cache', 'cache']);
     foreach (['memory_anon' => ['total_rss', 'rss'], 'memory_file' => ['total_cache', 'cache']] as $key => $fields) {
-        $value = pmssResourceLogReadMemoryStatField($memoryStat, $fields[0])
-            ?? pmssResourceLogReadMemoryStatField($memoryStat, $fields[1]);
-        if ($value !== null) $values[$key] = $value;
+        if (($value = $memoryValues[$fields[0]] ?? $memoryValues[$fields[1]] ?? null) !== null) $values[$key] = $value;
     }
 
     return $values === [] ? null : $values;
@@ -162,21 +160,23 @@ function pmssResourceLogReadBlkioBytesWithSource(string $blkioSliceDir, string $
     return null;
 }
 
-/** Read one named field from a v1 memory.stat file. */
-function pmssResourceLogReadMemoryStatField(string $path, string $field): ?int
+/** Read requested v1 key/value counters once, retaining the first valid row per field. */
+function pmssResourceLogReadMemoryStatFields(string $path, array $fields): array
 {
     $raw = pmssReadRegularFileContents($path);
-    if ($raw === null || trim($raw) === '') return null;
-
+    if ($raw === null || trim($raw) === '') return [];
+    $wanted = array_fill_keys($fields, true); $values = []; $seen = [];
     foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
         [$name, $value] = array_pad(pmssConfigLineColumns((string) $line, 0, [], 2), 2, null);
-        if ($name !== $field || !ctype_digit((string) $value)) continue;
-        $parsed = (int) $value;
-        return ($parsed < 0 || $parsed >= PMSS_RESOURCE_COUNTER_SENTINEL) ? null : $parsed;
+        if (!isset($wanted[$name]) || isset($seen[$name]) || !ctype_digit((string) $value)) continue;
+        $seen[$name] = true; $parsed = (int) $value;
+        if ($parsed >= 0 && $parsed < PMSS_RESOURCE_COUNTER_SENTINEL) $values[$name] = $parsed;
     }
-
-    return null;
+    return $values;
 }
+
+/** Retain the single-field reader contract for existing callers. */
+function pmssResourceLogReadMemoryStatField(string $path, string $field): ?int { return pmssResourceLogReadMemoryStatFields($path, [$field])[$field] ?? null; }
 
 /**
  * Read cgroup v2 memory.stat counters for the given user slice.

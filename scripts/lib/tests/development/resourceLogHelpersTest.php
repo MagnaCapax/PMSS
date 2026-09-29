@@ -79,6 +79,15 @@ PHP
         return $this->pmssMakeTempDir('pmss-resource-', 0700);
     }
 
+    public function testMemoryStatBatchPreservesFirstNumericRowAndSingleFieldContract(): void
+    {
+        $path = $this->makeRoot().'/memory.stat';
+        file_put_contents($path, "rss invalid\nrss 12\nrss 34\ncache 9223372036854775807\ncache 5\nswap 0\n");
+        $this->assertSame(['rss' => 12, 'swap' => 0], \pmssResourceLogReadMemoryStatFields($path, ['rss', 'cache', 'swap']));
+        $this->assertSame(12, \pmssResourceLogReadMemoryStatField($path, 'rss'));
+        $this->assertSame(null, \pmssResourceLogReadMemoryStatField($path, 'cache'));
+    }
+
     private function makeCounters(int $ioRead, int $ioWrite, int $cpuNsec, int $memory, int $tasks, int $ioReadOps = 0, int $ioWriteOps = 0): array
     {
         return [

@@ -38,28 +38,28 @@ function pmssUserMetricsCollect(int $uid, ?string $cgroupRoot = null): array
     // --- CPU (cpuacct + cpu controllers) ---
     $m['cpu_usage_nsec'] = pmssResourceLogReadSysfsCounter($root.'/cpuacct'.$slice.'cpuacct.usage');
     // cpuacct.stat reports user/system in USER_HZ ticks (not ns) — recorded raw.
-    $m['cpu_user_ticks'] = pmssResourceLogReadMemoryStatField($root.'/cpuacct'.$slice.'cpuacct.stat', 'user');
-    $m['cpu_system_ticks'] = pmssResourceLogReadMemoryStatField($root.'/cpuacct'.$slice.'cpuacct.stat', 'system');
+    $cpuTicks = pmssResourceLogReadMemoryStatFields($root.'/cpuacct'.$slice.'cpuacct.stat', ['user', 'system']);
+    foreach (['cpu_user_ticks' => 'user', 'cpu_system_ticks' => 'system'] as $key => $field) $m[$key] = $cpuTicks[$field] ?? null;
     // CFS throttling (only populated when a CPU quota is set on the slice).
-    $m['cpu_nr_periods'] = pmssResourceLogReadMemoryStatField($root.'/cpu'.$slice.'cpu.stat', 'nr_periods');
-    $m['cpu_nr_throttled'] = pmssResourceLogReadMemoryStatField($root.'/cpu'.$slice.'cpu.stat', 'nr_throttled');
-    $m['cpu_throttled_nsec'] = pmssResourceLogReadMemoryStatField($root.'/cpu'.$slice.'cpu.stat', 'throttled_time');
+    $cpuStat = pmssResourceLogReadMemoryStatFields($root.'/cpu'.$slice.'cpu.stat', ['nr_periods', 'nr_throttled', 'throttled_time']);
+    foreach (['cpu_nr_periods' => 'nr_periods', 'cpu_nr_throttled' => 'nr_throttled',
+        'cpu_throttled_nsec' => 'throttled_time'] as $key => $field) $m[$key] = $cpuStat[$field] ?? null;
 
     // --- Memory (memory controller) ---
-    $m['mem_current'] = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.usage_in_bytes');
-    $m['mem_peak'] = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.max_usage_in_bytes');
-    $m['mem_limit'] = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.limit_in_bytes');
-    $m['mem_failcnt'] = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.failcnt');
-    $m['memsw_current'] = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.'memory.memsw.usage_in_bytes');
+    foreach (['mem_current' => 'memory.usage_in_bytes', 'mem_peak' => 'memory.max_usage_in_bytes',
+        'mem_limit' => 'memory.limit_in_bytes', 'mem_failcnt' => 'memory.failcnt',
+        'memsw_current' => 'memory.memsw.usage_in_bytes'] as $key => $file) {
+        $m[$key] = pmssResourceLogReadSysfsCounter($root.'/memory'.$slice.$file);
+    }
     $m['mem_oom_kill'] = pmssResourceLogReadMemoryStatField($root.'/memory'.$slice.'memory.oom_control', 'oom_kill');
     // Full memory.stat field set (v1 names).
-    foreach ([
+    $memoryFields = [
         'rss', 'cache', 'rss_huge', 'mapped_file', 'swap', 'shmem', 'dirty', 'writeback',
         'pgfault', 'pgmajfault', 'pgpgin', 'pgpgout',
         'inactive_anon', 'active_anon', 'inactive_file', 'active_file', 'unevictable',
-    ] as $field) {
-        $m['mem_'.$field] = pmssResourceLogReadMemoryStatField($root.'/memory'.$slice.'memory.stat', $field);
-    }
+    ];
+    $memoryStat = pmssResourceLogReadMemoryStatFields($root.'/memory'.$slice.'memory.stat', $memoryFields);
+    foreach ($memoryFields as $field) $m['mem_'.$field] = $memoryStat[$field] ?? null;
 
     // --- PIDs ---
     $m['pids_current'] = pmssResourceLogReadSysfsCounter($root.'/pids'.$slice.'pids.current');
