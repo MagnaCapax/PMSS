@@ -44,6 +44,45 @@ class CodexLaunchersTest extends CodexLauncherTestCase
         }
     }
 
+    public function testNonTerminalPromptInvocationDoesNotWaitForStdinEof(): void
+    {
+        $promptFile = $this->tempDir.'/prompt.txt';
+        file_put_contents($promptFile, 'Never wait for caller stdin');
+        foreach (['codex exec', 'codex exec ##PROMPT##', 'codex exec ##PROMPT_FILE##',
+            'codex exec ##PROMPT_STDIN##'] as $command) {
+            // Keep the parent's pipe open until the child exits. The timeout bounds regressions.
+            $args = ['timeout', '--kill-after=1s', '3s', 'bash', '-c',
+                'source "$1"; codex_invoke "$2" "$3"', '_',
+                $this->launcherRoot.'/development/lib/codex-exec.sh', $command, $promptFile];
+            $process = proc_open(\pmssCommandArgvShellQuote($args),
+                [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes,
+                $this->launcherRoot, $this->launcherEnv);
+            $this->assertTrue(is_resource($process));
+            $output = stream_get_contents($pipes[1]).stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            fclose($pipes[0]);
+            $rc = proc_close($process);
+            $this->assertSame(0, $rc, $command.': '.$output);
+            $capture = $this->pmssReadJsonArrayFile($this->tempDir.'/assistant.json');
+            $this->assertSame($command === 'codex exec ##PROMPT_STDIN##' ? 'Never wait for caller stdin' : '',
+                $capture['stdin'], $command);
+        }
+    }
+
+    public function testInteractivePromptInvocationKeepsTerminalStdin(): void
+    {
+        $promptFile = $this->tempDir.'/prompt.txt';
+        file_put_contents($promptFile, 'interactive');
+        foreach (['bash -c "test -t 0" ##PROMPT##', 'bash -c "test -t 0"'] as $command) {
+            $inner = \pmssCommandArgvShellQuote(['bash', '-c', 'source "$1"; codex_invoke "$2" "$3"', '_',
+                $this->launcherRoot.'/development/lib/codex-exec.sh', $command, $promptFile]);
+            $result = $this->pmssExecShellCommand('timeout --kill-after=1s 3s script -q -e -c '
+                .escapeshellarg($inner).' /dev/null < /dev/null', $this->launcherEnv);
+            $this->assertSame(0, $result['rc'], $command.': '.$result['output']);
+        }
+    }
+
     public function testExplicitModelsAndReasoningFollowDefaults(): void
     {
         $result = $this->launch('codex-run.sh', ['run', '--prompt', 'fixture', '--exec',

@@ -94,7 +94,7 @@ codex_invoke() {
 		return 127
 	fi
 
-	local prompt prompt_q prompt_file_q exec_cmd_final prompt_mode
+	local prompt prompt_q prompt_file_q exec_cmd_final prompt_mode stdin_redirect=''
 	prompt="$(cat "$prompt_file")"
 	printf -v prompt_q '%q' "$prompt"
 	printf -v prompt_file_q '%q' "$prompt_file"
@@ -106,12 +106,14 @@ codex_invoke() {
 		return
 	fi
 
+	# Piped callers may never close stdin; keep a terminal available for interactive assistants.
+	[[ -t 0 ]] || stdin_redirect=' < /dev/null'
 	if [[ "$prompt_mode" == "prompt-inline" ]]; then
 		echo "[codex] invoking: $exec_cmd_final [prompt-inline]" >&1
-		eval "$exec_cmd_final"
+		eval "$exec_cmd_final$stdin_redirect"
 		return
 	fi
 
 	echo "[codex] invoking: $exec_cmd_final [prompt-string]" >&1
-	eval "$exec_cmd_final $prompt_q"
+	eval "$exec_cmd_final $prompt_q$stdin_redirect"
 }
