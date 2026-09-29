@@ -40,19 +40,15 @@ function pmssRunProfiledStep(string $description, callable $step)
 {
     $started = microtime(true);
     logmsg('[START] '.$description.' :: [callable]');
-
+    $status = 'ERR';
     try {
         $result = $step();
-    } catch (\Throwable $throwable) {
-        $duration = microtime(true) - $started;
-        pmssLogStatus('ERR', $description, 1, $duration);
-        throw $throwable;
+        $status = 'OK';
+        return $result;
+    } finally {
+        // Keep both outcomes on the same profiling path, including thrown steps.
+        pmssLogStatus($status, $description, $status === 'OK' ? 0 : 1, microtime(true) - $started);
     }
-
-    $duration = microtime(true) - $started;
-    pmssLogStatus('OK', $description, 0, $duration);
-
-    return $result;
 }
 
 /**

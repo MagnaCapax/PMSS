@@ -19,10 +19,11 @@ function pmssSystemdActionSkip(string $reason, string $description, bool $profil
 
 function pmssSystemdActionSkipReason(?string $unit = null, bool $skipInDryRun = false, bool $skipInStrictTestMode = false): string
 {
-    if (($skipInDryRun && pmssEnvFlagEnabled('PMSS_DRY_RUN')) || ($skipInStrictTestMode && pmssTestModeEnabled())) return 'test/dry-run';
-    if (!pmssEnvFlagEnabled('PMSS_DRY_RUN') && !pmssSystemdRuntimeAvailable()) return 'systemd unavailable';
+    $dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
+    if (($skipInDryRun && $dryRun) || ($skipInStrictTestMode && pmssTestModeEnabled())) return 'test/dry-run';
+    if (!$dryRun && !pmssSystemdRuntimeAvailable()) return 'systemd unavailable';
     if ($unit !== null && !pmssSystemdUnitNameIsSafe($unit)) return 'invalid unit name';
-    if ($unit !== null && !pmssEnvFlagEnabled('PMSS_DRY_RUN') && !pmssSystemdUnitExists($unit)) return 'unit '.$unit.' missing';
+    if ($unit !== null && !$dryRun && !pmssSystemdUnitExists($unit)) return 'unit '.$unit.' missing';
     return '';
 }
 
@@ -31,10 +32,7 @@ function pmssSystemdActionSkipReason(?string $unit = null, bool $skipInDryRun = 
  */
 function pmssSystemdUnitExists(string $unit): bool
 {
-    if (!pmssSystemdRuntimeAvailable()) {
-        return false;
-    }
-    if (!pmssSystemdUnitNameIsSafe($unit)) {
+    if (!pmssSystemdRuntimeAvailable() || !pmssSystemdUnitNameIsSafe($unit)) {
         return false;
     }
     $unit = trim($unit);
