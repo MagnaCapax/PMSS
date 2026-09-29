@@ -178,5 +178,8 @@ function pmssProfileSummary(): void
     if ($encoded === null || !pmssDirEnsureExists(dirname($profileOutput), 0755)) {
         return;
     }
-    @file_put_contents($profileOutput, $encoded);
+    // A failed or short write must be visible; the summary remains best-effort.
+    if (@file_put_contents($profileOutput, $encoded) !== strlen($encoded)) {
+        logmsg('[WARN] Unable to write complete step profile report');
+    }
 }

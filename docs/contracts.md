@@ -207,6 +207,8 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - If JSON encoding fails, leaves any existing report untouched and creates no
     report directories. Directory preparation failures skip the write. These
     failures remain best-effort; valid report bytes and summary logs are unchanged.
+  - Failed or short report writes emit a warning while the summary remains
+    best-effort.
 
 ---
 

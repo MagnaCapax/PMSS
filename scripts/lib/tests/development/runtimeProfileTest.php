@@ -187,6 +187,21 @@ class RuntimeProfileTest extends TestCase
         }
     }
 
+    public function testProfileSummaryReportsFailedOutputWrite(): void
+    {
+        $this->resetState();
+        $root = $this->pmssMakeTempDir('pmss-profile-write-');
+        $this->pmssTrackEnvOverrides(['PMSS_PROFILE_OUTPUT' => $root]);
+        $this->recordProfileEntry();
+
+        ob_start();
+        pmssProfileSummary();
+        $output = ob_get_clean();
+
+        $this->assertTrue(strpos($output, '[WARN] Unable to write complete step profile report') !== false);
+        $this->assertTrue(is_dir($root));
+    }
+
     private function recordProfileEntry(array $overrides = []): void
     {
         pmssRecordProfile(array_replace([
