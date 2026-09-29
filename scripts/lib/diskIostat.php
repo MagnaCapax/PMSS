@@ -252,8 +252,16 @@ function pmssDiskIostatWriteSnapshotFiles(
         [$historyRawLogFile, $historyPrefix.$iostatRaw."\n---\n", FILE_APPEND],
     ];
 
+    // Reject every malformed destination before publishing any of the three files.
     foreach ($writes as $write) {
-        if (@file_put_contents($write[0], $write[1], $write[2]) === false) {
+        if ($write[0] === '' || pmssFilesystemPathHasNulByte($write[0])) {
+            fwrite(STDERR, "Unable to write iostat snapshot file: invalid path\n");
+            return false;
+        }
+    }
+
+    foreach ($writes as $write) {
+        if (@file_put_contents($write[0], $write[1], $write[2]) !== strlen($write[1])) {
             fwrite(STDERR, 'Unable to write iostat snapshot file: '.$write[0]."\n");
             return false;
         }

@@ -228,6 +228,48 @@ class DiskIostatTest extends TestCase
         $this->assertFalse(\pmssDiskIostatWriteSnapshotFiles($root.'/missing/iostat', $payload, 'raw'));
     }
 
+    public function testWriteSnapshotFilesRejectsMalformedPathsBeforePublishing(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-iostat-path-write-');
+        $paths = [$root.'/iostat', $root.'/history', $root.'/raw'];
+        foreach ([0, 1, 2] as $index) {
+            foreach (['', "bad\0path"] as $invalid) {
+                $targets = $paths;
+                $targets[$index] = $invalid;
+                $this->pmssAssertNoPhpWarnings(function () use ($targets): void {
+                    $this->assertFalse(\pmssDiskIostatWriteSnapshotFiles($targets[0], ['time' => 1], 'raw', $targets[1], $targets[2]));
+                });
+                foreach ($paths as $path) $this->assertFalse(file_exists($path));
+            }
+        }
+    }
+
+    public function testWriteSnapshotFilesRejectsShortWritesAtEachOutput(): void
+    {
+        $script = <<<'PHP'
+namespace DiskIostatWriteFixture;
+function file_put_contents($path, $data, $flags = 0) {
+    $index = $GLOBALS['writeIndex']++;
+    return \file_put_contents($path, $index === $GLOBALS['shortIndex'] ? substr($data, 0, -1) : $data, $flags);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/diskIostat.php', 'DiskIostatWriteFixture');
+        $script .= <<<'PHP'
+[$paths, $GLOBALS['shortIndex']] = json_decode(getenv('PMSS_TEST_IOSTAT_WRITES'), true);
+$GLOBALS['writeIndex'] = 0;
+$ok = pmssDiskIostatWriteSnapshotFiles($paths[0], ['time' => 1], 'raw', $paths[1], $paths[2]);
+echo json_encode([$ok, $GLOBALS['writeIndex'], array_map('file_exists', $paths)]);
+PHP;
+        foreach ([0, 1, 2, -1] as $shortIndex) {
+            $root = $this->pmssMakeTempDir('pmss-iostat-short-write-');
+            $paths = [$root.'/iostat', $root.'/history', $root.'/raw'];
+            $expectedCalls = $shortIndex < 0 ? 3 : $shortIndex + 1;
+            $this->assertSame([$shortIndex < 0, $expectedCalls, array_map(static function (int $index) use ($expectedCalls): bool {
+                return $index < $expectedCalls;
+            }, [0, 1, 2])], $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_IOSTAT_WRITES' => json_encode([$paths, $shortIndex])]));
+        }
+    }
+
     public function testDiscoveryRejectsMalformedPathsWithoutPhpWarnings(): void
     {
         $root = $this->pmssMakeTempDir('pmss-iostat-path-');

@@ -525,6 +525,9 @@ iptables helpers:
 
 ## Resource Statistics
 
+- `pmssDiskIostatWriteSnapshotFiles()` validates all three output paths before
+  writing and returns `false` on a failed or short write. Successful snapshot
+  and history bytes retain their existing order and format.
 - Customer cgroup readers share ordered counter paths, unsigned/limit parsing,
   and memory fields in `etc/skel/www/scriptsInc.php` (ADR 0059). Page-specific
   directory precedence, missing-data behavior, and pressure classification stay unchanged.
