@@ -51,6 +51,11 @@ function pmssCheckDirectoriesPublicDirectories(): array
 /** Ensure a public projection directory without following or taking over an unsafe path. */
 function pmssCheckDirectoriesEnsurePublicDirectory(string $path, callable $log, int $ownerUid = 0, int $ownerGid = 0): bool
 {
+    // clearstatcache() throws on NUL paths before lstat() can fail softly.
+    if (strpos($path, "\0") !== false) {
+        $log('WARN: invalid public directory path; skipping');
+        return false;
+    }
     if ($path === '') {
         $log("WARN: invalid public directory or owner: $path");
         return false;
@@ -82,8 +87,9 @@ function pmssCheckDirectoriesEnsurePublicDirectory(string $path, callable $log, 
 /** Ensure one runtime/log directory exists with root-only traversal permissions. */
 function pmssCheckDirectoriesEnsureDirectory(string $thisDir, callable $log, string $owner = 'root'): bool
 {
-    if ($thisDir === '') {
-        $log('WARN: empty required directory path; skipping');
+    // Reject malformed paths before clearstatcache() and keep checking later dirs.
+    if ($thisDir === '' || strpos($thisDir, "\0") !== false) {
+        $log($thisDir === '' ? 'WARN: empty required directory path; skipping' : 'WARN: invalid required directory path; skipping');
         return false;
     }
 

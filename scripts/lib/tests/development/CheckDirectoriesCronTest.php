@@ -67,6 +67,7 @@ class CheckDirectoriesCronTest extends TestCase
         $messages = [];
         $target = $this->tempDir.'/target';
         $this->pmssEnsureDir($target, 0755);
+        $this->assertTrue(chmod($target, 0755));
         $link = $this->tempDir.'/runtime-link';
         $this->pmssCreateSymlinkOrSkip($target, $link);
 
@@ -82,6 +83,25 @@ class CheckDirectoriesCronTest extends TestCase
 
         $this->assertFalse(\pmssCheckDirectoriesEnsureDirectory('', $this->pmssMakeArrayLogger($messages), $this->pmssCurrentOwner()));
         $this->pmssAssertMessagesContain($messages, 'empty required directory path');
+    }
+
+    public function testMalformedDirectoryPathsFailSoftAndMainContinues(): void
+    {
+        $messages = [];
+        $log = $this->pmssMakeArrayLogger($messages);
+        foreach (["\0", "bad\0path", "bad\0", $this->tempDir."/\0child", $this->tempDir."/child\0"] as $path) {
+            $this->pmssAssertNoPhpWarnings(function () use ($path, $log): void {
+                $this->assertFalse(\pmssCheckDirectoriesEnsureDirectory($path, $log, $this->pmssCurrentOwner()));
+                $this->assertFalse(\pmssCheckDirectoriesEnsurePublicDirectory($path, $log, posix_geteuid(), posix_getegid()));
+            });
+        }
+
+        $created = $this->tempDir.'/after-malformed';
+        $logger = new \Logger(__FILE__, $this->tempDir, $this->tempDir, 'checkDirectoriesMalformedTest');
+        $this->assertSame(0, \pmssCheckDirectoriesMain($logger, ["bad\0path", $created]));
+        $this->assertTrue(is_dir($created));
+        $this->pmssAssertMessagesContain($messages, 'invalid required directory path');
+        $this->pmssAssertMessagesContain($messages, 'invalid public directory path');
     }
 
     public function testMainContinuesAfterIndividualDirectoryFailure(): void
