@@ -37,34 +37,34 @@ function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload
     $userLogsDir = $userHome.'/.logs';
     $userLogFile = $userLogsDir.'/trackerCleaner.log';
     $tmpLogPath = pmssCreatePrivateTempFile('pmss-trackerCleaner-');
-    if ($tmpLogPath === null || @file_put_contents($tmpLogPath, $payload) === false) {
-        if (is_string($tmpLogPath)) @unlink($tmpLogPath);
+    if ($tmpLogPath === null) {
         return;
     }
-    if (!@chown($tmpLogPath, $username)) {
-        pmssTrackerCleanerLog("WARN: Unable to chown temp log {$tmpLogPath} for user {$username}; skipping per-user verbose log.");
-        @unlink($tmpLogPath);
-        return;
-    }
-    @chgrp($tmpLogPath, $username); @chmod($tmpLogPath, 0640);
+    try {
+        if (@file_put_contents($tmpLogPath, $payload) === false) return;
+        if (!@chown($tmpLogPath, $username)) {
+            pmssTrackerCleanerLog("WARN: Unable to chown temp log {$tmpLogPath} for user {$username}; skipping per-user verbose log.");
+            return;
+        }
+        @chgrp($tmpLogPath, $username); @chmod($tmpLogPath, 0640);
 
-    pmssUserLifecycleStep('trackerCleaner', $username, 'ensure_user_logs_dir', pmssBuildUserShellCommand($username, 'mkdir -p ~/.logs', '/bin/bash'), false);
-    if (!is_dir($userLogsDir) || !pmssPathWithinRootIsSafe($userLogsDir, $userHome, true)) {
-        pmssTrackerCleanerLog("WARN: User log directory is unsafe or missing for {$username} ({$userLogsDir}); skipping per-user verbose log.");
-        @unlink($tmpLogPath);
-        return;
-    }
-    if (file_exists($userLogFile) && is_link($userLogFile)) {
-        pmssTrackerCleanerLog("WARN: User log file is symlink for {$username} ({$userLogFile}); skipping per-user verbose log.");
-        @unlink($tmpLogPath);
-        return;
-    }
+        pmssUserLifecycleStep('trackerCleaner', $username, 'ensure_user_logs_dir', pmssBuildUserShellCommand($username, 'mkdir -p ~/.logs', '/bin/bash'), false);
+        if (!is_dir($userLogsDir) || !pmssPathWithinRootIsSafe($userLogsDir, $userHome, true)) {
+            pmssTrackerCleanerLog("WARN: User log directory is unsafe or missing for {$username} ({$userLogsDir}); skipping per-user verbose log.");
+            return;
+        }
+        if (file_exists($userLogFile) && is_link($userLogFile)) {
+            pmssTrackerCleanerLog("WARN: User log file is symlink for {$username} ({$userLogFile}); skipping per-user verbose log.");
+            return;
+        }
 
-    pmssUserLifecycleStep('trackerCleaner', $username, 'append_user_verbose_log', pmssBuildUserShellCommand($username, 'cat '.escapeshellarg($tmpLogPath).' >> ~/.logs/trackerCleaner.log', '/bin/bash'), false);
-    if (file_exists($userLogFile) && !is_link($userLogFile) && pmssPathWithinRootIsSafe($userLogFile, $userHome)) {
-        pmssUserFileApplyOwnership($userLogFile, $username);
+        pmssUserLifecycleStep('trackerCleaner', $username, 'append_user_verbose_log', pmssBuildUserShellCommand($username, 'cat '.escapeshellarg($tmpLogPath).' >> ~/.logs/trackerCleaner.log', '/bin/bash'), false);
+        if (file_exists($userLogFile) && !is_link($userLogFile) && pmssPathWithinRootIsSafe($userLogFile, $userHome)) {
+            pmssUserFileApplyOwnership($userLogFile, $username);
+        }
+    } finally {
+        @unlink($tmpLogPath);
     }
-    @unlink($tmpLogPath);
 }
 /** Resolve the per-user tracker-cleaner change log path after boundary checks. */
 function pmssTrackerCleanerUserChangeLogPath(string $username, string $homeRoot = '/home'): ?string
