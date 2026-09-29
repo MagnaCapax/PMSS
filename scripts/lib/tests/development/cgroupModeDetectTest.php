@@ -36,4 +36,20 @@ class cgroupModeDetectTest extends TestCase
         // no signals at all -> unknown.
         $this->assertSame('unknown', \pmssCgroupModeFromSignals(null, false, []));
     }
+
+    public function testCgroupSelfEntriesRejectMalformedPathsAndPreserveParsing(): void
+    {
+        $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-cgroup-self-', 0700).'/cgroup', "2:cpu,cpuacct:/user.slice\n0::/user.slice/session.scope\ninvalid\n");
+        $expected = [
+            ['hierarchy' => '2', 'controllers' => ['cpu', 'cpuacct'], 'path' => '/user.slice'],
+            ['hierarchy' => '0', 'controllers' => [], 'path' => '/user.slice/session.scope'],
+        ];
+
+        $this->assertSame($expected, \pmssCgroupSelfEntries($path));
+        $this->assertSame('/user.slice/session.scope', \pmssCgroupSelfPath($path));
+        $this->assertSame([], \pmssCgroupSelfEntries($path.'.missing'));
+        $this->assertSame([], \pmssCgroupSelfEntries($path."\0suffix"));
+        $this->assertSame([], \pmssCgroupSelfEntries("\0".$path));
+        $this->assertSame('', \pmssCgroupSelfPath($path."\0suffix"));
+    }
 }

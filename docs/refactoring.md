@@ -64,6 +64,11 @@ trimming it, retaining existing invalid-unit/action skip paths. Valid names,
 allowed actions, whitespace normalization, and generated commands are unchanged;
 `SystemdRuntimeProcessesTest` exercises these contracts without service operations.
 
+The current-process cgroup membership reader rejects NUL-containing paths before
+calling `file()`. Malformed and unreadable paths return the existing empty entries
+result, and path selection returns an empty string. Valid v1 and unified entries
+retain their parsing order; `cgroupModeDetectTest` covers both paths with fixtures.
+
 Config backup and prune helpers reject NUL bytes in source paths and service
 keys before trimming, so malformed inputs cannot select an existing backup for
 replacement or deletion. Rejections retain the null/no-op failure paths and

@@ -81,6 +81,8 @@ function pmssCgroupModeWithDefault(string $default): string { $mode = pmssCgroup
  */
 function pmssCgroupSelfEntries(string $path = '/proc/self/cgroup'): array
 {
+    // Keep malformed paths on the same empty-result path as failed reads.
+    if (pmssFilesystemPathHasNulByte($path)) return [];
     $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     $entries = [];
     foreach (is_array($lines) ? $lines : [] as $line) {

@@ -194,11 +194,19 @@ class RuntimeProfileTest extends TestCase
         $this->pmssTrackEnvOverrides(['PMSS_PROFILE_OUTPUT' => $root]);
         $this->recordProfileEntry();
 
-        ob_start();
-        pmssProfileSummary();
-        $output = ob_get_clean();
+        $oldDefaults = $GLOBALS['PMSS_LOGMSG_DEFAULTS'] ?? null;
+        $oldForward = $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] ?? null;
+        $GLOBALS['PMSS_LOGMSG_DEFAULTS'] = ['dir' => $root, 'base_name' => 'profile-warning'];
+        $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] = false;
+        try {
+            pmssProfileSummary();
+        } finally {
+            $GLOBALS['PMSS_LOGMSG_DEFAULTS'] = $oldDefaults;
+            $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] = $oldForward;
+        }
 
-        $this->assertTrue(strpos($output, '[WARN] Unable to write complete step profile report') !== false);
+        $log = (string) @file_get_contents($root.'/profile-warning.log');
+        $this->assertTrue(strpos($log, '[WARN] Unable to write complete step profile report') !== false);
         $this->assertTrue(is_dir($root));
     }
 
