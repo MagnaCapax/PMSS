@@ -55,7 +55,11 @@ function pmssCreatePrivateTempDir(string $prefix): ?string
         if (pmssRegularFilePathIsReadable($path)) @unlink($path);
         return null;
     }
-    @chmod($path, 0700);
+    // Do not hand a caller a workspace whose private mode could not be set.
+    if (is_link($path) || !@chmod($path, 0700)) {
+        @rmdir($path);
+        return null;
+    }
     if (pmssPrivateTempDirRealpath($path, $prefix) === null) {
         @rmdir($path);
         return null;

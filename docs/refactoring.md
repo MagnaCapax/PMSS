@@ -28,6 +28,11 @@ clean-ups.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Private temporary directory creation returns a path only after its 0700 mode
+has been applied. A failed chmod or replaced symlink returns `null` and attempts
+to remove the newly created directory; successful callers retain the same path
+and private permissions, including under a restrictive process umask.
+
 For any optimization/refactor touching existing CLI/API output, follow this
 minimal loop before merge:
 

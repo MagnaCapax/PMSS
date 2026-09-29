@@ -85,6 +85,21 @@ class RuntimeTest extends TestCase
         }
     }
 
+    public function testCreatePrivateTempDirRestoresModeUnderRestrictiveUmask(): void
+    {
+        $priorUmask = umask(0777);
+        $path = null;
+        try {
+            $path = \pmssCreatePrivateTempDir('pmss-runtime-umask-');
+            $this->assertTrue(is_string($path) && is_dir($path));
+            clearstatcache(true, (string) $path);
+            $this->assertSame(0700, fileperms($path) & 0777);
+        } finally {
+            umask($priorUmask);
+            if (is_string($path) && is_dir($path)) @rmdir($path);
+        }
+    }
+
     public function testPrivateTempBaseDirRejectsUnsafeBoundaryMatrix(): void
     {
         $file = $this->pmssMakeTempFile('pmss-temp-base-file-');
