@@ -32,11 +32,7 @@ function pmssDiskIostatDeviceNameIsSafe(string $device): bool
  */
 function pmssDiskIostatDiscoverDevices(string $sysBlockDir = '/sys/block'): array
 {
-    // Match the existing discovery-failure result before PHP rejects the path.
-    if ($sysBlockDir === '' || pmssFilesystemPathHasNulByte($sysBlockDir)) {
-        return [];
-    }
-    $entries = @scandir($sysBlockDir);
+    $entries = pmssDirectoryEntriesRead($sysBlockDir);
     if (!is_array($entries)) {
         return [];
     }

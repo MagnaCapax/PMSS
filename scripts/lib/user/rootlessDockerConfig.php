@@ -40,8 +40,8 @@ function pmssUserRootlessDockerStoreExists(string $dataRoot): bool
             return true;
         }
         if (is_dir($path)) {
-            $contents = @scandir($path);
-            if (is_array($contents) && count($contents) > 2) {
+            $contents = pmssDirectoryEntriesRead($path);
+            if (is_array($contents) && $contents !== []) {
                 return true;
             }
         }

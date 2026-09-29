@@ -65,7 +65,7 @@ function pmssLockHandleFdList($handle, string $fdRoot = '/proc/self/fd'): array
     if (!is_array($handleStat) || !isset($handleStat['dev'], $handleStat['ino'])) return [];
 
     $fds = [];
-    foreach (scandir($fdRoot) ?: [] as $entry) {
+    foreach (pmssDirectoryEntriesRead($fdRoot) ?: [] as $entry) {
         if (!ctype_digit($entry)) continue;
         $fd = (int) $entry;
         if ($fd <= 2) continue;

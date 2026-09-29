@@ -22,7 +22,7 @@ function pmssUserProcHeldBlocks(
         return null;
     }
 
-    $pidEntries = @scandir($procRoot);
+    $pidEntries = pmssDirectoryEntriesRead($procRoot);
     if ($pidEntries === false) {
         return null;
     }
@@ -42,7 +42,7 @@ function pmssUserProcHeldBlocks(
         $accountProcessCount++;
 
         $fdRoot = rtrim($procRoot, '/').'/'.$pid.'/fd';
-        $fdEntries = @scandir($fdRoot);
+        $fdEntries = pmssDirectoryEntriesRead($fdRoot);
         if ($fdEntries === false) {
             return null;
         }

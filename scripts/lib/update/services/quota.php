@@ -103,7 +103,7 @@ function pmssEnsureMountNofailOption(string $mountPoint, ?callable $logger = nul
 function pmssWarnUnexpectedQuotaFiles(string $mountPoint, ?callable $logger = null): void
 {
     $log = $logger ?: 'logMessage';
-    if ($mountPoint === '' || !is_dir($mountPoint) || ($entries = @scandir($mountPoint)) === false) {
+    if ($mountPoint === '' || !is_dir($mountPoint) || ($entries = pmssDirectoryEntriesRead($mountPoint)) === false) {
         return;
     }
 
