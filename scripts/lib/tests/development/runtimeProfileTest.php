@@ -189,25 +189,18 @@ class RuntimeProfileTest extends TestCase
 
     public function testProfileSummaryReportsFailedOutputWrite(): void
     {
-        $this->resetState();
         $root = $this->pmssMakeTempDir('pmss-profile-write-');
-        $this->pmssTrackEnvOverrides(['PMSS_PROFILE_OUTPUT' => $root]);
-        $this->recordProfileEntry();
-
-        $oldDefaults = $GLOBALS['PMSS_LOGMSG_DEFAULTS'] ?? null;
-        $oldForward = $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] ?? null;
-        $GLOBALS['PMSS_LOGMSG_DEFAULTS'] = ['dir' => $root, 'base_name' => 'profile-warning'];
-        $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] = false;
-        try {
-            pmssProfileSummary();
-        } finally {
-            $GLOBALS['PMSS_LOGMSG_DEFAULTS'] = $oldDefaults;
-            $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] = $oldForward;
-        }
-
-        $log = (string) @file_get_contents($root.'/profile-warning.log');
-        $this->assertTrue(strpos($log, '[WARN] Unable to write complete step profile report') !== false);
-        $this->assertTrue(is_dir($root));
+        // The suite may already have loaded the bootstrap logger, whose output path is fixed.
+        // Isolate this assertion so it exercises the profile helper's file logger contract.
+        $script = '$root = '.var_export($root, true).';'
+            .'putenv("PMSS_PROFILE_OUTPUT=".$root);'
+            .'$GLOBALS["PMSS_PROFILE"] = [["description" => "step", "duration" => 0.1]];'
+            .'$GLOBALS["PMSS_LOGMSG_DEFAULTS"] = ["dir" => $root, "base_name" => "profile-warning"];'
+            .'$GLOBALS["PMSS_LOGMSG_USES_LOGMESSAGE"] = false;'
+            .'ob_start(); pmssProfileSummary(); ob_end_clean();'
+            .'echo json_encode([is_dir($root), strpos((string) @file_get_contents($root."/profile-warning.log"),'
+            .'"[WARN] Unable to write complete step profile report") !== false]);';
+        $this->assertSame([true, true], $this->pmssRunRepoInlinePhpRequireJson('scripts/lib/update/runtime/profile.php', $script));
     }
 
     private function recordProfileEntry(array $overrides = []): void

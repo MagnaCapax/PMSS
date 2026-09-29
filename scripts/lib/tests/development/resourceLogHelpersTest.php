@@ -11,7 +11,7 @@ class ResourceLogHelpersTest extends TestCase
     public function testCounterStateReleasesLockWhenReadOrPersistenceThrows(): void
     {
         $path = $this->makeStatePath(['io_read' => 4]);
-        $load = $this->pmssInlinePhpLibraryInNamespace('scripts/lib/resources/log.php', 'CounterLifecycleFixture');
+        $load = $this->pmssInlinePhpLibraryInNamespace('scripts/lib/resources/counterState.php', 'CounterLifecycleFixture');
         $results = $this->pmssRunInlinePhpJson(<<<'PHP'
 namespace CounterLifecycleFixture;
 function pmssLockFileAcquire($path, $nonBlocking, $mode) {

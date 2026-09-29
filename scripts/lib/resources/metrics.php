@@ -17,8 +17,7 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/log.php'; // pmssResourceLogRead{SysfsCounter,BlkioReadWrite,MemoryStatField}, PMSS_RESOURCE_COUNTER_SENTINEL
-require_once __DIR__.'/../runtime.php'; // pmssReadRegularFile*
+require_once __DIR__.'/counters.php';
 
 /**
  * Collect every available per-user performance metric for one UID from the

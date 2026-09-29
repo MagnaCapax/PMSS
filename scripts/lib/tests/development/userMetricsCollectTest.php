@@ -6,6 +6,14 @@ require_once dirname(__DIR__, 2).'/resources/metrics.php';
 
 class UserMetricsCollectTest extends TestCase
 {
+    /** Metrics alone must load the counter reader without the persistence writer. */
+    public function testMetricsEntrypointLoadsOnlyCounterBoundary(): void
+    {
+        $loaded = $this->pmssRunRepoInlinePhpRequireJson('scripts/lib/resources/metrics.php',
+            'echo json_encode([function_exists("pmssResourceLogReadCountersV1"), function_exists("pmssCounterStateUpdate")]);');
+        $this->assertSame([true, false], $loaded);
+    }
+
     private function tree(array $files): string
     {
         $root = $this->pmssMakeTempDir('pmss-metrics-', 0700);
