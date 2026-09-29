@@ -143,8 +143,7 @@ function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): 
             $stderr = '';
         }
 
-        fclose($pipes[1]);
-        fclose($pipes[2]);
+        pmssProcessPipesClose([$pipes[1], $pipes[2]]);
         unset($pipes[1], $pipes[2]);
 
         $rc = proc_close($process);

@@ -82,12 +82,10 @@ function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $ti
     }
     if ($pipeFailed) {
         pmssProcessPipesClose($pipes);
-        if (is_resource($process)) {
-            if (function_exists('proc_terminate')) {
-                @proc_terminate($process);
-            }
-            @proc_close($process);
+        if (function_exists('proc_terminate')) {
+            @proc_terminate($process);
         }
+        @proc_close($process);
         return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'proc_open pipes unavailable', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => true];
     }
 
@@ -104,9 +102,7 @@ function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $ti
         }
     } else {
         $capture = pmssCommandOutputPipesDrain($pipes, $timeoutSec, $startedAt, $maxBuffer, $mirrorOutput, $streamSelectError);
-        foreach ([1, 2] as $index) {
-            if (isset($pipes[$index]) && is_resource($pipes[$index])) fclose($pipes[$index]);
-        }
+        pmssProcessPipesClose([$pipes[1], $pipes[2]]);
     }
     $rc = $capture['timed_out']
         ? pmssCommandTimeoutClose($process, $timeoutCommand, $timeoutSec, $startedAt)
