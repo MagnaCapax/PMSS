@@ -182,7 +182,8 @@ function fwrite($handle, $bytes) {
     return $limit === false ? false : \fwrite($handle, substr($bytes, 0, $limit));
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/snapshot.php', 'SnapshotWriteFixture');
+        $filesystem = var_export(dirname(__DIR__, 2).'/runtime/filesystem.php', true);
+        $script .= "require {$filesystem};".$this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/snapshot.php', 'SnapshotWriteFixture');
         $script .= <<<'PHP'
 [$line, $GLOBALS['limits']] = json_decode(getenv('PMSS_TEST_SNAPSHOT_WRITE'), true);
 $GLOBALS['requests'] = [];

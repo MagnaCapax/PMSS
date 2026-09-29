@@ -60,7 +60,7 @@ function pmssCronLockSkipLog(string $message): void { echo date('Y-m-d H:i:s').'
  */
 function pmssLockHandleFdList($handle, string $fdRoot = '/proc/self/fd'): array
 {
-    if (!is_resource($handle) || get_resource_type($handle) !== 'stream' || $fdRoot === '' || pmssFilesystemPathHasNulByte($fdRoot) || !is_dir($fdRoot)) return [];
+    if (!pmssStreamHandleIsOpen($handle) || $fdRoot === '' || pmssFilesystemPathHasNulByte($fdRoot) || !is_dir($fdRoot)) return [];
     $handleStat = @fstat($handle);
     if (!is_array($handleStat) || !isset($handleStat['dev'], $handleStat['ino'])) return [];
 
@@ -108,7 +108,7 @@ function pmssLockChildClosePrefix(): string
 /** Record the current process id in an acquired lock handle. */
 function pmssLockHandleWritePid($handle): bool
 {
-    if (!is_resource($handle) || get_resource_type($handle) !== 'stream') return false;
+    if (!pmssStreamHandleIsOpen($handle)) return false;
     $pid = (string) getmypid();
     // Preserve the previous PID when the stream cannot seek to its beginning.
     if (!@rewind($handle) || !@ftruncate($handle, 0)) return false;
@@ -155,7 +155,7 @@ function pmssRuntimeLockDir(): string
 
 function pmssLockHandleRelease($handle, bool $unlock = true): void
 {
-    if (!is_resource($handle) || get_resource_type($handle) !== 'stream') return;
+    if (!pmssStreamHandleIsOpen($handle)) return;
     try {
         $unlock && @flock($handle, LOCK_UN);
     } finally {

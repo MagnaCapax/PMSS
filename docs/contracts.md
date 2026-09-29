@@ -140,6 +140,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   confirms matching device/inode metadata; supplied path snapshots can reuse
   returned handle metadata. Invalid/closed handles and unreadable metadata return false.
 
+- `pmssStreamHandleIsOpen($handle): bool` accepts only live stream resources.
+  Lock, snapshot, TTY, and command-pipe callers keep their existing failure results
+  for closed handles and resources of other types.
+
 - `pmssWriteManagedPathFileWithBackup()` leaves an existing managed file intact
   when its timestamped backup cannot be created. The backup helper accepts a
   copy only when it contains the full source file; incomplete copies are removed.

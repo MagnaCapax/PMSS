@@ -9,7 +9,7 @@
 function pmssStreamIsTty($stream, bool $defaultWhenUnavailable = false): bool
 {
     // Native TTY probes require a stream; other live resources can throw despite @.
-    if (!is_resource($stream) || get_resource_type($stream) !== 'stream') return $defaultWhenUnavailable;
+    if (!pmssStreamHandleIsOpen($stream)) return $defaultWhenUnavailable;
     if (function_exists('stream_isatty')) return @stream_isatty($stream);
     if (function_exists('posix_isatty')) return @posix_isatty($stream);
     return $defaultWhenUnavailable;

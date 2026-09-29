@@ -97,6 +97,8 @@ function pmssRemovePrivateTempDir(string $path, string $prefix, string $descript
 // NUL bytes make PHP filesystem calls version-dependent; reject them at the
 // runtime boundary and keep callers on the existing fail-soft path.
 function pmssFilesystemPathHasNulByte(string $path): bool { return strpos($path, "\0") !== false; }
+/** Reject closed streams and other resource types before stream operations. */
+function pmssStreamHandleIsOpen($handle): bool { return is_resource($handle) && get_resource_type($handle) === 'stream'; }
 /** Treat a dangling symlink as an occupied path, unlike file_exists(). */
 function pmssPathExistsOrLink(string $path): bool { return file_exists($path) || is_link($path); }
 function pmssRegularFilePathIsReadable(string $path): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && is_file($path) && !is_link($path); }
@@ -108,7 +110,7 @@ function pmssLockFilePathIsSafe(string $path): bool { return $path !== '' && !pm
 function pmssLockFileHandleMatchesPath($handle, string $path, ?array $pathStat = null, ?array &$handleStat = null): bool
 {
     $handleStat = null; $validateLockPath = $pathStat === null;
-    if (!is_resource($handle) || get_resource_type($handle) !== 'stream' || ($validateLockPath && !pmssLockFilePathIsSafe($path))) return false;
+    if (!pmssStreamHandleIsOpen($handle) || ($validateLockPath && !pmssLockFilePathIsSafe($path))) return false;
     $observedHandleStat = @fstat($handle); $pathStat = $validateLockPath ? @stat($path) : $pathStat;
     $handleStat = is_array($observedHandleStat) ? $observedHandleStat : null;
     if ($handleStat === null || !is_array($pathStat)) return false;

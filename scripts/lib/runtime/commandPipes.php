@@ -1,6 +1,8 @@
 <?php
 /** Nonblocking output collection for command capture. */
 
+require_once __DIR__.'/filesystem.php';
+
 function pmssProcessPipeDescriptorSpec(string $stdinMode = 'r', string $stdoutMode = 'w', string $stderrMode = 'w'): array
 {
     return [0 => ['pipe', $stdinMode], 1 => ['pipe', $stdoutMode], 2 => ['pipe', $stderrMode]];
@@ -26,11 +28,7 @@ function pmssCommandOutputPipesDrain(array $pipes, int $timeoutSec, float $start
 
     // Validate both channels before consuming either; invalid handles must not
     // turn a partial launch/cleanup failure into a PHP stream-operation fatal.
-    foreach ([1, 2] as $index) {
-        if (!isset($pipes[$index]) || !is_resource($pipes[$index]) || get_resource_type($pipes[$index]) !== 'stream') {
-            return ['stdout' => '', 'stderr' => $streamSelectError, 'timed_out' => false];
-        }
-    }
+    if (!pmssStreamHandleIsOpen($pipes[1] ?? null) || !pmssStreamHandleIsOpen($pipes[2] ?? null)) return ['stdout' => '', 'stderr' => $streamSelectError, 'timed_out' => false];
 
     while (!feof($pipes[1]) || !feof($pipes[2])) {
         $read = [];

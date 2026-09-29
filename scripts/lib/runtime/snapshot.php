@@ -31,7 +31,7 @@ function pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defa
     } finally {
         try {
             // A callback may already have closed the stream, including before throwing.
-            if (is_resource($handle) && get_resource_type($handle) === 'stream') @fclose($handle);
+            if (pmssStreamHandleIsOpen($handle)) @fclose($handle);
         } finally {
             // Stream cleanup can throw too; always restore the caller's creation mask.
             if ($oldUmask !== null) umask($oldUmask);
@@ -43,7 +43,7 @@ function pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defa
 function pmssSnapshotWriteLine($handle, string $line): void
 {
     // Keep invalid or closed handles on the legacy best-effort no-op path.
-    if (!is_resource($handle) || get_resource_type($handle) !== 'stream') return;
+    if (!pmssStreamHandleIsOpen($handle)) return;
     $line .= PHP_EOL;
     $length = strlen($line);
     // A short write may still make progress; never spin on a stalled or failed stream.
