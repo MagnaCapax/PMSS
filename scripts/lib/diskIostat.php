@@ -94,10 +94,12 @@ function pmssDiskIostatReadPsiFullAvg300(string $psiPath = '/proc/pressure/io'):
         return null;
     }
     $raw = @file_get_contents($psiPath);
-    if (!is_string($raw) || !preg_match('/^full\s.*?avg300=([0-9.]+)/m', $raw, $matches)) {
+    // A partial or malformed PSI value must not become a healthy-looking sample.
+    if (!is_string($raw) || !preg_match('/^full\s.*?avg300=([0-9]+(?:\.[0-9]+)?)(?:\s|$)/m', $raw, $matches)) {
         return null;
     }
-    return (float) $matches[1];
+    $value = (float) $matches[1];
+    return is_finite($value) ? $value : null;
 }
 
 /**

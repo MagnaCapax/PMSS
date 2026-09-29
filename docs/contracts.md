@@ -233,6 +233,9 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     quoting, using the cron's existing catch-and-report path. Valid device
     names, executable quoting, discovery ordering, and empty-list fallback
     remain unchanged.
+  - PSI `full avg300` accepts a complete unsigned decimal value only. Malformed
+    or unrepresentable values return `null` (no signal); valid samples retain
+    their float result.
 
 - pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defaultLogPath, callable $callback): int
   - Empty or NUL-containing resolved log paths return 1 before creating parent

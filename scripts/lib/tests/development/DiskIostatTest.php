@@ -6,6 +6,21 @@ require_once dirname(__DIR__, 2).'/diskIostat.php';
 
 class DiskIostatTest extends TestCase
 {
+    public function testPsiFullAvg300RejectsMalformedValues(): void
+    {
+        $path = $this->pmssMakeTempFile('pmss-iostat-psi-');
+        foreach (['0.00' => 0.0, '12.34' => 12.34, '100' => 100.0] as $raw => $expected) {
+            file_put_contents($path, "some avg300=99.00\nfull avg10=1.00 avg60=2.00 avg300={$raw} total=123\n");
+            $this->assertSame($expected, \pmssDiskIostatReadPsiFullAvg300($path));
+        }
+        foreach (['...', '1..2', '.5', '12bad', ''] as $raw) {
+            file_put_contents($path, "full avg10=1.00 avg60=2.00 avg300={$raw} total=123\n");
+            $this->assertSame(null, \pmssDiskIostatReadPsiFullAvg300($path));
+        }
+        file_put_contents($path, 'full avg300='.str_repeat('9', 400)." total=123\n");
+        $this->assertSame(null, \pmssDiskIostatReadPsiFullAvg300($path));
+    }
+
     /** Build a fake class/block tree with kernel-style partition links. */
     private function homeTree(array $chains): array
     {
