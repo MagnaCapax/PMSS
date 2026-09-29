@@ -74,7 +74,8 @@ function pmssUserProcHeldBlocks(
             }
             $seenInodes[$inodeKey] = true;
             $blocks = (int) $stat['blocks'];
-            if ($blocks < 0) {
+            // A larger sum would become a float and violate the nullable-int result.
+            if ($blocks < 0 || $blocks > PHP_INT_MAX - $heldBlocks) {
                 return null;
             }
             $heldBlocks += $blocks;

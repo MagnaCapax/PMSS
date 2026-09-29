@@ -66,4 +66,18 @@ class UserProcHeldBlocksTest extends TestCase
             return ['dev' => 7, 'ino' => 10, 'nlink' => 0];
         }));
     }
+
+    public function testReturnsNullWhenHeldBlockSumWouldOverflow(): void
+    {
+        $procRoot = $this->makeProcFixture([12345 => 1500]);
+        file_put_contents($procRoot.'/12345/fd/4', '');
+        $stats = [
+            '12345/3' => ['dev' => 7, 'ino' => 10, 'nlink' => 0, 'uid' => 1500, 'blocks' => PHP_INT_MAX],
+            '12345/4' => ['dev' => 7, 'ino' => 11, 'nlink' => 0, 'uid' => 1500, 'blocks' => 1],
+        ];
+
+        $this->assertSame(null, pmssUserProcHeldBlocks(1500, 7, $procRoot, $this->statReader($stats)));
+        $stats['12345/4']['blocks'] = 0;
+        $this->assertSame(PHP_INT_MAX, pmssUserProcHeldBlocks(1500, 7, $procRoot, $this->statReader($stats)));
+    }
 }
