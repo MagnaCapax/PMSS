@@ -97,23 +97,22 @@ class ArrRootExecutionBlockTest extends TestCase
 
     public function testGuardMatchesInstalledAppPathsAndAnchorsThePrefix(): void
     {
-        $prefixes = \pmssArrRootGuardInstallPrefixes('/opt');
+        $prefixes = \pmssRootGuardInstallPrefixes('/opt');
 
-        $this->assertSame('Radarr', \pmssArrRootGuardAppForExe('/opt/Radarr/Radarr', $prefixes));
-        $this->assertSame('Sonarr', \pmssArrRootGuardAppForExe('/opt/Sonarr/bin/Sonarr', $prefixes));
+        $this->assertSame('Radarr', \pmssRootGuardAppForExe('/opt/Radarr/Radarr', $prefixes));
+        $this->assertSame('Sonarr', \pmssRootGuardAppForExe('/opt/Sonarr/bin/Sonarr', $prefixes));
         // Anchoring: a look-alike install directory must not resolve to a managed app.
-        $this->assertSame(null, \pmssArrRootGuardAppForExe('/opt/RadarrEvil/Radarr', $prefixes));
-        $this->assertSame(null, \pmssArrRootGuardAppForExe('/opt/Radarr2/Radarr', $prefixes));
+        $this->assertSame(null, \pmssRootGuardAppForExe('/opt/RadarrEvil/Radarr', $prefixes));
+        $this->assertSame(null, \pmssRootGuardAppForExe('/opt/Radarr2/Radarr', $prefixes));
         // A customer's own copy lives under their home and must never be selected.
-        $this->assertSame(null, \pmssArrRootGuardAppForExe('/home/tomate/.bin/Sonarr/Sonarr', $prefixes));
-        $this->assertSame(null, \pmssArrRootGuardAppForExe('/usr/bin/bash', $prefixes));
+        $this->assertSame(null, \pmssRootGuardAppForExe('/home/tomate/.bin/Sonarr/Sonarr', $prefixes));
+        $this->assertSame(null, \pmssRootGuardAppForExe('/usr/bin/bash', $prefixes));
 
-        $allPrefixes = \pmssRootGuardInstallPrefixes('/opt');
-        $this->assertSame('Whisparr', \pmssRootGuardAppForExe('/opt/Whisparr/Whisparr', $allPrefixes));
-        $this->assertSame('qBittorrent', \pmssRootGuardAppForExe('/usr/bin/qbittorrent-nox', $allPrefixes));
-        $this->assertSame('Deluge', \pmssRootGuardAppForExe('/usr/local/bin/deluge-web', $allPrefixes));
-        $this->assertSame('rTorrent', \pmssRootGuardAppForExe('/usr/local/bin/rtorrent', $allPrefixes));
-        $this->assertSame(null, \pmssRootGuardAppForExe('/usr/bin/qbittorrent-nox-helper', $allPrefixes));
+        $this->assertSame('Whisparr', \pmssRootGuardAppForExe('/opt/Whisparr/Whisparr', $prefixes));
+        $this->assertSame('qBittorrent', \pmssRootGuardAppForExe('/usr/bin/qbittorrent-nox', $prefixes));
+        $this->assertSame('Deluge', \pmssRootGuardAppForExe('/usr/local/bin/deluge-web', $prefixes));
+        $this->assertSame('rTorrent', \pmssRootGuardAppForExe('/usr/local/bin/rtorrent', $prefixes));
+        $this->assertSame(null, \pmssRootGuardAppForExe('/usr/bin/qbittorrent-nox-helper', $prefixes));
         $this->assertFalse(\pmssRootGuardExeIsStandardPath('/tmp/root-owned-app'));
         $this->assertTrue(\pmssRootGuardExeIsStandardPath('/opt/RadarrEvil/Radarr'));
     }

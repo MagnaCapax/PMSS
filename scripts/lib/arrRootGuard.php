@@ -18,7 +18,6 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/update/apps/arr.php';
 require_once __DIR__.'/runtime.php';
 
 /** Known system installation paths for consumer applications that must not run as root. */
@@ -59,17 +58,6 @@ const PMSS_ROOT_GUARD_STANDARD_PATHS = array(
     '/opt',
 );
 
-/** Install prefixes PMSS uses for the shared *ARR installs. */
-function pmssArrRootGuardInstallPrefixes(string $installRoot = '/opt'): array
-{
-    $prefixes = array();
-    foreach (array_keys(PMSS_ARR_APP_BRANCHES) as $app) {
-        $prefixes[$app] = $installRoot.'/'.$app.'/';
-    }
-
-    return $prefixes;
-}
-
 /** Resolve every known consumer application path, allowing ARR tests to use a temp install root. */
 function pmssRootGuardInstallPrefixes(string $installRoot = '/opt'): array
 {
@@ -92,23 +80,6 @@ function pmssRootGuardPathMatchesRoot(string $exe, string $root): bool
 {
     $root = rtrim($root, '/');
     return $exe === $root || strpos($exe, $root.'/') === 0;
-}
-
-/**
- * Name the *ARR application an executable path belongs to, or null when it belongs to none.
- *
- * The trailing slash on each prefix anchors the match, so /opt/RadarrEvil and /opt/Radarr2 do not
- * resolve to Radarr.
- */
-function pmssArrRootGuardAppForExe(string $exe, array $prefixes): ?string
-{
-    foreach ($prefixes as $app => $prefix) {
-        if (strncmp($exe, $prefix, strlen($prefix)) === 0) {
-            return $app;
-        }
-    }
-
-    return null;
 }
 
 /** Name any known consumer application for an executable path, or null when it is unknown. */
@@ -259,37 +230,6 @@ function pmssRootGuardSignal(int $pid, int $signal): bool
     }
 
     return (bool) @posix_kill($pid, $signal);
-}
-
-/**
- * Kill every selected *ARR process; returns how many were signalled.
- *
- * Silent when there is nothing to kill -- the log stays a signal rather than a heartbeat. The
- * caller's logger is the single sink; the cron entry already routes it to a persistent file, so a
- * second hand-rolled append here would only duplicate it.
- */
-function pmssRootGuardKillAll(
-    callable $log,
-    string $procRoot = '/proc',
-    string $installRoot = '/opt',
-    string $procNetRoot = '/proc/net'
-): int
-{
-    $killed = 0;
-    foreach (pmssRootGuardScan($procRoot, $installRoot, $procNetRoot) as $pid => $process) {
-        if (($process['action'] ?? '') !== 'kill') {
-            continue;
-        }
-        if (!pmssRootGuardSignal($pid, defined('SIGKILL') ? SIGKILL : 9)) {
-            $log('###PMSS_ROOT_GUARD_ALERT action=kill_failed pid='.$pid.' uid='.$process['uid'].' app='.$process['app'].' exe='.$process['exe'].' predicate='.$process['predicate']);
-            continue;
-        }
-
-        $killed++;
-        $log('###PMSS_ROOT_GUARD_ALERT action=killed pid='.$pid.' uid='.$process['uid'].' app='.$process['app'].' exe='.$process['exe'].' predicate='.$process['predicate']);
-    }
-
-    return $killed;
 }
 
 /** Alert on every finding and kill only applications with a known install path. */
