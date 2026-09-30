@@ -46,7 +46,8 @@ function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload
         return;
     }
     try {
-        if (@file_put_contents($tmpLogPath, $payload) === false) return;
+        // Never append a truncated verbose report to the user's log.
+        if (@file_put_contents($tmpLogPath, $payload) !== strlen($payload)) return;
         if (!@chown($tmpLogPath, $username)) {
             pmssTrackerCleanerLog("WARN: Unable to chown temp log {$tmpLogPath} for user {$username}; skipping per-user verbose log.");
             return;

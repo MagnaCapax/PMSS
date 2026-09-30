@@ -114,7 +114,8 @@ function pmssUpdateRecordIncompleteUserMaintenance(int $processed, int $total, a
         'skipped'   => array_values($skipReasons),
     ];
     $encoded = pmssJsonEncodePrettyLine($payload);
-    if (!is_string($encoded) || @file_put_contents($path, $encoded) === false) {
+    // A partial marker cannot reliably describe the skipped maintenance tail.
+    if (!is_string($encoded) || @file_put_contents($path, $encoded) !== strlen($encoded)) {
         logmsg('[WARN] Unable to write incomplete user maintenance marker: '.$path);
     }
 }

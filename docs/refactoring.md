@@ -33,6 +33,11 @@ status line. A peer sending more continuation lines raises an error instead of
 keeping support mail delivery occupied indefinitely. Ordinary single-line and
 multiline replies retain their status-code handling.
 
+Incomplete user-maintenance markers warn on a failed or short write. Tracker
+cleaner verbose logs reach the per-user append step only after the complete
+temporary payload is written. Both retain their existing successful bytes and
+failure cleanup paths.
+
 Private temporary directory creation returns a path only after its 0700 mode
 has been applied. A failed chmod or replaced symlink returns `null` and attempts
 to remove the newly created directory; successful callers retain the same path
