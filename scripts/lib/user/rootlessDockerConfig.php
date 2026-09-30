@@ -134,6 +134,11 @@ function pmssUserRootlessDockerConfigConverge(string $user, string $home, int $u
 
     $hasConfigFile = is_file($configFile);
     $current = $hasConfigFile ? @file_get_contents($configFile) : false;
+    // A failed read is not an empty config: replacing it would discard user settings.
+    if ($hasConfigFile && $current === false) {
+        $result['reason'] = 'read_failed';
+        return $result;
+    }
     $data = [];
     if ($current !== false && trim((string) $current) !== '') {
         $decoded = pmssJsonDecodeAssoc((string) $current);

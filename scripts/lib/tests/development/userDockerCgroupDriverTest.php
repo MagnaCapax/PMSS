@@ -251,6 +251,37 @@ class UserDockerCgroupDriverTest extends TestCase
         $this->assertEquals('{broken', file_get_contents($home.'/.config/docker/daemon.json'));
     }
 
+    public function testUnreadableExistingConfigIsPreservedEvenWithInvalidJsonRecovery(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-rootless-docker-read-failure-');
+        @mkdir($home.'/.config/docker', 0755, true);
+        $path = $home.'/.config/docker/daemon.json';
+        file_put_contents($path, '{"keep":true}');
+
+        // Inject a read failure independently of the runner's privileges.
+        $script = <<<'PHP'
+namespace RootlessDockerConfigReadFixture;
+function file_get_contents($path) {
+    if ($path === getenv('PMSS_TEST_DOCKER_CONFIG_PATH')) return false;
+    return \file_get_contents($path);
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/rootlessDockerConfig.php', 'RootlessDockerConfigReadFixture');
+        $script .= <<<'PHP'
+$path = getenv('PMSS_TEST_DOCKER_CONFIG_PATH');
+$result = pmssUserRootlessDockerConfigConverge('alice', dirname(dirname(dirname($path))), 0, 0, [
+    'create_when_missing' => true, 'invalid_json_as_empty' => true,
+]);
+echo json_encode(['result' => $result, 'bytes' => \file_get_contents($path),
+    'temporaryFiles' => glob(dirname($path).'/.daemon.json.*')]);
+PHP;
+        $result = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_DOCKER_CONFIG_PATH' => $path]);
+
+        $this->pmssAssertArraySubsetSame(['ok' => false, 'changed' => false, 'reason' => 'read_failed'], $result['result']);
+        $this->assertSame('{"keep":true}', $result['bytes']);
+        $this->assertSame([], $result['temporaryFiles']);
+    }
+
     public function testSharedRootlessDockerConfigRejectsSymlinkedConfigFile(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rootless-docker-');
