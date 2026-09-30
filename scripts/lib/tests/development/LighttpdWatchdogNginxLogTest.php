@@ -33,19 +33,23 @@ function lstat($path) { fault('path-stat'); return \lstat($path); }
 function pmssJsonFileReadAssoc($path, $safe) { fault('state'); return \pmssJsonFileReadAssoc($path, $safe); }
 function fseek($handle, $offset, $whence = SEEK_SET) {
     fault('seek');
-    return $GLOBALS['stage'] === 'seek-false' ? -1 : \fseek($handle, $offset, $whence);
+    return $GLOBALS['stage'] === 'seek-false'
+        || ($GLOBALS['stage'] === 'rewind-false' && $whence === SEEK_CUR)
+        ? -1 : \fseek($handle, $offset, $whence);
 }
-function fgets($handle) { fault('read'); return \fgets($handle); }
+function fgets($handle) { fault('read'); return $GLOBALS['stage'] === 'read-false' ? false : \fgets($handle); }
 function pmssLighttpdWatchdogNginxEventParse($line) { fault('parse'); return \pmssLighttpdWatchdogNginxEventParse($line); }
-function ftell($handle) { fault('tell'); return \ftell($handle); }
+function ftell($handle) { fault('tell'); return $GLOBALS['stage'] === 'tell-false' ? false : \ftell($handle); }
 function fclose($handle) { $GLOBALS['closes']++; return \fclose($handle); }
 PHP;
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/watchdogNginxLogReader.php', 'NginxReadFixture');
         $script .= <<<'PHP'
 [$logPath, $statePath] = json_decode(getenv('PMSS_TEST_NGINX_READ'), true);
 $original = file_get_contents($statePath);
+$logLine = file_get_contents($logPath);
 $results = [];
-foreach (['stat', 'path-stat', 'state', 'seek', 'read', 'parse', 'tell', 'open-false', 'stat-false', 'seek-false'] as $stage) {
+foreach (['stat', 'path-stat', 'state', 'seek', 'read', 'parse', 'tell', 'open-false', 'stat-false', 'seek-false', 'read-false', 'tell-false', 'rewind-false'] as $stage) {
+    file_put_contents($logPath, $stage === 'rewind-false' ? rtrim($logLine, "\n") : $logLine);
     foreach (['exception', 'error'] as $kind) {
         $GLOBALS['stage'] = $stage;
         $GLOBALS['failure'] = substr($stage, -6) === '-false' ? null
@@ -64,12 +68,13 @@ foreach (['stat', 'path-stat', 'state', 'seek', 'read', 'parse', 'tell', 'open-f
         ];
     }
 }
+file_put_contents($logPath, $logLine);
 echo json_encode($results);
 PHP;
         $results = $this->pmssRunInlinePhpJson($script, [
             'PMSS_TEST_NGINX_READ' => json_encode([$logPath, $statePath]),
         ]);
-        $this->assertSame(20, count($results));
+        $this->assertSame(26, count($results));
         foreach ($results as $case => $result) {
             $this->assertSame([true, true, strpos($case, 'open-false-') === 0 ? 0 : 1, [], true], $result, $case);
         }
@@ -207,6 +212,26 @@ PHP;
 
         $state = json_decode((string) file_get_contents($statePath), true);
         $this->assertSame(1, $state['users']['alice']['failureCycles']);
+    }
+
+    public function testIncrementalReaderAdvancesPastCompleteLineBeforeIncompleteLine(): void
+    {
+        $logPath = $this->pmssMakeTempPath('lighttpd-nginx-log-', '.log');
+        $statePath = $this->pmssMakeTempPath('lighttpd-nginx-state-', '.json');
+        file_put_contents($logPath, '');
+        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'alice']);
+
+        $completeLine = $this->nginxLine(25000);
+        file_put_contents($logPath, $completeLine.rtrim($completeLine, "\n"));
+        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'alice']);
+        $state = json_decode((string) file_get_contents($statePath), true);
+        $this->assertSame(strlen($completeLine), $state['offset']);
+        $this->assertSame(1, $state['users']['alice']['failureCycles']);
+
+        file_put_contents($logPath, "\n", FILE_APPEND);
+        \pmssLighttpdWatchdogNginxActionsRead($logPath, $statePath, [25000 => 'alice']);
+        $state = json_decode((string) file_get_contents($statePath), true);
+        $this->assertSame(2, $state['users']['alice']['failureCycles']);
     }
 
     public function testIncrementalReaderFailsSoftForUnsafeInputs(): void

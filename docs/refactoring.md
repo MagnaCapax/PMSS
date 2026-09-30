@@ -144,6 +144,9 @@ The lighttpd watchdog's incremental nginx reader closes its log stream in
 throws. Exceptions continue to propagate without publishing a new cursor.
 Normal cursor bytes, partial-line retries, and recovery decisions are unchanged;
 `LighttpdWatchdogNginxLogTest` covers exceptional cleanup and legacy behavior.
+Failed reads, partial-line rewind failures, and unavailable cursor positions
+leave the prior state untouched so a later run can retry the same evidence.
+Complete lines before a partial final line still advance the cursor normally.
 
 Counter-state updates release their lock even when reading prior state or
 calculating deltas throws, as well as when persistence throws. The original

@@ -44,9 +44,14 @@ function pmssLighttpdWatchdogNginxActionsRead(string $logPath, string $statePath
         // Retain at most a reset plus the final failure per port. This preserves
         // relevant event order without holding an unbounded log backlog.
         $eventsByPort = array();
+        $partialLine = false;
         while (($line = @fgets($handle)) !== false) {
             if (substr($line, -1) !== "\n") {
-                @fseek($handle, -strlen($line), SEEK_CUR);
+                // Preserve the incomplete line for the next run only if rewind succeeds.
+                if (@fseek($handle, -strlen($line), SEEK_CUR) !== 0) {
+                    return array();
+                }
+                $partialLine = true;
                 break;
             }
             $event = pmssLighttpdWatchdogNginxEventParse($line);
@@ -62,7 +67,14 @@ function pmssLighttpdWatchdogNginxActionsRead(string $logPath, string $statePath
                 $eventsByPort[$port] = array($event);
             }
         }
+        // A read error is not EOF: do not publish a cursor past unprocessed lines.
+        if (!$partialLine && !feof($handle)) {
+            return array();
+        }
         $newOffset = @ftell($handle);
+        if (!is_int($newOffset)) {
+            return array();
+        }
     } finally {
         // Cover metadata, state loading, and parsing failures as well as early returns.
         if (pmssStreamHandleIsOpen($handle)) {
@@ -78,7 +90,7 @@ function pmssLighttpdWatchdogNginxActionsRead(string $logPath, string $statePath
     $newState = array(
         'device' => (int) $logStat['dev'],
         'inode' => (int) $logStat['ino'],
-        'offset' => is_int($newOffset) ? $newOffset : (int) ($logStat['size'] ?? 0),
+        'offset' => $newOffset,
         'users' => $advanced['users'],
     );
     if (!pmssAtomicJsonFileWrite($statePath, $newState, 0600)) {
