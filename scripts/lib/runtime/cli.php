@@ -101,7 +101,10 @@ function pmssCliEntrypointScriptResolve(string $baseDir, string $relativePath): 
 
 function pmssRunCliEntrypoint(string $scriptPath, callable $main): void
 {
-    if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === $scriptPath) exit((int) $main());
+    $invokedPath = $_SERVER['SCRIPT_FILENAME'] ?? null;
+    // Malformed server metadata must not reach realpath() or invoke a CLI main.
+    if (PHP_SAPI === 'cli' && is_string($invokedPath) && !pmssFilesystemPathHasNulByte($invokedPath)
+        && realpath($invokedPath) === $scriptPath) exit((int) $main());
 }
 
 function pmssRunCliEntrypointWithArgv(string $scriptPath, callable $main): void
