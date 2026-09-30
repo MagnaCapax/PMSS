@@ -104,8 +104,8 @@ function pmssResourceLogReadCountersV1(int $uid, ?string $cgroupRoot = null): ?a
 /** Read one non-negative integer cgroup counter file, rejecting the UINT64_MAX sentinel. */
 function pmssResourceLogReadSysfsCounter(string $path): ?int
 {
-    $raw = pmssReadRegularFileTrimmed($path);
-    if ($raw === null || !ctype_digit($raw)) return null;
+    $raw = pmssReadRegularFileDigits($path);
+    if ($raw === null) return null;
     $value = (int) $raw;
     return ($value < 0 || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) ? null : $value;
 }

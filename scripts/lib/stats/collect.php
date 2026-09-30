@@ -55,12 +55,12 @@ function pmssStatsReadCgroupStats(string $cgroupDir): array
     $stats = ['memory_current' => null, 'memory_limit' => null, 'pids_current' => null, 'cpu_usage_usec' => null, 'io_read_bytes' => 0, 'io_write_bytes' => 0, 'io_pressure_avg10' => null];
     if ($cgroupDir === '' || !is_dir($cgroupDir)) return $stats;
 
-    $memoryCurrent = pmssReadRegularFileTrimmed($cgroupDir.'/memory.current') ?? '';
+    $memoryCurrent = pmssReadRegularFileDigits($cgroupDir.'/memory.current');
     $memoryMax = pmssReadRegularFileTrimmed($cgroupDir.'/memory.max') ?? '';
-    $pidsCurrent = pmssReadRegularFileTrimmed($cgroupDir.'/pids.current') ?? '';
-    $stats['memory_current'] = ctype_digit($memoryCurrent) ? (int) $memoryCurrent : null;
+    $pidsCurrent = pmssReadRegularFileDigits($cgroupDir.'/pids.current');
+    $stats['memory_current'] = $memoryCurrent !== null ? (int) $memoryCurrent : null;
     $stats['memory_limit'] = ($memoryMax === 'max') ? 'max' : (ctype_digit($memoryMax) ? (int) $memoryMax : null);
-    $stats['pids_current'] = ctype_digit($pidsCurrent) ? (int) $pidsCurrent : null;
+    $stats['pids_current'] = $pidsCurrent !== null ? (int) $pidsCurrent : null;
 
     foreach (preg_split('/\r?\n/', trim(pmssReadRegularFileContents($cgroupDir.'/cpu.stat') ?? '')) ?: [] as $line) {
         if (preg_match('/^usage_usec\s+(\d+)$/', (string) $line, $matches) === 1) $stats['cpu_usage_usec'] = (int) $matches[1];
