@@ -73,15 +73,13 @@ function pmssUserSystemdWatchdogSnapshot(string $username, int $unitCount, strin
 function pmssUserSystemdWatchdogStatusPath(string $home): string
 {
     $path = rtrim($home, '/').'/.systemd-user-status.json';
-    return is_dir($home) && !is_link($home) && pmssPathTargetIsSafe($path, false, true)
-        && pmssPathWithinResolvedRoot($path, $home) ? $path : '';
+    return is_dir($home) && !is_link($home) && pmssUserStatusPathIsSafe($home, $path) ? $path : '';
 }
 
 /** Atomically publish an observe-only status snapshot. */
 function pmssUserSystemdWatchdogStatusWrite(string $home, string $path, array $status): bool
 {
-    if ($path === '' || !pmssPathTargetIsSafe($path, false, true) || !pmssPathWithinResolvedRoot($path, $home)) return false;
-    return pmssAtomicJsonFileWrite($path, $status, 0644);
+    return pmssUserStatusPathIsSafe($home, $path) && pmssAtomicJsonFileWrite($path, $status, 0644);
 }
 
 /** Emit only actionable failures and recovery transitions. */
@@ -96,11 +94,7 @@ function pmssUserSystemdWatchdogLogTransition(string $username, array $status, a
 
     $prefix = in_array($state, ['degraded', 'unknown'], true) ? '###PMSS_USER_SYSTEMD_ALERT ' : '';
     $message = $prefix.'User systemd watchdog: '.$username.' state='.$state.' manager='.(string) ($status['managerState'] ?? 'unknown');
-    echo date('Y-m-d H:i:s').' '.$message.PHP_EOL;
-    pmssUserLog($username, $message);
-    if (function_exists('pmssLogJson')) {
-        pmssLogJson(['event' => 'user_systemd_watchdog', 'user' => $username, 'state' => $state, 'manager_state' => $status['managerState'] ?? 'unknown']);
-    }
+    pmssUserWatchdogLogTransition($username, $message, ['event' => 'user_systemd_watchdog', 'user' => $username, 'state' => $state, 'manager_state' => $status['managerState'] ?? 'unknown']);
 }
 
 /** Observe one account and publish state without restarting or enabling anything. */

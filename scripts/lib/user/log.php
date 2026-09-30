@@ -84,3 +84,11 @@ function pmssUserLog(string $user, string $message): void
         pmssUserWriteLogs($payload);
     }
 }
+
+/** Mirror a watchdog transition to its cron, per-user, and optional JSON logs. */
+function pmssUserWatchdogLogTransition(string $user, string $message, array $event): void
+{
+    echo date('Y-m-d H:i:s').' '.$message.PHP_EOL;
+    pmssUserLog($user, $message);
+    if (function_exists('pmssLogJson')) pmssLogJson($event);
+}

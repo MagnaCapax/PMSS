@@ -100,21 +100,14 @@ function pmssMediaStackWatchdogSnapshot(string $username, array $apps, array $pr
 /** Atomically publish a customer-readable status artifact. */
 function pmssMediaStackWatchdogStatusWrite(string $home, string $path, array $status): bool
 {
-    if ($path === '' || !pmssPathTargetIsSafe($path, false, true) || !pmssPathWithinResolvedRoot($path, $home)) {
-        return false;
-    }
-    return pmssAtomicJsonFileWrite($path, $status, 0644);
+    return pmssUserStatusPathIsSafe($home, $path) && pmssAtomicJsonFileWrite($path, $status, 0644);
 }
 
 /** Log state transitions to both the host cron stream and the per-user log. */
 function pmssMediaStackWatchdogLogTransition(string $username, string $app, string $state, int $failures): void
 {
     $message = 'Media stack watchdog: '.$username.' '.$app.' state='.$state.' consecutive_failures='.$failures;
-    echo date('Y-m-d H:i:s').' '.$message.PHP_EOL;
-    pmssUserLog($username, $message);
-    if (function_exists('pmssLogJson')) {
-        pmssLogJson(array('event' => 'media_stack_watchdog', 'user' => $username, 'app' => $app, 'state' => $state, 'consecutive_failures' => $failures));
-    }
+    pmssUserWatchdogLogTransition($username, $message, array('event' => 'media_stack_watchdog', 'user' => $username, 'app' => $app, 'state' => $state, 'consecutive_failures' => $failures));
 }
 
 /** Observe one installed account and publish its current app states. */

@@ -14,6 +14,9 @@ function pmssUserFilePathIsSafe(string $path): bool
     return pmssPathTargetIsSafe($path, false, true);
 }
 
+/** Keep customer-readable status artifacts inside their account home. */
+function pmssUserStatusPathIsSafe(string $home, string $path): bool { return $path !== '' && pmssPathTargetIsSafe($path, false, true) && pmssPathWithinResolvedRoot($path, $home); }
+
 /**
  * Confirm a safe path resolves inside an already-existing directory root.
  */
