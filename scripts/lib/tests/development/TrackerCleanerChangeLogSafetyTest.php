@@ -6,6 +6,23 @@ require_once dirname(__DIR__, 2).'/trackerCleaner.php';
 
 final class TrackerCleanerChangeLogSafetyTest extends TestCase
 {
+    public function testVerboseLogRejectsInvalidUsernameBeforeUserOperations(): void
+    {
+        foreach (['', '../etc', 'root', 'bad-user', "user\nname", "user\0name"] as $username) {
+            [$result, $output] = $this->pmssCaptureStdout(static function () use ($username): void {
+                pmssTrackerCleanerWriteUserVerboseLog($username, 'payload');
+            });
+            $this->assertSame(null, $result);
+            $this->assertStringContainsString('WARN: Refusing verbose log for invalid user.', $output);
+        }
+
+        // An empty payload retains the existing quiet no-op, even for invalid names.
+        [, $output] = $this->pmssCaptureStdout(static function (): void {
+            pmssTrackerCleanerWriteUserVerboseLog('bad-user', '');
+        });
+        $this->assertSame('', $output);
+    }
+
     public function testChangeLogAppendWritesInsideExplicitSafeHomeRoot(): void
     {
         $homeRoot = $this->pmssMakeTempDir('pmss-tracker-cleaner-home-');

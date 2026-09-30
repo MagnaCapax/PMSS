@@ -33,6 +33,11 @@ function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload
     if ($payload === '') {
         return;
     }
+    // Reject malformed account names before forming a home path or user command.
+    if (!pmssValidateUsername($username) || pmssUsernameIsReserved($username)) {
+        pmssTrackerCleanerLog('WARN: Refusing verbose log for invalid user.');
+        return;
+    }
     $userHome = "/home/{$username}";
     $userLogsDir = $userHome.'/.logs';
     $userLogFile = $userLogsDir.'/trackerCleaner.log';

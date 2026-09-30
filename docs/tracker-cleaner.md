@@ -13,6 +13,7 @@ This document explains the rTorrent tracker cleaner used on PMSS hosts: what it 
 - If backup verification fails (permissions, full disk, or path safety), the cleaner stops for that user without modifying torrents.
 - An existing backup target must be a regular file; symlinks and non-file targets stop the cleaner before its copy step.
 - A per‑user log lists which torrents were modified.
+- The verbose-log writer rejects invalid account names before using a home path or user command.
 - You can disable the cleaner per user with a simple opt‑out file.
 
 ## What It Does
