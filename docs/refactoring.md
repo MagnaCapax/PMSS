@@ -28,6 +28,12 @@ clean-ups.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Managed serialized file targets accept integer modes or decimal digit strings
+within the Unix permission range (0 through 07777). Malformed or out-of-range
+modes follow the existing failed-target callback path before any file is
+replaced; valid integer modes and decimal strings retain their previous values.
+`ManagedFileWriteSafetyTest` covers rejected modes and accepted forms.
+
 Support SMTP response reads accept up to 1000 reply lines, including the final
 status line. A peer sending more continuation lines raises an error instead of
 keeping support mail delivery occupied indefinitely. Ordinary single-line and

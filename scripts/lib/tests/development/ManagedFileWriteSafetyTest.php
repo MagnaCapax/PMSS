@@ -61,6 +61,28 @@ final class ManagedFileWriteSafetyTest extends TestCase
         $this->assertSame('payload', (string) file_get_contents($path));
     }
 
+    public function testSerializedTargetRejectsMalformedModesBeforePublishing(): void
+    {
+        $path = $this->tempDir.'/mode-state.dat';
+        file_put_contents($path, 'original');
+
+        foreach (['', 'invalid', '-1', '640junk', "640\n", -1, 010000, str_repeat('9', 30)] as $mode) {
+            $failures = [];
+            $ok = \pmssManagedSerializedTargetsWrite('replacement', [
+                [$path, 'root', $mode, false],
+            ], static function (string $failedPath) use (&$failures): void {
+                $failures[] = $failedPath;
+            });
+
+            $this->assertFalse($ok, (string) $mode);
+            $this->assertSame([$path], $failures, (string) $mode);
+            $this->assertSame('original', file_get_contents($path), (string) $mode);
+        }
+
+        $this->assertSame(640, \pmssManagedSerializedTargetNormalize([$path, 'root', '640', false])[2]);
+        $this->assertSame(0640, \pmssManagedSerializedTargetNormalize([$path, 'root', 0640, false])[2]);
+    }
+
     public function testAtomicJsonPublicationFailuresPreservePreviousSnapshot(): void
     {
         foreach (['encoding', 'temp', 'false', 'zero', 'short', 'chmod', 'rename'] as $mode) {

@@ -231,6 +231,14 @@ function pmssManagedSerializedTargetNormalize($target): ?array
         return null;
     }
 
+    // chmod must never receive a mode produced by casting malformed tuple data.
+    if (is_string($mode) && preg_match('/^[0-9]+$/D', $mode) !== 1) {
+        return null;
+    }
+    if ((int) $mode < 0 || (int) $mode > 07777) {
+        return null;
+    }
+
     return [$path, $group, (int) $mode, (bool) ($target[3] ?? false)];
 }
 
