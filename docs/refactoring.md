@@ -28,6 +28,11 @@ clean-ups.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Support SMTP response reads accept up to 1000 reply lines, including the final
+status line. A peer sending more continuation lines raises an error instead of
+keeping support mail delivery occupied indefinitely. Ordinary single-line and
+multiline replies retain their status-code handling.
+
 Private temporary directory creation returns a path only after its 0700 mode
 has been applied. A failed chmod or replaced symlink returns `null` and attempts
 to remove the newly created directory; successful callers retain the same path

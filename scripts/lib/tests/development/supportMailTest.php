@@ -101,6 +101,29 @@ class SupportMailTest extends TestCase
         fclose($stream);
     }
 
+    public function testSmtpExpectAcceptsReplyAtLineLimit(): void
+    {
+        $stream = fopen('php://temp', 'w+');
+        fwrite($stream, str_repeat("250-more\r\n", 999)."250 done\r\n");
+        rewind($stream);
+
+        \pmssSupportSmtpExpect($stream, [250]);
+
+        fclose($stream);
+    }
+
+    public function testSmtpExpectRejectsUnboundedContinuation(): void
+    {
+        $stream = fopen('php://temp', 'w+');
+        fwrite($stream, str_repeat("250-more\r\n", 1001));
+        rewind($stream);
+
+        $this->assertThrowsRuntime(static function () use ($stream): void {
+            \pmssSupportSmtpExpect($stream, [250]);
+        }, 'Support SMTP response has too many lines.');
+        fclose($stream);
+    }
+
     public function testSmtpExpectRejectsUnexpectedCode(): void
     {
         $stream = fopen('php://temp', 'w+');

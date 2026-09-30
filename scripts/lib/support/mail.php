@@ -208,7 +208,12 @@ function pmssSupportMailSendViaSmtp(string $host, int $port, int $timeout, array
 function pmssSupportSmtpExpect($stream, array $expectedCodes): void
 {
     $line = '';
+    $replyLines = 0;
     do {
+        // A peer that keeps sending continuation lines must not hold delivery forever.
+        if (++$replyLines > 1000) {
+            throw new RuntimeException('Support SMTP response has too many lines.');
+        }
         $chunk = fgets($stream);
         if (!is_string($chunk)) {
             $meta = pmssStreamHandleIsOpen($stream) ? stream_get_meta_data($stream) : [];
