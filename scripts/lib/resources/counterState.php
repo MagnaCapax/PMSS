@@ -31,14 +31,7 @@ function pmssCounterStateLockAcquire(string $statePath)
  */
 function pmssCounterStateWritePayload($handle, string $payload): bool
 {
-    if (!pmssStreamHandleIsOpen($handle)) {
-        return false;
-    }
-    if (!@rewind($handle) || !@ftruncate($handle, 0)) {
-        return false;
-    }
-
-    return @fwrite($handle, $payload) === strlen($payload) && @fflush($handle);
+    return pmssLockHandleWritePayload($handle, $payload);
 }
 
 /** Persist counter state under lock and return deltas for the selected fields.

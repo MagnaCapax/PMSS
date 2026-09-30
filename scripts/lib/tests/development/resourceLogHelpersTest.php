@@ -29,9 +29,9 @@ function pmssJsonEncodeSafe($state) {
     if ($GLOBALS['counterPhase'] === 'encode') throw $GLOBALS['counterFailure'];
     return \pmssJsonEncodeSafe($state);
 }
-function fwrite($handle, $payload) {
+function pmssLockHandleWritePayload($handle, $payload) {
     if ($GLOBALS['counterPhase'] === 'write') throw $GLOBALS['counterFailure'];
-    return \fwrite($handle, $payload);
+    return \pmssLockHandleWritePayload($handle, $payload);
 }
 PHP
             .$load.'$path = '.var_export($path, true).';'.<<<'PHP'

@@ -38,6 +38,9 @@ cleaner verbose logs reach the per-user append step only after the complete
 temporary payload is written. Both retain their existing successful bytes and
 failure cleanup paths.
 
+Locked PID and counter-state streams share one seek, truncate, complete-write,
+and flush sequence. Their existing entrypoints and failure results are retained.
+
 Private temporary directory creation returns a path only after its 0700 mode
 has been applied. A failed chmod or replaced symlink returns `null` and attempts
 to remove the newly created directory; successful callers retain the same path

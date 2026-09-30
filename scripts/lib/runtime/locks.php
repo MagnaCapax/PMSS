@@ -105,15 +105,17 @@ function pmssLockChildClosePrefix(): string
     return $closeParts === [] ? '' : 'exec '.implode(' ', $closeParts).'; ';
 }
 
-/** Record the current process id in an acquired lock handle. */
-function pmssLockHandleWritePid($handle): bool
+/** Replace a locked stream only after a successful seek; require a complete write. */
+function pmssLockHandleWritePayload($handle, string $payload): bool
 {
     if (!pmssStreamHandleIsOpen($handle)) return false;
-    $pid = (string) getmypid();
-    // Preserve the previous PID when the stream cannot seek to its beginning.
+    // Preserve the previous contents when the stream cannot seek to its beginning.
     if (!@rewind($handle) || !@ftruncate($handle, 0)) return false;
-    return @fwrite($handle, $pid) === strlen($pid) && @fflush($handle);
+    return @fwrite($handle, $payload) === strlen($payload) && @fflush($handle);
 }
+
+/** Record the current process id in an acquired lock handle. */
+function pmssLockHandleWritePid($handle): bool { return pmssLockHandleWritePayload($handle, (string) getmypid()); }
 
 /** Normalize and validate the basename before resolving its runtime lock path. */
 function pmssRuntimeLockPath(string $basename): string
