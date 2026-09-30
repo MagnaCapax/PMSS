@@ -829,6 +829,9 @@ function function_exists($name) {
 function fopen($path, $mode) {
     return $GLOBALS['snapshotHandle'] = \fopen($path, $mode);
 }
+function chmod($path, $mode) {
+    return getenv('PMSS_TEST_SNAPSHOT_CASE') === 'chmod_failed' ? false : \chmod($path, $mode);
+}
 function flock($handle, $operation) {
     $GLOBALS['snapshotLockOperation'] = $operation;
     return getenv('PMSS_TEST_SNAPSHOT_CASE') === 'failed' ? false : \flock($handle, $operation);
@@ -862,17 +865,17 @@ echo json_encode([$result, $called, is_resource($GLOBALS['snapshotHandle']), uma
     file_get_contents($path), $exception, $GLOBALS['snapshotLockOperation'] ?? null]);
 umask($before);
 PHP;
-        foreach (['failed', 'success', 'nonzero', 'throw', 'unavailable', 'closed', 'closed_throw'] as $case) {
+        foreach (['chmod_failed', 'failed', 'success', 'nonzero', 'throw', 'unavailable', 'closed', 'closed_throw'] as $case) {
             $path = $this->pmssMakeTempFile('pmss-snapshot-lock-');
             file_put_contents($path, "previous snapshot\n");
             $expectedBody = "previous snapshot\n";
             $throws = in_array($case, ['throw', 'closed_throw'], true);
-            if (!in_array($case, ['failed', 'throw', 'closed', 'closed_throw'], true)) $expectedBody .= "snapshot payload\n";
+            if (!in_array($case, ['chmod_failed', 'failed', 'throw', 'closed', 'closed_throw'], true)) $expectedBody .= "snapshot payload\n";
             $this->assertSame([
-                $throws ? null : ($case === 'failed' ? 1 : (in_array($case, ['nonzero', 'closed'], true) ? 7 : 0)),
-                $case !== 'failed', false, 0027, $expectedBody,
+                $throws ? null : (in_array($case, ['chmod_failed', 'failed'], true) ? 1 : (in_array($case, ['nonzero', 'closed'], true) ? 7 : 0)),
+                !in_array($case, ['chmod_failed', 'failed'], true), false, 0027, $expectedBody,
                 $throws ? 'snapshot callback failed' : '',
-                $case === 'unavailable' ? null : LOCK_EX,
+                in_array($case, ['chmod_failed', 'unavailable'], true) ? null : LOCK_EX,
             ], $this->pmssRunInlinePhpJson($script, [
                 'PMSS_TEST_SNAPSHOT_CASE' => $case, 'PMSS_TEST_SNAPSHOT_LOG' => $path,
             ]), $case);

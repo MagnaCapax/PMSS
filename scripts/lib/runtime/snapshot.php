@@ -22,7 +22,10 @@ function pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defa
         if ($handle === false) {
             return 1;
         }
-        @chmod($logPath, 0600);
+        // Do not collect a snapshot when the log's private mode cannot be enforced.
+        if (!@chmod($logPath, 0600)) {
+            return 1;
+        }
         // Never collect or append a snapshot after its serialization lock failed.
         if (function_exists('flock') && !@flock($handle, LOCK_EX)) {
             return 1;
