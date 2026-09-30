@@ -216,6 +216,9 @@ Unsigned decimal values that must fit a PHP integer use
 whitespace, signs, non-digits, and overflow before casting, while accepting zero
 and leading zeroes. Callers retain their own defaults, minimums, and error text.
 `pmssEnvReadDigits()` keeps its documented saturating cast contract.
+The sysctl profile's sysfs NIC speed read uses this bounded parser; malformed or
+oversized samples retain its 1000 Mbps fallback, while explicit environment
+overrides keep their existing `pmssEnvReadDigits()` behavior.
 
 ### Third-Instance Refactor Trigger
 

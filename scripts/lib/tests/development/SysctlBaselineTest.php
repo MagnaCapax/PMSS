@@ -160,6 +160,29 @@ class SysctlBaselineTest extends TestCase
         $this->assertSame(25000, \pmssSysctlNicSpeedMbps());
     }
 
+    public function testNicSpeedFallsBackForMalformedSysfsSamples(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-nic-samples-', 0700);
+        $routePath = $dir.'/route';
+        $speedPath = $dir.'/net/eno1/speed';
+        @mkdir(dirname($speedPath), 0755, true);
+        file_put_contents($routePath, "Iface\tDestination\n"."eno1\t00000000\n");
+        $this->pmssTrackEnvOverrides([
+            'PMSS_SYSCTL_NIC_SPEED_MBPS' => null,
+            'PMSS_SYSCTL_PROC_NET_ROUTE_PATH' => $routePath,
+            'PMSS_SYSCTL_SYS_CLASS_NET_PATH' => $dir.'/net',
+        ]);
+
+        foreach (['', '-1', '1000.5', '18446744073709551616', "10\0G"] as $sample) {
+            file_put_contents($speedPath, $sample);
+            $this->assertSame(1000, \pmssSysctlNicSpeedMbps(), 'unexpected speed for '.bin2hex($sample));
+        }
+        foreach (['0' => 0, '00025000' => 25000, (string) PHP_INT_MAX => PHP_INT_MAX] as $sample => $expected) {
+            file_put_contents($speedPath, $sample."\n");
+            $this->assertSame($expected, \pmssSysctlNicSpeedMbps(), 'unexpected speed for '.$sample);
+        }
+    }
+
     public function testNicSpeedRejectsUnsafeRouteInterfaceNames(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-nic-unsafe-', 0700);

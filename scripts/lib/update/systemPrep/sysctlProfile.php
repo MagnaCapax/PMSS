@@ -98,7 +98,8 @@ function pmssSysctlNicSpeedMbps(): int
 
     $speedPath = pmssResolvePathFromEnv('PMSS_SYSCTL_SYS_CLASS_NET_PATH', '/sys/class/net').'/'.$iface.'/speed';
     $speed = pmssReadRegularFileTrimmed($speedPath) ?? '';
-    return ctype_digit($speed) ? (int) $speed : 1000;
+    // A malformed sysfs sample must not saturate into a fictitious fast link.
+    return pmssUnsignedDecimalIntParse($speed) ?? 1000;
 }
 
 /** Detect whether the current host is a virtual machine. */
