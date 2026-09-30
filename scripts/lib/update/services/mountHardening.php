@@ -60,12 +60,12 @@ function pmssMountHardeningRunMountStep(string $description, array $args, callab
 }
 
 /** Resolve the shared inputs used by optional temp mount hardening modes. */
-function pmssMountHardeningContext(string $fstabContext, string $mountsWarn, callable $logger, ?string $fstabPath, ?string $mountsPath): array
+function pmssMountHardeningContext(string $fstabContext, string $mountsWarnSuffix, callable $logger, ?string $fstabPath, ?string $mountsPath): array
 {
     $fstabPath = $fstabPath ?? '/etc/fstab';
     $mountsPath = $mountsPath ?? pmssResolvePathFromEnv('PMSS_PROC_MOUNTS_PATH', '/proc/mounts');
     $mounts = pmssMountHardeningReadMounts($mountsPath);
-    if ($mounts === [] && !pmssMountHardeningReadablePath($mountsPath)) $logger($mountsWarn);
+    if ($mounts === [] && !pmssMountHardeningReadablePath($mountsPath)) $logger('[WARN] '.$mountsPath.$mountsWarnSuffix);
     return ['fstab_path' => $fstabPath, 'mounts' => $mounts, 'lines' => pmssFstabLinesRead($fstabPath, $logger, $fstabContext), 'required' => ['noexec', 'nosuid', 'nodev'], 'conflicts' => ['exec', 'suid', 'dev']];
 }
 
@@ -74,8 +74,7 @@ function pmssConfigureTempMountNoexec(?callable $logger = null, ?string $fstabPa
 {
     $log = $logger ?: 'logMessage';
     if (!pmssMountHardeningFlagEnabled('PMSS_HARDEN_TMP_NOEXEC', '[SKIP] /tmp and /dev/shm noexec hardening disabled (PMSS_HARDEN_TMP_NOEXEC not set)', '[SKIP] /tmp and /dev/shm noexec hardening disabled via PMSS_HARDEN_TMP_NOEXEC', $log)) return;
-    $ctx = pmssMountHardeningContext('fstab hardening', '[WARN] '.($mountsPath ?? pmssResolvePathFromEnv('PMSS_PROC_MOUNTS_PATH', '/proc/mounts')).' not readable; skipping mount option checks', $log, $fstabPath, $mountsPath);
-    $fstabPath = $ctx['fstab_path']; $mounts = $ctx['mounts']; $lines = $ctx['lines']; $required = $ctx['required']; $conflicts = $ctx['conflicts'];
+    ['fstab_path' => $fstabPath, 'mounts' => $mounts, 'lines' => $lines, 'required' => $required, 'conflicts' => $conflicts] = pmssMountHardeningContext('fstab hardening', ' not readable; skipping mount option checks', $log, $fstabPath, $mountsPath);
     $fstabChanged = false;
     $remounts = [];
     foreach (['/tmp', '/dev/shm'] as $mountPoint) {
@@ -111,8 +110,7 @@ function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPat
     if (!pmssMountHardeningFlagEnabled('PMSS_HARDEN_TMP_TMPFS', '[SKIP] /tmp tmpfs hardening disabled (PMSS_HARDEN_TMP_TMPFS not set)', '[SKIP] /tmp tmpfs hardening disabled via PMSS_HARDEN_TMP_TMPFS', $log)) return;
     $size = pmssEnvTrimmed('PMSS_TMPFS_TMP_SIZE', '2G');
     if (!preg_match('/^[0-9]+[KMGTP]?$/i', $size)) { $log('[WARN] Invalid PMSS_TMPFS_TMP_SIZE value; defaulting to 2G'); $size = '2G'; }
-    $ctx = pmssMountHardeningContext('/tmp tmpfs configuration', '[WARN] '.($mountsPath ?? pmssResolvePathFromEnv('PMSS_PROC_MOUNTS_PATH', '/proc/mounts')).' not readable; skipping /proc/mounts checks', $log, $fstabPath, $mountsPath);
-    $fstabPath = $ctx['fstab_path']; $mounts = $ctx['mounts']; $lines = $ctx['lines']; $required = $ctx['required']; $conflicts = $ctx['conflicts'];
+    ['fstab_path' => $fstabPath, 'mounts' => $mounts, 'lines' => $lines, 'required' => $required, 'conflicts' => $conflicts] = pmssMountHardeningContext('/tmp tmpfs configuration', ' not readable; skipping /proc/mounts checks', $log, $fstabPath, $mountsPath);
     $tmpMount = $mounts['/tmp'] ?? ['type' => null, 'options' => []];
     if ($lines === null) return;
 
