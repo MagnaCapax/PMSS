@@ -156,6 +156,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   open-but-busy result when `closeOnBusy=false`. `RuntimeLockSafetyTest` covers
   exception cleanup and ordinary creation, contention, and release behavior.
 
+- `pmssRuntimeLockDir()` rejects empty normalized overrides and symlinked lock
+  roots. An explicit override must be a directory after creation. The default
+  path retains its legacy return behavior if an unprivileged caller cannot
+  create it; ordinary existing directories retain their path and mode behavior.
+
 - `pmssLockHandleWritePid($handle): bool`
   - Rewinds before truncating, preserving the previous PID if seeking fails.
   - Stops on failed seek, truncation, incomplete write, or flush and returns

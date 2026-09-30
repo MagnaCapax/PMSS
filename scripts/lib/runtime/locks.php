@@ -139,11 +139,20 @@ function pmssRuntimeLockDir(): string
 {
     $override = getenv('PMSS_RUNTIME_LOCK_DIR');
     $dir = is_string($override) && $override !== '' ? rtrim($override, '/') : '/run/pmss/locks';
+    // Refuse malformed or redirected lock roots before any filesystem mutation.
+    if ($dir === '' || pmssFilesystemPathHasNulByte($dir) || is_link($dir)) {
+        throw new RuntimeException('Unsafe runtime lock directory');
+    }
     if (!is_dir($dir)) {
         if (!is_dir(dirname($dir))) {
             @mkdir(dirname($dir), 0755, true);
         }
         @mkdir($dir, 0700);
+    }
+    // Keep the legacy default-path result when an unprivileged caller cannot
+    // create /run; explicit overrides must resolve to a usable lock root.
+    if (is_string($override) && $override !== '' && (is_link($dir) || !is_dir($dir))) {
+        throw new RuntimeException('Unsafe runtime lock directory');
     }
     $perms = @fileperms($dir);
     // Never re-mode a shared sticky directory (e.g. a mistaken override pointing at /tmp).

@@ -85,6 +85,29 @@ class RuntimeLockSafetyTest extends TestCase
         }
     }
 
+    public function testRuntimeLockDirRejectsRedirectedOrUnusableOverrides(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-runtime-lock-root-');
+        $realDir = $root.'/real';
+        $this->assertTrue(mkdir($realDir, 0700));
+        $link = $root.'/redirect';
+        $this->assertTrue(symlink($realDir, $link));
+        $file = $this->pmssWriteFile($root.'/occupied', 'keep');
+
+        foreach ([$link, $file, '///'] as $unsafe) {
+            $this->pmssWithEnv(['PMSS_RUNTIME_LOCK_DIR' => $unsafe], function (): void {
+                $this->assertThrowsRuntime(static function (): void {
+                    \pmssRuntimeLockDir();
+                }, 'Unsafe runtime lock directory');
+            });
+        }
+        $this->assertSame('keep', file_get_contents($file));
+        $this->assertSame($realDir, realpath($link));
+        $this->pmssWithEnv(['PMSS_RUNTIME_LOCK_DIR' => $realDir], function () use ($realDir): void {
+            $this->assertSame($realDir, \pmssRuntimeLockDir());
+        });
+    }
+
     public function testLockAcquireRejectsUnsafeModesBeforeFilesystemChanges(): void
     {
         $root = $this->pmssMakeTempDir('pmss-runtime-lock-modes-');
