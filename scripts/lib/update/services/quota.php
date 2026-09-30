@@ -139,6 +139,10 @@ function pmssQuotaEscapePathForLog(string $path): string
  */
 function pmssQuotaCommandRun(string $command, ?callable $runner = null): array
 {
+    // Reject malformed command bytes before trim() or a supplied runner sees them.
+    if (strpos($command, "\0") !== false) {
+        return ['ok' => false, 'rc' => 1, 'output' => ''];
+    }
     $command = trim($command);
     if ($command === '') {
         return ['ok' => false, 'rc' => 1, 'output' => ''];

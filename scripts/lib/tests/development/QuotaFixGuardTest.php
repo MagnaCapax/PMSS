@@ -28,6 +28,20 @@ class QuotaFixGuardTest extends TestCase
         $this->assertSame('', $result['output']);
     }
 
+    public function testQuotaCommandRunRejectsNulBeforeRunner(): void
+    {
+        foreach (["\0quotaoff -av", "quotaoff\0 -av", "quotaoff -av\0"] as $command) {
+            $called = false;
+            $result = \pmssQuotaCommandRun($command, static function () use (&$called): array {
+                $called = true;
+                return ['rc' => 0, 'stdout' => 'unexpected', 'stderr' => ''];
+            });
+
+            $this->assertFalse($called);
+            $this->assertSame(['ok' => false, 'rc' => 1, 'output' => ''], $result);
+        }
+    }
+
     public function testQuotaFixUsesExitAwareRunnerForDestructiveCommands(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/quotaFix.php', [
