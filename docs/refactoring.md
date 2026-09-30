@@ -236,6 +236,10 @@ The sysctl profile's sysfs NIC speed read uses this bounded parser; malformed or
 oversized samples retain its 1000 Mbps fallback, while explicit environment
 overrides keep their existing `pmssEnvReadDigits()` behavior.
 
+The sysctl swap-device probe rejects NUL bytes and dot path components before
+reading sysfs. Valid device names retain their rotational checks; malformed
+names return the existing slow-device result.
+
 ### Third-Instance Refactor Trigger
 
 When code review identifies that a proposed function has the same API shape as

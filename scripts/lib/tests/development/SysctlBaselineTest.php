@@ -160,6 +160,23 @@ class SysctlBaselineTest extends TestCase
         $this->assertSame(25000, \pmssSysctlNicSpeedMbps());
     }
 
+    public function testBlockDeviceProbeRejectsMalformedNames(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-block-', 0700);
+        $root = $dir.'/block';
+        @mkdir($root.'/vda/queue', 0755, true);
+        @mkdir($dir.'/queue', 0755, true);
+        file_put_contents($root.'/vda/queue/rotational', "0\n");
+        file_put_contents($dir.'/queue/rotational', "0\n");
+
+        foreach (['', '.', '..', "vda\0other", "vda\n"] as $name) {
+            $seen = [];
+            $this->assertFalse(\pmssSysctlBlockDeviceIsFast($name, $root, $seen), 'unexpected device for '.bin2hex($name));
+        }
+        $seen = [];
+        $this->assertTrue(\pmssSysctlBlockDeviceIsFast('vda', $root, $seen));
+    }
+
     public function testNicSpeedFallsBackForMalformedSysfsSamples(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-nic-samples-', 0700);

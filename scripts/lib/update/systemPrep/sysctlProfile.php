@@ -24,8 +24,10 @@ function pmssSysctlHasSwap(): bool
 /** Return true when a block device or one of its slaves is non-rotational. */
 function pmssSysctlBlockDeviceIsFast(string $deviceName, string $sysClassBlockRoot, array &$seen = []): bool
 {
+    // /proc/swaps and sysfs entries must not turn malformed names into path traversal.
+    if (strpos($deviceName, "\0") !== false) return false;
     $deviceName = basename($deviceName);
-    if ($deviceName === '' || isset($seen[$deviceName])) {
+    if (!pmssPathRelativeStringIsSafe($deviceName) || isset($seen[$deviceName])) {
         return false;
     }
 
