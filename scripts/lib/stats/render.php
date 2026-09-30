@@ -46,12 +46,15 @@ function pmssStatsRenderText(array $stats, array $options = []): string
 
     $diskValue = pmssStatsFormatBytesOrFallback($stats['disk']['used_bytes'], $stats['disk']['used_text']).' / '.pmssStatsFormatBytesOrFallback($stats['disk']['limit_bytes'], $stats['disk']['limit_text']);
     $memoryValue = pmssStatsFormatBytesOrFallback($stats['memory']['current_bytes']).' / '.pmssStatsFormatBytesOrFallback($stats['memory']['limit_bytes']);
+    $ratio = $stats['rtorrent']['ratio'] !== null ? number_format((float) $stats['rtorrent']['ratio'], 2) : 'n/a';
+    $trafficValue = $stats['traffic']['upload_month_mib'] !== null ? pmssTrafficFormatAmount((float) $stats['traffic']['upload_month_mib']) : 'n/a';
+    $rates = [];
+    foreach (['upload', 'download'] as $direction) $rates[$direction] = pmssFormatBytes((float) ($stats['rtorrent'][$direction.'_rate'] ?? 0.0)).'/s';
     if (!empty($options['mini'])) {
-        $ratio = $stats['rtorrent']['ratio'] !== null ? number_format((float) $stats['rtorrent']['ratio'], 2) : 'n/a';
         $lines[] = $title;
         $lines[] = 'Disk '.$diskValue.' · Mem '.$memoryValue;
-        $lines[] = 'Up '.pmssFormatBytes((float) ($stats['rtorrent']['upload_rate'] ?? 0.0)).'/s · Down '.pmssFormatBytes((float) ($stats['rtorrent']['download_rate'] ?? 0.0)).'/s · Ratio '.$ratio;
-        $lines[] = 'Traffic '.(($stats['traffic']['upload_month_mib'] !== null) ? pmssTrafficFormatAmount((float) $stats['traffic']['upload_month_mib']) : 'n/a').' · Uptime '.($stats['uptime_seconds'] !== null ? pmssStatsFormatUptime((int) $stats['uptime_seconds']) : 'n/a');
+        $lines[] = 'Up '.$rates['upload'].' · Down '.$rates['download'].' · Ratio '.$ratio;
+        $lines[] = 'Traffic '.$trafficValue.' · Uptime '.($stats['uptime_seconds'] !== null ? pmssStatsFormatUptime((int) $stats['uptime_seconds']) : 'n/a');
         return implode(PHP_EOL, $lines).PHP_EOL;
     }
 
@@ -67,16 +70,14 @@ function pmssStatsRenderText(array $stats, array $options = []): string
     }
     $lines[] = pmssStatsRenderLine('Torrents', $torrentSummary);
     foreach ([['Upload', '▲', 'upload'], ['Download', '▼', 'download']] as [$label, $arrow, $direction]) {
-        $lines[] = pmssStatsRenderLine($label, $arrow.' '.pmssFormatBytes((float) ($stats['rtorrent'][$direction.'_rate'] ?? 0.0)).'/s', 'Total: '.pmssStatsFormatBytesOrFallback($stats['rtorrent'][$direction.'_total']));
+        $lines[] = pmssStatsRenderLine($label, $arrow.' '.$rates[$direction], 'Total: '.pmssStatsFormatBytesOrFallback($stats['rtorrent'][$direction.'_total']));
     }
-    $lines[] = pmssStatsRenderLine('Ratio', $stats['rtorrent']['ratio'] !== null ? number_format((float) $stats['rtorrent']['ratio'], 2) : 'n/a');
+    $lines[] = pmssStatsRenderLine('Ratio', $ratio);
     $lines[] = '';
 
-    $trafficValue = ($stats['traffic']['upload_month_mib'] !== null) ? pmssTrafficFormatAmount((float) $stats['traffic']['upload_month_mib']) : 'n/a';
-    $trafficSuffix = '';
+    $trafficSuffix = $stats['traffic']['limit_mib'] !== null ? pmssStatsRenderPercentSuffix($stats['traffic']['percent'], 16) : '';
     if ($stats['traffic']['limit_mib'] !== null) {
         $trafficValue .= ' / '.pmssTrafficFormatAmount((float) $stats['traffic']['limit_mib']);
-        $trafficSuffix = pmssStatsRenderPercentSuffix($stats['traffic']['percent'], 16);
     }
     $lines[] = pmssStatsRenderLine('Traffic', $trafficValue, $trafficSuffix);
     $lines[] = pmssStatsRenderLine('Uptime', $stats['uptime_seconds'] !== null ? pmssStatsFormatUptime((int) $stats['uptime_seconds']) : 'n/a', 'PMSS '.$stats['pmss_version']);
@@ -107,12 +108,11 @@ function pmssStatsMain(array $argv): int
 
     $options = [
         'full' => pmssCliOptionPresent($parsed, 'full'),
-        'json' => pmssCliOptionPresent($parsed, 'json'),
         'mini' => pmssCliOptionPresent($parsed, 'mini'),
         'no_header' => pmssCliOptionPresent($parsed, 'no-header'),
     ];
     $stats = pmssStatsCollect();
-    if ($options['json']) return pmssJsonEmitPayload($stats, 'Failed to encode PMSS stats JSON.', JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if (pmssCliOptionPresent($parsed, 'json')) return pmssJsonEmitPayload($stats, 'Failed to encode PMSS stats JSON.', JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     echo pmssStatsRenderText($stats, $options);
     return 0;
 }
