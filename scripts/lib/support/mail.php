@@ -124,9 +124,9 @@ function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): 
         throw new RuntimeException('Unable to start sendmail transport.');
     }
     if (!isset($pipes[0], $pipes[1], $pipes[2])
-        || !is_resource($pipes[0])
-        || !is_resource($pipes[1])
-        || !is_resource($pipes[2])) {
+        || !pmssStreamHandleIsOpen($pipes[0])
+        || !pmssStreamHandleIsOpen($pipes[1])
+        || !pmssStreamHandleIsOpen($pipes[2])) {
         pmssProcessPipesClose($pipes);
         proc_close($process);
         throw new RuntimeException('Sendmail transport did not provide usable pipes.');
@@ -173,7 +173,7 @@ function pmssSupportMailSendViaSmtp(string $host, int $port, int $timeout, array
     $errno = 0;
     $errstr = '';
     $stream = @stream_socket_client('tcp://'.$host.':'.$port, $errno, $errstr, $timeout);
-    if (!is_resource($stream)) {
+    if (!pmssStreamHandleIsOpen($stream)) {
         throw new RuntimeException('Support SMTP connection failed: '.$errstr);
     }
 
@@ -211,7 +211,7 @@ function pmssSupportSmtpExpect($stream, array $expectedCodes): void
     do {
         $chunk = fgets($stream);
         if (!is_string($chunk)) {
-            $meta = is_resource($stream) ? stream_get_meta_data($stream) : [];
+            $meta = pmssStreamHandleIsOpen($stream) ? stream_get_meta_data($stream) : [];
             if (!empty($meta['timed_out'])) {
                 throw new RuntimeException('Support SMTP server timed out.');
             }

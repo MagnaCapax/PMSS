@@ -19,7 +19,7 @@ function pmssLighttpdWatchdogNginxActionsRead(string $logPath, string $statePath
     try {
         $logStat = null;
         $pathStat = @lstat($logPath);
-        if (!is_resource($handle) || !is_array($pathStat)
+        if (!pmssStreamHandleIsOpen($handle) || !is_array($pathStat)
             || !pmssLockFileHandleMatchesPath($handle, $logPath, $pathStat, $logStat)
         ) {
             return array();
@@ -65,7 +65,7 @@ function pmssLighttpdWatchdogNginxActionsRead(string $logPath, string $statePath
         $newOffset = @ftell($handle);
     } finally {
         // Cover metadata, state loading, and parsing failures as well as early returns.
-        if (is_resource($handle)) {
+        if (pmssStreamHandleIsOpen($handle)) {
             @fclose($handle);
         }
     }

@@ -50,7 +50,7 @@ function pmssRequireCliEntrypointScript(string $baseDir, string $relativePath, b
     // A shebang cannot be included before strict_types; execute that target as a script.
     $prefix = false;
     $handle = @fopen($scriptPath, 'rb');
-    if (is_resource($handle)) {
+    if (pmssStreamHandleIsOpen($handle)) {
         $prefix = @fread($handle, 2);
         @fclose($handle);
     }

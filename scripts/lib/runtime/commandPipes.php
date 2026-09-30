@@ -12,7 +12,7 @@ function pmssProcessPipeDescriptorSpec(string $stdinMode = 'r', string $stdoutMo
 function pmssProcessPipesClose(array $pipes): void
 {
     foreach ($pipes as $pipe) {
-        if (is_resource($pipe)) {
+        if (pmssStreamHandleIsOpen($pipe)) {
             fclose($pipe);
         }
     }

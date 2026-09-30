@@ -31,7 +31,7 @@ function pmssCounterStateLockAcquire(string $statePath)
  */
 function pmssCounterStateWritePayload($handle, string $payload): bool
 {
-    if (!is_resource($handle) || get_resource_type($handle) !== 'stream') {
+    if (!pmssStreamHandleIsOpen($handle)) {
         return false;
     }
     if (!@rewind($handle) || !@ftruncate($handle, 0)) {
