@@ -110,7 +110,9 @@ can be enabled with `PMSS_HARDEN_TMP_NOEXEC=1` to add `noexec,nosuid,nodev` to
 `/tmp`). To provision a dedicated tmpfs-backed `/tmp`, set
 `PMSS_HARDEN_TMP_TMPFS=1`; the default size is `2G` and can be overridden via
 `PMSS_TMPFS_TMP_SIZE` (e.g. `512M`). Enabling tmpfs overlays any existing `/tmp`
-contents, so plan for services that may have open handles.
+contents, so plan for services that may have open handles. If the live mount
+table cannot be read, the fstab update may proceed, but the live `/tmp` mount
+is skipped rather than assuming `/tmp` is unmounted.
 
 ### Package Phase Ordering
 

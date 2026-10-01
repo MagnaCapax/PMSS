@@ -90,6 +90,35 @@ class TempTmpfsMountTest extends TestCase
         chmod($mounts, 0600);
     }
 
+    public function testUnavailableMountStateSkipsLiveMount(): void
+    {
+        ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(
+            'pmss-tmpfs-mounts-missing-',
+            "UUID=abc / ext4 defaults 0 0\n"
+        );
+
+        $this->pmssResetRuntimeProfile();
+        $messages = $this->runTmpfsHardening($fstab, $mounts.'-missing');
+
+        $this->assertStringContainsString('tmpfs /tmp tmpfs', (string) file_get_contents($fstab));
+        $this->assertEquals([], $this->pmssProfileCommands());
+        $this->pmssAssertMessagesContain($messages, 'Skipping live /tmp mount because mount state is unavailable');
+    }
+
+    public function testFailedMountReadSkipsLiveMount(): void
+    {
+        ['dir' => $dir, 'fstab' => $fstab] = $this->pmssMountFixtureCreate(
+            'pmss-tmpfs-mounts-directory-',
+            "tmpfs /tmp tmpfs defaults,noexec,nosuid,nodev,size=2G 0 0\n"
+        );
+
+        $this->pmssResetRuntimeProfile();
+        $messages = $this->runTmpfsHardening($fstab, $dir);
+
+        $this->assertEquals([], $this->pmssProfileCommands());
+        $this->pmssAssertMessagesContain($messages, 'Skipping live /tmp mount because mount state is unavailable');
+    }
+
     public function testUnsafeInputPathsWarnAndSkipUnsafeReads(): void
     {
         ['fstab' => $fstab, 'mounts' => $mounts] = $this->pmssMountFixtureCreate(

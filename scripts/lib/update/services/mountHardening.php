@@ -20,10 +20,12 @@ function pmssMountHardeningFlagEnabled(string $envKey, string $notSetMessage, st
 }
 
 /** Read /proc/mounts style data into a mountpoint-indexed map. */
-function pmssMountHardeningReadMounts(string $mountsPath): array
+function pmssMountHardeningReadMounts(string $mountsPath, ?bool &$readSucceeded = null): array
 {
     $mounts = [];
+    $readSucceeded = false;
     if (!pmssMountHardeningReadablePath($mountsPath) || ($lines = @file($mountsPath, FILE_IGNORE_NEW_LINES)) === false) return $mounts;
+    $readSucceeded = true;
     foreach ($lines as $line) {
         $columns = pmssConfigLineColumns($line, 4, []);
         if ($columns === []) continue;
@@ -35,7 +37,7 @@ function pmssMountHardeningReadMounts(string $mountsPath): array
 /** Keep invalid override paths away from PHP filesystem calls. */
 function pmssMountHardeningReadablePath(string $path): bool
 {
-    return $path !== '' && !pmssFilesystemPathHasNulByte($path) && is_readable($path);
+    return $path !== '' && !pmssFilesystemPathHasNulByte($path) && !is_dir($path) && is_readable($path);
 }
 
 /** Persist fstab mutations before any live remount is attempted. */
@@ -64,9 +66,9 @@ function pmssMountHardeningContext(string $fstabContext, string $mountsWarnSuffi
 {
     $fstabPath = $fstabPath ?? '/etc/fstab';
     $mountsPath = $mountsPath ?? pmssResolvePathFromEnv('PMSS_PROC_MOUNTS_PATH', '/proc/mounts');
-    $mounts = pmssMountHardeningReadMounts($mountsPath);
-    if ($mounts === [] && !pmssMountHardeningReadablePath($mountsPath)) $logger('[WARN] '.$mountsPath.$mountsWarnSuffix);
-    return ['fstab_path' => $fstabPath, 'mounts' => $mounts, 'lines' => pmssFstabLinesRead($fstabPath, $logger, $fstabContext), 'required' => ['noexec', 'nosuid', 'nodev'], 'conflicts' => ['exec', 'suid', 'dev']];
+    $mounts = pmssMountHardeningReadMounts($mountsPath, $mountsRead);
+    if (!$mountsRead) $logger('[WARN] '.$mountsPath.$mountsWarnSuffix);
+    return ['fstab_path' => $fstabPath, 'mounts' => $mounts, 'mounts_read' => $mountsRead, 'lines' => pmssFstabLinesRead($fstabPath, $logger, $fstabContext), 'required' => ['noexec', 'nosuid', 'nodev'], 'conflicts' => ['exec', 'suid', 'dev']];
 }
 
 /** Ensure /tmp and /dev/shm are mounted with noexec/nosuid/nodev when enabled. */
@@ -110,7 +112,7 @@ function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPat
     if (!pmssMountHardeningFlagEnabled('PMSS_HARDEN_TMP_TMPFS', '[SKIP] /tmp tmpfs hardening disabled (PMSS_HARDEN_TMP_TMPFS not set)', '[SKIP] /tmp tmpfs hardening disabled via PMSS_HARDEN_TMP_TMPFS', $log)) return;
     $size = pmssEnvTrimmed('PMSS_TMPFS_TMP_SIZE', '2G');
     if (!preg_match('/^[0-9]+[KMGTP]?$/i', $size)) { $log('[WARN] Invalid PMSS_TMPFS_TMP_SIZE value; defaulting to 2G'); $size = '2G'; }
-    ['fstab_path' => $fstabPath, 'mounts' => $mounts, 'lines' => $lines, 'required' => $required, 'conflicts' => $conflicts] = pmssMountHardeningContext('/tmp tmpfs configuration', ' not readable; skipping /proc/mounts checks', $log, $fstabPath, $mountsPath);
+    ['fstab_path' => $fstabPath, 'mounts' => $mounts, 'mounts_read' => $mountsRead, 'lines' => $lines, 'required' => $required, 'conflicts' => $conflicts] = pmssMountHardeningContext('/tmp tmpfs configuration', ' not readable; skipping /proc/mounts checks', $log, $fstabPath, $mountsPath);
     $tmpMount = $mounts['/tmp'] ?? ['type' => null, 'options' => []];
     if ($lines === null) return;
 
@@ -133,6 +135,8 @@ function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPat
     }
 
     if ($changed && !pmssMountHardeningPersistFstabChanges($fstabPath, $lines, $log)) return;
+    // An unknown live mount state must never be treated as an unmounted /tmp.
+    if (!$mountsRead) { $log('[WARN] Skipping live /tmp mount because mount state is unavailable'); return; }
     if (!is_dir('/tmp') || is_link('/tmp')) { $log('[WARN] /tmp is not a directory; skipping tmpfs mount'); return; }
     $needsMount = $added || ($tmpMount['type'] !== 'tmpfs');
     if (!$needsMount && array_diff($required, $tmpMount['options']) === []) { $log('[SKIP] /tmp already mounted as tmpfs with hardened options'); return; }
