@@ -340,6 +340,7 @@ PHP
             ['read' => 12, 'write' => 34, 'source' => 'throttle'],
             \pmssResourceLogReadBlkioBytesWithSource($root, 'blkio.bfq.io_service_bytes', 'blkio.throttle.io_service_bytes')
         );
+        $this->assertSame(\pmssResourceLogReadBlkioBytesWithSource($root, 'blkio.bfq.io_service_bytes', 'blkio.throttle.io_service_bytes'), \pmssResourceLogReadBlkioBytesWithSource($root));
     }
 
     private function makeStatePath($previousPayload = null): string

@@ -74,11 +74,13 @@ class UserMetricsCollectTest extends TestCase
     {
         $slice = 'user.slice/user-1000.slice';
         $root = $this->tree([
-            'blkio/'.$slice.'/blkio.throttle.io_service_bytes' =>
+            'blkio/'.$slice.'/blkio.bfq.io_service_bytes' =>
                 "8:0 Read 1000\n8:0 Write 2000\n8:16 Read 500\n8:16 Write 250\nTotal 3750\n",
+            'blkio/'.$slice.'/blkio.throttle.io_service_bytes' => "8:0 Read 1\n8:0 Write 2\n",
         ]);
         $m = \pmssUserMetricsCollect(1000, $root);
         $this->assertEquals(1500, $m['io_bytes_read']);
         $this->assertEquals(2250, $m['io_bytes_write']);
+        $this->assertTrue(!array_key_exists('io_ops_read', $m));
     }
 }

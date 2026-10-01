@@ -69,15 +69,11 @@ function pmssUserMetricsCollect(int $uid, ?string $cgroupRoot = null): array
     // Prefer BFQ per-cgroup accounting (fleet-default scheduler on rotational/md hosts); fall
     // back to throttle on non-BFQ hosts. Match ops to the same family the bytes came from (#707).
     // (Raw cumulative telemetry — no delta/enforcement, so no source-reseed guard needed here.)
-    $ioBytes = pmssResourceLogReadBlkioBytesWithSource($root.'/blkio'.$slice, 'blkio.bfq.io_service_bytes', 'blkio.throttle.io_service_bytes');
+    $ioBytes = pmssResourceLogReadBlkioBytesWithSource($root.'/blkio'.$slice);
     pmssMetricMergeReadWrite($m, 'io_bytes', $ioBytes);
     if ($ioBytes !== null) {
-        $opsFile = $ioBytes['source'] === 'bfq' ? 'blkio.bfq.io_serviced' : 'blkio.throttle.io_serviced';
-        pmssMetricMergeReadWrite($m, 'io_ops', pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.$opsFile));
+        pmssMetricMergeReadWrite($m, 'io_ops', pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.'.$ioBytes['source'].'.io_serviced'));
     }
-    // The CFQ-era blkio.io_service_time / io_wait_time / io_queued files do not exist under the
-    // BFQ or throttle policies on any current host (blk-mq); their reads were dead. Removed (#707).
-
     // Omit unavailable readings once, retaining zero counters and insertion order.
     return array_filter($m, static function (?int $value): bool { return $value !== null; });
 }

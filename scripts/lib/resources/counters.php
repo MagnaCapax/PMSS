@@ -75,7 +75,7 @@ function pmssResourceLogReadCountersV1(int $uid, ?string $cgroupRoot = null): ?a
     // from the SAME accounting family the bytes came from, and record io_source so the delta
     // path can reseed the baseline on a source switch, avoiding a phantom first delta (#707).
     $blkioSlice = $root.'/blkio'.$slice;
-    $bytes = pmssResourceLogReadBlkioBytesWithSource($blkioSlice, 'blkio.bfq.io_service_bytes', 'blkio.throttle.io_service_bytes');
+    $bytes = pmssResourceLogReadBlkioBytesWithSource($blkioSlice);
     if ($bytes !== null) {
         // ATOMIC io group: bytes, ops, AND io_source are recorded together or not at all. If the
         // ops file is transiently unreadable, omit the WHOLE io sample rather than store a partial
@@ -84,8 +84,7 @@ function pmssResourceLogReadCountersV1(int $uid, ?string $cgroupRoot = null): ?a
         // reseed guard (keyed on io_source) would NOT fire — risking a spurious IOPS throttle.
         // Safe: on a BFQ host both bfq.* files are exposed together (CONFIG_BFQ_CGROUP_DEBUG), so
         // "bytes present, ops absent" is only a transient read failure, never a steady state.
-        $opsFile = $bytes['source'] === 'bfq' ? 'blkio.bfq.io_serviced' : 'blkio.throttle.io_serviced';
-        $ops = pmssResourceLogReadBlkioReadWrite($blkioSlice.$opsFile);
+        $ops = pmssResourceLogReadBlkioReadWrite($blkioSlice.'blkio.'.$bytes['source'].'.io_serviced');
         if ($ops !== null) {
             $values += ['io_read' => $bytes['read'], 'io_write' => $bytes['write'],
                 'io_read_ops' => $ops['read'], 'io_write_ops' => $ops['write'], 'io_source' => $bytes['source']];
@@ -147,7 +146,7 @@ function pmssResourceLogReadBlkioReadWrite(string $path): ?array
  *
  * @return array{read:int,write:int,source:string}|null
  */
-function pmssResourceLogReadBlkioBytesWithSource(string $blkioSliceDir, string $bfqFile, string $throttleFile): ?array
+function pmssResourceLogReadBlkioBytesWithSource(string $blkioSliceDir, string $bfqFile = 'blkio.bfq.io_service_bytes', string $throttleFile = 'blkio.throttle.io_service_bytes'): ?array
 {
     $bfq = pmssResourceLogReadBlkioReadWrite($blkioSliceDir.$bfqFile);
     if ($bfq !== null && ($bfq['read'] > 0 || $bfq['write'] > 0)) return $bfq + ['source' => 'bfq'];

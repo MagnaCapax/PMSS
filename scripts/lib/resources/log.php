@@ -75,7 +75,8 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
         'tasks' => (int) ($counters['tasks'] ?? 0),
         'ts' => time(),
     ];
-    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) {
+    $deltaFields = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'];
+    foreach ($deltaFields as $field) {
         $state[$field] = (int) ($counters[$field] ?? 0);
     }
     foreach (pmssResourceMemoryBreakdownFieldMap() as $field) { array_key_exists($field, $counters) && $state[$field] = (int) $counters[$field]; }
@@ -86,7 +87,7 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
     $result = pmssCounterStateUpdate(
         $statePath,
         $state,
-        ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'],
+        $deltaFields,
         [
             'io_read' => PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_BYTES,
             'io_write' => PMSS_RESOURCE_LOG_MAX_INTERVAL_IO_BYTES,
