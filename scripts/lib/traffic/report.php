@@ -59,11 +59,11 @@ function pmssShowTrafficMain(array $argv): int
     $report = pmssShowTrafficReportBuild($users, $statsDir);
     pmssShowTrafficRowsSort($report['rows'], $sort);
     if ($asJson) {
-        return pmssJsonEmitPayload(pmssShowTrafficJsonPayload($report['rows'], $report['dataMonthTotal'], $report['dataMonthTotalLocal'], $report['baseUsers'], $report['baseUsersWithStats'], $report['overLimitCount'], $report['nearLimitCount'], $report['missingStats']), 'Failed to encode traffic report JSON.');
+        return pmssJsonEmitPayload(pmssShowTrafficJsonPayload($report), 'Failed to encode traffic report JSON.');
     }
 
     foreach ($report['rows'] as $row) { pmssShowTrafficPrintRow($row, $extended, $useColor); }
-    pmssShowTrafficPrintSummary($extended, $showMissing, $report['missingStats'], count($report['baseUsers']), $report['overLimitCount'], $report['nearLimitCount'], $report['dataMonthTotal'], $report['dataMonthTotalLocal']);
+    pmssShowTrafficPrintSummary($report, $extended, $showMissing);
     return 0;
 }
 
@@ -84,12 +84,12 @@ function pmssShowTrafficUsersLoad(string $listUsersScript, string $statsDir): ?a
 /** @return array<string,mixed> */
 function pmssShowTrafficReportBuild(array $users, string $statsDir): array
 {
-    $report = ['rows' => [], 'dataMonthTotal' => 0.0, 'dataMonthTotalLocal' => 0.0, 'missingStats' => [], 'baseUsers' => [], 'baseUsersWithStats' => [], 'overLimitCount' => 0, 'nearLimitCount' => 0];
+    $report = ['rows' => [], 'dataMonthTotal' => 0.0, 'dataMonthTotalLocal' => 0.0, 'missingStats' => [], 'baseUsers' => [], 'overLimitCount' => 0, 'nearLimitCount' => 0];
     $limitCache = [];
     foreach ($users as $thisUser) {
         $isLocalnet = pmssTrafficUserKeyIsLocalnet($thisUser);
         $baseUser = pmssTrafficUserKeyBaseUser($thisUser);
-        $report['baseUsers'][$baseUser] = true;
+        if (!isset($report['baseUsers'][$baseUser])) $report['baseUsers'][$baseUser] = false;
         $statsPath = pmssTrafficStatsPath($thisUser, $statsDir);
         if (!is_file($statsPath)) {
             $report['missingStats'][] = $thisUser;
@@ -106,9 +106,8 @@ function pmssShowTrafficReportBuild(array $users, string $statsDir): array
         $isLocalnet && $report['dataMonthTotalLocal'] += $rawCounters['month'];
 
         $ingressPath = pmssTrafficDataPaths($baseUser)[pmssTrafficDataPathKey($isLocalnet, 'ingress')];
-        $inboundMonth = null;
         $ingressData = pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser);
-        $ingressData !== null && $inboundMonth = (float) $ingressData['raw']['month'];
+        $inboundMonth = $ingressData !== null ? (float) $ingressData['raw']['month'] : null;
 
         $inboundRatio = ($inboundMonth !== null && $rawCounters['month'] > 0) ? round($inboundMonth / $rawCounters['month'], 2) : null;
         $dataRates = ['week' => round(($rawCounters['week'] / (7 * 24 * 60 * 60)), 2), 'day' => round(($rawCounters['day'] / (24 * 60 * 60)), 2), 'hour' => round(($rawCounters['hour'] / (60 * 60)), 2), '15min' => round(($rawCounters['15min'] / (15 * 60)), 2)];
@@ -120,16 +119,11 @@ function pmssShowTrafficReportBuild(array $users, string $statsDir): array
         }
 
         $limitMiB = ($limitCache[$baseUser] !== null) ? ($limitCache[$baseUser] * 1024) : null;
-        $pctUsed = null;
-        $overLimit = false;
-        $nearLimit = false;
-        if ($limitMiB !== null && $limitMiB > 0) {
-            $pctUsed = ($rawCounters['month'] / $limitMiB) * 100;
-            $overLimit = ($pctUsed >= 100);
-            $nearLimit = (!$overLimit && $pctUsed >= 80);
-        }
+        $pctUsed = $limitMiB !== null ? ($rawCounters['month'] / $limitMiB) * 100 : null;
+        $overLimit = $pctUsed !== null && $pctUsed >= 100;
+        $nearLimit = $pctUsed !== null && !$overLimit && $pctUsed >= 80;
         if (!$isLocalnet) {
-            $report['baseUsersWithStats'][$baseUser] = true;
+            $report['baseUsers'][$baseUser] = true;
             if ($overLimit) $report['overLimitCount']++; elseif ($nearLimit) $report['nearLimitCount']++;
         }
 
@@ -151,15 +145,15 @@ function pmssShowTrafficRowsSort(array &$rows, string $sort): void
     });
 }
 
-function pmssShowTrafficJsonPayload(array $rows, float $dataMonthTotal, float $dataMonthTotalLocal, array $baseUsers, array $baseUsersWithStats, int $overLimitCount, int $nearLimitCount, array $missingStats): array
+function pmssShowTrafficJsonPayload(array $report): array
 {
     return [
         'users' => array_map(static function (array $row): array {
             return ['user' => $row['user'], 'display' => pmssShowTrafficDisplayAmounts($row['rawMiB']), 'rates' => $row['rates'], 'inboundMonthMiB' => $row['inboundMonthMiB'], 'inboundOutboundRatio' => $row['inboundRatio'], 'limitMiB' => $row['limitMiB'], 'pctUsed' => ($row['pctUsed'] !== null) ? round($row['pctUsed'], 2) : null, 'overLimit' => $row['overLimit'], 'nearLimit' => $row['nearLimit'], 'rawMiB' => $row['rawMiB']];
-        }, $rows),
-        'totals' => ['monthMiB' => round($dataMonthTotal, 2), 'monthLocalMiB' => round($dataMonthTotalLocal, 2), 'monthTiB' => round(($dataMonthTotal / 1024 / 1024), 2), 'monthLocalTiB' => round(($dataMonthTotalLocal / 1024 / 1024), 2)],
-        'summary' => ['totalUsers' => count($baseUsers), 'usersWithStats' => count($baseUsersWithStats), 'overLimit' => $overLimitCount, 'nearLimit' => $nearLimitCount, 'missingStats' => count($missingStats)],
-        'missingStatsUsers' => $missingStats,
+        }, $report['rows']),
+        'totals' => ['monthMiB' => round($report['dataMonthTotal'], 2), 'monthLocalMiB' => round($report['dataMonthTotalLocal'], 2), 'monthTiB' => round(($report['dataMonthTotal'] / 1024 / 1024), 2), 'monthLocalTiB' => round(($report['dataMonthTotalLocal'] / 1024 / 1024), 2)],
+        'summary' => ['totalUsers' => count($report['baseUsers']), 'usersWithStats' => count(array_filter($report['baseUsers'])), 'overLimit' => $report['overLimitCount'], 'nearLimit' => $report['nearLimitCount'], 'missingStats' => count($report['missingStats'])],
+        'missingStatsUsers' => $report['missingStats'],
     ];
 }
 
@@ -212,10 +206,11 @@ function pmssShowTrafficLimitDisplays(array $row, bool $useColor): array
     return [$limitDisplay, sprintf('%4s', $pctDisplayRaw), $statusDisplay, $barDisplay];
 }
 
-function pmssShowTrafficPrintSummary(bool $extended, bool $showMissing, array $missingStats, int $baseUserCount, int $overLimitCount, int $nearLimitCount, float $dataMonthTotal, float $dataMonthTotalLocal): void
+function pmssShowTrafficPrintSummary(array $report, bool $extended, bool $showMissing): void
 {
-    $monthTotalTiB = number_format(($dataMonthTotal / 1024 / 1024), 2);
-    $monthTotalLocalTiB = number_format(($dataMonthTotalLocal / 1024 / 1024), 2);
+    $missingStats = $report['missingStats'];
+    $monthTotalTiB = number_format(($report['dataMonthTotal'] / 1024 / 1024), 2);
+    $monthTotalLocalTiB = number_format(($report['dataMonthTotalLocal'] / 1024 / 1024), 2);
     if (!$extended) {
         echo "* Month Total: {$monthTotalTiB}TiB - Local Total: {$monthTotalLocalTiB}TiB\n";
         if (!empty($missingStats)) {
@@ -229,7 +224,7 @@ function pmssShowTrafficPrintSummary(bool $extended, bool $showMissing, array $m
     $missingLine = " Missing stats: ".count($missingStats)." users";
     if (!empty($missingStats) && !$showMissing) $missingLine .= " (--show-missing to list)";
     echo $line."\n";
-    echo " Total users: {$baseUserCount}  |  Over limit: {$overLimitCount}  |  Near limit (>=80%): {$nearLimitCount}\n";
+    echo " Total users: ".count($report['baseUsers'])."  |  Over limit: {$report['overLimitCount']}  |  Near limit (>=80%): {$report['nearLimitCount']}\n";
     echo " Month egress: {$monthTotalTiB}TiB  |  Local: {$monthTotalLocalTiB}TiB\n";
     echo $missingLine."\n";
     if ($showMissing && !empty($missingStats)) echo " Missing: ".implode(' ', $missingStats)."\n";

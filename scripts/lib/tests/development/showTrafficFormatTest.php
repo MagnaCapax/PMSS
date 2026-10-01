@@ -127,7 +127,11 @@ class ShowTrafficFormatTest extends TestCase
             'totals' => ['monthMiB' => 1536.25, 'monthLocalMiB' => 512.0, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0],
             'summary' => ['totalUsers' => 2, 'usersWithStats' => 1, 'overLimit' => 0, 'nearLimit' => 1, 'missingStats' => 1],
             'missingStatsUsers' => ['ghost'],
-        ], \pmssShowTrafficJsonPayload([$row], 1536.25, 512.0, ['alice' => true, 'bob' => true], ['alice' => true], 0, 1, ['ghost']));
+        ], \pmssShowTrafficJsonPayload([
+            'rows' => [$row], 'dataMonthTotal' => 1536.25, 'dataMonthTotalLocal' => 512.0,
+            'baseUsers' => ['alice' => true, 'bob' => false],
+            'overLimitCount' => 0, 'nearLimitCount' => 1, 'missingStats' => ['ghost'],
+        ]));
     }
 
     public function testReportBuilderSnapshotCoversTotalsLimitsAndSorting(): void
@@ -160,6 +164,27 @@ class ShowTrafficFormatTest extends TestCase
             'totals' => ['monthMiB' => 1450.0, 'monthLocalMiB' => 50.0, 'monthTiB' => 0.0, 'monthLocalTiB' => 0.0],
             'summary' => ['totalUsers' => 3, 'usersWithStats' => 2, 'overLimit' => 0, 'nearLimit' => 1, 'missingStats' => 1],
             'missingStatsUsers' => ['ghost'],
-        ], \pmssShowTrafficJsonPayload($report['rows'], $report['dataMonthTotal'], $report['dataMonthTotalLocal'], $report['baseUsers'], $report['baseUsersWithStats'], $report['overLimitCount'], $report['nearLimitCount'], $report['missingStats']));
+        ], \pmssShowTrafficJsonPayload($report));
+        $this->assertSame(['bob' => true, 'alice' => true, 'ghost' => false], $report['baseUsers']);
+        $duplicateReport = \pmssShowTrafficReportBuild(['alice', 'alice'], $statsDir);
+        $this->assertSame(1, \pmssShowTrafficJsonPayload($duplicateReport)['summary']['usersWithStats']);
+    }
+
+    public function testTextSummaryMatchesExistingLayouts(): void
+    {
+        $report = [
+            'missingStats' => ['ghost'], 'dataMonthTotal' => 1048576.0,
+            'dataMonthTotalLocal' => 524288.0, 'baseUsers' => ['alice' => true, 'bob' => true],
+            'overLimitCount' => 1, 'nearLimitCount' => 0,
+        ];
+        [, $plain] = $this->pmssCaptureStdout(static function () use ($report): void {
+            \pmssShowTrafficPrintSummary($report, false, true);
+        });
+        $this->assertSame("* Month Total: 1.00TiB - Local Total: 0.50TiB\n* Missing traffic stats for 1 users (run trafficStats to rebuild).\n* Missing: ghost\n", $plain);
+        [, $extended] = $this->pmssCaptureStdout(static function () use ($report): void {
+            \pmssShowTrafficPrintSummary($report, true, false);
+        });
+        $line = str_repeat('-', 72)."\n";
+        $this->assertSame($line." Total users: 2  |  Over limit: 1  |  Near limit (>=80%): 0\n Month egress: 1.00TiB  |  Local: 0.50TiB\n Missing stats: 1 users (--show-missing to list)\n".$line, $extended);
     }
 }
