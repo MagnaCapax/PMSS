@@ -93,8 +93,12 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
 
     $probeCommand = 'pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1';
     exec($probeCommand, $_, $probeStatus);
-    if ($probeStatus !== 0) {
+    if ($probeStatus === 1) {
         logmsg("[SKIP] {$description} (no {$name} processes)");
+        return;
+    }
+    if ($probeStatus !== 0) {
+        logmsg("[WARN] {$description} (pgrep failed, rc={$probeStatus})");
         return;
     }
 
@@ -114,10 +118,15 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
         $deadline = microtime(true) + $waitSeconds;
         while (true) {
             exec($probeCommand, $_, $probeStatus);
-            if ($probeStatus !== 0) {
+            if ($probeStatus === 1) {
                 if ($signal === 'TERM') {
                     logmsg("[OK] {$description} (graceful stop)");
                 }
+                return;
+            }
+            // A failed probe cannot prove that the process exited or justify escalation.
+            if ($probeStatus !== 0) {
+                logmsg("[WARN] {$description} (pgrep failed after SIG{$signal}, rc={$probeStatus})");
                 return;
             }
             if (microtime(true) >= $deadline) {

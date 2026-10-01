@@ -93,6 +93,12 @@ trimming it, retaining existing invalid-unit/action skip paths. Valid names,
 allowed actions, whitespace normalization, and generated commands are unchanged;
 `SystemdRuntimeProcessesTest` exercises these contracts without service operations.
 
+Process termination treats `pgrep -x` exit 1 as no match and other nonzero exits
+as probe failures. A failed probe before signaling skips the kill; a failed
+probe after a signal stops escalation instead of claiming the process exited.
+Normal no-match, graceful-stop, and SIGKILL paths retain their prior behavior.
+`UpdateRuntimeProcessesTest` covers both probe failures with stub commands.
+
 The current-process cgroup membership reader rejects NUL-containing paths before
 calling `file()`. Malformed and unreadable paths return the existing empty entries
 result, and path selection returns an empty string. Valid v1 and unified entries

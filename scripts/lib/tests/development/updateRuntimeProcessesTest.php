@@ -19,6 +19,7 @@ class UpdateRuntimeProcessesTest extends TestCase
 #!/bin/bash
 state_file=${PMSS_TEST_PGREP_STATE:?}
 state=$(cat "$state_file" 2>/dev/null || echo stopped)
+[ "$state" = "error" ] && exit 2
 [ "$state" = "running" ]
 BASH,
             'pkill' => <<<'BASH'
@@ -28,8 +29,10 @@ printf '%s
 state_file=${PMSS_TEST_PGREP_STATE:?}
 mode=$(cat "${PMSS_TEST_KILL_MODE:?}" 2>/dev/null || echo term)
 case "${1:-}" in
-  -TERM) [ "$mode" = "term" ] && printf 'stopped
-' > "$state_file" ;;
+  -TERM)
+    [ "$mode" = "term" ] && printf '%s\n' stopped > "$state_file"
+    [ "$mode" = "error" ] && printf '%s\n' error > "$state_file"
+    ;;
   -KILL) printf 'stopped
 ' > "$state_file" ;;
 esac
@@ -57,6 +60,16 @@ BASH
         \killProcess('demo', 'Stopping demo process', null, 0);
 
         $this->assertEquals([], $this->pmssProfileCommands());
+    }
+
+    public function testKillProcessSkipsWhenInitialProbeFails(): void
+    {
+        @file_put_contents($this->tempDir.'/state', "error\n");
+
+        \killProcess('demo', 'Stopping demo process', null, 0);
+
+        $this->assertEquals([], $this->pmssProfileCommands());
+        $this->assertSame('', file_get_contents($this->tempDir.'/commands.log'));
     }
 
     public function testKillProcessSkipsUnsafeProcessName(): void
@@ -145,6 +158,17 @@ BASH
             "pkill -TERM -x 'demo'",
             "pkill -KILL -x 'demo'",
         ], $this->pmssProfileCommands());
+    }
+
+    public function testKillProcessDoesNotEscalateWhenPostTermProbeFails(): void
+    {
+        @file_put_contents($this->tempDir.'/state', "running\n");
+        @file_put_contents($this->tempDir.'/kill-mode', "error\n");
+
+        \killProcess('demo', 'Stopping demo process', null, 0);
+
+        $this->assertEquals(["pkill -TERM -x 'demo'"], $this->pmssProfileCommands());
+        $this->assertSame("error\n", file_get_contents($this->tempDir.'/state'));
     }
 
     public function testKillProcessSkipsUnsafeSystemdUnitButStillKillsProcess(): void
