@@ -21,17 +21,6 @@ function pmssCgroupRefreshHasExplicitIoPolicy(array $payload): bool
         || trim((string) ($payload['IOWriteIOPS'] ?? '')) !== '';
 }
 
-/** Build the canonical per-user cgroup refresh command from stored config. */
-function pmssCgroupRefreshBuildCommand(string $username, array $payload): ?string
-{
-    $args = pmssUserConfigCliBuildStoredCgroupApplyArgs($username, $payload);
-    if ($args === null) {
-        return null;
-    }
-
-    return pmssBuildCommand('php', $args);
-}
-
 /** Reapply explicit io.latency/io.cost settings for every matching managed user. */
 function pmssCgroupPolicyRefreshRun(): int
 {
@@ -46,7 +35,7 @@ function pmssCgroupPolicyRefreshRun(): int
             continue;
         }
 
-        $command = pmssCgroupRefreshBuildCommand($user, $payload);
+        $command = pmssUserConfigCliBuildStoredCgroupApplyCommand($user, $payload);
         if ($command === null) {
             function_exists('pmssUserLog') && pmssUserLog($user, '[WARN] cgroupPolicyRefresh skipped: missing RAM baseline');
             continue;

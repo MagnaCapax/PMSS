@@ -11,6 +11,7 @@
  */
 
 require_once __DIR__.'/../cli/helpText.php';
+require_once __DIR__.'/../runtime.php';
 
 /** @return array<string,array<string,mixed>> Shared resource option specification. */
 function pmssUserConfigCliResourceSpecs(): array
@@ -210,6 +211,13 @@ function pmssUserConfigCliBuildStoredCgroupApplyArgs(string $username, array $pa
         $memory,
         array_merge(['name' => $username, 'memory' => $memory], pmssUserConfigCliPersistedStoredResources($payload))
     );
+}
+
+/** Build the PHP command for a stored plan; a missing RAM baseline remains a skip. */
+function pmssUserConfigCliBuildStoredCgroupApplyCommand(string $username, array $payload): ?string
+{
+    $args = pmssUserConfigCliBuildStoredCgroupApplyArgs($username, $payload);
+    return $args === null ? null : pmssBuildCommand('php', $args);
 }
 
 /** Render the canonical userConfig.php help output. */

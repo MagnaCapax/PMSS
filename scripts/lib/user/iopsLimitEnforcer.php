@@ -23,14 +23,14 @@ function pmssIopsLimitBuildThrottleCommand(string $username, int $iops): string
 
 function pmssIopsLimitBuildRestoreCommand(string $username, array $payload): ?string
 {
-    $args = pmssUserConfigCliBuildStoredCgroupApplyArgs($username, $payload);
-    if ($args === null) {
+    $applyCommand = pmssUserConfigCliBuildStoredCgroupApplyCommand($username, $payload);
+    if ($applyCommand === null) {
         return null;
     }
 
     return pmssBuildCommand('php', ['/scripts/util/userConfigCgroup.php', $username, '--apply', '--wipe'])
         .' && '
-        .pmssBuildCommand('php', $args);
+        .$applyCommand;
 }
 
 /** @return array{action:string,limit:int,usage:int} */

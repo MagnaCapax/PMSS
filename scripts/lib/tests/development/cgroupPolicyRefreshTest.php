@@ -24,7 +24,7 @@ class cgroupPolicyRefreshTest extends TestCase
 
     public function testBuildCommandCarriesIoCostAndLatencyFlags(): void
     {
-        $command = \pmssCgroupRefreshBuildCommand('alice', [
+        $command = \pmssUserConfigCliBuildStoredCgroupApplyCommand('alice', [
             'ramMiB' => 1024,
             'CPUWeight' => 200,
             'ioLatencyMs' => 50,
@@ -44,7 +44,7 @@ class cgroupPolicyRefreshTest extends TestCase
 
     public function testBuildCommandReturnsNullWithoutMemoryBaseline(): void
     {
-        $this->assertSame(null, \pmssCgroupRefreshBuildCommand('alice', ['ioLatencyMs' => 50]));
+        $this->assertSame(null, \pmssUserConfigCliBuildStoredCgroupApplyCommand('alice', ['ioLatencyMs' => 50]));
     }
 
     public function testRootCronSchedulesCgroupPolicyRefresh(): void

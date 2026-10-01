@@ -66,13 +66,6 @@ function pmssUserCgroupSliceMemoryRefreshPlan(
     ];
 }
 
-/** Build the canonical cgroup apply command for a stored user plan. */
-function pmssUserCgroupSliceApplyCommand(string $username, array $payload): ?string
-{
-    $args = pmssUserConfigCliBuildStoredCgroupApplyArgs($username, $payload);
-    return $args === null ? null : pmssBuildCommand('php', $args);
-}
-
 /** Reapply the stored cgroup plan when the live slice memory cap has drifted low. */
 function pmssUserCgroupSliceSelfHeal(string $username, UserConfigStore $store): bool
 {
@@ -94,7 +87,7 @@ function pmssUserCgroupSliceSelfHeal(string $username, UserConfigStore $store): 
         return true;
     }
 
-    $command = pmssUserCgroupSliceApplyCommand($username, $payload);
+    $command = pmssUserConfigCliBuildStoredCgroupApplyCommand($username, $payload);
     if ($command === null) {
         pmssUserLog($username, '[WARN] cgroup slice refresh skipped: missing RAM baseline');
         return false;

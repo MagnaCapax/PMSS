@@ -45,7 +45,7 @@ class UserCgroupSliceHealthTest extends TestCase
 
     public function testApplyCommandUsesStoredCgroupArgs(): void
     {
-        $command = \pmssUserCgroupSliceApplyCommand('alice', [
+        $command = \pmssUserConfigCliBuildStoredCgroupApplyCommand('alice', [
             'ramMiB' => 8192,
             'IOWeight' => 300,
             'cpuQuotaPercent' => 'infinity',
