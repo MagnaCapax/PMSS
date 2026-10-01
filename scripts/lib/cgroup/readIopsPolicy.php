@@ -104,15 +104,14 @@ function pmssCgroupPolicyReadIopsTierCeiling(array $source, array $policy): ?int
     if (is_array($serviceType)) {
         return pmssCgroupPolicyPositiveIntSetting($serviceType['resourceIOPSReadMax'] ?? null);
     }
-    if (is_scalar($serviceType)) {
-        $key = trim((string) $serviceType);
-        $catalog = $policy['serviceTypes'] ?? [];
-        if ($key !== '' && is_array($catalog) && is_array($catalog[$key] ?? null)) {
-            return pmssCgroupPolicyPositiveIntSetting($catalog[$key]['resourceIOPSReadMax'] ?? null);
-        }
+    if (!is_scalar($serviceType)) {
+        return null;
     }
 
-    return null;
+    $key = trim((string) $serviceType);
+    $catalog = $policy['serviceTypes'] ?? [];
+    return $key !== '' && is_array($catalog) && is_array($catalog[$key] ?? null)
+        ? pmssCgroupPolicyPositiveIntSetting($catalog[$key]['resourceIOPSReadMax'] ?? null) : null;
 }
 
 /** Clamp the computed read-IOPS cap while honoring the absolute tier ceiling. */

@@ -160,7 +160,7 @@ class IopsLimitHelpersTest extends TestCase
 
     public function testPlanTransitions(): void
     {
-        foreach ([[1000, 1001, false, 'enforce'], [1000, 1001, true, 'none'], [1000, 900, true, 'restore']] as $case) {
+        foreach ([[1000, 1001, false, 'enforce'], [1000, 1001, true, 'none'], [1000, 900, true, 'restore'], [1000, 900, false, 'none']] as $case) {
             $this->assertSame($case[3], \pmssIopsLimitEnforcementPlan($case[0], $case[1], $case[2])['action']);
         }
     }

@@ -27,11 +27,12 @@ function pmssIoCeilingHistorySamples(string $path): iterable
         }
         try {
             $stat = fstat($handle);
-            $offset = max(0, ($stat['size'] ?? 0) - 16 * 1024 * 1024);
+            $size = $stat['size'] ?? 0;
+            $offset = max(0, $size - 16 * 1024 * 1024);
             if (fseek($handle, $offset) !== 0) {
                 continue;
             }
-            $remaining = ($stat['size'] ?? 0) - $offset;
+            $remaining = $size - $offset;
             $discard = $offset > 0;
             $cutDay = null;
             while ($remaining > 0 && ($line = fgets($handle, min(8193, $remaining + 1))) !== false) {

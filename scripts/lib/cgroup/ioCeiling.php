@@ -14,9 +14,11 @@ const PMSS_IO_CEILING_DIMENSIONS = [
 /** Accept only finite, non-negative numeric scalars from I/O samples and policy. */
 function pmssCgroupNonNegativeFiniteNumber($value): ?float
 {
-    return (is_int($value) || is_float($value) || is_string($value))
-        && is_numeric($value) && is_finite((float) $value) && (float) $value >= 0
-        ? (float) $value : null;
+    if ((!is_int($value) && !is_float($value) && !is_string($value)) || !is_numeric($value)) {
+        return null;
+    }
+    $number = (float) $value;
+    return is_finite($number) && $number >= 0 ? $number : null;
 }
 
 /** Validate tracker settings before allocating or publishing any estimates. */

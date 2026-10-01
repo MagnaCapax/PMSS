@@ -37,13 +37,11 @@ function pmssIopsLimitBuildRestoreCommand(string $username, array $payload): ?st
 function pmssIopsLimitEnforcementPlan(int $limit, int $usage, bool $markerExists): array
 {
     $overLimit = $limit > 0 && $usage > $limit;
-    if ($overLimit && !$markerExists) {
-        return ['action' => 'enforce', 'limit' => $limit, 'usage' => $usage];
+    $action = 'none';
+    if ($overLimit !== $markerExists) {
+        $action = $overLimit ? 'enforce' : 'restore';
     }
-    if (!$overLimit && $markerExists) {
-        return ['action' => 'restore', 'limit' => $limit, 'usage' => $usage];
-    }
-    return ['action' => 'none', 'limit' => $limit, 'usage' => $usage];
+    return ['action' => $action, 'limit' => $limit, 'usage' => $usage];
 }
 
 function pmssIopsLimitsRun(): int

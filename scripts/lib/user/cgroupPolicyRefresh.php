@@ -14,11 +14,11 @@ require_once __DIR__.'/../cgroup/ioCeilingHistory.php';
 function pmssCgroupRefreshHasExplicitIoPolicy(array $payload): bool
 {
     $latencyMs = $payload['ioLatencyMs'] ?? null;
-    return (is_numeric($latencyMs) && (int) $latencyMs > 0)
-        || trim((string) ($payload['ioCostQos'] ?? '')) !== ''
-        || trim((string) ($payload['ioCostModel'] ?? '')) !== ''
-        || trim((string) ($payload['IOReadIOPS'] ?? '')) !== ''
-        || trim((string) ($payload['IOWriteIOPS'] ?? '')) !== '';
+    if (is_numeric($latencyMs) && (int) $latencyMs > 0) return true;
+    foreach (['ioCostQos', 'ioCostModel', 'IOReadIOPS', 'IOWriteIOPS'] as $field) {
+        if (trim((string) ($payload[$field] ?? '')) !== '') return true;
+    }
+    return false;
 }
 
 /** Reapply explicit io.latency/io.cost settings for every matching managed user. */
