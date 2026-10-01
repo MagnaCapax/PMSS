@@ -117,6 +117,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
+- `killProcess()` rejects NUL bytes in the original process name before trimming,
+  so malformed names cannot select a process for `pkill -x`. Ordinary surrounding
+  whitespace still normalizes to the same exact binary name.
+
 - `pmssCheckDirectoriesEnsureDirectory()` requires the managed path itself to
   be a real directory before changing ownership or mode. A symlink or other
   occupied path logs a warning and returns `false` without changing its target.

@@ -76,6 +76,11 @@ function pmssSystemdUnitActionIfPresent(string $unit, string $description, strin
  */
 function killProcess(string $name, string $description, ?string $systemdUnit = null, int $timeoutSeconds = 10): void
 {
+    // Validate raw bytes before trim() can erase a malformed process name.
+    if (pmssFilesystemPathHasNulByte($name)) {
+        logmsg("[WARN] {$description} (invalid process name)");
+        return;
+    }
     $name = trim($name);
     if (!pmssCommandBinaryNameIsSafe($name)) {
         logmsg("[WARN] {$description} (invalid process name)");

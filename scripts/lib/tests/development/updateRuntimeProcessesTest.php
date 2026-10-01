@@ -63,9 +63,21 @@ BASH
     {
         @file_put_contents($this->tempDir.'/state', "running\n");
 
-        \killProcess('demo name', 'Stopping demo process', null, 0);
+        foreach (['demo name', "\0demo", "demo\0", "de\0mo"] as $name) {
+            \killProcess($name, 'Stopping demo process', null, 0);
+        }
 
         $this->assertEquals([], $this->pmssProfileCommands());
+        $this->assertSame("running\n", file_get_contents($this->tempDir.'/state'));
+    }
+
+    public function testKillProcessRetainsWhitespaceNormalization(): void
+    {
+        @file_put_contents($this->tempDir.'/state', "running\n");
+
+        \killProcess(" demo \n", 'Stopping demo process', null, 0);
+
+        $this->assertEquals(["pkill -TERM -x 'demo'"], $this->pmssProfileCommands());
     }
 
     public function testKillProcessSkipsWhenProcessToolingIsUnavailable(): void
