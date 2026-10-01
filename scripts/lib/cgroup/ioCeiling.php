@@ -11,6 +11,14 @@ const PMSS_IO_CEILING_DIMENSIONS = [
     'read_mbs' => 'throughputRead', 'write_mbs' => 'throughputWrite',
 ];
 
+/** Accept only finite, non-negative numeric scalars from I/O samples and policy. */
+function pmssCgroupNonNegativeFiniteNumber($value): ?float
+{
+    return (is_int($value) || is_float($value) || is_string($value))
+        && is_numeric($value) && is_finite((float) $value) && (float) $value >= 0
+        ? (float) $value : null;
+}
+
 /** Validate tracker settings before allocating or publishing any estimates. */
 function pmssIoCeilingSettings(array $policy): ?array
 {
@@ -44,12 +52,11 @@ function pmssIoCeilingCompute(iterable $samples, array $policy, int $now): ?arra
         }
         $values = [];
         foreach (PMSS_IO_CEILING_DIMENSIONS as $dimension => $field) {
-            $value = $sample[$field] ?? null;
-            if ((!is_int($value) && !is_float($value) && !is_string($value))
-                || !is_numeric($value) || !is_finite((float) $value) || (float) $value < 0) {
+            $value = pmssCgroupNonNegativeFiniteNumber($sample[$field] ?? null);
+            if ($value === null) {
                 continue 2;
             }
-            $values[$dimension] = (float) $value;
+            $values[$dimension] = $value;
         }
         // Epoch time, not the collector's local-time prefix, defines the UTC day.
         // Deduplicate overlapping rotations; repeated rows cannot satisfy the gate.

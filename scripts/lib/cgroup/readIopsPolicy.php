@@ -9,6 +9,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/ioCeiling.php';
+
 /** Return a positive integer setting or null without coercing invalid policy. */
 function pmssCgroupPolicyPositiveIntSetting($value): ?int
 {
@@ -29,15 +31,8 @@ function pmssCgroupPolicyUserHasExplicitReadIops(array $source): bool
 /** Read the review-adjustable host oversell multiplier. */
 function pmssCgroupPolicyReadIopsOversell(array $policy): float
 {
-    $value = $policy['cgroup']['assignMax']['iops'] ?? null;
-    if ((!is_int($value) && !is_float($value) && !is_string($value))
-        || !is_numeric($value)
-        || !is_finite((float) $value)
-        || (float) $value <= 0) {
-        return 2.0;
-    }
-
-    return (float) $value;
+    $value = pmssCgroupNonNegativeFiniteNumber($policy['cgroup']['assignMax']['iops'] ?? null);
+    return $value !== null && $value > 0 ? $value : 2.0;
 }
 
 /** Return read-IOPS floors keyed by storage class. */
