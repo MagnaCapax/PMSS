@@ -9,6 +9,7 @@
  */
 
 require_once __DIR__.'/templates.php';
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../configBackups.php';
 require_once __DIR__.'/../runtime.php';
 
@@ -155,7 +156,10 @@ function pmssCreateNginxConfigSetup(): array
         @passthru('openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj "/C=FI/ST=none/L=none/O=PulsedMedia/CN=' . $serverHostname . '" -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt');
     }
 
-    pmssDirEnsureExists('/etc/nginx/users', 0751);
+    // Apply the mode on every run; an existing directory would otherwise keep its old mode.
+    if (!pmssEnsureSafeDir('/etc/nginx/users', 0751)) {
+        fwrite(STDERR, "Could not apply mode 0751 to /etc/nginx/users\n");
+    }
 
     if ($subdomainEnabled) {
         pmssDirEnsureExists($subdomainConfigDir, 0755);

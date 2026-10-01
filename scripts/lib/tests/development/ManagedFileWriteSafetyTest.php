@@ -8,6 +8,22 @@ final class ManagedFileWriteSafetyTest extends TestCase
 {
     protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-managed-file-write-']; }
 
+    public function testEnsureSafeDirTightensAnExistingDirectoryMode(): void
+    {
+        $path = $this->pmssMakeTempDir('pmss-safe-dir-existing-', 0755);
+        chmod($path, 0755);
+
+        $this->assertTrue(\pmssEnsureSafeDir($path, 0751));
+        clearstatcache(true, $path);
+        $this->assertEquals(0751, fileperms($path) & 0777, 'an existing directory must get the requested mode, not keep its old one');
+    }
+
+    public function testNginxUsersDirectoryModeIsAppliedEveryRun(): void
+    {
+        $setup = (string) file_get_contents(dirname(__DIR__, 2).'/nginxConfig/setup.php');
+        $this->assertTrue(strpos($setup, "pmssEnsureSafeDir('/etc/nginx/users', 0751)") !== false, 'nginx users directory mode must be applied on existing hosts too');
+    }
+
     public function testEnsureSafeDirReportsModeFailure(): void
     {
         $root = $this->pmssMakeTempDir('pmss-safe-dir-');
