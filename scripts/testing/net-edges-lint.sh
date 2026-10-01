@@ -12,11 +12,6 @@ STRICT="${PMSS_LINT_NET_STRICT:-0}"
 PATTERN='curl\b|wget\b|\bnc\b|telnet\b'
 VIOL=0
 
-scanMatches() {
-	local file="$1"
-	grep -nE "$PATTERN" "$file" | cut -d: -f1-2 --output-delimiter=': ' || true
-}
-
 phpScan() {
 	local file raw
 	while IFS= read -r -d '' file; do
@@ -30,7 +25,7 @@ phpScan() {
 			fi
 			echo "PHP net edge: $file: ${raw}" >&2
 			VIOL=$((VIOL + 1))
-		done < <(scanMatches "$file")
+		done < <(pmss_testing_scan_matches "$file" "$PATTERN")
 	done < <(pmss_testing_find_first_party_php_files "$ROOT_DIR")
 }
 
@@ -43,7 +38,7 @@ shScan() {
 		while IFS= read -r raw; do
 			echo "Shell net edge: $file: ${raw}" >&2
 			VIOL=$((VIOL + 1))
-		done < <(scanMatches "$file")
+		done < <(pmss_testing_scan_matches "$file" "$PATTERN")
 	done < <(pmss_testing_find_bash_files "$ROOT_DIR")
 }
 

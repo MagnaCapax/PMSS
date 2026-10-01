@@ -55,11 +55,6 @@ shellAllowlistedLine() {
 	return 1
 }
 
-scanMatches() {
-	local file="$1"
-	grep -nE "$PATTERN" "$file" | cut -d: -f1-2 --output-delimiter=': ' || true
-}
-
 reportViolation() {
 	local kind="$1" file="$2" raw="$3"
 	echo "${kind} sharp edge: $file: ${raw}" >&2
@@ -76,7 +71,7 @@ reportFatalMatches() {
 	local file="$1" regex="$2" raw
 	while IFS= read -r raw; do
 		reportFatal "$file" "$raw"
-	done < <(grep -nE "$regex" "$file" | cut -d: -f1-2 --output-delimiter=': ' || true)
+	done < <(pmss_testing_scan_matches "$file" "$regex")
 }
 
 phpScan() {
@@ -100,7 +95,7 @@ phpScan() {
 				continue
 			fi
 			reportViolation "PHP" "$file" "${line}: ${text}"
-		done < <(scanMatches "$file")
+		done < <(pmss_testing_scan_matches "$file" "$PATTERN")
 	done < <(pmss_testing_find_first_party_php_files "$ROOT_DIR")
 }
 
@@ -120,7 +115,7 @@ shScan() {
 				continue
 			fi
 			reportViolation "Shell" "$file" "${line}: ${text}"
-		done < <(scanMatches "$file")
+		done < <(pmss_testing_scan_matches "$file" "$PATTERN")
 	done < <(pmss_testing_find_bash_files "$ROOT_DIR")
 }
 
