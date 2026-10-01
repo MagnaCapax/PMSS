@@ -50,6 +50,7 @@ Keep the canonical installer/update details under `docs/install.md` and
 - **scripts/lib/update/users/** – User maintenance (context, HTTP, home maintenance, ruTorrent refresh).
 - **scripts/lib/update/apps/** – Application installers (rtorrent, deluge, docker, etc.) called during phase 2. These modules perform one-time bootstrap tasks only; ongoing configuration and scheduling belong under `scripts/util` and `scripts/cron`.
 - **scripts/lib/trackerCleaner.php** – Cron-facing facade for the tracker cleaner. The `trackerCleaner/` modules own selection policy, logs, guarded backups, and the bounded run separately (ADR 0076).
+- **scripts/lib/portManager.php** – Stable service-port and CLI facade. `portManager/state.php` owns assignment files and shared reservation reads; `portManager/selection.php` owns bind checks and allocation. Legacy rTorrent markers remain part of the used-port set.
 - **scripts/lib/resources/log.php** – Resource-log entrypoint. `resources/counters.php` owns cgroup reads shared with performance telemetry; `resources/counterState.php` owns locked delta persistence shared with traffic ingress (ADR 0078).
 
 ## Package Strategy
