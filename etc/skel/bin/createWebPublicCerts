@@ -36,7 +36,11 @@ if ($serverFqdn !== '') {
     echo "  http://".$user.".".$serverFqdn."/\n";
 }
 if ($serviceId !== '') {
-    $label = substr(hash('sha256', 'mcx.fi:service:'.$serviceId), 0, 16);
+    // This runs as the customer; /scripts/lib is root-only, so keep the
+    // equivalent expression here. NginxUserHostsTest checks it against pmssMcxLabel.
+    $canonicalId = ltrim($serviceId, '0');
+    if ($canonicalId === '') $canonicalId = '0';
+    $label = substr(hash('sha256', 'mcx.fi:service:'.$canonicalId), 0, 16);
     echo "  http://".$label.".mcx.fi/\n";
 }
 echo "\nThese serve over plain HTTP today; opening them with https:// shows a\n";

@@ -2,7 +2,7 @@
 /**
  * Nginx per-user subdomain helpers.
  *
- * These helpers keep hostname validation and hash host derivation consistent
+ * These helpers keep hostname validation and permalink derivation consistent
  * across nginx config generation without altering existing path-based routes.
  *
  * @license GPL-3.0-only
@@ -29,33 +29,36 @@ function pmssNginxUserBillingServiceIdFromHome(string $home): ?string
     return pmssUserBillingServiceIdDigitsRead($home);
 }
 
-/**
- * Build the SHA256 host prefix for a user.
- */
-function pmssNginxUserHashHostname(string $username, string $billingServiceId, string $hostname): string
+/** Derive the published mcx.fi label from a billing identifier. */
+function pmssMcxLabel(string $kind, string $id): string
 {
-    return hash('sha256', $username.'.'.$billingServiceId.'.'.$hostname).'.'.$hostname;
+    if ($kind !== 'service' && $kind !== 'customer') {
+        throw new InvalidArgumentException('Invalid mcx.fi label kind');
+    }
+    if ($id === '' || !ctype_digit($id)) {
+        throw new InvalidArgumentException('Invalid mcx.fi billing identifier');
+    }
+    // Billing casts IDs to integers; trimming zeroes avoids integer overflow here.
+    $canonicalId = ltrim($id, '0');
+    if ($canonicalId === '') $canonicalId = '0';
+    return substr(hash('sha256', 'mcx.fi:'.$kind.':'.$canonicalId), 0, 16);
 }
 
 /**
  * Stable mcx.fi service hostname for a user's billing service id.
  *
- * Mirrors the mcx.fi DNS builder VERBATIM (web4 remote/mcxData-api.php:
- * substr(sha256("mcx.fi:service:".serviceid),0,16)) so the name this server
- * serves by Host matches the A record the builder already publishes in the
- * mcx.fi zone. Public sha256-cut-16, no secret (operator-chosen, customer-computable).
+ * The billing data API on web5 computes this label; the DNS builder consumes it.
  */
 function pmssNginxUserMcxHostname(string $billingServiceId): string
 {
-    return substr(hash('sha256', 'mcx.fi:service:'.$billingServiceId), 0, 16).'.mcx.fi';
+    return pmssMcxLabel('service', $billingServiceId).'.mcx.fi';
 }
 
 /**
  * Stable mcx.fi CLUSTER hostname for a user's billing client id.
  *
- * Mirrors the mcx.fi DNS builder VERBATIM (ns0-build-mcx.php:
- * substr(sha256("mcx.fi:customer:".clientid),0,16)) — the same relationship the
- * service hostname above has to its own record. The builder publishes this label
+ * The billing data API on web5 computes this label; ns0-build-mcx.php consumes it.
+ * The builder publishes this label
  * as multi-A round-robin across every node holding one of that customer's
  * services, so each node must answer for it to serve the customer's content.
  *
@@ -68,7 +71,7 @@ function pmssNginxUserMcxHostname(string $billingServiceId): string
  */
 function pmssNginxUserMcxClusterHostname(string $billingClientId): string
 {
-    return substr(hash('sha256', 'mcx.fi:customer:'.$billingClientId), 0, 16).'.mcx.fi';
+    return pmssMcxLabel('customer', $billingClientId).'.mcx.fi';
 }
 
 /**

@@ -46,9 +46,9 @@ function pmssCreateNginxConfigWriteFile(string $path, string $content, string $u
 }
 
 /**
- * Write public/private subdomain vhosts from the shared render context.
+ * Write the public subdomain vhost from the shared render context.
  */
-function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, string $subdomainBase, ?string $hashHost, bool $suspended, ?int $serverPort = null, ?string $mcxHosts = null): bool
+function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, string $subdomainBase, bool $suspended, ?int $serverPort = null, ?string $mcxHosts = null): bool
 {
     $hostSslBlock = (string) ($ctx['nginxSslBlock'] ?? '');
     $replacements = [
@@ -68,19 +68,10 @@ function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, st
     $publicHost = $ownFqdn.($mcxHosts !== null && $mcxHosts !== '' ? ' '.$mcxHosts : '');
     // The public vhost uses the user's OWN certificate when they have opted into
     // per-name HTTPS (docs/adr/0039); otherwise the host cert (name-mismatch
-    // warning), unchanged. The private vhost always uses the host cert.
+    // warning), unchanged.
     $publicSslBlock = pmssNginxUserSslBlock($ownFqdn, $hostSslBlock);
-    foreach ([[$publicHost, 'public'.$prefix.'Template', '', 'public'.$label.' subdomain config', $publicSslBlock], [$hashHost, 'private'.$prefix.'Template', '-hash', 'private'.$label.' subdomain config', $hostSslBlock]] as $target) {
-        if ($target[0] === null) {
-            continue;
-        }
-        $config = strtr((string) ($ctx[$target[1]] ?? ''), $replacements + ['##host##' => $target[0], '##ssl_block##' => $target[4]]);
-        if (!pmssCreateNginxConfigWriteFile((string) ($ctx['subdomainConfigDir'] ?? '/etc/nginx/conf.d').'/pmss-user-'.$user.$target[2].'.conf', $config, $user, $target[3])) {
-            return false;
-        }
-    }
-
-    return true;
+    $config = strtr((string) ($ctx['public'.$prefix.'Template'] ?? ''), $replacements + ['##host##' => $publicHost, '##ssl_block##' => $publicSslBlock]);
+    return pmssCreateNginxConfigWriteFile((string) ($ctx['subdomainConfigDir'] ?? '/etc/nginx/conf.d').'/pmss-user-'.$user.'.conf', $config, $user, 'public'.$label.' subdomain config');
 }
 
 /**
@@ -144,13 +135,11 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     $userTemplate = $ctx['userTemplate'] ?? false;
     $subdomainEnabled = $ctx['subdomainEnabled'] ?? false;
     $subdomainBase = (string)($ctx['subdomainBase'] ?? '');
-    $hashHost = null;
     $mcxHost = null;
 
     if ($subdomainEnabled) {
         $billingServiceId = pmssNginxUserBillingServiceIdFromHome($homeDir);
         if ($billingServiceId !== null) {
-            $hashHost = pmssNginxUserHashHostname($thisUser, $billingServiceId, $subdomainBase);
             $mcxHost = pmssNginxUserMcxHostname($billingServiceId);
             // Customers with 2+ services also get a cluster name, round-robined
             // across their nodes by the zone builder. The client id is already on
@@ -192,9 +181,8 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
 
     $writtenPaths = [];
     if ($subdomainEnabled) {
-        if (!pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $hashHost, $isSuspended, $serverPort ?? null, $mcxHost)) return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
+        if (!pmssCreateNginxConfigWriteSubdomainConfigs($ctx, $thisUser, $subdomainBase, $isSuspended, $serverPort ?? null, $mcxHost)) return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
         $writtenPaths[] = $managedPaths['public'];
-        if ($hashHost !== null) $writtenPaths[] = $managedPaths['private'];
     }
 
     if (!$isSuspended && ($userTemplate === false || $userTemplate === '')) {

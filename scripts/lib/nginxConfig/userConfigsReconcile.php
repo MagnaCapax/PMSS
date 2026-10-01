@@ -20,10 +20,13 @@ function pmssCreateNginxConfigManagedUserPaths(string $user, array $ctx): array
     $nginxUsersDir = pmssCreateNginxConfigContextDir($ctx, 'nginxUsersDir', '/etc/nginx/users');
     $subdomainConfigDir = pmssCreateNginxConfigContextDir($ctx, 'subdomainConfigDir', '/etc/nginx/conf.d');
 
-    $paths = ['user' => $nginxUsersDir.'/'.$user];
+    $paths = [
+        'user' => $nginxUsersDir.'/'.$user,
+        // Retired generated route: always reconcile it, even without subdomains.
+        'private' => $subdomainConfigDir.'/pmss-user-'.$user.'-hash.conf',
+    ];
     if (!empty($ctx['subdomainEnabled'])) {
         $paths['public'] = $subdomainConfigDir.'/pmss-user-'.$user.'.conf';
-        $paths['private'] = $subdomainConfigDir.'/pmss-user-'.$user.'-hash.conf';
     }
 
     return $paths;
@@ -76,7 +79,8 @@ function pmssCreateNginxConfigPruneOrphans(array $users, array $ctx): bool
         if ($user === '' || !pmssValidateUsername($user)) {
             continue;
         }
-        foreach (pmssCreateNginxConfigManagedUserPaths($user, $ctx) as $path) {
+        foreach (pmssCreateNginxConfigManagedUserPaths($user, $ctx) as $label => $path) {
+            if ($label === 'private') continue;
             $expected[$path] = true;
         }
     }
@@ -84,6 +88,8 @@ function pmssCreateNginxConfigPruneOrphans(array $users, array $ctx): bool
     $patterns = [pmssCreateNginxConfigContextDir($ctx, 'nginxUsersDir', '/etc/nginx/users').'/*'];
     if (!empty($ctx['subdomainEnabled'])) {
         $patterns[] = pmssCreateNginxConfigContextDir($ctx, 'subdomainConfigDir', '/etc/nginx/conf.d').'/pmss-user-*.conf';
+    } else {
+        $patterns[] = pmssCreateNginxConfigContextDir($ctx, 'subdomainConfigDir', '/etc/nginx/conf.d').'/pmss-user-*-hash.conf';
     }
 
     $success = true;
@@ -94,6 +100,11 @@ function pmssCreateNginxConfigPruneOrphans(array $users, array $ctx): bool
         }
         sort($matches, SORT_STRING);
         foreach ($matches as $path) {
+            // Only remove the exact generated hash filename, never lookalikes.
+            if (substr($path, -10) === '-hash.conf' &&
+                (preg_match('/^pmss-user-(.+)-hash\.conf$/D', basename($path), $match) !== 1 || !pmssValidateUsername($match[1]))) {
+                continue;
+            }
             if (isset($expected[$path])) {
                 continue;
             }

@@ -102,8 +102,23 @@ class NginxConfigWriteGuardTest extends TestCase
         }
 
         $this->assertTrue(\pmssCreateNginxConfigPruneOrphans(['alice'], $ctx));
-        foreach (\pmssCreateNginxConfigManagedUserPaths('alice', $ctx) as $path) $this->assertTrue(is_file($path));
+        foreach (\pmssCreateNginxConfigManagedUserPaths('alice', $ctx) as $label => $path) {
+            $this->assertSame($label !== 'private', is_file($path));
+        }
         foreach (\pmssCreateNginxConfigManagedUserPaths('bob', $ctx) as $path) $this->assertFalse(file_exists($path));
+    }
+
+    public function testRetiredHashConfigPruneUsesExactGeneratedFilename(): void
+    {
+        $ctx = ['nginxUsersDir' => $this->tempDir.'/users', 'subdomainConfigDir' => $this->tempDir.'/conf.d', 'subdomainEnabled' => false];
+        $generated = $this->pmssWriteFile($ctx['subdomainConfigDir'].'/pmss-user-alice-hash.conf', "old\n");
+        $lookalike = $this->pmssWriteFile($ctx['subdomainConfigDir'].'/pmss-user-ALICE-hash.conf', "keep\n");
+        $backup = $this->pmssWriteFile($ctx['subdomainConfigDir'].'/pmss-user-alice-hash.conf.bak', "keep\n");
+
+        $this->assertTrue(\pmssCreateNginxConfigPruneOrphans(['alice'], $ctx));
+        $this->assertFalse(file_exists($generated));
+        $this->assertTrue(is_file($lookalike));
+        $this->assertTrue(is_file($backup));
     }
 
     public function testGeneratorWriteFailurePreservesPriorTarget(): void
@@ -149,6 +164,7 @@ class NginxConfigWriteGuardTest extends TestCase
         ];
         $public = $conf.'/pmss-user-alice.conf';
         $private = $conf.'/pmss-user-alice-hash.conf';
+        $this->pmssWriteFile($private, "stale\n");
 
         $this->assertSame(PMSS_NGINX_USER_CONFIG_GENERATED, \pmssCreateNginxConfigGenerateUser('alice', $ctx, false));
         $this->assertSame('active alice 12345', file_get_contents($users.'/alice'));
@@ -216,10 +232,10 @@ class NginxConfigWriteGuardTest extends TestCase
     {
         $configDir = $this->tempDir.'/conf.d';
         @mkdir($configDir, 0755, true);
-        $ctx = ['subdomainConfigDir' => $configDir, 'nginxSslBlock' => 'ssl-on', 'publicSubdomainTemplate' => 'public ##host## ##user## ##port## ##ssl_block##', 'privateSubdomainTemplate' => 'private ##host## ##user## ##port## ##ssl_block##'];
-        $this->assertTrue(\pmssCreateNginxConfigWriteSubdomainConfigs($ctx, 'alice', 'example.test', 'hash.example.test', false, 12345));
+        $ctx = ['subdomainConfigDir' => $configDir, 'nginxSslBlock' => 'ssl-on', 'publicSubdomainTemplate' => 'public ##host## ##user## ##port## ##ssl_block##'];
+        $this->assertTrue(\pmssCreateNginxConfigWriteSubdomainConfigs($ctx, 'alice', 'example.test', false, 12345));
         $this->assertEquals('public alice.example.test alice 12345 ssl-on', (string) file_get_contents($configDir.'/pmss-user-alice.conf'));
-        $this->assertEquals('private hash.example.test alice 12345 ssl-on', (string) file_get_contents($configDir.'/pmss-user-alice-hash.conf'));
+        $this->assertFalse(file_exists($configDir.'/pmss-user-alice-hash.conf'));
 
         $homeDir = $this->tempDir.'/home/alice';
         @mkdir($homeDir, 0755, true);

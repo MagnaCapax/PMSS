@@ -31,8 +31,8 @@ an issuance path:
    `pmssNginxUserSslBlock`, wired in `nginxConfig/userConfigsGenerate.php`): the
    public subdomain vhost uses `/etc/letsencrypt/live/<user>.<server>/` when that
    certificate exists, else the existing host cert. This changes nothing for a
-   user who has not opted in. The private (hash-host) vhost always uses the host
-   cert.
+   user who has not opted in. The unreachable private hash vhost was retired;
+   see `docs/contracts.md` for the current subdomain contract.
 
 2. **ACME HTTP-01 challenge location** (`nginxConfig/templates.php`, public
    subdomain port-80 block): `location ^~ /.well-known/acme-challenge/` served

@@ -87,20 +87,48 @@ class NginxUserHostsTest extends TestCase
         }
     }
 
-    public function testHashHostnameMatchesExpected(): void
+    public function testMcxLabelsMatchPublishedVectors(): void
     {
-        $cases = [
-            ['alice', '123', 'seedbox.example.com'],
-            ['bob', '999', 'node.example.net'],
-            ['user1', '4567', 'host.domain.tld'],
-            ['zeus', '42', 'alpha.beta'],
-            ['test', '10001', 'srv.example.org'],
-        ];
+        $vectors = json_decode((string) file_get_contents(__DIR__.'/../fixtures/mcx-label-vectors.json'), true);
+        $this->assertTrue(is_array($vectors));
+        foreach ($vectors as $vector) {
+            $this->assertSame($vector['label'], \pmssMcxLabel($vector['kind'], $vector['id']));
+            $hostname = $vector['kind'] === 'service'
+                ? \pmssNginxUserMcxHostname($vector['id'])
+                : \pmssNginxUserMcxClusterHostname($vector['id']);
+            $this->assertSame($vector['label'].'.mcx.fi', $hostname);
+        }
+    }
 
-        foreach ($cases as [$user, $billingServiceId, $host]) {
-            $seed = $user.'.'.$billingServiceId.'.'.$host;
-            $expected = hash('sha256', $seed).'.'.$host;
-            $this->assertEquals($expected, \pmssNginxUserHashHostname($user, $billingServiceId, $host));
+    public function testMcxLabelRejectsInvalidInput(): void
+    {
+        foreach (['', 'other', 'Service'] as $kind) {
+            $this->assertThrows(\InvalidArgumentException::class, static function () use ($kind): void { \pmssMcxLabel($kind, '1'); });
+        }
+        foreach (['', ' 1', '1 ', '-1', '1x', '1.0'] as $id) {
+            $this->assertThrows(\InvalidArgumentException::class, static function () use ($id): void { \pmssMcxLabel('service', $id); });
+        }
+    }
+
+    public function testMcxLabelCanonicalizesZeroesWithoutIntegerOverflow(): void
+    {
+        $this->assertSame(\pmssMcxLabel('service', '0'), \pmssMcxLabel('service', '0000'));
+        $longId = '000'.str_repeat('9', 40);
+        $this->assertSame(\pmssMcxLabel('customer', substr($longId, 3)), \pmssMcxLabel('customer', $longId));
+    }
+
+    public function testCustomerCertCommandMatchesServiceVectors(): void
+    {
+        $vectors = json_decode((string) file_get_contents(__DIR__.'/../fixtures/mcx-label-vectors.json'), true);
+        $script = dirname(__DIR__, 4).'/etc/skel/bin/createWebPublicCerts';
+        foreach ($vectors as $vector) {
+            if ($vector['kind'] !== 'service') continue;
+            $home = $this->pmssMakeTempDir('mcx-certs-home-');
+            file_put_contents($home.'/.billingServiceId', $vector['id']);
+            $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script), ['HOME' => $home]);
+            $this->assertSame(0, $result['rc']);
+            $this->assertTrue(strpos($result['output'], 'http://'.\pmssMcxLabel('service', $vector['id']).'.mcx.fi/') !== false);
+            $this->assertTrue(strpos($result['output'], 'http://'.$vector['label'].'.mcx.fi/') !== false);
         }
     }
 }

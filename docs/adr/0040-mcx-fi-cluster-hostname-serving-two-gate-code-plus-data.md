@@ -8,8 +8,9 @@ Accepted
 
 ## Context
 Each customer with 2+ active services gets a stable **cluster** permalink
-`substr(sha256("mcx.fi:customer:".clientId),0,16).".mcx.fi"`, published by the ns0
-mcx.fi zone builder as a multi-A round-robin across the customer's node IPs. For a
+`substr(sha256("mcx.fi:customer:".clientId),0,16).".mcx.fi"`. The billing data API
+on web5 computes the label; ns0-build-mcx.php consumes it and publishes a multi-A
+round-robin across the customer's node IPs. For a
 node to actually SERVE that hostname (rather than answer with its default vhost), the
 per-user public nginx vhost must carry the cluster hostname in `server_name`.
 

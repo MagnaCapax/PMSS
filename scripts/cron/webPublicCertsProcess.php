@@ -39,6 +39,7 @@ const LOG_PREFIX = 'webPublicCerts';
 // SAN fleet-wide, so the cert only covered the per-server subdomain (verified
 // 2026-08-04 on le4-0-106-225wardrobe/mcxstati). Same fallback the serving path uses.
 require_once __DIR__.'/../lib/user/billingIds.php';
+require_once __DIR__.'/../lib/nginxUserHosts.php';
 
 if (posix_getuid() !== 0) {
     fwrite(STDERR, "Must run as root.\n");
@@ -97,7 +98,7 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
     // as a SAN on the migration-window fleet, not just the per-server subdomain.
     $serviceId = (string) pmssUserBillingServiceIdDigitsRead($home);
     if ($serviceId !== '') {
-        $names[] = substr(hash('sha256', 'mcx.fi:service:'.$serviceId), 0, 16).'.mcx.fi';
+        $names[] = pmssNginxUserMcxHostname($serviceId);
     }
 
     $certName = $names[0];

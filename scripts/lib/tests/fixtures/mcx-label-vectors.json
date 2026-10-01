@@ -1,0 +1,7 @@
+[
+  {"kind":"service","id":"1","label":"7d040fe202162644"},
+  {"kind":"service","id":"12345","label":"2abe4cb1f3714476"},
+  {"kind":"service","id":"0012345","label":"2abe4cb1f3714476"},
+  {"kind":"customer","id":"1","label":"73f48d104284e03b"},
+  {"kind":"customer","id":"98765","label":"c8289e927de38526"}
+]
