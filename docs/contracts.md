@@ -545,6 +545,9 @@ iptables helpers:
 
 ## Resource Statistics
 
+- `pmssResourceLogManagedUserUids()` revalidates list output before UID lookup
+  and omits nonpositive resolver results. `pmssResourceLogLookupManagedUid()`
+  accepts only representable, positive decimal output from its `id -u` fallback.
 - `pmssDiskIostatWriteSnapshotFiles()` validates all three output paths before
   writing and returns `false` on a failed or short write. Successful snapshot
   and history bytes retain their existing order and format.

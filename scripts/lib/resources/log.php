@@ -29,8 +29,8 @@ function pmssResourceLogLookupManagedUid(string $user): ?int
         if ($uid !== null) return $uid;
     }
 
-    $uid = trim((string) @shell_exec('id -u '.escapeshellarg($user).' 2>/dev/null'));
-    return ctype_digit($uid) ? (int) $uid : null;
+    $uid = pmssUnsignedDecimalIntParse(trim((string) @shell_exec('id -u '.escapeshellarg($user).' 2>/dev/null')));
+    return $uid !== null && $uid > 0 ? $uid : null;
 }
 
 /** Return managed resource-account users keyed by validated UID. */
@@ -42,7 +42,9 @@ function pmssResourceLogManagedUserUids(array $additionalUsers = ['www-data'], ?
 
     foreach ($listUsers($additionalUsers) as $user) {
         $user = (string) $user;
-        if (!is_int($uid = $uidResolver($user))) continue;
+        // The list and resolver are separate process boundaries; trust neither result.
+        if (!pmssResourceUserIsValid($user)) continue;
+        if (!is_int($uid = $uidResolver($user)) || $uid <= 0) continue;
         $result[$user] = $uid;
     }
 

@@ -551,6 +551,24 @@ PHP
         $this->assertSame(null, \pmssResourceLogLookupManagedUid('Alice'));
     }
 
+    public function testManagedUserUidsRejectsMalformedNamesAndNonpositiveResolverResults(): void
+    {
+        $resolved = [];
+        $users = ['alice', 'www-data', '', 'Alice', '../etc', "bad\nname", "bad\0name", 'bob', 'carol'];
+        $uids = ['alice' => 1001, 'www-data' => 33, 'bob' => 0, 'carol' => -1];
+        $result = \pmssResourceLogManagedUserUids(
+            ['www-data'],
+            static function (array $additional) use ($users): array { return $users; },
+            static function (string $user) use (&$resolved, $uids): int {
+                $resolved[] = $user;
+                return $uids[$user];
+            }
+        );
+
+        $this->assertSame(['alice' => 1001, 'www-data' => 33], $result);
+        $this->assertSame(['alice', 'www-data', 'bob', 'carol'], $resolved);
+    }
+
     public function testTrafficIngressLoadsResourceHelpersDirectly(): void
     {
         $legacyPath = dirname(__DIR__, 3).'/resources/'.'user'.'Helpers.php';
