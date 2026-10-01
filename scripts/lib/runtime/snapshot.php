@@ -12,14 +12,21 @@ function pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defa
         $oldUmask = umask(0077);
         $logPath = pmssResolvePathFromEnv($envKey, $defaultLogPath);
         // Reject malformed filenames before creating parents or reaching fopen().
-        if ($logPath === '' || pmssFilesystemPathHasNulByte($logPath)) {
+        if (!pmssPathSegmentsAreSafe($logPath, true, true, true, false)
+            || !pmssLockFilePathIsSafe($logPath)) {
             return 1;
         }
-        if (!pmssDirEnsureExists(dirname($logPath), 0755)) {
+        if (!pmssDirEnsureExists(dirname($logPath), 0755)
+            || !pmssPathSegmentsAreSafe($logPath, true, true, true, false)
+            || !pmssLockFilePathIsSafe($logPath)) {
             return 1;
         }
         $handle = @fopen($logPath, 'ab');
         if ($handle === false) {
+            return 1;
+        }
+        // Append opens must still refer to the checked regular path before chmod.
+        if (!pmssLockFileHandleMatchesPath($handle, $logPath)) {
             return 1;
         }
         // Do not collect a snapshot when the log's private mode cannot be enforced.

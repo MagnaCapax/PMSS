@@ -134,6 +134,10 @@ consuming unrelated resources. Task cleanup tolerates a callback closing its
 stream, so its return value or original exception survives and the prior umask
 is restored. Valid streams retain the same newline-terminated bytes and warning
 normalization; `RuntimeStreamSafetyTest` and `RuntimeTest` cover these boundaries.
+Snapshot log tasks reject symlinked ancestors, redirected leaves, and non-regular
+targets before append, then confirm the opened stream still matches the path
+before changing its mode or invoking the collector. Valid paths retain their
+append bytes, mode, lock, callback result, and umask restoration.
 The task restores the prior umask in a nested `finally` even if closing the
 stream throws. Close exceptions retain their existing propagation and precedence
 over callback exceptions; normal callback results and append bytes are unchanged.

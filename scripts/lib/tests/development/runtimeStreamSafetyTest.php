@@ -129,6 +129,38 @@ PHP;
         }
     }
 
+    public function testSnapshotRejectsRedirectedAndNonRegularLogTargets(): void
+    {
+        $runtime = var_export(dirname(__DIR__, 2).'/runtime.php', true);
+        $script = 'namespace SnapshotTargetFixture; function posix_geteuid() { return 0; }';
+        $script .= "require {$runtime};".$this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/snapshot.php', 'SnapshotTargetFixture');
+        $script .= <<<'PHP'
+$called = false;
+$rc = pmssRunSnapshotLogTask('snapshot-test.php', 'PMSS_TEST_SNAPSHOT_TARGET',
+    getenv('PMSS_TEST_SNAPSHOT_TARGET'), static function () use (&$called): int {
+        $called = true;
+        return 7;
+    });
+echo json_encode([$rc, $called]);
+PHP;
+        $root = $this->pmssMakeTempDir('pmss-snapshot-target-');
+        $target = $root.'/existing.log';
+        file_put_contents($target, "previous snapshot\n");
+        $link = $root.'/linked.log';
+        $linkedDir = $root.'/linked-dir';
+        mkdir($root.'/logs');
+        symlink($target, $link);
+        symlink($root.'/logs', $linkedDir);
+        foreach ([$link, $linkedDir.'/new.log', $root.'/logs', $root.'/missing/../new.log'] as $path) {
+            $this->assertSame([1, false], $this->pmssRunInlinePhpJson($script, [
+                'PMSS_TEST_SNAPSHOT_TARGET' => $path,
+            ]));
+            $this->assertSame("previous snapshot\n", file_get_contents($target));
+            $this->assertFalse(file_exists($root.'/logs/new.log'));
+            $this->assertFalse(file_exists($root.'/missing'));
+        }
+    }
+
     public function testSnapshotWritersIgnoreInvalidAndClosedHandles(): void
     {
         $closed = fopen('php://memory', 'w+');
