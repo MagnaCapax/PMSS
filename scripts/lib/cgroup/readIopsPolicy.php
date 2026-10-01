@@ -63,13 +63,13 @@ function pmssCgroupPolicyReadIopsClassFloor(?string $storageClass, array $policy
 {
     $floors = pmssCgroupPolicyReadIopsClassFloors($policy);
     $class = is_string($storageClass) ? strtolower($storageClass) : '';
-    return $floors[$class] ?? $floors['default'] ?? $floors['storage'] ?? 200;
+    return $floors[$class] ?? $floors['default'];
 }
 
 /** Prefer explicit user IOWeight, then the policy default, then systemd's default-ish 100. */
 function pmssCgroupPolicyUserIoWeight(array $source, array $policy): int
 {
-    foreach ([$source['IOWeight'] ?? null, $policy['ioWeight'] ?? null, 100] as $value) {
+    foreach ([$source['IOWeight'] ?? null, $policy['ioWeight'] ?? null] as $value) {
         $weight = pmssCgroupPolicyPositiveIntSetting($value);
         if ($weight !== null) {
             return $weight;
@@ -120,14 +120,7 @@ function pmssCgroupPolicyReadIopsClamp(int $candidate, int $classFloor, int $tie
 {
     $classFloor = max(1, $classFloor);
     $tierCeiling = max(1, $tierCeiling);
-    if ($candidate > $tierCeiling) {
-        return $tierCeiling;
-    }
-    if ($candidate < $classFloor) {
-        return min($classFloor, $tierCeiling);
-    }
-
-    return $candidate;
+    return min($tierCeiling, max($classFloor, $candidate));
 }
 
 /**
@@ -194,12 +187,8 @@ function pmssCgroupPolicyBlockDeviceName(string $devicePath): ?string
 function pmssCgroupPolicyHomeDeviceIsMdBacked(string $devicePath, string $sysClassBlock = '/sys/class/block'): bool
 {
     $device = pmssCgroupPolicyBlockDeviceName($devicePath);
-    if ($device === null) {
-        return false;
-    }
-
-    return preg_match('/^md\d+\z/', $device) === 1
-        || is_dir(rtrim($sysClassBlock, '/').'/'.$device.'/md');
+    return $device !== null && (preg_match('/^md\d+\z/', $device) === 1
+        || is_dir(rtrim($sysClassBlock, '/').'/'.$device.'/md'));
 }
 
 /** Resolve one block device's storage class from sysfs rotational/NVMe primitives. */
@@ -235,14 +224,8 @@ function pmssCgroupPolicyBlockStorageClassResolve(string $deviceName, string $sy
             $slaveClasses[] = $slaveClass;
         }
     }
-    if (in_array('hdd', $slaveClasses, true)) {
-        return 'hdd';
-    }
-    if (in_array('nvme', $slaveClasses, true)) {
-        return 'nvme';
-    }
-    if (in_array('ssd', $slaveClasses, true)) {
-        return 'ssd';
+    foreach (['hdd', 'nvme', 'ssd'] as $priority) {
+        if (in_array($priority, $slaveClasses, true)) return $priority;
     }
 
     return $class;
