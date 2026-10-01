@@ -8,6 +8,29 @@ final class ManagedFileWriteSafetyTest extends TestCase
 {
     protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-managed-file-write-']; }
 
+    public function testEnsureSafeDirReportsModeFailure(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-safe-dir-');
+        $library = $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/userFileWrite.php', 'SafeDirModeFixture');
+        $result = $this->pmssRunInlinePhpJson(<<<'PHP'
+namespace SafeDirModeFixture;
+function chmod($path, $mode) {
+    return $GLOBALS['failMode'] ? false : \chmod($path, $mode);
+}
+PHP
+            .$library.'$path = '.var_export($root.'/state', true).';'.<<<'PHP'
+$GLOBALS['failMode'] = true;
+$failed = pmssEnsureSafeDir($path, 0700);
+$GLOBALS['failMode'] = false;
+$succeeded = pmssEnsureSafeDir($path, 0700);
+\clearstatcache(true, $path);
+echo json_encode([$failed, $succeeded, \is_dir($path), \fileperms($path) & 0777]);
+PHP
+        );
+
+        $this->assertSame([false, true, true, 0700], $result);
+    }
+
     public function testImmutableToggleRejectsNulPathBeforeFilesystemProbe(): void
     {
         \pmssManagedFileImmutableSet($this->tempDir."/bad\0file", true);

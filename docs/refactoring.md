@@ -28,6 +28,11 @@ clean-ups.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Managed directory creation reports failure when its requested mode cannot be
+applied, even if the directory exists. Existing successful calls retain their
+directory and mode; callers can use their current failure path instead of
+writing into a directory with unintended permissions.
+
 Managed serialized file targets accept integer modes or decimal digit strings
 within the Unix permission range (0 through 07777). Malformed or out-of-range
 modes follow the existing failed-target callback path before any file is

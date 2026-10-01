@@ -59,9 +59,8 @@ function pmssEnsureSafeDir(string $path, int $mode): bool
         return false;
     }
 
-    @chmod($path, $mode);
-
-    return is_dir($path) && !is_link($path);
+    // A created directory is not ready for callers until its requested mode applies.
+    return @chmod($path, $mode) && is_dir($path) && !is_link($path);
 }
 
 /** Ensure each managed directory exists, reporting unsafe paths through the callback. */
