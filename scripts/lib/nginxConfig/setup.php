@@ -180,8 +180,6 @@ function pmssCreateNginxConfigSetup(): array
         'runtimePortDir' => '/etc/seedbox/runtime/ports',
         'nginxSslBlock' => $nginxSslBlock,
         'publicSubdomainTemplate' => $templates['public'],
-        'privateSubdomainTemplate' => $templates['private'],
         'publicSuspendedTemplate' => $templates['publicSuspended'],
-        'privateSuspendedTemplate' => $templates['privateSuspended'],
     ];
 }

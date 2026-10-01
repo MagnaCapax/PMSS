@@ -158,9 +158,7 @@ class NginxConfigWriteGuardTest extends TestCase
             'userTemplate' => 'active ##username ##serverPort',
             'suspendedTemplate' => 'suspended ##username',
             'publicSubdomainTemplate' => 'public ##host## ##port##',
-            'privateSubdomainTemplate' => 'private ##host## ##port##',
             'publicSuspendedTemplate' => 'suspended public ##host##',
-            'privateSuspendedTemplate' => 'suspended private ##host##',
         ];
         $public = $conf.'/pmss-user-alice.conf';
         $private = $conf.'/pmss-user-alice-hash.conf';

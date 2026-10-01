@@ -119,50 +119,8 @@ class DelugeReverseProxyHardeningTest extends TestCase
     }
 
     // =========================================================================
-    // SECTION 2: Subdomain routing hardening (avoid double-prefix /user-<user>/)
+    // SECTION 2: Active base-host routing
     // =========================================================================
-
-    public function testCreateNginxConfigPrivateSubdomainProxiesUserPrefixAsIs(): void
-    {
-        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
-        $script = \pmssNginxUserSubdomainTemplates()['private'];
-
-        $this->assertStringContainsAllStrings(['location ^~ /user-##user##/ {', 'proxy_pass http://127.0.0.1:##port##;'], $script);
-    }
-
-    public function testCreateNginxConfigPrivateSubdomainStillPrefixesRootToUserArea(): void
-    {
-        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
-        $script = \pmssNginxUserSubdomainTemplates()['private'];
-
-        $this->assertStringContainsAllStrings(['location / {', 'proxy_pass http://127.0.0.1:##port##/user-##user##/;'], $script);
-    }
-
-    public function testCreateNginxConfigPrivateSubdomainAsIsLocationUsesProxyParams(): void
-    {
-        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
-        $script = \pmssNginxUserSubdomainTemplates()['private'];
-        $this->assertStringContainsAllStrings(['location ^~ /user-##user##/', 'include /etc/nginx/proxy_params;'], $script);
-    }
-
-    public function testCreateNginxConfigPrivateSubdomainNormalizesDelugeCookiePath(): void
-    {
-        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
-        $script = \pmssNginxUserSubdomainTemplates()['private'];
-
-        $this->assertStringContainsString(
-            'proxy_cookie_path ~^/user-##user##/deluge/user-##user##/deluge/.* /user-##user##/deluge/;',
-            $script
-        );
-    }
-
-    public function testCreateNginxConfigPrivateSubdomainDelugeLegacyRedirectsExist(): void
-    {
-        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
-        $block = \pmssNginxUserSubdomainTemplates()['private'];
-
-        $this->assertStringContainsAllStrings(['Keep for compatibility until at least 2028-01-28', 'location = /deluge-##user## {', 'return 308 /deluge-##user##/$is_args$args;', 'location /deluge-##user##/ {', 'proxy_pass http://127.0.0.1:##port##/deluge-##user##/;'], $block);
-    }
 
     public function testCreateNginxConfigAddsBaseHostnameToDefaultServerName(): void
     {
@@ -171,14 +129,6 @@ class DelugeReverseProxyHardeningTest extends TestCase
         // Regression guard: base-host requests (FQDN) must land on the main vhost
         // where /etc/nginx/users/* is included (legacy Deluge redirects live there).
         $this->assertStringContainsAllStrings(["'server_name localhost;'", "'server_name localhost '.\$subdomainBase.';'"], $script);
-    }
-
-    public function testCreateNginxConfigPrivateSubdomainDoesNotExposePublicPrefix(): void
-    {
-        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
-        // The private vhost is intended to expose only /user-<user>/ and /webdav-<user>/.
-        $block = \pmssNginxUserSubdomainTemplates()['private'];
-        $this->assertStringNotContainsString('/public-##user##/', $block);
     }
 
     public function testCreateNginxConfigStillSupportsLegacyDelugeWebPortPlaceholder(): void
@@ -473,7 +423,6 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
         // Keep upload-specific timeout and streaming directives in one WebDAV include.
         $this->assertStringContainsAllStrings(['location /webdav-##user##/', 'include /etc/nginx/webdav_proxy_params;'], $templates['public']);
-        $this->assertStringContainsAllStrings(['location /webdav-##user##/', 'include /etc/nginx/webdav_proxy_params;'], $templates['private']);
     }
 
     public function testWebdavLocationsAllowLargeUploads(): void
@@ -484,6 +433,5 @@ class DelugeReverseProxyHardeningTest extends TestCase
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
         $templates = \pmssNginxUserSubdomainTemplates();
         $this->assertStringContainsAllStrings(['client_max_body_size 0;'], $templates['public']);
-        $this->assertStringContainsAllStrings(['client_max_body_size 0;'], $templates['private']);
     }
 }

@@ -75,7 +75,6 @@ class ErrorPageTemplateTest extends TestCase
 
         foreach ([
             'user template' => [$this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user'), '##username', 3],
-            'private subdomain template' => [\pmssNginxUserSubdomainTemplates()['private'], '##user##', 4],
         ] as $label => [$contents, $token, $count]) {
             $this->assertEquals($count, substr_count($contents, 'error_page 502 /error-502-'.$token.'.html;'), $label);
             $this->assertStringContainsAllStrings(['location = /error-502-'.$token.'.html {', 'try_files $uri /error-502.html;'], $contents, $label.': ');
