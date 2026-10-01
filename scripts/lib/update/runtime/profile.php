@@ -171,7 +171,15 @@ function pmssProfileSummary(): void
     }
     // Encoding must succeed before opening the report: an empty fallback erases prior evidence.
     $encoded = pmssJsonEncodePretty($profile);
-    if ($encoded === null || !pmssDirEnsureExists(dirname($profileOutput), 0755)) {
+    // An override must not redirect a root-run profile write through a symlink.
+    if ($encoded === null) {
+        return;
+    }
+    if (!pmssPathTargetIsSafe($profileOutput, false)) {
+        logmsg('[WARN] Unable to write complete step profile report');
+        return;
+    }
+    if (!pmssDirEnsureExists(dirname($profileOutput), 0755)) {
         return;
     }
     // A failed or short write must be visible; the summary remains best-effort.

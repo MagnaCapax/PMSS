@@ -187,6 +187,26 @@ class RuntimeProfileTest extends TestCase
         }
     }
 
+    public function testProfileSummaryRefusesUnsafeReportPaths(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-profile-path-');
+        $outside = $root.'/outside.json';
+        file_put_contents($outside, 'prior report');
+        symlink($outside, $root.'/linked.json');
+        symlink($root, $root.'/linked-dir');
+
+        foreach ([$root.'/linked.json', $root.'/linked-dir/new.json', $root.'/../escaped.json', 'relative-report.json'] as $path) {
+            $this->resetState();
+            $this->pmssTrackEnvOverrides(['PMSS_PROFILE_OUTPUT' => $path]);
+            $GLOBALS['PMSS_PROFILE'] = [['description' => 'step', 'duration' => 0.1]];
+
+            pmssProfileSummary();
+
+            $this->assertSame('prior report', file_get_contents($outside));
+            $this->assertFalse(file_exists($root.'/new.json'));
+        }
+    }
+
     public function testProfileSummaryReportsFailedOutputWrite(): void
     {
         $root = $this->pmssMakeTempDir('pmss-profile-write-');
