@@ -80,6 +80,25 @@ class PmssStatsCliTest extends TestCase
         $this->pmssAssertArraySubsetSame(['torrent_total' => 6, 'torrent_active' => 4, 'torrent_stopped' => 2, 'torrent_downloading' => 2, 'ratio' => 2.0], $stats['rtorrent']);
     }
 
+    public function testRtorrentCountersRejectMalformedResponses(): void
+    {
+        foreach ([false, null, '', 'bad', [], -1, '1e309'] as $invalid) {
+            $caller = static function (string $socketPath, string $method, array $params, int $timeout) use ($invalid) {
+                return $method === 'get_down_rate' ? $invalid : 0;
+            };
+            $stats = \pmssStatsReadRtorrentStats($caller, '/unused');
+            $this->assertFalse($stats['ok']);
+            $this->assertSame(null, $stats['download_rate']);
+        }
+
+        $caller = static function (string $socketPath, string $method, array $params, int $timeout) {
+            return $method === 'd.multicall2' ? [] : '0';
+        };
+        $stats = \pmssStatsReadRtorrentStats($caller, '/unused');
+        $this->assertTrue($stats['ok']);
+        $this->assertSame(0.0, $stats['download_rate']);
+    }
+
     public function testRenderTextShowsCompactLayout(): void
     {
         $stats = $this->collectStats([

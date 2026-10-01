@@ -581,6 +581,9 @@ iptables helpers:
   Terminal stats retain their help exit status and text layouts, including raw
   percentages beside clamped bars. Traffic columns retain unitless default rates
   and the extended display's 1000 MiB/s scaling threshold.
+- Terminal rTorrent stats accept finite, non-negative numeric counter responses.
+  Malformed counters retain the existing unavailable-probe result rather than
+  reporting a successful zero; valid numeric strings and zero retain their values.
 - pmssStatsStatusModelBuild(?string $uid, ?bool $dockerEnabledPolicy, ?callable $runner=null, array $overrides=[]): array
   - Builds the customer-panel VPN/app/Docker status model; WireGuard and
     OpenVPN use customer-readable interface presence (`wg0`, `tun0`) instead of

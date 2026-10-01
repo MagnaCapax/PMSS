@@ -91,7 +91,8 @@ function pmssStatsReadRtorrentStats(callable $caller, string $socketPath): array
 
     foreach (['upload_rate' => 'get_up_rate', 'download_rate' => 'get_down_rate', 'upload_total' => 'get_up_total', 'download_total' => 'get_down_total'] as $key => $method) {
         $value = $caller($socketPath, $method, [], 2);
-        if ($value === false) return $stats;
+        // A malformed RPC value must not turn into a successful zero reading.
+        if (!is_numeric($value) || !is_finite((float) $value) || (float) $value < 0.0) return $stats;
         $stats[$key] = (float) $value;
     }
     $stats['ok'] = true;
