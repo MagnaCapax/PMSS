@@ -28,6 +28,10 @@ clean-ups.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Boot-default convergence logs nonzero `/proc` remount and `update-grub` results
+through the caller logger after managed configuration is persisted. Both steps
+retain their fail-soft flow and successful command sequence.
+
 Managed directory creation reports failure when its requested mode cannot be
 applied, even if the directory exists. Existing successful calls retain their
 directory and mode; callers can use their current failure path instead of

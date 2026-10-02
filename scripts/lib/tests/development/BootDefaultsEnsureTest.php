@@ -170,6 +170,39 @@ class BootDefaultsEnsureTest extends TestCase
         }
     }
 
+    public function testBootDefaultsReportsFailedActivationWithoutRetrying(): void
+    {
+        $library = $this->pmssInlinePhpLibraryInNamespace('scripts/lib/update/systemPrep/bootDefaults.php', 'BootDefaultsFailureFixture');
+        $result = $this->pmssRunInlinePhpJson(<<<'PHP'
+namespace BootDefaultsFailureFixture;
+function pmssFstabLinesRead($path, $log, $context) { return ['proc /proc proc defaults 0 0']; }
+function pmssFstabMountOptionsEnsure(&$lines, $mount, $required, $removed, $drop, $type, $replacements) { return ['changed' => true]; }
+function pmssWriteManagedPathFileWithBackup($path, $lines, $kind, $log) { return true; }
+function pmssBuildCommand($binary, $args) { return $binary; }
+function pmssCommandPath($binary) { return '/stub/update-grub'; }
+function runStep($description, $command) { $GLOBALS['steps'][] = $description; return $GLOBALS['stepRc']; }
+PHP
+            .$library.<<<'PHP'
+$messages = $GLOBALS['steps'] = [];
+$log = static function ($message) use (&$messages) { $messages[] = $message; };
+$GLOBALS['stepRc'] = 23;
+pmssBootDefaultsEnsureProcHidepid('/tmp/fstab', $log);
+pmssBootDefaultsApplyGrubChanges(true, '/tmp/grub', '', $log);
+$failed = [$messages, $GLOBALS['steps']];
+$messages = $GLOBALS['steps'] = [];
+$GLOBALS['stepRc'] = 0;
+pmssBootDefaultsEnsureProcHidepid('/tmp/fstab', $log);
+pmssBootDefaultsApplyGrubChanges(true, '/tmp/grub', '', $log);
+echo json_encode([$failed, [$messages, $GLOBALS['steps']]]);
+PHP
+        );
+
+        $this->assertSame(['Updated /proc mount options in /tmp/fstab', '[WARN] /proc hidepid remount failed (rc=23)', '[WARN] update-grub failed (rc=23); boot options may not be applied'], $result[0][0]);
+        $this->assertSame(['Remounting /proc with hidepid=2', 'Updating GRUB configuration'], $result[0][1]);
+        $this->assertSame(['Updated /proc mount options in /tmp/fstab'], $result[1][0]);
+        $this->assertSame($result[0][1], $result[1][1]);
+    }
+
     public function testFstabMutationCharacterizationMatrix(): void
     {
         $cases = [

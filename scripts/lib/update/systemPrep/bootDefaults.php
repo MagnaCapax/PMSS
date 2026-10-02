@@ -45,7 +45,8 @@ function pmssBootDefaultsEnsureProcHidepid(string $fstabPath, callable $log): vo
 
     // Do not activate a mount configuration that could not be persisted.
     if (!pmssWriteManagedPathFileWithBackup($fstabPath, $lines, 'fstab', $log)) return;
-    runStep('Remounting /proc with hidepid=2', pmssBuildCommand('mount', ['-o', 'remount,hidepid=2', '/proc']));
+    $rc = runStep('Remounting /proc with hidepid=2', pmssBuildCommand('mount', ['-o', 'remount,hidepid=2', '/proc']));
+    if ($rc !== 0) $log('[WARN] /proc hidepid remount failed (rc='.$rc.')');
 }
 
 function pmssBootDefaultsGrubValueUnquote(string $rawValue): string
@@ -113,7 +114,8 @@ function pmssBootDefaultsApplyGrubChanges(bool $grubChanged, string $grubPath, s
 {
     if (!$grubChanged) return;
     if (pmssCommandPath('update-grub') !== '') {
-        runStep('Updating GRUB configuration', 'update-grub');
+        $rc = runStep('Updating GRUB configuration', 'update-grub');
+        if ($rc !== 0) $log('[WARN] update-grub failed (rc='.$rc.'); boot options may not be applied');
     } else {
         $log('[WARN] update-grub not available; run update-grub after editing '.$grubPath);
     }
