@@ -89,18 +89,23 @@ function pmssStatsReadRtorrentStats(callable $caller, string $socketPath): array
         'torrent_total' => null, 'torrent_active' => null, 'torrent_seeding' => null, 'torrent_downloading' => null, 'torrent_stopped' => null,
     ];
 
-    foreach (['upload_rate' => 'get_up_rate', 'download_rate' => 'get_down_rate', 'upload_total' => 'get_up_total', 'download_total' => 'get_down_total'] as $key => $method) {
-        $value = $caller($socketPath, $method, [], 2);
-        // A malformed RPC value must not turn into a successful zero reading.
-        if (!is_numeric($value) || !is_finite((float) $value) || (float) $value < 0.0) return $stats;
-        $stats[$key] = (float) $value;
-    }
-    $stats['ok'] = true;
-    $stats['ratio'] = ($stats['download_total'] > 0.0) ? ($stats['upload_total'] / $stats['download_total']) : null;
+    try {
+        foreach (['upload_rate' => 'get_up_rate', 'download_rate' => 'get_down_rate', 'upload_total' => 'get_up_total', 'download_total' => 'get_down_total'] as $key => $method) {
+            $value = $caller($socketPath, $method, [], 2);
+            // A malformed RPC value must not turn into a successful zero reading.
+            if (!is_numeric($value) || !is_finite((float) $value) || (float) $value < 0.0) return $stats;
+            $stats[$key] = (float) $value;
+        }
+        $stats['ok'] = true;
+        $stats['ratio'] = ($stats['download_total'] > 0.0) ? ($stats['upload_total'] / $stats['download_total']) : null;
 
-    foreach (['torrent_total' => 'main', 'torrent_active' => 'started', 'torrent_seeding' => 'seeding'] as $key => $view) {
-        $result = $caller($socketPath, 'd.multicall2', [$view, 'd.get_hash='], 2);
-        if (is_array($result)) $stats[$key] = count($result);
+        foreach (['torrent_total' => 'main', 'torrent_active' => 'started', 'torrent_seeding' => 'seeding'] as $key => $view) {
+            $result = $caller($socketPath, 'd.multicall2', [$view, 'd.get_hash='], 2);
+            if (is_array($result)) $stats[$key] = count($result);
+        }
+    } catch (\Throwable $exception) {
+        // A failed optional RPC probe must not prevent disk and traffic stats.
+        return $stats;
     }
     if ($stats['torrent_active'] !== null && $stats['torrent_seeding'] !== null) $stats['torrent_downloading'] = max(0, $stats['torrent_active'] - $stats['torrent_seeding']);
     if ($stats['torrent_total'] !== null && $stats['torrent_active'] !== null) $stats['torrent_stopped'] = max(0, $stats['torrent_total'] - $stats['torrent_active']);

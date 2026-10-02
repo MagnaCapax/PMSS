@@ -99,6 +99,27 @@ class PmssStatsCliTest extends TestCase
         $this->assertSame(0.0, $stats['download_rate']);
     }
 
+    public function testRtorrentProbeExceptionsKeepOtherStatsAvailable(): void
+    {
+        $failingRate = static function (): void { throw new \RuntimeException('RPC failed'); };
+        $stats = \pmssStatsReadRtorrentStats($failingRate, '/unused');
+        $this->assertFalse($stats['ok']);
+        $this->assertSame(null, $stats['upload_rate']);
+
+        $failingView = static function (string $socketPath, string $method) {
+            if ($method === 'd.multicall2') throw new \RuntimeException('RPC failed');
+            return 0;
+        };
+        $stats = \pmssStatsReadRtorrentStats($failingView, '/unused');
+        $this->assertTrue($stats['ok']);
+        $this->assertSame(0.0, $stats['upload_rate']);
+        $this->assertSame(null, $stats['torrent_total']);
+
+        $payload = $this->collectStats([], $failingRate);
+        $this->assertSame('M10G S', $payload['product']);
+        $this->assertFalse($payload['rtorrent']['ok']);
+    }
+
     public function testRenderTextShowsCompactLayout(): void
     {
         $stats = $this->collectStats([
@@ -295,14 +316,14 @@ class PmssStatsCliTest extends TestCase
      * @param array<string, string> $overrides
      * @return array<string, mixed>
      */
-    private function collectStats(array $overrides = []): array
+    private function collectStats(array $overrides = [], ?callable $rtorrentCaller = null): array
     {
         return \pmssStatsCollect(array_replace([
             'user' => 'alice',
             'home' => $this->home,
             'config_dir' => $this->configDir,
             'cgroup_dir' => $this->cgroupDir,
-        ], $overrides), $this->rtorrentCallerStub());
+        ], $overrides), $rtorrentCaller ?? $this->rtorrentCallerStub());
     }
 
     /**
