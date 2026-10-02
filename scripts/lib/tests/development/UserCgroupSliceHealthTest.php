@@ -6,6 +6,20 @@ require_once dirname(__DIR__, 2).'/user/userCgroupSliceHealth.php';
 
 class UserCgroupSliceHealthTest extends TestCase
 {
+    public function testSelfHealRejectsInvalidUsernamesBeforeStoreAccess(): void
+    {
+        $store = new class extends \UserConfigStore {
+            public function get(string $username): ?array
+            {
+                throw new \RuntimeException('Invalid username reached the config store');
+            }
+        };
+
+        foreach (['', '../', 'Alice', "alice\n", 'toolongusername'] as $username) {
+            $this->assertFalse(\pmssUserCgroupSliceSelfHeal($username, $store));
+        }
+    }
+
     public function testExpectedMemoryMaxUsesCanonicalCgroupClamp(): void
     {
         foreach ([[], ['ramMiB' => null], ['ramMiB' => false], ['ramMiB' => []], ['ramMiB' => 'bad'], ['ramMiB' => 0]] as $payload) {

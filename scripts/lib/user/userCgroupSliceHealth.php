@@ -69,6 +69,11 @@ function pmssUserCgroupSliceMemoryRefreshPlan(
 /** Reapply the stored cgroup plan when the live slice memory cap has drifted low. */
 function pmssUserCgroupSliceSelfHeal(string $username, UserConfigStore $store): bool
 {
+    // A rejected account cannot be considered healed, even when no repair ran.
+    if (!pmssValidateUsername($username)) {
+        return false;
+    }
+
     $dropinRepaired = pmssUserCgroupSliceRepairLegacyBareMemoryMaxForUser($username, static function (string $message) use ($username): void {
         pmssUserLog($username, $message);
         logMessage($message);
