@@ -66,6 +66,10 @@ function pmssPortManagerAssignServicePort(string $user, string $service, ?int $p
     }
 
     $lockHandle = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-portManager.lock'));
+    if ($lockHandle === false) {
+        $status = 'lock_failed';
+        return null;
+    }
     try {
         if ($context['present']) {
             $port = pmssPortManagerReadAssignedPort($context['file']);

@@ -72,6 +72,7 @@ function pmssPortManagerMain(array $argv): int
             return 0;
         }
         if ($assignStatus === 'port_dir_unavailable') return pmssPortManagerFail("Error: unable to initialize port directory\n");
+        if ($assignStatus === 'lock_failed') return pmssPortManagerFail("Error: unable to acquire port lock\n", $user, $action, $service, null, 'lock_failed');
         if ($assignStatus === 'port_range_exhausted') return pmssPortManagerFail("Error: no free port available\n", $user, $action, $service, null, 'port_range_exhausted');
         if ($assignStatus === 'write_failed') return pmssPortManagerFail("Error: failed to persist port assignment\n", $user, $action, $service, null, 'write_failed');
         return pmssPortManagerFail("Error: invalid stored port assignment\n", $user, $action, $service, null, $assignStatus === 'invalid_existing_assignment' ? 'invalid_existing_assignment' : 'unsafe_assignment_path');
@@ -95,7 +96,7 @@ function pmssPortManagerMain(array $argv): int
     }
 
     $lockHandle = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-portManager.lock'));
-    if ($lockHandle === false) pmssPortManagerLog($user, $action, $service, null, 'WARN', 'lock_failed');
+    if ($lockHandle === false) return pmssPortManagerFail("Error: unable to acquire port lock\n", $user, $action, $service, null, 'lock_failed');
     try {
         if (!$context['present']) {
             echo 'No port assigned';

@@ -61,6 +61,39 @@ final class PortManagerCliTest extends TestCase
         $this->assertSame('24567', trim($result['output']));
     }
 
+    public function testAssignDoesNotWriteWhenLockCannotBeAcquired(): void
+    {
+        $portDir = $this->makePortDir();
+        $lockDir = $this->pmssMakeTempDir('pmss-port-lock-');
+        $this->pmssCreateSymlinkOrSkip($this->pmssMakeTempFile('pmss-port-lock-target-'), $lockDir.'/pmss-portManager.lock');
+
+        $result = $this->runPortManager(['assign', 'alice', 'lighttpd'], [
+            'PMSS_PORT_MANAGER_DIR' => $portDir,
+            'PMSS_RUNTIME_LOCK_DIR' => $lockDir,
+        ]);
+
+        $this->assertSame(1, $result['rc']);
+        $this->assertStringContainsString('Error: unable to acquire port lock', $result['output']);
+        $this->assertFalse(file_exists($portDir.'/lighttpd-alice'));
+    }
+
+    public function testReleaseDoesNotRemoveAssignmentWhenLockCannotBeAcquired(): void
+    {
+        $portDir = $this->makePortDir();
+        file_put_contents($portDir.'/lighttpd-alice', "24567\n");
+        $lockDir = $this->pmssMakeTempDir('pmss-port-lock-');
+        $this->pmssCreateSymlinkOrSkip($this->pmssMakeTempFile('pmss-port-lock-target-'), $lockDir.'/pmss-portManager.lock');
+
+        $result = $this->runPortManager(['release', 'alice', 'lighttpd'], [
+            'PMSS_PORT_MANAGER_DIR' => $portDir,
+            'PMSS_RUNTIME_LOCK_DIR' => $lockDir,
+        ]);
+
+        $this->assertSame(1, $result['rc']);
+        $this->assertStringContainsString('Error: unable to acquire port lock', $result['output']);
+        $this->assertSame("24567\n", file_get_contents($portDir.'/lighttpd-alice'));
+    }
+
     public function testAssignFailsWhenExistingPortFileIsMalformed(): void
     {
         $portDir = $this->makePortDir();
