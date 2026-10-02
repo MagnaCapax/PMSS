@@ -1099,16 +1099,23 @@ bashrc_custom_media_stack_blocks_strip() {
 }
 
 media_stack_app_processes_kill() {
-	local pattern="$1" username="${2:-$USERNAME}" pid comm
+	local pattern="$1" username="${2:-$USERNAME}" pid comm ancestors=" " ancestor
 
 	if [[ $DRY_RUN -eq 1 ]]; then
 		log_info "[dry-run] would stop processes matching $pattern"
 		return 0
 	fi
 	command -v pgrep >/dev/null 2>&1 || return 0
+	# The launcher chain (ssh, bash -c, nohup, screen, tmux window) carries the
+	# installer's argv too, so spare every ancestor, not only the installer itself.
+	ancestor=$$
+	while [[ "$ancestor" =~ ^[0-9]+$ && "$ancestor" -gt 1 ]]; do
+		ancestors+="$ancestor "
+		ancestor=$(ps -o ppid= -p "$ancestor" 2>/dev/null | tr -d ' ' || true)
+	done
 	# Match app command lines, but preserve the shell and the shared tmux server.
 	for pid in $(pgrep -f -u "$username" -- "$pattern" 2>/dev/null); do
-		[[ "$pid" == "$$" || "$pid" == "$BASHPID" ]] && continue
+		[[ "$pid" == "$BASHPID" || "$ancestors" == *" $pid "* ]] && continue
 		comm=$(ps -o comm= -p "$pid" 2>/dev/null) || continue
 		[[ "$comm" == tmux* ]] && continue
 		kill -9 "$pid" 2>/dev/null || true
