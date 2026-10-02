@@ -11,7 +11,7 @@
 function pmssBootDefaultsRequiredGrubOptions(string $grubOption, ?array $extraGrubOptions): array
 {
     $options = [];
-    foreach (array_merge([$grubOption], is_array($extraGrubOptions) ? $extraGrubOptions : []) as $option) {
+    foreach (array_merge([$grubOption], $extraGrubOptions ?? []) as $option) {
         $option = trim((string) $option);
         if ($option !== '') $options[] = $option;
     }
@@ -21,7 +21,7 @@ function pmssBootDefaultsRequiredGrubOptions(string $grubOption, ?array $extraGr
 function pmssBootDefaultsRequiredGrubSettings(?array $extraGrubSettings): array
 {
     $settings = [];
-    foreach (is_array($extraGrubSettings) ? $extraGrubSettings : [] as $key => $value) {
+    foreach ($extraGrubSettings ?? [] as $key => $value) {
         $key = trim((string) $key);
         if ($key !== '' && preg_match('/^[A-Z0-9_]+$/', $key) === 1) $settings[$key] = trim((string) $value);
     }
@@ -30,20 +30,18 @@ function pmssBootDefaultsRequiredGrubSettings(?array $extraGrubSettings): array
 
 function pmssBootDefaultsEnsureProcHidepid(string $fstabPath, callable $log): void
 {
-    $fstabChanged = false;
     $lines = pmssFstabLinesRead($fstabPath, $log, '/proc hidepid enforcement');
     if ($lines === null) return;
 
     $plan = pmssFstabMountOptionsEnsure($lines, '/proc', [], [], false, 'proc', ['hidepid=' => 'hidepid=2']);
     if ($plan === null) {
         $lines[] = "proc\t/proc\tproc\tdefaults,hidepid=2\t0\t0";
-        $fstabChanged = true;
         $log('Added /proc mount with hidepid=2 to '.$fstabPath);
     } elseif ($plan['changed']) {
-        $fstabChanged = true;
         $log('Updated /proc mount options in '.$fstabPath);
+    } else {
+        return;
     }
-    if (!$fstabChanged) return;
 
     // Do not activate a mount configuration that could not be persisted.
     if (!pmssWriteManagedPathFileWithBackup($fstabPath, $lines, 'fstab', $log)) return;
@@ -62,7 +60,6 @@ function pmssBootDefaultsEnsureGrubOptions(array &$lines, array $requiredGrubOpt
     $changed = $found = false;
     foreach ($lines as $idx => $line) {
         if (!preg_match('/^(GRUB_CMDLINE_LINUX_DEFAULT|GRUB_CMDLINE_LINUX)=("|\')([^"\']*)("|\')/', $line, $match)) continue;
-        $lineChanged = false;
         // Keep option placement backward-compatible while healing every managed line's quoting.
         if (!$found) {
             $found = true;
@@ -73,17 +70,16 @@ function pmssBootDefaultsEnsureGrubOptions(array &$lines, array $requiredGrubOpt
             $updatedValue = implode(' ', $currentOptions);
             if ($updatedValue !== $match[3]) {
                 $lines[$idx] = $match[1].'='.$match[2].$updatedValue.$match[2];
-                $lineChanged = true;
+                $changed = true;
                 $log('Updated '.$match[1].' options in '.$grubPath);
             }
         }
         $lineToNormalize = $lines[$idx] ?? $line;
         if (preg_match('/^(GRUB_CMDLINE_LINUX_DEFAULT|GRUB_CMDLINE_LINUX)=("|\')([^"\']*)\2\2+$/', $lineToNormalize, $malformedMatch) === 1) {
             $lines[$idx] = $malformedMatch[1].'='.$malformedMatch[2].$malformedMatch[3].$malformedMatch[2];
-            $lineChanged = true;
+            $changed = true;
             $log('Normalized '.$malformedMatch[1].' quoting in '.$grubPath);
         }
-        $changed = $lineChanged || $changed;
     }
     if ($found || $requiredGrubOptions === []) return $changed;
 
@@ -96,19 +92,16 @@ function pmssBootDefaultsEnsureGrubSettings(array &$lines, array $requiredGrubSe
 {
     $changed = false;
     foreach ($requiredGrubSettings as $settingKey => $settingValue) {
-        $settingFound = false;
         $settingPrefix = $settingKey.'=';
         foreach ($lines as $lineIdx => $line) {
             if (strpos($line, $settingPrefix) !== 0) continue;
-            $settingFound = true;
             if (pmssBootDefaultsGrubValueUnquote(trim(substr($line, strlen($settingPrefix)))) !== $settingValue) {
                 $lines[$lineIdx] = $settingKey.'="'.$settingValue.'"';
                 $changed = true;
                 $log('Updated '.$settingKey.' in '.$grubPath);
             }
-            break;
+            continue 2;
         }
-        if ($settingFound) continue;
         $lines[] = $settingKey.'="'.$settingValue.'"';
         $changed = true;
         $log('Added '.$settingKey.' to '.$grubPath);
