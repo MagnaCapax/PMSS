@@ -62,6 +62,7 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
     {
         $lines = ['alpha', 'beta'];
         $payloadLength = strlen("alpha\nbeta\n");
+        file_put_contents($this->tempDir.'/core.py', "original\n");
         foreach ([false, 0, $payloadLength - 1] as $writeResult) {
             $this->logs = [];
             $writer = static function () use ($writeResult) { return $writeResult; };
@@ -82,6 +83,7 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
 
     public function testPatchWriterAcceptsCompleteWrite(): void
     {
+        file_put_contents($this->tempDir.'/core.py', "original\n");
         $writer = static function (string $path, string $payload): int { return strlen($payload); };
         $result = \pmssDelugeWritePatchedLines(
             $this->tempDir.'/core.py',
@@ -95,6 +97,29 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
 
         $this->assertTrue($result, 'Complete writes must retain the success result');
         $this->assertEquals([], $this->logs, 'Complete writes must not emit a warning');
+    }
+
+    public function testPatchWriterRefusesReplacedTarget(): void
+    {
+        $target = $this->tempDir.'/target.py';
+        file_put_contents($target, "original\n");
+        $path = $this->tempDir.'/core.py';
+        $writerCalled = false;
+        $writer = static function () use (&$writerCalled): int { $writerCalled = true; return 6; };
+
+        foreach (['missing', 'symlink', 'directory'] as $kind) {
+            if ($kind === 'symlink') symlink($target, $path);
+            if ($kind === 'directory') mkdir($path);
+            $this->logs = [];
+            $result = \pmssDelugeWritePatchedLines($path, ['patch'], false, $this->logger, 'dry: ', 'write failed: ', $writer);
+            $this->assertFalse($result, 'Replaced target must be rejected: '.$kind);
+            $this->pmssAssertMessagesContain($this->logs, 'write failed:', 'Expected write warning');
+            if ($kind === 'symlink') unlink($path);
+            if ($kind === 'directory') rmdir($path);
+        }
+
+        $this->assertFalse($writerCalled, 'Writer must not receive an unsafe target');
+        $this->assertEquals("original\n", file_get_contents($target), 'Symlink target must stay intact');
     }
 
     public function testPatchReturnsTrueWhenGuardAlreadyPresent(): void

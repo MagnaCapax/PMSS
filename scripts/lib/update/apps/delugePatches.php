@@ -41,6 +41,9 @@ function pmssDelugeWritePatchedLines(string $path, array $lines, bool $dryRun, c
     $newContent = implode("\n", $lines);
     if ($newContent !== '' && substr($newContent, -1) !== "\n") $newContent .= "\n";
     if ($dryRun) { $log($dryRunMessage.$path); return true; }
+    // Recheck after the earlier read so a replaced target is rejected before writing.
+    clearstatcache(true, $path);
+    if (!pmssRegularFilePathIsReadable($path)) { $log($writeWarning.$path); return false; }
     $written = $writer ? $writer($path, $newContent) : @file_put_contents($path, $newContent);
     if ($written !== strlen($newContent)) { $log($writeWarning.$path); return false; }
     return true;
