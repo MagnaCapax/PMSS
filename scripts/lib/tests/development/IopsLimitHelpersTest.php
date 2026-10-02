@@ -165,6 +165,24 @@ class IopsLimitHelpersTest extends TestCase
         }
     }
 
+    public function testEnforcerReportsFailedAccountScanButAcceptsEmptySuccessfulScan(): void
+    {
+        $script = $this->pmssMakeTempDir('pmss-iops-list-').'/listUsers.php';
+        foreach ([
+            ["echo \"user1\\n\"; exit(7);", 1],
+            ["echo \"PHP Fatal error: failed account scan\\n\";", 1],
+            ['', 0],
+        ] as $case) {
+            $this->pmssWriteExecutablePhpFile($script, $case[0]);
+            $this->pmssWithEnv([
+                'PMSS_TEST_MODE' => '1',
+                'PMSS_TEST_LIST_USERS_COMMAND' => $script,
+            ], function () use ($case): void {
+                $this->assertSame($case[1], \pmssIopsLimitsRun());
+            });
+        }
+    }
+
     public function testRootCronSchedulesIopsLimits(): void
     {
         $this->pmssAssertRepoFileContainsString(

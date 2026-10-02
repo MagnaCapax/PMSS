@@ -46,7 +46,11 @@ function pmssIopsLimitEnforcementPlan(int $limit, int $usage, bool $markerExists
 
 function pmssIopsLimitsRun(): int
 {
-    $users = pmssListManagedUsers('/scripts/listUsers.php');
+    // A failed account scan is not an empty fleet; let cron report the failure.
+    $users = pmssListManagedUsersFromResult(pmssListManagedUsersResult('/scripts/listUsers.php'));
+    if ($users === null) {
+        return 1;
+    }
     $store = new UserConfigStore();
 
     foreach ($users as $user) {

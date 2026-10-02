@@ -103,6 +103,11 @@ probe after a signal stops escalation instead of claiming the process exited.
 Normal no-match, graceful-stop, and SIGKILL paths retain their prior behavior.
 `UpdateRuntimeProcessesTest` covers both probe failures with stub commands.
 
+Monthly IOPS enforcement uses the managed-user scan result, returning a nonzero
+cron status when the scan fails or emits diagnostics. A successful empty scan
+still returns success without changing any per-user state; `IopsLimitHelpersTest`
+covers both outcomes with an isolated list command.
+
 The current-process cgroup membership reader rejects NUL-containing paths before
 calling `file()`. Malformed and unreadable paths return the existing empty entries
 result, and path selection returns an empty string. Valid v1 and unified entries
