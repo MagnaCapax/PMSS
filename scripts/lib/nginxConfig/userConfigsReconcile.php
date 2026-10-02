@@ -85,30 +85,40 @@ function pmssCreateNginxConfigPruneOrphans(array $users, array $ctx): bool
         }
     }
 
-    $patterns = [pmssCreateNginxConfigContextDir($ctx, 'nginxUsersDir', '/etc/nginx/users').'/*'];
+    $patterns = ['user' => pmssCreateNginxConfigContextDir($ctx, 'nginxUsersDir', '/etc/nginx/users').'/*'];
     if (!empty($ctx['subdomainEnabled'])) {
-        $patterns[] = pmssCreateNginxConfigContextDir($ctx, 'subdomainConfigDir', '/etc/nginx/conf.d').'/pmss-user-*.conf';
+        $patterns['public'] = pmssCreateNginxConfigContextDir($ctx, 'subdomainConfigDir', '/etc/nginx/conf.d').'/pmss-user-*.conf';
     } else {
-        $patterns[] = pmssCreateNginxConfigContextDir($ctx, 'subdomainConfigDir', '/etc/nginx/conf.d').'/pmss-user-*-hash.conf';
+        $patterns['private'] = pmssCreateNginxConfigContextDir($ctx, 'subdomainConfigDir', '/etc/nginx/conf.d').'/pmss-user-*-hash.conf';
     }
 
     $success = true;
-    foreach ($patterns as $pattern) {
+    foreach ($patterns as $kind => $pattern) {
         $matches = glob($pattern);
         if (!is_array($matches)) {
+            $success = false;
             continue;
         }
         sort($matches, SORT_STRING);
         foreach ($matches as $path) {
+            $name = basename($path);
+            // Only generated route names may be removed from a shared config directory.
+            if ($kind === 'user' && !pmssValidateUsername($name)) {
+                continue;
+            }
+            if ($kind === 'public' &&
+                (preg_match('/^pmss-user-(.+?)(?:-hash)?\.conf$/D', $name, $match) !== 1 || !pmssValidateUsername($match[1]))) {
+                continue;
+            }
             // Only remove the exact generated hash filename, never lookalikes.
-            if (substr($path, -10) === '-hash.conf' &&
-                (preg_match('/^pmss-user-(.+)-hash\.conf$/D', basename($path), $match) !== 1 || !pmssValidateUsername($match[1]))) {
+            if ($kind === 'private' &&
+                (preg_match('/^pmss-user-(.+)-hash\.conf$/D', $name, $match) !== 1 || !pmssValidateUsername($match[1]))) {
                 continue;
             }
             if (isset($expected[$path])) {
                 continue;
             }
-            if (!pmssCreateNginxConfigRemoveFile($path, basename($path), 'orphan managed config')) {
+            if (!pmssCreateNginxConfigRemoveFile($path, $name, 'orphan managed config')) {
                 $success = false;
             }
         }

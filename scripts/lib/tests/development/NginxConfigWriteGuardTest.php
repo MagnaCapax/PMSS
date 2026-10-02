@@ -108,6 +108,35 @@ class NginxConfigWriteGuardTest extends TestCase
         foreach (\pmssCreateNginxConfigManagedUserPaths('bob', $ctx) as $path) $this->assertFalse(file_exists($path));
     }
 
+    public function testOrphanPruneKeepsFilesOutsideGeneratedNameShapes(): void
+    {
+        $ctx = ['nginxUsersDir' => $this->tempDir.'/users', 'subdomainConfigDir' => $this->tempDir.'/conf.d', 'subdomainEnabled' => true];
+        $kept = [
+            $this->pmssWriteFile($ctx['nginxUsersDir'].'/README', "keep\n"),
+            $this->pmssWriteFile($ctx['nginxUsersDir'].'/alice.backup', "keep\n"),
+            $this->pmssWriteFile($ctx['subdomainConfigDir'].'/pmss-user-ALICE.conf', "keep\n"),
+            $this->pmssWriteFile($ctx['subdomainConfigDir'].'/pmss-user-alice-extra.conf', "keep\n"),
+        ];
+        $orphan = $this->pmssWriteFile($ctx['subdomainConfigDir'].'/pmss-user-bob.conf', "remove\n");
+
+        $this->assertTrue(\pmssCreateNginxConfigPruneOrphans([], $ctx));
+        foreach ($kept as $path) $this->assertSame("keep\n", file_get_contents($path));
+        $this->assertFalse(file_exists($orphan));
+    }
+
+    public function testOrphanPruneReportsFailedGlobScan(): void
+    {
+        $script = <<<'PHP'
+namespace NginxPruneGlobFixture;
+function glob($pattern) { return false; }
+function pmssValidateUsername($user) { return preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user) === 1; }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/nginxConfig/userConfigsReconcile.php', 'NginxPruneGlobFixture');
+        $script .= 'echo json_encode(["ok" => pmssCreateNginxConfigPruneOrphans([], ["subdomainEnabled" => true])]);';
+
+        $this->assertSame(['ok' => false], $this->pmssRunInlinePhpJson($script));
+    }
+
     public function testRetiredHashConfigPruneUsesExactGeneratedFilename(): void
     {
         $ctx = ['nginxUsersDir' => $this->tempDir.'/users', 'subdomainConfigDir' => $this->tempDir.'/conf.d', 'subdomainEnabled' => false];
