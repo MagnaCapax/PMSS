@@ -49,6 +49,50 @@ final class PortManagerSharedNamespaceTest extends TestCase
         return [$portDir, $legacyDir];
     }
 
+    /** Simulate a reservation change between preflight and lock acquisition. */
+    private function runLockRace(string $action, string $mutation): array
+    {
+        $portDir = $this->makePortDir();
+        $assignment = $portDir.'/rclone-alice';
+        if ($mutation === 'remove') file_put_contents($assignment, "25000\n");
+        $script = 'namespace PortManagerLockRaceFixture; require_once '.var_export($this->pmssRepoPath('scripts/lib/portManager.php'), true).';';
+        $script .= '$GLOBALS["assignment"] = '.var_export($assignment, true).'; $GLOBALS["mutation"] = '.var_export($mutation, true).';';
+        $script .= <<<'PHP'
+function pmssLockFileAcquire($path) {
+    if ($GLOBALS['mutation'] === 'create') \file_put_contents($GLOBALS['assignment'], "25000\n");
+    else \unlink($GLOBALS['assignment']);
+    return \tmpfile();
+}
+function pmssUserBaseContext() { return []; }
+function pmssUserWriteLogs() { return true; }
+PHP;
+        $source = $action === 'assign' ? 'scripts/lib/portManager/selection.php' : 'scripts/lib/portManager.php';
+        $script .= $this->pmssInlinePhpLibraryInNamespace($source, 'PortManagerLockRaceFixture');
+        if ($action === 'assign') {
+            $script .= '$status = null; $port = pmssPortManagerAssignServicePort("alice", "rclone", 26000, $status);';
+            $script .= 'echo json_encode(["port" => $port, "status" => $status, "file" => \file_get_contents($GLOBALS["assignment"])]);';
+        } else {
+            $script .= '\ob_start(); $rc = pmssPortManagerMain(["portManager.php", "release", "alice", "rclone"]); $output = \ob_get_clean();';
+            $script .= 'echo json_encode(["rc" => $rc, "output" => $output, "present" => \file_exists($GLOBALS["assignment"])]);';
+        }
+        return $this->pmssRunInlinePhpJson($script, ['PMSS_PORT_MANAGER_DIR' => $portDir, 'PMSS_PORT_MANAGER_LEGACY_DIR' => $portDir.'/missing']);
+    }
+
+    public function testAssignmentCreatedWhileWaitingForLockIsAdopted(): void
+    {
+        $this->assertSame(['port' => 25000, 'status' => 'already_assigned', 'file' => "25000\n"], $this->runLockRace('assign', 'create'));
+    }
+
+    public function testAssignmentRemovedWhileWaitingForReleaseLockIsNotUnlinkedAgain(): void
+    {
+        $this->assertSame(['rc' => 0, 'output' => 'No port assigned', 'present' => false], $this->runLockRace('release', 'remove'));
+    }
+
+    public function testAssignmentCreatedWhileWaitingForReleaseLockIsRemoved(): void
+    {
+        $this->assertSame(['rc' => 0, 'output' => 'Port released', 'present' => false], $this->runLockRace('release', 'create'));
+    }
+
     public function testUsedPortsIncludeAllManagedServices(): void
     {
         $portDir = $this->makePortDir();

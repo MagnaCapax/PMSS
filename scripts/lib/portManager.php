@@ -98,6 +98,12 @@ function pmssPortManagerMain(array $argv): int
     $lockHandle = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-portManager.lock'));
     if ($lockHandle === false) return pmssPortManagerFail("Error: unable to acquire port lock\n", $user, $action, $service, null, 'lock_failed');
     try {
+        // Recheck after locking so release acts on the current assignment.
+        $context = pmssPortManagerAssignmentContext($user, $service, $contextStatus);
+        if ($context === null) {
+            if ($contextStatus === 'port_dir_unavailable') return pmssPortManagerFail("Error: unable to initialize port directory\n");
+            return pmssPortManagerFail("Error: invalid stored port assignment\n", $user, $action, $service, null, 'unsafe_assignment_path');
+        }
         if (!$context['present']) {
             echo 'No port assigned';
             return 0;

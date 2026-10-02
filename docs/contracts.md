@@ -873,6 +873,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Assigns a unique port from the shared managed-service namespace and persists the reservation; fresh candidates must be bindable on both loopback and the IPv4 wildcard address.
   - Safety: rejects invalid usernames/service names before building reservation paths; `PMSS_PORT_MANAGER_DIR` may override the reservation directory for hermetic tests.
   - Lock failure: assignment and release return an error without changing reservations when the shared port lock cannot be acquired.
+  - Assignment and release recheck the reservation path after acquiring the lock; a concurrent change is handled using the current assignment state.
 
 - etc/skel/install-media-stack.sh
   - Port allocation: consumes root-provisioned `~/.media-stack-port-APP` markers for SABnzbd, Radarr, Prowlarr, Sonarr, Autobrr, and Jellyfin. A legacy configured port is preserved only when no marker exists; a fresh install without a valid marker fails closed and requests a full PMSS update.

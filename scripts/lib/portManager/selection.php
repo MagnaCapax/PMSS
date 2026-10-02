@@ -71,6 +71,9 @@ function pmssPortManagerAssignServicePort(string $user, string $service, ?int $p
         return null;
     }
     try {
+        // The assignment may have changed while waiting for the shared lock.
+        $context = pmssPortManagerAssignmentContext($user, $service, $status);
+        if ($context === null) return null;
         if ($context['present']) {
             $port = pmssPortManagerReadAssignedPort($context['file']);
             if ($port === null) { $status = 'invalid_existing_assignment'; return null; }
