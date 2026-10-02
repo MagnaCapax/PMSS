@@ -153,6 +153,31 @@ class UserWebRootReconcileTest extends TestCase
             $this->pmssReconcileSummary($messages)
         );
     }
+    public function testPartialMergeKeepsExistingDirectoryModeWhileAddingNestedFiles(): void
+    {
+        $this->pmssWriteFile($this->skeleton.'/managed/nested/new.php', 'managed');
+        $this->pmssWriteFile($this->home.'/www/managed/customer.txt', 'customer');
+        chmod($this->home.'/www/managed', 0700);
+
+        $messages = [];
+        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+        $this->assertSame(0700, fileperms($this->home.'/www/managed') & 07777);
+        $this->assertSame('customer', file_get_contents($this->home.'/www/managed/customer.txt'));
+        $this->assertSame('managed', file_get_contents($this->home.'/www/managed/nested/new.php'));
+    }
+    public function testPartialMergeDoesNotWalkSkeletonLinkIntoExistingDirectory(): void
+    {
+        $outside = $this->pmssMakeTempDir('pmss-web-reconcile-linked-');
+        $this->pmssWriteFile($outside.'/secret.txt', 'outside');
+        $this->pmssCreateSymlinkOrSkip($outside, $this->skeleton.'/linked');
+        $this->pmssWriteFile($this->home.'/www/linked/customer.txt', 'customer');
+
+        $messages = [];
+        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+        $this->assertSame('customer', file_get_contents($this->home.'/www/linked/customer.txt'));
+        $this->assertFalse(file_exists($this->home.'/www/linked/secret.txt'));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Refusing unsafe skeleton symlink: linked'));
+    }
     public function testPerUserLockSkipsWithoutChangingRoot(): void
     {
         $lockDir = getenv('PMSS_USER_WEB_ROOT_LOCK_DIR');
