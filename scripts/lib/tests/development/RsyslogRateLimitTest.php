@@ -47,6 +47,11 @@ class RsyslogRateLimitTest extends TestCase
                 $this->pmssMakeArrayLogger($messages),
                 static function (string $description, string $command) use (&$commands): int {
                     $commands[] = [$description, $command];
+                    preg_match('/-f (.+)$/', $command, $matches);
+                    $candidate = trim($matches[1] ?? '', "'");
+                    if ((fileperms($candidate) & 0777) !== 0600) {
+                        throw new \RuntimeException('rsyslog candidate is not private');
+                    }
                     return 0;
                 }
             );
@@ -58,6 +63,7 @@ class RsyslogRateLimitTest extends TestCase
         $this->assertEquals(0640, fileperms($target) & 0777, 'rsyslog config mode changed');
         $this->assertEquals(1, count($commands));
         $this->assertTrue(strpos($commands[0][1], 'rsyslogd -N1 -f ') !== false, 'candidate was not validated');
+        $this->assertEquals([], glob($root.'/.pmss-rsyslog-*') ?: [], 'candidate was not removed');
         $this->pmssAssertMessagesContain($messages, 'Applied rsyslog kernel input rate limit', 'expected apply log');
         $this->assertEquals(1, count(glob($target.'.pmss-backup-*') ?: []), 'expected one backup');
     }

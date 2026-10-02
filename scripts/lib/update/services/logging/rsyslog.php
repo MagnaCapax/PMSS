@@ -59,7 +59,12 @@ function pmssApplyRsyslogKernelInputRateLimit(?callable $logger = null, ?callabl
         $log('[WARN] Unable to prepare rsyslog configuration candidate');
         return;
     }
-    @chmod($candidatePath, 0600);
+    // Never pass a full host configuration to validation if its private mode failed.
+    if (!@chmod($candidatePath, 0600)) {
+        @unlink($candidatePath);
+        $log('[WARN] Unable to secure rsyslog configuration candidate');
+        return;
+    }
     try {
         $validationRc = $run(
             'Validating rsyslog kernel input rate limit',
