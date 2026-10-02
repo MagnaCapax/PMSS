@@ -37,18 +37,26 @@ function pmssUserConfigCliResourceSpecs(): array
 function pmssUserConfigCliLegacyValue(array $parsed, string $option, array $args, int $legacyIndex, $default = null) { $value = pmssCliOption($parsed, $option, null, null); return ($value !== null && $value !== true) ? $value : (array_key_exists($legacyIndex, $args) ? $args[$legacyIndex] : $default); }
 
 /** @return array<int,string> List shared long-option names for resource flags. */
-function pmssUserConfigCliResourceOptionNames(string $optionKey): array { return array_values(array_filter(array_map('strval', array_column(pmssUserConfigCliResourceSpecs(), $optionKey)), 'strlen')); }
+function pmssUserConfigCliResourceOptionNames(): array { return array_column(pmssUserConfigCliResourceSpecs(), 'addUserOption'); }
 
 /** @return array<int,string> Stable resource-key groups for CLI help rendering. */
 function pmssUserConfigCliResourceGroupKeys(string $group): array
 {
-    return [
-        'addUserPositionals' => ['trafficLimit', 'trafficCapMbit'],
-        'addUserPrimaryOptions' => ['trafficLimit', 'iopsLimit', 'trafficCapMbit'],
-        'addUserAdvancedOptions' => ['CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'],
-        'userConfigPositionals' => ['trafficLimit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'],
-        'userConfigNamedOptions' => ['trafficLimit', 'iopsLimit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'],
-    ][$group] ?? [];
+    $specs = pmssUserConfigCliResourceSpecs();
+    if ($group === 'addUserPositionals') {
+        return array_keys(array_filter($specs, static function (array $spec): bool {
+            return isset($spec['addUserLegacyIndex']) && $spec['addUserLegacyIndex'] <= 6;
+        }));
+    }
+    if ($group === 'addUserPrimaryOptions' || $group === 'addUserAdvancedOptions') {
+        return array_slice(array_keys($specs), $group === 'addUserPrimaryOptions' ? 0 : 3, $group === 'addUserPrimaryOptions' ? 3 : null);
+    }
+    if ($group !== 'userConfigPositionals' && $group !== 'userConfigNamedOptions') return [];
+    $positionals = array_filter($specs, static function (array $spec): bool { return isset($spec['userConfigIndex']); });
+    uasort($positionals, static function (array $left, array $right): int { return $left['userConfigIndex'] <=> $right['userConfigIndex']; });
+    $keys = array_keys($positionals);
+    if ($group === 'userConfigNamedOptions') array_splice($keys, 1, 0, ['iopsLimit']);
+    return $keys;
 }
 
 /** @return array<int,string> Render resource help lines from the shared spec table. */
@@ -57,32 +65,21 @@ function pmssUserConfigCliResourceHelpLines(string $group, string $labelKey, arr
     $lines = []; $specs = pmssUserConfigCliResourceSpecs(); foreach (pmssUserConfigCliResourceGroupKeys($group) as $key) { isset($specs[$key][$labelKey]) && $lines[] = pmssCliHelpLine($specs[$key][$labelKey], $specs[$key]['description'].($descriptionSuffixes[$key] ?? '')); } return $lines;
 }
 
-/** @return array<string,mixed> Parse resource values with named options overriding positional slots. */
-function pmssUserConfigCliResolvedResources(array $parsed, array $args, string $optionKey, string $indexKey): array
+/** @return array<string,mixed> Read shared resource options for creation, explicit updates, or defaulted updates. */
+function pmssUserConfigCliResources(array $parsed, array $args, string $indexKey, string $mode): array
 {
     $values = [];
     foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        $legacyIndex = (int) ($spec[$indexKey] ?? -1);
-        $value = pmssUserConfigCliLegacyValue($parsed, $spec[$optionKey], $args, $legacyIndex, $spec['default']);
-        $values[$key] = ($spec['parse'] === 'int' && $value !== null) ? (int) $value : $value;
-    }
-    return $values;
-}
-
-/** @return array<string,mixed> Parse only explicitly provided resource values. */
-function pmssUserConfigCliExplicitResources(array $parsed, array $args, string $optionKey, string $indexKey): array
-{
-    $values = [];
-    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        $value = null;
-        $optionValue = $parsed['options'][$spec[$optionKey]] ?? null;
-        if ($optionValue !== null && $optionValue !== true && $optionValue !== '') {
-            $value = $optionValue;
-        } elseif (isset($spec[$indexKey]) && array_key_exists($spec[$indexKey], $args) && $args[$spec[$indexKey]] !== '') {
-            $value = $args[$spec[$indexKey]];
+        if ($mode === 'explicit') {
+            $optionValue = $parsed['options'][$spec['addUserOption']] ?? null;
+            $index = $spec[$indexKey] ?? -1;
+            $value = $optionValue !== null && $optionValue !== true && $optionValue !== ''
+                ? $optionValue : ((isset($spec[$indexKey]) && array_key_exists($index, $args) && $args[$index] !== '') ? $args[$index] : null);
+        } else {
+            $value = pmssUserConfigCliLegacyValue($parsed, $spec['addUserOption'], $args, (int) ($spec[$indexKey] ?? -1), $mode === 'resolved' ? $spec['default'] : null);
         }
-        if ($value !== null) {
-            $values[$key] = ($spec['parse'] === 'int') ? (int) $value : $value;
+        if ($mode === 'resolved' || ($value !== null && $value !== '')) {
+            $values[$key] = $mode !== 'raw' && $spec['parse'] === 'int' && $value !== null ? (int) $value : $value;
         }
     }
     return $values;

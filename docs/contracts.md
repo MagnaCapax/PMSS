@@ -975,6 +975,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
     lighttpd, regenerates nginx, starts rTorrent and lighttpd, refreshes network,
     queues permission fix; optional traffic limit persists to runtime traffic files (user config store always writes `trafficLimit=0`).
   - Resource passthrough: Supports optional `--traffic-limit-gb`, `--traffic-cap-mbit`, `--upload-throttle-kib`, `--cpu-weight`, `--io-weight`, `--io-read-bw`, `--io-write-bw`, `--io-read-iops`, `--io-write-iops`, and `--cpu-quota-percent` flags while preserving the legacy positional form.
+  - Resource options share one specification and projection across creation and reconfiguration (ADR 0080). Creation keeps raw nonempty values; targeted updates use explicitly supplied values; full updates retain defaults. Named option precedence and help order stay fixed.
   - Bonus display state: optional `--bonus-quota-gib` accepts a non-negative integer; positive values are atomically written to `~/.bonusQuota` as `<user>:<user> 0640` during post-provisioning, while omission or zero leaves the artifact absent.
   - Help: `-h` / `--help` prints structured usage and exits successfully.
   - Parse failures: missing or invalid CLI arguments print usage/error text to stderr and exit non-zero.

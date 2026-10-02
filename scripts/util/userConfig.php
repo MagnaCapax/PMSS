@@ -30,7 +30,7 @@ require_once __DIR__.'/../lib/portManager.php';
  * Main entry point for user configuration changes.
  */
 $usage = pmssUserConfigCliUsage();
-$resourceOptions = pmssUserConfigCliResourceOptionNames('addUserOption');
+$resourceOptions = pmssUserConfigCliResourceOptionNames();
 $parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null), array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled'], $resourceOptions));
 $helpRequested = pmssCliOption($parsed, 'help', 'h', false) !== false;
 $args = array_merge([''], $parsed['arguments']);
@@ -46,7 +46,7 @@ try {
 } catch (InvalidArgumentException $exception) {
     die($exception->getMessage()."\n");
 }
-$explicitResourceOverrides = pmssUserConfigCliExplicitResources($parsed, $args, 'addUserOption', 'userConfigIndex');
+$explicitResourceOverrides = pmssUserConfigCliResources($parsed, $args, 'userConfigIndex', 'explicit');
 $namedConfigChange = $uploadThrottleKib !== null
     || $dockerEnabled !== null
     || count($explicitResourceOverrides) > 0;
@@ -62,7 +62,7 @@ $user = [
     'memory'    => (int) $args[2],
     'quota'     => (int) $args[3],
 ];
-$user = array_merge($user, pmssUserConfigCliResolvedResources($parsed, $args, 'addUserOption', 'userConfigIndex'));
+$user = array_merge($user, pmssUserConfigCliResources($parsed, $args, 'userConfigIndex', 'resolved'));
 $user['name'] = pmssNormalizeUsername((string) $user['name']);
 
 $passwdEntry = pmssPasswdEntryLookup($user['name']);

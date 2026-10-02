@@ -22,11 +22,11 @@ class userConfigCliCharacterizationTest extends TestCase
         ]);
         $this->assertSame(['', '200', '', '/dev/sda:5M', '', '', '', '150'], $positionals);
 
-        $parsed = \pmssUserConfigCliResolvedResources(
+        $parsed = \pmssUserConfigCliResources(
             ['options' => []],
             array_merge(['userConfig.php', 'alice', '512', '100'], $positionals),
-            'addUserOption',
-            'userConfigIndex'
+            'userConfigIndex',
+            'resolved'
         );
 
         $this->assertSame(0, $parsed['trafficLimit']);
@@ -47,7 +47,7 @@ class userConfigCliCharacterizationTest extends TestCase
             ]
         );
 
-        $resolved = \pmssUserConfigCliResolvedResources($parsed, $args, 'addUserOption', 'userConfigIndex');
+        $resolved = \pmssUserConfigCliResources($parsed, $args, 'userConfigIndex', 'resolved');
 
         $this->assertSame(400, $resolved['CPUWeight']);
         $this->assertSame('/dev/nvme0n1:8M', $resolved['IOReadBW']);
@@ -65,13 +65,37 @@ class userConfigCliCharacterizationTest extends TestCase
             ]
         );
 
-        $resolved = \pmssUserConfigCliExplicitResources($parsed, $args, 'addUserOption', 'userConfigIndex');
+        $resolved = \pmssUserConfigCliResources($parsed, $args, 'userConfigIndex', 'explicit');
 
         $this->assertSame([
             'trafficCapMbit' => 0,
             'IOWeight' => 300,
             'ioLatencyMs' => 50,
         ], $resolved);
+    }
+
+    public function testResourceModesKeepRawCreationAndUpdatePresenceSemantics(): void
+    {
+        $args = array_fill(0, 10, '');
+        $args[5] = '500';
+        $args[8] = '200';
+        $parsed = ['options' => ['traffic-cap-mbit' => '0', 'cpu-weight' => '', 'io-weight' => '300']];
+
+        $raw = \pmssUserConfigCliResources($parsed, $args, 'addUserLegacyIndex', 'raw');
+        $this->assertSame('500', $raw['trafficLimit']);
+        $this->assertSame('0', $raw['trafficCapMbit']);
+        $this->assertFalse(isset($raw['CPUWeight']));
+        $this->assertSame('300', $raw['IOWeight']);
+
+        $explicit = \pmssUserConfigCliResources($parsed, $args, 'addUserLegacyIndex', 'explicit');
+        $this->assertSame(500, $explicit['trafficLimit']);
+        $this->assertSame(0, $explicit['trafficCapMbit']);
+        $this->assertSame(200, $explicit['CPUWeight']);
+        $this->assertSame(300, $explicit['IOWeight']);
+
+        $resolved = \pmssUserConfigCliResources($parsed, $args, 'addUserLegacyIndex', 'resolved');
+        $this->assertSame(0, $resolved['CPUWeight']);
+        $this->assertSame(0, $resolved['ioLatencyMs']);
     }
 
     public function testBuildUserConfigPositionalsKeepsExplicitZeroValues(): void
@@ -101,7 +125,7 @@ class userConfigCliCharacterizationTest extends TestCase
             '45',
             'enable=1 ctrl=user',
         ]);
-        $explicit = \pmssUserConfigCliExplicitResources($parsed, $args, 'addUserOption', 'userConfigIndex');
+        $explicit = \pmssUserConfigCliResources($parsed, $args, 'userConfigIndex', 'explicit');
         $presence = array_fill_keys(array_keys($explicit), true);
 
         $this->assertSame([

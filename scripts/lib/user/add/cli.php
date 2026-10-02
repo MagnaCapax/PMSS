@@ -83,7 +83,7 @@ function pmssAddUserBonusQuotaGiBParse($raw): ?int
  */
 function pmssAddUserParseCli(array $argv): array
 {
-    $longOptions = array_merge(['user', 'password', 'ram-mib', 'disk-quota-gib', 'bonus-quota-gib', 'upload-throttle-kib', 'docker-enabled'], pmssUserConfigCliResourceOptionNames('addUserOption'));
+    $longOptions = array_merge(['user', 'password', 'ram-mib', 'disk-quota-gib', 'bonus-quota-gib', 'upload-throttle-kib', 'docker-enabled'], pmssUserConfigCliResourceOptionNames());
     $parsed = pmssParseCliTokens($argv, $longOptions);
     if (pmssCliHelpRequested($parsed)) return ['help' => true, 'usage' => pmssAddUserCliUsage()];
 
@@ -104,12 +104,7 @@ function pmssAddUserParseCli(array $argv): array
         $user['bonusQuotaGiB'] = $bonusQuotaGiB;
     }
 
-    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        $value = pmssUserConfigCliLegacyValue($parsed, $spec['addUserOption'], $args, isset($spec['addUserLegacyIndex']) ? (int) $spec['addUserLegacyIndex'] : -1, null);
-        if ($value !== null && $value !== '') {
-            $user[$key] = $value;
-        }
-    }
+    $user = array_merge($user, pmssUserConfigCliResources($parsed, $args, 'addUserLegacyIndex', 'raw'));
     $torrentThrottle = pmssUserConfigCliParseUploadThrottleOption(
         pmssUserConfigCliLegacyValue($parsed, 'upload-throttle-kib', $args, 7, null),
         'Invalid upload throttle value'

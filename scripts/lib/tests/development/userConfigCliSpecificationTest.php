@@ -84,6 +84,7 @@ class userConfigCliSpecificationTest extends TestCase
         foreach ([
             'addUserPositionals' => ['trafficLimit', 'trafficCapMbit'],
             'addUserPrimaryOptions' => ['trafficLimit', 'iopsLimit', 'trafficCapMbit'],
+            'addUserAdvancedOptions' => ['CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'],
             'userConfigPositionals' => ['trafficLimit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'],
             'userConfigNamedOptions' => ['trafficLimit', 'iopsLimit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'],
         ] as $group => $expected) {
