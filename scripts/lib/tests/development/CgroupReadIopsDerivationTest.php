@@ -45,6 +45,7 @@ class CgroupReadIopsDerivationTest extends TestCase
             'hdd',
             true
         ));
+        $this->assertSame(200, \pmssCgroupPolicyDerivedReadIopsCap(['IOReadIOPS' => []], $this->policy(), null, 100, 1, 'hdd'));
     }
 
     public function testMissingOrInsufficientTrackerFallsBackToClassFloorOnly(): void
@@ -80,6 +81,8 @@ class CgroupReadIopsDerivationTest extends TestCase
 
         $this->assertSame(500, \pmssCgroupPolicyDerivedReadIopsCap($payload, $policy, 1000.0, 400, 4, 'ssd', true));
         $this->assertSame(900, \pmssCgroupPolicyDerivedReadIopsCap($payload, $policy, 5000.0, 400, 4, 'ssd', true));
+        $this->assertSame(500, \pmssCgroupPolicyDerivedReadIopsCap($payload, $this->policy(['cgroup' => ['assignMax' => ['iops' => 1.0]]]), 1000.0, 400, 4, 'ssd'));
+        $this->assertSame(900, \pmssCgroupPolicyDerivedReadIopsCap($payload, $this->policy(['cgroup' => ['assignMax' => ['iops' => 0]]]), 2000.0, 400, 4, 'ssd'));
     }
 
     public function testFloorSumAboveMeasuredHostMaxLogsAndSkipsDerivation(): void

@@ -22,19 +22,6 @@ function pmssCgroupPolicyPositiveIntSetting($value): ?int
     return $integer > 0 ? $integer : null;
 }
 
-/** Return true when the user payload carries an operator-set read-IOPS value. */
-function pmssCgroupPolicyUserHasExplicitReadIops(array $source): bool
-{
-    return isset($source['IOReadIOPS']) && is_scalar($source['IOReadIOPS']);
-}
-
-/** Read the review-adjustable host oversell multiplier. */
-function pmssCgroupPolicyReadIopsOversell(array $policy): float
-{
-    $value = pmssCgroupNonNegativeFiniteNumber($policy['cgroup']['assignMax']['iops'] ?? null);
-    return $value !== null && $value > 0 ? $value : 2.0;
-}
-
 /** Return read-IOPS floors keyed by storage class. */
 function pmssCgroupPolicyReadIopsClassFloors(array $policy): array
 {
@@ -62,7 +49,7 @@ function pmssCgroupPolicyReadIopsClassFloors(array $policy): array
 function pmssCgroupPolicyReadIopsClassFloor(?string $storageClass, array $policy): int
 {
     $floors = pmssCgroupPolicyReadIopsClassFloors($policy);
-    $class = is_string($storageClass) ? strtolower($storageClass) : '';
+    $class = $storageClass !== null ? strtolower($storageClass) : '';
     return $floors[$class] ?? $floors['default'];
 }
 
@@ -156,7 +143,7 @@ function pmssCgroupPolicyDerivedReadIopsCap(
     ?string $storageClass,
     bool $derivationAllowed = true
 ): ?int {
-    if (pmssCgroupPolicyUserHasExplicitReadIops($source) || !$derivationAllowed || $nominalUserCount <= 0) {
+    if ((isset($source['IOReadIOPS']) && is_scalar($source['IOReadIOPS'])) || !$derivationAllowed || $nominalUserCount <= 0) {
         return null;
     }
 
@@ -167,7 +154,8 @@ function pmssCgroupPolicyDerivedReadIopsCap(
     }
 
     $share = pmssCgroupPolicyUserIoWeight($source, $policy) / $weightSum;
-    $candidate = (int) floor(max(0.0, $hostMaxReadIops) * pmssCgroupPolicyReadIopsOversell($policy) * $share);
+    $oversell = pmssCgroupNonNegativeFiniteNumber($policy['cgroup']['assignMax']['iops'] ?? null);
+    $candidate = (int) floor(max(0.0, $hostMaxReadIops) * ($oversell !== null && $oversell > 0 ? $oversell : 2.0) * $share);
     return pmssCgroupPolicyReadIopsClamp($candidate, $floor, $tierCeiling);
 }
 
@@ -175,7 +163,7 @@ function pmssCgroupPolicyDerivedReadIopsCap(
 function pmssCgroupPolicyBlockDeviceName(string $devicePath): ?string
 {
     $device = basename(trim($devicePath));
-    if ($device === '' || preg_match('/^[A-Za-z0-9._!+-]+\z/', $device) !== 1) {
+    if (preg_match('/^[A-Za-z0-9._!+-]+\z/', $device) !== 1) {
         return null;
     }
 
