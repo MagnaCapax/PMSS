@@ -40,7 +40,7 @@ function pmssSystemdUnitExists(string $unit): bool
     exec('systemctl list-unit-files '.escapeshellarg($candidate).' 2>/dev/null', $output, $status);
     if ($status === 0) {
         foreach ($output as $line) {
-            if (stripos($line, $candidate) === 0) {
+            if (pmssSystemdUnitListLineMatches($line, $candidate)) {
                 return true;
             }
         }
@@ -51,6 +51,12 @@ function pmssSystemdUnitExists(string $unit): bool
     }
     exec('systemctl cat '.escapeshellarg($candidate).' >/dev/null 2>&1', $_, $st2);
     return $st2 === 0;
+}
+
+/** Match the unit column exactly; a longer prefix is a different unit. */
+function pmssSystemdUnitListLineMatches(string $line, string $candidate): bool
+{
+    return preg_match('/^'.preg_quote($candidate, '/').'\s/i', $line) === 1;
 }
 
 /**

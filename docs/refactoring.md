@@ -256,6 +256,11 @@ Systemd skip reporting belongs in `pmssSystemdActionSkip()`: pass the existing
 reason and description, with `false` for legacy callers that do not record a
 profile entry. Keep reason evaluation at its original point in each flow.
 
+Systemd unit discovery matches the complete first column of `list-unit-files`
+output. A unit whose name only begins with the requested service name does not
+prove that the requested unit exists; on-disk and `systemctl cat` fallbacks
+remain available.
+
 When a helper pattern reaches three similar implementations, extract the shared
 shape before shipping the third clone. The third implementation is the refactor
 trigger, not proof that a duplicated pattern should persist.

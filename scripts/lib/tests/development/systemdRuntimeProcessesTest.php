@@ -6,6 +6,22 @@ require_once dirname(__DIR__, 2).'/update/services/systemd.php';
 
 class SystemdRuntimeProcessesTest extends TestCase
 {
+    public function testSystemdUnitListRequiresExactUnitColumn(): void
+    {
+        foreach ([
+            'demo.service enabled enabled' => true,
+            'DEMO.SERVICE disabled disabled' => true,
+            "demo.service\tstatic" => true,
+            'demo.service-extra enabled enabled' => false,
+            'demo.service.socket enabled enabled' => false,
+            'demo.service' => false,
+            'other.service enabled enabled' => false,
+            ' demo.service enabled enabled' => false,
+        ] as $line => $expected) {
+            $this->assertSame($expected, \pmssSystemdUnitListLineMatches($line, 'demo.service'));
+        }
+    }
+
     public function testSystemdActionSkipPreservesLogsAndProfileOptOut(): void
     {
         $forwarding = $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'];
