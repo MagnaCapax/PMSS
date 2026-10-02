@@ -202,10 +202,14 @@ class installMediaStackScriptTest extends TestCase
     {
         $this->assertStringContainsAllStrings([
             'AUTOBRR__HOST=127.0.0.1',
-            'AUTOBRR__BASE_URL=/autobrr/',
-            'AUTOBRR__BASE_URL_MODE_LEGACY=true',
+            'AUTOBRR_BASE_URL="/public-$(id -un)/autobrr/"',
+            'AUTOBRR__BASE_URL=$AUTOBRR_BASE_URL',
+            'AUTOBRR__BASE_URL_MODE_LEGACY=false',
             '--config=\\"$HOME/.config/autobrr\\"',
         ], $this->script);
+        $this->assertSame(3, substr_count($this->script, 'AUTOBRR__BASE_URL=$AUTOBRR_BASE_URL'));
+        $this->assertStringContainsString('"http://127.0.0.1:${seed_port}${AUTOBRR_BASE_URL}"', $this->script);
+        $this->assertStringContainsString('AUTOBRR__BASE_URL=/public-$(id -un)/autobrr/ AUTOBRR__BASE_URL_MODE_LEGACY=false', $this->script);
     }
 
     public function testMediaStackCredentialsUseDelugeStylePhpCsprngAndOwnerOnlyFile(): void
@@ -751,7 +755,7 @@ LIGHTTPD;
             '"/sonarr" => "/public-alice/sonarr"',
             '$HTTP["url"] =~ "^/autobrr(\$|/)" {',
             '"port" => 17474',
-            '"/autobrr" => ""',
+            '"/autobrr" => "/public-alice/autobrr"',
             '$HTTP["url"] =~ "^/jellyfin(\$|/)" {',
             '"port" => 18096',
             '"/jellyfin" => "/public-alice/jellyfin"',
@@ -940,11 +944,12 @@ BASHRC
         $newConfig = $home.'/new/config.toml';
         $existingConfig = $home.'/existing/config.toml';
         $this->pmssEnsureDir(dirname($newConfig));
-        $this->pmssWriteFile($existingConfig, "host = \"127.0.0.1\"\nport = 12345\nsessionSecret = \"oldsecret\"\ncustom = true\n");
+        $this->pmssWriteFile($existingConfig, "host = \"127.0.0.1\"\nport = 12345\nbaseUrl = \"/autobrr/\"\nbaseUrlModeLegacy = true\nsessionSecret = \"oldsecret\"\ncustom = true\n");
         $functions = $this->pmssExtractShellFunctions($this->script, array('autobrr_configure'));
         $script = implode("\n", array(
             '#!/usr/bin/env bash',
             'set -euo pipefail',
+            'AUTOBRR_BASE_URL=/public-alice/autobrr/',
             $functions,
             'autobrr_configure '.escapeshellarg($newConfig).' 23456 newsecret',
             'autobrr_configure '.escapeshellarg($existingConfig).' 34567 newsecret',
@@ -960,12 +965,16 @@ BASHRC
             'port = 23456',
             'port = 34567',
             'custom = true',
+            'baseUrl = "/public-alice/autobrr/"',
             'baseUrl = "/autobrr/"',
+            'baseUrlModeLegacy = false',
             'baseUrlModeLegacy = true',
             'databaseType = "sqlite"',
             'sessionSecret = "newsecret"',
             'sessionSecret = "oldsecret"',
         ], $output);
+        $this->assertSame(1, substr_count($output, 'baseUrl = "/public-alice/autobrr/"'));
+        $this->assertSame(1, substr_count($output, 'baseUrlModeLegacy = false'));
     }
 
     public function testLogFilePathSetOnce(): void

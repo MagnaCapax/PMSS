@@ -165,7 +165,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - Writes Servarr XML configs in `~/.config/<app>/config.xml` with randomized ports, localhost bind, URL base `/public-<user>/<app>`, `UpdateMechanism=Script`, and `UpdateAutomatically=False` (Refs #920). The authentication API requires a transient `BuiltIn` value when no script path exists, so the installer re-applies `Script` after stopping the authentication-seed process. With no `UpdateScriptPath` configured, manual updates can download, extract into a temporary sandbox, and back up app data, but stop before launching the updater that can remove the shared `.NET` host. `External` is reset by unpackaged apps on startup. This policy takes effect on install/reinstall, is customer-editable, and does not replace a customer-supplied update script; rerun this installer for Servarr updates.
 - Jellyfin writes `~/.config/jellyfin/network.xml` likewise.
 - SABnzbd writes `~/.config/sabnzbd/sabnzbd.ini`, sets `[misc]` username/password, and keeps `inet_exposure = 4` so the proxied WebUI remains reachable.
-- Autobrr writes `~/.config/autobrr/config.toml`, binds to `127.0.0.1`, sets a session secret when absent, creates the initial admin user with `autobrrctl`, and serves its sub-path through the generated per-user proxy fragment.
+- Autobrr writes `~/.config/autobrr/config.toml`, binds to `127.0.0.1`, sets a session secret when absent, creates the initial admin user with `autobrrctl`, and mounts its UI, API, and session cookie at `/public-<user>/autobrr/`. Existing config values remain customer-controlled; the installer start commands set this base path in Autobrr's environment.
 - Radarr, Sonarr, and Prowlarr are seeded through their local host-config API on temporary loopback ports, then returned to their assigned ports with Forms auth enabled.
 - Jellyfin is started on a temporary loopback port so the startup wizard can create and verify the admin account before the public proxy is restarted.
 - Credentials are written to `~/.media-stack-credentials.txt` with mode `600` and echoed in the final summary.
@@ -175,7 +175,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - Sources `~/.bashrc` with `set +u` so `~/.bashrc.custom` takes effect (and to avoid aborts when nounset is active in a user’s shell configs).
 
 8) Reverse proxy
-- Writes the PMSS-managed media-stack proxy fragment to `~/.lighttpd/custom.d/media-stack.conf` with URL rewriting from `/app` to `/public-<user>/<app>`; Autobrr uses the documented strip-to-empty map and an exact bare-path trailing-slash redirect.
+- Writes the PMSS-managed media-stack proxy fragment to `~/.lighttpd/custom.d/media-stack.conf` with URL rewriting from `/app` to `/public-<user>/<app>`; Autobrr uses that same non-empty map and an exact bare-path trailing-slash redirect.
 - On first rerun after older installer versions, legacy PMSS-managed `~/.lighttpd/custom` content is migrated out of the user-controlled include so custom rules are preserved.
 
 9) Launch

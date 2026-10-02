@@ -96,6 +96,7 @@ MEDIA_STACK_UNLIMITED_MEMORY_BYTES=$((1024 * 1024 * 1024 * 1024 * 1024))
 MEDIA_STACK_BASE_SESSIONS=(sonarr radarr prowlarr sabnzbd cloudplow autobrr)
 MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow autobrr)
 MEDIA_STACK_CREDENTIALS_FILE="$HOME/.media-stack-credentials.txt"
+AUTOBRR_BASE_URL="/public-$(id -un)/autobrr/"
 
 # Overrides (initialized empty)
 OVR_SONARR_URL=""
@@ -443,8 +444,8 @@ autobrr_configure() {
 		cat >"$config_file" <<EOF
 host = "127.0.0.1"
 port = ${port}
-baseUrl = "/autobrr/"
-baseUrlModeLegacy = true
+baseUrl = "${AUTOBRR_BASE_URL}"
+baseUrlModeLegacy = false
 databaseType = "sqlite"
 EOF
 		if [[ -n "$session_secret" ]]; then
@@ -459,10 +460,10 @@ EOF
 		printf '\nport = %s\n' "$port" >>"$config_file"
 	fi
 	if ! grep -qE '^[[:space:]]*baseUrl[[:space:]]*=' "$config_file"; then
-		printf 'baseUrl = "/autobrr/"\n' >>"$config_file"
+		printf 'baseUrl = "%s"\n' "$AUTOBRR_BASE_URL" >>"$config_file"
 	fi
 	if ! grep -qE '^[[:space:]]*baseUrlModeLegacy[[:space:]]*=' "$config_file"; then
-		printf 'baseUrlModeLegacy = true\n' >>"$config_file"
+		printf 'baseUrlModeLegacy = false\n' >>"$config_file"
 	fi
 	if ! grep -qE '^[[:space:]]*databaseType[[:space:]]*=' "$config_file"; then
 		printf 'databaseType = "sqlite"\n' >>"$config_file"
@@ -841,7 +842,7 @@ EOF
 			lighttpd_media_stack_proxy_block_write "$app" "$port"
 		done
 		echo ""
-		lighttpd_media_stack_proxy_block_write "autobrr" "$AUTOBRR_PORT" ""
+		lighttpd_media_stack_proxy_block_write "autobrr" "$AUTOBRR_PORT"
 		if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 			echo ""
 			lighttpd_media_stack_proxy_block_write "jellyfin" "$JELLYFIN_PORT"
@@ -1687,11 +1688,11 @@ autobrr_auth_seed() {
 	if [[ "$had_db" -eq 0 ]]; then
 		tmux kill-session -t "$session" 2>/dev/null || true
 		tmux new-session -d -s "$session" \
-			"AUTOBRR__HOST=127.0.0.1 AUTOBRR__PORT=\"$seed_port\" AUTOBRR__BASE_URL=/autobrr/ AUTOBRR__BASE_URL_MODE_LEGACY=true \"$HOME/.bin/autobrr/autobrr\" --config=\"$datadir\" 2>&1 | tee -a \"$datadir/autobrr-auth-seed.log\"" || {
+			"AUTOBRR__HOST=127.0.0.1 AUTOBRR__PORT=\"$seed_port\" AUTOBRR__BASE_URL=$AUTOBRR_BASE_URL AUTOBRR__BASE_URL_MODE_LEGACY=false \"$HOME/.bin/autobrr/autobrr\" --config=\"$datadir\" 2>&1 | tee -a \"$datadir/autobrr-auth-seed.log\"" || {
 			log_err "Failed to start Autobrr for local database migration"
 			return 1
 		}
-		if ! media_stack_wait_http_ok "http://127.0.0.1:${seed_port}/autobrr/" 30 "$session"; then
+		if ! media_stack_wait_http_ok "http://127.0.0.1:${seed_port}${AUTOBRR_BASE_URL}" 30 "$session"; then
 			log_err "Autobrr did not start for local auth seeding (see $datadir/autobrr-auth-seed.log)"
 			tmux kill-session -t "$session" 2>/dev/null || true
 			return 1
@@ -1894,7 +1895,7 @@ media_stack_start_apps() {
 		"source $HOME/.bin/cloudplow/bin/activate && python3 $HOME/.bin/cloudplow/cloudplow/cloudplow.py run --config=$HOME/.config/cloudplow/config.json --loglevel=DEBUG --cachefile=$HOME/.config/cloudplow/cache.db --logfile=$HOME/.config/cloudplow/cloudplow.log" \
 		"Cloudplow not found at $HOME/.bin/cloudplow/cloudplow/cloudplow.py"
 	media_stack_start_tmux_app "autobrr" "$HOME/.bin/autobrr/autobrr" \
-		"AUTOBRR__HOST=127.0.0.1 AUTOBRR__PORT=\"$AUTOBRR_PORT\" AUTOBRR__BASE_URL=/autobrr/ AUTOBRR__BASE_URL_MODE_LEGACY=true \"$HOME/.bin/autobrr/autobrr\" --config=\"$HOME/.config/autobrr\" 2>&1 | tee -a \"$HOME/.config/autobrr/autobrr.log\"" \
+		"AUTOBRR__HOST=127.0.0.1 AUTOBRR__PORT=\"$AUTOBRR_PORT\" AUTOBRR__BASE_URL=$AUTOBRR_BASE_URL AUTOBRR__BASE_URL_MODE_LEGACY=false \"$HOME/.bin/autobrr/autobrr\" --config=\"$HOME/.config/autobrr\" 2>&1 | tee -a \"$HOME/.config/autobrr/autobrr.log\"" \
 		"Autobrr not found at $HOME/.bin/autobrr/autobrr"
 }
 
@@ -2071,7 +2072,7 @@ media_stack_secure_autobrr() {
 	fi
 	media_stack_credentials_app_write "$app" "$MEDIA_STACK_AUTH_USERNAME" "$AUTOBRR_PASSWORD"
 	media_stack_start_tmux_app "$app" "$HOME/.bin/autobrr/autobrr" \
-		"AUTOBRR__HOST=127.0.0.1 AUTOBRR__PORT=\"$port\" AUTOBRR__BASE_URL=/autobrr/ AUTOBRR__BASE_URL_MODE_LEGACY=true \"$HOME/.bin/autobrr/autobrr\" --config=\"$datadir\" 2>&1 | tee -a \"$datadir/autobrr.log\"" \
+		"AUTOBRR__HOST=127.0.0.1 AUTOBRR__PORT=\"$port\" AUTOBRR__BASE_URL=$AUTOBRR_BASE_URL AUTOBRR__BASE_URL_MODE_LEGACY=false \"$HOME/.bin/autobrr/autobrr\" --config=\"$datadir\" 2>&1 | tee -a \"$datadir/autobrr.log\"" \
 		"Autobrr not found at $HOME/.bin/autobrr/autobrr"
 	media_stack_secure_marker_print "$app"
 }
@@ -2470,7 +2471,7 @@ fi
 
 # shellcheck disable=SC2016
 append_to_bashrc_custom_if_missing '# PMSS Media stack aliases (updated Nov 2025)
-alias autobrr='\''tmux new-session -d -s "autobrr" "AUTOBRR__HOST=127.0.0.1 AUTOBRR__BASE_URL=/autobrr/ AUTOBRR__BASE_URL_MODE_LEGACY=true \"$HOME/.bin/autobrr/autobrr\" --config=\"$HOME/.config/autobrr\" 2>&1 | tee -a \"$HOME/.config/autobrr/autobrr.log\""'\''
+alias autobrr='\''tmux new-session -d -s "autobrr" "AUTOBRR__HOST=127.0.0.1 AUTOBRR__BASE_URL=/public-$(id -un)/autobrr/ AUTOBRR__BASE_URL_MODE_LEGACY=false \"$HOME/.bin/autobrr/autobrr\" --config=\"$HOME/.config/autobrr\" 2>&1 | tee -a \"$HOME/.config/autobrr/autobrr.log\""'\''
 alias sonarr='\''tmux new-session -d -s "sonarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Sonarr/Sonarr.dll\" --data=\"$HOME/.config/sonarr\""'\''
 alias radarr='\''tmux new-session -d -s "radarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Radarr/Radarr.dll\" --nobrowser --data=\"$HOME/.config/radarr\""'\''
 alias prowlarr='\''tmux new-session -d -s "prowlarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Prowlarr/Prowlarr.dll\" --nobrowser --data=\"$HOME/.config/prowlarr\""'\''
