@@ -8,7 +8,7 @@
 require_once dirname(__DIR__).'/runtime/filesystem.php';
 require_once dirname(__DIR__).'/pathSafety.php';
 
-/** Reserve one port or throw; the caller owns the transaction lock and rollback. */
+/** Reserve one port or throw; the caller holds the reservation lock. */
 function pmssRtorrentPortReserve(string $directoryBase, $type, $rangeStart = 2000, $rangeEnd = 65000): int
 {
     // Validate the namespace and range before creating either directory.

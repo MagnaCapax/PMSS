@@ -54,7 +54,7 @@ function pmssRtorrentPortReservationSourceEmpty(bool $uncertain = false): array
 {
     return array(
         'ports' => array(),
-        'uncertain' => $uncertain ? array_fill_keys(array_keys(pmssRtorrentPortReservationSpecs()), true) : array(),
+        'uncertain' => $uncertain ? array('scgi' => true) : array(),
     );
 }
 
@@ -62,16 +62,14 @@ function pmssRtorrentPortReservationSourceEmpty(bool $uncertain = false): array
 function pmssRtorrentPortReservationPayloadSource(array $payload): array
 {
     $source = pmssRtorrentPortReservationSourceEmpty();
-    foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
-        if (!array_key_exists($spec['key'], $payload)) {
-            continue;
-        }
+    $spec = pmssRtorrentPortReservationSpecs()['scgi'];
+    if (array_key_exists($spec['key'], $payload)) {
         $port = pmssNetworkPortParseDigits($payload[$spec['key']], $spec['min'], $spec['max']);
         if ($port === null) {
-            $source['uncertain'][$type] = true;
-            continue;
+            $source['uncertain']['scgi'] = true;
+        } else {
+            $source['ports']['scgi'][$port] = true;
         }
-        $source['ports'][$type][$port] = true;
     }
     return $source;
 }
@@ -86,18 +84,13 @@ function pmssRtorrentPortReservationPayloadSource(array $payload): array
  */
 function pmssRtorrentPortReservationReusable(array $payload, string $base = '/var/lib/pmss/ports'): array
 {
-    $reusable = array();
-    foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
-        $port = pmssNetworkPortParseDigits($payload[$spec['key']] ?? null, $spec['min'], $spec['max']);
-        if ($port === null) {
-            continue;
-        }
-        $marker = rtrim($base, '/').'/'.$type.'/'.$port;
-        if (is_file($marker) && !is_link($marker)) {
-            $reusable[$type.'Port'] = $port;
-        }
+    $spec = pmssRtorrentPortReservationSpecs()['scgi'];
+    $port = pmssNetworkPortParseDigits($payload[$spec['key']] ?? null, $spec['min'], $spec['max']);
+    if ($port === null) {
+        return array();
     }
-    return $reusable;
+    $marker = rtrim($base, '/').'/scgi/'.$port;
+    return is_file($marker) && !is_link($marker) ? array('scgiPort' => $port) : array();
 }
 
 /** Read canonical or legacy stored ownership without hiding malformed files. */
@@ -139,17 +132,15 @@ function pmssRtorrentPortReservationConfigSource(string $path): array
     }
 
     $source = pmssRtorrentPortReservationSourceEmpty();
+    $spec = pmssRtorrentPortReservationSpecs()['scgi'];
     foreach ($lines as $line) {
         $line = trim((string) $line);
         if ($line === '' || $line[0] === '#') {
             continue;
         }
-        foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
-            if (preg_match($spec['pattern'], $line, $matches) !== 1) {
-                continue;
-            }
+        if (preg_match($spec['pattern'], $line, $matches) === 1) {
             $port = pmssNetworkPortParseDigits($matches[1], $spec['min'], $spec['max']);
-            $port === null ? $source['uncertain'][$type] = true : $source['ports'][$type][$port] = true;
+            $port === null ? $source['uncertain']['scgi'] = true : $source['ports']['scgi'][$port] = true;
         }
     }
     return $source;

@@ -8,18 +8,6 @@
 
 require_once __DIR__.'/rtorrentPortReservations.php';
 
-/** Merge one ownership source into the live reference set. */
-function pmssRtorrentPortReservationsReferenceMerge(array &$references, array $source): void
-{
-    foreach ($source['ports'] as $type => $ports) {
-        foreach ($ports as $port => $present) {
-            if ($present) {
-                $references[$type][(int) $port] = true;
-            }
-        }
-    }
-}
-
 /**
  * Remove old markers absent from every readable live-user ownership source.
  *
@@ -51,56 +39,48 @@ function pmssRtorrentPortReservationsReconcile(
 
     try {
         $references = array();
-        $specs = pmssRtorrentPortReservationSpecs();
+        $spec = pmssRtorrentPortReservationSpecs()['scgi'];
         foreach ($users as $user) {
             if (!pmssRtorrentPortReservationUsernameIsValid($user)) {
                 return array_replace($result, array('status' => 'skipped', 'reason' => 'invalid_user_list'));
             }
             $stored = pmssRtorrentPortReservationStoredSource($user, $configRoot);
             $configured = pmssRtorrentPortReservationConfigSource(rtrim($homeRoot, '/').'/'.$user.'/.rtorrent.rc');
-            foreach ($specs as $type => $spec) {
-                if (!empty($stored['uncertain'][$type])
-                    || (!isset($stored['ports'][$type]) && !empty($configured['uncertain'][$type]))) {
-                    return array_replace($result, array('status' => 'skipped', 'reason' => 'uncertain_'.$type.'_ownership'));
+            if (!empty($stored['uncertain']['scgi'])
+                || (!isset($stored['ports']['scgi']) && !empty($configured['uncertain']['scgi']))) {
+                return array_replace($result, array('status' => 'skipped', 'reason' => 'uncertain_scgi_ownership'));
+            }
+            foreach (array($stored, $configured) as $source) {
+                foreach ($source['ports']['scgi'] ?? array() as $port => $present) {
+                    if ($present) $references[(int) $port] = true;
                 }
             }
-            pmssRtorrentPortReservationsReferenceMerge($references, $stored);
-            pmssRtorrentPortReservationsReferenceMerge($references, $configured);
         }
 
-        // Validate every marker directory before removing from any of them.
-        $entries = array();
-        foreach ($specs as $type => $spec) {
-            $directory = $portsBase.'/'.$type;
-            if (!pmssPathExistsOrLink($directory)) {
-                $entries[$type] = array();
-                continue;
-            }
-            $listed = is_dir($directory) && !is_link($directory) && pmssPathTargetIsSafe($directory, true)
-                ? pmssDirectoryEntriesRead($directory)
-                : false;
-            if (!is_array($listed)) {
-                return array_replace($result, array('status' => 'skipped', 'reason' => 'unsafe_marker_directory'));
-            }
-            $entries[$type] = $listed;
+        $directory = $portsBase.'/scgi';
+        if (!pmssPathExistsOrLink($directory)) {
+            return $result;
+        }
+        $entries = is_dir($directory) && !is_link($directory) && pmssPathTargetIsSafe($directory, true)
+            ? pmssDirectoryEntriesRead($directory)
+            : false;
+        if (!is_array($entries)) {
+            return array_replace($result, array('status' => 'skipped', 'reason' => 'unsafe_marker_directory'));
         }
         $now = $now ?? time();
         $graceSeconds = max(0, $graceSeconds);
-        foreach ($entries as $type => $names) {
-            $spec = $specs[$type];
-            foreach ($names as $name) {
-                $path = $portsBase.'/'.$type.'/'.$name;
-                $port = pmssNetworkPortParseDigits($name, $spec['min'], $spec['max']);
-                $mtime = @filemtime($path);
-                if ($port === null || !is_int($mtime) || !pmssRegularFilePathIsReadable($path)
-                    || isset($references[$type][$port]) || ($now - $mtime) < $graceSeconds) {
-                    $result['kept']++;
-                    continue;
-                }
-                pmssRtorrentPortReservationMarkerRemove($portsBase, $type, $port)
-                    ? $result['removed']++
-                    : $result['errors']++;
+        foreach ($entries as $name) {
+            $path = $directory.'/'.$name;
+            $port = pmssNetworkPortParseDigits($name, $spec['min'], $spec['max']);
+            $mtime = @filemtime($path);
+            if ($port === null || !is_int($mtime) || !pmssRegularFilePathIsReadable($path)
+                || isset($references[$port]) || ($now - $mtime) < $graceSeconds) {
+                $result['kept']++;
+                continue;
             }
+            pmssRtorrentPortReservationMarkerRemove($portsBase, 'scgi', $port)
+                ? $result['removed']++
+                : $result['errors']++;
         }
         if ($result['errors'] > 0) {
             $result['status'] = 'error';

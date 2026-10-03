@@ -3,7 +3,7 @@
  * rTorrent configuration generator and idempotency helper.
  *
  * The legacy class name is a compatibility contract for provisioning scripts.
- * The class owns defaults, the reservation transaction, and configuration IO;
+ * The class owns defaults, locked SCGI reservation, and configuration IO;
  * template rendering and exclusive port allocation live in focused modules.
  *
  * @author Aleksi Ursin
@@ -160,11 +160,10 @@ class rtorrentConfig
         return pmssRtorrentPortReservationLockPath();
     }
 
-    /** Acquire missing ports as one transaction and unwind only its own markers. */
+    /** Reserve the missing SCGI port under the reconciler's shared lock. */
     private function configWithPortDefaults(array $config): array
     {
-        $reserve = array('scgi' => !isset($config['scgiPort']));
-        if (!in_array(true, $reserve, true)) {
+        if (isset($config['scgiPort'])) {
             return $config;
         }
 
@@ -173,24 +172,10 @@ class rtorrentConfig
             throw new RuntimeException('Unable to acquire rTorrent port reservation lock');
         }
 
-        $reserved = array();
         try {
-            foreach (pmssRtorrentPortReservationSpecs() as $type => $spec) {
-                if (!$reserve[$type]) {
-                    continue;
-                }
-                $port = $this->_configPortPrivate($type, $spec['min'], $spec['max']);
-                $config[$type.'Port'] = $port;
-                $reserved[] = array($type, $port);
-            }
+            $spec = pmssRtorrentPortReservationSpecs()['scgi'];
+            $config['scgiPort'] = $this->_configPortPrivate('scgi', $spec['min'], $spec['max']);
             return $config;
-        } catch (Throwable $exception) {
-            foreach (array_reverse($reserved) as $reservation) {
-                if (!pmssRtorrentPortReservationMarkerRemove($this->portReservationBaseDir(), $reservation[0], $reservation[1])) {
-                    logmsg('[WARN] Failed to roll back rTorrent '.$reservation[0].' port reservation');
-                }
-            }
-            throw $exception;
         } finally {
             pmssLockHandleRelease($lock);
         }

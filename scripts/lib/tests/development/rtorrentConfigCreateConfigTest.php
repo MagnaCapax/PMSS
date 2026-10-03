@@ -82,6 +82,28 @@ class rtorrentConfigCreateConfigTest extends TestCase
         $this->assertFalse(isset($result['config']['listenPort']));
     }
 
+    public function testReservationSourcesKeepOnlyScgiOwnership(): void
+    {
+        $payload = ['rtorrentPort' => 4001, 'rtorrentDhtPort' => 24001, 'rtorrentListenPort' => 44001];
+        $this->assertSame(
+            ['ports' => ['scgi' => [4001 => true]], 'uncertain' => []],
+            \pmssRtorrentPortReservationPayloadSource($payload)
+        );
+        $this->assertSame(
+            ['ports' => [], 'uncertain' => ['scgi' => true]],
+            \pmssRtorrentPortReservationPayloadSource(array_replace($payload, ['rtorrentPort' => 'invalid']))
+        );
+
+        $path = $this->pmssWriteFile(
+            $this->pmssMakeTempFile('pmss-rtorrent-source-'),
+            "network.scgi.open_port = 127.0.0.1:4002\ndht.port.set = invalid\nnetwork.port_range.set = 44001-44001\n"
+        );
+        $this->assertSame(
+            ['ports' => ['scgi' => [4002 => true]], 'uncertain' => []],
+            \pmssRtorrentPortReservationConfigSource($path)
+        );
+    }
+
     public function testCreateConfigAppliesMemoryHeadroomGuardrails(): void
     {
         $this->skipIfLocalnetPresent('memory guardrail');

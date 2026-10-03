@@ -18,16 +18,17 @@ reservation attempts crossed a nullable boolean before becoming exceptions.
 
 ## Decision
 `rtorrentConfig` retains its public API, protected hooks, defaults, file IO, and
-transaction lock/rollback. `rtorrent/configRender.php` renders tokens directly;
+reservation lock. After ADR 0081 left only SCGI allocation, the multi-port
+rollback was removed. `rtorrent/configRender.php` renders tokens directly;
 `rtorrent/portReservation.php` uses one exclusive writer for random attempts and
 the ordered fallback. Username checks reuse the existing reservation validator.
 
 ## Consequences
 The sizing map, tri-state reservation result, duplicate attempt body, and duplicate
 username fallback disappear. Port ranges, random-attempt budget, exceptions,
-rollback, file modes, localnet handling, and replacement order remain unchanged.
+file modes, localnet handling, and replacement order remain unchanged.
 Literal render snapshots, memory boundary cases, a seeded fallback, and existing
-unsafe-path/rollback tests lock behavior. No production migration is needed.
+unsafe-path tests lock behavior. No production migration is needed.
 
 ## References
 - [ADR 0036](0036-pmss-owned-config-files-are-generated-from-a-template-never-parsed-and-patched.md)

@@ -43,7 +43,8 @@ Old dht/listen markers are inert, including in reconciliation. A full dht or
 listen pool cannot prevent account creation. Templates using `##dhtPort` or
 `##listenPort` are unsupported. `##dhtPort` can still have its supported
 `##dht` prefix replaced; no numeric port is substituted. The scgi
-lock, rollback, range, and cleanup behavior remain in place.
+lock, range, and cleanup behavior remain in place. With one acquired port per
+call, there is no multi-port transaction to roll back.
 
 ## References
 
