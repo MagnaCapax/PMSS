@@ -62,6 +62,19 @@ class installBootstrapSafetyTest extends TestCase
         ], $this->script);
     }
 
+    public function testFreshInstallStopsWhenUpdateFails(): void
+    {
+        $this->assertStringContainsString(implode("\n\t", [
+            'run_cmd /scripts/update.php "${UPDATE_ARGS[@]}"',
+            'update_rc=$?',
+            'if [ "$update_rc" -ne 0 ]; then',
+            "\t".'log_error "Update failed (rc=${update_rc}); see /var/log/pmss/update.log"',
+            "\t".'exit "$update_rc"',
+            'fi',
+            'run_cmd /scripts/util/setupRootCron.php',
+        ]), $this->script);
+    }
+
     public function testInstallerDoesNotDuplicateSharedSystemPrepConvergence(): void
     {
         foreach ([

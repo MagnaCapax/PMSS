@@ -641,6 +641,11 @@ if [ "$RUN_UPDATE" = true ]; then
 	log_info "Update logs: /var/log/pmss/update.log (bootstrap), /var/log/pmss-update.log (phase 2), /var/log/pmss-update.jsonl (JSON)"
 	export_update_bootstrap_env
 	run_cmd /scripts/update.php "${UPDATE_ARGS[@]}"
+	update_rc=$?
+	if [ "$update_rc" -ne 0 ]; then
+		log_error "Update failed (rc=${update_rc}); see /var/log/pmss/update.log"
+		exit "$update_rc"
+	fi
 	run_cmd /scripts/util/setupRootCron.php
 	run_cmd /scripts/util/setupPermissions.php
 	run_cmd /scripts/util/quotaFix.php
