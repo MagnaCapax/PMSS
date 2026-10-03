@@ -15,6 +15,7 @@ class MediaStackNginxRedirectTest extends TestCase
         'jellyfin',
         'komga',
         'autobrr',
+        'whisparr',
     ];
 
     private function publicProxyBlock(): string
@@ -47,6 +48,21 @@ class MediaStackNginxRedirectTest extends TestCase
             $this->assertTrue(
                 strpos($block, 'proxy_cookie_path /'.$app.' /public-##username/'.$app.';') !== false,
                 'Nginx public block must restore cookie scope for '.$app
+            );
+        }
+    }
+
+    public function testTildeProxyBlockRewritesPublicSessionCookiePaths(): void
+    {
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
+        $matches = array();
+        preg_match('/location \/~##username\/ \{.*?\n\}/s', $template, $matches);
+        $this->assertTrue(isset($matches[0]), 'Expected /~ nginx location block');
+
+        foreach (self::PUBLIC_SESSION_COOKIE_APPS as $app) {
+            $this->assertStringContainsString(
+                'proxy_cookie_path /'.$app.' /~##username/'.$app.';',
+                $matches[0]
             );
         }
     }

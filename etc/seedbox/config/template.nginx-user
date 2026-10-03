@@ -29,6 +29,7 @@ location /public-##username/ {
         proxy_cookie_path /jellyfin /public-##username/jellyfin;
         proxy_cookie_path /komga /public-##username/komga;
         proxy_cookie_path /autobrr /public-##username/autobrr;
+        proxy_cookie_path /whisparr /public-##username/whisparr;
         # Keep redirect rewriting generic so nginx does not need per-app
         # location rules for trailing-slash and similar lighttpd responses.
         proxy_redirect ~^(https?://[^/]+)?/(.+)$ /public-##username/$2;
@@ -58,6 +59,8 @@ location /~##username/ {
         proxy_cookie_path /sonarr /~##username/sonarr;
         proxy_cookie_path /jellyfin /~##username/jellyfin;
         proxy_cookie_path /komga /~##username/komga;
+        proxy_cookie_path /autobrr /~##username/autobrr;
+        proxy_cookie_path /whisparr /~##username/whisparr;
         proxy_redirect ~^(https?://[^/]+)?/(.+)$ /~##username/$2;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
