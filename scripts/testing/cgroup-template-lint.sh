@@ -45,6 +45,7 @@ check_present "$v2" "CPUQuota=%%USER_CGROUP_CPU_QUOTA%%" "CPUQuota placeholder"
 
 # v1 template rules
 check_present "$v1" "BlockIOAccounting=yes" "BlockIOAccounting (v1)"
+check_present "$v1" "IPAccounting=yes" "IPAccounting (v1; feeds per-user ingress stats)"
 check_absent "$v1" "MemoryLimit" "MemoryLimit must not appear (even v1 here)"
 check_present "$v1" "TasksMax=%%USER_CGROUP_TASKS_MAX%%" "TasksMax placeholder (v1)"
 check_present "$v1" "CPUQuota=%%USER_CGROUP_CPU_QUOTA%%" "CPUQuota placeholder (v1)"
