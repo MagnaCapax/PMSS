@@ -99,8 +99,10 @@ if (!$running) {
     // so without this cd the console opens in an inaccessible /root. Keep
     // ttyd diagnostics in the private lighttpd tree; they are surfaced only
     // when the socket never appears, not as customer-session output.
+    // lighttpd bin-copy-environment gives php-cgi only PATH/SHELL/USER, so set HOME to match the cd (GH #968).
     $spawnLog = $home.'/.lighttpd/console-error.log';
     $spawn = 'cd '.escapeshellarg($home).' 2>/dev/null || exit 1; '
+        .'export HOME='.escapeshellarg($home).'; '
         .': > '.escapeshellarg($spawnLog).' 2>/dev/null || exit 1; '
         .$cmd.' </dev/null >/dev/null 2>>'.escapeshellarg($spawnLog);
     // Fully detach so ttyd outlives this php-cgi request. Capture outer-shell

@@ -41,6 +41,19 @@ class BrowserConsoleArtifactsTest extends TestCase
         );
     }
 
+    public function testLauncherExportsHomeForTheSpawnedShell(): void
+    {
+        $src = $this->repoFile('etc/skel/www/console.php');
+        $cd = strpos($src, "'cd '.escapeshellarg(\$home)");
+        $export = strpos($src, "'export HOME='.escapeshellarg(\$home)");
+        $cmd = strpos($src, "\$cmd.' </dev/null");
+
+        $this->assertTrue($cd !== false, 'spawn must change to the customer home');
+        $this->assertTrue($export !== false, 'spawn must export the customer home');
+        $this->assertTrue($cmd !== false, 'spawn must run the ttyd command');
+        $this->assertTrue($cd < $export && $export < $cmd, 'export HOME between cd and ttyd');
+    }
+
     public function testLauncherLivenessProbeIsNotAProcessMatch(): void
     {
         $src = $this->repoFile('etc/skel/www/console.php');
