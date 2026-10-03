@@ -125,6 +125,15 @@ class BrowserConsoleArtifactsTest extends TestCase
         $this->assertStringContainsString('Try again', $src);
     }
 
+    public function testEndedSessionReturnsToLauncher(): void
+    {
+        $src = $this->repoFile('etc/skel/www/console.php');
+        $this->assertStringContainsString('disableReconnect=true', $src);
+        $this->assertStringContainsString('querySelectorAll(".xterm > div")', $src);
+        $this->assertStringContainsString('Press ⏎ to Reconnect', $src);
+        $this->assertStringContainsString('window.location.reload()', $src);
+    }
+
     public function testProxyBlockUsesLoopbackSocketUpgrade(): void
     {
         $src = $this->repoFile('etc/seedbox/config/template.lighttpd');

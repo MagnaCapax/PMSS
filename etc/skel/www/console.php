@@ -91,7 +91,7 @@ if (!$running) {
         .' -W --once --check-origin'
         .' -i '.escapeshellarg($sock)
         .' -b '.escapeshellarg($basePath)
-        .' -t fontSize=15'
+        .' -t fontSize=15 -t disableReconnect=true'
         .' '.$shellCmd;
 
     // Start the shell in the customer's HOME. The per-user lighttpd (and its
@@ -143,4 +143,18 @@ echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
     .'<title>Shell console</title>'
     .'<style>html,body{margin:0;height:100%;background:#101216}'
     .'iframe{border:0;width:100%;height:100%;display:block}</style></head>'
-    .'<body><iframe src="console/" title="'.htmlspecialchars($label, ENT_QUOTES).'"></iframe></body></html>';
+    .'<body><iframe id="terminal" src="console/" title="'.htmlspecialchars($label, ENT_QUOTES).'">'
+    .'</iframe><script>'
+    .'/* ttyd --once exits on disconnect; its in-frame retry cannot restart it. */'
+    .'setInterval(function () {'
+    .'var frame = document.getElementById("terminal");'
+    .'var page = frame.contentDocument;'
+    .'if (!page) return;'
+    .'var overlays = page.querySelectorAll(".xterm > div");'
+    .'for (var i = 0; i < overlays.length; i++) {'
+    .'if (overlays[i].textContent === "Press ⏎ to Reconnect") {'
+    .'window.location.reload(); return;'
+    .'}'
+    .'}'
+    .'}, 500);'
+    .'</script></body></html>';
