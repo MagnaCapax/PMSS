@@ -16,7 +16,11 @@ operate under fixed cost caps.
 
 The gate produced three PMSS BUILD verdicts in 33 days (September 10, 11, and
 16; none since). Issue-referencing build commits fell from 2.61 per day in
-August to 0.41 per day during September 7–October 3. On October 1, all 12
+August to 0.41 per day during September 7–October 3. August was not a healthy
+baseline either: measured against inflow, July had 53 issues filed and 47
+issue-referencing commits, and August 106 filed and 94 commits, so the build
+lane was already falling behind before September 1 and the gate change made
+it worse. On October 1, all 12
 build cycles logged “No approved issues after gate” while roughly 70 tractable
 issues were rejected per cycle. Liveness monitoring read the builder as healthy
 throughout: it ran every cycle and exited 0.
