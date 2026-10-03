@@ -27,7 +27,7 @@ if (!pmssHostnameIsValid($hostname)) {
     $hostname = 'localhost';
     $clientArtifactsEnabled = false;
 }
-$fqdn = strpos($hostname, '.pulsedmedia.com') !== false ? $hostname : $hostname.'.pulsedmedia.com';
+$fqdn = strpos($hostname, '.') !== false ? $hostname : $hostname.'.pulsedmedia.com';
 $slug = str_replace('.', '-', $fqdn);
 
 $openvpnDir   = '/etc/openvpn';

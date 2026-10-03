@@ -235,7 +235,7 @@ function pmssSystemStatusOpenvpnClientArtifactCheck(callable $isFile, string $ho
     $hostname = trim($hostname);
     if ($hostname === '') return pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname unknown');
     if (!pmssHostnameIsValid($hostname)) return pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname invalid');
-    $fqdn = strpos($hostname, '.pulsedmedia.com') !== false ? $hostname : $hostname.'.pulsedmedia.com';
+    $fqdn = strpos($hostname, '.') !== false ? $hostname : $hostname.'.pulsedmedia.com';
     $slug = str_replace('.', '-', $fqdn);
     $artifacts = ['/home/openvpn-'.$slug.'.ovpn', '/home/openvpn-'.$slug.'.crt'];
     $missing = array_values(array_map('basename', array_filter($artifacts, static function (string $path) use ($isFile): bool { return !$isFile($path); })));

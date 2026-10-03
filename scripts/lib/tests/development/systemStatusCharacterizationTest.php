@@ -557,6 +557,21 @@ final class SystemStatusCharacterizationTest extends TestCase
         );
     }
 
+    public function testSystemStatusUsesFullOpenvpnHostnameWithoutAppendingPmDomain(): void
+    {
+        $paths = [];
+        $isFile = static function (string $path) use (&$paths): bool {
+            $paths[] = $path;
+            return true;
+        };
+
+        $result = pmssSystemStatusOpenvpnClientArtifactCheck($isFile, 'seedbox.example.org');
+
+        $this->assertSame('OK', $result['status']);
+        $this->assertSame('openvpn-seedbox-example-org.ovpn, openvpn-seedbox-example-org.crt', $result['detail']);
+        $this->assertSame(['/home/openvpn-seedbox-example-org.ovpn', '/home/openvpn-seedbox-example-org.crt'], $paths);
+    }
+
     public function testSystemStatusIncludesComponentProjectionVerbatim(): void
     {
         $dependencies = $this->buildSystemStatusDependencies();

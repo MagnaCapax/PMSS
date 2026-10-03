@@ -1,7 +1,7 @@
 # ADR 0083: Require the home mount during fresh install preflight
 
 Date: 2026-10-03
-Category: provisioning
+Category: architecture
 
 ## Status
 

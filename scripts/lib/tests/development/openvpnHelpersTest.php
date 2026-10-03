@@ -8,7 +8,7 @@ class OpenvpnHelpersTest extends TestCase
     private function assertOpenvpnArtifactPathsRemainInlined(string $path, array $needles = []): void
     {
         $this->pmssAssertRepoFileContainsAllStrings($path, array_merge([
-            "strpos(\$hostname, '.pulsedmedia.com') !== false",
+            "strpos(\$hostname, '.') !== false",
             "str_replace('.', '-', \$fqdn)",
             "'/home/openvpn-'.\$slug.'.ovpn'",
             "'/home/openvpn-'.\$slug.'.crt'",

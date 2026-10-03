@@ -749,6 +749,7 @@ These scripts are primarily imperative; treat them as idempotent installers guar
 
 - openvpn.php
   - Seeds EasyRSA into `/etc/openvpn/easy-rsa`, writes vars, builds server certs/DH, renews an expired or soon-expiring server leaf under the existing CA after a PKI backup, renders server config from template, restarts service; writes client `.ovpn` and `ca.crt` to `/home`, packs `openvpn-config.tgz` into skeleton and updates user homes.
+  - Client profiles and artifact names use the hostname as given when it contains a dot; bare hostnames gain `.pulsedmedia.com`. The system status artifact probe uses the same rule.
 
 - rclone.php
   - Logic: Picks the pinned version by default, optionally fetches the latest release when requested, replaces `/usr/bin/rclone` when version mismatch, installs from the official zip.
