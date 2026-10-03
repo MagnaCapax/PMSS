@@ -114,6 +114,6 @@ function pmssPortManagerMain(array $argv): int
         pmssPortManagerLog($user, $action, $service, null, 'OK', 'released');
         return 0;
     } finally {
-        if ($lockHandle !== false) pmssLockHandleRelease($lockHandle);
+        pmssLockHandleRelease($lockHandle);
     }
 }

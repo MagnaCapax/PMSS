@@ -95,8 +95,6 @@ function pmssPortManagerAssignServicePort(string $user, string $service, ?int $p
         $status = 'assigned';
         return $port;
     } finally {
-        if ($lockHandle !== false) {
-            pmssLockHandleRelease($lockHandle);
-        }
+        pmssLockHandleRelease($lockHandle);
     }
 }
