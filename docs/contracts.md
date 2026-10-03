@@ -427,6 +427,8 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - pmssUserReconcileWebRoot(array $ctx, ?callable $logger=null): bool
   - Converges one user's managed web root under a per-user lock, preserving
     customer-owned paths and refusing unsafe symlinks or conflicting path types.
+  - A failed directory scan stops validation, ownership traversal, or skeleton
+    copying; an unreadable existing root cannot be classified as empty.
   - Emits one structured summary log line per locked run with `reason`, `mode`,
     `files_restored`, `duration_ms`, and `preserved_conflict` fields.
 - pmssEnsureLingerAndDocker(string $user): void

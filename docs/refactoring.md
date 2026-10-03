@@ -206,6 +206,11 @@ Valid scans preserve ordering, numeric keys, literal names, and caller-owned
 symlink policy. `RuntimeDirectoryEntriesTest` covers these boundaries with
 temporary fixtures; an empty directory still returns an empty array.
 
+Web-root reconciliation treats a failed directory scan as a failed traversal,
+including during skeleton validation, copy, ownership application, and root
+classification. Partial merges report a failed copy instead of proceeding to
+state migration. `UserWebRootReconcileTest` covers unreadable skeleton entries.
+
 rTorrent escalation markers are encoded before opening the destination. Failed
 JSON encoding returns `false` without creating or truncating a marker; valid
 payload bytes and retry timing remain unchanged. `rtorrentWatchdogDecisionTest`

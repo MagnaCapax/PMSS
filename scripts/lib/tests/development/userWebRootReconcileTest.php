@@ -178,6 +178,32 @@ class UserWebRootReconcileTest extends TestCase
         $this->assertFalse(file_exists($this->home.'/www/linked/secret.txt'));
         $this->assertTrue($this->pmssMessagesContain($messages, 'Refusing unsafe skeleton symlink: linked'));
     }
+    public function testUnreadableSkeletonDirectoryRefusesRestoreAndMerge(): void
+    {
+        $blocked = $this->skeleton.'/blocked';
+        $this->pmssWriteFile($blocked.'/managed.php', 'managed');
+        chmod($blocked, 0000);
+        try {
+            // Root may still scan a mode-0000 directory; the fixture needs a real scan failure.
+            if (pmssDirectoryEntriesRead($blocked) !== false) {
+                return;
+            }
+            $this->assertFalse(pmssUserWebRootReconcileTreeIsSafe($this->skeleton, $this->home, false));
+            $this->assertFalse(pmssUserWebRootReconcileApplyOwnership($blocked, $this->user));
+            $messages = [];
+            $this->assertFalse(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+            $this->assertFalse(is_dir($this->home.'/www'));
+
+            $this->pmssWriteFile($this->home.'/www/customer.php', 'customer');
+            $messages = [];
+            $this->assertFalse(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+            $this->assertSame('customer', file_get_contents($this->home.'/www/customer.php'));
+            $this->assertFalse(file_exists($this->home.'/www/blocked/managed.php'));
+            $this->assertStringContainsString('reason=restore-failed', $this->pmssReconcileSummary($messages));
+        } finally {
+            chmod($blocked, 0755);
+        }
+    }
     public function testPerUserLockSkipsWithoutChangingRoot(): void
     {
         $lockDir = getenv('PMSS_USER_WEB_ROOT_LOCK_DIR');
