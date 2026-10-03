@@ -6,6 +6,22 @@ require_once dirname(__DIR__, 2).'/certbotSetup.php';
 
 class SetupLetsEncryptTest extends TestCase
 {
+    public function testHostEmailResolutionUsesConfiguredAddressAndFleetFallback(): void
+    {
+        $config = $this->pmssMakeTempDir('pmss-certbot-email-').'/letsencrypt-email';
+        $this->assertSame('noreplies@pulsedmedia.com', \pmssSetupLetsEncryptEmailResolve('box.pulsedmedia.com', $config));
+        $this->assertSame(null, \pmssSetupLetsEncryptEmailResolve('box.example.com', $config));
+        $this->assertSame(null, \pmssSetupLetsEncryptEmailResolve('box.pulsedmedia.com.evil.test', $config));
+
+        file_put_contents($config, "owner@example.com\n");
+        $this->assertSame('owner@example.com', \pmssSetupLetsEncryptEmailResolve('box.example.com', $config));
+
+        file_put_contents($config, "bad address\n");
+        $this->assertSame(null, \pmssSetupLetsEncryptEmailResolve('box.pulsedmedia.com', $config));
+        file_put_contents($config, '');
+        $this->assertSame(null, \pmssSetupLetsEncryptEmailResolve('box.pulsedmedia.com', $config));
+    }
+
     /** Build the shared hermetic certbot setup options used by these tests. */
     private function pmssLetsEncryptTestOptions(array $overrides = []): array
     {

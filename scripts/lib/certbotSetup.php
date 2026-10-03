@@ -9,6 +9,24 @@
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/lighttpd/userFileWrite.php';
 
+/** Resolve the host ACME contact without assigning fleet mail to other installs. */
+function pmssSetupLetsEncryptEmailResolve(string $hostname, string $configPath = '/etc/seedbox/config/letsencrypt-email'): ?string
+{
+    if (file_exists($configPath) || is_link($configPath)) {
+        $email = @file_get_contents($configPath);
+        if (!is_string($email)) {
+            return null;
+        }
+        $email = trim($email);
+        return $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)
+            && preg_match('/[\r\n\0\s]/', $email) !== 1 ? $email : null;
+    }
+
+    $hostname = strtolower(trim($hostname));
+    return substr($hostname, -strlen('.pulsedmedia.com')) === '.pulsedmedia.com'
+        ? 'noreplies@pulsedmedia.com' : null;
+}
+
 /**
  * Execute one provisioning primitive and fail loudly when it does not succeed.
  */

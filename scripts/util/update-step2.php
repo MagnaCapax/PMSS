@@ -43,7 +43,7 @@ pmssRequireRelativeFiles(__DIR__.'/../lib', [
     'update/arrRootExecutionBlock.php', 'update/repositories.php', 'update/storageBenchmark.php',
     'update/systemPrep.php', 'update/services/systemd.php', 'update/services/logging.php',
     'update/services/logrotate.php', 'update/services/mountHardening.php', 'update/userMaintenance.php',
-    'update/networking.php', 'update/services/bootstrap.php', 'motd/Generator.php',
+    'update/networking.php', 'update/services/bootstrap.php', 'motd/Generator.php', 'certbotSetup.php',
 ]);
 
 requireRoot();
@@ -511,7 +511,12 @@ pmssRunProfiledCallable('Applying system service disable/mask policy (post-app)'
 // authenticated loopback defaults so the accident is not rewarded.
 pmssRunProfiledCallable('Blocking root execution of ARR applications', 'pmssEnsureArrRootExecutionBlocked', ['logmsg']);
 
-runStep('Updating Let\'s Encrypt configuration', '/scripts/util/setupLetsEncrypt.php noreplies@pulsedmedia.com');
+$letsEncryptEmail = pmssSetupLetsEncryptEmailResolve(pmssHostnameRead());
+if ($letsEncryptEmail === null) {
+    logmsg('[SKIP] no valid Let\'s Encrypt email configured in /etc/seedbox/config/letsencrypt-email');
+} else {
+    runStep('Updating Let\'s Encrypt configuration', pmssBuildCommand('/scripts/util/setupLetsEncrypt.php', [$letsEncryptEmail]));
+}
 // Drop obsolete global autodl configuration
 if (file_exists('/etc/autodl.cfg')) { unlink('/etc/autodl.cfg'); }
 
