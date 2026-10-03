@@ -209,19 +209,49 @@ if [[ -z "$target_issue" ]]; then
 	echo "[agentic-issues] candidates: raw=${raw_candidate_count} filtered=${#issue_numbers[@]} (pre-gate)" >&1
 
 	# --- Autonomous build-eligibility gate (author-independent) ---
-	# Replaces the former human author-gate (APPROVED_AUTHORS + "approved" label + MagnaCapax
-	# comment + anti-bait-and-switch). An issue is build-eligible IFF it carries the `build-ready`
-	# label — which the adversarial review applies only after the issue passes its full gate set,
-	# INCLUDING the malicious-intent classification gate. Author is irrelevant: on a public repo
-	# every author is untrusted; trust is earned by the change surviving the automated review, never
-	# granted by the author's name. This removes the human-in-loop bottleneck while keeping every
-	# automated defense (untrusted-body handling, never-weaken-validation, frozen paths, sandbox, QA
-	# security review) and the git-revertability of every commit. issue_build_ready[$num] is set from
-	# the label scan above.
+	# ADR 0082: build-ready means the review loop converged to BUILD. Alternatively, a
+	# separate-context intent check may return CLEAR for an unparked issue. That command
+	# labels anything not clear needs-investigation, excluded by the candidate query and
+	# prioritised by review lanes. Issue authors and bodies remain untrusted.
+	INTENT_CHECK_MAX_CALLS=3
+	intent_check_calls=0
+	intent_check_cap_logged=0
+	declare -A issue_clear_updated_at=()
+	intent_check_enabled=0
+	if [[ -n "${PMSS_INTENT_CHECK_CMD:-}" && -f "$PMSS_INTENT_CHECK_CMD" && -x "$PMSS_INTENT_CHECK_CMD" ]]; then
+		intent_check_enabled=1
+		echo "[agentic-issues] GATE: intent check enabled ($PMSS_INTENT_CHECK_CMD)" >&1
+	else
+		echo "[agentic-issues] GATE: intent check disabled" >&1
+	fi
 	check_issue_approved() {
 		local num="$1"
 		if [[ -n "${issue_build_ready[$num]:-}" ]]; then
 			return 0
+		fi
+		if [[ "$intent_check_enabled" == "1" && "$num" =~ ^[0-9]+$ ]]; then
+			if [[ "$intent_check_calls" -ge "$INTENT_CHECK_MAX_CALLS" ]]; then
+				if [[ "$intent_check_cap_logged" == "0" ]]; then
+					echo "[agentic-issues] GATE: intent-check call cap (3) reached this run" >&1
+					intent_check_cap_logged=1
+				fi
+			else
+				local output rc line timestamp
+				intent_check_calls=$((intent_check_calls + 1))
+				rc=0
+				output=$(timeout 300 "$PMSS_INTENT_CHECK_CMD" "$num") || rc=$?
+				if [[ "$rc" == "0" ]]; then
+					while IFS= read -r line; do
+						if [[ "$line" =~ ^CLEAR\ updated_at=([0-9TZ:+-]+)$ ]]; then
+							timestamp="${BASH_REMATCH[1]}"
+							issue_clear_updated_at["$num"]="$timestamp"
+							echo "[agentic-issues] GATE: #$num intent-check CLEAR (updated_at=$timestamp)" >&1
+							return 0
+						fi
+					done <<<"$output"
+				fi
+				echo "[agentic-issues] GATE: #$num intent-check not clear (exit=$rc)" >&1
+			fi
 		fi
 		echo "[agentic-issues] GATE: #$num not build-ready (adversarial review incl. malicious-intent gate not passed)" >&1
 		return 1
@@ -232,6 +262,10 @@ if [[ -z "$target_issue" ]]; then
 
 		local num
 		for num in "$@"; do
+			# A full tier needs no more model calls; still collect free build-ready issues.
+			if [[ ${#approved_issues[@]} -ge "$max_issues" && -z "${issue_build_ready[$num]:-}" ]]; then
+				continue
+			fi
 			if check_issue_approved "$num"; then
 				approved_issues+=("$num")
 				echo "[agentic-issues] GATE: #$num approved" >&1
@@ -314,8 +348,17 @@ ISSUE_NONCE=$(head -c 16 /dev/urandom | od -A n -t x1 | tr -d ' \n')
 # Anything larger is likely context flooding or contains embedded payloads.
 MAX_ISSUE_BODY=10240
 
+fresh_issue_numbers=()
 for num in "${issue_numbers[@]}"; do
 	echo "[agentic-issues] fetching details for #$num..." >&1
+	if [[ -z "$target_issue" && -n "${issue_clear_updated_at[$num]:-}" ]]; then
+		current_updated_at=$(gh issue view "$num" --json updatedAt --jq '.updatedAt' 2>/dev/null) || current_updated_at=""
+		if [[ "$current_updated_at" != "${issue_clear_updated_at[$num]}" ]]; then
+			echo "[agentic-issues] GATE: #$num changed after intent check (was ${issue_clear_updated_at[$num]}, now ${current_updated_at:-<unavailable>}) — skipped this cycle" >&1
+			continue
+		fi
+	fi
+	fresh_issue_numbers+=("$num")
 	# Fetch to temp file for size check before adding to context
 	issue_tmp="$OUTDIR/issue-${num}.tmp"
 	gh issue view "$num" --json title,labels,body \
@@ -339,6 +382,11 @@ for num in "${issue_numbers[@]}"; do
 	} >>"$ISSUES_FILE"
 	rm -f "$issue_tmp"
 done
+issue_numbers=("${fresh_issue_numbers[@]}")
+if [[ ${#issue_numbers[@]} -eq 0 ]]; then
+	echo "[agentic-issues] No issues left after freshness check. Skipping." >&1
+	exit 0
+fi
 
 # ============================================================
 # ISSUE BODY SANITIZATION (defense-in-depth against prompt injection)
