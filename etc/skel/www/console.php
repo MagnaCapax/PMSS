@@ -96,7 +96,9 @@ if (!$running) {
 
     // Start the shell in the customer's HOME. The per-user lighttpd (and its
     // php-cgi children) inherit cwd=/root from the root cron that starts them,
-    // so without this cd the console opens in an inaccessible /root. Keep
+    // so without this cd the console opens in an inaccessible /root. php-cgi
+    // carries no HOME either, so export the passwd home with the cd: scripts that
+    // read $HOME (install-media-stack.sh) otherwise refuse to run (GH #968). Keep
     // ttyd diagnostics in the private lighttpd tree; they are surfaced only
     // when the socket never appears, not as customer-session output.
     // lighttpd bin-copy-environment gives php-cgi only PATH/SHELL/USER, so set HOME to match the cd (GH #968).
