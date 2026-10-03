@@ -14,11 +14,31 @@
 require_once __DIR__.'/lib/runtime.php';
 pmssRequireRelativeFiles(__DIR__, ['lib/userLifecycle.php', 'lib/cli/optionParser.php']);
 
+/** Resolve a torrent directory only when every link and the final path stay in this home. */
+function pmssUserTorrentsDirectory(string $home, string $realHome, int $homeUid, string $relativeDir): ?string
+{
+    $path = $home;
+    foreach (explode('/', $relativeDir) as $part) {
+        $path .= '/'.$part;
+        $entry = @lstat($path);
+        if ($entry === false || (($entry['mode'] & 0170000) === 0120000 && $entry['uid'] !== $homeUid)) {
+            return null;
+        }
+    }
+
+    $realDir = realpath($path);
+    return $realDir !== false && is_dir($realDir) && strpos($realDir, rtrim($realHome, '/').'/') === 0
+        ? $realDir : null;
+}
+
 function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
 {
     $counts = ['rtorrent' => 0, 'deluge' => 0, 'qbittorrent' => 0, 'total' => 0];
     if (!pmssUsernameIsValid($username)) return $counts;
     $home = $homeDir.'/'.$username;
+    $realHome = realpath($home);
+    $homeStat = @stat($home);
+    if (is_link($home) || $realHome === false || $homeStat === false || !is_dir($realHome)) return $counts;
     $clientPatterns = [
         'rtorrent' => ['session/*.torrent'],
         'deluge' => ['.config/deluge/state/*.torrent', '.delugeSession/*.torrent', '.sessionDeluge/*.torrent'],
@@ -32,7 +52,10 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
     foreach ($clientPatterns as $client => $patterns) {
         $seen = [];
         foreach ($patterns as $pattern) {
-            foreach (glob($home.'/'.$pattern) ?: [] as $path) {
+            $directory = pmssUserTorrentsDirectory($home, $realHome, $homeStat['uid'], dirname($pattern));
+            if ($directory === null) continue;
+            foreach (glob($directory.'/'.basename($pattern)) ?: [] as $path) {
+                if (is_link($path)) continue;
                 $name = pathinfo(basename($path), PATHINFO_FILENAME);
                 if ($name !== '' && $name !== '.' && $name !== '..') {
                     $seen[$name] = true;

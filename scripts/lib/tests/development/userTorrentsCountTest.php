@@ -80,6 +80,54 @@ class UserTorrentsCountTest extends TestCase
         $this->assertEquals(0, $counts['total']);
     }
 
+    public function testSymlinkedSessionOutsideHomeIsSkipped(): void
+    {
+        $home = $this->homeDir();
+        $this->pmssWriteFile($home.'/bob/session/foreign.torrent', 'test');
+        $this->pmssEnsureDir($home.'/alice');
+        $this->assertTrue(symlink($home.'/bob/session', $home.'/alice/session'));
+
+        $counts = \pmssUserTorrentsCountForUser($home, 'alice');
+        $this->assertEquals(0, $counts['rtorrent']);
+        $this->assertEquals(0, $counts['total']);
+    }
+
+    public function testSymlinkedConfigParentOutsideHomeIsSkipped(): void
+    {
+        $home = $this->homeDir();
+        $this->pmssWriteFile($home.'/bob/.config/deluge/state/foreign.torrent', 'test');
+        $this->pmssWriteFile($home.'/alice/session/own.torrent', 'test');
+        $this->assertTrue(symlink($home.'/bob/.config', $home.'/alice/.config'));
+
+        $counts = \pmssUserTorrentsCountForUser($home, 'alice');
+        $this->assertEquals(0, $counts['deluge']);
+        $this->assertEquals(1, $counts['rtorrent']);
+        $this->assertEquals(1, $counts['total']);
+    }
+
+    public function testSymlinkedTorrentEntryIsSkipped(): void
+    {
+        $home = $this->homeDir();
+        $foreign = $this->pmssWriteFile($home.'/bob/session/foreign.torrent', 'test');
+        $this->pmssWriteFile($home.'/alice/session/own.torrent', 'test');
+        $this->assertTrue(symlink($foreign, $home.'/alice/session/foreign.torrent'));
+
+        $counts = \pmssUserTorrentsCountForUser($home, 'alice');
+        $this->assertEquals(1, $counts['rtorrent']);
+        $this->assertEquals(1, $counts['total']);
+    }
+
+    public function testSymlinkedDirectoryWithinHomeStillCounts(): void
+    {
+        $home = $this->homeDir();
+        $this->pmssWriteFile($home.'/alice/private-session/own.torrent', 'test');
+        $this->assertTrue(symlink($home.'/alice/private-session', $home.'/alice/session'));
+
+        $counts = \pmssUserTorrentsCountForUser($home, 'alice');
+        $this->assertEquals(1, $counts['rtorrent']);
+        $this->assertEquals(1, $counts['total']);
+    }
+
     public function testInvalidUsernameReturnsZeros(): void
     {
         $home = $this->homeDir();

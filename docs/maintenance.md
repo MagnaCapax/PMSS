@@ -18,6 +18,8 @@ are frequently used during day-to-day operations:
 - `scripts/showTraffic.php` - show per-user traffic summary (`--json` available).
 - `scripts/util/userTrafficLimit.php` - set per-user traffic limit (expects validated units).
 - `scripts/userTorrents.php` - count torrents per user (`--by-client` for breakdown).
+  Each client directory must resolve inside that user's home; links owned by
+  another user and symlinked torrent entries are skipped.
 - `scripts/addUser.php` - provision a new user account (creates services/config).
 - `scripts/suspend.php` / `scripts/unsuspend.php` - toggle user suspension state.
 - `scripts/terminateUser.php` - terminate a user account (`--confirm` required for non-interactive runs); the home and any matching `backup-<user>` recreate backup are removed synchronously.
