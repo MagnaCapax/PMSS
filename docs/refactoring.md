@@ -37,6 +37,10 @@ applied, even if the directory exists. Existing successful calls retain their
 directory and mode; callers can use their current failure path instead of
 writing into a directory with unintended permissions.
 
+Nginx's fallback self-signed certificate command accepts only a valid host name
+and quotes the complete OpenSSL subject as one shell argument. Valid host names
+retain the same certificate subject; malformed host names skip the command.
+
 Managed serialized file targets accept integer modes or decimal digit strings
 within the Unix permission range (0 through 07777). Malformed or out-of-range
 modes follow the existing failed-target callback path before any file is

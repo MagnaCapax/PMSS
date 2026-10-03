@@ -36,6 +36,16 @@ function pmssCreateNginxConfigSetupWrite(string $path, string $content): bool
     return false;
 }
 
+/** Keep the host name inside one OpenSSL subject argument. */
+function pmssNginxConfigSelfSignedCertCommand(string $hostname): ?string
+{
+    if (!pmssHostnameIsValid($hostname)) return null;
+
+    return 'openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj '
+        .escapeshellarg('/C=FI/ST=none/L=none/O=PulsedMedia/CN='.$hostname)
+        .' -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt';
+}
+
 /**
  * Ensure the default nginx site defines default_server on its listen directives.
  *
@@ -153,7 +163,8 @@ function pmssCreateNginxConfigSetup(): array
 
     if (!file_exists("/etc/nginx/ssl/nginx.crt")) {
         // Generate a self-signed cert if Let's Encrypt not present yet (ignore errors on systems without openssl)
-        @passthru('openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj "/C=FI/ST=none/L=none/O=PulsedMedia/CN=' . $serverHostname . '" -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt');
+        $command = pmssNginxConfigSelfSignedCertCommand($serverHostname);
+        if ($command !== null) @passthru($command);
     }
 
     // Apply the mode on every run; an existing directory would otherwise keep its old mode.

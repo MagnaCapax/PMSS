@@ -3,6 +3,25 @@ namespace PMSS\Tests;
 
 class NginxDefaultServerTest extends TestCase
 {
+    public function testSelfSignedCertCommandKeepsValidSubjectAndRejectsShellInput(): void
+    {
+        require_once dirname(__DIR__, 2).'/nginxConfig/setup.php';
+
+        foreach (['host', 'node.example.test', '192.0.2.1'] as $hostname) {
+            $command = \pmssNginxConfigSelfSignedCertCommand($hostname);
+            $this->assertSame(
+                'openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj '
+                    .escapeshellarg('/C=FI/ST=none/L=none/O=PulsedMedia/CN='.$hostname)
+                    .' -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt',
+                $command
+            );
+        }
+
+        foreach (['', 'node;id', 'node$(id)', 'node";id', "node\nother", "node\0other", '../node'] as $hostname) {
+            $this->assertSame(null, \pmssNginxConfigSelfSignedCertCommand($hostname));
+        }
+    }
+
     public function testGlobalConfigWritesReportFailureAndPreserveSuccessfulBytes(): void
     {
         require_once dirname(__DIR__, 2).'/nginxConfig/setup.php';
