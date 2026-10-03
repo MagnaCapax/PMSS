@@ -62,6 +62,10 @@ function pmssListManagedUsersResult(string $command = '/scripts/listUsers.php'):
     if (function_exists('pmssTestModeEnabled') && pmssTestModeEnabled() && is_string($override) && trim($override) !== '') {
         $command = trim($override);
     }
+    // Reject malformed command paths before escapeshellarg() or exec() sees them.
+    if (strpos($command, "\0") !== false) {
+        return array('exitCode' => 1, 'users' => array());
+    }
     exec(escapeshellarg($command), $lines, $exitCode);
     if ($exitCode === 0 && pmssManagedUsersOutputHasDiagnostics($lines)) {
         return array('exitCode' => 1, 'users' => array());

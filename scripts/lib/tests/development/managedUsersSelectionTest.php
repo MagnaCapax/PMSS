@@ -49,6 +49,16 @@ class ManagedUsersSelectionTest extends TestCase
         $this->assertEquals([], $result['users']);
     }
 
+    public function testListManagedUsersRejectsNulCommandPaths(): void
+    {
+        foreach (["\0".$this->listUsersScript, $this->listUsersScript."\0suffix"] as $command) {
+            $result = \pmssListManagedUsersResult($command);
+            $this->assertEquals(1, $result['exitCode']);
+            $this->assertEquals([], $result['users']);
+            $this->assertEquals([], \pmssListManagedUsers($command));
+        }
+    }
+
     public function testListManagedUsersReturnsEmptyListOnDiagnosticOutput(): void
     {
         $this->writeListUsersScript("echo \"Warning: require_once(/scripts/lib/users.php): Failed opening required\\nuser1\\n\";");
