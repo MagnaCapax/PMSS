@@ -36,6 +36,15 @@ For a Debian-based development container that can run the local validation
 suite without touching a real host, see the `Development Container` section in
 `CONTRIBUTING.md`.
 
+### Run it on your own server
+
+PMSS is the same stack Pulsed Media runs on its own servers, and it installs on any Debian 12 server you control. The step-by-step walkthrough, with screenshots of a fresh Debian 12 minimal install, post-install fix-ups and common gotchas, is on the wiki: https://wiki.pulsedmedia.com/wiki/Installing_PM_Software_Stack
+
+Before you start, check three things:
+- `/home` is its own filesystem (the Debian installer's "Separate /home partition" option does this).
+- The hostname is a fully qualified domain name.
+- You can reach the server from its console, a public IP or a 10.x network. The PMSS firewall drops traffic on the uplink from 192.168.0.0/16, 172.16.0.0/12 and 100.64.0.0/10.
+
 ### Installation
 
 Install minimal Debian system, and run following as root
