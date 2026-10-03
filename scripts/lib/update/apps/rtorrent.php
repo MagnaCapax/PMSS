@@ -214,9 +214,10 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
     
     echo "**** Killing all running rtorrent processes\n";
     # So many because of potentially updating from ancient version, who knows ... Who even knows if you try to update deb 5 machine what happens :P
-    runStep('Killing rtorrent processes', 'killall -9 rtorrent');
-    runStep('Killing rtorrent main processes', 'killall -9 "rtorrent main"');
-    runStep('Killing rtorrent binary processes', 'killall -9 /usr/local/bin/rtorrent');
+    // pkill returns 1 when nothing matches; retain errors for other failures.
+    runStep('Killing rtorrent processes', 'pkill -9 -x rtorrent || [ "$?" -eq 1 ]');
+    runStep('Killing rtorrent main processes', 'pkill -9 -x "rtorrent main" || [ "$?" -eq 1 ]');
+    runStep('Killing rtorrent binary processes', 'pkill -9 -f "^/usr/local/bin/rtorrent([[:space:]]|$)" || [ "$?" -eq 1 ]');
 
 
     if (file_exists('/etc/seedbox/config/template.rtorrent.rc')) {
