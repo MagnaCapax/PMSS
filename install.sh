@@ -252,7 +252,9 @@ export_update_bootstrap_env() {
 	fi
 }
 
+existing_install=false
 if pmssDetectExistingInstall; then
+	existing_install=true
 	log_warn "ALREADY INSTALLED -- UPDATING"
 
 	if [ "$RUN_UPDATE" != true ]; then
@@ -477,6 +479,18 @@ export DEBIAN_FRONTEND=noninteractive
 preflight_checks() {
 	local required_bytes=$((2 * 1024 * 1024 * 1024)) # 2 GiB
 	local free_bytes
+
+	if [ "$existing_install" != true ]; then
+		case "${PMSS_SKIP_HOME_MOUNT_CHECK:-}" in
+		1 | [Tt][Rr][Uu][Ee]) ;;
+		*)
+			if ! mountpoint -q /home; then
+				log_error "/home is not mounted as a separate filesystem. Mount /home before installing, or set PMSS_SKIP_HOME_MOUNT_CHECK=1 for an intentional non-standard deployment."
+				exit 1
+			fi
+			;;
+		esac
+	fi
 
 	free_bytes=$(df -Pk / | awk 'NR==2 {print $4 * 1024}')
 	if [ -n "$free_bytes" ] && [ "$free_bytes" -lt "$required_bytes" ]; then

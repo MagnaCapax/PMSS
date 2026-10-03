@@ -18,6 +18,11 @@ Interactivity contract:
 
 ## Filesystem provisioning
 
+Fresh installs stop in the bootstrap preflight unless `/home` is a mount point.
+Provision and mount it before running `install.sh`. For an intentional
+non-standard deployment, set `PMSS_SKIP_HOME_MOUNT_CHECK=1`; the same override
+is recognized by the user tools. The check also applies to `--dry-run`.
+
 `/home` must be formatted with default-or-denser inode allocation for shared
 seedbox workloads. Media stacks create many small files under application
 metadata, queues, caches, and rootless container storage, so low-inode profiles

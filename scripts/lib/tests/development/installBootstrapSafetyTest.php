@@ -75,6 +75,20 @@ class installBootstrapSafetyTest extends TestCase
         ]), $this->script);
     }
 
+    public function testHomeMountPreflightPrecedesProvisioning(): void
+    {
+        $this->assertOrderedStrings([
+            'existing_install=false',
+            'existing_install=true',
+            'preflight_checks() {',
+            'if [ "$existing_install" != true ]; then',
+            'PMSS_SKIP_HOME_MOUNT_CHECK',
+            'mountpoint -q /home',
+            "\npreflight_checks\nprint_summary",
+            'run_cmd apt update',
+        ], $this->script);
+    }
+
     public function testInstallerDoesNotDuplicateSharedSystemPrepConvergence(): void
     {
         foreach ([
