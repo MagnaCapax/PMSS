@@ -25,13 +25,14 @@ function pmssRtorrentPortReservationUsernameIsValid($user): bool
     return $user !== '' && $normalized === $user && preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user) === 1;
 }
 
-/** Return the canonical legacy reservation types in acquisition order. */
+/**
+ * Reserve only scgi: dht/listen had no template consumer and full pools blocked
+ * provisioning (ADR 0081). Their old markers are inert.
+ */
 function pmssRtorrentPortReservationSpecs(): array
 {
     return array(
         'scgi' => array('key' => 'rtorrentPort', 'min' => 4000, 'max' => 24000, 'pattern' => '/^(?:scgi_port|network\.scgi\.open_port)\s*=\s*(?:[^:\s]+:)?([^\s#]+)/i'),
-        'dht' => array('key' => 'rtorrentDhtPort', 'min' => 24001, 'max' => 44000, 'pattern' => '/^(?:dht_?port|dht\.port(?:\.set)?)\s*=\s*([^\s#]+)/i'),
-        'listen' => array('key' => 'rtorrentListenPort', 'min' => 44001, 'max' => 64000, 'pattern' => '/^(?:port_range|network\.port_range(?:\.set)?)\s*=\s*([^\s#-]+)/i'),
     );
 }
 
@@ -79,8 +80,8 @@ function pmssRtorrentPortReservationPayloadSource(array $payload): array
  * Return the stored ports a reconfigure may keep, as createConfig() input keys.
  *
  * A stored port is kept only while its reservation marker still exists, so a
- * reconfigure (plan change) keeps the account's ports instead of reserving three
- * new ones and leaving the old markers for the reconciler. A missing, malformed,
+ * reconfigure (plan change) keeps the account's scgi port instead of reserving a
+ * new one and leaving the old marker for the reconciler. A missing, malformed,
  * out-of-range or symlinked entry is left out and createConfig() reserves fresh.
  */
 function pmssRtorrentPortReservationReusable(array $payload, string $base = '/var/lib/pmss/ports'): array

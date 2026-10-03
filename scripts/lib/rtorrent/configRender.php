@@ -26,8 +26,6 @@ function pmssRtorrentConfigRender(string $template, array $config, array $resour
         '##uploadSlots' => $uploadSlots,
         '##uploadThrottleLine' => $uploadThrottleLine,
         '##scgiPort' => $config['scgiPort'],
-        '##dhtPort' => $config['dhtPort'],
-        '##listenPort' => $config['listenPort'],
         '##pex' => $config['pex'],
         '##dht' => $config['dht'],
         '##memoryMax' => max(170, $ramMiB - $gapMiB).'M',

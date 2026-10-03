@@ -34,8 +34,6 @@ class rtorrentConfigCreateConfigTest extends TestCase
             'us=##uploadSlots',
             '##uploadThrottleLine',
             'scgi=##scgiPort',
-            'dht=##dhtPort',
-            'listen=##listenPort',
             'pex=##pex',
             'dhtmode=##dht',
             'mem=##memoryMax',
@@ -46,8 +44,6 @@ class rtorrentConfigCreateConfigTest extends TestCase
         $input = [
             'ram'        => 1000,
             'scgiPort'   => 5000,
-            'dhtPort'    => 5001,
-            'listenPort' => 5002,
             'pex'        => 'auto',
             'dht'        => 'yes',
             'uploadThrottle' => 1234,
@@ -60,7 +56,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
 
         // Freeze the public render result instead of repeating its sizing formula.
         $expected = "min=24\nmax=128\nusg=168\nus=28\nthrottle.global_up.max_rate.set = 1234\n"
-            ."scgi=5000\ndht=5001\nlisten=5002\npex=auto\ndhtmode=yes\nmem=750M\n";
+            ."scgi=5000\npex=auto\ndhtmode=yes\nmem=750M\n";
 
         $this->assertEquals($expected, (string) $result['configFile']);
         $this->assertEquals($input, $result['config']);
@@ -68,6 +64,22 @@ class rtorrentConfigCreateConfigTest extends TestCase
         $defaults = new \rtorrentConfig(['custom' => true], "min=##minimumPeers\nmax=##maximumPeers\nus=##uploadSlots\nusg=##uploadSlotsGlobal\n");
         $defaultResult = $defaults->createConfig($input);
         $this->assertEquals("min=24\nmax=128\nus=28\nusg=168\n", $defaultResult['configFile']);
+    }
+
+    public function testCreateConfigDoesNotRenderUnsupportedPortTokens(): void
+    {
+        $this->skipIfLocalnetPresent('unsupported port tokens');
+        $cfg = new \rtorrentConfig([
+            'ramBlock' => 250,
+            'peers' => ['minimum' => 1, 'maximum' => 2],
+            'uploadSlots' => 1,
+        ], "scgi=##scgiPort\ndht=##dhtPort\nlisten=##listenPort\n");
+
+        $result = $cfg->createConfig(['ram' => 500, 'scgiPort' => 5000, 'dht' => 'auto', 'pex' => 'auto']);
+        // The supported ##dht token still replaces its prefix in ##dhtPort.
+        $this->assertSame("scgi=5000\ndht=autoPort\nlisten=##listenPort\n", $result['configFile']);
+        $this->assertFalse(isset($result['config']['dhtPort']));
+        $this->assertFalse(isset($result['config']['listenPort']));
     }
 
     public function testCreateConfigAppliesMemoryHeadroomGuardrails(): void
@@ -87,8 +99,6 @@ class rtorrentConfigCreateConfigTest extends TestCase
 
         $base = [
             'scgiPort'   => 5000,
-            'dhtPort'    => 5001,
-            'listenPort' => 5002,
             'pex'        => 'auto',
             'dht'        => 'yes',
         ];
@@ -120,7 +130,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
         }
     }
 
-    public function testCreateConfigKeepsLegacyPortDefaultRules(): void
+    public function testCreateConfigReservesOnlyMissingScgiPort(): void
     {
         $this->skipIfLocalnetPresent('port default');
 
@@ -128,13 +138,13 @@ class rtorrentConfigCreateConfigTest extends TestCase
             'ramBlock' => 250,
             'peers' => ['minimum' => 1, 'maximum' => 2],
             'uploadSlots' => 1,
-        ], "scgi=##scgiPort\ndht=##dhtPort\nlisten=##listenPort\n") extends \rtorrentConfig {
+        ], "scgi=##scgiPort\n") extends \rtorrentConfig {
             public $reservedTypes = [];
 
             protected function _configPortPrivate($type, $rangeStart = 2000, $rangeEnd = 65000)
             {
                 $this->reservedTypes[] = $type;
-                return ['scgi' => 4001, 'dht' => 24002, 'listen' => 44002][$type];
+                return 4001;
             }
         };
 
@@ -147,8 +157,10 @@ class rtorrentConfigCreateConfigTest extends TestCase
             'dht' => 'yes',
         ]);
 
-        $this->assertEquals(['dht', 'listen'], $cfg->reservedTypes);
-        $this->assertEquals("scgi=0\ndht=24002\nlisten=44002\n", (string) $result['configFile']);
+        $this->assertEquals([], $cfg->reservedTypes);
+        $this->assertEquals("scgi=0\n", (string) $result['configFile']);
+        $this->assertSame('', $result['config']['dhtPort']);
+        $this->assertSame(null, $result['config']['listenPort']);
     }
 
     public function testCreateConfigKeepsRenderingSilent(): void
@@ -163,8 +175,6 @@ class rtorrentConfigCreateConfigTest extends TestCase
             return $cfg->createConfig([
                 'ram' => 500,
                 'scgiPort' => 5000,
-                'dhtPort' => 5001,
-                'listenPort' => 5002,
                 'pex' => 'auto',
                 'dht' => 'yes',
             ]);
@@ -342,40 +352,35 @@ PHP;
     public function testPortReservationRefusesExhaustedOrSymlinkedRange(): void
     {
         $portRoot = $this->pmssMakeTempDir('pmss-rtorrent-ports-');
-        @mkdir($portRoot.'/dht', 0755, true);
-        file_put_contents($portRoot.'/dht/24001', '');
-        file_put_contents($portRoot.'/dht/24002', '');
+        @mkdir($portRoot.'/scgi', 0755, true);
+        file_put_contents($portRoot.'/scgi/4000', '');
+        file_put_contents($portRoot.'/scgi/4001', '');
         $cfg = $this->rtorrentPortReservationFixture($portRoot);
 
         $this->assertThrowsRuntime(static function () use ($cfg): void {
-            $cfg->reservePrivatePort('dht', 24001, 24002);
-        }, 'No available rTorrent dht port reservation slots');
+            $cfg->reservePrivatePort('scgi', 4000, 4001);
+        }, 'No available rTorrent scgi port reservation slots');
 
-        @mkdir($portRoot.'/listen', 0755, true);
-        if (!@symlink($portRoot.'/missing', $portRoot.'/listen/44001')) {
+        if (!@symlink($portRoot.'/missing', $portRoot.'/scgi/4002')) {
             throw new SkipTest('symlink fixtures unavailable');
         }
 
         $this->assertThrowsRuntime(static function () use ($cfg): void {
-            $cfg->reservePrivatePort('listen', 44001, 44001);
-        }, 'No available rTorrent listen port reservation slots');
-        $this->assertTrue(is_link($portRoot.'/listen/44001'), 'dangling symlink should remain untouched');
+            $cfg->reservePrivatePort('scgi', 4002, 4002);
+        }, 'No available rTorrent scgi port reservation slots');
+        $this->assertTrue(is_link($portRoot.'/scgi/4002'), 'dangling symlink should remain untouched');
     }
 
-    public function testCreateConfigRollsBackEveryPartialReservation(): void
+    public function testCreateConfigFailedScgiReservationCreatesNoMarkers(): void
     {
-        $this->skipIfLocalnetPresent('reservation rollback');
-
-        foreach (['dht', 'listen'] as $failType) {
-            $portRoot = $this->pmssMakeTempDir('pmss-rtorrent-transaction-');
-            $cfg = $this->rtorrentTransactionalFixture($portRoot, $failType);
-            $this->assertThrowsRuntime(static function () use ($cfg): void {
-                $cfg->createConfig(['ram' => 500, 'pex' => 'auto', 'dht' => 'auto']);
-            }, 'forced '.$failType.' reservation failure');
-
-            $this->assertFalse(file_exists($portRoot.'/scgi/4000'), 'scgi marker must unwind after '.$failType.' failure');
-            $this->assertFalse(file_exists($portRoot.'/dht/24001'), 'dht marker must unwind after '.$failType.' failure');
-        }
+        $portRoot = $this->pmssMakeTempDir('pmss-rtorrent-transaction-');
+        $cfg = $this->rtorrentTransactionalFixture($portRoot, 'scgi');
+        $this->assertThrowsRuntime(static function () use ($cfg): void {
+            $cfg->createConfig(['ram' => 500, 'pex' => 'auto', 'dht' => 'auto']);
+        }, 'forced scgi reservation failure');
+        $this->assertFalse(file_exists($portRoot.'/scgi/4000'));
+        $this->assertFalse(is_dir($portRoot.'/dht'));
+        $this->assertFalse(is_dir($portRoot.'/listen'));
     }
 
     public function testCreateConfigKeepsSuccessfulTransactionalReservations(): void
@@ -388,8 +393,31 @@ PHP;
 
         $this->assertEquals(4000, $result['config']['scgiPort']);
         $this->assertTrue(is_file($portRoot.'/scgi/4000'));
-        $this->assertTrue(is_file($portRoot.'/dht/24001'));
-        $this->assertTrue(is_file($portRoot.'/listen/44001'));
+        $this->assertFalse(isset($result['config']['dhtPort']));
+        $this->assertFalse(isset($result['config']['listenPort']));
+        $this->assertFalse(is_dir($portRoot.'/dht'));
+        $this->assertFalse(is_dir($portRoot.'/listen'));
+    }
+
+    public function testCreateConfigIgnoresFullUnusedPortPools(): void
+    {
+        $portRoot = $this->pmssMakeTempDir('pmss-rtorrent-full-ports-');
+        foreach (['dht' => [24001, 44000], 'listen' => [44001, 64000]] as $type => $range) {
+            $this->pmssEnsureDir($portRoot.'/'.$type);
+            for ($port = $range[0]; $port <= $range[1]; $port++) {
+                file_put_contents($portRoot.'/'.$type.'/'.$port, '');
+            }
+        }
+        $cfg = $this->rtorrentPortReservationFixture($portRoot);
+
+        $result = $cfg->createConfig(['ram' => 500, 'pex' => 'auto', 'dht' => 'auto']);
+
+        $this->assertTrue(is_file($portRoot.'/scgi/'.$result['config']['scgiPort']));
+        $this->assertSame(1, count(glob($portRoot.'/scgi/*')));
+        $this->assertFalse(isset($result['config']['dhtPort']));
+        $this->assertFalse(isset($result['config']['listenPort']));
+        $this->assertSame(20000, count(glob($portRoot.'/dht/*')));
+        $this->assertSame(20000, count(glob($portRoot.'/listen/*')));
     }
 
     public function testReservationReusableKeepsOnlyStoredPortsWithLiveMarkers(): void
@@ -400,12 +428,12 @@ PHP;
         }
         $stored = ['rtorrentPort' => 4100, 'rtorrentDhtPort' => '24100', 'rtorrentListenPort' => 44100];
 
-        // All three stored and reserved: all three kept (numeric strings too).
-        $this->assertEquals(['scgiPort' => 4100, 'dhtPort' => 24100, 'listenPort' => 44100], \pmssRtorrentPortReservationReusable($stored, $portRoot));
+        // Legacy dht/listen values and markers do not affect scgi reuse.
+        $this->assertEquals(['scgiPort' => 4100], \pmssRtorrentPortReservationReusable($stored, $portRoot));
 
-        // Marker gone: that type is left for a fresh reservation, the others are kept.
+        // Legacy marker removal cannot change scgi reuse.
         @unlink($portRoot.'/dht/24100');
-        $this->assertEquals(['scgiPort' => 4100, 'listenPort' => 44100], \pmssRtorrentPortReservationReusable($stored, $portRoot));
+        $this->assertEquals(['scgiPort' => 4100], \pmssRtorrentPortReservationReusable($stored, $portRoot));
 
         // New account (payload default rtorrentPort 0), missing keys, malformed and out-of-range values: nothing kept.
         $this->assertEquals([], \pmssRtorrentPortReservationReusable(['rtorrentPort' => 0], $portRoot));
@@ -417,9 +445,7 @@ PHP;
         // A directory or symlink in the marker slot is not a reservation.
         @mkdir($portRoot.'/scgi/4200', 0755, true);
         $this->assertEquals([], \pmssRtorrentPortReservationReusable(['rtorrentPort' => 4200], $portRoot));
-        if (@symlink($portRoot.'/listen/44100', $portRoot.'/listen/44200')) {
-            $this->assertEquals([], \pmssRtorrentPortReservationReusable(['rtorrentListenPort' => 44200], $portRoot));
-        }
+        $this->assertEquals([], \pmssRtorrentPortReservationReusable(['rtorrentListenPort' => 44100], $portRoot));
     }
 
     public function testCreateConfigReconfigureKeepsReservedPortsWithoutNewMarkers(): void
@@ -430,18 +456,18 @@ PHP;
         $first = $cfg->createConfig(['ram' => 500, 'pex' => 'auto', 'dht' => 'auto']);
         $stored = [
             'rtorrentPort' => $first['config']['scgiPort'],
-            'rtorrentDhtPort' => $first['config']['dhtPort'],
-            'rtorrentListenPort' => $first['config']['listenPort'],
+            'rtorrentDhtPort' => 24100,
+            'rtorrentListenPort' => 44100,
         ];
 
         $again = $cfg->createConfig(\pmssRtorrentPortReservationReusable($stored, $portRoot) + ['ram' => 1000, 'pex' => 'auto', 'dht' => 'auto']);
 
         $this->assertEquals($first['config']['scgiPort'], $again['config']['scgiPort']);
-        $this->assertEquals($first['config']['dhtPort'], $again['config']['dhtPort']);
-        $this->assertEquals($first['config']['listenPort'], $again['config']['listenPort']);
-        foreach (['scgi', 'dht', 'listen'] as $type) {
-            $this->assertEquals(1, count(glob($portRoot.'/'.$type.'/*')), $type.' reconfigure must not reserve a second marker');
-        }
+        $this->assertFalse(isset($again['config']['dhtPort']));
+        $this->assertFalse(isset($again['config']['listenPort']));
+        $this->assertEquals(1, count(glob($portRoot.'/scgi/*')), 'reconfigure must not reserve a second scgi marker');
+        $this->assertFalse(is_dir($portRoot.'/dht'));
+        $this->assertFalse(is_dir($portRoot.'/listen'));
     }
 
     public function testReservationReconcilerKeepsReferencesRecentAndUnsafeMarkers(): void
@@ -480,23 +506,35 @@ PHP;
         $this->assertFalse(file_exists($fixture['portsBase'].'/scgi/4002'), 'old unreferenced marker must be reclaimed');
         $this->assertTrue(is_file($fixture['portsBase'].'/scgi/4003'), 'recent marker must survive publication grace');
         $this->assertTrue(is_link($fixture['portsBase'].'/scgi/4004'), 'unsafe marker must remain untouched');
-        $this->assertTrue(is_file($fixture['portsBase'].'/listen/44002'), 'rendered config reference must be retained');
+        $this->assertTrue(is_file($fixture['portsBase'].'/dht/24001'), 'legacy markers must remain inert');
+        $this->assertTrue(is_file($fixture['portsBase'].'/dht/24002'));
+        $this->assertTrue(is_file($fixture['portsBase'].'/listen/44001'));
+        $this->assertTrue(is_file($fixture['portsBase'].'/listen/44002'));
     }
 
-    public function testReservationReconcilerSkipsIncompleteOwnershipSources(): void
+    public function testReservationReconcilerIgnoresLegacyPortsAndStaticRange(): void
     {
         $fixture = $this->rtorrentReconcileFixture();
-        $this->pmssWriteFile($fixture['configRoot'].'/users/dummy.json', json_encode(['rtorrentPort' => 4000]));
+        $this->pmssWriteFile($fixture['configRoot'].'/users/dummy.json', json_encode([
+            'rtorrentPort' => 4000,
+            'rtorrentDhtPort' => 'invalid',
+            'rtorrentListenPort' => 'invalid',
+        ]));
+        $this->pmssWriteFile($fixture['homeRoot'].'/dummy/.rtorrent.rc', "network.scgi.open_port = 127.0.0.1:4000\ndht.port.set = invalid\nnetwork.port_range.set = 50000-60000\n");
         $this->pmssWriteFile($fixture['portsBase'].'/dht/24001', '');
+        $this->pmssWriteFile($fixture['portsBase'].'/listen/44001', '');
         @touch($fixture['portsBase'].'/dht/24001', 1000);
+        @touch($fixture['portsBase'].'/listen/44001', 1000);
 
         $result = \pmssRtorrentPortReservationsReconcile(
             ['dummy'], $fixture['homeRoot'], $fixture['configRoot'], $fixture['portsBase'], 10000, 3600, $fixture['lockPath']
         );
 
-        $this->assertSame('skipped', $result['status']);
-        $this->assertSame('uncertain_dht_ownership', $result['reason']);
-        $this->assertTrue(is_file($fixture['portsBase'].'/dht/24001'), 'uncertainty must retain every marker');
+        $this->assertSame('ok', $result['status']);
+        $this->assertSame('', $result['reason']);
+        $this->assertSame(0, $result['removed']);
+        $this->assertTrue(is_file($fixture['portsBase'].'/dht/24001'));
+        $this->assertTrue(is_file($fixture['portsBase'].'/listen/44001'));
     }
 
     public function testReservationReconcilerSkipsMalformedStoredConfig(): void

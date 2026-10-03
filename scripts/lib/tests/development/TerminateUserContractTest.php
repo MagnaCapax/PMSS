@@ -132,8 +132,7 @@ final class TerminateUserContractTest extends TestCase
     {
         $this->pmssAssertRepoFileContractCases([
             'scripts/util/userConfig.php' => ['required' => [
-                'rtorrentDhtPort',
-                'rtorrentListenPort',
+                "'rtorrentPort' => (int) (\$configuration['config']['scgiPort'] ?? 0)",
                 'failed to persist rTorrent ports',
             ]],
             'scripts/terminateUser.php' => ['required' => [

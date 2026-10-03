@@ -145,7 +145,7 @@ try {
     $resources = pmssReadOptionalSerializedArrayFile('/etc/seedbox/config/system.rtorrent.resources', 'rTorrent resource configuration');
     $rtorrentConfig = new rtorrentConfig($resources);
     $throttle = pmssReadTorrentThrottle($user['name']);
-    // Keep the account's reserved ports across a reconfigure; only missing ones are reserved anew.
+    // Keep the account's reserved scgi port across a reconfigure.
     $configuration = $rtorrentConfig->createConfig(pmssRtorrentPortReservationReusable($payload) + [
         'ram' => $user['memory'],
         'dht' => pmssReadRequiredRegularFile('/etc/seedbox/config/user.rtorrent.defaults.dht', 'rTorrent DHT defaults'),
@@ -162,8 +162,6 @@ $rtorrentConfig->writeConfig($user['name'], $configuration['configFile']);
 $rtorrentPortsChanged = false;
 foreach (array(
     'rtorrentPort' => (int) ($configuration['config']['scgiPort'] ?? 0),
-    'rtorrentDhtPort' => (int) ($configuration['config']['dhtPort'] ?? 0),
-    'rtorrentListenPort' => (int) ($configuration['config']['listenPort'] ?? 0),
 ) as $key => $port) {
     if ($port > 0 && (!isset($payload[$key]) || (int) $payload[$key] !== $port)) {
         $payload[$key] = $port;

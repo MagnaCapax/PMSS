@@ -163,11 +163,7 @@ class rtorrentConfig
     /** Acquire missing ports as one transaction and unwind only its own markers. */
     private function configWithPortDefaults(array $config): array
     {
-        $reserve = array(
-            'scgi' => !isset($config['scgiPort']),
-            'dht' => empty($config['dhtPort']),
-            'listen' => empty($config['listenPort']),
-        );
+        $reserve = array('scgi' => !isset($config['scgiPort']));
         if (!in_array(true, $reserve, true)) {
             return $config;
         }
