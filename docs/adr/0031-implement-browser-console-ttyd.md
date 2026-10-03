@@ -85,3 +85,8 @@ Implement GH #326 as an **additive** browser console:
 - `scripts/lib/update/apps/ttyd.php`, `etc/skel/www/console.php`,
   `etc/seedbox/config/template.lighttpd`, `etc/skel/www/info.php`
 - `scripts/lib/tests/development/BrowserConsoleArtifactsTest.php`
+
+## Update 2026-10-03 (GH #807, GH #777)
+- **Entry point.** The ephemeral console is now its own in-page top-frame tab ("Console"), added by `etc/skel/www/index.php` through the per-user local frame merge and shown only when `console.php` and `/usr/bin/ttyd` both exist (ADR 0021 #2). The info tab keeps only the "Persistent (tmux)" opt-in. This supersedes the "Open console" button in Decision 3.
+- **Reuse check.** `console.php` reuses a running ttyd only when its UNIX socket accepts a connection (`pmssConsoleSocketLive()`). Process-list matching was dropped: `pgrep -f` run through `exec()` matches its own `sh -c` wrapper, and `--once` exits without unlinking the socket, so a stale socket was trusted and every launch after the first returned 503. A bare connect never reaches ttyd's WebSocket callbacks, so it does not consume the single `--once` client.
+- **One connected console per account.** Both modes share `~/.lighttpd/console.sock`; while one window is connected, a second launch reuses that ttyd and `--once` refuses the extra client.

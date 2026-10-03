@@ -111,7 +111,7 @@ if (file_exists($pmssStorageHealthNoticeLib)) {
 	<div id="pmss-console" style="margin-top:16px">
 	  <h2 style="margin:0 0 6px;font-size:1.1em">Shell console</h2>
 	  <p style="margin:0 0 10px;color:#555">Use the Console tab for a shell in your browser — no SSH client needed, runs as your own account. For a session that keeps running after you close the panel, open a persistent tmux session. Only one console window can be connected at a time.</p>
-	  <a href="console.php?mode=persist" target="_blank" rel="noopener" style="display:inline-block;padding:8px 14px;margin-left:6px;background:#3a3f4b;color:#fff;text-decoration:none;border-radius:4px">Persistent (tmux)</a>
+	  <a href="console.php?mode=persist" target="_blank" rel="noopener" style="display:inline-block;padding:8px 14px;background:#3a3f4b;color:#fff;text-decoration:none;border-radius:4px">Persistent (tmux)</a>
 	</div>
 <?php endif; ?>
 
