@@ -20,6 +20,28 @@
  * @author PMSS Team
  */
 
+/**
+ * Return true only when something accepts connections on the console socket.
+ *
+ * Neither the socket file nor the process list is a liveness signal: ttyd
+ * --once exits without unlinking its socket, and a process-list search run
+ * through exec() matches its own `sh -c` wrapper (GH #807).
+ * A bare connect never reaches ttyd's WebSocket callbacks, so it does not use
+ * up the single --once client.
+ */
+function pmssConsoleSocketLive($sock)
+{
+    if (!file_exists($sock)) {
+        return false;
+    }
+    $conn = @stream_socket_client('unix://'.$sock, $errno, $errstr, 0.5);
+    if ($conn === false) {
+        return false;
+    }
+    fclose($conn);
+    return true;
+}
+
 // Resolve the running customer from the process identity — never from request data.
 $uid  = function_exists('posix_getuid') ? posix_getuid() : null;
 $pw   = ($uid !== null && function_exists('posix_getpwuid')) ? posix_getpwuid($uid) : false;
@@ -55,19 +77,10 @@ $shellCmd = $persist ? 'tmux new -A -s console' : 'bash';
 // base-path must match the reverse-proxy prefix for asset/WebSocket resolution.
 $basePath = '/user-'.$name.'/console/';
 
-// Reuse a live console only if the ttyd process AND its socket are both present.
-// A bare pgrep match is not a liveness signal: a matched-but-dead ttyd whose
-// socket has vanished would be trusted, the spawn block skipped, and the
-// customer served a bare lighttpd mod_proxy 503 with no console-error.log
-// diagnostic (GH #789). Requiring the socket file falls through to the spawn
-// block, which clears the stale socket, respawns ttyd, and restores the
-// diagnostic. Extends ADR-0031 (only spawn failures reach the user's log).
-$running = false;
-$out = [];
-@exec('pgrep -u '.escapeshellarg($name).' -f '.escapeshellarg('ttyd .*'.$sock).' 2>/dev/null', $out, $rc);
-if ($rc === 0 && !empty($out) && file_exists($sock)) {
-    $running = true;
-}
+// Reuse a live console only if its socket accepts a connection; otherwise the
+// spawn block clears the stale socket, respawns ttyd and refreshes the
+// console-error.log diagnostic (GH #789, #807; ADR-0031).
+$running = pmssConsoleSocketLive($sock);
 
 if (!$running) {
     @unlink($sock); // clear a stale socket left by a previously exited ttyd

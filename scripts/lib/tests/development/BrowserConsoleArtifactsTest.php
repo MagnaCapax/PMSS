@@ -4,7 +4,7 @@ namespace PMSS\Tests;
 /**
  * Hermetic guards for the GH #326 browser console (ADR 0031).
  *
- * Source-inspection only — no processes spawned, no sockets, no side effects.
+ * Source inspection and local socket fixtures, without spawning ttyd.
  * Asserts the security and provisioning invariants that must not regress:
  * pinned-binary install, loopback-socket proxy, customer-tree separation,
  * no-root / no-request-data-in-command, and disabled-path fail-soft behaviour.
@@ -39,6 +39,43 @@ class BrowserConsoleArtifactsTest extends TestCase
             (bool) preg_match('/^[^\S\r\n]*(require|require_once|include|include_once)\b/m', $src),
             'console.php must contain no include/require statement (customer-tree separation)'
         );
+    }
+
+    public function testLauncherLivenessProbeIsNotAProcessMatch(): void
+    {
+        $src = $this->repoFile('etc/skel/www/console.php');
+        $this->assertStringNotContainsString('pgrep', $src);
+        $this->assertStringContainsString("stream_socket_client('unix://'", $src);
+    }
+
+    public function testLauncherSocketProbeDistinguishesStaleFromLive(): void
+    {
+        $src = $this->repoFile('etc/skel/www/console.php');
+        $this->assertTrue(
+            preg_match('/^function pmssConsoleSocketLive\(.*?^\}$/ms', $src, $match) === 1,
+            'console.php must define a standalone pmssConsoleSocketLive function'
+        );
+        if (!function_exists('pmssConsoleSocketLive')) {
+            eval($match[0]);
+        }
+
+        $dir = $this->pmssMakeTempDir('pmss-console-');
+        $sock = $dir.'/socket';
+        $this->assertTrue(strlen($sock) < 100, 'UNIX socket path must fit the platform limit');
+        $this->assertFalse(\pmssConsoleSocketLive($sock), 'missing socket must be dead');
+
+        $listener = @stream_socket_server('unix://'.$sock);
+        $this->assertTrue($listener !== false, 'expected local UNIX socket listener');
+        fclose($listener);
+        $this->assertTrue(file_exists($sock), 'closed listener must leave a stale socket fixture');
+        $this->assertFalse(\pmssConsoleSocketLive($sock), 'stale socket must be dead');
+
+        @unlink($sock);
+        $listener = @stream_socket_server('unix://'.$sock);
+        $this->assertTrue($listener !== false, 'expected live UNIX socket listener');
+        $this->assertTrue(\pmssConsoleSocketLive($sock), 'live listener must accept connections');
+        fclose($listener);
+        @unlink($sock);
     }
 
     public function testLauncherIsUnprivilegedAndInjectionSafe(): void
