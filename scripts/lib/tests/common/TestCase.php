@@ -1398,11 +1398,16 @@ PHP
     }
 
     /** Render a copied user-panel index fixture from its customer www directory. */
-    protected function pmssRenderCopiedUserPanelIndex(array $homeFlags = [], array $configDirs = []): string
+    protected function pmssRenderCopiedUserPanelIndex(
+        array $homeFlags = [],
+        array $configDirs = [],
+        array $extraWwwFiles = [],
+        array $env = []
+    ): string
     {
         $home = $this->pmssMakeUserWebHome('panel-home-');
         $sourceWww = $this->pmssRepoPath('etc/skel/www');
-        foreach (['index.php', 'pmssTabs.js', 'jquery.tabs.css', 'welcome.php'] as $file) {
+        foreach (array_merge(['index.php', 'pmssTabs.js', 'jquery.tabs.css', 'welcome.php'], $extraWwwFiles) as $file) {
             if (is_file($sourceWww.'/'.$file)) {
                 $this->assertTrue(@copy($sourceWww.'/'.$file, $home.'/www/'.$file), 'Expected copied panel fixture: '.$file);
             }
@@ -1415,8 +1420,8 @@ PHP
         }
 
         return $this->pmssRunShellCommand(
-            'cd '.escapeshellarg($home.'/www').' && '.escapeshellarg(PHP_BINARY).' index.php',
-            [],
+            'sh -c '.escapeshellarg('cd '.escapeshellarg($home.'/www').' && '.escapeshellarg(PHP_BINARY).' index.php'),
+            $env,
             '2>/dev/null'
         );
     }

@@ -47,6 +47,41 @@ class UserPanelTopFrameContractTest extends TestCase
             'ADR 0021 #3: the default (first) top-frame tab must be welcome, never a feature tab that may 503');
     }
 
+    /** ADR 0021 #2 — the console tab requires both launcher and ttyd. */
+    public function testConsoleTabShownWhenBackendPresent(): void
+    {
+        $ttyd = $this->pmssMakeTempFile('pmss-ttyd-');
+        $html = $this->pmssRenderCopiedUserPanelIndex([], [], ['console.php'], [
+            'PMSS_CONSOLE_TTYD_BIN' => $ttyd,
+            'PMSS_DISABLE_REMOTE_FRAMES' => '1',
+        ]);
+        $this->assertStringContainsString("loadFrame('console'", $html);
+        $this->assertStringNotContainsString('target="_blank"', $html);
+        $this->assertSame('welcome', $this->firstTabId($html));
+    }
+
+    /** ADR 0021 #2 — an undeployed ttyd must not advertise a console tab. */
+    public function testConsoleTabHiddenWithoutTtyd(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-ttyd-');
+        $html = $this->pmssRenderCopiedUserPanelIndex([], [], ['console.php'], [
+            'PMSS_CONSOLE_TTYD_BIN' => $dir.'/missing',
+            'PMSS_DISABLE_REMOTE_FRAMES' => '1',
+        ]);
+        $this->assertStringNotContainsString("loadFrame('console'", $html);
+    }
+
+    /** ADR 0021 #2 — the launcher must reach the user tree before the tab appears. */
+    public function testConsoleTabHiddenWithoutLauncher(): void
+    {
+        $ttyd = $this->pmssMakeTempFile('pmss-ttyd-');
+        $html = $this->pmssRenderCopiedUserPanelIndex([], [], [], [
+            'PMSS_CONSOLE_TTYD_BIN' => $ttyd,
+            'PMSS_DISABLE_REMOTE_FRAMES' => '1',
+        ]);
+        $this->assertStringNotContainsString("loadFrame('console'", $html);
+    }
+
     /** ADR 0021 #2 — a disabled app (config dir present, enable flag absent) must NOT surface a tab. */
     public function testDisabledAppHasNoTab(): void
     {

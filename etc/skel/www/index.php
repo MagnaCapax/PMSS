@@ -269,6 +269,25 @@ function pmssLocalFrameInstalledAppFramesRead($homePath = '..')
 }
 
 /**
+ * Return the browser console tab when its backend is deployed (GH #777, ADR 0031):
+ * the per-user launcher and the ttyd binary must both exist (ADR 0021 #2, same
+ * gate as the info tab). The tab opens the ephemeral console; the persistent
+ * (tmux) session stays an opt-in on the info tab. PMSS_CONSOLE_TTYD_BIN only
+ * overrides the presence check (tests); console.php always runs /usr/bin/ttyd.
+ *
+ * @return array<string,array<string,string>>
+ */
+function pmssLocalFrameConsoleFrameRead($launcherPath = 'console.php')
+{
+    $ttyd = getenv('PMSS_CONSOLE_TTYD_BIN');
+    $ttyd = (is_string($ttyd) && $ttyd !== '') ? $ttyd : '/usr/bin/ttyd';
+    if (!is_file($launcherPath) || !is_file($ttyd)) {
+        return array();
+    }
+    return array('console' => pmssLocalFrameDefinition('console.php', 'Console', 'Shell console in your browser'));
+}
+
+/**
  * Read customer-owned custom tabs.
  *
  * Each non-comment line defines: appname|tooltip|label|url.
@@ -562,7 +581,7 @@ $frameData = pmssLocalFrameCustomFramesRead();
 // TWICE. Dedup case-insensitively so a tab the master already provides is never re-added.
 $pmssFramesKeysLower = array();
 foreach (array_keys($frames) as $pmssFrameKey) { $pmssFramesKeysLower[strtolower($pmssFrameKey)] = true; }
-foreach (array(pmssLocalFrameInstalledAppFramesRead(), pmssLocalFrameProxyAppFramesRead()) as $pmssCandidateFrames) {
+foreach (array(pmssLocalFrameInstalledAppFramesRead(), pmssLocalFrameProxyAppFramesRead(), pmssLocalFrameConsoleFrameRead()) as $pmssCandidateFrames) {
     foreach ($pmssCandidateFrames as $app => $frame) {
         if (!isset($pmssFramesKeysLower[strtolower($app)]) && !isset($frameData[$app])) {
             $frameData[$app] = $frame;
