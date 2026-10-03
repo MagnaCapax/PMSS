@@ -84,15 +84,24 @@ PHP;
     public function testDisabledModePreservesBuildReadyOnly(): void
     {
         $command = $this->launcherEnv['PMSS_INTENT_CHECK_CMD'];
+        $inherited = getenv('PMSS_INTENT_CHECK_CMD');
         unset($this->launcherEnv['PMSS_INTENT_CHECK_CMD']);
-        foreach ([[], ['PMSS_INTENT_CHECK_CMD' => ''],
-            ['PMSS_INTENT_CHECK_CMD' => $this->launcherEnv['PMSS_TEST_ISSUES']]] as $env) {
-            $run = $this->select([], $env);
-            $this->assertSame(0, $run['rc'], $run['output']);
-            $this->assertStringContainsString('intent check disabled', $run['output']);
-            $this->assertStringContainsString('No approved issues after gate', $run['output']);
+        // The shell launcher inherits unspecified variables from this process.
+        putenv('PMSS_INTENT_CHECK_CMD');
+        try {
+            foreach ([[], ['PMSS_INTENT_CHECK_CMD' => ''],
+                ['PMSS_INTENT_CHECK_CMD' => $this->launcherEnv['PMSS_TEST_ISSUES']]] as $env) {
+                $run = $this->select([], $env);
+                $this->assertSame(0, $run['rc'], $run['output']);
+                $this->assertStringContainsString('intent check disabled', $run['output']);
+                $this->assertStringContainsString('No approved issues after gate', $run['output']);
+            }
+        } finally {
+            if ($inherited !== false) {
+                putenv('PMSS_INTENT_CHECK_CMD='.$inherited);
+            }
+            $this->launcherEnv['PMSS_INTENT_CHECK_CMD'] = $command;
         }
-        $this->launcherEnv['PMSS_INTENT_CHECK_CMD'] = $command;
         $this->assertSame([], $this->calls());
     }
 
