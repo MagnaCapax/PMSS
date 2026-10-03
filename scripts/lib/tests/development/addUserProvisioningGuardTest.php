@@ -3,6 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/user/add/provisioningRuntime.php';
+require_once dirname(__DIR__, 2).'/user/add/preflight.php';
 require_once dirname(__DIR__, 2).'/user/identity.php';
 
 class AddUserProvisioningGuardTest extends TestCase
@@ -52,6 +53,43 @@ class AddUserProvisioningGuardTest extends TestCase
         $lines = file($this->pmssRepoPath('scripts/addUser.php'), FILE_IGNORE_NEW_LINES);
         $this->assertTrue(is_array($lines), 'addUser.php must be readable');
         $this->assertTrue(count($lines) <= 200, 'addUser.php must stay under 200 lines');
+    }
+
+    public function testCronSpoolPreflightRemovesOnlyUnclaimedRegularFile(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-adduser-cron-');
+        $path = $dir.'/alice';
+        $orphan = static function (int $uid) {
+            return false;
+        };
+        $claimed = static function (int $uid): array {
+            return array('uid' => $uid, 'name' => 'other');
+        };
+
+        $this->assertSame('absent', \pmssAddUserCronSpoolPreflight('alice', $dir, $orphan));
+        $this->pmssWriteFile($path, 'old cron');
+        $this->assertSame('claimed', \pmssAddUserCronSpoolPreflight('alice', $dir, $claimed));
+        $this->assertSame('old cron', file_get_contents($path));
+        $this->assertSame('removed', \pmssAddUserCronSpoolPreflight('alice', $dir, $orphan));
+        $this->assertFalse(file_exists($path));
+    }
+
+    public function testCronSpoolPreflightRefusesUnsafeEntries(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-adduser-cron-');
+        $path = $dir.'/alice';
+        $orphan = static function (int $uid) {
+            return false;
+        };
+
+        $this->assertSame('unsafe', \pmssAddUserCronSpoolPreflight('../alice', $dir, $orphan));
+        $this->assertTrue(mkdir($path));
+        $this->assertSame('unsafe', \pmssAddUserCronSpoolPreflight('alice', $dir, $orphan));
+        $this->assertTrue(rmdir($path));
+        $target = $this->pmssWriteFile($dir.'/target', 'keep');
+        $this->assertTrue(symlink($target, $path));
+        $this->assertSame('unsafe', \pmssAddUserCronSpoolPreflight('alice', $dir, $orphan));
+        $this->assertSame('keep', file_get_contents($target));
     }
 
     public function testAddUserRejectsReservedRuntimeAndDaemonNames(): void
