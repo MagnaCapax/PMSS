@@ -10,6 +10,7 @@ RUN apt-get update \
         ca-certificates \
         file \
         git \
+        lua5.4 \
         php-cli \
         ripgrep \
         shellcheck \
