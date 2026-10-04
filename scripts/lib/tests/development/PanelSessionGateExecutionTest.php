@@ -3,14 +3,14 @@
  * Behavioural test for the mod_magnet panel session gate.
  *
  * PanelSessionGateSourceTest only matches source text, which is exactly how the
- * invalid Lua pattern on line 25 shipped green (issue #963): the PCRE idiom
+ * invalid Lua pattern shipped green (issue #963): the PCRE idiom
  * "($|/)" is the literal text "$|/" in a Lua pattern, so panel_user() returned
  * nil on every real path and the whole gate was inert. This test executes the
  * real panelSessionGate.lua under a stubbed `lighty` global and asserts the
- * decision it reaches, so a regression in the match or the branch order fails
+ * decisions it reaches, so a regression in the covered paths fails
  * the suite rather than passing on a source string.
  *
- * Requires a Lua interpreter (lua5.4/lua5.3/lua5.1/lua). When none is present the
+ * Requires a Lua interpreter (lua5.4/lua5.3/lua5.1/lua/luajit). When none is present the
  * test skips rather than fails, so a host without Lua stays green; CI and the dev
  * container install lua5.4 (Dockerfile, .github/workflows/ci.yml).
  *
@@ -61,7 +61,7 @@ class PanelSessionGateExecutionTest extends TestCase
      * Run the gate for one request and return its outcome.
      *
      * @param array<string,string> $headers
-     * @return array{rc:string,remote_user:string,auth:string,err:string}
+     * @return array{rc:string,remote_user:string,auth:string,location:string,err:string}
      */
     private function runGate(string $luaBinary, string $path, array $headers): array
     {
@@ -86,14 +86,15 @@ class PanelSessionGateExecutionTest extends TestCase
             ."if not ok then io.write(\"ERR=\"..tostring(rc)..\"\\n\") os.exit(0) end\n"
             ."io.write(\"RC=\"..tostring(rc)..\"\\n\")\n"
             ."io.write(\"REMOTE_USER=\"..tostring(reqEnv[\"REMOTE_USER\"])..\"\\n\")\n"
-            ."io.write(\"AUTH=\"..tostring(reqEnv[\"PMSS_PANEL_AUTH\"])..\"\\n\")\n";
+            ."io.write(\"AUTH=\"..tostring(reqEnv[\"PMSS_PANEL_AUTH\"])..\"\\n\")\n"
+            ."io.write(\"LOCATION=\"..tostring(lighty.header[\"Location\"])..\"\\n\")\n";
 
         $dir = $this->pmssMakeTempDir('panelgate');
         $driverPath = $dir.'/driver.lua';
         file_put_contents($driverPath, $driver);
 
         $output = (string) @shell_exec($luaBinary.' '.escapeshellarg($driverPath).' 2>&1');
-        $result = ['rc' => '', 'remote_user' => '', 'auth' => '', 'err' => ''];
+        $result = ['rc' => '', 'remote_user' => '', 'auth' => '', 'location' => '', 'err' => ''];
         foreach (preg_split('/\r?\n/', $output) ?: [] as $line) {
             if (strpos($line, 'RC=') === 0) {
                 $result['rc'] = substr($line, 3);
@@ -101,6 +102,8 @@ class PanelSessionGateExecutionTest extends TestCase
                 $result['remote_user'] = substr($line, 12);
             } elseif (strpos($line, 'AUTH=') === 0) {
                 $result['auth'] = substr($line, 5);
+            } elseif (strpos($line, 'LOCATION=') === 0) {
+                $result['location'] = substr($line, 9);
             } elseif (strpos($line, 'ERR=') === 0) {
                 $result['err'] = substr($line, 4);
             }
@@ -134,6 +137,7 @@ class PanelSessionGateExecutionTest extends TestCase
         // No cookie, no Authorization, Accept: text/html -> redirect to login (302).
         $result = $this->runGate($lua, '/user-bob/', ['Accept' => 'text/html']);
         $this->assertSame('302', $result['rc'], 'html visitor with no session must be redirected to login');
+        $this->assertSame('/user-bob/panelSessionLogin.php?return=/user-bob/', $result['location']);
 
         // The bare "/user-bob" form (no trailing slash) must match too — this is the
         // end-of-string case the original "$" anchor was meant to cover.
@@ -166,5 +170,11 @@ class PanelSessionGateExecutionTest extends TestCase
         $result = $this->runGate($lua, '/webdav-bob/file', ['Accept' => 'text/html']);
         $this->assertSame('nil', $result['rc']);
         $this->assertSame('nil', $result['remote_user'], 'non-panel paths must not set REMOTE_USER');
+
+        foreach (['/user-', '/user-Bob/'] as $path) {
+            $result = $this->runGate($lua, $path, ['Accept' => 'text/html']);
+            $this->assertSame('nil', $result['rc'], 'invalid panel user must delegate: '.$path);
+            $this->assertSame('nil', $result['remote_user'], 'invalid panel user must not set REMOTE_USER: '.$path);
+        }
     }
 }
