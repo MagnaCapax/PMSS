@@ -227,7 +227,7 @@ install_codex() {
 		rm -rf "$tmp"
 		return 1
 	fi
-	if ! verify_checksum "$tmp/codex.tar.gz" "codex-${arch}-unknown-linux-musl.tar.gz"; then
+	if ! verify_checksum "$tmp/codex.tar.gz" "codex-${tag}-${arch}-unknown-linux-musl.tar.gz"; then
 		fail "Codex download failed integrity check"
 		rm -rf "$tmp"
 		return 1
