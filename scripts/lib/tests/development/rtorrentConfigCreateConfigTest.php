@@ -468,6 +468,13 @@ PHP;
         @mkdir($portRoot.'/scgi/4200', 0755, true);
         $this->assertEquals([], \pmssRtorrentPortReservationReusable(['rtorrentPort' => 4200], $portRoot));
         $this->assertEquals([], \pmssRtorrentPortReservationReusable(['rtorrentListenPort' => 44100], $portRoot));
+
+        // An ordinary marker reached through a symlinked namespace is not ours.
+        $otherRoot = $this->pmssMakeTempDir('pmss-rtorrent-other-');
+        $redirectedRoot = $this->pmssMakeTempDir('pmss-rtorrent-redirected-');
+        $this->pmssWriteFile($otherRoot.'/4100', '');
+        $this->assertTrue(symlink($otherRoot, $redirectedRoot.'/scgi'));
+        $this->assertEquals([], \pmssRtorrentPortReservationReusable($stored, $redirectedRoot));
     }
 
     public function testCreateConfigReconfigureKeepsReservedPortsWithoutNewMarkers(): void

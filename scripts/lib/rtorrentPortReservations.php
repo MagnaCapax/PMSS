@@ -90,7 +90,9 @@ function pmssRtorrentPortReservationReusable(array $payload, string $base = '/va
         return array();
     }
     $marker = rtrim($base, '/').'/scgi/'.$port;
-    return is_file($marker) && !is_link($marker) ? array('scgiPort' => $port) : array();
+    // A marker beneath a redirected directory does not prove this namespace owns it.
+    return pmssPathTargetIsSafe($marker, false, true) && is_file($marker) && !is_link($marker)
+        ? array('scgiPort' => $port) : array();
 }
 
 /** Read canonical or legacy stored ownership without hiding malformed files. */
