@@ -71,26 +71,31 @@ function pmssConfigureQuotaMount(?callable $logger = null): void
         return;
     }
 
-    // The remount below applies commit= live. But when the fstab entry carries journaled-quota
-    // options (jqfmt=/usrjquota=/grpjquota=) and quota is turned on, the kernel refuses the remount —
-    // `mount -o remount` re-reads fstab and tries to re-apply the quota options, and ext4 rejects it:
-    //   "EXT4-fs: Cannot change journaled quota options when quota turned on"
-    // so the step fails rc=32 on every run and logs a spurious ERR that masks real failures in the
-    // update log. commit= and the quota options already take effect at mount/boot time, so skip the
-    // doomed, redundant remount when the fstab entry declares journaled quota. (The options live in
-    // fstab, not /proc/mounts — ext4 does not echo the journaled-quota options in the live mount
-    // string — so detection reads the fstab entry.) Non-journaled-quota mounts remount as before.
+    // Ext4 refuses to re-apply journaled-quota options once any quota type is on.
+    // A fresh install has the options in fstab but still needs this live remount
+    // before quotacheck can create aquota files. Check kernel quota state too.
     $fstabLines = pmssFstabLinesRead('/etc/fstab', $log, 'quota remount journaled-quota check');
     $fstabEntry = $fstabLines !== null ? pmssFstabMountEntryRead($fstabLines, $mount) : null;
     $fstabOptions = $fstabEntry['columns'][3] ?? '';
-    if (preg_match('/(?:^|,)(?:jqfmt=|usrjquota=|grpjquota=)/', $fstabOptions) === 1) {
-        $log('[INFO] Skipping remount for '.$mount.' (journaled quota in fstab cannot be re-applied while quota is on; commit/quota options take effect at mount time)');
+    if (pmssJournaledQuotaRemountBlocked($mount, $fstabOptions)) {
+        $log('[INFO] Skipping remount for '.$mount.' (journaled quota is active; options cannot be re-applied until the next mount)');
         pmssWarnUnexpectedQuotaFiles($mount, $log);
         return;
     }
 
     runStep('Remounting '.$mount.' to refresh quota options', sprintf('mount -o remount %s', escapeshellarg($mount)));
     pmssWarnUnexpectedQuotaFiles($mount, $log);
+}
+
+/** Skip a journaled-quota remount only when user or group quota is live. */
+function pmssJournaledQuotaRemountBlocked(string $mount, string $fstabOptions, ?callable $runner = null): bool
+{
+    if (preg_match('/(?:^|,)(?:jqfmt=|usrjquota=|grpjquota=)/', $fstabOptions) !== 1) {
+        return false;
+    }
+    // quotaon -p exits with the number of enabled quota types (0, 1, or 2).
+    $state = pmssQuotaCommandRun('quotaon -p '.escapeshellarg($mount), $runner);
+    return in_array($state['rc'], [1, 2], true);
 }
 
 /**

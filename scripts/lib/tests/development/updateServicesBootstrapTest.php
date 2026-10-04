@@ -159,4 +159,26 @@ class UpdateServicesBootstrapTest extends TestCase
             'Skipping remount for '.$mount.' (mount path not found)'
         );
     }
+
+    public function testJournaledQuotaRemountDependsOnLiveQuotaState(): void
+    {
+        $mount = '/home/test mount';
+        $options = 'noatime,usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1';
+        foreach ([0 => false, 1 => true, 2 => true, 127 => false] as $rc => $expected) {
+            $commands = [];
+            $runner = static function (string $command) use ($rc, &$commands): array {
+                $commands[] = $command;
+                return ['rc' => $rc, 'stdout' => '', 'stderr' => ''];
+            };
+            $this->assertSame($expected, \pmssJournaledQuotaRemountBlocked($mount, $options, $runner));
+            $this->assertSame(["quotaon -p '/home/test mount'"], $commands);
+        }
+
+        $called = false;
+        $this->assertFalse(\pmssJournaledQuotaRemountBlocked($mount, 'noatime', static function () use (&$called): array {
+            $called = true;
+            return ['rc' => 2, 'stdout' => '', 'stderr' => ''];
+        }));
+        $this->assertFalse($called);
+    }
 }
