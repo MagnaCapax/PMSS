@@ -7,7 +7,7 @@ PMSS now installs system-wide AI CLI binaries during updates via
 This script installs three AI coding assistants in your home directory. Each tool requires your own API key or account to use. No credentials are pre-installed or shared between users.
 
 Installed tools:
-- **Gemini CLI** (Google) - Free tier available with Google account
+- **Gemini CLI** (Google) - Requires a Gemini API key or organisation access through Google Cloud / Code Assist Standard or Enterprise
 - **Codex CLI** (OpenAI) - Requires API key or subscription
 - **Claude Code** (Anthropic) - Requires API key or subscription
 
@@ -48,13 +48,7 @@ After installation, run `ai-help` for a summary of all tools and their configura
 
 ### Gemini CLI (Google)
 
-Gemini CLI has a free tier that only requires a Google account.
-
-**Setup (free tier):**
-```bash
-gemini
-# Follow the prompts to log in with your Google account
-```
+Google stopped serving Gemini CLI requests from personal Google-account sign-in (AI Pro/Ultra and free Code Assist for individuals) on 2026-06-18, moving those users to Antigravity CLI, which this script does not install. See [Google's announcement](https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/).
 
 **Setup (API key):**
 1. Get an API key from https://aistudio.google.com
@@ -159,7 +153,7 @@ Configuration paths:
 
 ### Authentication errors
 
-- **Gemini:** Re-run `gemini` and follow the login prompts, or verify your `GEMINI_API_KEY` is set correctly.
+- **Gemini:** Verify your `GEMINI_API_KEY` is set correctly.
 - **Codex:** Verify `OPENAI_API_KEY` is set and re-run the login command:
   ```bash
   printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key

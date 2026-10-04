@@ -119,7 +119,7 @@ cat <<'BANNER'
   ╔══════════════════════════════════════════════════════╗
   ║          AI CLI Tools Installer (PMSS)              ║
   ╠══════════════════════════════════════════════════════╣
-  ║  gemini  — Google Gemini CLI (free tier available)  ║
+  ║  gemini  — Google Gemini CLI (API key)              ║
   ║  codex   — OpenAI Codex CLI                         ║
   ║  claude  — Anthropic Claude Code                    ║
   ╚══════════════════════════════════════════════════════╝
@@ -359,8 +359,7 @@ Each requires YOUR OWN API key or account — nothing is shared.
 TOOLS:
 
   gemini    Google Gemini CLI
-            Free tier: just log in with a Google account
-            Or set: export GEMINI_API_KEY="your-key-from-aistudio.google.com"
+            Set: export GEMINI_API_KEY="your-key-from-aistudio.google.com"
             Docs:   https://github.com/google-gemini/gemini-cli
 
   codex     OpenAI Codex CLI
