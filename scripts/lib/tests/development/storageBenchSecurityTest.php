@@ -311,7 +311,8 @@ PHP;
         $failure = \storageBenchmarkApplyRunResult(['test' => 'randwrite', 'ok' => false], ['ok' => false], 'fio failed');
         $log = $this->pmssMakeJsonLogPath('pmss-bench-shared-', 'benchmark-storage.jsonl');
         [$unused, $output] = $this->pmssCaptureStdout(static function () use ($log): void {
-            \storageBenchmarkDevicePreflightSkip($log, \storageBenchmarkEntryBase('2025-01-01T00:00:00Z', '', 'run'), ['model' => 'M', 'serial' => 'S', 'rota' => 1, 'size' => '1T'], '/dev/null', 'not a readable block device');
+            $entry = \storageBenchmarkEntryBase('2025-01-01T00:00:00Z', '', 'run') + ['device' => '/dev/null', 'model' => 'M', 'serial' => 'S', 'rota' => 1, 'size' => '1T'];
+            \storageBenchmarkDevicePreflightSkip($log, $entry, 'not a readable block device');
         });
         $entries = \pmssJsonLineFileRead($log);
 
@@ -321,6 +322,7 @@ PHP;
         $this->assertStringContainsString("/dev/null\tskipped: not a readable block device", $output);
         $this->assertSame('device-preflight', $entries[0]['test'] ?? '');
         $this->assertSame('not a readable block device', $entries[0]['error'] ?? '');
+        $this->assertSame('S', $entries[0]['serial'] ?? '');
     }
 
     public function testStorageBenchmarkSourceKeepsSafetyHelpers(): void
@@ -330,7 +332,7 @@ PHP;
         foreach ([
             'iostat serialized array reader' => [['storageBenchmarkIostatUtilPctRead', 'pmssReadSerializedArrayFile($path)'], ['unserialize(']],
             'file-backed checked capture' => [['storageBenchmarkRequireCommandField', 'pmssCommandCapture($command, 30)', "'free space', true"], ["\$free=(int)trim((string) shell_exec('df -PB1 ", 'storageBenchmarkRequirePositive'.'IntCommandField']],
-            'device checked capture' => [['pmssStorageHealthDiskInventoryRead()', 'storageBenchmarkDeviceSizeBytesRead', "pmssCommandCapture('blockdev --getsize64 "], ["shell_exec('lsblk -dn", "shell_exec('blockdev --getsize64 "]],
+            'device checked capture' => [['pmssStorageHealthDiskInventoryRead()', 'storageBenchmarkDeviceSizeBytesRead', "storageBenchmarkCommandFieldRead('blockdev --getsize64 "], ["shell_exec('lsblk -dn", "shell_exec('blockdev --getsize64 "]],
         ] as $label => $case) {
             $this->assertStringContainsAndOmitsStrings($case[0], $case[1], $source, $label.': ');
         }

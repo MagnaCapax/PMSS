@@ -64,8 +64,8 @@ function storageBenchmarkAppendJsonLine(string $jsonLog, array $entry): void { i
 function storageBenchmarkEntryBase(string $runTs, string $label, string $runId): array { return ['timestamp' => $runTs, 'label' => $label ?: null, 'run_id' => $runId, 'run_ts' => $runTs]; }
 function storageBenchmarkApplyRunResult(array $entry, array $res, string $fallbackError = 'unknown'): array { if ($res['ok']) $entry['metrics'] = $res['result']; else $entry['error'] = $res['error'] ?? $fallbackError; return $entry; }
 function storageBenchmarkIostatUtilPctRead(string $path): ?float { $payload = pmssReadSerializedArrayFile($path); $util = $payload['diskUtil'] ?? null; return (is_int($util) || is_float($util) || (is_string($util) && is_numeric(trim($util)))) ? (float) trim((string) $util) : null; }
-/** Validate raw command bytes before whitespace normalization can erase NULs. */
-function storageBenchmarkRequireCommandField(string $command, string $label, bool $positiveInt = false): string
+/** Read a command field, rejecting malformed raw bytes before trimming. */
+function storageBenchmarkCommandFieldRead(string $command, bool $positiveInt = false): ?string
 {
     $result = pmssCommandCapture($command, 30);
     $raw = (string) ($result['stdout'] ?? '');
@@ -73,8 +73,14 @@ function storageBenchmarkRequireCommandField(string $command, string $label, boo
     if ((int) ($result['rc'] ?? 1) !== 0 || pmssFilesystemPathHasNulByte($raw)
         || $value === '' || preg_match('/[\r\n\0]/', $value) === 1
         || ($positiveInt && (pmssUnsignedDecimalIntParse($value) ?? 0) <= 0)) {
-        storageBenchmarkFail("Error: failed to read {$label}.\n");
+        return null;
     }
+    return $value;
+}
+function storageBenchmarkRequireCommandField(string $command, string $label, bool $positiveInt = false): string
+{
+    $value = storageBenchmarkCommandFieldRead($command, $positiveInt);
+    if ($value === null) storageBenchmarkFail("Error: failed to read {$label}.\n");
     return $value;
 }
 /** Return true only for raw block-device paths safe to pass to read-only probes. */
@@ -90,20 +96,9 @@ function storageBenchmarkRegisterFileCleanup(string $path): void { register_shut
 /** Read block-device size through a checked command boundary. */
 function storageBenchmarkDeviceSizeBytesRead(string $path): ?int
 {
-    if (!storageBenchmarkDevicePathIsSafe($path)) {
-        return null;
-    }
-
-    $result = pmssCommandCapture('blockdev --getsize64 '.escapeshellarg($path), 30);
-    // Inspect the original bytes so a NUL-padded size cannot authorize raw reads.
-    $raw = (string) ($result['stdout'] ?? '');
-    $value = trim($raw);
-    if ((int) ($result['rc'] ?? 1) !== 0 || pmssFilesystemPathHasNulByte($raw)
-        || $value === '' || preg_match('/[\r\n\0]/', $value) === 1 || (pmssUnsignedDecimalIntParse($value) ?? 0) <= 0) {
-        return null;
-    }
-
-    return (int) $value;
+    if (!storageBenchmarkDevicePathIsSafe($path)) return null;
+    $value = storageBenchmarkCommandFieldRead('blockdev --getsize64 '.escapeshellarg($path), true);
+    return $value === null ? null : (int) $value;
 }
 
 function fioRun(string $file, int $size, int $runtime, array $job): array
@@ -140,7 +135,7 @@ function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string
 }
 
 function storageBenchmarkPrintFileSummary(string $targetDir, string $jsonLog, string $label, array $summary): void { echo "\n== Storage benchmark summary ".($label !== '' ? '(' . $label . ' on '.$targetDir.')' : "(on {$targetDir})")." ==\n"; echo "test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95_ms\twrite_p95_ms\n"; foreach ($summary as $row) printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n", ...$row); echo "\nJSON log: {$jsonLog}\n"; }
-function storageBenchmarkDevicePreflightSkip(string $jsonLog, array $base, array $meta, string $path, string $error): void { storageBenchmarkAppendJsonLine($jsonLog, $base + ['device' => $path, 'model' => $meta['model'], 'serial' => $meta['serial'], 'rota' => $meta['rota'], 'size' => $meta['size'], 'test' => 'device-preflight', 'ok' => false, 'error' => $error]); printf("%s\tskipped: %s\n", $path, $error); }
+function storageBenchmarkDevicePreflightSkip(string $jsonLog, array $deviceEntry, string $error): void { storageBenchmarkAppendJsonLine($jsonLog, $deviceEntry + ['test' => 'device-preflight', 'ok' => false, 'error' => $error]); printf("%s\tskipped: %s\n", $deviceEntry['device'], $error); }
 function storageBenchmarkDdSeqread(string $path, int $count, int $skip): array { $dd = sprintf('dd if=%s of=/dev/null bs=1M count=%d skip=%d iflag=direct 2>&1', escapeshellarg($path), $count, $skip); [$rc, $so, $se] = [runCommand($dd, true), $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '', $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stderr'] ?? '']; $line = trim($se !== '' ? $se : $so); $mbps = null; $secs = null; if (preg_match('/\s([0-9.]+)\s+s,\s+([0-9.]+)\s+MB\/s/', $line, $m)) { $secs = (float) $m[1]; $mbps = (float) $m[2]; } return ['rc' => $rc, 'mbps' => $mbps, 'secs' => $secs]; }
 function storageBenchmarkMedian(array $values): float { sort($values); $n = count($values); if ($n === 0) return 0.0; $m = (int) floor(($n - 1) / 2); return $n % 2 ? (float) $values[$m] : (($values[$m] + $values[$m + 1]) / 2); }
 function storageBenchmarkPeerMedian(array $peer, string $key): float { return storageBenchmarkMedian(array_filter(array_column($peer, $key), static function ($value): bool { return $value !== null; })); }
@@ -159,9 +154,9 @@ function storageBenchmarkRunDeviceTests(string $jsonLog, string $runTs, string $
     foreach (pmssStorageHealthDiskInventoryRead() as $meta) {
         $path = $meta['path'];
         $deviceEntry = $base + ['device' => $path, 'model' => $meta['model'], 'serial' => $meta['serial'], 'rota' => $meta['rota'], 'size' => $meta['size']];
-        if (!storageBenchmarkDevicePathIsSafe($path) || !is_readable($path) || @filetype($path) !== 'block') { storageBenchmarkDevicePreflightSkip($jsonLog, $base, $meta, $path, 'not a readable block device'); continue; }
+        if (!storageBenchmarkDevicePathIsSafe($path) || !is_readable($path) || @filetype($path) !== 'block') { storageBenchmarkDevicePreflightSkip($jsonLog, $deviceEntry, 'not a readable block device'); continue; }
         $size = storageBenchmarkDeviceSizeBytesRead($path);
-        if ($size === null) { storageBenchmarkDevicePreflightSkip($jsonLog, $base, $meta, $path, 'unable to determine block device size'); continue; }
+        if ($size === null) { storageBenchmarkDevicePreflightSkip($jsonLog, $deviceEntry, 'unable to determine block device size'); continue; }
         $count = (int) floor($ddSizeBytes / (1024 * 1024));
         $skip = $size > ($count * 1024 * 1024 + 4 * 1024 * 1024) ? random_int(0, (int) floor(($size - $count * 1024 * 1024) / (1024 * 1024))) : 0;
         $dd = storageBenchmarkDdSeqread($path, $count, $skip);
