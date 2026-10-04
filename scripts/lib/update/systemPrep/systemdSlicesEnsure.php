@@ -142,7 +142,13 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         } elseif ($mode !== 'v2' && is_numeric($policy['ioLatencyMs'] ?? null) && (int) $policy['ioLatencyMs'] > 0) {
             $log('[SKIP] IODeviceLatencyTargetSec skipped on cgroup v1');
         }
-        $raw = strtr((string)@file_get_contents($tpl), $repl);
+        $template = is_file($tpl) ? @file_get_contents($tpl) : false;
+        if ($template === false) {
+            // A non-file or unreadable template must not replace a working drop-in.
+            $log('[WARN] Unable to read slice template: '.$tpl);
+            return;
+        }
+        $raw = strtr($template, $repl);
         // Append per-mount device throttles and weights from policy
         if (is_array($policy['mounts'] ?? null)) {
             $append = [];

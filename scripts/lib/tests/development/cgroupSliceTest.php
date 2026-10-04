@@ -116,6 +116,28 @@ class cgroupSliceTest extends TestCase
         $this->assertTrue(!file_exists($fixture['dropDir'].'/15-pmss.conf'));
     }
 
+    public function testUnreadableTemplatePreservesExistingDropin(): void
+    {
+        $fixture = $this->pmssSystemdSliceFixturePrepare([
+            'mode' => 'v1',
+            'v1Template' => null,
+        ]);
+        $template = $fixture['cfgDir'].'/template.cgroup.user-slice.v1.conf';
+        mkdir($template);
+        $target = $fixture['dropDir'].'/15-pmss.conf';
+        file_put_contents($target, "[Slice]\nTasksMax=4096\n");
+        $messages = [];
+
+        $this->pmssWithEnv($fixture['env'], function () use (&$messages): void {
+            \pmssEnsureSystemdSlices($this->pmssMakeArrayLogger($messages));
+        });
+
+        $this->assertSame("[Slice]\nTasksMax=4096\n", file_get_contents($target));
+        $this->assertTrue((bool) array_filter($messages, function ($message): bool {
+            return strpos($message, 'Unable to read slice template:') !== false;
+        }));
+    }
+
     public function testTasksMaxDefaultScalesWithHostCapacity(): void
     {
         $tplBody = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
