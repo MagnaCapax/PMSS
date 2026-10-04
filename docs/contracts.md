@@ -1003,7 +1003,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
     `###ADDUSER_JSON:{...}` with explicit `success`/`exit_code` fields for automation.
 
 - scripts/changePw.php [--jsonl] USERNAME [PASSWORD]
-  - Behavior: Sets Unix password (generated if omitted) and per-user htpasswd; prints the password.
+  - Behavior: Sets the Unix password (generated if omitted), writes the per-user htpasswd and any existing qBittorrent config with the account's privileges, and prints the password.
     With `--jsonl`, suppresses human status lines and emits one JSON object with the new credential, sync return codes, and `qbittorrent_updated` (`true` when the existing qBittorrent config was updated, `false` when no qBittorrent config was present, `null` before that sync step is reached).
 
 - scripts/unsuspend.php USERNAME
@@ -1020,13 +1020,24 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Safety: Direct cleanup helpers reject NUL-containing paths and skip malformed/out-of-range rTorrent port values before unlinking reservation files. The recursive purge step builder accepts only exact managed home or recreate-backup paths for valid usernames; invalid paths throw before a shell step is built.
 
 - scripts/recreateUser.php USERNAME RAM_MiB QUOTA_GiB
-  - Behavior: Kills user processes; if `/home/<user>` exists, moves to `/home/backup-<user>`;
-    recreates from `/etc/skel`, ensures dirs (`data`, `session`, `.lighttpd`);
-    re-applies configs (`userConfig.php`, lighttpd/nginx, permissions);
-    restores authoritative billing/contact files (`.billingServiceId`, legacy
-    `.billingId`, `.billingClientId`, and `.notifyEmail`) before nginx regeneration,
-    immediately reapplies `root:<user> 0640`, then restores `data`, `session`,
-    and `.htpasswd` when available; validates ownership.
+  - Pre-flight: Before backup handling or process termination, exclusive private write probes must succeed in `/home`, the port runtime directory (or its parent before creation), and `/etc`; failure names the path and leaves the account untouched.
+  - Behavior: Acquires a per-account runtime lock, then kills user processes;
+    if `/home/<user>` exists, makes it private to root
+    and moves it within `/home` to `backup-<user>`. Rebuilds from `/etc/skel` with the new
+    home private to root. Renames `data`, `session`, and `.local/share/pmss` from the
+    backup into vacant destinations (including skeleton directories holding only
+    a regular `.gitkeep`, which is removed), then restores root-owned billing/contact
+    files (`.billingServiceId`, legacy `.billingId`,
+    `.billingClientId`, and `.notifyEmail`) and regular `.htpasswd`. Billing
+    files retain `root:<user> 0640`. Billing sources outside the file-type or
+    ownership contract stay in the backup and are reported.
+    The home is handed to the user only after restore, before service configuration,
+    nginx regeneration, and permissions. Ownership is validated, then the home
+    remains account-owned for the `changePw.php` password reset. The backup stays root-private during the rebuild;
+    after the password step succeeds, its top-level directory is returned to
+    `<user>:<user> 0700` so the account can reach files left in it. It remains
+    root-private on failure. Per-user config overrides stay in the backup and
+    their paths are printed for manual review. A missing home leaves any prior backup alone.
 
 ---
 

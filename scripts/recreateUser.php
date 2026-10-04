@@ -36,6 +36,8 @@ if (substr(__FILE__, 0, 3) === "\xEF\xBB\xBF") {
 /* ===== 1. CLI parsing ===== */
 require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/shell.php';
+require_once __DIR__.'/lib/user/recreateRestore.php';
+require_once __DIR__.'/lib/portManager.php';
 $userLifecycleLib = __DIR__.'/lib/userLifecycle.php';
 if (is_file($userLifecycleLib)) {
     require_once $userLifecycleLib;
@@ -97,6 +99,24 @@ if ($homeExists) {
     }
 }
 
+// Probe the real port directory when present; its parent is the write target
+// when the port allocator has yet to create that directory.
+$portDir = pmssPortManagerReservationPath();
+$runtimeWriteDir = $portDir === '' ? $portDir : (is_dir($portDir) ? $portDir : dirname($portDir));
+try {
+    pmssRecreateRequireWritableDirectories(['/home', $runtimeWriteDir, '/etc']);
+} catch (RuntimeException $error) {
+    fwrite(STDERR, $error->getMessage()."\n");
+    exit(1);
+}
+
+// A second rebuild of the same account must wait until this one has finished.
+$recreateLock = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-userRecreate-'.$userName.'.lock'), true);
+if ($recreateLock === false) {
+    fwrite(STDERR, "Rebuild already running or lock unavailable for {$userName}\n");
+    exit(1);
+}
+
 // Handle a leftover backup-<user> from a PRIOR rebuild. Policy (2026-07-23): the backup
 // persists until terminateUser reclaims it or the NEXT recreateUser supersedes it - it no
 // longer blocks a rebuild. We NEVER delete it up-front: a failed prior rebuild can leave
@@ -123,22 +143,14 @@ if (file_exists($backupDir)) {
     }
 }
 
-function ensureDir(string $dir, string $owner): void
-{
-    if (!is_dir($dir)) {
-        if (!@mkdir($dir, 0755, true) && !is_dir($dir)) {
-            fwrite(STDERR, "Unable to create required directory: {$dir}\n");
-            exit(1);
-        }
-        pmssRunOrExit('chown -R ' . escapeshellarg($owner) . ':' . escapeshellarg($owner) . ' ' . escapeshellarg($dir));
-    }
-}
-
 /* ===== 5. Begin ===== */
 echo "[*] Killing processes for {$userName}\n";
 pmssRunOrExit('pkill -9 -u ' . escapeshellarg($userName) . ' || true');
 
 if ($homeExists) {
+    // Keep the archive private while customer state is moved into the new home.
+    pmssRunOrExit('chown root:root ' . escapeshellarg($homeDir));
+    pmssRunOrExit('chmod 0700 ' . escapeshellarg($homeDir));
     echo "[*] Moving {$homeDir} to {$backupDir}\n";
     pmssRunOrExit('mv ' . escapeshellarg($homeDir) . ' ' . escapeshellarg($backupDir));
 } else {
@@ -152,14 +164,35 @@ if (!is_dir($homeDir)) {
     fwrite(STDERR, "Validation failed: homeDir missing after skeleton copy\n");
     exit(1);
 }
-pmssRunOrExit('chown -R ' . escapeshellarg($userName) . ':' . escapeshellarg($userName) . ' ' . escapeshellarg($homeDir));
+// The home stays private to root until all account state has been restored.
+pmssRunOrExit('chown root:root ' . escapeshellarg($homeDir));
+pmssRunOrExit('chmod 0700 ' . escapeshellarg($homeDir));
+pmssRunOrExit('find ' . escapeshellarg($homeDir) . ' -mindepth 1 -exec chown -h ' .
+    escapeshellarg($userName.':'.$userName) . ' {} +');
 
-/* 6a. Guarantee required sub-dirs */
-ensureDir("{$homeDir}/data",    $userName);
-ensureDir("{$homeDir}/session", $userName);
-ensureDir("{$homeDir}/.lighttpd", $userName);
+/* ===== 7. Restore account state ===== */
+$uid = (int) $passwd['uid'];
+$gid = (int) $passwd['gid'];
+try {
+    if ($homeExists) {
+        echo "[*] Restoring data and session\n";
+    }
+    $onBilling = static function (): void {
+        echo "[*] Restoring billing identities\n";
+    };
+    foreach (pmssRecreateRestoreHome($homeDir, $backupDir, $homeExists, $uid, $gid, 0, 0, $onBilling) as $path) {
+        echo "[i] Left in backup: {$path}\n";
+    }
+} catch (RuntimeException $error) {
+    fwrite(STDERR, $error->getMessage()."\n");
+    exit(1);
+}
 
-/* ===== 7. Service config ===== */
+// Only the top-level handoff makes the restored tree reachable by the account.
+pmssRunOrExit('chown ' . escapeshellarg($userName.':'.$userName) . ' ' . escapeshellarg($homeDir));
+pmssRunOrExit('chmod 0770 ' . escapeshellarg($homeDir));
+
+/* ===== 8. Service config ===== */
 pmssRunOrExit(sprintf(
     '/scripts/util/userConfig.php %s %d %d',
     escapeshellarg($userName),
@@ -169,44 +202,10 @@ pmssRunOrExit(sprintf(
 pmssRunOrExit('/scripts/util/setupUserHomePermissions.php ' . escapeshellarg($userName));
 pmssRunOrExit('/scripts/util/userConfigLighttpd.php ' . escapeshellarg($userName));
 
-/* Restore authoritative provisioning artifacts before dependent config is rendered. */
-if ($homeExists) {
-    echo "[*] Restoring billing identities\n";
-    foreach (['.billingServiceId', '.billingId', '.billingClientId', '.notifyEmail'] as $billingFileName) {
-        $sourcePath = "{$backupDir}/{$billingFileName}";
-        if (!is_file($sourcePath) || is_link($sourcePath)) {
-            continue;
-        }
-
-        $destinationPath = "{$homeDir}/{$billingFileName}";
-        pmssRunOrExit('cp ' . escapeshellarg($sourcePath) . ' ' . escapeshellarg($destinationPath));
-        pmssRunOrExit('chown ' . escapeshellarg('root:'.$userName) . ' ' . escapeshellarg($destinationPath));
-        pmssRunOrExit('chmod 0640 ' . escapeshellarg($destinationPath));
-    }
-}
-
 pmssRunOrExit('/scripts/util/createNginxConfig.php --user ' . escapeshellarg($userName));
 pmssRunOrExit('/scripts/util/userPermissions.php ' . escapeshellarg($userName));
 
-/* ===== 8. Restore data (if we had any) ===== */
-if ($homeExists) {
-    echo "[*] Restoring data and session\n";
-    foreach (['data', 'session'] as $dir) {
-        $src = "{$backupDir}/{$dir}";
-        $dst = "{$homeDir}/{$dir}";
-        if (is_dir($src)) {
-            pmssRunOrExit('rsync -a ' . escapeshellarg($src . '/') . ' ' . escapeshellarg($dst . '/'));
-        }
-    }
-    if (is_file("{$backupDir}/.lighttpd/.htpasswd")) {
-        pmssRunOrExit('cp ' . escapeshellarg("{$backupDir}/.lighttpd/.htpasswd") . ' ' .
-            escapeshellarg("{$homeDir}/.lighttpd/"));
-    }
-}
-
 /* ===== 9. Ownership sanity ===== */
-$uid = $passwd['uid'];
-$gid = $passwd['gid'];
 $stat = @stat($homeDir);
 if (!is_array($stat)) {
     fwrite(STDERR, "Validation failed: unable to stat homeDir\n");
@@ -223,7 +222,25 @@ if ($password !== null && $password !== '') {
     $pwArgs .= ' ' . escapeshellarg($password);
 }
 echo "[*] Setting password\n";
-pmssRunOrExit('php ' . __DIR__ . '/changePw.php ' . $pwArgs);
+// The home remains account-owned so changePw can write the credential as that account.
+$credentialPath = "{$homeDir}/.lighttpd/.htpasswd";
+if (!pmssRecreateCredentialPathIsSafe($credentialPath)) {
+    fwrite(STDERR, "Refusing unsafe credential path: {$credentialPath}\n");
+    $passwordRc = 1;
+} else {
+    $passwordRc = pmssRun('php ' . __DIR__ . '/changePw.php ' . $pwArgs, false);
+}
+if ($passwordRc !== 0) {
+    fwrite(STDERR, "Password update failed (rc={$passwordRc}) for {$userName}\n");
+    exit($passwordRc);
+}
+
+if ($homeExists) {
+    // No rebuild step reads this archive again; return its remaining files to the account.
+    pmssRequireSafeRecreateUserPath($backupDir, 'backup');
+    pmssRunOrExit('chown -h ' . escapeshellarg($userName.':'.$userName) . ' ' . escapeshellarg($backupDir));
+    pmssRunOrExit('chmod 0700 ' . escapeshellarg($backupDir));
+}
 
 /* ===== 11. Reclaim the superseded prior backup (only after the new backup exists) ===== */
 // The current home has now been safely moved into {$backupDir} and the rebuild has passed

@@ -16,10 +16,16 @@ function pmssPortManagerDefaultPath(string $leaf, string $productionPath): strin
     return (is_string($testRoot) && $testRoot !== '' ? rtrim($testRoot, '/') : sys_get_temp_dir()).'/'.$leaf;
 }
 
+/** Resolve the shared service-port reservation path without creating it. */
+function pmssPortManagerReservationPath(): string
+{
+    return rtrim(pmssResolvePathFromEnv('PMSS_PORT_MANAGER_DIR', pmssPortManagerDefaultPath('port-manager', '/etc/seedbox/runtime/ports')), '/');
+}
+
 /** Resolve and initialize the shared service-port reservation directory. */
 function pmssPortManagerReservationDir(): ?string
 {
-    $portDir = rtrim(pmssResolvePathFromEnv('PMSS_PORT_MANAGER_DIR', pmssPortManagerDefaultPath('port-manager', '/etc/seedbox/runtime/ports')), '/');
+    $portDir = pmssPortManagerReservationPath();
     if (!pmssPathTargetIsSafe($portDir, true) || !pmssDirEnsureExists($portDir, 0755) || !is_dir($portDir) || is_link($portDir)) {
         return null;
     }
