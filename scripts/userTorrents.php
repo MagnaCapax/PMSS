@@ -31,6 +31,23 @@ function pmssUserTorrentsDirectory(string $home, string $realHome, int $homeUid,
         ? $realDir : null;
 }
 
+/** List unique torrent names only while each entry still resolves inside the user home. */
+function pmssUserTorrentsEntryNames(string $directory, string $filePattern, string $realHome): array
+{
+    $seen = [];
+    foreach (glob($directory.'/'.$filePattern) ?: [] as $path) {
+        if (is_link($path)) continue;
+        $realPath = realpath($path);
+        if ($realPath === false || strpos($realPath, rtrim($realHome, '/').'/') !== 0) continue;
+        $name = pathinfo(basename($path), PATHINFO_FILENAME);
+        if ($name !== '' && $name !== '.' && $name !== '..') {
+            $seen[$name] = true;
+        }
+    }
+
+    return array_keys($seen);
+}
+
 function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
 {
     $counts = ['rtorrent' => 0, 'deluge' => 0, 'qbittorrent' => 0, 'total' => 0];
@@ -54,12 +71,8 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
         foreach ($patterns as $pattern) {
             $directory = pmssUserTorrentsDirectory($home, $realHome, $homeStat['uid'], dirname($pattern));
             if ($directory === null) continue;
-            foreach (glob($directory.'/'.basename($pattern)) ?: [] as $path) {
-                if (is_link($path)) continue;
-                $name = pathinfo(basename($path), PATHINFO_FILENAME);
-                if ($name !== '' && $name !== '.' && $name !== '..') {
-                    $seen[$name] = true;
-                }
+            foreach (pmssUserTorrentsEntryNames($directory, basename($pattern), $realHome) as $name) {
+                $seen[$name] = true;
             }
         }
         $counts[$client] = count($seen);

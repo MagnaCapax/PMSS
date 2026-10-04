@@ -13,6 +13,29 @@ class UserTorrentsCountTest extends TestCase
 
     private function homeDir(): string { return $this->tempDir.'/home'; }
 
+    public function testEntryNamesInsideHomeAreCounted(): void
+    {
+        $directory = $this->homeDir().'/alice/session';
+        $this->pmssWriteFile($directory.'/a.torrent', 'test');
+        $this->pmssWriteFile($directory.'/b.torrent', 'test');
+        $this->assertSame(['a', 'b'], \pmssUserTorrentsEntryNames($directory, '*.torrent', realpath($this->homeDir().'/alice')));
+
+        $counts = \pmssUserTorrentsCountForUser($this->homeDir(), 'alice');
+        $this->assertEquals(2, $counts['rtorrent']);
+        $this->assertEquals(2, $counts['total']);
+    }
+
+    public function testEntryNamesSkipDirectoryWithSymlinkedComponentOutsideHome(): void
+    {
+        $home = $this->homeDir().'/alice';
+        $outside = $this->tempDir.'/outside';
+        $this->pmssWriteFile($outside.'/session/foreign.torrent', 'test');
+        $this->pmssEnsureDir($home);
+        $this->assertTrue(symlink($outside, $home.'/linked'));
+
+        $this->assertSame([], \pmssUserTorrentsEntryNames($home.'/linked/session', '*.torrent', realpath($home)));
+    }
+
     public function testCountsAllClientsAndTotals(): void
     {
         $home = $this->homeDir();
