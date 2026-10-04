@@ -523,7 +523,7 @@ Bootstrap helpers from install-time env (Phase 2):
 
 ## Networking
 
-- pmssEnsureNetworkTemplate(?callable $logger=null): void → writes default PHP array config to `/etc/seedbox/config/network` when missing (eth0, speed=1000, throttle defaults).
+- pmssEnsureNetworkTemplate(?callable $logger=null, ?callable $routeReader=null): void → writes default PHP array config to `/etc/seedbox/config/network` when missing (first safe non-tunnel default-route interface, falling back to eth0; speed=1000 and throttle defaults). Existing config is not rewritten.
 - pmssApplyNetworkConfig(): void → runs `/scripts/util/setupNetwork.php` to render/apply FireQOS config.
 
 - detectPrimaryInterface(): string → from config or `ip route` default iface (fallback `eth0`).

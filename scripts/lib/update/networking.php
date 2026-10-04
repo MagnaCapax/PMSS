@@ -17,11 +17,27 @@
 
 require_once __DIR__.'/logging.php';
 require_once __DIR__.'/managedPath.php';
+require_once __DIR__.'/../network/interface.php';
+
+/** Select the first safe, non-tunnel device on a default route. */
+function pmssNetworkDefaultRouteInterface(string $routes): string
+{
+    foreach (explode("\n", $routes) as $route) {
+        if (preg_match('/^default\s+.*\bdev\s+(\S+)/', trim($route), $matches) !== 1) {
+            continue;
+        }
+        $interface = pmssNetworkInterfaceNameNormalize($matches[1]);
+        if ($interface !== '' && preg_match('/^(tun|tap|wg)/', $interface) !== 1) {
+            return $interface;
+        }
+    }
+    return 'eth0';
+}
 
 /**
  * Seed the default network configuration file when missing.
  */
-function pmssEnsureNetworkTemplate(?callable $logger = null): void
+function pmssEnsureNetworkTemplate(?callable $logger = null, ?callable $routeReader = null): void
 {
     $log  = $logger ?: 'logMessage';
     $path = pmssResolvePathFromEnv('PMSS_NETWORK_CONFIG', '/etc/seedbox/config/network');
@@ -36,6 +52,9 @@ function pmssEnsureNetworkTemplate(?callable $logger = null): void
         $log('[WARN] Network configuration template missing: '.$templatePath);
         return;
     }
+    $routes = $routeReader ? $routeReader() : shell_exec('/sbin/ip -4 route show default 2>/dev/null');
+    $interface = pmssNetworkDefaultRouteInterface((string) $routes);
+    $template = str_replace('##INTERFACE##', $interface, $template);
     if (substr($template, -1) !== "\n") {
         $template .= PHP_EOL;
     }
