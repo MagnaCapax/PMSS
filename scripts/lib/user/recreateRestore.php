@@ -39,6 +39,8 @@ function pmssRecreateRequireWritableDirectories(array $directories): void
 function pmssRecreateHasLinkedParent(string $path): bool
 {
     for ($parent = dirname($path); $parent !== dirname($parent); $parent = dirname($parent)) {
+        // A shell rebuild step may have replaced a parent since its last PHP check.
+        clearstatcache(true, $parent);
         if (is_link($parent)) {
             return true;
         }
@@ -49,6 +51,8 @@ function pmssRecreateHasLinkedParent(string $path): bool
 /** Require the top-level restore trees to be inaccessible to the account. */
 function pmssRecreateRequirePrivateDirectory(string $path, int $ownerUid): void
 {
+    // Shell chown/chmod does not invalidate PHP's cached lstat.
+    clearstatcache(true, $path);
     $stat = @lstat($path);
     if (is_link($path) || !is_array($stat) || ($stat['mode'] & 0170000) !== 0040000
         || $stat['uid'] !== $ownerUid || ($stat['mode'] & 0077) !== 0) {
@@ -59,6 +63,8 @@ function pmssRecreateRequirePrivateDirectory(string $path, int $ownerUid): void
 /** Accept an absent or regular credential file beneath real directories. */
 function pmssRecreateCredentialPathIsSafe(string $path): bool
 {
+    // Service configuration runs in shell commands after the restore checks.
+    clearstatcache(true, $path);
     return !pmssRecreateHasLinkedParent($path) && !is_link($path)
         && (!file_exists($path) || is_file($path));
 }

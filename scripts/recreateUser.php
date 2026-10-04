@@ -72,6 +72,8 @@ $backupDir = "/home/backup-{$userName}";
 
 function pmssRequireSafeRecreateUserPath(string $path, string $label): void
 {
+    // Shell copy and move steps may have changed a path since its last PHP check.
+    clearstatcache(true, $path);
     if (is_link($path)) {
         fwrite(STDERR, "Refusing to operate on symlinked {$label} path: {$path}\n");
         exit(1);
@@ -206,6 +208,8 @@ pmssRunOrExit('/scripts/util/createNginxConfig.php --user ' . escapeshellarg($us
 pmssRunOrExit('/scripts/util/userPermissions.php ' . escapeshellarg($userName));
 
 /* ===== 9. Ownership sanity ===== */
+// Service configuration changed the home through shell commands.
+clearstatcache(true, $homeDir);
 $stat = @stat($homeDir);
 if (!is_array($stat)) {
     fwrite(STDERR, "Validation failed: unable to stat homeDir\n");
@@ -247,6 +251,10 @@ if ($homeExists) {
 // the ownership-sanity check above, so the prior backup we set aside is truly superseded
 // and can be reclaimed. $supersededBackup is only ever set when $homeExists was true (a
 // fresh backup was created), so this never deletes a possible sole copy.
+if ($supersededBackup !== null) {
+    // The earlier shell move created this path after pre-flight checks.
+    clearstatcache(true, $supersededBackup);
+}
 if ($supersededBackup !== null && is_dir($supersededBackup)) {
     echo "[*] Reclaiming superseded prior backup {$supersededBackup}\n";
     // .trafficData/.trafficDataLocal are immutable (chattr +i, PMSS #161); clear before rm (cf. terminateUser #176). GH PMSS#725.

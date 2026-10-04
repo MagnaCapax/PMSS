@@ -249,6 +249,21 @@ class RecreateUserSafetyGuardTest extends TestCase
         $this->assertSame('keep', file_get_contents($backup.'/data/sole-copy'));
     }
 
+    public function testPrivateDirectoryRechecksModeAfterShellChmod(): void
+    {
+        [$home] = $this->fixture('shell-chmod');
+        $this->assertTrue(chmod($home, 0770));
+        $this->assertFalse(is_link($home));
+        $stat = lstat($home);
+        $this->assertTrue(is_array($stat));
+        $this->assertSame(0770, $stat['mode'] & 0777);
+
+        // Shell changes do not invalidate PHP's cached lstat for this path.
+        exec('chmod 0700 '.escapeshellarg($home), $output, $rc);
+        $this->assertSame(0, $rc);
+        \pmssRecreateRequirePrivateDirectory($home, $stat['uid']);
+    }
+
     public function testInvalidBillingSourceIsLeftBehindWithoutAborting(): void
     {
         [$home, $backup, $base] = $this->fixture('bad-identity');
