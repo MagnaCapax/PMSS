@@ -50,6 +50,45 @@ final class QbittorrentConfigCharacterizationTest extends TestCase
         $this->assertSame('[BitTorrent]', $lines[4]);
     }
 
+    public function testPasswordSyncAsCurrentAccountUpdatesConfig(): void
+    {
+        $username = $this->pmssCurrentOwner();
+        $path = $this->pmssWriteRelativeFile($this->homeRoot, $username.'/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nLocale=en\n");
+
+        $this->assertTrue(\pmssUpdateQbittorrentPasswordAsUser($username, 'secret'));
+        $this->assertTrue(strpos((string) file_get_contents($path), 'WebUI\\Password_PBKDF2=@ByteArray(') !== false);
+    }
+
+    public function testPasswordSyncAsCurrentAccountRejectsLinkedConfig(): void
+    {
+        $username = $this->pmssCurrentOwner();
+        $directory = $this->homeRoot.'/'.$username.'/.config/qBittorrent';
+        mkdir($directory, 0700, true);
+        [$target, $link] = $this->pmssCreateSymlinkedFileOrSkip($this->homeRoot.'/target.conf', $directory.'/qBittorrent.conf', "[Preferences]\nLocale=en\n");
+
+        $this->assertFalse(\pmssUpdateQbittorrentPasswordAsUser($username, 'secret'));
+        $this->assertSame("[Preferences]\nLocale=en\n", file_get_contents($target));
+    }
+
+    public function testPasswordSyncAsCurrentAccountRejectsLinkedDirectory(): void
+    {
+        $username = $this->pmssCurrentOwner();
+        $home = $this->homeRoot.'/'.$username;
+        mkdir($home, 0700);
+        mkdir($home.'/.config', 0700);
+        [$targetDir, $linkedDir] = $this->pmssCreateSymlinkedDirectoryOrSkip($this->homeRoot.'/config-target', $home.'/.config/qBittorrent');
+        $target = $targetDir.'/qBittorrent.conf';
+        file_put_contents($target, "[Preferences]\nLocale=en\n");
+
+        $this->assertFalse(\pmssUpdateQbittorrentPasswordAsUser($username, 'secret'));
+        $this->assertSame("[Preferences]\nLocale=en\n", file_get_contents($target));
+    }
+
+    public function testPasswordSyncAsCurrentAccountRejectsUnknownUser(): void
+    {
+        $this->assertFalse(\pmssUpdateQbittorrentPasswordAsUser('no-such-pmss-user-987654321', 'secret'));
+    }
+
     public function testUploadThrottleRemovalKeepsRemainingPreferencesSnapshot(): void
     {
         $configPath = $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nConnection\\GlobalUPLimit=512\nLocale=en\n");

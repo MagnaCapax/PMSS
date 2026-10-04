@@ -42,6 +42,7 @@ if ($username === '') {
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/user/qbittorrent.php';
+require_once __DIR__.'/lib/user/passwordFile.php';
 require_once __DIR__.'/lib/user/userFilesystem.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Changing
@@ -58,8 +59,8 @@ if (!$jsonlOutput) {
     echo "\t *******  {$username}     new password:   {$password} \n";
 }
 
-// Feed the password via stdin to passwd using printf; quote arguments to avoid
-// injection even when passwords contain special characters.
+// Feed the password via stdin to passwd using printf; quote the password and
+// username as shell arguments, including special characters.
 $pwPayload = $password."\n".$password."\n";
 $cmd = sprintf(
     "printf '%%s' %s | passwd %s",
@@ -92,18 +93,9 @@ if (!is_dir($htpasswdDir)) {
     exit(1);
 }
 
-$htpasswdCommand = is_file($htpasswdFile) ? 'htpasswd -b -m' : 'htpasswd -c -b -m';
-
 $htpasswdOutput = [];
-$htpasswdReturnCode = 0;
-exec(sprintf(
-    '%s %s %s %s 2>&1',
-    $htpasswdCommand,
-    escapeshellarg($htpasswdFile),
-    escapeshellarg($username),
-    escapeshellarg($password)
-), $htpasswdOutput, $htpasswdReturnCode);
-if ($htpasswdReturnCode !== 0 || !is_file($htpasswdFile)) {
+$htpasswdReturnCode = pmssUserHtpasswdPasswordUpdate($username, $password, $htpasswdFile, $htpasswdOutput);
+if ($htpasswdReturnCode !== 0) {
     fwrite(STDERR, "htpasswd update failed for {$username}; aborting credential sync\n");
     if ($htpasswdOutput !== []) {
         fwrite(STDERR, implode("\n", $htpasswdOutput)."\n");
@@ -114,28 +106,10 @@ if ($htpasswdReturnCode !== 0 || !is_file($htpasswdFile)) {
     exit(1);
 }
 
-$chownOutput = [];
-$chownReturnCode = 0;
-exec(sprintf(
-    'chown %s %s 2>&1',
-    escapeshellarg($username.':'.$username),
-    escapeshellarg($htpasswdFile)
-), $chownOutput, $chownReturnCode);
-if ($chownReturnCode !== 0) {
-    fwrite(STDERR, "htpasswd ownership update failed for {$username}; aborting credential sync\n");
-    if ($chownOutput !== []) {
-        fwrite(STDERR, implode("\n", $chownOutput)."\n");
-    }
-    if ($jsonlOutput) {
-        pmssChangePwEmitJsonl($username, $password, $passwdReturnCode, $htpasswdReturnCode, null);
-    }
-    exit(1);
-}
-
 // Sync password to qBittorrent if installed.
 // Deluge is intentionally excluded: its auth file stores passwords in plaintext,
 // making account password sync a security risk (see GH#211).
-$qbittorrentUpdated = pmssUpdateQbittorrentPassword($username, $password);
+$qbittorrentUpdated = pmssUpdateQbittorrentPasswordAsUser($username, $password);
 
 // qBittorrent writes its in-memory config during graceful shutdown. Kill it
 // after the hash write so stale settings cannot restore the previous password;

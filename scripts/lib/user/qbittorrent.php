@@ -244,3 +244,32 @@ function pmssUpdateQbittorrentPassword(string $username, string $password): bool
 {
     return pmssQbittorrentApplyPassword($username, $password);
 }
+
+/** Write the user-owned config with the account's privileges. */
+function pmssUpdateQbittorrentPasswordAsUser(string $username, string $password): bool
+{
+    $identity = function_exists('posix_getpwnam') ? @posix_getpwnam($username) : false;
+    if (!is_array($identity) || !function_exists('posix_geteuid')) {
+        return false;
+    }
+    if (posix_geteuid() === (int) $identity['uid']) {
+        return pmssUpdateQbittorrentPassword($username, $password);
+    }
+    if (posix_geteuid() !== 0) {
+        return false;
+    }
+
+    // Load the operator library before the child switches to the account identity.
+    $code = 'require_once '.var_export(__FILE__, true).";\n".<<<'PHP'
+$account = posix_getpwnam($argv[1]);
+if (!is_array($account)
+    || !posix_initgroups($argv[1], (int) $account['gid'])
+    || !posix_setgid((int) $account['gid'])
+    || !posix_setuid((int) $account['uid'])) exit(1);
+exit(pmssUpdateQbittorrentPassword($argv[1], $argv[2]) ? 0 : 1);
+PHP;
+    $output = [];
+    $status = 1;
+    exec(pmssBuildCommand(PHP_BINARY, ['-r', $code, $username, $password]).' 2>/dev/null', $output, $status);
+    return $status === 0;
+}
