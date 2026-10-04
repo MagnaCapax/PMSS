@@ -94,6 +94,32 @@ class QuotaFixGuardTest extends TestCase
         $this->assertStringNotContainsString('[quotaFix] WARNING: command failed (rc=2): quotaon -ap', $logText);
     }
 
+    public function testHomeQuotaEnforcementWarnsOnlyOnDeclaredShortfall(): void
+    {
+        $cases = [
+            ['usrjquota=aquota.user,grpjquota=aquota.group', 2, []],
+            ['usrjquota=aquota.user,grpjquota=aquota.group', 0, ['[quotaFix] WARNING: /home declares 2 quota type(s) in fstab but 0 are on']],
+            ['usrquota,grpquota', 1, ['[quotaFix] WARNING: /home declares 2 quota type(s) in fstab but 1 are on']],
+            ['usrquota,usrjquota=aquota.user', 1, []],
+            ['defaults', 0, []],
+        ];
+        foreach ($cases as [$options, $enabled, $expected]) {
+            ['fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-quota-verify-', "UUID=abc /srv ext4 usrquota 0 0\nUUID=def /home ext4 {$options} 0 0\n");
+            $commands = [];
+            $logs = [];
+            \pmssQuotaHomeEnforcementWarn(
+                static function (string $command) use ($enabled, &$commands): array {
+                    $commands[] = $command;
+                    return ['rc' => $enabled, 'stdout' => '', 'stderr' => ''];
+                },
+                $this->pmssMakeArrayLogger($logs),
+                $fstab
+            );
+            $this->assertSame($expected, $logs);
+            $this->assertSame($options === 'defaults' ? [] : ['quotaon -p /home'], $commands);
+        }
+    }
+
     public function testQuotaFixSkipsQuotacheckWhenQuotaoffFails(): void
     {
         $this->pmssAssertRepoFileContract('scripts/util/quotaFix.php', [

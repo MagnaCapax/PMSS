@@ -161,6 +161,35 @@ function pmssQuotaCommandRun(string $command, ?callable $runner = null): array
     return ['ok' => $rc === 0, 'rc' => $rc, 'output' => $stdout.$stderr];
 }
 
+/** Warn when /home declares more quota types than the kernel has enabled. */
+function pmssQuotaHomeEnforcementWarn(?callable $runner = null, ?callable $logger = null, ?string $fstabPath = null): void
+{
+    $log = $logger ?: 'logMessage';
+    $lines = pmssFstabLinesRead($fstabPath ?? '/etc/fstab', $log, 'quota enforcement verification.');
+    $entry = $lines === null ? null : pmssFstabMountEntryRead($lines, '/home');
+    if ($entry === null) {
+        return;
+    }
+
+    // Each type counts once even if both journaled and plain options appear.
+    $options = explode(',', $entry['columns'][3]);
+    $user = $group = false;
+    foreach ($options as $option) {
+        $user = $user || preg_match('/^usr(?:jquota=|quota(?:=|$))/', $option) === 1;
+        $group = $group || preg_match('/^grp(?:jquota=|quota(?:=|$))/', $option) === 1;
+    }
+    $declared = (int) $user + (int) $group;
+    if ($declared === 0) {
+        return;
+    }
+
+    // quotaon -p returns the number of enabled types, not a success status.
+    $enabled = pmssQuotaCommandRun('quotaon -p /home', $runner)['rc'];
+    if ($enabled < $declared) {
+        $log('[quotaFix] WARNING: /home declares '.$declared.' quota type(s) in fstab but '.$enabled.' are on');
+    }
+}
+
 /**
  * Run a quotaFix maintenance command while preserving legacy command output.
  *
