@@ -40,4 +40,21 @@ class UserBillingIdsSafetyTest extends TestCase
 
         $this->assertSame(null, \pmssUserBillingDigitsRead($home, ['../outside']));
     }
+
+    public function testBillingDigitsReadRejectsUnsupportedEntriesAndValues(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-billing-values-');
+        $path = $home.'/.billingServiceId';
+        foreach (['0', '-1', '12x', "42\0", (string) PHP_INT_MAX.'0', str_repeat('1', 257)] as $value) {
+            file_put_contents($path, $value);
+            $this->assertSame(null, \pmssUserBillingServiceIdDigitsRead($home), $value);
+        }
+        file_put_contents($path, "00042\n");
+        $this->assertSame('00042', \pmssUserBillingServiceIdDigitsRead($home));
+
+        $second = $home.'/.billingClientId';
+        $this->assertTrue(link($path, $second));
+        $this->assertSame(null, \pmssUserBillingServiceIdDigitsRead($home));
+        $this->assertSame(null, \pmssUserBillingClientIdDigitsRead($home));
+    }
 }

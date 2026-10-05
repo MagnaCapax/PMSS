@@ -105,6 +105,33 @@ function pmssStreamHandleIsOpen($handle): bool { return is_resource($handle) && 
 function pmssPathExistsOrLink(string $path): bool { return file_exists($path) || is_link($path); }
 function pmssRegularFilePathIsReadable(string $path): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && is_file($path) && !is_link($path); }
 
+/** Read a bounded regular file only when the opened entry matches its directory entry. */
+function pmssReadRegularFileContentsVerified(string $path, ?int $requiredUid = null, int $maxBytes = 4096): ?string
+{
+    if ($path === '' || $path[0] !== '/' || pmssFilesystemPathHasNulByte($path) || $maxBytes < 1) return null;
+    clearstatcache(true, $path);
+    $entry = @lstat($path);
+    if (!is_array($entry) || (($entry['mode'] ?? 0) & 0170000) !== 0100000 || ($entry['nlink'] ?? 0) !== 1) return null;
+
+    $handle = @fopen($path, 'rb');
+    if (!pmssStreamHandleIsOpen($handle)) return null;
+    try {
+        $opened = @fstat($handle);
+        if (!is_array($opened)
+            || (($opened['mode'] ?? 0) & 0170000) !== 0100000
+            || ($opened['nlink'] ?? 0) !== 1
+            || ($opened['dev'] ?? null) !== $entry['dev']
+            || ($opened['ino'] ?? null) !== $entry['ino']
+            || ($requiredUid !== null && ($opened['uid'] ?? null) !== $requiredUid)
+            || ($opened['size'] ?? PHP_INT_MAX) > $maxBytes) return null;
+
+        $contents = @stream_get_contents($handle, $maxBytes + 1);
+        return is_string($contents) && strlen($contents) <= $maxBytes && strlen($contents) === $opened['size'] ? $contents : null;
+    } finally {
+        @fclose($handle);
+    }
+}
+
 /** Lock and other write targets must be plain files; refuse symlinks and device paths. */
 function pmssLockFilePathIsSafe(string $path): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && !is_link($path) && (!file_exists($path) || is_file($path)); }
 

@@ -14,15 +14,11 @@ require_once __DIR__.'/../runtime.php';
 /** Read a positive digit-only identifier without following symlinks. */
 function pmssUserBillingDigitsFileRead(string $path, bool $requireRootOwner = false): ?string
 {
-    if (!pmssRegularFilePathIsReadable($path)) {
-        return null;
-    }
-    if ($requireRootOwner && @fileowner($path) !== 0) {
-        return null;
-    }
-
-    $raw = pmssReadRegularFileDigits($path);
-    return ($raw !== null && (int) $raw > 0) ? $raw : null;
+    $contents = pmssReadRegularFileContentsVerified($path, $requireRootOwner ? 0 : null, 256);
+    if ($contents === null) return null;
+    $raw = trim($contents, " \t\r\n");
+    $id = pmssUnsignedDecimalIntParse($raw);
+    return $id !== null && $id > 0 ? $raw : null;
 }
 
 /** Accept only the billing dot-file basenames this helper is meant to probe. */
