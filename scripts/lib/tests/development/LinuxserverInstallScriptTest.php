@@ -158,9 +158,22 @@ BASH;
 
         $this->assertEquals(0, $result['rc']);
         $this->assertTrue(is_file($credentialFile));
+        $this->assertSame(0600, fileperms($credentialFile) & 0777);
         $contents = (string) file_get_contents($credentialFile);
         $this->assertStringContainsAllStrings(['MYSQL_ROOT_PASSWORD=', 'MYSQL_USER=db_home'], $contents);
         $this->assertStringContainsAllStrings(['--env-file '.$credentialFile, '-p 127.0.0.1:3306:3306'], $result['dockerLog']);
+    }
+
+    public function testCredentialFileWriterRejectsLinkedTarget(): void
+    {
+        $directory = $this->homeDir.'/docker/mariadb';
+        $this->pmssEnsureDir($directory);
+        $outside = $this->pmssWriteFile($this->tempDir.'/outside.env', 'kept');
+        $link = $directory.'/pmss-credentials.env';
+        $this->pmssCreateSymlinkOrSkip($outside, $link);
+
+        $this->assertFalse(\pmssDockerInstallLsioWriteCredentialFile($link, 'db', 'user'));
+        $this->assertSame('kept', file_get_contents($outside));
     }
 
     public function testDryRunPhpMyAdminUsesLocalOnlyBindAndMariadbHost(): void

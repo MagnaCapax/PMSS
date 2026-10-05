@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 /**
  * Build the command usage text for the current entrypoint name.
@@ -119,12 +120,14 @@ function pmssDockerInstallLsioWriteCredentialFile(string $credentialFile, string
         '',
     ]);
 
-    if (@file_put_contents($credentialFile, $payload) === false) {
+    $account = function_exists('posix_getpwuid') && function_exists('posix_geteuid')
+        ? @posix_getpwuid(posix_geteuid()) : false;
+    $home = dirname(dirname(dirname($credentialFile)));
+    if (!is_array($account) || !isset($account['name'])
+        || !pmssReplaceAccountFile($account['name'], $home, $credentialFile, $payload, 0600)) {
         fwrite(STDERR, "Failed to write credential file: {$credentialFile}\n");
         return false;
     }
-
-    @chmod($credentialFile, 0600);
     return true;
 }
 
