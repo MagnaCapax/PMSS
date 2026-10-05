@@ -66,7 +66,15 @@ function pmssUserHtpasswdHashWrite(string $htpasswdPath, string $username, strin
         $updatedLines[] = $entry;
     }
 
-    return pmssWriteUserFile($htpasswdPath, implode("\n", $updatedLines)."\n", $owner, 0640);
+    $content = implode("\n", $updatedLines)."\n";
+    $account = function_exists('posix_getpwnam') ? @posix_getpwnam($owner) : false;
+    if (is_array($account) && is_file($htpasswdPath) && !is_link($htpasswdPath)
+        && @fileowner($htpasswdPath) !== $account['uid']) {
+        // Existing installations can carry an older owner; normalize it once.
+        return pmssWriteUserFile($htpasswdPath, $content, $owner, 0640);
+    }
+
+    return pmssReplaceAccountFile($owner, dirname(dirname($htpasswdPath)), $htpasswdPath, $content, 0640);
 }
 
 /**

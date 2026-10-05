@@ -66,15 +66,16 @@ class userPasswordShadowSyncTest extends TestCase
 
     public function testHtpasswdSyncFromShadowWritesUnlockedHash(): void
     {
+        $username = $this->pmssCurrentOwner();
         $homeRoot = $this->pmssTrackHomeRoot($this->tempDir.'/home');
         $shadowPath = $this->tempDir.'/shadow';
-        $htpasswdPath = $homeRoot.'/alice/.lighttpd/.htpasswd';
+        $htpasswdPath = $homeRoot.'/'.$username.'/.lighttpd/.htpasswd';
         @mkdir(dirname($htpasswdPath), 0755, true);
-        file_put_contents($shadowPath, 'alice:$6$shadow$hash:20000:0:99999:7:::'."\n");
-        file_put_contents($htpasswdPath, 'alice:$apr1$legacy$hash'."\n");
+        file_put_contents($shadowPath, $username.':$6$shadow$hash:20000:0:99999:7:::'."\n");
+        file_put_contents($htpasswdPath, $username.':$apr1$legacy$hash'."\n");
 
-        $this->assertTrue(\pmssUserHtpasswdSyncFromShadow('alice', $shadowPath));
-        $this->assertEquals('alice:$6$shadow$hash'."\n", (string) file_get_contents($htpasswdPath));
+        $this->assertTrue(\pmssUserHtpasswdSyncFromShadow($username, $shadowPath));
+        $this->assertEquals($username.':$6$shadow$hash'."\n", (string) file_get_contents($htpasswdPath));
     }
 
     public function testUnsuspendRequiresPasswordSyncLibraryAndHook(): void
