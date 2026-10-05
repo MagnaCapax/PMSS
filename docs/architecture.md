@@ -30,7 +30,8 @@ Keep the canonical installer/update details under `docs/install.md` and
   against an existing account home and launches account-owned file work as that
   account. `pmssReplaceAccountFile()` in the adjacent managed writer streams
   content to an atomic replacement. Root-owned managed entries keep their
-  existing writer and ownership contract.
+  existing writer and ownership contract. Small account-owned directory creation
+  and file-mode repairs run as the account, with managed repair for older owners.
 - **scripts/lib/runtime/commands.php** – Stable command facade. `commandProcess.php`
   owns launch/retry/reaping for both I/O modes; `commandPipes.php` drains output,
   `commandTimeout.php` retains ADR 0035 deadlines and group signals,

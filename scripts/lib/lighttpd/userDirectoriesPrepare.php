@@ -96,7 +96,7 @@ function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool 
     }
 
     // Converge legacy file modes without rewriting customer configuration.
-    pmssUserFileApplyMetadata($customFile, $user, 0640);
+    pmssAccountFileApplyMetadata($user, $homeDir, $customFile, 0640);
     return true;
 }
 
@@ -121,7 +121,7 @@ function pmssEnsureWebdavLockDatabase(string $user, string $homeDir): void
         return;
     }
 
-    pmssUserFileApplyMetadata($lockFile, $user, 0600);
+    pmssAccountFileApplyMetadata($user, $homeDir, $lockFile, 0600);
     clearstatcache(true, $lockFile);
     pmssUserFileApplyOwnership($lighttpdDir, $user);
 }

@@ -83,6 +83,19 @@ function pmssUserFileApplyMetadata(string $path, string $owner, int $mode, ?stri
     pmssUserFileApplyOwnership($path, $owner, $group);
 }
 
+/** Converge an account file's mode as its owner; older ownership is repaired by the managed path. */
+function pmssAccountFileApplyMetadata(string $username, string $home, string $path, int $mode): void
+{
+    if ($mode < 0 || $mode > 0777 || !pmssUserFilePathIsSafe($path) || !is_file($path)) return;
+    $account = function_exists('posix_getpwnam') ? @posix_getpwnam($username) : false;
+    if (is_array($account) && @fileowner($path) === $account['uid']
+        && pmssAccountPathRun($username, $home, [$path],
+            'find '.escapeshellarg($path).' -maxdepth 0 -type f -links 1 -exec chmod '.sprintf('%o', $mode).' {} +')) {
+        return;
+    }
+    pmssUserFileApplyMetadata($path, $username, $mode);
+}
+
 /**
  * Atomically replace a regular file, with optional temp-file preparation.
  * Incomplete writes leave the destination untouched and remove the temp file.

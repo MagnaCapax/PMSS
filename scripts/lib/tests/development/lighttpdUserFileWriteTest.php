@@ -77,6 +77,41 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertSame('second', file_get_contents($path));
     }
 
+    public function testAccountPathRunCreatesOnlyInsideOwnedHome(): void
+    {
+        $home = $this->tempDir.'/account';
+        $this->assertTrue(@mkdir($home));
+        $owner = $this->pmssCurrentOwner();
+        $directory = $home.'/.bin';
+
+        $this->assertTrue(\pmssAccountPathRun($owner, $home, [$directory], 'mkdir -m 750 -- '.escapeshellarg($directory)));
+        $this->assertTrue(is_dir($directory));
+        $this->assertSame(0750, fileperms($directory) & 0777);
+        $outside = $this->tempDir.'/outside';
+        $this->assertFalse(\pmssAccountPathRun($owner, $home, [$outside], 'mkdir -- '.escapeshellarg($outside)));
+        $this->assertFalse(is_dir($outside));
+    }
+
+    public function testAccountFileMetadataConvergesOnlySafeOwnedFile(): void
+    {
+        $home = $this->tempDir.'/account';
+        $this->assertTrue(@mkdir($home));
+        $path = $home.'/custom';
+        $this->assertTrue(@file_put_contents($path, 'kept') !== false);
+        $this->assertTrue(@chmod($path, 0750));
+        $owner = $this->pmssCurrentOwner();
+
+        \pmssAccountFileApplyMetadata($owner, $home, $path, 0640);
+        clearstatcache(true, $path);
+        $this->assertSame(0640, fileperms($path) & 0777);
+        $this->assertSame('kept', file_get_contents($path));
+        $this->assertTrue(@symlink($path, $home.'/linked'));
+        \pmssAccountFileApplyMetadata($owner, $home, $home.'/linked', 0600);
+        \pmssAccountFileApplyMetadata($owner, $home, $path, 01000);
+        clearstatcache(true, $path);
+        $this->assertSame(0640, fileperms($path) & 0777);
+    }
+
     public function testOwnershipMetadataUsesEntryAwareCalls(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/lighttpd/userFileWrite.php');

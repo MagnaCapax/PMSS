@@ -13,6 +13,8 @@ require_once __DIR__.'/../lib/shell.php';
 require_once __DIR__.'/../lib/pathSafety.php';
 require_once __DIR__.'/../lib/user/userFilesystem.php';
 require_once __DIR__.'/../lib/user/subordinateIds.php';
+require_once __DIR__.'/../lib/user/directories.php';
+require_once __DIR__.'/../lib/lighttpd/accountPath.php';
 require_once __DIR__.'/../lib/traffic/storage.php';
 
 $usage = 'Usage: ./userPermissions.php USERNAME';
@@ -124,10 +126,10 @@ foreach ([
     if (is_dir($binDir)) {
         continue;
     }
-    pmssRun(sprintf('mkdir -p %s', escapeshellarg($binDir)));
-    chownPath($binDir, "{$thisUser}:{$thisUser}");
-    chmodPath($binDir, 0750, true);
-    pmssUserLog($thisUser, $binSpec[1]);
+    $created = pmssAccountPathRun($thisUser, $homeDir, [$binDir], 'mkdir -m 750 -- '.escapeshellarg($binDir));
+    if ($created || pmssEnsureUserHomeDir($thisUser, $homeDir, basename($binDir), 0750)) {
+        pmssUserLog($thisUser, $binSpec[1]);
+    }
 }
 
 $chmodItems = [

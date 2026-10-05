@@ -57,6 +57,7 @@ final class AccountPathOperationStaticTest extends TestCase
             "exec('lighttpd -t -f '.\$home.'/config');" => true,
             "exec(pmssBuildUserShellCommand(\$user, 'lighttpd -t -f '.\$home.'/config'));" => false,
             "pmssWriteUserFile(\$homeDir.'/file', 'value', \$user, 0640);" => false,
+            "pmssAccountPathRun(\$user, \$homeDir, [\$homeDir.'/bin'], 'mkdir -- '.escapeshellarg(\$homeDir.'/bin'));" => false,
             "include \$home.'/extra.php';" => true,
             "chown root:root /home/\$user/file" => true,
             "runStep('mode', 'find /home/\$user -not -type l -exec chmod 750 {} +');" => false,
@@ -85,7 +86,7 @@ final class AccountPathOperationStaticTest extends TestCase
 
     private function operationOnLine(string $line): bool
     {
-        if (preg_match('/pmss(?:BuildUser(?:Service)?ShellCommand|WriteUserFile|ReplaceUserFile)/', $line)) return false;
+        if (preg_match('/pmss(?:AccountPathRun|BuildUser(?:Service)?ShellCommand|WriteUserFile|ReplaceUserFile)/', $line)) return false;
         if (preg_match('/\bfind\b.*-not -type l.*(?:-exec chown -h|-exec chmod)/', $line)
             || preg_match('/\bfind\b.*-type f -links 1.*-exec (?:chmod|chown -h)/', $line)) return false;
         if (preg_match('/\b(?:chown|chmod|chgrp|cp|mv|rm|touch|mkdir|lighttpd)\s+/', $line)
