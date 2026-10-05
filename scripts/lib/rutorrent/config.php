@@ -8,6 +8,7 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 /**
  * Update ruTorrent configuration for a given user.
@@ -48,17 +49,13 @@ function updateRutorrentConfig($username, $scgiPort)
 
     $configPath = $rutorrentDir.'/conf/config.php';
     $accessPath = $rutorrentDir.'/conf/access.ini';
-    if (file_put_contents($configPath, $rutorrentConfig) === false) {
+    if (!pmssWriteUserFile($configPath, $rutorrentConfig, $username, 0750)) {
         echo "Failed to write ruTorrent config to {$configPath}\n";
         return;
     }
-    if (file_put_contents($accessPath, $accessIni) === false) {
+    if (!pmssWriteUserFile($accessPath, $accessIni, $username, 0750)) {
         echo "Failed to write ruTorrent access config to {$accessPath}\n";
         return;
-    }
-
-    foreach ([$configPath, $accessPath] as $path) {
-        pmssRutorrentConfigConvergeFilePermissions($path, $username);
     }
 }
 
@@ -79,25 +76,4 @@ function pmssRutorrentConfigResolveBasePath($envName, $default)
 
     $path = rtrim($value, '/');
     return $path === '' ? '/' : $path;
-}
-
-/**
- * Keep per-user ruTorrent config files owned and readable only inside the account.
- *
- * @param string $path     Config file path.
- * @param string $username Account owner and group name.
- *
- * @return void
- */
-function pmssRutorrentConfigConvergeFilePermissions($path, $username)
-{
-    if (!@chown($path, $username)) {
-        echo "Warning: failed to set ruTorrent config owner on {$path}\n";
-    }
-    if (!@chgrp($path, $username)) {
-        echo "Warning: failed to set ruTorrent config group on {$path}\n";
-    }
-    if (!@chmod($path, 0750)) {
-        echo "Warning: failed to set ruTorrent config mode on {$path}\n";
-    }
 }

@@ -35,14 +35,35 @@ class RutorrentConfigOwnershipTest extends TestCase
         $this->assertEquals("allow = test\n", (string) file_get_contents($confDir.'/access.ini'));
     }
 
-    public function testUpdateRutorrentConfigKeepsExplicitOwnershipConvergenceCalls(): void
+    public function testUpdateRutorrentConfigUsesManagedWriterForBothFiles(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/rutorrent/config.php');
 
-        $this->assertStringContainsString('pmssRutorrentConfigConvergeFilePermissions($path, $username);', $source);
-        $this->assertStringContainsString('@chown($path, $username)', $source);
-        $this->assertStringContainsString('@chgrp($path, $username)', $source);
-        $this->assertStringContainsString('@chmod($path, 0750)', $source);
+        $this->assertStringContainsString('pmssWriteUserFile($configPath, $rutorrentConfig, $username, 0750)', $source);
+        $this->assertStringContainsString('pmssWriteUserFile($accessPath, $accessIni, $username, 0750)', $source);
+        $this->assertFalse(strpos($source, 'file_put_contents($configPath') !== false);
+        $this->assertFalse(strpos($source, 'file_put_contents($accessPath') !== false);
+    }
+
+    public function testUpdateRutorrentConfigLeavesLinkedConfigDestinationUntouched(): void
+    {
+        [$user] = $this->currentUserWithMatchingGroup();
+        $configRoot = $this->pmssMakeTempDir('pmss-rutorrent-config-');
+        $homeRoot = $this->pmssMakeTempDir('pmss-rutorrent-home-');
+        $confDir = $this->pmssUserHomePath($homeRoot, $user).'/www/rutorrent/conf';
+        $this->pmssEnsureDir($confDir);
+        $this->pmssWriteFile($configRoot.'/template.rutorrent.config', $this->configTemplate());
+        $this->pmssWriteFile($configRoot.'/template.rutorrent.access', "allow = test\n");
+        $outside = $this->pmssWriteFile($configRoot.'/outside', 'keep');
+        $this->assertTrue(symlink($outside, $confDir.'/config.php'));
+
+        $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $configRoot, 'PMSS_HOME_DIR' => $homeRoot], function () use ($user): void {
+            \updateRutorrentConfig($user, 1);
+        });
+
+        $this->assertSame('keep', (string) file_get_contents($outside));
+        $this->assertTrue(is_link($confDir.'/config.php'));
+        $this->assertFalse(file_exists($confDir.'/access.ini'));
     }
 
     private function configTemplate(): string
