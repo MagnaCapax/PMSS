@@ -18,6 +18,7 @@ require_once __DIR__.'/resourcePlan.php';
 require_once __DIR__.'/userDirectoriesPrepare.php';
 require_once __DIR__.'/../user/userConfigStore.php';
 require_once __DIR__.'/../mediaStackPorts.php';
+require_once __DIR__.'/../runtime.php';
 
 function pmssLighttpdUserConfigLoad(string $thisUser, ?UserConfigStore $store = null): array
 {
@@ -99,7 +100,7 @@ function pmssUserConfigLighttpdConfigureUser(
     if (pmssNetworkPortInRange($invidiousPort, 1024)) {
         pmssLighttpdWriteManagedProxyFragment('invidious', $thisUser, $invidiousPort, $invidiousConfPath);
     } elseif (is_file($invidiousConfPath) || is_link($invidiousConfPath)) {
-        @unlink($invidiousConfPath);
+        exec(pmssBuildUserShellCommand($thisUser, 'rm -f -- '.escapeshellarg($invidiousConfPath)));
     }
 
     // Deluge: generate a per-user proxy fragment under ~/.lighttpd/custom.d/

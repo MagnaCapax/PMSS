@@ -20,7 +20,7 @@ class InvidiousLighttpdProxyTest extends TestCase
             ".invidiousPort",
             "pmssLighttpdWriteManagedProxyFragment('invidious'",
             "pmss-invidious.conf",
-            "@unlink(\$invidiousConfPath);",
+            "exec(pmssBuildUserShellCommand(\$thisUser, 'rm -f -- '.escapeshellarg(\$invidiousConfPath)));",
         ]);
     }
 }
