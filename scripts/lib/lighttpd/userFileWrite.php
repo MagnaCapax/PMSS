@@ -215,6 +215,19 @@ function pmssReplaceAccountFile(string $username, string $home, string $path, st
     return pmssAccountPathRun($username, $home, [$path], $command, $content);
 }
 
+/** Keep older ownership layouts writable while normal account files use the account writer. */
+function pmssReplaceAccountFileWithLegacyFallback(string $username, string $home, string $path, string $content, int $mode): bool
+{
+    $account = function_exists('posix_getpwnam') ? @posix_getpwnam($username) : false;
+    if (!is_array($account) || !isset($account['uid'])
+        || @fileowner($home) !== $account['uid']
+        || @fileowner(dirname($path)) !== $account['uid']
+        || (file_exists($path) && @fileowner($path) !== $account['uid'])) {
+        return pmssWriteUserFile($path, $content, $username, $mode);
+    }
+    return pmssReplaceAccountFile($username, $home, $path, $content, $mode);
+}
+
 /** Best-effort immutable toggle for managed root-owned files. */
 function pmssManagedFileImmutableSet(string $path, bool $enable): void
 {

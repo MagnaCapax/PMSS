@@ -39,7 +39,7 @@ function pmssLighttpdPanelSessionGateDeploy(string $user, string $homeDir): bool
     }
 
     $target = pmssLighttpdPanelSessionGatePath($homeDir);
-    return pmssWriteUserFile($target, $content, $user, 0600)
+    return pmssReplaceAccountFileWithLegacyFallback($user, $homeDir, $target, $content, 0600)
         && pmssLighttpdPanelSessionGateFileUsable($target);
 }
 

@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__.'/portManager.php';
+require_once __DIR__.'/lighttpd/userFileWrite.php';
 
 /** @return array<string, array{path:string,patterns:array<int,string>}> */
 function pmssMediaStackPortDefinitions(): array
@@ -77,7 +78,7 @@ function pmssMediaStackPortsEnsure(string $user, string $home): array
         $preferred = pmssMediaStackConfiguredPortRead($home, $definition);
         $port = pmssPortManagerAssignServicePort($user, 'media-stack-'.$app, $preferred);
         $marker = $home.'/.media-stack-port-'.$app;
-        if ($port === null || !pmssWriteUserFile($marker, (string) $port, $user, 0644)) {
+        if ($port === null || !pmssReplaceAccountFileWithLegacyFallback($user, $home, $marker, (string) $port, 0644)) {
             $ports[$app] = 0;
             continue;
         }

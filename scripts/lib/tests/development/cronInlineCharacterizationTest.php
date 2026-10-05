@@ -9,7 +9,7 @@ class CronInlineCharacterizationTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/webPublicCertsProcess.php', [
             "require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';",
-            'pmssWriteUserFile($failedMarker, gmdate(\'c\')." rc=$rc\\n", $user, 0644);',
+            'pmssReplaceAccountFileWithLegacyFallback($user, $home, $failedMarker, gmdate(\'c\')." rc=$rc\\n", 0644);',
             '@unlink($flag);',
             '@unlink($failedMarker);',
         ], ['@file_put_contents($failedMarker' => 'failure marker must use the shared writer']);

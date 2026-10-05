@@ -125,7 +125,7 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
         }
         logLine('user='.$user.' result=issued names='.implode(',', $names));
     } else {
-        pmssWriteUserFile($failedMarker, gmdate('c')." rc=$rc\n", $user, 0644);
+        pmssReplaceAccountFileWithLegacyFallback($user, $home, $failedMarker, gmdate('c')." rc=$rc\n", 0644);
         $failed++;
         logLine('user='.$user.' result=failed rc='.$rc.' names='.implode(',', $names)
             .' tail='.substr(str_replace("\n", ' ', implode(' ', array_slice($out, -3))), 0, 300));

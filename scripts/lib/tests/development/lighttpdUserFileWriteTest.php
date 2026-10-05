@@ -60,6 +60,23 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertFalse(\pmssReplaceAccountFile($this->pmssCurrentOwner(), $home, $home.'/dir', 'new', 0600));
     }
 
+    public function testAccountFileLegacyFallbackKeepsNormalModeAndRejectsLinks(): void
+    {
+        $home = $this->tempDir.'/account';
+        $this->assertTrue(@mkdir($home));
+        $owner = $this->pmssCurrentOwner();
+        $path = $home.'/marker';
+        $this->assertTrue(\pmssReplaceAccountFileWithLegacyFallback($owner, $home, $path, 'first', 0644));
+        $this->assertTrue(\pmssReplaceAccountFileWithLegacyFallback($owner, $home, $path, 'second', 0600));
+        $this->assertSame('second', file_get_contents($path));
+        $this->assertSame(0600, fileperms($path) & 0777);
+
+        $this->assertTrue(@symlink($path, $home.'/linked'));
+        $this->assertFalse(\pmssReplaceAccountFileWithLegacyFallback($owner, $home, $home.'/linked', 'bad', 0600));
+        $this->assertFalse(\pmssReplaceAccountFileWithLegacyFallback($owner, $home, $this->tempDir.'/outside', 'bad', 0600));
+        $this->assertSame('second', file_get_contents($path));
+    }
+
     public function testOwnershipMetadataUsesEntryAwareCalls(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/lighttpd/userFileWrite.php');
