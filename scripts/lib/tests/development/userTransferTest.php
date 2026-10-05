@@ -507,7 +507,7 @@ SNAP;
         ], 'Restart script must not blindly kill the lock PID: ');
     }
 
-    public function testRestartMarkerNeverFollowsATenantPlantedSymlink(): void
+    public function testRestartMarkerRejectsLinkedEntries(): void
     {
         $base = $this->pmssMakeTempDir('pmss-userTransfer-marker-');
         $logDir = $base.'/logs';
@@ -528,6 +528,11 @@ SNAP;
         $this->assertTrue($create(), 'marker must be created on a clean path');
         $this->assertTrue(is_file($marker) && !is_link($marker), 'marker must be a regular file');
         $this->assertSame(0, filesize($marker), 'marker must be empty');
+        $this->assertSame(posix_geteuid(), fileowner($marker));
+
+        file_put_contents($marker, 'existing');
+        $this->assertTrue($create(), 'an existing marker still requests a restart');
+        $this->assertSame('existing', file_get_contents($marker), 'existing marker bytes must remain intact');
         unlink($marker);
 
         // A symlink to an existing file: refused, and the target is never touched.

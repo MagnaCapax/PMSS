@@ -84,17 +84,17 @@ function pmssUserTransferRequestRtorrentRestart(string $home, string $localUser)
 }
 
 /**
- * Create the restart marker without ever following a symlink.
- *
- * This runs as root inside the tenant-owned ~/www, so it must never dereference whatever is
- * at that path (ADR-0041: unsafe symlinks are refused). The consumer (~/.rtorrentRestart.php)
- * only checks that the marker exists and then unlinks it, so an empty file written through the
- * shared symlink-safe writer (same-dir temp file + atomic rename, symlinked parents refused)
- * is all that is needed.
+ * Ensure the restart marker exists without changing an existing regular file.
+ * The consumer checks only for presence and then removes the marker. A missing
+ * marker is created as the account; linked or non-file entries are refused.
  */
 function pmssUserTransferCreateRestartMarker(string $marker, string $localUser): bool
 {
-    if (!pmssWriteUserFile($marker, '', $localUser, 0644)) {
+    if (!pmssUserFilePathIsSafe($marker)) {
+        return false;
+    }
+    $home = dirname(dirname($marker));
+    if (!is_file($marker) && !pmssReplaceAccountFile($localUser, $home, $marker, '', 0644)) {
         return false;
     }
     logMessage('[OK] Requested rTorrent restart marker');
