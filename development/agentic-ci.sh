@@ -84,14 +84,15 @@ done
 codex_prepare_agent_exec_command "$ASSIST_DIR" "$default_agent" agent exec_cmd || exit $?
 
 ci_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-ci_run_args=()
+ci_run_jq='.[0]'
 if [[ -n "$ci_branch" && "$ci_branch" != "HEAD" ]]; then
-	ci_run_args=(--branch "$ci_branch" --event push)
+	ci_branch_jq="$(php -r 'echo json_encode($argv[1]);' "$ci_branch")"
+	ci_run_jq='map(select(.headBranch == '"$ci_branch_jq"' and .event == "push")) | .[0]'
 fi
 
 # Pre-flight: skip session entirely if CI is already green (saves tokens on no-op runs)
 if [[ "$autocommit" == "1" && "$dry_run" == "0" ]]; then
-	latest_conclusion=$(gh run list --limit 1 "${ci_run_args[@]}" --json conclusion --jq '.[0].conclusion' 2>/dev/null || true)
+	latest_conclusion=$(gh run list --limit 50 --json conclusion,headBranch,event --jq "$ci_run_jq | .conclusion" 2>/dev/null || true)
 	if [[ "$latest_conclusion" == "success" ]]; then
 		echo "[codex-ci] CI is green. Nothing to fix. Skipping." >&1
 		exit 0
@@ -293,7 +294,7 @@ if [[ "$fetch_mode" == "gh" ]]; then
 	fi
 
 	echo "[codex-ci] discovering latest run..." >&1
-	run_id=$(gh run list --limit 1 "${ci_run_args[@]}" --json databaseId --jq '.[0].databaseId')
+	run_id=$(gh run list --limit 50 --json databaseId,headBranch,event --jq "$ci_run_jq | .databaseId")
 else
 	origin_url="$(git config --get remote.origin.url 2>/dev/null || true)"
 	repo_full="$(ci_parse_github_repo "$origin_url" 2>/dev/null || true)"

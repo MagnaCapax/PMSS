@@ -124,7 +124,7 @@ BASH
         $this->assertSame("REST curl log\n", file_get_contents($out));
     }
 
-    public function testBothGhRunListsSelectCurrentPushBranch(): void
+    public function testBothGhRunListsSelectNewestCurrentPush(): void
     {
         $root = $this->pmssMakeTempDir('pmss-ci-branch-');
         $bin = $root.'/bin';
@@ -133,7 +133,29 @@ BASH
         $this->pmssWriteExecutableFile($bin.'/gh', <<<'BASH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$TRACE"
-[[ "$*" == *databaseId* ]] && printf '7\n' || printf 'failure\n'
+[[ " $* " != *" --branch "* && " $* " != *" --event "* ]] || exit 1
+[[ " $* " == *" --limit 50 "* ]] || exit 1
+while [[ $# -gt 0 ]]; do
+    if [[ "$1" == --jq ]]; then
+        shift
+        FILTER="$1" php -r '
+            $prefix = "map(select(.headBranch == \"main\" and .event == \"push\")) | .[0] | .";
+            $filter = getenv("FILTER");
+            if (strpos($filter, $prefix) !== 0) exit(1);
+            $field = substr($filter, strlen($prefix));
+            if (!in_array($field, ["conclusion", "databaseId"], true)) exit(1);
+            foreach (json_decode(getenv("FIXTURE_RUNS"), true) as $run) {
+                if ($run["headBranch"] === "main" && $run["event"] === "push") {
+                    echo $run[$field], "\n";
+                    break;
+                }
+            }
+        '
+        exit $?
+    fi
+    shift
+done
+exit 1
 BASH
         );
         $this->pmssWriteExecutableFile($bin.'/git', <<<'BASH'
@@ -144,17 +166,24 @@ BASH
         $preflight = $this->scriptPart('# Pre-flight: skip session', "\nhave() {");
         $discovery = $this->scriptPart("run_id=\"\"\nrepo_full=", "\nif [[ -z \"\$run_id\" ]];");
         $branch = $this->scriptPart('ci_branch=', "\n# Pre-flight: skip session");
-        $body = 'export PATH='.escapeshellarg($bin).':$PATH; export TRACE='.escapeshellarg($trace)."\n".
+        $runs = '[{"headBranch":"other","event":"push","conclusion":"success","databaseId":9},'.
+            '{"headBranch":"main","event":"workflow_dispatch","conclusion":"success","databaseId":8},'.
+            '{"headBranch":"main","event":"push","conclusion":"failure","databaseId":7},'.
+            '{"headBranch":"main","event":"push","conclusion":"success","databaseId":6}]';
+        $body = 'export PATH='.escapeshellarg($bin).':$PATH; export TRACE='.escapeshellarg($trace).
+            '; export FIXTURE_RUNS='.escapeshellarg($runs)."\n".
             'autocommit=1; dry_run=0; fetch_mode=gh' . "\n".
             'ci_parse_github_repo() { printf "MagnaCapax/PMSS"; }' . "\n".
             'ci_validate_github_repo() { return 0; }' . "\n".
-            $branch."\n".$preflight."\n".$discovery;
+            $branch."\n".$preflight."\n".$discovery."\n".'printf "selected=%s/%s\n" "$latest_conclusion" "$run_id"';
         $result = $this->runFixture($body, $root);
         $this->assertSame(0, $result['rc'], $result['output']);
+        $this->assertStringContainsString('selected=failure/7', $result['output']);
         $calls = file($trace, FILE_IGNORE_NEW_LINES);
         $this->assertSame(2, count($calls));
         foreach ($calls as $call) {
-            $this->assertStringContainsString('--branch main --event push', $call);
+            $this->assertStringContainsString('--limit 50', $call);
+            $this->assertStringContainsString('headBranch,event', $call);
         }
     }
 
