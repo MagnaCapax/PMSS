@@ -112,7 +112,9 @@ function pmssEnsureWebdavLockDatabase(string $user, string $homeDir): void
         return;
     }
     if (!file_exists($lockFile)) {
-        @touch($lockFile);
+        if (!pmssWriteUserFile($lockFile, '', $user, 0600)) {
+            return;
+        }
         clearstatcache(true, $lockFile);
     }
     if (!is_file($lockFile)) {
