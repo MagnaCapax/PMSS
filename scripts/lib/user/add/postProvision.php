@@ -53,11 +53,11 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
     runProvisionStep('Seed quota file', 'php /scripts/cron/updateQuotas.php');
     runProvisionStep(
         'Normalize quota file permissions',
-        sprintf('chmod 640 %s', escapeshellarg("/home/{$user['name']}/.quota"))
+        sprintf('find %s -maxdepth 0 -type f -links 1 -exec chmod 640 {} +', escapeshellarg("/home/{$user['name']}/.quota"))
     );
     runProvisionStep(
         'Set quota file ownership',
-        sprintf('chown root:%s %s', escapeshellarg($user['name']), escapeshellarg("/home/{$user['name']}/.quota"))
+        sprintf('find %s -maxdepth 0 -type f -links 1 -exec chown -h %s {} +', escapeshellarg("/home/{$user['name']}/.quota"), escapeshellarg('root:'.$user['name']))
     );
 
     try {

@@ -20,6 +20,16 @@ final class AddUserPostProvisionTest extends TestCase
         $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/user/add/postProvision.php', ['pmssTrafficWriteFile(', 'pmssEnsureSafeDir($runtimeStatsDir, 0755)']);
     }
 
+    public function testQuotaMetadataStepsSelectRegularFileEntry(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/add/postProvision.php', [
+            'find %s -maxdepth 0 -type f -links 1 -exec chmod 640 {} +',
+            'find %s -maxdepth 0 -type f -links 1 -exec chown -h %s {} +',
+        ]);
+        $this->pmssAssertRepoFileNotContainsString('scripts/lib/user/add/postProvision.php',
+            "sprintf('chown root:%s %s'");
+    }
+
     public function testBonusQuotaPersistenceIsOptionalAtomicAndSymlinkSafe(): void
     {
         $home = $this->tempDir.'/alice';
