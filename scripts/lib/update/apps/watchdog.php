@@ -68,9 +68,19 @@ foreach ([
     if (!pmssWatchdogRunRequiredStep($description, $command)) return;
 }
 
-if ($device !== '/dev/watchdog' && is_string($config = @file_get_contents('/etc/watchdog.conf'))) {
+if ($device !== '/dev/watchdog') {
+    $config = @file_get_contents('/etc/watchdog.conf');
+    if (!is_string($config)) {
+        logMessage('[WARN] Unable to read watchdog device configuration; leaving service disabled.');
+        return;
+    }
+
     $updated = preg_replace('/^watchdog-device\\s*=\\s*\\/dev\\/watchdog\\b/m', 'watchdog-device = '.$device, $config);
-    if ($updated !== null && $updated !== $config) {
+    if ($updated === null) {
+        logMessage('[WARN] Unable to prepare watchdog device configuration; leaving service disabled.');
+        return;
+    }
+    if ($updated !== $config) {
         if (@file_put_contents('/etc/watchdog.conf', $updated) !== strlen($updated)) {
             logMessage('[WARN] Unable to update watchdog device path; leaving service disabled.');
             return;

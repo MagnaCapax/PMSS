@@ -32,6 +32,19 @@ class WatchdogInstallerSafetyTest extends TestCase
         ]);
     }
 
+    public function testAlternateDeviceRequiresReadableAndRewritableConfiguration(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/update/apps/watchdog.php', [
+            "if (\$device !== '/dev/watchdog') {",
+            "\$config = @file_get_contents('/etc/watchdog.conf');",
+            'if (!is_string($config)) {',
+            'Unable to read watchdog device configuration; leaving service disabled.',
+            'if ($updated === null) {',
+            'Unable to prepare watchdog device configuration; leaving service disabled.',
+            "runStep('Enabling watchdog service'",
+        ]);
+    }
+
     public function testMaskedAndDevicelessUnitsAreHandledBeforeInstallation(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/update/apps/watchdog.php');

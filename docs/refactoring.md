@@ -64,6 +64,9 @@ locale generation keeps its existing best-effort sequence.
 Watchdog and vnStat config rewrites also require the full payload byte count
 before service activation or restart. Failed and short writes keep their
 existing warning and skip paths.
+When the watchdog uses an alternate device, an unreadable or unrewritable
+installed configuration also skips activation; otherwise it could start with
+the template's default device despite selecting a different one.
 
 Locked PID and counter-state streams share one seek, truncate, complete-write,
 and flush sequence. Their existing entrypoints and failure results are retained.
