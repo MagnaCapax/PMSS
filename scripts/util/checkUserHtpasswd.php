@@ -102,13 +102,6 @@ function pmssCheckUserHtpasswdMain(array $argv): int
                 continue;
             }
 
-            pmssUserLifecycleStep(
-                'htpasswd',
-                $thisUser,
-                'chown_htpasswd',
-                'chown '.escapeshellarg($thisUser.':'.$thisUser).' '.escapeshellarg($userHtpasswd),
-                false
-            );
             pmssUserLog($thisUser, 'htpasswd sync: appended legacy credential to per-user .htpasswd');
         }
     }

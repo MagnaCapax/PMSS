@@ -53,4 +53,11 @@ class CheckUserHtpasswdTest extends TestCase
             'Skipping htpasswd sync for invalid username',
         ]);
     }
+
+    public function testAppendOwnsTheAccountFileWithoutExtraMetadataCommand(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/util/checkUserHtpasswd.php');
+        $this->assertStringContainsString('pmssAppendUserFile($userHtpasswd, $thisPassword."\\n", $thisUser, 0640)', $source);
+        $this->assertFalse(strpos($source, 'chown_htpasswd') !== false);
+    }
 }
