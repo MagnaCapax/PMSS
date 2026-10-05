@@ -96,6 +96,25 @@ function pmssLighttpdApplyPhpIniContent(string $content, string $user, int $memo
     return $content;
 }
 
+/**
+ * Write account-owned php.ini content while accepting a legacy root-owned entry.
+ * Only an existing regular entry with one link may use the managed writer; new
+ * and account-owned entries are replaced under the account identity.
+ */
+function pmssLighttpdPhpIniWrite(string $path, string $user, string $content): bool
+{
+    $home = dirname(dirname($path));
+    if (pmssReplaceAccountFile($user, $home, $path, $content, 0640)) {
+        return true;
+    }
+    $entry = @stat($path);
+    return pmssUserFilePathIsSafe($path)
+        && basename($path) === 'php.ini' && basename(dirname($path)) === '.lighttpd'
+        && pmssPathWithinResolvedRoot($path, $home)
+        && is_file($path) && is_array($entry) && $entry['uid'] === 0 && $entry['nlink'] === 1
+        && pmssWriteUserFile($path, $content, $user, 0640);
+}
+
 function pmssLighttpdSyncPhpIni(string $phpIniPath, string $user, int $memoryLimitMiB, &$failureReason = null): bool
 {
     $failureReason = '';
@@ -105,18 +124,20 @@ function pmssLighttpdSyncPhpIni(string $phpIniPath, string $user, int $memoryLim
     }
     if (!file_exists($phpIniPath)) {
         $skelPhpIni = @file_get_contents('/etc/skel/.lighttpd/php.ini');
-        if (!is_string($skelPhpIni) || !pmssWriteUserFile($phpIniPath, $skelPhpIni, $user, 0640)) {
+        if (!is_string($skelPhpIni) || !pmssLighttpdPhpIniWrite($phpIniPath, $user, $skelPhpIni)) {
             $failureReason = 'seed';
             return false;
         }
     }
     $phpIniContent = pmssReadRegularFileContents($phpIniPath);
-    if (is_string($phpIniContent) && !pmssAtomicWriteFile($phpIniPath, pmssLighttpdApplyPhpIniContent($phpIniContent, $user, $memoryLimitMiB))) {
+    if (is_string($phpIniContent) && !pmssLighttpdPhpIniWrite($phpIniPath, $user, pmssLighttpdApplyPhpIniContent($phpIniContent, $user, $memoryLimitMiB))) {
         $failureReason = 'update';
         return false;
     }
 
-    pmssUserFileApplyMetadata($phpIniPath, $user, 0640);
+    if ($phpIniContent === null) {
+        pmssUserFileApplyMetadata($phpIniPath, $user, 0640);
+    }
 
     return true;
 }

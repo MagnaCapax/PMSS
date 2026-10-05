@@ -182,6 +182,42 @@ LIGHTTPD;
         $this->assertEquals(0640, fileperms($path) & 0777);
     }
 
+    public function testPhpIniSyncKeepsOtherDirectivesAndAccountOwnership(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-php-ini-home-');
+        $this->pmssEnsureDir($home.'/.lighttpd');
+        $path = $home.'/.lighttpd/php.ini';
+        file_put_contents($path, "memory_limit = 128M\n; keep this line\n");
+        $reason = null;
+        $owner = $this->pmssCurrentOwner();
+
+        $this->assertTrue(\pmssLighttpdSyncPhpIni($path, $owner, 256, $reason));
+        $updated = file_get_contents($path);
+        $this->assertStringContainsString("memory_limit = 256M\n", $updated);
+        $this->assertStringContainsString('; keep this line', $updated);
+        $this->assertStringContainsString('upload_tmp_dir = /home/'.$owner.'/.lighttpd/upload', $updated);
+        $this->assertSame('', $reason);
+        $this->assertSame(0640, fileperms($path) & 0777);
+        $this->assertSame(posix_geteuid(), fileowner($path));
+    }
+
+    public function testPhpIniAccountWriterRejectsLinkedAndMultiplyLinkedEntries(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-php-ini-link-');
+        $this->pmssEnsureDir($home.'/.lighttpd');
+        $path = $home.'/.lighttpd/php.ini';
+        $outside = $home.'/outside';
+        file_put_contents($outside, 'keep');
+        symlink($outside, $path);
+        $this->assertFalse(\pmssLighttpdPhpIniWrite($path, $this->pmssCurrentOwner(), 'new'));
+        $this->assertSame('keep', file_get_contents($outside));
+
+        unlink($path);
+        link($outside, $path);
+        $this->assertFalse(\pmssLighttpdPhpIniWrite($path, $this->pmssCurrentOwner(), 'new'));
+        $this->assertSame('keep', file_get_contents($outside));
+    }
+
     public function testProxyPortEnsureRejectsSymlinkTarget(): void
     {
         $root = $this->pmssMakeTempDir('pmss-lighttpd-proxy-port-');
