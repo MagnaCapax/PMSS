@@ -86,6 +86,13 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
         $this->pmssAssertRepoFileNotContainsString('scripts/startRtorrent', '@copy($skelExecutor, $executor)');
     }
 
+    public function testStartRtorrentCreatesSessionAsAccountUser(): void
+    {
+        $this->pmssAssertRepoFileContainsString('scripts/startRtorrent',
+            "pmssBuildUserShellCommand(\$user, 'mkdir -m 755 -p -- '.escapeshellarg(\$home.'/session'))");
+        $this->pmssAssertRepoFileNotContainsString('scripts/startRtorrent', "@chown(\$home.'/session', \$user)");
+    }
+
     public function testUpdateStep2RegistersPermissionShutdownRescueBeforeWork(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
