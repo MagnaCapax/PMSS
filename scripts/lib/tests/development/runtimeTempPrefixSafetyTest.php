@@ -50,6 +50,23 @@ class RuntimeTempPrefixSafetyTest extends TestCase
         $this->assertTrue(is_dir($directory));
     }
 
+    public function testNestedMatchingDirectoryCannotAuthorizeCleanup(): void
+    {
+        $parent = $this->pmssMakeTempDir('pmss-prefix-parent-');
+        $nested = $parent.'/pmss-prefix-nested';
+        $this->assertTrue(mkdir($nested, 0700));
+        $calls = 0;
+        $messages = [];
+        $logger = static function (string $message) use (&$messages): void { $messages[] = $message; };
+        $runner = static function () use (&$calls): int { $calls++; return 0; };
+
+        $this->assertSame(null, \pmssPrivateTempDirRealpath($nested, 'pmss-prefix-', $logger));
+        $this->assertSame(1, \pmssRemovePrivateTempDir($nested, 'pmss-prefix-', 'Cleanup fixture', $logger, $runner));
+        $this->assertSame(0, $calls);
+        $this->assertSame(array_fill(0, 2, '[WARN] Refusing temporary directory cleanup outside PMSS temp scope: '.realpath($nested)), $messages);
+        $this->assertTrue(is_dir($nested));
+    }
+
     public function testValidPrefixesPreserveCreationAndCleanupContracts(): void
     {
         foreach (['p', 'P', '7', 'pmss-normal-', 'pmss_mixed.7-'] as $prefix) {

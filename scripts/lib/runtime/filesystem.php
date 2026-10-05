@@ -74,8 +74,8 @@ function pmssPrivateTempDirRealpath(string $path, string $prefix, ?callable $log
     if (pmssFilesystemPathHasNulByte($path)) { $log('[WARN] Refusing temporary directory cleanup for unsafe path'); return null; }
     $base = pmssPrivateTempBaseDirRealpath(); $real = $path !== '' && !is_link($path) ? realpath($path) : false;
     if ($base === null || $real === false || !is_dir($real)) { $log('[WARN] Refusing temporary directory cleanup for unresolved path: '.$path); return null; }
-    $basePrefix = $base.DIRECTORY_SEPARATOR;
-    if (strpos($real, $basePrefix) !== 0 || strpos(basename($real), $prefix) !== 0) { $log('[WARN] Refusing temporary directory cleanup outside PMSS temp scope: '.$real); return null; }
+    // tempnam() creates direct children; a matching nested name is not our workspace.
+    if (dirname($real) !== $base || strpos(basename($real), $prefix) !== 0) { $log('[WARN] Refusing temporary directory cleanup outside PMSS temp scope: '.$real); return null; }
     return $real;
 }
 

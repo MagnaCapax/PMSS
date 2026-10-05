@@ -119,6 +119,9 @@ Private temporary file/directory creation and directory cleanup share
 the entire prefix, including rejecting a final newline, before creation or
 recursive cleanup is attempted. Invalid prefixes keep the existing null/failed
 results and cleanup warning; valid prefixes retain the same scoped command.
+Cleanup also requires the resolved workspace to be a direct child of the temp
+root, matching the temp-file creator; a nested directory with a matching name
+cannot authorize recursive deletion.
 `RuntimeTempPrefixSafetyTest` covers these boundaries with temporary fixtures
 and a recording cleanup runner that never executes the deletion command.
 
