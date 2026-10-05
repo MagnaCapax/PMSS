@@ -3,9 +3,48 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/resources/metrics.php';
+require_once dirname(__DIR__, 2).'/resources/oomStatus.php';
 
 class UserMetricsCollectTest extends TestCase
 {
+    public function testOomProjectionSeedsThenDatesIncreasesAndResets(): void
+    {
+        $seed = \pmssOomStatusStateNext([], 4, 100);
+        $this->assertSame(['count' => 4, 'last_increase' => null, 'sampled_at' => 100], $seed);
+        $same = \pmssOomStatusStateNext($seed, 4, 200);
+        $this->assertSame(null, $same['last_increase']);
+        $increase = \pmssOomStatusStateNext($same, 5, 300);
+        $this->assertSame(300, $increase['last_increase']);
+        $this->assertSame(300, \pmssOomStatusStateNext($increase, 5, 400)['last_increase']);
+        $this->assertSame(null, \pmssOomStatusStateNext($increase, 0, 500)['last_increase']);
+        $this->assertSame(600, \pmssOomStatusStateNext($increase, 2, 600)['last_increase']);
+    }
+
+    /** A forged home projection cannot become the collector's previous sample. */
+    public function testOomProjectionReadsOnlyRootState(): void
+    {
+        // Keep the root entrypoint free of reads from the tenant-controlled home.
+        $projectorSource = (string) file_get_contents(dirname(__DIR__, 2).'/resources/oomStatus.php');
+        foreach (['file_get_contents(', 'fopen(', 'readfile(', 'pmssReadSerializedArrayFile('] as $reader) {
+            $this->assertSame(false, strpos($projectorSource, $reader) !== false);
+        }
+        $root = $this->pmssMakeTempDir('pmss-oom-project-', 0700);
+        $homeRoot = $root.'/home';
+        $stateRoot = $root.'/state';
+        @mkdir($homeRoot.'/www-data', 0700, true);
+        @mkdir($stateRoot, 0700);
+        $homePath = $homeRoot.'/www-data/.oomKillStatus';
+        $this->pmssWriteFile($homePath, serialize(['count' => 1, 'last_increase' => 1, 'sampled_at' => 1]));
+
+        $this->assertTrue(\pmssOomStatusProject('www-data', 4, 100, $homeRoot, $stateRoot));
+        $this->assertSame(null, unserialize((string) file_get_contents($homePath))['last_increase']);
+        $this->pmssWriteFile($homePath, serialize(['count' => 1000, 'last_increase' => 200, 'sampled_at' => 200]));
+        $this->assertTrue(\pmssOomStatusProject('www-data', 5, 300, $homeRoot, $stateRoot));
+        $projected = unserialize((string) file_get_contents($homePath));
+        $this->assertSame(5, $projected['count']);
+        $this->assertSame(300, $projected['last_increase']);
+        $this->assertSame(5, json_decode((string) file_get_contents($stateRoot.'/www-data.json'), true)['count']);
+    }
     /** Metrics alone must load the counter reader without the persistence writer. */
     public function testMetricsEntrypointLoadsOnlyCounterBoundary(): void
     {

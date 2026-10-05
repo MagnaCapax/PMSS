@@ -559,7 +559,17 @@ iptables helpers:
   and history bytes retain their existing order and format.
 - Customer cgroup readers share ordered counter paths, unsigned/limit parsing,
   and memory fields in `etc/skel/www/scriptsInc.php` (ADR 0059). Page-specific
-  directory precedence, missing-data behavior, and pressure classification stay unchanged.
+  directory precedence and missing-data behavior stay unchanged; live pressure
+  thresholds remain separate from the OOM recency signal.
+- The five-minute metrics collector projects the maximum parent/child cgroup-v1
+  `oom_kill` count into the owning account's private `.oomKillStatus` file (root:user
+  0640). Its baseline and last-increase state are locked in root-owned
+  `/var/run/pmss/oomStatus`; the collector never reads the home projection.
+  Its first sample is an undated baseline; subsequent increases record the
+  observation time, while a zero reset clears it. The welcome panel treats an
+  observed increase as current for 24 hours when the sample is at most 15 minutes
+  old. A higher live counter is immediately current; missing or stale projection
+  data cannot turn a lifetime count into a permanent HIGH warning.
 - `pmssCustomerNonnegativeFloat($value): ?float` is the customer-tree metric
   normalizer; it rejects non-numeric, non-finite, and negative values.
 

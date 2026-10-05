@@ -34,3 +34,25 @@ counter retains the existing current-memory fallback. The memory-status byte
 formatter returns `n/a` for non-finite input. Finite counters, field precedence,
 and valid status payloads remain unchanged; overflow fixtures and the existing
 payload snapshots cover these boundaries.
+
+## OOM recency decision (2026-10-05)
+
+The cgroup-v1 `oom_kill` counter is cumulative. A nonzero lifetime count is
+history, not evidence of current pressure. Treating it as HIGH forever also
+keeps showing RAM-upgrade advice after the last kill is long past.
+
+Options considered: classify every nonzero count as HIGH; read a prior sample
+from the account home; or retain the prior sample under root ownership. The
+first option latches indefinitely. The second lets a tenant replace the file
+between validation and read, potentially blocking the root metrics collector.
+
+The metrics collector keeps the baseline and last observed increase in locked,
+root-owned counter state under `/var/run/pmss/oomStatus` (ADR 0078). It only
+writes the bounded projection into the account home using the managed writer.
+The panel reads that projection as the owning user. HIGH from cgroup-v1 OOM
+requires an observed count increase within 24 hours and a fresh sample. A
+first sample of a nonzero count has no known event time and does not qualify.
+
+The runtime directory is transient: after reboot, the first collection seeds a
+new baseline. A tenant can alter only their own panel projection; root never
+uses that file as input. Existing live memory-pressure thresholds are unchanged.

@@ -128,10 +128,23 @@ function pmssWebCgroupMemoryStatusV1OomKillRead($cgroupDir, $uid)
     return $max;
 }
 
+/** Only a sampled increase within 24 hours can make a lifetime v1 counter live. */
+function pmssWebCgroupMemoryStatusOomRecent($count, $state, $now)
+{
+    if (!is_int($count) || $count <= 0 || !is_int($now) || $now < 0 || !is_array($state)) return false;
+    $sampled = $state['sampled_at'] ?? null;
+    $baseline = $state['count'] ?? null;
+    $increase = $state['last_increase'] ?? null;
+    if (!is_int($sampled) || $sampled > $now || $sampled < $now - 900
+        || !is_int($baseline) || $baseline < 0 || $count < $baseline) return false;
+    if ($count > $baseline) return true; // Kill since the collector's latest sample.
+    return is_int($increase) && $increase <= $now && $increase > $now - 86400;
+}
+
 /** Classify current cgroup memory pressure into a user-facing level. */
 function pmssWebCgroupMemoryStatusClassify(array $stats)
 {
-    if ((int) ($stats['oom_kill_events'] ?? 0) > 0) {
+    if (!empty($stats['oom_kill_recent'])) {
         return 'HIGH';
     }
     $usagePercent = $stats['usage_percent'];
@@ -216,8 +229,16 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
     }
     // cgroup-v1 fleet (ADR-0019): memory.events is absent, so the v2 oom_kill above is 0.
     // Fall back to the real OOM-kill count from memory.oom_control (the only sound v1 signal).
-    if ($stats['oom_kill_events'] === 0 && !pmssWebCgroupMemoryStatusV2MemoryControllerAvailable($cgroupDir)) {
+    $v2Memory = pmssWebCgroupMemoryStatusV2MemoryControllerAvailable($cgroupDir);
+    if ($stats['oom_kill_events'] === 0 && !$v2Memory) {
         $stats['oom_kill_events'] = pmssWebCgroupMemoryStatusV1OomKillRead($cgroupDir, $uid);
+    }
+    if ($stats['oom_kill_events'] > 0) {
+        $stats['oom_kill_recent'] = $v2Memory || pmssWebCgroupMemoryStatusOomRecent(
+            $stats['oom_kill_events'],
+            pmssCustomerSerializedArrayFileRead($overrides['oom_status_path'] ?? '../.oomKillStatus'),
+            $overrides['now'] ?? time()
+        );
     }
     $status = pmssWebCgroupMemoryStatusClassify(array_replace($stats, [
         'memory_current' => $memoryPressureCurrent,
@@ -228,7 +249,7 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
     return $stats + [
         'status' => $status,
         'status_color' => ['LOW' => '#81c784', 'MEDIUM' => '#ffb74d', 'HIGH' => '#ef5350', 'THROTTLED' => '#d2691e'][$status] ?? '#b0bec5',
-        'message' => $stats['oom_kill_events'] > 0
+        'message' => !empty($stats['oom_kill_recent'])
             ? 'Your account reached its memory limit and had processes stopped (out-of-memory) '.number_format($stats['oom_kill_events']).' time(s). If transfers or apps keep getting interrupted, adding Extra RAM from your Upgrade Options raises the limit for this service.'
             : ($status === 'THROTTLED'
                 ? 'Your service is running at reduced speed due to memory pressure. Reducing active tasks or upgrading your plan will restore full speed.'
@@ -371,7 +392,7 @@ function pmssWelcomeMemorySectionHtmlBuild($pressureStatusOverride = null)
     $hasOomEvents = is_array($pressureStatus)
         && ((int) ($pressureStatus['max_events'] ?? 0) > 0
             || (int) ($pressureStatus['oom_events'] ?? 0) > 0
-            || (int) ($pressureStatus['oom_kill_events'] ?? 0) > 0);
+            || !empty($pressureStatus['oom_kill_recent']));
     $isThrottleActive = is_array($pressureStatus)
         && (string) ($pressureStatus['status'] ?? '') === 'THROTTLED'
         && !$hasOomEvents;

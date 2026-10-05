@@ -39,12 +39,14 @@ function pmssCounterStateWritePayload($handle, string $payload): bool
  * @param array<string, int> $deltaCeilings
  * @return array{delta: array<string, int>, previous_state: array<string, mixed>, state: array<string, int>}
  */
-function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFields, array $deltaCeilings = []): array
+function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFields, array $deltaCeilings = [], ?callable $stateNext = null): array
 {
     $handle = pmssCounterStateLockAcquire($statePath);
     // The lock covers reads and delta calculation as well as persistence.
     try {
         $previousState = $handle !== false ? (pmssJsonDecodeAssoc((string) @stream_get_contents($handle)) ?? []) : [];
+        // State transitions that depend on the prior sample must run under this lock.
+        if ($stateNext !== null) { $state = $stateNext($previousState, $state); }
         $delta = [];
         foreach ($deltaFields as $field) {
             $currentValue = (int) ($state[$field] ?? 0);
@@ -62,9 +64,11 @@ function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFie
                 : $candidateDelta;
         }
 
+        $persisted = false;
         if ($handle !== false && is_string($payload = pmssJsonEncodeSafe($state))) {
             $written = pmssCounterStateWritePayload($handle, $payload);
             $modeSet = @chmod($statePath, 0600);
+            $persisted = $written && $modeSet;
             if (!$written || !$modeSet) {
                 error_log('[WARN] Unable to persist counter state: '.json_encode($statePath));
             }
@@ -72,5 +76,7 @@ function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFie
     } finally {
         if ($handle !== false) { pmssLockHandleRelease($handle); }
     }
-    return ['delta' => $delta, 'previous_state' => $previousState, 'state' => $state];
+    $result = ['delta' => $delta, 'previous_state' => $previousState, 'state' => $state];
+    if ($stateNext !== null) { $result['persisted'] = $persisted; }
+    return $result;
 }

@@ -14,13 +14,15 @@
  */
 require_once '/scripts/lib/resources/log.php';
 require_once '/scripts/lib/resources/metrics.php';
+require_once '/scripts/lib/resources/oomStatus.php';
 
 // Root-only: per-user performance metrics are customer data (MISSION #1 privacy).
 // 0700 dir + 0600 files keep them unreadable cross-tenant — no customer can read
 // another customer's resource usage. The customer-facing UI reads its own
 // /home/<user>/.resourceData, never this operator-side log.
 $logDir = '/var/log/pmss/metrics';
-if (!pmssEnsureSafeDir($logDir, 0700)) {
+$oomStateDir = '/var/run/pmss/oomStatus';
+if (!pmssEnsureSafeDir($logDir, 0700) || !pmssEnsureSafeDir($oomStateDir, 0700)) {
     exit(pmssCliReturnWithStderr("Failed to prepare metrics log directory.\n"));
 }
 @chmod($logDir, 0700);
@@ -50,5 +52,13 @@ foreach ($userUids as $user => $uid) {
     }
     if ($newFile) {
         @chmod($path, 0600);
+    }
+    // This private projection is the only collector data exposed to the owning account.
+    $parent = $metrics['mem_oom_kill'] ?? null;
+    $child = pmssResourceLogReadMemoryStatField('/sys/fs/cgroup/memory/user.slice/user-'.$uid.'.slice/user@'.$uid.'.service/memory.oom_control', 'oom_kill');
+    if (($parent !== null || $child !== null) && is_dir(userFilesystem::homePath($user))) {
+        if (!pmssOomStatusProject($user, max($parent ?? 0, $child ?? 0), time())) {
+            fwrite(STDERR, "Failed to project OOM status for {$user}.\n");
+        }
     }
 }

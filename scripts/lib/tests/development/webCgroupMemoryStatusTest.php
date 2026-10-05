@@ -14,7 +14,7 @@ class WebCgroupMemoryStatusTest extends TestCase
             'unlimited' => [['memory.usage_in_bytes' => '100', 'memory.soft_limit_in_bytes' => '200', 'memory.limit_in_bytes' => '1125899906842624'], 'b13f997189cf41dc30eeac3d348dc7a24e82ce0c5f940f4dcc6692679deec1df'],
             'mixed' => [['memory.current' => '0', 'memory.usage_in_bytes' => '100', 'memory.high' => 'max', 'memory.soft_limit_in_bytes' => '200', 'memory.max' => '-1', 'memory.limit_in_bytes' => '400'], 'e0d31abe844743a809c096f2277697e801847a2db87190b226e6880d2b2bc0e4'],
             'pressure' => [['memory.current' => '195', 'memory.high' => '200', 'memory.max' => '400', 'memory.stat' => "anon 160\nfile 35", 'cgroup.controllers' => 'cpu memory io', 'memory.pressure' => "some avg10=0.50 total=1\nfull avg10=0.10 total=2", 'memory.events' => "high 1001\nmax 2\noom 0\noom_kill 0"], '83d6b1884a8fc2cbbdd4c0d1afc0e7f5a016d375707fbab640301a9e10836201'],
-            'oom' => [['memory.usage_in_bytes' => '100', 'memory.limit_in_bytes' => '400', 'memory.oom_control' => 'oom_kill 4'], '9b86c22953066fb6084cf2c605989188340dde98d0bce43a9fae8e5ea1585298'],
+            'oom' => [['memory.usage_in_bytes' => '100', 'memory.limit_in_bytes' => '400', 'memory.oom_control' => 'oom_kill 4'], '34825e5d6c3dd4ab5f54654d5ba81909804ca8623344a19e14fd104eb8bc1593'],
             'invalid' => [['memory.current' => '-1', 'memory.usage_in_bytes' => '1.2', 'memory.high' => '', 'memory.max' => 'max'], '7f43320f26a6efcabc24f23aa74a5ae1e927c6bc45ff9f68f9e9302bbb28b977'],
         ];
         foreach ($cases as $name => [$files, $hash]) {
@@ -228,8 +228,9 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->pmssWriteFile($dir.'/memory.events', "high 0\n");
         // Real OOM kills on the account's own slice — the ONLY sound v1 pressure signal.
         $this->pmssWriteFile($dir.'/memory.oom_control', "oom_kill_disable 0\nunder_oom 0\noom_kill 4\n");
+        $this->pmssWriteFile($dir.'/oom.state', serialize(['count' => 4, 'last_increase' => 100, 'sampled_at' => 100]));
 
-        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234]);
+        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234, 'oom_status_path' => $dir.'/oom.state', 'now' => 100]);
 
         $this->assertSame(4, $status['oom_kill_events']);
         $this->assertSame('HIGH', $status['status']);
@@ -248,11 +249,36 @@ class WebCgroupMemoryStatusTest extends TestCase
         $childDir = $dir.'/user@1234.service';
         @mkdir($childDir, 0777, true);
         $this->pmssWriteFile($childDir.'/memory.oom_control', "oom_kill_disable 0\nunder_oom 0\noom_kill 3\n");
+        $this->pmssWriteFile($dir.'/oom.state', serialize(['count' => 2, 'last_increase' => null, 'sampled_at' => 100]));
 
-        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234]);
+        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234, 'oom_status_path' => $dir.'/oom.state', 'now' => 100]);
 
         $this->assertSame(3, $status['oom_kill_events']);
         $this->assertSame('HIGH', $status['status']);
+    }
+
+    public function testOomRecencyRejectsLifetimeAndStaleSignals(): void
+    {
+        $state = ['count' => 4, 'last_increase' => 100, 'sampled_at' => 86500];
+        $this->assertSame(false, \pmssWebCgroupMemoryStatusOomRecent(4, $state, 86500));
+        $this->assertSame(true, \pmssWebCgroupMemoryStatusOomRecent(5, $state, 86500));
+        $this->assertSame(false, \pmssWebCgroupMemoryStatusOomRecent(3, $state, 86500));
+        $this->assertSame(false, \pmssWebCgroupMemoryStatusOomRecent(4, ['count' => 4, 'last_increase' => 86500, 'sampled_at' => 85000], 86500));
+        $this->assertSame(false, \pmssWebCgroupMemoryStatusOomRecent(4, [], 86500));
+    }
+
+    public function testHistoricalOomDoesNotAdvertiseRamUpgrade(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-stale-oom-');
+        $this->pmssWriteFile($dir.'/memory.usage_in_bytes', "100\n");
+        $this->pmssWriteFile($dir.'/memory.limit_in_bytes', "400\n");
+        $this->pmssWriteFile($dir.'/memory.oom_control', "oom_kill 4\n");
+        $this->pmssWriteFile($dir.'/oom.state', serialize(['count' => 4, 'last_increase' => 100, 'sampled_at' => 86500]));
+
+        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir, 'uid' => 1234, 'oom_status_path' => $dir.'/oom.state', 'now' => 86500]);
+        $this->assertSame(4, $status['oom_kill_events']);
+        $this->assertSame('LOW', $status['status']);
+        $this->assertSame('', $status['message']);
     }
 
     public function testReadUsesAnonymousMemoryForPressureButReportsInclusiveCurrent(): void
