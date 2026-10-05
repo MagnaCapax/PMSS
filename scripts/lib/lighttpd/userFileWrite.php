@@ -8,6 +8,7 @@
 require_once __DIR__.'/../pathSafety.php';
 require_once __DIR__.'/../log.php';
 require_once __DIR__.'/../runtime/filesystem.php';
+require_once __DIR__.'/accountPath.php';
 
 function pmssUserFilePathIsSafe(string $path): bool
 {
@@ -185,6 +186,33 @@ function pmssWriteManagedFile(string $path, string $content, string $owner, ?str
 function pmssWriteUserFile(string $path, string $content, string $owner, int $mode): bool
 {
     return pmssWriteManagedFile($path, $content, $owner, $owner, $mode);
+}
+
+/**
+ * Atomically replace account-owned content as the account itself.
+ * Existing entries must be regular files owned by that account. A root-owned
+ * managed entry remains on pmssWriteManagedFile(), even when its parent is
+ * writable by the account. The parent must already exist.
+ */
+function pmssReplaceAccountFile(string $username, string $home, string $path, string $content, int $mode): bool
+{
+    $account = function_exists('posix_getpwnam') ? @posix_getpwnam($username) : false;
+    if (!is_array($account) || !isset($account['uid']) || $mode < 0 || $mode > 0777
+        || !pmssUserFilePathIsSafe($path)
+        || (file_exists($path) && (@fileowner($path) !== $account['uid'] || @stat($path)['nlink'] !== 1))) {
+        return false;
+    }
+
+    $directory = dirname($path);
+    $temporary = $directory.'/'.basename($path).'.pmss-tmp-XXXXXXXX';
+    $command = 'tmp=$(mktemp -- '.escapeshellarg($temporary).') || exit 1; '
+        .'trap \'rm -f -- "$tmp"\' EXIT; '
+        .'cat > "$tmp" && test "$(wc -c < "$tmp")" -eq '.strlen($content)
+        .' && chmod '.sprintf('%o', $mode).' -- "$tmp"'
+        .' && test ! -L '.escapeshellarg($path)
+        .' && { test ! -e '.escapeshellarg($path).' || test -f '.escapeshellarg($path).'; }'
+        .' && mv -T -- "$tmp" '.escapeshellarg($path);
+    return pmssAccountPathRun($username, $home, [$path], $command, $content);
 }
 
 /** Best-effort immutable toggle for managed root-owned files. */

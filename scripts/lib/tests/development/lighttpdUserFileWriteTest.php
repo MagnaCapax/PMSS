@@ -8,6 +8,58 @@ class LighttpdUserFileWriteTest extends TestCase
 {
     protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-lighttpd-user-write-']; }
 
+    public function testAccountFileReplacementKeepsContentAndMode(): void
+    {
+        $home = $this->tempDir.'/account';
+        $this->assertTrue(@mkdir($home));
+        $path = $home.'/config';
+        $owner = $this->pmssCurrentOwner();
+
+        $this->assertTrue(\pmssReplaceAccountFile($owner, $home, $path, "first\n", 0640));
+        $this->assertTrue(\pmssReplaceAccountFile($owner, $home, $path, "second\n", 0600));
+        $this->assertSame("second\n", file_get_contents($path));
+        $this->assertSame(0600, fileperms($path) & 0777);
+        $this->assertSame([], glob($home.'/config.pmss-tmp-*'));
+    }
+
+    public function testAccountFileReplacementRejectsPathsOutsideHome(): void
+    {
+        $home = $this->tempDir.'/account';
+        $this->assertTrue(@mkdir($home));
+        $outside = $this->tempDir.'/outside';
+        $this->assertFalse(\pmssReplaceAccountFile($this->pmssCurrentOwner(), $home, $outside, 'new', 0600));
+        $this->assertFalse(file_exists($outside));
+    }
+
+    public function testAccountFileReplacementRejectsLinkedTarget(): void
+    {
+        $home = $this->tempDir.'/account';
+        $this->assertTrue(@mkdir($home));
+        $this->assertTrue(@file_put_contents($home.'/original', 'kept') !== false);
+        $this->assertTrue(@symlink($home.'/original', $home.'/linked'));
+        $this->assertFalse(\pmssReplaceAccountFile($this->pmssCurrentOwner(), $home, $home.'/linked', 'new', 0600));
+        $this->assertSame('kept', file_get_contents($home.'/original'));
+    }
+
+    public function testAccountFileReplacementRejectsMissingParentAndBadMode(): void
+    {
+        $home = $this->tempDir.'/account';
+        $this->assertTrue(@mkdir($home));
+        $owner = $this->pmssCurrentOwner();
+        $this->assertFalse(\pmssReplaceAccountFile($owner, $home, $home.'/missing/file', 'new', 0600));
+        $this->assertFalse(\pmssReplaceAccountFile($owner, $home, $home.'/config', 'new', 01000));
+        $this->assertFalse(file_exists($home.'/config'));
+    }
+
+    public function testAccountFileReplacementRejectsUnknownAccountAndDirectoryTarget(): void
+    {
+        $home = $this->tempDir.'/account';
+        $this->assertTrue(@mkdir($home));
+        $this->assertTrue(@mkdir($home.'/dir'));
+        $this->assertFalse(\pmssReplaceAccountFile('pmss-no-such-account-123', $home, $home.'/config', 'new', 0600));
+        $this->assertFalse(\pmssReplaceAccountFile($this->pmssCurrentOwner(), $home, $home.'/dir', 'new', 0600));
+    }
+
     public function testOwnershipMetadataUsesEntryAwareCalls(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/lighttpd/userFileWrite.php');
