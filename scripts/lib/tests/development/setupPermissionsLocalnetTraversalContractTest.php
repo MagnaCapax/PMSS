@@ -77,6 +77,15 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
         ]);
     }
 
+    public function testStartRtorrentRefreshesExecutorThroughManagedWriter(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/startRtorrent', [
+            "require_once __DIR__.'/lib/lighttpd/userFileWrite.php';",
+            'pmssWriteUserFile($executor, $skelData, $user, 0755)',
+        ]);
+        $this->pmssAssertRepoFileNotContainsString('scripts/startRtorrent', '@copy($skelExecutor, $executor)');
+    }
+
     public function testUpdateStep2RegistersPermissionShutdownRescueBeforeWork(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [

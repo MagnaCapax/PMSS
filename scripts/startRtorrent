@@ -16,6 +16,7 @@ if (is_file($userLogLib)) {
     require_once $userLogLib;
 }
 require_once __DIR__.'/lib/user/serviceLaunch.php';
+require_once __DIR__.'/lib/lighttpd/userFileWrite.php';
 require_once __DIR__.'/lib/rtorrent/process.php';
 
 if ($argc !== 2) {
@@ -119,15 +120,7 @@ if (is_file($executor) && is_file($skelExecutor) && !is_link($executor)) {
     $skelData = @file_get_contents($skelExecutor);
     $skelHasLock = is_string($skelData) && $skelData !== '' && strpos($skelData, '.rtorrentExecute.lock') !== false && strpos($skelData, 'flock(') !== false;
     if (!$executorHasLock && $skelHasLock) {
-        if (@copy($skelExecutor, $executor)) {
-            @chmod($executor, 0755);
-            @chown($executor, $user);
-            if (function_exists('posix_getpwnam')) {
-                $pw = @posix_getpwnam($user);
-                if (is_array($pw) && isset($pw['gid'])) {
-                    @chgrp($executor, (int) $pw['gid']);
-                }
-            }
+        if (pmssWriteUserFile($executor, $skelData, $user, 0755)) {
             logmsg("[INFO] Refreshed {$executor} from {$skelExecutor} (added lock guard)");
         } else {
             logmsg("[WARN] Failed to refresh {$executor} from {$skelExecutor}");
