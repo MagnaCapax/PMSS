@@ -208,7 +208,7 @@ if (!file_exists($qbittorrentConfigFile)) {
             ],
             $qbittorrentTemplate
         );
-        if (@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false) {
+        if (!pmssReplaceUserFileWithMetadata($qbittorrentConfigFile, $qbittorrentConfig, 0644, 'root', 'root')) {
             fwrite(STDERR, "Warning: failed to write qBittorrent config for {$user['name']}\n");
         }
         if (!pmssNetworkPortFileWrite(sprintf('/home/%s/.qbittorrentPort', $user['name']), $qbittorrentPort, 1024, 65500, 0644)) {
