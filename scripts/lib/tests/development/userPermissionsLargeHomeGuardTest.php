@@ -41,6 +41,7 @@ PHP;
                 'find %s -not -type l \( ! -type f -o -links 1 \) -not -perm %s -exec chmod %s {} +',
                 'find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chmod %o {} +',
                 'find %s -path %s -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',
+                'find %s -type f -links 1 -perm /0111 -exec chmod a-x {} +',
                 'function pmssFindOwnerMismatchPredicate(string $owner): string',
                 '\( -not -user %s -o -not -group %s \)',
                 'find %s -not -type l \( ! -type f -o -links 1 \) %s -exec chown -h %s {} +',

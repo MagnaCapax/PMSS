@@ -113,7 +113,7 @@ pmssRun(sprintf(
 // copied carrying the exec bit. Strip exec from ~/www FILES (dirs are already normalised
 // to 0750 by the walk above). Bounded to ~/www so large payload trees under ~/data are
 // untouched; the explicit chmodItems below re-apply any file that legitimately keeps exec.
-pmssRun(sprintf('find %s -type f -perm /0111 -exec chmod a-x {} +', escapeshellarg("/home/{$thisUser}/www")));
+pmssRun(sprintf('find %s -type f -links 1 -perm /0111 -exec chmod a-x {} +', escapeshellarg("/home/{$thisUser}/www")));
 
 // Ensure ~/.bin and ~/bin exist with safe permissions and ownership.
 foreach ([
