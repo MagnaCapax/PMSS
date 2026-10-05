@@ -33,11 +33,11 @@ function chmodPath(string $path, int $perm, bool $recursive = false): void
 
     if ($recursive) {
         $mode = sprintf('%04o', $perm);
-        pmssRun(sprintf('find %s -not -type l -not -perm %s -exec chmod %s {} +', $target, $mode, $mode));
+        pmssRun(sprintf('find %s -not -type l \( ! -type f -o -links 1 \) -not -perm %s -exec chmod %s {} +', $target, $mode, $mode));
         return;
     }
 
-    pmssRun(sprintf('chmod %s%o %s', $recursive ? '-R ' : '', $perm, $target));
+    pmssRun(sprintf('find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chmod %o {} +', $target, $perm));
 }
 
 function chownPath(string $path, string $owner, bool $recursive = false): void
@@ -50,13 +50,13 @@ function chownPath(string $path, string $owner, bool $recursive = false): void
     if ($recursive) {
         $predicate = pmssFindOwnerMismatchPredicate($owner);
         if ($predicate !== '') {
-            pmssRun(sprintf('find %s -not -type l %s -exec chown %s {} +', $target, $predicate, escapeshellarg($owner)));
+            pmssRun(sprintf('find %s -not -type l \( ! -type f -o -links 1 \) %s -exec chown -h %s {} +', $target, $predicate, escapeshellarg($owner)));
             return;
         }
     }
 
     // Quote owner spec as a single argument; chown accepts quoted 'user.group'
-    pmssRun(sprintf('chown %s%s %s', $recursive ? '-R ' : '', escapeshellarg($owner), $target));
+    pmssRun(sprintf('find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chown -h %s {} +', $target, escapeshellarg($owner)));
 }
 
 function pmssFindOwnerMismatchPredicate(string $owner): string
@@ -249,7 +249,7 @@ foreach ($excludes as $ex) {
 }
 // Skip symbolic links so broken symlinks (e.g. ~/www/watch) do not cause chown
 // dereference errors or non-zero rc noise in logs.
-$findParts[] = '-not -type l';
+$findParts[] = '-not -type l \( ! -type f -o -links 1 \)';
 $uidRanges = pmssSubordinateIdRanges($thisUser, (int) $userIds['uid'], 'uid');
 $gidRanges = pmssSubordinateIdRanges($thisUser, (int) $userIds['gid'], 'gid');
 if ($uidRanges !== [] || $gidRanges !== []) {

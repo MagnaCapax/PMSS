@@ -38,14 +38,18 @@ PHP;
                 "require_once __DIR__.'/../lib/user/subordinateIds.php';",
                 "\$findParts[] = '-execdir chown -h';",
                 '$mode = sprintf(\'%04o\', $perm);',
-                'find %s -not -type l -not -perm %s -exec chmod %s {} +',
+                'find %s -not -type l \( ! -type f -o -links 1 \) -not -perm %s -exec chmod %s {} +',
+                'find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chmod %o {} +',
                 'find %s -path %s -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',
                 'function pmssFindOwnerMismatchPredicate(string $owner): string',
                 '\( -not -user %s -o -not -group %s \)',
-                'find %s -not -type l %s -exec chown %s {} +',
+                'find %s -not -type l \( ! -type f -o -links 1 \) %s -exec chown -h %s {} +',
+                'find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chown -h %s {} +',
             ],
             'forbidden' => [
                 '["/home/{$thisUser}/data", 0750, true],' => 'Expected data tree chmod to avoid recursive mode',
+                "pmssRun(sprintf('chown %s%s %s'" => 'Direct ownership command must stay out of the account tree',
+                "pmssRun(sprintf('chmod %s%o %s'" => 'Direct mode command must stay out of the account tree',
             ],
         ]);
     }
