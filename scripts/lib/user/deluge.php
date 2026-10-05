@@ -117,7 +117,7 @@ function userConfigureDeluge(array $user, array $configuration): void
     $sessionDir    = "$home/.sessionDeluge";
 
     if (!file_exists($configDir)) {
-        runStep('Creating Deluge config dir', sprintf('mkdir -p %s', escapeshellarg($configDir)));
+        runStep('Creating Deluge config dir', pmssBuildUserShellCommand($username, 'mkdir -p -- '.escapeshellarg($configDir)));
     }
     $ownedDirs = [
         'Deluge unfinished' => $unfinishedDir,
@@ -125,8 +125,7 @@ function userConfigureDeluge(array $user, array $configuration): void
     ];
     foreach ($ownedDirs as $label => $dir) {
         if (!file_exists($dir)) {
-            runStep('Creating '.$label.' dir', sprintf('mkdir -p %s', escapeshellarg($dir)));
-            runStep('Fixing '.$label.' ownership', sprintf('chown %1$s -R %2$s', escapeshellarg($username.':'.$username), escapeshellarg($dir)));
+            runStep('Creating '.$label.' dir', pmssBuildUserShellCommand($username, 'mkdir -p -- '.escapeshellarg($dir)));
         }
     }
 

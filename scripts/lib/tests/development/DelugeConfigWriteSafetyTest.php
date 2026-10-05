@@ -6,6 +6,14 @@ require_once dirname(__DIR__, 2).'/user/deluge.php';
 
 final class DelugeConfigWriteSafetyTest extends TestCase
 {
+    public function testMissingDirectoriesAreCreatedAsAccountUser(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/user/deluge.php');
+        $this->assertStringContainsString("pmssBuildUserShellCommand(\$username, 'mkdir -p -- '.escapeshellarg(\$configDir))", $source);
+        $this->assertStringContainsString("pmssBuildUserShellCommand(\$username, 'mkdir -p -- '.escapeshellarg(\$dir))", $source);
+        $this->assertFalse(strpos($source, "sprintf('chown %1\$s -R %2\$s', escapeshellarg(\$username.':'.\$username), escapeshellarg(\$dir))") !== false);
+    }
+
     public function testConfigWriteCreatesRegularFile(): void
     {
         $path = $this->pmssMakeTempDir('pmss-deluge-config-write-', 0700).'/core.conf';
