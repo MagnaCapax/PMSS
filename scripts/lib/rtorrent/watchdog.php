@@ -14,6 +14,7 @@ require_once __DIR__.'/../rtorrentConfig.php';
 require_once __DIR__.'/../user/log.php';
 require_once __DIR__.'/../user/traffic.php';
 require_once __DIR__.'/../user/userConfigStore.php';
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 /** Emit a cron-visible line when debug is enabled or the caller forces it. */
 function pmssCheckRtorrentLog(string $message, bool $force = false, bool $debug = false): void
@@ -65,12 +66,14 @@ function pmssCheckRtorrentRefreshExecutorFromSkel(string $user, string $home, bo
     }
     if ($skelHash === $userHash) return;
 
-    if (!@copy($skelScript, $userScript)) {
+    $skelContent = @file_get_contents($skelScript);
+    if (!is_string($skelContent)) {
         pmssCheckRtorrentLogBoth($user, 'executor refresh failed (copy error)', $debug);
         return;
     }
-    if (!@chown($userScript, $user)) {
-        pmssCheckRtorrentLogBoth($user, 'refreshed stale executor from skel (ownership update failed)', $debug);
+    $mode = @fileperms($userScript);
+    if (!pmssWriteUserFile($userScript, $skelContent, $user, is_int($mode) ? $mode & 0777 : 0750)) {
+        pmssCheckRtorrentLogBoth($user, 'executor refresh failed (copy error)', $debug);
         return;
     }
     pmssCheckRtorrentLogBoth($user, 'refreshed stale executor from skel', $debug);

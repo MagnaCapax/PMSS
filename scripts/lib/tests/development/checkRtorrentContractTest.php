@@ -102,10 +102,8 @@ class checkRtorrentContractTest extends TestCase
                     '$skelHash = @md5_file($skelScript);',
                     '$userHash = @md5_file($userScript);',
                     'executor refresh skipped (checksum unavailable)',
-                    "if (!@copy(\$skelScript, \$userScript))",
+                    'pmssWriteUserFile($userScript, $skelContent, $user, is_int($mode) ? $mode & 0777 : 0750)',
                     'executor refresh failed (copy error)',
-                    "if (!@chown(\$userScript, \$user))",
-                    'refreshed stale executor from skel (ownership update failed)',
                 ],
                 'forbidden' => [
                     'copy($skelScript, $userScript);',
