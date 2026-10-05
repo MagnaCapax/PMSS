@@ -58,7 +58,8 @@ class NginxUserHostsTest extends TestCase
         foreach ($valid as $raw => $expected) {
             $home = $this->pmssMakeTempDir('nginx-hosts-home-');
             file_put_contents($home.'/.billingServiceId', $raw);
-            $this->assertEquals($expected, \pmssNginxUserBillingServiceIdFromHome($home));
+            $this->assertSame($expected, \pmssUserBillingServiceIdDigitsRead($home));
+            $this->assertSame(fileowner($home.'/.billingServiceId') === 0 ? $expected : null, \pmssNginxUserBillingServiceIdFromHome($home));
         }
     }
 
@@ -67,7 +68,8 @@ class NginxUserHostsTest extends TestCase
         $home = $this->pmssMakeTempDir('nginx-hosts-legacy-');
         file_put_contents($home.'/.billingId', "0008\n");
 
-        $this->assertEquals('0008', \pmssNginxUserBillingServiceIdFromHome($home));
+        $this->assertSame('0008', \pmssUserBillingServiceIdDigitsRead($home));
+        $this->assertSame(fileowner($home.'/.billingId') === 0 ? '0008' : null, \pmssNginxUserBillingServiceIdFromHome($home));
     }
 
     public function testBillingServiceIdFromHomeRejectsInvalidValues(): void

@@ -97,7 +97,7 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
     // Service id via the canonical reader (.billingServiceId, falling back to the
     // legacy .billingId) so the portable per-service mcx.fi permalink is included
     // as a SAN on the migration-window fleet, not just the per-server subdomain.
-    $serviceId = (string) pmssUserBillingServiceIdDigitsRead($home);
+    $serviceId = (string) pmssUserBillingServiceIdDigitsRead($home, true);
     if ($serviceId !== '') {
         $names[] = pmssNginxUserMcxHostname($serviceId);
     }

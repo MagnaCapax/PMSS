@@ -132,7 +132,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
             // across their nodes by the zone builder. The client id is already on
             // this node, so no remote lookup is needed. Single-service users get a
             // name that never resolves — inert, nginx never sees a request for it.
-            $billingClientId = pmssUserBillingClientIdDigitsRead($homeDir);
+            $billingClientId = pmssUserBillingClientIdDigitsRead($homeDir, true);
             if ($billingClientId !== null) {
                 $mcxHost .= ' '.pmssNginxUserMcxClusterHostname($billingClientId);
             }

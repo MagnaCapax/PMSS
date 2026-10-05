@@ -57,4 +57,13 @@ class UserBillingIdsSafetyTest extends TestCase
         $this->assertSame(null, \pmssUserBillingServiceIdDigitsRead($home));
         $this->assertSame(null, \pmssUserBillingClientIdDigitsRead($home));
     }
+
+    public function testManagedOwnerRequirementUsesTheOpenedEntry(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-billing-owner-');
+        $path = $home.'/.billingClientId';
+        file_put_contents($path, "123\n");
+        $this->assertSame('123', \pmssUserBillingClientIdDigitsRead($home));
+        $this->assertSame(fileowner($path) === 0 ? '123' : null, \pmssUserBillingClientIdDigitsRead($home, true));
+    }
 }

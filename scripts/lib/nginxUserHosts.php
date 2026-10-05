@@ -26,7 +26,7 @@ function pmssNginxUserHostIsValidFqdn(string $hostname): bool
  */
 function pmssNginxUserBillingServiceIdFromHome(string $home): ?string
 {
-    return pmssUserBillingServiceIdDigitsRead($home);
+    return pmssUserBillingServiceIdDigitsRead($home, true);
 }
 
 /** Derive the published mcx.fi label from a billing identifier. */
