@@ -15,6 +15,7 @@
  */
 require_once __DIR__.'/log.php';
 require_once __DIR__.'/runtime/filesystem.php';
+require_once __DIR__.'/lighttpd/userFileWrite.php';
 require_once __DIR__.'/rtorrentPortReservations.php';
 require_once __DIR__.'/rtorrent/configRender.php';
 require_once __DIR__.'/rtorrent/portReservation.php';
@@ -85,13 +86,8 @@ class rtorrentConfig
         if (!$this->userConfigFileTargetIsSafe($file)) {
             return false;
         }
-        if (!file_exists($file)) {
-            if (@touch($file) === false || !$this->userConfigFileTargetIsSafe($file)) {
-                return false;
-            }
-            @chmod($file, 0644);
-        }
-        return is_writable($file) && @file_put_contents($file, $config) === strlen($config);
+        return (!file_exists($file) || is_writable($file))
+            && pmssReplaceUserFilePreservingMetadata($file, $config, 0644);
     }
     /**
      * Rewrite a user's configuration only when the contents differ.
