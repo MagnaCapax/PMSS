@@ -95,6 +95,13 @@ function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = 
     runStep('Starting PMSS boot tuning service', 'systemctl start pmss-boot-tuning.service || true');
 }
 
+/** Confirm the entire locale configuration was written before reporting success. */
+function pmssLocaleGenWriteComplete(string $path, string $content, ?callable $writer = null): bool
+{
+    $written = $writer ? $writer($path, $content) : @file_put_contents($path, $content);
+    return $written === strlen($content);
+}
+
 /**
  * Make sure essential locale assets exist before other services start.
  */
@@ -121,12 +128,15 @@ function pmssEnsureLocaleBaseline(): void
             $line = $locale.' UTF-8';
             if ($gen === false) {
                 // Best effort: create file with the required locale line
-                @file_put_contents('/etc/locale.gen', $line."\n");
-                logMessage('[WARN] /etc/locale.gen missing; created with '.$line);
+                if (pmssLocaleGenWriteComplete('/etc/locale.gen', $line."\n")) {
+                    logMessage('[WARN] /etc/locale.gen missing; created with '.$line);
+                } else {
+                    logMessage('[WARN] Unable to create /etc/locale.gen with '.$line);
+                }
             } else {
                 if (strpos($gen, $line) === false) {
                     // Append the desired locale line if not present at all
-                    if (@file_put_contents('/etc/locale.gen', rtrim($gen, "\r\n")."\n".$line."\n") === false) {
+                    if (!pmssLocaleGenWriteComplete('/etc/locale.gen', rtrim($gen, "\r\n")."\n".$line."\n")) {
                         logMessage('[WARN] Unable to append '.$line.' to /etc/locale.gen');
                     } else {
                         logMessage('Appended '.$line.' to /etc/locale.gen');

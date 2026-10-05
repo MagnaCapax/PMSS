@@ -57,6 +57,10 @@ cleaner verbose logs reach the per-user append step only after the complete
 temporary payload is written. Both retain their existing successful bytes and
 failure cleanup paths.
 
+Locale baseline writes likewise report creation or append success only after
+the entire `/etc/locale.gen` payload is written. Failed and short writes warn;
+locale generation keeps its existing best-effort sequence.
+
 Locked PID and counter-state streams share one seek, truncate, complete-write,
 and flush sequence. Their existing entrypoints and failure results are retained.
 
