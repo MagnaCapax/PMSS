@@ -7,7 +7,7 @@
  * file may still contain valid credentials. Modern deployments should favour
  * per-user auth from the start.
  *
- * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author    Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  *
  * @license GPL-3.0-only

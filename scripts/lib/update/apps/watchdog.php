@@ -4,7 +4,7 @@
  *
  * Re-enable watchdog with a robust network check to avoid false positives.
  *
- * @author  Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author  Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  *
  * @license GPL-3.0-only

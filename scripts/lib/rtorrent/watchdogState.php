@@ -5,7 +5,7 @@
  * Keeps marker-file naming, stale-condition timing, and restart-grace state out
  * of process control code while preserving the legacy function names.
  *
- * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author    Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  * @license   Proprietary
  */

@@ -8,7 +8,7 @@
  * /home/<user>/www-disabled. Also refreshes nginx user config so the UI
  * reflects the suspension immediately.
  *
- * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author    Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  *
  * @license GPL-3.0-only

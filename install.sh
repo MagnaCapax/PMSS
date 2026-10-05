@@ -10,7 +10,7 @@
 # Only adjust behaviour when absolutely necessary, and coordinate changes with
 # the platform team.
 #
-# Author: Aleksi Ursin <aleksi@magnacapax.fi>
+# Author: Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
 # Copyright 2010-2025 Magna Capax Finland Oy
 
 DEFAULT_REPOSITORY="https://github.com/MagnaCapax/PMSS"

@@ -9,7 +9,7 @@
  * - Logs failures via `Logger`, then continues to the next user so one broken
  *   account does not halt the sweep.
  *
- * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author    Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  *
  * @license GPL-3.0-only

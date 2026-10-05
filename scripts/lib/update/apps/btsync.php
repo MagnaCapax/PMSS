@@ -9,7 +9,7 @@
  * This workflow has been stable for years—avoid modifications unless the
  * service itself changes. Coordinate updates with the platform team first.
  *
- * @author  Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author  Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  *
  * @license GPL-3.0-only

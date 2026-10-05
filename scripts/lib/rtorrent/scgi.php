@@ -6,7 +6,7 @@
  * the XML-RPC codec, Unix-socket transport, and listen-queue parser live in
  * focused modules.
  *
- * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author    Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  * @license   Proprietary
  */

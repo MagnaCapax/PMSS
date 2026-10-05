@@ -22,7 +22,7 @@ declare(strict_types=1);
  *
  * Usage: recreateUser.php USERNAME MAX_RAM_MiB DISK_QUOTA_GiB [PASSWORD]
  *
- * @author  Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author  Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  */
 

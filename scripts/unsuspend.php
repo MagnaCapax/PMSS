@@ -7,7 +7,7 @@
  * /home/<user>/www-disabled when present, refreshes nginx user config, and
  * restarts and verifies the per-user web stack before completing.
  *
- * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author    Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  *
  * @license GPL-3.0-only

@@ -5,7 +5,7 @@
  * Owns destructive user-tree recovery targets so process control code does not
  * also carry session-reset and custom-config quarantine policy.
  *
- * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author    Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  * @license   Proprietary
  */

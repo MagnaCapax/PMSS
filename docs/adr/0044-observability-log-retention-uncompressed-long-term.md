@@ -30,7 +30,7 @@ Keeping these logs is nearly free: `system-stats.log` is ~200 B/line × 288/day
 `iostat-history-raw.log` (~365 MB/year), which needs a bound so a pathological node
 cannot fill `/var/log`.
 
-The prior policy was operator-committed (a1aa3e19, 650405b2, aleksi@magnacapax.fi)
+The prior policy was operator-committed (a1aa3e19, 650405b2)
 and is superseded by an explicit operator directive on 2026-08-14: retention "should
 be for ever" and "no compression initially".
 

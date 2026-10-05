@@ -7,7 +7,7 @@
  * SCGI-unresponsive processes. Runs from root cron and logs interventions to
  * stdout plus per-user PMSS logs.
  *
- * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author    Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  * @license   Proprietary
  */

@@ -6,7 +6,7 @@
  * Centralises firewall and FireQOS updates so update.php can invoke it
  * repeatedly while keeping tenant-specific overrides intact.
  *
- * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author    Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  *
  * @license GPL-3.0-only

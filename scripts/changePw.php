@@ -10,7 +10,7 @@
  * - Passwords are echoed to the operator; call sites must ensure the terminal
  *   history is handled appropriately.
  *
- * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author    Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  *
  * @license GPL-3.0-only

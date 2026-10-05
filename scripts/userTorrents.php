@@ -6,7 +6,7 @@
  * Intended for quick operational overview of how many torrents each tenant
  * has active by inspecting /home/<user>/session/*.torrent files.
  *
- * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author    Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  *
  * @license GPL-3.0-only

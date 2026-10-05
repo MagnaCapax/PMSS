@@ -17,7 +17,7 @@
  *     exist with user ownership when referenced by config.
  *   - User lighttpd process launched; script prints `ps` output for visibility.
  *
- * @author  Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author  Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  */
 

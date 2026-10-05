@@ -9,7 +9,7 @@
  * script exits non-zero and prints a single error line instead of a stack
  * trace to keep downstream consumers safer.
  *
- * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @author    Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  *
  * @license GPL-3.0-only
