@@ -10,14 +10,16 @@ class WebdavLockBootstrapTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-webdav-lock-', 0700);
         $userHome = dirname($this->pmssEnsureDir($dir.'/home/deefbox/.lighttpd', 0700));
+        $owner = $this->pmssCurrentOwner();
 
-        \pmssEnsureWebdavLockDatabase('deefbox', $userHome);
+        \pmssEnsureWebdavLockDatabase($owner, $userHome);
 
         $lockFile = $userHome.'/.lighttpd/webdav.lock.db';
         $this->assertTrue(is_file($lockFile), 'expected lock file created');
         $this->assertEquals(0600, fileperms($lockFile) & 0777, 'expected 0600 lock perms');
+        $this->assertSame(posix_geteuid(), fileowner($lockFile));
         $this->pmssAssertRepoFileContainsString('scripts/lib/lighttpd/userDirectoriesPrepare.php',
-            "pmssWriteUserFile(\$lockFile, '', \$user, 0600)");
+            "pmssReplaceAccountFile(\$user, \$homeDir, \$lockFile, '', 0600)");
     }
 
     public function testExistingLinkedLockLeavesDestinationUntouched(): void

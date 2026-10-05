@@ -12,10 +12,9 @@ class LighttpdUserDirectoryPrepTest extends TestCase
 
     public function testCreatesDirectoriesAndCustomFile(): void
     {
-        $user = 'testuser';
         $home = $this->pmssEnsureUserWebHome($this->base, 'home');
 
-        $ok = \pmssPrepareLighttpdUserDirectories($user, $home, true);
+        $ok = $this->prepareAsCurrentAccount($home, true);
         $this->assertTrue($ok);
 
         $this->assertTrue(is_dir($home.'/.lighttpd'));
@@ -25,6 +24,7 @@ class LighttpdUserDirectoryPrepTest extends TestCase
         $this->assertTrue(is_dir($home.'/www/public'));
         $this->assertTrue(is_file($home.'/.lighttpd/custom'));
         $this->assertEquals(0640, (fileperms($home.'/.lighttpd/custom') & 0777));
+        $this->assertSame(posix_geteuid(), fileowner($home.'/.lighttpd/custom'));
 
         $this->assertEquals(0751, (@fileperms($home.'/.lighttpd') & 0777));
         $this->assertEquals(0750, (@fileperms($home.'/.lighttpd/custom.d') & 0777));
@@ -101,13 +101,26 @@ class LighttpdUserDirectoryPrepTest extends TestCase
 
     public function testAcceptsExpectedDurablePublicWebRootSymlink(): void
     {
-        $user = 'testuser';
         $home = $this->pmssEnsureUserWebHome($this->base, 'home');
         $target = $home.'/.local/share/pmss/public';
         $this->pmssEnsureDir($target, 0751);
         $this->pmssCreateSymlinkOrSkip('../.local/share/pmss/public', $home.'/www/public');
 
-        $this->assertTrue(\pmssPrepareLighttpdUserDirectories($user, $home, false));
+        $this->assertTrue($this->prepareAsCurrentAccount($home, false));
         $this->assertSame('../.local/share/pmss/public', readlink($home.'/www/public'));
+    }
+
+    /** The host account name may exceed PMSS's production username limit. */
+    private function prepareAsCurrentAccount(string $home, bool $deflate): bool
+    {
+        $source = $this->pmssRepoPath('scripts/lib/lighttpd/userDirectoriesPrepare.php');
+        $script = 'function pmssValidateUsername($user) { '
+            .'return $user === posix_getpwuid(posix_geteuid())["name"]; } '
+            .'require '.var_export($source, true).'; '
+            .'$user = posix_getpwuid(posix_geteuid())["name"]; '
+            .'echo json_encode(["ok" => pmssPrepareLighttpdUserDirectories($user, '
+            .var_export($home, true).', '.($deflate ? 'true' : 'false').')]);';
+        $result = $this->pmssRunInlinePhpJson($script);
+        return $result['ok'] ?? false;
     }
 }
