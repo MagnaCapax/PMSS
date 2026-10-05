@@ -82,19 +82,19 @@ function rtorrentProcessResetSessionDirectory(string $home, string $user, callab
         return false;
     }
 
-    if (!@chown($sessionDir, $user)) {
+    if (!@lchown($sessionDir, $user)) {
         $logFn("Failed to restore session directory owner: {$sessionDir}", true);
         return false;
     }
     if (function_exists('posix_getpwnam')) {
         $pw = @posix_getpwnam($user);
-        if (!isset($pw['gid']) || !@chgrp($sessionDir, (int) $pw['gid'])) {
+        if (!isset($pw['gid']) || !@lchgrp($sessionDir, (int) $pw['gid'])) {
             $logFn("Failed to restore session directory group: {$sessionDir}", true);
             return false;
         }
     }
 
-    return true;
+    return is_dir($sessionDir) && !is_link($sessionDir);
 }
 
 /**

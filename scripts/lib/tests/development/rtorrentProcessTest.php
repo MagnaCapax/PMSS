@@ -498,4 +498,13 @@ class RtorrentProcessTest extends TestCase
         $this->assertTrue(is_dir($home.'/session'), 'The recreated directory remains available for later repair');
         $this->pmssAssertMessagesContain($messages, 'Failed to restore session directory owner');
     }
+
+    public function testResetSessionDirectoryUsesLinkAwareMetadataCalls(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/rtorrent/recovery.php');
+        $this->assertStringContainsString('@lchown($sessionDir, $user)', $source);
+        $this->assertStringContainsString('@lchgrp($sessionDir, (int) $pw[\'gid\'])', $source);
+        $this->assertStringContainsString('return is_dir($sessionDir) && !is_link($sessionDir);', $source);
+        $this->assertFalse(strpos($source, '@chown($sessionDir, $user)') !== false);
+    }
 }
