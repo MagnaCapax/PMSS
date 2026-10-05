@@ -188,6 +188,8 @@ function pmssEnsureSshdStarvationDropin(
         runStep('Ensuring ssh.service starvation-resistance drop-in directory', 'install -d -m 0755 '.escapeshellarg($dropinDir));
         runStep('Installing ssh.service starvation-resistance drop-in', sprintf('cp %s %s', escapeshellarg($template), escapeshellarg($dropinFile)));
         runStep('Reloading systemd unit files (ssh starvation resistance)', '/usr/bin/systemctl daemon-reload || true');
+        runStep('Validating sshd before restarting for OOM inheritance', pmssSshdValidationCommand());
+        runStep('Restarting sshd for normal session OOM scores', '/usr/bin/systemctl try-restart ssh');
         return true;
     }
 
@@ -212,6 +214,11 @@ function pmssEnsureSshdStarvationDropin(
     );
     if ($changed) {
         runStep('Reloading systemd unit files (ssh starvation resistance)', '/usr/bin/systemctl daemon-reload || true');
+        if (runStep('Validating sshd before restarting for OOM inheritance', pmssSshdValidationCommand()) === 0) {
+            runStep('Restarting sshd for normal session OOM scores', '/usr/bin/systemctl try-restart ssh');
+        } else {
+            logMessage('[WARN] Skipping sshd restart: sshd configuration validation failed');
+        }
     }
 
     return true;

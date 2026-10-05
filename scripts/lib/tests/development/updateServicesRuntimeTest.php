@@ -89,6 +89,8 @@ class UpdateServicesRuntimeTest extends TestCase
             "install -d -m 0755 '/etc/systemd/system/ssh.service.d'",
             "cp '/etc/seedbox/config/template.ssh.service.pmss-starvation.conf' '/etc/systemd/system/ssh.service.d/10-pmss-starvation-resistance.conf'",
             '/usr/bin/systemctl daemon-reload || true',
+            \pmssSshdValidationCommand(),
+            '/usr/bin/systemctl try-restart ssh',
             'cp /etc/seedbox/config/template.sshd_config /etc/ssh/sshd_config',
             'chmod 644 /etc/ssh/sshd_config',
             \pmssSshdValidationCommand(),
@@ -192,9 +194,39 @@ class UpdateServicesRuntimeTest extends TestCase
             'per-user slice containment prevents pid exhaustion',
             "CPUWeight=10000\n",
             "IOWeight=10000\n",
-            "OOMScoreAdjust=-1000\n",
             "MemoryMin=64M\n",
         ], $content);
+        $this->assertTrue(strpos($content, 'OpenSSH oom_adjust_setup protects the listener') !== false);
+        $this->assertSame(0, preg_match('/^OOMScoreAdjust\s*=/m', $content));
+    }
+
+    public function testSshdStarvationDropinSkipsRestartWhenUnchanged(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-ssh-dropin-same-');
+        $dropinDir = $root.'/ssh.service.d';
+        $dropinFile = $dropinDir.'/10-pmss-starvation-resistance.conf';
+        $this->pmssEnsureDir($dropinDir);
+        $this->pmssWriteFile($dropinFile, $this->pmssReadRepoFile('etc/seedbox/config/template.ssh.service.pmss-starvation.conf'));
+        $this->pmssResetRuntimeProfile();
+
+        $previousConfigDir = getenv('PMSS_CONFIG_DIR');
+        putenv('PMSS_CONFIG_DIR='.$this->pmssRepoPath('etc/seedbox/config'));
+        try {
+            $this->assertTrue(\pmssEnsureSshdStarvationDropin($dropinDir, $dropinFile, $root));
+            $this->assertEquals([], $this->pmssProfileCommands());
+        } finally {
+            putenv($previousConfigDir === false ? 'PMSS_CONFIG_DIR' : 'PMSS_CONFIG_DIR='.$previousConfigDir);
+        }
+    }
+
+    public function testSshdStarvationDropinRestartRequiresChangedContentAndValidSyntax(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/services/bootstrap.php', [
+            "if (\$changed) {\n        runStep('Reloading systemd unit files (ssh starvation resistance)'",
+            "if (runStep('Validating sshd before restarting for OOM inheritance', pmssSshdValidationCommand()) === 0) {",
+            "runStep('Restarting sshd for normal session OOM scores', '/usr/bin/systemctl try-restart ssh');",
+            "[WARN] Skipping sshd restart: sshd configuration validation failed",
+        ]);
     }
 
     public function testCronRestartDropinSkipsUnchangedContent(): void

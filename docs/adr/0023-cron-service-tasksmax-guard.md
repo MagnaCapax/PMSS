@@ -56,10 +56,11 @@ cron.service, the accounting parent for `rtorrent`, `screen`, `lighttpd`,
 cap remains defense-in-depth for user cron jobs that are not PMSS service
 launches.
 
-PMSS also installs an `ssh.service` drop-in with high CPU/IO weights,
-`OOMScoreAdjust=-1000`, and `MemoryMin=64M`. This is defense-in-depth for
-CPU/IO/OOM pressure only; the pid-exhaustion fix is the per-user slice
-containment above.
+PMSS also installs an `ssh.service` drop-in with high CPU/IO weights and
+`MemoryMin=64M`. OpenSSH protects its listener from OOM itself; systemd
+`OOMScoreAdjust=-1000` would make SSH sessions inherit that protection, so the
+drop-in omits it. This is defense-in-depth for CPU/IO/OOM pressure only; the
+pid-exhaustion fix is the per-user slice containment above.
 
 ## Consequences
 - Positive: Runaway cron jobs can hit a bounded service-level task cap instead
