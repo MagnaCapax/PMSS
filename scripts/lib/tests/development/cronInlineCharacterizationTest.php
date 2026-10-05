@@ -5,6 +5,16 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class CronInlineCharacterizationTest extends TestCase
 {
+    public function testWebPublicCertFailureMarkerUsesSharedWriter(): void
+    {
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/cron/webPublicCertsProcess.php', [
+            "require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';",
+            'pmssWriteUserFile($failedMarker, gmdate(\'c\')." rc=$rc\\n", $user, 0644);',
+            '@unlink($flag);',
+            '@unlink($failedMarker);',
+        ], ['@file_put_contents($failedMarker' => 'failure marker must use the shared writer']);
+    }
+
     public function testBootTuningUsesSharedManagedPathWrites(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPrep.php', [

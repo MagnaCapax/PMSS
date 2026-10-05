@@ -68,6 +68,18 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertFalse(\pmssWriteUserFile($linkDir.'/.htpasswd', "user:hash\n", $this->pmssCurrentOwner(), 0640));
     }
 
+    public function testWriteUserFileRejectsSymlinkedTarget(): void
+    {
+        [$realPath, $linkPath] = $this->pmssCreateSymlinkedFileOrSkip(
+            $this->tempDir.'/other-file',
+            $this->tempDir.'/.request-web-certs.failed',
+            "original\n"
+        );
+
+        $this->assertFalse(\pmssWriteUserFile($linkPath, "replacement\n", $this->pmssCurrentOwner(), 0644));
+        $this->assertSame("original\n", file_get_contents($realPath));
+    }
+
     public function testWriteUserFileRejectsRelativePath(): void
     {
         $this->assertFalse(\pmssWriteUserFile('relative.htpasswd', "user:hash\n", $this->pmssCurrentOwner(), 0640));

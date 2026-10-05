@@ -40,6 +40,7 @@ const LOG_PREFIX = 'webPublicCerts';
 // 2026-08-04 on le4-0-106-225wardrobe/mcxstati). Same fallback the serving path uses.
 require_once __DIR__.'/../lib/user/billingIds.php';
 require_once __DIR__.'/../lib/nginxUserHosts.php';
+require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 
 if (posix_getuid() !== 0) {
     fwrite(STDERR, "Must run as root.\n");
@@ -124,7 +125,7 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
         }
         logLine('user='.$user.' result=issued names='.implode(',', $names));
     } else {
-        @file_put_contents($failedMarker, gmdate('c')." rc=$rc\n");
+        pmssWriteUserFile($failedMarker, gmdate('c')." rc=$rc\n", $user, 0644);
         $failed++;
         logLine('user='.$user.' result=failed rc='.$rc.' names='.implode(',', $names)
             .' tail='.substr(str_replace("\n", ' ', implode(' ', array_slice($out, -3))), 0, 300));
