@@ -8,6 +8,14 @@ class LighttpdUserFileWriteTest extends TestCase
 {
     protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-lighttpd-user-write-']; }
 
+    public function testOwnershipMetadataUsesEntryAwareCalls(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/lighttpd/userFileWrite.php');
+        $this->assertStringContainsString('@lchown($path, $owner)', $source);
+        $this->assertStringContainsString('@lchgrp($path, ($group === null || $group === \'\') ? $owner : $group)', $source);
+        $this->assertFalse(strpos($source, '@chown($path, $owner)') !== false);
+    }
+
     public function testAppendUserFileWritesNewFile(): void
     {
         $path = $this->tempDir.'/user/.lighttpd/.htpasswd';

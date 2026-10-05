@@ -70,8 +70,8 @@ function pmssManagedDirsEnsure(array $directories, callable $failureLogger): voi
 function pmssUserFileApplyOwnership(string $path, string $owner, ?string $group = null): void
 {
     if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
-        @chown($path, $owner);
-        @chgrp($path, ($group === null || $group === '') ? $owner : $group);
+        @lchown($path, $owner);
+        @lchgrp($path, ($group === null || $group === '') ? $owner : $group);
     }
 }
 
