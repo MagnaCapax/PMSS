@@ -38,7 +38,7 @@ if (file_exists('/etc/vnstat.conf')) {	// Fix some default configs! Especially o
     $vnstatConfig = preg_replace('/^BandwidthDetection\s+\d+/m', 'BandwidthDetection 0', $vnstatConfig, -1, $bdCount);
     if ($bdCount === 0) { $vnstatConfig .= "\nBandwidthDetection 0\n"; }
 
-    if (@file_put_contents('/etc/vnstat.conf', $vnstatConfig) === false) {
+    if (@file_put_contents('/etc/vnstat.conf', $vnstatConfig) !== strlen($vnstatConfig)) {
         echo "Warning: unable to write /etc/vnstat.conf; skipping vnStat restart.\n";
         return;
     }

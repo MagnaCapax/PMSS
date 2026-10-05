@@ -61,6 +61,10 @@ Locale baseline writes likewise report creation or append success only after
 the entire `/etc/locale.gen` payload is written. Failed and short writes warn;
 locale generation keeps its existing best-effort sequence.
 
+Watchdog and vnStat config rewrites also require the full payload byte count
+before service activation or restart. Failed and short writes keep their
+existing warning and skip paths.
+
 Locked PID and counter-state streams share one seek, truncate, complete-write,
 and flush sequence. Their existing entrypoints and failure results are retained.
 

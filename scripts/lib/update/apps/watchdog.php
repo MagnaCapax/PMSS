@@ -71,7 +71,7 @@ foreach ([
 if ($device !== '/dev/watchdog' && is_string($config = @file_get_contents('/etc/watchdog.conf'))) {
     $updated = preg_replace('/^watchdog-device\\s*=\\s*\\/dev\\/watchdog\\b/m', 'watchdog-device = '.$device, $config);
     if ($updated !== null && $updated !== $config) {
-        if (@file_put_contents('/etc/watchdog.conf', $updated) === false) {
+        if (@file_put_contents('/etc/watchdog.conf', $updated) !== strlen($updated)) {
             logMessage('[WARN] Unable to update watchdog device path; leaving service disabled.');
             return;
         }
