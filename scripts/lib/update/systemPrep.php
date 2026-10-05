@@ -98,8 +98,7 @@ function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = 
 /** Confirm the entire locale configuration was written before reporting success. */
 function pmssLocaleGenWriteComplete(string $path, string $content, ?callable $writer = null): bool
 {
-    $written = $writer ? $writer($path, $content) : @file_put_contents($path, $content);
-    return $written === strlen($content);
+    return pmssFileWriteComplete($path, $content, 0, $writer);
 }
 
 /**

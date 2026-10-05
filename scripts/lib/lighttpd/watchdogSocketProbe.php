@@ -228,7 +228,7 @@ function pmssLighttpdWatchdogRecordSocketFailure(string $username, array $option
     $count = max(0, pmssReadRegularFileInt($statePath)) + 1;
     $encodedCount = (string) $count;
     // A partial write must not authorize a destructive restart.
-    if (@file_put_contents($statePath, $encodedCount, LOCK_EX) !== strlen($encodedCount)) {
+    if (!pmssFileWriteComplete($statePath, $encodedCount, LOCK_EX)) {
         return array('action' => 'wait', 'count' => 0, 'threshold' => $threshold);
     }
 

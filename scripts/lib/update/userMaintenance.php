@@ -59,8 +59,7 @@ function pmssUserRefreshMarkDone(string $user, string $signature, ?callable $wri
         return;
     }
     $payload = $signature."\n";
-    $written = $writer ? $writer($path, $payload) : @file_put_contents($path, $payload);
-    if ($written !== strlen($payload)) {
+    if (!pmssFileWriteComplete($path, $payload, 0, $writer)) {
         logMessage('[WARN] Unable to write user refresh marker: '.$path);
     }
 }

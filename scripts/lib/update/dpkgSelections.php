@@ -71,7 +71,7 @@ function pmssWriteSanitisedDpkgSelectionsTempFile(array $sanitised): ?string
     }
     $payload = implode(PHP_EOL, $sanitised).PHP_EOL;
     // Never hand dpkg a truncated baseline after a short filesystem write.
-    if (@file_put_contents($tmpSelection, $payload, LOCK_EX) === strlen($payload)) {
+    if (pmssFileWriteComplete($tmpSelection, $payload, LOCK_EX)) {
         return $tmpSelection;
     }
     @unlink($tmpSelection);

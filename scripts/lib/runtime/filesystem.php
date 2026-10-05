@@ -97,6 +97,8 @@ function pmssRemovePrivateTempDir(string $path, string $prefix, string $descript
 // NUL bytes make PHP filesystem calls version-dependent; reject them at the
 // runtime boundary and keep callers on the existing fail-soft path.
 function pmssFilesystemPathHasNulByte(string $path): bool { return strpos($path, "\0") !== false; }
+/** A write succeeds only when every payload byte reaches the file. */
+function pmssFileWriteComplete(string $path, string $content, int $flags = 0, ?callable $writer = null): bool { return ($writer ? $writer($path, $content) : @file_put_contents($path, $content, $flags)) === strlen($content); }
 /** Reject closed streams and other resource types before stream operations. */
 function pmssStreamHandleIsOpen($handle): bool { return is_resource($handle) && get_resource_type($handle) === 'stream'; }
 /** Treat a dangling symlink as an occupied path, unlike file_exists(). */

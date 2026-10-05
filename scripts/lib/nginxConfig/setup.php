@@ -31,7 +31,7 @@ function pmssCreateNginxConfigSetupCopy(string $source, string $target): bool
 /** Check the complete byte count so a short global config write is visible. */
 function pmssCreateNginxConfigSetupWrite(string $path, string $content): bool
 {
-    if (@file_put_contents($path, $content) === strlen($content)) return true;
+    if (pmssFileWriteComplete($path, $content)) return true;
     pmssCreateNginxConfigSetupWarn('write', $path);
     return false;
 }

@@ -183,7 +183,7 @@ function pmssProfileSummary(): void
         return;
     }
     // A failed or short write must be visible; the summary remains best-effort.
-    if (@file_put_contents($profileOutput, $encoded) !== strlen($encoded)) {
+    if (!pmssFileWriteComplete($profileOutput, $encoded)) {
         logmsg('[WARN] Unable to write complete step profile report');
     }
 }

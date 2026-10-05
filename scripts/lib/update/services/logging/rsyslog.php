@@ -51,7 +51,7 @@ function pmssApplyRsyslogKernelInputRateLimit(?callable $logger = null, ?callabl
     if (
         !is_string($candidatePath)
         || $candidatePath === ''
-        || @file_put_contents($candidatePath, $candidateBody) !== strlen($candidateBody)
+        || !pmssFileWriteComplete($candidatePath, $candidateBody)
     ) {
         if (is_string($candidatePath)) {
             @unlink($candidatePath);
