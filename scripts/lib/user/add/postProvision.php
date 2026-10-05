@@ -28,10 +28,11 @@ function pmssAddUserBonusQuotaPersist(array $user, string $homePath): bool
         return false;
     }
 
-    return pmssWriteUserFile(
+    return pmssReplaceAccountFileWithLegacyFallback(
+        $user['name'],
+        rtrim($homePath, '/'),
         rtrim($homePath, '/').'/.bonusQuota',
         (string) $user['bonusQuotaGiB'],
-        $user['name'],
         0640
     );
 }
