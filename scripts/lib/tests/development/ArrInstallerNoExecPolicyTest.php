@@ -136,7 +136,8 @@ class ArrInstallerNoExecPolicyTest extends TestCase
 
     public function testReleaseActivationPathGuardHandlesSafeAndUnsafeBoundaries(): void
     {
-        $workDir = $this->pmssMakeTempDir('pmss-arr-work-', 0700);
+        $workDir = \pmssCreatePrivateTempDir('pmss-arr-work-');
+        $this->assertTrue(is_string($workDir));
         $extractPath = $workDir.'/Radarr';
         $installParent = $this->pmssMakeTempDir('pmss-arr-install-', 0700);
         @mkdir($extractPath, 0700);

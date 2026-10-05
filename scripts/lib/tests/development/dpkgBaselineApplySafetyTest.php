@@ -100,12 +100,11 @@ class DpkgBaselineApplySafetyTest extends TestCase
     {
         $this->pmssSkipUnlessFunctionExists('pmssPrivateTempDirRealpath');
 
-        $tmpDir = $this->pmssMakeTempDir('pmss-private-realpath-root-', 0700);
-        $ownedDir = $tmpDir.'/pmss-libssl-owned';
-        @mkdir($ownedDir, 0700);
+        $ownedDir = \pmssCreatePrivateTempDir('pmss-libssl-');
+        $this->assertTrue(is_string($ownedDir));
         [$resolved, $output] = $this->pmssCaptureStdout(function () use ($ownedDir): ?string {
             return \pmssPrivateTempDirRealpath($ownedDir, 'pmss-libssl-');
-        }, ['TMPDIR' => $tmpDir]);
+        });
 
         $this->assertSame(realpath($ownedDir), $resolved);
         $this->assertEquals('', $output, 'Expected accepted private temp directory to stay quiet');
