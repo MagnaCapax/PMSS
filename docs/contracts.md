@@ -771,6 +771,10 @@ These scripts are primarily imperative; treat them as idempotent installers guar
 
 Other app installers (mono.php, syncthing.php, vnstat.php, iprange.php, pyload.php) follow the same pattern: install/refresh packages or binaries as needed and avoid breaking existing setups. Consult the scripts when extending.
 
+The vnStat config refresh preserves the existing rendered settings and file metadata.
+It rejects unreadable or redirected config paths and replaces the file atomically;
+failed replacement leaves the previous config intact and skips the restart.
+
 ---
 
 ## Utilities (Script Contracts)

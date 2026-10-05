@@ -180,15 +180,13 @@ class UpdateAppInstallerContractsTest extends TestCase
             'vnstat.php' => [
                 'required' => [
                     "require_once '/scripts/lib/networkInfo.php';",
+                    "require_once __DIR__.'/vnstatConfig.php';",
                     "networkInterfaceNameNormalized((string) \$link)",
                     "runStep('Installing vnstat'",
                     "aptCmd('install -y vnstat')",
                     "runStep('Updating vnstat interface database'",
                     "pmssBuildCommand('vnstat', ['-u', '-i', \$link])",
-                    "str_replace('RateUnit 1', 'RateUnit 0'",
-                    'MaxBandwidth 50000',
-                    'Warning: unable to read /etc/vnstat.conf',
-                    'Warning: unable to write /etc/vnstat.conf',
+                    "pmssVnstatConfigRefresh('/etc/vnstat.conf'",
                     "runStep('Restarting vnstat'",
                     "pmssBuildCommand('/etc/init.d/vnstat', ['restart'])",
                 ],
@@ -196,6 +194,15 @@ class UpdateAppInstallerContractsTest extends TestCase
                     'passthru(' => 'vnstat.php should route shelling through runStep()',
                     'chown -R vnstat:vnstat /var/lib/vnstat' => 'vnstat.php should not keep Debian 8 repair branches for unsupported releases',
                     '$debianMajor' => 'vnstat.php should not parse Debian major versions for removed Debian 8 repair logic',
+                ],
+            ],
+            'vnstatConfig.php' => [
+                'required' => [
+                    "str_replace('RateUnit 1', 'RateUnit 0'",
+                    'MaxBandwidth 50000',
+                    'pmssReadRegularFileContents($path)',
+                    'pmssReplaceUserFilePreservingMetadata',
+                    'skipping vnStat restart',
                 ],
             ],
             'watchdog.php' => [
