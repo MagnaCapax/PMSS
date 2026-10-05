@@ -53,4 +53,19 @@ PHP;
             ],
         ]);
     }
+
+    public function testLegacyPermissionStepsSelectOnlyDirectRegularEntries(): void
+    {
+        $this->pmssAssertRepoFileContract('scripts/util/setupUserHomePermissions.php', [
+            'required' => [
+                "'find '.\$rtorrentRcTarget.' -maxdepth 0 -not -type l \\( ! -type f -o -links 1 \\) -exec chown -h root:root {} +'",
+                "'find '.\$rutorrentConfTarget.' -maxdepth 0 -not -type l \\( ! -type f -o -links 1 \\) -exec chmod 775 {} +'",
+                "'find '.\$lighttpdDirTarget.' -maxdepth 0 -not -type l -exec chmod 750 {} +'",
+            ],
+            'forbidden' => [
+                "'chown root:root '.\$rtorrentRcTarget" => 'Direct ownership must stay out of account paths',
+                "'chmod 775 '.\$rutorrentConfTarget" => 'Direct mode changes must stay out of account paths',
+            ],
+        ]);
+    }
 }

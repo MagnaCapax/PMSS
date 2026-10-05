@@ -30,19 +30,19 @@ $steps = array();
 // Align with historical behaviour but quote paths defensively.
 $rtorrentRcTarget = pmssPathShellTarget($rtorrentRc);
 if ($rtorrentRcTarget !== null) {
-    $steps[] = array('chown_rtorrent_rc', 'chown root:root '.$rtorrentRcTarget);
-    $steps[] = array('chmod_rtorrent_rc', 'chmod 775 '.$rtorrentRcTarget);
+    $steps[] = array('chown_rtorrent_rc', 'find '.$rtorrentRcTarget.' -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chown -h root:root {} +');
+    $steps[] = array('chmod_rtorrent_rc', 'find '.$rtorrentRcTarget.' -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chmod 775 {} +');
 }
 
 $rutorrentConfTarget = pmssPathShellTarget($rutorrentConf);
 if ($rutorrentConfTarget !== null) {
-    $steps[] = array('chown_rutorrent_conf', 'chown root:root '.$rutorrentConfTarget);
-    $steps[] = array('chmod_rutorrent_conf', 'chmod 775 '.$rutorrentConfTarget);
+    $steps[] = array('chown_rutorrent_conf', 'find '.$rutorrentConfTarget.' -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chown -h root:root {} +');
+    $steps[] = array('chmod_rutorrent_conf', 'find '.$rutorrentConfTarget.' -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chmod 775 {} +');
 }
 
 $lighttpdDirTarget = pmssPathShellTarget($lighttpdDir);
 if ($lighttpdDirTarget !== null) {
-    $steps[] = array('chmod_lighttpd_custom', 'chmod 750 '.$lighttpdDirTarget);
+    $steps[] = array('chmod_lighttpd_custom', 'find '.$lighttpdDirTarget.' -maxdepth 0 -not -type l -exec chmod 750 {} +');
 }
 
 if ($steps !== array()) {
