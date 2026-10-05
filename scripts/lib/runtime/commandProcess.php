@@ -24,31 +24,28 @@ function pmssCommandPipedCapture(string $bash, string $timeoutCommand, int $time
     return pmssCommandProcessCapture($bash, $timeoutCommand, $timeoutSec, $maxBuffer, $mirrorOutput, $launchError, $launchRc, $retryLaunch, $streamSelectError, $cwd, $env);
 }
 
+/** Keep launch and pipe failures on the same result contract. */
+function pmssCommandProcessFailure(int $rc, string $error, bool $pipeFailed = false): array { return ['rc' => $rc, 'stdout' => '', 'stderr' => $error, 'timed_out' => false, 'launch_failed' => !$pipeFailed, 'pipe_failed' => $pipeFailed]; }
+
 /** Launch, collect, and reap both I/O modes through one lifecycle; public wrappers keep their defaults. */
 function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $timeoutSec, int $maxBuffer, bool $mirrorOutput, string $launchError, int $launchRc, bool $retryLaunch, string $streamSelectError, ?string $cwd, ?array $env, bool $inheritTty = false): array
 {
     // Direct capture callers bypass shell quoting; proc_open() can truncate at a NUL.
     if (strpos($bash, "\0") !== false) {
-        return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'unsafe proc_open command', 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];
+        return pmssCommandProcessFailure($launchRc, 'unsafe proc_open command');
     }
     if ($cwd !== null && ($cwd === '' || pmssFilesystemPathHasNulByte($cwd) || !is_dir($cwd))) {
-        return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'unsafe proc_open cwd', 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];
+        return pmssCommandProcessFailure($launchRc, 'unsafe proc_open cwd');
     }
     if ($env !== null) {
         $normalizedEnv = [];
         foreach ($env as $key => $value) {
             // Consume the entire variable name; $ also matches before a final newline.
-            if (!is_string($key)
-                || preg_match('/^[A-Za-z_][A-Za-z0-9_]*\z/', $key) !== 1
-                || (!is_string($value) && !is_int($value) && !is_float($value) && !is_bool($value))
-            ) {
-                return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'unsafe proc_open environment', 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];
+            if (!is_string($key) || preg_match('/^[A-Za-z_][A-Za-z0-9_]*\z/', $key) !== 1
+                || !is_scalar($value) || strpos((string) $value, "\0") !== false) {
+                return pmssCommandProcessFailure($launchRc, 'unsafe proc_open environment');
             }
-            $value = (string) $value;
-            if (strpos($value, "\0") !== false) {
-                return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'unsafe proc_open environment', 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];
-            }
-            $normalizedEnv[$key] = $value;
+            $normalizedEnv[$key] = (string) $value;
         }
         $env = $normalizedEnv;
     }
@@ -68,7 +65,7 @@ function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $ti
         if (is_resource($process)) break;
     }
     if (!is_resource($process)) {
-        return ['rc' => $launchRc, 'stdout' => '', 'stderr' => $launchError, 'timed_out' => false, 'launch_failed' => true, 'pipe_failed' => false];
+        return pmssCommandProcessFailure($launchRc, $launchError);
     }
     $pipeFailed = false;
     foreach ($inheritTty ? [] : [0, 1, 2] as $index) {
@@ -86,7 +83,7 @@ function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $ti
             @proc_terminate($process);
         }
         @proc_close($process);
-        return ['rc' => $launchRc, 'stdout' => '', 'stderr' => 'proc_open pipes unavailable', 'timed_out' => false, 'launch_failed' => false, 'pipe_failed' => true];
+        return pmssCommandProcessFailure($launchRc, 'proc_open pipes unavailable', true);
     }
 
     $startedAt = microtime(true);
