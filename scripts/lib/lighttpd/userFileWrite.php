@@ -324,3 +324,22 @@ function pmssAppendUserFile(string $path, string $content, string $owner, int $m
 
     return true;
 }
+
+/** Append to an account-owned file while holding its append lock. */
+function pmssAppendAccountFile(string $username, string $home, string $path, string $content, int $mode): bool
+{
+    $account = function_exists('posix_getpwnam') ? @posix_getpwnam($username) : false;
+    if (!is_array($account) || !isset($account['uid']) || $mode < 0 || $mode > 0777
+        || !pmssUserFilePathIsSafe($path)
+        || (file_exists($path) && (!is_file($path) || @fileowner($path) !== $account['uid']
+            || @stat($path)['nlink'] !== 1))) {
+        return false;
+    }
+
+    $target = escapeshellarg($path);
+    $command = 'umask 077; test ! -L '.$target
+        .' && { test ! -e '.$target.' || test -f '.$target.'; }'
+        .' && exec 3>>'.$target.' && flock -x 3 && cat >&3'
+        .' && chmod '.sprintf('%o', $mode).' -- '.$target;
+    return pmssAccountPathRun($username, $home, [$path], $command, $content);
+}

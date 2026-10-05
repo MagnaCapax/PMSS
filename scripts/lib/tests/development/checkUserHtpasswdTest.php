@@ -57,6 +57,7 @@ class CheckUserHtpasswdTest extends TestCase
     public function testAppendOwnsTheAccountFileWithoutExtraMetadataCommand(): void
     {
         $source = $this->pmssReadRepoFile('scripts/util/checkUserHtpasswd.php');
+        $this->assertStringContainsString('pmssAppendAccountFile($thisUser, "/home/{$thisUser}", $userHtpasswd, $thisPassword."\\n", 0640)', $source);
         $this->assertStringContainsString('pmssAppendUserFile($userHtpasswd, $thisPassword."\\n", $thisUser, 0640)', $source);
         $this->assertFalse(strpos($source, 'chown_htpasswd') !== false);
     }

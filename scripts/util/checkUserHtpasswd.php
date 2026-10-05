@@ -89,7 +89,14 @@ function pmssCheckUserHtpasswdMain(array $argv): int
                 continue;
             }
 
-            if (!pmssAppendUserFile($userHtpasswd, $thisPassword."\n", $thisUser, 0640)) {
+            $account = function_exists('posix_getpwnam') ? @posix_getpwnam($thisUser) : false;
+            $olderOwner = is_array($account) && is_file($userHtpasswd)
+                && @fileowner($userHtpasswd) !== $account['uid'];
+            // Older files need one managed write to normalize their owner.
+            $written = $olderOwner
+                ? pmssAppendUserFile($userHtpasswd, $thisPassword."\n", $thisUser, 0640)
+                : pmssAppendAccountFile($thisUser, "/home/{$thisUser}", $userHtpasswd, $thisPassword."\n", 0640);
+            if (!$written) {
                 pmssUserLifecycleContextLogStatusMessage('htpasswd',
                     'write',
                     $thisUser,

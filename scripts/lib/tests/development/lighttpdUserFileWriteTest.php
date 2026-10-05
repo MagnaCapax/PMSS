@@ -121,6 +121,35 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertFalse(file_exists($outsideDir.'/.htpasswd'));
     }
 
+    public function testAccountAppendPreservesExistingLinesAndMode(): void
+    {
+        $home = $this->tempDir.'/account';
+        $this->assertTrue(@mkdir($home));
+        $path = $home.'/.htpasswd';
+        $owner = $this->pmssCurrentOwner();
+
+        $this->assertTrue(\pmssAppendAccountFile($owner, $home, $path, "first:hash\n", 0640));
+        $this->assertTrue(\pmssAppendAccountFile($owner, $home, $path, "second:hash\n", 0640));
+        $this->assertSame("first:hash\nsecond:hash\n", file_get_contents($path));
+        $this->assertSame(0640, fileperms($path) & 0777);
+    }
+
+    public function testAccountAppendRejectsUnsafeTargets(): void
+    {
+        $home = $this->tempDir.'/account';
+        $this->assertTrue(@mkdir($home));
+        $this->assertTrue(@file_put_contents($home.'/original', 'kept') !== false);
+        $this->assertTrue(@symlink($home.'/original', $home.'/linked'));
+        $owner = $this->pmssCurrentOwner();
+
+        $this->assertFalse(\pmssAppendAccountFile($owner, $home, $home.'/linked', 'new', 0640));
+        $this->assertFalse(\pmssAppendAccountFile($owner, $home, $this->tempDir.'/outside', 'new', 0640));
+        $this->assertFalse(\pmssAppendAccountFile($owner, $home, $home.'/missing/file', 'new', 0640));
+        $this->assertFalse(\pmssAppendAccountFile($owner, $home, $home.'/file', 'new', 01000));
+        $this->assertFalse(\pmssAppendAccountFile('pmss-no-such-account-123', $home, $home.'/file', 'new', 0640));
+        $this->assertSame('kept', file_get_contents($home.'/original'));
+    }
+
     public function testWriteUserFileRejectsSymlinkedParentDirectory(): void
     {
         [, $linkDir] = $this->pmssCreateSymlinkedDirectoryOrSkip($this->tempDir.'/real', $this->tempDir.'/linked');
@@ -231,7 +260,7 @@ class LighttpdUserFileWriteTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings(
             'scripts/util/checkUserHtpasswd.php',
-            ['pmssAppendUserFile(', 'Unable to append legacy credential to per-user htpasswd'],
+            ['pmssAppendAccountFile(', 'pmssAppendUserFile(', 'Unable to append legacy credential to per-user htpasswd'],
             ['file_put_contents($userHtpasswd']
         );
     }
