@@ -81,27 +81,14 @@ function pmssCreateNginxConfigLegacyDelugeWebPort(string $homeDir, string $user)
 {
     foreach (['/.delugeWebPort' => 0, '/.delugePort' => 1] as $portFile => $offset) {
         $delugePortPath = $homeDir.$portFile;
-        if (!pmssRegularFilePathIsReadable($delugePortPath)) {
+        $raw = pmssReadRegularFileContentsVerified($delugePortPath, 0, 32);
+        if ($raw === null) {
             if (is_link($delugePortPath)) pmssCreateNginxConfigUserLog($user, '[WARN] Ignoring symlinked '.$portFile.' while rendering nginx template');
             continue;
         }
-
-        $owner = @fileowner($delugePortPath);
-        if ($owner === false || (int) $owner !== 0) {
-            pmssCreateNginxConfigUserLog($user, '[WARN] Ignoring non-root-owned '.$portFile.' while rendering nginx template');
-            continue;
-        }
-
-        $raw = pmssReadRegularFileTrimmed($delugePortPath);
-        if ($raw === null) continue;
-        if ($raw === '' || !ctype_digit($raw)) {
-            pmssCreateNginxConfigUserLog($user, '[WARN] Ignoring non-numeric '.$portFile.' value while rendering nginx template');
-            continue;
-        }
-
-        $delugePort = (int) $raw;
         $maxPort = $offset === 1 ? 65534 : 65535;
-        if (pmssNetworkPortInRange($delugePort, 1024, $maxPort)) {
+        $delugePort = pmssNetworkPortParseDigits($raw, 1024, $maxPort);
+        if ($delugePort !== null) {
             return $delugePort + $offset;
         }
         pmssCreateNginxConfigUserLog($user, '[WARN] Ignoring invalid '.$portFile.' value while rendering nginx template');

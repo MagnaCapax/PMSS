@@ -147,7 +147,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
         // Regression guard: if we ever need to render a legacy template placeholder,
         // never trust user-owned/symlinked port files.
-        $this->assertStringContainsAllStrings(["'/.delugePort'", 'fileowner(', 'is_link('], $script);
+        $this->assertStringContainsAllStrings(["'/.delugePort'", 'pmssReadRegularFileContentsVerified($delugePortPath, 0, 32)', 'pmssNetworkPortParseDigits($raw, 1024, $maxPort)'], $script);
     }
 
     // =========================================================================

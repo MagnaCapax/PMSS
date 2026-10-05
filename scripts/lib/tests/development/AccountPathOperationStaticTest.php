@@ -16,7 +16,7 @@ final class AccountPathOperationStaticTest extends TestCase
         'scripts/lib/lighttpd/delugeWebConf.php:66' => ['ca3295ab37e134547d4dcbf5aad5f4ab9578fd7f', 'fixed process name with quoted account'],
         'scripts/lib/network/fireqos.php:39' => ['b4712db6815bc3f3adbcce7ab5678ddb8db7a60b', 'uid lookup with quoted account'],
         'scripts/lib/resources/log.php:32' => ['abcdc22775d788f8fa306195c4bbca4a3da976ab', 'uid lookup with quoted account'],
-        'scripts/lib/nginxConfig/userConfigsGenerate.php:172' => ['66d938ed265b0ac243e1b992e1820850e3e6fe1e', 'fixed config utility with quoted account'],
+        'scripts/lib/nginxConfig/userConfigsGenerate.php:159' => ['66d938ed265b0ac243e1b992e1820850e3e6fe1e', 'fixed config utility with quoted account'],
         'scripts/lib/update/users/docker.php:79' => ['b1fd9ef63ccf528d30bc352bef2c0d326d4311b5', 'uid lookup with quoted account'],
     ];
 

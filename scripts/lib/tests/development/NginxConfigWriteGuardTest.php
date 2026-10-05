@@ -272,6 +272,21 @@ PHP;
         $this->assertEquals(1, \pmssCreateNginxConfigLegacyDelugeWebPort($homeDir, 'alice'));
     }
 
+    public function testLegacyDelugePortReaderRequiresOpenedRegularEntry(): void
+    {
+        $homeDir = $this->tempDir.'/home/alice';
+        @mkdir($homeDir, 0755, true);
+        $port = $this->pmssWriteFile($homeDir.'/.delugeWebPort', "23000\n");
+        $owner = (int) fileowner($port);
+        $this->assertSame("23000\n", \pmssReadRegularFileContentsVerified($port, $owner, 32));
+        $this->assertSame(null, \pmssReadRegularFileContentsVerified($port, $owner + 1, 32));
+        $this->assertSame(null, \pmssReadRegularFileContentsVerified($port, $owner, 3));
+        $second = $homeDir.'/.delugePort';
+        $this->assertTrue(link($port, $second));
+        $this->assertSame(null, \pmssReadRegularFileContentsVerified($port, $owner, 32));
+        $this->assertSame(1, \pmssCreateNginxConfigLegacyDelugeWebPort($homeDir, 'alice'));
+    }
+
     public function testGeneratorUsesGuardedWriterForNginxOutputs(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/nginxConfig/userConfigsGenerate.php', [
