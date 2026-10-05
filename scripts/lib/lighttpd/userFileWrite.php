@@ -225,7 +225,10 @@ function pmssReplaceAccountFile(string $username, string $home, string $path, st
         .' && test ! -L '.escapeshellarg($path)
         .' && { test ! -e '.escapeshellarg($path).' || test -f '.escapeshellarg($path).'; }'
         .' && mv -T -- "$tmp" '.escapeshellarg($path);
-    return pmssAccountPathRun($username, $home, [$path], $command, $content);
+    $replaced = pmssAccountPathRun($username, $home, [$path], $command, $content);
+    // The shell replaces the inode outside PHP; invalidate metadata cached for the old path.
+    clearstatcache(true, $path);
+    return $replaced;
 }
 
 /** Keep older ownership layouts writable while normal account files use the account writer. */
