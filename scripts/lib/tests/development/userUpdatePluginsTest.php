@@ -9,6 +9,13 @@ require_once dirname(__DIR__, 2).'/update/users.php';
 
 class UserUpdatePluginsTest extends TestCase
 {
+    public function testDeprecatedPluginRemovalUsesAccountCommand(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/update/users/rutorrent.php');
+        $this->assertStringContainsString("pmssBuildUserShellCommand(\$user, 'rm -rf -- '.escapeshellarg(\"{\$home}/www/rutorrent/plugins/cpuload\"))", $source);
+        $this->assertFalse(strpos($source, "sprintf('rm -rf %s'") !== false);
+    }
+
     public function testEnsurePluginsReportsMissingSource(): void
     {
         $home = $this->pmssMakeTempDir('pmss-plugins-home-');

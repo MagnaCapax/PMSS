@@ -17,7 +17,7 @@ function pmssUserEnsurePlugins(array $ctx): void
     $userEsc = $ctx['user_esc'];
 
     if (file_exists("{$home}/www/rutorrent/plugins/cpuload")) {
-        runUserStep($user, 'Removing deprecated cpuload plugin', sprintf('rm -rf %s', escapeshellarg("{$home}/www/rutorrent/plugins/cpuload")));
+        runUserStep($user, 'Removing deprecated cpuload plugin', pmssBuildUserShellCommand($user, 'rm -rf -- '.escapeshellarg("{$home}/www/rutorrent/plugins/cpuload")));
     }
 
     $unpackPath = "{$home}/www/rutorrent/plugins/unpack";
