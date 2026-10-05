@@ -58,6 +58,27 @@ class UpdateNetworkingTemplateTest extends TestCase
         $this->assertSame(array(), $messages);
     }
 
+    public function testEnsureNetworkTemplateRejectsMissingInterfaceToken(): void
+    {
+        $configDir = $this->pmssMakeTempDir('pmss-network-config-');
+        $targetDir = $this->pmssMakeTempDir('pmss-network-target-');
+        $target = $targetDir.'/network';
+        $this->pmssWriteRelativeFile($configDir, 'template.network', "<?php return array('interface' => 'eth0');\n");
+        $messages = array();
+
+        $this->pmssWithEnv(
+            array('PMSS_CONFIG_DIR' => $configDir, 'PMSS_NETWORK_CONFIG' => $target),
+            function () use (&$messages): void {
+                \pmssEnsureNetworkTemplate($this->pmssMakeArrayLogger($messages), static function (): string {
+                    throw new \RuntimeException('Invalid template must not trigger route detection');
+                });
+            }
+        );
+
+        $this->assertFalse(file_exists($target));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'template missing interface token'));
+    }
+
     public function testDefaultRouteInterfaceRejectsUnsafeAndTunnelDevices(): void
     {
         $this->assertSame('enp1s0', \pmssNetworkDefaultRouteInterface(

@@ -52,6 +52,11 @@ function pmssEnsureNetworkTemplate(?callable $logger = null, ?callable $routeRea
         $log('[WARN] Network configuration template missing: '.$templatePath);
         return;
     }
+    // A missing substitution token would persist a stale or incomplete interface.
+    if (strpos($template, '##INTERFACE##') === false) {
+        $log('[WARN] Network configuration template missing interface token: '.$templatePath);
+        return;
+    }
     $routes = $routeReader ? $routeReader() : shell_exec('/sbin/ip -4 route show default 2>/dev/null');
     $interface = pmssNetworkDefaultRouteInterface((string) $routes);
     $template = str_replace('##INTERFACE##', $interface, $template);
