@@ -14,6 +14,13 @@ final class DelugeConfigWriteSafetyTest extends TestCase
         $this->assertFalse(strpos($source, "sprintf('chown %1\$s -R %2\$s', escapeshellarg(\$username.':'.\$username), escapeshellarg(\$dir))") !== false);
     }
 
+    public function testOwnershipWalkFiltersLinkedFiles(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/user/deluge.php');
+        $this->assertStringContainsString('find %s -not -type l \( ! -type f -o -links 1 \) -exec chown -h %s {} +', $source);
+        $this->assertFalse(strpos($source, "sprintf('chown %1\$s -R %2\$s'") !== false);
+    }
+
     public function testConfigWriteCreatesRegularFile(): void
     {
         $path = $this->pmssMakeTempDir('pmss-deluge-config-write-', 0700).'/core.conf';

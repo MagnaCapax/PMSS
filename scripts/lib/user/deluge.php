@@ -174,7 +174,11 @@ function userConfigureDeluge(array $user, array $configuration): void
     }
     pmssEnsureDelugeServicePassword($username);
 
-    runStep('Fixing Deluge ownership', sprintf('chown %1$s -R %2$s', escapeshellarg($username.':'.$username), escapeshellarg("$home/.config/")));
+    runStep('Fixing Deluge ownership', sprintf(
+        'find %s -not -type l \( ! -type f -o -links 1 \) -exec chown -h %s {} +',
+        escapeshellarg("$home/.config/"),
+        escapeshellarg($username.':'.$username)
+    ));
 
     // If the web config changed, restart deluge-web so base/port changes take effect.
     // Cron (checkDelugeInstances.php) will start it again when Deluge is enabled.
