@@ -35,6 +35,11 @@ class TorrentThrottleTest extends TestCase
             'zero value' => ['0', 0640, 0],
             'positive value' => ['123', 0640, 123],
             'group writable' => ['10', 0666, null],
+            'decimal value' => ['10.5', 0640, null],
+            'exponent value' => ['1e3', 0640, null],
+            'negative value' => ['-1', 0640, null],
+            'out of range' => [(string) PHP_INT_MAX.'0', 0640, null],
+            'embedded control' => ["10\0", 0640, null],
         ] as $label => [$content, $mode, $expected]) {
             @unlink($this->throttlePath());
             if ($content !== null) {
@@ -51,6 +56,13 @@ class TorrentThrottleTest extends TestCase
         file_put_contents($this->homeRoot.'/alice/evil/.torrentThrottle', '77');
 
         $this->assertEquals(null, pmssReadTorrentThrottle('alice/evil'));
+    }
+
+    public function testReadRejectsMultiplyLinkedEntry(): void
+    {
+        $this->writeThrottleFile('77');
+        $this->assertTrue(link($this->throttlePath(), $this->homeRoot.'/'.$this->user.'/other'));
+        $this->assertSame(null, pmssReadTorrentThrottle($this->user));
     }
 
     public function testWriteCreatesFileForPositive(): void

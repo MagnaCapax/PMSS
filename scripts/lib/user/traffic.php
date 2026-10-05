@@ -140,23 +140,13 @@ function pmssReadTorrentThrottle(string $username): ?int
     }
 
     $path = pmssUserHomeFilePath($username, '.torrentThrottle');
-    if (!pmssRegularFilePathIsReadable($path)) {
-        return null;
-    }
-
-    $stats = @stat($path);
-    if ($stats === false) {
-        return null;
-    }
-
-    if (($stats['mode'] & 0022) !== 0) { // group/other writable
+    $stats = null;
+    $raw = pmssReadRegularFileContentsVerified($path, pmssTestModeEnabled() ? null : 0, 64, $stats);
+    if ($raw === null || !is_array($stats) || ($stats['mode'] & 0022) !== 0) {
         return null;
     }
 
     if (!pmssTestModeEnabled()) {
-        if ((int) $stats['uid'] !== 0) {
-            return null;
-        }
         if (function_exists('posix_getgrgid')
             && is_array($group = @posix_getgrgid((int) $stats['gid']))
             && isset($group['name'])
@@ -166,13 +156,8 @@ function pmssReadTorrentThrottle(string $username): ?int
         }
     }
 
-    $raw = pmssReadRegularFileTrimmed($path);
-    if ($raw === null || $raw === '' || !is_numeric($raw)) {
-        return null;
-    }
-
-    $value = (int) $raw;
-    return $value > 0 ? $value : 0;
+    $value = pmssUnsignedDecimalIntParse(trim($raw, " \t\r\n"));
+    return $value;
 }
 
 /**

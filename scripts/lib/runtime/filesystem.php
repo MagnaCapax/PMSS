@@ -105,9 +105,10 @@ function pmssStreamHandleIsOpen($handle): bool { return is_resource($handle) && 
 function pmssPathExistsOrLink(string $path): bool { return file_exists($path) || is_link($path); }
 function pmssRegularFilePathIsReadable(string $path): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && is_file($path) && !is_link($path); }
 
-/** Read a bounded regular file only when the opened entry matches its directory entry. */
-function pmssReadRegularFileContentsVerified(string $path, ?int $requiredUid = null, int $maxBytes = 4096): ?string
+/** Read a bounded regular file whose opened entry matches its directory entry; optionally return its metadata. */
+function pmssReadRegularFileContentsVerified(string $path, ?int $requiredUid = null, int $maxBytes = 4096, ?array &$metadata = null): ?string
 {
+    $metadata = null;
     if ($path === '' || $path[0] !== '/' || pmssFilesystemPathHasNulByte($path) || $maxBytes < 1) return null;
     clearstatcache(true, $path);
     $entry = @lstat($path);
@@ -126,7 +127,9 @@ function pmssReadRegularFileContentsVerified(string $path, ?int $requiredUid = n
             || ($opened['size'] ?? PHP_INT_MAX) > $maxBytes) return null;
 
         $contents = @stream_get_contents($handle, $maxBytes + 1);
-        return is_string($contents) && strlen($contents) <= $maxBytes && strlen($contents) === $opened['size'] ? $contents : null;
+        if (!is_string($contents) || strlen($contents) > $maxBytes || strlen($contents) !== $opened['size']) return null;
+        $metadata = $opened;
+        return $contents;
     } finally {
         @fclose($handle);
     }
