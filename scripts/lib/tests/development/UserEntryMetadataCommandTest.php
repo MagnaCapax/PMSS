@@ -56,7 +56,8 @@ final class UserEntryMetadataCommandTest extends TestCase
         $http = $this->pmssReadRepoFile('scripts/lib/update/users/http.php');
         $this->assertSame(5, substr_count($rutorrent, 'pmssUserEntryChownCommand('));
         $this->assertSame(2, substr_count($rutorrent, 'pmssUserEntryChmodCommand('));
-        $this->assertStringContainsString('pmssUserEntryChownCommand($irssiDir, $user.\':\'.$user, true)', $http);
+        $this->assertStringContainsString('pmssBuildUserShellCommand($user, $copyCommand)', $http);
+        $this->assertFalse(strpos($http, 'pmssUserEntryChownCommand($irssiDir') !== false);
         $this->assertFalse(strpos($rutorrent, 'chown -R') !== false);
         $this->assertFalse(strpos($rutorrent, 'chmod -R') !== false);
     }

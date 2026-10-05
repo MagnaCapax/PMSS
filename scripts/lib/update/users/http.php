@@ -49,8 +49,8 @@ function pmssUserConfigureHttp(array $ctx): void
     if (!is_dir($irssiDir)) {
         pmssEnsureUserHomeDir($user, $home, '.irssi', 0755, $userLog);
         $skelConfigPath = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/.irssi/config';
-        runUserStep($user, 'Copying irssi skeleton config', sprintf('cp %s %s/', $skelConfigPath === '/etc/skel/.irssi/config' ? $skelConfigPath : escapeshellarg($skelConfigPath), escapeshellarg($irssiDir)));
-        runUserStep($user, 'Adjusting irssi configuration ownership', pmssUserEntryChownCommand($irssiDir, $user.':'.$user, true));
+        $copyCommand = sprintf('cp %s %s/', $skelConfigPath === '/etc/skel/.irssi/config' ? $skelConfigPath : escapeshellarg($skelConfigPath), escapeshellarg($irssiDir));
+        runUserStep($user, 'Copying irssi skeleton config', pmssBuildUserShellCommand($user, $copyCommand));
     }
 
     if (!is_dir("{$home}/www/recycle")) {

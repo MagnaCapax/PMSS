@@ -140,7 +140,7 @@ JSON
         }
 
         $expected = sprintf('cp /etc/skel/.irssi/config %s/', escapeshellarg($home.'/.irssi'));
-        $this->assertEquals($expected, $cmd ?? '');
+        $this->assertEquals(\pmssBuildUserShellCommand('dummy', $expected), $cmd ?? '');
     }
 
     public function testConfigureHttpUsesSkelOverrideForIrssiCopy(): void
@@ -171,7 +171,7 @@ JSON
         }
 
         $expected = sprintf('cp %s %s/', escapeshellarg($skel.'/.irssi/config'), escapeshellarg($home.'/.irssi'));
-        $this->assertEquals($expected, $cmd ?? '');
+        $this->assertEquals(\pmssBuildUserShellCommand('dummy', $expected), $cmd ?? '');
     }
 }
 
