@@ -18,7 +18,7 @@ class LighttpdWatchdogErrorPageTest extends TestCase
                 $this->assertSame(null, pmssLighttpdWatchdogCommandCapture('df', $invalid));
                 $this->assertSame(null, pmssLighttpdWatchdogCommandCapture('df'.$invalid, ''));
                 $this->assertFalse(pmssLighttpdWatchdogRootInodesExhausted($invalid));
-                $this->assertTrue(pmssLighttpdWatchdogConfigInvalid($binDir.'/config'.$invalid));
+                $this->assertTrue(pmssLighttpdWatchdogConfigInvalid('alice', $binDir.'/config'.$invalid));
                 $this->assertSame(null, pmssLighttpdWatchdogQuotaStateRead($invalid, $binDir));
             }
             // A rejected live probe must still use a valid saved quota snapshot.
@@ -42,6 +42,42 @@ class LighttpdWatchdogErrorPageTest extends TestCase
                     pmssLighttpdWatchdogCommandCapture('df', escapeshellarg($value).' '.$rc)
                 );
             }
+        });
+    }
+
+    public function testConfigProbeRunsThroughAccountLaunch(): void
+    {
+        $binDir = $this->pmssMakeTempDir('pmss-watchdog-account-');
+        $config = $binDir.'/config';
+        $log = $binDir.'/launch.log';
+        file_put_contents($config, 'fixture');
+        $this->pmssWriteExecutableFiles($binDir, [
+            'id' => "#!/bin/sh\n[ \"\$1\" = '-u' ] && [ \"\$2\" = 'alice' ] && echo 2002 && exit 0\nexit 1\n",
+            'lighttpd' => "#!/bin/sh\nprintf '%s\\n' \"\$*\" > ".escapeshellarg($log)."\nexit 7\n",
+            'systemctl' => "#!/bin/sh\nexit 0\n",
+            'systemd-run' => "#!/bin/sh\nprintf '%s\\n' \"\$*\" > ".escapeshellarg($binDir.'/scope.log')."\nwhile [ \"\$1\" != '--' ]; do shift; done\nshift\n\"\$@\"\n",
+            'su' => "#!/bin/sh\n[ \"\$1\" = 'alice' ] || exit 8\nshift\n[ \"\$1\" = '-c' ] || exit 9\nshift\n/bin/sh -c \"\$1\"\n",
+        ]);
+        $this->pmssWithPathPrefix($binDir, function () use ($binDir, $config, $log): void {
+            $this->assertTrue(pmssLighttpdWatchdogConfigInvalid('alice', $config));
+            $this->assertSame('-t -f '.$config."\n", file_get_contents($log));
+            $this->assertStringContainsAllStrings(['--slice=user-2002.slice', 'su alice -c'], file_get_contents($binDir.'/scope.log'));
+        });
+    }
+
+    public function testConfigProbeSkipsCommandWhenAccountLaunchCannotBeBuilt(): void
+    {
+        $binDir = $this->pmssMakeTempDir('pmss-watchdog-no-account-');
+        $config = $binDir.'/config';
+        $marker = $binDir.'/launched';
+        file_put_contents($config, 'fixture');
+        $this->pmssWriteExecutableFiles($binDir, [
+            'id' => "#!/bin/sh\nexit 1\n",
+            'lighttpd' => "#!/bin/sh\nprintf launched > ".escapeshellarg($marker)."\nexit 1\n",
+        ]);
+        $this->pmssWithPathPrefix($binDir, function () use ($config, $marker): void {
+            $this->assertFalse(pmssLighttpdWatchdogConfigInvalid('missing-account', $config));
+            $this->assertFalse(file_exists($marker));
         });
     }
 
