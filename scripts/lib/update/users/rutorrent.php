@@ -14,7 +14,6 @@
 function pmssUserEnsurePlugins(array $ctx): void
 {
     [$user, $home] = pmssUserContextIdentity($ctx);
-    $userEsc = $ctx['user_esc'];
 
     if (file_exists("{$home}/www/rutorrent/plugins/cpuload")) {
         runUserStep($user, 'Removing deprecated cpuload plugin', pmssBuildUserShellCommand($user, 'rm -rf -- '.escapeshellarg("{$home}/www/rutorrent/plugins/cpuload")));
@@ -25,8 +24,8 @@ function pmssUserEnsurePlugins(array $ctx): void
         $source = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/www/rutorrent/plugins/unpack';
         $unpackArg = escapeshellarg($unpackPath);
         runUserStep($user, 'Installing unpack plugin', sprintf('cp -Rp %s %s', escapeshellarg($source), $unpackArg));
-        runUserStep($user, 'Adjusting unpack plugin ownership', sprintf('chown -R %1$s:%1$s %2$s', $userEsc, $unpackArg));
-        runUserStep($user, 'Setting unpack plugin permissions', sprintf('chmod -R 755 %s', $unpackArg));
+        runUserStep($user, 'Adjusting unpack plugin ownership', pmssUserEntryChownCommand($unpackPath, $user.':'.$user, true));
+        runUserStep($user, 'Setting unpack plugin permissions', pmssUserEntryChmodCommand($unpackPath, 0755, true));
     }
 
     $userShareDir = "{$home}/www/rutorrent/share/users/{$user}";
@@ -39,13 +38,13 @@ function pmssUserEnsurePlugins(array $ctx): void
 
     if (!file_exists($userShareDir.'/torrents') && file_exists($userShareDir)) {
         runUserStep($user, 'Creating ruTorrent torrents directory', sprintf('mkdir -p %s', escapeshellarg($userShareDir.'/torrents')));
-        runUserStep($user, 'Adjusting retracker ownership', sprintf('chown %1$s:%1$s %2$s', $userEsc, escapeshellarg($retrackerConfigPath)));
+        runUserStep($user, 'Adjusting retracker ownership', pmssUserEntryChownCommand($retrackerConfigPath, $user.':'.$user));
     }
 
     $rssDir = "{$home}/www/rutorrent/share/settings/rss";
     if (!file_exists($rssDir)) {
         runUserStep($user, 'Creating ruTorrent RSS settings directory', sprintf('mkdir -p %s', escapeshellarg($rssDir)));
-        runUserStep($user, 'Adjusting RSS settings ownership', sprintf('chown %1$s:%1$s %2$s', $userEsc, escapeshellarg($rssDir)));
+        runUserStep($user, 'Adjusting RSS settings ownership', pmssUserEntryChownCommand($rssDir, $user.':'.$user));
         echo "\t*** Created RSS Settings folder\n";
     }
 }
@@ -93,7 +92,6 @@ PHP;
 function pmssUserUpdateThemes(array $ctx): void
 {
     [$user, $home] = pmssUserContextIdentity($ctx);
-    $userEsc = $ctx['user_esc'];
 
     $themesPath = "{$home}/www/rutorrent/plugins/theme/themes/";
     $skelThemesPath = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/www/rutorrent/plugins/theme/themes/';
@@ -110,7 +108,7 @@ function pmssUserUpdateThemes(array $ctx): void
                 escapeshellarg($themesPath)
             )
         );
-        runUserStep($user, "Adjusting theme {$theme} ownership", sprintf('chown -R %1$s:%1$s %2$s', $userEsc, escapeshellarg($themesPath.$theme)));
+        runUserStep($user, "Adjusting theme {$theme} ownership", pmssUserEntryChownCommand($themesPath.$theme, $user.':'.$user, true));
     }
 }
 
@@ -122,7 +120,6 @@ function pmssUserUpdateThemes(array $ctx): void
 function pmssUserUpgradeRutorrent(array $ctx): void
 {
     [$user, $home] = pmssUserContextIdentity($ctx);
-    $userEsc       = $ctx['user_esc'];
     $expectedSha   = $ctx['rutorrent_index_sha'];
     $rutorrentPath = "{$home}/www/rutorrent";
     $legacyPath    = "{$home}/www/oldRutorrent-3";
@@ -189,6 +186,6 @@ function pmssUserUpgradeRutorrent(array $ctx): void
     }
 
     updateRutorrentConfig($user, 1);
-    runUserStep($user, 'Setting ruTorrent ownership', sprintf('chown -R %1$s:%1$s %2$s', $userEsc, escapeshellarg($rutorrentPath)));
-    runUserStep($user, 'Setting ruTorrent permissions', sprintf('chmod -R 751 %s', escapeshellarg($rutorrentPath)));
+    runUserStep($user, 'Setting ruTorrent ownership', pmssUserEntryChownCommand($rutorrentPath, $user.':'.$user, true));
+    runUserStep($user, 'Setting ruTorrent permissions', pmssUserEntryChmodCommand($rutorrentPath, 0751, true));
 }

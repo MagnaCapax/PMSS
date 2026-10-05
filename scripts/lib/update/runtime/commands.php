@@ -101,6 +101,31 @@ if (!function_exists('runUserStep')) {
     }
 }
 
+/** Select real account entries before changing owner, skipping multiply linked files. */
+function pmssUserEntryChownCommand(string $path, string $owner, bool $recursive = false): string
+{
+    return sprintf(
+        'find %s %s-not -type l \( ! -type f -o -links 1 \) -exec chown -h %s {} +',
+        escapeshellarg($path),
+        $recursive ? '' : '-maxdepth 0 ',
+        escapeshellarg($owner)
+    );
+}
+
+/** Select real account entries before changing mode, skipping multiply linked files. */
+function pmssUserEntryChmodCommand(string $path, int $mode, bool $recursive = false): string
+{
+    if ($mode < 0 || $mode > 07777) {
+        throw new InvalidArgumentException('Invalid account entry mode');
+    }
+    return sprintf(
+        'find %s %s-not -type l \( ! -type f -o -links 1 \) -exec chmod %04o {} +',
+        escapeshellarg($path),
+        $recursive ? '' : '-maxdepth 0 ',
+        $mode
+    );
+}
+
 /**
  * Compose a reusable apt-get command prefix.
  */
