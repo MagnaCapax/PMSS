@@ -127,6 +127,34 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
         });
     }
 
+    public function testMarkerWarnsWhenWriteIsIncomplete(): void
+    {
+        $stateDir = $this->pmssMakeTempDir('pmss-urefresh-short-', 0700);
+        $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $stateDir], function () use ($stateDir): void {
+            foreach ([false, 0, 2] as $written) {
+                ob_start();
+                try {
+                    pmssUserRefreshMarkDone('alice', 'new-signature', static function () use ($written) { return $written; });
+                } finally {
+                    $output = (string) ob_get_clean();
+                }
+                $this->assertStringContainsString('Unable to write user refresh marker', $output);
+                $this->assertFalse(file_exists($stateDir.'/alice'));
+            }
+
+            ob_start();
+            try {
+                pmssUserRefreshMarkDone('alice', 'new-signature', static function (string $path, string $payload): int {
+                    return file_put_contents($path, $payload);
+                });
+            } finally {
+                $output = (string) ob_get_clean();
+            }
+            $this->assertSame('', $output);
+            $this->assertSame("new-signature\n", file_get_contents($stateDir.'/alice'));
+        });
+    }
+
     private function assertUnsafeMarkerRejected(string $stateDir): void
     {
         $this->pmssWithEnv([

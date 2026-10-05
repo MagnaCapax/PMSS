@@ -254,7 +254,8 @@ through the shared path-safety predicate before reads or writes, including the
 marker leaf. Symlinks and non-regular markers cannot authorize a resume skip;
 completion writes leave them untouched and use the existing unsafe-marker
 warning. Missing state directories and ordinary marker files retain the usual
-create, update, and signature-matching behavior.
+create, update, and signature-matching behavior. Failed or short completion
+writes emit the existing write warning instead of silently reporting success.
 
 ### User dotfile hooks (`.bashrc.custom` / `.bashrc.user`)
 

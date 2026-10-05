@@ -45,7 +45,7 @@ function pmssUserRefreshAlreadyDone(string $user, string $signature): bool
 }
 
 /** Record that the user is fully refreshed against this signature. */
-function pmssUserRefreshMarkDone(string $user, string $signature): void
+function pmssUserRefreshMarkDone(string $user, string $signature, ?callable $writer = null): void
 {
     $path = pmssUserRefreshMarkerPath($user);
     if ($path === '') {
@@ -58,7 +58,9 @@ function pmssUserRefreshMarkDone(string $user, string $signature): void
         logMessage('[WARN] Unable to create user refresh state directory: '.$dir);
         return;
     }
-    if (@file_put_contents($path, $signature."\n") === false) {
+    $payload = $signature."\n";
+    $written = $writer ? $writer($path, $payload) : @file_put_contents($path, $payload);
+    if ($written !== strlen($payload)) {
         logMessage('[WARN] Unable to write user refresh marker: '.$path);
     }
 }
