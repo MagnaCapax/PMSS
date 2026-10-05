@@ -288,6 +288,23 @@ class UserTrafficStateHelpersTest extends TestCase
         $this->assertEquals(0, \pmssTrafficLimitReadGiBFile($link));
     }
 
+    public function testIntegerSettingReaderRejectsLinkedOversizedAndControlEntries(): void
+    {
+        $path = $this->tempDir.'/limit-managed';
+        $parser = static function ($raw, ?string &$error): ?int {
+            return \pmssIntegerSettingParseNonNegative($raw, 'GiB', $error);
+        };
+        file_put_contents($path, "500\n");
+        $this->assertTrue(link($path, $this->tempDir.'/limit-second-name'));
+        $this->assertSame(0, \pmssIntegerSettingFileRead($path, $parser));
+
+        unlink($this->tempDir.'/limit-second-name');
+        file_put_contents($path, str_repeat('5', 257));
+        $this->assertSame(0, \pmssIntegerSettingFileRead($path, $parser));
+        file_put_contents($path, "500\0");
+        $this->assertSame(0, \pmssIntegerSettingFileRead($path, $parser));
+    }
+
     public function testTrafficLimitReadGiBFileHandlesContentCases(): void
     {
         foreach ([

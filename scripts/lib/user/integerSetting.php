@@ -26,7 +26,7 @@ function pmssIntegerSettingParseNonNegative($raw, string $suffix = '', ?string &
     if (is_int($raw)) {
         $value = $raw;
     } elseif (is_string($raw)) {
-        $trim = trim($raw);
+        $trim = trim($raw, " \t\r\n");
         if ($trim === '') {
             $error = 'empty';
             return null;
@@ -69,10 +69,12 @@ function pmssIntegerSettingParseNonNegative($raw, string $suffix = '', ?string &
 
 function pmssIntegerSettingFileRead(string $path, callable $parser, int $default = 0): int
 {
-    $raw = pmssReadRegularFileTrimmed($path);
-    if ($raw === null || $raw === '') {
+    $contents = pmssReadRegularFileContentsVerified($path, null, 256);
+    if ($contents === null) {
         return $default;
     }
+    $raw = trim($contents, " \t\r\n");
+    if ($raw === '') return $default;
 
     $error = null;
     $value = $parser($raw, $error);
