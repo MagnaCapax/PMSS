@@ -30,7 +30,7 @@ function storageBenchmarkHomeDeviceResolve(
         return $entry + ['ok' => false, 'error' => 'unsafe or unavailable mount device'];
     }
 
-    $check = $deviceCheck ?: static function (string $device): bool {
+    $check = $deviceCheck ?: function (string $device): bool {
         return is_readable($device) && @filetype($device) === 'block';
     };
     if (!$check($path)) return $entry + ['ok' => false, 'error' => 'mount device is not a readable block device'];
