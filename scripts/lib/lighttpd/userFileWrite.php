@@ -131,15 +131,23 @@ function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTe
     }
 }
 
+/** Prepare replacement metadata before publication; failed permissions leave the old file intact. */
+function pmssUserFilePrepareMetadata(string $path, int $mode, ?string $owner, ?string $group): bool
+{
+    if ($mode < 0 || $mode > 07777 || !@chmod($path, $mode)) {
+        return false;
+    }
+    if ($owner === null || !function_exists('posix_geteuid') || @posix_geteuid() !== 0) {
+        return true;
+    }
+
+    return @lchown($path, $owner) && @lchgrp($path, ($group === null || $group === '') ? $owner : $group);
+}
+
 function pmssReplaceUserFileWithMetadata(string $path, string $content, int $mode, ?string $owner = null, ?string $group = null): bool
 {
-    return pmssReplaceUserFile($path, $content, static function (string $tmpPath) use ($mode, $owner, $group): void {
-        if ($owner === null) {
-            @chmod($tmpPath, $mode);
-            return;
-        }
-
-        pmssUserFileApplyMetadata($tmpPath, $owner, $mode, $group);
+    return pmssReplaceUserFile($path, $content, static function (string $tmpPath) use ($mode, $owner, $group): bool {
+        return pmssUserFilePrepareMetadata($tmpPath, $mode, $owner, $group);
     });
 }
 
@@ -159,10 +167,12 @@ function pmssReplaceUserFilePreservingMetadata(string $path, string $content, in
         }
     }
 
-    return pmssReplaceUserFile($path, $content, static function (string $tmpPath) use ($group, $mode, $owner): void {
-        @chmod($tmpPath, $mode);
-        if ($owner !== null) @chown($tmpPath, $owner);
-        if ($group !== null) @chgrp($tmpPath, $group);
+    return pmssReplaceUserFile($path, $content, static function (string $tmpPath) use ($group, $mode, $owner): bool {
+        if (!pmssUserFilePrepareMetadata($tmpPath, $mode, null, null)) {
+            return false;
+        }
+        return ($owner === null || @chown($tmpPath, $owner))
+            && ($group === null || @chgrp($tmpPath, $group));
     });
 }
 

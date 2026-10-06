@@ -154,6 +154,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   when its timestamped backup cannot be created. The backup helper accepts a
   copy only when it contains the full source file; incomplete copies are removed.
 
+- Atomic user-file replacements publish only after the requested mode and any
+  applicable owner/group changes succeed on the temporary file. Invalid modes
+  or failed metadata operations return `false`, leave the existing destination
+  intact, and remove the temporary file. Valid writes keep their prior bytes,
+  ownership, and mode.
+
 - Lock lifecycle helpers close streams when handle validation, lock acquisition,
   or explicit unlocking throws. The original throwable propagates; successful
   acquisition still transfers ownership to the caller, including the legacy
