@@ -359,6 +359,23 @@ class MediaStackPanelTest extends TestCase
         $this->assertStringContainsAllStrings(['.install-media-stack-web.pid', 'install-media-stack.sh', "USER='alice'"], $command);
     }
 
+    public function testStartCommandReturnsAtOnceAndKeepsPidFile(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-start-launch-');
+        $this->pmssWriteExecutableFile($home.'/install-media-stack.sh', "#!/bin/bash\nsleep 3\n");
+
+        $started = microtime(true);
+        shell_exec(\pmssMediaStackPanelStartCommandBuild($home, 'alice'));
+        $elapsed = microtime(true) - $started;
+        $pid = (int) trim((string) @file_get_contents($home.'/.install-media-stack-web.pid'));
+
+        $this->assertTrue($elapsed < 2.0, 'launch must not wait for the installer ('.round($elapsed, 2).'s)');
+        $this->assertTrue($pid > 0 && is_dir('/proc/'.$pid), 'pid file must name the running installer');
+        if ($pid > 0 && function_exists('posix_kill')) {
+            posix_kill($pid, 15);
+        }
+    }
+
     public function testRecoveryCommandUsesFixedInstallerMode(): void
     {
         $command = \pmssMediaStackPanelRecoveryCommandBuild('/home/alice', 'alice');
