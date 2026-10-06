@@ -150,15 +150,19 @@ class SupportCommandTest extends TestCase
 
     public function testDiagnosticsBuildCarriesBillingIdentifiers(): void
     {
-        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingServiceId', "42\n");
-        file_put_contents($this->homeRoot.'/'.$this->user.'/.billingClientId', "99\n");
+        $servicePath = $this->homeRoot.'/'.$this->user.'/.billingServiceId';
+        $clientPath = $this->homeRoot.'/'.$this->user.'/.billingClientId';
+        file_put_contents($servicePath, "42\n");
+        file_put_contents($clientPath, "99\n");
 
         $diagnostics = \pmssSupportDiagnosticsBuild('Need help', $this->pmssCommandEchoRunner());
 
-        $this->assertSame(42, $diagnostics['billingServiceId']);
-        $this->assertSame(99, $diagnostics['billingClientId']);
-        $this->assertStringContainsString('billing_service_id=42', $diagnostics['body']);
-        $this->assertStringContainsString('billing_client_id=99', $diagnostics['body']);
+        $serviceId = fileowner($servicePath) === 0 ? 42 : 0;
+        $clientId = fileowner($clientPath) === 0 ? 99 : 0;
+        $this->assertSame($serviceId, $diagnostics['billingServiceId']);
+        $this->assertSame($clientId, $diagnostics['billingClientId']);
+        $this->assertStringContainsString('billing_service_id='.$serviceId, $diagnostics['body']);
+        $this->assertStringContainsString('billing_client_id='.$clientId, $diagnostics['body']);
     }
 
     public function testSnapshotWriteCreatesPrivateFile(): void

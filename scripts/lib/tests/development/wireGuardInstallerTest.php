@@ -7,6 +7,18 @@ require_once dirname(__DIR__, 2).'/wireguard.php';
 
 class WireGuardInstallerTest extends TestCase
 {
+    public function testGuideEndpointRequiresManagedBillingEntryOwner(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-wireguard-billing-');
+        $path = $home.'/.billingServiceId';
+        file_put_contents($path, "42\n");
+
+        $this->pmssWithEnv(['PMSS_WG_DNS_IP' => '198.51.100.10'], function () use ($home, $path): void {
+            $expected = fileowner($path) === 0 ? \pmssNginxUserMcxHostname('42') : 'seed.example.com';
+            $this->assertSame($expected, \wgUserGuideEndpoint($home, 'seed.example.com'));
+        });
+    }
+
     public function testResolveEndpointSourcePriority(): void
     {
         $cases = [
@@ -502,7 +514,7 @@ class WireGuardInstallerTest extends TestCase
         $this->assertStringNotContainsString('old.example.com:12345', $updated);
     }
 
-    public function testSyncUserGuideAddressesUsesMatchingMcxServiceEndpoint(): void
+    public function testSyncUserGuideAddressesRequiresManagedOwnerForMcxServiceEndpoint(): void
     {
         $homeBase = $this->pmssMakeTempDir('pmss-wireguard-tests-', 0700);
         $clientPublicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
@@ -527,7 +539,9 @@ class WireGuardInstallerTest extends TestCase
             );
         });
 
-        $serviceEndpoint = \pmssNginxUserMcxHostname('696');
+        $billingPath = $homeBase.'/alice/.billingId';
+        $serviceEndpoint = fileowner($billingPath) === 0
+            ? \pmssNginxUserMcxHostname('696') : '198.51.100.10';
         $this->assertStringContainsString(
             'Endpoint = '.$serviceEndpoint.":51820\n",
             (string) file_get_contents($homeBase.'/alice/wireguard.txt')

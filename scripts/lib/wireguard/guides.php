@@ -149,7 +149,7 @@ function wgApplyPeerToGuide(string $content, string $publicKey, string $endpoint
 /** Prefer the stable service hostname only when it resolves to this host. */
 function wgUserGuideEndpoint(string $home, string $endpoint): string
 {
-    $serviceId = pmssUserBillingServiceIdDigitsRead($home);
+    $serviceId = pmssUserBillingServiceIdDigitsRead($home, true);
     if ($serviceId === null) {
         return $endpoint;
     }
