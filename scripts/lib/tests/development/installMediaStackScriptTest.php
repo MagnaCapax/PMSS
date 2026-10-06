@@ -1191,6 +1191,42 @@ BASHRC
         );
     }
 
+    public function testAppProcessKillPreservesInstallerLauncherChain(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-process-kill-launcher-');
+        $trace = $home.'/trace.log';
+        $functions = $this->pmssExtractShellFunctions($this->script, array('media_stack_app_processes_kill'));
+        // `ssh host 'bash install-media-stack.sh --apps=sabnzbd'` puts the app name
+        // into the argv of the installer's parent (52001) and grandparent (52002).
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'USERNAME=alice DRY_RUN=0',
+            'TRACE='.escapeshellarg($trace),
+            'log_info() { :; }',
+            'pgrep() {',
+            '  [[ "$*" == "-f -u alice -- sabnzbd" ]] || return 2',
+            '  printf "52002\\n52001\\n%s\\n41002\\n" "$$"',
+            '}',
+            'ps() {',
+            '  if [[ "$2" == "ppid=" ]]; then',
+            '    case "$4" in 52001) echo " 52002" ;; 52002) echo " 1" ;; *) echo " 52001" ;; esac',
+            '    return 0',
+            '  fi',
+            '  echo "python3"',
+            '}',
+            'kill() { echo "kill:$*" >> "$TRACE"; }',
+            $functions,
+            'media_stack_app_processes_kill sabnzbd',
+            'echo completed',
+            '',
+        ));
+
+        $output = $this->pmssRunShellHarness($script);
+        $this->assertStringContainsString('completed', $output);
+        $this->assertSame("kill:-9 41002\n", (string) file_get_contents($trace));
+    }
+
     public function testServarrInstallHelperRunsSharedDownloadAndConfigSequence(): void
     {
         $home = $this->pmssMakeTempDir('pmss-media-stack-servarr-home-');
