@@ -210,6 +210,7 @@ PHP;
         'www/index.php',
         'www/jquery.tabs.css',
         'www/mediaStack.php',
+        'www/mediaStackRecoveryCommand.php',
         'www/openvpn-config.tgz',
         'www/panelSessionStore.php',
         'www/panelSessionAuth.php',

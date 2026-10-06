@@ -8,6 +8,7 @@
  * @author PMSS Team
  */
 require_once __DIR__.'/scriptsInc.php';
+require_once __DIR__.'/mediaStackRecoveryCommand.php';
 
 const PMSS_MEDIA_STACK_MEMORY_MINIMUM_BYTES = 1024 * 1024 * 1024;
 const PMSS_MEDIA_STACK_MEMORY_UNLIMITED_BYTES = 1024 * 1024 * 1024 * 1024 * 1024;
@@ -580,20 +581,6 @@ function pmssMediaStackPanelStartCommandBuild(string $home, string $username): s
         .' USER='.escapeshellarg($username)
         .' LOGNAME='.escapeshellarg($username)
         .' /bin/bash -lc '.escapeshellarg($innerCommand);
-}
-
-/** Build the fixed one-shot command used to relaunch absent tmux sessions. */
-function pmssMediaStackPanelRecoveryCommandBuild(string $home, string $username): string
-{
-    $scriptPath = pmssCustomerHomePath($home, 'install-media-stack.sh');
-    $successMarker = 'pmss-media-stack-started';
-
-    return 'cd '.escapeshellarg($home)
-        .' && HOME='.escapeshellarg($home)
-        .' USER='.escapeshellarg($username)
-        .' LOGNAME='.escapeshellarg($username)
-        .' /bin/bash '.escapeshellarg($scriptPath).' --start-stopped >/dev/null 2>&1'
-        .' && printf %s '.escapeshellarg($successMarker);
 }
 
 /**
