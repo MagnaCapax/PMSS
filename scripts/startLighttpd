@@ -15,7 +15,8 @@
  * Postconditions:
  *   - Required subdirectories (`.lighttpd`, `.lighttpd/upload`, optional `.lighttpd/compress`)
  *     exist with user ownership when referenced by config.
- *   - User lighttpd process launched; script prints `ps` output for visibility.
+ *   - User lighttpd process launched, or an existing instance left untouched.
+ *     A fresh launch prints `ps` output for visibility.
  *
  * @author  Aleksi Ursin <123067457+MagnaCapax@users.noreply.github.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
@@ -28,9 +29,10 @@ if ($argc != 2) die("Usage: startLighttpd USERNAME\n");
 // pass the file_exists() checks below and unlink/chdir outside /home.
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/user/serviceLaunch.php';
+require_once __DIR__.'/lib/user/watchdog.php';
 $user = pmssUsernameNormalizeIfValid((string) $argv[1]);
 if ($user === null) die("Invalid username\n");
-$homeDir = '/home/'.$user;
+$homeDir = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/').'/'.$user;
 $configPath = $homeDir.'/.lighttpd.conf';
 
 /** Return true only when an existing path resolves inside the user's home. */
@@ -61,7 +63,7 @@ function pmssStartLighttpdEnsureDirectory(string $user, string $homeDir, string 
 
     if (!is_dir($dir)) {
         $rc = 0;
-        passthru(pmssBuildUserShellCommand($user, 'mkdir -p '.escapeshellarg($dir)), $rc);
+        passthru(pmssLockChildClosePrefix().pmssBuildUserShellCommand($user, 'mkdir -p '.escapeshellarg($dir)), $rc);
         if ($rc !== 0) {
             return false;
         }
@@ -82,46 +84,83 @@ function pmssStartLighttpdRemoveSocket(string $homeDir, string $socketPath): boo
     return @unlink($socketPath) || !file_exists($socketPath);
 }
 
-// Check user is valid
-if (!file_exists($homeDir)) die("Invalid username\n");
-if (!is_dir($homeDir)) die("User home is not a directory!\n");
-if (!file_exists($configPath)) die("User does not have lighttpd configuration - lighttpd maybe disabled\n");
-
-$lighttpdDir = $homeDir.'/.lighttpd';
-$uploadDir   = $lighttpdDir.'/upload';
-$config      = @file_get_contents($configPath);
-$deflateEnabled = is_string($config) && preg_match('/^[ \t]*deflate\.cache-dir/m', $config);
-
-$requiredDirs = [$lighttpdDir, $uploadDir];
-if ($deflateEnabled) {
-    $requiredDirs[] = $lighttpdDir.'/compress';
+/** Wait briefly for another starter; only a busy lock is worth retrying. */
+function pmssStartLighttpdLockAcquire(string $user)
+{
+    $path = pmssRuntimeLockPath('pmss-lighttpdStart-'.$user.'.lock');
+    $deadline = microtime(true) + 10.0;
+    do {
+        $busy = false;
+        $lock = pmssLockFileAcquire($path, true, 'c', false, true, $busy);
+        if ($lock !== false || !$busy) return $lock;
+        usleep(100000);
+    } while (microtime(true) < $deadline);
+    return false;
 }
-foreach ($requiredDirs as $dir) {
-    if (pmssStartLighttpdEnsureDirectory($user, $homeDir, $dir)) {
-        continue;
+
+/** Keep the process check and socket cleanup inside the same account lock. */
+function pmssStartLighttpdRun(string $user, string $homeDir, string $configPath): int
+{
+    // Check user is valid before creating the lock file.
+    if (!file_exists($homeDir)) { echo "Invalid username\n"; return 1; }
+    if (!is_dir($homeDir)) { echo "User home is not a directory!\n"; return 1; }
+    if (!file_exists($configPath)) { echo "User does not have lighttpd configuration - lighttpd maybe disabled\n"; return 1; }
+
+    $lock = pmssStartLighttpdLockAcquire($user);
+    if ($lock === false) {
+        fwrite(STDERR, "Unable to acquire lighttpd start lock for {$user}\n");
+        return 1;
     }
-    fwrite(STDERR, "Unable to prepare lighttpd directory: {$dir}\n");
-    exit(1);
-}
-foreach (glob(rtrim($lighttpdDir, '/').'/php.socket*') ?: [] as $socketPath) {
-    if (pmssStartLighttpdRemoveSocket($homeDir, $socketPath)) {
-        continue;
+    try {
+        pmssLockHandleExportChildCloseFds($lock);
+        if (pmssUserWatchdogProcessRunning($user, 'lighttpd')) {
+            echo "lighttpd already running for {$user}\n";
+            return 0;
+        }
+
+        $lighttpdDir = $homeDir.'/.lighttpd';
+        $uploadDir   = $lighttpdDir.'/upload';
+        $config      = @file_get_contents($configPath);
+        $deflateEnabled = is_string($config) && preg_match('/^[ \t]*deflate\.cache-dir/m', $config);
+
+        $requiredDirs = [$lighttpdDir, $uploadDir];
+        if ($deflateEnabled) {
+            $requiredDirs[] = $lighttpdDir.'/compress';
+        }
+        foreach ($requiredDirs as $dir) {
+            if (pmssStartLighttpdEnsureDirectory($user, $homeDir, $dir)) {
+                continue;
+            }
+            fwrite(STDERR, "Unable to prepare lighttpd directory: {$dir}\n");
+            return 1;
+        }
+        foreach (glob(rtrim($lighttpdDir, '/').'/php.socket*') ?: [] as $socketPath) {
+            if (pmssStartLighttpdRemoveSocket($homeDir, $socketPath)) {
+                continue;
+            }
+            fwrite(STDERR, "Unable to remove stale lighttpd socket: {$socketPath}\n");
+            return 1;
+        }
+
+        // lighttpd inherits cwd before opening logs; keep it out of root-only paths.
+        if (!@chdir($homeDir)) {
+            fwrite(STDERR, "Unable to enter user home\n");
+            return 1;
+        }
+        $startCommand = 'cd '.escapeshellarg($homeDir).' && /usr/sbin/lighttpd -f '.escapeshellarg($configPath);
+        $startRc = 0;
+        passthru(pmssLockChildClosePrefix().pmssBuildUserServiceShellCommand($user, $startCommand), $startRc);
+        if ($startRc !== 0) {
+            fwrite(STDERR, "Unable to start lighttpd inside user slice\n");
+            return 1;
+        }
+
+        passthru(pmssLockChildClosePrefix().'ps aux | grep '.escapeshellarg($user)); // Output running processes
+        return 0;
+    } finally {
+        pmssLockHandleRelease($lock);
+        putenv(PMSS_UPDATE_LOCK_FDS_ENV);
     }
-    fwrite(STDERR, "Unable to remove stale lighttpd socket: {$socketPath}\n");
-    exit(1);
 }
 
-// lighttpd inherits cwd before opening logs; keep it out of root-only paths.
-if (!@chdir($homeDir)) {
-    fwrite(STDERR, "Unable to enter user home\n");
-    exit(1);
-}
-$startCommand = 'cd '.escapeshellarg($homeDir).' && /usr/sbin/lighttpd -f '.escapeshellarg($configPath);
-$startRc = 0;
-passthru(pmssBuildUserServiceShellCommand($user, $startCommand), $startRc);
-if ($startRc !== 0) {
-    fwrite(STDERR, "Unable to start lighttpd inside user slice\n");
-    exit(1);
-}
-
-passthru('ps aux | grep '.escapeshellarg($user)); // Output running processes
+exit(pmssStartLighttpdRun($user, $homeDir, $configPath));
