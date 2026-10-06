@@ -1,4 +1,4 @@
-# ADR 0085: Root entry point for one account restart
+# ADR 0086: Root entry point for one account restart
 
 Date: 2026-10-06
 Category: security
@@ -52,3 +52,5 @@ A start failure is recorded but does not prevent later starts. A restart is
 verified on a live host by checking that the account's rTorrent, media stack,
 and lighttpd processes are running again and by reading
 `/var/log/pmss/restartUser.log`.
+The rTorrent and lighttpd start results follow their observed process state even
+when a watchdog starts a daemon before the restart launchers run.

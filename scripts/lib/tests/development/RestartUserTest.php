@@ -62,6 +62,55 @@ SH
         });
     }
 
+    /** Run the production start function with process and launcher probes confined to this test namespace. */
+    private function startWithFixture(bool $launcherSuccess, bool $rtorrentRunning, int $lighttpdVisibleAfter): array
+    {
+        if (!function_exists('PMSS\\Tests\\RestartUserFixture\\pmssRestartUserServicesStart')) {
+            $method = new \ReflectionFunction('pmssRestartUserServicesStart');
+            $lines = file($method->getFileName());
+            $this->assertTrue(is_array($lines));
+            $source = implode('', array_slice($lines, $method->getStartLine() - 1, $method->getEndLine() - $method->getStartLine() + 1));
+            eval('namespace PMSS\\Tests\\RestartUserFixture;' . "\n" . $source);
+        }
+        $GLOBALS['PMSS_TEST_RESTART_START'] = [
+            'launcherSuccess' => $launcherSuccess, 'rtorrentRunning' => $rtorrentRunning,
+            'lighttpdVisibleAfter' => $lighttpdVisibleAfter, 'lighttpdChecks' => 0,
+            'sleeps' => 0, 'launchers' => [],
+        ];
+        try {
+            $home = $this->pmssMakeTempDir('pmss-restart-start-');
+            $result = RestartUserFixture\pmssRestartUserServicesStart('alice', $home, 1001);
+            return [$result, $GLOBALS['PMSS_TEST_RESTART_START']];
+        } finally {
+            unset($GLOBALS['PMSS_TEST_RESTART_START']);
+        }
+    }
+
+    public function testStartUsesRunningPostStateDespiteLauncherFailure(): void
+    {
+        [$result, $calls] = $this->startWithFixture(false, true, 1);
+        $this->assertSame(['started' => ['rtorrent', 'lighttpd'], 'failed' => []], $result);
+        $this->assertSame(['startRtorrent', 'startLighttpd'], $calls['launchers']);
+        $this->assertSame(0, $calls['sleeps']);
+    }
+
+    public function testStartFailsWhenLaunchersSucceedButServicesStayDown(): void
+    {
+        [$result, $calls] = $this->startWithFixture(true, false, PHP_INT_MAX);
+        $this->assertSame(['started' => [], 'failed' => ['rtorrent', 'lighttpd']], $result);
+        $this->assertSame(['startRtorrent', 'startLighttpd'], $calls['launchers']);
+        $this->assertSame(26, $calls['lighttpdChecks']);
+        $this->assertSame(25, $calls['sleeps']);
+    }
+
+    public function testStartWaitsForLighttpdToAppear(): void
+    {
+        [$result, $calls] = $this->startWithFixture(true, true, 3);
+        $this->assertSame(['started' => ['rtorrent', 'lighttpd'], 'failed' => []], $result);
+        $this->assertSame(3, $calls['lighttpdChecks']);
+        $this->assertSame(2, $calls['sleeps']);
+    }
+
     public function testSignalsAreWrappedInAccountShell(): void
     {
         foreach (['TERM', 'KILL'] as $signal) {
@@ -136,7 +185,7 @@ SH
         $this->assertStringNotContainsString('function pmssMediaStackPanelRecoveryCommandBuild(', $panel);
         $this->assertStringContainsString("'www/mediaStackRecoveryCommand.php'", $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php'));
         $command = \pmssRestartUserMediaStackCommandBuild('alice', $home);
-        $this->assertStringContainsString('/usr/bin/timeout -k 10 300 '
+        $this->assertStringContainsString('/usr/bin/timeout --kill-after=10 300 '
             .\pmssBuildUserShellCommand('alice', $expected), $command);
         $this->assertOrderedStrings([
             "pmssRestartUserRootStart('startRtorrent'",
@@ -163,4 +212,32 @@ SH
         $this->assertSame($record, json_decode(trim((string) file_get_contents($path)), true));
         $this->assertSame(1, count(file($path)));
     }
+}
+
+namespace PMSS\Tests\RestartUserFixture;
+
+/** Stub the fixed root launcher while recording that both starts were attempted. */
+function pmssRestartUserRootStart(string $launcher, string $user): bool
+{
+    $GLOBALS['PMSS_TEST_RESTART_START']['launchers'][] = $launcher;
+    return $GLOBALS['PMSS_TEST_RESTART_START']['launcherSuccess'];
+}
+
+/** Supply the result of the existing bounded rTorrent probe. */
+function pmssRestartUserRtorrentRunning(string $user): bool
+{
+    return $GLOBALS['PMSS_TEST_RESTART_START']['rtorrentRunning'];
+}
+
+/** Supply lighttpd visibility after a chosen number of comm checks. */
+function pmssRestartUserServiceRunning(int $uid, string $comm): bool
+{
+    $GLOBALS['PMSS_TEST_RESTART_START']['lighttpdChecks']++;
+    return $GLOBALS['PMSS_TEST_RESTART_START']['lighttpdChecks'] >= $GLOBALS['PMSS_TEST_RESTART_START']['lighttpdVisibleAfter'];
+}
+
+/** Keep the five-second production bound observable without delaying the suite. */
+function usleep(int $microseconds): void
+{
+    $GLOBALS['PMSS_TEST_RESTART_START']['sleeps']++;
 }

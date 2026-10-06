@@ -73,7 +73,7 @@ function pmssRestartUserRtorrentRunning(string $user, float $startupSeconds = 5.
 /** Bound only the account-owned media-stack start while the root locks are held. */
 function pmssRestartUserMediaStackCommandBuild(string $user, string $home): string
 {
-    return pmssLockChildClosePrefix().'/usr/bin/timeout -k 10 300 '
+    return pmssLockChildClosePrefix().'/usr/bin/timeout --kill-after=10 300 '
         .pmssBuildUserShellCommand($user, pmssMediaStackPanelRecoveryCommandBuild($home, $user)).' 2>/dev/null';
 }
 
@@ -82,7 +82,9 @@ function pmssRestartUserServicesStart(string $user, string $home, int $uid): arr
 {
     $started = [];
     $failed = [];
-    if (pmssRestartUserRootStart('startRtorrent', $user) && pmssRestartUserRtorrentRunning($user)) $started[] = 'rtorrent';
+    // A watchdog can start the daemon first, making our launcher report failure.
+    pmssRestartUserRootStart('startRtorrent', $user);
+    if (pmssRestartUserRtorrentRunning($user)) $started[] = 'rtorrent';
     else $failed[] = 'rtorrent';
 
     if (is_file($home.'/.media-stack-status.json')) {
@@ -99,7 +101,14 @@ function pmssRestartUserServicesStart(string $user, string $home, int $uid): arr
         else $failed[] = 'media-stack';
     }
 
-    if (pmssRestartUserRootStart('startLighttpd', $user) && pmssRestartUserServiceRunning($uid, 'lighttpd')) $started[] = 'lighttpd';
+    pmssRestartUserRootStart('startLighttpd', $user);
+    $lighttpdRunning = pmssRestartUserServiceRunning($uid, 'lighttpd');
+    // Give either starter five seconds to make the account-owned daemon visible.
+    for ($attempt = 0; $attempt < 25 && !$lighttpdRunning; $attempt++) {
+        usleep(200000);
+        $lighttpdRunning = pmssRestartUserServiceRunning($uid, 'lighttpd');
+    }
+    if ($lighttpdRunning) $started[] = 'lighttpd';
     else $failed[] = 'lighttpd';
     return ['started' => $started, 'failed' => $failed];
 }
