@@ -51,11 +51,17 @@ function storageBenchmarkHomeDeviceResolve(
     $entry['size'] = $size;
     if (is_dir($sysfsDevice.'/md')) {
         $state = @file_get_contents($sysfsDevice.'/md/array_state');
-        $degraded = @file_get_contents($sysfsDevice.'/md/degraded');
-        if ($state === false || $degraded === false || !ctype_digit(trim($degraded))) {
+        $level = @file_get_contents($sysfsDevice.'/md/level');
+        $degradedPath = $sysfsDevice.'/md/degraded';
+        $degraded = @file_get_contents($degradedPath);
+        if ($degraded === false && !file_exists($degradedPath) && $level !== false
+            && in_array(trim($level), ['raid0', 'linear'], true)) {
+            $degraded = '0';
+        }
+        if ($state === false || $level === false || $degraded === false || !ctype_digit(trim($degraded))) {
             return $entry + ['ok' => false, 'error' => 'unable to read md array status'];
         }
-        $entry['md'] = ['array_state' => trim($state), 'degraded' => (int) trim($degraded)];
+        $entry['md'] = ['array_state' => trim($state), 'degraded' => (int) trim($degraded), 'level' => trim($level)];
     }
     return $entry + ['ok' => true];
 }

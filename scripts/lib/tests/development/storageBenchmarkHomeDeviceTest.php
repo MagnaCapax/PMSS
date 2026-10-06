@@ -24,6 +24,7 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         mkdir($sysfs.'/md0/md', 0755, true);
         file_put_contents($sysfs.'/md0/queue/rotational', "0\n");
         file_put_contents($sysfs.'/md0/md/array_state', "clean\n");
+        file_put_contents($sysfs.'/md0/md/level', "raid10\n");
         file_put_contents($sysfs.'/md0/md/degraded', "1\n");
         $check = static function (): bool { return true; };
         $canonical = static function (string $path): string { return $path; };
@@ -38,7 +39,27 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         $md = \storageBenchmarkHomeDeviceResolve('/home', '/dev/md0', $sysfs, $check, $canonical, $size);
         $this->assertSame(true, $md['ok']);
         $this->assertSame(0, $md['rota']);
-        $this->assertSame(['array_state' => 'clean', 'degraded' => 1], $md['md']);
+        $this->assertSame(['array_state' => 'clean', 'degraded' => 1, 'level' => 'raid10'], $md['md']);
+    }
+
+    public function testMissingMdDegradedOnlyAllowedWithoutRedundancy(): void
+    {
+        $sysfs = $this->pmssMakeTempDir('pmss-home-sysfs-');
+        mkdir($sysfs.'/md0/md', 0755, true);
+        file_put_contents($sysfs.'/md0/md/array_state', "clean\n");
+        $check = function (): bool { return true; };
+        $canonical = function (string $path): string { return $path; };
+        $size = function (): int { return 1024 * 1024; };
+
+        file_put_contents($sysfs.'/md0/md/level', "raid0\n");
+        $raid0 = \storageBenchmarkHomeDeviceResolve('/home', '/dev/md0', $sysfs, $check, $canonical, $size);
+        $this->assertSame(true, $raid0['ok']);
+        $this->assertSame(['array_state' => 'clean', 'degraded' => 0, 'level' => 'raid0'], $raid0['md']);
+
+        file_put_contents($sysfs.'/md0/md/level', "raid10\n");
+        $raid10 = \storageBenchmarkHomeDeviceResolve('/home', '/dev/md0', $sysfs, $check, $canonical, $size);
+        $this->assertSame(false, $raid10['ok']);
+        $this->assertSame('unable to read md array status', $raid10['error']);
     }
 
     public function testUnsafeAndNonBlockMountsAreRejected(): void
