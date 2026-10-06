@@ -95,7 +95,7 @@ class MdadmCheckarrayTest extends TestCase
         $this->assertSame(0, $result['rc']);
         $this->assertStringContainsString('skipping md1 (degraded); requested sync_action=idle', $result['output']);
         $this->assertStringContainsString('checking non-degraded arrays: md0', $result['output']);
-        $this->assertStringContainsString('--cron --idle --quiet md0', $this->readStubLog());
+        $this->assertSame("--idle --quiet md0\n", $this->readStubLog());
         $this->assertSame("idle\n", (string) file_get_contents($syncTarget));
     }
 
@@ -107,7 +107,7 @@ class MdadmCheckarrayTest extends TestCase
 
         $this->assertSame(0, $result['rc']);
         $this->assertStringContainsString('preserving checkarray --all behavior', $result['output']);
-        $this->assertStringContainsString('--cron --idle --quiet --all', $this->readStubLog());
+        $this->assertSame("--idle --quiet --all\n", $this->readStubLog());
     }
 
     public function testRootCronUsesGuardWithoutChangingQuarterlyGate(): void

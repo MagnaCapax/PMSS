@@ -104,7 +104,8 @@ function pmssMdadmCheckarrayRequestIdle(string $array, string $sysBlockRoot): bo
 /** Run Debian checkarray and preserve its stdout/stderr in the cron log. */
 function pmssMdadmCheckarrayRunCommand(string $binary, array $arrays): int
 {
-    $args = array_merge(['--cron', '--idle', '--quiet'], empty($arrays) ? ['--all'] : array_values($arrays));
+    // PMSS owns the cron schedule; --cron would let AUTOCHECK silently skip it.
+    $args = array_merge(['--idle', '--quiet'], empty($arrays) ? ['--all'] : array_values($arrays));
     $result = pmssCommandCapture(pmssBuildCommand($binary, $args), 120);
     if ((string) ($result['stdout'] ?? '') !== '') {
         echo (string) $result['stdout'];
