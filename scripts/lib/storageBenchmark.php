@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/runtime.php';
 pmssRequireRelativeFiles(__DIR__, ['cli/optionParser.php', 'storageBenchmark/report.php', 'storageHealth/common.php']);
+require_once __DIR__.'/storageBenchmarkHomeDevice.php';
 
 /** Emit a legacy CLI fatal error and preserve the historical exit code. */
 function storageBenchmarkFail(string $message): void { exit(pmssCliReturnWithStderr($message)); }
@@ -26,6 +27,7 @@ function storageBenchmarkMain(array $argv): int
             ['--target <dir>', 'Directory for file-backed tests (default /home).'], ['--size <bytes|MiB|GiB>', 'Target file size (default 500G, capped to 80% free).'],
             ['--runtime <seconds>', 'Per-test runtime for volume fio tests (default 60).'], ['--label <name>', 'Tag results (e.g., hostname/site/array).'],
             ['--json <path>', 'JSON Lines log (default /var/log/pmss/benchmark-storage.jsonl).'], ['--devices', 'Enable per-device tests (dd seqread + fio randread).'],
+            ['--home-device', 'Read-only test of the block device under --target (default /home); skips file and per-member device tests.'],
             ['--dd-size <MiB|GiB>', 'Size for dd seqread per device (default 1G).'], ['--device-runtime <sec>', 'Per-device fio runtime (default 30).'],
             ['--require-idle', 'Abort if busy (ioping/iostat exceed thresholds).'], ['--idle-latency-ms <ms>', 'ioping avg latency threshold (default 100).'],
             ['--idle-util <percent>', 'iostat util threshold (default 85).'], ['--show-last', 'Print the last run human summary and exit.'],
@@ -33,10 +35,12 @@ function storageBenchmarkMain(array $argv): int
         return 0;
     }
 
-    $testDevices = pmssCliOptionPresent($parsed, 'devices', null, true); $requireIdle = pmssCliOptionPresent($parsed, 'require-idle', null, true); $showLast = pmssCliOptionPresent($parsed, 'show-last', null, true);
+    $testDevices = pmssCliOptionPresent($parsed, 'devices', null, true); $homeDevice = pmssCliOptionPresent($parsed, 'home-device', null, true); $requireIdle = pmssCliOptionPresent($parsed, 'require-idle', null, true); $showLast = pmssCliOptionPresent($parsed, 'show-last', null, true);
     $targetDir = (string) pmssCliOptionString($parsed, 'target', null, '/home', true); $fileSize = (string) pmssCliOptionString($parsed, 'size', null, '500G', true); $jsonLog = (string) pmssCliOptionString($parsed, 'json', null, '/var/log/pmss/benchmark-storage.jsonl', true);
     $label = (string) pmssCliOptionString($parsed, 'label', null, '', true); $ddSize = (string) pmssCliOptionString($parsed, 'dd-size', null, '1G', true);
     if ($showLast) return storageBenchmarkShowLast($jsonLog);
+
+    if ($homeDevice) return storageBenchmarkHomeDeviceMain($parsed, $targetDir, $jsonLog, $label, $ddSize, $requireIdle);
 
     $runtime = storageBenchmarkRequireIntOption($parsed, 'runtime', 60, 1, 'positive'); $devRuntime = $testDevices ? storageBenchmarkRequireIntOption($parsed, 'device-runtime', 30, 1, 'positive') : 30;
     $idleLatencyMs = storageBenchmarkRequireIntOption($parsed, 'idle-latency-ms', 100, 0, 'non-negative'); $idleUtilPct = storageBenchmarkRequireIntOption($parsed, 'idle-util', 85, 0, 'non-negative');
@@ -105,7 +109,7 @@ function fioRun(string $file, int $size, int $runtime, array $job): array
 {
     $json = pmssCreatePrivateTempFile('fio-'); if ($json === null) return ['ok' => false, 'error' => 'unable to allocate fio JSON temp file'];
     try {
-        $opts = ['--name='.escapeshellarg($job['name']), '--filename='.escapeshellarg($file), '--size='.$size, '--time_based=1', '--runtime='.(int) ($job['runtime'] ?? $runtime), '--rw='.escapeshellarg($job['rw']), '--ioengine=libaio', '--iodepth='.(int) $job['iodepth'], '--numjobs='.(int) $job['numjobs'], '--direct='.(int) $job['direct'], '--group_reporting=1']; if (isset($job['bs'])) $opts[] = '--bs='.escapeshellarg($job['bs']); if (isset($job['bssplit'])) $opts[] = '--bssplit='.escapeshellarg($job['bssplit']); if (isset($job['rwmixread'])) $opts[] = '--rwmixread='.(int) $job['rwmixread']; $cmd = 'fio --output-format=json --output '.escapeshellarg($json).' '.implode(' ', $opts); $rc = runCommand($cmd, true); $payload = @file_get_contents($json);
+        $opts = ['--name='.escapeshellarg($job['name']), '--filename='.escapeshellarg($file), '--size='.$size, '--time_based=1', '--runtime='.(int) ($job['runtime'] ?? $runtime), '--rw='.escapeshellarg($job['rw']), '--ioengine=libaio', '--iodepth='.(int) $job['iodepth'], '--numjobs='.(int) $job['numjobs'], '--direct='.(int) $job['direct'], '--group_reporting=1']; if (isset($job['bs'])) $opts[] = '--bs='.escapeshellarg($job['bs']); if (isset($job['bssplit'])) $opts[] = '--bssplit='.escapeshellarg($job['bssplit']); if (isset($job['rwmixread'])) $opts[] = '--rwmixread='.(int) $job['rwmixread']; if (!empty($job['readonly'])) $opts[] = '--readonly'; $cmd = 'fio --output-format=json --output '.escapeshellarg($json).' '.implode(' ', $opts); $rc = runCommand($cmd, true); $payload = @file_get_contents($json);
     } finally {
         // Release the private output even when quoting, execution, or reading throws.
         @unlink($json);
