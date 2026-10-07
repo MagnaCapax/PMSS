@@ -41,8 +41,8 @@ final class MediaStackPortManagerTest extends TestCase
     {
         $ports = \pmssMediaStackPortsEnsure($this->user, $this->home);
 
-        $this->assertSame(6, count($ports));
-        $this->assertSame(6, count(array_unique($ports)));
+        $this->assertSame(7, count($ports));
+        $this->assertSame(7, count(array_unique($ports)));
         foreach ($ports as $app => $port) {
             $this->assertTrue(\pmssNetworkPortInRange($port, \PMSS_PORT_MANAGER_MIN_PORT, \PMSS_PORT_MANAGER_MAX_PORT));
             $this->assertSame((string) $port, file_get_contents($this->home.'/.media-stack-port-'.$app));

@@ -194,6 +194,7 @@ PHP;
         '.bashrc',
         'install-media-stack.sh',
         'install-ai-tools.sh',
+        'install-openclaw.php',
         'bin/docker-install-lsio',
         'bin/docker-install-wireguard.sh',
         'bin/linuxserverInstall.sh',

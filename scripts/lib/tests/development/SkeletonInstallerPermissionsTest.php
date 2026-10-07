@@ -7,7 +7,7 @@ class SkeletonInstallerPermissionsTest extends TestCase
 {
     public function testUserInstallerScriptsAreExecutable(): void
     {
-        foreach (['install-ai-tools.sh', 'install-media-stack.sh'] as $name) {
+        foreach (['install-ai-tools.sh', 'install-media-stack.sh', 'install-openclaw.php'] as $name) {
             $path = $this->pmssRepoPath('etc/skel/'.$name);
             $mode = is_file($path) ? fileperms($path) : false;
 

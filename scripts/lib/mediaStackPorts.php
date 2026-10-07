@@ -24,6 +24,7 @@ function pmssMediaStackPortDefinitions(): array
         'prowlarr' => array('path' => '.config/prowlarr/config.xml', 'patterns' => array($xmlPort)),
         'sonarr' => array('path' => '.config/sonarr/config.xml', 'patterns' => array($xmlPort)),
         'autobrr' => array('path' => '.config/autobrr/config.toml', 'patterns' => array($iniPort)),
+        'openclaw' => array('path' => '.openclaw/gateway.port', 'patterns' => array('/^([0-9]{1,5})(?:\r?\n|$)/')),
         'jellyfin' => array(
             'path' => '.config/jellyfin/config/network.xml',
             'patterns' => array(
