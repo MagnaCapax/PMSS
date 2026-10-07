@@ -51,7 +51,7 @@ class installMediaStackScriptTest extends TestCase
             'JELLYFIN-URL = https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/',
         ], $this->script);
 
-        foreach (['etc/skel/install-media-stack.sh', 'etc/skel/www/userMediaStackPanel.php', 'etc/skel/www/index.php'] as $path) {
+        foreach (['etc/skel/install-media-stack.sh', 'etc/skel/www/userMediaStackPanel.php', 'etc/skel/www/index.php', 'etc/skel/.bashrc'] as $path) {
             $this->assertStringNotContainsString('jellyfin/web/'.'index.html', $this->pmssReadRepoFile($path));
         }
     }
