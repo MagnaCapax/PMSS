@@ -1,6 +1,7 @@
 <?php
 /** Account preflight, locks, and ordered service starts for restartUser. */
 require_once __DIR__.'/restartProcesses.php';
+require_once __DIR__.'/serviceLaunch.php';
 require_once dirname(__DIR__).'/userLifecycle.php';
 require_once dirname(__DIR__).'/rtorrent/process.php';
 
@@ -73,8 +74,10 @@ function pmssRestartUserRtorrentRunning(string $user, float $startupSeconds = 5.
 /** Bound only the account-owned media-stack start while the root locks are held. */
 function pmssRestartUserMediaStackCommandBuild(string $user, string $home): string
 {
+    $scoped = pmssBuildUserServiceShellCommand($user, pmssMediaStackPanelRecoveryCommandBuild($home, $user));
+    // Bound both slice setup and the scoped start; keep the marker on stdout.
     return pmssLockChildClosePrefix().'/usr/bin/timeout --kill-after=10s 300 '
-        .pmssBuildUserShellCommand($user, pmssMediaStackPanelRecoveryCommandBuild($home, $user)).' 2>/dev/null';
+        .pmssBuildCommand('/bin/sh', ['-c', $scoped]).' 2>/dev/null';
 }
 
 /** @return array{started:array<int,string>,failed:array<int,string>} */

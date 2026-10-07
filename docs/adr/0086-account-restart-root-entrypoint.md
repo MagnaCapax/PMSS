@@ -34,6 +34,9 @@ PID using the existing watchdog probe, which accepts the `rtorrent main` process
 name. The account-owned media-stack start has a 300-second deadline and a
 10-second kill grace. A timeout records a media-stack failure and leaves the
 lighttpd start in the sequence; customer-script children may outlive that limit.
+The account-owned media-stack start runs through `pmssBuildUserServiceShellCommand()`
+so its apps enter `user-UID.slice` under the ADR 0023 service-launch rule; a
+2026-10-07 production check found plain `su` had left them in root's session scope.
 
 The media-stack command has one definition in the customer skeleton. The panel
 loads its per-user copy; the root CLI loads only the root-owned `/etc/skel` copy
