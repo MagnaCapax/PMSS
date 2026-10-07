@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/../quotaSnapshot.php';
+require_once __DIR__.'/../traffic/storage.php';
 
 /**
  * Read the quota snapshot written into the user home directory.
@@ -141,7 +142,7 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
     $memoryCurrentBytes = is_numeric($resource['memory']['current'] ?? null) ? (float) $resource['memory']['current'] : (is_int($cgroup['memory_current'] ?? null) ? (float) $cgroup['memory_current'] : null);
     $memoryLimitBytes = is_numeric($config['ramMiB'] ?? null) ? ((float) $config['ramMiB']) * 1024 * 1024 : (is_int($cgroup['memory_limit'] ?? null) ? (float) $cgroup['memory_limit'] : null);
     $trafficLimitMiB = $trafficLimitState['effectiveLimitGiB'] > 0 ? $trafficLimitState['effectiveLimitGiB'] * 1024.0 : null;
-    $trafficUsedMiB = is_numeric($traffic['raw']['month'] ?? null) ? (float) $traffic['raw']['month'] : null;
+    $trafficUsedMiB = pmssTrafficRawMonthMiB($traffic);
 
     return [
         'context' => $context,
@@ -158,7 +159,7 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
         'memory' => ['current_bytes' => $memoryCurrentBytes, 'limit_bytes' => $memoryLimitBytes, 'percent' => pmssStatsPercent($memoryCurrentBytes, $memoryLimitBytes)],
         'traffic' => [
             'upload_month_mib' => $trafficUsedMiB,
-            'download_month_mib' => is_numeric($trafficIngress['raw']['month'] ?? null) ? (float) $trafficIngress['raw']['month'] : null,
+            'download_month_mib' => pmssTrafficRawMonthMiB($trafficIngress),
             'limit_mib' => $trafficLimitMiB,
             'bonus_gib' => $trafficLimitState['bonusGiB'],
             'percent' => pmssStatsPercent($trafficUsedMiB, $trafficLimitMiB),

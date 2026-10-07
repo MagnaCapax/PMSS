@@ -103,11 +103,8 @@ function pmssUserQuotaStatusPath(string $username): ?string
 function pmssReadUserTrafficMonth(string $path): int
 {
     $data = pmssReadSerializedArrayFile($path);
-    if ($data === null || !isset($data['raw']['month']) || !is_numeric($data['raw']['month'])) {
-        return 0;
-    }
-
-    return (int) round($data['raw']['month']);
+    $month = $data === null ? null : pmssTrafficRawMonthMiB($data);
+    return $month === null ? 0 : (int) round($month);
 }
 
 /** @return array<string,int> */

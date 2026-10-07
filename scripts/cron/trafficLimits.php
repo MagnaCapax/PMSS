@@ -58,7 +58,7 @@ foreach($users AS $thisUser) {
         continue;
     }
     $trafficLimit = (float) $trafficLimitState['effectiveLimitGiB'];
-    $trafficUsageGiB = ($data['raw']['month'] / 1024);   // Set to GiB
+    $trafficUsageGiB = (pmssTrafficRawMonthMiB($data) / 1024);   // Set to GiB
     $userConfig = $userConfigStore->get($thisUser);
     $trafficCapMbit = (is_array($userConfig) && isset($userConfig['trafficCapMbit']) && is_numeric($userConfig['trafficCapMbit']))
         ? (int) $userConfig['trafficCapMbit']

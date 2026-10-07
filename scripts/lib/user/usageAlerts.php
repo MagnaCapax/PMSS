@@ -73,7 +73,7 @@ function pmssUsageAlertsConditionsRead(string $user, string $homeRoot = '/home',
     if ($traffic !== null && pmssUsageAlertsRootArtifactIsTrusted($limitPath)) {
         $bonusPath = pmssUsageAlertsRootArtifactIsTrusted($home.'/.bonusTraffic') ? $home.'/.bonusTraffic' : '';
         $limit = pmssTrafficLimitStateRead($limitPath, $bonusPath)['effectiveLimitGiB'];
-        if ($limit > 0) $trafficPercent = ((float) $traffic['raw']['month'] / ($limit * 1024.0)) * 100.0;
+        if ($limit > 0) $trafficPercent = (pmssTrafficRawMonthMiB($traffic) / ($limit * 1024.0)) * 100.0;
     }
 
     $diskPercent = null;
