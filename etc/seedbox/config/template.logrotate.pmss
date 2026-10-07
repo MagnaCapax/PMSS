@@ -89,7 +89,7 @@
 # Performance/storage-metric logs use ten-year-equivalent retention by cadence.
 # Rotated per-user metric files leave the live metrics directory so the wildcard
 # cannot recursively rotate its own output.
-/var/log/pmss/quota-daily.log {
+/var/log/pmss/quota-daily.log /var/log/pmss/quotaSnapshot.log {
     monthly
     rotate 120
     missingok

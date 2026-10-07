@@ -79,7 +79,7 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   metrics every five minutes. It also atomically refreshes the narrow mode-0644
   `/var/log/pmss/host-pressure.json` snapshot consumed by customer-panel
   storage-pressure notices.
-- `quotaSnapshot.php` – Append daily quota usage snapshots (machine-parseable; root-only log at `/var/log/pmss/quota-daily.log`).
+- `quotaSnapshot.php` – Append daily quota usage snapshots (machine-parseable; root-only log at `/var/log/pmss/quota-daily.log`). Failed `repquota` on a mount declared with journaled quotas emits `###PMSS_QUOTA_ALERT` and exits non-zero; cron captures the alert in `/var/log/pmss/quotaSnapshot.log`.
 - `resourceLog.php` – Capture per-user CPU, memory, and I/O samples every five minutes into the resource metering pipeline.
   The shared cgroup-v1 blkio reader rejects a Read or Write total that reaches
   the existing counter sentinel (`PHP_INT_MAX`) before addition can overflow.

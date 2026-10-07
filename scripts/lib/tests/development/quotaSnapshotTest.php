@@ -56,14 +56,30 @@ class QuotaSnapshotTest extends TestCase
 
     public function testRootCronSchedulesQuotaSnapshots(): void
     {
-        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/root.cron', '/scripts/cron/quotaSnapshot.php', 'root.cron should schedule quotaSnapshot.php');
+        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/root.cron', '/scripts/cron/quotaSnapshot.php >> /var/log/pmss/quotaSnapshot.log 2>&1', 'root.cron should capture quota alerts');
+    }
+
+    public function testJournaledQuotaDeclarationUsesOnlyTargetMount(): void
+    {
+        $fstab = $this->pmssMakeTempFile('pmss-quota-snapshot-fstab-');
+        foreach ([
+            ["UUID=a /srv ext4 usrjquota=aquota.user 0 0\nUUID=b /home ext4 defaults 0 0\n", false],
+            ["# UUID=a /home ext4 usrjquota=aquota.user 0 0\n", false],
+            ["UUID=a /home ext4 usrquota,grpquota 0 0\n", false],
+            ["UUID=a /home ext4 usrjquota=aquota.user 0 0\n", true],
+            ["UUID=a /home ext4 grpjquota=aquota.group 0 0\n", true],
+        ] as [$contents, $expected]) {
+            file_put_contents($fstab, $contents);
+            $this->assertSame($expected, \pmssQuotaSnapshotMountDeclaresJournaledQuota('/home', $fstab));
+        }
+        $this->assertFalse(\pmssQuotaSnapshotMountDeclaresJournaledQuota('/home', $fstab.'.missing'));
     }
 
     public function testLogrotateKeepsQuotaHistoryRootOnly(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings(
             'etc/seedbox/config/template.logrotate.pmss',
-            ['/var/log/pmss/quota-daily.log', 'rotate 120', 'compress', 'delaycompress', 'create 0600 root root'],
+            ['/var/log/pmss/quota-daily.log /var/log/pmss/quotaSnapshot.log', 'rotate 120', 'compress', 'delaycompress', 'create 0600 root root'],
             'logrotate policy is missing: '
         );
     }

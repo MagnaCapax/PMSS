@@ -529,6 +529,7 @@ Bootstrap helpers from install-time env (Phase 2):
 - pmssConfigureQuotaMount(?callable $logger=null): void → honors `PMSS_SKIP_QUOTA`; updates fstab quota options for `PMSS_QUOTA_MOUNT` (default `/home`) and remounts unless journaled quota is already active on the live mount. This lets first installs mount with quota options before `quotacheck` creates `aquota.*`.
 - pmssEnsureQuotaOptions(string $mountPoint, array $requiredOptions=null, ?callable $logger=null): void → ensures quota options present on the `/etc/fstab` line; writes backup + updated file.
 - quotaFix's final `/home` check compares declared user/group quota types in fstab with `quotaon -p /home`'s enabled-type count. A shortfall logs a specific warning without changing quotaFix's exit status; no declared quota types produce no query or warning.
+- The daily quota snapshot retains `repquota_failed` in its private data log. When the target fstab entry declares journaled quotas, the same failure also emits `###PMSS_QUOTA_ALERT` to the cron log and exits non-zero. Other snapshot warnings retain their previous exit status.
 
 ---
 
