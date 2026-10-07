@@ -5,7 +5,8 @@
   <title>Account Suspended</title>
   <link rel="stylesheet" href="/css/error-styles.css" />
   <style>
-    body { background:#030711; color:#f5f5f5; font-family: "Inter", "Segoe UI", sans-serif; }
+    html { background:#030711; }
+    body { background:#030711; height:auto; min-height:100%; color:#f5f5f5; font-family: "Inter", "Segoe UI", sans-serif; }
     .container { max-width: 860px; margin: 6vh auto; padding: 0 2rem; }
     .error-message { font-size: 2.8rem; display:block; font-weight: 600; margin-bottom: 1.25rem; text-transform: uppercase; letter-spacing: .08em; }
     .content-container { display:flex; flex-wrap:wrap; align-items:center; gap:2rem; background:rgba(12,18,30,0.92); padding:2.5rem; border-radius:18px; box-shadow:0 30px 90px rgba(0,0,0,0.45); }
@@ -21,6 +22,7 @@
   <div class="container">
     <span class="error-message">Account Suspended</span>
     <div class="content-container">
+      <div id="image-container"><img id="error-image" alt="Account suspended" style="max-width:100%;border-radius:12px" /></div>
       <div class="error-description">
         <p>
           This account is currently suspended and access to its services is
@@ -30,9 +32,11 @@
           If you believe this is a mistake or need assistance restoring access,
           please contact support.
         </p>
+        <p>To restore access, check your invoices in the <a href="https://pulsedmedia.com/clients/clientarea.php?action=invoices">client area</a>.</p>
         <a class="cta" href="https://pulsedmedia.com/contact/">Contact Support</a>
       </div>
     </div>
   </div>
+  <script>(function(){var e=document.getElementById('error-image');e.onerror=function(){e.style.display='none';};e.src='/suspended_images/suspended-'+(Math.floor(Math.random()*5)+1)+'.jpg';}());</script>
 </body>
 </html>

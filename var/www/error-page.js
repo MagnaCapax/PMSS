@@ -4,9 +4,11 @@
 
   var prefix = imageElement.getAttribute('data-error-image-prefix') || '';
   var count = parseInt(imageElement.getAttribute('data-error-image-count') || '0', 10);
+  var extension = imageElement.getAttribute('data-error-image-ext') || 'png';
+  if (['png', 'jpg', 'webp'].indexOf(extension) === -1) extension = 'png';
   if (prefix !== '' && count > 0) {
     var selected = Math.floor(Math.random() * count) + 1;
-    imageElement.src = prefix + selected + '.png';
+    imageElement.src = prefix + selected + '.' + extension;
   }
 
   imageElement.classList.add('error-image');
