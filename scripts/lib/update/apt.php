@@ -17,6 +17,11 @@ require_once __DIR__.'/../runtime.php';
 function pmssLoadRepoTemplate(string $codename, ?callable $logger = null): string
 {
     $log = $logger ?: 'logMessage';
+    // A suite name is one filename component, never a path supplied to the reader.
+    if (preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/D', $codename) !== 1) {
+        $log('[WARN] Invalid repository codename, skipping template');
+        return '';
+    }
     // Allow tests and recovery scripts to point at alternate config roots.
     $path = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config')."/template.sources.$codename";
 
@@ -48,7 +53,7 @@ function pmssSafeWriteSources(string $content, string $label, ?callable $logger 
             $log("[WARN] Target sources path is a directory for $label and backup path is unsafe, skipping update");
             return false;
         }
-        $log(@file_put_contents($backup, $content, LOCK_EX) === false
+        $log(@file_put_contents($backup, $content, LOCK_EX) !== strlen($content)
             ? "[WARN] Target sources path is a directory for $label and backup write failed, skipping update"
             : "[WARN] Target sources path is a directory for $label, wrote backup and skipped update");
         return false;
@@ -70,14 +75,14 @@ function pmssSafeWriteSources(string $content, string $label, ?callable $logger 
             $log("[ERROR] Unsafe backup path for $label sources.list: $backup");
             return false;
         }
-        $log(@file_put_contents($backup, $current, LOCK_EX) === false
+        $log(@file_put_contents($backup, $current, LOCK_EX) !== strlen($current)
             ? "[WARN] Unable to create backup $backup before updating $label"
             : "Backup for sources.list written to $backup");
     }
 
-    if (@file_put_contents($target, $content, LOCK_EX) === false) {
+    if (@file_put_contents($target, $content, LOCK_EX) !== strlen($content)) {
         $log("[ERROR] Failed to write sources.list for $label, attempting restore");
-        if ($current !== false && @file_put_contents($target, $current, LOCK_EX) === false) {
+        if ($current !== false && @file_put_contents($target, $current, LOCK_EX) !== strlen($current)) {
             $log("[WARN] Failed to restore previous sources.list for $label");
         }
         return false;

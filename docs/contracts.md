@@ -296,10 +296,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 - pmssLoadRepoTemplate(string $codename, ?callable $logger=null): string
   - Loads `/etc/seedbox/config/template.sources.<codename>` (or `PMSS_CONFIG_DIR`).
+  - Rejects names that are not a single alphanumeric-led filename component before reading a template.
   - Returns trimmed content with trailing `\n`, or `''` and logs when missing/empty.
 
 - pmssSafeWriteSources(string $content, string $label, ?callable $logger=null): bool
   - Uses `PMSS_APT_SOURCES_PATH` (default `/etc/apt/sources.list`), backs up current sources to `.pmss-backup` (best-effort), writes new content or restores on failure.
+  - A write counts as complete only when its byte count matches the requested content; short target writes use the existing restore path.
 
 - pmssUpdateAptSources(string $distroName, int $distroVersion, string $currentHash, array $repos, ?callable $logger=null): void
   - Dispatches by distro: Debian uses `pmssUpdateAptSourcesDebian`; Ubuntu logs unsupported.

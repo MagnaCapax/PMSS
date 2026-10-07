@@ -241,6 +241,20 @@ class DistroDetectionTest extends TestCase
         }
     }
 
+    /** Invalid suite names must not reach the filesystem or appear in log lines. */
+    public function testLoadRepoTemplateRejectsMalformedSuiteNames(): void
+    {
+        $this->pmssWithRepoTemplates(['bookworm' => "deb https://mirror.invalid bookworm main\n"], function (): void {
+            foreach (['', '../bookworm', '/bookworm', 'book\\worm', "bookworm\nother", "bookworm\0other", 'book worm'] as $codename) {
+                $logs = [];
+                $this->assertSame('', \pmssLoadRepoTemplate($codename, $this->pmssMakeArrayLogger($logs)));
+                $this->pmssAssertMessagesContain($logs, 'Invalid repository codename, skipping template');
+                $this->assertSame(1, count($logs));
+            }
+            $this->assertSame("deb https://mirror.invalid bookworm main\n", \pmssLoadRepoTemplate('bookworm', function (): void {}));
+        });
+    }
+
     public function testDebianReleaseSpecsExposeSharedRepositoryMetadata(): void
     {
         $specs = \pmssDebianReleaseSpecs();
