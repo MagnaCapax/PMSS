@@ -13,7 +13,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             [
                 'function pmssLocalFrameCustomFramesRead($path = \'../.customFrames\')',
                 '$frameData = pmssLocalFrameCustomFramesRead();',
-                'foreach (array(pmssLocalFrameInstalledAppFramesRead(), pmssLocalFrameProxyAppFramesRead(), pmssLocalFrameConsoleFrameRead()) as $pmssCandidateFrames) {',
+                'foreach (array(pmssLocalFrameInstalledAppFramesRead(), pmssLocalFrameProxyAppFramesRead(), pmssLocalFrameConsoleFrameRead(), pmssLocalFrameAppsFrameRead()) as $pmssCandidateFrames) {',
                 '$frames = array_merge($frames, $frameData);',
             ],
             'Missing index.php frame handling fragment: ',

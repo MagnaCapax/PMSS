@@ -288,6 +288,18 @@ function pmssLocalFrameConsoleFrameRead($launcherPath = 'console.php')
 }
 
 /**
+ * Return the Apps tab only when its customer page has been delivered.
+ *
+ * @return array<string,array<string,string>>
+ */
+function pmssLocalFrameAppsFrameRead($path = 'apps.php')
+{
+    return is_file($path)
+        ? array('apps' => pmssLocalFrameDefinition('apps.php', 'Apps', 'Applications you can run'))
+        : array();
+}
+
+/**
  * Read customer-owned custom tabs.
  *
  * Each non-comment line defines: appname|tooltip|label|url.
@@ -581,7 +593,7 @@ $frameData = pmssLocalFrameCustomFramesRead();
 // TWICE. Dedup case-insensitively so a tab the master already provides is never re-added.
 $pmssFramesKeysLower = array();
 foreach (array_keys($frames) as $pmssFrameKey) { $pmssFramesKeysLower[strtolower($pmssFrameKey)] = true; }
-foreach (array(pmssLocalFrameInstalledAppFramesRead(), pmssLocalFrameProxyAppFramesRead(), pmssLocalFrameConsoleFrameRead()) as $pmssCandidateFrames) {
+foreach (array(pmssLocalFrameInstalledAppFramesRead(), pmssLocalFrameProxyAppFramesRead(), pmssLocalFrameConsoleFrameRead(), pmssLocalFrameAppsFrameRead()) as $pmssCandidateFrames) {
     foreach ($pmssCandidateFrames as $app => $frame) {
         if (!isset($pmssFramesKeysLower[strtolower($app)]) && !isset($frameData[$app])) {
             $frameData[$app] = $frame;

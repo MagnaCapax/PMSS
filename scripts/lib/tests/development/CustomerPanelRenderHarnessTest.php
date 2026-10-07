@@ -5,6 +5,15 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class CustomerPanelRenderHarnessTest extends TestCase
 {
+    public function testAppsPageRendersWithoutPhpErrors(): void
+    {
+        $html = $this->pmssRenderCustomerPanelPage('apps.php', [], [
+            'minBytes' => 4000,
+        ]);
+        $this->assertStringContainsString('Self-hosted apps you can run', $html);
+        $this->assertStringContainsString('Installed by PMSS', $html);
+    }
+
     public function testRendersCurrentCustomerPanelWithoutPhpErrors(): void
     {
         $run = $this->pmssCustomerPanelRenderHarnessRun();

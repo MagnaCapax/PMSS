@@ -82,6 +82,27 @@ class UserPanelTopFrameContractTest extends TestCase
         $this->assertStringNotContainsString("loadFrame('console'", $html);
     }
 
+    /** A delivered Apps page gets an in-page tab after the default Welcome tab. */
+    public function testAppsTabShownWhenPagePresent(): void
+    {
+        $html = $this->pmssRenderCopiedUserPanelIndex([], [], ['apps.php'], [
+            'PMSS_DISABLE_REMOTE_FRAMES' => '1',
+        ]);
+        $this->assertStringContainsString("loadFrame('apps'", $html);
+        $this->assertSame('welcome', $this->firstTabId($html));
+        $this->assertStringNotContainsString('target="_blank"', $html);
+    }
+
+    /** An account still awaiting apps.php must not get a broken tab. */
+    public function testAppsTabHiddenWithoutPage(): void
+    {
+        $html = $this->pmssRenderCopiedUserPanelIndex([], [], [], [
+            'PMSS_DISABLE_REMOTE_FRAMES' => '1',
+        ]);
+        $this->assertStringNotContainsString("loadFrame('apps'", $html);
+        $this->assertSame('welcome', $this->firstTabId($html));
+    }
+
     /** ADR 0021 #2 — a disabled app (config dir present, enable flag absent) must NOT surface a tab. */
     public function testDisabledAppHasNoTab(): void
     {

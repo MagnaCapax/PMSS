@@ -205,6 +205,7 @@ PHP;
         '.lighttpd/php.ini',
         'radarr-sonarr.txt',
         'www/console.php',
+        'www/apps.php',
         'www/deluge.php',
         'www/error-503.html',
         'www/filemanager.php',
