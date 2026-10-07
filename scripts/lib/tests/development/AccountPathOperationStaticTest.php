@@ -9,7 +9,7 @@ final class AccountPathOperationStaticTest extends TestCase
     /** Fixed commands with an account argument; each entry also pins its reviewed line. */
     private const SAFE = [
         'scripts/cron/checkLighttpdInstances.php:62' => ['66d938ed265b0ac243e1b992e1820850e3e6fe1e', 'fixed config utility with quoted account'],
-        'scripts/cron/webPublicCertsProcess.php:124' => ['8073e46d40d522b379cbc0518ad64b2e494f42a4', 'fixed config utility with quoted account'],
+        'scripts/cron/webPublicCertsProcess.php:129' => ['8073e46d40d522b379cbc0518ad64b2e494f42a4', 'fixed config utility with quoted account'],
         'scripts/lib/rtorrent/processInspection.php:98' => ['13417f72f7995d00594046ad6921f6924f10f56a', 'process listing with quoted account'],
         'scripts/lib/rtorrent/processLifecycle.php:147' => ['12b37a5ae2ed26df531cf9f4d0ea67203ef8646a', 'fixed launcher with quoted account'],
         'scripts/lib/lighttpd/userConfigApply.php:61' => ['af1754514e1c4518bfe8bbc90929d930bb125806', 'fixed port utility with quoted account'],

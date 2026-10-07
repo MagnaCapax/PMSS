@@ -2,7 +2,7 @@
 <?php
 /**
  * createWebPublicCerts — request a real HTTPS certificate for your public web
- * folder's stable hostnames.
+ * folder's service permalink, optionally including the username hostname.
  *
  * Runs as the CUSTOMER. It cannot issue the certificate itself — certificate
  * issuance needs root (it writes under /etc/letsencrypt and answers the ACME
@@ -23,6 +23,12 @@ if ($home === false || $home === '' || !is_dir($home)) {
     fwrite(STDERR, "Cannot determine your home directory.\n");
     exit(1);
 }
+
+if ($argc > 2 || ($argc === 2 && $argv[1] !== '--with-username-hostname')) {
+    fwrite(STDERR, "Usage: createWebPublicCerts [--with-username-hostname]\n");
+    exit(2);
+}
+$withUsername = $argc === 2;
 
 // Same two-file order, and the same strictness, as pmssUserBillingServiceIdDigitsRead():
 // .billingServiceId first, then the legacy .billingId. That canonical reader lives
@@ -54,23 +60,40 @@ $user = basename($home);
 
 echo "Public HTTPS certificate request\n";
 echo "================================\n\n";
-echo "Your public web folder (~/www/public/) is reachable at:\n";
-if ($serverFqdn !== '') {
-    echo "  http://".$user.".".$serverFqdn."/\n";
+if (!$withUsername && $serviceId === '') {
+    echo "This account has no service permalink yet, so there is nothing to certify without the username.\n";
+    echo "Use --with-username-hostname to request the username hostname instead.\n";
+    exit(1);
 }
+
+echo "Your public web folder (~/www/public/) will have HTTPS at:\n";
 if ($serviceId !== '') {
     // This runs as the customer; /scripts/lib is root-only, so keep the
     // equivalent expression here. NginxUserHostsTest checks it against pmssMcxLabel.
     $canonicalId = ltrim($serviceId, '0');
     if ($canonicalId === '') $canonicalId = '0';
     $label = substr(hash('sha256', 'mcx.fi:service:'.$canonicalId), 0, 16);
-    echo "  http://".$label.".mcx.fi/\n";
+    echo "  https://".$label.".mcx.fi/\n";
 }
-echo "\nThese serve over plain HTTP today; opening them with https:// shows a\n";
-echo "certificate warning. This request gets a real certificate for them so\n";
-echo "https:// works without a warning.\n\n";
+if ($withUsername) {
+    if ($serverFqdn !== '') echo "  https://".$user.".".$serverFqdn."/\n";
+    echo "\nEvery publicly trusted certificate is recorded in public Certificate Transparency logs.\n";
+    echo "Anyone can search them, and the record is permanent. Including ".$user.".".$serverFqdn." publishes your username there for good.\n";
+    echo "Requesting the default later does not remove it.\n";
+    echo "Type yes to include your username, anything else cancels: ";
+    $answer = fgets(STDIN);
+    if ($answer === false || trim($answer) !== 'yes') {
+        echo "Cancelled. Nothing was requested.\n";
+        exit(1);
+    }
+} else {
+    echo "\nThe certificate covers only this username-free name.\n";
+    echo "The username hostname ".$user.".".$serverFqdn." stays on plain HTTP unless you rerun with --with-username-hostname.\n";
+    echo "If you requested a username certificate before, this replaces it with one for the permalink only.\n";
+    echo "Your username remains in the public logs from before.\n";
+}
 
-if (file_put_contents($home.'/.request-web-certs', gmdate('c')."\n") === false) {
+if (file_put_contents($home.'/.request-web-certs', $withUsername ? "username\n" : "default\n") === false) {
     fwrite(STDERR, "Could not record the request. Please open a support ticket.\n");
     exit(1);
 }

@@ -198,6 +198,7 @@ PHP;
         'bin/docker-install-wireguard.sh',
         'bin/linuxserverInstall.sh',
         'bin/support',
+        'bin/createWebPublicCerts',
         'www/scriptsInc.php',
         '.scriptsInc.php',
         '.lighttpd/php.ini',

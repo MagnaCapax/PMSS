@@ -11,8 +11,8 @@
  * (see scripts/lib/nginxUserHosts.php pmssNginxUserSslBlock + docs/adr/0039).
  *
  * Names issued (single-homed only — HTTP-01 validation must land on THIS host):
- *   - <user>.<server-fqdn>            (per-server subdomain, wildcard DNS)
- *   - <sha16-of-serviceid>.mcx.fi     (portable per-service permalink)
+ *   - Default: <sha16-of-serviceid>.mcx.fi (username-free service permalink)
+ *   - Confirmed username mode: <user>.<server-fqdn> plus that permalink
  * The cluster permalink (sha256 of client id) is DELIBERATELY excluded: it is a
  * round-robin multi-A record, so an HTTP-01 challenge can be answered by any of
  * the customer's nodes, not reliably this one. Cluster HTTPS is out of scope
@@ -41,6 +41,7 @@ const LOG_PREFIX = 'webPublicCerts';
 require_once __DIR__.'/../lib/user/billingIds.php';
 require_once __DIR__.'/../lib/nginxUserHosts.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
+require_once __DIR__.'/../lib/runtime/filesystem.php';
 
 if (posix_getuid() !== 0) {
     fwrite(STDERR, "Must run as root.\n");
@@ -93,16 +94,20 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
 
     $requested++;
 
-    $names = [$user.'.'.$serverFqdn];
-    // Service id via the canonical reader (.billingServiceId, falling back to the
-    // legacy .billingId) so the portable per-service mcx.fi permalink is included
-    // as a SAN on the migration-window fleet, not just the per-server subdomain.
-    $serviceId = (string) pmssUserBillingServiceIdDigitsRead($home, true);
-    if ($serviceId !== '') {
-        $names[] = pmssNginxUserMcxHostname($serviceId);
+    $requestContent = pmssReadRegularFileContentsVerified($flag, null, 64);
+    $serviceId = pmssUserBillingServiceIdDigitsRead($home, true);
+    $names = pmssWebPublicCertNames($user, $serverFqdn, $serviceId === null ? null : (string) $serviceId, $requestContent);
+    $mode = trim((string) $requestContent) === 'username' ? 'username' : 'default';
+    if ($names === []) {
+        pmssReplaceAccountFileWithLegacyFallback($user, $home, $failedMarker, gmdate('c')." no-service-id\n", 0644);
+        $failed++;
+        logLine('user='.$user.' result=failed reason=no-service-id mode='.$mode);
+        continue;
     }
 
-    $certName = $names[0];
+    // This local lineage label is never a certificate name. Keeping it lets
+    // certbot replace the same lineage's -d names without changing nginx lookup.
+    $certName = $user.'.'.$serverFqdn;
     $args = ['certonly', '--webroot', '-w', WEBROOT, '--cert-name', $certName,
         '-n', '--agree-tos', '--keep-until-expiring'];
     foreach ($names as $n) {
@@ -123,11 +128,11 @@ foreach (glob('/home/*/.request-web-certs') ?: [] as $flag) {
         if (is_file('/scripts/util/createNginxConfig.php')) {
             exec('/scripts/util/createNginxConfig.php --user '.escapeshellarg($user).' 2>&1');
         }
-        logLine('user='.$user.' result=issued names='.implode(',', $names));
+        logLine('user='.$user.' result=issued mode='.$mode.' names='.implode(',', $names));
     } else {
         pmssReplaceAccountFileWithLegacyFallback($user, $home, $failedMarker, gmdate('c')." rc=$rc\n", 0644);
         $failed++;
-        logLine('user='.$user.' result=failed rc='.$rc.' names='.implode(',', $names)
+        logLine('user='.$user.' result=failed mode='.$mode.' rc='.$rc.' names='.implode(',', $names)
             .' tail='.substr(str_replace("\n", ' ', implode(' ', array_slice($out, -3))), 0, 300));
     }
     $out = [];
