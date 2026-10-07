@@ -61,6 +61,7 @@ function pmssSysctlSecuritySettingsBuild(): array
         'kernel.unprivileged_userns_clone' => '1',
         'fs.suid_dumpable' => '0',
         'fs.file-max' => '3000000',
+        'fs.inotify.max_queued_events' => '65536',
         'fs.protected_regular' => '2',
         'fs.protected_fifos' => '2',
         // scope=2 (admin-only ptrace) blocks pidfd_getfd-via-mm=NULL exploit class
