@@ -50,13 +50,8 @@ function storageBenchmarkMain(array $argv): int
 
     $runId = date('YmdHis').'-'.bin2hex(random_bytes(3)); $runTs = date('c');
     $fs = storageBenchmarkRequireCommandField('stat -f -c %T '.escapeshellarg($targetDir), 'filesystem type'); $mntDev = storageBenchmarkRequireCommandField('df -P '.escapeshellarg($targetDir).' | awk '.escapeshellarg('NR==2 {print $1}'), 'mount device');
-    $pre = storageBenchmarkEntryBase($runTs, $label, $runId) + ['target_dir' => $targetDir, 'test' => 'preflight-idle', 'ok' => true];
-    $pre['ioping_avg_ms'] = pmssIopingAverageMs($targetDir);
-    if (($pre['ioping_avg_ms'] ?? 0) > $idleLatencyMs) { $pre['ok'] = false; $pre['warn'] = 'ioping above threshold'; }
-    $iostatUtilPct = storageBenchmarkIostatUtilPctRead('/var/run/pmss/iostat');
-    if ($iostatUtilPct !== null) { $pre['iostat_util_pct'] = $iostatUtilPct; if ($pre['iostat_util_pct'] > $idleUtilPct) { $pre['ok'] = false; $pre['warn_util'] = 'iostat util high'; } }
-    storageBenchmarkAppendJsonLine($jsonLog, $pre);
-    if ($requireIdle && !$pre['ok']) return pmssCliReturnWithStderr("Busy system (--require-idle): aborting.\n", 2);
+    $idle = storageBenchmarkIdlePreflight($jsonLog, storageBenchmarkEntryBase($runTs, $label, $runId) + ['target_dir' => $targetDir], $targetDir, $idleLatencyMs, $idleUtilPct);
+    if ($requireIdle && !$idle) return pmssCliReturnWithStderr("Busy system (--require-idle): aborting.\n", 2);
 
     $summary = storageBenchmarkRunFileTests($targetDir, $jsonLog, $runTs, $label, $runId, $mntDev, $fs, $requested, $runtime);
     storageBenchmarkPrintFileSummary($targetDir, $jsonLog, $label, $summary);
@@ -68,6 +63,16 @@ function storageBenchmarkAppendJsonLine(string $jsonLog, array $entry): void { i
 function storageBenchmarkEntryBase(string $runTs, string $label, string $runId): array { return ['timestamp' => $runTs, 'label' => $label ?: null, 'run_id' => $runId, 'run_ts' => $runTs]; }
 function storageBenchmarkApplyRunResult(array $entry, array $res, string $fallbackError = 'unknown'): array { if ($res['ok']) $entry['metrics'] = $res['result']; else $entry['error'] = $res['error'] ?? $fallbackError; return $entry; }
 function storageBenchmarkIostatUtilPctRead(string $path): ?float { $payload = pmssReadSerializedArrayFile($path); $util = $payload['diskUtil'] ?? null; return (is_int($util) || is_float($util) || (is_string($util) && is_numeric(trim($util)))) ? (float) trim((string) $util) : null; }
+/** Persist the shared idle evidence before either benchmark mode decides whether to abort. */
+function storageBenchmarkIdlePreflight(string $jsonLog, array $base, string $targetDir, int $latencyLimit, int $utilLimit): bool
+{
+    $pre = $base + ['test' => 'preflight-idle', 'ok' => true];
+    $pre['ioping_avg_ms'] = pmssIopingAverageMs($targetDir);
+    if (($pre['ioping_avg_ms'] ?? 0) > $latencyLimit) { $pre['ok'] = false; $pre['warn'] = 'ioping above threshold'; }
+    $util = storageBenchmarkIostatUtilPctRead('/var/run/pmss/iostat'); if ($util !== null) { $pre['iostat_util_pct'] = $util; if ($util > $utilLimit) { $pre['ok'] = false; $pre['warn_util'] = 'iostat util high'; } }
+    storageBenchmarkAppendJsonLine($jsonLog, $pre);
+    return $pre['ok'];
+}
 /** Read a command field, rejecting malformed raw bytes before trimming. */
 function storageBenchmarkCommandFieldRead(string $command, bool $positiveInt = false): ?string
 {
@@ -141,6 +146,8 @@ function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string
 function storageBenchmarkPrintFileSummary(string $targetDir, string $jsonLog, string $label, array $summary): void { echo "\n== Storage benchmark summary ".($label !== '' ? '(' . $label . ' on '.$targetDir.')' : "(on {$targetDir})")." ==\n"; echo "test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95_ms\twrite_p95_ms\n"; foreach ($summary as $row) printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n", ...$row); echo "\nJSON log: {$jsonLog}\n"; }
 function storageBenchmarkDevicePreflightSkip(string $jsonLog, array $deviceEntry, string $error): void { storageBenchmarkAppendJsonLine($jsonLog, $deviceEntry + ['test' => 'device-preflight', 'ok' => false, 'error' => $error]); printf("%s\tskipped: %s\n", $deviceEntry['device'], $error); }
 function storageBenchmarkDdSeqread(string $path, int $count, int $skip): array { $dd = sprintf('dd if=%s of=/dev/null bs=1M count=%d skip=%d iflag=direct 2>&1', escapeshellarg($path), $count, $skip); [$rc, $so, $se] = [runCommand($dd, true), $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '', $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stderr'] ?? '']; $line = trim($se !== '' ? $se : $so); $mbps = null; $secs = null; if (preg_match('/\s([0-9.]+)\s+s,\s+([0-9.]+)\s+MB\/s/', $line, $m)) { $secs = (float) $m[1]; $mbps = (float) $m[2]; } return ['rc' => $rc, 'mbps' => $mbps, 'secs' => $secs]; }
+/** Choose an in-bounds MiB offset with the existing four-MiB tail margin. */
+function storageBenchmarkDdSkipBlocks(int $size, int $count): int { return $size > ($count * 1024 * 1024 + 4 * 1024 * 1024) ? random_int(0, (int) floor(($size - $count * 1024 * 1024) / (1024 * 1024))) : 0; }
 function storageBenchmarkMedian(array $values): float { sort($values); $n = count($values); if ($n === 0) return 0.0; $m = (int) floor(($n - 1) / 2); return $n % 2 ? (float) $values[$m] : (($values[$m] + $values[$m + 1]) / 2); }
 function storageBenchmarkPeerMedian(array $peer, string $key): float { return storageBenchmarkMedian(array_filter(array_column($peer, $key), static function ($value): bool { return $value !== null; })); }
 
@@ -162,7 +169,7 @@ function storageBenchmarkRunDeviceTests(string $jsonLog, string $runTs, string $
         $size = storageBenchmarkDeviceSizeBytesRead($path);
         if ($size === null) { storageBenchmarkDevicePreflightSkip($jsonLog, $deviceEntry, 'unable to determine block device size'); continue; }
         $count = (int) floor($ddSizeBytes / (1024 * 1024));
-        $skip = $size > ($count * 1024 * 1024 + 4 * 1024 * 1024) ? random_int(0, (int) floor(($size - $count * 1024 * 1024) / (1024 * 1024))) : 0;
+        $skip = storageBenchmarkDdSkipBlocks($size, $count);
         $dd = storageBenchmarkDdSeqread($path, $count, $skip);
         $entry = $deviceEntry + ['test' => 'device-seqread-dd', 'params' => ['bs' => '1M', 'count' => $count, 'skip_blocks' => $skip], 'ok' => ($dd['rc'] === 0 && $dd['mbps'] !== null)];
         if ($dd['mbps'] !== null) $entry['metrics'] = ['seqread_MBps' => $dd['mbps'], 'elapsed_s' => $dd['secs']]; else $entry['error'] = 'dd parse failed';

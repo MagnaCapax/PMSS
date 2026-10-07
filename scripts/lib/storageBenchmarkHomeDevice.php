@@ -105,9 +105,7 @@ function storageBenchmarkHomeDeviceRunTests(
         'ok' => false, 'measured' => false, 'error' => 'fio unavailable; random read not measured']);
     printf("%s\thome-device-randread-4k\tnot measured (fio unavailable)\n", $path);
     $count = (int) floor($ddSizeBytes / (1024 * 1024));
-    $size = $device['size'];
-    $skip = $size > ($count * 1024 * 1024 + 4 * 1024 * 1024)
-        ? random_int(0, (int) floor(($size - $count * 1024 * 1024) / (1024 * 1024))) : 0;
+    $skip = storageBenchmarkDdSkipBlocks($device['size'], $count);
     $runDd = $ddRunner ?: 'storageBenchmarkDdSeqread';
     $dd = $runDd($path, $count, $skip);
     $entry = $row + ['test' => 'home-device-seqread-dd', 'params' => ['bs' => '1M',
@@ -135,13 +133,8 @@ function storageBenchmarkHomeDeviceMain(array $parsed, string $targetDir, string
         return pmssCliReturnWithStderr($device['error']."\n", 3);
     }
 
-    $pre = $base + $device + ['target_dir' => $targetDir, 'test' => 'preflight-idle', 'ok' => true];
-    $pre['ioping_avg_ms'] = pmssIopingAverageMs($targetDir);
-    if (($pre['ioping_avg_ms'] ?? 0) > $idleLatencyMs) { $pre['ok'] = false; $pre['warn'] = 'ioping above threshold'; }
-    $iostatUtilPct = storageBenchmarkIostatUtilPctRead('/var/run/pmss/iostat');
-    if ($iostatUtilPct !== null) { $pre['iostat_util_pct'] = $iostatUtilPct; if ($pre['iostat_util_pct'] > $idleUtilPct) { $pre['ok'] = false; $pre['warn_util'] = 'iostat util high'; } }
-    storageBenchmarkAppendJsonLine($jsonLog, $pre);
-    if ($requireIdle && !$pre['ok']) return pmssCliReturnWithStderr("Busy system (--require-idle): aborting.\n", 2);
+    $idle = storageBenchmarkIdlePreflight($jsonLog, $base + $device + ['target_dir' => $targetDir], $targetDir, $idleLatencyMs, $idleUtilPct);
+    if ($requireIdle && !$idle) return pmssCliReturnWithStderr("Busy system (--require-idle): aborting.\n", 2);
 
     $fioPresent = pmssCommandPath('fio') !== '';
     $ddSizeBytes = $fioPresent ? 0 : storageBenchmarkRequireSizeBytes('--dd-size', $ddSize, 1024 * 1024, '1 MiB');
