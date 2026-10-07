@@ -42,23 +42,6 @@ class AddUserProvisioningGuardTest extends TestCase
                     ],
                 ],
             ],
-            'scripts/recreateUser.php' => [
-                'required' => [
-                    "require_once __DIR__.'/lib/update.php';",
-                    "require_once __DIR__.'/lib/update/users.php';",
-                    'if (!pmssUpdateUserEnvironment($userName)) {',
-                ],
-                'ordered' => [[
-                    'needles' => [
-                        '/scripts/util/userConfig.php',
-                        'pmssUpdateUserEnvironment($userName)',
-                        '/* ===== 9. Ownership sanity',
-                        '/* ===== 10. Password',
-                    ],
-                    'missingPrefix' => 'recreateUser.php missing environment refresh step: ',
-                    'orderPrefix' => 'recreateUser.php must refresh after config and before password: ',
-                ]],
-            ],
             'scripts/lib/user/add/provisioningRuntime.php' => [
                 'required' => ['###ADDUSER:', '###ADDUSER_JSON:', 'function pmssAddUserRuntimeInit('],
             ],

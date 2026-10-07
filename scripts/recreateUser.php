@@ -209,10 +209,6 @@ pmssRunOrExit('/scripts/util/userConfigLighttpd.php ' . escapeshellarg($userName
 pmssRunOrExit('/scripts/util/createNginxConfig.php --user ' . escapeshellarg($userName));
 // Permission repair is advisory here; keep the existing ownership sanity gate below.
 pmssRun('/scripts/util/userPermissions.php ' . escapeshellarg($userName));
-if (!pmssUpdateUserEnvironment($userName)) {
-    fwrite(STDERR, "User environment update failed for {$userName}\n");
-    exit(1);
-}
 
 /* ===== 9. Ownership sanity ===== */
 // Service configuration changed the home through shell commands.
@@ -251,6 +247,14 @@ if ($homeExists) {
     pmssRequireSafeRecreateUserPath($backupDir, 'backup');
     pmssRunOrExit('chown -h ' . escapeshellarg($userName.':'.$userName) . ' ' . escapeshellarg($backupDir));
     pmssRunOrExit('chmod 0700 ' . escapeshellarg($backupDir));
+}
+
+$environmentReason = null;
+if (!pmssUpdateUserEnvironment($userName, '', $environmentReason)) {
+    $reason = is_string($environmentReason) && trim($environmentReason) !== '' ? $environmentReason : 'unknown reason';
+    $message = '[!] Non-fatal: user environment pass failed ('.$reason.'); the next PMSS update converges this account';
+    fwrite(STDERR, $message."\n");
+    pmssUserLog($userName, $message);
 }
 
 /* ===== 11. Reclaim the superseded prior backup (only after the new backup exists) ===== */

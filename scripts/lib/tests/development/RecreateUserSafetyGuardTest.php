@@ -308,6 +308,22 @@ class RecreateUserSafetyGuardTest extends TestCase
         ], $handoff);
     }
 
+    public function testEnvironmentPassFollowsPasswordAndBackupHandoffWithoutAborting(): void
+    {
+        $script = $this->pmssReadRepoFile('scripts/recreateUser.php');
+        $environmentCall = "pmssUpdateUserEnvironment(\$userName, '', \$environmentReason)";
+        $reclaimHeading = '/* ===== 11. Reclaim the superseded prior backup';
+        $this->assertOrderedStrings([
+            '/changePw.php ',
+            "pmssRunOrExit('chown -h ' . escapeshellarg(\$userName.':'.\$userName)",
+            $environmentCall,
+            $reclaimHeading,
+        ], $script);
+        $environmentPosition = strpos($script, $environmentCall);
+        $reclaimPosition = strpos($script, $reclaimHeading, $environmentPosition);
+        $this->assertFalse(strpos(substr($script, $environmentPosition, $reclaimPosition - $environmentPosition), 'exit(') !== false);
+    }
+
     public function testMissingHomeLeavesPossibleSoleCopyInBackup(): void
     {
         [$home, $backup] = $this->fixture('fresh');

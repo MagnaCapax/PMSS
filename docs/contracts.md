@@ -1065,14 +1065,17 @@ Automation often invokes these utilities; below are expected inputs and effects.
     files retain `root:<user> 0640`. Billing sources outside the file-type or
     ownership contract stay in the backup and are reported.
     The home is handed to the user only after restore, before service configuration,
-    nginx regeneration, permissions, and the shared per-user environment pass
-    used by addUser and update-step2. A failed environment pass stops recreation.
-    Ownership is validated, then the home
-    remains account-owned for the `changePw.php` password reset. The backup stays root-private during the rebuild;
+    nginx regeneration, and permissions. Ownership is validated, then the home
+    remains account-owned for the `changePw.php` password reset. The backup stays
+    root-private during the rebuild;
     after the password step succeeds, its top-level directory is returned to
-    `<user>:<user> 0700` so the account can reach files left in it. It remains
-    root-private on failure. Per-user config overrides stay in the backup and
-    their paths are printed for manual review. A missing home leaves any prior backup alone.
+    `<user>:<user> 0700` so the account can reach files left in it. The shared
+    per-user environment pass used by addUser and update-step2 runs after the
+    password succeeds and any backup is handed back. A failed pass is logged
+    and left for the next PMSS update (ADR 0089). The backup remains
+    root-private on password failure. Per-user config overrides stay in the
+    backup and their paths are printed for manual review. A missing home leaves
+    any prior backup alone.
 
 ---
 
