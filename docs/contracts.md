@@ -961,6 +961,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 ## Customer File Manager URLs – `etc/skel/www/filemanager.php`
 
 - A successful Settings save returns to the current folder listing without retaining `settings=1`.
+- After rewriting its configuration in the PHP source, Settings invalidates that script's OPcache entry for the serving PHP process.
 - Preview, Open, and DirectLink URLs retain the request script's directory (such as `/user-<username>/`) when tinyfilemanager has not selected a mapped multi-user root.
 - The fallback runs after mapped-root selection so enabling tinyfilemanager's multi-user mode cannot double the request prefix.
 

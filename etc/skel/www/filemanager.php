@@ -3470,6 +3470,9 @@ class FM_Zipper_Tar
                     @fputs($fh, $lines[$x], strlen($lines[$x]));
                 }
                 @fclose($fh);
+                if (function_exists('opcache_invalidate')) {
+                    opcache_invalidate($fm_file, true);
+                }
             }
         }
     }
