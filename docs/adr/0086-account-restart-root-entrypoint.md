@@ -52,7 +52,3 @@ A start failure is recorded but does not prevent later starts. A restart is
 verified on a live host by checking that the account's rTorrent, media stack,
 and lighttpd processes are running again and by reading
 `/var/log/pmss/restartUser.log`.
-The rTorrent and lighttpd start results follow their observed process state even
-when a watchdog starts a daemon before the restart launchers run.
-`startLighttpd` is idempotent and serialized per account, so the watchdog and a
-restart cannot delete each other's sockets.
