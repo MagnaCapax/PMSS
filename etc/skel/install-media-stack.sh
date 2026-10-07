@@ -93,6 +93,8 @@ SECURE_APP=""
 MEDIA_STACK_MIN_MEMORY_MIB=1024
 MEDIA_STACK_MIN_MEMORY_BYTES=$((MEDIA_STACK_MIN_MEMORY_MIB * 1024 * 1024))
 MEDIA_STACK_UNLIMITED_MEMORY_BYTES=$((1024 * 1024 * 1024 * 1024 * 1024))
+# First starts on busy disks can take minutes; session-aware waits stop when the app exits.
+MEDIA_STACK_APP_START_WAIT=600
 MEDIA_STACK_BASE_SESSIONS=(sonarr radarr prowlarr sabnzbd cloudplow autobrr)
 MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow autobrr)
 MEDIA_STACK_CREDENTIALS_FILE="$HOME/.media-stack-credentials.txt"
@@ -575,6 +577,7 @@ jellyfin_config_dir_reset() {
 
 servarr_config_xml_converge() {
 	local app="$1" datadir="$2" port="$3" default_port="$4"
+	local invalid_config
 
 	if [[ $DRY_RUN -eq 0 ]]; then
 		touch "$datadir"/update_required
@@ -582,7 +585,16 @@ servarr_config_xml_converge() {
 	echo "${app^^} Installed"
 	echo "Configuring ${app^^}"
 	if [[ $DRY_RUN -eq 0 ]]; then
-		if [ ! -f "$datadir/config.xml" ]; then
+		if [[ ! -f "$datadir/config.xml" || ! -s "$datadir/config.xml" ]] || ! grep -qs '</Config>' "$datadir/config.xml"; then
+			if [[ -s "$datadir/config.xml" ]]; then
+				invalid_config="$datadir/config.xml.invalid-$(date +%Y%m%d%H%M%S)"
+				if [[ -e "$invalid_config" ]]; then
+					log_err "Refusing to replace preserved invalid config.xml at $invalid_config"
+					return 1
+				fi
+				mv "$datadir/config.xml" "$invalid_config"
+				log_warn "Preserved invalid ${app} config.xml at $invalid_config"
+			fi
 			cat <<EOF >"$datadir/config.xml"
 <Config>
   <UrlBase></UrlBase>
@@ -1435,13 +1447,26 @@ media_stack_require_auth_seed_tools() {
 # session has exited, the app process died (e.g. OOM) so we fail fast instead of
 # polling the whole budget. Optional $curl_config supplies owner-only request
 # headers without exposing credentials in process arguments. Returns: 0 ready,
-# 1 timeout, 2 process exited.
+# 1 timeout, 2 process exited or reported a fatal startup error. Optional
+# $seed_log and $seed_log_offset watch only bytes appended by this seed run.
+servarr_seed_log_fatal() {
+	local seed_log="$1" seed_log_offset="$2"
+	if [[ -f "$seed_log" ]] && grep -q 'Non-recoverable failure' < <(tail -c +"$((seed_log_offset + 1))" "$seed_log"); then
+		log_err "App reported a fatal startup error; see $seed_log"
+		return 0
+	fi
+	return 1
+}
+
 media_stack_wait_http_ok() {
-	local url="$1" attempts="${2:-45}" session="${3:-}" curl_config="${4:-}" attempt
+	local url="$1" attempts="${2:-45}" session="${3:-}" curl_config="${4:-}" seed_log="${5:-}" seed_log_offset="${6:-0}" attempt
 	local -a curl_options=()
 	[[ -n "$curl_config" ]] && curl_options=(--config "$curl_config")
 
 	for ((attempt = 1; attempt <= attempts; attempt++)); do
+		if [[ -n "$seed_log" ]] && servarr_seed_log_fatal "$seed_log" "$seed_log_offset"; then
+			return 2
+		fi
 		if curl -fsS --max-time 2 "${curl_options[@]}" "$url" >/dev/null 2>&1; then
 			return 0
 		fi
@@ -1523,9 +1548,12 @@ servarr_api_key_curl_config_write() {
 }
 
 servarr_api_key_curl_config_wait() {
-	local config_file="$1" curl_config="$2" attempts="${3:-180}" session="${4:-}" attempt
+	local config_file="$1" curl_config="$2" attempts="${3:-180}" session="${4:-}" seed_log="${5:-}" seed_log_offset="${6:-0}" attempt
 
 	for ((attempt = 1; attempt <= attempts; attempt++)); do
+		if [[ -n "$seed_log" ]] && servarr_seed_log_fatal "$seed_log" "$seed_log_offset"; then
+			return 2
+		fi
 		if servarr_api_key_curl_config_write "$config_file" "$curl_config"; then
 			return 0
 		fi
@@ -1573,7 +1601,7 @@ servarr_auth_seed() {
 	local app="$1" install_name="$2" dll="$3" desired_port="$4" api_version="$5" password="$6" extra_args="${7:-}"
 	local datadir="$HOME/.config/${app}"
 	local config_file="$datadir/config.xml"
-	local seed_port session base_url response_json payload_json curl_config put_code unauth_code run_args existing_password key_wait_rc seed_wait_rc
+	local seed_port session base_url response_json payload_json curl_config put_code unauth_code run_args existing_password key_wait_rc seed_wait_rc seed_log seed_log_offset
 
 	if servarr_config_auth_configured "$config_file"; then
 		existing_password=$(media_stack_credentials_value "$(media_stack_app_key "$app")_PASSWORD")
@@ -1596,6 +1624,11 @@ servarr_auth_seed() {
 	servarr_config_xml_tag_converge "$config_file" Port "$seed_port"
 	servarr_config_xml_tag_converge "$config_file" AuthenticationRequired Enabled
 	run_args="${dll}${extra_args:+ $extra_args} --data=\"$datadir\""
+	seed_log="$datadir/${app}-auth-seed.log"
+	seed_log_offset=0
+	if [[ -f "$seed_log" ]]; then
+		seed_log_offset=$(stat -c %s "$seed_log")
+	fi
 	tmux kill-session -t "$session" 2>/dev/null || true
 	tmux new-session -d -s "$session" \
 		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/${install_name}\" && \"$DOTNET_ROOT_PATH/dotnet\" ${run_args} 2>&1 | tee -a \"$datadir/${app}-auth-seed.log\"" || {
@@ -1605,13 +1638,14 @@ servarr_auth_seed() {
 		return 1
 	}
 
-	servarr_api_key_curl_config_wait "$config_file" "$curl_config" 180 "$session"
+	log_info "Waiting up to ${MEDIA_STACK_APP_START_WAIT}s for ${install_name} first start and API key"
+	servarr_api_key_curl_config_wait "$config_file" "$curl_config" "$MEDIA_STACK_APP_START_WAIT" "$session" "$seed_log" "$seed_log_offset"
 	key_wait_rc=$?
 	if [[ $key_wait_rc -ne 0 ]]; then
 		if [[ $key_wait_rc -eq 2 ]]; then
 			log_err "${install_name} auth-seed process exited before writing its API key; see $datadir/${app}-auth-seed.log"
 		else
-			log_err "${install_name} did not write a valid local API key within ~180s; see $datadir/${app}-auth-seed.log"
+			log_err "${install_name} did not write a valid local API key within ~${MEDIA_STACK_APP_START_WAIT}s; see $datadir/${app}-auth-seed.log"
 		fi
 		tmux kill-session -t "$session" 2>/dev/null || true
 		rm -f "$response_json" "$payload_json" "$curl_config"
@@ -1619,17 +1653,15 @@ servarr_auth_seed() {
 		return 1
 	fi
 
-	# Cold .NET first-run (DB migration) on a contended host can take well over the
-	# old 45-attempt (~45s) budget; 180 gives headroom, and the session-aware fail
-	# fast returns early if the app dies, so the larger budget never idles on a
-	# corpse. Keep the abort fail-closed (never start an unauthenticated app).
-	media_stack_wait_http_ok "$base_url" 180 "$session" "$curl_config"
+	# Keep the abort fail-closed (never start an unauthenticated app).
+	log_info "Waiting up to ${MEDIA_STACK_APP_START_WAIT}s for ${install_name} first start and local auth API"
+	media_stack_wait_http_ok "$base_url" "$MEDIA_STACK_APP_START_WAIT" "$session" "$curl_config" "$seed_log" "$seed_log_offset"
 	seed_wait_rc=$?
 	if [[ $seed_wait_rc -ne 0 ]]; then
 		if [[ $seed_wait_rc -eq 2 ]]; then
 			log_err "${install_name} auth-seed process exited before its API came up; see $datadir/${app}-auth-seed.log"
 		else
-			log_err "${install_name} did not expose its local auth configuration API within ~180s; see $datadir/${app}-auth-seed.log"
+			log_err "${install_name} did not expose its local auth configuration API within ~${MEDIA_STACK_APP_START_WAIT}s; see $datadir/${app}-auth-seed.log"
 		fi
 		tmux kill-session -t "$session" 2>/dev/null || true
 		rm -f "$response_json" "$payload_json" "$curl_config"
@@ -1637,7 +1669,7 @@ servarr_auth_seed() {
 		return 1
 	fi
 
-	if ! curl -fsS --max-time 10 --config "$curl_config" "$base_url" -o "$response_json"; then
+	if ! curl -fsS --max-time 90 --config "$curl_config" "$base_url" -o "$response_json"; then
 		log_err "Failed to read ${install_name} local auth configuration"
 		tmux kill-session -t "$session" 2>/dev/null || true
 		rm -f "$response_json" "$payload_json" "$curl_config"
@@ -1652,7 +1684,7 @@ servarr_auth_seed() {
 		return 1
 	fi
 
-	put_code=$(media_stack_http_code "${base_url}/1" --config "$curl_config" -X PUT -H 'Content-Type: application/json' --data-binary "@${payload_json}")
+	put_code=$(media_stack_http_code "${base_url}/1" --config "$curl_config" -X PUT -H 'Content-Type: application/json' --data-binary "@${payload_json}" --max-time 90)
 	if [[ "$put_code" != "200" && "$put_code" != "202" ]]; then
 		log_err "${install_name} rejected local auth configuration (HTTP ${put_code})"
 		tmux kill-session -t "$session" 2>/dev/null || true
@@ -1678,6 +1710,7 @@ servarr_auth_seed() {
 	servarr_config_xml_tag_converge "$config_file" AuthenticationRequired Enabled
 	servarr_config_xml_tag_converge "$config_file" UpdateMechanism Script
 	log_ok "${install_name} app-level auth configured"
+	media_stack_credentials_app_write "$app" "$MEDIA_STACK_AUTH_USERNAME" "$password"
 }
 
 autobrr_auth_seed() {
@@ -1730,13 +1763,14 @@ jellyfin_auth_payload_write() {
 # answer 302 (which curl -f treats as ready) while the prefixed API answers 503 until startup
 # finishes. 10.11 keeps answering unprefixed. Print whichever base answers 200.
 jellyfin_startup_base_url() {
-	local base_url="$1" config_dir="$2" attempts="${3:-120}" prefix="" xml attempt
+	local base_url="$1" config_dir="$2" budget="${3:-120}" prefix="" xml start
 	for xml in "$config_dir/network.xml" "$config_dir/system.xml"; do
 		prefix=$(sed -n -E 's|.*<BaseUrl>([^<]*)</BaseUrl>.*|\1|p' "$xml" 2>/dev/null | head -n 1)
 		[[ -n "$prefix" ]] && break
 	done
 	prefix="${prefix%/}"
-	for ((attempt = 1; attempt <= attempts; attempt++)); do
+	start=$SECONDS
+	while ((SECONDS < start + budget)); do
 		if [[ -n "$prefix" && "$(media_stack_http_code "${base_url}${prefix}/Startup/Configuration")" == "200" ]]; then
 			printf '%s' "${base_url}${prefix}"
 			return 0
@@ -1761,7 +1795,8 @@ jellyfin_auth_seed() {
 	tmux new-session -d -s "$session" \
 		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${seed_port}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log\"" 2>/dev/null || true
 
-	if ! media_stack_wait_http_ok "${base_url}/Startup/Configuration" 120 "$session"; then
+	log_info "Waiting up to ${MEDIA_STACK_APP_START_WAIT}s for Jellyfin first start and startup API"
+	if ! media_stack_wait_http_ok "${base_url}/Startup/Configuration" "$MEDIA_STACK_APP_START_WAIT" "$session"; then
 		log_err "Jellyfin did not expose the startup API for admin seeding (see $JELLYFIN_LOG_DIR/jellyfin-auth-seed.log)"
 		if media_stack_log_has "$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log" "FfmpegException\|Failed.*ffmpeg"; then
 			log_err "Jellyfin failed FFmpeg validation — pass --jellyfin-ffmpeg=$HOME/.bin/ffmpeg after installing FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
@@ -1773,7 +1808,7 @@ jellyfin_auth_seed() {
 		rm -f "$payload_json" "$auth_json"
 		return 1
 	fi
-	if ! base_url=$(jellyfin_startup_base_url "$base_url" "$JELLYFIN_CONFIG_DIR" 120); then
+	if ! base_url=$(jellyfin_startup_base_url "$base_url" "$JELLYFIN_CONFIG_DIR" "$MEDIA_STACK_APP_START_WAIT"); then
 		log_err "Jellyfin startup API never answered HTTP 200, with or without BaseUrl (see $JELLYFIN_LOG_DIR/jellyfin-auth-seed.log)"
 		tmux kill-session -t "$session" 2>/dev/null || true
 		rm -f "$payload_json" "$auth_json"
@@ -2048,7 +2083,6 @@ media_stack_secure_servarr() {
 		log_err "${install_name} auth seeding failed"
 		return 1
 	fi
-	media_stack_credentials_app_write "$app" "$MEDIA_STACK_AUTH_USERNAME" "$password"
 	media_stack_start_servarr_app "$app" "$install_name" "$dll" "$extra_args"
 	media_stack_secure_marker_print "$app"
 }

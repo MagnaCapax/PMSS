@@ -101,6 +101,47 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringNotContainsString('<UpdateAutomatically>True</UpdateAutomatically>', $output);
     }
 
+    public function testServarrConfigRepairsEmptyAndTruncatedFilesWithoutReplacingValidConfig(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-config-repair-');
+        foreach (array('empty', 'truncated', 'valid') as $name) {
+            $this->pmssEnsureDir($home.'/'.$name);
+        }
+        $this->pmssWriteFile($home.'/empty/config.xml', '');
+        $truncated = "<Config>\n  <Port>7878</Port>\n  <Original>keep these bytes";
+        $this->pmssWriteFile($home.'/truncated/config.xml', $truncated);
+        $this->pmssWriteFile($home.'/valid/config.xml', "<Config>\n  <Custom>preserved</Custom>\n  <Port>7878</Port>\n  <UrlBase></UrlBase>\n  <BindAddress>127.0.0.1</BindAddress>\n</Config>\n");
+
+        $functions = $this->pmssExtractShellFunctions($this->script, array(
+            'servarr_config_xml_tag_converge', 'servarr_config_xml_converge',
+        ));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash', 'set -euo pipefail',
+            'HOME='.escapeshellarg($home), 'USERNAME=alice', 'DRY_RUN=0',
+            'log_warn() { echo "WARN:$*"; }', 'log_info() { :; }',
+            $functions,
+            'for name in empty truncated valid; do servarr_config_xml_converge radarr "$HOME/$name" 17878 7878; done',
+            '',
+        ));
+        $output = $this->pmssRunShellHarness($script);
+
+        foreach (array('empty', 'truncated', 'valid') as $name) {
+            $config = (string) file_get_contents($home.'/'.$name.'/config.xml');
+            $this->assertStringContainsAllStrings(array(
+                '<Port>17878</Port>', '<UrlBase>/public-alice/radarr</UrlBase>',
+                '<BindAddress>127.0.0.1</BindAddress>',
+                '<AuthenticationRequired>Enabled</AuthenticationRequired>',
+            ), $config);
+        }
+        $invalid = glob($home.'/truncated/config.xml.invalid-*');
+        $this->assertSame(1, count($invalid));
+        $this->assertSame($truncated, (string) file_get_contents($invalid[0]));
+        $this->assertStringContainsString('WARN:Preserved invalid radarr config.xml', $output);
+        $this->assertSame(array(), glob($home.'/empty/config.xml.invalid-*'));
+        $this->assertSame(array(), glob($home.'/valid/config.xml.invalid-*'));
+        $this->assertStringContainsString('<Custom>preserved</Custom>', (string) file_get_contents($home.'/valid/config.xml'));
+    }
+
     public function testVenvPipBootstrapUsesPython3(): void
     {
         $this->assertStringContainsString('python_venv_install_requirements() {', $this->script);
@@ -264,15 +305,56 @@ class installMediaStackScriptTest extends TestCase
             'password not changed',
             'servarr_config_xml_tag_converge "$config_file" AuthenticationMethod Forms',
             'servarr_config_xml_tag_converge "$config_file" AuthenticationRequired Enabled',
-            'servarr_api_key_curl_config_wait "$config_file" "$curl_config" 180 "$session"',
-            'media_stack_wait_http_ok "$base_url" 180 "$session" "$curl_config"',
-            'curl -fsS --max-time 10 --config "$curl_config" "$base_url" -o "$response_json"',
-            'media_stack_http_code "${base_url}/1" --config "$curl_config"',
+            'MEDIA_STACK_APP_START_WAIT=600',
+            'servarr_api_key_curl_config_wait "$config_file" "$curl_config" "$MEDIA_STACK_APP_START_WAIT" "$session" "$seed_log" "$seed_log_offset"',
+            'media_stack_wait_http_ok "$base_url" "$MEDIA_STACK_APP_START_WAIT" "$session" "$curl_config" "$seed_log" "$seed_log_offset"',
+            'curl -fsS --max-time 90 --config "$curl_config" "$base_url" -o "$response_json"',
+            'media_stack_http_code "${base_url}/1" --config "$curl_config" -X PUT -H \'Content-Type: application/json\' --data-binary "@${payload_json}" --max-time 90',
             'unauthenticated API returned HTTP ${unauth_code}',
             'Radarr auth seeding failed; not starting media stack',
             'Prowlarr auth seeding failed; not starting media stack',
             'Sonarr auth seeding failed; not starting media stack',
         ], $this->script);
+
+        $seed = $this->pmssExtractShellFunction($this->script, 'servarr_auth_seed');
+        $this->assertOrderedStrings(array(
+            'log_ok "${install_name} app-level auth configured"',
+            'media_stack_credentials_app_write "$app" "$MEDIA_STACK_AUTH_USERNAME" "$password"',
+        ), $seed);
+    }
+
+    public function testServarrSeedWaitsIgnoreOldFatalLogAndStopOnNewFatalLog(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-fatal-seed-');
+        $log = $home.'/radarr-auth-seed.log';
+        $this->pmssWriteFile($log, "old run: Non-recoverable failure\n");
+        $functions = $this->pmssExtractShellFunctions($this->script, array(
+            'servarr_seed_log_fatal', 'media_stack_wait_http_ok',
+            'servarr_api_key_curl_config_write', 'servarr_api_key_curl_config_wait',
+        ));
+        $script = implode("\n", array(
+            '#!/usr/bin/env bash', 'set -euo pipefail',
+            'LOG='.escapeshellarg($log), 'CONFIG='.escapeshellarg($home.'/config.xml'),
+            'CURL_CONFIG='.escapeshellarg($home.'/curl.conf'),
+            'printf "<Config></Config>\\n" > "$CONFIG"',
+            'curl() { return 1; }',
+            'tmux() { [[ "$1" == has-session ]]; }',
+            'log_err() { echo "ERR:$*"; }',
+            'sleep() { if [[ "$APPEND_FATAL" == 1 ]]; then echo "new run: Non-recoverable failure" >> "$LOG"; APPEND_FATAL=0; fi; }',
+            $functions,
+            'APPEND_FATAL=0; offset=$(stat -c %s "$LOG")',
+            'rc=0; servarr_api_key_curl_config_wait "$CONFIG" "$CURL_CONFIG" 1 seed "$LOG" "$offset" || rc=$?; echo "old_key=$rc"',
+            'rc=0; media_stack_wait_http_ok http://x 1 seed "" "$LOG" "$offset" || rc=$?; echo "old_http=$rc"',
+            'APPEND_FATAL=1; rc=0; servarr_api_key_curl_config_wait "$CONFIG" "$CURL_CONFIG" 10 seed "$LOG" "$offset" || rc=$?; echo "new_key=$rc"',
+            'offset=$(stat -c %s "$LOG"); APPEND_FATAL=1',
+            'rc=0; media_stack_wait_http_ok http://x 10 seed "" "$LOG" "$offset" || rc=$?; echo "new_http=$rc"',
+            '',
+        ));
+        $output = $this->pmssRunShellHarness($script);
+        $this->assertStringContainsAllStrings(array(
+            'old_key=1', 'old_http=1', 'new_key=2', 'new_http=2',
+            'ERR:App reported a fatal startup error; see '.$log,
+        ), $output);
     }
 
     public function testMediaStackWaitHttpOkReadyFailFastAndTimeout(): void
@@ -413,6 +495,7 @@ BASH
             'export TRACE='.escapeshellarg($trace),
             'export EXPECTED_HEADER='.escapeshellarg('header = "X-Api-Key: '.$apiKey.'"'),
             'DOTNET_ROOT_PATH=/opt/dotnet',
+            'MEDIA_STACK_APP_START_WAIT=600',
             'MEDIA_STACK_AUTH_USERNAME=pmss',
             'servarr_config_auth_configured() { return 1; }',
             'servarr_config_xml_tag_converge() { printf "tag:%s=%s\\n" "$2" "$3" >> "$TRACE"; }',
@@ -422,6 +505,7 @@ BASH
             'log_warn() { :; }',
             'log_err() { :; }',
             'log_ok() { :; }',
+            'media_stack_credentials_app_write() { :; }',
             'sleep() { if ! grep -q "<ApiKey>" "$HOME/.config/radarr/config.xml"; then printf '.escapeshellarg("<Config><ApiKey>{$apiKey}</ApiKey></Config>\n").' > "$HOME/.config/radarr/config.xml"; fi; }',
             $functions,
             'servarr_auth_seed radarr Radarr Radarr.dll 17878 v3 test-password --nobrowser',
@@ -502,7 +586,7 @@ BASH
             'fail',
         )), $this->pmssRunShellHarness($script));
         $this->assertStringContainsAllStrings([
-            'if ! base_url=$(jellyfin_startup_base_url "$base_url" "$JELLYFIN_CONFIG_DIR" 120); then',
+            'if ! base_url=$(jellyfin_startup_base_url "$base_url" "$JELLYFIN_CONFIG_DIR" "$MEDIA_STACK_APP_START_WAIT"); then',
             'Jellyfin startup API never answered HTTP 200, with or without BaseUrl',
         ], $this->script);
     }
