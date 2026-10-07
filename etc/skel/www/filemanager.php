@@ -3998,7 +3998,7 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
         let form = $($this);
         $.ajax({
             type: form.attr('method'), url: form.attr('action'), data: form.serialize()+"&ajax="+true,
-            success: function (data) {if(data) { window.location.reload();}}
+            success: function (data) {if(data) { window.location.href = '?p=<?php echo urlencode(FM_PATH) ?>';}}
         }); return false;
     }
     //Create new password hash
