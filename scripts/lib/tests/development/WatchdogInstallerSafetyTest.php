@@ -26,7 +26,7 @@ class WatchdogInstallerSafetyTest extends TestCase
             $source
         );
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/update/apps/watchdog.php', [
-            "@file_put_contents('/etc/watchdog.conf', \$updated) !== strlen(\$updated)",
+            "!pmssFileWriteComplete('/etc/watchdog.conf', \$updated)",
             "logMessage('[WARN] Unable to update watchdog device path; leaving service disabled.');",
             "runStep('Enabling watchdog service'",
         ]);

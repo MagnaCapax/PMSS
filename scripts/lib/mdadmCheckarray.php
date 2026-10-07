@@ -98,7 +98,7 @@ function pmssMdadmCheckarrayRequestIdle(string $array, string $sysBlockRoot): bo
     }
 
     $path = rtrim($sysBlockRoot, '/').'/'.$array.'/md/sync_action';
-    return file_exists($path) && @file_put_contents($path, "idle\n") === strlen("idle\n");
+    return file_exists($path) && pmssFileWriteComplete($path, "idle\n");
 }
 
 /** Run Debian checkarray and preserve its stdout/stderr in the cron log. */

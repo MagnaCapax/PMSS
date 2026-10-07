@@ -53,7 +53,7 @@ function pmssSafeWriteSources(string $content, string $label, ?callable $logger 
             $log("[WARN] Target sources path is a directory for $label and backup path is unsafe, skipping update");
             return false;
         }
-        $log(@file_put_contents($backup, $content, LOCK_EX) !== strlen($content)
+        $log(!pmssFileWriteComplete($backup, $content, LOCK_EX)
             ? "[WARN] Target sources path is a directory for $label and backup write failed, skipping update"
             : "[WARN] Target sources path is a directory for $label, wrote backup and skipped update");
         return false;
@@ -75,14 +75,14 @@ function pmssSafeWriteSources(string $content, string $label, ?callable $logger 
             $log("[ERROR] Unsafe backup path for $label sources.list: $backup");
             return false;
         }
-        $log(@file_put_contents($backup, $current, LOCK_EX) !== strlen($current)
+        $log(!pmssFileWriteComplete($backup, $current, LOCK_EX)
             ? "[WARN] Unable to create backup $backup before updating $label"
             : "Backup for sources.list written to $backup");
     }
 
-    if (@file_put_contents($target, $content, LOCK_EX) !== strlen($content)) {
+    if (!pmssFileWriteComplete($target, $content, LOCK_EX)) {
         $log("[ERROR] Failed to write sources.list for $label, attempting restore");
-        if ($current !== false && @file_put_contents($target, $current, LOCK_EX) !== strlen($current)) {
+        if ($current !== false && !pmssFileWriteComplete($target, $current, LOCK_EX)) {
             $log("[WARN] Failed to restore previous sources.list for $label");
         }
         return false;
