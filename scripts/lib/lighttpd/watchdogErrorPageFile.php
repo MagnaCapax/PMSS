@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__.'/userFileWrite.php';
+require_once __DIR__.'/../user/identity.php';
 
 /** Render a static browser/plain-text 502 page for a specific diagnosis. */
 function pmssLighttpdWatchdogRenderErrorPage(string $reasonKey): string
@@ -84,6 +85,10 @@ function pmssLighttpdWatchdogRenderErrorPage(string $reasonKey): string
 /** Write or refresh a per-user 502 page inside the selected web root. */
 function pmssLighttpdWatchdogWriteErrorPage(string $username, string $reasonKey, string $webRoot = '/var/www'): bool
 {
+    if (!pmssValidateUsername($username)) {
+        return false;
+    }
+
     return pmssReplaceUserFileWithMetadata(
         rtrim($webRoot, '/').'/error-502-'.$username.'.html',
         pmssLighttpdWatchdogRenderErrorPage($reasonKey),
@@ -94,6 +99,11 @@ function pmssLighttpdWatchdogWriteErrorPage(string $username, string $reasonKey,
 /** Remove a per-user 502 page when the tenant web stack recovers. */
 function pmssLighttpdWatchdogDeleteErrorPage(string $username, string $webRoot = '/var/www'): bool
 {
+    // Validate before treating an absent path as an already-completed deletion.
+    if (!pmssValidateUsername($username)) {
+        return false;
+    }
+
     $path = rtrim($webRoot, '/').'/error-502-'.$username.'.html';
     if (!file_exists($path)) {
         return true;

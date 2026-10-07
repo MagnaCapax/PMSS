@@ -310,4 +310,16 @@ SH
         $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
         $this->assertTrue(pmssLighttpdWatchdogDeleteErrorPage('alice', $webRoot));
     }
+
+    public function testErrorPageFileOperationsRejectInvalidAccountNames(): void
+    {
+        $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
+        $path = $this->watchdogErrorPagePath($webRoot);
+        file_put_contents($path, 'untouched');
+        foreach (['', 'Alice', 'alice/../alice', "alice\0", 'toolongname'] as $username) {
+            $this->assertFalse(pmssLighttpdWatchdogWriteErrorPage($username, 'php', $webRoot));
+            $this->assertFalse(pmssLighttpdWatchdogDeleteErrorPage($username, $webRoot));
+            $this->assertSame('untouched', file_get_contents($path));
+        }
+    }
 }
