@@ -24,9 +24,6 @@ function pmssLighttpdWatchdogSocketPaths(string $homeDir, string $configPath): a
     $maxProcs = preg_match('/"max-procs"\s*=>\s*([0-9]+)/', $config, $matches) === 1 ? (int) $matches[1] : 0;
     $minProcs = preg_match('/"min-procs"\s*=>\s*([0-9]+)/', $config, $matches) === 1 ? (int) $matches[1] : 0;
 
-    if ($maxProcs === 1) {
-        return [$baseSocketPath];
-    }
     if ($maxProcs <= 0) {
         return [$baseSocketPath.'-0'];
     }
