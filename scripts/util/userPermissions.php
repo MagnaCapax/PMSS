@@ -10,6 +10,7 @@
 
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/shell.php';
+require_once __DIR__.'/../lib/user/permissionsCommands.php';
 require_once __DIR__.'/../lib/pathSafety.php';
 require_once __DIR__.'/../lib/user/userFilesystem.php';
 require_once __DIR__.'/../lib/user/subordinateIds.php';
@@ -35,11 +36,11 @@ function chmodPath(string $path, int $perm, bool $recursive = false): void
 
     if ($recursive) {
         $mode = sprintf('%04o', $perm);
-        pmssRun(sprintf('find %s -not -type l \( ! -type f -o -links 1 \) -not -perm %s -exec chmod %s {} +', $target, $mode, $mode));
+        pmssUserPermissionsRun(sprintf('find %s -not -type l \( ! -type f -o -links 1 \) -not -perm %s -exec chmod %s {} +', $target, $mode, $mode));
         return;
     }
 
-    pmssRun(sprintf('find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chmod %o {} +', $target, $perm));
+    pmssUserPermissionsRun(sprintf('find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chmod %o {} +', $target, $perm));
 }
 
 function chownPath(string $path, string $owner, bool $recursive = false): void
@@ -52,13 +53,13 @@ function chownPath(string $path, string $owner, bool $recursive = false): void
     if ($recursive) {
         $predicate = pmssFindOwnerMismatchPredicate($owner);
         if ($predicate !== '') {
-            pmssRun(sprintf('find %s -not -type l \( ! -type f -o -links 1 \) %s -exec chown -h %s {} +', $target, $predicate, escapeshellarg($owner)));
+            pmssUserPermissionsRun(sprintf('find %s -not -type l \( ! -type f -o -links 1 \) %s -exec chown -h %s {} +', $target, $predicate, escapeshellarg($owner)));
             return;
         }
     }
 
     // Quote owner spec as a single argument; chown accepts quoted 'user.group'
-    pmssRun(sprintf('find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chown -h %s {} +', $target, escapeshellarg($owner)));
+    pmssUserPermissionsRun(sprintf('find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chown -h %s {} +', $target, escapeshellarg($owner)));
 }
 
 function pmssFindOwnerMismatchPredicate(string $owner): string
@@ -105,7 +106,7 @@ if ($homeOwner !== false && $homeGroup !== false &&
         )
     );
 }
-pmssRun(sprintf(
+pmssUserPermissionsRun(sprintf(
     'find %s -path %s -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',
     escapeshellarg('/home/'.$thisUser),
     escapeshellarg("/home/{$thisUser}/.local")
@@ -115,7 +116,7 @@ pmssRun(sprintf(
 // copied carrying the exec bit. Strip exec from ~/www FILES (dirs are already normalised
 // to 0750 by the walk above). Bounded to ~/www so large payload trees under ~/data are
 // untouched; the explicit chmodItems below re-apply any file that legitimately keeps exec.
-pmssRun(sprintf('find %s -type f -links 1 -perm /0111 -exec chmod a-x {} +', escapeshellarg("/home/{$thisUser}/www")));
+pmssUserPermissionsRun(sprintf('find %s -type f -links 1 -perm /0111 -exec chmod a-x {} +', escapeshellarg("/home/{$thisUser}/www")));
 
 // Ensure ~/.bin and ~/bin exist with safe permissions and ownership.
 foreach ([
@@ -270,7 +271,7 @@ $findParts[] = '-execdir chown -h';
 $findParts[] = escapeshellarg($userIds['uid'].':'.$userIds['gid']);
 $findParts[] = '{}';
 $findParts[] = '+';
-pmssRun(implode(' ', $findParts));
+pmssUserPermissionsRun(implode(' ', $findParts));
 
 foreach ($chownItems as $item) {
     $path = $item[0];
@@ -286,3 +287,5 @@ foreach ($trafficFiles as $trafficFile) {
 if (file_exists("/home/{$thisUser}/.ssh")) {
     chmodPath("/home/{$thisUser}/.ssh", 0750);
 }
+
+exit(pmssUserPermissionsResult());

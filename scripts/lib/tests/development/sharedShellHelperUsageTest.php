@@ -28,7 +28,7 @@ class SharedShellHelperUsageTest extends TestCase
     {
         $this->pmssAssertRepoFileContractCases([
             'scripts/util/userPermissions.php' => [
-                'required' => ["__DIR__.'/../lib/shell.php'", 'pmssRun('],
+                'required' => ["__DIR__.'/../lib/shell.php'", "__DIR__.'/../lib/user/permissionsCommands.php'", 'pmssUserPermissionsRun('],
                 'forbidden' => ['function run(string $cmd): int' => 'Expected userPermissions.php to stop defining a local run() helper'],
             ],
             'scripts/recreateUser.php' => [

@@ -205,7 +205,8 @@ pmssRunOrExit('/scripts/util/setupUserHomePermissions.php ' . escapeshellarg($us
 pmssRunOrExit('/scripts/util/userConfigLighttpd.php ' . escapeshellarg($userName));
 
 pmssRunOrExit('/scripts/util/createNginxConfig.php --user ' . escapeshellarg($userName));
-pmssRunOrExit('/scripts/util/userPermissions.php ' . escapeshellarg($userName));
+// Permission repair is advisory here; keep the existing ownership sanity gate below.
+pmssRun('/scripts/util/userPermissions.php ' . escapeshellarg($userName));
 
 /* ===== 9. Ownership sanity ===== */
 // Service configuration changed the home through shell commands.
