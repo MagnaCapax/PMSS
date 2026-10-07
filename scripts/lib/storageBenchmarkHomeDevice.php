@@ -1,18 +1,6 @@
 <?php
 /** Read-only benchmark of the block device mounted below the selected target. */
 
-/** Validate a read target without requiring write access to customer storage. */
-function storageBenchmarkHomeDeviceRequireTarget(string $targetDir): string
-{
-    $path = rtrim($targetDir, '/');
-    if ($path === '' || preg_match('/[\r\n\0]/', $path) === 1
-        || !pmssPathSegmentsAreSafe($path, true, true, true, true)) {
-        storageBenchmarkFail("Error: unsafe target directory: {$targetDir}\n");
-    }
-    if (!is_dir($path)) storageBenchmarkFail("Error: target not found: {$targetDir}\n");
-    return $path;
-}
-
 /** Resolve and inspect only the device reported by df; callers may inject probes for hermetic tests. */
 function storageBenchmarkHomeDeviceResolve(
     string $targetDir,
@@ -30,9 +18,7 @@ function storageBenchmarkHomeDeviceResolve(
         return $entry + ['ok' => false, 'error' => 'unsafe or unavailable mount device'];
     }
 
-    $check = $deviceCheck ?: function (string $device): bool {
-        return is_readable($device) && @filetype($device) === 'block';
-    };
+    $check = $deviceCheck ?: 'storageBenchmarkDeviceIsReadableBlock';
     if (!$check($path)) return $entry + ['ok' => false, 'error' => 'mount device is not a readable block device'];
 
     $resolve = $canonicalPath ?: 'realpath';
@@ -108,10 +94,7 @@ function storageBenchmarkHomeDeviceRunTests(
     $skip = storageBenchmarkDdSkipBlocks($device['size'], $count);
     $runDd = $ddRunner ?: 'storageBenchmarkDdSeqread';
     $dd = $runDd($path, $count, $skip);
-    $entry = $row + ['test' => 'home-device-seqread-dd', 'params' => ['bs' => '1M',
-        'count' => $count, 'skip_blocks' => $skip], 'ok' => ($dd['rc'] === 0 && $dd['mbps'] !== null)];
-    if ($dd['mbps'] !== null) $entry['metrics'] = ['seqread_MBps' => $dd['mbps'], 'elapsed_s' => $dd['secs']];
-    else $entry['error'] = 'dd parse failed';
+    $entry = storageBenchmarkDdResultEntry($row, 'home-device-seqread-dd', $count, $skip, $dd);
     storageBenchmarkAppendJsonLine($jsonLog, $entry);
     printf("%s\thome-device-seqread-dd\tdd_seqread_MB/s=%s\n", $path,
         $dd['mbps'] !== null ? number_format($dd['mbps'], 2) : 'n/a');
@@ -124,7 +107,7 @@ function storageBenchmarkHomeDeviceMain(array $parsed, string $targetDir, string
     $idleLatencyMs = storageBenchmarkRequireIntOption($parsed, 'idle-latency-ms', 100, 0, 'non-negative');
     $idleUtilPct = storageBenchmarkRequireIntOption($parsed, 'idle-util', 85, 0, 'non-negative');
     storageBenchmarkRequireJsonLogPath($jsonLog);
-    $targetDir = storageBenchmarkHomeDeviceRequireTarget($targetDir);
+    $targetDir = storageBenchmarkRequireTargetDir($targetDir, false);
     $runId = date('YmdHis').'-'.bin2hex(random_bytes(3)); $runTs = date('c');
     $base = storageBenchmarkEntryBase($runTs, $label, $runId);
     $device = storageBenchmarkHomeDeviceResolve($targetDir);

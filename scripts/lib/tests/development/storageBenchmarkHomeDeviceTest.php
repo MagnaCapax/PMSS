@@ -105,6 +105,24 @@ class StorageBenchmarkHomeDeviceTest extends TestCase
         $this->assertStringContainsString('not measured', $output);
     }
 
+    public function testReadOnlyDdEntryKeepsLegacyResultShape(): void
+    {
+        $base = ['device' => '/dev/example', 'mode' => 'home-device'];
+        $cases = [
+            [['rc' => 0, 'mbps' => 12.5, 'secs' => 2.0], true, ['seqread_MBps' => 12.5, 'elapsed_s' => 2.0]],
+            [['rc' => 7, 'mbps' => 12.5, 'secs' => 2.0], false, ['seqread_MBps' => 12.5, 'elapsed_s' => 2.0]],
+            [['rc' => 0, 'mbps' => null, 'secs' => null], false, null],
+        ];
+        foreach (['home-device-seqread-dd', 'device-seqread-dd'] as $test) {
+            foreach ($cases as [$result, $ok, $metrics]) {
+                $entry = \storageBenchmarkDdResultEntry($base, $test, 2, 4, $result);
+                $expected = $base + ['test' => $test, 'params' => ['bs' => '1M', 'count' => 2, 'skip_blocks' => 4], 'ok' => $ok];
+                if ($metrics === null) $expected['error'] = 'dd parse failed'; else $expected['metrics'] = $metrics;
+                $this->assertSame($expected, $entry);
+            }
+        }
+    }
+
     public function testFioJobsStayReadOnlyAndUseRequestedRuntime(): void
     {
         $log = $this->pmssMakeTempDir('pmss-home-log-').'/benchmark.jsonl';
