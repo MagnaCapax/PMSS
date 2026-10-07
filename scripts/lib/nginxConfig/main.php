@@ -59,7 +59,12 @@ function pmssCreateNginxConfigMain(array $argv): int
     $restartNginx = pmssCliOptionPresent($parsed, 'restart', 'r');
 
     $selection = pmssManagedUsersSelectFromCommand('/scripts/listUsers.php', $requestedUser, array('emitEmptyMessage' => true, 'invalidMessage' => "Invalid username: %s\n", 'notFoundMessage' => "Username not found: %s\n"));
-    if ($selection['exitCode'] !== 0 || $selection['users'] === array()) return $selection['exitCode'];
+    if ($selection['exitCode'] !== 0 || ($requestedUser !== '' && $selection['users'] === array())) return $selection['exitCode'];
+    if ($selection['users'] === array()) {
+        // A successful empty listing still needs the global default site refreshed.
+        pmssCreateNginxConfigSetup();
+        return pmssCreateNginxConfigTestAndMaybeRestart($restartNginx);
+    }
 
     $requestedUser = $selection['username'];
     $users = $selection['users'];

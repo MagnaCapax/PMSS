@@ -238,6 +238,8 @@ Failed CLI link publication emits a warning; a later update can retry the link.
 8. Configure the web stack, regenerate per-user nginx configs from staged
    templates, disable legacy daemons, and install supporting packages
    (e.g., mediainfo, Let’s Encrypt helpers).
+   An empty managed-user list still refreshes the global nginx default site
+   and runs the config test; `--restart` restarts nginx after a passing test.
 9. Update every user environment via `pmssUpdateAllUsers()`, which also owns
    linger/rootless-Docker wiring and the optional post-refresh checks
    (user crontabs are user-owned and not rewritten).
