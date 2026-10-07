@@ -53,9 +53,9 @@
 !/var/www/401_images
 !/var/www/401_images/*
 !/var/www/502_images
-!/var/www/502_images/*
+!/var/www/502_images/*.jpg
 !/var/www/404_images
-!/var/www/404_images/*
+!/var/www/404_images/*.jpg
 !/var/www/landing_images
 !/var/www/landing_images/*
 !/var/www/suspended_images

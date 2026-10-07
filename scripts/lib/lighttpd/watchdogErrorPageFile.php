@@ -64,7 +64,7 @@ function pmssLighttpdWatchdogRenderErrorPage(string $reasonKey): string
         ."  </div>\n"
         ."</div>\n\n"
         ."<script>\n"
-        ."  const variants = ['/502_images/502-1.png', '/502_images/502-2.png', '/502_images/502-3.png', '/502_images/502-4.png', '/502_images/502-5.png', '/502_images/502-6.png', '/502_images/502-7.png', '/502_images/502-8.png', '/502_images/502-9.png', '/502_images/502-10.png', '/502_images/502-11.png', '/502_images/502-12.png', '/502_images/502-13.png'];\n"
+        ."  const variants = ['/502_images/502-1.jpg', '/502_images/502-2.jpg', '/502_images/502-3.jpg', '/502_images/502-4.jpg', '/502_images/502-5.jpg', '/502_images/502-6.jpg', '/502_images/502-7.jpg', '/502_images/502-8.jpg', '/502_images/502-9.jpg', '/502_images/502-10.jpg', '/502_images/502-11.jpg', '/502_images/502-12.jpg', '/502_images/502-13.jpg'];\n"
         ."  const imageElement = document.getElementById('error-image');\n"
         ."  imageElement.src = variants[Math.floor(Math.random() * variants.length)];\n"
         ."  imageElement.classList.add('error-image');\n"

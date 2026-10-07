@@ -33,12 +33,12 @@ class ErrorPageTemplateTest extends TestCase
             ['var/www/error-502.html', '/502_images/502-', 13, true],
         ] as [$path, $prefix, $count, $hasHomeLink]) {
             $contents = $this->assertErrorPageImagePool($path, $prefix, $count);
+            $this->assertStringContainsString('data-error-image-ext="jpg"', $contents, $path);
+            $this->assertImageFilesExist(ltrim($prefix, '/'), $count);
             if ($hasHomeLink) {
                 $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
             }
         }
-        $this->assertStringContainsString('data-error-image-ext="jpg"', $this->pmssReadRepoFile('var/www/error-401.html'));
-        $this->assertImageFilesExist('401_images/401-', 5);
     }
 
     public function testLandingPageKeepsLinksAndImagePool(): void
@@ -87,6 +87,10 @@ class ErrorPageTemplateTest extends TestCase
                 $line = '!/var/www/'.$directory.$suffix;
                 $this->assertTrue(in_array($line, $lines, true), $line.' is missing from .gitignore');
             }
+        }
+        foreach (['404_images', '502_images'] as $directory) {
+            $this->assertTrue(in_array('!/var/www/'.$directory, $lines, true));
+            $this->assertTrue(in_array('!/var/www/'.$directory.'/*.jpg', $lines, true));
         }
     }
 
