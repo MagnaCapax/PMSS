@@ -110,6 +110,22 @@ class MdadmCheckarrayTest extends TestCase
         $this->assertSame("--idle --quiet --all\n", $this->readStubLog());
     }
 
+    public function testIdleRequestRequiresCompleteWrite(): void
+    {
+        stream_wrapper_register('pmssmdwrite', MdadmCheckarrayWriteStream::class);
+        try {
+            foreach ([0 => false, 2 => false, 5 => true] as $limit => $expected) {
+                MdadmCheckarrayWriteStream::$limit = $limit;
+                MdadmCheckarrayWriteStream::$written = '';
+                $this->assertSame($expected, \pmssMdadmCheckarrayRequestIdle('md0', 'pmssmdwrite://sys'));
+                $this->assertSame(substr("idle\n", 0, $limit), MdadmCheckarrayWriteStream::$written);
+            }
+            $this->assertFalse(\pmssMdadmCheckarrayRequestIdle('md/0', 'pmssmdwrite://sys'));
+        } finally {
+            stream_wrapper_unregister('pmssmdwrite');
+        }
+    }
+
     public function testRootCronUsesGuardWithoutChangingQuarterlyGate(): void
     {
         $cron = $this->pmssReadRepoFile('etc/seedbox/config/root.cron');
@@ -159,5 +175,29 @@ class MdadmCheckarrayTest extends TestCase
                 'PMSS_MDADM_CHECKARRAY_STUB_LOG' => $this->fixtureRoot.'/checkarray.log',
             ]
         );
+    }
+}
+
+/** Simulate a sysfs command accepting only a bounded number of bytes. */
+class MdadmCheckarrayWriteStream
+{
+    public static $limit = 0;
+    public static $written = '';
+
+    public function url_stat(): array
+    {
+        return ['mode' => 0100000, 2 => 0100000];
+    }
+
+    public function stream_open(): bool
+    {
+        return true;
+    }
+
+    public function stream_write(string $data): int
+    {
+        $bytes = min(strlen($data), self::$limit - strlen(self::$written));
+        self::$written .= substr($data, 0, $bytes);
+        return $bytes;
     }
 }
