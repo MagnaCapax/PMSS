@@ -1,7 +1,7 @@
 # ADR 0089: Run the user environment pass after recreate handback
 
 Date: 2026-10-07
-Category: operations
+Category: architecture
 
 ## Status
 
