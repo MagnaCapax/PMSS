@@ -100,6 +100,6 @@ if (file_put_contents($home.'/.request-web-certs', $withUsername ? "username\n" 
 @unlink($home.'/.request-web-certs.failed');
 
 echo "Request recorded. Your certificate will normally be in place within a few\n";
-echo "minutes. Re-run this command any time to check — once https:// loads\n";
+echo "minutes. Re-run the same command any time to check — once https:// loads\n";
 echo "without a warning, you are done. Renewal is automatic afterwards.\n";
 exit(0);
