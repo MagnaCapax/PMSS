@@ -142,7 +142,7 @@ function pmssLocalFrameProxyAppDefinitions($username = '')
         'qbittorrent' => pmssLocalFrameDefinition('qbittorrent/', 'qBittorrent', 'qBittorrent - Torrent web UI'),
         'deluge' => pmssLocalFrameDefinition('deluge/', 'Deluge', 'Deluge - Torrent web UI'),
         'rclone' => pmssLocalFrameDefinition('rclone/', 'Rclone', 'Rclone Web UI'),
-        'jellyfin' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'jellyfin/web/index.html', 'Jellyfin', 'Jellyfin - Media server'),
+        'jellyfin' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'jellyfin/web/', 'Jellyfin', 'Jellyfin - Media server'),
         'radarr' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'radarr/', 'Radarr', 'Radarr - Movie manager'),
         'sonarr' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'sonarr/', 'Sonarr', 'Sonarr - TV manager'),
         'prowlarr' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'prowlarr/', 'Prowlarr', 'Prowlarr - Indexer manager'),

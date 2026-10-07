@@ -1512,7 +1512,7 @@ media_stack_credentials_file_write() {
 		printf 'AUTOBRR_USERNAME = %s\n' "$MEDIA_STACK_AUTH_USERNAME"
 		printf 'AUTOBRR_PASSWORD = %s\n' "$AUTOBRR_PASSWORD"
 		if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-			printf 'JELLYFIN_URL = https://%s/public-%s/jellyfin/web/index.html\n' "$HOSTNAME" "$USERNAME"
+			printf 'JELLYFIN_URL = https://%s/public-%s/jellyfin/web/\n' "$HOSTNAME" "$USERNAME"
 			printf 'JELLYFIN_USERNAME = %s\n' "$MEDIA_STACK_AUTH_USERNAME"
 			printf 'JELLYFIN_PASSWORD = %s\n' "$JELLYFIN_PASSWORD"
 		fi
@@ -1999,7 +1999,7 @@ media_stack_credentials_app_write() {
 
 	app_key=$(media_stack_app_key "$app")
 	case "$app" in
-	jellyfin) url_path="jellyfin/web/index.html" ;;
+	jellyfin) url_path="jellyfin/web/" ;;
 	radarr | sonarr | prowlarr | sabnzbd | autobrr) url_path="${app}/" ;;
 	*)
 		log_err "Unknown media-stack app for credentials write: $app"
@@ -2552,7 +2552,7 @@ for app in radarr sonarr prowlarr sabnzbd autobrr; do
 	echo "${app^^}-URL = https://${HOSTNAME}/public-${USERNAME}/${app}/"
 done
 if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
-	echo "JELLYFIN-URL = https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
+	echo "JELLYFIN-URL = https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/"
 	echo "JELLYFIN-LOCAL-URL = http://127.0.0.1:${JELLYFIN_PORT}"
 	echo "JELLYFIN-MEDIA-PATH = $HOME/data"
 	echo "JELLYFIN-LIBRARY-GUIDANCE = Jellyfin cannot list /home on PMSS; type the full path above into the folder field instead of selecting /home."

@@ -460,7 +460,7 @@ class IndexSkeletonFrameDataTest extends TestCase
         foreach (['sabnzbd', 'radarr', 'prowlarr', 'sonarr', 'lidarr', 'readarr', 'autobrr'] as $app) {
             $this->assertStringContainsString("loadFrame('".$app."', '/public-alice/".$app."/')", $html);
         }
-        $this->assertStringContainsString("loadFrame('jellyfin', '/public-alice/jellyfin/web/index.html')", $html);
+        $this->assertStringContainsString("loadFrame('jellyfin', '/public-alice/jellyfin/web/')", $html);
         $this->assertStringNotContainsString('<a href="#notebook"', $html);
     }
 

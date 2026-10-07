@@ -249,7 +249,7 @@ function pmssMediaStackPanelAppDefinitionsRead(): array
     return array(
         'jellyfin' => array(
             'label' => 'Jellyfin',
-            'urlPath' => 'jellyfin/web/index.html',
+            'urlPath' => 'jellyfin/web/',
             'markers' => array('dir' => array('.config/jellyfin'), 'file' => array('.bin/jellyfin/jellyfin.dll')),
             'secureMarkers' => array('file' => array('.config/jellyfin/config/network.xml', '.bin/jellyfin/jellyfin.dll')),
             'auth' => array('type' => 'xml-allowed', 'path' => '.config/jellyfin/config/system.xml', 'tag' => 'IsStartupWizardCompleted', 'allowed' => array('true', '1')),

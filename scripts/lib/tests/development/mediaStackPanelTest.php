@@ -118,7 +118,7 @@ class MediaStackPanelTest extends TestCase
         $status = $this->mediaStatusFixture('pmss-media-installed-', '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
 
         $this->assertSame('installed', $status['state']);
-        $this->assertStringContainsString('/public-alice/jellyfin/web/index.html', $status['urls']['Jellyfin']);
+        $this->assertStringContainsString('/public-alice/jellyfin/web/', $status['urls']['Jellyfin']);
         $this->assertSame(array('Jellyfin'), array_keys($status['urls']));
     }
 
@@ -285,7 +285,7 @@ class MediaStackPanelTest extends TestCase
         $this->assertSame(array_fill_keys($apps, true), $prerequisites);
         $this->assertSame($apps, $actions);
         $this->assertSame(array(
-            'Jellyfin' => 'https://seedbox.example/public-alice/jellyfin/web/index.html',
+            'Jellyfin' => 'https://seedbox.example/public-alice/jellyfin/web/',
             'Radarr' => 'https://seedbox.example/public-alice/radarr/',
             'Sonarr' => 'https://seedbox.example/public-alice/sonarr/',
             'Prowlarr' => 'https://seedbox.example/public-alice/prowlarr/',
@@ -345,7 +345,7 @@ class MediaStackPanelTest extends TestCase
             'message' => 'Media stack is installed for this account.',
             'details' => array('Use the app-level credentials in ~/.media-stack-credentials.txt; exposed apps can be secured from this panel.'),
             'tail' => '',
-            'urls' => array('Jellyfin' => 'https://seedbox.example/public-alice/jellyfin/web/index.html'),
+            'urls' => array('Jellyfin' => 'https://seedbox.example/public-alice/jellyfin/web/'),
         ));
 
         $this->assertStringContainsAllStrings(['.media-stack-credentials.txt', 'public-alice/jellyfin'], $html);

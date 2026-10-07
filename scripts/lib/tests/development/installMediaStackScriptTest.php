@@ -43,6 +43,19 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('[0-9]+){1,2}-${JF_ARCH}', $this->script);
     }
 
+    public function testJellyfinWebLinksKeepTrailingSlashWithoutDeadIndexPath(): void
+    {
+        $this->assertStringContainsAllStrings([
+            'JELLYFIN_URL = https://%s/public-%s/jellyfin/web/',
+            'jellyfin) url_path="jellyfin/web/" ;;',
+            'JELLYFIN-URL = https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/',
+        ], $this->script);
+
+        foreach (['etc/skel/install-media-stack.sh', 'etc/skel/www/userMediaStackPanel.php', 'etc/skel/www/index.php'] as $path) {
+            $this->assertStringNotContainsString('jellyfin/web/'.'index.html', $this->pmssReadRepoFile($path));
+        }
+    }
+
     public function testProwlarrRuntimeNetcorePresent(): void
     {
         $this->assertStringContainsAllStrings([
