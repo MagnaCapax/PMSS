@@ -133,12 +133,10 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testCreateNginxConfigStillSupportsLegacyDelugeWebPortPlaceholder(): void
     {
-        $setup = $this->pmssReadRepoFile('scripts/lib/nginxConfig/setup.php');
         $generator = $this->pmssReadRepoFile('scripts/lib/nginxConfig/userConfigsGenerate.php');
 
         // Backward compat: older nginx user templates may still use ##delugeWebPort.
-        $this->assertStringContainsAllStrings(['##delugeWebPort', "strpos(\$userTemplate, '##delugeWebPort')"], $setup);
-        $this->assertStringContainsString('##delugeWebPort', $generator);
+        $this->assertStringContainsAllStrings(["strpos(\$template, '##delugeWebPort')", "\$replacements['##delugeWebPort']"], $generator);
     }
 
     public function testCreateNginxConfigDelugeWebPortPlaceholderTreatsPortFileAsUntrusted(): void
