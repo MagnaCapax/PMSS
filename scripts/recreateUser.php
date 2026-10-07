@@ -38,6 +38,8 @@ require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/shell.php';
 require_once __DIR__.'/lib/user/recreateRestore.php';
 require_once __DIR__.'/lib/portManager.php';
+require_once __DIR__.'/lib/update.php';
+require_once __DIR__.'/lib/update/users.php';
 $userLifecycleLib = __DIR__.'/lib/userLifecycle.php';
 if (is_file($userLifecycleLib)) {
     require_once $userLifecycleLib;
@@ -207,6 +209,10 @@ pmssRunOrExit('/scripts/util/userConfigLighttpd.php ' . escapeshellarg($userName
 pmssRunOrExit('/scripts/util/createNginxConfig.php --user ' . escapeshellarg($userName));
 // Permission repair is advisory here; keep the existing ownership sanity gate below.
 pmssRun('/scripts/util/userPermissions.php ' . escapeshellarg($userName));
+if (!pmssUpdateUserEnvironment($userName)) {
+    fwrite(STDERR, "User environment update failed for {$userName}\n");
+    exit(1);
+}
 
 /* ===== 9. Ownership sanity ===== */
 // Service configuration changed the home through shell commands.
