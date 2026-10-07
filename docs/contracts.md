@@ -909,6 +909,11 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - etc/skel/install-media-stack.sh
   - Port allocation: consumes root-provisioned `~/.media-stack-port-APP` markers for SABnzbd, Radarr, Prowlarr, Sonarr, Autobrr, and Jellyfin. A legacy configured port is preserved only when no marker exists; a fresh install without a valid marker fails closed and requests a full PMSS update.
 
+- etc/skel/install-openclaw.php
+  - Port allocation: consumes the root-provisioned `~/.media-stack-port-openclaw` marker, writes `~/.openclaw/gateway.port`, and refuses install or start without a valid marker. OpenClaw has no lighttpd proxy.
+  - Lifecycle: installs only two marked jobs in the account's own crontab; check stops retrying after five consecutive failed starts until manual start.
+  - Authentication: a private gateway environment file supplies a token, and the gateway binds loopback only.
+
 - scripts/util/systemTest.php
   - Behavior: Read-only probe of system readiness (binary versions, config presence);
     intended post-provision.

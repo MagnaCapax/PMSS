@@ -21,10 +21,12 @@ mirrored to the shared user logs when available.
 
 The customer-run `install-media-stack.sh` cannot access this root-owned store.
 Root-side lighttpd convergence therefore reserves SABnzbd, Radarr, Prowlarr,
-Sonarr, Autobrr, and Jellyfin ports and publishes user-readable
+Sonarr, Autobrr, Jellyfin, and OpenClaw ports and publishes user-readable
 `~/.media-stack-port-APP` markers. Existing in-range app ports are adopted when
-they are not listening or already reserved; otherwise the next installer run
-converges the app and its proxy to a fresh managed port.
+they are not listening or already reserved; otherwise the next media-stack
+installer run converges its app and proxy to a fresh managed port.
+OpenClaw has no lighttpd proxy. Its separate opt-in installer binds the reserved
+port on loopback and requires a gateway token.
 Invalid usernames and service names are rejected before any reservation path is built.
 Persisted assignment files must contain a numeric TCP port; malformed existing
 assignments are treated as errors for that user, while malformed sibling files
