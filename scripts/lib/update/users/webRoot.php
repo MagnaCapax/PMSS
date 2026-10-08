@@ -165,6 +165,28 @@ function pmssUserWebRootMigrationDirectoryIsEmpty(string $path): bool
     return is_array($entries) && empty($entries);
 }
 
+/** Run as the account, or as an already unprivileged owner of a fixture home. */
+function pmssUserWebRootMigrationRun(string $user, string $home, array $paths, string $command): bool
+{
+    if (pmssAccountPathRun($user, $home, $paths, $command)) {
+        return true;
+    }
+    $uid = function_exists('posix_geteuid') ? @posix_geteuid() : -1;
+    if ($uid < 1 || @fileowner($home) !== $uid || !pmssPathTargetIsSafe($home, true)) {
+        return false;
+    }
+    foreach ($paths as $path) {
+        if (!pmssPathSegmentsAreSafe($path, false, true)
+            || !pmssPathWithinResolvedRoot($path, $home)) {
+            return false;
+        }
+    }
+    $process = @proc_open('sh -c '.escapeshellarg($command), [
+        0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w'],
+    ], $pipes);
+    return is_resource($process) && @proc_close($process) === 0;
+}
+
 /** Move a directory within one home with the account's authority. */
 function pmssUserWebRootMigrationRenameAsAccount(string $user, string $home, string $source, string $target): bool
 {
@@ -177,8 +199,29 @@ function pmssUserWebRootMigrationRenameAsAccount(string $user, string $home, str
         return false;
     }
 
+    $before = @lstat($source);
+    if (!is_array($before)) {
+        return false;
+    }
     $command = 'mv -T -- '.escapeshellarg($source).' '.escapeshellarg($target);
-    return pmssAccountPathRun($user, $home, [$source, $target], $command);
+    $moved = pmssUserWebRootMigrationRun($user, $home, [$source, $target], $command);
+    if (!$moved && dirname($source) === $home && dirname($target) === $home) {
+        // A root-owned, non-writable home cannot have its direct children
+        // substituted by the tenant while root performs watchdog recovery.
+        $homeStat = @lstat($home);
+        $moved = function_exists('posix_geteuid') && @posix_geteuid() === 0
+            && is_array($homeStat) && (int) $homeStat['uid'] === 0
+            && (((int) $homeStat['mode']) & 0022) === 0
+            && pmssPathTargetIsSafe($home, true)
+            && pmssPathTargetIsSafe($source, true, true)
+            && pmssPathTargetIsSafe($target, true, true)
+            && is_array($current = @lstat($source))
+            && $current['dev'] === $before['dev'] && $current['ino'] === $before['ino']
+            && @rename($source, $target);
+    }
+    $after = $moved ? @lstat($target) : false;
+    return is_array($after) && !is_link($target)
+        && $after['dev'] === $before['dev'] && $after['ino'] === $before['ino'];
 }
 
 /** Apply metadata captured from lstat() without treating failures as fatal. */
@@ -374,7 +417,7 @@ function pmssUserMigrateWebRootBasenameCollapsePath(
             return;
         }
         if (!pmssUserWebRootMigrationDirectoryIsEmpty($target)
-            || !pmssAccountPathRun($user, $home, [$target], 'rmdir -- '.escapeshellarg($target))) {
+            || !pmssUserWebRootMigrationRun($user, $home, [$target], 'rmdir -- '.escapeshellarg($target))) {
             pmssUserWebRootMigrationRemoveCopy($temporary);
             pmssUserWebRootMigrationLog($user, $logger, 'Preserving destination conflict for '.$sourceRelative);
             return;
@@ -444,7 +487,7 @@ function pmssUserMigrateWebRootPath(
     if (!$sourceExists) {
         if (!pmssUserWebRootMigrationPrepareParent($user, $home, $sourceParent, $logger)
             || pmssPathExistsOrLink($source)
-            || !pmssAccountPathRun($user, $home, [$source],
+            || !pmssUserWebRootMigrationRun($user, $home, [$source],
                 'ln -sT -- '.escapeshellarg($linkTarget).' '.escapeshellarg($source))) {
             pmssUserWebRootMigrationLog($user, $logger, 'Unable to restore symlink for '.$sourceRelative);
             return;
@@ -475,7 +518,7 @@ function pmssUserMigrateWebRootPath(
         return;
     }
 
-    if (pmssPathExistsOrLink($source) || !pmssAccountPathRun($user, $home, [$source],
+    if (pmssPathExistsOrLink($source) || !pmssUserWebRootMigrationRun($user, $home, [$source],
         'ln -sT -- '.escapeshellarg($linkTarget).' '.escapeshellarg($source))) {
         $restored = !pmssPathExistsOrLink($source)
             && pmssUserWebRootMigrationRenameAsAccount($user, $home, $target, $source);
