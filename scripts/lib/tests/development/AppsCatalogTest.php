@@ -139,9 +139,7 @@ class AppsCatalogTest extends TestCase
         $this->assertTrue(count($catalog) > 100);
         $names = array_column($catalog, 'name');
         foreach (\PMSS_LSIO_EXCLUDED as $excluded) $this->assertFalse(in_array($excluded, $names, true), $excluded);
-        foreach (\pmssAppsCatalogRead() as $apps) foreach ($apps as $app) {
-            $this->assertFalse(in_array(strtolower(str_replace(' ', '', $app[0])), $names, true), $app[0]);
-        }
+        $this->assertTrue(in_array('thelounge', $names, true));
         foreach ($catalog as $app) {
             $this->assertTrue(strpos($app['guide'], 'https://docs.linuxserver.io/images/docker-') === 0);
             $this->assertTrue(preg_match_all('/./us', $app['description']) <= 120);
@@ -167,6 +165,9 @@ class AppsCatalogTest extends TestCase
         $this->assertStringContainsString('Guides on the Pulsed Media wiki', $html);
         $catalog = require dirname(__DIR__, 4).'/etc/skel/www/appsLsioCatalog.php';
         $this->assertStringContainsString('More from LinuxServer.io ('.count($catalog).')', $html);
+        $lsio = substr($html, strpos($html, 'id="pmss-lsio-apps"'));
+        $this->assertStringContainsString('data-search="thelounge"', $lsio);
+        $this->assertStringContainsString('https://docs.linuxserver.io/images/docker-thelounge/', $lsio);
         $this->assertStringContainsString('https://docs.linuxserver.io/images/docker-blender/', $html);
         $this->assertSame(count($catalog), substr_count($html, 'data-search="'));
         foreach ($catalog as $app) $this->assertStringContainsString('data-search="'.$app['name'].'"', $html);
