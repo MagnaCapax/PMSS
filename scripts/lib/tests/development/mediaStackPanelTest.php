@@ -362,6 +362,20 @@ class MediaStackPanelTest extends TestCase
         $this->assertStringContainsAllStrings(['.install-media-stack-web.pid', 'install-media-stack.sh', "USER='alice'"], $command);
     }
 
+    public function testStartCommandDetachesInstallerFromFrontendPipe(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-detach-');
+        $this->pmssWriteFile($home.'/install-media-stack.sh', "#!/bin/bash\nsleep 5\n");
+
+        $start = microtime(true);
+        \pmssFrontendShellExec(\pmssMediaStackPanelStartCommandBuild($home, 'alice'));
+        $elapsed = microtime(true) - $start;
+
+        $this->assertTrue($elapsed < 2, 'Frontend command waited for the background installer: '.$elapsed.'s');
+        $pid = \pmssMediaStackPanelPidRead($home);
+        $this->assertTrue(\pmssMediaStackPanelPidRunning($pid), 'PID file must identify a live installer process.');
+    }
+
     public function testRecoveryCommandUsesFixedInstallerMode(): void
     {
         $command = \pmssMediaStackPanelRecoveryCommandBuild('/home/alice', 'alice');

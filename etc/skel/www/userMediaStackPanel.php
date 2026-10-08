@@ -578,7 +578,7 @@ function pmssMediaStackPanelStartCommandBuild(string $home, string $username): s
 
     $innerCommand = 'cd '.escapeshellarg($home)
         .' && rm -f -- '.escapeshellarg($pidPath)
-        .' && nohup /bin/bash '.escapeshellarg($scriptPath).' >/dev/null 2>&1 & echo $! > '.escapeshellarg($pidPath);
+        .' && { nohup /bin/bash '.escapeshellarg($scriptPath).' >/dev/null 2>&1 </dev/null & echo $! > '.escapeshellarg($pidPath).'; }';
 
     return 'HOME='.escapeshellarg($home)
         .' USER='.escapeshellarg($username)
