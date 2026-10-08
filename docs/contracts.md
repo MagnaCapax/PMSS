@@ -978,6 +978,8 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ## Customer Server Status – `etc/skel/www/welcome.php` and `stats.php`
 
+- When the update-only `statsHelpers.php` has not arrived, `stats.php` returns
+  HTTP 200 with a short reload notice instead of failing during the guiv heal.
 - `pmssStatsChartOptions()` caps the shared Traffic, CPU, Storage I/O, and IOPS chart x-axis at six visible date ticks and gives legends explicit point markers, width, and spacing (Refs #878).
 - The Storage I/O text block emits explicit newlines between read, write, and
   operations values; PHP template close tags otherwise consume source newlines (Refs #879).

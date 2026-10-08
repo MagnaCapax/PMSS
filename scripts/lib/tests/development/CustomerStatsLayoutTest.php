@@ -114,7 +114,8 @@ final class CustomerStatsLayoutTest extends TestCase
                     '$pmssStatsRequiredHelpers',
                     'Stats unavailable: missing local panel helper',
                     "require_once __DIR__.'/scriptsInc.php';",
-                    "require_once __DIR__.'/statsHelpers.php';",
+                    "pmssWelcomeRequireLocalHelper('statsHelpers.php');",
+                    'The Info page is being updated on this server. Reload it in a few minutes.',
                     'pmssStatsRenderResourceBlocks($resourceState);',
                 ),
                 'forbidden' => array('function pmssStatsSerializedStateRead(', 'PMSS_STATS'.'_HELPERS_ONLY'),
@@ -136,7 +137,7 @@ final class CustomerStatsLayoutTest extends TestCase
             foreach (array('stats.php', 'info.php') as $page) {
                 $result = $render($page, array('minBytes' => 1, 'query' => ''));
 
-                $this->assertStringContainsString('Stats unavailable: missing local panel helper statsHelpers.php.', $result['stdout']);
+                $this->assertStringContainsString('The Info page is being updated on this server. Reload it in a few minutes.', $result['stdout']);
                 $this->assertStringNotContainsString('Fatal error', $result['stdout'].$result['stderr']);
             }
         });

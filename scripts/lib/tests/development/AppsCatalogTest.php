@@ -12,7 +12,7 @@ class AppsCatalogTest extends TestCase
 {
     public function testGuivRequiresStayInsideDeliveredSet(): void
     {
-        $guiv = array('welcome', 'scriptsInc', 'userMediaStackPanel', 'qbittorrent',
+        $guiv = array('welcome', 'stats', 'scriptsInc', 'userMediaStackPanel', 'qbittorrent',
             'deluge', 'rclone', 'rtorrentRestart', 'lighttpdRestart');
         foreach ($guiv as $name) {
             $source = $this->pmssReadRepoFile('etc/skel/www/'.$name.'.php');
@@ -400,6 +400,20 @@ class AppsCatalogTest extends TestCase
             $this->assertSame(0, $result['rc']);
             $this->assertStringContainsString('The Apps page is being updated on this server. Reload it in a few minutes.', $result['stdout']);
             $this->assertStringContainsString('HTTP=200', $result['stdout']);
+        });
+    }
+
+    public function testStatsShowsUpdatingNoticeBeforeUpdateOnlyHelperArrives(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render, string $runRoot): void {
+            $this->assertTrue(unlink($home.'/www/statsHelpers.php'));
+            file_put_contents($runRoot.'/php-cli-bootstrap.php',
+                "register_shutdown_function(function () { echo ' HTTP='.(http_response_code() ?: 200); });\n", FILE_APPEND);
+            $result = $render('stats.php', array('minBytes' => 80));
+            $this->assertSame(0, $result['rc']);
+            $this->assertSame('', $result['stderr']);
+            $this->assertSame('The Info page is being updated on this server. Reload it in a few minutes. HTTP=200',
+                $result['stdout']);
         });
     }
 
