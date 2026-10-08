@@ -143,3 +143,11 @@ Media Start, Stop, Restart, and Show log buttons appear only when
 status and security information without offering unsupported controls.
 `userMediaStackPanel.php` loads the update-only recovery command helper through
 the guarded local loader, preserving the guiv dependency closure (ADR 0022).
+
+## Amendment 2026-10-08 (5)
+
+During staggered guiv delivery, `apps.php?status=1` and `?log=APP` return HTTP
+503 JSON with an `updating` message when the older `scriptsInc.php` lacks their
+emitters. The shared status poll displays that message in app rows and stops
+retrying until the page is reloaded. Ordinary transient poll failures retain
+their retry behavior.

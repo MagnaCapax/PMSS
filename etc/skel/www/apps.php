@@ -1,8 +1,18 @@
 <?php
 /** Customer app controls and the closed, documentation-only Docker catalog. */
 require_once __DIR__.'/scriptsInc.php';
-if (isset($_GET['status'])) { pmssCustomerAppsStatusJsonEmit(); return; }
-if (isset($_GET['log'])) { pmssCustomerAppsLogJsonEmit(); return; }
+if (isset($_GET['status']) || isset($_GET['log'])) {
+    $helper = isset($_GET['status']) ? 'pmssCustomerAppsStatusJsonEmit' : 'pmssCustomerAppsLogJsonEmit';
+    if (!function_exists($helper)) {
+        http_response_code(503);
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        echo json_encode(array('updating' => true, 'message' => 'The Apps page is being updated on this server. Reload it in a few minutes.'));
+        return;
+    }
+    $helper();
+    return;
+}
 require_once __DIR__.'/userMediaStackPanel.php';
 
 /** The wiki catalog keeps the existing category and native-install metadata. */

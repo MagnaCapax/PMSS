@@ -398,6 +398,22 @@ class AppsCatalogTest extends TestCase
         });
     }
 
+    public function testAppsFeedsAnswerUpdatingWhenGuivHelperIsOld(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render, string $runRoot): void {
+            $this->pmssWriteFile($home.'/www/scriptsInc.php', "<?php\n");
+            file_put_contents($runRoot.'/php-cli-bootstrap.php',
+                "register_shutdown_function(function () { echo ' HTTP='.(http_response_code() ?: 200); });\n", FILE_APPEND);
+            foreach (array('status=1', 'log=sonarr') as $query) {
+                $result = $render('apps.php', array('query' => $query, 'minBytes' => 100));
+                $this->assertSame(0, $result['rc']);
+                $this->assertSame('', $result['stderr']);
+                $this->assertSame('{"updating":true,"message":"The Apps page is being updated on this server. Reload it in a few minutes."} HTTP=503',
+                    $result['stdout']);
+            }
+        });
+    }
+
     public function testLegacyToggleShellCommandsStillRunForAjaxPost(): void
     {
         $root = $this->pmssMakeTempDir('pmss-toggle-legacy-');

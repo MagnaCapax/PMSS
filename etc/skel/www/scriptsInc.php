@@ -1652,6 +1652,16 @@ function pmssMediaStackSecureApp(button, app) {
 var pmssAppsBusy = {};
 function pmssAppsStatusUrl() { return $('.pmss-apps-section').attr('data-status-url'); }
 var pmssAppsRefreshTimer;
+function pmssAppsUpdatingResponse(xhr) {
+    if (!xhr || xhr.status !== 503 || !xhr.responseJSON || xhr.responseJSON.updating !== true) return false;
+    window.clearTimeout(pmssAppsRefreshTimer);
+    $('.pmss-apps-section .row').each(function() {
+        var notice = $(this).find('.row-error');
+        if (!notice.length) notice = $('<div class="row-error" role="alert"></div>').appendTo(this);
+        notice.text(xhr.responseJSON.message);
+    });
+    return true;
+}
 function pmssAppsRefresh(callback) {
     window.clearTimeout(pmssAppsRefreshTimer);
     $.getJSON(pmssAppsStatusUrl(), function(payload) {
@@ -1672,7 +1682,9 @@ function pmssAppsRefresh(callback) {
         });
         if (callback) callback(payload);
         pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, payload.poll ? 5000 : 10000);
-    }).fail(function() { pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, 10000); });
+    }).fail(function(xhr) {
+        if (!pmssAppsUpdatingResponse(xhr)) pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, 10000);
+    });
 }
 function pmssAppsWait(id, desired, deadline) {
     window.setTimeout(function() {
@@ -1686,7 +1698,14 @@ function pmssAppsWait(id, desired, deadline) {
             } else {
                 pmssAppsWait(id, desired, deadline);
             }
-        }).fail(function() { if (Date.now() < deadline) pmssAppsWait(id, desired, deadline); else { pmssAppsBusy[id] = false; $('[data-app="' + id + '"] .row-error').text('Could not read app status.'); } });
+        }).fail(function(xhr) {
+            if (pmssAppsUpdatingResponse(xhr)) {
+                pmssAppsBusy[id] = false;
+                $('[data-app="' + id + '"] .row-progress').text('');
+                $('[data-app="' + id + '"] button').prop('disabled', false);
+            } else if (Date.now() < deadline) pmssAppsWait(id, desired, deadline);
+            else { pmssAppsBusy[id] = false; $('[data-app="' + id + '"] .row-error').text('Could not read app status.'); }
+        });
     }, 2000);
 }
 function pmssAppsAct(button, id, action) {
