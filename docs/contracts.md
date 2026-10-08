@@ -867,6 +867,14 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/userPermissions.php <user>
   - Behavior: Fixes ownership/permissions under `/home/<user>` according to policy (chmod/chown); safe to re-run.
+  - Billing identity: `.billingServiceId`, legacy `.billingId`, and `.billingClientId`
+    have `root:<user> 0640` as their managed state. `writeHomeMarker.php` creates
+    registered billing markers as root (currently `.billingId`); `recreateUser`
+    restores billing files with identity UID 0, and management-host backfill
+    writes them as root. Root-run `userTransfer` uses `rsync -a` to preserve root
+    ownership. Readers require a root-owned regular file. This permission pass
+    normalizes ownership and mode only for a root-owned regular file; it logs and
+    leaves non-root-owned, symlinked, or other non-regular entries unchanged.
   - Provisioned recipient: Converges `.notifyEmail` to `root:<user> 0640`, preserving customer read access while preventing local redirection of future notifications.
 
 - scripts/util/userConfig.php <user> <ramMiB> <quotaGiB>
