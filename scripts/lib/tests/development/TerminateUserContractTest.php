@@ -83,13 +83,52 @@ final class TerminateUserContractTest extends TestCase
             'purge must be remove -> clear-immutable -> remove-leftovers'
         );
         $this->assertStringNotContainsString('chattr', $steps[0][1], 'first removal must not walk the tree');
-        $this->assertStringContainsString('chattr -R -i', $steps[1][1]);
+        $this->assertStringContainsString('find -P . -depth', $steps[1][1]);
+        $this->assertStringContainsString('chattr -i --', $steps[1][1]);
         $this->assertStringContainsString("'/home/user1234'", $steps[1][1], 'path must be shell-escaped');
         $this->assertSame($steps[0][1], $steps[2][1], 'leftover removal repeats the initial removal');
 
         foreach ($steps as $step) {
             $this->assertSame(0, strpos($step[1], 'if [ -d '), 'every step must no-op when the directory is gone');
+            $this->assertStringContainsString('cd -P --', $step[1]);
+            $this->assertStringContainsString('"$pin"', $step[1]);
         }
+    }
+
+    public function testPinnedPurgeRemovesCompleteRealTreeWithoutFollowingInnerLink(): void
+    {
+        $base = $this->pmssMakeTempDir('pmss-purge-real-');
+        $home = $base.'/home';
+        $outside = $base.'/outside';
+        $this->pmssEnsureDir($home.'/nested');
+        $this->pmssEnsureDir($outside);
+        file_put_contents($home.'/nested/data', "customer\0bytes");
+        file_put_contents($home.'/.hidden', 'hidden');
+        file_put_contents($outside.'/sentinel', 'outside');
+        symlink($outside, $home.'/nested/outside-link');
+        foreach ([false, true, false] as $clear) {
+            exec(\pmssPinnedTreePurgeCommand($home, $clear), $output, $rc);
+            $this->assertSame(0, $rc);
+        }
+        $this->assertFalse(file_exists($home), 'the entire real tenant tree must be removed');
+        $this->assertSame('outside', file_get_contents($outside.'/sentinel'));
+    }
+
+    public function testPinnedPurgeRefusesLinkedRootAndPreservesTenantData(): void
+    {
+        $base = $this->pmssMakeTempDir('pmss-purge-linked-');
+        $home = $base.'/home';
+        $outside = $base.'/outside';
+        $this->pmssEnsureDir($home);
+        $this->pmssEnsureDir($outside);
+        file_put_contents($home.'/customer', 'tenant');
+        file_put_contents($outside.'/sentinel', 'outside');
+        rename($home, $base.'/saved-home');
+        symlink($outside, $home);
+        exec(\pmssPinnedTreePurgeCommand($home, false), $output, $rc);
+        $this->assertSame(0, $rc);
+        $this->assertSame('tenant', file_get_contents($base.'/saved-home/customer'));
+        $this->assertSame('outside', file_get_contents($outside.'/sentinel'));
     }
 
     public function testPurgeDirectoryStepsRejectPathsOutsideManagedHomes(): void

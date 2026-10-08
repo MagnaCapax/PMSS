@@ -7,6 +7,7 @@
  */
 
 require_once dirname(__DIR__).'/userLifecycle.php';
+require_once dirname(__DIR__).'/pathSafety.php';
 require_once __DIR__.'/userConfigStore.php';
 
 function pmssTerminateUserRejectUnsafePath(string $username, string $phase, string $path, string $message, string $contextKey = 'path'): bool
@@ -84,13 +85,11 @@ function pmssTerminateUserPurgeDirectorySteps(string $label, string $path): arra
         throw new InvalidArgumentException('Refusing unsafe user purge path');
     }
 
-    $arg = escapeshellarg($path);
-    $whenPresent = 'if [ -d '.$arg.' ]; then ';
-    $remove = $whenPresent.'rm -rf -- '.$arg.'; fi';
+    $remove = pmssPinnedTreePurgeCommand($path, false);
 
     return array(
         array('remove_'.$label.'_initial', $remove),
-        array('clear_immutable_'.$label, $whenPresent.'command -v chattr >/dev/null 2>&1 && chattr -R -i '.$arg.' 2>/dev/null || true; fi'),
+        array('clear_immutable_'.$label, pmssPinnedTreePurgeCommand($path, true)),
         array('remove_'.$label.'_leftovers', $remove),
     );
 }

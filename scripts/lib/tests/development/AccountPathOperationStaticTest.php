@@ -107,6 +107,20 @@ final class AccountPathOperationStaticTest extends TestCase
             'Imported source ownership must be normalised before account rename');
     }
 
+    public function testTerminationPurgeUsesPinnedSymlinkRefusingTree(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/terminationCleanup.php', [
+            'pmssPinnedTreePurgeCommand($path, false)',
+            'pmssPinnedTreePurgeCommand($path, true)',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/pathSafety.php', [
+            "[ ! -L '.\$arg",
+            'cd -P --',
+            'find -P . -depth',
+            'rm -rf -- ./* ./.[!.]* ./..?*',
+        ]);
+    }
+
     /** @return array<int,string> */
     private function scanFile(string $path): array
     {
