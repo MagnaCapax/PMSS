@@ -17,14 +17,17 @@ $home = dirname(__DIR__);
 $username = basename(rtrim($home, '/'));
 $hostname = function_exists('gethostname') ? (string) gethostname() : '';
 $hostname = $hostname !== '' ? $hostname : (string) php_uname('n');
-$action = (string) ($_GET['action'] ?? 'status');
+$action = $_GET['action'] ?? 'status';
+$action = is_string($action) ? $action : 'status';
 
-if (isset($_POST['action']) && strpos((string) $_POST['action'], 'confirm-secure-') === 0) {
+if (isset($_POST['action']) && is_string($_POST['action']) && strpos($_POST['action'], 'confirm-secure-') === 0) {
     pmssMediaStackPanelSecureHandle($home, $username, $hostname);
 } elseif ($action === 'start') {
     pmssMediaStackPanelStartHandle($home, $username, $hostname);
 } elseif ($action === 'start-stopped') {
     pmssMediaStackPanelRecoveryHandle($home, $username, $hostname);
+} elseif (in_array($action, array('app-start', 'app-stop', 'app-restart'), true)) {
+    pmssMediaStackPanelAppActionHandle($home, $username, $hostname, $action);
 }
 
 pmssMediaStackPanelJsonRespond(pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname));
@@ -45,6 +48,66 @@ function pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname)
         'poll' => !empty($status['poll']),
         'state' => $status['state'],
     );
+}
+
+/** Change exactly one installed customer's tmux app and its opt-out marker. */
+function pmssMediaStackPanelAppActionHandle($home, $username, $hostname, $action)
+{
+    $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
+    if (!pmssMediaStackPanelRecoveryRequestAllowed($_SERVER)) {
+        $payload['message'] = 'App controls require a panel POST request.';
+        pmssMediaStackPanelJsonRespond($payload, ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' ? 403 : 405);
+    }
+    $app = $_POST['app'] ?? '';
+    $app = is_string($app) ? $app : '';
+    $allowed = array_fill_keys(array_merge(array_keys(pmssMediaStackPanelAppDefinitionsRead()), array('cloudplow')), true);
+    $installed = pmssMediaStackPanelExpectedAppIdsRead($home);
+    if (is_file(pmssCustomerHomePath($home, '.bin/cloudplow/cloudplow/cloudplow.py'))) $installed['cloudplow'] = true;
+    if (!isset($allowed[$app]) || !isset($installed[$app])) {
+        $payload['message'] = 'Unknown or uninstalled media-stack app.';
+        pmssMediaStackPanelJsonRespond($payload, 400);
+    }
+    $script = pmssCustomerHomePath($home, 'install-media-stack.sh');
+    if (!is_file($script) || is_link($script) || !is_readable($script) || !pmssFrontendShellExecAvailable()) {
+        $payload['message'] = 'Media stack installer is unavailable.';
+        pmssMediaStackPanelJsonRespond($payload, 409);
+    }
+    $gate = $action === 'app-stop' ? array('ok' => true) : pmssMediaStackPanelRecoveryGateRead($home);
+    if (!$gate['ok']) {
+        $payload['message'] = $gate['message'];
+        pmssMediaStackPanelJsonRespond($payload, 409);
+    }
+    $marker = pmssCustomerHomePath($home, '.'.$app.'Disable');
+    if (is_link($marker) || (file_exists($marker) && !is_file($marker))) {
+        $payload['message'] = 'App control marker is unsafe.';
+        pmssMediaStackPanelJsonRespond($payload, 409);
+    }
+    if ($action === 'app-restart' && is_file($marker)) {
+        $payload['message'] = 'Start this app before requesting a restart.';
+        pmssMediaStackPanelJsonRespond($payload, 409);
+    }
+    if ($action === 'app-stop' && !@touch($marker)) {
+        $payload['message'] = 'Could not save the stopped state.';
+        pmssMediaStackPanelJsonRespond($payload, 500);
+    }
+    if ($action === 'app-start' && is_file($marker) && !@unlink($marker)) {
+        $payload['message'] = 'Could not clear the stopped state.';
+        pmssMediaStackPanelJsonRespond($payload, 500);
+    }
+    $flags = $action === 'app-start' ? array('--start-app='.$app)
+        : ($action === 'app-stop' ? array('--stop-app='.$app) : array('--stop-app='.$app, '--start-app='.$app));
+    foreach ($flags as $flag) {
+        $command = 'cd '.escapeshellarg($home).' && HOME='.escapeshellarg($home)
+            .' USER='.escapeshellarg($username).' LOGNAME='.escapeshellarg($username)
+            .' /bin/bash '.escapeshellarg($script).' '.escapeshellarg($flag).' >/dev/null 2>&1 && printf %s pmss-ok';
+        if (trim((string) pmssFrontendShellExec($command)) !== 'pmss-ok') {
+            $payload['message'] = 'Could not '.$action.' '.$app.'.';
+            pmssMediaStackPanelJsonRespond($payload, 500);
+        }
+    }
+    $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
+    $payload['message'] = ucfirst($app).' '.$action.' request completed.';
+    pmssMediaStackPanelJsonRespond($payload, 202);
 }
 
 /** Start absent media-stack sessions once, without changing watchdog policy. */
@@ -133,13 +196,13 @@ function pmssMediaStackPanelSecureHandle($home, $username, $hostname)
  */
 function pmssMediaStackPanelStartHandle($home, $username, $hostname)
 {
-    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    if (!pmssMediaStackPanelRecoveryRequestAllowed($_SERVER)) {
         $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
         $payload['message'] = 'Media stack install start requires POST.';
         $payload['canStart'] = true;
         $payload['poll'] = false;
         $payload['state'] = 'blocked';
-        pmssMediaStackPanelJsonRespond($payload, 405);
+        pmssMediaStackPanelJsonRespond($payload, ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' ? 403 : 405);
     }
 
     $status = pmssMediaStackPanelStatusRead($home, $username, $hostname);

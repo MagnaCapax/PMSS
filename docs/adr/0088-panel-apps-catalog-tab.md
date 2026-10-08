@@ -72,3 +72,32 @@ are open. Their descriptions and caution tags are fixed display copy, and
 their setup links stay within the existing wiki category anchors. This
 amendment supersedes the earlier read-only decision and the #673 relation
 above; the original rationale is retained as decision history.
+
+## Amendment 2026-10-08 (2)
+
+The Apps tab now offers live per-app controls. Installer-managed media apps use
+their own tmux sessions for start, stop, and restart. A customer-owned
+`~/.<app>Disable` marker records an intentional stop; `--start-stopped` skips
+these apps, while `--start-app=APP` and `--stop-app=APP` act on one validated
+installed app. The observe-only watchdog publishes `off` with zero failures for
+marked apps, so a deliberate stop neither degrades the stack nor alerts. This
+follows the default-on marker convention from #672 and rTorrent's existing
+`.rtorrentDisable` marker. Opt-in qBittorrent, Deluge, and rclone retain their
+`~/.<app>Enable` markers.
+
+All customer state changes require POST and `X-Requested-With`. The Apps status
+and bounded log reads remain GET. Native client stop signals only customer-owned
+processes in the panel's mount namespace whose `/proc/<pid>/exe` resolves to the
+app's native binary allowlist.
+For Deluge's Python entry points, both the native interpreter executable and
+the exact installed entry point in `cmdline` must match. Same-named container
+processes are excluded. The qBittorrent password-sync
+challenge remains on the shared action path. This narrows the impact of exposed
+application credentials, a material concern for torrent WebUIs (for example,
+qBittorrent CVE-2023-30801), without changing the account's credential storage.
+See [NVD CVE-2023-30801](https://nvd.nist.gov/vuln/detail/CVE-2023-30801).
+
+Install remains a whole-stack action. The seven media rows expose current
+session state and app auth state, while the Docker catalog stays collapsed and
+documentation-only. A stopped app can be started individually without waking
+other intentionally stopped apps.

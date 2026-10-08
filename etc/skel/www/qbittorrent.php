@@ -4,9 +4,12 @@ require_once __DIR__.'/scriptsInc.php';
 /** Lightweight frontend toggle for qBittorrent. */
 
 $action = pmssFrontendActionRequest();
+pmssFrontendPostActionRequired();
 pmssQbittorrentFrontendPasswordSync($action);
 
-pmssFrontendToggleAction('../.qbittorrentEnable', static function () { passthru('zsh -c "qbittorrent-nox -d" >> /dev/null 2>&1 &'); }, 'killall -u $(whoami) -9 qbittorrent-nox;', 'killall -u $(whoami) qbittorrent-nox; sleep 3; killall -u $(whoami) -9 qbittorrent-nox');
+pmssFrontendToggleAction('../.qbittorrentEnable', static function () { passthru('zsh -c "qbittorrent-nox -d" >> /dev/null 2>&1 &'); }, static function () {
+    pmssCustomerNativeStop(pmssCustomerManagedAppDefinitions()['qBittorrent']['binaries']);
+});
 function pmssQbittorrentFrontendPasswordSync($action) {
     if ($action !== 'start' && $action !== 'restart') return;
     $configPath = __DIR__.'/../.config/qBittorrent/qBittorrent.conf';

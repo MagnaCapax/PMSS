@@ -51,8 +51,9 @@ function pmssActionRequest(action, passwordValue) {
     var request = {
         url: action.url,
         cache: false,
-        data: null,
-        type: action.type || 'GET',
+        data: action.data || null,
+        type: action.type || 'POST',
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
         success: function(payload) {
             deferred.resolve(payload);
         },
@@ -74,10 +75,10 @@ function pmssActionRequest(action, passwordValue) {
         }
     };
     if (action.dataType) request.dataType = action.dataType;
-    if (action.headers) request.headers = action.headers;
+    if (action.headers) $.extend(request.headers, action.headers);
     if (action.passwordField && passwordValue !== undefined) {
         request.type = 'POST';
-        request.data = {};
+        request.data = $.extend({}, action.data || {});
         request.data[action.passwordField] = passwordValue;
     }
     $.ajax(request);

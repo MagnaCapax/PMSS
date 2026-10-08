@@ -8,5 +8,5 @@ pmssFrontendToggleAction(
     static function () {
         pmssFrontendShellExec('nohup deluged -l /home/$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');
     },
-    'killall -u $(whoami) -9 deluged; killall -u $(whoami) -9 deluge-web'
+    static function () { pmssCustomerNativeStop(pmssCustomerManagedAppDefinitions()['Deluge']['binaries']); }
 );

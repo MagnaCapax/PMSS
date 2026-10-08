@@ -228,7 +228,7 @@ function pmssMediaStackPanelRuntimeDetailsRead(array $runtime): array
         }
         $label = $app === 'cloudplow' ? 'Cloudplow' : pmssMediaStackPanelAppLabelRead($app);
         $state = (string) ($runtime['apps'][$app]['state'] ?? 'unknown');
-        $text = $state === 'running' ? 'running' : ($state === 'failed' ? 'failed repeatedly' : 'not running');
+        $text = $state === 'running' ? 'running' : ($state === 'off' ? 'stopped by you' : ($state === 'failed' ? 'failed repeatedly' : 'not running'));
         $failures = (int) ($runtime['apps'][$app]['consecutiveFailures'] ?? 0);
         $suffix = $state === 'failed' ? ' ('.$failures.' consecutive failed checks).' : '.';
         $details[] = $label.': '.$text.$suffix;
@@ -615,12 +615,13 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
         $runtime = pmssMediaStackPanelRuntimeStatusRead($home);
         if ($runtime !== null) {
             $runtimeState = (string) ($runtime['state'] ?? 'healthy');
+            $hasOff = in_array('off', array_column($runtime['apps'], 'state'), true);
             $panelState = $runtimeState === 'failed' ? 'failed' : ($runtimeState === 'degraded' ? 'degraded' : 'installed');
             $message = $runtimeState === 'failed'
                 ? 'Media stack is installed, but one or more apps failed repeatedly.'
                 : ($runtimeState === 'degraded'
                     ? 'Media stack is installed, but one or more apps are not running.'
-                    : 'Media stack is installed and all managed apps are running.');
+                    : ($hasOff ? 'Media stack is installed. Apps you stopped remain off.' : 'Media stack is installed and all managed apps are running.'));
             return array_merge($status, array(
                 'state' => $panelState,
                 'message' => $message,

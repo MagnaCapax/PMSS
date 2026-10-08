@@ -61,12 +61,12 @@ function pmssMediaStackWatchdogSessionRunning(string $username, string $app, ?ca
         return (bool) $probe($username, $app);
     }
 
-    $command = pmssBuildUserShellCommand($username, 'tmux has-session -t '.escapeshellarg($app));
+    $command = pmssBuildUserShellCommand($username, 'tmux has-session -t '.escapeshellarg('='.$app));
     return pmssCommandCapture($command, 10)['rc'] === 0;
 }
 
 /** Build one observation snapshot from the current and previous probes. */
-function pmssMediaStackWatchdogSnapshot(string $username, array $apps, array $previous = array(), ?callable $probe = null): array
+function pmssMediaStackWatchdogSnapshot(string $username, array $apps, array $previous = array(), ?callable $probe = null, string $home = ''): array
 {
     $states = array();
     $hasStopped = false;
@@ -74,6 +74,10 @@ function pmssMediaStackWatchdogSnapshot(string $username, array $apps, array $pr
     $previousApps = is_array($previous['apps'] ?? null) ? $previous['apps'] : array();
 
     foreach ($apps as $app => $definition) {
+        if ($home !== '' && is_file($home.'/.'.$app.'Disable')) {
+            $states[$app] = array('label' => $definition['label'], 'state' => 'off', 'consecutiveFailures' => 0);
+            continue;
+        }
         $running = pmssMediaStackWatchdogSessionRunning($username, $app, $probe);
         $oldFailures = (int) ($previousApps[$app]['consecutiveFailures'] ?? 0);
         $failures = $running ? 0 : max(0, $oldFailures) + 1;
@@ -127,7 +131,7 @@ function pmssMediaStackWatchdogRunUser(string $username, string $homeRoot = '/ho
     }
 
     $previous = pmssJsonFileReadAssoc($path, true) ?? array();
-    $status = pmssMediaStackWatchdogSnapshot($username, $apps, $previous, $probe);
+    $status = pmssMediaStackWatchdogSnapshot($username, $apps, $previous, $probe, $home);
     if (!pmssMediaStackWatchdogStatusWrite($home, $path, $status)) {
         echo date('Y-m-d H:i:s').' Media stack watchdog: unable to publish status for '.$username.PHP_EOL;
         return $status;
@@ -137,7 +141,7 @@ function pmssMediaStackWatchdogRunUser(string $username, string $homeRoot = '/ho
     foreach ($status['apps'] as $app => $appStatus) {
         $state = (string) $appStatus['state'];
         $oldState = (string) ($previousApps[$app]['state'] ?? '');
-        if ($state !== 'running' && $state !== $oldState) {
+        if ($state !== 'running' && $state !== 'off' && $state !== $oldState) {
             pmssMediaStackWatchdogLogTransition($username, $app, $state, (int) $appStatus['consecutiveFailures']);
         } elseif ($state === 'running' && $oldState !== '' && $oldState !== 'running') {
             pmssMediaStackWatchdogLogTransition($username, $app, $state, 0);

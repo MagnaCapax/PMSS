@@ -970,7 +970,7 @@ function pmssWelcomeCoreServiceStatusBadgeHtmlBuild($label, $status) {
 /** Build the ordered queue for the whole-account restart control. */
 function pmssWelcomeServiceRestartActionsBuild(array $managedApps, array $mediaStackStatus) {
     $actions = array();
-    if (file_exists('rtorrentRestart.php')) $actions[] = array('label' => 'rTorrent', 'url' => 'rtorrentRestart.php');
+    if (file_exists('rtorrentRestart.php') && !is_file('../.rtorrentDisable')) $actions[] = array('label' => 'rTorrent', 'url' => 'rtorrentRestart.php');
 
     foreach ($managedApps as $appName => $definition) {
         if (!is_array($definition)

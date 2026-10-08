@@ -42,7 +42,7 @@ PMSS_MEDIA_STACK_SKIP_UPDATE=0
 for pmss_media_stack_arg in "$@"; do
 	case "$pmss_media_stack_arg" in
 	--self-update) PMSS_MEDIA_STACK_SELF_UPDATE=1 ;;
-	--skip-update | --uninstall | --start-stopped | --secure-app=*) PMSS_MEDIA_STACK_SKIP_UPDATE=1 ;;
+	--skip-update | --uninstall | --start-stopped | --start-app=* | --stop-app=* | --secure-app=*) PMSS_MEDIA_STACK_SKIP_UPDATE=1 ;;
 	esac
 done
 unset pmss_media_stack_arg
@@ -89,6 +89,9 @@ VERIFY_ONLY=0
 FORCE_INSTALL=0
 UNINSTALL=0
 START_STOPPED=0
+START_APP=""
+STOP_APP=""
+APP_ACTION_REQUESTED=0
 SECURE_APP=""
 MEDIA_STACK_MIN_MEMORY_MIB=1024
 MEDIA_STACK_MIN_MEMORY_BYTES=$((MEDIA_STACK_MIN_MEMORY_MIB * 1024 * 1024))
@@ -146,6 +149,8 @@ Modes:
   --verify-only               Only verify URLs (alias: implies --dry-run) and exit
   --force                     Continue below the ${MEDIA_STACK_MIN_MEMORY_MIB} MiB memory guard
   --start-stopped             Start installed apps whose tmux sessions are absent
+  --start-app=APP             Start one installed app whose session is absent
+  --stop-app=APP              Stop only the named app's tmux session
   --secure-app=APP            Apply PMSS default auth to one installed app
   --uninstall                 Stop media-stack sessions and remove PMSS-managed files
   --self-update               Fetch and re-exec the latest installer from GitHub
@@ -163,6 +168,14 @@ for arg in "$@"; do
 	--dry-run) DRY_RUN=1 ;;
 	--force) FORCE_INSTALL=1 ;;
 	--start-stopped) START_STOPPED=1 ;;
+	--start-app=*)
+		START_APP=${arg#*=}
+		APP_ACTION_REQUESTED=1
+		;;
+	--stop-app=*)
+		STOP_APP=${arg#*=}
+		APP_ACTION_REQUESTED=1
+		;;
 	--secure-app=*) SECURE_APP=${arg#*=} ;;
 	--uninstall) UNINSTALL=1 ;;
 	--verify-only)
@@ -242,6 +255,24 @@ log_err() { echo -e "${C_ERR}[ERR ]${C_RESET} $*" >&2; }
 
 # Relaunch only absent sessions through the installer-managed aliases. This
 # gives the panel one explicit recovery action without creating a restart loop.
+media_stack_app_id_valid() {
+	case "$1" in
+	jellyfin | sonarr | radarr | prowlarr | sabnzbd | autobrr | cloudplow) return 0 ;;
+	esac
+	return 1
+}
+
+media_stack_app_installed() {
+	case "$1" in
+	jellyfin) [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]] ;;
+	sonarr | radarr | prowlarr) [[ -f "$HOME/.bin/${1^}/${1^}.dll" ]] ;;
+	sabnzbd) [[ -f "$HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py" ]] ;;
+	autobrr) [[ -f "$HOME/.bin/autobrr/autobrr" ]] ;;
+	cloudplow) [[ -f "$HOME/.bin/cloudplow/cloudplow/cloudplow.py" ]] ;;
+	*) return 1 ;;
+	esac
+}
+
 media_stack_start_stopped() {
 	local alias_file="$HOME/.bashrc.custom"
 	local app app_rc failed=0
@@ -254,9 +285,19 @@ media_stack_start_stopped() {
 		log_err "Media-stack aliases are missing or unsafe: $alias_file"
 		return 1
 	fi
+	if [[ -n "$START_APP" ]] && ! grep -q "^alias ${START_APP}=" "$alias_file"; then
+		log_err "App is not installed: $START_APP"
+		return 1
+	fi
+	if [[ -n "$START_APP" ]] && ! media_stack_app_installed "$START_APP"; then
+		log_err "App binary is missing: $START_APP"
+		return 1
+	fi
 
 	for app in jellyfin "${MEDIA_STACK_BASE_SESSIONS[@]}"; do
-		if tmux has-session -t "$app" 2>/dev/null; then
+		[[ -n "$START_APP" && "$app" != "$START_APP" ]] && continue
+		[[ -z "$START_APP" && (-e "$HOME/.${app}Disable" || -L "$HOME/.${app}Disable") ]] && continue
+		if tmux has-session -t "=$app" 2>/dev/null; then
 			continue
 		fi
 		if /bin/bash --noprofile --norc -O expand_aliases -c '
@@ -275,6 +316,19 @@ media_stack_start_stopped() {
 
 	return "$failed"
 }
+
+if [[ $APP_ACTION_REQUESTED -eq 1 ]]; then
+	if [[ -n "$START_APP" && -n "$STOP_APP" ]] || ! media_stack_app_id_valid "${START_APP:-$STOP_APP}"; then
+		log_err 'Invalid media-stack app action'
+		exit 2
+	fi
+	if [[ -n "$STOP_APP" ]]; then
+		tmux kill-session -t "=$STOP_APP" 2>/dev/null || true
+		exit 0
+	fi
+	media_stack_start_stopped
+	exit $?
+fi
 
 if [[ $START_STOPPED -eq 1 ]]; then
 	media_stack_start_stopped

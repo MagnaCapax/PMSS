@@ -919,7 +919,7 @@ LIGHTTPD;
         $bin = $this->pmssMakeTempDir('pmss-media-start-stopped-bin-');
         $this->pmssWriteExecutableFile($bin.'/tmux', <<<'BASH'
 #!/usr/bin/env bash
-if [[ "$1" == "has-session" && "$3" == "radarr" ]]; then
+if [[ "$1" == "has-session" && "$3" == "=radarr" ]]; then
     exit 0
 fi
 if [[ "$1" == "has-session" ]]; then
@@ -940,6 +940,7 @@ BASHRC
             'HOME='.escapeshellarg($home),
             'PATH='.escapeshellarg($bin).':$PATH',
             'MEDIA_STACK_BASE_SESSIONS=(sonarr radarr prowlarr sabnzbd cloudplow autobrr)',
+            'START_APP=""',
             'log_ok() { echo "OK:$*"; }',
             'log_warn() { echo "WARN:$*"; }',
             'log_err() { echo "ERR:$*"; }',
@@ -956,11 +957,59 @@ BASHRC
         $this->assertStringNotContainsString('new-session -d -s radarr true', $output);
     }
 
+    public function testStoppedMarkerSkipsBulkButExplicitStartTargetsOneApp(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-marker-');
+        $bin = $this->pmssMakeTempDir('pmss-media-marker-bin-');
+        $this->pmssWriteExecutableFile($bin.'/tmux', <<<'BASH'
+#!/usr/bin/env bash
+if [[ "$1" == has-session ]]; then exit 1; fi
+printf '%s\n' "$*" >> "$HOME/actions"
+BASH
+        );
+        $this->pmssWriteFile($home.'/.bashrc.custom', "alias sonarr='tmux new-session -s sonarr'\nalias radarr='tmux new-session -s radarr'\n");
+        $this->pmssWriteRelativeFile($home, '.bin/Sonarr/Sonarr.dll', 'binary');
+        $this->pmssWriteFile($home.'/.sonarrDisable', '');
+        $function = $this->pmssExtractShellFunction($this->script, 'media_stack_app_installed')."\n"
+            .$this->pmssExtractShellFunction($this->script, 'media_stack_start_stopped');
+        $harness = implode("\n", array('#!/usr/bin/env bash', 'set -euo pipefail',
+            'HOME='.escapeshellarg($home), 'PATH='.escapeshellarg($bin).':$PATH',
+            'MEDIA_STACK_BASE_SESSIONS=(sonarr radarr)', 'START_APP=""',
+            'log_ok() { :; }', 'log_warn() { :; }', 'log_err() { :; }',
+            $function, 'media_stack_start_stopped', 'START_APP=sonarr',
+            'media_stack_start_stopped', 'cat "$HOME/actions"', ''));
+        $output = $this->pmssRunShellHarness($harness);
+        $this->assertSame(1, substr_count($output, 'new-session -s sonarr'));
+        $this->assertSame(1, substr_count($output, 'new-session -s radarr'));
+        $this->assertStringContainsString('APP_ACTION_REQUESTED=0', $this->script);
+        $this->assertStringContainsString('media_stack_app_id_valid "${START_APP:-$STOP_APP}"', $this->script);
+        $this->assertStringContainsString('tmux kill-session -t "=$STOP_APP"', $this->script);
+    }
+
+    public function testAppStopFlagKillsOnlyValidatedSession(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stop-');
+        $bin = $this->pmssMakeTempDir('pmss-media-stop-bin-');
+        $this->pmssWriteExecutableFile($bin.'/tmux', <<<'BASH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$HOME/actions"
+BASH
+        );
+        $base = 'HOME='.escapeshellarg($home).' PATH='.escapeshellarg($bin).':"$PATH" /bin/bash '
+            .escapeshellarg($this->pmssRepoPath('etc/skel/install-media-stack.sh'));
+        $good = $this->pmssExecShellCommand($base.' --stop-app=sonarr');
+        $this->assertSame(0, $good['rc'], $good['output']);
+        $this->assertSame("kill-session -t =sonarr\n", file_get_contents($home.'/actions'));
+        $bad = $this->pmssExecShellCommand($base.' --stop-app=../../evil');
+        $this->assertTrue($bad['rc'] !== 0);
+        $this->assertSame("kill-session -t =sonarr\n", file_get_contents($home.'/actions'));
+    }
+
     public function testSecureAppModeIsScopedAndSkipsFullInstallResolution(): void
     {
         $this->assertStringContainsAllStrings([
             '--secure-app=APP',
-            '--skip-update | --uninstall | --start-stopped | --secure-app=*)',
+            '--skip-update | --uninstall | --start-stopped | --start-app=* | --stop-app=* | --secure-app=*)',
             '--secure-app=*) SECURE_APP=${arg#*=} ;;',
             'media_stack_secure_app_id_valid() {',
             'jellyfin | radarr | sonarr | prowlarr | sabnzbd | autobrr)',

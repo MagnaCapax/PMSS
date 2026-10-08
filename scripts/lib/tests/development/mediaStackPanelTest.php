@@ -36,7 +36,7 @@ class MediaStackPanelTest extends TestCase
             'function pmssMediaStackPanel'.'Installed',
         ]);
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/mediaStack.php', [
-            "strpos((string) \$_POST['action'], 'confirm-secure-') === 0",
+            "is_string(\$_POST['action']) && strpos(\$_POST['action'], 'confirm-secure-') === 0",
             'pmssMediaStackPanelSecureHandle($home, $username, $hostname);',
             "elseif (\$action === 'start-stopped')",
             'pmssMediaStackPanelRecoveryHandle($home, $username, $hostname);',

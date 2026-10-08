@@ -911,6 +911,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - etc/skel/install-media-stack.sh
   - Port allocation: consumes root-provisioned `~/.media-stack-port-APP` markers for SABnzbd, Radarr, Prowlarr, Sonarr, Autobrr, and Jellyfin. A legacy configured port is preserved only when no marker exists; a fresh install without a valid marker fails closed and requests a full PMSS update.
+  - App control: `--start-app=APP` launches only one installed, absent tmux session; `--stop-app=APP` kills only that session. The closed app list includes Jellyfin, Sonarr, Radarr, Prowlarr, SABnzbd, Autobrr, and Cloudplow. `--start-stopped` skips `~/.<app>Disable` markers.
 
 - etc/skel/install-openclaw.php
   - Port allocation: consumes the root-provisioned `~/.media-stack-port-openclaw` marker, writes `~/.openclaw/gateway.port`, and refuses install or start without a valid marker. OpenClaw has no lighttpd proxy.
@@ -1000,6 +1001,12 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - The `Restart all my services` control composes the existing customer-owned restart endpoints for rTorrent, enabled Deluge/qBittorrent/rclone frontends, stopped media-stack tmux apps, and Lighttpd.
 - Requests run sequentially as the authenticated customer; qBittorrent retains its account-password synchronization challenge, media-stack recovery retains its same-origin AJAX POST gate, and failures do not prevent later services from receiving their request.
 - The Lighttpd request is sent last so its graceful restart cannot interrupt earlier panel requests. Media-stack recovery uses the existing `--start-stopped` path and preserves live tmux sessions.
+
+## Customer Apps Controls – `etc/skel/www/apps.php`
+
+- `?status=1` reads live tmux sessions once, native processes, opt-in/opt-out markers, and media-stack auth state. `?log=APP` reads only the selected media app's own log, capped at 16 KiB, twenty lines, and 300 characters per line with HTML escaping.
+- All state-changing customer endpoints require POST with `X-Requested-With: XMLHttpRequest`. A GET action returns HTTP 405. qBittorrent retains the HTTP 428 password-sync challenge.
+- Media app stop writes `~/.<app>Disable`; start removes it; restart preserves it. The observe-only watchdog publishes `off` with zero failures for marked apps, and bulk recovery skips them. Native frontend stops signal only account-owned processes in the panel's mount namespace whose executable resolves to the app's native binary allowlist; Deluge's Python entry points also require an exact interpreter and script match.
 
 ---
 
