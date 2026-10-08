@@ -528,6 +528,45 @@ SNAP;
         $this->assertStringContainsString('[INFO] rTorrent session rewrite found no /home path references to update', $output);
     }
 
+    public function testRutorrentShareRenameMovesExactDirectoryAsAccount(): void
+    {
+        $account = posix_getpwuid(posix_geteuid());
+        $user = $account['name'];
+        $home = $this->pmssMakeTempDir('pmss-share-rename-');
+        $parent = $home.'/www/rutorrent/share/users';
+        $this->pmssEnsureDir($parent.'/remote');
+        file_put_contents($parent.'/remote/payload', "customer bytes\0remain");
+        $inode = lstat($parent.'/remote')['ino'];
+        \pmssUserTransferRenameRutorrentShare($home, 'remote', $user);
+        $this->assertFalse(file_exists($parent.'/remote'));
+        $this->assertSame("customer bytes\0remain", file_get_contents($parent.'/'.$user.'/payload'));
+        $this->assertSame($inode, lstat($parent.'/'.$user)['ino']);
+    }
+
+    public function testRutorrentShareRenameRefusesLinkedSourceAndDestination(): void
+    {
+        $account = posix_getpwuid(posix_geteuid());
+        $user = $account['name'];
+        $base = $this->pmssMakeTempDir('pmss-share-linked-');
+        $home = $base.'/home';
+        $parent = $home.'/www/rutorrent/share/users';
+        $outside = $base.'/outside';
+        $this->pmssEnsureDir($parent);
+        $this->pmssEnsureDir($outside);
+        file_put_contents($outside.'/payload', 'outside bytes');
+        symlink($outside, $parent.'/remote');
+        \pmssUserTransferRenameRutorrentShare($home, 'remote', $user);
+        $this->assertSame('outside bytes', file_get_contents($outside.'/payload'));
+        $this->assertTrue(is_link($parent.'/remote'));
+        unlink($parent.'/remote');
+        $this->pmssEnsureDir($parent.'/remote');
+        file_put_contents($parent.'/remote/payload', 'tenant bytes');
+        symlink($outside, $parent.'/'.$user);
+        \pmssUserTransferRenameRutorrentShare($home, 'remote', $user);
+        $this->assertSame('tenant bytes', file_get_contents($parent.'/remote/payload'));
+        $this->assertSame('outside bytes', file_get_contents($outside.'/payload'));
+    }
+
     public function testRtorrentRestartScriptUsesLiveUserProcessFallback(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/.rtorrentRestart.php', [

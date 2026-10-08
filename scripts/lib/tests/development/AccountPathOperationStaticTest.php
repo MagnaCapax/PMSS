@@ -93,6 +93,20 @@ final class AccountPathOperationStaticTest extends TestCase
         ]);
     }
 
+    public function testTransferShareRenameRunsUnderAccountAndChecksBothFinalNodes(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/userTransfer/postSetup.php', [
+            'clearstatcache(true, $src)',
+            'clearstatcache(true, $dst)',
+            'pmssPathTargetIsSafe($src, true, true)',
+            'pmssPathTargetIsSafe($dst, true, true)',
+            'pmssAccountPathRun($localUser, $home, [$src, $dst], $command)',
+        ]);
+        $source = $this->pmssReadRepoFile('scripts/lib/userTransfer/postSetup.php');
+        $this->assertTrue(strpos($source, "'Normalising user permissions'") < strpos($source, 'pmssUserTransferRenameRutorrentShare($home, $remoteUser, $localUser)'),
+            'Imported source ownership must be normalised before account rename');
+    }
+
     /** @return array<int,string> */
     private function scanFile(string $path): array
     {
