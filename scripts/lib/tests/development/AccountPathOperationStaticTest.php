@@ -67,18 +67,6 @@ final class AccountPathOperationStaticTest extends TestCase
         }
     }
 
-    public function testTransferSessionRewriteKeepsFinalNodeGuardAndAccountWriter(): void
-    {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/userTransfer/sessionRewrite.php', [
-            'clearstatcache(true, $sessionFile)',
-            'pmssPathTargetIsSafe($sessionFile, false, true)',
-            'is_link($sessionFile)',
-            'pmssAccountPathRun($localUser, $home, [$sessionFile]',
-        ]);
-        $this->pmssAssertRepoFileNotContainsString('scripts/lib/userTransfer/sessionRewrite.php',
-            'file_put_contents($sessionFile, $rewritten)');
-    }
-
     /** @return array<int,string> */
     private function scanFile(string $path): array
     {

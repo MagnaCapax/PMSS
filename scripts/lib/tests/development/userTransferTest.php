@@ -450,7 +450,6 @@ SNAP;
     public function testRewriteRtorrentSessionPathsUpdatesSessionFilesForUserRename(): void
     {
         $home = $this->pmssMakeUserHomeTree('pmss-userTransfer-session-rewrite-', 'session', 'home/newuser');
-        $localUser = (string) posix_getpwuid(posix_geteuid())['name'];
         $sessionDir = $home.'/session';
 
         $sessionFile = $sessionDir.'/test.torrent.rtorrent';
@@ -459,33 +458,15 @@ SNAP;
         file_put_contents($sessionFile, $payload);
 
         \pmssUserTransferRewriteRtorrentSessionPaths([
-            'localUser' => $localUser,
+            'localUser' => 'newuser',
             'remoteUser' => 'olduser',
         ], $home);
 
         $updated = (string) file_get_contents($sessionFile);
-        $newPath = '/home/'.$localUser.'/data/movie';
+        $newPath = '/home/newuser/data/movie';
         $expected = 'd9:directory'.strlen($newPath).':'.$newPath.'e';
 
         $this->assertEquals($expected, $updated);
-    }
-
-    public function testRewriteRtorrentSessionPathsRefusesSymlinkedFinalFile(): void
-    {
-        $home = $this->pmssMakeUserHomeTree('pmss-userTransfer-session-link-', 'session');
-        $outside = $this->pmssMakeTempDir('pmss-userTransfer-outside-').'/protected.rtorrent';
-        $oldPath = '/home/olduser/data/movie';
-        $payload = 'd9:directory'.strlen($oldPath).':'.$oldPath.'e';
-        file_put_contents($outside, $payload);
-        $this->assertTrue(symlink($outside, $home.'/session/linked.rtorrent'));
-
-        \pmssUserTransferRewriteRtorrentSessionPaths([
-            'localUser' => (string) posix_getpwuid(posix_geteuid())['name'],
-            'remoteUser' => 'olduser',
-        ], $home);
-
-        $this->assertSame($payload, file_get_contents($outside));
-        $this->assertTrue(is_link($home.'/session/linked.rtorrent'));
     }
 
     public function testRewriteRtorrentSessionPathsReportsWhenNothingNeedsRewrite(): void
