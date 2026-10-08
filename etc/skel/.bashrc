@@ -118,7 +118,7 @@ if [ -f /etc/bash_completion ]; then
 fi
 
 
-alias arrinfo='echo "RADARR-URL = https://$(hostname)/public-$(whoami)/radarr/" && echo "SONARR-URL = https://$(hostname)/public-$(whoami)/sonarr/" && echo "PROWLARR-URL = https://$(hostname)/public-$(whoami)/prowlarr/" && echo "LIDARR-URL = https://$(hostname)/public-$(whoami)/lidarr/" && echo "READARR-URL = https://$(hostname)/public-$(whoami)/readarr/" && echo "JELLYFIN-URL = https://$(hostname)/public-$(whoami)/jellyfin/web/index.html" && echo ""'
+alias arrinfo='echo "RADARR-URL = https://$(hostname)/public-$(whoami)/radarr/" && echo "SONARR-URL = https://$(hostname)/public-$(whoami)/sonarr/" && echo "PROWLARR-URL = https://$(hostname)/public-$(whoami)/prowlarr/" && echo "LIDARR-URL = https://$(hostname)/public-$(whoami)/lidarr/" && echo "READARR-URL = https://$(hostname)/public-$(whoami)/readarr/" && echo "JELLYFIN-URL = https://$(hostname)/public-$(whoami)/jellyfin/web/" && echo ""'
 passwordChange() {
     local length=16
     local newPassword=""

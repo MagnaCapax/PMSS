@@ -273,6 +273,15 @@ SH
         $this->assertStringContainsString('This usually resolves within a few minutes. No action needed.', $contents);
     }
 
+    public function testRenderedErrorPageUsesJpgVariants(): void
+    {
+        $contents = pmssLighttpdWatchdogRenderErrorPage('php');
+        for ($number = 1; $number <= 13; $number++) {
+            $this->assertStringContainsString("'/502_images/502-{$number}.jpg'", $contents);
+        }
+        $this->assertEquals(0, substr_count($contents, '/502_images/502-1.png'));
+    }
+
     public function testStaticFallback502PageQualifiesTicketGuidance(): void
     {
         $contents = $this->pmssReadRepoFile('var/www/error-502.html');
@@ -300,5 +309,17 @@ SH
     {
         $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
         $this->assertTrue(pmssLighttpdWatchdogDeleteErrorPage('alice', $webRoot));
+    }
+
+    public function testErrorPageFileOperationsRejectInvalidAccountNames(): void
+    {
+        $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
+        $path = $this->watchdogErrorPagePath($webRoot);
+        file_put_contents($path, 'untouched');
+        foreach (['', 'Alice', 'alice/../alice', "alice\0", 'toolongname'] as $username) {
+            $this->assertFalse(pmssLighttpdWatchdogWriteErrorPage($username, 'php', $webRoot));
+            $this->assertFalse(pmssLighttpdWatchdogDeleteErrorPage($username, $webRoot));
+            $this->assertSame('untouched', file_get_contents($path));
+        }
     }
 }

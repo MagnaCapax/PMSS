@@ -43,7 +43,17 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
         $configPath = $this->writeConfig("\"max-procs\" => 1\n\"min-procs\" => 1");
 
         $this->assertEquals(
-            [$this->tempDir.'/.lighttpd/php.socket'],
+            [$this->tempDir.'/.lighttpd/php.socket-0'],
+            \pmssLighttpdWatchdogSocketPaths($this->tempDir, $configPath)
+        );
+    }
+
+    public function testBuildsSingleSocketPathWhenMinProcsMissing(): void
+    {
+        $configPath = $this->writeConfig('"max-procs" => 1');
+
+        $this->assertEquals(
+            [$this->tempDir.'/.lighttpd/php.socket-0'],
             \pmssLighttpdWatchdogSocketPaths($this->tempDir, $configPath)
         );
     }

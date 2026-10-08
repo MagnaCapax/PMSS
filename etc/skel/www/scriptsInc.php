@@ -15,9 +15,16 @@ function writeLog($msg) {
  * This keeps the lightweight toggle endpoints on one contract.
  */
 function pmssFrontendActionRequest() {
- if (!isset($_REQUEST['action'])) die();
+ $action = $_POST['action'] ?? $_GET['action'] ?? '';
+ return is_string($action) ? $action : '';
+}
 
- return (string) $_REQUEST['action'];
+/** Reject cross-site and read-only requests before changing account state. */
+function pmssFrontendPostActionRequired() {
+ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+     && strcasecmp((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''), 'XMLHttpRequest') === 0) return;
+ http_response_code(($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' ? 403 : 405);
+ exit;
 }
 
 /** Check whether a customer-side PHP action may call one runtime function. */
@@ -1111,9 +1118,76 @@ if (!function_exists('pmssCustomerManagedAppDefinitions')) {
  /** Return metadata for customer-managed app frontends copied into www/. */
  function pmssCustomerManagedAppDefinitions() { return array(
    'qBittorrent' => array('enable' => '../.qbittorrentEnable', 'endpoint' => 'qbittorrent.php', 'binaries' => array('/usr/bin/qbittorrent-nox', '/usr/local/bin/qbittorrent-nox')),
-   'Deluge'      => array('enable' => '../.delugeEnable',      'endpoint' => 'deluge.php',      'binaries' => array('/usr/bin/deluged', '/usr/local/bin/deluged')),
+   'Deluge'      => array('enable' => '../.delugeEnable',      'endpoint' => 'deluge.php',      'binaries' => array('/usr/bin/deluged', '/usr/local/bin/deluged', '/usr/bin/deluge-web', '/usr/local/bin/deluge-web')),
    'rclone'      => array('enable' => '../.rcloneEnable',      'endpoint' => 'rclone.php',      'binaries' => array('/usr/bin/rclone')),
   ); }
+}
+
+/** Match Welcome's managed-app availability gate on every customer page. */
+if (!function_exists('pmssWelcomeServiceAvailable')) {
+ function pmssWelcomeServiceAvailable($scriptPath, array $binaryPaths) {
+  if (!file_exists($scriptPath)) return false;
+  foreach ($binaryPaths as $binaryPath) if (file_exists((string) $binaryPath)) return true;
+  return false;
+ }
+}
+
+/** Select only this UID's processes executing one of the installed native binaries. */
+function pmssCustomerNativePidsRead(array $binaries, string $procRoot = '/proc', $uid = null): array {
+ $uid = $uid === null && function_exists('posix_geteuid') ? posix_geteuid() : $uid;
+ if ($uid === null || !is_int($uid) || $uid < 1) return array();
+ $mountNamespace = @readlink(rtrim($procRoot, '/').'/self/ns/mnt');
+ if ($mountNamespace === false) return array();
+ $allowed = array();
+ $scripts = array();
+ foreach ($binaries as $binary) {
+  $resolved = realpath($binary);
+  if ($resolved === false) continue;
+  $allowed[$resolved] = true;
+  $handle = @fopen($resolved, 'rb');
+  if (!is_resource($handle)) continue;
+  $first = fgets($handle, 160);
+  fclose($handle);
+  if (is_string($first) && preg_match('/^#!\s*(\/\S+)/', $first, $match) === 1) {
+   $interpreterPath = $match[1];
+   if ($interpreterPath === '/usr/bin/env' && preg_match('/^#!\s*\/usr\/bin\/env\s+python3(?:\s|$)/', trim($first)) === 1) $interpreterPath = '/usr/bin/python3';
+   $interpreter = realpath($interpreterPath);
+   if ($interpreter !== false) $scripts[$resolved] = $interpreter;
+  }
+ }
+ $pids = array();
+ foreach (glob(rtrim($procRoot, '/').'/*', GLOB_ONLYDIR) ?: array() as $entry) {
+  $pid = basename($entry);
+  if (!ctype_digit($pid) || (int) $pid < 2) continue;
+  $owner = @fileowner($entry);
+  if ($owner !== $uid) continue;
+  if (@readlink($entry.'/ns/mnt') !== $mountNamespace) continue;
+  $exe = @readlink($entry.'/exe');
+  if (is_string($exe)) $exe = preg_replace('/ \(deleted\)$/', '', $exe);
+  if ($exe !== false && isset($allowed[$exe])) { $pids[] = (int) $pid; continue; }
+  if ($exe === false || $scripts === array()) continue;
+  $cmdline = @file_get_contents($entry.'/cmdline', false, null, 0, 4096);
+  $args = is_string($cmdline) ? explode("\0", $cmdline) : array();
+  $script = isset($args[1]) ? realpath($args[1]) : false;
+  if ($script !== false && isset($scripts[$script]) && $scripts[$script] === $exe) $pids[] = (int) $pid;
+ }
+ return $pids;
+}
+
+/** Signal matched native processes without selecting same-named Docker guests. */
+function pmssCustomerNativeSignal(array $binaries, int $signal, string $procRoot = '/proc', $uid = null, ?callable $sender = null): int {
+ $count = 0;
+ foreach (pmssCustomerNativePidsRead($binaries, $procRoot, $uid) as $pid) {
+  if ($sender !== null ? $sender($pid, $signal) : (function_exists('posix_kill') && @posix_kill($pid, $signal))) $count++;
+ }
+ return $count;
+}
+
+/** Give native frontends a brief graceful exit before a scoped force stop. */
+function pmssCustomerNativeStop(array $binaries): void {
+ if (pmssCustomerNativeSignal($binaries, 15) === 0) return;
+ usleep(3000000);
+ pmssCustomerNativeSignal($binaries, 9);
 }
 
 if (!function_exists('pmssWelcomeHttpContextCreate')) {
@@ -1125,11 +1199,568 @@ if (!function_exists('pmssWelcomeHttpContextCreate')) {
  }
 }
 
-/**
- * Shared start/disable/restart toggle flow for lightweight app frontends.
- * The callers provide the enable marker path plus app-specific commands.
- */
+/* The heal can load this file alongside older siblings; define the shared set once. */
+if (!function_exists('pmssCustomerAppsMediaIdsRead')) {
+/** Return the seven installer-managed IDs, including the local Cloudplow install. */
+function pmssCustomerAppsMediaIdsRead(): array
+{
+    return function_exists('pmssMediaStackPanelAppDefinitionsRead')
+        ? array_merge(array_keys(pmssMediaStackPanelAppDefinitionsRead()), array('cloudplow')) : array();
+}
+
+/** One tmux query covers every media app. */
+function pmssCustomerAppsTmuxSessionsRead(): array
+{
+    $output = pmssFrontendShellExec("tmux list-sessions -F '#S' 2>/dev/null");
+    $sessions = array();
+    foreach (explode("\n", (string) $output) as $name) {
+        if (in_array($name, pmssCustomerAppsMediaIdsRead(), true)) $sessions[$name] = true;
+    }
+    return $sessions;
+}
+
+/** Use current markers and processes, never a potentially stale watchdog snapshot. */
+function pmssCustomerAppsStatusRead(string $home, string $username, string $hostname): array
+{
+    $panel = function_exists('pmssMediaStackPanelStatusRead')
+        ? pmssMediaStackPanelStatusRead($home, $username, $hostname) : array();
+    $installed = function_exists('pmssMediaStackPanelExpectedAppIdsRead')
+        ? pmssMediaStackPanelExpectedAppIdsRead($home) : array();
+    if (function_exists('pmssMediaStackPanelAppDefinitionsRead')
+        && is_file(pmssCustomerHomePath($home, '.bin/cloudplow/cloudplow/cloudplow.py'))) $installed['cloudplow'] = true;
+    $sessions = $installed === array() ? array() : pmssCustomerAppsTmuxSessionsRead();
+    $apps = array();
+    foreach (pmssCustomerAppsMediaIdsRead() as $id) {
+        if (!isset($installed[$id])) continue;
+        $marker = pmssCustomerHomePath($home, '.'.$id.'Disable');
+        $security = $panel['security'][$id] ?? array();
+        $apps[$id] = array(
+            'kind' => 'media',
+            'state' => is_file($marker) ? 'off' : (isset($sessions[$id]) ? 'running' : 'not-running'),
+            'url' => (string) ($security['url'] ?? ''),
+            'security' => (string) ($security['status'] ?? 'Unavailable'),
+            'protected' => !empty($security['protected']),
+            'exposed' => $security !== array() && empty($security['protected']),
+            'canSecure' => !empty($security['canSecure']),
+        );
+    }
+    $rtorrentOff = is_file(pmssCustomerHomePath($home, '.rtorrentDisable'));
+    $apps['rtorrent'] = array('kind' => 'rtorrent', 'state' => $rtorrentOff ? 'off'
+        : (pmssCustomerNativePidsRead(array('/usr/bin/rtorrent', '/usr/local/bin/rtorrent')) !== array() ? 'running' : 'not-running'), 'url' => 'rutorrent/');
+    foreach (pmssCustomerManagedAppDefinitions() as $name => $definition) {
+        if (!pmssWelcomeServiceAvailable($definition['endpoint'], $definition['binaries'])) continue;
+        $enabled = is_file(pmssCustomerHomePath($home, basename($definition['enable'])));
+        $apps[$name] = array('kind' => 'managed', 'state' => !$enabled ? 'off'
+            : (pmssCustomerNativePidsRead($definition['binaries']) !== array() ? 'running' : 'not-running'),
+            'url' => $name === 'qBittorrent' ? 'qbittorrent/' : ($name === 'Deluge' ? 'deluge/' : 'rclone/'),
+            'endpoint' => $definition['endpoint']);
+    }
+    // This page is served by the account's lighttpd, so a successful request proves it is running.
+    $apps['lighttpd'] = array('kind' => 'web', 'state' => 'running');
+    return array('apps' => $apps, 'installed' => $installed !== array(),
+        'canStart' => !empty($panel['canStart']) && is_file(__DIR__.'/mediaStack.php'),
+        'canRestart' => !empty($panel['canRestart']) && is_file(__DIR__.'/mediaStack.php'),
+        'poll' => !empty($panel['poll']), 'message' => (string) ($panel['message'] ?? ''),
+        'mediaAppControl' => is_file(__DIR__.'/appsRuntime.php'));
+}
+
+/** Descriptions are display copy; app identity and URL come from existing readers. */
+function pmssCustomerAppsDescriptionsRead(): array
+{
+    return array('Jellyfin' => 'Stream your library to TV, phone and browser',
+        'Sonarr' => 'Finds and downloads TV episodes', 'Radarr' => 'Finds and downloads movies',
+        'Prowlarr' => 'Manages indexers for Sonarr and Radarr', 'SABnzbd' => 'Usenet downloader',
+        'Autobrr' => 'Grabs releases from IRC announces', 'Cloudplow' => 'Moves finished files to cloud storage',
+        'rTorrent + ruTorrent' => 'Your main torrent client', 'qBittorrent' => 'Second torrent client',
+        'Deluge' => 'Second torrent client', 'rclone' => 'Sync to and from cloud storage');
+}
+
+/** The installed rows use one shared responsive markup shape. */
+function pmssCustomerAppRowStart(string $name, string $description, string $id = ''): string
+{
+    return '<div class="row"'.($id === '' ? '' : ' data-app="'.pmssCustomerHtmlAttr($id).'"').'><div class="main"><div class="name">'.pmssCustomerHtmlAttr($name).'</div>'
+        .($description === '' ? '' : '<div class="desc">'.pmssCustomerHtmlAttr($description).'</div>').'</div>';
+}
+
+/** Small fixed-action buttons keep every valid control visible. */
+function pmssCustomerAppButton(string $label, string $action, string $class = ''): string
+{
+    return '<button type="button" class="b '.$class.'" data-action="'.pmssCustomerHtmlAttr($action).'">'.pmssCustomerHtmlAttr($label).'</button>';
+}
+
+/** Render one row from the current live state. The browser replaces this row after polling. */
+function pmssCustomerAppRowHtmlBuild(string $id, array $app, bool $mediaAppControl = true): string
+{
+    $names = array('jellyfin' => 'Jellyfin', 'sonarr' => 'Sonarr', 'radarr' => 'Radarr',
+        'prowlarr' => 'Prowlarr', 'sabnzbd' => 'SABnzbd', 'autobrr' => 'Autobrr',
+        'cloudplow' => 'Cloudplow', 'rtorrent' => 'rTorrent + ruTorrent',
+        'qBittorrent' => 'qBittorrent', 'Deluge' => 'Deluge', 'rclone' => 'rclone',
+        'lighttpd' => 'Web server');
+    $name = $names[$id] ?? $id;
+    $description = pmssCustomerAppsDescriptionsRead()[$name] ?? ($id === 'lighttpd' ? 'Your account web server' : '');
+    $state = $app['state'];
+    $label = $state === 'off' ? ($app['kind'] === 'managed' ? 'Off' : 'Stopped by you')
+        : ($state === 'not-running' ? 'Not running' : ($state === 'running' ? 'Running' : 'Status unavailable'));
+    $pillClass = $state === 'running' ? 'p-run' : ($state === 'off' ? 'p-off' : 'p-stop');
+    $html = pmssCustomerAppRowStart($name, $description, $id)
+        .'<span class="pill '.$pillClass.'">'.pmssCustomerHtmlAttr($label).'</span>';
+    if (!empty($app['exposed'])) $html .= '<span class="pill p-warn">No login set</span>';
+    $html .= '<div class="acts">';
+    if (($state === 'running' || $app['kind'] === 'media') && !empty($app['url'])) {
+        $html .= '<a class="b b-pri" href="'.pmssCustomerHtmlAttr($app['url']).'" target="_blank" rel="noopener">Open</a>';
+    }
+    if ($app['kind'] === 'media') {
+        if ($mediaAppControl) {
+            if ($state === 'running') $html .= pmssCustomerAppButton('Restart', 'restart').pmssCustomerAppButton('Stop', 'stop');
+            else $html .= pmssCustomerAppButton('Start', 'start', 'b-pri').($state === 'not-running' ? pmssCustomerAppButton('Show log', 'log') : '');
+        }
+        if (!empty($app['canSecure']) && is_file(__DIR__.'/mediaStack.php')) $html .= pmssCustomerAppButton('Secure this app', 'secure', 'b-warn');
+    } elseif ($app['kind'] === 'rtorrent') {
+        if ($state === 'running') $html .= pmssCustomerAppButton('Restart', 'restart').pmssCustomerAppButton('Stop', 'stop');
+        else $html .= pmssCustomerAppButton('Start', 'start', 'b-pri');
+    } elseif ($app['kind'] === 'managed') {
+        if ($state === 'running') $html .= pmssCustomerAppButton('Restart', 'restart').pmssCustomerAppButton('Turn off', 'disable');
+        elseif ($state === 'off') $html .= pmssCustomerAppButton('Turn on', 'start', 'b-pri');
+        else $html .= pmssCustomerAppButton('Start', 'start', 'b-pri').pmssCustomerAppButton('Turn off', 'disable');
+    } else {
+        $html .= pmssCustomerAppButton('Restart', 'restart', 'b-pri');
+    }
+    return $html.'</div><span class="row-progress" aria-live="polite"></span><div class="row-error" role="alert"></div><pre class="row-log" hidden></pre></div>';
+}
+
+/** The installer status takes precedence over partial app install markers. */
+function pmssCustomerAppsMediaRowsBuild(array $status): string
+{
+    if (!empty($status['poll'])) {
+        return pmssCustomerAppRowStart('Installing the media stack…', $status['message']).'</div>';
+    }
+    if (empty($status['installed'])) {
+        $names = implode(', ', array_merge(function_exists('pmssMediaStackPanelAppDefinitionsRead')
+            ? array_column(pmssMediaStackPanelAppDefinitionsRead(), 'label') : array(), array('Cloudplow')));
+        return pmssCustomerAppRowStart('Media Stack is not installed', $names)
+            .'<div class="desc" id="pmss-install-progress">'.pmssCustomerHtmlAttr($status['message']).'</div></div>'
+            .'<div class="acts"><button type="button" class="b b-pri" onclick="pmssAppsInstall(this)"'
+            .(!empty($status['canStart']) && is_file(__DIR__.'/mediaStack.php') ? '' : ' disabled').'>Install Media Stack</button></div></div>';
+    }
+    $html = '';
+    foreach (pmssCustomerAppsMediaIdsRead() as $id) {
+        if (isset($status['apps'][$id])) $html .= pmssCustomerAppRowHtmlBuild($id, $status['apps'][$id], !empty($status['mediaAppControl']));
+    }
+    return $html;
+}
+
+/** Render the same app controls on Welcome and Apps. */
+function pmssCustomerAppsSectionHtmlBuild(array $status, string $statusUrl = 'apps.php?status=1'): string
+{
+    $rows = array();
+    foreach (array('rtorrent', 'qBittorrent', 'Deluge', 'rclone', 'lighttpd') as $id) {
+        if (isset($status['apps'][$id])) $rows[$id] = pmssCustomerAppRowHtmlBuild($id, $status['apps'][$id], !empty($status['mediaAppControl']));
+    }
+    $startAll = !empty($status['installed']) && empty($status['poll']) && !empty($status['canRestart'])
+        && is_file(__DIR__.'/mediaStack.php')
+        ? '<button type="button" class="b" id="pmss-start-all" data-bulk-action="start-stopped">Start all stopped</button>' : '';
+    return strtr('<section class="pmss-apps-section" data-status-url="STATUS_URL"><div class="apps-header"><h2>Your apps</h2><button type="button" class="b" onclick="pmssAppsRestartAll(this)">Restart all my services</button></div>
+<div class="group">Media Stack</div><div class="section-actions">START_ALL</div><div class="list" id="pmss-media-apps" data-installing="INSTALLING">MEDIA_ROWS</div>
+<div class="group">Torrent clients</div><div class="list" id="pmss-torrent-apps">TORRENT_ROWS</div>
+<div class="group">Transfers</div><div class="list" id="pmss-transfer-apps">TRANSFER_ROWS</div>
+<div class="group">Web server</div><div class="list">WEB_ROW</div></section>', array('STATUS_URL' => pmssCustomerHtmlAttr($statusUrl),
+        'START_ALL' => $startAll, 'INSTALLING' => !empty($status['poll']) ? '1' : '0',
+        'MEDIA_ROWS' => pmssCustomerAppsMediaRowsBuild($status),
+        'TORRENT_ROWS' => ($rows['rtorrent'] ?? '').($rows['qBittorrent'] ?? '').($rows['Deluge'] ?? ''),
+        'TRANSFER_ROWS' => $rows['rclone'] ?? '', 'WEB_ROW' => $rows['lighttpd'] ?? ''));
+}
+
+/** Shared responsive app-row styles for both guiv pages. */
+function pmssCustomerAppsCss(): string
+{
+    return '<style>'.'
+.pmss-apps-section{font-size:14px;line-height:1.45;background:#0b1220;color:#e6edf3;padding:14px;border-radius:8px;box-sizing:border-box}.pmss-apps-section h2{font-size:1.05rem;color:#fff;margin:0}.apps-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.pmss-apps-section .group{color:#9fb0c3;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 4px}.pmss-apps-section .list{border:1px solid #2e3b4f;border-radius:8px;overflow:hidden}
+.pmss-apps-section .row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid #223042;background:#0f1b2b;flex-wrap:wrap}.pmss-apps-section .row:first-child{border-top:0}.pmss-apps-section .row .main{flex:1;min-width:0}.pmss-apps-section .row .name{font-weight:bold;color:#fff}.pmss-apps-section .row .desc{color:#9fb0c3;font-size:13px}
+.pmss-apps-section .pill{font-size:12px;padding:2px 9px;border-radius:999px;white-space:nowrap}.p-run{background:#12351f;color:#8fd18f}.p-stop{background:#3a1d1d;color:#f19999}.p-off{background:#1f2937;color:#9fb0c3}.p-warn{background:#3a2e12;color:#f0b429}
+.pmss-apps-section .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.pmss-apps-section .b{font-size:13px;padding:5px 12px;border-radius:6px;border:1px solid #2e3b4f;background:#13293d;color:#e6edf3;text-decoration:none;white-space:nowrap;cursor:pointer}.pmss-apps-section .b-pri{background:#0e7490;border-color:#0e7490;color:#fff}.pmss-apps-section .b-warn{border-color:#6b5420;color:#f0b429;background:#2a2414}
+.row-progress{color:#9fb0c3}.row-error{color:#f19999;width:100%}.row-log{width:100%;max-height:240px;overflow:auto;white-space:pre-wrap;background:#0b1220;color:#e6edf3;padding:8px}.pmss-apps-section .section-actions{display:flex;gap:8px;margin:8px 0 12px}
+#pmss-action-notice{display:none;position:fixed;top:10px;right:10px;z-index:9999;max-width:580px;padding:8px 12px;border:1px solid #2e3b4f;background:#13293d;color:#e6edf3;font-weight:bold}#pmss-action-notice.pmss-error{border-color:#f19999;background:#3a1d1d;color:#f19999}
+@media(max-width:640px){.apps-header{align-items:flex-start;flex-direction:column}.pmss-apps-section .acts{width:100%;justify-content:flex-start}}
+'.'</style>';
+}
+
+/** Send one read-only status shape from either customer page. */
+function pmssCustomerAppsStatusJsonEmit(): void
+{
+    pmssWelcomeRequireLocalHelper('userMediaStackPanel.php');
+    $home = dirname(__DIR__);
+    $hostname = function_exists('gethostname') ? (string) gethostname() : '';
+    $status = pmssCustomerAppsStatusRead($home, basename(rtrim($home, '/')),
+        $hostname !== '' ? $hostname : (string) php_uname('n'));
+    $rows = array();
+    foreach ($status['apps'] as $id => $app) {
+        if ($status['poll'] && $app['kind'] === 'media') continue;
+        $rows[$id] = pmssCustomerAppRowHtmlBuild($id, $app, $status['mediaAppControl']);
+    }
+    $status['rows'] = $rows;
+    $status['mediaHtml'] = pmssCustomerAppsMediaRowsBuild($status);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode($status);
+}
+
+/** Serve bounded media logs through either page when the newer runtime is installed. */
+function pmssCustomerAppsLogJsonEmit(): void
+{
+    pmssWelcomeRequireLocalHelper('appsRuntime.php');
+    $app = is_string($_GET['log'] ?? null) ? $_GET['log'] : '';
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    if (!function_exists('pmssAppsLogTailRead') || !in_array($app, pmssCustomerAppsMediaIdsRead(), true)) {
+        http_response_code(400);
+        echo '{}';
+        return;
+    }
+    echo json_encode(array('app' => $app, 'html' => pmssAppsLogTailRead(dirname(__DIR__), $app)));
+}
+}
+/** Shared browser actions stay in a guiv-delivered PHP file (ADR 0022). */
+function pmssActionScriptJs(): string {
+ $js = <<<'JS'
+/* Shared customer-panel action helpers. Loaded after jQuery. */
+var pmssActionNoticeTimer = null;
+var pmssMediaStackPollTimer = null;
+
+function pmssShowActionNotice(message, isError) {
+    var notice = $('#pmss-action-notice');
+    if (notice.length === 0) {
+        alert(message);
+        return;
+    }
+
+    notice.stop(true, true);
+    notice.removeClass('pmss-error');
+    if (isError) {
+        notice.addClass('pmss-error');
+    }
+
+    notice.text(message).fadeIn('fast');
+
+    if (pmssActionNoticeTimer !== null) {
+        window.clearTimeout(pmssActionNoticeTimer);
+    }
+
+    pmssActionNoticeTimer = window.setTimeout(function() {
+        notice.fadeOut('slow');
+    }, 3200);
+}
+
+function pmssSetActionLoading(button, isLoading) {
+    var actionButton = $(button);
+    var indicator = actionButton.next('.pmss-action-loading');
+
+    if (isLoading) {
+        actionButton.attr('disabled', 'disabled');
+        if (indicator.length === 0) {
+            indicator = $('<span class="pmss-action-loading" aria-live="polite">&#8987; Working...</span>');
+            actionButton.after(indicator);
+        }
+        indicator.show();
+        return;
+    }
+
+    actionButton.removeAttr('disabled');
+    if (indicator.length > 0) {
+        indicator.hide();
+    }
+}
+
+function pmssActionRequest(action, passwordValue) {
+    var deferred = $.Deferred();
+    var request = {
+        url: action.url,
+        cache: false,
+        data: action.data || null,
+        type: action.type || 'POST',
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+        success: function(payload) {
+            deferred.resolve(payload);
+        },
+        error: function(xhr) {
+            if (xhr.status === 428 && action.passwordField) {
+                var password = window.prompt('Enter your account password to sync qBittorrent WebUI login.');
+                if (password !== null) {
+                    pmssActionRequest(action, password).done(function(payload) {
+                        deferred.resolve(payload);
+                    }).fail(function(retryXhr, cancelled) {
+                        deferred.reject(retryXhr, cancelled);
+                    });
+                } else {
+                    deferred.reject(xhr, true);
+                }
+                return;
+            }
+            deferred.reject(xhr, false);
+        }
+    };
+    if (action.dataType) request.dataType = action.dataType;
+    if (action.headers) $.extend(request.headers, action.headers);
+    if (action.passwordField && passwordValue !== undefined) {
+        request.type = 'POST';
+        request.data = $.extend({}, action.data || {});
+        request.data[action.passwordField] = passwordValue;
+    }
+    $.ajax(request);
+    return deferred.promise();
+}
+
+function pmssRunAction(button, url, successMessage, shouldReload, pendingMessage, passwordFieldName, passwordValue) {
+    pmssSetActionLoading(button, true);
+    if (pendingMessage) pmssShowActionNotice(pendingMessage, false);
+
+    var action = {
+        url: url,
+        passwordField: passwordFieldName || (url.indexOf('qbittorrent.php') === 0 ? 'qbittorrentPassword' : '')
+    };
+    pmssActionRequest(action, passwordValue).done(function() {
+        pmssSetActionLoading(button, false);
+        if (successMessage) pmssShowActionNotice(successMessage, false);
+        if (shouldReload) window.setTimeout(function() { location.reload(true); }, 900);
+    }).fail(function(xhr, cancelled) {
+        pmssSetActionLoading(button, false);
+        if (!cancelled) pmssShowActionNotice('Action failed. Please try again in a moment.', true);
+    });
+}
+
+function pmssMediaStackPollSchedule(delay) {
+    if (pmssMediaStackPollTimer !== null) {
+        window.clearTimeout(pmssMediaStackPollTimer);
+        pmssMediaStackPollTimer = null;
+    }
+
+    if (delay > 0) {
+        pmssMediaStackPollTimer = window.setTimeout(pmssMediaStackStatusRefresh, delay);
+    }
+}
+
+function pmssMediaStackApply(payload) {
+    var panel = $('#pmss-media-stack-status');
+    var button = $('#pmss-media-stack-start');
+    var recoveryButton = $('#pmss-media-stack-recovery');
+
+    if (panel.length > 0 && payload && payload.html) {
+        panel.html(payload.html);
+    }
+
+    if (button.length > 0 && payload) {
+        if (payload.canStart) {
+            button.removeAttr('disabled');
+        } else {
+            button.attr('disabled', 'disabled');
+        }
+    }
+
+    if (recoveryButton.length > 0 && payload) {
+        if (payload.canRestart) {
+            recoveryButton.removeAttr('disabled').show();
+        } else {
+            recoveryButton.attr('disabled', 'disabled').hide();
+        }
+    }
+
+    pmssMediaStackPollSchedule(payload && payload.poll ? 4000 : 0);
+}
+
+function pmssMediaStackStatusRefresh() {
+    if ($('#pmss-media-stack-status').length === 0) {
+        pmssMediaStackPollSchedule(0);
+        return;
+    }
+
+    $.ajax({
+        url: 'mediaStack.php?action=status',
+        dataType: 'json',
+        cache: false,
+        success: function(payload) {
+            pmssMediaStackApply(payload);
+        }
+    });
+}
+
+function pmssMediaStackAction(button, action, pendingMessage, failureMessage) {
+    pmssSetActionLoading(button, true);
+    pmssShowActionNotice(pendingMessage, false);
+
+    $.ajax({
+        url: 'mediaStack.php?action=' + action,
+        type: 'POST',
+        dataType: 'json',
+        cache: false,
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+        success: function(payload) {
+            pmssSetActionLoading(button, false);
+            pmssMediaStackApply(payload);
+            if (payload && payload.message) {
+                pmssShowActionNotice(payload.message, false);
+            }
+            if (typeof window.pmssAppsActionComplete === 'function') window.pmssAppsActionComplete();
+        },
+        error: function(xhr) {
+            pmssSetActionLoading(button, false);
+            if (xhr && xhr.responseText) {
+                pmssMediaStackStatusRefresh();
+            }
+            pmssShowActionNotice(failureMessage, true);
+        }
+    });
+}
+
+function pmssMediaStackStart(button) {
+    pmssMediaStackAction(button, 'start', 'Starting media stack install...', 'Media stack install could not be started from the panel.');
+}
+
+function pmssMediaStackStartStopped(button) {
+    pmssMediaStackAction(button, 'start-stopped', 'Starting stopped media-stack apps...', 'Stopped media-stack apps could not be started from the panel.');
+}
+
+function pmssMediaStackSecureApp(button, app) {
+    if (!/^[a-z0-9-]+$/.test(app)) {
+        pmssShowActionNotice('Unknown media-stack app.', true);
+        return;
+    }
+
+    pmssSetActionLoading(button, true);
+    pmssShowActionNotice('Securing media-stack app...', false);
+    $.ajax({
+        url: 'mediaStack.php',
+        type: 'POST',
+        dataType: 'json',
+        cache: false,
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+        data: {action: 'confirm-secure-' + app},
+        success: function(payload) {
+            pmssSetActionLoading(button, false);
+            pmssMediaStackApply(payload);
+            if (payload && payload.message) {
+                pmssShowActionNotice(payload.message, false);
+            }
+            if (typeof window.pmssAppsActionComplete === 'function') window.pmssAppsActionComplete();
+        },
+        error: function() {
+            pmssSetActionLoading(button, false);
+            pmssMediaStackStatusRefresh();
+            pmssShowActionNotice('Media-stack app auth could not be configured from the panel.', true);
+        }
+    });
+}
+var pmssAppsBusy = {};
+function pmssAppsStatusUrl() { return $('.pmss-apps-section').attr('data-status-url'); }
+var pmssAppsRefreshTimer;
+function pmssAppsUpdatingResponse(xhr) {
+    if (!xhr || xhr.status !== 503 || !xhr.responseJSON || xhr.responseJSON.updating !== true) return false;
+    window.clearTimeout(pmssAppsRefreshTimer);
+    $('.pmss-apps-section .row').each(function() {
+        var notice = $(this).find('.row-error');
+        if (!notice.length) notice = $('<div class="row-error" role="alert"></div>').appendTo(this);
+        notice.text(xhr.responseJSON.message);
+    });
+    return true;
+}
+function pmssAppsRefresh(callback) {
+    window.clearTimeout(pmssAppsRefreshTimer);
+    $.getJSON(pmssAppsStatusUrl(), function(payload) {
+        var media = $('#pmss-media-apps'), wasInstalling = media.attr('data-installing') === '1';
+        if (payload.poll || wasInstalling || !payload.installed) media.html(payload.mediaHtml);
+        media.attr('data-installing', payload.poll ? '1' : '0');
+        if (payload.poll || !payload.installed || !payload.canRestart) $('#pmss-start-all').remove();
+        else if (!$('#pmss-start-all').length) $('.pmss-apps-section .section-actions').html('<button type="button" class="b" id="pmss-start-all" data-bulk-action="start-stopped">Start all stopped</button>');
+        $.each(payload.rows || {}, function(id, html) {
+            if (pmssAppsBusy[id]) return;
+            var oldRow = $('.pmss-apps-section [data-app="' + id + '"]');
+            if (oldRow.length) {
+                var oldLog = oldRow.find('.row-log');
+                var replacement = $(html);
+                if (!oldLog.prop('hidden')) replacement.find('.row-log').html(oldLog.html()).prop('hidden', false);
+                oldRow.replaceWith(replacement);
+            }
+        });
+        if (callback) callback(payload);
+        pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, payload.poll ? 5000 : 10000);
+    }).fail(function(xhr) {
+        if (!pmssAppsUpdatingResponse(xhr)) pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, 10000);
+    });
+}
+function pmssAppsWait(id, desired, deadline) {
+    window.setTimeout(function() {
+        $.getJSON(pmssAppsStatusUrl(), function(payload) {
+            var row = $('[data-app="' + id + '"]');
+            var state = payload.apps && payload.apps[id] && payload.apps[id].state;
+            if (state === desired || Date.now() >= deadline) {
+                pmssAppsBusy[id] = false;
+                if (payload.rows && payload.rows[id]) row.replaceWith(payload.rows[id]);
+                if (state !== desired) $('[data-app="' + id + '"] .row-error').text('Status did not settle within 60 seconds. Check the app log.');
+            } else {
+                pmssAppsWait(id, desired, deadline);
+            }
+        }).fail(function(xhr) {
+            if (pmssAppsUpdatingResponse(xhr)) {
+                pmssAppsBusy[id] = false;
+                $('[data-app="' + id + '"] .row-progress').text('');
+                $('[data-app="' + id + '"] button').prop('disabled', false);
+            } else if (Date.now() < deadline) pmssAppsWait(id, desired, deadline);
+            else { pmssAppsBusy[id] = false; $('[data-app="' + id + '"] .row-error').text('Could not read app status.'); }
+        });
+    }, 2000);
+}
+function pmssAppsAct(button, id, action) {
+    var row = $(button).closest('.row'), kind = id === 'rtorrent' ? 'rtorrent' : (id === 'lighttpd' ? 'web' : (id === 'qBittorrent' || id === 'Deluge' || id === 'rclone' ? 'managed' : 'media'));
+    if (action === 'log') { $.getJSON(pmssAppsStatusUrl().replace('status=1', 'log=' + encodeURIComponent(id)), function(payload) { row.find('.row-log').html(payload.html || 'No log available.').prop('hidden', false); }); return; }
+    if (id === 'rtorrent' && action === 'stop' && !window.confirm('Stop rTorrent? All your torrents stop seeding until you start it again.')) return;
+    if (action === 'secure') { if (!window.confirm('Secure this app with its default login?')) return; pmssMediaStackSecureApp(button, id); return; }
+    var endpoint = kind === 'media' ? 'mediaStack.php?action=app-' + action : (kind === 'rtorrent' ? 'rtorrentRestart.php?action=' + action : (kind === 'web' ? 'lighttpdRestart.php?action=confirm-restart' : (id === 'qBittorrent' ? 'qbittorrent.php' : id === 'Deluge' ? 'deluge.php' : 'rclone.php') + '?action=' + action));
+    var desired = action === 'stop' || action === 'disable' ? 'off' : 'running';
+    pmssAppsBusy[id] = true;
+    row.find('.row-error').text(''); row.find('.row-progress').text(action === 'stop' || action === 'disable' ? 'Stopping…' : 'Starting…');
+    row.find('button').prop('disabled', true);
+    pmssActionRequest({url:endpoint, data:kind === 'media' ? {app:id} : null, passwordField:id === 'qBittorrent' ? 'qbittorrentPassword' : ''}).done(function() {
+        if (kind === 'web') { pmssAppsBusy[id] = false; row.find('.row-progress').text('Restart requested.'); row.find('button').prop('disabled', false); return; }
+        pmssAppsWait(id, desired, Date.now() + 60000);
+    }).fail(function(xhr, cancelled) {
+        pmssAppsBusy[id] = false; row.find('.row-progress').text(''); row.find('button').prop('disabled', false);
+        if (!cancelled) row.find('.row-error').text((xhr.responseJSON && xhr.responseJSON.message) || 'Action failed. Please try again.');
+    });
+}
+$(document).on('click', '.row[data-app] button[data-action]', function() { pmssAppsAct(this, $(this).closest('.row').attr('data-app'), $(this).attr('data-action')); });
+$(document).on('click', '#pmss-start-all[data-bulk-action]', function() { pmssAppsBulk(this, $(this).attr('data-bulk-action')); });
+function pmssAppsBulk(button, action) { pmssMediaStackAction(button, action, 'Starting stopped apps…', 'Could not start stopped apps.'); }
+function pmssAppsInstall(button) { pmssMediaStackStart(button); }
+function pmssAppsRestartAll(button) {
+    $(button).prop('disabled', true);
+    $.getJSON(pmssAppsStatusUrl(), function(status) {
+        var actions = [], failures = 0, apps = status.apps || {};
+        if (apps.rtorrent && apps.rtorrent.state !== 'off') actions.push({url:'rtorrentRestart.php?action=restart'});
+        $.each({qBittorrent:'qbittorrent.php', Deluge:'deluge.php', rclone:'rclone.php'}, function(id, endpoint) {
+            if (apps[id] && apps[id].state !== 'off') actions.push({url:endpoint + '?action=restart', passwordField:id === 'qBittorrent' ? 'qbittorrentPassword' : ''});
+        });
+        if (status.installed && status.canRestart && $('#pmss-start-all').length) actions.push({url:'mediaStack.php?action=start-stopped'});
+        if (apps.lighttpd) actions.push({url:'lighttpdRestart.php?action=confirm-restart'});
+        function next() {
+            if (!actions.length) {
+                $(button).prop('disabled', false);
+                pmssShowActionNotice(failures ? 'Some restart requests failed.' : 'Restart requests sent.', !!failures);
+                pmssAppsRefresh();
+                return;
+            }
+            pmssActionRequest(actions.shift()).done(next).fail(function() { failures++; next(); });
+        }
+        next();
+    }).fail(function() { $(button).prop('disabled', false); pmssShowActionNotice('Could not read current app status.', true); });
+}
+window.pmssAppsActionComplete = function() { pmssAppsRefresh(); };
+$(function() { if ($('.pmss-apps-section').length) pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, 10000); });
+JS;
+ return $js."\n";
+}
+
+/** Preserve both callable handlers and legacy shell-command strings. */
 function pmssFrontendToggleAction($enableFile, callable $startHandler, $disableCommand, $restartCommand = null) {
+ pmssFrontendPostActionRequired();
  switch (pmssFrontendActionRequest()) {
   case 'start':
     touch($enableFile);
@@ -1137,12 +1768,15 @@ function pmssFrontendToggleAction($enableFile, callable $startHandler, $disableC
     break;
 
   case 'disable':
-    unlink($enableFile);
-    pmssFrontendShellExec($disableCommand);
+    @unlink($enableFile);
+    if (is_callable($disableCommand) && !is_string($disableCommand)) $disableCommand();
+    else pmssFrontendShellExec($disableCommand);
     break;
 
   case 'restart':
-    pmssFrontendShellExec($restartCommand === null ? $disableCommand : $restartCommand);
+    $stop = $restartCommand === null ? $disableCommand : $restartCommand;
+    if (is_callable($stop) && !is_string($stop)) $stop();
+    else pmssFrontendShellExec($stop);
     $startHandler();
     break;
  }

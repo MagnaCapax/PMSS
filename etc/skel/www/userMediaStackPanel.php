@@ -8,6 +8,9 @@
  * @author PMSS Team
  */
 require_once __DIR__.'/scriptsInc.php';
+if (function_exists('pmssWelcomeRequireLocalHelper')) {
+    pmssWelcomeRequireLocalHelper('mediaStackRecoveryCommand.php');
+}
 
 const PMSS_MEDIA_STACK_MEMORY_MINIMUM_BYTES = 1024 * 1024 * 1024;
 const PMSS_MEDIA_STACK_MEMORY_UNLIMITED_BYTES = 1024 * 1024 * 1024 * 1024 * 1024;
@@ -150,6 +153,7 @@ function pmssMediaStackPanelRecoveryGateRead(string $home): array
 {
     $aliasPath = pmssCustomerHomePath($home, '.bashrc.custom');
     foreach (array(
+        array(!function_exists('pmssMediaStackPanelRecoveryCommandBuild'), 'Media stack recovery helper is not available on this host yet.'),
         array(!is_file(pmssCustomerHomePath($home, 'install-media-stack.sh')), 'Media stack installer is missing from this account.'),
         array(!is_file($aliasPath) || is_link($aliasPath) || !is_readable($aliasPath), 'Media stack launch aliases are missing or unsafe.'),
         array(!pmssFrontendShellExecAvailable(), 'PHP shell execution is unavailable on this host.'),
@@ -227,7 +231,7 @@ function pmssMediaStackPanelRuntimeDetailsRead(array $runtime): array
         }
         $label = $app === 'cloudplow' ? 'Cloudplow' : pmssMediaStackPanelAppLabelRead($app);
         $state = (string) ($runtime['apps'][$app]['state'] ?? 'unknown');
-        $text = $state === 'running' ? 'running' : ($state === 'failed' ? 'failed repeatedly' : 'not running');
+        $text = $state === 'running' ? 'running' : ($state === 'off' ? 'stopped by you' : ($state === 'failed' ? 'failed repeatedly' : 'not running'));
         $failures = (int) ($runtime['apps'][$app]['consecutiveFailures'] ?? 0);
         $suffix = $state === 'failed' ? ' ('.$failures.' consecutive failed checks).' : '.';
         $details[] = $label.': '.$text.$suffix;
@@ -248,7 +252,7 @@ function pmssMediaStackPanelAppDefinitionsRead(): array
     return array(
         'jellyfin' => array(
             'label' => 'Jellyfin',
-            'urlPath' => 'jellyfin/web/index.html',
+            'urlPath' => 'jellyfin/web/',
             'markers' => array('dir' => array('.config/jellyfin'), 'file' => array('.bin/jellyfin/jellyfin.dll')),
             'secureMarkers' => array('file' => array('.config/jellyfin/config/network.xml', '.bin/jellyfin/jellyfin.dll')),
             'auth' => array('type' => 'xml-allowed', 'path' => '.config/jellyfin/config/system.xml', 'tag' => 'IsStartupWizardCompleted', 'allowed' => array('true', '1')),
@@ -574,26 +578,12 @@ function pmssMediaStackPanelStartCommandBuild(string $home, string $username): s
 
     $innerCommand = 'cd '.escapeshellarg($home)
         .' && rm -f -- '.escapeshellarg($pidPath)
-        .' && nohup /bin/bash '.escapeshellarg($scriptPath).' >/dev/null 2>&1 & echo $! > '.escapeshellarg($pidPath);
+        .' && { nohup /bin/bash '.escapeshellarg($scriptPath).' >/dev/null 2>&1 </dev/null & echo $! > '.escapeshellarg($pidPath).'; }';
 
     return 'HOME='.escapeshellarg($home)
         .' USER='.escapeshellarg($username)
         .' LOGNAME='.escapeshellarg($username)
         .' /bin/bash -lc '.escapeshellarg($innerCommand);
-}
-
-/** Build the fixed one-shot command used to relaunch absent tmux sessions. */
-function pmssMediaStackPanelRecoveryCommandBuild(string $home, string $username): string
-{
-    $scriptPath = pmssCustomerHomePath($home, 'install-media-stack.sh');
-    $successMarker = 'pmss-media-stack-started';
-
-    return 'cd '.escapeshellarg($home)
-        .' && HOME='.escapeshellarg($home)
-        .' USER='.escapeshellarg($username)
-        .' LOGNAME='.escapeshellarg($username)
-        .' /bin/bash '.escapeshellarg($scriptPath).' --start-stopped >/dev/null 2>&1'
-        .' && printf %s '.escapeshellarg($successMarker);
 }
 
 /**
@@ -628,12 +618,13 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
         $runtime = pmssMediaStackPanelRuntimeStatusRead($home);
         if ($runtime !== null) {
             $runtimeState = (string) ($runtime['state'] ?? 'healthy');
+            $hasOff = in_array('off', array_column($runtime['apps'], 'state'), true);
             $panelState = $runtimeState === 'failed' ? 'failed' : ($runtimeState === 'degraded' ? 'degraded' : 'installed');
             $message = $runtimeState === 'failed'
                 ? 'Media stack is installed, but one or more apps failed repeatedly.'
                 : ($runtimeState === 'degraded'
                     ? 'Media stack is installed, but one or more apps are not running.'
-                    : 'Media stack is installed and all managed apps are running.');
+                    : ($hasOff ? 'Media stack is installed. Apps you stopped remain off.' : 'Media stack is installed and all managed apps are running.'));
             return array_merge($status, array(
                 'state' => $panelState,
                 'message' => $message,
@@ -715,7 +706,6 @@ function pmssMediaStackPanelHtmlBuild(array $status): string
                 continue;
             }
 
-            $appId = (string) ($app['id'] ?? '');
             $isProtected = !empty($app['protected']);
             $stateClass = $isProtected ? 'protected' : 'exposed';
             $html .= '<li class="pmss-media-stack-auth-'.$stateClass.'">';
@@ -728,10 +718,6 @@ function pmssMediaStackPanelHtmlBuild(array $status): string
                     .pmssCustomerHtmlAttr($app['url']).'</a>';
             }
 
-            if (!$isProtected && !empty($app['canSecure']) && pmssMediaStackPanelAppIdAllowed($appId)) {
-                $html .= ' <input type="button" class="pmss-media-stack-secure" value="Secure this app"'
-                    .' onClick="pmssMediaStackSecureApp(this, \''.pmssCustomerHtmlAttr($appId).'\');" />';
-            }
             $html .= '</li>';
         }
         $html .= '</ul>';

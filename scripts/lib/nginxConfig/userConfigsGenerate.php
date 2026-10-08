@@ -178,18 +178,16 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
         return PMSS_NGINX_USER_CONFIG_SKIPPED;
     }
 
-    if ($isSuspended) {
-        $userConfig = str_replace('##username', $thisUser, $suspendedTemplate);
-    } else {
-        $placeholders = array("##username", "##serverPort");
-        $replacements = array($thisUser, $serverPort);
-        if ($ctx['needsDelugeWebPort'] ?? false) {
-            // Backward compatibility: older templates may still use ##delugeWebPort.
-            $placeholders[] = "##delugeWebPort";
-            $replacements[] = pmssCreateNginxConfigLegacyDelugeWebPort($homeDir, $thisUser);
+    $template = $isSuspended ? $suspendedTemplate : $userTemplate;
+    $replacements = ['##username' => $thisUser];
+    if (!$isSuspended) {
+        $replacements['##serverPort'] = (string) $serverPort;
+        // Older templates may still request the legacy Deluge web port.
+        if (strpos($template, '##delugeWebPort') !== false) {
+            $replacements['##delugeWebPort'] = (string) pmssCreateNginxConfigLegacyDelugeWebPort($homeDir, $thisUser);
         }
-        $userConfig = str_replace($placeholders, $replacements, $userTemplate);
     }
+    $userConfig = strtr($template, $replacements);
 
     if (!pmssCreateNginxConfigWriteFile($managedPaths['user'], $userConfig, $thisUser, $isSuspended ? 'user suspended config' : 'user config')) return PMSS_NGINX_USER_CONFIG_WRITE_FAILED;
     $writtenPaths[] = $managedPaths['user'];

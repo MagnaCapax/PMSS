@@ -183,6 +183,7 @@ class SkeletonWebLocalAssetTest extends TestCase
             'scripts/lib/update/users/filesystem.php',
             [
                 "'www/scriptsInc.php',",
+                "'www/apps.php',",
                 "'www/deluge.php',",
                 "'www/error-503.html',",
                 "'www/filemanager.php',",

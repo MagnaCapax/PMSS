@@ -36,17 +36,19 @@ class MediaStackPanelTest extends TestCase
             'function pmssMediaStackPanel'.'Installed',
         ]);
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/mediaStack.php', [
-            "strpos((string) \$_POST['action'], 'confirm-secure-') === 0",
+            "is_string(\$_POST['action']) && strpos(\$_POST['action'], 'confirm-secure-') === 0",
             'pmssMediaStackPanelSecureHandle($home, $username, $hostname);',
             "elseif (\$action === 'start-stopped')",
             'pmssMediaStackPanelRecoveryHandle($home, $username, $hostname);',
         ]);
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/welcome.php', [
-            'pmssMediaStackStartStopped',
+            "pmssCustomerAppsSectionHtmlBuild(\$appsStatus, 'welcome.php?status=1')",
+            'pmssActionScriptJs()',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/scriptsInc.php', [
             'pmssMediaStackSecureApp',
             "data: {action: 'confirm-secure-' + app}",
             "headers: {'X-Requested-With': 'XMLHttpRequest'}",
-            'value="Start stopped apps"',
         ]);
     }
 
@@ -118,7 +120,7 @@ class MediaStackPanelTest extends TestCase
         $status = $this->mediaStatusFixture('pmss-media-installed-', '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
 
         $this->assertSame('installed', $status['state']);
-        $this->assertStringContainsString('/public-alice/jellyfin/web/index.html', $status['urls']['Jellyfin']);
+        $this->assertStringContainsString('/public-alice/jellyfin/web/', $status['urls']['Jellyfin']);
         $this->assertSame(array('Jellyfin'), array_keys($status['urls']));
     }
 
@@ -202,7 +204,8 @@ class MediaStackPanelTest extends TestCase
 
         $this->assertFalse($status['security']['sonarr']['protected']);
         $this->assertSame('confirm-secure-sonarr', $status['security']['sonarr']['action']);
-        $this->assertStringContainsAllStrings(['Exposed', 'Secure this app', "pmssMediaStackSecureApp(this, 'sonarr')"], $html);
+        $this->assertStringContainsString('Exposed', $html);
+        $this->assertStringNotContainsString('Secure this app', $html);
     }
 
     public function testSecurityStatusDetectsAutobrrSqliteUser(): void
@@ -285,7 +288,7 @@ class MediaStackPanelTest extends TestCase
         $this->assertSame(array_fill_keys($apps, true), $prerequisites);
         $this->assertSame($apps, $actions);
         $this->assertSame(array(
-            'Jellyfin' => 'https://seedbox.example/public-alice/jellyfin/web/index.html',
+            'Jellyfin' => 'https://seedbox.example/public-alice/jellyfin/web/',
             'Radarr' => 'https://seedbox.example/public-alice/radarr/',
             'Sonarr' => 'https://seedbox.example/public-alice/sonarr/',
             'Prowlarr' => 'https://seedbox.example/public-alice/prowlarr/',
@@ -345,7 +348,7 @@ class MediaStackPanelTest extends TestCase
             'message' => 'Media stack is installed for this account.',
             'details' => array('Use the app-level credentials in ~/.media-stack-credentials.txt; exposed apps can be secured from this panel.'),
             'tail' => '',
-            'urls' => array('Jellyfin' => 'https://seedbox.example/public-alice/jellyfin/web/index.html'),
+            'urls' => array('Jellyfin' => 'https://seedbox.example/public-alice/jellyfin/web/'),
         ));
 
         $this->assertStringContainsAllStrings(['.media-stack-credentials.txt', 'public-alice/jellyfin'], $html);
@@ -357,6 +360,20 @@ class MediaStackPanelTest extends TestCase
         $command = \pmssMediaStackPanelStartCommandBuild($home, 'alice');
 
         $this->assertStringContainsAllStrings(['.install-media-stack-web.pid', 'install-media-stack.sh', "USER='alice'"], $command);
+    }
+
+    public function testStartCommandDetachesInstallerFromFrontendPipe(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-detach-');
+        $this->pmssWriteFile($home.'/install-media-stack.sh', "#!/bin/bash\nsleep 5\n");
+
+        $start = microtime(true);
+        \pmssFrontendShellExec(\pmssMediaStackPanelStartCommandBuild($home, 'alice'));
+        $elapsed = microtime(true) - $start;
+
+        $this->assertTrue($elapsed < 2, 'Frontend command waited for the background installer: '.$elapsed.'s');
+        $pid = \pmssMediaStackPanelPidRead($home);
+        $this->assertTrue(\pmssMediaStackPanelPidRunning($pid), 'PID file must identify a live installer process.');
     }
 
     public function testRecoveryCommandUsesFixedInstallerMode(): void

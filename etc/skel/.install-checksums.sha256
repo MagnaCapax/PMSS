@@ -7,7 +7,7 @@
 #
 # To update: download the new release, run sha256sum, update this file, commit.
 #
-# Last updated: 2026-10-04
+# Last updated: 2026-10-07
 
 # --- install-media-stack.sh artifacts ---
 
@@ -40,3 +40,7 @@
 
 # OpenAI Codex CLI rust-v0.160.0 (linux x86_64 musl); identifier is versioned by release tag
 306865417d4ee7a927785852910a527f41e1e159add390ac5ae3accb67d44a13  codex-rust-v0.160.0-x86_64-unknown-linux-musl.tar.gz
+
+# --- install-openclaw.php artifacts ---
+# Node.js 24.21.0 (linux x64), nodejs.org/dist/v24.21.0/SHASUMS256.txt
+fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6  node-v24.21.0-linux-x64.tar.xz

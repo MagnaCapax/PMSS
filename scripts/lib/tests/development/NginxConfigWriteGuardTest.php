@@ -162,7 +162,7 @@ PHP;
         @mkdir($nginxUsersDir, 0755, true);
         if (!@symlink($priorRoute, $nginxUsersDir.'/alice')) throw new SkipTest('symlink unavailable');
         $ctx = ['nginxUsersDir' => $nginxUsersDir, 'homeBase' => $homeBase, 'runtimePortDir' => $runtimePortDir,
-            'userTemplate' => 'proxy ##username ##serverPort', 'subdomainEnabled' => false, 'needsDelugeWebPort' => false];
+            'userTemplate' => 'proxy ##username ##serverPort', 'subdomainEnabled' => false];
 
         $this->assertSame(PMSS_NGINX_USER_CONFIG_WRITE_FAILED, \pmssCreateNginxConfigGenerateUser('alice', $ctx, false));
         $this->assertEquals("old route\n", (string) file_get_contents($priorRoute));
@@ -213,6 +213,32 @@ PHP;
         $this->assertSame(PMSS_NGINX_USER_CONFIG_SKIPPED, \pmssCreateNginxConfigGenerateUser('alice', $ctx, false));
         $this->assertFalse(file_exists($users.'/alice'));
         $this->assertFalse(file_exists($public));
+    }
+
+    public function testPrimaryTemplateRenderingPreservesRepeatedAndUnknownTokens(): void
+    {
+        $home = $this->tempDir.'/home/alice';
+        $this->pmssWriteFile($home.'/.rtorrent.rc', "schedule = test\n");
+        $this->pmssWriteFile($home.'/.lighttpd.conf', "server.port = 12345\n");
+        $this->pmssWriteFile($this->tempDir.'/ports/lighttpd-alice', "12345\n");
+        @mkdir($this->tempDir.'/users', 0755, true);
+        $ctx = [
+            'homeBase' => $this->tempDir.'/home', 'runtimePortDir' => $this->tempDir.'/ports',
+            'nginxUsersDir' => $this->tempDir.'/users', 'subdomainEnabled' => false,
+            'userTemplate' => '##username|##username|##serverPort|##unknown',
+            'suspendedTemplate' => '##username|##serverPort|##unknown',
+        ];
+
+        $this->assertSame(PMSS_NGINX_USER_CONFIG_GENERATED, \pmssCreateNginxConfigGenerateUser('alice', $ctx, false));
+        $this->assertSame('alice|alice|12345|##unknown', file_get_contents($this->tempDir.'/users/alice'));
+
+        $ctx['userTemplate'] = '##delugeWebPort|##delugeWebPort|##serverPort';
+        $this->assertSame(PMSS_NGINX_USER_CONFIG_GENERATED, \pmssCreateNginxConfigGenerateUser('alice', $ctx, false));
+        $this->assertSame('1|1|12345', file_get_contents($this->tempDir.'/users/alice'));
+
+        @mkdir($home.'/www-disabled', 0755);
+        $this->assertSame(PMSS_NGINX_USER_CONFIG_GENERATED, \pmssCreateNginxConfigGenerateUser('alice', $ctx, false));
+        $this->assertSame('alice|##serverPort|##unknown', file_get_contents($this->tempDir.'/users/alice'));
     }
 
     public function testIntentionalSkipKeepsSingleUserRouteButFullRunRemovesIt(): void

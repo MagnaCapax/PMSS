@@ -93,13 +93,24 @@ class BootTuningEnsureTest extends TestCase
             'rc.local must gate the per-disk loop on boot-tuning presence (ADR 0064 step 2)',
             'the boot-tuning presence gate must appear before the per-disk (DISK) loop'
         );
-        // The md stripe_cache loop and the bcache cache_mode loop are NOT gated - boot-tuning does
-        // not own those - so they must remain present in rc.local.
-        $this->pmssAssertRepoFileContainsAllStrings(
-            $rel,
-            ['stripe_cache_size', 'bcache/cache_mode'],
-            'md loop and bcache cache_mode loop must remain in rc.local (step 2 gates only per-disk)'
-        );
+        $rcLocal = (string)file_get_contents($this->pmssRepoPath($rel));
+        $gateStart = strpos($rcLocal, 'if [ ! -e /usr/local/sbin/pmss-boot-tuning.sh ]; then');
+        $gateEnd = strpos($rcLocal, "\nfi\n", $gateStart);
+        $mdLoop = strpos($rcLocal, 'for MD in');
+        $bcacheMode = strpos($rcLocal, 'for BCACHE in');
+        $this->assertTrue($gateStart !== false && $gateEnd !== false && $mdLoop !== false && $bcacheMode !== false,
+            'rc.local must retain the presence gate, md loop, and bcache cache_mode loop');
+        $this->assertTrue($gateStart < $mdLoop && $mdLoop < $gateEnd, 'md loop must be inside the boot-tuning presence gate');
+        $this->assertTrue($gateEnd < $bcacheMode && strpos($rcLocal, 'bcache/cache_mode', $bcacheMode) !== false,
+            'bcache cache_mode loop must remain outside the gate');
+
+        $bootTuning = (string)file_get_contents($this->pmssRepoPath('etc/seedbox/config/template.pmss-boot-tuning.sh'));
+        foreach (['sync_speed_min' => '25000', 'sync_speed_max' => '750000'] as $knob => $value) {
+            $this->assertTrue(strpos($rcLocal, 'echo '.$value.' | tee /sys/block/${MD}/md/'.$knob) !== false,
+                'rc.local md '.$knob.' must be '.$value);
+            $this->assertTrue(strpos($bootTuning, 'write_sys "$md/md/'.$knob.'" '.$value) !== false,
+                'boot-tuning md '.$knob.' must match rc.local at '.$value);
+        }
     }
 
     public function testSdSchedulerStaysBfqNotMqDeadline(): void

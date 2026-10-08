@@ -95,3 +95,38 @@ an issuance path:
 - `scripts/lib/nginxConfig/templates.php` — ACME challenge location
 - `etc/skel/bin/createWebPublicCerts`, `scripts/cron/webPublicCertsProcess.php`
 - ADR 0036 (generated-from-template), ADR 0038 (/~username/ alias)
+
+## Amendment 2026-10-07: username-free default
+
+Every publicly trusted certificate is recorded in public Certificate
+Transparency logs, which are searchable and permanent. The per-server
+subdomain contains the account username. Usernames are not public unless the
+customer chooses to publish them.
+
+The default request now issues a certificate only for the username-free
+`<sha16>.mcx.fi` service permalink. The customer can include
+`<user>.<server-fqdn>` only by selecting `--with-username-hostname` and typing
+`yes` after the disclosure. The `.request-web-certs` file carries `default` or
+`username`; unreadable and older request content selects the default. The
+certbot lineage keeps the existing `<user>.<server-fqdn>` label in both modes:
+that label is a local directory name, not a certificate name, and nginx uses
+it to find the certificate. The customer CLI is now refreshed into existing
+homes on update.
+
+Existing certificates remain in place until a customer makes a new request.
+Their names are already in the public logs; renewal reveals nothing new, while
+removal would break working HTTPS. In default mode, HTTPS on
+`<user>.<server-fqdn>` still shows a name mismatch because nginx serves the
+permalink certificate. Switching modes repeatedly is bounded by the CA's
+five-per-exact-name-set weekly limit. On-host verification that certbot replaces
+the names of an existing lineage non-interactively is still required before
+relying on mode changes.
+
+A shared wildcard certificate per server or for `mcx.fi` was rejected. It
+would copy one private key to many hosts; a key leaked from any host would let
+an attacker impersonate every name covered by that wildcard.
+
+References for this amendment: `scripts/lib/nginxUserHosts.php`
+`pmssWebPublicCertNames`, `scripts/cron/webPublicCertsProcess.php`,
+`etc/skel/bin/createWebPublicCerts`, and
+`scripts/lib/update/users/filesystem.php`.

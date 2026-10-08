@@ -10,6 +10,8 @@
 
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/shell.php';
+require_once __DIR__.'/../lib/user/permissionsCommands.php';
+require_once __DIR__.'/../lib/user/billingPermissions.php';
 require_once __DIR__.'/../lib/pathSafety.php';
 require_once __DIR__.'/../lib/user/userFilesystem.php';
 require_once __DIR__.'/../lib/user/subordinateIds.php';
@@ -35,11 +37,11 @@ function chmodPath(string $path, int $perm, bool $recursive = false): void
 
     if ($recursive) {
         $mode = sprintf('%04o', $perm);
-        pmssRun(sprintf('find %s -not -type l \( ! -type f -o -links 1 \) -not -perm %s -exec chmod %s {} +', $target, $mode, $mode));
+        pmssUserPermissionsRun(sprintf('find %s -not -type l \( ! -type f -o -links 1 \) -not -perm %s -exec chmod %s {} +', $target, $mode, $mode));
         return;
     }
 
-    pmssRun(sprintf('find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chmod %o {} +', $target, $perm));
+    pmssUserPermissionsRun(sprintf('find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chmod %o {} +', $target, $perm));
 }
 
 function chownPath(string $path, string $owner, bool $recursive = false): void
@@ -52,13 +54,13 @@ function chownPath(string $path, string $owner, bool $recursive = false): void
     if ($recursive) {
         $predicate = pmssFindOwnerMismatchPredicate($owner);
         if ($predicate !== '') {
-            pmssRun(sprintf('find %s -not -type l \( ! -type f -o -links 1 \) %s -exec chown -h %s {} +', $target, $predicate, escapeshellarg($owner)));
+            pmssUserPermissionsRun(sprintf('find %s -not -type l \( ! -type f -o -links 1 \) %s -exec chown -h %s {} +', $target, $predicate, escapeshellarg($owner)));
             return;
         }
     }
 
     // Quote owner spec as a single argument; chown accepts quoted 'user.group'
-    pmssRun(sprintf('find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chown -h %s {} +', $target, escapeshellarg($owner)));
+    pmssUserPermissionsRun(sprintf('find %s -maxdepth 0 -not -type l \( ! -type f -o -links 1 \) -exec chown -h %s {} +', $target, escapeshellarg($owner)));
 }
 
 function pmssFindOwnerMismatchPredicate(string $owner): string
@@ -105,7 +107,7 @@ if ($homeOwner !== false && $homeGroup !== false &&
         )
     );
 }
-pmssRun(sprintf(
+pmssUserPermissionsRun(sprintf(
     'find %s -path %s -prune -o -type d -not -perm 0750 -exec chmod 0750 {} +',
     escapeshellarg('/home/'.$thisUser),
     escapeshellarg("/home/{$thisUser}/.local")
@@ -115,7 +117,7 @@ pmssRun(sprintf(
 // copied carrying the exec bit. Strip exec from ~/www FILES (dirs are already normalised
 // to 0750 by the walk above). Bounded to ~/www so large payload trees under ~/data are
 // untouched; the explicit chmodItems below re-apply any file that legitimately keeps exec.
-pmssRun(sprintf('find %s -type f -links 1 -perm /0111 -exec chmod a-x {} +', escapeshellarg("/home/{$thisUser}/www")));
+pmssUserPermissionsRun(sprintf('find %s -type f -links 1 -perm /0111 -exec chmod a-x {} +', escapeshellarg("/home/{$thisUser}/www")));
 
 // Ensure ~/.bin and ~/bin exist with safe permissions and ownership.
 foreach ([
@@ -146,6 +148,8 @@ $chmodItems = [
     ["/home/{$thisUser}/.bash_history", 0640],
     ["/home/{$thisUser}/.bashrc", 0644],
     ["/home/{$thisUser}/.bashrc.user", 0640],
+    // Heal non-executable skeleton files copied with mode 0755 before #1019.
+    ["/home/{$thisUser}/radarr-sonarr.txt", 0644],
     ["/home/{$thisUser}/.tmp", 0770],
     ["/home/{$thisUser}/.config", 0770, true],
     ["/home/{$thisUser}/.trafficData", 0640],
@@ -161,6 +165,7 @@ $chmodItems = [
     ["/home/{$thisUser}/.*.php", 0750],
     ["/home/{$thisUser}/.lighttpd.conf", 0644],
     ["/home/{$thisUser}/.lighttpd", 0775],
+    ["/home/{$thisUser}/.lighttpd/php.ini", 0640],
     ["/home/{$thisUser}/.lighttpd/.htpasswd", 0754],
     ["/home/{$thisUser}/.lighttpd/compress", 0770],
     ["/home/{$thisUser}/.lighttpd/upload", 0770],
@@ -177,11 +182,10 @@ $chownItems = [
     // NOTE: Avoid blanket chown -R on the whole home; exclude known root-owned files/dirs first.
     // The remaining tree is handled by a targeted find below.
     ["/home/{$thisUser}/.quota", "root:{$thisUser}"],
-    // Billing identity files: root-owned (user reads via group, cannot WRITE) so a user
-    // cannot forge their own service/client id. Mirrors .quota. Writers are root
-    // (recreateUser restore, mgmt-host backfill); order-time provisioning creates the file
-    // before the first permission refresh, and the service id is stable (no user rewrite).
-    // Root ownership closes the forgery at the source (GH #784).
+    // Billing identity files are created root-owned by writeHomeMarker.php,
+    // recreateUser restore with identity uid 0, and management-host backfill.
+    // userTransfer's root-run rsync -a preserves root ownership. Readers require
+    // a root owner; this pass never adopts a non-root file.
     ["/home/{$thisUser}/.billingServiceId", "root:{$thisUser}"],
     ["/home/{$thisUser}/.billingId", "root:{$thisUser}"],
     ["/home/{$thisUser}/.billingClientId", "root:{$thisUser}"],
@@ -208,6 +212,13 @@ $chownItems = [
 
 $trafficFiles = array_values($trafficPaths);
 
+// Check each identity entry once with lstat before either repair phase.
+$billingRepairable = [];
+foreach (['.billingServiceId', '.billingId', '.billingClientId'] as $billingName) {
+    $billingPath = $homeDir.'/'.$billingName;
+    $billingRepairable[$billingPath] = pmssUserBillingFileRepairable($thisUser, $billingPath, @lstat($billingPath));
+}
+
 // Ensure traffic files are mutable while ownership and permissions are repaired.
 foreach ($trafficFiles as $trafficFile) {
     pmssTrafficSetImmutable($trafficFile, false);
@@ -215,6 +226,9 @@ foreach ($trafficFiles as $trafficFile) {
 
 foreach ($chmodItems as $item) {
     $path = $item[0];
+    if (array_key_exists($path, $billingRepairable) && !$billingRepairable[$path]) {
+        continue;
+    }
     $perm = $item[1];
     $recursive = isset($item[2]) ? (bool)$item[2] : false;
     chmodPath($path, $perm, $recursive);
@@ -270,10 +284,13 @@ $findParts[] = '-execdir chown -h';
 $findParts[] = escapeshellarg($userIds['uid'].':'.$userIds['gid']);
 $findParts[] = '{}';
 $findParts[] = '+';
-pmssRun(implode(' ', $findParts));
+pmssUserPermissionsRun(implode(' ', $findParts));
 
 foreach ($chownItems as $item) {
     $path = $item[0];
+    if (array_key_exists($path, $billingRepairable) && !$billingRepairable[$path]) {
+        continue;
+    }
     $owner = $item[1];
     $recursive = isset($item[2]) ? (bool)$item[2] : false;
     chownPath($path, $owner, $recursive);
@@ -286,3 +303,5 @@ foreach ($trafficFiles as $trafficFile) {
 if (file_exists("/home/{$thisUser}/.ssh")) {
     chmodPath("/home/{$thisUser}/.ssh", 0750);
 }
+
+exit(pmssUserPermissionsResult());

@@ -308,6 +308,35 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertEquals(0, count(glob($movedDir.'/.htpasswd.pmss-tmp-*') ?: []));
     }
 
+    public function testReplacementMetadataFailurePreservesExistingFile(): void
+    {
+        $path = $this->tempDir.'/managed';
+        $this->pmssWriteFile($path, 'original');
+        $this->assertTrue(chmod($path, 0600));
+
+        foreach ([-1, 010000] as $mode) {
+            $this->assertFalse(\pmssReplaceUserFileWithMetadata($path, 'new', $mode));
+            $this->assertFalse(\pmssReplaceUserFilePreservingMetadata($this->tempDir.'/fresh', 'new', $mode));
+            clearstatcache(true, $path);
+            $this->assertSame('original', file_get_contents($path));
+            $this->assertSame(0600, fileperms($path) & 0777);
+            $this->assertFalse(file_exists($this->tempDir.'/fresh'));
+            $this->assertSame([], glob($this->tempDir.'/*.pmss-tmp-*'));
+        }
+    }
+
+    public function testReplacementMetadataSuccessKeepsModeAndContent(): void
+    {
+        $path = $this->tempDir.'/managed';
+        $this->assertTrue(\pmssReplaceUserFileWithMetadata($path, 'first', 0640, $this->pmssCurrentOwner()));
+        clearstatcache(true, $path);
+        $this->assertSame(0640, fileperms($path) & 0777);
+        $this->assertTrue(\pmssReplaceUserFilePreservingMetadata($path, 'second'));
+        clearstatcache(true, $path);
+        $this->assertSame('second', file_get_contents($path));
+        $this->assertSame(0640, fileperms($path) & 0777);
+    }
+
     public function testCheckUserHtpasswdUsesSafeAppendHelper(): void
     {
         $this->pmssAssertRepoFileContainsAndOmitsStrings(

@@ -107,7 +107,7 @@ function pmssShowTrafficReportBuild(array $users, string $statsDir): array
 
         $ingressPath = pmssTrafficDataPaths($baseUser)[pmssTrafficDataPathKey($isLocalnet, 'ingress')];
         $ingressData = pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser);
-        $inboundMonth = $ingressData !== null ? (float) $ingressData['raw']['month'] : null;
+        $inboundMonth = $ingressData !== null ? pmssTrafficRawMonthMiB($ingressData) : null;
 
         $inboundRatio = ($inboundMonth !== null && $rawCounters['month'] > 0) ? round($inboundMonth / $rawCounters['month'], 2) : null;
         $dataRates = ['week' => round(($rawCounters['week'] / (7 * 24 * 60 * 60)), 2), 'day' => round(($rawCounters['day'] / (24 * 60 * 60)), 2), 'hour' => round(($rawCounters['hour'] / (60 * 60)), 2), '15min' => round(($rawCounters['15min'] / (15 * 60)), 2)];

@@ -7,6 +7,43 @@
  *
  * @license GPL-3.0-only
  */
+require_once dirname(__DIR__).'/pathSafety.php';
+
+/** Move one whole home directory under its trusted parent without overwriting data. */
+function pmssRecreateMoveTopDirectory(string $source, string $destination): void
+{
+    clearstatcache(true, $source);
+    clearstatcache(true, $destination);
+    if (dirname($source) !== dirname($destination)
+        || !pmssPathTargetIsSafe(dirname($source), true)
+        || !pmssPathTargetIsSafe($source, true, true) || !is_dir($source)
+        || !pmssPathTargetIsSafe($destination, true, true)
+        || file_exists($destination) || is_link($destination)) {
+        throw new RuntimeException('Unsafe top-level recreate move: '.$source);
+    }
+    $before = @lstat($source);
+    if (!is_array($before) || !@rename($source, $destination)) {
+        throw new RuntimeException('Unable to move recreate directory: '.$source);
+    }
+    clearstatcache(true, $destination);
+    $after = @lstat($destination);
+    if (!is_array($after) || $before['dev'] !== $after['dev'] || $before['ino'] !== $after['ino']) {
+        throw new RuntimeException('Recreate move identity mismatch: '.$destination);
+    }
+}
+
+/** Remove a superseded archive only through the pinned real tree. */
+function pmssRecreatePurgeSupersededDirectory(string $path): bool
+{
+    clearstatcache(true, $path);
+    if (!pmssPathTargetIsSafe($path, true, true) || !is_dir($path)) return false;
+    foreach ([false, true, false] as $clearImmutable) {
+        $output = [];
+        exec(pmssPinnedTreePurgeCommand($path, $clearImmutable).' 2>&1', $output, $rc);
+    }
+    clearstatcache(true, $path);
+    return !file_exists($path) && !is_link($path);
+}
 
 /** Prove each rebuild destination accepts a private exclusive create and write. */
 function pmssRecreateRequireWritableDirectories(array $directories): void
@@ -124,17 +161,25 @@ function pmssRecreateCopyFile(string $source, string $destination, ?int $require
         return false;
     }
     $sourceStat = @lstat($source);
-    if (is_link($source) || pmssRecreateHasLinkedParent($source)
+    clearstatcache(true, $source);
+    if (is_link($source) || !pmssPathTargetIsSafe($source, false, true)
+        || pmssRecreateHasLinkedParent($source)
         || !is_array($sourceStat) || ($sourceStat['mode'] & 0170000) !== 0100000
         || ($requiredUid !== null && $sourceStat['uid'] !== $requiredUid)) {
         return false;
     }
-    if (pmssRecreateHasLinkedParent($destination) || !is_dir(dirname($destination)) || is_link($destination)
+    clearstatcache(true, $destination);
+    if (!pmssPathTargetIsSafe($destination, false, true)
+        || pmssRecreateHasLinkedParent($destination) || !is_dir(dirname($destination)) || is_link($destination)
         || (file_exists($destination) && !is_file($destination))) {
         throw new RuntimeException('Unsafe restore file: '.$destination);
     }
     if (!@copy($source, $destination)) {
         throw new RuntimeException('Unable to copy restore file: '.$source);
+    }
+    clearstatcache(true, $destination);
+    if (!pmssPathTargetIsSafe($destination, false, true) || !is_file($destination) || is_link($destination)) {
+        throw new RuntimeException('Unsafe restored file: '.$destination);
     }
     if ($targetUid !== null && ($targetGid === null || !@chown($destination, $targetUid)
         || !@chgrp($destination, $targetGid) || !@chmod($destination, 0640))) {

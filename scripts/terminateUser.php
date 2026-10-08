@@ -193,11 +193,12 @@ pmssUserLifecycleRunSteps('terminate', $username, array(
     array('release_media_sonarr_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-sonarr'),
     array('release_media_autobrr_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-autobrr'),
     array('release_media_jellyfin_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-jellyfin'),
+    array('release_media_openclaw_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-openclaw'),
 ), $dryRun);
 pmssTerminateUserUnlinkPath($username, 'remove_nginx_user_file', "/etc/nginx/users/{$username}", $dryRun);
 
-// Home and the recreate backup are purged the same way; the recursive chattr runs on
-// the residue only, so every immutable path is covered without naming any of them.
+// Home and the recreate backup are purged the same way; immutable flags are
+// cleared by verified inode on the residue only.
 //
 // The purge runs LAST because it is the only unbounded step here. Every step above is
 // cheap and bounded, and on an account large enough for the purge to exceed the caller's

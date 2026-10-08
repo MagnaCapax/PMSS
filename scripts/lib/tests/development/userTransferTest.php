@@ -469,6 +469,47 @@ SNAP;
         $this->assertEquals($expected, $updated);
     }
 
+    public function testRewriteSessionPreservesImportedInodeAndExactBencodedBytes(): void
+    {
+        $home = $this->pmssMakeUserHomeTree('pmss-session-inode-', 'session', 'home/newuser');
+        $path = $home.'/session/one.rtorrent';
+        $localUser = posix_geteuid() === 65534 ? 'root' : 'nobody';
+        $localAccount = posix_getpwnam($localUser);
+        $this->assertTrue(is_array($localAccount));
+        $old = '/home/olduser/data/a';
+        $payload = 'd9:directory'.strlen($old).':'.$old.'4:note4:keep' . 'e';
+        file_put_contents($path, $payload);
+        $before = lstat($path);
+        $this->assertFalse($before['uid'] === $localAccount['uid'], 'fixture must exercise foreign imported ownership');
+        \pmssUserTransferRewriteRtorrentSessionPaths(['localUser' => $localUser, 'remoteUser' => 'olduser'], $home);
+        $new = '/home/'.$localUser.'/data/a';
+        $this->assertSame('d9:directory'.strlen($new).':'.$new.'4:note4:keepe', file_get_contents($path));
+        $after = lstat($path);
+        $this->assertSame($before['ino'], $after['ino']);
+        $this->assertSame($before['uid'], $after['uid']);
+    }
+
+    public function testRewriteSessionRefusesLinkedFinalAndParentWithoutTouchingOutside(): void
+    {
+        $base = $this->pmssMakeTempDir('pmss-session-linked-');
+        $home = $base.'/home';
+        $this->pmssEnsureDir($home.'/session');
+        $outside = $base.'/outside.rtorrent';
+        $payload = 'd9:directory20:/home/olduser/data/ae';
+        file_put_contents($outside, $payload);
+        file_put_contents($home.'/session/legitimate.rtorrent', $payload);
+        symlink($outside, $home.'/session/linked.rtorrent');
+        \pmssUserTransferRewriteRtorrentSessionPaths(['localUser' => 'newuser', 'remoteUser' => 'olduser'], $home);
+        $this->assertSame($payload, file_get_contents($outside));
+        $this->assertStringContainsString('/home/newuser/', file_get_contents($home.'/session/legitimate.rtorrent'));
+        unlink($home.'/session/linked.rtorrent');
+        rename($home.'/session', $home.'/saved-session');
+        symlink($base, $home.'/session');
+        \pmssUserTransferRewriteRtorrentSessionPaths(['localUser' => 'newuser', 'remoteUser' => 'olduser'], $home);
+        $this->assertSame($payload, file_get_contents($outside));
+        $this->assertTrue(is_file($home.'/saved-session/legitimate.rtorrent'));
+    }
+
     public function testRewriteRtorrentSessionPathsReportsWhenNothingNeedsRewrite(): void
     {
         $base = $this->pmssMakeTempDir('pmss-userTransfer-session-nochange-');
@@ -489,6 +530,68 @@ SNAP;
         }, ['PMSS_LOG_DIR' => $logDir]);
 
         $this->assertStringContainsString('[INFO] rTorrent session rewrite found no /home path references to update', $output);
+    }
+
+    public function testRutorrentShareRenameMovesExactDirectoryAsAccount(): void
+    {
+        $account = posix_getpwuid(posix_geteuid());
+        $user = $account['name'];
+        $home = $this->pmssMakeTempDir('pmss-share-rename-');
+        $parent = $home.'/www/rutorrent/share/users';
+        $this->pmssEnsureDir($parent.'/remote');
+        file_put_contents($parent.'/remote/payload', "customer bytes\0remain");
+        $inode = lstat($parent.'/remote')['ino'];
+        \pmssUserTransferRenameRutorrentShare($home, 'remote', $user);
+        $this->assertFalse(file_exists($parent.'/remote'));
+        $this->assertSame("customer bytes\0remain", file_get_contents($parent.'/'.$user.'/payload'));
+        $this->assertSame($inode, lstat($parent.'/'.$user)['ino']);
+    }
+
+    public function testRutorrentShareRenameRefusesLinkedSourceAndDestination(): void
+    {
+        $account = posix_getpwuid(posix_geteuid());
+        $user = $account['name'];
+        $base = $this->pmssMakeTempDir('pmss-share-linked-');
+        $home = $base.'/home';
+        $parent = $home.'/www/rutorrent/share/users';
+        $outside = $base.'/outside';
+        $this->pmssEnsureDir($parent);
+        $this->pmssEnsureDir($outside);
+        file_put_contents($outside.'/payload', 'outside bytes');
+        symlink($outside, $parent.'/remote');
+        \pmssUserTransferRenameRutorrentShare($home, 'remote', $user);
+        $this->assertSame('outside bytes', file_get_contents($outside.'/payload'));
+        $this->assertTrue(is_link($parent.'/remote'));
+        unlink($parent.'/remote');
+        $this->pmssEnsureDir($parent.'/remote');
+        file_put_contents($parent.'/remote/payload', 'tenant bytes');
+        symlink($outside, $parent.'/'.$user);
+        \pmssUserTransferRenameRutorrentShare($home, 'remote', $user);
+        $this->assertSame('tenant bytes', file_get_contents($parent.'/remote/payload'));
+        $this->assertSame('outside bytes', file_get_contents($outside.'/payload'));
+    }
+
+    public function testRutorrentShareRenameFollowsOnlyManagedDurableShareLayout(): void
+    {
+        $account = posix_getpwuid(posix_geteuid());
+        $user = $account['name'];
+        $base = $this->pmssMakeTempDir('pmss-share-managed-');
+        $home = $base.'/home';
+        $share = $home.'/.local/share/pmss/rutorrent/share';
+        $this->pmssWriteFile($share.'/users/remote/payload', "durable\0bytes");
+        $this->pmssEnsureDir($home.'/www/rutorrent');
+        symlink('../../.local/share/pmss/rutorrent/share', $home.'/www/rutorrent/share');
+        \pmssUserTransferRenameRutorrentShare($home, 'remote', $user);
+        $this->assertSame("durable\0bytes", file_get_contents($share.'/users/'.$user.'/payload'));
+        $this->assertFalse(file_exists($share.'/users/remote'));
+        $this->assertTrue(is_link($home.'/www/rutorrent/share'));
+        $outside = $base.'/outside';
+        $this->pmssWriteFile($outside.'/users/remote/payload', 'outside');
+        unlink($home.'/www/rutorrent/share');
+        symlink($outside, $home.'/www/rutorrent/share');
+        \pmssUserTransferRenameRutorrentShare($home, 'remote', $user);
+        $this->assertSame('outside', file_get_contents($outside.'/users/remote/payload'));
+        $this->assertSame("durable\0bytes", file_get_contents($share.'/users/'.$user.'/payload'));
     }
 
     public function testRtorrentRestartScriptUsesLiveUserProcessFallback(): void

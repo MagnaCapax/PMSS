@@ -38,6 +38,8 @@ require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/shell.php';
 require_once __DIR__.'/lib/user/recreateRestore.php';
 require_once __DIR__.'/lib/portManager.php';
+require_once __DIR__.'/lib/update.php';
+require_once __DIR__.'/lib/update/users.php';
 $userLifecycleLib = __DIR__.'/lib/userLifecycle.php';
 if (is_file($userLifecycleLib)) {
     require_once $userLifecycleLib;
@@ -133,13 +135,16 @@ if (file_exists($backupDir)) {
         $supersededBackup = $backupDir . '.superseded';
         pmssRequireSafeRecreateUserPath($supersededBackup, 'superseded-backup');
         if (file_exists($supersededBackup)) {
-            // .trafficData/.trafficDataLocal are immutable (chattr +i, PMSS #161); clear the immutable
-            // attr recursively before rm or it fails "Operation not permitted" (cf. terminateUser #176,
+            // .trafficData/.trafficDataLocal are immutable (PMSS #161); clear the immutable
+            // flag on verified inodes before removal or it fails "Operation not permitted" (cf. terminateUser #176,
             // userTransfer #283). GH PMSS#725. Failing here is fail-safe (before rebuild — live account untouched).
-            pmssRunOrExit('chattr -R -i ' . escapeshellarg($supersededBackup) . ' 2>/dev/null; rm -rf ' . escapeshellarg($supersededBackup));
+            if (!pmssRecreatePurgeSupersededDirectory($supersededBackup)) {
+                fwrite(STDERR, "Unable to reclaim superseded backup before rebuild: {$supersededBackup}\n");
+                exit(1);
+            }
         }
         echo "[*] Setting aside prior backup {$backupDir} -> {$supersededBackup}\n";
-        pmssRunOrExit('mv ' . escapeshellarg($backupDir) . ' ' . escapeshellarg($supersededBackup));
+        pmssRecreateMoveTopDirectory($backupDir, $supersededBackup);
     } else {
         echo "[i] Home missing but prior backup {$backupDir} present - leaving it untouched (possible sole copy).\n";
     }
@@ -154,7 +159,7 @@ if ($homeExists) {
     pmssRunOrExit('chown root:root ' . escapeshellarg($homeDir));
     pmssRunOrExit('chmod 0700 ' . escapeshellarg($homeDir));
     echo "[*] Moving {$homeDir} to {$backupDir}\n";
-    pmssRunOrExit('mv ' . escapeshellarg($homeDir) . ' ' . escapeshellarg($backupDir));
+    pmssRecreateMoveTopDirectory($homeDir, $backupDir);
 } else {
     echo "[i] Home directory missing - building fresh\n";
 }
@@ -205,7 +210,8 @@ pmssRunOrExit('/scripts/util/setupUserHomePermissions.php ' . escapeshellarg($us
 pmssRunOrExit('/scripts/util/userConfigLighttpd.php ' . escapeshellarg($userName));
 
 pmssRunOrExit('/scripts/util/createNginxConfig.php --user ' . escapeshellarg($userName));
-pmssRunOrExit('/scripts/util/userPermissions.php ' . escapeshellarg($userName));
+// Permission repair is advisory here; keep the existing ownership sanity gate below.
+pmssRun('/scripts/util/userPermissions.php ' . escapeshellarg($userName));
 
 /* ===== 9. Ownership sanity ===== */
 // Service configuration changed the home through shell commands.
@@ -246,6 +252,14 @@ if ($homeExists) {
     pmssRunOrExit('chmod 0700 ' . escapeshellarg($backupDir));
 }
 
+$environmentReason = null;
+if (!pmssUpdateUserEnvironment($userName, '', $environmentReason)) {
+    $reason = is_string($environmentReason) && trim($environmentReason) !== '' ? $environmentReason : 'unknown reason';
+    $message = '[!] Non-fatal: user environment pass failed ('.$reason.'); the next PMSS update converges this account';
+    fwrite(STDERR, $message."\n");
+    pmssUserLog($userName, $message);
+}
+
 /* ===== 11. Reclaim the superseded prior backup (only after the new backup exists) ===== */
 // The current home has now been safely moved into {$backupDir} and the rebuild has passed
 // the ownership-sanity check above, so the prior backup we set aside is truly superseded
@@ -257,12 +271,11 @@ if ($supersededBackup !== null) {
 }
 if ($supersededBackup !== null && is_dir($supersededBackup)) {
     echo "[*] Reclaiming superseded prior backup {$supersededBackup}\n";
-    // .trafficData/.trafficDataLocal are immutable (chattr +i, PMSS #161); clear before rm (cf. terminateUser #176). GH PMSS#725.
+    // .trafficData/.trafficDataLocal are immutable (PMSS #161); clear before removal (cf. terminateUser #176). GH PMSS#725.
     // This runs AFTER a successful rebuild — a cleanup failure here must NOT fail the tool (the account is already rebuilt),
     // so it is non-fatal (exec, not pmssRunOrExit). A lingering .superseded is routine janitorial, not a rebuild failure.
-    exec('chattr -R -i ' . escapeshellarg($supersededBackup) . ' 2>/dev/null; rm -rf ' . escapeshellarg($supersededBackup) . ' 2>&1', $reclaimOut, $reclaimRc);
-    if ($reclaimRc !== 0) {
-        fwrite(STDERR, "[!] Non-fatal: could not fully reclaim {$supersededBackup} (rc={$reclaimRc}); rebuild already succeeded, manual cleanup may be needed.\n");
+    if (!pmssRecreatePurgeSupersededDirectory($supersededBackup)) {
+        fwrite(STDERR, "[!] Non-fatal: could not fully reclaim {$supersededBackup}; rebuild already succeeded, manual cleanup may be needed.\n");
     }
 }
 

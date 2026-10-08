@@ -7,42 +7,17 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../lib/runtime.php';
+require_once __DIR__.'/../lib/quotaSnapshotCron.php';
 
 const PMSS_QUOTA_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/quota-daily.log';
 const PMSS_QUOTA_SNAPSHOT_MOUNT_DEFAULT = '/home';
 
-/**
- * Parse `repquota -u -n` output into stable numeric rows.
- *
- * @return array<int, array{0:string,1:string,2:string,3:string,4:string,5:string,6:string}>
- */
-function pmssQuotaSnapshotParseRepquotaUserRows(array $lines): array
-{
-    $rows = [];
-    foreach ($lines as $line) {
-        $tokens = pmssConfigLineColumns((string) $line, 2, []);
-        if ($tokens === [] || preg_match('/^#?([0-9]+)$/', $tokens[0], $m) !== 1) {
-            continue;
-        }
-
-        $numbers = array_values(array_filter(array_slice($tokens, 1), 'ctype_digit'));
-        if (count($numbers) < 6) {
-            continue;
-        }
-
-        $rows[] = array_merge([$m[1]], array_slice($numbers, 0, 6));
-    }
-
-    return $rows;
-}
-
-function pmssQuotaSnapshotRun(): int
+function pmssQuotaSnapshotRun(?string $fstabPath = null): int
 {
     $mountPath = getenv('PMSS_QUOTA_SNAPSHOT_MOUNT') ?: PMSS_QUOTA_SNAPSHOT_MOUNT_DEFAULT;
     $mountLabel = preg_replace('/\\s+/', '', $mountPath);
 
-    return pmssRunSnapshotLogTask(__FILE__, 'PMSS_QUOTA_SNAPSHOT_LOG', PMSS_QUOTA_SNAPSHOT_LOG_DEFAULT, static function ($fh, string $ts) use ($mountLabel, $mountPath): int {
+    return pmssRunSnapshotLogTask(__FILE__, 'PMSS_QUOTA_SNAPSHOT_LOG', PMSS_QUOTA_SNAPSHOT_LOG_DEFAULT, static function ($fh, string $ts) use ($mountLabel, $mountPath, $fstabPath): int {
         $repquota = pmssCommandPath('repquota');
         if ($repquota === '') {
             pmssSnapshotWriteWarn($fh, $ts, 'repquota_missing');
@@ -58,6 +33,9 @@ function pmssQuotaSnapshotRun(): int
                 'rc' => $rc,
                 'mount' => $mountLabel,
             ], $output);
+            if (pmssQuotaSnapshotMountDeclaresJournaledQuota($mountPath, $fstabPath ?? '/etc/fstab')) {
+                return pmssCliReturnWithStderr('###PMSS_QUOTA_ALERT repquota_failed mount='.pmssSnapshotWarnToken($mountPath, 'mount').' rc='.$rc.PHP_EOL);
+            }
             return 0;
         }
 

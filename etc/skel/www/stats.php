@@ -6,7 +6,7 @@
  * Copyright (C) 2010-2025 Magna Capax Finland Oy
  * TODO: status hover logs and allowed restarts.
  */
-$pmssStatsRequiredHelpers = array('scriptsInc.php', 'statsHelpers.php');
+$pmssStatsRequiredHelpers = array('scriptsInc.php');
 $pmssStatsMissingHelpers = array();
 foreach ($pmssStatsRequiredHelpers as $pmssStatsHelper) {
     $pmssStatsHelperPath = __DIR__.'/'.$pmssStatsHelper;
@@ -21,18 +21,17 @@ if ($pmssStatsMissingHelpers !== array()) {
     return;
 }
 require_once __DIR__.'/scriptsInc.php';
-require_once __DIR__.'/statsHelpers.php';
-
-$pmssWebCgroupMemoryStatusLib = __DIR__.'/webCgroupMemoryStatus.php';
-if (file_exists($pmssWebCgroupMemoryStatusLib)) {
-    require_once $pmssWebCgroupMemoryStatusLib;
+pmssWelcomeRequireLocalHelper('statsHelpers.php');
+// The guiv heal can deliver this page before update.php installs its helper.
+if (!function_exists('pmssStatsSerializedStateRead')) {
+    echo 'The Info page is being updated on this server. Reload it in a few minutes.';
+    return;
 }
+
+pmssWelcomeRequireLocalHelper('webCgroupMemoryStatus.php');
 
 // Customer-side traffic-limit reader; see ADR 0016.
-$pmssUserTrafficLimitLib = __DIR__.'/userTrafficLimit.php';
-if (file_exists($pmssUserTrafficLimitLib)) {
-    require_once $pmssUserTrafficLimitLib;
-}
+pmssWelcomeRequireLocalHelper('userTrafficLimit.php');
 
 $pmssDockerEnabledPolicy = null;
 $pmssMemoryPressure = function_exists('pmssWebCgroupMemoryStatusRead')
@@ -270,7 +269,13 @@ function pmssStatsToggleApp(button) {
     var request = new XMLHttpRequest();
     request.onreadystatechange = function() {
         if (request.readyState !== 4) return;
-        if (feedback) feedback.textContent = request.status >= 200 && request.status < 400 ? 'Updated' : 'Retry';
+        if (request.status < 200 || request.status >= 400) {
+            if (feedback) feedback.textContent = 'Retry';
+            button.disabled = false;
+            button.removeAttribute('aria-busy');
+            return;
+        }
+        if (feedback) feedback.textContent = 'Updated';
         window.setTimeout(function() {
             try {
                 if (window.parent && window.parent !== window) {
@@ -287,6 +292,7 @@ function pmssStatsToggleApp(button) {
         button.removeAttribute('aria-busy');
     };
     request.open('POST', endpoint + '?action=' + encodeURIComponent(action), true);
+    request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
     request.send('');
     return false;
 }
@@ -315,7 +321,7 @@ function pmssStatsToggleApp(button) {
         <span class="value">
 <?php
 $ipUrl = 'https://pulsedmedia.com/remote/myip.php';
-if (file_exists(__DIR__.'/welcomeMessage.php')) require_once __DIR__.'/welcomeMessage.php';
+pmssWelcomeRequireLocalHelper('welcomeMessage.php');
 $ip = function_exists('pmssWelcomeHttpContextCreate')
     ? @file_get_contents($ipUrl, false, pmssWelcomeHttpContextCreate())
     : false;

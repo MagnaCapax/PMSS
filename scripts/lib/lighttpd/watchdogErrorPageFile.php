@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__.'/userFileWrite.php';
+require_once __DIR__.'/../user/identity.php';
 
 /** Render a static browser/plain-text 502 page for a specific diagnosis. */
 function pmssLighttpdWatchdogRenderErrorPage(string $reasonKey): string
@@ -64,7 +65,7 @@ function pmssLighttpdWatchdogRenderErrorPage(string $reasonKey): string
         ."  </div>\n"
         ."</div>\n\n"
         ."<script>\n"
-        ."  const variants = ['/502_images/502-1.png', '/502_images/502-2.png', '/502_images/502-3.png', '/502_images/502-4.png', '/502_images/502-5.png', '/502_images/502-6.png', '/502_images/502-7.png', '/502_images/502-8.png', '/502_images/502-9.png', '/502_images/502-10.png', '/502_images/502-11.png', '/502_images/502-12.png', '/502_images/502-13.png'];\n"
+        ."  const variants = ['/502_images/502-1.jpg', '/502_images/502-2.jpg', '/502_images/502-3.jpg', '/502_images/502-4.jpg', '/502_images/502-5.jpg', '/502_images/502-6.jpg', '/502_images/502-7.jpg', '/502_images/502-8.jpg', '/502_images/502-9.jpg', '/502_images/502-10.jpg', '/502_images/502-11.jpg', '/502_images/502-12.jpg', '/502_images/502-13.jpg'];\n"
         ."  const imageElement = document.getElementById('error-image');\n"
         ."  imageElement.src = variants[Math.floor(Math.random() * variants.length)];\n"
         ."  imageElement.classList.add('error-image');\n"
@@ -84,6 +85,10 @@ function pmssLighttpdWatchdogRenderErrorPage(string $reasonKey): string
 /** Write or refresh a per-user 502 page inside the selected web root. */
 function pmssLighttpdWatchdogWriteErrorPage(string $username, string $reasonKey, string $webRoot = '/var/www'): bool
 {
+    if (!pmssValidateUsername($username)) {
+        return false;
+    }
+
     return pmssReplaceUserFileWithMetadata(
         rtrim($webRoot, '/').'/error-502-'.$username.'.html',
         pmssLighttpdWatchdogRenderErrorPage($reasonKey),
@@ -94,6 +99,11 @@ function pmssLighttpdWatchdogWriteErrorPage(string $username, string $reasonKey,
 /** Remove a per-user 502 page when the tenant web stack recovers. */
 function pmssLighttpdWatchdogDeleteErrorPage(string $username, string $webRoot = '/var/www'): bool
 {
+    // Validate before treating an absent path as an already-completed deletion.
+    if (!pmssValidateUsername($username)) {
+        return false;
+    }
+
     $path = rtrim($webRoot, '/').'/error-502-'.$username.'.html';
     if (!file_exists($path)) {
         return true;

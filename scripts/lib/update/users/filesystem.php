@@ -77,6 +77,17 @@ function pmssUserDeletePathIfPresent(string $path): void
     }
 }
 
+/** Keep the old installer while a user crontab still executes it. */
+function pmssUserRemoveLegacyOpenClawInstaller(string $user, string $home, string $spoolDir = '/var/spool/cron/crontabs'): void
+{
+    $crontab = @file_get_contents($spoolDir.'/'.$user);
+    if (is_string($crontab) && strpos($crontab, 'install-openclaw.php') !== false) {
+        return;
+    }
+
+    pmssUserDeletePathIfPresent($home.'/install-openclaw.php');
+}
+
 /**
  * Restore the skeleton's data/watch links without replacing user content.
  */
@@ -197,13 +208,17 @@ PHP;
         'bin/docker-install-lsio',
         'bin/docker-install-wireguard.sh',
         'bin/docker-reclaim-ownership',
+        'bin/install-openclaw',
         'bin/linuxserverInstall.sh',
         'bin/support',
+        'bin/createWebPublicCerts',
         'www/scriptsInc.php',
         '.scriptsInc.php',
-        '.lighttpd/php.ini',
         'radarr-sonarr.txt',
         'www/console.php',
+        'www/apps.php',
+        'www/appsLsioCatalog.php',
+        'www/appsRuntime.php',
         'www/deluge.php',
         'www/error-503.html',
         'www/filemanager.php',
@@ -211,6 +226,7 @@ PHP;
         'www/index.php',
         'www/jquery.tabs.css',
         'www/mediaStack.php',
+        'www/mediaStackRecoveryCommand.php',
         'www/openvpn-config.tgz',
         'www/panelSessionStore.php',
         'www/panelSessionAuth.php',
@@ -239,6 +255,8 @@ PHP;
     foreach ($files as $file) {
         updateUserFile($file, $user);
     }
+
+    pmssUserRemoveLegacyOpenClawInstaller($user, $home);
 
     pmssUserDeletePathIfPresent($home.'/www/phpXplorer');
 

@@ -9,7 +9,7 @@ final class AccountPathOperationStaticTest extends TestCase
     /** Fixed commands with an account argument; each entry also pins its reviewed line. */
     private const SAFE = [
         'scripts/cron/checkLighttpdInstances.php:62' => ['66d938ed265b0ac243e1b992e1820850e3e6fe1e', 'fixed config utility with quoted account'],
-        'scripts/cron/webPublicCertsProcess.php:124' => ['8073e46d40d522b379cbc0518ad64b2e494f42a4', 'fixed config utility with quoted account'],
+        'scripts/cron/webPublicCertsProcess.php:129' => ['8073e46d40d522b379cbc0518ad64b2e494f42a4', 'fixed config utility with quoted account'],
         'scripts/lib/rtorrent/processInspection.php:98' => ['13417f72f7995d00594046ad6921f6924f10f56a', 'process listing with quoted account'],
         'scripts/lib/rtorrent/processLifecycle.php:147' => ['12b37a5ae2ed26df531cf9f4d0ea67203ef8646a', 'fixed launcher with quoted account'],
         'scripts/lib/lighttpd/userConfigApply.php:61' => ['af1754514e1c4518bfe8bbc90929d930bb125806', 'fixed port utility with quoted account'],
@@ -65,6 +65,85 @@ final class AccountPathOperationStaticTest extends TestCase
         foreach ($cases as $source => $expected) {
             $this->assertSame($expected, $this->operationOnLine($source), $source);
         }
+    }
+
+    public function testRecreateCopyRetainsFinalNodeChecks(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/recreateRestore.php', [
+            'clearstatcache(true, $source)',
+            'pmssPathTargetIsSafe($source, false, true)',
+            'clearstatcache(true, $destination)',
+            'pmssPathTargetIsSafe($destination, false, true)',
+            'is_link($destination)',
+        ]);
+    }
+
+    public function testTransferSessionRewriteUsesVerifiedOpenInode(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/userTransfer/sessionRewrite.php', [
+            'clearstatcache(true, $sessionFile)',
+            'pmssPathTargetIsSafe($sessionFile, false, true)',
+            'pmssInodeSafeRewriteRegularFile($home, $sessionFile',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/pathSafety.php', [
+            "@fopen(\$path, 'r+b')",
+            '@fstat($handle)',
+            '@lstat($path)',
+            "\$opened['ino'] !== \$named['ino']",
+        ]);
+    }
+
+    public function testTransferShareRenameRunsUnderAccountAndChecksBothFinalNodes(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/userTransfer/postSetup.php', [
+            'clearstatcache(true, $src)',
+            'clearstatcache(true, $dst)',
+            "@readlink(\$share) !== '../../.local/share/pmss/rutorrent/share'",
+            "\$share = \$home.'/.local/share/pmss/rutorrent/share'",
+            'pmssPathTargetIsSafe($src, true, true)',
+            'pmssPathTargetIsSafe($dst, true, true)',
+            'pmssAccountPathRun($localUser, $home, [$src, $dst], $command)',
+        ]);
+        $source = $this->pmssReadRepoFile('scripts/lib/userTransfer/postSetup.php');
+        $this->assertTrue(strpos($source, "'Normalising user permissions'") < strpos($source, 'pmssUserTransferRenameRutorrentShare($home, $remoteUser, $localUser)'),
+            'Imported source ownership must be normalised before account rename');
+    }
+
+    public function testTerminationPurgeUsesPinnedSymlinkRefusingTree(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/terminationCleanup.php', [
+            'pmssPinnedTreePurgeCommand($path, false)',
+            'pmssPinnedTreePurgeCommand($path, true)',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/pathSafety.php', [
+            "[ ! -L '.\$arg",
+            'cd -P --',
+            'find -P . -depth',
+            'rm -rf -- ./* ./.[!.]* ./..?*',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/pathSafety/immutableClear.pl', [
+            'O_NOFOLLOW',
+            'sysopen(my $handle',
+            '$inode[1] != $named[1]',
+            'ioctl($handle, 0x80086601, $flags)',
+            'ioctl($handle, 0x40086602, $flags)',
+        ]);
+    }
+
+    public function testRecreateTopLevelMoveAndCleanupUseCheckedInodes(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/recreateUser.php', [
+            'pmssRecreateMoveTopDirectory($backupDir, $supersededBackup)',
+            'pmssRecreateMoveTopDirectory($homeDir, $backupDir)',
+            'pmssRecreatePurgeSupersededDirectory($supersededBackup)',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/recreateRestore.php', [
+            'clearstatcache(true, $source)',
+            'clearstatcache(true, $destination)',
+            'pmssPathTargetIsSafe($source, true, true)',
+            'pmssPathTargetIsSafe($destination, true, true)',
+            'pmssPinnedTreePurgeCommand($path, $clearImmutable)',
+        ]);
     }
 
     /** @return array<int,string> */

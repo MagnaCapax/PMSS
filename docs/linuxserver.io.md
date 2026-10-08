@@ -102,7 +102,7 @@ Publishing ports follows the usual Docker syntax:
 
 Examples:
 
-- Jellyfin HTTP UI: `-p 8096:8096`
+- Jellyfin HTTP UI: `-p 127.0.0.1:8096:8096` (open through an SSH tunnel)
 - qBittorrent WebUI: `-p 8080:8080`
 
 If a `docker run` command fails with a “bind: address already in use” error,
@@ -143,7 +143,7 @@ This section walks through a simple Jellyfin media server deployment.
      -e PUID=0 \
      -e PGID=0 \
      -e TZ=Etc/UTC \
-     -p 8096:8096 \
+     -p 127.0.0.1:8096:8096 \
      -v ~/docker/jellyfin/config:/config \
      -v ~/docker/jellyfin/data:/data \
      --restart unless-stopped \
@@ -159,8 +159,17 @@ This section walks through a simple Jellyfin media server deployment.
 
 5. **Connect from your browser**
 
-   Visit `http://<your-seedbox-hostname>:8096/` in a browser. Complete the
-   Jellyfin setup wizard, pointing it at your media directories under `~/`.
+   From your own computer, open an SSH tunnel (replace the account and host):
+
+   ```bash
+   ssh -N -L 18096:127.0.0.1:8096 <your-username>@<your-seedbox-hostname>
+   ```
+
+   Keep the tunnel open and visit `http://127.0.0.1:18096/`. Complete the
+   Jellyfin setup wizard promptly, using a strong, separate admin password.
+   Other accounts on the same PMSS host can reach its loopback ports, so a
+   loopback bind protects against remote access but does not isolate tenants.
+   If you chose a different host port, replace `8096` in the tunnel command.
 
 Once this is working you can reuse the same pattern for other images.
 
@@ -169,8 +178,9 @@ If you want the most common PMSS-ready presets without retyping the full
 It supports `jellyfin`, `qbittorrent`, `radarr`, `sonarr`, `prowlarr`,
 `mariadb`, and `phpmyadmin`, creates the expected home-directory mounts,
 attaches the containers to a shared `pmss-media` Docker network, and keeps
-`--restart unless-stopped` enabled. The database presets bind to
-`127.0.0.1` by default so they stay local to the host. The legacy
+`--restart unless-stopped` enabled. Jellyfin and the database presets bind to
+`127.0.0.1` by default. Use the SSH tunnel above for the Jellyfin wizard and
+later browser access. The legacy
 `~/bin/linuxserverInstall.sh` wrapper remains available for compatibility.
 
 ## 4. Common seedbox recipes

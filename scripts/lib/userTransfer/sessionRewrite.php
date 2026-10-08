@@ -22,7 +22,8 @@ function pmssUserTransferRewriteRtorrentSessionPaths(array $cfg, string $home): 
         logMessage('[INFO] Skipping rTorrent session rewrite (session directory missing)');
         return;
     }
-    if (!pmssUserTransferIsPathWithinHome($sessionDir, $home)) {
+    clearstatcache(true, $sessionDir);
+    if (!pmssPathTargetIsSafe($sessionDir, true) || !pmssUserTransferIsPathWithinHome($sessionDir, $home)) {
         logMessage('[WARN] Skipping rTorrent session rewrite (session path escapes user home)');
         return;
     }
@@ -34,28 +35,22 @@ function pmssUserTransferRewriteRtorrentSessionPaths(array $cfg, string $home): 
     $rewrittenFiles = 0;
     $rewrittenPaths = 0;
     foreach ($sessionFiles as $sessionFile) {
-        if (!is_file($sessionFile) || !pmssUserTransferIsPathWithinHome($sessionFile, $home)) {
+        clearstatcache(true, $sessionFile);
+        if (!pmssPathTargetIsSafe($sessionFile, false, true)
+            || !pmssUserTransferIsPathWithinHome($sessionFile, $home)) {
             logMessage('[WARN] Skipping unsafe rTorrent session file: '.$sessionFile);
             continue;
         }
-        $raw = @file_get_contents($sessionFile);
-        if (!is_string($raw)) {
-            logMessage('[WARN] Unable to read rTorrent session file: '.$sessionFile);
-            continue;
-        }
         $fileReplacements = 0;
-        $rewritten = pmssUserTransferRewriteBencodedHomePaths($raw, $remoteUser, $localUser, $fileReplacements);
-        if ($rewritten === null) {
-            logMessage('[WARN] Skipping malformed rTorrent session file: '.$sessionFile);
+        $ok = pmssInodeSafeRewriteRegularFile($home, $sessionFile,
+            static function (string $raw) use ($remoteUser, $localUser, &$fileReplacements): ?string {
+                return pmssUserTransferRewriteBencodedHomePaths($raw, $remoteUser, $localUser, $fileReplacements);
+            });
+        if (!$ok) {
+            logMessage('[WARN] Skipping unsafe, unreadable or malformed rTorrent session file: '.$sessionFile);
             continue;
         }
-        if ($fileReplacements < 1) {
-            continue;
-        }
-        if (@file_put_contents($sessionFile, $rewritten) === false) {
-            logMessage('[WARN] Failed to rewrite rTorrent session file: '.$sessionFile);
-            continue;
-        }
+        if ($fileReplacements < 1) continue;
         $rewrittenFiles++;
         $rewrittenPaths += $fileReplacements;
     }

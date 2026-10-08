@@ -116,6 +116,10 @@ function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
         // production script-root guard failure (GH #722) that breaks the php-type sections. Absent file
         // (new user / no cycle yet) => tail rc!=0 => a benign error stub, not a crash.
         $sections['user_metrics_latest'] = ['type' => 'command', 'command' => 'tail -1 '.escapeshellarg('/var/log/pmss/metrics/'.$user).' 2>/dev/null', 'format' => 'json'];
+        // One sample about 24 hours back: 288 five-minute intervals plus the current line.
+        // The newest rotation is archive/<user>.1 and remains plain text via delaycompress.
+        // With shorter history, tail/head return the oldest available line; its ts gives the real window.
+        $sections['user_metrics_24h_ago'] = ['type' => 'command', 'command' => 'cat '.escapeshellarg('/var/log/pmss/metrics/archive/'.$user.'.1').' '.escapeshellarg('/var/log/pmss/metrics/'.$user).' 2>/dev/null | tail -n 289 | head -1', 'format' => 'json'];
         // End-to-end per-user responsiveness: a timed local HTTP GET to the user's panel path
         // (nginx -> per-user lighttpd). A healthy account answers fast with 401/200; under I/O
         // saturation the listener still reads `systemctl is-active` while the actual request hangs

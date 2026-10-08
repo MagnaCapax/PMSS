@@ -129,8 +129,57 @@ class NginxUserHostsTest extends TestCase
             file_put_contents($home.'/.billingServiceId', $vector['id']);
             $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script), ['HOME' => $home]);
             $this->assertSame(0, $result['rc']);
-            $this->assertTrue(strpos($result['output'], 'http://'.\pmssMcxLabel('service', $vector['id']).'.mcx.fi/') !== false);
-            $this->assertTrue(strpos($result['output'], 'http://'.$vector['label'].'.mcx.fi/') !== false);
+            $this->assertTrue(strpos($result['output'], 'https://'.\pmssMcxLabel('service', $vector['id']).'.mcx.fi/') !== false);
+            $this->assertTrue(strpos($result['output'], 'https://'.$vector['label'].'.mcx.fi/') !== false);
         }
+    }
+
+    public function testWebPublicCertNamesFollowRequestMode(): void
+    {
+        $mcx = \pmssNginxUserMcxHostname('123');
+        $cases = [
+            ['username', '123', ['alice.host.example', $mcx]],
+            ['username', null, ['alice.host.example']],
+            ['default', '123', [$mcx]],
+            ['default', null, []],
+            ['2026-09-01T00:00:00Z', '123', [$mcx]],
+            [null, '123', [$mcx]],
+        ];
+        foreach ($cases as [$request, $serviceId, $expected]) {
+            $this->assertSame($expected, \pmssWebPublicCertNames('alice', 'host.example', $serviceId, $request));
+        }
+    }
+
+    public function testCustomerCertCommandModes(): void
+    {
+        $script = escapeshellarg(dirname(__DIR__, 4).'/etc/skel/bin/createWebPublicCerts');
+        $php = escapeshellarg(PHP_BINARY);
+
+        $legacyHome = $this->pmssMakeTempDir('mcx-certs-legacy-');
+        file_put_contents($legacyHome.'/.billingId', "123\n");
+        $result = $this->pmssExecShellCommand($php.' '.$script, ['HOME' => $legacyHome]);
+        $this->assertSame(0, $result['rc']);
+        $this->assertTrue(strpos($result['output'], 'https://'.\pmssNginxUserMcxHostname('123').'/') !== false);
+        $this->assertSame("default\n", file_get_contents($legacyHome.'/.request-web-certs'));
+
+        $emptyHome = $this->pmssMakeTempDir('mcx-certs-empty-');
+        $result = $this->pmssExecShellCommand($php.' '.$script, ['HOME' => $emptyHome]);
+        $this->assertSame(1, $result['rc']);
+        $this->assertTrue(!file_exists($emptyHome.'/.request-web-certs'));
+
+        $yesHome = $this->pmssMakeTempDir('mcx-certs-yes-');
+        file_put_contents($yesHome.'/.billingId', "123\n");
+        $result = $this->pmssExecShellCommand("printf 'yes\\n' | HOME=".escapeshellarg($yesHome).' '.$php.' '.$script.' --with-username-hostname');
+        $this->assertSame(0, $result['rc']);
+        $this->assertSame("username\n", file_get_contents($yesHome.'/.request-web-certs'));
+        $this->assertTrue(strpos($result['output'], 'Certificate Transparency') !== false);
+
+        $noHome = $this->pmssMakeTempDir('mcx-certs-no-');
+        $result = $this->pmssExecShellCommand("printf 'no\\n' | HOME=".escapeshellarg($noHome).' '.$php.' '.$script.' --with-username-hostname');
+        $this->assertSame(1, $result['rc']);
+        $this->assertTrue(!file_exists($noHome.'/.request-web-certs'));
+
+        $result = $this->pmssExecShellCommand($php.' '.$script.' --unknown', ['HOME' => $emptyHome]);
+        $this->assertSame(2, $result['rc']);
     }
 }

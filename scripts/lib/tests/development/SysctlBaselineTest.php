@@ -21,7 +21,7 @@ class SysctlBaselineTest extends TestCase
             'net.core.rmem_max = 67108864', 'net.core.default_qdisc = fq', 'net.ipv4.tcp_congestion_control = bbr',
             'net.ipv4.ip_local_reserved_ports = 2000-38000',
             'net.netfilter.nf_conntrack_max = 524288', 'kernel.kptr_restrict = 1', 'kernel.yama.ptrace_scope = 2',
-            'fs.protected_regular = 2',
+            'fs.inotify.max_queued_events = 65536', 'fs.protected_regular = 2',
         ], 'expected sysctl file to be written');
         $this->pmssAssertRepoFileContainsString('scripts/lib/update/systemPrep/sysctlTuning.php', "/etc/sysctl.d/99-pmss.conf");
     }
@@ -131,10 +131,10 @@ class SysctlBaselineTest extends TestCase
         $procSysRoot = $this->pmssMakeTempDir('pmss-sysctl-proc-', 0700);
         $this->pmssTrackEnvOverrides(['PMSS_SYSCTL_PROC_SYS_PATH' => $procSysRoot]);
         $cases = [
-            'no_swap' => [['ram_gb' => 64, 'has_swap' => false, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '68c03c71f756713da409528b510a143926626c71f82268f2bdcd182354551d8f'],
-            'vm' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => true, 'nic_speed_gbps' => 1], 'a387e515b36ef9c3cbc79dcbedce499f71e2f615303a47f359a70b774b0cee67'],
-            'fast_swap_10g_conntrack' => [['ram_gb' => 256, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => false, 'nic_speed_gbps' => 10, 'has_conntrack' => true], '402571fbb9ae5d029df3984910e3b78cecc76d6363f445370c9603703b712a8c'],
-            'slow_swap' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], 'e2e283040d7da3b9520f169a53b8694677c78121ee54d30d0ba51dec653f8f78'],
+            'no_swap' => [['ram_gb' => 64, 'has_swap' => false, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '56d73c2c9eff3a9fc0d3801e6639381ee107ee45cf627c49e5f926b6d996c615'],
+            'vm' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => true, 'nic_speed_gbps' => 1], 'aba955d478363d1f47d9da6ffad245bbb24c16fc27d32950e093d99159268584'],
+            'fast_swap_10g_conntrack' => [['ram_gb' => 256, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => false, 'nic_speed_gbps' => 10, 'has_conntrack' => true], '90def2fd6a4958056eff2b7185143944c38c9064b95db85eba45167a3d284cdd'],
+            'slow_swap' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '258a01b256b52f49dc391a8a238e2fb0406fe0719d1cf201f46baba76a629144'],
         ];
 
         foreach ($cases as $label => [$profile, $expectedHash]) {

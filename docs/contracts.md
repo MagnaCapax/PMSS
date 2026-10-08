@@ -154,6 +154,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   when its timestamped backup cannot be created. The backup helper accepts a
   copy only when it contains the full source file; incomplete copies are removed.
 
+- Atomic user-file replacements publish only after the requested mode and any
+  applicable owner/group changes succeed on the temporary file. Invalid modes
+  or failed metadata operations return `false`, leave the existing destination
+  intact, and remove the temporary file. Valid writes keep their prior bytes,
+  ownership, and mode.
+
 - Lock lifecycle helpers close streams when handle validation, lock acquisition,
   or explicit unlocking throws. The original throwable propagates; successful
   acquisition still transfers ownership to the caller, including the legacy
@@ -266,6 +272,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Output: text report by default, or JSON envelope with `timestamp`, `hostname`, `version`, `user`, and `sections`.
   - Side-effects: none intended; collects read-only command and file snapshots.
   - Validation: requires root outside `PMSS_TEST_MODE=1`; `--user` is validated through managed-user selection before per-user sections run.
+  - Per-user metrics: `user_metrics_latest` reads the current JSONL tail; `user_metrics_24h_ago` reads the 289th line from the end of the newest uncompressed rotation plus the live log. With less history it returns the oldest available line; callers use its `ts` to determine the actual interval.
 
 ---
 
@@ -290,10 +297,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 - pmssLoadRepoTemplate(string $codename, ?callable $logger=null): string
   - Loads `/etc/seedbox/config/template.sources.<codename>` (or `PMSS_CONFIG_DIR`).
+  - Rejects names that are not a single alphanumeric-led filename component before reading a template.
   - Returns trimmed content with trailing `\n`, or `''` and logs when missing/empty.
 
 - pmssSafeWriteSources(string $content, string $label, ?callable $logger=null): bool
   - Uses `PMSS_APT_SOURCES_PATH` (default `/etc/apt/sources.list`), backs up current sources to `.pmss-backup` (best-effort), writes new content or restores on failure.
+  - A write counts as complete only when its byte count matches the requested content; short target writes use the existing restore path.
 
 - pmssUpdateAptSources(string $distroName, int $distroVersion, string $currentHash, array $repos, ?callable $logger=null): void
   - Dispatches by distro: Debian uses `pmssUpdateAptSourcesDebian`; Ubuntu logs unsupported.
@@ -347,6 +356,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 - pmssEnsureLegacySysctlBaseline(?callable $logger=null, ?string $targetOverride=null, bool $reload=true, ?string $modulesLoadOverride=null): void
   - Writes `/etc/sysctl.d/99-pmss.conf` (override path) with the PMSS-owned hardware-aware baseline.
+  - Sets `fs.inotify.max_queued_events` to 65536 for bursty media library monitoring.
   - Reserves the PMSS port-manager service band from kernel ephemeral source-port selection via `net.ipv4.ip_local_reserved_ports`.
   - Ensures `/etc/modules-load.d/pmss-bbr.conf` contains `tcp_bbr` (override path).
   - Respects operator-owned keys from `/etc/sysctl.d/90-pmss-overrides.conf` and records the applied profile under the `sysctl` section in `/etc/seedbox/config/hardware.json`.
@@ -521,6 +531,7 @@ Bootstrap helpers from install-time env (Phase 2):
 - pmssConfigureQuotaMount(?callable $logger=null): void → honors `PMSS_SKIP_QUOTA`; updates fstab quota options for `PMSS_QUOTA_MOUNT` (default `/home`) and remounts unless journaled quota is already active on the live mount. This lets first installs mount with quota options before `quotacheck` creates `aquota.*`.
 - pmssEnsureQuotaOptions(string $mountPoint, array $requiredOptions=null, ?callable $logger=null): void → ensures quota options present on the `/etc/fstab` line; writes backup + updated file.
 - quotaFix's final `/home` check compares declared user/group quota types in fstab with `quotaon -p /home`'s enabled-type count. A shortfall logs a specific warning without changing quotaFix's exit status; no declared quota types produce no query or warning.
+- The daily quota snapshot retains `repquota_failed` in its private data log. When the target fstab entry declares journaled quotas, the same failure also emits `###PMSS_QUOTA_ALERT` to the cron log and exits non-zero. Other snapshot warnings retain their previous exit status.
 
 ---
 
@@ -729,6 +740,7 @@ Safety: per-user public-key reads revalidate the username and ignore missing,
 non-regular, symlinked, unreadable, or invalid-key registry files.
 Per-user guide address reconciliation derives the embedded private key's public
 key and updates only the matching assigned peer; unmatched guides remain unchanged.
+Service hostnames in guides require a root-owned billing ID entry.
 
 ---
 
@@ -793,7 +805,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Directory preparation seeds `.lighttpd/custom` at `0640` and reapplies that mode to existing regular files without rewriting their contents or modification time; symlinks and non-file targets remain rejected.
 
 - scripts/cron/checkLighttpdInstances.php [<user>]
-  - Behavior: Keeps per-user `lighttpd` and `php-cgi` healthy, regenerates missing configs, and refreshes per-user 502 pages while the web stack is unhealthy. A non-blocking runtime lock makes overlapping invocations skip cleanly.
+  - Behavior: Keeps per-user `lighttpd` and `php-cgi` healthy, regenerates missing configs, and refreshes per-user 502 pages while the web stack is unhealthy. A non-blocking runtime lock makes overlapping invocations skip cleanly. The 502 page file helpers reject invalid account names before writing or treating a missing file as a completed deletion.
   - Socket failure markers: validates both the runtime directory and marker path before recording or clearing consecutive failures. Symlinks and non-regular markers remain untouched; an unsafe path or incomplete counter write retains the existing `wait` action with count zero and cannot authorize a socket-failure restart.
   - Socket health: An `ECONNREFUSED` result for a configured `php.socket-N` path is treated as stale-index drift when strict `ss -xln` parsing finds at least the configured number of live listeners under the same account's `.lighttpd` directory. Missing, malformed, or incomplete listener evidence retains the consecutive-failure restart gate.
   - Restart verification: after issuing a restart, retries the bounded `ss -xln` listener-coverage read through the shared command runner. Missing listeners emit `restart_attempted_still_down`; a failed probe emits `restart_attempted_unverified`. Both outcomes are log-only and never trigger another restart.
@@ -855,6 +867,14 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/userPermissions.php <user>
   - Behavior: Fixes ownership/permissions under `/home/<user>` according to policy (chmod/chown); safe to re-run.
+  - Billing identity: `.billingServiceId`, legacy `.billingId`, and `.billingClientId`
+    have `root:<user> 0640` as their managed state. `writeHomeMarker.php` creates
+    registered billing markers as root (currently `.billingId`); `recreateUser`
+    restores billing files with identity UID 0, and management-host backfill
+    writes them as root. Root-run `userTransfer` uses `rsync -a` to preserve root
+    ownership. Readers require a root-owned regular file. This permission pass
+    normalizes ownership and mode only for a root-owned regular file; it logs and
+    leaves non-root-owned, symlinked, or other non-regular entries unchanged.
   - Provisioned recipient: Converges `.notifyEmail` to `root:<user> 0640`, preserving customer read access while preventing local redirection of future notifications.
 
 - scripts/util/userConfig.php <user> <ramMiB> <quotaGiB>
@@ -899,6 +919,14 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - etc/skel/install-media-stack.sh
   - Port allocation: consumes root-provisioned `~/.media-stack-port-APP` markers for SABnzbd, Radarr, Prowlarr, Sonarr, Autobrr, and Jellyfin. A legacy configured port is preserved only when no marker exists; a fresh install without a valid marker fails closed and requests a full PMSS update.
+  - App control: `--start-app=APP` launches only one installed, absent tmux session; `--stop-app=APP` kills only that session. The closed app list includes Jellyfin, Sonarr, Radarr, Prowlarr, SABnzbd, Autobrr, and Cloudplow. `--start-stopped` skips `~/.<app>Disable` markers.
+
+- etc/skel/bin/install-openclaw
+  - Port allocation: consumes the root-provisioned `~/.media-stack-port-openclaw` marker, writes `~/.openclaw/gateway.port`, and refuses install or start without a valid marker. OpenClaw has no lighttpd proxy.
+  - Quota preflight: before downloading, install checks for 60,000 available file slots below the account's soft file-count limit when quota output is usable; unavailable or unlimited quota output does not block installation.
+  - Startup: install and manual start wait up to 120 seconds for the loopback listener; the cron check waits up to 5 seconds. A live process at the deadline is reported as still starting, and status shows listener state.
+  - Lifecycle: install or successful manual start writes two marked jobs using `$HOME/bin/install-openclaw` in the account's own crontab; check stops retrying after five consecutive failed starts until manual start.
+  - Authentication: a private gateway environment file supplies a token, and the gateway binds loopback only.
 
 - scripts/util/systemTest.php
   - Behavior: Read-only probe of system readiness (binary versions, config presence);
@@ -906,7 +934,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/supportCommand.php <message>
   - Behavior: Saves a read-only support snapshot under `/home/<user>/.support/requests/` and submits the same snapshot to the configured support inbox.
-  - Inputs: Reads `/etc/seedbox/config/support.php`, `/etc/seedbox/config/version`, optional `/home/<user>/.billingServiceId` with `.billingId` legacy fallback, and optional `/home/<user>/.billingClientId`.
+  - Inputs: Reads `/etc/seedbox/config/support.php`, `/etc/seedbox/config/version`, optional root-owned `/home/<user>/.billingServiceId` with `.billingId` legacy fallback, and optional root-owned `/home/<user>/.billingClientId`.
   - Flags and overrides: `-h`/`--help` prints usage and exits successfully; `PMSS_SUPPORT_CONFIG_PATH` overrides the support config file path before the `PMSS_CONFIG_DIR` default is consulted.
   - Delivery: Prefers a local `sendmail` binary when present, otherwise attempts direct MX SMTP delivery to the configured support inbox.
 
@@ -943,11 +971,15 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ## Customer File Manager URLs – `etc/skel/www/filemanager.php`
 
+- A successful Settings save returns to the current folder listing without retaining `settings=1`.
+- After rewriting its configuration in the PHP source, Settings invalidates that script's OPcache entry for the serving PHP process.
 - Preview, Open, and DirectLink URLs retain the request script's directory (such as `/user-<username>/`) when tinyfilemanager has not selected a mapped multi-user root.
 - The fallback runs after mapped-root selection so enabling tinyfilemanager's multi-user mode cannot double the request prefix.
 
 ## Customer Server Status – `etc/skel/www/welcome.php` and `stats.php`
 
+- When the update-only `statsHelpers.php` has not arrived, `stats.php` returns
+  HTTP 200 with a short reload notice instead of failing during the guiv heal.
 - `pmssStatsChartOptions()` caps the shared Traffic, CPU, Storage I/O, and IOPS chart x-axis at six visible date ticks and gives legends explicit point markers, width, and spacing (Refs #878).
 - The Storage I/O text block emits explicit newlines between read, write, and
   operations values; PHP template close tags otherwise consume source newlines (Refs #879).
@@ -976,11 +1008,20 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Archives are written as `~/.pmss-backups/config-YYYYMMDD-HHMMSS.tar.gz` with a private `0700` directory and `0600` files.
   - Retention keeps the newest 7 scheduled archives and prunes older files only after a newly written archive is verified as an existing non-empty file inside the same home.
 
-## Customer Whole-Account Service Restart – `etc/skel/www/welcome.php`
+## Customer Whole-Account Service Restart – `etc/skel/www/scriptsInc.php`
 
-- The `Restart all my services` control composes the existing customer-owned restart endpoints for rTorrent, enabled Deluge/qBittorrent/rclone frontends, stopped media-stack tmux apps, and Lighttpd.
+- Welcome and Apps render one shared `Your apps` section and use its read-only status JSON to queue the customer-owned restart endpoints for rTorrent, enabled Deluge/qBittorrent/rclone frontends, stopped media-stack tmux apps, and Lighttpd.
 - Requests run sequentially as the authenticated customer; qBittorrent retains its account-password synchronization challenge, media-stack recovery retains its same-origin AJAX POST gate, and failures do not prevent later services from receiving their request.
 - The Lighttpd request is sent last so its graceful restart cannot interrupt earlier panel requests. Media-stack recovery uses the existing `--start-stopped` path and preserves live tmux sessions.
+
+## Customer Apps Controls – `etc/skel/www/scriptsInc.php`
+
+- Both `welcome.php?status=1` and `apps.php?status=1` emit the same live tmux, native-process, marker, and media-stack auth state; both are read-only. `?log=APP` reads only the selected media app's own log, capped at 16 KiB, twenty lines, and 300 characters per line with HTML escaping.
+- If an older guiv-delivered `scriptsInc.php` lacks the Apps status or log emitter, that Apps feed returns HTTP 503 JSON with `updating: true` and a reload message. The shared status poll shows the message in app rows and stops retrying; other transient failures still retry.
+- While the existing media-stack launcher pid is live, its `poll` status takes precedence over partial install markers: the Media Stack group shows one progress row and no app controls. The shared status poll runs every five seconds until the installer exits, then renders app rows or the existing failure message and Install action. Media per-app controls require `appsRuntime.php` in the customer tree.
+- The web install launcher closes its standard streams before returning the POST response; its PID file records the installer process used by status polling.
+- All state-changing customer endpoints require POST with `X-Requested-With: XMLHttpRequest`. A GET action returns HTTP 405. qBittorrent retains the HTTP 428 password-sync challenge.
+- Media app stop writes `~/.<app>Disable`; start removes it; restart preserves it. The observe-only watchdog publishes `off` with zero failures for marked apps, and bulk recovery skips them. Native frontend stops signal only account-owned processes in the panel's mount namespace whose executable resolves to the app's native binary allowlist; Deluge's Python entry points also require an exact interpreter and script match.
 
 ---
 
@@ -1050,11 +1091,16 @@ Automation often invokes these utilities; below are expected inputs and effects.
     ownership contract stay in the backup and are reported.
     The home is handed to the user only after restore, before service configuration,
     nginx regeneration, and permissions. Ownership is validated, then the home
-    remains account-owned for the `changePw.php` password reset. The backup stays root-private during the rebuild;
+    remains account-owned for the `changePw.php` password reset. The backup stays
+    root-private during the rebuild;
     after the password step succeeds, its top-level directory is returned to
-    `<user>:<user> 0700` so the account can reach files left in it. It remains
-    root-private on failure. Per-user config overrides stay in the backup and
-    their paths are printed for manual review. A missing home leaves any prior backup alone.
+    `<user>:<user> 0700` so the account can reach files left in it. The shared
+    per-user environment pass used by addUser and update-step2 runs after the
+    password succeeds and any backup is handed back. A failed pass is logged
+    and left for the next PMSS update (ADR 0089). The backup remains
+    root-private on password failure. Per-user config overrides stay in the
+    backup and their paths are printed for manual review. A missing home leaves
+    any prior backup alone.
 
 ---
 

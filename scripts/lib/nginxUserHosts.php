@@ -55,6 +55,22 @@ function pmssNginxUserMcxHostname(string $billingServiceId): string
 }
 
 /**
+ * Certificate names for an opt-in public HTTPS request (docs/adr/0039).
+ * Only a confirmed "username" request includes the per-server hostname.
+ * Unreadable and legacy requests use the username-free service permalink.
+ *
+ * @return list<string>
+ */
+function pmssWebPublicCertNames(string $user, string $serverFqdn, ?string $serviceId, ?string $requestContent): array
+{
+    $names = trim((string) $requestContent) === 'username' ? [$user.'.'.$serverFqdn] : [];
+    if ($serviceId !== null) {
+        $names[] = pmssNginxUserMcxHostname($serviceId);
+    }
+    return $names;
+}
+
+/**
  * Stable mcx.fi CLUSTER hostname for a user's billing client id.
  *
  * The billing data API on web5 computes this label; ns0-build-mcx.php consumes it.

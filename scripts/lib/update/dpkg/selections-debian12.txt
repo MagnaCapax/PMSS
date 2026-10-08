@@ -1499,3 +1499,4 @@ zsh	install
 zsh-common	install
 zstd	install
 ioping	install
+fio	install

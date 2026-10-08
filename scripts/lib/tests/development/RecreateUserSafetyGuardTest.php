@@ -73,8 +73,56 @@ class RecreateUserSafetyGuardTest extends TestCase
             'pmssRecreateRequireWritableDirectories(',
             'Setting aside prior backup',
             'Killing processes for',
-            "pmssRunOrExit('mv ' . escapeshellarg(\$homeDir)",
+            'pmssRecreateMoveTopDirectory($homeDir, $backupDir)',
         ], $script);
+    }
+
+    public function testTopLevelRecreateMoveKeepsEveryByteAndOriginalInode(): void
+    {
+        $base = $this->tempDir.'/top-real';
+        $this->pmssWriteFile($base.'/home/data/movie', "movie\0bytes");
+        $this->pmssWriteFile($base.'/home/session/lock', 'session');
+        $before = lstat($base.'/home');
+        \pmssRecreateMoveTopDirectory($base.'/home', $base.'/backup');
+        $this->assertFalse(file_exists($base.'/home'));
+        $this->assertSame("movie\0bytes", file_get_contents($base.'/backup/data/movie'));
+        $this->assertSame('session', file_get_contents($base.'/backup/session/lock'));
+        $this->assertSame($before['ino'], lstat($base.'/backup')['ino']);
+    }
+
+    public function testTopLevelRecreateMoveRefusesLinkedPathsAndPreservesBothTrees(): void
+    {
+        $base = $this->tempDir.'/top-linked';
+        $this->pmssWriteFile($base.'/outside/payload', 'outside');
+        $this->pmssWriteFile($base.'/home/data/payload', 'tenant');
+        symlink($base.'/outside', $base.'/backup');
+        $this->assertThrowsRuntime(static function () use ($base): void {
+            \pmssRecreateMoveTopDirectory($base.'/home', $base.'/backup');
+        });
+        $this->assertSame('tenant', file_get_contents($base.'/home/data/payload'));
+        $this->assertSame('outside', file_get_contents($base.'/outside/payload'));
+        unlink($base.'/backup');
+        rename($base.'/home', $base.'/saved-home');
+        symlink($base.'/outside', $base.'/home');
+        $this->assertThrowsRuntime(static function () use ($base): void {
+            \pmssRecreateMoveTopDirectory($base.'/home', $base.'/backup');
+        });
+        $this->assertSame('tenant', file_get_contents($base.'/saved-home/data/payload'));
+        $this->assertSame('outside', file_get_contents($base.'/outside/payload'));
+    }
+
+    public function testRecreateSupersededPurgeRemovesRealTreeAndRefusesLinkedRoot(): void
+    {
+        $base = $this->tempDir.'/superseded';
+        $this->pmssWriteFile($base.'/archive/nested/payload', 'customer');
+        $this->assertTrue(\pmssRecreatePurgeSupersededDirectory($base.'/archive'));
+        $this->assertFalse(file_exists($base.'/archive'));
+        $this->pmssWriteFile($base.'/outside/payload', 'outside');
+        $this->pmssWriteFile($base.'/saved/payload', 'tenant');
+        symlink($base.'/outside', $base.'/archive');
+        $this->assertFalse(\pmssRecreatePurgeSupersededDirectory($base.'/archive'));
+        $this->assertSame('outside', file_get_contents($base.'/outside/payload'));
+        $this->assertSame('tenant', file_get_contents($base.'/saved/payload'));
     }
 
     public function testRestoreMovesCustomerDirectoriesWithoutDoublingData(): void
@@ -104,6 +152,34 @@ class RecreateUserSafetyGuardTest extends TestCase
         $this->assertSame([$backup.'/.config/pmss', $backup.'/.rtorrent.rc.custom'], $left);
         $this->assertFalse(file_exists($home.'/.config/pmss'));
         $this->assertSame('override', file_get_contents($backup.'/.config/pmss/override'));
+    }
+
+    public function testRestoreCopyRefusesSymlinkedFinalDestination(): void
+    {
+        [$home, $backup, $base] = $this->fixture('copy-final-link');
+        $source = $backup.'/.billingServiceId';
+        $outside = $base.'/outside';
+        $this->pmssWriteFile($source, "123\n");
+        $this->pmssWriteFile($outside, 'keep');
+        $this->assertTrue(symlink($outside, $home.'/.billingServiceId'));
+
+        $this->assertThrowsRuntime(static function () use ($source, $home): void {
+            \pmssRecreateCopyFile($source, $home.'/.billingServiceId');
+        }, 'Unsafe restore file');
+        $this->assertSame('keep', file_get_contents($outside));
+        $this->assertSame("123\n", file_get_contents($source));
+    }
+
+    public function testRestoreCopyPreservesRealFileBytes(): void
+    {
+        [$home, $backup] = $this->fixture('copy-real-file');
+        $source = $backup.'/.billingServiceId';
+        $destination = $home.'/.billingServiceId';
+        $this->pmssWriteFile($source, "123\n");
+
+        $this->assertTrue(\pmssRecreateCopyFile($source, $destination));
+        $this->assertSame("123\n", file_get_contents($destination));
+        $this->assertSame("123\n", file_get_contents($source));
     }
 
     public function testRepositorySkeletonAllowsRestoreOfExistingData(): void
@@ -306,6 +382,22 @@ class RecreateUserSafetyGuardTest extends TestCase
             "pmssRunOrExit('chmod 0700 ' . escapeshellarg(\$backupDir));",
             '/* ===== 11. Reclaim the superseded prior backup',
         ], $handoff);
+    }
+
+    public function testEnvironmentPassFollowsPasswordAndBackupHandoffWithoutAborting(): void
+    {
+        $script = $this->pmssReadRepoFile('scripts/recreateUser.php');
+        $environmentCall = "pmssUpdateUserEnvironment(\$userName, '', \$environmentReason)";
+        $reclaimHeading = '/* ===== 11. Reclaim the superseded prior backup';
+        $this->assertOrderedStrings([
+            '/changePw.php ',
+            "pmssRunOrExit('chown -h ' . escapeshellarg(\$userName.':'.\$userName)",
+            $environmentCall,
+            $reclaimHeading,
+        ], $script);
+        $environmentPosition = strpos($script, $environmentCall);
+        $reclaimPosition = strpos($script, $reclaimHeading, $environmentPosition);
+        $this->assertFalse(strpos(substr($script, $environmentPosition, $reclaimPosition - $environmentPosition), 'exit(') !== false);
     }
 
     public function testMissingHomeLeavesPossibleSoleCopyInBackup(): void

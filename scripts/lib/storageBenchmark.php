@@ -8,13 +8,21 @@
 
 require_once __DIR__.'/runtime.php';
 pmssRequireRelativeFiles(__DIR__, ['cli/optionParser.php', 'storageBenchmark/report.php', 'storageHealth/common.php']);
+require_once __DIR__.'/storageBenchmarkHomeDevice.php';
 
 /** Emit a legacy CLI fatal error and preserve the historical exit code. */
 function storageBenchmarkFail(string $message): void { exit(pmssCliReturnWithStderr($message)); }
 function storageBenchmarkRequireSizeBytes(string $optionName, string $value, int $minimumBytes = 1, string $minimumLabel = 'positive size'): int { $bytes = preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i', trim($value)) === 1 ? pmssParseSizeToBytes($value, true, true) : null; if ($bytes === null || $bytes <= 0.0 || !is_finite($bytes) || $bytes >= (float) PHP_INT_MAX) storageBenchmarkFail("Error: {$optionName} must be a positive size (examples: 1G, 512M, 1048576).\n"); if ($bytes < $minimumBytes) storageBenchmarkFail("Error: {$optionName} must be at least {$minimumLabel}.\n"); return (int) $bytes; }
 function storageBenchmarkRequireIntOption(array $parsed, string $optionName, int $default, int $minimum, string $minimumLabel): int { $value = pmssCliOption($parsed, $optionName, null, null); if ($value === null || $value === true) return $default; $parsedInt = is_string($value) ? pmssUnsignedDecimalIntParse($value) : null; if ($parsedInt === null || $parsedInt < $minimum) storageBenchmarkFail("Error: --{$optionName} must be a {$minimumLabel} integer.\n"); return $parsedInt; }
 function storageBenchmarkRequireJsonLogPath(string $jsonLog): void { $jsonDir = dirname($jsonLog); $jsonDirError = null; if (!pmssLogWriteDirectoryPrepare($jsonDir, 0755, $jsonDirError, true)) storageBenchmarkFail($jsonDirError === 'create' ? "Error: failed to create JSON log directory: {$jsonDir}\n" : "Error: unsafe JSON log path: {$jsonLog}\n"); if (!pmssLogWritePathIsSafe($jsonLog)) storageBenchmarkFail("Error: unsafe JSON log path: {$jsonLog}\n"); }
-function storageBenchmarkRequireTargetDir(string $targetDir): string { $path = rtrim($targetDir, '/'); if ($path === '' || preg_match('/[\r\n\0]/', $path) === 1 || !pmssPathSegmentsAreSafe($path, true, true, true, true)) storageBenchmarkFail("Error: unsafe target directory: {$targetDir}\n"); if (!is_dir($path) || !is_writable($path)) storageBenchmarkFail("Error: target not writable: {$targetDir}\n"); return $path; }
+/** File jobs require write access; mounted-device reads only require an existing directory. */
+function storageBenchmarkRequireTargetDir(string $targetDir, bool $writable = true): string
+{
+    $path = rtrim($targetDir, '/');
+    if ($path === '' || preg_match('/[\r\n\0]/', $path) === 1 || !pmssPathSegmentsAreSafe($path, true, true, true, true)) storageBenchmarkFail("Error: unsafe target directory: {$targetDir}\n");
+    if (!is_dir($path) || ($writable && !is_writable($path))) storageBenchmarkFail('Error: target '.($writable ? 'not writable' : 'not found').": {$targetDir}\n");
+    return $path;
+}
 
 function storageBenchmarkMain(array $argv): int
 {
@@ -26,6 +34,7 @@ function storageBenchmarkMain(array $argv): int
             ['--target <dir>', 'Directory for file-backed tests (default /home).'], ['--size <bytes|MiB|GiB>', 'Target file size (default 500G, capped to 80% free).'],
             ['--runtime <seconds>', 'Per-test runtime for volume fio tests (default 60).'], ['--label <name>', 'Tag results (e.g., hostname/site/array).'],
             ['--json <path>', 'JSON Lines log (default /var/log/pmss/benchmark-storage.jsonl).'], ['--devices', 'Enable per-device tests (dd seqread + fio randread).'],
+            ['--home-device', 'Read-only test of the block device under --target (default /home); skips file and per-member device tests.'],
             ['--dd-size <MiB|GiB>', 'Size for dd seqread per device (default 1G).'], ['--device-runtime <sec>', 'Per-device fio runtime (default 30).'],
             ['--require-idle', 'Abort if busy (ioping/iostat exceed thresholds).'], ['--idle-latency-ms <ms>', 'ioping avg latency threshold (default 100).'],
             ['--idle-util <percent>', 'iostat util threshold (default 85).'], ['--show-last', 'Print the last run human summary and exit.'],
@@ -33,10 +42,12 @@ function storageBenchmarkMain(array $argv): int
         return 0;
     }
 
-    $testDevices = pmssCliOptionPresent($parsed, 'devices', null, true); $requireIdle = pmssCliOptionPresent($parsed, 'require-idle', null, true); $showLast = pmssCliOptionPresent($parsed, 'show-last', null, true);
+    $testDevices = pmssCliOptionPresent($parsed, 'devices', null, true); $homeDevice = pmssCliOptionPresent($parsed, 'home-device', null, true); $requireIdle = pmssCliOptionPresent($parsed, 'require-idle', null, true); $showLast = pmssCliOptionPresent($parsed, 'show-last', null, true);
     $targetDir = (string) pmssCliOptionString($parsed, 'target', null, '/home', true); $fileSize = (string) pmssCliOptionString($parsed, 'size', null, '500G', true); $jsonLog = (string) pmssCliOptionString($parsed, 'json', null, '/var/log/pmss/benchmark-storage.jsonl', true);
     $label = (string) pmssCliOptionString($parsed, 'label', null, '', true); $ddSize = (string) pmssCliOptionString($parsed, 'dd-size', null, '1G', true);
     if ($showLast) return storageBenchmarkShowLast($jsonLog);
+
+    if ($homeDevice) return storageBenchmarkHomeDeviceMain($parsed, $targetDir, $jsonLog, $label, $ddSize, $requireIdle);
 
     $runtime = storageBenchmarkRequireIntOption($parsed, 'runtime', 60, 1, 'positive'); $devRuntime = $testDevices ? storageBenchmarkRequireIntOption($parsed, 'device-runtime', 30, 1, 'positive') : 30;
     $idleLatencyMs = storageBenchmarkRequireIntOption($parsed, 'idle-latency-ms', 100, 0, 'non-negative'); $idleUtilPct = storageBenchmarkRequireIntOption($parsed, 'idle-util', 85, 0, 'non-negative');
@@ -46,13 +57,8 @@ function storageBenchmarkMain(array $argv): int
 
     $runId = date('YmdHis').'-'.bin2hex(random_bytes(3)); $runTs = date('c');
     $fs = storageBenchmarkRequireCommandField('stat -f -c %T '.escapeshellarg($targetDir), 'filesystem type'); $mntDev = storageBenchmarkRequireCommandField('df -P '.escapeshellarg($targetDir).' | awk '.escapeshellarg('NR==2 {print $1}'), 'mount device');
-    $pre = storageBenchmarkEntryBase($runTs, $label, $runId) + ['target_dir' => $targetDir, 'test' => 'preflight-idle', 'ok' => true];
-    $pre['ioping_avg_ms'] = pmssIopingAverageMs($targetDir);
-    if (($pre['ioping_avg_ms'] ?? 0) > $idleLatencyMs) { $pre['ok'] = false; $pre['warn'] = 'ioping above threshold'; }
-    $iostatUtilPct = storageBenchmarkIostatUtilPctRead('/var/run/pmss/iostat');
-    if ($iostatUtilPct !== null) { $pre['iostat_util_pct'] = $iostatUtilPct; if ($pre['iostat_util_pct'] > $idleUtilPct) { $pre['ok'] = false; $pre['warn_util'] = 'iostat util high'; } }
-    storageBenchmarkAppendJsonLine($jsonLog, $pre);
-    if ($requireIdle && !$pre['ok']) return pmssCliReturnWithStderr("Busy system (--require-idle): aborting.\n", 2);
+    $idle = storageBenchmarkIdlePreflight($jsonLog, storageBenchmarkEntryBase($runTs, $label, $runId) + ['target_dir' => $targetDir], $targetDir, $idleLatencyMs, $idleUtilPct);
+    if ($requireIdle && !$idle) return pmssCliReturnWithStderr("Busy system (--require-idle): aborting.\n", 2);
 
     $summary = storageBenchmarkRunFileTests($targetDir, $jsonLog, $runTs, $label, $runId, $mntDev, $fs, $requested, $runtime);
     storageBenchmarkPrintFileSummary($targetDir, $jsonLog, $label, $summary);
@@ -64,6 +70,16 @@ function storageBenchmarkAppendJsonLine(string $jsonLog, array $entry): void { i
 function storageBenchmarkEntryBase(string $runTs, string $label, string $runId): array { return ['timestamp' => $runTs, 'label' => $label ?: null, 'run_id' => $runId, 'run_ts' => $runTs]; }
 function storageBenchmarkApplyRunResult(array $entry, array $res, string $fallbackError = 'unknown'): array { if ($res['ok']) $entry['metrics'] = $res['result']; else $entry['error'] = $res['error'] ?? $fallbackError; return $entry; }
 function storageBenchmarkIostatUtilPctRead(string $path): ?float { $payload = pmssReadSerializedArrayFile($path); $util = $payload['diskUtil'] ?? null; return (is_int($util) || is_float($util) || (is_string($util) && is_numeric(trim($util)))) ? (float) trim((string) $util) : null; }
+/** Persist the shared idle evidence before either benchmark mode decides whether to abort. */
+function storageBenchmarkIdlePreflight(string $jsonLog, array $base, string $targetDir, int $latencyLimit, int $utilLimit): bool
+{
+    $pre = $base + ['test' => 'preflight-idle', 'ok' => true];
+    $pre['ioping_avg_ms'] = pmssIopingAverageMs($targetDir);
+    if (($pre['ioping_avg_ms'] ?? 0) > $latencyLimit) { $pre['ok'] = false; $pre['warn'] = 'ioping above threshold'; }
+    $util = storageBenchmarkIostatUtilPctRead('/var/run/pmss/iostat'); if ($util !== null) { $pre['iostat_util_pct'] = $util; if ($util > $utilLimit) { $pre['ok'] = false; $pre['warn_util'] = 'iostat util high'; } }
+    storageBenchmarkAppendJsonLine($jsonLog, $pre);
+    return $pre['ok'];
+}
 /** Read a command field, rejecting malformed raw bytes before trimming. */
 function storageBenchmarkCommandFieldRead(string $command, bool $positiveInt = false): ?string
 {
@@ -91,6 +107,10 @@ function storageBenchmarkDevicePathIsSafe(string $path): bool
         && pmssPathSegmentsAreSafe($path, false, false);
 }
 
+/** Both device modes require the same readable block-device boundary. */
+function storageBenchmarkDeviceIsReadableBlock(string $path): bool
+{ return storageBenchmarkDevicePathIsSafe($path) && is_readable($path) && @filetype($path) === 'block'; }
+
 function storageBenchmarkRegisterFileCleanup(string $path): void { register_shutdown_function(static function () use ($path): void { if ($path !== '' && is_file($path)) @unlink($path); }); }
 
 /** Read block-device size through a checked command boundary. */
@@ -105,7 +125,7 @@ function fioRun(string $file, int $size, int $runtime, array $job): array
 {
     $json = pmssCreatePrivateTempFile('fio-'); if ($json === null) return ['ok' => false, 'error' => 'unable to allocate fio JSON temp file'];
     try {
-        $opts = ['--name='.escapeshellarg($job['name']), '--filename='.escapeshellarg($file), '--size='.$size, '--time_based=1', '--runtime='.(int) ($job['runtime'] ?? $runtime), '--rw='.escapeshellarg($job['rw']), '--ioengine=libaio', '--iodepth='.(int) $job['iodepth'], '--numjobs='.(int) $job['numjobs'], '--direct='.(int) $job['direct'], '--group_reporting=1']; if (isset($job['bs'])) $opts[] = '--bs='.escapeshellarg($job['bs']); if (isset($job['bssplit'])) $opts[] = '--bssplit='.escapeshellarg($job['bssplit']); if (isset($job['rwmixread'])) $opts[] = '--rwmixread='.(int) $job['rwmixread']; $cmd = 'fio --output-format=json --output '.escapeshellarg($json).' '.implode(' ', $opts); $rc = runCommand($cmd, true); $payload = @file_get_contents($json);
+        $opts = ['--name='.escapeshellarg($job['name']), '--filename='.escapeshellarg($file), '--size='.$size, '--time_based=1', '--runtime='.(int) ($job['runtime'] ?? $runtime), '--rw='.escapeshellarg($job['rw']), '--ioengine=libaio', '--iodepth='.(int) $job['iodepth'], '--numjobs='.(int) $job['numjobs'], '--direct='.(int) $job['direct'], '--group_reporting=1']; if (isset($job['bs'])) $opts[] = '--bs='.escapeshellarg($job['bs']); if (isset($job['bssplit'])) $opts[] = '--bssplit='.escapeshellarg($job['bssplit']); if (isset($job['rwmixread'])) $opts[] = '--rwmixread='.(int) $job['rwmixread']; if (!empty($job['readonly'])) $opts[] = '--readonly'; $cmd = 'fio --output-format=json --output '.escapeshellarg($json).' '.implode(' ', $opts); $rc = runCommand($cmd, true); $payload = @file_get_contents($json);
     } finally {
         // Release the private output even when quoting, execution, or reading throws.
         @unlink($json);
@@ -137,6 +157,14 @@ function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string
 function storageBenchmarkPrintFileSummary(string $targetDir, string $jsonLog, string $label, array $summary): void { echo "\n== Storage benchmark summary ".($label !== '' ? '(' . $label . ' on '.$targetDir.')' : "(on {$targetDir})")." ==\n"; echo "test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95_ms\twrite_p95_ms\n"; foreach ($summary as $row) printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n", ...$row); echo "\nJSON log: {$jsonLog}\n"; }
 function storageBenchmarkDevicePreflightSkip(string $jsonLog, array $deviceEntry, string $error): void { storageBenchmarkAppendJsonLine($jsonLog, $deviceEntry + ['test' => 'device-preflight', 'ok' => false, 'error' => $error]); printf("%s\tskipped: %s\n", $deviceEntry['device'], $error); }
 function storageBenchmarkDdSeqread(string $path, int $count, int $skip): array { $dd = sprintf('dd if=%s of=/dev/null bs=1M count=%d skip=%d iflag=direct 2>&1', escapeshellarg($path), $count, $skip); [$rc, $so, $se] = [runCommand($dd, true), $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '', $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stderr'] ?? '']; $line = trim($se !== '' ? $se : $so); $mbps = null; $secs = null; if (preg_match('/\s([0-9.]+)\s+s,\s+([0-9.]+)\s+MB\/s/', $line, $m)) { $secs = (float) $m[1]; $mbps = (float) $m[2]; } return ['rc' => $rc, 'mbps' => $mbps, 'secs' => $secs]; }
+/** Preserve the JSON shape for dd results in both read-only device modes. */
+function storageBenchmarkDdResultEntry(array $deviceEntry, string $test, int $count, int $skip, array $dd): array
+{
+    return array_replace($deviceEntry + ['test' => $test, 'params' => ['bs' => '1M', 'count' => $count, 'skip_blocks' => $skip], 'ok' => ($dd['rc'] === 0 && $dd['mbps'] !== null)],
+        $dd['mbps'] !== null ? ['metrics' => ['seqread_MBps' => $dd['mbps'], 'elapsed_s' => $dd['secs']]] : ['error' => 'dd parse failed']);
+}
+/** Choose an in-bounds MiB offset with the existing four-MiB tail margin. */
+function storageBenchmarkDdSkipBlocks(int $size, int $count): int { return $size > ($count * 1024 * 1024 + 4 * 1024 * 1024) ? random_int(0, (int) floor(($size - $count * 1024 * 1024) / (1024 * 1024))) : 0; }
 function storageBenchmarkMedian(array $values): float { sort($values); $n = count($values); if ($n === 0) return 0.0; $m = (int) floor(($n - 1) / 2); return $n % 2 ? (float) $values[$m] : (($values[$m] + $values[$m + 1]) / 2); }
 function storageBenchmarkPeerMedian(array $peer, string $key): float { return storageBenchmarkMedian(array_filter(array_column($peer, $key), static function ($value): bool { return $value !== null; })); }
 
@@ -154,14 +182,13 @@ function storageBenchmarkRunDeviceTests(string $jsonLog, string $runTs, string $
     foreach (pmssStorageHealthDiskInventoryRead() as $meta) {
         $path = $meta['path'];
         $deviceEntry = $base + ['device' => $path, 'model' => $meta['model'], 'serial' => $meta['serial'], 'rota' => $meta['rota'], 'size' => $meta['size']];
-        if (!storageBenchmarkDevicePathIsSafe($path) || !is_readable($path) || @filetype($path) !== 'block') { storageBenchmarkDevicePreflightSkip($jsonLog, $deviceEntry, 'not a readable block device'); continue; }
+        if (!storageBenchmarkDeviceIsReadableBlock($path)) { storageBenchmarkDevicePreflightSkip($jsonLog, $deviceEntry, 'not a readable block device'); continue; }
         $size = storageBenchmarkDeviceSizeBytesRead($path);
         if ($size === null) { storageBenchmarkDevicePreflightSkip($jsonLog, $deviceEntry, 'unable to determine block device size'); continue; }
         $count = (int) floor($ddSizeBytes / (1024 * 1024));
-        $skip = $size > ($count * 1024 * 1024 + 4 * 1024 * 1024) ? random_int(0, (int) floor(($size - $count * 1024 * 1024) / (1024 * 1024))) : 0;
+        $skip = storageBenchmarkDdSkipBlocks($size, $count);
         $dd = storageBenchmarkDdSeqread($path, $count, $skip);
-        $entry = $deviceEntry + ['test' => 'device-seqread-dd', 'params' => ['bs' => '1M', 'count' => $count, 'skip_blocks' => $skip], 'ok' => ($dd['rc'] === 0 && $dd['mbps'] !== null)];
-        if ($dd['mbps'] !== null) $entry['metrics'] = ['seqread_MBps' => $dd['mbps'], 'elapsed_s' => $dd['secs']]; else $entry['error'] = 'dd parse failed';
+        $entry = storageBenchmarkDdResultEntry($deviceEntry, 'device-seqread-dd', $count, $skip, $dd);
         storageBenchmarkAppendJsonLine($jsonLog, $entry);
         printf("%s\tdd_seqread_MB/s=%s\n", $path, $dd['mbps'] !== null ? number_format($dd['mbps'], 2) : 'n/a');
         $iop = pmssIopingAverageMs($path);

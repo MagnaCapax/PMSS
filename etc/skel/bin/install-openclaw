@@ -1,0 +1,527 @@
+#!/usr/bin/env php
+<?php
+/** Per-account OpenClaw installer and cron watchdog. Run only as the account owner. */
+
+const OC_NODE_VERSION = '24.21.0';
+const OC_NODE_SHA256 = 'fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6';
+const OC_CRON_TAG = '# pmss-openclaw';
+const OC_REQUIRED_FILES = 60000;
+
+/** Keep all process paths under the caller's own home. */
+function ocPaths(): array
+{
+    $home = getenv('HOME');
+    if (!is_string($home) || $home === '' || !is_dir($home) || is_link($home)) {
+        throw new RuntimeException('HOME must be an existing directory');
+    }
+    $home = rtrim($home, '/');
+    return array(
+        'home' => $home,
+        'node' => $home.'/.local/share/node-openclaw/bin/node',
+        'npm' => $home.'/.local/share/node-openclaw/lib/node_modules/npm/bin/npm-cli.js',
+        'entry' => $home.'/.local/share/openclaw/lib/node_modules/openclaw/openclaw.mjs',
+        'state' => $home.'/.openclaw',
+        'port' => $home.'/.openclaw/gateway.port',
+        'env' => $home.'/.openclaw/gateway.env',
+        'pid' => $home.'/.openclaw/gateway.pid',
+        'check' => $home.'/.openclaw/check.state',
+        'npmCache' => $home.'/.local/share/openclaw-npm-cache',
+    );
+}
+
+/** Install into the private prefix with a private download cache, never the account's own ~/.npm. */
+function ocNpmInstallArgs(array $paths): array
+{
+    return array(
+        $paths['node'], $paths['npm'], 'install',
+        '--prefix', $paths['home'].'/.local/share/openclaw',
+        '--cache', $paths['npmCache'],
+        '-g', '--allow-scripts=@google/genai,esbuild,koffi,protobufjs,openclaw', 'openclaw',
+    );
+}
+
+/** Return the first-line PMSS port only if it has the media-stack marker shape. */
+function ocReservedPort(string $path): ?int
+{
+    if (!is_file($path) || is_link($path)) {
+        return null;
+    }
+    $handle = @fopen($path, 'rb');
+    $line = $handle ? fgets($handle, 32) : false;
+    if ($handle) {
+        fclose($handle);
+    }
+    if (!is_string($line) || !preg_match('/^[0-9]{1,5}(?:\r?\n|$)/D', $line)) {
+        return null;
+    }
+    $port = (int) $line;
+    return $port >= 1 && $port <= 65535 ? $port : null;
+}
+
+/** Run an argument vector, capturing output without shell interpolation. */
+function ocRun(array $args, ?array $env = null): array
+{
+    $command = implode(' ', array_map('escapeshellarg', $args));
+    $process = proc_open($command.' 2>&1', array(0 => array('pipe', 'r'), 1 => array('pipe', 'w')), $pipes, null, $env);
+    if (!is_resource($process)) {
+        return array(1, 'Could not launch command');
+    }
+    fclose($pipes[0]);
+    $output = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+    return array(proc_close($process), (string) $output);
+}
+
+/** Read the file columns from a plain quota row; zero soft limit is unlimited. */
+function ocQuotaFileHeadroom(string $quotaOutput): ?array
+{
+    foreach (preg_split('/\r?\n/', $quotaOutput) as $line) {
+        if (!preg_match('/^\s*\/\S+\s+\d+\*?\s+\d+\s+\d+\s+(?:\S+\s+)?(\d+)\*?\s+(\d+)\s+(\d+)(?:\s+\S+)?\s*$/D', $line, $match)) {
+            continue;
+        }
+        $used = filter_var($match[1], FILTER_VALIDATE_INT);
+        $soft = filter_var($match[2], FILTER_VALIDATE_INT);
+        $hard = filter_var($match[3], FILTER_VALIDATE_INT);
+        if ($used !== false && $soft !== false && $hard !== false && $soft > 0) {
+            return array('used' => $used, 'soft' => $soft, 'hard' => $hard);
+        }
+    }
+    return null;
+}
+
+/** Preserve every foreign crontab byte; manage only trailing PMSS lines. */
+function ocCronMerge(string $current, string $home, bool $install): string
+{
+    $lines = preg_split('/(?<=\n)/', $current, -1, PREG_SPLIT_NO_EMPTY);
+    $kept = '';
+    foreach ($lines as $line) {
+        if (preg_match('/# pmss-openclaw\r?\n?$/D', $line) !== 1) {
+            $kept .= $line;
+        }
+    }
+    if (!$install) {
+        return $kept;
+    }
+    if ($kept !== '' && substr($kept, -1) !== "\n") {
+        $kept .= "\n";
+    }
+    return $kept."@reboot php \$HOME/bin/install-openclaw check ".OC_CRON_TAG."\n"
+        ."* * * * * php \$HOME/bin/install-openclaw check ".OC_CRON_TAG."\n";
+}
+
+/** Install a crontab from a private temporary file, leaving other jobs alone. */
+function ocCronApply(array $paths, bool $install): void
+{
+    list($rc, $current) = ocRun(array('crontab', '-l'));
+    if ($rc !== 0 && strpos($current, 'no crontab for') === false) {
+        throw new RuntimeException('Could not read crontab: '.$current);
+    }
+    if ($rc !== 0) {
+        $current = '';
+    }
+    $merged = ocCronMerge($current, $paths['home'], $install);
+    if ($merged === $current) {
+        return;
+    }
+    $temp = tempnam($paths['home'], '.openclaw-cron-');
+    if ($temp === false) {
+        throw new RuntimeException('Could not stage crontab');
+    }
+    try {
+        chmod($temp, 0600);
+        file_put_contents($temp, $merged);
+        list($rc, $output) = ocRun(array('crontab', $temp));
+        if ($rc !== 0) {
+            throw new RuntimeException('Could not update crontab: '.$output);
+        }
+    } finally {
+        unlink($temp);
+    }
+}
+
+/** A failed launch counts once; the fifth failure permanently gates checks. */
+function ocNextCheckState(string $state, bool $healthy, int $time): string
+{
+    if ($healthy) {
+        return 'healthy 0 '.$time."\n";
+    }
+    if (strpos($state, 'gave_up ') === 0) {
+        return $state;
+    }
+    $count = preg_match('/^failed ([0-4]) /', $state, $match) ? (int) $match[1] : 0;
+    ++$count;
+    return ($count >= 5 ? 'gave_up ' : 'failed '.$count.' ').$time."\n";
+}
+
+/** Private env contents are accepted only with an account-owned 0600 file. */
+function ocGatewayEnv(array $paths): array
+{
+    $file = $paths['env'];
+    if (!is_file($file) || is_link($file) || (fileperms($file) & 0077) !== 0 || fileowner($file) !== posix_geteuid()) {
+        throw new RuntimeException('Gateway token file is absent or insecure');
+    }
+    $contents = (string) file_get_contents($file);
+    if (!preg_match('/^OPENCLAW_GATEWAY_TOKEN=([a-f0-9]{64})\n?$/D', $contents, $match)) {
+        throw new RuntimeException('Gateway token file is invalid');
+    }
+    $env = getenv();
+    $env['OPENCLAW_GATEWAY_TOKEN'] = $match[1];
+    $env['PATH'] = dirname($paths['node']).':'.($env['PATH'] ?? '/usr/bin:/bin');
+    // The gateway runs npm itself (global root/prefix lookups, plugins); keep that under ~/.openclaw so --purge removes it.
+    $env['npm_config_cache'] = $paths['state'].'/npm-cache';
+    return $env;
+}
+
+/** Match the entry path or one of OpenClaw's exact rewritten process titles. */
+function ocCmdlineIsGateway(string $cmdline, string $entry): bool
+{
+    if (strpos($cmdline, $entry) !== false) {
+        return true;
+    }
+    $first = strtok($cmdline, "\0 \t\r\n");
+    return $first === 'openclaw' || $first === 'openclaw-gateway';
+}
+
+/** Check UID, executable and command line before signaling a recorded PID. */
+function ocRunningPid(array $paths): ?int
+{
+    $pid = is_file($paths['pid']) && !is_link($paths['pid']) ? trim((string) file_get_contents($paths['pid'])) : '';
+    if (!preg_match('/^[1-9][0-9]*$/D', $pid)) {
+        return null;
+    }
+    $proc = '/proc/'.$pid;
+    $cmd = @file_get_contents($proc.'/cmdline');
+    $exe = @readlink($proc.'/exe');
+    $owner = @fileowner($proc);
+    if ($owner !== posix_geteuid() || $exe !== realpath($paths['node']) || !is_string($cmd)
+        || !ocCmdlineIsGateway($cmd, $paths['entry'])) {
+        return null;
+    }
+    return (int) $pid;
+}
+
+/** Existing credentials survive repeat installs; new files are private from creation. */
+function ocEnsureToken(array $paths): void
+{
+    if (file_exists($paths['env']) || is_link($paths['env'])) {
+        ocGatewayEnv($paths);
+        return;
+    }
+    $old = umask(0077);
+    try {
+        $handle = @fopen($paths['env'], 'x');
+        if ($handle === false) {
+            throw new RuntimeException('Could not create gateway token');
+        }
+        $content = 'OPENCLAW_GATEWAY_TOKEN='.bin2hex(random_bytes(32))."\n";
+        if (fwrite($handle, $content) !== strlen($content)) {
+            fclose($handle);
+            throw new RuntimeException('Could not write gateway token');
+        }
+        fclose($handle);
+    } finally {
+        umask($old);
+    }
+}
+
+/** Download one pinned archive and verify it before extraction. */
+function ocInstallNode(array $paths): void
+{
+    if (is_file($paths['node']) && is_executable($paths['node'])) {
+        list($rc, $version) = ocRun(array($paths['node'], '--version'));
+        if ($rc === 0 && trim($version) === 'v'.OC_NODE_VERSION) {
+            return;
+        }
+    }
+    $base = $paths['home'].'/.local/share';
+    if (!is_dir($base) && !mkdir($base, 0700, true)) {
+        throw new RuntimeException('Could not prepare local share directory');
+    }
+    $work = $base.'/.node-openclaw-'.bin2hex(random_bytes(6));
+    mkdir($work, 0700);
+    $archive = $work.'/node.tar.xz';
+    $name = 'node-v'.OC_NODE_VERSION.'-linux-x64.tar.xz';
+    list($rc, $out) = ocRun(array('curl', '-fsSL', '--connect-timeout', '15', '--max-time', '300', 'https://nodejs.org/dist/v'.OC_NODE_VERSION.'/'.$name, '-o', $archive));
+    if ($rc !== 0 || !is_file($archive) || !hash_equals(OC_NODE_SHA256, hash_file('sha256', $archive))) {
+        throw new RuntimeException('Node download or SHA256 verification failed: '.$out);
+    }
+    $stage = $work.'/node';
+    mkdir($stage, 0700);
+    list($rc, $out) = ocRun(array('tar', '-xJf', $archive, '--strip-components=1', '-C', $stage));
+    if ($rc !== 0) {
+        throw new RuntimeException('Node extraction failed: '.$out);
+    }
+    $target = dirname($paths['node'], 2);
+    $backup = $work.'/previous';
+    if ((file_exists($target) || is_link($target)) && !rename($target, $backup)) {
+        throw new RuntimeException('Could not move the previous Node version');
+    }
+    if (!rename($stage, $target)) {
+        if (is_dir($backup)) {
+            rename($backup, $target);
+        }
+        throw new RuntimeException('Could not publish Node');
+    }
+    ocRemoveTree($work);
+}
+
+/** Remove only the installer's fixed directories; never traverse symlinks. */
+function ocRemoveTree(string $path): void
+{
+    if (is_link($path) || is_file($path)) {
+        unlink($path);
+    } elseif (is_dir($path)) {
+        foreach (new DirectoryIterator($path) as $entry) {
+            if (!$entry->isDot()) {
+                ocRemoveTree($entry->getPathname());
+            }
+        }
+        rmdir($path);
+    }
+}
+
+/** OpenClaw runs with the pinned interpreter and a token from the private env. */
+function ocCli(array $paths, array $args, ?array $env = null): array
+{
+    return ocRun(array_merge(array($paths['node'], $paths['entry']), $args), $env);
+}
+
+/** Stop only a verified account-owned process. */
+function ocStop(array $paths): void
+{
+    $pid = ocRunningPid($paths);
+    if ($pid === null) {
+        return;
+    }
+    posix_kill($pid, SIGTERM);
+    for ($i = 0; $i < 10 && ocRunningPid($paths) !== null; ++$i) {
+        usleep(200000);
+    }
+    if (ocRunningPid($paths) === $pid) {
+        posix_kill($pid, SIGKILL);
+    }
+}
+
+/** Probe only the account's reserved loopback listener. */
+function ocPortListening(?int $port): bool
+{
+    if ($port === null) {
+        return false;
+    }
+    $socket = @fsockopen('127.0.0.1', $port, $error, $message, 1);
+    if ($socket === false) {
+        return false;
+    }
+    fclose($socket);
+    return true;
+}
+
+/** Launch detached; wait for readiness without treating a slow gateway as failed. */
+function ocStart(array $paths, bool $reset, int $waitSeconds): bool
+{
+    $env = ocGatewayEnv($paths);
+    $port = ocReservedPort($paths['home'].'/.media-stack-port-openclaw');
+    if ($port === null) {
+        throw new RuntimeException('No PMSS-reserved port yet; run a full PMSS update first');
+    }
+    if (!is_file($paths['entry'])) {
+        throw new RuntimeException('OpenClaw is not installed');
+    }
+    list($rc, $auth) = ocCli($paths, array('config', 'get', 'gateway.auth.mode'), $env);
+    if ($rc !== 0 || trim($auth, " \t\r\n\"") !== 'token') {
+        throw new RuntimeException('Gateway token authentication is not configured');
+    }
+    file_put_contents($paths['port'], $port."\n");
+    if ($reset) {
+        file_put_contents($paths['check'], "healthy 0 ".time()."\n");
+    }
+    if (ocRunningPid($paths) !== null) {
+        return true;
+    }
+    $log = $paths['state'].'/logs/gateway.log';
+    if (!is_dir(dirname($log))) {
+        mkdir(dirname($log), 0700, true);
+    }
+    $command = 'nohup setsid '.escapeshellarg($paths['node']).' '.escapeshellarg($paths['entry'])
+        .' gateway run --bind loopback --port '.escapeshellarg((string) $port)
+        .' </dev/null >>'.escapeshellarg($log).' 2>&1 & echo $!';
+    $process = proc_open($command, array(0 => array('pipe', 'r'), 1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes, null, $env);
+    if (!is_resource($process)) {
+        return false;
+    }
+    fclose($pipes[0]);
+    $pid = trim((string) stream_get_contents($pipes[1]));
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    proc_close($process);
+    if (!preg_match('/^[1-9][0-9]*$/D', $pid)) {
+        return false;
+    }
+    file_put_contents($paths['pid'], $pid."\n");
+    for ($waited = 0; $waited < $waitSeconds; ++$waited) {
+        sleep(1);
+        if (ocRunningPid($paths) === null) {
+            return false;
+        }
+        if (ocPortListening($port)) {
+            return true;
+        }
+    }
+    echo "Gateway is still starting; check `install-openclaw status` in a minute.\n";
+    return true;
+}
+
+/** One cron check at a time; five consecutive failures require manual start. */
+function ocCheck(array $paths): void
+{
+    $lock = fopen($paths['state'].'/check.lock', 'c');
+    if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
+        return;
+    }
+    $prior = is_file($paths['check']) ? (string) file_get_contents($paths['check']) : '';
+    if (strpos($prior, 'gave_up ') === 0) {
+        return;
+    }
+    $healthy = ocRunningPid($paths) !== null;
+    if (!$healthy) {
+        try {
+            $healthy = ocStart($paths, false, 5);
+        } catch (Throwable $error) {
+            fwrite(STDERR, $error->getMessage()."\n");
+        }
+    }
+    file_put_contents($paths['check'], ocNextCheckState($prior, $healthy, time()));
+    flock($lock, LOCK_UN);
+    fclose($lock);
+}
+
+/** One entry point keeps include-only test calls hermetic. */
+function ocMain(array $args): int
+{
+    $command = $args[1] ?? '';
+    if (!in_array($command, array('install', 'start', 'stop', 'status', 'check', 'uninstall'), true)) {
+        echo "Usage: install-openclaw install [--yes] | start | stop | status [--show-token] | check | uninstall [--purge]\n";
+        return $command === '' ? 0 : 1;
+    }
+    if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+        throw new RuntimeException('Run as your own account, not root');
+    }
+    $paths = ocPaths();
+    if ($command === 'install') {
+        echo "OpenClaw is a chat-driven agent with shell access to this account. Its gateway or bot token equals shell access.\n";
+        if (!in_array('--yes', $args, true)) {
+            echo 'Continue? [y/N] ';
+            if (strtolower(trim((string) fgets(STDIN))) !== 'y') {
+                return 1;
+            }
+        }
+        $port = ocReservedPort($paths['home'].'/.media-stack-port-openclaw');
+        if ($port === null) {
+            throw new RuntimeException('No PMSS-reserved port yet; run a full PMSS update first');
+        }
+        list($quotaRc, $quotaOutput) = ocRun(array('quota', '-w', '-p', '-u'));
+        $files = $quotaRc === 0 ? ocQuotaFileHeadroom($quotaOutput) : null;
+        if ($files !== null && $files['used'] > $files['soft'] - OC_REQUIRED_FILES) {
+            throw new RuntimeException('OpenClaw needs '.OC_REQUIRED_FILES.' files; '.$files['used'].' files are currently used and the account file limit is '.$files['soft'].'. Installing would exceed the account file-count quota.');
+        }
+        ocInstallNode($paths);
+        $env = getenv();
+        $env['PATH'] = dirname($paths['node']).':'.($env['PATH'] ?? '/usr/bin:/bin');
+        list($rc, $output) = ocRun(ocNpmInstallArgs($paths), $env);
+        ocRemoveTree($paths['npmCache']);
+        if ($rc !== 0) {
+            if (strpos($output, '-122') !== false || strpos($output, 'EDQUOT') !== false) {
+                throw new RuntimeException('npm install failed: the account file-count quota was reached.');
+            }
+            throw new RuntimeException('npm install failed: '.$output);
+        }
+        if (!is_file($paths['entry'])) {
+            throw new RuntimeException('npm did not install the OpenClaw entry point');
+        }
+        if (!is_dir($paths['state'])) {
+            mkdir($paths['state'], 0700);
+        }
+        ocEnsureToken($paths);
+        $env = ocGatewayEnv($paths);
+        list($rc, $help) = ocCli($paths, array('onboard', '--help'), $env);
+        foreach (array('--non-interactive', '--accept-risk', '--skip-daemon', '--skip-channels', '--gateway-token-ref-env') as $flag) {
+            if ($rc !== 0 || strpos($help, $flag) === false) {
+                throw new RuntimeException('Installed OpenClaw onboarding lacks '.$flag);
+            }
+        }
+        $flags = array('onboard', '--non-interactive', '--accept-risk', '--mode', 'local', '--auth-choice', 'skip', '--gateway-auth', 'token', '--gateway-token-ref-env', 'OPENCLAW_GATEWAY_TOKEN', '--gateway-bind', 'loopback', '--gateway-port', (string) $port, '--skip-daemon', '--skip-channels', '--skip-skills', '--skip-health', '--skip-ui', '--suppress-gateway-token-output');
+        list($rc, $output) = ocCli($paths, $flags, $env);
+        if ($rc !== 0) {
+            throw new RuntimeException('Onboarding failed; see OpenClaw diagnostics.');
+        }
+        $wrapper = "#!/bin/sh\nPATH=".escapeshellarg(dirname($paths['node'])).":\$PATH\nexport PATH\nexec "
+            .escapeshellarg($paths['node']).' '.escapeshellarg($paths['entry'])." \"\$@\"\n";
+        if (!is_dir($paths['home'].'/bin')) {
+            mkdir($paths['home'].'/bin', 0750);
+        }
+        file_put_contents($paths['home'].'/bin/openclaw', $wrapper);
+        chmod($paths['home'].'/bin/openclaw', 0750);
+        file_put_contents($paths['port'], $port."\n");
+        ocCronApply($paths, true);
+        if (!ocStart($paths, true, 120)) {
+            throw new RuntimeException('Gateway did not stay running; inspect ~/.openclaw/logs/gateway.log');
+        }
+        echo "Installed on loopback port {$port}. Configure your model provider with: ~/bin/openclaw configure\n";
+        return 0;
+    }
+    if ($command === 'uninstall') {
+        ocStop($paths);
+        ocCronApply($paths, false);
+        foreach (array($paths['home'].'/bin/openclaw', $paths['pid']) as $file) {
+            if (is_file($file) || is_link($file)) {
+                unlink($file);
+            }
+        }
+        ocRemoveTree($paths['home'].'/.local/share/openclaw');
+        ocRemoveTree($paths['home'].'/.local/share/node-openclaw');
+        ocRemoveTree($paths['npmCache']);
+        echo "Cron entries, wrapper, and program files removed.\n";
+        if (in_array('--purge', $args, true)) {
+            ocRemoveTree($paths['state']);
+            echo "OpenClaw configuration and data removed.\n";
+        }
+        return 0;
+    }
+    if ($command === 'status') {
+        $pid = ocRunningPid($paths);
+        $port = ocReservedPort($paths['port']);
+        $state = is_file($paths['check']) ? trim((string) file_get_contents($paths['check'])) : 'never checked';
+        $node = is_file($paths['node']) ? trim((string) ocRun(array($paths['node'], '--version'))[1]) : 'missing';
+        $version = is_file($paths['entry']) ? trim((string) ocCli($paths, array('--version'))[1]) : 'missing';
+        echo 'Gateway: '.($pid === null ? 'stopped' : 'running').' pid='.($pid ?? '-').' port='.($port ?? '-').' listening='.(ocPortListening($port) ? 'yes' : 'no')."\n";
+        echo "Check: {$state}\nNode: {$node}\nOpenClaw: {$version}\n";
+        if (in_array('--show-token', $args, true)) {
+            echo 'Token: '.ocGatewayEnv($paths)['OPENCLAW_GATEWAY_TOKEN']."\n";
+        }
+        return 0;
+    }
+    if ($command === 'stop') {
+        ocStop($paths);
+        echo "Gateway stopped.\n";
+        return 0;
+    }
+    if ($command === 'start') {
+        if (!ocStart($paths, true, 120)) {
+            throw new RuntimeException('Gateway did not stay running');
+        }
+        ocCronApply($paths, true);
+        echo "Gateway running.\n";
+        return 0;
+    }
+    ocCheck($paths);
+    return 0;
+}
+
+if (isset($_SERVER['SCRIPT_FILENAME']) && realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__) {
+    try {
+        exit(ocMain($argv));
+    } catch (Throwable $error) {
+        fwrite(STDERR, $error->getMessage()."\n");
+        exit(1);
+    }
+}

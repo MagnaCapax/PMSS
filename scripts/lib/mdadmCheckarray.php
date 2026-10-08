@@ -15,6 +15,8 @@ require_once __DIR__.'/storageHealth.php';
 const PMSS_MDADM_CHECKARRAY_BIN_DEFAULT = '/usr/share/mdadm/checkarray';
 const PMSS_MDADM_CHECKARRAY_MDSTAT_DEFAULT = '/proc/mdstat';
 const PMSS_MDADM_CHECKARRAY_SYS_BLOCK_DEFAULT = '/sys/block';
+const PMSS_MDADM_CHECKARRAY_MIN_DAYS_DEFAULT = '/etc/seedbox/config/mdadmCheckarrayMinDays';
+const PMSS_MDADM_CHECKARRAY_STATE_DEFAULT = '/var/lib/pmss/mdadm-checkarray-last';
 
 /** Emit one cron-friendly status line with a stable prefix. */
 function pmssMdadmCheckarrayLog(string $message): void
@@ -98,13 +100,14 @@ function pmssMdadmCheckarrayRequestIdle(string $array, string $sysBlockRoot): bo
     }
 
     $path = rtrim($sysBlockRoot, '/').'/'.$array.'/md/sync_action';
-    return file_exists($path) && @file_put_contents($path, "idle\n") !== false;
+    return file_exists($path) && pmssFileWriteComplete($path, "idle\n");
 }
 
 /** Run Debian checkarray and preserve its stdout/stderr in the cron log. */
 function pmssMdadmCheckarrayRunCommand(string $binary, array $arrays): int
 {
-    $args = array_merge(['--cron', '--idle', '--quiet'], empty($arrays) ? ['--all'] : array_values($arrays));
+    // PMSS owns the cron schedule; --cron would let AUTOCHECK silently skip it.
+    $args = array_merge(['--idle', '--quiet'], empty($arrays) ? ['--all'] : array_values($arrays));
     $result = pmssCommandCapture(pmssBuildCommand($binary, $args), 120);
     if ((string) ($result['stdout'] ?? '') !== '') {
         echo (string) $result['stdout'];
@@ -114,6 +117,37 @@ function pmssMdadmCheckarrayRunCommand(string $binary, array $arrays): int
     }
 
     return (int) ($result['rc'] ?? 1);
+}
+
+/** Treat absent, malformed, or out-of-range file contents as unset. */
+function pmssMdadmCheckarrayReadInteger(string $path): ?int
+{
+    $value = @file_get_contents($path);
+    if (!is_string($value) || !ctype_digit(trim($value))) {
+        return null;
+    }
+
+    $digits = ltrim(trim($value), '0');
+    $parsed = filter_var($digits === '' ? '0' : $digits, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+    return $parsed === false ? null : $parsed;
+}
+
+/** The host minimum applies only when both the setting and last start are valid. */
+function pmssMdadmCheckarrayWithinMinDays(int $minDays, ?int $lastStarted, int $now): bool
+{
+    return $minDays > 0 && $lastStarted !== null && $now - $lastStarted < $minDays * 86400;
+}
+
+/** A failed state write must not turn a successful checkarray invocation into failure. */
+function pmssMdadmCheckarrayRunAndRemember(string $binary, array $arrays, string $statePath): int
+{
+    $startedAt = time();
+    $rc = pmssMdadmCheckarrayRunCommand($binary, $arrays);
+    if ($rc === 0 && ((!is_dir(dirname($statePath)) && !@mkdir(dirname($statePath), 0755, true))
+        || !pmssFileWriteComplete($statePath, (string) $startedAt."\n"))) {
+        pmssMdadmCheckarrayLog('unable to write last-check state');
+    }
+    return $rc;
 }
 
 /** Cron entrypoint for the quarterly mdadm redundancy check. */
@@ -131,6 +165,16 @@ function pmssMdadmCheckarrayMain(array $argv): int
         return 0;
     }
 
+    $minDays = pmssMdadmCheckarrayReadInteger(pmssEnvTrimmed(
+        'PMSS_MDADM_CHECKARRAY_MIN_DAYS_PATH', PMSS_MDADM_CHECKARRAY_MIN_DAYS_DEFAULT
+    )) ?? 0;
+    $statePath = pmssEnvTrimmed('PMSS_MDADM_CHECKARRAY_STATE_PATH', PMSS_MDADM_CHECKARRAY_STATE_DEFAULT);
+    $lastStarted = $minDays > 0 ? pmssMdadmCheckarrayReadInteger($statePath) : null;
+    if (pmssMdadmCheckarrayWithinMinDays($minDays, $lastStarted, time())) {
+        pmssMdadmCheckarrayLog('skipping: last check '.date('c', $lastStarted).' is within the '.$minDays.'-day host minimum');
+        return 0;
+    }
+
     $sysBlockRoot = pmssEnvTrimmed('PMSS_MDADM_CHECKARRAY_SYS_BLOCK_ROOT', PMSS_MDADM_CHECKARRAY_SYS_BLOCK_DEFAULT);
     $plan = pmssMdadmCheckarrayPlan(
         pmssEnvTrimmed('PMSS_MDADM_CHECKARRAY_MDSTAT_PATH', PMSS_MDADM_CHECKARRAY_MDSTAT_DEFAULT),
@@ -139,7 +183,7 @@ function pmssMdadmCheckarrayMain(array $argv): int
 
     if ($plan['fallback_all']) {
         pmssMdadmCheckarrayLog('unable to enumerate md arrays ('.$plan['reason'].'); preserving checkarray --all behavior');
-        return pmssMdadmCheckarrayRunCommand($binary, []);
+        return pmssMdadmCheckarrayRunAndRemember($binary, [], $statePath);
     }
 
     foreach (['degraded' => 'degraded', 'unknown' => 'state unknown'] as $key => $label) {
@@ -155,5 +199,5 @@ function pmssMdadmCheckarrayMain(array $argv): int
     }
 
     pmssMdadmCheckarrayLog('checking non-degraded arrays: '.implode(' ', $plan['healthy']));
-    return pmssMdadmCheckarrayRunCommand($binary, $plan['healthy']);
+    return pmssMdadmCheckarrayRunAndRemember($binary, $plan['healthy'], $statePath);
 }

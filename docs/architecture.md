@@ -26,6 +26,11 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/restartUser.php** – Root-only, one-account restart entry point for
+  billing. It holds the recreate/restart locks, signals only that account's
+  processes as the account, and starts rTorrent, marked media-stack apps, then
+  lighttpd. Its root-side media-stack bridge loads the root-owned skeleton
+  command helper; customer PHP loads the per-user copy (ADR 0086).
 - **scripts/lib/lighttpd/accountPath.php** – `pmssAccountPathRun()` checks paths
   against an existing account home and launches account-owned file work as that
   account. `pmssReplaceAccountFile()` in the adjacent managed writer streams

@@ -13,7 +13,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             [
                 'function pmssLocalFrameCustomFramesRead($path = \'../.customFrames\')',
                 '$frameData = pmssLocalFrameCustomFramesRead();',
-                'foreach (array(pmssLocalFrameInstalledAppFramesRead(), pmssLocalFrameProxyAppFramesRead(), pmssLocalFrameConsoleFrameRead()) as $pmssCandidateFrames) {',
+                'foreach (array(pmssLocalFrameInstalledAppFramesRead(), pmssLocalFrameProxyAppFramesRead(), pmssLocalFrameConsoleFrameRead(), pmssLocalFrameAppsFrameRead()) as $pmssCandidateFrames) {',
                 '$frames = array_merge($frames, $frameData);',
             ],
             'Missing index.php frame handling fragment: ',
@@ -460,7 +460,7 @@ class IndexSkeletonFrameDataTest extends TestCase
         foreach (['sabnzbd', 'radarr', 'prowlarr', 'sonarr', 'lidarr', 'readarr', 'autobrr'] as $app) {
             $this->assertStringContainsString("loadFrame('".$app."', '/public-alice/".$app."/')", $html);
         }
-        $this->assertStringContainsString("loadFrame('jellyfin', '/public-alice/jellyfin/web/index.html')", $html);
+        $this->assertStringContainsString("loadFrame('jellyfin', '/public-alice/jellyfin/web/')", $html);
         $this->assertStringNotContainsString('<a href="#notebook"', $html);
     }
 

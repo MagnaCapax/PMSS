@@ -81,7 +81,7 @@ if ($device !== '/dev/watchdog') {
         return;
     }
     if ($updated !== $config) {
-        if (@file_put_contents('/etc/watchdog.conf', $updated) !== strlen($updated)) {
+        if (!pmssFileWriteComplete('/etc/watchdog.conf', $updated)) {
             logMessage('[WARN] Unable to update watchdog device path; leaving service disabled.');
             return;
         }

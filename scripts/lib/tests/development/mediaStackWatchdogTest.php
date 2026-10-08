@@ -50,6 +50,23 @@ class MediaStackWatchdogTest extends TestCase
         $this->assertSame(0, $status['apps']['sonarr']['consecutiveFailures']);
     }
 
+    public function testDeliberatelyStoppedAppIsOffWithoutFailureOrAlert(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-watchdog-off-');
+        $this->pmssWriteFile($home.'/.sonarrDisable', '');
+        $apps = array('sonarr' => \pmssMediaStackWatchdogAppDefinitions()['sonarr']);
+        $previous = array('apps' => array('sonarr' => array('state' => 'failed', 'consecutiveFailures' => 9)));
+        $probes = 0;
+        $status = \pmssMediaStackWatchdogSnapshot('alice', $apps, $previous, static function () use (&$probes): bool {
+            $probes++;
+            return false;
+        }, $home);
+        $this->assertSame('off', $status['apps']['sonarr']['state']);
+        $this->assertSame(0, $status['apps']['sonarr']['consecutiveFailures']);
+        $this->assertSame('healthy', $status['state']);
+        $this->assertSame(0, $probes);
+    }
+
     public function testRunUserPublishesTheObservedAccountSnapshot(): void
     {
         $homeRoot = $this->pmssMakeTempDir('media-stack-watchdog-run-');

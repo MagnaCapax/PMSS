@@ -48,8 +48,11 @@ function pmssCheckGuiUserPathIsSafe(string $path, string $homeDir, bool $directo
         return false;
     }
 
+    clearstatcache(true, $path);
     return pmssPathTargetIsSafe($path, $directoryTarget, true)
-        && pmssPathWithinRootIsSafe(dirname($path), $homeDir, true);
+        && pmssPathWithinRootIsSafe(dirname($path), $homeDir, true)
+        && !is_link($path)
+        && (!file_exists($path) || ($directoryTarget ? is_dir($path) : is_file($path)));
 }
 
 /**
@@ -57,6 +60,16 @@ function pmssCheckGuiUserPathIsSafe(string $path, string $homeDir, bool $directo
  */
 function pmssCheckGuiApplyOwnership(string $path, string $user, callable $log): bool
 {
+    clearstatcache(true, $path);
+    if (is_link($path)) {
+        $log("Skipping {$user}: refusing to apply ownership to symlinked {$path}");
+        return false;
+    }
+    if (!is_file($path) && !is_dir($path)) {
+        $log("Skipping {$user}: unable to apply ownership to {$path}");
+        return false;
+    }
+
     if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
         if (!@chown($path, $user) || !@chgrp($path, $user)) {
             $log("Skipping {$user}: unable to apply ownership to {$path}");

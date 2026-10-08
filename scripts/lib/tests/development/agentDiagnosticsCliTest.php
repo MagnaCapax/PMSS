@@ -50,7 +50,7 @@ final class agentDiagnosticsCliTest extends TestCase
         $payload = $this->pmssDecodeJsonArray($output);
 
         $this->assertSame(
-            ['motd', 'storage', 'services', 'system', 'cgroup', 'system_test', 'users', 'resources', 'traffic', 'user_settings', 'user_processes', 'user_metrics_latest', 'user_identity', 'user_quota', 'user_disk', 'user_http_responsiveness'],
+            ['motd', 'storage', 'services', 'system', 'cgroup', 'system_test', 'users', 'resources', 'traffic', 'user_settings', 'user_processes', 'user_metrics_latest', 'user_metrics_24h_ago', 'user_identity', 'user_quota', 'user_disk', 'user_http_responsiveness'],
             array_keys($payload['sections'])
         );
         $this->assertSame(
@@ -71,6 +71,7 @@ final class agentDiagnosticsCliTest extends TestCase
             ['ts' => 1756200000, 'uid' => 1001, 'mem_failcnt' => 126389728, 'mem_current' => 327155712, 'mem_peak' => 327155712, 'mem_limit' => 327155712, 'mem_oom_kill' => 0],
             $payload['sections']['user_metrics_latest']
         );
+        $this->assertSame($payload['sections']['user_metrics_latest'], $payload['sections']['user_metrics_24h_ago']);
         $this->assertSame(['raw' => 'uid=1001(alice) gid=1001(alice) groups=1001(alice)'], $payload['sections']['user_identity']);
         $this->assertSame(['raw' => 'Disk quotas for user alice'], $payload['sections']['user_quota']);
         $this->assertSame(['raw' => '12G /home/alice'], $payload['sections']['user_disk']);
@@ -86,6 +87,47 @@ final class agentDiagnosticsCliTest extends TestCase
 
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Invalid username', $result['output']);
+    }
+
+    public function testUserMetricsHistoryCommandReadsNewestRotationThenLiveWithBoundedOutput(): void
+    {
+        $user = "alice'; printf injected";
+        $spec = \pmssAgentDiagnosticsSectionSpecs($user)['user_metrics_24h_ago'];
+
+        $this->assertSame('command', $spec['type']);
+        $this->assertSame('json', $spec['format']);
+        $this->assertSame(
+            'cat '.escapeshellarg('/var/log/pmss/metrics/archive/'.$user.'.1').' '.escapeshellarg('/var/log/pmss/metrics/'.$user).' 2>/dev/null | tail -n 289 | head -1',
+            $spec['command']
+        );
+    }
+
+    public function testUserMetricsHistorySelectsArchiveSampleAndHandlesMissingFiles(): void
+    {
+        $root = $this->pmssMakeNamedTempDir('pmss-agent-metrics-');
+        $rotatedPath = $root.'/alice.1';
+        $livePath = $root.'/alice';
+        $spec = \pmssAgentDiagnosticsSectionSpecs('alice')['user_metrics_24h_ago'];
+        $spec['command'] = str_replace(
+            [escapeshellarg('/var/log/pmss/metrics/archive/alice.1'), escapeshellarg('/var/log/pmss/metrics/alice')],
+            [escapeshellarg($rotatedPath), escapeshellarg($livePath)],
+            $spec['command']
+        );
+
+        $rotated = [];
+        $live = [];
+        for ($line = 1; $line <= 150; $line++) {
+            $rotated[] = json_encode(['ts' => 'archive-'.$line]);
+            $live[] = json_encode(['ts' => 'live-'.$line]);
+        }
+        file_put_contents($rotatedPath, implode("\n", $rotated)."\n");
+        file_put_contents($livePath, implode("\n", $live)."\n");
+
+        $this->assertSame(['ts' => 'archive-12'], \pmssAgentDiagnosticsSpecCollect($spec));
+        unlink($rotatedPath);
+        $this->assertSame(['ts' => 'live-1'], \pmssAgentDiagnosticsSpecCollect($spec));
+        unlink($livePath);
+        $this->assertStringContainsString('returned invalid JSON', \pmssAgentDiagnosticsSpecCollect($spec)['error']);
     }
 
     public function testTextOutputKeepsSectionDelimiters(): void

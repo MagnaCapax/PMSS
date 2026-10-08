@@ -18,10 +18,6 @@ function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths
     $localUser = $cfg['localUser'];
     $remoteUser = $cfg['remoteUser'];
 
-    if ($remoteUser !== $localUser) {
-        pmssUserTransferRenameRutorrentShare($home, $remoteUser, $localUser);
-    }
-
     // Keep migrated torrent clients usable without copying server-specific config wholesale.
     pmssUserTransferRewriteRtorrentSessionPaths($cfg, $home);
     pmssUserTransferPreserveQbittorrentCategories(
@@ -38,6 +34,11 @@ function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths
         'Normalising user permissions',
         pmssBuildCommand('php', [dirname(__DIR__, 2).'/util/userPermissions.php', $localUser])
     );
+    // rsync -a can leave the imported share owned by the source UID. Repair it
+    // before asking the local account to rename that directory.
+    if ($remoteUser !== $localUser) {
+        pmssUserTransferRenameRutorrentShare($home, $remoteUser, $localUser);
+    }
     if ($remoteUser !== $localUser) {
         pmssUserTransferVerifyPayloadOwnership($localUser, $home);
     }
@@ -49,20 +50,38 @@ function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths
 
 function pmssUserTransferRenameRutorrentShare(string $home, string $remoteUser, string $localUser): void
 {
-    $src = $home.'/www/rutorrent/share/users/'.$remoteUser;
-    $dst = $home.'/www/rutorrent/share/users/'.$localUser;
-    if (!file_exists($src) || file_exists($dst)) {
+    $share = $home.'/www/rutorrent/share';
+    clearstatcache(true, $share);
+    if (is_link($share)) {
+        // ADR 0041's managed link is a normal customer layout. Address its
+        // durable target directly so no root or account command traverses it.
+        if (@readlink($share) !== '../../.local/share/pmss/rutorrent/share'
+            || !pmssPathTargetIsSafe(dirname($share), true)) {
+            logMessage('[WARN] Skipping ruTorrent rename (unexpected share link)');
+            return;
+        }
+        $share = $home.'/.local/share/pmss/rutorrent/share';
+    }
+    $src = $share.'/users/'.$remoteUser;
+    $dst = $share.'/users/'.$localUser;
+    clearstatcache(true, $src);
+    clearstatcache(true, $dst);
+    if (!file_exists($src) && !is_link($src)) {
         return;
     }
-    if (!pmssUserTransferIsPathWithinHome($src, $home) || !pmssUserTransferIsPathWithinHome(dirname($dst), $home)) {
-        logMessage('[WARN] Skipping ruTorrent rename (path escapes home)');
+    if (!pmssPathTargetIsSafe($src, true, true) || !is_dir($src)
+        || !pmssPathTargetIsSafe($dst, true, true) || file_exists($dst) || is_link($dst)
+        || !pmssUserTransferIsPathWithinHome($src, $home)
+        || !pmssUserTransferIsPathWithinHome(dirname($dst), $home)) {
+        logMessage('[WARN] Skipping ruTorrent rename (unsafe source or destination)');
         return;
     }
-    if (@rename($src, $dst)) {
+    $command = 'mv -T -- '.escapeshellarg($src).' '.escapeshellarg($dst);
+    if (pmssAccountPathRun($localUser, $home, [$src, $dst], $command)) {
         logMessage('[OK] Renamed ruTorrent user directory');
         return;
     }
-    runStep('Renaming ruTorrent user directory', pmssBuildCommand('mv', [$src, $dst]));
+    logMessage('[WARN] Unable to rename ruTorrent user directory as account');
 }
 
 function pmssUserTransferRequestRtorrentRestart(string $home, string $localUser): void

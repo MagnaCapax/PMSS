@@ -142,7 +142,7 @@ function pmssLocalFrameProxyAppDefinitions($username = '')
         'qbittorrent' => pmssLocalFrameDefinition('qbittorrent/', 'qBittorrent', 'qBittorrent - Torrent web UI'),
         'deluge' => pmssLocalFrameDefinition('deluge/', 'Deluge', 'Deluge - Torrent web UI'),
         'rclone' => pmssLocalFrameDefinition('rclone/', 'Rclone', 'Rclone Web UI'),
-        'jellyfin' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'jellyfin/web/index.html', 'Jellyfin', 'Jellyfin - Media server'),
+        'jellyfin' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'jellyfin/web/', 'Jellyfin', 'Jellyfin - Media server'),
         'radarr' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'radarr/', 'Radarr', 'Radarr - Movie manager'),
         'sonarr' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'sonarr/', 'Sonarr', 'Sonarr - TV manager'),
         'prowlarr' => pmssLocalFrameDefinition($publicBase === '' ? '' : $publicBase.'prowlarr/', 'Prowlarr', 'Prowlarr - Indexer manager'),
@@ -285,6 +285,18 @@ function pmssLocalFrameConsoleFrameRead($launcherPath = 'console.php')
         return array();
     }
     return array('console' => pmssLocalFrameDefinition('console.php', 'Console', 'Shell console in your browser'));
+}
+
+/**
+ * Return the Apps tab only when its customer page has been delivered.
+ *
+ * @return array<string,array<string,string>>
+ */
+function pmssLocalFrameAppsFrameRead($path = 'apps.php')
+{
+    return is_file($path)
+        ? array('apps' => pmssLocalFrameDefinition('apps.php', 'Apps', 'Applications you can run'))
+        : array();
 }
 
 /**
@@ -581,7 +593,7 @@ $frameData = pmssLocalFrameCustomFramesRead();
 // TWICE. Dedup case-insensitively so a tab the master already provides is never re-added.
 $pmssFramesKeysLower = array();
 foreach (array_keys($frames) as $pmssFrameKey) { $pmssFramesKeysLower[strtolower($pmssFrameKey)] = true; }
-foreach (array(pmssLocalFrameInstalledAppFramesRead(), pmssLocalFrameProxyAppFramesRead(), pmssLocalFrameConsoleFrameRead()) as $pmssCandidateFrames) {
+foreach (array(pmssLocalFrameInstalledAppFramesRead(), pmssLocalFrameProxyAppFramesRead(), pmssLocalFrameConsoleFrameRead(), pmssLocalFrameAppsFrameRead()) as $pmssCandidateFrames) {
     foreach ($pmssCandidateFrames as $app => $frame) {
         if (!isset($pmssFramesKeysLower[strtolower($app)]) && !isset($frameData[$app])) {
             $frameData[$app] = $frame;

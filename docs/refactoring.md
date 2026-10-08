@@ -194,6 +194,9 @@ checks remain distinct: suspended users need a static template, while active
 users need the torrent marker and a usable lighttpd port. An absent active
 primary template still leaves the generated subdomain route in place.
 `NginxConfigWriteGuardTest` locks the rendered routes and cleanup decisions.
+Primary-route templates use the same token substitution for active and suspended
+accounts; only active routes resolve port tokens, and unknown tokens remain intact.
+Legacy Deluge port lookup runs only when the selected active template uses its token.
 
 Pinned remote archive steps reject control bytes in archive names, source
 directory names, and workspace paths before downloading or constructing the

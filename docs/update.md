@@ -238,9 +238,14 @@ Failed CLI link publication emits a warning; a later update can retry the link.
 8. Configure the web stack, regenerate per-user nginx configs from staged
    templates, disable legacy daemons, and install supporting packages
    (e.g., mediainfo, Let’s Encrypt helpers).
+   An empty managed-user list still refreshes the global nginx default site
+   and runs the config test; `--restart` restarts nginx after a passing test.
 9. Update every user environment via `pmssUpdateAllUsers()`, which also owns
    linger/rootless-Docker wiring and the optional post-refresh checks
    (user crontabs are user-owned and not rewritten).
+   A failed `userPermissions.php` repair reports the failed-command count and
+   first command to stderr and returns 1. The updater warns and continues;
+   only its timeout (rc 124) stops the user refresh.
 10. Reapply network templates, apply security hardening, summarise profiling, and
    log completion markers. Tenant-empty fresh installs also run the existing
    storage benchmark once with `--require-idle --devices` before root cron is
