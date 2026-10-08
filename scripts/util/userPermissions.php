@@ -11,6 +11,7 @@
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/shell.php';
 require_once __DIR__.'/../lib/user/permissionsCommands.php';
+require_once __DIR__.'/../lib/user/billingPermissions.php';
 require_once __DIR__.'/../lib/pathSafety.php';
 require_once __DIR__.'/../lib/user/userFilesystem.php';
 require_once __DIR__.'/../lib/user/subordinateIds.php';
@@ -181,11 +182,10 @@ $chownItems = [
     // NOTE: Avoid blanket chown -R on the whole home; exclude known root-owned files/dirs first.
     // The remaining tree is handled by a targeted find below.
     ["/home/{$thisUser}/.quota", "root:{$thisUser}"],
-    // Billing identity files: root-owned (user reads via group, cannot WRITE) so a user
-    // cannot forge their own service/client id. Mirrors .quota. Writers are root
-    // (recreateUser restore, mgmt-host backfill); order-time provisioning creates the file
-    // before the first permission refresh, and the service id is stable (no user rewrite).
-    // Root ownership closes the forgery at the source (GH #784).
+    // Billing identity files are created root-owned by writeHomeMarker.php,
+    // recreateUser restore with identity uid 0, and management-host backfill.
+    // userTransfer's root-run rsync -a preserves root ownership. Readers require
+    // a root owner; this pass never adopts a non-root file.
     ["/home/{$thisUser}/.billingServiceId", "root:{$thisUser}"],
     ["/home/{$thisUser}/.billingId", "root:{$thisUser}"],
     ["/home/{$thisUser}/.billingClientId", "root:{$thisUser}"],
@@ -212,6 +212,13 @@ $chownItems = [
 
 $trafficFiles = array_values($trafficPaths);
 
+// Check each identity entry once with lstat before either repair phase.
+$billingRepairable = [];
+foreach (['.billingServiceId', '.billingId', '.billingClientId'] as $billingName) {
+    $billingPath = $homeDir.'/'.$billingName;
+    $billingRepairable[$billingPath] = pmssUserBillingFileRepairable($thisUser, $billingPath, @lstat($billingPath));
+}
+
 // Ensure traffic files are mutable while ownership and permissions are repaired.
 foreach ($trafficFiles as $trafficFile) {
     pmssTrafficSetImmutable($trafficFile, false);
@@ -219,6 +226,9 @@ foreach ($trafficFiles as $trafficFile) {
 
 foreach ($chmodItems as $item) {
     $path = $item[0];
+    if (array_key_exists($path, $billingRepairable) && !$billingRepairable[$path]) {
+        continue;
+    }
     $perm = $item[1];
     $recursive = isset($item[2]) ? (bool)$item[2] : false;
     chmodPath($path, $perm, $recursive);
@@ -278,6 +288,9 @@ pmssUserPermissionsRun(implode(' ', $findParts));
 
 foreach ($chownItems as $item) {
     $path = $item[0];
+    if (array_key_exists($path, $billingRepairable) && !$billingRepairable[$path]) {
+        continue;
+    }
     $owner = $item[1];
     $recursive = isset($item[2]) ? (bool)$item[2] : false;
     chownPath($path, $owner, $recursive);
