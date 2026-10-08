@@ -228,3 +228,46 @@ function pmssPathWithinResolvedRoot(string $path, string $root): bool
     $candidate = rtrim($realParent, '/').'/'.basename($path);
     return strpos($candidate, rtrim($realRoot, '/').'/') === 0;
 }
+
+/** Rewrite one existing regular inode without following a substituted path. */
+function pmssInodeSafeRewriteRegularFile(string $root, string $path, callable $rewrite): bool
+{
+    clearstatcache(true, $path);
+    if (!pmssPathTargetIsSafe($root, true) || !is_dir($root)
+        || !pmssPathTargetIsSafe($path, false, true)
+        || !pmssPathWithinResolvedRoot($path, $root)) {
+        return false;
+    }
+    $handle = @fopen($path, 'r+b');
+    if ($handle === false) return false;
+    try {
+        clearstatcache(true, $path);
+        $opened = @fstat($handle);
+        $named = @lstat($path);
+        if (!is_array($opened) || !is_array($named)
+            || ($opened['mode'] & 0170000) !== 0100000
+            || ($named['mode'] & 0170000) !== 0100000
+            || $opened['nlink'] !== 1
+            || $opened['dev'] !== $named['dev'] || $opened['ino'] !== $named['ino']
+            || !pmssPathTargetIsSafe($path, false, true)
+            || !pmssPathWithinResolvedRoot($path, $root)) {
+            return false;
+        }
+        $original = @stream_get_contents($handle);
+        if (!is_string($original)) return false;
+        $replacement = $rewrite($original);
+        if (!is_string($replacement)) return false;
+        if ($replacement === $original) return true;
+        if (@rewind($handle) === false) return false;
+        $length = strlen($replacement);
+        $written = 0;
+        while ($written < $length) {
+            $count = @fwrite($handle, substr($replacement, $written));
+            if (!is_int($count) || $count < 1) return false;
+            $written += $count;
+        }
+        return @ftruncate($handle, $length) && @fflush($handle);
+    } finally {
+        @fclose($handle);
+    }
+}

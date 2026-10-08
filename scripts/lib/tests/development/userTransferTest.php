@@ -469,6 +469,43 @@ SNAP;
         $this->assertEquals($expected, $updated);
     }
 
+    public function testRewriteSessionPreservesImportedInodeAndExactBencodedBytes(): void
+    {
+        $home = $this->pmssMakeUserHomeTree('pmss-session-inode-', 'session', 'home/newuser');
+        $path = $home.'/session/one.rtorrent';
+        $old = '/home/olduser/data/a';
+        $payload = 'd9:directory'.strlen($old).':'.$old.'4:note4:keep' . 'e';
+        file_put_contents($path, $payload);
+        $before = lstat($path);
+        \pmssUserTransferRewriteRtorrentSessionPaths(['localUser' => 'newuser', 'remoteUser' => 'olduser'], $home);
+        $new = '/home/newuser/data/a';
+        $this->assertSame('d9:directory'.strlen($new).':'.$new.'4:note4:keepe', file_get_contents($path));
+        $after = lstat($path);
+        $this->assertSame($before['ino'], $after['ino']);
+        $this->assertSame($before['uid'], $after['uid']);
+    }
+
+    public function testRewriteSessionRefusesLinkedFinalAndParentWithoutTouchingOutside(): void
+    {
+        $base = $this->pmssMakeTempDir('pmss-session-linked-');
+        $home = $base.'/home';
+        $this->pmssEnsureDir($home.'/session');
+        $outside = $base.'/outside.rtorrent';
+        $payload = 'd9:directory20:/home/olduser/data/ae';
+        file_put_contents($outside, $payload);
+        file_put_contents($home.'/session/legitimate.rtorrent', $payload);
+        symlink($outside, $home.'/session/linked.rtorrent');
+        \pmssUserTransferRewriteRtorrentSessionPaths(['localUser' => 'newuser', 'remoteUser' => 'olduser'], $home);
+        $this->assertSame($payload, file_get_contents($outside));
+        $this->assertStringContainsString('/home/newuser/', file_get_contents($home.'/session/legitimate.rtorrent'));
+        unlink($home.'/session/linked.rtorrent');
+        rename($home.'/session', $home.'/saved-session');
+        symlink($base, $home.'/session');
+        \pmssUserTransferRewriteRtorrentSessionPaths(['localUser' => 'newuser', 'remoteUser' => 'olduser'], $home);
+        $this->assertSame($payload, file_get_contents($outside));
+        $this->assertTrue(is_file($home.'/saved-session/legitimate.rtorrent'));
+    }
+
     public function testRewriteRtorrentSessionPathsReportsWhenNothingNeedsRewrite(): void
     {
         $base = $this->pmssMakeTempDir('pmss-userTransfer-session-nochange-');

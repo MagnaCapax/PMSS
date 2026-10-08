@@ -78,6 +78,21 @@ final class AccountPathOperationStaticTest extends TestCase
         ]);
     }
 
+    public function testTransferSessionRewriteUsesVerifiedOpenInode(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/userTransfer/sessionRewrite.php', [
+            'clearstatcache(true, $sessionFile)',
+            'pmssPathTargetIsSafe($sessionFile, false, true)',
+            'pmssInodeSafeRewriteRegularFile($home, $sessionFile',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/pathSafety.php', [
+            "@fopen(\$path, 'r+b')",
+            '@fstat($handle)',
+            '@lstat($path)',
+            "\$opened['ino'] !== \$named['ino']",
+        ]);
+    }
+
     /** @return array<int,string> */
     private function scanFile(string $path): array
     {
