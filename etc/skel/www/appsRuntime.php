@@ -3,6 +3,18 @@
 require_once __DIR__.'/scriptsInc.php';
 require_once __DIR__.'/userMediaStackPanel.php';
 
+/** Guard every helper supplied by another customer file before the page runs. */
+function pmssAppsRuntimeReady(): bool
+{
+    foreach (array('pmssActionScriptJs', 'pmssFrontendShellExec', 'pmssCustomerHomePath',
+        'pmssCustomerNativePidsRead', 'pmssCustomerManagedAppDefinitions',
+        'pmssWelcomeServiceAvailable', 'pmssMediaStackPanelAppDefinitionsRead',
+        'pmssMediaStackPanelStatusRead', 'pmssMediaStackPanelExpectedAppIdsRead') as $helper) {
+        if (!function_exists($helper)) return false;
+    }
+    return true;
+}
+
 /** Return the seven installer-managed IDs, including the local Cloudplow install. */
 function pmssAppsMediaIdsRead(): array
 {

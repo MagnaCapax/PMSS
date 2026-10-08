@@ -46,7 +46,7 @@ class CustomerActionRequestHeaderTest extends TestCase
         }
 
         // The common wrappers must retain their own header, and the dynamic Info-tab caller must be scanned.
-        $shared = file_get_contents($root.'/pmssActions.js');
+        $shared = file_get_contents($root.'/scriptsInc.php');
         $this->assertTrue(strpos($shared, "headers: {'X-Requested-With': 'XMLHttpRequest'}") !== false);
         $this->assertTrue(strpos($shared, 'pmssActionRequest(action, passwordValue)') !== false);
         $this->assertTrue(isset($checked['stats.php']), 'Info-tab dynamic endpoint was not checked');

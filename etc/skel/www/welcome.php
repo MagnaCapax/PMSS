@@ -82,7 +82,7 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
     <link href="screen.css" rel="stylesheet" type="text/css" media="screen" />
     <!-- Javascript -->
     <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
-    <script type="text/javascript" src="pmssActions.js"></script>
+    <script type="text/javascript"><?= pmssActionScriptJs() ?></script>
     <style type="text/css">
         .pmss-bonus-banner {
             flex: 0 0 100%;

@@ -37,7 +37,7 @@ class AppsCatalogTest extends TestCase
         $html = $this->pmssRenderCustomerPanelPage('apps.php', [], ['minBytes' => 4000]);
         $this->assertStringContainsString('Media Stack is not installed', $html);
         $this->assertStringContainsString('Install Media Stack', $html);
-        $this->assertStringContainsString('src="pmssActions.js"', $html);
+        $this->assertStringContainsString('function pmssActionRequest(action, passwordValue)', $html);
         preg_match_all('/href="([^"]+)"[^>]*>Setup guide &#8599;<\/a>/', $html, $matches);
         $this->assertSame(39, count($matches[1]));
         $allowed = array_values(\pmssAppsAllowedUrlsRead());
@@ -73,7 +73,7 @@ class AppsCatalogTest extends TestCase
     public function testActionsUseExistingCustomerEndpointsOnly(): void
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/apps.php');
-        $shared = $this->pmssReadRepoFile('etc/skel/www/pmssActions.js');
+        $shared = $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php');
         $this->assertStringContainsString("require_once __DIR__.'/scriptsInc.php'", $source);
         $this->assertStringContainsString("require_once __DIR__.'/userMediaStackPanel.php'", $source);
         $this->assertStringNotContainsString('/scripts/', $source);
@@ -88,8 +88,7 @@ class AppsCatalogTest extends TestCase
             $this->assertStringContainsString($route, $shared);
         }
         $this->assertStringContainsString("'endpoint' => 'qbittorrent.php'", $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php'));
-        $this->assertStringContainsString("'www/pmssActions.js'", $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php'));
-        $this->assertStringContainsString('src="pmssActions.js"', $this->pmssReadRepoFile('etc/skel/www/welcome.php'));
+        $this->assertStringContainsString('pmssActionScriptJs()', $this->pmssReadRepoFile('etc/skel/www/welcome.php'));
         $this->assertStringContainsString("'www/appsRuntime.php'", $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php'));
     }
 
@@ -175,9 +174,48 @@ class AppsCatalogTest extends TestCase
         $html = $this->pmssRenderCustomerPanelPage('welcome.php', array(), array('minBytes' => 10000));
         $this->assertStringContainsString('rtorrentRestart.php', $html);
         $this->assertStringContainsString('lighttpdRestart.php?action=confirm-restart', $html);
-        $shared = $this->pmssReadRepoFile('etc/skel/www/pmssActions.js');
+        $shared = $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php');
         $this->assertStringContainsString("type: action.type || 'POST'", $shared);
         $this->assertStringContainsString("headers: {'X-Requested-With': 'XMLHttpRequest'}", $shared);
+    }
+
+    public function testAppsShowsUpdatingNoticeWhenGuivHelperIsOld(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render, string $runRoot): void {
+            // A healed, older scriptsInc.php may lack helpers used by a newer apps.php.
+            $this->pmssWriteFile($home.'/www/scriptsInc.php', "<?php\n");
+            $bootstrap = $runRoot.'/php-cli-bootstrap.php';
+            file_put_contents($bootstrap, "register_shutdown_function(function () { echo ' HTTP='.(http_response_code() ?: 200); });\n", FILE_APPEND);
+            $result = $render('apps.php', array('minBytes' => 100));
+            $this->assertSame(0, $result['rc']);
+            $this->assertStringContainsString('The Apps page is being updated on this server. Reload it in a few minutes.', $result['stdout']);
+            $this->assertStringContainsString('HTTP=200', $result['stdout']);
+        });
+    }
+
+    public function testLegacyToggleShellCommandsStillRunForAjaxPost(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-toggle-legacy-');
+        $marker = $root.'/enabled';
+        $disabled = $root.'/disabled';
+        $restarted = $root.'/restarted';
+        $started = $root.'/started';
+        $source = '<?php require '.var_export($this->pmssRepoPath('etc/skel/www/scriptsInc.php'), true).';'
+            .'$_SERVER["REQUEST_METHOD"]="POST"; $_SERVER["HTTP_X_REQUESTED_WITH"]="XMLHttpRequest";'
+            .'$marker='.var_export($marker, true).';'
+            .'$start=static function () { file_put_contents('.var_export($started, true).', "yes"); };'
+            .'file_put_contents($marker, "on");'
+            .'$_POST["action"]="disable";'
+            .'pmssFrontendToggleAction($marker, $start, '.var_export('printf disabled > '.escapeshellarg($disabled), true).', '.var_export('printf restarted > '.escapeshellarg($restarted), true).');'
+            .'$_POST["action"]="restart";'
+            .'pmssFrontendToggleAction($marker, $start, '.var_export('printf disabled > '.escapeshellarg($disabled), true).', '.var_export('printf restarted > '.escapeshellarg($restarted), true).');';
+        $script = $this->pmssWriteFile($root.'/toggle.php', $source);
+        $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script));
+        $this->assertSame(0, $result['rc'], $result['output']);
+        $this->assertFalse(is_file($marker));
+        $this->assertSame('disabled', file_get_contents($disabled));
+        $this->assertSame('restarted', file_get_contents($restarted));
+        $this->assertSame('yes', file_get_contents($started));
     }
 
     private function pmssAppsEndpointProbe(string $home, string $endpoint, string $action, string $method, bool $ajax): string

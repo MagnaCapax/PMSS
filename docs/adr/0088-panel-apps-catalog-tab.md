@@ -101,3 +101,16 @@ Install remains a whole-stack action. The seven media rows expose current
 session state and app auth state, while the Docker catalog stays collapsed and
 documentation-only. A stopped app can be started individually without waking
 other intentionally stopped apps.
+
+## Amendment 2026-10-08 (3)
+
+The shared action JavaScript is emitted inline from guiv-delivered
+`scriptsInc.php` by both Welcome and Apps. Guiv cannot deliver `.js` files,
+so a guiv-healed Welcome page cannot rely on `pmssActions.js` being present
+before a host has run `update.php` (ADR 0022). The action request behavior is
+unchanged.
+The toggle helper accepts both current callable handlers and the shell-command
+strings passed by older qBittorrent, Deluge, and rclone pages. It retains the
+POST and `X-Requested-With` gate. When an updated `apps.php` encounters older
+guiv helpers during staggered delivery, it renders a short updating notice
+with HTTP 200 instead of failing with an undefined-function error.

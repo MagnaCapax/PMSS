@@ -144,6 +144,12 @@ function pmssAppsLiveRowBuild(string $id, array $app): string
 }
 
 require_once __DIR__.'/appsRuntime.php';
+if (!function_exists('pmssAppsRuntimeReady') || !pmssAppsRuntimeReady()) {
+    http_response_code(200);
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Apps</title></head><body><p>The Apps page is being updated on this server. Reload it in a few minutes.</p></body></html>';
+    return;
+}
 $home = dirname(__DIR__);
 $username = basename(rtrim($home, '/'));
 $hostname = function_exists('gethostname') ? (string) gethostname() : '';
@@ -171,7 +177,7 @@ $urls = pmssAppsAllowedUrlsRead();
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Apps</title>
 <link href="screen.css" rel="stylesheet" media="screen">
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script><script src="pmssActions.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script><script><?= pmssActionScriptJs() ?></script>
 <style>
 .apps{font-size:14px;line-height:1.45;max-width:980px;margin:0 auto}.apps h1{font-size:1.5rem;margin:4px 0 14px}.apps h2{font-size:1.05rem;color:#fff;margin:24px 0 8px}
 .group{color:#9fb0c3;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 4px}.list{border:1px solid #2e3b4f;border-radius:8px;overflow:hidden}

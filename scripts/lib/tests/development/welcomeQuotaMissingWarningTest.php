@@ -239,7 +239,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
             'function pmssRestartAllServices(button)',
             'pmssActionRequest(action).done(runNext)',
             'Restart requests sent for all available account services.',
-            'src="pmssActions.js"',
+            'pmssActionScriptJs()',
         ], $source);
     }
 
