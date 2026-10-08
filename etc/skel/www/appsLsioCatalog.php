@@ -561,15 +561,6 @@ return array (
   ),
   62 =>
   array (
-    'name' => 'pwndrop',
-    'title' => 'pwndrop',
-    'description' => 'pwndrop is a self-deployable file hosting service for sending out red teaming payloads or securely sharing your private',
-    'category' => 'File Sharing,Security',
-    'image' => 'lscr.io/linuxserver/pwndrop',
-    'guide' => 'https://docs.linuxserver.io/images/docker-pwndrop/',
-  ),
-  63 =>
-  array (
     'name' => 'bitcoin-knots',
     'title' => 'Bitcoin Knots',
     'description' => 'Bitcoin Knots can be used as a desktop client for regular payments or as a full node server utility for merchants and ot',
@@ -577,7 +568,7 @@ return array (
     'image' => 'lscr.io/linuxserver/bitcoin-knots',
     'guide' => 'https://docs.linuxserver.io/images/docker-bitcoin-knots/',
   ),
-  64 =>
+  63 =>
   array (
     'name' => 'budge',
     'title' => 'budge',
@@ -586,7 +577,7 @@ return array (
     'image' => 'lscr.io/linuxserver/budge',
     'guide' => 'https://docs.linuxserver.io/images/docker-budge/',
   ),
-  65 =>
+  64 =>
   array (
     'name' => 'kimai',
     'title' => 'kimai',
@@ -595,7 +586,7 @@ return array (
     'image' => 'lscr.io/linuxserver/kimai',
     'guide' => 'https://docs.linuxserver.io/images/docker-kimai/',
   ),
-  66 =>
+  65 =>
   array (
     'name' => 'davos',
     'title' => 'davos',
@@ -604,7 +595,7 @@ return array (
     'image' => 'lscr.io/linuxserver/davos',
     'guide' => 'https://docs.linuxserver.io/images/docker-davos/',
   ),
-  67 =>
+  66 =>
   array (
     'name' => 'filezilla',
     'title' => 'FIleZilla',
@@ -613,7 +604,7 @@ return array (
     'image' => 'lscr.io/linuxserver/filezilla',
     'guide' => 'https://docs.linuxserver.io/images/docker-filezilla/',
   ),
-  68 =>
+  67 =>
   array (
     'name' => 'azahar',
     'title' => 'Azahar',
@@ -622,7 +613,7 @@ return array (
     'image' => 'lscr.io/linuxserver/azahar',
     'guide' => 'https://docs.linuxserver.io/images/docker-azahar/',
   ),
-  69 =>
+  68 =>
   array (
     'name' => 'dogwalk',
     'title' => 'DOGWALK',
@@ -631,7 +622,7 @@ return array (
     'image' => 'lscr.io/linuxserver/dogwalk',
     'guide' => 'https://docs.linuxserver.io/images/docker-dogwalk/',
   ),
-  70 =>
+  69 =>
   array (
     'name' => 'dolphin',
     'title' => 'Dolphin Emulator',
@@ -640,7 +631,7 @@ return array (
     'image' => 'lscr.io/linuxserver/dolphin',
     'guide' => 'https://docs.linuxserver.io/images/docker-dolphin/',
   ),
-  71 =>
+  70 =>
   array (
     'name' => 'dosbox-staging',
     'title' => 'DOSBox Staging',
@@ -649,7 +640,7 @@ return array (
     'image' => 'lscr.io/linuxserver/dosbox-staging',
     'guide' => 'https://docs.linuxserver.io/images/docker-dosbox-staging/',
   ),
-  72 =>
+  71 =>
   array (
     'name' => 'duckstation',
     'title' => 'DuckStation',
@@ -658,7 +649,7 @@ return array (
     'image' => 'lscr.io/linuxserver/duckstation',
     'guide' => 'https://docs.linuxserver.io/images/docker-duckstation/',
   ),
-  73 =>
+  72 =>
   array (
     'name' => 'eden',
     'title' => 'Eden',
@@ -667,7 +658,7 @@ return array (
     'image' => 'lscr.io/linuxserver/eden',
     'guide' => 'https://docs.linuxserver.io/images/docker-eden/',
   ),
-  74 =>
+  73 =>
   array (
     'name' => 'flycast',
     'title' => 'Flycast',
@@ -676,7 +667,7 @@ return array (
     'image' => 'lscr.io/linuxserver/flycast',
     'guide' => 'https://docs.linuxserver.io/images/docker-flycast/',
   ),
-  75 =>
+  74 =>
   array (
     'name' => 'gzdoom',
     'title' => 'GZDoom',
@@ -685,7 +676,7 @@ return array (
     'image' => 'lscr.io/linuxserver/gzdoom',
     'guide' => 'https://docs.linuxserver.io/images/docker-gzdoom/',
   ),
-  76 =>
+  75 =>
   array (
     'name' => 'luanti',
     'title' => 'luanti',
@@ -694,7 +685,7 @@ return array (
     'image' => 'lscr.io/linuxserver/luanti',
     'guide' => 'https://docs.linuxserver.io/images/docker-luanti/',
   ),
-  77 =>
+  76 =>
   array (
     'name' => 'mame',
     'title' => 'MAME',
@@ -703,7 +694,7 @@ return array (
     'image' => 'lscr.io/linuxserver/mame',
     'guide' => 'https://docs.linuxserver.io/images/docker-mame/',
   ),
-  78 =>
+  77 =>
   array (
     'name' => 'melonds',
     'title' => 'melonDS',
@@ -712,7 +703,7 @@ return array (
     'image' => 'lscr.io/linuxserver/melonds',
     'guide' => 'https://docs.linuxserver.io/images/docker-melonds/',
   ),
-  79 =>
+  78 =>
   array (
     'name' => 'modrinth',
     'title' => 'Modrinth App',
@@ -721,7 +712,7 @@ return array (
     'image' => 'lscr.io/linuxserver/modrinth',
     'guide' => 'https://docs.linuxserver.io/images/docker-modrinth/',
   ),
-  80 =>
+  79 =>
   array (
     'name' => 'pcsx2',
     'title' => 'PCSX2',
@@ -730,7 +721,7 @@ return array (
     'image' => 'lscr.io/linuxserver/pcsx2',
     'guide' => 'https://docs.linuxserver.io/images/docker-pcsx2/',
   ),
-  81 =>
+  80 =>
   array (
     'name' => 'ppsspp',
     'title' => 'PPSSPP',
@@ -739,7 +730,7 @@ return array (
     'image' => 'lscr.io/linuxserver/ppsspp',
     'guide' => 'https://docs.linuxserver.io/images/docker-ppsspp/',
   ),
-  82 =>
+  81 =>
   array (
     'name' => 'retroarch',
     'title' => 'RetroArch',
@@ -748,7 +739,7 @@ return array (
     'image' => 'lscr.io/linuxserver/retroarch',
     'guide' => 'https://docs.linuxserver.io/images/docker-retroarch/',
   ),
-  83 =>
+  82 =>
   array (
     'name' => 'rpcs3',
     'title' => 'RPCS3',
@@ -757,7 +748,7 @@ return array (
     'image' => 'lscr.io/linuxserver/rpcs3',
     'guide' => 'https://docs.linuxserver.io/images/docker-rpcs3/',
   ),
-  84 =>
+  83 =>
   array (
     'name' => 'scummvm',
     'title' => 'ScummVM',
@@ -766,7 +757,7 @@ return array (
     'image' => 'lscr.io/linuxserver/scummvm',
     'guide' => 'https://docs.linuxserver.io/images/docker-scummvm/',
   ),
-  85 =>
+  84 =>
   array (
     'name' => 'shadps4',
     'title' => 'shadPS4',
@@ -775,7 +766,7 @@ return array (
     'image' => 'lscr.io/linuxserver/shadps4',
     'guide' => 'https://docs.linuxserver.io/images/docker-shadps4/',
   ),
-  86 =>
+  85 =>
   array (
     'name' => 'steam',
     'title' => 'Steam',
@@ -784,7 +775,7 @@ return array (
     'image' => 'lscr.io/linuxserver/steam',
     'guide' => 'https://docs.linuxserver.io/images/docker-steam/',
   ),
-  87 =>
+  86 =>
   array (
     'name' => 'webstation',
     'title' => 'Webstation',
@@ -793,7 +784,7 @@ return array (
     'image' => 'lscr.io/linuxserver/webstation',
     'guide' => 'https://docs.linuxserver.io/images/docker-webstation/',
   ),
-  88 =>
+  87 =>
   array (
     'name' => 'blade-of-agony',
     'title' => 'Wolfenstein: Blade of Agony',
@@ -802,7 +793,7 @@ return array (
     'image' => 'lscr.io/linuxserver/blade-of-agony',
     'guide' => 'https://docs.linuxserver.io/images/docker-blade-of-agony/',
   ),
-  89 =>
+  88 =>
   array (
     'name' => 'xemu',
     'title' => 'xemu',
@@ -811,7 +802,7 @@ return array (
     'image' => 'lscr.io/linuxserver/xemu',
     'guide' => 'https://docs.linuxserver.io/images/docker-xemu/',
   ),
-  90 =>
+  89 =>
   array (
     'name' => 'winegui',
     'title' => 'WineGUI',
@@ -820,7 +811,7 @@ return array (
     'image' => 'lscr.io/linuxserver/winegui',
     'guide' => 'https://docs.linuxserver.io/images/docker-winegui/',
   ),
-  91 =>
+  90 =>
   array (
     'name' => 'habridge',
     'title' => 'habridge',
@@ -829,7 +820,7 @@ return array (
     'image' => 'lscr.io/linuxserver/habridge',
     'guide' => 'https://docs.linuxserver.io/images/docker-habridge/',
   ),
-  92 =>
+  91 =>
   array (
     'name' => 'homeassistant',
     'title' => 'Home Assistant Core',
@@ -838,7 +829,7 @@ return array (
     'image' => 'lscr.io/linuxserver/homeassistant',
     'guide' => 'https://docs.linuxserver.io/images/docker-homeassistant/',
   ),
-  93 =>
+  92 =>
   array (
     'name' => 'gimp',
     'title' => 'GIMP',
@@ -847,7 +838,7 @@ return array (
     'image' => 'lscr.io/linuxserver/gimp',
     'guide' => 'https://docs.linuxserver.io/images/docker-gimp/',
   ),
-  94 =>
+  93 =>
   array (
     'name' => 'krita',
     'title' => 'Krita',
@@ -856,7 +847,7 @@ return array (
     'image' => 'lscr.io/linuxserver/krita',
     'guide' => 'https://docs.linuxserver.io/images/docker-krita/',
   ),
-  95 =>
+  94 =>
   array (
     'name' => 'rawtherapee',
     'title' => 'RawTherapee',
@@ -865,7 +856,7 @@ return array (
     'image' => 'lscr.io/linuxserver/rawtherapee',
     'guide' => 'https://docs.linuxserver.io/images/docker-rawtherapee/',
   ),
-  96 =>
+  95 =>
   array (
     'name' => 'jackett',
     'title' => 'jackett',
@@ -874,7 +865,7 @@ return array (
     'image' => 'lscr.io/linuxserver/jackett',
     'guide' => 'https://docs.linuxserver.io/images/docker-jackett/',
   ),
-  97 =>
+  96 =>
   array (
     'name' => 'nzbhydra2',
     'title' => 'nzbhydra2',
@@ -883,7 +874,7 @@ return array (
     'image' => 'lscr.io/linuxserver/nzbhydra2',
     'guide' => 'https://docs.linuxserver.io/images/docker-nzbhydra2/',
   ),
-  98 =>
+  97 =>
   array (
     'name' => 'limnoria',
     'title' => 'limnoria',
@@ -892,7 +883,7 @@ return array (
     'image' => 'lscr.io/linuxserver/limnoria',
     'guide' => 'https://docs.linuxserver.io/images/docker-limnoria/',
   ),
-  99 =>
+  98 =>
   array (
     'name' => 'ngircd',
     'title' => 'ngircd',
@@ -901,7 +892,7 @@ return array (
     'image' => 'lscr.io/linuxserver/ngircd',
     'guide' => 'https://docs.linuxserver.io/images/docker-ngircd/',
   ),
-  100 =>
+  99 =>
   array (
     'name' => 'znc',
     'title' => 'znc',
@@ -910,7 +901,7 @@ return array (
     'image' => 'lscr.io/linuxserver/znc',
     'guide' => 'https://docs.linuxserver.io/images/docker-znc/',
   ),
-  101 =>
+  100 =>
   array (
     'name' => 'pidgin',
     'title' => 'Pidgin',
@@ -919,7 +910,7 @@ return array (
     'image' => 'lscr.io/linuxserver/pidgin',
     'guide' => 'https://docs.linuxserver.io/images/docker-pidgin/',
   ),
-  102 =>
+  101 =>
   array (
     'name' => 'thelounge',
     'title' => 'thelounge',
@@ -928,7 +919,7 @@ return array (
     'image' => 'lscr.io/linuxserver/thelounge',
     'guide' => 'https://docs.linuxserver.io/images/docker-thelounge/',
   ),
-  103 =>
+  102 =>
   array (
     'name' => 'faster-whisper',
     'title' => 'faster-whisper',
@@ -937,7 +928,7 @@ return array (
     'image' => 'lscr.io/linuxserver/faster-whisper',
     'guide' => 'https://docs.linuxserver.io/images/docker-faster-whisper/',
   ),
-  104 =>
+  103 =>
   array (
     'name' => 'piper',
     'title' => 'piper',
@@ -946,7 +937,7 @@ return array (
     'image' => 'lscr.io/linuxserver/piper',
     'guide' => 'https://docs.linuxserver.io/images/docker-piper/',
   ),
-  105 =>
+  104 =>
   array (
     'name' => 'handbrake',
     'title' => 'HandBrake',
@@ -955,7 +946,7 @@ return array (
     'image' => 'lscr.io/linuxserver/handbrake',
     'guide' => 'https://docs.linuxserver.io/images/docker-handbrake/',
   ),
-  106 =>
+  105 =>
   array (
     'name' => 'kometa',
     'title' => 'kometa',
@@ -964,7 +955,7 @@ return array (
     'image' => 'lscr.io/linuxserver/kometa',
     'guide' => 'https://docs.linuxserver.io/images/docker-kometa/',
   ),
-  107 =>
+  106 =>
   array (
     'name' => 'mediaelch',
     'title' => 'MediaElch',
@@ -973,7 +964,7 @@ return array (
     'image' => 'lscr.io/linuxserver/mediaelch',
     'guide' => 'https://docs.linuxserver.io/images/docker-mediaelch/',
   ),
-  108 =>
+  107 =>
   array (
     'name' => 'medusa',
     'title' => 'medusa',
@@ -982,7 +973,7 @@ return array (
     'image' => 'lscr.io/linuxserver/medusa',
     'guide' => 'https://docs.linuxserver.io/images/docker-medusa/',
   ),
-  109 =>
+  108 =>
   array (
     'name' => 'sickgear',
     'title' => 'SickGear',
@@ -991,7 +982,7 @@ return array (
     'image' => 'lscr.io/linuxserver/sickgear',
     'guide' => 'https://docs.linuxserver.io/images/docker-sickgear/',
   ),
-  110 =>
+  109 =>
   array (
     'name' => 'vlc',
     'title' => 'VLC Media Player',
@@ -1000,7 +991,7 @@ return array (
     'image' => 'lscr.io/linuxserver/vlc',
     'guide' => 'https://docs.linuxserver.io/images/docker-vlc/',
   ),
-  111 =>
+  110 =>
   array (
     'name' => 'doplarr_rs',
     'title' => 'doplarr_rs',
@@ -1009,7 +1000,7 @@ return array (
     'image' => 'lscr.io/linuxserver/doplarr_rs',
     'guide' => 'https://docs.linuxserver.io/images/docker-doplarr_rs/',
   ),
-  112 =>
+  111 =>
   array (
     'name' => 'ombi',
     'title' => 'ombi',
@@ -1018,7 +1009,7 @@ return array (
     'image' => 'lscr.io/linuxserver/ombi',
     'guide' => 'https://docs.linuxserver.io/images/docker-ombi/',
   ),
-  113 =>
+  112 =>
   array (
     'name' => 'airsonic-advanced',
     'title' => 'airsonic-advanced',
@@ -1027,7 +1018,7 @@ return array (
     'image' => 'lscr.io/linuxserver/airsonic-advanced',
     'guide' => 'https://docs.linuxserver.io/images/docker-airsonic-advanced/',
   ),
-  114 =>
+  113 =>
   array (
     'name' => 'mstream',
     'title' => 'mstream',
@@ -1036,7 +1027,7 @@ return array (
     'image' => 'lscr.io/linuxserver/mstream',
     'guide' => 'https://docs.linuxserver.io/images/docker-mstream/',
   ),
-  115 =>
+  114 =>
   array (
     'name' => 'emby',
     'title' => 'emby',
@@ -1045,7 +1036,7 @@ return array (
     'image' => 'lscr.io/linuxserver/emby',
     'guide' => 'https://docs.linuxserver.io/images/docker-emby/',
   ),
-  116 =>
+  115 =>
   array (
     'name' => 'plex',
     'title' => 'plex',
@@ -1054,7 +1045,7 @@ return array (
     'image' => 'lscr.io/linuxserver/plex',
     'guide' => 'https://docs.linuxserver.io/images/docker-plex/',
   ),
-  117 =>
+  116 =>
   array (
     'name' => 'ffmpeg',
     'title' => 'ffmpeg',
@@ -1063,7 +1054,7 @@ return array (
     'image' => 'lscr.io/linuxserver/ffmpeg',
     'guide' => 'https://docs.linuxserver.io/images/docker-ffmpeg/',
   ),
-  118 =>
+  117 =>
   array (
     'name' => 'htpcmanager',
     'title' => 'htpcmanager',
@@ -1072,7 +1063,7 @@ return array (
     'image' => 'lscr.io/linuxserver/htpcmanager',
     'guide' => 'https://docs.linuxserver.io/images/docker-htpcmanager/',
   ),
-  119 =>
+  118 =>
   array (
     'name' => 'minisatip',
     'title' => 'minisatip',
@@ -1081,7 +1072,7 @@ return array (
     'image' => 'lscr.io/linuxserver/minisatip',
     'guide' => 'https://docs.linuxserver.io/images/docker-minisatip/',
   ),
-  120 =>
+  119 =>
   array (
     'name' => 'synclounge',
     'title' => 'synclounge',
@@ -1090,7 +1081,7 @@ return array (
     'image' => 'lscr.io/linuxserver/synclounge',
     'guide' => 'https://docs.linuxserver.io/images/docker-synclounge/',
   ),
-  121 =>
+  120 =>
   array (
     'name' => 'tautulli',
     'title' => 'tautulli',
@@ -1099,7 +1090,7 @@ return array (
     'image' => 'lscr.io/linuxserver/tautulli',
     'guide' => 'https://docs.linuxserver.io/images/docker-tautulli/',
   ),
-  122 =>
+  121 =>
   array (
     'name' => 'tvheadend',
     'title' => 'tvheadend',
@@ -1108,7 +1099,7 @@ return array (
     'image' => 'lscr.io/linuxserver/tvheadend',
     'guide' => 'https://docs.linuxserver.io/images/docker-tvheadend/',
   ),
-  123 =>
+  122 =>
   array (
     'name' => 'webgrabplus',
     'title' => 'webgrabplus',
@@ -1117,7 +1108,7 @@ return array (
     'image' => 'lscr.io/linuxserver/webgrabplus',
     'guide' => 'https://docs.linuxserver.io/images/docker-webgrabplus/',
   ),
-  124 =>
+  123 =>
   array (
     'name' => 'apprise-api',
     'title' => 'apprise-api',
@@ -1126,7 +1117,7 @@ return array (
     'image' => 'lscr.io/linuxserver/apprise-api',
     'guide' => 'https://docs.linuxserver.io/images/docker-apprise-api/',
   ),
-  125 =>
+  124 =>
   array (
     'name' => 'healthchecks',
     'title' => 'healthchecks',
@@ -1135,7 +1126,7 @@ return array (
     'image' => 'lscr.io/linuxserver/healthchecks',
     'guide' => 'https://docs.linuxserver.io/images/docker-healthchecks/',
   ),
-  126 =>
+  125 =>
   array (
     'name' => 'librespeed',
     'title' => 'librespeed',
@@ -1144,7 +1135,7 @@ return array (
     'image' => 'lscr.io/linuxserver/librespeed',
     'guide' => 'https://docs.linuxserver.io/images/docker-librespeed/',
   ),
-  127 =>
+  126 =>
   array (
     'name' => 'smokeping',
     'title' => 'smokeping',
@@ -1153,7 +1144,7 @@ return array (
     'image' => 'lscr.io/linuxserver/smokeping',
     'guide' => 'https://docs.linuxserver.io/images/docker-smokeping/',
   ),
-  128 =>
+  127 =>
   array (
     'name' => 'speedtest-tracker',
     'title' => 'speedtest-tracker',
@@ -1162,7 +1153,7 @@ return array (
     'image' => 'lscr.io/linuxserver/speedtest-tracker',
     'guide' => 'https://docs.linuxserver.io/images/docker-speedtest-tracker/',
   ),
-  129 =>
+  128 =>
   array (
     'name' => 'syslog-ng',
     'title' => 'syslog-ng',
@@ -1171,7 +1162,7 @@ return array (
     'image' => 'lscr.io/linuxserver/syslog-ng',
     'guide' => 'https://docs.linuxserver.io/images/docker-syslog-ng/',
   ),
-  130 =>
+  129 =>
   array (
     'name' => 'beets',
     'title' => 'beets',
@@ -1180,7 +1171,7 @@ return array (
     'image' => 'lscr.io/linuxserver/beets',
     'guide' => 'https://docs.linuxserver.io/images/docker-beets/',
   ),
-  131 =>
+  130 =>
   array (
     'name' => 'lollypop',
     'title' => 'Lollypop',
@@ -1189,7 +1180,7 @@ return array (
     'image' => 'lscr.io/linuxserver/lollypop',
     'guide' => 'https://docs.linuxserver.io/images/docker-lollypop/',
   ),
-  132 =>
+  131 =>
   array (
     'name' => 'spotube',
     'title' => 'Spotube',
@@ -1198,7 +1189,7 @@ return array (
     'image' => 'lscr.io/linuxserver/spotube',
     'guide' => 'https://docs.linuxserver.io/images/docker-spotube/',
   ),
-  133 =>
+  132 =>
   array (
     'name' => 'your_spotify',
     'title' => 'your_spotify',
@@ -1207,7 +1198,7 @@ return array (
     'image' => 'lscr.io/linuxserver/your_spotify',
     'guide' => 'https://docs.linuxserver.io/images/docker-your_spotify/',
   ),
-  134 =>
+  133 =>
   array (
     'name' => 'unifi-network-application',
     'title' => 'unifi-network-application',
@@ -1216,7 +1207,7 @@ return array (
     'image' => 'lscr.io/linuxserver/unifi-network-application',
     'guide' => 'https://docs.linuxserver.io/images/docker-unifi-network-application/',
   ),
-  135 =>
+  134 =>
   array (
     'name' => 'wireshark',
     'title' => 'Wireshark',
@@ -1225,7 +1216,7 @@ return array (
     'image' => 'lscr.io/linuxserver/wireshark',
     'guide' => 'https://docs.linuxserver.io/images/docker-wireshark/',
   ),
-  136 =>
+  135 =>
   array (
     'name' => 'adguardhome-sync',
     'title' => 'adguardhome-sync',
@@ -1234,7 +1225,7 @@ return array (
     'image' => 'lscr.io/linuxserver/adguardhome-sync',
     'guide' => 'https://docs.linuxserver.io/images/docker-adguardhome-sync/',
   ),
-  137 =>
+  136 =>
   array (
     'name' => 'ddclient',
     'title' => 'ddclient',
@@ -1243,7 +1234,7 @@ return array (
     'image' => 'lscr.io/linuxserver/ddclient',
     'guide' => 'https://docs.linuxserver.io/images/docker-ddclient/',
   ),
-  138 =>
+  137 =>
   array (
     'name' => 'duckdns',
     'title' => 'duckdns',
@@ -1252,7 +1243,7 @@ return array (
     'image' => 'lscr.io/linuxserver/duckdns',
     'guide' => 'https://docs.linuxserver.io/images/docker-duckdns/',
   ),
-  139 =>
+  138 =>
   array (
     'name' => 'fail2ban',
     'title' => 'fail2ban',
@@ -1261,7 +1252,7 @@ return array (
     'image' => 'lscr.io/linuxserver/fail2ban',
     'guide' => 'https://docs.linuxserver.io/images/docker-fail2ban/',
   ),
-  140 =>
+  139 =>
   array (
     'name' => 'keepassxc',
     'title' => 'KeePassXC',
@@ -1270,7 +1261,7 @@ return array (
     'image' => 'lscr.io/linuxserver/keepassxc',
     'guide' => 'https://docs.linuxserver.io/images/docker-keepassxc/',
   ),
-  141 =>
+  140 =>
   array (
     'name' => 'darktable',
     'title' => 'darktable',
@@ -1279,7 +1270,7 @@ return array (
     'image' => 'lscr.io/linuxserver/darktable',
     'guide' => 'https://docs.linuxserver.io/images/docker-darktable/',
   ),
-  142 =>
+  141 =>
   array (
     'name' => 'digikam',
     'title' => 'digiKam',
@@ -1288,7 +1279,7 @@ return array (
     'image' => 'lscr.io/linuxserver/digikam',
     'guide' => 'https://docs.linuxserver.io/images/docker-digikam/',
   ),
-  143 =>
+  142 =>
   array (
     'name' => 'lychee',
     'title' => 'lychee',
@@ -1297,7 +1288,7 @@ return array (
     'image' => 'lscr.io/linuxserver/lychee',
     'guide' => 'https://docs.linuxserver.io/images/docker-lychee/',
   ),
-  144 =>
+  143 =>
   array (
     'name' => 'piwigo',
     'title' => 'piwigo',
@@ -1306,7 +1297,7 @@ return array (
     'image' => 'lscr.io/linuxserver/piwigo',
     'guide' => 'https://docs.linuxserver.io/images/docker-piwigo/',
   ),
-  145 =>
+  144 =>
   array (
     'name' => 'code-server',
     'title' => 'code-server',
@@ -1315,7 +1306,7 @@ return array (
     'image' => 'lscr.io/linuxserver/code-server',
     'guide' => 'https://docs.linuxserver.io/images/docker-code-server/',
   ),
-  146 =>
+  145 =>
   array (
     'name' => 'github-desktop',
     'title' => 'Github Desktop',
@@ -1324,7 +1315,7 @@ return array (
     'image' => 'lscr.io/linuxserver/github-desktop',
     'guide' => 'https://docs.linuxserver.io/images/docker-github-desktop/',
   ),
-  147 =>
+  146 =>
   array (
     'name' => 'gitqlient',
     'title' => 'GitQlient',
@@ -1333,7 +1324,7 @@ return array (
     'image' => 'lscr.io/linuxserver/gitqlient',
     'guide' => 'https://docs.linuxserver.io/images/docker-gitqlient/',
   ),
-  148 =>
+  147 =>
   array (
     'name' => 'intellij-idea',
     'title' => 'IntelliJ IDEA',
@@ -1342,7 +1333,7 @@ return array (
     'image' => 'lscr.io/linuxserver/intellij-idea',
     'guide' => 'https://docs.linuxserver.io/images/docker-intellij-idea/',
   ),
-  149 =>
+  148 =>
   array (
     'name' => 'pycharm',
     'title' => 'PyCharm',
@@ -1351,7 +1342,7 @@ return array (
     'image' => 'lscr.io/linuxserver/pycharm',
     'guide' => 'https://docs.linuxserver.io/images/docker-pycharm/',
   ),
-  150 =>
+  149 =>
   array (
     'name' => 'vscode',
     'title' => 'VS Code',
@@ -1360,7 +1351,7 @@ return array (
     'image' => 'lscr.io/linuxserver/vscode',
     'guide' => 'https://docs.linuxserver.io/images/docker-vscode/',
   ),
-  151 =>
+  150 =>
   array (
     'name' => 'vscodium',
     'title' => 'VSCodium',
@@ -1369,7 +1360,7 @@ return array (
     'image' => 'lscr.io/linuxserver/vscodium',
     'guide' => 'https://docs.linuxserver.io/images/docker-vscodium/',
   ),
-  152 =>
+  151 =>
   array (
     'name' => 'vscodium-web',
     'title' => 'vscodium-web',
@@ -1378,7 +1369,7 @@ return array (
     'image' => 'lscr.io/linuxserver/vscodium-web',
     'guide' => 'https://docs.linuxserver.io/images/docker-vscodium-web/',
   ),
-  153 =>
+  152 =>
   array (
     'name' => 'yaak',
     'title' => 'yaak',
@@ -1387,7 +1378,7 @@ return array (
     'image' => 'lscr.io/linuxserver/yaak',
     'guide' => 'https://docs.linuxserver.io/images/docker-yaak/',
   ),
-  154 =>
+  153 =>
   array (
     'name' => 'grocy',
     'title' => 'grocy',
@@ -1396,7 +1387,7 @@ return array (
     'image' => 'lscr.io/linuxserver/grocy',
     'guide' => 'https://docs.linuxserver.io/images/docker-grocy/',
   ),
-  155 =>
+  154 =>
   array (
     'name' => 'remmina',
     'title' => 'Remmina',
@@ -1405,7 +1396,7 @@ return array (
     'image' => 'lscr.io/linuxserver/remmina',
     'guide' => 'https://docs.linuxserver.io/images/docker-remmina/',
   ),
-  156 =>
+  155 =>
   array (
     'name' => 'rustdesk',
     'title' => 'RustDesk',
@@ -1414,7 +1405,7 @@ return array (
     'image' => 'lscr.io/linuxserver/rustdesk',
     'guide' => 'https://docs.linuxserver.io/images/docker-rustdesk/',
   ),
-  157 =>
+  156 =>
   array (
     'name' => 'webtop',
     'title' => 'webtop',
@@ -1423,7 +1414,7 @@ return array (
     'image' => 'lscr.io/linuxserver/webtop',
     'guide' => 'https://docs.linuxserver.io/images/docker-webtop/',
   ),
-  158 =>
+  157 =>
   array (
     'name' => 'sealskin',
     'title' => 'Sealskin',
@@ -1432,7 +1423,7 @@ return array (
     'image' => 'lscr.io/linuxserver/sealskin',
     'guide' => 'https://docs.linuxserver.io/images/docker-sealskin/',
   ),
-  159 =>
+  158 =>
   array (
     'name' => 'lm-studio',
     'title' => 'LM Studio',
@@ -1441,7 +1432,7 @@ return array (
     'image' => 'lscr.io/linuxserver/lm-studio',
     'guide' => 'https://docs.linuxserver.io/images/docker-lm-studio/',
   ),
-  160 =>
+  159 =>
   array (
     'name' => 'pelorus',
     'title' => 'Pelorus',
@@ -1450,7 +1441,7 @@ return array (
     'image' => 'lscr.io/linuxserver/pelorus',
     'guide' => 'https://docs.linuxserver.io/images/docker-pelorus/',
   ),
-  161 =>
+  160 =>
   array (
     'name' => 'kasm',
     'title' => 'kasm',
@@ -1459,7 +1450,7 @@ return array (
     'image' => 'lscr.io/linuxserver/kasm',
     'guide' => 'https://docs.linuxserver.io/images/docker-kasm/',
   ),
-  162 =>
+  161 =>
   array (
     'name' => 'kali-linux',
     'title' => 'kali-linux',
@@ -1468,7 +1459,7 @@ return array (
     'image' => 'lscr.io/linuxserver/kali-linux',
     'guide' => 'https://docs.linuxserver.io/images/docker-kali-linux/',
   ),
-  163 =>
+  162 =>
   array (
     'name' => 'nginx',
     'title' => 'nginx',
@@ -1477,7 +1468,7 @@ return array (
     'image' => 'lscr.io/linuxserver/nginx',
     'guide' => 'https://docs.linuxserver.io/images/docker-nginx/',
   ),
-  164 =>
+  163 =>
   array (
     'name' => 'swag',
     'title' => 'swag',
@@ -1486,7 +1477,7 @@ return array (
     'image' => 'lscr.io/linuxserver/swag',
     'guide' => 'https://docs.linuxserver.io/images/docker-swag/',
   ),
-  165 =>
+  164 =>
   array (
     'name' => 'freshrss',
     'title' => 'freshrss',
@@ -1495,25 +1486,7 @@ return array (
     'image' => 'lscr.io/linuxserver/freshrss',
     'guide' => 'https://docs.linuxserver.io/images/docker-freshrss/',
   ),
-  166 =>
-  array (
-    'name' => 'boinc',
-    'title' => 'BOINC',
-    'description' => 'BOINC is a platform for high-throughput computing on a large scale (thousands or millions of computers).',
-    'category' => 'Science',
-    'image' => 'lscr.io/linuxserver/boinc',
-    'guide' => 'https://docs.linuxserver.io/images/docker-boinc/',
-  ),
-  167 =>
-  array (
-    'name' => 'foldingathome',
-    'title' => 'Folding@home',
-    'description' => 'Folding@home is a distributed computing project for simulating protein dynamics, including the process of protein foldin',
-    'category' => 'Science',
-    'image' => 'lscr.io/linuxserver/foldingathome',
-    'guide' => 'https://docs.linuxserver.io/images/docker-foldingathome/',
-  ),
-  168 =>
+  165 =>
   array (
     'name' => 'mastodon',
     'title' => 'mastodon',
@@ -1522,7 +1495,7 @@ return array (
     'image' => 'lscr.io/linuxserver/mastodon',
     'guide' => 'https://docs.linuxserver.io/images/docker-mastodon/',
   ),
-  169 =>
+  166 =>
   array (
     'name' => 'qdirstat',
     'title' => 'QDirStat',
@@ -1531,7 +1504,7 @@ return array (
     'image' => 'lscr.io/linuxserver/qdirstat',
     'guide' => 'https://docs.linuxserver.io/images/docker-qdirstat/',
   ),
-  170 =>
+  167 =>
   array (
     'name' => 'diskover',
     'title' => 'diskover',
@@ -1540,7 +1513,7 @@ return array (
     'image' => 'lscr.io/linuxserver/diskover',
     'guide' => 'https://docs.linuxserver.io/images/docker-diskover/',
   ),
-  171 =>
+  168 =>
   array (
     'name' => 'kdenlive',
     'title' => 'Kdenlive',
@@ -1549,7 +1522,7 @@ return array (
     'image' => 'lscr.io/linuxserver/kdenlive',
     'guide' => 'https://docs.linuxserver.io/images/docker-kdenlive/',
   ),
-  172 =>
+  169 =>
   array (
     'name' => 'openshot',
     'title' => 'OpenShot',
@@ -1558,7 +1531,7 @@ return array (
     'image' => 'lscr.io/linuxserver/openshot',
     'guide' => 'https://docs.linuxserver.io/images/docker-openshot/',
   ),
-  173 =>
+  170 =>
   array (
     'name' => 'shotcut',
     'title' => 'shotcut',
@@ -1567,7 +1540,7 @@ return array (
     'image' => 'lscr.io/linuxserver/shotcut',
     'guide' => 'https://docs.linuxserver.io/images/docker-shotcut/',
   ),
-  174 =>
+  171 =>
   array (
     'name' => 'chrome',
     'title' => 'Chrome',
@@ -1576,7 +1549,7 @@ return array (
     'image' => 'lscr.io/linuxserver/chrome',
     'guide' => 'https://docs.linuxserver.io/images/docker-chrome/',
   ),
-  175 =>
+  172 =>
   array (
     'name' => 'chromium',
     'title' => 'Chromium',
@@ -1585,7 +1558,7 @@ return array (
     'image' => 'lscr.io/linuxserver/chromium',
     'guide' => 'https://docs.linuxserver.io/images/docker-chromium/',
   ),
-  176 =>
+  173 =>
   array (
     'name' => 'firefox',
     'title' => 'Firefox',
@@ -1594,7 +1567,7 @@ return array (
     'image' => 'lscr.io/linuxserver/firefox',
     'guide' => 'https://docs.linuxserver.io/images/docker-firefox/',
   ),
-  177 =>
+  174 =>
   array (
     'name' => 'helium',
     'title' => 'Helium',
@@ -1603,7 +1576,7 @@ return array (
     'image' => 'lscr.io/linuxserver/helium',
     'guide' => 'https://docs.linuxserver.io/images/docker-helium/',
   ),
-  178 =>
+  175 =>
   array (
     'name' => 'librewolf',
     'title' => 'LibreWolf',
@@ -1612,7 +1585,7 @@ return array (
     'image' => 'lscr.io/linuxserver/librewolf',
     'guide' => 'https://docs.linuxserver.io/images/docker-librewolf/',
   ),
-  179 =>
+  176 =>
   array (
     'name' => 'msedge',
     'title' => 'Microsoft Edge',
@@ -1621,7 +1594,7 @@ return array (
     'image' => 'lscr.io/linuxserver/msedge',
     'guide' => 'https://docs.linuxserver.io/images/docker-msedge/',
   ),
-  180 =>
+  177 =>
   array (
     'name' => 'opera',
     'title' => 'Opera',
@@ -1630,7 +1603,7 @@ return array (
     'image' => 'lscr.io/linuxserver/opera',
     'guide' => 'https://docs.linuxserver.io/images/docker-opera/',
   ),
-  181 =>
+  178 =>
   array (
     'name' => 'brave',
     'title' => 'The Brave browser',
@@ -1639,7 +1612,7 @@ return array (
     'image' => 'lscr.io/linuxserver/brave',
     'guide' => 'https://docs.linuxserver.io/images/docker-brave/',
   ),
-  182 =>
+  179 =>
   array (
     'name' => 'ungoogled-chromium',
     'title' => 'Ungoogled Chromium',
@@ -1648,7 +1621,7 @@ return array (
     'image' => 'lscr.io/linuxserver/ungoogled-chromium',
     'guide' => 'https://docs.linuxserver.io/images/docker-ungoogled-chromium/',
   ),
-  183 =>
+  180 =>
   array (
     'name' => 'vivaldi',
     'title' => 'Vivaldi',
@@ -1657,7 +1630,7 @@ return array (
     'image' => 'lscr.io/linuxserver/vivaldi',
     'guide' => 'https://docs.linuxserver.io/images/docker-vivaldi/',
   ),
-  184 =>
+  181 =>
   array (
     'name' => 'zen',
     'title' => 'Zen Browser',
@@ -1666,7 +1639,7 @@ return array (
     'image' => 'lscr.io/linuxserver/zen',
     'guide' => 'https://docs.linuxserver.io/images/docker-zen/',
   ),
-  185 =>
+  182 =>
   array (
     'name' => 'mullvad-browser',
     'title' => 'mullvad-browser',

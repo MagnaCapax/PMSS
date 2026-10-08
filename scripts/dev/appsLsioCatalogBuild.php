@@ -6,6 +6,8 @@ const PMSS_LSIO_EXCLUDED = array(
     'jellyfin', 'sonarr', 'radarr', 'prowlarr', 'sabnzbd', 'qbittorrent', 'deluge', 'lidarr', 'bazarr', 'mariadb', 'phpmyadmin', 'resilio-sync', 'wireguard',
     // Circumvention-specific application.
     'oscam',
+    // Shared-host abuse risk: long-running CPU donation, and payload delivery built to deceive downloaders.
+    'boinc', 'foldingathome', 'pwndrop',
 );
 
 /** Reduce upstream Markdown to short, plain display copy. */

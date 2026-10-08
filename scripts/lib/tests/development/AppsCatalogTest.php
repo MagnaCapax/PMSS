@@ -139,7 +139,9 @@ class AppsCatalogTest extends TestCase
         $this->assertTrue(count($catalog) > 100);
         $names = array_column($catalog, 'name');
         $this->assertTrue(in_array('homeassistant', $names, true));
+        $this->assertTrue(in_array('kali-linux', $names, true));
         $this->assertFalse(in_array('oscam', $names, true) || in_array('jellyfin', $names, true));
+        foreach (array('boinc', 'foldingathome', 'pwndrop') as $excluded) $this->assertFalse(in_array($excluded, $names, true), $excluded);
         foreach (\PMSS_LSIO_EXCLUDED as $excluded) $this->assertFalse(in_array($excluded, $names, true), $excluded);
         $this->assertTrue(in_array('thelounge', $names, true));
         foreach ($catalog as $app) {

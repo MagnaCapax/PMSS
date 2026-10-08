@@ -125,6 +125,7 @@ content rule, and deprecated or unstable images. The 39 wiki entries and their
 guides stay in place. One search filters
 both lists, including category names. The page omits the LinuxServer.io list
 when the snapshot has not yet arrived during a staggered update.
+Shared-host abuse risk also excludes `boinc`, `foldingathome`, and `pwndrop`.
 
 The page warns that LinuxServer.io's published-port examples bind every
 address, and shows a loopback bind instead. Each app still needs its own login
