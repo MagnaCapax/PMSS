@@ -27,7 +27,7 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
                 'credentialFile' => '',
                 'dbName' => '',
                 'dbUser' => '',
-                'command' => array('docker', 'run', '-d', '--name', 'jellyfin', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '8096:8096', '-v', '/home/example/docker/jellyfin/config:/config', '-v', '/home/example/media:/data', '--restart', 'unless-stopped', 'lscr.io/linuxserver/jellyfin:latest'),
+                'command' => array('docker', 'run', '-d', '--name', 'jellyfin', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8096:8096', '-v', '/home/example/docker/jellyfin/config:/config', '-v', '/home/example/media:/data', '--restart', 'unless-stopped', 'lscr.io/linuxserver/jellyfin:latest'),
             ),
             'qbittorrent' => array(
                 'mkdirPaths' => array('/home/example/docker/qbittorrent/config', '/home/example/downloads'),
@@ -72,6 +72,14 @@ class LinuxserverInstallPlanSnapshotTest extends TestCase
                 'command' => array('docker', 'run', '-d', '--name', 'phpmyadmin', '-e', 'PUID=0', '-e', 'PGID=0', '-e', 'TZ=UTC', '--network', 'pmss-media', '-p', '127.0.0.1:8082:80', '-e', 'PMA_HOST=mariadb', '-e', 'PMA_PORT=3306', '-v', '/home/example/docker/phpmyadmin/config:/config', '--restart', 'unless-stopped', 'lscr.io/linuxserver/phpmyadmin:latest'),
             ),
         ), $snapshot);
+    }
+
+    public function testJellyfinCustomPortAlsoPublishesOnlyOnLoopback(): void
+    {
+        $spec = \pmssDockerInstallLsioAppSpec('jellyfin', '/home/example', true);
+        $command = \pmssDockerInstallLsioDockerRunCommand('jellyfin', '18096', 'UTC', $spec);
+
+        $this->assertSame('127.0.0.1:18096:8096', $command[array_search('-p', $command, true) + 1]);
     }
 
     public function testLsioMariadbInstallPlanUsesEnvFileOutsideDryRun(): void

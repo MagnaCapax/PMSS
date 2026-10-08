@@ -152,7 +152,7 @@ function pmssDockerInstallLsioHostPort(?string $value, string $defaultPort): ?st
 function pmssDockerInstallLsioAppCatalog(): array
 {
     return [
-        'jellyfin' => ['port' => '8096', 'volumes' => ['config' => '/config', 'media' => '/data']],
+        'jellyfin' => ['port' => '8096', 'bindHost' => '127.0.0.1', 'volumes' => ['config' => '/config', 'media' => '/data']],
         'qbittorrent' => ['port' => '8080', 'extraArgs' => ['-e', 'WEBUI_PORT=8080'], 'volumes' => ['config' => '/config', 'downloads' => '/downloads']],
         'radarr' => ['port' => '7878', 'volumes' => ['config' => '/config', 'movies' => '/movies', 'downloads' => '/downloads']],
         'sonarr' => ['port' => '8989', 'volumes' => ['config' => '/config', 'tv' => '/tv', 'downloads' => '/downloads']],
