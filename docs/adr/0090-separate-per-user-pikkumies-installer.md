@@ -49,7 +49,9 @@ listener, port, or web route. Pikkumies runs with the account owner's rights.
 ## Consequences
 
 Until the mcxPikkumies repository is public, the clone fails with a clear
-message. Hermes, the agent runtime, needs Python 3.11 to 3.13. On Debian
-10/11, `pikkumies install` installs Pikkumies but reports the runtime not
-installed; Debian 12/13 work. Updates come daily from the MagnaCapax GitHub
+message. Hermes, the agent runtime, needs Python 3.11 to 3.13. Where the host's
+python3 is older (Debian 10/11), Pikkumies downloads a pinned,
+checksum-verified standalone Python into the account on x86_64, about 75 MB
+download and 257 MB on disk in the user's own quota (Pikkumies ADR-0014).
+Updates come daily from the MagnaCapax GitHub
 organisation, the same trust `update.php` already places in it.
