@@ -915,6 +915,8 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - etc/skel/bin/install-openclaw
   - Port allocation: consumes the root-provisioned `~/.media-stack-port-openclaw` marker, writes `~/.openclaw/gateway.port`, and refuses install or start without a valid marker. OpenClaw has no lighttpd proxy.
+  - Quota preflight: before downloading, install checks for 60,000 available file slots below the account's soft file-count limit when quota output is usable; unavailable or unlimited quota output does not block installation.
+  - Startup: install and manual start wait up to 120 seconds for the loopback listener; the cron check waits up to 5 seconds. A live process at the deadline is reported as still starting, and status shows listener state.
   - Lifecycle: install or successful manual start writes two marked jobs using `$HOME/bin/install-openclaw` in the account's own crontab; check stops retrying after five consecutive failed starts until manual start.
   - Authentication: a private gateway environment file supplies a token, and the gateway binds loopback only.
 

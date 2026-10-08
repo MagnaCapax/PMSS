@@ -7,6 +7,51 @@ require_once dirname(__DIR__, 2).'/mediaStackPorts.php';
 
 final class OpenClawInstallerTest extends TestCase
 {
+    public function testCmdlineAcceptsEntryAndExactRewrittenTitles(): void
+    {
+        $entry = '/tmp/oc-entry/openclaw.mjs';
+        foreach (array(
+            "/tmp/oc-node\0{$entry}\0gateway\0",
+            "openclaw\0\0   ",
+            "openclaw-gateway\0   \0",
+        ) as $cmdline) {
+            $this->assertTrue(\ocCmdlineIsGateway($cmdline, $entry));
+        }
+        foreach (array('', "node\0/other/app.js\0", "openclawx\0", "openclaw-gateway-helper\0") as $cmdline) {
+            $this->assertFalse(\ocCmdlineIsGateway($cmdline, $entry));
+        }
+    }
+
+    public function testQuotaFileHeadroomReadsPlainAndOverQuotaRows(): void
+    {
+        $header = "Disk quotas for user test (uid 1000):\nFilesystem blocks quota limit grace files quota limit grace\n";
+        $this->assertSame(
+            array('used' => 54000, 'soft' => 75000, 'hard' => 93750),
+            \ocQuotaFileHeadroom($header."/dev/md4 123456 1000000 1250000 54000 75000 93750\n")
+        );
+        $this->assertSame(
+            array('used' => 76000, 'soft' => 75000, 'hard' => 93750),
+            \ocQuotaFileHeadroom($header."/dev/md4 123456 1000000 1250000 76000* 75000 93750 6days\n")
+        );
+        $this->assertSame(
+            array('used' => 200, 'soft' => 75000, 'hard' => 93750),
+            \ocQuotaFileHeadroom($header."/dev/md4 123456* 1000000 1250000 7days 200 75000 93750\n")
+        );
+    }
+
+    public function testQuotaFileHeadroomIgnoresUnlimitedAndInvalidOutput(): void
+    {
+        foreach (array(
+            "/dev/md4 123 0 0 200 0 0\n",
+            "quota: command unavailable\n",
+            "Filesystem blocks quota limit grace files quota limit grace\n",
+            "/dev/md4 123 0 0 no-files 75000 93750\n",
+            "/dev/md4 123 0 0 999999999999999999999999 75000 93750\n",
+        ) as $output) {
+            $this->assertSame(null, \ocQuotaFileHeadroom($output));
+        }
+    }
+
     public function testCronMergePreservesForeignBytesAndIsIdempotent(): void
     {
         $foreign = "SHELL=/bin/sh\r\n# personal\n* * * * * echo keep\n";

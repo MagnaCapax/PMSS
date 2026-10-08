@@ -4,6 +4,12 @@ OpenClaw is optional. It is a chat-driven agent with shell access to your
 account. Anyone with its gateway token or access to an authorized bot can
 exercise that access. Give chat access only to your own identity.
 
+## Requirements
+
+OpenClaw needs about 55,000 files and 1.3 GB of disk space. The installer
+refuses accounts whose file-count quota cannot fit the installation. The
+first gateway start can take a minute or two on a busy server.
+
 After a full PMSS update has reserved your port, run:
 
 ```sh
