@@ -55,3 +55,20 @@ controls; it points customers to them.
 - ADR 0021: top-frame navigation contract.
 - ADR 0022: delivered customer files and sibling dependencies.
 - ADR 0067: media-stack panel app catalog.
+
+## Amendment 2026-10-08
+
+The operator rejected the read-only page because its installed-app rows only
+linked elsewhere. The Apps tab now displays actual app and login state and
+offers Open, install, recovery, secure, and managed-service toggle/restart
+controls. These call the existing Welcome endpoints. Welcome and Apps load the
+same delivered `pmssActions.js`, so request behavior (including qBittorrent's
+password-sync prompt) has one implementation on both tabs. The media-stack
+watchdog snapshot supplies per-app runtime state; unavailable snapshots are
+shown as unknown rather than reported as stopped.
+
+The 39 rootless Docker entries remain documentation-only while #885 and #886
+are open. Their descriptions and caution tags are fixed display copy, and
+their setup links stay within the existing wiki category anchors. This
+amendment supersedes the earlier read-only decision and the #673 relation
+above; the original rationale is retained as decision history.

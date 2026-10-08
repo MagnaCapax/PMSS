@@ -43,10 +43,13 @@ class MediaStackPanelTest extends TestCase
         ]);
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/welcome.php', [
             'pmssMediaStackStartStopped',
+            'value="Start stopped apps"',
+            'src="pmssActions.js"',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/pmssActions.js', [
             'pmssMediaStackSecureApp',
             "data: {action: 'confirm-secure-' + app}",
             "headers: {'X-Requested-With': 'XMLHttpRequest'}",
-            'value="Start stopped apps"',
         ]);
     }
 

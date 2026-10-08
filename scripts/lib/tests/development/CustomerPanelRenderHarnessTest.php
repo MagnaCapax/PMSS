@@ -10,8 +10,8 @@ class CustomerPanelRenderHarnessTest extends TestCase
         $html = $this->pmssRenderCustomerPanelPage('apps.php', [], [
             'minBytes' => 4000,
         ]);
-        $this->assertStringContainsString('Self-hosted apps you can run', $html);
-        $this->assertStringContainsString('Installed by PMSS', $html);
+        $this->assertStringContainsString('Find more apps', $html);
+        $this->assertStringContainsString('Media Stack is not installed', $html);
     }
 
     public function testRendersCurrentCustomerPanelWithoutPhpErrors(): void

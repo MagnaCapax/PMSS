@@ -1116,6 +1116,15 @@ if (!function_exists('pmssCustomerManagedAppDefinitions')) {
   ); }
 }
 
+/** Match Welcome's managed-app availability gate on every customer page. */
+if (!function_exists('pmssWelcomeServiceAvailable')) {
+ function pmssWelcomeServiceAvailable($scriptPath, array $binaryPaths) {
+  if (!file_exists($scriptPath)) return false;
+  foreach ($binaryPaths as $binaryPath) if (file_exists((string) $binaryPath)) return true;
+  return false;
+ }
+}
+
 if (!function_exists('pmssWelcomeHttpContextCreate')) {
  /**
   * Build the standard remote-request context used by PMSS GUI pages.
