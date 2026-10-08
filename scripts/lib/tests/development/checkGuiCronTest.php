@@ -113,7 +113,7 @@ PHP;
 
     public function testMissingSentinelUsesSharedReconciler(): void
     {
-        $user = $this->pmssFixtureUserForCurrentUid('dummy');
+        $user = 'dummy';
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-check-gui-reconcile-');
         $homeDir = $this->pmssUserHomePath($homeRoot, $user);
         $this->pmssEnsureDir($homeDir.'/www');
@@ -140,7 +140,7 @@ PHP;
 
     public function testSingleWatchdogRecoveryRestoresPanelAndRutorrentAfterWebRootDeletion(): void
     {
-        $user = $this->pmssFixtureUserForCurrentUid('dummy');
+        $user = 'dummy';
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-check-gui-full-recovery-');
         $homeDir = $this->pmssUserHomePath($homeRoot, $user);
         $this->pmssEnsureDir($homeDir);
@@ -176,7 +176,7 @@ PHP;
 
     public function testWatchdogRecoveryIsIdempotentAfterTheFirstRun(): void
     {
-        $user = $this->pmssFixtureUserForCurrentUid('dummy');
+        $user = 'dummy';
         $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-check-gui-idempotent-');
         $homeDir = $this->pmssUserHomePath($homeRoot, $user);
         $this->pmssEnsureDir($homeDir);

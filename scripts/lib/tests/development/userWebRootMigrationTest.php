@@ -51,36 +51,6 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertTrue($this->pmssMessagesContain($messages, 'Migrated www/rutorrent/share'));
     }
 
-    public function testAccountRenameKeepsDirectoryInodeAndNestedContent(): void
-    {
-        $source = $this->home.'/www/public';
-        $target = $this->home.'/.local/share/pmss/public';
-        $this->pmssWriteFile($source.'/nested/index.html', 'customer-content');
-        $this->pmssEnsureDir(dirname($target));
-        $before = \pmssUserWebRootMigrationSnapshot($source, true);
-
-        $this->assertTrue(\pmssUserWebRootMigrationRenameAsAccount($this->pmssCurrentOwner(), $this->home, $source, $target));
-        $this->assertSame($before, \pmssUserWebRootMigrationSnapshot($target, true));
-        $this->assertSame('customer-content', file_get_contents($target.'/nested/index.html'));
-        $this->assertFalse(file_exists($source));
-    }
-
-    public function testAccountRenameRefusesLinkedDestinationParentAndPreservesOutside(): void
-    {
-        $source = $this->home.'/www/public';
-        $outside = $this->homeRoot.'/outside-rename';
-        $this->pmssWriteFile($source.'/index.html', 'customer-content');
-        $this->pmssWriteFile($outside.'/public/index.html', 'outside-content');
-        $this->pmssEnsureDir($this->home.'/.local/share');
-        $this->pmssCreateSymlinkOrSkip($outside, $this->home.'/.local/share/pmss');
-
-        $this->assertFalse(\pmssUserWebRootMigrationRenameAsAccount(
-            $this->pmssCurrentOwner(), $this->home, $source, $this->home.'/.local/share/pmss/public'
-        ));
-        $this->assertSame('customer-content', file_get_contents($source.'/index.html'));
-        $this->assertSame('outside-content', file_get_contents($outside.'/public/index.html'));
-    }
-
     public function testExistingMigrationIsIdempotent(): void
     {
         $target = $this->home.'/.local/share/pmss/public';

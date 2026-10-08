@@ -189,10 +189,7 @@ function pmssUserWebRootReconcileCopyEntry(
         $installed = is_string($linkTarget)
             && pmssUserWebRootReconcileLinkTargetIsSafe($target, $linkTarget, $home)
             && ($merge || (!file_exists($target) && !is_link($target)))
-            && ($merge
-                ? pmssAccountPathRun($user, $home, [$target],
-                    'ln -sT -- '.escapeshellarg($linkTarget).' '.escapeshellarg($target))
-                : @symlink($linkTarget, $target));
+            && @symlink($linkTarget, $target);
         if ($merge && !$installed) {
             pmssUserWebRootMigrationLog($user, $logger, 'Refusing unsafe skeleton symlink: '.$relative);
         }
@@ -209,16 +206,15 @@ function pmssUserWebRootReconcileCopyEntry(
             return false;
         }
         $created = !is_dir($target);
-        $mode = $stat['mode'] & 07777;
-        $createdSuccessfully = !$created || ($merge
-            ? pmssAccountPathRun($user, $home, [$target],
-                'mkdir -m 0700 -- '.escapeshellarg($target))
-            : @mkdir($target, $mode));
-        if ($created && !$createdSuccessfully) {
+        if ($created && !@mkdir($target, $stat['mode'] & 07777)) {
             return $merge;
         }
-        if (!$merge) {
-            @chmod($target, $mode);
+        if (!$merge || $created) {
+            @chmod($target, $stat['mode'] & 07777);
+        }
+        if ($merge && $created && function_exists('posix_geteuid') && @posix_geteuid() === 0) {
+            @chown($target, $user);
+            @chgrp($target, $user);
         }
         foreach ($entries as $child) {
             $childRelative = $relative === '' ? $child : $relative.'/'.$child;
@@ -230,10 +226,6 @@ function pmssUserWebRootReconcileCopyEntry(
             if (!pmssUserWebRootReconcileCopyEntry($source.'/'.$child, $target.'/'.$child, $home, $childRelative, $stats, $user, $logger)) {
                 return false;
             }
-        }
-        if ($merge && $created) {
-            pmssAccountPathRun($user, $home, [$target],
-                'chmod '.escapeshellarg(sprintf('%04o', $mode)).' -- '.escapeshellarg($target));
         }
         return true;
     }
@@ -300,8 +292,7 @@ function pmssUserWebRootReconcileFull(
     if ($success) {
         $entries = pmssDirectoryEntriesRead($www);
         $currentRootIsSafe = !pmssPathExistsOrLink($www) || (!is_link($www) && $entries === []);
-        $success = $currentRootIsSafe
-            && pmssUserWebRootMigrationRenameAsAccount($user, $home, $stage, $www);
+        $success = $currentRootIsSafe && @rename($stage, $www);
     }
     if (!$success) {
         pmssUserWebRootReconcileRemoveTree($stage);

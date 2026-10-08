@@ -12,7 +12,6 @@
 require_once dirname(__DIR__, 2).'/pathSafety.php';
 require_once dirname(__DIR__, 2).'/runtime/filesystem.php';
 require_once dirname(__DIR__, 2).'/user/directories.php';
-require_once dirname(__DIR__, 2).'/lighttpd/accountPath.php';
 
 /** Emit one migration message through the normal updater logger or a test logger. */
 function pmssUserWebRootMigrationLog(string $user, ?callable $logger, string $message): void
@@ -163,22 +162,6 @@ function pmssUserWebRootMigrationDirectoryIsEmpty(string $path): bool
 {
     $entries = pmssDirectoryEntriesRead($path);
     return is_array($entries) && empty($entries);
-}
-
-/** Move a directory within one home with the account's authority. */
-function pmssUserWebRootMigrationRenameAsAccount(string $user, string $home, string $source, string $target): bool
-{
-    clearstatcache(true, $source);
-    clearstatcache(true, $target);
-    if (!pmssUserWebRootMigrationParentSafe($home, dirname($source))
-        || !pmssUserWebRootMigrationParentSafe($home, dirname($target))
-        || !pmssPathTargetIsSafe($source, true, true) || !is_dir($source)
-        || !pmssPathTargetIsSafe($target, true, true)) {
-        return false;
-    }
-
-    $command = 'mv -T -- '.escapeshellarg($source).' '.escapeshellarg($target);
-    return pmssAccountPathRun($user, $home, [$source, $target], $command);
 }
 
 /** Apply metadata captured from lstat() without treating failures as fatal. */
@@ -373,15 +356,14 @@ function pmssUserMigrateWebRootBasenameCollapsePath(
             pmssUserWebRootMigrationLog($user, $logger, 'Preserving non-directory destination conflict at '.$targetRelative);
             return;
         }
-        if (!pmssUserWebRootMigrationDirectoryIsEmpty($target)
-            || !pmssAccountPathRun($user, $home, [$target], 'rmdir -- '.escapeshellarg($target))) {
+        if (!pmssUserWebRootMigrationDirectoryIsEmpty($target) || !@rmdir($target)) {
             pmssUserWebRootMigrationRemoveCopy($temporary);
             pmssUserWebRootMigrationLog($user, $logger, 'Preserving destination conflict for '.$sourceRelative);
             return;
         }
     }
 
-    if (!pmssUserWebRootMigrationRenameAsAccount($user, $home, $temporary, $target)) {
+    if (!@rename($temporary, $target)) {
         pmssUserWebRootMigrationRemoveCopy($temporary);
         pmssUserWebRootMigrationLog($user, $logger, 'Unable to copy misfiled '.$misfileRelative.' to durable storage');
         return;
@@ -444,8 +426,7 @@ function pmssUserMigrateWebRootPath(
     if (!$sourceExists) {
         if (!pmssUserWebRootMigrationPrepareParent($user, $home, $sourceParent, $logger)
             || pmssPathExistsOrLink($source)
-            || !pmssAccountPathRun($user, $home, [$source],
-                'ln -sT -- '.escapeshellarg($linkTarget).' '.escapeshellarg($source))) {
+            || !@symlink($linkTarget, $source)) {
             pmssUserWebRootMigrationLog($user, $logger, 'Unable to restore symlink for '.$sourceRelative);
             return;
         }
@@ -460,25 +441,22 @@ function pmssUserMigrateWebRootPath(
     }
     if (!pmssUserWebRootMigrationPrepareParent($user, $home, $targetParent, $logger)
         || pmssPathExistsOrLink($target)
-        || !pmssUserWebRootMigrationRenameAsAccount($user, $home, $source, $target)) {
+        || !@rename($source, $target)) {
         pmssUserWebRootMigrationLog($user, $logger, 'Unable to move '.$sourceRelative.' to durable storage');
         return;
     }
 
     $after = pmssUserWebRootMigrationSnapshot($target, true);
     if ($after === null || $before !== $after) {
-        $restored = !pmssPathExistsOrLink($source)
-            && pmssUserWebRootMigrationRenameAsAccount($user, $home, $target, $source);
+        $restored = !pmssPathExistsOrLink($source) && @rename($target, $source);
         pmssUserWebRootMigrationLog($user, $logger, $restored
             ? 'Verification failed; restored '.$sourceRelative
             : 'Verification failed; durable copy preserved at '.$targetRelative);
         return;
     }
 
-    if (pmssPathExistsOrLink($source) || !pmssAccountPathRun($user, $home, [$source],
-        'ln -sT -- '.escapeshellarg($linkTarget).' '.escapeshellarg($source))) {
-        $restored = !pmssPathExistsOrLink($source)
-            && pmssUserWebRootMigrationRenameAsAccount($user, $home, $target, $source);
+    if (pmssPathExistsOrLink($source) || !@symlink($linkTarget, $source)) {
+        $restored = !pmssPathExistsOrLink($source) && @rename($target, $source);
         pmssUserWebRootMigrationLog($user, $logger, $restored
             ? 'Unable to link '.$sourceRelative.'; restored original path'
             : 'Unable to link '.$sourceRelative.'; durable copy preserved at '.$targetRelative);
