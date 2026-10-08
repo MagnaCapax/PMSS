@@ -50,14 +50,7 @@ order. A skipped legitimate migration is a data-preservation failure.
   `webRootReconcile.php` runs the final full-restore stage move and partial
   merge directory/link creation as the account. Existing content snapshots,
   conflict checks, and resulting modes remain in place. Account authority
-  bounds a parent swap or linked path to that account's permissions. An
-  already unprivileged process that owns the fixture home may use its existing
-  UID when the fixture name has no passwd entry; it gains no authority.
-  The root watchdog may publish a complete staged web root directly only when
-  both names are immediate children of a checked root-owned home that is not
-  writable by group or others. It rechecks the source inode and verifies the
-  destination inode after the move. A customer-owned home continues through
-  the account path; a failed account move there is refused.
+  bounds a parent swap or linked path to that account's permissions.
 
 ## Remaining boundaries
 
@@ -78,10 +71,9 @@ order. A skipped legitimate migration is a data-preservation failure.
   retain root file renames. These root operations remain unchanged. PHP 7.3 has no
   `openat`/`fchown`/`fchmod` interface to bind them to descriptors; path
   predicates do not close a tenant parent swap, and `renameat` would move a
-  replacement link rather than the verified source inode. The guarded top-level
-  watchdog fallback has a root directory move only under a root-owned home;
-  root file publication, copy, ownership, and cleanup paths are not claimed
-  safe against concurrent parent replacement. Their
+  replacement link rather than the verified source inode. No root directory
+  move remains, but the root file publication, copy, ownership, and cleanup
+  paths are not claimed safe against concurrent parent replacement. Their
   metadata contract needs a separate semantics-preserving design.
 
 ## Consequences

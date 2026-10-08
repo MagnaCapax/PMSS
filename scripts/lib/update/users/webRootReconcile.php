@@ -190,7 +190,7 @@ function pmssUserWebRootReconcileCopyEntry(
             && pmssUserWebRootReconcileLinkTargetIsSafe($target, $linkTarget, $home)
             && ($merge || (!file_exists($target) && !is_link($target)))
             && ($merge
-                ? pmssUserWebRootMigrationRun($user, $home, [$target],
+                ? pmssAccountPathRun($user, $home, [$target],
                     'ln -sT -- '.escapeshellarg($linkTarget).' '.escapeshellarg($target))
                 : @symlink($linkTarget, $target));
         if ($merge && !$installed) {
@@ -211,7 +211,7 @@ function pmssUserWebRootReconcileCopyEntry(
         $created = !is_dir($target);
         $mode = $stat['mode'] & 07777;
         $createdSuccessfully = !$created || ($merge
-            ? pmssUserWebRootMigrationRun($user, $home, [$target],
+            ? pmssAccountPathRun($user, $home, [$target],
                 'mkdir -m 0700 -- '.escapeshellarg($target))
             : @mkdir($target, $mode));
         if ($created && !$createdSuccessfully) {
@@ -232,7 +232,7 @@ function pmssUserWebRootReconcileCopyEntry(
             }
         }
         if ($merge && $created) {
-            pmssUserWebRootMigrationRun($user, $home, [$target],
+            pmssAccountPathRun($user, $home, [$target],
                 'chmod '.escapeshellarg(sprintf('%04o', $mode)).' -- '.escapeshellarg($target));
         }
         return true;
