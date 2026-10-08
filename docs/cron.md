@@ -93,7 +93,12 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
 - `iopsLimits.php` – Refresh per-user monthly IOPS throttling by comparing `resourceStats` month totals against `/etc/seedbox/runtime/iopsLimits/<user>` and temporarily capping `/home` read/write IOPS via `userConfigCgroup.php`.
 - `mdadmCheckarray.php` – Runs the quarterly mdadm redundancy check for
   non-degraded md arrays only, logging degraded or unknown arrays that are
-  deferred until redundancy is restored.
+  deferred until redundancy is restored. Optionally set
+  `/etc/seedbox/config/mdadmCheckarrayMinDays` to one non-negative integer to
+  require that many days between successful checkarray starts on this host.
+  Missing, empty, malformed, or `0` keeps the existing quarterly hostname-staggered
+  schedule unchanged. The last start is stored in
+  `/var/lib/pmss/mdadm-checkarray-last` after checkarray exits successfully.
 - `trafficLog.php` – Capture recent traffic counters for aggregation.
 - `trafficStats.php` – Fold raw logs into long-term statistics.
 - `systemdServicesGuard.php` – Enforce stop/disable/mask policy for system services.
