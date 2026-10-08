@@ -14,6 +14,8 @@
  * @version 1.0
  */
 require_once __DIR__.'/scriptsInc.php';
+if (isset($_GET['status'])) { pmssCustomerAppsStatusJsonEmit(); exit; }
+if (isset($_GET['log'])) { pmssCustomerAppsLogJsonEmit(); exit; }
 
 if (isset($_GET['backup']) && $_GET['backup'] === 'download') {
     pmssCustomerBackupDownload(dirname(__DIR__));
@@ -56,7 +58,10 @@ $delugePasswordCanRotate = $pageState['delugePasswordCanRotate'];
 $delugePasswordNotice = $pageState['delugePasswordNotice'];
 $delugePassword = $pageState['delugePassword'];
 $mediaStackStatus = $pageState['mediaStackStatus'];
-$coreServiceStatuses = $pageState['coreServiceStatuses'];
+$home = dirname(__DIR__);
+$hostname = function_exists('gethostname') ? (string) gethostname() : '';
+$appsStatus = pmssCustomerAppsStatusRead($home, basename(rtrim($home, '/')),
+    $hostname !== '' ? $hostname : (string) php_uname('n'));
 $billingServiceId = $pageState['billingServiceId'];
 $trafficBandwidthState = $pageState['trafficBandwidthState'];
 $welcomeHeadingHtml = pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage);
@@ -64,14 +69,12 @@ $announcementItemsHtml = pmssWelcomeAnnouncementItemsHtmlBuild();
 $articleItemsHtml      = pmssWelcomePanelFeedItemsHtmlBuild('article', 4);
 $wikiItemsHtml         = pmssWelcomePanelFeedItemsHtmlBuild('wiki', 10);
 $storageHealthNoticeHtml = pmssWelcomeStorageHealthNoticeHtmlRead();
-$managedApps = pmssCustomerManagedAppDefinitions();
+
 $guiFramesLocalOnly = is_file('../.guiFramesLocalOnly') && !is_link('../.guiFramesLocalOnly');
 $usageAlertsPermissions = @fileperms('../.usageAlertsEnabled');
 $usageAlertsEnabled = is_file('../.usageAlertsEnabled') && !is_link('../.usageAlertsEnabled')
     && is_int($usageAlertsPermissions) && ($usageAlertsPermissions & 0777) === 0600;
-$serviceRestartActions = pmssWelcomeServiceRestartActionsBuild($managedApps, $mediaStackStatus);
-$serviceRestartActionsJson = json_encode($serviceRestartActions, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
+
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -83,6 +86,7 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
     <!-- Javascript -->
     <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
     <script type="text/javascript"><?= pmssActionScriptJs() ?></script>
+    <?= pmssCustomerAppsCss() ?>
     <style type="text/css">
         .pmss-bonus-banner {
             flex: 0 0 100%;
@@ -244,7 +248,7 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
         }
     </style>
     <script type="text/javascript">
-        var pmssServiceRestartActions = <?php echo $serviceRestartActionsJson; ?>;
+
 
         function pmssGuiFramesModeApply(button, mode) {
             pmssSetActionLoading(button, true);
@@ -282,34 +286,6 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
                     pmssShowActionNotice('Usage alert preference could not be saved.', true);
                 }
             });
-        }
-
-        function pmssRestartAllServices(button) {
-            var actions = pmssServiceRestartActions.slice(0);
-            var failures = [];
-            var actionIndex = 0;
-            pmssSetActionLoading(button, true);
-
-            function runNext() {
-                if (actionIndex >= actions.length) {
-                    pmssSetActionLoading(button, false);
-                    if (failures.length > 0) {
-                        pmssShowActionNotice('Restart requests failed or were cancelled for: ' + failures.join(', ') + '.', true);
-                    } else {
-                        pmssShowActionNotice('Restart requests sent for all available account services.', false);
-                    }
-                    return;
-                }
-
-                var action = actions[actionIndex++];
-                pmssShowActionNotice('Restarting ' + action.label + '...', false);
-                pmssActionRequest(action).done(runNext).fail(function() {
-                    failures.push(action.label);
-                    runNext();
-                });
-            }
-
-            runNext();
         }
 
     </script>
@@ -351,26 +327,23 @@ if (!is_string($serviceRestartActionsJson)) $serviceRestartActionsJson = '[]';
                         <p>Opt in to email when traffic reaches 80% of the monthly allowance, disk usage reaches 90% of quota, or a monitored media-stack service is reported down. Alerts reset after the condition clears.</p>
                         <input type="button" name="usageAlertsMode" value="<?php echo $usageAlertsEnabled ? 'Disable usage alert email' : 'Enable usage alert email'; ?>" onClick="pmssUsageAlertsModeApply(this, '<?php echo $usageAlertsEnabled ? 'disabled' : 'enabled'; ?>');" />
 
-                        <h6>All account services</h6>
-                        <p>Restart every available service for this account. Installed media-stack apps that are stopped are started without disturbing live tmux sessions.</p>
-                        <input type="button" name="servicesRestart" value="Restart all my services" onClick="pmssRestartAllServices(this);" />
-
-<?php echo pmssWelcomeManagedAppsHtmlBuild($managedApps, $delugePasswordCanRotate, $delugePasswordNotice, $delugePassword); ?>
+                        <?php echo pmssCustomerAppsSectionHtmlBuild($appsStatus, 'welcome.php?status=1'); ?>
+                        <h6>App passwords</h6>
+                        <p>Deluge Web UI password: <b><?php echo pmssCustomerHtmlAttr($delugePassword === '' ? 'Unavailable' : $delugePassword); ?></b> (also used for the daemon connection; separate from your account password)</p>
+                        <?php if ($delugePasswordCanRotate): ?><form method="post" action=""><input type="hidden" name="delugePasswordRotate" value="1" /><input type="submit" value="Rotate Deluge Password" /></form><?php else: ?><p><b>Deluge password rotation is unavailable on this host.</b></p><?php endif; ?>
+                        <?php if ($delugePasswordNotice !== ''): ?><p><b><?php echo pmssCustomerHtmlAttr($delugePasswordNotice); ?></b></p><?php endif; ?>
+                        <p>rclone password is the same as your web access password.</p>
+                        <p>qBittorrent username is your own username and password matches your account password. Change it once logged in if you want a separate WebUI password.</p>
 
 <?php
 if (file_exists('mediaStack.php') && function_exists('pmssMediaStackPanelHtmlBuild')) {
 ?>
                         <h6>Media Stack</h6>
                         <div id="pmss-media-stack-status"><?php echo pmssMediaStackPanelHtmlBuild($mediaStackStatus); ?></div>
-                        <input type="button" id="pmss-media-stack-start" name="mediaStackStart" value="Install Media Stack" onClick="pmssMediaStackStart(this);"<?php if (empty($mediaStackStatus['canStart'])) echo ' disabled="disabled"'; ?> />
-                        <input type="button" id="pmss-media-stack-recovery" name="mediaStackRecovery" value="Start stopped apps" onClick="pmssMediaStackStartStopped(this);"<?php if (empty($mediaStackStatus['canRestart'])) echo ' disabled="disabled" style="display:none"'; ?> />
 <?php
 }
 ?>
 
-                        <h6>rTorrent</h6>
-                        <input type="button" name="rtorrentRestart" value="Restart rTorrent" onClick="pmssRunAction(this, 'rtorrentRestart.php', 'rTorrent restart request sent, please allow up to 2 minutes for restart to happen.', false, 'Sending rTorrent restart request...');" />
-                        <?php echo pmssWelcomeCoreServiceStatusBadgeHtmlBuild('rTorrent', $coreServiceStatuses['rtorrent'] ?? 'unknown'); ?>
                         <h6>Torrent configuration backup</h6>
                         <p>Download rTorrent, ruTorrent, Deluge, and qBittorrent configuration plus torrent session/resume state. Media files are not included.</p>
                         <p><b>Keep the archive private:</b> it can contain private tracker URLs and separate application credentials.</p>
@@ -393,14 +366,6 @@ if (is_array($configRestoreResult)) {
 }
 ?>
 <?php
-if (file_exists('lighttpdRestart.php')) {
-?>
-                        <h6>Lighttpd</h6>
-                        <input type="button" name="lighttpdRestart" value="Restart Lighttpd" onClick="pmssRunAction(this, 'lighttpdRestart.php?action=confirm-restart', 'Lighttpd restart request sent. It might take a couple of minutes.', false, 'Lighttpd restart may take a couple of minutes...');" />
-                        <?php echo pmssWelcomeCoreServiceStatusBadgeHtmlBuild('Lighttpd', $coreServiceStatuses['lighttpd'] ?? 'unknown'); ?>
-<?php
-}
-
 if (file_exists('openvpn-config.tgz')) {
 ?>
                         <hr />
@@ -544,7 +509,6 @@ function pmssWelcomePageStateBuild() {
         'delugePasswordNotice' => $delugeState['passwordNotice'],
         'delugePassword' => $delugeState['password'],
         'mediaStackStatus' => $mediaStackStatus,
-        'coreServiceStatuses' => pmssWelcomeCoreServiceStatusesRead(),
         'billingServiceId' => $billingServiceId,
         'trafficBandwidthState' => $trafficBandwidthState,
     );
@@ -931,105 +895,6 @@ function pmssWelcomeDelugeStateBuild($username, $delugeAuthPath) {
 }
 
 function pmssWelcomeHtmlAttr($value) { return pmssCustomerHtmlAttr($value); }
-
-function pmssWelcomeJsSingleQuoted($value) { return str_replace(array('\\', "'", "\r", "\n"), array('\\\\', "\\'", '\\r', '\\n'), (string) $value); }
-
-/** Read passive up/down state for the two core customer-owned services. */
-function pmssWelcomeCoreServiceStatusesRead() {
-    $unknown = array('rtorrent' => 'unknown', 'lighttpd' => 'unknown');
-    if (!pmssFrontendShellExecAvailable()) return $unknown;
-
-    $uid = function_exists('posix_getuid') ? (int) posix_getuid() : (int) getmyuid();
-    return array(
-        'rtorrent' => pmssWelcomeCoreServicePgrepStatusRead($uid, '-f', '^rtorrent'),
-        'lighttpd' => pmssWelcomeCoreServicePgrepStatusRead($uid, '-x', 'lighttpd'),
-    );
-}
-
-/** Run one fixed pgrep liveness probe and map output to a customer badge state. */
-function pmssWelcomeCoreServicePgrepStatusRead($uid, $mode, $pattern) {
-    $mode = $mode === '-f' ? '-f' : '-x';
-    $command = 'pgrep -u '.(int) $uid.' '.(string) $mode.' '.escapeshellarg((string) $pattern).' 2>/dev/null';
-    $output = pmssFrontendShellExec($command);
-    return is_string($output) && trim($output) !== '' ? 'running' : 'stopped';
-}
-
-/** Render a compact status badge using the media-stack badge visual language. */
-function pmssWelcomeCoreServiceStatusBadgeHtmlBuild($label, $status) {
-    $status = in_array($status, array('running', 'stopped'), true) ? $status : 'unknown';
-    $classes = array('pmss-media-stack-auth-badge');
-    if ($status === 'running') $classes[] = 'pmss-media-stack-auth-badge-protected';
-    if ($status === 'stopped') $classes[] = 'pmss-media-stack-auth-badge-exposed';
-
-    return '<span class="pmss-core-service-status"><b>'.pmssWelcomeHtmlAttr($label).':</b> '
-        .'<span class="'.pmssWelcomeHtmlAttr(implode(' ', $classes)).'">'
-        .pmssWelcomeHtmlAttr($status).'</span></span>';
-}
-
-
-/** Build the ordered queue for the whole-account restart control. */
-function pmssWelcomeServiceRestartActionsBuild(array $managedApps, array $mediaStackStatus) {
-    $actions = array();
-    if (file_exists('rtorrentRestart.php') && !is_file('../.rtorrentDisable')) $actions[] = array('label' => 'rTorrent', 'url' => 'rtorrentRestart.php');
-
-    foreach ($managedApps as $appName => $definition) {
-        if (!is_array($definition)
-            || !isset($definition['endpoint'], $definition['binaries'], $definition['enable'])
-            || !is_array($definition['binaries'])
-            || !file_exists((string) $definition['enable'])
-            || !pmssWelcomeServiceAvailable((string) $definition['endpoint'], $definition['binaries'])) continue;
-
-        $action = array('label' => (string) $appName, 'url' => (string) $definition['endpoint'].'?action=restart');
-        if ($appName === 'qBittorrent') $action['passwordField'] = 'qbittorrentPassword';
-        $actions[] = $action;
-    }
-
-    if (!empty($mediaStackStatus['canRestart']) && file_exists('mediaStack.php')) {
-        $actions[] = array(
-            'label' => 'stopped media-stack apps',
-            'url' => 'mediaStack.php?action=start-stopped',
-            'type' => 'POST',
-            'dataType' => 'json',
-            'headers' => array('X-Requested-With' => 'XMLHttpRequest'),
-        );
-    }
-
-    // A graceful lighttpd restart can interrupt this page, so send it last.
-    if (file_exists('lighttpdRestart.php')) $actions[] = array('label' => 'Lighttpd', 'url' => 'lighttpdRestart.php?action=confirm-restart');
-    return $actions;
-}
-
-function pmssWelcomeActionButtonHtmlBuild($name, $value, $url, $successMessage, $shouldReload, $pendingMessage) {
-    return '<input type="button" name="'.pmssWelcomeHtmlAttr($name).'" value="'.pmssWelcomeHtmlAttr($value).'" onClick="pmssRunAction(this, \''
-        .pmssWelcomeJsSingleQuoted($url).'\', \''
-        .pmssWelcomeJsSingleQuoted($successMessage).'\', '
-        .($shouldReload ? 'true' : 'false').', \''
-        .pmssWelcomeJsSingleQuoted($pendingMessage).'\');" />';
-}
-
-function pmssWelcomeManagedAppsHtmlBuild(array $managedApps, $delugePasswordCanRotate, $delugePasswordNotice, $delugePassword) {
-    $delugeHtml = '<p>Deluge Web UI password: <b>'.pmssWelcomeHtmlAttr($delugePassword === '' ? 'Unavailable' : $delugePassword).'</b> (also used for the daemon connection; separate from your account password)</p>';
-    if ($delugePasswordCanRotate) $delugeHtml .= '<form method="post" action=""><input type="hidden" name="delugePasswordRotate" value="1" /><input type="submit" value="Rotate Deluge Password" /></form>';
-    else $delugeHtml .= '<p><b>Deluge password rotation is unavailable on this host.</b></p>';
-    $delugeHtml .= $delugePasswordNotice !== '' ? '<p><b>'.pmssWelcomeHtmlAttr($delugePasswordNotice).'</b></p>' : '';
-
-    $specs = array(
-        array('Deluge', 'deluge', 'Deluge', $delugeHtml, 'Start Deluge', 'Deluge starting. Accessible at /deluge-USERNAME/. Refresh GUI to see tab.', 'Deluge start request sent...', 'Disable Deluge', 'Deluge disabled.', 'Disabling Deluge...', 'Restart Deluge', 'Deluge restart requested.', 'Restarting Deluge...'),
-        array('rclone', 'rclone', 'Rclone Web UI', '<p>Rclone password is the same as your web access password</p>', 'Start Rclone', 'Rclone starting, access at /user-USERNAME/rclone. Refresh GUI to see tab.', 'Starting Rclone...', 'Disable Rclone', 'Rclone disabled.', 'Disabling Rclone...', 'Restart Rclone', 'Rclone restart requested.', 'Restarting Rclone...'),
-        array('qBittorrent', 'qbittorrent', 'qBittorrent', '<p>qBittorrent username is your own username and password matches your account password. Change it once logged in if you want a separate WebUI password. If you get 503, try restarting Lighttpd — port may have changed.</p>', 'Start qBittorrent', 'qBittorrent starting, access at /user-USERNAME/qbittorrent/ — Refresh GUI to see tab.', 'Starting qBittorrent...', 'Disable qBittorrent', 'qBittorrent disabled.', 'Disabling qBittorrent...', 'Restart qBittorrent', 'qBittorrent restart requested.', 'Restarting qBittorrent...'),
-    );
-
-    $html = '';
-    foreach ($specs as list($appName, $prefix, $heading, $body, $startLabel, $startSuccess, $startPending, $disableLabel, $disableSuccess, $disablePending, $restartLabel, $restartSuccess, $restartPending)) {
-        $definition = is_array($managedApps[$appName] ?? null) ? $managedApps[$appName] : array();
-        if (!isset($definition['endpoint'], $definition['binaries'], $definition['enable']) || !is_array($definition['binaries']) || !pmssWelcomeServiceAvailable($definition['endpoint'], $definition['binaries'])) continue;
-        $endpoint = (string) $definition['endpoint'];
-        $html .= '<h6>'.pmssWelcomeHtmlAttr($heading).'</h6>'.$body;
-        $html .= !file_exists((string) $definition['enable']) ? pmssWelcomeActionButtonHtmlBuild($prefix.'Start', $startLabel, $endpoint.'?action=start', $startSuccess, true, $startPending) : pmssWelcomeActionButtonHtmlBuild($prefix.'Disable', $disableLabel, $endpoint.'?action=disable', $disableSuccess, true, $disablePending).pmssWelcomeActionButtonHtmlBuild($prefix.'Restart', $restartLabel, $endpoint.'?action=restart', $restartSuccess, false, $restartPending);
-    }
-
-    return $html;
-}
 
 function pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage) {
     $html = '';

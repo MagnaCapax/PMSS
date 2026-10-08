@@ -79,6 +79,6 @@ class addUserQbittorrentPasswordSyncTest extends TestCase
             "url.indexOf('qbittorrent.php') === 0 ? 'qbittorrentPassword' : ''",
             'pmssActionRequest(action, passwordValue).done',
         ]);
-        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/welcome.php', ['pmssActionScriptJs()', 'pmssRunAction(this,']);
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/welcome.php', ['pmssActionScriptJs()', 'pmssCustomerAppsSectionHtmlBuild($appsStatus']);
     }
 }

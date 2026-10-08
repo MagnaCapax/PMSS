@@ -42,8 +42,7 @@ class MediaStackPanelTest extends TestCase
             'pmssMediaStackPanelRecoveryHandle($home, $username, $hostname);',
         ]);
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/welcome.php', [
-            'pmssMediaStackStartStopped',
-            'value="Start stopped apps"',
+            "pmssCustomerAppsSectionHtmlBuild(\$appsStatus, 'welcome.php?status=1')",
             'pmssActionScriptJs()',
         ]);
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/scriptsInc.php', [
@@ -205,7 +204,8 @@ class MediaStackPanelTest extends TestCase
 
         $this->assertFalse($status['security']['sonarr']['protected']);
         $this->assertSame('confirm-secure-sonarr', $status['security']['sonarr']['action']);
-        $this->assertStringContainsAllStrings(['Exposed', 'Secure this app', "pmssMediaStackSecureApp(this, 'sonarr')"], $html);
+        $this->assertStringContainsString('Exposed', $html);
+        $this->assertStringNotContainsString('Secure this app', $html);
     }
 
     public function testSecurityStatusDetectsAutobrrSqliteUser(): void

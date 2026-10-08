@@ -1,13 +1,9 @@
 <?php
 /** Customer app controls and the closed, documentation-only Docker catalog. */
 require_once __DIR__.'/scriptsInc.php';
+if (isset($_GET['status'])) { pmssCustomerAppsStatusJsonEmit(); return; }
+if (isset($_GET['log'])) { pmssCustomerAppsLogJsonEmit(); return; }
 require_once __DIR__.'/userMediaStackPanel.php';
-
-/** Escape every dynamic value used in text, attributes, and inline handlers. */
-function pmssAppsEscape($value): string
-{
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-}
 
 /** The wiki catalog keeps the existing category and native-install metadata. */
 function pmssAppsCatalogRead(): array
@@ -81,88 +77,6 @@ function pmssAppsAllowedUrlsRead(): array
     return $urls;
 }
 
-/** Descriptions are display copy; app identity and URL come from existing readers. */
-function pmssAppsDescriptionsRead(): array
-{
-    return array('Jellyfin' => 'Stream your library to TV, phone and browser',
-        'Sonarr' => 'Finds and downloads TV episodes', 'Radarr' => 'Finds and downloads movies',
-        'Prowlarr' => 'Manages indexers for Sonarr and Radarr', 'SABnzbd' => 'Usenet downloader',
-        'Autobrr' => 'Grabs releases from IRC announces', 'Cloudplow' => 'Moves finished files to cloud storage',
-        'rTorrent + ruTorrent' => 'Your main torrent client', 'qBittorrent' => 'Second torrent client',
-        'Deluge' => 'Second torrent client', 'rclone' => 'Sync to and from cloud storage');
-}
-
-/** The installed rows use one shared responsive markup shape. */
-function pmssAppsRowStart(string $name, string $description, string $id = ''): string
-{
-    return '<div class="row"'.($id === '' ? '' : ' data-app="'.pmssAppsEscape($id).'"').'><div class="main"><div class="name">'.pmssAppsEscape($name).'</div>'
-        .($description === '' ? '' : '<div class="desc">'.pmssAppsEscape($description).'</div>').'</div>';
-}
-
-/** Small fixed-action buttons keep every valid control visible. */
-function pmssAppsButton(string $label, string $action, string $class = ''): string
-{
-    return '<button type="button" class="b '.$class.'" data-action="'.pmssAppsEscape($action).'">'.pmssAppsEscape($label).'</button>';
-}
-
-/** Render one row from the current live state. The browser replaces this row after polling. */
-function pmssAppsLiveRowBuild(string $id, array $app): string
-{
-    $names = array('jellyfin' => 'Jellyfin', 'sonarr' => 'Sonarr', 'radarr' => 'Radarr',
-        'prowlarr' => 'Prowlarr', 'sabnzbd' => 'SABnzbd', 'autobrr' => 'Autobrr',
-        'cloudplow' => 'Cloudplow', 'rtorrent' => 'rTorrent + ruTorrent',
-        'qBittorrent' => 'qBittorrent', 'Deluge' => 'Deluge', 'rclone' => 'rclone',
-        'lighttpd' => 'Web server');
-    $name = $names[$id] ?? $id;
-    $description = pmssAppsDescriptionsRead()[$name] ?? ($id === 'lighttpd' ? 'Your account web server' : '');
-    $state = $app['state'];
-    $label = $state === 'off' ? ($app['kind'] === 'managed' ? 'Off' : 'Stopped by you')
-        : ($state === 'not-running' ? 'Not running' : ($state === 'running' ? 'Running' : 'Status unavailable'));
-    $pillClass = $state === 'running' ? 'p-run' : ($state === 'off' ? 'p-off' : 'p-stop');
-    $html = pmssAppsRowStart($name, $description, $id)
-        .'<span class="pill '.$pillClass.'">'.pmssAppsEscape($label).'</span>';
-    if (!empty($app['exposed'])) $html .= '<span class="pill p-warn">No login set</span>';
-    $html .= '<div class="acts">';
-    if ($state === 'running' && !empty($app['url'])) {
-        $html .= '<a class="b b-pri" href="'.pmssAppsEscape($app['url']).'" target="_blank" rel="noopener">Open</a>';
-    }
-    if ($app['kind'] === 'media') {
-        if ($state === 'running') $html .= pmssAppsButton('Restart', 'restart').pmssAppsButton('Stop', 'stop');
-        else $html .= pmssAppsButton('Start', 'start', 'b-pri').($state === 'not-running' ? pmssAppsButton('Show log', 'log') : '');
-        if (!empty($app['canSecure'])) $html .= pmssAppsButton('Secure this app', 'secure', 'b-warn');
-    } elseif ($app['kind'] === 'rtorrent') {
-        if ($state === 'running') $html .= pmssAppsButton('Restart', 'restart').pmssAppsButton('Stop', 'stop');
-        else $html .= pmssAppsButton('Start', 'start', 'b-pri');
-    } elseif ($app['kind'] === 'managed') {
-        if ($state === 'running') $html .= pmssAppsButton('Restart', 'restart').pmssAppsButton('Turn off', 'disable');
-        elseif ($state === 'off') $html .= pmssAppsButton('Turn on', 'start', 'b-pri');
-        else $html .= pmssAppsButton('Start', 'start', 'b-pri').pmssAppsButton('Turn off', 'disable');
-    } else {
-        $html .= pmssAppsButton('Restart', 'restart', 'b-pri');
-    }
-    return $html.'</div><span class="row-progress" aria-live="polite"></span><div class="row-error" role="alert"></div><pre class="row-log" hidden></pre></div>';
-}
-
-/** The installer status takes precedence over partial app install markers. */
-function pmssAppsMediaRowsBuild(array $status): string
-{
-    if ($status['poll']) {
-        return pmssAppsRowStart('Installing the media stack…', $status['message']).'</div>';
-    }
-    if (!$status['installed']) {
-        $names = implode(', ', array_merge(array_column(pmssMediaStackPanelAppDefinitionsRead(), 'label'), array('Cloudplow')));
-        return pmssAppsRowStart('Media Stack is not installed', $names)
-            .'<div class="desc" id="pmss-install-progress">'.pmssAppsEscape($status['message']).'</div></div>'
-            .'<div class="acts"><button type="button" class="b b-pri" onclick="pmssAppsInstall(this)"'
-            .($status['canStart'] ? '' : ' disabled').'>Install Media Stack</button></div></div>';
-    }
-    $html = '';
-    foreach (pmssAppsMediaIdsRead() as $id) {
-        if (isset($status['apps'][$id])) $html .= pmssAppsLiveRowBuild($id, $status['apps'][$id]);
-    }
-    return $html;
-}
-
 require_once __DIR__.'/appsRuntime.php';
 if (!function_exists('pmssAppsRuntimeReady') || !pmssAppsRuntimeReady()) {
     http_response_code(200);
@@ -174,28 +88,7 @@ $home = dirname(__DIR__);
 $username = basename(rtrim($home, '/'));
 $hostname = function_exists('gethostname') ? (string) gethostname() : '';
 $hostname = $hostname !== '' ? $hostname : (string) php_uname('n');
-if (isset($_GET['log'])) {
-    header('Content-Type: application/json; charset=utf-8');
-    header('Cache-Control: no-store');
-    $app = is_string($_GET['log']) ? $_GET['log'] : '';
-    if (!in_array($app, pmssAppsMediaIdsRead(), true)) { http_response_code(400); echo '{}'; return; }
-    echo json_encode(array('app' => $app, 'html' => pmssAppsLogTailRead($home, $app)));
-    return;
-}
-$status = pmssAppsLiveStatusRead($home, $username, $hostname);
-if (isset($_GET['status'])) {
-    header('Content-Type: application/json; charset=utf-8');
-    header('Cache-Control: no-store');
-    $rows = array();
-    foreach ($status['apps'] as $id => $app) {
-        if ($status['poll'] && $app['kind'] === 'media') continue;
-        $rows[$id] = pmssAppsLiveRowBuild($id, $app);
-    }
-    $status['rows'] = $rows;
-    $status['mediaHtml'] = pmssAppsMediaRowsBuild($status);
-    echo json_encode($status);
-    return;
-}
+$status = pmssCustomerAppsStatusRead($home, $username, $hostname);
 $urls = pmssAppsAllowedUrlsRead();
 $lsioCatalog = is_file(__DIR__.'/appsLsioCatalog.php') ? require __DIR__.'/appsLsioCatalog.php' : array();
 if (!is_array($lsioCatalog)) $lsioCatalog = array();
@@ -204,121 +97,27 @@ if (!is_array($lsioCatalog)) $lsioCatalog = array();
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Apps</title>
 <link href="screen.css" rel="stylesheet" media="screen">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script><script><?= pmssActionScriptJs() ?></script>
+<?= pmssCustomerAppsCss() ?>
 <style>
-.apps{font-size:14px;line-height:1.45;max-width:980px;margin:0 auto}.apps h1{font-size:1.5rem;margin:4px 0 14px}.apps h2{font-size:1.05rem;color:#fff;margin:24px 0 8px}.apps-header{display:flex;align-items:center;justify-content:space-between;gap:12px}.apps-header h1{margin-bottom:14px}
-.group{color:#9fb0c3;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 4px}.list{border:1px solid #2e3b4f;border-radius:8px;overflow:hidden}
-.row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid #223042;background:#0f1b2b;flex-wrap:wrap}.row:first-child{border-top:0}.row .main{flex:1;min-width:0}.row .name{font-weight:bold;color:#fff}.row .desc{color:#9fb0c3;font-size:13px}
-.pill{font-size:12px;padding:2px 9px;border-radius:999px;white-space:nowrap}.p-run{background:#12351f;color:#8fd18f}.p-stop{background:#3a1d1d;color:#f19999}.p-off{background:#1f2937;color:#9fb0c3}.p-warn{background:#3a2e12;color:#f0b429}
-.acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.b{font-size:13px;padding:5px 12px;border-radius:6px;border:1px solid #2e3b4f;background:#13293d;color:#e6edf3;text-decoration:none;white-space:nowrap;cursor:pointer}.b-pri{background:#0e7490;border-color:#0e7490;color:#fff}.b-warn{border-color:#6b5420;color:#f0b429;background:#2a2414}
-.search{width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:1px solid #2e3b4f;background:#0b1220;color:#e6edf3;font-size:14px;margin:4px 0 10px}.note{color:#9fb0c3;font-size:13px;margin:0 0 8px}.mrow{display:flex;gap:12px;align-items:baseline;padding:7px 14px;border-top:1px solid #223042;background:#0f1b2b}.mrow:first-child{border-top:0}.mrow .name{font-weight:bold;color:#fff;min-width:170px}.mrow .desc{flex:1;color:#9fb0c3;font-size:13px}.mrow .tag{font-size:11px;color:#f0b429;margin-left:6px}.mrow a{white-space:nowrap;font-size:13px}
-.row-progress{color:#9fb0c3}.row-error{color:#f19999;width:100%}.row-log{width:100%;max-height:240px;overflow:auto;white-space:pre-wrap;background:#0b1220;color:#e6edf3;padding:8px}.section-actions{display:flex;gap:8px;margin:8px 0 12px}
-#pmss-action-notice{display:none;position:fixed;top:10px;right:10px;z-index:9999;max-width:580px;padding:8px 12px;border:1px solid #2e3b4f;background:#13293d;color:#e6edf3;font-weight:bold}#pmss-action-notice.pmss-error{border-color:#f19999;background:#3a1d1d;color:#f19999}
-@media(max-width:640px){.apps-header{align-items:flex-start;flex-direction:column}.acts{width:100%;justify-content:flex-start}.mrow{flex-wrap:wrap}.mrow .name{min-width:0}}
+.apps{font-size:14px;line-height:1.45;max-width:980px;margin:0 auto}.apps h1{font-size:1.5rem;margin:4px 0 14px}.apps>h2{font-size:1.05rem;color:#fff;margin:24px 0 8px}
+.apps>.list,.lsio-group .list{border:1px solid #2e3b4f;border-radius:8px;overflow:hidden}
+.lsio-group .group{color:#9fb0c3;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 4px}
+.search{width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:1px solid #2e3b4f;background:#0b1220;color:#e6edf3;font-size:14px;margin:4px 0 10px}.note{color:#9fb0c3;font-size:13px;margin:0 0 8px}
+.mrow{display:flex;gap:12px;align-items:baseline;padding:7px 14px;border-top:1px solid #223042;background:#0f1b2b}.mrow:first-child{border-top:0}.mrow .name{font-weight:bold;color:#fff;min-width:170px}.mrow .desc{flex:1;color:#9fb0c3;font-size:13px}.mrow .tag{font-size:11px;color:#f0b429;margin-left:6px}.mrow a{white-space:nowrap;font-size:13px}
+@media(max-width:640px){.mrow{flex-wrap:wrap}.mrow .name{min-width:0}}
 </style></head><body><div id="pmss-action-notice" role="status" aria-live="polite"></div>
 <div id="wrap"><div id="full_page"><div class="full_top_nohd"></div><div class="full_body"><div class="apps">
-<div class="apps-header"><h1>Apps</h1><button type="button" class="b" onclick="pmssAppsRestartAll(this)">Restart all my services</button></div><h2>Your apps</h2>
-<div class="group">Media Stack</div><div class="section-actions">
-<?php if ($status['installed'] && !$status['poll']): ?><button type="button" class="b" id="pmss-start-all" data-bulk-action="start-stopped">Start all stopped</button><?php endif; ?>
-</div><div class="list" id="pmss-media-apps" data-installing="<?= $status['poll'] ? '1' : '0' ?>">
-<?= pmssAppsMediaRowsBuild($status) ?>
-</div><div class="group">Torrent clients</div><div class="list" id="pmss-torrent-apps">
-<?php foreach (array('rtorrent','qBittorrent','Deluge') as $id): if (isset($status['apps'][$id])) echo pmssAppsLiveRowBuild($id, $status['apps'][$id]); endforeach; ?>
-</div><div class="group">Transfers</div><div class="list" id="pmss-transfer-apps"><?php if (isset($status['apps']['rclone'])) echo pmssAppsLiveRowBuild('rclone', $status['apps']['rclone']); ?></div>
-<div class="group">Web server</div><div class="list"><?= pmssAppsLiveRowBuild('lighttpd', $status['apps']['lighttpd']) ?></div>
+<h1>Apps</h1>
+<?= pmssCustomerAppsSectionHtmlBuild($status, 'apps.php?status=1') ?>
 <h2>Find more apps</h2><p class="note">You can set up more apps yourself with rootless Docker. LinuxServer.io examples publish ports on every address (for example 8080:8080). On this server that puts the app on the internet: publish it as 127.0.0.1:8080:8080 instead, and turn on the app's own login — other accounts on this server can reach a port on 127.0.0.1.</p>
 <input id="pmss-apps-search" class="search" type="search" aria-label="Search apps" placeholder="Search apps, e.g. comics, photos, IRC">
 <h2>Guides on the Pulsed Media wiki</h2><div class="list" id="pmss-more-apps">
-<?php foreach (pmssAppsCatalogRead() as $category => $apps): foreach ($apps as $app): ?><div class="mrow" data-category="<?= pmssAppsEscape($category) ?>"><span class="name"><?= pmssAppsEscape($app[0]) ?><?php if ($app[3] !== ''): ?><span class="tag"><?= pmssAppsEscape($app[3]) ?></span><?php endif; ?></span><span class="desc"><?= pmssAppsEscape($app[2]) ?></span><a href="<?= pmssAppsEscape($urls[$category]) ?>" target="_blank" rel="noopener">Setup guide &#8599;</a></div><?php endforeach; endforeach; ?></div>
+<?php foreach (pmssAppsCatalogRead() as $category => $apps): foreach ($apps as $app): ?><div class="mrow" data-category="<?= pmssCustomerHtmlAttr($category) ?>"><span class="name"><?= pmssCustomerHtmlAttr($app[0]) ?><?php if ($app[3] !== ''): ?><span class="tag"><?= pmssCustomerHtmlAttr($app[3]) ?></span><?php endif; ?></span><span class="desc"><?= pmssCustomerHtmlAttr($app[2]) ?></span><a href="<?= pmssCustomerHtmlAttr($urls[$category]) ?>" target="_blank" rel="noopener">Setup guide &#8599;</a></div><?php endforeach; endforeach; ?></div>
 <?php if ($lsioCatalog): ?><h2>More from LinuxServer.io (<?= count($lsioCatalog) ?>)</h2><div id="pmss-lsio-apps">
-<?php $lastCategory = null; foreach ($lsioCatalog as $app): if ($app['category'] !== $lastCategory): if ($lastCategory !== null): ?></div></div><?php endif; $lastCategory = $app['category']; ?><div class="lsio-group"><div class="group"><?= pmssAppsEscape($lastCategory) ?></div><div class="list"><?php endif; ?>
-<div class="mrow" data-category="<?= pmssAppsEscape($app['category']) ?>"><span class="name"><?= pmssAppsEscape($app['title']) ?></span><span class="desc"><?= pmssAppsEscape($app['description']) ?></span><a href="<?= pmssAppsEscape($app['guide']) ?>" target="_blank" rel="noopener">Setup guide &#8599;</a></div>
+<?php $lastCategory = null; foreach ($lsioCatalog as $app): if ($app['category'] !== $lastCategory): if ($lastCategory !== null): ?></div></div><?php endif; $lastCategory = $app['category']; ?><div class="lsio-group"><div class="group"><?= pmssCustomerHtmlAttr(str_replace(',', ', ', $lastCategory)) ?></div><div class="list"><?php endif; ?>
+<div class="mrow" data-category="<?= pmssCustomerHtmlAttr(str_replace(',', ', ', $app['category'])) ?>"><span class="name"><?= pmssCustomerHtmlAttr($app['title']) ?></span><span class="desc"><?= pmssCustomerHtmlAttr($app['description']) ?></span><a href="<?= pmssCustomerHtmlAttr($app['guide']) ?>" target="_blank" rel="noopener">Setup guide &#8599;</a></div>
 <?php endforeach; ?></div></div></div><?php endif; ?>
 </div></div><div class="full_bottom"></div></div></div>
 <script>
-var pmssAppsBusy = {};
-var pmssAppsRefreshTimer;
-function pmssAppsRefresh(callback) {
-    window.clearTimeout(pmssAppsRefreshTimer);
-    $.getJSON('apps.php?status=1', function(payload) {
-        var media = $('#pmss-media-apps'), wasInstalling = media.attr('data-installing') === '1';
-        if (payload.poll || wasInstalling || !payload.installed) media.html(payload.mediaHtml);
-        media.attr('data-installing', payload.poll ? '1' : '0');
-        if (payload.poll || !payload.installed) $('#pmss-start-all').remove();
-        else if (!$('#pmss-start-all').length) $('.section-actions').html('<button type="button" class="b" id="pmss-start-all" data-bulk-action="start-stopped">Start all stopped</button>');
-        $.each(payload.rows || {}, function(id, html) {
-            if (pmssAppsBusy[id]) return;
-            var oldRow = $('[data-app="' + id + '"]');
-            if (oldRow.length) {
-                var oldLog = oldRow.find('.row-log');
-                var replacement = $(html);
-                if (!oldLog.prop('hidden')) replacement.find('.row-log').html(oldLog.html()).prop('hidden', false);
-                oldRow.replaceWith(replacement);
-            }
-        });
-        if (callback) callback(payload);
-        pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, payload.poll ? 5000 : 10000);
-    }).fail(function() { pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, 10000); });
-}
-function pmssAppsWait(id, desired, deadline) {
-    window.setTimeout(function() {
-        $.getJSON('apps.php?status=1', function(payload) {
-            var row = $('[data-app="' + id + '"]');
-            var state = payload.apps && payload.apps[id] && payload.apps[id].state;
-            if (state === desired || Date.now() >= deadline) {
-                pmssAppsBusy[id] = false;
-                if (payload.rows && payload.rows[id]) row.replaceWith(payload.rows[id]);
-                if (state !== desired) $('[data-app="' + id + '"] .row-error').text('Status did not settle within 60 seconds. Check the app log.');
-            } else {
-                pmssAppsWait(id, desired, deadline);
-            }
-        }).fail(function() { if (Date.now() < deadline) pmssAppsWait(id, desired, deadline); else { pmssAppsBusy[id] = false; $('[data-app="' + id + '"] .row-error').text('Could not read app status.'); } });
-    }, 2000);
-}
-function pmssAppsAct(button, id, action) {
-    var row = $(button).closest('.row'), kind = id === 'rtorrent' ? 'rtorrent' : (id === 'lighttpd' ? 'web' : (id === 'qBittorrent' || id === 'Deluge' || id === 'rclone' ? 'managed' : 'media'));
-    if (action === 'log') { $.getJSON('apps.php?log=' + encodeURIComponent(id), function(payload) { row.find('.row-log').html(payload.html || 'No log available.').prop('hidden', false); }); return; }
-    if (id === 'rtorrent' && action === 'stop' && !window.confirm('Stop rTorrent? All your torrents stop seeding until you start it again.')) return;
-    if (action === 'secure') { if (!window.confirm('Secure this app with its default login?')) return; pmssMediaStackSecureApp(button, id); return; }
-    var endpoint = kind === 'media' ? 'mediaStack.php?action=app-' + action : (kind === 'rtorrent' ? 'rtorrentRestart.php?action=' + action : (kind === 'web' ? 'lighttpdRestart.php?action=confirm-restart' : (id === 'qBittorrent' ? 'qbittorrent.php' : id === 'Deluge' ? 'deluge.php' : 'rclone.php') + '?action=' + action));
-    var desired = action === 'stop' || action === 'disable' ? 'off' : 'running';
-    pmssAppsBusy[id] = true;
-    row.find('.row-error').text(''); row.find('.row-progress').text(action === 'stop' || action === 'disable' ? 'Stopping…' : 'Starting…');
-    row.find('button').prop('disabled', true);
-    pmssActionRequest({url:endpoint, data:kind === 'media' ? {app:id} : null, passwordField:id === 'qBittorrent' ? 'qbittorrentPassword' : ''}).done(function() {
-        if (kind === 'web') { pmssAppsBusy[id] = false; row.find('.row-progress').text('Restart requested.'); row.find('button').prop('disabled', false); return; }
-        pmssAppsWait(id, desired, Date.now() + 60000);
-    }).fail(function(xhr, cancelled) {
-        pmssAppsBusy[id] = false; row.find('.row-progress').text(''); row.find('button').prop('disabled', false);
-        if (!cancelled) row.find('.row-error').text((xhr.responseJSON && xhr.responseJSON.message) || 'Action failed. Please try again.');
-    });
-}
-$(document).on('click', '.row[data-app] button[data-action]', function() { pmssAppsAct(this, $(this).closest('.row').attr('data-app'), $(this).attr('data-action')); });
-$(document).on('click', '#pmss-start-all[data-bulk-action]', function() { pmssAppsBulk(this, $(this).attr('data-bulk-action')); });
-function pmssAppsBulk(button, action) { pmssMediaStackAction(button, action, 'Starting stopped apps…', 'Could not start stopped apps.'); }
-function pmssAppsInstall(button) { pmssMediaStackStart(button); }
-function pmssAppsRestartAll(button) {
-    $(button).prop('disabled', true);
-    $.getJSON('apps.php?status=1', function(status) {
-        var actions = [], failures = 0, apps = status.apps || {};
-        if (apps.rtorrent && apps.rtorrent.state !== 'off') actions.push({url:'rtorrentRestart.php?action=restart'});
-        $.each({qBittorrent:'qbittorrent.php', Deluge:'deluge.php', rclone:'rclone.php'}, function(id, endpoint) {
-            if (apps[id] && apps[id].state !== 'off') actions.push({url:endpoint + '?action=restart', passwordField:id === 'qBittorrent' ? 'qbittorrentPassword' : ''});
-        });
-        if (status.installed) actions.push({url:'mediaStack.php?action=start-stopped'});
-        actions.push({url:'lighttpdRestart.php?action=confirm-restart'});
-        function next() {
-            if (!actions.length) {
-                $(button).prop('disabled', false);
-                pmssShowActionNotice(failures ? 'Some restart requests failed.' : 'Restart requests sent.', !!failures);
-                pmssAppsRefresh();
-                return;
-            }
-            pmssActionRequest(actions.shift()).done(next).fail(function() { failures++; next(); });
-        }
-        next();
-    }).fail(function() { $(button).prop('disabled', false); pmssShowActionNotice('Could not read current app status.', true); });
-}
-window.pmssAppsActionComplete = function() { pmssAppsRefresh(); };
-pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, <?= $status['poll'] ? '5000' : '10000' ?>);
 $('#pmss-apps-search').on('input', function() { var query = this.value.toLowerCase().trim(); $('#pmss-more-apps .mrow, #pmss-lsio-apps .mrow').each(function() { $(this).toggle(($(this).find('.name, .desc').text() + ' ' + $(this).attr('data-category')).toLowerCase().indexOf(query) !== -1); }); $('#pmss-lsio-apps .lsio-group').each(function() { $(this).toggle($(this).find('.mrow:visible').length > 0); }); });
 </script></body></html>

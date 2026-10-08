@@ -129,3 +129,17 @@ when the snapshot has not yet arrived during a staggered update.
 The page warns that LinuxServer.io's published-port examples bind every
 address, and shows a loopback bind instead. Each app still needs its own login
 because other accounts on the host can reach loopback ports.
+
+The Welcome and Apps tabs now render the same Your apps rows, read the same
+live status, run the same action JavaScript, and serve the same read-only status
+JSON from guiv-delivered `scriptsInc.php`. Welcome's separate service controls
+and PHP restart queue are removed. Each page supplies its own status URL in
+the section markup; the shared queue uses live JSON and restarts rTorrent via
+`rtorrentRestart.php?action=restart`.
+
+Media Start, Stop, Restart, and Show log buttons appear only when
+`appsRuntime.php` is present. That file arrived with the matching
+`mediaStack.php` actions, so a healed Welcome on an older host still displays
+status and security information without offering unsupported controls.
+`userMediaStackPanel.php` loads the update-only recovery command helper through
+the guarded local loader, preserving the guiv dependency closure (ADR 0022).

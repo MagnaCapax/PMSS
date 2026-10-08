@@ -8,7 +8,9 @@
  * @author PMSS Team
  */
 require_once __DIR__.'/scriptsInc.php';
-require_once __DIR__.'/mediaStackRecoveryCommand.php';
+if (function_exists('pmssWelcomeRequireLocalHelper')) {
+    pmssWelcomeRequireLocalHelper('mediaStackRecoveryCommand.php');
+}
 
 const PMSS_MEDIA_STACK_MEMORY_MINIMUM_BYTES = 1024 * 1024 * 1024;
 const PMSS_MEDIA_STACK_MEMORY_UNLIMITED_BYTES = 1024 * 1024 * 1024 * 1024 * 1024;
@@ -151,6 +153,7 @@ function pmssMediaStackPanelRecoveryGateRead(string $home): array
 {
     $aliasPath = pmssCustomerHomePath($home, '.bashrc.custom');
     foreach (array(
+        array(!function_exists('pmssMediaStackPanelRecoveryCommandBuild'), 'Media stack recovery helper is not available on this host yet.'),
         array(!is_file(pmssCustomerHomePath($home, 'install-media-stack.sh')), 'Media stack installer is missing from this account.'),
         array(!is_file($aliasPath) || is_link($aliasPath) || !is_readable($aliasPath), 'Media stack launch aliases are missing or unsafe.'),
         array(!pmssFrontendShellExecAvailable(), 'PHP shell execution is unavailable on this host.'),
@@ -703,7 +706,6 @@ function pmssMediaStackPanelHtmlBuild(array $status): string
                 continue;
             }
 
-            $appId = (string) ($app['id'] ?? '');
             $isProtected = !empty($app['protected']);
             $stateClass = $isProtected ? 'protected' : 'exposed';
             $html .= '<li class="pmss-media-stack-auth-'.$stateClass.'">';
@@ -716,10 +718,6 @@ function pmssMediaStackPanelHtmlBuild(array $status): string
                     .pmssCustomerHtmlAttr($app['url']).'</a>';
             }
 
-            if (!$isProtected && !empty($app['canSecure']) && pmssMediaStackPanelAppIdAllowed($appId)) {
-                $html .= ' <input type="button" class="pmss-media-stack-secure" value="Secure this app"'
-                    .' onClick="pmssMediaStackSecureApp(this, \''.pmssCustomerHtmlAttr($appId).'\');" />';
-            }
             $html .= '</li>';
         }
         $html .= '</ul>';

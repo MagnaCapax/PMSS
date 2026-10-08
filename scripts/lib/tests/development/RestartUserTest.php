@@ -132,7 +132,7 @@ SH
             ." && printf %s 'pmss-media-stack-started'";
         $this->assertSame($expected, \pmssMediaStackPanelRecoveryCommandBuild($home, 'alice'));
         $panel = $this->pmssReadRepoFile('etc/skel/www/userMediaStackPanel.php');
-        $this->assertStringContainsString("require_once __DIR__.'/mediaStackRecoveryCommand.php';", $panel);
+        $this->assertStringContainsString("pmssWelcomeRequireLocalHelper('mediaStackRecoveryCommand.php');", $panel);
         $this->assertStringNotContainsString('function pmssMediaStackPanelRecoveryCommandBuild(', $panel);
         $this->assertStringContainsString("'www/mediaStackRecoveryCommand.php'", $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php'));
         $binDir = $this->pmssMakeTempDir('pmss-restart-id-');

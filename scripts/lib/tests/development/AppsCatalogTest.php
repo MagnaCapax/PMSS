@@ -10,6 +10,91 @@ ob_end_clean();
 /** Customer Apps tab contract: live controls and a closed wiki catalog. */
 class AppsCatalogTest extends TestCase
 {
+    public function testGuivRequiresStayInsideDeliveredSet(): void
+    {
+        $guiv = array('welcome', 'scriptsInc', 'userMediaStackPanel', 'qbittorrent',
+            'deluge', 'rclone', 'rtorrentRestart', 'lighttpdRestart');
+        foreach ($guiv as $name) {
+            $source = $this->pmssReadRepoFile('etc/skel/www/'.$name.'.php');
+            $tokens = token_get_all($source);
+            foreach ($tokens as $index => $token) {
+                if (!is_array($token) || !in_array($token[0], array(T_REQUIRE, T_REQUIRE_ONCE, T_INCLUDE, T_INCLUDE_ONCE), true)) continue;
+                $expression = '';
+                for ($next = $index + 1; isset($tokens[$next]) && $tokens[$next] !== ';'; $next++) {
+                    $expression .= is_array($tokens[$next]) ? $tokens[$next][1] : $tokens[$next];
+                }
+                if (preg_match('/__DIR__\s*\.\s*[\'\"]\/([^\'\"]+\.php)[\'\"]/', $expression, $match)) {
+                    $this->assertTrue(in_array(substr($match[1], 0, -4), $guiv, true), $name.' requires update-only '.$match[1]);
+                    continue;
+                }
+                $this->assertTrue(strpos($expression, '$path') !== false &&
+                    ($name === 'scriptsInc' && strpos($source, 'is_file($path)') !== false
+                        || $name === 'welcome' && strpos($source, "file_exists(\$path = '/etc/seedbox/config/network')") !== false),
+                    $name.' has an unguarded dynamic include: '.$expression);
+            }
+        }
+        $this->assertStringContainsString("pmssWelcomeRequireLocalHelper('mediaStackRecoveryCommand.php')",
+            $this->pmssReadRepoFile('etc/skel/www/userMediaStackPanel.php'));
+    }
+
+    public function testWelcomeAndAppsShareRowsAndReadOnlyStatus(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            $this->pmssEnsureDir($home.'/.config/jellyfin', 0700);
+            $this->pmssWriteFile($home.'/.jellyfinDisable', '');
+            $apps = $render('apps.php', ['minBytes' => 4000])['stdout'];
+            $welcome = $render('welcome.php', ['minBytes' => 10000])['stdout'];
+            preg_match('/<section class="pmss-apps-section".*?<\/section>/s', $apps, $appsSection);
+            preg_match('/<section class="pmss-apps-section".*?<\/section>/s', $welcome, $welcomeSection);
+            $this->assertTrue(isset($appsSection[0], $welcomeSection[0]));
+            $this->assertSame(str_replace('apps.php?status=1', 'welcome.php?status=1', $appsSection[0]), $welcomeSection[0]);
+            $this->assertSame(1, substr_count($welcomeSection[0], 'Restart all my services'));
+
+            $appsStatus = json_decode($render('apps.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'], true);
+            $welcomeStatus = json_decode($render('welcome.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'], true);
+            $this->assertTrue(is_array($appsStatus) && is_array($welcomeStatus));
+            $this->assertSame($appsStatus, $welcomeStatus);
+            $this->assertSame('off', $appsStatus['apps']['jellyfin']['state']);
+            $this->assertSame(true, $appsStatus['mediaAppControl']);
+        });
+    }
+
+    public function testHealedWelcomeWorksBeforeUpdateOnlyAppsFilesArrive(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            $this->pmssEnsureDir($home.'/.config/jellyfin', 0700);
+            $this->pmssWriteFile($home.'/install-media-stack.sh', "#!/bin/sh\nexit 0\n");
+            $this->pmssWriteFile($home.'/.bashrc.custom', "# media aliases\n");
+            foreach (array('appsRuntime.php', 'mediaStack.php', 'mediaStackRecoveryCommand.php', 'apps.php') as $file) {
+                $this->assertTrue(unlink($home.'/www/'.$file));
+            }
+            $html = $render('welcome.php', ['minBytes' => 10000])['stdout'];
+            $this->assertStringContainsString('Your apps', $html);
+            $this->assertStringContainsString('Jellyfin', $html);
+            $this->assertStringNotContainsString('data-action="stop"', $html);
+            $this->assertStringNotContainsString('data-action="log"', $html);
+            $status = json_decode($render('welcome.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'], true);
+            $this->assertSame(false, $status['mediaAppControl']);
+            $this->assertSame(false, $status['canRestart']);
+        });
+    }
+
+    public function testMovedOperationsExistOnlyInSharedHelper(): void
+    {
+        $shared = $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php');
+        foreach (array('pmssCustomerAppsStatusRead', 'pmssCustomerAppRowHtmlBuild',
+            'pmssCustomerAppsSectionHtmlBuild', 'pmssCustomerAppsStatusJsonEmit', 'pmssAppsRestartAll') as $name) {
+            $this->assertStringContainsString('function '.$name.'(', $shared);
+        }
+        foreach (array('welcome.php', 'apps.php') as $page) {
+            $source = $this->pmssReadRepoFile('etc/skel/www/'.$page);
+            foreach (array('pmssWelcomeManagedAppsHtmlBuild', 'pmssWelcomeServiceRestartActionsBuild',
+                'pmssAppsLiveRowBuild', 'pmssAppsMediaRowsBuild', 'pmssAppsAct', 'pmssAppsRestartAll') as $name) {
+                $this->assertStringNotContainsString('function '.$name.'(', $source);
+            }
+        }
+    }
+
     public function testSelfHostedCatalogHasExpectedRowsAndAnchors(): void
     {
         $catalog = \pmssAppsCatalogRead();
@@ -104,7 +189,7 @@ class AppsCatalogTest extends TestCase
         $html = $this->pmssRenderCustomerPanelPage('apps.php', [], ['minBytes' => 4000]);
         $this->assertSame(1, substr_count($html, '>Restart all my services</button>'));
         $header = substr($html, strpos($html, '<div class="apps-header">'), 220);
-        $this->assertStringContainsString('<h1>Apps</h1><button type="button" class="b" onclick="pmssAppsRestartAll(this)">Restart all my services</button>', $header);
+        $this->assertStringContainsString('<h2>Your apps</h2><button type="button" class="b" onclick="pmssAppsRestartAll(this)">Restart all my services</button>', $header);
         $this->assertTrue(strpos($html, 'Restart all my services</button>') < strpos($html, '<div class="group">Media Stack</div>'));
         $this->assertStringContainsString('.apps-header{align-items:flex-start;flex-direction:column}', $html);
     }
@@ -123,7 +208,7 @@ class AppsCatalogTest extends TestCase
             $this->assertStringContainsString('Media stack install is running.', $media);
             $this->assertStringNotContainsString('data-app=', $media);
             $this->assertStringNotContainsString('data-action=', $media);
-            $this->assertStringNotContainsString('id="pmss-start-all"', substr($html, 0, strpos($html, '<div class="group">Torrent clients</div>')));
+            $this->assertStringNotContainsString('id="pmss-start-all"', $media);
             $json = $render('apps.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'];
             $status = json_decode($json, true);
             $this->assertTrue($status['poll']);
@@ -159,9 +244,9 @@ class AppsCatalogTest extends TestCase
                 if ($installed) $this->assertStringContainsString('id="pmss-start-all" data-bulk-action="start-stopped"', $html);
             }
         });
-        $source = $this->pmssReadRepoFile('etc/skel/www/apps.php');
-        $this->assertSame(2, substr_count($source, 'data-bulk-action="start-stopped"'));
-        $this->assertStringContainsString("$(document).on('click', '#pmss-start-all[data-bulk-action]'", $source);
+        $shared = $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php');
+        $this->assertStringContainsString('data-bulk-action="start-stopped"', $shared);
+        $this->assertStringContainsString("$(document).on('click', '#pmss-start-all[data-bulk-action]'", $shared);
     }
 
     public function testInstalledStackRendersRuntimeRowsAndSecurityState(): void
@@ -197,9 +282,8 @@ class AppsCatalogTest extends TestCase
         $this->assertStringNotContainsString('/scripts/', $source);
         $this->assertStringNotContainsString('location.reload', $source);
         $this->assertStringNotContainsString('<form', $source);
-        $this->assertStringContainsString('rtorrentRestart.php?action=', $source);
+        $this->assertStringContainsString('rtorrentRestart.php?action=', $shared);
         foreach (array('pmssMediaStackStart', 'pmssMediaStackSecureApp') as $function) {
-            $this->assertStringContainsString($function, $source);
             $this->assertStringContainsString('function '.$function.'(', $shared);
         }
         foreach (array('mediaStack.php?action=status', 'mediaStack.php?action=', 'mediaStack.php') as $route) {

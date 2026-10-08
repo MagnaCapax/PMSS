@@ -1011,16 +1011,16 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Archives are written as `~/.pmss-backups/config-YYYYMMDD-HHMMSS.tar.gz` with a private `0700` directory and `0600` files.
   - Retention keeps the newest 7 scheduled archives and prunes older files only after a newly written archive is verified as an existing non-empty file inside the same home.
 
-## Customer Whole-Account Service Restart – `etc/skel/www/welcome.php`
+## Customer Whole-Account Service Restart – `etc/skel/www/scriptsInc.php`
 
-- The `Restart all my services` control composes the existing customer-owned restart endpoints for rTorrent, enabled Deluge/qBittorrent/rclone frontends, stopped media-stack tmux apps, and Lighttpd.
+- Welcome and Apps render one shared `Your apps` section and use its read-only status JSON to queue the customer-owned restart endpoints for rTorrent, enabled Deluge/qBittorrent/rclone frontends, stopped media-stack tmux apps, and Lighttpd.
 - Requests run sequentially as the authenticated customer; qBittorrent retains its account-password synchronization challenge, media-stack recovery retains its same-origin AJAX POST gate, and failures do not prevent later services from receiving their request.
 - The Lighttpd request is sent last so its graceful restart cannot interrupt earlier panel requests. Media-stack recovery uses the existing `--start-stopped` path and preserves live tmux sessions.
 
-## Customer Apps Controls – `etc/skel/www/apps.php`
+## Customer Apps Controls – `etc/skel/www/scriptsInc.php`
 
-- `?status=1` reads live tmux sessions once, native processes, opt-in/opt-out markers, and media-stack auth state. `?log=APP` reads only the selected media app's own log, capped at 16 KiB, twenty lines, and 300 characters per line with HTML escaping.
-- The page header owns `Restart all my services`. While the existing media-stack launcher pid is live, its `poll` status takes precedence over partial install markers: the Media Stack group shows one progress row and no app controls. The Apps status poll runs every five seconds until the installer exits, then renders app rows or the existing failure message and Install action.
+- Both `welcome.php?status=1` and `apps.php?status=1` emit the same live tmux, native-process, marker, and media-stack auth state; both are read-only. `?log=APP` reads only the selected media app's own log, capped at 16 KiB, twenty lines, and 300 characters per line with HTML escaping.
+- While the existing media-stack launcher pid is live, its `poll` status takes precedence over partial install markers: the Media Stack group shows one progress row and no app controls. The shared status poll runs every five seconds until the installer exits, then renders app rows or the existing failure message and Install action. Media per-app controls require `appsRuntime.php` in the customer tree.
 - All state-changing customer endpoints require POST with `X-Requested-With: XMLHttpRequest`. A GET action returns HTTP 405. qBittorrent retains the HTTP 428 password-sync challenge.
 - Media app stop writes `~/.<app>Disable`; start removes it; restart preserves it. The observe-only watchdog publishes `off` with zero failures for marked apps, and bulk recovery skips them. Native frontend stops signal only account-owned processes in the panel's mount namespace whose executable resolves to the app's native binary allowlist; Deluge's Python entry points also require an exact interpreter and script match.
 
