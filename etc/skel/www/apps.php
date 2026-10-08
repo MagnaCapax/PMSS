@@ -125,9 +125,16 @@ if (!is_array($lsioCatalog)) $lsioCatalog = array();
 <?php foreach (pmssAppsCatalogRead() as $category => $apps): foreach ($apps as $app): ?><div class="mrow" data-category="<?= pmssCustomerHtmlAttr($category) ?>"><span class="name"><?= pmssCustomerHtmlAttr($app[0]) ?><?php if ($app[3] !== ''): ?><span class="tag"><?= pmssCustomerHtmlAttr($app[3]) ?></span><?php endif; ?></span><span class="desc"><?= pmssCustomerHtmlAttr($app[2]) ?></span><a href="<?= pmssCustomerHtmlAttr($urls[$category]) ?>" target="_blank" rel="noopener">Setup guide &#8599;</a></div><?php endforeach; endforeach; ?></div>
 <?php if ($lsioCatalog): ?><h2>More from LinuxServer.io (<?= count($lsioCatalog) ?>)</h2><div id="pmss-lsio-apps">
 <?php $lastCategory = null; foreach ($lsioCatalog as $app): if ($app['category'] !== $lastCategory): if ($lastCategory !== null): ?></div></div><?php endif; $lastCategory = $app['category']; ?><div class="lsio-group"><div class="group"><?= pmssCustomerHtmlAttr(str_replace(',', ', ', $lastCategory)) ?></div><div class="list"><?php endif; ?>
-<div class="mrow" data-category="<?= pmssCustomerHtmlAttr(str_replace(',', ', ', $app['category'])) ?>"><span class="name"><?= pmssCustomerHtmlAttr($app['title']) ?></span><span class="desc"><?= pmssCustomerHtmlAttr($app['description']) ?></span><a href="<?= pmssCustomerHtmlAttr($app['guide']) ?>" target="_blank" rel="noopener">Setup guide &#8599;</a></div>
+<div class="mrow" data-category="<?= pmssCustomerHtmlAttr(str_replace(',', ', ', $app['category'])) ?>" data-search="<?= pmssCustomerHtmlAttr($app['name']) ?>"><span class="name"><?= pmssCustomerHtmlAttr($app['title']) ?></span><span class="desc"><?= pmssCustomerHtmlAttr($app['description']) ?></span><a href="<?= pmssCustomerHtmlAttr($app['guide']) ?>" target="_blank" rel="noopener">Setup guide &#8599;</a></div>
 <?php endforeach; ?></div></div></div><?php endif; ?>
 </div></div><div class="full_bottom"></div></div></div>
 <script>
-$('#pmss-apps-search').on('input', function() { var query = this.value.toLowerCase().trim(); $('#pmss-more-apps .mrow, #pmss-lsio-apps .mrow').each(function() { $(this).toggle(($(this).find('.name, .desc').text() + ' ' + $(this).attr('data-category')).toLowerCase().indexOf(query) !== -1); }); $('#pmss-lsio-apps .lsio-group').each(function() { $(this).toggle($(this).find('.mrow:visible').length > 0); }); });
+$('#pmss-apps-search').on('input', function() {
+    var query = this.value.toLowerCase().trim(), compactQuery = query.replace(/[\s-]/g, '');
+    $('#pmss-more-apps .mrow, #pmss-lsio-apps .mrow').each(function() {
+        var row = $(this), search = (row.find('.name, .desc').text() + ' ' + row.attr('data-category') + ' ' + (row.attr('data-search') || '')).toLowerCase();
+        row.toggle(search.indexOf(query) !== -1 || search.replace(/[\s-]/g, '').indexOf(compactQuery) !== -1);
+    });
+    $('#pmss-lsio-apps .lsio-group').each(function() { $(this).toggle($(this).find('.mrow:visible').length > 0); });
+});
 </script></body></html>

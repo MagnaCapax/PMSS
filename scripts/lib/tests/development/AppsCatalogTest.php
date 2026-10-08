@@ -168,9 +168,14 @@ class AppsCatalogTest extends TestCase
         $catalog = require dirname(__DIR__, 4).'/etc/skel/www/appsLsioCatalog.php';
         $this->assertStringContainsString('More from LinuxServer.io ('.count($catalog).')', $html);
         $this->assertStringContainsString('https://docs.linuxserver.io/images/docker-blender/', $html);
+        $this->assertSame(count($catalog), substr_count($html, 'data-search="'));
+        foreach ($catalog as $app) $this->assertStringContainsString('data-search="'.$app['name'].'"', $html);
         $this->assertSame(1, substr_count($html, 'id="pmss-apps-search"'));
         $this->assertStringContainsString('127.0.0.1:8080:8080', $html);
         $this->assertStringContainsString("#pmss-more-apps .mrow, #pmss-lsio-apps .mrow", $html);
+        $this->assertStringContainsString("query.replace(/[\\s-]/g, '')", $html);
+        $this->assertStringContainsString("search.indexOf(query) !== -1 || search.replace(/[\\s-]/g, '').indexOf(compactQuery) !== -1", $html);
+        $this->assertStringContainsString("row.attr('data-search')", $html);
     }
 
     public function testMissingLsioCatalogLeavesWikiGuidesAvailable(): void
