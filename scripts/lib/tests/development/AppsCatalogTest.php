@@ -228,6 +228,34 @@ class AppsCatalogTest extends TestCase
         });
     }
 
+    public function testAppsSectionRowsKeepLaterGroupsNested(): void
+    {
+        $status = array('installed' => false, 'poll' => false, 'message' => '',
+            'canStart' => true, 'canRestart' => false, 'mediaAppControl' => true,
+            'apps' => array(
+                'rtorrent' => array('state' => 'running', 'kind' => 'rtorrent', 'url' => ''),
+                'qBittorrent' => array('state' => 'off', 'kind' => 'managed', 'url' => ''),
+                'Deluge' => array('state' => 'not-running', 'kind' => 'managed', 'url' => ''),
+                'rclone' => array('state' => 'running', 'kind' => 'managed', 'url' => ''),
+                'lighttpd' => array('state' => 'running', 'kind' => 'web', 'url' => ''),
+            ));
+        foreach (array('not installed', 'installing', 'installed') as $state) {
+            $status['poll'] = $state === 'installing';
+            $status['installed'] = $state === 'installed';
+            if ($status['installed']) {
+                $status['apps']['jellyfin'] = array('state' => 'not-running', 'kind' => 'media', 'url' => '');
+            }
+            $html = \pmssCustomerAppsSectionHtmlBuild($status);
+            $this->assertSame(substr_count($html, '<div'), substr_count($html, '</div>'), $state.' div balance');
+
+            $document = new \DOMDocument();
+            $this->assertTrue(@$document->loadHTML($html), $state.' HTML parse');
+            $xpath = new \DOMXPath($document);
+            $nested = $xpath->query('//*[@id="pmss-torrent-apps"]/ancestor::section[contains(concat(" ", normalize-space(@class), " "), " pmss-apps-section ")]');
+            $this->assertSame(1, $nested->length, $state.' Torrent clients inside Apps section');
+        }
+    }
+
     public function testFailedInstallRestoresMessageAndInstallButton(): void
     {
         $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
