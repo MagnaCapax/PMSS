@@ -48,9 +48,11 @@ PHP
         $script = $this->buildUserEnvironmentScript(
             'web-root-before-context',
             <<<'PHP'
-// Reconciliation moves its stage under the real account identity.
-$account = function_exists('posix_getpwuid') ? posix_getpwuid(posix_geteuid()) : false;
-$user = is_array($account) ? $account['name'] : 'alice';
+$user = 'alice';
+// Root must chown to a real account; do not create system users in hermetic tests.
+if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
+    $user = 'root';
+}
 $home = $base.'/home/'.$user;
 $skel = $base.'/skel/www';
 $locks = $base.'/locks';
