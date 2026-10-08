@@ -73,8 +73,8 @@ $pmssAppsUrls = pmssAppsAllowedUrlsRead();
   <link href="<?= pmssAppsEscape($pmssAppsUrls['stylesheet']) ?>" rel="stylesheet" media="screen" />
   <style>
     .pmss-apps-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    .pmss-apps-table th, .pmss-apps-table td { padding: 8px; border: 1px solid #ddd; text-align: left; }
-    .pmss-apps-table th { background: #f2f2f2; }
+    .pmss-apps-table th, .pmss-apps-table td { padding: 8px; border: 1px solid #2e3b4f; text-align: left; }
+    .pmss-apps-table th { background: #13293d; color: #f8fafc; }
   </style>
 </head>
 <body>
