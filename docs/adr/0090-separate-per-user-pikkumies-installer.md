@@ -1,7 +1,7 @@
 # ADR 0090: Separate per-user Pikkumies installer
 
 Date: 2026-10-08
-Category: feature
+Category: architecture
 
 ## Status
 

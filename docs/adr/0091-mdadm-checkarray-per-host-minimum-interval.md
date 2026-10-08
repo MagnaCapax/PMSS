@@ -1,7 +1,7 @@
 # ADR 0091: Per-host minimum interval for mdadm checkarray
 
 Date: 2026-10-08
-Category: operations
+Category: data
 
 ## Status
 
