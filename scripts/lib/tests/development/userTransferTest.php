@@ -473,12 +473,16 @@ SNAP;
     {
         $home = $this->pmssMakeUserHomeTree('pmss-session-inode-', 'session', 'home/newuser');
         $path = $home.'/session/one.rtorrent';
+        $localUser = posix_geteuid() === 65534 ? 'root' : 'nobody';
+        $localAccount = posix_getpwnam($localUser);
+        $this->assertTrue(is_array($localAccount));
         $old = '/home/olduser/data/a';
         $payload = 'd9:directory'.strlen($old).':'.$old.'4:note4:keep' . 'e';
         file_put_contents($path, $payload);
         $before = lstat($path);
-        \pmssUserTransferRewriteRtorrentSessionPaths(['localUser' => 'newuser', 'remoteUser' => 'olduser'], $home);
-        $new = '/home/newuser/data/a';
+        $this->assertFalse($before['uid'] === $localAccount['uid'], 'fixture must exercise foreign imported ownership');
+        \pmssUserTransferRewriteRtorrentSessionPaths(['localUser' => $localUser, 'remoteUser' => 'olduser'], $home);
+        $new = '/home/'.$localUser.'/data/a';
         $this->assertSame('d9:directory'.strlen($new).':'.$new.'4:note4:keepe', file_get_contents($path));
         $after = lstat($path);
         $this->assertSame($before['ino'], $after['ino']);
