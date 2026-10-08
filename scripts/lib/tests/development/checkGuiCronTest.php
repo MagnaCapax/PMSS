@@ -292,6 +292,42 @@ PHP;
         $this->pmssAssertMessagesContain($messages, 'unsafe www directory target');
     }
 
+    public function testApplyOwnershipRefusesSymlinkedFinalNode(): void
+    {
+        $target = $this->pmssWriteFile($this->tempDir.'/outside.txt', 'outside');
+        $link = $this->tempDir.'/linked.txt';
+        symlink($target, $link);
+        $owner = fileowner($target);
+        $messages = [];
+
+        $this->assertFalse(\pmssCheckGuiApplyOwnership(
+            $link,
+            $this->pmssCurrentOwner(),
+            $this->pmssMakeArrayLogger($messages)
+        ));
+        clearstatcache(true, $target);
+        $this->assertSame($owner, fileowner($target));
+        $this->pmssAssertMessagesContain($messages, 'refusing to apply ownership to symlinked');
+    }
+
+    public function testApplyOwnershipAcceptsRealFileAndDirectory(): void
+    {
+        $file = $this->pmssWriteFile($this->tempDir.'/panel.php', 'panel');
+        $directory = $this->pmssEnsureDir($this->tempDir.'/www');
+        $user = $this->pmssCurrentOwner();
+        $messages = [];
+
+        foreach ([$file, $directory] as $path) {
+            $this->assertTrue(\pmssCheckGuiApplyOwnership(
+                $path,
+                $user,
+                $this->pmssMakeArrayLogger($messages)
+            ));
+            clearstatcache(true, $path);
+            $this->assertSame(posix_geteuid(), fileowner($path));
+        }
+    }
+
     public function testRestoreUserIndexCopiesSafeSkeletonSource(): void
     {
         $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
