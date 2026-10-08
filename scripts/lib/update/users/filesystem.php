@@ -202,7 +202,6 @@ PHP;
         'bin/createWebPublicCerts',
         'www/scriptsInc.php',
         '.scriptsInc.php',
-        '.lighttpd/php.ini',
         'radarr-sonarr.txt',
         'www/console.php',
         'www/apps.php',
