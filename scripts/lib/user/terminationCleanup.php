@@ -68,11 +68,11 @@ function pmssTerminateUserRemoveEmptyDir(string $username, string $phase, string
 }
 
 /**
- * Steps that purge a directory: remove ordinary files, clear immutable flags on
- * whatever survived, then remove that residue.
+ * Steps that purge a directory: remove ordinary files, clear immutable flags
+ * through verified open inodes on whatever survived, then remove that residue.
  *
  * The ordering is deliberate (Refs #606): a full recursive chattr BEFORE the removal
- * delays inode recovery on large accounts even when nothing is immutable. Running it
+ * delays inode recovery on large accounts even when nothing is immutable. Running the scan
  * only on the residue keeps the walk bounded to the files rm could not delete, and
  * covers every immutable path in the tree without a list that can drift from what
  * the writers actually mark.

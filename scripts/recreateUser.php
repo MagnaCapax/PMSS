@@ -135,8 +135,8 @@ if (file_exists($backupDir)) {
         $supersededBackup = $backupDir . '.superseded';
         pmssRequireSafeRecreateUserPath($supersededBackup, 'superseded-backup');
         if (file_exists($supersededBackup)) {
-            // .trafficData/.trafficDataLocal are immutable (chattr +i, PMSS #161); clear the immutable
-            // attr recursively before rm or it fails "Operation not permitted" (cf. terminateUser #176,
+            // .trafficData/.trafficDataLocal are immutable (PMSS #161); clear the immutable
+            // flag on verified inodes before removal or it fails "Operation not permitted" (cf. terminateUser #176,
             // userTransfer #283). GH PMSS#725. Failing here is fail-safe (before rebuild — live account untouched).
             if (!pmssRecreatePurgeSupersededDirectory($supersededBackup)) {
                 fwrite(STDERR, "Unable to reclaim superseded backup before rebuild: {$supersededBackup}\n");
@@ -271,7 +271,7 @@ if ($supersededBackup !== null) {
 }
 if ($supersededBackup !== null && is_dir($supersededBackup)) {
     echo "[*] Reclaiming superseded prior backup {$supersededBackup}\n";
-    // .trafficData/.trafficDataLocal are immutable (chattr +i, PMSS #161); clear before rm (cf. terminateUser #176). GH PMSS#725.
+    // .trafficData/.trafficDataLocal are immutable (PMSS #161); clear before removal (cf. terminateUser #176). GH PMSS#725.
     // This runs AFTER a successful rebuild — a cleanup failure here must NOT fail the tool (the account is already rebuilt),
     // so it is non-fatal (exec, not pmssRunOrExit). A lingering .superseded is routine janitorial, not a rebuild failure.
     if (!pmssRecreatePurgeSupersededDirectory($supersededBackup)) {

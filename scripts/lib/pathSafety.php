@@ -280,7 +280,8 @@ function pmssPinnedTreePurgeCommand(string $path, bool $clearImmutable): string
     }
     $arg = escapeshellarg($path);
     $action = $clearImmutable
-        ? 'command -v chattr >/dev/null 2>&1 && find -P . -depth \\( -type f -o -type d \\) -execdir chattr -i -- {} + 2>/dev/null || true'
+        ? 'command -v perl >/dev/null 2>&1 && find -P . -depth \\( -type f -o -type d \\) -execdir perl '
+            .escapeshellarg(__DIR__.'/pathSafety/immutableClear.pl').' "$(pwd -P)" {} + 2>/dev/null || true'
         : 'rm -rf -- ./* ./.[!.]* ./..?* && cd / && rmdir -- '.$arg;
     return 'if [ -d '.$arg.' ] && [ ! -L '.$arg.' ]; then '
         .'pin=$(stat -Lc %d:%i -- '.$arg.') && ( cd -P -- '.$arg

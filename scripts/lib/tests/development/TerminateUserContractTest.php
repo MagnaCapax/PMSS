@@ -68,7 +68,7 @@ final class TerminateUserContractTest extends TestCase
     }
 
     /**
-     * The purge sequence is rm first, recursive chattr on the residue only, then rm
+     * The purge sequence is remove first, inode-safe flag clearing on residue, then remove
      * the leftovers (Refs #606 — a full recursive chattr before the removal delays
      * inode recovery on large accounts). Covering the tree recursively means no named
      * path list exists to drift from what the writers actually mark immutable.
@@ -82,9 +82,9 @@ final class TerminateUserContractTest extends TestCase
             array_column($steps, 0),
             'purge must be remove -> clear-immutable -> remove-leftovers'
         );
-        $this->assertStringNotContainsString('chattr', $steps[0][1], 'first removal must not walk the tree');
+        $this->assertStringNotContainsString('immutableClear.pl', $steps[0][1], 'first removal must not walk the tree');
         $this->assertStringContainsString('find -P . -depth', $steps[1][1]);
-        $this->assertStringContainsString('chattr -i --', $steps[1][1]);
+        $this->assertStringContainsString('immutableClear.pl', $steps[1][1]);
         $this->assertStringContainsString("'/home/user1234'", $steps[1][1], 'path must be shell-escaped');
         $this->assertSame($steps[0][1], $steps[2][1], 'leftover removal repeats the initial removal');
 

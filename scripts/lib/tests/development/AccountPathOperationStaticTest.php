@@ -121,6 +121,13 @@ final class AccountPathOperationStaticTest extends TestCase
             'find -P . -depth',
             'rm -rf -- ./* ./.[!.]* ./..?*',
         ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/pathSafety/immutableClear.pl', [
+            'O_NOFOLLOW',
+            'sysopen(my $handle',
+            '$inode[1] != $named[1]',
+            'ioctl($handle, 0x80086601, $flags)',
+            'ioctl($handle, 0x40086602, $flags)',
+        ]);
     }
 
     public function testRecreateTopLevelMoveAndCleanupUseCheckedInodes(): void
