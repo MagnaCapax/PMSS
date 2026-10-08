@@ -73,8 +73,56 @@ class RecreateUserSafetyGuardTest extends TestCase
             'pmssRecreateRequireWritableDirectories(',
             'Setting aside prior backup',
             'Killing processes for',
-            "pmssRunOrExit('mv ' . escapeshellarg(\$homeDir)",
+            'pmssRecreateMoveTopDirectory($homeDir, $backupDir)',
         ], $script);
+    }
+
+    public function testTopLevelRecreateMoveKeepsEveryByteAndOriginalInode(): void
+    {
+        $base = $this->tempDir.'/top-real';
+        $this->pmssWriteFile($base.'/home/data/movie', "movie\0bytes");
+        $this->pmssWriteFile($base.'/home/session/lock', 'session');
+        $before = lstat($base.'/home');
+        \pmssRecreateMoveTopDirectory($base.'/home', $base.'/backup');
+        $this->assertFalse(file_exists($base.'/home'));
+        $this->assertSame("movie\0bytes", file_get_contents($base.'/backup/data/movie'));
+        $this->assertSame('session', file_get_contents($base.'/backup/session/lock'));
+        $this->assertSame($before['ino'], lstat($base.'/backup')['ino']);
+    }
+
+    public function testTopLevelRecreateMoveRefusesLinkedPathsAndPreservesBothTrees(): void
+    {
+        $base = $this->tempDir.'/top-linked';
+        $this->pmssWriteFile($base.'/outside/payload', 'outside');
+        $this->pmssWriteFile($base.'/home/data/payload', 'tenant');
+        symlink($base.'/outside', $base.'/backup');
+        $this->assertThrowsRuntime(static function () use ($base): void {
+            \pmssRecreateMoveTopDirectory($base.'/home', $base.'/backup');
+        });
+        $this->assertSame('tenant', file_get_contents($base.'/home/data/payload'));
+        $this->assertSame('outside', file_get_contents($base.'/outside/payload'));
+        unlink($base.'/backup');
+        rename($base.'/home', $base.'/saved-home');
+        symlink($base.'/outside', $base.'/home');
+        $this->assertThrowsRuntime(static function () use ($base): void {
+            \pmssRecreateMoveTopDirectory($base.'/home', $base.'/backup');
+        });
+        $this->assertSame('tenant', file_get_contents($base.'/saved-home/data/payload'));
+        $this->assertSame('outside', file_get_contents($base.'/outside/payload'));
+    }
+
+    public function testRecreateSupersededPurgeRemovesRealTreeAndRefusesLinkedRoot(): void
+    {
+        $base = $this->tempDir.'/superseded';
+        $this->pmssWriteFile($base.'/archive/nested/payload', 'customer');
+        $this->assertTrue(\pmssRecreatePurgeSupersededDirectory($base.'/archive'));
+        $this->assertFalse(file_exists($base.'/archive'));
+        $this->pmssWriteFile($base.'/outside/payload', 'outside');
+        $this->pmssWriteFile($base.'/saved/payload', 'tenant');
+        symlink($base.'/outside', $base.'/archive');
+        $this->assertFalse(\pmssRecreatePurgeSupersededDirectory($base.'/archive'));
+        $this->assertSame('outside', file_get_contents($base.'/outside/payload'));
+        $this->assertSame('tenant', file_get_contents($base.'/saved/payload'));
     }
 
     public function testRestoreMovesCustomerDirectoriesWithoutDoublingData(): void

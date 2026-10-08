@@ -121,6 +121,22 @@ final class AccountPathOperationStaticTest extends TestCase
         ]);
     }
 
+    public function testRecreateTopLevelMoveAndCleanupUseCheckedInodes(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/recreateUser.php', [
+            'pmssRecreateMoveTopDirectory($backupDir, $supersededBackup)',
+            'pmssRecreateMoveTopDirectory($homeDir, $backupDir)',
+            'pmssRecreatePurgeSupersededDirectory($supersededBackup)',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/recreateRestore.php', [
+            'clearstatcache(true, $source)',
+            'clearstatcache(true, $destination)',
+            'pmssPathTargetIsSafe($source, true, true)',
+            'pmssPathTargetIsSafe($destination, true, true)',
+            'pmssPinnedTreePurgeCommand($path, $clearImmutable)',
+        ]);
+    }
+
     /** @return array<int,string> */
     private function scanFile(string $path): array
     {

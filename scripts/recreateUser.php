@@ -138,10 +138,13 @@ if (file_exists($backupDir)) {
             // .trafficData/.trafficDataLocal are immutable (chattr +i, PMSS #161); clear the immutable
             // attr recursively before rm or it fails "Operation not permitted" (cf. terminateUser #176,
             // userTransfer #283). GH PMSS#725. Failing here is fail-safe (before rebuild — live account untouched).
-            pmssRunOrExit('chattr -R -i ' . escapeshellarg($supersededBackup) . ' 2>/dev/null; rm -rf ' . escapeshellarg($supersededBackup));
+            if (!pmssRecreatePurgeSupersededDirectory($supersededBackup)) {
+                fwrite(STDERR, "Unable to reclaim superseded backup before rebuild: {$supersededBackup}\n");
+                exit(1);
+            }
         }
         echo "[*] Setting aside prior backup {$backupDir} -> {$supersededBackup}\n";
-        pmssRunOrExit('mv ' . escapeshellarg($backupDir) . ' ' . escapeshellarg($supersededBackup));
+        pmssRecreateMoveTopDirectory($backupDir, $supersededBackup);
     } else {
         echo "[i] Home missing but prior backup {$backupDir} present - leaving it untouched (possible sole copy).\n";
     }
@@ -156,7 +159,7 @@ if ($homeExists) {
     pmssRunOrExit('chown root:root ' . escapeshellarg($homeDir));
     pmssRunOrExit('chmod 0700 ' . escapeshellarg($homeDir));
     echo "[*] Moving {$homeDir} to {$backupDir}\n";
-    pmssRunOrExit('mv ' . escapeshellarg($homeDir) . ' ' . escapeshellarg($backupDir));
+    pmssRecreateMoveTopDirectory($homeDir, $backupDir);
 } else {
     echo "[i] Home directory missing - building fresh\n";
 }
@@ -271,9 +274,8 @@ if ($supersededBackup !== null && is_dir($supersededBackup)) {
     // .trafficData/.trafficDataLocal are immutable (chattr +i, PMSS #161); clear before rm (cf. terminateUser #176). GH PMSS#725.
     // This runs AFTER a successful rebuild — a cleanup failure here must NOT fail the tool (the account is already rebuilt),
     // so it is non-fatal (exec, not pmssRunOrExit). A lingering .superseded is routine janitorial, not a rebuild failure.
-    exec('chattr -R -i ' . escapeshellarg($supersededBackup) . ' 2>/dev/null; rm -rf ' . escapeshellarg($supersededBackup) . ' 2>&1', $reclaimOut, $reclaimRc);
-    if ($reclaimRc !== 0) {
-        fwrite(STDERR, "[!] Non-fatal: could not fully reclaim {$supersededBackup} (rc={$reclaimRc}); rebuild already succeeded, manual cleanup may be needed.\n");
+    if (!pmssRecreatePurgeSupersededDirectory($supersededBackup)) {
+        fwrite(STDERR, "[!] Non-fatal: could not fully reclaim {$supersededBackup}; rebuild already succeeded, manual cleanup may be needed.\n");
     }
 }
 
