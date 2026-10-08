@@ -97,6 +97,12 @@ as deferred — not adopted as a side effect of consolidating the writers.
   regression, not a data risk). A run-marker gate (`/run/pmss-boot-tuning.applied`) would close
   this; deferred as a refinement since systemPrep installs+enables+starts the unit together, so
   presence≈ran in the normal case.
+- **Implementation status correction (2026-10-08).** The md loop is now inside the same
+  boot-tuning presence gate as the per-disk loop. The earlier step-2 sentence saying
+  the md loop was not gated because boot-tuning did not own it was incorrect:
+  boot-tuning writes the md per-array knobs. rc.local's fallback now matches its
+  `sync_speed_min` 25000 and `sync_speed_max` 750000; the bcache `cache_mode` loop
+  remains ungated and rc.local-only.
 - **Step 3: blocked on fleet minimum PMSS version**, as designed.
 
 ## Consequences
