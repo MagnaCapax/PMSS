@@ -138,6 +138,8 @@ class AppsCatalogTest extends TestCase
         $catalog = require dirname(__DIR__, 4).'/etc/skel/www/appsLsioCatalog.php';
         $this->assertTrue(count($catalog) > 100);
         $names = array_column($catalog, 'name');
+        $this->assertTrue(in_array('homeassistant', $names, true));
+        $this->assertFalse(in_array('oscam', $names, true) || in_array('jellyfin', $names, true));
         foreach (\PMSS_LSIO_EXCLUDED as $excluded) $this->assertFalse(in_array($excluded, $names, true), $excluded);
         $this->assertTrue(in_array('thelounge', $names, true));
         foreach ($catalog as $app) {

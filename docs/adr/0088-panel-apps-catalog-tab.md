@@ -120,9 +120,9 @@ with HTTP 200 instead of failing with an undefined-function error.
 The operator requested the "Find more apps" section open by default and a
 broader LinuxServer.io catalog. A developer script builds a dated, closed
 customer-tree snapshot from the LinuxServer.io images API. It excludes apps
-already supplied by PMSS, images unsuited to shared accounts,
-abuse-prone and circumvention-specific images, and deprecated or unstable
-images. The 39 wiki entries and their guides stay in place. One search filters
+already supplied by PMSS, `oscam` under the standing circumvention-specific
+content rule, and deprecated or unstable images. The 39 wiki entries and their
+guides stay in place. One search filters
 both lists, including category names. The page omits the LinuxServer.io list
 when the snapshot has not yet arrived during a staggered update.
 

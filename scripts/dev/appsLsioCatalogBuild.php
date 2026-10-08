@@ -3,11 +3,7 @@
 const PMSS_LSIO_SOURCE = 'https://api.linuxserver.io/api/v1/images?include_config=false';
 const PMSS_LSIO_EXCLUDED = array(
     // PMSS already provides these applications.
-    'jellyfin', 'sonarr', 'radarr', 'prowlarr', 'sabnzbd', 'qbittorrent', 'deluge', 'lidarr', 'bazarr', 'mariadb', 'phpmyadmin', 'resilio-sync',
-    // These need host privileges, networking controls, LAN discovery, or hardware unavailable to shared accounts.
-    'wireguard', 'unifi-network-application', 'fail2ban', 'ddclient', 'duckdns', 'adguardhome-sync', 'habridge', 'homeassistant', 'qemu-static', 'socket-proxy', 'modmanager', 'syslog-ng', 'kasm', 'openssh-server', 'swag', 'minisatip', 'lm-studio', 'pelorus',
-    // Shared CPU, bandwidth, and IPs make these unsuitable.
-    'boinc', 'foldingathome', 'speedtest-tracker', 'librespeed', 'pwndrop', 'kali-linux',
+    'jellyfin', 'sonarr', 'radarr', 'prowlarr', 'sabnzbd', 'qbittorrent', 'deluge', 'lidarr', 'bazarr', 'mariadb', 'phpmyadmin', 'resilio-sync', 'wireguard',
     // Circumvention-specific application.
     'oscam',
 );
