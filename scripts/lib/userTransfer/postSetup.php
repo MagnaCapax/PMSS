@@ -50,8 +50,20 @@ function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths
 
 function pmssUserTransferRenameRutorrentShare(string $home, string $remoteUser, string $localUser): void
 {
-    $src = $home.'/www/rutorrent/share/users/'.$remoteUser;
-    $dst = $home.'/www/rutorrent/share/users/'.$localUser;
+    $share = $home.'/www/rutorrent/share';
+    clearstatcache(true, $share);
+    if (is_link($share)) {
+        // ADR 0041's managed link is a normal customer layout. Address its
+        // durable target directly so no root or account command traverses it.
+        if (@readlink($share) !== '../../.local/share/pmss/rutorrent/share'
+            || !pmssPathTargetIsSafe(dirname($share), true)) {
+            logMessage('[WARN] Skipping ruTorrent rename (unexpected share link)');
+            return;
+        }
+        $share = $home.'/.local/share/pmss/rutorrent/share';
+    }
+    $src = $share.'/users/'.$remoteUser;
+    $dst = $share.'/users/'.$localUser;
     clearstatcache(true, $src);
     clearstatcache(true, $dst);
     if (!file_exists($src) && !is_link($src)) {

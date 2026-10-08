@@ -98,6 +98,8 @@ final class AccountPathOperationStaticTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/userTransfer/postSetup.php', [
             'clearstatcache(true, $src)',
             'clearstatcache(true, $dst)',
+            "@readlink(\$share) !== '../../.local/share/pmss/rutorrent/share'",
+            "\$share = \$home.'/.local/share/pmss/rutorrent/share'",
             'pmssPathTargetIsSafe($src, true, true)',
             'pmssPathTargetIsSafe($dst, true, true)',
             'pmssAccountPathRun($localUser, $home, [$src, $dst], $command)',

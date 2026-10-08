@@ -567,6 +567,29 @@ SNAP;
         $this->assertSame('outside bytes', file_get_contents($outside.'/payload'));
     }
 
+    public function testRutorrentShareRenameFollowsOnlyManagedDurableShareLayout(): void
+    {
+        $account = posix_getpwuid(posix_geteuid());
+        $user = $account['name'];
+        $base = $this->pmssMakeTempDir('pmss-share-managed-');
+        $home = $base.'/home';
+        $share = $home.'/.local/share/pmss/rutorrent/share';
+        $this->pmssWriteFile($share.'/users/remote/payload', "durable\0bytes");
+        $this->pmssEnsureDir($home.'/www/rutorrent');
+        symlink('../../.local/share/pmss/rutorrent/share', $home.'/www/rutorrent/share');
+        \pmssUserTransferRenameRutorrentShare($home, 'remote', $user);
+        $this->assertSame("durable\0bytes", file_get_contents($share.'/users/'.$user.'/payload'));
+        $this->assertFalse(file_exists($share.'/users/remote'));
+        $this->assertTrue(is_link($home.'/www/rutorrent/share'));
+        $outside = $base.'/outside';
+        $this->pmssWriteFile($outside.'/users/remote/payload', 'outside');
+        unlink($home.'/www/rutorrent/share');
+        symlink($outside, $home.'/www/rutorrent/share');
+        \pmssUserTransferRenameRutorrentShare($home, 'remote', $user);
+        $this->assertSame('outside', file_get_contents($outside.'/users/remote/payload'));
+        $this->assertSame("durable\0bytes", file_get_contents($share.'/users/'.$user.'/payload'));
+    }
+
     public function testRtorrentRestartScriptUsesLiveUserProcessFallback(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/.rtorrentRestart.php', [
