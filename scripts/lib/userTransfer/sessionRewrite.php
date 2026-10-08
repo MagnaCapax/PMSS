@@ -4,6 +4,8 @@
  *
  * @license GPL-3.0-only
  */
+require_once dirname(__DIR__).'/lighttpd/accountPath.php';
+
 /**
  * Rewrite /home/<remote>/ path strings in local rTorrent session files.
  *
@@ -34,7 +36,9 @@ function pmssUserTransferRewriteRtorrentSessionPaths(array $cfg, string $home): 
     $rewrittenFiles = 0;
     $rewrittenPaths = 0;
     foreach ($sessionFiles as $sessionFile) {
-        if (!is_file($sessionFile) || !pmssUserTransferIsPathWithinHome($sessionFile, $home)) {
+        clearstatcache(true, $sessionFile);
+        if (!pmssPathTargetIsSafe($sessionFile, false, true) || !is_file($sessionFile)
+            || is_link($sessionFile) || !pmssUserTransferIsPathWithinHome($sessionFile, $home)) {
             logMessage('[WARN] Skipping unsafe rTorrent session file: '.$sessionFile);
             continue;
         }
@@ -52,7 +56,9 @@ function pmssUserTransferRewriteRtorrentSessionPaths(array $cfg, string $home): 
         if ($fileReplacements < 1) {
             continue;
         }
-        if (@file_put_contents($sessionFile, $rewritten) === false) {
+        // Preserve the in-place rewrite while limiting a swapped path to account rights.
+        if (!pmssAccountPathRun($localUser, $home, [$sessionFile],
+            'cat > '.escapeshellarg($sessionFile), $rewritten)) {
             logMessage('[WARN] Failed to rewrite rTorrent session file: '.$sessionFile);
             continue;
         }
