@@ -69,6 +69,22 @@ final class OpenClawInstallerTest extends TestCase
         $this->assertSame($foreign, \ocCronMerge($foreign.$managed, '/tmp/oc-account', false));
     }
 
+    public function testNpmInstallUsesPrivateCacheNotTheAccountNpmDirectory(): void
+    {
+        $paths = array(
+            'home' => '/tmp/oc-account',
+            'node' => '/tmp/oc-account/.local/share/node-openclaw/bin/node',
+            'npm' => '/tmp/oc-account/.local/share/node-openclaw/lib/node_modules/npm/bin/npm-cli.js',
+            'npmCache' => '/tmp/oc-account/.local/share/openclaw-npm-cache',
+        );
+        $args = \ocNpmInstallArgs($paths);
+        $cache = array_search('--cache', $args, true);
+        $this->assertTrue($cache !== false);
+        $this->assertSame('/tmp/oc-account/.local/share/openclaw-npm-cache', $args[$cache + 1]);
+        $this->assertSame(false, in_array('/tmp/oc-account/.npm', $args, true));
+        $this->assertSame('openclaw', end($args));
+    }
+
     public function testCronMergeMigratesLegacyMarkedLine(): void
     {
         $legacy = "@reboot php \$HOME/install-openclaw.php check # pmss-openclaw\n";

@@ -25,6 +25,18 @@ function ocPaths(): array
         'env' => $home.'/.openclaw/gateway.env',
         'pid' => $home.'/.openclaw/gateway.pid',
         'check' => $home.'/.openclaw/check.state',
+        'npmCache' => $home.'/.local/share/openclaw-npm-cache',
+    );
+}
+
+/** Install into the private prefix with a private download cache, never the account's own ~/.npm. */
+function ocNpmInstallArgs(array $paths): array
+{
+    return array(
+        $paths['node'], $paths['npm'], 'install',
+        '--prefix', $paths['home'].'/.local/share/openclaw',
+        '--cache', $paths['npmCache'],
+        '-g', '--allow-scripts=@google/genai,esbuild,koffi,protobufjs,openclaw', 'openclaw',
     );
 }
 
@@ -413,7 +425,8 @@ function ocMain(array $args): int
         ocInstallNode($paths);
         $env = getenv();
         $env['PATH'] = dirname($paths['node']).':'.($env['PATH'] ?? '/usr/bin:/bin');
-        list($rc, $output) = ocRun(array($paths['node'], $paths['npm'], 'install', '--prefix', $paths['home'].'/.local/share/openclaw', '-g', '--allow-scripts=@google/genai,esbuild,koffi,protobufjs,openclaw', 'openclaw'), $env);
+        list($rc, $output) = ocRun(ocNpmInstallArgs($paths), $env);
+        ocRemoveTree($paths['npmCache']);
         if ($rc !== 0) {
             if (strpos($output, '-122') !== false || strpos($output, 'EDQUOT') !== false) {
                 throw new RuntimeException('npm install failed: the account file-count quota was reached.');
@@ -464,6 +477,7 @@ function ocMain(array $args): int
         }
         ocRemoveTree($paths['home'].'/.local/share/openclaw');
         ocRemoveTree($paths['home'].'/.local/share/node-openclaw');
+        ocRemoveTree($paths['npmCache']);
         echo "Cron entries, wrapper, and program files removed.\n";
         if (in_array('--purge', $args, true)) {
             ocRemoveTree($paths['state']);
