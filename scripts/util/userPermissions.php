@@ -147,6 +147,8 @@ $chmodItems = [
     ["/home/{$thisUser}/.bash_history", 0640],
     ["/home/{$thisUser}/.bashrc", 0644],
     ["/home/{$thisUser}/.bashrc.user", 0640],
+    // Heal non-executable skeleton files copied with mode 0755 before #1019.
+    ["/home/{$thisUser}/radarr-sonarr.txt", 0644],
     ["/home/{$thisUser}/.tmp", 0770],
     ["/home/{$thisUser}/.config", 0770, true],
     ["/home/{$thisUser}/.trafficData", 0640],
@@ -162,6 +164,7 @@ $chmodItems = [
     ["/home/{$thisUser}/.*.php", 0750],
     ["/home/{$thisUser}/.lighttpd.conf", 0644],
     ["/home/{$thisUser}/.lighttpd", 0775],
+    ["/home/{$thisUser}/.lighttpd/php.ini", 0640],
     ["/home/{$thisUser}/.lighttpd/.htpasswd", 0754],
     ["/home/{$thisUser}/.lighttpd/compress", 0770],
     ["/home/{$thisUser}/.lighttpd/upload", 0770],
