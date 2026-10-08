@@ -270,7 +270,13 @@ function pmssStatsToggleApp(button) {
     var request = new XMLHttpRequest();
     request.onreadystatechange = function() {
         if (request.readyState !== 4) return;
-        if (feedback) feedback.textContent = request.status >= 200 && request.status < 400 ? 'Updated' : 'Retry';
+        if (request.status < 200 || request.status >= 400) {
+            if (feedback) feedback.textContent = 'Retry';
+            button.disabled = false;
+            button.removeAttribute('aria-busy');
+            return;
+        }
+        if (feedback) feedback.textContent = 'Updated';
         window.setTimeout(function() {
             try {
                 if (window.parent && window.parent !== window) {
@@ -287,6 +293,7 @@ function pmssStatsToggleApp(button) {
         button.removeAttribute('aria-busy');
     };
     request.open('POST', endpoint + '?action=' + encodeURIComponent(action), true);
+    request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
     request.send('');
     return false;
 }
