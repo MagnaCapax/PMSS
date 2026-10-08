@@ -197,6 +197,8 @@ if (isset($_GET['status'])) {
     return;
 }
 $urls = pmssAppsAllowedUrlsRead();
+$lsioCatalog = is_file(__DIR__.'/appsLsioCatalog.php') ? require __DIR__.'/appsLsioCatalog.php' : array();
+if (!is_array($lsioCatalog)) $lsioCatalog = array();
 ?>
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Apps</title>
@@ -209,7 +211,7 @@ $urls = pmssAppsAllowedUrlsRead();
 .pill{font-size:12px;padding:2px 9px;border-radius:999px;white-space:nowrap}.p-run{background:#12351f;color:#8fd18f}.p-stop{background:#3a1d1d;color:#f19999}.p-off{background:#1f2937;color:#9fb0c3}.p-warn{background:#3a2e12;color:#f0b429}
 .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.b{font-size:13px;padding:5px 12px;border-radius:6px;border:1px solid #2e3b4f;background:#13293d;color:#e6edf3;text-decoration:none;white-space:nowrap;cursor:pointer}.b-pri{background:#0e7490;border-color:#0e7490;color:#fff}.b-warn{border-color:#6b5420;color:#f0b429;background:#2a2414}
 .search{width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:1px solid #2e3b4f;background:#0b1220;color:#e6edf3;font-size:14px;margin:4px 0 10px}.note{color:#9fb0c3;font-size:13px;margin:0 0 8px}.mrow{display:flex;gap:12px;align-items:baseline;padding:7px 14px;border-top:1px solid #223042;background:#0f1b2b}.mrow:first-child{border-top:0}.mrow .name{font-weight:bold;color:#fff;min-width:170px}.mrow .desc{flex:1;color:#9fb0c3;font-size:13px}.mrow .tag{font-size:11px;color:#f0b429;margin-left:6px}.mrow a{white-space:nowrap;font-size:13px}
-.row-progress{color:#9fb0c3}.row-error{color:#f19999;width:100%}.row-log{width:100%;max-height:240px;overflow:auto;white-space:pre-wrap;background:#0b1220;color:#e6edf3;padding:8px}.section-actions{display:flex;gap:8px;margin:8px 0 12px}.apps details summary{cursor:pointer;color:#fff;font-weight:bold;margin:24px 0 10px}
+.row-progress{color:#9fb0c3}.row-error{color:#f19999;width:100%}.row-log{width:100%;max-height:240px;overflow:auto;white-space:pre-wrap;background:#0b1220;color:#e6edf3;padding:8px}.section-actions{display:flex;gap:8px;margin:8px 0 12px}
 #pmss-action-notice{display:none;position:fixed;top:10px;right:10px;z-index:9999;max-width:580px;padding:8px 12px;border:1px solid #2e3b4f;background:#13293d;color:#e6edf3;font-weight:bold}#pmss-action-notice.pmss-error{border-color:#f19999;background:#3a1d1d;color:#f19999}
 @media(max-width:640px){.apps-header{align-items:flex-start;flex-direction:column}.acts{width:100%;justify-content:flex-start}.mrow{flex-wrap:wrap}.mrow .name{min-width:0}}
 </style></head><body><div id="pmss-action-notice" role="status" aria-live="polite"></div>
@@ -223,8 +225,14 @@ $urls = pmssAppsAllowedUrlsRead();
 <?php foreach (array('rtorrent','qBittorrent','Deluge') as $id): if (isset($status['apps'][$id])) echo pmssAppsLiveRowBuild($id, $status['apps'][$id]); endforeach; ?>
 </div><div class="group">Transfers</div><div class="list" id="pmss-transfer-apps"><?php if (isset($status['apps']['rclone'])) echo pmssAppsLiveRowBuild('rclone', $status['apps']['rclone']); ?></div>
 <div class="group">Web server</div><div class="list"><?= pmssAppsLiveRowBuild('lighttpd', $status['apps']['lighttpd']) ?></div>
-<details><summary>Find more apps (39)</summary><p class="note">39 more apps you can set up yourself with rootless Docker. Each needs its own login turned on, because other accounts on this server can reach its port.</p><input id="pmss-apps-search" class="search" type="search" aria-label="Search apps" placeholder="Search apps, e.g. comics, photos, IRC"><div class="list" id="pmss-more-apps">
-<?php foreach (pmssAppsCatalogRead() as $category => $apps): foreach ($apps as $app): ?><div class="mrow"><span class="name"><?= pmssAppsEscape($app[0]) ?><?php if ($app[3] !== ''): ?><span class="tag"><?= pmssAppsEscape($app[3]) ?></span><?php endif; ?></span><span class="desc"><?= pmssAppsEscape($app[2]) ?></span><a href="<?= pmssAppsEscape($urls[$category]) ?>" target="_blank" rel="noopener">Setup guide &#8599;</a></div><?php endforeach; endforeach; ?></div></details>
+<h2>Find more apps</h2><p class="note">You can set up more apps yourself with rootless Docker. LinuxServer.io examples publish ports on every address (for example 8080:8080). On this server that puts the app on the internet: publish it as 127.0.0.1:8080:8080 instead, and turn on the app's own login — other accounts on this server can reach a port on 127.0.0.1.</p>
+<input id="pmss-apps-search" class="search" type="search" aria-label="Search apps" placeholder="Search apps, e.g. comics, photos, IRC">
+<h2>Guides on the Pulsed Media wiki</h2><div class="list" id="pmss-more-apps">
+<?php foreach (pmssAppsCatalogRead() as $category => $apps): foreach ($apps as $app): ?><div class="mrow" data-category="<?= pmssAppsEscape($category) ?>"><span class="name"><?= pmssAppsEscape($app[0]) ?><?php if ($app[3] !== ''): ?><span class="tag"><?= pmssAppsEscape($app[3]) ?></span><?php endif; ?></span><span class="desc"><?= pmssAppsEscape($app[2]) ?></span><a href="<?= pmssAppsEscape($urls[$category]) ?>" target="_blank" rel="noopener">Setup guide &#8599;</a></div><?php endforeach; endforeach; ?></div>
+<?php if ($lsioCatalog): ?><h2>More from LinuxServer.io (<?= count($lsioCatalog) ?>)</h2><div id="pmss-lsio-apps">
+<?php $lastCategory = null; foreach ($lsioCatalog as $app): if ($app['category'] !== $lastCategory): if ($lastCategory !== null): ?></div></div><?php endif; $lastCategory = $app['category']; ?><div class="lsio-group"><div class="group"><?= pmssAppsEscape($lastCategory) ?></div><div class="list"><?php endif; ?>
+<div class="mrow" data-category="<?= pmssAppsEscape($app['category']) ?>"><span class="name"><?= pmssAppsEscape($app['title']) ?></span><span class="desc"><?= pmssAppsEscape($app['description']) ?></span><a href="<?= pmssAppsEscape($app['guide']) ?>" target="_blank" rel="noopener">Setup guide &#8599;</a></div>
+<?php endforeach; ?></div></div></div><?php endif; ?>
 </div></div><div class="full_bottom"></div></div></div>
 <script>
 var pmssAppsBusy = {};
@@ -312,5 +320,5 @@ function pmssAppsRestartAll(button) {
 }
 window.pmssAppsActionComplete = function() { pmssAppsRefresh(); };
 pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, <?= $status['poll'] ? '5000' : '10000' ?>);
-$('#pmss-apps-search').on('input', function() { var query = this.value.toLowerCase().trim(); $('#pmss-more-apps .mrow').each(function() { $(this).toggle($(this).text().toLowerCase().indexOf(query) !== -1); }); });
+$('#pmss-apps-search').on('input', function() { var query = this.value.toLowerCase().trim(); $('#pmss-more-apps .mrow, #pmss-lsio-apps .mrow').each(function() { $(this).toggle(($(this).find('.name, .desc').text() + ' ' + $(this).attr('data-category')).toLowerCase().indexOf(query) !== -1); }); $('#pmss-lsio-apps .lsio-group').each(function() { $(this).toggle($(this).find('.mrow:visible').length > 0); }); });
 </script></body></html>

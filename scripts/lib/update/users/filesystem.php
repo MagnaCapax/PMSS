@@ -217,6 +217,7 @@ PHP;
         'radarr-sonarr.txt',
         'www/console.php',
         'www/apps.php',
+        'www/appsLsioCatalog.php',
         'www/appsRuntime.php',
         'www/deluge.php',
         'www/error-503.html',

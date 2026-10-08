@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 4).'/scripts/dev/appsLsioCatalogBuild.php';
 ob_start();
 require_once dirname(__DIR__, 4).'/etc/skel/www/apps.php';
 ob_end_clean();
@@ -38,12 +39,64 @@ class AppsCatalogTest extends TestCase
         $this->assertStringContainsString('Media Stack is not installed', $html);
         $this->assertStringContainsString('Install Media Stack', $html);
         $this->assertStringContainsString('function pmssActionRequest(action, passwordValue)', $html);
-        preg_match_all('/href="([^"]+)"[^>]*>Setup guide &#8599;<\/a>/', $html, $matches);
+        $wiki = substr($html, strpos($html, 'id="pmss-more-apps"'), strpos($html, 'More from LinuxServer.io') - strpos($html, 'id="pmss-more-apps"'));
+        preg_match_all('/href="([^"]+)"[^>]*>Setup guide &#8599;<\/a>/', $wiki, $matches);
         $this->assertSame(39, count($matches[1]));
         $allowed = array_values(\pmssAppsAllowedUrlsRead());
         foreach ($matches[1] as $href) {
             $this->assertTrue(in_array(html_entity_decode($href, ENT_QUOTES, 'UTF-8'), $allowed, true), $href);
         }
+    }
+
+    public function testLsioSnapshotIsFilteredAndHasSafeGuideLinks(): void
+    {
+        $catalog = require dirname(__DIR__, 4).'/etc/skel/www/appsLsioCatalog.php';
+        $this->assertTrue(count($catalog) > 100);
+        $names = array_column($catalog, 'name');
+        foreach (\PMSS_LSIO_EXCLUDED as $excluded) $this->assertFalse(in_array($excluded, $names, true), $excluded);
+        foreach (\pmssAppsCatalogRead() as $apps) foreach ($apps as $app) {
+            $this->assertFalse(in_array(strtolower(str_replace(' ', '', $app[0])), $names, true), $app[0]);
+        }
+        foreach ($catalog as $app) {
+            $this->assertTrue(strpos($app['guide'], 'https://docs.linuxserver.io/images/docker-') === 0);
+            $this->assertTrue(preg_match_all('/./us', $app['description']) <= 120);
+            $this->assertSame('lscr.io/linuxserver/'.$app['name'], $app['image']);
+        }
+        $this->assertSame(count($names), count(array_unique($names)));
+        $fixture = array(
+            array('name' => 'blender', 'description' => '[Blender] is useful. More text.', 'category' => 'Art', 'stable' => true, 'deprecated' => false),
+            array('name' => 'jellyfin', 'description' => 'Already provided.', 'category' => 'Media', 'stable' => true, 'deprecated' => false),
+            array('name' => 'old', 'description' => 'Old.', 'category' => 'Other', 'stable' => true, 'deprecated' => true),
+            array('name' => 'unstable', 'description' => 'Unstable.', 'category' => 'Other', 'stable' => false, 'deprecated' => false),
+        );
+        $this->assertSame(array(array('name' => 'blender', 'title' => 'Blender', 'description' => 'Blender is useful.',
+            'category' => 'Art', 'image' => 'lscr.io/linuxserver/blender',
+            'guide' => 'https://docs.linuxserver.io/images/docker-blender/')), \pmssLsioCatalogBuild($fixture));
+    }
+
+    public function testMoreAppsRendersOpenWithLsioRowsAndOneSearch(): void
+    {
+        $html = $this->pmssRenderCustomerPanelPage('apps.php', [], ['minBytes' => 4000]);
+        $this->assertStringContainsString('<h2>Find more apps</h2>', $html);
+        $this->assertStringNotContainsString('<details>', $html);
+        $this->assertStringContainsString('Guides on the Pulsed Media wiki', $html);
+        $catalog = require dirname(__DIR__, 4).'/etc/skel/www/appsLsioCatalog.php';
+        $this->assertStringContainsString('More from LinuxServer.io ('.count($catalog).')', $html);
+        $this->assertStringContainsString('https://docs.linuxserver.io/images/docker-blender/', $html);
+        $this->assertSame(1, substr_count($html, 'id="pmss-apps-search"'));
+        $this->assertStringContainsString('127.0.0.1:8080:8080', $html);
+        $this->assertStringContainsString("#pmss-more-apps .mrow, #pmss-lsio-apps .mrow", $html);
+    }
+
+    public function testMissingLsioCatalogLeavesWikiGuidesAvailable(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            @unlink($home.'/www/appsLsioCatalog.php');
+            $html = $render('apps.php', ['minBytes' => 4000])['stdout'];
+            $this->assertStringContainsString('Guides on the Pulsed Media wiki', $html);
+            $this->assertStringNotContainsString('More from LinuxServer.io', $html);
+            $this->assertStringContainsString('Find more apps', $html);
+        });
     }
 
     public function testRestartAllIsInResponsivePageHeader(): void
@@ -155,6 +208,7 @@ class AppsCatalogTest extends TestCase
         $this->assertStringContainsString("'endpoint' => 'qbittorrent.php'", $this->pmssReadRepoFile('etc/skel/www/scriptsInc.php'));
         $this->assertStringContainsString('pmssActionScriptJs()', $this->pmssReadRepoFile('etc/skel/www/welcome.php'));
         $this->assertStringContainsString("'www/appsRuntime.php'", $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php'));
+        $this->assertStringContainsString("'www/appsLsioCatalog.php'", $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php'));
     }
 
     public function testLiveStatusJsonAndBoundedEscapedLog(): void
