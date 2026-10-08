@@ -167,6 +167,8 @@ function ocGatewayEnv(array $paths): array
     $env = getenv();
     $env['OPENCLAW_GATEWAY_TOKEN'] = $match[1];
     $env['PATH'] = dirname($paths['node']).':'.($env['PATH'] ?? '/usr/bin:/bin');
+    // The gateway runs npm itself (global root/prefix lookups, plugins); keep that under ~/.openclaw so --purge removes it.
+    $env['npm_config_cache'] = $paths['state'].'/npm-cache';
     return $env;
 }
 

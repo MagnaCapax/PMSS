@@ -138,6 +138,16 @@ final class OpenClawInstallerTest extends TestCase
         $this->assertSame($first, file_get_contents($paths['env']));
     }
 
+    public function testGatewayEnvKeepsRuntimeNpmCacheUnderStateDir(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-openclaw-env-');
+        $paths = array('env' => $root.'/gateway.env', 'node' => $root.'/node/bin/node', 'state' => $root);
+        \ocEnsureToken($paths);
+        $env = \ocGatewayEnv($paths);
+        $this->assertSame($root.'/npm-cache', $env['npm_config_cache']);
+        $this->assertSame($root.'/node/bin', explode(':', $env['PATH'])[0]);
+    }
+
     public function testPortCatalogAdoptsGatewayPortAndRejectsInvalidContent(): void
     {
         $root = $this->pmssMakeTempDir('pmss-openclaw-catalog-');
