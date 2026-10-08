@@ -64,21 +64,22 @@ class DelugeCoreTemplateTest extends TestCase
 
     public function testUserConfigureDelugeSkipsWritesWhenRequiredTemplateMissing(): void
     {
-        $user = ['name' => 'alice', 'memory' => 4];
+        $username = posix_getpwuid(posix_geteuid())['name'];
+        $user = ['name' => $username, 'memory' => 4];
         $this->pmssAssignTempDirProperty('homeRoot', 'pmss-deluge-home-root-');
         $this->pmssAssignTempDirProperty('configRoot', 'pmss-deluge-config-root-');
         putenv('PMSS_HOME_DIR='.$this->homeRoot);
         putenv('PMSS_SEEDBOX_CONFIG_DIR='.$this->configRoot);
         putenv('PMSS_DRY_RUN=1');
 
-        $configDir = $this->homeRoot.'/alice/.config/deluge';
+        $configDir = $this->homeRoot.'/'.$username.'/.config/deluge';
         @mkdir($configDir, 0755, true);
-        @mkdir($this->homeRoot.'/alice/dataUnfinished', 0755, true);
-        @mkdir($this->homeRoot.'/alice/.sessionDeluge', 0755, true);
+        @mkdir($this->homeRoot.'/'.$username.'/dataUnfinished', 0755, true);
+        @mkdir($this->homeRoot.'/'.$username.'/.sessionDeluge', 0755, true);
         file_put_contents($configDir.'/core.conf', 'original core');
         file_put_contents($configDir.'/hostlist.conf', 'original hostlist');
         file_put_contents($configDir.'/web.conf', 'original web');
-        file_put_contents($this->homeRoot.'/alice/.delugePort', '6111');
+        file_put_contents($this->homeRoot.'/'.$username.'/.delugePort', '6111');
 
         file_put_contents($this->configRoot.'/template.deluge.core.conf', '"daemon_port": ##DAEMONPORT');
         file_put_contents($this->configRoot.'/template.deluge.core.nocache.conf', '"daemon_port": ##DAEMONPORT');
@@ -89,12 +90,13 @@ class DelugeCoreTemplateTest extends TestCase
         $this->assertSame('original core', (string) file_get_contents($configDir.'/core.conf'));
         $this->assertSame('original hostlist', (string) file_get_contents($configDir.'/hostlist.conf'));
         $this->assertSame('original web', (string) file_get_contents($configDir.'/web.conf'));
-        $this->assertSame('6111', trim((string) file_get_contents($this->homeRoot.'/alice/.delugePort')));
+        $this->assertSame('6111', trim((string) file_get_contents($this->homeRoot.'/'.$username.'/.delugePort')));
     }
 
     public function testUserConfigureDelugeUsesConfiguredTemplateRootForWrites(): void
     {
-        $user = ['name' => 'alice', 'memory' => 4];
+        $username = posix_getpwuid(posix_geteuid())['name'];
+        $user = ['name' => $username, 'memory' => 4];
         $this->pmssAssignTempDirProperty('homeRoot', 'pmss-deluge-home-root-');
         $this->pmssAssignTempDirProperty('configRoot', 'pmss-deluge-config-root-');
         putenv('PMSS_HOME_DIR='.$this->homeRoot);
@@ -102,11 +104,12 @@ class DelugeCoreTemplateTest extends TestCase
         putenv('PMSS_DELUGE_AUTH_TEMPLATE_PATH='.$this->configRoot.'/template.deluge.auth');
         putenv('PMSS_DRY_RUN=1');
 
-        $configDir = $this->homeRoot.'/alice/.config/deluge';
+        $configDir = $this->homeRoot.'/'.$username.'/.config/deluge';
         @mkdir($configDir, 0755, true);
-        @mkdir($this->homeRoot.'/alice/dataUnfinished', 0755, true);
-        @mkdir($this->homeRoot.'/alice/.sessionDeluge', 0755, true);
+        @mkdir($this->homeRoot.'/'.$username.'/dataUnfinished', 0755, true);
+        @mkdir($this->homeRoot.'/'.$username.'/.sessionDeluge', 0755, true);
         file_put_contents($configDir.'/auth', "localclient:seed:10\n");
+        file_put_contents($this->homeRoot.'/'.$username.'/.delugeWebPort', '6201');
         file_put_contents($this->configRoot.'/template.deluge.core.conf', '"daemon_port": ##DAEMONPORT, "max_upload_speed": ##UPLOAD_THROTTLE##');
         file_put_contents($this->configRoot.'/template.deluge.core.nocache.conf', '"daemon_port": ##DAEMONPORT, "max_upload_speed": ##UPLOAD_THROTTLE##');
         file_put_contents($this->configRoot.'/template.deluge.hostlist.conf', 'daemon=##DAEMONPORT');
@@ -117,7 +120,7 @@ class DelugeCoreTemplateTest extends TestCase
 
         $this->assertStringContainsString('"daemon_port": 6200', (string) file_get_contents($configDir.'/core.conf'));
         $this->assertSame('daemon=6200', (string) file_get_contents($configDir.'/hostlist.conf'));
-        $this->assertSame('user=alice port=6201', (string) file_get_contents($configDir.'/web.conf'));
-        $this->assertSame('6200', trim((string) file_get_contents($this->homeRoot.'/alice/.delugePort')));
+        $this->assertSame('user='.$username.' port=6201', (string) file_get_contents($configDir.'/web.conf'));
+        $this->assertSame('6200', trim((string) file_get_contents($this->homeRoot.'/'.$username.'/.delugePort')));
     }
 }

@@ -56,12 +56,17 @@ function pmssDelugeAuthLocalclientPasswordRead(string $authPath): string
 /**
  * Write or replace the localclient password in a Deluge auth file.
  */
-function pmssDelugeAuthWriteLocalclientPassword(string $authPath, string $password): bool
+function pmssDelugeAuthWriteLocalclientPassword(string $authPath, string $password, ?string $owner = null): bool
 {
     if ($password === '' || strpos($password, ':') !== false || preg_match('/[\r\n]/', $password) === 1) {
         return false;
     }
     if (!pmssUserFilePathIsSafe($authPath)) {
+        return false;
+    }
+    $existing = @lstat($authPath);
+    if ($owner !== null && is_array($existing)
+        && (($existing['mode'] & 0170000) !== 0100000 || $existing['nlink'] !== 1)) {
         return false;
     }
 
@@ -83,7 +88,10 @@ function pmssDelugeAuthWriteLocalclientPassword(string $authPath, string $passwo
         $lines[] = 'localclient:'.$password.':10';
     }
 
-    if (!pmssAtomicWriteFile($authPath, implode("\n", $lines)."\n", 0600)) {
+    $content = implode("\n", $lines)."\n";
+    if (!($owner !== null
+        ? pmssWriteUserFile($authPath, $content, $owner, 0600)
+        : pmssAtomicWriteFile($authPath, $content, 0600))) {
         return false;
     }
 
@@ -160,7 +168,7 @@ function pmssDelugeServicePasswordApply(string $username, string $password): boo
         return false;
     }
 
-    if (pmssDelugeAuthWriteLocalclientPassword($authPath, $password)) {
+    if (pmssDelugeAuthWriteLocalclientPassword($authPath, $password, $username)) {
         return true;
     }
 
