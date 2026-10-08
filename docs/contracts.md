@@ -913,9 +913,9 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Port allocation: consumes root-provisioned `~/.media-stack-port-APP` markers for SABnzbd, Radarr, Prowlarr, Sonarr, Autobrr, and Jellyfin. A legacy configured port is preserved only when no marker exists; a fresh install without a valid marker fails closed and requests a full PMSS update.
   - App control: `--start-app=APP` launches only one installed, absent tmux session; `--stop-app=APP` kills only that session. The closed app list includes Jellyfin, Sonarr, Radarr, Prowlarr, SABnzbd, Autobrr, and Cloudplow. `--start-stopped` skips `~/.<app>Disable` markers.
 
-- etc/skel/install-openclaw.php
+- etc/skel/bin/install-openclaw
   - Port allocation: consumes the root-provisioned `~/.media-stack-port-openclaw` marker, writes `~/.openclaw/gateway.port`, and refuses install or start without a valid marker. OpenClaw has no lighttpd proxy.
-  - Lifecycle: installs only two marked jobs in the account's own crontab; check stops retrying after five consecutive failed starts until manual start.
+  - Lifecycle: install or successful manual start writes two marked jobs using `$HOME/bin/install-openclaw` in the account's own crontab; check stops retrying after five consecutive failed starts until manual start.
   - Authentication: a private gateway environment file supplies a token, and the gateway binds loopback only.
 
 - scripts/util/systemTest.php

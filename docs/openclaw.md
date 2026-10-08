@@ -7,8 +7,8 @@ exercise that access. Give chat access only to your own identity.
 After a full PMSS update has reserved your port, run:
 
 ```sh
-php ~/install-openclaw.php install
-php ~/install-openclaw.php status
+install-openclaw install
+install-openclaw status
 ```
 
 The installer asks for confirmation (`--yes` skips the prompt). It installs
@@ -28,7 +28,7 @@ ssh -L <localport>:127.0.0.1:<port> user@host
 ```
 
 Visit `http://127.0.0.1:<localport>/` locally. The token is displayed only
-by `php ~/install-openclaw.php status --show-token`; keep it private.
+by `install-openclaw status --show-token`; keep it private.
 Tailscale Serve is an optional way to reach the same loopback service if you
 already use Tailscale. Do not make the gateway public or switch its bind away
 from loopback.
@@ -46,12 +46,12 @@ channels, binds loopback, and stores a reference to
 Useful commands:
 
 ```sh
-php ~/install-openclaw.php start
-php ~/install-openclaw.php stop
-php ~/install-openclaw.php check
-php ~/install-openclaw.php status
-php ~/install-openclaw.php uninstall
-php ~/install-openclaw.php uninstall --purge
+install-openclaw start
+install-openclaw stop
+install-openclaw check
+install-openclaw status
+install-openclaw uninstall
+install-openclaw uninstall --purge
 ```
 
 The cron check stops trying after five consecutive failed starts. `start`

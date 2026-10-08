@@ -27,11 +27,11 @@ effective authority as shell access to the account.
 
 ## Decision
 
-`etc/skel/install-openclaw.php` is a separate customer-run PHP installer. PHP
+`etc/skel/bin/install-openclaw` is a separate customer-run PHP installer. PHP
 fits the multi-step checksum, npm, configuration, credential, and cron work
 under the repository language policy. It is self-contained and has no
 operator-tree includes (ADR 0016). The updater distributes it with the other
-home installers. It never alters the media-stack or AI-tools installers.
+per-account commands. It never alters the media-stack or AI-tools installers.
 
 The existing media-stack port catalog reserves an OpenClaw port for every
 account during lighttpd apply, without creating a proxy. The marker is
@@ -72,3 +72,11 @@ channel. A full PMSS update must publish the port marker before installation.
 The local dry run is PHP lint and hermetic development tests; a live host still
 needs an account-owned install, gateway health check, cron reboot check, and
 SSH tunnel check after deployment.
+
+## Placement (2026-10-08)
+
+New per-account installers ship in `~/bin`, which is on PATH. The existing
+`install-media-stack.sh` and `install-ai-tools.sh` stay in the home root for
+now because the web panel, restart path, and customer-facing documentation
+invoke them there. The old `~/install-openclaw.php` is removed on refresh
+unless the account's crontab still runs it.

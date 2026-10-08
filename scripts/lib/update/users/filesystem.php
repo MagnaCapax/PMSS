@@ -77,6 +77,17 @@ function pmssUserDeletePathIfPresent(string $path): void
     }
 }
 
+/** Keep the old installer while a user crontab still executes it. */
+function pmssUserRemoveLegacyOpenClawInstaller(string $user, string $home, string $spoolDir = '/var/spool/cron/crontabs'): void
+{
+    $crontab = @file_get_contents($spoolDir.'/'.$user);
+    if (is_string($crontab) && strpos($crontab, 'install-openclaw.php') !== false) {
+        return;
+    }
+
+    pmssUserDeletePathIfPresent($home.'/install-openclaw.php');
+}
+
 /**
  * Restore the skeleton's data/watch links without replacing user content.
  */
@@ -194,9 +205,9 @@ PHP;
         '.bashrc',
         'install-media-stack.sh',
         'install-ai-tools.sh',
-        'install-openclaw.php',
         'bin/docker-install-lsio',
         'bin/docker-install-wireguard.sh',
+        'bin/install-openclaw',
         'bin/linuxserverInstall.sh',
         'bin/support',
         'bin/createWebPublicCerts',
@@ -242,6 +253,8 @@ PHP;
     foreach ($files as $file) {
         updateUserFile($file, $user);
     }
+
+    pmssUserRemoveLegacyOpenClawInstaller($user, $home);
 
     pmssUserDeletePathIfPresent($home.'/www/phpXplorer');
 

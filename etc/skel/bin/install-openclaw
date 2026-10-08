@@ -75,8 +75,8 @@ function ocCronMerge(string $current, string $home, bool $install): string
     if ($kept !== '' && substr($kept, -1) !== "\n") {
         $kept .= "\n";
     }
-    return $kept."@reboot php \$HOME/install-openclaw.php check ".OC_CRON_TAG."\n"
-        ."* * * * * php \$HOME/install-openclaw.php check ".OC_CRON_TAG."\n";
+    return $kept."@reboot php \$HOME/bin/install-openclaw check ".OC_CRON_TAG."\n"
+        ."* * * * * php \$HOME/bin/install-openclaw check ".OC_CRON_TAG."\n";
 }
 
 /** Install a crontab from a private temporary file, leaving other jobs alone. */
@@ -335,7 +335,7 @@ function ocMain(array $args): int
 {
     $command = $args[1] ?? '';
     if (!in_array($command, array('install', 'start', 'stop', 'status', 'check', 'uninstall'), true)) {
-        echo "Usage: php ~/install-openclaw.php install [--yes] | start | stop | status [--show-token] | check | uninstall [--purge]\n";
+        echo "Usage: install-openclaw install [--yes] | start | stop | status [--show-token] | check | uninstall [--purge]\n";
         return $command === '' ? 0 : 1;
     }
     if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
@@ -434,6 +434,7 @@ function ocMain(array $args): int
         if (!ocStart($paths, true)) {
             throw new RuntimeException('Gateway did not stay running');
         }
+        ocCronApply($paths, true);
         echo "Gateway running.\n";
         return 0;
     }

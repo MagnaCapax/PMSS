@@ -2,14 +2,14 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 4).'/etc/skel/install-openclaw.php';
+require_once dirname(__DIR__, 4).'/etc/skel/bin/install-openclaw';
 require_once dirname(__DIR__, 2).'/mediaStackPorts.php';
 
 final class OpenClawInstallerTest extends TestCase
 {
     public function testCronMergePreservesForeignBytesAndIsIdempotent(): void
     {
-        $foreign = 'MAILTO=me'.'@'."example.test\r\n# personal\n* * * * * echo keep\n";
+        $foreign = "SHELL=/bin/sh\r\n# personal\n* * * * * echo keep\n";
         $merged = \ocCronMerge($foreign, '/tmp/oc-account', true);
         $this->assertSame($foreign, substr($merged, 0, strlen($foreign)));
         $this->assertSame($merged, \ocCronMerge($merged, '/tmp/oc-account', true));
@@ -20,8 +20,16 @@ final class OpenClawInstallerTest extends TestCase
     public function testCronMergeRemovesOnlyMarkedLines(): void
     {
         $foreign = "# pmss-openclaw is a note, not a trailing marker\n@daily echo keep # other\n";
-        $managed = "@reboot php \$HOME/install-openclaw.php check # pmss-openclaw\n";
+        $managed = "@reboot php \$HOME/bin/install-openclaw check # pmss-openclaw\n";
         $this->assertSame($foreign, \ocCronMerge($foreign.$managed, '/tmp/oc-account', false));
+    }
+
+    public function testCronMergeMigratesLegacyMarkedLine(): void
+    {
+        $legacy = "@reboot php \$HOME/install-openclaw.php check # pmss-openclaw\n";
+        $expected = "@reboot php \$HOME/bin/install-openclaw check # pmss-openclaw\n"
+            ."* * * * * php \$HOME/bin/install-openclaw check # pmss-openclaw\n";
+        $this->assertSame($expected, \ocCronMerge($legacy, '/tmp/oc-account', true));
     }
 
     public function testReservedPortRequiresRegularFirstLineInRange(): void
