@@ -109,6 +109,25 @@ final class AccountPathOperationStaticTest extends TestCase
             'Imported source ownership must be normalised before account rename');
     }
 
+    public function testWebRootDirectoryMovesRunUnderAccount(): void
+    {
+        $migration = $this->pmssReadRepoFile('scripts/lib/update/users/webRoot.php');
+        $reconcile = $this->pmssReadRepoFile('scripts/lib/update/users/webRootReconcile.php');
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/webRoot.php', [
+            'pmssPathTargetIsSafe($source, true, true)',
+            'pmssPathTargetIsSafe($target, true, true)',
+            'pmssAccountPathRun($user, $home, [$source, $target], $command)',
+            'pmssUserWebRootMigrationRenameAsAccount($user, $home, $temporary, $target)',
+            'pmssUserWebRootMigrationRenameAsAccount($user, $home, $source, $target)',
+            'pmssUserWebRootMigrationRenameAsAccount($user, $home, $target, $source)',
+            "pmssAccountPathRun(\$user, \$home, [\$source],",
+        ]);
+        $this->assertFalse(strpos($migration, '@rename(') !== false);
+        $this->assertFalse(strpos($reconcile, '@rename($stage, $www)') !== false);
+        $this->assertTrue(strpos($reconcile, 'pmssUserWebRootMigrationRenameAsAccount($user, $home, $stage, $www)') !== false);
+        $this->assertTrue(strpos($reconcile, 'pmssAccountPathRun($user, $home, [$target]') !== false);
+    }
+
     public function testTerminationPurgeUsesPinnedSymlinkRefusingTree(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/terminationCleanup.php', [

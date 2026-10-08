@@ -178,6 +178,21 @@ class UserWebRootReconcileTest extends TestCase
         $this->assertFalse(file_exists($this->home.'/www/linked/secret.txt'));
         $this->assertTrue($this->pmssMessagesContain($messages, 'Refusing unsafe skeleton symlink: linked'));
     }
+
+    public function testPartialMergeRefusesLinkedTenantDirectoryWithoutChangingOutside(): void
+    {
+        $outside = $this->pmssMakeTempDir('pmss-web-reconcile-tenant-outside-');
+        $this->pmssWriteFile($outside.'/keep.txt', 'outside-content');
+        $this->pmssWriteFile($this->home.'/www/index.php', 'customer-panel');
+        $this->pmssCreateSymlinkOrSkip($outside, $this->home.'/www/rutorrent');
+
+        $messages = [];
+        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+        $this->assertSame('customer-panel', file_get_contents($this->home.'/www/index.php'));
+        $this->assertSame('outside-content', file_get_contents($outside.'/keep.txt'));
+        $this->assertFalse(file_exists($outside.'/index.html'));
+        $this->assertTrue(is_link($this->home.'/www/rutorrent'));
+    }
     public function testUnreadableSkeletonDirectoryRefusesRestoreAndMerge(): void
     {
         $blocked = $this->skeleton.'/blocked';

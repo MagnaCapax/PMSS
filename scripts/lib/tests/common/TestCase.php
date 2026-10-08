@@ -445,10 +445,10 @@ abstract class TestCase
         return ['user' => $user, 'home' => $this->pmssUserHomePath($homeRoot, $user)];
     }
 
-    /** Use a real account for ownership fixtures when the test runner is root. */
+    /** Use the executing account for operations that deliberately drop privilege. */
     protected function pmssFixtureUserForCurrentUid(string $user): string
     {
-        return function_exists('posix_geteuid') && @posix_geteuid() === 0 ? 'root' : $user;
+        return $this->pmssCurrentOwner() ?: $user;
     }
 
     /** Build the updater user-context shape shared by user maintenance handlers. */
