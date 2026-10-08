@@ -928,11 +928,6 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Lifecycle: install or successful manual start writes two marked jobs using `$HOME/bin/install-openclaw` in the account's own crontab; check stops retrying after five consecutive failed starts until manual start.
   - Authentication: a private gateway environment file supplies a token, and the gateway binds loopback only.
 
-- etc/skel/bin/install-pikkumies.sh
-  - Scope: opt-in command run by the account owner; no root, port, service, or PMSS-managed cron.
-  - Lifecycle: writes only `~/.mcxPikkumies` (git checkout with fast-forward updates), `~/pikkumies` (symlink), and `~/.pikkumiesKey` when absent (Pulsed Media endpoint in `endpoint=`, empty `key=`). Through `pikkumies install`, it adds one daily `pikkumies update` crontab line tagged `# pikkumies-update` and preserves every other line.
-  - Local settings: PMSS does not edit files inside `~/.mcxPikkumies` because the Pikkumies updater stops on edited tracked files; use `~/.pikkumiesKey` or `~/pikkumies/local/`.
-
 - scripts/util/systemTest.php
   - Behavior: Read-only probe of system readiness (binary versions, config presence);
     intended post-provision.

@@ -5,7 +5,7 @@ Category: architecture
 
 ## Status
 
-Accepted
+Accepted, on hold (2026-10-08): not shipped to accounts until the LLM proxy per-user keys and accounting are ready. The installer from 88edd1a7 was taken out of `etc/skel` and the update file list; restoring it is a revert of the hold commit.
 
 ## Context
 

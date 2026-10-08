@@ -208,7 +208,6 @@ PHP;
         'bin/docker-install-lsio',
         'bin/docker-install-wireguard.sh',
         'bin/install-openclaw',
-        'bin/install-pikkumies.sh',
         'bin/linuxserverInstall.sh',
         'bin/support',
         'bin/createWebPublicCerts',
