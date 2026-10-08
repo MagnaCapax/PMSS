@@ -48,9 +48,7 @@ PHP
         $script = $this->buildUserEnvironmentScript(
             'web-root-before-context',
             <<<'PHP'
-// Reconciliation moves its stage under the real account identity.
-$account = function_exists('posix_getpwuid') ? posix_getpwuid(posix_geteuid()) : false;
-$user = is_array($account) ? $account['name'] : 'alice';
+$user = 'alice';
 $home = $base.'/home/'.$user;
 $skel = $base.'/skel/www';
 $locks = $base.'/locks';

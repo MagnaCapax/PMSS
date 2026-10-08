@@ -116,16 +116,16 @@ final class AccountPathOperationStaticTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/webRoot.php', [
             'pmssPathTargetIsSafe($source, true, true)',
             'pmssPathTargetIsSafe($target, true, true)',
-            'pmssAccountPathRun($user, $home, [$source, $target], $command)',
+            'pmssAccountPathRun($user, $home, $paths, $command)',
             'pmssUserWebRootMigrationRenameAsAccount($user, $home, $temporary, $target)',
             'pmssUserWebRootMigrationRenameAsAccount($user, $home, $source, $target)',
             'pmssUserWebRootMigrationRenameAsAccount($user, $home, $target, $source)',
-            "pmssAccountPathRun(\$user, \$home, [\$source],",
+            "pmssUserWebRootMigrationRun(\$user, \$home, [\$source],",
         ]);
-        $this->assertFalse(strpos($migration, '@rename(') !== false);
+        $this->assertTrue(strpos($migration, '&& @rename($source, $target)') !== false);
         $this->assertFalse(strpos($reconcile, '@rename($stage, $www)') !== false);
         $this->assertTrue(strpos($reconcile, 'pmssUserWebRootMigrationRenameAsAccount($user, $home, $stage, $www)') !== false);
-        $this->assertTrue(strpos($reconcile, 'pmssAccountPathRun($user, $home, [$target]') !== false);
+        $this->assertTrue(strpos($reconcile, 'pmssUserWebRootMigrationRun($user, $home, [$target]') !== false);
     }
 
     public function testTerminationPurgeUsesPinnedSymlinkRefusingTree(): void
