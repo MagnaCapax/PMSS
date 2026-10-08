@@ -1005,6 +1005,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 ## Customer Apps Controls – `etc/skel/www/apps.php`
 
 - `?status=1` reads live tmux sessions once, native processes, opt-in/opt-out markers, and media-stack auth state. `?log=APP` reads only the selected media app's own log, capped at 16 KiB, twenty lines, and 300 characters per line with HTML escaping.
+- The page header owns `Restart all my services`. While the existing media-stack launcher pid is live, its `poll` status takes precedence over partial install markers: the Media Stack group shows one progress row and no app controls. The Apps status poll runs every five seconds until the installer exits, then renders app rows or the existing failure message and Install action.
 - All state-changing customer endpoints require POST with `X-Requested-With: XMLHttpRequest`. A GET action returns HTTP 405. qBittorrent retains the HTTP 428 password-sync challenge.
 - Media app stop writes `~/.<app>Disable`; start removes it; restart preserves it. The observe-only watchdog publishes `off` with zero failures for marked apps, and bulk recovery skips them. Native frontend stops signal only account-owned processes in the panel's mount namespace whose executable resolves to the app's native binary allowlist; Deluge's Python entry points also require an exact interpreter and script match.
 

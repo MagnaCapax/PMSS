@@ -143,6 +143,26 @@ function pmssAppsLiveRowBuild(string $id, array $app): string
     return $html.'</div><span class="row-progress" aria-live="polite"></span><div class="row-error" role="alert"></div><pre class="row-log" hidden></pre></div>';
 }
 
+/** The installer status takes precedence over partial app install markers. */
+function pmssAppsMediaRowsBuild(array $status): string
+{
+    if ($status['poll']) {
+        return pmssAppsRowStart('Installing the media stack…', $status['message']).'</div>';
+    }
+    if (!$status['installed']) {
+        $names = implode(', ', array_merge(array_column(pmssMediaStackPanelAppDefinitionsRead(), 'label'), array('Cloudplow')));
+        return pmssAppsRowStart('Media Stack is not installed', $names)
+            .'<div class="desc" id="pmss-install-progress">'.pmssAppsEscape($status['message']).'</div></div>'
+            .'<div class="acts"><button type="button" class="b b-pri" onclick="pmssAppsInstall(this)"'
+            .($status['canStart'] ? '' : ' disabled').'>Install Media Stack</button></div></div>';
+    }
+    $html = '';
+    foreach (pmssAppsMediaIdsRead() as $id) {
+        if (isset($status['apps'][$id])) $html .= pmssAppsLiveRowBuild($id, $status['apps'][$id]);
+    }
+    return $html;
+}
+
 require_once __DIR__.'/appsRuntime.php';
 if (!function_exists('pmssAppsRuntimeReady') || !pmssAppsRuntimeReady()) {
     http_response_code(200);
@@ -167,8 +187,12 @@ if (isset($_GET['status'])) {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
     $rows = array();
-    foreach ($status['apps'] as $id => $app) $rows[$id] = pmssAppsLiveRowBuild($id, $app);
+    foreach ($status['apps'] as $id => $app) {
+        if ($status['poll'] && $app['kind'] === 'media') continue;
+        $rows[$id] = pmssAppsLiveRowBuild($id, $app);
+    }
     $status['rows'] = $rows;
+    $status['mediaHtml'] = pmssAppsMediaRowsBuild($status);
     echo json_encode($status);
     return;
 }
@@ -179,7 +203,7 @@ $urls = pmssAppsAllowedUrlsRead();
 <link href="screen.css" rel="stylesheet" media="screen">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script><script><?= pmssActionScriptJs() ?></script>
 <style>
-.apps{font-size:14px;line-height:1.45;max-width:980px;margin:0 auto}.apps h1{font-size:1.5rem;margin:4px 0 14px}.apps h2{font-size:1.05rem;color:#fff;margin:24px 0 8px}
+.apps{font-size:14px;line-height:1.45;max-width:980px;margin:0 auto}.apps h1{font-size:1.5rem;margin:4px 0 14px}.apps h2{font-size:1.05rem;color:#fff;margin:24px 0 8px}.apps-header{display:flex;align-items:center;justify-content:space-between;gap:12px}.apps-header h1{margin-bottom:14px}
 .group{color:#9fb0c3;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 4px}.list{border:1px solid #2e3b4f;border-radius:8px;overflow:hidden}
 .row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid #223042;background:#0f1b2b;flex-wrap:wrap}.row:first-child{border-top:0}.row .main{flex:1;min-width:0}.row .name{font-weight:bold;color:#fff}.row .desc{color:#9fb0c3;font-size:13px}
 .pill{font-size:12px;padding:2px 9px;border-radius:999px;white-space:nowrap}.p-run{background:#12351f;color:#8fd18f}.p-stop{background:#3a1d1d;color:#f19999}.p-off{background:#1f2937;color:#9fb0c3}.p-warn{background:#3a2e12;color:#f0b429}
@@ -187,14 +211,14 @@ $urls = pmssAppsAllowedUrlsRead();
 .search{width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:1px solid #2e3b4f;background:#0b1220;color:#e6edf3;font-size:14px;margin:4px 0 10px}.note{color:#9fb0c3;font-size:13px;margin:0 0 8px}.mrow{display:flex;gap:12px;align-items:baseline;padding:7px 14px;border-top:1px solid #223042;background:#0f1b2b}.mrow:first-child{border-top:0}.mrow .name{font-weight:bold;color:#fff;min-width:170px}.mrow .desc{flex:1;color:#9fb0c3;font-size:13px}.mrow .tag{font-size:11px;color:#f0b429;margin-left:6px}.mrow a{white-space:nowrap;font-size:13px}
 .row-progress{color:#9fb0c3}.row-error{color:#f19999;width:100%}.row-log{width:100%;max-height:240px;overflow:auto;white-space:pre-wrap;background:#0b1220;color:#e6edf3;padding:8px}.section-actions{display:flex;gap:8px;margin:8px 0 12px}.apps details summary{cursor:pointer;color:#fff;font-weight:bold;margin:24px 0 10px}
 #pmss-action-notice{display:none;position:fixed;top:10px;right:10px;z-index:9999;max-width:580px;padding:8px 12px;border:1px solid #2e3b4f;background:#13293d;color:#e6edf3;font-weight:bold}#pmss-action-notice.pmss-error{border-color:#f19999;background:#3a1d1d;color:#f19999}
-@media(max-width:640px){.acts{width:100%;justify-content:flex-start}.mrow{flex-wrap:wrap}.mrow .name{min-width:0}}
+@media(max-width:640px){.apps-header{align-items:flex-start;flex-direction:column}.acts{width:100%;justify-content:flex-start}.mrow{flex-wrap:wrap}.mrow .name{min-width:0}}
 </style></head><body><div id="pmss-action-notice" role="status" aria-live="polite"></div>
 <div id="wrap"><div id="full_page"><div class="full_top_nohd"></div><div class="full_body"><div class="apps">
-<h1>Apps</h1><h2>Your apps</h2>
+<div class="apps-header"><h1>Apps</h1><button type="button" class="b" onclick="pmssAppsRestartAll(this)">Restart all my services</button></div><h2>Your apps</h2>
 <div class="group">Media Stack</div><div class="section-actions">
-<?php if ($status['installed']): ?><button type="button" class="b" id="pmss-start-all" data-bulk-action="start-stopped">Start all stopped</button><?php endif; ?>
-<button type="button" class="b" onclick="pmssAppsRestartAll(this)">Restart all my services</button></div><div class="list" id="pmss-media-apps">
-<?php if (!$status['installed']): ?><div class="row"><div class="main"><div class="name">Media Stack is not installed</div><div class="desc"><?= pmssAppsEscape(implode(', ', array_merge(array_column(pmssMediaStackPanelAppDefinitionsRead(), 'label'), array('Cloudplow')))) ?></div><div class="desc" id="pmss-install-progress"><?= pmssAppsEscape($status['message']) ?></div></div><div class="acts"><button type="button" class="b b-pri" onclick="pmssAppsInstall(this)"<?= $status['canStart'] ? '' : ' disabled' ?>>Install Media Stack</button></div></div><?php else: foreach (pmssAppsMediaIdsRead() as $id): if (isset($status['apps'][$id])) echo pmssAppsLiveRowBuild($id, $status['apps'][$id]); endforeach; endif; ?>
+<?php if ($status['installed'] && !$status['poll']): ?><button type="button" class="b" id="pmss-start-all" data-bulk-action="start-stopped">Start all stopped</button><?php endif; ?>
+</div><div class="list" id="pmss-media-apps" data-installing="<?= $status['poll'] ? '1' : '0' ?>">
+<?= pmssAppsMediaRowsBuild($status) ?>
 </div><div class="group">Torrent clients</div><div class="list" id="pmss-torrent-apps">
 <?php foreach (array('rtorrent','qBittorrent','Deluge') as $id): if (isset($status['apps'][$id])) echo pmssAppsLiveRowBuild($id, $status['apps'][$id]); endforeach; ?>
 </div><div class="group">Transfers</div><div class="list" id="pmss-transfer-apps"><?php if (isset($status['apps']['rclone'])) echo pmssAppsLiveRowBuild('rclone', $status['apps']['rclone']); ?></div>
@@ -204,8 +228,15 @@ $urls = pmssAppsAllowedUrlsRead();
 </div></div><div class="full_bottom"></div></div></div>
 <script>
 var pmssAppsBusy = {};
+var pmssAppsRefreshTimer;
 function pmssAppsRefresh(callback) {
+    window.clearTimeout(pmssAppsRefreshTimer);
     $.getJSON('apps.php?status=1', function(payload) {
+        var media = $('#pmss-media-apps'), wasInstalling = media.attr('data-installing') === '1';
+        if (payload.poll || wasInstalling || !payload.installed) media.html(payload.mediaHtml);
+        media.attr('data-installing', payload.poll ? '1' : '0');
+        if (payload.poll || !payload.installed) $('#pmss-start-all').remove();
+        else if (!$('#pmss-start-all').length) $('.section-actions').html('<button type="button" class="b" id="pmss-start-all" data-bulk-action="start-stopped">Start all stopped</button>');
         $.each(payload.rows || {}, function(id, html) {
             if (pmssAppsBusy[id]) return;
             var oldRow = $('[data-app="' + id + '"]');
@@ -217,7 +248,8 @@ function pmssAppsRefresh(callback) {
             }
         });
         if (callback) callback(payload);
-    });
+        pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, payload.poll ? 5000 : 10000);
+    }).fail(function() { pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, 10000); });
 }
 function pmssAppsWait(id, desired, deadline) {
     window.setTimeout(function() {
@@ -255,23 +287,7 @@ function pmssAppsAct(button, id, action) {
 $(document).on('click', '.row[data-app] button[data-action]', function() { pmssAppsAct(this, $(this).closest('.row').attr('data-app'), $(this).attr('data-action')); });
 $(document).on('click', '#pmss-start-all[data-bulk-action]', function() { pmssAppsBulk(this, $(this).attr('data-bulk-action')); });
 function pmssAppsBulk(button, action) { pmssMediaStackAction(button, action, 'Starting stopped apps…', 'Could not start stopped apps.'); }
-function pmssAppsInstall(button) { pmssMediaStackStart(button); pmssAppsInstallPoll(0); }
-function pmssAppsInstallPoll(elapsed) {
-    if (elapsed >= 3600000) return;
-    window.setTimeout(function() {
-        $.getJSON('mediaStack.php?action=status', function(payload) {
-            $('#pmss-install-progress').text(payload.message || 'Installing Media Stack…');
-            if (payload.state === 'failed') return;
-            $.getJSON('apps.php?status=1', function(status) {
-                if (!status.installed || payload.poll) { pmssAppsInstallPoll(elapsed + 4000); return; }
-                var ids = ['jellyfin','sonarr','radarr','prowlarr','sabnzbd','autobrr','cloudplow'], html = '';
-                $.each(ids, function(_, id) { if (status.rows[id]) html += status.rows[id]; });
-                $('#pmss-media-apps').html(html);
-                if (!$('#pmss-start-all').length) $('.section-actions').prepend('<button type="button" class="b" id="pmss-start-all" data-bulk-action="start-stopped">Start all stopped</button>');
-            });
-        });
-    }, 4000);
-}
+function pmssAppsInstall(button) { pmssMediaStackStart(button); }
 function pmssAppsRestartAll(button) {
     $(button).prop('disabled', true);
     $.getJSON('apps.php?status=1', function(status) {
@@ -295,6 +311,6 @@ function pmssAppsRestartAll(button) {
     }).fail(function() { $(button).prop('disabled', false); pmssShowActionNotice('Could not read current app status.', true); });
 }
 window.pmssAppsActionComplete = function() { pmssAppsRefresh(); };
-window.setInterval(pmssAppsRefresh, 10000);
+pmssAppsRefreshTimer = window.setTimeout(pmssAppsRefresh, <?= $status['poll'] ? '5000' : '10000' ?>);
 $('#pmss-apps-search').on('input', function() { var query = this.value.toLowerCase().trim(); $('#pmss-more-apps .mrow').each(function() { $(this).toggle($(this).text().toLowerCase().indexOf(query) !== -1); }); });
 </script></body></html>

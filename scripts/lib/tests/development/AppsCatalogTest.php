@@ -46,6 +46,51 @@ class AppsCatalogTest extends TestCase
         }
     }
 
+    public function testRestartAllIsInResponsivePageHeader(): void
+    {
+        $html = $this->pmssRenderCustomerPanelPage('apps.php', [], ['minBytes' => 4000]);
+        $this->assertSame(1, substr_count($html, '>Restart all my services</button>'));
+        $header = substr($html, strpos($html, '<div class="apps-header">'), 220);
+        $this->assertStringContainsString('<h1>Apps</h1><button type="button" class="b" onclick="pmssAppsRestartAll(this)">Restart all my services</button>', $header);
+        $this->assertTrue(strpos($html, 'Restart all my services</button>') < strpos($html, '<div class="group">Media Stack</div>'));
+        $this->assertStringContainsString('.apps-header{align-items:flex-start;flex-direction:column}', $html);
+    }
+
+    public function testRunningInstallerHidesPartialMediaAppControls(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            $this->pmssEnsureDir($home.'/.config/jellyfin', 0700);
+            $this->pmssWriteFile($home.'/.install-media-stack-web.pid', (string) getmypid());
+            $html = $render('apps.php', ['minBytes' => 4000])['stdout'];
+            $media = substr($html, strpos($html, 'id="pmss-media-apps"'));
+            $media = substr($media, 0, strpos($media, '<div class="group">Torrent clients</div>'));
+            $this->assertStringContainsString('data-installing="1"', $media);
+            $this->assertSame(1, substr_count($media, 'class="row"'));
+            $this->assertStringContainsString('Installing the media stack…', $media);
+            $this->assertStringContainsString('Media stack install is running.', $media);
+            $this->assertStringNotContainsString('data-app=', $media);
+            $this->assertStringNotContainsString('data-action=', $media);
+            $this->assertStringNotContainsString('id="pmss-start-all"', substr($html, 0, strpos($html, '<div class="group">Torrent clients</div>')));
+            $json = $render('apps.php', ['query' => 'status=1', 'minBytes' => 100])['stdout'];
+            $status = json_decode($json, true);
+            $this->assertTrue($status['poll']);
+            $this->assertStringContainsString('Installing the media stack…', $status['mediaHtml']);
+            $this->assertFalse(isset($status['rows']['jellyfin']));
+            $this->assertStringContainsString('payload.poll ? 5000 : 10000', $html);
+        });
+    }
+
+    public function testFailedInstallRestoresMessageAndInstallButton(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            $this->pmssWriteFile($home.'/.install-media-stack.log', "[ERR ] Download failed\n");
+            $html = $render('apps.php', ['minBytes' => 4000])['stdout'];
+            $this->assertStringContainsString('A previous web install stopped before completion.', $html);
+            $this->assertStringContainsString('>Install Media Stack</button>', $html);
+            $this->assertStringNotContainsString('Installing the media stack…', $html);
+        });
+    }
+
     public function testRenderedHandlersHaveNoEscapedQuotesAndWebServerIsRunning(): void
     {
         $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
