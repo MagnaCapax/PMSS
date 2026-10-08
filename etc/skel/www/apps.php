@@ -192,7 +192,7 @@ $urls = pmssAppsAllowedUrlsRead();
 <div id="wrap"><div id="full_page"><div class="full_top_nohd"></div><div class="full_body"><div class="apps">
 <h1>Apps</h1><h2>Your apps</h2>
 <div class="group">Media Stack</div><div class="section-actions">
-<?php if ($status['installed']): ?><button type="button" class="b" id="pmss-start-all" onclick="pmssAppsBulk(this,'start-stopped')">Start all stopped</button><?php endif; ?>
+<?php if ($status['installed']): ?><button type="button" class="b" id="pmss-start-all" data-bulk-action="start-stopped">Start all stopped</button><?php endif; ?>
 <button type="button" class="b" onclick="pmssAppsRestartAll(this)">Restart all my services</button></div><div class="list" id="pmss-media-apps">
 <?php if (!$status['installed']): ?><div class="row"><div class="main"><div class="name">Media Stack is not installed</div><div class="desc"><?= pmssAppsEscape(implode(', ', array_merge(array_column(pmssMediaStackPanelAppDefinitionsRead(), 'label'), array('Cloudplow')))) ?></div><div class="desc" id="pmss-install-progress"><?= pmssAppsEscape($status['message']) ?></div></div><div class="acts"><button type="button" class="b b-pri" onclick="pmssAppsInstall(this)"<?= $status['canStart'] ? '' : ' disabled' ?>>Install Media Stack</button></div></div><?php else: foreach (pmssAppsMediaIdsRead() as $id): if (isset($status['apps'][$id])) echo pmssAppsLiveRowBuild($id, $status['apps'][$id]); endforeach; endif; ?>
 </div><div class="group">Torrent clients</div><div class="list" id="pmss-torrent-apps">
@@ -253,6 +253,7 @@ function pmssAppsAct(button, id, action) {
     });
 }
 $(document).on('click', '.row[data-app] button[data-action]', function() { pmssAppsAct(this, $(this).closest('.row').attr('data-app'), $(this).attr('data-action')); });
+$(document).on('click', '#pmss-start-all[data-bulk-action]', function() { pmssAppsBulk(this, $(this).attr('data-bulk-action')); });
 function pmssAppsBulk(button, action) { pmssMediaStackAction(button, action, 'Starting stopped apps…', 'Could not start stopped apps.'); }
 function pmssAppsInstall(button) { pmssMediaStackStart(button); pmssAppsInstallPoll(0); }
 function pmssAppsInstallPoll(elapsed) {
@@ -266,7 +267,7 @@ function pmssAppsInstallPoll(elapsed) {
                 var ids = ['jellyfin','sonarr','radarr','prowlarr','sabnzbd','autobrr','cloudplow'], html = '';
                 $.each(ids, function(_, id) { if (status.rows[id]) html += status.rows[id]; });
                 $('#pmss-media-apps').html(html);
-                if (!$('#pmss-start-all').length) $('.section-actions').prepend('<button type="button" class="b" id="pmss-start-all" onclick="pmssAppsBulk(this,\'start-stopped\')">Start all stopped</button>');
+                if (!$('#pmss-start-all').length) $('.section-actions').prepend('<button type="button" class="b" id="pmss-start-all" data-bulk-action="start-stopped">Start all stopped</button>');
             });
         });
     }, 4000);

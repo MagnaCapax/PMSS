@@ -65,7 +65,8 @@ function pmssAppsLiveStatusRead(string $home, string $username, string $hostname
             'url' => $name === 'qBittorrent' ? 'qbittorrent/' : ($name === 'Deluge' ? 'deluge/' : 'rclone/'),
             'endpoint' => $definition['endpoint']);
     }
-    $apps['lighttpd'] = array('kind' => 'web', 'state' => 'unknown');
+    // This page is served by the account's lighttpd, so a successful request proves it is running.
+    $apps['lighttpd'] = array('kind' => 'web', 'state' => 'running');
     return array('apps' => $apps, 'installed' => $installed !== array(),
         'canStart' => !empty($panel['canStart']), 'canRestart' => !empty($panel['canRestart']),
         'poll' => !empty($panel['poll']), 'message' => (string) ($panel['message'] ?? ''));

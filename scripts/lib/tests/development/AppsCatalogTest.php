@@ -46,6 +46,26 @@ class AppsCatalogTest extends TestCase
         }
     }
 
+    public function testRenderedHandlersHaveNoEscapedQuotesAndWebServerIsRunning(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
+            foreach (array(false, true) as $installed) {
+                if ($installed) $this->pmssEnsureDir($home.'/.config/jellyfin', 0700);
+                $html = $render('apps.php', ['minBytes' => 4000])['stdout'];
+                preg_match_all('/\bon[a-z]+\s*=\s*(["\'])(.*?)\1/is', $html, $handlers);
+                $this->assertTrue(count($handlers[2]) > 0);
+                foreach ($handlers[2] as $handler) $this->assertStringNotContainsString("\\'", $handler);
+                $webRow = substr($html, strpos($html, 'data-app="lighttpd"'), 500);
+                $this->assertStringContainsString('<span class="pill p-run">Running</span>', $webRow);
+                $this->assertSame(1, substr_count($webRow, 'data-action="restart"'));
+                if ($installed) $this->assertStringContainsString('id="pmss-start-all" data-bulk-action="start-stopped"', $html);
+            }
+        });
+        $source = $this->pmssReadRepoFile('etc/skel/www/apps.php');
+        $this->assertSame(2, substr_count($source, 'data-bulk-action="start-stopped"'));
+        $this->assertStringContainsString("$(document).on('click', '#pmss-start-all[data-bulk-action]'", $source);
+    }
+
     public function testInstalledStackRendersRuntimeRowsAndSecurityState(): void
     {
         $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
@@ -101,6 +121,8 @@ class AppsCatalogTest extends TestCase
             $status = json_decode($json, true);
             $this->assertTrue(is_array($status));
             $this->assertSame('off', $status['apps']['jellyfin']['state']);
+            $this->assertSame('running', $status['apps']['lighttpd']['state']);
+            $this->assertStringContainsString('<span class="pill p-run">Running</span>', $status['rows']['lighttpd']);
             $this->assertTrue(isset($status['apps']['jellyfin']['security']));
             $this->assertStringContainsString('Stopped by you', $status['rows']['jellyfin']);
             $this->pmssWriteRelativeFile($home, '.config/jellyfin/log/jellyfin.log', str_repeat("<script>\n", 25));
