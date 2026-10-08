@@ -106,6 +106,34 @@ class RecreateUserSafetyGuardTest extends TestCase
         $this->assertSame('override', file_get_contents($backup.'/.config/pmss/override'));
     }
 
+    public function testRestoreCopyRefusesSymlinkedFinalDestination(): void
+    {
+        [$home, $backup, $base] = $this->fixture('copy-final-link');
+        $source = $backup.'/.billingServiceId';
+        $outside = $base.'/outside';
+        $this->pmssWriteFile($source, "123\n");
+        $this->pmssWriteFile($outside, 'keep');
+        $this->assertTrue(symlink($outside, $home.'/.billingServiceId'));
+
+        $this->assertThrowsRuntime(static function () use ($source, $home): void {
+            \pmssRecreateCopyFile($source, $home.'/.billingServiceId');
+        }, 'Unsafe restore file');
+        $this->assertSame('keep', file_get_contents($outside));
+        $this->assertSame("123\n", file_get_contents($source));
+    }
+
+    public function testRestoreCopyPreservesRealFileBytes(): void
+    {
+        [$home, $backup] = $this->fixture('copy-real-file');
+        $source = $backup.'/.billingServiceId';
+        $destination = $home.'/.billingServiceId';
+        $this->pmssWriteFile($source, "123\n");
+
+        $this->assertTrue(\pmssRecreateCopyFile($source, $destination));
+        $this->assertSame("123\n", file_get_contents($destination));
+        $this->assertSame("123\n", file_get_contents($source));
+    }
+
     public function testRepositorySkeletonAllowsRestoreOfExistingData(): void
     {
         [$home, $backup] = $this->fixture('repository-skeleton');

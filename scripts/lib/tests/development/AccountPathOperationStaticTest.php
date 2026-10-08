@@ -67,6 +67,17 @@ final class AccountPathOperationStaticTest extends TestCase
         }
     }
 
+    public function testRecreateCopyRetainsFinalNodeChecks(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/recreateRestore.php', [
+            'clearstatcache(true, $source)',
+            'pmssPathTargetIsSafe($source, false, true)',
+            'clearstatcache(true, $destination)',
+            'pmssPathTargetIsSafe($destination, false, true)',
+            'is_link($destination)',
+        ]);
+    }
+
     /** @return array<int,string> */
     private function scanFile(string $path): array
     {

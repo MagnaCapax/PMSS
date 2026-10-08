@@ -7,6 +7,7 @@
  *
  * @license GPL-3.0-only
  */
+require_once dirname(__DIR__).'/pathSafety.php';
 
 /** Prove each rebuild destination accepts a private exclusive create and write. */
 function pmssRecreateRequireWritableDirectories(array $directories): void
@@ -124,17 +125,25 @@ function pmssRecreateCopyFile(string $source, string $destination, ?int $require
         return false;
     }
     $sourceStat = @lstat($source);
-    if (is_link($source) || pmssRecreateHasLinkedParent($source)
+    clearstatcache(true, $source);
+    if (is_link($source) || !pmssPathTargetIsSafe($source, false, true)
+        || pmssRecreateHasLinkedParent($source)
         || !is_array($sourceStat) || ($sourceStat['mode'] & 0170000) !== 0100000
         || ($requiredUid !== null && $sourceStat['uid'] !== $requiredUid)) {
         return false;
     }
-    if (pmssRecreateHasLinkedParent($destination) || !is_dir(dirname($destination)) || is_link($destination)
+    clearstatcache(true, $destination);
+    if (!pmssPathTargetIsSafe($destination, false, true)
+        || pmssRecreateHasLinkedParent($destination) || !is_dir(dirname($destination)) || is_link($destination)
         || (file_exists($destination) && !is_file($destination))) {
         throw new RuntimeException('Unsafe restore file: '.$destination);
     }
     if (!@copy($source, $destination)) {
         throw new RuntimeException('Unable to copy restore file: '.$source);
+    }
+    clearstatcache(true, $destination);
+    if (!pmssPathTargetIsSafe($destination, false, true) || !is_file($destination) || is_link($destination)) {
+        throw new RuntimeException('Unsafe restored file: '.$destination);
     }
     if ($targetUid !== null && ($targetGid === null || !@chown($destination, $targetUid)
         || !@chgrp($destination, $targetGid) || !@chmod($destination, 0640))) {
