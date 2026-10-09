@@ -207,6 +207,7 @@ PHP;
         'install-ai-tools.sh',
         'bin/docker-install-lsio',
         'bin/docker-install-wireguard.sh',
+        'bin/docker-reclaim-ownership',
         'bin/install-openclaw',
         'bin/linuxserverInstall.sh',
         'bin/support',

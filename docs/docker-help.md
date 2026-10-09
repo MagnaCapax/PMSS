@@ -117,6 +117,32 @@ docker compose up -d
 
 See the [rootless Docker limitations](https://docs.docker.com/engine/security/rootless/#known-limitations) for details.
 
+### Locked out of your own directory after running a container
+
+If a container's entrypoint `chown`s its data to a non-zero internal UID/GID
+(the common LinuxServer.io default when `PUID`/`PGID` are left unset — see
+[`docs/linuxserver.io.md`](./linuxserver.io.md) section 2.1), the affected
+path ends up owned by a namespace-remapped UID on the host that is not you.
+Depending on what got chowned, this can go beyond "can't delete a file" —
+if the chown reached the bind-mounted directory itself, you can lose even
+`ls`/read access to it, with a permission-denied error that makes it look
+broken rather than just differently owned.
+
+Running the same container again does not help, because its root (UID 0)
+still maps back to you — the problem is only ever a *different*, non-zero
+UID. Fix it with the bundled helper, which starts a disposable container as
+UID 0 (which always maps back to your own account) against the affected
+path:
+
+```
+docker-reclaim-ownership ~/docker/jellyfin/config
+```
+
+This hands ownership of the path, and everything under it, back to you. It
+does not touch anything outside the path you give it. Afterwards, re-run the
+container with `PUID=0`/`PGID=0` (or use `docker-install-lsio`, which already
+sets them) so it does not happen again.
+
 For a deeper guide to running linuxserver.io application containers on PMSS, see
 [`docs/linuxserver.io.md`](./linuxserver.io.md). For the host-managed WireGuard
 VPN service (recommended default), see [`docs/wireguard.md`](./wireguard.md);
