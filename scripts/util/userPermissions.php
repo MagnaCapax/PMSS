@@ -163,10 +163,13 @@ $chmodItems = [
     // ~/www is normalised above (dirs 0750 via the home walk, files exec-stripped);
     // a recursive 0750 here would re-add the exec bit to served data files (#781).
     ["/home/{$thisUser}/.*.php", 0750],
+    // Include-only; the glob above is for the wrappers that are executed.
+    ["/home/{$thisUser}/.scriptsInc.php", 0640],
     ["/home/{$thisUser}/.lighttpd.conf", 0644],
     ["/home/{$thisUser}/.lighttpd", 0775],
     ["/home/{$thisUser}/.lighttpd/php.ini", 0640],
-    ["/home/{$thisUser}/.lighttpd/.htpasswd", 0754],
+    // Matches the htpasswd writer; every reader runs as the account.
+    ["/home/{$thisUser}/.lighttpd/.htpasswd", 0640],
     ["/home/{$thisUser}/.lighttpd/compress", 0770],
     ["/home/{$thisUser}/.lighttpd/upload", 0770],
     ["/home/{$thisUser}/www/rutorrent/conf/config.php", 0754],
