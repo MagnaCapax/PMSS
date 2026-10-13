@@ -43,6 +43,24 @@ function pmssLsioCatalogBuild(array $images): array
     return $entries;
 }
 
+/** Publish a complete catalog from the target directory, retaining its public read mode. */
+function pmssLsioCatalogWrite(string $target, string $output): bool
+{
+    $temporary = @tempnam(dirname($target), '.pmss-lsio-');
+    if ($temporary === false) {
+        return false;
+    }
+
+    // A short write or failed mode change must leave the previous snapshot intact.
+    $ready = @file_put_contents($temporary, $output) === strlen($output)
+        && @chmod($temporary, 0644);
+    if (!$ready || !@rename($temporary, $target)) {
+        @unlink($temporary);
+        return false;
+    }
+    return true;
+}
+
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     $source = $argv[1] ?? PMSS_LSIO_SOURCE;
     $json = @file_get_contents($source);
@@ -56,7 +74,7 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     $array = preg_replace('/[ \t]+$/m', '', var_export($entries, true));
     $output = "<?php\n/** Source: ".PMSS_LSIO_SOURCE."; snapshot: ".date('Y-m-d').". */\nreturn ".$array.";\n";
     $target = dirname(__DIR__, 2).'/etc/skel/www/appsLsioCatalog.php';
-    if (file_put_contents($target, $output) !== strlen($output)) {
+    if (!pmssLsioCatalogWrite($target, $output)) {
         fwrite(STDERR, "Could not write {$target}\n");
         exit(1);
     }

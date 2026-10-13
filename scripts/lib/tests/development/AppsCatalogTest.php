@@ -161,6 +161,22 @@ class AppsCatalogTest extends TestCase
             'guide' => 'https://docs.linuxserver.io/images/docker-blender/')), \pmssLsioCatalogBuild($fixture));
     }
 
+    public function testLsioSnapshotWritePublishesOnlyCompleteReadableFiles(): void
+    {
+        $directory = $this->pmssMakeTempDir('pmss-lsio-write-');
+        $target = $directory.'/catalog.php';
+        file_put_contents($target, 'previous');
+
+        $this->assertTrue(\pmssLsioCatalogWrite($target, '<?php return [];'));
+        $this->assertSame('<?php return [];', file_get_contents($target));
+        $this->assertSame(0644, fileperms($target) & 0777);
+
+        $this->assertFalse(\pmssLsioCatalogWrite($directory, 'replacement'));
+        $this->assertSame(array(), glob($directory.'/.pmss-lsio-*'));
+        $this->assertFalse(\pmssLsioCatalogWrite($directory.'/missing/catalog.php', 'replacement'));
+        $this->assertSame('<?php return [];', file_get_contents($target));
+    }
+
     public function testMoreAppsRendersOpenWithLsioRowsAndOneSearch(): void
     {
         $html = $this->pmssRenderCustomerPanelPage('apps.php', [], ['minBytes' => 4000]);

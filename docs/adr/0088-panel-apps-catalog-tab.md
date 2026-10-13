@@ -127,6 +127,10 @@ both lists, including category names. The page omits the LinuxServer.io list
 when the snapshot has not yet arrived during a staggered update.
 Shared-host abuse risk also excludes `boinc`, `foldingathome`, and `pwndrop`.
 
+The catalog builder publishes its complete PHP snapshot through a same-directory
+temporary file with mode 0644. Failed writes or replacement leave the previous
+snapshot available and remove the temporary file.
+
 The page warns that LinuxServer.io's published-port examples bind every
 address, and shows a loopback bind instead. Each app still needs its own login
 because other accounts on the host can reach loopback ports.
