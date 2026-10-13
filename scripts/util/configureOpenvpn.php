@@ -62,7 +62,7 @@ if ($serverCertificateRenewalNeeded) {
 // 1) Package presence (informational)
 // OpenVPN/EasyRSA packages are expected to be installed during the package phase.
 if (!is_file('/usr/sbin/openvpn') || (!is_dir($easyRsaShare) && !is_dir($easyRsaDir))) {
-    logmsg('[INFO] OpenVPN/EasyRSA packages not detected; proceeding with EasyRSA fallback if needed');
+    logmsg('[INFO] OpenVPN/EasyRSA packages not detected; provisioning may be incomplete');
 }
 
 // 2) Ensure directories
@@ -77,14 +77,8 @@ if (!is_dir($easyRsaDir) || !file_exists($easyRsaDir.'/easyrsa')) {
     if (is_dir($easyRsaShare)) {
         runStep('Seeding EasyRSA from system share', sprintf('cp -r %s %s', escapeshellarg($easyRsaShare), escapeshellarg($openvpnDir)));
     } else {
-        runStep('Creating EasyRSA directory', 'install -d -m 0755 '.escapeshellarg($easyRsaDir));
-        runStep(
-            'Downloading EasyRSA v3.1.1 (fallback)',
-            'cd '.escapeshellarg($openvpnDir).' && '
-            .'wget -q https://github.com/OpenVPN/easy-rsa/releases/download/v3.1.1/EasyRSA-3.1.1.tgz -O EasyRSA.tgz && '
-            .'tar -xzf EasyRSA.tgz && '
-            .'mv EasyRSA-3.1.1 easy-rsa || true'
-        );
+        logmsg('[WARN] EasyRSA package not installed (expected from the dpkg baseline); skipping OpenVPN provisioning');
+        return;
     }
 }
 
