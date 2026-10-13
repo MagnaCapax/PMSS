@@ -85,7 +85,7 @@ function pmssUserRootlessDockerConfigWrite(string $configFile, string $json, int
 
     $ok = false;
     $isRoot = function_exists('posix_geteuid') && (int) @posix_geteuid() === 0;
-    if (@file_put_contents($tempFile, $json) !== strlen($json)) {
+    if (!pmssFileWriteComplete($tempFile, $json)) {
         $reason = 'write_failed';
     } elseif ($isRoot && !@chown($tempFile, $uid)) {
         $reason = 'chown_failed';

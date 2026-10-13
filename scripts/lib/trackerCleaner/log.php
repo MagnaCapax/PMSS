@@ -105,8 +105,7 @@ function pmssTrackerCleanerAppendUserChangeLog(string $username, array $changes,
         return $log;
     }
 
-    $written = @file_put_contents($userLogPath, $log, FILE_APPEND | LOCK_EX);
-    if ($written === false || $written !== strlen($log)) {
+    if (!pmssFileWriteComplete($userLogPath, $log, FILE_APPEND | LOCK_EX)) {
         pmssTrackerCleanerLog("WARN: Failed to append tracker change log for user {$username} ({$userLogPath}).");
         return $log;
     }

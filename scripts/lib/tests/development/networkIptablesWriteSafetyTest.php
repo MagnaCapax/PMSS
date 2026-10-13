@@ -67,6 +67,7 @@ function file_put_contents($path, $data, $flags = 0) {
     if ($mode === 'zero') return 0;
     return \file_put_contents($path, $mode === 'short' ? substr($data, 0, -1) : $data, $flags);
 }
+function pmssFileWriteComplete($path, $data, $flags = 0) { return file_put_contents($path, $data, $flags) === strlen($data); }
 function runCommand($command, $verbose, $logger) {
     $GLOBALS['commands'][] = [$command, $verbose, $logger];
     $GLOBALS['bytes'] = \file_get_contents($GLOBALS['path']);

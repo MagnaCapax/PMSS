@@ -103,6 +103,7 @@ function file_put_contents($path, $data, $flags) {
     if ($limit === false) return false;
     return \file_put_contents($path, $limit === null ? $data : substr($data, 0, $limit), $flags);
 }
+function pmssFileWriteComplete($path, $data, $flags = 0) { return file_put_contents($path, $data, $flags) === strlen($data); }
 PHP;
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/rtorrent/watchdogState.php', 'WatchdogStateWriteFixture');
         $script .= <<<'PHP'

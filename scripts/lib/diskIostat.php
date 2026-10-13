@@ -263,7 +263,7 @@ function pmssDiskIostatWriteSnapshotFiles(
     }
 
     foreach ($writes as $write) {
-        if (@file_put_contents($write[0], $write[1], $write[2]) !== strlen($write[1])) {
+        if (!pmssFileWriteComplete($write[0], $write[1], $write[2])) {
             fwrite(STDERR, 'Unable to write iostat snapshot file: '.$write[0]."\n");
             return false;
         }

@@ -69,6 +69,7 @@ function file_put_contents($path, $data, $flags) {
     if ($limit !== null) $data = substr($data, 0, $limit);
     return \file_put_contents($path, $data, $flags);
 }
+function pmssFileWriteComplete($path, $data, $flags = 0) { return file_put_contents($path, $data, $flags) === strlen($data); }
 PHP;
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/log.php', 'LogAppendFixture');
         $script .= <<<'PHP'

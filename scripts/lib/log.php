@@ -137,7 +137,7 @@ function pmssJsonLineAppend(string $path, array $payload): bool
     return pmssLogWritePathIsSafe($path)
         && is_string($encoded = pmssJsonEncodeSafe($payload, JSON_UNESCAPED_SLASHES))
         // Include the delimiter: a partial record is not a successful append.
-        && @file_put_contents($path, $encoded.PHP_EOL, FILE_APPEND | LOCK_EX) === strlen($encoded.PHP_EOL);
+        && pmssFileWriteComplete($path, $encoded.PHP_EOL, FILE_APPEND | LOCK_EX);
 }
 
 /** Stream decodable JSON Lines entries to a caller-owned handler. */
@@ -190,7 +190,7 @@ function pmssLogAppendTimestampedLine(string $path, string $message, string $tim
     }
     $line = date($timestampFormat).$prefix.$message.PHP_EOL;
     // Keep incomplete writes on the existing failure/fallback path.
-    $written = @file_put_contents($path, $line, FILE_APPEND | LOCK_EX) === strlen($line);
+    $written = pmssFileWriteComplete($path, $line, FILE_APPEND | LOCK_EX);
     $written && $mode !== null && @chmod($path, $mode);
     return $written;
 }

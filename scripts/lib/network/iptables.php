@@ -163,7 +163,7 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
     }
     try {
         // Never restore an incomplete ruleset, even when the write made progress.
-        if (@file_put_contents($tmp, $data) !== strlen($data)) {
+        if (!pmssFileWriteComplete($tmp, $data)) {
             networkIptablesLog('ERROR', 'unable to write iptables-restore temp file');
             return false;
         }

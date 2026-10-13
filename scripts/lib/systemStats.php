@@ -194,7 +194,7 @@ function pmssSystemStatsAppendLogLine(string $path, string $line): bool
 
     $record = rtrim($line, "\r\n")."\n";
     // A partial record must reach the cron caller's existing failure warning.
-    return @file_put_contents($path, $record, FILE_APPEND | LOCK_EX) === strlen($record);
+    return pmssFileWriteComplete($path, $record, FILE_APPEND | LOCK_EX);
 }
 
 /**

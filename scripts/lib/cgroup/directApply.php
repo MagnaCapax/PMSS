@@ -119,14 +119,9 @@ function pmssCgroupDirectWritableFileTarget(string $path): bool
 /** Write one bounded integer target and reject failed or short sysfs writes. */
 function pmssCgroupDirectIntegerFileWrite(string $path, int $value, int $minimum, int $maximum): bool
 {
-    if ($minimum > $maximum || $value < $minimum || $value > $maximum
-        || !pmssCgroupDirectWritableFileTarget($path)) {
-        return false;
-    }
-
-    $payload = (string) $value;
-    $bytes = @file_put_contents($path, $payload);
-    return is_int($bytes) && $bytes === strlen($payload);
+    return $minimum <= $maximum && $value >= $minimum && $value <= $maximum
+        && pmssCgroupDirectWritableFileTarget($path)
+        && pmssFileWriteComplete($path, (string) $value);
 }
 
 /** Log and optionally print the legacy cycle summary, then return process rc. */

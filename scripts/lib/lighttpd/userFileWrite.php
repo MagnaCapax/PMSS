@@ -113,7 +113,7 @@ function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTe
     }
 
     try {
-        if (@file_put_contents($tmp, $content) !== strlen($content)) {
+        if (!pmssFileWriteComplete($tmp, $content)) {
             return false;
         }
         if ($prepareTemp !== null && $prepareTemp($tmp) === false) {
@@ -355,7 +355,7 @@ function pmssAppendUserFile(string $path, string $content, string $owner, int $m
         return false;
     }
 
-    if (@file_put_contents($path, $content, FILE_APPEND | LOCK_EX) !== strlen($content)) {
+    if (!pmssFileWriteComplete($path, $content, FILE_APPEND | LOCK_EX)) {
         return false;
     }
 

@@ -245,6 +245,8 @@ including the newline, before reporting success. Short or zero writes return
 fallback and applies the optional mode only after a complete write. Partial
 bytes remain in place: no truncation or retry risks overwriting concurrent logs.
 `LogWriteSafetyTest` injects incomplete writes and checks successful byte output.
+Operator-side file writers share this exact-byte check through
+`pmssFileWriteComplete()` while retaining their own path and cleanup rules.
 
 Rootless Docker config publication rejects empty or NUL-containing targets and
 requires a complete temporary-file write before metadata changes or rename.

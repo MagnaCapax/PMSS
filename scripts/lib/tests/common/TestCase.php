@@ -1119,6 +1119,7 @@ function file_put_contents($path, $bytes, $flags = 0) {
     if ($mode === 'zero') return 0;
     return \file_put_contents($path, $mode === 'short' ? substr($bytes, 0, -1) : $bytes, $flags);
 }
+function pmssFileWriteComplete($path, $bytes, $flags = 0) { return file_put_contents($path, $bytes, $flags) === strlen($bytes); }
 function chmod($path, $permissions) {
     if ($GLOBALS['mode'] === 'chmodThrow') throw $GLOBALS['throwable'];
     return $GLOBALS['mode'] === 'chmod' ? false : \chmod($path, $permissions);
