@@ -58,6 +58,23 @@ class SysctlBaselineTest extends TestCase
         $this->pmssAssertMessagesContain($messages, 'already present and up to date', 'expected skip log');
     }
 
+    public function testMatchingContentAtUnsafePathIsNotReportedConverged(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-unsafe-');
+        $outside = $dir.'/outside.conf';
+        $content = "kernel.kptr_restrict = 1\n";
+        file_put_contents($outside, $content);
+        $target = $dir.'/managed.conf';
+        $this->pmssCreateSymlinkOrSkip($outside, $target);
+        $messages = [];
+        $log = $this->pmssMakeArrayLogger($messages);
+
+        $this->assertSame([false, false], \pmssSysctlManagedContentRefresh($target, $content, 'sysctl test', $log));
+        $this->pmssAssertMessagesContain($messages, 'Unsafe sysctl test target', 'expected symlink refusal');
+        $this->assertFalse($this->pmssMessagesContain($messages, 'already present and up to date'));
+        $this->assertSame($content, file_get_contents($outside));
+    }
+
     public function testCreatesTargetDirectory(): void
     {
         $fixture = $this->runBaselineFixture('pmss-sysctl-dir-', [], false, 'nested/sysctl.conf');

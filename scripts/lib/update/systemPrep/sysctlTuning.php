@@ -13,6 +13,10 @@ function pmssSysctlManagedContentRefresh(string $path, string $content, string $
 {
     $warnLog = '[WARN] Unable to write '.$label.' at '.$path;
     if (($existing = @file_get_contents($path)) !== false && trim($existing) === trim($content)) {
+        // An unchanged symlink or unsafe parent is not a converged managed file.
+        if (!pmssManagedPathIsSafe($path, $label, $log)) {
+            return [false, false];
+        }
         $log('[SKIP] '.ucfirst($label).' already present and up to date');
         return [true, true];
     }
