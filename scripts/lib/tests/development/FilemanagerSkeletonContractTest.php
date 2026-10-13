@@ -5,6 +5,65 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class FilemanagerSkeletonContractTest extends TestCase
 {
+    public function testSettingsSurviveSkeletonRefresh(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-filemanager-settings-');
+        $source = $this->pmssRepoPath('etc/skel/www/filemanager.php');
+        $local = $home.'/filemanager.php';
+        $this->assertTrue(copy($source, $local));
+        $script = <<<'PHP'
+define('FM_EMBED', true);
+$_SERVER = array(
+    'USER' => %s,
+    'HTTP_HOST' => 'localhost',
+    'PHP_SELF' => '/filemanager.php',
+    'SCRIPT_NAME' => '/filemanager.php',
+    'REQUEST_URI' => '/filemanager.php?p=',
+);
+$_GET = array('p' => '');
+$_POST = $_FILES = $_REQUEST = array();
+ob_start();
+require %s;
+ob_end_clean();
+$settings = %s;
+$source = %s;
+$local = %s;
+$defaults = (new FM_Config())->data;
+$createdOnRead = file_exists($settings);
+$cfg->data['show_hidden'] = true;
+$cfg->data['calc_folder'] = true;
+$saved = $cfg->save();
+$sourceUnchanged = hash_file('sha1', $local) === hash_file('sha1', $source);
+copy($source, $local);
+$afterRefresh = (new FM_Config())->data;
+file_put_contents($settings, '{"show_hidden":true}');
+$partial = (new FM_Config())->data;
+file_put_contents($settings, '{invalid');
+$malformed = (new FM_Config())->data;
+echo json_encode(compact('defaults', 'createdOnRead', 'saved', 'sourceUnchanged', 'afterRefresh', 'partial', 'malformed'));
+PHP;
+        $script = sprintf(
+            $script,
+            var_export('../'.ltrim($home, '/'), true),
+            var_export($local, true),
+            var_export($home.'/.config/filemanager-settings.json', true),
+            var_export($source, true),
+            var_export($local, true)
+        );
+        $run = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script));
+        $this->assertSame(0, $run['rc'], 'Filemanager settings probe failed: '.$run['output']);
+        $result = json_decode($run['output'], true);
+        $this->assertTrue(is_array($result), 'Filemanager settings probe did not return JSON: '.$run['output']);
+        $this->assertSame(['lang', 'error_reporting', 'show_hidden', 'hide_Cols', 'calc_folder'], array_keys($result['defaults']));
+        $this->assertFalse($result['createdOnRead']);
+        $this->assertTrue($result['saved']);
+        $this->assertTrue($result['sourceUnchanged']);
+        $this->assertTrue($result['afterRefresh']['show_hidden']);
+        $this->assertTrue($result['afterRefresh']['calc_folder']);
+        $this->assertSame($result['defaults']['calc_folder'], $result['partial']['calc_folder']);
+        $this->assertSame($result['defaults'], $result['malformed']);
+    }
+
     private function runRemoteUrlProbe(): array
     {
         $root = $this->pmssMakeTempDir('pmss-filemanager-url-');

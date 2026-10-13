@@ -522,8 +522,7 @@ if (isset($_POST['ajax']) && !FM_READONLY) {
             $cfg->data['calc_folder'] = $caf;
             $calc_folder = $caf;
         }
-        $cfg->save();
-        echo true;
+        echo $cfg->save();
     }
 
     // new password hash
@@ -3429,6 +3428,7 @@ class FM_Zipper_Tar
  class FM_Config
 {
      var $data;
+     private $settingsFile;
 
     function __construct()
     {
@@ -3453,28 +3453,34 @@ class FM_Zipper_Tar
             die($msg);
         }
         if (is_array($data) && count($data)) $this->data = $data;
-        else $this->save();
+        $this->settingsFile = rtrim($root_path, '/').'/.config/filemanager-settings.json';
+        $saved = @file_get_contents($this->settingsFile);
+        $saved = $saved === false ? null : json_decode($saved, true);
+        if (is_array($saved)) {
+            foreach (['lang', 'error_reporting', 'show_hidden', 'hide_Cols', 'calc_folder'] as $key) {
+                if (!array_key_exists($key, $saved)) continue;
+                if ($key === 'lang') {
+                    if (is_string($saved[$key]) && $saved[$key] !== '') $this->data[$key] = $saved[$key];
+                } elseif (is_bool($saved[$key])) {
+                    $this->data[$key] = $saved[$key];
+                }
+            }
+        }
     }
 
     function save()
     {
-        $fm_file = __FILE__;
-        $var_name = '$CONFIG';
-        $var_value = var_export(json_encode($this->data), true);
-        $config_string = "<?php" . chr(13) . chr(10) . "//Default Configuration".chr(13) . chr(10)."$var_name = $var_value;" . chr(13) . chr(10);
-        if (is_writable($fm_file)) {
-            $lines = file($fm_file);
-            if ($fh = @fopen($fm_file, "w")) {
-                @fputs($fh, $config_string, strlen($config_string));
-                for ($x = 3; $x < count($lines); $x++) {
-                    @fputs($fh, $lines[$x], strlen($lines[$x]));
-                }
-                @fclose($fh);
-                if (function_exists('opcache_invalidate')) {
-                    opcache_invalidate($fm_file, true);
-                }
-            }
+        $directory = dirname($this->settingsFile);
+        if (!is_dir($directory) && !@mkdir($directory, 0755, true)) return false;
+        $json = json_encode($this->data);
+        if ($json === false || ($temp = @tempnam($directory, 'filemanager-')) === false) return false;
+        // Replace only after the complete settings document is on disk.
+        $written = @file_put_contents($temp, $json);
+        if ($written !== strlen($json) || !@chmod($temp, 0600) || !@rename($temp, $this->settingsFile)) {
+            @unlink($temp);
+            return false;
         }
+        return true;
     }
 }
 
