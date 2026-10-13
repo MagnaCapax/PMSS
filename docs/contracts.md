@@ -689,6 +689,8 @@ read-only probes used by baseline sanitization and source-build guards.
 
 ## rTorrent Configuration – `scripts/lib/rtorrentConfig.php`
 
+- The per-user `.rtorrentExecute.php` supervisor launches the PMSS-built
+  `/usr/local/bin/rtorrent` directly, regardless of its inherited `PATH`.
 - `etc/skel/.rtorrentThrottleInit.php`
   - Runs once in the background from the skeleton `.rtorrent.rc.custom` five seconds after rTorrent starts, so rTorrent remains free to serve the helper's SCGI request.
   - Derives the customer name from the executing UID, loads the customer's existing ruTorrent throttle plugin, and re-applies its cached named channel rates through `rThrottle::obtain()`.

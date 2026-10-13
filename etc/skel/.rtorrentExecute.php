@@ -43,7 +43,7 @@ while (true) {
 
   writeLog('starting rtorrent');
   $rtorrentRc = 0;
-  passthru('rtorrent', $rtorrentRc);
+  passthru('/usr/local/bin/rtorrent', $rtorrentRc);
   writeLog('rtorrent exited (rc='.$rtorrentRc.'); sleeping 5 seconds then restarting');
   sleep(5); // avoid overloading the server
 }
