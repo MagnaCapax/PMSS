@@ -132,6 +132,13 @@ function pmssRecreateMoveDirectory(string $source, string $destination): bool
         || is_link($destination) || (file_exists($destination) && !is_dir($destination))) {
         throw new RuntimeException('Unsafe restore directory: '.$destination);
     }
+    // A restore move must retain its inode; refuse another device before removing a placeholder.
+    $sourceStat = @lstat($source);
+    $parentStat = @stat(dirname($destination));
+    if (!is_array($sourceStat) || ($sourceStat['mode'] & 0170000) !== 0040000
+        || !is_array($parentStat) || $sourceStat['dev'] !== $parentStat['dev']) {
+        throw new RuntimeException('Restore directory is not on the destination filesystem: '.$source);
+    }
     if (is_dir($destination)) {
         $entries = scandir($destination);
         $contents = $entries === false ? [] : array_values(array_diff($entries, ['.', '..']));
@@ -150,6 +157,12 @@ function pmssRecreateMoveDirectory(string $source, string $destination): bool
     // Both paths are beneath /home, so rename preserves the directory's inode and quota use.
     if (!@rename($source, $destination)) {
         throw new RuntimeException('Unable to move restore directory: '.$source);
+    }
+    clearstatcache(true, $destination);
+    $movedStat = @lstat($destination);
+    if (!is_array($movedStat) || ($movedStat['mode'] & 0170000) !== 0040000
+        || $movedStat['dev'] !== $sourceStat['dev'] || $movedStat['ino'] !== $sourceStat['ino']) {
+        throw new RuntimeException('Restore move identity mismatch: '.$destination);
     }
     return true;
 }

@@ -1084,7 +1084,9 @@ Automation often invokes these utilities; below are expected inputs and effects.
     and moves it within `/home` to `backup-<user>`. Rebuilds from `/etc/skel` with the new
     home private to root. Renames `data`, `session`, and `.local/share/pmss` from the
     backup into vacant destinations (including skeleton directories holding only
-    a regular `.gitkeep`, which is removed), then restores root-owned billing/contact
+    a regular `.gitkeep`, which is removed). Directory moves require the source
+    and destination parent on the same device before placeholder removal and
+    verify the moved inode after rename. Then restores root-owned billing/contact
     files (`.billingServiceId`, legacy `.billingId`,
     `.billingClientId`, and `.notifyEmail`) and regular `.htpasswd`. Billing
     files retain `root:<user> 0640`. Billing sources outside the file-type or
