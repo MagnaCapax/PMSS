@@ -1208,15 +1208,34 @@ function pmssCustomerAppsMediaIdsRead(): array
         ? array_merge(array_keys(pmssMediaStackPanelAppDefinitionsRead()), array('cloudplow')) : array();
 }
 
-/** One tmux query covers every media app. */
+/** Accept only a single pane launched from the installer's app directory. */
+function pmssCustomerAppsTmuxSessionsParse(string $output): array
+{
+    $paths = array('cloudplow' => array('/.bin/cloudplow', 'cloudplow.py'));
+    foreach (pmssMediaStackPanelAppDefinitionsRead() as $app => $definition) {
+        $files = $definition['markers']['file'] ?? $definition['secureMarkers']['file'];
+        $paths[$app] = array('/'.dirname($files[0]), basename($files[0]));
+    }
+    $sessions = array();
+    $counts = array();
+    foreach (explode("\n", trim($output)) as $line) {
+        $parts = explode('|', $line, 2);
+        if (count($parts) !== 2 || !isset($paths[$parts[0]])) continue;
+        $name = $parts[0];
+        $counts[$name] = ($counts[$name] ?? 0) + 1;
+        if (strpos($parts[1], $paths[$name][0]) !== false
+            && strpos($parts[1], $paths[$name][1]) !== false) $sessions[$name] = true;
+    }
+    foreach ($counts as $name => $count) if ($count !== 1) unset($sessions[$name]);
+    return $sessions;
+}
+
+/** One tmux query covers every media app without trusting a session name alone. */
 function pmssCustomerAppsTmuxSessionsRead(): array
 {
-    $output = pmssFrontendShellExec("tmux list-sessions -F '#S' 2>/dev/null");
-    $sessions = array();
-    foreach (explode("\n", (string) $output) as $name) {
-        if (in_array($name, pmssCustomerAppsMediaIdsRead(), true)) $sessions[$name] = true;
-    }
-    return $sessions;
+    $output = pmssFrontendShellExec("tmux list-panes -a -F '#{session_name}|#{pane_start_command}' 2>/dev/null");
+    return function_exists('pmssMediaStackPanelAppDefinitionsRead')
+        ? pmssCustomerAppsTmuxSessionsParse((string) $output) : array();
 }
 
 /** Use current markers and processes, never a potentially stale watchdog snapshot. */

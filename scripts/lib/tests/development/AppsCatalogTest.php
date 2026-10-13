@@ -10,6 +10,16 @@ ob_end_clean();
 /** Customer Apps tab contract: live controls and a closed wiki catalog. */
 class AppsCatalogTest extends TestCase
 {
+    public function testMediaSessionStatusRequiresAnInstallerPane(): void
+    {
+        $parse = '\\pmssCustomerAppsTmuxSessionsParse';
+        $this->assertSame(array(), $parse("sonarr|bash\n"));
+        $this->assertSame(array('sonarr' => true), $parse('sonarr|cd "$HOME/.bin/Sonarr" && dotnet Sonarr.dll'));
+        $this->assertSame(array(), $parse("sonarr|cd \"\$HOME/.bin/Sonarr\" && dotnet Sonarr.dll\nsonarr|bash"));
+        $this->assertSame(array(), $parse('other|cd "$HOME/.bin/Sonarr" && dotnet Sonarr.dll'));
+        $this->assertSame(array('cloudplow' => true), $parse('cloudplow|python3 "$HOME/.bin/cloudplow/cloudplow/cloudplow.py"'));
+    }
+
     public function testGuivRequiresStayInsideDeliveredSet(): void
     {
         $guiv = array('welcome', 'stats', 'scriptsInc', 'userMediaStackPanel', 'qbittorrent',

@@ -51,6 +51,17 @@ function pmssMediaStackWatchdogStatusPath(string $home): string
     return is_dir($home) && !is_link($home) && pmssPathTargetIsSafe($path, false, true) ? $path : '';
 }
 
+/** Reject same-named customer sessions that were not launched as this app. */
+function pmssMediaStackWatchdogPaneOwned(string $app, string $output): bool
+{
+    $definition = pmssMediaStackWatchdogAppDefinitions()[$app] ?? null;
+    if ($definition === null) return false;
+    $command = rtrim($output, "\r\n");
+    $path = '/'.dirname($definition['binary']);
+    return $command !== '' && strpos($command, "\n") === false
+        && strpos($command, $path) !== false && strpos($command, basename($definition['binary'])) !== false;
+}
+
 /** Probe a user's tmux server without changing its sessions. */
 function pmssMediaStackWatchdogSessionRunning(string $username, string $app, ?callable $probe = null): bool
 {
@@ -61,8 +72,9 @@ function pmssMediaStackWatchdogSessionRunning(string $username, string $app, ?ca
         return (bool) $probe($username, $app);
     }
 
-    $command = pmssBuildUserShellCommand($username, 'tmux has-session -t '.escapeshellarg('='.$app));
-    return pmssCommandCapture($command, 10)['rc'] === 0;
+    $query = 'tmux list-panes -s -t '.escapeshellarg('='.$app).' -F '.escapeshellarg('#{pane_start_command}');
+    $result = pmssCommandCapture(pmssBuildUserShellCommand($username, $query), 10);
+    return $result['rc'] === 0 && pmssMediaStackWatchdogPaneOwned($app, (string) $result['stdout']);
 }
 
 /** Build one observation snapshot from the current and previous probes. */

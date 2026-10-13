@@ -17,7 +17,7 @@ All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to
 - Idempotent: re‑runs converge to the same state; dry‑run exists for verification.
 - Safe defaults: localhost binding; randomized high ports; aliases to launch in `tmux`.
 - Memory pre-flight: accounts below 1024 MiB are warned and must use `--force` from SSH.
-- Uninstall path: `--uninstall` stops media-stack sessions, removes PMSS-managed app/config and runtime-status paths, and backs up/strips managed shell aliases.
+- Uninstall path: `--uninstall` stops verified media-stack sessions, removes PMSS-managed app/config and runtime-status paths, and backs up/strips managed shell aliases.
 - Servarr update policy: Radarr, Sonarr, and Prowlarr select `Script` updates without supplying an update script and disable automatic updates. Manual updates report an undefined-script error before launching the built-in updater; rerun this installer to update safely.
 - App-level authentication: the installer generates per-app passwords, configures auth before the public proxy is restarted, and writes credentials to `~/.media-stack-credentials.txt` with mode `600`.
 - Logging: colored console output and log tee to `~/.install-media-stack.log`.
@@ -181,6 +181,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 9) Launch
 - Starts each app under a tmux session (skipped in `--dry-run`).
 - `--start-stopped` is a separate one-shot recovery path: it skips downloads and installation, preserves live sessions, and launches only missing sessions through the installer-managed aliases.
+- Session control verifies the sole tmux pane's launch command against the installed app directory. Existing installer sessions keep their names and remain manageable; an unrelated same-named customer session is neither reported as running nor stopped. Such a collision prevents starting that app until the customer frees the name.
 
 10) Logging
 - All output is colored for terminals and appended to `~/.install-media-stack.log`.

@@ -273,6 +273,51 @@ media_stack_app_installed() {
 	esac
 }
 
+# A session name alone belongs to the account, not to this installer. Legacy
+# app sessions stay usable, but only their one-pane app command may be managed.
+media_stack_session_owned() {
+	local session="$1" app="${1%-auth-seed}" expected binary command
+	case "$app" in
+	jellyfin)
+		expected='/.bin/jellyfin'
+		binary='jellyfin.dll'
+		;;
+	sonarr)
+		expected='/.bin/Sonarr'
+		binary='Sonarr.dll'
+		;;
+	radarr)
+		expected='/.bin/Radarr'
+		binary='Radarr.dll'
+		;;
+	prowlarr)
+		expected='/.bin/Prowlarr'
+		binary='Prowlarr.dll'
+		;;
+	sabnzbd)
+		expected='/.bin/sabnzbd'
+		binary='SABnzbd.py'
+		;;
+	autobrr)
+		expected='/.bin/autobrr'
+		binary='autobrr'
+		;;
+	cloudplow)
+		expected='/.bin/cloudplow'
+		binary='cloudplow.py'
+		;;
+	*) return 1 ;;
+	esac
+	command=$(tmux list-panes -s -t "=$session" -F '#{pane_start_command}' 2>/dev/null) || return 1
+	[[ -n "$command" && "$command" != *$'\n'* && "$command" == *"$expected"* && "$command" == *"$binary"* ]] || return 1
+	return 0
+}
+
+media_stack_session_kill_owned() {
+	media_stack_session_owned "$1" || return 0
+	tmux kill-session -t "=$1" 2>/dev/null || true
+}
+
 media_stack_start_stopped() {
 	local alias_file="$HOME/.bashrc.custom"
 	local app app_rc failed=0
@@ -297,7 +342,12 @@ media_stack_start_stopped() {
 	for app in jellyfin "${MEDIA_STACK_BASE_SESSIONS[@]}"; do
 		[[ -n "$START_APP" && "$app" != "$START_APP" ]] && continue
 		[[ -z "$START_APP" && (-e "$HOME/.${app}Disable" || -L "$HOME/.${app}Disable") ]] && continue
+		if media_stack_session_owned "$app"; then
+			continue
+		fi
 		if tmux has-session -t "=$app" 2>/dev/null; then
+			log_warn "Session $app is not a PMSS app; leaving it untouched"
+			failed=1
 			continue
 		fi
 		if /bin/bash --noprofile --norc -O expand_aliases -c '
@@ -323,7 +373,7 @@ if [[ $APP_ACTION_REQUESTED -eq 1 ]]; then
 		exit 2
 	fi
 	if [[ -n "$STOP_APP" ]]; then
-		tmux kill-session -t "=$STOP_APP" 2>/dev/null || true
+		media_stack_session_kill_owned "$STOP_APP"
 		exit 0
 	fi
 	media_stack_start_stopped
@@ -1189,9 +1239,9 @@ media_stack_uninstall() {
 	username=$(whoami)
 	log_step "Uninstalling PMSS media stack"
 	if [[ $DRY_RUN -eq 0 ]]; then
-		for app in jellyfin sabnzbd radarr prowlarr sonarr cloudplow autobrr jellyfin-smoke; do
+		for app in jellyfin sabnzbd radarr prowlarr sonarr cloudplow autobrr; do
 			if command -v tmux >/dev/null 2>&1; then
-				tmux kill-session -t "$app" 2>/dev/null || true
+				media_stack_session_kill_owned "$app"
 			fi
 		done
 		if command -v pgrep >/dev/null 2>&1; then
@@ -1683,7 +1733,7 @@ servarr_auth_seed() {
 	if [[ -f "$seed_log" ]]; then
 		seed_log_offset=$(stat -c %s "$seed_log")
 	fi
-	tmux kill-session -t "$session" 2>/dev/null || true
+	media_stack_session_kill_owned "$session"
 	tmux new-session -d -s "$session" \
 		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/${install_name}\" && \"$DOTNET_ROOT_PATH/dotnet\" ${run_args} 2>&1 | tee -a \"$datadir/${app}-auth-seed.log\"" || {
 		log_err "Failed to start ${install_name} for local auth seeding"
@@ -1701,7 +1751,7 @@ servarr_auth_seed() {
 		else
 			log_err "${install_name} did not write a valid local API key within ~${MEDIA_STACK_APP_START_WAIT}s; see $datadir/${app}-auth-seed.log"
 		fi
-		tmux kill-session -t "$session" 2>/dev/null || true
+		media_stack_session_kill_owned "$session"
 		rm -f "$response_json" "$payload_json" "$curl_config"
 		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 		return 1
@@ -1717,7 +1767,7 @@ servarr_auth_seed() {
 		else
 			log_err "${install_name} did not expose its local auth configuration API within ~${MEDIA_STACK_APP_START_WAIT}s; see $datadir/${app}-auth-seed.log"
 		fi
-		tmux kill-session -t "$session" 2>/dev/null || true
+		media_stack_session_kill_owned "$session"
 		rm -f "$response_json" "$payload_json" "$curl_config"
 		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 		return 1
@@ -1725,14 +1775,14 @@ servarr_auth_seed() {
 
 	if ! curl -fsS --max-time 90 --config "$curl_config" "$base_url" -o "$response_json"; then
 		log_err "Failed to read ${install_name} local auth configuration"
-		tmux kill-session -t "$session" 2>/dev/null || true
+		media_stack_session_kill_owned "$session"
 		rm -f "$response_json" "$payload_json" "$curl_config"
 		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 		return 1
 	fi
 	if ! servarr_auth_payload_write "$response_json" "$payload_json" "$password"; then
 		log_err "Failed to build ${install_name} auth payload"
-		tmux kill-session -t "$session" 2>/dev/null || true
+		media_stack_session_kill_owned "$session"
 		rm -f "$response_json" "$payload_json" "$curl_config"
 		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 		return 1
@@ -1741,7 +1791,7 @@ servarr_auth_seed() {
 	put_code=$(media_stack_http_code "${base_url}/1" --config "$curl_config" -X PUT -H 'Content-Type: application/json' --data-binary "@${payload_json}" --max-time 90)
 	if [[ "$put_code" != "200" && "$put_code" != "202" ]]; then
 		log_err "${install_name} rejected local auth configuration (HTTP ${put_code})"
-		tmux kill-session -t "$session" 2>/dev/null || true
+		media_stack_session_kill_owned "$session"
 		rm -f "$response_json" "$payload_json" "$curl_config"
 		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 		return 1
@@ -1751,13 +1801,13 @@ servarr_auth_seed() {
 	unauth_code=$(media_stack_http_code "$base_url")
 	if [[ "$unauth_code" != "401" && "$unauth_code" != "403" ]]; then
 		log_err "${install_name} auth verification failed; unauthenticated API returned HTTP ${unauth_code}"
-		tmux kill-session -t "$session" 2>/dev/null || true
+		media_stack_session_kill_owned "$session"
 		rm -f "$response_json" "$payload_json" "$curl_config"
 		servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 		return 1
 	fi
 
-	tmux kill-session -t "$session" 2>/dev/null || true
+	media_stack_session_kill_owned "$session"
 	rm -f "$response_json" "$payload_json" "$curl_config"
 	servarr_config_xml_tag_converge "$config_file" Port "$desired_port"
 	servarr_config_xml_tag_converge "$config_file" AuthenticationMethod Forms
@@ -1773,7 +1823,7 @@ autobrr_auth_seed() {
 
 	[[ -s "$db_file" ]] && had_db=1
 	if [[ "$had_db" -eq 0 ]]; then
-		tmux kill-session -t "$session" 2>/dev/null || true
+		media_stack_session_kill_owned "$session"
 		tmux new-session -d -s "$session" \
 			"AUTOBRR__HOST=127.0.0.1 AUTOBRR__PORT=\"$seed_port\" AUTOBRR__BASE_URL=$AUTOBRR_BASE_URL AUTOBRR__BASE_URL_MODE_LEGACY=false \"$HOME/.bin/autobrr/autobrr\" --config=\"$datadir\" 2>&1 | tee -a \"$datadir/autobrr-auth-seed.log\"" || {
 			log_err "Failed to start Autobrr for local database migration"
@@ -1781,10 +1831,10 @@ autobrr_auth_seed() {
 		}
 		if ! media_stack_wait_http_ok "http://127.0.0.1:${seed_port}${AUTOBRR_BASE_URL}" 30 "$session"; then
 			log_err "Autobrr did not start for local auth seeding (see $datadir/autobrr-auth-seed.log)"
-			tmux kill-session -t "$session" 2>/dev/null || true
+			media_stack_session_kill_owned "$session"
 			return 1
 		fi
-		tmux kill-session -t "$session" 2>/dev/null || true
+		media_stack_session_kill_owned "$session"
 	fi
 
 	if printf '%s\n' "$password" | "$HOME/.bin/autobrr/autobrrctl" --config "$datadir" create-user "$MEDIA_STACK_AUTH_USERNAME" >/dev/null 2>&1; then
@@ -1845,7 +1895,7 @@ jellyfin_auth_seed() {
 	payload_json=$(mktemp)
 	auth_json=$(mktemp)
 
-	tmux kill-session -t "$session" 2>/dev/null || true
+	media_stack_session_kill_owned "$session"
 	tmux new-session -d -s "$session" \
 		"export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${seed_port}\"; cd \"$HOME/.bin/jellyfin\" && nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log\"" 2>/dev/null || true
 
@@ -1858,20 +1908,20 @@ jellyfin_auth_seed() {
 		if media_stack_log_has "$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log" "illegal instruction\|SIGILL\|signal 4"; then
 			log_err "Jellyfin crashed with Illegal Instruction — CPU lacks required instruction sets"
 		fi
-		tmux kill-session -t "$session" 2>/dev/null || true
+		media_stack_session_kill_owned "$session"
 		rm -f "$payload_json" "$auth_json"
 		return 1
 	fi
 	if ! base_url=$(jellyfin_startup_base_url "$base_url" "$JELLYFIN_CONFIG_DIR" "$MEDIA_STACK_APP_START_WAIT"); then
 		log_err "Jellyfin startup API never answered HTTP 200, with or without BaseUrl (see $JELLYFIN_LOG_DIR/jellyfin-auth-seed.log)"
-		tmux kill-session -t "$session" 2>/dev/null || true
+		media_stack_session_kill_owned "$session"
 		rm -f "$payload_json" "$auth_json"
 		return 1
 	fi
 
 	if ! curl -fsS --max-time 10 "${base_url}/Startup/User" >/dev/null; then
 		log_err "Jellyfin startup user initialization failed"
-		tmux kill-session -t "$session" 2>/dev/null || true
+		media_stack_session_kill_owned "$session"
 		rm -f "$payload_json" "$auth_json"
 		return 1
 	fi
@@ -1879,14 +1929,14 @@ jellyfin_auth_seed() {
 	code=$(media_stack_http_code "${base_url}/Startup/User" -X POST -H 'Content-Type: application/json' --data-binary "@${payload_json}")
 	if [[ "$code" != "204" ]]; then
 		log_err "Jellyfin rejected startup admin creation (HTTP ${code})"
-		tmux kill-session -t "$session" 2>/dev/null || true
+		media_stack_session_kill_owned "$session"
 		rm -f "$payload_json" "$auth_json"
 		return 1
 	fi
 	code=$(media_stack_http_code "${base_url}/Startup/Complete" -X POST)
 	if [[ "$code" != "204" ]]; then
 		log_err "Jellyfin rejected startup completion (HTTP ${code})"
-		tmux kill-session -t "$session" 2>/dev/null || true
+		media_stack_session_kill_owned "$session"
 		rm -f "$payload_json" "$auth_json"
 		return 1
 	fi
@@ -1901,12 +1951,12 @@ jellyfin_auth_seed() {
 	code=$(media_stack_http_code "${base_url}/Users/AuthenticateByName" -X POST -H 'Content-Type: application/json' -H 'Authorization: MediaBrowser Client="PMSS", Device="media-stack-installer", DeviceId="pmss-media-stack", Version="1"' --data-binary "@${auth_json}")
 	if [[ "$code" != "200" ]]; then
 		log_err "Jellyfin admin login verification failed (HTTP ${code})"
-		tmux kill-session -t "$session" 2>/dev/null || true
+		media_stack_session_kill_owned "$session"
 		rm -f "$payload_json" "$auth_json"
 		return 1
 	fi
 
-	tmux kill-session -t "$session" 2>/dev/null || true
+	media_stack_session_kill_owned "$session"
 	rm -f "$payload_json" "$auth_json" "$JELLYFIN_LOG_DIR/jellyfin-auth-seed.log" 2>/dev/null || true
 	log_ok "Jellyfin admin account configured"
 }
@@ -1994,7 +2044,7 @@ media_stack_verify_sessions() {
 	sleep 3
 	log_step "Verifying started applications..."
 	while IFS= read -r app; do
-		if tmux has-session -t "$app" 2>/dev/null; then
+		if media_stack_session_owned "$app"; then
 			log_ok "$app session is running"
 			continue
 		fi
@@ -2073,7 +2123,7 @@ media_stack_secure_marker_print() {
 media_stack_stop_app_for_auth() {
 	local session="$1" process_pattern="$2"
 
-	tmux kill-session -t "$session" 2>/dev/null || true
+	media_stack_session_kill_owned "$session"
 	media_stack_app_processes_kill "$process_pattern"
 }
 
@@ -2279,7 +2329,7 @@ fi
 log_step "Stopping existing sessions..."
 if [[ $DRY_RUN -eq 0 ]]; then
 	while IFS= read -r app; do
-		tmux kill-session -t "${app}" 2>/dev/null || true
+		media_stack_session_kill_owned "$app"
 	done < <(media_stack_sessions "${MEDIA_STACK_STOP_SESSIONS[@]}")
 fi
 

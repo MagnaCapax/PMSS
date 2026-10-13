@@ -6,6 +6,15 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class MediaStackWatchdogTest extends TestCase
 {
+    public function testSessionProbeRejectsForeignAndMultiPaneCommands(): void
+    {
+        $this->assertFalse(\pmssMediaStackWatchdogPaneOwned('sonarr', "bash\n"));
+        $this->assertTrue(\pmssMediaStackWatchdogPaneOwned('sonarr', 'cd "$HOME/.bin/Sonarr" && dotnet Sonarr.dll'));
+        $this->assertFalse(\pmssMediaStackWatchdogPaneOwned('sonarr', "cd \"\$HOME/.bin/Sonarr\"\nbash\n"));
+        $this->assertFalse(\pmssMediaStackWatchdogPaneOwned('radarr', 'cd "$HOME/.bin/Sonarr" && dotnet Sonarr.dll'));
+        $this->assertFalse(\pmssMediaStackWatchdogPaneOwned('other', 'cd "$HOME/.bin/Sonarr" && dotnet Sonarr.dll'));
+    }
+
     public function testDefinitionsCoverTheManagedPanelApps(): void
     {
         $this->assertSame(array('sonarr', 'radarr', 'prowlarr', 'sabnzbd', 'cloudplow', 'jellyfin', 'autobrr'), array_keys(\pmssMediaStackWatchdogAppDefinitions()));

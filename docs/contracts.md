@@ -932,7 +932,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - etc/skel/install-media-stack.sh
   - Port allocation: consumes root-provisioned `~/.media-stack-port-APP` markers for SABnzbd, Radarr, Prowlarr, Sonarr, Autobrr, and Jellyfin. A legacy configured port is preserved only when no marker exists; a fresh install without a valid marker fails closed and requests a full PMSS update.
-  - App control: `--start-app=APP` launches only one installed, absent tmux session; `--stop-app=APP` kills only that session. The closed app list includes Jellyfin, Sonarr, Radarr, Prowlarr, SABnzbd, Autobrr, and Cloudplow. `--start-stopped` skips `~/.<app>Disable` markers.
+  - App control: `--start-app=APP` launches only one installed, absent tmux session; `--stop-app=APP` kills only a one-pane session whose launch command contains the installer's app directory. A same-named customer session is left untouched. The closed app list includes Jellyfin, Sonarr, Radarr, Prowlarr, SABnzbd, Autobrr, and Cloudplow. `--start-stopped` skips `~/.<app>Disable` markers.
 
 - etc/skel/bin/install-openclaw
   - Port allocation: consumes the root-provisioned `~/.media-stack-port-openclaw` marker, writes `~/.openclaw/gateway.port`, and refuses install or start without a valid marker. OpenClaw has no lighttpd proxy.
@@ -1030,6 +1030,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 ## Customer Apps Controls – `etc/skel/www/scriptsInc.php`
 
 - Both `welcome.php?status=1` and `apps.php?status=1` emit the same live tmux, native-process, marker, and media-stack auth state; both are read-only. `?log=APP` reads only the selected media app's own log, capped at 16 KiB, twenty lines, and 300 characters per line with HTML escaping.
+- A media app's tmux state is running only when its sole pane was launched from that app's installer directory. The root watchdog uses the same check; a same-named shell session is not an app.
 - If an older guiv-delivered `scriptsInc.php` lacks the Apps status or log emitter, that Apps feed returns HTTP 503 JSON with `updating: true` and a reload message. The shared status poll shows the message in app rows and stops retrying; other transient failures still retry.
 - While the existing media-stack launcher pid is live, its `poll` status takes precedence over partial install markers: the Media Stack group shows one progress row and no app controls. The shared status poll runs every five seconds until the installer exits, then renders app rows or the existing failure message and Install action. Media per-app controls require `appsRuntime.php` in the customer tree.
 - The web install launcher closes its standard streams before returning the POST response; its PID file records the installer process used by status polling.

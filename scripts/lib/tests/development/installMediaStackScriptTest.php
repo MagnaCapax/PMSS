@@ -491,6 +491,8 @@ BASH
         );
 
         $functions = $this->pmssExtractShellFunctions($this->script, array(
+            'media_stack_session_owned',
+            'media_stack_session_kill_owned',
             'media_stack_wait_http_ok',
             'media_stack_http_code',
             'servarr_api_key_curl_config_write',
@@ -922,6 +924,11 @@ LIGHTTPD;
 if [[ "$1" == "has-session" && "$3" == "=radarr" ]]; then
     exit 0
 fi
+if [[ "$1" == "list-panes" && "$4" == "=radarr" ]]; then
+    echo 'cd "$HOME/.bin/Radarr" && dotnet Radarr.dll'
+    exit 0
+fi
+if [[ "$1" == "list-panes" ]]; then exit 1; fi
 if [[ "$1" == "has-session" ]]; then
     exit 1
 fi
@@ -933,7 +940,8 @@ alias sonarr='tmux new-session -d -s sonarr true'
 alias radarr='tmux new-session -d -s radarr true'
 BASHRC
         );
-        $function = $this->pmssExtractShellFunction($this->script, 'media_stack_start_stopped');
+        $function = $this->pmssExtractShellFunction($this->script, 'media_stack_session_owned')."\n"
+            .$this->pmssExtractShellFunction($this->script, 'media_stack_start_stopped');
         $harness = implode("\n", array(
             '#!/usr/bin/env bash',
             'set -euo pipefail',
@@ -971,6 +979,7 @@ BASH
         $this->pmssWriteRelativeFile($home, '.bin/Sonarr/Sonarr.dll', 'binary');
         $this->pmssWriteFile($home.'/.sonarrDisable', '');
         $function = $this->pmssExtractShellFunction($this->script, 'media_stack_app_installed')."\n"
+            .$this->pmssExtractShellFunction($this->script, 'media_stack_session_owned')."\n"
             .$this->pmssExtractShellFunction($this->script, 'media_stack_start_stopped');
         $harness = implode("\n", array('#!/usr/bin/env bash', 'set -euo pipefail',
             'HOME='.escapeshellarg($home), 'PATH='.escapeshellarg($bin).':$PATH',
@@ -983,7 +992,7 @@ BASH
         $this->assertSame(1, substr_count($output, 'new-session -s radarr'));
         $this->assertStringContainsString('APP_ACTION_REQUESTED=0', $this->script);
         $this->assertStringContainsString('media_stack_app_id_valid "${START_APP:-$STOP_APP}"', $this->script);
-        $this->assertStringContainsString('tmux kill-session -t "=$STOP_APP"', $this->script);
+        $this->assertStringContainsString('media_stack_session_kill_owned "$STOP_APP"', $this->script);
     }
 
     public function testAppStopFlagKillsOnlyValidatedSession(): void
@@ -992,11 +1001,17 @@ BASH
         $bin = $this->pmssMakeTempDir('pmss-media-stop-bin-');
         $this->pmssWriteExecutableFile($bin.'/tmux', <<<'BASH'
 #!/usr/bin/env bash
+if [[ "$1" == list-panes ]]; then cat "$HOME/pane-command"; exit 0; fi
 printf '%s\n' "$*" >> "$HOME/actions"
 BASH
         );
         $base = 'HOME='.escapeshellarg($home).' PATH='.escapeshellarg($bin).':"$PATH" /bin/bash '
             .escapeshellarg($this->pmssRepoPath('etc/skel/install-media-stack.sh'));
+        $this->pmssWriteFile($home.'/pane-command', "bash\n");
+        $foreign = $this->pmssExecShellCommand($base.' --stop-app=sonarr');
+        $this->assertSame(0, $foreign['rc'], $foreign['output']);
+        $this->assertFalse(file_exists($home.'/actions'));
+        $this->pmssWriteFile($home.'/pane-command', "cd \"\$HOME/.bin/Sonarr\" && dotnet Sonarr.dll\n");
         $good = $this->pmssExecShellCommand($base.' --stop-app=sonarr');
         $this->assertSame(0, $good['rc'], $good['output']);
         $this->assertSame("kill-session -t =sonarr\n", file_get_contents($home.'/actions'));
@@ -1139,7 +1154,7 @@ BASH
             'MEDIA_STACK_STOP_SESSIONS=(sabnzbd radarr prowlarr sonarr cloudplow autobrr)',
             'media_stack_sessions "${MEDIA_STACK_STOP_SESSIONS[@]}"',
             'while IFS= read -r app; do',
-            'tmux kill-session -t "${app}"',
+            'media_stack_session_kill_owned "$app"',
         ], $this->script);
     }
 
