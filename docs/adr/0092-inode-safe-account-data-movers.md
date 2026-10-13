@@ -6,7 +6,7 @@ Category: security
 ## Status
 
 Accepted for the four original flows and the account-level webroot operations
-below. The remaining root operations retain their existing behavior.
+below. Remaining root operations retain their existing behavior.
 
 ## Context
 
@@ -45,19 +45,22 @@ order. A skipped legitimate migration is a data-preservation failure.
   the Linux flag ioctl to that handle. This keeps a swapped name from changing
   flags outside the tree. Perl is present in the Debian 10–12 selection
   baselines; no Python runtime is introduced.
-- `update/users/webRoot.php` runs directory migration, its rollback, legacy
-  copy publication, empty-target removal, and link creation as the account.
-  `webRootReconcile.php` runs the final full-restore stage move and partial
-  merge directory/link creation as the account. Existing content snapshots,
-  conflict checks, and resulting modes remain in place. Account authority
-  bounds a parent swap or linked path to that account's permissions. An
-  already unprivileged process that owns the fixture home may use its existing
-  UID when the fixture name has no passwd entry; it gains no authority.
-  The root watchdog may publish a complete staged web root directly only when
-  both names are immediate children of a checked root-owned home that is not
-  writable by group or others. It rechecks the source inode and verifies the
-  destination inode after the move. A customer-owned home continues through
-  the account path; a failed account move there is refused.
+- `update/users/webRoot.php` runs directory migration, rollback, legacy copy
+  publication, empty-target removal, and link creation with account authority.
+  `webRootReconcile.php` uses the same authority for the final full-restore
+  stage move and partial merge directory/link creation. Existing snapshots,
+  conflicts, content, and modes remain unchanged. An already unprivileged
+  process owning the fixture home may use its own UID when the fixture name
+  has no passwd entry; this grants no additional authority. When the caller
+  already is the named account, PHP `rename()` replaces an existing empty
+  web root directly and verifies the moved inode. This covers both missing
+  and empty full-restore targets without depending on an external move command.
+  A root process acting as its own fixture account requires root-owned,
+  group-and-other-unwritable parents for every account path. The root watchdog
+  may publish a complete stage directly for another account only when both
+  names are immediate children of a checked root-owned home with those same
+  permissions. Customer-owned homes stay on the account path; failed account
+  moves there are refused.
 
 ## Remaining boundaries
 
@@ -70,19 +73,13 @@ order. A skipped legitimate migration is a data-preservation failure.
   close the implied-parent case, so no such partial change was retained.
 - Webroot legacy copy still copies source entries and applies captured UID,
   GID, mode, and timestamps as root before changing the staged tree to account
-  ownership. Dropping privilege can skip foreign-owned source entries or
-  change the verified metadata. Its failure cleanup also handles root-owned
-  staged entries. Full reconciliation copies and chowns its root-owned stage;
-  partial reconciliation installs root-owned managed files through a root
-  temporary file. The full-restore and partial managed-file publication also
-  retain root file renames. These root operations remain unchanged. PHP 7.3 has no
-  `openat`/`fchown`/`fchmod` interface to bind them to descriptors; path
-  predicates do not close a tenant parent swap, and `renameat` would move a
-  replacement link rather than the verified source inode. The guarded top-level
-  watchdog fallback has a root directory move only under a root-owned home;
-  root file publication, copy, ownership, and cleanup paths are not claimed
-  safe against concurrent parent replacement. Their
-  metadata contract needs a separate semantics-preserving design.
+  ownership. Its failure cleanup also handles root-owned staged entries. Full
+  reconciliation copies and chowns its root-owned stage; partial reconciliation
+  installs root-owned managed files through a root temporary file. Those root
+  file operations remain unchanged. PHP 7.3 has no `openat`/`fchown`/`fchmod`
+  interface to bind them to descriptors; path predicates do not close a tenant
+  parent swap. The root-owned-home watchdog fallback is limited to a top-level
+  directory move and does not claim the other root webroot operations safe.
 
 ## Consequences
 

@@ -165,13 +165,39 @@ function pmssUserWebRootMigrationDirectoryIsEmpty(string $path): bool
     return is_array($entries) && empty($entries);
 }
 
+/** Root may act as its own fixture account only beneath unwritable root parents. */
+function pmssUserWebRootMigrationRootParentsSafe(string $home, array $paths): bool
+{
+    foreach ($paths as $path) {
+        $parent = dirname($path);
+        while (true) {
+            if (!pmssUserWebRootMigrationParentSafe($home, $parent)
+                || !is_array($stat = @lstat($parent))
+                || (int) $stat['uid'] !== 0 || (((int) $stat['mode']) & 0022) !== 0) {
+                return false;
+            }
+            if ($parent === $home) {
+                break;
+            }
+            $parent = dirname($parent);
+        }
+    }
+    return true;
+}
+
 /** Run as the account, or as an already unprivileged owner of a fixture home. */
 function pmssUserWebRootMigrationRun(string $user, string $home, array $paths, string $command): bool
 {
+    $uid = function_exists('posix_geteuid') ? @posix_geteuid() : -1;
+    $account = function_exists('posix_getpwnam') ? @posix_getpwnam($user) : false;
+    if ($uid === 0 && is_array($account) && isset($account['uid'])
+        && (int) $account['uid'] === 0
+        && !pmssUserWebRootMigrationRootParentsSafe($home, $paths)) {
+        return false;
+    }
     if (pmssAccountPathRun($user, $home, $paths, $command)) {
         return true;
     }
-    $uid = function_exists('posix_geteuid') ? @posix_geteuid() : -1;
     if ($uid < 1 || @fileowner($home) !== $uid || !pmssPathTargetIsSafe($home, true)) {
         return false;
     }
@@ -204,7 +230,22 @@ function pmssUserWebRootMigrationRenameAsAccount(string $user, string $home, str
         return false;
     }
     $command = 'mv -T -- '.escapeshellarg($source).' '.escapeshellarg($target);
-    $moved = pmssUserWebRootMigrationRun($user, $home, [$source, $target], $command);
+    $uid = function_exists('posix_geteuid') ? @posix_geteuid() : -1;
+    $account = function_exists('posix_getpwnam') ? @posix_getpwnam($user) : false;
+    // The caller already has account authority; PHP rename preserves the
+    // existing empty-directory replacement used by full restore.
+    $sameAccount = $uid > 0 && is_array($account) && isset($account['uid'])
+        && (int) $account['uid'] === $uid
+        && @fileowner($home) === $uid;
+    $rootAccount = $uid === 0 && is_array($account) && isset($account['uid'])
+        && (int) $account['uid'] === 0
+        && pmssUserWebRootMigrationRootParentsSafe($home, [$source, $target]);
+    $moved = false;
+    if ($sameAccount || $rootAccount) {
+        $moved = @rename($source, $target);
+    } elseif ($uid !== 0 || !is_array($account) || !isset($account['uid']) || (int) $account['uid'] !== 0) {
+        $moved = pmssUserWebRootMigrationRun($user, $home, [$source, $target], $command);
+    }
     if (!$moved && dirname($source) === $home && dirname($target) === $home) {
         // A root-owned, non-writable home cannot have its direct children
         // substituted by the tenant while root performs watchdog recovery.
@@ -219,6 +260,7 @@ function pmssUserWebRootMigrationRenameAsAccount(string $user, string $home, str
             && $current['dev'] === $before['dev'] && $current['ino'] === $before['ino']
             && @rename($source, $target);
     }
+    clearstatcache(true, $target);
     $after = $moved ? @lstat($target) : false;
     return is_array($after) && !is_link($target)
         && $after['dev'] === $before['dev'] && $after['ino'] === $before['ino'];

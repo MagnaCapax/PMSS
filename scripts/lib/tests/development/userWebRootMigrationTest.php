@@ -65,6 +65,24 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertFalse(file_exists($source));
     }
 
+    public function testSameAccountRenameReplacesEmptyDirectoryWithoutShellMv(): void
+    {
+        if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+            return;
+        }
+        $source = $this->home.'/www/public';
+        $target = $this->home.'/.local/share/pmss/public';
+        $this->pmssWriteFile($source.'/nested/index.html', 'customer-content');
+        $this->pmssEnsureDir($target);
+        $before = \pmssUserWebRootMigrationSnapshot($source, true);
+        $this->pmssTrackEnvOverrides(['PATH' => $this->pmssMakeTempDir('pmss-web-root-empty-path-')]);
+
+        $this->assertTrue(\pmssUserWebRootMigrationRenameAsAccount($this->user, $this->home, $source, $target));
+        $this->assertSame($before, \pmssUserWebRootMigrationSnapshot($target, true));
+        $this->assertSame('customer-content', file_get_contents($target.'/nested/index.html'));
+        $this->assertFalse(file_exists($source));
+    }
+
     public function testAccountRenameRefusesLinkedDestinationParentAndPreservesOutside(): void
     {
         $source = $this->home.'/www/public';
@@ -79,6 +97,25 @@ class UserWebRootMigrationTest extends TestCase
         ));
         $this->assertSame('customer-content', file_get_contents($source.'/index.html'));
         $this->assertSame('outside-content', file_get_contents($outside.'/public/index.html'));
+    }
+
+    public function testRootFixtureRenameRefusesWritableParent(): void
+    {
+        if (!function_exists('posix_geteuid') || posix_geteuid() !== 0) {
+            return;
+        }
+        $source = $this->home.'/www/public';
+        $target = $this->home.'/.local/share/pmss/public';
+        $this->pmssWriteFile($source.'/index.html', 'customer-content');
+        $this->pmssEnsureDir(dirname($target));
+        chmod($this->home.'/www', 0777);
+        try {
+            $this->assertFalse(\pmssUserWebRootMigrationRenameAsAccount($this->user, $this->home, $source, $target));
+            $this->assertSame('customer-content', file_get_contents($source.'/index.html'));
+            $this->assertFalse(file_exists($target));
+        } finally {
+            chmod($this->home.'/www', 0755);
+        }
     }
 
     public function testExistingMigrationIsIdempotent(): void
