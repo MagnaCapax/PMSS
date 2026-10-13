@@ -138,14 +138,18 @@ function pmssCronRestartDropinContent(?int $cpuThreads = null): string
         ."RestartSec=10\n";
 }
 
+/** Restart a failed ProFTPD master after transient startup dependencies recover. */
+function pmssProftpdRestartDropinContent(): string
+{
+    return "[Unit]\nStartLimitIntervalSec=0\n\n[Service]\nRestart=always\nRestartSec=30\n";
+}
+
 /**
- * Ensure the cron.service restart policy drop-in is written to a safe target.
+ * Ensure a service restart policy drop-in is written to a safe target.
  */
-function pmssEnsureCronRestartDropin(
-    string $dropinDir = '/etc/systemd/system/cron.service.d',
-    string $dropinFile = '',
-    string $systemdRuntimeDir = '/run/systemd/system',
-    ?bool &$changed = null
+function pmssEnsureServiceRestartDropin(
+    string $label, string $content, string $dropinDir, string $dropinFile,
+    string $systemdRuntimeDir, ?bool &$changed
 ): bool {
     $changed = false;
     if (!is_dir($systemdRuntimeDir)) {
@@ -155,31 +159,51 @@ function pmssEnsureCronRestartDropin(
     $dropinDir = rtrim($dropinDir, '/');
     $dropinFile = $dropinFile !== '' ? $dropinFile : $dropinDir.'/pmss-restart.conf';
     if ($dropinDir === '' || $dropinDir[0] !== '/' || $dropinFile[0] !== '/' || dirname($dropinFile) !== $dropinDir) {
-        logMessage('[ERR] Refusing unsafe cron systemd drop-in path: '.$dropinFile);
+        logMessage('[ERR] Refusing unsafe '.$label.' systemd drop-in path: '.$dropinFile);
         return false;
     }
     if (!pmssPathTargetIsSafe($dropinDir, true, false, false)) {
-        logMessage('[ERR] Refusing unsafe cron systemd drop-in directory path: '.$dropinDir);
+        logMessage('[ERR] Refusing unsafe '.$label.' systemd drop-in directory path: '.$dropinDir);
         return false;
     }
 
     $changed = pmssRefreshManagedPathFile(
         $dropinFile,
-        pmssCronRestartDropinContent(),
-        'cron systemd drop-in',
+        $content,
+        $label.' systemd drop-in',
         'logMessage',
         [
-            'directoryFailureMessage' => '[ERR] Failed to create cron systemd drop-in directory: '.$dropinDir,
-            'writeFailureMessage' => '[ERR] Failed to write cron systemd drop-in target: '.$dropinFile,
+            'directoryFailureMessage' => '[ERR] Failed to create '.$label.' systemd drop-in directory: '.$dropinDir,
+            'writeFailureMessage' => '[ERR] Failed to write '.$label.' systemd drop-in target: '.$dropinFile,
         ],
         $succeeded
     );
     if ($changed && ((int) @fileperms($dropinFile) & 0777) !== 0644) {
-        logMessage('[ERR] Failed to set cron systemd drop-in mode: '.$dropinFile);
+        logMessage('[ERR] Failed to set '.$label.' systemd drop-in mode: '.$dropinFile);
         $changed = false;
         return false;
     }
     return $succeeded;
+}
+
+/** Preserve the cron drop-in's public call and logging contract. */
+function pmssEnsureCronRestartDropin(
+    string $dropinDir = '/etc/systemd/system/cron.service.d',
+    string $dropinFile = '',
+    string $systemdRuntimeDir = '/run/systemd/system',
+    ?bool &$changed = null
+): bool {
+    return pmssEnsureServiceRestartDropin('cron', pmssCronRestartDropinContent(), $dropinDir, $dropinFile, $systemdRuntimeDir, $changed);
+}
+
+/** Ensure ProFTPD has a retry policy without changing its other unit settings. */
+function pmssEnsureProftpdRestartDropin(
+    string $dropinDir = '/etc/systemd/system/proftpd.service.d',
+    string $dropinFile = '',
+    string $systemdRuntimeDir = '/run/systemd/system',
+    ?bool &$changed = null
+): bool {
+    return pmssEnsureServiceRestartDropin('proftpd', pmssProftpdRestartDropinContent(), $dropinDir, $dropinFile, $systemdRuntimeDir, $changed);
 }
 
 /** PAM session line that places cron-spawned user jobs into user-UID.slice. */

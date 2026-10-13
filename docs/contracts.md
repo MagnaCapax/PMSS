@@ -854,6 +854,9 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Installs/updates root cron entries from `/etc/seedbox/config/root.cron`.
   - Behavior: Maintains the PMSS-owned `cron.service` drop-in with `Restart=always` and an aggregate `TasksMax=8192` cap so cron-spawned user jobs cannot consume host-wide pid capacity.
 
+- scripts/util/ftpConfig.php
+  - Behavior: Installs a PMSS-owned `proftpd.service` restart-only drop-in when the ProFTPD configuration directory exists and systemd is available. A changed drop-in triggers a systemd reload before the existing configuration test and service restart (ADR 0093).
+
 - scripts/cron/checkGui.php
   - Behavior: Runs outside the panel request path and checks non-empty
     `www/index.php` and `www/rutorrent/index.html` sentinels. When either

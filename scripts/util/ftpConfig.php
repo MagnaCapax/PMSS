@@ -7,7 +7,7 @@
  * @author PMSS Team
  */
 
-foreach (['../lib/update.php', '../lib/update/runtime/commands.php', '../lib/update/distro.php', '../lib/configBackups.php'] as $relativePath) {
+foreach (['../lib/update.php', '../lib/update/runtime/commands.php', '../lib/update/services/systemd.php', '../lib/update/distro.php', '../lib/configBackups.php'] as $relativePath) {
     require_once __DIR__.'/'.$relativePath;
 }
 
@@ -25,6 +25,13 @@ $proftpdDir = '/etc/proftpd';
 if (!is_dir($proftpdDir)) {
     logMessage("Skipping ProFTPD configuration (directory {$proftpdDir} missing).");
     exit(0);
+}
+
+// Retry failed starts after transient name-resolution failures; preserve deliberate systemctl stops.
+$dropinChanged = false;
+pmssEnsureProftpdRestartDropin('/etc/systemd/system/proftpd.service.d', '', '/run/systemd/system', $dropinChanged);
+if ($dropinChanged) {
+    runStep('Reloading systemd unit files (proftpd restart policy)', 'systemctl daemon-reload || true');
 }
 
 $hostname = $hostname === '' ? 'localhost' : $hostname;

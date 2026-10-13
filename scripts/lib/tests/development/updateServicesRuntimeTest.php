@@ -109,6 +109,69 @@ class UpdateServicesRuntimeTest extends TestCase
         $this->assertSame(0644, fileperms($dropinFile) & 0777);
     }
 
+    public function testProftpdRestartDropinHasOnlyRestartPolicy(): void
+    {
+        $this->assertSame(
+            "[Unit]\nStartLimitIntervalSec=0\n\n[Service]\nRestart=always\nRestartSec=30\n",
+            \pmssProftpdRestartDropinContent()
+        );
+    }
+
+    public function testProftpdRestartDropinCreatesAndSkipsUnchangedContent(): void
+    {
+        list($root, $dropinDir, $dropinFile) = $this->pmssProftpdDropinFixture('pmss-proftpd-dropin-');
+        $changed = false;
+        $this->assertTrue(\pmssEnsureProftpdRestartDropin($dropinDir, $dropinFile, $root, $changed));
+        $this->assertTrue($changed);
+        $this->assertSame(\pmssProftpdRestartDropinContent(), $this->pmssReadFileOrEmpty($dropinFile));
+        $this->assertSame(0644, fileperms($dropinFile) & 0777);
+
+        $mtime = filemtime($dropinFile);
+        $changed = true;
+        $this->assertTrue(\pmssEnsureProftpdRestartDropin($dropinDir, $dropinFile, $root, $changed));
+        $this->assertFalse($changed);
+        $this->assertSame($mtime, filemtime($dropinFile));
+    }
+
+    public function testProftpdRestartDropinRefusesUnsafePaths(): void
+    {
+        list($root, $dropinDir, $dropinFile) = $this->pmssProftpdDropinFixture('pmss-proftpd-unsafe-');
+        $outside = $root.'/outside.conf';
+        $this->pmssWriteFile($outside, 'original');
+        $this->pmssEnsureDir($dropinDir);
+        symlink($outside, $dropinFile);
+        $changed = true;
+        $this->assertFalse(\pmssEnsureProftpdRestartDropin($dropinDir, $dropinFile, $root, $changed));
+        $this->assertFalse($changed);
+        $this->assertSame('original', $this->pmssReadFileOrEmpty($outside));
+
+        $changed = true;
+        $this->assertFalse(\pmssEnsureProftpdRestartDropin($dropinDir, $outside, $root, $changed));
+        $this->assertFalse($changed);
+
+        $linkDir = $root.'/link.service.d';
+        symlink($dropinDir, $linkDir);
+        $changed = true;
+        $this->assertFalse(\pmssEnsureProftpdRestartDropin($linkDir, $linkDir.'/pmss-restart.conf', $root, $changed));
+        $this->assertFalse($changed);
+
+        $linkRoot = $root.'/link-root';
+        $this->pmssCreateSymlinkOrSkip($root, $linkRoot);
+        $changed = true;
+        $this->assertFalse(\pmssEnsureProftpdRestartDropin($linkRoot.'/proftpd.service.d', '', $root, $changed));
+        $this->assertFalse($changed);
+    }
+
+    public function testProftpdConfigWiresRestartPolicyBeforeConfigValidation(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/util/ftpConfig.php', [
+            "if (!is_dir(\$proftpdDir))",
+            'pmssEnsureProftpdRestartDropin(',
+            "runStep('Reloading systemd unit files (proftpd restart policy)'",
+            "runStep('Validating ProFTPD configuration'",
+        ]);
+    }
+
     public function testCronRestartDropinBoundsAggregateCronTasks(): void
     {
         $content = \pmssCronRestartDropinContent();
@@ -299,6 +362,13 @@ class UpdateServicesRuntimeTest extends TestCase
     {
         $root = $this->pmssMakeTempDir($prefix);
         $dropinDir = $root.'/cron.service.d';
+        return [$root, $dropinDir, $dropinDir.'/pmss-restart.conf'];
+    }
+
+    private function pmssProftpdDropinFixture(string $prefix): array
+    {
+        $root = $this->pmssMakeTempDir($prefix);
+        $dropinDir = $root.'/proftpd.service.d';
         return [$root, $dropinDir, $dropinDir.'/pmss-restart.conf'];
     }
 }
