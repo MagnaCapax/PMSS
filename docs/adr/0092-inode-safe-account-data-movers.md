@@ -5,8 +5,9 @@ Category: security
 
 ## Status
 
-Accepted for the four original flows and the account-level webroot operations
-below. Remaining root operations retain their existing behavior.
+Accepted for the original flows, the account-level webroot operations, and
+the userTransfer receiver below. Remaining root operations retain their
+existing behavior.
 
 ## Context
 
@@ -24,6 +25,10 @@ order. A skipped legitimate migration is a data-preservation failure.
 - Use the narrowest existing boundary for each operation: checked open inode
   for the session file, account UID for the share rename, and pinned real
   directories for root moves and purges.
+- Keep the transfer receiver as host root: preserves imported numeric owners,
+  but allows sender-controlled path and hardlink operations with host authority.
+- Run rsync as the account without a user namespace: confines host authority,
+  but loses subordinate UID/GID ownership.
 
 ## Decision
 
@@ -35,6 +40,24 @@ order. A skipped legitimate migration is a data-preservation failure.
   the existing permission normalization. ADR 0041's exact managed share link
   is resolved to its durable in-home directory before validation; unexpected
   links are refused.
+- `userTransfer` now probes the source account's primary and subordinate IDs
+  after authentication. It refuses malformed or oversized mappings, then runs
+  each `rsync -aHAX --numeric-ids` receive as the target account in a user
+  namespace. Namespace UID/GID 0 map to the target account; source subordinate
+  ranges map to the target's allocated subordinate ranges. A private mount
+  namespace remounts regular filesystem paths outside the target home read-only
+  before rsync starts; proc/sys and root-only Docker mounts retain their
+  existing access controls. The home bind remains writable. Missing namespace,
+  mapping, mount, or kernel protected-link prerequisites fail closed. The account-owned child
+  does not inherit the root Expect wrapper's password environment variable.
+  SSH ignores per-account config so a target-owned ProxyCommand cannot reroute
+  the password prompt.
+- The main and final receives exclude root-managed `.billingId`,
+  `.billingServiceId`, and `.billingClientId`. Provisioning writes the target
+  `.billingId` before transfer. The canonical service-ID reader falls back to
+  that file, and the management-host backfill recreates `.billingClientId`.
+  The latter may remain absent until the next backfill run. Rsync does not
+  interpret sender `user.rsync.*` fake-super xattrs as privileged metadata.
 - `recreateUser.php` renames the top-level home and backup only between checked
   real directories under the same parent, then verifies the moved inode.
   Superseded archives use the same pinned purge as termination.
@@ -64,13 +87,6 @@ order. A skipped legitimate migration is a data-preservation failure.
 
 ## Remaining boundaries
 
-- `userTransfer/remoteScripts.php` generates root `rsync -a` passes, including
-  `-R` for volatile paths. Upstream documents an implied-parent receiver write
-  escape for rsync through 3.4.4. Removing `-R` changes where session, share,
-  and public data land; running the receiver as the account loses archived UID
-  ownership. The newer receiver confinement cannot be assumed on the supported
-  Debian baselines. A destination guard or no-follow default alone does not
-  close the implied-parent case, so no such partial change was retained.
 - Webroot legacy copy still copies source entries and applies captured UID,
   GID, mode, and timestamps as root before changing the staged tree to account
   ownership. Its failure cleanup also handles root-owned staged entries. Full
@@ -83,15 +99,16 @@ order. A skipped legitimate migration is a data-preservation failure.
 
 ## Consequences
 
-- Four flows have normal-path and linked-path tests; the CI account-path test
-  pins their reviewed operations. Existing customer data movement and cleanup
-  ordering remain the expected behavior.
-- The rsync flow and remaining root webroot operations must not be described
-  as hardened by this ADR. Their exact constraints above remain open.
+- The receiver test covers layout, hardlinks, subordinate owners, billing
+  fallback, a mid-receive directory-to-symlink swap, and refusal to create a
+  hardlink to a foreign-owned file. Existing cleanup order remains unchanged.
+- Other root webroot operations retain the boundaries described above.
 
 ## References
 
 - ADR 0041: managed and customer-owned webroot state.
 - ADR 0062: synchronous termination purge order.
 - ADR 0084: recreate restore and backup semantics.
-- [Rsync security advisories](https://rsync.samba.org/security.html).
+- [Rsync security advisories](https://rsync.samba.org/security.html), including
+  CVE-2026-53785 (implied-parent escape), CVE-2026-53796 (receiver chdir race),
+  and CVE-2026-53799 (ACL/xattr symlink race) on versions through 3.4.4.

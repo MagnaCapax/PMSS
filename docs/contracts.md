@@ -382,6 +382,13 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 ## User Environment Orchestration – `scripts/lib/update/users.php` and submodules
 
 - User transfer – `scripts/util/userTransfer.php`
+  - Receiver runs as the target account inside a user namespace and a private
+    mount view with filesystem paths outside the target home read-only. Source
+    subordinate IDs map to the target allocation; unmappable ownership fails
+    the transfer. Both
+    rsync passes exclude `.billingId`, `.billingServiceId`, and
+    `.billingClientId`; target provisioning and the canonical fallback reader
+    retain service identity, while client ID returns after fleet backfill.
   - Main rsync excludes server-specific torrent client configs such as
     `~/.config/qBittorrent/qBittorrent.conf`.
   - Post-transfer qBittorrent category preservation reads only category-bearing
@@ -871,8 +878,9 @@ Automation often invokes these utilities; below are expected inputs and effects.
     have `root:<user> 0640` as their managed state. `writeHomeMarker.php` creates
     registered billing markers as root (currently `.billingId`); `recreateUser`
     restores billing files with identity UID 0, and management-host backfill
-    writes them as root. Root-run `userTransfer` uses `rsync -a` to preserve root
-    ownership. Readers require a root-owned regular file. This permission pass
+    writes them as root. `userTransfer` excludes these markers and retains the
+    target's provisioned `.billingId`. Readers require a root-owned regular file.
+    This permission pass
     normalizes ownership and mode only for a root-owned regular file; it logs and
     leaves non-root-owned, symlinked, or other non-regular entries unchanged.
   - Provisioned recipient: Converges `.notifyEmail` to `root:<user> 0640`, preserving customer read access while preventing local redirection of future notifications.

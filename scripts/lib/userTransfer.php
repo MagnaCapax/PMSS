@@ -28,6 +28,7 @@ function pmssUserTransferScratchPayloads(array $cfg, array $paths = []): array
     return [
         'expect' => pmssUserTransferBuildExpectWrapper()."\n",
         'authProbe' => pmssUserTransferBuildAuthProbe($cfg),
+        'identityProbe' => pmssUserTransferBuildIdentityProbe($cfg),
         'mainScript' => pmssUserTransferBuildRsyncMain($cfg),
         'finalScript' => pmssUserTransferBuildRsyncFinal($cfg),
         'remoteSizeScript' => pmssUserTransferBuildRemoteSizeProbe($cfg),
@@ -92,9 +93,9 @@ function pmssUserTransferMain(array $argv): int
         };
         register_shutdown_function($cleanup);
 
-        foreach (pmssUserTransferScratchPayloads($cfg, $scratchPaths) as $key => $contents) {
-            pmssUserTransferWriteFile($scratchPaths[$key], $contents, 0700);
-        }
+        pmssUserTransferWriteFile($scratchPaths['expect'], pmssUserTransferBuildExpectWrapper()."\n", 0700);
+        pmssUserTransferWriteFile($scratchPaths['authProbe'], pmssUserTransferBuildAuthProbe($cfg), 0700);
+        pmssUserTransferWriteFile($scratchPaths['identityProbe'], pmssUserTransferBuildIdentityProbe($cfg), 0700);
 
         try {
             // Validate credentials first so a bad password does not burn dozens of rsync passes.
@@ -102,6 +103,18 @@ function pmssUserTransferMain(array $argv): int
             if ($authRc !== 0) {
                 logMessage(sprintf('[ERR] Aborting user transfer: remote authentication pre-flight failed (rc=%d)', $authRc));
                 return 1;
+            }
+
+            $identityRc = runStep('Reading source ownership ranges', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['identityProbe']]));
+            if ($identityRc !== 0) {
+                throw new RuntimeException('Source ownership probe failed', 1);
+            }
+            $source = pmssUserTransferParseIdentity((string) ($GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? ''));
+            $cfg['receiver'] = pmssUserTransferReceiverConfig($cfg['localUser'], $home, $source);
+            foreach (pmssUserTransferScratchPayloads($cfg, $scratchPaths) as $key => $contents) {
+                if ($key !== 'expect' && $key !== 'authProbe' && $key !== 'identityProbe') {
+                    pmssUserTransferWriteFile($scratchPaths[$key], $contents, 0700);
+                }
             }
 
             $lastMainRc = pmssUserTransferRunPasses('Pulling home data', $scratchPaths['expect'], $scratchPaths['mainScript'], $cfg['mainPasses'], $cfg['sleepMin'], $cfg['sleepMax']);

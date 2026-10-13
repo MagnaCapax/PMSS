@@ -3,6 +3,7 @@ namespace PMSS\Tests;
 
 require_once dirname(__DIR__, 3).'/lib/userTransfer.php';
 require_once dirname(__DIR__, 3).'/lib/user/dockerContainerIds.php';
+require_once dirname(__DIR__, 3).'/lib/user/billingIds.php';
 
 /**
  * Hermetic tests for user transfer helpers.
@@ -132,9 +133,9 @@ class UserTransferTest extends TestCase
         $cfg = $this->baseConfig();
 
         foreach ([
-            [\pmssUserTransferBuildRsyncMain($cfg), ['rsync -a --stats', ':/home/deefbox/', '/home/deefbox/', "--exclude='.rtorrent.rc'", "--exclude='.qbittorrentPort'", "--exclude='.config/pmss-user.json'", "--exclude='.trafficDataIngress'", "--exclude='.trafficDataIngressLocal'", "--exclude='.resourceData'", "--exclude='*.pmss-tmp-*'"], ['rsync -av' => 'expected no verbose per-file rsync logging', '--exclude={' => 'expected no brace-expanded excludes']],
-            [\pmssUserTransferBuildRsyncFinal($cfg), ["rsync -a --stats '-R'", ':/home/deefbox/./session', ':/home/deefbox/./www/public'], ['rsync -av' => 'expected no verbose per-file rsync logging', '{session' => 'expected no brace-expanded sources']],
-            [\pmssUserTransferBuildAuthProbe($cfg), ['ssh -o Compression=no', '-o NumberOfPasswordPrompts=1', "-l 'deefbox'", "'example.com'", "'/bin/true'"], []],
+            [\pmssUserTransferBuildRsyncMain($cfg), ['rsync -aHAX --numeric-ids', ':/home/deefbox/', '/home/deefbox/', '.rtorrent.rc', '.qbittorrentPort', '.config/pmss-user.json', '.trafficDataIngress', '.trafficDataIngressLocal', '.resourceData', '*.pmss-tmp-*', '/.billingId', '/.billingServiceId', '/.billingClientId'], ['rsync -av' => 'expected no verbose per-file rsync logging', '--exclude={' => 'expected no brace-expanded excludes']],
+            [\pmssUserTransferBuildRsyncFinal($cfg), ["rsync -aHAX --numeric-ids", "'-R'", ':/home/deefbox/./session', ':/home/deefbox/./www/public'], ['rsync -av' => 'expected no verbose per-file rsync logging', '{session' => 'expected no brace-expanded sources']],
+            [\pmssUserTransferBuildAuthProbe($cfg), ['ssh -F /dev/null -o Compression=no', '-o NumberOfPasswordPrompts=1', "-l 'deefbox'", "'example.com'", "'/bin/true'"], []],
             [\pmssUserTransferBuildRemoteSizeProbe($this->baseConfig(['remoteUser' => 'remote01', 'verifyThreshold' => 90])), ['-o NumberOfPasswordPrompts=1', "'example.com'", '/home/remote01/', 'du -sb -- "$home"', 'find "$home" -type f -printf .', 'printf "bytes=%s files=%s\\n"'], ['%p' => 'expected no path-printing stat probe output']],
         ] as [$script, $required, $forbidden]) {
             $this->assertStringContainsAndOmitsStrings($required, $forbidden, $script);
@@ -189,7 +190,7 @@ class UserTransferTest extends TestCase
     public function testGeneratedScriptsKeepSharedSshFlagsAligned(): void
     {
         $cfg = $this->baseConfig();
-        $sharedFlags = 'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no';
+        $sharedFlags = 'ssh -F /dev/null -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no';
 
         foreach ([
             \pmssUserTransferBuildRsyncMain($cfg),
@@ -247,30 +248,20 @@ class UserTransferTest extends TestCase
     public function testGeneratedTransferScriptsMatchSnapshot(): void
     {
         $cfg = $this->baseConfig();
-        $expectedScratchPaths = ['expect' => '/root/pmss-userTransfer-<generated>/transfer.expect', 'authProbe' => '/root/pmss-userTransfer-<generated>/auth-probe.sh', 'mainScript' => '/root/pmss-userTransfer-<generated>/rsync-main.sh', 'finalScript' => '/root/pmss-userTransfer-<generated>/rsync-final.sh', 'remoteSizeScript' => '/root/pmss-userTransfer-<generated>/remote-size.sh', 'qbittorrentProbeScript' => '/root/pmss-userTransfer-<generated>/qbittorrent-categories.sh', 'dockerQuiesceScript' => '/root/pmss-userTransfer-<generated>/docker-quiesce.sh', 'dockerIds' => '/root/pmss-userTransfer-<generated>/docker-ids', 'dockerStartScript' => '/root/pmss-userTransfer-<generated>/docker-start.sh', 'qbittorrentConfig' => '/root/pmss-userTransfer-<generated>/qBittorrent.conf', 'qbittorrentCategories' => '/root/pmss-userTransfer-<generated>/categories.json'];
-        $expectedPayloadKeys = ['expect', 'authProbe', 'mainScript', 'finalScript', 'remoteSizeScript', 'qbittorrentProbeScript', 'dockerQuiesceScript'];
-        $expectedMain = <<<'SNAP'
-#!/bin/bash
-set -e
-rsync -a --stats -e 'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l '\''deefbox'\''' --exclude='.rtorrent.rc' --exclude='.config/qBittorrent/qBittorrent.conf' --exclude='.qbittorrentPort' --exclude='.config/pmss-user.json' --exclude='.config/deluge/core.conf' --exclude='.config/deluge/web.conf' --exclude='.cache' --exclude='www' --exclude='session' --exclude='www/rutorrent/share' --exclude='.lighttpd' --exclude='.logs' --exclude='.local' --exclude='.lighttpd.conf' --exclude='.quota' --exclude='.rtorrentExecuteRun' --exclude='.trafficData' --exclude='.trafficDataLocal' --exclude='.trafficDataIngress' --exclude='.trafficDataIngressLocal' --exclude='rTorrentLog' --exclude='.bonusQuota' --exclude='.bonusTraffic' --exclude='.trafficLimit' --exclude='.resourceData' --exclude='*.pmss-tmp-*' 'deefbox@example.com:/home/deefbox/' '/home/deefbox/'
-SNAP;
-        $expectedFinal = <<<'SNAP'
-#!/bin/bash
-set -e
-rsync -a --stats '-R' -e 'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l '\''deefbox'\''' 'deefbox@example.com:/home/deefbox/./session' 'deefbox@example.com:/home/deefbox/./www/rutorrent/share' 'deefbox@example.com:/home/deefbox/./.lighttpd/custom' 'deefbox@example.com:/home/deefbox/./.lighttpd/custom.d' 'deefbox@example.com:/home/deefbox/./.local' 'deefbox@example.com:/home/deefbox/./www/public' '/home/deefbox/'
-SNAP;
+        $expectedScratchPaths = ['expect' => '/root/pmss-userTransfer-<generated>/transfer.expect', 'authProbe' => '/root/pmss-userTransfer-<generated>/auth-probe.sh', 'identityProbe' => '/root/pmss-userTransfer-<generated>/identity-probe.sh', 'mainScript' => '/root/pmss-userTransfer-<generated>/rsync-main.sh', 'finalScript' => '/root/pmss-userTransfer-<generated>/rsync-final.sh', 'remoteSizeScript' => '/root/pmss-userTransfer-<generated>/remote-size.sh', 'qbittorrentProbeScript' => '/root/pmss-userTransfer-<generated>/qbittorrent-categories.sh', 'dockerQuiesceScript' => '/root/pmss-userTransfer-<generated>/docker-quiesce.sh', 'dockerIds' => '/root/pmss-userTransfer-<generated>/docker-ids', 'dockerStartScript' => '/root/pmss-userTransfer-<generated>/docker-start.sh', 'qbittorrentConfig' => '/root/pmss-userTransfer-<generated>/qBittorrent.conf', 'qbittorrentCategories' => '/root/pmss-userTransfer-<generated>/categories.json'];
+        $expectedPayloadKeys = ['expect', 'authProbe', 'identityProbe', 'mainScript', 'finalScript', 'remoteSizeScript', 'qbittorrentProbeScript', 'dockerQuiesceScript'];
         $expectedAuth = <<<'SNAP'
 #!/bin/bash
 set -e
-ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o NumberOfPasswordPrompts=1 -l 'deefbox' 'example.com' '/bin/true'
+ssh -F /dev/null -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o NumberOfPasswordPrompts=1 -l 'deefbox' 'example.com' '/bin/true'
 SNAP;
 
-        $this->assertEquals($expectedMain."\n", \pmssUserTransferBuildRsyncMain($cfg));
-        $this->assertEquals($expectedFinal."\n", \pmssUserTransferBuildRsyncFinal($cfg));
+        $this->assertStringContainsAllStrings(['--numeric-ids', '--usermap=', '--groupmap=', 'unshare -U', 'env -u PMSS_USER_TRANSFER_PASSWORD', '/.billingId'], \pmssUserTransferBuildRsyncMain($cfg));
+        $this->assertStringContainsAllStrings(['--numeric-ids', '-R', 'unshare -U', '/.billingClientId'], \pmssUserTransferBuildRsyncFinal($cfg));
         $this->assertEquals($expectedAuth."\n", \pmssUserTransferBuildAuthProbe($cfg));
         $this->assertSame($expectedScratchPaths, \pmssUserTransferScratchPaths('/root/pmss-userTransfer-<generated>/'));
         $this->assertSame($expectedPayloadKeys, array_keys(\pmssUserTransferScratchPayloads($cfg)));
-        $this->assertSame('27a5c229df1afe3aebf5b903cddd085410c1b0ecdeb7183dca903aa0ac2c69eb', hash('sha256', json_encode(\pmssUserTransferScratchPayloads($cfg))));
+        $this->assertStringContainsString('/etc/sub$kind', \pmssUserTransferScratchPayloads($cfg)['identityProbe']);
     }
 
     public function testDockerQuiesceProbeBoundsAndStopsSourceSet(): void
@@ -342,7 +333,7 @@ SNAP;
         );
 
         $this->assertStringContainsAllStrings([
-            "ssh -o Compression=no",
+            "ssh -F /dev/null -o Compression=no",
             "-o NumberOfPasswordPrompts=1",
             "-l 'deefbox'",
             "'example.com'",
@@ -409,16 +400,156 @@ SNAP;
     public function testSharedRsyncCommandBuilderMatchesSnapshot(): void
     {
         $cfg = $this->baseConfig();
-        $expected = <<<'SNAP'
-#!/bin/bash
-set -e
-rsync -a --stats -e 'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l '\''deefbox'\''' --exclude='www' --exclude='session' 'deefbox@example.com:/home/deefbox/' 'deefbox@example.com:/home/deefbox/.local' '/home/deefbox/'
-SNAP;
+        $script = \pmssUserTransferBuildRsyncCommand($cfg, ['/home/deefbox/', '/home/deefbox/.local'], ['www', 'session']);
+        $this->assertStringContainsAllStrings(['rsync -aHAX --numeric-ids', 'www', 'session', 'unshare -U', 'wait "$child"'], $script);
+    }
 
-        $this->assertEquals(
-            $expected."\n",
-            \pmssUserTransferBuildRsyncCommand($cfg, ['/home/deefbox/', '/home/deefbox/.local'], ['www', 'session'])
-        );
+    public function testSourceIdentityAndSubordinateMapsRejectUnsafeInputs(): void
+    {
+        $frame = static function (string $body): string {
+            return "password: \nPMSS_TRANSFER_IDENTITY_BEGIN ".$body."PMSS_TRANSFER_IDENTITY_END\nConnection closed.\n";
+        };
+        $identity = \pmssUserTransferParseIdentity($frame("uid=2200 gid=2300\nsubuid=110000:2\nsubgid=120000:2\n"));
+        $this->assertSame([110000, 2], $identity['subuid'][0]);
+        $this->assertSame("0 3000 1\n110000 200000 2\n", \pmssUserTransferIdMap($identity['subuid'], [[200000, 2]], 3000));
+        foreach (["", "uid=0 gid=0\n", "uid=2200 gid=2300\nsubuid=110000:0\n",
+            "uid=2200 gid=2300\nsubuid=110000:2\nsubuid=110001:2\n",
+            "uid=2200 gid=2300\nsubuid=110000:2\ninvalid\n",
+            "uid=110000 gid=2300\nsubuid=110000:2\n",
+            "uid=18446744073709551615 gid=2300\n"] as $invalid) {
+            $this->assertThrowsRuntime(static function () use ($invalid, $frame): void {
+                \pmssUserTransferParseIdentity($invalid === '' ? '' : $frame($invalid));
+            }, 'Source');
+        }
+        $this->assertThrowsRuntime(static function () use ($identity): void {
+            \pmssUserTransferIdMap($identity['subuid'], [[200000, 1]], 3000);
+        }, 'too small');
+        $this->assertThrowsRuntime(static function () use ($identity): void {
+            \pmssUserTransferIdMap($identity['subuid'], [[200000, 2], [200001, 2]], 3000);
+        }, 'overlaps');
+    }
+
+    /** Root-only local rehearsal: no network or host account mutation. */
+    public function testNamespacedReceiverPreservesPayloadAndBillingFallback(): void
+    {
+        if (!function_exists('posix_geteuid') || posix_geteuid() !== 0) {
+            throw new SkipTest('requires root for user-namespace ownership mapping');
+        }
+        $account = posix_getpwnam('nobody');
+        if (!is_array($account) || !is_executable('/usr/bin/unshare') || !is_executable('/usr/bin/setpriv')) {
+            throw new SkipTest('receiver prerequisites unavailable');
+        }
+        $root = $this->pmssMakeTempPath('pmss-userTransfer-namespace-');
+        mkdir($root, 0755);
+        $source = $root.'/source';
+        $target = $root.'/target';
+        $outside = $root.'/outside';
+        mkdir($source, 0755);
+        mkdir($source.'/data', 0755);
+        mkdir($target, 0755);
+        mkdir($outside, 0755);
+        chmod($root, 0755);
+        chmod($source, 0755);
+        chmod($source.'/data', 0755);
+        chown($source, $account['uid']);
+        chgrp($source, $account['gid']);
+        chown($source.'/data', $account['uid']);
+        chgrp($source.'/data', $account['gid']);
+        chown($outside, $account['uid']);
+        chgrp($outside, $account['gid']);
+        chown($target, $account['uid']);
+        chgrp($target, $account['gid']);
+        file_put_contents($target.'/.billingId', "98765\n");
+        chmod($target.'/.billingId', 0640);
+        foreach (['.billingId', '.billingServiceId', '.billingClientId'] as $marker) {
+            file_put_contents($source.'/'.$marker, "1\n");
+        }
+        file_put_contents($source.'/data/payload', 'payload');
+        chown($source.'/data/payload', $account['uid']);
+        chgrp($source.'/data/payload', $account['gid']);
+        link($source.'/data/payload', $source.'/data/hardlink');
+        file_put_contents($source.'/data/subordinate', 'subordinate');
+        chown($source.'/data/subordinate', 100000);
+        chgrp($source.'/data/subordinate', 100000);
+        chmod($source.'/data/subordinate', 0644);
+        file_put_contents($source.'/data/setuid', 'not executable code');
+        chown($source.'/data/setuid', $account['uid']);
+        chgrp($source.'/data/setuid', $account['gid']);
+        chmod($source.'/data/setuid', 04755);
+        $hasFakeSuper = is_executable('/usr/bin/setfattr') && is_executable('/usr/bin/getfattr');
+        if ($hasFakeSuper) {
+            exec('setfattr -n '.escapeshellarg('user.rsync.%stat').' -v '.escapeshellarg('0:0:04755')
+                .' '.escapeshellarg($source.'/data/setuid'), $ignored, $xattrRc);
+            $this->assertSame(0, $xattrRc, 'fake-super fixture xattr could not be set');
+        }
+        symlink($outside, $target.'/escape');
+        mkdir($source.'/escape');
+        chmod($source.'/escape', 0755);
+        chown($source.'/escape', $account['uid']);
+        chgrp($source.'/escape', $account['gid']);
+        file_put_contents($source.'/escape/blocked', 'must stay inside target');
+        chown($source.'/escape/blocked', $account['uid']);
+        chgrp($source.'/escape/blocked', $account['gid']);
+        $cfg = ['receiver' => ['uid' => $account['uid'], 'gid' => $account['gid'], 'home' => $target,
+            'uidMap' => "0 {$account['uid']} 1\n110000 100000 1\n",
+            'gidMap' => "0 {$account['gid']} 1\n120000 100000 1\n",
+            'sourceUid' => 2200, 'sourceGid' => 2300]];
+        $rsync = 'rsync -aHAX --numeric-ids --usermap=2200:0 --groupmap=2300:0 '
+            .'--filter='.escapeshellarg('-x user.rsync.*').' --filter='.escapeshellarg('-x! user.*').' '
+            .'--exclude=/.billingId --exclude=/.billingServiceId --exclude=/.billingClientId '
+            .escapeshellarg($source.'/').' '.escapeshellarg($target.'/');
+        $script = \pmssUserTransferBuildReceiver($cfg, $rsync);
+        $output = [];
+        exec('bash -c '.escapeshellarg("set -e\n".$script).' 2>&1', $output, $rc);
+        $this->assertSame(0, $rc, implode("\n", $output));
+        $this->assertSame('payload', file_get_contents($target.'/data/payload'));
+        $this->assertSame(fileinode($target.'/data/payload'), fileinode($target.'/data/hardlink'));
+        $this->assertSame($account['uid'], fileowner($target.'/data/payload'));
+        $this->assertSame(100000, fileowner($target.'/data/subordinate'));
+        $this->assertSame(100000, filegroup($target.'/data/subordinate'));
+        $this->assertSame(0, fileowner($target.'/.billingId'));
+        $this->assertSame(98765, \pmssUserBillingServiceIdRead($target, true));
+        $this->assertFalse(file_exists($target.'/.billingServiceId'));
+        $this->assertFalse(file_exists($target.'/.billingClientId'));
+        $this->assertTrue(fileowner($target.'/data/setuid') !== 0);
+        if ($hasFakeSuper) {
+            exec('getfattr -n '.escapeshellarg('user.rsync.%stat').' '.escapeshellarg($target.'/data/setuid').' 2>/dev/null', $ignored, $xattrRc);
+            $this->assertTrue($xattrRc !== 0, 'fake-super metadata must not land on the target');
+        }
+        $this->assertFalse(file_exists($outside.'/blocked'));
+        $escape = 'touch '.escapeshellarg($outside.'/escaped');
+        exec('bash -c '.escapeshellarg("set -e\n".\pmssUserTransferBuildReceiver($cfg, $escape)).' 2>&1', $output, $escapeRc);
+        $this->assertTrue($escapeRc !== 0, 'receiver mount view must refuse writes outside the home');
+        $this->assertFalse(file_exists($outside.'/escaped'));
+        $noPassword = 'bash -c '.escapeshellarg('test -z "${PMSS_USER_TRANSFER_PASSWORD+x}"');
+        exec('PMSS_USER_TRANSFER_PASSWORD=secret bash -c '
+            .escapeshellarg("set -e\n".\pmssUserTransferBuildReceiver($cfg, $noPassword)).' 2>&1', $output, $passwordRc);
+        $this->assertSame(0, $passwordRc, 'account-owned receiver inherited the password');
+        $link = 'ln '.escapeshellarg($target.'/.billingId').' '.escapeshellarg($target.'/data/cross-tenant-link');
+        exec('bash -c '.escapeshellarg("set -e\n".\pmssUserTransferBuildReceiver($cfg, $link)).' 2>&1', $output, $linkRc);
+        $this->assertTrue($linkRc !== 0, 'namespace receiver must not hardlink a foreign-owned file');
+
+        // The attacker replaces a directory only after the receiver has started.
+        mkdir($target.'/swap', 0755);
+        chown($target.'/swap', $account['uid']);
+        $swapShell = 'touch '.escapeshellarg($target.'/.ready')
+            .'; while [ ! -L '.escapeshellarg($target.'/swap').' ]; do sleep 0.01; done; '
+            .'touch '.escapeshellarg($target.'/swap/escaped');
+        $swapCommand = 'bash -c '.escapeshellarg($swapShell);
+        $process = proc_open('bash -c '.escapeshellarg("set -e\n".\pmssUserTransferBuildReceiver($cfg, $swapCommand)),
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $this->assertTrue(is_resource($process), 'receiver process must start');
+        for ($i = 0; $i < 500 && !file_exists($target.'/.ready'); $i++) {
+            usleep(10000);
+        }
+        $this->assertTrue(file_exists($target.'/.ready'), 'receiver did not reach the swap point');
+        $this->assertTrue(rename($target.'/swap', $target.'/parked'), 'attacker rename failed');
+        $this->assertTrue(symlink($outside, $target.'/swap'), 'attacker symlink failed');
+        $swapOutput = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $this->assertTrue(proc_close($process) !== 0, (string) $swapOutput);
+        $this->assertFalse(file_exists($outside.'/escaped'));
     }
 
     public function testRewriteBencodedHomePathsHandlesRewriteNoopAndMalformedInput(): void
@@ -784,7 +915,9 @@ SNAP;
 
     private function baseConfig(array $overrides = []): array
     {
-        return array_replace(['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'], $overrides);
+        return array_replace(['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com',
+            'receiver' => ['uid' => 1200, 'gid' => 1200, 'home' => '/home/deefbox', 'uidMap' => "0 1200 1\n100000 200000 65536\n",
+                'gidMap' => "0 1200 1\n100000 200000 65536\n", 'sourceUid' => 1300, 'sourceGid' => 1300]], $overrides);
     }
 
     private function assertHostnameValidity(array $hostnames, bool $expected, string $label): void

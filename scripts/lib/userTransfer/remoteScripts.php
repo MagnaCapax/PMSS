@@ -7,12 +7,14 @@
  */
 
 require_once __DIR__.'/../user/dockerContainerIds.php';
+require_once __DIR__.'/receiverNamespace.php';
 
 function pmssUserTransferScratchPaths(string $scratchRoot): array
 {
     $scratchRoot = rtrim($scratchRoot, '/');
     return [
         'expect' => $scratchRoot.'/transfer.expect', 'authProbe' => $scratchRoot.'/auth-probe.sh',
+        'identityProbe' => $scratchRoot.'/identity-probe.sh',
         'mainScript' => $scratchRoot.'/rsync-main.sh', 'finalScript' => $scratchRoot.'/rsync-final.sh',
         'remoteSizeScript' => $scratchRoot.'/remote-size.sh', 'qbittorrentProbeScript' => $scratchRoot.'/qbittorrent-categories.sh',
         'dockerQuiesceScript' => $scratchRoot.'/docker-quiesce.sh', 'dockerIds' => $scratchRoot.'/docker-ids',
@@ -24,7 +26,9 @@ function pmssUserTransferScratchPaths(string $scratchRoot): array
 
 function pmssUserTransferBuildSshCommand(string $remoteUser, array $extraOptions = []): string
 {
-    return 'ssh '.implode(' ', array_merge([
+    // The receiver runs as the customer; ignore customer-controlled SSH config
+    // so it cannot redirect the password prompt to a ProxyCommand.
+    return 'ssh -F /dev/null '.implode(' ', array_merge([
         '-o Compression=no', '-o UserKnownHostsFile=/dev/null', '-o StrictHostKeyChecking=no',
     ], $extraOptions, ['-l '.escapeshellarg($remoteUser)]));
 }
@@ -54,9 +58,14 @@ function pmssUserTransferBuildRsyncCommand(
         $arguments[] = escapeshellarg($prefix.$source);
     }
 
-    return "#!/bin/bash\nset -e\n".'rsync -a --stats'.($options === '' ? '' : ' '.$options).' -e '
+    $rsync = 'rsync -aHAX --numeric-ids --stats --usermap='
+        .escapeshellarg($cfg['receiver']['sourceUid'].':0').' --groupmap='
+        .escapeshellarg($cfg['receiver']['sourceGid'].':0')
+        .' --filter='.escapeshellarg('-x user.rsync.*').' --filter='.escapeshellarg('-x! user.*')
+        .($options === '' ? '' : ' '.$options).' -e '
         .escapeshellarg(pmssUserTransferBuildSshCommand($cfg['remoteUser']))
-        .' '.implode(' ', $arguments).' '.escapeshellarg('/home/'.$cfg['localUser'].'/')."\n";
+        .' '.implode(' ', $arguments).' '.escapeshellarg('/home/'.$cfg['localUser'].'/');
+    return "#!/bin/bash\nset -e\n".pmssUserTransferBuildReceiver($cfg, $rsync);
 }
 
 function pmssUserTransferBuildRsyncMain(array $cfg): string
@@ -67,6 +76,7 @@ function pmssUserTransferBuildRsyncMain(array $cfg): string
         '.lighttpd', '.logs', '.local', '.lighttpd.conf', '.quota', '.rtorrentExecuteRun', '.trafficData',
         '.trafficDataLocal', '.trafficDataIngress', '.trafficDataIngressLocal', 'rTorrentLog', '.bonusQuota',
         '.bonusTraffic', '.trafficLimit', '.resourceData', '*.pmss-tmp-*',
+        '/.billingId', '/.billingServiceId', '/.billingClientId',
     ];
 
     return pmssUserTransferBuildRsyncCommand($cfg, ['/home/'.$cfg['remoteUser'].'/'], $excludes);
@@ -78,7 +88,7 @@ function pmssUserTransferBuildRsyncFinal(array $cfg): string
     return pmssUserTransferBuildRsyncCommand($cfg, [
         $remoteHome.'/./session', $remoteHome.'/./www/rutorrent/share', $remoteHome.'/./.lighttpd/custom',
         $remoteHome.'/./.lighttpd/custom.d', $remoteHome.'/./.local', $remoteHome.'/./www/public',
-    ], [], ['-R']);
+    ], ['/.billingId', '/.billingServiceId', '/.billingClientId'], ['-R']);
 }
 
 function pmssUserTransferBuildAuthProbe(array $cfg): string
