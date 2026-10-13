@@ -153,6 +153,19 @@ class SystemStatsCollectTest extends TestCase
         }
     }
 
+    public function testPsiParserRejectsMalformedAndUnrepresentableFields(): void
+    {
+        $raw = "some avg10=1.23 avg60=4.56 avg300=7.89 total=123\nfull avg10=0.12 avg60=0.34 avg300=0.56 total=456\n";
+        foreach (['.', '1..2', '1e2', '101', str_repeat('9', 400)] as $invalid) {
+            $this->assertSame('na', \pmssSystemStatsPsiFromRaw(str_replace('avg10=1.23', 'avg10='.$invalid, $raw)));
+        }
+        foreach (['.', '1.5', PHP_INT_MAX.'0'] as $invalid) {
+            $result = \pmssSystemStatsPsiFromRaw(str_replace('total=456', 'total='.$invalid, $raw));
+            $this->assertSame('1.2/4.6/0.1/7.9/0.3/0.6/123/na', $result);
+        }
+        $this->assertSame('1.2/4.6/0.1/7.9/0.3/0.6/123/456', \pmssSystemStatsPsiFromRaw($raw));
+    }
+
     public function testTopMemoryRowsRenderValidatedCompactValues(): void
     {
         $this->assertEquals(

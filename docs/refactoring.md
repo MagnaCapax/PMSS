@@ -264,6 +264,11 @@ casting, returning the caller's default instead of a saturated integer.
 Representable values, zero, and leading zeroes keep their previous results;
 `RuntimeTest` covers these file-boundary cases.
 
+System-stats PSI parsing accepts finite percentage averages up to 100 and
+representable integer microsecond totals. Malformed or oversized fields render
+as `na`, while valid fields keep the existing slash-joined order and formatting.
+`SystemStatsCollectTest` covers the malformed boundary and legacy snapshot.
+
 Systemd integer counter mapping rejects unsigned decimal values above
 `PHP_INT_MAX` before casting, including values with leading zeros. Oversized
 samples return the existing missing-sample result instead of a saturated counter;
