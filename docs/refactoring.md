@@ -28,6 +28,12 @@ clean-ups.
 
 ## Minimal Contract Rules (Joukahainen)
 
+The file-backed storage benchmark reserves its random output name with exclusive
+creation before preallocation or fio runs. A name collision fails without
+touching the existing entry. Normal and shutdown cleanup compare device and
+inode before unlinking, so a replaced path is left alone. Successful benchmark
+jobs and their report format remain unchanged.
+
 Boot-default convergence logs nonzero `/proc` remount and `update-grub` results
 through the caller logger after managed configuration is persisted. Both steps
 retain their fail-soft flow and successful command sequence.

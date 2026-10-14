@@ -2,9 +2,47 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/storageBenchmark.php';
 
 class StorageBenchSecurityTest extends TestCase
 {
+    public function testBenchmarkFileReservationAndCleanupPreserveForeignEntries(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-bench-file-');
+        $path = $dir.'/pmss-fio-test.dat';
+        $identity = \storageBenchmarkFileReserve($path);
+        $this->assertTrue(is_array($identity));
+        $this->assertTrue(is_file($path));
+
+        // Exclusive creation must leave an existing file and its contents alone.
+        file_put_contents($path, 'original');
+        $this->assertSame(null, \storageBenchmarkFileReserve($path));
+        $this->assertSame('original', file_get_contents($path));
+
+        $oldHandle = fopen($path, 'r');
+        unlink($path);
+        file_put_contents($path, 'replacement');
+        $this->assertFalse(\storageBenchmarkFileCleanup($path, $identity));
+        $this->assertSame('replacement', file_get_contents($path));
+
+        unlink($path);
+        $target = $dir.'/target';
+        file_put_contents($target, 'target');
+        symlink($target, $path);
+        $this->assertSame(null, \storageBenchmarkFileReserve($path));
+        $this->assertFalse(\storageBenchmarkFileCleanup($path, $identity));
+        $this->assertTrue(is_link($path));
+        $this->assertSame('target', file_get_contents($target));
+        fclose($oldHandle);
+
+        unlink($path);
+        $reserved = \storageBenchmarkFileReserve($path);
+        $this->assertTrue(is_array($reserved));
+        $this->assertTrue(\storageBenchmarkFileCleanup($path, $reserved));
+        $this->assertFalse(file_exists($path));
+        $this->assertFalse(\storageBenchmarkFileCleanup($path, $reserved));
+    }
+
     public function testCommandFieldsAndDeviceSizesValidateRawOutput(): void
     {
         // Inject capture results; no command, allocation, or block-device read runs.

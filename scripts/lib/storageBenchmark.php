@@ -111,7 +111,31 @@ function storageBenchmarkDevicePathIsSafe(string $path): bool
 function storageBenchmarkDeviceIsReadableBlock(string $path): bool
 { return storageBenchmarkDevicePathIsSafe($path) && is_readable($path) && @filetype($path) === 'block'; }
 
-function storageBenchmarkRegisterFileCleanup(string $path): void { register_shutdown_function(static function () use ($path): void { if ($path !== '' && is_file($path)) @unlink($path); }); }
+/** Reserve the benchmark name before fio or fallocate can touch it. */
+function storageBenchmarkFileReserve(string $path): ?array
+{
+    $handle = @fopen($path, 'x');
+    if ($handle === false) return null;
+    $identity = @fstat($handle);
+    @fclose($handle);
+    return is_array($identity) ? ['dev' => $identity['dev'], 'ino' => $identity['ino']] : null;
+}
+
+/** Never remove a path replaced after this run reserved its file. */
+function storageBenchmarkFileCleanup(string $path, array $identity): bool
+{
+    clearstatcache(true, $path);
+    $current = @lstat($path);
+    return is_array($current) && $current['dev'] === $identity['dev']
+        && $current['ino'] === $identity['ino'] && @unlink($path);
+}
+
+function storageBenchmarkRegisterFileCleanup(string $path, array $identity): void
+{
+    register_shutdown_function(static function () use ($path, $identity): void {
+        storageBenchmarkFileCleanup($path, $identity);
+    });
+}
 
 /** Read block-device size through a checked command boundary. */
 function storageBenchmarkDeviceSizeBytesRead(string $path): ?int
@@ -140,7 +164,10 @@ function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string
     $free = (int) storageBenchmarkRequireCommandField('df -PB1 '.escapeshellarg($targetDir).' | awk '.escapeshellarg('NR==2 {print $4}'), 'free space', true);
     $use = (int) min($requested, floor($free * 0.8));
     if ($use <= 0) storageBenchmarkFail("Insufficient free space.\n");
-    $testFile = rtrim($targetDir, '/').'/pmss-fio-'.bin2hex(random_bytes(4)).'.dat'; storageBenchmarkRegisterFileCleanup($testFile);
+    $testFile = rtrim($targetDir, '/').'/pmss-fio-'.bin2hex(random_bytes(4)).'.dat';
+    $testFileIdentity = storageBenchmarkFileReserve($testFile);
+    if ($testFileIdentity === null) storageBenchmarkFail("Error: failed to reserve benchmark file.\n");
+    storageBenchmarkRegisterFileCleanup($testFile, $testFileIdentity);
     if (pmssCommandPath('fallocate') !== '' && runCommand('fallocate -l '.$use.' '.escapeshellarg($testFile)) !== 0) storageBenchmarkFail("Error: failed to preallocate benchmark file.\n");
     $summary = [];
     foreach (storageBenchmarkFileJobs() as $job) {
@@ -150,7 +177,7 @@ function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string
         if ($res['ok']) $summary[] = [$job['name'], $res['result']['read_bw_MBps'], $res['result']['write_bw_MBps'], $res['result']['read_iops'], $res['result']['write_iops'], $res['result']['read_p95_ms'], $res['result']['write_p95_ms']];
         storageBenchmarkAppendJsonLine($jsonLog, $entry);
     }
-    @unlink($testFile);
+    storageBenchmarkFileCleanup($testFile, $testFileIdentity);
     return $summary;
 }
 
