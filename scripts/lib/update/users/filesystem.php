@@ -80,7 +80,16 @@ function pmssUserDeletePathIfPresent(string $path): void
 /** Keep the old installer while a user crontab still executes it. */
 function pmssUserRemoveLegacyOpenClawInstaller(string $user, string $home, string $spoolDir = '/var/spool/cron/crontabs'): void
 {
-    $crontab = @file_get_contents($spoolDir.'/'.$user);
+    $crontabPath = $spoolDir.'/'.$user;
+    $entry = @lstat($crontabPath);
+    // A special or unreadable spool entry cannot prove the old cron job is gone.
+    if (is_array($entry) && ($entry['mode'] & 0170000) !== 0100000) {
+        return;
+    }
+    $crontab = @file_get_contents($crontabPath);
+    if ($crontab === false && $entry !== false) {
+        return;
+    }
     if (is_string($crontab) && strpos($crontab, 'install-openclaw.php') !== false) {
         return;
     }

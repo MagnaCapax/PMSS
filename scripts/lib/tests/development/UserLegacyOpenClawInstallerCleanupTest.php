@@ -40,6 +40,36 @@ final class UserLegacyOpenClawInstallerCleanupTest extends TestCase
         $this->assertFalse(file_exists($this->legacy));
     }
 
+    public function testDirectorySpoolEntryKeepsInstaller(): void
+    {
+        mkdir($this->spoolDir.'/'.$this->user);
+        \pmssUserRemoveLegacyOpenClawInstaller($this->user, $this->home, $this->spoolDir);
+        $this->assertSame("legacy installer\n", file_get_contents($this->legacy));
+    }
+
+    public function testUnreadableRegularSpoolKeepsInstaller(): void
+    {
+        $path = $this->spoolDir.'/'.$this->user;
+        file_put_contents($path, "@reboot php install-openclaw.php\n");
+        chmod($path, 0000);
+        try {
+            if (is_readable($path)) {
+                throw new SkipTest('current user can read mode-0000 files');
+            }
+            \pmssUserRemoveLegacyOpenClawInstaller($this->user, $this->home, $this->spoolDir);
+            $this->assertSame("legacy installer\n", file_get_contents($this->legacy));
+        } finally {
+            chmod($path, 0600);
+        }
+    }
+
+    public function testNonregularSpoolSymlinkKeepsInstaller(): void
+    {
+        $this->pmssCreateSymlinkOrSkip($this->spoolDir.'/missing', $this->spoolDir.'/'.$this->user);
+        \pmssUserRemoveLegacyOpenClawInstaller($this->user, $this->home, $this->spoolDir);
+        $this->assertSame("legacy installer\n", file_get_contents($this->legacy));
+    }
+
     public function testOutsideSymlinkTargetIsUntouched(): void
     {
         $outside = $this->pmssMakeTempFile('pmss-openclaw-outside-');

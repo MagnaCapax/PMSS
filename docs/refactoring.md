@@ -28,6 +28,10 @@ clean-ups.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Legacy per-user installer cleanup preserves the old installer when its crontab
+entry is non-regular or cannot be read. A missing crontab, or one read
+successfully without the old installer reference, retains cleanup behavior.
+
 The account restart audit writer rejects empty or NUL-containing paths and
 records that cannot be encoded as JSON before creating a directory or opening
 the log. Valid records retain their existing JSON Lines bytes and append result.
