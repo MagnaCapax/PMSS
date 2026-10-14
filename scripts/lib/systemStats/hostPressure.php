@@ -39,6 +39,8 @@ function pmssSystemStatsHostPressurePayloadBuild(array $stats, ?int $timestamp =
 /** Atomically publish the latest host-pressure snapshot as root:root 0644. */
 function pmssSystemStatsHostPressureSnapshotWrite(string $path, array $stats, ?int $timestamp = null, int $ownerUid = 0, int $ownerGid = 0): bool
 {
+    // Reject paths the managed writer cannot use before chmod touches the parent.
+    if (!pmssPathSegmentsAreSafe($path, false, true, true, false)) return false;
     if (!pmssCheckDirectoriesEnsurePublicDirectory(dirname($path), static function (string $message): void {
         fwrite(STDERR, $message.PHP_EOL);
     }, $ownerUid, $ownerGid)) return false;

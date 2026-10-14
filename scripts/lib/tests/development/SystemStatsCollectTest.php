@@ -325,4 +325,17 @@ PHP;
         $this->assertFalse(\pmssSystemStatsHostPressureSnapshotWrite($link, $stats, 101, posix_geteuid(), posix_getegid()));
         $this->assertSame("unchanged\n", file_get_contents($target));
     }
+
+    public function testHostPressureSnapshotRejectsMalformedPathBeforeChangingParent(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-host-pressure-invalid-', 0700);
+        $stats = ['psiIo' => '1/2/3/4/5/6/7/8', 'iopingHome' => '100.0ms'];
+
+        foreach (['', 'relative.json', $dir."/bad\0path"] as $path) {
+            $this->assertFalse(\pmssSystemStatsHostPressureSnapshotWrite($path, $stats, 100, posix_geteuid(), posix_getegid()));
+        }
+        clearstatcache(true, $dir);
+        $this->assertSame(0700, fileperms($dir) & 0777);
+        $this->assertFalse(file_exists($dir.'/bad'));
+    }
 }
