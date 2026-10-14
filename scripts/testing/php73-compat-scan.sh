@@ -22,6 +22,14 @@ fail=0
 scan() {
 	local pattern="$1" label="$2" out
 	out=$("${SEARCHER[@]}" "$pattern" scripts etc/skel/www || true)
+	local bin
+	while IFS= read -r -d '' bin; do
+		if command -v rg >/dev/null 2>&1; then
+			out+=$(rg -n -H --no-ignore "$pattern" "$bin" || true)
+		else
+			out+=$(grep -nE "$pattern" "$bin" || true)
+		fi
+	done < <(find etc/skel/bin -maxdepth 1 -type f -exec grep -lZE '^#!/usr/bin/(env )?php$' {} +)
 	if [[ -n "$out" ]]; then
 		echo "[FAIL] $label found:" >&2
 		echo "$out" >&2

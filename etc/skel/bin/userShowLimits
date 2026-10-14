@@ -1,0 +1,349 @@
+#!/usr/bin/env php
+<?php
+/** Read-only account limits and shared server snapshot. */
+
+/** Keep untrusted display strings from controlling the terminal. */
+function pmssUserShowLimitsText($value)
+{
+    return preg_replace('/[\x00-\x1f\x7f-\x9f]/', '', (string) $value);
+}
+
+/** Shorten fractional values only when rendering the human view. */
+function pmssUserShowLimitsHumanNumber($value)
+{
+    if (!is_float($value) || floor($value) === $value) return pmssUserShowLimitsText($value);
+    if ($value > 0 && $value < 0.01) return '<0.01';
+    return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
+}
+
+/** Add one raw, base-unit metric. */
+function pmssUserShowLimitsMetric(&$metrics, $name, $value, $limit, $unit, $source)
+{
+    $value = $unit === '' && is_string($value) ? pmssUserShowLimitsText($value)
+        : (is_numeric($value) && is_finite((float) $value) ? (float) $value : (is_bool($value) ? $value : (is_string($value) ? pmssUserShowLimitsText($value) : null)));
+    $limit = is_numeric($limit) && (float) $limit > 0 && is_finite((float) $limit) ? (float) $limit : null;
+    $metrics[] = array('metric' => $name, 'value' => $value, 'limit' => $limit,
+        'unit' => $unit, 'percent' => $limit !== null && is_numeric($value) ? round($value * 100 / $limit, 1) : null,
+        'source' => $source);
+}
+
+/** Load one bundled panel reader, checking its exact callable contract. */
+function pmssUserShowLimitsHelper($file, array $functions, array $overrides)
+{
+    $path = $overrides['helper_paths'][$file] ?? (($overrides['www'] ?? __DIR__.'/../www').'/'.$file);
+    if (!is_file($path) || is_link($path)) throw new RuntimeException('Panel helper unavailable');
+    require_once $path;
+    foreach ($functions as $function) {
+        if (!function_exists($function)) throw new RuntimeException('Panel helper outdated');
+    }
+}
+
+/** Read account config without warnings when an old account has no JSON copy. */
+function pmssUserShowLimitsConfig($home, $overrides)
+{
+    pmssUserShowLimitsHelper('scriptsInc.php', array('pmssJsonFileReadAssoc'), $overrides);
+    $config = pmssJsonFileReadAssoc($home.'/.config/pmss-user.json');
+    return is_array($config) ? $config : array();
+}
+
+/** Read numeric account configuration, rejecting arbitrary display text. */
+function pmssUserShowLimitsConfigured(&$metrics, $config, $key, $unit, $scale = 1)
+{
+    $raw = $config[$key] ?? null;
+    // Stored I/O caps use /dev/DEVICE:RATE; only the numeric rate is a metric.
+    if (strpos($key, 'IO') === 0 && strpos($key, 'Weight') === false && is_string($raw)
+        && preg_match('/:\s*([0-9]+)([KMGT]?)(?:i?B)?\s*$/i', $raw, $match)) {
+        $raw = (float) $match[1] * pow(1024, (int) (strpos(' KMGT', strtoupper($match[2])) ?: 0));
+    }
+    $value = is_numeric($raw) && (float) $raw >= 0 && is_finite((float) $raw) ? (float) $raw * $scale : null;
+    pmssUserShowLimitsMetric($metrics, $key.' configured', $value, null, $unit, 'account-config');
+}
+
+/** Parse one quota data line, including stars, grace fields and wrapped devices. */
+function pmssUserShowLimitsQuota($path)
+{
+    $raw = is_file($path) && !is_link($path) ? @file_get_contents($path) : null;
+    if (!is_string($raw)) return null;
+    foreach (preg_split('/\r?\n/', $raw) as $line) {
+        $parts = preg_split('/\s+/', trim($line));
+        if (count($parts) < 6) continue;
+        for ($i = 0; $i < count($parts); $i++) {
+            if (!preg_match('/^([0-9]+(?:\.[0-9]+)?)([KMGTP]?)(\*)?$/i', $parts[$i], $first)) continue;
+            $values = array();
+            $index = $i;
+            while ($index < count($parts) && count($values) < 6) {
+                if (preg_match('/^([0-9]+(?:\.[0-9]+)?)([KMGTP]?)(\*)?$/i', $parts[$index], $match)) {
+                    $power = $match[2] === '' ? (count($values) < 3 ? 1 : 0) : (int) strpos(' KMGTP', strtoupper($match[2]));
+                    $number = (float) $match[1] * pow(1024, $power);
+                    $values[] = $number;
+                } elseif (count($values) !== 3) break;
+                $index++;
+            }
+            if (count($values) === 6) return $values;
+        }
+    }
+    return null;
+}
+
+/** Read one month from the existing serialized account snapshots. */
+function pmssUserShowLimitsMonth($home, $file, $key, $scale = 1)
+{
+    $data = pmssCustomerSerializedArrayFileRead($home.'/'.$file, 1048576);
+    $raw = $key === '' ? ($data['raw']['month'] ?? null) : ($data[$key]['raw']['month'] ?? null);
+    return is_numeric($raw) && (float) $raw >= 0 && is_finite((float) $raw) ? (float) $raw * $scale : null;
+}
+
+/** Read a scalar cgroup value from the account slice only. */
+function pmssUserShowLimitsCgroup($dir, $file, $limit = false)
+{
+    $raw = pmssCustomerTrimmedFileRead($dir.'/'.$file);
+    if ($raw === 'max' || ($limit && $raw === '-1')) return null;
+    return $limit ? pmssCustomerCgroupCounterRead(array($dir.'/'.$file), true)
+        : pmssCustomerUnsignedIntegerFileRead($dir.'/'.$file);
+}
+
+/** Resolve the account slice without crossing into another user's cgroup. */
+function pmssUserShowLimitsSlice($uid, $controller)
+{
+    $slice = '/user.slice/user-'.$uid.'.slice';
+    return is_dir('/sys/fs/cgroup'.$slice) ? '/sys/fs/cgroup'.$slice : '/sys/fs/cgroup/'.$controller.$slice;
+}
+
+/** Collect account and server sections, isolating failures by section. */
+function pmssUserShowLimitsCollect(array $overrides = array(), $human = false)
+{
+    $uid = $overrides['uid'] ?? posix_geteuid();
+    $pw = posix_getpwuid($uid);
+    $home = $overrides['home'] ?? ($pw['dir'] ?? getenv('HOME'));
+    $home = rtrim((string) $home, '/');
+    $user = pmssUserShowLimitsText($pw['name'] ?? basename($home));
+    $host = pmssUserShowLimitsText($overrides['host'] ?? gethostname());
+    $now = $overrides['now'] ?? time();
+    $proc = rtrim($overrides['proc'] ?? '/proc', '/');
+    $cgroups = $overrides['cgroups'] ?? array();
+    $sections = array();
+    $builders = array(
+        'account' => function (&$m) use ($home, $overrides, $user, $host) {
+            pmssUserShowLimitsHelper('scriptsInc.php', array('pmssCustomerBonusDisplayStateRead', 'pmssJsonFileReadAssoc', 'pmssCustomerTrimmedFileRead'), $overrides);
+            $config = pmssUserShowLimitsConfig($home, $overrides);
+            foreach (array('username' => $user, 'hostname' => $host,
+                'PMSS version' => pmssCustomerTrimmedFileRead($overrides['version'] ?? '/etc/seedbox/config/version'),
+                'Debian version' => pmssCustomerTrimmedFileRead($overrides['debian'] ?? '/etc/debian_version')) as $key => $value) {
+                pmssUserShowLimitsMetric($m, $key, $value, null, '', 'proc');
+            }
+            $bonus = pmssCustomerBonusDisplayStateRead($home.'/.bonus', $home.'/.bonusQuota');
+            pmssUserShowLimitsMetric($m, 'bonus', $bonus['value'] ?? null, null, ($bonus['unit'] ?? '') === 'gib' ? 'gib' : 'percent', 'account-config');
+            pmssUserShowLimitsMetric($m, 'Docker enabled', isset($config['dockerEnabled']) ? (bool) $config['dockerEnabled'] : null, null, 'bool', 'account-config');
+        },
+        'disk' => function (&$m) use ($home, $overrides, $now) {
+            $config = pmssUserShowLimitsConfig($home, $overrides);
+            foreach (array('quota', 'quotaBurst') as $key) pmssUserShowLimitsConfigured($m, $config, $key, 'bytes', 1073741824);
+            $quota = pmssUserShowLimitsQuota($home.'/.quota');
+            foreach (array('blocks used' => 0, 'blocks soft' => 1, 'blocks hard' => 2, 'files used' => 3, 'files soft' => 4, 'files hard' => 5) as $name => $index) {
+                $unit = $index < 3 ? 'bytes' : 'count';
+                $value = $quota[$index] ?? null;
+                $limit = $index === 0 ? ($quota[1] ?? null) : ($index === 3 ? ($quota[4] ?? null) : null);
+                pmssUserShowLimitsMetric($m, $name, $value, $limit, $unit, 'quota-snapshot');
+            }
+            pmssUserShowLimitsMetric($m, 'blocks against hard', $quota[0] ?? null, $quota[2] ?? null, 'bytes', 'quota-snapshot');
+            pmssUserShowLimitsMetric($m, 'files against hard', $quota[3] ?? null, $quota[5] ?? null, 'count', 'quota-snapshot');
+            $age = is_file($home.'/.quota') ? @filemtime($home.'/.quota') : false;
+            pmssUserShowLimitsMetric($m, 'snapshot age', $age === false ? null : max(0, $now - $age), null, 'seconds', 'quota-snapshot');
+        },
+        'memory' => function (&$m) use ($home, $uid, $cgroups, $overrides, $now) {
+            pmssUserShowLimitsHelper('scriptsInc.php', array('pmssCustomerCgroupMemoryRead', 'pmssCustomerSerializedArrayFileRead', 'pmssFormatBytes'), $overrides);
+            pmssUserShowLimitsHelper('webCgroupMemoryStatus.php', array('pmssWebCgroupMemoryStatusRead'), $overrides);
+            $config = pmssUserShowLimitsConfig($home, $overrides);
+            pmssUserShowLimitsConfigured($m, $config, 'ramMiB', 'bytes', 1048576);
+            $state = pmssWebCgroupMemoryStatusRead(array('uid' => $uid, 'cgroup_dir' => $cgroups['memory'] ?? '', 'oom_status_path' => $home.'/.oomKillStatus', 'now' => $now));
+            if (empty($state['available'])) throw new RuntimeException('Memory unavailable');
+            pmssUserShowLimitsMetric($m, 'memory', $state['memory_current'] ?? null, $state['limit_bytes'] ?? null, 'bytes', 'cgroup');
+            pmssUserShowLimitsMetric($m, 'memory pressure', $state['pressure_usage_percent'] ?? null, 100, 'percent', 'cgroup');
+            pmssUserShowLimitsMetric($m, 'memory status', $state['status'] ?? null, null, '', 'cgroup');
+            pmssUserShowLimitsMetric($m, 'OOM kills', $state['oom_kill_events'] ?? null, null, 'count', 'cgroup');
+            pmssUserShowLimitsMetric($m, 'RAM GB-hours this month', pmssUserShowLimitsMonth($home, '.resourceData', 'ram_hours'), null, 'gib-hours', 'resource-data');
+        },
+        'processes' => function (&$m) use ($uid, $cgroups, $overrides) {
+            pmssUserShowLimitsHelper('scriptsInc.php', array('pmssCustomerCgroupCounterPaths', 'pmssCustomerCgroupCounterRead', 'pmssCustomerUnsignedIntegerFileRead', 'pmssCustomerTrimmedFileRead'), $overrides);
+            $dir = $cgroups['pids'] ?? '';
+            $currentPaths = $dir !== '' ? array($dir.'/pids.current') : pmssCustomerCgroupCounterPaths($uid, '', 'pids.current', 'pids', 'pids.current');
+            $current = pmssCustomerCgroupCounterRead($currentPaths);
+            $maxPath = $dir !== '' ? array($dir.'/pids.max') : pmssCustomerCgroupCounterPaths($uid, '', 'pids.max', 'pids', 'pids.max');
+            $limit = pmssCustomerCgroupCounterRead($maxPath, true);
+            pmssUserShowLimitsMetric($m, 'processes', $current, $limit, 'count', 'cgroup');
+            $rlimit = posix_getrlimit();
+            foreach (array('soft open files' => 'soft openfiles', 'hard open files' => 'hard openfiles') as $name => $key) {
+                pmssUserShowLimitsMetric($m, $name, $rlimit[$key] ?? null, null, 'count', 'rlimit');
+            }
+        },
+        'cpu' => function (&$m, &$unlimited) use ($home, $uid, $cgroups, $overrides) {
+            pmssUserShowLimitsHelper('scriptsInc.php', array('pmssCustomerTrimmedFileRead', 'pmssCustomerSerializedArrayFileRead'), $overrides);
+            $config = pmssUserShowLimitsConfig($home, $overrides);
+            pmssUserShowLimitsConfigured($m, $config, 'CPUWeight', 'count');
+            pmssUserShowLimitsConfigured($m, $config, 'cpuQuotaPercent', 'percent');
+            $dir = $cgroups['cpu'] ?? pmssUserShowLimitsSlice($uid, 'cpu');
+            $weight = pmssCustomerTrimmedFileRead($dir.'/cpu.weight');
+            $weightName = $weight === null ? 'CPU shares enforced' : 'CPU weight enforced';
+            $weight = $weight === null ? pmssUserShowLimitsCgroup($dir, 'cpu.shares') : $weight;
+            pmssUserShowLimitsMetric($m, $weightName, $weight, null, 'count', 'cgroup');
+            $max = pmssCustomerTrimmedFileRead($dir.'/cpu.max');
+            if ($max !== null) {
+                $parts = preg_split('/\s+/', $max);
+                $quota = ($parts[0] ?? '') === 'max' ? null : ($parts[0] ?? null);
+                $unlimited['CPU quota enforced'] = ($parts[0] ?? '') === 'max';
+                $period = $parts[1] ?? null;
+            } else {
+                $quota = pmssCustomerTrimmedFileRead($dir.'/cpu.cfs_quota_us');
+                $unlimited['CPU quota enforced'] = $quota === '-1';
+                $period = pmssCustomerTrimmedFileRead($dir.'/cpu.cfs_period_us');
+            }
+            $percent = is_numeric($quota) && (float) $quota >= 0 && is_numeric($period) && (float) $period > 0 ? (float) $quota * 100 / (float) $period : null;
+            pmssUserShowLimitsMetric($m, 'CPU quota enforced', $percent, null, 'percent', 'cgroup');
+            pmssUserShowLimitsMetric($m, 'CPU hours this month', ($nano = pmssUserShowLimitsMonth($home, '.resourceData', 'cpu')) === null ? null : $nano / 3600000000000, null, 'hours', 'resource-data');
+        },
+        'disk I/O' => function (&$m) use ($home, $uid, $cgroups, $overrides) {
+            pmssUserShowLimitsHelper('scriptsInc.php', array('pmssCustomerTrimmedFileRead', 'pmssCustomerSerializedArrayFileRead'), $overrides);
+            $config = pmssUserShowLimitsConfig($home, $overrides);
+            foreach (array('IOWeight' => 'count', 'IOReadBW' => 'bytes_per_second', 'IOWriteBW' => 'bytes_per_second', 'IOReadIOPS' => 'iops', 'IOWriteIOPS' => 'iops') as $key => $unit) pmssUserShowLimitsConfigured($m, $config, $key, $unit);
+            $dir = $cgroups['io'] ?? pmssUserShowLimitsSlice($uid, 'blkio');
+            $weight = pmssCustomerTrimmedFileRead($dir.'/io.weight');
+            if ($weight !== null && preg_match('/(?:^|\s)default\s+([0-9]+)/', $weight, $match)) $weight = $match[1];
+            if ($weight === null) $weight = pmssCustomerTrimmedFileRead($dir.'/blkio.bfq.weight');
+            pmssUserShowLimitsMetric($m, 'I/O weight enforced', $weight, null, 'count', 'cgroup');
+            foreach (array('read bps' => 'read_bps', 'write bps' => 'write_bps', 'read IOPS' => 'read_iops', 'write IOPS' => 'write_iops') as $name => $key) {
+                $v1 = 'blkio.throttle.'.$key.'_device';
+                $raw = pmssCustomerTrimmedFileRead($dir.'/'.$v1);
+                if ($raw === null) $raw = pmssCustomerTrimmedFileRead($dir.'/io.max');
+                $value = null;
+                if (is_string($raw) && preg_match('/(?:^|\s)(?:'.preg_quote($key, '/').'\s*=|[0-9]+:[0-9]+\s+)([0-9]+)/', $raw, $match)) $value = $match[1];
+                pmssUserShowLimitsMetric($m, $name.' enforced', $value, null, strpos($key, 'bps') !== false ? 'bytes_per_second' : 'iops', 'cgroup');
+            }
+            foreach (array('io_read' => 'I/O read bytes this month', 'io_write' => 'I/O write bytes this month', 'io_read_ops' => 'I/O read ops this month', 'io_write_ops' => 'I/O write ops this month') as $key => $name) {
+                pmssUserShowLimitsMetric($m, $name, pmssUserShowLimitsMonth($home, '.resourceData', $key), null, strpos($key, 'ops') !== false ? 'count' : 'bytes', 'resource-data');
+            }
+        },
+        'traffic' => function (&$m) use ($home, $overrides) {
+            pmssUserShowLimitsHelper('scriptsInc.php', array('pmssCustomerSerializedArrayFileRead'), $overrides);
+            pmssUserShowLimitsHelper('userTrafficLimit.php', array('pmssTrafficLimitStateRead'), $overrides);
+            $config = pmssUserShowLimitsConfig($home, $overrides);
+            $state = pmssTrafficLimitStateRead($home.'/.trafficLimit', $home.'/.bonusTraffic');
+            $limit = ($state['effectiveLimitGiB'] ?? 0) > 0 ? $state['effectiveLimitGiB'] * 1073741824 : null;
+            pmssUserShowLimitsMetric($m, 'upload this month', pmssUserShowLimitsMonth($home, '.trafficData', '', 1048576), $limit, 'bytes', 'traffic-data');
+            pmssUserShowLimitsMetric($m, 'inbound this month', pmssUserShowLimitsMonth($home, '.trafficDataIngress', '', 1048576), null, 'bytes', 'traffic-data');
+            pmssUserShowLimitsMetric($m, 'bonus traffic', isset($state['bonusGiB']) ? $state['bonusGiB'] * 1073741824 : null, null, 'bytes', 'traffic-data');
+            pmssUserShowLimitsConfigured($m, $config, 'trafficCapMbit', 'mbit');
+        },
+        'server (shared by all accounts)' => function (&$m) use ($proc, $overrides) {
+            $uptime = @file_get_contents($proc.'/uptime');
+            pmssUserShowLimitsMetric($m, 'uptime', is_string($uptime) ? explode(' ', trim($uptime))[0] : null, null, 'seconds', 'proc');
+            $load = @file_get_contents($proc.'/loadavg');
+            $parts = is_string($load) ? preg_split('/\s+/', trim($load)) : array();
+            foreach (array(0 => 'load average (run queue) 1m', 1 => 'load average (run queue) 5m', 2 => 'load average (run queue) 15m') as $index => $name) pmssUserShowLimitsMetric($m, $name, $parts[$index] ?? null, null, 'count', 'proc');
+            $cpuInfo = @file_get_contents($proc.'/cpuinfo');
+            $cpuCount = is_string($cpuInfo) ? preg_match_all('/^processor\s*:/m', $cpuInfo) : null;
+            pmssUserShowLimitsMetric($m, 'CPU count', $overrides['cpu_count'] ?? $cpuCount, null, 'count', 'proc');
+            $info = @file_get_contents($proc.'/meminfo');
+            foreach (array('MemTotal' => 'memory total', 'MemAvailable' => 'memory available') as $key => $name) {
+                $value = is_string($info) && preg_match('/^'.preg_quote($key, '/').':\s*([0-9]+)\s*kB/m', $info, $match) ? (float) $match[1] * 1024 : null;
+                pmssUserShowLimitsMetric($m, $name, $value, null, 'bytes', 'proc');
+            }
+            foreach (array('cpu' => 'some', 'io' => 'full', 'memory' => 'full') as $kind => $level) {
+                $raw = @file_get_contents($proc.'/pressure/'.$kind);
+                $value = is_string($raw) && preg_match('/^'.$level.'\s+avg10=([0-9.]+)/m', $raw, $match) ? $match[1] : null;
+                pmssUserShowLimitsMetric($m, 'server-wide '.$kind.' pressure '.$level.' avg10', $value, null, 'percent', 'proc');
+            }
+            $homeFs = $overrides['home_fs'] ?? '/home';
+            pmssUserShowLimitsMetric($m, 'server /home (shared by all accounts) total', @disk_total_space($homeFs), null, 'bytes', 'filesystem');
+            pmssUserShowLimitsMetric($m, 'server /home (shared by all accounts) free', @disk_free_space($homeFs), null, 'bytes', 'filesystem');
+        },
+    );
+    foreach ($builders as $name => $build) {
+        $metrics = array();
+        $unlimited = array();
+        try {
+            $build($metrics, $unlimited);
+            $sections[$name] = array('available' => true, 'metrics' => $metrics);
+            // Human-only state distinguishes an explicit unlimited cgroup file from a failed read.
+            if ($human && $unlimited) $sections[$name]['unlimited'] = $unlimited;
+        } catch (Throwable $e) {
+            $sections[$name] = array('available' => false, 'metrics' => array());
+        }
+    }
+    return array('user' => $user, 'host' => $host, 'generated_at' => $now, 'sections' => $sections);
+}
+
+/** Display raw metrics without allowing untrusted terminal escapes. */
+function pmssUserShowLimitsHuman(array $data)
+{
+    $noColor = getenv('NO_COLOR');
+    $color = function_exists('posix_isatty') && posix_isatty(STDOUT) && ($term = getenv('TERM')) && $term !== 'dumb' && ($noColor === false || $noColor === '');
+    $width = max(10, min(30, (int) (getenv('COLUMNS') ?: 80) - 55));
+    foreach ($data['sections'] as $section => $state) {
+        echo "\n".($color ? "\033[1m" : '').pmssUserShowLimitsText(ucfirst($section)).($color ? "\033[0m" : '')."\n";
+        if (!$state['available']) { echo "  n/a (panel helper missing or outdated; refreshed by the next PMSS update)\n"; continue; }
+        $configured = array();
+        foreach ($state['metrics'] as $entry) {
+            if ($entry['source'] === 'account-config') $configured[$entry['metric']] = $entry;
+        }
+        foreach ($state['metrics'] as $metric) {
+            $value = $metric['value'];
+            $format = function ($number) { return function_exists('pmssFormatBytes') ? pmssFormatBytes($number) : number_format((float) $number, 0, '.', '').' B'; };
+            $unit = $metric['unit'];
+            $shown = $value === null ? (!empty($state['unlimited'][$metric['metric']]) ? 'unlimited' : 'n/a')
+                : ($unit === 'bytes' || $unit === 'bytes_per_second' ? $format($value).($unit === 'bytes_per_second' ? '/s' : '')
+                : ($unit === 'seconds' && $metric['metric'] === 'uptime' ? floor($value / 86400).'d '.floor($value % 86400 / 3600).'h '.floor($value % 3600 / 60).'m'
+                : ($unit === 'seconds' && $metric['metric'] === 'snapshot age' ? ($value < 60 ? floor($value).'s' : floor($value / 60).'m')
+                : (is_bool($value) ? ($value ? 'yes' : 'no') : pmssUserShowLimitsHumanNumber($value)))));
+            $suffix = $unit === 'percent' ? '%' : ($unit === 'iops' ? ' IOPS' : ($unit !== '' && !in_array($unit, array('bytes', 'bytes_per_second', 'bool', 'count', 'seconds'), true) ? ' '.($unit === 'gib-hours' ? 'GiB-hours' : $unit) : ''));
+            if ($metric['metric'] === 'memory pressure') $suffix = '%';
+            if ($value !== null) $shown .= $suffix;
+            if ($metric['limit'] !== null && $metric['metric'] !== 'memory pressure') $shown .= ' / '.($unit === 'bytes' ? $format($metric['limit']) : pmssUserShowLimitsHumanNumber($metric['limit']).$suffix).' enforced';
+            elseif ($value !== null && in_array($metric['metric'], array('memory', 'processes', 'upload this month'), true)) $shown .= ' / unlimited';
+            elseif ($metric['source'] === 'cgroup' && $value !== null && strpos($metric['metric'], 'enforced') !== false) $shown .= ' enforced';
+            $pair = array('memory' => 'ramMiB configured', 'blocks used' => 'quota configured', 'CPU weight enforced' => 'CPUWeight configured', 'CPU shares enforced' => 'CPUWeight configured', 'CPU quota enforced' => 'cpuQuotaPercent configured', 'I/O weight enforced' => 'IOWeight configured');
+            $configMetric = $configured[$pair[$metric['metric']] ?? ''] ?? null;
+            if ($configMetric !== null && $configMetric['value'] !== null) {
+                $shown .= ' ('.($configMetric['unit'] === 'bytes' ? $format($configMetric['value']) : pmssUserShowLimitsHumanNumber($configMetric['value'])).' configured)';
+            }
+            if ($metric['percent'] !== null) {
+                $pct = $metric['percent'];
+                $filled = min($width, max(0, (int) round($width * min(100, $pct) / 100)));
+                $shade = $pct >= 90 ? '31' : ($pct >= 70 ? '33' : '32');
+                $bar = str_repeat('#', $filled).str_repeat('-', $width - $filled);
+                $shown .= ' ['.($color ? "\033[{$shade}m" : '').$bar.($color ? "\033[0m" : '').'] '.pmssUserShowLimitsHumanNumber($pct).'%';
+            }
+            $shown .= ' ['.$metric['source'].']';
+            echo '  '.str_pad(pmssUserShowLimitsText($metric['metric']), 37).' '.$shown."\n";
+        }
+    }
+}
+
+/** Refuse privileged execution before loading account-owned PHP. */
+function pmssUserShowLimitsRootCheck($euid)
+{
+    if ($euid !== 0) return true;
+    fwrite(STDERR, "userShowLimits: run this as the account user (for example: su - USER -c userShowLimits)\n");
+    return false;
+}
+
+/** Parse CLI output mode and emit a read-only snapshot. */
+function pmssUserShowLimitsMain(array $argv, array $overrides = array())
+{
+    if (!pmssUserShowLimitsRootCheck($overrides['euid'] ?? posix_geteuid())) return 1;
+    $option = $argv[1] ?? '';
+    if (count($argv) > 2 || !in_array($option, array('', '--json', '--jsonl', '--help', '-h'), true)) {
+        fwrite(STDERR, "Usage: userShowLimits [--json|--jsonl|--help]\n");
+        return 2;
+    }
+    if ($option === '--help' || $option === '-h') { echo "Usage: userShowLimits [--json|--jsonl|--help]\n"; return 0; }
+    $data = pmssUserShowLimitsCollect($overrides, $option === '');
+    if ($option === '--json') echo json_encode($data, JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR)."\n";
+    elseif ($option === '--jsonl') {
+        foreach ($data['sections'] as $section => $state) foreach ($state['metrics'] as $metric) {
+            echo json_encode(array('section' => $section) + $metric, JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR)."\n";
+        }
+    } else pmssUserShowLimitsHuman($data);
+    return 0;
+}
+
+if (!defined('PMSS_USER_SHOW_LIMITS_LIBRARY')) exit(pmssUserShowLimitsMain($argv));

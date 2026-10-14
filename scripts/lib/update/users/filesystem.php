@@ -211,6 +211,7 @@ PHP;
         'bin/linuxserverInstall.sh',
         'bin/support',
         'bin/createWebPublicCerts',
+        'bin/userShowLimits',
         'www/scriptsInc.php',
         '.scriptsInc.php',
         'radarr-sonarr.txt',

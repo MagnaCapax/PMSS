@@ -55,7 +55,7 @@ final class PmssCustomerContextFatalScanner
     {
         if (!is_dir($this->www)) return [];
 
-        $wwwFiles = $this->files($this->www, false);
+        $wwwFiles = array_merge($this->files($this->www, false), $this->binPhpFiles());
         $customerDefs = $this->definitions(array_merge($this->files($this->skel, false), $wwwFiles));
         $operatorDefs = $this->definitions($this->files($this->root.'/scripts/lib', true));
         $violations = [];
@@ -89,6 +89,24 @@ final class PmssCustomerContextFatalScanner
             if (!$file->isFile() || $file->getExtension() !== 'php') continue;
             if ($recursive && (strpos($path, '/tests/') !== false || strpos($path, '/devristo/') !== false)) continue;
             $files[] = $path;
+        }
+        sort($files);
+        return $files;
+    }
+
+    /** Discover extensionless PHP commands by their interpreter line. */
+    private function binPhpFiles(): array
+    {
+        $files = [];
+        $dir = $this->skel.'/bin';
+        if (!is_dir($dir)) return $files;
+        foreach (new DirectoryIterator($dir) as $file) {
+            if (!$file->isFile()) continue;
+            $handle = @fopen($file->getPathname(), 'r');
+            if ($handle === false) continue;
+            $first = fgets($handle);
+            fclose($handle);
+            if (is_string($first) && preg_match('~^#!/usr/bin/(?:env )?php\s*$~', $first)) $files[] = $file->getPathname();
         }
         sort($files);
         return $files;
