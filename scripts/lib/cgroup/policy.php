@@ -8,6 +8,7 @@
 
 require_once dirname(__DIR__).'/pathSafety.php';
 require_once dirname(__DIR__).'/runtime.php';
+require_once dirname(__DIR__).'/blockDeviceLeaves.php';
 
 const PMSS_BFQ_KERNEL_MAX = 1000;
 const PMSS_BFQ_FALLBACK_MAX_BONUS_PERCENT = 300;
@@ -65,28 +66,9 @@ function pmssCgroupPolicyMountBfqActive(string $mountPath = '/home', ?string $so
     $device = basename(trim($source ?? pmssCgroupPolicyMountSourceResolve($mountPath)));
     if ($device === '' || preg_match('/^[A-Za-z0-9_-]+$/', $device) !== 1) return null;
 
-    $pending = [[$device, 0]];
-    $complete = true;
-    while ($pending !== []) {
-        list($target, $depth) = array_pop($pending);
-        if ($depth > 8) { $complete = false; continue; }
-
-        // Partitions live beneath their parent disk, not directly in /sys/block.
-        if (!is_dir($sysBlock.'/'.$target)) {
-            $partitions = @glob($sysBlock.'/*/'.$target.'/partition');
-            if ($partitions === false || count($partitions) !== 1) { $complete = false; continue; }
-            $parent = basename(dirname(dirname($partitions[0])));
-            $pending[] = [$parent, $depth + 1];
-            continue;
-        }
-
-        $slaves = @glob($sysBlock.'/'.$target.'/slaves/*');
-        if ($slaves === false) { $complete = false; continue; }
-        if ($slaves !== []) {
-            foreach ($slaves as $slave) $pending[] = [basename($slave), $depth + 1];
-            continue;
-        }
-
+    $topology = pmssBlockDeviceLeaves($device, $sysBlock, static function (string $pattern) { return @glob($pattern); });
+    $complete = $topology['complete'];
+    foreach ($topology['leaves'] as $target) {
         $schedFile = $sysBlock.'/'.$target.'/queue/scheduler';
         if (!is_readable($schedFile)) {
             $complete = false;

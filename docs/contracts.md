@@ -251,6 +251,9 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   remain unchanged, and exceptions continue to propagate.
 
 - Iostat input boundaries (`scripts/lib/diskIostat.php`):
+  - `/home` leaf selection uses the shared block-device walk. An incomplete
+    topology falls back to the discovered-device list; BFQ policy may still
+    report active when a readable leaf proves BFQ despite another failed branch.
   - Device-name validation matches the entire input, rejecting final newlines.
     Empty or NUL-containing discovery paths return the existing empty list.
   - NUL-containing executable paths raise `RuntimeException` before shell

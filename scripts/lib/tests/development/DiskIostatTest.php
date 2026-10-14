@@ -71,6 +71,15 @@ PHP;
         return \pmssDiskIostatSampleDevices($discovered, $class, static function () use ($source): string { return $source; }, $devRoot);
     }
 
+    /** Lock the shared walk's order, deduplication, and incomplete-scan signal. */
+    public function testSharedTopologyWalkPreservesLeafContract(): void
+    {
+        list($root, $class, $devices) = $this->homeTree(['md0' => ['md1', 'md2'], 'md1' => ['sda'], 'md2' => ['sda']]);
+        $this->assertSame(['leaves' => ['sda'], 'complete' => true], \pmssBlockDeviceLeaves('md0', $class));
+        $this->assertSame(['sda'], $this->homeDevices(['sda'], $root.'/dev/md0', $class, $root.'/dev'));
+        $this->assertSame(['leaves' => [], 'complete' => false], \pmssBlockDeviceLeaves('missing', $class));
+    }
+
     public function testGuestSamplesOnlyHomeDiskAndKeepsLegacySnapshotKeys(): void
     {
         list($root, $class) = $this->homeTree(['vda' => [], 'vdb' => []]);

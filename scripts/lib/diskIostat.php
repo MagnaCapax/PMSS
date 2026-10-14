@@ -13,6 +13,7 @@
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/systemStats.php';   // for pmssSystemStatsIopingMs() — reused, not re-implemented (DRY)
 require_once __DIR__.'/cgroup/policy.php';
+require_once __DIR__.'/blockDeviceLeaves.php';
 
 const PMSS_DISK_IOSTAT_HISTORY_LOG = '/var/log/pmss/iostat-history.log';
 const PMSS_DISK_IOSTAT_HISTORY_RAW_LOG = '/var/log/pmss/iostat-history-raw.log';
@@ -133,38 +134,12 @@ function pmssDiskIostatHomeDevices(array $sampled, string $sysClassBlock = '/sys
     if (strpos($source, $devRoot.'/mapper/') === 0) {
         $source = (string) realpath($source);
     }
-    $root = rtrim($sysClassBlock, '/');
-    $leaves = [];
-    $seen = [];
-    $walk = static function (string $device, int $depth) use (&$walk, &$leaves, &$seen, $root): bool {
-        if ($depth > 8 || !pmssDiskIostatDeviceNameIsSafe($device)) return false;
-        if (isset($seen[$device])) return true; // Shared leaves are counted once.
-        $seen[$device] = true;
-        $path = $root.'/'.$device;
-        if (!is_dir($path)) return false;
-        $slaves = @glob($path.'/slaves/*');
-        // A failed scan cannot prove this is a leaf disk.
-        if ($slaves === false) return false;
-        if ($slaves) {
-            foreach ($slaves as $slave) {
-                if (!$walk(basename($slave), $depth + 1)) return false;
-            }
-            return true;
-        }
-        if (is_file($path.'/partition')) {
-            $real = realpath($path);
-            if ($real === false) return false;
-            $device = basename(dirname($real));
-        }
-        if (!pmssDiskIostatDeviceNameIsSafe($device) || !is_dir($root.'/'.$device)) return false;
-        $leaves[$device] = true;
-        return true;
-    };
-    if (!$walk(basename($source), 0) || !$leaves) return null;
-    foreach ($leaves as $device => $_) {
+    $topology = pmssBlockDeviceLeaves(basename($source), rtrim($sysClassBlock, '/'), static function (string $pattern) { return @glob($pattern); });
+    if (!$topology['complete'] || !$topology['leaves']) return null;
+    foreach ($topology['leaves'] as $device) {
         if (!in_array($device, $sampled, true)) return null;
     }
-    return array_keys($leaves);
+    return $topology['leaves'];
 }
 
 /** Use /home leaves when resolvable; otherwise retain the discovered list. */
