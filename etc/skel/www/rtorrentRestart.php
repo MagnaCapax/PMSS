@@ -18,7 +18,7 @@ if ($action === 'stop') {
 } elseif ($action === 'start') {
     if (is_file($marker) && !@unlink($marker)) { http_response_code(500); exit; }
     @touch(__DIR__.'/.rtorrentRestart');
-} elseif ($action === '' || $action === 'restart') {
+} elseif ($action === 'restart') {
     @touch(__DIR__.'/.rtorrentRestart');
 } else {
     http_response_code(400);

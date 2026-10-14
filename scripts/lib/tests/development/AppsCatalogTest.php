@@ -447,6 +447,18 @@ class AppsCatalogTest extends TestCase
         });
     }
 
+    public function testRtorrentRestartRejectsMissingAndEmptyActions(): void
+    {
+        $this->pmssWithCustomerPanelRender(function (string $home): void {
+            $marker = $home.'/www/.rtorrentRestart';
+            foreach (array(null, '', 'unknown') as $action) {
+                $post = $this->pmssAppsEndpointProbe($home, 'rtorrentRestart.php', $action, 'POST', true);
+                $this->assertStringContainsString('HTTP=400', $post);
+                $this->assertFalse(is_file($marker));
+            }
+        });
+    }
+
     public function testWelcomeStillRendersControlsUsingPostRequests(): void
     {
         $html = $this->pmssRenderCustomerPanelPage('welcome.php', array(), array('minBytes' => 10000));
@@ -526,11 +538,11 @@ class AppsCatalogTest extends TestCase
         $this->assertSame('yes', file_get_contents($started));
     }
 
-    private function pmssAppsEndpointProbe(string $home, string $endpoint, string $action, string $method, bool $ajax): string
+    private function pmssAppsEndpointProbe(string $home, string $endpoint, ?string $action, string $method, bool $ajax): string
     {
         $php = '$_SERVER["REQUEST_METHOD"]='.var_export($method, true).';'
             .'$_SERVER["HTTP_X_REQUESTED_WITH"]='.var_export($ajax ? 'XMLHttpRequest' : '', true).';'
-            .'$_GET["action"]='.var_export($action, true).';'
+            .($action === null ? '' : '$_GET["action"]='.var_export($action, true).';')
             .'register_shutdown_function(function(){echo "HTTP=".(http_response_code() ?: 200);});'
             .'require '.var_export($home.'/www/'.$endpoint, true).';';
         $command = 'cd '.escapeshellarg($home.'/www').' && '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($php);
